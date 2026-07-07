@@ -1,0 +1,134 @@
+{#
+ Copyright 2008 Steven Barth <steven@midlink.org>
+ Copyright 2012 David Menting <david@nut-bolt.nl>
+ Copyright 2008-2022 Jo-Philipp Wich <jo@mein.io>
+ Copyright 2026 footstrap theme
+ Licensed to the public under the Apache License 2.0.
+-#}
+
+{%
+	import { getuid, getspnam } from 'luci.core';
+
+	const boardinfo = ubus.call('system', 'board') ?? {};
+	const darkpref = (match(theme, /-dark$/) ? 'true' : (match(theme, /-light$/) ? 'false' : null));
+
+	http.prepare_content('text/html; charset=UTF-8');
+-%}
+
+<!DOCTYPE html>
+<html lang="{{ dispatcher.lang }}" {{ darkpref ? `data-darkmode="${darkpref}"` : '' }}>
+	<head>
+		<meta charset="utf-8">
+		<title>{{ striptags(`${boardinfo.hostname ?? '?'}${dispatched?.title ? ` | ${_(dispatched.title)}` : ''}`) }}</title>
+		{% if (!darkpref): %}
+			<script>
+				/* footstrap: saved client preference wins, else follow OS. */
+				(function() {
+					var root = document.querySelector(':root'),
+					    saved = null;
+					try { saved = localStorage.getItem('fs-darkmode'); } catch (e) {}
+					var mq = window.matchMedia('(prefers-color-scheme: dark)');
+					function set(dark) { root.setAttribute('data-darkmode', dark ? 'true' : 'false'); }
+					if (saved === 'true' || saved === 'false') {
+						set(saved === 'true');
+					} else {
+						set(mq.matches);
+						mq.addEventListener('change', function(m) {
+							try { if (localStorage.getItem('fs-darkmode')) return; } catch (e) {}
+							set(m.matches);
+						});
+					}
+				})();
+			</script>
+		{% endif %}
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="darkreader-lock">
+		<link rel="stylesheet" href="{{ media }}/cascade.css?v={{ pkgs_update_time }}">
+		<link rel="icon" href="{{ media }}/logo_48.png" sizes="48x48">
+		<link rel="icon" href="{{ media }}/logo.svg" sizes="any">
+		{% if (node?.css): %}
+		<link rel="stylesheet" href="{{ resource }}/{{ node.css }}">
+		{% endif %}
+		{% if (css): %}
+		<style title="text/css">{{ css }}</style>
+		{% endif %}
+		<script src="{{ dispatcher.build_url('admin/translations', dispatcher.lang) }}"></script>
+		<script src="{{ resource }}/cbi.js"></script>
+	</head>
+
+	<body class="lang_{{ dispatcher.lang }} {{ entityencode(striptags(node?.title ?? ''), true) }}" data-page="{{ entityencode(join('-', length(ctx.request_path) ? ctx.request_path : ctx.path), true) }}">
+		{% if (!blank_page): %}
+		<div class="fs-shell">
+			<aside class="fs-sidebar">
+				<a class="fs-brand" href="{{ dispatcher.build_url() }}">
+					<span class="fs-logo">
+						<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M4 9a12 12 0 0 1 16 0"/><path d="M7.5 13a7 7 0 0 1 9 0"/><circle cx="12" cy="17" r="1.4" fill="#fff" stroke="none"/></svg>
+					</span>
+					<span class="fs-wordmark">{{ striptags(boardinfo.hostname ?? 'OpenWrt') }}</span>
+				</a>
+
+				<div class="fs-navlabel">{{ _('Menu') }}</div>
+				<ul class="nav" id="topmenu"></ul>
+				<ul id="modemenu" class="fs-modemenu"></ul>
+
+				<div class="fs-spacer"></div>
+
+				{% if (!darkpref): %}
+				<div class="fs-themerow">
+					<span>{{ _('Theme') }}</span>
+					<button type="button" class="fs-toggle" id="fs-theme-toggle" aria-label="{{ _('Toggle theme') }}">
+						<span class="fs-knob">
+							<svg class="fs-ico-moon" viewBox="0 0 24 24" fill="#fff"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8Z"/></svg>
+							<svg class="fs-ico-sun" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+						</span>
+					</button>
+				</div>
+				{% endif %}
+
+				{% if (dispatcher.lookup("admin/logout")): %}
+				<a class="fs-logout" href="{{ dispatcher.build_url('admin/logout') }}">
+					<svg class="fs-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 12H3m0 0 3-3m-3 3 3 3"/></svg>
+					{{ _('Logout') }}
+				</a>
+				{% endif %}
+			</aside>
+
+			<main class="fs-main" id="maincontent">
+				<div class="fs-topbar">
+					<div class="fs-title">
+						<div class="fs-title-main">{{ dispatched?.title ? _(dispatched.title) : striptags(boardinfo.hostname ?? 'OpenWrt') }}</div>
+						<div class="fs-title-sub">{{ entityencode(striptags(`${boardinfo.model ?? ''}${boardinfo.system ? ` · ${boardinfo.system}` : ''}`)) }}</div>
+					</div>
+					<div id="indicators" class="fs-indicators"></div>
+				</div>
+
+				<div class="fs-content">
+					{% if (getuid() == 0 && getspnam('root')?.pwdp === ''): %}
+						<div class="alert-message warning">
+							<h4>{{ _('No password set!') }}</h4>
+							<p>{{ _('There is no password set on this router. Please configure a root password to protect the web interface.') }}</p>
+							{% if (dispatcher.lookup("admin/system/admin")): %}
+							  <div class="right"><a class="btn" href="{{ dispatcher.build_url("admin/system/admin") }}">{{ _('Go to password configuration...') }}</a></div>
+							{% endif %}
+						</div>
+					{% endif %}
+
+					{% if (boardinfo.rootfs_type == "initramfs"): %}
+						<div class="alert-message warning">
+							<h4>{{ _('System running in recovery (initramfs) mode.') }}</h4>
+							<p>{{ _('No changes to settings will be stored and are lost after rebooting. This mode should only be used to install a firmware upgrade') }}</p>
+							{% if (dispatcher.lookup("admin/system/flash")): %}
+							  <div class="right"><a class="btn" href="{{ dispatcher.build_url("admin/system/flash") }}">{{ _('Go to firmware upgrade...') }}</a></div>
+							{% endif %}
+						</div>
+					{% endif %}
+
+					<noscript>
+						<div class="alert-message warning">
+							<h4>{{ _('JavaScript required!') }}</h4>
+							<p>{{ _('You must enable JavaScript in your browser or LuCI will not work properly.') }}</p>
+						</div>
+					</noscript>
+
+					<div id="tabmenu" style="display:none"></div>
+		{% endif %}
