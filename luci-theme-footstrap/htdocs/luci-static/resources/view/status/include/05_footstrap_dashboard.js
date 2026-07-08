@@ -190,10 +190,10 @@ return baseclass.extend({
 			catch (e) { datestr = new Date(unixtime * 1000).toISOString().replace('T', ' ').slice(0, 16); }
 		}
 
-		/* Model + Architecture live in the page-head identity line already,
-		 * so keep them out of the System card to avoid duplication. */
 		const sysRows = [
 			[_('Hostname'), board.hostname],
+			[_('Model'), board.model],
+			[_('Architecture'), board.system],
 			[_('Target Platform'), L.isObject(board.release) ? board.release.target : ''],
 			[_('Firmware Version'), firmware || luciver], [_('Kernel Version'), board.kernel],
 			[_('Local Time'), datestr],
@@ -343,7 +343,7 @@ return baseclass.extend({
 		box.innerHTML = `
 			<div class="fs-dashhead">
 				<div class="fs-dashhead-title">${_('Overview')}</div>
-				<div class="fs-dashhead-sub">${esc(board.model || board.hostname || 'OpenWrt')}${board.system ? ' · ' + esc(board.system) : ''}</div>
+				<div class="fs-dashhead-sub">${esc(board.hostname || board.model || 'OpenWrt')}</div>
 			</div>
 			<div class="fs-cols">
 				<div class="fs-card"><div class="fs-card-title">${_('System')}</div><div class="fs-kvs">${sysRows}</div></div>
