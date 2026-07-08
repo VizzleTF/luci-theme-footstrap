@@ -31,6 +31,16 @@
 				})();
 			</script>
 		{% endif %}
+		<script>
+			/* footstrap: apply saved color palette before paint (no flash).
+			   'github' = GitHub Primer variant; empty/absent = footstrap default. */
+			(function() {
+				try {
+					var p = localStorage.getItem('fs-palette');
+					if (p) document.querySelector(':root').setAttribute('data-palette', p);
+				} catch (e) {}
+			})();
+		</script>
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="darkreader-lock">
 		<link rel="stylesheet" href="{{ media }}/cascade.css?v={{ pkgs_update_time }}">

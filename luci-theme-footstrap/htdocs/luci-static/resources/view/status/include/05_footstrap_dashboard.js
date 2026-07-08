@@ -9,8 +9,10 @@
  * "OpenWrt Overview". Additive include (unique filename, no collision). Renders
  * the whole overview: page head, KPI row, System, Memory, Storage, Port status,
  * Network upstream + connections, DHCP leases. The stock sections it replaces
- * are hidden at runtime. Data comes from the same ubus/ rpc the stock includes
- * use. Crosses the theme/mod line on purpose (docs/08). */
+ * are hidden by tagging them .fs-dup-hidden by title (watchDuplicates) — only
+ * the sections we reproduce, so 3rd-party includes (temp-status etc.) stay
+ * visible. Data comes from the same ubus/ rpc the stock includes use.
+ * Crosses the theme/mod line on purpose (docs/08). */
 
 const callSystemBoard = rpc.declare({ object: 'system', method: 'board' });
 const callSystemInfo  = rpc.declare({ object: 'system', method: 'info' });
@@ -78,11 +80,62 @@ function leasesCard(title, subLabel, addrHeader, leases, addrOf) {
 	</div>`;
 }
 
+/* This include is installed to the GLOBAL luci-mod-status include dir, so LuCI
+ * auto-loads it on the overview page under EVERY active theme. It must render
+ * only when a footstrap theme is active — otherwise its unstyled .fs-* markup
+ * dumps as raw text (cascade.css isn't loaded). L.env.media is the active
+ * theme's media base, e.g. /luci-static/footstrap or /luci-static/bootstrap;
+ * only footstrap variants contain "footstrap" ("bootstrap" does not). */
+function isFootstrapTheme() {
+	return String(L.env.media || '').indexOf('footstrap') >= 0;
+}
+
+/* Titles of the ONLY stock sections our dashboard reproduces. Everything else
+ * (3rd-party includes like luci-app-temp-status) is left visible. Titles come
+ * from _() so they match whatever locale the stock includes render in. */
+function dupTitles() {
+	return [ _('System'), _('Memory'), _('Storage'), _('Port status'), _('Network'),
+	         _('DHCP Leases'), _('Active DHCP Leases'), _('Wireless'), _('Associated Stations') ];
+}
+function tagDuplicates(titles) {
+	document.querySelectorAll('.cbi-section').forEach((sec) => {
+		if (sec.querySelector('.fs-dashroot') || sec.classList.contains('fs-dup-hidden'))
+			return;
+		const h = sec.querySelector('.cbi-title h3');
+		const t = (h && h.firstChild) ? String(h.firstChild.nodeValue || '').trim() : '';
+		if (t && titles.indexOf(t) >= 0)
+			sec.classList.add('fs-dup-hidden');
+	});
+}
+/* Stock overview includes sort AFTER ours (05_) and re-render on every poll, so
+ * a one-shot tag would miss/lose them. Watch #maincontent and re-tag on change
+ * (debounced) — this also avoids the first-frame duplicate flash.
+ * render() runs on every poll, so the observer is installed ONCE (guarded by
+ * dupObserver) — otherwise each poll leaked another observer and the page got
+ * progressively slower. */
+let dupObserver = null;
+function watchDuplicates() {
+	const titles = dupTitles();
+	tagDuplicates(titles);
+	if (dupObserver)
+		return;
+	const mc = document.getElementById('maincontent') || document.body;
+	let pending = false;
+	dupObserver = new MutationObserver(() => {
+		if (pending) return;
+		pending = true;
+		requestAnimationFrame(() => { pending = false; tagDuplicates(titles); });
+	});
+	dupObserver.observe(mc, { childList: true, subtree: true });
+}
+
 return baseclass.extend({
 	title: _('Overview'),
 	loadHistory: [],
 
 	load() {
+		if (!isFootstrapTheme())
+			return Promise.resolve(null);
 		return Promise.all([
 			L.resolveDefault(callSystemBoard(), {}),
 			L.resolveDefault(callSystemInfo(), {}),
@@ -104,6 +157,8 @@ return baseclass.extend({
 	},
 
 	render(data) {
+		if (!isFootstrapTheme() || data == null)
+			return E([]);
 		const board = data[0] || {}, info = data[1] || {}, luci = data[2] || {}, unixtime = data[3] || 0;
 		const dhcp = data[4] || {}, ctCount = +data[5] || 0, ctMax = +data[6] || 0;
 		const wanNets = data[7] || [], builtins = data[8] || [];
@@ -303,17 +358,7 @@ return baseclass.extend({
 			${dhcp6Card}
 			${wifiCard}`;
 
-		this.hideDuplicates();
+		watchDuplicates();
 		return box;
-	},
-
-	hideDuplicates() {
-		const kill = [ _('System'), _('Memory'), _('Storage'), _('Port status'), _('Network'), _('DHCP Leases'), _('Active DHCP Leases'), _('Wireless'), _('Associated Stations') ];
-		document.querySelectorAll('.cbi-section').forEach((sec) => {
-			if (sec.querySelector('.fs-dashroot')) return;
-			const h = sec.querySelector('.cbi-title h3');
-			const t = (h && h.firstChild) ? String(h.firstChild.nodeValue || '').trim() : '';
-			if (kill.indexOf(t) >= 0) sec.classList.add('fs-dup-hidden');
-		});
 	}
 });

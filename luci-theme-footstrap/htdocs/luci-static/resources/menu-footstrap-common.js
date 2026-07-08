@@ -66,16 +66,93 @@ function renderModeMenu(tree, renderMainMenu) {
 		ul.style.display = '';
 }
 
-/* header theme toggle (client-side data-darkmode + localStorage) */
-function wireThemeToggle() {
-	const btn = document.getElementById('fs-theme-toggle');
-	if (!btn) return;
-	btn.addEventListener('click', () => {
-		const root = document.querySelector(':root');
-		const dark = root.getAttribute('data-darkmode') !== 'true';
-		root.setAttribute('data-darkmode', dark ? 'true' : 'false');
-		try { localStorage.setItem('fs-darkmode', dark ? 'true' : 'false'); } catch (e) {}
+/* header Appearance popover: Mode (auto/light/dark) + Palette (footstrap/github).
+ * Both axes are client-side, instant, persisted in localStorage — no server, no
+ * reload. head.ut's inline script applies both before paint (no flash). Layout
+ * (sidebar/top) is a server choice and stays in the stock "Design" dropdown. */
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+function currentMode() {
+	const s = lsGet('fs-darkmode');
+	return s === 'true' ? 'dark' : (s === 'false' ? 'light' : 'auto');
+}
+function currentPalette() {
+	return lsGet('fs-palette') === 'github' ? 'github' : 'footstrap';
+}
+function applyMode(val) {
+	const root = document.querySelector(':root');
+	if (val === 'auto') lsDel('fs-darkmode');
+	else lsSet('fs-darkmode', val === 'dark' ? 'true' : 'false');
+	const dark = (val === 'dark') ||
+		(val === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+	root.setAttribute('data-darkmode', dark ? 'true' : 'false');
+}
+function applyPalette(val) {
+	const root = document.querySelector(':root');
+	if (val === 'github') { lsSet('fs-palette', 'github'); root.setAttribute('data-palette', 'github'); }
+	else { lsDel('fs-palette'); root.removeAttribute('data-palette'); }
+}
+
+/* one segmented control; highlights the active option, calls onPick on change */
+function segControl(current, opts, onPick) {
+	const wrap = E('div', { 'class': 'fs-seg', 'role': 'group' });
+	opts.forEach(o => {
+		const b = E('button', {
+			'type': 'button',
+			'class': o.val === current ? 'active' : '',
+			'data-val': o.val
+		}, [ o.label ]);
+		b.addEventListener('click', () => {
+			onPick(o.val);
+			wrap.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+		});
+		wrap.appendChild(b);
 	});
+	return wrap;
+}
+
+function wireAppearance() {
+	const btn = document.getElementById('fs-appearance');
+	if (!btn) return;
+
+	const pop = E('div', { 'class': 'fs-appearance-pop', 'role': 'dialog', 'aria-label': _('Appearance'), 'hidden': '' }, [
+		E('div', { 'class': 'fs-ap-group' }, [
+			E('div', { 'class': 'fs-ap-label' }, [ _('Theme') ]),
+			segControl(currentMode(), [
+				{ val: 'auto',  label: _('Auto') },
+				{ val: 'light', label: _('Light') },
+				{ val: 'dark',  label: _('Dark') }
+			], applyMode)
+		]),
+		E('div', { 'class': 'fs-ap-group' }, [
+			E('div', { 'class': 'fs-ap-label' }, [ _('Palette') ]),
+			segControl(currentPalette(), [
+				{ val: 'footstrap', label: 'Footstrap' },
+				{ val: 'github',    label: 'GitHub' }
+			], applyPalette)
+		])
+	]);
+	btn.parentNode.classList.add('fs-appearance-wrap');
+	btn.parentNode.appendChild(pop);
+
+	function outside(e) { if (!pop.contains(e.target) && !btn.contains(e.target) && e.target !== btn) close(); }
+	function esc(e) { if (e.key === 'Escape') { close(); btn.focus(); } }
+	function open() {
+		pop.hidden = false; btn.setAttribute('aria-expanded', 'true');
+		document.addEventListener('click', outside, true);
+		document.addEventListener('keydown', esc);
+	}
+	function close() {
+		pop.hidden = true; btn.setAttribute('aria-expanded', 'false');
+		document.removeEventListener('click', outside, true);
+		document.removeEventListener('keydown', esc);
+	}
+
+	btn.setAttribute('aria-haspopup', 'dialog');
+	btn.setAttribute('aria-expanded', 'false');
+	btn.addEventListener('click', (e) => { e.stopPropagation(); pop.hidden ? open() : close(); });
 }
 
 return baseclass.extend({
@@ -95,7 +172,7 @@ return baseclass.extend({
 					renderTabMenu(node, url);
 			}
 
-			wireThemeToggle();
+			wireAppearance();
 		});
 	}
 });

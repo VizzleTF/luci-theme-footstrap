@@ -35,6 +35,7 @@
 	--border: #e4e9f1;
 	--text: #101725;
 	--dim: #5b6675;
+	--faint: #8891a0;	/* fainter than --dim: uppercase micro-labels (table headers, field titles) */
 	--accent: #1f8fe8;
 	--accent-lt: #7ec8ff;	/* logo-gradient light end (both modes) */
 	--on-accent: #fff;	/* text/knob on accent/good/danger fills (both modes) */
@@ -98,6 +99,7 @@
 	--border: #232b3a;
 	--text: #e8edf5;
 	--dim: #8b95a7;
+	--faint: #697488;	/* fainter than --dim: uppercase micro-labels (table headers, field titles) */
 	--accent: #3ba7ff;
 	--accent-soft: rgba(59,167,255,.14);
 	--track: #1b2230;
@@ -111,6 +113,54 @@
 
 	--disabled-opacity: .45;
 	color-scheme: dark;
+}
+
+/* ============================================================
+ * GitHub palette variant — activated by data-palette="github" on :root
+ * (set from localStorage 'fs-palette' by the head inline script). Token-only
+ * override: same layout, same components, colors from GitHub Primer
+ * (light default + dark dimmed). The bridge recomputes off these tokens;
+ * only the raw *-rgb bridge values need explicit re-mapping.
+ * Specificity: [data-palette][data-darkmode] (0,3,0) wins over the base blocks.
+ * ============================================================ */
+:root[data-palette="github"] {
+	/* GitHub — LIGHT */
+	--bg: #f6f8fa;
+	--panel: #ffffff;
+	--panel2: #f6f8fa;
+	--border: #d0d7de;
+	--text: #1f2328;
+	--dim: #656d76;
+	--faint: #818b98;
+	--accent: #0969da;
+	--accent-lt: #54aeff;
+	--accent-soft: rgba(9,105,218,.10);
+	--track: #eaeef2;
+	--good: #1a7f37;
+	--warn: #9a6700;
+	--danger: #cf222e;
+	--error-color-high-rgb: 207, 34, 46;
+	--success-color-high-rgb: 26, 127, 55;
+}
+
+:root[data-palette="github"][data-darkmode="true"] {
+	/* GitHub — DARK (dimmed) */
+	--bg: #1c2128;
+	--panel: #22272e;
+	--panel2: #2d333b;
+	--border: #444c56;
+	--text: #adbac7;
+	--dim: #768390;
+	--faint: #636e7b;
+	--accent: #539bf5;
+	--accent-lt: #79c0ff;
+	--accent-soft: rgba(83,155,245,.15);
+	--track: #373e47;
+	--good: #57ab5a;
+	--warn: #c69026;
+	--danger: #e5534b;
+	--error-color-high-rgb: 229, 83, 75;
+	--success-color-high-rgb: 87, 171, 90;
 }
 
 /* Reset.less
@@ -2741,26 +2791,47 @@ body {
 	padding: 10px 11px;
 	color: var(--dim); font-weight: 600; font-size: 14px;
 }
-.fs-toggle {
-	position: relative; width: 52px; height: 28px;
-	border-radius: 99px;
-	background: var(--track);
-	border: 1px solid var(--border);
-	cursor: pointer; flex: 0 0 auto; padding: 0;
+/* Appearance popover trigger + panel (Mode + Palette quick switch).
+ * Trigger lives in .fs-themerow (sidebar) / .fs-topnav-right (top); the popover
+ * is appended next to it and positioned by layout (opens up in sidebar, down in
+ * top-nav). menu-footstrap-common.js adds .fs-appearance-wrap to the parent. */
+.fs-appearance-wrap { position: relative; }
+.fs-appearance-btn {
+	display: inline-flex; align-items: center; justify-content: center;
+	width: 34px; height: 34px; padding: 0; flex: 0 0 auto;
+	border: 1px solid var(--border); border-radius: 9px;
+	background: var(--panel2); color: var(--dim); cursor: pointer;
+	transition: color .15s, border-color .15s, background .15s;
 }
-.fs-knob {
-	position: absolute; top: 2px; left: 27px;
-	width: 22px; height: 22px; border-radius: 50%;
-	background: var(--accent);
-	transition: left .28s cubic-bezier(.4,0,.2,1);
-	display: flex; align-items: center; justify-content: center;
+.fs-appearance-btn:hover { color: var(--text); border-color: var(--accent); }
+.fs-appearance-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.fs-appearance-btn svg { width: 18px; height: 18px; }
+
+.fs-appearance-pop {
+	position: absolute; z-index: 60; right: 0; bottom: calc(100% + 8px);
+	min-width: 216px; padding: 12px;
+	background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+	box-shadow: 0 12px 34px rgba(0,0,0,.30);
+	display: flex; flex-direction: column; gap: 12px;
+	animation: fs-fade .16s ease;
 }
-.fs-knob svg { width: 12px; height: 12px; display: none; }
-.fs-knob .fs-ico-moon { display: block; }
-:root[data-darkmode="true"] .fs-knob { left: 3px; }
-:root[data-darkmode="true"] .fs-knob .fs-ico-moon { display: block; }
-:root:not([data-darkmode="true"]) .fs-knob .fs-ico-sun { display: block; }
-:root:not([data-darkmode="true"]) .fs-knob .fs-ico-moon { display: none; }
+.fs-appearance-pop[hidden] { display: none; }
+body.fs-top .fs-appearance-pop { top: calc(100% + 8px); bottom: auto; }
+
+.fs-ap-group { display: flex; flex-direction: column; gap: 6px; }
+.fs-ap-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.fs-seg {
+	display: flex; gap: 4px; padding: 3px;
+	background: var(--panel2); border: 1px solid var(--border); border-radius: 9px;
+}
+.fs-seg button {
+	flex: 1; padding: 6px 8px; border: 0; border-radius: 7px;
+	background: transparent; color: var(--dim);
+	font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2;
+	cursor: pointer; white-space: nowrap; transition: background .15s, color .15s;
+}
+.fs-seg button:hover { color: var(--text); }
+.fs-seg button.active { background: var(--accent); color: var(--on-accent, #fff); }
 
 .fs-logout {
 	display: flex; align-items: center; gap: 11px;
@@ -2844,6 +2915,13 @@ legend, .cbi-section > h3:first-child { font-size: 14px; font-weight: 700; }
 .cbi-value-field > .control-group { margin-top: 8px; }
 .cbi-value-field > .control-group:not(:has(.cbi-input-password)) {
 	display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center;
+}
+/* Buttons placed straight in a field (not wrapped in .control-group), e.g.
+ * app action rows Enable/Disable, Start/Restart/Stop. Inline-block buttons only
+ * get whitespace spacing horizontally; on wrap (mobile) the rows collapse
+ * together. Lay the field out as a wrapping flex with a real gap. */
+.cbi-value-field:has(> .cbi-button) {
+	display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end;
 }
 .cbi-value:last-child { border-bottom: 0; }
 .cbi-value-title { color: var(--dim); font-size: 13px; font-weight: 500; }
@@ -3054,11 +3132,19 @@ footer.fs-footer a:hover { color: var(--accent); }
 /* ==================================================================
  * FOOTSTRAP dashboard (05_footstrap_dashboard.js) — Overview design
  * Full custom overview: page head, KPI, System/Memory/Storage, ports,
- * network upstream, DHCP leases. Wrapper card stripped; stock dupes hidden.
+ * network upstream, DHCP leases. Wrapper card stripped; stock sections
+ * hidden structurally (see rule below).
  * ================================================================== */
 .cbi-section:has(.fs-dashroot) { background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0; }
 .cbi-section:has(.fs-dashroot) > .cbi-title { display: none; }
 .fs-dashroot { display: flex; flex-direction: column; gap: 14px; }
+
+/* Hide ONLY the stock sections our dashboard duplicates (System/Memory/Storage/
+ * Port status/Network/DHCP/Wireless). The include tags them by title with
+ * .fs-dup-hidden via a MutationObserver — 3rd-party sections (e.g.
+ * luci-app-temp-status) are left untouched and render normally below. !important
+ * beats the stock includes' per-poll inline display=''. */
+.cbi-section.fs-dup-hidden { display: none !important; }
 
 /* page head */
 .fs-dashhead { margin-bottom: 6px; }
@@ -3237,6 +3323,17 @@ body[data-page='admin-status-overview'] .cbi-title .label.notice {
 .tabs > li:not(.active):hover > a, .cbi-tabmenu > .cbi-tab-disabled:hover > a { color: var(--text); }
 .cbi-tabmenu.map > li { font-size: 13px; font-weight: 600; }
 .cbi-tab-disabled[data-errors]::after { background: var(--danger); }
+
+/* Inactive tab panes: the base [data-tab-title] rule sets height:0/overflow:hidden,
+ * but that only collapses the content box — padding/border/margin still render as
+ * empty bars. Apps that put data-tab-active straight on .cbi-section (e.g. podkop)
+ * keep the section's 18px/22px padding + 16px margin, showing phantom strips.
+ * Collapse the whole box for the inactive pane. */
+.cbi-section[data-tab-active="false"] {
+	padding: 0;
+	margin: 0;
+	border: 0;
+}
 
 /* ==================================================================
  * FOOTSTRAP audit fixes
@@ -3478,8 +3575,6 @@ body.fs-top { display: block; }
 .cbi-page-actions .cbi-button-reset:hover { border-color: var(--danger) !important; color: var(--danger) !important; }
 .cbi-page-actions .cbi-button-save:hover,
 .cbi-page-actions .cbi-button-apply:hover { filter: brightness(1.08); }
-
-.cbi-section.fs-dup-hidden { display: none !important; }
 
 /* overview: hide the stock <h2>Status</h2> — the dashboard renders its own head */
 body[data-page='admin-status-overview'] #view > h2[name='content'],
@@ -4050,10 +4145,12 @@ body[data-page="admin-system-package-manager"] #packages .td .btn { border-radiu
  * is covered too — one rule themes every data table, div- or table-based. */
 .table .tr.table-titles, .table .tr.cbi-section-table-titles {
 	border-bottom: 1px solid var(--border);
+	background: transparent;	/* drop the base panel2 header bar — match the dashboard's faint-label + underline look */
 }
 .table .tr.table-titles .th, .table .tr.cbi-section-table-titles .th {
 	color: var(--faint); font-size: 10px; font-weight: 700;
 	letter-spacing: .06em; text-transform: uppercase;
+	background: transparent;
 }
 .table .tr:not(.table-titles):not(.cbi-section-table-titles) {
 	border-bottom: 1px solid var(--border); transition: background .12s;
