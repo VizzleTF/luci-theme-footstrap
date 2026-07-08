@@ -3056,31 +3056,10 @@ footer.fs-footer a:hover { color: var(--accent); }
 	font-family: var(--font-mono); color: var(--text); text-align: right;
 }
 
-/* --- MEMORY / meter rows: label+value on top, thin bar below (design look) --- */
-.cbi-section .table:not([id]) .tr:has(.cbi-progressbar) {
-	position: relative;
-	display: flex; flex-direction: column; gap: 9px;
-	padding: 13px 0;
-}
-.cbi-section .table:not([id]) .tr:has(.cbi-progressbar) .td {
-	display: block; border: 0; padding: 0; width: auto; text-align: left;
-}
-.cbi-section .table:not([id]) .tr:has(.cbi-progressbar) .td:first-child {
-	color: var(--dim); font-weight: 600; font-size: 13px; padding-right: 160px;
-}
-.cbi-section .table:not([id]) .tr:has(.cbi-progressbar) .cbi-progressbar {
-	position: static; width: 100%; min-width: 0; height: 8px;
-	border: 0; background: var(--track); border-radius: 99px; overflow: visible;
-}
-.cbi-section .table:not([id]) .tr:has(.cbi-progressbar) .cbi-progressbar > div {
-	height: 8px; border-radius: 99px; background: var(--accent);
-}
-.cbi-section .table:not([id]) .tr:has(.cbi-progressbar) .cbi-progressbar::after {
-	position: absolute; inset: auto; top: 11px; right: 0; left: auto; bottom: auto;
-	display: block; width: auto;
-	font-family: var(--font-mono); font-size: 12px; font-weight: 500;
-	color: var(--dim); text-shadow: none;
-}
+/* Progressbar rows in a section table (e.g. luci-app-cpu-status): keep the
+ * native label | bar layout (one row), just vertically center the cells. The
+ * bar itself is themed by the generic .cbi-progressbar pill-meter above. */
+.cbi-section .table:not([id]) .tr:has(.cbi-progressbar) .td { vertical-align: middle; }
 
 /* remove double card when a section nests a table-only include */
 .cbi-section .cbi-section { border: 0; box-shadow: none; padding: 0; margin: 0; background: transparent; }
