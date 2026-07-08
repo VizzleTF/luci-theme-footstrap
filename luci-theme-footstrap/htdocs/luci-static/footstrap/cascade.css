@@ -3114,7 +3114,7 @@ footer.fs-footer a:hover { color: var(--accent); }
  * network upstream, DHCP leases. Wrapper card stripped; stock sections
  * hidden structurally (see rule below).
  * ================================================================== */
-.cbi-section:has(.fs-dashroot) { background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0; }
+.cbi-section:has(.fs-dashroot) { background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0 0 16px; }
 .cbi-section:has(.fs-dashroot) > .cbi-title { display: none; }
 .fs-dashroot { display: flex; flex-direction: column; gap: 14px; }
 
