@@ -123,8 +123,9 @@
  * only the raw *-rgb bridge values need explicit re-mapping.
  * Specificity: [data-palette][data-darkmode] (0,3,0) wins over the base blocks.
  * ============================================================ */
-:root[data-palette="github"] {
-	/* GitHub — LIGHT */
+:root[data-palette="github"],
+:root[data-palette="roman"] {
+	/* GitHub — LIGHT (Roman reuses these colours; only its background differs) */
 	--bg: #f6f8fa;
 	--panel: #ffffff;
 	--panel2: #f6f8fa;
@@ -143,7 +144,8 @@
 	--success-color-high-rgb: 26, 127, 55;
 }
 
-:root[data-palette="github"][data-darkmode="true"] {
+:root[data-palette="github"][data-darkmode="true"],
+:root[data-palette="roman"][data-darkmode="true"] {
 	/* GitHub — DARK (dimmed) */
 	--bg: #1c2128;
 	--panel: #22272e;
@@ -161,6 +163,43 @@
 	--danger: #e5534b;
 	--error-color-high-rgb: 229, 83, 75;
 	--success-color-high-rgb: 87, 171, 90;
+}
+
+/* Roman = GitHub colours + a doodle-cats wallpaper behind the content area.
+ * Cards sit on --panel and cover it, so the cats show through the gaps. The
+ * pattern fill is a low-opacity neutral grey, so it reads on both the light and
+ * dark GitHub backgrounds. */
+:root[data-palette="roman"] .fs-main,
+:root[data-palette="roman"] .fs-topwrap {
+	background-image: url(cats.svg);
+	background-repeat: repeat;
+	background-size: 520px auto;
+}
+/* let the cats show through the footer too */
+:root[data-palette="roman"] footer.fs-footer { background: transparent; }
+
+/* Roman: give the tab bar the same solid card style as the sections (panel bg +
+ * border + radius + shadow) so the cats sit behind it, not through it. Drop the
+ * tab underline (it overflowed the rounded corners) — the active tab is marked by
+ * its accent-coloured label. */
+:root[data-palette="roman"] #tabmenu ul.tabs,
+:root[data-palette="roman"] ul.cbi-tabmenu {
+	background: var(--panel);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	box-shadow: var(--fs-shadow);
+	padding: 4px 10px;
+}
+:root[data-palette="roman"] #tabmenu ul.tabs > li > a {
+	border-bottom: 0;
+	margin-bottom: 0;
+}
+/* controls carry a border/rounding, so their frost is bounded by their shape */
+:root[data-palette="roman"] .cbi-button,
+:root[data-palette="roman"] .btn,
+:root[data-palette="roman"] .cbi-dropdown:not([open]) {
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
 }
 
 /* Reset.less
@@ -4151,6 +4190,67 @@ body[data-page="admin-system-package-manager"] #packages .td .btn { border-radiu
 .table .tr:last-child { border-bottom: 0; }
 /* keep section/modal tables flush (no forced hover-card look) */
 .cbi-section .table > .tr, .cbi-modal .table > .tr { border-radius: 0; }
+
+/* the base pulls .cbi-section-create up 3px to hug a table border; that glues the
+ * "Add" button to the last row — give it a real gap instead. */
+.cbi-section-create, .cbi-section-create.cbi-tblsection-create { margin-top: 12px; }
+
+/* ==================================================================
+ * Responsive CBI section tables (firewall zones, port forwards, DHCP …).
+ * The base forces .tr/.td to table display and dropdowns to min-width:210px,
+ * so tables with several dropdown columns overflow the content column and
+ * never stack. Desktop/tablet: let in-table controls shrink to share the
+ * available width. Narrow (<760px): stack each row into a card, using the
+ * cell's data-title as its label.
+ * ================================================================== */
+/* Query the actual content width, not the viewport — the sidebar eats width, so
+ * a viewport breakpoint would stack too late (or too early) depending on layout. */
+.cbi-map { container-type: inline-size; }
+
+.cbi-section-table .td .cbi-dropdown,
+.cbi-section-table .td .cbi-input-select,
+.cbi-section-table .td select,
+.cbi-section-table .td input[type="text"] {
+	min-width: 0;
+	max-width: none;
+	width: 100%;
+}
+
+/* Below ~960px of available width the multi-dropdown row no longer fits — stack. */
+@container (max-width: 960px) {
+	.cbi-section-table,
+	.cbi-section-table .thead,
+	.cbi-section-table .tbody,
+	.cbi-section-table .tr,
+	.cbi-section-table .td { display: block; width: auto; }
+	.cbi-section-table .thead { display: none; }
+	.cbi-section-table .tr.cbi-section-table-row,
+	.cbi-section-table .tbody .tr {
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: var(--panel2);
+		padding: 8px 14px;
+		margin-bottom: 12px;
+	}
+	.cbi-section-table .tbody .tr:hover { background: var(--panel2); }
+	.cbi-section-table .td {
+		display: flex; align-items: center; justify-content: space-between;
+		gap: 14px; padding: 8px 0; border: 0; text-align: right;
+		border-bottom: 1px solid var(--border);
+	}
+	.cbi-section-table .tr .td:last-child { border-bottom: 0; }
+	.cbi-section-table .td[data-title]::before {
+		content: attr(data-title);
+		flex: 0 0 auto; text-align: left;
+		font-size: 10px; font-weight: 700; letter-spacing: .05em;
+		text-transform: uppercase; color: var(--faint);
+	}
+	.cbi-section-table .td.cbi-section-actions { justify-content: flex-end; flex-wrap: wrap; }
+	.cbi-section-table .td .cbi-dropdown,
+	.cbi-section-table .td select,
+	.cbi-section-table .td input[type="text"] { width: auto; min-width: 150px; flex: 0 1 auto; }
+	.cbi-section-table .td .zone-forwards { width: 100%; }
+}
 
 /* ==================================================================
  * FOOTSTRAP fixes: .hidden must win over the .cbi-value flex row rule

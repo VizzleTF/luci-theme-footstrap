@@ -30,12 +30,10 @@ PKG_LICENSE:=Apache-2.0
 define Package/luci-theme-footstrap/postrm
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
-	uci -q delete luci.themes.Footstrap
-	uci -q delete luci.themes.FootstrapDark
-	uci -q delete luci.themes.FootstrapLight
-	uci -q delete luci.themes.FootstrapTop
-	uci -q delete luci.themes.FootstrapTopDark
-	uci -q delete luci.themes.FootstrapTopLight
+	for t in FootstrapSidebar FootstrapOnTop Footstrap FootstrapDark \
+	         FootstrapLight FootstrapTop FootstrapTopDark FootstrapTopLight; do
+		uci -q delete "luci.themes.$$t"
+	done
 	uci commit luci
 }
 endef

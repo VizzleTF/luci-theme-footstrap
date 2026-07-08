@@ -1,33 +1,27 @@
 #!/bin/sh
 
-changed=0
+# Remove any previously registered footstrap theme entries. Older versions
+# registered six dark/light variants — mode (dark/light) and palette are now
+# client-side toggles (Appearance popover), so only the layout needs a
+# server-side theme entry.
+for t in Footstrap FootstrapDark FootstrapLight FootstrapTop FootstrapTopDark \
+         FootstrapTopLight FootstrapSidebar FootstrapOnTop; do
+	uci -q delete "luci.themes.$t"
+done
 
-set_opt() {
-	local key=$1
-	local val=$2
+# Register the two layouts.
+uci set luci.themes.FootstrapSidebar=/luci-static/footstrap
+uci set luci.themes.FootstrapOnTop=/luci-static/footstrap-top
 
-	if ! uci -q get "luci.$key" 2>/dev/null; then
-		uci set "luci.$key=$val"
-		changed=1
-	fi
-}
+# Normalise the active theme: collapse any footstrap dark/light variant onto its
+# base layout (so upgrading users keep their layout), and default a fresh
+# install to the sidebar layout. Non-footstrap themes are left untouched.
+cur=$(uci -q get luci.main.mediaurlbase)
+case "$cur" in
+	/luci-static/footstrap-top*) uci set luci.main.mediaurlbase=/luci-static/footstrap-top ;;
+	/luci-static/footstrap*)     uci set luci.main.mediaurlbase=/luci-static/footstrap ;;
+	"") [ "$PKG_UPGRADE" != 1 ] && uci set luci.main.mediaurlbase=/luci-static/footstrap ;;
+esac
 
-set_opt themes.Footstrap /luci-static/footstrap
-
-if [ "$PKG_UPGRADE" != 1 ] && [ $changed = 1 ]; then
-	set_opt main.mediaurlbase /luci-static/footstrap
-fi
-
-set_opt themes.FootstrapDark /luci-static/footstrap-dark
-set_opt themes.FootstrapLight /luci-static/footstrap-light
-
-# top-nav variant (selectable in System → System → Language and Style)
-set_opt themes.FootstrapTop /luci-static/footstrap-top
-set_opt themes.FootstrapTopDark /luci-static/footstrap-top-dark
-set_opt themes.FootstrapTopLight /luci-static/footstrap-top-light
-
-if [ $changed = 1 ]; then
-	uci commit luci
-fi
-
+uci commit luci
 exit 0

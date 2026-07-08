@@ -79,7 +79,8 @@ function currentMode() {
 	return s === 'true' ? 'dark' : (s === 'false' ? 'light' : 'auto');
 }
 function currentPalette() {
-	return lsGet('fs-palette') === 'github' ? 'github' : 'footstrap';
+	const s = lsGet('fs-palette');
+	return (s === 'github' || s === 'roman') ? s : 'footstrap';
 }
 function applyMode(val) {
 	const root = document.querySelector(':root');
@@ -91,8 +92,8 @@ function applyMode(val) {
 }
 function applyPalette(val) {
 	const root = document.querySelector(':root');
-	if (val === 'github') { lsSet('fs-palette', 'github'); root.setAttribute('data-palette', 'github'); }
-	else { lsDel('fs-palette'); root.removeAttribute('data-palette'); }
+	if (val === 'footstrap') { lsDel('fs-palette'); root.removeAttribute('data-palette'); }
+	else { lsSet('fs-palette', val); root.setAttribute('data-palette', val); }
 }
 
 /* one segmented control; highlights the active option, calls onPick on change */
@@ -130,7 +131,8 @@ function wireAppearance() {
 			E('div', { 'class': 'fs-ap-label' }, [ _('Palette') ]),
 			segControl(currentPalette(), [
 				{ val: 'footstrap', label: 'Footstrap' },
-				{ val: 'github',    label: 'GitHub' }
+				{ val: 'github',    label: 'GitHub' },
+				{ val: 'roman',     label: 'Roman' }
 			], applyPalette)
 		])
 	]);
