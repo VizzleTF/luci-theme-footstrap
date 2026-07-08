@@ -24,10 +24,19 @@ function renderMainMenu(tree, url, level) {
 		const linkurl = hasSub ? '#' : L.url(url, child.name);
 		const active = (L.env.dispatchpath[(level || 0) + 1] == child.name);
 
-		const li = E('li', { 'class': (subclass + (active ? ' active' : '')).trim() }, [
-			E('a', { 'class': linkclass, 'href': linkurl }, [ _(child.title) ]),
-			submenu
-		]);
+		const link = E('a', { 'class': linkclass, 'href': linkurl }, [ _(child.title) ]);
+		const li = E('li', { 'class': (subclass + (active ? ' active' : '')).trim() }, [ link, submenu ]);
+
+		/* touch/click support: hover-only dropdowns are unusable on mobile, so
+		 * tapping a section toggles its submenu open (and keeps it open until
+		 * another is tapped or you tap outside — see the document handler). */
+		if (hasSub)
+			link.addEventListener('click', (ev) => {
+				ev.preventDefault();
+				const open = li.classList.contains('open');
+				ul.querySelectorAll('li.open').forEach((o) => o.classList.remove('open'));
+				if (!open) li.classList.add('open');
+			});
 
 		ul.appendChild(li);
 	});
@@ -39,5 +48,10 @@ function renderMainMenu(tree, url, level) {
 return baseclass.extend({
 	__init__() {
 		common.bootstrap(renderMainMenu);
+		/* close any open top-nav dropdown when tapping outside it */
+		document.addEventListener('click', (ev) => {
+			if (!ev.target.closest('.fs-mainmenu > li.dropdown'))
+				document.querySelectorAll('.fs-mainmenu > li.open').forEach((o) => o.classList.remove('open'));
+		});
 	}
 });

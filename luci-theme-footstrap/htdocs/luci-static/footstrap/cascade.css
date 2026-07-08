@@ -3513,7 +3513,8 @@ body.fs-top { display: block; }
 	content: ""; position: absolute; left: 0; right: 0; top: -10px; height: 10px;
 }
 .fs-topnav .fs-mainmenu > li.dropdown:hover > .dropdown-menu,
-.fs-topnav .fs-mainmenu > li.dropdown:focus-within > .dropdown-menu { display: block; }
+.fs-topnav .fs-mainmenu > li.dropdown:focus-within > .dropdown-menu,
+.fs-topnav .fs-mainmenu > li.dropdown.open > .dropdown-menu { display: block; }
 .fs-topnav .fs-mainmenu .dropdown-menu li > a {
 	display: block; padding: 8px 11px; border-radius: 8px;
 	color: var(--dim); font-size: 13px; font-weight: 500; white-space: nowrap;
