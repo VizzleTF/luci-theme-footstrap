@@ -1,23 +1,22 @@
 #!/bin/sh
-# luci-theme-footstrap installer for OpenWrt 25.12+ (apk).
+# luci-theme-footstrap installer for OpenWrt 24.10 (ipk) and 25.12+ (apk).
 #
 # One-line install (run on the router over SSH):
 #   wget -qO- https://raw.githubusercontent.com/VizzleTF/footstrap/main/install.sh | sh
 # or:
 #   curl -fsSL https://raw.githubusercontent.com/VizzleTF/footstrap/main/install.sh | sh
 #
-# Optional: pin a release tag ->  ... | sh -s v0.2.1
+# Optional: pin a release tag ->  ... | sh -s v0.3.1
 #
-# Downloads the latest (or given) release .apk from GitHub and installs it with
-# apk. The package registers its six theme entries on first install; pick one in
-# System -> System -> Language and Style (field "Design"). Licensed Apache-2.0.
+# Detects the OpenWrt release and its package manager, then downloads the
+# matching asset from the latest (or given) GitHub release: .apk for apk-based
+# systems (25.12+), .ipk for opkg-based systems (24.10). Licensed Apache-2.0.
 
 set -e
 
 REPO="VizzleTF/footstrap"
 TAG="${1:-latest}"
 TMP="/tmp/footstrap-install"
-APK="$TMP/luci-theme-footstrap.apk"
 
 info() { printf '[*] %s\n' "$1"; }
 ok()   { printf '[+] %s\n' "$1"; }
@@ -26,10 +25,10 @@ err()  { printf '[-] %s\n' "$1" >&2; }
 
 printf '\n================================================\n'
 printf '    luci-theme-footstrap installer\n'
-printf '    LuCI theme for OpenWrt 25.12+\n'
+printf '    LuCI theme for OpenWrt 24.10 / 25.12+\n'
 printf '================================================\n\n'
 
-# --- sanity ---------------------------------------------------------------
+# --- detect OpenWrt + require >= 24.10 -----------------------------------
 if [ -f /etc/openwrt_release ]; then
 	. /etc/openwrt_release 2>/dev/null || true
 	ok "Detected: ${DISTRIB_DESCRIPTION:-OpenWrt}"
@@ -37,10 +36,37 @@ else
 	warn "This does not look like OpenWrt — continuing anyway."
 fi
 
-if ! command -v apk >/dev/null 2>&1; then
-	err "apk not found. This theme targets OpenWrt 25.12+ (apk only), not opkg/ipk."
+# Refuse clearly-too-old releases (theme needs the ucode theme engine + modern
+# CSS shipped by 24.10+). SNAPSHOT / empty / non-numeric versions are allowed.
+case "${DISTRIB_RELEASE:-}" in
+	''|*SNAPSHOT*) : ;;
+	*)
+		_maj=$(printf '%s' "$DISTRIB_RELEASE" | cut -d. -f1)
+		_min=$(printf '%s' "$DISTRIB_RELEASE" | cut -d. -f2)
+		case "$_maj$_min" in
+			*[!0-9]*|'') : ;;	# unparseable -> don't block
+			*)
+				if [ "$_maj" -lt 24 ] || { [ "$_maj" -eq 24 ] && [ "$_min" -lt 10 ]; }; then
+					err "footstrap requires OpenWrt 24.10 or newer (detected $DISTRIB_RELEASE)."
+					exit 1
+				fi
+				;;
+		esac
+		;;
+esac
+
+# --- pick package manager / asset format ---------------------------------
+if command -v apk >/dev/null 2>&1; then
+	PM="apk"; EXT="apk"
+elif command -v opkg >/dev/null 2>&1; then
+	PM="opkg"; EXT="ipk"
+else
+	err "Neither apk nor opkg found — cannot install a package."
 	exit 1
 fi
+ok "Package manager: $PM (installing .$EXT)"
+
+PKG="$TMP/luci-theme-footstrap.$EXT"
 
 # --- downloader -----------------------------------------------------------
 # Prefer tools that speak HTTPS on OpenWrt; fall back through what's present.
@@ -65,7 +91,7 @@ fetch() {
 	return 1
 }
 
-# --- resolve the .apk asset url ------------------------------------------
+# --- resolve the asset url ------------------------------------------------
 if [ "$TAG" = "latest" ]; then
 	API="https://api.github.com/repos/$REPO/releases/latest"
 else
@@ -73,10 +99,10 @@ else
 fi
 
 info "Resolving release ($TAG)..."
-ASSET_URL=$(fetch "$API" "" | grep -o 'https://[^"]*luci-theme-footstrap[^"]*\.apk' | head -n1 || true)
+ASSET_URL=$(fetch "$API" "" | grep -o "https://[^\"]*luci-theme-footstrap[^\"]*\.$EXT" | head -n1 || true)
 
 if [ -z "$ASSET_URL" ]; then
-	err "Could not find a .apk asset for release '$TAG'."
+	err "Could not find a .$EXT asset for release '$TAG'."
 	err "Check releases: https://github.com/$REPO/releases"
 	exit 1
 fi
@@ -85,16 +111,22 @@ ok "Found: $ASSET_URL"
 # --- download -------------------------------------------------------------
 mkdir -p "$TMP"
 info "Downloading package..."
-if ! fetch "$ASSET_URL" "$APK" || [ ! -s "$APK" ]; then
-	err "Download failed. If it is a TLS/cert error, install ca-bundle:"
-	err "  apk add ca-bundle   (then re-run this script)"
+if ! fetch "$ASSET_URL" "$PKG" || [ ! -s "$PKG" ]; then
+	err "Download failed. If it is a TLS/cert error, install the CA bundle:"
+	if [ "$PM" = "apk" ]; then err "  apk add ca-bundle   (then re-run)"; else err "  opkg update && opkg install ca-bundle   (then re-run)"; fi
 	exit 1
 fi
-ok "Downloaded $(wc -c < "$APK") bytes."
+ok "Downloaded $(wc -c < "$PKG") bytes."
 
 # --- install --------------------------------------------------------------
-info "Installing with apk..."
-apk add --allow-untrusted "$APK"
+info "Installing with $PM..."
+if [ "$PM" = "apk" ]; then
+	apk add --allow-untrusted "$PKG"
+else
+	# local .ipk: opkg installs it directly; luci-base is already present on any
+	# LuCI system, so no repo fetch is needed.
+	opkg install "$PKG"
+fi
 
 rm -f /tmp/luci-indexcache* 2>/dev/null || true
 rm -rf "$TMP" 2>/dev/null || true
@@ -102,6 +134,7 @@ rm -rf "$TMP" 2>/dev/null || true
 printf '\n'
 ok "luci-theme-footstrap installed."
 info "Select it in System -> System -> Language and Style -> \"Design\":"
-info "  Footstrap / FootstrapDark / FootstrapLight  (sidebar)"
-info "  FootstrapTop / …Dark / …Light               (top-nav)"
+info "  FootstrapSidebar  (sidebar)"
+info "  FootstrapOnTop    (top-nav)"
+info "Dark/light and the colour palette are in the header \"Appearance\" popover."
 info "Then hard-reload the page (Ctrl+F5)."
