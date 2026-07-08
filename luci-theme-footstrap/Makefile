@@ -27,6 +27,19 @@ LUCI_MINIFY_JS:=0
 
 PKG_LICENSE:=Apache-2.0
 
+define Package/luci-theme-footstrap/postinst
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] || {
+	# uci-defaults registers the theme entries; refresh rpcd + clear caches so
+	# LuCI picks them up without a reboot.
+	[ -f /etc/uci-defaults/30_luci-theme-footstrap ] && \
+		sh /etc/uci-defaults/30_luci-theme-footstrap >/dev/null 2>&1 || true
+	rm -f /tmp/luci-indexcache* /tmp/luci-modulecache/* >/dev/null 2>&1 || true
+	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+}
+exit 0
+endef
+
 define Package/luci-theme-footstrap/postrm
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
@@ -35,6 +48,8 @@ define Package/luci-theme-footstrap/postrm
 		uci -q delete "luci.themes.$$t"
 	done
 	uci commit luci
+	rm -f /tmp/luci-indexcache* >/dev/null 2>&1 || true
+	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
 }
 endef
 

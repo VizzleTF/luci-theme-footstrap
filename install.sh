@@ -131,6 +131,12 @@ fi
 rm -f /tmp/luci-indexcache* 2>/dev/null || true
 rm -rf "$TMP" 2>/dev/null || true
 
+# refresh rpcd so LuCI re-reads ACLs / theme registration without a reboot
+if [ -x /etc/init.d/rpcd ]; then
+	info "Restarting rpcd..."
+	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+fi
+
 printf '\n'
 ok "luci-theme-footstrap installed."
 info "Select it in System -> System -> Language and Style -> \"Design\":"
