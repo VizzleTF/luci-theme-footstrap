@@ -37,8 +37,11 @@
 			(function() {
 				try {
 					var p = localStorage.getItem('fs-palette');
-					if (p === 'roman') { p = 'rvht'; localStorage.setItem('fs-palette', p); }	/* legacy rename */
-					if (p) document.querySelector(':root').setAttribute('data-palette', p);
+					if (p === 'roman') { p = 'rvht'; localStorage.setItem('fs-palette', p); }	/* legacy */
+					if (p === 'github') { p = null; localStorage.removeItem('fs-palette'); }	/* github is now the default */
+					var root = document.querySelector(':root');
+					if (p === 'hicontrast') root.removeAttribute('data-palette');
+					else root.setAttribute('data-palette', p || 'footstrap');
 				} catch (e) {}
 			})();
 		</script>

@@ -116,14 +116,15 @@
 }
 
 /* ============================================================
- * GitHub palette variant — activated by data-palette="github" on :root
- * (set from localStorage 'fs-palette' by the head inline script). Token-only
- * override: same layout, same components, colors from GitHub Primer
- * (light default + dark dimmed). The bridge recomputes off these tokens;
- * only the raw *-rgb bridge values need explicit re-mapping.
+ * DEFAULT "footstrap" palette — GitHub Primer colors (light + dark dimmed).
+ * Applied via data-palette="footstrap" on :root by default (head.ut inline
+ * script). The high-contrast look lives in the base :root blocks and is
+ * selectable as "hicontrast" (no data-palette attr). Token-only override:
+ * same layout/components; the bridge recomputes off these tokens, only the raw
+ * *-rgb bridge values need explicit re-mapping.
  * Specificity: [data-palette][data-darkmode] (0,3,0) wins over the base blocks.
  * ============================================================ */
-:root[data-palette="github"],
+:root[data-palette="footstrap"],
 :root[data-palette="rvht"] {
 	/* GitHub — LIGHT (Rvht reuses these colours; only its background differs) */
 	--bg: #f6f8fa;
@@ -144,7 +145,7 @@
 	--success-color-high-rgb: 26, 127, 55;
 }
 
-:root[data-palette="github"][data-darkmode="true"],
+:root[data-palette="footstrap"][data-darkmode="true"],
 :root[data-palette="rvht"][data-darkmode="true"] {
 	/* GitHub — DARK (dimmed) */
 	--bg: #1c2128;

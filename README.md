@@ -3,6 +3,18 @@
 Собственная тема LuCI для OpenWrt **24.10+**: OpenWrt **24.10** (пакет `.ipk`,
 opkg) и **25.12+** (пакет `.apk`, apk). База — `luci-theme-bootstrap` (master).
 
+## Скриншоты (палитра Rvht)
+
+![Overview](docs/screenshots/overview-dark.png)
+
+| Software | Wireless |
+|---|---|
+| ![Software](docs/screenshots/software-dark.png) | ![Wireless](docs/screenshots/wireless-dark.png) |
+
+Три палитры (Appearance → Palette): **Footstrap** (по умолчанию, цвета GitHub
+Primer), **Hi-Contrast** (насыщенная), **Rvht** (Footstrap + обои-коты). Плюс
+режим Auto/Light/Dark. Всё client-side, без перезагрузки.
+
 ## Установка
 
 На роутере (SSH) — одной строкой. Скрипт определяет пакетный менеджер и ставит

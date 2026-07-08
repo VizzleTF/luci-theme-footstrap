@@ -80,8 +80,9 @@ function currentMode() {
 }
 function currentPalette() {
 	const s = lsGet('fs-palette');
-	if (s === 'roman') return 'rvht';	/* legacy name */
-	return (s === 'github' || s === 'rvht') ? s : 'footstrap';
+	if (s === 'hicontrast') return 'hicontrast';
+	if (s === 'rvht' || s === 'roman') return 'rvht';	/* roman = legacy name */
+	return 'footstrap';	/* default = GitHub colors; legacy 'github'/null map here */
 }
 function applyMode(val) {
 	const root = document.querySelector(':root');
@@ -93,7 +94,10 @@ function applyMode(val) {
 }
 function applyPalette(val) {
 	const root = document.querySelector(':root');
-	if (val === 'footstrap') { lsDel('fs-palette'); root.removeAttribute('data-palette'); }
+	/* hicontrast = the base :root tokens (no data-palette attr); footstrap
+	 * (default, GitHub colors) and rvht set an explicit attr. */
+	if (val === 'hicontrast') { lsSet('fs-palette', 'hicontrast'); root.removeAttribute('data-palette'); }
+	else if (val === 'footstrap') { lsDel('fs-palette'); root.setAttribute('data-palette', 'footstrap'); }
 	else { lsSet('fs-palette', val); root.setAttribute('data-palette', val); }
 }
 
@@ -131,9 +135,9 @@ function wireAppearance() {
 		E('div', { 'class': 'fs-ap-group' }, [
 			E('div', { 'class': 'fs-ap-label' }, [ _('Palette') ]),
 			segControl(currentPalette(), [
-				{ val: 'footstrap', label: 'Footstrap' },
-				{ val: 'github',    label: 'GitHub' },
-				{ val: 'rvht',      label: 'Rvht' }
+				{ val: 'footstrap',  label: 'Footstrap' },
+				{ val: 'hicontrast', label: 'Hi-Contrast' },
+				{ val: 'rvht',       label: 'Rvht' }
 			], applyPalette)
 		])
 	]);
