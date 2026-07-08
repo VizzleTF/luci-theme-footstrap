@@ -79,6 +79,13 @@ include ../../luci.mk
 - Версию задавать не нужно: `luci.mk` генерирует `PKG_VERSION` из git
   (`git-<дата>.<коммиты>~<hash>` или `<major>.<число коммитов>`).
 
+> **Реальный Makefile footstrap отличается** (важно для сборки пакета):
+> `LUCI_MINIFY_CSS:=0` + `LUCI_MINIFY_JS:=0` (минификатор ломает `:has()`/
+> `color-mix()`/`calc()` — docs/06 п.13), `LUCI_PKGARCH:=all` (noarch),
+> `include $(TOPDIR)/feeds/luci/luci.mk` (абсолютный путь — работает и в
+> `package/`, и в feeds), инжектируемая `FOOTSTRAP_VERSION` для CI. Подробно —
+> **docs/13**.
+
 ## uci-defaults: регистрация темы
 
 `root/etc/uci-defaults/30_luci-theme-mytheme` (паттерн bootstrap, актуальный master):
