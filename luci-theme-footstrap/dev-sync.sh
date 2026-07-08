@@ -12,14 +12,18 @@ ssh "$R" "mkdir -p /usr/share/ucode/luci/template/themes/$N \
 	/www/luci-static/$N /www/luci-static/resources/view/$N \
 	/www/luci-static/resources/view/status/include"
 
-# sidebar templates + top-nav templates
-scp -q "$D"/ucode/template/themes/$N/*.ut       "$R":/usr/share/ucode/luci/template/themes/$N/
-scp -q "$D"/ucode/template/themes/$N-top/*.ut   "$R":/usr/share/ucode/luci/template/themes/$N-top/
+# sidebar templates (+ partials/) + top-nav templates
+scp -q  "$D"/ucode/template/themes/$N/*.ut      "$R":/usr/share/ucode/luci/template/themes/$N/
+ssh "$R" "mkdir -p /usr/share/ucode/luci/template/themes/$N/partials"
+scp -q  "$D"/ucode/template/themes/$N/partials/*.ut "$R":/usr/share/ucode/luci/template/themes/$N/partials/
+scp -q  "$D"/ucode/template/themes/$N-top/*.ut  "$R":/usr/share/ucode/luci/template/themes/$N-top/
 
-# shared static (cascade.css, fonts, logo) + both menu renderers
-scp -qr "$D"/htdocs/luci-static/$N/*                 "$R":/www/luci-static/$N/
-scp -q  "$D"/htdocs/luci-static/resources/menu-$N.js     "$R":/www/luci-static/resources/
-scp -q  "$D"/htdocs/luci-static/resources/menu-$N-top.js "$R":/www/luci-static/resources/
+# shared static (cascade.css, fonts, logo) + menu renderers (+ shared common)
+scp -qr "$D"/htdocs/luci-static/$N/*                     "$R":/www/luci-static/$N/
+scp -q  "$D"/htdocs/luci-static/resources/menu-$N-common.js "$R":/www/luci-static/resources/
+scp -q  "$D"/htdocs/luci-static/resources/menu-$N.js        "$R":/www/luci-static/resources/
+scp -q  "$D"/htdocs/luci-static/resources/menu-$N-top.js    "$R":/www/luci-static/resources/
+scp -q  "$D"/htdocs/luci-static/resources/fs-select.js      "$R":/www/luci-static/resources/
 scp -q  "$D"/htdocs/luci-static/resources/view/$N/*      "$R":/www/luci-static/resources/view/$N/
 scp -q  "$D"/htdocs/luci-static/resources/view/status/include/05_${N}_dashboard.js \
 	"$R":/www/luci-static/resources/view/status/include/

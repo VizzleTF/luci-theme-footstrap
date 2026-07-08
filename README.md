@@ -24,6 +24,8 @@ ucode-шаблонах). Деплой: `luci-theme-footstrap/dev-sync.sh`. Пр�
 | [docs/08-design-sistema.md](docs/08-design-sistema.md) | Дизайн-система footstrap: токены, компоненты, границы тема/приложение |
 | [docs/09-realizatsiya-sidebar.md](docs/09-realizatsiya-sidebar.md) | Спека варианта 1A Sidebar Console: раскладка, файлы, DoD |
 | [docs/10-realizatsiya-topnav.md](docs/10-realizatsiya-topnav.md) | Спека варианта 1B Top-nav: выбор темы, symlinks, раскладка |
+| [docs/11-refactor-best-practices.md](docs/11-refactor-best-practices.md) | Ресерч best-practices (SOLID/KISS/DRY): что применено, что неприменимо в LuCI, roadmap |
+| [docs/12-luci-component-coverage.md](docs/12-luci-component-coverage.md) | Матрица покрытия всех `LuCI.ui`-виджетов темой (общая логика, исключения) |
 | [docs/design/](docs/design/) | Референс макета (Claude Design) |
 
 ## Тестовый стенд

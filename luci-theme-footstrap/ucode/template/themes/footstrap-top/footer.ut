@@ -17,6 +17,7 @@
 			</main>{# /.fs-main #}
 		</div>{# /.fs-topwrap #}
 		<script>L.require('menu-footstrap-top')</script>
+		<script>L.require('fs-select')</script>
 		{% endif %}
 	</body>
 </html>

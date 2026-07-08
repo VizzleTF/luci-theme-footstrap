@@ -1,10 +1,12 @@
 'use strict';
 'require baseclass';
 'require ui';
+'require menu-footstrap-common as common';
 
-/* Footstrap sidebar menu renderer (variant 1A).
- * Fills #topmenu vertically, #modemenu (modes), #tabmenu (section tabs),
- * and wires the sidebar theme toggle. Spec: docs/09-realizatsiya-sidebar.md */
+/* Footstrap SIDEBAR menu (variant 1A): vertical #topmenu with icons and
+ * collapsible sections. Shared mode/tab/toggle logic lives in
+ * menu-footstrap-common (composed via common.bootstrap). Only renderMainMenu is
+ * layout-specific. Spec: docs/09-realizatsiya-sidebar.md */
 
 const ICONS = {
 	status:   '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
@@ -29,133 +31,55 @@ function iconSvg(name) {
 		'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + body + '</svg>';
 }
 
+/* main sections -> vertical sidebar list (#topmenu), collapsible */
+function renderMainMenu(tree, url, level) {
+	const ul = level ? E('ul', {}) : document.querySelector('#topmenu');
+	const children = ui.menu.getChildren(tree);
+
+	if (children.length == 0 || level > 1)
+		return E([]);
+
+	/* dispatchpath = [mode, section, subsection, …]; sections sit at
+	 * index (level+1) because the first call gets the mode. */
+	const idx = (level || 0) + 1;
+
+	children.forEach(child => {
+		const submenu = renderMainMenu(child, url + '/' + child.name, (level || 0) + 1);
+		const hasSub = !!submenu.firstElementChild;
+		const isActive = (L.env.dispatchpath[idx] == child.name);
+		const chevron = hasSub
+			? '<svg class="fs-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
+			: '';
+
+		const link = E('a', {
+			'href': hasSub ? '#' : L.url(url, child.name),
+			'class': (isActive && !hasSub) ? 'active' : ''
+		});
+		link.innerHTML = (level ? '' : iconSvg(child.name)) + '<span class="fs-label"></span>' + chevron;
+		link.querySelector('.fs-label').textContent = _(child.title);
+
+		const li = E('li', {
+			'class': [
+				isActive ? 'active' : '',
+				hasSub ? 'has-sub' : '',
+				(hasSub && isActive) ? 'open' : ''
+			].join(' ').trim()
+		}, [ link, submenu ]);
+
+		if (hasSub)
+			link.addEventListener('click', (ev) => {
+				ev.preventDefault();
+				li.classList.toggle('open');
+			});
+
+		ul.appendChild(li);
+	});
+
+	return ul;
+}
+
 return baseclass.extend({
 	__init__() {
-		ui.menu.load().then((tree) => {
-			this.render(tree);
-			this.wireThemeToggle();
-		});
-	},
-
-	render(tree) {
-		this.renderModeMenu(tree);
-
-		if (L.env.dispatchpath.length >= 3) {
-			let node = tree, url = '';
-			for (let i = 0; i < 3 && node; i++) {
-				node = node.children[L.env.dispatchpath[i]];
-				url = url + (url ? '/' : '') + L.env.dispatchpath[i];
-			}
-			if (node)
-				this.renderTabMenu(node, url);
-		}
-	},
-
-	/* main sections -> vertical sidebar list (#topmenu) */
-	renderMainMenu(tree, url, level) {
-		const ul = level ? E('ul', {}) : document.querySelector('#topmenu');
-		const children = ui.menu.getChildren(tree);
-
-		if (children.length == 0 || level > 1)
-			return E([]);
-
-		/* dispatchpath = [mode, section, subsection, ...]; sections sit at
-		 * index (level+1) because the first renderMainMenu call gets the mode. */
-		const idx = (level || 0) + 1;
-
-		children.forEach(child => {
-			const submenu = this.renderMainMenu(child, url + '/' + child.name, (level || 0) + 1);
-			const hasSub = !!submenu.firstElementChild;
-			const isActive = (L.env.dispatchpath[idx] == child.name);
-			const chevron = hasSub
-				? '<svg class="fs-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
-				: '';
-
-			const link = E('a', {
-				'href': hasSub ? '#' : L.url(url, child.name),
-				'class': (isActive && !hasSub) ? 'active' : ''
-			});
-			link.innerHTML = (level ? '' : iconSvg(child.name)) + '<span class="fs-label"></span>' + chevron;
-			link.querySelector('.fs-label').textContent = _(child.title);
-
-			const li = E('li', {
-				'class': [
-					isActive ? 'active' : '',
-					hasSub ? 'has-sub' : '',
-					(hasSub && isActive) ? 'open' : ''
-				].join(' ').trim()
-			}, [ link, submenu ]);
-
-			if (hasSub)
-				link.addEventListener('click', (ev) => {
-					ev.preventDefault();
-					li.classList.toggle('open');
-				});
-
-			ul.appendChild(li);
-		});
-
-		return ul;
-	},
-
-	/* section tabs -> #tabmenu (horizontal) */
-	renderTabMenu(tree, url, level) {
-		const container = document.querySelector('#tabmenu');
-		const ul = E('ul', { 'class': 'tabs' });
-		const children = ui.menu.getChildren(tree);
-		let activeNode = null;
-
-		children.forEach(child => {
-			const isActive = (L.env.dispatchpath[3 + (level || 0)] == child.name);
-			ul.appendChild(E('li', { 'class': 'tabmenu-item-%s %s'.format(child.name, isActive ? 'active' : '') }, [
-				E('a', { 'href': L.url(url, child.name) }, [ _(child.title) ])
-			]));
-			if (isActive)
-				activeNode = child;
-		});
-
-		if (ul.children.length == 0)
-			return E([]);
-
-		container.appendChild(ul);
-		container.style.display = '';
-
-		if (activeNode)
-			this.renderTabMenu(activeNode, url + '/' + activeNode.name, (level || 0) + 1);
-
-		return ul;
-	},
-
-	/* modes (admin/status/...) -> #modemenu; usually single -> hidden */
-	renderModeMenu(tree) {
-		const ul = document.querySelector('#modemenu');
-		const children = ui.menu.getChildren(tree);
-
-		children.forEach((child, index) => {
-			const isActive = L.env.requestpath.length
-				? child.name === L.env.requestpath[0]
-				: index === 0;
-
-			ul.appendChild(E('li', { 'class': isActive ? 'active' : '' }, [
-				E('a', { 'href': L.url(child.name) }, [ _(child.title) ])
-			]));
-
-			if (isActive)
-				this.renderMainMenu(child, child.name);
-		});
-
-		if (children.length <= 1)
-			ul.classList.add('single');
-	},
-
-	wireThemeToggle() {
-		const btn = document.getElementById('fs-theme-toggle');
-		if (!btn) return;
-		btn.addEventListener('click', () => {
-			const root = document.querySelector(':root');
-			const dark = root.getAttribute('data-darkmode') !== 'true';
-			root.setAttribute('data-darkmode', dark ? 'true' : 'false');
-			try { localStorage.setItem('fs-darkmode', dark ? 'true' : 'false'); } catch (e) {}
-		});
+		common.bootstrap(renderMainMenu);
 	}
 });

@@ -15,46 +15,7 @@
 	http.prepare_content('text/html; charset=UTF-8');
 -%}
 
-<!DOCTYPE html>
-<html lang="{{ dispatcher.lang }}" {{ darkpref ? `data-darkmode="${darkpref}"` : '' }}>
-	<head>
-		<meta charset="utf-8">
-		<title>{{ striptags(`${boardinfo.hostname ?? '?'}${dispatched?.title ? ` | ${_(dispatched.title)}` : ''}`) }}</title>
-		{% if (!darkpref): %}
-			<script>
-				/* footstrap: saved client preference wins, else follow OS. */
-				(function() {
-					var root = document.querySelector(':root'),
-					    saved = null;
-					try { saved = localStorage.getItem('fs-darkmode'); } catch (e) {}
-					var mq = window.matchMedia('(prefers-color-scheme: dark)');
-					function set(dark) { root.setAttribute('data-darkmode', dark ? 'true' : 'false'); }
-					if (saved === 'true' || saved === 'false') {
-						set(saved === 'true');
-					} else {
-						set(mq.matches);
-						mq.addEventListener('change', function(m) {
-							try { if (localStorage.getItem('fs-darkmode')) return; } catch (e) {}
-							set(m.matches);
-						});
-					}
-				})();
-			</script>
-		{% endif %}
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<meta name="darkreader-lock">
-		<link rel="stylesheet" href="{{ media }}/cascade.css?v={{ pkgs_update_time }}">
-		<link rel="icon" href="{{ media }}/logo_48.png" sizes="48x48">
-		<link rel="icon" href="{{ media }}/logo.svg" sizes="any">
-		{% if (node?.css): %}
-		<link rel="stylesheet" href="{{ resource }}/{{ node.css }}">
-		{% endif %}
-		{% if (css): %}
-		<style title="text/css">{{ css }}</style>
-		{% endif %}
-		<script src="{{ dispatcher.build_url('admin/translations', dispatcher.lang) }}"></script>
-		<script src="{{ resource }}/cbi.js"></script>
-	</head>
+{% include('themes/footstrap/partials/head', { boardinfo, darkpref }) %}
 
 	<body class="lang_{{ dispatcher.lang }} {{ entityencode(striptags(node?.title ?? ''), true) }}" data-page="{{ entityencode(join('-', length(ctx.request_path) ? ctx.request_path : ctx.path), true) }}">
 		{% if (!blank_page): %}

@@ -1,0 +1,48 @@
+name: Build LuCI theme apk
+
+# LuCI themes are architecture-independent (noarch): a single SDK build
+# produces a package that installs on ANY OpenWrt 25.12+ target, so no
+# per-arch matrix is needed. Trigger on version tags or manually.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build noarch apk (OpenWrt SDK)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build package via OpenWrt SDK
+        uses: openwrt/gh-action-sdk@main
+        env:
+          # SNAPSHOT SDK ships the apk toolchain used by 25.12+.
+          ARCH: x86-64-SNAPSHOT
+          FEEDNAME: footstrap
+          PACKAGES: luci-theme-footstrap
+          NO_REFRESH_CHECK: 1
+
+      - name: Collect apk
+        run: |
+          mkdir -p dist
+          find bin/ -name 'luci-theme-footstrap*.apk' -exec cp {} dist/ \;
+          ls -l dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: luci-theme-footstrap-apk
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk

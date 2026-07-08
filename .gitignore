@@ -6,3 +6,11 @@
 .vscode/
 .idea/
 *.swp
+# local tooling (playwright venv + chromium; machine-specific, large)
+.claude/tooling/
+# preview screenshots
+.claude/skills/footstrap-preview/out/
+# page review screenshots
+page-review/
+# built packages
+dist/
