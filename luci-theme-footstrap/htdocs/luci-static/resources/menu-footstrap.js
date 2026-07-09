@@ -105,7 +105,9 @@ function renderMainMenu(tree, url, level) {
 			link.addEventListener('click', (ev) => {
 				ev.preventDefault();
 				const open = li.classList.contains('open');
-				if (flyoutMode()) closeFlyouts();
+				/* flyout panels are always exclusive; the expanded-sidebar accordion
+				 * folds the others back only when asked (Appearance -> Submenus) */
+				if (flyoutMode() || common.autoCollapse()) closeFlyouts();
 				li.classList.toggle('open', !open);
 			});
 

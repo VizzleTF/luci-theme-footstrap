@@ -131,6 +131,26 @@ function applyPalette(val) {
 	else { lsSet('fs-palette', val); root.setAttribute('data-palette', val); }
 }
 
+/* Sidebar accordion behaviour: with auto-collapse on, opening a section folds
+ * every other one back (one open at a time); off (default, and the historical
+ * behaviour) they stack. Only meaningful for the expanded sidebar — the rail
+ * flyouts and the mobile bar are always exclusive. Read by menu-footstrap.js. */
+function currentAutoCollapse() {
+	return lsGet('fs-menu-autocollapse') === 'true';
+}
+function applyAutoCollapse(val) {
+	const on = (val === 'on');
+	if (on) lsSet('fs-menu-autocollapse', 'true');
+	else lsDel('fs-menu-autocollapse');
+
+	/* switching it on with several sections already unfolded would leave the
+	 * menu in a state the setting says is impossible — fold all but the active */
+	if (on) {
+		document.querySelectorAll('#topmenu > li.open:not(.active)')
+			.forEach(li => li.classList.remove('open'));
+	}
+}
+
 /* one segmented control; highlights the active option, calls onPick on change */
 function segControl(current, opts, onPick) {
 	const wrap = E('div', { 'class': 'fs-seg', 'role': 'group' });
@@ -485,7 +505,7 @@ function wireAppearance() {
 	const btn = document.getElementById('fs-appearance');
 	if (!btn) return;
 
-	const pop = E('div', { 'class': 'fs-appearance-pop', 'role': 'dialog', 'aria-label': _('Appearance'), 'hidden': '' }, [
+	const groups = [
 		E('div', { 'class': 'fs-ap-group' }, [
 			E('div', { 'class': 'fs-ap-label' }, [ _('Theme') ]),
 			segControl(currentMode(), [
@@ -502,7 +522,21 @@ function wireAppearance() {
 				{ val: 'rvht',       label: 'Rvht' }
 			], applyPalette)
 		])
-	]);
+	];
+
+	/* the top-nav layout has no accordion — its sections are hover dropdowns,
+	 * already exclusive — so the switch is offered on the sidebar layout only */
+	if (!document.body.classList.contains('fs-top')) {
+		groups.push(E('div', { 'class': 'fs-ap-group' }, [
+			E('div', { 'class': 'fs-ap-label' }, [ _('Submenus') ]),
+			segControl(currentAutoCollapse() ? 'on' : 'off', [
+				{ val: 'off', label: _('Keep open') },
+				{ val: 'on',  label: _('Auto-collapse') }
+			], applyAutoCollapse)
+		]));
+	}
+
+	const pop = E('div', { 'class': 'fs-appearance-pop', 'role': 'dialog', 'aria-label': _('Appearance'), 'hidden': '' }, groups);
 	document.body.appendChild(pop);
 
 	function outside(e) { if (!pop.contains(e.target) && !btn.contains(e.target) && e.target !== btn) close(); }
@@ -558,6 +592,9 @@ function wireRail() {
 }
 
 return baseclass.extend({
+	/* menu-footstrap.js asks before unfolding a section (see applyAutoCollapse) */
+	autoCollapse: currentAutoCollapse,
+
 	/* entry point: load the menu tree, render mode menu (which drives the
 	 * injected renderMainMenu), the section tabs, and wire the theme toggle. */
 	bootstrap(renderMainMenu) {

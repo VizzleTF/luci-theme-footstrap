@@ -43,6 +43,7 @@ def main():
     ap.add_argument("--ls", action="append", default=[], metavar="KEY=VALUE",
                     help="extra localStorage entry set before load, repeatable (e.g. --ls fs-rail=true)")
     ap.add_argument("--hover", default="", help="CSS selector to hover before the shot (flyouts/dropdowns)")
+    ap.add_argument("--click", default="", help="CSS selector to click before the shot (popovers)")
     ap.add_argument("--viewport-only", action="store_true", help="shoot the viewport instead of the full page")
     args = ap.parse_args()
     pages = list(args.pages or [])
@@ -102,6 +103,12 @@ def main():
                                 time.sleep(0.4)
                             except Exception as e:
                                 print(f"hover {args.hover!r} failed: {e}")
+                        if args.click:
+                            try:
+                                page.click(args.click, timeout=3000)
+                                time.sleep(0.4)
+                            except Exception as e:
+                                print(f"click {args.click!r} failed: {e}")
                         slug = path.replace('/', '-')[:120]
                         name = f"{layout}__{mode}__{slug}.png"
                         fp = outdir / name
