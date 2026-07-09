@@ -56,8 +56,24 @@ function closeFlyouts(except) {
  * section, re-derived from the path, would stay open. We remember the accordion
  * state here and restore it in renderMainMenu. Only consulted in the expanded
  * sidebar with auto-collapse off; flyouts and auto-collapse are exclusive by
- * design and re-open just the active one. */
-const _openSections = new Set();
+ * design and re-open just the active one.
+ *
+ * Persisted in localStorage: a module-level Set alone survives SPA navs but NOT a
+ * full page load — and plenty of LuCI pages are not SPA-able (non-`view` nodes,
+ * or any hard reload / F5), which would reset the Set and refold every section but
+ * the active one. Backing it with localStorage keeps the unfolded set stable across
+ * both kinds of navigation. */
+const OPEN_KEY = 'fs-menu-open';
+function loadOpenSections() {
+	try {
+		const a = JSON.parse(localStorage.getItem(OPEN_KEY) || '[]');
+		return new Set(Array.isArray(a) ? a : []);
+	} catch (e) { return new Set(); }
+}
+function saveOpenSections() {
+	try { localStorage.setItem(OPEN_KEY, JSON.stringify(Array.from(_openSections))); } catch (e) {}
+}
+const _openSections = loadOpenSections();
 
 /* main sections -> vertical sidebar list (#topmenu), collapsible */
 function renderMainMenu(tree, url, level) {
@@ -89,8 +105,10 @@ function renderMainMenu(tree, url, level) {
 		const keepOpen = hasSub && !level && !flyoutMode() && !common.autoCollapse();
 		const startOpen = hasSub && !flyoutMode() &&
 			(isActive || (keepOpen && _openSections.has(child.name)));
-		if (keepOpen && startOpen)
+		if (keepOpen && startOpen && !_openSections.has(child.name)) {
 			_openSections.add(child.name);
+			saveOpenSections();
+		}
 		const chevron = hasSub
 			? '<svg class="fs-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
 			: '';
@@ -128,10 +146,11 @@ function renderMainMenu(tree, url, level) {
 				 * folds the others back only when asked (Appearance -> Submenus) */
 				if (flyoutMode() || common.autoCollapse()) { closeFlyouts(); _openSections.clear(); }
 				li.classList.toggle('open', !open);
-				/* remember the accordion state so a SPA nav restores it (Keep open) */
+				/* remember the accordion state so any navigation restores it (Keep open) */
 				if (flyoutMode()) return;
 				if (!open) _openSections.add(child.name);
 				else _openSections.delete(child.name);
+				saveOpenSections();
 			});
 
 			/* hybrid devices: once a real MOUSE enters the menu, drop the tap-opened
