@@ -67,9 +67,24 @@ function enhance(sel) {
 	});
 }
 
+/* Tag standalone data tables so the responsive (&lt;820px) stacking rules can key
+ * off a static `.fs-dt` class instead of a live `:has(.tr.table-titles)` that the
+ * style engine re-evaluated on every mutation of these polled tables
+ * (Processes/routes/leases). Match = <table class="table"> with a table-titles
+ * header, not a .cbi-section-table (config forms keep their own layout). */
+function tagDataTables() {
+	document.querySelectorAll('#view table.table:not(.cbi-section-table):not(.fs-dt)').forEach((t) => {
+		if (t.querySelector('.tr.table-titles'))
+			t.classList.add('fs-dt');
+	});
+}
+
 return baseclass.extend({
 	__init__() {
-		const scan = () => document.querySelectorAll('select.cbi-input-select:not([data-fs-select])').forEach(enhance);
+		const scan = () => {
+			document.querySelectorAll('select.cbi-input-select:not([data-fs-select])').forEach(enhance);
+			tagDataTables();
+		};
 		scan();
 
 		let pending = false;

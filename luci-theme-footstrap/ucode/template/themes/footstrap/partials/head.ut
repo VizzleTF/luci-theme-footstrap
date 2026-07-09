@@ -47,6 +47,12 @@
 		</script>
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="darkreader-lock">
+		{# preload above-the-fold fonts so they don't wait for the full cascade.css
+		   download+parse; crossorigin is required even same-origin or the fetch is
+		   duplicated. body text = Manrope 600, headings = 700, mono values = JBM 400. #}
+		<link rel="preload" href="{{ media }}/fonts/manrope-600.woff2" as="font" type="font/woff2" crossorigin>
+		<link rel="preload" href="{{ media }}/fonts/manrope-700.woff2" as="font" type="font/woff2" crossorigin>
+		<link rel="preload" href="{{ media }}/fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
 		<link rel="stylesheet" href="{{ media }}/cascade.css?v={{ pkgs_update_time }}">
 		<link rel="icon" href="{{ media }}/logo_48.png" sizes="48x48">
 		<link rel="icon" href="{{ media }}/logo.svg" sizes="any">

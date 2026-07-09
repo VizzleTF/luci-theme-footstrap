@@ -14,6 +14,36 @@
  * (menu-footstrap / menu-footstrap-top) only defines renderMainMenu and calls
  * common.bootstrap(renderMainMenu). */
 
+/* --- stray-interval teardown for SPA nav ---------------------------------
+ * A full page load kills every window.setInterval the outgoing page set. Our
+ * SPA nav never reloads, so a view's own setInterval poller keeps firing
+ * against a page that's gone — e.g. luci-app-podkop's log tailer
+ * (view/podkop/main.js: `this.timer = setInterval(() => this.checkOnce(), …)`)
+ * logs `[SHELL] [/usr/bin/podkop check_logs]` forever after you navigate away.
+ * L.Poll pollers are handled separately (queue flush in navigate); this covers
+ * the plain setInterval ones. Track view-set interval ids and clear them on nav
+ * teardown, but preserve L.Poll's own 1s tick (it is a window.setInterval too).
+ * Hook at module eval — the earliest point, before any view render sets a timer. */
+const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = new Set()));
+(function hookIntervals() {
+	if (window.__fsIntervalsHooked) return;
+	window.__fsIntervalsHooked = true;
+	const _si = window.setInterval, _ci = window.clearInterval;
+	window.setInterval = function () {
+		const id = _si.apply(window, arguments);
+		_viewIntervals.add(id);
+		return id;
+	};
+	window.clearInterval = function (id) {
+		_viewIntervals.delete(id);
+		return _ci.apply(window, arguments);
+	};
+})();
+function clearViewIntervals() {
+	const keep = (L.Poll && L.Poll.timer) || null;
+	_viewIntervals.forEach((id) => { if (id !== keep) window.clearInterval(id); });
+}
+
 /* section tabs -> #tabmenu (horizontal) */
 function renderTabMenu(tree, url, level) {
 	const container = document.querySelector('#tabmenu');
@@ -187,6 +217,86 @@ function nodeForSegs(segs) {
 	return node;
 }
 
+/* The view class a menu node instantiates, or null if the node isn't SPA-able.
+ * Normal `view` nodes derive it from action.path; the Status→Overview `template`
+ * node maps to view.status.index (its server template just instantiates that —
+ * see ensureOverviewHelpers). Shared by navigate() and the hover prefetch. */
+function viewClassFor(node) {
+	if (!node || !node.action || node.satisfied === false)
+		return null;
+	if (node.action.type === 'view')
+		return 'view.' + String(node.action.path).replace(/\//g, '.');
+	if (node.action.type === 'template' && node.action.path === 'admin_status/index')
+		return 'view.status.index';
+	return null;
+}
+
+/* Build the exact URL LuCI.require() will fetch for a class name, cache-bust and
+ * all (base_url/<dotted→slashed>.js?v=resource_version). Matching it byte-for-byte
+ * is what makes a hover prefetch a warm cache hit for the subsequent require(). */
+function moduleUrl(className) {
+	const v = L.env.resource_version ? ('?v=' + L.env.resource_version) : '';
+	return (L.env.base_url || '') + '/' + className.replace(/\./g, '/') + '.js' + v;
+}
+
+/* Hover prefetch: on pointerenter of a link to an SPA-able view, warm the browser
+ * HTTP cache for its module JS with a plain fetch() — NOT require(): require would
+ * run the class __init__ and render another page's view into #view. The later
+ * click's require() then hits cache instead of the network (−10–40 ms LAN on the
+ * first visit to a page, more on WAN/VPN). Deduped per class; failures are silent
+ * (it's a pure optimisation). Static resource, so same-origin credentials are moot. */
+const _prefetched = new Set();
+function prefetchView(pathname) {
+	const segs = segsFromPath(pathname);
+	if (!segs) return;
+	const className = viewClassFor(nodeForSegs(segs));
+	if (!className || _prefetched.has(className)) return;
+	_prefetched.add(className);
+	try { fetch(moduleUrl(className), { credentials: 'same-origin' }).catch(() => {}); } catch (e) {}
+}
+
+/* Status→Overview is a `template` node whose server template (admin_status/index.ut)
+ * defines 3 global helpers used by the stock status includes
+ * (18_cpu/20_memory/25_storage/30_network …) and then instantiates
+ * view.status.index. Reaching overview via SPA never runs that inline <script>,
+ * so define the helpers here — idempotent, guarded so a prior full load's copies
+ * are not clobbered. Bodies are verbatim from admin_status/index.ut, except
+ * L.itemlist -> window.L.itemlist: itemlist lives on the augmented runtime
+ * singleton, not the bare module-`L` this factory receives (the two-L trap,
+ * docs/14). `E`/`String`/`.format` are true globals so they need no change. */
+function ensureOverviewHelpers() {
+	if (typeof window.progressbar != 'function')
+		window.progressbar = function(query, value, max, byte) {
+			var pg = document.querySelector(query),
+			    vn = parseInt(value) || 0,
+			    mn = parseInt(max) || 100,
+			    fv = byte ? String.format('%1024.2mB', value) : value,
+			    fm = byte ? String.format('%1024.2mB', max) : max,
+			    pc = Math.floor((100 / mn) * vn);
+			if (pg) {
+				pg.firstElementChild.style.width = pc + '%';
+				pg.setAttribute('title', '%s / %s (%d%%)'.format(fv, fm, pc));
+			}
+		};
+	if (typeof window.renderBox != 'function')
+		window.renderBox = function(title, active, childs) {
+			childs = childs || [];
+			childs.unshift(window.L.itemlist(E('span'), [].slice.call(arguments, 3)));
+			return E('div', { class: 'ifacebox' }, [
+				E('div', { class: 'ifacebox-head center ' + (active ? 'active' : '') },
+					E('strong', title)),
+				E('div', { class: 'ifacebox-body left' }, childs)
+			]);
+		};
+	if (typeof window.renderBadge != 'function')
+		window.renderBadge = function(icon, title) {
+			return E('span', { class: 'ifacebadge' }, [
+				E('img', { src: icon, title: title || '' }),
+				window.L.itemlist(E('span'), [].slice.call(arguments, 2))
+			]);
+		};
+}
+
 /* Attempt an in-place navigation to `pathname`. Returns true if handled as a
  * SPA nav (caller should preventDefault), false to let the browser do a normal
  * full navigation. `push` adds a history entry (false when replaying popstate). */
@@ -195,14 +305,14 @@ function navigate(pathname, push) {
 	if (!segs) return false;
 
 	const node = nodeForSegs(segs);
-	if (!node || !node.action || node.action.type !== 'view' || node.satisfied === false)
+	const className = viewClassFor(node);
+	if (!className)
 		return false;
 
-	/* Ensure a #view container. On view pages the dispatcher emits one; on a
-	 * `template` page (e.g. the status overview) it doesn't — inject one into
-	 * .fs-content, dropping the stale template content, so we can SPA *away* from
-	 * overview too. Navigating back TO overview stays a full reload (it's a
-	 * template node → navigate() bails), so it always re-renders fresh. */
+	/* Ensure a #view container. View pages and the overview template both emit
+	 * one; a `cbi`/other template page may not — inject one into .fs-content,
+	 * dropping the stale content, so we can SPA there. When arriving via SPA the
+	 * previous view's #view is reused and LuCI.view replaces its content. */
 	if (!document.getElementById('view')) {
 		const host = document.querySelector('.fs-content');
 		if (!host) return false;
@@ -215,8 +325,6 @@ function navigate(pathname, push) {
 		host.appendChild(v);
 	}
 
-	const className = 'view.' + String(node.action.path).replace(/\//g, '.');
-
 	/* teardown: drop the outgoing view's pollers so they stop hitting detached
 	 * DOM / wasting RPCs. Flush the queue but do NOT Poll.stop() — stop() deletes
 	 * the internal tick and the incoming view's poll.add() would never auto-start.
@@ -224,6 +332,10 @@ function navigate(pathname, push) {
 	 * check, so a flush here is safe. */
 	if (L.Poll && L.Poll.queue)
 		L.Poll.queue.length = 0;
+	/* also kill the outgoing view's plain setInterval pollers (e.g. podkop's log
+	 * tailer) — a full load would have; the SPA must do it explicitly. Keeps
+	 * L.Poll's own tick alive. */
+	clearViewIntervals();
 	try { if (typeof ui.hideModal == 'function') ui.hideModal(); } catch (e) {}
 
 	/* point the runtime env at the new node so views, tabs and highlighting read
@@ -258,6 +370,9 @@ function navigate(pathname, push) {
 	 * Fresh instance -> fresh __init__ -> renders into #view. require/instanceof
 	 * errors fall back to a real navigation; render-time errors are handled inside
 	 * LuCI.view (shows the stock error), same as a full load. */
+	if (className === 'view.status.index')
+		ensureOverviewHelpers();
+
 	const RT = window.L;
 	RT.require(className).then(view => {
 		if (!(view instanceof RT.view))
@@ -293,9 +408,40 @@ function wireRouter() {
 			ev.preventDefault();
 	}, false);
 
+	/* warm the view module cache when the pointer enters a nav link */
+	document.addEventListener('pointerover', (ev) => {
+		const a = ev.target.closest && ev.target.closest('a[href]');
+		if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download'))
+			return;
+		const raw = a.getAttribute('href');
+		if (!raw || raw.charAt(0) === '#') return;
+		let url;
+		try { url = new URL(a.href, window.location.href); } catch (e) { return; }
+		if (url.origin === window.location.origin)
+			prefetchView(url.pathname);
+	}, false);
+
 	window.addEventListener('popstate', () => {
 		if (!navigate(window.location.pathname, false))
 			window.location.reload();
+	});
+}
+
+/* Pause LuCI's 1s poll loop while the tab is hidden and resume when it shows
+ * again. LuCI has no visibilitychange handler, so a status/overview page left
+ * open in a background tab hammers ubus 24/7 (esp. the pricey iwinfo getAssocList)
+ * on a low-power router. Poll.stop() just clearInterval()s (the queue is
+ * preserved); Poll.start() re-arms the interval and runs one immediate step() so
+ * data is fresh the moment the tab is refocused. A poller added while hidden
+ * won't auto-start (stop() deletes the tick) — start() picks it up on show, so
+ * nothing is lost, only deferred. See docs/14 for the stop()/tick caveat. */
+let _visWired = false;
+function wireVisibility() {
+	if (_visWired) return;
+	_visWired = true;
+	document.addEventListener('visibilitychange', () => {
+		if (!L.Poll) return;
+		try { document.hidden ? L.Poll.stop() : L.Poll.start(); } catch (e) {}
 	});
 }
 
@@ -353,6 +499,7 @@ return baseclass.extend({
 			renderChrome();
 			wireAppearance();
 			wireRouter();
+			wireVisibility();
 		});
 	}
 });

@@ -35,9 +35,9 @@ Rules when editing CSS:
 - **Overview tables**: discriminate by `id`. Key/value includes (System, Memory) render `<table class="table">` **without** id → 2-col label/value style. Data tables (DHCP leases = `id="status_leases"`) have an **id** → data-table style. Use `.table[id]` vs `.table:not([id])`.
 - `:has()` and `color-mix()` are used (modern browsers only — fine for target). After any CSS edit, brace-check: `python3 -c "s=open(F).read();print(s.count('{'),s.count('}'))"`.
 
-## Status dashboard (theme/mod boundary)
+## Overview layout include (theme/mod boundary)
 
-`htdocs/luci-static/resources/view/status/include/05_footstrap_dashboard.js` is an **additive** overview include (unique filename → no file collision with `luci-mod-status`; LuCI auto-discovers all `*.js` in that dir, `05_` sorts first). It renders the KPI row + System/Memory/Storage cards from `system.board`/`system.info`/`luci.getVersion`/`luci.getMountPoints`, and at runtime **hides the stock duplicate sections** (System/Memory/Storage) by title via class `.fs-dup-hidden` (`!important`, survives the stock includes' per-poll `display=''`). Its index.js wrapper card is stripped via `.cbi-section:has(.fs-dashroot)`. This deliberately crosses the theme/mod line (`docs/08` "Границы") — a theme cannot otherwise produce this layout since content is app-rendered.
+`htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js` is an **additive**, layout-only overview include (unique filename → no collision with `luci-mod-status`; LuCI auto-discovers `*.js` in that dir, `05_` sorts first). It renders **no content of its own** — it only re-arranges the **stock** System/Memory/Storage sections: a `MutationObserver` on `#view` tags those three `.cbi-section`s by title and wraps them in `.fs-ovl`, so CSS grid puts System in the left column across both rows with Memory (top) + Storage (bottom) in the right column (`.fs-ovl` block in `cascade.css`). The stock poll updates each section **in place** (`dom.content`), never rebuilding the `.cbi-section` wrapper, so the moved wrappers stay put across polls (minimal flicker, no full-tree swap — the reason the earlier full-custom `05_footstrap_dashboard.js` was dropped: rebuilding a page-tall tree every poll flickered and reset mobile scroll). Its own empty stock wrapper is hidden via `#view > .cbi-section:has(.fs-ovl-marker)`. Gated on a footstrap theme being active (`L.env.media`).
 
 ## Package / registration
 
@@ -49,7 +49,7 @@ Rules when editing CSS:
 
 Test router: `ssh router` (OpenWrt 25.12.2, mediatek/filogic, apk). **Never break it; back up before touching files** (`/root/theme-backup/`). Login for authed testing: root + password set during dev.
 
-Deploy everything: `luci-theme-footstrap/dev-sync.sh` (copies both layouts' templates, `cascade.css`, fonts, both menu-JS, the dashboard include; recreates media/template symlinks; registers themes idempotently; **does not** change the active theme).
+Deploy everything: `luci-theme-footstrap/dev-sync.sh` (copies both layouts' templates, `cascade.css`, fonts, both menu-JS, the overview-layout include; recreates media/template symlinks; registers themes idempotently; **does not** change the active theme).
 
 Iterate faster on single files:
 ```sh
@@ -66,7 +66,7 @@ ssh router '
   orig=$(uci get luci.main.mediaurlbase)
   uci set luci.main.mediaurlbase=/luci-static/footstrap; uci commit luci; rm -f /tmp/luci-indexcache*
   curl -s -c /tmp/j -b /tmp/j --data-urlencode luci_username=root --data-urlencode luci_password=<pw> -o /dev/null http://127.0.0.1/cgi-bin/luci/
-  curl -s -b /tmp/j http://127.0.0.1/cgi-bin/luci/admin/status/overview | grep -o "fs-dashroot\|Unable to render"
+  curl -s -b /tmp/j http://127.0.0.1/cgi-bin/luci/admin/status/overview | grep -o "cbi-section\|Unable to render"
   uci set luci.main.mediaurlbase=$orig; uci commit luci'   # always revert
 ```
 Local tooling note: `node` is a broken nvm shim here — don't rely on it; brace/paren-check JS/CSS with `python3` instead.

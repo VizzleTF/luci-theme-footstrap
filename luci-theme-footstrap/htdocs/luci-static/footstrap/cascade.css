@@ -98,7 +98,7 @@
 	--panel2: #161c28;
 	--border: #232b3a;
 	--text: #e8edf5;
-	--dim: #8b95a7;
+	--dim: #9ba6b8;
 	--faint: #697488;	/* fainter than --dim: uppercase micro-labels (table headers, field titles) */
 	--accent: #3ba7ff;
 	--accent-soft: rgba(59,167,255,.14);
@@ -153,7 +153,7 @@
 	--panel2: #2d333b;
 	--border: #444c56;
 	--text: #adbac7;
-	--dim: #768390;
+	--dim: #8c99a8;
 	--faint: #636e7b;
 	--accent: #539bf5;
 	--accent-lt: #79c0ff;
@@ -179,9 +179,12 @@
 /* let the cats show through the footer too */
 :root[data-palette="rvht"] footer.fs-footer { background: transparent; }
 
-/* controls carry a border/rounding, so their frost is bounded by their shape */
-:root[data-palette="rvht"] .cbi-button,
-:root[data-palette="rvht"] .btn,
+/* A CBI form (firewall/interfaces) has dozens of .btn/.cbi-button; a
+ * backdrop-filter on each is a live backdrop-sampling layer over the cats.svg
+ * wallpaper — costly on weak GPUs — yet invisible, since every button already
+ * has an opaque --default-btn-background (or a solid colour for apply/remove).
+ * So the blur is dropped from buttons entirely. Closed dropdowns keep the frost:
+ * there are few of them and their body can show the wallpaper through. */
 :root[data-palette="rvht"] .cbi-dropdown:not([open]) {
 	backdrop-filter: blur(6px);
 	-webkit-backdrop-filter: blur(6px);
@@ -213,6 +216,12 @@
 	-webkit-mask-composite: source-in;
 	        mask-composite: intersect;
 }
+/* The wash's -72px top/bottom overhang extends past #view onto its siblings; and
+ * #view is a z-index:0 stacking context, so it paints over the notification above
+ * it and the footer below (z-index:auto) — a grey tint band. Lift those siblings
+ * above #view so the wash stays behind them. */
+:root[data-palette="rvht"] .alert-message,
+:root[data-palette="rvht"] footer.fs-footer { position: relative; z-index: 1; }
 
 /* Reset.less
  * Props to Eric Meyer (meyerweb.com) for his CSS reset file. We're using an adapted version here	that cuts out some of the reset HTML elements we will never need here (i.e., dfn, samp, etc).
@@ -2898,6 +2907,9 @@ body.fs-top .fs-appearance-pop { top: calc(100% + 8px); bottom: auto; }
 	min-width: 0;
 	display: flex; flex-direction: column;
 	background: var(--bg);
+	/* contain the rvht #view::before wash overhang (inset -40px sides) so it
+	 * doesn't push the page's horizontal scroll; clip keeps vertical flow */
+	overflow-x: clip;
 }
 .fs-topbar {
 	min-height: 66px;
@@ -2951,7 +2963,7 @@ body.fs-top .fs-appearance-pop { top: calc(100% + 8px); bottom: auto; }
 .cbi-section, .cbi-map > .cbi-section-node, fieldset.cbi-section, .panel {
 	background: var(--panel);
 	border: 1px solid var(--border);
-	border-radius: 16px;
+	border-radius: 12px;
 	box-shadow: var(--fs-shadow);
 }
 .cbi-section { padding: 18px 22px; margin-bottom: 16px; }
@@ -3135,7 +3147,7 @@ footer.fs-footer a:hover { color: var(--accent); }
 
 .alert-message {
 	padding: 14px 16px;
-	border-radius: 14px;
+	border-radius: 12px;
 	border: 1px solid var(--border);
 	border-left: 3px solid var(--accent);
 	background: var(--panel);
@@ -3145,7 +3157,20 @@ footer.fs-footer a:hover { color: var(--accent); }
 }
 .alert-message h4 { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: var(--text); }
 .alert-message p { margin: 4px 0; color: var(--dim); font-size: 13px; }
-.alert-message .table { margin: 8px 0; }
+/* inner table (e.g. firmware Current/Available) — flatten so it doesn't read as
+ * a nested card on the alert panel; subtle row dividers only */
+.alert-message .table { margin: 10px 0; background: transparent; border: 0; box-shadow: none; border-radius: 0; }
+.alert-message .table .th { color: var(--dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.alert-message .table .th, .alert-message .table .td { padding: 7px 14px 7px 0; background: transparent; border-color: color-mix(in srgb, var(--border) 60%, transparent); }
+.alert-message .table .td { color: var(--text); }
+/* opaque panel bg for every type variant — the base `.alert-message.<type>`
+ * rules (specificity 0,2,0) set a linear-gradient of legacy bridge vars that
+ * don't resolve, leaving the alert transparent so the rvht cats wallpaper shows
+ * through ("behind a tint"). Restore a solid panel and win on source order. */
+.alert-message.notice, .alert-message.success, .alert-message.info,
+.alert-message.warning, .alert-message.error, .alert-message.danger {
+	background: var(--panel);
+}
 .alert-message.warning { border-left-color: var(--warn); }
 .alert-message.error, .alert-message.danger { border-left-color: var(--danger); }
 .alert-message.success, .alert-message.notice { border-left-color: var(--good); }
@@ -3157,125 +3182,6 @@ footer.fs-footer a:hover { color: var(--accent); }
 
 @media (max-width: 854px) {
 	.fs-main > .alert-message { margin: 12px 16px 0; }
-}
-
-/* ==================================================================
- * FOOTSTRAP dashboard (05_footstrap_dashboard.js) — Overview design
- * Full custom overview: page head, KPI, System/Memory/Storage, ports,
- * network upstream, DHCP leases. Wrapper card stripped; stock sections
- * hidden structurally (see rule below).
- * ================================================================== */
-.cbi-section:has(.fs-dashroot) { background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0 0 16px; }
-.cbi-section:has(.fs-dashroot) > .cbi-title { display: none; }
-.fs-dashroot { display: flex; flex-direction: column; gap: 14px; }
-
-/* Hide ONLY the stock sections our dashboard duplicates (System/Memory/Storage/
- * Port status/Network/DHCP/Wireless). The include tags them by title with
- * .fs-dup-hidden via a MutationObserver — 3rd-party sections (e.g.
- * luci-app-temp-status) are left untouched and render normally below. !important
- * beats the stock includes' per-poll inline display=''. */
-.cbi-section.fs-dup-hidden { display: none !important; }
-
-/* page head */
-.fs-dashhead { margin-bottom: 6px; }
-.fs-dashhead-title { font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
-.fs-dashhead-sub { color: var(--dim); font-size: 13px; margin-top: 3px; }
-
-/* KPI row */
-.fs-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-.fs-kpi { background: var(--panel); border: 1px solid var(--border); border-radius: 15px; padding: 15px 16px; display: flex; flex-direction: column; gap: 9px; box-shadow: var(--fs-shadow); }
-.fs-kpi-head { display: flex; align-items: center; justify-content: space-between; min-height: 20px; }
-.fs-kpi-cap { color: var(--dim); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
-.fs-kpi-val { font-family: var(--font-mono); font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: var(--text); line-height: 1; }
-.fs-kpi-val span { font-size: 14px; color: var(--dim); font-weight: 600; margin-left: 3px; }
-.fs-kpi-sub { color: var(--dim); font-size: 12px; }
-.fs-badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; }
-.fs-badge.accent { color: var(--accent); background: var(--accent-soft); }
-.fs-badge.good   { color: var(--good);   background: color-mix(in srgb, var(--good) 16%, transparent); }
-.fs-badge.warn   { color: var(--warn);   background: color-mix(in srgb, var(--warn) 16%, transparent); }
-.fs-badge.danger { color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); }
-.fs-kpi .fs-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
-
-/* cards */
-.fs-cols { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; align-items: start; }
-.fs-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; box-shadow: var(--fs-shadow); }
-.fs-card-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 14px; }
-.fs-card-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.fs-card-hd .fs-card-title { margin: 0; }
-
-/* System key/value */
-.fs-kvs { display: flex; flex-direction: column; }
-.fs-kv { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 9px 0; border-bottom: 1px solid var(--border); }
-.fs-kv:last-child { border-bottom: 0; }
-.fs-kv > span { color: var(--dim); font-size: 13px; }
-.fs-kv > b { font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--text); text-align: right; }
-
-/* meters */
-.fs-meters { display: flex; flex-direction: column; gap: 14px; }
-.fs-meters-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-.fs-meter { display: flex; flex-direction: column; gap: 7px; }
-.fs-meter-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.fs-meter-top > span { font-size: 13px; font-weight: 600; color: var(--text); }
-.fs-meter-top > em { font-style: normal; font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
-.fs-bar { height: 8px; background: var(--track); border-radius: 99px; overflow: hidden; }
-.fs-bar > div { height: 100%; border-radius: 99px; transition: width .4s ease; }
-
-/* port status */
-.fs-ports { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
-.fs-port { background: var(--panel2); border: 1px solid var(--border); border-radius: 12px; padding: 13px 12px; display: flex; flex-direction: column; gap: 9px; }
-.fs-port.off { opacity: .6; }
-.fs-port-top { display: flex; align-items: center; justify-content: space-between; }
-.fs-port-name { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--text); }
-.fs-port.off .fs-port-name { color: var(--dim); }
-.fs-port-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
-.fs-port-dot.off { background: var(--track); border: 1px solid var(--faint, var(--dim)); }
-.fs-port-speed { font-size: 12px; font-weight: 600; color: var(--good); }
-.fs-port-speed.off { color: var(--dim); }
-.fs-port-io { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--dim); }
-
-/* network upstream */
-.fs-upstream { border: 1px solid var(--border); border-radius: 13px; overflow: hidden; background: var(--panel2); }
-.fs-upstream-hd { display: flex; align-items: center; gap: 9px; padding: 11px 16px; background: var(--accent-soft); border-bottom: 1px solid var(--border); }
-.fs-upstream-hd > span:nth-child(2) { font-size: 13px; font-weight: 700; color: var(--accent); }
-.fs-conn { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--good); background: color-mix(in srgb, var(--good) 16%, transparent); border-radius: 6px; padding: 2px 8px; }
-.fs-conn.bad { color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); }
-.fs-upstream-grid { padding: 16px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px 24px; }
-.fs-nf { display: flex; flex-direction: column; gap: 3px; }
-.fs-nf > span { color: var(--dim); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.fs-nf > b { font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--text); }
-.fs-upstream-dev { display: flex; align-items: center; gap: 11px; padding: 12px 16px; border-top: 1px solid var(--border); }
-.fs-dev-ic { width: 30px; height: 30px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-.fs-dev-name { font-size: 13px; font-weight: 600; color: var(--text); }
-.fs-dev-mac { font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
-.fs-conns { margin-top: 16px; }
-.fs-conns-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
-.fs-conns-top > span { font-size: 13px; font-weight: 600; color: var(--text); }
-.fs-conns-top > em { font-style: normal; font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
-.fs-conns-top > em b { color: var(--accent); font-weight: 500; }
-
-/* dhcp leases */
-.fs-lease-sub { color: var(--dim); font-size: 12px; margin-bottom: 14px; margin-top: -8px; }
-.fs-leases { display: grid; grid-template-columns: 1.4fr 1fr 1.3fr .9fr auto; gap: 0 18px; align-items: center; }
-.fs-lease-h { color: var(--faint, var(--dim)); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
-.fs-lease-host { display: flex; align-items: center; gap: 10px; padding: 13px 0; border-bottom: 1px solid var(--border); }
-.fs-lease-host > span:last-child { font-size: 13px; font-weight: 600; color: var(--text); }
-.fs-av { width: 26px; height: 26px; border-radius: 8px; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-.fs-av.accent { background: var(--accent-soft); color: var(--accent); }
-.fs-av.good { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
-.fs-av.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
-.fs-lease-ip { font-family: var(--font-mono); font-size: 13px; color: var(--text); padding: 13px 0; border-bottom: 1px solid var(--border); }
-.fs-lease-mac, .fs-lease-rem { font-family: var(--font-mono); font-size: 12px; color: var(--dim); padding: 13px 0; border-bottom: 1px solid var(--border); }
-.fs-lease-act { padding: 13px 0; border-bottom: 1px solid var(--border); }
-.fs-leases > div:nth-last-child(-n+5) { border-bottom: 0; }
-
-@media (max-width: 900px) {
-	.fs-kpis { grid-template-columns: repeat(2, 1fr); }
-	.fs-cols { grid-template-columns: 1fr; }
-	.fs-meters-2 { grid-template-columns: 1fr; }
-	.fs-ports { grid-template-columns: repeat(2, 1fr); }
-	.fs-upstream-grid { grid-template-columns: 1fr 1fr; }
-	.fs-leases { grid-template-columns: 1fr; }
-	.fs-lease-h { display: none; }
 }
 
 /* ==================================================================
@@ -3312,6 +3218,40 @@ body[data-page='admin-status-overview'] .cbi-title .label.notice {
 	color: var(--accent);
 	background: var(--accent-soft);
 	border-color: var(--accent);
+}
+
+/* Section Hide/Show toggles -> compact chevron icon buttons. The label is a
+ * span with a raw "Hide"/"Show" text node (index.js) + data-style: expanded =
+ * inactive, collapsed = active. Hide the text (font-size:0) and draw a chevron
+ * with ::after borders: up = "will collapse" (expanded), down = "will expand"
+ * (collapsed). data-indicator='poll-status' is unique to these toggles. */
+.cbi-title .label[data-indicator='poll-status'],
+body[data-page='admin-status-overview'] .cbi-title .label[data-indicator='poll-status'] {
+	font-size: 0;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+}
+.cbi-title .label[data-indicator='poll-status']::after,
+body[data-page='admin-status-overview'] .cbi-title .label[data-indicator='poll-status']::after {
+	content: '';
+	width: 7px;
+	height: 7px;
+	border-right: 2px solid currentColor;
+	border-bottom: 2px solid currentColor;
+	border-radius: 1px;
+	transform: rotate(45deg);			/* default: chevron down (collapsed / Show) */
+	margin-top: -2px;					/* optical centring of the down chevron */
+	transition: transform .15s ease;
+}
+.cbi-title .label[data-indicator='poll-status'][data-style='inactive']::after,
+body[data-page='admin-status-overview'] .cbi-title .label[data-indicator='poll-status'][data-style='inactive']::after {
+	transform: rotate(-135deg);			/* expanded / Hide -> chevron up */
+	margin-top: 2px;
 }
 
 /* ==================================================================
@@ -3477,7 +3417,7 @@ select[multiple] { background-color: var(--panel2); color: var(--text); }
  * Active only under body.fs-top. Horizontal menu + dropdowns.
  * ================================================================== */
 body.fs-top { display: block; }
-.fs-topwrap { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+.fs-topwrap { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); overflow-x: clip; }
 
 /* top bar */
 .fs-topnav {
@@ -3618,67 +3558,6 @@ body.fs-top { display: block; }
 .cbi-page-actions .cbi-button-save:hover,
 .cbi-page-actions .cbi-button-apply:hover { filter: brightness(1.08); }
 
-/* overview: hide the stock <h2>Status</h2> — the dashboard renders its own head */
-body[data-page='admin-status-overview'] #view > h2[name='content'],
-body[data-page='admin-status-overview'] #maincontent h2[name='content'] { display: none; }
-
-/* ==================================================================
- * FOOTSTRAP dashboard — DHCPv6 + Wireless (Overview design)
- * ================================================================== */
-.fs-leases6 { display: grid; grid-template-columns: auto 1.4fr 1.4fr .8fr auto; gap: 0 18px; align-items: center; }
-.fs-tag { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 3px 8px; }
-.fs-l6-if { padding: 13px 0; border-bottom: 1px solid var(--border); }
-.fs-l6-host { font-size: 13px; font-weight: 600; color: var(--text); padding: 13px 0; border-bottom: 1px solid var(--border); }
-.fs-l6-ip, .fs-l6-rem { font-family: var(--font-mono); font-size: 12px; color: var(--dim); padding: 13px 0; border-bottom: 1px solid var(--border); }
-.fs-l6-act { padding: 13px 0; border-bottom: 1px solid var(--border); }
-.fs-leases6 > div:nth-last-child(-n+5) { border-bottom: 0; }
-
-/* wireless radios */
-.fs-radios { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.fs-radio { border: 1px solid var(--border); border-radius: 13px; overflow: hidden; background: var(--panel2); }
-.fs-radio-hd { display: flex; align-items: center; gap: 9px; padding: 11px 16px; background: var(--accent-soft); border-bottom: 1px solid var(--border); }
-.fs-radio-hd > svg { width: 15px; height: 15px; flex: 0 0 auto; }
-.fs-radio-name { font-size: 13px; font-weight: 700; color: var(--accent); font-family: var(--font-mono); }
-.fs-radio-band { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--dim); }
-.fs-radio-grid { padding: 14px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 11px 18px; }
-.fs-radio-grid .fs-nf > span { font-size: 11px; text-transform: none; letter-spacing: 0; }
-.fs-ssid { margin: 0 16px 16px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; display: flex; gap: 11px; align-items: flex-start; }
-.fs-ssid > svg { margin-top: 1px; flex: 0 0 auto; }
-.fs-ssid-body { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
-.fs-ssid-name { font-weight: 700; color: var(--text); }
-.fs-ssid-name span { font-weight: 500; color: var(--dim); }
-.fs-ssid-bssid { font-family: var(--font-mono); color: var(--dim); font-size: 11px; }
-.fs-ssid-meta { display: flex; gap: 8px; align-items: center; margin-top: 2px; }
-.fs-enc { font-size: 11px; font-weight: 600; color: var(--good); background: color-mix(in srgb, var(--good) 16%, transparent); border-radius: 5px; padding: 2px 7px; }
-.fs-ssid-meta > span:last-child { color: var(--dim); font-size: 11px; }
-
-/* associated stations */
-.fs-st-title { font-size: 13px; font-weight: 700; color: var(--text); margin: 22px 0 14px; }
-.fs-stations { display: grid; grid-template-columns: 1.2fr 1.1fr 1.5fr .9fr 1.4fr auto; gap: 0 16px; align-items: center; }
-.fs-st-net { display: flex; align-items: center; gap: 9px; padding: 14px 0; border-bottom: 1px solid var(--border); }
-.fs-st-net > span:last-child { font-size: 12px; font-weight: 600; color: var(--text); }
-.fs-st-net .fs-av svg { width: 15px; height: 15px; }
-.fs-st-mac { font-family: var(--font-mono); font-size: 12px; color: var(--dim); padding: 14px 0; border-bottom: 1px solid var(--border); }
-.fs-st-host { padding: 14px 0; border-bottom: 1px solid var(--border); }
-.fs-st-hn { font-size: 12px; font-weight: 600; color: var(--text); }
-.fs-st-ip { font-family: var(--font-mono); font-size: 11px; color: var(--dim); }
-.fs-st-sig { display: flex; align-items: center; gap: 8px; padding: 14px 0; border-bottom: 1px solid var(--border); }
-.fs-st-sig > span { font-family: var(--font-mono); font-size: 11px; color: var(--dim); }
-.fs-st-rate { font-family: var(--font-mono); font-size: 11px; color: var(--dim); padding: 14px 0; border-bottom: 1px solid var(--border); line-height: 1.5; }
-.fs-st-act { padding: 14px 0; border-bottom: 1px solid var(--border); }
-.fs-stations > div:nth-last-child(-n+6) { border-bottom: 0; }
-
-@media (max-width: 900px) {
-	.fs-radios { grid-template-columns: 1fr; }
-	.fs-leases6, .fs-stations { grid-template-columns: 1fr; }
-}
-
-/* outline pill buttons in dashboard tables */
-.fs-btn-o { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 8px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
-.fs-btn-o:hover { background: var(--accent-soft); }
-.fs-btn-o.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
-.fs-btn-o.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
-
 /* ==================================================================
  * FOOTSTRAP form widgets (variant A) — toggles, file input, uniform
  * button height, outline row-action buttons. Applies to all CBI forms.
@@ -3747,13 +3626,6 @@ input[type="file"]::file-selector-button:hover { border-color: var(--accent); co
  * dropdown polish.
  * ================================================================== */
 
-/* crisp row dividers — stretch cells to row height so borders align */
-.fs-leases, .fs-leases6, .fs-stations { align-items: stretch; }
-.fs-leases > div, .fs-leases6 > div, .fs-stations > div { display: flex; align-items: center; }
-.fs-lease-h { align-items: flex-end; }
-.fs-st-rate, .fs-st-host { flex-direction: column; align-items: flex-start; justify-content: center; }
-.fs-l6-if, .fs-lease-act, .fs-l6-act, .fs-st-act { justify-content: flex-start; }
-
 /* Save / Reset — flat outline (no fill); Save & Apply — solid accent */
 .cbi-page-actions .cbi-button-save,
 .cbi-page-actions .cbi-button-apply + .cbi-button-save,
@@ -3778,7 +3650,7 @@ input[type="file"]::file-selector-button:hover { border-color: var(--accent); co
 
 /* nav dropdown — crisp per design language */
 .fs-topnav .fs-mainmenu .dropdown-menu {
-	min-width: 200px; padding: 7px; border-radius: 13px;
+	min-width: 200px; padding: 7px; border-radius: 12px;
 	box-shadow: 0 12px 34px rgba(0,0,0,.32);
 	background: color-mix(in srgb, var(--panel) 96%, transparent);
 	backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -3793,21 +3665,6 @@ input[type="file"]::file-selector-button:hover { border-color: var(--accent); co
 }
 .cbi-dropdown ul.dropdown li { border-radius: 8px; padding: 8px 11px; }
 .cbi-dropdown ul.dropdown li[selected], .cbi-dropdown ul.dropdown li.focus { background: var(--accent-soft); color: var(--accent); }
-
-/* compact lease/station tables */
-.fs-leases > div, .fs-leases6 > div { padding-top: 8px; padding-bottom: 8px; }
-.fs-stations > div { padding-top: 9px; padding-bottom: 9px; }
-.fs-lease-h { padding-top: 0; }
-.fs-av { width: 24px; height: 24px; border-radius: 7px; font-size: 11px; }
-.fs-st-net .fs-av { width: 24px; height: 24px; }
-.fs-st-net .fs-av svg { width: 13px; height: 13px; }
-.fs-lease-sub { margin-bottom: 10px; }
-.fs-st-title { margin: 18px 0 10px; }
-
-/* overview: System spans full height of right column (Memory + Storage) */
-.fs-cols { align-items: stretch; }
-.fs-colr { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.fs-colr .fs-card { flex: 0 0 auto; }
 
 /* ==================================================================
  * FOOTSTRAP review polish: subtle poll indicator, outline row buttons
@@ -3900,11 +3757,6 @@ select option { background: var(--panel); color: var(--text); }
 .table.cbi-section-table .th, .table.cbi-section-table .td { padding: 8px 12px 8px 0; }
 .cbi-section-table .tr.cbi-section-table-titles .th,
 .cbi-section-table .tr.table-titles .th { font-size: 10px; letter-spacing: .05em; line-height: 1.25; }
-
-/* overview: hide the firmware-upgrade notification (design omits it). Matched
- * by its attendedsysupgrade link; apply/error banners are untouched. Still
- * visible on the Firmware/Software pages. */
-body[data-page='admin-status-overview'] .alert-message:has(a[href*='attendedsysupgrade']) { display: none !important; }
 
 /* ==================================================================
  * FOOTSTRAP cbi-dropdown widget — the JS select used across all forms.
@@ -4090,64 +3942,6 @@ textarea:focus {
 	box-shadow: 0 0 0 3px var(--accent-soft) !important;
 }
 
-/* ==================================================================
- * FOOTSTRAP Software / package-manager page — match Claude design.
- * DOM: h2 + .cbi-map-descr, .controls (disk/filter/download/actions/
- * i18n), ul.cbi-tabmenu.mode, .pager.center, table#packages.table.
- * ================================================================== */
-body[data-page="admin-system-package-manager"] h2 {
-	font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px;
-}
-body[data-page="admin-system-package-manager"] .cbi-map-descr {
-	color: var(--dim); font-size: 13px; line-height: 1.6; margin-bottom: 18px;
-}
-/* warning line -> amber pill */
-body[data-page="admin-system-package-manager"] .cbi-map-descr span:last-child {
-	display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;
-	font-size: 12px; font-weight: 600; color: var(--warn);
-	background: color-mix(in srgb, var(--warn) 14%, transparent);
-	border-radius: 8px; padding: 5px 11px;
-}
-body[data-page="admin-system-package-manager"] .cbi-map-descr span:last-child a { color: var(--warn); text-decoration: underline; }
-
-/* toolbar card (first .controls) */
-body[data-page="admin-system-package-manager"] .controls {
-	background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
-	padding: 20px 22px; margin: 0 0 16px 0; gap: 16px 20px;
-	display: flex; flex-wrap: wrap; align-items: flex-end;
-}
-body[data-page="admin-system-package-manager"] .controls > div {
-	display: flex; flex-direction: column; gap: 8px; margin: 0; flex: 1 1 220px; min-width: 0;
-}
-body[data-page="admin-system-package-manager"] .controls label {
-	font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
-	color: var(--faint); margin: 0; padding: 0;
-}
-/* disk + i18n rows span full width */
-body[data-page="admin-system-package-manager"] .controls > div:first-child,
-body[data-page="admin-system-package-manager"] .controls > div:last-child { flex: 1 1 100%; }
-body[data-page="admin-system-package-manager"] .controls > div:last-child {
-	flex-direction: row; align-items: center; gap: 14px;
-	border-top: 1px solid var(--border); padding-top: 14px;
-}
-body[data-page="admin-system-package-manager"] .controls > div:last-child > div { display: flex; gap: 16px; }
-body[data-page="admin-system-package-manager"] .controls .control-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-body[data-page="admin-system-package-manager"] .controls .control-group input { flex: 1; min-width: 0; }
-body[data-page="admin-system-package-manager"] .controls .control-group .btn { white-space: nowrap; }
-
-/* disk space progress bar (thick, full width, rounded, good-fill) */
-body[data-page="admin-system-package-manager"] .controls > div:first-child { text-align: left; align-items: flex-start; }
-body[data-page="admin-system-package-manager"] #disk-space-label { margin-bottom: 2px; text-align: left; align-self: flex-start; }
-body[data-page="admin-system-package-manager"] .cbi-progressbar {
-	display: block; width: 100%; height: 10px; background: var(--track); border: 0;
-	border-radius: 99px; overflow: hidden; box-shadow: none; position: relative;
-	text-indent: -9999px;
-}
-body[data-page="admin-system-package-manager"] .cbi-progressbar > div {
-	background: var(--good) !important; height: 100%; border-radius: 99px;
-	white-space: nowrap; overflow: hidden;
-}
-
 /* tabs */
 /* mode tabmenu (Available/Installed/Updates etc) — component-scoped, not
  * page-scoped: any .cbi-tabmenu.mode gets the accent-underline treatment.
@@ -4168,72 +3962,6 @@ ul.cbi-tabmenu.mode > li.cbi-tab > a {
 }
 ul.cbi-tabmenu.mode > li > a:hover { color: var(--text); }
 
-/* pager */
-body[data-page="admin-system-package-manager"] .pager.center {
-	display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 0;
-}
-body[data-page="admin-system-package-manager"] .pager .text { font-size: 12px; color: var(--dim); }
-body[data-page="admin-system-package-manager"] .pager .btn.prev,
-body[data-page="admin-system-package-manager"] .pager .btn.next {
-	flex: 0 0 auto; width: 40px; min-width: 40px; height: 34px; padding: 0; border-radius: 9px;
-	border: 1px solid var(--border); background: var(--panel2); color: var(--text);
-	display: inline-flex; align-items: center; justify-content: center;
-}
-body[data-page="admin-system-package-manager"] .pager .text { flex: 0 0 auto; }
-
-/* package table -> card */
-/* frame + uppercase headers + row hover come from the general .table card;
- * only the Software-specific bits (widths, mono cells, paddings) stay here. */
-body[data-page="admin-system-package-manager"] #packages { margin-top: 16px; width: 100%; max-width: 100%; }
-body[data-page="admin-system-package-manager"] #packages .th { padding: 12px 14px; }
-body[data-page="admin-system-package-manager"] #packages .td { padding: 10px 14px; font-size: 13px; color: var(--dim); border: 0; }
-
-/* Column widths — the package NAME is the important column, so give it the
- * flexible room and hard-cap the version / size columns instead. Names break on
- * their natural hyphens (word-break:normal), never per-character. */
-body[data-page="admin-system-package-manager"] #packages .th:first-child,
-body[data-page="admin-system-package-manager"] #packages .td[data-title="Package name"] {
-	flex: 1 1 190px; min-width: 150px;
-	font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--text);
-	word-break: normal; overflow-wrap: break-word;
-}
-body[data-page="admin-system-package-manager"] #packages .th.version,
-body[data-page="admin-system-package-manager"] #packages .td.version {
-	flex: 0 0 150px; width: 150px; min-width: 150px;
-	white-space: normal; word-break: normal; overflow-wrap: break-word;
-}
-body[data-page="admin-system-package-manager"] #packages .th.size,
-body[data-page="admin-system-package-manager"] #packages .td.size {
-	flex: 0 0 92px; width: 92px; min-width: 92px; white-space: nowrap;
-}
-body[data-page="admin-system-package-manager"] #packages .td.version,
-body[data-page="admin-system-package-manager"] #packages .td.size { font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
-body[data-page="admin-system-package-manager"] #packages .th.col-10,
-body[data-page="admin-system-package-manager"] #packages .td[data-title="Description"] { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
-body[data-page="admin-system-package-manager"] #packages .th.cbi-section-actions,
-body[data-page="admin-system-package-manager"] #packages .td.cbi-section-actions { flex: 0 0 auto; }
-body[data-page="admin-system-package-manager"] #packages .td .btn { border-radius: 8px !important; white-space: nowrap; }
-
-/* Mobile: this table has no .cbi-map wrapper, so the shared container-query
- * stacking doesn't reach it. #view is a query container (declared once, near the
- * generic data-table stacking below) and we stack rows into label/value pairs
- * (data-title comes from the header cells). */
-@container (max-width: 760px) {
-	body[data-page="admin-system-package-manager"] #packages .tr.cbi-section-table-titles { display: none; }
-	body[data-page="admin-system-package-manager"] #packages .tr { display: block; padding: 12px 16px; }
-	body[data-page="admin-system-package-manager"] #packages .td {
-		display: flex; justify-content: space-between; gap: 14px; align-items: baseline;
-		width: auto !important; min-width: 0 !important; flex: none !important; padding: 4px 0;
-	}
-	body[data-page="admin-system-package-manager"] #packages .td[data-title]::before {
-		content: attr(data-title); flex: 0 0 auto; color: var(--faint);
-		font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
-	}
-	body[data-page="admin-system-package-manager"] #packages .td[data-title="Description"] { display: block; }
-	body[data-page="admin-system-package-manager"] #packages .td.cbi-section-actions { justify-content: flex-end; margin-top: 6px; }
-	body[data-page="admin-system-package-manager"] #packages .td.cbi-section-actions::before { content: none; }
-}
-
 /* ==================================================================
  * FOOTSTRAP: standalone data tables -> rounded card (Startup,
  * Processes, Routes, etc.). Tables inside a CBI section already sit in
@@ -4241,7 +3969,7 @@ body[data-page="admin-system-package-manager"] #packages .td .btn { border-radiu
  * ================================================================== */
 .table {
 	border: 1px solid var(--border);
-	border-radius: 16px;
+	border-radius: 12px;
 	overflow: hidden;
 	background: var(--panel);
 }
@@ -4340,24 +4068,28 @@ body[data-page="admin-system-package-manager"] #packages .td .btn { border-radiu
  * ================================================================== */
 #view { container-type: inline-size; }
 
+/* .fs-dt is set by fs-select.js on <table class="table"> that has a
+ * .tr.table-titles header and is NOT .cbi-section-table — replacing a live
+ * `:has(.tr.table-titles):not(.cbi-section-table)` that the style engine had to
+ * re-evaluate on every mutation of these polled tables (Processes/routes/leases). */
 @container (max-width: 820px) {
-	#view table.table:has(.tr.table-titles):not(.cbi-section-table) .tr.table-titles { display: none; }
-	#view table.table:has(.tr.table-titles):not(.cbi-section-table) .tr { display: block; padding: 10px 16px; }
-	#view table.table:has(.tr.table-titles):not(.cbi-section-table) .td {
+	#view table.fs-dt .tr.table-titles { display: none; }
+	#view table.fs-dt .tr { display: block; padding: 10px 16px; }
+	#view table.fs-dt .td {
 		display: flex; align-items: baseline; justify-content: space-between;
 		gap: 14px; padding: 5px 0; border: 0; text-align: right; min-width: 0; width: auto;
 	}
-	#view table.table:has(.tr.table-titles):not(.cbi-section-table) .td[data-title]::before {
+	#view table.fs-dt .td[data-title]::before {
 		content: attr(data-title); flex: 0 0 auto; text-align: left;
 		font-size: 10px; font-weight: 700; letter-spacing: .05em;
 		text-transform: uppercase; color: var(--faint); white-space: nowrap;
 	}
-	#view table.table:has(.tr.table-titles):not(.cbi-section-table) .td.cbi-section-actions {
+	#view table.fs-dt .td.cbi-section-actions {
 		justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 4px;
 	}
-	#view table.table:has(.tr.table-titles):not(.cbi-section-table) .td.cbi-section-actions::before,
-	#view table.table:has(.tr.table-titles):not(.cbi-section-table) .td:not([data-title])::before,
-	#view table.table:has(.tr.table-titles):not(.cbi-section-table) .td[data-title=""]::before { content: none; }
+	#view table.fs-dt .td.cbi-section-actions::before,
+	#view table.fs-dt .td:not([data-title])::before,
+	#view table.fs-dt .td[data-title=""]::before { content: none; }
 }
 
 /* ==================================================================
@@ -4366,11 +4098,6 @@ body[data-page="admin-system-package-manager"] #packages .td .btn { border-radiu
  * the Software pager .controls must not get the toolbar-card frame.
  * ================================================================== */
 .hidden, .cbi-value.hidden, .cbi-section.hidden, tr.hidden, .cbi-value-field .hidden { display: none !important; }
-
-body[data-page="admin-system-package-manager"] .controls:has(.pager) {
-	background: none; border: 0; border-radius: 0; padding: 6px 0; margin: 0;
-}
-
 /* ==================================================================
  * FOOTSTRAP RangeSlider (UIRangeSlider) — the one LuCI widget the base
  * bootstrap left to native browser rendering. Token-driven track/thumb.
@@ -4410,7 +4137,7 @@ input[type="range"]:focus { box-shadow: 0 0 0 3px var(--accent-soft); }
 .fs-login-wrap { display: flex; justify-content: center; padding: 7vh 16px 40px; }
 .fs-login {
 	width: 100%; max-width: 400px;
-	background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+	background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
 	padding: 26px 26px 24px; box-shadow: 0 24px 60px rgba(0,0,0,.45);
 }
 .fs-login-title { font-size: 21px; font-weight: 800; letter-spacing: -.01em; color: var(--text); margin-bottom: 20px; }
@@ -4438,7 +4165,7 @@ input[type="range"]:focus { box-shadow: 0 0 0 3px var(--accent-soft); }
  * Scoped by the username field so nothing else on the site is affected. */
 form:has(> .cbi-map input[name="luci_username"]) {
 	max-width: 400px; margin: 7vh auto 40px;
-	background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+	background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
 	padding: 26px 26px 24px; box-shadow: 0 24px 60px rgba(0,0,0,.45);
 }
 form:has(> .cbi-map input[name="luci_username"]) .cbi-map,
@@ -4502,10 +4229,186 @@ form:has(> .cbi-map input[name="luci_username"]) .cbi-page-actions .btn:hover { 
 
 /* Round the popup itself to match the theme's cards (base is only 3px), plus
  * small rounding on the diff boxes and legend swatches for a cohesive look. */
-#modal_overlay .modal { border-radius: 16px; }
+#modal_overlay .modal { border-radius: 12px; }
 #modal_overlay .uci-dialog div > ins,
 #modal_overlay .uci-dialog div > del,
 #modal_overlay .uci-dialog div > var { border-radius: 8px; }
 #modal_overlay .uci-change-legend-label > ins,
 #modal_overlay .uci-change-legend-label > del,
 #modal_overlay .uci-change-legend-label > var { border-radius: 4px; overflow: hidden; }
+
+/* ---------------------------------------------------------------------------
+ * Stock overview layout: 05_footstrap_overview_layout.js wraps the stock
+ * System / Memory / Storage sections in .fs-ovl. Grid: System fills the left
+ * column across both rows, Memory (top) + Storage (bottom) stack in the right
+ * column. Only layout — the stock section styling/data is untouched. The rest
+ * of the overview (Network, DHCP, Wireless …) stays full-width below.
+ * --------------------------------------------------------------------------- */
+/* hide the stock <h2>Status</h2> page heading — the chrome already shows the
+ * page title (sidebar topbar / top-nav location), so it's a redundant duplicate. */
+body[data-page='admin-status-overview'] #view > h2[name='content'],
+body[data-page='admin-status-overview'] #maincontent h2[name='content'] { display: none; }
+.fs-ovl {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 16px;
+	/* stretch (default) so the System column and the Memory+Storage column end
+	 * at the same bottom edge — equal height regardless of which has more rows */
+	margin-bottom: 16px;			/* match stock .cbi-section spacing below the grid */
+}
+.fs-ovl > .fs-ovl-sys { grid-column: 1; grid-row: 1 / 3; margin: 0; }
+.fs-ovl > .fs-ovl-mem { grid-column: 2; grid-row: 1; margin: 0; }
+.fs-ovl > .fs-ovl-sto { grid-column: 2; grid-row: 2; margin: 0; }
+/* hide our own empty stock wrapper — the include renders only .fs-ovl-marker,
+ * which index.js nests inside the section's inner container (not a direct
+ * child), so match it anywhere in the descendants, not with `>`. */
+#view > .cbi-section:has(.fs-ovl-marker) { display: none; }
+
+@media (max-width: 800px) {
+	.fs-ovl { grid-template-columns: 1fr; }
+	.fs-ovl > .fs-ovl-sys,
+	.fs-ovl > .fs-ovl-mem,
+	.fs-ovl > .fs-ovl-sto { grid-column: 1; grid-row: auto; }
+}
+
+/* ---------------------------------------------------------------------------
+ * Stock Port status (29_ports.js) reskin — pure CSS over the stock .ifacebox
+ * markup. Turn the icon-in-a-box tiles into left-aligned cards with a link
+ * dot: name + status dot (top row), speed, then TX/RX on one line.
+ *
+ * IMPORTANT: Network (30_network.js) and Wireless (60_wifi.js) reuse the SAME
+ * .ifacebox / .ifacebox-head / .ifacebox-body classes, so every rule is scoped
+ * to `.ifacebox:has(img[src*="/port_"])` — only Port status tiles carry a
+ * `icons/port_*.svg` icon. This keeps the reskin off Network/Wireless.
+ * Link state = the icon src (port_up/pse_up = link, *_down = no link). Child
+ * order: 1 name-head, 2 body(icon+speed), 3 zone-bar head, 4 body(traffic).
+ * --------------------------------------------------------------------------- */
+/* grid wrapper — only the ports grid (its tiles carry port_* icons) */
+body[data-page='admin-status-overview'] div:has(> .ifacebox img[src*="/port_"]) {
+	gap: 12px !important;
+	grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)) !important;
+	margin-bottom: 0 !important;
+}
+/* the card */
+body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) {
+	margin: 0 !important;
+	min-width: 0 !important;
+	max-width: none !important;
+	text-align: left;
+	background: var(--panel2);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 12px 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+/* drop the stock icon and the zone-colour bar row */
+body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) img { display: none; }
+body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > :nth-child(3) { display: none !important; }
+/* speed body: hide its <br> so only the speed text shows */
+body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) br { display: none; }
+/* name row: name left, status dot right */
+body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 13px;
+	color: var(--text);
+}
+body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child::after {
+	content: '';
+	width: 9px; height: 9px;
+	border-radius: 50%;
+	background: var(--good);				/* linked (default) */
+	flex: 0 0 auto;
+}
+/* no-link (icon *_down.svg): hollow ring + dim name */
+body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child { color: var(--dim); }
+body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child::after {
+	background: transparent;
+	border: 1.5px solid var(--dim);
+}
+/* speed line (2nd child): green when linked, dim when not */
+body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--good);
+	text-align: left;
+}
+body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-body:nth-child(2) { color: var(--dim); }
+/* traffic (4th child): TX / RX (stock keeps them on two lines via a <br> that
+ * CSS can't turn into a one-line gap without merging the two runs). Mono + dim. */
+body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container {
+	font-family: var(--font-mono);
+	font-size: 11px !important;
+	color: var(--dim);
+	line-height: 1.7;
+}
+
+/* ---------------------------------------------------------------------------
+ * Memory / Storage (stock 20_memory.js, 25_storage.js) reskin — restyle the
+ * stock <table>.table rows into the old-dashboard meter look: label + value on
+ * one line, a thin NEUTRAL (no accent colour) bar below. Value comes from the
+ * .cbi-progressbar title attr (kept in ::after, moved above the bar). Scoped to
+ * our .fs-ovl-mem / .fs-ovl-sto wrappers so the global pill-meter is untouched.
+ * --------------------------------------------------------------------------- */
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .table { display: block; }
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .tr {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 5px 10px;
+	padding: 7px 0 10px;
+	border: 0;
+	position: relative;
+}
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .tr:last-child { padding-bottom: 2px; }
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .td {
+	display: block;
+	width: auto !important;
+	padding: 0 !important;
+	border: 0 !important;
+}
+/* label — row 1, left */
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .td:first-child {
+	grid-column: 1; grid-row: 1;
+	align-self: center;
+	font-size: 12px; font-weight: 600; color: var(--text);
+}
+/* bar cell — spans full width on row 2 */
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .td:nth-child(2) {
+	grid-column: 1 / -1; grid-row: 2;
+}
+/* thin neutral track + grey fill (no accent colour) */
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .cbi-progressbar {
+	position: static;					/* ::after then anchors to the .tr */
+	height: 7px; min-width: 0;
+	margin: 0;							/* base .cbi-progressbar has margin:1.4em 0 4px — huge top gap */
+	background: var(--track);
+	border: 0; border-radius: 99px; overflow: hidden;
+}
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .cbi-progressbar > div {
+	background: var(--accent);
+	border-radius: 99px;
+}
+/* kill the base bootstrap ::before (also content:attr(title), top:-1.4em left:0)
+ * — it duplicates the value on the left; we render it once via ::after below */
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .cbi-progressbar::before { display: none; }
+/* value (title) floated onto the label line, right-aligned, mono/dim */
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .cbi-progressbar::after {
+	content: attr(title);
+	position: absolute;
+	top: 9px; right: 0; left: auto; bottom: auto;	/* reset base inset:0 */
+	display: block;
+	font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+	color: var(--dim); text-shadow: none;
+	white-space: nowrap;
+}
+
+/* System / Memory / Storage cards: drop the per-row border-bottom dividers
+ * (the generic .cbi-section .table .td rule adds them) — cleaner card look. */
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .table .td,
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .table .th,
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .cbi-value { border-bottom: 0 !important; }
+/* System key/value table draws its dividers on .tr (not .td) — remove those too */
+body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .table .tr { border-bottom: 0 !important; }

@@ -16,35 +16,36 @@
   сток bootstrap). Спека: `../docs/10-realizatsiya-topnav.md`.
 
 Каждая — с вариантами Dark/Light (форс) + auto. Обе используют один
-`cascade.css`, шрифты, логотип и дашборд-include; отличие только в раскладке
-хрома (header/footer + menu-JS). Медиа-каталоги top-линейки — symlink на
-`footstrap`.
+`cascade.css`, шрифты, логотип и overview-layout include; отличие только в
+раскладке хрома (header/footer + menu-JS). Медиа-каталоги top-линейки — symlink
+на `footstrap`.
 
 Дизайн-токены (dark/light) — в `:root` блоке `cascade.css` (мост к легаси
 bootstrap-переменным, поэтому стандартные cbi-виджеты перекрашены без правки
 базовых правил). Шрифты Manrope + JetBrains Mono самохостятся в `fonts/`.
 
-**Граница темы:** тема даёт хром + дизайн-язык. KPI-дэшборд с кольцом памяти,
-спарклайном load и графической панелью портов из макета — это контент
-Status-страницы (view-JS `luci-mod-status`), отдельная фаза-мод. Подробно —
-`../docs/08-design-sistema.md`, раздел «Границы».
+**Граница темы:** тема даёт хром + дизайн-язык, контент Status-страницы рисует
+view-JS `luci-mod-status`. Тема сам контент не рендерит — только переставляет
+штатные секции overview. Подробно — `../docs/08-design-sistema.md`, раздел
+«Границы».
 
-**Dashboard (мини-мод в теме):**
-`htdocs/luci-static/resources/view/status/include/05_footstrap_dashboard.js` —
-*аддитивный* status-overview include (новое имя файла → без конфликта с
+**Overview-layout (мини-мод в теме):**
+`htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js` —
+*аддитивный* status-overview include (уникальное имя → без конфликта с
 luci-mod-status). LuCI сам подхватывает все `*.js` из каталога; префикс `05_`
-ставит его первым. Рисует верх overview как в макете **1A**: KPI-ряд
-(**Load / Memory / Storage / Uptime**) + карточки System (без Uptime/Load —
-ушли в KPI) + Memory (бары Available/Used/Buffered/Cached) + Storage (диск/
-temp/mounts). Данные — `system.board`, `system.info`, `luci.getVersion`,
-`luci.getMountPoints`.
+ставит его первым. Своего контента **не рисует** — `MutationObserver` на `#view`
+находит штатные секции System/Memory/Storage по заголовку и оборачивает их в
+`.fs-ovl`, а CSS-grid раскладывает: System — левая колонка на оба ряда, Memory
+(сверху) + Storage (снизу) — правая. Остальные секции остаются штатными ниже.
+Штатный poll обновляет нутро каждой секции **на месте** (`dom.content`), обёртку
+`.cbi-section` не пересоздаёт, поэтому перемещённые секции не мигают. Свою
+пустую обёртку скрывает CSS `#view > .cbi-section:has(.fs-ovl-marker)`. Это
+рендер-логика, а не оформление — осознанно пересекает границу тема/мод (docs/08
+«Границы»); чужие файлы не переопределяются.
 
-Штатные дубли (System/Memory/Storage) скрываются в рантайме по заголовку
-(класс `.fs-dup-hidden`, `!important` — переживает per-poll `display=''`).
-Секции Ports/Network/DHCP/Wifi остаются. Обёртка-карточка от `index.js`
-снимается через CSS `:has(.fs-dashroot)`. Это рендер-логика, а не оформление —
-осознанно пересекает границу тема/мод (docs/08 «Границы»); чужие файлы не
-переопределяются.
+Прежний вариант (`05_footstrap_dashboard.js`) рисовал весь overview кастомно
+(KPI-ряд, карточки, свои таблицы) — но пересборка страницы-в-высоту на каждый
+poll мигала и сбрасывала скролл на мобильном, поэтому заменён на layout-only.
 
 ## Структура
 

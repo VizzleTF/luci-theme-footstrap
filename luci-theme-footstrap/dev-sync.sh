@@ -25,7 +25,7 @@ scp -q  "$D"/htdocs/luci-static/resources/menu-$N.js        "$R":/www/luci-stati
 scp -q  "$D"/htdocs/luci-static/resources/menu-$N-top.js    "$R":/www/luci-static/resources/
 scp -q  "$D"/htdocs/luci-static/resources/fs-select.js      "$R":/www/luci-static/resources/
 scp -q  "$D"/htdocs/luci-static/resources/view/$N/*      "$R":/www/luci-static/resources/view/$N/
-scp -q  "$D"/htdocs/luci-static/resources/view/status/include/05_${N}_dashboard.js \
+scp -q  "$D"/htdocs/luci-static/resources/view/status/include/05_${N}_overview_layout.js \
 	"$R":/www/luci-static/resources/view/status/include/
 
 ssh "$R" "
