@@ -21,11 +21,22 @@ scp -q  "$D"/ucode/template/themes/$N-top/*.ut  "$R":/usr/share/ucode/luci/templ
 # shared static (cascade.css, fonts, logo) + menu renderers (+ shared common)
 scp -qr "$D"/htdocs/luci-static/$N/*                     "$R":/www/luci-static/$N/
 scp -q  "$D"/htdocs/luci-static/resources/menu-$N-common.js "$R":/www/luci-static/resources/
+# stamp the git-derived version into the deployed common.js (the packaged build
+# does the same in the Makefile) so the Appearance popover shows a real version
+# and the update check works on the dev router.
+FS_V="$(git -C "$D" describe --tags --always 2>/dev/null | sed 's/^v//')"
+[ -n "$FS_V" ] && ssh "$R" "sed -i \"s#const FS_VERSION = '[^']*'#const FS_VERSION = '$FS_V'#\" /www/luci-static/resources/menu-$N-common.js"
 scp -q  "$D"/htdocs/luci-static/resources/menu-$N.js        "$R":/www/luci-static/resources/
 scp -q  "$D"/htdocs/luci-static/resources/menu-$N-top.js    "$R":/www/luci-static/resources/
 scp -q  "$D"/htdocs/luci-static/resources/fs-select.js      "$R":/www/luci-static/resources/
 scp -q  "$D"/htdocs/luci-static/resources/view/status/include/05_${N}_overview_layout.js \
 	"$R":/www/luci-static/resources/view/status/include/
+
+# self-update backend: the exec script + its rpcd ACL (file.exec of that one path)
+ssh "$R" "mkdir -p /usr/libexec /usr/share/rpcd/acl.d"
+scp -q  "$D"/root/usr/libexec/footstrap-selfupdate.sh          "$R":/usr/libexec/
+scp -q  "$D"/root/usr/share/rpcd/acl.d/luci-theme-footstrap.json "$R":/usr/share/rpcd/acl.d/
+ssh "$R" "chmod +x /usr/libexec/footstrap-selfupdate.sh; /etc/init.d/rpcd reload 2>/dev/null; rm -f /tmp/luci-indexcache*"
 
 ssh "$R" "
 # media symlinks (dark/light + top share the footstrap assets dir)

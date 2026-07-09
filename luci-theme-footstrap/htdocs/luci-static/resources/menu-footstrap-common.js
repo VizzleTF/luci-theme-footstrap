@@ -501,6 +501,46 @@ function placePopover(btn, pop) {
 	pop.style.top  = Math.max(gap, Math.min(top,  vh - h - gap)) + 'px';
 }
 
+/* ---- theme version + update check --------------------------------------
+ * FS_VERSION is stamped at build/deploy: the package Makefile (Build/Compile)
+ * and dev-sync.sh rewrite the '0.0.0-dev' literal below to the git-derived
+ * version. On release builds it is the real version; a plain source checkout
+ * (never stamped) stays 'dev' and skips the update check.
+ *
+ * The update check hits the GitHub Releases API from the BROWSER (CORS-open),
+ * once per page load — memoised in _fsUpdatePromise so re-opening the popover
+ * (or a second layout) reuses the same result; a full reload re-checks. No
+ * router backend, no rpcd ACL: it is a pure client fetch that fails silent
+ * (offline / rate-limited -> no badge, version still shows). */
+const FS_VERSION = '0.0.0-dev';
+const FS_REPO = 'VizzleTF/luci-theme-footstrap';
+let _fsUpdatePromise = null;
+
+function fsVersionReal() { return /^\d+\.\d+/.test(FS_VERSION) && FS_VERSION !== '0.0.0-dev'; }
+function fsParseVer(s) { return String(s).replace(/^v/, '').split(/[.\-+]/).map(n => parseInt(n, 10) || 0); }
+function fsVerCmp(a, b) {
+	a = fsParseVer(a); b = fsParseVer(b);
+	for (let i = 0; i < Math.max(a.length, b.length); i++) {
+		const d = (a[i] || 0) - (b[i] || 0);
+		if (d) return d > 0 ? 1 : -1;
+	}
+	return 0;
+}
+function checkFootstrapUpdate() {
+	if (_fsUpdatePromise) return _fsUpdatePromise;
+	if (!fsVersionReal())
+		return (_fsUpdatePromise = Promise.resolve({ current: FS_VERSION, latest: null, hasUpdate: false }));
+	_fsUpdatePromise = fetch('https://api.github.com/repos/' + FS_REPO + '/releases/latest',
+			{ headers: { 'Accept': 'application/vnd.github+json' } })
+		.then(r => r.ok ? r.json() : null)
+		.then(j => {
+			const latest = (j && j.tag_name) ? j.tag_name : null;
+			return { current: FS_VERSION, latest, hasUpdate: !!(latest && fsVerCmp(latest, FS_VERSION) > 0) };
+		})
+		.catch(() => ({ current: FS_VERSION, latest: null, hasUpdate: false }));
+	return _fsUpdatePromise;
+}
+
 function wireAppearance() {
 	const btn = document.getElementById('fs-appearance');
 	if (!btn) return;
@@ -536,8 +576,71 @@ function wireAppearance() {
 		]));
 	}
 
+	/* version line + "new version" badge + one-click Update button (the last two
+	 * are revealed by the update check below when a newer release exists). */
+	const badge = E('a', {
+		'class': 'fs-ap-badge', 'hidden': '',
+		'href': 'https://github.com/' + FS_REPO + '/releases/latest',
+		'target': '_blank', 'rel': 'noopener'
+	}, [ _('New version available') ]);
+	const updateBtn = E('button', { 'class': 'fs-ap-update', 'type': 'button', 'hidden': '' }, [ _('Update now') ]);
+	groups.push(E('div', { 'class': 'fs-ap-footer' }, [
+		E('div', { 'class': 'fs-ap-verrow' }, [
+			E('span', { 'class': 'fs-ap-version' }, [ fsVersionReal() ? ('Footstrap v' + FS_VERSION) : 'Footstrap (dev)' ]),
+			badge
+		]),
+		updateBtn
+	]));
+
 	const pop = E('div', { 'class': 'fs-appearance-pop', 'role': 'dialog', 'aria-label': _('Appearance'), 'hidden': '' }, groups);
 	document.body.appendChild(pop);
+
+	/* once per page load: reveal the badge + Update button and mark the trigger
+	 * (green dot) when a newer release exists. Runs now (not on open) so the dot
+	 * shows immediately. */
+	checkFootstrapUpdate().then(u => {
+		if (!u.hasUpdate) return;
+		btn.classList.add('fs-has-update');
+		badge.hidden = false;
+		badge.textContent = _('New version available') + (u.latest ? ' (' + u.latest + ')' : '');
+		updateBtn.hidden = false;
+	});
+
+	/* one-click self-update: confirm, then run the ACL-gated backend script via
+	 * file.exec (fs.exec). It downloads the latest release .apk/.ipk and installs
+	 * it with apk (25.12) or opkg (24.10); on success the page reloads onto the
+	 * new theme. No user input reaches the script — the ACL grants exec of that
+	 * fixed path only, so there is nothing to inject. */
+	function runSelfUpdate() {
+		close();
+		const modal = (body) => ui.showModal(_('Update Footstrap'), body);
+		const fail = (msg) => modal([
+			E('p', {}, _('Update failed') + ': ' + String(msg || _('unknown error')).replace(/^ERR:\s*/, '').trim()),
+			E('div', { 'class': 'right' }, E('button', { 'class': 'btn', 'click': ui.hideModal }, _('Close')))
+		]);
+		modal([
+			E('p', {}, _('Download and install the latest Footstrap release from GitHub? The page reloads when done.')),
+			E('div', { 'class': 'right' }, [
+				E('button', { 'class': 'btn', 'click': ui.hideModal }, _('Cancel')), ' ',
+				E('button', { 'class': 'btn cbi-button-action', 'click': doUpdate }, _('Update'))
+			])
+		]);
+		function doUpdate() {
+			modal([ E('p', { 'class': 'spinning' }, _('Downloading and installing…')) ]);
+			L.require('fs')
+				.then(fs => fs.exec('/usr/libexec/footstrap-selfupdate.sh'))
+				.then(res => {
+					if (res && res.code === 0 && /(^|\n)OK\s*$/.test(String(res.stdout || ''))) {
+						modal([ E('p', {}, _('Updated. Reloading…')) ]);
+						window.setTimeout(() => location.reload(), 1200);
+					} else {
+						fail((res && (res.stderr || res.stdout)) || '');
+					}
+				})
+				.catch(e => fail(e && e.message || e));
+		}
+	}
+	updateBtn.addEventListener('click', runSelfUpdate);
 
 	function outside(e) { if (!pop.contains(e.target) && !btn.contains(e.target) && e.target !== btn) close(); }
 	function esc(e) { if (e.key === 'Escape') { close(); btn.focus(); } }

@@ -2873,6 +2873,41 @@ body {
 
 .fs-ap-group { display: flex; flex-direction: column; gap: 6px; }
 .fs-ap-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+
+/* version line + "new version" pill + Update button at the foot of the popover */
+.fs-ap-footer {
+	display: flex; flex-direction: column; gap: 8px;
+	margin-top: 2px; padding-top: 10px; border-top: 1px solid var(--border);
+}
+.fs-ap-verrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.fs-ap-version { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.fs-ap-update {
+	display: block; width: 100%; padding: 8px 12px;
+	font-size: 12px; font-weight: 600; cursor: pointer;
+	color: var(--on-accent, #fff); background: var(--good);
+	border: 1px solid transparent; border-radius: 9px;
+	transition: filter .15s;
+}
+.fs-ap-update:hover { filter: brightness(1.08); }
+.fs-ap-update[hidden] { display: none; }
+.fs-ap-badge {
+	font-size: 11px; font-weight: 600; white-space: nowrap; text-decoration: none;
+	color: var(--good); padding: 2px 9px; border-radius: 999px;
+	background: color-mix(in srgb, var(--good) 15%, transparent);
+	border: 1px solid color-mix(in srgb, var(--good) 40%, transparent);
+}
+.fs-ap-badge[hidden] { display: none; }
+.fs-ap-badge:hover { filter: brightness(1.12); }
+
+/* update indicator: a green dot at the top-right of the Appearance trigger,
+ * matching the overview port-status link dot. Added by menu-*-common.js when a
+ * newer release is found. The panel-coloured ring lifts it off the icon. */
+#fs-appearance { position: relative; overflow: visible; }
+#fs-appearance.fs-has-update::after {
+	content: ''; position: absolute; top: 3px; right: 3px;
+	width: 8px; height: 8px; border-radius: 50%;
+	background: var(--good); box-shadow: 0 0 0 2px var(--panel);
+}
 .fs-seg {
 	display: flex; gap: 4px; padding: 3px;
 	background: var(--panel2); border: 1px solid var(--border); border-radius: 9px;
@@ -3256,10 +3291,10 @@ footer.fs-footer a:hover { color: var(--accent); }
  * firewall zones, port forwards …). Forcing width:40%/nowrap on their first
  * column starved the remaining data columns (dates broke mid-token). Exclude
  * CBI section tables and the JS-tagged data tables (.fs-dt) explicitly. */
-.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt) .td:first-child {
+.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)) .td:first-child {
 	color: var(--dim); font-weight: 500; width: 40%; white-space: nowrap;
 }
-.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt) .td:last-child:not(:first-child) {
+.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)) .td:last-child:not(:first-child) {
 	font-family: var(--font-mono); color: var(--text); text-align: right;
 }
 
@@ -4612,8 +4647,8 @@ body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifa
  * the progressbar itself (:has), so it covers every such row uniformly instead
  * of per-section. The bar + value styling is the general .cbi-progressbar rule.
  * --------------------------------------------------------------------------- */
-body[data-page='admin-status-overview'] .cbi-section .table:has(.cbi-progressbar) { display: block; }
-body[data-page='admin-status-overview'] .cbi-section .table .tr:has(.cbi-progressbar) {
+body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)):has(.cbi-progressbar) { display: block; }
+body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr);
 	gap: 5px 10px;
@@ -4621,8 +4656,8 @@ body[data-page='admin-status-overview'] .cbi-section .table .tr:has(.cbi-progres
 	border: 0;
 	position: relative;
 }
-body[data-page='admin-status-overview'] .cbi-section .table .tr:has(.cbi-progressbar):last-child { padding-bottom: 2px; }
-body[data-page='admin-status-overview'] .cbi-section .table .tr:has(.cbi-progressbar) .td {
+body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar):last-child { padding-bottom: 2px; }
+body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td {
 	display: block;
 	width: auto !important;
 	padding: 0 !important;
@@ -4635,7 +4670,7 @@ body[data-page='admin-status-overview'] .cbi-section .table .tr:has(.cbi-progres
  * stopped shrinking on a phone. Let it wrap anywhere, and keep a gutter on the
  * right for the value, which is pinned above the bar's right edge (::after on
  * .cbi-progressbar — out of flow, so nothing else reserves space for it). */
-body[data-page='admin-status-overview'] .cbi-section .table .tr:has(.cbi-progressbar) .td:first-child {
+body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
 	grid-column: 1; grid-row: 1;
 	align-self: center;
 	min-width: 0;
@@ -4645,7 +4680,7 @@ body[data-page='admin-status-overview'] .cbi-section .table .tr:has(.cbi-progres
 	font-size: 12px; font-weight: 600; color: var(--text);
 }
 /* bar cell — spans full width on row 2 */
-body[data-page='admin-status-overview'] .cbi-section .table .tr:has(.cbi-progressbar) .td:nth-child(2) {
+body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:nth-child(2) {
 	grid-column: 1 / -1; grid-row: 2;
 }
 

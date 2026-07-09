@@ -53,6 +53,15 @@ define Package/luci-theme-footstrap/postrm
 }
 endef
 
+# Stamp the git-derived version into the theme JS so the Appearance popover can
+# show it and run its GitHub update check. luci.mk calls this hook right after
+# copying htdocs into PKG_BUILD_DIR, so we rewrite the build copy — never the
+# source tree. Skipped when PKG_VERSION is empty (leaves the '0.0.0-dev' literal).
+define Build/Prepare/luci-theme-footstrap
+	$(if $(PKG_VERSION),$(SED) "s#const FS_VERSION = '[^']*'#const FS_VERSION = '$(PKG_VERSION)'#" \
+		$(PKG_BUILD_DIR)/htdocs/luci-static/resources/menu-footstrap-common.js)
+endef
+
 include $(TOPDIR)/feeds/luci/luci.mk
 
 # call BuildPackage - OpenWrt buildroot signature

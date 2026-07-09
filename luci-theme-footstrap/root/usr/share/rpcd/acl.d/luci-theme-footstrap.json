@@ -1,0 +1,10 @@
+{
+	"luci-theme-footstrap": {
+		"description": "Footstrap theme self-update (install the latest release)",
+		"write": {
+			"file": {
+				"/usr/libexec/footstrap-selfupdate.sh": [ "exec" ]
+			}
+		}
+	}
+}
