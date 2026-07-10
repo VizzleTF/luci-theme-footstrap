@@ -3303,6 +3303,18 @@ footer.fs-footer a:hover { color: var(--accent); }
  * bar itself is themed by the generic .cbi-progressbar pill-meter above. */
 .cbi-section .table:not([id]):not(.cbi-section-table) .tr:has(.cbi-progressbar) .td { vertical-align: middle; }
 
+/* Multi-column DATA tables with a progressbar column (cpu-status "Detailed load
+ * of each CPU"): the generic meter floats its value ABOVE the bar, which lands
+ * on the row divider. Here the bar sits in a real table row, so shrink it and
+ * put the value INLINE to its right, vertically centred — clear of the border. */
+.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar {
+	min-width: 60px !important; margin-right: 42px;
+}
+.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar::after {
+	right: auto; left: calc(100% + 8px); bottom: auto; top: 50%;
+	transform: translateY(-50%);
+}
+
 /* remove double card when a section nests a table-only include */
 .cbi-section .cbi-section { border: 0; box-shadow: none; padding: 0; margin: 0; background: transparent; }
 

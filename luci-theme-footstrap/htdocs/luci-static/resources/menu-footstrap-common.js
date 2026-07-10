@@ -516,6 +516,17 @@ const FS_VERSION = '0.0.0-dev';
 const FS_REPO = 'VizzleTF/luci-theme-footstrap';
 let _fsUpdatePromise = null;
 
+/* opt-out toggle for the GitHub update check (Appearance -> Updates). Default on;
+ * off means no network call, no badge/dot. */
+function currentUpdateCheck() { return lsGet('fs-update-check') !== 'off'; }
+function applyUpdateCheck(val) {
+	if (val === 'off') { lsSet('fs-update-check', 'off'); document.getElementById('fs-appearance')?.classList.remove('fs-has-update'); }
+	else lsDel('fs-update-check');
+	/* re-evaluate so turning it back on within the same session shows the state */
+	_fsUpdatePromise = null;
+	if (typeof window.__fsUpdateApply == 'function') window.__fsUpdateApply();
+}
+
 function fsVersionReal() { return /^\d+\.\d+/.test(FS_VERSION) && FS_VERSION !== '0.0.0-dev'; }
 function fsParseVer(s) { return String(s).replace(/^v/, '').split(/[.\-+]/).map(n => parseInt(n, 10) || 0); }
 function fsVerCmp(a, b) {
@@ -528,7 +539,7 @@ function fsVerCmp(a, b) {
 }
 function checkFootstrapUpdate() {
 	if (_fsUpdatePromise) return _fsUpdatePromise;
-	if (!fsVersionReal())
+	if (!fsVersionReal() || !currentUpdateCheck())
 		return (_fsUpdatePromise = Promise.resolve({ current: FS_VERSION, latest: null, hasUpdate: false }));
 	_fsUpdatePromise = fetch('https://api.github.com/repos/' + FS_REPO + '/releases/latest',
 			{ headers: { 'Accept': 'application/vnd.github+json' } })
@@ -584,6 +595,16 @@ function wireAppearance() {
 		'target': '_blank', 'rel': 'noopener'
 	}, [ _('New version available') ]);
 	const updateBtn = E('button', { 'class': 'fs-ap-update', 'type': 'button', 'hidden': '' }, [ _('Update now') ]);
+
+	/* opt-out toggle for the update check */
+	groups.push(E('div', { 'class': 'fs-ap-group' }, [
+		E('div', { 'class': 'fs-ap-label' }, [ _('Updates') ]),
+		segControl(currentUpdateCheck() ? 'on' : 'off', [
+			{ val: 'on',  label: _('Check') },
+			{ val: 'off', label: _('Off') }
+		], applyUpdateCheck)
+	]));
+
 	groups.push(E('div', { 'class': 'fs-ap-footer' }, [
 		E('div', { 'class': 'fs-ap-verrow' }, [
 			E('span', { 'class': 'fs-ap-version' }, [ fsVersionReal() ? ('Footstrap v' + FS_VERSION) : 'Footstrap (dev)' ]),
@@ -595,16 +616,24 @@ function wireAppearance() {
 	const pop = E('div', { 'class': 'fs-appearance-pop', 'role': 'dialog', 'aria-label': _('Appearance'), 'hidden': '' }, groups);
 	document.body.appendChild(pop);
 
-	/* once per page load: reveal the badge + Update button and mark the trigger
-	 * (green dot) when a newer release exists. Runs now (not on open) so the dot
-	 * shows immediately. */
-	checkFootstrapUpdate().then(u => {
-		if (!u.hasUpdate) return;
-		btn.classList.add('fs-has-update');
-		badge.hidden = false;
-		badge.textContent = _('New version available') + (u.latest ? ' (' + u.latest + ')' : '');
-		updateBtn.hidden = false;
-	});
+	/* reveal the badge + Update button and mark the trigger (green dot) when a
+	 * newer release exists. Runs once per page load and again when the Updates
+	 * toggle flips (via window.__fsUpdateApply, which applyUpdateCheck calls). */
+	function applyUpdateUI() {
+		if (!currentUpdateCheck()) {
+			btn.classList.remove('fs-has-update');
+			badge.hidden = true; updateBtn.hidden = true;
+			return;
+		}
+		checkFootstrapUpdate().then(u => {
+			btn.classList.toggle('fs-has-update', !!u.hasUpdate);
+			badge.hidden = !u.hasUpdate; updateBtn.hidden = !u.hasUpdate;
+			if (u.hasUpdate)
+				badge.textContent = _('New version available') + (u.latest ? ' (' + u.latest + ')' : '');
+		});
+	}
+	window.__fsUpdateApply = applyUpdateUI;
+	applyUpdateUI();
 
 	/* one-click self-update: confirm, then run the ACL-gated backend script via
 	 * file.exec (fs.exec). It downloads the latest release .apk/.ipk and installs
