@@ -106,4 +106,23 @@
 		.fs-topnav .fs-mainmenu > li.dropdown > a.menu::after { display: none; }
 		.fs-topnav-right { margin-left: auto; }
 	}
+
+	/* Top-bar logout icon button (template: .fs-top-logout, sits in .fs-topnav-right
+	 * just left of the Appearance button). Desktop keeps the "Log out" text as the
+	 * last menu item; on a phone that item wraps onto its own line as a stray link,
+	 * so hide it there and reveal this compact icon button instead — a door+arrow
+	 * glyph, red on hover, matching the Appearance button's look. */
+	.fs-top-logout { display: none; }
+	@media (max-width: 600px) {
+		body.fs-top #topmenu > li:has(> a[href$="/admin/logout"]) { display: none; }
+		.fs-top-logout {
+			display: inline-flex; align-items: center; justify-content: center;
+			width: 34px; height: 34px; flex: 0 0 auto;
+			border: 1px solid var(--border); border-radius: var(--radius);
+			background: var(--panel2); color: var(--dim);
+			transition: color .15s, border-color .15s;
+		}
+		.fs-top-logout svg { width: 18px; height: 18px; }
+		.fs-top-logout:hover { color: var(--danger); border-color: var(--danger); }
+	}
 }

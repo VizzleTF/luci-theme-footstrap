@@ -40,6 +40,16 @@
 		#view .cbi-dropdown { min-width: 0; max-width: 100%; }
 		#view .cbi-value-field input, #view .cbi-value-field select, #view .cbi-value-field .cbi-dropdown { max-width: 100%; }
 		#view .fs-ovl .table .td, #view .fs-ovl .table .th { overflow-wrap: anywhere; min-width: 0; }
+
+		/* Stack each field: label on its own line, control + description full-width
+		 * below. On the desktop the label/field sit side by side (space-between), but
+		 * on a phone that squeezes the field — and any .cbi-value-description inside it
+		 * — into a ~120px column, so one sentence of help wrapped to 8 lines. Bootstrap
+		 * avoids this by flex-wrapping the field below its fixed-width label; do the
+		 * same here, scoped to the phone width, so descriptions get the full column. */
+		#view .cbi-value { flex-wrap: wrap; }
+		#view .cbi-value > .cbi-value-title { flex: 1 1 100%; text-align: left; padding-top: 0; }
+		#view .cbi-value > .cbi-value-field { flex: 1 1 100%; min-width: 0; }
 	}
 
 	/* ==================================================================

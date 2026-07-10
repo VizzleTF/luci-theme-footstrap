@@ -32,6 +32,10 @@
 					</button>
 				</div>
 
+				{# LuCI poll status ("Refreshing") + other indicators land here by id.
+				   Expanded: the word as a pill; collapsed rail: a spinning green glyph. #}
+				<div id="indicators" class="fs-indicators"></div>
+
 				<div class="fs-navlabel">{{ _('Menu') }}</div>
 				<ul class="nav" id="topmenu"></ul>
 				<ul id="modemenu" class="fs-modemenu"></ul>
@@ -52,13 +56,6 @@
 			</aside>
 
 			<main class="fs-main" id="maincontent">
-				<div class="fs-topbar">
-					<div class="fs-title">
-						<div class="fs-title-main">{{ dispatched?.title ? _(dispatched.title) : striptags(boardinfo.hostname ?? 'OpenWrt') }}</div>
-					</div>
-					<div id="indicators" class="fs-indicators"></div>
-				</div>
-
 				<div class="fs-content">
 					{% if (getuid() == 0 && getspnam('root')?.pwdp === ''): %}
 						<div class="alert-message warning">

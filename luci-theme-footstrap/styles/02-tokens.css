@@ -12,22 +12,14 @@
 	 * palette change here repaints both without touching a rule.
 	 * ============================================================ */
 	:root {
-		/* footstrap tokens — LIGHT */
-		--bg: #eef1f6;
-		--panel: #ffffff;
-		--panel2: #f6f8fb;
-		--border: #e4e9f1;
-		--text: #101725;
-		--dim: #5b6675;
-		--faint: #8891a0;	/* fainter than --dim: uppercase micro-labels (table headers, field titles) */
-		--accent: #1f8fe8;
-		--accent-lt: #7ec8ff;	/* logo-gradient light end (both modes) */
-		--on-accent: #fff;	/* text/knob on accent/good/danger fills (both modes) */
-		--accent-soft: rgba(31,143,232,.10);
-		--track: #eaeef4;
-		--good: #17b978;
-		--warn: #e08a1e;
-		--danger: #e04f4f;
+		/* Palette COLOURS (--bg…--danger, --accent-*, --track, the *-rgb bridge) are
+		 * NOT here — they live in 03-palettes.css as swappable variant blocks, one
+		 * per colourway × light/dark, and the default (footstrap) also fills bare
+		 * :root there. Add a colourway = add a block there, nothing to touch here.
+		 * Everything in this file is palette-INDEPENDENT: shadows, radius, fonts, the
+		 * var()-based bridge (auto-follows whatever palette is active), and the shared
+		 * HSL-component bridge (both palettes resolve fine off it). */
+		--on-accent: #fff;	/* text/knob on accent/good/danger fills (all palettes/modes) */
 		--fs-shadow: 0 1px 3px rgba(15,23,37,.08);
 		/* drop shadow for floating pop surfaces (menus, dropdown lists, the
 		 * appearance popover, the native select picker). One value replaces the
@@ -75,13 +67,11 @@
 		--primary-color-low: var(--accent);
 		--on-primary-color: #ffffff;
 
-		--error-color-high-rgb: 224, 79, 79;
 		--error-color-high: var(--danger);
 		--error-color-medium: var(--danger);
 		--error-color-low: var(--danger);
 		--on-error-color: #ffffff;
 
-		--success-color-high-rgb: 23, 185, 120;
 		--success-color-high: var(--good);
 		--success-color-medium: var(--good);
 		--success-color-low: var(--good);
@@ -97,25 +87,9 @@
 	}
 
 	:root[data-darkmode="true"] {
-		/* footstrap tokens — DARK */
-		--bg: #0a0d13;
-		--panel: #111620;
-		--panel2: #161c28;
-		--border: #232b3a;
-		--text: #e8edf5;
-		--dim: #9ba6b8;
-		--faint: #697488;	/* fainter than --dim: uppercase micro-labels (table headers, field titles) */
-		--accent: #3ba7ff;
-		--accent-soft: rgba(59,167,255,.14);
-		--track: #1b2230;
-		--good: #43e0a0;
-		--warn: #ffb454;
-		--danger: #ff6b6b;
+		/* palette colours are in 03-palettes.css; only mode-level, palette-independent
+		 * tokens live here */
 		--fs-shadow: 0 1px 2px rgba(0,0,0,.4);
-
-		--error-color-high-rgb: 255, 107, 107;
-		--success-color-high-rgb: 67, 224, 160;
-
 		--disabled-opacity: .45;
 		color-scheme: dark;
 	}

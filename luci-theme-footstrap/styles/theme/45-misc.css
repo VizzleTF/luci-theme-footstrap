@@ -33,8 +33,8 @@
 	 * <table class="table"> with a .tr.table-titles header and td[data-title],
 	 * NOT .cbi-section-table and NOT inside .cbi-map, so the block above never
 	 * reaches them (they overflow to ~800px on a phone). #view is their query
-	 * container; stack each row into label/value pairs below 820px (820 clears
-	 * the widest natural table width measured, the DHCPv6 leases at 807px).
+	 * container; stack each row into label/value pairs below 820px (phones). On the
+	 * desktop column data tables stay tables and fit by reflowing long values.
 	 * ================================================================== */
 	#view { container-type: inline-size; }
 

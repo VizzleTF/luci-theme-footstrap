@@ -7,7 +7,11 @@
 	 * page by id: give that lone wrapper the same panel card a .cbi-section gets
 	 * (mirrors theme/30-tables.css `.cbi-section` — --panel, 1px border, r12,
 	 * --fs-shadow, 18px/22px padding). SPA re-stamps body[data-page] on tab nav,
-	 * so the id resolves when you land on the SSH-Keys tab. */
+	 * so the id resolves when you land on the SSH-Keys tab.
+	 *
+	 * Scoped to this page on purpose: a general "card any bare #view > div" rule was
+	 * tried and reverted — it wrapped whole tabbed views (e.g. Startup) in a card,
+	 * which was not wanted. Bare-view pages that need framing get their own id here. */
 	body[data-page="admin-system-admin-sshkeys"] #view > div {
 		background: var(--panel);
 		border: 1px solid var(--border);

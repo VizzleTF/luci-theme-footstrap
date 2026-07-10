@@ -320,25 +320,29 @@
 		background: var(--bg);
 		overflow-x: clip;
 	}
-	/* The sidebar topbar used to be a full-width divider strip carrying the page
-	 * title. That title just repeats the page's own card heading, so the strip is
-	 * dropped: no border, no min-height, no vertical padding, title hidden. What
-	 * stays is #indicators (unsaved-changes / poll status), which LuCI targets by
-	 * id — it floats top-right and only claims vertical space when non-empty. Inner
-	 * padding still clears the centered content column so indicators line up with
-	 * the cards below. */
-	.fs-topbar {
-		flex: 0 0 auto;
-		padding-left: max(28px, calc((100% - var(--fs-content-max)) / 2 + 28px));
-		padding-right: max(28px, calc((100% - var(--fs-content-max)) / 2 + 28px));
-		display: flex; align-items: center; justify-content: flex-end;
-		gap: 16px;
-		background: var(--bg);
+	/* The old sidebar topbar (a page-title strip in <main>) is gone — the title just
+	 * repeated the page's own card heading. LuCI's #indicators (poll "Refreshing",
+	 * unsaved-changes) now lives in the sidebar footer, above Appearance. Empty →
+	 * collapsed, so it only shows when there is something to report. */
+	.fs-sidebar #indicators {
+		display: flex; justify-content: center; flex-wrap: wrap; gap: 6px;
+		padding: 0 6px 4px;
 	}
-	.fs-topbar .fs-title { display: none; }
-	.fs-topbar .fs-indicators:not(:empty) { margin: 10px 0 2px; }
-	.fs-title-main { font-size: 15px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
-	.fs-indicators { flex-wrap: wrap; justify-content: flex-end; }
+	.fs-sidebar #indicators:empty { display: none; }
+	.fs-indicators { flex-wrap: wrap; }
+
+	/* Collapsed rail: swap the "Refreshing" word for a spinning green two-arrows
+	 * refresh glyph — a masked SVG tinted with --good so it follows the palette.
+	 * Only the poll-status indicator becomes an icon; others (unsaved changes …)
+	 * keep their pill. Expanded, poll-status shows the word (shared pill rule). */
+	:root[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"] {
+		font-size: 0; width: 30px; height: 30px; padding: 0;
+		border: 0; box-shadow: none; background: var(--good);
+		-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 15-6.7L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3Cpath d='M21 12a9 9 0 0 1-15 6.7L3 16'/%3E%3Cpath d='M3 21v-5h5'/%3E%3C/svg%3E") center / 19px no-repeat;
+		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 15-6.7L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3Cpath d='M21 12a9 9 0 0 1-15 6.7L3 16'/%3E%3Cpath d='M3 21v-5h5'/%3E%3C/svg%3E") center / 19px no-repeat;
+		animation: fs-spin 1.1s linear infinite;
+	}
+	@keyframes fs-spin { to { transform: rotate(360deg); } }
 
 	.fs-content { padding: 22px 28px; flex: 1 1 auto; width: 100%; max-width: var(--fs-content-max); margin: 0 auto; }
 
@@ -443,15 +447,13 @@
 		.fs-themerow .fs-ico, .fs-logout .fs-ico { width: 18px; height: 18px; }
 
 		.fs-content { padding: 16px; }
-		.fs-topbar { padding: 0 16px; }
 	}
 
 	/* ==================================================================
 	 * FOOTSTRAP notifications — ui.addNotification prepends
 	 * .alert-message as first child of #maincontent (.fs-main).
-	 * Order it below the topbar and give it card spacing.
+	 * Order it above the content and give it card spacing.
 	 * ================================================================== */
-	.fs-main > .fs-topbar { order: 0; }
 	.fs-main > .alert-message { order: 1; margin: 16px auto 0; width: calc(100% - 56px); max-width: calc(var(--fs-content-max) - 56px); }
 	.fs-main > .fs-content { order: 2; }
 	.fs-main > .fs-footer { order: 3; }
@@ -503,7 +505,7 @@
 	#indicators [data-indicator][data-style="active"] { color: var(--good); }
 	/* the base only gives clickable indicators a pointer cursor under a <header>,
 	 * which exists in the top-nav layout but not in the sidebar one (its indicators
-	 * sit in .fs-topbar inside <main>) — so "Refreshing" showed a text caret there. */
+	 * sit in the sidebar footer) — so "Refreshing" showed a text caret there. */
 	.fs-indicators [data-indicator][data-clickable],
 	#indicators [data-indicator][data-clickable] { cursor: pointer; }
 }

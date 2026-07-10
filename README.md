@@ -1,6 +1,6 @@
 # luci-theme-footstrap
 
-![Overview — палитра Rvht](docs/screenshots/overview-dark.png)
+![luci-theme-footstrap](docs/screenshots/Example.gif)
 
 [Ещё скриншоты →](docs/screenshots/)
 

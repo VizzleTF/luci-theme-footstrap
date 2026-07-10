@@ -42,9 +42,11 @@
 						localStorage.setItem('fs-wallpaper', 'cats');
 						localStorage.removeItem('fs-palette'); p = null;
 					}
-					if (p === 'github') { localStorage.removeItem('fs-palette'); p = null; }	/* github = default */
-					if (p === 'hicontrast') root.removeAttribute('data-palette');
-					else root.setAttribute('data-palette', 'footstrap');
+					/* footstrap (GitHub colours) is the default = bare :root, no attr.
+					   Legacy 'github'/'footstrap' map to it. Only hicontrast is opt-in. */
+					if (p === 'github' || p === 'footstrap') { localStorage.removeItem('fs-palette'); p = null; }
+					if (p === 'hicontrast') root.setAttribute('data-palette', 'hicontrast');
+					else root.removeAttribute('data-palette');
 					if (localStorage.getItem('fs-wallpaper') === 'cats')
 						root.setAttribute('data-wallpaper', 'cats');
 					/* Rounding: base corner radius (0-20px). 12 = default, no override.

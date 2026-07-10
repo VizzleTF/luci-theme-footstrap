@@ -1,15 +1,38 @@
 @layer tokens {
 	/* ============================================================
-	 * DEFAULT "footstrap" palette — GitHub Primer colors (light + dark dimmed).
-	 * Applied via data-palette="footstrap" on :root by default (head.ut inline
-	 * script). The high-contrast look lives in the base :root blocks and is
-	 * selectable as "hicontrast" (no data-palette attr). Token-only override:
-	 * same layout/components; the bridge recomputes off these tokens, only the raw
-	 * *-rgb bridge values need explicit re-mapping.
-	 * Specificity: [data-palette][data-darkmode] (0,3,0) wins over the base blocks.
+	 * COLOURWAYS (palettes)
+	 *
+	 * Every colour the theme uses is a variable, and every palette is one
+	 * self-contained block per mode. Two ship today — footstrap (GitHub Primer,
+	 * the default) and hicontrast — but the structure is the point: adding a new
+	 * colourway is copy-one-pair-and-recolour, nothing else in the theme changes.
+	 *
+	 * TO ADD A COLOURWAY "sunset":
+	 *   1. Copy the two hicontrast blocks below, rename data-palette to "sunset".
+	 *   2. Set the 14 colours + accent-soft + the two *-rgb (raw RGB of --danger /
+	 *      --good, for the alert tints that need an alpha). accent-lt is light-only;
+	 *      dark inherits it.
+	 *   3. Register the name: applyPalette()/currentPalette() in
+	 *      menu-footstrap-common.js and the head.ut pre-paint switch.
+	 * That's it — layout, components and the --*-color-* bridge (02-tokens) all key
+	 * off these tokens, so they repaint automatically.
+	 *
+	 * The HSL-component bridge (--background-color-h/s/l, --border-color-low-hsl, …
+	 * in 02-tokens) is shared, not per-palette: it only tints a few subtle
+	 * shadows/hairlines and both shipped palettes read fine off it. A new colourway
+	 * with a very different hue MAY override those in its own block for a perfect
+	 * shadow tint, but it is optional — colours alone get you 95% there.
+	 *
+	 * Default: footstrap fills bare :root (no data-palette attr), so a no-JS load
+	 * still has colours. hicontrast is opt-in via data-palette="hicontrast".
+	 * Specificity: [data-palette][data-darkmode] (0,2,1) beats the bare/default
+	 * blocks, and each block sets a COMPLETE token set so the winner fully applies.
 	 * ============================================================ */
+
+	/* ---- footstrap — GitHub Primer (DEFAULT, also fills bare :root) ---- */
+	:root,
 	:root[data-palette="footstrap"] {
-		/* GitHub — LIGHT */
+		/* LIGHT */
 		--bg: #f6f8fa;
 		--panel: #ffffff;
 		--panel2: #f6f8fa;
@@ -18,7 +41,7 @@
 		--dim: #656d76;
 		--faint: #818b98;
 		--accent: #0969da;
-		--accent-lt: #54aeff;
+		--accent-lt: #54aeff;	/* logo-gradient light end (both modes) */
 		--accent-soft: rgba(9,105,218,.10);
 		--track: #eaeef2;
 		--good: #1a7f37;
@@ -27,9 +50,9 @@
 		--error-color-high-rgb: 207, 34, 46;
 		--success-color-high-rgb: 26, 127, 55;
 	}
-
+	:root[data-darkmode="true"],
 	:root[data-palette="footstrap"][data-darkmode="true"] {
-		/* GitHub — DARK (dimmed) */
+		/* DARK (dimmed) */
 		--bg: #1c2128;
 		--panel: #22272e;
 		--panel2: #2d333b;
@@ -38,7 +61,6 @@
 		--dim: #8c99a8;
 		--faint: #636e7b;
 		--accent: #539bf5;
-		--accent-lt: #79c0ff;
 		--accent-soft: rgba(83,155,245,.15);
 		--track: #373e47;
 		--good: #57ab5a;
@@ -46,5 +68,44 @@
 		--danger: #e5534b;
 		--error-color-high-rgb: 229, 83, 75;
 		--success-color-high-rgb: 87, 171, 90;
+	}
+
+	/* ---- hicontrast — deeper, more saturated (opt-in) ---- */
+	:root[data-palette="hicontrast"] {
+		/* LIGHT */
+		--bg: #eef1f6;
+		--panel: #ffffff;
+		--panel2: #f6f8fb;
+		--border: #e4e9f1;
+		--text: #101725;
+		--dim: #5b6675;
+		--faint: #8891a0;
+		--accent: #1f8fe8;
+		--accent-lt: #7ec8ff;	/* logo-gradient light end (both modes) */
+		--accent-soft: rgba(31,143,232,.10);
+		--track: #eaeef4;
+		--good: #17b978;
+		--warn: #e08a1e;
+		--danger: #e04f4f;
+		--error-color-high-rgb: 224, 79, 79;
+		--success-color-high-rgb: 23, 185, 120;
+	}
+	:root[data-palette="hicontrast"][data-darkmode="true"] {
+		/* DARK */
+		--bg: #0a0d13;
+		--panel: #111620;
+		--panel2: #161c28;
+		--border: #232b3a;
+		--text: #e8edf5;
+		--dim: #9ba6b8;
+		--faint: #697488;
+		--accent: #3ba7ff;
+		--accent-soft: rgba(59,167,255,.14);
+		--track: #1b2230;
+		--good: #43e0a0;
+		--warn: #ffb454;
+		--danger: #ff6b6b;
+		--error-color-high-rgb: 255, 107, 107;
+		--success-color-high-rgb: 67, 224, 160;
 	}
 }

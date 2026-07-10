@@ -41,6 +41,18 @@
 		border: 0; border-radius: 0; overflow: visible; background: none;
 	}
 	.cbi-section .table { margin: 0; width: 100%; }
+	/* Data tables rendered straight in #view (no .cbi-section — package-manager,
+	 * Startup) miss the width:100% above, so they sized to preferred width and
+	 * overflowed the content column. Pin them to the container so a wrappable column
+	 * (package-manager's Description) reflows to fit instead of forcing a scroll. */
+	#view .table[id], #view table.fs-dt { width: 100%; }
+	/* width:100% alone can't shrink a table below its min-content — a column with a
+	 * long unbreakable value holds the floor. Let long words/values break so the
+	 * table reflows to fit the ~984px column instead of scrolling (package-manager's
+	 * prose Description, a long command path in Processes, …). The DHCP leases need
+	 * finer control — only their DUID/IPv6 columns may break, not IPv4/MAC — so that
+	 * lives in its own page costyl (styles/pages/50-leases.css), which overrides. */
+	#view .table[id] .td, #view table.fs-dt .td { overflow-wrap: anywhere; }
 	.cbi-section .table .td,
 	.cbi-section .table .th {
 		padding: 10px 16px 10px 0;
@@ -66,19 +78,20 @@
 	.cbi-section .table[id] .td, .cbi-section .table[id] .th,
 	#view table.fs-dt .td, #view table.fs-dt .th { padding: 10px 11px; }
 	.cbi-section .table[id] .td { font-family: var(--font-mono); font-size: 12px; color: var(--text); }
-	/* A many-column data table can be a touch wider than its section. Rather than
-	 * clip the last column or wrap every value mid-string, let the table scroll
-	 * horizontally inside its own row: overflow-x on the wrapper, the table free to
-	 * exceed it. Narrow screens still get the fs-dt card stacking (@container), so
-	 * the scroll only appears on a wide screen where a big table truly overflows. */
-	#view :has(> .table[id]), #view :has(> .table.fs-dt) { overflow-x: auto; }
+	/* No horizontal-scroll wrapper: a data table reflows to fit the content column
+	 * via the overflow-wrap rule above (long opaque values break), so it never needs
+	 * to scroll or be forced into cards on desktop. Card-stacking stays for phones
+	 * only (@container ≤820, below). */
 	.cbi-section .table[id] .tr:not(.table-titles):hover .td { background: var(--panel2); }
 	.cbi-section .table[id] .tr.table-titles .th { border-bottom-color: var(--border); }
 	/* Contour around the whole data table (leases, wifi, processes, …). A real
 	 * <table> needs border-collapse:separate for the radius to take (collapse
-	 * silently drops border-radius); harmless on the div-based tables. */
-	.cbi-section .table[id],
-	.cbi-section .table.fs-dt, .cbi-section table.fs-dt {
+	 * silently drops border-radius); harmless on the div-based tables. Scoped to
+	 * #view too, not just .cbi-section: Startup (system/startup) renders a
+	 * .table.fs-dt straight in a bare #view wrapper with no section, so the
+	 * section-scoped selector missed it and it drew frameless. */
+	.cbi-section .table[id], #view .table[id],
+	.cbi-section .table.fs-dt, .cbi-section table.fs-dt, #view table.fs-dt {
 		border-collapse: separate; border-spacing: 0;
 		border: 1px solid var(--border); border-radius: var(--radius-lg);
 		/* no overflow:hidden — it clipped the last column when a wide table (many
@@ -190,12 +203,17 @@
 	 * .tr.table-titles header and is NOT .cbi-section-table — replacing a live
 	 * `:has(.tr.table-titles):not(.cbi-section-table)` that the style engine had to
 	 * re-evaluate on every mutation of these polled tables (Processes/routes/leases). */
+	/* Card-stack a data table into label/value rows on phones only (≤820). On the
+	 * desktop content column every fs-dt (including the wide DHCP leases) stays a
+	 * real table and fits by reflowing its long opaque values — see the overflow-wrap
+	 * rule far above. So no per-table breakpoint and no always-carding here. */
 	@container (max-width: 820px) {
 		#view table.fs-dt .tr.table-titles { display: none; }
 		#view table.fs-dt .tr { display: block; padding: 10px 16px; }
 		#view table.fs-dt .td {
 			display: flex; align-items: baseline; justify-content: space-between;
 			gap: 14px; padding: 5px 0; border: 0; text-align: right; min-width: 0; width: auto;
+			flex-wrap: wrap; overflow-wrap: anywhere; white-space: normal;
 		}
 		#view table.fs-dt .td[data-title]::before {
 			content: attr(data-title); flex: 0 0 auto; text-align: left;
@@ -214,11 +232,9 @@
 		 * intrinsically ~250px and, with min-width:auto flex items, were clipped on the
 		 * right by .fs-main's overflow-x:clip. flex-wrap drops an oversized value below
 		 * its label; min-width:0/max-width:100% + overflow-wrap break the content. */
-		#view table.fs-dt .td { flex-wrap: wrap; overflow-wrap: anywhere; }
 		#view table.fs-dt .td > *,
 		#view table.fs-dt .td .ifacebadge { min-width: 0; max-width: 100%; }
 	}
-
 	/* general table cell padding — compact but readable (Startup/Processes/etc) */
 	.table .td { padding-top: 7px; padding-bottom: 7px; }
 }

@@ -82,7 +82,12 @@ function renderTabMenu(tree, url, level) {
  * render, on resize, and when a view renders its own tabs (works in both layouts
  * and as the page narrows). */
 function stripFitsOneRow(ul) {
-	const first = ul.firstElementChild, last = ul.lastElementChild;
+	/* Only laid-out children count. The top-nav hides its "Log out" <li> below 600px
+	 * (a top-bar icon button takes over); a display:none child has offsetTop 0, so
+	 * using it as `last` made this read "one row" even while VPN had wrapped — and
+	 * the density fit never kicked in. Filter to items that actually render. */
+	const items = [...ul.children].filter((el) => el.getClientRects().length > 0);
+	const first = items[0], last = items[items.length - 1];
 	/* one row iff first and last item share a top edge */
 	return !first || !last || first.offsetTop === last.offsetTop;
 }
@@ -173,10 +178,10 @@ function applyMode(val) {
 }
 function applyPalette(val) {
 	const root = document.querySelector(':root');
-	/* hicontrast = the base :root tokens (no data-palette attr); footstrap (default,
-	 * GitHub colors) sets the explicit attr. Only these two remain. */
-	if (val === 'hicontrast') { lsSet('fs-palette', 'hicontrast'); root.removeAttribute('data-palette'); }
-	else { lsDel('fs-palette'); root.setAttribute('data-palette', 'footstrap'); }
+	/* footstrap (GitHub colours) is the default = bare :root, no attr; hicontrast is
+	 * the opt-in variant. Colourway blocks live in styles/03-palettes.css. */
+	if (val === 'hicontrast') { lsSet('fs-palette', 'hicontrast'); root.setAttribute('data-palette', 'hicontrast'); }
+	else { lsDel('fs-palette'); root.removeAttribute('data-palette'); }
 }
 
 /* Corner-radius axis: one base value (the card radius, 0–20px) set as an inline
