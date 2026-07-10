@@ -1,0 +1,104 @@
+@layer theme {
+	/* ==================================================================
+	 * FOOTSTRAP TOP-NAV layout (theme footstrap-top / design 1B)
+	 * Active only under body.fs-top. Horizontal menu + dropdowns.
+	 * ================================================================== */
+	body.fs-top { display: block; }
+	.fs-topwrap { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); overflow-x: clip; }
+
+	/* top bar */
+	.fs-topnav {
+		position: sticky; top: 0; z-index: 50;
+		display: flex; align-items: center; gap: 12px;
+		height: 46px;
+		/* the bar is a <header>, and its drop shadow used to come from a navbar
+		 * rule the theme no longer carries. Own the shadow here. */
+		box-shadow: 0 1px 3px hsla(var(--border-color-low-hsl), .25),
+		            inset 0 -1px 0 hsla(var(--border-color-low-hsl), .01);
+		/* align the nav content to the .fs-content inner column (container centered
+		 * at --fs-content-max, plus its 28px side padding) so the logo/menu line up
+		 * with the headings and cards below */
+		padding: 0 max(20px, calc((100% - var(--fs-content-max)) / 2 + 28px));
+		background: color-mix(in srgb, var(--panel) 88%, transparent);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+		border-bottom: 1px solid var(--border);
+	}
+	/* placement only — the look lives in 18-chrome.css */
+	.fs-topnav .fs-brand { padding: 0; flex: 0 0 auto; }
+
+	/* horizontal main menu — left-aligned right after the logo; flex:1 fills the
+	 * row so the right controls sit at the content column's right edge */
+	.fs-topnav .fs-mainmenu {
+		display: flex; align-items: center; justify-content: flex-start; gap: 2px;
+		list-style: none; margin: 0 0 0 8px; padding: 0; flex: 1 1 auto; flex-wrap: wrap;
+	}
+	.fs-topnav .fs-mainmenu > li { position: relative; }
+	.fs-topnav .fs-mainmenu > li > a {
+		display: block; padding: 6px 11px; border-radius: 9px;
+		color: var(--dim); font-size: 15px; font-weight: 600; white-space: nowrap;
+	}
+	.fs-topnav .fs-mainmenu > li > a:hover { color: var(--text); background: var(--panel2); opacity: 1; }
+	.fs-topnav .fs-mainmenu > li.active > a { color: var(--accent); background: var(--accent-soft); }
+
+	/* dropdowns — a translucent popover in the design language */
+	.fs-topnav .fs-mainmenu .dropdown-menu {
+		display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 60;
+		min-width: 200px; padding: 7px; margin: 0;
+		list-style: none;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		box-shadow: 0 12px 34px rgba(0,0,0,.32);
+		background: color-mix(in srgb, var(--panel) 96%, transparent);
+		backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+	}
+	/* invisible bridge over the gap so hover isn't lost moving into the menu */
+	.fs-topnav .fs-mainmenu .dropdown-menu::before {
+		content: ""; position: absolute; left: 0; right: 0; top: -10px; height: 10px;
+	}
+	/* hover opens only on real pointer devices — on touch, mobile browsers keep an
+	 * emulated :hover/:focus stuck after a tap, which blocks the tap-to-close. */
+	@media (hover: hover) {
+		.fs-topnav .fs-mainmenu > li.dropdown:hover > .dropdown-menu { display: block; }
+	}
+	/* tap/click toggle (.open) works on every device; second tap removes it */
+	.fs-topnav .fs-mainmenu > li.dropdown.open > .dropdown-menu { display: block; }
+	.fs-topnav .fs-mainmenu .dropdown-menu li > a {
+		display: block; padding: 9px 12px; border-radius: 9px;
+		color: var(--dim); font-size: 13px; font-weight: 500; white-space: nowrap;
+	}
+	.fs-topnav .fs-mainmenu .dropdown-menu li > a:hover { color: var(--text); background: var(--panel2); opacity: 1; }
+	.fs-topnav .fs-mainmenu .dropdown-menu li.active > a { color: var(--accent); background: var(--accent-soft); }
+	.fs-topnav .fs-mainmenu > li.dropdown > a.menu::after { content: none; display: none; }
+
+	/* right controls */
+	.fs-topnav-right { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; margin-left: auto; }
+	.fs-topnav-right .fs-logout .fs-ico { width: 19px; height: 19px; }
+
+	/* mode menu row (rare, >1 mode) */
+	.fs-modemenu-top {
+		display: flex; gap: 4px; list-style: none; margin: 0; padding: 8px 24px;
+		background: var(--panel); border-bottom: 1px solid var(--border);
+	}
+	.fs-modemenu-top li a { color: var(--dim); font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 8px; }
+	.fs-modemenu-top li.active a { color: var(--accent); background: var(--accent-soft); }
+
+	/* responsive: wrap menu */
+	@media (max-width: 900px) {
+		.fs-topnav { flex-wrap: wrap; height: auto; padding: 10px 16px; gap: 10px; }
+		.fs-topnav .fs-mainmenu { order: 3; flex: 1 1 100%; flex-wrap: wrap; }
+		/* The dropdown stays anchored to its own item (li keeps position:relative),
+		 * exactly as on desktop. It used to go static so the panel spanned the whole
+		 * bar — but once the menu wraps onto a second row, a bar-wide panel hanging
+		 * below the bar covers that row: moving the pointer down to an item there
+		 * left the first item and closed its panel before you could reach anything.
+		 * menu-footstrap-top.js nudges the panel left when it would leave the
+		 * viewport (items near the right edge). */
+		.fs-topnav .fs-mainmenu .dropdown-menu {
+			left: 0; right: auto; top: calc(100% + 6px);
+			max-width: calc(100vw - 32px);
+		}
+		.fs-topnav .fs-mainmenu > li.dropdown > a.menu::after { display: none; }
+		.fs-topnav-right { margin-left: auto; }
+	}
+}

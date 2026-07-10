@@ -1,0 +1,54 @@
+@layer theme {
+	/* ==================================================================
+	 * Shared chrome — brand, logo, wordmark, logout, indicators.
+	 *
+	 * These widgets are the same in both layouts; only where they sit differs.
+	 * They used to be described twice — unscoped in 20-shell-sidebar.css and again
+	 * under `.fs-topnav` in 26-topnav.css — and the two copies had drifted (32px vs
+	 * 30px logo, 11px vs 10px brand gap, 10px vs 8px indicator gap). The top-nav
+	 * values are the reference and live here.
+	 *
+	 * A layout file may still set *placement* on these (flex-grow, order,
+	 * justification, the icon-rail collapse) — never their look.
+	 * ================================================================== */
+
+	.fs-brand {
+		display: flex; align-items: center; gap: 10px;
+		color: var(--text); font-weight: 800;
+	}
+	.fs-brand:hover { opacity: 1; }
+
+	.fs-logo {
+		width: 30px; height: 30px; border-radius: 9px;
+		background: linear-gradient(135deg, var(--accent), var(--accent-lt));
+		display: flex; align-items: center; justify-content: center;
+		flex: 0 0 auto;
+	}
+	.fs-logo svg { width: 17px; height: 17px; }
+
+	.fs-wordmark { font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
+
+	.fs-logout { display: flex; align-items: center; color: var(--dim); }
+	.fs-logout:hover { color: var(--danger); opacity: 1; }
+
+	.fs-indicators { display: flex; align-items: center; gap: 8px; }
+
+	/* ------------------------------------------------------------------
+	 * Menu primitives. Both layouts render the LuCI menu as `ul.nav > li > a`,
+	 * and both used to inherit these three things from a navbar rule set the
+	 * theme no longer carries — a 19px line-height, `display: block` on the
+	 * items, and the `position: relative` that every submenu popup anchors to.
+	 * State them here, once, for both layouts.
+	 * ------------------------------------------------------------------ */
+	ul.nav { position: relative; margin: 0; list-style: none; }
+	ul.nav > li { display: block; }
+	ul.nav a { line-height: 19px; text-decoration: none; }
+
+	/* The submenu popup: `.dropdown-menu` is emitted by menu-footstrap-top.js and,
+	 * for the split Save & Apply button, by luci-base's own ui.js — so it must be
+	 * styled even though the sidebar never renders one. Each item anchors its own
+	 * nested popup, hence position: relative. */
+	.dropdown-menu li { display: block; position: relative; }
+	/* wins over `ul.nav a` above: the popup sets its own denser rhythm */
+	ul.nav .dropdown-menu a, .dropdown-menu a { line-height: 18px; }
+}

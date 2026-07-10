@@ -5,7 +5,7 @@
 
 /* Footstrap TOP-nav menu (variant 1B): horizontal #topmenu with one level of
  * hover dropdowns. Shared mode/tab/toggle logic lives in menu-footstrap-common
- * (composed via common.bootstrap). Only renderMainMenu is layout-specific.
+ * (composed via common.init). Only renderMainMenu is layout-specific.
  * Spec: docs/10-realizatsiya-topnav.md */
 
 /* Each dropdown hangs off its own item (CSS anchors it at left:0 of the li), so
@@ -79,7 +79,7 @@ function renderMainMenu(tree, url, level) {
 
 return baseclass.extend({
 	__init__() {
-		common.bootstrap(renderMainMenu);
+		common.init(renderMainMenu);
 		/* close any open top-nav dropdown when tapping outside it */
 		document.addEventListener('click', (ev) => {
 			if (!ev.target.closest('.fs-mainmenu > li.dropdown'))

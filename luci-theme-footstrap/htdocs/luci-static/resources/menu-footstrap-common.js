@@ -12,7 +12,7 @@
  *
  * So: mode menu, section tabs and the theme toggle live here once; each layout
  * (menu-footstrap / menu-footstrap-top) only defines renderMainMenu and calls
- * common.bootstrap(renderMainMenu). */
+ * common.init(renderMainMenu). */
 
 /* --- stray-interval teardown for SPA nav ---------------------------------
  * A full page load kills every window.setInterval the outgoing page set. Our
@@ -613,7 +613,12 @@ function wireAppearance() {
 
 	groups.push(E('div', { 'class': 'fs-ap-footer' }, [
 		E('div', { 'class': 'fs-ap-verrow' }, [
-			E('span', { 'class': 'fs-ap-version' }, [ fsVersionReal() ? ('Footstrap v' + FS_VERSION) : 'Footstrap (dev)' ]),
+			E('a', {
+				'class': 'fs-ap-version',
+				'href': 'https://github.com/' + FS_REPO,
+				'target': '_blank',
+				'rel': 'noopener noreferrer'
+			}, [ fsVersionReal() ? ('Footstrap v' + FS_VERSION) : 'Footstrap (dev)' ]),
 			badge
 		]),
 		updateBtn
@@ -776,7 +781,7 @@ return baseclass.extend({
 
 	/* entry point: load the menu tree, render mode menu (which drives the
 	 * injected renderMainMenu), the section tabs, and wire the theme toggle. */
-	bootstrap(renderMainMenu) {
+	init(renderMainMenu) {
 		ui.menu.load().then((tree) => {
 			_tree = tree;
 			_renderMain = renderMainMenu;

@@ -1,0 +1,58 @@
+@layer base {
+	/* Tables. LuCI builds them out of divs carrying .table/.tr/.th/.td rather than
+	 * real table markup, so the display roles have to be assigned by hand. */
+	.tr { display: table-row; }
+	.table[width="33%"], .th[width="33%"], .td[width="33%"] { width: 33%; }
+	.table[width="100%"], .th[width="100%"], .td[width="100%"] { width: 100%; }
+
+	.table {
+		display: table;
+		width: 100%;
+		margin-bottom: 18px;
+		padding: 0;
+		font-size: 13px;
+		border-collapse: collapse;
+		position: relative;
+	}
+
+	.table .th, .table .td {
+		display: table-cell;
+		vertical-align: middle; /* Fixme */
+		padding: 10px 10px 9px;
+		line-height: 18px;
+		text-align: left;
+	}
+
+	.table .tr:first-child .th {
+		padding-top: 9px;
+		font-weight: bold;
+		vertical-align: top;
+	}
+
+	.table .td, .table .th {
+		border-top: 1px solid var(--border-color-medium);
+	}
+
+	.tr.placeholder {
+		height: calc(3em + 20px);
+	}
+
+	.tr.placeholder > .td {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		text-align: center;
+		line-height: 3em;
+	}
+
+	.tr.drag-over-above,
+	.tr.drag-over-below {
+		border: 2px solid var(--primary-color-high);
+		border-width: 2px 0 0 0;
+	}
+
+	.tr.drag-over-below {
+		border-width: 0 0 2px 0;
+	}
+}

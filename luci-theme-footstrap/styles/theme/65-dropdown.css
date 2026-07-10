@@ -1,0 +1,188 @@
+@layer theme {
+	/* legacy top-nav dropdown popup (rarely used) */
+	.dropdown-menu { background-color: var(--panel); border-color: var(--border); }
+	.dropdown-menu a { color: var(--text); text-shadow: none; }
+	.dropdown-menu a:hover { background: var(--panel2); background-image: none; color: var(--accent); }
+
+	/* Split "Save & Apply" dropdown: a plain dropdown in the action bar carries no
+	 * frame of its own. */
+	.cbi-page-actions .cbi-dropdown {
+		border: 0; border-radius: 9px; background: transparent;
+	}
+	/* …except that the split control's outer div IS the apply button — ui.js emits
+	 * `.cbi-dropdown.btn.cbi-button.cbi-button-apply` — so the rule above would
+	 * paint the button transparent. It used to be repainted by a `.cbi-button-apply`
+	 * rule written afterwards, which made the fix depend on source order. Win on
+	 * specificity instead. */
+	.cbi-page-actions .cbi-dropdown.cbi-button-apply,
+	.cbi-page-actions .cbi-dropdown > .cbi-button {
+		background: var(--accent);
+		background-image: none;
+		border: 0;
+		color: var(--on-accent);
+	}
+	.cbi-page-actions .cbi-dropdown.cbi-button-apply:hover,
+	.cbi-page-actions .cbi-dropdown > .cbi-button:hover { filter: brightness(1.08); }
+
+	/* ==================================================================
+	 * FOOTSTRAP cbi-dropdown widget — the JS select used across all forms.
+	 * Restyle to match the design dropdown (panel2, rounded, chevron,
+	 * focus ring) + themed open list. Native <select> is styled separately.
+	 * ================================================================== */
+	.cbi-dropdown:not(.btn):not(.cbi-button) {
+		background: var(--panel2);
+		background-image: none;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		color: var(--text);
+		min-height: 38px;
+		transition: border-color .15s, box-shadow .15s;
+	}
+	.cbi-dropdown:not(.btn):not(.cbi-button):hover { border-color: var(--dim); }
+	.cbi-dropdown:focus, .cbi-dropdown[open] {
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px var(--accent-soft);
+		outline: none;
+	}
+	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li {
+		padding: 8px 12px; color: var(--text);
+		font-family: var(--font-sans);
+	}
+	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[display]:not([display="0"]) { border-left: 0; }
+	.cbi-dropdown > ul > li[placeholder] { color: var(--faint, var(--dim)); }
+
+	/* Custom chevron in the toggle (hide the stock text/svg arrow).
+	 *
+	 * `.open` is the only hit target that opens the list — on a button dropdown
+	 * (.cbi-dropdown.btn, e.g. Diagnostics) a click anywhere else RUNS the button.
+	 * `font-size: 0` collapsed the stock `line-height: 2em` to zero, so the span
+	 * measured 28x0 and the chevron, drawn by an absolutely positioned ::after, sat
+	 * outside its own box: aiming at it hit the button instead. Give it a real box —
+	 * full widget height, comfortable width — and centre the chevron inside it. */
+	.cbi-dropdown > .open {
+		font-size: 0; line-height: 0; border: 0;
+		position: relative; padding: 0;
+		align-self: stretch;
+		min-width: 34px; min-height: 30px;
+		display: flex; align-items: center; justify-content: center;
+		cursor: pointer;
+	}
+	.cbi-dropdown > .open > * { display: none; }
+	.cbi-dropdown > .open::after {
+		content: ""; position: absolute; inset: 0; margin: auto;
+		width: 7px; height: 7px;
+		border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim);
+		transform: translateY(-2px) rotate(45deg);	/* optical centre of a "v" */
+	}
+
+	/* open list -> design popover. This used to be stated four times over; the
+	 * values below are the ones that were winning. */
+	.cbi-dropdown[open] { z-index: 1100; }
+	.cbi-dropdown[open] > ul.dropdown {
+		background: var(--panel);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		box-shadow: 0 12px 34px rgba(0,0,0,.32);
+		padding: 6px;
+		margin-top: 6px;
+	}
+	.cbi-dropdown[open] > ul.dropdown > li {
+		border-radius: 8px; padding: 9px 11px;
+		border-left: 0; color: var(--text);
+		position: relative;
+		/* the base rule puts a border-bottom on the li; on a border-radius:8px box that
+		 * border curls up at the corners. Drop it and draw a straight inset strip via
+		 * ::after instead, so the divider is a plain line and the hover pill stays rounded. */
+		border-bottom: 0;
+	}
+	.cbi-dropdown[open] > ul.dropdown > li:not(:last-child)::after {
+		content: ""; position: absolute; left: 11px; right: 11px; bottom: 0;
+		height: 1px; background: var(--border);
+	}
+	.cbi-dropdown[open] > ul.dropdown > li:hover,
+	.cbi-dropdown[open] > ul.dropdown > li.focus { background: var(--panel2); color: var(--accent); }
+	/* selected is written after hover on purpose: hovering the selected row must
+	 * keep the accent tint rather than fall back to the neutral hover pill */
+	.cbi-dropdown[open] > ul.dropdown > li[selected] { background: var(--accent-soft); color: var(--accent); }
+	.cbi-dropdown[open] > ul.dropdown > li.create-item { border-top: 1px solid var(--border); margin-top: 4px; }
+	/* The "add item" field of a dropdown is a text input and gets the same 10px
+	 * radius as every other one (theme/60-inputs.css). It used to say 8px here and
+	 * win or lose depending on which block was written last. */
+	.cbi-dropdown .create-item-input { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); }
+	/* dropdown add-item (e.g. Community Lists) — the .cbi-dropdown styles itself,
+	 * so the wrapper is transparent, no double frame. */
+	.cbi-dynlist > .add-item:has(> .cbi-dropdown) {
+		background: none; border: 0; overflow: visible; box-shadow: none;
+	}
+
+	.cbi-section-table .td .cbi-dropdown,
+	.cbi-section-table .td .cbi-input-select,
+	.cbi-section-table .td select,
+	.cbi-section-table .td input[type="text"] {
+		min-width: 0;
+		max-width: none;
+		width: 100%;
+	}
+
+	/* Below ~960px of available width the multi-dropdown row no longer fits — stack. */
+	@container (max-width: 960px) {
+		.cbi-section-table,
+		.cbi-section-table .thead,
+		.cbi-section-table .tbody,
+		.cbi-section-table .tr,
+		.cbi-section-table .td { display: block; width: auto; }
+		.cbi-section-table .thead { display: none; }
+		.cbi-section-table .tr.cbi-section-table-row,
+		.cbi-section-table .tbody .tr {
+			border: 1px solid var(--border);
+			border-radius: 12px;
+			background: var(--panel2);
+			padding: 8px 14px;
+			margin-bottom: 12px;
+		}
+		.cbi-section-table .tbody .tr:hover { background: var(--panel2); }
+		.cbi-section-table .td {
+			display: flex; align-items: center; justify-content: space-between;
+			gap: 14px; padding: 8px 0; border: 0; text-align: right;
+			border-bottom: 1px solid var(--border);
+		}
+		.cbi-section-table .tr .td:last-child { border-bottom: 0; }
+		.cbi-section-table .td[data-title]::before {
+			content: attr(data-title);
+			flex: 0 0 auto; text-align: left;
+			font-size: 10px; font-weight: 700; letter-spacing: .05em;
+			text-transform: uppercase; color: var(--faint);
+		}
+		.cbi-section-table .td.cbi-section-actions { justify-content: flex-end; flex-wrap: wrap; }
+		.cbi-section-table .td .cbi-dropdown,
+		.cbi-section-table .td select,
+		.cbi-section-table .td input[type="text"] { width: auto; min-width: 150px; flex: 0 1 auto; }
+		.cbi-section-table .td .zone-forwards { width: 100%; }
+	}
+
+	/* ==================================================================
+	 * Widget popups must escape the table card
+	 *
+	 * The "standalone data table -> rounded card" rule sets `overflow: hidden`
+	 * on .table (to clip row backgrounds at the rounded corners). A form table
+	 * (Diagnostics: three command widgets in one row) also holds .cbi-dropdown
+	 * widgets whose open list is absolutely positioned — hidden overflow cropped
+	 * it at the table's edge, so it looked cut off and buried under the card
+	 * below, and the clipped list dragged the table's box around with it.
+	 * Drop the clip on any table that hosts a widget, and lift the open widget
+	 * over the following (unpositioned) cards.
+	 *
+	 * A real <table> inherits `border-collapse: collapse`, and a collapsed border
+	 * model ignores border-radius: the rounded corners of the card were coming from
+	 * `overflow: hidden` clipping the background, not from the border. Dropping the
+	 * clip therefore squared the frame off. Restore the separated border model —
+	 * with zero spacing it lays out identically, and the radius now applies to the
+	 * border itself.
+	 * ================================================================== */
+	.table:has(.cbi-dropdown),
+	.table:has(.cbi-dynlist) {
+		overflow: visible;
+		border-collapse: separate;
+		border-spacing: 0;
+	}
+}

@@ -1,6 +1,6 @@
 ---
 name: footstrap-audit
-description: Static-audit cascade.css and the theme JS for un-themed spots and breakage before deploying. Reports bracket balance, CSS custom properties used via var() but never defined (silently-dropped shadows/colors), and hardcoded color literals in the base bootstrap region that bypass the token bridge. Use after big CSS edits, when something looks off-theme, or as a pre-commit check. Triggers: "audit css", "проверь css", "un-themed", "что не переопределили", "lint theme".
+description: Static-audit the CSS sources in styles/ and the theme JS for un-themed spots, duplication and breakage before deploying. Reports bracket balance, CSS custom properties used via var() but never defined (silently-dropped shadows/colors), declarations shadowed by a later rule on the same selector in the same layer, stray !important, and hardcoded color literals in styles/base that bypass the token bridge. A companion cssdiff.py compares computed styles of two stylesheets on a live page — use that to check a change altered nothing. Triggers: "audit css", "проверь css", "un-themed", "что не переопределили", "lint theme", "cssdiff".
 ---
 
 # footstrap-audit
@@ -13,7 +13,7 @@ Fast, dependency-free static check of `luci-theme-footstrap` styles/scripts.
 python3 .claude/skills/footstrap-audit/audit.py
 ```
 
-Reports three things:
+Reports five things:
 
 1. **balance** — `{}`/`()`/`[]` counts for `cascade.css` and every resources JS.
    Any mismatch = a broken block; fix before deploying.
@@ -21,16 +21,22 @@ Reports three things:
    drop silently (missing shadows/borders/colors). Common after editing the
    `:root` token block — re-add the HSL component tokens. Runtime-inline vars
    (`--zone-color-rgb`, `--focus-color-rgb`, `--on-color`) are allow-listed.
-3. **hardcoded colors in base region** — `#hex` / numeric `rgb()/hsl()` in the
-   unmodified bootstrap region (before the first appended `FOOTSTRAP` section),
-   with selector + line. These bypass the token bridge → candidates to map to
-   tokens.
+3. **declarations shadowed within a layer** — the same selector, in the same
+   cascade layer and at-rule context, setting the same property twice. The
+   earlier one is dead code, and it means a rule was appended at the bottom of
+   the file instead of edited in place. Reported for `theme`/`page` only;
+   `styles/base` re-states properties on purpose. The group-then-refine idiom
+   (`input…, textarea { min-height: 38px }` then `textarea { min-height: 84px }`)
+   is not reported.
+4. **stray `!important`** outside the files allowed to carry one.
+5. **hardcoded colors in styles/base** — `#hex` / numeric `rgb()/hsl()` with
+   file, line and selector. These bypass the token bridge, so a palette or
+   dark-mode switch cannot reach them → candidates to map to tokens.
 
-Caveat on #3: the script flags a base literal even if a **later** appended
-footstrap block already overrides that selector (it can't track cascade order).
-Cross-check: many `header` / `.nav .dropdown-menu` hits are dead (overridden by
-the sidebar/top-nav rules); the live ones are form/widget selectors
-(`.cbi-*`, `.ifacebox`, `.zonebadge`, `select[multiple]`, `.close`, `.tabs`).
+Caveat on #5: the script flags a base literal even when a `styles/theme` rule
+already overrides that selector (it cannot track cascade order). Cross-check
+before touching one — a live hit shows up as a colour that does not follow the
+palette; a dead one changes nothing. `cssdiff.py` settles it either way.
 
 ## Also compile-check templates (printed as a tip by the script)
 

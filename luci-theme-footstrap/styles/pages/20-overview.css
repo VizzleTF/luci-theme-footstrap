@@ -1,0 +1,245 @@
+@layer page {
+	/* Why this file still carries !important, when the rest of the theme dropped it:
+	 * these declarations do not fight another stylesheet — they fight inline
+	 * `style=` attributes written by luci-mod-status. 29_ports.js builds each Port
+	 * status tile as
+	 *     E('div', {class: 'ifacebox', style: 'margin:.25em;min-width:70px;max-width:100px'})
+	 * and an inline declaration outranks every author rule in every layer. Only an
+	 * author !important beats it. Same for the meter rows and the hidden zone bar.
+	 * A cascade layer cannot replace these flags; do not remove them.
+	 * ================================================================== */
+
+	/* ==================================================================
+	 * FOOTSTRAP section toggle (Hide/Show) — override stock overview rules
+	 * (base `.label` + body[data-page=...] .cbi-title .label leak uppercase,
+	 * margins and a colored-badge look). Make them clean theme pills.
+	 * ================================================================== */
+	.cbi-title .label,
+	body[data-page='admin-status-overview'] .cbi-title .label {
+		text-transform: none;
+		letter-spacing: 0;
+		font-size: 11px;
+		font-weight: 600;
+		line-height: 1.4;
+		margin: 0;
+		padding: 4px 12px;
+		min-width: 0;
+		border-radius: 99px;
+		background: var(--panel2);
+		border: 1px solid var(--border);
+		color: var(--dim);
+		box-shadow: none;
+		cursor: pointer;
+	}
+	.cbi-title .label:hover,
+	body[data-page='admin-status-overview'] .cbi-title .label:hover {
+		color: var(--text);
+		border-color: var(--dim);
+		opacity: 1;
+	}
+	.cbi-title .label.notice,
+	body[data-page='admin-status-overview'] .cbi-title .label.notice {
+		opacity: 1;
+		color: var(--accent);
+		background: var(--accent-soft);
+		border-color: var(--accent);
+	}
+
+	/* Section Hide/Show toggles -> compact chevron icon buttons. The label is a
+	 * span with a raw "Hide"/"Show" text node (index.js) + data-style: expanded =
+	 * inactive, collapsed = active. Hide the text (font-size:0) and draw a chevron
+	 * with ::after borders: up = "will collapse" (expanded), down = "will expand"
+	 * (collapsed). data-indicator='poll-status' is unique to these toggles. */
+	.cbi-title .label[data-indicator='poll-status'],
+	body[data-page='admin-status-overview'] .cbi-title .label[data-indicator='poll-status'] {
+		font-size: 0;
+		width: 26px;
+		height: 26px;
+		padding: 0;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 8px;
+	}
+	.cbi-title .label[data-indicator='poll-status']::after,
+	body[data-page='admin-status-overview'] .cbi-title .label[data-indicator='poll-status']::after {
+		content: '';
+		width: 7px;
+		height: 7px;
+		border-right: 2px solid currentColor;
+		border-bottom: 2px solid currentColor;
+		border-radius: 1px;
+		transform: rotate(45deg);			/* default: chevron down (collapsed / Show) */
+		margin-top: -2px;					/* optical centring of the down chevron */
+		transition: transform .15s ease;
+	}
+	.cbi-title .label[data-indicator='poll-status'][data-style='inactive']::after,
+	body[data-page='admin-status-overview'] .cbi-title .label[data-indicator='poll-status'][data-style='inactive']::after {
+		transform: rotate(-135deg);			/* expanded / Hide -> chevron up */
+		margin-top: 2px;
+	}
+
+	/* ---------------------------------------------------------------------------
+	 * Stock overview layout: 05_footstrap_overview_layout.js wraps the stock
+	 * System / Memory / Storage sections in .fs-ovl. Grid: System fills the left
+	 * column across both rows, Memory (top) + Storage (bottom) stack in the right
+	 * column. Only layout — the stock section styling/data is untouched. The rest
+	 * of the overview (Network, DHCP, Wireless …) stays full-width below.
+	 * --------------------------------------------------------------------------- */
+	/* hide the stock <h2>Status</h2> page heading — the chrome already shows the
+	 * page title (sidebar topbar / top-nav location), so it's a redundant duplicate. */
+	body[data-page='admin-status-overview'] #view > h2[name='content'],
+	body[data-page='admin-status-overview'] #maincontent h2[name='content'] { display: none; }
+	.fs-ovl {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 16px;
+		/* stretch (default) so the System column and the Memory+Storage column end
+		 * at the same bottom edge — equal height regardless of which has more rows */
+		margin-bottom: 16px;			/* match stock .cbi-section spacing below the grid */
+	}
+	/* min-width:0 so a grid item shrinks to its track instead of to its content's
+	 * min-width (default auto) — otherwise a long System value (model/firmware
+	 * string) blew the single-column track past a ~344px phone and clipped. */
+	.fs-ovl > .fs-ovl-sys { grid-column: 1; grid-row: 1 / 3; margin: 0; min-width: 0; }
+	.fs-ovl > .fs-ovl-mem { grid-column: 2; grid-row: 1; margin: 0; min-width: 0; }
+	.fs-ovl > .fs-ovl-sto { grid-column: 2; grid-row: 2; margin: 0; min-width: 0; }
+	/* hide our own empty stock wrapper — the include renders only .fs-ovl-marker,
+	 * which index.js nests inside the section's inner container (not a direct
+	 * child), so match it anywhere in the descendants, not with `>`. */
+	#view > .cbi-section:has(.fs-ovl-marker) { display: none; }
+
+	@media (max-width: 800px) {
+		.fs-ovl { grid-template-columns: 1fr; }
+		.fs-ovl > .fs-ovl-sys,
+		.fs-ovl > .fs-ovl-mem,
+		.fs-ovl > .fs-ovl-sto { grid-column: 1; grid-row: auto; }
+	}
+
+	/* ---------------------------------------------------------------------------
+	 * Stock Port status (29_ports.js) reskin — pure CSS over the stock .ifacebox
+	 * markup. Turn the icon-in-a-box tiles into left-aligned cards with a link
+	 * dot: name + status dot (top row), speed, then TX/RX on one line.
+	 *
+	 * IMPORTANT: Network (30_network.js) and Wireless (60_wifi.js) reuse the SAME
+	 * .ifacebox / .ifacebox-head / .ifacebox-body classes, so every rule is scoped
+	 * to `.ifacebox:has(img[src*="/port_"])` — only Port status tiles carry a
+	 * `icons/port_*.svg` icon. This keeps the reskin off Network/Wireless.
+	 * Link state = the icon src (port_up/pse_up = link, *_down = no link). Child
+	 * order: 1 name-head, 2 body(icon+speed), 3 zone-bar head, 4 body(traffic).
+	 * --------------------------------------------------------------------------- */
+	/* grid wrapper — only the ports grid (its tiles carry port_* icons) */
+	body[data-page='admin-status-overview'] div:has(> .ifacebox img[src*="/port_"]) {
+		gap: 12px !important;
+		grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)) !important;
+		margin-bottom: 0 !important;
+	}
+	/* the card */
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) {
+		margin: 0 !important;
+		min-width: 0 !important;
+		max-width: none !important;
+		text-align: left;
+		background: var(--panel2);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		padding: 12px 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
+	/* drop the stock icon and the zone-colour bar row */
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) img { display: none; }
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > :nth-child(3) { display: none !important; }
+	/* speed body: hide its <br> so only the speed text shows */
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) br { display: none; }
+	/* name row: name left, status dot right */
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		font-size: 13px;
+		color: var(--text);
+	}
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child::after {
+		content: '';
+		width: 9px; height: 9px;
+		border-radius: 50%;
+		background: var(--good);				/* linked (default) */
+		flex: 0 0 auto;
+	}
+	/* no-link (icon *_down.svg): hollow ring + dim name */
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child { color: var(--dim); }
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child::after {
+		background: transparent;
+		border: 1.5px solid var(--dim);
+	}
+	/* speed line (2nd child): green when linked, dim when not */
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--good);
+		text-align: left;
+	}
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-body:nth-child(2) { color: var(--dim); }
+	/* traffic (4th child): TX / RX (stock keeps them on two lines via a <br> that
+	 * CSS can't turn into a one-line gap without merging the two runs). Mono + dim. */
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container {
+		font-family: var(--font-mono);
+		font-size: 11px !important;
+		color: var(--dim);
+		line-height: 1.7;
+	}
+
+	/* ---------------------------------------------------------------------------
+	 * Overview meter rows — any stock <table>.table row that carries a
+	 * .cbi-progressbar (Memory, Storage, CPU load, Network active connections, …)
+	 * becomes the meter look: label + value on one line, thin bar below. Keyed off
+	 * the progressbar itself (:has), so it covers every such row uniformly instead
+	 * of per-section. The bar + value styling is the general .cbi-progressbar rule.
+	 * --------------------------------------------------------------------------- */
+	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)):has(.cbi-progressbar) { display: block; }
+	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 5px 10px;
+		padding: 7px 0 10px;
+		border: 0;
+		position: relative;
+	}
+	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar):last-child { padding-bottom: 2px; }
+	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td {
+		display: block;
+		width: auto !important;
+		padding: 0 !important;
+		border: 0 !important;
+	}
+	/* label — row 1, left.
+	 * The key/value rule above puts `white-space: nowrap` on a first column; a
+	 * mount point ("192.168.3.26:/volume1/… (/mnt/hdd_isync)") is one unbreakable
+	 * line, so the row's min-content width blew past the card and Memory/Storage
+	 * stopped shrinking on a phone. Let it wrap anywhere, and keep a gutter on the
+	 * right for the value, which is pinned above the bar's right edge (::after on
+	 * .cbi-progressbar — out of flow, so nothing else reserves space for it). */
+	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
+		grid-column: 1; grid-row: 1;
+		align-self: center;
+		min-width: 0;
+		white-space: normal;
+		overflow-wrap: anywhere;
+		padding-right: min(200px, 50%) !important;
+		font-size: 12px; font-weight: 600; color: var(--text);
+	}
+	/* bar cell — spans full width on row 2 */
+	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:nth-child(2) {
+		grid-column: 1 / -1; grid-row: 2;
+	}
+
+	/* System / Memory / Storage cards: drop the per-row border-bottom dividers
+	 * (the generic .cbi-section .table .td rule adds them) — cleaner card look. */
+	body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .table .td,
+	body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .table .th,
+	body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .cbi-value { border-bottom: 0 !important; }
+	/* System key/value table draws its dividers on .tr (not .td) — remove those too */
+	body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .table .tr { border-bottom: 0 !important; }
+}

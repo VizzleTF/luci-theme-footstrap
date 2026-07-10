@@ -1,0 +1,200 @@
+@layer base {
+	/* The .cbi-dropdown widget. ui.js drives it purely through attributes —
+	 * [open], [multiple], [empty], [more], [display], [selected] — and the rules
+	 * below are what turn those attributes into a working combobox. The eleven
+	 * !important flags here are load-bearing: they carry the widget's internal
+	 * display/padding, and dropping them collapses the popup. See docs/17. */
+	.cbi-dropdown {
+		display: inline-flex !important;
+		cursor: pointer;
+		height: auto;
+		position: relative;
+		padding: 0 !important;
+	}
+
+	.cbi-dropdown:not(.btn):not(.cbi-button) {
+		background: linear-gradient(var(--background-color-high) 0%, var(--border-color-low) 100%);
+		border: 1px solid var(--border-color-high);
+		border-radius: 3px;
+		color: var(--text-color-high);
+	}
+
+	.cbi-dropdown img {
+		/* the following are necessary to constrain (vector) images of any size */
+		max-height: 1.6em;  /* Adjusts image height to fit slightly larger than text line height */
+		width: auto;  /* Preserves aspect ratio */
+	}
+
+	.cbi-dropdown > ul {
+		margin: 0 !important;
+		padding: 0;
+		list-style: none;
+		overflow-x: hidden;
+		overflow-y: hidden;
+		display: flex;
+		width: 100%;
+	}
+
+	.cbi-dropdown.btn > ul:not(.dropdown),
+	.cbi-dropdown.cbi-button > ul:not(.dropdown) {
+		margin: 0 0 0 13px !important;
+	}
+
+	.cbi-dropdown.btn.spinning > ul:not(.dropdown),
+	.cbi-dropdown.cbi-button.spinning > ul:not(.dropdown) {
+		margin: 0 !important;
+	}
+
+	.cbi-dropdown > ul.preview {
+		display: none;
+	}
+
+	.cbi-dropdown > .open,
+	.cbi-dropdown > .more {
+		flex-grow: 0;
+		flex-shrink: 0;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		text-align: center;
+		line-height: 2em;
+		padding: 0 .3em;
+	}
+
+	.cbi-dropdown.btn > .open,
+	.cbi-dropdown.cbi-button > .open {
+		padding: 0 .5em;
+		margin-left: .5em;
+		border-left: 1px solid;
+	}
+
+	.cbi-dropdown > .more,
+	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[placeholder] {
+		color: var(--text-color-medium);
+		display: none;
+	}
+
+	.cbi-dropdown > ul > li {
+		display: none;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		flex-shrink: 1;
+		flex-grow: 1;
+		align-items: center;
+		align-self: center;
+		color: inherit;
+	}
+
+	.cbi-dropdown > ul.dropdown > li,
+	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li {
+		min-height: 20px;
+		padding: .25em;
+		color: var(--text-color-high);
+	}
+
+	.cbi-dropdown > ul > li .hide-open { display: block; display: initial; }
+	.cbi-dropdown > ul > li .hide-close { display: none; }
+
+	.cbi-dropdown > ul > li[display]:not([display="0"]) {
+		border-left: 1px solid var(--border-color-high);
+	}
+
+	.cbi-dropdown[empty] > ul {
+		max-width: 1px;
+	}
+
+	.cbi-dropdown > ul > li > form {
+		display: none;
+		margin: 0;
+		padding: 0;
+		pointer-events: none;
+	}
+
+	.cbi-dropdown > ul > li img {
+		vertical-align: middle;
+		margin-right: .25em;
+	}
+
+	.cbi-dropdown > ul > li > form > input[type="checkbox"] {
+		margin: 0 .25em 0 0;
+	}
+
+	.cbi-dropdown > ul > li input[type="text"] {
+		height: 20px;
+	}
+
+	.cbi-dropdown[open] {
+		position: relative;
+	}
+
+	.cbi-dropdown[open] > ul.dropdown {
+		display: block;
+		background: var(--background-color-low);
+		border: 1px solid var(--border-color-high);
+		box-shadow: 0 0 4px var(--border-color-high);
+		position: absolute;
+		z-index: 1100;
+		max-width: none;
+		min-width: 100%;
+		width: auto;
+		transition: max-height .125s ease-in;
+		overflow-y: auto;
+	}
+
+	.cbi-dropdown > ul > li[display],
+	.cbi-dropdown[open] > ul.preview,
+	.cbi-dropdown[open] > ul.dropdown > li,
+	.cbi-dropdown[multiple] > ul > li > label,
+	.cbi-dropdown[multiple][open] > ul.dropdown > li,
+	.cbi-dropdown[multiple][more] > .more,
+	.cbi-dropdown[multiple][empty] > .more {
+		flex-grow: 1;
+		display: flex !important;
+	}
+
+	.cbi-dropdown[empty] > ul > li,
+	.cbi-dropdown[optional][open] > ul.dropdown > li[placeholder] {
+		display: block !important;
+	}
+
+	.cbi-dropdown[multiple][open] > ul.dropdown > li > form {
+		display: flex !important;
+	}
+
+	.cbi-dropdown[open] > ul.dropdown > li .hide-open { display: none; }
+	.cbi-dropdown[open] > ul.dropdown > li .hide-close { display: block; display: initial; }
+
+	.cbi-dropdown[open] > ul.dropdown > li {
+		border-bottom: 1px solid var(--border-color-high);
+	}
+
+	.cbi-dropdown[open] > ul.dropdown > li[selected] {
+		background: var(--primary-color-medium);
+		color: var(--on-primary-color);
+	}
+
+	.cbi-dropdown[open] > ul.dropdown > li.focus,
+	.cbi-dropdown[open] > ul.dropdown > li:hover {
+		background: var(--primary-color-low);
+		color: var(--on-primary-color);
+	}
+
+	.cbi-dropdown[open] > ul.dropdown > li[selected].focus,
+	.cbi-dropdown[open] > ul.dropdown > li[selected]:hover {
+		background: linear-gradient(90deg, var(--primary-color-medium) 50%, var(--primary-color-low));
+	}
+
+	.cbi-dropdown[open] > ul.dropdown > li:last-child {
+		margin-bottom: 0;
+		border-bottom: none;
+	}
+
+	.cbi-dropdown[open] > ul.dropdown > li[unselectable] {
+		opacity: 0.7;
+	}
+
+	.cbi-dropdown[open] > ul.dropdown > li > input.create-item-input:first-child:last-child {
+		width: 100%;
+	}
+}

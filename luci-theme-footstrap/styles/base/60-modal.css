@@ -1,0 +1,110 @@
+@layer base {
+	/* The modal overlay ui.js shows for config diffs, uploads and login, plus the
+	 * colour variants shared by .btn / .alert-message / .cbi-tooltip. */
+	#modal_overlay {
+		position: fixed;
+		top: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.7);
+		z-index: 900;
+		overflow: auto;
+		transition: opacity .125s ease-in;
+		opacity: 0;
+		visibility: hidden;
+	}
+
+	.modal {
+		width: 90%;
+		margin: 5em auto;
+		min-height: 32px;
+		max-width: 600px;
+		border-radius: 3px;
+		background: var(--background-color-high);
+		border: 1px solid var(--border-color-low);
+		box-shadow: 0 0 3px var(--background-color-low);
+		padding: 1em 1em .5em 1em;
+		min-width: 270px;
+	}
+
+	.modal > * {
+		line-height: normal;
+		margin-bottom: .5em;
+		max-width: 100%;
+	}
+
+	.modal > pre,
+	.modal > textarea {
+		white-space: pre-wrap;
+		overflow: auto;
+		width: 100%;
+	}
+
+	.modal > .button-row {
+		display: flex;
+		justify-content: space-between;
+		flex-wrap: wrap;
+	}
+
+	.modal > .button-row > button:not(:last-of-type) {
+		margin-right: .5em;
+	}
+
+	.modal > .button-row > button:first-of-type {
+		margin-right: auto;
+	}
+
+	body.modal-overlay-active {
+		overflow: hidden;
+		height: 100vh;
+	}
+
+	body.modal-overlay-active #modal_overlay {
+		left: 0;
+		right: 0;
+		opacity: 1;
+		visibility: visible;
+	}
+
+	.btn .close, .alert-message .close {
+		font-family: var(--font-sans);
+		line-height: 18px;
+	}
+
+	.btn.danger,
+	.alert-message.danger,
+	.btn.error,
+	.alert-message.error,
+	.cbi-tooltip.error {
+		background: linear-gradient(var(--error-color-low), var(--error-color-medium));
+		color: var(--on-error-color);
+		border-color: var(--error-color-high) var(--error-color-high) var(--error-color-low);
+	}
+
+	.btn.success, .alert-message.success, .cbi-tooltip.success {
+		background: linear-gradient(var(--success-color-low), var(--success-color-medium));
+		color: var(--on-error-color);
+		border-color: var(--success-color-high) var(--success-color-high) var(--success-color-low);
+	}
+
+	.btn.info, .alert-message.info, .cbi-tooltip.info {
+		background: linear-gradient(var(--primary-color-low), var(--primary-color-medium));
+		color: var(--on-primary-color);
+		border-color: var(--primary-color-high) var(--primary-color-high) var(--primary-color-low);
+	}
+
+	.alert-message.notice, .cbi-tooltip.notice {
+		background: linear-gradient(var(--background-color-low), var(--background-color-medium));
+		border-color: var(--background-color-high) var(--background-color-high) var(--background-color-low);
+		color: var(--text-color-high);
+	}
+
+	.alert-message.warning {
+		background: linear-gradient(var(--warn-color-low), var(--warn-color-medium));
+		border-color: var(--warn-color-high) var(--warn-color-high) var(--warn-color-low);
+		color: var(--on-warn-color);
+	}
+
+	.modal.alert-message {
+		color: var(--text-color-high);
+	}
+}

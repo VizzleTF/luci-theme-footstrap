@@ -1,0 +1,447 @@
+@layer base {
+	/* Forms: input types, the .cbi-value row layout, and the focus/disabled/
+	 * readonly/invalid states shared by every CBI widget. */
+	fieldset {
+		margin-bottom: 9px;
+		padding-top: 9px;
+	}
+
+	fieldset legend {
+		display: block;
+		font-size: 19.5px;
+		line-height: 1;
+		color: var(--text-color-high);
+		padding-top: 20px;
+	}
+
+	label,
+	input,
+	button,
+	select {
+		font-family: var(--font-sans);
+		font-size: 13px;
+		font-weight: normal;
+		line-height: normal;
+	}
+
+	.cbi-value {
+		display: flex;
+		flex-wrap: wrap;
+		margin-bottom: 18px;
+		align-items: baseline;
+	}
+
+	.cbi-value-field {
+		margin-left: 20px;
+		flex: 1;
+	}
+
+	.cbi-value label.cbi-value-title {
+		padding-top: 6px;
+		font-size: 13px;
+		line-height: 18px;
+		flex: 0 0 180px;
+		text-align: right;
+		color: var(--text-color-high);
+	}
+
+	.cbi-value > .cbi-section,
+	.cbi-value > .cbi-tblsection {
+		width: 100%;
+	}
+
+	label > input[type="checkbox"],
+	label > input[type="radio"] {
+		vertical-align: text-top;
+		margin: 0;
+	}
+
+	label[for] {
+		cursor: pointer;
+	}
+
+	input,
+	textarea,
+	select,
+	.cbi-select,
+	.cbi-dropdown:not(.btn):not(.cbi-button) {
+		display: inline-block;
+		width: 210px;
+		padding: 4px;
+		background: var(--background-color-high);
+		color: var(--text-color-high);
+		font-size: 13px;
+		line-height: 18px;
+		border: 1px solid var(--border-color-high);
+		border-radius: 3px;
+	}
+
+	@media screen and (min-width: 768px) {
+		#localtime {
+			width: 300px;
+		}
+	}
+
+	input,
+	select,
+	.cbi-select,
+	.cbi-dropdown:not(.btn):not(.cbi-button) {
+		height: 30px;
+	}
+
+	.cbi-dropdown:not(.btn):not(.cbi-button),
+	.cbi-dynlist {
+		min-width: 210px;
+		max-width: 400px;
+		width: auto;
+	}
+
+	.cbi-dynlist {
+		height: auto;
+		min-height: 30px;
+		display: inline-flex;
+		flex-direction: column;
+	}
+
+	.cbi-dynlist > .item {
+		margin-bottom: 4px;
+		box-shadow: 0 0 2px var(--border-color-high);
+		background: var(--background-color-high);
+		padding: 6px 2em 6px 4px;
+		border: 1px solid var(--border-color-high);
+		border-radius: 3px;
+		color: var(--text-color-high);
+		position: relative;
+		pointer-events: auto; /* needed for drag-and-drop in UIDynamicList */
+		overflow: hidden;
+		word-break: break-all;
+		cursor: move; /* drag-and-drop */
+		user-select: text; /* text selection in drag-and-drop */
+	}
+
+	.cbi-dynlist > .item::after {
+		content: "×";
+		position: absolute;
+		display: inline-flex;
+		align-items: center;
+		top: -1px;
+		right: -1px;
+		bottom: -1px;
+		padding: 0 6px;
+		border: 1px solid var(--border-color-high);
+		border-radius: 0 3px 3px 0;
+		font-weight: bold;
+		color: var(--error-color-high);
+		pointer-events: auto;
+	}
+
+	/* indication line for drag-and-drop in UIDynamicList*/
+	.cbi-dynlist > .item.drag-over { 
+		border-top: 1px solid var(--text-color-highest);
+	}
+
+	/* Make item being dragged in UIDynamicList partially transparent*/
+	.cbi-dynlist > .item.dragging {
+		opacity: 0.5;
+	}
+
+	/* prevent pointer changing when over the span element in UIDynamicList */
+	.cbi-dynlist > .item > span {
+		pointer-events: none;
+	}
+
+	.cbi-dynlist > .add-item {
+		display: flex;
+	}
+
+	/* indication line for drag-and-drop in UIDynamicList*/
+	.cbi-dynlist > .add-item > .cbi-input-text.drag-over {
+		border-top: 1px solid var(--text-color-highest);
+	}
+
+	/* indication line for drag-and-drop in UIDynamicList*/
+	.cbi-dynlist > .add-item > .cbi-button-add.drag-over {
+		border-top: 1px solid var(--text-color-highest);
+	}
+
+	.cbi-dynlist > .add-item > input,
+	.cbi-dynlist > .add-item > button {
+		flex: 1 1 auto;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.cbi-value-field > .cbi-checkbox,
+	.cbi-value-field > div > .cbi-radio {
+		height: 30px;
+		display: inline-flex;
+		align-items: center;
+	}
+
+	.cbi-radio {
+		cursor: pointer;
+		gap: .125em;
+	}
+
+	.cbi-select {
+		padding: 0;
+		position: relative;
+		background: linear-gradient(var(--background-color-high), var(--border-color-low));
+	}
+
+	.cbi-select select,
+	.cbi-select select:focus {
+		-webkit-appearance: none; /* nonstandard, should remove in future */
+		appearance: none;
+		outline: none;
+		border: none;
+		background: transparent;
+		height: 100%;
+		width: 100%;
+		padding: 0 .3em;
+		cursor: pointer;
+		margin-right: .6em;
+	}
+
+	.cbi-select::before {
+		position: absolute;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		content: "▾";
+		padding: 0 .3em;
+		background: linear-gradient(var(--background-color-high), var(--border-color-low));
+		pointer-events: none;
+		border-radius: 3px;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+
+	.cbi-select select option {
+		background: var(--background-color-low);
+		color: var(--text-color-high);
+	}
+
+	.cbi-select select option:hover {
+		background: var(--primary-color-low);
+		color: var(--on-primary-color);
+	}
+
+	.cbi-select select option:checked {
+		background: var(--primary-color-medium);
+		color: var(--on-primary-color);
+	}
+
+	input[type=file] {
+		padding: initial;
+		border: initial;
+		line-height: initial;
+		box-shadow: none;
+		width: auto !important;
+	}
+
+	input[type=button], input[type=reset], input[type=submit] {
+		width: auto;
+		height: auto;
+	}
+
+	select[multiple] {
+		height: inherit;
+		background-color: var(--on-accent);
+	}
+
+	input[type="checkbox"],
+	input[type="radio"] {
+		--bd-color: var(--border-color-high);
+		--fg-color: var(--text-color-high);
+		-webkit-appearance: none; /* nonstandard, should remove in future */
+		appearance: none;
+		width: 14px;
+		height: 14px;
+		color: var(--fg-color);
+		position: relative;
+		display: inline-block;
+		cursor: pointer;
+		background: none;
+		border: none;
+	}
+
+	input[type="checkbox"]::before,
+	input[type="checkbox"]::after,
+	input[type="radio"]::before,
+	input[type="radio"]::after {
+		position: absolute;
+		content: "";
+	}
+
+	input[type="checkbox"]::before,
+	input[type="radio"]::before {
+		top: 0;
+		left: 0;
+		width: 14px;
+		height: 14px;
+		background: linear-gradient(var(--background-color-high), var(--background-color-low));
+		border: 1px solid var(--bd-color);
+		border-radius: 2px;
+	}
+
+	input[type="radio"],
+	input[type="radio"]::before {
+		border-radius: 50%;
+	}
+
+	input[type="checkbox"]::after,
+	input[type="radio"]::after {
+		top: 2px;
+		left: 2px;
+		width: 10px;
+		height: 10px;
+	}
+
+	input[type="checkbox"]:checked::after,
+	input[type="radio"]:checked::after {
+		--checkmark-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'><path d='m2.5 7.4 7.5 7.5-2.5 2.4L0 10Zm15-5L20 4.9 7.5 17.3 5 15Z'/></svg>");
+		-webkit-mask: var(--checkmark-icon) center/cover no-repeat;
+		mask: var(--checkmark-icon) center/cover no-repeat;
+		background: var(--fg-color);
+	}
+
+	input[type="radio"]:checked:after {
+		--checkmark-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'><circle cx='10' cy='10' r='7'/></svg>");
+	}
+
+	input[type="checkbox"].cbi-input-invalid,
+	input[type="radio"].cbi-input-invalid {
+		--bd-color: var(--error-color-medium);
+		--fg-color: var(--error-color-high);
+	}
+
+	.td > input[type=text],
+	.td > input[type=password],
+	.td > select,
+	.td > .cbi-dropdown:not(.btn):not(.cbi-button),
+	.cbi-dynlist > .add-item > .cbi-dropdown {
+		width: 100%;
+	}
+
+	::placeholder {
+		color: var(--text-color-medium);
+	}
+
+	.item::after,
+	.btn,
+	.cbi-button,
+	.cbi-select,
+	.cbi-dropdown,
+	.cbi-dynlist > .item,
+	input[type="checkbox"]::before,
+	input[type="radio"]::before,
+	input, button, textarea, select {
+		transition: border linear 0.2s, box-shadow linear 0.2s;
+		box-shadow: inset 0 1px 3px hsla(var(--border-color-low-hsl), .01);
+	}
+
+	.item:hover::after,
+	.btn:hover, .btn:focus,
+	.cbi-button:hover, .cbi-button:focus,
+	.cbi-select.focus,
+	.cbi-dropdown:focus, .cbi-dropdown[open],
+	.cbi-dynlist > .item:focus,
+	input[type="checkbox"]:focus::before,
+	/* The `border-color` below used to carry !important. An important declaration
+	 * in an earlier layer outranks one in a later layer, so it painted this blue
+	 * ring over the theme's own focus/hover colours on every button and input.
+	 * Nothing depends on the flag — base already loses to `theme` for normal
+	 * declarations. See docs/17. */
+	input[type="radio"]:focus::before,
+	input:focus, button:hover, textarea:focus, select:focus {
+		--focus-color-rgb: 82, 168, 236;
+
+		outline: 0;
+		border-color: rgba(var(--focus-color-rgb), 0.8);
+		box-shadow: inset 0 1px 3px hsla(var(--border-color-low-hsl), .01), 0 0 8px rgba(var(--focus-color-rgb), 0.6);
+		text-decoration: none;
+	}
+
+	.cbi-input-invalid:focus,
+	.cbi-select.cbi-input-invalid,
+	input[type="checkbox"].cbi-input-invalid:focus::before,
+	input[type="radio"].cbi-input-invalid:focus::before {
+		--focus-color-rgb: var(--error-color-high-rgb);
+	}
+
+	input[disabled],
+	button[disabled],
+	select[disabled],
+	textarea[disabled],
+	.cbi-select[disabled]::before,
+	.cbi-dropdown[disabled]:not(.btn):not(.cbi-button),
+	input[type="checkbox"][disabled]::before,
+	input[type="checkbox"][disabled]::after,
+	input[type="radio"][disabled]::before,
+	input[type="radio"][disabled]::after {
+		opacity: var(--disabled-opacity);
+		pointer-events: none;
+		cursor: default;
+	}
+
+	input[readonly],
+	select[readonly],
+	textarea[readonly] {
+		border-color: hsla(var(--border-color-high-hsl), var(--disabled-opacity));
+		pointer-events: auto;
+		cursor: auto;
+	}
+
+	.cbi-optionals,
+	.cbi-section-create {
+		padding: 0 0 10px 10px;
+	}
+
+	.cbi-section-create {
+		margin: -3px;
+		display: inline-flex;
+		align-items: center;
+	}
+
+	.cbi-section-create > * {
+		margin: 3px;
+		flex: 1 1 auto;
+	}
+
+	.cbi-section-create > * > input {
+		width: 100%;
+	}
+
+	.actions,
+	.cbi-page-actions {
+		background: var(--background-color-low);
+		margin-bottom: 18px;
+		padding: 17px 20px 18px 17px;
+		border-top: 1px solid var(--border-color-medium);
+		border-radius: 0 0 3px 3px;
+		text-align: right;
+	}
+
+	.actions .secondary-action,
+	.cbi-page-actions .secondary-action{
+		float: right;
+	}
+
+	.actions .secondary-action a,
+	.cbi-page-actions .secondary-action a {
+		line-height: 30px;
+	}
+
+	.actions .secondary-action a:hover,
+	.cbi-page-actions .secondary-action a:hover {
+		text-decoration: underline;
+	}
+
+	.cbi-page-actions > form {
+		display: inline;
+		margin: 0;
+	}
+}

@@ -1,0 +1,52 @@
+@layer tokens {
+	/* ============================================================
+	 * DEFAULT "footstrap" palette — GitHub Primer colors (light + dark dimmed).
+	 * Applied via data-palette="footstrap" on :root by default (head.ut inline
+	 * script). The high-contrast look lives in the base :root blocks and is
+	 * selectable as "hicontrast" (no data-palette attr). Token-only override:
+	 * same layout/components; the bridge recomputes off these tokens, only the raw
+	 * *-rgb bridge values need explicit re-mapping.
+	 * Specificity: [data-palette][data-darkmode] (0,3,0) wins over the base blocks.
+	 * ============================================================ */
+	:root[data-palette="footstrap"],
+	:root[data-palette="rvht"] {
+		/* GitHub — LIGHT (Rvht reuses these colours; only its background differs) */
+		--bg: #f6f8fa;
+		--panel: #ffffff;
+		--panel2: #f6f8fa;
+		--border: #d0d7de;
+		--text: #1f2328;
+		--dim: #656d76;
+		--faint: #818b98;
+		--accent: #0969da;
+		--accent-lt: #54aeff;
+		--accent-soft: rgba(9,105,218,.10);
+		--track: #eaeef2;
+		--good: #1a7f37;
+		--warn: #9a6700;
+		--danger: #cf222e;
+		--error-color-high-rgb: 207, 34, 46;
+		--success-color-high-rgb: 26, 127, 55;
+	}
+
+	:root[data-palette="footstrap"][data-darkmode="true"],
+	:root[data-palette="rvht"][data-darkmode="true"] {
+		/* GitHub — DARK (dimmed) */
+		--bg: #1c2128;
+		--panel: #22272e;
+		--panel2: #2d333b;
+		--border: #444c56;
+		--text: #adbac7;
+		--dim: #8c99a8;
+		--faint: #636e7b;
+		--accent: #539bf5;
+		--accent-lt: #79c0ff;
+		--accent-soft: rgba(83,155,245,.15);
+		--track: #373e47;
+		--good: #57ab5a;
+		--warn: #c69026;
+		--danger: #e5534b;
+		--error-color-high-rgb: 229, 83, 75;
+		--success-color-high-rgb: 87, 171, 90;
+	}
+}

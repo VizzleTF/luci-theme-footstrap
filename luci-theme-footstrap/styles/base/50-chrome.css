@@ -1,0 +1,186 @@
+@layer base {
+	/* Page chrome: the sticky <header> band, dropdown anchoring, the section tab
+	 * strip, breadcrumbs and the footer. Both layouts restyle these in
+	 * styles/theme/ — what stays here is the geometry a view can rely on. */
+	header {
+		position: sticky;
+		top: 0;
+		z-index: 800;
+		overflow: visible;
+		color: var(--text-color-medium);
+		margin: -5px -5px 15px -5px;
+		display: flex;
+	}
+
+	li.menu, .dropdown {
+		position: relative;
+	}
+
+	.dropdown:hover ul.dropdown-menu {
+		left: 0;
+	}
+
+	.tabs, .cbi-tabmenu {
+		--tab-bar-background-color: var(--background-color-high);
+		--tab-inactive-background-color-h: var(--border-color-low-h);
+		--tab-inactive-background-color-s: var(--border-color-low-s);
+		--tab-inactive-background-color-l: var(--border-color-low-l);
+		--tab-inactive-background-color: var(--border-color-low);
+		--tab-inactive-border-color: var(--border-color-medium);
+		--tab-inactive-text-color-delta-l: 33.33%;
+		--tab-inactive-text-color-l: calc(var(--tab-inactive-background-color-l) + var(--background-color-delta-l-sign) * var(--tab-inactive-text-color-delta-l));
+		--tab-inactive-text-color: hsl(var(--tab-inactive-background-color-hsl));
+		--tab-inactive-hover-background-color: var(--background-color-high);
+		--tab-active-background-color: var(--background-color-high);
+		--tab-active-text-color: #0069d6;
+		--tab-active-border-color: var(--border-color-medium);
+
+		margin: 0 -5px 18px;
+		padding: 0 2px;
+		list-style: none;
+		display: flex;
+		flex-wrap: wrap;
+		background: linear-gradient(var(--tab-bar-background-color) 28px, var(--tab-inactive-border-color) 28px);
+		background-size: 1px 29px;
+		background-position: left bottom;
+	}
+
+	.tabs > li, .cbi-tabmenu > li {
+		flex: 0 1 auto;
+		display: flex;
+		align-items: center;
+		height: 25px;
+		max-width: 48%;
+		margin: 4px 2px 0 2px;
+		background: var(--tab-active-background-color);
+		border: 1px solid var(--tab-active-border-color);
+		border-bottom: none;
+		border-radius: 4px 4px 0 0;
+		color: var(--primary-color-high);
+	}
+
+	.tabs > li > a, .cbi-tabmenu > li > a {
+		padding: 4px 6px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		color: inherit;
+		text-decoration: none;
+		border-radius: 4px 4px 0 0;
+		line-height: 25px;
+		outline: none;
+	}
+
+	.tabs > li > a:focus-visible, .cbi-tabmenu > li > a:focus-visible {
+		text-decoration: underline;
+	}
+
+	.tabs > li:not(.active):hover, .cbi-tabmenu > .cbi-tab-disabled:hover {
+		background: linear-gradient(var(--tab-inactive-hover-background-color) 90%, var(--tab-inactive-border-color) 100%);
+	}
+
+	.tabs > li:not(.active), .cbi-tabmenu > .cbi-tab-disabled {
+		color: var(--tab-inactive-text-color);
+		background: linear-gradient(var(--tab-inactive-background-color) 90%, var(--tab-inactive-border-color) 100%);
+	}
+
+	.cbi-tab-disabled[data-errors]::after {
+		content: attr(data-errors);
+		background: var(--error-color-high);
+		color: var(--on-accent);
+		height: 16px;
+		min-width: 16px;
+		border-radius: 8px;
+		text-align: center;
+		margin: 0 5px 0 0;
+		padding: 3px 2px 1px 2px;
+		display: inline-flex;
+		flex-direction: column;
+		justify-content: center;
+		font-size: 12px;
+	}
+
+	.cbi-tabmenu.map {
+		margin: 0;
+	}
+
+	.cbi-tabmenu.map > li {
+		font-size: 16.5px;
+		font-weight: bold;
+	}
+
+	.cbi-tab-descr {
+		margin: -9px 0 18px 0;
+	}
+
+	.tabs .menu-dropdown, .tabs .dropdown-menu {
+		top: 35px;
+		border-width: 1px;
+		border-radius: 0 6px 6px 6px;
+	}
+
+	.tabs a.menu:after, .tabs .dropdown-toggle:after {
+		border-top-color: var(--text-color-medium);
+		margin-top: 15px;
+		margin-left: 5px;
+	}
+
+	.tabs li.open.menu .menu, .tabs .open.dropdown .dropdown-toggle {
+		border-color: var(--border-color-high);
+	}
+
+	.tabs li.open a.menu:after, .tabs .dropdown.open .dropdown-toggle:after {
+		border-top-color: var(--text-color-high);
+	}
+
+	.breadcrumb {
+		padding: 7px 14px;
+		margin: 0 0 18px;
+		background: linear-gradient(to bottom, var(--background-color-high), var(--background-color-low));
+		border: 1px solid var(--border-color-medium);
+		border-radius: 3px;
+		display: flex;
+		flex: 0;
+	}
+
+	.breadcrumb li {
+		list-style: none;
+	}
+
+	.breadcrumb li:not(:last-child)::after {
+		content: "|";
+		padding: 0 5px;
+	}
+
+	.breadcrumb .active a {
+		color: var(--text-color-medium);
+	}
+
+	footer {
+		padding-top: 17px;
+		margin-top: auto;
+		border-top: 1px solid var(--border-color-low);
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		font-size: 12px;
+		color: var(--text-color-medium);
+		/* the redundant properties below work around a csstidy bug */
+		/* Match footer with header padding left and right so they are aligned (header uses 1180px, but footer was using 940px) */ 
+		padding-left: calc((100% - 1180px) / 2);
+		padding-right: calc((100% - 1180px) / 2);
+	}
+
+	footer a {
+		color: var(--primary-color-low);
+	}
+
+	footer span {
+		margin-bottom: 1em;
+	}
+
+	footer ul.breadcrumb {
+		margin-left: auto;
+	}
+}

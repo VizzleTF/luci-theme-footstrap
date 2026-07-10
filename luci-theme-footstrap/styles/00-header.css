@@ -1,0 +1,27 @@
+/*!
+ * luci-theme-footstrap
+ * Copyright 2026 footstrap contributors
+ * Licensed under the Apache License v2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Portions of styles/base are derived from luci-theme-bootstrap, whose notices
+ * the Apache License requires this file to carry for as long as that code ships:
+ *   Copyright 2012 Nut & Bolt <david@nut-bolt.nl>
+ *   Copyright 2011 Twitter, Inc
+ */
+
+/* Layer order — declared here and nowhere else. A later layer beats an earlier
+ * one regardless of selector specificity; unlayered rules beat every layer and
+ * that slot is deliberately empty, it is the escape hatch.
+ *
+ *   tokens  design tokens, and the bridge onto the variable names LuCI views
+ *           and third-party luci-app-* stylesheets expect            styles/0*
+ *   base    widget defaults every LuCI view assumes exist        styles/base/*
+ *   theme   footstrap components and the two layouts            styles/theme/*
+ *   page    per-page corrections                                styles/pages/*
+ *
+ * build-css.sh concatenates those four directories into cascade.css — never
+ * edit htdocs/luci-static/footstrap/cascade.css, it is generated and gitignored.
+ * A rule that needs !important to beat another footstrap rule is a sign it
+ * belongs in a later layer, not that it needs the flag. */
+@layer tokens, base, theme, page;

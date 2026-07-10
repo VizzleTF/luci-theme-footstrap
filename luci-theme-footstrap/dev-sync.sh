@@ -7,6 +7,10 @@ R="${1:-router}"
 N=footstrap
 D="$(cd "$(dirname "$0")" && pwd)"
 
+# cascade.css is generated from styles/ + pages/ and is not in git. --dev keeps
+# the comments so the file on the router still reads like the source.
+"$D"/build-css.sh "$D/htdocs/luci-static/$N/cascade.css" --dev
+
 ssh "$R" "mkdir -p /usr/share/ucode/luci/template/themes/$N \
 	/usr/share/ucode/luci/template/themes/$N-top \
 	/www/luci-static/$N \
@@ -39,18 +43,17 @@ scp -q  "$D"/root/usr/share/rpcd/acl.d/luci-theme-footstrap.json "$R":/usr/share
 ssh "$R" "chmod +x /usr/libexec/footstrap-selfupdate.sh; /etc/init.d/rpcd reload 2>/dev/null; rm -f /tmp/luci-indexcache*"
 
 ssh "$R" "
-# -n is load-bearing: without it, a re-run sees the existing symlink-to-directory
-# as a directory and drops the new link INSIDE it (themes/footstrap/footstrap).
-# media symlinks (dark/light + top share the footstrap assets dir)
+# Both layouts serve the same assets, so $N-top is a symlink to the one real
+# media dir. -n is load-bearing: without it a re-run sees the existing
+# symlink-to-directory as a directory and drops the new link INSIDE it
+# (luci-static/footstrap/footstrap-top).
 cd /www/luci-static
-rm -f $N/$N $N-top/$N-top 2>/dev/null   # clean up strays left by an older run
-ln -sfn $N $N-dark; ln -sfn $N $N-light
-ln -sfn $N $N-top; ln -sfn $N $N-top-dark; ln -sfn $N $N-top-light
-# template symlinks (dark/light reuse base templates per layout)
+ln -sfn $N $N-top
+# The six pre-consolidation variant names are gone. Sweep any left by an older
+# run of this script, or the router keeps serving a theme LuCI no longer lists.
+rm -f $N/$N $N-top/$N-top $N-dark $N-light $N-top-dark $N-top-light 2>/dev/null
 cd /usr/share/ucode/luci/template/themes
-rm -f $N/$N $N-top/$N-top 2>/dev/null
-ln -sfn $N $N-dark; ln -sfn $N $N-light
-ln -sfn $N-top $N-top-dark; ln -sfn $N-top $N-top-light
+rm -f $N/$N $N-top/$N-top $N-dark $N-light $N-top-dark $N-top-light 2>/dev/null
 touch /lib/apk/db/installed
 rm -f /tmp/luci-indexcache*"
 

@@ -1,0 +1,494 @@
+@layer theme {
+	/* ==================================================================
+	 * FOOTSTRAP SHELL — variant 1A Sidebar Console
+	 * Layout + chrome + component tuning over styles/base.
+	 * Markup: ucode/template/themes/footstrap/header.ut
+	 * Spec:   docs/09-realizatsiya-sidebar.md
+	 * ================================================================== */
+
+	body {
+		padding: 0;
+		background-color: var(--bg);
+		font-family: var(--font-sans);
+	}
+
+	/* shell = sidebar + main */
+	.fs-shell {
+		display: flex;
+		min-height: 100vh;
+		width: 100%;
+	}
+
+	/* ---------- sidebar ---------- */
+	.fs-sidebar {
+		width: 224px;
+		flex: 0 0 auto;
+		background: var(--panel);
+		border-right: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		padding: 22px 14px;
+		position: sticky;
+		top: 0;
+		height: 100vh;
+		overflow-y: auto;
+	}
+
+	.fs-brandrow {
+		display: flex; align-items: center; gap: 6px;
+		padding: 0 4px 20px 8px;
+	}
+	/* placement only — the look lives in 18-chrome.css */
+	.fs-brand { flex: 1 1 auto; min-width: 0; }
+
+	/* collapse the sidebar to an icon rail */
+	.fs-railtoggle {
+		display: inline-flex; align-items: center; justify-content: center;
+		width: 28px; height: 28px; padding: 0; flex: 0 0 auto;
+		border: 1px solid transparent; border-radius: 8px;
+		background: transparent; color: var(--faint); cursor: pointer;
+		transition: color .15s, background .15s, border-color .15s;
+	}
+	.fs-railtoggle:hover { color: var(--text); background: var(--panel2); border-color: var(--border); }
+	.fs-railtoggle .fs-ico { width: 16px; height: 16px; transition: transform .2s ease; }
+	/* the sidebar is a fixed-width column, so its wordmark must truncate */
+	.fs-wordmark { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+	.fs-navlabel {
+		color: var(--dim);
+		font-size: 11px; font-weight: 700; letter-spacing: .1em;
+		text-transform: uppercase;
+		padding: 6px 10px 8px;
+	}
+
+	/* vertical main nav (#topmenu) */
+	.fs-sidebar ul.nav,
+	.fs-sidebar #modemenu {
+		list-style: none;
+		margin: 0; padding: 0;
+		display: flex; flex-direction: column; gap: 2px;
+	}
+	.fs-sidebar ul.nav > li { position: relative; }
+	.fs-sidebar ul.nav > li > a {
+		display: flex; align-items: center; gap: 11px;
+		padding: 10px 11px;
+		border-radius: 10px;
+		color: var(--dim);
+		font-weight: 600; font-size: 14px;
+		line-height: 1.1;
+	}
+	.fs-sidebar ul.nav > li > a:hover {
+		opacity: 1;
+		background: var(--panel2);
+		color: var(--text);
+	}
+	.fs-sidebar ul.nav > li.active > a,
+	.fs-sidebar ul.nav > li > a.active {
+		background: var(--accent-soft);
+		color: var(--accent);
+	}
+	.fs-sidebar ul.nav .fs-ico { width: 17px; height: 17px; flex: 0 0 auto; }
+	.fs-sidebar ul.nav > li > a .fs-label { flex: 1 1 auto; }
+
+	/* collapse chevron for sections with children */
+	.fs-chevron {
+		width: 14px; height: 14px; flex: 0 0 auto;
+		color: var(--dim);
+		transition: transform .2s ease;
+	}
+	.fs-sidebar ul.nav > li.open > a .fs-chevron { transform: rotate(90deg); }
+	.fs-sidebar ul.nav > li.has-sub > a { cursor: pointer; }
+
+	/* nested submenu -> collapsed by default, shown when parent .open */
+	.fs-sidebar ul.nav ul {
+		list-style: none; margin: 0 0 0 28px; padding: 0;
+		display: none; flex-direction: column; gap: 2px;
+		overflow: hidden;
+	}
+	.fs-sidebar ul.nav > li.open > ul { display: flex; margin: 2px 0 6px 28px; }
+	.fs-sidebar ul.nav ul a {
+		display: block; padding: 7px 11px; border-radius: 8px;
+		color: var(--dim); font-size: 13px; font-weight: 500;
+	}
+	.fs-sidebar ul.nav ul a:hover { color: var(--text); background: var(--panel2); opacity: 1; }
+	.fs-sidebar ul.nav ul a.active { color: var(--accent); background: var(--accent-soft); }
+
+	.fs-modemenu { margin-top: 4px; }
+	.fs-modemenu:empty, .fs-modemenu.single { display: none; }
+
+	.fs-spacer { flex: 1 1 auto; min-height: 12px; }
+
+	/* theme toggle row — the whole row is the Appearance trigger (a <button>) */
+	.fs-themerow {
+		display: flex; align-items: center; gap: 11px;
+		width: 100%; padding: 10px 11px; border: 0; border-radius: 10px;
+		background: transparent; color: var(--dim);
+		font: inherit; font-weight: 600; font-size: 14px; line-height: 1.1;
+		text-align: left; cursor: pointer;
+	}
+	.fs-themerow:hover { background: var(--panel2); color: var(--text); }
+	.fs-themerow[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent); }
+	.fs-themerow .fs-ico { width: 17px; height: 17px; flex: 0 0 auto; }
+	.fs-themerow .fs-label { flex: 1 1 auto; }
+
+	/* Appearance popover trigger + panel (Mode + Palette quick switch).
+	 * Trigger is .fs-themerow (sidebar) / .fs-appearance-btn (top-nav); the popover
+	 * itself is parented to <body> and positioned by menu-footstrap-common.js —
+	 * .fs-sidebar is `overflow-y: auto`, which clips an absolutely-positioned child. */
+	.fs-appearance-wrap { position: relative; }
+	.fs-appearance-btn {
+		display: inline-flex; align-items: center; justify-content: center;
+		width: 34px; height: 34px; padding: 0; flex: 0 0 auto;
+		border: 1px solid var(--border); border-radius: 9px;
+		background: var(--panel2); color: var(--dim); cursor: pointer;
+		transition: color .15s, border-color .15s, background .15s;
+	}
+	.fs-appearance-btn:hover { color: var(--text); border-color: var(--accent); }
+	.fs-appearance-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+	.fs-appearance-btn svg { width: 18px; height: 18px; }
+
+	.fs-appearance-pop {
+		position: fixed; z-index: 1000; left: 0; top: 0;
+		min-width: 216px; padding: 12px;
+		background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+		box-shadow: 0 12px 34px rgba(0,0,0,.30);
+		display: flex; flex-direction: column; gap: 12px;
+		animation: fs-fade .16s ease;
+	}
+	.fs-appearance-pop[hidden] { display: none; }
+
+	.fs-ap-group { display: flex; flex-direction: column; gap: 6px; }
+	.fs-ap-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+
+	/* version line + "new version" pill + Update button at the foot of the popover */
+	.fs-ap-footer {
+		display: flex; flex-direction: column; gap: 8px;
+		margin-top: 2px; padding-top: 10px; border-top: 1px solid var(--border);
+	}
+	.fs-ap-verrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+	/* links to the project repo — reads as muted text until hovered */
+	.fs-ap-version { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; text-decoration: none; }
+	.fs-ap-version:hover { color: var(--accent); text-decoration: underline; }
+	.fs-ap-update {
+		display: block; width: 100%; padding: 8px 12px;
+		font-size: 12px; font-weight: 600; cursor: pointer;
+		color: var(--on-accent, #fff); background: var(--good);
+		border: 1px solid transparent; border-radius: 9px;
+		transition: filter .15s;
+	}
+	.fs-ap-update:hover { filter: brightness(1.08); }
+	.fs-ap-update[hidden] { display: none; }
+	.fs-ap-badge {
+		font-size: 11px; font-weight: 600; white-space: nowrap; text-decoration: none;
+		color: var(--good); padding: 2px 9px; border-radius: 999px;
+		background: color-mix(in srgb, var(--good) 15%, transparent);
+		border: 1px solid color-mix(in srgb, var(--good) 40%, transparent);
+	}
+	.fs-ap-badge[hidden] { display: none; }
+	.fs-ap-badge:hover { filter: brightness(1.12); }
+
+	/* update indicator: a green dot at the top-right of the Appearance trigger,
+	 * matching the overview port-status link dot. Added by menu-*-common.js when a
+	 * newer release is found. The panel-coloured ring lifts it off the icon. */
+	#fs-appearance { position: relative; overflow: visible; }
+	#fs-appearance.fs-has-update::after {
+		content: ''; position: absolute; top: 3px; right: 3px;
+		width: 8px; height: 8px; border-radius: 50%;
+		background: var(--good); box-shadow: 0 0 0 2px var(--panel);
+	}
+	.fs-seg {
+		display: flex; gap: 4px; padding: 3px;
+		background: var(--panel2); border: 1px solid var(--border); border-radius: 9px;
+	}
+	.fs-seg button {
+		flex: 1; padding: 6px 8px; border: 0; border-radius: 7px;
+		background: transparent; color: var(--dim);
+		font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2;
+		cursor: pointer; white-space: nowrap; transition: background .15s, color .15s;
+	}
+	.fs-seg button:hover { color: var(--text); }
+	.fs-seg button.active { background: var(--accent); color: var(--on-accent, #fff); }
+
+	/* a sidebar row, not a bare icon: gap + hit area + a hover plate */
+	.fs-logout {
+		gap: 11px; padding: 10px 11px; border-radius: 10px;
+		font-weight: 600; font-size: 14px;
+	}
+	.fs-logout:hover { background: var(--panel2); }
+	.fs-logout .fs-ico { width: 17px; height: 17px; flex: 0 0 auto; }
+	.fs-logout .fs-label { flex: 1 1 auto; }
+
+	/* ==================================================================
+	 * Collapsed sidebar (icon rail) — <html data-rail="true">, toggled by
+	 * #fs-rail-toggle, persisted in localStorage and re-applied before paint by
+	 * head.ut. Labels collapse away; a section's submenu becomes a flyout panel
+	 * anchored to the right of its icon, opened on hover (desktop) or on focus,
+	 * which is what a tap on the <a href="#"> section link produces on touch.
+	 * Applies wherever the sidebar is still vertical. That cut-off is 600px (see
+	 * the mobile top-bar block below) — it must track that breakpoint exactly, and
+	 * the JS one in menu-footstrap.js:flyoutMode(), or the collapse button sets
+	 * data-rail with no rule to match it and nothing happens.
+	 * ================================================================== */
+	@media (min-width: 601px) {
+		:root[data-rail="true"] .fs-sidebar {
+			width: 68px; padding: 22px 10px;
+			/* the default `overflow-y: auto` computes overflow-x to `auto` as well,
+			 * which would clip the flyouts; the rail is short enough not to scroll */
+			overflow: visible;
+			z-index: 40;
+		}
+		:root[data-rail="true"] .fs-brandrow { flex-direction: column; gap: 10px; padding: 0 0 18px; }
+		:root[data-rail="true"] .fs-brand { flex: 0 0 auto; justify-content: center; }
+		:root[data-rail="true"] .fs-railtoggle .fs-ico { transform: rotate(180deg); }
+
+		/* only the rail's own labels collapse — a `.fs-label` also exists on every
+		 * submenu link, and those live inside the flyout where they must stay */
+		:root[data-rail="true"] .fs-wordmark,
+		:root[data-rail="true"] .fs-navlabel,
+		:root[data-rail="true"] .fs-modemenu,
+		:root[data-rail="true"] .fs-sidebar ul.nav > li > a > .fs-label,
+		:root[data-rail="true"] .fs-themerow > .fs-label,
+		:root[data-rail="true"] .fs-logout > .fs-label,
+		:root[data-rail="true"] .fs-sidebar .fs-chevron { display: none; }
+
+		:root[data-rail="true"] .fs-sidebar ul.nav > li > a,
+		:root[data-rail="true"] .fs-themerow,
+		:root[data-rail="true"] .fs-logout {
+			justify-content: center; gap: 0; padding: 10px 0;
+		}
+
+		/* leaf sections have no flyout — show their name as a tooltip bubble */
+		:root[data-rail="true"] .fs-sidebar ul.nav > li:not(.has-sub) > a::after {
+			content: attr(data-label);
+			position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
+			margin-left: 10px; z-index: 70;
+			padding: 6px 10px; border-radius: 8px;
+			background: var(--panel); border: 1px solid var(--border);
+			box-shadow: 0 12px 34px rgba(0,0,0,.30);
+			color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap;
+			opacity: 0; pointer-events: none; transition: opacity .12s ease;
+		}
+		:root[data-rail="true"] .fs-sidebar ul.nav > li:not(.has-sub) > a:hover::after { opacity: 1; }
+
+		/* the flyout panel: opened by hover on a mouse, or by .open which the menu JS
+		 * toggles on tap/click (exclusively — see menu-footstrap.js flyoutMode). The
+		 * hover rule is gated on a real pointer: mobile browsers leave :hover stuck
+		 * on the tapped element, which would block tap-to-close. */
+		:root[data-rail="true"] .fs-sidebar ul.nav > li.has-sub > ul {
+			display: none;
+			position: absolute; left: 100%; top: -8px; margin: 0 0 0 10px;
+			min-width: 196px; padding: 8px; z-index: 70;
+			background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+			box-shadow: 0 12px 34px rgba(0,0,0,.30);
+			animation: fs-fade .14s ease;
+		}
+		:root[data-rail="true"] .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
+		@media (hover: hover) {
+			:root[data-rail="true"] .fs-sidebar ul.nav > li.has-sub:hover > ul { display: flex; }
+		}
+		/* the flyout's heading, so the collapsed icon still names its section */
+		:root[data-rail="true"] .fs-sidebar ul.nav > li > ul[data-title]::before {
+			content: attr(data-title);
+			padding: 4px 11px 8px;
+			color: var(--faint); font-size: 10px; font-weight: 700;
+			letter-spacing: .06em; text-transform: uppercase;
+		}
+		/* bridge the 10px gap so the pointer can travel icon -> flyout without a hover drop */
+		:root[data-rail="true"] .fs-sidebar ul.nav > li.has-sub::after {
+			content: ''; position: absolute; left: 100%; top: 0;
+			width: 12px; height: 100%;
+		}
+	}
+
+	/* ---------- main column ---------- */
+	.fs-main {
+		flex: 1 1 auto;
+		min-width: 0;
+		display: flex; flex-direction: column;
+		background: var(--bg);
+		overflow-x: clip;
+	}
+	.fs-topbar {
+		min-height: 48px;
+		flex: 0 0 auto;
+		/* full-width divider, but inner content aligned to the centered content column:
+		 * .fs-content is centered at --fs-content-max and adds 28px of side padding,
+		 * so the title/indicators must clear both to line up with the cards below */
+		padding-top: 7px; padding-bottom: 7px;
+		padding-left: max(28px, calc((100% - var(--fs-content-max)) / 2 + 28px));
+		padding-right: max(28px, calc((100% - var(--fs-content-max)) / 2 + 28px));
+		display: flex; align-items: center; justify-content: space-between;
+		gap: 16px;
+		border-bottom: 1px solid var(--border);
+		background: var(--bg);
+	}
+	.fs-title-main { font-size: 15px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
+	.fs-indicators { flex-wrap: wrap; justify-content: flex-end; }
+
+	.fs-content { padding: 22px 28px; flex: 1 1 auto; width: 100%; max-width: var(--fs-content-max); margin: 0 auto; }
+
+	/* online pill / indicators */
+	#indicators .fs-pill,
+	.fs-pill {
+		display: inline-flex; align-items: center; gap: 8px;
+		background: var(--panel); border: 1px solid var(--border);
+		border-radius: 99px; padding: 6px 13px;
+		font-size: 12px; color: var(--dim);
+	}
+	.fs-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex: 0 0 auto; }
+	.fs-dot.live { animation: fs-livepulse 2s infinite; }
+	@keyframes fs-livepulse {
+		0% { box-shadow: 0 0 0 0 var(--accent-soft); }
+		70% { box-shadow: 0 0 0 7px transparent; }
+		100% { box-shadow: 0 0 0 0 transparent; }
+	}
+
+	/* ---------- footer ---------- */
+	footer.fs-footer {
+		padding: 14px 28px; border-top: 1px solid var(--border);
+		color: var(--dim); font-size: 12px; background: var(--bg);
+	}
+	footer.fs-footer a { color: var(--dim); }
+	footer.fs-footer a:hover { color: var(--accent); }
+
+	/* ==================================================================
+	 * Responsive sidebar -> top bar. Below the top-nav layout's own breakpoint the
+	 * sidebar becomes the SAME bar as body.fs-top's .fs-topnav: sticky + blurred,
+	 * brand left, menu wrapped onto its own row, section submenus as full-width
+	 * popup cards (not an inline accordion that reflows the wrapped menu), and the
+	 * Appearance trigger as a square icon button on the right. The markup differs
+	 * (.fs-label/.fs-ico/.fs-chevron, plain nested <ul> instead of .dropdown-menu),
+	 * so the rules are restated here against the sidebar's own classes rather than
+	 * shared with .fs-topnav.
+	 * ================================================================== */
+	@media (max-width: 600px) {
+		.fs-shell { flex-direction: column; }
+		.fs-sidebar {
+			width: 100%; height: auto;
+			position: sticky; top: 0; z-index: 50;
+			flex-direction: row; flex-wrap: wrap; align-items: center;
+			gap: 10px; padding: 10px 16px;
+			background: color-mix(in srgb, var(--panel) 88%, transparent);
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+			border-right: 0; border-bottom: 1px solid var(--border);
+			/* the submenu popups anchor to this bar and must escape it */
+			overflow: visible;
+		}
+		.fs-brandrow { flex: 0 0 auto; order: 1; padding: 0; }
+		.fs-navlabel, .fs-spacer, .fs-railtoggle, .fs-modemenu { display: none; }
+
+		/* menu row */
+		.fs-sidebar ul.nav {
+			order: 3; flex: 1 1 100%;
+			flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px;
+		}
+		.fs-sidebar ul.nav > li.has-sub { position: static; }
+		.fs-sidebar ul.nav > li > a {
+			padding: 6px 11px; border-radius: 9px;
+			font-size: 15px; white-space: nowrap;
+		}
+		.fs-sidebar ul.nav > li > a .fs-ico,
+		.fs-sidebar ul.nav > li > a .fs-chevron { display: none; }
+
+		/* submenu = popup card anchored under the bar. Sized to its content (max-content)
+		 * rather than spanning the full bar width, so the items aren't stretched edge to
+		 * edge — just a compact dropdown. Capped to the viewport so a long label wraps
+		 * instead of overflowing. */
+		.fs-sidebar ul.nav ul,
+		.fs-sidebar ul.nav > li.open > ul {
+			display: none;
+			position: absolute; left: 16px; right: auto; top: calc(100% + 8px); z-index: 60;
+			width: max-content; min-width: 180px; max-width: calc(100vw - 32px);
+			margin: 0; padding: 6px;
+			background: var(--panel); border: 1px solid var(--border);
+			border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.28);
+		}
+		/* hover only on real pointer devices — a tap leaves :hover stuck on mobile
+		 * browsers and would block the tap-to-close (same guard as .fs-topnav) */
+		@media (hover: hover) {
+			.fs-sidebar ul.nav > li.has-sub:hover > ul { display: block; }
+		}
+		.fs-sidebar ul.nav > li.has-sub.open > ul { display: block; }
+		.fs-sidebar ul.nav ul a { padding: 8px 11px; font-size: 13px; }
+
+		/* right controls: Logout + Appearance as square icon buttons, like the
+		 * top-nav's .fs-topnav-right (the sidebar's Logout row is a footer link the
+		 * bar has no room for, and #topmenu no longer carries a Log out entry) */
+		.fs-themerow, .fs-logout {
+			flex: 0 0 auto;
+			width: 34px; height: 34px; padding: 0; justify-content: center;
+			border: 1px solid var(--border); border-radius: 9px;
+			background: var(--panel2);
+		}
+		/* both sit on the brand row (order 2) — the menu wraps below it at order 3 */
+		.fs-themerow { order: 2; margin-left: auto; }
+		.fs-logout { order: 2; }
+		.fs-themerow .fs-label, .fs-logout .fs-label { display: none; }
+		.fs-themerow .fs-ico, .fs-logout .fs-ico { width: 18px; height: 18px; }
+
+		.fs-content { padding: 16px; }
+		.fs-topbar { padding: 12px 16px; }
+	}
+
+	/* ==================================================================
+	 * FOOTSTRAP notifications — ui.addNotification prepends
+	 * .alert-message as first child of #maincontent (.fs-main).
+	 * Order it below the topbar and give it card spacing.
+	 * ================================================================== */
+	.fs-main > .fs-topbar { order: 0; }
+	.fs-main > .alert-message { order: 1; margin: 16px auto 0; width: calc(100% - 56px); max-width: calc(var(--fs-content-max) - 56px); }
+	.fs-main > .fs-content { order: 2; }
+	.fs-main > .fs-footer { order: 3; }
+
+	@media (max-width: 854px) {
+		.fs-main > .alert-message { margin: 12px 16px 0; }
+	}
+
+	/* Phone: alerts (e.g. the "New Firmware Available" sysupgrade banner, injected by
+	 * ui.addNotification as a `.fs-main > .alert-message` — a SIBLING of #view, not a
+	 * child) lay their action buttons in a nowrap flex row, so on a ~344px screen the
+	 * trailing Dismiss button was shoved past the panel and clipped by .fs-main's
+	 * overflow-x:clip. Scope to .fs-main so it covers both those top-level alerts and
+	 * any inside #view; let the row wrap and drop margin pushes so buttons stack. */
+	@media (max-width: 600px) {
+		.fs-main .alert-message { flex-wrap: wrap; }
+		.fs-main .alert-message > * { min-width: 0; margin-left: 0; }
+		/* the action row (Stop showing… + Dismiss) is a nested flex that stayed nowrap,
+		 * so the first button's label got clipped when Dismiss sat beside it. Wrap the
+		 * inner rows and let button labels break instead of truncate. */
+		.fs-main .alert-message div { flex-wrap: wrap; min-width: 0; }
+		.fs-main .alert-message .btn,
+		.fs-main .alert-message button { white-space: normal; max-width: 100%; }
+	}
+
+	/* content column, centered */
+	.fs-main-top { flex: 1 1 auto; display: flex; flex-direction: column; }
+	/* top-nav: page-title strip is redundant (menu shows location) — hide it */
+	.fs-main-top .fs-pagehead { display: none; }
+	.fs-main-top .fs-content { max-width: var(--fs-content-max); margin: 0 auto; width: 100%; padding-top: 12px; }
+	.fs-main-top .fs-footer { max-width: var(--fs-content-max); margin: 0 auto; width: 100%; border-top: 1px solid var(--border); }
+
+	/* ==================================================================
+	 * FOOTSTRAP review polish: subtle poll indicator, outline row buttons
+	 * ================================================================== */
+	/* topnav poll-status ("Refreshing") — subtle, not a loud accent chip */
+	.fs-indicators .label,
+	.fs-indicators [data-indicator],
+	#indicators .label,
+	#indicators [data-indicator] {
+		text-transform: none;
+		font-weight: 600; font-size: 12px;
+		background: var(--panel2); background-image: none;
+		border: 1px solid var(--border);
+		color: var(--dim);
+		border-radius: 99px; padding: 4px 11px; box-shadow: none;
+	}
+	.fs-indicators [data-indicator][data-style="active"],
+	#indicators [data-indicator][data-style="active"] { color: var(--good); }
+	/* the base only gives clickable indicators a pointer cursor under a <header>,
+	 * which exists in the top-nav layout but not in the sidebar one (its indicators
+	 * sit in .fs-topbar inside <main>) — so "Refreshing" showed a text caret there. */
+	.fs-indicators [data-indicator][data-clickable],
+	#indicators [data-indicator][data-clickable] { cursor: pointer; }
+}

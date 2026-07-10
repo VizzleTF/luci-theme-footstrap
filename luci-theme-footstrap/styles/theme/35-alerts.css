@@ -1,0 +1,67 @@
+@layer theme {
+	/* ==================================================================
+	 * Alert panel. A left accent stripe on a panel card; the type variants
+	 * recolour the frame.
+	 *
+	 * The `background: var(--panel)` used to be repeated for each variant
+	 * (`.alert-message.warning`, `.alert-message.error`, …) to out-specify the
+	 * gradients in styles/base. That is what cascade layers are for — a normal
+	 * declaration in `theme` beats one in `base` whatever the specificity — so
+	 * one rule now does it.
+	 * ================================================================== */
+	.alert-message {
+		padding: 14px 16px;
+		border-radius: 12px;
+		border: 1px solid var(--border);
+		border-left: 3px solid var(--accent);
+		background: var(--panel);
+		color: var(--text);
+		box-shadow: var(--fs-shadow);
+		gap: 12px;
+	}
+	/* warning and error tint the whole frame; success and notice only the stripe */
+	.alert-message.warning { border-color: var(--warn); }
+	.alert-message.error, .alert-message.danger { border-color: var(--danger); }
+	.alert-message.success, .alert-message.notice { border-left-color: var(--good); }
+
+	.alert-message h4 { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: var(--text); }
+	.alert-message p { margin: 4px 0; color: var(--dim); font-size: 13px; }
+	/* inner table (e.g. firmware Current/Available) — flatten so it doesn't read as
+	 * a nested card on the alert panel; subtle row dividers only */
+	.alert-message .table { margin: 10px 0; background: transparent; border: 0; box-shadow: none; border-radius: 0; }
+	.alert-message .table .th { color: var(--dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+	.alert-message .table .th, .alert-message .table .td { padding: 7px 14px 7px 0; background: transparent; border-color: color-mix(in srgb, var(--border) 60%, transparent); }
+	.alert-message .table .td { color: var(--text); }
+
+	/* ==================================================================
+	 * The `.label` pill.
+	 *
+	 * LuCI core barely uses it, but it is part of the class vocabulary any
+	 * luci-app-* may reach for, so the theme owns it in tokens rather than
+	 * leaving it to the gradient in styles/base. `.important` is the conventional
+	 * name for what we call accent; `.danger` has no counterpart there and is
+	 * added because packages use it. See docs/gallery.html.
+	 * ================================================================== */
+	.label {
+		display: inline-block; padding: 3px 9px; border-radius: 99px;
+		font-size: 11px; font-weight: 600; line-height: 1.4;
+		background: var(--panel2); border: 1px solid var(--border);
+		color: var(--dim); text-shadow: none; text-transform: none;
+	}
+	.label.important, .label.notice { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+	.label.warning { background: color-mix(in srgb, var(--warn) 16%, transparent); border-color: var(--warn); color: var(--warn); }
+	.label.success { background: color-mix(in srgb, var(--good) 16%, transparent); border-color: var(--good); color: var(--good); }
+	.label.danger, .label.error { background: color-mix(in srgb, var(--danger) 16%, transparent); border-color: var(--danger); color: var(--danger); }
+	a.label:link, a.label:visited { color: var(--dim); }
+	a.label:hover { text-decoration: none; color: var(--text); }
+
+	/* the show/hide toggles in a section title are .label pills too, but clickable */
+	.cbi-title .label {
+		font-size: 11px; font-weight: 600;
+		padding: 3px 10px; border-radius: 99px;
+		background: var(--panel2); border: 1px solid var(--border);
+		color: var(--dim); cursor: pointer; line-height: 1.4;
+	}
+	.cbi-title .label:hover { color: var(--text); opacity: 1; }
+	.cbi-title .label.notice { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+}

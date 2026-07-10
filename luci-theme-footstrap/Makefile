@@ -21,7 +21,8 @@ LUCI_DEPENDS:=+luci-base
 LUCI_PKGARCH:=all
 
 # Ship CSS/JS verbatim — the LuCI minifier mangles modern CSS (:has(),
-# color-mix(), nested calc()) and ES syntax, which breaks the layout.
+# color-mix(), nested calc()) and ES syntax, which breaks the layout. The CSS is
+# minified by build-css.sh instead, which only drops comments and indentation.
 LUCI_MINIFY_CSS:=0
 LUCI_MINIFY_JS:=0
 
@@ -53,11 +54,19 @@ define Package/luci-theme-footstrap/postrm
 }
 endef
 
-# Stamp the git-derived version into the theme JS so the Appearance popover can
-# show it and run its GitHub update check. luci.mk calls this hook right after
-# copying htdocs into PKG_BUILD_DIR, so we rewrite the build copy — never the
-# source tree. Skipped when PKG_VERSION is empty (leaves the '0.0.0-dev' literal).
+# luci.mk calls this hook right after copying luasrc/ucode/htdocs/root/src into
+# PKG_BUILD_DIR, so we rewrite the build copy — never the source tree.
+#
+# 1. cascade.css is generated, not committed: build-css.sh concatenates
+#    styles/*.css + pages/*.css and strips comments. Those two dirs are not in
+#    luci.mk's copy list, so we read them from $(CURDIR) and write the result
+#    straight into the build tree. Only `cat`/`awk` are used — no host toolchain
+#    to install, which is why this works on an OpenWrt buildbot.
+# 2. Stamp the git-derived version into the theme JS so the Appearance popover
+#    can show it and run its GitHub update check. Skipped when PKG_VERSION is
+#    empty (leaves the '0.0.0-dev' literal).
 define Build/Prepare/luci-theme-footstrap
+	$(SHELL) $(CURDIR)/build-css.sh $(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css
 	$(if $(PKG_VERSION),$(SED) "s#const FS_VERSION = '[^']*'#const FS_VERSION = '$(PKG_VERSION)'#" \
 		$(PKG_BUILD_DIR)/htdocs/luci-static/resources/menu-footstrap-common.js)
 endef

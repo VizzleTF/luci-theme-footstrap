@@ -10,12 +10,11 @@
 	import { getuid, getspnam } from 'luci.core';
 
 	const boardinfo = ubus.call('system', 'board') ?? {};
-	const darkpref = (match(theme, /-dark$/) ? 'true' : (match(theme, /-light$/) ? 'false' : null));
 
 	http.prepare_content('text/html; charset=UTF-8');
 -%}
 
-{% include('themes/footstrap/partials/head', { boardinfo, darkpref }) %}
+{% include('themes/footstrap/partials/head', { boardinfo }) %}
 
 	<body class="lang_{{ dispatcher.lang }} {{ entityencode(striptags(node?.title ?? ''), true) }}" data-page="{{ entityencode(join('-', length(ctx.request_path) ? ctx.request_path : ctx.path), true) }}">
 		{% if (!blank_page): %}
@@ -39,12 +38,10 @@
 
 				<div class="fs-spacer"></div>
 
-				{% if (!darkpref): %}
 				<button type="button" class="fs-themerow" id="fs-appearance" title="{{ _('Appearance') }}">
 					<svg class="fs-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9"/><path d="M17 7h3"/><circle cx="15" cy="7" r="2"/><path d="M4 17h3"/><path d="M11 17h9"/><circle cx="9" cy="17" r="2"/></svg>
 					<span class="fs-label">{{ _('Appearance') }}</span>
 				</button>
-				{% endif %}
 
 				{% if (dispatcher.lookup("admin/logout")): %}
 				<a class="fs-logout" href="{{ dispatcher.build_url('admin/logout') }}" title="{{ _('Logout') }}">

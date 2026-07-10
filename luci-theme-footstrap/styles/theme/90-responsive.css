@@ -1,0 +1,68 @@
+@layer theme {
+	/* ==================================================================
+	 * FOOTSTRAP phone overflow safety net (≤600px = below the sidebar→top-bar
+	 * breakpoint). .fs-main uses overflow-x:clip, so any element wider than the
+	 * viewport is silently CUT on the right rather than scrolled to. A device sweep
+	 * (iPhone/Samsung/Pixel/iPad presets) found the offenders below; each fix lets
+	 * the offending control/table shrink or wrap so nothing is clipped. Tablets
+	 * (≥768px) were already clean and keep the roomier desktop layout.
+	 * ================================================================== */
+	@media (max-width: 600px) {
+		/* Was written outside this @media and never took effect: the base rule
+		 * .cbi-dropdown:not(.btn):not(.cbi-button) is more specific and kept its
+		 * 400px cap. With the base in its own layer the unscoped rule would have
+		 * capped every dropdown on the desktop too — it belongs here. */
+		.cbi-dropdown { max-width: 100%; }
+
+		/* apk Software page: stack each labeled control; base gives its labels a
+		 * min-width:250px that overflowed a ~360px screen. Label on its own line,
+		 * button/input rows wrap. Scoped via #disk-space-label (this page only). */
+		#view:has(#disk-space-label) .controls > div { display: block; min-width: 0; margin-bottom: 8px; }
+		#view:has(#disk-space-label) .controls label { display: block; min-width: 0; white-space: normal; margin-bottom: 4px; }
+		#view:has(#disk-space-label) .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: 8px; }
+		#view:has(#disk-space-label) .controls .control-group input { flex: 1 1 140px; min-width: 0; max-width: 100%; }
+
+		/* Diagnostics tool (input + method select + button in one <table> row) has no
+		 * id and no .cbi-section-table, so nothing stacks it — a fixed table layout
+		 * stayed ~365px wide. Break its rows/cells to blocks on a phone. */
+		body[data-page='admin-network-diagnostics'] #view .table:not([id]):not(.cbi-section-table),
+		body[data-page='admin-network-diagnostics'] #view .table:not([id]):not(.cbi-section-table) .tr,
+		body[data-page='admin-network-diagnostics'] #view .table:not([id]):not(.cbi-section-table) .td { display: block; width: auto; }
+
+		/* fs-dt data tables (System→Startup init.d list, leases, processes): the row
+		 * stacking already runs via @container, but the <table> box itself stayed
+		 * display:table and could keep an intrinsic min-width. Block it so its width
+		 * can't exceed the column. */
+		#view table.fs-dt { display: block; width: 100%; }
+
+		/* generic caps: a dropdown/input/select must never exceed its field, and long
+		 * key/value strings in the Overview System/Memory/Storage cards must break. */
+		#view .cbi-dropdown { min-width: 0; max-width: 100%; }
+		#view .cbi-value-field input, #view .cbi-value-field select, #view .cbi-value-field .cbi-dropdown { max-width: 100%; }
+		#view .fs-ovl .table .td, #view .fs-ovl .table .th { overflow-wrap: anywhere; min-width: 0; }
+	}
+
+	/* ==================================================================
+	 * Dropdown list: anchored to its widget, never full-bleed
+	 *
+	 * ui.js has a touch branch (`'ontouchstart' in window`) that stretches the open
+	 * list across the viewport with inline styles:
+	 *     ul.style.left  = `${-rect.left}px`
+	 *     ul.style.right = `${rect.right - vpWidth}px`
+	 * Those offsets assume the list's containing block is the viewport. It is not:
+	 * .cbi-dropdown is position:relative, so a negative `left` drags the list off to
+	 * the side and clips the labels — which is what a phone actually rendered.
+	 * An author `!important` outranks an inline declaration, so pin it back under
+	 * the widget and size it to its content. Harmless on desktop, where ui.js sets
+	 * only top/bottom/max-height and left/right were already at their initial value.
+	 *
+	 * These flags fight an *inline style*, not another stylesheet rule — no layer
+	 * can replace them. Keep them. */
+	.cbi-dropdown[open] > ul.dropdown {
+		left: 0 !important;
+		right: auto !important;
+		min-width: 100% !important;
+		width: max-content !important;
+		max-width: min(92vw, 420px) !important;
+	}
+}

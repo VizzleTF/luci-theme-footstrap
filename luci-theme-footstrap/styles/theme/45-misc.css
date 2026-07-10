@@ -1,0 +1,94 @@
+@layer theme {
+	/* fade-in used by overview poll */
+	.fade-in { animation: fs-fade .3s ease; }
+	@keyframes fs-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+	.cbi-title-ref { color: var(--accent); }
+	.close { color: var(--text); text-shadow: none; opacity: .6; }
+	.close:hover { opacity: 1; }
+	.ifacebox { background: var(--panel); border-color: var(--border); }
+	.ifacebox .ifacebox-head { background: var(--panel2); color: var(--text); }
+	.ifacebadge { background: var(--panel2); border-color: var(--border); }
+	.ifacebadge-active { border-color: var(--accent); }
+	.zonebadge-empty { border-color: var(--border); color: var(--dim); }
+	.spinning::before {
+		border-color: var(--border);
+		border-top-color: var(--accent);
+	}
+
+	/* ==================================================================
+	 * Responsive CBI section tables (firewall zones, port forwards, DHCP …).
+	 * The base forces .tr/.td to table display and dropdowns to min-width:210px,
+	 * so tables with several dropdown columns overflow the content column and
+	 * never stack. Desktop/tablet: let in-table controls shrink to share the
+	 * available width. Narrow (<760px): stack each row into a card, using the
+	 * cell's data-title as its label.
+	 * ================================================================== */
+	/* Query the actual content width, not the viewport — the sidebar eats width, so
+	 * a viewport breakpoint would stack too late (or too early) depending on layout. */
+	.cbi-map { container-type: inline-size; }
+
+	/* ==================================================================
+	 * Responsive standalone data tables — DHCP/DHCPv6 leases, Processes,
+	 * Startup init scripts, wireless Associated Stations, etc. These are plain
+	 * <table class="table"> with a .tr.table-titles header and td[data-title],
+	 * NOT .cbi-section-table and NOT inside .cbi-map, so the block above never
+	 * reaches them (they overflow to ~800px on a phone). #view is their query
+	 * container; stack each row into label/value pairs below 820px (820 clears
+	 * the widest natural table width measured, the DHCPv6 leases at 807px).
+	 * ================================================================== */
+	#view { container-type: inline-size; }
+
+	/* pager (pagination row: « prev · text · » next) — generic component, not page
+	 * scoped: any .pager gets an inline centred row with compact square buttons. */
+	.pager.center { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 10px; padding: 14px 0; }
+	.pager .text { flex: 0 0 auto; font-size: 12px; color: var(--dim); }
+
+	/* ==================================================================
+	 * FOOTSTRAP: page heading + tab strips as cards
+	 *
+	 * Everything that sits directly on the page background gets the same
+	 * frame as a .cbi-section card, so a page reads as a stack of panels
+	 * instead of loose text floating over the (possibly patterned) bg.
+	 *   - the map/view heading and its description form ONE card;
+	 *   - every tab strip (page tabs, mode tabs, CBI form tabs) is a pill
+	 *     row; the active pill is an --accent fill (design mock).
+	 * Appended last: source order beats the earlier tab/heading rules.
+	 * ================================================================== */
+
+	/* ---------- heading card (h2 + .cbi-map-descr) ---------- */
+	.cbi-map > h2,
+	#view > h2 {
+		background: var(--panel);
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		box-shadow: var(--fs-shadow);
+		margin: 0 0 16px;
+		padding: 16px 22px;
+		font-size: 18px;
+		font-weight: 700;
+		color: var(--text);
+	}
+	/* a heading followed by a description: split the card across the two
+	 * siblings (no wrapper element exists to hold them both) */
+	.cbi-map > h2:has(+ .cbi-map-descr),
+	#view > h2:has(+ .cbi-map-descr) {
+		border-bottom: 0;
+		border-radius: 12px 12px 0 0;
+		padding-bottom: 4px;
+		margin-bottom: 0;
+		box-shadow: none;
+	}
+	.cbi-map > h2 + .cbi-map-descr,
+	#view > h2 + .cbi-map-descr {
+		background: var(--panel);
+		border: 1px solid var(--border);
+		border-top: 0;
+		border-radius: 0 0 12px 12px;
+		box-shadow: var(--fs-shadow);
+		margin: 0 0 16px;
+		padding: 0 22px 16px;
+		color: var(--dim);
+		font-size: 13px;
+		line-height: 1.5;
+	}
+}

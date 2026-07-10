@@ -1,0 +1,60 @@
+@layer page {
+	/* ==================================================================
+	 * LOGIN — the stock, server-rendered sysauth.ut, restyled as a centered card.
+	 * Neither layout forks that template: a theme-local sysauth.ut used to hide the
+	 * form in a <section hidden> and reveal it from a view module, which cannot
+	 * work before a session exists (every RPC answers "Access denied", the promise
+	 * rejects, render() never runs) — a blank page with no way to log in. So both
+	 * layouts fall back to the stock one, which also gives the login page the theme
+	 * chrome and the palette wallpaper for free.
+	 * Scoped by the username field so nothing else on the site is affected.
+	 * ================================================================== */
+	form:has(> .cbi-map input[name="luci_username"]) {
+		max-width: 400px; margin: 7vh auto 40px;
+		background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+		padding: 26px 26px 24px; box-shadow: 0 24px 60px rgba(0,0,0,.45);
+	}
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-map,
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-section,
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-section-node {
+		background: none; border: 0; padding: 0; margin: 0; box-shadow: none;
+	}
+	/* the login card IS the panel — the generic "heading gets its own card" rule
+	 * would draw a second frame inside it */
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-map > h2,
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-map-descr {
+		background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0;
+	}
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-map > h2 {
+		font-size: 21px; font-weight: 800; letter-spacing: -.01em; margin: 0 0 6px;
+	}
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-map-descr { color: var(--dim); font-size: 13px; margin: 0 0 20px; }
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-value {
+		display: block; border: 0; padding: 0 0 15px; margin: 0;
+	}
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-value-title {
+		display: block; text-align: left; width: auto; max-width: none; padding: 0 0 6px;
+		font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--faint);
+	}
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-value-field {
+		width: 100%; margin: 0; padding: 0;
+	}
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-value-field input {
+		width: 100%; margin: 0; box-sizing: border-box;
+	}
+	form:has(> .cbi-map input[name="luci_username"]) .alert-message { margin: 0 0 14px; border-radius: 10px; }
+	/* a column, not a block: some auth plugins add a second action (Reset) and the
+	 * full-width buttons below carry margin:0, so they ended up glued together */
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-page-actions {
+		display: flex; flex-direction: column; gap: 10px;
+		background: none; border: 0;
+		padding: 0; margin: 6px 0 0; text-align: left;
+	}
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-page-actions .btn,
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-page-actions input[type="submit"] {
+		width: 100%; box-sizing: border-box; min-height: 44px; margin: 0; border-radius: 12px;
+		background: var(--accent); color: var(--on-accent);
+		border: 0; font-weight: 700; font-size: 14px;
+	}
+	form:has(> .cbi-map input[name="luci_username"]) .cbi-page-actions .btn:hover { filter: brightness(1.06); }
+}

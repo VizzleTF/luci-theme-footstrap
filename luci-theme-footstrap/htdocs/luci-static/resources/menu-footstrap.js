@@ -5,7 +5,7 @@
 
 /* Footstrap SIDEBAR menu (variant 1A): vertical #topmenu with icons and
  * collapsible sections. Shared mode/tab/toggle logic lives in
- * menu-footstrap-common (composed via common.bootstrap). Only renderMainMenu is
+ * menu-footstrap-common (composed via common.init). Only renderMainMenu is
  * layout-specific. Spec: docs/09-realizatsiya-sidebar.md */
 
 const ICONS = {
@@ -171,7 +171,7 @@ function renderMainMenu(tree, url, level) {
 
 return baseclass.extend({
 	__init__() {
-		common.bootstrap(renderMainMenu);
+		common.init(renderMainMenu);
 
 		/* close an open flyout when clicking outside the menu, and drop stale
 		 * `.open` state whenever the two meanings swap (rail toggled, window

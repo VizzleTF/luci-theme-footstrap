@@ -1,0 +1,218 @@
+@layer base {
+	/* Small widgets a view or a third-party luci-app-* can drop anywhere: tooltip,
+	 * progress bar, firewall zone badge, button states, close cross, alert box and
+	 * the .label pill. */
+	.cbi-title-ref {
+		color: var(--primary-color-high);
+	}
+
+	.cbi-title-ref::after {
+		content: "➙";
+	}
+
+	.cbi-tooltip-container {
+		cursor: help;
+	}
+
+	.cbi-tooltip {
+		position: absolute;
+		z-index: 1000;
+		left: -10000px;
+		box-shadow: 0 0 2px var(--border-color-high);
+		border-radius: 3px;
+		background: var(--background-color-high);
+		white-space: pre;
+		padding: 2px 5px;
+		opacity: 0;
+		transition: opacity .25s ease-in;
+	}
+
+	.cbi-tooltip-container:hover .cbi-tooltip:not(:empty) {
+		left: auto;
+		opacity: 1;
+		transition: opacity .25s ease-in;
+	}
+
+	.cbi-progressbar {
+		border: 1px solid var(--border-color-high);
+		border-radius: 3px;
+		position: relative;
+		min-width: 170px;
+		height: 10px;
+		margin: 1.4em 0 4px 0;
+		background: var(--background-color-medium);
+	}
+
+	.cbi-progressbar > div {
+		background: var(--primary-color-medium);
+		height: 100%;
+		transition: width .25s ease-in;
+		width: 0%;
+		border-radius: 2px;
+	}
+
+	.cbi-progressbar::before {
+		position: absolute;
+		top: -1.4em;
+		left: 0;
+		content: attr(title);
+		white-space: pre;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.zonebadge .cbi-tooltip {
+		padding: 1px;
+		background: inherit;
+		margin: -1.6em 0 0 -5px;
+		border-radius: 3px;
+		pointer-events: none;
+		box-shadow: 0 0 3px var(--border-color-high);
+	}
+
+	.zonebadge .cbi-tooltip > * {
+		margin: 1px;
+		z-index: 2;
+		position: relative;
+	}
+
+	.zone-forwards {
+		display: flex;
+		flex-wrap: nowrap;
+	}
+
+	.zone-forwards > * {
+		flex: 1 1 40%;
+		padding: 1px;
+		text-wrap: auto;
+	}
+
+	.zone-forwards > span {
+		flex-basis: 10%;
+		text-align: center;
+	}
+
+	.zone-forwards .zone-src,
+	.zone-forwards .zone-dest {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.btn.active, .btn:active {
+		box-shadow: inset 0 2px 4px hsla(var(--border-color-low-hsl), .25), 0 1px 2px rgba(0, 0, 0, 0.05);
+	}
+
+	.btn.disabled,
+	.btn[disabled] {
+		cursor: default;
+		opacity: var(--disabled-opacity);
+		box-shadow: none;
+	}
+
+	.btn.large {
+		font-size: 15px;
+		line-height: normal;
+		padding: 9px 14px 9px;
+		border-radius: 6px;
+	}
+
+	.btn.small {
+		padding: 7px 9px 7px;
+		font-size: 11px;
+	}
+
+	.close {
+		float: right;
+		color: var(--text-color-high);
+		font-size: 20px;
+		font-weight: bold;
+		line-height: 13.5px;
+		text-shadow: 0 1px 0 var(--background-color-high);
+		opacity: 0.25;
+	}
+
+	.close:hover {
+		color: var(--text-color-high);
+		text-decoration: none;
+		opacity: 0.4;
+	}
+
+	.alert-message {
+		position: relative;
+		padding: .5em .5em .25em .5em;
+		margin-bottom: .5em;
+		color: var(--on-warn-color);
+		background: linear-gradient(var(--warn-color-low), var(--warn-color-medium));
+		border: 1px solid var(--border-color-low);
+		border-color: var(--border-color-high) var(--border-color-high) var(--border-color-low);
+		border-radius: 4px;
+		box-shadow: 1px 1px 1px var(--border-color-low);
+		white-space: unset;
+	}
+
+	.alert-message .close {
+		margin-top: 1px;
+	}
+
+	.alert-message h4,
+	.alert-message h5,
+	.alert-message pre,
+	.alert-message ul,
+	.alert-message li,
+	.alert-message p {
+		color: inherit;
+		border: none;
+		line-height: inherit;
+		background: transparent;
+		padding: 0;
+		margin: .25em 0;
+	}
+
+	.alert-message button {
+		margin: .25em 0;
+	}
+
+	.label,
+	header [data-indicator] {
+		padding: 3px 3px 2px;
+		font-size: 9.75px;
+		font-weight: bold;
+		color: var(--text-color-high);
+		text-transform: uppercase;
+		white-space: nowrap;
+		background-color: var(--background-color-low);
+		border-radius: 3px;
+		text-shadow: none;
+		margin: .125em 0 .125em .4em;
+	}
+
+	a.label:link,
+	a.label:visited {
+		color: var(--on-accent);
+	}
+
+	a.label:hover {
+		text-decoration: none;
+	}
+
+	.label.important {
+		background-color: var(--primary-color-high);
+		color: var(--on-primary-color);
+	}
+
+	.label.warning {
+		background-color: var(--warn-color-high);
+		color: var(--on-warn-color);
+	}
+
+	.label.success {
+		background-color: var(--success-color-high);
+		color: var(--on-success-color);
+	}
+
+	.label.notice,
+	header [data-indicator][data-style="active"] {
+		color: var(--on-primary-color);
+		background-color: var(--primary-color-high);
+	}
+}

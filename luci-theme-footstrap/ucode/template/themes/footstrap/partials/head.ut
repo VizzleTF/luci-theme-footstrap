@@ -1,36 +1,34 @@
 {#
  Shared <head> for both footstrap layouts (sidebar + top-nav). Included as
- include('themes/footstrap/partials/head', { boardinfo, darkpref }). Env vars
+ include('themes/footstrap/partials/head', { boardinfo }). Env vars
  (media, resource, dispatcher, dispatched, node, css, pkgs_update_time) come
- from the render scope; boardinfo/darkpref are passed in explicitly.
+ from the render scope; boardinfo is passed in explicitly.
  Licensed to the public under the Apache License 2.0.
 -#}
 <!DOCTYPE html>
-<html lang="{{ dispatcher.lang }}" {{ darkpref ? `data-darkmode="${darkpref}"` : '' }}>
+<html lang="{{ dispatcher.lang }}">
 	<head>
 		<meta charset="utf-8">
 		<title>{{ striptags(`${boardinfo.hostname ?? '?'}${dispatched?.title ? ` | ${_(dispatched.title)}` : ''}`) }}</title>
-		{% if (!darkpref): %}
-			<script>
-				/* footstrap: saved client preference wins, else follow OS. */
-				(function() {
-					var root = document.querySelector(':root'),
-					    saved = null;
-					try { saved = localStorage.getItem('fs-darkmode'); } catch (e) {}
-					var mq = window.matchMedia('(prefers-color-scheme: dark)');
-					function set(dark) { root.setAttribute('data-darkmode', dark ? 'true' : 'false'); }
-					if (saved === 'true' || saved === 'false') {
-						set(saved === 'true');
-					} else {
-						set(mq.matches);
-						mq.addEventListener('change', function(m) {
-							try { if (localStorage.getItem('fs-darkmode')) return; } catch (e) {}
-							set(m.matches);
-						});
-					}
-				})();
-			</script>
-		{% endif %}
+		<script>
+			/* footstrap: saved client preference wins, else follow OS. */
+			(function() {
+				var root = document.querySelector(':root'),
+				    saved = null;
+				try { saved = localStorage.getItem('fs-darkmode'); } catch (e) {}
+				var mq = window.matchMedia('(prefers-color-scheme: dark)');
+				function set(dark) { root.setAttribute('data-darkmode', dark ? 'true' : 'false'); }
+				if (saved === 'true' || saved === 'false') {
+					set(saved === 'true');
+				} else {
+					set(mq.matches);
+					mq.addEventListener('change', function(m) {
+						try { if (localStorage.getItem('fs-darkmode')) return; } catch (e) {}
+						set(m.matches);
+					});
+				}
+			})();
+		</script>
 		<script>
 			/* footstrap: apply saved color palette before paint (no flash).
 			   'github' = GitHub Primer variant; empty/absent = footstrap default. */

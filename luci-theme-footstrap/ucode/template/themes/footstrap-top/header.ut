@@ -8,12 +8,11 @@
 	import { getuid, getspnam } from 'luci.core';
 
 	const boardinfo = ubus.call('system', 'board') ?? {};
-	const darkpref = (match(theme, /-dark$/) ? 'true' : (match(theme, /-light$/) ? 'false' : null));
 
 	http.prepare_content('text/html; charset=UTF-8');
 -%}
 
-{% include('themes/footstrap/partials/head', { boardinfo, darkpref }) %}
+{% include('themes/footstrap/partials/head', { boardinfo }) %}
 
 	<body class="lang_{{ dispatcher.lang }} fs-top {{ entityencode(striptags(node?.title ?? ''), true) }}" data-page="{{ entityencode(join('-', length(ctx.request_path) ? ctx.request_path : ctx.path), true) }}">
 		{% if (!blank_page): %}
@@ -30,11 +29,9 @@
 
 				<div class="fs-topnav-right">
 					<div id="indicators" class="fs-indicators"></div>
-					{% if (!darkpref): %}
 					<button type="button" class="fs-appearance-btn" id="fs-appearance" aria-label="{{ _('Appearance') }}">
 						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9"/><path d="M17 7h3"/><circle cx="15" cy="7" r="2"/><path d="M4 17h3"/><path d="M11 17h9"/><circle cx="9" cy="17" r="2"/></svg>
 					</button>
-					{% endif %}
 				</div>
 			</header>
 			<ul id="modemenu" class="fs-modemenu-top" style="display:none"></ul>

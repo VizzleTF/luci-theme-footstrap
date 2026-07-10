@@ -1,0 +1,37 @@
+@layer theme {
+	.zonebadge .cbi-tooltip { box-shadow: 0 6px 20px rgba(0,0,0,.28); }
+
+	/* ==================================================================
+	 * "Configuration / Changes" (uci changes) modal — soften the stock
+	 * vivid success/error diff colours to token-based tints that read on
+	 * both light and dark. #modal_overlay prefix wins over the base
+	 * `.uci-dialog div > ins` specificity. Covers the diff blocks, the
+	 * `var` (option changed) inner ins/del, and the legend swatches.
+	 * ================================================================== */
+	#modal_overlay .uci-dialog ins {
+		background-color: color-mix(in srgb, var(--good) 18%, var(--panel));
+	}
+	#modal_overlay .uci-dialog del {
+		background-color: color-mix(in srgb, var(--danger) 18%, var(--panel));
+	}
+	#modal_overlay .uci-dialog div > ins {
+		border-color: color-mix(in srgb, var(--good) 45%, transparent);
+	}
+	#modal_overlay .uci-dialog div > del {
+		border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+	}
+	#modal_overlay .uci-dialog div > var {
+		background-color: var(--panel2);
+		border-color: var(--border);
+	}
+
+	/* Round the popup itself to match the theme's cards (base is only 3px), plus
+	 * small rounding on the diff boxes and legend swatches for a cohesive look. */
+	#modal_overlay .modal { border-radius: 12px; }
+	#modal_overlay .uci-dialog div > ins,
+	#modal_overlay .uci-dialog div > del,
+	#modal_overlay .uci-dialog div > var { border-radius: 8px; }
+	#modal_overlay .uci-change-legend-label > ins,
+	#modal_overlay .uci-change-legend-label > del,
+	#modal_overlay .uci-change-legend-label > var { border-radius: 4px; overflow: hidden; }
+}

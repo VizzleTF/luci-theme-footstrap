@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<!--
+  footstrap component gallery.
+
+  Every widget LuCI (or any luci-app-* package) can put on a page, rendered with
+  the real class names ui.js/cbi.js emit, so the theme can be checked without
+  hunting for a router page that happens to use the widget.
+
+  Serve it next to the stylesheet and open it without logging in:
+
+    scp docs/gallery.html router:/www/luci-static/footstrap/
+    open http://<router>/luci-static/footstrap/gallery.html
+
+  Toggle dark/light with the button; ?palette=rvht picks the wallpaper palette.
+-->
+<html lang="en" data-darkmode="true" data-palette="footstrap">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>footstrap — component gallery</title>
+<link rel="stylesheet" href="cascade.css">
+<style>
+	/* gallery chrome only — never part of the theme */
+	body { background: var(--bg); color: var(--text); }
+	.g-wrap { max-width: 1180px; margin: 0 auto; padding: 24px 28px 80px; }
+	.g-bar { position: sticky; top: 0; z-index: 900; display: flex; gap: 10px; align-items: center;
+	         padding: 12px 0; margin-bottom: 8px; background: var(--bg); border-bottom: 1px solid var(--border); }
+	.g-bar h1 { font-size: 18px; margin: 0; flex: 1 1 auto; }
+	.g-sec { margin: 34px 0 0; }
+	.g-sec > h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase;
+	              color: var(--dim); margin: 0 0 12px; font-weight: 700; }
+	.g-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+	.g-note { color: var(--dim); font-size: 12px; margin: -4px 0 10px; }
+</style>
+</head>
+<body class="lang_en">
+<div class="g-wrap">
+
+<div class="g-bar">
+	<h1>footstrap — component gallery</h1>
+	<button class="cbi-button" onclick="var r=document.documentElement;r.setAttribute('data-darkmode',r.getAttribute('data-darkmode')==='true'?'false':'true')">Toggle dark</button>
+	<button class="cbi-button" onclick="var r=document.documentElement;r.setAttribute('data-palette',r.getAttribute('data-palette')==='rvht'?'footstrap':'rvht')">Toggle palette</button>
+</div>
+
+<div class="g-sec">
+	<h2>Typography &amp; text elements</h2>
+	<div class="cbi-section">
+		<h1>Heading 1</h1><h2>Heading 2</h2><h3>Heading 3</h3>
+		<h4>Heading 4</h4><h5>Heading 5</h5><h6>Heading 6</h6>
+		<p>Body paragraph with a <a href="#">link</a>, <strong>strong</strong>, <em>emphasis</em>,
+		   <code>inline code</code>, <var>a var</var>, <small>small print</small>,
+		   H<sub>2</sub>O and x<sup>2</sup>, an <abbr title="abbreviation">abbr</abbr>,
+		   <kbd>Ctrl</kbd>+<kbd>C</kbd>, <del>deleted</del> and <ins>inserted</ins> text.</p>
+		<blockquote><p>A blockquote, as an app might render a hint.</p></blockquote>
+		<pre>#!/bin/sh
+uci set network.lan.ipaddr='192.168.1.1'
+uci commit network</pre>
+		<hr>
+		<ul><li>Unordered item</li><li>Another item</li></ul>
+		<ol><li>Ordered item</li><li>Another item</li></ol>
+		<ul class="unstyled"><li>Unstyled list item</li></ul>
+		<dl><dt>Term</dt><dd>Definition</dd><dt>Другой термин</dt><dd>Определение</dd></dl>
+		<address>OpenWrt, somewhere on a LAN</address>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>Buttons — every cbi-button variant</h2>
+	<div class="g-row">
+		<button class="cbi-button">cbi-button</button>
+		<button class="cbi-button cbi-button-action">action</button>
+		<button class="cbi-button cbi-button-apply">apply</button>
+		<button class="cbi-button cbi-button-save">save</button>
+		<button class="cbi-button cbi-button-positive">positive</button>
+		<button class="cbi-button cbi-button-negative">negative</button>
+		<button class="cbi-button cbi-button-remove">remove</button>
+		<button class="cbi-button cbi-button-reset">reset</button>
+		<button class="cbi-button cbi-button-neutral">neutral</button>
+		<button class="cbi-button cbi-button-edit">edit</button>
+		<button class="cbi-button cbi-button-add">add</button>
+		<button class="cbi-button cbi-button-link">link</button>
+		<button class="cbi-button cbi-button-download">download</button>
+		<button class="cbi-button cbi-button-find">find</button>
+		<button class="cbi-button cbi-button-reload">reload</button>
+		<button class="cbi-button cbi-button-up">up</button>
+		<button class="cbi-button cbi-button-down">down</button>
+		<button class="cbi-button" disabled>disabled</button>
+		<button class="cbi-button spinning">spinning</button>
+	</div>
+	<div class="g-row">
+		<a class="btn" href="#">.btn</a>
+		<a class="btn primary" href="#">.btn.primary</a>
+		<input type="button" value="input[type=button]">
+		<input type="submit" value="input[type=submit]">
+		<input type="reset" value="input[type=reset]">
+	</div>
+	<p class="g-note">Row-action size (inside a <code>.td</code>) is shown in the tables section.</p>
+</div>
+
+<div class="g-sec">
+	<h2>Page action bar</h2>
+	<div class="cbi-page-actions">
+		<div class="cbi-dropdown" tabindex="0">
+			<button class="cbi-button cbi-button-apply">Save &amp; Apply</button>
+			<span class="open">▾</span>
+		</div>
+		<button class="cbi-button cbi-button-save">Save</button>
+		<button class="cbi-button cbi-button-reset">Reset</button>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>Form fields (.cbi-value rows)</h2>
+	<div class="cbi-section">
+		<h3>Section title</h3>
+		<div class="cbi-section-descr">A section description, as CBI renders it.</div>
+		<div class="cbi-section-node">
+			<div class="cbi-value">
+				<label class="cbi-value-title">Text input</label>
+				<div class="cbi-value-field"><input type="text" class="cbi-input-text" value="OpenWrt"></div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Password</label>
+				<div class="cbi-value-field"><input type="password" class="cbi-input-password" value="secret"></div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Invalid input</label>
+				<div class="cbi-value-field">
+					<input type="text" class="cbi-input-text cbi-input-invalid" value="not an ip">
+					<div class="cbi-value-description">Expecting: valid IP address</div>
+				</div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Native select</label>
+				<div class="cbi-value-field">
+					<select class="cbi-input-select"><option>alpha</option><option>beta</option></select>
+				</div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Multiple select</label>
+				<div class="cbi-value-field">
+					<select multiple size="3"><option selected>one</option><option>two</option><option>three</option></select>
+				</div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Checkbox (toggle)</label>
+				<div class="cbi-value-field">
+					<div class="cbi-checkbox"><input id="cb1" type="checkbox" checked><label for="cb1"></label></div>
+				</div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Radio</label>
+				<div class="cbi-value-field">
+					<label><input type="radio" name="r" checked> yes</label>
+					<label><input type="radio" name="r"> no</label>
+				</div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Textarea</label>
+				<div class="cbi-value-field"><textarea class="cbi-input-textarea" rows="3">option one
+option two</textarea></div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">File upload</label>
+				<div class="cbi-value-field"><input type="file"></div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Range slider</label>
+				<div class="cbi-value-field">
+					<div class="cbi-range-slider">
+						<input type="range" min="0" max="100" value="40">
+						<span class="cbi-range-slider-value">40</span>
+					</div>
+				</div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Dynamic list</label>
+				<div class="cbi-value-field">
+					<div class="cbi-dynlist">
+						<div class="item" tabindex="0"><span>192.168.1.1</span></div>
+						<div class="item" tabindex="0"><span>1.1.1.1</span></div>
+						<div class="add-item"><input type="text" class="cbi-input-text" placeholder="add entry…"></div>
+					</div>
+				</div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Buttons in a field</label>
+				<div class="cbi-value-field">
+					<button class="cbi-button cbi-button-neutral">Start</button>
+					<button class="cbi-button cbi-button-neutral">Restart</button>
+					<button class="cbi-button cbi-button-negative">Stop</button>
+				</div>
+			</div>
+		</div>
+		<div class="cbi-section-error"><ul><li>A section error, as CBI renders a validation failure.</li></ul></div>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>cbi-dropdown widget (the JS select)</h2>
+	<div class="g-row">
+		<div class="cbi-dropdown" tabindex="0"><ul><li class="focus" display="0">Selected value</li></ul><span class="open">▾</span></div>
+		<div class="cbi-dropdown btn cbi-button cbi-button-action" tabindex="0"><ul><li>Button dropdown</li></ul><span class="open">▾</span></div>
+	</div>
+	<p class="g-note">The open list is rendered by ui.js at runtime; its rules are exercised on any real form page.</p>
+</div>
+
+<div class="g-sec">
+	<h2>Tabs</h2>
+	<ul class="tabs">
+		<li class="cbi-tab"><a href="#">General Settings</a></li>
+		<li class="cbi-tab-disabled"><a href="#">Advanced</a></li>
+		<li class="cbi-tab-disabled" data-errors="1"><a href="#">With errors</a></li>
+	</ul>
+	<ul class="cbi-tabmenu">
+		<li class="cbi-tab"><a href="#">Mode A</a></li>
+		<li class="cbi-tab-disabled"><a href="#">Mode B</a></li>
+	</ul>
+</div>
+
+<div class="g-sec">
+	<h2>Alerts &amp; notices</h2>
+	<div class="alert-message">Plain alert-message.</div>
+	<div class="alert-message notice">notice — a poll or a hint.</div>
+	<div class="alert-message info">info</div>
+	<div class="alert-message success">success</div>
+	<div class="alert-message warning">warning — configuration not committed.</div>
+	<div class="alert-message danger">danger — the interface will go down.</div>
+	<div class="alert-message error">error</div>
+	<div class="alert-message warning">
+		<h4>With a heading and actions</h4>
+		<p>Some explanatory body text.</p>
+		<div><button class="cbi-button">Stop showing</button> <button class="cbi-button">Dismiss</button></div>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>Progress bars</h2>
+	<div class="cbi-progressbar" title="303.37 MiB / 484.11 MiB (62%)"><div style="width:62%"></div></div>
+	<div class="cbi-progressbar" title="3.46 MiB / 242.05 MiB (1%)"><div style="width:1%"></div></div>
+	<div class="cbi-progressbar" title="97%"><div style="width:97%"></div></div>
+</div>
+
+<div class="g-sec">
+	<h2>Badges &amp; status</h2>
+	<div class="g-row">
+		<span class="ifacebadge">eth0</span>
+		<span class="ifacebadge ifacebadge-active">br-lan</span>
+		<span class="zonebadge" style="background:#a4d1a4">lan</span>
+		<span class="zonebadge zonebadge-empty">empty</span>
+		<span class="label">label</span>
+		<span class="label notice">notice</span>
+		<span class="label warning">warning</span>
+		<span class="label danger">danger</span>
+		<span class="label success">success</span>
+	</div>
+	<div class="g-row">
+		<div class="ifacebox" style="min-width:70px;max-width:120px">
+			<div class="ifacebox-head center active">wan</div>
+			<div class="ifacebox-body left">1000 Mbit/s<br>▲ 1.2 GiB ▼ 8.3 GiB</div>
+		</div>
+		<div class="ifacebox" style="min-width:70px;max-width:120px">
+			<div class="ifacebox-head center">lan2</div>
+			<div class="ifacebox-body left">no link</div>
+		</div>
+	</div>
+	<div class="g-row">
+		<span class="cbi-tooltip-container">hover for tooltip<span class="cbi-tooltip">The tooltip body.</span></span>
+		<em class="spinning">Loading…</em>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>Key/value table (no id) — System, Memory</h2>
+	<div class="cbi-section">
+		<h3>System</h3>
+		<div class="table">
+			<div class="tr"><div class="td">Hostname</div><div class="td">OpenWrt</div></div>
+			<div class="tr"><div class="td">Model</div><div class="td">Netcore N60 Pro</div></div>
+			<div class="tr"><div class="td">Uptime</div><div class="td">8d 14h 11m 18s</div></div>
+		</div>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>Data table (with id) — leases, processes</h2>
+	<div class="cbi-section">
+		<h3>Active DHCPv4 Leases</h3>
+		<table class="table" id="status_leases">
+			<tr class="tr table-titles">
+				<th class="th">Hostname</th><th class="th">IPv4 address</th>
+				<th class="th">MAC</th><th class="th">Lease time</th><th class="th">&nbsp;</th>
+			</tr>
+			<tr class="tr cbi-rowstyle-1">
+				<td class="td">Watch</td><td class="td">10.11.12.131</td>
+				<td class="td">E6:EF:BA:54:DE:32</td><td class="td">9h 10m 51s</td>
+				<td class="td"><button class="cbi-button cbi-button-apply">Reserve IP</button></td>
+			</tr>
+			<tr class="tr cbi-rowstyle-2">
+				<td class="td">iPhone</td><td class="td">10.11.12.182</td>
+				<td class="td">F4:A3:10:96:E0:53</td><td class="td">8h 56m 4s</td>
+				<td class="td"><button class="cbi-button cbi-button-apply">Reserve IP</button></td>
+			</tr>
+		</table>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>CBI section table — firewall zones, port forwards</h2>
+	<div class="cbi-section cbi-tblsection">
+		<h3>Zones</h3>
+		<table class="table cbi-section-table">
+			<tr class="tr cbi-section-table-titles">
+				<th class="th cbi-section-table-cell">Zone</th>
+				<th class="th cbi-section-table-cell">Input</th>
+				<th class="th cbi-section-table-cell cbi-section-actions">&nbsp;</th>
+			</tr>
+			<tr class="tr cbi-section-table-row cbi-rowstyle-1">
+				<td class="td cbi-value-field cbi-section-table-cell">lan</td>
+				<td class="td cbi-value-field cbi-section-table-cell">accept</td>
+				<td class="td cbi-section-table-cell nowrap cbi-section-actions">
+					<button class="cbi-button drag-handle center">☰</button>
+					<button class="btn cbi-button cbi-button-edit">Edit</button>
+					<button class="btn cbi-button cbi-button-remove">Delete</button>
+				</td>
+			</tr>
+			<tr class="tr cbi-section-table-row cbi-rowstyle-2">
+				<td class="td cbi-value-field cbi-section-table-cell">wan</td>
+				<td class="td cbi-value-field cbi-section-table-cell">reject</td>
+				<td class="td cbi-section-table-cell nowrap cbi-section-actions">
+					<button class="cbi-button drag-handle center">☰</button>
+					<button class="btn cbi-button cbi-button-edit">Edit</button>
+					<button class="btn cbi-button cbi-button-remove">Delete</button>
+				</td>
+			</tr>
+		</table>
+		<div class="cbi-section-create"><button class="cbi-button cbi-button-add">Add</button></div>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>Pager</h2>
+	<div class="pager center">
+		<a class="btn prev" href="#">«</a>
+		<div class="text">Page 2 of 7</div>
+		<a class="btn next" href="#">»</a>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>Modal</h2>
+	<div id="modal_overlay" style="position:static;display:block;background:transparent;padding:0">
+		<div class="modal" style="margin:0">
+			<h4>Modal title</h4>
+			<p>Modal body — this is what a confirmation or an edit form looks like.</p>
+			<div class="right button-row">
+				<button class="cbi-button cbi-button-neutral">Dismiss</button>
+				<button class="cbi-button cbi-button-positive important">Confirm</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+</div>
+</body>
+</html>

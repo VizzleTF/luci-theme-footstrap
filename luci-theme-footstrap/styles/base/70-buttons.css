@@ -1,0 +1,109 @@
+@layer base {
+	/* Buttons. `.btn` and `.cbi-button` are interchangeable in LuCI markup, and a
+	 * row-action button usually carries both plus a `-<variant>` class that says
+	 * what it means (edit, remove, apply, save). The variants only set --on-color
+	 * and a border here; styles/theme/55-buttons.css does the painting. */
+	.item::after,
+	.btn,
+	.cbi-button {
+		--default-btn-background: linear-gradient(var(--background-color-high), var(--background-color-high) 25%, var(--background-color-low));
+		--on-color: var(--text-color-high);
+
+		cursor: pointer;
+		display: inline-block;
+		background: var(--default-btn-background);
+		padding: 0 14px;
+		color: var(--on-color);
+		font-size: 13px;
+		line-height: 2em;
+		border: 1px solid var(--border-color-high);
+		border-radius: 4px;
+		white-space: pre;
+	}
+
+	.cbi-input-invalid,
+	.cbi-input-invalid.cbi-dropdown:not(.btn):not(.cbi-button),
+	.cbi-input-invalid.cbi-dropdown:not([open]) > ul > li,
+	.cbi-value-error input {
+		color: var(--error-color-high);
+		border-color: var(--error-color-medium);
+	}
+
+	.cbi-button-positive,
+	.cbi-button-fieldadd,
+	.cbi-button-add,
+	.cbi-button-save {
+		--on-color: var(--success-color-high);
+		border-color: var(--on-color);
+	}
+
+	.cbi-button-neutral,
+	.cbi-button-download,
+	.cbi-button-find,
+	.cbi-button-link,
+	.cbi-button-up,
+	.cbi-button-down {
+		color: var(--text-color-high);
+	}
+
+	.btn.primary,
+	.cbi-button-action,
+	.cbi-button-apply,
+	.cbi-button-reload,
+	.cbi-button-edit {
+		--on-color: var(--primary-color-high);
+		border-color: var(--on-color);
+	}
+
+	.cbi-button-negative,
+	.cbi-section-remove .cbi-button,
+	.cbi-button-reset,
+	.cbi-button-remove {
+		--on-color: var(--error-color-high);
+		border-color: var(--on-color);
+	}
+
+	.cbi-page-actions::after {
+		display: table;
+		content: "";
+		clear: both;
+	}
+
+	.cbi-page-actions > * {
+		vertical-align: middle;
+	}
+
+	.cbi-page-actions > :not([method="post"]):not(.cbi-button-apply):not(.cbi-button-negative):not(.cbi-button-save):not(.cbi-button-reset) {
+		float: left;
+		margin-right: .4em;
+	}
+
+	.btn.primary,
+	.cbi-button-action.important,
+	.cbi-page-actions .cbi-button-apply,
+	.cbi-section-actions .cbi-button-edit {
+		--on-color: var(--on-primary-color);
+		background: linear-gradient(var(--primary-color-medium), var(--primary-color-low));
+		border-color: var(--primary-color-high);
+	}
+
+	.cbi-button-positive.important,
+	.cbi-page-actions .cbi-button-save {
+		--on-color: var(--on-success-color);
+		background: linear-gradient(var(--success-color-medium), var(--success-color-low));
+		border-color: var(--success-color-high);
+	}
+
+	.cbi-button-negative.important {
+		--on-color: var(--on-error-color);
+		background: linear-gradient(var(--error-color-medium), var(--error-color-low));
+		border-color: var(--error-color-high);
+	}
+
+	.cbi-page-actions .cbi-button-apply + .cbi-button-save,
+	.cbi-page-actions .cbi-button-negative + .cbi-button-save {
+		--on-color: var(--success-color-high);
+		border-color: var(--on-color);
+		background: var(--default-btn-background);
+	}
+}

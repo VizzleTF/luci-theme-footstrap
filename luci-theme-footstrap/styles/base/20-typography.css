@@ -1,0 +1,221 @@
+@layer base {
+	/* Document scaffolding: the body box, links, and the typographic scale a view
+	 * inherits when it emits plain <h1>/<p>/<ul>/<pre> markup. */
+	body {
+		background-color: var(--background-color-high);
+		font-family: var(--font-sans);
+		font-size: 13px;
+		font-weight: normal;
+		line-height: 18px;
+		color: var(--text-color-high);
+		padding: 5px;
+		min-height: 100%;
+		display: flex;
+		flex-direction: column;
+		overflow-y: scroll;
+	}
+
+	a {
+		color: var(--primary-color-high);
+		text-decoration: none;
+		line-height: inherit;
+		font-weight: inherit;
+	}
+
+	a:hover {
+		color: var(--primary-color-low);
+		text-decoration: underline;
+	}
+
+	.nowrap:not(span) {
+	/*	Sometimes you need to wrap: badges on narrow screens look weird 
+		and nowrap defeats other width constraints, so exclude span */
+		white-space: nowrap;
+	}
+
+	/* Headings, body text, lists, code and preformatted blocks. */
+	p,
+	.cbi-map-descr,
+	.cbi-section-descr,
+	.table .tr.cbi-section-table-descr .th {
+		font-size: 13px;
+		font-weight: normal;
+		line-height: 18px;
+		margin-bottom: 9px;
+	}
+
+	p small {
+		font-size: 11px;
+		color: var(--text-color-low);
+	}
+
+	h1,
+	h2,
+	h3, legend,
+	h4,
+	h5,
+	h6 {
+		font-weight: bold;
+		color: var(--text-color-high);
+	}
+
+	h1 small,
+	h2 small,
+	h3 small,
+	h4 small,
+	h5 small,
+	h6 small {
+		color: var(--text-color-low);
+	}
+
+	h1 {
+		margin-bottom: 18px;
+		font-size: 30px;
+		line-height: 36px;
+	}
+
+	h1 small {
+		font-size: 18px;
+	}
+
+	h2 {
+		font-size: 24px;
+		line-height: 36px;
+	}
+
+	h2 small {
+		font-size: 14px;
+	}
+
+	h3, legend,
+	h4,
+	h5,
+	h6 {
+		line-height: 36px;
+	}
+
+	h3, legend {
+		font-size: 18px;
+	}
+
+	h3 small {
+		font-size: 14px;
+	}
+
+	h4 {
+		font-size: 16px;
+	}
+
+	h4 small {
+		font-size: 12px;
+	}
+
+	h5 {
+		font-size: 14px;
+	}
+
+	h6 {
+		font-size: 13px;
+		color: var(--text-color-low);
+		text-transform: uppercase;
+	}
+
+	ul, ol {
+		margin: 0 0 18px 25px;
+	}
+
+	ul ul,
+	ul ol,
+	ol ol,
+	ol ul {
+		margin-bottom: 0;
+	}
+
+	ul {
+		list-style: disc;
+	}
+
+	ol {
+		list-style: decimal;
+	}
+
+	li {
+		line-height: 18px;
+		color: var(--text-color-medium);
+	}
+
+	dl {
+		margin-bottom: 18px;
+	}
+
+	dl dt, dl dd {
+		line-height: 18px;
+	}
+
+	dl dt {
+		font-weight: bold;
+	}
+
+	dl dd {
+		margin-left: 9px;
+	}
+
+	hr {
+		margin: 20px 0 19px;
+		border: 0;
+		border-bottom: 1px solid var(--border-color-low);
+	}
+
+	strong {
+		font-style: inherit;
+		font-weight: bold;
+	}
+
+	em {
+		font-style: italic;
+		font-weight: inherit;
+		line-height: inherit;
+	}
+
+	small { font-size: 0.9em }
+
+	address {
+		display: block;
+		line-height: 18px;
+		margin-bottom: 18px;
+	}
+
+	code, pre {
+		padding: 0 3px 2px;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		border-radius: 3px;
+	}
+
+	code {
+		background-color: var(--border-color-low);
+		color: var(--text-color-high);
+		padding: 1px 3px;
+	}
+
+	pre {
+		--border-color-h: var(--background-color-h);
+		--border-color-s: var(--background-color-s);
+		--border-color-delta-l: 100%;
+		--border-color-l: calc(var(--background-color-l) + var(--background-color-delta-l-sign) * var(--border-color-delta-l));
+		--border-color-a: 0.15;
+		--border-color: hsla(var(--border-color-hsl), var(--border-color-a));
+
+		background-color: var(--background-color-low);
+		display: block;
+		padding: 8.5px;
+		margin: 0 0 18px;
+		line-height: 18px;
+		font-size: 12px;
+		border: 1px solid var(--border-color);
+		border-radius: 3px;
+		white-space: pre;
+		white-space: pre-wrap;
+		word-wrap: break-word;
+	}
+}

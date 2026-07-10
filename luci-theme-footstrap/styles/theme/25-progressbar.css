@@ -1,0 +1,48 @@
+@layer theme {
+	/* progress bars -> thin footstrap meter. One general rule for every
+	 * .cbi-progressbar (overview Memory/Storage/Network, Software disk space, package
+	 * manager, …): a slim rounded track with an accent fill, and the LuCI title
+	 * value floated just above the bar's right edge (mono/dim) instead of stuffed
+	 * inside a fat pill. No per-page overrides. */
+	.cbi-progressbar {
+		position: relative;
+		height: 10px;
+		background: var(--track);
+		border: 0;
+		border-radius: 99px;
+		overflow: visible;
+		min-width: 120px;
+		margin: 0;
+	}
+	.cbi-progressbar > div {
+		height: 100%;
+		background: var(--accent);
+		border-radius: 99px;
+		transition: width .4s ease;
+	}
+	/* the ::before in styles/base also prints the title (top-left) — hide the duplicate */
+	.cbi-progressbar::before { display: none; }
+	.cbi-progressbar::after {
+		content: attr(title);
+		position: absolute; right: 0; bottom: calc(100% + 4px); top: auto; left: auto;
+		font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+		color: var(--dim); white-space: nowrap; text-shadow: none;
+	}
+
+	/* Progressbar rows in a section table (e.g. luci-app-cpu-status): keep the
+	 * native label | bar layout (one row), just vertically center the cells. The
+	 * bar itself is themed by the generic .cbi-progressbar pill-meter above. */
+	.cbi-section .table:not([id]):not(.cbi-section-table) .tr:has(.cbi-progressbar) .td { vertical-align: middle; }
+
+	/* Multi-column DATA tables with a progressbar column (cpu-status "Detailed load
+	 * of each CPU"): the generic meter floats its value ABOVE the bar, which lands
+	 * on the row divider. Here the bar sits in a real table row, so shrink it and
+	 * put the value INLINE to its right, vertically centred — clear of the border. */
+	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar {
+		min-width: 60px; margin-right: 42px;
+	}
+	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar::after {
+		right: auto; left: calc(100% + 8px); bottom: auto; top: 50%;
+		transform: translateY(-50%);
+	}
+}
