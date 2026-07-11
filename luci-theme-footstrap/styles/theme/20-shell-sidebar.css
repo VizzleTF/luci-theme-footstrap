@@ -241,7 +241,7 @@
 	 * the JS one in menu-footstrap.js:flyoutMode(), or the collapse button sets
 	 * data-rail with no rule to match it and nothing happens.
 	 * ================================================================== */
-	@media (min-width: 601px) {
+	@media (min-width: 768px) {
 		:root[data-rail="true"] .fs-sidebar {
 			width: 68px; padding: 22px 10px;
 			/* the default `overflow-y: auto` computes overflow-x to `auto` as well,
@@ -380,7 +380,7 @@
 	 * so the rules are restated here against the sidebar's own classes rather than
 	 * shared with .fs-topnav.
 	 * ================================================================== */
-	@media (max-width: 600px) {
+	@media (max-width: 767px) {
 		.fs-shell { flex-direction: column; }
 		.fs-sidebar {
 			width: 100%; height: auto;
@@ -458,7 +458,7 @@
 	.fs-main > .fs-content { order: 2; }
 	.fs-main > .fs-footer { order: 3; }
 
-	@media (max-width: 854px) {
+	@media (max-width: 767px) {
 		.fs-main > .alert-message { margin: 12px 16px 0; }
 	}
 
@@ -468,7 +468,7 @@
 	 * trailing Dismiss button was shoved past the panel and clipped by .fs-main's
 	 * overflow-x:clip. Scope to .fs-main so it covers both those top-level alerts and
 	 * any inside #view; let the row wrap and drop margin pushes so buttons stack. */
-	@media (max-width: 600px) {
+	@media (max-width: 767px) {
 		.fs-main .alert-message { flex-wrap: wrap; }
 		.fs-main .alert-message > * { min-width: 0; margin-left: 0; }
 		/* the action row (Stop showing… + Dismiss) is a nested flex that stayed nowrap,

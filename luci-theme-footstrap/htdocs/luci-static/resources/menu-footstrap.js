@@ -41,7 +41,7 @@ function iconSvg(name) {
  *     and once a real mouse enters the menu). */
 function flyoutMode() {
 	return document.documentElement.getAttribute('data-rail') === 'true' ||
-	       window.matchMedia('(max-width: 600px)').matches;
+	       window.matchMedia('(max-width: 767px)').matches;
 }
 
 function closeFlyouts(except) {
@@ -182,6 +182,6 @@ return baseclass.extend({
 				closeFlyouts();
 		});
 		document.getElementById('fs-rail-toggle')?.addEventListener('click', () => closeFlyouts());
-		window.matchMedia('(max-width: 600px)').addEventListener('change', () => closeFlyouts());
+		window.matchMedia('(max-width: 767px)').addEventListener('change', () => closeFlyouts());
 	}
 });

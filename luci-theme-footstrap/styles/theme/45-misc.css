@@ -33,8 +33,8 @@
 	 * <table class="table"> with a .tr.table-titles header and td[data-title],
 	 * NOT .cbi-section-table and NOT inside .cbi-map, so the block above never
 	 * reaches them (they overflow to ~800px on a phone). #view is their query
-	 * container; stack each row into label/value pairs below 820px (phones). On the
-	 * desktop column data tables stay tables and fit by reflowing long values.
+	 * container; stack each row into label/value pairs below 800px. On a wider column
+	 * (content-max 1280) data tables stay real tables and reflow long values.
 	 * ================================================================== */
 	#view { container-type: inline-size; }
 
@@ -63,7 +63,7 @@
 		border-radius: var(--radius-lg);
 		box-shadow: var(--fs-shadow);
 		margin: 0 0 16px;
-		padding: 16px 22px;
+		padding: 16px;
 		font-size: 18px;
 		font-weight: 700;
 		color: var(--text);
@@ -86,7 +86,7 @@
 		border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 		box-shadow: var(--fs-shadow);
 		margin: 0 0 16px;
-		padding: 0 22px 16px;
+		padding: 0 16px 16px;
 		color: var(--dim);
 		font-size: 13px;
 		line-height: 1.5;

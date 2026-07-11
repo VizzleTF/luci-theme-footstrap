@@ -1,13 +1,13 @@
 @layer theme {
 	/* ==================================================================
-	 * FOOTSTRAP phone overflow safety net (≤600px = below the sidebar→top-bar
-	 * breakpoint). .fs-main uses overflow-x:clip, so any element wider than the
+	 * FOOTSTRAP phone overflow safety net (≤767px = mobile tier, below the
+	 * sidebar→top-bar breakpoint). .fs-main uses overflow-x:clip, so any element wider than the
 	 * viewport is silently CUT on the right rather than scrolled to. A device sweep
 	 * (iPhone/Samsung/Pixel/iPad presets) found the offenders below; each fix lets
 	 * the offending control/table shrink or wrap so nothing is clipped. Tablets
 	 * (≥768px) were already clean and keep the roomier desktop layout.
 	 * ================================================================== */
-	@media (max-width: 600px) {
+	@media (max-width: 767px) {
 		/* Was written outside this @media and never took effect: the base rule
 		 * .cbi-dropdown:not(.btn):not(.cbi-button) is more specific and kept its
 		 * 400px cap. With the base in its own layer the unscoped rule would have

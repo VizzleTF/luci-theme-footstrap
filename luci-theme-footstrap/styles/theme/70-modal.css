@@ -28,6 +28,14 @@
 	/* Round the popup itself to match the theme's cards (base is only 3px), plus
 	 * small rounding on the diff boxes and legend swatches for a cohesive look. */
 	#modal_overlay .modal { border-radius: var(--radius-lg); }
+
+	/* A config-form modal (Bridge device options, firewall rule, …) is only 600px
+	 * wide by default. That's cramped for a form with a table (Bridge VLAN filtering,
+	 * whose .cbi-map container then falls under the 960px stack threshold and cards
+	 * even on a big screen) — so give any modal carrying a .cbi-map real room. Fluid
+	 * via vw: widens toward 1280 on desktop (the container clears 960 and tables show
+	 * as tables), stays narrow (cards) on tablet/phone. */
+	.modal:has(.cbi-map) { max-width: min(1100px, 94vw); }
 	#modal_overlay .uci-dialog div > ins,
 	#modal_overlay .uci-dialog div > del,
 	#modal_overlay .uci-dialog div > var { border-radius: var(--radius-sm); }

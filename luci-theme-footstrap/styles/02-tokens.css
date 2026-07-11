@@ -30,7 +30,7 @@
 		 * keeps its own literal. */
 		--fs-focus-ring: 0 0 0 3px var(--accent-soft);
 		--knob-x: 3px;
-		--fs-content-max: 1040px;	/* content column cap (matches design mock) */
+		--fs-content-max: 1280px;	/* content column cap (desktop breakpoint ≥1200) */
 
 		/* Corner-radius scale. One user-tunable base — Appearance → Rounding slider,
 		 * 0–20px, persisted as localStorage `fs-radius` and pre-painted as an inline

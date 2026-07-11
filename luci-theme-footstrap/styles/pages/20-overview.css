@@ -103,7 +103,7 @@
 	 * child), so match it anywhere in the descendants, not with `>`. */
 	#view > .cbi-section:has(.fs-ovl-marker) { display: none; }
 
-	@media (max-width: 800px) {
+	@container (max-width: 800px) {
 		.fs-ovl { grid-template-columns: 1fr; }
 		.fs-ovl > .fs-ovl-sys,
 		.fs-ovl > .fs-ovl-mem,
@@ -122,13 +122,18 @@
 	 * Link state = the icon src (port_up/pse_up = link, *_down = no link). Child
 	 * order: 1 name-head, 2 body(icon+speed), 3 zone-bar head, 4 body(traffic).
 	 * --------------------------------------------------------------------------- */
-	/* grid wrapper — only the ports grid (its tiles carry port_* icons) */
+	/* grid wrapper — only the ports grid (its tiles carry port_* icons). auto-fit +
+	 * minmax(126, 200) is count-agnostic: many ports shrink toward 126 and wrap to
+	 * more rows; few ports cap at 200 instead of one stretching across the whole
+	 * width. Works for a 2-port device or a 24-port switch alike. */
 	body[data-page='admin-status-overview'] div:has(> .ifacebox img[src*="/port_"]) {
-		gap: 12px !important;
-		grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)) !important;
+		gap: 10px !important;
+		grid-template-columns: repeat(auto-fit, minmax(126px, 200px)) !important;
 		margin-bottom: 0 !important;
 	}
-	/* the card */
+	/* the card: a compact grid — name across the top, then the speed on the left with
+	 * the ▲TX/▼RX traffic on the right (baseline-aligned with the speed). Below a
+	 * narrow card width the two stack full-width (container query further down). */
 	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) {
 		margin: 0 !important;
 		min-width: 0 !important;
@@ -137,27 +142,25 @@
 		background: var(--panel2);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-lg);
-		padding: 12px 14px;
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
+		padding: 9px 11px;
+		container-type: inline-size;
+		display: grid;
+		grid-template-columns: 1fr auto;
+		column-gap: 8px; row-gap: 3px;
+		align-items: baseline;
 	}
 	/* drop the stock icon and the zone-colour bar row */
 	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) img { display: none; }
 	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > :nth-child(3) { display: none !important; }
-	/* speed body: hide its <br> so only the speed text shows */
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) br { display: none; }
-	/* name row: name left, status dot right */
+	/* name row (top, spans both columns): name left, status dot right */
 	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		font-size: 13px;
-		color: var(--text);
+		grid-column: 1 / -1;
+		display: flex; align-items: center; justify-content: space-between; gap: 6px;
+		font-size: 13px; font-weight: 600; color: var(--text);
 	}
 	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child::after {
 		content: '';
-		width: 9px; height: 9px;
+		width: 8px; height: 8px;
 		border-radius: 50%;
 		background: var(--good);				/* linked (default) */
 		flex: 0 0 auto;
@@ -168,21 +171,33 @@
 		background: transparent;
 		border: 1.5px solid var(--dim);
 	}
-	/* speed line (2nd child): green when linked, dim when not */
+	/* speed (2nd child) → left column, green when linked, dim when not; hide its <br> */
 	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
-		font-size: 13px;
-		font-weight: 600;
-		color: var(--good);
-		text-align: left;
+		font-size: 13px; font-weight: 600; color: var(--good); text-align: left;
 	}
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) br { display: none; }
 	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-body:nth-child(2) { color: var(--dim); }
-	/* traffic (4th child): TX / RX (stock keeps them on two lines via a <br> that
-	 * CSS can't turn into a one-line gap without merging the two runs). Mono + dim. */
+	/* traffic (4th child) → right column: ▲ transmitted over ▼ received (stock keeps
+	 * them on two lines via a <br> — CSS can't reorder br-separated text runs). Mono,
+	 * dim, right-aligned so the numbers line up on the card's right edge. */
+	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) { text-align: right; }
 	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container {
 		font-family: var(--font-mono);
 		font-size: 11px !important;
 		color: var(--dim);
-		line-height: 1.7;
+		line-height: 1.5;
+		text-align: right;
+		white-space: nowrap;
+	}
+	/* Too narrow for speed + traffic side by side (card ≤158): stack them full-width
+	 * so the nowrap traffic figures never spill past the card edge. Container query
+	 * on the card itself (container-type above) — keys off the CARD width, so it
+	 * follows the auto-fit shrink, not the viewport. */
+	@container (max-width: 158px) {
+		body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2),
+		body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) { grid-column: 1 / -1; }
+		body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4),
+		body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container { text-align: left; }
 	}
 
 	/* ---------------------------------------------------------------------------

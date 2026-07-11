@@ -89,7 +89,7 @@
 	/* .fs-modemenu-top li.active a grouped in theme/10-chrome.css */
 
 	/* responsive: wrap menu */
-	@media (max-width: 900px) {
+	@media (max-width: 1199px) {
 		.fs-topnav { flex-wrap: wrap; height: auto; padding: 10px 16px; gap: 10px; }
 		.fs-topnav .fs-mainmenu { order: 3; flex: 1 1 100%; flex-wrap: wrap; }
 		/* The dropdown stays anchored to its own item (li keeps position:relative),
@@ -113,7 +113,7 @@
 	 * so hide it there and reveal this compact icon button instead — a door+arrow
 	 * glyph, red on hover, matching the Appearance button's look. */
 	.fs-top-logout { display: none; }
-	@media (max-width: 600px) {
+	@media (max-width: 767px) {
 		body.fs-top #topmenu > li:has(> a[href$="/admin/logout"]) { display: none; }
 		.fs-top-logout {
 			display: inline-flex; align-items: center; justify-content: center;

@@ -13,15 +13,22 @@
 	 * enough to reflow the whole table within the column while IPv4/MAC/IAID stay
 	 * intact. Matched by data-title (LuCI's per-cell column label).
 	 *
-	 * Scoped to min-width 821 (a container query on #view): at ≤820 the table cards
+	 * Scoped to min-width 801 (a container query on #view): at ≤800 the table cards
 	 * via the theme's @container block, where cells wrap normally — this nowrap must
 	 * not leak into that phone layout. It sits in @layer page so it wins over the
 	 * theme's general overflow-wrap. Target this one table here rather than in the
 	 * shared theme file, so other fs-dt tables keep the plain break-to-fit behaviour. */
-	@container (min-width: 821px) {
+	@container (min-width: 801px) {
 		#view table.fs-dt:is(.leases, .leases6) .td { white-space: nowrap; }
 		#view table.fs-dt:is(.leases, .leases6) .td[data-title="DUID"],
 		#view table.fs-dt:is(.leases, .leases6) .td[data-title="IPv6 addresses"] {
+			white-space: normal; overflow-wrap: anywhere;
+		}
+		/* Hostname wraps too so a long device name doesn't force the table wider.
+		 * overflow-wrap:anywhere takes the natural breaks first (the hyphens in
+		 * "Yandex-Station-Midi-61QK") and, when a token still won't fit the column,
+		 * splits it mid-word rather than overflowing. Short names stay on one line. */
+		#view table.fs-dt:is(.leases, .leases6) .td[data-title="Hostname"] {
 			white-space: normal; overflow-wrap: anywhere;
 		}
 	}
