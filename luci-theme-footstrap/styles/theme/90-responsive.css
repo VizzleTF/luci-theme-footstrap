@@ -16,8 +16,26 @@
 
 		/* apk Software page: stack each labeled control; base gives its labels a
 		 * min-width:250px that overflowed a ~360px screen. Label on its own line,
-		 * button/input rows wrap. Scoped via #disk-space-label (this page only). */
-		#view:has(#disk-space-label) .controls > div { display: block; min-width: 0; margin-bottom: 8px; }
+		 * button/input rows wrap. Scoped via #disk-space-label (this page only).
+		 * `.controls` is a flex-ROW, so its Filter/Download/Actions columns crammed
+		 * side-by-side and overlapped — block it so the columns stack. The app injects
+		 * an UNLAYERED inline <style> (`.controls{display:flex}` + `.controls > *{…}`)
+		 * that no cascade layer can outrank, so these carry !important, exactly like
+		 * the inline-style fighters elsewhere in this file. */
+		#view:has(#disk-space-label) .controls { display: block !important; }
+		#view:has(#disk-space-label) .controls > div { display: block !important; min-width: 0; margin-bottom: 8px; }
+		/* the bar's value (::after "63% used (…)") normally floats above the bar, but
+		 * there the "Disk space:" label already sits — on a phone the long value text
+		 * overlapped it. Drop it BELOW the bar. The bar is a fixed 10px box so a static
+		 * ::after can't push the next control; reserve space with margin-bottom and
+		 * place the value absolutely in it (wrapping to the bar width). */
+		#view:has(#disk-space-label) #disk-space-label + .cbi-progressbar {
+			width: 100%; margin-bottom: 3em;
+		}
+		#view:has(#disk-space-label) #disk-space-label + .cbi-progressbar::after {
+			top: calc(100% + 5px); left: 0; right: auto; bottom: auto;
+			text-align: left; white-space: normal; max-width: 100%;
+		}
 		#view:has(#disk-space-label) .controls label { display: block; min-width: 0; white-space: normal; margin-bottom: 4px; }
 		#view:has(#disk-space-label) .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: 8px; }
 		#view:has(#disk-space-label) .controls .control-group input { flex: 1 1 140px; min-width: 0; max-width: 100%; }
