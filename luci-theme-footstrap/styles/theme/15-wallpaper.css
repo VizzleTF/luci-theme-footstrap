@@ -4,12 +4,22 @@
 	 * which only ever added this wallpaper on the default colours). Cards sit on
 	 * --panel and cover it, so the cats show through the gaps; the pattern fill is
 	 * a low-opacity neutral grey, so it reads on both light and dark backgrounds. */
-	:root[data-wallpaper="cats"] .fs-main,
+	/* Paint the wallpaper on exactly ONE element per layout, or two overlapping
+	 * semi-transparent tile layers double up and misalign. Sidebar: .fs-main (there
+	 * is no .fs-topwrap). Top-nav: .fs-topwrap wraps the bar + .fs-main-top, so paint
+	 * the wrapper and EXCLUDE its .fs-main-top child. */
+	:root[data-wallpaper="cats"] .fs-main:not(.fs-main-top),
 	:root[data-wallpaper="cats"] .fs-topwrap {
 		background-image: url(cats.svg);
 		background-repeat: repeat;
 		background-size: 440px auto;
 	}
+	/* Top-nav: the content wrapper (.fs-main-top / #maincontent) carries an opaque
+	 * --bg fill that would hide the wrapper's single tiling layer — make it
+	 * transparent so the one .fs-topwrap layer shows through the whole content area
+	 * (its own --bg is the same colour, so only the cats appear). This is what keeps
+	 * a single, seam-free tiling instead of a second misaligned layer. */
+	:root[data-wallpaper="cats"] .fs-main-top { background-color: transparent; }
 	/* let the cats show through the footer too */
 	:root[data-wallpaper="cats"] footer.fs-footer { background: transparent; }
 

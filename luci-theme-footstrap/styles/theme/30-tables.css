@@ -112,7 +112,18 @@
 	#view table.fs-dt .tr:last-child .td:first-child { border-bottom-left-radius: var(--radius-lg); }
 	.cbi-section .table[id] .tr:last-child .td:last-child,
 	#view table.fs-dt .tr:last-child .td:last-child { border-bottom-right-radius: var(--radius-lg); }
-	.cbi-section .table[id] .tr.placeholder .td { color: var(--dim); font-family: var(--font-sans); }
+	/* Empty data table: L.ui.Table adds a single-cell .tr.placeholder ("There are no
+	 * active leases"). In a display:table table that lone cell spans only the first
+	 * column, and the bottom-corner rounding then draws a tiny rounded box on the
+	 * left. Make the placeholder row + cell block the full table width, left-aligned,
+	 * carrying the frame's bottom corners so the note fills the table cleanly. */
+	.cbi-section .table[id] .tr.placeholder, #view table.fs-dt .tr.placeholder { display: block; }
+	.cbi-section .table[id] .tr.placeholder .td,
+	#view table.fs-dt .tr.placeholder .td {
+		display: block; width: 100%; text-align: left;
+		color: var(--dim); font-family: var(--font-sans);
+		border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+	}
 
 	/* --- KEY/VALUE tables: system, memory ---
 	 * "no id" alone is NOT enough: form.TableSection/GridSection also render
