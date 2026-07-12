@@ -7,6 +7,10 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-theme-footstrap
+# luci.mk defaults LUCI_NAME to the checkout's directory name and keys the
+# Build/Prepare hook name on it — a differently-named checkout symlinked into
+# the feed would silently skip the CSS build. Pin it.
+LUCI_NAME:=luci-theme-footstrap
 
 # Version is git-derived locally; CI injects FOOTSTRAP_VERSION from the tag
 # (the SDK build has no .git so it can't derive one).
@@ -48,8 +52,15 @@ define Package/luci-theme-footstrap/postrm
 	         FootstrapLight FootstrapTop FootstrapTopDark FootstrapTopLight; do
 		uci -q delete "luci.themes.$$t"
 	done
+	# don't leave the active theme pointing at the media dir we just removed —
+	# fall back to bootstrap instead of relying on LuCI's runtime fallback
+	case "$$(uci -q get luci.main.mediaurlbase)" in
+		/luci-static/footstrap*)
+			[ -f /www/luci-static/bootstrap/cascade.css ] && \
+				uci set luci.main.mediaurlbase=/luci-static/bootstrap ;;
+	esac
 	uci commit luci
-	rm -f /tmp/luci-indexcache* >/dev/null 2>&1 || true
+	rm -f /tmp/luci-indexcache* /tmp/luci-modulecache/* >/dev/null 2>&1 || true
 	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
 }
 endef

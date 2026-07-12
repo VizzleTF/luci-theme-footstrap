@@ -29,7 +29,12 @@ scp -q  "$D"/htdocs/luci-static/resources/menu-$N-common.js "$R":/www/luci-stati
 # does the same in the Makefile) so the Appearance popover shows a real version
 # and the update check works on the dev router.
 FS_V="$(git -C "$D" describe --tags --always 2>/dev/null | sed 's/^v//')"
-[ -n "$FS_V" ] && ssh "$R" "sed -i \"s#const FS_VERSION = '[^']*'#const FS_VERSION = '$FS_V'#\" /www/luci-static/resources/menu-$N-common.js"
+# if-form, not `[ -n ] && ssh`: under `set -e` a failed &&-list aborts the whole
+# sync when git describe yields nothing (e.g. a copied tree without .git).
+# Also refuse a tag with sed/shell-special characters instead of interpolating it.
+if [ -n "$FS_V" ] && expr "$FS_V" : '[0-9A-Za-z._-]*$' >/dev/null; then
+	ssh "$R" "sed -i \"s#const FS_VERSION = '[^']*'#const FS_VERSION = '$FS_V'#\" /www/luci-static/resources/menu-$N-common.js"
+fi
 scp -q  "$D"/htdocs/luci-static/resources/menu-$N.js        "$R":/www/luci-static/resources/
 scp -q  "$D"/htdocs/luci-static/resources/menu-$N-top.js    "$R":/www/luci-static/resources/
 scp -q  "$D"/htdocs/luci-static/resources/fs-select.js      "$R":/www/luci-static/resources/

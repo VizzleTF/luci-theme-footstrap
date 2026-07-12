@@ -68,7 +68,9 @@ if [ "$DEV" -eq 0 ]; then
 				p = index(line, "/*")
 				if (p == 0) { out = out line; line = ""; break }
 				out = out substr(line, 1, p - 1)
-				if (substr(line, p + 2, 1) == "!") { out = out line; line = ""; break }
+				# keep the banner from the marker on — appending the WHOLE line
+				# here (as this used to) duplicated any text before a mid-line /*!
+				if (substr(line, p + 2, 1) == "!") { out = out substr(line, p); line = ""; break }
 				line = substr(line, p + 2); inc = 1
 			}
 			sub(/^[ \t]+/, "", out)
