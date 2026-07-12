@@ -32,6 +32,14 @@ function sectionTitle(sec) {
 }
 
 function arrange() {
+	/* the theme's SPA nav can leave this observer wired while another page
+	 * renders into #view — detach as soon as the route stops being the overview,
+	 * instead of re-running on every mutation of every subsequent page. Both the
+	 * server template and the SPA router stamp body[data-page]. */
+	if ((document.body.getAttribute('data-page') || '') !== 'admin-status-overview') {
+		stopWatch();
+		return;
+	}
 	const view = document.getElementById('view');
 	if (!view) return;
 	const map = roleMap(), found = {};
@@ -53,13 +61,25 @@ function arrange() {
 }
 
 /* Stock sections render/re-render async (they sort after us and repaint every
- * poll), so watch #view and re-run arrange() on change (debounced, one observer
- * installed once — a per-poll observer leak would slow the page down). */
-let observer = null;
+ * poll), so watch #view and re-run arrange() on change (debounced, ONE observer
+ * per #view node — a per-poll observer leak would slow the page down). The SPA
+ * router may REPLACE the #view element between visits, so watch() re-attaches
+ * whenever the node it observed is no longer the current one; a singleton bound
+ * forever to the first #view would silently watch a detached tree and the grid
+ * would never apply on a later SPA visit. */
+let observer = null, observedView = null;
+function stopWatch() {
+	if (observer) observer.disconnect();
+	observer = null;
+	observedView = null;
+}
 function watch() {
+	const view = document.getElementById('view');
+	if (observer && observedView !== view)
+		stopWatch();
 	arrange();
-	if (observer) return;
-	const view = document.getElementById('view') || document.body;
+	if (observer || !view) return;
+	observedView = view;
 	let pending = false;
 	observer = new MutationObserver(() => {
 		if (pending) return;

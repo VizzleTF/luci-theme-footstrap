@@ -39,9 +39,14 @@ function iconSvg(name) {
  *     may be open, hover drives it on a mouse, and a tap toggles it — so `.open`
  *     must behave like the top-nav dropdown (exclusive, cleared on outside click
  *     and once a real mouse enters the menu). */
+/* one MediaQueryList for the mobile breakpoint — flyoutMode() runs on every
+ * click/pointerenter/render item, and allocating a fresh MQL each time is
+ * wasted work. Must track the 767px breakpoint in 20-shell-sidebar.css /
+ * 90-responsive.css. */
+const _mqMobile = window.matchMedia('(max-width: 767px)');
 function flyoutMode() {
 	return document.documentElement.getAttribute('data-rail') === 'true' ||
-	       window.matchMedia('(max-width: 767px)').matches;
+	       _mqMobile.matches;
 }
 
 function closeFlyouts(except) {
@@ -80,7 +85,7 @@ function renderMainMenu(tree, url, level) {
 	const ul = level ? E('ul', {}) : document.querySelector('#topmenu');
 	const children = ui.menu.getChildren(tree);
 
-	if (children.length == 0 || level > 1)
+	if (!ul || children.length == 0 || level > 1)
 		return E([]);
 
 	/* dispatchpath = [mode, section, subsection, …]; sections sit at
@@ -142,12 +147,20 @@ function renderMainMenu(tree, url, level) {
 			link.addEventListener('click', (ev) => {
 				ev.preventDefault();
 				const open = li.classList.contains('open');
-				/* flyout panels are always exclusive; the expanded-sidebar accordion
-				 * folds the others back only when asked (Appearance -> Submenus) */
-				if (flyoutMode() || common.autoCollapse()) { closeFlyouts(); _openSections.clear(); }
+				/* flyout panels are always exclusive, but they must NOT touch the
+				 * remembered accordion set — it mirrors the desktop "Keep open"
+				 * state, and wiping it here meant one tap in the phone flyout lost
+				 * the user's open sections after a resize back to desktop. */
+				if (flyoutMode()) {
+					closeFlyouts();
+					li.classList.toggle('open', !open);
+					return;
+				}
+				/* the expanded-sidebar accordion folds the others back only when
+				 * asked (Appearance -> Submenus) */
+				if (common.autoCollapse()) { closeFlyouts(); _openSections.clear(); }
 				li.classList.toggle('open', !open);
 				/* remember the accordion state so any navigation restores it (Keep open) */
-				if (flyoutMode()) return;
 				if (!open) _openSections.add(child.name);
 				else _openSections.delete(child.name);
 				saveOpenSections();
@@ -182,6 +195,6 @@ return baseclass.extend({
 				closeFlyouts();
 		});
 		document.getElementById('fs-rail-toggle')?.addEventListener('click', () => closeFlyouts());
-		window.matchMedia('(max-width: 767px)').addEventListener('change', () => closeFlyouts());
+		_mqMobile.addEventListener('change', () => closeFlyouts());
 	}
 });

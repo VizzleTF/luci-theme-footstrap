@@ -47,6 +47,10 @@ function clearViewIntervals() {
 /* section tabs -> #tabmenu (horizontal) */
 function renderTabMenu(tree, url, level) {
 	const container = document.querySelector('#tabmenu');
+	/* a template variant without the container must not blow up the whole
+	 * ui.menu.load() chain (an unhandled rejection here kills every menu) */
+	if (!container)
+		return E([]);
 	const ul = E('ul', { 'class': 'tabs' });
 	const children = ui.menu.getChildren(tree);
 	let activeNode = null;
@@ -82,7 +86,7 @@ function renderTabMenu(tree, url, level) {
  * render, on resize, and when a view renders its own tabs (works in both layouts
  * and as the page narrows). */
 function stripFitsOneRow(ul) {
-	/* Only laid-out children count. The top-nav hides its "Log out" <li> below 600px
+	/* Only laid-out children count. The top-nav hides its "Log out" <li> below 768px
 	 * (a top-bar icon button takes over); a display:none child has offsetTop 0, so
 	 * using it as `last` made this read "one row" even while VPN had wrapped — and
 	 * the density fit never kicked in. Filter to items that actually render. */
@@ -92,9 +96,25 @@ function stripFitsOneRow(ul) {
 	return !first || !last || first.offsetTop === last.offsetTop;
 }
 function fitTabStrips() {
-	document.querySelectorAll('#tabmenu ul.tabs, .tabs, .cbi-tabmenu, .fs-topnav .fs-mainmenu').forEach((ul) => {
+	/* .fs-sidebar ul.nav is only a horizontal strip on the phone bar (≤767px);
+	 * on the desktop it is a vertical list where the one-row measure is
+	 * meaningless — fitOne() skips it there. */
+	document.querySelectorAll('.tabs, .cbi-tabmenu, .fs-topnav .fs-mainmenu, .fs-sidebar > ul.nav').forEach((ul) => {
+		if (ul.children.length < 2) return;
+		if (ul.matches('.fs-sidebar > ul.nav') && getComputedStyle(ul).flexDirection !== 'row') {
+			/* desktop sidebar: a vertical list — the one-row measure is meaningless
+			 * and would floor it at fs-dense2 forever. Clear and skip. */
+			if (ul.classList.contains('fs-dense1') || ul.classList.contains('fs-dense2'))
+				ul.classList.remove('fs-dense1', 'fs-dense2');
+			return;
+		}
+		/* steady state (poll tick on an already-fitting strip): one measure, zero
+		 * class writes — the write-measure-write dance below forces a reflow per
+		 * strip, which is wasted on pages polled every second. */
+		if (!ul.classList.contains('fs-dense1') && !ul.classList.contains('fs-dense2') && stripFitsOneRow(ul))
+			return;
 		ul.classList.remove('fs-dense1', 'fs-dense2');
-		if (ul.children.length < 2 || stripFitsOneRow(ul)) return;
+		if (stripFitsOneRow(ul)) return;
 		ul.classList.add('fs-dense1');
 		if (stripFitsOneRow(ul)) return;
 		ul.classList.remove('fs-dense1');
@@ -126,14 +146,19 @@ function renderModeMenu(tree, renderMainMenu) {
 			? child.name === L.env.requestpath[0]
 			: index === 0;
 
-		ul.appendChild(E('li', { 'class': isActive ? 'active' : '' }, [
-			E('a', { 'href': L.url(child.name) }, [ _(child.title) ])
-		]));
+		/* the main menu must render even if a template variant has no #modemenu —
+		 * only the mode list itself is skippable chrome */
+		if (ul)
+			ul.appendChild(E('li', { 'class': isActive ? 'active' : '' }, [
+				E('a', { 'href': L.url(child.name) }, [ _(child.title) ])
+			]));
 
 		if (isActive)
 			renderMainMenu(child, child.name);
 	});
 
+	if (!ul)
+		return;
 	if (children.length <= 1)
 		ul.classList.add('single');
 	if (ul.children.length > 1)
@@ -276,6 +301,15 @@ function sliderControl(current, min, max, onInput) {
  * which always starts from a fresh instance anyway. See docs/14. */
 
 let _tree = null, _renderMain = null, _wired = false;
+/* navigation generation token: two quick clicks race their async require()s, and
+ * without this the FIRST view could render into #view after the second, leaving
+ * stale content under the newer URL/title/chrome. Each committed navigation bumps
+ * the generation; a resolved require whose generation is stale renders nothing. */
+let _navGen = 0;
+/* the self-update poll chain reschedules itself with a raw setTimeout (only
+ * setInterval is hooked above), so navigate() must be able to cancel it — or it
+ * keeps firing fs.exec RPCs and can pop its modal onto an unrelated page. */
+let _updTimer = null;
 
 /* rebuild mode menu + main menu + section tabs from the current L.env; called
  * on first load and after every SPA navigation. Clears the containers first so
@@ -415,6 +449,9 @@ function navigate(pathname, push) {
 	if (!className)
 		return false;
 
+	/* from here on the navigation is committed */
+	const gen = ++_navGen;
+
 	/* Ensure a #view container. View pages and the overview template both emit
 	 * one; a `cbi`/other template page may not — inject one into .fs-content,
 	 * dropping the stale content, so we can SPA there. When arriving via SPA the
@@ -442,6 +479,7 @@ function navigate(pathname, push) {
 	 * tailer) — a full load would have; the SPA must do it explicitly. Keeps
 	 * L.Poll's own tick alive. */
 	clearViewIntervals();
+	if (_updTimer) { window.clearTimeout(_updTimer); _updTimer = null; }
 	try { if (typeof ui.hideModal == 'function') ui.hideModal(); } catch (e) {}
 
 	/* point the runtime env at the new node so views, tabs and highlighting read
@@ -473,6 +511,12 @@ function navigate(pathname, push) {
 
 	renderChrome();
 
+	/* a full load starts at the top; the in-place swap must too — without this,
+	 * navigating away from a long page opens the next one mid-scroll. popstate
+	 * replays (push=false) keep the browser's own scroll handling. */
+	if (push)
+		window.scrollTo(0, 0);
+
 	/* Require + instantiate through the runtime singleton `window.L`, NOT the
 	 * bare `L` a LuCI module factory is handed. They are different objects: the
 	 * dispatcher builds `window.L = new LuCI()` and the `ui` module augments *that*
@@ -491,12 +535,28 @@ function navigate(pathname, push) {
 
 	const RT = window.L;
 	RT.require(className).then(view => {
+		if (gen !== _navGen) return;	/* a newer navigation superseded this one */
 		if (!(view instanceof RT.view))
 			throw new TypeError('Loaded class ' + className + ' is not a view');
 		new view.constructor();
-	}).catch(() => { window.location = pathname; });
+	}).catch(() => { if (gen === _navGen) window.location = pathname; });
 
 	return true;
+}
+
+/* The same-origin nav URL an event's link points at, or null when the link is
+ * not ours to handle (new-tab target, download, bare #hash, cross-origin,
+ * unparsable). Shared by the click router and the hover prefetch — the two
+ * used to carry drifting copies of this filter. */
+function linkUrlFrom(ev) {
+	const a = ev.target.closest && ev.target.closest('a[href]');
+	if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download'))
+		return null;
+	const raw = a.getAttribute('href');
+	if (!raw || raw.charAt(0) === '#') return null;
+	let url;
+	try { url = new URL(a.href, window.location.href); } catch (e) { return null; }
+	return url.origin === window.location.origin ? url : null;
 }
 
 function wireRouter() {
@@ -508,17 +568,13 @@ function wireRouter() {
 		    ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey)
 			return;
 
-		const a = ev.target.closest('a[href]');
-		if (!a) return;
-		if (a.target && a.target !== '_self') return;
-		if (a.hasAttribute('download')) return;
+		const url = linkUrlFrom(ev);
+		if (!url) return;
 
-		const raw = a.getAttribute('href');
-		if (!raw || raw.charAt(0) === '#') return;
-
-		let url;
-		try { url = new URL(a.href, window.location.href); } catch (e) { return; }
-		if (url.origin !== window.location.origin) return;
+		/* navigate() carries only the pathname: pushState-ing a bare path for a
+		 * link that promised ?query= / #hash would strip both from the URL (and
+		 * from the view, which reads location.search). Let those links full-load. */
+		if (url.search || url.hash) return;
 
 		if (navigate(url.pathname, true))
 			ev.preventDefault();
@@ -526,18 +582,19 @@ function wireRouter() {
 
 	/* warm the view module cache when the pointer enters a nav link */
 	document.addEventListener('pointerover', (ev) => {
-		const a = ev.target.closest && ev.target.closest('a[href]');
-		if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download'))
-			return;
-		const raw = a.getAttribute('href');
-		if (!raw || raw.charAt(0) === '#') return;
-		let url;
-		try { url = new URL(a.href, window.location.href); } catch (e) { return; }
-		if (url.origin === window.location.origin)
+		const url = linkUrlFrom(ev);
+		if (url)
 			prefetchView(url.pathname);
 	}, false);
 
 	window.addEventListener('popstate', () => {
+		/* an entry carrying a query belongs to a full load (we only ever push bare
+		 * paths) — replaying it as a bare-path SPA nav would drop the query the
+		 * view expects, so reload instead */
+		if (window.location.search) {
+			window.location.reload();
+			return;
+		}
 		if (!navigate(window.location.pathname, false))
 			window.location.reload();
 	});
@@ -555,9 +612,21 @@ let _visWired = false;
 function wireVisibility() {
 	if (_visWired) return;
 	_visWired = true;
+	/* respect a manual pause: the user can stop polling via the "Refreshing"
+	 * indicator, and an unconditional start() on tab-show would silently undo
+	 * that. Only resume what the tab-hide actually paused. */
+	let wasActive = true;
 	document.addEventListener('visibilitychange', () => {
 		if (!L.Poll) return;
-		try { document.hidden ? L.Poll.stop() : L.Poll.start(); } catch (e) {}
+		try {
+			if (document.hidden) {
+				wasActive = L.Poll.active();
+				if (wasActive) L.Poll.stop();
+			}
+			else if (wasActive) {
+				L.Poll.start();
+			}
+		} catch (e) {}
 	});
 }
 
@@ -609,7 +678,8 @@ let _fsUpdatePromise = null;
  * off means no network call, no badge/dot. */
 function currentUpdateCheck() { return lsGet('fs-update-check') !== 'off'; }
 function applyUpdateCheck(val) {
-	if (val === 'off') { lsSet('fs-update-check', 'off'); document.getElementById('fs-appearance')?.classList.remove('fs-has-update'); }
+	/* the badge/dot cleanup happens in applyUpdateUI (invoked just below) */
+	if (val === 'off') lsSet('fs-update-check', 'off');
 	else lsDel('fs-update-check');
 	/* re-evaluate so turning it back on within the same session shows the state */
 	_fsUpdatePromise = null;
@@ -803,8 +873,9 @@ function wireAppearance() {
 				}
 				if (/^ERR:/.test(out))
 					return fail(out);
-				/* RUNNING, or IDLE if the worker has not written the file yet */
-				window.setTimeout(() => poll(fs, deadline), FS_UPDATE_POLL_MS);
+				/* RUNNING, or IDLE if the worker has not written the file yet.
+				 * Tracked in _updTimer so navigate() can cancel the chain. */
+				_updTimer = window.setTimeout(() => poll(fs, deadline), FS_UPDATE_POLL_MS);
 			}).catch(e => sessionGone(e && e.message || e) ? relogin() : fail(e && e.message || e));
 		}
 

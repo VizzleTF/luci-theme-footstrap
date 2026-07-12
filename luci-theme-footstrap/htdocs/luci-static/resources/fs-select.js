@@ -22,6 +22,41 @@ function readChoices(sel) {
 	return choices;
 }
 
+/* cheap identity of the option list, to detect a script rebuilding it
+ * (select.replaceChildren, dependency-driven re-population, …) */
+function choicesKey(sel) {
+	return Array.prototype.map.call(sel.options, (o) => o.value + '\u0000' + o.textContent).join('\u0001');
+}
+
+/* undo enhance(): drop the widget, unhide the native select */
+function teardown(sel) {
+	if (sel._fsNode && sel._fsNode.parentNode)
+		sel._fsNode.parentNode.removeChild(sel._fsNode);
+	delete sel.dataset.fsSelect;
+	sel._fsDd = sel._fsNode = sel._fsKey = null;
+	sel.style.display = '';
+}
+
+/* keep an enhanced select and its widget in step when a script drives the
+ * native element directly: ui.Select.setValue() rewrites value/options WITHOUT
+ * dispatching `change`, so the change-event mirror in enhance() never fires and
+ * the visible widget went stale (showed the old value while Save read the new
+ * one). Runs from the scan() pass on every observed mutation. */
+function resync(sel) {
+	const dd = sel._fsDd;
+	if (!dd || !sel._fsNode) return;
+	if (sel.disabled) { teardown(sel); return; }	/* disabled later: back to native */
+	const key = choicesKey(sel);
+	if (key !== sel._fsKey) {
+		/* option list rebuilt — recreate the widget from the fresh options */
+		teardown(sel);
+		enhance(sel);
+		return;
+	}
+	if (dd.getValue() !== sel.value)
+		dd.setValue(sel.value);
+}
+
 function enhance(sel) {
 	if (sel.multiple || sel.dataset.fsSelect || sel.disabled) return;
 	if (!sel.closest('.cbi-value-field, .td.cbi-value-field, .cbi-value')) return;
@@ -39,6 +74,9 @@ function enhance(sel) {
 	const node = dd.render();
 	sel.dataset.fsSelect = '1';
 	sel.style.display = 'none';
+	sel._fsDd = dd;
+	sel._fsNode = node;
+	sel._fsKey = choicesKey(sel);
 
 	/* AFTER the select: it must stay frameEl.firstChild for ui.Select to read
 	 * its value on save. */
@@ -83,6 +121,7 @@ return baseclass.extend({
 	__init__() {
 		const scan = () => {
 			document.querySelectorAll('select.cbi-input-select:not([data-fs-select])').forEach(enhance);
+			document.querySelectorAll('select.cbi-input-select[data-fs-select]').forEach(resync);
 			tagDataTables();
 		};
 		scan();
@@ -92,6 +131,11 @@ return baseclass.extend({
 			if (pending) return;
 			pending = true;
 			requestAnimationFrame(() => { pending = false; scan(); });
-		}).observe(document.body, { childList: true, subtree: true });
+		}).observe(document.body, {
+			childList: true, subtree: true,
+			/* `disabled` flips and attr-driven value writes never mutate childList;
+			 * watch them so resync()/enhance() notice (filtered — cheap) */
+			attributes: true, attributeFilter: [ 'disabled', 'value', 'selected' ]
+		});
 	}
 });

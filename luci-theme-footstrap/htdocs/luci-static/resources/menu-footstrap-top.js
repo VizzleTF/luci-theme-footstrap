@@ -33,7 +33,7 @@ function renderMainMenu(tree, url, level) {
 	const ul = level ? E('ul', { 'class': 'dropdown-menu' }) : document.querySelector('#topmenu');
 	const children = ui.menu.getChildren(tree);
 
-	if (children.length == 0 || level > 1)
+	if (!ul || children.length == 0 || level > 1)
 		return E([]);
 
 	children.forEach(child => {
