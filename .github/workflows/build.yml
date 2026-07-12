@@ -102,7 +102,7 @@ jobs:
       # not in our gallery. Proves every level is legible as text AND as a fill, and that
       # high/medium/low are actually three different colours — they were once three aliases
       # of one token, and a flat colour passes every contrast check there is.
-      - name: Export tier (third-party contract: AA + the ramp is not flat)
+      - name: "Export tier (third-party contract: AA + the ramp is not flat)"
         run: node tools/export-tier.mjs
 
       # THE GATE THAT MAKES SHIPPING MINIFIED JS SAFE.
