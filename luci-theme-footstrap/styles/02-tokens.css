@@ -123,37 +123,93 @@
 		 * follows dark mode — and so that an app overwriting one restyles its own
 		 * widgets without touching this theme's chrome.
 		 * ---------------------------------------------------------------------- */
+		/* high / medium / low is a PROMINENCE scale, not decoration: `high` is the
+		 * role at full strength, `low` is it muted, `medium` sits between. It used
+		 * to be three aliases of one token — a flat colour where the consumer asked
+		 * for a gradation — and third-party apps DO ask: luci-app-podkop paints its
+		 * "no data" latency with --primary-color-low and got the same vivid accent
+		 * as a live one; luci-app-justclash reads eleven of these names. Stock
+		 * firewall.js and status/cpu.js read them too.
+		 *
+		 * Direction is taken from luci-theme-bootstrap, which is what every app was
+		 * calibrated against: `high` is the most pronounced value of the role
+		 * (--text-color-high is the readable text, -low the faint one;
+		 * --border-color-high the visible rule, -low the hairline), while
+		 * --background-color-* is an elevation axis instead — high = the raised
+		 * surface, low = the recessed one. What differs per family is the MECHANISM,
+		 * and it is chosen by measurement, not taste; see each block below.
+		 *
+		 * The binding constraint throughout: an app reads a level as `color:` about as
+		 * often as it reads it as `background:` (counted across bootstrap's own
+		 * cascade, firewall.js and status/cpu.js), so EVERY level must clear WCAG AA
+		 * as text on --fs-bg/--fs-panel/--fs-panel2 and still carry a legible
+		 * --on-*-color when used as a fill. */
 		--background-color-high: var(--fs-panel);
-		--background-color-medium: var(--fs-panel2);
+		--background-color-medium: color-mix(in srgb, var(--fs-panel) 55%, var(--fs-panel2));
 		--background-color-low: var(--fs-panel2);
 
+		/* --text-color-low cannot move: --fs-dim IS the muted text colour and it
+		 * already sits ON the AA floor (4.56:1 on --fs-panel2 in dark), so a fainter
+		 * step would have to be an illegible grey. It stays equal to -medium — the
+		 * ramp is still wide, because -high is --fs-text — and a duplicate beats a
+		 * value nobody can read. */
 		--text-color-highest: var(--fs-text);
 		--text-color-high: var(--fs-text);
 		--text-color-medium: var(--fs-dim);
 		--text-color-low: var(--fs-dim);
 
-		--border-color-high: var(--fs-border);
+		/* borders carry no text, so here -low MAY fade toward the surface: a hairline
+		 * is supposed to disappear into it. */
+		--border-color-high: color-mix(in srgb, var(--fs-border) 60%, var(--fs-text));
 		--border-color-medium: var(--fs-border);
-		--border-color-low: var(--fs-border);
+		--border-color-low: color-mix(in srgb, var(--fs-border) 55%, var(--fs-panel));
 
+		/* ACCENT RAMPS: the axis is CHROMA at constant lightness — `high` is the pure
+		 * palette colour, and each step down mixes it toward --fs-dim in oklch, which
+		 * interpolates lightness linearly and so drains saturation while leaving
+		 * luminance where it was. Contrast therefore barely moves across the ramp, and
+		 * every level stays printable as text. That is the whole reason for this shape,
+		 * and both of the obvious alternatives were measured and rejected:
+		 *
+		 *   fade `low` toward the surface — the intuitive "muted" — spends contrast we
+		 *   do not have. On --fs-panel2 in dark every accent already sits at 4.56–4.59:1,
+		 *   i.e. +0.06 over AA; an 8% fade dropped --warn-color-low to 4.18:1 and its own
+		 *   ink to 4.45:1 ON it. A muted step nobody can print text in is the bug being
+		 *   fixed, not one to trade for.
+		 *
+		 *   push `high` toward --fs-text — free in contrast terms — collapses the ramp in
+		 *   DARK mode, because there --fs-text is near-white: the "strong" end comes back
+		 *   washed out and lands on top of the desaturated "weak" end (measured 0.055
+		 *   apart, i.e. flat). Lightness is not available as an axis in both modes at once.
+		 *   Chroma is.
+		 *
+		 * Bootstrap's own accent ramp walks lightness instead (--primary-color-low is its
+		 * DARKEST blue), which is why that ramp reads inverted in dark mode and lands at
+		 * 3.6:1 there — below AA. We keep the direction (`high` = most pronounced) and drop
+		 * the mechanism. Every step is mixed FROM the token it grades: no second, hand-kept
+		 * copy of a colour (see the note at the foot of this file).
+		 *
+		 * tools/export-tier.mjs proves all of it — AA as text on all three surfaces, a
+		 * legible --on-*-color as a fill, and that the ramp is not secretly flat — across
+		 * {footstrap,hicontrast} × {light,dark}. */
 		--primary-color-high: var(--fs-accent);
-		--primary-color-medium: var(--fs-accent);
-		--primary-color-low: var(--fs-accent);
+		--primary-color-medium: color-mix(in oklch, var(--fs-accent) 78%, var(--fs-dim));
+		--primary-color-low: color-mix(in oklch, var(--fs-accent) 45%, var(--fs-dim));
 		--on-primary-color: var(--fs-on-accent);
 
 		--error-color-high: var(--fs-danger);
-		--error-color-medium: var(--fs-danger);
-		--error-color-low: var(--fs-danger);
+		--error-color-medium: color-mix(in oklch, var(--fs-danger) 78%, var(--fs-dim));
+		--error-color-low: color-mix(in oklch, var(--fs-danger) 45%, var(--fs-dim));
 		--on-error-color: var(--fs-on-danger);
 
 		--success-color-high: var(--fs-good);
-		--success-color-medium: var(--fs-good);
-		--success-color-low: var(--fs-good);
+		--success-color-medium: color-mix(in oklch, var(--fs-good) 78%, var(--fs-dim));
+		--success-color-low: color-mix(in oklch, var(--fs-good) 45%, var(--fs-dim));
 		--on-success-color: var(--fs-on-good);
 
 		--warn-color-high: var(--fs-warn);
-		--warn-color-medium: var(--fs-warn);
-		--warn-color-low: var(--fs-warn);
+		--warn-color-medium: color-mix(in oklch, var(--fs-warn) 78%, var(--fs-dim));
+		--warn-color-low: color-mix(in oklch, var(--fs-warn) 45%, var(--fs-dim));
 		--on-warn-color: var(--fs-on-warn);
 
 		--fs-disabled-opacity: .6;

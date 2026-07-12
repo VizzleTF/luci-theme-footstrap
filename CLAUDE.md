@@ -35,7 +35,8 @@ Registered in `luci.themes` (System → System → Language and Style), **2 entr
 - `styles/00-header.css` — licence banner + the **only** `@layer` declaration.
 - `styles/01-fonts.css` — `@font-face`, unlayered.
 - `styles/02-tokens.css`, `03-palettes.css` — `@layer tokens`. **Two tiers, and the split is load-bearing.** *Private:* `--fs-*` (`--fs-bg/--fs-panel/--fs-text/--fs-accent/…`, the radius scale, the z-index scale `--fs-z-*` — every z-index in the theme comes from there). **Every rule in this theme reads only these.** *Export:* the `--*-color-*` names LuCI themes conventionally expose, defined **from** the private tier and read by **nobody** inside footstrap — they exist so a third-party `luci-app-*` stylesheet keeps working and keeps following the palette and dark mode.
-  Why: `:root` is a **shared** global scope — every `luci-app-*` drops its CSS into the same document, **unlayered, which outranks every cascade layer**. One app writing `:root { --accent: … }`, or `--radius`/`--text`/`--border` (names anyone would pick), used to repaint this whole theme silently. Base reading the *export* names was the wider hole still: `--text-color-high` is a LuCI **convention**, so an app is *likelier* to declare it. Measured on `docs/gallery.html` with a hostile `:root`: **312 of 336 elements repainted before the split, 0 after.** `audit.py` fails on any read of an export name from inside `styles/`, so the coupling cannot grow back. Element-scoped locals (`--bd-color`, `--fg-color`, `--on-color`, `--focus-color`, `pre`'s `--border-color`) are exempt — they are declared inside the rule that reads them and cannot be hijacked from a foreign `:root`.
+  The export tier is a **ramp, not a set of aliases** — `high`/`medium`/`low` must be three different colours, because consumers ask for a gradation and get whatever we define. All three used to alias one token, so `luci-app-podkop` painted its "no data" latency with `--primary-color-low` and got the same vivid accent as a live value. The ramp's axis is **chroma at constant lightness** (`color-mix(in oklch, … , var(--fs-dim))`): fading `low` toward the surface — the intuitive "muted" — spends contrast the palette does not have (on `--fs-panel2` in dark every accent already sits at 4.56:1, i.e. +0.06 over AA), and pushing `high` toward `--fs-text` collapses the ramp in dark mode, where `--fs-text` is near-white. `tools/export-tier.mjs` enforces all of it; the full reasoning is in `02-tokens.css`.
+  Why the private tier exists at all: `:root` is a **shared** global scope — every `luci-app-*` drops its CSS into the same document, **unlayered, which outranks every cascade layer**. One app writing `:root { --accent: … }`, or `--radius`/`--text`/`--border` (names anyone would pick), used to repaint this whole theme silently. Base reading the *export* names was the wider hole still: `--text-color-high` is a LuCI **convention**, so an app is *likelier* to declare it. Measured on `docs/gallery.html` with a hostile `:root`: **312 of 336 elements repainted before the split, 0 after.** `audit.py` fails on any read of an export name from inside `styles/`, so the coupling cannot grow back. Element-scoped locals (`--bd-color`, `--fg-color`, `--on-color`, `--focus-color`, `pre`'s `--border-color`) are exempt — they are declared inside the rule that reads them and cannot be hijacked from a foreign `:root`.
 - `styles/base/*.css` — `@layer base`, the widget defaults every LuCI view assumes: reset, typography, forms, tables, chrome, modal, buttons, cbi-dropdown, widgets, LuCI-specific. Split from a single 2300-line file; rule order inside the layer is unchanged.
 - `styles/theme/10-chrome.css` — `@layer theme`, the chrome both layouts share (brand, logo, wordmark, logout, indicators, `ul.nav` menu primitives). Its values are the **top-nav** ones. A layout file may set placement on these (`flex`, `order`, the icon-rail collapse) but never their look — they used to be described twice and had drifted.
 - `styles/theme/15`–`95` — `@layer theme`, one file per component/layout concern (wallpaper, shell-sidebar, progressbar, tables, alerts, tabs, misc, topnav, buttons, inputs, dropdown, modal, responsive, a11y-media).
@@ -155,8 +156,9 @@ checks, **nothing there is shipped**: `luci.mk` copies `htdocs/` and `ucode/` ve
 the OpenWrt buildbot has no node. Run them before pushing:
 
 ```sh
-npm run lint      # eslint (theme JS) + stylelint (styles/ tree)
-npm run a11y      # axe-core, WCAG 2.2 AA, over docs/gallery.html
+npm run lint         # eslint (theme JS) + stylelint (styles/ tree)
+npm run a11y         # axe-core, WCAG 2.2 AA, over docs/gallery.html
+npm run export-tier  # the --*-color-* contract with third-party luci-app-*
 ```
 
 - **eslint** needs `ecmaFeatures.globalReturn` — a LuCI resource file is evaluated inside a
@@ -176,6 +178,14 @@ npm run a11y      # axe-core, WCAG 2.2 AA, over docs/gallery.html
   being translucent its rendered value depends on the surface underneath — so no
   percentage is safe everywhere. Give the chip an opaque surface (`--panel2`) and let the
   border carry the colour. `audit.py` cannot see this; axe can.
+- **`tools/export-tier.mjs`** guards the one thing axe *cannot* see: the outbound
+  `--*-color-*` tier. Those widgets belong to other people's packages (`luci-app-podkop`,
+  `luci-app-justclash`, stock `firewall.js`/`status/cpu.js` all read them), so they are not
+  in the gallery and no contrast check ever looked at them. It proves each level is legible
+  as **text** on all three surfaces, that the matching `--on-*-color` is legible **on** it as
+  a fill, and that `high`/`medium`/`low` are three *different* colours — see the ramp note in
+  `02-tokens.css`. That last check exists because they were once three aliases of one token
+  and **a flat colour passes every contrast threshold there is**; only a spread check fails on it.
 
 ## Build the .apk (distribution)
 

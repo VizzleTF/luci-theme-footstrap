@@ -88,6 +88,14 @@ jobs:
       - name: axe-core (WCAG 2.2 AA over the widget gallery, all palettes x modes)
         run: node tools/a11y-gallery.mjs
 
+      # The --*-color-* export tier is the contract with OTHER people's packages (podkop,
+      # justclash, stock firewall.js all read it), and axe cannot see it: those widgets are
+      # not in our gallery. Proves every level is legible as text AND as a fill, and that
+      # high/medium/low are actually three different colours — they were once three aliases
+      # of one token, and a flat colour passes every contrast check there is.
+      - name: Export tier (third-party contract: AA + the ramp is not flat)
+        run: node tools/export-tier.mjs
+
       # THE GATE THAT MAKES SHIPPING MINIFIED JS SAFE.
       #
       # luci.mk minifies our JS with jsmin on the buildbot. jsmin decides whether a `/`
