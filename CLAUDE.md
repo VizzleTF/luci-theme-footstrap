@@ -219,3 +219,30 @@ Via OpenWrt SDK: symlink the package into `feeds/luci/themes/`, `./scripts/feeds
 ## Commit rules
 
 Conventional Commits, message in English. **Never commit without an explicit instruction.** No co-author / "Generated with" / any AI attribution trailers.
+
+## CHANGELOG.md — every tag gets an entry, written before the tag is pushed
+
+`CHANGELOG.md` is the human-readable record of what shipped, in English, newest first, one
+`## [x.y.z] — YYYY-MM-DD` section per **released tag** (Keep a Changelog format; sections
+`Added` / `Changed` / `Fixed` / `Removed` / `Security` / `Performance`). A tag with no entry
+is a release nobody can read: the git log is a list of commits, not a list of *changes*, and
+a user upgrading from the previous `.apk` reads this file, not `git log`.
+
+**Cutting a release is three steps, in this order**: write the entry → commit it → tag that
+commit. Never tag first — the tag must point at a commit that already contains its own entry,
+otherwise the release page and the tarball describe a version whose changelog does not exist
+yet. Add the `compare/` link at the bottom in the same commit.
+
+What goes in an entry:
+- **Write the effect, not the diff.** "Buttons had no focus indicator at all" beats "changed
+  `:hover` to `:focus` in `styles/base/70-buttons.css`". The reader wants to know what was
+  broken for them and whether it is fixed.
+- **Keep the number that made the change worth making.** This project's commit bodies already
+  carry them (20 KB of font drawing 227 labels; 312 of 336 elements repainted by a hostile
+  `:root`; contrast at 1.69:1 where AA wants 4.5) — a claim with a measurement behind it is
+  the whole difference between a changelog and a marketing blurb. Carry it across.
+- **Say what a rule protects against when it is non-obvious**, in one clause. Half of this
+  theme's invariants exist because the obvious alternative was tried and measured worse; an
+  entry that omits the reason invites the next person to undo it.
+- Group several commits under one version when they shipped under one tag — the section is per
+  *release*, not per commit.
