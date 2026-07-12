@@ -512,6 +512,80 @@ function nodeForSegs(segs) {
 	return node;
 }
 
+/* ---- alias / firstchild resolution ---------------------------------------
+ *
+ * 7 of the 27 links the menu renders are not pages but redirects: 4 `alias`
+ * (Firewall, System Log, Realtime Graphs, and any app that groups its tabs that
+ * way) and 3 `firstchild` (Administration, Terminal, Attended Sysupgrade). They
+ * used to be the router's blind spot — viewClassFor() saw a non-`view` action and
+ * fell through to a full page load, so the most-clicked entries in the whole menu
+ * were the ones that still reloaded.
+ *
+ * The server does not redirect them: a full GET of /admin/status/logs answers 200
+ * at that URL and stamps the *resolved* leaf into requestpath/dispatchpath/nodespec
+ * (verified against the live router), keeping `pathinfo` as the requested path. So
+ * the client can do the same resolution — and must do it EXACTLY the way
+ * dispatcher.uc does, or a click and an F5 on the same URL would open different
+ * pages. Hence node_weight() and the firstchild rules below are ports, not
+ * approximations. The one thing skipped is the ACL check: the menu tree the client
+ * is handed by /admin/menu is already ACL-filtered for this session.
+ *
+ * `rewrite` is deliberately NOT followed. The tree has none, and a wrong guess at
+ * its splice semantics would silently open the WRONG page — strictly worse than
+ * the full load it would fall back to. */
+
+/* node_weight() from dispatcher.uc: lower wins; a login node sorts last. */
+function nodeWeight(node) {
+	return Math.min(node.order ?? 9999, 9999) + (node.auth && node.auth.login ? 10000 : 0);
+}
+
+/* resolve_firstchild() from dispatcher.uc: the eligible child of lowest weight.
+ * Ties go to the first in tree order (the comparison is strict, as upstream's is,
+ * and JSON.parse preserves key order). A `firstchild` child is only eligible if it
+ * resolves to something itself — recursively. */
+function firstChildOf(node) {
+	let bestName = null, best = null;
+	const kids = node.children || {};
+	for (const name in kids) {
+		const child = kids[name];
+		if (!child.satisfied || !child.title || !child.action || typeof child.action !== 'object')
+			continue;
+		if (child.action.type === 'firstchild') {
+			if ((!best || nodeWeight(best) > nodeWeight(child)) && firstChildOf(child)) {
+				best = child; bestName = name;
+			}
+		} else if (!child.firstchild_ineligible) {
+			if (!best || nodeWeight(best) > nodeWeight(child)) {
+				best = child; bestName = name;
+			}
+		}
+	}
+	return best ? { name: bestName, node: best } : null;
+}
+
+/* Follow alias/firstchild to the real page. Returns {segs, node} of the leaf the
+ * dispatcher would have rendered, or null when nothing resolves (the server would
+ * 404 — let it). The hop cap is a cycle guard: an alias loop in some app's menu.d
+ * must not hang the UI. */
+function resolveSegs(segs) {
+	let node = nodeForSegs(segs);
+	for (let hops = 0; node && node.action && hops < 8; hops++) {
+		const type = node.action.type;
+		if (type === 'alias') {
+			segs = String(node.action.path).split('/');
+			node = nodeForSegs(segs);
+		} else if (type === 'firstchild') {
+			const pick = firstChildOf(node);
+			if (!pick) return null;
+			segs = segs.concat([ pick.name ]);
+			node = pick.node;
+		} else {
+			return { segs, node };
+		}
+	}
+	return null;
+}
+
 /* The view class a menu node instantiates, or null if the node isn't SPA-able.
  * Normal `view` nodes derive it from action.path; the Status→Overview `template`
  * node maps to view.status.index (its server template just instantiates that —
@@ -540,11 +614,15 @@ function moduleUrl(className) {
  * click's require() then hits cache instead of the network (−10–40 ms LAN on the
  * first visit to a page, more on WAN/VPN). Deduped per class; failures are silent
  * (it's a pure optimisation). Static resource, so same-origin credentials are moot. */
+/* view classes this router has already required — i.e. the ones LuCI has an instance
+ * cached for. A class NOT in here is rendered by the require() itself (see navigate). */
+const _seen = new Set();
 const _prefetched = new Set();
 function prefetchView(pathname) {
 	const segs = segsFromPath(pathname);
 	if (!segs) return;
-	const className = viewClassFor(nodeForSegs(segs));
+	const res = resolveSegs(segs);
+	const className = viewClassFor(res && res.node);
 	if (!className || _prefetched.has(className)) return;
 	_prefetched.add(className);
 	try { fetch(moduleUrl(className), { credentials: 'same-origin' }).catch(() => {}); } catch (e) {}
@@ -604,10 +682,17 @@ function navigate(pathname, push) {
 	const segs = segsFromPath(pathname);
 	if (!segs) return false;
 
-	const node = nodeForSegs(segs);
+	/* `segs` is what the user clicked, `rsegs` the leaf it resolves to — the two
+	 * differ for an alias/firstchild link, and a full load keeps BOTH: the URL and
+	 * pathinfo stay as requested while requestpath/dispatchpath/nodespec/title carry
+	 * the resolved leaf. Mirror that split exactly; collapsing it either way would
+	 * make an F5 land somewhere the click did not. */
+	const res = resolveSegs(segs);
+	const node = res && res.node;
 	const className = viewClassFor(node);
 	if (!className)
 		return false;
+	const rsegs = res.segs;
 
 	/* from here on the navigation is committed */
 	const gen = ++_navGen;
@@ -628,13 +713,31 @@ function navigate(pathname, push) {
 		host.appendChild(v);
 	}
 
-	/* teardown: drop the outgoing view's pollers so they stop hitting detached
-	 * DOM / wasting RPCs. Flush the queue but do NOT Poll.stop() — stop() deletes
-	 * the internal tick and the incoming view's poll.add() would never auto-start.
-	 * The only non-view poller LuCI adds is the transient apply/reboot reachability
-	 * check, so a flush here is safe. */
-	if (L.Poll && L.Poll.queue)
+	/* teardown: drop the outgoing view's pollers so they stop hitting detached DOM /
+	 * wasting RPCs, then put the poll loop back into the state a FRESH PAGE LOAD leaves
+	 * it in. The only non-view poller LuCI adds is the transient apply/reboot
+	 * reachability check, so flushing the queue is safe.
+	 *
+	 * Why the re-arm matters: LuCI runs one 1 s tick and `step()` fires a queue entry
+	 * only when `tick % interval == 0`. Simply leaving the OUTGOING page's tick running
+	 * (what this router used to do) makes the incoming view's poller wait for the next
+	 * multiple of its interval — up to `pollinterval`, 5 s. Wireless draws its station
+	 * list from the first poll, so it sat spinning for 4950 ms against ~360 ms on a full
+	 * load; every poll-fed section lagged the same way.
+	 *
+	 * stop() alone is NOT the fix: it deletes `tick`, and Poll.add() only auto-starts
+	 * when `tick != null`, so the incoming pollers would never start at all. stop() then
+	 * start() on an EMPTY queue leaves exactly what a fresh document has when its view is
+	 * about to render — `tick = 0`, no timer armed. The view's first poll.add() then sees
+	 * `tick != null && !active()`, calls start() itself, and start() steps immediately.
+	 * That is not a shortcut around upstream: it is upstream. On a full load initDOM()
+	 * runs Poll.start() on an empty queue before the view renders, and the view's own
+	 * poll.add() is what arms the timer and takes the first step. */
+	if (L.Poll && L.Poll.queue) {
 		L.Poll.queue.length = 0;
+		L.Poll.stop();
+		L.Poll.start();
+	}
 	/* also kill the outgoing view's plain setInterval pollers (e.g. podkop's log
 	 * tailer) — a full load would have; the SPA must do it explicitly. Keeps
 	 * L.Poll's own tick alive. */
@@ -645,8 +748,8 @@ function navigate(pathname, push) {
 
 	/* point the runtime env at the new node so views, tabs and highlighting read
 	 * the right path. For a fully-matched leaf, request == dispatch path. */
-	L.env.requestpath  = segs.slice();
-	L.env.dispatchpath = segs.slice();
+	L.env.requestpath  = rsegs.slice();
+	L.env.dispatchpath = rsegs.slice();
 	L.env.pathinfo     = '/' + segs.join('/');
 	/* `readonly` is not decoration: luci.js implements hasViewPermission() as
 	 * `!env.nodespec.readonly`, and the dispatcher stamps it on every node an ACL
@@ -659,8 +762,8 @@ function navigate(pathname, push) {
 
 	/* Keep <body data-page> in sync with the route. The server template stamps the
 	 * dispatch path (`ctx.path`) on every full load, and LuCI's
-	 * page-scoped CSS (and any per-page hook) keys off it. `segs` here is the
-	 * resolved leaf path, so the two agree — which is the point: a firstchild URL
+	 * page-scoped CSS (and any per-page hook) keys off it. `rsegs` is the resolved
+	 * leaf path, so the two agree — which is the point: a firstchild URL
 	 * like /admin/status must produce the same "admin-status-overview" whether it
 	 * arrives as a full load or as a client-side nav. A SPA nav swaps the
 	 * view without reloading, so — like requestpath/dispatchpath/title above —
@@ -668,7 +771,7 @@ function navigate(pathname, push) {
 	 * data-page and its scoped styles silently don't apply. This is route-state
 	 * sync the router already owns, not a per-page patch: it fixes every
 	 * body[data-page=…] rule at once. */
-	document.body.setAttribute('data-page', segs.join('-'));
+	document.body.setAttribute('data-page', rsegs.join('-'));
 
 	if (push)
 		history.pushState({ fsnav: true }, '', pathname);
@@ -698,18 +801,34 @@ function navigate(pathname, push) {
 	 * mutations above are fine on either; only the require target must be window.L.
 	 * See docs/14.
 	 *
-	 * Fresh instance -> fresh __init__ -> renders into #view. require/instanceof
-	 * errors fall back to a real navigation; render-time errors are handled inside
-	 * LuCI.view (shows the stock error), same as a full load. */
+	 * require/instanceof errors fall back to a real navigation; render-time errors are
+	 * handled inside LuCI.view (shows the stock error), same as a full load.
+	 *
+	 * WHEN to re-instantiate is the subtle part, and getting it wrong cost this router
+	 * a duplicate render on every first visit to a page. LuCI's require() does not hand
+	 * back a class — it caches an INSTANCE, so `require('view.x')` on a class not seen
+	 * before CONSTRUCTS it, and a view's __init__ *is* its render. (That is the whole of
+	 * ui.instantiateView(): require the view and you have rendered it.) So on a first
+	 * visit the require already painted the page, and the `new view.constructor()` that
+	 * followed painted it a SECOND time — two renders, and two pollers registered for the
+	 * same page, doubling its RPCs for as long as the user stayed. Only on a REVISIT does
+	 * require() return the cached singleton whose __init__ already ran, and only then does
+	 * a fresh instance have to be built to re-run it.
+	 *
+	 * `_seen` is that distinction, and it must be read BEFORE the require resolves, since
+	 * the require is what fills LuCI's cache. */
 	if (className === 'view.status.index')
 		ensureOverviewHelpers();
 
 	const RT = window.L;
+	const cached = _seen.has(className);
+	_seen.add(className);
 	RT.require(className).then(view => {
 		if (gen !== _navGen) return;	/* a newer navigation superseded this one */
 		if (!(view instanceof RT.view))
 			throw new TypeError('Loaded class ' + className + ' is not a view');
-		new view.constructor();
+		if (cached)
+			new view.constructor();	/* singleton: its __init__ already ran, re-run it */
 	}).catch((e) => {
 		/* The full-page reload is a correct fallback, but swallowing the reason made
 		 * every SPA-router regression look like "the page is just slow to load"
@@ -1210,6 +1329,14 @@ return baseclass.extend({
 		ui.menu.load().then((tree) => {
 			_tree = tree;
 			_renderMain = renderMainMenu;
+
+			/* The page we are standing on arrived as a full load, which means LuCI has
+			 * ALREADY required — and therefore instantiated and rendered — its view. Seed
+			 * `_seen` with it, or the first SPA nav BACK to this page would take require()'s
+			 * cached instance, skip the re-instantiation, and render nothing at all. */
+			const here = viewClassFor(nodeForSegs(L.env.dispatchpath || []));
+			if (here)
+				_seen.add(here);
 
 			renderChrome();
 			wireAppearance();
