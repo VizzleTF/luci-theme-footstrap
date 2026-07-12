@@ -79,7 +79,6 @@
 	.cbi-tabmenu > li > a:hover {
 		background: var(--accent-soft);
 		color: var(--text);
-		opacity: 1;
 	}
 
 	/* active pill */

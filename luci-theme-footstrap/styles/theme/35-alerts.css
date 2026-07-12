@@ -47,6 +47,8 @@
 		font-size: 11px; font-weight: 600; line-height: 1.4;
 		background: var(--panel2); border: 1px solid var(--border);
 		color: var(--dim); text-shadow: none; text-transform: none;
+		/* carried over from the absorbed styles/base .label rule */
+		white-space: nowrap; margin: .125em 0 .125em .4em;
 	}
 	.label.important, .label.notice { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 	.label.warning { background: color-mix(in srgb, var(--warn) 16%, transparent); border-color: var(--warn); color: var(--warn); }
@@ -55,13 +57,21 @@
 	a.label:link, a.label:visited { color: var(--dim); }
 	a.label:hover { text-decoration: none; color: var(--text); }
 
-	/* the show/hide toggles in a section title are .label pills too, but clickable */
+	/* The show/hide toggles in a section title are .label pills too, but clickable.
+	 * SINGLE owner of the pill look: pages/20-overview.css used to restate it (in
+	 * the page layer, unscoped — so it silently won everywhere) with values that
+	 * had drifted from this block. The merged values below are the ones that were
+	 * actually rendering. The overrides at the end (text-transform … box-shadow)
+	 * neutralise the overview-scoped decorations styles/base/95-luci.css puts on
+	 * these pills (uppercase, margins, min-width, badge look). */
 	.cbi-title .label {
 		font-size: 11px; font-weight: 600;
-		padding: 3px 10px; border-radius: var(--radius-pill);
+		padding: 4px 12px; border-radius: var(--radius-pill);
 		background: var(--panel2); border: 1px solid var(--border);
 		color: var(--dim); cursor: pointer; line-height: 1.4;
+		text-transform: none; letter-spacing: 0;
+		margin: 0; min-width: 0; box-shadow: none;
 	}
-	.cbi-title .label:hover { color: var(--text); opacity: 1; }
-	.cbi-title .label.notice { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+	.cbi-title .label:hover { color: var(--text); border-color: var(--dim); opacity: 1; }
+	.cbi-title .label.notice { opacity: 1; color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 }

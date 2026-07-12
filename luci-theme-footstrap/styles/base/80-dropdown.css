@@ -12,12 +12,8 @@
 		padding: 0 !important;
 	}
 
-	.cbi-dropdown:not(.btn):not(.cbi-button) {
-		background: linear-gradient(var(--background-color-high) 0%, var(--border-color-low) 100%);
-		border: 1px solid var(--border-color-high);
-		border-radius: 3px;
-		color: var(--text-color-high);
-	}
+	/* the closed control's paint (surface, border, radius, colour) is owned by
+	 * theme/65-dropdown.css — absorbed */
 
 	.cbi-dropdown img {
 		/* the following are necessary to constrain (vector) images of any size */
@@ -124,10 +120,6 @@
 		height: 20px;
 	}
 
-	.cbi-dropdown[open] {
-		position: relative;
-	}
-
 	.cbi-dropdown[open] > ul.dropdown {
 		display: block;
 		background: var(--background-color-low);
@@ -165,29 +157,10 @@
 	.cbi-dropdown[open] > ul.dropdown > li .hide-open { display: none; }
 	.cbi-dropdown[open] > ul.dropdown > li .hide-close { display: block; display: initial; }
 
-	.cbi-dropdown[open] > ul.dropdown > li {
-		border-bottom: 1px solid var(--border-color-high);
-	}
-
-	.cbi-dropdown[open] > ul.dropdown > li[selected] {
-		background: var(--primary-color-medium);
-		color: var(--on-primary-color);
-	}
-
-	.cbi-dropdown[open] > ul.dropdown > li.focus,
-	.cbi-dropdown[open] > ul.dropdown > li:hover {
-		background: var(--primary-color-low);
-		color: var(--on-primary-color);
-	}
-
-	.cbi-dropdown[open] > ul.dropdown > li[selected].focus,
-	.cbi-dropdown[open] > ul.dropdown > li[selected]:hover {
-		background: linear-gradient(90deg, var(--primary-color-medium) 50%, var(--primary-color-low));
-	}
-
+	/* open-list row paint (dividers, selected/focus/hover states) is owned by
+	 * theme/65-dropdown.css — absorbed */
 	.cbi-dropdown[open] > ul.dropdown > li:last-child {
 		margin-bottom: 0;
-		border-bottom: none;
 	}
 
 	.cbi-dropdown[open] > ul.dropdown > li[unselectable] {

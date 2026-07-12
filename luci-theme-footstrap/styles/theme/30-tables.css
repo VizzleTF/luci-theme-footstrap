@@ -7,7 +7,6 @@
 		box-shadow: var(--fs-shadow);
 	}
 	.cbi-section { padding: 16px; margin-bottom: 16px; }
-	h2, h3, legend, .cbi-section-descr { color: var(--text); }
 	/* a bare <legend>; the ones inside a .cbi-section are covered below */
 	legend { font-size: 14px; font-weight: 700; }
 
@@ -104,21 +103,31 @@
 	 * only the four OUTER corner cells to match — the header row's end cells (top)
 	 * and the last row's end cells (bottom). This is the frame's corners, not a
 	 * per-row pill. */
+	/* `#view .table[id]` is listed too: the frame rule above draws the rounded
+	 * border for an id-table sitting straight in #view (no section), so its
+	 * corner cells must round with it — without it they poked past the frame. */
 	.cbi-section .table[id] .tr.table-titles .th:first-child,
+	#view .table[id] .tr.table-titles .th:first-child,
 	#view table.fs-dt .tr.table-titles .th:first-child { border-top-left-radius: var(--radius-lg); }
 	.cbi-section .table[id] .tr.table-titles .th:last-child,
+	#view .table[id] .tr.table-titles .th:last-child,
 	#view table.fs-dt .tr.table-titles .th:last-child { border-top-right-radius: var(--radius-lg); }
 	.cbi-section .table[id] .tr:last-child .td:first-child,
+	#view .table[id] .tr:last-child .td:first-child,
 	#view table.fs-dt .tr:last-child .td:first-child { border-bottom-left-radius: var(--radius-lg); }
 	.cbi-section .table[id] .tr:last-child .td:last-child,
+	#view .table[id] .tr:last-child .td:last-child,
 	#view table.fs-dt .tr:last-child .td:last-child { border-bottom-right-radius: var(--radius-lg); }
 	/* Empty data table: L.ui.Table adds a single-cell .tr.placeholder ("There are no
 	 * active leases"). In a display:table table that lone cell spans only the first
 	 * column, and the bottom-corner rounding then draws a tiny rounded box on the
 	 * left. Make the placeholder row + cell block the full table width, left-aligned,
 	 * carrying the frame's bottom corners so the note fills the table cleanly. */
-	.cbi-section .table[id] .tr.placeholder, #view table.fs-dt .tr.placeholder { display: block; }
+	.cbi-section .table[id] .tr.placeholder,
+	#view .table[id] .tr.placeholder,
+	#view table.fs-dt .tr.placeholder { display: block; }
 	.cbi-section .table[id] .tr.placeholder .td,
+	#view .table[id] .tr.placeholder .td,
 	#view table.fs-dt .tr.placeholder .td {
 		display: block; width: 100%; text-align: left;
 		color: var(--dim); font-family: var(--font-sans);
@@ -132,7 +141,7 @@
 	 * column starved the remaining data columns (dates broke mid-token). Exclude
 	 * CBI section tables and the JS-tagged data tables (.fs-dt) explicitly. */
 	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)) .td:first-child {
-		color: var(--dim); font-weight: 500; width: 40%; white-space: nowrap;
+		color: var(--dim); font-weight: 600; width: 40%; white-space: nowrap;
 	}
 	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)) .td:last-child:not(:first-child) {
 		font-family: var(--font-mono); color: var(--text); text-align: right;
@@ -142,7 +151,6 @@
 	.cbi-section .cbi-section { border: 0; box-shadow: none; padding: 0; margin: 0; background: transparent; }
 
 	/* generic links/labels inside cards */
-	.cbi-section a { color: var(--accent); }
 	.cbi-section .ifacebox, .cbi-section .zonebadge { border-radius: var(--radius); }
 
 	/* Inactive tab panes: the base [data-tab-title] rule sets height:0/overflow:hidden,

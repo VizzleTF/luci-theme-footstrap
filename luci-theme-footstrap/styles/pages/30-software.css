@@ -3,18 +3,21 @@
 	 * Software (package-manager) disk-space bar -> match the overview Memory/Storage
 	 * meter: "Disk space" label + value on one line, thin accent bar below. The
 	 * value comes from the .cbi-progressbar title (moved out of the bar via ::after).
-	 * Scoped to #view:has(#disk-space-label) so it only hits this page (works under
-	 * SPA and full load alike — no body[data-page] dependency).
+	 * Scoped by body[data-page] — the same idiom the page's phone rules use in
+	 * theme/90-responsive.css (the SPA router re-stamps data-page, so it works
+	 * under SPA and full load alike; the old :has(#disk-space-label) scope relied
+	 * on an id 24.10 doesn't ship).
 	 * --------------------------------------------------------------------------- */
-	#view:has(#disk-space-label) .controls > div:first-child { position: relative; display: block; flex: 1 1 100%; width: 100%; margin: 0 0 6px; }
+	body[data-page='admin-system-package-manager'] #view .controls > div:first-child { position: relative; display: block; flex: 1 1 100%; width: 100%; margin: 0 0 6px; }
 
 	/* #packages (apk Software page) is a cbi-section-table with a
 	 * .cbi-section-table-titles header, so neither the .fs-dt tagging nor the
 	 * general stacking above reaches it — on a phone it overflows to ~1000px and
-	 * gets clipped. Stack it into label/value rows the same way below 820px.
-	 * Keyed off the unique #packages id, so it needs no page scope (works under
-	 * SPA and full load alike). */
-	@container (max-width: 820px) {
+	 * gets clipped. Stack it into label/value rows the same way below 800px — the
+	 * same container breakpoint every other card-stacking rule uses (30-tables,
+	 * 20-overview, 50-leases). Keyed off the unique #packages id, so it needs no
+	 * page scope (works under SPA and full load alike). */
+	@container (max-width: 800px) {
 		#packages .tr.cbi-section-table-titles { display: none; }
 		#packages .tr { display: block; padding: 12px 16px; }
 		#packages .td {
@@ -33,7 +36,7 @@
 		#packages .td.cbi-section-actions::before,
 		#packages .td:not([data-title])::before { content: none; }
 	}
-	#view:has(#disk-space-label) #disk-space-label {
+	body[data-page='admin-system-package-manager'] #disk-space-label {
 		display: block; margin: 0; font-size: 12px; font-weight: 600; color: var(--dim);
 	}
 }

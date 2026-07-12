@@ -33,32 +33,11 @@
 		transition: opacity .25s ease-in;
 	}
 
-	.cbi-progressbar {
-		border: 1px solid var(--border-color-high);
-		border-radius: 3px;
-		position: relative;
-		min-width: 170px;
-		height: 10px;
-		margin: 1.4em 0 4px 0;
-		background: var(--background-color-medium);
-	}
-
+	/* .cbi-progressbar paint (track, fill, the title readout) is owned by
+	 * theme/25-progressbar.css — absorbed. Only the fill's starting width stays:
+	 * the poll JS animates the inline width from it. */
 	.cbi-progressbar > div {
-		background: var(--primary-color-medium);
-		height: 100%;
-		transition: width .25s ease-in;
 		width: 0%;
-		border-radius: 2px;
-	}
-
-	.cbi-progressbar::before {
-		position: absolute;
-		top: -1.4em;
-		left: 0;
-		content: attr(title);
-		white-space: pre;
-		overflow: hidden;
-		text-overflow: ellipsis;
 	}
 
 	.zonebadge .cbi-tooltip {
@@ -99,7 +78,7 @@
 	}
 
 	.btn.active, .btn:active {
-		box-shadow: inset 0 2px 4px hsla(var(--border-color-low-hsl), .25), 0 1px 2px rgba(0, 0, 0, 0.05);
+		box-shadow: inset 0 2px 4px color-mix(in srgb, var(--border) 25%, transparent), 0 1px 2px rgba(0, 0, 0, 0.05);
 	}
 
 	.btn.disabled,
@@ -172,7 +151,9 @@
 		margin: .25em 0;
 	}
 
-	.label,
+	/* The `.label` pill (and its .important/.warning/… variants and a.label link
+	 * states) is owned by theme/35-alerts.css — absorbed. What stays is the
+	 * header-indicator fallback for a theme that doesn't restyle indicators. */
 	header [data-indicator] {
 		padding: 3px 3px 2px;
 		font-size: 9.75px;
@@ -186,31 +167,6 @@
 		margin: .125em 0 .125em .4em;
 	}
 
-	a.label:link,
-	a.label:visited {
-		color: var(--on-accent);
-	}
-
-	a.label:hover {
-		text-decoration: none;
-	}
-
-	.label.important {
-		background-color: var(--primary-color-high);
-		color: var(--on-primary-color);
-	}
-
-	.label.warning {
-		background-color: var(--warn-color-high);
-		color: var(--on-warn-color);
-	}
-
-	.label.success {
-		background-color: var(--success-color-high);
-		color: var(--on-success-color);
-	}
-
-	.label.notice,
 	header [data-indicator][data-style="active"] {
 		color: var(--on-primary-color);
 		background-color: var(--primary-color-high);

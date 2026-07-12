@@ -10,10 +10,6 @@
 	.ifacebadge { background: var(--panel2); border-color: var(--border); }
 	.ifacebadge-active { border-color: var(--accent); }
 	.zonebadge-empty { border-color: var(--border); color: var(--dim); }
-	.spinning::before {
-		border-color: var(--border);
-		border-top-color: var(--accent);
-	}
 
 	/* ==================================================================
 	 * Responsive CBI section tables (firewall zones, port forwards, DHCP …).

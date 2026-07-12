@@ -11,20 +11,24 @@
 		position: sticky; top: 0; z-index: 50;
 		display: flex; align-items: center; gap: 12px;
 		height: 46px;
+		/* the bar is a <header>; keep it at margin 0 explicitly — its spacing to
+		 * the content below comes from .fs-main-top .fs-content padding, never
+		 * from a header margin */
+		margin: 0;
 		/* the bar is a <header>, and its drop shadow used to come from a navbar
 		 * rule the theme no longer carries. Own the shadow here. */
-		box-shadow: 0 1px 3px hsla(var(--border-color-low-hsl), .25),
-		            inset 0 -1px 0 hsla(var(--border-color-low-hsl), .01);
+		box-shadow: 0 1px 3px color-mix(in srgb, var(--border) 25%, transparent),
+		            inset 0 -1px 0 color-mix(in srgb, var(--border) 1%, transparent);
 		/* align the nav content to the .fs-content inner column (container centered
 		 * at --fs-content-max, plus its 28px side padding) so the logo/menu line up
 		 * with the headings and cards below */
-		padding: 0 max(20px, calc((100% - var(--fs-content-max)) / 2 + 28px));
-		background: color-mix(in srgb, var(--panel) 88%, transparent);
+		padding: 0 max(20px, calc((100% - var(--fs-content-max)) / 2 + var(--fs-content-pad)));
+		background: var(--fs-bar-bg);
 		backdrop-filter: blur(10px);
 		-webkit-backdrop-filter: blur(10px);
 		border-bottom: 1px solid var(--border);
 	}
-	/* placement only — the look lives in 18-chrome.css */
+	/* placement only — the look lives in 10-chrome.css */
 	.fs-topnav .fs-brand { padding: 0; flex: 0 0 auto; }
 
 	/* horizontal main menu — left-aligned right after the logo; flex:1 fills the
@@ -38,14 +42,8 @@
 		display: block; padding: 6px 11px; border-radius: var(--radius);
 		color: var(--dim); font-size: 15px; font-weight: 600; white-space: nowrap;
 	}
-	/* auto-fit: menu-footstrap-common.js adds .fs-dense1/.fs-dense2 when the bar's
-	 * items would wrap, shrinking the pills to keep the menu on one row before it
-	 * drops to its own line. Padding is trimmed hard first, the font barely (15->14
-	 * only at the d2 floor); the 2px gap stays, so a pill never gets tighter than
-	 * its label. Specificity beats the base rule above. */
-	.fs-topnav .fs-mainmenu.fs-dense1 > li > a { padding: 4px 8px; }
-	.fs-topnav .fs-mainmenu.fs-dense2 > li > a { padding: 3px 6px; font-size: 14px; }
-	/* hover/active grouped for both layouts in theme/10-chrome.css */
+	/* hover/active and the .fs-dense1/2 auto-fit steps are grouped for both
+	 * layouts in theme/10-chrome.css */
 
 	/* dropdowns — a translucent popover in the design language */
 	.fs-topnav .fs-mainmenu .dropdown-menu {
@@ -71,14 +69,19 @@
 	.fs-topnav .fs-mainmenu > li.dropdown.open > .dropdown-menu { display: block; }
 	.fs-topnav .fs-mainmenu .dropdown-menu li > a {
 		display: block; padding: 9px 12px; border-radius: var(--radius);
-		color: var(--dim); font-size: 13px; font-weight: 500; white-space: nowrap;
+		color: var(--dim); font-size: 13px; font-weight: 600; white-space: nowrap;
 	}
 	/* dropdown-menu link hover/active grouped in theme/10-chrome.css */
 	.fs-topnav .fs-mainmenu > li.dropdown > a.menu::after { content: none; display: none; }
 
 	/* right controls */
 	.fs-topnav-right { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; margin-left: auto; }
-	.fs-topnav-right .fs-logout .fs-ico { width: 19px; height: 19px; }
+
+	/* content column, centered. 26px top ≈ the old 12px + the 15px header
+	 * margin-bottom the bar used to inherit from base — keeps the gap. */
+	.fs-main-top { flex: 1 1 auto; display: flex; flex-direction: column; }
+	.fs-main-top .fs-content { max-width: var(--fs-content-max); margin: 0 auto; width: 100%; padding-top: 26px; }
+	.fs-main-top .fs-footer { max-width: var(--fs-content-max); margin: 0 auto; width: 100%; border-top: 1px solid var(--border); }
 
 	/* mode menu row (rare, >1 mode) */
 	.fs-modemenu-top {
@@ -103,26 +106,17 @@
 			left: 0; right: auto; top: calc(100% + 6px);
 			max-width: calc(100vw - 32px);
 		}
-		.fs-topnav .fs-mainmenu > li.dropdown > a.menu::after { display: none; }
-		.fs-topnav-right { margin-left: auto; }
 	}
 
 	/* Top-bar logout icon button (template: .fs-top-logout, sits in .fs-topnav-right
 	 * just left of the Appearance button). Desktop keeps the "Log out" text as the
 	 * last menu item; on a phone that item wraps onto its own line as a stray link,
-	 * so hide it there and reveal this compact icon button instead — a door+arrow
-	 * glyph, red on hover, matching the Appearance button's look. */
+	 * so hide it there and reveal this compact icon button instead. Its look (and
+	 * the Appearance button's) lives in theme/10-chrome.css — only the phone-only
+	 * visibility switch is layout logic and stays here. */
 	.fs-top-logout { display: none; }
 	@media (max-width: 767px) {
 		body.fs-top #topmenu > li:has(> a[href$="/admin/logout"]) { display: none; }
-		.fs-top-logout {
-			display: inline-flex; align-items: center; justify-content: center;
-			width: 34px; height: 34px; flex: 0 0 auto;
-			border: 1px solid var(--border); border-radius: var(--radius);
-			background: var(--panel2); color: var(--dim);
-			transition: color .15s, border-color .15s;
-		}
-		.fs-top-logout svg { width: 18px; height: 18px; }
-		.fs-top-logout:hover { color: var(--danger); border-color: var(--danger); }
+		.fs-top-logout { display: inline-flex; }
 	}
 }

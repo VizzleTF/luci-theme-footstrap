@@ -30,7 +30,6 @@
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
 		box-shadow: none; text-shadow: none;
-		cursor: pointer;
 	}
 	.cbi-button:hover, .btn:hover,
 	input[type="button"]:hover, input[type="submit"]:hover, input[type="reset"]:hover { border-color: var(--dim); }
@@ -76,8 +75,6 @@
 		justify-content: flex-end;
 		gap: 8px;
 	}
-	.cbi-page-actions > form { display: inline; }
-
 	.cbi-page-actions .cbi-button,
 	.cbi-page-actions .btn {
 		min-height: 40px;
@@ -95,8 +92,7 @@
 	}
 	.cbi-page-actions .cbi-button-reset:hover { border-color: var(--danger); color: var(--danger); }
 
-	input[type="file"]::file-selector-button,
-	input[type="file"]::-webkit-file-selector-button {
+	input[type="file"]::file-selector-button {
 		margin-right: 12px; padding: 8px 14px;
 		font-family: var(--font-sans); font-size: 12px; font-weight: 600;
 		color: var(--text); background: var(--panel2);

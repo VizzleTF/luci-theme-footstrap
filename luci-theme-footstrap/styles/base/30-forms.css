@@ -192,7 +192,6 @@
 
 	.cbi-select select,
 	.cbi-select select:focus {
-		-webkit-appearance: none; /* nonstandard, should remove in future */
 		appearance: none;
 		outline: none;
 		border: none;
@@ -239,7 +238,9 @@
 		border: initial;
 		line-height: initial;
 		box-shadow: none;
-		width: auto !important;
+		/* out-specifies the base `input { width: 210px }` on its own — the
+		 * !important it used to carry fought nothing */
+		width: auto;
 	}
 
 	input[type=button], input[type=reset], input[type=submit] {
@@ -256,7 +257,6 @@
 	input[type="radio"] {
 		--bd-color: var(--border-color-high);
 		--fg-color: var(--text-color-high);
-		-webkit-appearance: none; /* nonstandard, should remove in future */
 		appearance: none;
 		width: 14px;
 		height: 14px;
@@ -340,7 +340,7 @@
 	input[type="radio"]::before,
 	input, button, textarea, select {
 		transition: border linear 0.2s, box-shadow linear 0.2s;
-		box-shadow: inset 0 1px 3px hsla(var(--border-color-low-hsl), .01);
+		box-shadow: inset 0 1px 3px color-mix(in srgb, var(--border) 1%, transparent);
 	}
 
 	.item:hover::after,
@@ -357,11 +357,16 @@
 	 * declarations. See docs/17. */
 	input[type="radio"]:focus::before,
 	input:focus, button:hover, textarea:focus, select:focus {
-		--focus-color-rgb: 82, 168, 236;
+		/* used to be the hardcoded bootstrap blue `82, 168, 236` — a literal that
+		 * ignored palette and dark mode wherever the theme layer doesn't override
+		 * the focus look (.cbi-select.focus, raw checkbox/radio ::before,
+		 * button:focus). Follows --accent now; the invalid state below still swaps
+		 * in --error-color-high-rgb. */
+		--focus-color-rgb: var(--accent-rgb, 82, 168, 236);
 
 		outline: 0;
 		border-color: rgba(var(--focus-color-rgb), 0.8);
-		box-shadow: inset 0 1px 3px hsla(var(--border-color-low-hsl), .01), 0 0 8px rgba(var(--focus-color-rgb), 0.6);
+		box-shadow: inset 0 1px 3px color-mix(in srgb, var(--border) 1%, transparent), 0 0 8px rgba(var(--focus-color-rgb), 0.6);
 		text-decoration: none;
 	}
 
@@ -390,7 +395,7 @@
 	input[readonly],
 	select[readonly],
 	textarea[readonly] {
-		border-color: hsla(var(--border-color-high-hsl), var(--disabled-opacity));
+		border-color: color-mix(in srgb, var(--border) calc(var(--disabled-opacity) * 100%), transparent);
 		pointer-events: auto;
 		cursor: auto;
 	}
@@ -415,8 +420,9 @@
 		width: 100%;
 	}
 
-	.actions,
-	.cbi-page-actions {
+	/* .cbi-page-actions paint is owned by theme/55-buttons.css — absorbed.
+	 * The legacy `.actions` plate has no theme override, so it stays. */
+	.actions {
 		background: var(--background-color-low);
 		margin-bottom: 18px;
 		padding: 17px 20px 18px 17px;

@@ -38,7 +38,7 @@
 		display: flex; align-items: center; gap: 6px;
 		padding: 0 4px 20px 8px;
 	}
-	/* placement only — the look lives in 18-chrome.css */
+	/* placement only — the look lives in 10-chrome.css */
 	.fs-brand { flex: 1 1 auto; min-width: 0; }
 
 	/* collapse the sidebar to an icon rail */
@@ -99,7 +99,7 @@
 	.fs-sidebar ul.nav > li.open > ul { display: flex; margin: 2px 0 6px 28px; }
 	.fs-sidebar ul.nav ul a {
 		display: block; padding: 7px 11px; border-radius: var(--radius-sm);
-		color: var(--dim); font-size: 13px; font-weight: 500;
+		color: var(--dim); font-size: 13px; font-weight: 600;
 	}
 	/* hover/active grouped in theme/10-chrome.css */
 
@@ -120,22 +120,11 @@
 	.fs-themerow .fs-ico { width: 17px; height: 17px; flex: 0 0 auto; }
 	.fs-themerow .fs-label { flex: 1 1 auto; }
 
-	/* Appearance popover trigger + panel (Mode + Palette quick switch).
-	 * Trigger is .fs-themerow (sidebar) / .fs-appearance-btn (top-nav); the popover
-	 * itself is parented to <body> and positioned by menu-footstrap-common.js —
-	 * .fs-sidebar is `overflow-y: auto`, which clips an absolutely-positioned child. */
-	.fs-appearance-wrap { position: relative; }
-	.fs-appearance-btn {
-		display: inline-flex; align-items: center; justify-content: center;
-		width: 34px; height: 34px; padding: 0; flex: 0 0 auto;
-		border: 1px solid var(--border); border-radius: var(--radius);
-		background: var(--panel2); color: var(--dim); cursor: pointer;
-		transition: color .15s, border-color .15s, background .15s;
-	}
-	.fs-appearance-btn:hover { color: var(--text); border-color: var(--accent); }
-	.fs-appearance-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
-	.fs-appearance-btn svg { width: 18px; height: 18px; }
-
+	/* Appearance popover panel (Mode + Palette quick switch). The trigger is
+	 * .fs-themerow (sidebar) / .fs-appearance-btn (top-nav, look in 10-chrome);
+	 * the popover itself is parented to <body> and positioned by
+	 * menu-footstrap-common.js — .fs-sidebar is `overflow-y: auto`, which clips
+	 * an absolutely-positioned child. */
 	.fs-appearance-pop {
 		position: fixed; z-index: 1000; left: 0; top: 0;
 		min-width: 216px; padding: 12px;
@@ -199,23 +188,30 @@
 	.fs-seg button.active { background: var(--accent); color: var(--on-accent, #fff); }
 
 	/* Rounding axis = a range slider + live px readout (segControl's sibling in the
-	 * popover). Track/thumb are styled on both WebKit and Firefox pseudo-elements. */
+	 * popover). Track/thumb are styled on both WebKit and Firefox pseudo-elements.
+	 * Written as `input[type="range"].fs-range` on purpose: the generic form-widget
+	 * rule `input[type="range"]` in theme/60-inputs.css is (0,1,1) and later in the
+	 * cascade, so a bare `.fs-range` (0,1,0) silently lost every one of these
+	 * declarations and the popover rendered the generic 6px/16px slider instead. */
 	.fs-rangewrap { display: flex; align-items: center; gap: 10px; }
-	.fs-range {
+	input[type="range"].fs-range {
 		flex: 1 1 auto; min-width: 0; height: 4px; margin: 6px 0;
 		-webkit-appearance: none; appearance: none;
 		background: var(--track); border-radius: var(--radius-pill); cursor: pointer;
 	}
-	.fs-range::-webkit-slider-thumb {
+	input[type="range"].fs-range::-webkit-slider-thumb {
 		-webkit-appearance: none; appearance: none;
 		width: 15px; height: 15px; border-radius: 50%;
 		background: var(--accent); border: 2px solid var(--panel); box-shadow: var(--fs-shadow);
 	}
-	.fs-range::-moz-range-thumb {
+	input[type="range"].fs-range::-moz-range-thumb {
 		width: 15px; height: 15px; border-radius: 50%;
 		background: var(--accent); border: 2px solid var(--panel); box-shadow: var(--fs-shadow);
 	}
-	.fs-range:focus-visible { outline: none; box-shadow: var(--fs-focus-ring); }
+	input[type="range"].fs-range::-moz-range-track {
+		height: 4px; background: var(--track); border-radius: var(--radius-pill);
+	}
+	input[type="range"].fs-range:focus-visible { outline: none; box-shadow: var(--fs-focus-ring); }
 	.fs-range-val {
 		flex: 0 0 auto; min-width: 34px; text-align: right;
 		font-size: 11px; font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums;
@@ -236,10 +232,11 @@
 	 * head.ut. Labels collapse away; a section's submenu becomes a flyout panel
 	 * anchored to the right of its icon, opened on hover (desktop) or on focus,
 	 * which is what a tap on the <a href="#"> section link produces on touch.
-	 * Applies wherever the sidebar is still vertical. That cut-off is 600px (see
-	 * the mobile top-bar block below) — it must track that breakpoint exactly, and
-	 * the JS one in menu-footstrap.js:flyoutMode(), or the collapse button sets
-	 * data-rail with no rule to match it and nothing happens.
+	 * Applies wherever the sidebar is still vertical. That cut-off is 768px (the
+	 * mobile top-bar block below takes over at max-width 767px) — it must track
+	 * that breakpoint exactly, and the JS one in menu-footstrap.js (_mqMobile),
+	 * or the collapse button sets data-rail with no rule to match it and nothing
+	 * happens.
 	 * ================================================================== */
 	@media (min-width: 768px) {
 		:root[data-rail="true"] .fs-sidebar {
@@ -344,31 +341,18 @@
 	}
 	@keyframes fs-spin { to { transform: rotate(360deg); } }
 
-	.fs-content { padding: 22px 28px; flex: 1 1 auto; width: 100%; max-width: var(--fs-content-max); margin: 0 auto; }
+	.fs-content { padding: 22px var(--fs-content-pad); flex: 1 1 auto; width: 100%; max-width: var(--fs-content-max); margin: 0 auto; }
 
-	/* online pill / indicators */
-	#indicators .fs-pill,
-	.fs-pill {
-		display: inline-flex; align-items: center; gap: 8px;
-		background: var(--panel); border: 1px solid var(--border);
-		border-radius: var(--radius-pill); padding: 6px 13px;
-		font-size: 12px; color: var(--dim);
-	}
-	.fs-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex: 0 0 auto; }
-	.fs-dot.live { animation: fs-livepulse 2s infinite; }
-	@keyframes fs-livepulse {
-		0% { box-shadow: 0 0 0 0 var(--accent-soft); }
-		70% { box-shadow: 0 0 0 7px transparent; }
-		100% { box-shadow: 0 0 0 0 transparent; }
-	}
-
-	/* ---------- footer ---------- */
-	footer.fs-footer {
-		padding: 14px 28px; border-top: 1px solid var(--border);
+	/* ---------- footer ----------
+	 * Bare `footer`, not `footer.fs-footer`: the theme owns footer paint outright
+	 * (absorbed from styles/base, which keeps only the flex skeleton), so a
+	 * third-party view emitting its own <footer> stays themed too. */
+	footer {
+		padding: 14px var(--fs-content-pad); border-top: 1px solid var(--border);
 		color: var(--dim); font-size: 12px; background: var(--bg);
 	}
-	footer.fs-footer a { color: var(--dim); }
-	footer.fs-footer a:hover { color: var(--accent); }
+	footer a { color: var(--dim); }
+	footer a:hover { color: var(--accent); }
 
 	/* ==================================================================
 	 * Responsive sidebar -> top bar. Below the top-nav layout's own breakpoint the
@@ -387,7 +371,7 @@
 			position: sticky; top: 0; z-index: 50;
 			flex-direction: row; flex-wrap: wrap; align-items: center;
 			gap: 10px; padding: 10px 16px;
-			background: color-mix(in srgb, var(--panel) 88%, transparent);
+			background: var(--fs-bar-bg);
 			backdrop-filter: blur(10px);
 			-webkit-backdrop-filter: blur(10px);
 			border-right: 0; border-bottom: 1px solid var(--border);
@@ -407,20 +391,26 @@
 			padding: 6px 11px; border-radius: var(--radius);
 			font-size: 15px; white-space: nowrap;
 		}
+		/* .fs-dense1/2 auto-fit steps are grouped with the top-nav's in
+		 * theme/10-chrome.css (the JS only stamps them while this list is a row) */
 		.fs-sidebar ul.nav > li > a .fs-ico,
 		.fs-sidebar ul.nav > li > a .fs-chevron { display: none; }
 
 		/* submenu = popup card anchored under the bar. Sized to its content (max-content)
 		 * rather than spanning the full bar width, so the items aren't stretched edge to
 		 * edge — just a compact dropdown. Capped to the viewport so a long label wraps
-		 * instead of overflowing. */
+		 * instead of overflowing. Surface values (translucent panel, blur, padding,
+		 * min-width, link padding) mirror the top-nav .dropdown-menu in 50-topnav.css —
+		 * same popup in two markups, keep them in sync. */
 		.fs-sidebar ul.nav ul,
 		.fs-sidebar ul.nav > li.open > ul {
 			display: none;
 			position: absolute; left: 16px; right: auto; top: calc(100% + 8px); z-index: 60;
-			width: max-content; min-width: 180px; max-width: calc(100vw - 32px);
-			margin: 0; padding: 6px;
-			background: var(--panel); border: 1px solid var(--border);
+			width: max-content; min-width: 200px; max-width: calc(100vw - 32px);
+			margin: 0; padding: 7px;
+			background: color-mix(in srgb, var(--panel) 96%, transparent);
+			backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+			border: 1px solid var(--border);
 			border-radius: var(--radius-lg); box-shadow: var(--fs-shadow-pop);
 		}
 		/* hover only on real pointer devices — a tap leaves :hover stuck on mobile
@@ -429,7 +419,7 @@
 			.fs-sidebar ul.nav > li.has-sub:hover > ul { display: block; }
 		}
 		.fs-sidebar ul.nav > li.has-sub.open > ul { display: block; }
-		.fs-sidebar ul.nav ul a { padding: 8px 11px; font-size: 13px; }
+		.fs-sidebar ul.nav ul a { padding: 9px 12px; font-size: 13px; }
 
 		/* right controls: Logout + Appearance as square icon buttons, like the
 		 * top-nav's .fs-topnav-right (the sidebar's Logout row is a footer link the
@@ -443,6 +433,8 @@
 		/* both sit on the brand row (order 2) — the menu wraps below it at order 3 */
 		.fs-themerow { order: 2; margin-left: auto; }
 		.fs-logout { order: 2; }
+		/* danger hover ring, matching the top-nav's .fs-top-logout icon button */
+		.fs-logout:hover { border-color: var(--danger); }
 		.fs-themerow .fs-label, .fs-logout .fs-label { display: none; }
 		.fs-themerow .fs-ico, .fs-logout .fs-ico { width: 18px; height: 18px; }
 
@@ -454,7 +446,11 @@
 	 * .alert-message as first child of #maincontent (.fs-main).
 	 * Order it above the content and give it card spacing.
 	 * ================================================================== */
-	.fs-main > .alert-message { order: 1; margin: 16px auto 0; width: calc(100% - 56px); max-width: calc(var(--fs-content-max) - 56px); }
+	.fs-main > .alert-message {
+		order: 1; margin: 16px auto 0;
+		width: calc(100% - var(--fs-content-pad) * 2);
+		max-width: calc(var(--fs-content-max) - var(--fs-content-pad) * 2);
+	}
 	.fs-main > .fs-content { order: 2; }
 	.fs-main > .fs-footer { order: 3; }
 
@@ -478,13 +474,6 @@
 		.fs-main .alert-message .btn,
 		.fs-main .alert-message button { white-space: normal; max-width: 100%; }
 	}
-
-	/* content column, centered */
-	.fs-main-top { flex: 1 1 auto; display: flex; flex-direction: column; }
-	/* top-nav: page-title strip is redundant (menu shows location) — hide it */
-	.fs-main-top .fs-pagehead { display: none; }
-	.fs-main-top .fs-content { max-width: var(--fs-content-max); margin: 0 auto; width: 100%; padding-top: 12px; }
-	.fs-main-top .fs-footer { max-width: var(--fs-content-max); margin: 0 auto; width: 100%; border-top: 1px solid var(--border); }
 
 	/* ==================================================================
 	 * FOOTSTRAP review polish: subtle poll indicator, outline row buttons

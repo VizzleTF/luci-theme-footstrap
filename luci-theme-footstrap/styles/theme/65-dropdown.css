@@ -1,5 +1,10 @@
 @layer theme {
-	/* legacy top-nav dropdown popup (rarely used) */
+	/* Generic .dropdown-menu popup — reaches the split "Save & Apply" menu ui.js
+	 * renders in the action bar (and any third-party use). Hover text is ACCENT on
+	 * purpose, matching the open cbi-dropdown list: this is a form control's menu.
+	 * The top-nav's NAV dropdowns share the class but hover to --text instead via
+	 * the more specific grouped rule in theme/10-chrome.css — that difference is
+	 * intentional (nav surfaces hover text, form menus hover accent), not drift. */
 	.dropdown-menu { background-color: var(--panel); border-color: var(--border); }
 	.dropdown-menu a { color: var(--text); text-shadow: none; }
 	.dropdown-menu a:hover { background: var(--panel2); background-image: none; color: var(--accent); }
@@ -31,7 +36,6 @@
 	 * ================================================================== */
 	.cbi-dropdown:not(.btn):not(.cbi-button) {
 		background: var(--panel2);
-		background-image: none;
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
 		color: var(--text);
@@ -64,7 +68,7 @@
 		position: relative; padding: 0;
 		align-self: stretch;
 		min-width: 34px; min-height: 30px;
-		display: flex; align-items: center; justify-content: center;
+		align-items: center;
 		cursor: pointer;
 	}
 	.cbi-dropdown > .open > * { display: none; }
@@ -90,9 +94,9 @@
 		border-radius: var(--radius-sm); padding: 9px 11px;
 		border-left: 0; color: var(--text);
 		position: relative;
-		/* the base rule puts a border-bottom on the li; on a border-radius: var(--radius-sm) box that
-		 * border curls up at the corners. Drop it and draw a straight inset strip via
-		 * ::after instead, so the divider is a plain line and the hover pill stays rounded. */
+		/* no border-bottom divider: on a rounded box it curls up at the corners.
+		 * The straight inset strip below (::after) is the divider instead, so the
+		 * hover pill stays rounded. */
 		border-bottom: 0;
 	}
 	.cbi-dropdown[open] > ul.dropdown > li:not(:last-child)::after {

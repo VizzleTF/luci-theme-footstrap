@@ -29,8 +29,15 @@
 		 * dynlist add-item). The invalid state swaps the colour for --danger and
 		 * keeps its own literal. */
 		--fs-focus-ring: 0 0 0 3px var(--accent-soft);
-		--knob-x: 3px;
 		--fs-content-max: 1280px;	/* content column cap (desktop breakpoint ≥1200) */
+		/* content column side padding. Coupled uses: .fs-content padding, the
+		 * top-nav bar's centering calc, and the notification width calc — one
+		 * token so they can't drift apart. */
+		--fs-content-pad: 28px;
+		/* translucent blurred bar surface — the top-nav bar and the sidebar's
+		 * phone bar are the same component in two markups; one token keeps their
+		 * glass tint identical. */
+		--fs-bar-bg: color-mix(in srgb, var(--panel) 88%, transparent);
 
 		/* Corner-radius scale. One user-tunable base — Appearance → Rounding slider,
 		 * 0–20px, persisted as localStorage `fs-radius` and pre-painted as an inline
@@ -65,22 +72,22 @@
 		--primary-color-high: var(--accent);
 		--primary-color-medium: var(--accent);
 		--primary-color-low: var(--accent);
-		--on-primary-color: #ffffff;
+		--on-primary-color: var(--on-accent);
 
 		--error-color-high: var(--danger);
 		--error-color-medium: var(--danger);
 		--error-color-low: var(--danger);
-		--on-error-color: #ffffff;
+		--on-error-color: var(--on-accent);
 
 		--success-color-high: var(--good);
 		--success-color-medium: var(--good);
 		--success-color-low: var(--good);
-		--on-success-color: #ffffff;
+		--on-success-color: var(--on-accent);
 
 		--warn-color-high: var(--warn);
 		--warn-color-medium: var(--warn);
 		--warn-color-low: var(--warn);
-		--on-warn-color: #ffffff;
+		--on-warn-color: var(--on-accent);
 
 		--disabled-opacity: .6;
 		color-scheme: light;
@@ -94,32 +101,8 @@
 		color-scheme: dark;
 	}
 
-	/* ==================================================================
-	 * FOOTSTRAP audit fixes
-	 * (1) Re-add HSL component tokens dropped in the :root swap, so base
-	 *     rules using hsla(var(--*-hsl), a) / component calcs resolve.
-	 * (2) Map remaining hardcoded literals in live components to tokens.
-	 * ================================================================== */
-	:root {
-		--background-color-delta-l-sign: -1;
-		--background-color-h: 220; --background-color-s: 26%; --background-color-l: 95%;
-		--background-color-high-hsl: 0, 0%, 100%;
-		--border-color-hsl: 218, 28%, 92%;
-		--border-color-high-hsl: 218, 28%, 92%;
-		--border-color-low-hsl: 218, 28%, 92%;
-		--border-color-low-h: 218; --border-color-low-s: 28%; --border-color-low-l: 92%;
-		--text-color-low-hsl: 216, 13%, 41%;
-		--tab-inactive-background-color-hsl: 218, 28%, 92%;
-	}
-	:root[data-darkmode="true"] {
-		--background-color-delta-l-sign: 1;
-		--background-color-h: 223; --background-color-s: 31%; --background-color-l: 6%;
-		--background-color-high-hsl: 220, 31%, 10%;
-		--border-color-hsl: 219, 25%, 18%;
-		--border-color-high-hsl: 219, 25%, 18%;
-		--border-color-low-hsl: 219, 25%, 18%;
-		--border-color-low-h: 219; --border-color-low-s: 25%; --border-color-low-l: 18%;
-		--text-color-low-hsl: 218, 15%, 60%;
-		--tab-inactive-background-color-hsl: 219, 25%, 18%;
-	}
+	/* The HSL-component bridge (--*-hsl triples, --*-h/s/l parts, delta signs)
+	 * that used to sit here is GONE: every base rule that read it was converted
+	 * to color-mix() over the real palette tokens, so shadows/hairlines follow
+	 * a palette exactly instead of a parallel hand-synced HSL copy. */
 }

@@ -17,17 +17,19 @@
 	 * That's it — layout, components and the --*-color-* bridge (02-tokens) all key
 	 * off these tokens, so they repaint automatically.
 	 *
-	 * The HSL-component bridge (--background-color-h/s/l, --border-color-low-hsl, …
-	 * in 02-tokens) is shared, not per-palette: it only tints a few subtle
-	 * shadows/hairlines and both shipped palettes read fine off it. A new colourway
-	 * with a very different hue MAY override those in its own block for a perfect
-	 * shadow tint, but it is optional — colours alone get you 95% there.
+	 * Shadows/hairlines everywhere are color-mix() over these same tokens (the
+	 * old HSL-component bridge is gone), so a new colourway's shadow tints follow
+	 * its colours automatically — nothing extra to define.
 	 *
 	 * Default: footstrap fills bare :root (no data-palette attr), so a no-JS load
 	 * still has colours. hicontrast is opt-in via data-palette="hicontrast".
 	 * Specificity: [data-palette][data-darkmode] (0,2,1) beats the bare/default
 	 * blocks, and each block sets a COMPLETE token set so the winner fully applies.
 	 * ============================================================ */
+
+	/* Native <select> closed-control chevron (theme/60-inputs.css). A data-URI
+	 * can't reference var() or currentColor, so each palette block bakes its own
+	 * --dim into the stroke — the only way the glyph can follow palette/mode. */
 
 	/* ---- footstrap — GitHub Primer (DEFAULT, also fills bare :root) ---- */
 	:root,
@@ -40,7 +42,9 @@
 		--text: #1f2328;
 		--dim: #656d76;
 		--faint: #818b98;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23656d76" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--accent: #0969da;
+		--accent-rgb: 9, 105, 218;	/* raw RGB of --accent, for base's focus glow (rgba(var(),a)) */
 		--accent-lt: #54aeff;	/* logo-gradient light end (both modes) */
 		--accent-soft: rgba(9,105,218,.10);
 		--track: #eaeef2;
@@ -60,7 +64,9 @@
 		--text: #adbac7;
 		--dim: #8c99a8;
 		--faint: #636e7b;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%238c99a8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--accent: #539bf5;
+		--accent-rgb: 83, 155, 245;
 		--accent-soft: rgba(83,155,245,.15);
 		--track: #373e47;
 		--good: #57ab5a;
@@ -80,7 +86,9 @@
 		--text: #101725;
 		--dim: #5b6675;
 		--faint: #8891a0;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%235b6675" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--accent: #1f8fe8;
+		--accent-rgb: 31, 143, 232;
 		--accent-lt: #7ec8ff;	/* logo-gradient light end (both modes) */
 		--accent-soft: rgba(31,143,232,.10);
 		--track: #eaeef4;
@@ -99,7 +107,9 @@
 		--text: #e8edf5;
 		--dim: #9ba6b8;
 		--faint: #697488;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%239ba6b8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--accent: #3ba7ff;
+		--accent-rgb: 59, 167, 255;
 		--accent-soft: rgba(59,167,255,.14);
 		--track: #1b2230;
 		--good: #43e0a0;

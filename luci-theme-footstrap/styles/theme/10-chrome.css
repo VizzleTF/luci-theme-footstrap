@@ -4,7 +4,7 @@
 	 *
 	 * These widgets are the same in both layouts; only where they sit differs.
 	 * They used to be described twice — unscoped in 20-shell-sidebar.css and again
-	 * under `.fs-topnav` in 26-topnav.css — and the two copies had drifted (32px vs
+	 * under `.fs-topnav` in the topnav file — and the two copies had drifted (32px vs
 	 * 30px logo, 11px vs 10px brand gap, 10px vs 8px indicator gap). The top-nav
 	 * values are the reference and live here.
 	 *
@@ -16,7 +16,6 @@
 		display: flex; align-items: center; gap: 10px;
 		color: var(--text); font-weight: 800;
 	}
-	.fs-brand:hover { opacity: 1; }
 
 	.fs-logo {
 		width: 30px; height: 30px; border-radius: var(--radius);
@@ -29,9 +28,41 @@
 	.fs-wordmark { font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
 
 	.fs-logout { display: flex; align-items: center; color: var(--dim); }
-	.fs-logout:hover { color: var(--danger); opacity: 1; }
+	.fs-logout:hover { color: var(--danger); }
 
 	.fs-indicators { display: flex; align-items: center; gap: 8px; }
+
+	/* ------------------------------------------------------------------
+	 * Square 34px icon button — the Appearance trigger (top-nav, and it is the
+	 * same element both layouts mount as #fs-appearance in top markup) and the
+	 * top-nav's phone logout button. One look; the hover accent differs
+	 * (appearance -> accent, logout -> danger) and stays with each button.
+	 * The sidebar's PHONE bar squares its .fs-themerow/.fs-logout rows into
+	 * this same look inside its own media block (they are full-width text rows
+	 * on the desktop, so those can't join this unconditional rule).
+	 * ------------------------------------------------------------------ */
+	.fs-appearance-btn,
+	.fs-top-logout {
+		display: inline-flex; align-items: center; justify-content: center;
+		width: 34px; height: 34px; padding: 0; flex: 0 0 auto;
+		border: 1px solid var(--border); border-radius: var(--radius);
+		background: var(--panel2); color: var(--dim); cursor: pointer;
+		transition: color .15s, border-color .15s, background .15s;
+	}
+	.fs-appearance-btn svg,
+	.fs-top-logout svg { width: 18px; height: 18px; }
+	.fs-appearance-btn:hover { color: var(--text); border-color: var(--accent); }
+	.fs-appearance-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+	.fs-top-logout:hover { color: var(--danger); border-color: var(--danger); }
+
+	/* Density steps for the horizontal main menu, shared by both layouts —
+	 * menu-footstrap-common.js adds .fs-dense1/2 when the row would wrap (and
+	 * strips them while the sidebar list is vertical, so no media guard needed).
+	 * Padding is trimmed hard first, the font only at the d2 floor. */
+	.fs-topnav .fs-mainmenu.fs-dense1 > li > a,
+	.fs-sidebar ul.nav.fs-dense1 > li > a { padding: 4px 8px; }
+	.fs-topnav .fs-mainmenu.fs-dense2 > li > a,
+	.fs-sidebar ul.nav.fs-dense2 > li > a { padding: 3px 6px; font-size: 14px; }
 
 	/* ------------------------------------------------------------------
 	 * Menu primitives. Both layouts render the LuCI menu as `ul.nav > li > a`,
@@ -73,5 +104,22 @@
 	.fs-topnav .fs-mainmenu .dropdown-menu li.active > a,
 	.fs-modemenu-top li.active a {
 		background: var(--accent-soft); color: var(--accent);
+	}
+
+	/* Keyboard focus for the chrome controls, one look for both layouts — the
+	 * same ring every form field already gets. Form fields keep their own rules;
+	 * this covers the buttons/links the theme itself renders, which had only the
+	 * UA default (menu links: base's thin dotted outline). */
+	.fs-railtoggle:focus-visible,
+	.fs-appearance-btn:focus-visible,
+	.fs-themerow:focus-visible,
+	.fs-logout:focus-visible,
+	.fs-top-logout:focus-visible,
+	.fs-seg button:focus-visible,
+	.fs-ap-update:focus-visible,
+	.fs-sidebar ul.nav a:focus-visible,
+	.fs-topnav .fs-mainmenu a:focus-visible {
+		outline: none;
+		box-shadow: var(--fs-focus-ring);
 	}
 }

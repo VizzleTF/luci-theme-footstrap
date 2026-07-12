@@ -150,7 +150,7 @@
 		white-space: nowrap;
 		background: linear-gradient(var(--background-color-high), var(--background-color-medium));
 		border-radius: 4px;
-		box-shadow: inset 0 1px 0 hsla(var(--text-color-low-hsl), 0.05);
+		box-shadow: inset 0 1px 0 color-mix(in srgb, var(--dim) 5%, transparent);
 		display: inline-flex;
 		flex-direction: column;
 		line-height: 1.2em;
@@ -166,7 +166,7 @@
 	}
 
 	.ifacebox .ifacebox-head[style] {
-		text-shadow: 0 1px 1px hsla(var(--background-color-high-hsl), 0.75);
+		text-shadow: 0 1px 1px color-mix(in srgb, var(--panel) 75%, transparent);
 	}
 
 	.ifacebox .ifacebox-head.active {
@@ -199,9 +199,9 @@
 		padding: 2px;
 		background: linear-gradient(var(--background-color-high), var(--background-color-high) 25%, var(--background-color-medium));
 		color: var(--text-color-high);
-		text-shadow: 0 1px 1px hsla(var(--background-color-high-hsl), 0.75);
+		text-shadow: 0 1px 1px color-mix(in srgb, var(--panel) 75%, transparent);
 		border-radius: 4px;
-		box-shadow: inset 0 1px 0 hsla(var(--background-color-high-hsl), 0.05);
+		box-shadow: inset 0 1px 0 color-mix(in srgb, var(--panel) 5%, transparent);
 		cursor: default;
 		line-height: 1.2em;
 	}
@@ -283,7 +283,7 @@
 		display: inline-block;
 		white-space: nowrap;
 		color: var(--text-color-high);
-		text-shadow: 0 1px 1px hsla(var(--background-color-high-hsl), 0.75);
+		text-shadow: 0 1px 1px color-mix(in srgb, var(--panel) 75%, transparent);
 	}
 
 	.zonebadge > em,
@@ -334,7 +334,9 @@
 	}
 
 	#modal_overlay > .modal.login > button.important {
-		font-size: 120% !important;
+		/* (0,3,2) already beats every button rule in any layer — the !important
+		 * this carried fought nothing */
+		font-size: 120%;
 		margin-top: .5em;
 		width: 100%;
 	}
@@ -435,6 +437,12 @@
 		margin: 15vh auto;
 	}
 
+	/* The padding reserves room for the ::before spinner glyph. The !important is
+	 * load-bearing: a spinning dropdown-button (the Save & Apply split control
+	 * while applying) is a .cbi-dropdown, whose `padding: 0 !important` in
+	 * 80-dropdown.css would otherwise win — only a later same-layer !important
+	 * longhand outranks that shorthand. It also (correctly) keeps the 32px against
+	 * the theme's own .btn padding. */
 	.spinning {
 		position: relative;
 		padding-left: 32px !important;
@@ -615,30 +623,7 @@
 		stroke: var(--text-color-highest)!important;
 	}
 
-	/* === STATUS OVERVIEW: HIDE/SHOW BUTTONS === */
-
-	/* Change mouse icon from text cursor to pointer */
-	body[data-page='admin-status-overview'] .cbi-title .label {
-	  cursor: pointer;
-	}
-
-	/* Smaller buttons on larger screens */
-	@media screen and (min-width : 481px) {
-	  body[data-page='admin-status-overview'] .cbi-title .label {
-	    line-height: 1em;
-	    margin: 0.7em 0;
-	  }
-	}
-
-	/* Slightly fade "show" button */
-	body[data-page='admin-status-overview'] .cbi-title .label.notice {
-	  opacity: var(--disabled-opacity);
-	}
-
-	/* Remove fade when hovered */
-	body[data-page='admin-status-overview'] .cbi-title .label.notice:hover {
-	  opacity: initial;
-	}
-
-	/* === END STATUS OVERVIEW: HIDE/SHOW BUTTONS === */
+	/* The overview Hide/Show toggle pills are owned by theme/35-alerts.css
+	 * (.cbi-title .label) + pages/20-overview.css (the chevron variant) —
+	 * the page-scoped block that used to sit here was fully overridden. */
 }

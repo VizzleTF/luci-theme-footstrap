@@ -1,12 +1,13 @@
 @layer theme {
 	/* value rows */
-	/* align-items:baseline (not center): a row's field can be taller than its control
-	 * because a `.cbi-value-description` sits under it (podkop, many app forms). center
+	/* display:flex + align-items:baseline come from styles/base — do not restate
+	 * or switch to center: a row's field can be taller than its control because a
+	 * `.cbi-value-description` sits under it (podkop, many app forms). center
 	 * then pushed the label to the middle of control+description — visibly below the
 	 * control. baseline lines the label up with the field's FIRST line (the control),
 	 * ignoring the description, so label and control read on one level for every
 	 * widget (select, dropdown, toggle, dynlist, textarea's first row). */
-	.cbi-value { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 8px 0; margin: 0; border-bottom: 1px solid var(--border); }
+	.cbi-value { justify-content: space-between; gap: 16px; padding: 8px 0; margin: 0; border-bottom: 1px solid var(--border); }
 	/* stacked controls in a field (e.g. Local Time: date input + Sync buttons)
 	 * need breathing room — the raw <br> collapses them together otherwise.
 	 * Exclude the password reveal group (it must stay seamless: no gap). */
@@ -15,9 +16,9 @@
 		display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center;
 	}
 	.cbi-value:last-child { border-bottom: 0; }
-	/* keep the base padding-top:6px — it is tuned for align-items:baseline (restored
-	 * on .cbi-value above), the same as stock bootstrap. */
-	.cbi-value-title { color: var(--dim); font-size: 13px; font-weight: 500; }
+	/* keep the base padding-top:6px — it is tuned for the base align-items:baseline,
+	 * the same as stock bootstrap. */
+	.cbi-value-title { color: var(--dim); font-size: 13px; font-weight: 600; }
 	/* Mono is for the *values* a field holds. A field also holds buttons (Sync
 	 * with browser, Start/Restart/Stop) and those are chrome, not data. Exclude
 	 * them here instead of relying on theme/55-buttons.css being concatenated later.
@@ -65,11 +66,13 @@
 	 * FOOTSTRAP polish round 2: native selects, spinners, dense tables
 	 * ================================================================== */
 
-	/* native <select> — custom chevron + theme (match text inputs) */
+	/* native <select> — custom chevron + theme (match text inputs). The chevron
+	 * data-URI lives in 03-palettes.css per palette/mode block (a URI can't read
+	 * var()), replacing a hardcoded grey that ignored palette and dark mode. */
 	select, select.cbi-input-select, .cbi-value-field select {
 		appearance: none; -webkit-appearance: none; -moz-appearance: none;
 		background-color: var(--panel2);
-		background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%238b95a7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		background-image: var(--fs-select-chevron);
 		background-repeat: no-repeat; background-position: right 12px center; background-size: 12px;
 		padding: 8px 34px 8px 12px;
 		border: 1px solid var(--border); border-radius: var(--radius);
@@ -167,7 +170,7 @@
 	 * of chips + one add-control, capped narrow so the chip's × sits near the
 	 * text instead of floating across a full-width field. */
 	.cbi-dynlist {
-		display: inline-flex; flex-direction: column; gap: 6px;
+		gap: 6px;
 		background: transparent; border: 0; padding: 0;
 		min-height: 0; min-width: 240px; max-width: 440px; width: 100%;
 		vertical-align: top;
@@ -187,7 +190,7 @@
 	}
 	/* text add-item = one bordered input group (input + + button attached) */
 	.cbi-dynlist > .add-item {
-		display: flex; align-items: stretch;
+		align-items: stretch;
 		background: var(--panel2); border: 1px solid var(--border);
 		border-radius: var(--radius-sm); overflow: hidden;
 		transition: border-color .15s, box-shadow .15s;

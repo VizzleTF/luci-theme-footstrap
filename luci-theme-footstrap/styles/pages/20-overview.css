@@ -9,38 +9,9 @@
 	 * A cascade layer cannot replace these flags; do not remove them.
 	 * ================================================================== */
 
-	/* ==================================================================
-	 * FOOTSTRAP section toggle (Hide/Show) — override stock overview rules
-	 * (base `.label` + body[data-page=...] .cbi-title .label leak uppercase,
-	 * margins and a colored-badge look). Make them clean theme pills.
-	 * ================================================================== */
-	.cbi-title .label {
-		text-transform: none;
-		letter-spacing: 0;
-		font-size: 11px;
-		font-weight: 600;
-		line-height: 1.4;
-		margin: 0;
-		padding: 4px 12px;
-		min-width: 0;
-		border-radius: var(--radius-pill);
-		background: var(--panel2);
-		border: 1px solid var(--border);
-		color: var(--dim);
-		box-shadow: none;
-		cursor: pointer;
-	}
-	.cbi-title .label:hover {
-		color: var(--text);
-		border-color: var(--dim);
-		opacity: 1;
-	}
-	.cbi-title .label.notice {
-		opacity: 1;
-		color: var(--accent);
-		background: var(--accent-soft);
-		border-color: var(--accent);
-	}
+	/* The generic `.cbi-title .label` pill look lives in theme/35-alerts.css (one
+	 * owner — a second copy here had drifted). This file keeps only the chevron
+	 * toggle below, which is overview-specific markup. */
 
 	/* Section Hide/Show toggles -> compact chevron icon buttons. The label is a
 	 * span with a raw "Hide"/"Show" text node (index.js) + data-style: expanded =

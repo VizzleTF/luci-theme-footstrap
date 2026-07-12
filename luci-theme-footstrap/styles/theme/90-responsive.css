@@ -14,31 +14,35 @@
 		 * capped every dropdown on the desktop too — it belongs here. */
 		.cbi-dropdown { max-width: 100%; }
 
-		/* apk Software page: stack each labeled control; base gives its labels a
-		 * min-width:250px that overflowed a ~360px screen. Label on its own line,
-		 * button/input rows wrap. Scoped via #disk-space-label (this page only).
+		/* Software page (luci-app-package-manager): stack each labeled control; base
+		 * gives its labels a min-width:250px that overflowed a ~360px screen. Label on
+		 * its own line, button/input rows wrap. Scoped by the page's data-page, NOT by
+		 * #disk-space-label: on 24.10 the "Disk space:" label ships with no id (25.12
+		 * added `id="disk-space-label"`), so a :has(#disk-space-label) scope silently
+		 * missed the whole page on 24.10 and left the value text overlapping the label.
 		 * `.controls` is a flex-ROW, so its Filter/Download/Actions columns crammed
 		 * side-by-side and overlapped — block it so the columns stack. The app injects
 		 * an UNLAYERED inline <style> (`.controls{display:flex}` + `.controls > *{…}`)
 		 * that no cascade layer can outrank, so these carry !important, exactly like
 		 * the inline-style fighters elsewhere in this file. */
-		#view:has(#disk-space-label) .controls { display: block !important; }
-		#view:has(#disk-space-label) .controls > div { display: block !important; min-width: 0; margin-bottom: 8px; }
-		/* the bar's value (::after "63% used (…)") normally floats above the bar, but
-		 * there the "Disk space:" label already sits — on a phone the long value text
-		 * overlapped it. Drop it BELOW the bar. The bar is a fixed 10px box so a static
-		 * ::after can't push the next control; reserve space with margin-bottom and
-		 * place the value absolutely in it (wrapping to the bar width). */
-		#view:has(#disk-space-label) #disk-space-label + .cbi-progressbar {
+		body[data-page='admin-system-package-manager'] #view .controls { display: block !important; }
+		body[data-page='admin-system-package-manager'] #view .controls > div { display: block !important; min-width: 0; margin-bottom: 8px; }
+		/* the bar's value (::after "63% used (…)") normally floats over the bar, but the
+		 * "Disk space:" label already sits above it — on a phone the long value text
+		 * overlapped label + bar. Drop it BELOW the bar. The bar is a fixed 10px box so a
+		 * static ::after can't push the next control; reserve space with margin-bottom
+		 * and place the value absolutely in it (wrapping to the bar width). The disk
+		 * section is the only `label` immediately followed by a `.cbi-progressbar`. */
+		body[data-page='admin-system-package-manager'] #view label + .cbi-progressbar {
 			width: 100%; margin-bottom: 3em;
 		}
-		#view:has(#disk-space-label) #disk-space-label + .cbi-progressbar::after {
+		body[data-page='admin-system-package-manager'] #view label + .cbi-progressbar::after {
 			top: calc(100% + 5px); left: 0; right: auto; bottom: auto;
 			text-align: left; white-space: normal; max-width: 100%;
 		}
-		#view:has(#disk-space-label) .controls label { display: block; min-width: 0; white-space: normal; margin-bottom: 4px; }
-		#view:has(#disk-space-label) .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: 8px; }
-		#view:has(#disk-space-label) .controls .control-group input { flex: 1 1 140px; min-width: 0; max-width: 100%; }
+		body[data-page='admin-system-package-manager'] #view .controls label { display: block; min-width: 0; white-space: normal; margin-bottom: 4px; }
+		body[data-page='admin-system-package-manager'] #view .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: 8px; }
+		body[data-page='admin-system-package-manager'] #view .controls .control-group input { flex: 1 1 140px; min-width: 0; max-width: 100%; }
 
 		/* Diagnostics tool (input + method select + button in one <table> row) has no
 		 * id and no .cbi-section-table, so nothing stacks it — a fixed table layout
@@ -62,10 +66,9 @@
 		/* Stack each field: label on its own line, control + description full-width
 		 * below. On the desktop the label/field sit side by side (space-between), but
 		 * on a phone that squeezes the field — and any .cbi-value-description inside it
-		 * — into a ~120px column, so one sentence of help wrapped to 8 lines. Bootstrap
-		 * avoids this by flex-wrapping the field below its fixed-width label; do the
-		 * same here, scoped to the phone width, so descriptions get the full column. */
-		#view .cbi-value { flex-wrap: wrap; }
+		 * — into a ~120px column, so one sentence of help wrapped to 8 lines. The row
+		 * already flex-wraps (base .cbi-value); the two full-width children below are
+		 * what actually stack it on a phone. */
 		#view .cbi-value > .cbi-value-title { flex: 1 1 100%; text-align: left; padding-top: 0; }
 		#view .cbi-value > .cbi-value-field { flex: 1 1 100%; min-width: 0; }
 	}

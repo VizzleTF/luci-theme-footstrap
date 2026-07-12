@@ -60,10 +60,6 @@
 		bottom: -0.25em;
 	}
 
-	img {
-		-ms-interpolation-mode: bicubic;
-	}
-
 	button,
 	input,
 	select,
@@ -73,6 +69,11 @@
 		margin: 0;
 		box-sizing: border-box;
 		vertical-align: baseline;
+	}
+
+	/* only <option> still renders this — 30-forms re-states line-height on
+	 * button/input/select/textarea, so the group above no longer carries it */
+	option {
 		line-height: 2em;
 	}
 
@@ -81,26 +82,19 @@
 	input[type="reset"],
 	input[type="submit"] {
 		cursor: pointer;
-		-webkit-appearance: button; /* nonstandard, should remove in future */
 		appearance: button;
 		word-break: break-all;
 	}
 
-	button[disabled],
-	input[type="button"][disabled],
-	input[type="reset"][disabled],
-	input[type="submit"][disabled] {
-		opacity: var(--disabled-opacity);
-	}
+	/* the disabled-opacity fade lives in 30-forms.css (same elements, plus
+	 * pointer-events/cursor) — the copy that used to sit here was dead weight */
 
 	input[type="search"] {
-		-webkit-appearance: textfield; /* nonstandard, should remove in future */
 		appearance: textfield;
 		box-sizing: content-box;
 	}
 
 	input[type="search"]::-webkit-search-decoration {
-		-webkit-appearance: none; /* nonstandard, should remove in future */
 		appearance: none;
 	}
 
