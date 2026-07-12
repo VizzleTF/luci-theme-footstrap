@@ -81,14 +81,12 @@
 	.btn[disabled] {
 		cursor: default;
 		opacity: var(--fs-disabled-opacity);
-		box-shadow: none;
 	}
 
-	/* .btn.large's size/radius and ALL of .btn.small are theme/55-buttons.css's —
-	 * absorbed. line-height stays: theme sizes the button by padding and never sets it. */
-	.btn.large {
-		line-height: normal;
-	}
+	/* `.btn.large` and `.btn.small` are theme/55-buttons.css's, in full — absorbed.
+	 * The `line-height: normal` that used to stay here was dead: theme's plain `.btn`
+	 * sets `line-height: 1.1`, and a later layer wins whatever the specificity. Same
+	 * for the `box-shadow: none` on .disabled above — theme's `.btn` already says it. */
 
 	/* The cross's colour, shadow and both opacities are theme/70-modal.css's —
 	 * absorbed. What is left is geometry, which theme does not touch. */
@@ -136,23 +134,17 @@
 	}
 
 	/* The `.label` pill (and its .important/.warning/… variants and a.label link
-	 * states) is owned by theme/35-alerts.css — absorbed. What stays is the
-	 * header-indicator fallback for a theme that doesn't restyle indicators. */
+	 * states) is owned by theme/35-alerts.css — absorbed.
+	 *
+	 * So is the indicator PILL: theme/20-shell-sidebar.css paints `#indicators
+	 * [data-indicator]`, and ui.js's showIndicator() is the only thing that emits one,
+	 * always into #indicators — so every `header [data-indicator]` is one of those, and
+	 * the later layer repainted padding/font/colour/background/radius here to nothing.
+	 * The whole `[data-style="active"]` rule went the same way. What survives is the
+	 * three properties theme does not touch. */
 	header [data-indicator] {
-		padding: 3px 3px 2px;
-		font-size: 9.75px;
-		font-weight: bold;
-		color: var(--fs-text);
-		text-transform: uppercase;
 		white-space: nowrap;
-		background-color: var(--fs-panel2);
-		border-radius: 3px;
 		text-shadow: none;
 		margin: .125em 0 .125em .4em;
-	}
-
-	header [data-indicator][data-style="active"] {
-		color: var(--fs-on-accent);
-		background-color: var(--fs-accent);
 	}
 }

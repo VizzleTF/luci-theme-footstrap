@@ -314,6 +314,62 @@ function applyAutoCollapse(val) {
 	document.dispatchEvent(new CustomEvent('fs-autocollapse', { detail: { on } }));
 }
 
+/* ---------------------------------------------------------------------------
+ * Disclosure primitives, shared by both layouts' menus.
+ *
+ * The sidebar and the top-nav render different markup, but a section header is
+ * the SAME W3C-APG disclosure control in both: an <a role="button"> that owns a
+ * panel it can show and hide. These three helpers used to be written out once per
+ * menu file — and the copies had already drifted apart (only the sidebar's Escape
+ * handler learnt to check flyout mode), which is the whole argument for hoisting
+ * them here. What stays layout-specific is the SELECTOR, so each is a parameter.
+ * ------------------------------------------------------------------------- */
+
+/* The `.open` class and aria-expanded must never disagree — `.open` alone told a
+ * sighted user everything and a screen-reader user nothing — so every open and
+ * close in both layouts goes through this one function. `linkSel` is the layout's
+ * trigger: the sidebar's bare `:scope > a`, the top-nav's `:scope > a.menu`. */
+function setOpen(li, on, linkSel) {
+	li.classList.toggle('open', on);
+	li.querySelector(linkSel)?.setAttribute('aria-expanded', on ? 'true' : 'false');
+}
+
+/* An <a role="button"> is given Enter by the browser but NOT Space, and a
+ * disclosure control has to answer both. */
+function wireSpaceKey(link) {
+	link.addEventListener('keydown', (ev) => {
+		if (ev.key !== ' ' && ev.key !== 'Spacebar') return;
+		ev.preventDefault();
+		link.click();
+	});
+}
+
+/* Dismissal, both ways round:
+ *  - click outside the menu closes it;
+ *  - WCAG 2.2 SC 1.4.13 (Content on Hover or Focus) — a panel revealed by hover or
+ *    focus must be dismissible from the KEYBOARD, and the disclosure pattern wants
+ *    focus handed back to the trigger that opened it.
+ * `when` is what lets the sidebar restrict both to flyout mode, where its `.open`
+ * means "popup panel" rather than "unfolded accordion" — closing an accordion
+ * because the user clicked elsewhere on the page would be wrong. */
+function wireDismiss(opts) {
+	const active = () => (opts.when ? opts.when() : true);
+
+	document.addEventListener('click', (ev) => {
+		if (active() && !ev.target.closest(opts.inside))
+			opts.close();
+	});
+
+	document.addEventListener('keydown', (ev) => {
+		if (ev.key !== 'Escape' || !active()) return;
+		const open = document.querySelector(opts.open);
+		if (!open) return;
+		const trigger = open.querySelector(opts.trigger);
+		opts.close();
+		trigger?.focus();
+	});
+}
+
 /* One segmented control; highlights the active option, calls onPick on change.
  *
  * `label` is not decoration: the visible caption is a sibling <div class="fs-ap-label">
@@ -592,7 +648,14 @@ function navigate(pathname, push) {
 	L.env.requestpath  = segs.slice();
 	L.env.dispatchpath = segs.slice();
 	L.env.pathinfo     = '/' + segs.join('/');
-	L.env.nodespec     = { satisfied: true, action: node.action, title: node.title, depends: node.depends };
+	/* `readonly` is not decoration: luci.js implements hasViewPermission() as
+	 * `!env.nodespec.readonly`, and the dispatcher stamps it on every node an ACL
+	 * grants read-but-not-write. Views (network/interfaces, wireless, the package
+	 * manager) and luci.js's own Save/Apply footer key their disabled state off it.
+	 * Dropping it here handed a read-only user LIVE Save/Apply buttons the moment
+	 * they arrived by SPA nav, where a full page load had correctly disabled them. */
+	L.env.nodespec     = { satisfied: true, action: node.action, title: node.title,
+	                       depends: node.depends, readonly: node.readonly };
 
 	/* Keep <body data-page> in sync with the route. The server template stamps the
 	 * dispatch path (`ctx.path`) on every full load, and LuCI's
@@ -1135,6 +1198,11 @@ function wireRail() {
 return baseclass.extend({
 	/* menu-footstrap.js asks before unfolding a section (see applyAutoCollapse) */
 	autoCollapse: currentAutoCollapse,
+
+	/* the disclosure primitives both layouts' menus build their sections on */
+	setOpen,
+	wireSpaceKey,
+	wireDismiss,
 
 	/* entry point: load the menu tree, render mode menu (which drives the
 	 * injected renderMainMenu), the section tabs, and wire the theme toggle. */

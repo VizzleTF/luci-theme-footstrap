@@ -89,7 +89,7 @@
 		color: var(--fs-text);
 	}
 
-	.cbi-dropdown > ul > li .hide-open { display: block; display: initial; }
+	.cbi-dropdown > ul > li .hide-open { display: initial; }
 	.cbi-dropdown > ul > li .hide-close { display: none; }
 
 	.cbi-dropdown > ul > li[display]:not([display="0"]) {
@@ -153,7 +153,7 @@
 	}
 
 	.cbi-dropdown[open] > ul.dropdown > li .hide-open { display: none; }
-	.cbi-dropdown[open] > ul.dropdown > li .hide-close { display: block; display: initial; }
+	.cbi-dropdown[open] > ul.dropdown > li .hide-close { display: initial; }
 
 	/* open-list row paint (dividers, selected/focus/hover states) is owned by
 	 * theme/65-dropdown.css — absorbed */

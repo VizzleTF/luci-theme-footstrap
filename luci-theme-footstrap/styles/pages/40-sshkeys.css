@@ -19,4 +19,12 @@
 		box-shadow: var(--fs-shadow);
 		padding: 16px;
 	}
+
+	/* An authorized_keys entry is a ~400-char base64 blob, so this is the one dynlist
+	 * that must not take theme/60-inputs.css's 440px cap. The rule used to sit in
+	 * `base` and was dead there — a layer beats specificity, so the theme's plain
+	 * `.cbi-dynlist` capped this page too. `page` is the layer that actually wins. */
+	body[data-page="admin-system-admin-sshkeys"] .cbi-dynlist {
+		max-width: none;
+	}
 }

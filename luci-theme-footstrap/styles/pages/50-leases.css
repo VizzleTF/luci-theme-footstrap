@@ -20,14 +20,12 @@
 	 * shared theme file, so other fs-dt tables keep the plain break-to-fit behaviour. */
 	@container fs-view (min-width: 801px) {
 		#view table.fs-dt:is(.leases, .leases6) .td { white-space: nowrap; }
-		#view table.fs-dt:is(.leases, .leases6) .td[data-title="DUID"],
-		#view table.fs-dt:is(.leases, .leases6) .td[data-title="IPv6 addresses"] {
-			white-space: normal; overflow-wrap: anywhere;
-		}
-		/* Hostname wraps too so a long device name doesn't force the table wider.
-		 * overflow-wrap:anywhere takes the natural breaks first (the hyphens in
+		/* The three columns allowed to wrap. Hostname is here for the same reason as
+		 * DUID: overflow-wrap:anywhere takes the natural breaks first (the hyphens in
 		 * "Yandex-Station-Midi-61QK") and, when a token still won't fit the column,
 		 * splits it mid-word rather than overflowing. Short names stay on one line. */
+		#view table.fs-dt:is(.leases, .leases6) .td[data-title="DUID"],
+		#view table.fs-dt:is(.leases, .leases6) .td[data-title="IPv6 addresses"],
 		#view table.fs-dt:is(.leases, .leases6) .td[data-title="Hostname"] {
 			white-space: normal; overflow-wrap: anywhere;
 		}

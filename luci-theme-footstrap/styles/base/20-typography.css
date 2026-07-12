@@ -186,8 +186,9 @@
 		margin-bottom: 18px;
 	}
 
+	/* no shared padding: BOTH members set their own below (code 1px 3px, pre 8.5px), so
+	 * the one written here never reached anything. */
 	code, pre {
-		padding: 0 3px 2px;
 		font-family: var(--fs-font-mono);
 		font-size: 12px;
 		border-radius: 3px;
@@ -213,7 +214,6 @@
 		font-size: 12px;
 		border: 1px solid var(--border-color);
 		border-radius: 3px;
-		white-space: pre;
 		white-space: pre-wrap;
 		word-wrap: break-word;
 	}

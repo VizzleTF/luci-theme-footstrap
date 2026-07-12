@@ -53,7 +53,7 @@
 		font-family: var(--fs-font-sans);
 	}
 	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[display]:not([display="0"]) { border-left: 0; }
-	.cbi-dropdown > ul > li[placeholder] { color: var(--fs-faint, var(--fs-dim)); }
+	.cbi-dropdown > ul > li[placeholder] { color: var(--fs-faint); }
 
 	/* Custom chevron in the toggle (hide the stock text/svg arrow).
 	 *

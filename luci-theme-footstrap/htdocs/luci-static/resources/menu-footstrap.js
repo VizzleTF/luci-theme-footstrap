@@ -49,18 +49,17 @@ function flyoutMode() {
 	       _mqMobile.matches;
 }
 
-/* `.open` is the only thing that told a sighted user a section was unfolded, and
- * it told a screen-reader user nothing: the trigger announced itself as a link
- * (href="#"), with no indication that it controlled a panel or what state that
- * panel was in. Every open/close now goes through here so the class and
- * aria-expanded cannot drift apart. */
+/* The trigger in this layout — a bare <a>, where the top-nav marks its own with
+ * `.menu`. common.setOpen keeps `.open` and aria-expanded from drifting apart. */
+const TRIGGER = ':scope > a';
+const OPEN_LI = '#topmenu > li.open';
+
 function setOpen(li, on) {
-	li.classList.toggle('open', on);
-	li.querySelector(':scope > a')?.setAttribute('aria-expanded', on ? 'true' : 'false');
+	common.setOpen(li, on, TRIGGER);
 }
 
 function closeFlyouts(except) {
-	document.querySelectorAll('#topmenu > li.open').forEach((o) => {
+	document.querySelectorAll(OPEN_LI).forEach((o) => {
 		if (o !== except) setOpen(o, false);
 	});
 }
@@ -205,13 +204,7 @@ function renderMainMenu(tree, url, level) {
 				saveOpenSections();
 			});
 
-			/* <a role="button"> is given Enter by the browser but not Space; a
-			 * disclosure control must answer both. */
-			link.addEventListener('keydown', (ev) => {
-				if (ev.key !== ' ' && ev.key !== 'Spacebar') return;
-				ev.preventDefault();
-				link.click();
-			});
+			common.wireSpaceKey(link);
 
 			/* hybrid devices: once a real MOUSE enters the menu, drop the tap-opened
 			 * panel so hover is authoritative and two panels never stack. Guarded on
@@ -233,25 +226,15 @@ return baseclass.extend({
 	__init__() {
 		common.init(renderMainMenu);
 
-		/* close an open flyout when clicking outside the menu, and drop stale
-		 * `.open` state whenever the two meanings swap (rail toggled, window
-		 * crossing the mobile breakpoint) — an accordion left open would otherwise
-		 * come back as a popup panel stuck on screen. */
-		document.addEventListener('click', (ev) => {
-			if (flyoutMode() && !ev.target.closest('#topmenu > li.has-sub'))
-				closeFlyouts();
-		});
-
-		/* WCAG 2.2 SC 1.4.13: a panel opened by hover or focus must be dismissible
-		 * from the keyboard, and the disclosure pattern wants focus back on the
-		 * trigger that opened it. Neither existed. */
-		document.addEventListener('keydown', (ev) => {
-			if (ev.key !== 'Escape') return;
-			const open = document.querySelector('#topmenu > li.open');
-			if (!open || !flyoutMode()) return;
-			const trigger = open.querySelector(':scope > a');
-			closeFlyouts();
-			trigger?.focus();
+		/* Click-outside and Escape both close an open flyout. Gated on flyoutMode():
+		 * outside this mode `.open` means "unfolded accordion", and folding a section
+		 * because the user clicked somewhere else on the page would be wrong. */
+		common.wireDismiss({
+			when: flyoutMode,
+			inside: '#topmenu > li.has-sub',
+			open: OPEN_LI,
+			trigger: TRIGGER,
+			close: () => closeFlyouts()
 		});
 
 		/* Entering flyout mode: fold everything, or a section left open as an

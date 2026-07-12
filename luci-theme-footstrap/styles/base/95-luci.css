@@ -129,13 +129,12 @@
 		-webkit-mask-size: cover;
 	}
 
+	/* The tint (and the 6%-not-12% reasoning behind it) is theme/30-tables.css's —
+	 * absorbed. It was written out here too, comment and all, and dead: theme sets the
+	 * `background` shorthand, which a later layer wins outright. */
 	.cbi-section-error {
 		border: 1px solid var(--fs-danger);
 		border-radius: 3px;
-		/* .06: the bold text inside is --error-color-high ON a tint of ITSELF, so the tint
-		 * eats its own contrast — .12 measured 4.4:1. At 6% every palette clears 4.5
-		 * (4.87 / 4.95 / 5.28 / 6.09). */
-		background-color: color-mix(in srgb, var(--fs-danger) 6%, transparent);
 		padding: 5px;
 		margin-bottom: 18px;
 	}
@@ -170,11 +169,6 @@
 
 	.ifacebox .ifacebox-head[style] {
 		text-shadow: var(--fs-text-emboss);
-	}
-
-	.ifacebox .ifacebox-head.active {
-		background: var(--fs-accent);
-		color: var(--fs-on-accent);
 	}
 
 	/* NO FALLBACK on --zone-color-rgb, and that is load-bearing — do not "fix" it.
@@ -498,7 +492,10 @@
 		overflow: hidden;
 	}
 
-	[data-tab-active="true"] {
+	/* the revealed state of both collapsibles — the tab pane and the file browser. Same
+	 * four declarations, written twice. */
+	[data-tab-active="true"],
+	.cbi-filebrowser.open {
 		opacity: 1;
 		height: auto;
 		overflow: visible;
@@ -515,13 +512,6 @@
 		opacity: 0;
 		height: 0;
 		overflow: hidden;
-	}
-
-	.cbi-filebrowser.open {
-		opacity: 1;
-		height: auto;
-		overflow: visible;
-		transition: opacity var(--fs-dur-fade);
 	}
 
 	.cbi-filebrowser > * {
@@ -633,10 +623,6 @@
 
 	[data-darkmode="true"] [data-page="admin-statistics-graphs"] [data-plugin] img {
 		filter: invert(100%) hue-rotate(150deg);
-	}
-
-	[data-page="admin-system-admin-sshkeys"] .cbi-dynlist {
-		max-width: none;
 	}
 
 	/* The realtime graphs (Status → Load/Traffic) inject resources/svg/*.svg into a

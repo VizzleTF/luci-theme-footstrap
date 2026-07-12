@@ -106,7 +106,8 @@
 	 * data-URI lives in 03-palettes.css per palette/mode block (a URI can't read
 	 * var()), replacing a hardcoded grey that ignored palette and dark mode. */
 	select, select.cbi-input-select, .cbi-value-field select {
-		appearance: none; -webkit-appearance: none; -moz-appearance: none;
+		/* -webkit- only: Firefox has had the unprefixed property since 80. */
+		appearance: none; -webkit-appearance: none;
 		background-color: var(--fs-panel2);
 		background-image: var(--fs-select-chevron);
 		background-repeat: no-repeat; background-position: right 12px center; background-size: 12px;

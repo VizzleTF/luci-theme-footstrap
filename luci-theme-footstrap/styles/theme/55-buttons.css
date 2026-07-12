@@ -68,34 +68,37 @@
 		box-shadow: inset 0 2px 4px color-mix(in srgb, var(--fs-border) 40%, transparent);
 	}
 
-	/* solid variants */
-	.cbi-button-positive { background: var(--fs-good); border-color: transparent; color: var(--fs-on-good); }
-	.cbi-button-action, .btn.primary, .cbi-button-action.important {
+	/* Solid variants — THREE fills, not six.
+	 *
+	 * `.cbi-button-*` is what LuCI's own views emit; `.btn.<colour-word>` is what a
+	 * third-party luci-app-* tends to emit, and base/60-modal.css paints those words
+	 * with gradients over the old bridge vars. Those gradients are dead: the plain
+	 * `.btn` rule above sets background/border/color in a LATER layer, which wins
+	 * regardless of specificity — so an unclaimed `.btn.danger` renders as a neutral
+	 * grey button with no colour cue. Coverage is a contract, so the theme claims
+	 * them; and it claims them in the SAME rule as their .cbi-button-* twin, because
+	 * written apart (which they were, twenty lines from each other with a byte-
+	 * identical body) a recolour lands on one half and not the other. */
+	.cbi-button-positive, .btn.success {
+		background: var(--fs-good); border-color: transparent; color: var(--fs-on-good);
+	}
+	.cbi-button-action, .cbi-button-action.important, .btn.primary, .btn.info {
 		background: var(--fs-accent); border-color: transparent; color: var(--fs-on-accent);
 	}
-	.cbi-button-negative, .cbi-button-remove, .cbi-button-negative.important {
+	.cbi-button-negative, .cbi-button-negative.important, .cbi-button-remove,
+	.btn.danger, .btn.error {
 		background: var(--fs-danger); border-color: transparent; color: var(--fs-on-danger);
 	}
 	/* This hover must stay ahead of the page-action Save rule below: at equal
 	 * specificity its `border-color: transparent` would otherwise erase Save's
-	 * outline on hover. */
+	 * outline on hover. (.cbi-button-remove is deliberately NOT here — it never
+	 * had the lift, and the row-action rules colour it their own way.) */
 	.cbi-button-positive:hover, .cbi-button-action:hover, .cbi-button-apply:hover,
-	.cbi-button-save:hover, .cbi-button-negative:hover { filter: var(--fs-hover-lift); border-color: transparent; }
-	.cbi-button-reset, .cbi-button-link { background: transparent; border-color: var(--fs-border); color: var(--fs-dim); }
-
-	/* The .btn colour words. base/60-modal.css paints .btn.danger/.error/.success/
-	 * .info with gradients over the bridge vars, but the plain `.btn` rule above
-	 * sets background/border/color in a LATER layer, which wins regardless of
-	 * specificity — so all four rendered as neutral grey buttons with no colour
-	 * cue at all. Coverage is a contract: the theme must claim them, not drop them.
-	 * Flat fills to match the .cbi-button-* variants above; :hover/:focus-visible/
-	 * :active are already covered by the shared rules. */
-	.btn.danger, .btn.error { background: var(--fs-danger); border-color: transparent; color: var(--fs-on-danger); }
-	.btn.success { background: var(--fs-good); border-color: transparent; color: var(--fs-on-good); }
-	.btn.info { background: var(--fs-accent); border-color: transparent; color: var(--fs-on-accent); }
-	.btn.danger:hover, .btn.error:hover, .btn.success:hover, .btn.info:hover {
+	.cbi-button-save:hover, .cbi-button-negative:hover,
+	.btn.success:hover, .btn.info:hover, .btn.danger:hover, .btn.error:hover {
 		filter: var(--fs-hover-lift); border-color: transparent;
 	}
+	.cbi-button-reset, .cbi-button-link { background: transparent; border-color: var(--fs-border); color: var(--fs-dim); }
 
 	/* Size words. base/90-widgets.css gives .btn.large/.btn.small a font-size AND a
 	 * padding/border-radius, but the `.btn` rule above re-sets padding and radius

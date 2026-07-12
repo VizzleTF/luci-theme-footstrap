@@ -6,9 +6,10 @@
 		padding-top: 9px;
 	}
 
+	/* the size is theme/30-tables.css's (`legend`) — absorbed; it was dead here, a later
+	 * layer beating this higher-specificity selector. */
 	fieldset legend {
 		display: block;
-		font-size: 19.5px;
 		line-height: 1;
 		color: var(--fs-text);
 		padding-top: 20px;
@@ -40,13 +41,13 @@
 		min-width: 0;
 	}
 
+	/* size and ink are theme/60-inputs.css's (`.cbi-value-title`) — absorbed. What is
+	 * left is the geometry of the label column, which theme does not touch. */
 	.cbi-value label.cbi-value-title {
 		padding-top: 6px;
-		font-size: 13px;
 		line-height: 18px;
 		flex: 0 0 180px;
 		text-align: right;
-		color: var(--fs-text);
 	}
 
 	.cbi-value > .cbi-section,
@@ -218,20 +219,11 @@
 		justify-content: center;
 	}
 
-	.cbi-select select option {
-		background: var(--fs-panel2);
-		color: var(--fs-text);
-	}
-
-	.cbi-select select option:hover {
-		background: var(--fs-accent);
-		color: var(--fs-on-accent);
-	}
-
-	.cbi-select select option:checked {
-		background: var(--fs-accent);
-		color: var(--fs-on-accent);
-	}
+	/* The option list is theme/60-inputs.css's (`select option`, plus the themed
+	 * ::picker under @supports) — absorbed. All three rules here were dead: layer order
+	 * is compared BEFORE specificity, so theme's bare `select option` beat even
+	 * `.cbi-select select option:checked`, and the accent hover/checked fills never
+	 * rendered. */
 
 	input[type=file] {
 		padding: initial;

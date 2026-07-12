@@ -33,17 +33,17 @@ function clampDropdown(li) {
 	});
 }
 
-/* Open state lives in ONE place. It used to be carried by the `.open` class alone,
- * which told a sighted user everything and a screen-reader user nothing: the
- * section trigger announced itself as a link, with no hint that it controlled a
- * collapsible panel or whether that panel was open. */
+/* The trigger in this layout. common.setOpen keeps `.open` and aria-expanded in
+ * step; opening additionally has to place the panel, which is top-nav-only. */
+const TRIGGER = ':scope > a.menu';
+const OPEN_LI = '.fs-mainmenu > li.open';	/* #topmenu IS .fs-mainmenu here (header.ut) */
+
 function setOpen(li, on) {
-	li.classList.toggle('open', on);
-	li.querySelector(':scope > a.menu')?.setAttribute('aria-expanded', on ? 'true' : 'false');
+	common.setOpen(li, on, TRIGGER);
 	if (on) clampDropdown(li);
 }
 function closeAll(root) {
-	(root || document).querySelectorAll('.fs-mainmenu > li.open, #topmenu > li.open').forEach((o) => setOpen(o, false));
+	(root || document).querySelectorAll(OPEN_LI).forEach((o) => setOpen(o, false));
 }
 
 /* main sections -> horizontal top menu with one level of dropdowns */
@@ -88,13 +88,7 @@ function renderMainMenu(tree, url, level) {
 				closeAll(ul);
 				if (!open) setOpen(li, true);
 			});
-			/* An <a role="button"> gets Enter from the browser but not Space, and a
-			 * disclosure must answer both. */
-			link.addEventListener('keydown', (ev) => {
-				if (ev.key !== ' ' && ev.key !== 'Spacebar') return;
-				ev.preventDefault();
-				link.click();
-			});
+			common.wireSpaceKey(link);
 			/* hybrid devices (desktop + touch): once a real MOUSE enters the
 			 * menu, drop any tap-opened .open so hover becomes authoritative and
 			 * you don't get a tapped menu stacked under a hovered one.
@@ -118,23 +112,17 @@ function renderMainMenu(tree, url, level) {
 return baseclass.extend({
 	__init__() {
 		common.init(renderMainMenu);
-		/* close any open top-nav dropdown when tapping outside it */
-		document.addEventListener('click', (ev) => {
-			if (!ev.target.closest('.fs-mainmenu > li.dropdown'))
-				closeAll();
+
+		/* tap outside closes the dropdown; Escape closes it and hands focus back. A
+		 * top-nav dropdown is a popup in every viewport, so there is no `when` guard
+		 * here — unlike the sidebar, whose `.open` doubles as an accordion. */
+		common.wireDismiss({
+			inside: '.fs-mainmenu > li.dropdown',
+			open: OPEN_LI,
+			trigger: TRIGGER,
+			close: () => closeAll()
 		});
-		/* WCAG 2.2 SC 1.4.13 (Content on Hover or Focus): content revealed by hover
-		 * or focus must be DISMISSIBLE without moving the pointer. There was no way
-		 * to close a dropdown from the keyboard at all. Focus goes back to the
-		 * trigger, as the disclosure pattern requires. */
-		document.addEventListener('keydown', (ev) => {
-			if (ev.key !== 'Escape') return;
-			const open = document.querySelector('.fs-mainmenu > li.open, #topmenu > li.open');
-			if (!open) return;
-			const trigger = open.querySelector(':scope > a.menu');
-			closeAll();
-			trigger?.focus();
-		});
+
 		/* a nudge computed for the old width is wrong at the new one; drop it and
 		 * let the next hover/tap recompute. Coalesced into a frame: `resize` fires
 		 * dozens of times a second while a window is dragged, and this used to walk

@@ -19,6 +19,38 @@ version.
 ### Added
 - This changelog, and its Russian mirror.
 
+### Fixed
+- **A read-only user got live Save/Apply buttons.** The SPA router rebuilds
+  `L.env.nodespec` on every navigation and was dropping its `readonly` flag —
+  which is not decoration: `luci.js` implements `hasViewPermission()` as
+  `!env.nodespec.readonly`, and the dispatcher stamps it on every node an ACL
+  grants read-but-not-write. So arriving at a page by menu click enabled the
+  Save, Apply and Reset the same page correctly disabled on a full load.
+- **The active interface was never highlighted.** `.ifacebox .ifacebox-head.active`
+  lived in `base` while `theme` repainted the plain `.ifacebox-head` — and a
+  cascade layer beats specificity, so the accent fill never rendered. On the
+  Overview, *IPv4 Upstream* and each radio drew as a flat grey plate.
+- **The SSH-Keys list was capped at 440 px.** Its `max-width: none` override sat
+  in `base` and lost to the theme's general `.cbi-dynlist` cap the same way, so a
+  ~400-char key wrapped over three lines. It now lives in `@layer page`, which
+  actually wins.
+
+### Changed
+- **Deduplicated the stylesheet** (−1.4 KB of wire bytes, no rendered change,
+  verified with `cssdiff` over nine pages). The solid buttons were written out
+  twice, byte for byte — `.cbi-button-positive` and `.btn.success` are one fill,
+  and written apart a recolour lands on half of them. Twelve `base` declarations
+  that a `theme` rule with a *different* selector already repainted are gone (the
+  project's own checker only matches identical selectors, so it could not see
+  them). `.fs-ico` was sized in three places; `white-space: pre` sat in front of
+  `pre-wrap`; `display: block` in front of `display: initial`.
+- **One disclosure implementation instead of two.** `setOpen`, the Space-key
+  handler, click-outside and Escape-to-dismiss were copied into both menu files,
+  and the copies had already drifted — only the sidebar's Escape handler checked
+  flyout mode. They now live in `menu-footstrap-common.js` with the selector as a
+  parameter. Byte-neutral after minification; the point is that the two layouts
+  can no longer disagree about what `.open` means.
+
 ## [0.7.15] — 2026-07-12
 
 ### Fixed

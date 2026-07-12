@@ -71,9 +71,12 @@
 	/* min-width:0 so a grid item shrinks to its track instead of to its content's
 	 * min-width (default auto) — otherwise a long System value (model/firmware
 	 * string) blew the single-column track past a ~344px phone and clipped. */
-	.fs-ovl > .fs-ovl-sys { grid-column: 1; grid-row: 1 / 3; margin: 0; min-width: 0; }
-	.fs-ovl > .fs-ovl-mem { grid-column: 2; grid-row: 1; margin: 0; min-width: 0; }
-	.fs-ovl > .fs-ovl-sto { grid-column: 2; grid-row: 2; margin: 0; min-width: 0; }
+	.fs-ovl > .fs-ovl-sys,
+	.fs-ovl > .fs-ovl-mem,
+	.fs-ovl > .fs-ovl-sto { margin: 0; min-width: 0; }
+	.fs-ovl > .fs-ovl-sys { grid-column: 1; grid-row: 1 / 3; }
+	.fs-ovl > .fs-ovl-mem { grid-column: 2; grid-row: 1; }
+	.fs-ovl > .fs-ovl-sto { grid-column: 2; grid-row: 2; }
 	/* hide our own empty stock wrapper — the include renders only .fs-ovl-marker,
 	 * which index.js nests inside the section's inner container (not a direct
 	 * child), so match it anywhere in the descendants, not with `>`. */

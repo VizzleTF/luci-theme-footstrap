@@ -98,13 +98,9 @@
 		color: var(--fs-text);
 	}
 
-	.alert-message.warning {
-		background: linear-gradient(var(--fs-warn), var(--fs-warn));
-		/* border-color is theme/35-alerts.css's — absorbed */
-		color: var(--fs-on-warn);
-	}
-
-	.modal.alert-message {
-		color: var(--fs-text);
-	}
+	/* `.alert-message.warning` and `.modal.alert-message` are theme/35-alerts.css's —
+	 * absorbed. Both were dead here: theme paints the plain `.alert-message` with a
+	 * background and a colour, and a later layer beats an earlier one whatever the
+	 * specificity, so the tinted variants never rendered what base said. (`.cbi-tooltip`
+	 * variants above stay — theme does not claim those.) */
 }

@@ -66,6 +66,10 @@
 	.close:hover { opacity: 1; }
 	.ifacebox { background: var(--fs-panel); border-color: var(--fs-border); }
 	.ifacebox .ifacebox-head { background: var(--fs-panel2); color: var(--fs-text); }
+	/* The active-interface highlight. It has to live in THIS layer, next to the head
+	 * it overrides: the same rule in base was dead, because a layer beats specificity
+	 * and the plain `.ifacebox-head` above repainted `.active` along with the rest. */
+	.ifacebox .ifacebox-head.active { background: var(--fs-accent); color: var(--fs-on-accent); }
 	.ifacebadge { background: var(--fs-panel2); border-color: var(--fs-border); }
 	.ifacebadge-active { border-color: var(--fs-accent); }
 	.zonebadge-empty { border-color: var(--fs-border); color: var(--fs-dim); }
