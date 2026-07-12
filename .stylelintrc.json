@@ -1,0 +1,80 @@
+{
+  "//": [
+    "Correctness rules only — deliberately NOT `extends: stylelint-config-standard`.",
+    "That preset is largely a formatter: it would demand its own indentation, quoting",
+    "and case conventions across the whole styles/ tree and bury the two or three",
+    "findings that actually matter under a thousand cosmetic ones. The house style",
+    "here is tabs + one-liners for short rules, and it is deliberate.",
+    "",
+    "What is switched on below is the set that can catch a real bug: a typo'd",
+    "property or pseudo-class, a broken hex, the same property twice in one block,",
+    "an empty block, a duplicate selector. Plus the project's own invariants from",
+    "CLAUDE.md — no stray !important, and no colour literal outside the palettes.",
+    "",
+    "audit.py stays: it checks things stylelint cannot see (var() defined-vs-used",
+    "across files, declarations shadowed within a cascade layer)."
+  ],
+  "rules": {
+    "color-no-invalid-hex": true,
+    "function-calc-no-unspaced-operator": true,
+    "string-no-newline": true,
+    "unit-no-unknown": true,
+    "property-no-unknown": true,
+    "declaration-block-no-duplicate-properties": [
+      true,
+      { "ignore": ["consecutive-duplicates-with-different-values"] }
+    ],
+    "declaration-block-no-shorthand-property-overrides": true,
+    "block-no-empty": true,
+    "selector-pseudo-class-no-unknown": true,
+    "selector-pseudo-element-no-unknown": [
+      true,
+      {
+        "ignorePseudoElements": [
+          "picker",
+          "picker-icon",
+          "checkmark",
+          "-webkit-slider-thumb",
+          "-moz-range-thumb",
+          "-webkit-search-decoration",
+          "file-selector-button"
+        ]
+      }
+    ],
+    "selector-type-no-unknown": true,
+    "media-feature-name-no-unknown": true,
+    "at-rule-no-unknown": true,
+    "comment-no-empty": true,
+    "no-duplicate-at-import-rules": true,
+    "no-duplicate-selectors": true,
+    "no-empty-source": true,
+    "no-invalid-double-slash-comments": true,
+    "no-invalid-position-at-import-rule": true,
+    "no-irregular-whitespace": true,
+
+    "no-descending-specificity": null,
+
+    "declaration-no-important": true
+  },
+  "overrides": [
+    {
+      "//": [
+        "The only files allowed an !important, and each for a documented reason.",
+        "theme/90-responsive + pages/20-overview outrank an inline style= attribute",
+        "written by 29_ports.js / ui.js — no cascade layer can do that, only an author",
+        "!important can. styles/base carries widget-internal layout (.cbi-dropdown) and",
+        "the .left/.right/.center forcing utilities. theme/95-a11y-media is the",
+        "reduced-motion block: !important INVERTS the layer order, so it is the only",
+        "way one rule can stop animations declared in base as well as in theme.",
+        "This list is the contract. Adding a file to it needs a reason in the file."
+      ],
+      "files": [
+        "luci-theme-footstrap/styles/base/*.css",
+        "luci-theme-footstrap/styles/theme/90-responsive.css",
+        "luci-theme-footstrap/styles/theme/95-a11y-media.css",
+        "luci-theme-footstrap/styles/pages/20-overview.css"
+      ],
+      "rules": { "declaration-no-important": null }
+    }
+  ]
+}

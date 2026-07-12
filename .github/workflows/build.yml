@@ -7,13 +7,130 @@ name: Build LuCI theme packages
 on:
   push:
     tags: ['v*']
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  # Gates that need nothing but python3, awk and sh — so they cost seconds and can
+  # never break the OpenWrt buildbot, which does not have node and never will.
+  # The npm-based gates live in the `lint` job below; both are CI-only, never in the
+  # Makefile. See docs/18.
+  check:
+    name: Static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell syntax
+        run: |
+          set -eu
+          for f in luci-theme-footstrap/*.sh install.sh \
+                   luci-theme-footstrap/root/usr/libexec/*.sh \
+                   luci-theme-footstrap/root/etc/uci-defaults/*; do
+            [ -f "$f" ] || continue
+            sh -n "$f" || { echo "syntax error: $f"; exit 1; }
+          done
+
+      - name: Build the stylesheet (this also enforces the size budget)
+        run: luci-theme-footstrap/build-css.sh /tmp/cascade.css
+
+      - name: Font budget
+        run: |
+          set -eu
+          # uhttpd serves /www/luci-static/* with NO compression, so these bytes are
+          # wire bytes. The faces are split by unicode-range, so a given UI fetches a
+          # subset of this — but the whole set still has to stay honest.
+          total=$(cat luci-theme-footstrap/htdocs/luci-static/footstrap/fonts/*.woff2 | wc -c)
+          budget=102400   # 100 KB for every subset of every face, combined
+          echo "fonts: $total bytes (budget $budget)"
+          [ "$total" -le "$budget" ] || { echo "over the font budget"; exit 1; }
+
+      - name: CSS/JS audit (undefined vars, shadowed rules, stray !important, colour literals)
+        run: python3 .claude/skills/footstrap-audit/audit.py --strict
+
+  # npm-based gates. These live HERE and nowhere else: the OpenWrt buildbot has no
+  # node, and luci.mk never needs one — it copies htdocs/ and ucode/ verbatim. Nothing
+  # in package.json is shipped.
+  lint:
+    name: Lint + accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: ESLint (theme JS)
+        run: npx eslint luci-theme-footstrap/htdocs
+
+      - name: Stylelint (styles/ tree)
+        run: npx stylelint "luci-theme-footstrap/styles/**/*.css"
+
+      - name: Install Chromium for axe
+        run: npx playwright install --with-deps chromium
+
+      # docs/gallery.html renders every widget LuCI (or a third-party luci-app-*) can
+      # emit, and it is a STATIC file — so the whole widget surface of the theme can be
+      # audited here with no router, no session and no network. Runs the full
+      # {light,dark} x {footstrap,hicontrast} matrix, because a palette switcher
+      # multiplies the contrast matrix and that is exactly where failures hide.
+      - name: axe-core (WCAG 2.2 AA over the widget gallery, all palettes x modes)
+        run: node tools/a11y-gallery.mjs
+
+      # THE GATE THAT MAKES SHIPPING MINIFIED JS SAFE.
+      #
+      # luci.mk minifies our JS with jsmin on the buildbot. jsmin decides whether a `/`
+      # opens a regex or a division from a ONE-character lookback against a fixed
+      # allow-list that contains neither `n` (from `return`) nor `>` (from `=>`), so
+      # `return /re/` can make it swallow the rest of the file — WHILE EXITING 0
+      # (openwrt/luci#8299, #8020, #8021, #8256). A non-zero exit code proves nothing.
+      #
+      # So we build the exact same jsmin from luci-base/src/jsmin.c and prove its output
+      # is TOKEN-IDENTICAL to our source. eslint's `wrap-regex` stops the hazardous shape
+      # being written in the first place; this proves it never got through.
+      #
+      # jsmin.c is byte-identical on openwrt-24.10 and master (checked), so one build
+      # covers both releases we support.
+      - name: Build jsmin (the same one the buildbot uses)
+        run: |
+          set -eu
+          curl -fsSL -o /tmp/jsmin.c \
+            https://raw.githubusercontent.com/openwrt/luci/master/modules/luci-base/src/jsmin.c
+          cc -O2 -o /tmp/jsmin /tmp/jsmin.c
+
+      - name: jsmin equivalence (minified JS must be the same program)
+        env:
+          JSMIN: /tmp/jsmin
+        run: |
+          node tools/jsmin-verify.mjs \
+            luci-theme-footstrap/htdocs/luci-static/resources/*.js \
+            luci-theme-footstrap/htdocs/luci-static/resources/view/status/include/*.js
+
+      - name: JS size budget (measured AFTER minification — that is what ships)
+        env:
+          JSMIN: /tmp/jsmin
+        run: |
+          set -eu
+          total=0
+          for f in luci-theme-footstrap/htdocs/luci-static/resources/*.js \
+                   luci-theme-footstrap/htdocs/luci-static/resources/view/status/include/*.js; do
+            n=$(/tmp/jsmin < "$f" | wc -c)
+            total=$((total + n))
+          done
+          budget=46080   # 45 KB of minified JS; it is ~35 KB today
+          echo "minified theme JS: $total bytes (budget $budget)"
+          [ "$total" -le "$budget" ] || { echo "over the JS budget"; exit 1; }
+
   build:
+    needs: [check, lint]
     name: Build ${{ matrix.fmt }} (${{ matrix.channel }})
     runs-on: ubuntu-latest
     strategy:
@@ -128,5 +245,5 @@ jobs:
 
             Or one-liner (auto-detects apk/ipk):
             ```sh
-            wget -qO- https://raw.githubusercontent.com/VizzleTF/footstrap/main/install.sh | sh
+            wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
             ```

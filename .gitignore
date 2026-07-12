@@ -16,3 +16,8 @@
 page-review/
 # built packages
 dist/
+
+# lint/a11y tooling only — never shipped (see package.json).
+# package-lock.json IS committed on purpose: it pins the transitive dependency
+# tree, so CI lints with exactly what was verified here.
+node_modules/

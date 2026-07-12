@@ -1,0 +1,19 @@
+{
+  "name": "luci-theme-footstrap-tooling",
+  "private": true,
+  "description": "Lint/a11y tooling only. NOTHING here is shipped: the OpenWrt package is built by luci.mk, which copies htdocs/ and ucode/ verbatim and never invokes node. These devDependencies exist for CI and for local checks.",
+  "scripts": {
+    "lint": "npm run lint:js && npm run lint:css",
+    "lint:js": "eslint luci-theme-footstrap/htdocs",
+    "lint:css": "stylelint \"luci-theme-footstrap/styles/**/*.css\"",
+    "a11y": "node tools/a11y-gallery.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.1",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "playwright": "^1.49.1",
+    "stylelint": "^16.12.0",
+    "stylelint-config-standard": "^36.0.1"
+  }
+}

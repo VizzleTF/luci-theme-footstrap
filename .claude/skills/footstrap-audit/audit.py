@@ -35,13 +35,56 @@ BASE = STYLES / "base"
 # outrank an inline style= attribute written by luci-mod-status (29_ports.js) or
 # ui.js, which no cascade layer can do. In styles/base they carry widget-internal
 # layout (.cbi-dropdown) or a forcing utility (.left/.right/.center).
-BANG_OK = {"90-responsive.css", "20-overview.css"} | {p.name for p in (STYLES / "base").glob("*.css")}
+# 95-a11y-media.css is the third kind: !important INVERTS the layer order, so
+# it is the only way one rule can stop animations declared in base as well as in
+# theme. That is the canonical form of the media query and it stays.
+BANG_OK = ({"90-responsive.css", "20-overview.css", "95-a11y-media.css"}
+           | {p.name for p in (STYLES / "base").glob("*.css")})
 
 # vars set at runtime (inline style / other files) — legitimately "undefined" here
 VAR_ALLOW = {"--zone-color-rgb", "--focus-color-rgb", "--on-color"}
 
+def _strip_for_balance(s):
+    """Drop comments and quoted strings before counting brackets.
+
+    Counting them raw makes this check punish the very thing the project asks for:
+    a dense comment explaining a hazard ("`(` IS on the allow-list") carries a lone
+    paren, and the file gets reported as unbalanced while every real parser accepts
+    it. The bracket counter is a smoke test for a truncated file, and a truncated
+    file is still obvious once comments and strings are gone.
+
+    Regex literals are NOT handled — an unbalanced bracket inside one would still
+    fool this. That is acceptable: eslint parses the JS for real in CI, so this is
+    the cheap no-dependency backstop, not the authority.
+    """
+    out, i, n = [], 0, len(s)
+    while i < n:
+        c = s[i]
+        if c == "/" and i + 1 < n and s[i + 1] == "*":          # /* block comment */
+            j = s.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+            continue
+        if c == "/" and i + 1 < n and s[i + 1] == "/":          # // line comment
+            j = s.find("\n", i)
+            i = n if j < 0 else j
+            continue
+        if c in "\"'`":                                          # quoted string
+            q, i = c, i + 1
+            while i < n:
+                if s[i] == "\\":
+                    i += 2
+                    continue
+                if s[i] == q:
+                    i += 1
+                    break
+                i += 1
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
 def balance(path):
-    s = path.read_text(encoding="utf-8")
+    s = _strip_for_balance(path.read_text(encoding="utf-8"))
     bad = [f"{a}{b} {s.count(a)}/{s.count(b)}"
            for a, b in [("{", "}"), ("(", ")"), ("[", "]")] if s.count(a) != s.count(b)]
     return bad
@@ -166,21 +209,34 @@ def sources():
 def main():
     if not BASE.is_dir():
         sys.exit(f"not found: {BASE}")
+    strict = "--strict" in sys.argv   # CI gate: exit non-zero if anything is reported
+    findings = 0
     css = sources()
     s = "\n".join(p.read_text(encoding="utf-8") for p in css)
 
-    print("== balance ==")
+    # CSS only, deliberately. This used to count brackets in the JS too, and it had to
+    # stop: counting them RAW punished dense comments (a lone `(` quoted inside one reads
+    # as unbalanced), and counting them after a hand-rolled strip was worse — that
+    # stripper read the `//` inside `.replace(/\//g, '.')` as a line comment and ate the
+    # rest of the line, which is the exact class of bug this project is guarding against
+    # in jsmin. A tool that cannot lex JS has no business counting its brackets.
+    # eslint parses the JS for real (CI `lint` job) and tools/jsmin-verify.mjs proves the
+    # minified output is token-identical to the source. Those are authorities; this was a
+    # guess, and a guess that cried wolf.
+    print("== balance (CSS) ==")
     problems = []
-    for p in [*css, *sorted(ROOT.glob("htdocs/luci-static/resources/**/*.js"))]:
+    for p in css:
         b = balance(p)
         if b:
             problems.append(p)
             print(f"  BAD {p.relative_to(ROOT)}: {', '.join(b)}")
+    findings += len(problems)
     if not problems:
         print("  ok (all balanced)")
 
     print("\n== css vars used but not defined ==")
     miss = audit_vars(s)
+    findings += len(miss)
     print("  none" if not miss else "\n".join(f"  {m}  (x{s.count('var('+m)})" for m in miss))
 
     print("\n== !important outside the files allowed to carry it ==")
@@ -192,6 +248,7 @@ def main():
             # a flag that terminates a declaration; prose in a comment does not
             if re.search(r"!important\s*[;}]", l):
                 stray.append((p.name, i, l.strip()[:70]))
+    findings += len(stray)
     if not stray:
         print("  none")
     else:
@@ -201,6 +258,7 @@ def main():
 
     print("\n== declarations shadowed within a layer (theme/page) ==")
     sh = audit_shadowed(css)
+    findings += len(sh)
     if not sh:
         print("  none")
     else:
@@ -214,6 +272,7 @@ def main():
     hc = [(p.name, ln, sel, txt)
           for p in sorted(BASE.glob("*.css"))
           for ln, sel, txt in base_hardcoded(p.read_text(encoding="utf-8").split("\n"))]
+    findings += len(hc)
     if not hc:
         print("  none")
     else:
@@ -225,5 +284,13 @@ def main():
     print("  ssh router 'for f in /usr/share/ucode/luci/template/themes/footstrap*/*.ut; do "
           "ucode -T -c -o /dev/null \"$f\" && echo OK $f || echo FAIL $f; done'")
 
+    # Without --strict this script is a report and always exits 0, which is fine for a
+    # human reading it — but useless as a CI gate, which is what it is now also used
+    # for. Under --strict, anything at all reported fails the build.
+    if strict and findings:
+        print(f"\nFAIL: {findings} finding(s) — see above", file=sys.stderr)
+        return 1
+    return 0
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)
