@@ -1072,6 +1072,32 @@ function wireRouter() {
 	});
 }
 
+/* ---- the poll indicator must not outlive the poll ------------------------
+ *
+ * LuCI shows the "Refreshing" pill on a `poll-start` event and flips it to "Paused" on
+ * `poll-stop`, and it NEVER hides it again — `ui.hideIndicator()` exists, but core only ever
+ * calls it for `uci-changes`.
+ *
+ * On a full page load that omission is invisible, because `Poll.start()` dispatches
+ * `poll-start` ONLY when the queue is non-empty (luci.js) — so a page with nothing to poll
+ * (Software, Backup, …) simply never grows an indicator. But this theme's SPA router flushes
+ * the queue and calls `stop()` on every navigation, and `stop()` DOES dispatch `poll-stop`.
+ * So walking from a polled page to an unpolled one left a "Paused" pill sitting there,
+ * reporting on a poll that does not exist on that page.
+ *
+ * The rule the pill should obey is just: it exists if and only if there is something to poll.
+ * "Paused" is meaningful when the user has paused a page that HAS pollers; with an empty
+ * queue it is a ghost. Hooking `poll-stop` also cures the same ghost in stock LuCI, where
+ * removing the last poller stops the loop and leaves the pill behind.
+ *
+ * Registered at module eval, i.e. AFTER luci.js has registered its own listener — so ours
+ * runs second and can take back what that one just painted. */
+document.addEventListener('poll-stop', () => {
+	if (L.Poll && L.Poll.queue && L.Poll.queue.length === 0) {
+		try { ui.hideIndicator('poll-status'); } catch (e) {}
+	}
+});
+
 /* Pause LuCI's 1s poll loop while the tab is hidden and resume when it shows
  * again. LuCI has no visibilitychange handler, so a status/overview page left
  * open in a background tab hammers ubus 24/7 (esp. the pricey iwinfo getAssocList)

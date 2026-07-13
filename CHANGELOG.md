@@ -110,6 +110,17 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   minimum (500 px of content), so the expanded sidebar now yields at ~780 px and the rail at ~625 px.
 
 ### Fixed
+- **A page with nothing to poll (Software, Backup…) showed a "Paused" pill, reporting on a poll that
+  does not exist there.** LuCI shows the indicator on a `poll-start` event and flips it to "Paused" on
+  `poll-stop` — and never hides it again (`ui.hideIndicator()` exists, but core only calls it for
+  `uci-changes`). On a full page load that omission is invisible, because `Poll.start()` only
+  dispatches `poll-start` when the queue is non-empty, so an unpolled page simply never grows an
+  indicator. But this theme's SPA router flushes the queue and calls `stop()` on every navigation, and
+  `stop()` *does* dispatch `poll-stop`. The pill now obeys the only rule that makes sense — it exists
+  if and only if there is something to poll — so it disappears on an unpolled page and comes back on a
+  polled one. A **manual** pause still shows "Paused", because there the queue is not empty and the
+  word means something. This also cures the same ghost in stock LuCI, where removing the last poller
+  stops the loop and leaves the pill behind.
 - **Collapsing the sidebar into the icon rail and then shrinking the window made the sidebar spring
   back OPEN, and toggling it again dropped straight to the phone bar.** The rail's rules were guarded
   at `min-width: 768px` while the vertical sidebar's guard had moved to 521 px, so in the gap between
