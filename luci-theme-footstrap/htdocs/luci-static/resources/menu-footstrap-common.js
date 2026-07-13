@@ -878,6 +878,43 @@ function ensureOverviewHelpers() {
 	/* eslint-enable no-var */
 }
 
+/* ---- a view's injected CSS dies with the view ---------------------------------------
+ *
+ * A view may inject a <style> into <head> at render time — `luci-app-filemanager` does, and
+ * so does its hex editor. On a full page load that stylesheet is discarded with the document,
+ * so it only ever affects the page that asked for it. Our SPA nav never reloads, so it stayed
+ * in <head> FOREVER and went on restyling every page the user visited afterwards.
+ *
+ * That is not cosmetic. The file manager's blob carries
+ *     .cbi-button-apply, .cbi-button-reset, .cbi-button-save:not(.custom-save-button)
+ *         { display: none !important }
+ * (it hides the stock buttons because it has its own), and being UNLAYERED with !important it
+ * outranks every cascade layer. Measured on the router: open the file manager once, then go to
+ * System → Save and Reset are GONE, and stay gone until a full reload. Any config page you
+ * touch after visiting that app is unsavable.
+ *
+ * So sweep them, exactly as the router already sweeps the outgoing view's pollers, its stray
+ * setIntervals and its open modals: put the document back into the state a fresh page load
+ * would leave it in.
+ *
+ * WHAT IS AND IS NOT SWEPT, and why the rule is safe:
+ *  - `[data-fs-shell]` — the ONE <style> the server emits (partials/head.ut). It belongs to the
+ *    document, not to a view. Marked server-side rather than guessed at.
+ *  - anything inside `#view` — already dies with the content swap; skip it.
+ *  - LuCI core injects no <style> at runtime at all (checked: luci.js, ui.js, cbi.js), so every
+ *    other one in the document came from a view.
+ * Removal is safe because a re-visit re-instantiates the view (see `_seen` below), which re-runs
+ * render() — and that is where an app injects its CSS. The one shape this would break is a view
+ * that injects at MODULE EVAL: `require()` caches the module, so it would never re-inject. No
+ * LuCI app does that, and one that did would already be broken by its own logic on a full load
+ * of any other page. */
+function sweepViewStyles() {
+	document.querySelectorAll('style:not([data-fs-shell])').forEach((el) => {
+		if (!el.closest('#view'))
+			el.remove();
+	});
+}
+
 /* Attempt an in-place navigation to `pathname`. Returns true if handled as a
  * SPA nav (caller should preventDefault), false to let the browser do a normal
  * full navigation. `push` adds a history entry (false when replaying popstate). */
@@ -960,6 +997,7 @@ function navigate(pathname, push) {
 	if (_updTimer) { window.clearTimeout(_updTimer); _updTimer = null; }
 	_updGen++;	/* and disown any fs.exec already in flight (see _updGen) */
 	try { if (typeof ui.hideModal == 'function') ui.hideModal(); } catch (e) {}
+	sweepViewStyles();	/* …and the CSS the outgoing view injected into <head> */
 
 	/* point the runtime env at the new node so views, tabs and highlighting read
 	 * the right path. For a fully-matched leaf, request == dispatch path. */

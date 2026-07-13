@@ -149,8 +149,15 @@
 		{% if (css): %}
 		{# no `title` attribute: on a <style> that is not the MIME type, it names a
 		   STYLE SHEET SET, which turns this into a "preferred" alternate sheet the
-		   user can switch off in Firefox's View -> Page Style. #}
-		<style>{{ css }}</style>
+		   user can switch off in Firefox's View -> Page Style.
+
+		   `data-fs-shell` marks this as the SHELL's stylesheet — the one the server
+		   emitted, which belongs to the document and not to any view. The SPA router
+		   sweeps every OTHER <style> on navigation, because a view that injects one
+		   (luci-app-filemanager does) would otherwise leave it behind to restyle every
+		   page the user visits afterwards. This attribute is how the router tells the
+		   two apart without guessing. See menu-footstrap-common.js. #}
+		<style data-fs-shell>{{ css }}</style>
 		{% endif %}
 		<script src="{{ dispatcher.build_url('admin/translations', dispatcher.lang) }}"></script>
 		{# cbi.js was the one asset with no cache key — stock LuCI busts it. It must

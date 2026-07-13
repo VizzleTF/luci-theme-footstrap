@@ -10,6 +10,23 @@ Security, Performance.
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+- **A view's injected CSS no longer follows you to every page you visit afterwards.** A view may inject
+  a `<style>` into `<head>` when it renders — `luci-app-filemanager` does — and on a full page load
+  that stylesheet dies with the document, so it only ever affects the page that asked for it. SPA
+  navigation never reloads, so it stayed in `<head>` forever. That is not cosmetic: the file manager's
+  blob carries `.cbi-button-apply, .cbi-button-reset, .cbi-button-save { display: none !important }`
+  (it hides the stock buttons because it has its own), and being **unlayered** with `!important` it
+  outranks every cascade layer. Measured on the router: open the file manager once, then go to
+  System → **Save and Reset are gone**, and stay gone until a hard reload — every config page you touch
+  afterwards is unsavable. The router now sweeps them on navigation, exactly as it already sweeps the
+  outgoing view's pollers, stray `setInterval`s and open modals: the document is put back into the
+  state a fresh page load would leave it in. The shell's own server-emitted `<style>` is marked
+  `data-fs-shell` and kept — the two are told apart, not guessed at. Verified: a re-visit to the file
+  manager now renders byte-for-byte identically to a full page load of it.
+
 ## [0.8.1] — 2026-07-13
 
 ### Security
