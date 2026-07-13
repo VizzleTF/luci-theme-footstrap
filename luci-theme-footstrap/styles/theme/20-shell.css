@@ -74,7 +74,7 @@
 	 * = base, vertical = the one override) states each of the three states exactly once.
 	 *
 	 * The override wins on SPECIFICITY, never on source order:
-	 *   :root[data-layout="sidebar"] .fs-sidebar  (0,3,0)  beats  .fs-sidebar  (0,1,0).
+	 *   :root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar  (0,3,0)  beats  .fs-sidebar  (0,1,0).
 	 * ================================================================== */
 	.fs-shell {
 		display: flex; flex-direction: column;
@@ -166,6 +166,8 @@
 	.fs-themerow {
 		display: flex; align-items: center; justify-content: center;
 		flex: 0 0 auto; order: 2; margin-left: auto;
+		/* see the :not(:empty) rule below — two margin-left:autos would SPLIT the free
+		 * space between them instead of pushing one cluster to the right edge */
 		width: 34px; height: 34px; padding: 0;
 		border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
 		background: var(--fs-panel2); color: var(--fs-dim);
@@ -173,6 +175,13 @@
 		text-align: left; cursor: pointer;
 		transition: background var(--fs-dur), border-color var(--fs-dur), color var(--fs-dur);
 	}
+	/* Exactly ONE member of the right cluster may carry margin-left:auto, and it must be
+	 * the FIRST one that is actually rendered. #indicators is earlier in the DOM, so when
+	 * the poll pill is showing IT opens the gap — and .fs-themerow's own auto then has to
+	 * stand down, or flexbox splits the free space between the two autos and the pill
+	 * drifts away from the buttons instead of hugging them. .fs-themerow keeps its auto for
+	 * the case the pill is empty and collapsed (#indicators:empty). */
+	.fs-sidebar #indicators:not(:empty) ~ .fs-themerow { margin-left: 0; }
 	.fs-logout {
 		flex: 0 0 auto; order: 2; justify-content: center;
 		width: 34px; height: 34px; padding: 0;
@@ -195,9 +204,22 @@
 	 * bar declared above has to be answered here, which is exactly what makes this
 	 * checkable — cssdiff proves the column is byte-identical to the pre-merge theme.
 	 * ================================================================== */
-	@media (min-width: 768px) {
-		:root[data-layout="sidebar"] .fs-shell { flex-direction: row; }
-		:root[data-layout="sidebar"] .fs-sidebar {
+	/* WHEN the vertical sidebar applies. Not "the viewport is at least 768px" — that number
+	 * said nothing about the thing that actually matters, which is how much room is left for
+	 * the CONTENT once the sidebar has taken its cut. And the sidebar's cut is not constant:
+	 * it is 224px expanded and 68px as a rail, so the two must give way at DIFFERENT widths,
+	 * which one viewport breakpoint cannot express. `data-narrow` is set by
+	 * menu-footstrap-common.js when the content column would fall below --fs-content-min
+	 * (500px), measured from the sidebar's actual cut — so the rail keeps its column ~156px
+	 * further down than the expanded sidebar does, which is exactly the room it gave back.
+	 *
+	 * The `min-width: 521px` is not a second guess: it is a floor that keeps the chrome
+	 * correct with JavaScript disabled. No JS means no data-narrow, so without it a phone
+	 * would render the desktop sidebar. Below 521 no sidebar cut leaves 500px anyway, so the
+	 * floor never contradicts the measurement — it just states its conclusion in advance. */
+	@media (min-width: 521px) {
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-shell { flex-direction: row; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar {
 			width: 224px; height: 100dvh;
 			flex: 0 0 auto;
 			flex-direction: column; flex-wrap: nowrap; align-items: normal;
@@ -214,45 +236,45 @@
 		}
 		/* the column is already 224px wide — that IS the cap, so the bar's 30ch one has to
 		 * go, or the brand would be capped twice and at the wrong value */
-		:root[data-layout="sidebar"] .fs-brandrow {
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-brandrow {
 			display: flex; align-items: center; gap: 6px;
 			flex: 0 0 auto; order: 0; min-width: auto; max-width: none; padding: 0 4px 20px 8px;
 		}
-		:root[data-layout="sidebar"] .fs-navlabel {
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-navlabel {
 			display: block;
 			color: var(--fs-dim);
 			font-size: 11px; font-weight: 700; letter-spacing: .1em;
 			text-transform: uppercase;
 			padding: 6px 10px 8px;
 		}
-		:root[data-layout="sidebar"] .fs-spacer { display: block; flex: 1 1 auto; min-height: 12px; }
-		:root[data-layout="sidebar"] .fs-railtoggle { display: inline-flex; }
-		:root[data-layout="sidebar"] .fs-modemenu { display: flex; margin-top: 4px; }
-		:root[data-layout="sidebar"] .fs-modemenu:empty,
-		:root[data-layout="sidebar"] .fs-modemenu.single { display: none; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-spacer { display: block; flex: 1 1 auto; min-height: 12px; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-railtoggle { display: inline-flex; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-modemenu { display: flex; margin-top: 4px; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-modemenu:empty,
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-modemenu.single { display: none; }
 
 		/* vertical main nav */
-		:root[data-layout="sidebar"] .fs-sidebar ul.nav,
-		:root[data-layout="sidebar"] .fs-sidebar #modemenu {
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav,
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar #modemenu {
 			order: 0; flex: 0 1 auto;
 			flex-direction: column; flex-wrap: nowrap; align-items: normal; gap: 2px;
 		}
-		:root[data-layout="sidebar"] .fs-sidebar ul.nav > li,
-		:root[data-layout="sidebar"] .fs-sidebar ul.nav > li.has-sub { position: relative; }
-		:root[data-layout="sidebar"] .fs-sidebar ul.nav > li > a {
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li,
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub { position: relative; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a {
 			display: flex; align-items: center; gap: 11px;
 			padding: 10px 11px;
 			font-size: 14px; white-space: normal;
 			line-height: 1.1;
 		}
-		:root[data-layout="sidebar"] .fs-sidebar ul.nav > li > a .fs-ico { display: block; }
-		:root[data-layout="sidebar"] .fs-sidebar ul.nav > li > a .fs-chevron { display: block; }
-		:root[data-layout="sidebar"] .fs-sidebar ul.nav .fs-ico,
-		:root[data-layout="sidebar"] .fs-themerow .fs-ico,
-		:root[data-layout="sidebar"] .fs-logout .fs-ico { width: 17px; height: 17px; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a .fs-ico { display: block; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a .fs-chevron { display: block; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav .fs-ico,
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow .fs-ico,
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout .fs-ico { width: 17px; height: 17px; }
 
 		/* nested submenu -> an inline accordion, not a popup */
-		:root[data-layout="sidebar"] .fs-sidebar ul.nav ul {
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav ul {
 			display: none;
 			/* the bar anchors this panel under the bar (absolute + top/left); an accordion
 			 * is just the next block in the column, so the offsets have to go back to auto
@@ -265,13 +287,13 @@
 			border: 0; border-radius: 0; box-shadow: none;
 			overflow: hidden;
 		}
-		:root[data-layout="sidebar"] .fs-sidebar ul.nav > li.open > ul { display: flex; margin: 2px 0 6px 28px; }
-		:root[data-layout="sidebar"] .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
-		:root[data-layout="sidebar"] .fs-sidebar ul.nav ul a { padding: 7px 11px; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.open > ul { display: flex; margin: 2px 0 6px 28px; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav ul a { padding: 7px 11px; }
 
 		/* the Appearance trigger and Log out are full-width text rows down here */
-		:root[data-layout="sidebar"] .fs-themerow,
-		:root[data-layout="sidebar"] .fs-logout {
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow,
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout {
 			order: 0; margin-left: 0;
 			width: 100%; height: auto;
 			justify-content: normal;
@@ -279,16 +301,16 @@
 			border: 0; border-radius: var(--fs-radius);
 			background: transparent;
 		}
-		:root[data-layout="sidebar"] .fs-themerow { text-align: left; }
-		:root[data-layout="sidebar"] .fs-logout { font-weight: 600; font-size: 14px; }
-		:root[data-layout="sidebar"] .fs-logout:hover { background: var(--fs-panel2); border-color: transparent; }
-		:root[data-layout="sidebar"] .fs-themerow:hover,
-		:root[data-layout="sidebar"] .fs-themerow[aria-expanded="true"] { border-color: transparent; }
-		:root[data-layout="sidebar"] .fs-themerow .fs-label,
-		:root[data-layout="sidebar"] .fs-logout .fs-label { display: block; flex: 1 1 auto; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow { text-align: left; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout { font-weight: 600; font-size: 14px; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout:hover { background: var(--fs-panel2); border-color: transparent; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow:hover,
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow[aria-expanded="true"] { border-color: transparent; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow .fs-label,
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout .fs-label { display: block; flex: 1 1 auto; }
 
 		/* the poll pill sits in the sidebar footer, above Appearance */
-		:root[data-layout="sidebar"] .fs-sidebar #indicators {
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar #indicators {
 			order: 0; margin-left: 0;
 			justify-content: center; flex-wrap: wrap; gap: 6px;
 			padding: 0 6px 4px;
@@ -435,42 +457,57 @@
 	 * head.ut. Labels collapse away; a section's submenu becomes a flyout panel
 	 * anchored to the right of its icon, opened on hover (desktop) or on focus,
 	 * which is what a tap on the <a href="#"> section link produces on touch.
-	 * Applies wherever the sidebar is still vertical. That cut-off is 768px (the
-	 * mobile top-bar block below takes over at max-width 767px) — it must track
-	 * that breakpoint exactly, and the JS one in menu-footstrap.js (_mqMobile),
-	 * or the collapse button sets data-rail with no rule to match it and nothing
-	 * happens.
+	 *
+	 * THE GUARD MUST BE EXACTLY THE VERTICAL SIDEBAR'S GUARD — the same media floor and the
+	 * same :not([data-narrow]). It used to say `min-width: 768px` while the vertical block
+	 * said 521, and that gap is a trap: between 521 and 767 with the rail collapsed, the
+	 * VERTICAL rules applied but the RAIL rules did not, so the sidebar sprang back open to
+	 * its full 224px — it EXPANDED as the window shrank. Worse, the measurement in
+	 * menu-footstrap-common.js was subtracting the rail's 68px while the sidebar was really
+	 * taking 224px, so it believed the content still fitted when it did not.
+	 *
+	 * The rule: the rail is a MODE of the vertical sidebar, so it can never be visible under
+	 * conditions the vertical sidebar is not.
 	 * ================================================================== */
-	@media (min-width: 768px) {
-		:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar {
+	@media (min-width: 521px) {
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar {
 			width: 68px; padding: 22px 10px;
 			/* the default `overflow-y: auto` computes overflow-x to `auto` as well,
 			 * which would clip the flyouts; the rail is short enough not to scroll */
 			overflow: visible;
 			z-index: var(--fs-z-sticky);
 		}
-		:root[data-layout="sidebar"][data-rail="true"] .fs-brandrow { flex-direction: column; gap: 10px; padding: 0 0 18px; }
-		:root[data-layout="sidebar"][data-rail="true"] .fs-brand { flex: 0 0 auto; justify-content: center; }
-		:root[data-layout="sidebar"][data-rail="true"] .fs-railtoggle .fs-ico { transform: rotate(180deg); }
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-brandrow { flex-direction: column; gap: 10px; padding: 0 0 18px; }
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-brand { flex: 0 0 auto; justify-content: center; }
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-railtoggle .fs-ico { transform: rotate(180deg); }
 
 		/* only the rail's own labels collapse — a `.fs-label` also exists on every
 		 * submenu link, and those live inside the flyout where they must stay */
-		:root[data-layout="sidebar"][data-rail="true"] .fs-wordmark,
-		:root[data-layout="sidebar"][data-rail="true"] .fs-navlabel,
-		:root[data-layout="sidebar"][data-rail="true"] .fs-modemenu,
-		:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar ul.nav > li > a > .fs-label,
-		:root[data-layout="sidebar"][data-rail="true"] .fs-themerow > .fs-label,
-		:root[data-layout="sidebar"][data-rail="true"] .fs-logout > .fs-label,
-		:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar .fs-chevron { display: none; }
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-wordmark,
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-navlabel,
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-modemenu,
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > a > .fs-label,
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-themerow > .fs-label,
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-logout > .fs-label,
+		/* The chevron is an affordance for a section you can UNFOLD. A rail item has no
+		 * label and no accordion — its children fly out to the side — so the chevron says
+		 * nothing and just crowds the icon.
+		 *
+		 * The selector has to be this long. The vertical override above turns the chevron
+		 * back on with `…[data-layout="sidebar"] .fs-sidebar ul.nav > li > a .fs-chevron`,
+		 * which is (0,4,3); a plainer `.fs-sidebar .fs-chevron` here is only (0,4,0) and
+		 * LOSES — which is exactly why the chevrons reappeared in the rail. Match its shape
+		 * and add the rail attribute: (0,5,3). */
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > a .fs-chevron { display: none; }
 
-		:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar ul.nav > li > a,
-		:root[data-layout="sidebar"][data-rail="true"] .fs-themerow,
-		:root[data-layout="sidebar"][data-rail="true"] .fs-logout {
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > a,
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-themerow,
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-logout {
 			justify-content: center; gap: 0; padding: 10px 0;
 		}
 
 		/* leaf sections have no flyout — show their name as a tooltip bubble */
-		:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar ul.nav > li:not(.has-sub) > a::after {
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li:not(.has-sub) > a::after {
 			content: attr(data-label);
 			position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
 			margin-left: 10px; z-index: var(--fs-z-flyout);
@@ -480,13 +517,13 @@
 			color: var(--fs-text); font-size: 13px; font-weight: 600; white-space: nowrap;
 			opacity: 0; pointer-events: none; transition: opacity var(--fs-dur);
 		}
-		:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar ul.nav > li:not(.has-sub) > a:hover::after { opacity: 1; }
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li:not(.has-sub) > a:hover::after { opacity: 1; }
 
 		/* the flyout panel: opened by hover on a mouse, or by .open which the menu JS
 		 * toggles on tap/click (exclusively — see menu-footstrap.js flyoutMode). The
 		 * hover rule is gated on a real pointer: mobile browsers leave :hover stuck
 		 * on the tapped element, which would block tap-to-close. */
-		:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar ul.nav > li.has-sub > ul {
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub > ul {
 			display: none;
 			position: absolute; left: 100%; top: -8px; margin: 0 0 0 10px;
 			min-width: 196px; padding: 8px; z-index: var(--fs-z-flyout);
@@ -494,19 +531,19 @@
 			box-shadow: var(--fs-shadow-pop);
 			animation: fs-fade .14s ease;
 		}
-		:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
 		@media (hover: hover) {
-			:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar ul.nav > li.has-sub:hover > ul { display: flex; }
+			:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub:hover > ul { display: flex; }
 		}
 		/* the flyout's heading, so the collapsed icon still names its section */
-		:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar ul.nav > li > ul[data-title]::before {
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > ul[data-title]::before {
 			content: attr(data-title);
 			padding: 4px 11px 8px;
 			color: var(--fs-faint); font-size: 10px; font-weight: 700;
 			letter-spacing: .06em; text-transform: uppercase;
 		}
 		/* bridge the 10px gap so the pointer can travel icon -> flyout without a hover drop */
-		:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar ul.nav > li.has-sub::after {
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub::after {
 			content: ''; position: absolute; left: 100%; top: 0;
 			width: 12px; height: 100%;
 		}
@@ -527,14 +564,25 @@
 	 * refresh glyph — a masked SVG tinted with --fs-good so it follows the palette.
 	 * Only the poll-status indicator becomes an icon; others (unsaved changes …)
 	 * keep their pill. Expanded, poll-status shows the word (shared pill rule). */
-	:root[data-layout="sidebar"][data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"] {
+	:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"] {
 		font-size: 0; width: 30px; height: 30px; padding: 0;
 		border: 0; box-shadow: none; background: var(--fs-good);
 		-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 15-6.7L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3Cpath d='M21 12a9 9 0 0 1-15 6.7L3 16'/%3E%3Cpath d='M3 21v-5h5'/%3E%3C/svg%3E") center / 19px no-repeat;
 		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 15-6.7L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3Cpath d='M21 12a9 9 0 0 1-15 6.7L3 16'/%3E%3Cpath d='M3 21v-5h5'/%3E%3C/svg%3E") center / 19px no-repeat;
-		animation: fs-spin 1.1s linear infinite;	/* @keyframes fs-spin: base/95-luci.css */
+		/* STATIC, deliberately. A spinner is a progress indicator — it promises that
+		 * something is happening that you are waiting for. This is a poll running quietly in
+		 * the background, forever; a permanently spinning glyph in the corner of the eye is
+		 * just noise, and it makes an idle router look busy. Green and still says the same
+		 * thing without moving. (Its click still pauses the poll — see the pill. The SPIN was
+		 * what broke that click: a target that never stops moving cannot be hit.) */
 	}
 
+	/* paused: the same glyph, gone quiet. Without this the rail kept saying GREEN while the
+	 * poll was stopped — the one thing the indicator exists to tell you, and it was lying.
+	 * (The pill gets this for free: its --fs-good only applies to [data-style="active"].) */
+	:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"]:not([data-style="active"]) {
+		background: var(--fs-dim);
+	}
 	.fs-content { padding: 22px var(--fs-content-pad); flex: 1 1 auto; width: 100%; max-width: var(--fs-content-max); margin: 0 auto; }
 
 	/* ---------- footer ----------

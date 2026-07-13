@@ -142,7 +142,42 @@ function fitTabStrips() {
  * would of course "fit", which would flip it straight back — the classic layout
  * oscillation. So: unstack → let the density steps try to squeeze it → stack only if even
  * the tightest step still wraps → then let the density relax, now that it owns a row. */
+/* ---- does the CONTENT column still have room, once the sidebar has taken its cut? -------
+ *
+ * The vertical sidebar gives way to the bar when what is LEFT for the content would be too
+ * narrow to read. That used to be `@media (max-width: 767px)`, which said nothing about the
+ * thing that actually matters — and could not, because the sidebar's cut is not a constant:
+ * it is 224px expanded and 68px collapsed to the rail. One viewport breakpoint therefore
+ * gave the two states the same answer, when the whole point of collapsing the sidebar is to
+ * hand ~156px BACK to the content. So the rail folded away at the same width as the
+ * expanded sidebar, and the room it had just freed bought the user nothing.
+ *
+ * Measured instead: the sidebar's real cut, subtracted from the real viewport. The rail now
+ * keeps its column ~156px further down than the expanded sidebar does.
+ *
+ * The widths are CONSTANTS, not read from the rendered sidebar — deliberately. Reading the
+ * live width would make the answer depend on the state it is deciding (once the sidebar is
+ * a bar it has no cut at all, so the content "fits", so it un-narrows, so it cuts again):
+ * an oscillation. A constant makes the decision a pure function of the viewport. */
+const CONTENT_MIN = 500;			/* below this a content column stops being readable */
+const SIDEBAR_W = 224, RAIL_W = 68;	/* theme/20-shell.css */
+const CONTENT_PAD = 56;				/* 2 * --fs-content-pad (02-tokens.css) */
+
+function fitShell() {
+	const root = document.documentElement;
+	if (currentLayout() === 'top') {		/* no sidebar, no cut, nothing to decide */
+		root.removeAttribute('data-narrow');
+		return;
+	}
+	const cut = (root.getAttribute('data-rail') === 'true') ? RAIL_W : SIDEBAR_W;
+	const content = window.innerWidth - cut - CONTENT_PAD;
+	if (content < CONTENT_MIN) root.setAttribute('data-narrow', '');
+	else root.removeAttribute('data-narrow');
+}
+
 function fitChrome() {
+	fitShell();
+
 	const bar = document.querySelector('.fs-sidebar');
 	const menu = document.getElementById('topmenu');
 	const desktopBar = !!bar && !!menu &&
@@ -1459,6 +1494,10 @@ function wireRail() {
 		if (on) { root.setAttribute('data-rail', 'true'); lsSet('fs-rail', 'true'); }
 		else { root.removeAttribute('data-rail'); lsDel('fs-rail'); }
 		sync();
+		/* the sidebar's cut just changed by ~156px, so the content column may now clear (or
+		 * fall below) --fs-content-min: re-take the measurement rather than wait for a
+		 * resize that is not coming */
+		scheduleTabFit();
 	});
 
 	sync();

@@ -35,8 +35,16 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const LIMITS = {
 	/* 16 (theme+pages, each fighting an inline or unlayered declaration) + 17 (base) */
 	importants: 33,
-	/* the widest selector the theme needs; see the layer rules in CLAUDE.md */
-	maxSpecificity: [1, 6, 0],
+	/* The widest selector the theme needs; see the layer rules in CLAUDE.md.
+	 *
+	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`. That is
+	 * not selector sprawl: the sidebar gives way to the bar when the CONTENT column would be
+	 * too narrow, and that answer depends on the sidebar's own cut (224px expanded, 68px as
+	 * a rail), so it cannot be a media query and has to be an attribute. Every rule in the
+	 * vertical block and the rail block therefore carries one more attribute than before —
+	 * the deepest of them is the rail's paused poll glyph, at [1,7,0]. The ratchet did its
+	 * job: it made the increase a decision instead of a drift. */
+	maxSpecificity: [1, 7, 0],
 	emptyRules: 0,
 };
 

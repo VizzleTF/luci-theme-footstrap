@@ -101,7 +101,34 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   paint one frame at full width and overflow its section on every poll tick, measured at 19–109 px,
   once a second); and coalesce on resize.
 
+- **The sidebar gives way to the bar when the CONTENT column would get too narrow — and the icon rail
+  therefore holds on ~155 px longer than the expanded sidebar.** It used to be one viewport
+  breakpoint (767 px) for both, which could not be right: the sidebar's cut is not a constant, it is
+  224 px expanded and 68 px as a rail. So collapsing the sidebar handed ~156 px back to the content
+  and then folded the whole thing away at exactly the same window width — the room it had just freed
+  bought the user nothing. The decision is measured from the sidebar's real cut against a stated
+  minimum (500 px of content), so the expanded sidebar now yields at ~780 px and the rail at ~625 px.
+
 ### Fixed
+- **Collapsing the sidebar into the icon rail and then shrinking the window made the sidebar spring
+  back OPEN, and toggling it again dropped straight to the phone bar.** The rail's rules were guarded
+  at `min-width: 768px` while the vertical sidebar's guard had moved to 521 px, so in the gap between
+  them the vertical rules applied and the rail's did not — the sidebar expanded to its full 224 px as
+  the window got *smaller*. The rail is a MODE of the vertical sidebar and can never be visible under
+  conditions the vertical sidebar is not; the two guards are now literally the same.
+- **The rail's "Refreshing" glyph could not be clicked to pause the poll — because it was spinning.**
+  A target that never stops moving cannot be hit. It is now a still green glyph, which is also what it
+  should have been: a spinner promises that something is happening *that you are waiting for*, while
+  this is a poll ticking quietly in the background forever, and a permanently spinning icon in the
+  corner of the eye just makes an idle router look busy. Pausing and resuming by click both work; and
+  the glyph now goes grey when the poll is paused, instead of shining green while lying about it.
+- **The "Refreshing" pill drifted away from the Appearance and Log out buttons in the bar** instead of
+  hugging them. Both it and the buttons carried `margin-left: auto`, and two autos SPLIT the free
+  space between them rather than pushing one cluster to the right edge.
+- **The chevrons came back on the collapsed rail's menu items.** A rail item has no label and no
+  accordion — its children fly out to the side — so the chevron says nothing and only crowds the icon.
+  The rail's rule to hide it was (0,4,0) and lost to the vertical sidebar's (0,4,3), which turns it
+  back on.
 - **The apk Software package list stopped collapsing into rows and overflowed its section.** It is
   `<table class="table" id="packages">` — no `.cbi-section-table` class at all — and its header row is
   `.cbi-section-table-titles`, not the `.table-titles` the data-table tagger looked for. So it matched
