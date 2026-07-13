@@ -1,18 +1,20 @@
 'use strict';
 'require baseclass';
 'require ui';
+'require fs-fit as fit';
 
-/* Shared menu logic for both footstrap layouts.
+/* Shared chrome logic: mode menu, section tabs, the SPA router and the Appearance
+ * popover. menu-footstrap.js is the one renderer that composes with it
+ * (common.init(renderMainMenu)).
  *
- * LuCI instantiates every required baseclass module into a singleton, so a base
- * class can't be `extend`-ed across modules. The idiomatic workaround (as used
- * by luci-app-podkop: `require view.podkop.main as main; main.foo()`) is
- * COMPOSITION — export functions you call on the singleton, and inject the
- * variable part (the layout-specific renderMainMenu) as a callback.
- *
- * So: mode menu, section tabs and the theme toggle live here once; each layout
- * (menu-footstrap / menu-footstrap-top) only defines renderMainMenu and calls
- * common.init(renderMainMenu). */
+ * There used to be TWO renderers here — a vertical one and a horizontal one — and
+ * this file existed to share what they had in common. They are one now: the layout
+ * is a client preference (:root[data-layout]) that CSS morphs, so the same markup
+ * serves the sidebar, the top bar, the collapsed rail and the phone bar. The
+ * composition seam is kept anyway, because LuCI instantiates every required
+ * baseclass module into a singleton — a base class cannot be `extend`-ed across
+ * modules, so injecting renderMainMenu as a callback is still how the two files
+ * talk. */
 
 /* --- stray-interval teardown for SPA nav ---------------------------------
  * A full page load kills every window.setInterval the outgoing page set. Our
@@ -99,7 +101,11 @@ function fitTabStrips() {
 	/* .fs-sidebar ul.nav is only a horizontal strip on the phone bar (≤767px);
 	 * on the desktop it is a vertical list where the one-row measure is
 	 * meaningless — fitOne() skips it there. */
-	document.querySelectorAll('.tabs, .cbi-tabmenu, .fs-topnav .fs-mainmenu, .fs-sidebar > ul.nav').forEach((ul) => {
+	/* `.fs-sidebar > ul.nav` covers the main menu in EVERY layout now — it is the same
+	 * list, and the flexDirection check below is what tells a bar (row) from a vertical
+	 * sidebar (column). The old `.fs-topnav .fs-mainmenu` selector went with the second
+	 * template. */
+	document.querySelectorAll('.tabs, .cbi-tabmenu, .fs-sidebar > ul.nav').forEach((ul) => {
 		if (ul.children.length < 2) return;
 		if (ul.matches('.fs-sidebar > ul.nav') && getComputedStyle(ul).flexDirection !== 'row') {
 			/* desktop sidebar: a vertical list — the one-row measure is meaningless
@@ -121,11 +127,47 @@ function fitTabStrips() {
 		ul.classList.add('fs-dense2');	/* floor: leave wrapped if it still overflows */
 	});
 }
-let _tabFitPending = false;
+/* ---- does the main menu fit on the brand's row? ---------------------------
+ * The desktop bar stacks its menu onto a second row only when the menu does NOT fit
+ * beside the brand — and whether it fits depends on how many sections THIS ROUTER has,
+ * not on how wide the screen is. A stock install renders 5 sections; a box with a few
+ * luci-app-* packages renders eleven. So this is measured, not keyed off a breakpoint.
+ *
+ * It used to be `@media (max-width: 1199px)`. Measured on a stock router the bar's
+ * contents come to ~683px (brand 109 + menu 371 + right cluster 155 + gaps), i.e. one
+ * row fits down to ~723px — so that breakpoint was stacking the menu on every laptop
+ * and throwing away a row of vertical space for nothing.
+ *
+ * Always measured in the UNSTACKED state: a stacked menu has the whole bar to itself and
+ * would of course "fit", which would flip it straight back — the classic layout
+ * oscillation. So: unstack → let the density steps try to squeeze it → stack only if even
+ * the tightest step still wraps → then let the density relax, now that it owns a row. */
+function fitChrome() {
+	const bar = document.querySelector('.fs-sidebar');
+	const menu = document.getElementById('topmenu');
+	const desktopBar = !!bar && !!menu &&
+		document.documentElement.getAttribute('data-layout') === 'top' &&
+		window.innerWidth >= 768;
+
+	if (bar) bar.classList.remove('fs-bar-stack');
+	fitTabStrips();
+	/* The menu's own pills wrapping IS the "it does not fit" signal — but only because the
+	 * unstacked desktop bar is flex-wrap: nowrap (50-toplayout.css). Without that the bar
+	 * would wrap itself and hand the menu a whole row, in which the menu of course "fits",
+	 * and this would never fire. Do NOT measure the bar's children by offsetTop instead:
+	 * the bar is align-items:center with children of different heights, so their offsetTop
+	 * differs even on one row (that read as "wrapped" for a 5-section menu). */
+	if (desktopBar && !stripFitsOneRow(menu)) {
+		bar.classList.add('fs-bar-stack');
+		fitTabStrips();
+	}
+}
+/* The measuring, the frame-coalescing and the ResizeObserver are NOT here: they are the
+ * shared engine in fs-fit.js, which the data tables use too (the two decisions are the same
+ * shape — measure UNCOLLAPSED, then toggle a class). fitChrome is registered with it in
+ * init(); this is just the "do it soon" entry point the chrome's own callers use. */
 function scheduleTabFit() {
-	if (_tabFitPending) return;
-	_tabFitPending = true;
-	requestAnimationFrame(() => { _tabFitPending = false; fitTabStrips(); });
+	fit.schedule();
 }
 /* Did this batch of mutations actually add or remove a tab strip?
  *
@@ -315,6 +357,45 @@ function applyAccent(deg) {
 		root.style.setProperty('--fs-accent-h', String(v));
 		root.setAttribute('data-accent', '');
 	}
+}
+
+/* Layout axis: the vertical sidebar (default) vs the horizontal top bar. Both are
+ * ONE template and ONE menu renderer now — the layout is a client class, morphed by
+ * CSS keyed off :root[data-layout='top'] (head.ut pre-paints it, so no flash), the
+ * same way dark-mode is. Toggling needs NO menu re-render: the DOM already serves
+ * both, and the sidebar menu's MutationObserver on data-layout folds/restores the
+ * accordion (menu-footstrap.js).
+ *
+ * currentLayout() reads the ATTRIBUTE, not localStorage, so the control reflects
+ * what is actually painted — which for a router migrated from the old top-nav theme
+ * is the SERVER default (luci.main.footstrap_layout=top, applied in head.ut) even
+ * with no localStorage yet.
+ *
+ * applyLayout() is the one axis that writes its DEFAULT value EXPLICITLY instead of
+ * clearing the key: a migrated router carries that server default, and lsDel would
+ * let it re-assert 'top' on the next load. localStorage always wins over the server
+ * default, so it must record the deliberate choice, not its absence. */
+/* head.ut stamps :root[data-layout] server-side and the pre-paint script overrides it
+ * from localStorage, so the attribute always carries an explicit value. Read it — do
+ * NOT read localStorage here, or a router whose default is 'top' (migrated from the
+ * old top-nav theme) would report 'sidebar' until the user first touched the toggle. */
+function currentLayout() {
+	return document.documentElement.getAttribute('data-layout') === 'top' ? 'top' : 'sidebar';
+}
+function isTopLayout() {
+	return currentLayout() === 'top';
+}
+function applyLayout(val) {
+	const layout = (val === 'top') ? 'top' : 'sidebar';
+	/* ALWAYS an explicit value, never a removed attribute: every layout rule matches
+	 * data-layout POSITIVELY (:root[data-layout='sidebar'] / ='top'), so that a future
+	 * third layout has to opt in to a rule rather than inherit it by not being 'top'.
+	 * head.ut stamps the same attribute server-side, so it is never absent. */
+	lsSet('fs-layout', layout);
+	document.querySelector(':root').setAttribute('data-layout', layout);
+	/* the bar and the column have completely different room for the menu, so the
+	 * fits-on-one-row measurement has to be re-taken. Nothing else re-renders. */
+	scheduleTabFit();
 }
 
 /* Sidebar accordion behaviour: with auto-collapse on, opening a section folds
@@ -524,13 +605,20 @@ function renderChrome() {
 	scheduleTabFit();
 }
 
-/* /cgi-bin/luci/admin/status/overview -> ['admin','status','overview'] */
+/* /cgi-bin/luci/admin/status/overview -> ['admin','status','overview'].
+ * The bare base (/cgi-bin/luci/, what dispatcher.build_url() emits for the brand
+ * wordmark link) yields an EMPTY seg list, NOT null: it is a valid LuCI path — the
+ * dispatcher's root node is itself a `firstchild`, so resolveSegs([]) walks
+ * root -> admin -> status -> overview exactly as the server does on a full GET of
+ * the base. Returning null here made navigate() treat the wordmark as un-routable
+ * and fall back to a full page reload. null stays reserved for a path that is not
+ * under LuCI's scriptname at all. */
 function segsFromPath(pathname) {
 	const base = L.env.scriptname || '';
 	if (base && pathname.indexOf(base) !== 0)
 		return null;
 	const rest = pathname.slice(base.length).replace(/^\/+|\/+$/g, '');
-	return rest.length ? rest.split('/') : null;
+	return rest.length ? rest.split('/') : [];
 }
 
 /* walk the (scrubbed, ACL-filtered) menu tree to the node for a path */
@@ -728,20 +816,31 @@ function navigate(pathname, push) {
 	/* from here on the navigation is committed */
 	const gen = ++_navGen;
 
-	/* Ensure a #view container. View pages and the overview template both emit
-	 * one; a `cbi`/other template page may not — inject one into .fs-content,
-	 * dropping the stale content, so we can SPA there. When arriving via SPA the
-	 * previous view's #view is reused and LuCI.view replaces its content. */
+	/* Ensure a #view container, and clear whatever the OUTGOING page left as a
+	 * SIBLING of #view inside .fs-content.
+	 *
+	 * LuCI.view repaints #view via dom.content(), which only replaces #view's OWN
+	 * children — anything a page emitted next to #view rides along untouched. The
+	 * Status→Overview `template` node emits <h2 name="content">Status</h2> right
+	 * there in .fs-content (footstrap hides it on the overview via a
+	 * body[data-page='admin-status-overview'] rule, since the chrome already shows
+	 * the title). SPA-navigating away changes data-page, so that rule stops matching
+	 * and the orphaned heading became visible on EVERY page until a full reload — the
+	 * "Status on all pages" bug. Sweep those strays on every nav, keeping only the
+	 * chrome that legitimately outlives a page: the section tabs, server notices and
+	 * <noscript>. This also serves the original purpose — a `cbi`/other template page
+	 * that emits no #view of its own gets a fresh one injected into the cleared host. */
+	const contentHost = document.querySelector('.fs-content');
+	if (!contentHost) return false;
+	Array.from(contentHost.children).forEach(c => {
+		if (c.id !== 'view' && c.id !== 'tabmenu' &&
+		    !c.classList.contains('alert-message') && c.nodeName !== 'NOSCRIPT')
+			c.remove();
+	});
 	if (!document.getElementById('view')) {
-		const host = document.querySelector('.fs-content');
-		if (!host) return false;
-		Array.from(host.children).forEach(c => {
-			if (c.id !== 'tabmenu' && !c.classList.contains('alert-message') && c.nodeName !== 'NOSCRIPT')
-				c.remove();
-		});
 		const v = document.createElement('div');
 		v.id = 'view';
-		host.appendChild(v);
+		contentHost.appendChild(v);
 	}
 
 	/* teardown: drop the outgoing view's pollers so they stop hitting detached DOM /
@@ -979,7 +1078,7 @@ function placePopover(btn, pop) {
 	const w = pop.offsetWidth, h = pop.offsetHeight;
 	const vw = document.documentElement.clientWidth;
 	const vh = document.documentElement.clientHeight;
-	const top_layout = document.body.classList.contains('fs-top');
+	const top_layout = isTopLayout();
 
 	let left = top_layout ? (r.right - w) : (r.right + gap);
 	let top  = top_layout ? (r.bottom + gap) : (r.bottom - h);
@@ -1071,6 +1170,13 @@ function wireAppearance() {
 	 * choosing a look. */
 	const groups = [
 		E('div', { 'class': 'fs-ap-group' }, [
+			E('div', { 'class': 'fs-ap-label' }, [ _('Layout') ]),
+			segControl(currentLayout(), [
+				{ val: 'sidebar', label: _('Sidebar') },
+				{ val: 'top',     label: _('Top') }
+			], applyLayout, _('Layout'))
+		]),
+		E('div', { 'class': 'fs-ap-group' }, [
 			E('div', { 'class': 'fs-ap-label' }, [ _('Theme') ]),
 			segControl(currentMode(), [
 				{ val: 'auto',  label: _('Auto') },
@@ -1122,8 +1228,11 @@ function wireAppearance() {
 	];
 
 	/* the top-nav layout has no accordion — its sections are hover dropdowns,
-	 * already exclusive — so the switch is offered on the sidebar layout only */
-	if (!document.body.classList.contains('fs-top')) {
+	 * already exclusive — so the switch is offered on the sidebar layout only.
+	 * NOTE: read once when the popover is built; a live layout toggle does not
+	 * rebuild it, so the Submenus control is present per the layout at first open.
+	 * Acceptable — the control is a no-op in top mode anyway. */
+	if (currentLayout() !== 'top') {
 		groups.push(E('div', { 'class': 'fs-ap-group' }, [
 			E('div', { 'class': 'fs-ap-label' }, [ _('Submenus') ]),
 			segControl(currentAutoCollapse() ? 'on' : 'off', [
@@ -1378,6 +1487,11 @@ return baseclass.extend({
 			const here = viewClassFor(nodeForSegs(L.env.dispatchpath || []));
 			if (here)
 				_seen.add(here);
+
+			/* the bar's "does the menu fit beside the brand" measurement joins the same
+			 * engine the tables use — it re-runs on every #view resize (which is also what
+			 * a rail collapse and a layout toggle produce) and on content mutations */
+			fit.add(fitChrome);
 
 			renderChrome();
 			wireAppearance();

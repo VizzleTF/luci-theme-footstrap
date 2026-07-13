@@ -1,10 +1,8 @@
 {#
- Shared footer body for both footstrap layouts. Included as
- include('themes/footstrap/partials/footer', { menu_module }) — menu_module is
- the layout's client menu renderer ('menu-footstrap' / 'menu-footstrap-top').
- The two copies were identical apart from that name and had every reason to
- drift; this is the single source now. The wrapper being closed is .fs-shell
- (sidebar) or .fs-topwrap (top-nav) — same depth in both templates.
+ Footer body. There is ONE layout template and ONE client menu renderer now —
+ sidebar and top bar are the same markup, morphed by :root[data-layout] — so the
+ `menu_module` parameter that used to pick between 'menu-footstrap' and
+ 'menu-footstrap-top' is gone with the second renderer.
  Licensed to the public under the Apache License 2.0.
 -#}
 		{% if (!blank_page): %}
@@ -37,8 +35,8 @@
 					</span>
 				</footer>
 			</main>{# /.fs-main #}
-		</div>{# /.fs-shell or /.fs-topwrap #}
-		<script>L.require('{{ menu_module }}')</script>
+		</div>{# /.fs-shell #}
+		<script>L.require('menu-footstrap')</script>
 		<script>L.require('fs-select')</script>
 		{% endif %}
 	</body>

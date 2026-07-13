@@ -8,14 +8,19 @@
 
 {%
 	import { getuid, getspnam } from 'luci.core';
+	import { cursor } from 'uci';
 
 	const boardinfo = ubus.call('system', 'board') ?? {};
 	const empty_password = (getuid() == 0 && getspnam('root')?.pwdp === '');
+	/* server default layout: a router migrated from the old top-nav theme carries
+	   luci.main.footstrap_layout=top (uci-defaults), so a client with no saved
+	   preference still paints top. Absent = sidebar. head.ut pre-paints it. */
+	const fs_layout = cursor().get('luci', 'main', 'footstrap_layout') || '';
 
 	http.prepare_content('text/html; charset=UTF-8');
 -%}
 
-{% include('themes/footstrap/partials/head', { boardinfo }) %}
+{% include('themes/footstrap/partials/head', { boardinfo, fs_layout }) %}
 
 	{#
 		data-page carries the DISPATCH path (ctx.path), not the request path. They
@@ -60,8 +65,8 @@
 
 				<div class="fs-spacer"></div>
 
-				{% include('themes/footstrap/partials/appearance', { with_label: true }) %}
-				{% include('themes/footstrap/partials/logout', { with_label: true }) %}
+				{% include('themes/footstrap/partials/appearance') %}
+				{% include('themes/footstrap/partials/logout') %}
 			</nav>
 
 			<main class="fs-main" id="maincontent" tabindex="-1">

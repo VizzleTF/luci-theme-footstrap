@@ -241,67 +241,74 @@
 	 * .tr.table-titles header and is NOT .cbi-section-table — replacing a live
 	 * `:has(.tr.table-titles):not(.cbi-section-table)` that the style engine had to
 	 * re-evaluate on every mutation of these polled tables (Processes/routes/leases). */
-	/* Card-stack a data table into label/value pairs only when the content column is
-	 * narrow. Above the threshold a wide fs-dt (DHCP leases) stays a real table and
-	 * reflows its long opaque values (DUID/IPv6, and the hostname) to fit — see the
-	 * overflow-wrap rules elsewhere.
+	/* ==================================================================
+	 * THE CARD STACK — one copy, for every DATA table, with no @container threshold.
 	 *
-	 * The threshold is stock LuCI's: bootstrap's mobile.css stacks its tables at
-	 * `max-device-width: 600px`. Ours is a CONTAINER query on #view, and below the
-	 * 767px tier .fs-content pads 16px a side — so a 600px viewport is a 568px
-	 * container, and that is the number. It used to be 800, which carded the table on
-	 * small tablets and narrow desktop windows where the real table still fits.
+	 * A data table used to be carded by a container query, and there were THREE different
+	 * thresholds for it: 568 here, 780 for the DHCP leases (8 nowrap mono columns hold a
+	 * ~736px floor, so they must card earlier) and 800 for the apk package list. The last
+	 * two each carried their own COPY of the declarations below, because CSS cannot share a
+	 * declaration block across two @container thresholds — 55 duplicated declarations, free
+	 * to drift apart in silence.
 	 *
-	 * The stack is the two-column shape stock LuCI uses on a phone (bootstrap's
-	 * mobile.css): the label sits ABOVE its value and each cell takes half the row.
-	 * The earlier shape put label and value on ONE line with the value flushed right,
-	 * which cost a leases row 7 full-width lines and gave the value ~40% of the width
-	 * — an .ifacebadge, a signal SVG or a DUID then wrapped under its own label
-	 * anyway. Half-width pairs fold the same row into 4 lines, and the value gets the
-	 * whole half-column. Values stay LEFT-aligned: they are opaque strings (MAC, DUID,
-	 * rates) and a ragged right edge reads worse than a ragged left one. */
-	@container fs-view (max-width: 568px) {
-		/* Clip the rows to the frame's rounded corners in the stacked layout. Zebra
-		 * (`.cbi-rowstyle-2`) paints its background on the .tr itself, and the frame is
-		 * overflow:visible — so the last (and any striped) row's SQUARE background poked
-		 * past the 12px rounded corners. Stacked rows are flex-wrap and fit the width, so
-		 * there is no horizontal column to clip here (the only thing overflow:visible
-		 * protected), making overflow:hidden safe — it clips the row backgrounds to the
-		 * radius exactly as the generic .table does. `#view .table.fs-dt` (1,2,0) is
-		 * chosen to outrank the frame's `#view .table[id]` (1,1,1) on specificity, not
-		 * source order. */
-		#view .table.fs-dt { overflow: hidden; }
-		table.fs-dt .tr.table-titles { display: none; }
-		table.fs-dt .tr {
-			display: flex; flex-wrap: wrap; align-items: flex-start;
-			padding: 10px 16px 12px;
-		}
-		table.fs-dt .td {
-			display: block; flex: 1 1 50%; min-width: 0; width: auto;
-			padding: 6px 10px 6px 0; border: 0; text-align: left;
-			overflow-wrap: anywhere; white-space: normal;
-		}
-		table.fs-dt .td[data-title]::before {
-			content: attr(data-title); display: block; margin-bottom: 3px;
-			font-size: 10px; font-weight: 700; letter-spacing: .05em;
-			text-transform: uppercase; color: var(--fs-faint);
-		}
-		/* the row's buttons (Disconnect, Reserve IP) are not a label/value pair — give
-		 * them the full width below the pairs, left-aligned like the values above. */
-		table.fs-dt .td.cbi-section-actions {
-			display: flex; flex: 1 1 100%; justify-content: flex-start;
-			flex-wrap: wrap; gap: 8px; padding-top: 8px;
-		}
-		table.fs-dt .td.cbi-section-actions::before,
-		table.fs-dt .td:not([data-title])::before,
-		table.fs-dt .td[data-title=""]::before { content: none; }
-		/* nothing inside a half-width cell may force the row wider than the viewport:
-		 * .fs-main uses overflow-x:clip, so an over-wide child is CUT, not scrolled to.
-		 * The assoclist value cells (an .ifacebadge with a long "Access Point …
-		 * (phyN-apM)" caption, the signal SVG) are intrinsically ~250px. */
-		table.fs-dt .td > *,
-		table.fs-dt .td .ifacebadge { min-width: 0; max-width: 100%; }
+	 * Both of those were really asking "does it OVERFLOW?", and overflow is a FACT the
+	 * browser computes rather than a number to guess. fs-select.js measures it and sets
+	 * .fs-stacked, so the two thresholds are gone and each table now discovers its own —
+	 * including one from a third-party luci-app-* whose column count we could never know.
+	 * What survives is the one judgement a measurement cannot make: 568, "too cramped to be
+	 * a table at all", which lives in fs-select.js beside the measurement.
+	 *
+	 * A CONFIG table (.cbi-section-table) is deliberately NOT here — see theme/65-dropdown.css.
+	 * Its rows hold widgets that bake in a width from the layout they were rendered in, so
+	 * un-collapsing it to measure it changes the thing being measured.
+	 *
+	 * The card shape is stock LuCI's phone layout (bootstrap's mobile.css): the label sits
+	 * ABOVE its value and each cell takes half the row. The earlier shape put label and value
+	 * on ONE line with the value flushed right, which cost a leases row 7 full-width lines and
+	 * gave the value ~40% of the width — an .ifacebadge, a signal SVG or a DUID then wrapped
+	 * under its own label anyway. Half-width pairs fold the same row into 4 lines and give the
+	 * value the whole half-column. Values stay LEFT-aligned: they are opaque strings (MAC,
+	 * DUID, rates), and a ragged right edge reads worse than a ragged left one.
+	 * ================================================================== */
+	.table.fs-stacked .tr.table-titles,
+	.table.fs-stacked .thead,
+	.table.fs-stacked .tr.cbi-section-table-titles,
+	.table.fs-stacked .tr.cbi-section-table-descr { display: none; }
+	.table.fs-stacked .tr { display: flex; flex-wrap: wrap; align-items: flex-start; }
+	.table.fs-stacked .td {
+		display: block; min-width: 0; width: auto;
+		padding: 6px 10px 6px 0; border: 0; text-align: left;
+		overflow-wrap: anywhere; white-space: normal;
 	}
+	/* the column label, lifted above its value (LuCI writes it per cell as data-title) */
+	.table.fs-stacked .td[data-title]::before {
+		content: attr(data-title); display: block; margin-bottom: 3px;
+		font-size: 10px; font-weight: 700; letter-spacing: .05em;
+		text-transform: uppercase; color: var(--fs-faint);
+	}
+	.table.fs-stacked .td.cbi-section-actions::before,
+	.table.fs-stacked .td:not([data-title])::before,
+	.table.fs-stacked .td[data-title=""]::before { content: none; }
+	/* the row's buttons are not a label/value pair — full width below the pairs */
+	.table.fs-stacked .td.cbi-section-actions {
+		display: flex; flex: 1 1 100%; justify-content: flex-start;
+		flex-wrap: wrap; gap: 8px; padding-top: 8px;
+	}
+	/* nothing inside a half-width cell may force the row wider than the viewport: .fs-main
+	 * is overflow-x:clip, so an over-wide child is CUT, not scrolled to. */
+	.table.fs-stacked .td > *,
+	.table.fs-stacked .td .ifacebadge { min-width: 0; max-width: 100%; }
+
+	/* --- the DATA table's flavour (L.ui.Table, tagged .fs-dt) ---
+	 * Clip rows to the frame's rounded corners: zebra paints its background on the .tr and
+	 * the frame is overflow:visible, so a striped row's SQUARE background poked past the
+	 * 12px corners. Stacked rows are flex-wrap and fit the width, so there is no horizontal
+	 * column to clip (the only thing overflow:visible protected). `#view .table.fs-dt`
+	 * (1,2,0) outranks the frame's `#view .table[id]` (1,1,1) on specificity, not order. */
+	#view .table.fs-dt.fs-stacked { overflow: hidden; }
+	.table.fs-dt.fs-stacked .tr { padding: 10px 16px 12px; }
+	.table.fs-dt.fs-stacked .td { flex: 1 1 50%; }
+
 	/* general table cell padding — compact but readable (Startup/Processes/etc) */
 	.table .td { padding-top: 7px; padding-bottom: 7px; }
 }

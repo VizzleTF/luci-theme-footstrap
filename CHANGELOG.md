@@ -10,6 +10,136 @@ Security, Performance.
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Added
+- **The sidebar/top-bar layout is now an instant toggle in Appearance → Layout, remembered per browser.** It
+  used to be a *server* choice: two theme entries in System → Design (`FootstrapSidebar`,
+  `FootstrapOnTop`), each with its own `mediaurlbase`, its own template directory and its own menu
+  renderer. Switching meant going through the Design page and reloading. It is now a client
+  preference like dark mode — `:root[data-layout]`, pre-painted by `head.ut` before the first frame,
+  so there is no flash — and switching repaints in place with **no page reload and no menu re-render**:
+  the DOM already serves both, and the menu's existing `MutationObserver` folds the accordion into
+  dropdowns (and restores it on the way back) because that is the same state change as collapsing the
+  icon rail.
+
+- **Three new CSS gates, each closing a hole nothing off-the-shelf covers** (`npm run check` runs the
+  lot; all three are CI-only — the OpenWrt buildbot still needs nothing but `cat`).
+  - `tools/css-dup.mjs` — **the same declaration body written under two different guards, plus the
+    `@mirror` contract that makes the unavoidable copies incapable of rotting.** No linter can flag
+    this duplication and none ever will: to a cascade-aware tool two rules under mutually-exclusive
+    guards (a media query vs an attribute selector, two `@container` thresholds) are both *required*,
+    since only one can ever match. Yet it is exactly the shape that drifts — this release removed 55
+    such declarations, and the detector then found a cluster nobody had noticed: the data-table card
+    stack is written **three times** (~41 redundant declarations), because it has to fire at 568px for
+    a normal table but at 780px for the DHCP leases, whose 8 nowrap mono columns hold a ~736px floor.
+    That one is **not removable** — hoisting the stack to the wider threshold and un-stacking the
+    narrower tables in the gap merely trades a copy for a *reset*, which is the same two-place coupling
+    in a form that is harder to reason about. So the copies stay and are **pinned**: every one carries
+    a `/* @mirror <group>/<role> */` tag, and the tool fails if they ever stop being byte-identical.
+    This closes the trap the detector walks into on its own — it finds bodies that are IDENTICAL, so
+    the moment two copies diverge they stop being a "duplicate" and it would go quiet *exactly when you
+    need it to shout*. There is no numeric budget: every duplicate must be folded or pinned, because a
+    budget is a number nobody defends and it lets the next unexplained copy in for free.
+  - `tools/fs-orphans.mjs` — **dead CSS, scoped to the `fs-*` namespace.** PurgeCSS/uncss and
+    coverage-based pruning are actively dangerous here: the coverage contract exists *because* a
+    third-party `luci-app-*` renders widgets no page we can see renders, and a tool that prunes what
+    it did not observe will un-theme somebody's app. But nobody else can emit an `fs-` class — so
+    inside that one namespace, "nothing we ship emits it" really does mean dead, with zero risk to the
+    contract. This is the check that catches a selector left behind when its markup is deleted.
+  - `tools/css-metrics.mjs` — a **ratchet** on `!important` (33: the 16 in theme/pages that fight an
+    inline or unlayered declaration, plus base's 17), max specificity and empty rules. `stylelint`
+    stops a *new* file adding an `!important`; this stops the allowlisted files quietly growing more.
+
+### Changed
+- **Design now lists ONE "Footstrap" theme instead of two.** `mediaurlbase` is always
+  `/luci-static/footstrap`; the layout is no longer a server-side theme at all. A router that was on
+  the old top-nav theme keeps its top bar: `uci-defaults` records it as the router's default layout
+  (`luci.main.footstrap_layout=top`), which `head.ut` stamps onto `<html data-layout>` — so a
+  *migrated router opens on the top bar even in a browser that has never seen it*, and the user's own
+  choice (localStorage) overrides that default forever after. A shell script cannot write
+  localStorage; this is the channel that carries the fact across the upgrade.
+- **`data-layout` is always stamped with an explicit value, by the server.** Absent-means-sidebar
+  would force every rule to be a *negative* match (`:not([data-layout="top"])`), and a future third
+  layout would then silently inherit the sidebar's rules merely by not being "top". Every layout rule
+  is a positive match instead, so a new layout has to opt in. It also means the chrome is correct with
+  JavaScript disabled — the attribute exists before a single byte of script runs.
+- **On a phone, every layout renders the same top bar.** The sidebar's phone bar and the top layout's
+  bar are one look now, so a narrow screen shows the same chrome whichever layout is picked. Where the
+  two layouts had ever disagreed on the same element, the top bar's value is the one that survived.
+- **The top bar's "Log out" is the same control as the sidebar's** — a square icon button in the right
+  cluster, not a separate text item in the menu. The menu renderer already dropped the tree's
+  `admin/logout` node in favour of the theme's own control; the top layout used to carry both.
+- **The bar is now written once, and the vertical sidebar is the exception.** The bar is needed when
+  `(viewport ≤ 767px) OR (:root[data-layout="top"])`, and CSS cannot OR a media query with an
+  attribute selector in one selector — so writing the bar under both guards meant writing it twice.
+  Measured: **55 of ~75 declarations were identical**, i.e. free to drift apart in silence. Inverting
+  it — the bar as the unguarded base, the vertical sidebar as a single guarded override that wins on
+  specificity (`0,3,0` vs `0,1,0`), never on source order — states each of the three chrome states
+  exactly once. This is only expressible because `data-layout` always carries an explicit value.
+  `cssdiff` proves the desktop sidebar is byte-identical across 3 014 elements.
+- **The bar stacks its menu onto a second row only when the menu does not fit — measured, not guessed.**
+  It used to be `@media (max-width: 1199px)`. But whether the menu fits beside the brand depends on how
+  many sections the router HAS (a stock install renders 5; a box with a few `luci-app-*` renders eleven),
+  so a device-width breakpoint is the wrong instrument. Measured on a stock router the bar's contents come
+  to ~683 px, so one row fits down to ~723 px — **that breakpoint was stacking the menu on every laptop and
+  throwing away a row of vertical space for nothing**. The menu now shrinks its pills first
+  (`.fs-dense1/2`) and stacks only when even the tightest step still wraps: at 1000 px a stock 5-section
+  menu never stacks, 11 sections shrink, and 13+ stack.
+
+- **One measuring engine (`fs-fit.js`) for every "does it still fit?" decision.** Two places in the
+  theme must decide something no CSS query can ask, because the answer depends on what the CONTENT
+  needs rather than on how wide the screen is: whether the menu fits beside the brand, and whether a
+  table can still be read as a table. Both were once breakpoints, and every one of those numbers was a
+  guess that some real router got wrong. The shape of the answer is always the same — measure the
+  element UNCOLLAPSED, then toggle a class — so the measuring, the frame-coalescing and the
+  ResizeObserver live in one module and a caller supplies only the decision. It encodes three rules,
+  each a bug that was actually hit: measure uncollapsed (a collapsed thing always "fits", so reading
+  it as it stands un-collapses it and the next frame collapses it again — oscillation); re-fit
+  **synchronously** on a mutation (a MutationObserver callback is a microtask and runs *before* the
+  frame is painted, whereas `requestAnimationFrame` runs *at* paint — deferring it let a stacked table
+  paint one frame at full width and overflow its section on every poll tick, measured at 19–109 px,
+  once a second); and coalesce on resize.
+
+### Fixed
+- **The apk Software package list stopped collapsing into rows and overflowed its section.** It is
+  `<table class="table" id="packages">` — no `.cbi-section-table` class at all — and its header row is
+  `.cbi-section-table-titles`, not the `.table-titles` the data-table tagger looked for. So it matched
+  *neither* rule and needed a hand-written stacking block of its own, at a fifth breakpoint. The
+  tagger now accepts either header markup, and the list card-stacks and un-stacks like every other
+  data table.
+- **A data table now becomes cards when it actually stops fitting, not when the viewport crosses a
+  number.** It used to be a container query, and there were THREE thresholds for it — 568 for a plain
+  table, 780 for the DHCP leases (their 8 nowrap mono columns hold a ~736 px floor, so they must card
+  earlier) and 800 for the package list — with the last two each carrying their own **copy** of the
+  card rules, because CSS cannot share a declaration block across two `@container` thresholds. Both of
+  those were really asking *does it overflow?*, which is a **fact the browser computes**, so both are
+  gone: the overflow is measured and each table discovers its own width — including a table from a
+  third-party `luci-app-*`, whose column count we could never have guessed. The card rules now exist
+  once. What survives is the one judgement a measurement cannot make ("too cramped to be a table at
+  all", 568), and it sits beside the measurement rather than in the stylesheet.
+- **A long hostname wraps instead of being silently truncated.** It was `nowrap` + ellipsis, which hid
+  the one string that tells you WHICH router you are looking at. It now breaks across lines —
+  `overflow-wrap: anywhere`, so it will break mid-word when a single "word" is itself wider than the box,
+  but only when there is no better break, so a normal dotted name still breaks at its dots. Wrapping
+  alone was not enough: the bar is flex-wrap, so instead of squeezing the brand, flexbox happily wrapped
+  the *menu* away and let a 78-character hostname sit on its own line 609 px wide. The brand is therefore
+  also **capped** (30ch), and the bar grows in height to hold the extra line.
+
+### Removed
+- **The second menu renderer, the second template and the second stylesheet are gone**
+  (`menu-footstrap-top.js`, `ucode/template/themes/footstrap-top/`, the `/luci-static/footstrap-top`
+  symlink, `styles/theme/50-topnav.css`). They were never two designs — the sidebar renderer already
+  emitted the markup that its own CSS turns into a horizontal bar on a phone, and it already had a
+  "flyout mode" in which a section behaves exactly like a top-nav dropdown. The top layout is that
+  mode, at desktop width: **the whole of the deleted renderer's unique logic was one function**
+  (`clampDropdown`, which nudges a dropdown back inside the viewport near the right edge), and it now
+  lives in the surviving renderer. Hover-to-open was always pure CSS. Net cost of gaining a
+  live-switchable layout: **+78 bytes of CSS**.
+- **The `with_label` template parameter and the elements it forked** (`.fs-appearance-btn`,
+  `.fs-top-logout`). A layout is a presentation choice, so it must not fork the markup: Appearance and
+  Log out are one row each, and the bar and the rail squash them into icon buttons in CSS.
+
 ## [0.7.18] — 2026-07-13
 
 ### Added

@@ -12,17 +12,16 @@ D="$(cd "$(dirname "$0")" && pwd)"
 "$D"/build-css.sh "$D/htdocs/luci-static/$N/cascade.css" --dev
 
 ssh "$R" "mkdir -p /usr/share/ucode/luci/template/themes/$N \
-	/usr/share/ucode/luci/template/themes/$N-top \
 	/www/luci-static/$N \
 	/www/luci-static/resources/view/status/include"
 
-# sidebar templates (+ partials/) + top-nav templates
+# the ONE template (+ partials/). Sidebar and top bar are the same markup now,
+# morphed by :root[data-layout] — there is no second theme dir to copy.
 scp -q  "$D"/ucode/template/themes/$N/*.ut      "$R":/usr/share/ucode/luci/template/themes/$N/
 ssh "$R" "mkdir -p /usr/share/ucode/luci/template/themes/$N/partials"
 scp -q  "$D"/ucode/template/themes/$N/partials/*.ut "$R":/usr/share/ucode/luci/template/themes/$N/partials/
-scp -q  "$D"/ucode/template/themes/$N-top/*.ut  "$R":/usr/share/ucode/luci/template/themes/$N-top/
 
-# shared static (cascade.css, fonts, logo) + menu renderers (+ shared common)
+# shared static (cascade.css, fonts, logo) + the menu renderer (+ shared common)
 scp -qr "$D"/htdocs/luci-static/$N/*                     "$R":/www/luci-static/$N/
 scp -q  "$D"/htdocs/luci-static/resources/menu-$N-common.js "$R":/www/luci-static/resources/
 # stamp the git-derived version into the deployed common.js (the packaged build
@@ -36,8 +35,8 @@ if [ -n "$FS_V" ] && expr "$FS_V" : '[0-9A-Za-z._-]*$' >/dev/null; then
 	ssh "$R" "sed -i \"s#const FS_VERSION = '[^']*'#const FS_VERSION = '$FS_V'#\" /www/luci-static/resources/menu-$N-common.js"
 fi
 scp -q  "$D"/htdocs/luci-static/resources/menu-$N.js        "$R":/www/luci-static/resources/
-scp -q  "$D"/htdocs/luci-static/resources/menu-$N-top.js    "$R":/www/luci-static/resources/
 scp -q  "$D"/htdocs/luci-static/resources/fs-select.js      "$R":/www/luci-static/resources/
+scp -q  "$D"/htdocs/luci-static/resources/fs-fit.js         "$R":/www/luci-static/resources/
 scp -q  "$D"/htdocs/luci-static/resources/view/status/include/05_${N}_overview_layout.js \
 	"$R":/www/luci-static/resources/view/status/include/
 
@@ -48,24 +47,21 @@ scp -q  "$D"/root/usr/share/rpcd/acl.d/luci-theme-footstrap.json "$R":/usr/share
 ssh "$R" "chmod +x /usr/libexec/footstrap-selfupdate.sh; /etc/init.d/rpcd reload 2>/dev/null; rm -f /tmp/luci-indexcache*"
 
 ssh "$R" "
-# Both layouts serve the same assets, so $N-top is a symlink to the one real
-# media dir. -n is load-bearing: without it a re-run sees the existing
-# symlink-to-directory as a directory and drops the new link INSIDE it
-# (luci-static/footstrap/footstrap-top).
-cd /www/luci-static
-ln -sfn $N $N-top
-# The six pre-consolidation variant names are gone. Sweep any left by an older
-# run of this script, or the router keeps serving a theme LuCI no longer lists.
+# Sweep every pre-consolidation name, INCLUDING $N-top: the top bar is not a theme
+# any more, so its media symlink and its template dir must go, or the router keeps
+# serving a theme LuCI no longer lists (and a stale mediaurlbase pointing at it
+# would still render).
 #
-# rm -rf, not rm -f: the legacy variants are DIRECTORIES (/www/luci-static/
-# footstrap-dark/, and the matching template dirs). `rm -f` refuses to remove a
-# directory, the error was swallowed by 2>/dev/null, and this block runs without
-# set -e — so the sweep silently did nothing and the router went on serving media
-# for a theme that is no longer in luci.themes. Every path here is a literal built
-# from $N; there is no glob and no user input.
-rm -rf $N/$N $N-top/$N-top $N-dark $N-light $N-top-dark $N-top-light
+# rm -rf, not rm -f: these are DIRECTORIES (/www/luci-static/footstrap-dark/, and
+# the matching template dirs) — and $N-top is a SYMLINK to a directory, which rm -rf
+# removes as the link, not its target. \`rm -f\` refuses to remove a directory, the
+# error was swallowed by 2>/dev/null, and this block runs without set -e, so the
+# sweep silently did nothing. Every path here is a literal built from \$N; there is
+# no glob and no user input.
+cd /www/luci-static
+rm -rf $N/$N $N-top $N-dark $N-light $N-top-dark $N-top-light
 cd /usr/share/ucode/luci/template/themes
-rm -rf $N/$N $N-top/$N-top $N-dark $N-light $N-top-dark $N-top-light
+rm -rf $N/$N $N-top $N-dark $N-light $N-top-dark $N-top-light
 touch /lib/apk/db/installed
 rm -f /tmp/luci-indexcache*"
 
@@ -76,4 +72,4 @@ rm -f /tmp/luci-indexcache*"
 scp -q "$D"/root/etc/uci-defaults/30_luci-theme-footstrap "$R":/tmp/30_luci-theme-footstrap
 ssh "$R" "PKG_UPGRADE=1 sh /tmp/30_luci-theme-footstrap; rm -f /tmp/30_luci-theme-footstrap /tmp/luci-indexcache*"
 
-echo "synced to $R (sidebar + top-nav registered, active theme unchanged)"
+echo "synced to $R (single Footstrap theme registered, active theme unchanged)"

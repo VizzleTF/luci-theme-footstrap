@@ -1,6 +1,7 @@
 'use strict';
 'require baseclass';
 'require ui';
+'require fs-fit as fit';
 
 /* Theme plain LuCI <select> fields (ui.Select, widget:'select') by rendering a
  * styled cbi-dropdown beside them — native <select> popups can't be CSS-styled.
@@ -130,15 +131,81 @@ function enhance(sel) {
 	}, { signal: ac.signal });
 }
 
-/* Tag standalone data tables so the responsive (&lt;820px) stacking rules can key
- * off a static `.fs-dt` class instead of a live `:has(.tr.table-titles)` that the
- * style engine re-evaluated on every mutation of these polled tables
- * (Processes/routes/leases). Match = <table class="table"> with a table-titles
- * header, not a .cbi-section-table (config forms keep their own layout). */
+/* Tag standalone data tables so the stacking rules can key off a static `.fs-dt` class
+ * instead of a live `:has(.tr.table-titles)` that the style engine re-evaluated on every
+ * mutation of these polled tables (Processes/routes/leases). Match = <table class="table">
+ * with a table-titles header, not a .cbi-section-table (config forms keep their own
+ * layout). */
 function tagDataTables() {
 	document.querySelectorAll('#view table.table:not(.cbi-section-table):not(.fs-dt)').forEach((t) => {
-		if (t.querySelector('.tr.table-titles'))
+		/* TWO header markups, and missing the second one is why the package list needed a
+		 * hand-written stacking block of its own. L.ui.Table emits `.tr.table-titles`; the
+		 * apk Software page emits `<table class="table" id="packages">` — no
+		 * .cbi-section-table class at all — whose header row is `.tr.cbi-section-table-titles`.
+		 * A `.table` with EITHER header is a data table; a `.table` with NEITHER is a
+		 * key/value include (System, Memory) and must never be carded. */
+		if (t.querySelector('.tr.table-titles, .tr.cbi-section-table-titles'))
 			t.classList.add('fs-dt');
+	});
+}
+
+/* ---- CARD-STACK A DATA TABLE THAT NO LONGER FITS --------------------------------
+ *
+ * The measuring, the scheduling and the observers are NOT here — they are the shared engine
+ * in fs-fit.js, which the top bar's menu uses too. This file supplies only the DECISION.
+ *
+ * WHAT THIS REPLACED. A data table used to be carded by a container query, and there were
+ * THREE different thresholds for it: 568 for a plain table (theme/30-tables.css), 780 for
+ * the DHCP leases (their 8 nowrap mono columns hold a ~736px floor, so they must card
+ * earlier) and 800 for the apk package list. Each of the last two carried its own COPY of
+ * the card rules, because CSS cannot share a declaration block across two @container
+ * thresholds. Both of those were really asking "does it OVERFLOW?" — a FACT the browser
+ * computes — so both are gone: the overflow is measured, each table discovers its own
+ * width, and the card rules live once, in theme/30-tables.css, keyed on .fs-stacked. A
+ * table from a third-party luci-app-*, whose column count we cannot know, is now handled
+ * too.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT TOUCH. A CONFIG table (.cbi-section-table) keeps its own
+ * container query (960, theme/65-dropdown.css). It is NOT measurable: its rows are full of
+ * widgets (fs-select turns every <select> into a ui.Dropdown), and a widget bakes in a
+ * width from the layout it was laid out in — so un-collapsing it to take a reading changes
+ * the very thing being read. Measured on the live router: after that toggle the firewall's
+ * zone table reported it needed 1747px where it really needs 1190px, and then overflowed
+ * its section by 557px — an overflow the CSS-only version never had. A data table has no
+ * widgets, which is exactly why it is the one that gets measured. */
+const STACKABLE = '#view .table.fs-dt';
+
+/* "Too cramped to be a table any more" — a DESIGN judgement, and the only number left here.
+ * It has to be a number: these tables do NOT overflow when the room runs out, because their
+ * cells break anywhere, so the table just compresses into an unreadable ribbon and there is
+ * no fact for anyone to read. A config row needs more room than a data row because a
+ * dropdown needs more than a text column — which is exactly why its old container query said
+ * 960 where the data table's said 568. The values are unchanged; what changed is that there
+ * are now TWO of them, in ONE place, instead of five spread across four files.
+ *
+ * (Do not try to make these measurable by giving the cells a min-width so that "cramped"
+ * MANUFACTURES an overflow. That was tried: it carded the firewall's zone table at 1420px
+ * and still overflowed by 39px once carded. A floor big enough to force the overflow is a
+ * floor big enough to break the card.) */
+const CRAMPED = 568;	/* stock LuCI cards its tables at a 600px viewport; below the 767px
+						 * tier .fs-content pads 16px a side, so 600 -> 568 of room */
+
+function fitTables() {
+	document.querySelectorAll(STACKABLE).forEach((t) => {
+		const was = t.classList.contains('fs-stacked');
+
+		/* Rule 1 of the engine: a stacked table is a pile of flex rows and always "fits", so
+		 * reading it as it stands un-stacks it and the next frame stacks it again. */
+		t.classList.remove('fs-stacked');
+		const room = fit.roomFor(t);
+		if (!(room > 0)) { if (was) t.classList.add('fs-stacked'); return; }
+
+		const stack = room < CRAMPED || fit.overflows(t);
+		/* write only on a real change: the poll re-renders these tables once a second, and
+		 * toggling the class off and on again each tick would invalidate style for every row
+		 * of Processes/Leases for nothing */
+		if (stack) t.classList.add('fs-stacked');
+		else if (was) t.classList.remove('fs-stacked');
 	});
 }
 
@@ -163,8 +230,11 @@ function relevant(mutations) {
 		}
 		for (const n of m.addedNodes) {
 			if (n.nodeType !== 1) continue;
-			if (n.matches('select.cbi-input-select, table.table')) return true;
-			if (n.querySelector('select.cbi-input-select, table.table')) return true;
+			/* `.table`, NOT `table.table`: LuCI renders most of these as DIVs (the
+			 * `display: table` comes from the CSS), so the tag-qualified selector missed
+			 * them — and with them every re-measure the poll should have triggered. */
+			if (n.matches('select.cbi-input-select, .table')) return true;
+			if (n.querySelector('select.cbi-input-select, .table')) return true;
 		}
 	}
 	return false;
@@ -175,9 +245,14 @@ return baseclass.extend({
 		const scan = () => {
 			document.querySelectorAll('select.cbi-input-select:not([data-fs-select])').forEach(enhance);
 			document.querySelectorAll('select.cbi-input-select[data-fs-select="1"]').forEach(resync);
-			tagDataTables();
 		};
 		scan();
+
+		/* A table has to be TAGGED .fs-dt before it can be fitted, and the tagging has to be
+		 * re-done whenever the poll brings a fresh table back — so the two travel together
+		 * as one fitter. fs-fit runs it now, on every content mutation (synchronously,
+		 * before paint) and on every resize of #view. */
+		fit.add(() => { tagDataTables(); fitTables(); });
 
 		let pending = false;
 		new MutationObserver((mutations) => {

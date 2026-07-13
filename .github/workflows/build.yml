@@ -105,6 +105,29 @@ jobs:
       - name: "Export tier (third-party contract: AA + the ramp is not flat)"
         run: node tools/export-tier.mjs
 
+      # A ratchet on the sheet's SHAPE, in the same spirit as build-css.sh's byte budgets.
+      # `!important` is 33 by design (16 in theme+pages, each fighting an inline or unlayered
+      # declaration that no cascade layer can outrank, + 17 in base) — stylelint stops a NEW
+      # file adding one, this stops the allowlisted files quietly growing more.
+      - name: "CSS metrics ratchet (!important, specificity, empty rules)"
+        run: node tools/css-metrics.mjs
+
+      # Dead CSS, scoped to OUR namespace — and the scoping is what makes it safe. The
+      # coverage contract (CLAUDE.md) forbids pruning a selector just because no page we can
+      # see renders it: a third-party luci-app-* renders widgets stock LuCI never does. But
+      # NOBODY else can emit an `fs-` class, so inside that namespace "nothing we ship emits
+      # it" really does mean dead. This is the check that catches a selector left behind when
+      # its markup is deleted.
+      - name: "Orphaned fs-* selectors (dead CSS in our own namespace)"
+        run: node tools/fs-orphans.mjs
+
+      # The same declaration body written under two DIFFERENT guards (a media query vs an
+      # attribute selector, or two @container queries). No linter can flag this — to a
+      # cascade-aware tool both rules are required, since only one ever matches — yet it is
+      # exactly the shape that drifts. Reported against a budget, not failed on sight.
+      - name: "Duplicated declaration bodies across guards"
+        run: node tools/css-dup.mjs
+
       # THE GATE THAT MAKES SHIPPING MINIFIED JS SAFE.
       #
       # luci.mk minifies our JS with jsmin on the buildbot. jsmin decides whether a `/`

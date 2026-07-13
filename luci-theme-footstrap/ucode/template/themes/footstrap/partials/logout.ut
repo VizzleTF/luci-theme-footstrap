@@ -1,18 +1,17 @@
 {#
- Shared logout link for both layouts (guarded on the node being dispatchable).
- Included as include('themes/footstrap/partials/logout', { with_label }) —
- with_label: the sidebar's footer row (.fs-logout); without it the top-nav's
- phone-only square icon button (.fs-top-logout, visibility in 50-topnav.css).
- Same door+arrow glyph either way.
+ The logout control (guarded on the node being dispatchable). ONE form for every
+ layout: a row carrying icon + label, which the bar and the icon rail squash into a
+ square icon button in CSS — same reasoning as partials/appearance.ut, so the old
+ `with_label` parameter and the separate .fs-top-logout element are gone.
+
+ This is also the ONLY logout the theme renders: the menu renderer drops the tree's
+ own admin/logout node (menu-footstrap.js), so the top layout no longer carries a
+ duplicate "Log out" item in the bar alongside this one.
  Licensed to the public under the Apache License 2.0.
 -#}
 {% if (dispatcher.lookup("admin/logout")): %}
-{% if (with_label): %}
-<a class="fs-logout" href="{{ dispatcher.build_url('admin/logout') }}" title="{{ _('Logout') }}">
-{% else %}
-<a class="fs-top-logout" href="{{ dispatcher.build_url('admin/logout') }}" title="{{ _('Logout') }}" aria-label="{{ _('Logout') }}">
-{% endif %}
+<a class="fs-logout" href="{{ dispatcher.build_url('admin/logout') }}" title="{{ _('Logout') }}" aria-label="{{ _('Logout') }}">
 	<svg class="fs-ico" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 12H3m0 0 3-3m-3 3 3 3"/></svg>
-	{% if (with_label): %}<span class="fs-label">{{ _('Logout') }}</span>{% endif %}
+	<span class="fs-label">{{ _('Logout') }}</span>
 </a>
 {% endif %}

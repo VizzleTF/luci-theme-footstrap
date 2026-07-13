@@ -8,10 +8,16 @@
     "lint:css": "stylelint \"luci-theme-footstrap/styles/**/*.css\"",
     "a11y": "node tools/a11y-gallery.mjs",
     "export-tier": "node tools/export-tier.mjs",
-    "i18n": "luci-theme-footstrap/update-po.sh --check"
+    "i18n": "luci-theme-footstrap/update-po.sh --check",
+    "css-dup": "node tools/css-dup.mjs",
+    "css-orphans": "node tools/fs-orphans.mjs",
+    "css-metrics": "node tools/css-metrics.mjs",
+    "check": "npm run lint && npm run css-metrics && npm run css-orphans && npm run css-dup && npm run export-tier && npm run i18n && npm run a11y"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
+    "@projectwallace/css-analyzer": "^9.9.0",
+    "css-tree": "^3.2.1",
     "eslint": "^9.17.0",
     "globals": "^15.14.0",
     "playwright": "^1.49.1",

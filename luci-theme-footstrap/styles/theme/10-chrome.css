@@ -71,36 +71,20 @@
 
 	.fs-indicators { display: flex; align-items: center; gap: 8px; }
 
-	/* ------------------------------------------------------------------
-	 * Square 34px icon button — the Appearance trigger (top-nav, and it is the
-	 * same element both layouts mount as #fs-appearance in top markup) and the
-	 * top-nav's phone logout button. One look; the hover accent differs
-	 * (appearance -> accent, logout -> danger) and stays with each button.
-	 * The sidebar's PHONE bar squares its .fs-themerow/.fs-logout rows into
-	 * this same look inside its own media block (they are full-width text rows
-	 * on the desktop, so those can't join this unconditional rule).
-	 * ------------------------------------------------------------------ */
-	.fs-appearance-btn,
-	.fs-top-logout {
-		display: inline-flex; align-items: center; justify-content: center;
-		width: 34px; height: 34px; padding: 0; flex: 0 0 auto;
-		border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
-		background: var(--fs-panel2); color: var(--fs-dim); cursor: pointer;
-		transition: background var(--fs-dur), border-color var(--fs-dur), color var(--fs-dur);
-	}
-	.fs-appearance-btn svg,
-	.fs-top-logout svg { width: 18px; height: 18px; }
-	.fs-appearance-btn:hover { color: var(--fs-text); border-color: var(--fs-accent); }
-	.fs-appearance-btn[aria-expanded="true"] { color: var(--fs-accent); border-color: var(--fs-accent); }
-	.fs-top-logout:hover { color: var(--fs-danger); border-color: var(--fs-danger); }
+	/* The 34px square icon button that .fs-themerow / .fs-logout collapse into is
+	 * NOT declared here any more. It only exists where the chrome is a bar or a rail,
+	 * and those states are already the ones that give them their border, surface and
+	 * size (20-shell-sidebar.css for the rail and the phone bar, 50-toplayout.css for
+	 * the desktop bar) — an unconditional copy here was a second definition of the
+	 * same button that the layout blocks then had to re-state anyway. The two
+	 * elements it used to target (.fs-appearance-btn, .fs-top-logout) no longer
+	 * exist: one template, one Appearance row, one Logout row. */
 
-	/* Density steps for the horizontal main menu, shared by both layouts —
-	 * menu-footstrap-common.js adds .fs-dense1/2 when the row would wrap (and
-	 * strips them while the sidebar list is vertical, so no media guard needed).
+	/* Density steps for the main menu once it is a horizontal row —
+	 * menu-footstrap-common.js adds .fs-dense1/2 when the row would wrap (and strips
+	 * them while the list is a vertical sidebar, so no media guard is needed).
 	 * Padding is trimmed hard first, the font only at the d2 floor. */
-	.fs-topnav .fs-mainmenu.fs-dense1 > li > a,
 	.fs-sidebar ul.nav.fs-dense1 > li > a { padding: 4px 8px; }
-	.fs-topnav .fs-mainmenu.fs-dense2 > li > a,
 	.fs-sidebar ul.nav.fs-dense2 > li > a { padding: 3px 6px; font-size: 14px; }
 
 	/* ------------------------------------------------------------------
@@ -114,34 +98,30 @@
 	ul.nav > li { display: block; }
 	ul.nav a { line-height: 19px; text-decoration: none; }
 
-	/* The submenu popup: `.dropdown-menu` is emitted by menu-footstrap-top.js and,
-	 * for the split Save & Apply button, by luci-base's own ui.js — so it must be
-	 * styled even though the sidebar never renders one. Each item anchors its own
-	 * nested popup, hence position: relative. */
+	/* `.dropdown-menu` is NOT the theme's menu any more — the theme's submenu is a
+	 * plain nested `ul`. It survives because luci-base's own ui.js emits it for the
+	 * split Save & Apply button, and a third-party luci-app-* may emit one too, so it
+	 * stays styled (coverage contract). Each item anchors its own nested popup, hence
+	 * position: relative. */
 	.dropdown-menu li { display: block; position: relative; }
 	/* wins over `ul.nav a` above: the popup sets its own denser rhythm */
 	ul.nav .dropdown-menu a, .dropdown-menu a { line-height: 18px; }
 
-	/* Menu item hover / active — one look, both layouts. Every menu surface (the
-	 * sidebar main list + submenu, the top-nav main list + dropdown, the mode menu
-	 * and the Appearance trigger row) hovers to panel2/text and marks the active
-	 * item with the accent-soft/accent pill. The selectors differ because the
-	 * markup differs (sidebar `ul.nav`, top-nav `.fs-mainmenu`), but the bodies are
-	 * identical, so they are grouped here instead of copied into each layout file. */
+	/* Menu item hover / active — one look, every layout. There is one markup now
+	 * (`ul.nav > li > a` plus a nested `ul`), so the main list, the submenu (an
+	 * accordion in the sidebar, a dropdown in the bar, a flyout in the rail), the mode
+	 * menu and the Appearance trigger row all take these two rules — no per-layout
+	 * copies to keep in step. */
 	.fs-sidebar ul.nav > li > a:hover,
 	.fs-sidebar ul.nav ul a:hover,
-	.fs-themerow:hover,
-	.fs-topnav .fs-mainmenu > li > a:hover,
-	.fs-topnav .fs-mainmenu .dropdown-menu li > a:hover {
+	.fs-themerow:hover {
 		background: var(--fs-panel2); color: var(--fs-text); opacity: 1;
 	}
 	.fs-sidebar ul.nav > li.active > a,
 	.fs-sidebar ul.nav > li > a.active,
 	.fs-sidebar ul.nav ul a.active,
 	.fs-themerow[aria-expanded="true"],
-	.fs-topnav .fs-mainmenu > li.active > a,
-	.fs-topnav .fs-mainmenu .dropdown-menu li.active > a,
-	.fs-modemenu-top li.active a {
+	.fs-modemenu li.active a {
 		background: var(--fs-accent-soft); color: var(--fs-accent);
 	}
 
@@ -150,14 +130,11 @@
 	 * this covers the buttons/links the theme itself renders, which had only the
 	 * UA default (menu links: base's thin dotted outline). */
 	.fs-railtoggle:focus-visible,
-	.fs-appearance-btn:focus-visible,
 	.fs-themerow:focus-visible,
 	.fs-logout:focus-visible,
-	.fs-top-logout:focus-visible,
 	.fs-seg button:focus-visible,
 	.fs-ap-update:focus-visible,
-	.fs-sidebar ul.nav a:focus-visible,
-	.fs-topnav .fs-mainmenu a:focus-visible {
+	.fs-sidebar ul.nav a:focus-visible {
 		outline: none;
 		box-shadow: var(--fs-focus-ring);
 	}

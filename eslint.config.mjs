@@ -89,8 +89,16 @@ export default [
 		 * cannot see the pragma that creates it. */
 		files: [
 			'luci-theme-footstrap/htdocs/luci-static/resources/menu-footstrap.js',
-			'luci-theme-footstrap/htdocs/luci-static/resources/menu-footstrap-top.js',
 		],
 		languageOptions: { globals: { common: 'readonly' } },
+	},
+	{
+		/* `'require fs-fit as fit';` — same pragma mechanism; a real binding at runtime
+		 * that ESLint cannot see. */
+		files: [
+			'luci-theme-footstrap/htdocs/luci-static/resources/fs-select.js',
+			'luci-theme-footstrap/htdocs/luci-static/resources/menu-footstrap-common.js',
+		],
+		languageOptions: { globals: { fit: 'readonly' } },
 	},
 ];

@@ -72,6 +72,13 @@ def main():
     ap.add_argument("--layout", default="/luci-static/footstrap")
     ap.add_argument("--mode", default="dark")
     ap.add_argument("--ssh-host", default="router")
+    # Container queries make the stylesheet's behaviour a FUNCTION of width: the table
+    # stacking tiers live in @container fs-view/fs-content, so a diff taken only at 1440
+    # never enters them. Verify a change to those tiers at a width inside each band.
+    ap.add_argument("--width", type=int, default=1440)
+    ap.add_argument("--height", type=int, default=900)
+    ap.add_argument("--ls", action="append", default=[], metavar="KEY=VALUE",
+                    help="extra localStorage entry set before load (e.g. --ls fs-layout=top)")
     args = ap.parse_args()
 
     pw = os.environ["LUCI_PW"]
@@ -88,9 +95,11 @@ def main():
         sh(f"uci set luci.main.mediaurlbase={args.layout}; uci commit luci; rm -f /tmp/luci-indexcache*")
         with sync_playwright() as p:
             br = p.chromium.launch(args=["--no-sandbox"])
-            ctx = br.new_context(viewport={"width":1440,"height":900})
+            ctx = br.new_context(viewport={"width":args.width,"height":args.height})
+            _extra = "".join(f"try{{localStorage.setItem('{k}','{v}')}}catch(e){{}}"
+                             for k, _, v in (e.partition("=") for e in args.ls))
             ctx.add_init_script(
-                f"try{{localStorage.setItem('fs-darkmode','{'true' if args.mode=='dark' else 'false'}')}}catch(e){{}}")
+                f"try{{localStorage.setItem('fs-darkmode','{'true' if args.mode=='dark' else 'false'}')}}catch(e){{}}{_extra}")
             ctx.request.post(f"{base}/cgi-bin/luci/", form={"luci_username":"root","luci_password":pw})
             page = ctx.new_page()
             for path in args.pages:

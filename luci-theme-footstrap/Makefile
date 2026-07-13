@@ -67,6 +67,11 @@ define Package/luci-theme-footstrap/postrm
 	         FootstrapLight FootstrapTop FootstrapTopDark FootstrapTopLight; do
 		uci -q delete "luci.themes.$$t"
 	done
+	# the theme's own server-side setting: the router's DEFAULT layout, which
+	# uci-defaults sets when migrating an old top-nav install. It means nothing to any
+	# other theme, and leaving it behind would silently re-apply the top bar if this
+	# package were reinstalled later.
+	uci -q delete luci.main.footstrap_layout
 	# don't leave the active theme pointing at the media dir we just removed —
 	# fall back to bootstrap instead of relying on LuCI's runtime fallback
 	case "$$(uci -q get luci.main.mediaurlbase)" in

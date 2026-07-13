@@ -6,7 +6,18 @@
  Licensed to the public under the Apache License 2.0.
 -#}
 <!DOCTYPE html>
-<html lang="{{ dispatcher.lang }}">
+{# data-layout is stamped by the SERVER, always, with an explicit value — never
+   left absent to mean "sidebar". Two reasons:
+   1. Every layout rule can then be a POSITIVE match (:root[data-layout="sidebar"],
+      :root[data-layout="top"]). A negative guard (:not([data-layout="top"])) would
+      silently hand the sidebar's rules to any FUTURE layout merely because it is
+      not "top" — a third layout has to opt in, not opt out.
+   2. The attribute exists before a single byte of JS runs, so the chrome is correct
+      with JS disabled too; the inline script below only OVERRIDES it from the
+      client's saved preference.
+   fs_layout is the router's default (luci.main.footstrap_layout, set by uci-defaults
+   when migrating an old top-nav install); absent = sidebar. #}
+<html lang="{{ dispatcher.lang }}" data-layout="{{ fs_layout == 'top' ? 'top' : 'sidebar' }}">
 	<head>
 		<meta charset="utf-8">
 		{# entityencode AROUND striptags. striptags removes tags but does NOT escape `&`
@@ -89,6 +100,20 @@
 				try {
 					if (localStorage.getItem('fs-rail') === 'true')
 						document.querySelector(':root').setAttribute('data-rail', 'true');
+				} catch (e) {}
+			})();
+		</script>
+		<script>
+			/* footstrap: the CLIENT's saved layout overrides the server's stamp on
+			   <html data-layout> above, before paint, so a reload never flashes the
+			   other layout. Only a KNOWN value is honoured — an unknown/corrupt one
+			   leaves the server's stamp standing rather than blanking the attribute,
+			   which every layout rule now matches on positively. */
+			(function() {
+				try {
+					var saved = localStorage.getItem('fs-layout');
+					if (saved === 'top' || saved === 'sidebar')
+						document.querySelector(':root').setAttribute('data-layout', saved);
 				} catch (e) {}
 			})();
 		</script>

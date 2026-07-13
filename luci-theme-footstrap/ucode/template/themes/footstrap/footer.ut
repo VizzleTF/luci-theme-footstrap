@@ -1,1 +1,1 @@
-{% include('themes/footstrap/partials/footer', { menu_module: 'menu-footstrap' }) %}
+{% include('themes/footstrap/partials/footer') %}

@@ -46,13 +46,56 @@ function iconSvg(name) {
 const _mqMobile = window.matchMedia('(max-width: 767px)');
 function flyoutMode() {
 	return document.documentElement.getAttribute('data-rail') === 'true' ||
+	       document.documentElement.getAttribute('data-layout') === 'top' ||
 	       _mqMobile.matches;
 }
 
-/* The trigger in this layout — a bare <a>, where the top-nav marks its own with
- * `.menu`. common.setOpen keeps `.open` and aria-expanded from drifting apart. */
+/* The trigger in this layout — a bare <a>. common.setOpen keeps `.open` and
+ * aria-expanded from drifting apart. */
 const TRIGGER = ':scope > a';
 const OPEN_LI = '#topmenu > li.open';
+
+/* ---- dropdown edge-clamp (desktop top bar only) --------------------------
+ * In the top layout each section's panel hangs off its OWN item (li is
+ * position:relative, ul is left:0 — theme/50-toplayout.css), so an item near the
+ * right edge would push its panel past the viewport. Nudge it back inside.
+ *
+ * Gated to the desktop bar on purpose: the phone bar anchors every panel to the
+ * bar's left edge and caps it to the viewport, and the collapsed rail flies panels
+ * out sideways — neither can overflow this way, so neither needs measuring.
+ * (This is the one piece of logic the deleted menu-footstrap-top.js carried.) */
+const EDGE_GAP = 8;
+function topBarMode() {
+	return document.documentElement.getAttribute('data-layout') === 'top' && !_mqMobile.matches;
+}
+function clampDropdown(li) {
+	if (!topBarMode()) return;
+	const menu = li.querySelector(':scope > ul');
+	if (!menu) return;
+
+	/* One pending measure per item. Sweeping the pointer across the bar otherwise
+	 * queues a frame per item crossed, each doing a write-then-read of layout, and
+	 * none of them cancelled once the pointer has moved on. */
+	if (li._fsClampRaf) window.cancelAnimationFrame(li._fsClampRaf);
+	li._fsClampRaf = window.requestAnimationFrame(() => {
+		li._fsClampRaf = 0;
+		menu.style.left = '';			/* back to the CSS anchor before measuring */
+		const r = menu.getBoundingClientRect();
+		if (!r.width) return;			/* still hidden — nothing to place */
+
+		/* measured after a frame: on pointerenter the :hover rule that reveals the
+		 * panel has not applied yet, so it would still measure 0x0 */
+		const overflowRight = r.right - (window.innerWidth - EDGE_GAP);
+		if (overflowRight > 0)
+			menu.style.left = -Math.min(overflowRight, r.left - EDGE_GAP) + 'px';
+	});
+}
+/* a nudge computed for the old width is wrong at the new one, and a nudge computed
+ * for the bar is meaningless once the layout goes back to the sidebar — drop them
+ * and let the next hover/tap recompute. */
+function clearClamps() {
+	document.querySelectorAll('#topmenu ul').forEach((m) => { m.style.left = ''; });
+}
 
 function setOpen(li, on) {
 	common.setOpen(li, on, TRIGGER);
@@ -192,6 +235,7 @@ function renderMainMenu(tree, url, level) {
 				if (flyoutMode()) {
 					closeFlyouts();
 					setOpen(li, !open);
+					if (!open) clampDropdown(li);	/* tap-opened panel must fit too */
 					return;
 				}
 				/* the expanded-sidebar accordion folds the others back only when
@@ -213,6 +257,9 @@ function renderMainMenu(tree, url, level) {
 			li.addEventListener('pointerenter', (ev) => {
 				if (ev.pointerType === 'mouse' && flyoutMode())
 					closeFlyouts();
+				/* the top bar opens this panel on hover (pure CSS), so it has to be
+				 * placed on hover too — not only when a tap sets .open */
+				clampDropdown(li);
 			});
 		}
 
@@ -246,11 +293,28 @@ return baseclass.extend({
 		 * runs — so a click listener added here would fire FIRST and read the old
 		 * data-rail. The attribute change is the state transition itself, and it
 		 * cannot be observed too early. */
-		const modeChanged = () => { flyoutMode() ? closeFlyouts() : restoreAccordion(); };
+		/* data-layout is watched alongside data-rail: switching the layout live is
+		 * exactly the same state transition as collapsing the rail — the bar's panels
+		 * are flyouts, the expanded sidebar's are an accordion — so the Appearance
+		 * toggle needs no menu re-render, only this. Any edge-clamp measured for the
+		 * old layout is dropped with it. */
+		const modeChanged = () => {
+			clearClamps();
+			flyoutMode() ? closeFlyouts() : restoreAccordion();
+		};
 		new MutationObserver(modeChanged).observe(document.documentElement, {
-			attributes: true, attributeFilter: [ 'data-rail' ]
+			attributes: true, attributeFilter: [ 'data-rail', 'data-layout' ]
 		});
 		_mqMobile.addEventListener('change', modeChanged);
+
+		/* a clamp computed at the old width is wrong at the new one. Coalesced into a
+		 * frame: resize fires dozens of times a second while a window is dragged. */
+		let resizePending = false;
+		window.addEventListener('resize', () => {
+			if (resizePending) return;
+			resizePending = true;
+			window.requestAnimationFrame(() => { resizePending = false; clearClamps(); });
+		});
 
 		/* Appearance -> Submenus -> auto-collapse is handled in common.js, which can
 		 * only reach the DOM: the remembered set and the aria-expanded state live
