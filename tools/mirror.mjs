@@ -38,6 +38,22 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+/* Whole FILES that must stay byte-identical. Same argument as an @mirror block, one level up:
+ * duplication a tool forces on you, made un-rottable.
+ *
+ * The Apache-2.0 text has to exist twice and neither copy can go:
+ *   LICENSE                        — the repo root, which is the only place GitHub looks
+ *   luci-theme-footstrap/LICENSE   — the PACKAGE, because PKG_LICENSE_FILES resolves against
+ *                                    $(PKG_BUILD_DIR) and luci.mk copies only
+ *                                    src/ luasrc/ htdocs/ root/ ucode/ po/ into it; CI rsyncs
+ *                                    only the package dir into the SDK, so the root file is not
+ *                                    reachable from $(CURDIR) either.
+ * A licence text cannot carry an @mirror comment without ceasing to be the licence text, so it
+ * is pinned as a whole file instead. */
+const SAME_FILE = [
+	['LICENSE', 'luci-theme-footstrap/LICENSE'],
+];
+
 /* Where a mirror may live. Deliberately explicit: a mirror is a decision, and a glob that
  * silently picks up a new tree would let one appear without anybody choosing it. */
 const SEARCH = [
@@ -98,6 +114,18 @@ function normalise(body) {
 	if (!kept.length) return '';
 	const indent = Math.min(...kept.map(l => l.match(/^[ \t]*/)[0].length));
 	return kept.map(l => l.slice(indent).replace(/\s+$/, '')).join('\n');
+}
+
+/* whole-file pins (see SAME_FILE) */
+for (const [a, b] of SAME_FILE) {
+	let ta, tb;
+	try { ta = readFileSync(join(ROOT, a)); } catch { errors.push(`@same-file: ${a} is missing`); continue; }
+	try { tb = readFileSync(join(ROOT, b)); } catch { errors.push(`@same-file: ${b} is missing`); continue; }
+	if (!ta.equals(tb))
+		errors.push(`@same-file: ${a} and ${b} have DRIFTED apart — they must be byte-identical ` +
+			`(${ta.length} vs ${tb.length} bytes).`);
+	else
+		console.log(`  ok   @same-file ${a} == ${b}   (${ta.length} bytes)`);
 }
 
 let bad = 0;

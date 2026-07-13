@@ -66,6 +66,17 @@ opkg install luci-theme-footstrap_*.ipk                # 24.10
 «Design». Это единственное, что задаётся на роутере — раскладка, палитра и всё
 остальное живут в попапе Appearance.
 
+## Лицензия
+
+Тема под **Apache-2.0** — и это не свободный выбор: `styles/base/` начинался как форк `cascade.css`
+из [luci-theme-bootstrap](https://github.com/openwrt/luci), ucode-шаблоны производны от шаблонов
+LuCI, а часть JS-хелперов скопирована из LuCI дословно. Всё это Apache-2.0, его notices едут вместе
+с ним, и вся экосистема LuCI/OpenWrt тоже Apache-2.0.
+
+Встроенные шрифты под неё **не** попадают. Manrope и JetBrains Mono — под
+[SIL Open Font License 1.1](luci-theme-footstrap/htdocs/luci-static/footstrap/fonts/OFL.txt); её
+текст и notices едут рядом со шрифтами, как того требует сама лицензия.
+
 ---
 
 Внутреннее устройство, сборка и заметки по разработке — в [docs/](docs/).

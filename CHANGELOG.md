@@ -13,6 +13,19 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 ## [Unreleased]
 
 ### Fixed
+- **The bundled webfonts were being redistributed without their licence.** Manrope and JetBrains Mono
+  are SIL Open Font License 1.1, and OFL §2 requires every copy of the Font Software to carry the
+  copyright notice **and** the licence text. The theme shipped nine `.woff2` files and neither — and
+  it could not have carried them inside the fonts, because these are unicode-range subsets and the
+  subsetter strips the licence out of the font's own name table (verified: the copyright survived, the
+  licence field did not). `fonts/OFL.txt` now travels with them to the router.
+- **The package's licence metadata pointed at nothing, and now ships what it declares.**
+  `PKG_LICENSE_FILES` resolves against `$(PKG_BUILD_DIR)`, which `luci.mk` fills with only
+  `src/ luasrc/ htdocs/ root/ ucode/ po/` — and CI rsyncs only the package directory into the SDK, so
+  the repo-root `LICENSE` was reachable from neither. `Build/Prepare` copies it in, and `PKG_LICENSE`
+  is now the honest `Apache-2.0 OFL-1.1`: the theme really does carry two bodies of work. The two
+  copies of the Apache text (repo root, for GitHub; package, for the build) are pinned byte-identical
+  by `npm run mirror`.
 - **A view's injected CSS no longer follows you to every page you visit afterwards.** A view may inject
   a `<style>` into `<head>` when it renders — `luci-app-filemanager` does — and on a full page load
   that stylesheet dies with the document, so it only ever affects the page that asked for it. SPA

@@ -67,6 +67,17 @@ Then pick **Footstrap** in **System → System → Language and Style**, field
 "Design". That is the only thing you set on the router — layout, palette and the
 rest are in the Appearance popover.
 
+## Licence
+
+The theme is **Apache-2.0** — and that is not a free choice: `styles/base/` began as a fork of
+[luci-theme-bootstrap](https://github.com/openwrt/luci)'s `cascade.css`, the ucode templates derive
+from LuCI's own, and a few JS helpers are copied from LuCI verbatim. All of that is Apache-2.0, its
+notices travel with it, and the whole LuCI/OpenWrt ecosystem is Apache-2.0 too.
+
+The bundled webfonts are **not** covered by it. Manrope and JetBrains Mono are
+[SIL Open Font License 1.1](luci-theme-footstrap/htdocs/luci-static/footstrap/fonts/OFL.txt), whose
+notice and text ship beside the fonts, as the licence requires.
+
 ---
 
 Internals, the build and development notes live in [docs/](docs/) (Russian).

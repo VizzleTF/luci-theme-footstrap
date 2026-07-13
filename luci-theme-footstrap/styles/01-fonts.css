@@ -1,6 +1,14 @@
 /* Self-hosted webfonts. Unlayered on purpose: @font-face declares a resource, it
  * is not a style rule, so a cascade layer would mean nothing here.
  *
+ * LICENCE — the fonts are NOT under the theme's Apache-2.0. Manrope and JetBrains Mono are
+ * SIL Open Font License 1.1, and OFL §2 requires every copy of the Font Software to carry the
+ * copyright notice AND the licence. These .woff2 are unicode-range SUBSETS, and the subsetter
+ * strips the licence out of the font's own name table — so the text has to travel beside the
+ * files: htdocs/luci-static/footstrap/fonts/OFL.txt, which ships to the router with them and is
+ * declared in the package (PKG_LICENSE_FILES). Do not delete it, and do not add a font without
+ * adding its notice there.
+ *
  * SPLIT BY SCRIPT, and that split is the whole point of this file.
  * uhttpd serves /www/luci-static/* with NO compression of any kind (there is no
  * gzip code anywhere in it — docs/18), so bytes on disk are bytes on the wire, and

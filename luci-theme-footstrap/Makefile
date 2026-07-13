@@ -56,13 +56,20 @@ LUCI_MINIFY_CSS:=0
 #   - tools/jsmin-verify.mjs proves jsmin's output is TOKEN-IDENTICAL to the source.
 # Both run in CI. See CLAUDE.md.
 
-PKG_LICENSE:=Apache-2.0
-# No PKG_LICENSE_FILES, deliberately. It resolves against $(PKG_BUILD_DIR), and luci.mk's
-# Build/Prepare copies only src/ luasrc/ htdocs/ root/ ucode/ po/ into it — the repo's LICENSE
-# (Apache-2.0, at the tree root) is not among them, and CI rsyncs only this package directory
-# into the SDK, so it is not reachable from $(CURDIR) either. Declaring the file without
-# shipping it makes the package metadata point at something that is not there, which is worse
-# than not declaring it: the SPDX identifier above is what a licence scanner actually reads.
+# TWO licences, because the package really does carry two bodies of work.
+#
+# Apache-2.0 is the theme itself — and it is not a free choice: styles/base began as a fork of
+# luci-theme-bootstrap's cascade.css, the ucode templates derive from LuCI's own, and a few JS
+# helpers are copied from LuCI verbatim. All of that is Apache-2.0 and its notices travel with
+# it (styles/00-header.css, the template headers).
+#
+# OFL-1.1 is the webfonts. Manrope and JetBrains Mono are SIL Open Font License 1.1, and OFL §2
+# requires every copy of the Font Software to carry the copyright notice AND the licence. The
+# .woff2 files here are unicode-range SUBSETS, and the subsetter strips the licence out of the
+# font's own metadata — so the text has to travel beside them, which is what
+# htdocs/luci-static/footstrap/fonts/OFL.txt is. It ships to the router with the fonts.
+PKG_LICENSE:=Apache-2.0 OFL-1.1
+PKG_LICENSE_FILES:=LICENSE htdocs/luci-static/footstrap/fonts/OFL.txt
 
 # RELOAD, NOT RESTART — this is the difference between "the theme updated" and
 # "everyone using LuCI was logged out".
@@ -146,6 +153,11 @@ endef
 #    can show it and run its GitHub update check. Skipped when PKG_VERSION is
 #    empty (leaves the '0.0.0-dev' literal).
 define Build/Prepare/luci-theme-footstrap
+	# luci.mk's Build/Prepare copies only src/ luasrc/ htdocs/ root/ ucode/ po/ into
+	# $(PKG_BUILD_DIR), and PKG_LICENSE_FILES resolves against THAT — so the Apache text has to
+	# be put there by hand or the declaration points at nothing. (The fonts' OFL.txt needs no
+	# help: it lives under htdocs/, which luci.mk already copies.)
+	$(CP) $(CURDIR)/LICENSE $(PKG_BUILD_DIR)/
 	$(SHELL) $(CURDIR)/build-css.sh $(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css
 	$(if $(PKG_VERSION),$(SED) "s#const FS_VERSION = '[^']*'#const FS_VERSION = '$(PKG_VERSION)'#" \
 		$(PKG_BUILD_DIR)/htdocs/luci-static/resources/menu-footstrap-common.js)
