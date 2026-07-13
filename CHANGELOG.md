@@ -10,7 +10,17 @@ Security, Performance.
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [Unreleased]
+## [0.8.2] — 2026-07-13
+
+### Changed
+- **The licensing position is written down, in the READMEs and in the Makefile.** The theme is
+  Apache-2.0 and that is **not** a free choice: `styles/base/` began as a fork of
+  luci-theme-bootstrap's `cascade.css`, the ucode templates derive from LuCI's own, and several JS
+  helpers are copied from LuCI verbatim — all Apache-2.0, whose notices have to travel with it. (GPLv2
+  is not even available: Apache-2.0's patent and indemnity clauses are additional restrictions GPLv2
+  forbids. GPLv3 would be legal but would cost the theme its place in the LuCI feed and make
+  firmware vendors avoid it, for a copyleft that buys little on code a browser is handed as source.)
+  The bundled fonts are **not** covered by it — they are SIL OFL 1.1, and now say so.
 
 ### Fixed
 - **The bundled webfonts were being redistributed without their licence.** Manrope and JetBrains Mono
@@ -1213,6 +1223,7 @@ line, not one per tag. The individual patch releases are in the git history.
 [0.7.4]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.1...v0.7.2
+[0.8.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.18...v0.8.0
 [0.7.18]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.17...v0.7.18

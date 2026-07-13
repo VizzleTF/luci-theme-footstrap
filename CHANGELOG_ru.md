@@ -10,7 +10,17 @@
 
 Каждый коммит пишет в `[Unreleased]`. При выпуске тега заголовок переименовывается.
 
-## [Unreleased]
+## [0.8.2] — 2026-07-13
+
+### Изменено
+- **Лицензионная позиция зафиксирована — в README и в Makefile.** Тема под Apache-2.0, и это **не**
+  свободный выбор: `styles/base/` начинался как форк `cascade.css` из luci-theme-bootstrap,
+  ucode-шаблоны производны от шаблонов LuCI, часть JS-хелперов скопирована из LuCI дословно — всё это
+  Apache-2.0, чьи notices обязаны ехать вместе с кодом. (GPLv2 даже недоступна: патентная оговорка и
+  indemnity в Apache-2.0 — это «дополнительные ограничения», которые GPLv2 запрещает. GPLv3 была бы
+  законна, но стоила бы теме места в фиде LuCI и заставила бы вендоров прошивок её избегать — ради
+  копилефта, который почти ничего не даёт коду, отдаваемому браузеру исходником.) Встроенные шрифты
+  под неё **не** попадают: они под SIL OFL 1.1, и теперь об этом сказано.
 
 ### Исправлено
 - **Встроенные шрифты распространялись без своей лицензии.** Manrope и JetBrains Mono — под SIL Open
@@ -1216,6 +1226,7 @@
 [0.7.4]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.1...v0.7.2
+[0.8.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.18...v0.8.0
 [0.7.18]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.17...v0.7.18
