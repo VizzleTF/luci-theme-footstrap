@@ -44,14 +44,14 @@
 	 * Startup) miss the width:100% above, so they sized to preferred width and
 	 * overflowed the content column. Pin them to the container so a wrappable column
 	 * (package-manager's Description) reflows to fit instead of forcing a scroll. */
-	#view .table[id], #view table.fs-dt { width: 100%; }
+	#view .table[id], table.fs-dt { width: 100%; }
 	/* width:100% alone can't shrink a table below its min-content — a column with a
 	 * long unbreakable value holds the floor. Let long words/values break so the
 	 * table reflows to fit the ~984px column instead of scrolling (package-manager's
 	 * prose Description, a long command path in Processes, …). The DHCP leases need
 	 * finer control — only their DUID/IPv6 columns may break, not IPv4/MAC — so that
 	 * lives in its own page costyl (styles/pages/50-leases.css), which overrides. */
-	#view .table[id] .td, #view table.fs-dt .td { overflow-wrap: anywhere; }
+	#view .table[id] .td, table.fs-dt .td { overflow-wrap: anywhere; }
 	.cbi-section .table .td,
 	.cbi-section .table .th {
 		padding: 10px 16px 10px 0;
@@ -75,7 +75,7 @@
 	/* --- DATA tables (with id or JS-tagged .fs-dt): leases, wifi, processes, … ---
 	 * Symmetric horizontal padding so cells clear the table's own contour (below). */
 	.cbi-section .table[id] .td, .cbi-section .table[id] .th,
-	#view table.fs-dt .td, #view table.fs-dt .th { padding: 10px 11px; }
+	table.fs-dt .td, table.fs-dt .th { padding: 10px 11px; }
 	.cbi-section .table[id] .td { font-family: var(--fs-font-mono); font-size: 12px; color: var(--fs-text); }
 	/* No horizontal-scroll wrapper: a data table reflows to fit the content column
 	 * via the overflow-wrap rule above (long opaque values break), so it never needs
@@ -90,7 +90,7 @@
 	 * .table.fs-dt straight in a bare #view wrapper with no section, so the
 	 * section-scoped selector missed it and it drew frameless. */
 	.cbi-section .table[id], #view .table[id],
-	.cbi-section .table.fs-dt, .cbi-section table.fs-dt, #view table.fs-dt {
+	.cbi-section .table.fs-dt, .cbi-section table.fs-dt, table.fs-dt {
 		border-collapse: separate; border-spacing: 0;
 		border: 1px solid var(--fs-border); border-radius: var(--fs-radius-lg);
 		/* overflow:visible, EXPLICITLY. It clipped the last column when a wide table
@@ -114,16 +114,16 @@
 	 * corner cells must round with it — without it they poked past the frame. */
 	.cbi-section .table[id] .tr.table-titles .th:first-child,
 	#view .table[id] .tr.table-titles .th:first-child,
-	#view table.fs-dt .tr.table-titles .th:first-child { border-top-left-radius: var(--fs-radius-lg); }
+	table.fs-dt .tr.table-titles .th:first-child { border-top-left-radius: var(--fs-radius-lg); }
 	.cbi-section .table[id] .tr.table-titles .th:last-child,
 	#view .table[id] .tr.table-titles .th:last-child,
-	#view table.fs-dt .tr.table-titles .th:last-child { border-top-right-radius: var(--fs-radius-lg); }
+	table.fs-dt .tr.table-titles .th:last-child { border-top-right-radius: var(--fs-radius-lg); }
 	.cbi-section .table[id] .tr:last-child .td:first-child,
 	#view .table[id] .tr:last-child .td:first-child,
-	#view table.fs-dt .tr:last-child .td:first-child { border-bottom-left-radius: var(--fs-radius-lg); }
+	table.fs-dt .tr:last-child .td:first-child { border-bottom-left-radius: var(--fs-radius-lg); }
 	.cbi-section .table[id] .tr:last-child .td:last-child,
 	#view .table[id] .tr:last-child .td:last-child,
-	#view table.fs-dt .tr:last-child .td:last-child { border-bottom-right-radius: var(--fs-radius-lg); }
+	table.fs-dt .tr:last-child .td:last-child { border-bottom-right-radius: var(--fs-radius-lg); }
 	/* Empty data table: L.ui.Table adds a single-cell .tr.placeholder ("There are no
 	 * active leases"). In a display:table table that lone cell spans only the first
 	 * column, and the bottom-corner rounding then draws a tiny rounded box on the
@@ -131,10 +131,10 @@
 	 * carrying the frame's bottom corners so the note fills the table cleanly. */
 	.cbi-section .table[id] .tr.placeholder,
 	#view .table[id] .tr.placeholder,
-	#view table.fs-dt .tr.placeholder { display: block; }
+	table.fs-dt .tr.placeholder { display: block; }
 	.cbi-section .table[id] .tr.placeholder .td,
 	#view .table[id] .tr.placeholder .td,
-	#view table.fs-dt .tr.placeholder .td {
+	table.fs-dt .tr.placeholder .td {
 		display: block; width: 100%; text-align: left;
 		color: var(--fs-dim); font-family: var(--fs-font-sans);
 		border-radius: 0 0 var(--fs-radius-lg) var(--fs-radius-lg);
@@ -231,37 +231,56 @@
 	 * .tr.table-titles header and is NOT .cbi-section-table — replacing a live
 	 * `:has(.tr.table-titles):not(.cbi-section-table)` that the style engine had to
 	 * re-evaluate on every mutation of these polled tables (Processes/routes/leases). */
-	/* Card-stack a data table into label/value rows only when the content column is
-	 * narrow (≤800). Above that a wide fs-dt (DHCP leases) stays a real table and
+	/* Card-stack a data table into label/value pairs only when the content column is
+	 * narrow. Above the threshold a wide fs-dt (DHCP leases) stays a real table and
 	 * reflows its long opaque values (DUID/IPv6, and the hostname) to fit — see the
-	 * overflow-wrap rules elsewhere; below 800 the cards read better. */
-	@container fs-view (max-width: 800px) {
-		#view table.fs-dt .tr.table-titles { display: none; }
-		#view table.fs-dt .tr { display: block; padding: 10px 16px; }
-		#view table.fs-dt .td {
-			display: flex; align-items: baseline; justify-content: space-between;
-			gap: 14px; padding: 5px 0; border: 0; text-align: right; min-width: 0; width: auto;
-			flex-wrap: wrap; overflow-wrap: anywhere; white-space: normal;
+	 * overflow-wrap rules elsewhere.
+	 *
+	 * The threshold is stock LuCI's: bootstrap's mobile.css stacks its tables at
+	 * `max-device-width: 600px`. Ours is a CONTAINER query on #view, and below the
+	 * 767px tier .fs-content pads 16px a side — so a 600px viewport is a 568px
+	 * container, and that is the number. It used to be 800, which carded the table on
+	 * small tablets and narrow desktop windows where the real table still fits.
+	 *
+	 * The stack is the two-column shape stock LuCI uses on a phone (bootstrap's
+	 * mobile.css): the label sits ABOVE its value and each cell takes half the row.
+	 * The earlier shape put label and value on ONE line with the value flushed right,
+	 * which cost a leases row 7 full-width lines and gave the value ~40% of the width
+	 * — an .ifacebadge, a signal SVG or a DUID then wrapped under its own label
+	 * anyway. Half-width pairs fold the same row into 4 lines, and the value gets the
+	 * whole half-column. Values stay LEFT-aligned: they are opaque strings (MAC, DUID,
+	 * rates) and a ragged right edge reads worse than a ragged left one. */
+	@container fs-view (max-width: 568px) {
+		table.fs-dt .tr.table-titles { display: none; }
+		table.fs-dt .tr {
+			display: flex; flex-wrap: wrap; align-items: flex-start;
+			padding: 10px 16px 12px;
 		}
-		#view table.fs-dt .td[data-title]::before {
-			content: attr(data-title); flex: 0 0 auto; text-align: left;
+		table.fs-dt .td {
+			display: block; flex: 1 1 50%; min-width: 0; width: auto;
+			padding: 6px 10px 6px 0; border: 0; text-align: left;
+			overflow-wrap: anywhere; white-space: normal;
+		}
+		table.fs-dt .td[data-title]::before {
+			content: attr(data-title); display: block; margin-bottom: 3px;
 			font-size: 10px; font-weight: 700; letter-spacing: .05em;
-			text-transform: uppercase; color: var(--fs-faint); white-space: nowrap;
+			text-transform: uppercase; color: var(--fs-faint);
 		}
-		#view table.fs-dt .td.cbi-section-actions {
-			justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 4px;
+		/* the row's buttons (Disconnect, Reserve IP) are not a label/value pair — give
+		 * them the full width below the pairs, left-aligned like the values above. */
+		table.fs-dt .td.cbi-section-actions {
+			display: flex; flex: 1 1 100%; justify-content: flex-start;
+			flex-wrap: wrap; gap: 8px; padding-top: 8px;
 		}
-		#view table.fs-dt .td.cbi-section-actions::before,
-		#view table.fs-dt .td:not([data-title])::before,
-		#view table.fs-dt .td[data-title=""]::before { content: none; }
-		/* let the value side shrink and wrap instead of forcing the row wider than the
-		 * viewport — on a phone the assoclist value cells (an .ifacebadge with a long
-		 * "Access Point … (phyN-apM)" caption, a MAC + IPv6 pair, the signal SVG) are
-		 * intrinsically ~250px and, with min-width:auto flex items, were clipped on the
-		 * right by .fs-main's overflow-x:clip. flex-wrap drops an oversized value below
-		 * its label; min-width:0/max-width:100% + overflow-wrap break the content. */
-		#view table.fs-dt .td > *,
-		#view table.fs-dt .td .ifacebadge { min-width: 0; max-width: 100%; }
+		table.fs-dt .td.cbi-section-actions::before,
+		table.fs-dt .td:not([data-title])::before,
+		table.fs-dt .td[data-title=""]::before { content: none; }
+		/* nothing inside a half-width cell may force the row wider than the viewport:
+		 * .fs-main uses overflow-x:clip, so an over-wide child is CUT, not scrolled to.
+		 * The assoclist value cells (an .ifacebadge with a long "Access Point …
+		 * (phyN-apM)" caption, the signal SVG) are intrinsically ~250px. */
+		table.fs-dt .td > *,
+		table.fs-dt .td .ifacebadge { min-width: 0; max-width: 100%; }
 	}
 	/* general table cell padding — compact but readable (Startup/Processes/etc) */
 	.table .td { padding-top: 7px; padding-bottom: 7px; }

@@ -139,40 +139,80 @@
 		width: 100%;
 	}
 
-	/* Below ~960px of available width the multi-dropdown row no longer fits — stack. */
+	/* Below ~960px of available width the multi-dropdown row no longer fits — stack each
+	 * config row into a card. The card's shape is stock LuCI's phone layout (bootstrap's
+	 * mobile.css): the column label sits ABOVE its cell, a read-only cell takes half the
+	 * row and a cell holding an input/select/dropdown takes the whole width — so an
+	 * OpenVPN instance (6 columns) folds into 3 short lines instead of 6 label:value
+	 * lines with the value flushed right. Same shape as the fs-dt data-table stack. */
 	@container fs-content (max-width: 960px) {
-		.cbi-section-table,
-		.cbi-section-table .thead,
-		.cbi-section-table .tbody,
-		.cbi-section-table .tr,
-		.cbi-section-table .td { display: block; width: auto; }
-		.cbi-section-table .thead { display: none; }
-		.cbi-section-table .tr.cbi-section-table-row,
-		.cbi-section-table .tbody .tr {
+		.table.cbi-section-table,
+		.table.cbi-section-table .tbody,
+		.table.cbi-section-table .td { display: block; width: auto; }
+		/* Hide the header row in BOTH markups — a stacked card repeats every one of its
+		 * labels, so the header is a duplicate that only ran off the right edge.
+		 * form.js wraps titles+descr in a `.thead`; the Lua CBI that half the
+		 * third-party apps still render through (luci-app-openvpn: "Lua compatibility
+		 * mode") emits a bare `tr.cbi-section-table-titles` inside the browser-inserted
+		 * <tbody>, with no .thead to match — which is why hiding only `.thead` left the
+		 * OpenVPN header on screen. `.tr.table-titles` is deliberately NOT listed: that
+		 * class comes from L.ui.Table, which renders plain data tables (.table, tagged
+		 * .fs-dt) and never a .cbi-section-table — their header is hidden by the fs-dt
+		 * stack in theme/30-tables.css instead. */
+		.table.cbi-section-table .thead,
+		.table.cbi-section-table .tr.cbi-section-table-titles,
+		.table.cbi-section-table .tr.cbi-section-table-descr { display: none; }
+		.table.cbi-section-table .tr {
+			display: flex; flex-wrap: wrap; align-items: flex-start; width: auto;
 			border: 1px solid var(--fs-border);
 			border-radius: var(--fs-radius-lg);
 			background: var(--fs-panel2);
-			padding: 8px 14px;
+			padding: 8px 14px 12px;
 			margin-bottom: 12px;
 		}
-		.cbi-section-table .tbody .tr:hover { background: var(--fs-panel2); }
-		.cbi-section-table .td {
-			display: flex; align-items: center; justify-content: space-between;
-			gap: 14px; padding: 8px 0; border: 0; text-align: right;
-			border-bottom: 1px solid var(--fs-border);
+		.table.cbi-section-table .tr:hover { background: var(--fs-panel2); }
+		/* `.table.cbi-section-table`, not `.cbi-section-table`: the general cell padding
+		 * for these tables is written as `.table.cbi-section-table .td` (theme/30-tables),
+		 * which outranks a one-class-lighter selector — a plainer selector here silently
+		 * kept the desktop padding.
+		 *
+		 * margin: 0 is load-bearing. The Lua CBI gives a table CELL the same
+		 * `.cbi-value-field` class a FORM field carries, and base indents that class by
+		 * 20px to sit it next to its label. In a stacked row every cell then measured
+		 * 50% + 20px, two no longer fit on a line, and each pair-cell wrapped to a line
+		 * of its own — which is exactly why the OpenVPN row stayed one column deep. */
+		.table.cbi-section-table .td {
+			flex: 1 1 100%; min-width: 0; margin: 0;
+			padding: 6px 10px 6px 0; border: 0; text-align: left;
 		}
-		.cbi-section-table .tr .td:last-child { border-bottom: 0; }
-		.cbi-section-table .td[data-title]::before {
-			content: attr(data-title);
-			flex: 0 0 auto; text-align: left;
+		/* A cell that only READS a value — dummy text, a flag, one button — is short, so
+		 * two fit on a line; anything with a real widget in it keeps the full width (the
+		 * 100% basis above), because a dropdown at half a phone's width is unusable.
+		 * Both spellings of the same widget: `CBI.DummyValue` from form.js, `dvalue`
+		 * from the Lua CBI's typename. */
+		.table.cbi-section-table .td[data-widget="CBI.DummyValue"],
+		.table.cbi-section-table .td[data-widget="CBI.FlagValue"],
+		.table.cbi-section-table .td[data-widget="CBI.Button"],
+		.table.cbi-section-table .td[data-widget="dvalue"],
+		.table.cbi-section-table .td[data-widget="fvalue"],
+		.table.cbi-section-table .td[data-widget="button"] { flex-basis: 50%; }
+		.table.cbi-section-table .td[data-title]::before {
+			content: attr(data-title); display: block; margin-bottom: 3px;
 			font-size: 10px; font-weight: 700; letter-spacing: .05em;
 			text-transform: uppercase; color: var(--fs-faint);
 		}
-		.cbi-section-table .td.cbi-section-actions { justify-content: flex-end; flex-wrap: wrap; }
-		.cbi-section-table .td .cbi-dropdown,
-		.cbi-section-table .td select,
-		.cbi-section-table .td input[type="text"] { width: auto; min-width: 150px; flex: 0 1 auto; }
-		.cbi-section-table .td .zone-forwards { width: 100%; }
+		/* the row's buttons are not a label/value pair: full width, left-aligned, and
+		 * each button stretches to share the line (Edit | Delete). */
+		.table.cbi-section-table .td.cbi-section-actions {
+			display: flex; flex: 1 1 100%; flex-wrap: wrap; gap: 8px;
+			justify-content: flex-start; padding-top: 8px;
+		}
+		.table.cbi-section-table .td.cbi-section-actions::before { content: none; }
+		.table.cbi-section-table .td.cbi-section-actions > * { flex: 1 1 auto; display: flex; gap: 8px; }
+		.table.cbi-section-table .td .cbi-dropdown,
+		.table.cbi-section-table .td select,
+		.table.cbi-section-table .td input[type="text"] { width: 100%; min-width: 0; }
+		.table.cbi-section-table .td .zone-forwards { width: 100%; }
 	}
 
 	/* ==================================================================

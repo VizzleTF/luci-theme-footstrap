@@ -104,6 +104,14 @@
 	 * ================================================================== */
 	#view { container-type: inline-size; container-name: fs-view fs-content; }
 
+	/* A modal is NOT inside #view — ui.js appends #modal_overlay to <body> — so every
+	 * @container query above resolved to nothing in there and no table stacked: on a
+	 * phone the Edit-interface dialog rendered its form at desktop widths and cut the
+	 * inputs off at the dialog's right edge. Carry BOTH names so a dialog stacks its
+	 * .cbi-section-table (fs-content) and its data tables (fs-view) exactly like the
+	 * page would. This is what makes any third-party app's modal work unchanged. */
+	.modal { container-type: inline-size; container-name: fs-view fs-content; }
+
 	/* pager (pagination row: « prev · text · » next) — generic component, not page
 	 * scoped: any .pager gets an inline centred row with compact square buttons. */
 	.pager.center { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 10px; padding: 14px 0; }

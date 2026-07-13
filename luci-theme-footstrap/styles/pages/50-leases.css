@@ -13,12 +13,14 @@
 	 * enough to reflow the whole table within the column while IPv4/MAC/IAID stay
 	 * intact. Matched by data-title (LuCI's per-cell column label).
 	 *
-	 * Scoped to min-width 801 (a container query on #view): at ≤800 the table cards
-	 * via the theme's @container block, where cells wrap normally — this nowrap must
-	 * not leak into that phone layout. It sits in @layer page so it wins over the
-	 * theme's general overflow-wrap. Target this one table here rather than in the
-	 * shared theme file, so other fs-dt tables keep the plain break-to-fit behaviour. */
-	@container fs-view (min-width: 801px) {
+	 * Scoped to min-width 569 (a container query on #view): at ≤568 — stock LuCI's
+	 * 600px phone breakpoint less .fs-content's 16px side padding — the table cards via
+	 * the theme's @container block, where cells wrap normally, and this nowrap must not
+	 * leak into that phone layout. The two thresholds are adjacent on purpose: a gap
+	 * would leave a band of widths with neither behaviour. It sits in @layer page so it
+	 * wins over the theme's general overflow-wrap. Target this one table here rather
+	 * than in the shared theme file, so other fs-dt tables keep plain break-to-fit. */
+	@container fs-view (min-width: 569px) {
 		#view table.fs-dt:is(.leases, .leases6) .td { white-space: nowrap; }
 		/* The three columns allowed to wrap. Hostname is here for the same reason as
 		 * DUID: overflow-wrap:anywhere takes the natural breaks first (the hyphens in

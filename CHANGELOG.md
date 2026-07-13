@@ -10,27 +10,88 @@ Security, Performance.
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [Unreleased]
+## [0.7.17] — 2026-07-13
+
+### Fixed
+- **A dialog on a phone laid its form out as if it were a desktop, and cut the inputs
+  off at its right edge.** Every mobile rule in the theme was scoped to `#view`, and
+  `ui.js` appends a modal to `<body>`, so none of them ever reached it. The
+  `@container` queries that stack tables resolved to nothing in there either, because
+  a modal sits inside no container the theme names. The modal is now a container in
+  its own right (`fs-view fs-content`), and the field-stacking rules no longer ask for
+  `#view`. Any app's dialog stacks the way its page does, not just the dialogs we
+  happened to test.
+- **The theme ignored the phone contract that every `luci-app-*` is written against.**
+  LuCI's own JS marks the cells it wants dropped on a phone with `.hide-xs`/`.hide-sm`
+  and weights columns with `.col-1`…`.col-10` (`wireless.js`, `connections.js`,
+  `package-manager.js`, `channel_analysis.js`, `ui.js`). No stylesheet but bootstrap's
+  `mobile.css` styles those classes, so a theme that skips them renders a layout the
+  app's own JS believes it has already handled. Associated Stations was showing the MAC
+  column stock LuCI hides, at the cost of half a row. Both class families are
+  implemented now. Stock needs `!important` to win that cascade; one extra class
+  (`.table .td.hide-xs`) does it here.
+- **Forms on a phone zoomed the page in and never zoomed back out.** iOS Safari zooms
+  when a focused control's text is smaller than 16px, and the theme's inputs are 13px.
+  Below 767px they are 16px now, as in stock LuCI.
+- **A stacked config row stayed one column deep whatever the rules said.** Two rules
+  from elsewhere were landing on its cells. The Lua CBI gives a table cell the same
+  `.cbi-value-field` class a form field carries, and base indents that class by 20px to
+  sit it next to its label, so a pair-cell measured `50% + 20px`, two of them no longer
+  fit a line, and each wrapped onto its own. Cell padding, meanwhile, is written as
+  `.table.cbi-section-table .td`, which outranked the stack's plainer selector, so the
+  stack's padding never applied at all. Both are fixed where they are written, not with
+  a flag.
+- The header row of a config table stayed visible on a phone and ran off the right
+  edge, above a card that already repeats every one of its labels. The rule hid only
+  `.thead`, which is the JS form's markup. The Lua CBI that half the third-party apps
+  still render through (`luci-app-openvpn`) emits a bare `tr.cbi-section-table-titles`
+  instead. Both are hidden now.
+
+### Changed
+- **Data tables on a phone stack the way stock LuCI stacks them: the column label sits
+  above its value, and each cell takes half the row.** They used to put label and value
+  on one line with the value flushed right, which left the value about 40% of the
+  width. An Associated Stations row then spent 7 full-width lines, and its
+  `.ifacebadge`, signal graph and long DUID wrapped under their own labels anyway.
+  Half-width pairs fold the same row into 4 lines and hand the value the whole
+  half-column. The row's buttons (Disconnect, Reserve IP) take a full-width line of
+  their own below the pairs. Values stay left-aligned: a MAC, a DUID or a rate is an
+  opaque string, and a ragged right edge reads worse than a ragged left one.
+- **Config tables stack the same way, and a cell holding a widget keeps the full
+  width.** A `.cbi-section-table` row (OpenVPN instances, firewall zones, port
+  forwards) used to card into `label : value` lines with the value flushed right. It
+  now uses the pair layout above: read-only cells at half a row (`data-widget` =
+  dummy/flag/button, in both the `CBI.*` spelling `form.js` emits and the lowercase one
+  the Lua CBI does), and any cell with an input, select or dropdown in it at the full
+  width, because a dropdown half a phone wide cannot be used. Row buttons get their own
+  line.
+- **The width at which a data table stops being a table is stock LuCI's now, not
+  ours.** Bootstrap's `mobile.css` stacks at `max-device-width: 600px`; the theme
+  carded at a container width of 800px, i.e. on small tablets and narrow desktop
+  windows where the real table still fits. The threshold is a 568px `#view` container:
+  a 600px viewport, less the 16px of side padding `.fs-content` carries below the 767px
+  tier. The DHCP-leases nowrap rule moved to the adjacent `min-width: 569px`, so no band
+  of widths is left with neither behaviour.
 
 ### Performance
 - **The overview showed nothing at all until its slowest section answered.** Stock
   `view.status.index` calls `poll_status()` with a `Promise.all` over every include's
-  `load()`, and `render()` does not return its tree until that settles — so `#view`
-  stays empty for the whole wait. Measured on the dev router (warm, in-place nav):
-  229 ms before the first section appeared, while System, CPU, Memory, Storage, DHCP
-  and Network had their data at 88 ms and were held back by `29_ports` and `60_wifi`
-  (180 ms each). Sections now paint as soon as **their own** data lands: first
-  section **229 → 91 ms**, everything filled 243 → 191 ms.
+  `load()`, and `render()` does not return its tree until that settles, so `#view` stays
+  empty for the whole wait. Measured on the dev router (warm, in-place nav): 229 ms
+  before the first section appeared, while System, CPU, Memory, Storage, DHCP and
+  Network had their data at 88 ms and were held back by `29_ports` and `60_wifi`
+  (180 ms each). Sections now paint as soon as their own data lands: first section
+  229 → 91 ms, everything filled 243 → 191 ms.
 - **The overview fetched all of its data twice on every visit.** Stock registers the
-  poller only after the first load completes, and `Poll.add()` steps immediately — so
-  the page re-ran every include's `load()` right after painting, ~250 ms of ubus work
+  poller only after the first load completes, and `Poll.add()` steps immediately, so the
+  page re-ran every include's `load()` right after painting: roughly 250 ms of ubus work
   for data it had just fetched. An in-flight guard folds that second run into the one
-  already running: **9 → 5 ubus requests per navigation**.
+  already running: 9 → 5 ubus requests per navigation.
   Both come from replacing `poll_status` from the theme's own overview include, which
-  loads inside `index.load()` — after the view instance exists and before `render()`
-  is called, the one window where the swap is safe, and it covers a full page load and
+  loads inside `index.load()`. That is the one window where the swap is safe (the view
+  instance exists, `render()` has not been called), and it covers a full page load and
   an in-place nav alike. The section frames, the includes, their `render()` output and
-  the Hide/Show toggles all stay upstream's; `fillSection()` is a transcription of
+  the Hide/Show toggles all stay upstream's. `fillSection()` is a transcription of
   stock's own loop, kept in the same order so it can be diffed against `index.js` when
   luci-mod-status changes. If the shape it expects is not there, the patch is skipped
   and the page runs stock.
@@ -587,6 +648,7 @@ line, not one per tag. The individual patch releases are in the git history.
   once jsmin was proven safe by a token-equivalence gate.
 
 [Unreleased]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.15...HEAD
+[0.7.17]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.16...v0.7.17
 [0.7.16]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.15...v0.7.16
 [0.7.15]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.14...v0.7.15
 [0.7.14]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.13...v0.7.14
