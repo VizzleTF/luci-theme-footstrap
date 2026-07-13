@@ -348,6 +348,12 @@
 	.fs-appearance-pop[hidden] { display: none; }
 
 	.fs-ap-group { display: flex; flex-direction: column; gap: 6px; }
+	/* The accordion switch is meaningless in the top layout — its sections are hover dropdowns
+	 * and already exclusive. Hidden HERE, not by a branch in the JS that builds the popover:
+	 * that popover is built once, at init, so a branch froze the control to whatever layout the
+	 * page happened to load in and the live toggle could never change it. Same
+	 * :root[data-layout] every other layout rule reads. */
+	:root[data-layout="top"] .fs-ap-submenus { display: none; }
 	.fs-ap-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--fs-faint); }
 
 	/* version line + "new version" pill + Update button at the foot of the popover */

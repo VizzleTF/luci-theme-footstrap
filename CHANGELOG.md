@@ -137,6 +137,14 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   tree, so they cost nothing today and catch the next mistake for free.
 
 ### Fixed
+- **The Appearance popover's "Submenus" control ignored the layout toggle.** The accordion switch is
+  meaningless in the top layout (its sections are hover dropdowns, already exclusive), and it was
+  left out with an `if (currentLayout() !== 'top')` around the group that builds it. But the popover
+  is built ONCE, in `init()` — so that branch froze the control to whatever layout the *page loaded
+  in*: switch to the top bar and it stayed on screen, load in the top bar and switch to the sidebar
+  and it never appeared. It is always built now and hidden by CSS on `:root[data-layout="top"]`,
+  which is the theme's own rule — toggling the layout re-renders nothing, CSS morphs the chrome — so
+  it is correct on load, on toggle, and with no JS state at all.
 - **In a window ~768–779 px wide the menu and the stylesheet disagreed about what the chrome was.**
   The CSS had moved off the 768 px breakpoint long ago: the sidebar yields when the *content* column
   would fall below its minimum, measured from the sidebar's real cut (`data-narrow`). `flyoutMode()`

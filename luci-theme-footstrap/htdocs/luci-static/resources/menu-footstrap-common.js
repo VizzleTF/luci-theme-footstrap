@@ -1337,20 +1337,28 @@ function wireAppearance() {
 		])
 	];
 
-	/* the top-nav layout has no accordion — its sections are hover dropdowns,
-	 * already exclusive — so the switch is offered on the sidebar layout only.
-	 * NOTE: read once when the popover is built; a live layout toggle does not
-	 * rebuild it, so the Submenus control is present per the layout at first open.
-	 * Acceptable — the control is a no-op in top mode anyway. */
-	if (currentLayout() !== 'top') {
-		groups.push(E('div', { 'class': 'fs-ap-group' }, [
-			E('div', { 'class': 'fs-ap-label' }, [ _('Submenus') ]),
-			segControl(currentAutoCollapse() ? 'on' : 'off', [
-				{ val: 'off', label: _('Keep open') },
-				{ val: 'on',  label: _('Auto-collapse') }
-			], applyAutoCollapse, _('Submenus'))
-		]));
-	}
+	/* The top layout has no accordion — its sections are hover dropdowns, already exclusive —
+	 * so this switch is meaningless there and must not be offered.
+	 *
+	 * ALWAYS BUILT, HIDDEN BY CSS (:root[data-layout="top"] .fs-ap-submenus, theme/20-shell.css).
+	 * It used to be an `if (currentLayout() !== 'top')` around the push, and that was simply
+	 * wrong: this popover is built ONCE, in init(), so the branch froze the control to the
+	 * layout the PAGE LOADED in. Switch to the top bar and the Submenus control stayed on
+	 * screen; load in the top bar, switch to the sidebar, and it never appeared. The comment
+	 * here used to call that "acceptable — a no-op in top mode anyway", which was true of the
+	 * control's effect and not of what the user saw.
+	 *
+	 * Doing it in CSS is not a workaround, it is the theme's rule: "toggling the layout
+	 * re-renders nothing; CSS morphs the chrome" (CLAUDE.md). This control is chrome. Keying it
+	 * off the same :root[data-layout] every other layout rule reads makes it correct on load,
+	 * correct on toggle, and correct with no JS state at all. */
+	groups.push(E('div', { 'class': 'fs-ap-group fs-ap-submenus' }, [
+		E('div', { 'class': 'fs-ap-label' }, [ _('Submenus') ]),
+		segControl(currentAutoCollapse() ? 'on' : 'off', [
+			{ val: 'off', label: _('Keep open') },
+			{ val: 'on',  label: _('Auto-collapse') }
+		], applyAutoCollapse, _('Submenus'))
+	]));
 
 	/* version line + "new version" badge + one-click Update button (the last two
 	 * are revealed by the update check below when a newer release exists). */
