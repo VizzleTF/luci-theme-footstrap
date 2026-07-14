@@ -27,7 +27,7 @@ jobs:
     name: Static checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Shell syntax
         run: |
@@ -169,9 +169,9 @@ jobs:
     name: Lint + accessibility
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -331,7 +331,7 @@ jobs:
             use_apk: 'n'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Resolve package version
         run: |
@@ -434,7 +434,7 @@ jobs:
             || { echo "no theme ${{ matrix.fmt }} produced"; exit 1; }
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: luci-theme-footstrap-${{ matrix.fmt }}
           path: dist/*.${{ matrix.fmt }}
@@ -452,10 +452,10 @@ jobs:
       # Checkout (this job only downloaded artifacts before) — the release body is
       # built from the tag's CHANGELOG section, so the repo has to be present.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -541,7 +541,7 @@ jobs:
           cat "$RUNNER_TEMP/notes.md"
 
       - name: Attach to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*
           body_path: ${{ runner.temp }}/notes.md

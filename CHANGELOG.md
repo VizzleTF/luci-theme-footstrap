@@ -83,6 +83,13 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   forcing utilities (`.td.right` and friends — LuCI writes them on a cell *to* override the table's
   own alignment, and they lose to it on specificity alone), and the flags that fight an inline
   `style=`, an unlayered `<style>` blob, or `prefers-reduced-motion`.
+- **CI is off the deprecated Node 20 runtime.** Every action was three or four majors behind
+  (`checkout@v4` → `v7`, `setup-node@v4` → `v5`, `upload/download-artifact` → `v7`/`v8`,
+  `action-gh-release@v2` → `v3`), and GitHub was already force-running them on Node 24 while
+  warning on every job — the one piece of debt here with somebody else's clock on it. The inputs
+  this workflow passes are unchanged across those majors; `download-artifact@v8` additionally turns
+  an artifact hash mismatch into an error rather than a warning, which is the direction this
+  repository's release path wants anyway.
 - **The validation tooltip is themed at last, and half of the base layer's absorption backlog is
   gone with it (50 declarations → 25).** `.cbi-tooltip`'s colour words were the one status surface
   the theme had never claimed — base carried them, and a comment there said so in as many words.
