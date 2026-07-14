@@ -1,86 +1,58 @@
-# luci-theme-footstrap
+# luci-theme-footstrap (пакет)
 
-Тема LuCI для OpenWrt **25.12+** (ucode-шаблоны). Дизайн — макет «OpenWrt Status
-Redesign» (см. `../docs/08-design-sistema.md`).
+Тема LuCI для OpenWrt **24.10 и новее** (ucode-шаблоны). Дизайн — макет «OpenWrt
+Status Redesign» (`../docs/08-design-sistema.md`).
 
-Внутреннее имя темы: `footstrap`. Media-путь: `/luci-static/footstrap`.
+Внутреннее имя: `footstrap`. Media-путь: `/luci-static/footstrap`.
 
-## Раскладки (выбор в System → System → Language and Style)
+## Одна тема, одна запись
 
-Зарегистрированы **две** записи — они отличаются только положением меню:
+В `luci.themes` регистрируется **ровно одна** запись — `Footstrap`
+(`/luci-static/footstrap`). Раскладка (боковое меню / верхняя панель), режим,
+палитра, обои, оттенок, акцент и скругление — **клиентские** оси в поповере
+Appearance: `localStorage` + атрибуты на `:root`, ничего не пишется на роутер.
+Отдельных тем под раскладку или под тёмный режим нет; все легаси-имена
+(`FootstrapSidebar`, `FootstrapOnTop`, `…-dark`/`…-light`) удаляются в
+`root/etc/uci-defaults/30_luci-theme-footstrap`.
 
-- **FootstrapSidebar** — 1A Sidebar Console: вертикальная навигация слева (224px,
-  иконки, сворачиваемые секции), topbar. Спека:
-  `../docs/09-realizatsiya-sidebar.md`.
-- **FootstrapOnTop** — 1B Top-nav: горизонтальное меню сверху с дропдаунами.
-  Спека: `../docs/10-realizatsiya-topnav.md`.
+Рендерер меню тоже один: `menu-footstrap.js`. Верхняя панель — это его же
+разметка, которую морфит CSS по `:root[data-layout]`. Второго шаблона, второго
+рендерера и симлинка `footstrap-top` не существует.
 
-Режим (auto/светлая/тёмная) и палитра — **клиентские** переключатели в поповере
-Appearance, а не отдельные темы. Обе раскладки используют один `cascade.css`,
-шрифты, логотип и overview-layout include; отличие только в раскладке хрома
-(header/footer + menu-JS). `/luci-static/footstrap-top` — symlink на единственный
-реальный media-каталог `footstrap`.
-
-Дизайн-токены (dark/light) живут в `styles/02-tokens.css` и содержат мост на
-общепринятые в темах LuCI имена (`--primary-color-high`, `--background-color-*`,
-…). Поэтому смена палитры перекрашивает и штатные cbi-виджеты, и CSS любого
-стороннего `luci-app-*`, не трогая ни одного правила. Шрифты Manrope +
-JetBrains Mono самохостятся в `fonts/`.
-
-**Граница темы:** тема даёт хром + дизайн-язык, контент Status-страницы рисует
-view-JS `luci-mod-status`. Тема сам контент не рендерит — только переставляет
-штатные секции overview. Подробно — `../docs/08-design-sistema.md`, раздел
-«Границы».
-
-**Overview-layout (мини-мод в теме):**
-`htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js` —
-*аддитивный* status-overview include (уникальное имя → без конфликта с
-luci-mod-status). LuCI сам подхватывает все `*.js` из каталога; префикс `05_`
-ставит его первым. Своего контента **не рисует** — `MutationObserver` на `#view`
-находит штатные секции System/Memory/Storage по заголовку и оборачивает их в
-`.fs-ovl`, а CSS-grid раскладывает: System — левая колонка на оба ряда, Memory
-(сверху) + Storage (снизу) — правая. Остальные секции остаются штатными ниже.
-Штатный poll обновляет нутро каждой секции **на месте** (`dom.content`), обёртку
-`.cbi-section` не пересоздаёт, поэтому перемещённые секции не мигают. Свою
-пустую обёртку скрывает CSS `#view > .cbi-section:has(.fs-ovl-marker)`. Это
-рендер-логика, а не оформление — осознанно пересекает границу тема/мод (docs/08
-«Границы»); чужие файлы не переопределяются.
-
-Прежний вариант (`05_footstrap_dashboard.js`) рисовал весь overview кастомно
-(KPI-ряд, карточки, свои таблицы) — но пересборка страницы-в-высоту на каждый
-poll мигала и сбрасывала скролл на мобильном, поэтому заменён на layout-only.
+**Граница темы:** тема даёт хром и дизайн-язык; контент страниц рисует view-JS
+`luci-mod-*`. Единственное исключение — `05_footstrap_overview_layout.js`: он
+не рисует своего контента, а только переставляет штатные секции overview.
+Подробно — `../docs/08-design-sistema.md`, раздел «Границы», и `../CLAUDE.md`.
 
 ## Структура
 
 ```
-Makefile                                  LUCI_TITLE, +luci-base, postrm
-htdocs/luci-static/footstrap/             cascade.css, mobile.css, logo.svg, logo_48.png
-htdocs/luci-static/footstrap-dark  -> footstrap   (symlink)
-htdocs/luci-static/footstrap-light -> footstrap   (symlink)
-htdocs/luci-static/resources/menu-footstrap.js    клиентский рендер меню
-htdocs/luci-static/resources/view/footstrap/sysauth.js
-ucode/template/themes/footstrap/          header.ut, footer.ut, sysauth.ut
-ucode/template/themes/footstrap-dark  -> footstrap   (symlink)
-ucode/template/themes/footstrap-light -> footstrap   (symlink)
-root/etc/uci-defaults/30_luci-theme-footstrap     регистрация в uci
+Makefile                          luci.mk; LUCI_MINIFY_CSS:=0; Build/Prepare (CSS, версия, po2lmo)
+styles/                           ИСТОЧНИК CSS: слои tokens / base / theme / pages
+build-css.sh                      styles/ -> htdocs/luci-static/footstrap/cascade.css
+i18n/                             каталог перевода (НЕ po/ — иначе luci.mk наплодит пакетов)
+ucode/template/themes/footstrap/  header.ut, footer.ut, sysauth.ut, partials/
+htdocs/luci-static/footstrap/     cascade.css (генерируется), fonts/, cats.svg
+htdocs/luci-static/resources/     menu-footstrap.js, menu-footstrap-common.js, fs-fit.js, fs-select.js
+  …/view/status/include/          05_footstrap_overview_layout.js
+root/etc/uci-defaults/            регистрация темы и миграция легаси-имён
+root/usr/libexec/                 footstrap-selfupdate.sh (+ ACL в root/usr/share/rpcd/acl.d/)
 ```
+
+**`cascade.css` не редактируется** — он генерируется `build-css.sh` из `styles/`
+и лежит в `.gitignore`. Цвета правятся в `styles/03-palettes.css`, шкалы и
+токены — в `styles/02-tokens.css`.
 
 ## Разработка на роутере
 
 ```sh
-./dev-sync.sh          # залить на ssh router (регистрация без активации)
+./dev-sync.sh          # залить на ssh router (регистрирует, но НЕ активирует тему)
 # включить вручную:
 ssh router 'uci set luci.main.mediaurlbase=/luci-static/footstrap; uci commit luci; rm -f /tmp/luci-indexcache*'
 # откат:
 ssh router 'uci set luci.main.mediaurlbase=/luci-static/bootstrap; uci commit luci'
 ```
 
-Кастомизация — через CSS-переменные `:root { --… }` в `cascade.css` (см.
-`../docs/04-css-menu-js-dark-mode.md`), раскладка правится в header.ut +
-menu-footstrap.js.
-
-## Сборка пакета .apk
-
-См. `../docs/05-sborka-deploy-razrabotka.md`. Кратко: положить каталог в
-`feeds/luci/themes/`, `make package/luci-theme-footstrap/compile V=s`,
-`apk add --allow-untrusted luci-theme-footstrap_*.apk`.
+Перед пушем — `npm run check` (eslint, stylelint, axe, экспорт-ярус, i18n,
+`@mirror`, оси Appearance и остальные гейты). Правила и ловушки — в `../CLAUDE.md`;
+сборка пакета — `../docs/05-sborka-deploy-razrabotka.md`.

@@ -8,6 +8,8 @@
 .vscode/
 .idea/
 *.swp
+# macOS finder droppings — one had already been committed under docs/
+.DS_Store
 # local tooling (playwright venv + chromium; machine-specific, large)
 .claude/tooling/
 # preview screenshots

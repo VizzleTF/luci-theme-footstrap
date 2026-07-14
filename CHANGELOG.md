@@ -34,6 +34,18 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   uci-defaults marker comment said "drop the marker" where the code **writes** it.
 
 ### Changed
+- **The READMEs describe the theme that exists.** The package README promised **two** theme entries
+  (`FootstrapSidebar` / `FootstrapOnTop`), a `/luci-static/footstrap-top` symlink, `-dark`/`-light`
+  symlinks, a `mobile.css` and a `sysauth.js` — none of which exist — claimed the theme needs OpenWrt
+  25.12+ (24.10 is supported too), and told the reader to customise `cascade.css`, a **generated** file
+  that is in `.gitignore`. It is now a short, true file: one theme entry, one renderer, where the CSS
+  source actually lives, and `npm run check` before pushing. The root README (and its Russian mirror)
+  had its benchmark labels swapped and its own result understated — the median page is **3.4×** faster
+  than luci-theme-bootstrap and the whole 38-page run **2.3×**, with requests per page falling from
+  15–48 to **0–8**; it read "≈2.3× median, ~1.9× overall, 15–39 → 1–4", and that 1.9× appears nowhere
+  in the benchmark. It also promised the theme "carries its own translations, so it follows whatever
+  language LuCI is set to" — the catalogue is **Russian only**; other locales get English for the
+  theme's own strings.
 - **CLAUDE.md now asks for comments that are minimally sufficient, not maximally dense — and its own
   stale numbers are fixed.** The guidance said "comment as densely as you like — the comments do not
   ship", which is how forty lying paragraphs grew: bytes are genuinely free (jsmin and `build-css.sh`

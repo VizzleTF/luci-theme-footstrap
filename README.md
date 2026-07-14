@@ -37,9 +37,10 @@ login page and package manager.
   release package, verifies its sha256 and installs it. Turn the check off in the
   same popover if you would rather it did not phone home.
 - **Faster than the stock theme.** Pages switch without a full reload (client-side
-  SPA navigation): a menu click is on average **≈2.3× faster** than
-  luci-theme-bootstrap (median across pages; ~1.9× overall, with network requests
-  per page dropping from 15–39 to 1–4). To measure it yourself, see
+  SPA navigation). Measured over 38 pages against luci-theme-bootstrap: the median
+  page opens **3.4× faster**, and the whole run takes **2.3×** less time. Network
+  requests per page drop from 15–48 to **0–8** — a page already in the cache fetches
+  nothing at all. To measure it yourself, see
   [docs/15](docs/15-benchmark-navigatsiya.md) (Russian).
 
 ## Install
@@ -52,10 +53,12 @@ publishes for it**, and installs it:
 wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
 ```
 
-For a specific version, pass the tag: `... | sh -s v0.8.0`.
+For a specific version, pass the tag: `... | sh -s v0.8.5`.
 
-The theme carries its own translations, so it follows whatever language LuCI is
-set to. One package — nothing else to install.
+One package — nothing else to install; the translation catalogue travels inside it.
+The theme ships a **Russian** catalogue; in other locales its own strings read in
+English, while the shared chrome (Menu, Logout) follows whatever `luci-base` is
+translated into.
 
 To install by hand, download the raw file from the
 [releases](https://github.com/VizzleTF/luci-theme-footstrap/releases) — the file
