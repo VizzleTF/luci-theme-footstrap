@@ -13,6 +13,10 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 ## [Unreleased]
 
 ### Fixed
+- **Software page on a phone: `filtered / all / none` stood one per line.** The rule that stacks that
+  page's control titles was written as `.controls label`, so it also blocked the three radio labels
+  nested a level deeper inside the group. It targets the group's own title label now
+  (`.controls > div > label`), and the three choices sit on one row — at 320px too.
 - **Software page on a phone: the pager broke onto three lines, and the package list still printed a
   column header it no longer needed.** Both are the same shape of bug — a rule aimed at one thing
   hitting another that merely shares its element name.

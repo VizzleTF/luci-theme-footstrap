@@ -44,7 +44,17 @@
 			top: calc(100% + 5px); left: 0; right: auto; bottom: auto;
 			text-align: left; white-space: normal; max-width: 100%;
 		}
-		body[data-page='admin-system-package-manager'] #view .controls label { display: block; min-width: 0; white-space: normal; margin-bottom: 4px; }
+		/* `> div > label` — the group's TITLE label ("Filter:", "Actions:", "Display LuCI
+		 * translation packages:"), not every label on the page. Written as plain `.controls label`
+		 * it also blocked the three radio labels nested a level deeper, and `filtered / all / none`
+		 * came out one per line. They are a set of three short choices: they belong on one row. */
+		body[data-page='admin-system-package-manager'] #view .controls > div > label { display: block; min-width: 0; white-space: normal; margin-bottom: 4px; }
+		/* …and the row they sit in. Stock separates them with &nbsp; text nodes, which is enough to
+		 * keep them apart but not to keep them from splitting mid-choice — a flex row with a real
+		 * gap wraps between labels instead of inside one. */
+		body[data-page='admin-system-package-manager'] #view .controls > div > div:has(> label > input[type="radio"]) {
+			display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px;
+		}
 		body[data-page='admin-system-package-manager'] #view .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: 8px; }
 		body[data-page='admin-system-package-manager'] #view .controls .control-group input { flex: 1 1 140px; min-width: 0; max-width: 100%; }
 
