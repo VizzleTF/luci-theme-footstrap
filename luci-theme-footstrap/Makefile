@@ -18,13 +18,6 @@ FOOTSTRAP_VERSION?=
 ifneq ($(FOOTSTRAP_VERSION),)
 PKG_VERSION:=$(FOOTSTRAP_VERSION)
 PKG_RELEASE:=1
-# The translation packages luci.mk generates from po/ (luci-i18n-footstrap-<lang>) take
-# their version from PKG_PO_VERSION, which defaults to a git-or-mtime stamp — and the SDK
-# build has no .git, so every CI run stamped them `0.<yymmdd>.<secs>`: a version unrelated
-# to the theme's and DIFFERENT on every build of the same commit. Pin them to the theme's
-# version, so the asset the installer downloads is named for the release it belongs to and
-# a rebuild of a tag is reproducible.
-PKG_PO_VERSION:=$(PKG_VERSION)-r$(PKG_RELEASE)
 endif
 
 LUCI_TITLE:=Footstrap Theme
@@ -159,6 +152,40 @@ endef
 # 2. Stamp the git-derived version into the theme JS so the Appearance popover
 #    can show it and run its GitHub update check. Skipped when PKG_VERSION is
 #    empty (leaves the '0.0.0-dev' literal).
+# 3. Compile the translation catalogue INTO this package (see below).
+#
+# THE CATALOGUE SHIPS INSIDE THE THEME PACKAGE. That is deliberate, it is not how a luci-app
+# does it, and undoing it re-opens two bugs that were both hit in production.
+#
+# The conventional way is luci.mk's own machinery: a `po/` directory makes it emit a SEPARATE
+# `luci-i18n-footstrap-<lang>` package per language. v0.8.4 shipped exactly that — and it broke
+# the update button for every install already in the field:
+#
+#   1. A release then carries several assets, and `footstrap-selfupdate.sh` — in every version
+#      users ALREADY have — picks one with `grep -E '\.apk$$' | head -1`. The GitHub API returns
+#      the asset list sorted BY NAME, and `luci-i18n-footstrap-ru-…apk` sorts before
+#      `luci-theme-footstrap-…apk`. So clicking Update installed the 6 KB catalogue INSTEAD of
+#      the theme: the strings turned Russian, the theme stayed on its old version, and the badge
+#      kept offering the same update — forever, because the script that picks the wrong asset is
+#      exactly the one that never gets replaced (issue #6). A router's installed self-updater
+#      cannot be fixed remotely: whatever we publish, it runs the picker it already has. The
+#      RELEASE is the only thing we control, so it stays at ONE asset per format (CI asserts it).
+#   2. Two packages can drift: theme new, catalogue old. An _() whose msgid the catalogue does
+#      not carry renders in English and reports nothing — the exact failure mode the i18n gate
+#      exists to prevent. Bundled, they cannot disagree.
+#
+# The cost is ~3.6 KB of catalogue on a router whose LuCI is English. That is the whole price.
+#
+# `po/` is therefore renamed to `i18n/`: LUCI_LANGUAGES is `$(wildcard po/*)`, so the rename is
+# what stops luci.mk generating the language packages at all. po2lmo is the same host tool it
+# would have used — luci-base/host is already a build dependency, so it is on the buildbot, and
+# it is installed into hostpkg/bin BEFORE this hook runs (verified in the CI log; this is why
+# the call lives here and not in Build/Compile, which a post-include `define` cannot override).
+#
+# The basename is `footstrap-theme.<lang>.lmo`, NOT `footstrap.<lang>.lmo`: lmo_load_catalog
+# globs `*.<lang>.lmo`, so any basename is loaded — and a router that installed v0.8.4 still
+# OWNS `footstrap.ru.lmo` through the old luci-i18n-footstrap-ru package. Writing that same path
+# would be a file conflict, and apk would refuse the very upgrade this change exists to deliver.
 define Build/Prepare/luci-theme-footstrap
 	# luci.mk's Build/Prepare copies only src/ luasrc/ htdocs/ root/ ucode/ po/ into
 	# $(PKG_BUILD_DIR), and PKG_LICENSE_FILES resolves against THAT — so the Apache text has to
@@ -168,6 +195,10 @@ define Build/Prepare/luci-theme-footstrap
 	$(SHELL) $(CURDIR)/build-css.sh $(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css
 	$(if $(PKG_VERSION),$(SED) "s#const FS_VERSION = '[^']*'#const FS_VERSION = '$(PKG_VERSION)'#" \
 		$(PKG_BUILD_DIR)/htdocs/luci-static/resources/menu-footstrap-common.js)
+	$(INSTALL_DIR) $(PKG_BUILD_DIR)/root/usr/lib/lua/luci/i18n
+	$(foreach po,$(wildcard $(CURDIR)/i18n/*/*.po), \
+		po2lmo $(po) \
+			$(PKG_BUILD_DIR)/root/usr/lib/lua/luci/i18n/footstrap-theme.$(notdir $(patsubst %/,%,$(dir $(po)))).lmo;)
 endef
 
 include $(TOPDIR)/feeds/luci/luci.mk

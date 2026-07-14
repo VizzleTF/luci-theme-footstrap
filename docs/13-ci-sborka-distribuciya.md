@@ -40,17 +40,20 @@
    toolchain-версии; поддержаны `.tar.zst` и `.tar.xz`).
 3. `rsync` каталог пакета `luci-theme-footstrap/` в `package/luci-theme-footstrap/`
    SDK (сохраняя симлинки темы), `feeds update -a && install -a`.
-4. `.config`: `CONFIG_PACKAGE_luci-theme-footstrap=m` +
-   `CONFIG_PACKAGE_luci-i18n-footstrap-ru=m` (+ `CONFIG_USE_APK=y` для apk),
+4. `.config`: `CONFIG_PACKAGE_luci-theme-footstrap=m` (+ `CONFIG_USE_APK=y` для apk),
    `make defconfig`, `make package/luci-theme-footstrap/compile V=s
    FOOTSTRAP_VERSION=<ver>`.
-5. Собрать **тему и языковые пакеты** из `bin/`, залить артефакт. Маска `find` перечисляет
-   и `luci-theme-footstrap-*`, и `luci-i18n-footstrap-*`; проверка «`dist/` непустой»
-   заменена на проверку **обоих имён** — именно она отсутствовала, пока восемь релизов
-   уезжали без каталога перевода (issue #6): SDK собирал `luci-i18n-footstrap-ru`, а
-   маска его не забирала, и на роутере каждый `_()` молча оставался английским.
+5. Собрать `.apk`/`.ipk` из `bin/`, залить артефакт. CI проверяет, что в `dist/`
+   **ровно один** пакет на формат — и это не гигиена, а защита старых роутеров:
+   `footstrap-selfupdate.sh`, который **уже стоит** у людей, выбирает ассет как
+   `grep -E '\.apk$' | head -1`, а GitHub отдаёт ассеты **отсортированными по имени**.
+   В 0.8.4 в релизе появился второй пакет (`luci-i18n-footstrap-ru`), он сортируется
+   раньше `luci-theme-footstrap-*` — и кнопка «Обновить» у всех ставила 6-КБ каталог
+   вместо темы, рапортуя об успехе (issue #6). Скрипт на роутере удалённо не починить,
+   поэтому неизменным должен остаться **релиз**: один ассет на формат, каталог перевода
+   едет внутри пакета темы (`Build/Compile` → `po2lmo`).
 6. Job `release` (только на тег): скачивает артефакты обоих форматов,
-   `softprops/action-gh-release` цепляет **все** пакеты к релизу.
+   `softprops/action-gh-release` цепляет оба пакета к релизу.
 
 Новый релиз: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
@@ -95,24 +98,20 @@ wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/i
 # закрепить версию:  ... | sh -s v0.3.6
 ```
 
-Он ставит **тему и её пакеты перевода** (`luci-i18n-footstrap-<lang>`) — без `.lmo` на
-роутере каждая строка темы отрисуется по-английски, что ничем не сигнализируется:
-`action_translations` собирает клиентский каталог из **всех** `.lmo` в
-`/usr/lib/lua/luci/i18n`, так что наш msgid либо проваливается в английский, либо
-разрешается по **чужому** переводу (на русском роутере «Top» из `luci-base` дал
-«Максимум»). `FOOTSTRAP_NO_I18N=1` — поставить только тему.
+Пакет один, перевод внутри: `.lmo` лежит в самой теме
+(`/usr/lib/lua/luci/i18n/footstrap-theme.<lang>.lmo`). Без каталога каждая строка темы
+отрисовалась бы по-английски, и это ничем не сигнализируется — `action_translations`
+собирает клиентский каталог из **всех** `.lmo` в `/usr/lib/lua/luci/i18n`, так что наш
+msgid либо проваливается в английский, либо разрешается по **чужому** переводу (msgid
+`Top` у кого-то переведён как «Максимум»; поэтому подписи поповера несут msgctxt).
 
-Ассет выбирается по **имени пакета**, не по расширению: в релизе теперь несколько
-пакетов, и `grep '\.apk$' | head -n1` взял бы тот, который GitHub перечислил первым —
-т.е. мог поставить 6-КБ каталог вместо темы.
+Ассет выбирается по **имени пакета**, не по расширению — см. пункт 5 выше.
 
 Вручную — **raw-файл из релиза** (НЕ zip-артефакт из Actions!):
 
 ```sh
 apk add --allow-untrusted luci-theme-footstrap-*.apk   # 25.12+
-apk add --allow-untrusted luci-i18n-footstrap-ru-*.apk # перевод (по желанию)
 opkg install luci-theme-footstrap_*.ipk                # 24.10
-opkg install luci-i18n-footstrap-ru_*.ipk              # перевод (по желанию)
 ```
 
 ## Формат пакетов + типичная ошибка
