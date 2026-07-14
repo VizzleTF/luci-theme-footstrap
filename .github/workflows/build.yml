@@ -371,6 +371,15 @@ jobs:
           make defconfig
           make package/luci-theme-footstrap/compile V=s FOOTSTRAP_VERSION="$FOOTSTRAP_VERSION"
 
+          # The translation catalogue is compiled INTO the theme package (Build/Prepare -> po2lmo),
+          # so it is a build artefact, not a file in git — and a silently missing .lmo is the whole
+          # bug class this area keeps producing: every _() then renders its English msgid and
+          # nothing anywhere complains. Assert it exists in the staged package tree.
+          find build_dir -name 'footstrap-theme.*.lmo' | grep -q . || {
+            echo "no footstrap-theme.<lang>.lmo in the package — the theme would ship untranslated"
+            exit 1
+          }
+
           mkdir -p "$GITHUB_WORKSPACE/dist"
           find bin/ -type f \( -name 'luci-theme-footstrap-*.apk' -o -name 'luci-theme-footstrap_*.ipk' \) \
             -exec cp {} "$GITHUB_WORKSPACE/dist/" \;

@@ -10,6 +10,34 @@ Security, Performance.
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+- **The Update button installed a 6 KB translation catalogue instead of the theme.** v0.8.4 added a
+  second package to the release (`luci-i18n-footstrap-ru`), and `footstrap-selfupdate.sh` — in every
+  version already sitting on a router — picks the release asset with `grep -E '\.apk$' | head -1`.
+  The GitHub API returns the asset list sorted **by name**, and `luci-i18n-footstrap-…` sorts before
+  `luci-theme-footstrap-…`. So clicking Update installed the catalogue, reported success, left the
+  theme on its old version and kept the badge asking for the same update — forever, because the
+  script that picks the wrong asset is the one that never gets replaced. The script on a router
+  cannot be fixed remotely: whatever we publish, it runs the picker it already has. So a release
+  carries **one asset per format** again and the catalogue travels **inside the theme package**; CI
+  fails the build unless `dist/` holds exactly one package per format. If your Update button gave
+  you Russian but no new version, that is this bug — press it once more on 0.8.5 and it lands.
+- **A third-party package's translation was overwriting the theme's own strings** — the layout
+  toggle read "Максимум" on a Russian router. LuCI serves **one merged catalogue** to the client
+  (`load_catalog()` reads every `*.<lang>.lmo` in `/usr/lib/lua/luci/i18n`, and a lookup returns the
+  first archive that has the hash), so a msgid is a name shared with every `luci-app` on the box and
+  readdir order decides who wins: somebody translates the msgid `Top` as "maximum" — right in a
+  bandwidth dialog, nonsense on a layout switch. Every label in the Appearance popover now carries
+  the `footstrap` message context, which makes the key ours alone. The chrome and login strings stay
+  context-free on purpose (they inherit a correct translation from `luci-base` in the ~40 languages
+  the theme ships no catalogue for), and so do System/Memory/Storage in the overview include — that
+  one *matches* the stock section titles and must resolve exactly as `luci-mod-status` does.
+
+### Changed
+- **The layout toggle reads «Сбоку» / «Сверху» in Russian.**
+
 ## [0.8.4] — 2026-07-14
 
 ### Fixed

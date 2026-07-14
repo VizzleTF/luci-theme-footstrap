@@ -287,45 +287,52 @@ npm run axes         # head.ut's pre-paint agrees with the live Appearance appli
   `02-tokens.css`. That last check exists because they were once three aliases of one token
   and **a flat colour passes every contrast threshold there is**; only a spread check fails on it.
 
-## i18n — a `_()` with no catalogue is silently English
+## i18n — a `_()` with no catalogue is silently English, and a msgid is a GLOBAL name
 
 Strings are wrapped in `_()` in the theme JS and the `.ut` templates, and `partials/head.ut`
-already loads LuCI's client-side catalogue (`admin/translations/<lang>`). But `luci.mk`
-derives `LUCI_LANGUAGES` from **`po/*`**, so with no `po/` directory no language package was
-ever built and every `_()` fell through to its English msgid — the Appearance popover said
-"Palette"/"Rounding"/"Cats" on a Russian LuCI and nothing reported a thing. **A missing
-translation cannot fail loudly by construction; that is why `--check` is a CI gate.**
+already loads LuCI's client-side catalogue (`admin/translations/<lang>`). Nothing about a missing
+or wrong translation can fail loudly — that is the whole shape of this area, and why the rules
+below are gates and not advice.
 
 - `luci-theme-footstrap/update-po.sh` rescans and merges; `--check` fails if the `.pot` is
-  stale or any msgstr is empty. Run it after adding or changing **any** `_()` string.
+  stale or any msgstr is empty. Run it after adding or changing **any** `_()` string. It compares
+  **msgctxt as well as msgid** — the context is part of the key, so a `.pot` carrying the same
+  msgids with the context dropped describes a different catalogue.
 - It uses LuCI's own `build/i18n-scan.pl`, which knows how to lex a `.ut` (it rewrites the
   template into JS before xgettext) and also picks up the `rpcd` ACL title. A grep for `_('…')`
   would miss the ACL string and choke on any apostrophe.
-- **Almost nothing to add to the Makefile**: `LUCI_TYPE`/`LUCI_BASENAME` resolve to
-  `theme`/`footstrap`, `LUCI_LANG.ru` is already defined in `luci.mk`, and it runs `po2lmo` itself
-  → the package `luci-i18n-footstrap-ru` is *built* as soon as `po/ru/footstrap.po` exists. The one
-  thing that IS set is `PKG_PO_VERSION` — luci.mk versions the language packages from it and it
-  falls back to a git-or-mtime stamp, so an SDK build (no `.git`) stamped them `0.<yymmdd>.<secs>`:
-  unrelated to the release, and different on every rebuild of the same tag.
-- **Building it is not shipping it, and that gap ate eight releases (issue #6).** The package must
-  be (1) collected by CI — the build job's `find` glob named only `luci-theme-footstrap-*`, so the
-  `.lmo` went in the bin and the release carried no catalogue — and (2) INSTALLED, by both
-  `install.sh` and `footstrap-selfupdate.sh`, which install every `luci-i18n-footstrap-*` asset
-  next to the theme. Neither is optional and both are asserted: CI fails unless *both* packages are
-  in `dist/` **by name** (the old check was "the dist dir is non-empty", which the theme alone
-  satisfied).
-- **The failure is invisible from the inside, which is why the checks are by name.** LuCI serves
-  ONE merged client catalogue — `action_translations` calls `load_catalog(lang,
-  '/usr/lib/lua/luci/i18n')`, which reads *every* `.lmo` in the directory — so a missing catalogue
-  does not error: our msgids either fall through to English or resolve against **somebody else's**
-  translation of the same string. On the reporter's Russian router the layout toggle read
-  "Максимум", `luci-base`'s translation of the msgid "Top".
-- **An asset is selected by package NAME, never by extension.** A release now carries the theme and
-  the language packages, so `grep '\.apk$' | head -n1` picks whichever GitHub listed first — a
-  6 KB catalogue installed in place of the theme. Both scripts match `/<pkg-name>[-_]…` and the
-  matcher is `@mirror`-pinned (`gh/asset-urls`).
+- **The catalogue ships INSIDE the theme package, and the directory is `i18n/`, not `po/`.**
+  luci.mk derives `LUCI_LANGUAGES` from `$(wildcard po/*)` and emits a separate
+  `luci-i18n-footstrap-<lang>` package per language — the conventional layout, which **broke the
+  update button on every router in the field** (v0.8.4, issue #6). A multi-asset release is
+  unpickable by the self-updater the router ALREADY runs: it takes `grep '\.apk$' | head -1`, the
+  GitHub API returns assets sorted **by name**, and `luci-i18n-…` sorts before `luci-theme-…`. So
+  Update installed a 6 KB catalogue instead of the theme, said OK, and offered the same update
+  forever. **A router's installed self-updater cannot be fixed remotely — the RELEASE has to stay
+  pickable by the script that is already there.** CI therefore fails unless `dist/` holds exactly
+  ONE package per format. Renaming `po/` is what stops luci.mk generating the language packages;
+  `Build/Compile` runs the same `po2lmo`. The basename is `footstrap-theme.<lang>.lmo`, **not**
+  `footstrap.<lang>.lmo`: `lmo_load_catalog` globs `*.<lang>.lmo` so any basename loads, and a
+  router that installed v0.8.4 still *owns* `footstrap.ru.lmo` through the old package — writing
+  that path would be a file conflict, and apk would refuse the very upgrade that fixes it.
+  Bundling also kills the skew: two packages could drift, and a theme whose catalogue lags simply
+  renders the new strings in English, reporting nothing.
+- **A msgid is a global name, shared with every `luci-app` on the router.** `action_translations`
+  calls `load_catalog(lang, '/usr/lib/lua/luci/i18n')`, which loads **every** `*.<lang>.lmo` in the
+  directory into ONE catalogue, and a lookup returns the first archive holding the hash — so
+  **readdir order decides who owns a string**. The layout toggle rendered "Максимум" on a user's
+  Russian router: somebody's catalogue translates the msgid `Top` as "maximum" — correct in a
+  bandwidth dialog, nonsense on a layout switch. Every label in the Appearance popover therefore
+  carries the `footstrap` **msgctxt** (`_(str, ctx)`; po2lmo keys on `ctxt\1msgid`), which makes
+  the key ours alone.
+  Three things are deliberately left context-free, and this is the interesting half of the rule:
+  the **chrome** (Menu, Logout, Skip to content) and the **login/notice sentences**, because
+  inheriting `luci-base`'s translation is a *feature* in the ~40 languages this theme has no
+  catalogue for; and **System/Memory/Storage** in `05_footstrap_overview_layout.js`, which
+  *matches* the stock section titles and must therefore resolve to exactly what `luci-mod-status`
+  resolves to.
 - Verified end-to-end on the router (compiled `.lmo` → `uci set luci.main.lang=ru`), not
-  merely by `msgfmt` exiting 0.
+  merely by `msgfmt` exiting 0. `dev-sync.sh` deploys the catalogue when `po2lmo` is on `$PATH`.
 
 ## Build the .apk (distribution)
 
