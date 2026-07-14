@@ -278,7 +278,11 @@ jobs:
             n=$(/tmp/jsmin < "$f" | wc -c)
             total=$((total + n))
           done
-          budget=46080   # 45 KB of minified JS; it is ~35 KB today
+          # 46 KB of minified JS; it is 46249 B today. A RATCHET, kept close to the real number
+          # on purpose: raising it is a decision, and this one was — the SPA router grew ~3 KB
+          # (26657 -> 29747 B minified) for the third-party-CSS guard, the sheet dedupe and the
+          # dark-mode stamping. Tighten it again whenever bytes go away, so they cannot drift back.
+          budget=47104
           echo "minified theme JS: $total bytes (budget $budget)"
           [ "$total" -le "$budget" ] || { echo "over the JS budget"; exit 1; }
 
