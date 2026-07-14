@@ -92,6 +92,13 @@ jobs:
           [ "$n" -gt 0 ] || { echo "no .ut templates found — the glob is wrong"; exit 1; }
           echo "$n ucode template(s) compile."
 
+      # The SDK finds packages by GREPPING their Makefiles for `call BuildPackage` (include/scan.mk).
+      # luci.mk is what calls it here, and the grep cannot see through an include — so a comment
+      # that looks like boilerplate is the only thing that puts this package in the SDK's list.
+      # It was deleted as boilerplate once; both builds went red with an error naming nothing.
+      - name: The SDK can see the package at all
+        run: sh tools/scan-marker.sh
+
       # rpcd SKIPS an acl.d file it cannot parse, and says nothing. A trailing comma here
       # means file.exec on the self-update script is granted to nobody: the update badge and
       # the Update button both die with "Access denied", for every user, and neither the

@@ -167,3 +167,18 @@ endef
 # Absolute, not a relative path: CI rsyncs this package into package/, not into the feed.
 include $(TOPDIR)/feeds/luci/luci.mk
 
+# THE LINE BELOW IS LOAD-BEARING AND IT IS NOT A SIGNATURE — do not delete it as boilerplate.
+#
+# include/scan.mk builds the package list by GREPPING the Makefiles, not by parsing them:
+#   find -L package -name Makefile | xargs grep -aHE 'call (Build/DefaultTargets|BuildPackage|KernelPackage)'
+# A Makefile that does not match is not in the list, so it is never dumped, no
+# CONFIG_PACKAGE_* symbol is emitted for it, and `make package/<name>/compile` answers
+# "No rule to make target" — with no error naming the package anywhere in the build.
+#
+# This theme never calls BuildPackage itself; luci.mk does, at the include above. The grep
+# cannot see that. So the only thing that puts this package into the SDK's list is the literal
+# text on the next line — which is why every luci-* Makefile carries it.
+# Deleting it as a useless comment is exactly what broke the build (both formats, silently).
+# tools/scan-marker.sh re-derives the grep from scan.mk and fails the build if it goes missing.
+# call BuildPackage - OpenWrt buildroot signature
+
