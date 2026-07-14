@@ -61,9 +61,32 @@ jobs:
           cmake -S "$RUNNER_TEMP/ucode" -B "$RUNNER_TEMP/ucode/build" -DCMAKE_BUILD_TYPE=Release >/dev/null
           cmake --build "$RUNNER_TEMP/ucode/build" -j"$(nproc)" >/dev/null
           UC="$RUNNER_TEMP/ucode/build/ucode"
+
+          # ucode RESOLVES `import` at COMPILE time, so header.ut's two imports must resolve or
+          # nothing compiles. Both are the ROUTER's runtime, not ours: `luci.core` is luci-base's
+          # ucode library (/usr/share/ucode/luci/core.uc) and `uci` is a native ucode binding
+          # (uci.so, built only against libuci). Neither exists on a bare runner, and dragging
+          # luci-base + libuci in to satisfy an import would make this gate a distro build.
+          #
+          # What this gate is for is OUR syntax — a stray brace in a .ut that would make every
+          # user's LuCI fall back to another theme. So stub the two modules and point ucode's
+          # search path at them: the import resolves, the template is parsed for real, and the
+          # stub bodies are never executed (-c compiles, it does not run). If a template ever
+          # imports something new, the compile fails loudly here rather than on the router —
+          # which is exactly the behaviour we want out of a missing stub.
+          STUB="$RUNNER_TEMP/ucode-stubs"
+          mkdir -p "$STUB/luci"
+          printf '%s\n' \
+            'function cursor() { return { get: function() { return null; } }; }' \
+            'export { cursor };' > "$STUB/uci.uc"
+          printf '%s\n' \
+            'function getuid() { return 0; }' \
+            'function getspnam() { return null; }' \
+            'export { getuid, getspnam };' > "$STUB/luci/core.uc"
+
           n=0
           for f in $(find luci-theme-footstrap/ucode -name '*.ut'); do
-            "$UC" -T -c -o /dev/null "$f" || { echo "template does not compile: $f"; exit 1; }
+            "$UC" -T -c -L "$STUB/*.uc" -o /dev/null "$f" || { echo "template does not compile: $f"; exit 1; }
             n=$((n + 1))
           done
           [ "$n" -gt 0 ] || { echo "no .ut templates found — the glob is wrong"; exit 1; }
