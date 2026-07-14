@@ -10,7 +10,28 @@ Security, Performance.
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [Unreleased]
+## [0.8.6] — 2026-07-14
+
+### Security
+- **Every release package is now signed with ed25519, and both the installer and the Update button
+  refuse a package that does not carry our signature.** The sha256 the installer already checked
+  cannot stand alone, and the reason is exact: GitHub *computes* the digest it publishes from the
+  bytes that were uploaded. Anyone able to replace a release asset — a leaked write-scoped token is
+  enough, no CI run involved — gets the digest recomputed for them, and the checksum then verifies
+  the attacker's package happily. The signing key is a CI secret, is in no branch, and cannot be
+  read back out of GitHub, so the same swap fails the signature: demonstrated end to end on the
+  router with the real script (asset replaced, digest recomputed → sha256 passes, `ERR: BAD
+  SIGNATURE`). `usign` is on every OpenWrt image (`base-files` depends on it), so this costs the
+  theme no new runtime dependency, it covers apk and ipk with one mechanism, and — unlike trusting
+  our key in `/etc/apk/keys` — it authorises nothing on the router beyond this one package. Both
+  checks fail **closed**: a missing digest, a missing `.sig` asset or no `usign` on the box all
+  refuse. A signature that is present and *wrong* is never overridable.
+- **CI refuses to publish a release it cannot sign, and refuses a key the routers would reject.**
+  The public half ships in the package and is embedded a second time in `install.sh` (which runs
+  from `curl | sh`, before any package exists). A divergence between the two copies cannot be
+  caught by any test — the installer would simply reject every release with `BAD SIGNATURE`, i.e.
+  the failure would look exactly like the attack — so CI compares them on every run, and the
+  release job re-verifies each freshly signed package against the key the router will actually use.
 
 ### Performance
 - **A page load no longer spawns a CGI process to fetch an empty translation catalogue — 31 ms off
@@ -303,25 +324,6 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   a missing type does not fall back to "unstyled" — it falls back to `base`.
 
 ### Security
-- **Every release package is now signed with ed25519, and both the installer and the Update button
-  refuse a package that does not carry our signature.** The sha256 the installer already checked
-  cannot stand alone, and the reason is exact: GitHub *computes* the digest it publishes from the
-  bytes that were uploaded. Anyone able to replace a release asset — a leaked write-scoped token is
-  enough, no CI run involved — gets the digest recomputed for them, and the checksum then verifies
-  the attacker's package happily. The signing key is a CI secret, is in no branch, and cannot be
-  read back out of GitHub, so the same swap fails the signature: demonstrated end to end on the
-  router with the real script (asset replaced, digest recomputed → sha256 passes, `ERR: BAD
-  SIGNATURE`). `usign` is on every OpenWrt image (`base-files` depends on it), so this costs the
-  theme no new runtime dependency, it covers apk and ipk with one mechanism, and — unlike trusting
-  our key in `/etc/apk/keys` — it authorises nothing on the router beyond this one package. Both
-  checks fail **closed**: a missing digest, a missing `.sig` asset or no `usign` on the box all
-  refuse. A signature that is present and *wrong* is never overridable.
-- **CI refuses to publish a release it cannot sign, and refuses a key the routers would reject.**
-  The public half ships in the package and is embedded a second time in `install.sh` (which runs
-  from `curl | sh`, before any package exists). A divergence between the two copies cannot be
-  caught by any test — the installer would simply reject every release with `BAD SIGNATURE`, i.e.
-  the failure would look exactly like the attack — so CI compares them on every run, and the
-  release job re-verifies each freshly signed package against the key the router will actually use.
 - **The self-updater installed without checking the sha256 whenever it could not find one.** The
   check was `if [ -n "$digest" ]`, with no `else`: GitHub renaming the field, the `jsonfilter`
   predicate ceasing to resolve, or `jsonfilter` being absent all left the digest empty — and the
@@ -1576,7 +1578,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
-[Unreleased]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.18...HEAD
+[0.8.6]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.8.5...v0.8.6
 [0.7.17]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.16...v0.7.17
 [0.7.16]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.15...v0.7.16
 [0.7.15]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.7.14...v0.7.15
