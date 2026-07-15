@@ -10,7 +10,7 @@ Security, Performance.
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [Unreleased]
+## [0.8.9] — 2026-07-15
 
 ### Fixed
 
@@ -1811,6 +1811,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.8.9]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.8.8...v0.8.9
 [0.8.8]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.8.7...v0.8.8
 [0.8.7]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.8.6...v0.8.7
 [0.8.6]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.8.5...v0.8.6
