@@ -869,9 +869,24 @@
 	});
 	// popover open/close from the button
 	if(btn&&pop){pop.setAttribute('hidden','');btn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();if(pop.hasAttribute('hidden')){pop.removeAttribute('hidden');place();}else pop.setAttribute('hidden','');});document.addEventListener('click',function(e){if(!pop.hasAttribute('hidden')&&!pop.contains(e.target)&&!btn.contains(e.target))pop.setAttribute('hidden','');});document.addEventListener('keydown',function(e){if(e.key==='Escape')pop.setAttribute('hidden','');});window.addEventListener('resize',function(){if(!pop.hasAttribute('hidden'))place();});}
-	// menu accordion (nothing navigates)
+	// menu (nothing navigates). Mirror menu-footstrap.js: a bar/rail/narrow menu is a set of
+	// hover popups (pure CSS opens them over the content), so a TAP only sticks a panel open
+	// until a real mouse re-enters — hover then takes over — or a click lands outside. Without
+	// that, a clicked panel sticks forever, which is the one way the playground diverged from
+	// the router. In the expanded sidebar `.open` is an unfolded accordion and must NOT self-close.
 	var tm=document.getElementById('topmenu');
-	if(tm)tm.querySelectorAll('li.has-sub>a').forEach(function(a){var li=a.parentNode;a.addEventListener('click',function(e){e.preventDefault();var o=li.classList.contains('open');if(root.getAttribute('data-pg-autocollapse')==='true')tm.querySelectorAll('li.has-sub.open').forEach(function(x){if(x!==li)x.classList.remove('open');});li.classList.toggle('open',!o);a.setAttribute('aria-expanded',!o?'true':'false');});});
+	function fsFlyout(){var l=root.getAttribute('data-layout');return (l==='top'||root.hasAttribute('data-narrow')||root.getAttribute('data-rail')==='true');}
+	function fsShut(except){if(!tm)return;tm.querySelectorAll('li.has-sub.open').forEach(function(x){if(x===except)return;x.classList.remove('open');var t=x.querySelector(':scope>a');if(t)t.setAttribute('aria-expanded','false');});}
+	if(tm)tm.querySelectorAll('li.has-sub>a').forEach(function(a){var li=a.parentNode;
+		a.addEventListener('click',function(e){e.preventDefault();var o=li.classList.contains('open');
+			if(fsFlyout()||root.getAttribute('data-pg-autocollapse')==='true')fsShut(li);
+			li.classList.toggle('open',!o);a.setAttribute('aria-expanded',!o?'true':'false');});
+		// hybrid: once a real mouse enters, drop the tap-stuck panel so CSS :hover is authoritative
+		li.addEventListener('pointerenter',function(e){if(e.pointerType==='mouse'&&fsFlyout())fsShut();});
+	});
+	// click-outside / Escape close an open flyout panel (the accordion stays; it is not a popup)
+	document.addEventListener('click',function(e){if(fsFlyout()&&tm&&!e.target.closest('#topmenu>li.has-sub'))fsShut();});
+	document.addEventListener('keydown',function(e){if(e.key==='Escape'&&fsFlyout())fsShut();});
 	// rail toggle
 	var rail=document.querySelector('.fs-railtoggle,#fs-rail-toggle');
 	if(rail)rail.addEventListener('click',function(e){e.preventDefault();root.getAttribute('data-rail')==='true'?root.removeAttribute('data-rail'):root.setAttribute('data-rail','true');if(pop&&!pop.hasAttribute('hidden'))place();});

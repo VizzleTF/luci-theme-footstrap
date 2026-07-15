@@ -61,6 +61,12 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ### Fixed
 
+- **The playground's top-bar menu no longer sticks a clicked dropdown open forever.** It click-toggled
+  `.open` and never cleared it, so a tapped panel stayed on screen when the pointer left — the one way
+  the demo diverged from a live router. It now mirrors `menu-footstrap.js`: in flyout mode (top bar /
+  rail / narrow) a tap sticks the panel only until a real mouse re-enters (CSS `:hover` takes over) or
+  a click lands outside/Escape closes it; the expanded-sidebar accordion is untouched, where `.open`
+  legitimately persists.
 - **The Wireless "Associated Stations" table no longer wraps Signal/Noise and the RX/TX rate onto
   extra lines** (issue #7). `overflow-wrap: anywhere` split the short "-54/-90 dBm" wherever a
   character landed and stacked the modulation string ("229 Mbit/s, 20 MHz, HE-MCS 9, HE-NSS 2") into
