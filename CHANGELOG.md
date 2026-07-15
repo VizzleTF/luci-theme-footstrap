@@ -15,9 +15,10 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ### Added
 
-- **A live playground of the theme, published to GitHub Pages.** A full themed overview built from
-  footstrap's real chrome — sidebar/top bar, the accordion menu, the System/Memory/Storage grid,
-  network ports, wireless radios, interface status and DHCP leases (all fictional data). The
+- **A live playground of the theme, published to GitHub Pages.** A real OpenWrt overview page, saved from a live router
+  and fully anonymised (every MAC, client IP, IPv6 prefix, SSID and device hostname replaced) —
+  the System/Memory/Storage grid, port status, wireless, interfaces and DHCP leases exactly as the
+  theme renders them. The
   Appearance button opens the theme's real popover with every control wired up — Layout, Theme,
   Palette, Wallpaper, Tint, Accent, Rounding, Submenus and the icon rail — so you can drag the sliders
   and watch the whole page repaint without installing anything. Nothing navigates (every menu link is
