@@ -7,7 +7,7 @@ msgctxt "footstrap"
 msgid "Accent"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:154
+#: htdocs/luci-static/resources/fs-appearance.js:162
 #: ucode/template/themes/footstrap/partials/appearance.ut:16
 #: ucode/template/themes/footstrap/partials/appearance.ut:18
 msgid "Appearance"
@@ -50,14 +50,14 @@ msgstr ""
 msgid "Collapse menu"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:204
+#: htdocs/luci-static/resources/fs-appearance.js:217
 msgctxt "footstrap"
 msgid "Confirm reset"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:195
+#: htdocs/luci-static/resources/fs-appearance.js:205
 msgctxt "footstrap"
-msgid "Could not save the default."
+msgid "Could not save the default. Reload the page and try again."
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:48
@@ -144,7 +144,7 @@ msgid "Menu"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:113
-#: htdocs/luci-static/resources/fs-appearance.js:170
+#: htdocs/luci-static/resources/fs-appearance.js:178
 msgid "New version available"
 msgstr ""
 
@@ -181,9 +181,9 @@ msgid "Please enter your username and password."
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:135
-#: htdocs/luci-static/resources/fs-appearance.js:249
+#: htdocs/luci-static/resources/fs-appearance.js:263
 msgctxt "footstrap"
-msgid "Reset"
+msgid "Reset to default"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:88
@@ -192,18 +192,18 @@ msgctxt "footstrap"
 msgid "Rounding"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:137
+#: htdocs/luci-static/resources/fs-appearance.js:144
 msgctxt "footstrap"
 msgid "Router default"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:134
-#: htdocs/luci-static/resources/fs-appearance.js:186
+#: htdocs/luci-static/resources/fs-appearance.js:194
 msgctxt "footstrap"
 msgid "Save as default"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:186
+#: htdocs/luci-static/resources/fs-appearance.js:194
 msgctxt "footstrap"
 msgid "Saved as default"
 msgstr ""

@@ -11,6 +11,25 @@ Style and format guide: [docs/21-changelog-stil-i-format.md](docs/21-changelog-s
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Changed
+
+- **The Appearance "Reset" button is now labelled "Reset to default".** "Reset" alone did not say
+  reset to *what*; the button drops this browser's overrides onto the router-wide default saved with
+  "Save as default", so the label now names that destination.
+
+### Fixed
+
+- **A failed "Save as default" now shows a visible message instead of a silent tooltip.** On a
+  rejected save rpc — most often an expired login session — the old code parked the error in a
+  `title` attribute nobody hovers, so the click looked like it did nothing; the popover now shows
+  "Could not save the default. Reload the page and try again." in place of its (absent) status text,
+  with the raw rpc error kept in the tooltip for debugging. Note this does not cover a *deleted*
+  `/etc/config/footstrap`: rpcd stages the write in the session and the commit then silently no-ops
+  without recreating the file, returning success (measured on the router) — that file is owned by the
+  package, and the read side already falls back to the built-in defaults.
+
 ## [0.9.0] — 2026-07-15
 
 ### Added

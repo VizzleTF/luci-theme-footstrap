@@ -341,6 +341,9 @@
 	.fs-ap-actrow .btn:disabled { cursor: default; }
 	/* the primed Reset (second click confirms) reads as the destructive action it is */
 	.fs-ap-armed { color: var(--fs-on-danger); background: var(--fs-danger); border-color: transparent; }
+	/* Save's only visible failure line (a rejected save rpc — usually a stale session) — shown in
+	 * place of the absent status text, hidden until a save actually fails. */
+	.fs-ap-err { margin-top: 8px; font-size: 11px; line-height: 1.35; color: var(--fs-danger); }
 
 	/* version line + "new version" pill + Update button at the foot of the popover */
 	.fs-ap-footer {

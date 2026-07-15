@@ -132,10 +132,18 @@ function wireAppearance() {
 	 * browser diverges from the saved default, disabled "Saved as default" when it already matches
 	 * (nothing to save). refreshSave() below drives that from prefs.matchesSavedDefault(). */
 	const saveBtn = E('button', { 'class': 'btn cbi-button-action', 'type': 'button' }, [ _('Save as default', 'footstrap') ]);
-	const resetBtn = E('button', { 'class': 'btn', 'type': 'button' }, [ _('Reset', 'footstrap') ]);
+	const resetBtn = E('button', { 'class': 'btn', 'type': 'button' }, [ _('Reset to default', 'footstrap') ]);
+	/* Save's only visible failure surface. saveAsDefault() writes /etc/config/footstrap over the
+	 * scoped uci ACL; the realistic failure is the rpc REJECTING — an expired session (403), a
+	 * missing ACL, ubus down — which the old code buried in a title tooltip nobody sees. (A DELETED
+	 * config is NOT caught here: rpcd stages the set in the session and commit then silently no-ops
+	 * without writing the file, returning success — measured on the router. The package owns that
+	 * file and the read side falls back to built-in defaults, so that edge is left to the package.) */
+	const saveErr = E('div', { 'class': 'fs-ap-err', 'role': 'alert', 'hidden': '' });
 	groups.push(E('div', { 'class': 'fs-ap-group fs-ap-actions' }, [
 		E('div', { 'class': 'fs-ap-label' }, [ _('Router default', 'footstrap') ]),
-		E('div', { 'class': 'fs-ap-actrow' }, [ saveBtn, resetBtn ])
+		E('div', { 'class': 'fs-ap-actrow' }, [ saveBtn, resetBtn ]),
+		saveErr
 	]));
 
 	groups.push(E('div', { 'class': 'fs-ap-footer' }, [
@@ -187,12 +195,17 @@ function wireAppearance() {
 	}
 	saveBtn.addEventListener('click', () => {
 		saveBtn.disabled = true;
+		saveErr.hidden = true;
 		prefs.saveAsDefault()
-			.then(() => { saveBtn.removeAttribute('title'); })
-			/* no status text (only two buttons) — on failure re-enable so the user can retry, and
-			 * park the rpc error in a title tooltip for debugging. An rpc error string is the one
-			 * string here neither the theme nor LuCI composed; a title attribute never parses it. */
-			.catch((e) => { saveBtn.title = _('Could not save the default.', 'footstrap') + ' ' + String((e && e.message) || e); })
+			.then(() => { saveErr.hidden = true; })
+			/* On failure re-enable (refreshSave, below) so the user can retry. The usual cause is a
+			 * stale session, which a reload fixes — so say that. The raw rpc error — the one string
+			 * here neither the theme nor LuCI composed — stays in a title tooltip for debugging. */
+			.catch((e) => {
+				saveErr.textContent = _('Could not save the default. Reload the page and try again.', 'footstrap');
+				saveErr.title = String((e && e.message) || e);
+				saveErr.hidden = false;
+			})
 			.finally(refreshSave);
 	});
 	/* two-click confirm: the first click arms, the second resets — clearing this browser's overrides
@@ -231,6 +244,7 @@ function wireAppearance() {
 	}
 	function open() {
 		pop.hidden = false; btn.setAttribute('aria-expanded', 'true');
+		saveErr.hidden = true;	/* a stale save error must not greet the next open */
 		refreshSave();	/* the saved default may have changed since this popover was built */
 		reposition();
 		pop.querySelector(FOCUSABLE)?.focus();
@@ -246,7 +260,7 @@ function wireAppearance() {
 		 * would fire */
 		if (resetArmed) {
 			resetArmed = false;
-			resetBtn.textContent = _('Reset', 'footstrap');
+			resetBtn.textContent = _('Reset to default', 'footstrap');
 			resetBtn.classList.remove('fs-ap-armed');
 		}
 		document.removeEventListener('click', outside, true);

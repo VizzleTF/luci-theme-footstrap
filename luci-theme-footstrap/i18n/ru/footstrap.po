@@ -13,7 +13,7 @@ msgctxt "footstrap"
 msgid "Accent"
 msgstr "Акцент"
 
-#: htdocs/luci-static/resources/fs-appearance.js:154
+#: htdocs/luci-static/resources/fs-appearance.js:162
 #: ucode/template/themes/footstrap/partials/appearance.ut:16
 #: ucode/template/themes/footstrap/partials/appearance.ut:18
 msgid "Appearance"
@@ -56,15 +56,15 @@ msgstr "Закрыть"
 msgid "Collapse menu"
 msgstr "Свернуть меню"
 
-#: htdocs/luci-static/resources/fs-appearance.js:204
+#: htdocs/luci-static/resources/fs-appearance.js:217
 msgctxt "footstrap"
 msgid "Confirm reset"
 msgstr "Подтвердить сброс"
 
-#: htdocs/luci-static/resources/fs-appearance.js:195
+#: htdocs/luci-static/resources/fs-appearance.js:205
 msgctxt "footstrap"
-msgid "Could not save the default."
-msgstr "Не удалось сохранить значение по умолчанию."
+msgid "Could not save the default. Reload the page and try again."
+msgstr "Не удалось сохранить умолчание. Обновите страницу и повторите."
 
 #: htdocs/luci-static/resources/fs-appearance.js:48
 msgctxt "footstrap"
@@ -154,7 +154,7 @@ msgid "Menu"
 msgstr "Меню"
 
 #: htdocs/luci-static/resources/fs-appearance.js:113
-#: htdocs/luci-static/resources/fs-appearance.js:170
+#: htdocs/luci-static/resources/fs-appearance.js:178
 msgid "New version available"
 msgstr "Доступна новая версия"
 
@@ -193,10 +193,10 @@ msgid "Please enter your username and password."
 msgstr "Введите имя пользователя и пароль."
 
 #: htdocs/luci-static/resources/fs-appearance.js:135
-#: htdocs/luci-static/resources/fs-appearance.js:249
+#: htdocs/luci-static/resources/fs-appearance.js:263
 msgctxt "footstrap"
-msgid "Reset"
-msgstr "Сбросить"
+msgid "Reset to default"
+msgstr "Сбросить к умолчанию"
 
 #: htdocs/luci-static/resources/fs-appearance.js:88
 #: htdocs/luci-static/resources/fs-appearance.js:89
@@ -204,18 +204,18 @@ msgctxt "footstrap"
 msgid "Rounding"
 msgstr "Скругление"
 
-#: htdocs/luci-static/resources/fs-appearance.js:137
+#: htdocs/luci-static/resources/fs-appearance.js:144
 msgctxt "footstrap"
 msgid "Router default"
 msgstr "По умолчанию для роутера"
 
 #: htdocs/luci-static/resources/fs-appearance.js:134
-#: htdocs/luci-static/resources/fs-appearance.js:186
+#: htdocs/luci-static/resources/fs-appearance.js:194
 msgctxt "footstrap"
 msgid "Save as default"
 msgstr "Сохранить по умолчанию"
 
-#: htdocs/luci-static/resources/fs-appearance.js:186
+#: htdocs/luci-static/resources/fs-appearance.js:194
 msgctxt "footstrap"
 msgid "Saved as default"
 msgstr "Сохранено по умолчанию"
@@ -329,6 +329,18 @@ msgstr "истекло время ожидания установщика"
 #: htdocs/luci-static/resources/fs-update.js:112
 msgid "unknown error"
 msgstr "неизвестная ошибка"
+
+#~ msgctxt "footstrap"
+#~ msgid ""
+#~ "Could not save. The router config may be missing or damaged — reinstall "
+#~ "the theme."
+#~ msgstr ""
+#~ "Не удалось сохранить. Конфиг роутера отсутствует или повреждён — "
+#~ "переустановите тему."
+
+#~ msgctxt "footstrap"
+#~ msgid "Reset"
+#~ msgstr "Сбросить"
 
 #~ msgctxt "footstrap"
 #~ msgid "Saved as the router-wide default."
