@@ -116,6 +116,15 @@
 	.dk-check li.done .bx { background: var(--fs-accent); }
 
 	/* fix my styles */
+	.dk-howto { margin: 0 0 18px; }
+	.dk-howto ol { margin: 0 0 14px; padding-left: 20px; display: grid; gap: 7px; font-size: 13.5px; line-height: 1.5; }
+	.dk-howto ol b { color: var(--fs-text); }
+	.dk-howto-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+	@media (max-width: 680px) { .dk-howto-cols { grid-template-columns: 1fr; } }
+	.dk-howto-cols > div { border: 1px solid var(--fs-border); border-radius: var(--fs-radius); padding: 10px 14px;
+	                       font-size: 12.5px; color: var(--fs-dim); line-height: 1.7; }
+	.dk-howto-cols .k { display: block; font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
+	                    font-weight: 700; margin-bottom: 5px; }
 	.dk-grab { margin-bottom: 16px; border: 1px solid var(--fs-border); border-radius: var(--fs-radius); padding: 4px 14px; }
 	.dk-grab summary { cursor: pointer; font-weight: 700; font-size: 13.5px; padding: 8px 0; color: var(--fs-accent); }
 	.dk-grab p { font-size: 13.5px; color: var(--fs-dim); line-height: 1.55; margin: 4px 0 12px; }
@@ -270,6 +279,29 @@
 			risking your code) are flagged with the manual fix. Every colour keeps your original as a
 			<code class="dk-inline">var(--token, <i>original</i>)</code> fallback, so a rewrite can never change
 			how your app renders on a theme that lacks the token — worst case, it does exactly what it did before.</p>
+
+		<div class="dk-howto">
+			<ol>
+				<li><b>Get the code in.</b> Paste your CSS / <code class="dk-inline">&lt;style&gt;</code> / markup
+					into the left box — or, if it's injected from JS and you can't find it, use the console grabber
+					below (or a plain <b>Save Page As → HTML only</b>).</li>
+				<li><b>Press <span style="color:var(--fs-good)">Fix styles</span>.</b> The right box fills with the
+					rewritten code and the report appears underneath.</li>
+				<li><b>Take the fixed copy, then clear the manual list.</b> Copy the right box back into your app,
+					then work through <b>Fix these by hand</b> — each links to <a href="#rules">the rule</a> that
+					explains it. You're done when that list is empty.</li>
+			</ol>
+			<div class="dk-howto-cols">
+				<div><span class="k" style="color:var(--fs-good)">Rewritten for you</span>
+					colour literals → tokens (original kept as fallback) · <code class="dk-inline">--warning-*</code>→<code class="dk-inline">--warn-*</code> ·
+					<code class="dk-inline">--text-color</code>→<code class="dk-inline">--text-color-high</code> · private <code class="dk-inline">--fs-*</code>→export token ·
+					stray <code class="dk-inline">!important</code> · runaway <code class="dk-inline">z-index</code> · <code class="dk-inline">&lt;font color&gt;</code></div>
+				<div><span class="k" style="color:var(--fs-warn)">Flagged for you</span>
+					CSS in <code class="dk-inline">&lt;head&gt;</code> · <code class="dk-inline">:root{}</code> / <code class="dk-inline">*{}</code> ·
+					un-prefixed classes · <code class="dk-inline">window.onload</code> · <code class="dk-inline">prefers-color-scheme</code> ·
+					hardcoded editor theme · stock selectors without a scope</div>
+			</div>
+		</div>
 
 		<details class="dk-grab">
 			<summary>Grab it straight off a running app →</summary>
