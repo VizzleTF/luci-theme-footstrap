@@ -13,6 +13,23 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ## [Unreleased]
 
+### Added
+
+- **A developer portal for third-party `luci-app-*` authors, published to GitHub Pages.** One
+  self-contained page an app author opens to see what to copy, which colour token to read and what
+  not to do — the 26-name export-tier grid (live under dark/palette/tint, click-to-copy `var()`), a
+  component catalogue with Preview/HTML/`E()` tabs, and the styling rules with the real-app bug
+  behind each. It is generated (like `cascade.css`) from the sources that already exist — tokens
+  parsed from `02-tokens.css`, components sliced from `docs/gallery.html`, the real stylesheet and
+  its fonts inlined — so nothing is hand-copied and nothing drifts.
+- **"Fix my styles" — an in-browser codemod in the portal.** Paste a chunk of an app (CSS, a
+  `<style>`, a DevTools copy) and it rewrites the mechanical mistakes in place — colour literals to
+  export tokens with a literal fallback, `--warning-*`→`--warn-*`, private `--fs-*` to the matching
+  export token, stray `!important`, runaway `z-index`, `<font color>` — and flags the structural ones
+  it must not auto-touch (`<head>` injection, `:root {}`, un-prefixed classes, `window.onload`,
+  `prefers-color-scheme`, a hardcoded editor theme, unscoped stock selectors). Every colour keeps the
+  original as a `var(--token, original)` fallback, so a rewrite can never change how the app renders.
+
 ### Changed
 
 - **The Appearance "Reset" button is now labelled "Reset to default".** "Reset" alone did not say
