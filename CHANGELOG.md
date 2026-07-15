@@ -21,6 +21,22 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   shows. Its ring follows the theme mode — dark on the light UI, light on dark — the way the SVG
   favicon follows `prefers-color-scheme`, though the logo reads the theme's own dark-mode flag rather
   than the media query. The cyan arcs are fixed and stay legible in both modes.
+- **The top navigation bar now collapses by measurement at every width, and the "Refreshing"
+  indicator shrinks to an icon before the menu wraps to a second row.** The bar used to switch to a
+  phone layout at a hard 768px breakpoint; now `fitChrome` (the ResizeObserver) shrinks the menu
+  pills, then swaps the "Refreshing" pill for a bordered green icon square — grey when the poll is
+  paused, matching the Appearance and Log out buttons — freeing ~56px that is often enough to keep
+  the menu on the brand's row, and stacks onto a second row only when even that overflows. No 768px
+  floor: whether the menu fits depends on how many sections the router has, not on the screen. The
+  sidebar layout keeps its own measured phone bar (`data-narrow`), untouched.
+
+### Fixed
+
+- **A section's dropdown jumped to the bar's left edge once the top menu wrapped to two rows.** Below
+  the old 768px breakpoint the top bar fell back to a phone layout that pinned every dropdown to the
+  bar's left edge, so a wrapped menu could show Network's submenu under Status. With the bar now
+  measured at every width, each dropdown stays anchored under its own item, and the existing clamp
+  keeps it inside the viewport.
 
 ## [0.8.9] — 2026-07-15
 

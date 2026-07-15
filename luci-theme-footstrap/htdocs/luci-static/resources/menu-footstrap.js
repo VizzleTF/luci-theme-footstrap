@@ -42,11 +42,6 @@ function iconSvg(name) {
 /* `.open` means two things: in the expanded sidebar, an unfolded accordion section (several may
  * be open, the active one starts open); in the rail or the bar, a popup panel (exactly one open,
  * hover drives it, a tap toggles it, cleared on outside click and once a real mouse enters). */
-/* The DESKTOP-bar breakpoint, for topBarMode() alone: 50-toplayout.css guards the desktop bar's
- * deltas with `@media (min-width: 768px)`, so the edge-clamp must fire under exactly its
- * complement. NOT what decides whether the sidebar has become a bar — see flyoutMode(). */
-const _mqMobile = window.matchMedia('(max-width: 767px)');
-
 /* Is a section's panel a POPUP (flyout / bar dropdown) rather than an unfolded accordion? Must
  * read the same input the STYLESHEET does: `data-narrow` (fitShell() in fs-chrome.js
  * stamps it before the menu renders). NEVER a viewport breakpoint: it used to be
@@ -66,17 +61,17 @@ function flyoutMode() {
 const TRIGGER = ':scope > a';
 const OPEN_LI = '#topmenu > li.open';
 
-/* ---- dropdown edge-clamp (desktop top bar only) --------------------------
+/* ---- dropdown edge-clamp (top bar, every width) --------------------------
  * In the top layout each panel hangs off its OWN item (li position:relative, ul left:0 —
- * theme/50-toplayout.css), so an item near the right edge would push its panel past the
- * viewport. Nudge it back inside. Desktop bar only: the phone bar anchors every panel to the
- * bar's left edge and caps it to the viewport, and the rail flies panels out sideways — neither
- * can overflow this way. */
+ * theme/50-toplayout.css), so an item near the right edge would push its panel past the viewport.
+ * Nudge it back inside. Runs at ANY width now that the top bar is measured (no 768 floor); the
+ * rail flies panels out sideways and the SIDEBAR layout's phone bar pins+caps its own, so neither
+ * needs this. */
 /* the viewport edge gap, defined once in fs-widgets.js — the Appearance popover keeps a popup off
  * the edge by the same amount, and the two used to state it separately */
 const EDGE_GAP = widgets.EDGE_GAP;
 function topBarMode() {
-	return document.documentElement.getAttribute('data-layout') === 'top' && !_mqMobile.matches;
+	return (document.documentElement.getAttribute('data-layout') === 'top');
 }
 function clampDropdown(li) {
 	if (!topBarMode()) return;
@@ -298,9 +293,9 @@ return baseclass.extend({
 		new MutationObserver(modeChanged).observe(document.documentElement, {
 			attributes: true, attributeFilter: [ 'data-rail', 'data-layout', 'data-narrow' ]
 		});
-		/* still needed: topBarMode()/clampDropdown key off the desktop-bar @media in
-		 * 50-toplayout.css, which data-narrow does not cover */
-		_mqMobile.addEventListener('change', modeChanged);
+		/* No 768 media-query listener any more: the top bar is measured at every width
+		 * (fitChrome, no floor), so crossing 768 no longer flips the chrome — nothing to
+		 * transition that the attribute observer and the resize clamp-clear below don't cover. */
 
 		/* a clamp computed at the old width is wrong at the new one; coalesced via fit.frame
 		 * (the shared coalescer) because resize fires dozens of times a second while a window

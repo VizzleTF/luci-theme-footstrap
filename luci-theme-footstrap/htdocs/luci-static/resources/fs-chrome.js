@@ -138,11 +138,15 @@ function fitChrome() {
 
 	const bar = document.querySelector('.fs-sidebar');
 	const menu = document.getElementById('topmenu');
-	const desktopBar = !!bar && !!menu &&
-		document.documentElement.getAttribute('data-layout') === 'top' &&
-		window.innerWidth >= 768;
+	/* The top bar is MEASURED at every width — no 768 floor. It used to bail below 768 and hand
+	 * the job to a phone-bar media query, which left the sub-768 bar pinning its dropdowns to the
+	 * left edge and never collapsing "Refreshing"; the shrink/compact/stack escalation below now
+	 * runs at any width for the top layout. (The SIDEBAR layout still has its own phone bar,
+	 * decided by fitShell's data-narrow, and is untouched here.) */
+	const topBar = !!bar && !!menu &&
+		document.documentElement.getAttribute('data-layout') === 'top';
 
-	if (bar) bar.classList.remove('fs-bar-stack');
+	if (bar) bar.classList.remove('fs-bar-stack', 'fs-ind-compact');
 	fitTabStrips();
 	/* ---- does the main menu fit on the brand's row? ----
 	 * Whether it fits depends on how many sections THIS router has (stock 5, a loaded box 11), not
@@ -152,13 +156,20 @@ function fitChrome() {
 	 * flipping straight back — oscillation.
 	 *
 	 * The menu's own pills wrapping IS the "does not fit" signal, but only because the unstacked
-	 * desktop bar is flex-wrap: nowrap (50-toplayout.css); otherwise the BAR wraps, hands the menu
+	 * top bar is flex-wrap: nowrap (50-toplayout.css); otherwise the BAR wraps, hands the menu
 	 * a whole row, and it always "fits". Do NOT measure the bar's children by offsetTop instead:
 	 * the bar is align-items:center with children of differing heights, so their offsetTop differs
 	 * even on one row (that read as "wrapped" for a 5-section menu). */
-	if (desktopBar && !stripFitsOneRow(menu)) {
-		bar.classList.add('fs-bar-stack');
+	if (topBar && !stripFitsOneRow(menu)) {
+		/* First step before stacking: collapse the poll pill ("Refreshing", ~90px) to an icon
+		 * square and re-measure — that width alone is often enough to keep the menu on the
+		 * brand's row and skip the second row entirely (styles/theme/50-toplayout.css). */
+		bar.classList.add('fs-ind-compact');
 		fitTabStrips();
+		if (!stripFitsOneRow(menu)) {
+			bar.classList.add('fs-bar-stack');
+			fitTabStrips();
+		}
 	}
 }
 /* Did this batch of mutations add or remove a tab strip? The observer below exists only to catch a
