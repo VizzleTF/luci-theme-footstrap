@@ -15,6 +15,15 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ### Added
 
+- **A live playground of the theme's Appearance controls, published to GitHub Pages.** One page of
+  footstrap's real chrome (sidebar/top bar, the accordion menu, cards, tables, forms) with every
+  Appearance control wired up — Layout, Theme, Palette, Wallpaper, Tint, Accent, Rounding, Submenus
+  and the icon rail — so you can drag the sliders and watch the whole page repaint without installing
+  anything. Nothing navigates (every menu link is inert) and the controls deliberately touch no
+  `localStorage`, so it can't change a real router's saved look. The control markup reuses the theme's
+  own classes and drives the same `:root` attributes / custom properties the real Appearance popover
+  does (the contract in `tools/axes.mjs`), so it repaints exactly as the router would. Linked from the
+  README and the devkit.
 - **A developer portal for third-party `luci-app-*` authors, published to GitHub Pages.** One
   self-contained page an app author opens to see what to copy, which colour token to read and what
   not to do — the 26-name export-tier grid (live under dark/palette/tint, click-to-copy `var()`), a

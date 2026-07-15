@@ -6,6 +6,11 @@
 
 [More screenshots →](docs/screenshots/)
 
+**🎛️ [Try it live — the playground](https://vizzletf.github.io/luci-theme-footstrap/playground.html)** · drag every
+Appearance control (tint, accent, rounding, palette, layout, dark mode, wallpaper) on the real chrome and watch it
+repaint — nothing to install. Building a `luci-app`? The **[developer devkit](https://vizzletf.github.io/luci-theme-footstrap/)**
+has the token grid, the component markup and a one-click style checker.
+
 A dark (and light) LuCI theme for OpenWrt 24.10 and newer, with the whole
 interface re-laid-out: rounded cards, readable forms, and a reworked dashboard,
 login page and package manager.

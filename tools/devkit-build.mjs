@@ -23,6 +23,8 @@ const SRC = join(ROOT, 'docs/devkit.src.html');
 const GALLERY = join(ROOT, 'docs/gallery.html');
 const TOKENS = join(ROOT, 'luci-theme-footstrap/styles/02-tokens.css');
 const OUT = join(ROOT, 'docs/devkit.html');
+const PG_SRC = join(ROOT, 'docs/playground.src.html');
+const PG_OUT = join(ROOT, 'docs/playground.html');
 
 /* The export tier is the whole contract an app is allowed to read. Its NAMES are the source of
  * truth here — the values render live from the inlined stylesheet, so we never restate a colour.
@@ -108,3 +110,8 @@ const out = src
 
 await writeFile(OUT, out);
 console.log(`devkit.html: ${tiers.length} token families, ${components.length} components, ${(out.length / 1024 | 0)} KB`);
+
+/* the playground shares the same inlined stylesheet — the theme's real chrome + Appearance controls */
+const pg = (await readFile(PG_SRC, 'utf8')).replace('/*__CASCADE__*/', () => css);
+await writeFile(PG_OUT, pg);
+console.log(`playground.html: ${(pg.length / 1024 | 0)} KB`);

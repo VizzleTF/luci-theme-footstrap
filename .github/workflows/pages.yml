@@ -42,6 +42,7 @@ jobs:
           mkdir -p _site/fonts
           cp docs/devkit.html _site/index.html          # portal is the Pages root
           cp docs/devkit.html _site/devkit.html
+          cp docs/playground.html _site/playground.html
           cp docs/gallery.html _site/gallery.html
           luci-theme-footstrap/build-css.sh _site/cascade.css   # gallery loads this by <link>
           cp "$FONTS"/fonts/*.woff2 _site/fonts/
