@@ -72,7 +72,7 @@
 	.cbi-section .table:is([id], .fs-dt) .td { font-family: var(--fs-font-mono); font-size: 12px; color: var(--fs-text); }
 	/* No horizontal-scroll wrapper: long values break (overflow-wrap above), so the table reflows
 	 * into the column. Whether it cards instead is MEASURED (.fs-stacked, fs-select.js), any width. */
-	.cbi-section .table:is([id], .fs-dt) .tr:not(.table-titles):hover .td { background: var(--fs-panel2); }
+	.cbi-section .table:is([id], .fs-dt) .tr:not(.table-titles):not(.placeholder):hover .td { background: var(--fs-panel2); }
 	.cbi-section .table:is([id], .fs-dt) .tr.table-titles .th { border-bottom-color: var(--fs-border); }
 	/* Contour around the whole data table. A real <table> needs border-collapse:separate or the
 	 * radius is silently dropped. Scoped to #view too: Startup renders a .table.fs-dt in a bare
@@ -132,6 +132,10 @@
 
 	/* generic links/labels inside cards */
 	.cbi-section .ifacebox, .cbi-section .zonebadge { border-radius: var(--fs-radius); }
+	/* The device/MAC badge inside the Network status box kept base's flat 4px, reading as square
+	 * against the card's --fs-radius corners (issue #5.4). Scoped to the status box: the small
+	 * firewall zone .ifacebadge chips want to stay tight. Follows the Rounding axis via the token. */
+	.network-status-table .ifacebox-body .ifacebadge { border-radius: var(--fs-radius); }
 	/* ...and the head has to round WITH the box. It sits inside the box's 1px border and carries the
 	 * zone colour as an inline background, so its own corners are what you see: base pairs a 4px box
 	 * with a 3px head, but the line above bumps only the BOX to --fs-radius (10px by default), which
@@ -215,7 +219,12 @@
 	.table .tr:not(.table-titles):not(.cbi-section-table-titles) {
 		transition: background var(--fs-dur);
 	}
-	.table .tr:not(.table-titles):not(.cbi-section-table-titles):hover { background: var(--fs-panel2); }
+	/* Row hover ONLY on real data/config tables. A plain layout `.table` — Diagnostics is one
+	 * <tr> of input+button spanning the whole card, with no header row, so fs-select never tags
+	 * it .fs-dt — lit the ENTIRE block on hover (issue #5.3), and a data table's placeholder row
+	 * ("no active leases") lit up too (issue #5.2, plus :not(.placeholder) above). Data tables
+	 * hover per-cell above; config tables (.cbi-section-table, never .fs-dt) hover data rows here. */
+	.table.cbi-section-table .tr.cbi-section-table-row:hover { background: var(--fs-panel2); }
 	/* keep section/modal tables flush (no forced hover-card look) */
 	.cbi-section .table > .tr, .cbi-modal .table > .tr { border-radius: 0; }
 

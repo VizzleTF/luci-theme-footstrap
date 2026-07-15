@@ -21,6 +21,21 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ### Fixed
 
+- **Hovering the Diagnostics page no longer highlights the whole controls block, and empty tables
+  no longer light up their "no data" row** (issue #5). A single generic `.table .tr:hover` tint hit
+  every table, including layout tables the theme never meant to make interactive: the Diagnostics
+  input+button row is one `<tr>` spanning the whole card (no header row, so it is never tagged a data
+  table), so hover lit the entire block; and a data table's placeholder row ("There are no active
+  leases") lit up on hover the same way. Row hover is now scoped to real data tables (per cell,
+  placeholder excluded) and config-table data rows only.
+- **The device/MAC badge in the Network status box now follows the rounding scale instead of a flat
+  4px** (issue #5). It kept the base widget's hardcoded 4px corners, which read as square next to the
+  card's `--fs-radius`; it now uses the token, so it rounds with the Appearance Rounding axis. Scoped
+  to the status box — the small firewall zone badges stay tight.
+- **The "Keep settings" checkbox in the firmware-upgrade confirm dialog no longer hugs its label
+  text** (issue #5). The attendedsysupgrade dialog renders `label.btn > input[type=checkbox]` + text,
+  and the base rule that zeroes a checkbox's margin left only a literal space between the ✓ and the
+  words; a `.btn > input[type=checkbox]` margin restores the gap without touching the toggle switches.
 - **A failed "Save as default" now shows a visible message instead of a silent tooltip.** On a
   rejected save rpc — most often an expired login session — the old code parked the error in a
   `title` attribute nobody hovers, so the click looked like it did nothing; the popover now shows

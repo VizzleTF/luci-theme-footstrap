@@ -86,6 +86,13 @@
 
 	/* Form widgets — toggles, file input. Applies to every CBI form. */
 
+	/* A raw checkbox inside a button-styled label sat flush against its text: base zeroes the
+	 * checkbox margin (30-forms.css) and only a literal space separated the ✓ from the words
+	 * (issue #5.1 — attendedsysupgrade's "Keep settings" confirm: label.btn > input[type=checkbox]
+	 * + text). Restore a gap. The toggle-switch .cbi-checkbox below is unaffected — its input is
+	 * opacity:0, so this margin moves nothing there. */
+	.btn > input[type="checkbox"], .btn > input[type="radio"] { margin-right: .5em; }
+
 	/* checkbox -> toggle switch */
 	.cbi-checkbox { display: inline-flex; align-items: center; }
 	.cbi-checkbox > input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
