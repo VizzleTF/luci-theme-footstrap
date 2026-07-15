@@ -850,6 +850,12 @@
 	.pg-banner b{color:var(--fs-text)}.pg-banner .sp{flex:1 1 auto}
 	.pg-banner a.pg-link{color:var(--fs-accent);font-weight:700;text-decoration:none;border:1px solid var(--fs-accent-line);padding:5px 12px;border-radius:var(--fs-radius-s);white-space:nowrap}
 	.pg-banner a.pg-link:hover{background:var(--fs-accent-soft)}
+	/* Static snapshot fix: the theme's Memory/Storage meter rows are a grid (label + bar below,
+	   value floated into a reserved gutter). That grid is authored for LuCI's DIV-tables; this saved
+	   page carries a REAL <table>, whose browser-inserted <tbody> makes a table box that shrink-wraps
+	   the rows to ~120px, so the floated value spills over the label. Making the tbody a block lets
+	   the grid rows fill the card, exactly as on a live router. */
+	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)):has(.cbi-progressbar) tbody{display:block}
 </style>
 <script>
 (function(){
