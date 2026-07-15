@@ -10,6 +10,7 @@ on:
     branches: [main]
     paths:
       - 'docs/devkit.src.html'
+      - 'docs/playground.src.html'
       - 'docs/gallery.html'
       - 'luci-theme-footstrap/styles/**'
       - 'tools/devkit-build.mjs'
