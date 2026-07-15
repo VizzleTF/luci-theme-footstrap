@@ -29,6 +29,10 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   it must not auto-touch (`<head>` injection, `:root {}`, un-prefixed classes, `window.onload`,
   `prefers-color-scheme`, a hardcoded editor theme, unscoped stock selectors). Every colour keeps the
   original as a `var(--token, original)` fallback, so a rewrite can never change how the app renders.
+  To feed it, paste the CSS directly, drop in a whole **Save Page As** dump (it flags a `<style>` /
+  `<link>` living in `<head>`), or run the one-line console grabber on the running app — it harvests
+  every `<head>`-injected sheet, every inline `style=` in `#view` and every `<font color>` to the
+  clipboard. Verified against a real excerpt of OpenClash's `oc.css`.
 
 ### Changed
 
