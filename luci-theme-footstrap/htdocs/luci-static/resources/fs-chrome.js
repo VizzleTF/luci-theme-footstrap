@@ -129,8 +129,15 @@ function fitShell() {
 	const g = shellGeometry();
 	const cut = prefs.currentRail() ? g.railW : g.sidebarW;
 	const content = window.innerWidth - cut - g.contentPad;
-	if (content < g.contentMin) root.setAttribute('data-narrow', '');
-	else root.removeAttribute('data-narrow');
+	/* toggleAttribute, NOT setAttribute: a same-value setAttribute still QUEUES a mutation record
+	 * (measured in Chromium: 5 identical setAttribute('data-narrow','') -> 5 records; toggleAttribute
+	 * on an already-present attribute -> 0). fitShell runs from fitChrome, which fs-fit calls on every
+	 * mutation batch inside #view — i.e. once a second on any polled page. menu-footstrap observes
+	 * data-narrow and treats each record as a mode CHANGE, so on a phone (390 - 224 - 56 = 110 < 500,
+	 * so the attribute is permanently set) every poll tick re-fired closeFlyouts() and the section the
+	 * user had just tapped open snapped shut, forever. The bug was one-sided and therefore invisible
+	 * on a desktop: the else-branch removeAttribute on an absent attribute already fires 0 records. */
+	root.toggleAttribute('data-narrow', content < g.contentMin);
 }
 
 function fitChrome() {
