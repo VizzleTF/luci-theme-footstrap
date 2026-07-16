@@ -30,8 +30,13 @@ import { analyze } from '@projectwallace/css-analyzer';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const LIMITS = {
-	/* 16 (theme+pages, each fighting an inline or unlayered declaration) + 17 (base) */
-	importants: 30,
+	/* 17 (theme+pages, each fighting an inline or unlayered declaration) + 14 (base).
+	 *
+	 * Raised 30 -> 31 for theme/45-misc.css's realtime-graph bleed. It is the sanctioned kind: the
+	 * stock views size their drawing from #view but write `style="width:100%"` on the box they draw
+	 * into, so inside our padded card the canvas is 34px short and the newest samples are clipped —
+	 * and an inline declaration is exactly what no cascade layer can outrank. */
+	importants: 31,
 	/* The widest selector the theme needs; see the layer rules in CLAUDE.md.
 	 *
 	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`. Not sprawl:

@@ -79,6 +79,34 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ### Fixed
 
+- **The realtime graphs (Status → Realtime *) no longer lose their right-hand edge — which is where
+  the newest samples are.** Every one of them — Load, Bandwidth, Wireless, Connections, and the
+  third-party `luci-app-*-status` pages that copy them — sizes its drawing from `#view`
+  (`width = document.querySelector('#view').offsetWidth - 2`) rather than from the box it actually
+  draws into. That holds only in a theme whose `.cbi-section` has no gutter, which is why
+  `luci-theme-bootstrap` is fine; ours is a card with 16px of padding and a 1px border, so the canvas
+  was 34px narrower than the drawing and those 34px were clipped off the right (measured on the
+  router, every realtime page, every width: `#view` 1158 against an svg of 1124). It reads as a phone
+  bug because the loss is absolute, not proportional: 34px is 3% of a 1124px desktop plot but 10% of a
+  322px phone one. The graph box is now bled back out to the card's border edge, so the canvas is
+  exactly `#view - 2` again; the bleed is derived from the card's padding (now the `--fs-card-pad`
+  token) rather than restated, so narrowing the gutter can't silently re-clip every graph.
+
+- **Status → Channel Analysis draws the 5GHz graph again, instead of a blob squashed against the left
+  edge.** Only the tab that happened to be open at page load got a real graph; every other radio's tab
+  was collapsed onto x≈0 — no channel grid, no channel numbers, every network stacked in a smear —
+  and it stayed that way for the life of the page, because nothing re-measures it. The theme was
+  hiding an inactive tab pane with `display: none`, and a `display: none` element has no width: stock
+  `channel_analysis.js` builds its channel axis from `graph.offsetWidth` in a
+  `requestAnimationFrame`, ONCE, so for a pane that starts inactive it read 0 and spaced every channel
+  0px apart (measured on the router: grid x-span 0px against the 1147px it needs). Inactive panes are
+  now hidden with `visibility: hidden` — which keeps the pane laid out at full width while still
+  taking it out of the accessibility tree and the tab order — and the `height: 0; overflow: hidden;
+  padding/margin/border: 0` that were already there keep it out of the scroll and stop it drawing a
+  phantom strip. That is exactly how `luci-theme-bootstrap` hides a pane, which is why the page was
+  never broken there. `display: none` bought nothing over zeroing the box: Network → Interfaces
+  measured the same 1039px of scroll height either way, Network → DNS the same 1347px.
+
 - **The "Flash image?" dialog no longer paints with its left half off the screen on a phone.** The
   dialog was there and working — it had just been scrolled sideways out of reach. `#modal_overlay` is
   the scroll container and the dialog is centred inside it with `margin: auto`, so a single child too

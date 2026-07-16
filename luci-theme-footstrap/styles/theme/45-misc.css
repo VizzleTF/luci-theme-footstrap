@@ -1,4 +1,29 @@
 @layer theme {
+	/* The realtime graphs (Status → Realtime *) size their drawing from #view — NOT from the box
+	 * they draw into: `width = document.querySelector('#view').offsetWidth - 2`, in bandwidth.js,
+	 * load.js, wireless.js and connections.js, and in the luci-app-*-status copies of them. That
+	 * assumption only holds in a theme whose .cbi-section has no gutter (luci-theme-bootstrap's has
+	 * none, which is why the page is whole there). Ours is a card: 16px padding + a 1px border, so
+	 * the canvas came out 34px narrower than the drawing, and the views draw NEWEST-first from the
+	 * right — the freshest samples were the ones falling off the edge. Measured on the router, on
+	 * every realtime page and at every width: #view 1158 vs svg 1124. It reads as a phone bug only
+	 * because the loss is absolute: 34px of a 1124px desktop plot is 3%, of a 322px phone plot 10%.
+	 *
+	 * So bleed the graph box back out to the card's border edge, making the canvas exactly
+	 * #view - 2 again. The bleed is padding + border, and it is derived from --fs-card-pad rather
+	 * than restated, or narrowing the gutter would silently re-clip every graph.
+	 *
+	 * Scoped by SHAPE, not by page: a graph is an inline-styled box wrapping an <svg>, one card
+	 * deep. The luci-app-*-status graphs are third-party pages this theme has never seen, and they
+	 * inherit the bug by copying the stock view. channel_analysis.js is deliberately NOT matched —
+	 * it measures its OWN box, so it is already correct, and it hangs off a bare [data-tab] div
+	 * rather than a .cbi-section. The !important fights the inline `width: 100%` on the box; nothing
+	 * in a cascade layer can outrank that. */
+	#view .cbi-section > div[style]:has(> svg) {
+		width: auto !important;
+		margin-inline: calc(-1 * (var(--fs-card-pad) + 1px));
+	}
+
 	/* WCAG 2.2 SC 1.4.1 (Use of Color, A): inside a block of text a link may not be identified
 	 * by COLOUR ALONE — it needs a non-colour cue or 3:1 against the surrounding text, and
 	 * --fs-accent on --fs-text measures 1.4:1 in dark mode. So: underline links in prose.

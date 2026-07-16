@@ -25,11 +25,13 @@ STYLES = ROOT / "styles"
 BASE = STYLES / "base"
 # The only files allowed an !important, and each for a reason no cascade layer covers:
 # 90-responsive/20-overview outrank an inline style= written by ui.js or
-# luci-mod-status's 29_ports.js; styles/base carries widget-internal layout
-# (.cbi-dropdown) and the .left/.right/.center forcing utilities; 95-a11y-media needs
-# it because the flag INVERTS the layer order — the only way one rule can stop
-# animations declared in base as well as in theme.
-BANG_OK = ({"90-responsive.css", "20-overview.css", "95-a11y-media.css"}
+# luci-mod-status's 29_ports.js; 45-misc outranks the inline style='width:100%' the
+# realtime graphs write on the box they draw into (their drawing is sized from #view,
+# so the card's gutter clips it unless the box is widened back); styles/base carries
+# widget-internal layout (.cbi-dropdown) and the .left/.right/.center forcing
+# utilities; 95-a11y-media needs it because the flag INVERTS the layer order — the
+# only way one rule can stop animations declared in base as well as in theme.
+BANG_OK = ({"90-responsive.css", "20-overview.css", "95-a11y-media.css", "45-misc.css"}
            | {p.name for p in (STYLES / "base").glob("*.css")})
 
 # var()s legitimately not defined inside styles/. --zone-color-rgb is written inline on

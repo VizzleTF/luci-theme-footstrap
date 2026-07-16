@@ -6,7 +6,7 @@
 		border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow);
 	}
-	.cbi-section { padding: 16px; margin-bottom: 16px; }
+	.cbi-section { padding: var(--fs-card-pad); margin-bottom: 16px; }
 	/* a bare <legend>; the ones inside a .cbi-section are covered below */
 	legend { font-size: 14px; font-weight: 700; }
 
@@ -151,14 +151,27 @@
 
 	/* Inactive tab panes. Base's [data-tab-title] rule sets height:0/overflow:hidden, collapsing only
 	 * the CONTENT box — padding/border/margin still draw empty bars (podkop and Network → Interfaces
-	 * put data-tab-active on a .cbi-section: 18px/22px padding + 16px margin of phantom strip). And
-	 * display:none, not height:0: a clipped pane STILL inflates scrollHeight — Interfaces scrolled
-	 * ~585px past the footer, Network → DNS another ~750px. Hence ANY [data-tab-title], not just
-	 * .cbi-section ones (DNS renders each tab as a bare <div>). Tab-menu <li>s carry data-tab but
-	 * never data-tab-title, so the bar is untouched; the :not() also covers first render, where LuCI
-	 * has set active="true" on the shown tab only. */
+	 * put data-tab-active on a .cbi-section: 18px/22px padding + 16px margin of phantom strip), and a
+	 * pane left in flow inflates scrollHeight (Interfaces scrolled ~585px past the footer, Network →
+	 * DNS another ~750px). Zeroing the box does both jobs; measured on the router, hiding the pane
+	 * with display:none buys nothing on top of it (Interfaces scrollHeight 1039 either way, DNS 1347).
+	 *
+	 * It is `visibility`, and NOT `display: none`, because a display:none pane has no width, and a
+	 * view is entitled to measure one: stock channel_analysis.js builds its channel axis from
+	 * `graph.offsetWidth` in a requestAnimationFrame, ONCE — for the pane that starts inactive it read
+	 * 0, so every channel offset landed at x≈0 and the 5GHz graph stayed a collapsed blob at the left
+	 * edge for the life of the page, since nothing ever re-measures it (grid x-span 0px vs the 1147px
+	 * it needs; luci-theme-bootstrap has no such bug because it hides panes exactly this way).
+	 * `visibility: hidden` keeps the pane laid out at full width while still taking it out of the
+	 * a11y tree and the tab order, and height:0 + overflow:hidden keep it out of the scroll.
+	 *
+	 * Hence ANY [data-tab-title], not just .cbi-section ones (DNS renders each tab as a bare <div>).
+	 * Tab-menu <li>s carry data-tab but never data-tab-title, so the bar is untouched; the :not() also
+	 * covers first render, where LuCI has set active="true" on the shown tab only. */
 	[data-tab-title]:not([data-tab-active="true"]) {
-		display: none;
+		visibility: hidden;
+		height: 0;
+		overflow: hidden;
 		padding: 0;
 		margin: 0;
 		border: 0;

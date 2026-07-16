@@ -83,14 +83,18 @@
         "The only files allowed an !important, and each for a documented reason.",
         "theme/90-responsive + pages/20-overview outrank an inline style= attribute",
         "written by 29_ports.js / ui.js — no cascade layer can do that, only an author",
-        "!important can. styles/base carries widget-internal layout (.cbi-dropdown) and",
-        "the .left/.right/.center forcing utilities. theme/95-a11y-media is the",
-        "reduced-motion block: !important INVERTS the layer order, so it is the only",
-        "way one rule can stop animations declared in base as well as in theme.",
+        "!important can. theme/45-misc is the same case: the realtime graphs write",
+        "style='width:100%' on the box they draw into, and the theme has to widen it or",
+        "the drawing (sized from #view) is clipped by the card's gutter. styles/base",
+        "carries widget-internal layout (.cbi-dropdown) and the .left/.right/.center",
+        "forcing utilities. theme/95-a11y-media is the reduced-motion block: !important",
+        "INVERTS the layer order, so it is the only way one rule can stop animations",
+        "declared in base as well as in theme.",
         "This list is the contract. Adding a file to it needs a reason in the file."
       ],
       "files": [
         "luci-theme-footstrap/styles/base/*.css",
+        "luci-theme-footstrap/styles/theme/45-misc.css",
         "luci-theme-footstrap/styles/theme/90-responsive.css",
         "luci-theme-footstrap/styles/theme/95-a11y-media.css",
         "luci-theme-footstrap/styles/pages/20-overview.css"

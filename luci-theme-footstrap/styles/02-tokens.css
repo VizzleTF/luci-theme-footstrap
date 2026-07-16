@@ -162,6 +162,13 @@
 		--fs-radius-sm: calc(var(--fs-radius-base) * 2 / 3);	/* chips, code, small insets, rail toggle (8 @12) */
 		--fs-radius-pill: 999px;					/* pills, toggles, badges — always round */
 
+		/* A card's inner gutter (.cbi-section). A token because it is read back to UNDO it:
+		 * theme/45-misc.css bleeds the realtime graphs out to the card's border edge, and the
+		 * offset it needs is this padding plus the card's 1px border. Written as a literal in
+		 * both places, narrowing the gutter here would silently re-clip every graph — the same
+		 * trap --fs-sidebar-w exists to close for fitShell(). */
+		--fs-card-pad: 16px;
+
 		--fs-font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 		--fs-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
