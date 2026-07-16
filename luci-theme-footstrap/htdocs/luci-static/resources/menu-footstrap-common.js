@@ -6,6 +6,7 @@
 'require fs-chrome as chrome';
 'require fs-router as router';
 'require fs-appearance as appearance';
+'require fs-prefs as prefs';
 'require fs-sheets as sheets';
 
 /* The chrome BOOTSTRAP: load the menu tree once, hand it to the parts that need it, and wire them
@@ -32,6 +33,13 @@ return baseclass.extend({
 	/* entry point: load the menu tree, render the mode menu (which drives the injected
 	 * renderMainMenu) and the section tabs, and wire the chrome. */
 	init(renderMainMenu) {
+		/* FIRST, and outside the promise: a third-party sheet that outranks the chrome is already
+		 * painting (fs-sheets: openclash's `* { margin: 0; padding: 0 }`). Nothing below depends on
+		 * it, and hanging it off ui.menu.load() only made the broken frame last a round-trip
+		 * longer — or forever, since the .catch() below swallows a menu failure into console. */
+		sheets.watchViewSheets();
+		prefs.guardDarkStamp();		/* a third party stamping :root — same shape, different vector */
+
 		ui.menu.load().then((menu) => {
 			tree.setTree(menu);
 			chrome.setRenderMain(renderMainMenu);
@@ -50,7 +58,6 @@ return baseclass.extend({
 			router.wire();
 			router.wireVisibility();
 			chrome.wireTabFit();
-			sheets.watchViewSheets();
 		/* fs-chrome's renderTabMenu warns about exactly this, and the root chain was left bare: a
 		 * throw anywhere in the calls above took out the menu, the router and the Appearance popover
 		 * together, silently. It still fails — there is no sane partial recovery — but loudly. */

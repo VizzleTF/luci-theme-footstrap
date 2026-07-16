@@ -79,6 +79,78 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ### Fixed
 
+- **Opening an OpenClash page no longer flips the whole theme to dark against your explicit choice.**
+  Pick Light in Appearance, run an OS that is set to dark, open Services → OpenClash, and the entire
+  UI went dark — reproduced on the router: `data-darkmode` `false` → `true`, page background
+  `rgb(246,248,250)` → `rgb(28,33,40)`. `luci-app-openclash` stamps `data-darkmode="true"` straight
+  onto `:root` from seven of its templates, gated on its own `isDarkBackground()`
+  (`openclash/js/common.js:12`), which consults `matchMedia('(prefers-color-scheme: dark)')` **before**
+  it ever looks at the page's real background — so your OS setting silently overrode the choice you
+  made here. Its `select_git_cdn.htm:117` also `removeAttribute`s the very attribute this theme writes
+  as `'false'`. The theme now watches the three attributes it owns and restates the truth. This is not
+  a cascade problem and no layer, specificity or `!important` could have answered it — it is a DOM
+  write. The guard corrects a wrong premise rather than fighting the app's intent: when the page
+  really is dark, OpenClash's write **agrees** with ours and the guard never fires, so its own
+  `[data-darkmode="true"]` rules (197 selectors) keep working exactly as its author meant. Verified
+  across all six combinations of {OS dark, OS light} × {Light, Dark, Auto}. Only the published trio
+  (`data-darkmode`/`data-theme`/`data-bs-theme`) is guarded — being published to apps is precisely
+  what puts it in their vocabulary; the theme's private axes are not, and a survey of ten shipping
+  packages found none that writes any of them.
+- **A third-party rule on `html` or `body` can no longer reach into the menu by inheritance either.**
+  The fence below stops a foreign selector *matching* a menu element, but inheritance is the way in it
+  cannot close: a rule on an ancestor needs no match at all, the value simply arrives from above.
+  Measured on the router against a hostile `html` rule with every declaration flagged: `font-style`
+  reached **166 of the menu's 169 elements**, `word-spacing`/`text-align` 157, `letter-spacing`/
+  `text-transform` 156, `cursor` 46 — while `font-family`, `color`, `font-size`, `line-height` and
+  `font-weight` reached **none**, because the chrome already stated those itself. It now states the
+  rest, and that closes it: **0 of 169**. No `!important` was needed and none was used — inheritance
+  is not a cascade competitor, it only supplies a value where no declaration matches, so any
+  declaration of ours beats an inherited flag. The pin sits on the chrome ROOT alone and deliberately
+  not on its descendants: a direct declaration beats an inherited one *even when the inherited one is
+  ours*, so pinning descendants broke the chrome's own inheritance — measured, it cost `.fs-label` the
+  `nowrap` it inherits (labels would wrap), `.fs-railtoggle` its centring, and forced `text-align`
+  from `start` to `left` on 302 elements, which would have broken every RTL language LuCI ships.
+  Pinning the root breaks the chain from `html` once and lets the chrome's own inheritance flow on:
+  `cssdiff` reports **0 property differences across 2378 elements**, so nothing about normal rendering
+  changed at all.
+- **The menu is now unreachable by a third-party app's CSS — including its `!important`.** Re-hosting
+  an invasive sheet into the `theme` layer settles a fight on specificity, but it cannot settle one
+  against a flag: importance ranks **above** layers, so `* { padding: 0 !important }` still owned the
+  sidebar, and so did `#indicators { display: none !important }`. The chrome uses names that are not
+  `fs-*` — `nav`, `indicators`, `modemenu`, `topmenu` — and `.nav` is one of the most common class
+  names on the web, so this was never hypothetical. Rather than out-rank the rule, the theme now puts
+  the menu where it cannot be addressed: a foreign selector's subject gets
+  `:where(:not(.fs-sidebar, .fs-sidebar *))` appended, and `!important` has nothing left to win.
+  `nav.fs-sidebar` is the one chrome root for **both** layouts (the top bar is the same markup), so
+  one fence covers the sidebar and the bar alike. Measured across the real stylesheets of eight
+  shipping packages: menu damage **47 → 0** on OpenClash and **1 → 0** on MosDNS (whose bundled
+  CodeMirror ends with `span { cursor: unset !important }`), and zero on the other six. The
+  alternative — our own flag in an earlier layer, which does beat a foreign flag — would have meant
+  ~550 `!important` and, since `color`/`background` are among them, would have overridden this
+  theme's own `forced-colors` block: fixing the cascade by breaking high contrast. `:where()` is
+  load-bearing rather than cosmetic — it contributes **zero** specificity, so every app rule keeps its
+  exact weight everywhere except inside the menu; a plain `:not()` would take its argument's
+  specificity and silently re-order an app's stylesheet against itself. Only selectors that are not
+  pinned by a name of the app's own are fenced, because a pinned one can never reach the chrome in the
+  first place — the same test that decides whether a sheet is invasive at all.
+- **A third-party app's global CSS reset no longer wrecks the theme's own chrome on that app's page.**
+  On `luci-app-openclash` the sidebar lost its indent (menu text flush at x=0, icons clipped off the
+  left edge), the section tabs collapsed to a bare row of text and the cards lost their padding — and
+  it happened only on footstrap, which is the tell. OpenClash's `oc.css` carries a reset meant for its
+  own log page, `* { margin: 0; padding: 0 }`, and leaks it document-wide through a plain `<link>` its
+  Lua template prints into the content area. Reproduced on the router from those two rules and nothing
+  else. The cause was ours: every footstrap rule lives in a `@layer`, and an **unlayered** normal
+  declaration beats a layered one at **any** specificity — so a `*` at 0,0,0 outranked the chrome's
+  0,3,1. Stock `luci-theme-bootstrap` declares no layers, so there the same `*` loses on specificity
+  and nobody ever saw it. Such a sheet is now re-hosted into the theme's existing `theme` layer
+  (`fs-sheets.js`), which puts it back on specificity footing: `*` loses to the chrome, while the app's
+  own `#tab-header ul.cbi-tabmenu li` (1,1,2) still beats our `ul.cbi-tabmenu li` (0,1,2) and its page
+  looks as its author intended. Measured all three placements — giving the app a layer *below* the
+  theme also fixes the chrome but repaints the app author's own widgets, which is why it sits in
+  `theme` and not in a new layer of its own. The sheet is never deleted (that once cost ACE its editor
+  and broke SSClash): a `<link>` is disabled and its rules re-imported via `@import … layer(theme)`, so
+  every rule still exists and an app that looks its own `<link>` back up by href still finds it.
+  Reported in #8 (iStoreOS 24.10.7).
 - **The realtime graphs (Status → Realtime *) no longer lose their right-hand edge — which is where
   the newest samples are.** Every one of them — Load, Bandwidth, Wireless, Connections, and the
   third-party `luci-app-*-status` pages that copy them — sizes its drawing from `#view`

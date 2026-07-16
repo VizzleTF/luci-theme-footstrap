@@ -1,4 +1,44 @@
 @layer theme {
+	/* ---- the menu's floor: pin what a foreign rule can reach by INHERITANCE ----
+	 *
+	 * fs-sheets.js fences the chrome out of a third-party selector, so nothing foreign MATCHES a
+	 * menu element any more. Inheritance is the way in that a fence cannot close: a rule on `html`
+	 * or `body` is an ANCESTOR, and excluding it is meaningless — the value arrives from above.
+	 * Measured on the router against a hostile rule on `html` with every declaration flagged:
+	 * font-style reached 166 of the menu's 169 elements, word-spacing and text-align 157,
+	 * letter-spacing and text-transform 156, cursor 46. font-family, color, font-size, line-height
+	 * and font-weight reached NONE — because the chrome already states those itself. That is the
+	 * whole fix: state the rest too.
+	 *
+	 * Inheritance is not a cascade competitor. It only supplies a value when NO declaration matches
+	 * the element, so any declaration of our own — normal, unflagged, at zero specificity — beats an
+	 * inherited `!important`. Hence no `!important` here, and none is needed.
+	 *
+	 * It goes on the ROOT ALONE, never on `.fs-sidebar *`, and that is the whole design. Inheritance
+	 * flows from the nearest ancestor that has a value: pinning the root breaks the chain from `html`
+	 * once, and every descendant then inherits OUR value — while the chrome's own inheritance keeps
+	 * working. Pinning descendants too was measured and it broke exactly that: a direct declaration
+	 * beats an inherited one even when the inherited one is ours, so `.fs-label` lost the `nowrap` it
+	 * inherits (labels would wrap), `.fs-railtoggle` lost its centring, and `text-align` was forced
+	 * from `start` to `left` on 302 elements — `start` follows the writing direction and `left` does
+	 * not, so that alone would have broken every RTL language LuCI ships. Hence `text-align: start`,
+	 * not `left`. Nothing below the root needs a pin: a foreign rule can no longer MATCH a menu
+	 * element (fs-sheets.js fences it), so `html`/`body` is the only way in and the root closes it.
+	 *
+	 * `:where()` keeps it at 0,0,0 so every existing chrome rule outranks it — the pin is a floor,
+	 * never a ceiling. Only inherited properties belong here; a non-inherited one would be a plain
+	 * style decision wearing a guard's coat. */
+	:where(.fs-sidebar) {
+		font-style: normal;
+		font-variant: normal;
+		letter-spacing: normal;
+		word-spacing: normal;
+		text-transform: none;
+		text-indent: 0;
+		text-align: start;
+		cursor: auto;
+	}
+
 	/* Shared chrome — brand, logo, wordmark, logout, indicators. Same in both layouts;
 	 * only their PLACEMENT differs. Written twice once (here and under `.fs-topnav`) and
 	 * the copies had drifted: 32 vs 30px logo, 11 vs 10px brand gap, 10 vs 8px indicator
@@ -96,10 +136,15 @@
 	ul.nav > li { display: block; }
 	ul.nav a { line-height: 19px; text-decoration: none; }
 
-	/* `.dropdown-menu` is not the theme's menu (that is a plain nested `ul`), but ui.js
-	 * emits it for the split Save & Apply button and a third-party luci-app-* may too, so
-	 * it stays styled (coverage contract). Each item anchors its own nested popup, hence
-	 * position: relative. */
+	/* `.dropdown-menu` is emitted by NOBODY here: not by this theme (its menu is a plain nested
+	 * `ul`), and not by luci-base — grepped, zero hits outside stylesheets. It stays styled purely
+	 * under the coverage contract: it is theme vocabulary (stock luci-theme-bootstrap carries 14
+	 * rules for it), so a third-party luci-app-* is entitled to emit it and expect a themed result.
+	 * A selector with no on-router example today is styled for the package that emits it tomorrow.
+	 * Each item anchors its own nested popup, hence position: relative.
+	 *
+	 * This comment used to claim ui.js emits it for the split Save & Apply button. It does not —
+	 * that button is a `.cbi-dropdown`, a different widget entirely. */
 	.dropdown-menu li { display: block; position: relative; }
 	/* wins over `ul.nav a` above: the popup sets its own denser rhythm */
 	ul.nav .dropdown-menu a, .dropdown-menu a { line-height: 18px; }

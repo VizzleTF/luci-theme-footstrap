@@ -82,6 +82,14 @@ function stampDark(root, dark) {
 }
 
 const _mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+/* the one expression for "is this page dark right now", so the applier, the OS listener and the
+ * guard below cannot disagree about it */
+function intendedDark() {
+	const m = currentMode();
+	return m === 'dark' || (m === 'auto' && _mqDark.matches);
+}
+
 function applyMode(val) {
 	const root = document.documentElement;
 	/* 'auto' is stored EXPLICITLY (not lsDel), so it overrides a router default of dark/light —
@@ -90,6 +98,50 @@ function applyMode(val) {
 	else lsSet('fs-darkmode', val === 'dark' ? 'true' : 'false');
 	const dark = (val === 'dark') || (val === 'auto' && _mqDark.matches);
 	stampDark(root, dark);
+}
+
+/* ---- the three dialects are PUBLISHED, so third parties write them too ----
+ *
+ * Announcing dark mode in a vocabulary apps understand is what makes them follow the page — and it
+ * is exactly why an app reaches for the same attribute. `luci-app-openclash` stamps
+ * `data-darkmode="true"` straight onto :root from seven of its templates (config_editor.htm:215,306,
+ * select_git_cdn.htm:114, config_edit.htm:259, tblsection.htm:479, sub_info_show.htm:52), gated on
+ * its own isDarkBackground() (openclash/js/common.js:12) — which consults
+ * `matchMedia('(prefers-color-scheme: dark)')` BEFORE it ever looks at the body's real background.
+ *
+ * So a user who explicitly chose LIGHT here, on an OS set to dark, gets the whole theme flipped to
+ * dark by opening an OpenClash page. Reproduced on the router: data-darkmode false -> true, page
+ * background rgb(246,248,250) -> rgb(28,33,40). Their explicit choice, lost, silently, to their OS
+ * setting, through someone else's package. select_git_cdn.htm:117's removeAttribute is the mirror
+ * hazard: it deletes the attribute head.ut writes as 'false'.
+ *
+ * No cascade trick can answer this — it is a DOM write, not a rule. So watch the attributes we own
+ * and restate the truth. Nothing else is guarded: the other axes (data-layout, data-palette,
+ * data-accent, data-tint) are PRIVATE to this theme, no app has a reason to know them, and a survey
+ * of ten shipping packages found none that writes any of them. The published trio is the surface
+ * precisely because it is published.
+ *
+ * This does not fight the app's intent, it corrects a wrong premise: when the page really is dark,
+ * OpenClash's write AGREES with ours and the guard never fires — the compare is what makes it inert
+ * in the common case, and what stops it looping on its own restamp. It also cannot ping-pong: our
+ * write produces a mutation, the callback re-runs, the values now match, it returns. */
+function guardDarkStamp() {
+	const root = document.documentElement;
+	const check = () => {
+		const dark = intendedDark();
+		if (root.getAttribute('data-darkmode') === (dark ? 'true' : 'false') &&
+			root.getAttribute('data-theme') === (dark ? 'dark' : 'light') &&
+			root.getAttribute('data-bs-theme') === (dark ? 'dark' : 'light')) return;
+		stampDark(root, dark);
+	};
+	/* An app's inline <script> runs while its template is still being parsed — long before this
+	 * module is fetched — so by now the attribute can already be wrong. Observing alone would never
+	 * see that mutation: check first, then watch. */
+	check();
+	new MutationObserver(check).observe(root, {
+		attributes: true,
+		attributeFilter: ['data-darkmode', 'data-theme', 'data-bs-theme']
+	});
 }
 /* "Auto" means follow the OS — it only did so at page load, so an OS flipping to dark on its
  * own schedule left the open page in light until a reload. Only follows when the effective mode
@@ -325,7 +377,7 @@ return baseclass.extend({
 
 	FS_RADIUS_DEFAULT,
 
-	currentMode, applyMode, stampDark,
+	currentMode, applyMode, stampDark, guardDarkStamp,
 	currentPalette, applyPalette,
 	currentWallpaper, applyWallpaper,
 	currentRadius, applyRadius,
