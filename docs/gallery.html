@@ -594,6 +594,24 @@ option two</textarea></div>
 				<button class="cbi-button cbi-button-positive important">Confirm</button>
 			</div>
 		</div>
+		<!-- flash.js's "Flash image?" dialog: prose inside `label.btn`, and a checksum `<li>`
+		     with no break opportunity. Both used to force the overlay to scroll sideways. -->
+		<div class="modal" style="margin:1em 0 0">
+			<h4>Flash image?</h4>
+			<p>The flash image was uploaded. Below is the checksum and file size listed, compare them with the original file to ensure data integrity.</p>
+			<ul>
+				<li>Size: 8.25 MB</li>
+				<li>SHA256: 5d27b68d801a4569696991c2435437508dff558b0c1f5d27b68d801a4569696b</li>
+			</ul>
+			<p><label class="btn"><input type="checkbox" checked> Keep settings and retain the current configuration</label></p>
+			<p><label class="btn"><input type="checkbox"> Include in backup a list of current installed packages at /etc/backup/installed_packages.txt</label></p>
+			<p class="alert-message danger"><label>Image check failed:<br><br>Invalid image type</label></p>
+			<p><label class="btn alert-message danger"><input type="checkbox"> Force upgrade<br><br>Select 'Force upgrade' to flash the image even if the image format check fails. Use only if you are sure that the firmware is correct and meant for your device!</label></p>
+			<div class="right button-row">
+				<button class="cbi-button cbi-button-neutral">Cancel</button>
+				<button class="cbi-button cbi-button-action important">Continue</button>
+			</div>
+		</div>
 	</div>
 </div>
 

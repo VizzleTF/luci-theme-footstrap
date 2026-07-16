@@ -79,6 +79,19 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ### Fixed
 
+- **The "Flash image?" dialog no longer paints with its left half off the screen on a phone.** The
+  dialog was there and working — it had just been scrolled sideways out of reach. `#modal_overlay` is
+  the scroll container and the dialog is centred inside it with `margin: auto`, so a single child too
+  wide to wrap drags the modal's own left edge past the viewport. Two stock LuCI children did it, and
+  both are prose: `flash.js` writes each checkbox row as a `<label class="btn">` wrapping a whole
+  sentence ("Include in backup a list of current installed packages at
+  /etc/backup/installed_packages.txt"), and `.btn` is `white-space: pre` — correct for a button's own
+  label, fatal for a sentence, since it cannot wrap at any width; the `<li>` carrying the image's
+  SHA256 is one unbreakable 64-char token with nothing to break at. Measured at a 360px viewport: the
+  overlay's scroll width was **634px against 530px of visible room**, the widest label ending 132px
+  past the modal's right edge; both now land inside it. The wrap is scoped to `label.btn` inside a
+  modal, so a real button keeps `pre`. `docs/gallery.html` renders the dialog now — the shape was
+  unrepresented, which is why no contrast or computed-style sweep had ever looked at it.
 - **The menu no longer closes itself once a second on a phone.** Tapping a section open and having it
   snap shut a second later was the poll doing it: `fitShell()` wrote `data-narrow` with
   `setAttribute` on every measure, and a same-value `setAttribute` still **queues a MutationObserver

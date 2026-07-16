@@ -15,6 +15,25 @@
 	 * widens toward 1100 on desktop (the container clears 960 and tables stay tables), stays
 	 * narrow (cards) on tablet/phone. */
 	.modal:has(.cbi-map) { max-width: min(1100px, 94vw); }
+
+	/* A modal must never gain a HORIZONTAL scroll: #modal_overlay is the scroll container
+	 * (base/60-modal.css, `overflow: auto`) and the dialog is centred in it with `margin: auto`,
+	 * so one over-wide child scrolls the modal's own left edge off the screen — the dialog is
+	 * still there, just unreachable-looking (reported from a phone, with the flash-image dialog
+	 * cut in half). Measured over the gallery's copy of it at a 360px viewport: the overlay
+	 * wanted 634px of scroll against 530px of room, the `backup_pkgs` label ending 132px past
+	 * the dialog's right edge. Both numbers are 0 now.
+	 *
+	 * Two children do it, and both are stock LuCI markup:
+	 *   - `<label class="btn">` — flash.js writes each checkbox row as one ("Keep settings and
+	 *     retain the current configuration", "Include in backup a list of current installed
+	 *     packages at /etc/backup/installed_packages.txt"). `.btn` is `white-space: pre`
+	 *     (base/70-buttons.css), which is right for a BUTTON's own label and wrong for a
+	 *     sentence: it cannot wrap at any width. Scoped to `label` — a real button keeps `pre`.
+	 *   - a `<li>` carrying a checksum ("SHA256: 5d27b68d…") — one unbreakable 64-char token,
+	 *     nothing to wrap at, so it needs `anywhere` rather than a normal break. */
+	#modal_overlay .modal label.btn { white-space: normal; }
+	#modal_overlay .modal li { overflow-wrap: anywhere; }
 	#modal_overlay .uci-dialog div > ins,
 	#modal_overlay .uci-dialog div > del,
 	#modal_overlay .uci-dialog div > var { border-radius: var(--fs-radius-sm); }
