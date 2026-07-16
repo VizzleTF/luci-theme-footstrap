@@ -3,29 +3,38 @@
  * them together. Proven, not assumed: breaking the fence constant to `.fs-sidebarTYPO` left the menu
  * completely unprotected and `npm run check`, `jsmin-verify` and `eslint` ALL exited 0.
  *
- *   1. `header.ut` — the markup. `<nav class="fs-sidebar">` IS the chrome root, for BOTH layouts
- *      (the top bar is the same element; CSS morphs it).
+ *   1. `header.ut` — the markup. A chrome root MARKS itself with `data-fs-chrome`; the <nav> is one,
+ *      and so are the skip link and (in fs-appearance.js) the Appearance popover, neither of which is
+ *      inside it. The mark is what the other two read.
  *   2. `fs-sheets.js` — CHROME_FENCE, appended to a foreign selector's subject so it can no longer
- *      MATCH a menu element. This is what beats a third party's `!important`: there is nothing left
+ *      MATCH a chrome element. This is what beats a third party's `!important`: there is nothing left
  *      to out-rank.
  *   3. `theme/10-chrome.css` — the pin, which closes the one way in a fence cannot: INHERITANCE from
  *      `html`/`body`, where no match is needed at all.
  *
- * The name is DERIVED FROM THE MARKUP here, never restated: rename the class in header.ut and this
- * gate re-derives it, then fails on the two copies that still say the old one. That is the whole
- * point — the failure it prevents has NO symptom. The fence silently stops fencing, every test stays
- * green, and the menu breaks on someone else's router months later, next to an app we never saw.
+ * The mark is DERIVED FROM THE MARKUP here, never restated: rename it in header.ut and this gate
+ * re-derives it, then fails on the two copies that still say the old one. That is the whole point —
+ * the failure it prevents has NO symptom. The fence silently stops fencing, every test stays green,
+ * and the menu breaks on someone else's router months later, next to an app we never saw.
  *
- * It also holds the SHAPES, because each was a bug that was measured, not imagined:
+ * The fence and the pin are each ONE canonical string, so this gate compares the whole string rather
+ * than testing it for tokens. That is not pedantry — it is the hole the token version had. Its four
+ * independent `includes()` checks all passed on `:where(:not(.fs-sidebar), .fs-sidebar *)`, a
+ * plausible botched edit that is the exact INVERSE of a fence: it stops sparing the chrome and starts
+ * TARGETING it. A gate whose thesis is "a stale copy just stops defending, silently" cannot be the
+ * thing that waves that through.
+ *
+ * The shapes the strings encode, each a measured bug and not an imagined one:
  *  - `:where()` in both. It contributes ZERO specificity. Drop it from the fence and every app rule
  *    silently gains a point, re-ordering the app's stylesheet against itself on its own page. Drop it
  *    from the pin and the pin (0,1,0) starts fighting the chrome's own rules on source order.
- *  - The fence must cover the root AND its subtree (`.X, .X *`); the root alone leaves every menu
+ *  - The fence must cover the root AND its subtree (`[m], [m] *`); the root alone leaves every menu
  *    element inside it exposed.
- *  - The pin must cover the root ALONE. Pinning descendants was measured and it broke the chrome's
- *    own inheritance: a direct declaration beats an inherited one even when the inherited one is
- *    ours, costing `.fs-label` its `nowrap` and forcing `text-align` from `start` to `left` on 302
- *    elements — which breaks every RTL language LuCI ships.
+ *  - The pin must cover the root ALONE, which it now states itself (`:not([m] *)`) instead of relying
+ *    on nobody ever nesting a mark. Pinning descendants was measured and it broke the chrome's own
+ *    inheritance: a direct declaration beats an inherited one even when the inherited one is ours,
+ *    costing `.fs-label` its `nowrap` and forcing `text-align` from `start` to `left` on 302 elements
+ *    — which breaks every RTL language LuCI ships.
  *  - The pin may only carry INHERITED properties. A non-inherited one there is a style decision
  *    wearing a guard's coat, and at 0,0,0 it would lose to everything anyway.
  *
@@ -43,48 +52,66 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 const HEADER = read('luci-theme-footstrap/ucode/template/themes/footstrap/header.ut');
 const SHEETS = read('luci-theme-footstrap/htdocs/luci-static/resources/fs-sheets.js');
 const PREFS = read('luci-theme-footstrap/htdocs/luci-static/resources/fs-prefs.js');
+const APPEARANCE = read('luci-theme-footstrap/htdocs/luci-static/resources/fs-appearance.js');
 const CHROME = read('luci-theme-footstrap/styles/theme/10-chrome.css');
 
 const errors = [];
 const ok = [];
 
-/* ---- 1. the chrome root, derived from the markup ------------------------------------- */
+/* ---- 1. the chrome mark, derived from the markup -------------------------------------- */
+/* `{# … #}` first: header.ut's own comments argue about markup in prose ("<nav>, not <aside>"), so a
+ * scanner that does not strip them counts tags the template never emits — this gate found four <nav>
+ * elements in a template with one. */
+const MARKUP = HEADER.replace(/\{#[\s\S]*?#\}/g, '');
+
 /* One <nav> in the template, and it is the menu — `<nav>, not <aside>` is a deliberate choice the
  * header documents. If that ever stops being true this throws rather than guessing wrong. */
-const navs = [...HEADER.matchAll(/<nav\b[^>]*\bclass="([^"]+)"/g)].map((m) => m[1].trim());
+const navs = [...MARKUP.matchAll(/<nav\b([^>]*)>/g)].map((m) => m[1]);
 if (navs.length !== 1) {
-	console.error(`FAIL: expected exactly one <nav> in header.ut (the chrome root), found ${navs.length}.`);
-	console.error('This gate derives the chrome root from the markup; teach it the new shape.');
+	console.error(`FAIL: expected exactly one <nav> in header.ut (the menu), found ${navs.length}.`);
+	console.error('This gate derives the chrome mark from it; teach it the new shape.');
 	process.exit(1);
 }
-const ROOT_CLASS = navs[0].split(/\s+/)[0];
-if (!(/^fs-/).test(ROOT_CLASS)) {
-	console.error(`FAIL: the chrome root class "${ROOT_CLASS}" is not in the fs-* namespace.`);
+const marks = [...new Set(navs[0].match(/\bdata-[a-z][a-z0-9-]*/g) || [])];
+if (marks.length !== 1) {
+	console.error(`FAIL: the <nav> in header.ut carries ${marks.length} data-* attributes (${marks.join(', ') || 'none'}).`);
+	console.error('Exactly one of them is the chrome mark the fence and the pin key off, and this gate');
+	console.error('derives it from here rather than restate it. Teach it which, or mark the nav.');
+	process.exit(1);
+}
+const MARK = marks[0];
+if (!(/^data-fs-/).test(MARK)) {
+	console.error(`FAIL: the chrome mark "${MARK}" is not in the fs-* namespace.`);
 	console.error('Nobody outside this theme may emit an fs-* name — that is what makes the fence safe.');
 	process.exit(1);
 }
-ok.push(`chrome root derived from header.ut: .${ROOT_CLASS}`);
+/* Every root that carries it, so the report names the set being defended rather than implying the
+ * <nav> is all of it — which is the assumption the class-name fence was built on and got wrong. */
+const roots = [...MARKUP.matchAll(new RegExp(`<([a-z]+)\\b[^>]*\\b${MARK}\\b`, 'g'))].map((m) => m[1]);
+const jsRoots = [...APPEARANCE.matchAll(new RegExp(`'${MARK}'`, 'g'))].length;
+ok.push(`chrome mark derived from header.ut: [${MARK}] — ${roots.length} root(s) in the template `
+	+ `(${roots.join(', ')}) + ${jsRoots} in fs-appearance.js`);
+if (!jsRoots)
+	errors.push(`fs-appearance.js does not mark anything with ${MARK}. The Appearance popover hangs off `
+		+ `<body>, outside every template root, so an unmarked one is fenced by nothing — which is the `
+		+ `exact gap that made the mark necessary`);
 
 /* ---- 2. the fence (fs-sheets.js) ------------------------------------------------------ */
+/* ONE canonical string, compared whole. See the header: the token-testing version passed an
+ * INVERTED fence, which targets the chrome instead of sparing it. */
+const EXPECT_FENCE = `:where(:not([${MARK}],[${MARK}] *))`;
 const fenceM = SHEETS.match(/const CHROME_FENCE = '([^']+)';/);
 if (!fenceM) {
 	errors.push('fs-sheets.js no longer declares `const CHROME_FENCE = \'…\';` — the fence is what '
-		+ 'keeps a third party\'s !important out of the menu; this gate cannot find it');
+		+ 'keeps a third party\'s !important out of the chrome; this gate cannot find it');
+} else if (fenceM[1] !== EXPECT_FENCE) {
+	errors.push(`CHROME_FENCE is\n      ${fenceM[1]}\n    and must be exactly\n      ${EXPECT_FENCE}\n`
+		+ `    It is appended to a foreign selector's SUBJECT, so every part of it is load-bearing: `
+		+ `:where() keeps it at zero specificity, :not() spares the chrome instead of selecting it, `
+		+ `[${MARK}] is the mark header.ut emits, and "[${MARK}] *" covers the subtree — the root alone `
+		+ `leaves every element inside the chrome exposed`);
 } else {
-	const fence = fenceM[1];
-	if (!fence.includes(`.${ROOT_CLASS}`))
-		errors.push(`CHROME_FENCE (${fence}) does not mention .${ROOT_CLASS}, the chrome root header.ut `
-			+ `emits — the menu is NOT fenced and nothing else would tell you`);
-	if (!fence.startsWith(':where('))
-		errors.push(`CHROME_FENCE (${fence}) must be wrapped in :where() so it adds ZERO specificity; `
-			+ `without it every fenced app rule silently gains a point against the app's own stylesheet`);
-	if (!fence.includes(':not('))
-		errors.push(`CHROME_FENCE (${fence}) must EXCLUDE the chrome (:not(…)), not select it`);
-	/* the subtree half: `.X *`. Without it the fence only spares the root element itself. */
-	if (!new RegExp(`\\.${ROOT_CLASS}\\s*\\*`).test(fence))
-		errors.push(`CHROME_FENCE (${fence}) covers .${ROOT_CLASS} but not its DESCENDANTS `
-			+ `(.${ROOT_CLASS} *) — every element inside the menu would stay exposed`);
-	if (!errors.length) ok.push(`fence excludes .${ROOT_CLASS} and its subtree, at zero specificity`);
+	ok.push(`fence excludes [${MARK}] and its subtree, at zero specificity`);
 }
 
 /* ---- 3. the pin (theme/10-chrome.css) ------------------------------------------------- */
@@ -102,21 +129,30 @@ const INHERITED = new Set([
 	'font-feature-settings', 'font-variation-settings', 'font-kerning', 'text-decoration-color'
 ]);
 
-const pinM = CHROME.match(/:where\(\s*\.([A-Za-z_][\w-]*)([^)]*)\)\s*\{([^}]*)\}/);
-if (!pinM) {
-	errors.push('theme/10-chrome.css no longer carries the `:where(.<root>) { … }` pin — it is what '
-		+ 'stops a foreign rule on html/body reaching the menu by INHERITANCE, which the fence cannot');
+/* Found by the MARK, not by position: the old matcher took the first `:where(.x…){…}` in the file,
+ * so a second such rule added above it would have been checked in the pin's place. */
+const EXPECT_PIN = `:where([${MARK}]:not([${MARK}] *))`;
+/* Comments stripped and the WHOLE selector captured, because a partial match is how a gate lies: a
+ * pattern anchored on `:where(…)` alone reads `.fs-x :where([m]:not([m] *))` as the pin it wanted and
+ * never sees the `.fs-x ` that scopes it to nothing. `[^{}]+` cannot cross a brace, so the nested
+ * rules inside `@layer theme { … }` are what this matches, not the layer block. */
+const CSS = CHROME.replace(/\/\*[\s\S]*?\*\//g, '');
+const pins = [...CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+	.map((m) => [m[0], m[1].trim().replace(/\s+/g, ' '), m[2]])
+	.filter((m) => m[1].includes(MARK));
+if (pins.length !== 1) {
+	errors.push(`theme/10-chrome.css carries ${pins.length} \`:where(…[${MARK}]…) { … }\` rules, expected 1. `
+		+ `The pin is what stops a foreign rule on html/body reaching the chrome by INHERITANCE, which `
+		+ `the fence cannot: a rule on an ANCESTOR needs no match at all`);
 } else {
-	const [, pinClass, pinRest, body] = pinM;
-	if (pinClass !== ROOT_CLASS)
-		errors.push(`the pin in theme/10-chrome.css targets .${pinClass}, but header.ut emits `
-			+ `.${ROOT_CLASS} — a foreign html/body rule inherits straight into the menu`);
-	/* root ONLY: `.X *` here re-breaks the chrome's own inheritance (measured: 302 elements) */
-	if ((/\*/).test(pinRest) || (/,/).test(pinRest))
-		errors.push(`the pin must target the chrome ROOT ALONE, but its selector also carries `
-			+ `"${pinRest.trim()}". Pinning descendants beats the chrome's OWN inherited values: `
-			+ `.fs-label loses its nowrap and text-align is forced from start to left (302 elements, `
-			+ `which breaks RTL). The root alone breaks the chain from html and lets ours flow on`);
+	const [, sel, body] = pins[0];
+	if (sel !== EXPECT_PIN)
+		errors.push(`the pin's selector is\n      ${sel}\n    and must be exactly\n      ${EXPECT_PIN}\n`
+			+ `    :where() keeps it at 0,0,0 so every chrome rule outranks it — the pin is a floor, never `
+			+ `a ceiling. ":not([${MARK}] *)" is what holds it to ROOTS: a mark nested inside another mark `
+			+ `would otherwise put a direct declaration on a descendant, which beats an inherited value `
+			+ `even when the inherited one is OURS (measured: .fs-label lost its nowrap, text-align forced `
+			+ `from start to left on 302 elements — that alone breaks every RTL language LuCI ships)`);
 	const props = [...body.matchAll(/([-a-z]+)\s*:/g)].map((m) => m[1]);
 	const notInherited = props.filter((p) => !INHERITED.has(p));
 	if (notInherited.length)
@@ -125,8 +161,8 @@ if (!pinM) {
 			+ `zero specificity it cannot win anything else anyway`);
 	if (!props.length)
 		errors.push('the pin declares nothing — a pin of nothing pins nothing');
-	if (!notInherited.length && props.length && pinClass === ROOT_CLASS)
-		ok.push(`pin on .${ROOT_CLASS} alone, ${props.length} inherited properties, zero specificity`);
+	if (!notInherited.length && props.length && sel === EXPECT_PIN)
+		ok.push(`pin on [${MARK}] roots only, ${props.length} inherited properties, zero specificity`);
 }
 
 /* ---- 4. the dark-mode guard is watching everything stampDark writes -------------------- */
@@ -143,13 +179,25 @@ if (!stampM) {
 	const watched = [...guardM[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
 	const missing = written.filter((a) => !watched.includes(a));
 	const extra = watched.filter((a) => !written.includes(a));
+	/* Two empty lists agree with each other, and that used to PASS — "watches all 0 published
+	 * dialects". Both halves are read by regex, so either one going quiet (stampDark stamping through
+	 * a helper or a loop instead of a literal setAttribute, an emptied attributeFilter) is the failure
+	 * this gate exists to catch, not a clean bill. */
+	if (!written.length)
+		errors.push('stampDark() writes no attribute this gate can see — it matches literal '
+			+ "setAttribute('…') calls, and finding none means either the guard is gone or the stamping "
+			+ 'moved somewhere this check cannot follow. Both leave the published dark-mode attributes '
+			+ 'unguarded, and both would otherwise read here as "nothing to guard"');
+	else if (!watched.length)
+		errors.push('the observer\'s attributeFilter is EMPTY while stampDark() writes '
+			+ `${written.join(', ')} — every published dialect is unguarded`);
 	if (missing.length)
 		errors.push(`stampDark() writes ${missing.join(', ')} but the guard does not watch `
 			+ `${missing.length > 1 ? 'them' : 'it'} — a third party can hijack that dialect silently`);
 	if (extra.length)
 		errors.push(`the guard watches ${extra.join(', ')}, which stampDark() does not write — it would `
 			+ `restamp on an attribute it does not own`);
-	if (!missing.length && !extra.length)
+	if (!missing.length && !extra.length && written.length)
 		ok.push(`dark-mode guard watches all ${written.length} published dialects: ${written.join(', ')}`);
 }
 

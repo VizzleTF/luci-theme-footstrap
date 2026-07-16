@@ -162,7 +162,13 @@ function wireAppearance() {
 	/* aria-modal matches what the popover already DOES: keydown() traps Tab inside it and Escape
 	 * closes it, so without the attribute it announced as a non-modal dialog while behaving as a
 	 * modal one — a screen reader would offer the page behind it that Tab cannot actually reach. */
-	const pop = E('div', { 'class': 'fs-appearance-pop', 'role': 'dialog', 'aria-modal': 'true', 'aria-label': _('Appearance'), 'hidden': '' }, groups);
+	/* data-fs-chrome marks a Zone 1 root, and this one is the reason the mark exists rather than a
+	 * class list: the popover is OURS but it is not inside the <nav>, so a fence that named
+	 * `.fs-sidebar` protected the menu from openclash's `*{padding:0!important}` and flattened this
+	 * dialog in the same document. It hangs off <body> because it is position:fixed and an ancestor
+	 * with a transform/filter would re-root it (the sidebar is such an ancestor), so it cannot simply
+	 * live in the <nav> and inherit the fence that way. See header.ut for the roots-only rule. */
+	const pop = E('div', { 'class': 'fs-appearance-pop', 'data-fs-chrome': '', 'role': 'dialog', 'aria-modal': 'true', 'aria-label': _('Appearance'), 'hidden': '' }, groups);
 	document.body.appendChild(pop);
 
 	/* reveal the badge + Update button and mark the trigger (green dot) when a newer release

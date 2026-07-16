@@ -14,7 +14,20 @@
 	 * the element, so any declaration of our own — normal, unflagged, at zero specificity — beats an
 	 * inherited `!important`. Hence no `!important` here, and none is needed.
 	 *
-	 * It goes on the ROOT ALONE, never on `.fs-sidebar *`, and that is the whole design. Inheritance
+	 * It keys off `[data-fs-chrome]` — the mark a chrome root carries in the markup (header.ut) — and
+	 * not off `.fs-sidebar`, because the chrome is not one element: the skip link sits beside
+	 * .fs-shell and the Appearance popover hangs off <body>, so a pin naming the menu left both of
+	 * them inheriting straight from `html`. The fence (fs-sheets.js) reads the same mark, so the two
+	 * halves of Zone 1's defence cannot cover different sets of elements. `npm run chrome-fence`
+	 * derives the mark from the markup and holds both to it.
+	 *
+	 * It goes on the ROOT ALONE — and says so IN THE SELECTOR (`:not([data-fs-chrome] *)`: a marked
+	 * element that is not inside a marked element), rather than trusting whoever adds the next marker
+	 * to have read this comment. A nested marker is otherwise a direct declaration on a descendant,
+	 * which is exactly the 302-element bug below, and no gate can see it: the markers live in a
+	 * template with conditional blocks, so "is this one inside that one" is not a question a text
+	 * scanner can answer. CSS can answer it, so let CSS answer it. That is the whole design.
+	 * Inheritance
 	 * flows from the nearest ancestor that has a value: pinning the root breaks the chain from `html`
 	 * once, and every descendant then inherits OUR value — while the chrome's own inheritance keeps
 	 * working. Pinning descendants too was measured and it broke exactly that: a direct declaration
@@ -22,13 +35,13 @@
 	 * inherits (labels would wrap), `.fs-railtoggle` lost its centring, and `text-align` was forced
 	 * from `start` to `left` on 302 elements — `start` follows the writing direction and `left` does
 	 * not, so that alone would have broken every RTL language LuCI ships. Hence `text-align: start`,
-	 * not `left`. Nothing below the root needs a pin: a foreign rule can no longer MATCH a menu
+	 * not `left`. Nothing below a root needs a pin: a foreign rule can no longer MATCH a chrome
 	 * element (fs-sheets.js fences it), so `html`/`body` is the only way in and the root closes it.
 	 *
 	 * `:where()` keeps it at 0,0,0 so every existing chrome rule outranks it — the pin is a floor,
 	 * never a ceiling. Only inherited properties belong here; a non-inherited one would be a plain
 	 * style decision wearing a guard's coat. */
-	:where(.fs-sidebar) {
+	:where([data-fs-chrome]:not([data-fs-chrome] *)) {
 		font-style: normal;
 		font-variant: normal;
 		letter-spacing: normal;

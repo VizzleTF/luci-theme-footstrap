@@ -92,10 +92,35 @@ function inertDeclarations(rule, props) {
 	return true;
 }
 
+/* ---- the verdict is a property of the sheet, taken BEFORE we rewrite it -------------------
+ *
+ * An invasive verdict is STICKY, and it has to be: the moment rehostIntoThemeLayer() fences a sheet,
+ * what stands in the DOM is no longer the CSS its app wrote, and re-judging our own edit answers a
+ * different question than the one asked.
+ *
+ * It used to answer the right one BY ACCIDENT. The fence named a class (`.fs-sidebar`), so a fenced
+ * selector still carried a name the theme styles, still tripped the `themeHit` test, and
+ * documentPoisoned() went on reporting the document spent. Nothing said that was load-bearing —
+ * moving the fence onto an attribute leaves no class name in the text, every fenced document would
+ * have read CLEAN, and the SPA would have carried openclash's `*{padding:0!important}` into the next
+ * page with the chrome fenced and the content flattened. Take the verdict once, keep it.
+ *
+ * Only `true` is kept. A clean sheet can still GROW hostile rules — an app that builds its CSS with
+ * insertRule() has an EMPTY sheet the first time we look — so a clean verdict stays provisional and
+ * is re-taken on every ask. */
+const _invasive = new WeakSet();
+
+function invasiveSheet(el, universe) {
+	if (_invasive.has(el)) return true;
+	const v = judgeSheet(el, universe);
+	if (v) _invasive.add(el);
+	return v;
+}
+
 /* true when this sheet can repaint a page that is not its own. A sheet that is not readable —
  * still loading, 404, cross-origin — is invasive by default: unknown CSS takes the slow path,
  * never the broken one. */
-function invasiveSheet(el, universe) {
+function judgeSheet(el, universe) {
 	let sheet;
 	try { sheet = el.sheet; } catch (e) { return true; }
 	if (!sheet) return true;
@@ -207,10 +232,17 @@ function documentPoisoned() {
  * measured), but that means ~550 of them, and `color`/`background` among them would beat this
  * theme's OWN forced-colors block. Fixing the cascade by breaking high-contrast is not a fix.
  *
- * So do not out-rank the rule — put the chrome where it cannot be addressed. `nav.fs-sidebar` is
- * the ONE chrome root for both layouts (the bar is the same markup; see CLAUDE.md), so appending
- * `:where(:not(.fs-sidebar, .fs-sidebar *))` to a foreign selector's SUBJECT leaves it matching
- * everything it used to except us. `!important` has nothing left to win.
+ * So do not out-rank the rule — put the chrome where it cannot be addressed. Appending
+ * `:where(:not([data-fs-chrome], [data-fs-chrome] *))` to a foreign selector's SUBJECT leaves it
+ * matching everything it used to except us. `!important` has nothing left to win.
+ *
+ * The chrome is NOT one element, and naming one is how this went wrong the first time: the fence
+ * said `.fs-sidebar`, which is the menu in both layouts (the bar is the same markup) — but the skip
+ * link is a sibling of .fs-shell and the Appearance popover hangs off <body>, so both stayed exposed
+ * while every test said the chrome was defended. `data-fs-chrome` is the fix: an element DECLARES
+ * that it is ours, where it is written (header.ut, fs-appearance.js), and the fence and the pin
+ * follow without being told. A future chrome root cannot forget to edit a constant in this file,
+ * because there is no constant naming it any more. `npm run chrome-fence` holds the three together.
  *
  * `:where()` is load-bearing and not cosmetic: it contributes ZERO specificity, so `*` stays 0,0,0
  * and `#indicators` stays 1,0,0 and the app's rules keep their exact weight against each other and
@@ -227,7 +259,7 @@ function documentPoisoned() {
  *  - A pseudo-element must stay LAST. `a::after` + a tail append serialised to `a::after:where()`
  *    — the argument silently EATEN, leaving an empty `:where()` that matches NOTHING, and the
  *    setter reported success. The fence goes before the pseudo-element: `a:where(…)::after`. */
-const CHROME_FENCE = ':where(:not(.fs-sidebar,.fs-sidebar *))';
+const CHROME_FENCE = ':where(:not([data-fs-chrome],[data-fs-chrome] *))';
 
 function fenceSelector(part) {
 	/* the getter always normalises a pseudo-element to `::`, incl. legacy `:before` */
@@ -266,6 +298,40 @@ function fenceImported(styleEl, names, tries) {
 	if (tries > 0) requestAnimationFrame(() => fenceImported(styleEl, names, tries - 1));
 }
 
+/* What a sheet IS, as text: the rules that are APPLYING, not the markup that may or may not have
+ * produced them. Serialised only ever to COMPARE — never re-parsed, so the serialiser cannot cost
+ * anyone a rule. */
+const serializeRules = (rules) => Array.prototype.map.call(rules, (r) => r.cssText).join('\n');
+
+/* ---- a <style>'s textContent is NOT its sheet, and both the wrap and the dedupe assumed it was ----
+ *
+ * Wrapping means re-setting textContent, which RE-PARSES: whatever the parse does not reproduce is
+ * deleted — silently, by the one fix in this file whose entire thesis is that deleting a view's CSS
+ * is one-way (see the head of the file). Two shapes where the text does not describe the sheet, and
+ * they are one question, not two:
+ *  - an app that builds its CSS with insertRule() — an empty <style> appended first, rules pushed in
+ *    after: the text is EMPTY while the rules apply, so the wrap writes `@layer theme {}` over a live
+ *    sheet and every rule in it is gone.
+ *  - a <style> carrying @import: it is invalid inside @layer and has to sit at the top of a sheet, so
+ *    the wrapped copy comes back without it.
+ *
+ * So ask the exact question once — does re-parsing this text give back the sheet that is applying? —
+ * rather than enumerate the shapes that make it false; the enumeration is what missed insertRule().
+ * The probe is a CONSTRUCTIBLE sheet: never adopted, so nothing paints, no <head> mutation, and our
+ * own observer never sees it. It also drops @import (per spec), which is why that case needs no test
+ * of its own — the serialisations differ and the answer is already no.
+ *
+ * No probe means no answer, and the honest answer to "may I re-parse this?" when we cannot check is
+ * NO: the sheet keeps every rule and the fence still holds Zone 1 without it. */
+let _probe = null;
+function textIsSheet(el, live) {
+	try {
+		if (!_probe) _probe = new CSSStyleSheet();
+		_probe.replaceSync(el.textContent);
+		return serializeRules(_probe.cssRules) === serializeRules(live);
+	} catch (e) { return false; }
+}
+
 function rehostIntoThemeLayer(el, universe) {
 	if (el.dataset.fsLayered) return;
 
@@ -282,22 +348,33 @@ function rehostIntoThemeLayer(el, universe) {
 		return;
 	}
 
-	/* @import and @charset are invalid inside @layer and must stay at the top of a sheet, so a
-	 * <style> carrying one cannot be wrapped — leave it unlayered rather than drop its rules. */
 	let rules;
 	try { rules = el.sheet && el.sheet.cssRules; } catch (e) { return; }
-	if (!rules) return;
-	for (const r of rules)
-		if (r.type === CSSRule.IMPORT_RULE || r.type === CSSRule.CHARSET_RULE) return;
+	/* No rules yet: nothing to re-host, nothing to fence — and, crucially, nothing to MARK. An app
+	 * that appends an empty <style> and fills it with insertRule() arrives here first; marking it
+	 * handled now would leave the sheet it is about to build unfenced for the life of the document. */
+	if (!rules || !rules.length) return;
 
-	origText.set(el, el.textContent);	/* dedupeViewSheets keys on this — see there */
+	/* Handled — and never twice. fenceRules() is NOT idempotent: pinnedToApp() strips a functional
+	 * pseudo-class before looking for the app's own name, so an already-fenced selector reads as
+	 * unpinned all over again and a second pass appends a second fence. The mark is the only thing
+	 * that says the work is done, so it has to be set for every path below, wrapped or not. */
 	el.dataset.fsLayered = '1';
-	/* layer by TEXT, fence by CSSOM, in that order: re-setting textContent re-parses the sheet and
+
+	/* Wrap only if the text still IS the sheet (see textIsSheet). When it is not, the sheet stays
+	 * unlayered — Zone 2 exactly where it already was, which is a trade — rather than lose rules,
+	 * and it is still FENCED below: the fence is pure CSSOM, needs no re-parse, and is the half that
+	 * answers `!important` anyway.
+	 *
+	 * Layer by TEXT, fence by CSSOM, in that order: re-setting textContent re-parses the sheet and
 	 * would throw away any selector we had already rewritten. A <style>'s url()s resolve against the
 	 * document either way, so re-parsing costs nothing here — which is exactly NOT true of a <link>
 	 * (measured: cssText serialises `url("img.png")` still relative, so inlining a linked sheet would
 	 * silently re-base every image and font in it. That is why a <link> keeps its @import). */
-	el.textContent = '@layer theme {\n' + el.textContent + '\n}';
+	if (textIsSheet(el, rules)) {
+		origText.set(el, el.textContent);	/* dedupeViewSheets keys on this — see there */
+		el.textContent = '@layer theme {\n' + el.textContent + '\n}';
+	}
 	try { if (el.sheet) fenceRules(el.sheet.cssRules, universe.names); } catch (e) { /* unfenced, not broken */ }
 }
 
@@ -336,12 +413,29 @@ function rehostInvasiveSheets() {
  * this function exists to prevent). Re-host first and both copies are equivalent by the time they
  * are compared, so whichever survives is already layered and the loser's shim is a byte-identical
  * duplicate this same pass collapses. */
+function sheetKey(el) {
+	if (el.tagName === 'LINK') return 'LINK|' + el.href;
+	const t = origText.get(el);
+	if (t !== undefined) return 'STYLE|' + t;
+	/* Not wrapped, so no original was kept — and this sheet's textContent may not BE its sheet (see
+	 * textIsSheet): every insertRule-built <style> has an empty one, so keying on the text gave them
+	 * all the same key and the second one was REMOVED as a "duplicate" of a sheet it shares nothing
+	 * with. That is the deletion this file exists to prevent, dressed as a dedupe. Key on what is
+	 * applying instead. */
+	let rules;
+	try { rules = el.sheet && el.sheet.cssRules; } catch (e) { return null; }
+	/* A sheet with no rules is a duplicate of nothing — and it is very likely a <style> an app has
+	 * appended but not yet filled: removing it strands the handle it is about to insertRule through. */
+	if (!rules || !rules.length) return null;
+	return 'STYLE|' + serializeRules(rules);
+}
+
 function dedupeViewSheets() {
 	const seen = new Set();
 	document.querySelectorAll(VIEW_SHEETS).forEach((el) => {
 		if (el.closest('#view')) return;
-		const key = el.tagName + '|' +
-			(el.tagName === 'LINK' ? el.href : (origText.get(el) || el.textContent));
+		const key = sheetKey(el);
+		if (key === null) return;
 		if (seen.has(key)) el.remove();
 		else seen.add(key);
 	});
@@ -361,7 +455,15 @@ function dedupeViewSheets() {
  * adblock, the file manager), which is what the observer watches — deliberately not the whole
  * document, since LuCI's poll rewrites content every second and this would fire on every tick. */
 function watchViewSheets() {
+	/* Dedupe the immediate pass too, in the observer's order (re-host strictly first — see there).
+	 * It used to re-host only, which left the server-rendered duplicate — the one case this pass
+	 * exists for — uncollapsed for the life of the document. Measured with the real
+	 * luci-app-openclash: it prints the same <link href=oc.css> from three templates, so its
+	 * Overwrite Settings page carried two identical links and the two @import shims we make for
+	 * them, parsing 117 KB of CSS twice. The observer never fires for either: both are in the
+	 * SERVER's HTML, so there is no mutation to see. */
 	rehostInvasiveSheets();
+	dedupeViewSheets();
 	new MutationObserver((muts) => {
 		for (const m of muts)
 			for (const n of m.addedNodes)

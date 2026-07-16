@@ -50,15 +50,31 @@
 		{#
 			Skip link: jump the menu instead of tabbing through every section on every page.
 			Visually hidden until focused (.fs-skip, theme/10-chrome.css).
+
+			data-fs-chrome: this element and its subtree are Zone 1 — see the <nav> below.
 		#}
-		<a class="fs-skip" href="#maincontent">{{ _('Skip to content') }}</a>
+		<a class="fs-skip" data-fs-chrome href="#maincontent">{{ _('Skip to content') }}</a>
 		<div class="fs-shell">
 			{#
 				<nav>, not <aside>: this column IS the site navigation, and an <aside> gets
 				role="complementary" — a screen reader could not reach the menu by landmark, and
 				the shell had no navigation landmark at all. CSS keys off .fs-sidebar.
+
+				data-fs-chrome marks a Zone 1 ROOT: everything from here down is ours, and no
+				third-party rule may match it (the fence, fs-sheets.js) or reach it from html/body
+				by inheritance (the pin, theme/10-chrome.css). Both key off the ATTRIBUTE, never off
+				a class list, because the alternative rotted: chrome is not one element — the skip
+				link and the Appearance popover are not inside this <nav> — so a fence naming
+				`.fs-sidebar` protected the menu and left them out, and nothing said so. Marking the
+				element is what a new chrome root cannot forget to do somewhere else.
+
+				It marks ROOTS ONLY: never nest one marker inside another. The pin states inherited
+				properties on the marked element, and a direct declaration beats an inherited one
+				EVEN WHEN the inherited one is ours — measured, that cost .fs-label its nowrap and
+				forced text-align from start to left on 302 elements (RTL). `npm run chrome-fence`
+				fails on a nested marker.
 			#}
-			<nav class="fs-sidebar" aria-label="{{ _('Menu') }}">
+			<nav class="fs-sidebar" data-fs-chrome aria-label="{{ _('Menu') }}">
 				<div class="fs-brandrow">
 					{% include('themes/footstrap/partials/brand', { boardinfo }) %}
 					<button type="button" class="fs-railtoggle" id="fs-rail-toggle" aria-label="{{ _('Collapse menu') }}" title="{{ _('Collapse menu') }}">
@@ -85,8 +101,10 @@
 				   `hidden` cannot do that — it is display:none, which strips the element from the
 				   accessibility tree too, so the h1 was never there and the SPA router's
 				   .fs-title-main sync updated a node no assistive tech could read. .fs-sr clips
-				   instead (like .fs-skip): clipped stays in the tree. #}
-				<div class="fs-title fs-sr">
+				   instead (like .fs-skip): clipped stays in the tree — and what keeps it clipped is
+				   a class a foreign `*` outranks with one `!important`, so it is marked Zone 1 too.
+				   Inside .fs-main, which is NOT marked: that is where app pages render. #}
+				<div class="fs-title fs-sr" data-fs-chrome>
 					<h1 class="fs-title-main">{{ entityencode(striptags(dispatched?.title ? _(dispatched.title) : (boardinfo.hostname ?? 'OpenWrt')), true) }}</h1>
 				</div>
 
@@ -94,7 +112,7 @@
 				   no load event, focus dies with the clicked <a> (renderChrome() empties
 				   #topmenu), the new <title> is not announced. The router writes the incoming
 				   title here after every nav; empty on a full load — that announces itself. #}
-				<div id="fs-nav-status" class="fs-sr" role="status" aria-live="polite"></div>
+				<div id="fs-nav-status" class="fs-sr" data-fs-chrome role="status" aria-live="polite"></div>
 
 				<div class="fs-content">
 					{% include('themes/footstrap/partials/notices', { boardinfo, empty_password }) %}

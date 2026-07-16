@@ -98,22 +98,42 @@ root of a whole bug class, and it cuts three ways. Measured across the real, shi
 ten packages (openclash, podkop, mosdns, filemanager, banip, adblock, ssclash, temp-status, passwall,
 justclash) — take the numbers below from `tools/chrome-fence.mjs` and the changelog, not from memory.
 
-**Zone 1 — OURS: the chrome.** `.fs-sidebar` (the ONE root, both layouts) · `fs-*` · `--fs-*` ·
+**Zone 1 — OURS: the chrome.** `[data-fs-chrome]` (the mark; see below) · `fs-*` · `--fs-*` ·
 `fs-*` localStorage · the Appearance axes. **Nobody outside may write here**, and three things
 enforce it, each closing a door the others cannot:
+- **The mark** (`header.ut`, `fs-appearance.js`) — **the chrome is NOT one element, and naming one is
+  how this went wrong**. The fence and the pin used to say `.fs-sidebar`, which is the menu in both
+  layouts — but the skip link is a sibling of `.fs-shell`, the Appearance popover hangs off `<body>`
+  (it is `position: fixed`, and the sidebar is a transformed ancestor that would re-root it), and the
+  sr-only `<h1>`/live region sit inside `.fs-main`. Measured by replaying v0.9.1's own fence text
+  against openclash's rule: the menu **held**, and all four of those broke — the popover flattened
+  (padding 12px→0) and `position: fixed→static`, both sr-only elements un-clipped onto every page.
+  So a chrome root **declares itself** with `data-fs-chrome` where it is written, and the other two
+  read the mark. A new chrome root cannot forget to edit a constant in another file, because there is
+  no constant naming it. **Mark ROOTS only** — never nest one inside another.
 - **The fence** (`fs-sheets.js`) — an invasive sheet's unpinned selectors get
-  `:where(:not(.fs-sidebar, .fs-sidebar *))` appended to their SUBJECT, so they can no longer *match*
-  a menu element. This is the only thing that beats a third party's `!important`: there is nothing
-  left to out-rank. `:where()` is load-bearing — zero specificity, so the app's rules keep their exact
-  weight everywhere else. Openclash's `*{padding:0!important}` took the menu from 47 damaged elements
-  to 0; mosdns's `span{cursor:unset!important}` from 1 to 0.
+  `:where(:not([data-fs-chrome], [data-fs-chrome] *))` appended to their SUBJECT, so they can no
+  longer *match* a chrome element. This is the only thing that beats a third party's `!important`:
+  there is nothing left to out-rank. `:where()` is load-bearing — zero specificity, so the app's rules
+  keep their exact weight everywhere else. Openclash's `*{padding:0!important}` took the menu from 47
+  damaged elements to 0; mosdns's `span{cursor:unset!important}` from 1 to 0.
 - **The pin** (`theme/10-chrome.css`) — the fence cannot close **inheritance**: a rule on `html`/`body`
-  needs no match at all. The pin states the inherited properties on the chrome **ROOT ALONE**, which
-  breaks the chain from `html` once while the chrome's own inheritance flows on. **Never pin
-  descendants** — a direct declaration beats an inherited one *even when the inherited one is ours*:
-  measured, it cost `.fs-label` its `nowrap` and forced `text-align` from `start` to `left` on 302
-  elements, breaking every RTL language LuCI ships. No `!important` is needed or wanted: inheritance
-  is not a cascade competitor.
+  needs no match at all. The pin states the inherited properties on the chrome **ROOTS ALONE**, which
+  breaks the chain from `html` once while the chrome's own inheritance flows on. It says so **in the
+  selector** (`:where([data-fs-chrome]:not([data-fs-chrome] *))`) rather than trusting the next person
+  not to nest a mark: **descendants must never be pinned** — a direct declaration beats an inherited
+  one *even when the inherited one is ours*: measured, it cost `.fs-label` its `nowrap` and forced
+  `text-align` from `start` to `left` on 302 elements, breaking every RTL language LuCI ships. That
+  guard is in CSS because no gate can check it — the marks live in a template with conditional blocks,
+  so "is this one inside that one" is not a question a text scanner can answer. No `!important` is
+  needed or wanted: inheritance is not a cascade competitor.
+- **The verdict is taken BEFORE the fence rewrites the sheet** (`_invasive`, a WeakSet in
+  `fs-sheets.js`), and only `true` is remembered. `documentPoisoned()` used to re-judge the *fenced*
+  text and reach the right answer **by accident**: the class-named fence left `.fs-sidebar` in the
+  selector, which is a name the theme styles, so a fenced rule still tripped `themeHit`. Moving to an
+  attribute leaves no class name behind — every fenced document would have read clean and the SPA
+  would have carried openclash's `*` into the next page. A clean verdict stays provisional (a sheet
+  built with `insertRule()` is empty the first time we look).
 - **The `:root` guard** (`fs-prefs.js`) — not a cascade problem at all. `luci-app-openclash` writes
   `data-darkmode` onto `:root` from **seven** templates, gated on a check that consults
   `matchMedia('(prefers-color-scheme: dark)')` before the page's real background — so an explicit
@@ -142,16 +162,38 @@ unpinned one is Zone 1/2. Two copies of that judgement would drift into disagree
 
 **`npm run chrome-fence` is what stops all of this rotting**, and it exists because the failure is
 silent: breaking the fence constant to `.fs-sidebarTYPO` left the menu completely unprotected while
-`check`, `jsmin-verify` and `eslint` all exited **0**. The chrome root is named in three places
-(markup, pin, fence); the gate **derives** it from `header.ut` and holds the other two to it, plus the
-shapes (`:where()` in both, subtree in the fence, root-only in the pin, inherited-only properties) and
-the guard's `attributeFilter` against `stampDark`.
+`check`, `jsmin-verify` and `eslint` all exited **0**. The mark is named in three places (markup, pin,
+fence); the gate **derives** it from `header.ut` and holds the other two to it, plus the guard's
+`attributeFilter` against `stampDark`.
+
+The fence and the pin are each **one canonical string, compared whole** — not tested for tokens, and
+that is not pedantry. The token version's four independent `includes()` checks all **passed** on
+`:where(:not(.fs-sidebar), .fs-sidebar *)`, a plausible botched edit that is the exact *inverse* of a
+fence: it stops sparing the chrome and starts targeting it. A gate whose thesis is "a stale copy just
+stops defending, silently" cannot be the thing that waves that through. Ten mutations are checked to
+fail, including that one. Do not loosen a comparison here to make an edit fit — change the string the
+gate builds, deliberately.
 
 **What is deliberately NOT covered** — these are accepted trades, not oversights: the `base` layer
 still loses to a foreign `*` in the content area (the app must outrank `theme` for its own page, so it
-sits above `base`; that was already true); a `<style>` carrying `@import`/`@charset` cannot be wrapped
-and is skipped; the observer watches `<head>` only (the initial pass covers server-rendered markup);
-and the fence is JS, so a wrong frame can paint before the modules land.
+sits above `base`; that was already true); a `<style>` whose **text is not its sheet** cannot be
+wrapped, so it is fenced but not re-hosted and Zone 2 stays where it already was (see `textIsSheet()`
+— an `@import` at the top, or an app that built the sheet with `insertRule()`); the observer watches
+`<head>` only (the initial pass covers server-rendered markup); and the fence is JS, so a wrong frame
+can paint before the modules land.
+
+**A `<style>`'s `textContent` is NOT its sheet — `el.sheet.cssRules` is**, and assuming otherwise put
+the one deletion this module exists to prevent *inside the fix for it*. An app that builds its CSS
+with `insertRule()` leaves the text empty while the rules apply, and the old wrap re-set
+`textContent`, which RE-PARSES: measured on the router, `.probe-only { color: lime }` came back as
+`@layer theme {}` — every rule gone, silently. The `if (!rules) return` guard could never fire, since
+a `CSSRuleList` is truthy at length 0. The dedupe had the same hole from the other end: every
+insertRule-built `<style>` keyed as the same empty string, so the second one was **removed** as a
+"duplicate" of a sheet it shares nothing with. `textIsSheet()` now asks the exact question once — does
+re-parsing this text give back the sheet that is applying? — with a **constructible** sheet as the
+probe (never adopted, so nothing paints and our own observer never sees it). It subsumes the
+`@import` case: `replaceSync` drops `@import` per spec, so the serialisations differ and the answer is
+already no. Verified on the router across all six shapes.
 
 ## CSS architecture (critical)
 

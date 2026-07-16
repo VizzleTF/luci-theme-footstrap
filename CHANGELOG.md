@@ -11,6 +11,51 @@ Style and format guide: [docs/21-changelog-stil-i-format.md](docs/21-changelog-s
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+
+- **A third-party app that builds its CSS with `insertRule()` no longer loses every rule to the
+  theme.** The guard against a view's injected CSS re-hosts a `<style>` by re-setting its
+  `textContent`, which re-parses the sheet — and a `<style>`'s text is not its sheet: an app that
+  appends an empty `<style>` and fills it through the CSSOM leaves the text empty while its rules
+  apply. Measured on the router: `.probe-only { color: lime }` came back as `@layer theme {}`, every
+  rule gone and nothing reported. That is the exact one-way deletion this code exists to prevent,
+  arriving inside the fix for it; the `if (!rules) return` guard could never fire, because a
+  `CSSRuleList` is truthy at length 0. The same assumption had holed the duplicate detector from the
+  other end — every insertRule-built `<style>` keyed as the same empty string, so the second one was
+  **removed** as a "duplicate" of a sheet it shares nothing with. Both now ask what is actually
+  applying.
+- **The Appearance popover, the skip link and the screen-reader title survive a third-party
+  `*{padding:0!important}`.** The chrome's fence named one element, `.fs-sidebar` — but the chrome is
+  not one element: the skip link is a sibling of the shell, the popover hangs off `<body>`, and the
+  sr-only `<h1>` and live region sit inside the content column. Replaying the previous release's own
+  fence text against openclash's real rule: the menu held, and all four of those broke — the popover
+  flattened (padding 12px→0) and torn out of `position: fixed`, both sr-only elements un-clipped onto
+  every page. A chrome root now declares itself with `data-fs-chrome` where it is written, and the
+  fence and the pin read the mark, so a new one cannot be forgotten in a constant somewhere else.
+- **A server-rendered duplicate stylesheet is collapsed instead of parsed twice.** The duplicate
+  detector was wired only to the `<head>` observer, so the one case the immediate pass exists for —
+  CSS that arrives in the *server's* HTML, with no mutation to observe — was never deduped. Measured
+  with the real `luci-app-openclash`: it prints the same `<link href=oc.css>` from three templates,
+  so its Overwrite Settings page carried two identical links and both `@import` shims made for them,
+  parsing 117 KB of CSS twice for the life of the document.
+- **The SPA no longer carries an invasive stylesheet into the next page.** The verdict that a
+  document is spent is now taken before the fence rewrites the sheet. It used to be re-derived from
+  the fenced text and came out right by accident — the old fence left a theme class name in the
+  selector, which is what tripped the test. Moving the fence onto an attribute would have made every
+  fenced document read clean.
+- **`npm run chrome-fence` fails on an inverted fence.** Its four token checks all passed on
+  `:where(:not(.fs-sidebar), .fs-sidebar *)` — a plausible botched edit that stops sparing the chrome
+  and starts targeting it. The fence and the pin are each one canonical string and are now compared
+  whole; ten mutations are checked to fail, including that one. Two vacuous passes went with it: the
+  dark-mode guard reported "watches all 0 dialects" when both halves of its comparison came back
+  empty, and the pin was matched by position rather than by identity.
+- **The one expression for "is this page dark" is now the one all three callers use.** Only the guard
+  called `intendedDark()`; the applier and the OS listener spelled the condition out again, three
+  lines under a comment saying they could not disagree.
+
+
 ## [0.9.1] — 2026-07-16
 
 ### Added

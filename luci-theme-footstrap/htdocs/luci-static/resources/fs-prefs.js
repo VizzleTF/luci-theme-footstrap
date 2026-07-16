@@ -83,8 +83,10 @@ function stampDark(root, dark) {
 
 const _mqDark = window.matchMedia('(prefers-color-scheme: dark)');
 
-/* the one expression for "is this page dark right now", so the applier, the OS listener and the
- * guard below cannot disagree about it */
+/* The one expression for "is this page dark right now", so the applier, the OS listener and the
+ * guard below cannot disagree about it — and all three really do call it now. Only the guard did:
+ * the other two spelled the same condition out again, which is the drift this exists to prevent,
+ * sitting three lines under a comment claiming it could not happen. */
 function intendedDark() {
 	const m = currentMode();
 	return m === 'dark' || (m === 'auto' && _mqDark.matches);
@@ -96,8 +98,9 @@ function applyMode(val) {
 	 * otherwise a router defaulted to dark could never be set back to "follow the OS" here. */
 	if (val === 'auto') lsSet('fs-darkmode', 'auto');
 	else lsSet('fs-darkmode', val === 'dark' ? 'true' : 'false');
-	const dark = (val === 'dark') || (val === 'auto' && _mqDark.matches);
-	stampDark(root, dark);
+	/* AFTER the store, so intendedDark() reads the choice just made — which is what lets the one
+	 * expression serve here too, instead of a second copy spelled in terms of `val`. */
+	stampDark(root, intendedDark());
 }
 
 /* ---- the three dialects are PUBLISHED, so third parties write them too ----
@@ -149,7 +152,7 @@ function guardDarkStamp() {
 _mqDark.addEventListener('change', () => {
 	if (currentMode() === 'auto') {
 		const root = document.documentElement;
-		stampDark(root, _mqDark.matches);
+		stampDark(root, intendedDark());
 	}
 });
 function applyPalette(val) {

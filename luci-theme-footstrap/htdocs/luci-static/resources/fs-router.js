@@ -282,10 +282,22 @@ function navigate(pathname, push) {
 	chrome.renderChrome();
 
 	/* a full load starts at the top; the in-place swap must too, or navigating away from a long
-	 * page opens the next one mid-scroll. popstate replays keep the browser's scroll handling.
-	 * In the desktop sidebar layout the window does NOT scroll — .fs-main is the scroll container
-	 * (it owns overflow-y so the sidebar can be static, not a composited sticky layer — issue #7),
-	 * so reset it too; scrollTo on whichever is not the scroller is a harmless no-op. */
+	 * page opens the next one mid-scroll. In the desktop sidebar layout the window does NOT scroll —
+	 * .fs-shell is exactly 100dvh with overflow:hidden and .fs-main owns overflow-y, so the sidebar
+	 * can be static rather than a composited sticky layer (issue #7) — so reset it too; scrollTo on
+	 * whichever of the two is not the scroller is a harmless no-op.
+	 *
+	 * A popstate replay resets NOTHING, and "the browser handles it" is only half true — worth
+	 * knowing before someone reaches for scrollRestoration here. That API restores the DOCUMENT, and
+	 * in the sidebar layout the document is the box that never moved (measured: scrollHeight 800 ==
+	 * innerHeight, while .fs-main sat at 2937). What actually puts the incoming page at the top there
+	 * is the swap itself: #view empties, .fs-main's scrollHeight collapses and the browser CLAMPS
+	 * scrollTop to 0 — the incoming view renders behind an RPC, so a layout always happens while it
+	 * is empty. Measured on the router, both the first-visit and the cached view path: Back after
+	 * scrolling the outgoing page to 134/260 opened the incoming one at 0. So Back does not restore
+	 * scroll in the sidebar layout — nobody can, until something records .fs-main's offset in the
+	 * history entry — but it does not strand the outgoing page's offset either, which is the failure
+	 * this comment used to invite by claiming the browser had it covered. */
 	if (push) {
 		window.scrollTo(0, 0);
 		const sc = document.getElementById('maincontent');
