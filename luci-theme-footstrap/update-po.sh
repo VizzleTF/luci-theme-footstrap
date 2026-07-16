@@ -43,12 +43,21 @@ done
 
 # Prefer a scanner from a local LuCI checkout ($LUCI_SRC) so the gate is not hostage to the
 # network; fall back to fetching it. jsmin.c is pinned the same way in CI.
+#
+# ONE trap, covering every temp and every exit. It used to be installed inside the fetch branch
+# only — so the LUCI_SRC branch had none at all — and the three mktemps below were cleaned by hand
+# at each success path. With `set -eu`, any failure in between (perl choking on a template, i.e.
+# exactly the stale-.pot session this script exists for) leaked them. `fetched` is what the trap
+# removes, so the LUCI_SRC path never deletes the user's own checkout.
+fetched=''; fresh=''; old_ids=''; new_ids=''
+# shellcheck disable=SC2064  # expand nothing now: the names are assigned as the script proceeds
+trap 'rm -f "$fetched" "$fresh" "$old_ids" "$new_ids"' EXIT INT TERM
+
 scanner=''
 if [ -n "${LUCI_SRC:-}" ] && [ -f "$LUCI_SRC/build/i18n-scan.pl" ]; then
 	scanner="$LUCI_SRC/build/i18n-scan.pl"
 else
-	scanner="$(mktemp)"
-	trap 'rm -f "$scanner"' EXIT
+	scanner="$(mktemp)"; fetched="$scanner"
 	curl -sfL --proto '=https' --proto-redir '=https' "$SCANNER_URL" -o "$scanner" || {
 		echo "update-po: cannot fetch $SCANNER_URL — set LUCI_SRC to a luci checkout" >&2
 		exit 1
@@ -76,10 +85,8 @@ if [ "$CHECK" = 1 ]; then
 	if ! cmp -s "$old_ids" "$new_ids"; then
 		echo "update-po: $POT is STALE — a string was added or removed without rerunning ./update-po.sh" >&2
 		diff "$old_ids" "$new_ids" | grep '^[<>]' >&2 || true
-		rm -f "$fresh" "$old_ids" "$new_ids"
 		exit 1
 	fi
-	rm -f "$fresh" "$old_ids" "$new_ids"
 
 	rc=0
 	for po in i18n/*/*.po; do

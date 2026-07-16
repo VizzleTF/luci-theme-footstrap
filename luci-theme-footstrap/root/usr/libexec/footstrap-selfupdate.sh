@@ -73,12 +73,22 @@ PUBKEY=/usr/share/luci-theme-footstrap/release.pub
 # $WORKER behind forever — what the "" branch reads as "a run is in progress" — so the button
 # wedges until a reboot.
 #
-# The certificate is always verified, and the scheme is pinned on the REDIRECT too: the asset hops
-# to objects.githubusercontent.com, and without --proto-redir a redirect to http:// would be
-# followed, handing an on-path attacker the package about to be installed as root. The package
-# manager itself still installs --allow-untrusted (it holds no key of ours), so what makes the
-# package trustworthy is the ed25519 signature checked below — but this channel is what delivers
-# the release metadata that names the asset and its signature. Never add a `-k` fallback.
+# The certificate is always verified. Never add a `-k` / `--no-check-certificate` fallback: a failed
+# verification IS the MITM case, and ca-bundle is in OpenWrt's DEFAULT_PACKAGES, so the insecure path
+# buys nothing.
+#
+# BE PRECISE ABOUT WHAT SURVIVES A REDIRECT, because the asset genuinely hops to
+# objects.githubusercontent.com and -L has to follow it:
+#   - the scheme pin (--proto-redir '=https') exists ONLY on the curl branch. uclient-fetch is tried
+#     FIRST and is the only downloader on a stock router (curl is not in the default package set —
+#     that is why this fallback chain exists at all), and it has no such flag: it follows up to 10
+#     redirects, and an absolute Location: is re-parsed from scratch, so http:// would be followed.
+#   - asset_host_ok() pins the host of the INITIAL request only; no backend pins the host across a
+#     redirect, and -L is cross-host by design.
+# So on the path a stock router actually takes, the ed25519 signature checked below is the ONE layer
+# that survives a redirect. That is sound — it is what makes the package trustworthy, and the package
+# manager installs --allow-untrusted regardless (it holds no key of ours) — but do not read this
+# channel as more than "a verified-certificate delivery of the release metadata".
 # @mirror gh/fetch
 fetch() {
 	_u="$1"; _t="$2"; _o="$3"
@@ -199,9 +209,17 @@ fetch_verify_install() {
 		rm -f "$pkg"; return 1
 	}
 
+	# Two DIFFERENT faults, reported apart (install.sh already distinguishes them). Collapsed into
+	# one message, an unexpected signature host — which is what an attack would look like — was
+	# reported to the admin as "the release publishes no signature", pointing at the release
+	# instead. Both still fail closed; only the diagnosis differed.
 	surl="$(sig_url "$json" "$url")"
-	[ -n "$surl" ] && asset_host_ok "$surl" || {
+	[ -n "$surl" ] || {
 		echo "ERR: release publishes no signature for the package, refusing to install" > "$STATUS"
+		rm -f "$pkg"; return 1
+	}
+	asset_host_ok "$surl" || {
+		echo "ERR: package signature offered from an unexpected host, refusing to install" > "$STATUS"
 		rm -f "$pkg"; return 1
 	}
 	fetch "$surl" 60 "$sig" && [ -s "$sig" ] || {
