@@ -59,6 +59,18 @@ LUCI_MINIFY_CSS:=0
 PKG_LICENSE:=Apache-2.0 OFL-1.1
 PKG_LICENSE_FILES:=LICENSE htdocs/luci-static/footstrap/fonts/OFL.txt
 
+# /etc/config/footstrap is SHIPPED as an empty stub and WRITTEN AT RUNTIME: Appearance -> "Save as
+# default" has rpcd uci-set the router-wide axes into that very file (fs-prefs.js saveAsDefault()).
+# Without this define the package manager owns it as an ordinary file and REPLACES it on upgrade —
+# so the admin's saved defaults were wiped by the theme's own one-click Update, silently, reported
+# as success. Measured on the dev router: eight options in the live file, package-owned, no
+# .conffiles entry beside base-files'/dnsmasq's. OpenWrt honours this for BOTH formats
+# (include/package-pack.mk: KEEP_$(1) -> apk .conffiles, ipk CONTROL/conffiles), so one define
+# covers 24.10's opkg and 25.12's apk alike. Any future root/etc/config/* must be listed here too.
+define Package/luci-theme-footstrap/conffiles
+/etc/config/footstrap
+endef
+
 # RELOAD, NOT RESTART: rpcd holds sessions in memory, so `restart` logs out every LuCI user —
 # including the admin who just clicked Update. `reload` sends SIGHUP, which re-reads
 # /usr/share/rpcd/acl.d/*, and that ACL refresh is the only thing this package needs from rpcd.
