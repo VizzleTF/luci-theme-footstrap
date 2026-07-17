@@ -11,6 +11,25 @@ Style and format guide: [docs/21-changelog-stil-i-format.md](docs/21-changelog-s
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Added
+
+- **`npm run changelog` holds the changelog contract, which had already drifted into the release
+  that was about to ship.** `[Unreleased]` had grown a duplicate `### Changed` across several
+  commits — each innocent on its own — and `Fixed` had drifted above `Removed`. Nothing failed:
+  `release-notes.sh` prints a header the first time it meets each `###`, so the release page would
+  simply have carried two "Changed" groups, and it is generated at tag time, when the tag is already
+  pushed. The gate checks the section set, order and uniqueness, empty sections, dates, the compare
+  links in both directions, and that the Russian mirror carries the same versions, dates, sections
+  and bullet counts — a mirror that lags is worse than none, and nothing renders differently when it
+  does. It also requires the `**bold lead**` on every bullet in `[Unreleased]` and in a freshly cut
+  version, because a bullet without one is dropped from the release page in silence; 106 older
+  bullets predate that convention and are exempt, since their notes are long since published. Proven
+  by mutation: eleven botched edits fail, the legacy exemption and a fresh `[Unreleased]` pass. The
+  prose the doc actually cares about — the effect, the measurement, what the rule protects — is
+  deliberately not checked, because no scanner can judge it.
+
 ## [0.9.2] — 2026-07-17
 
 ### Added

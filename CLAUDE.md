@@ -398,6 +398,7 @@ npm run css-dup      # the same declaration body under two different guards
 npm run mirror       # @mirror-pinned copies (CSS *and* shell) are still byte-identical
 npm run axes         # head.ut's pre-paint agrees with the live Appearance appliers
 npm run chrome-fence # the fence, the pin and the dark-mode guard still match the chrome
+npm run changelog    # the changelog contract (docs/21): sections, mirror, the release notes
 ```
 
 **`tools/jsmin-verify.mjs` is the one gate `check` cannot run**, and it is the one that catches the
@@ -554,6 +555,17 @@ to both as well, when a tag is asked for.
 a Changelog 1.1.0, Common Changelog and Conventional Commits) — the single source of truth for
 category set, fixed section order, entry structure and the release workflow. Always follow it; the
 summary below is the pointer, the doc is the contract.
+
+**`npm run changelog` holds the mechanical half of it**, and it exists because that half drifts in
+silence: `[Unreleased]` had grown a DUPLICATE `### Changed` across several commits, each innocent on
+its own, and `release-notes.sh` would have printed two "Changed" groups onto the release page — with
+nothing failing anywhere, since the notes are generated at tag time. It checks the section set,
+order and uniqueness, empty sections, the compare links, the dates, that the RU mirror carries the
+same versions/dates/sections/bullet counts, and that every bullet in `[Unreleased]` (or in a
+freshly-cut newest version) has its `**bold lead**` — without one the release page drops the entry
+and says nothing. Older sections are exempt from the lead check: 106 bullets predate the convention
+and are long since published. The prose is deliberately not checked — no scanner judges "keep the
+measurement".
 
 Two files, kept in lockstep: **`CHANGELOG.md`** (English) and **`CHANGELOG_ru.md`** (Russian
 mirror). Keep a Changelog format, newest first. Sections in the FIXED order `Added` / `Changed` /
