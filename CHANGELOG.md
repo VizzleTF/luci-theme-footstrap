@@ -29,9 +29,32 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   by mutation: eleven botched edits fail, the legacy exemption and a fresh `[Unreleased]` pass. The
   prose the doc actually cares about — the effect, the measurement, what the rule protects — is
   deliberately not checked, because no scanner can judge it.
+- **The dev routers now carry a wifi client that really associates, so Associated Stations has a
+  row** (`docker/hwsim-up.sh`, three radios per box instead of two). That table is the one the
+  measured card-stacking exists for, and it has been fixed twice from a screenshot because neither
+  dev box could show it: a station comes from a real association through ubus/iwinfo and cannot be
+  faked in a lease file the way the DHCP rows are. The client needs a radio of its own — a phy has
+  one channel, the client must sit on the main AP's, and that is exactly the channel the neighbour
+  must avoid. It is pinned to its own box by BSSID, derived on every run: both boxes beacon the
+  same SSID and hwsim's medium is global, so unpinned clients both landed on the *same* box — two
+  rows there, none on the other, and which box won changed between runs. The script also gives the
+  station a lease and a v4/v6 neighbour entry, because LuCI resolves the Host column through
+  hosthints and "?" is precisely the short cell that hides a column crush.
 
 ### Fixed
 
+- **The 25.12 dev router's main AP had never been on air, and nothing said so.** `wifi config`
+  writes `country=00` itself, and with no regulatory.db to resolve it 25.12's hostapd rejects the
+  whole config (`Invalid country_code`, `Cannot enable IEEE 802.11d without setting the
+  country_code`) and `hostapd.add_iface` fails for that phy — while 24.10's hostapd accepts the
+  same line, so only one box was affected. Radios, SSIDs and scans still rendered (they come from
+  uci and from the other container's beacons), and the only symptom was that nothing could ever
+  associate — which reads as "hwsim does not do clients". The country line is now deleted.
+  `hwsim-up.sh` also regenerates `/etc/config/wireless` unconditionally instead of guessing when
+  the file is still good: every guess so far has been wrong — testing that `radio0` exists survived
+  a module reload that handed the box a third radio, and the hwsim index inside each radio path
+  changes on every reload, so even a config with the right *number* of radios can point at phys
+  that no longer exist, which brings every SSID up as "unknown" and is an error nowhere.
 - **A data table whose leftmost column has been shredded into a tower of half-words now cards,
   instead of staying a table nobody can read** (issue #7). Auto table layout hands width out by
   what each column *demands*, and `overflow-wrap: anywhere` gives the row's identity column no

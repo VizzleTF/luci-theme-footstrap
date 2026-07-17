@@ -70,9 +70,16 @@ VLAN, and the fake WAN's default route is metric 100 so the real one keeps winni
 ./hwsim-up.sh --down   # unload
 ```
 
-Each container gets two virtual radios, real hostapd, real SSIDs and real scans. Run it
-after `compose up` and again after a container is recreated: a phy lives in a network
-namespace, and when that namespace dies the phy goes back to the host.
+Each container gets three virtual radios, real hostapd, real SSIDs and real scans: the main
+AP on channel 6 (plus a guest and a disabled IoT SSID), a neighbour on channel 11, and a
+**client that really associates with the main AP** — so Associated Stations has a row.
+That table is the one the measured card-stacking exists for and it kept being fixed blind
+(issue #7): a station cannot be faked in a lease file, it comes from a real association.
+The client needs a radio of its own because a phy has one channel and it must sit on the AP
+channel, which is exactly the channel the neighbour must avoid.
+
+Run it after `compose up` and again after a container is recreated: a phy lives in a
+network namespace, and when that namespace dies the phy goes back to the host.
 
 Nothing is installed on the host and no sudo is used — the module is built in a throwaway
 ubuntu container and loaded from a privileged one (being in the `docker` group is already
@@ -90,9 +97,15 @@ Three things worth knowing, all measured, all documented at the code:
 * **2.4 GHz only.** cfg80211 forbids beaconing on 5 GHz here because it never loads
   regulatory.db — the kernel resolves the firmware path in a namespace that is neither the
   container's nor the Ubuntu root, and `CONFIG_CFG80211_REQUIRE_SIGNED_REGDB=y` rules out
-  handing it one another way. The second radio is what makes **Channel Analysis** work at
-  all: a scan only ever shows what another radio in the same band and the same namespace is
-  beaconing, so each box carries a neighbour of its own on channel 11.
+  handing it one another way. That is also why `wifi config`'s own `country=00` has to be
+  **deleted**: with no regdb it resolves to nothing, and 25.12's hostapd rejects the whole
+  config over it (`Invalid country_code`), so that box's main AP silently never went on air
+  — radios, SSIDs and scans still rendered, only nothing could ever associate.
+* **hwsim's medium is global to the module — it does not stop at a network namespace.** A
+  client on `router2512` associates with `router2410`'s AP, and a scan from one box lists
+  the other's SSIDs (measured; this file used to claim the opposite). Each box still
+  carries a neighbour of its own so that **Channel Analysis** does not depend on the
+  sibling container being up — not because it cannot hear it.
 
 ## Two ways in, and both are needed
 

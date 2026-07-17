@@ -32,7 +32,16 @@ cd "$(dirname "$0")"
 KO_DIR="$(pwd)/hwsim"
 KO="$KO_DIR/mac80211_hwsim.ko"
 HELPER=ubuntu:24.04
-RADIOS=4
+# THREE radios per box, and the third one is a CLIENT, not decoration: Associated Stations
+# is a data table this theme keeps getting wrong (issue #7, twice), and with nobody
+# associated it renders "No information available" — so the one table whose column crush
+# the measured card-stacking exists to catch had no rows on either dev box. A station
+# cannot be faked in a lease file: it comes from ubus/iwinfo, i.e. from a real association.
+#
+# It needs a radio of its OWN because a phy has ONE channel: the client must sit on the
+# main AP's channel (6), and the neighbour must not — that is its whole job. Two radios
+# forced a choice between the neighbour's channel and having a client at all.
+RADIOS=6
 
 # 2.4 GHz ONLY, and that is a limit of this kernel, not a shortcut.
 #
@@ -44,14 +53,21 @@ RADIOS=4
 # CONFIG_CFG80211_REQUIRE_SIGNED_REGDB=y rules out handing it one another way.
 #
 # hwsim's own `regtest` modes bypass the database by applying a driver-supplied domain, and
-# that WAS tried: mode 6 gives 5 GHz to exactly two of the four radios (phy0 and phy1 get
-# custom domains, phy2/phy3 stay on world), which would make the two containers behave
-# differently for no reason a reader could guess. Two 2.4 radios each, identical on both
-# boxes, is the honest trade — and the UI surface is the same either way.
+# that WAS tried: mode 6 gives 5 GHz to only some of the radios (the first two get custom
+# domains, the rest stay on world), which would make the two containers behave differently
+# for no reason a reader could guess. 2.4 GHz only, identical on both boxes, is the honest
+# trade — and the UI surface is the same either way.
 #
-# The second radio is what makes Channel Analysis WORK: a scan only shows what another
-# radio in the same band and the same netns is beaconing, so each box carries a neighbour
-# of its own on a different channel.
+# The neighbour radio is what makes Channel Analysis show more than one channel: a scan
+# shows what other radios are beaconing, so each box carries a neighbour of its own on
+# channel 11.
+#
+# The MEDIUM IS GLOBAL TO THE MODULE — it does NOT stop at a network namespace, and this
+# file used to claim the opposite ("a box can only ever hear radios it owns"), which is
+# what made "give the box its own neighbour" look mandatory. Measured: a client on 2512
+# associated with 2410's AP, and a scan from 2512 lists 2410's SSIDs. Every radio here
+# hears every other one, whichever container holds it. So each box owns a neighbour
+# because it must not DEPEND on the sibling being up — not because it cannot hear it.
 
 pid_of() { docker inspect -f '{{.State.Pid}}' "$1"; }
 in_ct()  { docker exec "$1" sh -c "$2"; }
@@ -88,9 +104,9 @@ host_helper "
 	echo loaded
 "
 
-# Two radios each: hwsim's medium does not cross a network namespace, so a box can only
-# ever hear radios it owns. That is the whole reason for two — one is the router's AP, the
-# other beacons on a different channel so that Channel Analysis has something to find.
+# Three radios each — the router's AP, a neighbour on another channel, and the client that
+# associates with the AP. See the RADIOS note at the top for why the client needs a phy of
+# its own.
 echo "==> handing out radios"
 # The phys are DISCOVERED, never named phy0..phy3. The index is a kernel counter that keeps
 # climbing: reload the module a few times while working on this and the same four radios
@@ -102,12 +118,12 @@ echo "  on the host: ${avail:-none}"
 for ct in footstrap-2512 footstrap-2410; do
 	docker inspect "$ct" >/dev/null 2>&1 || { echo "  skip $ct (not running)"; continue; }
 	have="$(in_ct "$ct" 'ls /sys/class/ieee80211/ 2>/dev/null | wc -l')"
-	if [ "$have" -ge 2 ]; then
+	if [ "$have" -ge 3 ]; then
 		echo "  $ct already has $have phy(s)"
 		continue
 	fi
 	pid="$(pid_of "$ct")"
-	take="$(echo "$avail" | tr ' ' '\n' | grep -v '^$' | head -2 | tr '\n' ' ')"
+	take="$(echo "$avail" | tr ' ' '\n' | grep -v '^$' | head -3 | tr '\n' ' ')"
 	[ -n "$take" ] || { echo "  $ct: no phy left on the host"; continue; }
 	for p in $take; do
 		host_helper "iw phy $p set netns $pid" >/dev/null 2>&1 && echo "  $p -> $ct" \
@@ -140,26 +156,40 @@ for ct in footstrap-2512 footstrap-2410; do
 		# `wifi config` writes a radio section per phy — the same call /etc/init.d/boot
 		# makes on a real router. It cannot run at boot here: the phys arrive after.
 		#
-		# The test is for the RADIO SECTION, not for the file: `wifi config` skips a file
-		# that already exists, and the uci batch below happily writes its wifi-iface
-		# sections into a file with no radios in it. A half-written wireless config then
-		# blocked the generator forever, and every run after it configured APs onto radios
-		# that did not exist — silently, because `uci -q set` on a missing section says
-		# nothing.
-		uci -q get wireless.radio0 >/dev/null 2>&1 || {
-			rm -f /etc/config/wireless
-			wifi config >/dev/null 2>&1
-		}
-		uci -q get wireless.radio0 >/dev/null 2>&1 || { echo "  no radios detected"; exit 1; }
+		# ALWAYS regenerate, and do not try to be clever about when. `wifi config` skips a
+		# file that already exists, while the uci batch below happily writes wifi-iface
+		# sections into a file with no matching radios in it — `uci -q set` on a missing
+		# section says nothing at all. Every attempt to guess when the file is still good
+		# has been wrong: testing that radio0 exists survived a module reload that handed
+		# the box a THIRD radio, so radio2 was never generated and its settings went
+		# nowhere; and the hwsim index in each radio path changes on every reload, so even
+		# a config with the right NUMBER of radios can point at phys that no longer exist —
+		# which is not an error anywhere, it just brings every SSID up as "unknown".
+		# Nothing else owns this file: the batch below rewrites every section anyway.
+		rm -f /etc/config/wireless
+		wifi config >/dev/null 2>&1
+		uci -q get wireless.radio2 >/dev/null 2>&1 ||
+			{ echo "  fewer than 3 radios detected"; exit 1; }
 
-		# No `country`: with no regulatory.db (see the top of this file) a country hint
-		# cannot be resolved, so a country line would only hand hostapd a hint the kernel
-		# must reject.
+		# `wifi config` writes country=00 itself, and it must be DELETED, not merely left
+		# unset. With no regulatory.db (see the top of this file) a country hint cannot be
+		# resolved, and the 25.12 hostapd refuses the whole config over it:
+		#   Line 7: Invalid country_code 00
+		#   Cannot enable IEEE 802.11d without setting the country_code
+		# then `hostapd.add_iface failed for phy phy4`, and the MAIN AP of that box was
+		# never on air — on the 25.12 box only; the 24.10 hostapd accepts the same line.
+		# The page still rendered radios, SSIDs and a scan, because those come from uci and
+		# from the OTHER container beacons: the only visible symptom was that nothing could
+		# ever associate, which reads as "hwsim does not do clients".
 		#
 		# Everything below only re-states what a lived-in router would have: a main SSID, a
 		# guest SSID on its own network, a neighbour on another channel, and a disabled one
 		# (LuCI renders a disabled iface differently, and that state needs styling too).
 		uci -q batch <<-EOF
+			delete wireless.radio0.country
+			delete wireless.radio1.country
+			delete wireless.radio2.country
+
 			set wireless.radio0.band="2g"
 			set wireless.radio0.channel="6"
 			set wireless.radio0.htmode="HT20"
@@ -198,9 +228,58 @@ for ct in footstrap-2512 footstrap-2410; do
 			set wireless.iot_ap.encryption="psk2"
 			set wireless.iot_ap.key="iot12345678"
 			set wireless.iot_ap.disabled="1"
+
+			set wireless.radio2.band="2g"
+			set wireless.radio2.channel="6"
+			set wireless.radio2.htmode="HT20"
+			set wireless.radio2.cell_density="0"
+			delete wireless.radio2.disabled
+			delete wireless.default_radio2
+			set wireless.client=wifi-iface
+			set wireless.client.device="radio2"
+			set wireless.client.mode="sta"
+			set wireless.client.network="lan"
+			set wireless.client.ssid="footstrap-dev"
+			set wireless.client.encryption="psk2"
+			set wireless.client.key="footstrap123"
 			commit wireless
 		EOF
 		wifi up >/dev/null 2>&1
+		sleep 8
+
+		# PIN the client to this box AP by BSSID. Both boxes beacon the same SSID and the
+		# hwsim medium is global (see the top of this file), so an unpinned client picks
+		# whichever AP it hears first: measured, both clients landed on the SAME box — one
+		# Associated Stations table with two rows, the other with none, and which box won
+		# changed between runs. The BSSID is only knowable once the radio is up, and it
+		# moves every time the module is reloaded, which is why it is derived here on every
+		# run rather than written into a config.
+		ap="$(ubus call network.wireless status | jsonfilter -e "@.radio0.interfaces[0].ifname")"
+		bssid="$(cat "/sys/class/net/$ap/address" 2>/dev/null)"
+		if [ -n "$bssid" ]; then
+			uci -q set wireless.client.bssid="$bssid"
+			uci -q commit wireless
+			wifi reload >/dev/null 2>&1
+			sleep 10
+		fi
+
+		# Give the station a NAME. LuCI resolves the Host column of Associated Stations
+		# through hosthints — the lease file and the neighbour table, by MAC — and with
+		# neither it prints "?", which is exactly the short cell that hides the column
+		# crush this table keeps being fixed for. It cannot be a static line in rc.local
+		# beside the other fake clients: the MAC comes from hwsim and depends on which phy
+		# the box was handed, so it is only knowable here, after the radio exists.
+		sta="$(iw dev | awk "/Interface/{i=\$2} /type managed/{print i; exit}")"
+		mac="$(cat "/sys/class/net/$sta/address" 2>/dev/null)"
+		if [ -n "$mac" ]; then
+			lf="$(uci -q get dhcp.@dnsmasq[0].leasefile)"; lf="${lf:-/tmp/dhcp.leases}"
+			grep -qi "$mac" "$lf" 2>/dev/null ||
+				echo "4102444800 $mac 172.31.0.40 wifi-client 01:$mac" >> "$lf"
+			# Both families: the Host cell reads "name (v4, v6)", and it is the IPv6 that
+			# makes it long enough to be a realistic neighbour for the first column.
+			ip neigh replace 172.31.0.40 lladdr "$mac" dev eth0 nud stale 2>/dev/null
+			ip -6 neigh replace fd00:1::40 lladdr "$mac" dev eth0 nud stale 2>/dev/null
+		fi
 	' || echo "  $ct: wifi config failed"
 done
 
