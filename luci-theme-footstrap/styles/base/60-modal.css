@@ -15,14 +15,18 @@
 
 	.modal {
 		width: 90%;
-		margin: 5em auto;
-		min-height: 32px;
+		/* clear of the sticky bar, and centred. Was `5em auto` — a rhythm in the dialog's own font. */
+		margin: var(--fs-space-6) auto;
+		min-height: var(--fs-control-h);
 		max-width: 600px;
-		border-radius: 3px;
+		/* a modal is a CARD — the large radius, like every other panel */
+		border-radius: var(--fs-radius-lg);
 		background: var(--fs-panel);
 		border: 1px solid var(--fs-border);
 		box-shadow: 0 0 3px var(--fs-panel2);
-		padding: 1em 1em .5em 1em;
+		/* was `1em 1em .5em 1em` — a bottom half the top because the button row below carries its
+		 * own margin. The card's own gutter on every side; the button row's spacing is its business. */
+		padding: var(--fs-card-pad);
 		min-width: 270px;
 	}
 
@@ -46,7 +50,7 @@
 	}
 
 	.modal > .button-row > button:not(:last-of-type) {
-		margin-right: .5em;
+		margin-right: var(--fs-space-2);
 	}
 
 	.modal > .button-row > button:first-of-type {
@@ -65,9 +69,11 @@
 		visibility: visible;
 	}
 
+	/* the cross inside a button/alert: `line-height: 1` centres the glyph in its own box, where
+	 * this said 18px — upstream's leading, which stopped matching the moment the scale moved. */
 	.btn .close, .alert-message .close {
 		font-family: var(--fs-font-sans);
-		line-height: 18px;
+		line-height: 1;
 	}
 
 	/* THE WHOLE COLOUR-WORD BLOCK IS ABSORBED — do not re-add any of it.

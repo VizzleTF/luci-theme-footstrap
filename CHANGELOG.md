@@ -15,6 +15,18 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ### Added
 
+- **The templates' inline `<script>`s are now linted, closing the last gap where theme JS ran
+  unchecked.** `eslint` walked `htdocs/` and jsmin (via `luci.mk`) minified that same tree, while a
+  `.ut` is copied to the router verbatim — so both gates looked straight past the pre-paint in
+  `partials/head.ut`, the most load-bearing script in the theme: it stamps `:root` before the first
+  frame, and its failure mode is one wrong frame that nobody reports and no other test catches. An
+  eslint processor (`tools/lib/ut-scripts.mjs`) extracts each non-interpolated `<script>` body,
+  padded so a message's line and column point back at the `.ut` itself. A block the server
+  interpolates is not JS until rendered and cannot be parsed, so it is exempt — and therefore must
+  now be DATA ONLY (one statement, no control flow), which the processor enforces rather than
+  trusting. Proven by mutation: a reintroduced `var`, a misspelled local, a misspelled browser
+  global, a syntax error and logic smuggled into an interpolated block all fail the gate.
+
 - **Both supported releases now run as dev routers in docker (`docker/compose.yml`), replacing the
   single physical box.** The theme targets 24.10 and 25.12+, and the differences that bite are
   runtime ones one router cannot show: apk vs opkg, and `/lib/apk/db/installed` vs
@@ -38,6 +50,73 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   only, because cfg80211 in the WSL kernel never loads regulatory.db and refuses to beacon on 5 GHz.
 
 ### Changed
+
+- **The refresh glyph is the theme's own drawing — it was derived from Lucide, an obligation this
+  theme never declared.** Found while auditing the bootstrap inheritance, and it is not bootstrap's:
+  `--fs-icon-refresh` carried Lucide `refresh-cw`'s `M21 3v5h-5` byte-identical, plus its r=9 arc and
+  `L21 8` terminus, on its grid and stroke width. Lucide is ISC, which also requires the notice be
+  kept. Redrawn as two OPEN arcs with solid triangular heads — a different construction, not a nudge
+  of the same one (Lucide caps a continuous stroke with an L-shaped hook). The heads are solid rather
+  than chevrons because the glyph renders at 18px and chevrons dissolve there; measured, not assumed.
+
+- **Statistics graphs come back the right colour in dark mode.** The dark-mode inversion rotated hue
+  by 150° — a fudge inherited with the fork. 180° is the arithmetic, not a nudge of it: `invert()`
+  maps every hue to h+180, so rotating 180 back restores the ORIGINAL hue while keeping the inverted
+  lightness. Measured on collectd's own cpu-plugin series by reading the rendered pixel back: at 150°
+  System (red, h=0) came back at h=301 and User (blue, h=240) at h=180 — 59° and 60° out, i.e. the
+  blue plot was drawn cyan. At 180° all three primaries are exact. It is not exact for every colour
+  and cannot be — CSS `hue-rotate` is a linear matrix approximation rather than a true HSL rotation,
+  so amber still lands 13° out; the angle must not be tuned off 180 to chase it, which would trade an
+  exact red/green/blue for a marginally better amber.
+
+- **The checkbox tick, the radio dot and the help glyph are the theme's own drawings.** They were
+  `data:` URIs copied verbatim from `luci-theme-bootstrap` — and a drawn path is authored expression
+  in a way `padding: 8px` is not, which made them the sharpest single item in the whole inheritance.
+  Redrawn as **strokes**, which is this theme's icon language (`--spinner-icon`, `--fs-icon-refresh`:
+  `fill: none`, round caps, a 24 grid), where upstream's were solid filled paths. A mask keys on
+  alpha, so a stroked path masks exactly as a filled one did; all four states verified rendered. No
+  upstream artwork is left in the tree.
+
+- **The spinner's geometry is derived instead of being three literals in two files.** `left: 6px` +
+  `width: 20px` in `base/95-luci.css` and a bare `padding-left: 32px` in `theme/55-buttons.css`
+  encoded one relationship — the button pads left to clear the glyph — with nothing to notice when
+  the glyph is resized. `--fs-spin-size` is now the one statement and both sides read it; the
+  vertical centring is `margin-top: calc(size / -2)` rather than the hand-halved
+  `top: calc(50% - 10px)` (margin, not `translate` — `transform` is taken by the spin animation).
+
+- **The theme has its own type and space scales, replacing the rhythm it inherited from the
+  `luci-theme-bootstrap` fork.** `styles/base` sized everything off a 13/18 pair with 9px and 8.5px
+  halves of it, a 30/24/18/16/14/13 heading ramp and a 25px list indent — Twitter's 2011 scale,
+  which arrived with the fork rather than by anyone choosing it for Manrope. `02-tokens.css` now
+  carries `--fs-type-*` (11/12/13/16/20/26), `--fs-leading` and a 4px `--fs-space-*` grid, and base
+  reads them. Two things are genuinely better rather than merely different: the leading is
+  **unitless** (1.5), so a 20px heading gets 30px of leading instead of the flat 18px a length
+  pushed down onto it, and the one-line control height is **derived** (`--fs-control-h` = text box +
+  inset + borders) instead of the bare 30px that was upstream's arithmetic over upstream's leading —
+  so re-scaling the type no longer leaves every control the wrong height for its own text. Measured
+  on the router across System and Firewall: 1498 property diffs, every one of them intended
+  (line-height 18→19.5, control 30→32, field radius 3→10, field inset 4→8), nothing else moved.
+  Values that are functional rather than expressive are deliberately unchanged — the 180px label
+  column and the 210px field width are what fits LuCI's markup, not a step of anyone's rhythm.
+  Byte-identical declarations against upstream's cascade fell from 998 to 843.
+
+  **Never size a BOX `--fs-type * --fs-leading`.** That calc is 19.5px, and a half-pixel on a border
+  is upstream's 8.5px bug wearing a `calc()` — it went in on the dropdown row and showed up as 524
+  half-pixel `min-height`s before the measurement caught it. A fractional LINE box is fine and is
+  what unitless leading gives on any odd size; a fractional box edge is not. Take the nearer
+  `--fs-space` step, which is what a line of text at this scale rounds to anyway, or round
+  explicitly the way `--fs-control-h` does.
+
+- **The templates' browser JS is modern JS, like the rest of the theme.** The inline scripts in
+  `partials/head.ut` and `sysauth.ut` were ES5 (`var`, `function(){}`) inherited from the
+  `luci-theme-bootstrap` fork, while every module under `htdocs/` is `const`/`let` and arrows — the
+  theme already requires `:has()`, `color-mix()` and `@layer`, i.e. browsers years past ES6, so the
+  old shape bought nothing. `no-var` now holds them there. The login page's HTTPS-hop probe gets its
+  two server values (`ports`, `resource`) through a `window.__fsHttps` data blob instead of
+  interpolating them mid-statement, which is what lets the script itself be linted. Verified on the
+  router: the pre-paint stamps every axis (rounding, tint, accent, palette, wallpaper, rail, layout,
+  dark mode), the legacy `rvht`/`roman` palette migration still splits onto both axes, and the login
+  autofocus and port probe still work against a live HTTPS listener.
 
 - **Help text no longer strands a single word on its own last line.** LuCI writes its guidance as
   one or two sentences (`.cbi-value-description` sits in the field column, where it wraps most), and

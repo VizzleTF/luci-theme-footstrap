@@ -1,10 +1,16 @@
 @layer base {
 	/* The body box, links, and the type scale a view inherits from plain markup.
-	 * body background/padding/font-family: theme/20-shell.css — absorbed. */
+	 * body background/padding/font-family: theme/20-shell.css — absorbed.
+	 *
+	 * Every size and gutter here reads the scale in 02-tokens.css. It used to state literals —
+	 * 13/18 with 9px and 8.5px halves, a 30/24/18/16/14/13 heading ramp, a 25px list indent — which
+	 * was luci-theme-bootstrap's scale rather than a decision anyone made about Manrope. */
 	body {
-		font-size: 13px;
+		font-size: var(--fs-type);
 		font-weight: normal;
-		line-height: 18px;
+		/* unitless: it inherits as a FACTOR, so a 20px heading gets 30px of leading instead of the
+		 * flat 18px a length would push down onto it and clip. */
+		line-height: var(--fs-leading);
 		color: var(--fs-text);
 		min-height: 100%;
 		display: flex;
@@ -36,10 +42,9 @@
 	.cbi-map-descr,
 	.cbi-section-descr,
 	.table .tr.cbi-section-table-descr .th {
-		font-size: 13px;
+		font-size: var(--fs-type);
 		font-weight: normal;
-		line-height: 18px;
-		margin-bottom: 9px;
+		margin-bottom: var(--fs-space-2);
 		/* prose, so no orphans: LuCI's descriptions are one or two sentences of help text and a
 		 * single trailing word on its own line reads as a rendering fault. `pretty`, not
 		 * `balance` — balance is capped at a few lines and re-flows the WHOLE block, which is for
@@ -49,10 +54,15 @@
 	}
 
 	p small {
-		font-size: 11px;
+		font-size: var(--fs-type-xs);
 		color: var(--fs-dim);
 	}
 
+	/* The heading ramp. Stock LuCI hands h2 to a page title and h3/legend to a section title, and
+	 * theme/45-misc.css + theme/30-tables.css repaint exactly those two — so most of this ramp is
+	 * only ever rendered by a third-party luci-app-*. It is styled anyway: coverage is a contract
+	 * and only grows (CLAUDE.md). Every step is a scale token, and the ramp is monotonic, which is
+	 * the one property a heading ramp must have. */
 	h1,
 	h2,
 	h3, legend,
@@ -61,71 +71,52 @@
 	h6 {
 		font-weight: bold;
 		color: var(--fs-text);
+		/* 1.5 is prose leading; a heading is a label and looks slack at it. */
+		line-height: var(--fs-leading-tight);
 	}
 
+	/* One rule for every `<h_ small>`: relative, so it tracks whatever step its heading sits on
+	 * instead of the four hand-set sizes (18/14/14/12) this used to carry. */
 	h1 small,
 	h2 small,
 	h3 small,
 	h4 small,
 	h5 small,
 	h6 small {
+		font-size: .7em;
+		font-weight: normal;
 		color: var(--fs-dim);
 	}
 
 	h1 {
-		margin-bottom: 18px;
-		font-size: 30px;
-		line-height: 36px;
-	}
-
-	h1 small {
-		font-size: 18px;
+		margin-bottom: var(--fs-space-4);
+		font-size: var(--fs-type-2xl);
 	}
 
 	h2 {
-		font-size: 24px;
-		line-height: 36px;
-	}
-
-	h2 small {
-		font-size: 14px;
-	}
-
-	h3, legend,
-	h4,
-	h5,
-	h6 {
-		line-height: 36px;
+		font-size: var(--fs-type-xl);
 	}
 
 	h3, legend {
-		font-size: 18px;
-	}
-
-	h3 small {
-		font-size: 14px;
+		font-size: var(--fs-type-lg);
 	}
 
 	h4 {
-		font-size: 16px;
-	}
-
-	h4 small {
-		font-size: 12px;
+		font-size: var(--fs-type);
 	}
 
 	h5 {
-		font-size: 14px;
+		font-size: var(--fs-type-sm);
 	}
 
 	h6 {
-		font-size: 13px;
+		font-size: var(--fs-type-xs);
 		color: var(--fs-dim);
 		text-transform: uppercase;
 	}
 
 	ul, ol {
-		margin: 0 0 18px 25px;
+		margin: 0 0 var(--fs-space-4) var(--fs-space-6);
 	}
 
 	ul ul,
@@ -144,16 +135,11 @@
 	}
 
 	li {
-		line-height: 18px;
 		color: var(--fs-dim);
 	}
 
 	dl {
-		margin-bottom: 18px;
-	}
-
-	dl dt, dl dd {
-		line-height: 18px;
+		margin-bottom: var(--fs-space-4);
 	}
 
 	dl dt {
@@ -161,11 +147,11 @@
 	}
 
 	dl dd {
-		margin-left: 9px;
+		margin-left: var(--fs-space-2);
 	}
 
 	hr {
-		margin: 20px 0 19px;
+		margin: var(--fs-space-5) 0;
 		border: 0;
 		border-bottom: 1px solid var(--fs-border);
 	}
@@ -181,19 +167,18 @@
 		line-height: inherit;
 	}
 
-	small { font-size: 0.9em }
+	small { font-size: var(--fs-type-sm) }
 
 	address {
 		display: block;
-		line-height: 18px;
-		margin-bottom: 18px;
+		margin-bottom: var(--fs-space-4);
 	}
 
-	/* no shared padding: both members set their own below (code 1px 3px, pre 8.5px) */
+	/* no shared padding: both members set their own below (code a chip's inset, pre a block's) */
 	code, pre {
 		font-family: var(--fs-font-mono);
-		font-size: 12px;
-		border-radius: 3px;
+		font-size: var(--fs-type-sm);
+		border-radius: var(--fs-radius-sm);
 	}
 
 	code {
@@ -201,7 +186,7 @@
 		 * in dark — under AA. Still reads as a chip. */
 		background-color: var(--fs-panel2);
 		color: var(--fs-text);
-		padding: 1px 3px;
+		padding: 1px var(--fs-space-1);
 	}
 
 	pre {
@@ -209,12 +194,10 @@
 
 		background-color: var(--fs-panel2);
 		display: block;
-		padding: 8.5px;
-		margin: 0 0 18px;
-		line-height: 18px;
-		font-size: 12px;
+		padding: var(--fs-space-2);
+		margin: 0 0 var(--fs-space-4);
 		border: 1px solid var(--border-color);
-		border-radius: 3px;
+		border-radius: var(--fs-radius-sm);
 		white-space: pre-wrap;
 		word-wrap: break-word;
 	}

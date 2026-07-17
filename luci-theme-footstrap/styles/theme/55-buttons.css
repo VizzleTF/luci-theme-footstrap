@@ -150,7 +150,8 @@
 	.spinning, .cbi-button.spinning, .btn.spinning,
 	.cbi-dropdown.btn.spinning, .cbi-dropdown.cbi-button.spinning,
 	.cbi-dropdown:not(.btn):not(.cbi-button).spinning {
-		padding-left: 32px;
+		/* clear the glyph base/95-luci.css draws: its inset + its box + a gap. Was a bare 32px. */
+		padding-left: calc(var(--fs-space-2) + var(--fs-spin-size) + var(--fs-space-1));
 	}
 
 	input[type="file"]::file-selector-button {

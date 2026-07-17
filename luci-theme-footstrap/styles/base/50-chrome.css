@@ -43,32 +43,39 @@
 		content: attr(data-errors);
 		/* badge fill: theme/40-tabs.css — absorbed */
 		color: var(--fs-on-danger);
-		height: 16px;
-		min-width: 16px;
-		border-radius: 8px;
+		height: var(--fs-space-4);
+		min-width: var(--fs-space-4);
+		/* a pill, so it says so — `8px` was half the height above, restated by hand */
+		border-radius: var(--fs-radius-pill);
 		text-align: center;
-		margin: 0 5px 0 0;
-		padding: 3px 2px 1px 2px;
+		margin-right: var(--fs-space-1);
+		padding: 0 var(--fs-space-1);
 		display: inline-flex;
 		flex-direction: column;
 		justify-content: center;
-		font-size: 12px;
+		font-size: var(--fs-type-sm);
 	}
 
 	.cbi-tab-descr {
-		margin: -9px 0 18px 0;
+		/* the negative top pulls it under the tab strip it describes */
+		margin: calc(var(--fs-space-2) * -1) 0 var(--fs-space-4) 0;
 	}
 
+	/* hangs directly under the tab strip. `top: 35px` was that strip's height written out again —
+	 * a hidden pair with whatever sizes the tab. 100% IS the strip's height, by definition. */
 	.tabs .menu-dropdown, .tabs .dropdown-menu {
-		top: 35px;
+		top: 100%;
 		border-width: 1px;
-		border-radius: 0 6px 6px 6px;
+		/* square top-LEFT only: the panel hangs off the tab above it and the two share that
+		 * corner. Was a bare `0 6px 6px 6px`. */
+		border-radius: 0 var(--fs-radius) var(--fs-radius) var(--fs-radius);
 	}
 
+	/* the caret beside a tab's label: centred on the text box rather than nudged 15px down it. */
 	.tabs a.menu:after, .tabs .dropdown-toggle:after {
 		border-top-color: var(--fs-dim);
-		margin-top: 15px;
-		margin-left: 5px;
+		align-self: center;
+		margin-left: var(--fs-space-1);
 	}
 
 	.tabs li.open.menu .menu, .tabs .open.dropdown .dropdown-toggle {
@@ -80,11 +87,11 @@
 	}
 
 	.breadcrumb {
-		padding: 7px 14px;
-		margin: 0 0 18px;
+		padding: var(--fs-space-2) var(--fs-space-3);
+		margin: 0 0 var(--fs-space-4);
 		background: linear-gradient(to bottom, var(--fs-panel), var(--fs-panel2));
 		border: 1px solid var(--fs-border);
-		border-radius: 3px;
+		border-radius: var(--fs-radius);
 		display: flex;
 		flex: 0;
 	}
@@ -95,7 +102,7 @@
 
 	.breadcrumb li:not(:last-child)::after {
 		content: "|";
-		padding: 0 5px;
+		padding: 0 var(--fs-space-1);
 	}
 
 	.breadcrumb .active a {

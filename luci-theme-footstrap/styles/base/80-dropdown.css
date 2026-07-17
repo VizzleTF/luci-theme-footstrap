@@ -36,9 +36,11 @@
 		width: 100%;
 	}
 
+	/* clears the button's own side inset so the label starts on its text, not on its border.
+	 * !important: ui.js writes `margin` inline on an open list — see theme/90-responsive.css. */
 	.cbi-dropdown.btn > ul:not(.dropdown),
 	.cbi-dropdown.cbi-button > ul:not(.dropdown) {
-		margin: 0 0 0 13px !important;
+		margin: 0 0 0 var(--fs-space-3) !important;
 	}
 
 	.cbi-dropdown.btn.spinning > ul:not(.dropdown),
@@ -88,9 +90,12 @@
 	}
 
 	/* padding + color: theme/65-dropdown.css — absorbed (one menu row, both dropdown kinds). */
+	/* one menu row: a grid step, which is what a line of text at this scale rounds to. NOT
+	 * `calc(--fs-type * --fs-leading)` — that is 19.5px, and a half-pixel on a BOX edge is the
+	 * thing the scale exists to stop (a fractional LINE box is fine; a fractional border is not). */
 	.cbi-dropdown > ul.dropdown > li,
 	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li {
-		min-height: 20px;
+		min-height: var(--fs-space-5);
 	}
 
 	.cbi-dropdown > ul > li .hide-open { display: initial; }
@@ -117,11 +122,11 @@
 	}
 
 	.cbi-dropdown > ul > li > form > input[type="checkbox"] {
-		margin: 0 .25em 0 0;
+		margin: 0 var(--fs-space-1) 0 0;
 	}
 
 	.cbi-dropdown > ul > li input[type="text"] {
-		height: 20px;
+		height: var(--fs-space-5);
 	}
 
 	/* Open-list paint and sizing: theme/65-dropdown.css — absorbed. Left: what makes it a

@@ -71,26 +71,35 @@
 	));
 %}
 
+{# The two server values the script below needs, handed over as DATA. It is the one shape the
+   linter cannot read — a `{{ … }}` block is not JS until the server renders it — so it carries no
+   logic at all, and eslint's .ut processor enforces exactly that (tools/lib/ut-scripts.mjs). The
+   script itself is then plain JS and gets linted like every other file in the theme. #}
+<script>window.__fsHttps={ports:{{ https_ports }},resource:"{{ resource }}"};</script>
 <script>
-	var input = document.getElementsByName('luci_password')[0];
+	(() => {
+		const input = document.getElementsByName('luci_password')[0];
 
-	if (input)
-		input.focus();
+		if (input)
+			input.focus();
 
-	/* If the router also serves HTTPS, hop over to it — the password is about to go over this
-	 * connection. The <img> probe is upstream's trick: it proves the TLS port actually answers
-	 * before we send the user there. */
-	if (document.location.protocol != 'https:') {
-		{{ https_ports }}.forEach(function(port) {
-			var url = 'https://' + window.location.hostname + ':' + port + window.location.pathname;
-			var img = new Image();
+		/* If the router also serves HTTPS, hop over to it — the password is about to go over this
+		 * connection. The <img> probe is upstream's trick: it proves the TLS port actually answers
+		 * before we send the user there. */
+		if (document.location.protocol === 'https:') return;
 
-			img.onload = function() { window.location = url };
-			img.src = 'https://' + window.location.hostname + ':' + port + '{{ resource }}/icons/loading.svg?' + Math.random();
+		const { hostname, pathname } = window.location;
 
-			setTimeout(function() { img.src = '' }, 5000);
+		(window.__fsHttps.ports || []).forEach((port) => {
+			const url = `https://${hostname}:${port}${pathname}`;
+			const img = new Image();
+
+			img.onload = () => { window.location = url; };
+			img.src = `https://${hostname}:${port}${window.__fsHttps.resource}/icons/loading.svg?${Math.random()}`;
+
+			setTimeout(() => { img.src = ''; }, 5000);
 		});
-	}
+	})();
 </script>
 
 {% include('footer', { blank_page: true }) %}

@@ -10,7 +10,7 @@
 	#syslog {
 		width: 100%;
 		color: var(--fs-text);
-		margin-bottom: 18px;
+		margin-bottom: var(--fs-space-4);
 		font-family: var(--fs-font-mono);
 	}
 
@@ -107,21 +107,30 @@
 	th[data-sort-direction="asc"]::after { content: "\a0\25b2"; }
 	th[data-sort-direction="desc"]::after { content: "\a0\25bc"; }
 
+	/* The help sentence, indented to clear the ? glyph its ::before hangs in the margin. The
+	 * indent and the glyph's own `left` are ONE relationship — both said 1.25em, stated twice — so
+	 * they now derive from a single local. */
 	.cbi-value-description {
-		margin: .25em 0 0 1.25em;
+		--help-indent: 1.25em;
+
+		margin: var(--fs-space-1) 0 0 var(--help-indent);
 		position: relative;
 	}
 
 	.cbi-value-description:not(:empty)::before {
-		--help-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'><path d='M10 0A10 10 0 000 10a10 10 0 0010 10 10 10 0 0010-10A10 10 0 0010 0zm1 17H9v-2h2v2zm2.1-7.7l-.9.9c-.8.7-1.2 1.3-1.2 2.8H9v-.5c0-1.1.4-2.1 1.2-2.8l1.2-1.3c.4-.3.6-.8.6-1.4a2 2 0 00-2-2 2 2 0 00-2 2H6a4 4 0 014-4 4 4 0 014 4c0 .9-.4 1.7-.9 2.3z'/></svg>");
+		/* OURS, and drawn as a STROKE like every other glyph this theme owns (--spinner-icon below,
+		 * --fs-icon-refresh in 02-tokens.css: fill:none, round caps, a 24 grid). It replaces a solid
+		 * filled path copied verbatim from luci-theme-bootstrap: a drawn path is authored expression
+		 * in a way `padding: 8px` is not, which made it the sharpest item in that inheritance. */
+		--help-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9.4'/><path d='M8.9 9.4a3.2 3.2 0 1 1 3.9 3.6v1.4'/><path d='M12.8 17.6h-.02'/></svg>");
 
 		position: absolute;
-		left: -1.25em;
+		left: calc(var(--help-indent) * -1);
 		content: "\a0";
 		display: inline-block;
 		width: 1em;
 		height: 1em;
-		margin-right: .25em;
+		margin-right: var(--fs-space-1);
 		background: var(--fs-accent);
 		mask-image: var(--help-icon);
 		mask-size: cover;
@@ -132,12 +141,12 @@
 	/* tint (and the 6%-not-12% reasoning): theme/30-tables.css — absorbed */
 	.cbi-section-error {
 		border: 1px solid var(--fs-danger);
-		border-radius: 3px;
-		padding: 5px;
-		margin-bottom: 18px;
+		border-radius: var(--fs-radius);
+		padding: var(--fs-space-2);
+		margin-bottom: var(--fs-space-4);
 	}
 
-	.cbi-section-error ul { margin: 0 0 0 20px; }
+	.cbi-section-error ul { margin: 0 0 0 var(--fs-space-5); }
 
 	.cbi-section-error ul li {
 		/* colour: theme/35-alerts.css — absorbed */
@@ -146,21 +155,24 @@
 
 	.ifacebox {
 		border: 1px solid var(--fs-border);
-		margin: 0 10px;
+		margin: 0 var(--fs-space-3);
 		text-align: center;
 		white-space: nowrap;
 		/* surface: theme/45-misc.css (flat) — absorbed */
-		border-radius: 4px;
+		border-radius: var(--fs-radius-sm);
 		box-shadow: var(--fs-emboss);
 		display: inline-flex;
 		flex-direction: column;
-		line-height: 1.2em;
+		/* a plate of single-line labels, not prose */
+		line-height: var(--fs-leading-tight);
 		min-width: 100px;
 	}
 
 	.ifacebox .ifacebox-head {
 		border-bottom: 1px solid var(--fs-border);
-		border-radius: 3px 3px 0 0;
+		/* the head sits INSIDE the box's 1px border, so its own radius is the box's less that
+		 * border — restating a smaller literal is how the two drifted apart before. */
+		border-radius: calc(var(--fs-radius-sm) - 1px) calc(var(--fs-radius-sm) - 1px) 0 0;
 		padding: 2px;
 		/* surface + ink: theme/45-misc.css — absorbed */
 	}
@@ -185,7 +197,7 @@
 	}
 
 	.ifacebox .ifacebox-body {
-		padding: .25em;
+		padding: var(--fs-space-1);
 	}
 
 	#cbi-network-interface .ifacebox-body {
@@ -205,10 +217,11 @@
 		/* surface: theme/45-misc.css (flat) — absorbed */
 		color: var(--fs-text);
 		text-shadow: var(--fs-text-emboss);
-		border-radius: 4px;
+		border-radius: var(--fs-radius-sm);
 		box-shadow: var(--fs-emboss);
 		cursor: default;
-		line-height: 1.2em;
+		/* a badge is one line of label — the tight step, like .ifacebox above */
+		line-height: var(--fs-leading-tight);
 	}
 
 	.ifacebadge img {
@@ -228,7 +241,7 @@
 	}
 
 	.network-status-table .ifacebox {
-		margin: .5em;
+		margin: var(--fs-space-2);
 		flex-grow: 1;
 	}
 
@@ -240,7 +253,7 @@
 	}
 
 	.network-status-table .ifacebox-body > * {
-		margin: .25em;
+		margin: var(--fs-space-1);
 	}
 
 	.network-status-table .ifacebox-body > span {
@@ -263,9 +276,9 @@
 	.network-status-table .ifacebox-body .ifacebadge {
 		display: flex;
 		flex: 1;
-		padding: .25em;
+		padding: var(--fs-space-1);
 		min-width: 220px;
-		margin: .125em;
+		margin: var(--fs-space-1);
 	}
 
 	.ifacebadge.large {
@@ -279,12 +292,12 @@
 
 	.ifacebadge > *,
 	.ifacebadge.large > * {
-		margin: 0 .125em;
+		margin: 0 var(--fs-space-1);
 	}
 
 	.zonebadge {
 		padding: 2px;
-		border-radius: 4px;
+		border-radius: var(--fs-radius-sm);
 		display: inline-block;
 		white-space: nowrap;
 		color: var(--fs-text);
@@ -293,7 +306,7 @@
 
 	.zonebadge > em,
 	.zonebadge > strong {
-		margin: 0 2px;
+		margin: 0 var(--fs-space-1);
 		display: inline-block;
 	}
 
@@ -340,22 +353,27 @@
 
 	#modal_overlay > .modal.login > button.important {
 		/* no !important needed: the ID makes this (1,3,1), which no button rule can reach */
-		font-size: 120%;
-		margin-top: .5em;
+		/* the login dialog's one action, a step up the scale — it was a bare 120% of whatever the
+		 * button happened to be. */
+		font-size: var(--fs-type-lg);
+		margin-top: var(--fs-space-2);
 		width: 100%;
 	}
 
+	/* a list of changed settings, one per line: prose leading, not a hand 170%. */
 	.uci-change-list {
-		line-height: 170%;
+		line-height: var(--fs-leading);
 		white-space: pre;
 	}
 
+	/* one changed-setting row. It carried `line-height: 15px` — a hand number under a 13px face;
+	 * a row of single-line code takes the tight step like every other plate here. */
 	.uci-dialog div > del,
 	.uci-dialog div > ins,
 	.uci-dialog div > var {
 		margin-bottom: 2px;
 		border: 1px solid var(--fs-border);
-		line-height: 15px;
+		line-height: var(--fs-leading-tight);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		padding: 2px;
@@ -458,10 +476,14 @@
 		--spinner-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' stroke='%23000' stroke-width='3' fill='none'><circle cx='10' cy='10' r='8' stroke-opacity='.5'/><path d='M10 2c4 0 8 4 8 8'/></svg>");
 
 		position: absolute;
-		top: calc(50% - 10px);
-		left: 6px;
-		width: 20px;
-		height: 20px;
+		/* centred by DERIVATION: `top: calc(50% - 10px)` was half the height below, restated by
+		 * hand, so resizing the glyph decentred it. margin-top and not translate — `transform` is
+		 * taken by the spin animation. */
+		top: 50%;
+		margin-top: calc(var(--fs-spin-size) / -2);
+		left: var(--fs-space-2);
+		width: var(--fs-spin-size);
+		height: var(--fs-spin-size);
 		content: " ";
 		background: var(--on-color, #000);
 		mask: var(--spinner-icon) center/cover no-repeat;
@@ -602,7 +624,7 @@
 	}
 
 	.assoclist .ifacebadge > img {
-		margin: .2em;
+		margin: var(--fs-space-1);
 	}
 
 	.assoclist .td:nth-of-type(3),
@@ -614,8 +636,20 @@
 		word-break: normal;
 	}
 
+	/* Statistics renders its graphs as PNGs on a white ground, so dark mode inverts them. 180deg is
+	 * not a nudge of upstream's 150 — it is the arithmetic: invert() maps every hue to h+180, so
+	 * rotating 180 back restores the ORIGINAL hue while keeping the inverted lightness.
+	 *
+	 * Measured on collectd's own cpu-plugin series, reading the rendered pixel back: at 150deg
+	 * System (red, h=0) came back at h=301 and User (blue, h=240) at h=180 — 59 and 60 degrees out,
+	 * i.e. the blue plot was drawn CYAN. At 180deg all three primaries are exact.
+	 *
+	 * It is NOT exact for every colour and cannot be: CSS hue-rotate is a linear matrix
+	 * approximation, not a true HSL rotation, so a non-primary survives only approximately —
+	 * Wait I/O (amber, h=41) still lands 13deg out at 180. Do not "fix" that by tuning the angle:
+	 * moving off 180 trades an exact red/green/blue for a marginally better amber. */
 	[data-darkmode="true"] [data-page="admin-statistics-graphs"] [data-plugin] img {
-		filter: invert(100%) hue-rotate(150deg);
+		filter: invert(100%) hue-rotate(180deg);
 	}
 
 	/* Realtime graphs (Status → Load/Traffic) inject resources/svg/*.svg into a div with

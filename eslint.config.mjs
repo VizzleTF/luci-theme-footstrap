@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import globals from 'globals';
 import { readFileSync, readdirSync } from 'node:fs';
+import { utProcessor } from './tools/lib/ut-scripts.mjs';
 
 /* ESLint for the theme's browser JS. Runs in CI and locally, never on the OpenWrt buildbot: it
  * has no node and needs none — luci.mk copies htdocs/ verbatim.
@@ -122,4 +123,53 @@ export default [
 		files: [ file ],
 		languageOptions: { globals: Object.fromEntries(aliases.map((a) => [ a, 'readonly' ])) },
 	})),
+
+	/* THE TEMPLATES' INLINE <script>s — the theme's other browser JS, and until this entry the only
+	 * JS here that NOTHING checked. eslint walked htdocs/ and jsmin (via luci.mk) minifies that same
+	 * tree, while a .ut is copied to the router verbatim: both gates looked straight past the
+	 * pre-paint in partials/head.ut, which stamps :root before the first frame and whose only
+	 * failure symptom is one wrong frame that nobody reports and no other gate catches.
+	 * tools/lib/ut-scripts.mjs pulls each non-interpolated <script> body out as a virtual `<n>.js`,
+	 * padded so line/column point back at the .ut. See there for why an interpolated block is
+	 * exempt and what it must be instead. */
+	{ files: [ '**/*.ut' ], processor: utProcessor },
+	{ files: [ '**/*.ut/*.js' ], ...js.configs.recommended },
+	{
+		files: [ '**/*.ut/*.js' ],
+		languageOptions: {
+			ecmaVersion: 2023,
+			sourceType: 'script',
+			globals: {
+				...globals.browser,
+				L: 'readonly',
+				/* the pre-paint's own channel for server values: head.ut and sysauth.ut each emit one
+				 * interpolated data blob (see ut-scripts.mjs) that the linted blocks below read. */
+				__fsSD: 'readonly',
+				__fsHttps: 'readonly',
+			},
+		},
+		rules: {
+			/* the same reason as htdocs: every localStorage read here is wrapped in an empty catch,
+			 * because a browser in private mode THROWS and an unreadable preference is a default,
+			 * not an error. */
+			'no-empty': [ 'error', { allowEmptyCatch: true } ],
+			'no-unused-vars': [ 'error', { args: 'none', caughtErrors: 'none' } ],
+			'no-undef': 'error',
+			'no-shadow': 'warn',
+			'no-var': 'error',
+			'prefer-const': 'warn',
+			eqeqeq: [ 'warn', 'smart' ],
+			'no-eval': 'error',
+			'no-implied-eval': 'error',
+			'no-new-func': 'error',
+			'no-constant-binary-expression': 'error',
+			'no-self-compare': 'error',
+			'no-alert': 'error',
+			'no-console': [ 'warn', { allow: [ 'warn', 'error' ] } ],
+			/* NO `wrap-regex` here, and no `no-implicit-globals`. jsmin never sees a template —
+			 * luci.mk copies ucode/ verbatim — so the regex-vs-division hazard that rule exists for
+			 * cannot arise; and these blocks are IIFEs in real global scope, where a top-level
+			 * declaration is the point, not a mistake. */
+		},
+	},
 ];

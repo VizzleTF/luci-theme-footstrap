@@ -4,7 +4,7 @@
   "description": "Lint/a11y tooling only. NOTHING here is shipped: the OpenWrt package is built by luci.mk, which copies htdocs/ and ucode/ verbatim and never invokes node. These devDependencies exist for CI and for local checks.",
   "scripts": {
     "lint": "npm run lint:js && npm run lint:css",
-    "lint:js": "eslint luci-theme-footstrap/htdocs",
+    "lint:js": "eslint luci-theme-footstrap/htdocs && eslint luci-theme-footstrap/ucode",
     "lint:css": "stylelint \"luci-theme-footstrap/styles/**/*.css\"",
     "a11y": "node tools/a11y-gallery.mjs",
     "audit": "python3 .claude/skills/footstrap-audit/audit.py --strict",

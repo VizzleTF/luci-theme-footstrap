@@ -90,7 +90,14 @@
 		 * and inlining the SVG twice is exactly the drift css-dup exists to catch. STATIC glyph
 		 * on purpose — see the rail note; a spinner makes an idle poll look busy and moves the
 		 * click target that pauses it. */
-		--fs-icon-refresh: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 15-6.7L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3Cpath d='M21 12a9 9 0 0 1-15 6.7L3 16'/%3E%3Cpath d='M3 21v-5h5'/%3E%3C/svg%3E");
+		/* OURS. It was derived from Lucide's `refresh-cw` (ISC) — `M21 3v5h-5` was byte-identical,
+		 * and the r=9 arc and `L21 8` terminus came with it — which is a second outside obligation
+		 * this theme never declared, found while auditing the first. Redrawn as two OPEN
+		 * arcs with solid triangular heads: a different construction, not a nudge of the same one
+		 * (Lucide caps a continuous stroke with an L-shaped hook). Solid heads and not chevrons
+		 * because it renders at 18px — measured, chevrons dissolve at that size. It is a MASK, so
+		 * fill and stroke both give alpha. */
+		--fs-icon-refresh: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4.4 9.6A8.5 8.5 0 0 1 18.6 7.6'/%3E%3Cpath d='M19.6 14.4A8.5 8.5 0 0 1 5.4 16.4'/%3E%3Cpath fill='%23000' stroke='none' d='M21.6 10.6 15.4 8.4 20.4 4.2Z'/%3E%3Cpath fill='%23000' stroke='none' d='M2.4 13.4 8.6 15.6 3.6 19.8Z'/%3E%3C/svg%3E");
 		/* ...and the size it is drawn at. De-duplicating the SVG left its GEOMETRY to drift anyway:
 		 * the rail said 19px and the top bar 18px for the same glyph, which css-dup cannot see —
 		 * the declaration bodies differ, so it goes quiet. The two sites legitimately differ in
@@ -184,6 +191,69 @@
 
 		--fs-font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 		--fs-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+		/* ---- TYPE SCALE — footstrap's own, and the reason it exists is not tidiness ----
+		 *
+		 * styles/base carried a 13/18 rhythm with 9px and 8.5px halves of it. That is
+		 * luci-theme-bootstrap's scale, i.e. Twitter's 2011 choice, and it arrived here with the
+		 * fork rather than by anyone deciding it fits Manrope. Naming those same numbers as tokens
+		 * would have changed nothing that matters — the numbers ARE the borrowed expression — so
+		 * the scale is re-derived here and base reads it instead of restating literals.
+		 *
+		 * 13px stays the base DELIBERATELY, and it is not the same 13 as upstream's: a router UI is
+		 * dense tables of addresses and counters, and the size was re-chosen for that, not
+		 * inherited. What changes is the RHYTHM around it — a unitless 1.5 instead of a hard 18px.
+		 * Unitless matters: `line-height: 18px` is inherited as 18px into a 20px heading and clips
+		 * it, while 1.5 is re-resolved against each element's own size.
+		 *
+		 * Every STEP is a whole px; the line box 1.5 computes is not (13 -> 19.5), and that is fine
+		 * — a fractional line box is what unitless leading gives on any odd size, and the baseline
+		 * still snaps. What must stay whole is a BOX: never size an element `--fs-type * --fs-leading`
+		 * (a half-pixel border is upstream's 8.5px bug wearing a calc) — take the nearer --fs-space
+		 * step, which is what a line of text at this scale rounds to anyway. */
+		--fs-type-xs: 11px;	/* dense metadata: tooltips, table sub-labels, badges */
+		--fs-type-sm: 12px;	/* secondary text: help tails, footer, tab labels */
+		--fs-type: 13px;	/* body, tables, form fields — the base */
+		--fs-type-lg: 16px;	/* section titles */
+		--fs-type-xl: 20px;	/* page titles */
+		--fs-type-2xl: 26px;	/* h1 — a bare <h1> only a third-party app emits; see base/20-typography.css */
+		--fs-leading: 1.5;	/* unitless ON PURPOSE — see above (13 -> 19.5px) */
+		--fs-leading-tight: 1.2;	/* headings and single-line plates, where 1.5 looks loose */
+
+		/* ---- SPACE SCALE — a 4px grid ----------------------------------------------
+		 *
+		 * Same story: the 18px/9px pair base used was upstream's line-height and half of it, so
+		 * every gutter in the theme was a function of Twitter's leading. A 4px grid is independent
+		 * of the type scale, which is the point — changing the font size must not silently
+		 * re-space every widget. `--fs-card-pad` (16px) and `--fs-content-pad` (28px) are already
+		 * on this grid and stay named for their role; these are the generic steps.
+		 *
+		 * Do NOT add a step because one rule wants 10px. An unnamed level is how the radius tints
+		 * drifted into four strengths for two decisions (see the ladder above): pick the nearer
+		 * step, or argue in a comment for why this rule is genuinely different. */
+		--fs-space-1: 4px;
+		--fs-space-2: 8px;
+		--fs-space-3: 12px;
+		--fs-space-4: 16px;
+		--fs-space-5: 20px;
+		--fs-space-6: 24px;
+
+		/* The spinner glyph's box (base/95-luci.css `.spinning::before`). A TOKEN because it is read
+		 * back to clear it: theme/55-buttons.css pads a .spinning button left by inset + glyph +
+		 * gap. That was `left: 6px` + `width: 20px` here and a bare `padding-left: 32px` there —
+		 * three literals in two files encoding one relationship, with nothing to notice when the
+		 * glyph is resized. Same trap --fs-sidebar-w exists to close for fitShell(). */
+		--fs-spin-size: var(--fs-space-5);
+
+
+		/* One control height for every field that is a single line — input, select, .cbi-select,
+		 * .cbi-dropdown, and the checkbox/radio row that must line up beside them. DERIVED, not
+		 * measured by hand: the text box (--fs-text x --fs-leading = 19.5px) plus the vertical
+		 * inset those fields carry (2 x --fs-space-1) plus both 1px borders = 29.5 -> ceil 32.
+		 * It was a bare 30px in four rules, which was upstream's same arithmetic over upstream's
+		 * 18px leading — so re-scaling the type left every control the wrong height for its own
+		 * text, silently. Stated once here so the two cannot drift again. */
+		--fs-control-h: calc(round(up, calc(var(--fs-type) * var(--fs-leading) + var(--fs-space-1) * 2 + 2px), 4px));
 
 		/* ---- Stacking scale ----------------------------------------------------
 		 * Every z-index in the theme comes from here. There used to be nine bare numbers

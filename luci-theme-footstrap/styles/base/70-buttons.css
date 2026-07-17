@@ -11,12 +11,16 @@
 		cursor: pointer;
 		display: inline-block;
 		background: var(--default-btn-background);
-		padding: 0 14px;
+		/* the side inset was a bare 14px; a button's inset is a step of the space scale like
+		 * anything else. `line-height: 2em` is what gives the button its HEIGHT (there is no
+		 * `height` here), so it stays em-relative and tracks whatever size the button is set at —
+		 * theme/55-buttons.css repaints the fill but not the box. */
+		padding: 0 var(--fs-space-3);
 		color: var(--on-color);
-		font-size: 13px;
+		font-size: var(--fs-type);
 		line-height: 2em;
 		border: 1px solid var(--fs-border);
-		border-radius: 4px;
+		border-radius: var(--fs-radius);
 		white-space: pre;
 	}
 
@@ -72,7 +76,7 @@
 
 	.cbi-page-actions > :not([method="post"]):not(.cbi-button-apply):not(.cbi-button-negative):not(.cbi-button-save):not(.cbi-button-reset) {
 		float: left;
-		margin-right: .4em;
+		margin-right: var(--fs-space-1);
 	}
 
 	/* Fills and borders: theme/55-buttons.css — absorbed. --on-color stays (the spinner mask, see

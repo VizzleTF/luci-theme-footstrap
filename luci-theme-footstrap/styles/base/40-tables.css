@@ -8,9 +8,9 @@
 	.table {
 		display: table;
 		width: 100%;
-		margin-bottom: 18px;
+		margin-bottom: var(--fs-space-4);
 		padding: 0;
-		font-size: 13px;
+		font-size: var(--fs-type);
 		border-collapse: collapse;
 		position: relative;
 	}
@@ -26,19 +26,22 @@
 	.table .th, .table .td {
 		display: table-cell;
 		vertical-align: middle; /* Fixme */
-		padding: 10px 10px 9px;
-		line-height: 18px;
+		/* was `10px 10px 9px` — a bottom 1px shy of the top for no reason anyone recorded, which
+		 * is what an inherited number looks like. Symmetric, on the grid. */
+		padding: var(--fs-space-2) var(--fs-space-3);
 		text-align: left;
 	}
 
 	.table .tr:first-child .th {
-		padding-top: 9px;
+		padding-top: var(--fs-space-2);
 		font-weight: bold;
 		vertical-align: top;
 	}
 
+	/* the empty-table plate: three lines of leading plus the cell inset it sits in, so it keeps
+	 * the table's own height when there is nothing to show. */
 	.tr.placeholder {
-		height: calc(3em + 20px);
+		height: calc(3em + var(--fs-space-4));
 	}
 
 	.tr.placeholder > .td {
