@@ -309,10 +309,14 @@ curl -s -b /tmp/j "http://$IP/cgi-bin/luci/admin/status/overview" | grep -o "cbi
 ssh $R 'uci set luci.main.mediaurlbase=/luci-static/bootstrap; uci commit luci'   # always revert
 ```
 Verify a CSS change (`docs/17`). Screenshots are useless here: live counters (uptime, DHCP leases, wifi signal) move 0.5–1.3% of the pixels between two runs of the *same* stylesheet, while a real regression can be 0.19%. `cssdiff.py` loads a page once, snapshots `getComputedStyle` for every element, swaps the `<link>` to the second stylesheet and snapshots again — same DOM, same data, so every difference is caused by CSS:
+**Hand `--a`/`--b` the LOCAL files and let it upload them** — and pick the container with
+`FOOTSTRAP_SSH`, per release. Doing the `scp` yourself is how this tool once lied: the pair
+landed on one container while the tool (which hardcoded the other) found a STALE pair from an
+earlier session and reported 1329 line-height changes nobody had made. It now refuses to start
+unless both sheets are there, and prints the size + mtime of what it compared.
 ```sh
-scp -q old.css router2512:/www/luci-static/footstrap/cascade-a.css
-scp -q new.css router2512:/www/luci-static/footstrap/cascade-b.css
-LUCI_PW=<pw> python3 .claude/skills/footstrap-audit/cssdiff.py \
+FOOTSTRAP_SSH=router2410 LUCI_PW=<pw> .claude/tooling/preview-venv/bin/python \
+  .claude/skills/footstrap-audit/cssdiff.py --a /tmp/old.css --b /tmp/new.css \
   admin/network/firewall admin/system/system admin/status/overview admin/system/opkg
 ```
 

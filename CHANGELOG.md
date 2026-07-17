@@ -155,6 +155,17 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   containing block, so its `overflow` clips what it lays out; nothing paints differently, since the
   pane is `visibility: hidden`.
 
+- **`cssdiff.py`, the tool this project trusts to prove a CSS change is safe, could report changes
+  nobody had made — and it did.** It hardcoded `router2512` and ignored `FOOTSTRAP_SSH`, so a pair
+  of stylesheets scp'd to the 24.10 container was compared on the 25.12 one, where a stale
+  `cascade-a/b.css` from an earlier session was still lying about: 1329 line-height differences
+  belonging to no edit. With no stale pair to find it was worse than wrong — `page.evaluate` awaits
+  the swap's promise and has no timeout, and a 404 `<link>` fires `error`, never `load`, so the run
+  simply hung (measured past 150s). It now takes the host from `FOOTSTRAP_SSH` like every other tool
+  here, uploads `--a`/`--b` given as local paths, refuses to start unless both sheets are on the
+  router, prints the size and mtime of the two it compared, and rejects on a stylesheet that fails
+  to load. A tool whose job is noticing regressions must not be the thing inventing them.
+
 - **Clicking a second menu item while a page was still loading could leave the previous page's
   content under the new page's URL, permanently.** Measured on the router: leave the package manager
   for System after 150 ms and the paints into `#view` land System at 16010 ms, package-manager at

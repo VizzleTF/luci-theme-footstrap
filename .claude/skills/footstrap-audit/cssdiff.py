@@ -9,7 +9,8 @@ So: load the page ONCE, snapshot getComputedStyle for a fixed property set on ev
 element (keyed by a stable DOM path), swap the theme <link> to the second stylesheet,
 snapshot again, diff. Same DOM, same live data, so every difference is caused by CSS.
 
-Both stylesheets must already be on the router under /www/luci-static/footstrap/.
+Pass --a/--b as LOCAL paths and they are uploaded for you; pass bare filenames to compare two
+sheets already sitting under /www/luci-static/footstrap/ on the router.
 """
 import os, sys, subprocess, time, json, argparse, collections
 
@@ -64,10 +65,18 @@ SNAP = """(props) => {
   return out;
 }"""
 
-SWAP = """(href) => new Promise((res) => {
+# `onerror` is not politeness — without it this hangs FOREVER on a sheet the router does not have:
+# `page.evaluate` awaits the returned promise and has no default timeout, so a 404 (the browser
+# fires `error`, never `load`) parks the run with no message. Rejecting turns the one mistake this
+# tool cannot survive — comparing against a stylesheet that is not there — into a stack trace
+# instead of a silence. Verified against a deleted cascade-a.css: hung past 150s before, throws at
+# once now.
+SWAP = """(href) => new Promise((res, rej) => {
   const l = document.querySelector('link[rel=stylesheet][href*=cascade]');
+  if (!l) { rej(new Error('no cascade <link> on the page — is the theme active?')); return; }
   const n = l.cloneNode();
   n.href = href;
+  n.onerror = () => rej(new Error('stylesheet did not load: ' + href));
   n.onload = () => {
     l.remove();
     // Swapping the <link> restarts font matching (both sheets declare the same
@@ -84,11 +93,17 @@ FONTS_READY = "() => document.fonts.ready.then(() => true)"
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("pages", nargs="+")
-    ap.add_argument("--a", default="cascade-a.css", help="baseline css filename under /luci-static/footstrap/")
-    ap.add_argument("--b", default="cascade-b.css", help="candidate css filename")
+    ap.add_argument("--a", default="cascade-a.css",
+                    help="baseline: a LOCAL path (uploaded for you) or a filename already under "
+                         "/luci-static/footstrap/ on the router")
+    ap.add_argument("--b", default="cascade-b.css", help="candidate, same two forms as --a")
     ap.add_argument("--layout", default="/luci-static/footstrap")
     ap.add_argument("--mode", default="dark")
-    ap.add_argument("--ssh-host", default="router2512")
+    # FOOTSTRAP_SSH, like every other tool here. Hardcoding 25.12 made `FOOTSTRAP_SSH=router2410
+    # cssdiff.py` measure the 25.12 container while its author read the answer as 24.10's — and
+    # since the two branches differ in exactly the markup this theme has to serve, that is the
+    # reading most worth taking per release.
+    ap.add_argument("--ssh-host", default=os.environ.get("FOOTSTRAP_SSH", "router2512"))
     # Behaviour is a FUNCTION of width, and a diff taken only at 1440 never enters the
     # narrow states: the overview grid (@container fs-view 800), the config table's card
     # (@container fs-content 960 — which in the sidebar layout can fire on a 1200px DESKTOP,
@@ -107,6 +122,35 @@ def main():
     base = f"http://{host}"
 
     def sh(c): return subprocess.run(["ssh",args.ssh_host,c],capture_output=True,text=True)
+
+    # Upload a --a/--b given as a local path, then PROVE both sheets are on the router and say
+    # what they are. Every failure this closes is silent, and all of them have happened:
+    #   * the caller scp'd the pair to router2410 and the tool read router2512 (the hardcoded
+    #     default above), where a stale pair from an earlier session was still lying around — so it
+    #     compared two stylesheets nobody had asked about and reported 1329 line-height changes;
+    #   * with no pair there at all, the swap hung forever (see SWAP).
+    # A tool whose whole job is to notice regressions must not be the thing that invents them, so
+    # it now uploads what it is given and prints the size and mtime of what it actually compared.
+    WWW = "/www/luci-static/footstrap"
+    def stage(which, val):
+        if os.path.sep in val or os.path.exists(val):
+            if not os.path.isfile(val):
+                sys.exit(f"--{which}: no such file: {val}")
+            name = f"cascade-{which}.css"
+            up = subprocess.run(["scp","-q",val,f"{args.ssh_host}:{WWW}/{name}"],
+                                capture_output=True,text=True)
+            if up.returncode:
+                sys.exit(f"--{which}: cannot upload {val} to {args.ssh_host}: {up.stderr.strip()}")
+            return name
+        return val
+
+    a_name, b_name = stage("a", args.a), stage("b", args.b)
+    for which, name in (("a", a_name), ("b", b_name)):
+        ls = sh(f"ls -l {WWW}/{name}")
+        if ls.returncode or not ls.stdout.strip():
+            sys.exit(f"--{which}: {args.ssh_host}:{WWW}/{name} is not there — nothing to compare "
+                     f"against. Pass a local path and it will be uploaded for you.")
+        print(f"  {which}: {ls.stdout.strip()}")
     # This script SWITCHES the router's active theme and restores it in a finally block, so
     # `orig` is all that stands between a dev router and a broken UI. A failed ssh (or an
     # unset key) used to leave it the EMPTY STRING, and finally then ran
@@ -137,10 +181,10 @@ def main():
                 time.sleep(1.2)
                 page.evaluate(FONTS_READY)
                 # force stylesheet A first, so both snapshots come from a link we control
-                page.evaluate(SWAP, f"/luci-static/footstrap/{args.a}")
+                page.evaluate(SWAP, f"{WWW.replace('/www', '')}/{a_name}")
                 time.sleep(0.4)
                 sa = page.evaluate(SNAP, PROPS)
-                page.evaluate(SWAP, f"/luci-static/footstrap/{args.b}")
+                page.evaluate(SWAP, f"{WWW.replace('/www', '')}/{b_name}")
                 time.sleep(0.4)
                 sb = page.evaluate(SNAP, PROPS)
 

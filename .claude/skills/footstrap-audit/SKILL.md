@@ -76,7 +76,24 @@ ssh router2512 'for f in /usr/share/ucode/luci/template/themes/footstrap*/*.ut; 
 ```
 
 `router2512` (25.12) and `router2410` (24.10) are the two dev containers from
-`docker/compose.yml`; `cssdiff.py --ssh-host` takes either. Run it against both when a
-change could land differently per release — the ucode compiler and LuCI itself differ by
-branch. `cssdiff.py` needs playwright, so run it with the preview venv's python
-(`.claude/tooling/preview-venv/bin/python`), not the system one.
+`docker/compose.yml`; `cssdiff.py` takes either via `--ssh-host` or `FOOTSTRAP_SSH`. Run it
+against both when a change could land differently per release — the ucode compiler and LuCI
+itself differ by branch, and so does the markup `form.js` emits. `cssdiff.py` needs playwright,
+so run it with the preview venv's python (`.claude/tooling/preview-venv/bin/python`), not the
+system one.
+
+**Give `--a`/`--b` LOCAL paths and let the tool upload them** — it then prints the size and
+mtime of the two sheets it actually compared:
+
+```sh
+luci-theme-footstrap/build-css.sh /tmp/new.css
+FOOTSTRAP_SSH=router2410 LUCI_PW=1234 .claude/tooling/preview-venv/bin/python \
+  .claude/skills/footstrap-audit/cssdiff.py --a /tmp/old.css --b /tmp/new.css \
+  admin/network/firewall/forwards admin/status/overview
+```
+
+Hand-scp'ing the pair yourself still works (bare filenames are read from
+`/www/luci-static/footstrap/`), but that is how the tool once lied: the pair went to one
+container while the tool read the other, found a STALE `cascade-a/b.css` from an earlier
+session, and reported 1329 line-height changes that belonged to nobody's edit. It refuses to
+start now if either sheet is missing, rather than comparing whatever it finds.
