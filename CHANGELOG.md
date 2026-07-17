@@ -11,7 +11,7 @@ Style and format guide: [docs/21-changelog-stil-i-format.md](docs/21-changelog-s
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [Unreleased]
+## [0.9.2] — 2026-07-17
 
 ### Added
 
@@ -124,6 +124,82 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   the tail, unlike `balance`, which re-runs the whole block and is meant for headings; a browser
   without it wraps exactly as before, so there is nothing to guard. Measured over four pages: 12
   elements changed, no other property moved.
+
+
+- **Every Appearance axis owns its router default, instead of a second copy restating it.**
+  `_resolvedDefault()` spelled each validation out again — the 1–360 hue clamp twice, the 0–20
+  rounding clamp once, and a bare `sd('palette') || 'footstrap'` where `current()` whitelists — and
+  nothing observable fails when the two disagree: `matchesSavedDefault()` simply lies, and the Save
+  button IS that answer (it reads "Saved as default" and greys, or never greys at all), with nothing
+  else in the UI to contradict it. Each axis exposes its `def()` now and `_resolvedDefault()` calls
+  it. In the same pass, palette and wallpaper stopped being one shape written twice — `current()`
+  and `apply()` agreed line for line, and `palette`'s two halves had already drifted 100 lines apart
+  in the file — and join tint/accent on a factory (`enumAxis`, beside `hueAxis`). Verified on the
+  router against a real saved default (`layout=top`, `darkmode=dark`, `wallpaper=cats`): a clean
+  browser resolves every axis to it, the Save button greys, and diverging on one axis un-greys it.
+- **`npm run axes` gates the palette and wallpaper axes, which it had never seen.** It finds an
+  axis's localStorage key by scanning for `lsGet('fs-…')` call sites, and an axis built by a factory
+  has none — the key is an argument. It already special-cased `hueAxis()` for exactly this reason;
+  `enumAxis()` would have walked into the same blind spot and dropped both keys out of the contract
+  silently. It reads both factories now and holds each enum axis to head.ut's pre-paint in both
+  directions (the ON value it stamps and the removal that turns it off, since OFF is a bare `:root`).
+  Proven by mutation: renaming the factory, drifting palette's ON value and drifting wallpaper's
+  attribute each fail the gate.
+- **The zone test's "what is a CSS name" pattern is written once.** `fs-sheets.js` carried three
+  copies of `/[.#][A-Za-z_][\w-]*/g` — the vocabulary `themeNames()`, `pinnedToApp()` and
+  `judgeSheet()` all judge in — under a comment explaining that two copies of the *judgement* would
+  drift into disagreeing. A vocabulary that disagrees with itself is the same bug one level down:
+  widen it in the harvester alone and names enter the theme's set that the other two can never
+  match, so a selector that does reach the chrome reads as pinned and is left unfenced.
+- **Each Appearance caption is stated once, not once per reader.** Every axis wrote its label twice
+  — the visible caption and the control's `aria-label` — 18 `_()` calls for 9 axes, which is exactly
+  how what a sighted user reads and what a screen reader announces come apart. One `group()` helper
+  hands the same string to both.
+- **Animations follow the motion scale, like transitions already did.** `02-tokens.css` claims one
+  scale of four durations; only the *transitions* had been converted, so `fs-fade` — one keyframe,
+  one gesture — was ridden at `.14s`, `.16s` and `.3s`, and `.flash`/`.fade-out` at `.35s`/`.4s`.
+  `.14` vs `.16` for two pop surfaces is the same drift as the refresh glyph's 19px/18px, and
+  invisible to `css-dup` for the same reason: the declaration bodies differ, so it goes quiet. The
+  four `ease` keywords went too — `ease` is the initial value of `animation-timing-function`, so
+  writing it changes nothing, which `cssdiff` now confirms (0 diffs on that property). `fs-spin` is
+  the one deliberate exception and says why in place.
+- **Six specificity numbers in comments were wrong.** The rail chevron's justification for a
+  66-character selector said `(0,5,3)` against `(0,4,3)`; measured with the same analyzer
+  `css-metrics` uses, they are `(0,7,3)` and `(0,6,3)`. The login modal's said `(0,3,2)` where the
+  real selector is `(1,3,1)` — the comment had dropped the ID entirely. Every conclusion still held;
+  only the arithmetic lied, which is the worst kind of comment to leave standing, and this one had
+  already misled a reader.
+- **`header.ut` uses the UCI cursor the dispatcher already opened.** It imported `cursor` from
+  `uci` and opened a second one on every page render, then re-read `luci.main` — a package
+  `dispatcher.uc` pre-loads into `config.main` before calling the template — and left this file
+  reaching for UCI a different way than `sysauth.ut` does. Verified on the router across all three
+  paths: the saved default, the legacy `footstrap_layout` seed, and both absent.
+- **The "is this the top layout?" test is asked in one place.** It was written three times —
+  `prefs.isTopLayout()` (one caller), a raw `getAttribute` in `fs-chrome.js`, and `topBarMode()` in
+  `menu-footstrap.js` — which is the shape the `data-narrow` lesson warns about; one of those copies
+  had already drifted once.
+- **The refresh glyph is one size.** De-duplicating the SVG into `--fs-icon-refresh` left its
+  geometry free to drift, and it did: 19px in the rail, 18px in the top bar. `css-dup` cannot see
+  that — the declaration bodies differ, so it goes quiet. Now `--fs-icon-refresh-sz`.
+- **The export tier is parsed in one place.** `devkit-build.mjs` and `export-tier.mjs` each knew the
+  tier's shape, and they had already disagreed about `--text-color-highest`; `tools/lib/tokens.mjs`
+  is now the single parser both read.
+
+### Removed
+
+- **Ten dead exports, one dead option and two dead CLI flags.** `fit.run`, `fit.watch`,
+  `router.navigate`, `prefs.stampDark`, `prefs.snapshotAxes`, two on `fs-sheets` and three on
+  `fs-menutree` were on their modules' public API with no caller anywhere. `fit.touches`' `{removed}`
+  branch was orphaned by the `wireTabFit` removal above. `css-dup`'s `--min` put the gate's own
+  threshold on the command line — `--min 99` passes trivially — in a tool whose header rejects "a
+  number nobody defends", and it worked only by accident (`indexOf` → `-1` → `argv[0]` → `NaN` →
+  `|| 3`). The functions stay: two gates match `function stampDark(` by text.
+- **`stylelint-config-standard`, a dev dependency nothing extends**, fetched by every `npm ci`.
+- **`wireTabFit()` — a second MutationObserver and a second resize listener for work `fs-fit`
+  already does.** A view renders its `.cbi-tabmenu` into `#view`, which `fs-fit`'s observer watches
+  and re-fits **synchronously**, where this copy deferred through `fit.schedule()` — i.e. the
+  duplicate was strictly the slower path into the same work. Verified on the router: the bar's
+  auto-fitted state equals a forced re-fit at 1440/900/760/700/600/500/1200px.
 
 ### Fixed
 
@@ -283,83 +359,6 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 - **The one expression for "is this page dark" is now the one all three callers use.** Only the guard
   called `intendedDark()`; the applier and the OS listener spelled the condition out again, three
   lines under a comment saying they could not disagree.
-
-### Changed
-
-- **Every Appearance axis owns its router default, instead of a second copy restating it.**
-  `_resolvedDefault()` spelled each validation out again — the 1–360 hue clamp twice, the 0–20
-  rounding clamp once, and a bare `sd('palette') || 'footstrap'` where `current()` whitelists — and
-  nothing observable fails when the two disagree: `matchesSavedDefault()` simply lies, and the Save
-  button IS that answer (it reads "Saved as default" and greys, or never greys at all), with nothing
-  else in the UI to contradict it. Each axis exposes its `def()` now and `_resolvedDefault()` calls
-  it. In the same pass, palette and wallpaper stopped being one shape written twice — `current()`
-  and `apply()` agreed line for line, and `palette`'s two halves had already drifted 100 lines apart
-  in the file — and join tint/accent on a factory (`enumAxis`, beside `hueAxis`). Verified on the
-  router against a real saved default (`layout=top`, `darkmode=dark`, `wallpaper=cats`): a clean
-  browser resolves every axis to it, the Save button greys, and diverging on one axis un-greys it.
-- **`npm run axes` gates the palette and wallpaper axes, which it had never seen.** It finds an
-  axis's localStorage key by scanning for `lsGet('fs-…')` call sites, and an axis built by a factory
-  has none — the key is an argument. It already special-cased `hueAxis()` for exactly this reason;
-  `enumAxis()` would have walked into the same blind spot and dropped both keys out of the contract
-  silently. It reads both factories now and holds each enum axis to head.ut's pre-paint in both
-  directions (the ON value it stamps and the removal that turns it off, since OFF is a bare `:root`).
-  Proven by mutation: renaming the factory, drifting palette's ON value and drifting wallpaper's
-  attribute each fail the gate.
-- **The zone test's "what is a CSS name" pattern is written once.** `fs-sheets.js` carried three
-  copies of `/[.#][A-Za-z_][\w-]*/g` — the vocabulary `themeNames()`, `pinnedToApp()` and
-  `judgeSheet()` all judge in — under a comment explaining that two copies of the *judgement* would
-  drift into disagreeing. A vocabulary that disagrees with itself is the same bug one level down:
-  widen it in the harvester alone and names enter the theme's set that the other two can never
-  match, so a selector that does reach the chrome reads as pinned and is left unfenced.
-- **Each Appearance caption is stated once, not once per reader.** Every axis wrote its label twice
-  — the visible caption and the control's `aria-label` — 18 `_()` calls for 9 axes, which is exactly
-  how what a sighted user reads and what a screen reader announces come apart. One `group()` helper
-  hands the same string to both.
-- **Animations follow the motion scale, like transitions already did.** `02-tokens.css` claims one
-  scale of four durations; only the *transitions* had been converted, so `fs-fade` — one keyframe,
-  one gesture — was ridden at `.14s`, `.16s` and `.3s`, and `.flash`/`.fade-out` at `.35s`/`.4s`.
-  `.14` vs `.16` for two pop surfaces is the same drift as the refresh glyph's 19px/18px, and
-  invisible to `css-dup` for the same reason: the declaration bodies differ, so it goes quiet. The
-  four `ease` keywords went too — `ease` is the initial value of `animation-timing-function`, so
-  writing it changes nothing, which `cssdiff` now confirms (0 diffs on that property). `fs-spin` is
-  the one deliberate exception and says why in place.
-- **Six specificity numbers in comments were wrong.** The rail chevron's justification for a
-  66-character selector said `(0,5,3)` against `(0,4,3)`; measured with the same analyzer
-  `css-metrics` uses, they are `(0,7,3)` and `(0,6,3)`. The login modal's said `(0,3,2)` where the
-  real selector is `(1,3,1)` — the comment had dropped the ID entirely. Every conclusion still held;
-  only the arithmetic lied, which is the worst kind of comment to leave standing, and this one had
-  already misled a reader.
-- **`header.ut` uses the UCI cursor the dispatcher already opened.** It imported `cursor` from
-  `uci` and opened a second one on every page render, then re-read `luci.main` — a package
-  `dispatcher.uc` pre-loads into `config.main` before calling the template — and left this file
-  reaching for UCI a different way than `sysauth.ut` does. Verified on the router across all three
-  paths: the saved default, the legacy `footstrap_layout` seed, and both absent.
-- **The "is this the top layout?" test is asked in one place.** It was written three times —
-  `prefs.isTopLayout()` (one caller), a raw `getAttribute` in `fs-chrome.js`, and `topBarMode()` in
-  `menu-footstrap.js` — which is the shape the `data-narrow` lesson warns about; one of those copies
-  had already drifted once.
-- **The refresh glyph is one size.** De-duplicating the SVG into `--fs-icon-refresh` left its
-  geometry free to drift, and it did: 19px in the rail, 18px in the top bar. `css-dup` cannot see
-  that — the declaration bodies differ, so it goes quiet. Now `--fs-icon-refresh-sz`.
-- **The export tier is parsed in one place.** `devkit-build.mjs` and `export-tier.mjs` each knew the
-  tier's shape, and they had already disagreed about `--text-color-highest`; `tools/lib/tokens.mjs`
-  is now the single parser both read.
-
-### Removed
-
-- **Ten dead exports, one dead option and two dead CLI flags.** `fit.run`, `fit.watch`,
-  `router.navigate`, `prefs.stampDark`, `prefs.snapshotAxes`, two on `fs-sheets` and three on
-  `fs-menutree` were on their modules' public API with no caller anywhere. `fit.touches`' `{removed}`
-  branch was orphaned by the `wireTabFit` removal above. `css-dup`'s `--min` put the gate's own
-  threshold on the command line — `--min 99` passes trivially — in a tool whose header rejects "a
-  number nobody defends", and it worked only by accident (`indexOf` → `-1` → `argv[0]` → `NaN` →
-  `|| 3`). The functions stay: two gates match `function stampDark(` by text.
-- **`stylelint-config-standard`, a dev dependency nothing extends**, fetched by every `npm ci`.
-- **`wireTabFit()` — a second MutationObserver and a second resize listener for work `fs-fit`
-  already does.** A view renders its `.cbi-tabmenu` into `#view`, which `fs-fit`'s observer watches
-  and re-fits **synchronously**, where this copy deferred through `fit.schedule()` — i.e. the
-  duplicate was strictly the slower path into the same work. Verified on the router: the bar's
-  auto-fitted state equals a forced re-fit at 1440/900/760/700/600/500/1200px.
 
 ### Security
 
@@ -2484,6 +2483,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.9.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.8.9...v0.9.0
 [0.8.9]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.8.8...v0.8.9
