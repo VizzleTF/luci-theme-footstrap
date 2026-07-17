@@ -8,11 +8,14 @@
 #
 # Optional: pin a release tag ->  ... | sh -s v0.3.1
 #
+# The installer ASKS whether to install the update checker (luci-app-footstrap-updater). Force the
+# answer without a prompt (scripted installs):  FOOTSTRAP_UPDATER=1 (install) / =0 (theme only).
+#
 # Detects the OpenWrt release and its package manager, then installs the matching assets
-# from the latest (or given) GitHub release: .apk on 25.12+, .ipk on 24.10. TWO packages —
-# the theme (luci-theme-footstrap, carries its own .lmo catalogue) and the optional updater
-# (luci-app-footstrap-updater, the self-update backend + the Appearance Update button).
-# Licensed Apache-2.0.
+# from the latest (or given) GitHub release: .apk on 25.12+, .ipk on 24.10. The theme
+# (luci-theme-footstrap) is always installed; the updater (luci-app-footstrap-updater — the
+# self-update backend + the Appearance Update button) is OPTIONAL and the installer asks (or
+# FOOTSTRAP_UPDATER=1/0 decides non-interactively). Licensed Apache-2.0.
 
 set -e
 
@@ -28,6 +31,39 @@ info() { printf '[*] %s\n' "$1"; }
 ok()   { printf '[+] %s\n' "$1"; }
 warn() { printf '[!] %s\n' "$1"; }
 err()  { printf '[-] %s\n' "$1" >&2; }
+
+# Decide whether to install the update checker (the luci-app-footstrap-updater package). It is the
+# WHOLE of the "check for new versions / one-click Update" feature — no package, no update controls
+# in the Appearance panel, no network calls to GitHub. So the choice is: do you want update checks?
+#
+# ASKED INTERACTIVELY, but read from /dev/tty, NOT stdin — and that is the crux of a `curl | sh`
+# installer. In the documented one-liner `wget -qO- … | sh`, the shell is reading the SCRIPT from
+# stdin (the pipe), so a plain `read` would swallow the rest of the script, not the user's answer.
+# /dev/tty is the controlling terminal regardless of what stdin is, so the prompt works in BOTH the
+# piped form and podkop's `sh -c "$(wget -qO- …)"` form. (podkop gets away with a plain `read`
+# because its `sh -c "$(…)"` invocation leaves stdin ON the terminal; reading /dev/tty is the form
+# that does not depend on how the user launched us.)
+#
+# FOOTSTRAP_UPDATER=1/0 forces the answer with no prompt (for scripted/cron installs). With no
+# terminal and no override, default to installing it — that is the historical behaviour and the
+# common want, and FOOTSTRAP_UPDATER=0 is the documented way to opt out non-interactively.
+want_updater() {
+	case "${FOOTSTRAP_UPDATER:-}" in
+		0|no|n|false|NO|N|False) return 1 ;;
+		1|yes|y|true|YES|Y|True)  return 0 ;;
+	esac
+	if [ ! -r /dev/tty ]; then
+		info "Non-interactive: installing the update checker (FOOTSTRAP_UPDATER=0 to skip)."
+		return 0
+	fi
+	printf '[?] Install the update checker for one-click theme updates? [Y/n] ' > /dev/tty
+	# read failing (EOF/no input) falls through to the default: install.
+	read -r _ans < /dev/tty || { printf '\n' > /dev/tty; return 0; }
+	case "$_ans" in
+		n|N|no|NO|No) return 1 ;;
+		*)            return 0 ;;
+	esac
+}
 
 printf '\n================================================\n'
 printf '    luci-theme-footstrap installer\n'
@@ -326,11 +362,18 @@ install_asset() {
 
 install_asset "$THEME_URL"
 
-if [ -n "$UPDATER_URL" ]; then
-	install_asset "$UPDATER_URL"
-else
+# The updater is optional and the user chooses (see want_updater above). A release older than the
+# split simply has no updater asset — then there is nothing to offer or ask about.
+UPDATER_INSTALLED=0
+if [ -z "$UPDATER_URL" ]; then
 	warn "This release publishes no luci-app-footstrap-updater asset — installing the theme only."
 	warn "The Appearance popover will show the version but no update controls."
+elif want_updater; then
+	install_asset "$UPDATER_URL"
+	UPDATER_INSTALLED=1
+else
+	info "Skipping the update checker — the theme shows its version but no update controls."
+	info "Add it any time:  FOOTSTRAP_UPDATER=1 sh install.sh   (or re-run and answer yes)."
 fi
 
 # BOTH caches, as postinst/postrm/uci-defaults do: dropping only the index cache left a stale
@@ -347,7 +390,11 @@ if [ -x /etc/init.d/rpcd ]; then
 fi
 
 printf '\n'
-ok "luci-theme-footstrap installed (translations included)${UPDATER_URL:+ + luci-app-footstrap-updater}."
+if [ "$UPDATER_INSTALLED" = 1 ]; then
+	ok "luci-theme-footstrap + luci-app-footstrap-updater installed (translations included)."
+else
+	ok "luci-theme-footstrap installed (translations included)."
+fi
 info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
 info "Layout (sidebar / top bar), dark mode, palette, tint and accent all live in"
 info "the \"Appearance\" popover in the menu — they are per-browser, not per-router."
