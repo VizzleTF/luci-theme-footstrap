@@ -161,7 +161,7 @@
 
 	/* Make item being dragged in UIDynamicList partially transparent*/
 	.cbi-dynlist > .item.dragging {
-		opacity: 0.5;
+		opacity: .5;
 	}
 
 	/* prevent pointer changing when over the span element in UIDynamicList */
@@ -245,7 +245,7 @@
 	 * @supports) — absorbed. Do not re-add an option rule here: layer beats specificity,
 	 * so theme's bare `select option` outranks even `.cbi-select select option:checked`. */
 
-	input[type=file] {
+	input[type="file"] {
 		padding: initial;
 		border: initial;
 		line-height: initial;
@@ -254,7 +254,7 @@
 		width: auto;
 	}
 
-	input[type=button], input[type=reset], input[type=submit] {
+	input[type="button"], input[type="reset"], input[type="submit"] {
 		width: auto;
 		height: auto;
 	}
@@ -342,8 +342,8 @@
 		--fg-color: var(--fs-danger);
 	}
 
-	.td > input[type=text],
-	.td > input[type=password],
+	.td > input[type="text"],
+	.td > input[type="password"],
 	.td > select,
 	.td > .cbi-dropdown:not(.btn):not(.cbi-button),
 	.cbi-dynlist > .add-item > .cbi-dropdown {

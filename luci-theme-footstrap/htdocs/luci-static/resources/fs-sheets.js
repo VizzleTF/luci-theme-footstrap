@@ -301,7 +301,9 @@ function fenceRules(rules, names) {
  * the shim is inserted — retry until they are, then fence. Bounded: a sheet that never becomes
  * readable (404, cross-origin) simply stays unfenced, which is where we already were. */
 function fenceImported(styleEl, names, tries) {
-	let rules = null;
+	/* no initialiser: every path below assigns (the try, or the catch's null), so `= null`
+	 * here was a dead store — eslint 10 puts no-useless-assignment in recommended and said so. */
+	let rules;
 	try {
 		const first = styleEl.sheet && styleEl.sheet.cssRules[0];
 		rules = first && first.styleSheet && first.styleSheet.cssRules;

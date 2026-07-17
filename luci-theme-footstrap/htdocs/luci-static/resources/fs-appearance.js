@@ -17,7 +17,7 @@ function wireAppearance() {
 	 * around the appliers because the seg/slider controls call them directly and have no other seam
 	 * back to here. refreshSave is a hoisted function declaration; saveBtn it reads is assigned
 	 * below, before any of these fire (all are user events). */
-	const bump = fn => v => { fn(v); refreshSave(); };
+	const bump = (fn) => (v) => { fn(v); refreshSave(); };
 
 	/* One captioned row: `<div class=fs-ap-group>` + its label + the control. `make` is handed the
 	 * SAME label string the caption renders, because every control in here needs it a second time as
@@ -77,7 +77,7 @@ function wireAppearance() {
 			(label) => widgets.sliderControl(prefs.currentTint(), 0, 360, bump(prefs.applyTint), label, {
 				step: 5,
 				cls: 'fs-range-hue',
-				fmt: v => (v ? v + '°' : _('Off', 'footstrap'))
+				fmt: (v) => (v ? v + '°' : _('Off', 'footstrap'))
 			})),
 
 		/* recolours the accented CONTROLS (buttons/toggles/sliders/focus rings), not the canvas
@@ -86,7 +86,7 @@ function wireAppearance() {
 			(label) => widgets.sliderControl(prefs.currentAccent(), 0, 360, bump(prefs.applyAccent), label, {
 				step: 5,
 				cls: 'fs-range-hue fs-range-accent',
-				fmt: v => (v ? v + '°' : _('Off', 'footstrap'))
+				fmt: (v) => (v ? v + '°' : _('Off', 'footstrap'))
 			})),
 
 		group(_('Rounding', 'footstrap'),
@@ -183,7 +183,7 @@ function wireAppearance() {
 			badge.hidden = true; updateBtn.hidden = true;
 			return;
 		}
-		update.check().then(u => {
+		update.check().then((u) => {
 			btn.classList.toggle('fs-has-update', !!u.hasUpdate);
 			badge.hidden = !u.hasUpdate; updateBtn.hidden = !u.hasUpdate;
 			if (u.hasUpdate)

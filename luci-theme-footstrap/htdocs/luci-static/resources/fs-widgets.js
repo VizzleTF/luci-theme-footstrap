@@ -65,7 +65,7 @@ function segControl(current, opts, onPick, label) {
 	 * a screen reader had told them was one radio group. axe cannot catch this (it checks names and
 	 * roles, not key handling), which is why `npm run a11y` was green over it. */
 	function select(b, focus) {
-		wrap.querySelectorAll('button').forEach(x => {
+		wrap.querySelectorAll('button').forEach((x) => {
 			const on = (x === b);
 			x.classList.toggle('active', on);
 			x.setAttribute('aria-checked', on ? 'true' : 'false');
@@ -76,7 +76,7 @@ function segControl(current, opts, onPick, label) {
 		if (focus) b.focus();
 	}
 
-	opts.forEach(o => {
+	opts.forEach((o) => {
 		const active = (o.val === current);
 		const b = E('button', {
 			'type': 'button',
@@ -116,7 +116,7 @@ function segControl(current, opts, onPick, label) {
  * slider's 0 means "off", and announcing "0 degrees" would announce a hue that is not applied. */
 function sliderControl(current, min, max, onInput, label, opts) {
 	const o = opts || {};
-	const fmt = o.fmt || (v => v + 'px');
+	const fmt = o.fmt || ((v) => v + 'px');
 	const out = E('span', { 'class': 'fs-range-val' }, [ fmt(current) ]);
 	const input = E('input', {
 		'type': 'range', 'class': 'fs-range' + (o.cls ? ' ' + o.cls : ''),

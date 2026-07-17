@@ -51,7 +51,7 @@ function applyUpdateCheck(val) {
 	else prefs.lsDel('fs-update-check');
 	/* re-evaluate so turning it back on within the same session shows the state */
 	_fsUpdatePromise = null;
-	if (typeof _onUI == 'function') _onUI();
+	if (typeof _onUI === 'function') _onUI();
 }
 
 /* The parentheses around the regex are load-bearing — do not "tidy" them away. luci.mk minifies
@@ -60,7 +60,7 @@ function applyUpdateCheck(val) {
  * division and the regex's `//` swallows the rest of the file — exiting 0 (openwrt/luci#8299).
  * `(` IS on the allow-list. tools/jsmin-verify.mjs is the gate; this is the fix. */
 function fsVersionReal() { return ((/^\d+\.\d+/).test(FS_VERSION)) && FS_VERSION !== '0.0.0-dev'; }
-function fsParseVer(s) { return String(s).replace(/^v/, '').split(/[.\-+]/).map(n => parseInt(n, 10) || 0); }
+function fsParseVer(s) { return String(s).replace(/^v/, '').split(/[.\-+]/).map((n) => parseInt(n, 10) || 0); }
 function fsVerCmp(a, b) {
 	a = fsParseVer(a); b = fsParseVer(b);
 	for (let i = 0; i < Math.max(a.length, b.length); i++) {
@@ -74,8 +74,8 @@ function checkFootstrapUpdate() {
 	if (!fsVersionReal() || !currentUpdateCheck())
 		return (_fsUpdatePromise = Promise.resolve({ current: FS_VERSION, latest: null, hasUpdate: false }));
 	_fsUpdatePromise = window.L.require('fs')	/* window.L, not the module L — the two-L trap, docs/14 */
-		.then(fs => fs.exec(FS_UPDATE_SCRIPT, [ 'check' ]))
-		.then(res => {
+		.then((fs) => fs.exec(FS_UPDATE_SCRIPT, [ 'check' ]))
+		.then((res) => {
 			/* "v1.2.3" on success; "ERR: …" when the router could not reach the API, or
 			 * "ERR: unknown argument" from a backend older than this JS. All three: no badge. */
 			const out = String((res && res.stdout) || '').trim();
@@ -141,7 +141,7 @@ function runSelfUpdate() {
 		if (Date.now() > deadline)
 			return fail(_('timed out waiting for the installer'));
 
-		return fs.exec(FS_UPDATE_SCRIPT, [ 'status' ]).then(res => {
+		return fs.exec(FS_UPDATE_SCRIPT, [ 'status' ]).then((res) => {
 			/* the RPC was in flight while the user navigated: drop it on the floor */
 			if (stale()) return;
 			const out = String((res && res.stdout) || '').trim();
@@ -155,23 +155,23 @@ function runSelfUpdate() {
 			/* RUNNING, or IDLE if the worker has not written the file yet. Tracked in
 			 * _updTimer so navigate() can cancel the chain. */
 			_updTimer = window.setTimeout(() => poll(fs, deadline), FS_UPDATE_POLL_MS);
-		}).catch(e => {
+		}).catch((e) => {
 			if (stale()) return;
-			return sessionGone(e && e.message || e) ? relogin() : fail(e && e.message || e);
+			return sessionGone((e && e.message) || e) ? relogin() : fail((e && e.message) || e);
 		});
 	}
 
 	function doUpdate() {
 		modal([ E('p', { 'class': 'spinning' }, _('Downloading and installing…')) ]);
 		window.L.require('fs')
-			.then(fs => fs.exec(FS_UPDATE_SCRIPT).then(res => {
+			.then((fs) => fs.exec(FS_UPDATE_SCRIPT).then((res) => {
 				if (stale()) return;
 				const out = String((res && res.stdout) || '').trim();
 				if (!(/^(STARTED|RUNNING)$/).test(out))
 					return fail((res && (res.stderr || res.stdout)) || '');
 				poll(fs, Date.now() + FS_UPDATE_LIMIT_MS);
 			}))
-			.catch(e => { if (!stale()) fail(e && e.message || e); });
+			.catch((e) => { if (!stale()) fail((e && e.message) || e); });
 	}
 }
 

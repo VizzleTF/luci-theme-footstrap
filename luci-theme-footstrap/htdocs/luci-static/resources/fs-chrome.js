@@ -27,7 +27,7 @@ function renderTabMenu(node, url, level) {
 	const children = ui.menu.getChildren(node);
 	let activeNode = null;
 
-	children.forEach(child => {
+	children.forEach((child) => {
 		const isActive = (L.env.dispatchpath[3 + (level || 0)] === child.name);
 		/* aria-current="page", not just the `active` class: the class is paint, which a screen
 		 * reader cannot see. E() drops a null attribute value, so inactive tabs carry nothing. */

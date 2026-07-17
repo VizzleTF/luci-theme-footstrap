@@ -18,29 +18,29 @@
 		 * Scoped by data-page, NOT by #disk-space-label: on 24.10 the "Disk space:" label ships
 		 * with no id (25.12 added one), so a :has(#disk-space-label) scope silently missed the
 		 * whole page there.
-		 * !important because package-manager.js injects an UNLAYERED inline <style>
+		 * !important because package-manager.js injects an UNLAYERED inline \3c style>
 		 * (`.controls{display:flex}` + `.controls > *{…}`), and unlayered outranks every layer. */
-		body[data-page='admin-system-package-manager'] #view .controls { display: block !important; }
+		body[data-page="admin-system-package-manager"] #view .controls { display: block !important; }
 		/* `:not(.pager)` — the page reuses `.controls` for the « / "Displaying 1-100 of 7677" / »
 		 * pager, and its .pager is a <div> too. Blocking it stacked those three onto three lines
 		 * (reported). Only the LABELLED control groups want stacking; the pager is a row. */
-		body[data-page='admin-system-package-manager'] #view .controls > div:not(.pager) { display: block !important; min-width: 0; margin-bottom: 8px; }
+		body[data-page="admin-system-package-manager"] #view .controls > div:not(.pager) { display: block !important; min-width: 0; margin-bottom: 8px; }
 		/* …and the pager itself: a centred row that stays one. `.text` is the only part that may
 		 * give way, so the two buttons keep their size instead of being squeezed. */
-		body[data-page='admin-system-package-manager'] #view .controls > .pager {
+		body[data-page="admin-system-package-manager"] #view .controls > .pager {
 			display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 8px;
 		}
-		body[data-page='admin-system-package-manager'] #view .controls > .pager > .btn { flex: 0 0 auto; }
-		body[data-page='admin-system-package-manager'] #view .controls > .pager > .text { flex: 0 1 auto; min-width: 0; }
+		body[data-page="admin-system-package-manager"] #view .controls > .pager > .btn { flex: 0 0 auto; }
+		body[data-page="admin-system-package-manager"] #view .controls > .pager > .text { flex: 0 1 auto; min-width: 0; }
 		/* the bar's ::after value ("63% used …") normally floats above the bar, but the "Disk
 		 * space:" label already sits there — on a phone the long value text overlapped label +
 		 * bar. Drop it BELOW. The bar is a fixed 10px box, so a static ::after cannot push the
 		 * next control: reserve space with margin-bottom and place the value absolutely in it.
 		 * The disk section is the only `label` immediately followed by a `.cbi-progressbar`. */
-		body[data-page='admin-system-package-manager'] #view label + .cbi-progressbar {
+		body[data-page="admin-system-package-manager"] #view label + .cbi-progressbar {
 			width: 100%; margin-bottom: 3em;
 		}
-		body[data-page='admin-system-package-manager'] #view label + .cbi-progressbar::after {
+		body[data-page="admin-system-package-manager"] #view label + .cbi-progressbar::after {
 			top: calc(100% + 5px); left: 0; right: auto; bottom: auto;
 			text-align: left; white-space: normal; max-width: 100%;
 		}
@@ -48,21 +48,21 @@
 		 * translation packages:"), not every label on the page. Written as plain `.controls label`
 		 * it also blocked the three radio labels nested a level deeper, and `filtered / all / none`
 		 * came out one per line. They are a set of three short choices: they belong on one row. */
-		body[data-page='admin-system-package-manager'] #view .controls > div > label { display: block; min-width: 0; white-space: normal; margin-bottom: 4px; }
+		body[data-page="admin-system-package-manager"] #view .controls > div > label { display: block; min-width: 0; white-space: normal; margin-bottom: 4px; }
 		/* …and the row they sit in. Stock separates them with &nbsp; text nodes, which is enough to
 		 * keep them apart but not to keep them from splitting mid-choice — a flex row with a real
 		 * gap wraps between labels instead of inside one. */
-		body[data-page='admin-system-package-manager'] #view .controls > div > div:has(> label > input[type="radio"]) {
+		body[data-page="admin-system-package-manager"] #view .controls > div > div:has(> label > input[type="radio"]) {
 			display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px;
 		}
-		body[data-page='admin-system-package-manager'] #view .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: 8px; }
-		body[data-page='admin-system-package-manager'] #view .controls .control-group input { flex: 1 1 140px; min-width: 0; max-width: 100%; }
+		body[data-page="admin-system-package-manager"] #view .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: 8px; }
+		body[data-page="admin-system-package-manager"] #view .controls .control-group input { flex: 1 1 140px; min-width: 0; max-width: 100%; }
 
 		/* Diagnostics tool (input + method select + button in one <table> row) has no id and no
 		 * .cbi-section-table, so nothing stacks it — a fixed table layout stayed ~365px wide. */
-		body[data-page='admin-network-diagnostics'] #view .table:not([id]):not(.cbi-section-table),
-		body[data-page='admin-network-diagnostics'] #view .table:not([id]):not(.cbi-section-table) .tr,
-		body[data-page='admin-network-diagnostics'] #view .table:not([id]):not(.cbi-section-table) .td { display: block; width: auto; }
+		body[data-page="admin-network-diagnostics"] #view .table:not([id]):not(.cbi-section-table),
+		body[data-page="admin-network-diagnostics"] #view .table:not([id]):not(.cbi-section-table) .tr,
+		body[data-page="admin-network-diagnostics"] #view .table:not([id]):not(.cbi-section-table) .td { display: block; width: auto; }
 
 		/* fs-dt data tables (Startup init.d list, leases, processes) that do NOT card on a phone:
 		 * the row stacking is MEASURED (.fs-stacked, fs-select.js) and carries its own

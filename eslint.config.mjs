@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import stylistic from '@stylistic/eslint-plugin';
 import { readFileSync, readdirSync } from 'node:fs';
 import { utProcessor } from './tools/lib/ut-scripts.mjs';
 
@@ -40,6 +41,7 @@ export default [
 	{ files: ['luci-theme-footstrap/htdocs/**/*.js'], ...js.configs.recommended },
 	{
 		files: ['luci-theme-footstrap/htdocs/**/*.js'],
+		plugins: { '@stylistic': stylistic },
 		languageOptions: {
 			ecmaVersion: 2023,
 			sourceType: 'script',
@@ -79,7 +81,12 @@ export default [
 			'no-shadow': 'warn',
 			'no-var': 'error',
 			'prefer-const': 'warn',
-			eqeqeq: ['warn', 'smart'],
+			/* `always`, NOT `smart`. Both allow the deliberate `x != null` idiom (hence
+			 * null: 'ignore'), but `smart` ALSO waves through `typeof x == 'function'` — and
+			 * that is the one this codebase had drifted on: 5 loose sites against 9 strict,
+			 * with no gate able to say which was the house style. Loose == on a typeof is
+			 * never wrong, which is exactly why it goes unnoticed and spreads. */
+			eqeqeq: ['error', 'always', { null: 'ignore' }],
 			'no-eval': 'error',
 			'no-implied-eval': 'error',
 			'no-new-func': 'error',
@@ -105,6 +112,17 @@ export default [
 			 * argument (`s.replace(/x/, y)`) already sits behind `(` or `,`; not flagged.
 			 * tools/jsmin-verify.mjs is the backstop; this rule stops the breakage being written. */
 			'wrap-regex': 'error',
+
+			/* ---- the two FORMATTING rules, and they are @stylistic/* for a reason ----
+			 * ESLint deprecated every formatting rule in core (8.53) and @stylistic is where they
+			 * live maintained now. Both close a drift that was MEASURED here, not a taste:
+			 * arrow-parens stood at 62 with / 21 without — mixed inside single files, twice within
+			 * twenty lines of each other — and no-mixed-operators covers `e && e.message || e`,
+			 * which is correct by precedence and unreadable by design (the parenthesised twin was
+			 * already written three files away). Neither can change behaviour; both are autofixable,
+			 * which is the whole reason they are cheap to keep. */
+			'@stylistic/arrow-parens': ['error', 'always'],
+			'@stylistic/no-mixed-operators': 'error',
 		},
 	},
 	/* `'require fs-prefs as prefs';` — the same pragma mechanism as `ui`/`baseclass` above: luci.js
@@ -136,6 +154,7 @@ export default [
 	{ files: [ '**/*.ut/*.js' ], ...js.configs.recommended },
 	{
 		files: [ '**/*.ut/*.js' ],
+		plugins: { '@stylistic': stylistic },
 		languageOptions: {
 			ecmaVersion: 2023,
 			sourceType: 'script',
@@ -158,7 +177,7 @@ export default [
 			'no-shadow': 'warn',
 			'no-var': 'error',
 			'prefer-const': 'warn',
-			eqeqeq: [ 'warn', 'smart' ],
+			eqeqeq: [ 'error', 'always', { null: 'ignore' } ],
 			'no-eval': 'error',
 			'no-implied-eval': 'error',
 			'no-new-func': 'error',
@@ -166,6 +185,11 @@ export default [
 			'no-self-compare': 'error',
 			'no-alert': 'error',
 			'no-console': [ 'warn', { allow: [ 'warn', 'error' ] } ],
+			/* Same three as htdocs, and they matter MORE here, not less: this is the pre-paint, the
+			 * one copy of every axis that runs before the module loader exists. Zero violations
+			 * today — so they cost nothing and hold the next edit to the house style. */
+			'@stylistic/arrow-parens': [ 'error', 'always' ],
+			'@stylistic/no-mixed-operators': 'error',
 			/* NO `wrap-regex` here, and no `no-implicit-globals`. jsmin never sees a template —
 			 * luci.mk copies ucode/ verbatim — so the regex-vs-division hazard that rule exists for
 			 * cannot arise; and these blocks are IIFEs in real global scope, where a top-level

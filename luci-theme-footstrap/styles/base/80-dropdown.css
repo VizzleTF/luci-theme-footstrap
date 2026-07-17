@@ -168,7 +168,7 @@
 	}
 
 	.cbi-dropdown[open] > ul.dropdown > li[unselectable] {
-		opacity: 0.7;
+		opacity: .7;
 	}
 
 	.cbi-dropdown[open] > ul.dropdown > li > input.create-item-input:first-child:last-child {

@@ -119,7 +119,7 @@
 		 * an AA failure caused by hovering. So light DARKENS (0.90 -> 6.16:1: bigger cue AND
 		 * better contrast); dark, whose fill is light and ink dark, brightens (1.15 -> ~8:1).
 		 * Both move the button away from the page it sits on. */
-		--fs-hover-lift: brightness(0.90);
+		--fs-hover-lift: brightness(.90);
 
 		/* ---- MOTION — four durations, because the UI does four things. There used to be
 		 * seven (.12/.125/.15/.2/.22/.25/.4) and four curves (ease, ease-in, linear, one
@@ -189,8 +189,8 @@
 		 * trap --fs-sidebar-w exists to close for fitShell(). */
 		--fs-card-pad: 16px;
 
-		--fs-font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-		--fs-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+		--fs-font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+		--fs-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
 		/* ---- TYPE SCALE — footstrap's own, and the reason it exists is not tidiness ----
 		 *

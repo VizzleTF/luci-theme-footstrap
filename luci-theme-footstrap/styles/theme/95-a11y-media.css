@@ -5,7 +5,7 @@
 	 * every transition and keyframe in this theme is decoration, none carries information.
 	 *
 	 * WHY !important HERE — the documented exception, and NOT the same kind as the 13 in theme/
-	 * and pages/ that fight an inline `style=` or an unlayered <style>. A cascade layer cannot
+	 * and pages/ that fight an inline `style=` or an unlayered \3c style>. A cascade layer cannot
 	 * help: styles/base sets transitions and animations too, and !important INVERTS the layer
 	 * order (an important declaration in base would beat a normal one here). Only an important
 	 * declaration reaches all of them at once. This is the canonical form of the rule as

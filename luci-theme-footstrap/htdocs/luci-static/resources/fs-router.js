@@ -189,7 +189,7 @@ function ensureOverviewHelpers() {
 	   admin_status/index.ut so they can be diffed against upstream when it changes.
 	   Modernising the `var`s would silently break that property, which is the whole
 	   reason the copies are safe to carry. */
-	if (typeof window.progressbar != 'function')
+	if (typeof window.progressbar !== 'function')
 		window.progressbar = function(query, value, max, byte) {
 			var pg = document.querySelector(query),
 			    vn = parseInt(value) || 0,
@@ -202,7 +202,7 @@ function ensureOverviewHelpers() {
 				pg.setAttribute('title', '%s / %s (%d%%)'.format(fv, fm, pc));
 			}
 		};
-	if (typeof window.renderBox != 'function')
+	if (typeof window.renderBox !== 'function')
 		window.renderBox = function(title, active, childs) {
 			childs = childs || [];
 			childs.unshift(window.L.itemlist(E('span'), [].slice.call(arguments, 3)));
@@ -212,7 +212,7 @@ function ensureOverviewHelpers() {
 				E('div', { class: 'ifacebox-body left' }, childs)
 			]);
 		};
-	if (typeof window.renderBadge != 'function')
+	if (typeof window.renderBadge !== 'function')
 		window.renderBadge = function(icon, title) {
 			return E('span', { class: 'ifacebadge' }, [
 				E('img', { src: icon, title: title || '' }),
@@ -256,7 +256,7 @@ function navigate(pathname, push) {
 	 * server notices, <noscript>); this also gives a template page that emits no #view a fresh one. */
 	const contentHost = document.querySelector('.fs-content');
 	if (!contentHost) return false;
-	Array.from(contentHost.children).forEach(c => {
+	Array.from(contentHost.children).forEach((c) => {
 		if (c.id !== 'view' && c.id !== 'tabmenu' &&
 		    !c.classList.contains('alert-message') && c.nodeName !== 'NOSCRIPT')
 			c.remove();
@@ -292,7 +292,7 @@ function navigate(pathname, push) {
 	/* and kill any self-update poll chain: its setTimeout would otherwise keep firing fs.exec RPCs
 	 * and pop its modal over the page we are about to open (fs-update.js). */
 	update.cancel();
-	try { if (typeof ui.hideModal == 'function') ui.hideModal(); } catch (e) {}
+	try { if (typeof ui.hideModal === 'function') ui.hideModal(); } catch (e) {}
 
 	/* point the runtime env at the new node so views, tabs and highlighting read the right
 	 * path. For a fully-matched leaf, request == dispatch path. */
@@ -384,7 +384,7 @@ function navigate(pathname, push) {
 	const RT = window.L;
 	const cached = _seen.has(className);
 	_seen.add(className);
-	RT.require(className).then(view => {
+	RT.require(className).then((view) => {
 		if (!(view instanceof RT.view))
 			throw new TypeError('Loaded class ' + className + ' is not a view');
 		if (gen !== _navGen) {
@@ -420,7 +420,7 @@ function navigate(pathname, push) {
  * (new-tab target, download, bare #hash, cross-origin, unparsable). Shared by the click router and
  * the hover prefetch, which used to carry drifting copies of this filter. */
 function linkUrlFrom(ev) {
-	const a = ev.target.closest && ev.target.closest('a[href]');
+	const a = ev.target.closest?.('a[href]');
 	if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download'))
 		return null;
 	const raw = a.getAttribute('href');

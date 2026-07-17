@@ -32,8 +32,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
+      # 22, matching build.yml: eslint 10 / stylelint 17 need Node >= 20.19, and a bare `20`
+      # floats on the 20.x line that straddles that floor. Nothing here lints, but `npm ci`
+      # installs them and would EBADENGINE.
+      - uses: actions/setup-node@v5
+        with: { node-version: '22' }
       - run: npm ci
       - name: Build the portal
         run: |

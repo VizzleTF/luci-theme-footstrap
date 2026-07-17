@@ -23,13 +23,15 @@
     "changelog": "node tools/changelog.mjs"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.10.1",
-    "@eslint/js": "^9.39.5",
+    "@axe-core/playwright": "^4.12.1",
+    "@eslint/js": "^10.0.1",
     "@projectwallace/css-analyzer": "^9.9.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@stylistic/stylelint-plugin": "^5.2.1",
     "css-tree": "^3.2.1",
-    "eslint": "^9.17.0",
-    "globals": "^15.14.0",
-    "playwright": "^1.49.1",
-    "stylelint": "^16.12.0"
+    "eslint": "^10.7.0",
+    "globals": "^17.7.0",
+    "playwright": "^1.61.1",
+    "stylelint": "^17.14.0"
   }
 }

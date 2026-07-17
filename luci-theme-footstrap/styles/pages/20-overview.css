@@ -15,7 +15,7 @@
 	 * index.js emits a span with a raw "Hide"/"Show" text node + data-style (expanded =
 	 * inactive, collapsed = active); data-indicator='poll-status' is unique to these
 	 * toggles. font-size:0 hides the word, ::after borders draw the chevron. */
-	.cbi-title .label[data-indicator='poll-status'] {
+	.cbi-title .label[data-indicator="poll-status"] {
 		font-size: 0;
 		width: 26px;
 		height: 26px;
@@ -25,8 +25,8 @@
 		justify-content: center;
 		border-radius: var(--fs-radius-sm);
 	}
-	.cbi-title .label[data-indicator='poll-status']::after {
-		content: '';
+	.cbi-title .label[data-indicator="poll-status"]::after {
+		content: "";
 		width: 7px;
 		height: 7px;
 		border-right: 2px solid currentColor;
@@ -36,7 +36,7 @@
 		margin-top: -2px;					/* optical centring of the down chevron */
 		transition: transform var(--fs-dur-move);
 	}
-	.cbi-title .label[data-indicator='poll-status'][data-style='inactive']::after {
+	.cbi-title .label[data-indicator="poll-status"][data-style="inactive"]::after {
 		transform: rotate(-135deg);			/* expanded / Hide -> chevron up */
 		margin-top: 2px;
 	}
@@ -45,8 +45,8 @@
 	 * / Storage sections in .fs-ovl; this is the grid only — System left across both rows,
 	 * Memory + Storage right. Stock styling and data untouched. */
 	/* the chrome already shows the page title, so the stock <h2> is a duplicate */
-	body[data-page='admin-status-overview'] #view > h2[name='content'],
-	body[data-page='admin-status-overview'] #maincontent h2[name='content'] { display: none; }
+	body[data-page="admin-status-overview"] #view > h2[name="content"],
+	body[data-page="admin-status-overview"] #maincontent h2[name="content"] { display: none; }
 	.fs-ovl {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
@@ -85,7 +85,7 @@
 	/* grid wrapper. auto-fit + minmax(126, 200) is count-agnostic: many ports shrink
 	 * toward 126 and wrap; few ports cap at 200 instead of one stretching the full width.
 	 * 2-port device or 24-port switch alike. */
-	body[data-page='admin-status-overview'] div:has(> .ifacebox img[src*="/port_"]) {
+	body[data-page="admin-status-overview"] div:has(> .ifacebox img[src*="/port_"]) {
 		gap: 10px;								/* no inline gap — no flag needed */
 		grid-template-columns: repeat(auto-fit, minmax(126px, 200px)) !important;
 		margin-bottom: 0 !important;
@@ -109,7 +109,7 @@
 	 * `white-space: nowrap` on the speed cell (below) is what makes the TRAFFIC give way rather than
 	 * the speed: a flex item shrinks to its min-content, and for wrapping text that is its longest
 	 * word — the speed would silently break onto two lines instead. */
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) {
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) {
 		margin: 0 !important;
 		min-width: 0 !important;
 		max-width: none !important;
@@ -131,10 +131,10 @@
 		align-items: baseline;
 	}
 	/* drop the stock icon, and the zone-colour bar (child 3, inline display:flex) */
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) img { display: none; }
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > :nth-child(3) { display: none !important; }
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) img { display: none; }
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > :nth-child(3) { display: none !important; }
 	/* name row + its ::after status dot */
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
 		/* Its OWN row — and `width`, NOT `flex-basis: 100%`, which is the obvious way to write this
 		 * and does not work here: the card carries `container-type: inline-size`, so its main size is
 		 * not a definite length to resolve a percentage flex-basis against, and the browser falls
@@ -145,21 +145,21 @@
 		display: flex; align-items: center; justify-content: space-between; gap: 6px;
 		font-size: 13px; font-weight: 600; color: var(--fs-text);
 	}
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child::after {
-		content: '';
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child::after {
+		content: "";
 		width: 8px; height: 8px;
 		border-radius: 50%;
 		background: var(--fs-good);				/* linked (default) */
 		flex: 0 0 auto;
 	}
 	/* no link (*_down.svg): hollow ring, dim name */
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child { color: var(--fs-dim); }
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child::after {
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child { color: var(--fs-dim); }
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child::after {
 		background: transparent;
 		border: 1.5px solid var(--fs-dim);
 	}
 	/* speed: green when linked, dim when not */
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
 		font-size: 13px; font-weight: 600; color: var(--fs-good); text-align: left;
 		/* Two halves of one mechanism.
 		 * `nowrap` (and NO `min-width: 0`) = "I do not give way": a flex item's automatic minimum
@@ -172,11 +172,11 @@
 		 * a card they fitted (measured). */
 		flex: 1 1 auto; white-space: nowrap;
 	}
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) br { display: none; }
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-body:nth-child(2) { color: var(--fs-dim); }
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) br { display: none; }
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-body:nth-child(2) { color: var(--fs-dim); }
 	/* traffic: tx over rx, as stock's <br> leaves them — CSS cannot reorder br-separated
 	 * text runs. The 11px flag fights the inline `font-size:80%`. */
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) {
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) {
 		text-align: right;
 		/* Grows but never shrinks. Growing is what anchors the figures to the card's right edge on
 		 * EITHER row — sharing the speed's, or one of its own — since `text-align: right` then has a
@@ -186,7 +186,7 @@
 		 * `flex-shrink: 0` keeps the nowrap figures from being squeezed into an overflow. */
 		flex: 1 0 auto;
 	}
-	body[data-page='admin-status-overview'] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container {
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container {
 		font-family: var(--fs-font-mono);
 		font-size: 11px !important;
 		color: var(--fs-dim);
@@ -207,8 +207,8 @@
 	 * load, Network connections, …): label + value on one line, bar below. Keyed off the
 	 * progressbar (:has), not per-section, so it covers every such row — including a
 	 * third-party one. The bar itself is theme/25-progressbar.css. */
-	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)):has(.cbi-progressbar) { display: block; }
-	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) {
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)):has(.cbi-progressbar) { display: block; }
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		gap: 5px 10px;
@@ -216,8 +216,8 @@
 		border: 0;
 		position: relative;
 	}
-	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar):last-child { padding-bottom: 2px; }
-	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td {
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar):last-child { padding-bottom: 2px; }
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td {
 		display: block;
 		/* beats base's `.td[width="33%"]` with no flag: the includes set a width
 		 * ATTRIBUTE, not an inline style, so a later layer wins. */
@@ -230,7 +230,7 @@
 	 * min-content width blew past the card and Memory/Storage stopped shrinking on a phone.
 	 * padding-right = the gutter for the value, which is pinned over the bar's right edge
 	 * (::after, out of flow — nothing else reserves space for it). */
-	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
 		grid-column: 1; grid-row: 1;
 		align-self: center;
 		min-width: 0;
@@ -240,17 +240,17 @@
 		font-size: 12px; font-weight: 600; color: var(--fs-text);
 	}
 	/* bar cell — spans full width on row 2 */
-	body[data-page='admin-status-overview'] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:nth-child(2) {
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:nth-child(2) {
 		grid-column: 1 / -1; grid-row: 2;
 	}
 
 	/* Drop the per-row dividers theme/30-tables.css adds (.cbi-section .table .td) —
 	 * cleaner card. No !important: that rule is `theme`, this file is `page`, so the later
 	 * layer already wins. */
-	body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .table .td,
-	body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .table .th,
-	body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .cbi-value { border-bottom: 0; }
+	body[data-page="admin-status-overview"] :is(.fs-ovl-mem, .fs-ovl-sto) .table .td,
+	body[data-page="admin-status-overview"] :is(.fs-ovl-mem, .fs-ovl-sto) .table .th,
+	body[data-page="admin-status-overview"] :is(.fs-ovl-mem, .fs-ovl-sto) .cbi-value { border-bottom: 0; }
 	/* System key/value table draws its dividers on .tr (not .td) — remove those too */
-	body[data-page='admin-status-overview'] :is(.fs-ovl-mem, .fs-ovl-sto) .table .tr { border-bottom: 0; }
+	body[data-page="admin-status-overview"] :is(.fs-ovl-mem, .fs-ovl-sto) .table .tr { border-bottom: 0; }
 
 }

@@ -149,7 +149,7 @@ function renderMainMenu(tree, url, level) {
 	 * index (level+1) because the first call gets the mode. */
 	const idx = (level || 0) + 1;
 
-	children.forEach(child => {
+	children.forEach((child) => {
 		/* the chrome carries its own Logout entry (partials/logout.ut, in every layout), so
 		 * drop the tree's top-level admin/logout node or it shows up twice */
 		if (!level && child.name === 'logout')

@@ -41,6 +41,28 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   station a lease and a v4/v6 neighbour entry, because LuCI resolves the Host column through
   hosthints and "?" is precisely the short cell that hides a column crush.
 
+### Changed
+
+- **The theme's JS and CSS now read as one style, and two formatting gates hold them there.** The
+  sources were sound but idiomatically split, each drift invisible to every existing gate: arrow
+  functions were 62 parenthesised vs 21 bare (mixed twice within twenty lines of one file), string
+  quotes 309 double vs 47 single in attribute selectors, leading zeros 97 bare vs 5, and one
+  expression — `ev.target.closest && ev.target.closest('a[href]')` — was written both ways twenty
+  lines apart in `fs-router.js`. The majority won each: `@stylistic/arrow-parens` and
+  `@stylistic/string-quotes`/`number-leading-zero` (the stylistic rules ESLint and stylelint dropped
+  from core) close them for good, and `eqeqeq` moved from `smart` to `always` — which also caught 5
+  loose `typeof x == 'function'` against 9 strict, the one comparison `smart` waves through. The
+  overview include's module state took the `_` prefix its 17 siblings all carry. Every CSS change is
+  proven inert: `cascade.css` is byte-identical bar the quotes (116548→116551) and cssdiff reports 0
+  property differences over ~7000 elements on both 24.10 and 25.12; every JS change is jsmin
+  token-identical. What no rule can gate — attribute-quote presence (`input[type=file]`) and `0px`,
+  both removed from stylelint 16 and never ported — was fixed by hand and is now on review alone.
+- **The dev toolchain is on the current majors, and ESLint 10 found a dead store the bump paid
+  for.** eslint 9→10, stylelint 16→17, globals 15→17 and the rest to latest; both majors need Node
+  ≥20.19, so `pages.yml` moved off a bare `20` onto `22` to match `build.yml`. ESLint 10 puts
+  `no-useless-assignment` in its recommended set, which flagged a genuinely unread `let rules = null`
+  in `fs-sheets.js` (every path reassigns before the read) — a real dead store no earlier gate saw.
+
 ### Fixed
 
 - **The 25.12 dev router's main AP had never been on air, and nothing said so.** `wifi config`

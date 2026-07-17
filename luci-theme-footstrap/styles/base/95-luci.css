@@ -558,7 +558,7 @@
 		max-width: 100%;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		margin: .25em .25em 0px .25em;
+		margin: .25em .25em 0 .25em;
 		white-space: nowrap;
 		border-bottom: 1px solid var(--fs-border);
 	}
@@ -597,7 +597,7 @@
 		flex-direction: row;
 		flex-wrap: wrap;
 		margin: 0 -.125em .25em -.125em;
-		padding: 0 0 .125em 0px;
+		padding: 0 0 .125em 0;
 		border-bottom: 1px solid var(--fs-border);
 	}
 

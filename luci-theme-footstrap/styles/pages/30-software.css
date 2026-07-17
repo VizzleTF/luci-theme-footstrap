@@ -2,7 +2,7 @@
 	/* Software disk-space bar -> the overview Memory/Storage meter: label + value on one
 	 * line, bar below (the value is the .cbi-progressbar title, lifted out by ::after).
 	 * Scoped by body[data-page], NOT by :has(#disk-space-label) — 24.10 ships no such id. */
-	body[data-page='admin-system-package-manager'] #view .controls > div:first-child { position: relative; display: block; flex: 1 1 100%; width: 100%; margin: 0 0 6px; }
+	body[data-page="admin-system-package-manager"] #view .controls > div:first-child { position: relative; display: block; flex: 1 1 100%; width: 100%; margin: 0 0 6px; }
 
 	/* The package list's row SHAPE. #packages is a DATA table (`<table class="table"
 	 * id="packages">`, no .cbi-section-table class; fs-select.js tags it .fs-dt off its
@@ -40,7 +40,7 @@
 	#packages.fs-stacked .td.cbi-section-actions { justify-content: flex-end; margin-top: 6px; }
 	#packages.fs-stacked .td.cbi-section-actions::before,
 	#packages.fs-stacked .td:not([data-title])::before { content: none; }
-	body[data-page='admin-system-package-manager'] #disk-space-label {
+	body[data-page="admin-system-package-manager"] #disk-space-label {
 		display: block; margin: 0; font-size: 12px; font-weight: 600; color: var(--fs-dim);
 	}
 }

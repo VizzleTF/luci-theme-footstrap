@@ -398,7 +398,7 @@ function _resolvedDefault() {
 let _savedDefault = _resolvedDefault();
 function matchesSavedDefault() {
 	const cur = snapshotAxes();
-	return Object.keys(cur).every(k => cur[k] === _savedDefault[k]);
+	return Object.keys(cur).every((k) => cur[k] === _savedDefault[k]);
 }
 function saveAsDefault() {
 	const snap = snapshotAxes();

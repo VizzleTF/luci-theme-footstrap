@@ -27,10 +27,10 @@ function sectionTitle(sec) {
 }
 
 /* the wrapper we built, so the poll-tick fast path costs one property read */
-let wrapEl = null;
+let _wrapEl = null;
 
 function arrange() {
-	/* the SPA nav can leave this observer wired while another page renders into #view — detach as
+	/* the SPA nav can leave this _observer wired while another page renders into #view — detach as
 	 * soon as the route stops being the overview. Both the server template and the SPA router
 	 * stamp body[data-page] with the DISPATCH path, so /admin/status (firstchild -> overview)
 	 * matches too. */
@@ -46,7 +46,7 @@ function arrange() {
 	 * to cost a querySelectorAll over #view plus a sectionTitle() dig per section, every tick.
 	 * Deliberately NOT a disconnect(): if a future luci-mod-status ever DOES rebuild a section,
 	 * the wrapper loses its children and the slow path below rebuilds the grid — self-healing. */
-	if (wrapEl && wrapEl.isConnected && wrapEl.parentElement === view && wrapEl.children.length === 3)
+	if (_wrapEl && _wrapEl.isConnected && _wrapEl.parentElement === view && _wrapEl.children.length === 3)
 		return;
 
 	const found = {};
@@ -58,7 +58,7 @@ function arrange() {
 	if (!(found.sys && found.mem && found.sto)) return;
 	/* already wrapped? (first tick after a rebuild re-finds the existing grid) */
 	if (found.sys.parentElement && found.sys.parentElement.classList.contains('fs-ovl')) {
-		wrapEl = found.sys.parentElement;
+		_wrapEl = found.sys.parentElement;
 		return;
 	}
 	const wrap = document.createElement('div');
@@ -67,32 +67,32 @@ function arrange() {
 	found.sys.classList.add('fs-ovl-sys'); wrap.appendChild(found.sys);
 	found.mem.classList.add('fs-ovl-mem'); wrap.appendChild(found.mem);
 	found.sto.classList.add('fs-ovl-sto'); wrap.appendChild(found.sto);
-	wrapEl = wrap;
+	_wrapEl = wrap;
 }
 
 /* Stock sections render async and repaint every poll, so watch #view and re-run arrange()
- * (coalesced, ONE observer per #view node — a per-poll observer leak would slow the page down).
+ * (coalesced, ONE _observer per #view node — a per-poll _observer leak would slow the page down).
  * The SPA router may REPLACE the #view element between visits, so re-attach when the node we
  * observed is no longer the current one: a singleton bound to the first #view would silently
  * watch a detached tree and the grid would never apply on a later SPA visit. */
-let observer = null, observedView = null;
+let _observer = null, _observedView = null;
 function stopWatch() {
-	if (observer) observer.disconnect();
-	observer = null;
-	observedView = null;
-	wrapEl = null;	/* the grid belongs to the #view we are leaving */
+	if (_observer) _observer.disconnect();
+	_observer = null;
+	_observedView = null;
+	_wrapEl = null;	/* the grid belongs to the #view we are leaving */
 }
 function watch() {
 	const view = document.getElementById('view');
-	if (observer && observedView !== view)
+	if (_observer && _observedView !== view)
 		stopWatch();
 	arrange();
-	if (observer || !view) return;
-	observedView = view;
+	if (_observer || !view) return;
+	_observedView = view;
 	/* one arrange() per frame, however many mutations a poll tick delivers (fit.frame — the
 	 * theme's shared coalescer, fs-fit.js) */
-	observer = new MutationObserver(fit.frame(arrange));
-	observer.observe(view, { childList: true, subtree: true });
+	_observer = new MutationObserver(fit.frame(arrange));
+	_observer.observe(view, { childList: true, subtree: true });
 }
 
 /* ---- progressive paint -----------------------------------------------------
@@ -135,13 +135,13 @@ function fillSection(inc, container, res) {
 	}
 }
 
-let inflight = null;
+let _inflight = null;
 
 function pollProgressive(includes, containers, first_load) {
 	/* A run is already fetching exactly this data — join it instead of starting a second
 	 * stampede of the same RPCs. This is what kills the duplicate load. */
-	if (inflight)
-		return first_load ? Promise.resolve() : inflight;
+	if (_inflight)
+		return first_load ? Promise.resolve() : _inflight;
 
 	const run = network.flushCache().then(() => Promise.all(
 		includes.map((inc, i) => {
@@ -162,12 +162,12 @@ function pollProgressive(includes, containers, first_load) {
 		if (ssi) { ssi.style.display = ''; ssi.classList.add('fade-in'); }
 	});
 
-	inflight = run.finally(() => { inflight = null; });
+	_inflight = run.finally(() => { _inflight = null; });
 
 	/* First load: resolve NOW so index.render() returns its tree and the frames reach #view
 	 * immediately; the sections fill themselves. A poll tick resolves when the data is in —
 	 * that is what the poller expects. */
-	return first_load ? Promise.resolve() : inflight;
+	return first_load ? Promise.resolve() : _inflight;
 }
 
 /* Patch the stock overview view while index.load() is requiring its includes — after the instance
