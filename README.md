@@ -2,6 +2,14 @@
 
 **English** · [Русский](README_ru.md)
 
+> [!IMPORTANT]
+> **Upgrading to 0.9.3 from 0.9.2 or earlier: upgrade from the console with the one-line command
+> below — do not use the in-web *Update now* button.** In 0.9.3 the update machinery moved into a
+> separate, optional package. The old in-web updater installs only the theme, which no longer carries
+> that machinery, so it deletes its own backend mid-upgrade: *Update now* then fails with "resource
+> not found" and no further updates are offered. Running the console command once installs both
+> packages and restores updates. One-time step, for the 0.9.3 upgrade only.
+
 ![luci-theme-footstrap](docs/screenshots/Example.gif)
 
 [More screenshots →](docs/screenshots/)
