@@ -284,17 +284,14 @@ function applyAutoCollapse(val) {
 	/* stored explicitly ('false' for off, not lsDel) so it overrides a router default of 'on' */
 	lsSet('fs-menu-autocollapse', on ? 'true' : 'false');
 
-	/* switching it on with several sections unfolded would leave the menu in a state the
-	 * setting says is impossible — fold all but the active */
-	if (on) {
-		document.querySelectorAll('#topmenu > li.open:not(.active)')
-			.forEach(li => li.classList.remove('open'));
-	}
-
-	/* The menu owns two other pieces of this state — the remembered "keep open" set and each
-	 * trigger's aria-expanded — and neither is reachable from here, so folding the sections above
-	 * left them behind: the next navigation re-rendered from the stale set and unfolded everything
-	 * again. Tell the layout instead of reaching across into it. */
+	/* Switching it on with several sections unfolded leaves the menu in a state the setting says is
+	 * impossible, so somebody must fold them — but not this module. It owns storage; the menu owns
+	 * every piece of the open/closed state (the `.open` class, the trigger's aria-expanded, the
+	 * remembered "keep open" set), and it opens and closes exclusively through setOpen(), which is
+	 * what keeps the class and the aria agreeing. Reaching in from here with a raw classList.remove
+	 * satisfied the class and left the aria saying expanded — the exact disagreement setOpen exists
+	 * to prevent — and then relied on this event to have the menu repair what we had just broken.
+	 * One operation, one owner: say what changed and let the menu apply it. */
 	document.dispatchEvent(new CustomEvent('fs-autocollapse', { detail: { on } }));
 }
 
@@ -380,7 +377,7 @@ return baseclass.extend({
 
 	FS_RADIUS_DEFAULT,
 
-	currentMode, applyMode, stampDark, guardDarkStamp,
+	currentMode, applyMode, guardDarkStamp,
 	currentPalette, applyPalette,
 	currentWallpaper, applyWallpaper,
 	currentRadius, applyRadius,
@@ -390,5 +387,5 @@ return baseclass.extend({
 	currentAutoCollapse, applyAutoCollapse,
 	currentRail, applyRail,
 
-	snapshotAxes, saveAsDefault, resetToDefault, matchesSavedDefault
+	saveAsDefault, resetToDefault, matchesSavedDefault
 });

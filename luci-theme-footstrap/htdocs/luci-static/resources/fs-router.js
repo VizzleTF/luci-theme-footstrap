@@ -476,7 +476,6 @@ function wireVisibility() {
 
 return baseclass.extend({
 	seed,
-	navigate,
 	wire: wireRouter,
 	wireVisibility
 });

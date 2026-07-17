@@ -16,7 +16,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildCss } from './lib/gallery.mjs';
+import { buildCss } from './lib/css.mjs';
+import { parseExportTier } from './lib/tokens.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'docs/devkit.src.html');
@@ -26,35 +27,9 @@ const OUT = join(ROOT, 'docs/devkit.html');
 const PG_SRC = join(ROOT, 'docs/playground.src.html');
 const PG_OUT = join(ROOT, 'docs/playground.html');
 
-/* The export tier is the whole contract an app is allowed to read. Its NAMES are the source of
- * truth here — the values render live from the inlined stylesheet, so we never restate a colour.
- * Only these families are the tier; --fs-* is private and deliberately not surfaced. */
-function parseExportTier(css) {
-	const order = ['background', 'border', 'text', 'primary', 'success', 'warn', 'error'];
-	const found = new Set();
-	for (const m of css.matchAll(/--((?:background|border|text|primary|success|warn|error)-color-(?:highest|high|medium|low))\s*:/g))
-		found.add(m[1]);
-	for (const m of css.matchAll(/--(on-(?:primary|success|warn|error)-color)\s*:/g))
-		found.add('__on__' + m[1]);
-	const groups = {};
-	for (const name of found) {
-		if (name.startsWith('__on__')) continue;
-		const fam = name.split('-color-')[0];
-		(groups[fam] ||= { family: fam, levels: [], ink: null }).levels.push(name);
-	}
-	for (const name of found) {
-		if (!name.startsWith('__on__')) continue;
-		const real = name.slice('__on__'.length);          // on-primary-color → primary
-		const fam = real.replace(/^on-/, '').replace(/-color$/, '');
-		if (groups[fam]) groups[fam].ink = real;
-	}
-	const rank = { highest: 0, high: 1, medium: 2, low: 3 };
-	const lvl = (n) => rank[n.split('-color-')[1]] ?? 9;
-	return order.filter((f) => groups[f]).map((f) => ({
-		...groups[f],
-		levels: groups[f].levels.sort((a, b) => lvl(a) - lvl(b)),
-	}));
-}
+/* The export tier is the whole contract an app is allowed to read. Its NAMES are parsed from the
+ * token file (tools/lib/tokens.mjs — shared with export-tier.mjs, which MEASURES the same set);
+ * the values render live from the inlined stylesheet, so we never restate a colour. */
 
 /* Pull each <div class="g-sec"> out of the gallery. They are siblings (g-sec never nests), so a
  * split on the opening tag is exact. Strip the two things that are QA-internal, not dev-facing:
@@ -99,7 +74,7 @@ async function inlineAssets(cssText) {
 const [src, galleryHtml, tokensCss] = await Promise.all([
 	readFile(SRC, 'utf8'), readFile(GALLERY, 'utf8'), readFile(TOKENS, 'utf8'),
 ]);
-const css = await inlineAssets(await readFile(buildCss('devkit-cascade.css'), 'utf8'));
+const css = await inlineAssets(await readFile(buildCss(), 'utf8'));
 const tiers = parseExportTier(tokensCss);
 const components = parseComponents(galleryHtml);
 

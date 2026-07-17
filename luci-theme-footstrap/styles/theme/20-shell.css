@@ -339,7 +339,7 @@
 		background: var(--fs-panel); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow-pop);
 		display: flex; flex-direction: column; gap: 12px;
-		animation: fs-fade .16s ease;
+		animation: fs-fade var(--fs-dur);
 	}
 	.fs-appearance-pop[hidden] { display: none; }
 
@@ -519,9 +519,9 @@
 		 * the icon.
 		 *
 		 * The selector must be this long: the vertical override turns the chevron back on at
-		 * (0,4,3), so a plainer `.fs-sidebar .fs-chevron` here is only (0,4,0) and LOSES —
+		 * (0,6,3), so a plainer `.fs-sidebar .fs-chevron` here is only (0,6,0) and LOSES —
 		 * which is exactly why the chevrons reappeared in the rail. Match its shape and add
-		 * the rail attribute: (0,5,3). */
+		 * the rail attribute: (0,7,3). */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > a .fs-chevron { display: none; }
 
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > a,
@@ -553,7 +553,7 @@
 			min-width: 196px; padding: 8px; z-index: var(--fs-z-flyout);
 			background: var(--fs-panel); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-lg);
 			box-shadow: var(--fs-shadow-pop);
-			animation: fs-fade .14s ease;
+			animation: fs-fade var(--fs-dur);
 		}
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
 		@media (hover: hover) {
@@ -571,6 +571,35 @@
 			content: ''; position: absolute; left: 100%; top: 0;
 			width: 12px; height: 100%;
 		}
+
+		/* Collapsed rail: swap the "Refreshing" word for a green refresh glyph — a masked SVG
+		 * tinted with --fs-good, so it follows the palette. Only poll-status becomes an icon;
+		 * other indicators (unsaved changes …) keep their pill.
+		 *
+		 * These two lived OUTSIDE this media block, carrying only the [data-rail] half of the
+		 * guard — the surviving instance of the bug this block's header legislates against. It
+		 * was reachable, not theoretical: head.ut stamps data-rail from localStorage inline and
+		 * pre-paint, while data-narrow is written later by fitShell() in an async module. So on a
+		 * <521px phone a rail user had every OTHER rail rule excluded by the floor while these
+		 * two matched, and the "Refreshing" pill painted as a bare 30px green glyph inside the
+		 * phone bar until the modules landed — permanently if they failed. */
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"] {
+			font-size: 0; width: 30px; height: 30px; padding: 0;
+			border: 0; box-shadow: none; background: var(--fs-good);
+			-webkit-mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
+			mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
+			/* STATIC, deliberately. A spinner promises something you are WAITING for; this is a
+			 * poll running quietly in the background forever, and a permanently spinning glyph
+			 * makes an idle router look busy. The spin also broke the click that pauses the poll —
+			 * a target that never stops moving cannot be hit. */
+		}
+
+		/* paused: the same glyph gone quiet. Without this the rail kept saying GREEN while the poll
+		 * was stopped — the one thing the indicator exists to tell you, and it was lying. (The pill
+		 * gets this for free: its --fs-good only applies to [data-style="active"].) */
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"]:not([data-style="active"]) {
+			background: var(--fs-dim);
+		}
 	}
 
 	/* ---------- main column ---------- */
@@ -583,27 +612,6 @@
 	}
 	.fs-sidebar #indicators:empty { display: none; }
 	.fs-indicators { flex-wrap: wrap; }
-
-	/* Collapsed rail: swap the "Refreshing" word for a green refresh glyph — a masked SVG
-	 * tinted with --fs-good, so it follows the palette. Only poll-status becomes an icon;
-	 * other indicators (unsaved changes …) keep their pill. */
-	:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"] {
-		font-size: 0; width: 30px; height: 30px; padding: 0;
-		border: 0; box-shadow: none; background: var(--fs-good);
-		-webkit-mask: var(--fs-icon-refresh) center / 19px no-repeat;
-		mask: var(--fs-icon-refresh) center / 19px no-repeat;
-		/* STATIC, deliberately. A spinner promises something you are WAITING for; this is a
-		 * poll running quietly in the background forever, and a permanently spinning glyph
-		 * makes an idle router look busy. The spin also broke the click that pauses the poll —
-		 * a target that never stops moving cannot be hit. */
-	}
-
-	/* paused: the same glyph gone quiet. Without this the rail kept saying GREEN while the poll
-	 * was stopped — the one thing the indicator exists to tell you, and it was lying. (The pill
-	 * gets this for free: its --fs-good only applies to [data-style="active"].) */
-	:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"]:not([data-style="active"]) {
-		background: var(--fs-dim);
-	}
 	.fs-content { padding: 22px var(--fs-content-pad); flex: 1 1 auto; width: 100%; max-width: var(--fs-content-max); margin: 0 auto; }
 
 	/* ---------- footer ----------

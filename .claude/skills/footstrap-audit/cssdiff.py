@@ -23,7 +23,15 @@ PROPS = ["display","position","top","right","bottom","left","z-index",
          "font-family","font-size","font-weight","line-height","text-align",
          "white-space","overflow-x","overflow-y","flex-direction","flex-wrap",
          "align-items","justify-content","gap","grid-template-columns","order",
-         "text-transform","letter-spacing","visibility"]
+         "text-transform","letter-spacing","visibility",
+         # Motion and masks. Added because their absence made this tool LIE BY OMISSION: the
+         # refresh glyph's 19px->18px unification and the animation durations snapping onto the
+         # --fs-dur* scale both reported "0 property diffs" — the tool could not see either the
+         # regression it was asked about or the change it was asked to confirm. That is the
+         # failure CLAUDE.md names: a clean diff is only as honest as the property list behind it.
+         "animation-duration","animation-timing-function","animation-name",
+         "transition-duration","transition-property",
+         "mask-size","mask-image","-webkit-mask-size","-webkit-mask-image"]
 
 SNAP = """(props) => {
   const path = (el) => {

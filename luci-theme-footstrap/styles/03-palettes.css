@@ -33,8 +33,8 @@
 	 *
 	 * Default: footstrap fills bare :root (no data-palette), so a no-JS load still has
 	 * colours; hicontrast is opt-in via data-palette="hicontrast". Specificity:
-	 * [data-palette][data-darkmode] (0,2,1) beats the bare/default blocks, and each block
-	 * sets a COMPLETE token set so the winner fully applies.
+	 * :root[data-palette=…][data-darkmode=…] (0,3,0) beats the bare/default blocks, and each
+	 * block sets a COMPLETE token set so the winner fully applies.
 	 * ============================================================ */
 
 	/* Native <select> closed-control chevron (theme/60-inputs.css). A data-URI cannot

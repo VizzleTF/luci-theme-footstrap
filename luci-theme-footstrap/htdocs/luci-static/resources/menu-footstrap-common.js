@@ -57,7 +57,6 @@ return baseclass.extend({
 			chrome.wireRail();
 			router.wire();
 			router.wireVisibility();
-			chrome.wireTabFit();
 		/* fs-chrome's renderTabMenu warns about exactly this, and the root chain was left bare: a
 		 * throw anywhere in the calls above took out the menu, the router and the Appearance popover
 		 * together, silently. It still fails — there is no sane partial recovery — but loudly. */

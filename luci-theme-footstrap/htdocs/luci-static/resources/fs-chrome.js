@@ -150,8 +150,7 @@ function fitChrome() {
 	 * left edge and never collapsing "Refreshing"; the shrink/compact/stack escalation below now
 	 * runs at any width for the top layout. (The SIDEBAR layout still has its own phone bar,
 	 * decided by fitShell's data-narrow, and is untouched here.) */
-	const topBar = !!bar && !!menu &&
-		document.documentElement.getAttribute('data-layout') === 'top';
+	const topBar = !!bar && !!menu && prefs.isTopLayout();
 
 	if (bar) bar.classList.remove('fs-bar-stack', 'fs-ind-compact');
 	fitTabStrips();
@@ -179,26 +178,13 @@ function fitChrome() {
 		}
 	}
 }
-/* Did this batch of mutations add or remove a tab strip? The observer below exists only to catch a
- * view rendering its own .cbi-tabmenu after nav; firing on ANY mutation re-measured every strip on
- * the page once a second on a polled page — getClientRects()/offsetTop are layout reads, i.e. a
- * forced synchronous reflow per strip per tick, to learn the tabs had not moved.
- *
- * `removed: true` — a strip DISAPPEARING matters too (the density classes were sized for a menu no
- * longer on the page); that is the one way this differs from fs-select's use of the helper. */
-function tabStripTouched(mutations) {
-	return fit.touches(mutations, '.tabs, .cbi-tabmenu', { removed: true });
-}
-let _tabFitWired = false;
-function wireTabFit() {
-	if (_tabFitWired) return;
-	_tabFitWired = true;
-	window.addEventListener('resize', () => fit.schedule());
-	/* catch a view rendering its own .cbi-tabmenu after navigation */
-	new MutationObserver((mutations) => {
-		if (tabStripTouched(mutations)) fit.schedule();
-	}).observe(document.body, { childList: true, subtree: true });
-}
+/* No observer and no resize listener of our own: fs-fit owns both, and this file used to grow the
+ * second one CLAUDE.md warns against. A view renders its .cbi-tabmenu into #view, which fs-fit's
+ * MutationObserver already watches — and it re-fits SYNCHRONOUSLY (rule 2), where the copy here
+ * deferred through fit.schedule(), i.e. the duplicate was strictly the slower path into the same
+ * work. #tabmenu is a sibling of #view rather than inside it, but nothing writes it except
+ * renderChrome(), which schedules a fit itself. Resize is fs-fit's ResizeObserver on #view (with a
+ * window-resize fallback where there is no RO). */
 
 /* modes -> #modemenu; drives the injected renderMainMenu for the active mode */
 function renderModeMenu(node, renderMainMenu) {
@@ -288,6 +274,5 @@ return baseclass.extend({
 	/* registered with fs-fit by the theme's init(): the bar's "does the menu fit beside the brand"
 	 * measurement rides the same engine as the data tables' */
 	fitChrome,
-	wireTabFit,
 	wireRail
 });

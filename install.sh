@@ -211,10 +211,6 @@ if [ -z "$THEME_URL" ]; then
 	exit 1
 fi
 
-# ONE package per format per release, catalogue bundled inside the theme package: the release must
-# stay pickable by the self-updater a router ALREADY runs, which takes the first asset of its
-# extension and cannot be fixed remotely — see the Makefile note and issue #6.
-
 # --- download, verify, install --------------------------------------------
 # TWO checks, answering DIFFERENT attackers, and both fail CLOSED.
 #

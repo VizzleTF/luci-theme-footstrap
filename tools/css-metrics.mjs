@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-/* A RATCHET on the stylesheet's shape — same idea as the CSS size budget in build-css.sh and the
- * font-byte budget in CI: pin the numbers that only get worse by accident, so they cannot drift
- * up one commit at a time. Not style opinions; each is an invariant CLAUDE.md states in prose and
- * nothing enforced:
+/* A RATCHET on the stylesheet's shape: pin the numbers that only get worse by accident, so they
+ * cannot drift up one commit at a time. Not style opinions; each is an invariant CLAUDE.md states
+ * in prose and nothing enforced. (The CSS size budget and the font-byte budget this once cited as
+ * precedent are both GONE — build-css.sh keeps only a broken-build floor.)
  *
- *   IMPORTANTS — which declarations may carry `!important` is documented (16 in theme+pages, each
- *     fighting an inline or unlayered declaration; 14 in base): a fact about the cascade, not a
- *     preference. stylelint's `declaration-no-important` + allowlist stops a NEW file adding one;
+ *   IMPORTANTS — which declarations may carry `!important` is documented: a fact about the
+ *     cascade, not a preference. The count lives in LIMITS below and nowhere else — this header
+ *     used to restate it and had already drifted a digit, which is the failure build.yml refuses
+ *     to repeat by name. stylelint's `declaration-no-important` + allowlist stops a NEW file adding one;
  *     this stops the allowlisted files growing more. A RATCHET: it was 33 while three flags in base
  *     were fighting footstrap's own rules rather than an inline one — the cascade answers that with
  *     a later layer, so they are gone and the number came down with them. Tighten it again whenever
@@ -20,14 +21,9 @@
  *
  * Usage: node tools/css-metrics.mjs [--show]
  */
-import { readFileSync, mkdtempSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { analyze } from '@projectwallace/css-analyzer';
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { buildCss } from './lib/css.mjs';
 
 const LIMITS = {
 	/* 17 (theme+pages, each fighting an inline or unlayered declaration) + 14 (base).
@@ -49,9 +45,7 @@ const LIMITS = {
 	emptyRules: 0,
 };
 
-const tmp = join(mkdtempSync(join(tmpdir(), 'cssmetrics-')), 'cascade.css');
-execFileSync(join(ROOT, 'luci-theme-footstrap', 'build-css.sh'), [tmp], { stdio: 'ignore' });
-const result = analyze(readFileSync(tmp, 'utf8'));
+const result = analyze(readFileSync(buildCss(), 'utf8'));
 
 const importants = result.declarations.importants.total;
 const spec = result.selectors.specificity.max;			/* [a, b, c] */

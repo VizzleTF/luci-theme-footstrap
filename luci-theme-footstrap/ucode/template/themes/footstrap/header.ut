@@ -11,7 +11,6 @@
 
 {%
 	import { getuid, getspnam } from 'luci.core';
-	import { cursor } from 'uci';
 
 	const boardinfo = ubus.call('system', 'board') ?? {};
 	const empty_password = (getuid() == 0 && getspnam('root')?.pwdp === '');
@@ -19,11 +18,16 @@
 	   head.ut stamps them before paint and the client's own localStorage overrides every one — the
 	   browser choice always wins. Layout falls back to the legacy migration seed
 	   luci.main.footstrap_layout=top, which uci-defaults sets for a router upgraded from the old
-	   top-nav theme (a shell script cannot write localStorage). Absent = the built-in defaults. */
-	const c = cursor();
-	const fsd = c.get_all('footstrap', 'settings') ?? {};
+	   top-nav theme (a shell script cannot write localStorage). Absent = the built-in defaults.
+
+	   `uci` and `config` come from the render scope, which dispatcher.uc builds per request: `uci` is
+	   already a cursor (dispatcher.uc `let uci = cursor()`) and `config.main` is already
+	   `uci.get_all('luci','main')`. Importing cursor from 'uci' and opening a second one allocated a
+	   cursor per page render and re-read a package the dispatcher had loaded before calling us —
+	   and left this template reaching for UCI a different way than sysauth.ut does. */
+	const fsd = uci.get_all('footstrap', 'settings') ?? {};
 	const fs_defaults = {
-		layout:       fsd.layout || c.get('luci', 'main', 'footstrap_layout') || '',
+		layout:       fsd.layout || config.main.footstrap_layout || '',
 		darkmode:     fsd.darkmode || '',
 		palette:      fsd.palette || '',
 		wallpaper:    fsd.wallpaper || '',

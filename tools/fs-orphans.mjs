@@ -18,7 +18,7 @@
  *
  * Usage: node tools/fs-orphans.mjs
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as csstree from 'css-tree';
@@ -50,21 +50,17 @@ const IGNORE_EXACT = new Set([
  * that happens to share a name with one of them is still seen. */
 const NOT_A_CLASS_BEFORE = /(?:--|data-)$/;
 
-function walk(dir, out = []) {
-	for (const e of readdirSync(dir)) {
-		const p = join(dir, e);
-		if (statSync(p).isDirectory()) walk(p, out);
-		else out.push(p);
-	}
-	return out;
-}
+/* readdirSync(recursive) also returns the directory entries; every caller filters by extension,
+ * which drops them. */
+const filesIn = (dir, ext) => readdirSync(dir, { recursive: true })
+	.filter((f) => f.endsWith(ext)).map((f) => join(dir, f));
 
 /* ---- what the CSS styles ------------------------------------------------- */
 /* Ids as well as classes: the theme mounts #fs-appearance and #fs-rail-toggle by id, and a
  * class-only sweep would report them as "emitted but never styled" — a false alarm teaches you
  * to ignore the tool. */
 const styled = new Map();
-for (const f of walk(join(PKG, 'styles')).filter(p => p.endsWith('.css'))) {
+for (const f of filesIn(join(PKG, 'styles'), '.css')) {
 	const ast = csstree.parse(readFileSync(f, 'utf8'), { positions: true });
 	csstree.walk(ast, (node) => {
 		if (node.type !== 'ClassSelector' && node.type !== 'IdSelector') return;
@@ -93,8 +89,8 @@ function stripComments(text, file) {
 
 const emitted = new Map();
 const SRC = [
-	...walk(join(PKG, 'ucode')).filter(p => p.endsWith('.ut')),
-	...walk(join(PKG, 'htdocs')).filter(p => p.endsWith('.js')),
+	...filesIn(join(PKG, 'ucode'), '.ut'),
+	...filesIn(join(PKG, 'htdocs'), '.js'),
 ];
 for (const f of SRC) {
 	const text = stripComments(readFileSync(f, 'utf8'), f);

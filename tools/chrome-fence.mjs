@@ -85,12 +85,23 @@ if (!(/^data-fs-/).test(MARK)) {
 	console.error('Nobody outside this theme may emit an fs-* name — that is what makes the fence safe.');
 	process.exit(1);
 }
-/* Every root that carries it, so the report names the set being defended rather than implying the
- * <nav> is all of it — which is the assumption the class-name fence was built on and got wrong. */
+/* Every root that carries it. RATCHETED, not merely reported: this count is the whole thesis that
+ * "the chrome is NOT one element". Reporting it and gating only the JS root left the template side
+ * unguarded — deleting the mark from the skip link printed "3 root(s)" and exited 0, which is the
+ * v0.9.1 damage exactly (popover flattened 12px -> 0 and position: fixed -> static, both sr-only
+ * elements un-clipped onto every page; the <nav> alone held). Adding or removing a root is a
+ * deliberate act, so it is a deliberate edit here. */
+const EXPECT_ROOTS = 4;
 const roots = [...MARKUP.matchAll(new RegExp(`<([a-z]+)\\b[^>]*\\b${MARK}\\b`, 'g'))].map((m) => m[1]);
 const jsRoots = [...APPEARANCE.matchAll(new RegExp(`'${MARK}'`, 'g'))].length;
 ok.push(`chrome mark derived from header.ut: [${MARK}] — ${roots.length} root(s) in the template `
 	+ `(${roots.join(', ')}) + ${jsRoots} in fs-appearance.js`);
+if (roots.length !== EXPECT_ROOTS)
+	errors.push(`header.ut marks ${roots.length} chrome root(s) with ${MARK} (${roots.join(', ') || 'none'}), `
+		+ `expected ${EXPECT_ROOTS}. Each one is a Zone 1 root that is NOT inside the <nav>: the skip link is a `
+		+ `sibling of .fs-shell, and the sr-only <h1> and live region sit inside .fs-main. An unmarked root is `
+		+ `fenced by nothing and pinned by nothing — silently. If you added or removed one on purpose, say so `
+		+ `by changing EXPECT_ROOTS; if you did not, the mark went missing`);
 if (!jsRoots)
 	errors.push(`fs-appearance.js does not mark anything with ${MARK}. The Appearance popover hangs off `
 		+ `<body>, outside every template root, so an unmarked one is fenced by nothing — which is the `

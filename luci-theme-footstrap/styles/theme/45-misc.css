@@ -72,7 +72,7 @@
 	code, pre { font-weight: 400; }
 
 	/* fade-in used by overview poll */
-	.fade-in { animation: fs-fade .3s ease; }
+	.fade-in { animation: fs-fade var(--fs-dur-fade); }
 	@keyframes fs-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 	.cbi-title-ref { color: var(--fs-accent); }
 	.close { color: var(--fs-text); text-shadow: none; opacity: .6; }

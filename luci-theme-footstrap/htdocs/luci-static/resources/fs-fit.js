@@ -75,11 +75,9 @@ return baseclass.extend({
 		fit();
 	},
 
-	/* Re-fit now, synchronously — from a place that has just changed the room available (layout
-	 * toggle, icon-rail collapse). */
-	run,
-
-	/* Re-fit on the next frame, coalesced. */
+	/* Re-fit on the next frame, coalesced. (There is no exported `run`: everything that changes
+	 * the available room — the layout toggle, the rail collapse — schedules. Only the mutation
+	 * observer re-fits synchronously, and that is rule 2's whole point.) */
 	schedule,
 
 	/* Coalesce ANY callback into one call per frame (rule 3, for non-fitters): schedule() runs
@@ -96,21 +94,14 @@ return baseclass.extend({
 		};
 	},
 
-	/* Also watch this element's size (beyond #view, which is watched automatically). */
-	watch,
-
-	/* Did this batch add (or, with {removed: true}, remove) anything matching `sel`? The poll
-	 * rewrites content once a second, so every MutationObserver here needs that cheap question
-	 * before its document-wide queries; two had written the identical triple loop. Each caller
-	 * keeps its OWN `sel` — a shared filter would start lying to one of them. */
-	touches(mutations, sel, opts) {
-		const lists = (opts && opts.removed) ? [ 'addedNodes', 'removedNodes' ] : [ 'addedNodes' ];
+	/* Did this batch add anything matching `sel`? The poll rewrites content once a second, so a
+	 * MutationObserver here needs that cheap question before its document-wide queries. */
+	touches(mutations, sel) {
 		for (const m of mutations)
-			for (const which of lists)
-				for (const n of m[which]) {
-					if (n.nodeType !== 1) continue;
-					if (n.matches(sel) || n.querySelector(sel)) return true;
-				}
+			for (const n of m.addedNodes) {
+				if (n.nodeType !== 1) continue;
+				if (n.matches(sel) || n.querySelector(sel)) return true;
+			}
 		return false;
 	},
 

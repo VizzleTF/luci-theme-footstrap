@@ -110,8 +110,8 @@
 		 * showed the MAC and paid a whole half-row for it.
 		 *
 		 * The `.table .td.hide-xs` half is not redundant: the stacking rules select the cell as
-		 * `table.fs-dt .td` / `.cbi-section-table .td` (0,2,1), which outranks a bare `.hide-xs`
-		 * (0,1,0), so the cell kept their `display: block` and stayed visible. Stock LuCI wins
+		 * `table.fs-dt .td` (0,2,1) / `.cbi-section-table .td` (0,2,0), both of which outrank a
+		 * bare `.hide-xs` (0,1,0), so the cell kept their `display: block` and stayed visible. Stock LuCI wins
 		 * this with !important; one class more (`.table`, which every such table carries) wins it
 		 * without one. */
 		.hide-sm, .hide-xs,

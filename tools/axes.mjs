@@ -45,6 +45,13 @@ const HEAD = read('luci-theme-footstrap/ucode/template/themes/footstrap/partials
 const TOKENS = read('luci-theme-footstrap/styles/02-tokens.css');
 const STYLES = readTree('luci-theme-footstrap/styles');
 const ORPHANS = read('tools/fs-orphans.mjs');
+/* The THIRD implementation of the axes, and the one nothing held. lib/gallery.mjs stamps them onto
+ * :root so a11y-gallery.mjs and export-tier.mjs can sweep the matrix — its own header calls itself
+ * "THE ONE COPY" and it was the forgotten one. Renaming --fs-tint-h there left every gate at exit 0
+ * while export-tier reported "28 palette x mode x tint combinations" and silently measured an
+ * UNTINTED page in 21 of them: 7 distinct results presented as 28. A gate that measures the wrong
+ * thing quietly is worse than no gate — which is the sentence that file opens with. */
+const GALLERY = read('tools/lib/gallery.mjs');
 
 const errors = [];
 const ok = [];
@@ -95,8 +102,20 @@ for (const { key, attr, prop } of hueAxes) {
 	if (!rangeRe.test(HEAD))
 		errors.push(`${where}: head.ut does not validate the stored hue as 1..360 the way the JS does `
 			+ `(an out-of-range value would be pre-painted and then rejected by the popover)`);
-	ok.push(`hue axis ${key.padEnd(10)} -> ${attr}, ${prop}   (key, attr, property, order and range agree)`);
+	/* the gates' own stamper, held to the same axis it claims to sweep */
+	if (!GALLERY.includes(`'${attr}', '${prop}'`))
+		errors.push(`${where}: tools/lib/gallery.mjs does not stamp ${attr} with ${prop} — the axe and `
+			+ `export-tier sweeps would go on reporting this axis in their combination count while every `
+			+ `point of it measured the UNSTAMPED page, which is a pass by not looking`);
+	ok.push(`hue axis ${key.padEnd(10)} -> ${attr}, ${prop}   (key, attr, property, order and range agree; swept by lib/gallery.mjs)`);
 }
+
+/* ...and the converse: an axis lib/gallery.mjs stamps that the JS no longer has is a sweep of a
+ * dead attribute, which also reads as "28 combinations" and measures 7. */
+for (const [, attr, prop] of GALLERY.matchAll(/hue\(\w+, '([^']+)', '([^']+)'\)/g))
+	if (!hueAxes.some((a) => a.attr === attr && a.prop === prop))
+		errors.push(`tools/lib/gallery.mjs stamps ${attr}/${prop}, which no hueAxis() in the theme JS `
+			+ `declares — the gates sweep an axis the theme does not have`);
 
 /* ---- 3. the rounding default: JS, template and CSS token must be the same number ----- */
 const jsRadius = JS.match(/const\s+FS_RADIUS_DEFAULT\s*=\s*(\d+)/);

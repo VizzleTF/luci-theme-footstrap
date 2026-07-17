@@ -51,10 +51,8 @@ function iconSvg(name) {
  * click-outside did not close a panel (widgets.wireDismiss gates on this) and clampDropdown
  * refused to place it. */
 function flyoutMode() {
-	const root = document.documentElement;
-	return root.getAttribute('data-rail') === 'true' ||
-	       root.getAttribute('data-layout') === 'top' ||
-	       root.hasAttribute('data-narrow');
+	return prefs.currentRail() || prefs.isTopLayout() ||
+	       document.documentElement.hasAttribute('data-narrow');
 }
 
 /* The trigger — a bare <a>. widgets.setOpen keeps `.open` and aria-expanded in step. */
@@ -70,11 +68,8 @@ const OPEN_LI = '#topmenu > li.open';
 /* the viewport edge gap, defined once in fs-widgets.js — the Appearance popover keeps a popup off
  * the edge by the same amount, and the two used to state it separately */
 const EDGE_GAP = widgets.EDGE_GAP;
-function topBarMode() {
-	return (document.documentElement.getAttribute('data-layout') === 'top');
-}
 function clampDropdown(li) {
-	if (!topBarMode()) return;
+	if (!prefs.isTopLayout()) return;
 	const menu = li.querySelector(':scope > ul');
 	if (!menu) return;
 
@@ -302,17 +297,20 @@ return baseclass.extend({
 		 * is dragged */
 		window.addEventListener('resize', fit.frame(clearClamps));
 
-		/* Appearance -> Submenus -> auto-collapse lives in fs-prefs.js, which can only reach the
-		 * DOM — the remembered set is here. Without this, switching auto-collapse ON folded the
-		 * sections on screen but left them in the set, and the next navigation unfolded them
-		 * all again. */
+		/* Appearance -> Submenus -> auto-collapse. fs-prefs.js owns the stored value and says only
+		 * that it changed; applying it is entirely ours, because every piece of the state is —
+		 * the remembered set, the `.open` class and the aria-expanded that setOpen keeps in step.
+		 *
+		 * restoreAccordion() already IS "apply the current auto-collapse setting": with the set
+		 * cleared and auto ON it computes open = the active section alone, and with auto OFF it
+		 * restores what "Keep open" remembered. Skipped in flyout mode — a section there is a
+		 * popup, and force-opening the active one would leave it stuck on screen. */
 		document.addEventListener('fs-autocollapse', (ev) => {
 			if (ev.detail && ev.detail.on) {
 				_openSections.clear();
 				saveOpenSections();
 			}
-			document.querySelectorAll('#topmenu > li.has-sub')
-				.forEach((li) => setOpen(li, li.classList.contains('open')));
+			if (!flyoutMode()) restoreAccordion();
 		});
 	}
 });

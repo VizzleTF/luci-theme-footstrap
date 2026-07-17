@@ -18,8 +18,13 @@
  *
  *   node tools/export-tier.mjs
  */
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { buildCss, serveGallery, applyAppearance, matrix } from './lib/gallery.mjs';
+import { serveGallery, applyAppearance, matrix } from './lib/gallery.mjs';
+import { buildCss } from './lib/css.mjs';
+import { parseExportTier } from './lib/tokens.mjs';
 
 const AA = 4.5;
 
@@ -30,23 +35,52 @@ const AA = 4.5;
 const MIN_SPREAD = { background: 0.02, border: 0.10, default: 0.10 };
 
 const SURFACES = ['--fs-bg', '--fs-panel', '--fs-panel2'];
-const LEVELS = ['high', 'medium', 'low'];
-/* families an app paints TEXT with -> must clear AA on every surface */
+
+/* THE TIER IS DERIVED, never restated. This used to be a hand-written cross-product of
+ * ['text','primary',…] x ['high','medium','low'], which is a list, not the contract — and it had
+ * already fallen behind: --text-color-highest was defined in 02-tokens.css, shipped, read by apps,
+ * and measured by NOTHING. Painting it #808080 (~3.95:1 on a light --fs-bg) passed clean. What a
+ * hand list cannot do is fail when the tokens grow; parsing them can. */
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const TIER = parseExportTier(readFileSync(join(ROOT, 'luci-theme-footstrap/styles/02-tokens.css'), 'utf8'));
+
+/* The one thing that CANNOT be parsed: what a family MEANS. Whether apps print text in it or only
+ * separate surfaces with it is a judgement about other people's packages, so it stays written down
+ * — but every parsed family must appear in exactly one list, and an unclassified one is a hard
+ * failure rather than a silent omission. That is the half the old cross-product got wrong. */
 const TEXT_FAMILIES = ['text', 'primary', 'error', 'success', 'warn'];
-/* families used as a FILL -> their ink must clear AA on top of them */
-const INKS = {
-	primary: '--on-primary-color',
-	error: '--on-error-color',
-	success: '--on-success-color',
-	warn: '--on-warn-color',
-};
 /* --border-* and --background-* get no contrast floor: surface separations, not content. WCAG
  * 1.4.11's 3:1 covers the boundary that IDENTIFIES a control (focus ring, input outline), not
  * a table rule. */
-const ALL_FAMILIES = [...TEXT_FAMILIES, 'background', 'border'];
+const NO_FLOOR_FAMILIES = ['background', 'border'];
 
-/* build + serve + Appearance-axis stamping: shared with a11y-gallery.mjs (tools/lib/gallery.mjs) */
-const { base, close } = await serveGallery(buildCss('cascade-export.css'));
+const setup = [];
+const unclassified = TIER.map((t) => t.family)
+	.filter((f) => !TEXT_FAMILIES.includes(f) && !NO_FLOOR_FAMILIES.includes(f));
+if (unclassified.length)
+	setup.push(`02-tokens.css exports the famil${unclassified.length > 1 ? 'ies' : 'y'} `
+		+ `${unclassified.join(', ')}, which this gate classifies as neither text nor surface — so `
+		+ `${unclassified.length > 1 ? 'they are' : 'it is'} measured by nothing. Apps read a level as `
+		+ `color: about as often as background:; decide which, and say so here.`);
+for (const f of [...TEXT_FAMILIES, ...NO_FLOOR_FAMILIES])
+	if (!TIER.some((t) => t.family === f))
+		setup.push(`this gate expects a --${f}-color-* family, and 02-tokens.css defines none — either the `
+			+ `tier lost a family or the parser stopped seeing it, and both read here as "nothing to check"`);
+for (const t of TIER)
+	if (!t.levels.includes(`${t.family}-color-high`) || !t.levels.includes(`${t.family}-color-low`))
+		setup.push(`--${t.family}-color-* has no high/low pair (${t.levels.join(', ')}) — the spread check `
+			+ `is what proves the ramp is not secretly flat, and it needs both ends`);
+if (setup.length) {
+	console.error('export tier: FAIL — the gate and the tokens disagree about what the tier IS\n');
+	for (const s of setup) console.error(`  ${s}`);
+	process.exit(1);
+}
+
+const INKS = Object.fromEntries(TIER.filter((t) => t.ink).map((t) => [t.family, `--${t.ink}`]));
+const levelsOf = (family) => TIER.find((t) => t.family === family).levels.map((l) => `--${l}`);
+
+/* serve + Appearance-axis stamping: shared with a11y-gallery.mjs (tools/lib/gallery.mjs) */
+const { base, close } = await serveGallery(buildCss());
 
 const luminance = ([r, g, b]) => {
 	const f = (u) => (u /= 255) <= 0.03928 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4;
@@ -60,7 +94,7 @@ const spread = (a, b) => Math.max(...a.map((x, i) => Math.abs(x - b[i]))) / 255;
 
 const NAMES = [
 	...SURFACES,
-	...ALL_FAMILIES.flatMap((f) => LEVELS.map((l) => `--${f}-color-${l}`)),
+	...TIER.flatMap((t) => levelsOf(t.family)),
 	...Object.values(INKS),
 ];
 
@@ -109,9 +143,8 @@ for (const { palette, mode, tint } of MATRIX) {
 	const where = `${palette}/${mode}${tint === null ? '' : `/tint ${tint}°`}`;
 
 	for (const family of TEXT_FAMILIES)
-		for (const level of LEVELS)
+		for (const name of levelsOf(family))
 			for (const surface of SURFACES) {
-				const name = `--${family}-color-${level}`;
 				const ratio = contrast(v[name], v[surface]);
 				checks++;
 				if (ratio < AA)
@@ -119,15 +152,14 @@ for (const { palette, mode, tint } of MATRIX) {
 			}
 
 	for (const [family, ink] of Object.entries(INKS))
-		for (const level of LEVELS) {
-			const name = `--${family}-color-${level}`;
+		for (const name of levelsOf(family)) {
 			const ratio = contrast(v[ink], v[name]);
 			checks++;
 			if (ratio < AA)
 				failures.push(`${where}: ${ink} on ${name} = ${ratio.toFixed(2)} (AA needs ${AA} — apps fill with it)`);
 		}
 
-	for (const family of ALL_FAMILIES) {
+	for (const { family } of TIER) {
 		const hi = v[`--${family}-color-high`];
 		const lo = v[`--${family}-color-low`];
 		const need = MIN_SPREAD[family] ?? MIN_SPREAD.default;

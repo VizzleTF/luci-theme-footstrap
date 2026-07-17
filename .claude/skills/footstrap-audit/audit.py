@@ -34,11 +34,10 @@ BASE = STYLES / "base"
 BANG_OK = ({"90-responsive.css", "20-overview.css", "95-a11y-media.css", "45-misc.css"}
            | {p.name for p in (STYLES / "base").glob("*.css")})
 
-# var()s legitimately not defined inside styles/. --zone-color-rgb is written inline on
-# a zone badge by luci-mod-network — the only --*-rgb that may exist (the theme's own
-# RGB and HSL bridges were removed; see 02-tokens.css). --on-color is a leftover: it is
-# declared in base/70-buttons.css now, so that entry is a no-op.
-VAR_ALLOW = {"--zone-color-rgb", "--on-color"}
+# var()s legitimately not defined inside styles/: --zone-color-rgb is written inline on a zone
+# badge by luci-mod-network — the only --*-rgb that may exist (the theme's own RGB and HSL bridges
+# were removed; see 02-tokens.css).
+VAR_ALLOW = {"--zone-color-rgb"}
 
 def _strip_for_balance(s):
     """Drop comments and quoted strings before counting brackets.
@@ -283,6 +282,25 @@ def sources():
             + sorted((STYLES / "theme").glob("*.css"))
             + sorted((STYLES / "pages").glob("*.css")))
 
+def report(title, lines, empty="none", *hints):
+    """Print one section and return its finding count.
+
+    Every section is header -> items -> count -> hint, and seven hand-written copies had already
+    drifted: one printed its header with no leading blank line, and the empty case was spelled
+    three ways. The real hazard is the count — a new section whose author forgets `findings +=`
+    is silently non-gating under --strict, which is the one thing this script is for. Returning
+    the number makes forgetting it impossible.
+    """
+    print(f"\n== {title} ==")
+    if not lines:
+        print(f"  {empty}")
+        return 0
+    for l in lines:
+        print("  " + l)
+    for h in hints:
+        print("  " + h)
+    return len(lines)
+
 def main():
     if not BASE.is_dir():
         sys.exit(f"not found: {BASE}")
@@ -298,72 +316,46 @@ def main():
     # cannot lex JS has no business counting its brackets. eslint parses the JS for real
     # (CI `lint`) and tools/jsmin-verify.mjs proves the minified output is
     # token-identical; those are the authorities, this was a guess that cried wolf.
-    print("== balance (CSS) ==")
-    problems = []
-    for p in css:
-        b = balance(p)
-        if b:
-            problems.append(p)
-            print(f"  BAD {p.relative_to(ROOT)}: {', '.join(b)}")
-    findings += len(problems)
-    if not problems:
-        print("  ok (all balanced)")
+    findings += report("balance (CSS)",
+        [f"BAD {p.relative_to(ROOT)}: {', '.join(b)}" for p in css if (b := balance(p))],
+        "ok (all balanced)")
 
-    print("\n== css vars used but not defined ==")
     miss = audit_vars(s)
-    findings += len(miss)
-    print("  none" if not miss else "\n".join(f"  {m}  (x{s.count('var('+m)})" for m in miss))
+    findings += report("css vars used but not defined",
+        [f"{m}  (x{s.count('var(' + m)})" for m in miss])
 
-    print("\n== !important outside the files allowed to carry it ==")
-    stray = []
-    for p in css:
-        if p.name in BANG_OK:
-            continue
-        for i, l in enumerate(p.read_text(encoding="utf-8").split("\n"), 1):
-            # a flag that terminates a declaration; prose in a comment does not
-            if re.search(r"!important\s*[;}]", l):
-                stray.append((p.name, i, l.strip()[:70]))
-    findings += len(stray)
-    if not stray:
-        print("  none")
-    else:
-        for name, ln, txt in stray:
-            print(f"  {name}:{ln}  {txt}")
-        print("  -> move the rule to a later layer, or merge it with its twin")
+    stray = [(p.name, i, l.strip()[:70])
+             for p in css if p.name not in BANG_OK
+             for i, l in enumerate(p.read_text(encoding="utf-8").split("\n"), 1)
+             # a flag that terminates a declaration; prose in a comment does not
+             if re.search(r"!important\s*[;}]", l)]
+    findings += report("!important outside the files allowed to carry it",
+        [f"{name}:{ln}  {txt}" for name, ln, txt in stray], "none",
+        "-> move the rule to a later layer, or merge it with its twin")
 
-    print("\n== declarations shadowed within a layer (theme/page) ==")
     sh = audit_shadowed(css)
-    findings += len(sh)
-    if not sh:
-        print("  none")
-    else:
-        for sel, prop, pf, pl, pv, f, ln, v in sh:
-            same = "  SAME VALUE" if pv == v else ""
-            print(f"  {sel} {{ {prop} }}  {pf}:{pl} {pv!r} -> {f}:{ln} {v!r}{same}")
-        print(f"  ({len(sh)} dead) -> edit the first rule instead of appending a second")
-        print("     (group-then-refine, e.g. a shared input rule narrowed for textarea, is not reported)")
+    findings += report("declarations shadowed within a layer (theme/page)",
+        [f"{sel} {{ {prop} }}  {pf}:{pl} {pv!r} -> {f}:{ln} {v!r}"
+         + ("  SAME VALUE" if pv == v else "")
+         for sel, prop, pf, pl, pv, f, ln, v in sh], "none",
+        f"({len(sh)} dead) -> edit the first rule instead of appending a second",
+        "   (group-then-refine, e.g. a shared input rule narrowed for textarea, is not reported)")
 
-    print("\n== reads of the EXPORT tier (--*-color-*) from inside the theme ==")
     ex = audit_export_reads(css)
-    findings += len(ex)
-    if not ex:
-        print("  none (the bridge points outward only)")
-    else:
-        for name, ln, var, txt in ex:
-            print(f"  {name}:{ln:<4} {var:24} {txt}")
-        print(f"  ({len(ex)}) -> read the --fs-* token it aliases. A third-party luci-app-* can")
-        print("     declare these names on :root, unlayered, and repaint the theme silently.")
+    findings += report("reads of the EXPORT tier (--*-color-*) from inside the theme",
+        [f"{name}:{ln:<4} {var:24} {txt}" for name, ln, var, txt in ex],
+        "none (the bridge points outward only)",
+        f"({len(ex)}) -> read the --fs-* token it aliases. A third-party luci-app-* can",
+        "   declare these names on :root, unlayered, and repaint the theme silently.")
 
-    print("\n== base declarations a later layer repaints on the SAME selector ==")
     safe, backlog = audit_base_dead(css)
-    findings += len(safe)
-    if not safe:
-        print("  none removable")
-    else:
-        for name, ln, sel, prop, val in safe:
-            print(f"  {name}:{ln:<4} {sel[:56]}  {{ {prop}: {val[:34]} }}")
-        print(f"  ({len(safe)} dead) -> every selector of the rule is repainted by theme/page,")
-        print("     so deleting these changes no rendered style (prove it with cssdiff.py)")
+    findings += report("base declarations a later layer repaints on the SAME selector",
+        [f"{name}:{ln:<4} {sel[:56]}  {{ {prop}: {val[:34]} }}" for name, ln, sel, prop, val in safe],
+        "none removable",
+        f"({len(safe)} dead) -> every selector of the rule is repainted by theme/page,",
+        "   so deleting these changes no rendered style (prove it with cssdiff.py)")
+    # NOT a report() section: it re-groups by selector rather than listing findings, and it is
+    # deliberately NOT counted — the backlog is the to-do list, not a failure.
     if backlog:
         print(f"\n  -- absorption backlog: {len(backlog)} declaration(s) where only PART of the")
         print("     selector group is repainted. DO NOT DELETE: the members listed below are")
@@ -375,21 +367,12 @@ def main():
         for m, props in sorted(seen_sel.items()):
             print(f"       {m[:58]:58} base-only for: {', '.join(sorted(props))[:40]}")
 
-    print("\n== hardcoded colors in styles/base (candidates to tokenize) ==")
     hc = [(p.name, ln, sel, txt)
           for p in sorted(BASE.glob("*.css"))
           for ln, sel, txt in base_hardcoded(p.read_text(encoding="utf-8").split("\n"))]
-    findings += len(hc)
-    if not hc:
-        print("  none")
-    else:
-        for name, ln, sel, txt in hc:
-            print(f"  {name}:{ln:<4} [{sel}] {txt}")
-        print(f"  ({len(hc)} lines)")
-
-    print("\nTip: compile-check ucode templates on the router:")
-    print("  ssh router 'for f in /usr/share/ucode/luci/template/themes/footstrap*/*.ut; do "
-          "ucode -T -c -o /dev/null \"$f\" && echo OK $f || echo FAIL $f; done'")
+    findings += report("hardcoded colors in styles/base (candidates to tokenize)",
+        [f"{name}:{ln:<4} [{sel}] {txt}" for name, ln, sel, txt in hc], "none",
+        f"({len(hc)} lines)")
 
     # A plain run is a report and always exits 0 (fine for a human, useless as a gate);
     # --strict fails the build on anything reported.

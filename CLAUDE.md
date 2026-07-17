@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-`luci-theme-footstrap` — LuCI theme for **OpenWrt 24.10 and newer**. Deep design/architecture research lives in `docs/01`–`docs/18` (Russian) — read the relevant doc before non-trivial changes; `docs/17` covers the CSS build and cascade layers, `docs/18` the best-practice baseline and the audit. Communicate in Russian.
+`luci-theme-footstrap` — LuCI theme for **OpenWrt 24.10 and newer**. Deep design/architecture research lives in `docs/01`–`docs/21` (Russian; 10 and 12 do not exist) — read the relevant doc before non-trivial changes; `docs/17` covers the CSS build and cascade layers, `docs/18` the best-practice baseline and the audit, `docs/21` the changelog contract. Communicate in Russian.
 
 **Both releases are supported, and the API surface is genuinely the same** — verified against `openwrt-24.10` of `openwrt/luci`, not assumed:
 - LuCI on 24.10 is already **ucode**, not Lua (`modules/luci-base/ucode/` exists there), and every template API this theme uses is present: `ctx.path`, `ctx.request_path`, `entityencode`, `striptags`, `dispatcher.build_url/lookup/lang`, `ubus.call`, `pkgs_update_time` (whose 24.10 definition already falls back from `/lib/apk/db/installed` to `/usr/lib/opkg/status`).
@@ -50,6 +50,7 @@ reached across — that is what keeps it acyclic.
 | `fs-prefs.js` | the Appearance axes and their `localStorage` (the live half of the `axes` gate) |
 | `fs-widgets.js` | disclosure primitives (`setOpen`/`wireSpaceKey`/`wireDismiss`), the seg/slider controls, `EDGE_GAP` + `placePopover` |
 | `fs-chrome.js` | mode menu, section tabs, the rail toggle, `fitShell`/`fitChrome` |
+| `fs-select.js` | **two concerns, and the name only says one**: `<select>` → `ui.Dropdown` + typeahead, *and* the data tables' card stacking (`fitTables`). Loaded by `partials/footer.ut`, not required by any module |
 | `fs-sheets.js` | third-party CSS: keeping it out of the chrome, and off every later page |
 | `fs-router.js` | the SPA client router (docs/14) |
 | `fs-update.js` | **`FS_VERSION`**, the update check, the one-click self-update |
@@ -58,7 +59,7 @@ reached across — that is what keeps it acyclic.
 | `menu-footstrap.js` | the ONE menu renderer; injects `renderMainMenu` into `common.init` |
 
 Dependencies: `prefs→fit`, `widgets→prefs`, `chrome→{fit,prefs,menutree}`, `appearance→{prefs,widgets,update}`,
-`update→prefs`, `router→{menutree,chrome,sheets,update}`, `common→` all.
+`update→prefs`, `select→fit`, `router→{menutree,chrome,sheets,update}`, `common→` all.
 
 - **`FS_VERSION` lives in `fs-update.js`, and the FILE NAME is part of the contract**: the package
   `Makefile` (`Build/Prepare`) and `dev-sync.sh` both stamp the git version by `sed`-ing that literal
@@ -197,7 +198,7 @@ already no. Verified on the router across all six shapes.
 
 ## CSS architecture (critical)
 
-**`htdocs/luci-static/footstrap/cascade.css` is generated — never edit it.** It is gitignored and produced by `luci-theme-footstrap/build-css.sh`, which concatenates the `styles/` tree, strips comments and then squeezes the whitespace CSS ignores (~255 KB of source → **~112 KB**; uhttpd serves `/www/luci-static/*.css` with **no gzip**, so bytes are wire bytes). The squeeze deletes the space after `:`, the spaces around `{ } ; ,` and the last `;` of a block, and nothing else — it leaves the single space between selectors alone (`.a .b` is a descendant combinator, `.a.b` is not) and never touches `calc()` or a string. **All of that happens inside ONE string-aware awk pass, and the last `;` is dropped there too.** It used to be a `| sed 's/;}/}/g'` bolted onto the awk output, and sed cannot see strings: `content: ";}"` came out as `content: "}"`, and a data-URI containing `;}` was mangled the same way (both reproduced). Nothing in the tree happens to contain that byte pair — which is exactly how a bug like that waits for whoever adds the first one. Proven behaviour-neutral with `cssdiff` (0 diffs over ~4000 elements). The `/*!` licence banner is copied verbatim — it is an Apache-2.0 attribution, not formatting. There is no upper size budget any more (removed), but it keeps a **broken-build FLOOR** — it refuses to write a stylesheet suspiciously SHORT (a truncated write, a squeeze that ate the tail), which is a correctness guard, not a size limit. `build-css.sh` runs from the package `Makefile` (`Build/Prepare/luci-theme-footstrap`) and from `dev-sync.sh`; it needs only `cat`/`awk`, so an OpenWrt buildbot can run it. Use `--dev` to keep comments.
+**`htdocs/luci-static/footstrap/cascade.css` is generated — never edit it.** It is gitignored and produced by `luci-theme-footstrap/build-css.sh`, which concatenates the `styles/` tree, strips comments and then squeezes the whitespace CSS ignores (~287 KB of source → **~111 KB**; uhttpd serves `/www/luci-static/*.css` with **no gzip**, so bytes are wire bytes). The squeeze deletes the space after `:`, the spaces around `{ } ; ,` and the last `;` of a block, and nothing else — it leaves the single space between selectors alone (`.a .b` is a descendant combinator, `.a.b` is not) and never touches `calc()` or a string. **All of that happens inside ONE string-aware awk pass, and the last `;` is dropped there too.** It used to be a `| sed 's/;}/}/g'` bolted onto the awk output, and sed cannot see strings: `content: ";}"` came out as `content: "}"`, and a data-URI containing `;}` was mangled the same way (both reproduced). Nothing in the tree happens to contain that byte pair — which is exactly how a bug like that waits for whoever adds the first one. Proven behaviour-neutral with `cssdiff` (0 diffs over ~4000 elements). The `/*!` licence banner is copied verbatim — it is an Apache-2.0 attribution, not formatting. There is no upper size budget any more (removed), but it keeps a **broken-build FLOOR** — it refuses to write a stylesheet suspiciously SHORT (a truncated write, a squeeze that ate the tail), which is a correctness guard, not a size limit. `build-css.sh` runs from the package `Makefile` (`Build/Prepare/luci-theme-footstrap`) and from `dev-sync.sh`; it needs only `cat`/`awk`, so an OpenWrt buildbot can run it. Use `--dev` to keep comments.
 
 **One directory per cascade layer**; within each, the filename prefix is the source order:
 - `styles/00-header.css` — licence banner + the **only** `@layer` declaration.
@@ -213,7 +214,7 @@ already no. Verified on the router across all six shapes.
 - `styles/theme/10-chrome.css` — `@layer theme`, the chrome EVERY layout shares (brand, logo, wordmark, logout, indicators, `ul.nav` menu primitives, hover/active/focus). Its values are the **top-bar** ones: where the two layouts ever disagreed on the same element, the bar's value is the one that survived the merge. A layout file may set placement on these (`flex`, `order`, the rail/bar collapse) but never their look.
 - `styles/theme/15`–`95` — `@layer theme`, one file per component/layout concern (wallpaper, shell, progressbar, tables, alerts, tabs, misc, toplayout, buttons, inputs, dropdown, modal, responsive, a11y-media). `20-shell.css` carries the bar (base), the vertical sidebar (override) and the icon rail; `50-toplayout.css` is the top-layout bar delta (all widths, measured — no 768 floor).
 - `styles/theme/95-a11y-media.css` — `prefers-reduced-motion` and `forced-colors`. The reduced-motion block is the ONE place a new `!important` is legitimate: the flag inverts the layer order, so it is the only way a single rule can stop animations declared in `base` as well as in `theme`. Do not copy the flag out of that block.
-- `styles/pages/*.css` — `@layer page`, per-page corrections (login, overview, software, sshkeys, leases).
+- `styles/pages/*.css` — `@layer page`, per-page corrections (login, overview, software, sshkeys, leases, assoclist).
 
 Layer order is `tokens, base, theme, page`. A later layer beats an earlier one **regardless of specificity**, so a theme rule never needs `!important` to outrank a base rule. Unlayered rules beat every layer and that slot is deliberately empty — it is the escape hatch.
 
@@ -239,7 +240,8 @@ Rules when editing CSS:
 
 ## Overview layout include (theme/mod boundary)
 
-`htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js` is an **additive**, layout-only overview include (unique filename → no collision with `luci-mod-status`; LuCI auto-discovers `*.js` in that dir, `05_` sorts first). It renders **no content of its own** — it only re-arranges the **stock** System/Memory/Storage sections: a `MutationObserver` on `#view` tags those three `.cbi-section`s by title and wraps them in `.fs-ovl`, so CSS grid puts System in the left column across both rows with Memory (top) + Storage (bottom) in the right column (`.fs-ovl` block in `cascade.css`). The stock poll updates each section **in place** (`dom.content`), never rebuilding the `.cbi-section` wrapper, so the moved wrappers stay put across polls (minimal flicker, no full-tree swap — the reason the earlier full-custom `05_footstrap_dashboard.js` was dropped: rebuilding a page-tall tree every poll flickered and reset mobile scroll). Its own empty stock wrapper is hidden via `#view > .cbi-section:has(.fs-ovl-marker)`. Gated on a footstrap theme being active (`L.env.media`). The observer's callback has an **O(1) fast path** — one `isConnected` check on the wrapper it built — because it fires on every poll tick; it deliberately does NOT `disconnect()` after wrapping, so that if a future `luci-mod-status` ever does rebuild a section, the grid self-heals instead of staying broken.
+`htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js` is an **additive**, layout-only overview include (unique filename → no collision with `luci-mod-status`; LuCI auto-discovers `*.js` in that dir, `05_` sorts first). It renders **no content of its own** — it only re-arranges the **stock** System/Memory/Storage sections: a `MutationObserver` on `#view` tags those three `.cbi-section`s by title and wraps them in `.fs-ovl`, so CSS grid puts System in the left column across both rows with Memory (top) + Storage (bottom) in the right column (`.fs-ovl` block in `cascade.css`). The stock poll updates each section **in place** (`dom.content`), never rebuilding the `.cbi-section` wrapper, so the moved wrappers stay put across polls (minimal flicker, no full-tree swap — the reason the earlier full-custom `05_footstrap_dashboard.js` was dropped: rebuilding a page-tall tree every poll flickered and reset mobile scroll). Its own empty stock wrapper is hidden via `#view > .cbi-section:has(.fs-ovl-marker)`. Gated on a footstrap theme being active (`L.env.media`) AND on being the overview page
+(`body[data-page]`). The observer's callback has an **O(1) fast path** — one `isConnected` check on the wrapper it built — because it fires on every poll tick; it deliberately does NOT `disconnect()` after wrapping, so that if a future `luci-mod-status` ever does rebuild a section, the grid self-heals instead of staying broken.
 
 ## Package / registration
 
@@ -311,8 +313,8 @@ LUCI_PW=<pw> python3 .claude/skills/footstrap-audit/cssdiff.py \
 
 **A comment costs the user nothing — it costs the reader.** `luci.mk` runs the theme's JS
 through **jsmin** at package time (built from `luci-base/src/jsmin.c`; `luci-base/host` is
-already a build dependency, so it is on the buildbot). Comments are **72 KB of the 127 KB**
-of source — **57%** — and jsmin takes the shipped bytes to **47 KB (−63%)** while the source
+already a build dependency, so it is on the buildbot). Comments are **105 KB of the 169 KB**
+of source — **62%** — and jsmin takes the shipped bytes to **55 KB (−68%)** while the source
 in git keeps every word. uhttpd serves `/www` with **no compression**, so those would
 otherwise be wire bytes *and* flash bytes on an 8–16 MB device. The same holds for CSS:
 `build-css.sh` strips comments too. **So never trade a "why" away for bytes — there are none
@@ -447,14 +449,15 @@ the effect. To run it by hand: build jsmin from the `luci-upstream.pin` commit a
 
 - **eslint** needs `ecmaFeatures.globalReturn` — a LuCI resource file is evaluated inside a
   function wrapper, which is why each ends in a bare `return baseclass.extend({…})`. The
-  `'require x as y'` pragma names (`common`) are declared as globals; they are real
-  bindings at runtime that ESLint cannot see.
+  `'require x as y'` pragma aliases are real bindings at runtime that ESLint cannot see, so they
+  are declared as globals — DERIVED from the source tree (`resourceFiles()`), never listed, so a
+  new module's alias cannot be forgotten.
 - **stylelint** deliberately does NOT extend `stylelint-config-standard` (it is a
   formatter and would rewrite the whole tree). Only correctness rules, plus the project's
   own invariants: `declaration-no-important` with the same allowlist `audit.py` uses.
 - **axe-core** runs over `docs/gallery.html` — a STATIC file that renders every widget, so
-  the whole widget surface is auditable with no router. It sweeps the full
-  `{light,dark} × {footstrap,hicontrast}` matrix: a palette switcher multiplies the
+  the whole widget surface is auditable with no router. It sweeps `{light,dark} ×
+  {footstrap,hicontrast} × {untinted,60°,260°}` — 12 combinations: a palette switcher multiplies the
   contrast matrix, and that is precisely where failures hide (a 1.69:1 white-on-green
   survived in hicontrast dark until this gate existed).
 - **Chip/badge rule learned the hard way**: never put text of colour C on a *translucent

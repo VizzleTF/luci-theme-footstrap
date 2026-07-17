@@ -112,10 +112,10 @@
 		width: var(--fs-btn-size); padding: 0; font-size: 0; justify-content: center; position: relative;
 	}
 	:root[data-layout="top"] .fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]::before {
-		content: ""; width: 18px; height: 18px;
+		content: ""; width: var(--fs-icon-refresh-sz); height: var(--fs-icon-refresh-sz);
 		background: var(--fs-good);
-		-webkit-mask: var(--fs-icon-refresh) center / 18px no-repeat;
-		        mask: var(--fs-icon-refresh) center / 18px no-repeat;
+		-webkit-mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
+		        mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
 	}
 	:root[data-layout="top"] .fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]:not([data-style="active"])::before {
 		background: var(--fs-dim);

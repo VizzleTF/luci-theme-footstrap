@@ -52,15 +52,13 @@ const SEARCH = [
 ];
 const EXT = /\.(css|js|sh|ut)$|(^|\/)(Makefile|30_luci-theme-footstrap)$/;
 
-const files = [];
-for (const s of SEARCH) {
+/* SEARCH mixes directories with single files (Makefile, install.sh), so one isDirectory() stays. */
+const files = SEARCH.flatMap((s) => {
 	const p = join(ROOT, s);
-	(function walk(f) {
-		const st = statSync(f);
-		if (st.isDirectory()) { for (const e of readdirSync(f)) walk(join(f, e)); return; }
-		if (EXT.test(f)) files.push(f);
-	})(p);
-}
+	return statSync(p).isDirectory()
+		? readdirSync(p, { recursive: true }).map((e) => join(p, e))
+		: [p];
+}).filter((f) => EXT.test(f));
 
 /* `@mirror name` opens, `@endmirror` closes. The tag may sit inside any comment syntax — we
  * match the token only, and the closing line is not part of the body. */

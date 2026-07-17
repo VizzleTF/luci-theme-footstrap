@@ -1,8 +1,8 @@
 /* Shared harness for the two playwright gates that render docs/gallery.html: a11y-gallery.mjs
  * (axe, WCAG 2.2 AA) and export-tier.mjs (the outbound --*-color-* contract). Nothing here ships.
  *
- * Both gates repeated the same ~20 lines (build the stylesheet, serve the gallery on an ephemeral
- * port, stamp the Appearance axes onto :root). The stamping is what mattered: each gate's
+ * Both gates repeated the same ~20 lines (serve the gallery on an ephemeral port, stamp the
+ * Appearance axes onto :root). The stamping is what mattered: each gate's
  * `applyAppearance()` was one more copy of rules that already live in fs-prefs.js
  * and head.ut's pre-paint script — including the load-bearing one:
  *
@@ -16,18 +16,11 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, extname, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const TMP = process.env.RUNNER_TEMP || '/tmp';
 
-/* The stylesheet is GENERATED (build-css.sh concatenates styles/). Build it — never measure a
- * stale copy left over from the last run. */
-export function buildCss(name = 'cascade.css') {
-	const css = join(TMP, name);
-	execFileSync(join(ROOT, 'luci-theme-footstrap/build-css.sh'), [css], { stdio: 'inherit' });
-	return css;
-}
+/* buildCss lives in lib/css.mjs — it is not a gallery concern, and devkit-build.mjs was importing
+ * it from here while having nothing to do with the gallery. */
 
 /* Serve docs/gallery.html + the freshly-built stylesheet on an ephemeral port. */
 export async function serveGallery(cssPath) {

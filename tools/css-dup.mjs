@@ -18,25 +18,20 @@
  * byte-identical. Untagged = hard failure. The pin is not ceremony: THIS detector matches only
  * IDENTICAL bodies, so it goes quiet the moment two copies diverge, exactly when it should shout.
  *
- * Usage: node tools/css-dup.mjs [--min N] [--json]
+ * Usage: node tools/css-dup.mjs
  */
 import { readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import * as csstree from 'css-tree';
+import { buildCss } from './lib/css.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+/* Not a CLI flag. It was `--min N`, which put this gate's own threshold on the command line —
+ * `--min 99` passes trivially — in a tool whose header rejects "a number nobody defends". It also
+ * worked by accident: indexOf returns -1, +1 indexes argv[0] (the node path), Number() is NaN, and
+ * `|| 3` caught it. */
+const MIN_DECLS = 3;
 
-const MIN_DECLS = Number(process.argv[includesIdx('--min') + 1]) || 3;
-function includesIdx(f) { return process.argv.indexOf(f); }
-
-/* build the real stylesheet the router serves */
-const tmp = join(mkdtempSync(join(tmpdir(), 'cssdup-')), 'cascade.css');
-execFileSync(join(ROOT, 'luci-theme-footstrap', 'build-css.sh'), [tmp, '--dev'], { stdio: 'ignore' });
-const css = readFileSync(tmp, 'utf8');
+/* --dev: the pin is a COMMENT, and the squeeze strips comments */
+const css = readFileSync(buildCss({ dev: true }), 'utf8');
 
 /* css-tree drops comments from the AST, so the pin is collected on the side and matched back by
  * LINE. */
@@ -115,21 +110,17 @@ const unpinned = findings.filter(f => {
 	return pins.some(p => !p) || new Set(pins).size !== 1;
 });
 
-if (process.argv.includes('--json')) {
-	console.log(JSON.stringify({ findings, wasted, unpinned: unpinned.length }, null, 2));
-} else {
-	for (const f of findings) {
-		const pins = new Set(f.group.map(r => r.mirror));
-		const tag = (pins.size === 1 && !pins.has(null)) ? `pinned @mirror ${[...pins][0]}` : 'UNPINNED';
-		console.log(`\n--- ${f.n} decls x ${f.group.length} occurrences   [${tag}]`);
-		for (const r of f.group)
-			console.log(`    L${String(r.line).padEnd(6)} guard=${r.guard.padEnd(42)} ${r.selector}`);
-		console.log(`    decls: ${f.key}`);
-	}
-	console.log(`\n${findings.length} duplicated declaration bodies across differing guards `
-		+ `(>= ${MIN_DECLS} decls); ~${wasted} redundant declarations. `
-		+ `${unpinned.length ? `${unpinned.length} UNPINNED.` : 'all pinned.'}`);
+for (const f of findings) {
+	const pins = new Set(f.group.map(r => r.mirror));
+	const tag = (pins.size === 1 && !pins.has(null)) ? `pinned @mirror ${[...pins][0]}` : 'UNPINNED';
+	console.log(`\n--- ${f.n} decls x ${f.group.length} occurrences   [${tag}]`);
+	for (const r of f.group)
+		console.log(`    L${String(r.line).padEnd(6)} guard=${r.guard.padEnd(42)} ${r.selector}`);
+	console.log(`    decls: ${f.key}`);
 }
+console.log(`\n${findings.length} duplicated declaration bodies across differing guards `
+	+ `(>= ${MIN_DECLS} decls); ~${wasted} redundant declarations. `
+	+ `${unpinned.length ? `${unpinned.length} UNPINNED.` : 'all pinned.'}`);
 
 if (unpinned.length) {
 	console.error(`\nFAIL: ${unpinned.length} duplicated declaration body/bodies are not pinned.`);

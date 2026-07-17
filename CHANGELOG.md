@@ -15,6 +15,48 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ### Fixed
 
+- **The chrome-fence gate now fails when a chrome root loses its mark, instead of reporting the
+  loss and passing.** It derived the set of `data-fs-chrome` roots from `header.ut`, printed the
+  count and then gated only the one in `fs-appearance.js`. Deleting the mark from the skip link
+  printed `3 root(s)` and exited 0 — the v0.9.1 damage exactly, which is measured: the popover
+  flattened (padding 12px→0, `position: fixed`→`static`) and both sr-only elements un-clipped onto
+  every page, while the `<nav>` held. The count is ratcheted now, so adding or removing a root is a
+  deliberate edit rather than a silent one.
+- **The `--*-color-*` export tier gate measures every level it exports, not the three it was told
+  about.** Its family × level matrix was hand-written as `high/medium/low`, while `02-tokens.css`
+  also defines `--text-color-highest` — shipped, read by third-party apps, and inspected by nothing:
+  painting it `#808080` (~3.95:1 on a light `--fs-bg`, a real AA failure) passed with `OK — 1820
+  checks`. The names are parsed from the token file now (1904 checks), and a family the gate cannot
+  classify is a hard failure instead of an omission.
+- **The gates' own Appearance stamper can no longer sweep an axis the theme does not have.**
+  `tools/lib/gallery.mjs` calls itself "THE ONE COPY" of the axis contract and was the forgotten
+  one: renaming `--fs-tint-h` there left every gate at exit 0 while `export-tier` reported "28
+  palette × mode × tint combinations" and silently measured an untinted page in 21 of them — seven
+  distinct results presented as 28. `npm run axes` holds it to the axes it derives from the JS, in
+  both directions.
+- **A collapsed icon rail no longer paints a bare green glyph where the "Refreshing" pill belongs
+  on a phone.** Two rail rules sat outside the `@media (min-width: 521px)` floor that the rail
+  block's own comment legislates, carrying only the `[data-rail]` half of the guard. It was
+  reachable, not theoretical: `head.ut` stamps `data-rail` from localStorage inline and pre-paint,
+  while `data-narrow` is written later by `fitShell()` in an async module — so below 521px every
+  other rail rule was excluded while those two matched, until the modules landed, and permanently
+  if they failed.
+- **Toggling auto-collapse no longer leaves a section's `aria-expanded` claiming it is open.**
+  `fs-prefs.js` folded the menu itself with a raw `classList.remove`, satisfying the class and
+  leaving the aria stale — the exact disagreement `setOpen()` exists to prevent — then dispatched an
+  event asking the menu to repair what it had just broken. The preference module owns storage; the
+  menu owns every piece of the open/closed state and applies the change through `restoreAccordion()`,
+  which already computes it.
+- **`cssdiff.py` can see the changes it is asked to confirm.** Its property list carried no
+  `animation-*`, `transition-duration` or `mask-*`, so it reported "0 property diffs" for both the
+  refresh glyph's 19px→18px unification and the animation durations snapping onto the scale — unable
+  to see either the regression it was asked about or the change it was asked to prove. A clean diff
+  is only as honest as the property list behind it, which is the failure this repository already
+  records twice; the tool now shows those 13 diffs and nothing else.
+- **The SDK checksum step names the file it cannot find, instead of dying with a bare exit code
+  mid-release.** `WANT="$(grep … | cut …)"` under `set -euo pipefail` makes the grep's failure the
+  command, so a missing line killed the step and the `[ -n "$WANT" ] ||` guard below could never
+  print — the same dead-guard shape the step's own comment documents as fixed 45 lines above.
 - **A third-party app that builds its CSS with `insertRule()` no longer loses every rule to the
   theme.** The guard against a view's injected CSS re-hosts a `<style>` by re-setting its
   `textContent`, which re-parses the sheet — and a `<style>`'s text is not its sheet: an app that
@@ -60,6 +102,54 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 - **The one expression for "is this page dark" is now the one all three callers use.** Only the guard
   called `intendedDark()`; the applier and the OS listener spelled the condition out again, three
   lines under a comment saying they could not disagree.
+
+### Changed
+
+- **Animations follow the motion scale, like transitions already did.** `02-tokens.css` claims one
+  scale of four durations; only the *transitions* had been converted, so `fs-fade` — one keyframe,
+  one gesture — was ridden at `.14s`, `.16s` and `.3s`, and `.flash`/`.fade-out` at `.35s`/`.4s`.
+  `.14` vs `.16` for two pop surfaces is the same drift as the refresh glyph's 19px/18px, and
+  invisible to `css-dup` for the same reason: the declaration bodies differ, so it goes quiet. The
+  four `ease` keywords went too — `ease` is the initial value of `animation-timing-function`, so
+  writing it changes nothing, which `cssdiff` now confirms (0 diffs on that property). `fs-spin` is
+  the one deliberate exception and says why in place.
+- **Six specificity numbers in comments were wrong.** The rail chevron's justification for a
+  66-character selector said `(0,5,3)` against `(0,4,3)`; measured with the same analyzer
+  `css-metrics` uses, they are `(0,7,3)` and `(0,6,3)`. The login modal's said `(0,3,2)` where the
+  real selector is `(1,3,1)` — the comment had dropped the ID entirely. Every conclusion still held;
+  only the arithmetic lied, which is the worst kind of comment to leave standing, and this one had
+  already misled a reader.
+- **`header.ut` uses the UCI cursor the dispatcher already opened.** It imported `cursor` from
+  `uci` and opened a second one on every page render, then re-read `luci.main` — a package
+  `dispatcher.uc` pre-loads into `config.main` before calling the template — and left this file
+  reaching for UCI a different way than `sysauth.ut` does. Verified on the router across all three
+  paths: the saved default, the legacy `footstrap_layout` seed, and both absent.
+- **The "is this the top layout?" test is asked in one place.** It was written three times —
+  `prefs.isTopLayout()` (one caller), a raw `getAttribute` in `fs-chrome.js`, and `topBarMode()` in
+  `menu-footstrap.js` — which is the shape the `data-narrow` lesson warns about; one of those copies
+  had already drifted once.
+- **The refresh glyph is one size.** De-duplicating the SVG into `--fs-icon-refresh` left its
+  geometry free to drift, and it did: 19px in the rail, 18px in the top bar. `css-dup` cannot see
+  that — the declaration bodies differ, so it goes quiet. Now `--fs-icon-refresh-sz`.
+- **The export tier is parsed in one place.** `devkit-build.mjs` and `export-tier.mjs` each knew the
+  tier's shape, and they had already disagreed about `--text-color-highest`; `tools/lib/tokens.mjs`
+  is now the single parser both read.
+
+### Removed
+
+- **Ten dead exports, one dead option and two dead CLI flags.** `fit.run`, `fit.watch`,
+  `router.navigate`, `prefs.stampDark`, `prefs.snapshotAxes`, two on `fs-sheets` and three on
+  `fs-menutree` were on their modules' public API with no caller anywhere. `fit.touches`' `{removed}`
+  branch was orphaned by the `wireTabFit` removal above. `css-dup`'s `--min` put the gate's own
+  threshold on the command line — `--min 99` passes trivially — in a tool whose header rejects "a
+  number nobody defends", and it worked only by accident (`indexOf` → `-1` → `argv[0]` → `NaN` →
+  `|| 3`). The functions stay: two gates match `function stampDark(` by text.
+- **`stylelint-config-standard`, a dev dependency nothing extends**, fetched by every `npm ci`.
+- **`wireTabFit()` — a second MutationObserver and a second resize listener for work `fs-fit`
+  already does.** A view renders its `.cbi-tabmenu` into `#view`, which `fs-fit`'s observer watches
+  and re-fits **synchronously**, where this copy deferred through `fit.schedule()` — i.e. the
+  duplicate was strictly the slower path into the same work. Verified on the router: the bar's
+  auto-fitted state equals a forced re-fit at 1440/900/760/700/600/500/1200px.
 
 ### Security
 

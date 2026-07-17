@@ -20,7 +20,8 @@
 #   <no args>  -> STARTED | RUNNING            (spawn worker / already running)
 #   status     -> RUNNING | OK | ERR: <reason> | IDLE
 #   check      -> v<tag> | ERR: <reason>       (latest release, cached)
-# Exit 0 for all of these except a failed spawn; the client reads the keyword, not the code.
+# The client reads the KEYWORD, not the exit code: `check` exits 1 when the API is unreachable, and
+# an unknown argument exits 1, while the rest exit 0.
 
 # The CALLER sets this process's environment (above), so nothing may be resolved through an
 # inherited PATH — nor through the dynamic loader, which PATH does not cover: /bin/sh is not

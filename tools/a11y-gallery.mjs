@@ -16,10 +16,11 @@
  */
 import { chromium } from 'playwright';
 import { AxeBuilder } from '@axe-core/playwright';
-import { buildCss, serveGallery, applyAppearance, matrix } from './lib/gallery.mjs';
+import { serveGallery, applyAppearance, matrix } from './lib/gallery.mjs';
+import { buildCss } from './lib/css.mjs';
 
 /* build + serve + Appearance-axis stamping: shared with export-tier.mjs (tools/lib/gallery.mjs) */
-const { base, close } = await serveGallery(buildCss('cascade.css'));
+const { base, close } = await serveGallery(buildCss());
 
 /* The Tint axis re-hues every surface, so it multiplies this matrix like the palette does — and
  * unlike the palette it is a slider: the user can land anywhere on the wheel. Two hues, not the

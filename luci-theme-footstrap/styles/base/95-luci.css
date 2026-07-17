@@ -339,7 +339,7 @@
 	}
 
 	#modal_overlay > .modal.login > button.important {
-		/* no !important needed: (0,3,2) already beats every button rule in every layer */
+		/* no !important needed: the ID makes this (1,3,1), which no button rule can reach */
 		font-size: 120%;
 		margin-top: .5em;
 		width: 100%;
@@ -433,7 +433,7 @@
 	}
 
 	.flash {
-		animation: flash .35s;
+		animation: flash var(--fs-dur-fade);
 	}
 
 	#view > div.spinning:first-child {
@@ -466,6 +466,10 @@
 		background: var(--on-color, #000);
 		mask: var(--spinner-icon) center/cover no-repeat;
 		-webkit-mask: var(--spinner-icon) center/cover no-repeat;
+		/* The two deliberate exceptions to the motion scale (02-tokens.css), both because this
+		 * is a LOOP, not a state change: 1s is a spinner period, not one of the four durations;
+		 * and `linear` is the one justified curve — `ease` would slow at each turn's seam, so an
+		 * infinite rotation visibly stutters once a second instead of spinning. */
 		animation: fs-spin 1s linear infinite;
 	}
 
@@ -586,7 +590,7 @@
 	 * STAY though nothing here rides them: `fade-in` is an upstream animation NAME a
 	 * luci-app-* may ride (coverage contract, CLAUDE.md). */
 	.fade-out {
-		animation: fade-out .4s ease;
+		animation: fade-out var(--fs-dur-fade);
 	}
 
 	.assoclist .ifacebadge {

@@ -126,10 +126,7 @@ return baseclass.extend({
 	setTree,
 	tree: () => _tree,
 	segsFromPath,
-	nodeForSegs,
 	currentNode,
-	nodeWeight,
-	firstChildOf,
 	resolveSegs,
 	viewClassFor
 });

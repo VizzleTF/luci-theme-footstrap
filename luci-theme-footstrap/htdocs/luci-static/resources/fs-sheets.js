@@ -477,7 +477,5 @@ function watchViewSheets() {
 
 return baseclass.extend({
 	documentPoisoned,
-	dedupeViewSheets,
-	rehostInvasiveSheets,
 	watchViewSheets
 });
