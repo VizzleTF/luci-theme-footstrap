@@ -397,5 +397,6 @@ else
 fi
 info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
 info "Layout (sidebar / top bar), dark mode, palette, tint and accent all live in"
-info "the \"Appearance\" popover in the menu — they are per-browser, not per-router."
+info "the \"Appearance\" popover in the menu. Each browser keeps its own choices;"
+	info "\"Save as default\" stores the current look as the router-wide starting point."
 info "Then hard-reload the page (Ctrl+F5)."
