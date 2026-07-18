@@ -243,18 +243,29 @@ if [ -z "$THEME_URL" ]; then
 	exit 1
 fi
 
-# The updater ships from its OWN repo, always its own latest — the theme tag does not pin it. It is
-# OPTIONAL: an unreachable updater repo or a release with no updater asset is a warning, not a
-# failure, since the theme alone is a complete install. Named separately, never by a bare `\.$EXT$`
-# glob — a self-updater in the field picks each package by its own name (issue #6).
-info "Resolving the updater release (latest) from $REPO_UPDATER..."
-UPDATER_JSON="$TMP/updater.json"
-UPDATER_URL=""
-if resolve_release "$REPO_UPDATER" "$UPDATER_JSON" latest; then
-	UPDATER_URL=$(asset_urls "$UPDATER_JSON" luci-app-footstrap-updater | head -n1)
-else
-	warn "Could not reach the updater repo — installing the theme only."
-fi
+# === TEMPORARY: install the updater from the THEME release =====================================
+# The updater's own repo (VizzleTF/luci-app-footstrap-updater) has no SIGNED release yet — its
+# signing secret is not set, so its release job cannot run. Resolving the updater from there finds
+# nothing. Until it publishes, install the updater from the THEME repo's release: its v0.9.3 still
+# bundles the updater asset (the last release cut before the split), so both packages come from
+# THEME_JSON, verified by the same key. This holds only while `latest` on the theme repo is a
+# release that still carries the updater — cut a theme-only release and it stops, which is the cue
+# to switch to the two-repo path below.
+#
+# TO REVERT (once the updater repo has a signed release): delete this block and re-enable the
+# original two-repo resolution kept commented below; and change the install call further down back
+# to `install_asset "$UPDATER_URL" "$UPDATER_JSON"`.
+info "Installing the updater from the theme release (temporary — the updater repo has no release yet)..."
+UPDATER_JSON="$THEME_JSON"
+UPDATER_URL=$(asset_urls "$THEME_JSON" luci-app-footstrap-updater | head -n1)
+[ -n "$UPDATER_URL" ] || warn "The theme release carries no updater asset — installing the theme only."
+# --- original two-repo resolution (re-enable when the updater repo publishes) ---
+#   info "Resolving the updater release (latest) from $REPO_UPDATER..."
+#   UPDATER_JSON="$TMP/updater.json"; UPDATER_URL=""
+#   if resolve_release "$REPO_UPDATER" "$UPDATER_JSON" latest; then
+#       UPDATER_URL=$(asset_urls "$UPDATER_JSON" luci-app-footstrap-updater | head -n1)
+#   else warn "Could not reach the updater repo — installing the theme only."; fi
+# === end TEMPORARY =============================================================================
 
 # --- download, verify, install --------------------------------------------
 # TWO checks, answering DIFFERENT attackers, and both fail CLOSED.
