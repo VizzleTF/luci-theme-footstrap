@@ -137,7 +137,7 @@ jobs:
         run: luci-theme-footstrap/build-css.sh /tmp/cascade.css
 
       - name: CSS/JS audit (undefined vars, shadowed rules, stray !important, colour literals)
-        run: python3 .claude/skills/footstrap-audit/audit.py --strict
+        run: python3 tools/audit.py --strict
 
       # A string wrapped in _() that has no translation renders in ENGLISH, silently —
       # which is how the whole Appearance popover stayed English on a Russian LuCI while

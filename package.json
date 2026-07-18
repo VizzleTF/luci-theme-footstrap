@@ -7,7 +7,7 @@
     "lint:js": "eslint luci-theme-footstrap/htdocs && eslint luci-theme-footstrap/ucode",
     "lint:css": "stylelint \"luci-theme-footstrap/styles/**/*.css\"",
     "a11y": "node tools/a11y-gallery.mjs",
-    "audit": "python3 .claude/skills/footstrap-audit/audit.py --strict",
+    "audit": "python3 tools/audit.py --strict",
     "conffiles": "node tools/conffiles.mjs",
     "export-tier": "node tools/export-tier.mjs",
     "i18n": "luci-theme-footstrap/update-po.sh --check",
