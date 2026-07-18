@@ -19,7 +19,7 @@
  *
  * The ROUTER asks GitHub, not the browser (`footstrap-selfupdate.sh check`, the ACL-gated script the
  * Update button runs): a LAN client often has no route to the internet while the router does, and it
- * keeps the check off the user's own IP rate limit. Cached an hour by the script, memoised here per
+ * keeps the check off the user's own IP rate limit. Cached 5 min by the script, memoised here per
  * page load. Fails silent: no reachable API → no badge, the version still shows.
  *
  * The Appearance popover (the theme's fs-appearance.js) presents this; the DOM lives there, the
