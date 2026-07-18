@@ -25,18 +25,20 @@ import * as csstree from 'css-tree';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PKG = join(ROOT, 'luci-theme-footstrap');
-/* The optional updater package emits fs-* classes too (the Update confirm dialog's fs-ap-upd-*,
- * built by fs-update.js), and the theme's CSS styles them. Scan it as an emitter, or those selectors
- * read as dead. */
-const UPD = join(ROOT, 'luci-app-footstrap-updater');
+
+/* fs-* classes the theme STYLES but does not EMIT, because a SEPARATE repo emits them: the optional
+ * updater (VizzleTF/luci-app-footstrap-updater) builds the Appearance Update confirm dialog, whose
+ * fs-ap-upd-* markup fs-update.js creates — but the theme owns the chrome styling for it. Scoped to a
+ * prefix on purpose: only these dialog classes cross the repo boundary. Without this they read as dead
+ * CSS (styled, never emitted here), which they are not. */
+const EMITTED_BY_UPDATER = /^fs-ap-upd-/;
 
 /* Names that look like fs-* classes to a regex but are not. Without this the reverse check
  * drowns in custom properties and localStorage keys. */
 const IGNORE_EXACT = new Set([
-	/* localStorage keys (fs-update-check lives in the optional luci-app-footstrap-updater package,
-	 * whose htdocs the scan now covers as an emitter — so its key must be ignored here too) */
+	/* localStorage keys (fs-update-check lives in the optional updater's own repo, not scanned here) */
 	'fs-darkmode', 'fs-palette', 'fs-wallpaper', 'fs-radius', 'fs-tint', 'fs-accent',
-	'fs-rail', 'fs-layout', 'fs-menu-open', 'fs-menu-autocollapse', 'fs-update-check',
+	'fs-rail', 'fs-layout', 'fs-menu-open', 'fs-menu-autocollapse',
 	/* custom events / id prefixes */
 	'fs-autocollapse', 'fs-sub-', 'fs-topsub-',
 	/* a console log PREFIX (`console.error('fs-fit: a fitter threw')`), not markup. This is the one
@@ -96,7 +98,6 @@ const emitted = new Map();
 const SRC = [
 	...filesIn(join(PKG, 'ucode'), '.ut'),
 	...filesIn(join(PKG, 'htdocs'), '.js'),
-	...filesIn(join(UPD, 'htdocs'), '.js'),
 ];
 for (const f of SRC) {
 	const text = stripComments(readFileSync(f, 'utf8'), f);
@@ -120,7 +121,7 @@ const JUSTIFIED_UNSTYLED = {
 	'fs-nav-status': 'a JS hook (getElementById): the router\'s aria-live region, hidden by .fs-sr',
 };
 
-const orphanCss = [...styled.keys()].filter(c => !emitted.has(c)).sort();
+const orphanCss = [...styled.keys()].filter(c => !emitted.has(c) && !EMITTED_BY_UPDATER.test(c)).sort();
 const unstyled  = [...emitted.keys()].filter(c => !styled.has(c) && !IGNORE_EXACT.has(c)).sort();
 const unexpected = unstyled.filter(c => !(c in JUSTIFIED_UNSTYLED));
 

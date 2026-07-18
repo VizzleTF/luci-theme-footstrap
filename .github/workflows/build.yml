@@ -33,13 +33,11 @@ jobs:
         run: |
           set -eu
           # tools/ is in the glob because release-notes.sh is only ever RUN by the release
-          # job — i.e. after both packages have already built. A syntax error in it used to
+          # job — i.e. after the package has already built. A syntax error in it used to
           # be discovered at the one moment it costs the most.
           for f in luci-theme-footstrap/*.sh install.sh tools/*.sh \
                    luci-theme-footstrap/root/usr/libexec/*.sh \
-                   luci-theme-footstrap/root/etc/uci-defaults/* \
-                   luci-app-footstrap-updater/*.sh \
-                   luci-app-footstrap-updater/root/usr/libexec/*.sh; do
+                   luci-theme-footstrap/root/etc/uci-defaults/*; do
             [ -f "$f" ] || continue
             sh -n "$f" || { echo "syntax error: $f"; exit 1; }
           done
@@ -108,21 +106,20 @@ jobs:
       - name: rpcd ACL is valid JSON
         run: |
           set -eu
-          for f in luci-theme-footstrap/root/usr/share/rpcd/acl.d/*.json \
-                   luci-app-footstrap-updater/root/usr/share/rpcd/acl.d/*.json; do
+          for f in luci-theme-footstrap/root/usr/share/rpcd/acl.d/*.json; do
             python3 -m json.tool "$f" >/dev/null || { echo "invalid JSON: $f"; exit 1; }
             echo "ok: $f"
           done
 
-      # The release public key has to exist TWICE and neither copy can go: the updater package ships
-      # it (the self-updater reads it off the disk), and install.sh embeds it because `curl | sh`
-      # runs before any package exists. Nothing in the cascade can catch a divergence — the installer
-      # would simply reject every release with "BAD SIGNATURE", i.e. the failure looks exactly like
-      # the attack the key is there to stop. Compare the two. One key signs both packages.
-      - name: The installer embeds the key the package ships
+      # install.sh verifies the THEME asset's ed25519 signature, so it embeds the release public key —
+      # it runs from `curl | sh` before any package exists. The reference copy is release.pub at the
+      # repo root. A divergence looks exactly like the attack the key stops (the installer rejects every
+      # release with "BAD SIGNATURE"), so compare the two. The SAME key signs the updater's releases in
+      # its own repo (VizzleTF/luci-app-footstrap-updater), where the package ships its own copy.
+      - name: The installer embeds the release key
         run: |
           set -eu
-          pub=luci-app-footstrap-updater/root/usr/share/luci-app-footstrap-updater/release.pub
+          pub=release.pub
           want=$(grep -v '^untrusted comment:' "$pub" | tr -d '\n')
           [ -n "$want" ] || { echo "no key line in $pub"; exit 1; }
           # every key-shaped line in the installer, deduplicated: a stale copy left behind by a
@@ -150,7 +147,6 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y gettext
           luci-theme-footstrap/update-po.sh --check
-          luci-app-footstrap-updater/update-po.sh --check
 
   # npm-based gates. These live HERE and nowhere else: the OpenWrt buildbot has no
   # node, and luci.mk never needs one — it copies htdocs/ and ucode/ verbatim. Nothing
@@ -312,10 +308,9 @@ jobs:
       - name: Resolve the shipped JS
         run: |
           set -eu
-          # BOTH packages ship browser JS that luci.mk minifies with jsmin — the theme and the optional
-          # updater (fs-update.js). Ask the filesystem for both; a package left out silently drops the
-          # exit-0 jsmin-corruption check on its JS.
-          files=$(find luci-theme-footstrap/htdocs luci-app-footstrap-updater/htdocs -name '*.js' | sort | tr '\n' ' ')
+          # luci.mk copies htdocs/ wholesale, so every .js under it IS the shipped set — ask the
+          # filesystem, do not restate a glob (a new JS dir would be silently dropped from the check).
+          files=$(find luci-theme-footstrap/htdocs -name '*.js' | sort | tr '\n' ' ')
           [ -n "$files" ] || { echo "found no shipped JS — the glue is broken, not the theme"; exit 1; }
           echo "SHIPPED_JS=$files" >> "$GITHUB_ENV"
           echo "$files" | tr ' ' '\n'
@@ -451,61 +446,43 @@ jobs:
         working-directory: ${{ env.SDK_DIR }}
         run: |
           set -euo pipefail
-          # copy both package dirs (preserving the theme's symlinks) into the SDK
-          mkdir -p package/luci-theme-footstrap package/luci-app-footstrap-updater
+          # copy the package dir (preserving symlinks) into the SDK. Since the updater moved to its own
+          # repo (VizzleTF/luci-app-footstrap-updater), this repo builds ONLY the theme.
+          mkdir -p package/luci-theme-footstrap
           rsync -a --delete "$GITHUB_WORKSPACE/luci-theme-footstrap/" package/luci-theme-footstrap/
-          rsync -a --delete "$GITHUB_WORKSPACE/luci-app-footstrap-updater/" package/luci-app-footstrap-updater/
 
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
           echo 'CONFIG_PACKAGE_luci-theme-footstrap=m' >> .config
-          echo 'CONFIG_PACKAGE_luci-app-footstrap-updater=m' >> .config
           if [ "${{ matrix.use_apk }}" = "y" ]; then
             echo 'CONFIG_USE_APK=y' >> .config
           fi
           make defconfig
           make package/luci-theme-footstrap/compile V=s FOOTSTRAP_VERSION="$FOOTSTRAP_VERSION"
-          make package/luci-app-footstrap-updater/compile V=s FOOTSTRAP_VERSION="$FOOTSTRAP_VERSION"
 
-          # The translation catalogues are compiled INTO each package (Build/Prepare -> po2lmo), so
-          # they are build artefacts, not files in git — and a silently missing .lmo is the whole bug
-          # class this area keeps producing: every _() then renders its English msgid and nothing
-          # complains. Assert both catalogues exist in the staged package trees.
+          # The translation catalogue is compiled INTO the package (Build/Prepare -> po2lmo), a build
+          # artefact not a file in git — a silently missing .lmo ships English msgids and nothing
+          # complains. Assert it exists in the staged tree.
           find build_dir -name 'footstrap-theme.*.lmo' | grep -q . || {
             echo "no footstrap-theme.<lang>.lmo in the theme package — it would ship untranslated"
             exit 1
           }
-          find build_dir -name 'footstrap-updater.*.lmo' | grep -q . || {
-            echo "no footstrap-updater.<lang>.lmo in the updater package — it would ship untranslated"
-            exit 1
-          }
 
           mkdir -p "$GITHUB_WORKSPACE/dist"
-          find bin/ -type f \( -name 'luci-theme-footstrap-*.apk' -o -name 'luci-theme-footstrap_*.ipk' \
-                              -o -name 'luci-app-footstrap-updater-*.apk' -o -name 'luci-app-footstrap-updater_*.ipk' \) \
+          find bin/ -type f \( -name 'luci-theme-footstrap-*.apk' -o -name 'luci-theme-footstrap_*.ipk' \) \
             -exec cp {} "$GITHUB_WORKSPACE/dist/" \;
           ls -lah "$GITHUB_WORKSPACE/dist"
 
-          # EXACTLY TWO packages per format — the theme and the updater — each present by NAME. This
-          # is load-bearing, not tidiness: a self-updater IN THE FIELD resolves the theme asset by the
-          # name-anchored regex /luci-theme-footstrap[-_][^/]*\.EXT$/, so a stray extra asset that
-          # matched that regex (e.g. a per-language luci-i18n-footstrap-… package, issue #6) would be
-          # mis-picked and installed as the theme. Named-and-counted is what stops that: each package
-          # resolves to exactly ONE asset under its OWN name, and no third package sneaks in.
-          #
-          # The updater is deliberately named `luci-app-…`, NOT `luci-theme-footstrap-updater`: the
-          # latter would match the theme's own name-anchored pick and break the invariant. Because it
-          # is `luci-app-…` it never collides with /luci-theme-footstrap[-_]/.
-          #
-          # A THIRD package would need the same deliberate care (its own name-anchored pick, no
-          # collision), which is a decision to make on purpose — not by adding a glob.
+          # EXACTLY ONE theme package per format, by NAME. Load-bearing, not tidiness: a self-updater in
+          # the field resolves the theme by the name-anchored regex /luci-theme-footstrap[-_][^/]*\.EXT$/
+          # and takes head -1, so a stray extra asset matching it (e.g. a per-language luci-i18n-footstrap
+          # package, issue #6) would be mis-picked and installed as the theme. Named-and-counted stops
+          # that. (The updater is a separate repo now and releases its own single asset there.)
           n=$(ls "$GITHUB_WORKSPACE/dist" | grep -c "\.${{ matrix.fmt }}$" || true)
-          [ "$n" = 2 ] || { echo "expected exactly 2 .${{ matrix.fmt }} (theme + updater), got $n — see the note above"; exit 1; }
-          for name in luci-theme-footstrap luci-app-footstrap-updater; do
-            m=$(ls "$GITHUB_WORKSPACE/dist" | grep -cE "^${name}[-_][^/]*\.${{ matrix.fmt }}$" || true)
-            [ "$m" = 1 ] || { echo "expected exactly 1 ${name} .${{ matrix.fmt }}, got $m"; exit 1; }
-          done
+          [ "$n" = 1 ] || { echo "expected exactly 1 .${{ matrix.fmt }} (theme), got $n — see the note above"; exit 1; }
+          m=$(ls "$GITHUB_WORKSPACE/dist" | grep -cE "^luci-theme-footstrap[-_][^/]*\.${{ matrix.fmt }}$" || true)
+          [ "$m" = 1 ] || { echo "expected exactly 1 luci-theme-footstrap .${{ matrix.fmt }}, got $m"; exit 1; }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -573,7 +550,7 @@ jobs:
           printf '%s' "$FOOTSTRAP_USIGN_KEY" | base64 -d > "$RUNNER_TEMP/sec.key"
           trap 'shred -u "$RUNNER_TEMP/sec.key" 2>/dev/null || rm -f "$RUNNER_TEMP/sec.key"' EXIT
 
-          pub=luci-app-footstrap-updater/root/usr/share/luci-app-footstrap-updater/release.pub
+          pub=release.pub
           n=0
           for p in $(find dist -maxdepth 1 -type f \( -name '*.apk' -o -name '*.ipk' \) | sort); do
             "$U" -S -m "$p" -s "$RUNNER_TEMP/sec.key" -x "$p.sig"
@@ -588,39 +565,29 @@ jobs:
             echo "signed + verified: $(basename "$p")"
             n=$((n + 1))
           done
-          # 4 packages: theme + updater, in each of apk and ipk. One key signs them all.
-          [ "$n" -ge 4 ] || { echo "expected all four packages to sign, signed $n"; exit 1; }
+          # 2 packages: the theme in each of apk and ipk. The same key signs the updater's releases in
+          # its own repo.
+          [ "$n" -ge 2 ] || { echo "expected both theme packages to sign, signed $n"; exit 1; }
 
-          # The .sig assets must not disturb the asset pick of a self-updater ALREADY IN THE FIELD:
-          # it resolves the theme by /luci-theme-footstrap[-_][^/]*\.EXT$/ and the updater by
-          # /luci-app-footstrap-updater[-_][^/]*\.EXT$/, then takes head -1. A router's installed
-          # updater cannot be fixed remotely, so the RELEASE has to stay pickable by the script that
-          # is already there — the cost of being wrong is a router installing a 150-byte signature
-          # file, or the wrong package, as its theme (issue #6).
+          # The .sig assets must not disturb the asset pick of a self-updater ALREADY IN THE FIELD: it
+          # resolves the theme by /luci-theme-footstrap[-_][^/]*\.EXT$/ and takes head -1. A router's
+          # installed updater cannot be fixed remotely, so the RELEASE has to stay pickable by the
+          # script already there. Assert the name-anchored regex resolves to exactly ONE asset (a .sig
+          # ends in .EXT.sig, so it never matches `…\.EXT$`) — re-checking the invariant on the FINAL
+          # set, after signing added the .sig files.
           #
-          # Assert each NAME-anchored regex resolves to exactly ONE asset (a .sig ends in .EXT.sig, so
-          # it never matches `…\.EXT$`). This re-checks the two-package invariant on the FINAL asset
-          # set — the build job's check runs before signing added the .sig files.
-          #
-          # THE BARE `\.EXT$ | head -1` CATCH-ALL IS DELIBERATELY NO LONGER ASSERTED. It guarded
-          # self-updaters shipped up to v0.8.4, which picked by extension alone; the release now
-          # carries TWO packages per format, so that regex necessarily resolves to two and `head -1`
-          # would take `luci-app-footstrap-updater` (it sorts before `luci-theme-footstrap`). Those
-          # pre-name-matching updaters predate signing (<= v0.8.5) and cannot round-trip a modern
-          # signed release regardless; the migration path for such a router is to re-run install.sh
-          # once (which installs both packages by name). Every self-updater from the name-matching era
-          # onward — including the one shipped in THIS release — is safe, which is what the two
-          # name-anchored checks below prove.
+          # NOTE the field-migration seam of the split: a fielded self-updater ALSO looks for
+          # /luci-app-footstrap-updater[-_]…/ in THIS repo's release, and now finds none — which its
+          # non-fatal updater leg skips (the router keeps its current updater and still gets theme
+          # updates). To move onto the new repo's updater, a router re-runs install.sh once.
           for ext in apk ipk; do
-            for name in luci-theme-footstrap luci-app-footstrap-updater; do
-              re="^${name}[-_][^/]*\.$ext$"
-              n=$(ls dist | grep -cE "$re") || true
-              [ "$n" = 1 ] || {
-                echo "a fielded self-updater matching /$re/ would pick $n assets, want exactly 1:"
-                ls dist | grep -E "$re" || true
-                exit 1
-              }
-            done
+            re="^luci-theme-footstrap[-_][^/]*\.$ext$"
+            n=$(ls dist | grep -cE "$re") || true
+            [ "$n" = 1 ] || {
+              echo "a fielded self-updater matching /$re/ would pick $n assets, want exactly 1:"
+              ls dist | grep -E "$re" || true
+              exit 1
+            }
           done
           ls -l dist
 

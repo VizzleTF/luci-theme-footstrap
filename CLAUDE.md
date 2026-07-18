@@ -61,16 +61,27 @@ reached across — that is what keeps it acyclic.
 Dependencies: `prefs→fit`, `widgets→prefs`, `chrome→{fit,prefs,menutree}`, `appearance→{prefs,widgets,version}`,
 `select→fit`, `router→{menutree,chrome,sheets}`, `common→` all.
 
-- **The update CHECK and the one-click self-update are a SEPARATE, OPTIONAL package** —
-  `luci-app-footstrap-updater` (its own dir, own `Makefile`, own `dev-sync.sh`). It ships
-  `htdocs/.../fs-update.js` (the GitHub check + installer), the `footstrap-selfupdate.sh` backend, the
-  `file.exec` rpcd ACL, and `release.pub`. **No theme module statically requires `fs-update`** — a
-  missing updater would then be a `DependencyError` that takes out the whole chrome. `fs-appearance.js`
-  loads it at runtime (`L.require('fs-update')`, resolved to `null` on failure) and lights up the
-  Updates toggle + badge + Update button only when it resolves; the version line (from `fs-version.js`)
-  always shows. The router↔updater seam is INVERTED for the same reason: `fs-router.js` exports
-  `onNavigate(fn)` and `fs-update.js` registers its poll `cancel` there, so the router never names the
-  optional module. See the updater package's own notes.
+- **The update CHECK and the one-click self-update are a SEPARATE, OPTIONAL package IN ITS OWN
+  REPOSITORY** — `luci-app-footstrap-updater`, now at
+  [VizzleTF/luci-app-footstrap-updater](https://github.com/VizzleTF/luci-app-footstrap-updater) (its
+  own `Makefile`, CI, tags, version, changelog). **It is no longer in this repo** — do not re-add its
+  dir, its Makefile compile, or its gates here. This repo builds and releases the THEME alone; the two
+  are versioned independently. It ships `fs-update.js` (the GitHub check + installer), the
+  `footstrap-selfupdate.sh` backend, the `file.exec` rpcd ACL, and `release.pub`. **No theme module
+  statically requires `fs-update`** — a missing updater would then be a `DependencyError` that takes
+  out the whole chrome. `fs-appearance.js` loads it at runtime (`L.require('fs-update')`, resolved to
+  `null` on failure) and lights up the Updates toggle + badge + Update button only when it resolves;
+  the version line (from `fs-version.js`) always shows. The router↔updater seam is INVERTED for the
+  same reason: `fs-router.js` exports `onNavigate(fn)` and `fs-update.js` registers its poll `cancel`
+  there, so the router never names the optional module. **The runtime seam is unchanged by the split**
+  — `fs-update.js` still lands in `/www/luci-static/resources` and `L.require`s the theme's modules;
+  only its SOURCE moved repos. The theme's `install.sh` installs both packages from their two repos,
+  and its self-updater is repo-aware (theme from this repo, updater from its own, one `release.pub`
+  verifies both, updater skipped when current). `styles/theme/20-shell.css` keeps the confirm dialog's
+  `.fs-ap-upd-*` styling (theme owns the chrome); `tools/fs-orphans.mjs` marks that prefix
+  `EMITTED_BY_UPDATER` since the emitter is now another repo. Field migration: a router on an older
+  self-updater keeps getting theme updates (the missing updater asset is skipped, non-fatally) and
+  moves onto the new repo's updater by re-running `install.sh` once. See the updater repo's own notes.
 - **`FS_VERSION` lives in `fs-version.js` (the THEME), and the FILE NAME is part of the contract**: the
   theme `Makefile` (`Build/Prepare`) and `dev-sync.sh` both stamp the git version by `sed`-ing that
   literal **by path**. Moving the constant means changing both, and nothing else would notice — the
@@ -275,11 +286,11 @@ Everything fails **closed**. A missing digest, a missing `.sig` asset, no `usign
 
 **Why usign and not the package manager's own signature.** `apk verify` checks against `/etc/apk/keys`, so trusting footstrap's key there would make this theme a trust anchor for **everything the router installs** — far more authority than a theme has any business holding. opkg (24.10) cannot verify a standalone `.ipk` at all. `usign` is on **every** OpenWrt image (`base-files` depends on it — so this costs the theme no new runtime dep; see the `curl` lesson in the Makefile), it covers **both** formats with one mechanism, and the key it uses authorises nothing but this one package.
 
-**The key exists in two places and neither copy can go.** `luci-app-footstrap-updater/root/usr/share/luci-app-footstrap-updater/release.pub` is shipped by the updater package and is what the self-updater reads; `install.sh` must **embed** a copy, because `curl | sh` runs before any package exists. One key signs both the theme and the updater assets. A divergence cannot be caught by any test — the installer would just reject every release with `BAD SIGNATURE`, i.e. the failure looks exactly like the attack — so CI compares the two on every run. Rotating the key means changing both, and the release that ships the new `release.pub` is the one that starts trusting it.
+**The key exists in two places per repo and neither copy can go.** `install.sh` must **embed** the key, because `curl | sh` runs before any package exists; the reference copy this repo's CI compares it against is `release.pub` at the repo ROOT (the theme asset is signed too, so `install.sh` verifies it). The SAME key signs the updater's assets in its own repo, where its package ships its own `release.pub` and its CI runs the same compare. A divergence cannot be caught by any test — the installer would just reject every release with `BAD SIGNATURE`, i.e. the failure looks exactly like the attack — so each repo's CI compares its two copies on every run. Cross-repo key agreement is NOT gated: rotating the key means changing it in both repos, and the release that ships the new `release.pub` is the one that starts trusting it.
 
 `curl` is **not** in OpenWrt's default package set — the base image ships `uclient-fetch` — so the self-updater must fall back to it rather than take a runtime dependency. `jsonfilter`, `sha256sum` and `usign` *are* in the base image.
 
-**The two scripts cannot share a file** (the installer is `curl | sh` and runs *before* the package that would hold the library exists), so their `fetch()`, host allowlist, asset/signature lookup and `verify_sig()` are `@mirror`-pinned instead. That is not ceremony: they had **already** drifted three ways.
+**The two scripts cannot share a file** (the installer is `curl | sh` and runs *before* the package that would hold the library exists), so their `fetch()`, host allowlist, asset/signature lookup and `verify_sig()` are duplicated — they had **already** drifted three ways. **Since the updater split into its own repo, the `@mirror` pin between them is cross-repo and lives THERE**: the updater repo holds both `install.sh` and `footstrap-selfupdate.sh` and `npm run mirror` keeps them byte-identical inside it. This repo's `install.sh` carries the same helpers UNPINNED (its twin moved out); do not re-add `@mirror gh/*` markers to this repo's `install.sh` — the gate would fail on a group of one.
 
 - **`luci-theme-footstrap/luci-upstream.pin` is the single source of the pinned `openwrt/luci` commit** and the sha256s of the two tools this project borrows from it — `jsmin.c` (compiled and run in CI as the gate proving the shipped JS is safe) and `build/i18n-scan.pl` (run by perl as the i18n gate). Both are downloaded and **executed**, so pulling them from a moving `master` would mean the gate is whatever upstream pushed last. `update-po.sh` and the workflow both source that one file; they used to state the commit separately, each with a comment saying "bump them together". It also pins the two other borrowed-and-executed tools: `UCODE_PIN` (the interpreter that compile-checks the `.ut` templates) and `USIGN_PIN` — **the commit the router's own `usign` binary is built from**, so the signer in CI and the verifier in the field are the same code. usign needs neither cmake nor libubox: `cc *.c` over six sources plus the bundled `base64.c`; it is built by `tools/build-usign.sh`, which **both** jobs that need it call — the release job to sign, the build job to verify the SDK — because two copies of a `checkout <pin>` are exactly how two jobs end up on different commits.
 

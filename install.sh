@@ -1,26 +1,27 @@
 #!/bin/sh
-# luci-theme-footstrap installer for OpenWrt 24.10 (ipk) and 25.12+ (apk).
+# luci-theme-footstrap + luci-app-footstrap-updater installer for OpenWrt 24.10 (ipk) and 25.12+ (apk).
 #
 # One-line install (run on the router over SSH):
 #   wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
 # or:
 #   curl -fsSL https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
 #
-# Optional: pin a release tag ->  ... | sh -s v0.3.1
+# Optional: pin the THEME release tag ->  ... | sh -s v0.9.3  (the updater always takes its own latest)
 #
 # The installer ASKS whether to install the update checker (luci-app-footstrap-updater). Force the
 # answer without a prompt (scripted installs):  FOOTSTRAP_UPDATER=1 (install) / =0 (theme only).
 #
-# Detects the OpenWrt release and its package manager, then installs the matching assets
-# from the latest (or given) GitHub release: .apk on 25.12+, .ipk on 24.10. The theme
-# (luci-theme-footstrap) is always installed; the updater (luci-app-footstrap-updater — the
-# self-update backend + the Appearance Update button) is OPTIONAL and the installer asks (or
-# FOOTSTRAP_UPDATER=1/0 decides non-interactively). Licensed Apache-2.0.
+# SINCE THE SPLIT the theme and the updater ship from TWO repos with their own tags: the theme from
+# VizzleTF/luci-theme-footstrap, the updater from VizzleTF/luci-app-footstrap-updater. This installer
+# resolves each from its own latest release and verifies both against the one release key. The theme
+# is always installed; the updater is OPTIONAL and the installer asks (or FOOTSTRAP_UPDATER=1/0 decides
+# non-interactively). Licensed Apache-2.0.
 
 set -e
 
-REPO="VizzleTF/luci-theme-footstrap"
-TAG="${1:-latest}"
+REPO_THEME="VizzleTF/luci-theme-footstrap"
+REPO_UPDATER="VizzleTF/luci-app-footstrap-updater"
+TAG="${1:-latest}"		# pins the THEME tag only; the updater always resolves its own latest
 
 # mktemp, not a fixed /tmp name: /tmp is 1777, so a local unprivileged process can pre-create a
 # predictable name as a symlink and root writes the downloaded package through it (CWE-377).
@@ -124,7 +125,6 @@ ok "Package manager: $PM (installing .$EXT)"
 # wget is the last resort (non-OpenWrt); GNU wget follows https -> http redirects, hence
 # --https-only where the flag exists.
 #
-# @mirror gh/fetch
 fetch() {
 	_u="$1"; _t="$2"; _o="$3"
 	if command -v uclient-fetch >/dev/null 2>&1; then
@@ -149,19 +149,16 @@ fetch() {
 	fi
 	return 1
 }
-# @endmirror
 
 # The URL comes out of the API answer and the file it names is handed to `apk add
 # --allow-untrusted` as root. Pin the host, so a malformed or tampered response cannot point
 # that install at an arbitrary server.
-# @mirror gh/asset-host
 asset_host_ok() {
 	case "$1" in
 		https://github.com/*|https://objects.githubusercontent.com/*|https://release-assets.githubusercontent.com/*) return 0 ;;
 	esac
 	return 1
 }
-# @endmirror
 
 # Pick the asset by package NAME, not by extension. `grep "\.apk$" | head -n1` — what this did —
 # takes whichever asset GitHub lists first, and the API sorts assets BY NAME: in v0.8.4, when the
@@ -173,7 +170,6 @@ asset_host_ok() {
 # `name-1.2.3-r1.apk`, ipk: `name_1.2.3-r1_all.ipk`); anchoring on `/` in front stops a repo or
 # tag containing the package name from matching.
 #
-# @mirror gh/asset-urls
 asset_urls() {		# <json> <package-name> -> every matching asset URL, one per line
 	jsonfilter -i "$1" -e '@.assets[*].browser_download_url' 2>/dev/null \
 		| grep -E "/$2[-_][^/]*\.$EXT\$" || true
@@ -189,18 +185,15 @@ sig_url() {		# <json> <package-url> -> the detached signature published for THAT
 	# claim to have. -Fx = whole line, literal.
 	jsonfilter -i "$1" -e '@.assets[*].browser_download_url' 2>/dev/null | grep -Fx "$2.sig" || true
 }
-# @endmirror
 
 # usign is on EVERY OpenWrt image — base-files depends on it — so verifying the release signature
 # costs the theme no new runtime dependency (see LUCI_DEPENDS in the Makefile: the curl lesson).
 # The key is the package's own; it is not added to /etc/apk/keys, so nothing this package does
 # makes footstrap a trust anchor for the router's package manager at large.
-# @mirror gh/verify-sig
 verify_sig() {		# <file> <sigfile> <pubkey-file> -> 0 iff the signature is ours and intact
 	command -v usign >/dev/null 2>&1 || return 2
 	usign -V -q -m "$1" -x "$2" -p "$3"
 }
-# @endmirror
 
 # THE ONLY COPY of the release public key outside the packages, and it has to exist: this script is
 # fetched with `curl | sh` and runs BEFORE any package is installed. The package copy is
@@ -218,22 +211,7 @@ release_pubkey() {	# writes the key to $1
 	EOF
 }
 
-# --- resolve the assets ---------------------------------------------------
-if [ "$TAG" = "latest" ]; then
-	API="https://api.github.com/repos/$REPO/releases/latest"
-else
-	API="https://api.github.com/repos/$REPO/releases/tags/$TAG"
-fi
-
-info "Resolving release ($TAG)..."
-JSON="$TMP/release.json"
-if ! fetch "$API" 20 "$JSON" || [ ! -s "$JSON" ]; then
-	err "Could not reach the GitHub release API."
-	err "If it is a TLS/cert error, install the CA bundle:"
-	if [ "$PM" = "apk" ]; then err "  apk add ca-bundle   (then re-run)"; else err "  opkg update && opkg install ca-bundle   (then re-run)"; fi
-	exit 1
-fi
-
+# --- resolve the assets (TWO repos since the split) -----------------------
 # jsonfilter (OpenWrt base image) is what reads the sha256 out of the API answer — without it
 # there is no integrity check at all, only unverifiable bytes handed to root. Refuse, don't
 # fall back.
@@ -243,19 +221,40 @@ command -v jsonfilter >/dev/null 2>&1 || {
 	exit 1
 }
 
-THEME_URL=$(asset_urls "$JSON" luci-theme-footstrap | head -n1)
+# Fetch a repo's release JSON. $1 owner/repo, $2 outfile, $3 tag (latest | vX).
+resolve_release() {
+	if [ "$3" = "latest" ]; then _api="https://api.github.com/repos/$1/releases/latest"
+	else _api="https://api.github.com/repos/$1/releases/tags/$3"; fi
+	fetch "$_api" 20 "$2" && [ -s "$2" ]
+}
+
+info "Resolving the theme release ($TAG) from $REPO_THEME..."
+THEME_JSON="$TMP/theme.json"
+if ! resolve_release "$REPO_THEME" "$THEME_JSON" "$TAG"; then
+	err "Could not reach the GitHub release API."
+	err "If it is a TLS/cert error, install the CA bundle:"
+	if [ "$PM" = "apk" ]; then err "  apk add ca-bundle   (then re-run)"; else err "  opkg update && opkg install ca-bundle   (then re-run)"; fi
+	exit 1
+fi
+THEME_URL=$(asset_urls "$THEME_JSON" luci-theme-footstrap | head -n1)
 if [ -z "$THEME_URL" ]; then
 	err "Could not find a luci-theme-footstrap .$EXT asset for release '$TAG'."
-	err "Check releases: https://github.com/$REPO/releases"
+	err "Check releases: https://github.com/$REPO_THEME/releases"
 	exit 1
 fi
 
-# The updater is a SEPARATE package (the self-update backend + the Appearance Update button). It is
-# optional: a release older than the theme/updater split has no updater asset, and the theme alone is
-# a complete install, so a missing updater asset is a warning, not a failure. Named separately, never
-# by a bare `\.$EXT$` glob — a self-updater in the field picks the theme by name, so the second asset
-# must not be pickable as if it were the theme (issue #6).
-UPDATER_URL=$(asset_urls "$JSON" luci-app-footstrap-updater | head -n1)
+# The updater ships from its OWN repo, always its own latest — the theme tag does not pin it. It is
+# OPTIONAL: an unreachable updater repo or a release with no updater asset is a warning, not a
+# failure, since the theme alone is a complete install. Named separately, never by a bare `\.$EXT$`
+# glob — a self-updater in the field picks each package by its own name (issue #6).
+info "Resolving the updater release (latest) from $REPO_UPDATER..."
+UPDATER_JSON="$TMP/updater.json"
+UPDATER_URL=""
+if resolve_release "$REPO_UPDATER" "$UPDATER_JSON" latest; then
+	UPDATER_URL=$(asset_urls "$UPDATER_JSON" luci-app-footstrap-updater | head -n1)
+else
+	warn "Could not reach the updater repo — installing the theme only."
+fi
 
 # --- download, verify, install --------------------------------------------
 # TWO checks, answering DIFFERENT attackers, and both fail CLOSED.
@@ -280,6 +279,7 @@ UPDATER_URL=$(asset_urls "$JSON" luci-app-footstrap-updater | head -n1)
 # missing check, that is a failed one.
 install_asset() {
 	_url="$1"
+	_json="$2"		# the release JSON that LISTS this asset (its digest + signature live there)
 	_name=$(basename "$_url")
 	_pkg="$TMP/$_name"
 
@@ -292,7 +292,7 @@ install_asset() {
 		exit 1
 	fi
 
-	_digest=$(asset_digest "$JSON" "$_url")
+	_digest=$(asset_digest "$_json" "$_url")
 	if [ -z "$_digest" ] || ! command -v sha256sum >/dev/null 2>&1; then
 		if [ "${FOOTSTRAP_ALLOW_UNVERIFIED:-0}" = "1" ]; then
 			warn "No sha256 for $_name — installing UNVERIFIED because FOOTSTRAP_ALLOW_UNVERIFIED=1."
@@ -315,7 +315,7 @@ install_asset() {
 		ok "sha256 verified: $_name ($(wc -c < "$_pkg") bytes)"
 	fi
 
-	_sig_url=$(sig_url "$JSON" "$_url")
+	_sig_url=$(sig_url "$_json" "$_url")
 	_sig="$_pkg.sig"
 	_pub="$TMP/release.pub"
 	release_pubkey "$_pub"
@@ -343,7 +343,7 @@ install_asset() {
 		if ! verify_sig "$_pkg" "$_sig" "$_pub"; then
 			err "BAD SIGNATURE for $_name — refusing to install."
 			err "The bytes downloaded are NOT the package we published. Do not install them by"
-			err "hand; report it at https://github.com/$REPO/issues"
+			err "hand; report it at https://github.com/$REPO_UPDATER/issues"
 			exit 1
 		fi
 		ok "signature verified: $_name (usign, key $(usign -F -p "$_pub" 2>/dev/null))"
@@ -360,7 +360,7 @@ install_asset() {
 	rm -f "$_pkg"
 }
 
-install_asset "$THEME_URL"
+install_asset "$THEME_URL" "$THEME_JSON"
 
 # The updater is optional and the user chooses (see want_updater above). A release older than the
 # split simply has no updater asset — then there is nothing to offer or ask about.
@@ -369,7 +369,7 @@ if [ -z "$UPDATER_URL" ]; then
 	warn "This release publishes no luci-app-footstrap-updater asset — installing the theme only."
 	warn "The Appearance popover will show the version but no update controls."
 elif want_updater; then
-	install_asset "$UPDATER_URL"
+	install_asset "$UPDATER_URL" "$UPDATER_JSON"
 	UPDATER_INSTALLED=1
 else
 	info "Skipping the update checker — the theme shows its version but no update controls."
