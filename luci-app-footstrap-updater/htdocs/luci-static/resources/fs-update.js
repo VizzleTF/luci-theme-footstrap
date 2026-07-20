@@ -70,7 +70,11 @@ function applyUpdateCheck(val) {
  * updater-only update too — since the split the two packages have independent versions and release
  * streams. An unstamped source checkout stays 'dev' and is never checked. */
 const UPD_VERSION = '0.0.0-dev';
-function updIsReal() { return ((/^\d+\.\d+/).test(UPD_VERSION)) && UPD_VERSION !== '0.0.0-dev'; }
+/* Shape-only, and deliberately NOT `UPD_VERSION !== '0.0.0-dev'` — see the long note on isReal()
+ * in fs-version.js. A minifier that constant-folds runs before the version is stamped, so that
+ * comparison folds to false and the package reports itself as dev forever. This file is only
+ * jsmin'd today (terser is not pointed at it), which makes the trap latent rather than absent. */
+function updIsReal() { return ((/^\d+\.\d+/).test(UPD_VERSION)) && !((/-dev$/).test(UPD_VERSION)); }
 
 function fsParseVer(s) { return String(s).replace(/^v/, '').split(/[.\-+]/).map((n) => parseInt(n, 10) || 0); }
 function fsVerCmp(a, b) {

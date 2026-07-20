@@ -18,8 +18,18 @@ const FS_REPO = 'VizzleTF/luci-theme-footstrap';
 /* The parentheses around the regex are load-bearing — do not "tidy" them away. luci.mk minifies
  * this file with jsmin, whose regex-vs-division test is a ONE-character lookback against a fixed
  * allow-list. `n` (the last letter of `return`) is not on it, so `return /re/` is read as a
- * division and the regex's `//` swallows the rest of the file — exiting 0 (openwrt/luci#8299). */
-function isReal() { return ((/^\d+\.\d+/).test(FS_VERSION)) && FS_VERSION !== '0.0.0-dev'; }
+ * division and the regex's `//` swallows the rest of the file — exiting 0 (openwrt/luci#8299).
+ *
+ * The shape of the version is the WHOLE test — do NOT re-add a `FS_VERSION !== '0.0.0-dev'`
+ * comparison. CI runs terser over this file BEFORE the Makefile stamps the version, so at that
+ * moment both sides of that comparison are the same literal: terser folded it to `&& !1` and
+ * every released build reported itself as '(dev)' forever after, with the update check's theme
+ * leg (fs-update.js, gated on isReal) silently dead. An SDK/buildbot build has no terser step,
+ * so it worked locally and only ever broke in a release. A regex test is not constant-folded —
+ * proven by the same minified output, which kept this very `.test()` call — so the sentinel is
+ * excluded by its SHAPE instead. `-dev$` and not `^\d+\.\d+\.\d+$`, because dev-sync.sh stamps
+ * `git describe` ('0.9.4-12-gabc1234') and that must keep counting as a real version. */
+function isReal() { return ((/^\d+\.\d+/).test(FS_VERSION)) && !((/-dev$/).test(FS_VERSION)); }
 
 return baseclass.extend({
 	VERSION: FS_VERSION,

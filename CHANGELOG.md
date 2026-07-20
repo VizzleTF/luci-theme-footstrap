@@ -11,6 +11,25 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [0.9.5] — 2026-07-20
+
+### Fixed
+
+- **The Appearance popover shows the installed version again instead of "Footstrap (dev)", and the
+  theme's own update check is no longer dead on every released build.** `isReal()` tested
+  `FS_VERSION !== '0.0.0-dev'`, but CI runs terser over the theme's resources BEFORE the SDK build
+  stamps the git version into that literal — so at minify time both sides of the comparison were the
+  same string, terser constant-folded it, and the shipped file read
+  `return/^\d+\.\d+/.test(FS_VERSION)&&!1` (verified on a live 0.9.4 router). The later `sed`
+  rewrote the constant to `0.9.4` while `isReal()` stayed permanently `false`. Beyond the wrong
+  label, `fs-update.js` gates the theme leg of its check on `ver.isReal()`, so releases only ever
+  checked the *updater's* version — updates still arrived because one script installs both. The
+  sentinel is now excluded by SHAPE (`!/-dev$/`): a regex test is not constant-folded, proven by the
+  same minified output, which kept the existing `.test()` call. `-dev$` rather than a strict
+  `^\d+\.\d+\.\d+$` because `dev-sync.sh` stamps `git describe` (`0.9.4-12-gabc1234`), which must
+  keep counting as a real version. An SDK/buildbot build has no terser step, which is exactly why
+  this worked locally and only ever broke in a release.
+
 ## [0.9.4] — 2026-07-20
 
 ### Added
@@ -2857,6 +2876,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.9.5]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.1...v0.9.2
