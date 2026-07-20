@@ -671,7 +671,12 @@
 	.fs-main > .fs-footer { order: 3; }
 
 	@media (max-width: 767px) {
-		.fs-main > .alert-message { margin: 12px 16px 0; }
+		/* width:auto, not the base width above: that calc subtracts the DESKTOP gutter
+		 * (--fs-content-pad, 28px a side) while .fs-content's own gutter is 16px here — the
+		 * alert came out 24px narrower than the content and hugged the left (measured at 700px:
+		 * insets 16/40 where the content sits 16/16). auto + the side margins matches the
+		 * content column exactly at any width in this tier. */
+		.fs-main > .alert-message { margin: 12px 16px 0; width: auto; }
 	}
 
 	/* Phone: alerts (e.g. the sysupgrade banner, injected by ui.addNotification as a

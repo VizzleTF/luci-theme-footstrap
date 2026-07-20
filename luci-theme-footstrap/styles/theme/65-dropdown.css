@@ -411,8 +411,13 @@
 		.table.cbi-section-table .td.cbi-section-actions::before { content: none; }
 		/* flex-wrap: LuCI groups the row's buttons in ONE inner <div>, so the td's own wrap
 		 * (above) never fires — the div is a single flex item. Four buttons are ~330px; on a
-		 * 320px phone the carded interfaces row overflowed its section by 17px. */
-		.table.cbi-section-table .td.cbi-section-actions > * { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 8px; }
+		 * 320px phone the carded interfaces row overflowed its section by 17px. PINNED to the
+		 * data table's copy (theme/30-tables.css), which hit the same trap on Startup. */
+		.table.cbi-section-table .td.cbi-section-actions > * {
+			/* @mirror table-card/actions-inner */
+			flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 8px;
+			/* @endmirror */
+		}
 		.table.cbi-section-table .td .cbi-dropdown,
 		.table.cbi-section-table .td select,
 		.table.cbi-section-table .td input[type="text"] { width: 100%; min-width: 0; }

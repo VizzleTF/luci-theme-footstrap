@@ -374,6 +374,16 @@
 		flex-wrap: wrap; gap: 8px; padding-top: 8px;
 		/* @endmirror */
 	}
+	/* LuCI groups a row's buttons in ONE inner <div> (startup.js wraps all five), so the td's own
+	 * flex-wrap above never fires — the div is a single flex item, and .fs-main's overflow-x:clip
+	 * CUT the tail button (Startup at 390px, measured: the div needs 350px in a 324px cell and
+	 * "Stop" vanished). Same trap the config table hit on the interfaces row; PINNED to its copy
+	 * in theme/65-dropdown.css. */
+	.table.fs-stacked .td.cbi-section-actions > * {
+		/* @mirror table-card/actions-inner */
+		flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 8px;
+		/* @endmirror */
+	}
 	/* Nothing in a half-width cell may force the row wider than the viewport: .fs-main is
 	 * overflow-x:clip, so an over-wide child is CUT, not scrolled to. */
 	.table.fs-stacked .td > *,

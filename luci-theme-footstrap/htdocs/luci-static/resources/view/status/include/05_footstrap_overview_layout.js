@@ -22,7 +22,11 @@ function isFootstrapTheme() {
 const ROLES = { [_('System')]: 'sys', [_('Memory')]: 'mem', [_('Storage')]: 'sto' };
 
 function sectionTitle(sec) {
-	const h = sec.querySelector('.cbi-title h3');
+	/* TWO title markups, one per release: 25.12 wraps the heading (`.cbi-title > h3`), 24.10
+	 * emits a bare `<h3>` as the section's first child. Matching only the wrapped one meant the
+	 * grid never applied on 24.10 at all — measured on the dev container: every section tagged
+	 * `none`, `.fs-ovl` never built, silently. */
+	const h = sec.querySelector('.cbi-title h3, :scope > h3');
 	return (h && h.firstChild) ? String(h.firstChild.nodeValue || '').trim() : '';
 }
 

@@ -111,6 +111,22 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ### Fixed
 
+- **Startup's action buttons no longer get cut off on a phone — the card's button row wraps.**
+  LuCI groups a row's buttons in ONE inner `<div>`, so the card's own `flex-wrap` on the actions
+  cell never fired — the div is a single flex item, and `.fs-main`'s `overflow-x: clip` cut the
+  tail button (measured at 390px: the five-button div needs 350px in a 324px cell and "Stop"
+  vanished). The config-table card had this exact fix already (the interfaces row, 320px);
+  the data-table card now carries it too, `@mirror`-pinned so the two copies cannot drift.
+- **Notifications below 768px now span the content column instead of hugging the left, 24px
+  short.** `.fs-main > .alert-message` kept its desktop width (100% minus the 28px-a-side
+  gutter) while the content's own gutter narrows to 16px in that tier — measured at 700px:
+  alert insets 16/40 where the content sits 16/16. The narrow tier now uses `width: auto` with
+  the side margins, matching the column exactly at any width.
+- **The overview's two-column grid never applied on 24.10 — the section title lookup only knew
+  25.12's markup.** 25.12 wraps a section heading in `.cbi-title > h3`; 24.10 emits a bare
+  `<h3>` as the section's first child, so `sectionTitle()` returned `''` for every section and
+  `.fs-ovl` was silently never built (measured on the 24.10 dev container). The lookup now
+  accepts both shapes.
 - **The toggle switch is a 44×30 click target — it shipped at 40×22, under the WCAG 2.5.8
   floor.** The real checkbox inside `.cbi-checkbox` is `opacity: 0` at 0×0, so the label IS the
   whole hit box of LuCI's most common control, and 22px sat under the same 24px minimum the
