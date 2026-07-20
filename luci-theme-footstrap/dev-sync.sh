@@ -41,7 +41,7 @@ FS_V="$(git -C "$D" describe --tags --always 2>/dev/null | sed 's/^v//')"
 # describe yields nothing (a copied tree without .git). expr refuses a tag with
 # sed/shell-special characters rather than interpolating it.
 if [ -n "$FS_V" ] && expr "$FS_V" : '[0-9A-Za-z._-]*$' >/dev/null; then
-	ssh "$R" "sed -i \"s#const FS_VERSION = '[^']*'#const FS_VERSION = '$FS_V'#\" /www/luci-static/resources/fs-version.js"
+	ssh "$R" "sed -i \"s#const FS_VERSION *= *'[^']*'#const FS_VERSION = '$FS_V'#\" /www/luci-static/resources/fs-version.js"
 fi
 
 # The catalogue, which the PACKAGE compiles in Build/Prepare. po2lmo is a luci-base host tool,

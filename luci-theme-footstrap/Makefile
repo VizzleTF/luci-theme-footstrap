@@ -37,15 +37,27 @@ LUCI_URL:=https://github.com/VizzleTF/luci-theme-footstrap
 # :has()/color-mix()/nested calc() and break the layout. build-css.sh minifies instead.
 LUCI_MINIFY_CSS:=0
 #
-# JS: DO let luci.mk minify it — LUCI_MINIFY_JS defaults to 1, so this is the absence of an
-# opt-out. That is jsmin (luci-base/src/jsmin.c, on the buildbot already since luci-base/host is
-# a build dep). ~105 KB of this theme's 169 KB of JS is comments, and uhttpd serves /www with NO
-# compression, so those are wire AND flash bytes: jsmin ships 55 KB, git keeps every word.
+# JS: TWO minify paths, chosen by who is building.
 #
-# The catch, and why the gates exist: jsmin decides `/` = regex-or-division from a ONE-character
-# lookback, and `n` (of `return`) and `>` (of `=>`) are not on its allow-list — so `return /re/`
-# makes it eat the rest of the file AND EXIT 0 (openwrt/luci#8299). eslint's `wrap-regex` bans
-# the shape; tools/jsmin-verify.mjs proves jsmin's output is TOKEN-IDENTICAL to the source.
+# CI (the released packages) pre-minifies with terser BEFORE the SDK build (tools/minify-js.mjs:
+# mangles top-level identifiers too, which jsmin cannot — ~41 KB against jsmin's ~57 KB, −27%)
+# and signals it with FOOTSTRAP_PREMIN=1. jsmin must then stay AWAY from the already-minified
+# output: terser legitimately emits `return/^v/.test(s)`, the exact one-character-lookback trap
+# below, so LUCI_MINIFY_JS goes to 0 for that build.
+#
+# Everyone else (an SDK user, the buildbot — no node) builds the untouched source and KEEPS
+# luci.mk's default jsmin (LUCI_MINIFY_JS=1): ~105 KB of this tree's JS is comments, and uhttpd
+# serves /www with NO compression, so those are wire AND flash bytes either way.
+#
+# The catch on the jsmin path, and why the gates exist: jsmin decides `/` = regex-or-division
+# from a ONE-character lookback, and `n` (of `return`) and `>` (of `=>`) are not on its
+# allow-list — so `return /re/` makes it eat the rest of the file AND EXIT 0
+# (openwrt/luci#8299). eslint's `wrap-regex` bans the shape in the SOURCE; tools/jsmin-verify.mjs
+# proves jsmin's output is TOKEN-IDENTICAL to it. Both keep guarding the non-CI path.
+FOOTSTRAP_PREMIN?=
+ifneq ($(FOOTSTRAP_PREMIN),)
+LUCI_MINIFY_JS:=0
+endif
 
 # TWO licences, for two bodies of work.
 #
@@ -168,7 +180,7 @@ define Build/Prepare/luci-theme-footstrap
 	# htdocs/, which luci.mk already copies.)
 	$(CP) $(CURDIR)/LICENSE $(PKG_BUILD_DIR)/
 	$(SHELL) $(CURDIR)/build-css.sh $(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css
-	$(if $(PKG_VERSION),$(SED) "s#const FS_VERSION = '[^']*'#const FS_VERSION = '$(PKG_VERSION)'#" \
+	$(if $(PKG_VERSION),$(SED) "s#const FS_VERSION *= *'[^']*'#const FS_VERSION = '$(PKG_VERSION)'#" \
 		$(PKG_BUILD_DIR)/htdocs/luci-static/resources/fs-version.js)
 	$(INSTALL_DIR) $(PKG_BUILD_DIR)/root/usr/lib/lua/luci/i18n
 	$(foreach po,$(wildcard $(CURDIR)/i18n/*/*.po), \

@@ -189,6 +189,55 @@ function patchOverview() {
 	}).catch((e) => console.error('footstrap: overview progressive paint not applied', e));
 }
 
+/* Status→Overview is a `template` node whose server template (admin_status/index.ut) defines 3
+ * globals the stock status includes use (18_cpu/20_memory/25_storage/…) and then instantiates
+ * view.status.index. Arriving by the theme's SPA router never runs that inline <script>, so
+ * define them here — at module eval, i.e. inside index.load(), before ANY include renders —
+ * guarded, so a full load's copies (any theme) are not clobbered. Lives in this include and not
+ * in fs-router.js on purpose: the router ships on every page, and this ~1.1 KB is overview-only.
+ * Bodies are verbatim from upstream except L.itemlist → window.L.itemlist (the two-L trap,
+ * docs/14). */
+function ensureOverviewHelpers() {
+	/* eslint-disable no-var -- these three bodies are copied VERBATIM from LuCI's
+	   admin_status/index.ut so they can be diffed against upstream when it changes.
+	   Modernising the `var`s would silently break that property, which is the whole
+	   reason the copies are safe to carry. */
+	if (typeof window.progressbar !== 'function')
+		window.progressbar = function(query, value, max, byte) {
+			var pg = document.querySelector(query),
+			    vn = parseInt(value) || 0,
+			    mn = parseInt(max) || 100,
+			    fv = byte ? String.format('%1024.2mB', value) : value,
+			    fm = byte ? String.format('%1024.2mB', max) : max,
+			    pc = Math.floor((100 / mn) * vn);
+			if (pg) {
+				pg.firstElementChild.style.width = pc + '%';
+				pg.setAttribute('title', '%s / %s (%d%%)'.format(fv, fm, pc));
+			}
+		};
+	if (typeof window.renderBox !== 'function')
+		window.renderBox = function(title, active, childs) {
+			childs = childs || [];
+			childs.unshift(window.L.itemlist(E('span'), [].slice.call(arguments, 3)));
+			return E('div', { class: 'ifacebox' }, [
+				E('div', { class: 'ifacebox-head center ' + (active ? 'active' : '') },
+					E('strong', title)),
+				E('div', { class: 'ifacebox-body left' }, childs)
+			]);
+		};
+	if (typeof window.renderBadge !== 'function')
+		window.renderBadge = function(icon, title) {
+			return E('span', { class: 'ifacebadge' }, [
+				E('img', { src: icon, title: title || '' }),
+				window.L.itemlist(E('span'), [].slice.call(arguments, 2))
+			]);
+		};
+	/* eslint-enable no-var */
+}
+/* Unconditional (no theme gate): on a full load — any theme — the template's own copies exist
+ * first and the typeof guards make this a no-op; on an SPA arrival they are what saves the page. */
+ensureOverviewHelpers();
+
 /* Module-evaluation time = inside index.load(), before render(). From render() it would be too
  * late: poll_status has already been called by then. */
 if (isFootstrapTheme())

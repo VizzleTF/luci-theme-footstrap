@@ -20,7 +20,8 @@
     "chrome-fence": "node tools/chrome-fence.mjs",
     "css-i18n": "node tools/css-i18n.mjs",
     "devkit": "node tools/devkit-build.mjs",
-    "changelog": "node tools/changelog.mjs"
+    "changelog": "node tools/changelog.mjs",
+    "minify-js": "node tools/minify-js.mjs luci-theme-footstrap/htdocs/luci-static/resources"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
@@ -32,6 +33,7 @@
     "eslint": "^10.7.0",
     "globals": "^17.7.0",
     "playwright": "^1.61.1",
-    "stylelint": "^17.14.0"
+    "stylelint": "^17.14.0",
+    "terser": "^5.49.0"
   }
 }

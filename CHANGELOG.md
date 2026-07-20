@@ -198,6 +198,29 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
   where centring would drop the label to the middle of control+help. Delta is 0 on both 24.10 and
   25.12.
 
+### Performance
+
+- **Released packages ship terser-minified JS: ~41 KB where jsmin shipped ~57 KB (−27%).** jsmin
+  strips only comments and whitespace — identifiers are wire bytes, and uhttpd serves `/www`
+  uncompressed. CI now pre-minifies with terser (`tools/minify-js.mjs`; mangling top-level names
+  is safe because LuCI evaluates a resource file inside a function wrapper, and everything that
+  crosses a module seam is an undeclared global terser never renames) and builds with
+  `FOOTSTRAP_PREMIN=1`, which turns `LUCI_MINIFY_JS` off — jsmin over terser output would re-open
+  the openwrt/luci#8299 regex trap on shapes terser legitimately emits. An SDK build without node
+  keeps the jsmin path exactly as before, and `wrap-regex`/`jsmin-verify` keep guarding it. The
+  tool verifies its own output (it parses, the `'require'` pragma prologue is intact, the
+  `FS_VERSION` sed contract survives) and fails the build otherwise.
+- **The SPA router no longer carries the overview's template helpers on every page.** The ~1.1 KB
+  of `progressbar`/`renderBox`/`renderBadge` copies — needed only when Status→Overview is reached
+  by SPA navigation — moved from `fs-router.js` into the overview include, whose module eval runs
+  inside `index.load()`: still before any include renders, so the guarantee is unchanged.
+- **The optional updater module loads at idle instead of during chrome init.** On a router
+  without `luci-app-footstrap-updater` that `L.require('fs-update')` is a guaranteed 404, and it
+  fired in the middle of chrome init, competing with the view's own module fetch and RPCs on
+  every full load. The Appearance wiring is deferred to `requestIdleCallback` (capped at 2 s for
+  pages that never go idle), so it lands a few ms after load on a quiet page and within ~2 s
+  worst-case.
+
 ## [0.9.3] — 2026-07-17
 
 ### Added

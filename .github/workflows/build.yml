@@ -442,6 +442,20 @@ jobs:
           [ -n "$SDK_DIR" ] || { echo "SDK dir not found"; exit 1; }
           echo "SDK_DIR=$SDK_DIR" >> "$GITHUB_ENV"
 
+      # Terser beats jsmin by ~27% (identifier mangling, which jsmin cannot do), so the RELEASED
+      # packages ship terser output and the Makefile turns jsmin off for this build
+      # (FOOTSTRAP_PREMIN=1 -> LUCI_MINIFY_JS:=0 — jsmin over terser output would re-open the
+      # openwrt/luci#8299 regex trap on shapes terser legitimately emits). Minifying the CHECKOUT
+      # before the rsync below keeps the SDK build itself untouched. tools/minify-js.mjs verifies
+      # its own output (parses, require-pragma prologue intact, sane size) and fails the build
+      # otherwise. An SDK user without this step builds the readable source with jsmin as before.
+      - name: Pre-minify theme JS (terser)
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+          node tools/minify-js.mjs luci-theme-footstrap/htdocs/luci-static/resources
+          echo "FOOTSTRAP_PREMIN=1" >> "$GITHUB_ENV"
+
       - name: Build package
         working-directory: ${{ env.SDK_DIR }}
         run: |
@@ -459,7 +473,8 @@ jobs:
             echo 'CONFIG_USE_APK=y' >> .config
           fi
           make defconfig
-          make package/luci-theme-footstrap/compile V=s FOOTSTRAP_VERSION="$FOOTSTRAP_VERSION"
+          make package/luci-theme-footstrap/compile V=s FOOTSTRAP_VERSION="$FOOTSTRAP_VERSION" \
+            FOOTSTRAP_PREMIN="${FOOTSTRAP_PREMIN:-}"
 
           # The translation catalogue is compiled INTO the package (Build/Prepare -> po2lmo), a build
           # artefact not a file in git — a silently missing .lmo ships English msgids and nothing

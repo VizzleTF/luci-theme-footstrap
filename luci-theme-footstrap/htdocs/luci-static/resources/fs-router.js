@@ -229,49 +229,6 @@ function seed() {
 	adoptEntry();
 }
 
-/* Status→Overview is a `template` node whose server template (admin_status/index.ut) defines 3
- * globals the stock status includes use (18_cpu/20_memory/25_storage/…) and then instantiates
- * view.status.index. Arriving by SPA never runs that inline <script>, so define them here — guarded,
- * so a prior full load's copies are not clobbered. Bodies are verbatim from upstream except
- * L.itemlist → window.L.itemlist (the two-L trap, docs/14). */
-function ensureOverviewHelpers() {
-	/* eslint-disable no-var -- these three bodies are copied VERBATIM from LuCI's
-	   admin_status/index.ut so they can be diffed against upstream when it changes.
-	   Modernising the `var`s would silently break that property, which is the whole
-	   reason the copies are safe to carry. */
-	if (typeof window.progressbar !== 'function')
-		window.progressbar = function(query, value, max, byte) {
-			var pg = document.querySelector(query),
-			    vn = parseInt(value) || 0,
-			    mn = parseInt(max) || 100,
-			    fv = byte ? String.format('%1024.2mB', value) : value,
-			    fm = byte ? String.format('%1024.2mB', max) : max,
-			    pc = Math.floor((100 / mn) * vn);
-			if (pg) {
-				pg.firstElementChild.style.width = pc + '%';
-				pg.setAttribute('title', '%s / %s (%d%%)'.format(fv, fm, pc));
-			}
-		};
-	if (typeof window.renderBox !== 'function')
-		window.renderBox = function(title, active, childs) {
-			childs = childs || [];
-			childs.unshift(window.L.itemlist(E('span'), [].slice.call(arguments, 3)));
-			return E('div', { class: 'ifacebox' }, [
-				E('div', { class: 'ifacebox-head center ' + (active ? 'active' : '') },
-					E('strong', title)),
-				E('div', { class: 'ifacebox-body left' }, childs)
-			]);
-		};
-	if (typeof window.renderBadge !== 'function')
-		window.renderBadge = function(icon, title) {
-			return E('span', { class: 'ifacebadge' }, [
-				E('img', { src: icon, title: title || '' }),
-				window.L.itemlist(E('span'), [].slice.call(arguments, 2))
-			]);
-		};
-	/* eslint-enable no-var */
-}
-
 /* Attempt an in-place navigation to `pathname`. Returns true if handled as a
  * SPA nav (caller should preventDefault), false to let the browser do a normal
  * full navigation. `push` adds a history entry (false when replaying popstate).
@@ -437,9 +394,10 @@ function navigate(pathname, push, kbd) {
 	 * RPCs for as long as the user stayed. Only on a REVISIT does require() return the cached
 	 * singleton whose __init__ already ran. `_seen` is that distinction, and it must be read BEFORE
 	 * the require resolves, since the require is what fills LuCI's cache. */
-	if (className === 'view.status.index')
-		ensureOverviewHelpers();
-
+	/* Status→Overview needs the 3 template globals (progressbar/renderBox/renderBadge) an SPA
+	 * arrival never defines — the overview include (05_footstrap_overview_layout.js) defines them
+	 * at its module eval, i.e. inside index.load(), before any include renders. Not here: that
+	 * put ~1.1 KB of overview-only code on every page. */
 	const RT = window.L;
 	const cached = _seen.has(className);
 	_seen.add(className);

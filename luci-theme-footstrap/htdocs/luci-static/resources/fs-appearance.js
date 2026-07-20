@@ -17,8 +17,21 @@
 
 function wire() {
 	/* fs-update ships in the optional updater package; resolve it to null when absent so the popover
-	 * degrades to version-only instead of failing to build. */
-	return window.L.require('fs-update').then((m) => m, () => null).then(wireAppearance);
+	 * degrades to version-only instead of failing to build.
+	 *
+	 * Deferred to IDLE: on a router without the updater that require is a guaranteed 404, and it
+	 * used to fire in the middle of chrome init — competing with the view's own module fetch and
+	 * RPCs on every full load. Nothing needs the popover in the first idle moment; the timeout
+	 * caps the wait on a page that never goes idle (a busy poll), so the Appearance button is
+	 * wired within ~2 s worst-case, typically a few ms after load. */
+	return new Promise((resolve) => {
+		const go = () => resolve(
+			window.L.require('fs-update').then((m) => m, () => null).then(wireAppearance));
+		if (typeof window.requestIdleCallback === 'function')
+			window.requestIdleCallback(go, { timeout: 2000 });
+		else
+			window.setTimeout(go, 1);
+	});
 }
 
 function wireAppearance(update) {
