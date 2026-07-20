@@ -168,6 +168,9 @@
 	 * SPLITS the free space between the two and the pill drifts away from the buttons.
 	 * .fs-themerow keeps its own auto for when the pill is empty and collapsed. */
 	.fs-sidebar #indicators:not(:empty) ~ .fs-themerow { margin-left: 0; }
+	/* …and there are TWO .fs-themerow buttons now (Search, then Appearance), so the same split
+	 * would happen between THEM whenever the pill is collapsed: the second one stands down too. */
+	.fs-themerow ~ .fs-themerow { margin-left: 0; }
 	.fs-logout {
 		flex: 0 0 auto; order: 2; justify-content: center;
 		width: var(--fs-btn-size); height: var(--fs-btn-size); padding: 0;

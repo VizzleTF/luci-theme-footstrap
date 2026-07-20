@@ -95,6 +95,8 @@
 
 				<div class="fs-spacer"></div>
 
+				{# right cluster, in visual order: the poll pill above, then Search, Appearance, Log out #}
+				{% include('themes/footstrap/partials/search') %}
 				{% include('themes/footstrap/partials/appearance') %}
 				{% include('themes/footstrap/partials/logout') %}
 			</nav>

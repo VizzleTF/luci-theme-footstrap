@@ -1,0 +1,97 @@
+@layer theme {
+	/* ==================================================================
+	 * The page-search palette. Markup is built by fs-search.js and parented to <body>:
+	 * the vertical .fs-sidebar is `overflow: auto`, which would clip a child of the trigger,
+	 * and the overlay has to cover the whole viewport anyway.
+	 * ================================================================== */
+
+	/* The scrim. --fs-scrim is the theme's one colour literal (plain black at .7) on purpose:
+	 * it is the absence of light behind a dialog, not a tint of any palette token. */
+	.fs-search-ov {
+		position: fixed; inset: 0; z-index: var(--fs-z-popover);
+		display: flex; justify-content: center;
+		/* not centred vertically: the box grows DOWNWARD as results come in, and a centred one
+		 * would slide the input out from under the user's eyes on every keystroke */
+		align-items: flex-start;
+		padding: max(8vh, 24px) 16px 16px;
+		background: var(--fs-scrim);
+		animation: fs-fade var(--fs-dur-fade);
+	}
+	.fs-search-ov[hidden] { display: none; }
+
+	/* The dialog itself. It is a SCROLL CONTAINER, and that is not decoration: without a cap the
+	 * box grows past a short viewport (a phone in landscape is ~380px tall) and the rows at the
+	 * bottom become unreachable — a `position: fixed` popup cannot be scrolled by the page. */
+	.fs-search-box {
+		display: flex; flex-direction: column; min-height: 0;
+		width: 100%; max-width: 560px; max-height: min(70dvh, 560px);
+		background: var(--fs-glass);
+		backdrop-filter: var(--fs-blur); -webkit-backdrop-filter: var(--fs-blur);
+		border: 1px solid var(--fs-border); border-radius: var(--fs-radius-lg);
+		box-shadow: var(--fs-shadow-pop);
+		overflow: hidden;
+	}
+
+	.fs-search-row {
+		display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
+		padding: 12px 14px;
+		border-bottom: 1px solid var(--fs-border);
+	}
+	.fs-search-ico { display: inline-flex; color: var(--fs-faint); }
+	.fs-search-ico .fs-ico { width: 18px; height: 18px; }
+	/* The input carries no frame of its own — the ROW is the field, and the box around it is the
+	 * dialog. Two classes (0,2,0) on purpose: the generic field box in 60-inputs.css is
+	 * `input[type="text"], …` (0,1,1), which outranks a single class in the same layer whatever
+	 * the source order — measured, it painted this input with the page-field border, panel2 fill,
+	 * 8px/11px padding and a focus ring inside the dialog's own frame.
+	 *
+	 * 16px is not the theme's body size and is deliberate: a font-size below 16px makes iOS
+	 * Safari zoom the page when the field takes focus, and this one takes focus the moment the
+	 * palette opens. */
+	.fs-search-row .fs-search-input {
+		flex: 1 1 auto; min-width: 0;
+		margin: 0; padding: 0; border: 0; min-height: 0; background: transparent;
+		color: var(--fs-text);
+		font-family: inherit; font-size: 16px; font-weight: 600; line-height: 1.4;
+	}
+	.fs-search-row .fs-search-input:focus { outline: none; box-shadow: none; }
+	.fs-search-row .fs-search-input::placeholder { color: var(--fs-faint); font-weight: 600; }
+
+	.fs-search-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px; }
+
+	.fs-search-opt {
+		display: flex; align-items: baseline; gap: 10px;
+		padding: 9px 10px; border-radius: var(--fs-radius);
+		color: var(--fs-text); text-decoration: none; cursor: pointer;
+	}
+	/* One highlight for both pointer and keyboard: `.active` is set by fs-search.js for the
+	 * aria-activedescendant row AND on pointermove, so the mouse and the arrow keys can never
+	 * disagree about which row Enter would open. */
+	.fs-search-opt.active { background: var(--fs-accent-soft); color: var(--fs-accent); }
+	.fs-search-opt-title { flex: 0 1 auto; font-weight: 700; font-size: 14px; }
+	/* the breadcrumb: which section owns the page — the whole point of searching for it */
+	.fs-search-opt-path {
+		flex: 1 1 auto; min-width: 0;
+		color: var(--fs-faint); font-size: 12px; text-align: right;
+		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+	}
+	.fs-search-opt.active .fs-search-opt-path { color: inherit; }
+
+	/* "Recently visited" — the caption over the rows */
+	.fs-search-note {
+		flex: 0 0 auto;
+		padding: 10px 14px 2px;
+		color: var(--fs-faint);
+		font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+	}
+	.fs-search-note[hidden] { display: none; }
+
+	/* …and the box's EMPTY STATE when there are no rows at all ("No pages found"), which reads as
+	 * a sentence, not as an eyebrow label. :has() rather than a sibling combinator: the note sits
+	 * ABOVE the list it describes, so `+` cannot reach back to it. */
+	.fs-search-box:has(.fs-search-list:empty) .fs-search-note {
+		padding: 26px 14px 30px;
+		text-align: center; text-transform: none; letter-spacing: 0;
+		font-size: 13px; font-weight: 600;
+	}
+}

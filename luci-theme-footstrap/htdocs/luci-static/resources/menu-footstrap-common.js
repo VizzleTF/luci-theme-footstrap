@@ -8,6 +8,7 @@
 'require fs-appearance as appearance';
 'require fs-prefs as prefs';
 'require fs-sheets as sheets';
+'require fs-search as search';
 
 /* The chrome BOOTSTRAP: load the menu tree once, hand it to the parts that need it, and wire them
  * in the right order. It renders nothing itself — every piece lives in its own module:
@@ -18,6 +19,7 @@
  *   fs-chrome      mode menu, section tabs, the rail toggle, the "does it still fit" measurements
  *   fs-router      the SPA client router (docs/14)
  *   fs-sheets      the guard against a view's injected CSS repainting every later page
+ *   fs-search      the page-search palette (indexes the same tree, on first open)
  *   fs-appearance  the popover
  *   fs-version     the shipped version string (shown in the popover, no network)
  *
@@ -59,6 +61,9 @@ return baseclass.extend({
 
 			chrome.renderChrome();
 			appearance.wire();
+			/* after setTree(): the palette indexes that tree — lazily, on its first open, but its
+			 * recent-pages list is recorded from the first navigation onwards */
+			search.wire();
 			chrome.wireRail();
 			router.wire();
 			router.wireVisibility();

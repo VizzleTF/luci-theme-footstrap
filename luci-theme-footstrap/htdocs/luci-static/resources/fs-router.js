@@ -297,12 +297,17 @@ function navigate(pathname, push, kbd) {
 	/* kill the outgoing view's plain setInterval pollers too (podkop's log tailer) — a full load
 	 * would have. L.Poll's own tick survives. */
 	clearViewIntervals();
-	/* run every registered navigation callback — today just the optional updater's poll-chain cancel
-	 * (its setTimeout would otherwise keep firing fs.exec RPCs and pop its modal over the page we are
-	 * about to open). The router carries NO static dependency on that optional module — a missing
-	 * updater would be a DependencyError that takes out the whole chrome — so the edge is inverted:
-	 * fs-update.js (when the updater is installed) registers its cancel via onNavigate() below. */
-	for (const fn of _navCbs) { try { fn(); } catch (e) {} }
+	/* run every registered navigation callback — the optional updater's poll-chain cancel (its
+	 * setTimeout would otherwise keep firing fs.exec RPCs and pop its modal over the page we are
+	 * about to open) and the search palette's recent-pages record. The router carries NO static
+	 * dependency on the optional updater — a missing one would be a DependencyError that takes out
+	 * the whole chrome — so the edge is inverted: fs-update.js registers its cancel via onNavigate()
+	 * below.
+	 *
+	 * The RESOLVED segments are passed in, and that is not convenience: this runs BEFORE L.env is
+	 * re-pointed a few lines down, so a callback reading L.env.dispatchpath for "where are we going"
+	 * would silently record the page being left. */
+	for (const fn of _navCbs) { try { fn(rsegs); } catch (e) {} }
 	try { if (typeof ui.hideModal === 'function') ui.hideModal(); } catch (e) {}
 
 	/* point the runtime env at the new node so views, tabs and highlighting read the right
@@ -557,9 +562,10 @@ function wireVisibility() {
 	});
 }
 
-/* Callbacks to run on every SPA navigation. The only registrant today is the optional updater's poll
- * cancel (see navigate()); the registry exists so router keeps no static dependency on that optional
- * module. */
+/* Callbacks to run on every SPA navigation, each handed the resolved segments of the INCOMING page
+ * (see navigate() — they run before L.env is re-pointed). Registrants: the optional updater's poll
+ * cancel, which is why the registry exists at all (the router keeps no static dependency on that
+ * optional module), and fs-search's recent-pages record. */
 const _navCbs = [];
 function onNavigate(fn) { if (typeof fn === 'function') _navCbs.push(fn); }
 

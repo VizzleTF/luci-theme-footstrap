@@ -15,6 +15,23 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ### Added
 
+- **Find a page by typing its name: a search palette on `Ctrl`/`Cmd`+`K`, on `/`, or from the
+  magnifier in the chrome's right cluster, beside Appearance.** A loaded router carries around 200
+  reachable pages across 11 sections, and the only way to open one was to know which section owns
+  it — "Attended Sysupgrade"
+  is under System, "Port Forwards" is a TAB of Network → Firewall and appears in no menu list until
+  you are already there. Results are ranked title-prefix first, then title, then the ENGLISH path
+  segment (so `firewall` finds Межсетевой экран on a Russian router) and finally the breadcrumb;
+  every token must match, so `fire port` narrows to Port Forwards. Before a character is typed the
+  palette lists the last 8 pages visited, which is the view a router admin sees most — three or
+  four pages is where they live. It costs no request: the index is built, on first open only, from
+  the same ACL-filtered `/admin/menu` tree the chrome already loaded, so it can only ever offer
+  pages this session may open. Each result is a real `<a href>`, so opening one takes the SPA
+  router's own path — or its full-load fallback for a page that has none — with no second copy of
+  that decision. Not indexed through `ui.menu.getChildren()`: on an alias node that returns the
+  alias TARGET's children, which is right for drawing a menu and wrong for indexing — every tab of
+  every aliased page came back missing (measured: 78 nodes indexed, no Port Forwards on a router
+  that plainly has one).
 - **`prefers-contrast: more` is honoured: hairlines, secondary text and the focus ring all
   strengthen.** Same token mechanism as the reduced-transparency block: `--fs-border` pulls
   toward the text colour, the role hairlines (a 40/55% tint of their role) go to the full role
