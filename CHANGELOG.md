@@ -11,6 +11,34 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+
+- **The Search button no longer drifts to mid-bar in the top layout when the menu stacks onto a
+  second row.** In `data-layout="top"` with `.fs-bar-stack`, the right-cluster rule gave
+  `margin-left: auto` to *both* `.fs-themerow` buttons (Search, then Appearance); whenever
+  `#indicators` was empty and collapsed (`display: none`) — e.g. right after an SPA navigation,
+  before the poll pill returns — flexbox split the free space between the two autos and parked Search
+  in the middle of the bar (measured: `margin-left: 103px`, button at 54% of a 540px bar). The base
+  bar (`20-shell.css`) already guards this with `.fs-themerow ~ .fs-themerow { margin-left: 0 }`, but
+  the stacked-top auto rule out-specifies it (0,4,0 > 0,2,0), so the guard had to be restated inside
+  the `.fs-bar-stack` block. Verified on both 25.12 and 24.10: Search now takes the whole free margin
+  and the cluster sits flush right.
+- **Firefox no longer paints a second, whole-page scrollbar on the Overview page in the sidebar
+  layout (#12).** The desktop sidebar pins `.fs-shell` to `100dvh` with `overflow: hidden` and scrolls
+  the content inside `.fs-main` — Chrome keeps the document at viewport height, but Firefox propagated
+  ~158px of an out-of-flow descendant's scrollable overflow past both overflow ancestors up to the
+  document and drew a duplicate page scrollbar beside `.fs-main`'s own (measured in Firefox 151/152:
+  `html.scrollHeight` 1058 vs 900 viewport on Overview, where the `.fs-ovl` grid makes the column
+  ~2800px tall; a short page like System stayed 900, which is why only Overview showed it — and stock
+  luci-theme-bootstrap, with no fixed-shell/inner-scroll model, never did). `overflow: hidden` on the
+  shell or the root only hides the extra scrollbar while the document still scrolls the 158px, dragging
+  the fixed sidebar off-screen; `contain: paint` on `.fs-main` makes it the containing block for that
+  descendant and captures the overflow, so `html.scrollHeight` drops to 900 and the leak is gone at the
+  source. LuCI modals are `position: fixed` on `<body>`, not inside `.fs-main`, so the new containing
+  block does not re-base them. Verified in Firefox and Chrome on both 25.12 and 24.10.
+
 ## [0.9.5] — 2026-07-20
 
 ### Fixed
@@ -2876,6 +2904,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[Unreleased]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.5...HEAD
 [0.9.5]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.2...v0.9.3

@@ -94,6 +94,13 @@
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack #indicators,
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow { margin-left: auto; }
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack #indicators:not(:empty) ~ .fs-themerow { margin-left: 0; }
+	/* Two .fs-themerow buttons (Search, then Appearance): exactly like the base bar (20-shell.css),
+	 * only the FIRST rendered right-cluster item may keep margin-left:auto, or flexbox SPLITS the
+	 * free space between the two autos and Search drifts to mid-bar. The base `.fs-themerow ~
+	 * .fs-themerow` guard is out-specified by the auto rule above (0,4,0 > 0,2,0), so it must be
+	 * restated here. Bites when #indicators is :empty (display:none) — e.g. right after an SPA nav,
+	 * before the poll pill returns. */
+	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow ~ .fs-themerow { margin-left: 0; }
 
 	/* ==================================================================
 	 * THE POLL PILL COLLAPSES TO AN ICON *BEFORE* THE BAR STACKS — .fs-ind-compact

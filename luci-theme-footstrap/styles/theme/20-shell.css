@@ -223,6 +223,19 @@
 		}
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-main {
 			height: 100dvh; overflow-y: auto;
+			/* `contain: paint` — the fix for #12. .fs-shell is height:100dvh + overflow:hidden and
+			 * .fs-main is its own overflow:auto scroller, so Chrome never grows the document past the
+			 * viewport. Firefox does: on Обзор (where the .fs-ovl grid makes the column ~2800px tall)
+			 * it propagates ~158px of an out-of-flow descendant's scrollable overflow PAST both
+			 * overflow ancestors up to the initial containing block, painting a SECOND, whole-page
+			 * scrollbar beside .fs-main's own (measured: html.scrollHeight 1058 vs 900 viewport;
+			 * System, a short page, stays 900). overflow:hidden on the shell/main/root does NOT stop
+			 * it — it only hides the extra scrollbar while the document still scrolls 158px, dragging
+			 * the fixed sidebar up off-screen. Paint containment makes .fs-main the containing block
+			 * for that descendant and clips it, so the overflow is captured here and html.scrollHeight
+			 * drops to 900 (proven in Firefox). LuCI modals are position:fixed on <body>, not inside
+			 * .fs-main, so the new containing block does not re-base them. No-op in Chrome. */
+			contain: paint;
 		}
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar {
 			width: var(--fs-sidebar-w); height: 100dvh;
