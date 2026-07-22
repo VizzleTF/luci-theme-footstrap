@@ -35,5 +35,8 @@
     "playwright": "^1.61.1",
     "stylelint": "^17.14.0",
     "terser": "^5.49.0"
+  },
+  "overrides": {
+    "fast-uri": "^3.1.4"
   }
 }

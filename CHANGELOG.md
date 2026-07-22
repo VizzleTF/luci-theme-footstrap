@@ -21,6 +21,10 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 - **The realtime graph legend (Status → Realtime Graphs) no longer overlaps its own labels on a phone.** LuCI renders the UDP/TCP/Other legend as a six-cell-per-row table with an inline `table-layout:fixed`, splitting the row into six equal columns; at 375px each is ~52px and the `Average:`/`Peak:` labels overflowed onto the value beside them (measured). Stock luci-theme-bootstrap folds the six cells into label/value pairs on a narrow screen, so we do the same below 768px (each cell 50%, three stacked rows) — the labels fit on all four graphs (bandwidth, connections, wireless, load), on both 24.10 and 25.12. Keyed on the inline `table-layout` attribute, the one no-id `.table` LuCI marks that way, so System/Memory and DDNS-style status tables are untouched.
 
+### Security
+
+- **Pinned the dev-only transitive `fast-uri` to ≥ 3.1.4 (CVE-2026-16221, high).** Versions ≤ 3.1.3 do not treat a literal backslash as an authority delimiter, so `fast-uri` and Node's WHATWG `URL`/`fetch()` extract different hosts from the same string — a host-confusion desync that bypasses allowlist/SSRF filters. It reaches this repo only as `eslint → table → ajv → fast-uri` in `devDependencies`; nothing under `node_modules` ships to a router, so no fielded install was ever exposed. Resolved with a `package.json` `overrides` entry (`npm audit`: 0 vulnerabilities) rather than a fake direct dependency, since the theme imports no JS at all.
+
 ## [0.9.6] — 2026-07-22
 
 ### Fixed
