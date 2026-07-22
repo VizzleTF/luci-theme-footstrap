@@ -2,6 +2,7 @@
 	"luci-theme-footstrap": {
 		"description": "Footstrap Appearance router-wide defaults (Save as default)",
 		"write": {
+			"ubus": { "uci": [ "set", "commit" ] },
 			"uci": [ "footstrap" ]
 		}
 	}

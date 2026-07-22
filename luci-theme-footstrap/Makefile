@@ -106,6 +106,16 @@ endef
 
 define Package/luci-theme-footstrap/postrm
 #!/bin/sh
+# opkg runs the OLD package's postrm with arg "upgrade" during a version upgrade (proven on 24.10:
+# `prerm upgrade`, then `postrm upgrade`, then the new `postinst configure`) and "remove" on a real
+# removal. On upgrade this script MUST change nothing: reverting mediaurlbase to bootstrap, wiping
+# the theme registration and deleting the .installed marker here is what flipped every updating
+# 24.10 user back to bootstrap — and it defeated uci-defaults' own upgrade guard, because with the
+# marker gone uci-defaults treated the run as "fresh", yet postrm had already set mediaurlbase to
+# bootstrap, which no "fresh" branch re-activates. apk never runs this on upgrade (it uses the new
+# package's pre/post-upgrade), so guarding on the arg is correct for both managers; real removal
+# passes "remove" (opkg) or no arg and proceeds below.
+case "$$1" in *upgrade*) exit 0 ;; esac
 [ -n "$${IPKG_INSTROOT}" ] || {
 	# Every theme name this package has ever registered. postrm runs when uci-defaults is
 	# already deleted, so it cannot source the list: it is duplicated by necessity and

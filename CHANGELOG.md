@@ -11,10 +11,40 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [Unreleased]
+## [0.9.6] — 2026-07-22
 
 ### Fixed
 
+- **Updating the theme on 24.10 (opkg) no longer flips the active theme back to stock bootstrap.**
+  opkg runs the OLD package's `postrm` with arg `upgrade` during a version upgrade (verified on the
+  router: `prerm upgrade` → `postrm upgrade` → the new `postinst configure`), and the theme's postrm
+  ignored the arg — so every update ran its full REMOVAL path: it reverted `luci.main.mediaurlbase`
+  from `/luci-static/footstrap` to `/luci-static/bootstrap`, deleted the `luci.themes` registration
+  and wiped the `/usr/share/luci-theme-footstrap/.installed` marker. That also defeated the
+  uci-defaults upgrade guard — with the marker gone the follow-up `postinst` treated the run as a
+  *fresh* install, but postrm had already set mediaurlbase to bootstrap and no "fresh" branch
+  re-activates a theme that is no longer the active one, so the router stuck on bootstrap and the user
+  had to switch back by hand. apk (25.12+) was never affected: on an upgrade it runs the new package's
+  `post-upgrade`, never the old `post-deinstall` — which is why only 24.10 saw it. Fixed by returning
+  from postrm early on any `*upgrade*` arg, so it changes nothing on an upgrade and still cleans up
+  fully on a real removal. Verified with a throwaway opkg package: `postrm upgrade` now skips, `postrm
+  remove` still runs the body. Transition note: opkg runs the *old* version's postrm, so the upgrade
+  INTO the first release carrying this guard still reverts once — 24.10 users switch back to Footstrap
+  one last time, and every update after this one is clean.
+- **"Save as default" no longer fails with "Access denied" on sessions without wildcard ubus access
+  (24.10 admin logins).** The theme's rpcd ACL granted the `uci` *data* scope
+  (`write.uci: [footstrap]`) but never the `ubus` *method* scope, so calling the `uci` object over
+  `/ubus` fell back to stock `luci-base` — which grants `ubus.uci: [add, apply, confirm, delete,
+  order, rename, set]` but **not `commit`** (LuCI's own UI saves through the set→apply→confirm
+  rollback flow, never a raw commit). `saveAsDefault()` does `uci set` then `uci commit`: the set
+  passed, the commit returned `-32002 Access denied`, and the popover showed "Could not save the
+  default. Reload the page and try again." — permanently, since a reload cannot grant a missing ACL.
+  It worked only where the session carried a literal `*` (a fresh root login on the dev boxes), which
+  masked it for months. Reproduced on a user's 24.10.3 router: a modelled standard-admin session got
+  `uci/commit … Access denied` while `uci/set` passed. Fixed by granting `write.ubus.uci:
+  [set, commit]` in the theme's ACL; the `write.uci: [footstrap]` config scope still restricts every
+  write to `/etc/config/footstrap`, so no other config becomes writable. Verified on 24.10 and 25.12:
+  the modelled session now commits and the file is written.
 - **The Search button no longer drifts to mid-bar in the top layout when the menu stacks onto a
   second row.** In `data-layout="top"` with `.fs-bar-stack`, the right-cluster rule gave
   `margin-left: auto` to *both* `.fs-themerow` buttons (Search, then Appearance); whenever
@@ -2915,7 +2945,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
-[Unreleased]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.5...HEAD
+[0.9.6]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.2...v0.9.3
