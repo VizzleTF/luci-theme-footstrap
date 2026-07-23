@@ -11,13 +11,15 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [Unreleased]
+## [0.9.7] — 2026-07-23
 
 ### Removed
 
 - **The self-update package moved out of this repository into its own — [VizzleTF/luci-app-footstrap-updater](https://github.com/VizzleTF/luci-app-footstrap-updater) — with independent tags, version and release stream.** This repo now builds and signs the theme alone (one asset per format, two signatures); the updater's build, rpcd ACL, i18n, jsmin and asset-count steps are gone from CI, and `install.sh` is the two-repo installer — theme from here, updater from its own latest release, both verified against the one release key. The transition builds (up to 0.9.6) re-shipped the updater from here so no fielded router was stranded — a self-updater looks for the updater asset in this repo's release and nowhere else, and a router's installed updater cannot be fixed remotely. The updater repo's first tag is **v1.0.0**, strictly above the transition build's 0.9.6: opkg refuses a downgrade by default (exits 0, installs nothing), so a lower tag would have stranded every 24.10 router while reporting success. From that first published release the updater resolves from its own repo, so it is the day every router crosses over — the theme release stops carrying an updater asset, and a fielded self-updater's now-empty updater leg is skipped non-fatally.
 
 ### Fixed
+
+- **The Port status WAN/LAN indicator is back — the Internet port shows a red line and the LAN ports green, as on stock Bootstrap (issue #13).** LuCI's `29_ports.js` emits a thin zone-colour bar per port (child 3 of the `.ifacebox`, coloured inline by `firewall.getZoneColorStyle()` — the very call Bootstrap draws it with), and Footstrap's port-card reskin had hidden it with `display:none !important`, so a Footstrap user could not tell the WAN port from the LAN ports. It now shows, reordered to sit between the port name and the speed as the card's divider; the two grey `.ifacebox-head` borders base draws there are dropped so the colour line is the only separator. No new `!important` (the hiding flag was removed); the bar's hover tooltip still names the port's zone and networks.
 
 - **A stray "Save" button no longer floats above the page title on every legacy Lua page (issue #12, seen on luci-app-openvpn).** luci-compat opens each CBI form with `<input type="submit" value="Save" class="hidden">` — the control that makes Enter submit the form, and one that must never be seen. The theme's `.hidden { display: none }` lost the cascade to its own button rule: an attribute selector counts as a class, so `input[type="submit"]` (0,1,1) out-specified a bare `.hidden` (0,1,0) inside the same layer and put the box back on the page, at full button size, above the view's own `<h2>`. Every luci-compat view carried it, not just OpenVPN. `.hidden` now states the invariant once at 0,2,0 (`.hidden.hidden`), which also retires the enumerated `.cbi-value.hidden`/`.cbi-section.hidden`/`tr.hidden` list that had only ever covered the elements someone had already been bitten by — an `!important` would have worked too and would have inverted the layer order for every future override.
 
@@ -2965,6 +2967,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.9.7]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.6...v0.9.7
 [0.9.6]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.3...v0.9.4

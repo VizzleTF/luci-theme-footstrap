@@ -130,9 +130,31 @@
 		column-gap: 8px; row-gap: 3px;
 		align-items: baseline;
 	}
-	/* drop the stock icon, and the zone-colour bar (child 3, inline display:flex) */
+	/* drop the stock icon */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) img { display: none; }
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > :nth-child(3) { display: none !important; }
+	/* base/95-luci.css draws a border-bottom on EVERY .ifacebox-head; the port card carries
+	 * two heads (the name, child 1, and the zone-colour line, child 3), so that is two grey
+	 * dividers stacked around the colour line. Drop them — the colour line is the only
+	 * divider this card wants. Page layer beats base, no !important needed. */
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) .ifacebox-head { border-bottom: 0; border-radius: 0; }
+	/* zone-colour bar (child 3): WAN red, LAN green — the stock Port-status indicator
+	 * that distinguishes the Internet port from the LAN ports (issue #13). Its inner
+	 * .zonebadge segments already carry firewall.getZoneColorStyle() inline (a 3px-tall
+	 * strip, opacity 0.25 when the port has no carrier) and a `.cbi-tooltip` naming the
+	 * zone/networks on hover, so we do NOT restyle it — we only PLACE it: a full-width
+	 * colour line on its own row BETWEEN the name (child 1) and the speed/traffic bodies,
+	 * where it reads as the card's divider. `order` puts it there — name is order 0, this
+	 * order 1, the two bodies order 2 (below); without the order the bodies fall in source
+	 * order (name, speed, bar, traffic) and the bar splits speed from traffic. The inline
+	 * `display:flex` already shows it — this used to be hidden with `display:none
+	 * !important`, now removed. No `overflow`/`border-radius`: both clip the
+	 * absolutely-positioned tooltip. */
+	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:nth-child(3) {
+		order: 1;
+		flex: 0 0 100%;
+		width: 100%;
+		margin: 3px 0 6px;
+	}
 	/* name row + its ::after status dot */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
 		/* Its OWN row — and `width`, NOT `flex-basis: 100%`, which is the obvious way to write this
@@ -160,6 +182,7 @@
 	}
 	/* speed: green when linked, dim when not */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
+		order: 2;								/* below the zone-colour line (child 3, order 1) */
 		font-size: 13px; font-weight: 600; color: var(--fs-good); text-align: left;
 		/* Two halves of one mechanism.
 		 * `nowrap` (and NO `min-width: 0`) = "I do not give way": a flex item's automatic minimum
@@ -177,6 +200,7 @@
 	/* traffic: tx over rx, as stock's <br> leaves them — CSS cannot reorder br-separated
 	 * text runs. The 11px flag fights the inline `font-size:80%`. */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) {
+		order: 2;								/* shares the speed's row, below the zone line */
 		text-align: right;
 		/* Grows but never shrinks. Growing is what anchors the figures to the card's right edge on
 		 * EITHER row — sharing the speed's, or one of its own — since `text-align: right` then has a
