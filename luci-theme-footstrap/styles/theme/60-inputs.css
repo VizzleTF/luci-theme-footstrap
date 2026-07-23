@@ -642,9 +642,19 @@
 	 * to the last row — give it a real gap instead. */
 	.cbi-section-create, .cbi-section-create.cbi-tblsection-create { margin-top: 12px; }
 
-	/* `.hidden` must win over the .cbi-value flex row rule — CBI dependency hiding was leaking
-	 * podkop's conditional fields back onto the page. */
-	.hidden, .cbi-value.hidden, .cbi-section.hidden, tr.hidden, .cbi-value-field .hidden { display: none; }
+	/* `.hidden` must win over every component rule in this layer — CBI dependency hiding was
+	 * leaking podkop's conditional fields back onto the page, and the enumerated list that fixed
+	 * that (`.cbi-value.hidden`, `.cbi-section.hidden`, `tr.hidden`, …) only ever covered the
+	 * elements someone had already been bitten by. The one it did NOT cover is the Enter-key
+	 * submit every legacy Lua page carries: luci-compat's cbi/header.htm opens each form with
+	 * `<input type="submit" value="Save" class="hidden">`, and an ATTRIBUTE selector counts as a
+	 * class — theme/55-buttons.css's `input[type="submit"]` is 0,1,1 against a bare `.hidden`'s
+	 * 0,1,0, so it won, and a stray "Save" button floated above the page title on every
+	 * luci-compat view (issue #12, luci-app-openvpn). Doubling the class states the invariant
+	 * ONCE at 0,2,0 instead of chasing elements: hidden is hidden, whatever the element and
+	 * whatever component rule this layer also matched. An `!important` would have done it too,
+	 * and would have inverted the layer order for every future override — this does not. */
+	.hidden.hidden { display: none; }
 	/* RangeSlider (UIRangeSlider) — the one LuCI widget base leaves to native browser rendering.
 	 * Token-driven track/thumb. */
 	input[type="range"] {

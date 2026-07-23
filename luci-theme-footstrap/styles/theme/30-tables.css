@@ -59,6 +59,26 @@
 	}
 	.table.cbi-section-table .td.cbi-section-table-cell select,
 	.table.cbi-section-table .td.cbi-section-table-cell .cbi-select { width: inherit; }
+	/* THE FILTER ROW (form.js renderHeaderRows, `filterrow` + uci luci.main.tablefilters) is the
+	 * one place a field cannot claim the width it wants: it lives in a table HEADER cell, so the
+	 * column is as wide as the DATA under it, not as wide as the box. The rule above already makes
+	 * it fill that cell — what did not fit was the TEXT. LuCI writes the placeholder as `Filter ` +
+	 * the column title, and the theme's field is 13px type inside 11px of side padding, so on a
+	 * Russian firewall page "Фильтр Внутризональная пересылка" ran out of box and Firefox sliced it
+	 * mid-glyph (issue #12). The flag column is the worse half: form.js writes `width: 30px` INLINE
+	 * there (its filter takes one character), of which the theme's padding ate 22 — six pixels for
+	 * "0/1", which rendered as a single clipped digit.
+	 *
+	 * Denser box and denser type buy back ~20px per column and make the 30px one legible; the
+	 * ellipsis is what changes the FAILURE: a placeholder too long for its column now ENDS, instead
+	 * of being cut through a letter. Nothing is lost to it — the column title says the same word
+	 * directly above, which is the only reason shortening is honest here. No !important, so the
+	 * inline 30px still stands: it is upstream's sizing for a one-character field, and correct. */
+	.table.cbi-section-table .cbi-section-filter {
+		padding: 4px 6px;
+		font-size: 11px;
+		text-overflow: ellipsis;
+	}
 	/* width:100% cannot shrink a table below min-content — one long unbreakable value holds the
 	 * floor. Breaking values reflows it into the ~984px column instead of scrolling. DHCP leases
 	 * need finer control (only DUID/IPv6 may break, not IPv4/MAC): pages/50-leases.css. */
