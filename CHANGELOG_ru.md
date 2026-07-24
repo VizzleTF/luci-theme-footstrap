@@ -12,7 +12,7 @@
 
 Каждый коммит пишет в `[Unreleased]`. При выпуске тега заголовок переименовывается.
 
-## [Unreleased]
+## [0.10.1] — 2026-07-24
 
 ### Добавлено
 
@@ -3027,7 +3027,7 @@
   вложенный `calc()`, что ломало вёрстку напрочь. Минификация JS вернулась в 0.7.12, когда
   безопасность jsmin подтвердил гейт эквивалентности токенов.
 
-[Unreleased]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.10.0...HEAD
+[0.10.1]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.7...v0.10.0
 [0.9.7]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.6...v0.9.7
 [0.9.6]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.5...v0.9.6
