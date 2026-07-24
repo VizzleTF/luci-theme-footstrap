@@ -37,7 +37,7 @@
 
 	.table .tr:first-child .th {
 		padding-top: var(--fs-space-2);
-		font-weight: bold;
+		font-weight: var(--fs-weight-bold);
 		vertical-align: top;
 	}
 

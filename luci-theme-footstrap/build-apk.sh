@@ -16,7 +16,12 @@ BUILD_DIR="${BUILD_DIR:-/tmp/ow-footstrap-build}"
 # FORCE=1 overrides buildroot's host-prereq bail-outs (see step 4).
 export FORCE=1
 THEME_DIR="$(cd "$(dirname "$0")" && pwd)"          # this package
+REPO="$(cd "$THEME_DIR/.." && pwd)"                 # repo root (holds tools/, .github/)
+BUILD_YML="$REPO/.github/workflows/build.yml"
 SDK_DIR="$BUILD_DIR/sdk"
+# The SDK channel (major.minor) the release SDK is signed under — derived from REL, never a
+# second copy: 25.12.2 -> 25.12.
+CHANNEL="${REL%.*}"
 
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
@@ -28,19 +33,52 @@ if [ ! -d "$SDK_DIR" ]; then
 	# that will build a package a maintainer may hand to someone.
 	wget -q --https-only -O sdk.tar.zst "$SDK_URL"
 
-	# The SDK is the least verified input in this repo and the only one that ends up in the built
-	# package: jsmin.c and i18n-scan.pl — two LINTERS — are pinned by commit AND sha256, while the
-	# toolchain that builds the artifact arrived on trust alone. OpenWrt publishes sha256sums next
-	# to the tarball. Fails CLOSED: a missing or unmatched line refuses, it does not warn and carry
-	# on. Mirrors the same check in .github/workflows/build.yml.
-	echo ">> verifying SDK sha256 ..."
-	wget -q --https-only -O sha256sums "$SDK_BASE/sha256sums"
+	# Verify the SDK: signature first, checksum under it. This is the least verified input in this
+	# repo and the only one that ends up INSIDE the built package (jsmin.c and i18n-scan.pl are
+	# LINTERS pinned by commit and sha256; the toolchain that compiles the artifact arrives on TLS).
+	# `sha256sums` alone is NOT a verification — it is served by the same host from the same
+	# directory, unsigned, so whoever can replace the tarball replaces the checksum beside it (see
+	# CLAUDE.md on GitHub's asset digest). What makes it one is the ed25519 signature over that file,
+	# checked with a key pinned from a DIFFERENT host (github.com/openwrt/keyring). Fails CLOSED.
+	#
+	# Same check as .github/workflows/build.yml, from the SAME canonical inputs: the keyring/usign
+	# pins come from luci-upstream.pin, and the branch's signing key is read out of build.yml's
+	# matrix (its documented home — the key is a property of the branch, not of the pin file) rather
+	# than copied here, so this convenience script cannot drift from the release path.
+	[ -f "$BUILD_YML" ] || { echo "build.yml not found at $BUILD_YML — run from a repo checkout" >&2; exit 1; }
+	. "$THEME_DIR/luci-upstream.pin"
+	[ -n "${OPENWRT_KEYRING_PIN:-}" ] || { echo "OPENWRT_KEYRING_PIN missing from luci-upstream.pin" >&2; exit 1; }
+
+	# sdk_key / sdk_key_sha256 for CHANNEL, straight out of build.yml's matrix.
+	read -r SDK_KEY SDK_KEY_SHA256 <<-EOF
+	$(awk -F"'" -v ch="$CHANNEL" '
+		/channel:/ { c = $2 }
+		c == ch && /sdk_key:/        { k = $2 }
+		c == ch && /sdk_key_sha256:/ { s = $2 }
+		END { print k, s }' "$BUILD_YML")
+	EOF
+	[ -n "$SDK_KEY" ] && [ -n "$SDK_KEY_SHA256" ] \
+		|| { echo "no SDK signing key for channel $CHANNEL in build.yml" >&2; exit 1; }
+
+	echo ">> verifying SDK signature (key $SDK_KEY, channel $CHANNEL) ..."
+	rm -rf "$BUILD_DIR/usign"
+	U="$("$REPO/tools/build-usign.sh" "$BUILD_DIR/usign")"
+	wget -q --https-only -O sha256sums     "$SDK_BASE/sha256sums"
+	wget -q --https-only -O sha256sums.sig "$SDK_BASE/sha256sums.sig"
+	wget -q --https-only -O openwrt.pub \
+		"https://raw.githubusercontent.com/openwrt/keyring/$OPENWRT_KEYRING_PIN/usign/$SDK_KEY"
+	echo "$SDK_KEY_SHA256  openwrt.pub" | sha256sum -c - >/dev/null \
+		|| { echo "OpenWrt's $CHANNEL key does not match its pin — refusing to verify with it" >&2; exit 1; }
+	"$U" -V -m sha256sums -p openwrt.pub -x sha256sums.sig \
+		|| { echo "BAD SIGNATURE on OpenWrt's sha256sums — refusing to build with this SDK." >&2; exit 1; }
+	echo ">> signature verified; now the checksum means something."
+
 	WANT="$(grep -F " *$SDK_FILE" sha256sums | cut -d' ' -f1)"
 	[ -n "$WANT" ] || { echo "no sha256 published for $SDK_FILE" >&2; exit 1; }
 	GOT="$(sha256sum sdk.tar.zst | cut -d' ' -f1)"
 	[ "$WANT" = "$GOT" ] || { echo "SDK checksum mismatch: want $WANT, got $GOT" >&2; exit 1; }
-	rm -f sha256sums
-	echo ">> SDK sha256 verified."
+	rm -f sha256sums sha256sums.sig openwrt.pub
+	echo ">> SDK verified."
 
 	echo ">> extracting ..."
 	mkdir -p "$SDK_DIR"

@@ -19,6 +19,7 @@
 	let _sd_pal  = index([ 'footstrap', 'hicontrast' ], fs_defaults.palette) >= 0 ? fs_defaults.palette : '';
 	let _sd_wall = index([ 'off', 'cats', 'file' ], fs_defaults.wallpaper) >= 0 ? fs_defaults.wallpaper : '';
 	let _sd_ac   = index([ 'on', 'off' ], fs_defaults.autocollapse) >= 0 ? fs_defaults.autocollapse : '';
+	let _sd_dens = index([ 'compact', 'normal', 'large' ], fs_defaults.density) >= 0 ? fs_defaults.density : '';
 	let _tt = int(fs_defaults.tint),   _sd_tint = (_tt >= 1 && _tt <= 360) ? _tt : 0;
 	let _aa = int(fs_defaults.accent), _sd_acc  = (_aa >= 1 && _aa <= 360) ? _aa : 0;
 	let _rr = int(fs_defaults.rounding);
@@ -56,7 +57,7 @@
 		   current*() (so the popover's controls show the effective default when this browser has no
 		   localStorage of its own). Enums are '', the hues 0 (=off), rounding -1 (=unset) — see the
 		   sanitiser above. #}
-		<script>window.__fsSD={layout:"{{ _sd_lay }}",darkmode:"{{ _sd_dark }}",palette:"{{ _sd_pal }}",wallpaper:"{{ _sd_wall }}",tint:{{ _sd_tint }},accent:{{ _sd_acc }},rounding:{{ _sd_round }},autocollapse:"{{ _sd_ac }}",login_bg:"{{ _sd_lbg }}",tint_strength:{{ _sd_tstr }},photo_dim:{{ _sd_pdim }}};</script>
+		<script>window.__fsSD={layout:"{{ _sd_lay }}",darkmode:"{{ _sd_dark }}",palette:"{{ _sd_pal }}",wallpaper:"{{ _sd_wall }}",tint:{{ _sd_tint }},accent:{{ _sd_acc }},rounding:{{ _sd_round }},autocollapse:"{{ _sd_ac }}",login_bg:"{{ _sd_lbg }}",tint_strength:{{ _sd_tstr }},photo_dim:{{ _sd_pdim }},density:"{{ _sd_dens }}"};</script>
 		{# The update CHECK lives in the OPTIONAL luci-app-footstrap-updater package, which ships
 		   fs-update.js into /www/luci-static/resources. fs-appearance.js loads it at runtime to light
 		   up the Updates controls — but a bare require on a router WITHOUT the updater 404s in the
@@ -140,6 +141,15 @@
 					if (w === null) w = sd.wallpaper || null;
 					if (w === 'cats' || w === 'file') root.setAttribute('data-wallpaper', w);
 					else root.removeAttribute('data-wallpaper');
+
+					/* Density: Compact/Normal/Large, a pure token axis (02-tokens multiplies the
+					   type and space ladders). Normal is a bare :root, so the removeAttribute
+					   half matters as much as the set — without it a browser that switched back
+					   to Normal would paint one frame still compressed. */
+					let dn = localStorage.getItem('fs-density');
+					if (dn === null) dn = sd.density || null;
+					if (dn === 'compact' || dn === 'large') root.setAttribute('data-density', dn);
+					else root.removeAttribute('data-density');
 
 					/* Rounding 0-20px (02-tokens derives the control/chip radii from it). The
 					   default is a LITERAL: this runs before the stylesheet and cannot read the

@@ -7,6 +7,20 @@
  * here knows what it is being used FOR — that is the point, and it is why the menu and the popover
  * can each take what they need without either requiring the other. */
 
+/* The chrome's ONE inline-SVG wrapper. Every icon this theme draws is the same 24x24 stroked
+ * outline and differs only in its path data, but the wrapper was written out per call site — in the
+ * menu, in the search box, and again in four .ut partials — so `stroke-width` and the two linecap
+ * attributes were free to drift between icons that are meant to look like one set. Body in, markup
+ * out; the caller supplies only the shape.
+ *
+ * aria-hidden: every icon here sits beside its own label (or inside a control that has one), and an
+ * unlabelled <svg> is otherwise announced as a graphic in its own right. */
+function svgIcon(body, cls) {
+	return '<svg class="' + (cls || 'fs-ico') + '" aria-hidden="true" viewBox="0 0 24 24" fill="none" '
+		+ 'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
+		+ body + '</svg>';
+}
+
 /* ---- disclosure primitives, shared by the menu ----
  * A section header is a W3C-APG disclosure control: an <a role="button"> owning a panel it shows and
  * hides. These lived once per menu file back when there were two, and the copies had already drifted
@@ -166,6 +180,7 @@ function placePopover(btn, pop) {
 }
 
 return baseclass.extend({
+	svgIcon,
 	setOpen,
 	wireSpaceKey,
 	wireDismiss,

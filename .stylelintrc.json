@@ -111,7 +111,9 @@
         "in 95-luci. theme/95-a11y-media is the reduced-motion block: !important INVERTS",
         "the layer order, so it is the only way one rule can stop animations declared in",
         "base as well as in theme.",
-        "This list is the contract. Adding a file to it needs a reason in the file."
+        "This list is the contract. Adding a file to it needs a reason in the file.",
+        "The same list lives in tools/audit.py (BANG_OK); tools/bang-ok.mjs (npm run bang-ok)",
+        "fails if the two drift, so a file added here but not there (or vice versa) is caught."
       ],
       "files": [
         "luci-theme-footstrap/styles/base/*.css",

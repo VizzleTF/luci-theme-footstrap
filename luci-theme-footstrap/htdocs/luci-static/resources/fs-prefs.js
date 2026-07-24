@@ -29,10 +29,30 @@ function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return n
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
 
+/* A stored JSON ARRAY, or [] — the shape the two REMEMBERED LISTS use (the search palette's recent
+ * paths, the menu's open sections). lsGet above owns the try/catch around localStorage itself; this
+ * one is for JSON.parse over a value another tab may have corrupted, and for the Array guard that
+ * stops a stored object or string being spread into a list. Both callers had written the identical
+ * five lines, comment included; each still applies its own post-step (filter to strings / build a
+ * Set), which is the part that genuinely differs. */
+function lsGetArr(k) {
+	try {
+		const a = JSON.parse(lsGet(k) || '[]');
+		return Array.isArray(a) ? a : [];
+	} catch (e) { return []; }
+}
+
 /* the router-wide defaults the server stamped (head.ut). Read at RUNTIME so current*() reports the
  * effective default when this browser has no localStorage — the popover's controls then show what
  * the page is actually painted as, not a phantom "auto". */
 function sd(k) { try { return (window.__fsSD || {})[k]; } catch (e) { return undefined; } }
+
+/* …and the write back. An applier that persists to the router must update the blob the SERVER
+ * stamped, or current*() would keep reporting the OLD router default until the next full load —
+ * matchesSavedDefault() then lies about whether there is anything left to save. Three appliers did
+ * this with the same guarded one-liner; the guard is for a document where `window` is locked down,
+ * exactly like sd() above. */
+function setSD(field, val) { try { (window.__fsSD = window.__fsSD || {})[field] = val; } catch (e) {} }
 
 /* ---- every axis owns its ROUTER DEFAULT, and nothing else may restate it ----
  * `def()` is the sd() branch of current() alone — what the effective value would be with no
@@ -144,45 +164,30 @@ _mqDark.addEventListener('change', () => {
 		stampDark(root, intendedDark());
 	}
 });
-/* Corner-radius axis: one base value (the card radius, 0–20px) as an inline --fs-radius-base on
- * :root; 02-tokens derives the control/chip radii from it so every surface rounds in step. head.ut
- * pre-paints it. Stored explicitly (including the default 12), so it can override a router default. */
+/* Corner radius: the card radius (0–20px) as an inline --fs-radius-base on :root; 02-tokens derives
+ * every other radius from it, so surfaces round in step. head.ut pre-paints it, and tools/axes.mjs
+ * holds JS/CSS/head to this one number — hence the named const. The axis itself is a propAxis (below),
+ * the same shape as tint strength. */
 const FS_RADIUS_DEFAULT = 12;
-function radiusDefault() {
-	const d = sd('rounding');
-	return (typeof d === 'number' && d >= 0 && d <= 20) ? d : FS_RADIUS_DEFAULT;
-}
-function currentRadius() {
-	const raw = lsGet('fs-radius');
-	if (raw !== null) { const s = parseInt(raw, 10); return (s >= 0 && s <= 20) ? s : FS_RADIUS_DEFAULT; }
-	return radiusDefault();
-}
-function applyRadius(px) {
-	const root = document.documentElement;
-	const v = Math.max(0, Math.min(20, px | 0));
-	lsSet('fs-radius', String(v));
-	if (v === FS_RADIUS_DEFAULT) root.style.removeProperty('--fs-radius-base');
-	else root.style.setProperty('--fs-radius-base', v + 'px');
-}
 
-/* ---- the two axis SHAPES, each written once ------------------------------------------------
+/* ---- the three axis SHAPES, each written once ---------------------------------------------
  *
- * Four of the nine axes are two shapes with two instances each, so the shape lives in a factory and
- * the instance is one line. Both keep the same contract: `current()` is localStorage ?? def(),
- * `def()` is the router default alone, `apply()` stores the choice EXPLICITLY (see the header —
- * lsDel would mean "inherit the router default", which is not what picking the built-in means).
- * Neither uses `this`: every export below is a DETACHED method reference (`const currentTint =
- * TINT.current`), and a `this` in here would throw the moment one was called.
+ * Five of the axes are three shapes, so the shape lives in a factory and each instance is one line:
+ * enumAxis (palette), hueAxis (tint, accent), propAxis (rounding, tint strength). All keep the same
+ * contract: `current()` is localStorage ?? def(), `def()` is the router default alone, `apply()`
+ * stores the choice EXPLICITLY (see the header — lsDel would mean "inherit the router default", which
+ * is not what picking the built-in means). None use `this`: every export below is a DETACHED method
+ * reference (`const currentTint = TINT.current`), and a `this` in here would throw the moment one was
+ * called.
  *
- * The router-default fallback keys off the axis name (`fs-tint` -> window.__fsSD.tint), so both
- * helpers take their key as the FIRST argument and tools/axes.mjs matches each call by its literal
- * args — that scan is how a key reaches the gate at all, since an axis built by a factory has no
- * lsGet('fs-…') call site to find.
+ * Each factory takes its localStorage key as the FIRST argument, and tools/axes.mjs matches the call
+ * by its literal args — that scan is how a key reaches the gate at all, since an axis built by a
+ * factory has no lsGet('fs-…') call site to find.
  *
- * The other FIVE axes stay separate; each has a quirk a shared table would need an option for.
- * `mode` stores a value it does not apply (tri-state → matchMedia) and owns an MQL listener;
- * `radius` sets an inline property with no attribute; `layout` reads the ATTRIBUTE (the
- * server-migrated default); `autoCollapse`/`updateCheck` have no :root attribute at all. */
+ * The remaining axes stay separate; each has a quirk a shared table would need an option for.
+ * `mode` stores a value it does not apply (tri-state → matchMedia) and owns an MQL listener; `layout`
+ * reads the ATTRIBUTE (the server-migrated default); `wallpaper` is three-valued and persists to the
+ * router; `autoCollapse`/`updateCheck` have no :root attribute at all. */
 
 /* A two-value axis: `on` is stamped as the attribute's VALUE, `off` is a bare :root (no attribute).
  * Palette and wallpaper were this shape twice over — current() and apply() agreed line for line
@@ -246,6 +251,33 @@ function hueAxis(key, attr, prop) {
 	};
 }
 
+/* A numeric slider axis that sets an INLINE custom property and NO attribute: rounding (the card
+ * radius) and tint strength are the same shape. Both validate to [min,max], store the choice
+ * EXPLICITLY — including the default, so it overrides a router default (see the header; lsDel would
+ * mean "inherit") — and remove the property AT the default, so 02-tokens' own value shows through.
+ * They differ ONLY in how the number formats onto the property (px vs a 0..2 multiplier), so that is
+ * the one argument that varies. The sd() field name is passed in explicitly: unlike enum/hue it is
+ * NOT the key minus 'fs-' ('fs-radius' -> rounding, 'fs-tint-strength' -> tint_strength). */
+function propAxis(key, sdKey, prop, min, max, dfl, fmt) {
+	const inRange = (n) => (typeof n === 'number' && n >= min && n <= max);
+	const def = () => { const d = sd(sdKey); return inRange(d) ? d : dfl; };
+	return {
+		def,
+		current() {
+			const raw = lsGet(key);
+			if (raw !== null) { const v = parseInt(raw, 10); return inRange(v) ? v : dfl; }
+			return def();
+		},
+		apply(n) {
+			const root = document.documentElement;
+			const v = Math.max(min, Math.min(max, n | 0));
+			lsSet(key, String(v));
+			if (v === dfl) root.style.removeProperty(prop);
+			else root.style.setProperty(prop, fmt(v));
+		}
+	};
+}
+
 /* Palette: footstrap (GitHub colours) is the default = bare :root; hicontrast is the opt-in
  * variant. Colourway blocks live in styles/03-palettes.css. Legacy 'rvht'/'roman'/'github' are
  * migrated to explicit values by head.ut before paint, so they never reach current() on a loaded
@@ -271,6 +303,39 @@ function currentWallpaper() {
 	if (s === 'off') return 'off';
 	if (s === null) return wallpaperDefault();
 	return 'off';		/* a stray value reads as the built-in default */
+}
+
+/* Density: how much AIR the UI uses — Compact / Normal / Large. A three-value axis like wallpaper
+ * (data-density carries 'compact'|'large', or is absent for the Normal default), and it is a pure
+ * TOKEN axis: 02-tokens.css multiplies the type and space ladders by two numbers and every size in
+ * the theme follows, because every size reads one of those ladders. Nothing else changes — no
+ * layout switch, no re-render.
+ *
+ * The one thing it must do beyond stamping the attribute is re-run the MEASURED decisions:
+ * `fitChrome` (does the menu still fit beside the brand?), `fitTables` (does this table still fit
+ * un-carded?) and `fitShell` (is the content column still readable beside the sidebar?) all
+ * measured the OLD metrics. Compact makes more fit and Large less, so without this the bar stays
+ * stacked — or worse, stays unstacked and overflows — until the next resize. */
+const DENSITIES = [ 'compact', 'large' ];	/* the two non-default values; 'normal' = bare :root */
+function densityDefault() {
+	const d = sd('density');
+	return (DENSITIES.indexOf(d) >= 0) ? d : 'normal';
+}
+function currentDensity() {
+	const s = lsGet('fs-density');
+	if (DENSITIES.indexOf(s) >= 0) return s;
+	if (s === 'normal') return 'normal';
+	if (s === null) return densityDefault();
+	return 'normal';	/* a stray value reads as the built-in default */
+}
+function applyDensity(val) {
+	const root = document.documentElement;
+	const v = (DENSITIES.indexOf(val) >= 0) ? val : 'normal';
+	/* stored explicitly (including 'normal'), so it overrides a router default — see the header */
+	lsSet('fs-density', v);
+	if (v === 'normal') root.removeAttribute('data-density');
+	else root.setAttribute('data-density', v);
+	fit.schedule();
 }
 function applyWallpaper(val) {
 	const root = document.documentElement;
@@ -302,6 +367,10 @@ const currentTint = TINT.current, applyTint = TINT.apply;
  * tint. head.ut pre-paints it. */
 const ACCENT = hueAxis('fs-accent', 'data-accent', '--fs-accent-h');
 const currentAccent = ACCENT.current, applyAccent = ACCENT.apply;
+
+/* Rounding: the propAxis instance (default const + rationale up top). --fs-radius-base in px. */
+const RADIUS = propAxis('fs-radius', 'rounding', '--fs-radius-base', 0, 20, FS_RADIUS_DEFAULT, (v) => (v + 'px'));
+const currentRadius = RADIUS.current, applyRadius = RADIUS.apply, radiusDefault = RADIUS.def;
 
 /* Layout axis: vertical sidebar (default) vs horizontal top bar. ONE template, ONE renderer — CSS
  * morphs the chrome off :root[data-layout] (head.ut pre-paints it), and toggling re-renders
@@ -384,12 +453,23 @@ function currentRail() {
  * OTHER browsers/devices. resetToDefault() is the escape hatch that drops this browser back onto it. */
 const AXIS_KEYS = [
 	'fs-layout', 'fs-darkmode', 'fs-palette', 'fs-wallpaper',
-	'fs-tint', 'fs-accent', 'fs-radius', 'fs-menu-autocollapse', 'fs-tint-strength'
+	'fs-tint', 'fs-accent', 'fs-radius', 'fs-menu-autocollapse', 'fs-tint-strength', 'fs-density'
 ];
-/* the Tint-density default (its axis lives further down, but _resolvedDefault() runs at module init
- * — before that block — so the const it reads must be declared up here, or it is in the TDZ and the
- * whole module throws, taking the chrome and the menu with it. */
+/* Tint density: the STRENGTH of the router-identity Tint (the hue washed onto --fs-bg), a per-browser
+ * axis paired with the Tint hue — the hue picks the colour, this picks how strong it reads.
+ * --fs-tint-strength is a multiplier on the tint chroma (03-palettes.css): 100% = the designed
+ * strength, 0% = none, up to 200%. It only bites while a Tint hue is set (data-tint), and it is
+ * hidden and moot under the File wallpaper, where the tint resets to neutral (the photo covers the
+ * canvas). A normal per-browser axis: localStorage ?? router default ?? built-in; head.ut pre-paints
+ * it; stored explicitly (incl. the 100 default) so it can override a router default, like the hues.
+ *
+ * The axis and its default BOTH live up here, above _resolvedDefault()'s module-init call below: a
+ * propAxis instance is a `const`, so declaring it further down (where the slider's other siblings sit)
+ * puts it in the TDZ at init and the whole module throws — taking the chrome and the menu with it.
+ * That is not hypothetical; it was measured, and the empty sidebar is the only symptom. */
 const FS_TSTR_DEFAULT = 100;
+const TSTR = propAxis('fs-tint-strength', 'tint_strength', '--fs-tint-strength', 0, 200, FS_TSTR_DEFAULT, (v) => String(v / 100));
+const currentTintStrength = TSTR.current, applyTintStrength = TSTR.apply, tintStrengthDefault = TSTR.def;
 const _uciSet = rpc.declare({ object: 'uci', method: 'set', params: [ 'config', 'section', 'values' ] });
 const _uciCommit = rpc.declare({ object: 'uci', method: 'commit', params: [ 'config' ] });
 
@@ -403,7 +483,8 @@ function snapshotAxes() {
 		accent: String(currentAccent()),
 		rounding: String(currentRadius()),
 		autocollapse: currentAutoCollapse() ? 'on' : 'off',
-		tint_strength: String(currentTintStrength())
+		tint_strength: String(currentTintStrength()),
+		density: currentDensity()
 	};
 }
 /* The RESOLVED router default (UCI value if set, else the built-in), in snapshotAxes() string form,
@@ -426,7 +507,8 @@ function _resolvedDefault() {
 		accent: String(ACCENT.def()),
 		rounding: String(radiusDefault()),
 		autocollapse: autoCollapseDefault() ? 'on' : 'off',
-		tint_strength: String(tintStrengthDefault())
+		tint_strength: String(tintStrengthDefault()),
+		density: densityDefault()
 	};
 }
 let _savedDefault = _resolvedDefault();
@@ -444,7 +526,7 @@ function matchesSavedDefault() {
  * write is best-effort (a read-only session simply keeps the live per-browser value). */
 function _persistBaseline(field, strVal, numVal) {
 	_savedDefault[field] = strVal;
-	try { (window.__fsSD = window.__fsSD || {})[field] = (numVal === undefined) ? strVal : numVal; } catch (e) {}
+	setSD(field, (numVal === undefined) ? strVal : numVal);
 }
 function _persistUci(field, strVal) {
 	return _uciSet('footstrap', 'settings', { [field]: strVal })
@@ -475,7 +557,7 @@ function resetToDefault() {
  * reaches a path — no traversal surface. */
 const BG_PATH  = '/etc/footstrap/login-bg';		/* cgi-upload target; the ACL grants exactly this */
 const BG_SERVE = '/luci-static/footstrap/bg';	/* the uhttpd symlink to BG_PATH (uci-defaults) */
-const BG_MAX_SIDE = 2560;						/* cap the longest side — generous, so a full-screen backdrop stays crisp; still bounds flash/wire bytes */
+const BG_MAX_SIDE = 1920;						/* cap the longest side — a router serves this off flash with no gzip, and 1080p covers the screens LuCI is actually admin'd from; still crisp full-screen, far fewer flash/wire bytes */
 const BG_QUALITY  = 0.9;
 const BG_SRC_MAX  = 25 * 1024 * 1024;			/* refuse a source this big before decoding (decode-bomb guard) */
 const _fileRemove = rpc.declare({ object: 'file', method: 'remove', params: [ 'path' ] });
@@ -506,7 +588,7 @@ function _applyLoginBg(tok) {
 	const root = document.documentElement;
 	if (tok) root.style.setProperty('--fs-login-bg-url', "url('" + loginBgUrl(tok) + "')");
 	else root.style.removeProperty('--fs-login-bg-url');
-	try { (window.__fsSD = window.__fsSD || {}).login_bg = tok || ''; } catch (e) {}
+	setSD('login_bg', tok || '');
 }
 
 /* Re-encode the picked image to a bounded JPEG on a canvas. This is a SECURITY step as much as a
@@ -598,43 +680,20 @@ function applyPhotoDim(pct) {
 	const v = Math.max(0, Math.min(100, pct | 0));
 	if (v === FS_PDIM_DEFAULT) root.style.removeProperty('--fs-photo-dim');
 	else root.style.setProperty('--fs-photo-dim', v + '%');
-	try { (window.__fsSD = window.__fsSD || {}).photo_dim = v; } catch (e) {}
+	setSD('photo_dim', v);
 	/* the slider fires continuously; commit to uci once it settles */
 	if (_pdimTimer) clearTimeout(_pdimTimer);
 	_pdimTimer = setTimeout(() => _persistUci('photo_dim', String(v)), 500);
 }
 
-/* Tint density: the STRENGTH of the router-identity Tint (the hue washed onto --fs-bg), a per-browser
- * axis paired with the Tint hue — the hue picks the colour, this picks how strong it reads.
- * --fs-tint-strength is a multiplier on the tint chroma (03-palettes.css): 100% = the designed
- * strength, 0% = none, up to 200%. It only bites while a Tint hue is set (data-tint), and it is
- * hidden and moot under the File wallpaper, where the tint resets to neutral (the photo covers the
- * canvas). A normal per-browser axis: localStorage ?? router default ?? built-in; head.ut pre-paints
- * it; stored explicitly (incl. the 100 default) so it can override a router default, like the hues. */
-function tintStrengthDefault() {
-	const d = sd('tint_strength');
-	return (typeof d === 'number' && d >= 0 && d <= 200) ? d : FS_TSTR_DEFAULT;
-}
-function currentTintStrength() {
-	const raw = lsGet('fs-tint-strength');
-	if (raw !== null) { const v = parseInt(raw, 10); return (v >= 0 && v <= 200) ? v : FS_TSTR_DEFAULT; }
-	return tintStrengthDefault();
-}
-function applyTintStrength(pct) {
-	const root = document.documentElement;
-	const v = Math.max(0, Math.min(200, pct | 0));
-	lsSet('fs-tint-strength', String(v));
-	if (v === FS_TSTR_DEFAULT) root.style.removeProperty('--fs-tint-strength');
-	else root.style.setProperty('--fs-tint-strength', String(v / 100));
-}
-
 return baseclass.extend({
 	/* the storage helpers, shared with fs-update.js's own axis */
-	lsGet, lsSet, lsDel,
+	lsGet, lsSet, lsDel, lsGetArr,
 
 	currentMode, applyMode, guardDarkStamp,
 	currentPalette, applyPalette,
 	currentWallpaper, applyWallpaper,
+	currentDensity, applyDensity,
 	currentRadius, applyRadius,
 	currentTint, applyTint,
 	currentAccent, applyAccent,

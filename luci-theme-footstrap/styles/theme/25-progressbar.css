@@ -22,7 +22,7 @@
 	.cbi-progressbar::after {
 		content: attr(title);
 		position: absolute; right: 0; bottom: calc(100% + 4px); top: auto; left: auto;
-		font-family: var(--fs-font-mono); font-size: 11px; font-weight: 400;
+		font-family: var(--fs-font-mono); font-size: var(--fs-type-xs); font-weight: var(--fs-weight-normal);
 		color: var(--fs-dim); white-space: nowrap; text-shadow: none;
 	}
 
@@ -34,7 +34,7 @@
 	 * generic meter floats its value ABOVE the bar, which here lands on the row divider.
 	 * Shrink the bar and put the value INLINE to its right, clear of the border. */
 	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar {
-		min-width: 60px; margin-right: 42px;
+		min-width: 60px; margin-right: var(--fs-space-10);
 	}
 	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar::after {
 		right: auto; left: calc(100% + 8px); bottom: auto; top: 50%;

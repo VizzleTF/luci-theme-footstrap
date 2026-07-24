@@ -17,11 +17,11 @@
 	}
 
 	.cbi-section-table .tr.cbi-section-table-descr .th {
-		font-weight: normal;
+		font-weight: var(--fs-weight-normal);
 	}
 
 	.cbi-section-table-titles {
-		font-weight: bold;
+		font-weight: var(--fs-weight-bold);
 	}
 
 	/* The GridSection name column, and on 24.10 the THEME draws the whole of it — this is the one
@@ -91,7 +91,7 @@
 		flex: 1 1 4em;
 		/* at 1px apart, adjacent row actions sat inside each other's 24px target circle
 		 * (WCAG 2.2 SC 2.5.8) — see the min-height in theme/55-buttons.css */
-		margin: 0 4px;
+		margin: 0 var(--fs-space-1);
 	}
 
 	.td.cbi-section-actions > * > form {
@@ -156,7 +156,7 @@
 
 	.cbi-section-error ul li {
 		/* colour: theme/35-alerts.css — absorbed */
-		font-weight: bold;
+		font-weight: var(--fs-weight-bold);
 	}
 
 	.ifacebox {
@@ -179,7 +179,7 @@
 		/* the head sits INSIDE the box's 1px border, so its own radius is the box's less that
 		 * border — restating a smaller literal is how the two drifted apart before. */
 		border-radius: calc(var(--fs-radius-sm) - 1px) calc(var(--fs-radius-sm) - 1px) 0 0;
-		padding: 2px;
+		padding: var(--fs-space-0-5);
 		/* surface + ink: theme/45-misc.css — absorbed */
 	}
 
@@ -219,7 +219,7 @@
 		display: inline-block;
 		flex-direction: row;
 		border: 1px solid var(--fs-border);
-		padding: 2px;
+		padding: var(--fs-space-0-5);
 		/* surface: theme/45-misc.css (flat) — absorbed */
 		color: var(--fs-text);
 		text-shadow: var(--fs-text-emboss);
@@ -238,7 +238,7 @@
 
 	.ifacebadge-active {
 		/* border-color: theme/45-misc.css (accent) — absorbed */
-		font-weight: bold;
+		font-weight: var(--fs-weight-bold);
 	}
 
 	.network-status-table {
@@ -302,7 +302,7 @@
 	}
 
 	.zonebadge {
-		padding: 2px;
+		padding: var(--fs-space-0-5);
 		border-radius: var(--fs-radius-sm);
 		display: inline-block;
 		white-space: nowrap;
@@ -319,7 +319,7 @@
 	/* .zonebadge input width: theme/30-tables.css — absorbed with the generic box */
 
 	.zonebadge > .ifacebadge {
-		margin-left: 2px;
+		margin-left: var(--fs-space-0-5);
 	}
 
 	.zonebadge-empty {
@@ -375,12 +375,12 @@
 	.uci-dialog div > del,
 	.uci-dialog div > ins,
 	.uci-dialog div > var {
-		margin-bottom: 2px;
+		margin-bottom: var(--fs-space-0-5);
 		border: 1px solid var(--fs-border);
 		line-height: var(--fs-leading-tight);
 		overflow: hidden;
 		text-overflow: ellipsis;
-		padding: 2px;
+		padding: var(--fs-space-0-5);
 		position: relative;
 		background-color: var(--fs-panel2);
 	}
@@ -425,7 +425,7 @@
 
 	.uci-change-legend-label {
 		flex-basis: 150px;
-		margin: 2px;
+		margin: var(--fs-space-0-5);
 		display: flex;
 		align-items: center;
 	}
@@ -433,7 +433,7 @@
 	.uci-change-legend-label > ins,
 	.uci-change-legend-label > del,
 	.uci-change-legend-label > var {
-		margin-right: 4px;
+		margin-right: var(--fs-space-1);
 		width: 16px;
 		height: 16px;
 		display: flex;

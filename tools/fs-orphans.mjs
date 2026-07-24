@@ -19,11 +19,10 @@
  * Usage: node tools/fs-orphans.mjs
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import * as csstree from 'css-tree';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { ROOT } from './lib/root.mjs';
 const PKG = join(ROOT, 'luci-theme-footstrap');
 
 /* fs-* classes the theme STYLES but does not EMIT, because a SEPARATE repo emits them: the optional
@@ -39,6 +38,7 @@ const IGNORE_EXACT = new Set([
 	/* localStorage keys (fs-update-check lives in the optional updater's own repo, not scanned here) */
 	'fs-darkmode', 'fs-palette', 'fs-wallpaper', 'fs-radius', 'fs-tint', 'fs-accent',
 	'fs-rail', 'fs-layout', 'fs-menu-open', 'fs-menu-autocollapse', 'fs-recent', 'fs-tint-strength',
+	'fs-density',
 	/* custom events / id prefixes */
 	'fs-autocollapse', 'fs-sub-', 'fs-topsub-',
 	/* a console log PREFIX (`console.error('fs-fit: a fitter threw')`), not markup. This is the one

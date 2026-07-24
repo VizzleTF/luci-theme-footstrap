@@ -12,7 +12,7 @@
 		border: 1px solid var(--fs-border);
 		border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow);
-		padding: 16px;
+		padding: var(--fs-space-4);
 	}
 
 	/* An authorized_keys entry is a ~400-char base64 blob: the one dynlist that must not

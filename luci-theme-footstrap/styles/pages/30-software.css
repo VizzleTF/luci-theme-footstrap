@@ -2,7 +2,7 @@
 	/* Software disk-space bar -> the overview Memory/Storage meter: label + value on one
 	 * line, bar below (the value is the .cbi-progressbar title, lifted out by ::after).
 	 * Scoped by body[data-page], NOT by :has(#disk-space-label) — 24.10 ships no such id. */
-	body[data-page="admin-system-package-manager"] #view .controls > div:first-child { position: relative; display: block; flex: 1 1 100%; width: 100%; margin: 0 0 6px; }
+	body[data-page="admin-system-package-manager"] #view .controls > div:first-child { position: relative; display: block; flex: 1 1 100%; width: 100%; margin: 0 0 var(--fs-space-1-5); }
 
 	/* The package list's row SHAPE. #packages is a DATA table (`<table class="table"
 	 * id="packages">`, no .cbi-section-table class; fs-select.js tags it .fs-dt off its
@@ -37,7 +37,7 @@
 	#packages:not(.fs-stacked) .tr > .td:first-child { white-space: nowrap; }
 
 	#packages.fs-stacked .tr:not(.cbi-section-table-titles):not(.cbi-section-table-descr) {
-		display: block; padding: 12px 16px;
+		display: block; padding: var(--fs-space-3) var(--fs-space-4);
 	}
 	/* ---- the value is not ONE flex item, and space-between tore it apart ----
 	 *
@@ -52,7 +52,7 @@
 	 * else then packs flush right in DOM order, however many elements the value happens to be. */
 	#packages.fs-stacked .td {
 		display: flex; align-items: baseline; justify-content: flex-end;
-		gap: 0; padding: 5px 0; border: 0; text-align: right;
+		gap: 0; padding: var(--fs-space-1) 0; border: 0; text-align: right;
 		min-width: 0; width: auto; flex: none;
 	}
 	/* `margin-right: auto` is what replaces space-between: it eats the whole free line, so the
@@ -61,9 +61,9 @@
 	 * between EVERY pair of items — including the two halves of a highlighted name). */
 	#packages.fs-stacked .td[data-title]::before {
 		content: attr(data-title); flex: 0 0 auto; text-align: left; margin-bottom: 0;
-		margin-right: auto; padding-right: 14px;
-		font-size: 10px; font-weight: 700; letter-spacing: .05em;
-		text-transform: uppercase; color: var(--fs-faint); white-space: nowrap;
+		margin-right: auto; padding-right: var(--fs-space-3-5);
+		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking);
+		text-transform: uppercase; color: var(--fs-eyebrow-color); white-space: nowrap;
 	}
 	/* Column 4 = Description. NOT `[data-title="Description"]`: LuCI builds this table's cells from
 	 * the heading's innerText, and theme/30-tables.css uppercases `.th` — so the attribute really
@@ -71,11 +71,11 @@
 	 * language (measured). The theme's own CSS was rewriting the string the theme's own CSS keyed
 	 * off. Columns: 1 Package name | 2 Version | 3 Size | 4 Description | 5 actions. */
 	#packages.fs-stacked .td:nth-child(4) { display: block; text-align: left; overflow-wrap: anywhere; word-break: break-word; }
-	#packages.fs-stacked .td:nth-child(4)::before { display: block; margin-bottom: 3px; }
-	#packages.fs-stacked .td.cbi-section-actions { justify-content: flex-end; margin-top: 6px; }
+	#packages.fs-stacked .td:nth-child(4)::before { display: block; margin-bottom: var(--fs-space-1); }
+	#packages.fs-stacked .td.cbi-section-actions { justify-content: flex-end; margin-top: var(--fs-space-1-5); }
 	#packages.fs-stacked .td.cbi-section-actions::before,
 	#packages.fs-stacked .td:not([data-title])::before { content: none; }
 	body[data-page="admin-system-package-manager"] #disk-space-label {
-		display: block; margin: 0; font-size: 12px; font-weight: 600; color: var(--fs-dim);
+		display: block; margin: 0; font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-dim);
 	}
 }

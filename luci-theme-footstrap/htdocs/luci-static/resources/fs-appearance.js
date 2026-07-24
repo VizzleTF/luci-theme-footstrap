@@ -99,6 +99,17 @@ function wireAppearance(update) {
 			{ val: 'hicontrast', label: 'Hi-Contrast' }
 		], bump(prefs.applyPalette), label)),
 
+		/* Density: how much air the UI uses. Pure token axis — 02-tokens.css multiplies the type and
+		 * space ladders, so every size, gap and padding in the theme follows at once. The labels carry
+		 * the `footstrap` msgctxt like every other control here: a bare 'Compact'/'Large' is a msgid
+		 * some other package's catalogue may already own, and a lookup returns the first archive
+		 * holding the hash (see the i18n note in partials/appearance.ut). */
+		group(_('Density', 'footstrap'), (label) => widgets.segControl(prefs.currentDensity(), [
+			{ val: 'compact', label: _('Compact', 'footstrap') },
+			{ val: 'normal',  label: _('Normal', 'footstrap') },
+			{ val: 'large',   label: _('Large', 'footstrap') }
+		], bump(prefs.applyDensity), label)),
+
 		/* Wallpaper is THREE-valued: Off, Cats (doodle), File (the uploaded photo). Picking File reveals
 		 * the upload sub-panel BELOW the segments — a file input + preview + Remove, shown only in that
 		 * mode. The photo BYTES are router-side (fs-prefs uploads them and stores a token in uci); this
@@ -218,12 +229,19 @@ function wireAppearance(update) {
 
 	/* version line + "new version" badge + one-click Update button. The badge and button exist only
 	 * when the updater is installed (`update` non-null); they are revealed by the update check below
-	 * when a newer release exists. */
+	 * when a newer release exists.
+	 *
+	 * The badge's text is written twice — once as the initial label, once when the check reports a
+	 * version to append — so the msgid is resolved ONCE here. Two `_()` calls of the same string are
+	 * one edit away from becoming two different strings, i.e. two msgids, one of which nobody
+	 * translates. Local to this function on purpose: at module scope `_()` would run before the
+	 * popover is ever built. */
+	const NEW_VERSION = _('New version available');
 	const badge = update ? E('a', {
 		'class': 'fs-ap-badge', 'hidden': '',
 		'href': update.LATEST_URL,
 		'target': '_blank', 'rel': 'noopener'
-	}, [ _('New version available') ]) : null;
+	}, [ NEW_VERSION ]) : null;
 	const updateBtn = update
 		? E('button', { 'class': 'fs-ap-update', 'type': 'button', 'hidden': '' }, [ _('Update now') ])
 		: null;
@@ -302,7 +320,7 @@ function wireAppearance(update) {
 				btn.classList.toggle('fs-has-update', !!u.hasUpdate);
 				badge.hidden = !u.hasUpdate; updateBtn.hidden = !u.hasUpdate;
 				if (u.hasUpdate)
-					badge.textContent = _('New version available') + (u.latest ? ' (' + u.latest + ')' : '');
+					badge.textContent = NEW_VERSION + (u.latest ? ' (' + u.latest + ')' : '');
 			});
 		};
 		update.onUI(applyUpdateUI);

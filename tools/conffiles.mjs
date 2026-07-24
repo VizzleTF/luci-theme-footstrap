@@ -22,10 +22,9 @@
  * and in the lint job, neither of which has an OpenWrt SDK.
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { ROOT } from './lib/root.mjs';
 const PKG = join(ROOT, 'luci-theme-footstrap');
 const MAKEFILE = join(PKG, 'Makefile');
 const CONFIG_DIR = join(PKG, 'root/etc/config');

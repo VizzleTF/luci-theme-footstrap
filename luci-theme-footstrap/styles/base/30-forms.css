@@ -25,7 +25,7 @@
 	button {
 		font-family: var(--fs-font-sans);
 		font-size: var(--fs-type);
-		font-weight: normal;
+		font-weight: var(--fs-weight-normal);
 		line-height: normal;
 	}
 
@@ -116,7 +116,7 @@
 		top: -1px;
 		right: -1px;
 		bottom: -1px;
-		font-weight: bold;
+		font-weight: var(--fs-weight-bold);
 		pointer-events: auto;
 	}
 

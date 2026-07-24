@@ -23,10 +23,9 @@
  * `[data-title=""]`) are fine and stay allowed — they ask whether there IS a label, not what it says.
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { ROOT } from './lib/root.mjs';
 const STYLES = 'luci-theme-footstrap/styles';
 
 /* any data-title comparison carrying a NON-EMPTY value: =, ^=, $=, *=, ~=, |= */

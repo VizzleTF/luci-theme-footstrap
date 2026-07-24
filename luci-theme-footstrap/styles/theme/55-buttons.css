@@ -3,7 +3,7 @@
 	 * Enable/Disable, Start/Restart/Stop): inline-block buttons only get whitespace spacing
 	 * horizontally, so on wrap the rows collapsed together. Wrapping flex with a real gap. */
 	.cbi-value-field:has(> .cbi-button) {
-		display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end;
+		display: inline-flex; flex-wrap: wrap; gap: var(--fs-space-2); align-items: center; justify-content: flex-end;
 	}
 
 	/* The button. The native `input` types are in the selector list on purpose: LuCI's own views
@@ -17,9 +17,9 @@
 		/* auto, stated: theme/60-inputs.css's generic `input` box says 210px x 32px, and a base
 		 * reset would lose to it by layer — a button sizes to its label */
 		width: auto; height: auto;
-		min-height: 36px;
-		padding: 7px 14px;
-		font-family: var(--fs-font-sans); font-weight: 600; line-height: 1.1;
+		min-height: var(--fs-ctl-h);
+		padding: var(--fs-space-2) var(--fs-space-3-5);
+		font-family: var(--fs-font-sans); font-weight: var(--fs-weight); line-height: 1.1;
 		color: var(--fs-text);
 		background: var(--fs-panel2);
 		border: 1px solid var(--fs-border);
@@ -100,13 +100,13 @@
 	 * later layer, so a size word that carried only a font-size (as base's absorbed copy did)
 	 * came out with default-button padding. Theme owns .btn.large/.small in full now, geometry
 	 * on the radius scale rather than base's hardcoded 6px. */
-	.btn.large { font-size: 15px; min-height: 42px; padding: 9px 16px; border-radius: var(--fs-radius); }
-	.btn.small { font-size: 11px; min-height: 28px; padding: 5px 10px; border-radius: var(--fs-radius-sm); }
+	.btn.large { font-size: var(--fs-type-lg); min-height: var(--fs-ctl-h-lg); padding: var(--fs-space-2) var(--fs-space-4); border-radius: var(--fs-radius); }
+	.btn.small { font-size: var(--fs-type-xs); min-height: var(--fs-ctl-h-sm); padding: var(--fs-space-1) var(--fs-space-2-5); border-radius: var(--fs-radius-sm); }
 
 	.cbi-section .table[id] .td .btn,
-	.cbi-section .table[id] .td .cbi-button { padding: 4px 10px; font-size: 12px; }
+	.cbi-section .table[id] .td .cbi-button { padding: var(--fs-space-1) var(--fs-space-2-5); font-size: var(--fs-type); }
 	.alert-message .btn, .alert-message .cbi-button {
-		border-radius: var(--fs-radius); padding: 7px 13px; font-weight: 600;
+		border-radius: var(--fs-radius); padding: var(--fs-space-2) var(--fs-space-3); font-weight: var(--fs-weight);
 		background: var(--fs-panel2); border: 1px solid var(--fs-border); color: var(--fs-text);
 	}
 	.alert-message .btn:hover { border-color: var(--fs-accent); color: var(--fs-accent); }
@@ -118,20 +118,20 @@
 		border: 0;
 		border-radius: 0;
 		box-shadow: none;
-		padding: 8px 0;
+		padding: var(--fs-space-2) 0;
 		margin: 0 0 var(--fs-card-gap);
 		text-align: right;
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
-		gap: 8px;
+		gap: var(--fs-space-2);
 	}
 	.cbi-page-actions .cbi-button,
 	.cbi-page-actions .btn {
-		min-height: 40px;
-		padding: 0 18px;
+		min-height: var(--fs-ctl-h);
+		padding: 0 var(--fs-space-5);
 		border-radius: var(--fs-radius);
-		font-weight: 600;
+		font-weight: var(--fs-weight);
 		display: inline-flex; align-items: center; justify-content: center;
 		vertical-align: middle;
 	}
@@ -166,8 +166,8 @@
 	}
 
 	input[type="file"]::file-selector-button {
-		margin-right: 12px; padding: 8px 14px;
-		font-family: var(--fs-font-sans); font-size: 12px; font-weight: 600;
+		margin-right: var(--fs-space-3); padding: var(--fs-space-2) var(--fs-space-3-5);
+		font-family: var(--fs-font-sans); font-size: var(--fs-type); font-weight: var(--fs-weight);
 		color: var(--fs-text); background: var(--fs-panel2);
 		border: 1px solid var(--fs-border); border-radius: var(--fs-radius-sm); cursor: pointer;
 	}
@@ -187,7 +187,7 @@
 	 * ================================================================== */
 	.td .cbi-button, .td .btn, .cbi-section-actions .cbi-button, .cbi-section-actions .btn,
 	.cbi-section-table .cbi-button {
-		min-height: 32px; padding: 0 12px; font-size: 12px;
+		min-height: var(--fs-ctl-h-sm); padding: 0 var(--fs-space-3); font-size: var(--fs-type);
 	}
 	.td .cbi-button, .cbi-section-actions .cbi-button, .cbi-section-table .cbi-button {
 		background: transparent; background-image: none;
@@ -265,7 +265,7 @@
 	.cbi-dynlist > .add-item > button,
 	.cbi-dynlist > .add-item > .cbi-button-add {
 		flex: 0 0 auto; width: auto; min-width: 38px;
-		min-height: 32px; padding: 0 12px; margin: 0;
+		min-height: var(--fs-ctl-h-sm); padding: 0 var(--fs-space-3); margin: 0;
 		border: 0; border-left: 1px solid var(--fs-border);
 		border-radius: 0;
 		background: transparent; color: var(--fs-dim);
@@ -275,7 +275,7 @@
 	.control-group:has(> .cbi-input-password) > button.cbi-button-neutral {
 		border: 0; border-radius: 0; margin: 0;
 		background: transparent; color: var(--fs-dim);
-		padding: 0 13px; min-height: 36px;
+		padding: 0 var(--fs-space-3); min-height: var(--fs-ctl-h);
 		border-left: 1px solid var(--fs-border);
 	}
 	.control-group:has(> .cbi-input-password) > button.cbi-button-neutral:hover { color: var(--fs-accent); }

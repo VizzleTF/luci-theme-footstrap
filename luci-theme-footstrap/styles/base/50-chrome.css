@@ -57,7 +57,7 @@
 		display: inline-flex;
 		flex-direction: column;
 		justify-content: center;
-		font-size: var(--fs-type-sm);
+		font-size: var(--fs-type);
 	}
 
 	.cbi-tab-descr {

@@ -4,14 +4,14 @@
 	 * gradients — a layer does that for free (theme beats base whatever the specificity), so
 	 * one rule does it. */
 	.alert-message {
-		padding: 14px 16px;
+		padding: var(--fs-space-3-5) var(--fs-space-4);
 		border-radius: var(--fs-radius-lg);
 		border: 1px solid var(--fs-border);
 		border-left: 3px solid var(--fs-accent);
 		background: var(--fs-panel);
 		color: var(--fs-text);
 		box-shadow: var(--fs-shadow);
-		gap: 12px;
+		gap: var(--fs-space-3);
 	}
 	/* warning and error tint the whole frame; success and notice only the stripe */
 	.alert-message.warning { border-color: var(--fs-warn); }
@@ -22,7 +22,7 @@
 	 * here because a third-party alert may use it, and coverage only grows. h5/h6 joined for the
 	 * same reason — base styled them and the theme did not, so an alert heading looked like an
 	 * alert heading down to h4 and then fell back to a bootstrap one. */
-	.alert-message :is(h2, h3, h4, h5, h6) { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: var(--fs-text); }
+	.alert-message :is(h2, h3, h4, h5, h6) { margin: 0 0 var(--fs-space-1); font-size: var(--fs-type-lg); font-weight: var(--fs-weight-bold); color: var(--fs-text); }
 	/* the alert's own content reset — moved from base with the heading ramp (45-misc.css): its
 	 * `line-height: inherit` beat the ramp's tight leading in-layer, and left behind it would
 	 * lose to the ramp by layer (measured: alert headings dropped 21 -> 16.8px) */
@@ -37,15 +37,15 @@
 		background: transparent;
 		padding: 0;
 	}
-	.alert-message p { margin: 4px 0; color: var(--fs-dim); font-size: 13px; }
+	.alert-message p { margin: var(--fs-space-1) 0; color: var(--fs-dim); font-size: var(--fs-type); }
 	/* …and the body elements an alert may carry. Absorbed from base/90-widgets.css, same values:
 	 * the theme had claimed only <p> out of that rule's six selectors. */
 	.alert-message :is(ul, ol, li, pre) { color: var(--fs-text); margin: .25em 0; }
 	/* inner table (firmware Current/Available) — flatten so it does not read as a nested card
 	 * on the alert panel; subtle row dividers only */
-	.alert-message .table { margin: 10px 0; background: transparent; border: 0; box-shadow: none; border-radius: 0; }
-	.alert-message .table .th { color: var(--fs-dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-	.alert-message .table .th, .alert-message .table .td { padding: 7px 14px 7px 0; background: transparent; border-color: color-mix(in srgb, var(--fs-border) 60%, transparent); }
+	.alert-message .table { margin: var(--fs-space-2-5) 0; background: transparent; border: 0; box-shadow: none; border-radius: 0; }
+	.alert-message .table .th { color: var(--fs-eyebrow-color); font-weight: var(--fs-eyebrow-weight); font-size: var(--fs-type-xs); text-transform: uppercase; letter-spacing: var(--fs-eyebrow-tracking); }
+	.alert-message .table .th, .alert-message .table .td { padding: var(--fs-space-2) var(--fs-space-3-5) var(--fs-space-2) 0; background: transparent; border-color: color-mix(in srgb, var(--fs-border) 60%, transparent); }
 	.alert-message .table .td { color: var(--fs-text); }
 
 	/* The validation tooltip (ui.js pops it on a .cbi-tooltip-container). Its colour words were the
@@ -69,8 +69,8 @@
 	 * for what we call accent; `.danger` has no counterpart there and is added because
 	 * packages use it. See docs/gallery.html. */
 	.label {
-		display: inline-block; padding: 3px 9px; border-radius: var(--fs-radius-pill);
-		font-size: 11px; font-weight: 600; line-height: 1.4;
+		display: inline-block; padding: var(--fs-space-1) var(--fs-space-2); border-radius: var(--fs-radius-pill);
+		font-size: var(--fs-type-xs); font-weight: var(--fs-weight); line-height: 1.4;
 		background: var(--fs-panel2); border: 1px solid var(--fs-border);
 		color: var(--fs-dim); text-shadow: none; text-transform: none;
 		/* carried over from the absorbed styles/base .label rule */
@@ -96,8 +96,8 @@
 	 * rendering. The trailing overrides (text-transform … box-shadow) kill the uppercase /
 	 * margin / min-width / badge decorations base used to put on these pills. */
 	.cbi-title .label {
-		font-size: 11px; font-weight: 600;
-		padding: 4px 12px; border-radius: var(--fs-radius-pill);
+		font-size: var(--fs-type-xs); font-weight: var(--fs-weight);
+		padding: var(--fs-space-1) var(--fs-space-3); border-radius: var(--fs-radius-pill);
 		background: var(--fs-panel2); border: 1px solid var(--fs-border);
 		color: var(--fs-dim); cursor: pointer; line-height: 1.4;
 		text-transform: none; letter-spacing: 0;

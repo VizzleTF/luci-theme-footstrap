@@ -108,7 +108,7 @@
 		 * the declaration bodies differ, so it goes quiet. The two sites legitimately differ in
 		 * TECHNIQUE (the rail masks the element and drops the border; the bar keeps the bordered
 		 * square to match Appearance/Log out); the size was nobody's decision. */
-		--fs-icon-refresh-sz: 18px;
+		--fs-icon-refresh-sz: calc(18px * var(--fs-density-type));
 
 		/* the 1px raised edge on a plate carrying text, plus its text shadow. .ifacebox
 		 * mixed --fs-dim and .ifacebadge --fs-panel for the SAME edge at the same 5%. */
@@ -150,7 +150,7 @@
 		--fs-content-max: 1280px;	/* content column cap */
 		/* content column side padding — read by .fs-content, the top bar's centering calc
 		 * and the notification width calc, so they cannot drift apart. */
-		--fs-content-pad: 28px;
+		--fs-content-pad: calc(28px * var(--fs-density-space));
 		/* ------------------------------------------------------------------------
 		 * THE SHELL'S GEOMETRY — tokens, not literals, because the JS reads them back with
 		 * getPropertyValue(): the CSS lays the sidebar out, and fs-chrome.js
@@ -159,20 +159,20 @@
 		 * 68, CONTENT_MIN = 500) against bare literals in the CSS: narrow the rail here and
 		 * the measurement silently went on subtracting the old width.
 		 * ---------------------------------------------------------------------- */
-		--fs-sidebar-w: 224px;		/* the expanded vertical sidebar's column */
-		--fs-rail-w: 68px;		/* ...and the same sidebar collapsed to its icon rail */
+		--fs-sidebar-w: calc(224px * var(--fs-density-box));		/* the expanded vertical sidebar's column */
+		--fs-rail-w: calc(68px * var(--fs-density-box));		/* ...and the same sidebar collapsed to its icon rail */
 		--fs-content-min: 500px;	/* below this a content column stops being readable */
 		/* translucent blurred bar surface — the top-nav bar and the sidebar's phone bar are
 		 * one component in two markups; one token keeps their glass tint identical. */
 		--fs-bar-bg: color-mix(in srgb, var(--fs-panel) 88%, transparent);
 		/* height of that bar, and the scroll-margin every anchor target needs to clear it
 		 * (base/10-reset.css) — if the two drift, an in-page jump lands under the bar. */
-		--fs-bar-h: 46px;
+		--fs-bar-h: calc(46px * var(--fs-density-box));
 		/* the square icon-button in the bar/rail: the logo box, Appearance (.fs-themerow),
 		 * Log out (.fs-logout) and the collapsed poll pill are all one size so the right
 		 * cluster reads as a row of equal squares. Was a bare 34px in three files with the
 		 * logo left at 30 — the odd one out. */
-		--fs-btn-size: 34px;
+		--fs-btn-size: calc(34px * var(--fs-density-box));
 
 		/* Corner-radius scale. One user-tunable base (Appearance → Rounding, 0–20px,
 		 * localStorage `fs-radius`, pre-painted inline on :root by partials/head.ut before
@@ -192,12 +192,12 @@
 		 * offset it needs is this padding plus the card's 1px border. Written as a literal in
 		 * both places, narrowing the gutter here would silently re-clip every graph — the same
 		 * trap --fs-sidebar-w exists to close for fitShell(). */
-		--fs-card-pad: 16px;
+		--fs-card-pad: calc(16px * var(--fs-density-space));
 		/* The vertical rhythm BETWEEN cards (.cbi-section, tab groups, alerts, action bars).
 		 * It was the same 16px hand-written in seven files — 45-misc.css even carried a comment
 		 * apologising for it ("Same 16px every .cbi-section already uses") — which is an
 		 * unnamed level, and an unnamed level drifts (see the role-tint ladder above). */
-		--fs-card-gap: 16px;
+		--fs-card-gap: calc(16px * var(--fs-density-space));
 
 		--fs-font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 		--fs-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -221,14 +221,99 @@
 		 * still snaps. What must stay whole is a BOX: never size an element `--fs-type * --fs-leading`
 		 * (a half-pixel border is upstream's 8.5px bug wearing a calc) — take the nearer --fs-space
 		 * step, which is what a line of text at this scale rounds to anyway. */
-		--fs-type-xs: 11px;	/* dense metadata: tooltips, table sub-labels, badges */
-		--fs-type-sm: 12px;	/* secondary text: help tails, footer, tab labels */
-		--fs-type: 13px;	/* body, tables, form fields — the base */
-		--fs-type-lg: 16px;	/* section titles */
-		--fs-type-xl: 20px;	/* page titles */
-		--fs-type-2xl: 26px;	/* h1 — a bare <h1> only a third-party app emits; see base/20-typography.css */
+		/* FIVE steps, and the count is the point. The scale had grown to eight — 10, 11, 12, 13, 14,
+		 * 16, 20, 26 — where four of the gaps were a single pixel, which is below the threshold at
+		 * which anyone reads a size as *different*: it does not build hierarchy, it just makes two
+		 * rules that look unrelated in a grep. The 1px neighbours were folded together (10 into 11,
+		 * 12 into 13) and the 14 was split by what it was actually doing — chrome and menu items are
+		 * body text (13), a section title is a title (16) — which is what finally puts real distance
+		 * between a heading and the text under it, where before there was one pixel.
+		 * Ratio is roughly 1.25 per step. Anything that needs a size not on this list is making a
+		 * design decision and should say so in a comment. */
+		/* ---- DENSITY: one axis, two multipliers, and it only works because of the scales ----
+		 *
+		 * Compact / Normal / Large is a CLIENT preference (Appearance), stamped as
+		 * :root[data-density] — absent means Normal, so the default costs no attribute and no
+		 * override, exactly like every other axis here.
+		 *
+		 * THREE multipliers, because three different kinds of size want different treatment and one
+		 * knob gets all three wrong:
+		 *
+		 *   --fs-density-type   TEXT. Compact does not touch it at all: "compact" is a request for
+		 *                       less air, not for smaller writing, and shrinking the text is how a
+		 *                       density control turns into an accessibility problem.
+		 *   --fs-density-space  pure AIR — padding, margin, gap. This is what actually buys the room,
+		 *                       so it moves the most (.65 at Compact).
+		 *   --fs-density-box    boxes that must HOLD text or an icon: the sidebar column, the rail,
+		 *                       the bar height, the square icon buttons, the control-height floors.
+		 *                       These cannot follow the air: with type unchanged, a sidebar cut by
+		 *                       35% would no longer fit the menu labels it exists to show. They move
+		 *                       gently (.85), which is roughly what their own padding gave up.
+		 *
+		 * This is only expressible because every size in the theme now reads one of these tokens:
+		 * before that, a density axis would have meant hunting ~240 literals and would have gone
+		 * stale the first time someone wrote a number. Add a size OUTSIDE these ladders and it
+		 * silently stops responding to the axis — that is the cost, and the reason the ladders are
+		 * the contract.
+		 *
+		 * Type is rounded to whole pixels (a fractional font size renders soft); space is not, since
+		 * a sub-pixel padding is invisible and rounding it would collide steps together. */
+		--fs-density-type: 1;
+		--fs-density-space: 1;
+		--fs-density-box: 1;
+
+		/* ---- CONTROL HEIGHTS: three steps, and they follow the density too -----------
+		 * A minimum height is what stops a button collapsing onto its text, so it is part of how
+		 * dense the UI feels — leave it literal and Compact shrinks the writing while the buttons
+		 * stay put, which is the opposite of the setting. These had drifted to EIGHT values
+		 * (28/30/32/36/38/40/42/44) for what the design has three of; each was moved by at most 2px
+		 * onto the nearest step.
+		 * Not to be confused with --fs-control-h below: that is a FIELD's height, derived from the
+		 * text it must hold, and it already follows the type ladder. These are the floors a chrome
+		 * control gets when its content is not text. */
+		--fs-ctl-h-sm: calc(30px * var(--fs-density-box));	/* dense/small: .btn.small, table-row buttons */
+		--fs-ctl-h: calc(38px * var(--fs-density-box));	/* the default control */
+		--fs-ctl-h-lg: calc(44px * var(--fs-density-box));	/* prominent: .btn.large, the login submit */
+
+		--fs-type-xs: calc(round(11px * var(--fs-density-type), 1px));	/* eyebrow, badges, tooltips, dense metadata */
+		--fs-type: calc(round(13px * var(--fs-density-type), 1px));	/* body, tables, fields, menu items — the base */
+		--fs-type-lg: calc(round(16px * var(--fs-density-type), 1px));	/* section titles (h3/legend), alert headings */
+		--fs-type-xl: calc(round(20px * var(--fs-density-type), 1px));	/* page titles */
+		--fs-type-2xl: calc(round(26px * var(--fs-density-type), 1px));	/* h1 — only a third-party app emits a bare one */
+		/* ---- WEIGHT: there are only ever three, and they had six spellings ----------
+		 * The theme ships Manrope 600 and 700 and nothing else (styles/01-fonts.css), so these are
+		 * not a ramp to pick from — they are the two faces that exist, plus the "un-bold this"
+		 * value. `700` and `bold` were both in use and are the same weight; so are `400` and
+		 * `normal`, and 400 has no face at all (it resolves onto the 600 one — that is why body
+		 * text is semibold by design, and why adding a 400 face would silently restyle every page).
+		 * Naming them leaves one spelling each. */
+		--fs-weight-normal: 400;	/* "not bold" — no face of its own; resolves onto the 600 */
+		--fs-weight: 600;	/* the UI default: body, labels, controls */
+		--fs-weight-bold: 700;	/* titles, table headers, the eyebrow */
+
 		--fs-leading: 1.5;	/* unitless ON PURPOSE — see above (13 -> 19.5px) */
 		--fs-leading-tight: 1.2;	/* headings and single-line plates, where 1.5 looks loose */
+
+		/* ---- THE EYEBROW — one microlabel idiom, named once -------------------------
+		 *
+		 * Uppercase + tracked + bold + muted is ONE thing this theme draws in a dozen places: table
+		 * column headers, the stacked-card `data-title` labels, the Appearance group labels, the rail
+		 * flyout titles, the login field titles, the search-result section note. It had drifted into
+		 * four spellings of that one idiom — letter-spacing .04/.05/.06em, weight 600 vs 700, colour
+		 * --fs-dim vs --fs-faint — the same unnamed-level drift the role x step matrix above exists to
+		 * stop, only in typography. An eyebrow is a LABEL, so it takes the quietest ink and the widest
+		 * tracking of the set; the alert table's 600 was the odd one out and read lighter than every
+		 * other header on the page.
+		 *
+		 * SIZE is deliberately NOT here: 10px (a card/chrome label) and 11px (a table header, i.e.
+		 * --fs-type-xs) are two real tiers, and collapsing them would resize half the tables.
+		 *
+		 * Two things that look like eyebrows are NOT and must stay out: `h6` is a HEADING (it takes the
+		 * type scale and the heading ink), and `.fs-navlabel` is the menu's section separator, whose
+		 * .1em is deliberately wider than any label — it separates, it does not caption. */
+		--fs-eyebrow-tracking: .06em;
+		--fs-eyebrow-weight: 700;
+		--fs-eyebrow-color: var(--fs-faint);
 
 		/* ---- SPACE SCALE — a 4px grid ----------------------------------------------
 		 *
@@ -241,12 +326,30 @@
 		 * Do NOT add a step because one rule wants 10px. An unnamed level is how the radius tints
 		 * drifted into four strengths for two decisions (see the ladder above): pick the nearer
 		 * step, or argue in a comment for why this rule is genuinely different. */
-		--fs-space-1: 4px;
-		--fs-space-2: 8px;
-		--fs-space-3: 12px;
-		--fs-space-4: 16px;
-		--fs-space-5: 20px;
-		--fs-space-6: 24px;
+		/* The grid is 4px, but the theme genuinely works at 2px between the low steps: a chip's
+		 * inset, a nav item's row padding and a card's inner gutter all landed on 6/10/14 and no
+		 * amount of rounding makes them 4/8/12 without visibly changing the control. So the half
+		 * steps are NAMED rather than pretended away — they were the single largest group of
+		 * magic numbers left in the tree (6px x26, 10px x32, 14px x13, 2px x13). Above 16px the
+		 * grid stays 4px: nothing needs finer, and every value that had drifted between the steps
+		 * up there (22, 26, 42) was snapped onto one. */
+		--fs-space-0-5: calc(2px * var(--fs-density-space));
+		--fs-space-1: calc(4px * var(--fs-density-space));
+		--fs-space-1-5: calc(6px * var(--fs-density-space));
+		--fs-space-2: calc(8px * var(--fs-density-space));
+		--fs-space-2-5: calc(10px * var(--fs-density-space));
+		--fs-space-3: calc(12px * var(--fs-density-space));
+		--fs-space-3-5: calc(14px * var(--fs-density-space));
+		--fs-space-4: calc(16px * var(--fs-density-space));
+		--fs-space-5: calc(20px * var(--fs-density-space));
+		--fs-space-6: calc(24px * var(--fs-density-space));
+		--fs-space-7: calc(28px * var(--fs-density-space));
+		/* The top of the ladder is sparse on purpose — these three are gutters and insets, not
+		 * rhythm, and each has exactly one or two users (the login card's bottom margin, the gauge's
+		 * right gutter, the room a field leaves for its own chevron). They are named so that no
+		 * padding in this theme is an unexplained number, not because a fourth caller is expected. */
+		--fs-space-8: calc(32px * var(--fs-density-space));
+		--fs-space-10: calc(40px * var(--fs-density-space));
 
 		/* The spinner glyph's box (base/95-luci.css `.spinning::before`). A TOKEN because it is read
 		 * back to clear it: theme/55-buttons.css pads a .spinning button left by inset + glyph +
@@ -373,6 +476,36 @@
 
 		--fs-disabled-opacity: .6;
 		color-scheme: light;
+	}
+
+	/* ---- the DENSITY axis, and it is exactly two declarations per step ----------------
+	 *
+	 * Normal is a bare :root — no attribute, no override — so the default path costs nothing and a
+	 * browser that has never touched the control renders identically to before this existed.
+	 *
+	 * Space moves further than type in both directions (0.8/1.25 against 0.92/1.15), because that is
+	 * what the two settings are actually for: Compact is a request for less AIR, not for smaller
+	 * writing — matching them would put body text at 10.4px, under the floor the rest of this file
+	 * defends. At Compact the base is 12px and at Large 15px; the eyebrow never drops below 10px.
+	 *
+	 * These multiply the LADDERS, not the rules, so a size that is on a ladder follows the axis for
+	 * free and one that is not silently ignores it. That is the whole reason the ladders came first. */
+	:root[data-density="compact"] {
+		/* Type does NOT move. Compact is a request for less AIR, not for smaller writing — shrinking
+		 * the text is how a "compact" mode becomes an accessibility problem, and it buys far less
+		 * room than the padding does anyway. */
+		--fs-density-type: 1;
+		--fs-density-box: .85;
+		--fs-density-space: .65;
+	}
+	:root[data-density="large"] {
+		/* Large is about the TEXT, so the air does not grow with it: padding stays on the Normal
+		 * rhythm and only the type — and the boxes that have to hold it — get bigger. Inflating the
+		 * spacing as well just pushed content off the screen and made the setting read as "zoom",
+		 * which is the browser's job, not the theme's. */
+		--fs-density-type: 1.15;
+		--fs-density-box: 1.15;
+		--fs-density-space: 1;
 	}
 
 	:root[data-darkmode="true"] {

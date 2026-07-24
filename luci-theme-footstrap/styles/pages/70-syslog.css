@@ -14,8 +14,8 @@
 		color: var(--fs-text);
 		margin-bottom: var(--fs-space-4);
 		font-family: var(--fs-font-mono);
-		font-size: 12px;
-		line-height: 1.5;
+		font-size: var(--fs-type);
+		line-height: var(--fs-leading);
 		white-space: pre;
 		resize: vertical;
 	}

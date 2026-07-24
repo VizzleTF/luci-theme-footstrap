@@ -42,12 +42,9 @@
  * the attributes this theme publishes (`luci-app-openclash`, seven templates). Add a fourth dialect
  * to stampDark and forget the observer's attributeFilter, and that dialect is unguarded — silently.
  */
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const read = (p) => readFileSync(join(ROOT, p), 'utf8');
+import { ROOT, read } from './lib/root.mjs';
 
 const HEADER = read('luci-theme-footstrap/ucode/template/themes/footstrap/header.ut');
 const SHEETS = read('luci-theme-footstrap/htdocs/luci-static/resources/fs-sheets.js');

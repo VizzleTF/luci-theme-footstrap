@@ -59,8 +59,8 @@
 	 * the rail collapse) — never their look. */
 
 	.fs-brand {
-		display: flex; align-items: center; gap: 10px;
-		color: var(--fs-text); font-weight: 700;
+		display: flex; align-items: center; gap: var(--fs-space-2-5);
+		color: var(--fs-text); font-weight: var(--fs-weight-bold);
 	}
 
 	.fs-logo {
@@ -81,7 +81,7 @@
 
 	/* 700, not 800: no 800 face is shipped (it drew six elements for 18 KB — 01-fonts.css),
 	 * so 800 silently resolved to 700 anyway. Say so. */
-	.fs-wordmark { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+	.fs-wordmark { font-size: var(--fs-type-lg); font-weight: var(--fs-weight-bold); letter-spacing: -.01em; }
 
 	/* Skip link — the first tab stop: a keyboard/SR user jumps the whole menu instead of
 	 * tabbing through every section on every page. Off-screen until focused, never
@@ -89,9 +89,9 @@
 	 * one thing it exists for. Sits above everything, incl. an open popover. */
 	.fs-skip {
 		position: fixed; top: 8px; left: 8px; z-index: var(--fs-z-dropdown);
-		padding: 10px 16px; border-radius: var(--fs-radius);
+		padding: var(--fs-space-2-5) var(--fs-space-4); border-radius: var(--fs-radius);
 		background: var(--fs-accent); color: var(--fs-on-accent);
-		font-weight: 700; font-size: 13px; text-decoration: none;
+		font-weight: var(--fs-weight-bold); font-size: var(--fs-type); text-decoration: none;
 		box-shadow: var(--fs-shadow-pop);
 	}
 	/* Clipped, not translated off-screen: --fs-shadow-pop is offset 12px / blur 34px, so a
@@ -127,7 +127,7 @@
 	.fs-logout { display: flex; align-items: center; color: var(--fs-dim); }
 	.fs-logout:hover { color: var(--fs-danger); }
 
-	.fs-indicators { display: flex; align-items: center; gap: 8px; }
+	.fs-indicators { display: flex; align-items: center; gap: var(--fs-space-2); }
 
 	/* The 34px square icon button (.fs-themerow / .fs-logout collapsed) is NOT declared
 	 * here: it only exists where the chrome is a bar or a rail, and those blocks
@@ -138,8 +138,8 @@
 	 * fs-chrome.js (fitTabStrips) adds .fs-dense1/2 when the row would wrap (and strips them
 	 * in the vertical sidebar, so no media guard is needed). Padding is trimmed hard
 	 * first, the font only at the d2 floor. */
-	.fs-sidebar ul.nav.fs-dense1 > li > a { padding: 4px 8px; }
-	.fs-sidebar ul.nav.fs-dense2 > li > a { padding: 3px 6px; font-size: 14px; }
+	.fs-sidebar ul.nav.fs-dense1 > li > a { padding: var(--fs-space-1) var(--fs-space-2); }
+	.fs-sidebar ul.nav.fs-dense2 > li > a { padding: var(--fs-space-1) var(--fs-space-1-5); font-size: var(--fs-type); }
 
 	/* Menu primitives, once for both layouts (both render the menu as `ul.nav > li > a`):
 	 * the 19px line-height, `display: block` on the items and the `position: relative`

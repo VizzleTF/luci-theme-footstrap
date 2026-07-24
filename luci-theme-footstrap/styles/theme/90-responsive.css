@@ -24,11 +24,11 @@
 		/* `:not(.pager)` — the page reuses `.controls` for the « / "Displaying 1-100 of 7677" / »
 		 * pager, and its .pager is a <div> too. Blocking it stacked those three onto three lines
 		 * (reported). Only the LABELLED control groups want stacking; the pager is a row. */
-		body[data-page="admin-system-package-manager"] #view .controls > div:not(.pager) { display: block !important; min-width: 0; margin-bottom: 8px; }
+		body[data-page="admin-system-package-manager"] #view .controls > div:not(.pager) { display: block !important; min-width: 0; margin-bottom: var(--fs-space-2); }
 		/* …and the pager itself: a centred row that stays one. `.text` is the only part that may
 		 * give way, so the two buttons keep their size instead of being squeezed. */
 		body[data-page="admin-system-package-manager"] #view .controls > .pager {
-			display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 8px;
+			display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: var(--fs-space-2);
 		}
 		body[data-page="admin-system-package-manager"] #view .controls > .pager > .btn { flex: 0 0 auto; }
 		body[data-page="admin-system-package-manager"] #view .controls > .pager > .text { flex: 0 1 auto; min-width: 0; }
@@ -48,14 +48,14 @@
 		 * translation packages:"), not every label on the page. Written as plain `.controls label`
 		 * it also blocked the three radio labels nested a level deeper, and `filtered / all / none`
 		 * came out one per line. They are a set of three short choices: they belong on one row. */
-		body[data-page="admin-system-package-manager"] #view .controls > div > label { display: block; min-width: 0; white-space: normal; margin-bottom: 4px; }
+		body[data-page="admin-system-package-manager"] #view .controls > div > label { display: block; min-width: 0; white-space: normal; margin-bottom: var(--fs-space-1); }
 		/* …and the row they sit in. Stock separates them with &nbsp; text nodes, which is enough to
 		 * keep them apart but not to keep them from splitting mid-choice — a flex row with a real
 		 * gap wraps between labels instead of inside one. */
 		body[data-page="admin-system-package-manager"] #view .controls > div > div:has(> label > input[type="radio"]) {
-			display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px;
+			display: flex; flex-wrap: wrap; align-items: center; gap: var(--fs-space-1) var(--fs-space-5);
 		}
-		body[data-page="admin-system-package-manager"] #view .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: 8px; }
+		body[data-page="admin-system-package-manager"] #view .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: var(--fs-space-2); }
 		body[data-page="admin-system-package-manager"] #view .controls .control-group input { flex: 1 1 140px; min-width: 0; max-width: 100%; }
 
 		/* Diagnostics tool (input + method select + button in one <table> row) has no id and no
@@ -128,7 +128,7 @@
 		/* iOS Safari zooms the page in when a focused control's text is under 16px and never zooms
 		 * back out — the theme's 13px inputs did that on every form. Stock LuCI needs !important
 		 * for it; here the theme layer is enough. */
-		input, textarea, select, .cbi-dropdown > ul > li { font-size: 16px; }
+		input, textarea, select, .cbi-dropdown > ul > li { font-size: var(--fs-type-lg); }
 	}
 
 	/* ==================================================================

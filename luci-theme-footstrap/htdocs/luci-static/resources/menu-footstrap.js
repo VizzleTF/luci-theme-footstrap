@@ -33,10 +33,7 @@ function iconSvg(name) {
 		|| ((/serv|dnsmasq|cron/).test(key) ? ICONS.services : null)
 		|| ((/stat|overview|dash/).test(key) ? ICONS.status : null)
 		|| ICONS._default;
-	/* aria-hidden: the icon repeats the label beside it, and an unlabelled <svg> is announced
-	 * as a graphic of its own */
-	return '<svg class="fs-ico" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-		'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + body + '</svg>';
+	return widgets.svgIcon(body);
 }
 
 /* `.open` means two things: in the expanded sidebar, an unfolded accordion section (several may
@@ -126,13 +123,10 @@ function restoreAccordion() {
  * module-level Set does not survive a full page load, and plenty of LuCI pages are not SPA-able
  * (non-`view` nodes, any F5). */
 const OPEN_KEY = 'fs-menu-open';
+/* prefs.lsGetArr owns the parse, the corruption guard and the Array check; this list is a SET
+ * (membership is the only question asked of it), which is the one part that differs. */
 function loadOpenSections() {
-	/* prefs.lsGet/lsSet own the try/catch around localStorage itself; the try here is for
-	 * JSON.parse over a value another tab may have corrupted */
-	try {
-		const a = JSON.parse(prefs.lsGet(OPEN_KEY) || '[]');
-		return new Set(Array.isArray(a) ? a : []);
-	} catch (e) { return new Set(); }
+	return new Set(prefs.lsGetArr(OPEN_KEY));
 }
 function saveOpenSections() {
 	prefs.lsSet(OPEN_KEY, JSON.stringify(Array.from(_openSections)));

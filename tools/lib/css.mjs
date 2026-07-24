@@ -12,11 +12,11 @@
  */
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+export { ROOT } from './root.mjs';
+import { ROOT } from './root.mjs';
 
 /* -> absolute path of a freshly built cascade.css. stdio: 'inherit' keeps build-css.sh's
  * "N bytes -> path" line, which is worth having in a CI log and harmless locally. */

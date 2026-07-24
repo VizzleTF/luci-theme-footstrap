@@ -13,7 +13,7 @@
 		/* not centred vertically: the box grows DOWNWARD as results come in, and a centred one
 		 * would slide the input out from under the user's eyes on every keystroke */
 		align-items: flex-start;
-		padding: max(8vh, 24px) 16px 16px;
+		padding: max(8vh, var(--fs-space-6)) var(--fs-space-4) var(--fs-space-4);
 		background: var(--fs-scrim);
 		animation: fs-fade var(--fs-dur-fade);
 	}
@@ -33,8 +33,8 @@
 	}
 
 	.fs-search-row {
-		display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
-		padding: 12px 14px;
+		display: flex; align-items: center; gap: var(--fs-space-2-5); flex: 0 0 auto;
+		padding: var(--fs-space-3) var(--fs-space-3-5);
 		border-bottom: 1px solid var(--fs-border);
 	}
 	.fs-search-ico { display: inline-flex; color: var(--fs-faint); }
@@ -52,27 +52,27 @@
 		flex: 1 1 auto; min-width: 0;
 		margin: 0; padding: 0; border: 0; min-height: 0; background: transparent;
 		color: var(--fs-text);
-		font-family: inherit; font-size: 16px; font-weight: 600; line-height: 1.4;
+		font-family: inherit; font-size: var(--fs-type-lg); font-weight: var(--fs-weight); line-height: 1.4;
 	}
 	.fs-search-row .fs-search-input:focus { outline: none; box-shadow: none; }
-	.fs-search-row .fs-search-input::placeholder { color: var(--fs-faint); font-weight: 600; }
+	.fs-search-row .fs-search-input::placeholder { color: var(--fs-faint); font-weight: var(--fs-weight); }
 
-	.fs-search-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px; }
+	.fs-search-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--fs-space-1-5); }
 
 	.fs-search-opt {
-		display: flex; align-items: baseline; gap: 10px;
-		padding: 9px 10px; border-radius: var(--fs-radius);
+		display: flex; align-items: baseline; gap: var(--fs-space-2-5);
+		padding: var(--fs-space-2) var(--fs-space-2-5); border-radius: var(--fs-radius);
 		color: var(--fs-text); text-decoration: none; cursor: pointer;
 	}
 	/* One highlight for both pointer and keyboard: `.active` is set by fs-search.js for the
 	 * aria-activedescendant row AND on pointermove, so the mouse and the arrow keys can never
 	 * disagree about which row Enter would open. */
 	.fs-search-opt.active { background: var(--fs-accent-soft); color: var(--fs-accent); }
-	.fs-search-opt-title { flex: 0 1 auto; font-weight: 700; font-size: 14px; }
+	.fs-search-opt-title { flex: 0 1 auto; font-weight: var(--fs-weight-bold); font-size: var(--fs-type); }
 	/* the breadcrumb: which section owns the page — the whole point of searching for it */
 	.fs-search-opt-path {
 		flex: 1 1 auto; min-width: 0;
-		color: var(--fs-faint); font-size: 12px; text-align: right;
+		color: var(--fs-faint); font-size: var(--fs-type); text-align: right;
 		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 	}
 	.fs-search-opt.active .fs-search-opt-path { color: inherit; }
@@ -80,9 +80,9 @@
 	/* "Recently visited" — the caption over the rows */
 	.fs-search-note {
 		flex: 0 0 auto;
-		padding: 10px 14px 2px;
-		color: var(--fs-faint);
-		font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+		padding: var(--fs-space-2-5) var(--fs-space-3-5) var(--fs-space-0-5);
+		color: var(--fs-eyebrow-color);
+		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase;
 	}
 	.fs-search-note[hidden] { display: none; }
 
@@ -90,8 +90,8 @@
 	 * a sentence, not as an eyebrow label. :has() rather than a sibling combinator: the note sits
 	 * ABOVE the list it describes, so `+` cannot reach back to it. */
 	.fs-search-box:has(.fs-search-list:empty) .fs-search-note {
-		padding: 26px 14px 30px;
+		padding: var(--fs-space-6) var(--fs-space-3-5) var(--fs-space-7);
 		text-align: center; text-transform: none; letter-spacing: 0;
-		font-size: 13px; font-weight: 600;
+		font-size: var(--fs-type); font-weight: var(--fs-weight);
 	}
 }

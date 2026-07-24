@@ -5,12 +5,12 @@
 	 * sits under it, and center then pushed the label to the middle of control+description,
 	 * visibly BELOW the control. baseline lines the label up with the field's FIRST line for
 	 * every widget (select, dropdown, toggle, dynlist, textarea). */
-	.cbi-value { justify-content: space-between; gap: 16px; padding: 8px 0; margin: 0; border-bottom: 1px solid var(--fs-border); }
+	.cbi-value { justify-content: space-between; gap: var(--fs-space-4); padding: var(--fs-space-2) 0; margin: 0; border-bottom: 1px solid var(--fs-border); }
 	/* stacked controls in a field (Local Time: date input + Sync buttons) need breathing room —
 	 * the raw <br> collapses them. Exclude the password reveal group: it must stay seamless. */
-	.cbi-value-field > .control-group { margin-top: 8px; }
+	.cbi-value-field > .control-group { margin-top: var(--fs-space-2); }
 	.cbi-value-field > .control-group:not(:has(.cbi-input-password)) {
-		display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center;
+		display: inline-flex; flex-wrap: wrap; gap: var(--fs-space-2); align-items: center;
 	}
 	.cbi-value:last-child { border-bottom: 0; }
 	/* A toggle/checkbox field has NO text baseline: `.cbi-checkbox` is inline-flex with no line
@@ -33,7 +33,7 @@
 
 	/* keep base's padding-top: 6px — it is tuned for base's align-items: baseline. */
 	.cbi-value-title {
-		color: var(--fs-dim); font-size: 13px; font-weight: 600;
+		color: var(--fs-dim); font-size: var(--fs-type); font-weight: var(--fs-weight);
 		/* stated, not inherited: the control rule above hands every label `line-height: normal`,
 		 * and this one is TEXT — dropping it silently hands the label the font's own default
 		 * (measured: 18px -> normal, off the scale entirely). Absorbed from base with the rule
@@ -122,13 +122,13 @@
 	 *
 	 * This widget takes two clicks inside luci-app-firewall's ipsets or the wireless page to reach
 	 * on a router, which is why it went unseen; docs/gallery.html now renders it open. */
-	.cbi-filebrowser > * { border-bottom-color: var(--fs-border); padding: 6px 8px; }
-	.cbi-filebrowser > ul { display: flex; flex-direction: column; gap: 4px; }
-	.cbi-filebrowser > ul > li { align-items: center; flex-wrap: wrap; gap: 8px; }
+	.cbi-filebrowser > * { border-bottom-color: var(--fs-border); padding: var(--fs-space-1-5) var(--fs-space-2); }
+	.cbi-filebrowser > ul { display: flex; flex-direction: column; gap: var(--fs-space-1); }
+	.cbi-filebrowser > ul > li { align-items: center; flex-wrap: wrap; gap: var(--fs-space-2); }
 	.cbi-filebrowser > ul > li > div:first-child { flex: 1 1 auto; min-width: 0; }
 	.cbi-filebrowser > ul > li > div:last-child {
 		flex: 0 0 auto;
-		display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end;
+		display: flex; flex-wrap: wrap; gap: var(--fs-space-2); justify-content: flex-end;
 	}
 	.cbi-filebrowser > ul > li > div:last-child > button { margin: 0; }
 	/* moved from base with the generic 210px box (same layer arithmetic as the .td rules) */
@@ -178,7 +178,7 @@
 		border-color: var(--fs-accent);
 		box-shadow: var(--fs-focus-ring);
 	}
-	.cbi-checkbox > input[type="checkbox"]:disabled + label { opacity: .5; cursor: not-allowed; }
+	.cbi-checkbox > input[type="checkbox"]:disabled + label { opacity: var(--fs-disabled-opacity); cursor: not-allowed; }
 
 	/* RAW checkbox/radio — the drawing, absorbed from base whole: it undoes the generic `input`
 	 * box below (width/height/padding/background/border), and left behind in base every one of
@@ -298,7 +298,7 @@
 	/* native file input — the `initial`/auto resets are absorbed from base: the generic box
 	 * above would otherwise dress the native chooser in a 210px bordered field */
 	input[type="file"] {
-		color: var(--fs-dim); font-size: 13px;
+		color: var(--fs-dim); font-size: var(--fs-type);
 		padding: initial;
 		border: initial;
 		line-height: initial;
@@ -318,10 +318,10 @@
 		background-color: var(--fs-panel2);
 		background-image: var(--fs-select-chevron);
 		background-repeat: no-repeat; background-position: right 12px center; background-size: 12px;
-		padding: 8px 34px 8px 12px;
+		padding: var(--fs-space-2) var(--fs-space-8) var(--fs-space-2) var(--fs-space-3);
 		border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
-		color: var(--fs-text); font-family: var(--fs-font-sans); font-size: 13px;
-		line-height: 1.3; min-height: 38px; cursor: pointer;
+		color: var(--fs-text); font-family: var(--fs-font-sans); font-size: var(--fs-type);
+		line-height: 1.3; min-height: var(--fs-ctl-h); cursor: pointer;
 		/* width/display absorbed from base's generic field box: a select's natural width is its
 		 * longest option, so without the fixed box two selects in one form column ragged-edge;
 		 * display stated because Chromium's base-select UA default is inline-flex, not the
@@ -360,10 +360,10 @@
 			appearance: base-select;
 			background: var(--fs-panel); border: 1px solid var(--fs-border);
 			border-radius: var(--fs-radius-lg); box-shadow: var(--fs-shadow-pop);
-			padding: 6px; margin-top: 6px;
+			padding: var(--fs-space-1-5); margin-top: var(--fs-space-1-5);
 		}
 		.cbi-value-field select option {
-			padding: 8px 11px; border-radius: var(--fs-radius-sm); font-size: 13px;
+			padding: var(--fs-space-2) var(--fs-space-3); border-radius: var(--fs-radius-sm); font-size: var(--fs-type);
 			color: var(--fs-text); background: transparent; min-height: 0;
 		}
 		.cbi-value-field select option::checkmark { display: none; }
@@ -464,14 +464,14 @@
 		border: 1px solid var(--fs-border);
 		border-radius: var(--fs-radius);
 		color: var(--fs-text);
-		padding: 8px 11px;
-		min-height: 38px;
+		padding: var(--fs-space-2) var(--fs-space-3);
+		min-height: var(--fs-ctl-h);
 		box-shadow: none;
 		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
 	}
 	/* width/font-size absorbed from base's generic field box, same numbers — a textarea has
 	 * always sat at the fixed 210px (the elastic rule above names only text/url/search) */
-	textarea { min-height: 84px; line-height: 1.5; width: 210px; font-size: var(--fs-type); }
+	textarea { min-height: 84px; line-height: var(--fs-leading); width: 210px; font-size: var(--fs-type); }
 	/* A textarea's native scrollbar is a square strip and a rounded corner does not clip it, so
 	 * on a scrolling config field the grey bar poked past the radius — a square notch out of the
 	 * frame. Fix: a slim self-rounded thumb floated off the edges (transparent border +
@@ -485,9 +485,9 @@
 	 * 16px wide so ::-webkit-resizer (sized off the scrollbar) gets a bigger grab area; the 5px
 	 * transparent thumb border still leaves it 6px visible. */
 	textarea::-webkit-scrollbar { width: 16px; height: 16px; }
-	textarea::-webkit-scrollbar-track { background: transparent; margin: 16px 0 10px; }
+	textarea::-webkit-scrollbar-track { background: transparent; margin: var(--fs-space-4) 0 var(--fs-space-2-5); }
 	textarea::-webkit-scrollbar-thumb {
-		background: var(--fs-dim); border-radius: 8px;
+		background: var(--fs-dim); border-radius: var(--fs-radius-pill);
 		border: 5px solid transparent; background-clip: padding-box;
 	}
 	textarea::-webkit-scrollbar-thumb:hover { background: var(--fs-text); }
@@ -571,7 +571,7 @@
 	 * button, and no wrapping box: capped narrow so the chip's × sits near the text instead of
 	 * floating across a full-width field. */
 	.cbi-dynlist {
-		gap: 6px;
+		gap: var(--fs-space-1-5);
 		background: transparent; border: 0; padding: 0;
 		min-height: 0; min-width: 240px; max-width: 440px; width: 100%;
 		vertical-align: top;
@@ -630,7 +630,7 @@
 	.cbi-dynlist > .add-item > .cbi-input-text {
 		flex: 1 1 auto; min-width: 0; width: auto;
 		border: 0; background: transparent;
-		box-shadow: none; min-height: 32px; border-radius: 0;
+		box-shadow: none; min-height: var(--fs-ctl-h-sm); border-radius: 0;
 	}
 
 	/* password reveal: input + ∗ button as ONE seamless rounded group.
@@ -647,7 +647,7 @@
 	.control-group:has(> .cbi-input-password) > .cbi-input-password {
 		border: 0; border-radius: 0;
 		background: transparent; box-shadow: none;
-		min-height: 36px;
+		min-height: var(--fs-ctl-h);
 	}
 	.control-group:has(> .cbi-input-password):focus-within {
 		border-color: var(--fs-accent);
@@ -655,7 +655,7 @@
 	}
 	/* base pulls .cbi-section-create up 3px to hug a table border, which glues the "Add" button
 	 * to the last row — give it a real gap instead. */
-	.cbi-section-create, .cbi-section-create.cbi-tblsection-create { margin-top: 12px; }
+	.cbi-section-create, .cbi-section-create.cbi-tblsection-create { margin-top: var(--fs-space-3); }
 
 	/* `.hidden` must win over every component rule in this layer — CBI dependency hiding was
 	 * leaking podkop's conditional fields back onto the page, and the enumerated list that fixed
@@ -692,14 +692,14 @@
 	}
 	input[type="range"]::-moz-range-track { background: var(--fs-track); height: 6px; border-radius: var(--fs-radius-pill); }
 	input[type="range"]:focus { box-shadow: var(--fs-focus-ring); }
-	.cbi-range-slider { display: inline-flex; align-items: center; gap: 12px; width: 100%; max-width: 100%; }
+	.cbi-range-slider { display: inline-flex; align-items: center; gap: var(--fs-space-3); width: 100%; max-width: 100%; }
 	.cbi-range-slider-value {
 		background: var(--fs-panel2); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-sm);
-		padding: 4px 9px; color: var(--fs-accent); font-family: var(--fs-font-mono);
+		padding: var(--fs-space-1) var(--fs-space-2); color: var(--fs-accent); font-family: var(--fs-font-mono);
 		/* NOT 600: there is no bold mono face (styles/01-fonts.css), so 600 would either drag a
 		 * 20 KB file back in or be faked by synthetic emboldening, which smears a monospace grid.
 		 * The chip already reads as emphatic from its surface, border and accent ink. */
-		font-weight: 400; font-size: 12px; white-space: nowrap;
+		font-weight: var(--fs-weight-normal); font-size: var(--fs-type); white-space: nowrap;
 	}
-	.cbi-range-slider-calc, .cbi-range-slider-calc-units { color: var(--fs-dim); font-size: 12px; }
+	.cbi-range-slider-calc, .cbi-range-slider-calc-units { color: var(--fs-dim); font-size: var(--fs-type); }
 }

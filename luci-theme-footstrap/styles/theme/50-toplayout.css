@@ -25,7 +25,7 @@
 		 * a long hostname wraps onto a second line inside the capped brand (20-shell.css),
 		 * and a fixed height would clip it. */
 		min-height: var(--fs-bar-h); height: auto;
-		gap: 12px;
+		gap: var(--fs-space-3);
 		/* nowrap while the menu rides the brand's row. Without it flexbox wraps the BAR,
 		 * carrying the menu onto a second line by itself while its own pills stay in one
 		 * row — a stacked bar in everything but the styling (the right cluster keeps its
@@ -43,7 +43,7 @@
 	/* the menu rides the brand's row; its flex:1 opens the gap that pushes the right-hand
 	 * cluster to the content column's right edge */
 	:root[data-layout="top"] .fs-sidebar ul.nav {
-		order: 2; flex: 1 1 auto; margin-left: 8px;
+		order: 2; flex: 1 1 auto; margin-left: var(--fs-space-2);
 	}
 	:root[data-layout="top"] .fs-sidebar #indicators,
 	:root[data-layout="top"] .fs-themerow,
@@ -66,11 +66,11 @@
 	/* :not(:empty):not(.single) instead of a hide pair — the bar's base rule (20-shell.css)
 	 * already hides the strip; see the sidebar twin there for why the pair was folded. */
 	:root[data-layout="top"] .fs-modemenu:not(:empty):not(.single) {
-		display: flex; order: 4; flex: 1 1 100%; margin: 0; gap: 4px;
+		display: flex; order: 4; flex: 1 1 100%; margin: 0; gap: var(--fs-space-1);
 	}
 
 	/* the bar replaces the sidebar's 22px top padding with the top-nav's 26px */
-	:root[data-layout="top"] .fs-content { padding-top: 26px; }
+	:root[data-layout="top"] .fs-content { padding-top: var(--fs-space-6); }
 
 	/* ==================================================================
 	 * THE MENU DOES NOT FIT ON THE BRAND'S ROW — .fs-bar-stack
@@ -83,7 +83,7 @@
 	 * (.fs-ind-compact, below), and stacks only when even that still overflows.
 	 * ================================================================== */
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack {
-		flex-wrap: wrap; height: auto; padding: 10px 16px;
+		flex-wrap: wrap; height: auto; padding: var(--fs-space-2-5) var(--fs-space-4);
 	}
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack ul.nav {
 		order: 3; flex: 1 1 100%; margin-left: 0;

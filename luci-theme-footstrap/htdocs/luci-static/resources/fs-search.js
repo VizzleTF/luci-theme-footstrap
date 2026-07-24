@@ -3,6 +3,7 @@
 'require fs-menutree as tree';
 'require fs-prefs as prefs';
 'require fs-router as router';
+'require fs-widgets as widgets';
 
 /* Find a page by typing its name, instead of remembering which section owns it.
  *
@@ -145,13 +146,10 @@ function search(q, limit) {
 const RECENT_KEY = 'fs-recent';
 const RECENT_MAX = 8;
 
+/* prefs.lsGetArr owns the parse, the corruption guard and the Array check; only the
+ * "these are paths" filter is this module's business. */
 function loadRecent() {
-	/* prefs.lsGet owns the try/catch around localStorage itself; this one is for JSON.parse over a
-	 * value another tab may have corrupted */
-	try {
-		const a = JSON.parse(prefs.lsGet(RECENT_KEY) || '[]');
-		return Array.isArray(a) ? a.filter((x) => typeof x === 'string') : [];
-	} catch (e) { return []; }
+	return prefs.lsGetArr(RECENT_KEY).filter((x) => typeof x === 'string');
 }
 
 let _recent = loadRecent();
@@ -198,10 +196,8 @@ function wire() {
 	});
 	const list = E('div', { 'id': 'fs-search-list', 'class': 'fs-search-list', 'role': 'listbox', 'aria-label': _('Pages', 'footstrap') });
 	const note = E('div', { 'class': 'fs-search-note' });
-	/* aria-hidden: the icon repeats what the input's own label already says */
 	const ico = E('span', { 'class': 'fs-search-ico' });
-	ico.innerHTML = '<svg class="fs-ico" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-		'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>';
+	ico.innerHTML = widgets.svgIcon('<circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/>');
 	const box = E('div', { 'class': 'fs-search-box' }, [
 		E('div', { 'class': 'fs-search-row' }, [ ico, input ]),
 		/* the note is a CAPTION for the rows below it ("Recently visited") and the box's EMPTY

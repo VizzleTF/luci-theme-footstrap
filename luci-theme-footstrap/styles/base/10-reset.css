@@ -107,6 +107,6 @@
 	 * itself (one border around the group, `gap: 0`) — it does not need the pull-back either. */
 	.control-group {
 		display: inline-flex;
-		gap: 8px;
+		gap: var(--fs-space-2);
 	}
 }

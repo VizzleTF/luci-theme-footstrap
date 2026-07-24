@@ -89,7 +89,7 @@
 				<div class="fs-brandrow">
 					{% include('themes/footstrap/partials/brand', { boardinfo }) %}
 					<button type="button" class="fs-railtoggle" id="fs-rail-toggle" aria-label="{{ _('Collapse menu') }}" title="{{ _('Collapse menu') }}">
-						<svg class="fs-ico" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+						{% include('themes/footstrap/partials/icon', { body: '<path d="M15 6l-6 6 6 6"/>' }) %}
 					</button>
 				</div>
 

@@ -14,10 +14,10 @@
  */
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { join, extname, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, extname } from 'node:path';
 
-export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+export { ROOT } from './root.mjs';
+import { ROOT } from './root.mjs';
 
 /* buildCss lives in lib/css.mjs — it is not a gallery concern, and devkit-build.mjs was importing
  * it from here while having nothing to do with the gallery. */

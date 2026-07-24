@@ -24,12 +24,10 @@
  * an axis moved (or added) elsewhere would have left the gate quietly checking nothing. A glob
  * cannot go stale that way.
  */
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const read = (p) => readFileSync(join(ROOT, p), 'utf8');
+import { ROOT, read } from './lib/root.mjs';
 const readTree = (p) => readdirSync(join(ROOT, p), { recursive: true })
 	.filter((f) => f.endsWith('.css'))
 	.map((f) => read(join(p, f)))
@@ -74,8 +72,12 @@ const hueAxes = [...JS.matchAll(/hueAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([
 	.map(([, key, attr, prop]) => ({ key, attr, prop }));
 const enumAxes = [...JS.matchAll(/enumAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)]
 	.map(([, key, attr, on, off]) => ({ key, attr, on, off }));
+/* propAxis(key, sdKey, prop, …) — an inline-property slider (rounding, tint strength). Same reason
+ * as above: its lsGet(key) sits in the factory body, so keysIn() cannot see the key. Match the call. */
+const propAxes = [...JS.matchAll(/propAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'/g)]
+	.map(([, key, sdKey, prop]) => ({ key, sdKey, prop }));
 
-const jsKeys = new Set([...keysIn(JS), ...hueAxes.map(a => a.key), ...enumAxes.map(a => a.key)]);
+const jsKeys = new Set([...keysIn(JS), ...hueAxes.map(a => a.key), ...enumAxes.map(a => a.key), ...propAxes.map(a => a.key)]);
 const headKeys = keysIn(HEAD);
 
 if (!jsKeys.size) errors.push('found no fs-* localStorage keys in the theme JS — this tool is broken, not the theme');
@@ -147,6 +149,37 @@ for (const [, attr, prop] of GALLERY.matchAll(/hue\(\w+, '([^']+)', '([^']+)'\)/
 	if (!hueAxes.some((a) => a.attr === attr && a.prop === prop))
 		errors.push(`tools/lib/gallery.mjs stamps ${attr}/${prop}, which no hueAxis() in the theme JS `
 			+ `declares — the gates sweep an axis the theme does not have`);
+
+/* ---- 2c. EVERY OTHER :root attribute an applier stamps -------------------------------
+ *
+ * The hue and enum checks above only cover the two FACTORY shapes. The axes that keep their own
+ * applier — wallpaper (three-valued) and density (three-valued) — stamped a `data-*` attribute that
+ * nothing held to head.ut at all: rename it on one side and the pre-paint silently stops matching,
+ * whose only symptom is one wrong frame on reload, which is the exact failure this file exists for.
+ *
+ * Derived, not listed: take the attributes the JS appliers stamp and require head.ut to stamp each
+ * one too.
+ *
+ * It deliberately does NOT require the matching removeAttribute, and the reason is worth keeping:
+ * the first version of this check did, and it failed on `data-rail` — which is correct code. The
+ * pre-paint runs on a FRESH document where :root carries nothing but what the SERVER wrote (only
+ * `data-layout`), so there is never a stale attribute to clear; an axis whose off-state is a deleted
+ * key (applyRail lsDel's) simply falls through its `if` and is already right. The removals the other
+ * pre-paints do are defensive symmetry, not a requirement — asserting them would have made this gate
+ * demand a change that fixes nothing. */
+const OUTBOUND = new Set(['data-theme', 'data-bs-theme', 'data-darkmode']);	/* checked in 3b */
+const factoryAttrs = new Set([...hueAxes.map(a => a.attr), ...enumAxes.map(a => a.attr)]);
+const jsSets = new Set([...JS.matchAll(/root\.setAttribute\('(data-[a-z-]+)'/g)].map((m) => m[1]));
+
+for (const attr of jsSets) {
+	if (OUTBOUND.has(attr) || factoryAttrs.has(attr)) continue;
+	if (!HEAD.includes(`setAttribute('${attr}'`)) {
+		errors.push(`axis attribute '${attr}': an applier in the theme JS stamps it, but head.ut never `
+			+ `does — the axis is not pre-painted, so a reload shows the default for one frame and jumps`);
+		continue;
+	}
+	ok.push(`axis attr ${attr.padEnd(14)} (the applier stamps it and head.ut pre-paints it)`);
+}
 
 /* ---- 3. the rounding default: JS, template and CSS token must be the same number ----- */
 const jsRadius = JS.match(/const\s+FS_RADIUS_DEFAULT\s*=\s*(\d+)/);

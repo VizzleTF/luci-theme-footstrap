@@ -11,17 +11,17 @@
 	 * ramp's (45-misc.css) — legend is kept out of that group so this rule stays its one owner;
 	 * no line-height here: base's `fieldset legend` sets 1 and every real legend sits in a
 	 * fieldset, so stating leading here would silently repaint them all through the layer. */
-	legend { font-size: 14px; font-weight: 700; color: var(--fs-text); }
+	legend { font-size: var(--fs-type-lg); font-weight: var(--fs-weight-bold); color: var(--fs-text); }
 
 	/* overview (luci-mod-status) DOM:
 	 * .cbi-section > .cbi-title>h3 + div > table.table (.tr/.td) */
 
 	/* section title + collapse control */
-	.cbi-section > .cbi-title { margin-bottom: 12px; }
+	.cbi-section > .cbi-title { margin-bottom: var(--fs-space-3); }
 	.cbi-section > .cbi-title h3,
 	.cbi-section > h3:first-child,
 	.cbi-section > legend {
-		font-size: 14px; font-weight: 700; color: var(--fs-text);
+		font-size: var(--fs-type-lg); font-weight: var(--fs-weight-bold); color: var(--fs-text);
 		margin: 0; padding: 0; border: 0;
 	}
 	/* A bare section title (no .cbi-title wrapper) sat flush against the content below it —
@@ -30,7 +30,7 @@
 	 * gets its gap from the wrapper's own margin-bottom, so flagging the inner h3 too would
 	 * double it. */
 	.cbi-section > h3:first-child,
-	.cbi-section > legend { margin-bottom: 12px; }
+	.cbi-section > legend { margin-bottom: var(--fs-space-3); }
 
 	/* ---- tables in cards ----
 	 * Discriminator: a key/value include (System, Memory) has NO id; a data table has one
@@ -75,8 +75,8 @@
 	 * directly above, which is the only reason shortening is honest here. No !important, so the
 	 * inline 30px still stands: it is upstream's sizing for a one-character field, and correct. */
 	.table.cbi-section-table .cbi-section-filter {
-		padding: 4px 6px;
-		font-size: 11px;
+		padding: var(--fs-space-1) var(--fs-space-1-5);
+		font-size: var(--fs-type-xs);
 		text-overflow: ellipsis;
 	}
 	/* width:100% cannot shrink a table below min-content — one long unbreakable value holds the
@@ -85,7 +85,7 @@
 	#view .table[id] .td, table.fs-dt .td { overflow-wrap: anywhere; }
 	.cbi-section .table .td,
 	.cbi-section .table .th {
-		padding: 10px 16px 10px 0;
+		padding: var(--fs-space-2-5) var(--fs-space-4) var(--fs-space-2-5) 0;
 		border: 0; border-bottom: 1px solid var(--fs-border);
 		line-height: 1.45; vertical-align: middle;
 		text-align: left;
@@ -97,8 +97,8 @@
 	.cbi-section .table .td.cbi-section-table-cell.cbi-section-actions { text-align: right; }
 	.cbi-section .table .tr:last-child .td { border-bottom: 0; }
 	.cbi-section .table .th {
-		color: var(--fs-dim); font-weight: 700; font-size: 11px;
-		text-transform: uppercase; letter-spacing: .04em;
+		color: var(--fs-eyebrow-color); font-weight: var(--fs-eyebrow-weight); font-size: var(--fs-type-xs);
+		text-transform: uppercase; letter-spacing: var(--fs-eyebrow-tracking);
 	}
 
 	/* --- DATA tables ([id] or JS-tagged .fs-dt): leases, wifi, processes, routes … ---
@@ -111,8 +111,8 @@
 	 * hover, no header rule. Live: Status → Routing emits <table class="table"> with no id. */
 	.cbi-section .table:is([id], .fs-dt) .td,
 	.cbi-section .table:is([id], .fs-dt) .th,
-	table.fs-dt .td, table.fs-dt .th { padding: 10px 11px; }
-	.cbi-section .table:is([id], .fs-dt) .td { font-family: var(--fs-font-mono); font-size: 12px; color: var(--fs-text); }
+	table.fs-dt .td, table.fs-dt .th { padding: var(--fs-space-2-5) var(--fs-space-3); }
+	.cbi-section .table:is([id], .fs-dt) .td { font-family: var(--fs-font-mono); font-size: var(--fs-type); color: var(--fs-text); }
 	/* No horizontal-scroll wrapper: long values break (overflow-wrap above), so the table reflows
 	 * into the column. Whether it cards instead is MEASURED (.fs-stacked, fs-select.js), any width. */
 	.cbi-section .table:is([id], .fs-dt) .tr:not(.table-titles):not(.placeholder):hover .td { background: var(--fs-panel2); }
@@ -169,7 +169,7 @@
 	 * column would only starve the other five. A DDNS-style multi-column status table (no id, no
 	 * inline layout) is NOT excluded — it keeps the key/value first column exactly as before. */
 	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:first-child {
-		color: var(--fs-dim); font-weight: 600; width: 40%; white-space: nowrap;
+		color: var(--fs-dim); font-weight: var(--fs-weight); width: 40%; white-space: nowrap;
 	}
 	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:last-child:not(:first-child) {
 		font-family: var(--fs-font-mono); color: var(--fs-text); text-align: right;
@@ -273,7 +273,7 @@
 	 * a pseudo-element whose content is `none` generates NO BOX — so on 25.12, which renders a real
 	 * cell instead, these declarations have nothing to apply to. */
 	.table.cbi-section-table .th, .table.cbi-section-table .td,
-	.table.cbi-section-table .tr::before { padding: 8px 12px 8px 0; }
+	.table.cbi-section-table .tr::before { padding: var(--fs-space-2) var(--fs-space-3) var(--fs-space-2) 0; }
 	/* The zero padding-LEFT above is right only INSIDE a card: the .cbi-section supplies that gutter
 	 * itself, so the first column lines up with the card's own 16px. Outside one it is wrong —
 	 * Status → Firewall renders `.table.cbi-section-table` in a bare <div>, so the table draws its
@@ -281,9 +281,9 @@
 	 * (issue #7). A table carrying its own frame pads its own cells, like every other standalone
 	 * data table here. */
 	.table.cbi-section-table:not(.cbi-section *):not(.cbi-section-node *) .th,
-	.table.cbi-section-table:not(.cbi-section *):not(.cbi-section-node *) .td { padding: 10px 11px; }
+	.table.cbi-section-table:not(.cbi-section *):not(.cbi-section-node *) .td { padding: var(--fs-space-2-5) var(--fs-space-3); }
 	.cbi-section-table .tr.cbi-section-table-titles .th,
-	.cbi-section-table .tr.table-titles .th { font-size: 10px; letter-spacing: .05em; line-height: 1.25; }
+	.cbi-section-table .tr.table-titles .th { font-size: var(--fs-type-xs); letter-spacing: var(--fs-eyebrow-tracking); line-height: 1.25; }
 
 	/* Standalone data tables (Startup, Processes, Routes) -> rounded card. Inside a CBI section
 	 * the section already IS the card, so the frame is stripped there (above): no double border. */
@@ -317,8 +317,8 @@
 	}
 	.table .tr.table-titles .th, .table .tr.cbi-section-table-titles .th,
 	.table .tr.cbi-section-table-titles::before {
-		color: var(--fs-faint); font-size: 10px; font-weight: 700;
-		letter-spacing: .06em; text-transform: uppercase;
+		color: var(--fs-eyebrow-color); font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight);
+		letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase;
 		background: transparent;
 	}
 	/* The row's NAME, and it must read the same on both releases: 25.12 renders a real
@@ -331,7 +331,7 @@
 	 * (0,1,0) mono rule. */
 	.table.cbi-section-table .td.cbi-section-table-titles,
 	.table.cbi-section-table .tr.cbi-section-table-row::before {
-		font-family: var(--fs-font-sans); font-weight: 700; color: var(--fs-text);
+		font-family: var(--fs-font-sans); font-weight: var(--fs-weight-bold); color: var(--fs-text);
 	}
 	.table .tr:not(.table-titles):not(.cbi-section-table-titles) {
 		transition: background var(--fs-dur);
@@ -397,7 +397,7 @@
 	.table.fs-stacked .tr { display: flex; flex-wrap: wrap; }
 	.table.fs-stacked .td {
 		display: block; min-width: 0; width: auto;
-		padding: 6px 10px 6px 0; border: 0; text-align: left;
+		padding: var(--fs-space-1-5) var(--fs-space-2-5) var(--fs-space-1-5) 0; border: 0; text-align: left;
 		overflow-wrap: anywhere; white-space: normal;
 	}
 	/* The column label, lifted above its value (LuCI writes it per cell as data-title).
@@ -409,9 +409,9 @@
 	 * exactly when it should shout.) */
 	.table.fs-stacked .td[data-title]::before {
 		/* @mirror table-card/label */
-		content: attr(data-title); display: block; margin-bottom: 3px;
-		font-size: 10px; font-weight: 700; letter-spacing: .05em;
-		text-transform: uppercase; color: var(--fs-faint);
+		content: attr(data-title); display: block; margin-bottom: var(--fs-space-1);
+		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking);
+		text-transform: uppercase; color: var(--fs-eyebrow-color);
 		/* @endmirror */
 	}
 	.table.fs-stacked .td.cbi-section-actions::before,
@@ -422,7 +422,7 @@
 	.table.fs-stacked .td.cbi-section-actions {
 		/* @mirror table-card/actions */
 		display: flex; flex: 1 1 100%; justify-content: flex-start;
-		flex-wrap: wrap; gap: 8px; padding-top: 8px;
+		flex-wrap: wrap; gap: var(--fs-space-2); padding-top: var(--fs-space-2);
 		/* @endmirror */
 	}
 	/* LuCI groups a row's buttons in ONE inner <div> (startup.js wraps all five), so the td's own
@@ -432,7 +432,7 @@
 	 * in theme/65-dropdown.css. */
 	.table.fs-stacked .td.cbi-section-actions > * {
 		/* @mirror table-card/actions-inner */
-		flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 8px;
+		flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: var(--fs-space-2);
 		/* @endmirror */
 	}
 	/* Nothing in a half-width cell may force the row wider than the viewport: .fs-main is
@@ -447,7 +447,7 @@
 	 * only thing overflow:visible protected. `#view .table.fs-dt.fs-stacked` (1,3,0) outranks the
 	 * frame's `#view .table[id]` (1,2,0) on specificity, not order. */
 	#view .table.fs-dt.fs-stacked { overflow: hidden; }
-	.table.fs-dt.fs-stacked .tr { padding: 10px 16px 12px; }
+	.table.fs-dt.fs-stacked .tr { padding: var(--fs-space-2-5) var(--fs-space-4) var(--fs-space-3); }
 	/* `.fs-stacked .td`, not `.table.fs-dt.fs-stacked .td` — the same elements (the class is only
 	 * ever written onto a .table.fs-dt), but at (0,2,0) instead of (0,4,0): low enough that the
 	 * unguarded `.table .td.col-N` below, at (0,3,0), beats it on SPECIFICITY, not source order. */
@@ -477,5 +477,5 @@
 	.table .td.col-10, .table .th.col-10 { flex: 10 10 300px; }
 
 	/* general table cell padding — compact but readable (Startup/Processes/etc) */
-	.table .td { padding-top: 7px; padding-bottom: 7px; }
+	.table .td { padding-top: var(--fs-space-2); padding-bottom: var(--fs-space-2); }
 }

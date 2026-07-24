@@ -20,10 +20,9 @@
  * This holds the mechanical half — the half that breaks the generator.
  */
 import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { ROOT } from './lib/root.mjs';
 
 /* Keep a Changelog's order, `Performance` appended (docs/21). The RU mirror's names are the same
  * list in the same order — that is what lets the two files be compared by INDEX rather than by

@@ -19,8 +19,7 @@
  *   node tools/export-tier.mjs
  */
 import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { serveGallery, applyAppearance, matrix } from './lib/gallery.mjs';
 import { buildCss } from './lib/css.mjs';
@@ -41,7 +40,7 @@ const SURFACES = ['--fs-bg', '--fs-panel', '--fs-panel2'];
  * already fallen behind: --text-color-highest was defined in 02-tokens.css, shipped, read by apps,
  * and measured by NOTHING. Painting it #808080 (~3.95:1 on a light --fs-bg) passed clean. What a
  * hand list cannot do is fail when the tokens grow; parsing them can. */
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { ROOT } from './lib/root.mjs';
 const TIER = parseExportTier(readFileSync(join(ROOT, 'luci-theme-footstrap/styles/02-tokens.css'), 'utf8'));
 
 /* The one thing that CANNOT be parsed: what a family MEANS. Whether apps print text in it or only

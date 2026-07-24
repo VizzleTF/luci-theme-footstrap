@@ -38,7 +38,7 @@
 	}
 	.cbi-title .label[data-indicator="poll-status"][data-style="inactive"]::after {
 		transform: rotate(-135deg);			/* expanded / Hide -> chevron up */
-		margin-top: 2px;
+		margin-top: var(--fs-space-0-5);
 	}
 
 	/* Stock overview layout: 05_footstrap_overview_layout.js wraps the stock System / Memory
@@ -50,7 +50,7 @@
 	.fs-ovl {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 16px;
+		gap: var(--fs-space-4);
 		/* no align-items: the default stretch is what levels the two columns' bottom edges */
 		margin-bottom: var(--fs-card-gap);	/* match stock .cbi-section spacing below the grid */
 	}
@@ -86,7 +86,7 @@
 	 * toward 126 and wrap; few ports cap at 200 instead of one stretching the full width.
 	 * 2-port device or 24-port switch alike. */
 	body[data-page="admin-status-overview"] div:has(> .ifacebox img[src*="/port_"]) {
-		gap: 10px;								/* no inline gap — no flag needed */
+		gap: var(--fs-space-2-5);								/* no inline gap — no flag needed */
 		grid-template-columns: repeat(auto-fit, minmax(126px, 200px)) !important;
 		margin-bottom: 0 !important;
 	}
@@ -117,7 +117,7 @@
 		background: var(--fs-panel2);
 		border: 1px solid var(--fs-border);
 		border-radius: var(--fs-radius-lg);
-		padding: 9px 11px;
+		padding: var(--fs-space-2) var(--fs-space-3);
 		container-type: inline-size; container-name: fs-port;
 		display: flex;
 		/* `flex-direction: row` is NOT redundant: base/95-luci.css paints every .ifacebox
@@ -127,7 +127,7 @@
 		 * wrong axis. Cost an hour; state the axis. */
 		flex-direction: row;
 		flex-wrap: wrap;
-		column-gap: 8px; row-gap: 3px;
+		column-gap: var(--fs-space-2); row-gap: var(--fs-space-1);
 		align-items: baseline;
 	}
 	/* drop the stock icon */
@@ -153,7 +153,7 @@
 		order: 1;
 		flex: 0 0 100%;
 		width: 100%;
-		margin: 3px 0 6px;
+		margin: var(--fs-space-1) 0 var(--fs-space-1-5);
 	}
 	/* name row + its ::after status dot */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
@@ -164,8 +164,8 @@
 		 * sitting beside the speed; `width: 100%` gives it the full 176. */
 		flex: 0 0 auto;
 		width: 100%;
-		display: flex; align-items: center; justify-content: space-between; gap: 6px;
-		font-size: 13px; font-weight: 600; color: var(--fs-text);
+		display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-1-5);
+		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-text);
 	}
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child::after {
 		content: "";
@@ -183,7 +183,7 @@
 	/* speed: green when linked, dim when not */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
 		order: 2;								/* below the zone-colour line (child 3, order 1) */
-		font-size: 13px; font-weight: 600; color: var(--fs-good); text-align: left;
+		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-good); text-align: left;
 		/* Two halves of one mechanism.
 		 * `nowrap` (and NO `min-width: 0`) = "I do not give way": a flex item's automatic minimum
 		 * size is its min-content, which for nowrap text is the whole string — so the speed cannot be
@@ -212,9 +212,9 @@
 	}
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container {
 		font-family: var(--fs-font-mono);
-		font-size: 11px !important;
+		font-size: var(--fs-type-xs) !important;
 		color: var(--fs-dim);
-		line-height: 1.5;
+		line-height: var(--fs-leading);
 		white-space: nowrap;
 		/* Fights the element's own inline `text-align:left` (29_ports.js) so the ▲/▼ lines align on
 		 * their right edge and the units form a column instead of a ragged edge.
@@ -235,12 +235,16 @@
 	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
-		gap: 5px 10px;
-		padding: 7px 0 10px;
+		gap: var(--fs-space-1) var(--fs-space-2-5);
+		/* Halved from 8/10. A progressbar row is a LABEL over a 10px bar — the row is already
+		 * two lines tall, so the outer padding was doing the work of a gap twice over and Memory
+		 * and Storage read as mostly empty space. The bottom stays the larger of the two: the bar
+		 * sits on that edge, and equal padding reads as the bar hanging low in its row. */
+		padding: var(--fs-space-1) 0 var(--fs-space-1-5);
 		border: 0;
 		position: relative;
 	}
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar):last-child { padding-bottom: 2px; }
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar):last-child { padding-bottom: var(--fs-space-0-5); }
 	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td {
 		display: block;
 		/* beats base's `.td[width="33%"]` with no flag: the includes set a width
@@ -261,7 +265,7 @@
 		white-space: normal;
 		overflow-wrap: anywhere;
 		padding-right: min(200px, 50%);
-		font-size: 12px; font-weight: 600; color: var(--fs-text);
+		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-text);
 	}
 	/* bar cell — spans full width on row 2 */
 	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:nth-child(2) {

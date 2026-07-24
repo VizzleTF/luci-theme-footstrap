@@ -7,7 +7,7 @@
 	 * was luci-theme-bootstrap's scale rather than a decision anyone made about Manrope. */
 	body {
 		font-size: var(--fs-type);
-		font-weight: normal;
+		font-weight: var(--fs-weight-normal);
 		/* unitless: it inherits as a FACTOR, so a 20px heading gets 30px of leading instead of the
 		 * flat 18px a length would push down onto it and clip. */
 		line-height: var(--fs-leading);
@@ -43,7 +43,7 @@
 	.cbi-section-descr,
 	.table .tr.cbi-section-table-descr .th {
 		font-size: var(--fs-type);
-		font-weight: normal;
+		font-weight: var(--fs-weight-normal);
 		margin-bottom: var(--fs-space-2);
 		/* prose, so no orphans: LuCI's descriptions are one or two sentences of help text and a
 		 * single trailing word on its own line reads as a rendering fault. `pretty`, not
@@ -70,7 +70,7 @@
 	h5 small,
 	h6 small {
 		font-size: .7em;
-		font-weight: normal;
+		font-weight: var(--fs-weight-normal);
 		color: var(--fs-dim);
 	}
 
@@ -102,7 +102,7 @@
 	}
 
 	dl dt {
-		font-weight: bold;
+		font-weight: var(--fs-weight-bold);
 	}
 
 	dl dd {
@@ -117,7 +117,7 @@
 
 	strong {
 		font-style: inherit;
-		font-weight: bold;
+		font-weight: var(--fs-weight-bold);
 	}
 
 	em {
@@ -126,7 +126,7 @@
 		line-height: inherit;
 	}
 
-	small { font-size: var(--fs-type-sm) }
+	small { font-size: var(--fs-type) }
 
 	address {
 		display: block;
@@ -136,7 +136,7 @@
 	/* no shared padding: both members set their own below (code a chip's inset, pre a block's) */
 	code, pre {
 		font-family: var(--fs-font-mono);
-		font-size: var(--fs-type-sm);
+		font-size: var(--fs-type);
 		border-radius: var(--fs-radius-sm);
 	}
 

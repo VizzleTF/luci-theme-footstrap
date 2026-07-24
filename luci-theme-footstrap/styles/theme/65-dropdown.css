@@ -176,7 +176,7 @@
 		border: 1px solid var(--fs-border);
 		border-radius: var(--fs-radius);
 		color: var(--fs-text);
-		min-height: 38px;
+		min-height: var(--fs-ctl-h);
 		/* absorbed from base's generic field box with the width below. The fixed height is
 		 * load-bearing next to the min-height: without it a closed dropdown grows to its
 		 * tallest child (the Save & Apply split control carries a 40px button — measured,
@@ -212,7 +212,7 @@
 	 * base's .25em rows while every other dropdown got these. One menu, one row. */
 	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li,
 	.cbi-dropdown > ul.dropdown > li {
-		padding: 8px 12px; color: var(--fs-text);
+		padding: var(--fs-space-2) var(--fs-space-3); color: var(--fs-text);
 		font-family: var(--fs-font-sans);
 		/* one menu row: a grid step, which is what a line of text at this scale rounds to. NOT
 		 * `calc(--fs-type * --fs-leading)` — that is 19.5px, and a half-pixel on a BOX edge is
@@ -237,7 +237,7 @@
 		font-size: 0; line-height: 0; border: 0;
 		position: relative; padding: 0;
 		align-self: stretch;
-		min-width: 34px; min-height: 30px;
+		min-width: 34px; min-height: var(--fs-ctl-h-sm);
 		align-items: center;
 		cursor: pointer;
 	}
@@ -278,11 +278,11 @@
 		border: 1px solid var(--fs-border);
 		border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow-pop);
-		padding: 6px;
-		margin-top: 6px;
+		padding: var(--fs-space-1-5);
+		margin-top: var(--fs-space-1-5);
 	}
 	.cbi-dropdown[open] > ul.dropdown > li {
-		border-radius: var(--fs-radius-sm); padding: 9px 11px;
+		border-radius: var(--fs-radius-sm); padding: var(--fs-space-2) var(--fs-space-3);
 		border-left: 0; color: var(--fs-text);
 		position: relative;
 		/* no border-bottom divider: on a rounded box it curls up at the corners. The straight
@@ -306,7 +306,7 @@
 		background: var(--fs-panel2); color: var(--fs-accent); box-shadow: inset 2px 0 0 var(--fs-accent);
 		/* @endmirror */
 	}
-	.cbi-dropdown[open] > ul.dropdown > li.create-item { border-top: 1px solid var(--fs-border); margin-top: 4px; }
+	.cbi-dropdown[open] > ul.dropdown > li.create-item { border-top: 1px solid var(--fs-border); margin-top: var(--fs-space-1); }
 	/* The dropdown's "add item" field is a text input and takes the same radius as every other
 	 * one (theme/60-inputs.css). It said 8px here, and won or lost on source order. */
 	.cbi-dropdown .create-item-input { background: var(--fs-panel2); border: 1px solid var(--fs-border); border-radius: var(--fs-radius); color: var(--fs-text); }
@@ -356,8 +356,8 @@
 			border: 1px solid var(--fs-border);
 			border-radius: var(--fs-radius-lg);
 			background: var(--fs-panel2);
-			padding: 8px 14px 12px;
-			margin-bottom: 12px;
+			padding: var(--fs-space-2) var(--fs-space-3-5) var(--fs-space-3);
+			margin-bottom: var(--fs-space-3);
 		}
 		.table.cbi-section-table .tr:hover { background: var(--fs-panel2); }
 		/* `.table.cbi-section-table`, not `.cbi-section-table`: the desktop cell padding is written as
@@ -370,7 +370,7 @@
 		 * why the OpenVPN row stayed one column deep. */
 		.table.cbi-section-table .td {
 			flex: 1 1 100%; min-width: 0; margin: 0;
-			padding: 6px 10px 6px 0; border: 0; text-align: left;
+			padding: var(--fs-space-1-5) var(--fs-space-2-5) var(--fs-space-1-5) 0; border: 0; text-align: left;
 			/* same as the data card's cells (theme/30-tables.css): a carded cell holds opaque
 			 * tokens (a real-length IPv6 GUA is 39 chars with no break point — colons are not
 			 * break opportunities), and without `anywhere` one ran 156px past a 360px viewport
@@ -394,9 +394,9 @@
 		 * once they differ, exactly when it should shout. */
 		.table.cbi-section-table .td[data-title]::before {
 			/* @mirror table-card/label */
-			content: attr(data-title); display: block; margin-bottom: 3px;
-			font-size: 10px; font-weight: 700; letter-spacing: .05em;
-			text-transform: uppercase; color: var(--fs-faint);
+			content: attr(data-title); display: block; margin-bottom: var(--fs-space-1);
+			font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking);
+			text-transform: uppercase; color: var(--fs-eyebrow-color);
 			/* @endmirror */
 		}
 		/* The row's buttons are not a label/value pair: full width, each button stretching to
@@ -405,7 +405,7 @@
 		.table.cbi-section-table .td.cbi-section-actions {
 			/* @mirror table-card/actions */
 			display: flex; flex: 1 1 100%; justify-content: flex-start;
-			flex-wrap: wrap; gap: 8px; padding-top: 8px;
+			flex-wrap: wrap; gap: var(--fs-space-2); padding-top: var(--fs-space-2);
 			/* @endmirror */
 		}
 		.table.cbi-section-table .td.cbi-section-actions::before { content: none; }
@@ -415,7 +415,7 @@
 		 * data table's copy (theme/30-tables.css), which hit the same trap on Startup. */
 		.table.cbi-section-table .td.cbi-section-actions > * {
 			/* @mirror table-card/actions-inner */
-			flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 8px;
+			flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: var(--fs-space-2);
 			/* @endmirror */
 		}
 		.table.cbi-section-table .td .cbi-dropdown,

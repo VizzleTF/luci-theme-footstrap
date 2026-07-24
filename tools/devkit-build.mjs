@@ -14,12 +14,11 @@
  * the code a dev copies always matches what they see. Run: node tools/devkit-build.mjs
  */
 import { readFile, writeFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { buildCss } from './lib/css.mjs';
 import { parseExportTier } from './lib/tokens.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { ROOT } from './lib/root.mjs';
 const SRC = join(ROOT, 'docs/devkit.src.html');
 const GALLERY = join(ROOT, 'docs/gallery.html');
 const TOKENS = join(ROOT, 'luci-theme-footstrap/styles/02-tokens.css');

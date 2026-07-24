@@ -24,10 +24,9 @@
  * tag someone forgot to delete when the other copy died, and it enforces nothing.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, relative } from 'node:path';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { ROOT } from './lib/root.mjs';
 
 /* Whole FILES pinned byte-identical — the same argument one level up: duplication a tool forces
  * on you, made un-rottable. The Apache-2.0 text must exist twice and neither copy can go:

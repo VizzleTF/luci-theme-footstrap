@@ -23,7 +23,10 @@ import re, sys, pathlib
 ROOT = pathlib.Path(__file__).resolve().parents[1] / "luci-theme-footstrap"
 STYLES = ROOT / "styles"
 BASE = STYLES / "base"
-# The only files allowed an !important, and each for a reason no cascade layer covers:
+# The only files allowed an !important, and each for a reason no cascade layer covers.
+# This same list lives in .stylelintrc.json (the declaration-no-important:null override);
+# tools/bang-ok.mjs (npm run bang-ok) holds the two copies to each other, since Python and a
+# JSON config cannot share an import.
 # 90-responsive/20-overview outrank an inline style= written by ui.js or
 # luci-mod-status's 29_ports.js; 45-misc outranks the inline style='width:100%' the
 # realtime graphs write on the box they draw into (their drawing is sized from #view,
