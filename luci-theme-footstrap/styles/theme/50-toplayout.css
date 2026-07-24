@@ -102,30 +102,8 @@
 	 * before the poll pill returns. */
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow ~ .fs-themerow { margin-left: 0; }
 
-	/* ==================================================================
-	 * THE POLL PILL COLLAPSES TO AN ICON *BEFORE* THE BAR STACKS — .fs-ind-compact
-	 *
-	 * "Refreshing" is ~90px of the right cluster. When the menu no longer fits on the brand's
-	 * row, fs-chrome.js (fitChrome) first swaps that word for a bordered icon square — matching
-	 * Appearance / Log out — and re-measures: the freed width is often enough to keep the menu
-	 * on one row and skip the whole second row. Only if it still overflows does .fs-bar-stack
-	 * follow, and .fs-ind-compact stays set (the stacked bar is tighter still). The box, border
-	 * and radius come from the base pill rule (20-shell.css); this only hides the label and
-	 * paints the glyph. Static green arrows, grey when the poll is paused — same masked
-	 * --fs-icon-refresh as the rail, and the same reason it does not spin.
-	 * ================================================================== */
-	:root[data-layout="top"] .fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"] {
-		width: var(--fs-btn-size); padding: 0; font-size: 0; justify-content: center; position: relative;
-	}
-	:root[data-layout="top"] .fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]::before {
-		content: ""; width: var(--fs-icon-refresh-sz); height: var(--fs-icon-refresh-sz);
-		background: var(--fs-good);
-		/* @mirror poll-glyph/mask */
-		-webkit-mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
-		mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
-		/* @endmirror */
-	}
-	:root[data-layout="top"] .fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]:not([data-style="active"])::before {
-		background: var(--fs-dim);
-	}
+	/* The right cluster's own escalation — .fs-ind-compact and .fs-bar-actrow — is NOT here: it
+	 * belongs to the BAR, and the sidebar layout is a bar too once fitShell has stamped
+	 * data-narrow. Both live with the bar in 20-shell.css; this file is only the top layout's
+	 * delta, and the menu's .fs-bar-stack above is the part that really is top-only. */
 }

@@ -62,4 +62,17 @@
 	#modal_overlay .uci-change-legend-label > del,
 	/* same token as the diff blocks above — a literal 4px sat outside the Rounding axis */
 	#modal_overlay .uci-change-legend-label > var { border-radius: var(--fs-radius-sm); overflow: hidden; }
+
+	/* A CHANGED option is `<var><ins>uci set …</ins></var>`: the outer plate is rounded above, the
+	 * coloured fill is the child — and `overflow: hidden` does NOT round it, because the child never
+	 * reaches the corner it would be clipped at (the parent holds it 3px in: 1px border + 2px
+	 * padding). So the plate had rounded corners with a square green block sitting inside them, and
+	 * the legend's own "Option changed"/"Option removed" swatches were squares inside circles
+	 * (issue #14 — the two "Section" swatches, which have no child, were already round).
+	 * The child takes the parent's radius minus that 3px inset, which is what makes the two curves
+	 * concentric; `max()` keeps it at 0 rather than going negative when Rounding is turned down. */
+	#modal_overlay .uci-dialog var > ins,
+	#modal_overlay .uci-dialog var > del {
+		border-radius: max(0px, calc(var(--fs-radius-sm) - 3px));
+	}
 }

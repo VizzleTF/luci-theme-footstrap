@@ -152,7 +152,7 @@ function fitChrome() {
 	 * decided by fitShell's data-narrow, and is untouched here.) */
 	const topBar = !!bar && !!menu && prefs.isTopLayout();
 
-	if (bar) bar.classList.remove('fs-bar-stack', 'fs-ind-compact');
+	if (bar) bar.classList.remove('fs-bar-stack', 'fs-ind-compact', 'fs-bar-actrow');
 	fitTabStrips();
 	/* ---- does the main menu fit on the brand's row? ----
 	 * Whether it fits depends on how many sections THIS router has (stock 5, a loaded box 11), not
@@ -177,6 +177,58 @@ function fitChrome() {
 			fitTabStrips();
 		}
 	}
+
+	/* The cluster's own escalation, for EVERY bar — the top layout at any width, and the sidebar
+	 * layout once fitShell has stamped data-narrow. It runs after the menu's, because on the top
+	 * layout .fs-bar-stack has by then given the menu its own row and taken it out of the sum. */
+	if (bar && (topBar || document.documentElement.hasAttribute('data-narrow')))
+		fitCluster(bar, menu);
+}
+
+/* ---- does the right-hand cluster still fit beside the brand? ----
+ *
+ * The same question as the menu's, one row up, and it cannot be asked the same way. The cluster is
+ * four SIBLINGS — the indicators, Search, Appearance, Log out — so flexbox wraps them ONE AT A
+ * TIME: measured on a 380px phone bar, Log out alone dropped onto a second row and sat at its LEFT
+ * edge under the hostname, while the other three stayed up top. Either the whole cluster shares the
+ * brand's row or it takes a row of its own, right-aligned; there is no useful state in between.
+ *
+ * Two steps, cheapest first: collapse the pills to icon squares (~200px of prose on a bar showing
+ * both), and only if that still overflows give the cluster a row. .fs-ind-compact may already be
+ * set by the menu's escalation above — adding it twice is free, and it must NOT be cleared here:
+ * whoever asked for it still needs it. */
+function fitCluster(bar, menu) {
+	bar.classList.remove('fs-bar-actrow');
+	if (clusterFitsBrandRow(bar, menu))
+		return;
+
+	bar.classList.add('fs-ind-compact');
+	if (clusterFitsBrandRow(bar, menu))
+		return;
+
+	bar.classList.add('fs-bar-actrow');
+}
+
+/* Add the widths up rather than read positions: the bar is align-items:center over children of
+ * differing heights, so offsetTop differs even on ONE row — the same trap the menu measurement
+ * documents above. The menu is excluded because it owns a full-width row of its own in every bar
+ * (`ul.nav { flex: 1 1 100% }`), so it is never what the cluster competes with. */
+function clusterFitsBrandRow(bar, menu) {
+	const cs = getComputedStyle(bar);
+	const gap = parseFloat(cs.columnGap) || 0;
+	const room = bar.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+	let need = -gap;
+
+	for (const el of bar.children) {
+		/* offsetParent is null for a display:none child, which is most of them in a bar:
+		 * .fs-navlabel, .fs-spacer and #modemenu never show there, and #indicators is empty
+		 * (and so hidden) until the first poll pill lands. */
+		if (el === menu || el.offsetParent === null)
+			continue;
+		need += el.offsetWidth + gap;
+	}
+
+	return need <= room;
 }
 /* No observer and no resize listener of our own: fs-fit owns both, and this file used to grow the
  * second one CLAUDE.md warns against. A view renders its .cbi-tabmenu into #view, which fs-fit's
@@ -268,9 +320,46 @@ function wireRail() {
 	sync();
 }
 
+/* An indicator pill carries its whole meaning as prose — LuCI writes "Unsaved Changes: 2" — and the
+ * collapsed rail is 68px wide. Measured on the router: the pill wants 86px, wraps onto three lines
+ * and hangs 34px past the rail's edge over the content (issue #14). The rail is an icon strip, so
+ * CSS squares the pill there and draws this attribute instead of the label; a text node cannot be
+ * reached by a selector, which is why the badge has to be lifted into one here.
+ *
+ * The COUNT is what it shows — the only part that changes and the only part worth reading at that
+ * size. A pill with no trailing number (a third-party app's "Backup pending") falls back to a
+ * neutral dot: clipping the prose was tried and rendered "up pen", because a centred pill gives an
+ * ellipsis no start to anchor to. Choosing between the two is a decision, so it lives here rather
+ * than as a second CSS rule. The full prose stays in the label either way — a screen reader still
+ * reads it, and `title` keeps it reachable by pointer. */
+const IND_DOT = '•';
+
+function wireIndicatorCounts() {
+	const box = document.getElementById('indicators');
+	if (!box) return;
+
+	function stamp() {
+		box.querySelectorAll('[data-indicator]').forEach((el) => {
+			const txt = el.textContent || '';
+			const m = txt.match(/(\d+)\s*$/);
+			el.setAttribute('data-fs-badge', m ? m[1] : IND_DOT);
+			/* the rail hides the prose; the tooltip is where it stays reachable by pointer */
+			el.setAttribute('title', txt);
+		});
+	}
+
+	/* ui.showIndicator REPLACES the label's text node on an update ("Unsaved Changes: 1" -> ": 2")
+	 * and appends the span on the first change of the session, so both matter — and characterData
+	 * too, for the in-place rewrite. Our own attribute writes do not re-enter: attributes are not
+	 * observed. */
+	new MutationObserver(stamp).observe(box, { childList: true, subtree: true, characterData: true });
+	stamp();
+}
+
 return baseclass.extend({
 	setRenderMain,
 	renderChrome,
+	wireIndicatorCounts,
 	/* registered with fs-fit by the theme's init(): the bar's "does the menu fit beside the brand"
 	 * measurement rides the same engine as the data tables' */
 	fitChrome,

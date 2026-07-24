@@ -162,6 +162,58 @@
 		text-align: left; cursor: pointer;
 		transition: background var(--fs-dur), border-color var(--fs-dur), color var(--fs-dur);
 	}
+	/* ==================================================================
+	 * WHEN THE RIGHT CLUSTER RUNS OUT OF ROOM — .fs-ind-compact, then .fs-bar-actrow
+	 *
+	 * Both are set by fs-chrome.js (fitCluster) by MEASUREMENT, and both belong to the BAR rather
+	 * than to a layout: the top layout is a bar at every width, and the sidebar layout becomes one
+	 * on a phone (data-narrow). They used to sit in 50-toplayout.css under a data-layout="top"
+	 * guard, so a phone in the DEFAULT sidebar layout — the common case — got neither, and its bar
+	 * showed the full "Refreshing" and "Unsaved Changes: 1" pills with Log out wrapped alone onto a
+	 * second row at the LEFT edge (measured at 380px).
+	 *
+	 * Step 1, .fs-ind-compact: the pills lose their prose and become icon squares matching
+	 * Appearance / Log out — "Refreshing" alone is ~90px, "Unsaved Changes: 2" another ~110px, and
+	 * on the top layout freeing that is often enough to keep the MENU on the brand's row as well
+	 * (fitChrome's own escalation sets the same class for that reason).
+	 * Step 2, .fs-bar-actrow: the cluster still does not fit, so the brand row takes the full width
+	 * and the whole cluster moves down together. It keeps the right edge for free — the first
+	 * rendered cluster member already carries margin-left:auto (above). max-width must be released
+	 * along with the flex basis, or the 30ch cap leaves the brand short of the row it was just
+	 * given and the cluster rides back up beside it.
+	 * ================================================================== */
+	.fs-sidebar.fs-bar-actrow .fs-brandrow { flex: 1 1 100%; max-width: 100%; }
+
+	/* the poll pill: label off, masked glyph on. Static green arrows, grey when the poll is paused —
+	 * the same --fs-icon-refresh as the rail, and the same reason it does not spin (a permanently
+	 * spinning glyph makes an idle router look busy, and a moving target cannot be clicked). */
+	.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"] {
+		width: var(--fs-btn-size); padding: 0; font-size: 0; justify-content: center; position: relative;
+	}
+	.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]::before {
+		content: ""; width: var(--fs-icon-refresh-sz); height: var(--fs-icon-refresh-sz);
+		background: var(--fs-good);
+		/* @mirror poll-glyph/mask */
+		-webkit-mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
+		mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
+		/* @endmirror */
+	}
+	.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]:not([data-style="active"])::before {
+		background: var(--fs-dim);
+	}
+	/* every OTHER indicator collapses to the same box and shows the badge fs-chrome.js lifted out of
+	 * its label — the count, or a dot when there is no number — exactly as the collapsed rail does.
+	 * min-width rather than width: three digits must not be clipped, and here there is room to grow. */
+	.fs-sidebar.fs-ind-compact #indicators [data-indicator]:not([data-indicator="poll-status"]) {
+		min-width: var(--fs-btn-size); padding: 0 var(--fs-space-1); font-size: 0; justify-content: center;
+	}
+	.fs-sidebar.fs-ind-compact #indicators [data-indicator]:not([data-indicator="poll-status"])::after {
+		/* @mirror ind-badge/paint */
+		content: attr(data-fs-badge);
+		font-size: var(--fs-type-xs); font-weight: var(--fs-weight-bold); font-variant-numeric: tabular-nums;
+		/* @endmirror */
+	}
+
 	/* Exactly ONE member of the right cluster may carry margin-left:auto, and it must be the
 	 * FIRST one actually rendered. #indicators is earlier in the DOM, so when the poll pill
 	 * shows IT opens the gap and .fs-themerow's auto must stand down — otherwise flexbox
@@ -358,6 +410,17 @@
 		box-shadow: var(--fs-shadow-pop);
 		display: flex; flex-direction: column; gap: var(--fs-space-3);
 		animation: fs-fade var(--fs-dur);
+		/* The popover carries eight axes plus the wallpaper sub-panel and the footer, so on a short
+		 * viewport (a phone in landscape, a netbook) it is taller than the screen — and placePopover
+		 * can only MOVE it, never shrink it: the clamp pins top to the gap and the foot (Save as
+		 * default / Reset / Update) runs off the bottom with no way to reach it. Cap it to the
+		 * viewport and let it scroll instead. 16px is 2 x EDGE_GAP from fs-widgets.js — the same
+		 * margin the placement keeps on both edges; deliberately a literal and not --fs-space-2,
+		 * which the density axis scales while EDGE_GAP stays 8. dvh, not vh, so a phone's collapsing
+		 * URL bar does not hide the last row. offsetHeight/offsetWidth are read AFTER this applies,
+		 * so the clamp then always lands the whole popover on screen. */
+		max-height: calc(100dvh - 16px); max-width: calc(100vw - 16px); overflow: hidden auto;
+		overscroll-behavior: contain;
 	}
 	.fs-appearance-pop[hidden] { display: none; }
 
@@ -661,6 +724,41 @@
 		 * gets this for free: its --fs-good only applies to [data-style="active"].) */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"]:not([data-style="active"]) {
 			background: var(--fs-dim);
+		}
+
+		/* EVERY OTHER indicator — LuCI's "Unsaved Changes: N" and whatever a third-party app shows.
+		 * Its label is prose and the rail is 68px: measured on the router, that pill wants 86px,
+		 * wraps onto three lines and hangs 34px past the rail's edge over the content (issue #14).
+		 * The pill is not ours to shorten, so it becomes a square in the poll glyph's box and shows
+		 * the COUNT alone — the only part that changes, lifted into data-fs-count by fs-chrome.js
+		 * because a text node cannot be reached by a selector. `font-size: 0` kills the prose
+		 * without removing it: the label stays in the DOM for a screen reader, and in the `title`
+		 * for the pointer.
+		 *
+		 * What the badge SAYS — the count, or a dot when the label has no number — is decided in the
+		 * JS, so this stays one rule per box: written as two CSS rules it needed an extra attribute
+		 * and a `:not()` to tell them apart, which pushed the sheet's widest selector past the
+		 * css-metrics ratchet for a choice that is not a cascade question.
+		 *
+		 * `.fs-sidebar` is deliberately absent from these two: #indicators is an id, and the class
+		 * beside it only widened the selector. */
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] #indicators [data-indicator]:not([data-indicator="poll-status"]) {
+			/* min-width, not width: the count is unbounded (a big config can queue three digits) and
+			 * a fixed box would clip it. It grows from the poll glyph's square and stops at the
+			 * rail's inner width. */
+			font-size: 0; min-width: 30px; max-width: 100%; height: 30px;
+			box-sizing: border-box; padding: 0 var(--fs-space-1); overflow: hidden;
+			display: inline-flex; align-items: center; justify-content: center;
+		}
+		/* The top bar's compact step paints the same badge (50-toplayout.css) and CANNOT share this
+		 * rule: that one applies at every width, while this one must stay inside the 521px floor —
+		 * below it a rail user has data-rail stamped pre-paint but data-narrow not yet written, so a
+		 * merged rule would strip the phone bar's indicator to a bare digit until the modules land. */
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] #indicators [data-indicator]:not([data-indicator="poll-status"])::after {
+			/* @mirror ind-badge/paint */
+			content: attr(data-fs-badge);
+			font-size: var(--fs-type-xs); font-weight: var(--fs-weight-bold); font-variant-numeric: tabular-nums;
+			/* @endmirror */
 		}
 	}
 

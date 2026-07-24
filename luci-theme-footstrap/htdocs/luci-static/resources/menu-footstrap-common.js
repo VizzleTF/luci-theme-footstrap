@@ -65,6 +65,7 @@ return baseclass.extend({
 			 * recent-pages list is recorded from the first navigation onwards */
 			search.wire();
 			chrome.wireRail();
+			chrome.wireIndicatorCounts();
 			router.wire();
 			router.wireVisibility();
 		/* fs-chrome's renderTabMenu warns about exactly this, and the root chain was left bare: a
