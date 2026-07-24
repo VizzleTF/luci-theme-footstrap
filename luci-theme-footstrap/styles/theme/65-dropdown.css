@@ -163,7 +163,18 @@
 		display: flex;
 	}
 	.cbi-dropdown[open] > ul.dropdown > li .hide-open { display: none; }
-	.cbi-dropdown[open] > ul.dropdown > li .hide-close { display: initial; }
+	/* `min-width` because the thing that overflows an open row is a CHILD with an inline width, so
+	 * wrapping the row (theme/65 below) cannot reach it: form.js's RichListValue writes the
+	 * description block as `<div class="hide-close" style="min-width:25vw">`, which assumes the list
+	 * grows to fit — true on a theme that leaves ul.dropdown unbounded, false here (capped at
+	 * min(92vw, 420px), 90-responsive.css). The inline floor is a VIEWPORT fraction, so the wider the
+	 * screen the worse it gets: measured on a live router at 2559px, 25vw = 640px inside a 406px row
+	 * — scrollWidth 664 vs clientWidth 406, and the row's own `overflow: hidden` cut "…for routing
+	 * with/withou" mid-word, losing the whole "Requires hardware NAT support" sentence (issue #15,
+	 * reported again after 0.10.1, whose fix only addressed the row). At 1280px the same option fits,
+	 * which is why it does not reproduce on a laptop. An author !important is the only thing that
+	 * outranks an inline declaration; releasing the floor lets the text wrap inside its row. */
+	.cbi-dropdown[open] > ul.dropdown > li .hide-close { display: initial; min-width: 0 !important; }
 	.cbi-dropdown[open] > ul.dropdown > li:last-child {
 		margin-bottom: 0;
 	}

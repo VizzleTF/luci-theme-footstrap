@@ -113,6 +113,14 @@
 		margin: 0 !important;
 		min-width: 0 !important;
 		max-width: none !important;
+		/* …and `width` too, which stock never writes but a FORK does: on ImmortalWrt 25.12 the tile
+		 * carries `style="margin:.25em;width:100px"` instead of stock's `min-width:70px;max-width:100px`.
+		 * Releasing only the two stock properties left the fork's fixed width in charge, so the grid
+		 * handed each tile a 200px track and the tile drew itself 100px wide inside it — reported
+		 * against 0.10.1 with a console dump showing `maxW:"none"` (ours won) next to `width:"100px"`
+		 * (theirs did), on a Redmi AX6000. Naming all three costs nothing on stock, where `width` is
+		 * `auto` already. */
+		width: auto !important;
 		text-align: left;
 		background: var(--fs-panel2);
 		border: 1px solid var(--fs-border);

@@ -11,13 +11,21 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [Unreleased]
+## [0.10.2] — 2026-07-24
 
 ### Changed
 
 - **The README now opens on the theme itself instead of on an upgrade warning, and every claim in it is shown before it is explained.** The page led with a red *IMPORTANT* callout about a one-time 0.9.3 step, then three paragraphs of prose, and the only proof was a 2.2 MB GIF; the `--allow-untrusted` explanation — six lines of threat model — sat in the middle of the install instructions where a first-time reader has no use for it. The order is now hero → what it looks like → what it does → the benchmark → install, with the signature rationale folded into a `<details>`. Reading order is the change; the words are largely the ones that were already there.
 
 - **The README's screenshots are real, reproducible and no longer show a development container.** `tools/readme-shots.py` drives the dev router and shoots the three proof images (side menu, top bar, phone popup) plus the Appearance popover as an element shot, all in dark with the cats wallpaper. The dev box is a WSL container, so its overview advertised an i5-14600KF, 15.5 GiB of RAM, a 1 TB disk, a `C:\` mount and a 10 GbE port — none of which any router has. The script stops LuCI's poll (which would otherwise overwrite the values a second later, and which flips the indicator to "Paused" — restored, so the frame does not lie about the state) and substitutes what a real OpenWrt router reports: model, arch, kernel, 484 MiB of RAM, an 84 MiB overlay, four ports. The Appearance shot is the live popover rather than a drawing of one, so it cannot describe an axis set the theme no longer has — the hand-drawn version was already missing Density, uploaded wallpapers and the update controls. Light and dark copies are swapped by `<picture media>`, so it follows the reader's GitHub theme.
+
+### Fixed
+
+- **An option's description is no longer cut mid-word in an open dropdown, and the wider the screen the worse it used to be.** 0.10.1 taught the row to wrap, but the thing that overflowed was a child of it: `form.js`'s RichListValue writes its description block with an inline `min-width: 25vw`, which assumes the list grows to fit — true on a theme that leaves `ul.dropdown` unbounded, false here, where it is capped at `min(92vw, 420px)`. Being a viewport fraction, the floor scales with the monitor: measured on a live router at 2559 px, 25vw is 640 px inside a 406 px row, so the row's own `overflow: hidden` cut "…for routing with/withou" and swallowed the whole "Requires hardware NAT support" sentence. At 1280 px the same option fits, which is why it never reproduced on a laptop. Releasing the inline floor lets the text wrap inside the row it was given (Network → Firewall, "Hardware flow offloading"; issue #15).
+
+- **An empty table's "nothing here" row no longer lights up under the pointer.** The row hover was already spared it, but a second rule painted the CELL — `base/95-luci.css` lit every `.cbi-section-table .tr:hover .td`, which no later layer undid. It showed wherever the placeholder carries no `.cbi-section-table-row` class, so the theme's guarded rule never matched: measured on Services → UPnP ("There are no active port maps."), and swept across UPnP, NAT rules, IP sets, static routes, DHCP and the Overview to confirm nothing else still lights. Real rows keep their hover — a cue that promises a row you can act on now appears only on rows you can (issue #15).
+
+- **Port tiles on the Overview fill their track on forks that size them differently.** Stock `29_ports.js` writes `min-width:70px;max-width:100px` on each tile and the theme releases both, but ImmortalWrt 25.12 writes `width:100px` instead — a property nothing was overriding, so the grid handed each tile a 200 px track and the tile drew itself 100 px wide inside it. Reported with a console dump showing `max-width` already at `none` (ours won) next to `width: 100px` (theirs did), on a Redmi AX6000. Naming all three costs nothing on stock, where `width` is `auto` anyway.
 
 ## [0.10.1] — 2026-07-24
 
@@ -3029,6 +3037,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.10.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.7...v0.10.0
 [0.9.7]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.6...v0.9.7
