@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="120" viewBox="0 0 1200 120" role="img" aria-label="What it does">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="44" viewBox="0 0 1200 44" role="img" aria-label="What it does">
   <title>What it does</title>
-  <rect width="1200" height="120" rx="16" fill="#22272e"/>
-  <rect x="0" y="0" width="6" height="120" fill="#569df5"/>
+  <rect width="1200" height="44" rx="8" fill="#22272e"/>
+  <rect x="0" y="0" width="5" height="44" fill="#569df5"/>
   <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Manrope,sans-serif">
-    <text x="48" y="72" fill="#569df5" font-size="24" font-weight="800" letter-spacing="1" font-family="ui-monospace,'JetBrains Mono',monospace">01</text>
-    <text x="104" y="74" fill="#e6edf3" font-size="42" font-weight="800" letter-spacing="-1">What it does</text>
+    <text x="24" y="28" fill="#569df5" font-size="13" font-weight="800" letter-spacing="1" font-family="ui-monospace,'JetBrains Mono',monospace">01</text>
+    <text x="58" y="29" fill="#e6edf3" font-size="20" font-weight="800" letter-spacing="-.3">What it does</text>
   </g>
-  <path d="M1152 60h-40" stroke="#444c56" stroke-width="4" stroke-linecap="round"/>
+  <path d="M1176 22h-28" stroke="#444c56" stroke-width="3" stroke-linecap="round"/>
 </svg>
