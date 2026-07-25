@@ -26,13 +26,19 @@ import { analyze } from '@projectwallace/css-analyzer';
 import { buildCss } from './lib/css.mjs';
 
 const LIMITS = {
-	/* 17 (theme+pages, each fighting an inline or unlayered declaration) + 14 (base).
+	/* 18 (theme+pages: 14 fighting an inline or unlayered declaration, 4 the reduced-motion block,
+	 * whose `*` selector cannot beat a component rule in its own layer any other way) + 8 (base).
 	 *
 	 * Raised 30 -> 31 for theme/45-misc.css's realtime-graph bleed. It is the sanctioned kind: the
 	 * stock views size their drawing from #view but write `style="width:100%"` on the box they draw
 	 * into, so inside our padded card the canvas is 34px short and the newest samples are clipped —
-	 * and an inline declaration is exactly what no cascade layer can outrank. */
-	importants: 31,
+	 * and an inline declaration is exactly what no cascade layer can outrank.
+	 *
+	 * Lowered 31 -> 26: theme/65-dropdown.css's three `ul` margin flags were absorbed cargo from
+	 * luci-theme-bootstrap (no @layer there) whose stated adversary — an inline `margin` from ui.js
+	 * — does not exist on either release. They were beating the same FILE's open-popover
+	 * `margin-top`; see the note there. */
+	importants: 26,
 	/* The widest selector the theme needs; see the layer rules in CLAUDE.md.
 	 *
 	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`. Not sprawl:

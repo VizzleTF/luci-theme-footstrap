@@ -75,7 +75,20 @@
 	#packages.fs-stacked .td.cbi-section-actions { justify-content: flex-end; margin-top: var(--fs-space-1-5); }
 	#packages.fs-stacked .td.cbi-section-actions::before,
 	#packages.fs-stacked .td:not([data-title])::before { content: none; }
-	body[data-page="admin-system-package-manager"] #disk-space-label {
+	/* The "Disk space:" caption. Keyed on WHAT IT SITS BESIDE, not on `#disk-space-label` — that id
+	 * is 25.12+ only (`E('label',{'id':'disk-space-label'}, …)`; 24.10's package-manager.js emits a
+	 * bare `E('label',{}, …)`), so the id rule was dead on 24.10 and the caption kept base's
+	 * 250px-wide label instead of this line. Exactly the trap the note at the top of this file and
+	 * theme/90-responsive.css both warn about — and it was still here, in the rule the note is
+	 * about. The disk section is the only `label` immediately followed by a `.cbi-progressbar`,
+	 * which is the discriminator 90-responsive.css already uses for the same element.
+	 *
+	 * NOT `:has(:where(+ .cbi-progressbar))`: a leading combinator makes it a RELATIVE selector, and
+	 * only `:has()` itself accepts one — `:where()` takes a plain complex-selector list, so wrapping
+	 * it there makes the whole rule invalid and the browser drops it. stylelint parsed that happily
+	 * and `css-metrics` measured it happily; what caught it was reading the computed `display` back
+	 * off the router (still `inline`, on both releases). */
+	body[data-page="admin-system-package-manager"] #view label:has(+ .cbi-progressbar) {
 		display: block; margin: 0; font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-dim);
 	}
 }

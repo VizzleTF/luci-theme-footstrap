@@ -62,6 +62,27 @@ function resync(sel) {
 		dd.setValue(sel.value);
 }
 
+/* A VALUE written through the IDL is invisible to every observer there is.
+ *
+ * `sel.value = x` and `options[i].selected = true` — which is exactly what `ui.Select.setValue()`
+ * does, and `form.js`'s `updateDefaultValue()` calls it on every dependency pass — set no content
+ * attribute and add no node, so no MutationRecord is produced at all. relevant() therefore could
+ * never wake, resync() never ran, and the widget showed the old label while `getValue()` (and Save)
+ * read the new one. Reproduced on the router: `s.value = 'DROP'` left the widget unchanged.
+ *
+ * So this runs from the fitter, i.e. once per content mutation batch — the same cadence the tables
+ * already use — and it is deliberately the CHEAP half of resync(): a value compare per enhanced
+ * select, no choicesKey() over every option. Re-keying the widget stays behind relevant(), which now
+ * sees an option-list rebuild. */
+function resyncValues() {
+	for (const sel of document.querySelectorAll('select[data-fs-select]')) {
+		const dd = sel._fsDd;
+		if (!dd || !sel._fsNode || sel.disabled) continue;
+		if (dd.getValue() !== sel.value)
+			dd.setValue(sel.value);
+	}
+}
+
 function enhance(sel) {
 	if (sel.dataset.fsSelect || sel.disabled) return;	/* disabled: NOT marked — it may be enabled later */
 	/* `multiple` and "not in a CBI field" are permanent, so mark it and stop re-testing on
@@ -89,8 +110,24 @@ function enhance(sel) {
 	 * announces, and the visible widget nameless. Move the name over, drop the select from the
 	 * a11y tree. */
 	const title = sel.closest('.cbi-value')?.querySelector('.cbi-value-title');
-	if (title && title.textContent.trim())
-		node.setAttribute('aria-label', title.textContent.trim());
+	/* In a TABLE section there is no .cbi-value and no .cbi-value-title at all — form.js builds
+	 * `E('td', {class: 'td cbi-value-field'})` there — so on firewall zones, port forwards and
+	 * static leases the widget was left with no accessible name while the native select it replaces
+	 * is aria-hidden. The cell's `data-title` IS the column heading (LuCI fills it for the card
+	 * stack), which is the same string the header cell shows. */
+	const name = (title && title.textContent.trim()) ||
+		(sel.closest('.td')?.getAttribute('data-title') || '').trim();
+	if (name)
+		node.setAttribute('aria-label', name);
+	/* Clicking the field's caption must reach the widget. form.js wires that label to
+	 * `#widget.cbid…`.click()/focus() — which is the native <select> we just set `display: none` on,
+	 * so on this theme the click did nothing at all (measured: focus stayed on <body>, no list
+	 * opened), while stock bootstrap focuses the select. The <label for=…> is equally dead for the
+	 * same reason. Re-point the gesture at the visible control — focus only, which is the parity
+	 * stock gets: its `elem.click()` on a `<select>` opens no list either, so the gesture has always
+	 * meant "put me on this control". */
+	if (title)
+		title.addEventListener('click', () => node.focus(), { signal: ac.signal });
 	sel.setAttribute('aria-hidden', 'true');
 	sel._fsDd = dd;
 	sel._fsNode = node;
@@ -231,9 +268,19 @@ function relevant(mutations) {
 	/* attributeFilter narrows the ATTRIBUTE, not the element: `value`/`disabled` live on inputs
 	 * and buttons too, and a poll rewriting an input's value would otherwise wake the whole
 	 * scan. This half is ours alone; the added-node walk below is fs-fit's shared one. */
-	for (const m of mutations)
+	for (const m of mutations) {
 		if (m.type === 'attributes' && m.target.tagName === 'SELECT')
 			return true;
+		/* …and a REBUILT OPTION LIST. `sel.replaceChildren(new Option(…))` puts <option> elements in
+		 * addedNodes, and the shared walk below asks whether an added node IS or CONTAINS a select —
+		 * an <option> is neither, so the batch was dropped and resync() never re-keyed the widget.
+		 * Measured on the firewall page: after replaceChildren the native select listed AAA/BBB
+		 * while the widget still offered reject/drop/accept, and picking from the stale list wrote a
+		 * value the new list does not contain, i.e. `''`. CBI dependency handling rebuilds option
+		 * lists constantly, which is the case resync() was written for. */
+		if (m.type === 'childList' && m.target.tagName === 'SELECT')
+			return true;
+	}
 	/* `.table`, not `table.table` — the same selector tagDataTables() and STACKABLE use.
 	 * Additions only: a select or a table going away costs us nothing to notice. */
 	return fit.touches(mutations, 'select.cbi-input-select, .table');
@@ -343,7 +390,7 @@ return baseclass.extend({
 		/* A table must be TAGGED .fs-dt before it can be fitted, and re-tagged whenever the poll
 		 * brings a fresh one back — so the two travel as one fitter, which fs-fit runs now, on
 		 * every content mutation (synchronously, pre-paint) and on every resize of #view. */
-		fit.add(() => { tagDataTables(); fitTables(); });
+		fit.add(() => { tagDataTables(); fitTables(); resyncValues(); });
 
 		/* one scan per frame, however many mutations arrive (fit.frame — the theme's shared
 		 * coalescer) */

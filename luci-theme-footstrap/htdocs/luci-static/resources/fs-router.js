@@ -269,10 +269,51 @@ function navigate(pathname, push, kbd) {
 		    !c.classList.contains('alert-message') && c.nodeName !== 'NOSCRIPT')
 			c.remove();
 	});
+	/* …and the RUNTIME notifications, which live one level up and therefore survived every
+	 * navigation. `ui.addNotification()` does `mc.insertBefore(msg, mc.firstElementChild)` on
+	 * #maincontent — this theme's <main class="fs-main"> — while the sweep above only reaches
+	 * children of .fs-content, a descendant of it. A full load clears them; SPA never did, so
+	 * "Upload request failed" and every third-party banner stacked up over each following page for
+	 * the rest of the session (reproduced: the banner outlives a nav, and only F5 removes it).
+	 * The .fs-content banners kept above are the SERVER's notices (notices.ut) and legitimately
+	 * outlive a page; these are not the same thing. */
+	const mainHost = document.getElementById('maincontent');
+	if (mainHost)
+		Array.from(mainHost.children).forEach((c) => {
+			if (c.classList.contains('alert-message')) c.remove();
+		});
 	if (!document.getElementById('view')) {
 		const v = document.createElement('div');
 		v.id = 'view';
 		contentHost.appendChild(v);
+	}
+
+	/* SAY THAT SOMETHING IS LOADING, on a route whose module has never been fetched.
+	 *
+	 * The chrome switches instantly — title, URL, body[data-page], the menu highlight — but the
+	 * sweep above deliberately does not touch the children of #view, and LuCI's own spinner is
+	 * written by `View.__init__`, i.e. only once the view module has ARRIVED. So between the click
+	 * and the last round-trip of the module chain the user reads the PREVIOUS page's content under
+	 * the new page's title, with nothing moving. Measured on the router at 600 ms latency: at 150 ms
+	 * and 400 ms #view still held the System page while everything else said Processes; the
+	 * "Loading view…" spinner appeared at 900 ms and the content at 1800 ms. A full load would have
+	 * shown the browser's own progress for that whole window.
+	 *
+	 * Only for a COLD route: `_seen` means the class has already been through require(), where
+	 * View.__init__ paints its spinner synchronously and there is no gap to fill.
+	 *
+	 * Deliberately the SAME markup and the SAME msgid luci-base uses, not a skeleton of our own:
+	 * when View.__init__ replaces it there is nothing to see, and the string arrives already
+	 * translated in the ~40 languages this theme ships no catalogue for (the chrome rule — a
+	 * context-free msgid is how we inherit luci-base's translation). */
+	if (!_seen.has(tree.viewClassFor(node))) {
+		const vp = document.getElementById('view');
+		if (vp) {
+			const s = document.createElement('div');
+			s.className = 'spinning';
+			s.textContent = _('Loading view…');
+			vp.replaceChildren(s);
+		}
 	}
 
 	/* teardown: drop the outgoing view's pollers, then put the poll loop back into the state a FRESH

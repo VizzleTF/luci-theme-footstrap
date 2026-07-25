@@ -194,7 +194,11 @@ function wireAppearance(update) {
 
 		/* the DENSITY half of the Tint — how strong the hue reads. fs-ap-tint hides it (with the hue)
 		 * under File; fs-ap-density also hides it while no Tint hue is set (theme/20-shell.css). */
-		group(_('Density', 'footstrap'),
+		/* NOT "Density": that is the UI-density segment above, and this string is both the visible
+		 * caption AND the control's aria-label, so two rows read "Density" and a screen reader
+		 * announced "Density, radio group" and "Density, slider" with nothing to tell them apart.
+		 * They are visible together as soon as a Tint hue is set. */
+		group(_('Tint strength', 'footstrap'),
 			(label) => widgets.sliderControl(prefs.currentTintStrength(), 0, 200, bump(prefs.applyTintStrength), label, {
 				step: 5,
 				fmt: (v) => v + '%'
@@ -236,14 +240,14 @@ function wireAppearance(update) {
 	 * one edit away from becoming two different strings, i.e. two msgids, one of which nobody
 	 * translates. Local to this function on purpose: at module scope `_()` would run before the
 	 * popover is ever built. */
-	const NEW_VERSION = _('New version available');
+	const NEW_VERSION = _('New version available', 'footstrap');
 	const badge = update ? E('a', {
 		'class': 'fs-ap-badge', 'hidden': '',
 		'href': update.LATEST_URL,
 		'target': '_blank', 'rel': 'noopener'
 	}, [ NEW_VERSION ]) : null;
 	const updateBtn = update
-		? E('button', { 'class': 'fs-ap-update', 'type': 'button', 'hidden': '' }, [ _('Update now') ])
+		? E('button', { 'class': 'fs-ap-update', 'type': 'button', 'hidden': '' }, [ _('Update now', 'footstrap') ])
 		: null;
 
 	/* opt-out toggle for the update check — ONLY when the updater is installed. NOT bump()-ed: it is

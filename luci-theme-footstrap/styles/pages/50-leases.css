@@ -10,8 +10,14 @@
 	 * has). The nowrap IS that floor, and a floor is what makes a table OVERFLOW when the
 	 * room runs out — fs-select.js measures the overflow and sets .fs-stacked, so the ~780
 	 * is DISCOVERED and the card lives once, in theme/30-tables.css. `:not(.fs-stacked)` is
-	 * the whole guard: once carded, the cells must wrap again. */
-	#view table.fs-dt:is(.leases, .leases6):not(.fs-stacked) .td { white-space: nowrap; }
+	 * the whole guard: once carded, the cells must wrap again.
+	 *
+	 * `.lases` IS NOT A TYPO HERE — it is upstream's, and dropping it is what made this whole file
+	 * dead on 24.10. `40_dhcp.js` tags the IPv4 table `class="table lases"` there and
+	 * `class="table leases"` on 25.12+ (grepped on both containers). Measured on 24.10 with the
+	 * theme active: every one of the five cells computed `white-space: normal`, so the IPv4 and the
+	 * MAC wrapped across two lines — issue #7's exact symptom, on the release nobody re-checked. */
+	#view table.fs-dt:is(.leases, .lases, .leases6):not(.fs-stacked) .td { white-space: nowrap; }
 	/* ---- NEVER MATCH A `data-title` VALUE: it is a TRANSLATED, RENDER-DEPENDENT string ----
 	 *
 	 * LuCI fills `data-title` from the column HEADING, so on a localised router the value is the
@@ -33,16 +39,37 @@
 	 * natural breaks first — the hyphens in "Yandex-Station-Midi-61QK" — and only splits mid-token
 	 * when nothing else fits; short names stay on one line.
 	 *
-	 *   .leases    1 Hostname | 2 IPv4 address    | 3 MAC address | 4 DUID | 5 IAID | 6 Remaining | 7 Static
-	 *   .leases6   1 Interface| 2 Hostname        | 3 IPv6 addrs  | 4 DUID | 5 IAID | 6 Remaining | 7 Static
+	 * ---- COUNT FROM THE END, NEVER FROM THE START ----
 	 *
-	 * so: hostname + DUID in .leases, hostname + the IPv6 list + DUID in .leases6. IPv4/MAC/IAID
-	 * keep the nowrap above — they are the strings that must never be split. */
-	#view table.fs-dt.leases:not(.fs-stacked) .td:nth-child(1),
-	#view table.fs-dt.leases:not(.fs-stacked) .td:nth-child(4),
-	#view table.fs-dt.leases6:not(.fs-stacked) .td:nth-child(2),
-	#view table.fs-dt.leases6:not(.fs-stacked) .td:nth-child(3),
-	#view table.fs-dt.leases6:not(.fs-stacked) .td:nth-child(4) {
+	 * The LEADING column is optional on 25.12+: `40_dhcp.js` opens both tables with
+	 * `L.hasSystemFeature('odhcpd','dhcpv4') ? E('th', …, _('Interface')) : E([])`, so a router that
+	 * serves DHCP through odhcpd has one column more than one that does not, and every
+	 * `:nth-child()` here shifts by one. Reproduced on the router by inserting that column into the
+	 * live table: the MAC cell went from `nowrap` to `normal` — issue #7 straight back, on exactly
+	 * the routers that run odhcpd, and invisible on the ones that do not. The TRAILING columns are
+	 * identical either way, so `:nth-last-child()` cannot shift.
+	 *
+	 *   25.12+  .leases   [Interface] Hostname IPv4 MAC DUID IAID Remaining Static
+	 *                                    -7     -6  -5   -4   -3      -2      -1
+	 *           .leases6  [Interface] Hostname IPv6 DUID IAID Remaining Static
+	 *                                    -6     -5   -4   -3     -2      -1
+	 *   24.10   .lases     Hostname IPv4 MAC Remaining Static      (no DUID/IAID column at all)
+	 *                        -5      -4  -3     -2      -1
+	 *           .leases6   Host IPv6 DUID Remaining Static
+	 *                       -5   -4   -3     -2      -1
+	 *
+	 * so: the hostname, the IPv6 list and DUID may wrap; IPv4/MAC/IAID and the two short trailing
+	 * columns keep the nowrap above. `.leases` vs `.lases` separates the v4 tables by release on its
+	 * own. The v6 table carries the SAME class on both, so it is split on column COUNT — 24.10 has
+	 * exactly five, 25.12+ has six or seven. That count test is wrapped in `:where()` so it costs
+	 * NOTHING: `:has()` otherwise takes its argument's specificity, and `.tr.table-titles >
+	 * :nth-child(6)` alone pushed the selector to [1,8,1], past the sheet's [1,7,0] ceiling. */
+	#view table.fs-dt.leases:not(.fs-stacked) .td:is(:nth-last-child(7), :nth-last-child(4)),
+	#view table.fs-dt.leases6:has(:where(.tr.table-titles > :nth-child(6))):not(.fs-stacked)
+		.td:is(:nth-last-child(6), :nth-last-child(5), :nth-last-child(4)),
+	#view table.fs-dt.lases:not(.fs-stacked) .td:nth-last-child(5),
+	#view table.fs-dt.leases6:not(:has(:where(.tr.table-titles > :nth-child(6)))):not(.fs-stacked)
+		.td:is(:nth-last-child(5), :nth-last-child(4), :nth-last-child(3)) {
 		white-space: normal; overflow-wrap: anywhere;
 	}
 }

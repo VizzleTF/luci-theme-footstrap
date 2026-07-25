@@ -470,8 +470,22 @@ const AXIS_KEYS = [
 const FS_TSTR_DEFAULT = 100;
 const TSTR = propAxis('fs-tint-strength', 'tint_strength', '--fs-tint-strength', 0, 200, FS_TSTR_DEFAULT, (v) => String(v / 100));
 const currentTintStrength = TSTR.current, applyTintStrength = TSTR.apply, tintStrengthDefault = TSTR.def;
-const _uciSet = rpc.declare({ object: 'uci', method: 'set', params: [ 'config', 'section', 'values' ] });
-const _uciCommit = rpc.declare({ object: 'uci', method: 'commit', params: [ 'config' ] });
+/* `reject: true` IS THE WHOLE POINT — without it a refused write arrives as SUCCESS.
+ *
+ * rpc.js only raises on the ubus status code when the declaration asks it to (`raise: options.reject`
+ * → `if (req.raise && msg.result[0] !== 0) L.raise(...)`); otherwise it hands the code back as the
+ * resolved VALUE. Only an object/method-level denial (JSON-RPC -32002) or an HTTP error rejects on
+ * its own. So a per-config ACL refusal — `uci` granted, `footstrap` not — resolved with `6`
+ * (UBUS_STATUS_PERMISSION_DENIED) and every `.then()` below ran as if the file had been written.
+ *
+ * Measured on the router with the theme's own ACL narrowed to a config name that does not exist,
+ * and the two wildcard-granting packages installed here moved aside so the denial could actually be
+ * reached: the declaration WITHOUT the flag resolved with value 6, the same declaration WITH it
+ * rejected `ubus code 6: Permission denied`. Before this flag, Appearance → Save as default greyed
+ * the button and printed "Saved as default" for a write that never happened, and the user could not
+ * even retry — the button was disabled. */
+const _uciSet = rpc.declare({ object: 'uci', method: 'set', params: [ 'config', 'section', 'values' ], reject: true });
+const _uciCommit = rpc.declare({ object: 'uci', method: 'commit', params: [ 'config' ], reject: true });
 
 function snapshotAxes() {
 	return {
@@ -560,12 +574,24 @@ const BG_SERVE = '/luci-static/footstrap/bg';	/* the uhttpd symlink to BG_PATH (
 const BG_MAX_SIDE = 1920;						/* cap the longest side — a router serves this off flash with no gzip, and 1080p covers the screens LuCI is actually admin'd from; still crisp full-screen, far fewer flash/wire bytes */
 const BG_QUALITY  = 0.9;
 const BG_SRC_MAX  = 25 * 1024 * 1024;			/* refuse a source this big before decoding (decode-bomb guard) */
-const _fileRemove = rpc.declare({ object: 'file', method: 'remove', params: [ 'path' ] });
+const _fileRemove = rpc.declare({ object: 'file', method: 'remove', params: [ 'path' ], reject: true });
 /* cgi-upload writes the file mode 0600, and uhttpd refuses to SERVE a file that is not
  * world-readable (measured: 0600 -> 403, 0644 -> 200), so make it 0644 before it can be fetched. The
  * rpcd ACL grants exec on exactly `/bin/chmod 644 /etc/footstrap/login-bg` — one fixed command, no
  * argument the caller controls. */
-const _fileExec = rpc.declare({ object: 'file', method: 'exec', params: [ 'command', 'params' ] });
+const _fileExec = rpc.declare({ object: 'file', method: 'exec', params: [ 'command', 'params' ], reject: true });
+/* …and the ubus status is only half of it: `file.exec` reports the COMMAND's exit status inside the
+ * payload, so a chmod that ran and failed still comes back as a successful call. Unchecked, the
+ * chain below went on to commit `wallpaper=file` router-wide for a file uhttpd will 403 (cgi-upload
+ * writes it 0600) — the upload reports success and every device, including the pre-login page, gets
+ * a scrim over nothing. */
+function _chmodServeable(path) {
+	return _fileExec('/bin/chmod', [ '644', path ]).then((res) => {
+		if (res && res.code)
+			throw new Error(_('Upload failed.', 'footstrap') + ' (chmod ' + res.code + ')');
+		return res;
+	});
+}
 /* the cache-bust token charset — an md5/sha hex string. ONE copy here (currentLoginBg validates the
  * stored token, uploadLoginBg validates the fresh cgi-upload checksum); head.ut's ucode sanitiser and
  * the pre-paint inline script keep their own identical copies, unavoidably (they run before this
@@ -638,7 +664,7 @@ function uploadLoginBg(file) {
 		if (!BG_TOKEN_RE.test(tok))
 			return Promise.reject(new Error(_('Upload failed.', 'footstrap')));
 		/* make the just-written 0600 file world-readable, or uhttpd 403s it (see _fileExec) */
-		return _fileExec('/bin/chmod', [ '644', BG_PATH ])
+		return _chmodServeable(BG_PATH)
 			/* write the image AND switch the router default to File in one commit — uploading a photo
 			 * IS the act of making it the background, so a fresh browser and the pre-login page show it
 			 * without a separate Save-as-default. */

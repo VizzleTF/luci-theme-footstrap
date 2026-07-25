@@ -34,8 +34,17 @@
 	 * the rules below turn those into a working combobox. The display state machine is UNFLAGGED:
 	 * upstream resolved the states with !important, but flag-vs-flag falls back to
 	 * specificity-then-order anyway, so the machine below states the SAME resolution openly (see
-	 * the state-machine block). THREE !important remain — all on `ul` margins, because ui.js
-	 * writes `margin` INLINE on an open list: no cascade outranks an inline style. */
+	 * the state-machine block). The `ul` margins were flagged too, on the stated grounds that ui.js
+	 * writes `margin` INLINE on an open list. IT DOES NOT — grepped on both releases: ui.js touches
+	 * only `top`/`left`/`right`/`maxHeight`/`bottom` on that `ul`, and only under `'ontouchstart' in
+	 * window` (see 90-responsive.css, where the flags that fight THOSE live). The flags came in with
+	 * the absorbed widget from luci-theme-bootstrap, which has no @layer and needed one to beat its
+	 * own `ul { margin: 0 0 10px 25px }`; here the layer split does that for free. They were not
+	 * idle, though — they were beating THIS FILE: `margin: 0 !important` on (0,1,1) out-ranked the
+	 * open popover's own `margin-top` at (0,2,1) below, so the list sat 1px off the control instead
+	 * of the designed 6px, and the two `.btn` rules then needed flags of their own purely to escape
+	 * the first one. Measured on the gallery: dropping all three moves exactly one value (that gap,
+	 * 1px -> 7px) and nothing else. */
 	.cbi-dropdown {
 		display: inline-flex;
 		cursor: pointer;
@@ -49,7 +58,7 @@
 		width: auto;
 	}
 	.cbi-dropdown > ul {
-		margin: 0 !important;
+		margin: 0;
 		padding: 0;
 		list-style: none;
 		overflow-x: hidden;
@@ -58,14 +67,15 @@
 		width: 100%;
 	}
 	/* clears the button's own side inset so the label starts on its text, not on its border.
-	 * !important: ui.js writes `margin` inline on an open list — see 90-responsive.css. */
+	 * Unflagged: (0,3,1) over the rule above's (0,1,1) — it only ever needed a flag to beat that
+	 * rule's flag. */
 	.cbi-dropdown.btn > ul:not(.dropdown),
 	.cbi-dropdown.cbi-button > ul:not(.dropdown) {
-		margin: 0 0 0 var(--fs-space-3) !important;
+		margin: 0 0 0 var(--fs-space-3);
 	}
 	.cbi-dropdown.btn.spinning > ul:not(.dropdown),
 	.cbi-dropdown.cbi-button.spinning > ul:not(.dropdown) {
-		margin: 0 !important;
+		margin: 0;
 	}
 	.cbi-dropdown > ul.preview {
 		display: none;
@@ -290,6 +300,9 @@
 		border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow-pop);
 		padding: var(--fs-space-1-5);
+		/* the gap that detaches the popover from its control. It was DEAD until the `ul` margin
+		 * flags above came out (they out-ranked it from a lower specificity), so the list sat 1px
+		 * off the control — the one value that moved when they went. */
 		margin-top: var(--fs-space-1-5);
 	}
 	.cbi-dropdown[open] > ul.dropdown > li {

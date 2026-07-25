@@ -102,14 +102,42 @@ function fitTabStrips() {
  * able to see it. Memoised because fitShell runs on every resize and mutation and getComputedStyle
  * forces a style recalc; the fallbacks stop an empty custom property making the measurement NaN
  * (`NaN < NaN` is false, so the sidebar would simply never yield). */
-let _geom = null;
+/* A CUSTOM PROPERTY IS UNTYPED, so its computed value is a token stream and not a length.
+ * `parseFloat(getComputedStyle(root).getPropertyValue('--fs-sidebar-w'))` therefore reads
+ * `calc(224px * 1)` — a string starting with `c` — and returns NaN, which the fallbacks below turn
+ * straight back into the literals this function exists to stop restating. It read correctly until
+ * the Density axis wrapped three of the four tokens in `calc(… * var(--fs-density-box))`; only
+ * `--fs-content-min`, still a bare `500px`, kept working, which is why the failure was one-sided
+ * and silent. Measured on the router: content-min 500, and sidebar/rail/pad all NaN.
+ *
+ * Resolve them the way the platform actually offers without registering the property: assign the
+ * token to a REAL length property on a throwaway element and read the used value back. */
+let _probe = null;
+function resolveLen(token, dflt) {
+	if (!_probe) {
+		_probe = document.createElement('div');
+		_probe.setAttribute('aria-hidden', 'true');
+		/* out of flow, no box, no ink: it must never affect layout, scroll extent or hit-testing */
+		_probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;' +
+			'height:0;min-width:0;max-width:none;border:0;padding:0;margin:0;';
+		document.body.appendChild(_probe);
+	}
+	_probe.style.width = 'var(' + token + ')';
+	const v = parseFloat(getComputedStyle(_probe).width);
+	return Number.isFinite(v) ? v : dflt;
+}
+
+/* Memoised because fitShell runs on every resize and mutation and resolving forces a style recalc —
+ * but keyed on the DENSITY, because that is the one thing that changes these widths at runtime
+ * (`prefs.applyDensity()` stamps `:root[data-density]` and calls fit.schedule() precisely so they
+ * are re-measured). Reading one attribute is free; the memo without the key meant a density change
+ * re-measured against the widths of the density before it. */
+let _geom = null, _geomDensity = null;
 function shellGeometry() {
-	if (_geom) return _geom;
-	const cs = getComputedStyle(document.documentElement);
-	const px = (name, dflt) => {
-		const v = parseFloat(cs.getPropertyValue(name));
-		return Number.isFinite(v) ? v : dflt;
-	};
+	const density = document.documentElement.getAttribute('data-density') || '';
+	if (_geom && _geomDensity === density) return _geom;
+	_geomDensity = density;
+	const px = (name, dflt) => resolveLen(name, dflt);
 	_geom = {
 		contentMin: px('--fs-content-min', 500),
 		sidebarW:   px('--fs-sidebar-w', 224),
@@ -128,7 +156,10 @@ function fitShell() {
 	}
 	const g = shellGeometry();
 	const cut = prefs.currentRail() ? g.railW : g.sidebarW;
-	const content = window.innerWidth - cut - g.contentPad;
+	/* clientWidth, not innerWidth: the column the content actually gets excludes a classic
+	 * scrollbar, and innerWidth includes it — 15-17px of phantom room on Linux/Windows, i.e. the
+	 * 500px floor really fired at ~484. */
+	const content = document.documentElement.clientWidth - cut - g.contentPad;
 	/* toggleAttribute, NOT setAttribute: a same-value setAttribute still QUEUES a mutation record
 	 * (measured in Chromium: 5 identical setAttribute('data-narrow','') -> 5 records; toggleAttribute
 	 * on an already-present attribute -> 0). fitShell runs from fitChrome, which fs-fit calls on every

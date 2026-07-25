@@ -75,7 +75,12 @@ function walk(node, segs, trail, out, depth) {
 			 * "firewall". Both find it. */
 			t: title.toLowerCase(),
 			p: trail.join(' ').toLowerCase(),
-			n: csegs.join(' ').toLowerCase()
+			/* …minus the ROOT segment, which is `admin` on every single node. Indexed, it made
+			 * every substring of "admin" — a, ad, adm, dmi, min, in — a hit on all ~200 pages, so
+			 * `min` returned "Terminal", "Administration", "Attended Sysupgrade" and stopped at the
+			 * 20-result cap sorted only by depth (measured). It carries no information precisely
+			 * because it is shared by everything. */
+			n: csegs.slice(1).join(' ').toLowerCase()
 		});
 
 		if (depth < MAX_DEPTH)

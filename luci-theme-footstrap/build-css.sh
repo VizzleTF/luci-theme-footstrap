@@ -173,10 +173,35 @@ squeeze() {
 	' "$1"
 }
 
-# Fail loudly rather than let an unbalanced block ship. Braces matched as bracket
-# expressions: a bare /{/ is an interval-expression ambiguity some awks reject.
+# Fail loudly rather than let an unbalanced block ship.
+#
+# STRING-AWARE, for the same reason the comment stripper is: a brace inside a CSS STRING is not a
+# block. The counter used to gsub() over the raw line, so a perfectly valid rule made the build
+# REFUSE — measured, all three shapes: `content: ";}"`, `content: "{"`, and a data-URI carrying
+# `;}` (an inline <style> inside an SVG icon carries braces by construction). It fails closed, so
+# nothing was ever corrupted; what it costs is an afternoon spent looking for an imbalance that is
+# not there, on a message that names the file as broken. Nothing in the tree contains such a byte
+# today, which is exactly how this waited for whoever adds the first one — the same sentence
+# already written above the comment stripper, which was fixed and left this one behind.
 brace_count() {
-	awk '{ o += gsub(/[{]/, "&"); c += gsub(/[}]/, "&") } END {
+	awk '
+		BEGIN { q = "" }
+		{
+			line = $0; n = length(line); i = 1
+			while (i <= n) {
+				ch = substr(line, i, 1)
+				if (q != "") {				# inside a string
+					if (ch == "\\") { i += 2; continue }	# escape: skip the pair
+					if (ch == q) q = ""
+					i++; continue
+				}
+				if (ch == "\"" || ch == "'"'"'") { q = ch; i++; continue }
+				if (ch == "{") o++
+				else if (ch == "}") c++
+				i++
+			}
+		}
+		END {
 		if (o != c) { printf "build-css: %s: unbalanced braces (%d { vs %d })\n", FILENAME, o, c > "/dev/stderr"; exit 1 }
 		if (o < 100) { printf "build-css: %s: suspiciously few rules (%d)\n", FILENAME, o > "/dev/stderr"; exit 1 }
 		print o

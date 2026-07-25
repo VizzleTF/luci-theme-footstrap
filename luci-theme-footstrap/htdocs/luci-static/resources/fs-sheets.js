@@ -78,9 +78,41 @@ function themeNames() {
  * Shared by invasiveSheet() (is this sheet dangerous?) and fenceRules() (which parts get fenced?) —
  * they must agree by construction: a part judged able to reach another page is exactly a part able
  * to reach the chrome. Two copies of this test would drift into disagreeing. */
+/* Split a selector list on its TOP-LEVEL commas. `String.split(',')` cannot: `:not(.a, .b)` is one
+ * part carrying a comma, and splitting it there hands both halves to pinnedToApp() as garbage —
+ * `.cbi-button-save:not(.custom-save-button` keeps a visible app name (the argument regex needs a
+ * closing paren to fire), so the file manager's own motivating rule reads as pinned and is neither
+ * judged nor fenced. Measured on the router: `documentPoisoned()` said clean. `:not(a, b)` is
+ * ordinary modern CSS, not an exotic. */
+function selectorParts(text) {
+	const out = [];
+	let depth = 0, buf = '';
+	for (const ch of text) {
+		if (ch === '(') depth++;
+		else if (ch === ')') depth--;
+		if (ch === ',' && depth === 0) { out.push(buf.trim()); buf = ''; continue; }
+		buf += ch;
+	}
+	out.push(buf.trim());
+	return out.filter(Boolean);
+}
+
+/* Drop every functional pseudo-class ARGUMENT, nesting included. The old regex
+ * (`/:[a-z-]+\([^)]*\)/g`) stops at the first `)`, so `:not(:is(.app))` left a stray `)` and, worse,
+ * left `.app` looking like a pin. */
+function stripPseudoArgs(part) {
+	let out = '', depth = 0;
+	for (let i = 0; i < part.length; i++) {
+		const ch = part[i];
+		if (ch === '(' ) { depth++; if (depth === 1) { out += ' '; continue; } }
+		if (ch === ')') { depth--; continue; }
+		if (!depth) out += ch;
+	}
+	return out;
+}
+
 function pinnedToApp(part, names) {
-	return (part.replace(/:[a-z-]+\([^)]*\)/gi, ' ').match(NAME_RE) || [])
-		.some((n) => !names.has(n));
+	return (stripPseudoArgs(part).match(NAME_RE) || []).some((n) => !names.has(n));
 }
 
 /* A rule with a bare SELECTOR (`:root`, `pre`, `*`) still cannot touch us if none of its
@@ -125,7 +157,32 @@ const _invasive = new WeakSet();
 function invasiveSheet(el, universe) {
 	if (_invasive.has(el)) return true;
 	const v = judgeSheet(el, universe);
-	if (v) _invasive.add(el);
+	/* CACHE ONLY A VERDICT WE COULD ACTUALLY READ.
+	 *
+	 * A <link> has NO .sheet until its bytes land, and judgeSheet's "unreadable -> invasive" default
+	 * therefore fires for EVERY linked app stylesheet at the instant <head>'s observer first sees
+	 * it. Remembering that verdict is what turned a benign sheet into a permanently spent document:
+	 * measured on the router, `luci-app-mwan3` ships ONE rule —
+	 * `#mwan3-service-status > .alert-message { … }`, pinned to the app's own id, which this
+	 * module's own judgement calls clean — and its <link> on the Overview left documentPoisoned()
+	 * true for the life of the page, so every navigation FROM THE LANDING PAGE was a full load.
+	 * Proven by serving those same bytes twice: as a <style> the document stayed clean, as a <link>
+	 * it went poisoned. Nothing about the CSS decided it; only how it arrived.
+	 *
+	 * Safe to re-take, and the "never re-judge our own edit" rule above still holds, because the
+	 * two cases do not overlap: rehostIntoThemeLayer() edits a <style>'s text and fences its rules
+	 * — and a <style> in the document always HAS a sheet, so its verdict was cached when taken and
+	 * is never re-taken. A <link> it never edits at all (it disables the element and re-imports the
+	 * href into the theme layer), so a later read still sees the app's untouched CSS, which is the
+	 * right question. A 404 or cross-origin sheet keeps answering `true` on every ask exactly as
+	 * before — it simply is not remembered, which changes nothing.
+	 *
+	 * Conservative WHILE unreadable is preserved: `v` is still returned as taken, so a hostile
+	 * sheet is fenced and re-hosted on sight and the document reads spent until the bytes prove
+	 * otherwise. Only the memory is dropped. */
+	let readable;
+	try { readable = !!el.sheet; } catch (e) { readable = false; }
+	if (v && readable) _invasive.add(el);
 	return v;
 }
 
@@ -143,30 +200,31 @@ function judgeSheet(el, universe) {
 		for (const r of rules) {
 			if (invasive) return;
 			if (r.selectorText) {
-				for (const part of r.selectorText.split(',')) {
-					const p = part.trim();
-					if (!p) continue;
-					/* no class, no id, no attribute anywhere: a bare type/universal selector, which
-					 * matches stock markup on every page (`pre`, `*`, `svg text`, `:root`) — unless
-					 * everything it declares is inert here (see inertDeclarations) */
-					if (!(/[.#[]/).test(p)) {
-						if (inertDeclarations(r, props)) continue;
-						invasive = true;
-						return;
-					}
-					/* A rule may name a stock widget and still be harmless if it can only ever
-					 * MATCH inside the app's own markup: `#cbi-podkop-section > .cbi-section-remove`
-					 * needs podkop's section to exist. What pins it there is a name the theme does
-					 * NOT know — the app's own. A selector made ENTIRELY of stock names has nothing
-					 * pinning it, and matches the same widgets on every other page.
-					 *
-					 * Functional pseudo-class arguments are stripped before looking for that pin,
-					 * and that is the whole difference between podkop and the file manager:
-					 * `.cbi-button-save:not(.custom-save-button)` names an app class too, but
-					 * inside a NEGATION — it does not require the app's markup, it excludes it. */
-					const themeHit = (p.match(NAME_RE) || []).some((n) => names.has(n));
-					if (!themeHit) continue;
-					if (!pinnedToApp(p, names)) { invasive = true; return; }
+				/* ONE question, the SAME one fenceRules() asks: is this part held inside the app's
+				 * own markup by a name the theme does not know? `#cbi-podkop-section >
+				 * .cbi-section-remove` is — podkop's section has to exist for it to match anything,
+				 * so it can never reach another page or our chrome. A part with no such pin matches
+				 * the same widgets everywhere, and that is what invasive MEANS.
+				 *
+				 * This used to ask a second question first — "does it name anything the theme
+				 * styles?" — and skip the part when the answer was no. That is the hole: a pin is a
+				 * name the theme does NOT know, so "names nothing of ours" was read as "pinned" when
+				 * it often means the exact opposite. Measured on the router, verdict CLEAN and 95 of
+				 * 338 chrome elements flattened, by two selectors an app could write by accident:
+				 *   *:not(#zzz) { padding: 0 !important }     ← the `#` is inside a NEGATION
+				 *   [class]     { padding: 0 !important }     ← no class/id name at all
+				 * Both are unpinned, both match the whole document. fenceRules() already keyed on
+				 * pinnedToApp() alone and would have fenced them — it never got the chance, because
+				 * the judge called the sheet clean and nothing was re-hosted. The comment above
+				 * pinnedToApp() claims the two agree "by construction"; now they do. */
+				for (const p of selectorParts(r.selectorText)) {
+					if (pinnedToApp(p, names)) continue;
+					/* Unpinned, but it may still be unable to touch us: a rule whose every
+					 * declaration is a custom property this theme never reads is inert wherever it
+					 * lands (`:root { --app-temp-status-temp: … }`). */
+					if (inertDeclarations(r, props)) continue;
+					invasive = true;
+					return;
 				}
 			}
 			if (r.cssRules) walk(r.cssRules);
@@ -282,7 +340,7 @@ function fenceSelector(part) {
 function fenceRules(rules, names) {
 	for (const r of rules) {
 		if (r.selectorText) {
-			const parts = r.selectorText.split(',').map((p) => p.trim()).filter(Boolean);
+			const parts = selectorParts(r.selectorText);
 			if (parts.length && parts.some((p) => !pinnedToApp(p, names))) {
 				/* The setter parses the whole selector and, on one it cannot parse, does NOTHING and
 				 * does not throw — so it is atomic: never a half-written selector, and a failure just
@@ -346,6 +404,32 @@ function textIsSheet(el, live) {
 	} catch (e) { return false; }
 }
 
+/* Take a re-hosted <link> out of the cascade — and MEAN IT.
+ *
+ * `el.disabled = true` alone does not do it, and the failure is silent and total. The IDL attribute
+ * forwards to the ELEMENT's own flag; the thing that decides whether the CSS paints is
+ * `el.sheet.disabled`, and a <link> that is still LOADING has no `.sheet` at all. Every runtime
+ * injection is in exactly that state when <head>'s observer hands it here — which is the case this
+ * module exists for (`luci-app-banip` and `luci-app-adblock` append their <link> at module eval,
+ * openclash prints one from its template). So the assignment landed on nothing, the sheet came up
+ * ENABLED when the bytes arrived, and the app's ORIGINAL, UNFENCED CSS went on painting beside the
+ * fenced @import shim.
+ *
+ * Measured on the router with `* { padding: 0 !important }` behind a runtime <link>: `el.disabled`
+ * read back `true`, `el.sheet.disabled` was `false`, and 95 of the 338 chrome elements were
+ * flattened — the sidebar's own padding went 0px 88px -> 0px — while the shim's fenced copy sat
+ * there matching nothing. Setting `el.sheet.disabled = true` by hand restored all of it. The
+ * documented "openclash: 47 damaged -> 0" holds only because THAT sheet is server-rendered and has
+ * therefore already loaded by the time the immediate pass sees it.
+ */
+function silence(el) {
+	el.disabled = true;
+	if (el.sheet) { el.sheet.disabled = true; return; }
+	/* no sheet yet: re-assert once there is one. `once` — the element is marked fsLayered, so this
+	 * never re-arms, and a sheet that never loads has nothing to silence. */
+	el.addEventListener('load', () => { if (el.sheet) el.sheet.disabled = true; }, { once: true });
+}
+
 function rehostIntoThemeLayer(el, universe) {
 	if (el.dataset.fsLayered) return;
 
@@ -357,7 +441,7 @@ function rehostIntoThemeLayer(el, universe) {
 		s.textContent = '@import url("' + el.href.replace(/["\\]/g, '\\$&') + '") layer(theme);';
 		el.dataset.fsLayered = '1';
 		el.after(s);		/* keep source order: ties inside the layer still resolve as they did */
-		el.disabled = true;
+		silence(el);
 		fenceImported(s, universe.names, 60);	/* ~1s of frames; a cache hit lands on the first */
 		return;
 	}
@@ -478,7 +562,7 @@ function watchViewSheets() {
 	 * SERVER's HTML, so there is no mutation to see. */
 	rehostInvasiveSheets();
 	dedupeViewSheets();
-	new MutationObserver((muts) => {
+	const mo = new MutationObserver((muts) => {
 		for (const m of muts)
 			for (const n of m.addedNodes)
 				if (n.nodeName === 'STYLE' || n.nodeName === 'LINK') {
@@ -486,7 +570,19 @@ function watchViewSheets() {
 					dedupeViewSheets();
 					return;
 				}
-	}).observe(document.head, { childList: true });
+	});
+	mo.observe(document.head, { childList: true });
+	/* …and <body>, because `document.head.appendChild` is a CONVENTION, not a rule. An app that
+	 * appends its <style> to <body> (or to documentElement) after chrome init was seen by nothing:
+	 * the immediate pass had already run and the mutation was not under observation. Measured with
+	 * `* { padding: 0 !important }` in a body-appended <style>: 95 of 338 chrome elements flattened
+	 * and the sheet never marked. documentPoisoned() still saw it, so the SPA fell back to full
+	 * loads — the page you are ON stayed broken, which is the half that matters.
+	 *
+	 * childList WITHOUT subtree, exactly as for <head>: this fires only for DIRECT children of
+	 * <body>, and LuCI's poll rewrites content inside #view — a descendant — so the per-tick cost
+	 * the head-only choice was protecting stays zero. */
+	mo.observe(document.body, { childList: true });
 }
 
 return baseclass.extend({
