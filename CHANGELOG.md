@@ -11,6 +11,22 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Added
+
+- **A third dev container running ImmortalWrt 25.12, because a fork's LuCI is not upstream's.** Both port-tile bugs below came from view JS this project cannot read in `openwrt/luci`, and neither OpenWrt container can render them — issue #15 took two releases and two rounds of console dumps from the reporter for exactly that reason. No docker image is published for the fork, so the rootfs tarball is unpacked onto `scratch` by a build stage the two OpenWrt services never reach; everything after the base (app list, third-party packages, fixtures) stays one shared copy. The dev boxes also grew three fake switch ports (veth `eth1`–`eth3`), since x86 has exactly one and a single tile exercises none of what that card is — not its grid tracks, its wrap, nor its linked/unlinked variants.
+
+### Fixed
+
+- **Overview port tiles on ImmortalWrt no longer collapse to a sliver with their text spilling out.** 0.10.2 released the fork's inline `width:100px` so the tile could fill its 200px track — but the same fork also writes `align-items:center;justify-items:center` on the grid that holds the tiles, which makes a `width: auto` item size itself `fit-content` instead of stretching. The card is `container-type: inline-size`, i.e. size-contained, so its max-content contribution is **zero**: the tile drew nothing but its own padding (~17px) while the port name, speed and traffic rows overflowed to the right of it — worse than the half-width tile the release set out to fix. The tile now states `justify-self`/`align-self` itself, which needs no `!important` (the fork's declarations are `*-items` on the parent, and those only apply when the item says `auto`) and is a no-op on stock, where both are already `stretch`.
+
+## [Unreleased]
+
+### Security
+
+- **Two high-severity advisories in the dev toolchain are closed (`postcss`, `brace-expansion`).** Nothing shipped was affected — `luci.mk` copies only `htdocs/` and `ucode/`, and the npm tree exists for the CI gates — but a lint toolchain that parses this repo's own CSS should not be the thing carrying a path-traversal advisory. `npm audit fix` moved postcss to 8.5.23 and brace-expansion to 5.0.8; both are transitive, so `package.json` is untouched and only the lockfile changed.
+
 ## [0.11.0] — 2026-07-25
 
 ### Added
