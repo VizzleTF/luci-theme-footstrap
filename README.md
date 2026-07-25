@@ -77,7 +77,14 @@ version check (issue #17).
 
 ### If it will not download
 
-If the router cannot reach `github.com` at all, retry through a GitHub proxy:
+If the router cannot reach `github.com` at all, the **mirror** carries the installer too — same
+host as the packages it will fetch, and it is ours:
+
+```sh
+wget -qO- https://vizzletf.github.io/luci-theme-footstrap/install.sh | sh
+```
+
+If that host is unreachable as well, retry through a GitHub proxy:
 
 ```sh
 GITHUB_PROXY=https://gh-proxy.com/ sh -c "$(wget -qO- https://gh-proxy.com/https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh)"

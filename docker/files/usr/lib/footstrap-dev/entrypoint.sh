@@ -73,6 +73,28 @@ for d in dummy0 dummy1; do
 	ip link show "$d" >/dev/null 2>&1 || ip link add "$d" type dummy
 done
 
+# Fake SWITCH PORTS, so "Port status" is a card and not a single tile — x86 has one port, and
+# one tile exercises none of what that card is: the grid's track sizing, the wrap, the
+# linked/unlinked variants, the per-port zone colour. Issue #15 (a fork drawing its tiles half
+# their track) lived exactly there and could not be reproduced on a one-port box.
+#
+# THREE constraints decide the shape below, and each was measured on the box:
+#   * `veth`, NOT `dummy`. The port list comes from `ubus call luci getBuiltinEthernetPorts`,
+#     which on x86 keeps a device only if netifd reports `devtype` `ethernet`/`dsa` — and netifd
+#     reports NO devtype at all for a dummy (checked: `network.device status` gives eth1-as-dummy
+#     `present`/`up`/`carrier` and nothing else), so a dummy is invisible to that card however it
+#     is named or configured.
+#   * named `ethN`, because the same filter also wants `link-advertising` OR a name matching
+#     `^eth\d+$`, and a veth advertises nothing.
+#   * eth3's PEER is left down: carrier follows the peer, so that pair is the "no link" tile
+#     (hollow dot, dimmed name, port_down.svg) beside two linked ones.
+# They carry no network and appear in no uci config — the card reads the device list, not config.
+for n in 1 2 3; do
+	ip link show "eth$n" >/dev/null 2>&1 || ip link add "eth$n" type veth peer name "eth${n}p"
+	ip link set "eth$n" up
+	[ "$n" = 3 ] || ip link set "eth${n}p" up
+done
+
 # compose bind-mounts the host's public key to a staging path, because a bind mount carries
 # the HOST's ownership (uid 1000) and dropbear rejects an authorized_keys it does not see
 # as root's — reporting only "Permission denied (publickey)", which reads like a wrong key.

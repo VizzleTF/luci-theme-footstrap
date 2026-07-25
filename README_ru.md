@@ -77,7 +77,14 @@ wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/downl
 
 ### Если не скачивается
 
-Если роутеру `github.com` недоступен вовсе — повторите через GitHub-прокси:
+Если роутеру `github.com` недоступен вовсе, установщик есть и на **зеркале** — на том же хосте,
+откуда он потом возьмёт пакеты, и это наш хост:
+
+```sh
+wget -qO- https://vizzletf.github.io/luci-theme-footstrap/install.sh | sh
+```
+
+Если и этот хост недоступен — повторите через GitHub-прокси:
 
 ```sh
 GITHUB_PROXY=https://gh-proxy.com/ sh -c "$(wget -qO- https://gh-proxy.com/https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh)"

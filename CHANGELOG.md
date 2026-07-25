@@ -23,6 +23,10 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The release mirror carries `install.sh` and its signature too.** Found by cutting `github.com` off a dev router and running the documented mirror one-liner: the mirror had the manifest and both packages, but not the installer — so a user in exactly the situation the mirror exists for had a verified way to install and no way to obtain the thing that installs. The signature rides along, so the script can be checked before it runs as root.
+
 ### Security
 
 - **Two high-severity advisories in the dev toolchain are closed (`postcss`, `brace-expansion`).** Nothing shipped was affected — `luci.mk` copies only `htdocs/` and `ucode/`, and the npm tree exists for the CI gates — but a lint toolchain that parses this repo's own CSS should not be the thing carrying a path-traversal advisory. `npm audit fix` moved postcss to 8.5.23 and brace-expansion to 5.0.8; both are transitive, so `package.json` is untouched and only the lockfile changed.

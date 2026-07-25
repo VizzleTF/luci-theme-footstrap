@@ -22,6 +22,19 @@
 # dummy0/dummy1 are created by entrypoint.sh before procd starts: netifd does not know how
 # to make a dummy device, it only configures one that exists.
 uci -q batch <<'EOF'
+# The three fake switch ports (veth `eth1`-`eth3`, created by entrypoint.sh — read the note
+# there). A `config device` is what makes netifd CLAIM them: unclaimed, they carry no `devtype`
+# in `network.device status`, and `ubus call luci getBuiltinEthernetPorts` — the list "Port
+# status" renders — filters on exactly that field. Measured: veth alone gives one tile (eth0),
+# veth + these three gives four. They are `device` sections and not interfaces on purpose, so
+# they stay out of Network → Interfaces and only show up where a port belongs.
+set network.devp1=device
+set network.devp1.name='eth1'
+set network.devp2=device
+set network.devp2.name='eth2'
+set network.devp3=device
+set network.devp3.name='eth3'
+
 set network.wan=interface
 set network.wan.device='dummy0'
 set network.wan.proto='static'
