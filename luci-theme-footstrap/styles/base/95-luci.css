@@ -263,6 +263,21 @@
 		flex-direction: column;
 		height: 100%;
 		text-align: left;
+		/* `.ifacebox` above is `white-space: nowrap` — right for a plate of one-word labels, wrong
+		 * for THIS plate, whose lines are addresses: an uncompressed IPv6 (`Address:
+		 * 2001:db8:1a2b:3c4d:5e6f:7a8b:9c0d:1e2f/64`) is ~380px of unbreakable text, and the
+		 * Overview's upstream boxes are flex items that shrink. Measured on the fork container at
+		 * a 390px viewport: the box ended at x=348 and the address ran to x=393 — 45px of text
+		 * printed outside its own border, over the card behind it.
+		 *
+		 * `normal` alone does not fix it and is the obvious half-fix: an address has no spaces, so
+		 * there is nothing to wrap AT. `overflow-wrap: anywhere` is what allows a break inside the
+		 * token — and `anywhere` rather than `break-word` on purpose, because only `anywhere`
+		 * lowers the box's min-content size, so flexbox can shrink the item to the line instead of
+		 * handing it a width its content will overflow. The Interfaces page had this fixed for its
+		 * own copy (`#cbi-network-interface .ifacebox-body`, below); the status plate never did. */
+		white-space: normal;
+		overflow-wrap: anywhere;
 	}
 
 	.network-status-table .ifacebox-body > * {

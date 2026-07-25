@@ -477,6 +477,29 @@ option two</textarea></div>
 			<div class="ifacebox-body left">no link</div>
 		</div>
 	</div>
+	<!-- The Overview's upstream plates (30_network.js): the SAME .ifacebox classes as the port
+	     tiles above, wrapped in .network-status-table, and the reason that wrapper is styled
+	     separately — these lines are ADDRESSES. The IPv6 one is deliberately uncompressed and
+	     full length, because that is the case that broke: `.ifacebox` is `white-space: nowrap`,
+	     an address has no spaces to wrap at, and the plate is a flex item that shrinks — so the
+	     address printed outside its own border (measured at a 390px viewport: 45px past it).
+	     Narrow the window here and the text must stay inside the box. -->
+	<div class="network-status-table">
+		<div class="ifacebox">
+			<div class="ifacebox-head center active"><strong>IPv4 Upstream</strong></div>
+			<div class="ifacebox-body left">
+				<span><strong>Protocol:</strong> Static address<br><strong>Address:</strong> 203.0.113.42/24<br><strong>Gateway:</strong> 203.0.113.1<br><strong>DNS:</strong> 9.9.9.9<br><strong>Connected:</strong> 8d 12h 0m 57s</span>
+				<div><span class="ifacebadge"><img src="/luci-static/resources/icons/ethernet.svg" width="16" alt=""><span><strong>Device:</strong> Ethernet Adapter: "wwan0"<br><strong>MAC address:</strong> C6:68:C6:D1:EF:25</span></span></div>
+			</div>
+		</div>
+		<div class="ifacebox">
+			<div class="ifacebox-head center active"><strong>IPv6 Upstream</strong></div>
+			<div class="ifacebox-body left">
+				<span><strong>Protocol:</strong> Static address<br><strong>Prefix Delegated:</strong> 2001:db8:1a2b:3c4e:5e6f:7a8b:9c0d::/64<br><strong>Address:</strong> 2001:db8:1a2b:3c4d:5e6f:7a8b:9c0d:1e2f/64<br><strong>Gateway:</strong> 2001:db8:1a2b:3c4d::1<br><strong>Connected:</strong> 8d 12h 0m 57s</span>
+				<div><span class="ifacebadge"><img src="/luci-static/resources/icons/ethernet.svg" width="16" alt=""><span><strong>Device:</strong> Ethernet Adapter: "wwan0"<br><strong>MAC address:</strong> C6:68:C6:D1:EF:25</span></span></div>
+			</div>
+		</div>
+	</div>
 	<div class="g-row">
 		<span class="cbi-tooltip-container">hover for tooltip<span class="cbi-tooltip">The tooltip body.</span></span>
 		<em class="spinning">Loading…</em>

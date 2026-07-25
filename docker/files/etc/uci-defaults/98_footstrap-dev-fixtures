@@ -57,8 +57,8 @@ set network.wan.metric='100'
 set network.wan6=interface
 set network.wan6.device='dummy0'
 set network.wan6.proto='static'
-set network.wan6.ip6addr='2001:db8:1:1::42/64'
-set network.wan6.ip6prefix='2001:db8:1:2::/64'
+set network.wan6.ip6addr='2001:db8:1a2b:3c4d:5e6f:7a8b:9c0d:1e2f/64'
+set network.wan6.ip6prefix='2001:db8:1a2b:3c4e:5e6f:7a8b:9c0d::/64'
 
 set network.br_guest=device
 set network.br_guest.name='br-guest'
