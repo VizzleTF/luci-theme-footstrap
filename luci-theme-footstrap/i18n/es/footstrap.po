@@ -1,0 +1,392 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.9\n"
+
+#: htdocs/luci-static/resources/fs-appearance.js:209
+msgctxt "footstrap"
+msgid "Accent"
+msgstr "Acento"
+
+#: htdocs/luci-static/resources/fs-appearance.js:309
+#: ucode/template/themes/footstrap/partials/appearance.ut:16
+#: ucode/template/themes/footstrap/partials/appearance.ut:18
+msgid "Appearance"
+msgstr "Apariencia"
+
+#: ucode/template/themes/footstrap/sysauth.ut:37
+msgid "Authorization Required"
+msgstr "Se requiere autorización"
+
+#: htdocs/luci-static/resources/fs-appearance.js:92
+msgctxt "footstrap"
+msgid "Auto"
+msgstr "Auto"
+
+#: htdocs/luci-static/resources/fs-appearance.js:230
+msgctxt "footstrap"
+msgid "Auto-collapse"
+msgstr "Colapso automático"
+
+#: htdocs/luci-static/resources/fs-appearance.js:157
+msgctxt "footstrap"
+msgid "Cats"
+msgstr "Gatos"
+
+#: htdocs/luci-static/resources/fs-appearance.js:259
+msgctxt "footstrap"
+msgid "Check"
+msgstr "Comprobar"
+
+#: htdocs/luci-static/resources/fs-appearance.js:126
+#: htdocs/luci-static/resources/fs-appearance.js:128
+msgctxt "footstrap"
+msgid "Choose image"
+msgstr "Elegir imagen"
+
+#: htdocs/luci-static/resources/fs-chrome.js:338
+#: ucode/template/themes/footstrap/header.ut:91
+msgid "Collapse menu"
+msgstr "Contraer menú"
+
+#: htdocs/luci-static/resources/fs-appearance.js:108
+msgctxt "footstrap"
+msgid "Compact"
+msgstr "Compacto"
+
+#: htdocs/luci-static/resources/fs-appearance.js:367
+msgctxt "footstrap"
+msgid "Confirm reset"
+msgstr "Confirmar restablecimiento"
+
+#: htdocs/luci-static/resources/fs-prefs.js:635
+msgctxt "footstrap"
+msgid "Could not process the image."
+msgstr "No se pudo procesar la imagen."
+
+#: htdocs/luci-static/resources/fs-appearance.js:355
+msgctxt "footstrap"
+msgid "Could not save the default. Reload the page and try again."
+msgstr ""
+"No se pudo guardar la configuración predeterminada. Recargue la página e "
+"inténtelo de nuevo."
+
+#: htdocs/luci-static/resources/fs-appearance.js:94
+msgctxt "footstrap"
+msgid "Dark"
+msgstr "Oscuro"
+
+#: htdocs/luci-static/resources/fs-appearance.js:107
+msgctxt "footstrap"
+msgid "Density"
+msgstr "Densidad"
+
+#: htdocs/luci-static/resources/fs-appearance.js:131
+msgctxt "footstrap"
+msgid "Dim"
+msgstr "Oscuro"
+
+#: htdocs/luci-static/resources/fs-chrome.js:338
+msgid "Expand menu"
+msgstr "Expandir menú"
+
+#: htdocs/luci-static/resources/fs-appearance.js:158
+msgctxt "footstrap"
+msgid "File"
+msgstr "Archivo"
+
+#: root/usr/share/rpcd/acl.d/luci-theme-footstrap.json:3
+msgid ""
+"Footstrap Appearance router-wide defaults (Save as default) and login "
+"background upload"
+msgstr ""
+"Configuración predeterminada del enrutador Footstrap (Guardar como "
+"predeterminada) y carga del fondo de inicio de sesión"
+
+#: ucode/template/themes/footstrap/partials/notices.ut:25
+msgid "Go to firmware upgrade..."
+msgstr "Ir a la actualización del firmware..."
+
+#: ucode/template/themes/footstrap/partials/notices.ut:16
+msgid "Go to password configuration..."
+msgstr "Ir a la configuración de contraseñas..."
+
+#: ucode/template/themes/footstrap/sysauth.ut:32
+msgid "Invalid username and/or password! Please try again."
+msgstr "Nombre de usuario y/o contraseña incorrectos. Inténtalo de nuevo."
+
+#: ucode/template/themes/footstrap/partials/notices.ut:31
+msgid "JavaScript required!"
+msgstr "¡Se requiere JavaScript!"
+
+#: htdocs/luci-static/resources/fs-appearance.js:229
+msgctxt "footstrap"
+msgid "Keep open"
+msgstr "Mantener abierto"
+
+#: htdocs/luci-static/resources/fs-appearance.js:110
+msgctxt "footstrap"
+msgid "Large"
+msgstr "Grande"
+
+#: htdocs/luci-static/resources/fs-appearance.js:86
+msgctxt "footstrap"
+msgid "Layout"
+msgstr "Diseño"
+
+#: htdocs/luci-static/resources/fs-appearance.js:93
+msgctxt "footstrap"
+msgid "Light"
+msgstr "Claro"
+
+#: htdocs/luci-static/resources/fs-router.js:314
+msgid "Loading view…"
+msgstr "Cargando vista…"
+
+#: ucode/template/themes/footstrap/sysauth.ut:58
+msgid "Log in"
+msgstr "Iniciar sesión"
+
+#: ucode/template/themes/footstrap/partials/logout.ut:10
+#: ucode/template/themes/footstrap/partials/logout.ut:12
+msgid "Logout"
+msgstr "Cerrar sesión"
+
+#: ucode/template/themes/footstrap/partials/footer.ut:27
+msgid "Lua compatibility mode active"
+msgstr "Modo de compatibilidad LUA activo"
+
+#: htdocs/luci-static/resources/fs-overview.js:34
+msgid "Memory"
+msgstr "Memoria"
+
+#: ucode/template/themes/footstrap/header.ut:88
+#: ucode/template/themes/footstrap/header.ut:99
+msgid "Menu"
+msgstr "Menú"
+
+#: htdocs/luci-static/resources/fs-appearance.js:243
+msgctxt "footstrap"
+msgid "New version available"
+msgstr "Nueva versión disponible"
+
+#: ucode/template/themes/footstrap/partials/notices.ut:23
+msgid ""
+"No changes to settings will be stored and are lost after rebooting. This "
+"mode should only be used to install a firmware upgrade"
+msgstr ""
+"No se guardarán los cambios en la configuración y se perderán después de "
+"reiniciar el sistema. Este modo solo debe usarse para instalar una "
+"actualización de firmware"
+
+#: htdocs/luci-static/resources/fs-search.js:268
+msgctxt "footstrap"
+msgid "No pages found"
+msgstr "No se encontraron páginas"
+
+#: ucode/template/themes/footstrap/partials/notices.ut:13
+msgid "No password set!"
+msgstr "¡No se ha establecido ninguna contraseña!"
+
+#: htdocs/luci-static/resources/fs-appearance.js:109
+msgctxt "footstrap"
+msgid "Normal"
+msgstr "Normal"
+
+#: htdocs/luci-static/resources/fs-appearance.js:156
+#: htdocs/luci-static/resources/fs-appearance.js:192
+#: htdocs/luci-static/resources/fs-appearance.js:213
+#: htdocs/luci-static/resources/fs-appearance.js:260
+msgctxt "footstrap"
+msgid "Off"
+msgstr "Apagado"
+
+#: htdocs/luci-static/resources/fs-search.js:202
+msgctxt "footstrap"
+msgid "Pages"
+msgstr "Páginas"
+
+#: htdocs/luci-static/resources/fs-appearance.js:97
+msgctxt "footstrap"
+msgid "Palette"
+msgstr "Paleta"
+
+#: ucode/template/themes/footstrap/sysauth.ut:49
+msgid "Password"
+msgstr "Contraseña"
+
+#: htdocs/luci-static/resources/fs-prefs.js:649
+msgctxt "footstrap"
+msgid "Please choose an image file."
+msgstr "Por favor, seleccione un archivo de imagen."
+
+#: ucode/template/themes/footstrap/sysauth.ut:39
+msgid "Please enter your username and password."
+msgstr "Por favor, ingrese su nombre de usuario y contraseña."
+
+#: htdocs/luci-static/resources/fs-search.js:267
+msgctxt "footstrap"
+msgid "Recently visited"
+msgstr "Visitado recientemente"
+
+#: htdocs/luci-static/resources/fs-appearance.js:127
+msgctxt "footstrap"
+msgid "Remove"
+msgstr "Eliminar"
+
+#: htdocs/luci-static/resources/fs-appearance.js:273
+#: htdocs/luci-static/resources/fs-appearance.js:422
+msgctxt "footstrap"
+msgid "Reset to default"
+msgstr "Restablecer a valores predeterminados"
+
+#: htdocs/luci-static/resources/fs-appearance.js:216
+msgctxt "footstrap"
+msgid "Rounding"
+msgstr "Redondeo"
+
+#: htdocs/luci-static/resources/fs-appearance.js:284
+msgctxt "footstrap"
+msgid "Router default"
+msgstr "Configuración predeterminada del enrutador"
+
+#: htdocs/luci-static/resources/fs-appearance.js:272
+#: htdocs/luci-static/resources/fs-appearance.js:344
+msgctxt "footstrap"
+msgid "Save as default"
+msgstr "Guardar como predeterminado"
+
+#: htdocs/luci-static/resources/fs-appearance.js:344
+msgctxt "footstrap"
+msgid "Saved as default"
+msgstr "Guardado como predeterminado"
+
+#: ucode/template/themes/footstrap/partials/search.ut:14
+#: ucode/template/themes/footstrap/partials/search.ut:16
+msgid "Search"
+msgstr "Buscar"
+
+#: htdocs/luci-static/resources/fs-search.js:196
+#: htdocs/luci-static/resources/fs-search.js:223
+msgctxt "footstrap"
+msgid "Search pages"
+msgstr "Buscar páginas"
+
+#: htdocs/luci-static/resources/fs-search.js:197
+msgctxt "footstrap"
+msgid "Search pages…"
+msgstr "Buscar páginas…"
+
+#: htdocs/luci-static/resources/fs-appearance.js:87
+msgctxt "footstrap"
+msgid "Sidebar"
+msgstr "Barra lateral"
+
+#: ucode/template/themes/footstrap/header.ut:67
+msgid "Skip to content"
+msgstr "Saltar al contenido"
+
+#: htdocs/luci-static/resources/fs-search.js:268
+msgctxt "footstrap"
+msgid "Start typing to find a page"
+msgstr "Empiece a escribir para encontrar una página"
+
+#: htdocs/luci-static/resources/fs-overview.js:34
+msgid "Storage"
+msgstr "Almacenamiento"
+
+#: htdocs/luci-static/resources/fs-appearance.js:227
+msgctxt "footstrap"
+msgid "Submenus"
+msgstr "Submenús"
+
+#: htdocs/luci-static/resources/fs-overview.js:34
+msgid "System"
+msgstr "Sistema"
+
+#: ucode/template/themes/footstrap/partials/notices.ut:22
+msgid "System running in recovery (initramfs) mode."
+msgstr "El sistema se está ejecutando en modo de recuperación (initramfs)."
+
+#: htdocs/luci-static/resources/fs-prefs.js:638
+msgctxt "footstrap"
+msgid "That file is not a readable image."
+msgstr "Ese archivo no es una imagen legible."
+
+#: htdocs/luci-static/resources/fs-prefs.js:651
+msgctxt "footstrap"
+msgid "That image is too large."
+msgstr "Esa imagen es demasiado grande."
+
+#: htdocs/luci-static/resources/fs-appearance.js:91
+msgctxt "footstrap"
+msgid "Theme"
+msgstr "Tema"
+
+#: ucode/template/themes/footstrap/partials/notices.ut:14
+msgid ""
+"There is no password set on this router. Please configure a root password to "
+"protect the web interface."
+msgstr ""
+"Este enrutador no tiene contraseña. Configure una contraseña de "
+"administrador para proteger la interfaz web."
+
+#: htdocs/luci-static/resources/fs-appearance.js:188
+msgctxt "footstrap"
+msgid "Tint (router identification)"
+msgstr "Tinte (identificación del enrutador)"
+
+#: htdocs/luci-static/resources/fs-appearance.js:201
+msgctxt "footstrap"
+msgid "Tint strength"
+msgstr "Intensidad del tinte"
+
+#: htdocs/luci-static/resources/fs-appearance.js:88
+msgctxt "footstrap"
+msgid "Top"
+msgstr "Arriba"
+
+#: htdocs/luci-static/resources/fs-appearance.js:250
+msgctxt "footstrap"
+msgid "Update now"
+msgstr "Actualizar ahora"
+
+#: htdocs/luci-static/resources/fs-appearance.js:257
+msgctxt "footstrap"
+msgid "Updates"
+msgstr "Actualizaciones"
+
+#: htdocs/luci-static/resources/fs-prefs.js:591
+#: htdocs/luci-static/resources/fs-prefs.js:662
+#: htdocs/luci-static/resources/fs-prefs.js:665
+msgctxt "footstrap"
+msgid "Upload failed."
+msgstr "Error al cargar el archivo."
+
+#: htdocs/luci-static/resources/fs-appearance.js:167
+msgctxt "footstrap"
+msgid "Uploading…"
+msgstr "Cargando…"
+
+#: ucode/template/themes/footstrap/sysauth.ut:43
+msgid "Username"
+msgstr "Nombre de usuario"
+
+#: htdocs/luci-static/resources/fs-appearance.js:120
+msgctxt "footstrap"
+msgid "Wallpaper"
+msgstr "Fondo de pantalla"
+
+#: ucode/template/themes/footstrap/partials/notices.ut:32
+msgid ""
+"You must enable JavaScript in your browser or LuCI will not work properly."
+msgstr ""
+"Debe activar JavaScript en su navegador o LuCI no funcionará correctamente."
