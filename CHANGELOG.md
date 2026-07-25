@@ -13,9 +13,37 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ## [Unreleased]
 
+### Added
+
+- **The installer now says what to do when github.com is unreachable, instead of failing with a shrug.** The resolve-failure message prints a ready-to-paste `GITHUB_PROXY=…` line and three alternates, and the README carries a verify-then-run recipe with the release key typed out, so a user who fetches the installer through a proxy can check its signature before running it as root. Proxies were tested rather than collected: four of ten known public ones were alive and served byte-correct assets.
+
+- **An optional `GITHUB_PROXY` for networks where GitHub is unreachable at all.** Empty by default — `GITHUB_PROXY=https://your-proxy/ sh install.sh` puts the prefix in front of github URLs only, tries it first and falls back to the direct route, so a dead proxy cannot take the install with it. Safe to offer because every byte it can deliver is checked against the signed manifest; deliberately **not** a default, because a proxy can rewrite whatever no signature covers — and the one thing not covered is `install.sh` itself, which a one-liner pipes into `sh` as root. The self-updater reads it from UCI (`footstrap.settings.github_proxy`) and never from the environment: rpcd hands that process the caller's environment, so an env-sourced proxy would let anyone holding the update ACL redirect a root download.
+
+- **A signed release manifest, so installing and updating no longer touch `api.github.com`.** Every release now publishes `manifest.txt` plus `manifest.txt.sig`, carrying the tag, and each package's name, size and sha256 — fetched from `releases/latest/download/`, which is the release CDN and not the REST API. The API allows **60 unauthenticated requests per hour per source IP**; behind CGNAT, a shared exit or a DNS-based unblocker that budget belongs to strangers, and the installer died with `Could not reach the GitHub release API` — a message that sent people installing `ca-bundle` three times over (issue #17). Measured while writing this: `api.github.com` answered `x-ratelimit-limit: 60` with 39 left on an ordinary home connection, while `releases/latest/download/…` answered a 302 with no `x-ratelimit-*` header at all. Verified end to end on both dev containers: `uclient-fetch` follows the two redirects and the bytes match the digest the API publishes.
+
+- **A release mirror on GitHub Pages, carrying the manifest AND the packages.** A second host for routers that cannot reach `github.com` at all. Mirroring only the metadata would have been theatre — a release asset URL redirects *through* `github.com`, so a router that cannot reach it cannot fetch the package either. It needs no trust: the manifest is signed and carries every package's sha256, so mirrored bytes are held to exactly the same hash as bytes from GitHub. The installer falls back to it automatically and says so.
+
+- **A router already stuck behind the rate limit has to be rescued once, by hand.** The self-updater installed on it is the old one, it asks `api.github.com`, and the request that would fetch its replacement is the one that fails — so the fix cannot arrive through the mechanism it fixes. Re-run the installer over SSH once (`wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh`); from then on nothing on that router touches the API again.
+
+- **`install.sh` ships as a release asset, and the README points at it.** The documented one-liner fetched the installer from `raw.githubusercontent.com` — which GitHub's 2025-05-08 changelog names as one of the three things it rate-limits for unauthenticated callers, alongside HTTPS clone and the REST API. So the very user whose IP had run out of budget could fail to download the installer meant to rescue them. Release assets have no such budget. The raw URL still works and stays documented as the fallback.
+
 ### Changed
 
 - **The overview grid is a theme module now, not a `luci-mod-status` include, so routers on OTHER themes stop loading it.** `05_footstrap_overview_layout.js` lived in LuCI's global include directory, where every `*.js` is loaded on the overview whatever theme is active — measured with a headless browser against the dev container running stock `bootstrap`: our file was requested right beside `10_system.js`, downloaded and evaluated, and only then silenced by its own `L.env.media` gate. A theme package reaching into another module's namespace is exactly what this theme refuses to do to third-party apps. It is `fs-overview.js`, wired by the chrome; re-measured after the move, a foreign theme does not request it at all. Found via a fork ([yanjinbin](https://github.com/yanjinbin/luci-theme-footstrap)), which spotted it independently.
+
+- **The sha256 that gates an install is now one we signed, not one GitHub computed.** It used to come from `@.assets[*].digest`, which GitHub derives from whatever bytes were uploaded: anyone able to replace a release asset — a leaked write-scoped PAT, no CI run involved — had the digest recomputed for them, and the check then verified the attacker's package. That is why the ed25519 signature existed alongside it. The hash now lives inside the signed manifest, so one `usign` verification covers every package it lists, and the per-package `.sig` is no longer fetched on the manifest path. Those `.sig` assets are still published: a self-updater already in the field fetches them, and a router's installed updater cannot be fixed remotely.
+
+- **The free-space preflight and the release notes are covered by the signature too.** The preflight sized a root install against `@.assets[*].size`, an unsigned number; the confirm dialog showed `@.body`, text nothing had ever checked. Both now come from the manifest — the notes as a `notes.md` asset whose sha256 the manifest carries.
+
+- **Releases are published as a draft and flipped once every asset is uploaded.** `latest` moves to a release the moment it is published, and the release action created the release first and uploaded assets after — so a router polling in that window resolved `releases/latest/download/manifest.txt` against a release that had none. The same window existed for the `.apk` assets before the manifest; nothing had ever closed it. CI then proves the manifest resolves through the URL a router actually uses, and matches the one just built.
+
+- **`jsonfilter` is no longer required to install the current release.** The manifest is line-oriented and parses with `awk`, which busybox has. It stays required only on the API fallback path — a pinned pre-manifest tag such as `sh -s v0.9.3`.
+
+### Fixed
+
+- **A downgrade offered by a replayed manifest is now refused.** A signed manifest stays valid for ever, so an old one served by a stale mirror or a cache would have reinstalled an older theme over a newer one, verifying perfectly the whole way — the signature is genuine and the hash matches, so nothing else in the chain says no. Equal versions still install, because that is the Update button's deliberate reinstall.
+
+- **A manifest naming a different repository is refused.** One key signs both repos' manifests, so without that check a manifest lifted from the updater's release would verify perfectly as the theme's. A signature proves who wrote a file, never what the file is about.
 
 ## [0.10.2] — 2026-07-24
 

@@ -6,9 +6,40 @@
 # 25.12+, opkg on 24.10) and that difference is deliberately left visible: this project
 # has to keep working on both.
 #
+# A FORK is a third case, and it is here because a fork's LuCI is NOT the upstream one: on
+# ImmortalWrt 25.12 `29_ports.js` writes `justify-items:center` on the Port-status grid and
+# `width:100px` on each tile where upstream writes neither (issue #15) — a difference no amount
+# of reading openwrt/luci can show. Forks publish a rootfs TARBALL, not a docker image, so the
+# base is selected by stage: `BASE_STAGE=upstream` takes openwrt/rootfs, `BASE_STAGE=tarball`
+# unpacks ROOTFS_URL onto scratch. Everything after that — the app list, the third-party
+# packages, the fixtures — is ONE copy, shared by all three services; a second Dockerfile for
+# the fork would have been a copy that drifts.
+#
 # Build via docker/compose.yml, which pins the tag per service.
 ARG OPENWRT_TAG=x86-64-25.12.4
-FROM openwrt/rootfs:${OPENWRT_TAG}
+# Both of these must be declared HERE, before the first FROM: an ARG inside a stage is scoped to
+# that stage, and `FROM ${BASE_STAGE}` further down then resolves to an empty base name.
+ARG BASE_STAGE=upstream
+ARG ROOTFS_URL=
+FROM openwrt/rootfs:${OPENWRT_TAG} AS upstream
+
+# Unreachable — and therefore never even fetched — unless a service asks for BASE_STAGE=tarball:
+# buildkit builds only the stages the target depends on, which is what lets ROOTFS_URL default to
+# empty (an `ADD ""` would be a hard error) and keeps the two OpenWrt services from pulling alpine.
+FROM alpine:3.22 AS unpack
+ARG ROOTFS_URL
+ADD ${ROOTFS_URL} /tmp/rootfs.tar.gz
+RUN mkdir -p /rootfs && tar -xzf /tmp/rootfs.tar.gz -C /rootfs
+
+# COPY, not the tarball's own extraction: `ADD <url>` does not unpack a remote archive, and a
+# faithful copy is only possible because these rootfs tarballs carry NO device nodes (checked:
+# `tar -tv | grep '^[cb]'` is empty) — procd mounts devtmpfs on /dev at boot anyway.
+FROM scratch AS tarball
+COPY --from=unpack /rootfs/ /
+# scratch carries no metadata, so the PATH the rest of this file's RUNs rely on has to be stated.
+ENV PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+FROM ${BASE_STAGE}
 
 # The rootfs tarball has no /var/lock etc. — on a real router procd's boot creates them
 # under the /var -> /tmp tmpfs. They are needed BEFORE that, by the package manager below.

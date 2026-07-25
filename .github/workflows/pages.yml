@@ -17,6 +17,10 @@ on:
       - 'tools/lib/gallery.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
+  # Called by build.yml's release job once the release is published — that is what refreshes the
+  # release-metadata mirror below. It cannot be `on: release`, because an event raised by
+  # GITHUB_TOKEN does not trigger another workflow.
+  workflow_call:
 
 permissions:
   contents: read
@@ -51,6 +55,46 @@ jobs:
           luci-theme-footstrap/build-css.sh _site/cascade.css   # gallery loads this by <link>
           cp "$FONTS"/fonts/*.woff2 _site/fonts/
           cp "$FONTS"/cats.svg "$FONTS"/logo.svg _site/
+      # A FULL MIRROR OF THE LATEST RELEASE — the manifest, its signature, the notes AND THE
+      # PACKAGES. A different host from github.com, so a block or an outage covering one need not
+      # cover the other.
+      #
+      # THE PACKAGES ARE THE POINT, and a metadata-only mirror would have been theatre: a release
+      # asset URL redirects THROUGH github.com, so a router that cannot reach github.com cannot
+      # fetch the package either — mirroring only the manifest moves the failure two lines later
+      # and fixes nothing. What makes mirroring the packages safe is that the manifest is signed
+      # and carries their sha256: bytes from the mirror are held to exactly the same hash as bytes
+      # from GitHub, so the mirror is never trusted, only used.
+      #
+      # PULLED FROM THE RELEASE on every Pages build, never committed and never assembled here:
+      # this workflow also fires on a docs push, and a build that did not carry the release forward
+      # would silently empty the mirror. One source, copied.
+      #
+      # Fails OPEN — a repo with no manifest release yet publishes the portal without a mirror,
+      # which is exactly the state every reader already handles.
+      - name: Mirror the latest release
+        run: |
+          set -eu
+          if ! curl -fsSL --retry 2 -o _site/manifest.txt \
+                 "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/manifest.txt"; then
+            rm -f _site/manifest.txt
+            echo "the latest release publishes no manifest — mirror skipped"
+            exit 0
+          fi
+          curl -fsSL --retry 2 -o _site/manifest.txt.sig \
+            "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/manifest.txt.sig"
+          curl -fsSL --retry 2 -o _site/notes.md \
+            "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/notes.md" || rm -f _site/notes.md
+          # Every package the manifest names, under the name the manifest gives it — the same string
+          # a router will ask this mirror for. Reading the file list out of the manifest instead of
+          # globbing the release is what keeps the two in step.
+          tag=$(awk '$1=="tag"{print $2; exit}' _site/manifest.txt)
+          awk '$1=="pkg"{print $4}' _site/manifest.txt | while read -r f; do
+            curl -fsSL --retry 2 -o "_site/$f" \
+              "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$f"
+            echo "mirrored: $f ($(wc -c < "_site/$f") bytes)"
+          done
+          echo "mirror of $tag complete."
       - uses: actions/upload-pages-artifact@v3
         with: { path: _site }
 

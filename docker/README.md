@@ -1,17 +1,27 @@
-# Dev routers in docker — one per supported release
+# Dev routers in docker — one per supported release, plus a fork
 
-Two containers running the **real OpenWrt userland** (procd as PID 1, netifd, ubus, rpcd,
+Three containers running the **real OpenWrt userland** (procd as PID 1, netifd, ubus, rpcd,
 uhttpd, dropbear) with LuCI installed, from the release's own rootfs tarball:
 
 | ssh host | release | pkg manager | bridge address | from Windows |
 |---|---|---|---|---|
 | `router2512` | 25.12.4 | apk | 172.31.0.2 | http://localhost:8025 |
 | `router2410` | 24.10.7 | opkg | 172.31.0.3 | http://localhost:8024 |
+| `routerimm` | ImmortalWrt 25.12.0 | apk | 172.31.0.4 | http://localhost:8026 |
 
-Login: `root` / `1234` (that is `LUCI_PW` for the preview and cssdiff tooling). Both are up
-at once because the theme supports both releases and the differences that bite are runtime
-ones a single box cannot show — apk vs opkg, `/lib/apk/db/installed` vs
+Login: `root` / `1234` (that is `LUCI_PW` for the preview and cssdiff tooling). Both OpenWrt
+boxes are up at once because the theme supports both releases and the differences that bite are
+runtime ones a single box cannot show — apk vs opkg, `/lib/apk/db/installed` vs
 `/usr/lib/opkg/status` as the cache-bust stamp, and the two branches' LuCI.
+
+**The fork is a third case, not a duplicate of `router2512`.** A fork patches LuCI's own view
+JS, so its pages emit markup and inline styles upstream never does — issue #15 took two releases
+because ImmortalWrt's `29_ports.js` writes `width:100px` on a Port tile and
+`align-items:center;justify-items:center` on the grid holding it, where upstream writes
+`min-width:70px;max-width:100px` and no justification at all. No docker image is published for
+it, so `Dockerfile`'s `BASE_STAGE=tarball` unpacks the release rootfs tarball onto `scratch`;
+everything after that (the app list, the third-party packages, the fixtures) is the same single
+copy all three services share. It runs the same revision reporters are on (r37854).
 
 ## Start
 
@@ -26,6 +36,7 @@ not one of these: it stays the name of the physical box.
 ```sh
 ../luci-theme-footstrap/dev-sync.sh router2512      # register + deploy the theme
 ../luci-theme-footstrap/dev-sync.sh router2410
+../luci-theme-footstrap/dev-sync.sh routerimm
 ./hwsim-up.sh                                       # wifi (see below)
 ```
 

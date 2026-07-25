@@ -30,3 +30,12 @@ Host router2410
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
     LogLevel ERROR
+
+# The FORK box (ImmortalWrt 25.12). Reach for it when a report comes from one — a fork patches
+# LuCI's view JS, so its pages emit inline styles neither OpenWrt container can produce.
+Host routerimm
+    HostName 172.31.0.4
+    User root
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR

@@ -184,7 +184,7 @@ remote'а).
 собственного репозитория (docs/23):
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
+wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 # закрепить версию:  ... | sh -s v0.3.6
 ```
 

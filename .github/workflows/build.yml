@@ -527,6 +527,84 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # Turn the tag's CHANGELOG section into a short release body: one line per
+      # change (the bold lead of each bullet), grouped by Fixed/Added/…, with the
+      # install commands tucked into a collapsed block. The verbose rationale in the
+      # changelog is for maintainers and stays out of the release notes.
+      #
+      # It runs HERE, before the manifest and the signing, because the notes are now an
+      # ASSET too (dist/notes.md): the confirm dialog reads them from the release instead of
+      # from `@.body`, which needed api.github.com. The copy in $RUNNER_TEMP is still what
+      # fills the release page's body.
+      - name: Build release notes from the CHANGELOG
+        run: |
+          set -eu
+          ver="${GITHUB_REF_NAME#v}"
+          sh tools/release-notes.sh "$ver" > "$RUNNER_TEMP/notes.md"
+          mkdir -p dist
+          cp "$RUNNER_TEMP/notes.md" dist/notes.md
+          cat "$RUNNER_TEMP/notes.md"
+
+      # THE INSTALLER SHIPS AS A RELEASE ASSET, and that is not a convenience — it is half of
+      # issue #17. The documented one-liner fetches install.sh from raw.githubusercontent.com,
+      # and GitHub's 2025-05-08 changelog names raw as one of the three things it rate-limits
+      # for unauthenticated callers (alongside HTTPS clone and the REST API). So the very user
+      # whose IP has run out of API budget — CGNAT, a shared exit, a DNS-based unblocker — can
+      # fail to download the installer that was supposed to rescue them. Release assets are
+      # served from the release CDN and carry no such budget (measured: `releases/latest/
+      # download/…` answers 302 with no x-ratelimit-* header at all), so the README points at
+      # this asset and raw is only the fallback.
+      - name: Stage the installer as an asset
+        run: cp install.sh dist/install.sh
+
+      # THE MANIFEST — what takes api.github.com out of the install and update path entirely.
+      #
+      # Everything the installer and the self-updater used to read out of the release API
+      # (the tag, each asset's name, its size and its sha256) is written into ONE small text
+      # file, published as an asset and SIGNED. A router then fetches it from
+      #   https://github.com/<repo>/releases/latest/download/manifest.txt
+      # which is the release CDN, not the API: no 60-req/hour budget, and `latest` resolves the
+      # same way `/releases/latest` does (a pre-release is still skipped). Measured on both dev
+      # containers: uclient-fetch follows the two redirects and the bytes match the digest the
+      # API publishes.
+      #
+      # It is a LINE-ORIENTED text file, not JSON, so the router parses it with awk and the
+      # scripts stop needing jsonfilter at all — one less thing between a user and an install.
+      #
+      # `repo` is in the file and the reader checks it. One key signs BOTH repos' manifests, so
+      # without that line a manifest lifted from the updater's release would verify perfectly
+      # under the theme's name. The signature proves WHO wrote it, never WHAT IT IS ABOUT.
+      #
+      # `size` and the notes digest are here for the same reason as the package digests: the
+      # free-space preflight used to trust an unsigned `@.assets[*].size`, and the confirm
+      # dialog showed release notes nothing had ever checked.
+      - name: Build the release manifest
+        run: |
+          set -euo pipefail
+          cd dist
+          {
+            printf 'footstrap-manifest 1\n'
+            printf 'repo %s\n'     "$GITHUB_REPOSITORY"
+            printf 'tag %s\n'      "$GITHUB_REF_NAME"
+            printf 'version %s\n'  "${GITHUB_REF_NAME#v}"
+            printf 'date %s\n'     "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            printf 'notes %s %s\n' "$(sha256sum notes.md | cut -d' ' -f1)" notes.md
+            for f in *.apk *.ipk; do
+              [ -e "$f" ] || continue
+              # `luci-theme-footstrap-0.10.2-r1.apk` / `luci-theme-footstrap_0.10.2-r1_all.ipk`
+              # -> `luci-theme-footstrap`. The separator before the version is what both naming
+              # schemes agree on, and it is the same `[-_][0-9]` seam the asset regexes use.
+              name=$(printf '%s' "$f" | sed -E 's/[-_][0-9].*$//')
+              printf 'pkg %s %s %s %s %s\n' \
+                "$name" "${f##*.}" "$f" "$(stat -c%s "$f")" "$(sha256sum "$f" | cut -d' ' -f1)"
+            done
+          } > manifest.txt
+          cat manifest.txt
+          # A manifest that names no package is a manifest that would make every router report
+          # "no asset for this release" — the shape of the failure this file exists to prevent.
+          grep -q '^pkg luci-theme-footstrap ' manifest.txt || {
+            echo "the manifest names no theme package — refusing to publish it"; exit 1; }
+
       # SIGN. This is the only step that can vouch for the bytes a router installs.
       #
       # Why a detached signature and not the package manager's own: `apk add` verifies against
@@ -566,9 +644,21 @@ jobs:
           printf '%s' "$FOOTSTRAP_USIGN_KEY" | base64 -d > "$RUNNER_TEMP/sec.key"
           trap 'shred -u "$RUNNER_TEMP/sec.key" 2>/dev/null || rm -f "$RUNNER_TEMP/sec.key"' EXIT
 
+          # The manifest and the installer are signed alongside the packages, and the manifest is
+          # the one whose signature does the most work: it carries every package's sha256, so
+          # verifying it is what makes the per-package .sig redundant for a manifest-aware reader
+          # (the .sig assets stay published — a self-updater already in the field still fetches
+          # them, and a router's installed updater cannot be fixed remotely).
+          #
+          # install.sh is signed because it is executable code handed to root. Nothing can check
+          # that signature during `curl | sh` — the script IS the first thing that arrives — so it
+          # is not a link in the install chain; it is there so a careful admin can verify the
+          # installer out of band before running it.
           pub=release.pub
           n=0
-          for p in $(find dist -maxdepth 1 -type f \( -name '*.apk' -o -name '*.ipk' \) | sort); do
+          for p in $(find dist -maxdepth 1 -type f \
+                       \( -name '*.apk' -o -name '*.ipk' -o -name 'manifest.txt' -o -name 'install.sh' \) \
+                     | sort); do
             "$U" -S -m "$p" -s "$RUNNER_TEMP/sec.key" -x "$p.sig"
             # Verify with the key the ROUTER will use. A secret rotated in GitHub without the
             # public half being committed would otherwise publish a package that every installer
@@ -581,10 +671,15 @@ jobs:
             echo "signed + verified: $(basename "$p")"
             n=$((n + 1))
           done
-          # 2 packages: the theme in each of apk and ipk. The same key signs the updater's releases in
-          # its own repo, which is what lets a router cross from an asset published here to one published
-          # there without re-trusting anything.
-          [ "$n" -ge 2 ] || { echo "expected both theme packages to sign, signed $n"; exit 1; }
+          # 4: the theme in each of apk and ipk, plus manifest.txt and install.sh. The same key signs
+          # the updater's releases in its own repo, which is what lets a router cross from an asset
+          # published here to one published there without re-trusting anything.
+          [ "$n" -ge 4 ] || { echo "expected 4 files to sign (2 packages + manifest + installer), signed $n"; exit 1; }
+
+          # Named explicitly, not merely counted. The count above passes if some OTHER four files
+          # signed, and a release whose manifest is unsigned is one every manifest-aware router
+          # REFUSES — which reads as "BAD SIGNATURE", i.e. exactly like an attack.
+          [ -s dist/manifest.txt.sig ] || { echo "manifest.txt.sig was not produced"; exit 1; }
 
           # The .sig assets must not disturb the asset pick of a self-updater ALREADY IN THE FIELD: it
           # resolves the theme by /luci-theme-footstrap[-_][^/]*\.EXT$/ and takes head -1. A router's
@@ -608,23 +703,57 @@ jobs:
           done
           ls -l dist
 
-      # Turn the tag's CHANGELOG section into a short release body: one line per
-      # change (the bold lead of each bullet), grouped by Fixed/Added/…, with the
-      # install commands tucked into a collapsed block. The verbose rationale in the
-      # changelog is for maintainers and stays out of the release notes.
-      - name: Build release notes from the CHANGELOG
-        run: |
-          ver="${GITHUB_REF_NAME#v}"
-          sh tools/release-notes.sh "$ver" > "$RUNNER_TEMP/notes.md"
-          cat "$RUNNER_TEMP/notes.md"
-
       # Pinned by COMMIT, not by the `v3` tag: this is the only third-party action in the workflow
       # and the only step in the only job that holds `contents: write`, so whoever can move that tag
       # can publish assets under our release. It never sees the signing secret (step-scoped env) and
       # so cannot re-sign, which is what keeps the blast radius to "assets a router will refuse" —
       # but a tag is a mutable pointer and this is the wrong place to trust one. (= tag v3.)
-      - name: Attach to release
+      #
+      # PUBLISHED AS A DRAFT, then flipped in the next step. `latest` moves to a release the moment
+      # it is published, and this action creates the release FIRST and uploads the assets after —
+      # so a router polling in that window resolves `releases/latest/download/manifest.txt` to a
+      # release that has no manifest yet and reports a hard error. A draft is not `latest`, so the
+      # switch happens once, with every asset already in place. The same window existed for the
+      # .apk assets before the manifest; nothing had ever closed it.
+      - name: Attach to release (draft)
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228
         with:
           files: dist/*
           body_path: ${{ runner.temp }}/notes.md
+          draft: true
+
+      # The one instant at which `latest` moves. Everything a router will fetch is already uploaded.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release edit "$GITHUB_REF_NAME" --draft=false --repo "$GITHUB_REPOSITORY"
+          # Prove the thing this release exists to serve actually resolves, from the URL a router
+          # uses — not from the API. A 404 here means every install and every update check would
+          # have failed, and this is the last moment it is still a red build rather than a bug
+          # report.
+          for i in 1 2 3 4 5; do
+            if curl -fsSL --retry 2 -o "$RUNNER_TEMP/mf.check" \
+                 "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/manifest.txt"; then
+              break
+            fi
+            [ "$i" = 5 ] && { echo "releases/latest/download/manifest.txt does not resolve"; exit 1; }
+            sleep 5
+          done
+          diff -u dist/manifest.txt "$RUNNER_TEMP/mf.check" || {
+            echo "the manifest served by latest/download is not the one we just built"; exit 1; }
+          echo "manifest.txt resolves through releases/latest/download and matches."
+
+  # Refresh the GitHub Pages mirror of the release metadata (manifest.txt + its signature + the
+  # notes) now that the release is published. Called rather than triggered: `on: release` never
+  # fires for a release created with GITHUB_TOKEN.
+  pages:
+    name: Refresh the Pages mirror
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

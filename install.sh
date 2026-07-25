@@ -2,9 +2,16 @@
 # luci-theme-footstrap + luci-app-footstrap-updater installer for OpenWrt 24.10 (ipk) and 25.12+ (apk).
 #
 # One-line install (run on the router over SSH):
-#   wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
+#   wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 # or:
-#   curl -fsSL https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
+#   curl -fsSL https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
+#
+# THAT URL IS THE RELEASE ASSET, NOT raw.githubusercontent.com, and the difference is the whole of
+# issue #17. GitHub's 2025-05-08 changelog rate-limits three things for unauthenticated callers:
+# HTTPS clone, the REST API, and downloads from raw.githubusercontent.com. Behind CGNAT or a shared
+# exit that 60/hour budget is often already spent by somebody else, so the raw URL can fail to
+# deliver the very installer meant to help. Release assets carry no such budget. raw still works and
+# is documented as the fallback; it is simply not the first thing to reach for.
 #
 # Optional: pin the THEME release tag ->  ... | sh -s v0.9.3  (the updater always takes its own latest)
 #
@@ -23,6 +30,30 @@ REPO_THEME="VizzleTF/luci-theme-footstrap"
 REPO_UPDATER="VizzleTF/luci-app-footstrap-updater"
 TAG="${1:-latest}"		# pins the THEME tag only; the updater always resolves its own latest
 
+# A signed manifest, published as a release asset and fetched from the release CDN — this is what
+# replaced api.github.com as the source of "which asset, how big, what sha256" (see resolve_manifest).
+# The Pages copies are MIRRORS of the same signed file, for when github.com itself cannot be reached;
+# each holds only its repo's LATEST release, so a pinned tag never looks there.
+MIRROR_THEME="https://vizzletf.github.io/luci-theme-footstrap/manifest.txt"
+MIRROR_UPDATER="https://vizzletf.github.io/luci-app-footstrap-updater/manifest.txt"
+
+# An OPTIONAL prefix put in front of every github.com URL, for networks where GitHub is not reachable
+# at all — `GITHUB_PROXY=https://some-proxy/ sh install.sh`. **Empty by default, and that is a
+# deliberate choice, not an oversight.**
+#
+# What makes it safe to offer: every byte it can deliver is checked against the signed manifest, so a
+# proxy can serve the real release or fail, and nothing else. What makes it unsafe to DEFAULT to: a
+# proxy sees, and can rewrite, whatever is not covered by a signature — and the one thing not covered
+# is THIS SCRIPT. A one-liner that pipes an installer through a third party into `sh` as root hands
+# that party the router; the signature chain starts only after the script is already running. So the
+# proxy is something the admin turns on knowingly, for the assets, and the documented install URL
+# always points straight at github.com.
+#
+# Tried FIRST when set: an admin only sets it because the direct route does not work, and trying the
+# direct route first would mean waiting out a timeout on every request. Direct remains the fallback,
+# so a proxy that dies does not take the install with it.
+GITHUB_PROXY="${GITHUB_PROXY:-}"
+
 # mktemp, not a fixed /tmp name: /tmp is 1777, so a local unprivileged process can pre-create a
 # predictable name as a symlink and root writes the downloaded package through it (CWE-377).
 TMP="$(mktemp -d)" || { printf '[-] cannot create a temp dir\n' >&2; exit 1; }
@@ -32,6 +63,11 @@ info() { printf '[*] %s\n' "$1"; }
 ok()   { printf '[+] %s\n' "$1"; }
 warn() { printf '[!] %s\n' "$1"; }
 err()  { printf '[-] %s\n' "$1" >&2; }
+
+case "$GITHUB_PROXY" in
+	''|https://*) ;;
+	*) err "GITHUB_PROXY must be an https:// URL (got: $GITHUB_PROXY)"; exit 1 ;;
+esac
 
 # Decide whether to install the update checker (the luci-app-footstrap-updater package). It is the
 # WHOLE of the "check for new versions / one-click Update" feature — no package, no update controls
@@ -125,7 +161,11 @@ ok "Package manager: $PM (installing .$EXT)"
 # wget is the last resort (non-OpenWrt); GNU wget follows https -> http redirects, hence
 # --https-only where the flag exists.
 #
-fetch() {
+# IT OWNS THE NAMES `_u`, `_t` AND `_o`. sh has no locals, so a caller keeping its own state in one
+# of those loses it at the first fetch — and it loses it silently, into a plausible value: measured
+# in resolve_manifest, `_o` came back as the .sig path and `_t` as the string `20`, which turned the
+# tag check into `20 = latest` and sent every router down the API fallback with no message at all.
+fetch_direct() {
 	_u="$1"; _t="$2"; _o="$3"
 	if command -v uclient-fetch >/dev/null 2>&1; then
 		if [ -n "$_o" ]; then uclient-fetch -T "$_t" -qO "$_o" "$_u" 2>/dev/null
@@ -149,13 +189,43 @@ fetch() {
 	fi
 	return 1
 }
+# fetch <url> <max-seconds> [outfile] — the one every caller uses. With no GITHUB_PROXY set (the
+# default) it IS fetch_direct; with one set, GitHub URLs are tried through the proxy first and fall
+# back to the direct route, so a dead proxy cannot take the install down with it.
+#
+# Only github hosts are rewritten. A proxy prefix has no business in front of, say, the Pages mirror
+# URL, and an unconditional rewrite would send every future URL through a third party by accident.
+#
+# The proxy can serve wrong bytes; it cannot serve bytes that pass. Everything fetched through here
+# is either checked against the signed manifest (packages, notes) or IS the signature check itself
+# (the manifest and its .sig). The one thing outside that chain is this script, which is why the
+# documented install URL never goes through a proxy — see the GITHUB_PROXY note at the top.
+fetch() {
+	_fu="$1"; _ft="$2"; _fo="$3"
+	if [ -n "$GITHUB_PROXY" ]; then
+		case "$_fu" in
+			https://github.com/*|https://api.github.com/*|https://raw.githubusercontent.com/*|https://objects.githubusercontent.com/*|https://release-assets.githubusercontent.com/*)
+				if fetch_direct "${GITHUB_PROXY%/}/$_fu" "$_ft" "$_fo"; then
+					[ -z "$_fo" ] || [ -s "$_fo" ] && return 0
+				fi
+				[ -n "$_fo" ] && rm -f "$_fo"
+				;;
+		esac
+	fi
+	fetch_direct "$_fu" "$_ft" "$_fo"
+}
 
 # The URL comes out of the API answer and the file it names is handed to `apk add
 # --allow-untrusted` as root. Pin the host, so a malformed or tampered response cannot point
 # that install at an arbitrary server.
+# vizzletf.github.io is the release MIRROR (see resolve_manifest). It is on the list because a
+# mirrored install fetches its packages from there — not because being on the list is what makes
+# those bytes acceptable: what does that is the sha256 in the signed manifest, which the mirror
+# cannot influence.
 asset_host_ok() {
 	case "$1" in
 		https://github.com/*|https://objects.githubusercontent.com/*|https://release-assets.githubusercontent.com/*) return 0 ;;
+		https://vizzletf.github.io/*) return 0 ;;
 	esac
 	return 1
 }
@@ -211,35 +281,220 @@ release_pubkey() {	# writes the key to $1
 	EOF
 }
 
-# --- resolve the assets (TWO repos since the split) -----------------------
-# jsonfilter (OpenWrt base image) is what reads the sha256 out of the API answer — without it
-# there is no integrity check at all, only unverifiable bytes handed to root. Refuse, don't
-# fall back.
-command -v jsonfilter >/dev/null 2>&1 || {
-	err "jsonfilter not found — it is part of OpenWrt's base image."
-	err "This installer only supports OpenWrt."
-	exit 1
+# --- the signed release manifest -----------------------------------------
+#
+# WHY THIS EXISTS. Everything below used to come out of api.github.com, which allows 60
+# unauthenticated requests per hour PER SOURCE IP. Behind CGNAT, a shared exit or a DNS-based
+# unblocker that budget belongs to strangers, and the installer died with "Could not reach the
+# GitHub release API" — an error message that sent people installing ca-bundle three times over
+# (issue #17). The release CDN has no such budget: `releases/latest/download/<file>` answers a
+# 302 with no x-ratelimit-* header at all, and it is the same host that has been serving the
+# packages themselves all along. So the metadata moved into a file served from there.
+#
+# WHAT IT IS. A signed, line-oriented text file. `latest` resolves exactly as the API's
+# /releases/latest does — newest non-prerelease, non-draft:
+#
+#   footstrap-manifest 1
+#   repo VizzleTF/luci-theme-footstrap
+#   tag v0.10.2
+#   version 0.10.2
+#   date 2026-07-24T10:12:03Z
+#   notes <sha256> notes.md
+#   pkg luci-theme-footstrap apk luci-theme-footstrap-0.10.2-r1.apk 162357 <sha256>
+#   pkg luci-theme-footstrap ipk luci-theme-footstrap_0.10.2-r1_all.ipk 162128 <sha256>
+#
+# WHAT IT REPLACES IN THE TRUST CHAIN — nothing. It moves the sha256 from a value GitHub computes
+# for us into a value WE signed, which is strictly stronger: the old digest was recomputed for
+# whoever replaced the asset (a leaked write-scoped PAT is enough), and a manifest cannot be, since
+# the signing key is a secret that cannot be read back out. usign over the manifest therefore
+# covers every package hash it lists, which is why the manifest path does not fetch the packages'
+# own .sig files. (Those are still published — a self-updater already in the field fetches them,
+# and a router's installed updater cannot be fixed remotely.)
+mf_url() {		# <repo> <tag> -> the manifest URL for that release
+	if [ "$2" = "latest" ]; then
+		printf 'https://github.com/%s/releases/latest/download/manifest.txt' "$1"
+	else
+		printf 'https://github.com/%s/releases/download/%s/manifest.txt' "$1" "$2"
+	fi
+}
+mf_get() { awk -v k="$2" '$1==k {print $2; exit}' "$1"; }
+mf_pkg() {		# <manifest> <package-name> <ext> -> "<file> <size> <sha256>"
+	awk -v n="$2" -v e="$3" '$1=="pkg" && $2==n && $3==e {print $4, $5, $6; exit}' "$1"
 }
 
-# Fetch a repo's release JSON. $1 owner/repo, $2 outfile, $3 tag (latest | vX).
+# The manifest names the asset FILE, and that name becomes both a URL and a path in the working
+# directory. The signature is what makes the name trustworthy — but a compromised pipeline signing
+# `../../etc/something` must still not become a path traversal as root, and a defence that only
+# works when the other defence held is not a defence.
+safe_name() {
+	case "$1" in
+		''|*/*|.*|*[!A-Za-z0-9._-]*) return 1 ;;
+	esac
+	return 0
+}
+
+# Fetch the manifest and its signature, VERIFY, and only then look inside it. Order matters: parsing
+# first would mean acting on unverified text, and every value in there steers a download.
+#
+# Return codes are distinct because the fixes are: 1 = could not fetch (network / no release / this
+# release predates manifests), 2 = signature failed (never overridable — that is not a missing check,
+# it is a failed one), 3 = verified but describes a DIFFERENT repo or tag. That last one is not
+# pedantry: ONE key signs both repos' manifests, so without the `repo` check a manifest lifted from
+# the updater's release verifies perfectly as the theme's. A signature proves who wrote a file, never
+# what the file is about.
+#
+# NOTE THE VARIABLE NAMES, because this function was written once with the obvious ones and it was
+# wrong: sh has no locals, and fetch() assigns `_u`, `_t` and `_o`. A caller that keeps its own state
+# in those names loses it at the first fetch — measured here as `[ -s …mf.sig.sig ]` (the output path
+# had become the signature's) and a tag check comparing the string `20` (the timeout) against
+# `latest`, which sent every router down the API path in silence. Anything this function must still
+# hold AFTER a fetch is prefixed `_mf`.
+# Sets MF_BASE: empty when the manifest came from GitHub (packages are fetched from the release),
+# or the mirror's directory URL when it came from the mirror — a router that could not reach
+# github.com for the manifest will not reach it for the packages either, since a release asset URL
+# redirects through github.com. The mirror serves both, and the manifest's signed sha256 is what
+# holds either way, so this changes where the bytes come from and never whether they are checked.
+resolve_manifest() {	# <repo> <tag> <outfile> [mirror-url]
+	_mfrepo="$1"; _mftag="$2"; _mfout="$3"; _mfmirror="$4"
+	_mfurl="$(mf_url "$_mfrepo" "$_mftag")"
+	MF_BASE=""
+
+	if ! { fetch "$_mfurl" 20 "$_mfout" && [ -s "$_mfout" ] &&
+	       fetch "$_mfurl.sig" 20 "$_mfout.sig" && [ -s "$_mfout.sig" ]; }; then
+		# The mirror carries the same signed bytes, so falling back to it cannot lower the bar —
+		# it can only serve the real manifest or fail verification below. It mirrors the LATEST
+		# release only, hence the tag guard.
+		[ -n "$_mfmirror" ] && [ "$_mftag" = "latest" ] || return 1
+		fetch "$_mfmirror" 20 "$_mfout" && [ -s "$_mfout" ] || return 1
+		fetch "$_mfmirror.sig" 20 "$_mfout.sig" && [ -s "$_mfout.sig" ] || return 1
+		MF_BASE="${_mfmirror%/*}"
+		info "github.com did not answer — using the mirror (same signed files)."
+	fi
+
+	verify_sig "$_mfout" "$_mfout.sig" "$PUB" || return 2
+	[ "$(mf_get "$_mfout" repo)" = "$_mfrepo" ] || return 3
+	[ "$_mftag" = "latest" ] || [ "$(mf_get "$_mfout" tag)" = "$_mftag" ] || return 3
+	return 0
+}
+
+# --- resolve the assets (TWO repos since the split) -----------------------
+#
+# TWO SOURCES, IN THIS ORDER, and the order is the point:
+#   1. the signed manifest, off the release CDN — no API budget, so it works for the users this
+#      installer kept failing for;
+#   2. api.github.com, only when the release publishes no manifest. That means a release cut before
+#      manifests existed — a pinned old tag (`sh -s v0.9.3`), which is the honest use — and it is
+#      also what carries the changeover, since the newest release has no manifest until the first
+#      one is cut with this code in it.
+# There is no third: if a release has a manifest and it fails to VERIFY, that is a refusal, not a
+# reason to go ask the API for a second opinion.
+
+# The public key is written ONCE, up here: resolve_manifest needs it before any package is fetched.
+PUB="$TMP/release.pub"
+release_pubkey "$PUB"
+
+# Fetch a repo's release JSON. $1 owner/repo, $2 outfile, $3 tag (latest | vX). The API path only.
 resolve_release() {
 	if [ "$3" = "latest" ]; then _api="https://api.github.com/repos/$1/releases/latest"
 	else _api="https://api.github.com/repos/$1/releases/tags/$3"; fi
 	fetch "$_api" 20 "$2" && [ -s "$2" ]
 }
 
+# Resolve one repo's package. Sets, for the caller:
+#   <PREFIX>_URL   the package URL (built HERE from a verified tag + name, never taken from a JSON blob)
+#   <PREFIX>_SHA   its sha256
+#   <PREFIX>_SRC   "manifest" (the hash is signed) or the release JSON path (API path: check the .sig)
+# Returns 1 when this repo offers nothing installable.
+#
+# On the manifest path the package URL is assembled from the manifest's own `tag`, not from `latest`:
+# between reading the manifest and fetching the package a new release could become latest, and the
+# sha256 we are about to enforce belongs to the release we READ.
+# Every name here is `_rp*` for the reason spelled out above resolve_manifest: fetch() owns `_u`,
+# `_t` and `_o`, and sh has no locals.
+resolve_pkg() {		# <repo> <pkg-name> <tag> <mirror> <prefix>
+	_rprepo="$1"; _rpname="$2"; _rptag="$3"; _rpmirror="$4"; _rppfx="$5"
+	_rpmf="$TMP/$_rpname.mf"
+
+	resolve_manifest "$_rprepo" "$_rptag" "$_rpmf" "$_rpmirror"; _rprc=$?
+	case "$_rprc" in
+		0)
+			set -- $(mf_pkg "$_rpmf" "$_rpname" "$EXT")	# file size sha256
+			[ -n "$1" ] && [ -n "$3" ] || return 1
+			safe_name "$1" || {
+				err "The manifest names an implausible asset: $1"
+				err "Refusing — that name would become both a URL and a path under $TMP."
+				exit 1
+			}
+			# Built from the manifest's OWN tag, never from `latest`: between reading the
+			# manifest and fetching the package a newer release can become latest, and the
+			# sha256 about to be enforced belongs to the release we READ. MF_BASE points at
+			# the mirror when the manifest came from there (see resolve_manifest).
+			_rprtag="$(mf_get "$_rpmf" tag)"
+			if [ -n "$MF_BASE" ]; then
+				eval "${_rppfx}_URL=\"\$MF_BASE/\$1\""
+			else
+				eval "${_rppfx}_URL=\"https://github.com/\$_rprepo/releases/download/\$_rprtag/\$1\""
+			fi
+			eval "${_rppfx}_SHA=\"\$3\""
+			eval "${_rppfx}_SRC=manifest"
+			return 0
+			;;
+		2)
+			err "BAD SIGNATURE on the release manifest for $_rprepo — refusing."
+			err "The metadata is not what we published. Do not work around this by hand;"
+			err "report it at https://github.com/$REPO_THEME/issues"
+			exit 1
+			;;
+		3)
+			err "The release manifest for $_rprepo describes a different repo or tag — refusing."
+			exit 1
+			;;
+	esac
+
+	# No manifest: a pre-manifest release, or github.com is unreachable altogether. Ask the API.
+	_rpjson="$TMP/$_rpname.json"
+	resolve_release "$_rprepo" "$_rpjson" "$_rptag" || return 1
+	_rpurl="$(asset_urls "$_rpjson" "$_rpname" | head -n1)"
+	[ -n "$_rpurl" ] || return 1
+	eval "${_rppfx}_URL=\"\$_rpurl\""
+	eval "${_rppfx}_SHA=\"\""
+	eval "${_rppfx}_SRC=\"\$_rpjson\""
+	return 0
+}
+
 info "Resolving the theme release ($TAG) from $REPO_THEME..."
-THEME_JSON="$TMP/theme.json"
-if ! resolve_release "$REPO_THEME" "$THEME_JSON" "$TAG"; then
-	err "Could not reach the GitHub release API."
-	err "If it is a TLS/cert error, install the CA bundle:"
-	if [ "$PM" = "apk" ]; then err "  apk add ca-bundle   (then re-run)"; else err "  opkg update && opkg install ca-bundle   (then re-run)"; fi
+if ! resolve_pkg "$REPO_THEME" luci-theme-footstrap "$TAG" "$MIRROR_THEME" THEME; then
+	err "Could not resolve a luci-theme-footstrap .$EXT for release '$TAG'."
+	err "Neither the release manifest nor the GitHub release API answered with one."
+	err "  - if it is a TLS/cert error, install the CA bundle:"
+	if [ "$PM" = "apk" ]; then err "      apk add ca-bundle   (then re-run)"; else err "      opkg update && opkg install ca-bundle   (then re-run)"; fi
+	err "  - releases: https://github.com/$REPO_THEME/releases"
+	# The likeliest cause by far, and the one a user cannot guess a fix for: github.com does not
+	# answer from this router at all. Print the way out instead of leaving them to search for it.
+	# Only when no proxy is set — repeating the suggestion to someone who already took it is noise,
+	# and their failure has a different cause.
+	if [ -z "$GITHUB_PROXY" ]; then
+		err ""
+		err "  - if github.com is blocked or unreachable from this router, retry through a"
+		err "    GitHub proxy (the packages are signed, so a proxy cannot substitute them):"
+		err ""
+		err "        GITHUB_PROXY=https://gh-proxy.com/ sh install.sh"
+		err ""
+		err "    other public ones, if that one is down: https://ghproxy.net/ ,"
+		err "    https://ghfast.top/ , https://gh.llkk.cc/"
+		err "    Verified working at the time of writing; none of them is ours."
+	fi
 	exit 1
 fi
-THEME_URL=$(asset_urls "$THEME_JSON" luci-theme-footstrap | head -n1)
-if [ -z "$THEME_URL" ]; then
-	err "Could not find a luci-theme-footstrap .$EXT asset for release '$TAG'."
-	err "Check releases: https://github.com/$REPO_THEME/releases"
+[ "$THEME_SRC" = manifest ] || warn "This release publishes no manifest — fell back to the GitHub API."
+
+# jsonfilter (OpenWrt base image) is what reads the sha256 out of an API answer. It is required only
+# ON THAT PATH now: the manifest path parses with awk, so a router missing jsonfilter can still
+# install the current release. Refuse rather than fall back — without it there is no integrity check
+# at all on the API path, only unverifiable bytes handed to root.
+if [ "$THEME_SRC" != manifest ] && ! command -v jsonfilter >/dev/null 2>&1; then
+	err "jsonfilter not found — it is part of OpenWrt's base image, and the API fallback needs it."
+	err "This installer only supports OpenWrt."
 	exit 1
 fi
 
@@ -248,13 +503,9 @@ fi
 # failure, since the theme alone is a complete install. Named separately, never by a bare `\.$EXT$`
 # glob — a self-updater in the field picks each package by its own name (issue #6).
 info "Resolving the updater release (latest) from $REPO_UPDATER..."
-UPDATER_JSON="$TMP/updater.json"
 UPDATER_URL=""
-if resolve_release "$REPO_UPDATER" "$UPDATER_JSON" latest; then
-	UPDATER_URL=$(asset_urls "$UPDATER_JSON" luci-app-footstrap-updater | head -n1)
-else
-	warn "Could not reach the updater repo — installing the theme only."
-fi
+resolve_pkg "$REPO_UPDATER" luci-app-footstrap-updater latest "$MIRROR_UPDATER" UPDATER \
+	|| warn "Could not resolve an updater package — installing the theme only."
 
 # --- download, verify, install --------------------------------------------
 # TWO checks, answering DIFFERENT attackers, and both fail CLOSED.
@@ -277,9 +528,20 @@ fi
 # something you have to type, and its one honest use is pinning a release older than the signing
 # key (`sh -s v0.9.0`). A signature that is PRESENT and WRONG is never overridable: that is not a
 # missing check, that is a failed one.
+#
+# ON THE MANIFEST PATH the split is the same, only stronger: the sha256 is one WE signed, so the
+# usign check has already happened — over the manifest, before any of this ran — and it covers this
+# package's hash. There is nothing left for a per-package .sig to add, so it is not fetched. (The
+# .sig assets are still published: a self-updater already in the field fetches them, and a router's
+# installed updater cannot be fixed remotely.)
 install_asset() {
 	_url="$1"
-	_json="$2"		# the release JSON that LISTS this asset (its digest + signature live there)
+	# $2: "manifest" — the sha256 in $3 came out of a signed manifest, so the signature is already
+	# checked and covers it. Anything else is the release JSON that LISTS this asset (API path):
+	# its digest is GitHub's, so the package's own detached .sig has to be fetched and verified.
+	_src="$2"
+	_sha="$3"
+	_json="$_src"
 	_name=$(basename "$_url")
 	_pkg="$TMP/$_name"
 
@@ -290,6 +552,26 @@ install_asset() {
 		err "Download failed. If it is a TLS/cert error, install the CA bundle:"
 		if [ "$PM" = "apk" ]; then err "  apk add ca-bundle   (then re-run)"; else err "  opkg update && opkg install ca-bundle   (then re-run)"; fi
 		exit 1
+	fi
+
+	if [ "$_src" = manifest ]; then
+		if ! command -v sha256sum >/dev/null 2>&1; then
+			err "sha256sum not found — it is part of OpenWrt's base image. Refusing to install"
+			err "a package whose signed hash cannot be checked."
+			exit 1
+		fi
+		_got=$(sha256sum "$_pkg" | cut -d' ' -f1)
+		if [ "$_sha" != "$_got" ]; then
+			err "Checksum MISMATCH for $_name against the SIGNED manifest — refusing to install."
+			err "  expected $_sha"
+			err "  got      $_got"
+			err "The download does not match what we published. Report it at"
+			err "https://github.com/$REPO_THEME/issues"
+			exit 1
+		fi
+		ok "verified against the signed manifest: $_name ($(wc -c < "$_pkg") bytes)"
+		install_pkg_now "$_pkg" "$_name"
+		return 0
 	fi
 
 	_digest=$(asset_digest "$_json" "$_url")
@@ -317,8 +599,7 @@ install_asset() {
 
 	_sig_url=$(sig_url "$_json" "$_url")
 	_sig="$_pkg.sig"
-	_pub="$TMP/release.pub"
-	release_pubkey "$_pub"
+	_pub="$PUB"
 	if [ -z "$_sig_url" ] || ! command -v usign >/dev/null 2>&1; then
 		if [ "${FOOTSTRAP_ALLOW_UNVERIFIED:-0}" = "1" ]; then
 			warn "No signature check for $_name — installing UNVERIFIED because FOOTSTRAP_ALLOW_UNVERIFIED=1."
@@ -343,24 +624,31 @@ install_asset() {
 		if ! verify_sig "$_pkg" "$_sig" "$_pub"; then
 			err "BAD SIGNATURE for $_name — refusing to install."
 			err "The bytes downloaded are NOT the package we published. Do not install them by"
-			err "hand; report it at https://github.com/$REPO_UPDATER/issues"
+			err "hand; report it at https://github.com/$REPO_THEME/issues"
 			exit 1
 		fi
 		ok "signature verified: $_name (usign, key $(usign -F -p "$_pub" 2>/dev/null))"
 		rm -f "$_sig"
 	fi
 
-	info "Installing $_name with $PM..."
-	if [ "$PM" = "apk" ]; then
-		apk add --allow-untrusted "$_pkg"
-	else
-		# local .ipk; luci-base is on any LuCI system already, so no repo fetch is needed.
-		opkg install "$_pkg"
-	fi
-	rm -f "$_pkg"
+	install_pkg_now "$_pkg" "$_name"
 }
 
-install_asset "$THEME_URL" "$THEME_JSON"
+# Hand the verified file to the package manager. Split out so that BOTH paths through install_asset
+# end in the same three lines — an install that skipped a check by taking an early return past them
+# is the failure mode this file is built around avoiding.
+install_pkg_now() {
+	info "Installing $2 with $PM..."
+	if [ "$PM" = "apk" ]; then
+		apk add --allow-untrusted "$1"
+	else
+		# local .ipk; luci-base is on any LuCI system already, so no repo fetch is needed.
+		opkg install "$1"
+	fi
+	rm -f "$1"
+}
+
+install_asset "$THEME_URL" "$THEME_SRC" "$THEME_SHA"
 
 # The updater is optional and the user chooses (see want_updater above). A release older than the
 # split simply has no updater asset — then there is nothing to offer or ask about.
@@ -369,7 +657,7 @@ if [ -z "$UPDATER_URL" ]; then
 	warn "This release publishes no luci-app-footstrap-updater asset — installing the theme only."
 	warn "The Appearance popover will show the version but no update controls."
 elif want_updater; then
-	install_asset "$UPDATER_URL" "$UPDATER_JSON"
+	install_asset "$UPDATER_URL" "$UPDATER_SRC" "$UPDATER_SHA"
 	UPDATER_INSTALLED=1
 else
 	info "Skipping the update checker — the theme shows its version but no update controls."

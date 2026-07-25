@@ -59,11 +59,59 @@
 <br clear="right">
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
+wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 ```
 
 Дальше выберите **Footstrap** в **System → System → Language and Style**, поле «Design». Это
 единственное, что задаётся на роутере. Нужна конкретная версия — добавьте тег: `... | sh -s v0.9.0`.
+
+Ссылка ведёт на **ассет релиза**, а не на `raw.githubusercontent.com`. GitHub ограничивает raw для
+неаутентифицированных запросов — 60 в час на IP-адрес источника, — и за CGNAT или общим выходом этот
+лимит часто уже израсходован кем-то другим, так что по raw-ссылке может не скачаться сам установщик.
+У ассетов релиза такого лимита нет. Raw по-прежнему работает, если он вам привычнее:
+`wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh`.
+
+Ни установка, ни обновление больше не обращаются к `api.github.com`. Оба читают **подписанный
+манифест**, публикуемый вместе с релизом, поэтому лимит 60/час не может сломать ни установку, ни
+проверку версии (issue #17).
+
+### Если не скачивается
+
+Если роутеру `github.com` недоступен вовсе — повторите через GitHub-прокси:
+
+```sh
+GITHUB_PROXY=https://gh-proxy.com/ sh -c "$(wget -qO- https://gh-proxy.com/https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh)"
+```
+
+Публичные прокси, работавшие на момент написания, — ни один из них не наш, и любой может исчезнуть:
+`https://gh-proxy.com/`, `https://ghproxy.net/`, `https://ghfast.top/`, `https://gh.llkk.cc/`.
+
+`GITHUB_PROXY` подставляется только к github-адресам, пробуется первым и откатывается на прямой
+путь, так что мёртвый прокси не утащит установку за собой. **Пакеты, которые он отдаёт, безопасны
+что бы прокси ни делал** — каждый сверяется с sha256 из подписанного манифеста, так что прокси может
+отдать настоящий релиз либо не отдать ничего, но не что-то другое.
+
+**Исключение — сам установщик, и оно стоит десяти секунд внимания.** Однострочник выше отдаёт под
+root скрипт, скачанный через третью сторону, и никакой подписи на этом этапе ещё не проверено:
+цепочка доверия начинается только когда скрипт уже запущен. Если не хочется принимать это на веру —
+проверьте заранее (`usign` есть в каждом образе OpenWrt):
+
+```sh
+P=https://gh-proxy.com/https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download
+wget -qO /tmp/install.sh "$P/install.sh" && wget -qO /tmp/install.sh.sig "$P/install.sh.sig"
+cat > /tmp/release.pub <<'EOF'
+untrusted comment: luci-theme-footstrap release key
+RWQYxjhl4rz41tNZc3dXmnRplRO1ydN1q8as++iPUjZc6SRUCb952L/T
+EOF
+usign -V -m /tmp/install.sh -x /tmp/install.sh.sig -p /tmp/release.pub && GITHUB_PROXY=https://gh-proxy.com/ sh /tmp/install.sh
+```
+
+Ключ выписан выше намеренно: сверьте эти символы с [`release.pub`](release.pub) в репозитории — и
+прокси перестаёт участвовать в решении вообще.
+
+Есть и автоматический запасной путь, не требующий ни прокси, ни решения: если `github.com` не
+отвечает, установщик пробует **зеркало на GitHub Pages** с тем же подписанным манифестом и теми же
+пакетами. Прокси нужен тогда, когда недоступен и этот хост.
 
 <br clear="right">
 
