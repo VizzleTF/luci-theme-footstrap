@@ -193,6 +193,25 @@ define Build/Prepare/luci-theme-footstrap
 	# htdocs/, which luci.mk already copies.)
 	$(CP) $(CURDIR)/LICENSE $(PKG_BUILD_DIR)/
 	$(SHELL) $(CURDIR)/build-css.sh $(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css
+	# The private `--fs-*` names are 16% of the sheet and mean nothing to a browser — the same trade
+	# terser makes for the JS. BEFORE strip-templates.sh on purpose: the reserved set is derived by
+	# reading the JS and the templates, so it must see them whole. Over-reserving costs bytes,
+	# under-reserving breaks the theme silently.
+	# The reserved set is read from $(CURDIR), the SOURCE, never from $(PKG_BUILD_DIR): in CI the
+	# build tree's JS has already been through terser, so its comments are gone and five names that
+	# are only MENTIONED in a comment stop being reserved. That made the shipped sheet depend on WHO
+	# built it — 10 reserved names via CI, 15 via a plain SDK build, same source. Reading the source
+	# over-reserves by ~1 KB and is the safe direction.
+	$(SHELL) $(CURDIR)/mangle-tokens.sh \
+		$(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css \
+		$(CURDIR)/htdocs/luci-static/resources $(CURDIR)/ucode
+	# Templates are 58% comments and shipped them all. jsmin/terser strip the JS, build-css.sh the
+	# CSS; the .ut files were simply never included in that trade. Only `{# … #}` goes — see the
+	# script for why the ucode-code `/* … */` deliberately stays. -16 KB of 39, git keeps every word,
+	# and dev-sync.sh does NOT run this: a router you are debugging on keeps its comments.
+	$(SHELL) $(CURDIR)/strip-templates.sh $(PKG_BUILD_DIR)/ucode
+	# …and the same for the shell under root/ (71% and 95% comment lines). Whole-line `#` only.
+	$(SHELL) $(CURDIR)/strip-shell.sh $(PKG_BUILD_DIR)/root
 	$(if $(PKG_VERSION),$(SED) "s#const FS_VERSION *= *'[^']*'#const FS_VERSION = '$(PKG_VERSION)'#" \
 		$(PKG_BUILD_DIR)/htdocs/luci-static/resources/fs-version.js)
 	$(INSTALL_DIR) $(PKG_BUILD_DIR)/root/usr/lib/lua/luci/i18n
