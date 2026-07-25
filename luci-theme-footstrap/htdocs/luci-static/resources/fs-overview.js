@@ -4,14 +4,26 @@
 'require network';
 'require fs-fit as fit';
 
-/* Footstrap overview LAYOUT-only include: renders NOTHING of its own, only re-arranges the STOCK
+/* Footstrap overview LAYOUT-only module: renders NOTHING of its own, only re-arranges the STOCK
  * sections — wrapping System / Memory / Storage in a grid so Memory and Storage sit in a right
  * column beside System. Content, data and styling stay luci-mod-status's. (Do not go back to the
  * old 05_footstrap_dashboard.js: re-rendering a custom tree every poll flickered and reset mobile
  * scroll.) The stock poll updates each section IN PLACE via dom.content() and never rebuilds the
  * .cbi-section wrapper, so once moved into our grid the wrappers stay put across polls.
  *
- * Installed to the global include dir, so LuCI loads it under EVERY theme — hence the gate. */
+ * IT USED TO LIVE IN LuCI'S GLOBAL INCLUDE DIR (view/status/include/05_footstrap_overview_layout.js)
+ * and that was a real defect, not a filing preference: luci-mod-status loads EVERY *.js in that
+ * directory, so this file was fetched, parsed and evaluated on the overview of every router running
+ * a DIFFERENT theme. Measured with a headless browser against the dev container with `bootstrap`
+ * active: the request is right there beside 10_system.js and 20_memory.js. The `L.env.media` gate
+ * silenced it, but only after it had already been downloaded and run — a theme package reaching
+ * into another module's namespace, which is exactly what this project refuses to do to third-party
+ * apps (CLAUDE.md, the three zones). It is a chrome module now, loaded by the chrome, so a router on
+ * another theme never sees it at all.
+ *
+ * WHAT THAT COST, and why the code below looks the way it does: the old location bought two timing
+ * guarantees for free, because LuCI evaluated the file INSIDE index.load(). Both had to be paid for
+ * explicitly — see ensureOverviewHelpers() and patchOverview() at the bottom. */
 function isFootstrapTheme() {
 	return String(L.env.media || '').indexOf('footstrap') >= 0;
 }
@@ -79,7 +91,7 @@ function arrange() {
  * The SPA router may REPLACE the #view element between visits, so re-attach when the node we
  * observed is no longer the current one: a singleton bound to the first #view would silently
  * watch a detached tree and the grid would never apply on a later SPA visit. */
-let _observer = null, _observedView = null;
+let _observer = null, _observedView = null, _routeObserver = null;
 function stopWatch() {
 	if (_observer) _observer.disconnect();
 	_observer = null;
@@ -91,12 +103,48 @@ function watch() {
 	if (_observer && _observedView !== view)
 		stopWatch();
 	arrange();
-	if (_observer || !view) return;
+	/* The route check is what the stock include's render() used to provide implicitly — it only ran
+	 * when luci-mod-status rendered THIS page. A chrome module is alive on every page, so without
+	 * this an observer would be attached to #view on, say, the firewall page and re-run arrange()
+	 * for every mutation of a table it has no business watching. */
+	if (_observer || !view ||
+	    (document.body.getAttribute('data-page') || '') !== 'admin-status-overview')
+		return;
 	_observedView = view;
 	/* one arrange() per frame, however many mutations a poll tick delivers (fit.frame — the
 	 * theme's shared coalescer, fs-fit.js) */
 	_observer = new MutationObserver(fit.frame(arrange));
 	_observer.observe(view, { childList: true, subtree: true });
+}
+
+/* WHAT REPLACED render(). The include was instantiated by luci-mod-status once per overview render,
+ * which is how it knew a visit had happened; a chrome module is instantiated once per PAGE LOAD and
+ * then has to notice SPA navigation itself. `body[data-page]` is the signal — both the server
+ * template and fs-router stamp it with the dispatch path — so one attribute observer covers arriving
+ * at the overview, leaving it, and coming back.
+ *
+ * The empty `.cbi-section` wrapper stock used to build around this include is gone with it, and so
+ * is the `.fs-ovl-marker` element that existed only to let CSS hide that wrapper. */
+function wire() {
+	if (_routeObserver || !isFootstrapTheme() || !document.body)
+		return;
+	_routeObserver = new MutationObserver(() => {
+		if ((document.body.getAttribute('data-page') || '') === 'admin-status-overview')
+			onOverview();
+		else
+			stopWatch();
+	});
+	_routeObserver.observe(document.body, { attributes: true, attributeFilter: [ 'data-page' ] });
+	if ((document.body.getAttribute('data-page') || '') === 'admin-status-overview')
+		onOverview();
+}
+
+/* Everything that must happen on ARRIVAL at the overview, from either direction: a full page load
+ * that lands here, or an SPA navigation that restamps data-page. patchOverview() is idempotent
+ * (the __fsProgressive flag), so the two paths cannot double-patch. */
+function onOverview() {
+	patchOverview();
+	watch();
 }
 
 /* ---- progressive paint -----------------------------------------------------
@@ -174,9 +222,20 @@ function pollProgressive(includes, containers, first_load) {
 	return first_load ? Promise.resolve() : _inflight;
 }
 
-/* Patch the stock overview view while index.load() is requiring its includes — after the instance
- * exists, before render() is called: the one window where replacing poll_status is safe. Covers a
- * full page load and an SPA nav alike, since both go through index.load(). */
+/* Patch the stock overview view: replace poll_status so each section paints when its own data lands.
+ *
+ * TIMING, AND WHAT MOVING THE FILE COST. As an include this ran at module eval — which LuCI performs
+ * inside index.load(), i.e. after the view instance exists and before render() calls poll_status:
+ * the exact window the patch needs, for free, on both a full load and an SPA nav.
+ *
+ * A chrome module evaluates much earlier, so that window has to be aimed at rather than inherited,
+ * and it is called from the ROUTE (see wire()) instead of at eval. Two reasons it is not called at
+ * module eval any more: `L.require('view.status.index')` would pull the whole stock overview view
+ * into memory on every page, including pages that are not the overview; and on a full page load the
+ * require would race index.load() — which is why the patch is idempotent, guarded by the
+ * `__fsProgressive` flag on the prototype, and why failing to land is harmless. If it misses, the
+ * page simply renders the stock way: one Promise.all, ~90 ms later. Never broken, sometimes slower.
+ */
 function patchOverview() {
 	L.require('view.status.index').then((idx) => {
 		const proto = idx ? Object.getPrototypeOf(idx) : null;
@@ -191,10 +250,15 @@ function patchOverview() {
 
 /* Status→Overview is a `template` node whose server template (admin_status/index.ut) defines 3
  * globals the stock status includes use (18_cpu/20_memory/25_storage/…) and then instantiates
- * view.status.index. Arriving by the theme's SPA router never runs that inline <script>, so
- * define them here — at module eval, i.e. inside index.load(), before ANY include renders —
- * guarded, so a full load's copies (any theme) are not clobbered. Lives in this include and not
- * in fs-router.js on purpose: the router ships on every page, and this ~1.1 KB is overview-only.
+ * view.status.index. Arriving by the theme's SPA router never runs that inline <script>, so define
+ * them here, guarded, so a full load's copies (any theme) are not clobbered.
+ *
+ * This is the OTHER thing the include location used to give for free, and the one that survived the
+ * move intact: the definitions had to exist before any include renders, which module eval inside
+ * index.load() guaranteed. A chrome module evaluates once, at chrome init — i.e. before any SPA
+ * navigation can possibly happen — so the guarantee is now stronger rather than weaker. On a full
+ * load of the overview the template's own copies win the race and these are no-ops, as before.
+ *
  * Bodies are verbatim from upstream except L.itemlist → window.L.itemlist (the two-L trap,
  * docs/14). */
 function ensureOverviewHelpers() {
@@ -234,22 +298,11 @@ function ensureOverviewHelpers() {
 		};
 	/* eslint-enable no-var */
 }
-/* Unconditional (no theme gate): on a full load — any theme — the template's own copies exist
- * first and the typeof guards make this a no-op; on an SPA arrival they are what saves the page. */
+/* Unconditional: the typeof guards make it a no-op wherever the real definitions already exist. */
 ensureOverviewHelpers();
 
-/* Module-evaluation time = inside index.load(), before render(). From render() it would be too
- * late: poll_status has already been called by then. */
-if (isFootstrapTheme())
-	patchOverview();
-
 return baseclass.extend({
-	title: '',            /* no section title -> stock renders an empty wrapper */
-	render() {
-		if (!isFootstrapTheme())
-			return E([]);
-		watch();
-		/* marker lets CSS hide our own empty stock .cbi-section wrapper */
-		return E('div', { 'class': 'fs-ovl-marker', 'style': 'display:none' });
-	}
+	/* Called by menu-footstrap-common's init, once. Everything route-dependent hangs off the
+	 * data-page observer inside. */
+	wire,
 });

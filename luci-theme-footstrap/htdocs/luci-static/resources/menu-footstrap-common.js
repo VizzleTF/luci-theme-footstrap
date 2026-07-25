@@ -6,6 +6,7 @@
 'require fs-chrome as chrome';
 'require fs-router as router';
 'require fs-appearance as appearance';
+'require fs-overview as overview';
 'require fs-prefs as prefs';
 'require fs-sheets as sheets';
 'require fs-search as search';
@@ -21,6 +22,7 @@
  *   fs-sheets      the guard against a view's injected CSS repainting every later page
  *   fs-search      the page-search palette (indexes the same tree, on first open)
  *   fs-appearance  the popover
+ *   fs-overview    the overview grid — a THEME module, not a luci-mod-status include
  *   fs-version     the shipped version string (shown in the popover, no network)
  *
  * The version CHECK and the one-click self-update (fs-update.js) ship in the OPTIONAL
@@ -66,6 +68,12 @@ return baseclass.extend({
 			search.wire();
 			chrome.wireRail();
 			chrome.wireIndicatorCounts();
+			/* BEFORE router.wire(): the router restamps body[data-page] on every SPA navigation,
+			 * and that attribute is what fs-overview keys off. Wiring its observer after the
+			 * router's would still work today (the first stamp is the server's, already in the
+			 * DOM), but it would make a route change racy against a listener that is not attached
+			 * yet — cheap to order correctly, expensive to debug. */
+			overview.wire();
 			router.wire();
 			router.wireVisibility();
 		/* fs-chrome's renderTabMenu warns about exactly this, and the root chain was left bare: a

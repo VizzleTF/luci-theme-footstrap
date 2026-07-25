@@ -188,7 +188,7 @@ config internal 'themes'
         fs-appearance.js                DOM поповера Appearance (рантаймом грузит fs-update, если стоит)
         fs-fit.js                       общий «а влезает ли?» движок (ResizeObserver, rAF)
         fs-select.js                    <select> → ui.Dropdown, карточный режим таблиц
-/www/luci-static/resources/view/status/include/05_footstrap_overview_layout.js
+/www/luci-static/resources/fs-overview.js
         аддитивный layout-only инклюд Overview (LuCI сам подхватывает *.js из этого каталога)
 /usr/lib/lua/luci/i18n/footstrap-theme.<lang>.lmo
         каталог переводов — едет ВНУТРИ пакета темы (не отдельным luci-i18n-*, см. док 13)

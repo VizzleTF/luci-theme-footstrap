@@ -20,9 +20,13 @@ Appearance: `localStorage` + атрибуты на `:root`, ничего не п
 рендерера и симлинка `footstrap-top` не существует.
 
 **Граница темы:** тема даёт хром и дизайн-язык; контент страниц рисует view-JS
-`luci-mod-*`. Единственное исключение — `05_footstrap_overview_layout.js`: он
-не рисует своего контента, а только переставляет штатные секции overview.
-Подробно — `../docs/08-design-system.md`, раздел «Границы», и `../CLAUDE.md`.
+`luci-mod-*`. Единственное исключение — `fs-overview.js`: он не рисует своего
+контента, а только переставляет штатные секции overview. Раньше он лежал в
+ГЛОБАЛЬНОМ каталоге включений `luci-mod-status`, откуда LuCI грузит все `*.js`
+подряд — то есть скачивался и исполнялся на overview у роутеров с ЧУЖОЙ темой
+(замерено headless-браузером на дев-контейнере со стоковой `bootstrap`). Теперь
+это обычный модуль хрома. Подробно — `../docs/08-design-system.md`, раздел
+«Границы», и `../CLAUDE.md`.
 
 ## Структура
 
@@ -35,8 +39,7 @@ ucode/template/themes/footstrap/  header.ut, footer.ut, sysauth.ut, partials/
 htdocs/luci-static/footstrap/     cascade.css (генерируется), fonts/, cats.svg
 htdocs/luci-static/resources/     menu-footstrap.js (рендерер), menu-footstrap-common.js (bootstrap),
                                   fs-{menutree,prefs,widgets,chrome,router,sheets,version,appearance}.js,
-                                  fs-fit.js, fs-select.js
-  …/view/status/include/          05_footstrap_overview_layout.js
+                                  fs-fit.js, fs-select.js, fs-overview.js
 root/etc/uci-defaults/            регистрация темы и миграция легаси-имён
 root/usr/share/rpcd/acl.d/        luci-theme-footstrap.json (ACL: uci footstrap — Save-as-default)
 ```

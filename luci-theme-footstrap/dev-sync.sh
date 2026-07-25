@@ -14,7 +14,7 @@ D="$(cd "$(dirname "$0")" && pwd)"
 
 ssh "$R" "mkdir -p /usr/share/ucode/luci/template/themes/$N \
 	/www/luci-static/$N \
-	/www/luci-static/resources/view/status/include"
+"
 
 # the ONE template (+ partials/). Sidebar and top bar are the same markup, morphed by
 # :root[data-layout] — there is no second theme dir to copy.
@@ -29,8 +29,6 @@ scp -qr "$D"/htdocs/luci-static/$N/* "$R":/www/luci-static/$N/
 # individually, so a FIFTH would be shipped by the package (luci.mk copies htdocs/
 # wholesale) yet silently never reach the dev router — first tested after a release.
 scp -q  "$D"/htdocs/luci-static/resources/*.js "$R":/www/luci-static/resources/
-scp -q  "$D"/htdocs/luci-static/resources/view/status/include/*.js \
-	"$R":/www/luci-static/resources/view/status/include/
 
 # stamp the git-derived version into the deployed fs-version.js (the package does the same in
 # Build/Prepare) so the popover shows a real version and the updater's check compares against it. The
@@ -106,6 +104,11 @@ cd /www/luci-static
 rm -rf $N/$N $N-top $N-dark $N-light $N-top-dark $N-top-light
 cd /usr/share/ucode/luci/template/themes
 rm -rf $N/$N $N-top $N-dark $N-light $N-top-dark $N-top-light
+# The overview layout used to install into luci-mod-status's GLOBAL include dir, where LuCI loads
+# every *.js under any theme. It is a chrome module (fs-overview.js) now. A package upgrade drops
+# the old file; dev-sync copies rather than installs, so it has to be swept by name — otherwise the
+# dev router keeps running BOTH copies and the grid is arranged twice.
+rm -f /www/luci-static/resources/view/status/include/05_footstrap_overview_layout.js
 for db in /lib/apk/db/installed /usr/lib/opkg/status; do [ -f \"\$db\" ] && touch \"\$db\"; done
 rm -f /tmp/luci-indexcache*"
 

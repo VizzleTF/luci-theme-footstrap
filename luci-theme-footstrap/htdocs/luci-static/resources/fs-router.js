@@ -400,9 +400,9 @@ function navigate(pathname, push, kbd) {
 	 * singleton whose __init__ already ran. `_seen` is that distinction, and it must be read BEFORE
 	 * the require resolves, since the require is what fills LuCI's cache. */
 	/* Status→Overview needs the 3 template globals (progressbar/renderBox/renderBadge) an SPA
-	 * arrival never defines — the overview include (05_footstrap_overview_layout.js) defines them
-	 * at its module eval, i.e. inside index.load(), before any include renders. Not here: that
-	 * put ~1.1 KB of overview-only code on every page. */
+	 * arrival never defines. fs-overview.js defines them at its own module eval — which, as a
+	 * chrome module, happens at chrome init, i.e. before any SPA navigation can occur. Not here:
+	 * the router has no business owning luci-mod-status's globals. */
 	const RT = window.L;
 	const cached = _seen.has(className);
 	_seen.add(className);

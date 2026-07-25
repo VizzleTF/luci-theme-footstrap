@@ -284,7 +284,7 @@ var(--fs-dim))`). Обе очевидные альтернативы измер�
 **Вывод по фазам:**
 1. **Тема (сейчас):** хром sidebar/topnav + дизайн-язык CSS. Overview выглядит
    стильно; его секции остаются стоковыми — тема лишь **переставляет** их
-   (`htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js`:
+   (`htdocs/luci-static/resources/fs-overview.js`:
    аддитивный layout-only include, System слева, Memory/Storage справа; своего
    контента не рисует).
 2. **Опционально позже:** кастомный status-view (KPI/кольцо/порты как в макете) —

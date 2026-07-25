@@ -25,7 +25,7 @@ luci-theme-footstrap/
 │       ├── menu-footstrap.js          # рендер меню (единственный)
 │       ├── menu-footstrap-common.js   # bootstrap хрома; концерны — в fs-*.js (см. CLAUDE.md)
 │       ├── fs-{fit,menutree,prefs,widgets,chrome,select,sheets,search,router,version,appearance}.js
-│       └── view/status/include/05_footstrap_overview_layout.js
+│       └── fs-overview.js
 ├── root/                          # → / (корень rootfs)
 │   ├── etc/uci-defaults/30_luci-theme-footstrap   # регистрация темы
 │   ├── etc/config/footstrap                       # пустой стаб, пишется рантаймом (Save as default)

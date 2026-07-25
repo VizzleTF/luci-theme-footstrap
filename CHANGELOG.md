@@ -11,6 +11,12 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Changed
+
+- **The overview grid is a theme module now, not a `luci-mod-status` include, so routers on OTHER themes stop loading it.** `05_footstrap_overview_layout.js` lived in LuCI's global include directory, where every `*.js` is loaded on the overview whatever theme is active — measured with a headless browser against the dev container running stock `bootstrap`: our file was requested right beside `10_system.js`, downloaded and evaluated, and only then silenced by its own `L.env.media` gate. A theme package reaching into another module's namespace is exactly what this theme refuses to do to third-party apps. It is `fs-overview.js`, wired by the chrome; re-measured after the move, a foreign theme does not request it at all. Found via a fork ([yanjinbin](https://github.com/yanjinbin/luci-theme-footstrap)), which spotted it independently.
+
 ## [0.10.2] — 2026-07-24
 
 ### Changed

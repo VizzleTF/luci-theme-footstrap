@@ -455,7 +455,7 @@ input[type="reset"]:focus-visible {
   **принудительный reflow каждую секунду**: `getComputedStyle(ul).flexDirection` (`:104`)
   и `getClientRects()`/`offsetTop` (`:93-96`) — при том, что вкладки не менялись. Ширина
   меняется только по `resize`, а он уже слушается отдельно (`:134`).
-* `05_footstrap_overview_layout.js:84-89` — живёт весь сеанс и гоняет `arrange()` на каждый
+* `fs-overview.js` (тогда `05_footstrap_overview_layout.js`)`:84-89` — живёт весь сеанс и гоняет `arrange()` на каждый
   тик ради `return` на `:53` («already wrapped»). По собственному инварианту файла (сток
   обновляет секции **на месте** и не пересобирает `.cbi-section`) после успешной обёртки
   можно сразу `stopWatch()`.
@@ -535,7 +535,7 @@ input[type="reset"]:focus-visible {
   закрытие flyout'а сайдбара** (`menu-footstrap.js:193` слушает клик на `document` в фазе
   всплытия). И он там **не нужен**: `outside()` (`:896`) навешен в фазе capture и уже
   проверяет `btn.contains(e.target)`. Просто убрать.
-* **`05_footstrap_overview_layout.js:39` — гейт по `data-page` промахивается.**
+* **`fs-overview.js` (тогда `05_footstrap_overview_layout.js`)`:39` — гейт по `data-page` промахивается.**
   `header.ut:20` штампует `data-page` из **request_path**, поэтому на
   `/cgi-bin/luci/admin/status` (firstchild → рендерится overview) получается
   `data-page="admin-status"` → `stopWatch()` и раскладка не применяется, страница уезжает

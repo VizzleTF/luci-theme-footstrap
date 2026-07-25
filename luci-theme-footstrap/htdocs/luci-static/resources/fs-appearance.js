@@ -80,7 +80,7 @@ function wireAppearance(update) {
 	 * translates the msgid "Top" as "maximum". Contexting cannot be selective — whatever we leave
 	 * bare is a name anyone may take. The chrome and the login/notice sentences are deliberately
 	 * bare (inheriting luci-base's translation is a feature in the ~40 languages we have no
-	 * catalogue for), as are System/Memory/Storage in 05_footstrap_overview_layout.js, which MATCH
+	 * catalogue for), as are System/Memory/Storage in fs-overview.js, which MATCH
 	 * the stock headings. */
 	const groups = [
 		group(_('Layout', 'footstrap'), (label) => widgets.segControl(prefs.currentLayout(), [

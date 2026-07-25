@@ -42,7 +42,7 @@ msgctxt "footstrap"
 msgid "Choose image"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-chrome.js:255
+#: htdocs/luci-static/resources/fs-chrome.js:307
 #: ucode/template/themes/footstrap/header.ut:91
 msgid "Collapse menu"
 msgstr ""
@@ -83,7 +83,7 @@ msgctxt "footstrap"
 msgid "Dim"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-chrome.js:255
+#: htdocs/luci-static/resources/fs-chrome.js:307
 msgid "Expand menu"
 msgstr ""
 
@@ -147,7 +147,7 @@ msgstr ""
 msgid "Lua compatibility mode active"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js:22
+#: htdocs/luci-static/resources/fs-overview.js:34
 msgid "Memory"
 msgstr ""
 
@@ -278,7 +278,7 @@ msgctxt "footstrap"
 msgid "Start typing to find a page"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js:22
+#: htdocs/luci-static/resources/fs-overview.js:34
 msgid "Storage"
 msgstr ""
 
@@ -287,7 +287,7 @@ msgctxt "footstrap"
 msgid "Submenus"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js:22
+#: htdocs/luci-static/resources/fs-overview.js:34
 msgid "System"
 msgstr ""
 
