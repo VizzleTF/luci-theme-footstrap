@@ -11,7 +11,7 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [Unreleased]
+## [0.11.1] — 2026-07-25
 
 ### Added
 
@@ -21,9 +21,7 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 - **Overview port tiles on ImmortalWrt no longer collapse to a sliver with their text spilling out.** 0.10.2 released the fork's inline `width:100px` so the tile could fill its 200px track — but the same fork also writes `align-items:center;justify-items:center` on the grid that holds the tiles, which makes a `width: auto` item size itself `fit-content` instead of stretching. The card is `container-type: inline-size`, i.e. size-contained, so its max-content contribution is **zero**: the tile drew nothing but its own padding (~17px) while the port name, speed and traffic rows overflowed to the right of it — worse than the half-width tile the release set out to fix. The tile now states `justify-self`/`align-self` itself, which needs no `!important` (the fork's declarations are `*-items` on the parent, and those only apply when the item says `auto`) and is a no-op on stock, where both are already `stretch`.
 
-## [Unreleased]
-
-### Fixed
+- **A long IPv6 address in the Overview's upstream box now wraps instead of printing outside the box.** `.ifacebox` is `white-space: nowrap` — right for the port tiles, whose bodies are one-word labels, wrong for the upstream plate, whose lines are addresses. An uncompressed IPv6 (`Address: 2001:db8:1a2b:3c4d:5e6f:7a8b:9c0d:1e2f/64`) is ~380px of text with no space to break at, and the plate is a flex item that shrinks: measured at a 390px viewport, the box ended at x=348 and the address ran to x=393 — 45px of text over the card behind it. `white-space: normal` alone is the half-fix that does nothing here (an address has nothing to wrap AT); `overflow-wrap: anywhere` is what allows the break, and `anywhere` rather than `break-word` because only it lowers the box's min-content size, so flexbox shrinks the item to the line instead of handing it a width its content overflows. The Interfaces page had this fixed for its own copy of the plate years ago; the status one never did. `docs/gallery.html` now renders both upstream boxes with a full-length address, so the case has a home that needs no router.
 
 - **The release mirror carries `install.sh` and its signature too.** Found by cutting `github.com` off a dev router and running the documented mirror one-liner: the mirror had the manifest and both packages, but not the installer — so a user in exactly the situation the mirror exists for had a verified way to install and no way to obtain the thing that installs. The signature rides along, so the script can be checked before it runs as root.
 
@@ -3091,6 +3089,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.11.1]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.10.0...v0.10.1
