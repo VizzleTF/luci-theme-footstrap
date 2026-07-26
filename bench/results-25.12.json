@@ -1,6 +1,6 @@
 {
   "router": "http://10.11.12.1",
-  "runs": 3,
+  "runs": 5,
   "themes": [
     "bootstrap",
     "proton2025",
@@ -8,391 +8,604 @@
   ],
   "baseline": "bootstrap",
   "spa_pages": 38,
-  "median_speedup": 3.43,
+  "median_speedup": 4.31,
   "pages": [
     {
       "page": "admin/system/package-manager",
       "view": "package-manager",
       "title": "Software",
-      "speedup_vs_bootstrap": 1.06,
+      "speedup_vs_bootstrap": 1.11,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 813.8,
-      "proton2025_ms": 880.7,
-      "footstrap_ms": 764.6
+      "bootstrap_ms": 898.7,
+      "proton2025_ms": 933.9,
+      "footstrap_ms": 807.0,
+      "bootstrap_client_cpu_ms": 223.6,
+      "proton2025_client_cpu_ms": 244.0,
+      "footstrap_client_cpu_ms": 271.7
     },
     {
       "page": "admin/system/system",
       "view": "system/system",
       "title": "System",
-      "speedup_vs_bootstrap": 3.09,
+      "speedup_vs_bootstrap": 2.85,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 348.3,
-      "proton2025_ms": 393.0,
-      "footstrap_ms": 112.6
+      "bootstrap_ms": 368.6,
+      "proton2025_ms": 424.5,
+      "footstrap_ms": 129.3,
+      "bootstrap_client_cpu_ms": 112.8,
+      "proton2025_client_cpu_ms": 154.0,
+      "footstrap_client_cpu_ms": 29.5
     },
     {
       "page": "admin/system/admin",
       "view": "system/password",
       "title": "Administration",
-      "speedup_vs_bootstrap": 8.82,
+      "speedup_vs_bootstrap": 7.74,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 136.4,
-      "proton2025_ms": 153.1,
-      "footstrap_ms": 15.5
+      "bootstrap_ms": 149.9,
+      "proton2025_ms": 153.6,
+      "footstrap_ms": 19.4,
+      "bootstrap_client_cpu_ms": 20.2,
+      "proton2025_client_cpu_ms": 31.3,
+      "footstrap_client_cpu_ms": 8.2
     },
     {
       "page": "admin/system/admin/password",
       "view": "system/password",
       "title": "Router Password",
-      "speedup_vs_bootstrap": 7.74,
+      "speedup_vs_bootstrap": 8.49,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 107.5,
-      "proton2025_ms": 154.6,
-      "footstrap_ms": 13.9
+      "bootstrap_ms": 141.8,
+      "proton2025_ms": 156.3,
+      "footstrap_ms": 16.7,
+      "bootstrap_client_cpu_ms": 21.1,
+      "proton2025_client_cpu_ms": 30.0,
+      "footstrap_client_cpu_ms": 5.7
     },
     {
       "page": "admin/system/admin/dropbear",
       "view": "system/dropbear",
       "title": "SSH Access",
-      "speedup_vs_bootstrap": 6.09,
+      "speedup_vs_bootstrap": 16.92,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 222.9,
-      "proton2025_ms": 303.2,
-      "footstrap_ms": 36.6
+      "bootstrap_ms": 329.0,
+      "proton2025_ms": 333.5,
+      "footstrap_ms": 19.4,
+      "bootstrap_client_cpu_ms": 38.8,
+      "proton2025_client_cpu_ms": 52.3,
+      "footstrap_client_cpu_ms": 10.8
     },
     {
       "page": "admin/system/admin/sshkeys",
       "view": "system/sshkeys",
       "title": "SSH-Keys",
-      "speedup_vs_bootstrap": 8.15,
+      "speedup_vs_bootstrap": 8.99,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 154.8,
-      "proton2025_ms": 155.1,
-      "footstrap_ms": 19.0
+      "bootstrap_ms": 155.0,
+      "proton2025_ms": 170.4,
+      "footstrap_ms": 17.2,
+      "bootstrap_client_cpu_ms": 23.4,
+      "proton2025_client_cpu_ms": 30.6,
+      "footstrap_client_cpu_ms": 8.5
     },
     {
       "page": "admin/system/admin/uhttpd",
       "view": "system/uhttpd",
       "title": "HTTP(S) Access",
-      "speedup_vs_bootstrap": 4.4,
+      "speedup_vs_bootstrap": 4.43,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 152.6,
-      "proton2025_ms": 171.7,
-      "footstrap_ms": 34.7
+      "bootstrap_ms": 144.5,
+      "proton2025_ms": 160.1,
+      "footstrap_ms": 32.6,
+      "bootstrap_client_cpu_ms": 22.2,
+      "proton2025_client_cpu_ms": 32.1,
+      "footstrap_client_cpu_ms": 8.5
     },
     {
       "page": "admin/system/admin/repokeys",
       "view": "system/repokeys",
       "title": "Repo Public Keys",
-      "speedup_vs_bootstrap": 1.79,
+      "speedup_vs_bootstrap": 2.21,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 276.3,
-      "proton2025_ms": 302.9,
-      "footstrap_ms": 154.5
+      "bootstrap_ms": 290.8,
+      "proton2025_ms": 275.5,
+      "footstrap_ms": 131.8,
+      "bootstrap_client_cpu_ms": 28.3,
+      "proton2025_client_cpu_ms": 36.8,
+      "footstrap_client_cpu_ms": 14.1
     },
     {
       "page": "admin/system/startup",
       "view": "system/startup",
       "title": "Startup",
-      "speedup_vs_bootstrap": 1.14,
+      "speedup_vs_bootstrap": 1.16,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 1076.2,
-      "proton2025_ms": 1091.1,
-      "footstrap_ms": 941.4
+      "bootstrap_ms": 1097.3,
+      "proton2025_ms": 1106.6,
+      "footstrap_ms": 948.0,
+      "bootstrap_client_cpu_ms": 54.1,
+      "proton2025_client_cpu_ms": 60.4,
+      "footstrap_client_cpu_ms": 31.8
     },
     {
       "page": "admin/system/crontab",
       "view": "system/crontab",
       "title": "Scheduled Tasks",
-      "speedup_vs_bootstrap": 4.61,
+      "speedup_vs_bootstrap": 11.84,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 181.7,
-      "proton2025_ms": 199.2,
-      "footstrap_ms": 39.4
+      "bootstrap_ms": 188.4,
+      "proton2025_ms": 208.0,
+      "footstrap_ms": 15.9,
+      "bootstrap_client_cpu_ms": 20.3,
+      "proton2025_client_cpu_ms": 34.7,
+      "footstrap_client_cpu_ms": 8.0
     },
     {
       "page": "admin/system/leds",
       "view": "system/leds",
       "title": "LED Configuration",
-      "speedup_vs_bootstrap": 2.04,
+      "speedup_vs_bootstrap": 2.88,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 237.3,
-      "proton2025_ms": 268.8,
-      "footstrap_ms": 116.6
+      "bootstrap_ms": 213.9,
+      "proton2025_ms": 277.0,
+      "footstrap_ms": 74.4,
+      "bootstrap_client_cpu_ms": 31.6,
+      "proton2025_client_cpu_ms": 46.4,
+      "footstrap_client_cpu_ms": 12.2
     },
     {
       "page": "admin/system/flash",
       "view": "system/flash",
       "title": "Backup / Flash Firmware",
-      "speedup_vs_bootstrap": 2.15,
+      "speedup_vs_bootstrap": 2.68,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 243.5,
-      "proton2025_ms": 221.3,
-      "footstrap_ms": 113.2
+      "bootstrap_ms": 212.4,
+      "proton2025_ms": 238.3,
+      "footstrap_ms": 79.3,
+      "bootstrap_client_cpu_ms": 25.2,
+      "proton2025_client_cpu_ms": 38.5,
+      "footstrap_client_cpu_ms": 14.2
     },
     {
       "page": "admin/system/reboot",
       "view": "system/reboot",
       "title": "Reboot",
-      "speedup_vs_bootstrap": 2.21,
+      "speedup_vs_bootstrap": 6.49,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 139.5,
-      "proton2025_ms": 153.7,
-      "footstrap_ms": 63.1
+      "bootstrap_ms": 145.1,
+      "proton2025_ms": 206.3,
+      "footstrap_ms": 22.3,
+      "bootstrap_client_cpu_ms": 19.6,
+      "proton2025_client_cpu_ms": 33.9,
+      "footstrap_client_cpu_ms": 7.6
     },
     {
       "page": "admin/status/realtime",
       "view": "status/load",
       "title": "Realtime Graphs",
-      "speedup_vs_bootstrap": 7.04,
+      "speedup_vs_bootstrap": 8.73,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 105.5,
-      "proton2025_ms": 155.5,
-      "footstrap_ms": 15.0
+      "bootstrap_ms": 160.5,
+      "proton2025_ms": 171.6,
+      "footstrap_ms": 18.4,
+      "bootstrap_client_cpu_ms": 22.1,
+      "proton2025_client_cpu_ms": 32.2,
+      "footstrap_client_cpu_ms": 10.5
     },
     {
       "page": "admin/status/realtime/cpu",
       "view": "status/cpu",
       "title": "CPU",
-      "speedup_vs_bootstrap": 6.69,
+      "speedup_vs_bootstrap": 7.13,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 189.9,
-      "proton2025_ms": 167.8,
-      "footstrap_ms": 28.4
+      "bootstrap_ms": 196.2,
+      "proton2025_ms": 204.0,
+      "footstrap_ms": 27.5,
+      "bootstrap_client_cpu_ms": 26.2,
+      "proton2025_client_cpu_ms": 39.5,
+      "footstrap_client_cpu_ms": 13.8
     },
     {
       "page": "admin/status/realtime/load",
       "view": "status/load",
       "title": "Load",
-      "speedup_vs_bootstrap": 8.96,
+      "speedup_vs_bootstrap": 2.69,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 138.4,
-      "proton2025_ms": 154.2,
-      "footstrap_ms": 15.4
+      "bootstrap_ms": 186.7,
+      "proton2025_ms": 157.7,
+      "footstrap_ms": 69.5,
+      "bootstrap_client_cpu_ms": 25.7,
+      "proton2025_client_cpu_ms": 36.2,
+      "footstrap_client_cpu_ms": 15.9
     },
     {
       "page": "admin/status/realtime/bandwidth",
       "view": "status/bandwidth",
       "title": "Bandwidth",
-      "speedup_vs_bootstrap": 4.12,
+      "speedup_vs_bootstrap": 8.48,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 238.4,
-      "proton2025_ms": 203.6,
-      "footstrap_ms": 57.8
+      "bootstrap_ms": 262.4,
+      "proton2025_ms": 274.8,
+      "footstrap_ms": 31.0,
+      "bootstrap_client_cpu_ms": 40.3,
+      "proton2025_client_cpu_ms": 51.7,
+      "footstrap_client_cpu_ms": 17.1
     },
     {
       "page": "admin/status/realtime/wireless",
       "view": "status/wireless",
       "title": "Wireless",
-      "speedup_vs_bootstrap": 17.48,
+      "speedup_vs_bootstrap": 12.48,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 287.5,
-      "proton2025_ms": 254.1,
-      "footstrap_ms": 16.4
+      "bootstrap_ms": 258.6,
+      "proton2025_ms": 320.7,
+      "footstrap_ms": 20.7,
+      "bootstrap_client_cpu_ms": 42.7,
+      "proton2025_client_cpu_ms": 60.5,
+      "footstrap_client_cpu_ms": 14.2
     },
     {
       "page": "admin/status/realtime/connections",
       "view": "status/connections",
       "title": "Connections",
-      "speedup_vs_bootstrap": 2.47,
+      "speedup_vs_bootstrap": 8.32,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 138.7,
-      "proton2025_ms": 154.4,
-      "footstrap_ms": 56.1
+      "bootstrap_ms": 161.3,
+      "proton2025_ms": 156.6,
+      "footstrap_ms": 19.4,
+      "bootstrap_client_cpu_ms": 25.5,
+      "proton2025_client_cpu_ms": 36.2,
+      "footstrap_client_cpu_ms": 11.0
     },
     {
       "page": "admin/status/overview",
       "view": "admin_status/index",
       "title": "Overview",
-      "speedup_vs_bootstrap": 1.18,
+      "speedup_vs_bootstrap": 2.48,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 675.8,
-      "proton2025_ms": 753.7,
-      "footstrap_ms": 573.5
+      "bootstrap_ms": 972.5,
+      "proton2025_ms": 949.5,
+      "footstrap_ms": 392.1,
+      "bootstrap_client_cpu_ms": 102.7,
+      "proton2025_client_cpu_ms": 161.9,
+      "footstrap_client_cpu_ms": 22.3
     },
     {
       "page": "admin/status/routesj",
       "view": "status/routesj",
       "title": "Routing",
-      "speedup_vs_bootstrap": 2.6,
+      "speedup_vs_bootstrap": 1.33,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 200.4,
-      "proton2025_ms": 255.4,
-      "footstrap_ms": 77.0
+      "bootstrap_ms": 226.8,
+      "proton2025_ms": 262.2,
+      "footstrap_ms": 170.6,
+      "bootstrap_client_cpu_ms": 38.9,
+      "proton2025_client_cpu_ms": 54.2,
+      "footstrap_client_cpu_ms": 33.5
     },
     {
       "page": "admin/status/nftables",
       "view": "status/nftables",
       "title": "Firewall",
-      "speedup_vs_bootstrap": 2.32,
+      "speedup_vs_bootstrap": 1.67,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 209.8,
-      "proton2025_ms": 246.2,
-      "footstrap_ms": 90.4
+      "bootstrap_ms": 225.5,
+      "proton2025_ms": 278.8,
+      "footstrap_ms": 135.2,
+      "bootstrap_client_cpu_ms": 61.1,
+      "proton2025_client_cpu_ms": 74.1,
+      "footstrap_client_cpu_ms": 58.6
     },
     {
       "page": "admin/status/logs",
       "view": "status/syslog",
       "title": "System Log",
-      "speedup_vs_bootstrap": 2.64,
+      "speedup_vs_bootstrap": 5.39,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 185.6,
-      "proton2025_ms": 277.2,
-      "footstrap_ms": 70.3
+      "bootstrap_ms": 248.4,
+      "proton2025_ms": 236.8,
+      "footstrap_ms": 46.1,
+      "bootstrap_client_cpu_ms": 39.8,
+      "proton2025_client_cpu_ms": 63.2,
+      "footstrap_client_cpu_ms": 29.9
     },
     {
       "page": "admin/status/logs/syslog",
       "view": "status/syslog",
       "title": "System Log",
-      "speedup_vs_bootstrap": 2.97,
+      "speedup_vs_bootstrap": 5.16,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 189.4,
-      "proton2025_ms": 220.9,
-      "footstrap_ms": 63.8
+      "bootstrap_ms": 204.5,
+      "proton2025_ms": 237.4,
+      "footstrap_ms": 39.7,
+      "bootstrap_client_cpu_ms": 36.0,
+      "proton2025_client_cpu_ms": 94.1,
+      "footstrap_client_cpu_ms": 24.7
     },
     {
       "page": "admin/status/logs/dmesg",
       "view": "status/dmesg",
       "title": "Kernel Log",
-      "speedup_vs_bootstrap": 3.82,
+      "speedup_vs_bootstrap": 4.83,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 100.9,
-      "proton2025_ms": 155.7,
-      "footstrap_ms": 26.4
+      "bootstrap_ms": 116.6,
+      "proton2025_ms": 173.8,
+      "footstrap_ms": 24.2,
+      "bootstrap_client_cpu_ms": 22.9,
+      "proton2025_client_cpu_ms": 67.0,
+      "footstrap_client_cpu_ms": 13.7
     },
     {
       "page": "admin/status/processes",
       "view": "status/processes",
       "title": "Processes",
-      "speedup_vs_bootstrap": 1.7,
+      "speedup_vs_bootstrap": 1.68,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 290.5,
-      "proton2025_ms": 308.0,
-      "footstrap_ms": 170.5
+      "bootstrap_ms": 275.6,
+      "proton2025_ms": 305.1,
+      "footstrap_ms": 163.8,
+      "bootstrap_client_cpu_ms": 37.3,
+      "proton2025_client_cpu_ms": 60.4,
+      "footstrap_client_cpu_ms": 28.8
     },
     {
       "page": "admin/network/firewall",
       "view": "firewall/zones",
       "title": "Firewall",
-      "speedup_vs_bootstrap": 3.41,
+      "speedup_vs_bootstrap": 3.97,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 300.4,
-      "proton2025_ms": 306.9,
-      "footstrap_ms": 88.2
+      "bootstrap_ms": 337.0,
+      "proton2025_ms": 344.4,
+      "footstrap_ms": 85.0,
+      "bootstrap_client_cpu_ms": 53.5,
+      "proton2025_client_cpu_ms": 64.9,
+      "footstrap_client_cpu_ms": 31.0
     },
     {
       "page": "admin/network/firewall/zones",
       "view": "firewall/zones",
       "title": "General Settings",
-      "speedup_vs_bootstrap": 4.54,
+      "speedup_vs_bootstrap": 4.44,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 301.7,
-      "proton2025_ms": 305.8,
-      "footstrap_ms": 66.5
+      "bootstrap_ms": 364.2,
+      "proton2025_ms": 378.8,
+      "footstrap_ms": 82.1,
+      "bootstrap_client_cpu_ms": 57.1,
+      "proton2025_client_cpu_ms": 64.3,
+      "footstrap_client_cpu_ms": 23.3
     },
     {
       "page": "admin/network/firewall/forwards",
       "view": "firewall/forwards",
       "title": "Port Forwards",
-      "speedup_vs_bootstrap": 3.96,
+      "speedup_vs_bootstrap": 3.14,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 342.9,
-      "proton2025_ms": 356.5,
-      "footstrap_ms": 86.7
+      "bootstrap_ms": 328.2,
+      "proton2025_ms": 405.3,
+      "footstrap_ms": 104.6,
+      "bootstrap_client_cpu_ms": 45.4,
+      "proton2025_client_cpu_ms": 56.4,
+      "footstrap_client_cpu_ms": 17.5
     },
     {
       "page": "admin/network/firewall/rules",
       "view": "firewall/rules",
       "title": "Traffic Rules",
-      "speedup_vs_bootstrap": 3.45,
+      "speedup_vs_bootstrap": 3.24,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 299.9,
-      "proton2025_ms": 353.2,
-      "footstrap_ms": 87.0
+      "bootstrap_ms": 340.1,
+      "proton2025_ms": 375.9,
+      "footstrap_ms": 104.8,
+      "bootstrap_client_cpu_ms": 56.6,
+      "proton2025_client_cpu_ms": 72.0,
+      "footstrap_client_cpu_ms": 25.3
     },
     {
       "page": "admin/network/firewall/snats",
       "view": "firewall/snats",
       "title": "NAT Rules",
-      "speedup_vs_bootstrap": 2.81,
+      "speedup_vs_bootstrap": 2.34,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 225.0,
-      "proton2025_ms": 222.2,
-      "footstrap_ms": 80.2
+      "bootstrap_ms": 249.6,
+      "proton2025_ms": 264.2,
+      "footstrap_ms": 106.7,
+      "bootstrap_client_cpu_ms": 30.5,
+      "proton2025_client_cpu_ms": 42.2,
+      "footstrap_client_cpu_ms": 14.1
     },
     {
       "page": "admin/network/firewall/ipsets",
       "view": "firewall/ipsets",
       "title": "IP Sets",
-      "speedup_vs_bootstrap": 2.43,
+      "speedup_vs_bootstrap": 10.21,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 167.5,
-      "proton2025_ms": 219.4,
-      "footstrap_ms": 68.8
+      "bootstrap_ms": 215.4,
+      "proton2025_ms": 225.8,
+      "footstrap_ms": 21.1,
+      "bootstrap_client_cpu_ms": 27.0,
+      "proton2025_client_cpu_ms": 40.9,
+      "footstrap_client_cpu_ms": 8.9
     },
     {
       "page": "admin/network/wireless",
       "view": "network/wireless",
       "title": "Wireless",
-      "speedup_vs_bootstrap": 2.36,
+      "speedup_vs_bootstrap": 3.09,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 324.8,
-      "proton2025_ms": 432.8,
-      "footstrap_ms": 137.4
+      "bootstrap_ms": 392.0,
+      "proton2025_ms": 425.7,
+      "footstrap_ms": 126.8,
+      "bootstrap_client_cpu_ms": 49.9,
+      "proton2025_client_cpu_ms": 70.3,
+      "footstrap_client_cpu_ms": 22.0
     },
     {
       "page": "admin/network/network",
       "view": "network/interfaces",
       "title": "Interfaces",
-      "speedup_vs_bootstrap": 5.81,
+      "speedup_vs_bootstrap": 4.19,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 367.0,
-      "proton2025_ms": 370.0,
-      "footstrap_ms": 63.2
+      "bootstrap_ms": 409.6,
+      "proton2025_ms": 419.2,
+      "footstrap_ms": 97.7,
+      "bootstrap_client_cpu_ms": 63.3,
+      "proton2025_client_cpu_ms": 91.3,
+      "footstrap_client_cpu_ms": 34.3
     },
     {
       "page": "admin/network/routes",
       "view": "network/routes",
       "title": "Routing",
-      "speedup_vs_bootstrap": 4.47,
+      "speedup_vs_bootstrap": 4.91,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 350.1,
-      "proton2025_ms": 307.7,
-      "footstrap_ms": 78.3
+      "bootstrap_ms": 378.8,
+      "proton2025_ms": 355.0,
+      "footstrap_ms": 77.2,
+      "bootstrap_client_cpu_ms": 43.7,
+      "proton2025_client_cpu_ms": 60.1,
+      "footstrap_client_cpu_ms": 15.9
     },
     {
       "page": "admin/network/dhcp",
       "view": "network/dhcp",
       "title": "DHCP",
-      "speedup_vs_bootstrap": 3.07,
+      "speedup_vs_bootstrap": 2.96,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 279.1,
-      "proton2025_ms": 363.4,
-      "footstrap_ms": 90.9
+      "bootstrap_ms": 374.1,
+      "proton2025_ms": 363.5,
+      "footstrap_ms": 126.5,
+      "bootstrap_client_cpu_ms": 58.1,
+      "proton2025_client_cpu_ms": 66.3,
+      "footstrap_client_cpu_ms": 38.3
     },
     {
       "page": "admin/network/dns",
       "view": "network/dns",
       "title": "DNS",
-      "speedup_vs_bootstrap": 3.92,
+      "speedup_vs_bootstrap": 3.17,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 328.3,
-      "proton2025_ms": 398.4,
-      "footstrap_ms": 83.7
+      "bootstrap_ms": 370.5,
+      "proton2025_ms": 408.0,
+      "footstrap_ms": 117.0,
+      "bootstrap_client_cpu_ms": 62.9,
+      "proton2025_client_cpu_ms": 71.7,
+      "footstrap_client_cpu_ms": 39.3
     },
     {
       "page": "admin/network/diagnostics",
       "view": "network/diagnostics",
       "title": "Diagnostics",
-      "speedup_vs_bootstrap": 9.15,
+      "speedup_vs_bootstrap": 9.47,
       "footstrap_nav": "spa",
-      "bootstrap_ms": 188.9,
-      "proton2025_ms": 288.4,
-      "footstrap_ms": 20.6
+      "bootstrap_ms": 223.6,
+      "proton2025_ms": 305.8,
+      "footstrap_ms": 23.6,
+      "bootstrap_client_cpu_ms": 31.2,
+      "proton2025_client_cpu_ms": 44.8,
+      "footstrap_client_cpu_ms": 14.1
     }
   ],
-  "total_bootstrap_ms": 10517.5,
-  "total_proton2025_ms": 11679.7,
-  "total_footstrap_ms": 4637.7,
-  "total_speedup": 2.27
+  "total_bootstrap_ms": 11814.5,
+  "total_proton2025_ms": 12644.4,
+  "total_footstrap_ms": 4544.7,
+  "total_speedup": 2.6,
+  "cpu": {
+    "note": "client = CDP Performance deltas per navigation (main thread). router = /proc on the router; the web-stack figure is utime+stime+cutime+cstime of uhttpd+rpcd+ubusd, so reaped CGI children count. 'box' is /proc/stat and includes everything else the router does \u2014 compare it against idle_baseline.",
+    "client_total_ms": {
+      "bootstrap": 1741.7,
+      "proton2025": 2401.2,
+      "footstrap": 1008.9
+    },
+    "client_per_nav_ms": {
+      "bootstrap": 45.84,
+      "proton2025": 63.19,
+      "footstrap": 26.55
+    },
+    "client_breakdown_median_ms": {
+      "bootstrap": {
+        "TaskDuration": 38.06,
+        "ScriptDuration": 2.39,
+        "V8CompileDuration": 0.06,
+        "RecalcStyleDuration": 1.67,
+        "LayoutDuration": 1.23
+      },
+      "proton2025": {
+        "TaskDuration": 55.29,
+        "ScriptDuration": 5.52,
+        "V8CompileDuration": 0.11,
+        "RecalcStyleDuration": 3.52,
+        "LayoutDuration": 2.87
+      },
+      "footstrap": {
+        "TaskDuration": 15.93,
+        "ScriptDuration": 2.75,
+        "V8CompileDuration": 0.0,
+        "RecalcStyleDuration": 2.55,
+        "LayoutDuration": 0.9
+      }
+    },
+    "router": {
+      "bootstrap": {
+        "secs": 65.05,
+        "ncpu": 4.0,
+        "stack_ms": 36970.0,
+        "box_pct": 20.56,
+        "stack_pct": 14.21,
+        "load": 0.96,
+        "stack_ms_per_nav": 194.58
+      },
+      "proton2025": {
+        "secs": 71.67,
+        "ncpu": 4.0,
+        "stack_ms": 43800.0,
+        "box_pct": 23.57,
+        "stack_pct": 15.28,
+        "load": 0.67,
+        "stack_ms_per_nav": 230.53
+      },
+      "footstrap": {
+        "secs": 29.45,
+        "ncpu": 4.0,
+        "stack_ms": 17830.0,
+        "box_pct": 23.04,
+        "stack_pct": 15.14,
+        "load": 0.44,
+        "stack_ms_per_nav": 93.84
+      }
+    },
+    "router_navs": {
+      "bootstrap": 190,
+      "proton2025": 190,
+      "footstrap": 190
+    },
+    "router_poll_page": "admin/status/overview",
+    "router_poll_ms_per_s": {
+      "bootstrap": 13.7,
+      "proton2025": 85.8,
+      "footstrap": 15.7
+    },
+    "router_nav_ms_polling_removed": {
+      "bootstrap": 189.9,
+      "proton2025": 198.2,
+      "footstrap": 91.4
+    },
+    "idle_baseline": {
+      "before": {
+        "secs": 5.18,
+        "ncpu": 4.0,
+        "stack_ms": 0.0,
+        "box_pct": 1.85,
+        "stack_pct": 0.0,
+        "load": 0.13
+      },
+      "after": {
+        "secs": 5.2,
+        "ncpu": 4.0,
+        "stack_ms": 0.0,
+        "box_pct": 1.49,
+        "stack_pct": 0.0,
+        "load": 0.34
+      }
+    }
+  }
 }

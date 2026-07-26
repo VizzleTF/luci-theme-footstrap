@@ -370,6 +370,14 @@ function navigate(pathname, push, kbd) {
 	 * previous page's data-page and its scoped styles silently do not apply. */
 	document.body.setAttribute('data-page', rsegs.join('-'));
 
+	/* …and immediately hand the new page to fs-sheets, which darkens every foreign sheet that
+	 * belongs to a DIFFERENT page and re-lights the ones that belong to this one. This is what lets
+	 * an invasive sheet stay in the document without spending it — the alternative was a full load
+	 * on the way out of any page carrying one, which stock LuCI's five realtime views all do (see
+	 * the page-ownership block in fs-sheets.js). It must run AFTER the stamp above and BEFORE the
+	 * view renders, so nothing paints through a sheet that no longer owns the page. */
+	sheets.scopeToCurrentPage(rsegs);
+
 	/* Re-navigating to the page already on screen must REPLACE its history entry, not push a
 	 * second one. Clicking the active menu item is ordinary, and a duplicate entry makes Back do
 	 * nothing: popstate fires, `location.pathname === _curPath`, and the fragment guard below

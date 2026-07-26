@@ -27,6 +27,67 @@ METHOD (per theme)
   Also counts network requests fired during each transition (SPA fetches only
   the RPC it needs; a full reload re-requests the shell + scripts, even if 304).
 
+CPU — TWO TABLES, BECAUSE "CPU LOAD" IS TWO DIFFERENT QUESTIONS
+  Wall-clock time answers "how long did I wait". It does not answer "what did
+  this cost", and the two can disagree: a theme could be fast because it makes
+  the ROUTER do the work, or fast on the router while burning the client's
+  battery. So both ends are measured, by different means, and reported apart.
+
+  ROUTER (bench/…: "router CPU"). Measured ON the router, from /proc, at the
+  edges of each theme's measured passes — never per navigation, because an ssh
+  round trip per nav would add both latency to the timing table and CPU to the
+  thing being measured.
+
+  A LuCI view POLLS while it is open (status readouts, once a second), and that
+  is router CPU nobody navigated for. Measured naively, the pass window mixes
+  the two and the mixture flatters the fast theme twice: it serves the tour with
+  less CPU *and* finishes sooner, so it also pays less polling. So the polling
+  rate is measured separately, per theme, parked on one fixed page with nothing
+  else happening, and the table prints all three — the tour's total, the polling
+  rate, and the remainder divided by the navigation count. The first number is
+  the honest answer to "what did this tour cost my router"; the third is the
+  honest answer to "what does one navigation cost".
+
+  Two ways of counting, and the first is the attributable one:
+    - web stack: utime+stime+cutime+cstime of uhttpd, rpcd and ubusd. The
+      cutime/cstime halves are what make this work: uhttpd forks a CGI per
+      request and a reaped child's CPU lands in its parent's counters, so the
+      ucode that renders the shell IS counted (verified on the router: 10 shell
+      renders moved uhttpd's cutime+cstime by 41 jiffies, i.e. ~41 ms each,
+      while rpcd — which the login page never calls — did not move at all).
+      This attributes cost to the web stack and ignores unrelated router noise.
+    - whole box: the /proc/stat busy delta, i.e. "CPU load" in the plain sense.
+      Includes everything else the router is doing, so an IDLE BASELINE is
+      measured before and after the run and printed beside it. Do not read the
+      box figure without the baseline.
+  Window length comes from the ROUTER's own /proc/uptime, so a clock offset
+  between host and router cannot skew it. Jiffies are converted at 100 Hz —
+  USER_HZ, which is a fixed kernel ABI constant for /proc, not CONFIG_HZ.
+
+  NOTE FOR ANYONE RUNNING THIS IN A CONTAINER: /proc/stat inside a Docker
+  container is the HOST's (measured: byte-identical to the host's own), so the
+  "whole box" figure there would include this very benchmark's browser. The web
+  stack figure is per-process and stays correct. The published numbers come from
+  real hardware for exactly this reason.
+
+  CLIENT (bench/…: "client CPU"). Per navigation and precise, from CDP
+  Performance.getMetrics deltas: TaskDuration (main-thread task time) with a
+  ScriptDuration / RecalcStyleDuration / LayoutDuration / V8CompileDuration
+  breakdown. Verified on the router that these counters are monotonic across a
+  full page navigation — the renderer process is reused for a same-origin load,
+  so a bootstrap reload accumulates rather than resetting; a negative delta
+  (process replaced) is detected and the sample dropped rather than counted as 0.
+
+  Two things to know before quoting the client numbers. TaskDuration is ALL
+  main-thread task time in the window, so it includes whatever the open page was
+  doing anyway — the named parts (script/style/layout) sum to a small fraction of
+  it, and the rest is HTML parsing, network task dispatch, GC and timers. And
+  V8CompileDuration is ~0.1 ms in both themes on a warm cache, i.e. compiling
+  luci.js/cbi.js is NOT where a full reload loses: V8's code cache makes the
+  re-compile nearly free, so the reload's cost is the shell, the re-fetch and the
+  re-render. It is printed anyway, because "this is not the reason" is worth
+  seeing rather than assuming.
+
 STANDARD PAGES
   Discovered live from /admin/menu: every node the menu can turn into a link
   (satisfied + titled) at depth >= 3, whose *resolved* target is a standard LuCI
@@ -107,6 +168,60 @@ RENDERED = (
 def sh(host, cmd):
     return subprocess.run(["ssh", host, cmd], check=True,
                           capture_output=True, text=True).stdout.strip()
+
+
+# ---------------------------------------------------------------------------
+# router-side CPU
+# ---------------------------------------------------------------------------
+# ONE ssh round trip per sample. Everything is read from /proc, including the
+# clock: the window length comes from the router's own uptime so that a clock
+# offset between this host and the router cannot turn into a bogus percentage.
+CPU_PROBE = (
+    "for p in $(pgrep uhttpd) $(pgrep rpcd) $(pgrep ubusd); do "
+    "  awk '{print $14+$15+$16+$17}' /proc/$p/stat 2>/dev/null; "
+    "done | awk '{s+=$1} END{printf \"stack %d\\n\", s+0}'; "
+    # $1 is the literal "cpu", so: 2 user, 3 nice, 4 system, 5 idle, 6 iowait,
+    # 7 irq, 8 softirq, 9 steal. busy excludes idle AND iowait (waiting is not
+    # burning). The double space after "cpu" collapses under awk's default FS.
+    "awk '/^cpu /{printf \"busy %d\\nidle %d\\n\", $2+$3+$4+$7+$8+$9, $5+$6}' /proc/stat; "
+    "awk '{printf \"up %s\\n\", $1}' /proc/uptime; "
+    "awk '{printf \"load %s\\n\", $1}' /proc/loadavg; "
+    "grep -c ^processor /proc/cpuinfo | awk '{printf \"ncpu %s\\n\", $1}'"
+)
+USER_HZ = 100   # /proc/<pid>/stat is in USER_HZ, a fixed ABI constant (not CONFIG_HZ)
+
+# Where to park to measure the polling rate, and for how long. The overview is
+# the right page: it is the one users leave open, and it polls the most, so the
+# rate is well above the jiffy floor. Long enough that a 10 ms jiffy is noise.
+POLL_PAGE = "admin/status/overview"
+POLL_SECS = 10
+
+
+def cpu_sample(host):
+    out = {}
+    for line in sh(host, CPU_PROBE).splitlines():
+        k, _, v = line.partition(" ")
+        out[k] = float(v)
+    return out
+
+
+def cpu_window(a, b, navs=None):
+    """Turn two samples into the numbers the CPU tables print."""
+    secs = b["up"] - a["up"]
+    if secs <= 0:                     # router rebooted mid-run; refuse to invent a number
+        return None
+    ncpu = max(b.get("ncpu", 1), 1)
+    stack_ms = (b["stack"] - a["stack"]) * 1000.0 / USER_HZ
+    busy_j, idle_j = b["busy"] - a["busy"], b["idle"] - a["idle"]
+    total_j = busy_j + idle_j
+    w = {"secs": secs, "ncpu": ncpu, "stack_ms": stack_ms,
+         # as a share of the WHOLE box (all cores), which is what "load" means to a reader
+         "box_pct": (100.0 * busy_j / total_j) if total_j > 0 else float("nan"),
+         "stack_pct": 100.0 * (stack_ms / 1000.0) / (secs * ncpu),
+         "load": b.get("load", float("nan"))}
+    if navs:
+        w["stack_ms_per_nav"] = stack_ms / navs
+    return w
 
 
 def node_weight(n):
@@ -207,12 +322,28 @@ def nav_bootstrap(page, http, dp):
     return True
 
 
+# The renderer's own CPU counters, in the order the breakdown is printed.
+# TaskDuration is the headline (all main-thread task time); the rest are the
+# parts of it worth naming. V8CompileDuration is the one that separates a full
+# reload from an SPA nav: a reload re-compiles luci.js/cbi.js, a nav compiles
+# nothing.
+CPU_METRICS = ("TaskDuration", "ScriptDuration", "V8CompileDuration",
+               "RecalcStyleDuration", "LayoutDuration")
+
+
+def client_cpu(cdp):
+    m = {x["name"]: x["value"] for x in cdp.send("Performance.getMetrics")["metrics"]}
+    return {k: m.get(k, 0.0) for k in CPU_METRICS}
+
+
 def run_theme(p, http, base, media, pages, runs, login):
     browser = p.chromium.launch(args=["--no-sandbox"], headless=not login["headful"])
     ctx = browser.new_context(ignore_https_errors=True)
     ctx.request.post(f"{http}/cgi-bin/luci/",
                      form={"luci_username": "root", "luci_password": login["pw"]})
     page = ctx.new_page()
+    cdp = ctx.new_cdp_session(page)
+    cdp.send("Performance.enable")
 
     reqs = {"n": 0}
     page.on("request", lambda r: reqs.__setitem__("n", reqs["n"] + 1))
@@ -229,6 +360,7 @@ def run_theme(p, http, base, media, pages, runs, login):
 
     def go(dp):
         reqs["n"] = 0
+        cpu0 = client_cpu(cdp)
         # a marker on `window` dies with a full page load and survives an in-place
         # swap: the only honest way to tell a SPA nav from a router fallback, and
         # without it a 1.0x row looks like a slow SPA instead of a full reload.
@@ -249,24 +381,53 @@ def run_theme(p, http, base, media, pages, runs, login):
             print(f"  ! skip {dp}: not rendered in time (#view={txt!r})")
         if is_foot:
             spa[dp] = bool(page.evaluate("() => window.__benchmark === 1"))
-        return ms, reqs["n"]
+        # A negative delta means the renderer process was replaced mid-run, so the
+        # counters restarted from zero and this sample's history is gone. Drop it
+        # rather than record the post-restart absolute as if it were a delta —
+        # that would report a suspiciously CHEAP navigation, which is the wrong
+        # direction to be wrong in.
+        cpu1 = client_cpu(cdp)
+        d = {k: (cpu1[k] - cpu0[k]) * 1000.0 for k in CPU_METRICS}
+        cpu = None if any(v < 0 for v in d.values()) else d
+        return ms, reqs["n"], cpu
 
     # WARM pass (unmeasured)
     for dp in dps:
         go(dp)
 
-    # MEASURED passes
+    # MEASURED passes. The router-side window opens AFTER the warm pass and
+    # closes before the browser does, so it covers the measured navigations and
+    # nothing else — no page discovery, no login, no browser startup.
+    host = login["host"]
+    navs = 0
+    rt0 = cpu_sample(host)
     times = {dp: [] for dp in dps}
     nreq = {dp: [] for dp in dps}
+    ccpu = {dp: [] for dp in dps}
     for _ in range(runs):
         for dp in dps:
-            ms, n = go(dp)
+            ms, n, cpu = go(dp)
             if ms is not None:
                 times[dp].append(ms)
                 nreq[dp].append(n)
+                navs += 1
+                if cpu:
+                    ccpu[dp].append(cpu)
+    rt1 = cpu_sample(host)
+
+    # POLLING RATE, same theme, same browser, one fixed page, nobody navigating.
+    # Parked on the SAME page for every theme (a view that polls a lot, so the
+    # figure is not rounded down to nothing) — otherwise the three rates would
+    # describe three different pages. This is what the pass total has to be
+    # discounted by before "per navigation" means anything.
+    park = POLL_PAGE if POLL_PAGE in dps else dps[0]
+    go(park)
+    pk0 = cpu_sample(host)
+    time.sleep(POLL_SECS)
+    poll = cpu_window(pk0, cpu_sample(host))
 
     browser.close()
-    return times, nreq, spa
+    return times, nreq, spa, ccpu, cpu_window(rt0, rt1, navs), navs, poll
 
 
 def main():
@@ -285,12 +446,24 @@ def main():
     ip = re.search(r"^hostname (.+)$",
                    subprocess.check_output(["ssh", "-G", host]).decode(), re.M).group(1).strip()
     http = f"http://{ip}"
-    login = {"pw": pw, "headful": args.headful}
+    login = {"pw": pw, "headful": args.headful, "host": host}
 
     from playwright.sync_api import sync_playwright
 
     orig = sh(host, "uci get luci.main.mediaurlbase") or BOOTSTRAP
     print(f"router={http} original-theme={orig} runs={args.runs}")
+
+    # Idle baseline: what the router burns with nobody browsing. The "whole box"
+    # percentage below is meaningless without it — this box also routes traffic.
+    # Taken before AND after the whole run, so a reader can see whether the box
+    # stayed quiet; a single sample cannot show that.
+    def idle_baseline(secs=5):
+        a = cpu_sample(host)
+        time.sleep(secs)
+        return cpu_window(a, cpu_sample(host))
+
+    print(f"measuring idle baseline ({5} s, nobody browsing) …")
+    idle_pre = idle_baseline()
 
     results = {}
     try:
@@ -306,11 +479,15 @@ def main():
                 pages = discover_pages(http, c)
                 b.close()
                 print(f"\n=== {media}  ({len(pages)} standard pages) ===")
-                times, nreq, spa = run_theme(p, http, media, media, pages, args.runs, login)
-                results[media] = {"pages": pages, "times": times, "nreq": nreq, "spa": spa}
+                times, nreq, spa, ccpu, rcpu, navs, poll = run_theme(
+                    p, http, media, media, pages, args.runs, login)
+                results[media] = {"pages": pages, "times": times, "nreq": nreq, "spa": spa,
+                                  "ccpu": ccpu, "rcpu": rcpu, "navs": navs, "poll": poll}
     finally:
         sh(host, f"uci set luci.main.mediaurlbase={orig}; uci commit luci; rm -f /tmp/luci-indexcache*")
         print(f"\nreverted theme -> {orig}")
+
+    idle_post = idle_baseline()
 
     # ---- report ----
     def med(x): return statistics.median(x) if x else float("nan")
@@ -345,6 +522,10 @@ def main():
         row = {"page": dp, "view": vp, "title": title,
                "speedup_vs_" + name(BASELINE): round(sp, 2), "footstrap_nav": kind}
         row.update({name(m) + "_ms": round(vals[m], 1) for m in THEMES})
+        row.update({name(m) + "_client_cpu_ms":
+                    (round(c, 1) if c == c else None)
+                    for m in THEMES
+                    for c in [med([s["TaskDuration"] for s in results[m]["ccpu"][dp]])]})
         rows_out.append(row)
 
     print("-" * width)
@@ -365,6 +546,101 @@ def main():
         print(f"  footstrap vs {name(m):14s} {totals[m] / totals[FOOTSTRAP]:5.2f}x total, {per:5.2f}x median page")
     print("=" * width)
 
+    # ---- CPU: two tables, because the two ends answer different questions ----
+    def cmed(media, dp, key):
+        v = [s[key] for s in results[media]["ccpu"][dp]]
+        return med(v)
+
+    cw = 42 + 13 * len(THEMES) + 10
+    print("\n" + "=" * cw)
+    print("CLIENT CPU — browser main-thread time per navigation (median, ms)")
+    print("-" * cw)
+    print(f"{'page':40s}" + "".join(f"{name(m):>12s}" for m in THEMES) + f"{'saved':>10s}")
+    print("-" * cw)
+    ctot = {m: 0.0 for m in THEMES}
+    ccov = 0
+    for dp, vp, title in pages:
+        vals = {m: cmed(m, dp, "TaskDuration") for m in THEMES}
+        if any(v != v for v in vals.values()):
+            continue
+        ccov += 1
+        for m in THEMES:
+            ctot[m] += vals[m]
+        r = vals[BASELINE] / vals[FOOTSTRAP] if vals[FOOTSTRAP] else float("nan")
+        print(f"{dp:40s}" + "".join(f"{vals[m]:10.0f}ms" for m in THEMES) + f"{r:9.2f}x")
+    print("-" * cw)
+    print(f"{'TOTAL (sum of medians)':40s}" + "".join(f"{ctot[m]:10.0f}ms" for m in THEMES)
+          + (f"{ctot[BASELINE] / ctot[FOOTSTRAP]:9.2f}x" if ctot[FOOTSTRAP] else ""))
+    print(f"{'per navigation (mean over pages)':40s}"
+          + "".join(f"{(ctot[m] / ccov if ccov else float('nan')):10.1f}ms" for m in THEMES))
+    print("\nbreakdown — median per navigation over all pages (ms):")
+    for key in CPU_METRICS[1:]:
+        row = {m: med([cmed(m, dp, key) for dp, _, _ in pages
+                       if cmed(m, dp, key) == cmed(m, dp, key)]) for m in THEMES}
+        label = {"ScriptDuration": "script", "V8CompileDuration": "v8 compile",
+                 "RecalcStyleDuration": "style recalc", "LayoutDuration": "layout"}[key]
+        print(f"  {label:38s}" + "".join(f"{row[m]:10.1f}ms" for m in THEMES))
+    print("=" * cw)
+
+    print("\n" + "=" * cw)
+    print("ROUTER CPU — measured on the router itself, over each theme's measured passes")
+    print("-" * cw)
+    print(f"{'':40s}" + "".join(f"{name(m):>12s}" for m in THEMES))
+    print("-" * cw)
+    rc = {m: results[m]["rcpu"] for m in THEMES}
+    pl = {m: results[m]["poll"] for m in THEMES}
+
+    def nav_ms(m):
+        """What one navigation cost the router, once the open page's own polling is out."""
+        if not rc[m] or not pl[m] or not results[m]["navs"]:
+            return float("nan")
+        rate = pl[m]["stack_ms"] / pl[m]["secs"]                # ms of CPU per second, parked
+        return max(rc[m]["stack_ms"] - rate * rc[m]["secs"], 0.0) / results[m]["navs"]
+
+    if all(rc[m] for m in THEMES):
+        print(f"{'navigations (tour of every page x runs)':40s}"
+              + "".join(f"{results[m]['navs']:12d}" for m in THEMES))
+        print(f"{'tour duration':40s}" + "".join(f"{rc[m]['secs']:11.0f}s" for m in THEMES))
+        print(f"{'web stack CPU for the whole tour':40s}"
+              + "".join(f"{rc[m]['stack_ms'] / 1000.0:11.1f}s" for m in THEMES))
+        print(f"{'  polling rate, parked on one page':40s}"
+              + "".join((f"{pl[m]['stack_ms'] / pl[m]['secs']:8.0f}ms/s" if pl[m] else f"{'n/a':>11s}")
+                        for m in THEMES))
+        print(f"{'  => per navigation, polling removed':40s}"
+              + "".join(f"{nav_ms(m):10.0f}ms" for m in THEMES))
+        # RATES, not costs. Both rows are per-second averages over a window whose
+        # LENGTH is what the theme changed, so a faster theme compresses the same
+        # work into less time and its percentage goes UP while its CPU-seconds go
+        # down. Measured here: footstrap 26.0% box vs bootstrap 22.4%, on 19.3s of
+        # CPU against 37.6s. Anyone reading the percentage as the cost reads it
+        # backwards, so the rows say so.
+        print(f"{'web stack, share of the box (RATE)':40s}"
+              + "".join(f"{rc[m]['stack_pct']:11.1f}%" for m in THEMES))
+        print(f"{'whole box busy (RATE, incl. routing)':40s}"
+              + "".join(f"{rc[m]['box_pct']:11.1f}%" for m in THEMES))
+        print(f"{'load average, end of tour':40s}" + "".join(f"{rc[m]['load']:12.2f}" for m in THEMES))
+        print(f"{'':40s}" + "  <- rates over a window whose length the theme changed;")
+        print(f"{'':40s}" + "     compare CPU-SECONDS above, not these percentages.")
+        print("-" * cw)
+        for lbl, w in (("idle baseline, before the run", idle_pre),
+                       ("idle baseline, after the run", idle_post)):
+            if w:
+                print(f"{lbl:40s}{w['box_pct']:11.1f}%  box busy, "
+                      f"{w['stack_ms'] / w['secs']:.0f} ms/s web stack, load {w['load']:.2f}")
+        print(f"\n{rc[FOOTSTRAP]['ncpu']:.0f} cores. 'web stack' is uhttpd+rpcd+ubusd, counting "
+              "utime+stime+cutime+cstime, so\nthe CPU of a reaped CGI child lands in its parent "
+              f"and the ucode that renders the shell\nIS counted. A LuCI view polls while it is open "
+              f"(parked on {POLL_PAGE},\n{POLL_SECS} s), which is why the tour total is discounted by "
+              "that rate before dividing by\nthe navigation count.\n"
+              "\nCheck the parked rate against the idle baseline before trusting the discount: when "
+              "the\ntwo are within noise of each other, that theme's polling is too cheap to "
+              "measure and the\ndiscount is mostly removing the router's own background — which "
+              "makes the per-navigation\nfigure conservative, not flattering. A rate well above the "
+              "baseline is real polling.")
+    else:
+        print("  (unavailable: the router's uptime went backwards — rebooted mid-run?)")
+    print("=" * cw)
+
     if args.out:
         out = {"router": http, "runs": args.runs, "themes": [name(m) for m in THEMES],
                "baseline": name(BASELINE),
@@ -373,6 +649,29 @@ def main():
                "pages": rows_out}
         out.update({"total_" + name(m) + "_ms": round(totals[m], 1) for m in THEMES})
         out["total_speedup"] = round(totals[BASELINE] / totals[FOOTSTRAP], 2)
+        out["cpu"] = {
+            "note": ("client = CDP Performance deltas per navigation (main thread). "
+                     "router = /proc on the router; the web-stack figure is "
+                     "utime+stime+cutime+cstime of uhttpd+rpcd+ubusd, so reaped CGI "
+                     "children count. 'box' is /proc/stat and includes everything else "
+                     "the router does — compare it against idle_baseline."),
+            "client_total_ms": {name(m): round(ctot[m], 1) for m in THEMES},
+            "client_per_nav_ms": {name(m): round(ctot[m] / ccov, 2) for m in THEMES} if ccov else {},
+            "client_breakdown_median_ms": {
+                name(m): {k: round(med([cmed(m, dp, k) for dp, _, _ in pages
+                                        if cmed(m, dp, k) == cmed(m, dp, k)]), 2)
+                          for k in CPU_METRICS}
+                for m in THEMES},
+            "router": {name(m): ({k: round(v, 2) for k, v in rc[m].items()} if rc[m] else None)
+                       for m in THEMES},
+            "router_navs": {name(m): results[m]["navs"] for m in THEMES},
+            "router_poll_page": POLL_PAGE,
+            "router_poll_ms_per_s": {name(m): (round(pl[m]["stack_ms"] / pl[m]["secs"], 1)
+                                               if pl[m] else None) for m in THEMES},
+            "router_nav_ms_polling_removed": {name(m): round(nav_ms(m), 1) for m in THEMES},
+            "idle_baseline": {w: ({k: round(v, 2) for k, v in s.items()} if s else None)
+                              for w, s in (("before", idle_pre), ("after", idle_post))},
+        }
         json.dump(out, open(args.out, "w"), indent=2)
         print(f"wrote {args.out}")
 

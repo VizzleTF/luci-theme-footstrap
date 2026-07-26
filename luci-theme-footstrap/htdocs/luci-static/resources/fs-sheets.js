@@ -250,11 +250,17 @@ function judgeSheet(el, universe) {
  * <link> INSIDE the view tree (`luci-app-nlbwmon`) needs no handling: it dies with the swap. */
 const VIEW_SHEETS = 'style:not([data-fs-shell]), link[rel~="stylesheet"]:not([data-fs-shell])';
 
+/* An invasive sheet we OWN is contained — scopeToCurrentPage() darkens it the moment the router
+ * stamps the new page, so it cannot reach the next page and the document is not spent. One we could
+ * not attribute (not re-hostable, so never owned: an @import at the top, a sheet built with
+ * insertRule(), anything unreadable) still spends it, which is the pre-existing behaviour and the
+ * conservative half. */
 function documentPoisoned() {
 	const names = themeNames();
 	return Array.prototype.some.call(
 		document.querySelectorAll(VIEW_SHEETS),
-		(el) => !el.closest('#view') && (!names || invasiveSheet(el, names)));
+		(el) => !el.closest('#view')
+			&& (!names || (invasiveSheet(el, names) && !_owner.has(el))));
 }
 
 /* ---- an invasive sheet still has to render ITS page: re-host it into the theme LAYER ----
@@ -430,6 +436,81 @@ function silence(el) {
 	el.addEventListener('load', () => { if (el.sheet) el.sheet.disabled = true; }, { once: true });
 }
 
+/* ---- PAGE OWNERSHIP: contain an invasive sheet instead of spending the document ----
+ *
+ * A foreign sheet is injected by ONE page and has no business painting any other. Before this, an
+ * invasive sheet made the whole document spent (documentPoisoned) and the SPA fell back to a full
+ * load on the way OUT — correct, but stock LuCI pays it: `view/status/cpu.js` and its four realtime
+ * siblings each `document.head.append(E('style', …))` at MODULE EVAL, and that style carries
+ * `svg text { fill: #eee; font-size: 9pt }` — real properties on a bare selector, so invasive by the
+ * only definition that catches `[class] { padding: 0 !important }`. Measured on the router: 37 of 38
+ * pages navigated in-place instead of 38, `status/realtime/load` 15 ms -> 157 ms, and the whole
+ * realtime family 2-10x slower.
+ *
+ * Removing the sheet on the way out is NOT the fix, and it is the obvious one: the append is at
+ * module top level, `L.require` caches the module, so a second visit re-runs nothing and the page
+ * would render unstyled. Disabling is reversible, which is the whole difference.
+ *
+ * OWNER = body[data-page] when the sheet was re-hosted. The order that makes this sound is in
+ * fs-router.js: it stamps data-page (line ~371) BEFORE require()ing the view class (~450), so at the
+ * moment a view module evaluates and appends its <style>, the attribute already names ITS page. On a
+ * full load the server stamped it. Either way "now" is the sheet's own page.
+ *
+ * Recorded on the element that PAINTS, never on the one that was permanently silenced: for a <link>
+ * that is the @import shim, and re-enabling the original instead would undo silence() and put the
+ * app's unfenced CSS back over the chrome — the measured 95-of-338 flattening.
+ *
+ * THE OWNER IS THE APP, NOT THE PAGE, and that is not a guess — per-page was written first and
+ * swept: `luci-app-zapret2` has three pages that share ONE injected <style>
+ * (`.label-status { … !important }`), so it was owned by whichever loaded first and arrived DARK on
+ * the other two. Per-page ownership silently un-styles any app whose pages share an injector, which
+ * is a whole class of app, not a corner. `admin/<group>/<app>` — the first three dispatch segments —
+ * is the smallest key that keeps an app's own pages together while still blocking the leak this
+ * exists to block: onto OTHER apps and onto stock pages. The sweep is
+ * `tools/...`-less on purpose (it needs a live router); re-run it against a router with third-party
+ * apps after touching this, and look for a sheet that a full load has and an SPA arrival does not.
+ *
+ * Segments, never the dash-joined `data-page`: a dispatch segment may itself contain a dash
+ * (`admin/system/package-manager`), so splitting the attribute on '-' would cut inside a name. */
+const _owner = new WeakMap();
+const APP_DEPTH = 3;
+
+/* The router hands this over on every navigation (it holds the resolved segments). Until it does —
+ * the initial full load — derive it from the URL, which is the same information the server used. */
+let _curKey = null;
+
+function appKey(segs) {
+	return (segs || []).slice(0, APP_DEPTH).join('/');
+}
+
+function currentKey() {
+	if (_curKey !== null) return _curKey;
+	const p = location.pathname.replace(/^.*\/cgi-bin\/luci\/?/, '').replace(/\/+$/, '');
+	return appKey(p ? p.split('/') : []);
+}
+
+/* Both halves, for the reason silence() documents: el.disabled is the ELEMENT's flag and
+ * el.sheet.disabled is what decides whether the CSS paints, and a still-loading <link> has no
+ * .sheet for the assignment to reach. */
+function setEnabled(el, on) {
+	el.disabled = !on;
+	if (el.sheet) el.sheet.disabled = !on;
+	else if (!on) el.addEventListener('load', () => { if (el.sheet) el.sheet.disabled = true; }, { once: true });
+}
+
+/* Called by the router right after it stamps data-page, with the RESOLVED segments. Only sheets we
+ * OWN are touched: a clean sheet is harmless and an invasive one we could not attribute still
+ * poisons the document, so it keeps the full-load path rather than being silently disabled on its
+ * own page. */
+function scopeToCurrentPage(segs) {
+	if (segs) _curKey = appKey(segs);
+	const key = currentKey();
+	document.querySelectorAll(VIEW_SHEETS).forEach((el) => {
+		if (el.closest('#view') || !_owner.has(el)) return;
+		setEnabled(el, _owner.get(el) === key);
+	});
+}
+
 function rehostIntoThemeLayer(el, universe) {
 	if (el.dataset.fsLayered) return;
 
@@ -442,6 +523,7 @@ function rehostIntoThemeLayer(el, universe) {
 		el.dataset.fsLayered = '1';
 		el.after(s);		/* keep source order: ties inside the layer still resolve as they did */
 		silence(el);
+		_owner.set(s, currentKey());	/* the shim paints; the original is silenced for good */
 		fenceImported(s, universe.names, 60);	/* ~1s of frames; a cache hit lands on the first */
 		return;
 	}
@@ -458,6 +540,7 @@ function rehostIntoThemeLayer(el, universe) {
 	 * unpinned all over again and a second pass appends a second fence. The mark is the only thing
 	 * that says the work is done, so it has to be set for every path below, wrapped or not. */
 	el.dataset.fsLayered = '1';
+	_owner.set(el, currentKey());	/* a <style> is re-hosted IN PLACE, so it paints itself */
 
 	/* Wrap only if the text still IS the sheet (see textIsSheet). When it is not, the sheet stays
 	 * unlayered — Zone 2 exactly where it already was, which is a trade — rather than lose rules,
@@ -587,5 +670,6 @@ function watchViewSheets() {
 
 return baseclass.extend({
 	documentPoisoned,
+	scopeToCurrentPage,
 	watchViewSheets
 });
