@@ -92,7 +92,7 @@ msgstr "Densidad"
 #: htdocs/luci-static/resources/fs-appearance.js:131
 msgctxt "footstrap"
 msgid "Dim"
-msgstr "Oscuro"
+msgstr "Oscurecimiento"
 
 #: htdocs/luci-static/resources/fs-chrome.js:338
 msgid "Expand menu"
@@ -121,7 +121,7 @@ msgstr "Ir a la configuración de contraseñas..."
 
 #: ucode/template/themes/footstrap/sysauth.ut:32
 msgid "Invalid username and/or password! Please try again."
-msgstr "Nombre de usuario y/o contraseña incorrectos. Inténtalo de nuevo."
+msgstr "¡Nombre de usuario y/o contraseña incorrectos! Inténtelo de nuevo."
 
 #: ucode/template/themes/footstrap/partials/notices.ut:31
 msgid "JavaScript required!"
@@ -162,7 +162,7 @@ msgstr "Cerrar sesión"
 
 #: ucode/template/themes/footstrap/partials/footer.ut:27
 msgid "Lua compatibility mode active"
-msgstr "Modo de compatibilidad LUA activo"
+msgstr "Modo de compatibilidad Lua activo"
 
 #: htdocs/luci-static/resources/fs-overview.js:34
 msgid "Memory"
