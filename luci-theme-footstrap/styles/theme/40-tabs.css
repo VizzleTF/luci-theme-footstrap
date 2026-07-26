@@ -92,6 +92,34 @@
 		font-weight: var(--fs-weight-bold);
 	}
 
+	/* ---- keyboard focus: a ring that survives the ACTIVE pill ----
+	 *
+	 * base/50-chrome.css drew it as `outline: 2px solid var(--fs-accent)` inset by -2px, which is
+	 * invisible on exactly the tab most likely to be focused: the active pill's own background IS
+	 * --fs-accent (rule above; measured on the router, both are rgb(86,157,245)). Tabbing across a
+	 * strip, the ring vanished the moment it reached the current page's tab.
+	 *
+	 * Two rules, both using the system's existing focus geometry rather than a third one:
+	 * an INACTIVE pill sits on the card, so it takes --fs-focus-ring like every other control; the
+	 * ACTIVE pill is a saturated fill, so the ring needs a gap in the surface colour first — the
+	 * same halo shape the theme uses wherever a ring meets a filled control. box-shadow, not
+	 * outline, because the strip clips (which is why the outline was inset in the first place) and
+	 * a shadow is not clipped by the scroll container. */
+	#tabmenu ul.tabs > li > a:focus-visible,
+	ul.cbi-tabmenu.mode > li > a:focus-visible,
+	.tabs > li > a:focus-visible,
+	.cbi-tabmenu > li > a:focus-visible {
+		outline: none;
+		box-shadow: var(--fs-focus-ring);
+	}
+	#tabmenu ul.tabs > li.active > a:focus-visible,
+	ul.cbi-tabmenu.mode > li.cbi-tab > a:focus-visible,
+	.tabs > li.active > a:focus-visible,
+	.cbi-tabmenu > li.cbi-tab > a:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 2px var(--fs-panel), 0 0 0 5px var(--fs-accent-soft);
+	}
+
 	/* Density steps for a crowded strip: fs-chrome.js (fitTabStrips) MEASURES whether the tabs
 	 * wrap to a second row and, if so, adds .fs-dense1 then .fs-dense2. Padding is trimmed
 	 * hard first (9/14 -> 5/9 -> 3/7), the font only at the d2 floor (13 -> 12) and the gap

@@ -207,9 +207,14 @@
 	.cbi-section-actions .cbi-button-edit, .cbi-section-actions .cbi-button-action {
 		color: var(--fs-accent); border-color: var(--fs-accent-line); background: transparent;
 	}
+	/* THE HOVER INK IS --fs-text, NOT THE ROLE COLOUR, and that is the rule this file already
+	 * states twice with measurements: text of colour C on a translucent tint of C eats its own
+	 * contrast (Save: accent on accent-soft = 4.25:1, an AA failure; the alert `.label` chip: 3.4-4.4
+	 * across the palettes). The row actions were the last place it survived — the role still reads,
+	 * from the fill and the border, which is exactly how Save and Reset carry theirs. */
 	.td .cbi-button-action:hover, .td .cbi-button-edit:hover, .td .cbi-button-apply:hover,
 	.cbi-section-actions .cbi-button-action:hover {
-		background: var(--fs-accent-soft); color: var(--fs-accent);
+		background: var(--fs-accent-soft); color: var(--fs-text);
 		border-color: var(--fs-accent-line-hi);
 	}
 	/* An enabled/positive toggle in a table cell (System -> Startup) rendered as blue text on a
@@ -217,8 +222,12 @@
 	.td .cbi-button-positive, .cbi-section-actions .cbi-button-positive {
 		color: var(--fs-good); border-color: var(--fs-good-line); background: transparent;
 	}
+	/* …and the border-colour the other two variants already had. Without it the green outline stayed
+	 * at -line while action and negative brightened to -line-hi, so hovering the positive toggle
+	 * read as less responsive than its neighbours in the same row. */
 	.td .cbi-button-positive:hover, .cbi-section-actions .cbi-button-positive:hover {
-		background: var(--fs-good-soft);
+		background: var(--fs-good-soft); color: var(--fs-text);
+		border-color: var(--fs-good-line-hi);
 	}
 	.td .cbi-button-negative, .td .cbi-button-remove,
 	.cbi-section-actions .cbi-button-remove, .cbi-section-actions .cbi-button-negative {
@@ -226,7 +235,7 @@
 	}
 	.td .cbi-button-negative:hover, .td .cbi-button-remove:hover,
 	.cbi-section-actions .cbi-button-negative:hover {
-		background: var(--fs-danger-soft); color: var(--fs-danger);
+		background: var(--fs-danger-soft); color: var(--fs-text);
 		border-color: var(--fs-danger-line-hi);
 	}
 
@@ -272,7 +281,9 @@
 	/* Buttons that are part of a compound field widget. */
 	.cbi-dynlist > .add-item > button,
 	.cbi-dynlist > .add-item > .cbi-button-add {
-		flex: 0 0 auto; width: auto; min-width: 38px;
+		/* min-width was a bare 38px — the same number --fs-ctl-h already states. A restated value
+		 * is the drift this ladder exists to prevent, and it also sat out the Density axis. */
+		flex: 0 0 auto; width: auto; min-width: var(--fs-ctl-h);
 		min-height: var(--fs-ctl-h-sm); padding: 0 var(--fs-space-3); margin: 0;
 		border: 0; border-left: 1px solid var(--fs-border);
 		border-radius: 0;
@@ -287,8 +298,13 @@
 		border-left: 1px solid var(--fs-border);
 	}
 	.control-group:has(> .cbi-input-password) > button.cbi-button-neutral:hover { color: var(--fs-accent); }
+	/* SQUARE, ON THE LADDER: these were the only buttons in the theme set in bare pixels
+	 * (40 wide x 34 high), and 34 was the one control height that appears in no scale — the ladder
+	 * is --fs-ctl-h-sm/-h/-h-lg = 30/38/44, plus the derived FIELD height (--fs-control-h, 32).
+	 * A literal also opts out of the Density axis: every other control shrinks with
+	 * --fs-density-box and the pager did not. Square because the glyph is an arrow, not a label. */
 	.pager .btn.prev, .pager .btn.next {
-		flex: 0 0 auto; width: 40px; min-width: 40px; height: 34px; padding: 0;
+		flex: 0 0 auto; width: var(--fs-ctl-h); min-width: var(--fs-ctl-h); height: var(--fs-ctl-h); padding: 0;
 		border-radius: var(--fs-radius); border: 1px solid var(--fs-border);
 		background: var(--fs-panel2); color: var(--fs-text);
 		display: inline-flex; align-items: center; justify-content: center;

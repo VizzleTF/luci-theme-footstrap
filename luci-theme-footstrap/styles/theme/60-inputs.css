@@ -317,7 +317,9 @@
 		appearance: none; -webkit-appearance: none;
 		background-color: var(--fs-panel2);
 		background-image: var(--fs-select-chevron);
-		background-repeat: no-repeat; background-position: right 12px center; background-size: 12px;
+		/* right inset from the scale, not a literal 12 — the .cbi-select shell below states the same
+		 * position and two spellings of one number is how they would drift apart */
+		background-repeat: no-repeat; background-position: right var(--fs-space-3) center; background-size: 12px;
 		padding: var(--fs-space-2) var(--fs-space-8) var(--fs-space-2) var(--fs-space-3);
 		border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
 		color: var(--fs-text); font-family: var(--fs-font-sans); font-size: var(--fs-type);
@@ -385,18 +387,44 @@
 	 * :not(select) because the class also appears ON a bare <select> (docs/gallery.html renders
 	 * that shape): a replaced element cannot draw the ::before ▾, so shell paint there means a
 	 * gradient with no glyph — that shape keeps the themed-select rules above instead. */
+	/* IT PAINTS LIKE THE THEMED <select>, because it is the same control wearing an older shell.
+	 * It used to be the theme's only skeuomorphic surface: `linear-gradient(--fs-panel, --fs-border)`
+	 * on the box AND again on the ▾ plate. In the dark palettes --fs-border is LIGHTER than the
+	 * panel, so it was also the only control that got brighter towards the bottom. Nothing else in
+	 * the theme has a gradient at all.
+	 * The geometry below is not invented — it is the `select` rule above, property for property
+	 * (panel2 fill, the palette-aware --fs-select-chevron at the same position and size, the same
+	 * --fs-ctl-h floor, the same 210px box), so a legacy shell and a modern select line up in one
+	 * form column. This is the non-JS fallback: the people who see it already have something
+	 * broken, and it should not additionally look like a control from another theme. */
 	.cbi-select:not(select) {
 		display: inline-block;
 		width: 210px;
-		height: var(--fs-control-h);
+		/* `height`, NOT `min-height` — the inner select fills the shell with `height: 100%`, and a
+		 * percentage against an auto-height parent has no definite containing block to resolve
+		 * against, so it falls back to content height: measured, the select collapsed 30px -> 15px
+		 * inside a 38px shell, text at the top and half the hit area gone. The themed `select` can
+		 * use a floor because it IS the control; a wrapper has to state a height for its child. */
+		height: var(--fs-ctl-h);
 		color: var(--fs-text);
 		font-size: var(--fs-type);
 		border: 1px solid var(--fs-border);
 		border-radius: var(--fs-radius);
 		padding: 0;
 		position: relative;
-		background: linear-gradient(var(--fs-panel), var(--fs-border));
+		background-color: var(--fs-panel2);
+		background-image: var(--fs-select-chevron);
+		background-repeat: no-repeat;
+		background-position: right var(--fs-space-3) center;
+		background-size: 12px;
 		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+	}
+	/* The disabled cue used to live ENTIRELY on the ▾ plate: base/30-forms.css dims
+	 * `.cbi-select[disabled]::before` and never the shell itself. With the plate gone the state had
+	 * no visual at all, so the shell carries it now. */
+	.cbi-select[disabled]:not(select) {
+		opacity: var(--fs-disabled-opacity);
+		pointer-events: none;
 	}
 	.cbi-select.focus {
 		border-color: var(--fs-accent);
@@ -423,24 +451,18 @@
 		height: 100%;
 		min-height: 0;
 		width: 100%;
-		padding: 0 var(--fs-space-1);
+		/* clears the CHEVRON, which the shell now paints on its own background — the same
+		 * --fs-space-8 inset the themed select uses. `margin-right: .6em` used to clear the ▾ plate
+		 * instead, and an em-relative margin against a px-positioned glyph is how the two drifted. */
+		padding: 0 var(--fs-space-8) 0 var(--fs-space-3);
 		font-size: var(--fs-type);
 		line-height: normal;
 		cursor: pointer;
-		margin-right: .6em;
 	}
-	.cbi-select::before {
-		position: absolute;
-		top: 0; right: 0; bottom: 0;
-		content: "▾";
-		padding: 0 var(--fs-space-1);
-		background: linear-gradient(var(--fs-panel), var(--fs-border));
-		pointer-events: none;
-		border-radius: var(--fs-radius);
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-	}
+	/* The ▾ plate is gone: the chevron is a background on the shell, exactly as on `select`. Hidden
+	 * rather than deleted because base/30-forms.css still names `.cbi-select[disabled]::before` in
+	 * its disabled list — dropping the rule here would leave that one to paint a bare glyph. */
+	.cbi-select::before { display: none; }
 
 	/* spinner / loading */
 	.spinning, .cbi-value em, em.spinning { color: var(--fs-dim); }

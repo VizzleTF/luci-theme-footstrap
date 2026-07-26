@@ -116,10 +116,22 @@ uci commit network</pre>
 
 <div class="g-sec">
 	<h2>Page action bar</h2>
+	<!-- The Save &amp; Apply split control, copied from what ui.js ACTUALLY emits (captured off a
+	     live 25.12 router on admin/network/firewall). The classes are on the WRAPPER — it is a
+	     ui.Dropdown wearing `btn cbi-button cbi-button-apply` — and the label is an <li> inside its
+	     own <ul>, not a nested <button>. The shape here used to be `<div class="cbi-dropdown">` with
+	     an inner button, which is not a shape LuCI produces: the wrapper then matched the theme's
+	     `.cbi-dropdown:not(.btn):not(.cbi-button)` field rule and rendered as a grey box glued to a
+	     blue button. Anyone reading this card diagnosed a bug the theme does not have. -->
 	<div class="cbi-page-actions">
-		<div class="cbi-dropdown" tabindex="0">
-			<button class="cbi-button cbi-button-apply">Save &amp; Apply</button>
-			<span class="open">▾</span>
+		<div class="cbi-dropdown btn cbi-button cbi-button-apply important" tabindex="0" data-idref="g-apply">
+			<ul tabindex="-1">
+				<li data-value="0" selected display="0">Save &amp; Apply</li>
+				<li data-value="1">Apply unchecked</li>
+			</ul>
+			<span class="more" tabindex="-1">···</span>
+			<span class="open" tabindex="-1">▾</span>
+			<div><input type="hidden" value="0"></div>
 		</div>
 		<button class="cbi-button cbi-button-save">Save</button>
 		<button class="cbi-button cbi-button-reset">Reset</button>
@@ -413,6 +425,18 @@ option two</textarea></div>
 		<ul><li>a list item</li><li>another one</li></ul>
 		<pre>a &lt;pre&gt; block inside an alert</pre>
 	</div>
+	<!-- A table INSIDE an alert: the firmware Current/Available readout (admin/system/flash). The
+	     theme flattens it so it does not read as a card on a card, and that rule had never been
+	     rendered by anything here — a padding change to it measured 0 diffs because the shape was
+	     missing. -->
+	<div class="alert-message warning">
+		<h4>Firmware update available</h4>
+		<table class="table">
+			<tr class="tr table-titles"><th class="th">Field</th><th class="th">Current</th><th class="th">Available</th></tr>
+			<tr class="tr"><td class="td">Version</td><td class="td">25.12.0</td><td class="td">25.12.1</td></tr>
+			<tr class="tr"><td class="td">Size</td><td class="td">7.8 MB</td><td class="td">7.9 MB</td></tr>
+		</table>
+	</div>
 </div>
 
 <div class="g-sec">
@@ -443,6 +467,24 @@ option two</textarea></div>
 		<label class="cbi-value-title" for="g-cbisel-bad">.cbi-select.cbi-input-invalid</label>
 		<div class="cbi-value-field">
 			<select id="g-cbisel-bad" class="cbi-select cbi-input-invalid"><option>rejected value</option></select>
+		</div>
+	</div>
+	<!-- The other shape, and the one every check was blind to: luci-compat wraps the native select
+	     in a DIV that carries the class, so `.cbi-select:not(select)` is a real element with a real
+	     `select` child. Only this shape gets the shell paint (a replaced element cannot), which is
+	     why the theme has a `:not(select)` rule at all — and with no example here, nothing measured
+	     it. `[disabled]` is separate on purpose: base dims only the shell's ::before, so the state
+	     is easy to lose. -->
+	<div class="cbi-value">
+		<label class="cbi-value-title" for="g-cbisel-shell">.cbi-select (the DIV shell)</label>
+		<div class="cbi-value-field">
+			<div class="cbi-select"><select id="g-cbisel-shell"><option>one</option><option>two</option></select></div>
+		</div>
+	</div>
+	<div class="cbi-value">
+		<label class="cbi-value-title" for="g-cbisel-off">.cbi-select[disabled] (the DIV shell)</label>
+		<div class="cbi-value-field">
+			<div class="cbi-select" disabled><select id="g-cbisel-off" disabled><option>unavailable</option></select></div>
 		</div>
 	</div>
 </div>
