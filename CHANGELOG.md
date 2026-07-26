@@ -11,7 +11,7 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [Unreleased]
+## [0.11.4] — 2026-07-26
 
 ### Added
 
@@ -3194,6 +3194,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.11.4]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.0...v0.11.1
