@@ -106,7 +106,15 @@
 		order: 3; flex: 1 1 100%;
 		flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--fs-space-0-5);
 	}
-	.fs-sidebar ul.nav > li.has-sub { position: static; }
+	/* the dropdown hangs off its OWN item — in EVERY bar state, which is what this used to get
+	 * wrong (issue #19). `position: static` + a panel pinned at `left: 16px` was the bar's base,
+	 * and only the top layout's delta re-anchored it per item; so the sidebar layout collapsed
+	 * onto a bar (data-narrow, i.e. a desktop window narrowed past --fs-content-min) opened a
+	 * hover panel at the bar's LEFT EDGE while its trigger sat mid-bar. Measured at 760px: item
+	 * at x=253, panel at x=32 — travelling down to the panel leaves the <li>, nothing bridges
+	 * the diagonal and the CSS hover closes it, so no submenu entry could be reached at all.
+	 * A phone never showed it: `hover: none` disables the hover rule outright. */
+	.fs-sidebar ul.nav > li.has-sub { position: relative; }
 	.fs-sidebar ul.nav > li > a {
 		display: flex; align-items: center;
 		padding: var(--fs-space-1-5) var(--fs-space-3); border-radius: var(--fs-radius);
@@ -117,18 +125,27 @@
 	.fs-sidebar ul.nav > li > a .fs-ico,
 	.fs-sidebar ul.nav > li > a .fs-chevron { display: none; }
 
-	/* submenu = a popup card: sized to its content rather than stretched across the bar, and
-	 * capped to the viewport so a long label wraps instead of overflowing. */
+	/* submenu = a popup card under its own item: sized to its content rather than stretched
+	 * across the bar, and capped to the viewport so a long label wraps instead of overflowing.
+	 * `left: 0` = the item's left edge (the <li> above is the containing block); an item near
+	 * the right edge is nudged back inside by menu-footstrap.js clampDropdown, in every bar
+	 * state — the JS gate is the same question this rule asks, not a layout test. */
 	.fs-sidebar ul.nav ul,
 	.fs-sidebar ul.nav > li.open > ul {
 		display: none;
-		position: absolute; left: 16px; right: auto; top: calc(100% + 8px); z-index: var(--fs-z-flyout);
+		position: absolute; left: 0; right: auto; top: calc(100% + 8px); z-index: var(--fs-z-flyout);
 		width: max-content; min-width: 200px; max-width: calc(100vw - 32px);
 		margin: 0; padding: var(--fs-space-2);
 		background: var(--fs-glass);
 		backdrop-filter: var(--fs-blur); -webkit-backdrop-filter: var(--fs-blur);
 		border: 1px solid var(--fs-border);
 		border-radius: var(--fs-radius-lg); box-shadow: var(--fs-shadow-pop);
+	}
+	/* an invisible bridge across the 8px gap, so travelling from the item down into the panel
+	 * does not drop the hover and close it. Belongs to the BAR, not to one layout: the hover
+	 * rule below is unguarded, so every state that can open a panel on hover needs it. */
+	.fs-sidebar ul.nav > li.has-sub > ul::before {
+		content: ""; position: absolute; left: 0; right: 0; top: -10px; height: 10px;
 	}
 	/* hover only on a real pointer: a tap leaves :hover stuck on mobile browsers, which
 	 * would block tap-to-close */
@@ -360,6 +377,12 @@
 			border: 0; border-radius: 0; box-shadow: none;
 			overflow: hidden;
 		}
+		/* and the bar's hover bridge goes with the popup. The panel is static here, so the
+		 * bridge's containing block falls back to the <li> — an invisible 10px strip sitting
+		 * ABOVE the section, i.e. over the previous menu item, swallowing its clicks. The rail
+		 * (below) is a popup again but flies its panel out sideways, and brings its own
+		 * horizontal bridge (li.has-sub::after). */
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub > ul::before { content: none; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.open > ul { display: flex; margin: var(--fs-space-0-5) 0 var(--fs-space-1-5) var(--fs-space-7); }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav ul a { padding: var(--fs-space-2) var(--fs-space-3); }

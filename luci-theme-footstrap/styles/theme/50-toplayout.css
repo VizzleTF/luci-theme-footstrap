@@ -7,8 +7,7 @@
 	 * IS unless the vertical sidebar overrides it; see the note there. This file adds what the
 	 * TOP-LAYOUT bar wants on top of that base:
 	 *   - a designed bar height, and padding aligned to the content column;
-	 *   - the menu on the brand's row instead of wrapped beneath it;
-	 *   - a dropdown anchored to its OWN item rather than to the bar's left edge.
+	 *   - the menu on the brand's row instead of wrapped beneath it.
 	 *
 	 * NO `@media` floor. The top bar used to gate these deltas at `min-width: 768px` and fall back
 	 * to the phone bar below it — but "does the menu fit on the brand's row?" is a property of the
@@ -16,9 +15,9 @@
 	 * bar is now MEASURED: fs-chrome.js (fitChrome) shrinks the pills, then collapses the poll pill
 	 * to an icon, then stacks the menu onto its own row — at any width. The under-item dropdown and
 	 * its clamp therefore apply at every width too (menu-footstrap.js clampDropdown, no longer
-	 * gated on 768). The distinct left-pinned phone bar is gone for the top layout; the SIDEBAR
-	 * layout keeps its own phone bar (the base's left:16px panel), which this `[data-layout="top"]`
-	 * scope never touches.
+	 * gated on 768) — and, since issue #19, in every bar STATE as well, which is why they sit in
+	 * the base rather than here. There is no distinct left-pinned phone bar any more, in either
+	 * layout: one bar, one dropdown anchor.
 	 * ================================================================== */
 	:root[data-layout="top"] .fs-sidebar {
 		/* min-height, not height: the bar has a designed height but must be able to GROW —
@@ -49,17 +48,11 @@
 	:root[data-layout="top"] .fs-themerow,
 	:root[data-layout="top"] .fs-logout { order: 3; margin-left: 0; }
 
-	/* the dropdown hangs off its own item, so it lines up under the section it belongs to.
-	 * menu-footstrap.js nudges it back inside the viewport near the right edge (clampDropdown) —
-	 * needed at ANY width now that the top bar is measured, not just on the desktop. */
-	:root[data-layout="top"] .fs-sidebar ul.nav > li.has-sub { position: relative; }
-	:root[data-layout="top"] .fs-sidebar ul.nav ul,
-	:root[data-layout="top"] .fs-sidebar ul.nav > li.open > ul { left: 0; }
-	/* an invisible bridge across the 8px gap, so travelling from the item down into the
-	 * panel does not drop the hover and close it */
-	:root[data-layout="top"] .fs-sidebar ul.nav > li.has-sub > ul::before {
-		content: ""; position: absolute; left: 0; right: 0; top: -10px; height: 10px;
-	}
+	/* The under-item dropdown anchor, its hover bridge and the clamp are NOT here: they belong to
+	 * the BAR and live unguarded in 20-shell.css. They used to be this file's, and that WAS issue
+	 * #19 — the sidebar layout collapsed onto a bar is the same chrome, and it inherited a panel
+	 * pinned to the bar's left edge with no bridge, unreachable by hover. This file is the top
+	 * layout's delta; a rule every bar state needs is not a delta. */
 
 	/* the mode strip (only rendered when a router has more than one top-level mode) takes
 	 * its own full-width row under the bar */

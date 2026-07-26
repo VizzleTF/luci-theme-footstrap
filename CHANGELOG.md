@@ -11,6 +11,12 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+
+- **A submenu opened by hover can be reached with the mouse in every bar state, not only in the top layout** (issue #19). The bar is one piece of chrome — the top layout at every width, and the sidebar layout collapsed onto a bar once the content column drops below `--fs-content-min` — but three of its rules lived in the top layout's delta: `li.has-sub { position: relative }`, the panel's `left: 0`, and the invisible 10px bridge across the gap between the item and its panel. The base kept the opposite (`position: static`, panel pinned at `left: 16px`), so the collapsed sidebar opened its panel at the bar's left edge while the trigger sat mid-bar. Measured on the router at 760 px: the item at x=253, the panel at x=32, and moving the pointer down towards it leaves the `<li>` with nothing to bridge the diagonal, so the CSS `:hover` closes the panel — not one submenu entry was reachable. A phone never showed it, because `hover: none` disables the hover rule outright; the reporter hit it on a desktop with a narrowed window. The three rules move into the unguarded bar, and `clampDropdown` stops asking which *layout* is active and asks what the stylesheet asks — top layout **or** `data-narrow` — so an item near the right edge is nudged back inside there too (previously the CSS anchored the panel per item while the JS declined to place it). The vertical accordion turns the bridge off with the popup: with the panel static its containing block falls back to the `<li>`, leaving a 10px strip over the *previous* menu item that would eat its clicks. Verified on both releases across sidebar/top × 390–1440 px, and `cssdiff` reports 0 property diffs over 3266 elements on the desktop sidebar.
+
 ## [0.11.2] — 2026-07-25
 
 ### Fixed

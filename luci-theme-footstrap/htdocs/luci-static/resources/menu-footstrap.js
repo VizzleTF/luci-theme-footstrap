@@ -56,17 +56,25 @@ function flyoutMode() {
 const TRIGGER = ':scope > a';
 const OPEN_LI = '#topmenu > li.open';
 
-/* ---- dropdown edge-clamp (top bar, every width) --------------------------
- * In the top layout each panel hangs off its OWN item (li position:relative, ul left:0 —
- * theme/50-toplayout.css), so an item near the right edge would push its panel past the viewport.
- * Nudge it back inside. Runs at ANY width now that the top bar is measured (no 768 floor); the
- * rail flies panels out sideways and the SIDEBAR layout's phone bar pins+caps its own, so neither
- * needs this. */
+/* ---- dropdown edge-clamp (the BAR, every width and every bar state) ------
+ * A bar panel hangs off its OWN item (li position:relative, ul left:0 — theme/20-shell.css), so an
+ * item near the right edge would push its panel past the viewport. Nudge it back inside. Runs at
+ * ANY width now that the top bar is measured (no 768 floor); the rail flies panels out sideways
+ * and needs a different placement, so it is excluded below. */
 /* the viewport edge gap, defined once in fs-widgets.js — the Appearance popover keeps a popup off
  * the edge by the same amount, and the two used to state it separately */
 const EDGE_GAP = widgets.EDGE_GAP;
+/* Is this panel a BAR dropdown (anchored under its item) rather than a rail flyout (anchored
+ * beside it)? Ask what the STYLESHEET asks, exactly as flyoutMode() does: `data-narrow` is what
+ * turns the sidebar layout into a bar, and it also disables the rail (the rail's rules are all
+ * scoped `:not([data-narrow])`), so a narrow window is a bar even with the rail on. Gating this on
+ * isTopLayout() alone was issue #19's second half: the panel was anchored per item by the CSS but
+ * the clamp declined to place it, so an item near the right edge overflowed the viewport. */
+function barDropdown() {
+	return prefs.isTopLayout() || document.documentElement.hasAttribute('data-narrow');
+}
 function clampDropdown(li) {
-	if (!prefs.isTopLayout()) return;
+	if (!barDropdown()) return;
 	const menu = li.querySelector(':scope > ul');
 	if (!menu) return;
 
