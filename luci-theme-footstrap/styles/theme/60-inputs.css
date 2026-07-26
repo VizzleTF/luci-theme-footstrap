@@ -143,12 +143,25 @@
 	 * opacity:0, so this margin moves nothing there. */
 	.btn > input[type="checkbox"], .btn > input[type="radio"] { margin-right: .5em; }
 
-	/* checkbox -> toggle switch */
+	/* checkbox -> toggle switch
+	 *
+	 * The pill, the knob and the knob's travel are all on --fs-density-box, and every one of them
+	 * used to be a bare literal — so LuCI's most common control was the only one in the theme that
+	 * ignored the Density axis outright: 40x22 at Compact, 40x22 at Large, while every button and
+	 * field around it moved (38 -> 32.3 -> 43.7). 02-tokens.css states the rule the other way round:
+	 * "add a size OUTSIDE these ladders and it silently stops responding to the axis". The switch is
+	 * a box that holds a knob, which is the box tier by definition; the pager buttons were moved off
+	 * bare pixels for exactly this reason (55-buttons.css). Local names, not new global tokens: one
+	 * component needs one number and three things derived from it. */
 	.cbi-checkbox { display: inline-flex; align-items: center; }
 	.cbi-checkbox > input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
 	.cbi-checkbox > label {
+		--sw-w: calc(40px * var(--fs-density-box));
+		--sw-h: calc(22px * var(--fs-density-box));
+		--sw-knob: calc(16px * var(--fs-density-box));
+		--sw-pad: calc(2px * var(--fs-density-box));
 		display: inline-block; position: relative; margin: 0;
-		width: 40px; height: 22px; border-radius: var(--fs-radius-pill);
+		width: var(--sw-w); height: var(--sw-h); border-radius: var(--fs-radius-pill);
 		background: var(--fs-track); border: 1px solid var(--fs-border);
 		cursor: pointer; transition: background var(--fs-dur), border-color var(--fs-dur); vertical-align: middle;
 	}
@@ -156,13 +169,17 @@
 	 * control — and at 22px tall it sits under the 24px floor of WCAG 2.5.8. The floor is about
 	 * the CLICKABLE area, not the drawing: an invisible overlay stretches the target to 44x30
 	 * without fattening the pill (the visual 44x24 version was tried and looked bloated).
-	 * position:absolute, so it adds nothing to layout; the knob keeps ::after. */
+	 * position:absolute, so it adds nothing to layout; the knob keeps ::after.
+	 *
+	 * The inset stays LITERAL while the pill above scales: this is an accessibility floor, and a
+	 * floor that shrinks with a density setting is not one. At Compact the pill is 34x18.7, so the
+	 * target is 38x26.7 — still over the 24px minimum (measured). */
 	.cbi-checkbox > label::before {
 		content: ""; position: absolute; inset: -4px -2px;
 	}
 	.cbi-checkbox > label::after {
-		content: ""; position: absolute; top: 2px; left: 2px;
-		width: 16px; height: 16px; border-radius: 50%;
+		content: ""; position: absolute; top: var(--sw-pad); left: var(--sw-pad);
+		width: var(--sw-knob); height: var(--sw-knob); border-radius: 50%;
 		background: var(--fs-dim);
 		/* transform, not `left`: `left` is a layout property, so the knob re-laid out the row on
 		 * every frame of the slide. translateX is composited. */
@@ -170,13 +187,29 @@
 		transition: transform var(--fs-dur-move), background var(--fs-dur);
 	}
 	.cbi-checkbox > input[type="checkbox"]:checked + label { background: var(--fs-accent); border-color: transparent; }
-	.cbi-checkbox > input[type="checkbox"]:checked + label::after { transform: translateX(18px); background: var(--fs-on-accent); }
+	/* The travel is derived rather than hand-written (it was a literal 18px), so it cannot drift out
+	 * of step with the three sizes above. The `- 2px` is the pill's two 1px BORDERS and is the whole
+	 * subtlety: --sw-w is a border-box width, while an absolutely-positioned ::after is placed
+	 * against the PADDING box, so the room the knob actually has is 2px less. Deriving it without
+	 * that term overshoots by 2px and the knob lands off-centre against its own left inset
+	 * (measured: travel 20px where symmetry wants 18). The border does not scale with density, so
+	 * the term stays literal. */
+	.cbi-checkbox > input[type="checkbox"]:checked + label::after {
+		transform: translateX(calc(var(--sw-w) - var(--sw-knob) - var(--sw-pad) * 2 - 2px));
+		background: var(--fs-on-accent);
+	}
 	/* The real checkbox is opacity:0 / 0x0 above, so base's `input:focus::before` glow paints on
 	 * a 0x0 box — invisible. The <label> IS the switch, so the ring goes there. Without it the
-	 * single most common control in LuCI showed nothing under keyboard focus. */
+	 * single most common control in LuCI showed nothing under keyboard focus.
+	 *
+	 * -solo, because on the CHECKED switch — which is half the switches on any page — neither
+	 * other channel exists: the rule above fills the track with --fs-accent and sets
+	 * `border-color: transparent`, so this border flip is accent on accent (measured on the
+	 * gallery: fill rgb(86,157,245), border rgba(86,157,245,.97)) and the tinted ring was
+	 * accent at .15 alpha. A checked, keyboard-focused toggle showed literally nothing. */
 	.cbi-checkbox > input[type="checkbox"]:focus-visible + label {
 		border-color: var(--fs-accent);
-		box-shadow: var(--fs-focus-ring);
+		box-shadow: var(--fs-focus-ring-solo);
 	}
 	.cbi-checkbox > input[type="checkbox"]:disabled + label { opacity: var(--fs-disabled-opacity); cursor: not-allowed; }
 
@@ -191,7 +224,12 @@
 	input[type="radio"] {
 		--bd-color: var(--fs-border);
 		--fg-color: var(--fs-text);
-		--box: var(--fs-space-4);
+		/* 16px on the grid, but on the BOX tier, not the space tier. `var(--fs-space-4)` was the
+		 * same 16px at Normal and the wrong multiplier everywhere else: space moves to .65 at
+		 * Compact and stays 1 at Large, so the tick box went to 10.4px (smaller than any other
+		 * control on the page — measured) and then refused to grow at Large. A checkbox is a box
+		 * that has to HOLD an icon, which is what --fs-density-box is defined for. */
+		--box: calc(16px * var(--fs-density-box));
 		--mark-inset: 3px;
 		appearance: none;
 		width: var(--box);
@@ -713,7 +751,9 @@
 		box-shadow: var(--fs-shadow);
 	}
 	input[type="range"]::-moz-range-track { background: var(--fs-track); height: 6px; border-radius: var(--fs-radius-pill); }
-	input[type="range"]:focus { box-shadow: var(--fs-focus-ring); }
+	/* -solo: the track sets `border: 0` and `outline: none`, so there is no second channel here
+	 * either — the tinted ring was the whole indicator on a 6px bar. */
+	input[type="range"]:focus { box-shadow: var(--fs-focus-ring-solo); }
 	.cbi-range-slider { display: inline-flex; align-items: center; gap: var(--fs-space-3); width: 100%; max-width: 100%; }
 	.cbi-range-slider-value {
 		background: var(--fs-panel2); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-sm);

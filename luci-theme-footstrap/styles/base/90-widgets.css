@@ -15,7 +15,8 @@
 		position: absolute;
 		z-index: var(--fs-z-tooltip);
 		left: -10000px;
-		box-shadow: 0 0 2px var(--fs-border);
+		/* box-shadow: theme/35-alerts.css — absorbed (was `0 0 2px var(--fs-border)`, a hairline
+		 * halo on a surface that floats over arbitrary content) */
 		border-radius: var(--fs-radius-sm);
 		background: var(--fs-panel);
 		white-space: pre;
@@ -42,7 +43,8 @@
 		margin: -1.6em 0 0 -5px;
 		border-radius: var(--fs-radius-sm);
 		pointer-events: none;
-		/* box-shadow: theme/30-tables.css — absorbed */
+		/* box-shadow: theme/35-alerts.css now states ONE elevation for every .cbi-tooltip, so this
+		 * specialisation no longer needs one of its own */
 	}
 
 	.zonebadge .cbi-tooltip > * {

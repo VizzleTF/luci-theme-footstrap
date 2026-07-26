@@ -39,14 +39,22 @@
 		border-color: var(--fs-border); border-left-color: var(--fs-danger);
 		background: var(--fs-danger-fill);
 	}
-	.alert-message.success:not(.btn), .alert-message.notice:not(.btn) {
+	.alert-message.success:not(.btn) {
 		border-left-color: var(--fs-good);
 		background: var(--fs-good-fill);
 	}
 	/* `.info` was styled by nothing — it fell through to the plain panel with an accent stripe,
 	 * which is what a class-less .alert-message already looks like. It is a STATUS, so it tints
-	 * like the others; a bare .alert-message stays a flat panel, because a note is not a status. */
-	.alert-message.info:not(.btn) {
+	 * like the others; a bare .alert-message stays a flat panel, because a note is not a status.
+	 *
+	 * `.notice` is grouped HERE, not with .success where styles/base had left it. Grouped there it
+	 * was pixel-identical to success — same fill, same rail, no other channel — so one status word
+	 * carried two meanings, while the theme's own `.label.notice` is accent (with `.important`) and
+	 * `.cbi-tooltip.notice` is neutral: one word, three colours. What settles the direction is what
+	 * LuCI means by it: ui.js emits `notice spinning` for the "applying configuration changes"
+	 * banner, i.e. IN PROGRESS, not done — and stock luci-theme-bootstrap paints notice from
+	 * `--background-color-*`, keeping green for success alone. Informational, so: accent. */
+	.alert-message.info:not(.btn), .alert-message.notice:not(.btn) {
 		border-left-color: var(--fs-accent);
 		background: var(--fs-accent-fill);
 	}
@@ -110,6 +118,19 @@
 	 * ink is the role's own `--fs-on-*`, which 03-palettes.css sizes per palette AND per mode — a
 	 * global white failed AA on seven of the eight dark-palette fills. Same paint as base's, in the
 	 * theme's flat notation rather than a `linear-gradient(C, C)`. */
+	/* ONE elevation for the widget. base/90-widgets.css lit it with `0 0 2px var(--fs-border)` — a
+	 * raw 2px halo in the hairline colour, which measures 1.08-1.86:1 against the surfaces a
+	 * tooltip lands on — while the theme already overrode the single instance somebody happened to
+	 * look at (`.zonebadge .cbi-tooltip`, in 70-modal.css) to --fs-shadow-pop. A tooltip floats
+	 * over ARBITRARY content, which is the same reason the colour variants below stay opaque, so it
+	 * is the last surface that should be separated from the page by a hairline. The zonebadge
+	 * override is gone with this: it now says the same thing as the general rule. */
+	.cbi-tooltip { box-shadow: var(--fs-shadow-pop); }
+	/* base reveals it on :hover alone. The container is `cursor: help` and carries no tabindex in
+	 * anything LuCI ships, so nothing can focus it today and this matches nothing — but the
+	 * focusability belongs to ui.js, and a third-party app that gives its own tooltip container a
+	 * tabindex gets a keyboard-reachable tooltip the day it does. */
+	.cbi-tooltip-container:focus-within .cbi-tooltip:not(:empty) { left: auto; opacity: 1; }
 	.cbi-tooltip.info { background: var(--fs-accent); border-color: var(--fs-accent); color: var(--fs-on-accent); }
 	.cbi-tooltip.success { background: var(--fs-good); border-color: var(--fs-good); color: var(--fs-on-good); }
 	.cbi-tooltip.error { background: var(--fs-danger); border-color: var(--fs-danger); color: var(--fs-on-danger); }

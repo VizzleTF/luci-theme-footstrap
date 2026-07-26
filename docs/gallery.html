@@ -391,10 +391,17 @@ option two</textarea></div>
 
 <div class="g-sec">
 	<h2>Tabs</h2>
+	<!-- TWO strips, TWO active markers, and the difference is not cosmetic: `ul.tabs` is the
+	     THEME's own section strip (fs-chrome.js renderTabMenu) and marks the current page with
+	     `.active` + `aria-current="page"`, on an `li.tabmenu-item-<name>`; `ul.cbi-tabmenu` is
+	     ui.js's in-form strip and marks it with `.cbi-tab`. theme/40-tabs.css says so and styles
+	     both. This card used to write `<li class="cbi-tab">` in BOTH, so the first strip rendered
+	     with NO active tab at all (measured: all three li carried the muted ink) — a shape nothing
+	     can emit, which is exactly what a card must not show. -->
 	<ul class="tabs">
-		<li class="cbi-tab"><a href="#">General Settings</a></li>
-		<li class="cbi-tab-disabled"><a href="#">Advanced</a></li>
-		<li class="cbi-tab-disabled" data-errors="1"><a href="#">With errors</a></li>
+		<li class="tabmenu-item-general active"><a href="#" aria-current="page">General Settings</a></li>
+		<li class="tabmenu-item-advanced"><a href="#">Advanced</a></li>
+		<li class="tabmenu-item-errors cbi-tab-disabled" data-errors="1"><a href="#">With errors</a></li>
 	</ul>
 	<ul class="cbi-tabmenu">
 		<li class="cbi-tab"><a href="#">Mode A</a></li>
@@ -501,7 +508,13 @@ option two</textarea></div>
 	<div class="g-row">
 		<span class="ifacebadge">eth0</span>
 		<span class="ifacebadge ifacebadge-active">br-lan</span>
-		<span class="zonebadge" style="background:#a4d1a4">lan</span>
+		<!-- The inline style is firewall.js's getZoneColorStyle() verbatim: it declares
+		     --zone-color-rgb and then paints FROM it. Writing a plain `background:#a4d1a4` here
+		     was wrong in a way only dark mode shows: base/95-luci.css re-mixes the zone colour at
+		     .4/.3 for dark, reading that var with NO fallback (deliberately — see the comment
+		     there), so the !important declaration went invalid at computed-value time and the
+		     badge lost its colour entirely (measured: background rgba(0,0,0,0) in dark). -->
+		<span class="zonebadge" style="--zone-color-rgb:164, 209, 164; background-color:rgb(var(--zone-color-rgb))">lan</span>
 		<span class="zonebadge zonebadge-empty">empty</span>
 		<span class="label">label</span>
 		<span class="label notice">notice</span>
@@ -584,10 +597,12 @@ option two</textarea></div>
 
 	<h2>The forcing utilities (.left/.right/.center + .top/.middle/.bottom)</h2>
 	<!-- LuCI writes these on a cell to OVERRIDE the table's own alignment — `<td class="td right">`
-	     — which is why they carry the theme's only legitimate `!important`s outside the
-	     reduced-motion block: a bare `.right` (0,1,0) loses to the theme's `.cbi-section .table .td`
-	     (0,3,0) on specificity alone. Nothing rendered them, so stripping the flags showed no diff
-	     and read as "the flags do nothing". They do. -->
+	     — which is why they carry an `!important`: a bare `.right` (0,1,0) loses to the theme's
+	     `.cbi-section .table .td` (0,3,0) on specificity alone. Six of the eight flags in
+	     styles/base are these. Nothing rendered them, so stripping the flags showed no diff and
+	     read as "the flags do nothing". They do. (They are not the theme's ONLY flags outside the
+	     reduced-motion block, which is what this comment used to claim: there are 22 of those, each
+	     fighting an inline `style=` or an unlayered `<style>` — CLAUDE.md accounts for every one.) -->
 	<div class="cbi-section">
 		<table class="table" id="forcing-utils">
 			<tr class="tr table-titles">

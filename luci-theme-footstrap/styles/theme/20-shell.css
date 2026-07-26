@@ -581,7 +581,9 @@
 	input[type="range"].fs-range::-moz-range-track {
 		height: 4px; background: var(--fs-track); border-radius: var(--fs-radius-pill);
 	}
-	input[type="range"].fs-range:focus-visible { outline: none; box-shadow: var(--fs-focus-ring); }
+	/* -solo like the plain range: the hue bar has no border to flip, so the tinted ring was the
+	 * whole indicator and measured 1.15-1.29:1 (02-tokens.css). */
+	input[type="range"].fs-range:focus-visible { outline: none; box-shadow: var(--fs-focus-ring-solo); }
 	.fs-range-val {
 		flex: 0 0 auto; min-width: 34px; text-align: right;
 		font-size: var(--fs-type-xs); font-weight: var(--fs-weight); color: var(--fs-dim); font-variant-numeric: tabular-nums;

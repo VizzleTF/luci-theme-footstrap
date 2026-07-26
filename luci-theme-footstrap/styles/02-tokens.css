@@ -32,10 +32,28 @@
 		 * unnamed derived level, the drift shape the ladder exists to prevent. */
 		--fs-shadow-bar: 0 1px 3px color-mix(in srgb, var(--fs-border) 25%, transparent),
 		                 inset 0 -1px 0 color-mix(in srgb, var(--fs-border) 25%, transparent);
-		/* every field's focus ring (input, select, cbi-dropdown, range, dynlist add-item) and
-		 * its invalid twin — which takes -fill (18%), not -soft (12%): a red ring must read
-		 * as an ALARM, not as a hover tint. */
+		/* ---- TWO FOCUS RINGS, and WHICH ONE A CONTROL TAKES IS THE CONTRACT ------------
+		 * -soft is a TINT (10-15% of the accent), so composited on the surface it lands on it
+		 * measures 1.15 / 1.27 / 1.17 / 1.29 : 1 across palette x mode. That is a GLOW, not an
+		 * indicator: WCAG 1.4.11 wants 3:1 for the thing that tells you where focus is. It is
+		 * legitimate only BESIDE a second channel — every field here also flips border-color to
+		 * --fs-accent, and that change measures 4.88-6.52:1, so the border is the indicator and
+		 * the tint is the halo around it.
+		 *
+		 * -solo is for a control where the ring is the WHOLE indicator: nothing else about it
+		 * changes on focus. Three groups were relying on the tint alone and therefore showed
+		 * effectively nothing under the keyboard — every sidebar menu link and the chrome's icon
+		 * buttons (10-chrome.css), the section tabs (40-tabs.css) and both range sliders. The
+		 * 2px of surface is what lets it read against a FILLED control too (an accent-filled
+		 * button or the active tab pill would otherwise take an accent ring on an accent box);
+		 * solid accent then measures 5.19 / 5.39 / 6.52 / 8.52 on panel, 4.88-9.14 on the page.
+		 * It had been written out as a literal twice (the filled buttons, the active pill) before
+		 * it had a name — the drift shape the ladder exists to prevent.
+		 *
+		 * The invalid twin takes -fill (18%), not -soft: a red ring must read as an ALARM, not
+		 * as a hover tint. It is paired with a red BORDER, so the tint rule above applies. */
 		--fs-focus-ring: 0 0 0 3px var(--fs-accent-soft);
+		--fs-focus-ring-solo: 0 0 0 2px var(--fs-panel), 0 0 0 5px var(--fs-accent);
 		--fs-focus-ring-invalid: 0 0 0 3px var(--fs-danger-fill);
 
 		/* the theme's ONE colour literal, deliberately: black at .7 is the absence of light

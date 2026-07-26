@@ -49,7 +49,11 @@
 		box-shadow: var(--fs-focus-ring);
 	}
 	/* Solid variants sit ON --fs-accent/--fs-good/--fs-danger, so an accent-tinted ring is
-	 * invisible against them: ring in the surface colour with an accent halo. */
+	 * invisible against them: ring in the surface colour with an accent halo. That halo was
+	 * written out here as a literal ending in --fs-accent-soft — a 10-15% tint, i.e. 1.15-1.29:1
+	 * against the surface, so the only thing this rule really painted was the 2px gap. It is
+	 * --fs-focus-ring-solo now: same geometry, solid accent, and one name for the four rules that
+	 * had been spelling it out. */
 	.cbi-button-positive:focus-visible, .cbi-button-action:focus-visible,
 	.cbi-button-negative:focus-visible, .cbi-button-remove:focus-visible,
 	.cbi-button-apply:focus-visible, .cbi-button-save:focus-visible,
@@ -57,7 +61,7 @@
 	.btn.error:focus-visible, .btn.success:focus-visible, .btn.info:focus-visible {
 		outline: none;
 		border-color: transparent;
-		box-shadow: 0 0 0 2px var(--fs-panel), 0 0 0 5px var(--fs-accent-soft);
+		box-shadow: var(--fs-focus-ring-solo);
 	}
 
 	/* Pressed state. The `box-shadow: none` above would erase any press cue, so the inset shadow

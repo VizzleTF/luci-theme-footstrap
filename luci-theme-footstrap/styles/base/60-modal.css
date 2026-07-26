@@ -23,7 +23,9 @@
 		border-radius: var(--fs-radius-lg);
 		background: var(--fs-panel);
 		border: 1px solid var(--fs-border);
-		box-shadow: 0 0 3px var(--fs-panel2);
+		/* box-shadow: theme/70-modal.css — absorbed. It was `0 0 3px var(--fs-panel2)`, a shadow in
+		 * the colour of the page (in footstrap light panel2 and bg are the same hex), so the theme
+		 * gives every .modal --fs-shadow-pop instead and this one was dead. */
 		/* was `1em 1em .5em 1em` — a bottom half the top because the button row below carries its
 		 * own margin. The card's own gutter on every side; the button row's spacing is its business. */
 		padding: var(--fs-card-pad);

@@ -4,7 +4,7 @@
 	 * fading and spinning UI genuinely nauseating. Honoured globally rather than per-component;
 	 * every transition and keyframe in this theme is decoration, none carries information.
 	 *
-	 * WHY !important HERE — the documented exception, and NOT the same kind as the 13 in theme/
+	 * WHY !important HERE — the documented exception, and NOT the same kind as the 14 in theme/
 	 * and pages/ that fight an inline `style=` or an unlayered \3c style>. A cascade layer cannot
 	 * help: styles/base sets transitions and animations too, and !important INVERTS the layer
 	 * order (an important declaration in base would beat a normal one here). Only an important
@@ -55,8 +55,10 @@
 	 *     the opposite of what this user asked for.
 	 *   - secondary text: --fs-dim toward --fs-text, and --fs-faint (10-11px eyebrow labels)
 	 *     up to dim's level — small + faint is where AA erodes first.
-	 *   - the focus ring: the default ring is a 12% tint of the accent (--fs-accent-soft);
-	 *     at "more contrast" it carries the accent at 60%.
+	 *   - the focus ring: --fs-focus-ring is a tint of the accent (--fs-accent-soft: 10% light,
+	 *     15% dark — the one ladder member whose strength is per MODE, so not the ladder's 12%);
+	 *     at "more contrast" it carries the accent at 60%. Its sibling --fs-focus-ring-solo is
+	 *     already the SOLID accent and needs no restatement here.
 	 * ================================================================== */
 	@media (prefers-contrast: more) {
 		:root {
@@ -80,12 +82,24 @@
 	 * in system colour keywords so they follow the user's scheme.
 	 * ================================================================== */
 	@media (forced-colors: active) {
-		/* active tab / selected dropdown row / checked toggle: outline the state */
+		/* active tab / selected dropdown row / checked toggle: outline the state.
+		 *
+		 * `.ifacebox-head.active` and Apply joined the list rather than getting a rule of their own:
+		 * they are the same KIND of state — carried by a background, with no word to fall back on —
+		 * and it is the same repair. "This port is up" was indistinguishable from a dead port, and
+		 * Save & Apply did not read as a BUTTON at all: it is a .cbi-dropdown wrapper, so with its
+		 * fill forced to Canvas only the label inside the <li> kept a highlight, leaving what looks
+		 * like selected text beside a bare chevron (see tmp/decisions/4-forcedcolors-actionbar).
+		 * NOT extended to the alert and .label variants: the audit's proposal there was to encode
+		 * severity in border-style (dashed/dotted/double), and a border style is not a scale anyone
+		 * can learn — the honest repair is a word or an icon in the markup, which is ui.js's. */
 		#tabmenu ul.tabs > li.active > a,
 		ul.cbi-tabmenu.mode > li.cbi-tab > a,
 		.tabs > li.active > a,
 		.cbi-tabmenu > li.cbi-tab > a,
 		.cbi-dropdown > ul > li[selected],
+		.ifacebox .ifacebox-head.active,
+		.cbi-page-actions .cbi-button-apply,
 		.fs-seg button.active {
 			outline: 2px solid Highlight;
 			outline-offset: -2px;

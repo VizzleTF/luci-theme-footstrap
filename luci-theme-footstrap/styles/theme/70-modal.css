@@ -1,5 +1,13 @@
 @layer theme {
-	.zonebadge .cbi-tooltip { box-shadow: var(--fs-shadow-pop); }
+	/* base/60-modal.css draws the dialog's elevation as `0 0 3px var(--fs-panel2)`, and in
+	 * footstrap light --fs-panel2 and --fs-bg are the SAME hex (#f6f8fa): the shadow under the
+	 * top of the z-stack was drawn in the exact colour of the page behind it (measured 1.00:1;
+	 * dark is 1.27, hicontrast 1.06/1.14 — a glow, never a shadow, since panel2 is LIGHTER than
+	 * the canvas). Every other floating surface in the theme — the open dropdown, ::picker(select),
+	 * the rail flyout, the search box, the appearance popover — already takes --fs-shadow-pop.
+	 * Unscoped `.modal`, not `#modal_overlay .modal`: .modal is reachable outside the overlay, and
+	 * the layer beats base at equal specificity without a specificity fight. */
+	.modal { box-shadow: var(--fs-shadow-pop); }
 
 	/* The uci-changes diff used to be painted TWICE: base gave it one set of tints and five
 	 * #modal_overlay rules here gave it another — 30/60% against 18/45%, the same widget at two
