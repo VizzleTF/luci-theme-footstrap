@@ -200,22 +200,122 @@ function moduleUrl(className) {
 	return (L.env.base_url || '') + '/' + className.replace(/\./g, '/') + '.js' + v;
 }
 
-/* Hover prefetch: warm the browser HTTP cache for a view's module JS with a plain fetch() — NOT
- * require(), which would run the class __init__ and render another page's view into #view. The
- * later click's require() then hits cache instead of the network (−10–40 ms LAN on a first visit,
- * more over WAN/VPN). Deduped per class; failures are silent (it is a pure optimisation). */
+/* ---- link prefetch: warm the module cache for a page the user is about to open ----
+ *
+ * A plain fetch(), NOT require(): require() instantiates, and a view's __init__ IS its render, so it
+ * would paint another page into #view. fetch() only fills the browser's HTTP cache, which the later
+ * require()'s XHR then hits. Deduped per class; failures are silent (a pure optimisation).
+ *
+ * TRANSITIVE, and that is where most of the win is: warming the view class alone leaves its own
+ * `require` pragmas one round-trip behind it. view/network/routes.js pulls tools/network.js (40.5 KB),
+ * and measured on the dev router at 120 ms RTT a first visit cost 418 ms with the view warmed against
+ * 296 ms with its deps warmed too — one RTT exactly. Over six pages, 1713 ms cold → 1184 warmed →
+ * 1052 warmed transitively. The bytes are in hand either way, so the scan is free.
+ *
+ * The scan MUST NOT be line-anchored. The shipped files are MINIFIED and every pragma sits on one
+ * line (`'use strict';'require view';'require fs';…`), so /^'require …'$/m matches nothing at all —
+ * silently, which is how the first attempt at this measured a win of zero. luci.js lexes the leading
+ * string literals; this reads the same head of the file with one regex. */
+const PRAGMA_HEAD = 2000;	/* bytes of leading literals to scan — luci.js stops at the first non-string token */
+const PREFETCH_DEPTH = 3;
+
+function pragmaDeps(src) {
+	const re = /(['"])require[ \t]+([^'"]+?)\1/g;
+	const head = src.slice(0, PRAGMA_HEAD);
+	const out = [];
+	let m;
+	while ((m = re.exec(head)))
+		out.push(m[2].split(/[ \t]+as[ \t]+/)[0]);
+	return out;
+}
+
+/* SIX CLASS NAMES HAVE NO FILE, and fetching one is a guaranteed 404 in the user's console. luci.js
+ * seeds its class registry with them at load — `const classes = { baseclass: Class, dom: DOM,
+ * poll: Poll, request: Request, session: Session, view: View }` — so require() answers them from
+ * memory and never asks the network, while `ls /www/luci-static/resources` has no baseclass.js,
+ * dom.js, poll.js, request.js or session.js at all. Every view file's pragmas name `view` and
+ * `baseclass`, so a dependency walk hits this on its very first step: measured, warming the recents
+ * at idle put 404s for view.js and poll.js in the console of every page load, and the first hover
+ * added baseclass.js. This theme already refuses that noise elsewhere (head.ut probes for
+ * fs-update.js server-side rather than let a bare require 404), and the same standard applies here.
+ *
+ * A future LuCI adding a seventh built-in would cost one 404 per session — `_prefetched` makes it
+ * at most one — and the list is a literal from luci.js, not a guess about it. */
+const BUILTIN_CLASSES = new Set([ 'baseclass', 'dom', 'poll', 'request', 'session', 'view' ]);
+
+/* Is this class already instantiated? require() attaches its singleton to the LuCI prototype
+ * (`ptr[parts[idx]] = instance`), so a SINGLE-segment name reads back as L[name] — which covers the
+ * libs a loaded page has already pulled in (ui, form, uci, rpc, fs, validation, and network/firewall
+ * once some network page has been open). Skipping them spends no request on a cache hit nobody needs.
+ * `instanceof L.Class` rather than a truthiness test: L.env, L.url and L.get are members too, and a
+ * dep whose name collided with one of those would otherwise be skipped without ever being loaded —
+ * which is why this cannot be the guard for the six above either: they are seeded as CONSTRUCTORS
+ * (and under other names — L.Poll, L.Request, L.Class), so no `instanceof` probe sees them. A DOTTED
+ * name (tools.network) is not attached unless its parent already exists, so it is simply fetched —
+ * and those are the ones the win comes from. */
+function classLoaded(name) {
+	if (BUILTIN_CLASSES.has(name)) return true;
+	try { return name.indexOf('.') < 0 && window.L[name] instanceof window.L.Class; }
+	catch (e) { return false; }
+}
+
 /* view classes already required, i.e. the ones LuCI has an instance cached for. A class NOT in
  * here is rendered by the require() itself (see navigate). */
 const _seen = new Set();
 const _prefetched = new Set();
-function prefetchView(pathname) {
-	const segs = tree.segsFromPath(pathname);
-	if (!segs) return;
+/* className -> the promise of ITS OWN body being in the HTTP cache; navigate() waits on that.
+ * Deliberately the body and not the subtree, see _committed below. */
+const _warming = new Map();
+/* Roots a navigation has taken over. Speculation below them STOPS: require() is now fetching the same
+ * graph and pipelines its parse and eval against those fetches, so descending would only race it —
+ * measured at 120 ms RTT, waiting for the whole subtree instead cost 658 ms against 525 ms racing,
+ * for the sake of a duplicate that stopping avoids outright. Deps have not been asked for yet when a
+ * click arrives (they start only once the root body lands), so there is nothing in flight to collide
+ * with: this leaves zero duplicated bytes AND require()'s pipelining. */
+const _committed = new Set();
+
+function warmClass(name, depth, root) {
+	if (_prefetched.has(name)) return;
+	_prefetched.add(name);
+	if (classLoaded(name)) return;
+	let req;
+	try { req = fetch(moduleUrl(name), { credentials: 'same-origin' }); }
+	catch (e) { return; }
+	const body = req.then((res) => (res.ok ? res.text() : '')).catch(() => '');
+	_warming.set(name, body.then(() => {}, () => {}));
+	/* The visited set is global and the depth capped, so the walk terminates regardless of what the
+	 * pragmas say — require() raises DependencyError on a cycle, but only for classes it actually
+	 * loads, and this walks files it may never hand to require() at all. */
+	if (depth < PREFETCH_DEPTH)
+		body.then((src) => {
+			if (_committed.has(root)) return;
+			for (const d of pragmaDeps(src)) warmClass(d, depth + 1, root);
+		});
+}
+
+/* Warm the view a menu path resolves to, plus its dependency tree. `segs` is the menu path
+ * (`admin/network/routes`), the shape fs-search stores its recents in. */
+function prefetchSegs(segs) {
+	if (!Array.isArray(segs) || !segs.length) return;
 	const res = tree.resolveSegs(segs);
 	const className = tree.viewClassFor(res && res.node);
-	if (!className || _prefetched.has(className)) return;
-	_prefetched.add(className);
-	try { fetch(moduleUrl(className), { credentials: 'same-origin' }).catch(() => {}); } catch (e) {}
+	if (className) warmClass(className, 0, className);
+}
+
+function prefetchView(pathname) {
+	const segs = tree.segsFromPath(pathname);
+	if (segs) prefetchSegs(segs);
+}
+
+/* Wait for an in-flight prefetch of `className` instead of racing it — see the call site. Capped,
+ * because a wedged prefetch must never wedge a navigation: on a stalled connection require()'s own
+ * XHR and its error path are the better place to end up. */
+const WARM_WAIT_MS = 5000;
+function warmedThen(className) {
+	_committed.add(className);
+	const body = _warming.get(className);
+	if (!body) return Promise.resolve();
+	return Promise.race([ body, new Promise((r) => window.setTimeout(r, WARM_WAIT_MS)) ]);
 }
 
 /* The page we are standing on arrived as a full load, so LuCI has ALREADY required — hence
@@ -454,8 +554,26 @@ function navigate(pathname, push, kbd) {
 	 * the router has no business owning luci-mod-status's globals. */
 	const RT = window.L;
 	const cached = _seen.has(className);
-	_seen.add(className);
-	RT.require(className).then((view) => {
+	/* WAIT for an in-flight prefetch of this class rather than racing it. Two requests for the same
+	 * URL do not coalesce, so a click landing before the prefetch does downloads the module TWICE,
+	 * both at full latency, and gains nothing — measured at 120 ms RTT: the prefetch ran 2664→2788 ms
+	 * and the require's XHR 2682→2788 ms for the same 8.6 KB. That is the NORMAL case on a touch
+	 * device, where pointerover fires the same moment as the tap. Waiting costs nothing: the XHR
+	 * would have waited for exactly those bytes.
+	 *
+	 * `_seen` is marked here and not before, because it means "this class has been through require()"
+	 * and the wait introduces a window in which we may never get there. Marking it up front would
+	 * make the NEXT navigation take the cached branch — `new view.constructor()` on a class whose
+	 * require() is what renders it — i.e. two renders and two pollers for one page. */
+	warmedThen(className).then(() => {
+		/* superseded while waiting: never start the require. On a first visit the require IS the
+		 * render, so starting it here would paint a page the user has already left and hand
+		 * repairStaleRender() a mess that only exists because a require in flight cannot be stopped. */
+		if (gen !== _navGen) return null;
+		_seen.add(className);
+		return RT.require(className);
+	}).then((view) => {
+		if (view == null) return;
 		if (!(view instanceof RT.view))
 			throw new TypeError('Loaded class ' + className + ' is not a view');
 		if (gen !== _navGen) {
@@ -534,6 +652,26 @@ function wireRouter() {
 		const a = ev.target.closest?.('a[href]');
 		if (!a || a === lastHovered) return;
 		lastHovered = a;
+		const url = linkUrlFrom(ev);
+		if (url)
+			prefetchView(url.pathname);
+	}, { passive: true });
+
+	/* The pointer is not the only way a link gets chosen, and the other two ways got no prefetch at
+	 * all. A KEYBOARD user Tabs to the link and presses Enter — no pointer event ever fires, so the
+	 * whole optimisation was invisible to them; focusin is the keyboard's hover, and the Tab→Enter gap
+	 * is human-scale, so the module is usually there by the time Enter lands. A TOUCH user gets a
+	 * pointerover, but at the same moment as the tap, which is what the in-flight wait in navigate()
+	 * is for rather than an earlier trigger. pointerdown adds the one pointer case pointerover cannot
+	 * see: a link that scrolled UNDER a stationary pointer crosses no boundary and fires nothing.
+	 * Neither needs the lastHovered guard above — they fire once per interaction, not per element
+	 * crossed — and warmClass() dedupes per class anyway. */
+	document.addEventListener('focusin', (ev) => {
+		const url = linkUrlFrom(ev);
+		if (url)
+			prefetchView(url.pathname);
+	}, { passive: true });
+	document.addEventListener('pointerdown', (ev) => {
 		const url = linkUrlFrom(ev);
 		if (url)
 			prefetchView(url.pathname);
@@ -622,5 +760,9 @@ return baseclass.extend({
 	seed,
 	wire: wireRouter,
 	wireVisibility,
-	onNavigate
+	onNavigate,
+	/* fs-search warms the pages this admin actually uses (its recents) and the arrow-key-highlighted
+	 * result, both of which the pointer/focus triggers above cannot see. The edge points that way
+	 * round — search → router — because the router must keep no dependency on the palette. */
+	prefetchSegs
 });

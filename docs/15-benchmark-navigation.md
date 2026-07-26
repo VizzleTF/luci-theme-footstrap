@@ -74,6 +74,75 @@ One more thing the numbers show: a third-party theme can be slower than the stoc
 repaints. proton2025 loses to bootstrap on total time, with roughly twice the requests and four
 times the CSS. Pretty is not fast, which is the argument for measuring.
 
+## The remaining LAN time is not the theme's, and it is not the router's either
+
+On a LAN a warm navigation still costs 90–140 ms while the router answers most of its own RPCs in
+1–4 ms. That gap is worth writing down, because the obvious suspects are all innocent and the real
+cause sits two layers below this theme.
+
+**The theme is 4.9% of it.** CPU-profiling the main thread across 14 warm navigations on real
+hardware (`Profiler.setSamplingInterval 100µs`, self time by script): every `fs-*.js` file together
+is **6.8 ms per navigation** out of ~139 ms — `fs-chrome` 4.6, `fs-fit`'s `roomFor` 1.2, `fs-router`
+0.4, `fs-select` 0.2 — against 95.9 ms in which the main thread is *idle* and 21.5 ms of engine work
+(style, layout, paint). Another 3.7 ms/nav is `scrollTo`, which is ours. So zeroing the theme
+entirely would buy under 8%, and the chrome re-render everyone suspects (`renderChrome`, which does
+rebuild the menu on every navigation) measures **0.55 ms**.
+
+**The router is not slow either.** Per-request timings from the CDP *network service* (immune to
+renderer busyness) show server time of 1.0–4.0 ms for almost everything, including a 22 KB
+`network.interface.dump` batch at 1.4 ms — but **42–44 ms, every single time, for `session.access`
+(205 bytes) and for a lone `luci.getUnixtime` (211 bytes)**. Run the same call with the main thread
+idle and it takes 2.8 ms; `ubus call session access` on the router itself takes 0 ms.
+
+**It is Nagle plus delayed ACK, and uhttpd is where it lands.** uhttpd writes a response's headers
+and body as separate `write()`s and never sets `TCP_NODELAY`, so on a *reused keep-alive* connection
+a small body waits for the ACK of the previous response — which the client's kernel delays by ~40 ms.
+Reproduced with curl, no browser involved, four sequential POSTs on one connection:
+
+```
+req1 uci.changes         52 B    7.2 ms
+req2 session.access      53 B   44.0 ms   <-- small body, previous response unacked
+req3 getNetworkDevices 8913 B    9.6 ms   <-- a full MSS goes out immediately
+req4 session.access      53 B   42.8 ms
+fresh connection each time:      1.4 / 1.5 / 1.4 ms
+```
+
+That also explains the shape: TTFB is 0.37 ms (the headers are prompt), the *body* is late; the first
+request of a connection never stalls; large responses never stall.
+
+**A workaround exists, it is NOT theme-specific, and over HTTPS it is a trap.**
+`uci set uhttpd.main.http_keepalive=0` removes the stall (uhttpd then answers `Connection: close` on
+both protocols). Measured on the production router, aarch64 25.12.2:
+
+| | keep-alive 20 | keep-alive 0 | |
+|---|--:|--:|---|
+| footstrap, warm navigation, 6 pages, LAN | 754 ms | **453 ms** | **1.66×** |
+| footstrap, cold full load, LAN | 292 ms | **155 ms** | **1.88×** |
+| footstrap, warm navigation, 120 ms RTT | 1825 ms | 1834 ms | unchanged |
+| footstrap, cold full load, 120 ms RTT | 1551 ms | 1551 ms | unchanged |
+| **stock bootstrap**, full-load nav, 6 pages, LAN | 2126 ms | **1705 ms** | **1.25×** |
+| **stock bootstrap**, full-load nav, 120 ms RTT | 4782 ms | 4814 ms | unchanged |
+| **HTTPS**, full-load nav, 120 ms RTT | 9819 ms | **29 424 ms** | **3× WORSE** |
+
+Stock bootstrap gains too, which is the point: this is uhttpd's, not the theme's. Plain HTTP loses
+nothing even at 120 ms RTT, because the handshakes overlap across the six connections a browser opens
+while the Nagle stall is serial. **But keep-alive is load-bearing for TLS**: without it every request
+pays a TCP handshake plus a TLS handshake, and a page is ~49 requests — measured at 20 ms per fresh
+TLS handshake even on the LAN, and 3× the total page time at 120 ms RTT. So never set this on a router
+whose admin UI is reached over HTTPS or over a slow link.
+
+What did *not* materialise, so do not repeat these as objections: socket churn cost nothing measurable
+— uhttpd burned 3 jiffies per 100 GETs with keep-alive off against 4 with it on, TIME_WAIT sockets
+stayed at 0 in both, and conntrack did not grow. The proper fix is `TCP_NODELAY` in uhttpd, which
+keeps keep-alive *and* removes the stall, and helps every LuCI theme rather than this one.
+
+**Dead ends, so nobody re-derives them:** HTTPS does not avoid it (56.8 / 44.3 / 44.3 ms over TLS);
+`uhttpd -h` exposes no socket-option knob beyond `-k` (keep-alive timeout) and `-A` (TCP keepalive
+probes); and **the theme cannot work around it from JS** — it issues no ubus call of its own during a
+navigation (the calls are `form.js`'s `session.access` and the views' own data), `Connection: close`
+is a forbidden request header, and the connection pool is keyed by origin rather than by URL, so no
+cache-buster changes which socket a request lands on.
+
 ## Running it yourself
 
 ```sh
