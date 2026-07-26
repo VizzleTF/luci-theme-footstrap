@@ -113,16 +113,31 @@ function fitTabStrips() {
  * Resolve them the way the platform actually offers without registering the property: assign the
  * token to a REAL length property on a throwaway element and read the used value back. */
 let _probe = null;
+/* THE PROBE IS A PLAIN <div> IN THE SHARED DOCUMENT, so a third-party app's CSS can style it, and
+ * every one of its declarations is !important for that reason alone. It carries no chrome mark, so
+ * `fs-sheets`'s fence deliberately does not spare it (the fence protects the chrome's own elements),
+ * and even a fenced sheet still matches an unmarked div. Issue #19: an app whose stylesheet carried
+ * `div { min-width: 500px !important }` won every read — all four tokens came back 500 — so the cut
+ * the sidebar was said to take became 500 + 2x500 and `fitShell` folded the sidebar into a bar on a
+ * 1857px desktop. The threshold that produces is exactly 500 + 500 + 1000 = 2000 CSS px, which is
+ * why it was reported as a ZOOM bug: Chrome at 90% gives 2063 CSS px and passed, 100% gives 1857 and
+ * failed. Inline !important is what answers it — a style-attribute declaration outranks any author
+ * rule at the same importance, so there is nothing left for the app to out-rank.
+ * box-sizing is stated for the same reason: getComputedStyle().width is the CONTENT box, so a
+ * foreign `border-box` plus padding would shave the reading (the padding/border resets below are
+ * important, but only a stated box-sizing makes them provably irrelevant). */
 function resolveLen(token, dflt) {
 	if (!_probe) {
 		_probe = document.createElement('div');
 		_probe.setAttribute('aria-hidden', 'true');
 		/* out of flow, no box, no ink: it must never affect layout, scroll extent or hit-testing */
-		_probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;' +
-			'height:0;min-width:0;max-width:none;border:0;padding:0;margin:0;';
+		_probe.style.cssText = 'position:absolute!important;visibility:hidden!important;' +
+			'pointer-events:none!important;height:0!important;box-sizing:content-box!important;' +
+			'min-width:0!important;max-width:none!important;border:0!important;' +
+			'padding:0!important;margin:0!important;';
 		document.body.appendChild(_probe);
 	}
-	_probe.style.width = 'var(' + token + ')';
+	_probe.style.setProperty('width', 'var(' + token + ')', 'important');
 	const v = parseFloat(getComputedStyle(_probe).width);
 	return Number.isFinite(v) ? v : dflt;
 }
@@ -132,19 +147,30 @@ function resolveLen(token, dflt) {
  * (`prefs.applyDensity()` stamps `:root[data-density]` and calls fit.schedule() precisely so they
  * are re-measured). Reading one attribute is free; the memo without the key meant a density change
  * re-measured against the widths of the density before it. */
+/* The last resort, stated ONCE so the fallbacks and the sanity net below cannot restate the
+ * stylesheet's widths in two different places. Reaching for these means the measurement failed. */
+const GEOM_DFLT = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56 };
+
 let _geom = null, _geomDensity = null;
 function shellGeometry() {
 	const density = document.documentElement.getAttribute('data-density') || '';
 	if (_geom && _geomDensity === density) return _geom;
 	_geomDensity = density;
 	const px = (name, dflt) => resolveLen(name, dflt);
-	_geom = {
-		contentMin: px('--fs-content-min', 500),
-		sidebarW:   px('--fs-sidebar-w', 224),
-		railW:      px('--fs-rail-w', 68),
+	const g = {
+		contentMin: px('--fs-content-min', GEOM_DFLT.contentMin),
+		sidebarW:   px('--fs-sidebar-w', GEOM_DFLT.sidebarW),
+		railW:      px('--fs-rail-w', GEOM_DFLT.railW),
 		/* the token is ONE side's padding; the column loses it twice */
-		contentPad: px('--fs-content-pad', 28) * 2
+		contentPad: px('--fs-content-pad', GEOM_DFLT.contentPad / 2) * 2
 	};
+	/* Plausibility, and it costs one comparison: the rail IS the sidebar collapsed, so
+	 * 0 < railW < sidebarW holds by construction. Both known ways this measurement fails destroy
+	 * that — a hijacked probe reports ONE foreign width for all four (issue #19), a renamed or
+	 * absent token reports 0 for all four (an abs-positioned empty div with `width:auto` shrinks to
+	 * 0, and 0 is finite, so the per-read fallback above never fires). Neither can be seen in the
+	 * numbers one at a time; the RELATION between them is what gives it away. */
+	_geom = (g.railW > 0 && g.railW < g.sidebarW && g.contentMin > 0) ? g : Object.assign({}, GEOM_DFLT);
 	return _geom;
 }
 
