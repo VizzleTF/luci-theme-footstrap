@@ -19,11 +19,27 @@
  * mangle, quotes stay single, and the tool FAILS unless the declaration survives verbatim
  * enough for the sed to match. Silently losing it would make every release report "(dev)".
  *
- * Two self-checks per file, because a silent mis-minify here ships broken chrome:
+ * THE SEAM NAMES ARE RESERVED, AND THE LIST IS DERIVED — this is what the paragraph above got
+ * wrong, at the cost of a broken release. It is true that terser never RENAMES a free variable
+ * like `L`; what it will happily do is CREATE one. A LuCI resource file is the body of
+ * `function(window, document, L, …aliases)`, but terser is handed the file on its own, so to it
+ * the top level is global scope and `L` is just a name nobody declared — i.e. a name it is free
+ * to hand to a mangled variable. `fs-sheets.js` gained two top-level bindings, the generator
+ * reached `L`, and the shipped file opened with `const L=…`: "Identifier 'L' has already been
+ * declared", the module never loaded, and the whole chrome went with it (v0.11.6, pulled).
+ *
+ * So the free variables of the SOURCE are reserved, computed per file rather than listed: `L`,
+ * `E`, `_`, `window`, `document`, every `'require x as y'` alias, every browser global the file
+ * touches. A new seam name cannot be forgotten because nothing here names them.
+ *
+ * Three self-checks per file, because a silent mis-minify here ships broken chrome:
  *  - the output must PARSE (acorn, same options jsmin-verify uses);
  *  - the directive prologue must be IDENTICAL — the `'require x as y'` pragmas are how LuCI
  *    resolves dependencies, and a compress option that dropped them would leave every module
- *    loading with no dependencies and no error at minify time.
+ *    loading with no dependencies and no error at minify time;
+ *  - NOTHING the output declares may collide with a name the source uses freely. That is the
+ *    check that would have caught the `const L` above; `reserved` is the fix, this is the proof,
+ *    and they are derived from the same computation so they cannot disagree.
  */
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
@@ -47,6 +63,84 @@ const walk = (p) => {
 };
 roots.forEach(walk);
 
+/* Walk every node of an acorn AST. Hand-rolled because acorn-walk is not a dependency and this
+ * is the whole of what would be used from it: recurse into anything that looks like a node. */
+function walkAst(node, visit) {
+	if (!node || typeof node.type !== 'string') return;
+	visit(node);
+	for (const k of Object.keys(node)) {
+		if (k === 'type' || k === 'start' || k === 'end' || k === 'loc') continue;
+		const v = node[k];
+		if (Array.isArray(v)) v.forEach((c) => walkAst(c, visit));
+		else walkAst(v, visit);
+	}
+}
+
+/* Every name the file BINDS, anywhere and at any depth. Deliberately scope-blind: this feeds a
+ * subtraction, and over-collecting here can only shrink the reserved set's input, never invent a
+ * free name that is not one. (Both callers below want the same conservative answer.) */
+function boundNames(ast) {
+	const out = new Set();
+	const fromPattern = (p) => walkAst(p, (n) => {
+		if (n.type === 'Identifier') out.add(n.name);
+		/* a property KEY inside a destructuring pattern binds nothing: `{ a: b }` binds b */
+		if (n.type === 'Property' && !n.computed && n.key && n.key.type === 'Identifier') out.delete(n.key.name);
+	});
+	walkAst(ast, (n) => {
+		if (n.type === 'VariableDeclarator') fromPattern(n.id);
+		else if (n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression' ||
+		         n.type === 'ArrowFunctionExpression' || n.type === 'ClassDeclaration' ||
+		         n.type === 'ClassExpression') {
+			if (n.id) out.add(n.id.name);
+			(n.params || []).forEach(fromPattern);
+		}
+		else if (n.type === 'CatchClause' && n.param) fromPattern(n.param);
+	});
+	return out;
+}
+
+/* Names the file USES but never binds — its seam with the LuCI wrapper and with the browser.
+ * These are exactly the names terser must not hand to one of its own variables. */
+function freeNames(src) {
+	const ast = acorn.parse(src, ACORN);
+	const bound = boundNames(ast);
+	const used = new Set();
+	walkAst(ast, (n) => {
+		if (n.type === 'MemberExpression' && !n.computed && n.property) n.property._notARef = true;
+		/* `{ E }` is BOTH the key and a reference to E — a shorthand key must stay a reference */
+		if (n.type === 'Property' && !n.computed && !n.shorthand && n.key) n.key._notARef = true;
+		if (n.type === 'LabeledStatement' && n.label) n.label._notARef = true;
+		if (n.type === 'BreakStatement' && n.label) n.label._notARef = true;
+		if (n.type === 'ContinueStatement' && n.label) n.label._notARef = true;
+		if (n.type === 'Identifier' && !n._notARef) used.add(n.name);
+	});
+	return new Set([...used].filter((n) => !bound.has(n)));
+}
+
+/* THE WRAPPER'S PARAMETERS, which are bound whether the file mentions them or not — and that is
+ * the half a "free variables of the source" answer gets wrong. luci.js evaluates a resource file
+ * as `function(window, document, L, <one arg per require pragma>) { … }`, so those names are
+ * ALREADY declared in the scope terser is minifying into. `fs-sheets.js` never reads `L` outside
+ * a comment, so it is not free by any AST measure — and terser handed `L` to a top-level
+ * `const`, which is a redeclaration of the parameter and a SyntaxError before a line of it runs.
+ *
+ * The alias is derived exactly the way luci.js derives it (`as` name, else the dependency with
+ * every non-word character replaced), so this list cannot drift from what the loader binds. */
+function wrapperParams(src) {
+	/* `E` and `_` are not parameters — luci.js puts them on `window` — so shadowing one is legal
+	 * and, for a file that never reads it, harmless. They are reserved anyway: three files came
+	 * back declaring `const E=…`, and the difference between "harmless" and "the element factory
+	 * is gone" is whether some future line reads E from a place the AST cannot see (a template
+	 * this file evals, a string handed to another module). 40 bytes across the tree buys not
+	 * having to make that judgement per file. */
+	const names = new Set([ 'window', 'document', 'L', 'E', '_' ]);
+	for (const d of directives(src).split('\n')) {
+		const m = /^require[ \t]+(\S+)(?:[ \t]+as[ \t]+([a-zA-Z_]\S*))?$/.exec(d);
+		if (m) names.add(m[2] || m[1].replace(/[^a-zA-Z0-9_]/g, '_'));
+	}
+	return names;
+}
+
 /* the leading run of string-literal ExpressionStatements: 'use strict' + the require pragmas */
 function directives(src) {
 	const body = acorn.parse(src, ACORN).body;
@@ -65,11 +159,14 @@ for (const f of files) {
 	const name = basename(f);
 	const src = readFileSync(f, 'utf8');
 	const isVersion = (name === 'fs-version.js');
+	/* the two halves of "names this scope already has": what the file reads without binding, and
+	 * what the LuCI wrapper binds for it whether it reads them or not */
+	const free = new Set([ ...freeNames(src), ...wrapperParams(src) ]);
 	const res = await minify(src, {
 		parse: { bare_returns: true },
 		/* directives:false = do NOT remove them — the pragmas ARE directives */
 		compress: { directives: false },
-		mangle: { toplevel: true, reserved: isVersion ? [ 'FS_VERSION' ] : [] },
+		mangle: { toplevel: true, reserved: [ ...free, ...(isVersion ? [ 'FS_VERSION' ] : []) ] },
 		/* quote_style 1 = single quotes, so the version sed's '[^']*' still matches */
 		format: isVersion ? { quote_style: 1 } : {}
 	});
@@ -78,6 +175,12 @@ for (const f of files) {
 		acorn.parse(min, ACORN);
 		if (directives(min) !== directives(src))
 			throw new Error('directive prologue changed — a require pragma was lost');
+		/* The one that matters most: a name the source only USES must not come back DECLARED.
+		 * `const L = …` in the output shadows the wrapper's parameter and the module dies at
+		 * parse time with "Identifier 'L' has already been declared" (v0.11.6). */
+		const clash = [ ...boundNames(acorn.parse(min, ACORN)) ].filter((n) => free.has(n));
+		if (clash.length)
+			throw new Error(`the minifier declared ${clash.join(', ')} — a name this file gets from the LuCI wrapper`);
 		if (isVersion && !VERSION_DECL.test(min))
 			throw new Error('the FS_VERSION declaration did not survive — the version sed would miss');
 		/* a floor, not a budget: an empty/truncated write must not ship (build-css.sh's rule) */

@@ -11,7 +11,7 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [0.11.6] — 2026-07-27
+## [0.11.6] — 2026-07-28
 
 ### Fixed
 
