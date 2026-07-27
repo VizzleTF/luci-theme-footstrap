@@ -592,6 +592,17 @@ option two</textarea></div>
 				<td class="td">F4:A3:10:96:E0:53</td><td class="td">8h 56m 4s</td>
 				<td class="td"><button class="cbi-button cbi-button-apply">Reserve IP</button></td>
 			</tr>
+			<!-- …and the SAME button mid-click, which is the shape issue #22 was reported on:
+			     40_dhcp.js adds `spinning` to the button it was clicked on, and this row is inside
+			     a `.table[id]`, whose cell-button rule is (0,5,0) — the rule that used to out-rank
+			     the spinner's padding ladder and draw the glyph on top of the label. Rendered here
+			     so a regression is visible without a router (issue #15 was the same bug one rule
+			     lower down, and neither was in the gallery). -->
+			<tr class="tr cbi-rowstyle-1">
+				<td class="td">nb-ivan</td><td class="td">10.11.12.144</td>
+				<td class="td">A2:9C:41:07:BB:10</td><td class="td">2h 28m 11s</td>
+				<td class="td cbi-section-actions"><button class="cbi-button cbi-button-apply spinning" disabled>Reserve IP</button></td>
+			</tr>
 		</table>
 	</div>
 

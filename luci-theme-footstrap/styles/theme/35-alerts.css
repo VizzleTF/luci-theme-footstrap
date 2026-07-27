@@ -8,7 +8,23 @@
 		border-radius: var(--fs-radius-lg);
 		border: 1px solid var(--fs-border);
 		border-left: 3px solid var(--fs-accent);
-		background: var(--fs-panel);
+		/* THE SURFACE IS OPAQUE, THE STATUS TINT RIDES ON TOP OF IT. The variants below used to
+		 * REPLACE this with `background: var(--fs-*-fill)` — and a `-fill` is a color-mix with
+		 * TRANSPARENT (02-tokens.css), i.e. an 18% wash with nothing behind it. On a flat --fs-bg
+		 * nobody could tell; under Appearance -> Wallpaper: Cats the doodles tile behind the
+		 * content (theme/15-wallpaper.css leaves them at full strength precisely because "every
+		 * block that carries text paints an opaque --fs-panel of its own") and read straight
+		 * through all six status alerts. The plain .alert-message, the only one still on --fs-panel,
+		 * was the one that looked right.
+		 *
+		 * So: --fs-panel stays the background-COLOUR for every variant, and the tint is a
+		 * background-IMAGE layer over it. The named `-fill` step is unchanged — no fresh
+		 * percentage, no second spelling of the tint — and the composite is what the 18% wash
+		 * already looked like on a panel, so an untinted router sees the same pixels it did.
+		 * The local `--fs-alert-tint` is what keeps this ONE rule instead of six `background:`
+		 * overrides that each have to remember to re-state the panel. */
+		background-color: var(--fs-panel);
+		background-image: linear-gradient(var(--fs-alert-tint, transparent), var(--fs-alert-tint, transparent));
 		color: var(--fs-text);
 		box-shadow: var(--fs-shadow);
 		gap: var(--fs-space-3);
@@ -33,15 +49,15 @@
 	 * (Measured: rgb(234,122,116) -> the tint.) */
 	.alert-message.warning:not(.btn) {
 		border-color: var(--fs-border); border-left-color: var(--fs-warn);
-		background: var(--fs-warn-fill);
+		--fs-alert-tint: var(--fs-warn-fill);
 	}
 	.alert-message.error:not(.btn), .alert-message.danger:not(.btn) {
 		border-color: var(--fs-border); border-left-color: var(--fs-danger);
-		background: var(--fs-danger-fill);
+		--fs-alert-tint: var(--fs-danger-fill);
 	}
 	.alert-message.success:not(.btn) {
 		border-left-color: var(--fs-good);
-		background: var(--fs-good-fill);
+		--fs-alert-tint: var(--fs-good-fill);
 	}
 	/* `.info` was styled by nothing — it fell through to the plain panel with an accent stripe,
 	 * which is what a class-less .alert-message already looks like. It is a STATUS, so it tints
@@ -56,7 +72,7 @@
 	 * `--background-color-*`, keeping green for success alone. Informational, so: accent. */
 	.alert-message.info:not(.btn), .alert-message.notice:not(.btn) {
 		border-left-color: var(--fs-accent);
-		background: var(--fs-accent-fill);
+		--fs-alert-tint: var(--fs-accent-fill);
 	}
 
 	/* h2 is what the theme's own notices emit (the document had no heading above h4 at all); h4 is

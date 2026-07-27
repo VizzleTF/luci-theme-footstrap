@@ -369,11 +369,12 @@
 		--fs-space-8: calc(32px * var(--fs-density-space));
 		--fs-space-10: calc(40px * var(--fs-density-space));
 
-		/* The spinner glyph's box (base/95-luci.css `.spinning::before`). A TOKEN because it is read
-		 * back to clear it: theme/55-buttons.css pads a .spinning button left by inset + glyph +
-		 * gap. That was `left: 6px` + `width: 20px` here and a bare `padding-left: 32px` there —
-		 * three literals in two files encoding one relationship, with nothing to notice when the
-		 * glyph is resized. Same trap --fs-sidebar-w exists to close for fitShell(). */
+		/* The spinner glyph's box (base/95-luci.css `.spinning::before`, its width AND height — one
+		 * number, one name). It became a token because a SECOND file used to encode the same size:
+		 * the glyph was absolutely positioned, so theme/55-buttons.css had to clear it with a
+		 * `padding-left` derived from `left` + `width` + a gap, and the two files drifted with
+		 * nothing to notice. That padding is gone — the glyph sits in the flow now (issues #15 and
+		 * #22) — so this is once again read in one place, which is where a resize belongs. */
 		--fs-spin-size: var(--fs-space-5);
 
 

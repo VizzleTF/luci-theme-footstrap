@@ -15,6 +15,9 @@
 .DS_Store
 # local tooling (playwright venv + chromium; machine-specific, large)
 .claude/tooling/
+# Claude workspace file — the theme repo ships no agent instructions (see
+# "chore: move Claude workspace files out of the theme repo"); this copy is local.
+/CLAUDE.md
 # preview screenshots
 .claude/skills/footstrap-preview/out/
 # page review screenshots

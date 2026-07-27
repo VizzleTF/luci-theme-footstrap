@@ -622,6 +622,56 @@ function dedupeViewSheets() {
 	});
 }
 
+/* ---- THE LAYER ORDER IS A DOCUMENT-WIDE FACT, AND A SHEET INSERTED FIRST CAN REWRITE IT ----
+ *
+ * `@layer tokens, base, theme, page;` in 00-header.css is what makes theme beat base. That
+ * statement only holds while cascade.css is the FIRST sheet in the document to name a layer — the
+ * order is fixed by first appearance, and an earlier sheet naming `theme` makes theme the FIRST
+ * layer, i.e. the WEAKEST. Every later name is appended after it, so the whole cascade inverts:
+ * `tokens, base, page` end up above `theme` and base's `* { padding: 0 }` wins over the chrome's
+ * own rules. Measured on the router: `.fs-content` padding 24px/28px -> 0, and the top bar, the
+ * tabs and every button flattened with it.
+ *
+ * Which is exactly what re-hosting an app's sheet into `@layer theme` can cause, because WHERE the
+ * app put its <style> is the app's choice. Ace (shipped by `luci-app-ssclash`, and by any package
+ * that embeds an editor) calls `dom.importCssString`, which inserts its <style> as the FIRST CHILD
+ * of <head> — ahead of cascade.css. Wrapping that sheet, as the fence must, moved the first mention
+ * of `theme` to the top of the document and took the theme layer down with it. It is lazy, too:
+ * Ace adds more of those sheets on first hover, which is the "reloading fixes it until I touch
+ * anything" in the report.
+ *
+ * The repair is one declaration, and it works because inserting a NEW sheet re-runs the ordering
+ * (moving an existing one does NOT — measured, both ways): re-declare the canonical order from a
+ * fresh <style> placed first in <head>. Cheap, idempotent, and it states the same order 00-header.css
+ * does — one more copy of it, which is why the text is derived from nothing and simply repeated
+ * here, in the one other place that can see the whole document. */
+const LAYER_ORDER = '@layer tokens, base, theme, page;';
+let _layerStmt = null;
+
+function reassertLayerOrder() {
+	const head = document.head;
+	if (!head) return;
+	/* The anchor is whichever of ours comes first: cascade.css, or the statement a previous pass
+	 * already put in front of it. Only a sheet ahead of THAT can have named a layer before we did —
+	 * on a page with no foreign sheet this is one querySelectorAll and out. */
+	const own = [...document.querySelectorAll('link[rel~="stylesheet"]')]
+		.find((l) => (/\/cascade\.css/).test(l.href || ''));
+	if (!own) return;
+	const anchor = _layerStmt && _layerStmt.isConnected ? _layerStmt : own;
+	const ahead = [...document.querySelectorAll('style, link[rel~="stylesheet"]')]
+		.some((el) => el !== anchor && el !== own &&
+			(anchor.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING));
+	if (!ahead) return;
+
+	/* A FRESH element every time: re-inserting the same node is a move, and a move does not re-run
+	 * the ordering (measured — the inverted document stayed inverted). Dropping the previous one
+	 * keeps this at one spare <style> per document however many sheets an app injects. */
+	if (_layerStmt) _layerStmt.remove();
+	_layerStmt = document.createElement('style');
+	_layerStmt.textContent = LAYER_ORDER;
+	head.insertBefore(_layerStmt, head.firstChild);
+}
+
 /* Watch <head> rather than deduping on navigation: the copy arrives too late otherwise — podkop
  * injects from its render(), which resolves AFTER the router's require() callback, so a nav-time
  * sweep left the document permanently carrying one stale duplicate (bounded, never zero). The
@@ -645,12 +695,17 @@ function watchViewSheets() {
 	 * SERVER's HTML, so there is no mutation to see. */
 	rehostInvasiveSheets();
 	dedupeViewSheets();
+	reassertLayerOrder();	/* strictly AFTER the re-host: it is the wrap that can invert the order */
 	const mo = new MutationObserver((muts) => {
 		for (const m of muts)
 			for (const n of m.addedNodes)
 				if (n.nodeName === 'STYLE' || n.nodeName === 'LINK') {
+					/* `continue`, not `return`: our own statement can share a batch with the very
+					 * sheet that made it necessary, and bailing on the batch would skip that one. */
+					if (n === _layerStmt) continue;
 					rehostInvasiveSheets();	/* strictly before the dedupe — see there */
 					dedupeViewSheets();
+					reassertLayerOrder();
 					return;
 				}
 	});

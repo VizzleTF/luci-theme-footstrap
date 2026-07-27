@@ -485,29 +485,35 @@
 		margin: 15vh auto;
 	}
 
-	/* padding-left (room for the ::before spinner glyph): theme/55-buttons.css — absorbed, and the
-	 * !important it used to need went with it. It was there to beat `padding: 0 !important` on
-	 * .cbi-dropdown (80-dropdown.css) — a flag that is itself gone now — and the theme's own button
-	 * padding. Both are answered by specificity in a later layer instead. */
-	.spinning {
-		position: relative;
-	}
-
 	/* Rotate in CSS, NEVER with a SMIL <animateTransform> inside the data-URI: that runs in
 	 * the SVG's own document, which the page's `prefers-reduced-motion` cannot reach — the
 	 * one spinner a motion-sensitive user could not turn off. theme/95-a11y-media.css now
 	 * stops it like everything else. (The circle under the arc is rotationally symmetric,
 	 * so spinning the whole box looks identical.) */
+	/* ---- THE GLYPH SITS IN THE FLOW, AND THAT IS THE FIX FOR A WHOLE BUG CLASS ----
+	 *
+	 * It used to be `position: absolute; left: var(--fs-space-2)` over a `position: relative`
+	 * host, which means the host had to be told to leave room for it — a `padding-left` in
+	 * theme/55-buttons.css that had to OUT-RANK whatever else was padding that element. That is a
+	 * race nobody can win: every padding rule aimed at a button is a candidate, and the loser is
+	 * silent — the glyph simply draws on top of the label. Twice reported from the field, each
+	 * time by a more specific rule than the last: issue #15 (`.td .cbi-button`, 0,2,0 — Network →
+	 * Interfaces, "Restart") and issue #22 (`.cbi-section .table[id] .td .cbi-button`, 0,5,0 —
+	 * the overview's DHCP leases, "Reserve IP"), where the ladder had padding-left at 10px against
+	 * the 32px the glyph needs. A third rule would have done it again.
+	 *
+	 * In the flow the glyph reserves its OWN space, so no host needs a padding at all and there is
+	 * nothing left to out-rank. `flex: 0 0 auto` because the buttons are `inline-flex` and a flex
+	 * item with a mask is squeezable; `vertical-align: middle` for the non-flex hosts (`em.spinning`
+	 * = "Loading…", `#view > div.spinning`). The centring that `top: 50%` + a derived margin used
+	 * to do is now the host's own `align-items: center` / baseline alignment. */
 	.spinning::before {
 		--spinner-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' stroke='%23000' stroke-width='3' fill='none'><circle cx='10' cy='10' r='8' stroke-opacity='.5'/><path d='M10 2c4 0 8 4 8 8'/></svg>");
 
-		position: absolute;
-		/* centred by DERIVATION: `top: calc(50% - 10px)` was half the height below, restated by
-		 * hand, so resizing the glyph decentred it. margin-top and not translate — `transform` is
-		 * taken by the spin animation. */
-		top: 50%;
-		margin-top: calc(var(--fs-spin-size) / -2);
-		left: var(--fs-space-2);
+		display: inline-block;
+		flex: 0 0 auto;
+		vertical-align: middle;
+		margin-right: var(--fs-space-1);
 		width: var(--fs-spin-size);
 		height: var(--fs-spin-size);
 		content: " ";

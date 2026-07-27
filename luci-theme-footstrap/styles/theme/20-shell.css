@@ -707,9 +707,19 @@
 		@media (hover: hover) {
 			:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub:hover > ul { display: flex; }
 		}
-		/* the flyout's heading, so the collapsed icon still names its section */
+		/* the flyout's heading, so the collapsed icon still names its section.
+		 *
+		 * IT MUST UNDO THE BAR'S HOVER BRIDGE, and forgetting to was issue #22. This same
+		 * ::before is the bar's invisible 10px hover bridge above the panel (the unguarded rule
+		 * near the top of this file): `position: absolute; left: 0; right: 0; top: -10px;
+		 * height: 10px`. Re-pointing `content` at the title left all four of those in force, so
+		 * the heading rendered as a 10px-tall absolute box ten pixels ABOVE the flyout — out of
+		 * the flow, and clipped in half by the panel's own `overflow: hidden` (measured:
+		 * `top: -10px`, `height: 12px`, and the top of every letter cut off). The rail brings its
+		 * own bridge as `li.has-sub::after`, so nothing here needs the bar's. */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > ul[data-title]::before {
 			content: attr(data-title);
+			position: static; inset: auto; height: auto;
 			padding: var(--fs-space-1) var(--fs-space-3) var(--fs-space-2);
 			color: var(--fs-eyebrow-color); font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight);
 			letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase;

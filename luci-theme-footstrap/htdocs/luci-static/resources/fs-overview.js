@@ -237,7 +237,25 @@ function pollProgressive(includes, containers, first_load) {
  * page simply renders the stock way: one Promise.all, ~90 ms later. Never broken, sometimes slower.
  */
 function patchOverview() {
-	L.require('view.status.index').then((idx) => {
+	/* `window.L`, NEVER the bare `L` this factory was handed — and the reason is NOT this module's
+	 * own convenience, it is what the STOCK view ends up holding. `require()` passes the object it
+	 * was called on into the loaded module's factory (`const L = this` in luci.js), and
+	 * `view/status/index.js` then loads its own includes with that same `L` inside `load()`
+	 * (`L.require('view.status.include.' + …)`), so whichever `L` reaches index.js reaches
+	 * 30_network.js too — which calls `L.itemlist(...)` directly. `ui` hangs itemlist/showModal/…
+	 * on the RUNTIME INSTANCE that the dispatcher builds (`window.L = new LuCI()`), and a chrome
+	 * module like this one is loaded as a dependency, i.e. through `LuCI.prototype.require`, so our
+	 * `L` is the PROTOTYPE and has none of them.
+	 *
+	 * `require()` caches by class name, so the FIRST caller decides this for everybody: patching
+	 * through the bare `L` cached view.status.index bound to the prototype, and the overview then
+	 * died mid-render on "L.itemlist is not a function" with the page stuck on "Loading view…"
+	 * (issue #22 follow-up). It only bit on an SPA arrival — a full page load has the dispatcher
+	 * require the view through `window.L` before this observer ever fires — and only when this
+	 * patch won the race against fs-router's own `RT.require`, which is exactly the "sometimes,
+	 * coming from another page" the report described. Same trap as the itemlist calls below
+	 * (docs/14), reached from the other side. */
+	window.L.require('view.status.index').then((idx) => {
 		const proto = idx ? Object.getPrototypeOf(idx) : null;
 		if (!proto || proto.__fsProgressive || typeof proto.poll_status !== 'function')
 			return;
