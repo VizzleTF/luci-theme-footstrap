@@ -1,0 +1,125 @@
+# Dev routers for this theme, via owlab (https://github.com/VizzleTF/owlab).
+#
+#   owlab up            build and start every router
+#   owlab sync --watch  rebuild the CSS and push it on every edit
+#   owlab open owrt2512 open LuCI in a browser
+#   owlab doctor        what this machine supports
+#
+# Four routers rather than one, because the three axes that change how this
+# theme renders are the package manager (apk on 25.12, opkg on 24.10), the
+# LuCI feed (upstream vs a fork's patched one), and the release. Only all four
+# boxes cover every pairing.
+
+version: 1
+
+project:
+  name: luci-theme-footstrap
+  theme: footstrap
+
+  # The package lives in a subdirectory, so the install mapping is stated
+  # rather than left to the default.
+  install:
+    luci-theme-footstrap/htdocs: /www
+    luci-theme-footstrap/ucode: /usr/share/ucode/luci
+    luci-theme-footstrap/root: /
+
+  # cascade.css is concatenated from styles/ and is not in the tree. Without
+  # this, a sync copies everything except the file LuCI asks for and the
+  # router serves a 404 for its own stylesheet.
+  build: ./luci-theme-footstrap/build-css.sh luci-theme-footstrap/htdocs/luci-static/footstrap/cascade.css --dev
+
+  # Runs on the router after every sync. This is the half of an install that
+  # copying files does not cover: the package's own uci-defaults registers the
+  # theme, and owlab's `theme:` above then selects it.
+  #
+  # Registration is written out rather than sourced from
+  # root/etc/uci-defaults/30_luci-theme-footstrap, because sync deliberately
+  # never overwrites /etc/uci-defaults — that directory is the router's state.
+  post_sync: |
+    uci -q set luci.themes.Footstrap=/luci-static/footstrap
+    uci -q commit luci
+    rm -rf /www/luci-static/footstrap-top /usr/share/ucode/luci/template/themes/footstrap-top
+
+defaults:
+  fidelity: basic
+  arch: auto
+  # Everything, including the seeded wireless config: this theme has to style
+  # the wireless pages too, and they render from UCI with no radios present.
+  fixtures: [all]
+
+  # The list is long on purpose. A bare `luci` renders three menus, and a
+  # theme whose dev box shows three menus is a theme nobody can look at — the
+  # sections, tabs, tables and widgets that need styling live in the apps.
+  #
+  # curl is deliberately absent: it is not in OpenWrt's default set, and the
+  # self-updater's uclient-fetch fallback exists precisely because of that.
+  # Installing it here would hide that bug class on the dev box.
+  packages:
+    - luci
+    - luci-app-firewall
+    - luci-app-package-manager
+    - luci-app-opkg
+    - luci-app-banip
+    - luci-app-adblock
+    - luci-app-ddns
+    - luci-app-upnp
+    - luci-app-statistics
+    - luci-app-nlbwmon
+    - luci-app-sqm
+    - luci-app-vnstat2
+    - luci-app-wol
+    - luci-app-watchcat
+    - luci-app-filemanager
+    - luci-app-ttyd
+    - luci-app-https-dns-proxy
+    - luci-app-mwan3
+    - luci-app-acme
+    - luci-app-samba4
+    - luci-app-openvpn
+    - luci-proto-wireguard
+    - luci-proto-openconnect
+    - luci-mod-dashboard
+    - luci-app-attendedsysupgrade
+    - wpad-basic-mbedtls
+    - wifi-scripts
+    - iw
+    - iwinfo
+    - hostapd-utils
+    # dropbear ships no sftp-server and OpenSSH 9+ scp speaks SFTP by
+    # default, so without this every scp against the box fails. This is the
+    # one package here that is not about fidelity.
+    - openssh-sftp-server
+
+  # Third-party apps whose stylesheets this theme has to share a document
+  # with. They are the hardest case the theme handles, and no text file can
+  # reason about them: justclash ships no .css at all — every rule is built
+  # from its view JS at runtime.
+  #
+  # These are unsigned dev fixtures. They are pinned to exact releases and
+  # installed without signature verification; nothing here ships.
+  extra_packages:
+    - name: luci-app-openclash
+      apk: https://github.com/vernesong/OpenClash/releases/download/v0.47.116/luci-app-openclash-0.47.116.apk
+      ipk: https://github.com/vernesong/OpenClash/releases/download/v0.47.116/luci-app-openclash_0.47.116_all.ipk
+    - name: luci-app-justclash
+      apk: https://github.com/SaltyMonkey/justclash/releases/download/v0.73.0/luci-app-justclash-0.73.0-r1.apk
+      ipk: https://github.com/SaltyMonkey/justclash/releases/download/v0.73.0/luci-app-justclash-0.73.0-r1-all.ipk
+
+routers:
+  - id: owrt2512
+    release: "25.12.4"
+    ports: { http: 8025, ssh: 2225 }
+
+  - id: owrt2410
+    release: "24.10.8"
+    ports: { http: 8024, ssh: 2224 }
+
+  - id: imm2512
+    distro: immortalwrt
+    release: "25.12.1"
+    ports: { http: 8026, ssh: 2226 }
+
+  - id: imm2410
+    distro: immortalwrt
+    release: "24.10.6"
+    ports: { http: 8027, ssh: 2227 }

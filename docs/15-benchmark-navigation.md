@@ -311,7 +311,7 @@ ratio held. Full data was overwritten by the run above; this table is the record
 
 ### Dev containers (footstrap 0.10.0, 2026-07-24)
 
-Both dev containers (`docker/compose.yml`), x86 under WSL, so absolute numbers are not
+Both dev containers (`owlab.yaml`), x86 under WSL, so absolute numbers are not
 comparable with router hardware. Two themes only: proton2025 is not installed there. Three runs,
 median. Data in `bench/results-container-2512.json` and `bench/results-container-2410.json`.
 

@@ -267,4 +267,4 @@ docker run --rm -v /path/pkg.ipk:/tmp/p.ipk openwrt/rootfs:x86-64-24.10.4 \
 ## Локальная сборка (без CI)
 
 `luci-theme-footstrap/build-apk.sh` — сборка `.apk` через SDK на ext4 (детали в docs/05).
-Быстрый цикл разработки (без сборки) — `dev-sync.sh`, см. docs/05.
+Быстрый цикл разработки (без сборки) — `owlab sync`, см. docs/05.

@@ -7,7 +7,7 @@ luci-theme-footstrap/
 ├── Makefile
 ├── build-css.sh                   # собирает cascade.css из styles/ (cat+awk, без node)
 ├── build-apk.sh                   # локальная сборка .apk через SDK (docs/05)
-├── dev-sync.sh                    # деплой на живой роутер (docs/05)
+├── dev-sync.sh                    # деплой на ЖЕЛЕЗНЫЙ роутер (docs/05; контейнеры — owlab)
 ├── luci-upstream.pin              # пин коммита openwrt/luci + sha256 заимствованных тулов
 ├── LICENSE
 ├── styles/                        # ИСТОЧНИК CSS. НЕ шипается (luci.mk его не копирует)

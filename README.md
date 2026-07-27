@@ -144,6 +144,20 @@ The key is typed out above on purpose: compare those characters with
 
 </details>
 
+## Dev routers
+
+Four of them — OpenWrt and ImmortalWrt, 25.12 and 24.10 — from one file, on any
+OS. Needs [owlab](https://github.com/VizzleTF/owlab) and Docker:
+
+```sh
+owlab up                 # build and start all four
+owlab sync --watch       # rebuild the CSS and push it on every edit
+owlab open owrt2512      # open LuCI in a browser
+```
+
+Log in as `root` with an empty password. Details and the reasoning are in
+`docs/05-build-deploy-development.md`.
+
 ## Building a luci-app?
 
 The [developer devkit](https://vizzletf.github.io/luci-theme-footstrap/) has the colour token grid,

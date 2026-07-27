@@ -8,30 +8,43 @@
    docs/17). Основной режим при разработке.
 2. **Пакет .apk через SDK** — для распространения и чистой установки.
 
-## Дев-роутеры: два контейнера, по одному на релиз
+## Дев-роутеры: четыре контейнера, по одному на комбинацию
 
-Живой роутер здесь — это контейнер из `docker/compose.yml` (подробности и грабли —
-`docker/README.md`). Их **два**, потому что тема поддерживает и 24.10, и 25.12+, а
-различия, которые кусаются, — рантаймовые, и одна коробка их не покажет:
+Стенд поднимает [owlab](https://github.com/VizzleTF/owlab) из `owlab.yaml` в корне
+репозитория. Роутеров **четыре**, потому что различия, которые кусаются, —
+рантаймовые, и одна коробка их не покажет. Осей три: пакетник (apk с 25.12, opkg
+на 24.10), LuCI-фид (апстрим против форка) и релиз; четыре ящика покрывают все пары.
 
-| ssh-хост | релиз | пакетник | адрес моста | из Windows |
+| id | дистрибутив | релиз | пакетник | LuCI |
 |---|---|---|---|---|
-| `router2512` | 25.12 | apk | 172.31.0.2 | http://localhost:8025 |
-| `router2410` | 24.10 | opkg | 172.31.0.3 | http://localhost:8024 |
+| `owrt2512` | OpenWrt | 25.12.4 | apk | http://localhost:8025 |
+| `owrt2410` | OpenWrt | 24.10.8 | opkg | http://localhost:8024 |
+| `imm2512` | ImmortalWrt | 25.12.1 | apk | http://localhost:8026 |
+| `imm2410` | ImmortalWrt | 24.10.6 | opkg | http://localhost:8027 |
 
-Логин `root`/`1234` (он же `LUCI_PW`). Внутри — настоящий userland релиза (procd как PID 1,
+```sh
+owlab up                 # собрать и поднять все четыре
+owlab sync --watch       # пересобирать CSS и заливать на каждую правку
+owlab open owrt2512      # открыть LuCI в браузере
+owlab doctor             # что умеет эта машина
+```
+
+Логин `root`, пароль пустой. Внутри — настоящий userland релиза (procd как PID 1,
 netifd, ubus, rpcd, uhttpd) из его же rootfs-тарбола, а не самосборная имитация.
 
-- **Пересборка образа = сброс к заводским**: томов нет, `docker compose up -d --build`
-  сносит залитую тему — гоняем `dev-sync.sh` заново. Это и нужно: путь установки
-  проверяется по-настоящему, на обоих пакетниках, вместо коробки, которую полгода правили
-  руками. Бекап (ниже) при этом теряет смысл — сломал, пересобрал.
-- **Адрес моста обязателен, published-порт его не заменит**: тулинг берёт базовый URL из
-  `ssh -G <host>` (`http://<hostname>`), то есть ssh и http должны отвечать на **одном**
-  адресе. Порты `localhost:8025`/`:8024` — только для браузера со стороны **Windows**: NAT
-  WSL2 не маршрутизирует docker-мост в Windows.
-- **`curl` на них нет** — как и на стоковом роутере (см. `+luci-base` в CLAUDE.md), поэтому
-  сниппет с curl запускаем с хоста по адресу контейнера, а не `ssh router2512 'curl …'`.
+- **Обращение только через `localhost:<порт>`.** Адрес docker-моста маршрутизируется
+  с хоста на нативном Linux и внутри WSL2, но не на Docker Desktop для macOS и
+  Windows — поэтому ни одна команда не ходит по адресу моста, и стенд работает
+  одинаково на любой ОС. Это же снимает старое требование «ssh и http на одном адресе».
+- **Пересборка образа = сброс к заводским**: томов нет, `owlab up --rebuild`
+  сносит залитую тему — гоняем `owlab sync` заново. Это и нужно: путь установки
+  проверяется по-настоящему, на обоих пакетниках.
+- **`curl` на них нет** — как и на стоковом роутере (см. `+luci-base` в CLAUDE.md),
+  поэтому сниппет с curl запускаем с хоста по `localhost:<порт>`, а не
+  `owlab exec owrt2512 -- 'curl …'`.
+- **mwan3 и watchcat owlab гасит сам.** mwan3 считает dummy-WAN мёртвым и ставит
+  `ip rule … blackhole`: LuCI отвечает, а весь исходящий трафик висит без ошибки.
+  Страницы остаются, сервисы — нет.
 - Железный роутер остался как `ssh router` — когда вопрос именно в железе.
 
 ## Быстрый цикл разработки на живом роутере
@@ -44,30 +57,37 @@ netifd, ubus, rpcd, uhttpd) из его же rootfs-тарбола, а не са
 /www/luci-static/resources/menu-mytheme.js
 ```
 
-### Первичная заливка (роутер `ssh router2512`)
+### Заливка
 
 ```sh
-# 1. БЕКАП затрагиваемого (одноразово, до любых изменений)
-ssh router2512 'mkdir -p /root/theme-backup && \
-  cp -a /etc/config/luci /root/theme-backup/luci.config && \
-  tar -C / -czf /root/theme-backup/luci-theme-orig.tar.gz \
-    usr/share/ucode/luci/template/themes www/luci-static'
-
-# 2. Каталоги + файлы
-ssh router2512 'mkdir -p /usr/share/ucode/luci/template/themes/mytheme /www/luci-static/mytheme'
-scp ucode/template/themes/mytheme/*.ut router2512:/usr/share/ucode/luci/template/themes/mytheme/
-scp htdocs/luci-static/mytheme/*       router2512:/www/luci-static/mytheme/
-scp htdocs/luci-static/resources/menu-mytheme.js router2512:/www/luci-static/resources/
-
-# 3. Регистрация (НЕ переключая активную тему — безопасно)
-ssh router2512 'uci set luci.themes.MyTheme=/luci-static/mytheme && uci commit luci'
+owlab sync                    # во все роутеры
+owlab sync owrt2512           # в один
+owlab sync --watch            # и дальше на каждую правку
 ```
 
-Дальше тема выбирается в LuCI: System → System → Language and Style, или:
+`sync` кладёт файлы ровно туда, куда их положил бы `luci.mk`, и сбрасывает те же
+кэши, что и его postinst. Что именно делается — в `owlab.yaml`:
 
-```sh
-ssh router2512 'uci set luci.main.mediaurlbase=/luci-static/mytheme && uci commit luci'
-```
+- `build:` — пересобирает `cascade.css` из `styles/` (`build-css.sh --dev`,
+  с комментариями) перед каждой заливкой. Без этого шага в дерево копируется всё,
+  **кроме** файла, который LuCI и запрашивает, и роутер отдаёт 404 на собственный стиль;
+- `install:` — маппинг каталогов пакета в пути роутера;
+- `post_sync:` — регистрация темы (`luci.themes.Footstrap`) и снос легаси-каталогов.
+  Это делается тут, а не через `root/etc/uci-defaults/30_luci-theme-footstrap`,
+  потому что `sync` намеренно не перезаписывает `/etc/config` и `/etc/uci-defaults` —
+  это состояние роутера, а не содержимое пакета;
+- `theme: footstrap` — owlab выставляет `luci.main.mediaurlbase` после заливки.
+  Установка пакета темы её только **регистрирует**; активную тему пакет не меняет,
+  и на дев-стенде это ровно наоборот тому, что нужно.
+
+Resource-JS копируется **глобом** (`htdocs/` целиком), а не списком имён: список был
+багом — новый файл попадал в пакет (`luci.mk` копирует `htdocs/` целиком), но на
+дев-роутер молча не доезжал и впервые проверялся уже после релиза.
+
+Чего `sync` не делает в отличие от старого `dev-sync.sh`: не штампует `FS_VERSION`
+(поповер покажет `dev`) и не компилирует `i18n/*.po` → `.lmo` — строки остаются
+английскими. И то и другое делает настоящая сборка пакета (`owlab build`), где это
+и надо проверять.
 
 ### Страховка от поломки
 
@@ -76,14 +96,14 @@ ssh router2512 'uci set luci.main.mediaurlbase=/luci-static/mytheme && uci commi
   индикатор "Theme fallback" с текстом ошибки. Т.е. кривой шаблон **не окирпичит
   веб-интерфейс**.
 - Ручной откат в любой момент:
-  `ssh router2512 'uci set luci.main.mediaurlbase=/luci-static/bootstrap && uci commit luci'`
+  `owlab exec owrt2512 -- 'uci set luci.main.mediaurlbase=/luci-static/bootstrap && uci commit luci'`
 - Совсем всё сломалось: `uci` доступен по ssh, LuCI для восстановления не нужен.
 
 ### Кэши при итерации
 
 - Меню/диспетчер кэшируются: `/tmp/luci-indexcache.<hash>.json`. Хэш считается от
   mtime файлов меню — при добавлении/удалении файлов обновляется сам, но при
-  странностях: `ssh router2512 'rm -f /tmp/luci-indexcache*'`.
+  странностях: `owlab exec owrt2512 -- 'rm -f /tmp/luci-indexcache*'`.
 - Шаблоны `.ut` НЕ кэшируются между запросами (ucode компилирует на лету) —
   правка header.ut видна по F5.
 - CSS/JS кэширует браузер: жёсткий reload (Ctrl+Shift+R). `luci.js` грузится с
@@ -95,47 +115,13 @@ ssh router2512 'uci set luci.main.mediaurlbase=/luci-static/mytheme && uci commi
   на 24.10 ключ не меняется, файл доезжает, а браузер отдаёт старый из кэша — выглядит
   ровно как правка, которая ничего не сделала.
   ```sh
-  ssh router2512 'for db in /lib/apk/db/installed /usr/lib/opkg/status; do [ -f "$db" ] && touch "$db"; done'
+  owlab exec owrt2512 -- 'for db in /lib/apk/db/installed /usr/lib/opkg/status; do [ -f "$db" ] && touch "$db"; done'
   ```
-
-### Синхронизация одним скриптом
-
-```sh
-luci-theme-footstrap/dev-sync.sh [host]     # host по умолчанию — router
-```
-
-Скрипт делает всё разом (только `ssh`/`scp`, rsync на роутере не нужен):
-
-- пересобирает `cascade.css` из `styles/` (`build-css.sh --dev`, с комментариями);
-- копирует **единственный** каталог шаблонов `themes/footstrap/` вместе с `partials/`.
-  Второго каталога нет: sidebar и верхний бар — одна и та же разметка, которую морфит
-  `:root[data-layout]`;
-- копирует статику (`cascade.css`, шрифты, лого) и **все** resource-JS **глобом**
-  (`resources/*.js`: `menu-footstrap.js`, `menu-footstrap-common.js` и модули концернов
-  `fs-{fit,menutree,prefs,widgets,chrome,select,sheets,search,router,version,appearance}.js`)
-  плюс overview-include. Именно глобом, а не списком имён: список был
-  багом — новый файл попадал в пакет (`luci.mk` копирует `htdocs/` целиком), но на
-  дев-роутер молча не доезжал и впервые проверялся уже после релиза;
-- штампует версию из `git describe` в `FS_VERSION` внутри залитого
-  `fs-version.js` — то же делает `Build/Prepare` в пакете, иначе поповер
-  показывает `dev`;
-- компилирует каталог переводов `i18n/*/*.po` → `/usr/lib/lua/luci/i18n/footstrap-theme.<lang>.lmo`,
-  если в `$PATH` есть `po2lmo` (это host-tool `luci-base`; без него строки остаются
-  английскими, синк не падает);
-- **бэкенд самообновления НЕ ставит** — апдейтер вынесен в отдельный репо, роутер остаётся в
-  состоянии «updater-not-installed» (версия видна, кнопок обновления нет). Бэкенд, его
-  `file.exec`-ACL и ключ ставит `luci-app-footstrap-updater/dev-sync.sh <router>` (docs/23);
-- **удаляет** (`rm -rf`) легаси-каталоги вариантов, включая `footstrap-top`: верхний бар
-  больше не тема, симлинка нет и создавать его не надо;
-- прогоняет `root/etc/uci-defaults/30_luci-theme-footstrap` — единственный источник
-  регистрации (ОДНА запись `luci.themes.Footstrap`) — и сбрасывает кэши.
-
-**Активную тему не меняет** (`PKG_UPGRADE=1` форсит upgrade-ветку uci-defaults).
 
 ### Проверка изменения
 
 - **Шаблон** — тем же `trycompile`, что делает LuCI:
-  `ssh router2512 'ucode -T -c -o /dev/null /usr/share/ucode/luci/template/themes/footstrap/header.ut'`.
+  `owlab exec owrt2512 -- 'ucode -T -c -o /dev/null /usr/share/ucode/luci/template/themes/footstrap/header.ut'`.
   То же гоняет CI.
 - **CSS** — скриншотами проверять нельзя: живые счётчики (uptime, DHCP-лизы, сигнал wifi)
   двигают 0.5–1.3% пикселей между двумя прогонами ОДНОГО И ТОГО ЖЕ стиля, а реальная
@@ -143,8 +129,8 @@ luci-theme-footstrap/dev-sync.sh [host]     # host по умолчанию — r
   один раз, `<link>` подменяется на второй файл, снимок `getComputedStyle` по всем элементам —
   DOM и данные те же, значит любая разница вызвана CSS.
   ```sh
-  scp -q old.css router2512:/www/luci-static/footstrap/cascade-a.css
-  scp -q new.css router2512:/www/luci-static/footstrap/cascade-b.css
+  docker cp old.css owlab-luci-theme-footstrap-owrt2512:/www/luci-static/footstrap/cascade-a.css
+  docker cp new.css owlab-luci-theme-footstrap-owrt2512:/www/luci-static/footstrap/cascade-b.css
   LUCI_PW=<pw> python3 .claude/skills/footstrap-audit/cssdiff.py \
     admin/network/firewall admin/system/system admin/status/overview admin/system/opkg
   ```
@@ -186,7 +172,28 @@ Regex как **аргумент** (`s.replace(/x/g, y)`) уже стоит за 
 > Автоматическая сборка (**GitHub Actions**, apk + ipk, релизы, `install.sh`,
 > поддержка 24.10) вынесена в **docs/13**. Ниже — ручная сборка через SDK.
 
-### Через SDK
+### Через owlab
+
+```sh
+owlab build                       # таргет берётся у первого роутера из owlab.yaml
+owlab build --arch x86_64 --release 25.12.4
+owlab install owrt2512 dist/luci-theme-footstrap-*.apk
+```
+
+Поднимает `openwrt/sdk` нужного релиза, подкладывает репозиторий как `src-link`-feed
+**выше** официальных (иначе одноимённый пакет из апстрим-фида выиграет) и собирает.
+Результат — в `dist/`.
+
+Это не то же самое, что `sync`, и разница измерима: `luci.mk` держит
+`LUCI_MINIFY_JS`/`LUCI_MINIFY_CSS` включёнными, поэтому настоящая сборка гонит
+исходники через jsmin и csstidy. Замерено на этой теме — 120 358 байт из пакета
+против 418 930 из `sync`. Код, который работает несжатым и ломается минифицированным,
+не виден до сборки пакета; без этого шага его первым увидит пользователь.
+
+На Apple Silicon это идёт под эмуляцией: все теги `openwrt/sdk` — `linux/amd64`,
+апстрим публикует SDK только под Linux-x86_64. owlab предупреждает об этом до старта.
+
+### Через SDK руками
 
 Эти же шаги (скачать SDK, положить тему в feed, собрать) автоматизирует
 `luci-theme-footstrap/build-apk.sh` — руками они выглядят так:
@@ -220,10 +227,9 @@ ls bin/packages/*/luci/luci-theme-footstrap*.apk
 ### Установка на роутер
 
 ```sh
-scp bin/packages/*/luci/luci-theme-footstrap*.apk router2512:/tmp/
-ssh router2512 'apk add --allow-untrusted /tmp/luci-theme-footstrap*.apk'
+owlab install owrt2512 bin/packages/*/luci/luci-theme-footstrap*.apk
 # удаление
-ssh router2512 'apk del luci-theme-footstrap'
+owlab exec owrt2512 -- 'apk del luci-theme-footstrap'
 ```
 
 `--allow-untrusted` нужен, т.к. локальная сборка не подписана ключом фида.
