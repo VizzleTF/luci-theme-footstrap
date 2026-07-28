@@ -47,48 +47,59 @@ defaults:
   # the wireless pages too, and they render from UCI with no radios present.
   fixtures: [all]
 
-  # The list is long on purpose. A bare `luci` renders three menus, and a
-  # theme whose dev box shows three menus is a theme nobody can look at — the
-  # sections, tabs, tables and widgets that need styling live in the apps.
+  # Added ON TOP of owlab's stock set, which is already what a shipping
+  # OpenWrt router has. Every entry is prefixed with +, so this list adds to
+  # that rather than replacing it — an unprefixed list would define the router
+  # outright and quietly drop everything owlab installs by default.
+  #
+  # Entries that the stock set also contains are kept rather than trimmed.
+  # This file is the theme's test surface: each name here is something the
+  # theme is checked against, and it should stay readable as that list
+  # regardless of what owlab's defaults happen to include this month.
+  #
+  # It is long on purpose. A stock router renders a handful of menus, and a
+  # theme whose dev box shows a handful of menus is a theme nobody can look
+  # at — the sections, tabs, tables and widgets that need styling live in the
+  # apps.
   #
   # curl is deliberately absent: it is not in OpenWrt's default set, and the
   # self-updater's uclient-fetch fallback exists precisely because of that.
   # Installing it here would hide that bug class on the dev box.
   packages:
-    - luci
-    - luci-app-firewall
-    - luci-app-package-manager
-    - luci-app-opkg
-    - luci-app-banip
-    - luci-app-adblock
-    - luci-app-ddns
-    - luci-app-upnp
-    - luci-app-statistics
-    - luci-app-nlbwmon
-    - luci-app-sqm
-    - luci-app-vnstat2
-    - luci-app-wol
-    - luci-app-watchcat
-    - luci-app-filemanager
-    - luci-app-ttyd
-    - luci-app-https-dns-proxy
-    - luci-app-mwan3
-    - luci-app-acme
-    - luci-app-samba4
-    - luci-app-openvpn
-    - luci-proto-wireguard
-    - luci-proto-openconnect
-    - luci-mod-dashboard
-    - luci-app-attendedsysupgrade
-    - wpad-basic-mbedtls
-    - wifi-scripts
-    - iw
-    - iwinfo
-    - hostapd-utils
+    - +luci
+    - +luci-app-firewall
+    - +luci-app-package-manager
+    - +luci-app-opkg
+    - +luci-app-banip
+    - +luci-app-adblock
+    - +luci-app-ddns
+    - +luci-app-upnp
+    - +luci-app-statistics
+    - +luci-app-nlbwmon
+    - +luci-app-sqm
+    - +luci-app-vnstat2
+    - +luci-app-wol
+    - +luci-app-watchcat
+    - +luci-app-filemanager
+    - +luci-app-ttyd
+    - +luci-app-https-dns-proxy
+    - +luci-app-mwan3
+    - +luci-app-acme
+    - +luci-app-samba4
+    - +luci-app-openvpn
+    - +luci-proto-wireguard
+    - +luci-proto-openconnect
+    - +luci-mod-dashboard
+    - +luci-app-attendedsysupgrade
+    - +wpad-basic-mbedtls
+    - +wifi-scripts
+    - +iw
+    - +iwinfo
+    - +hostapd-utils
     # dropbear ships no sftp-server and OpenSSH 9+ scp speaks SFTP by
     # default, so without this every scp against the box fails. This is the
     # one package here that is not about fidelity.
-    - openssh-sftp-server
+    - +openssh-sftp-server
 
   # Third-party apps whose stylesheets this theme has to share a document
   # with. They are the hardest case the theme handles, and no text file can
