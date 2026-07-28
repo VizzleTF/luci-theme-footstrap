@@ -31,6 +31,8 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 - **The installer's own signature is the one thing still signed by hand.** `owfeed release` signs the packages it finds in the per-architecture directories and the manifest that names them; `install.sh` is not a package, and it is signed because it is executable code handed to root. Nothing can check that signature during `curl | sh` — the script IS the first thing that arrives — so it is not a link in the install chain; it exists so a careful admin can verify the installer out of band, and so the Pages mirror can carry `install.sh.sig` beside it.
 
+- **The feed is the first way to install this theme, and the installer is the second.** It is carried by [owfeed-packages](https://github.com/VizzleTF/owfeed-packages) for both release lines, and this README mentioned it nowhere — so a reader learned about `install.sh` and never about the path that upgrades with `apk upgrade` and needs no self-updater running at all. The installer keeps its place as what it is genuinely for: a router that cannot add a repository, or has no route to one. The two must not be mixed on one router, and that is now said where somebody reads it before doing it rather than after — `apk add ./file.apk` writes a content-hash pin into `/etc/apk/world`, the pin survives sysupgrade, and the package then never upgrades from the feed again.
+
 ## [0.11.6] — 2026-07-28
 
 ### Fixed

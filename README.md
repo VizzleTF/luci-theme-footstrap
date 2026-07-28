@@ -66,12 +66,58 @@ Median page **3.04× faster**, the whole run **2.33×**.
 
 ## Install
 
+### From the feed — the default
+
+The theme is published in [owfeed-packages](https://github.com/VizzleTF/owfeed-packages), which
+serves both release lines. Add the repository once and the theme upgrades with everything else:
+
+```sh
+# OpenWrt 25.12 and later. HTTPS on a stock image needs these two first.
+apk add ca-bundle libustream-mbedtls
+
+wget https://vizzletf.github.io/owfeed-packages/owfeed-packages.pem -O /etc/apk/keys/owfeed-packages.pem
+echo "https://vizzletf.github.io/owfeed-packages/releases/25.12/$(cat /etc/apk/arch)/packages.adb" > /etc/apk/repositories.d/owfeed-packages.list
+
+# Neither of those two files survives a sysupgrade on its own.
+printf '%s\n' /etc/apk/keys/owfeed-packages.pem /etc/apk/repositories.d/owfeed-packages.list >> /etc/sysupgrade.conf
+
+apk update && apk add luci-theme-footstrap
+```
+
+On 24.10 and earlier the feed serves the same theme as an ipk, through opkg:
+
+```sh
+# The key file's NAME is its id — opkg looks it up by that.
+wget https://vizzletf.github.io/owfeed-packages/9040356b214084da -O /etc/opkg/keys/9040356b214084da
+
+echo "src/gz owfeed-packages https://vizzletf.github.io/owfeed-packages/releases/24.10/$(. /etc/openwrt_release; echo $DISTRIB_ARCH)" >> /etc/opkg/customfeeds.conf
+
+opkg update && opkg install luci-theme-footstrap
+```
+
+For the warnings that come with adding any feed — chiefly that installing a key trusts that feed for
+*every* package name — read
+[the feed's own install section](https://github.com/VizzleTF/owfeed-packages#install). It is worth
+the two minutes.
+
+Updates then come from `apk upgrade`. Do not also run the installer below on the same router: `apk
+add ./file.apk` writes a content-hash pin into `/etc/apk/world` that survives sysupgrade, and the
+package would never upgrade from the feed again.
+
+### With the installer — offline, air-gapped, or no feed
+
 ```sh
 wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 ```
 
-Then pick **Footstrap** in **System → System → Language and Style**, field "Design". That is the only
-thing you set on the router. For a specific version, pass the tag: `... | sh -s v0.9.0`.
+For a specific version, pass the tag: `... | sh -s v0.9.0`. This path verifies a signed manifest
+against a key baked into the installer, so it needs nothing but the release assets — which is the
+case it exists for.
+
+### Then
+
+Pick **Footstrap** in **System → System → Language and Style**, field "Design". That is the only
+thing you set on the router.
 
 <details>
 <summary>Why that URL and not <code>raw.githubusercontent.com</code></summary>
@@ -157,6 +203,11 @@ owlab open owrt2512      # open LuCI in a browser
 
 Log in as `root` with an empty password. Details and the reasoning are in
 `docs/05-build-deploy-development.md`.
+
+owlab also builds the real package — `owlab build` runs the OpenWrt SDK and writes
+`dist/<arch>/`, which [owfeed](https://github.com/VizzleTF/owfeed) signs and publishes without
+either tool depending on the other. This theme is the worked example of that whole path;
+[ECOSYSTEM.md](https://github.com/VizzleTF/owfeed/blob/main/docs/ECOSYSTEM.md) is the map.
 
 ## Building a luci-app?
 

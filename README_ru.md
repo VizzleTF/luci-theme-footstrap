@@ -66,12 +66,59 @@
 
 ## Установка
 
+### Из фида — способ по умолчанию
+
+Тема публикуется в [owfeed-packages](https://github.com/VizzleTF/owfeed-packages), который отдаёт
+обе релизные линии. Репозиторий добавляется один раз, дальше тема обновляется вместе со всем
+остальным:
+
+```sh
+# OpenWrt 25.12 и новее. Для HTTPS на стоковом образе сперва нужны эти два пакета.
+apk add ca-bundle libustream-mbedtls
+
+wget https://vizzletf.github.io/owfeed-packages/owfeed-packages.pem -O /etc/apk/keys/owfeed-packages.pem
+echo "https://vizzletf.github.io/owfeed-packages/releases/25.12/$(cat /etc/apk/arch)/packages.adb" > /etc/apk/repositories.d/owfeed-packages.list
+
+# Сами по себе ни тот, ни другой файл не переживают sysupgrade.
+printf '%s\n' /etc/apk/keys/owfeed-packages.pem /etc/apk/repositories.d/owfeed-packages.list >> /etc/sysupgrade.conf
+
+apk update && apk add luci-theme-footstrap
+```
+
+На 24.10 и старше фид отдаёт ту же тему как ipk, через opkg:
+
+```sh
+# ИМЯ файла ключа — это его id, opkg ищет ключ именно по нему.
+wget https://vizzletf.github.io/owfeed-packages/9040356b214084da -O /etc/opkg/keys/9040356b214084da
+
+echo "src/gz owfeed-packages https://vizzletf.github.io/owfeed-packages/releases/24.10/$(. /etc/openwrt_release; echo $DISTRIB_ARCH)" >> /etc/opkg/customfeeds.conf
+
+opkg update && opkg install luci-theme-footstrap
+```
+
+Про предупреждения, которые идут с добавлением любого фида — главное из них: установка ключа
+означает доверие этому фиду для **любого** имени пакета, — читайте
+[раздел установки самого фида](https://github.com/VizzleTF/owfeed-packages#install). Эти две минуты
+стоят того.
+
+Дальше обновления приезжают через `apk upgrade`. Не запускайте на том же роутере установщик ниже:
+`apk add ./file.apk` пишет в `/etc/apk/world` пин на хеш содержимого, пин переживает sysupgrade, и
+пакет больше никогда не обновится из фида.
+
+### Установщиком — офлайн, воздушный зазор, фида нет
+
 ```sh
 wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 ```
 
-Дальше выберите **Footstrap** в **System → System → Language and Style**, поле «Design». Это
-единственное, что задаётся на роутере. Нужна конкретная версия — добавьте тег: `... | sh -s v0.9.0`.
+Нужна конкретная версия — добавьте тег: `... | sh -s v0.9.0`. Этот путь проверяет подписанный
+манифест ключом, зашитым в установщик, и не требует ничего, кроме ассетов релиза, — ради этого
+случая он и существует.
+
+### Дальше
+
+Выберите **Footstrap** в **System → System → Language and Style**, поле «Design». Это единственное,
+что задаётся на роутере.
 
 <details>
 <summary>Почему эта ссылка, а не <code>raw.githubusercontent.com</code></summary>
