@@ -27,6 +27,7 @@ import { join } from 'node:path';
 import { ROOT } from './lib/root.mjs';
 const PKG = join(ROOT, 'luci-theme-footstrap');
 const MAKEFILE = join(PKG, 'Makefile');
+const OWFEED = join(ROOT, 'owfeed.yml');
 const CONFIG_DIR = join(PKG, 'root/etc/config');
 
 const fails = [];
@@ -44,9 +45,38 @@ const declared = m
 	? m[1].split('\n').map(s => s.trim()).filter(s => s && !s.startsWith('#')).sort()
 	: [];
 
+/* …and what owfeed.yml declares, which is the copy that governs THE RELEASED PACKAGE. The
+ * Makefile describes the SDK path; nothing we publish comes from it since the build moved to
+ * owfeed, so a `conffiles` correct in one file and missing from the other protects exactly
+ * nobody while still reading as protected. Both are checked, and they must agree.
+ *
+ * A text match, like the Makefile one above and for the same reason: this gate runs on a dev
+ * box and in the lint job, and neither should need a YAML parser to answer a question about
+ * one list of paths. */
+const yml = readFileSync(OWFEED, 'utf8');
+const y = yml.match(/^\s*conffiles:\s*\[([^\]]*)\]/m);
+const owfeedDeclared = y
+	? [ ...y[1].matchAll(/["']([^"']+)["']/g) ].map(mm => mm[1]).sort()
+	: [];
+
 if (!shipped.length) {
 	console.log('conffiles: the package ships no /etc/config/* — nothing to declare.');
 	process.exit(0);
+}
+
+if (!y) {
+	fails.push(
+		`the package ships ${shipped.length} config file(s) but owfeed.yml declares no\n` +
+		`  conffiles: — the RELEASED package is the one built from it, so every one of them\n` +
+		`  is replaced on upgrade whatever the Makefile says`
+	);
+} else {
+	for (const p of shipped)
+		if (!owfeedDeclared.includes(p))
+			fails.push(`${p} is shipped but NOT in owfeed.yml's conffiles — the released package will overwrite it on upgrade`);
+	for (const p of owfeedDeclared)
+		if (!shipped.includes(p))
+			fails.push(`${p} is in owfeed.yml's conffiles but the package ships no such file — stale entry`);
 }
 
 if (!m) {
@@ -66,14 +96,15 @@ if (!m) {
 			fails.push(`${p} is declared a conffile but the package ships no such file — stale entry`);
 }
 
-console.log(`conffiles: ${shipped.length} shipped, ${declared.length} declared`);
+console.log(`conffiles: ${shipped.length} shipped, ${declared.length} in the Makefile, ${owfeedDeclared.length} in owfeed.yml`);
 for (const p of shipped)
-	console.log(`  ${declared.includes(p) ? 'ok  ' : 'FAIL'} ${p}`);
+	console.log(`  ${declared.includes(p) && owfeedDeclared.includes(p) ? 'ok  ' : 'FAIL'} ${p}`);
 
 if (fails.length) {
 	console.error('\nconffiles: FAILED\n');
 	for (const f of fails) console.error(`  ${f}`);
-	console.error('\nAdd the path to the conffiles define in luci-theme-footstrap/Makefile.');
+	console.error('\nAdd the path to BOTH: the conffiles define in luci-theme-footstrap/Makefile');
+	console.error('(the SDK path) and conffiles: in owfeed.yml (what the release is built from).');
 	process.exit(1);
 }
 

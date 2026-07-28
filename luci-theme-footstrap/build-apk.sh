@@ -5,6 +5,12 @@
 #
 #   ./build-apk.sh            # download SDK if needed, then build
 #   BUILD_DIR=~/x ./build-apk.sh
+#
+# THIS IS NOT HOW THE RELEASE IS BUILT any more — `./tools/stage.sh && owfeed build` is, and
+# it produces both formats in seconds without a toolchain (see owfeed.yml). What this script
+# exercises is the OTHER path: the Makefile, luci.mk, jsmin, and the SDK's own packaging. That
+# path still has to work — the theme should stay buildable in an SDK or a feed by someone who
+# has never heard of owfeed — and this is the only way to find out that it does.
 set -e
 
 REL="${OPENWRT_RELEASE:-25.12.2}"
@@ -17,7 +23,6 @@ BUILD_DIR="${BUILD_DIR:-/tmp/ow-footstrap-build}"
 export FORCE=1
 THEME_DIR="$(cd "$(dirname "$0")" && pwd)"          # this package
 REPO="$(cd "$THEME_DIR/.." && pwd)"                 # repo root (holds tools/, .github/)
-BUILD_YML="$REPO/.github/workflows/build.yml"
 SDK_DIR="$BUILD_DIR/sdk"
 # The SDK channel (major.minor) the release SDK is signed under — derived from REL, never a
 # second copy: 25.12.2 -> 25.12.
@@ -41,24 +46,20 @@ if [ ! -d "$SDK_DIR" ]; then
 	# CLAUDE.md on GitHub's asset digest). What makes it one is the ed25519 signature over that file,
 	# checked with a key pinned from a DIFFERENT host (github.com/openwrt/keyring). Fails CLOSED.
 	#
-	# Same check as .github/workflows/build.yml, from the SAME canonical inputs: the keyring/usign
-	# pins come from luci-upstream.pin, and the branch's signing key is read out of build.yml's
-	# matrix (its documented home — the key is a property of the branch, not of the pin file) rather
-	# than copied here, so this convenience script cannot drift from the release path.
-	[ -f "$BUILD_YML" ] || { echo "build.yml not found at $BUILD_YML — run from a repo checkout" >&2; exit 1; }
+	# Every pin comes from luci-upstream.pin — the keyring commit, usign, and the branch's own
+	# signing key. The keys used to live in .github/workflows/build.yml's matrix and were read out
+	# of it here; that matrix went with the SDK build when the release moved to owfeed, so they now
+	# have one home and this script has one source.
 	. "$THEME_DIR/luci-upstream.pin"
 	[ -n "${OPENWRT_KEYRING_PIN:-}" ] || { echo "OPENWRT_KEYRING_PIN missing from luci-upstream.pin" >&2; exit 1; }
 
-	# sdk_key / sdk_key_sha256 for CHANNEL, straight out of build.yml's matrix.
-	read -r SDK_KEY SDK_KEY_SHA256 <<-EOF
-	$(awk -F"'" -v ch="$CHANNEL" '
-		/channel:/ { c = $2 }
-		c == ch && /sdk_key:/        { k = $2 }
-		c == ch && /sdk_key_sha256:/ { s = $2 }
-		END { print k, s }' "$BUILD_YML")
-	EOF
+	# sdk_key / sdk_key_sha256 for CHANNEL: 25.12 -> OPENWRT_SDK_KEY_2512. Indirection through
+	# eval because the pin file is plain shell assignments and /bin/sh has no associative arrays.
+	CH_VAR="$(printf '%s' "$CHANNEL" | tr -d .)"
+	eval "SDK_KEY=\${OPENWRT_SDK_KEY_$CH_VAR:-}"
+	eval "SDK_KEY_SHA256=\${OPENWRT_SDK_KEY_${CH_VAR}_SHA256:-}"
 	[ -n "$SDK_KEY" ] && [ -n "$SDK_KEY_SHA256" ] \
-		|| { echo "no SDK signing key for channel $CHANNEL in build.yml" >&2; exit 1; }
+		|| { echo "no SDK signing key for channel $CHANNEL in luci-upstream.pin" >&2; exit 1; }
 
 	echo ">> verifying SDK signature (key $SDK_KEY, channel $CHANNEL) ..."
 	rm -rf "$BUILD_DIR/usign"

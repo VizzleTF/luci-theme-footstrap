@@ -294,14 +294,21 @@ release_pubkey() {	# writes the key to $1
 # WHAT IT IS. A signed, line-oriented text file. `latest` resolves exactly as the API's
 # /releases/latest does — newest non-prerelease, non-draft:
 #
-#   footstrap-manifest 1
+#   owfeed-manifest 1
 #   repo VizzleTF/luci-theme-footstrap
 #   tag v0.10.2
 #   version 0.10.2
 #   date 2026-07-24T10:12:03Z
 #   notes <sha256> notes.md
-#   pkg luci-theme-footstrap apk luci-theme-footstrap-0.10.2-r1.apk 162357 <sha256>
-#   pkg luci-theme-footstrap ipk luci-theme-footstrap_0.10.2-r1_all.ipk 162128 <sha256>
+#   pkg luci-theme-footstrap apk luci-theme-footstrap-0.10.2-r1.apk 162357 <sha256> noarch
+#   pkg luci-theme-footstrap ipk luci-theme-footstrap_0.10.2-r1_all.ipk 162128 <sha256> all
+#
+# The first line said `footstrap-manifest 1` up to 0.11.6: the file is written by `owfeed
+# release` now (it was hand-rolled in this repo's workflow, and owfeed's own shape was modelled
+# on it). NOTHING PARSES THAT LINE — not this script, not the self-updater — so the rename is
+# invisible to a router. The trailing `arch` is new for the same reason it is TRAILING: mf_pkg
+# below reads fields 4, 5 and 6 positionally, and a router's installed copy cannot be fixed
+# remotely, so a field inserted before them would have made every update fetch a URL that 404s.
 #
 # WHAT IT REPLACES IN THE TRUST CHAIN — nothing. It moves the sha256 from a value GitHub computes
 # for us into a value WE signed, which is strictly stronger: the old digest was recomputed for

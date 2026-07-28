@@ -1,9 +1,24 @@
 name: Build LuCI theme packages
 
-# luci-theme-footstrap is noarch (LUCI_PKGARCH:=all), so one build per package
-# format covers every target. Two formats are produced:
-#   apk  — OpenWrt 25.12+ (built with the latest 25.12.x SDK)
-#   ipk  — OpenWrt 24.10  (built with the latest 24.10.x SDK)
+# luci-theme-footstrap is noarch (LUCI_PKGARCH:=all), so one build covers every target.
+# Two formats are produced, from ONE staged rootfs:
+#   apk  — OpenWrt 25.12+
+#   ipk  — OpenWrt 24.10 (opkg, which calls the same package `all` rather than `noarch`)
+#
+# BOTH COME OUT OF owfeed (https://github.com/VizzleTF/owfeed), not out of the OpenWrt SDK.
+# The SDK legs downloaded, verified and unpacked a cross toolchain — twice, once per format —
+# to build a package containing not one compiled byte: CSS, ucode templates, browser JS and
+# fonts. What the SDK actually contributed was three things, and owfeed does all three (its
+# own po2lmo-identical .lmo compiler, the conffiles/scripts sidecars package-pack.mk emits,
+# and the default_postinst wrapper without which /etc/uci-defaults/* never runs).
+#
+# The SDK verification did not leave with the SDK: owfeed fetches the host `apk` out of a
+# release SDK tarball and holds it to the same contour this workflow used to run inline —
+# ed25519 over sha256sums, with OpenWrt's branch key pinned from a different host.
+#
+# What is NOT built here: luci-theme-footstrap/Makefile still describes this package for
+# anyone building it in an SDK or a feed, and the gates that protect that path (scan-marker,
+# jsmin equivalence) are still in `check`/`lint` below. Nothing released comes from it.
 on:
   push:
     tags: ['v*']
@@ -322,189 +337,142 @@ jobs:
 
   build:
     needs: [check, lint]
-    name: Build ${{ matrix.fmt }} (${{ matrix.channel }})
+    name: Build the packages
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Both legs build from a RELEASE SDK, resolved to the newest point release of their
-          # branch. The apk leg used to build from `snapshots`, i.e. a toolchain and an `apk
-          # mkpkg` from main that drift daily, while the release users install does not — the
-          # same argument this workflow already accepted for 24.10. `fallback` is what the
-          # resolver pins to if downloads.openwrt.org cannot be listed; it must stay a version
-          # that exists.
-          #
-          # `sdk_key` is the usign key OpenWrt signs THAT BRANCH's sha256sums with, and the two
-          # branches do not share one — 24.10 has a release key of its own, 25.12 is signed by the
-          # unattended-build key. Pinning one for both was measured wrong the only way it can be:
-          # the 24.10 leg refused to build. It lives here, next to the channel, because that is what
-          # it is a property of; the keyring COMMIT it is fetched from stays in luci-upstream.pin.
-          # `sdk_key_sha256` is what actually holds the content — see there.
-          - fmt: apk
-            channel: '25.12'
-            fallback: '25.12.5'
-            use_apk: 'y'
-            sdk_key: 'b5043e70f9a75cde'
-            sdk_key_sha256: 'd7ac10f9ed1b38033855f3d27c9327d558444fca804c685b17d9dcfb0648228f'
-          - fmt: ipk
-            channel: '24.10'
-            fallback: '24.10.4'
-            use_apk: 'n'
-            sdk_key: 'd310c6f2833e97f7'
-            sdk_key_sha256: 'e3624aa9be785362a172595b4919b233268871c4365a9b8da2b42ac41745ad95'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Resolve package version
+      # Node is a BUILD DEPENDENCY now, where it used to be lint-only. tools/stage.sh
+      # minifies the shipped JS with terser, and on the SDK path that was optional — luci.mk
+      # fell back to jsmin for a buildbot with no node. There is no jsmin here, so a missing
+      # node is a failed build rather than a quietly larger package.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      # --ignore-scripts: the staging tools are the only thing needed out of the tree, and a
+      # lifecycle script from a dev dependency has no business running in the job that
+      # produces the released bytes.
+      - run: npm ci --ignore-scripts
+
+      # owfeed's own setup action, which downloads a release binary and VERIFIES IT AGAINST
+      # GITHUB'S BUILD ATTESTATION before it is executed or put on PATH. That is the reason to
+      # prefer it over the `go install …@<sha>` this used to run: `go install` compiles the tool
+      # on every job and trusts whatever the module proxy returns for that revision, while the
+      # SHA256SUMS beside a release is not a check either — the same host serves both, so
+      # whoever can replace the binary replaces the checksum next to it. This project already
+      # makes that argument about GitHub's asset digest and about OpenWrt's `sha256sums`; an
+      # attestation is signed by GitHub's identity and logged publicly, which is evidence from
+      # somewhere the release host does not control. The action pins the WORKFLOW that may have
+      # produced it, not merely the repository.
+      #
+      # Pinned by COMMIT (= tag v0.1.3), like the release action below and for the same reason:
+      # a tag is a mutable pointer, and this one selects the tool that builds what we ship.
+      # `version:` names the same release — the ref pins the action, the input pins the binary,
+      # and the two must move together.
+      - uses: VizzleTF/owfeed/setup@b1484c3c3f535340340d851e860be28965a35368
+        with:
+          version: v0.1.3
+
+      # SOURCE_DATE_EPOCH is what makes the packages reproducible. Both containers record
+      # mtimes, and a package's identity is a hash over its payload — so without a fixed
+      # epoch, byte-identical content rebuilds into a package that claims to be new, which
+      # invalidates every cached copy and makes an integrity check report tampering that did
+      # not happen.
+      #
+      # The COMMIT's timestamp, not the job's: identity should depend on what went into the
+      # package and on nothing else, so re-running this workflow over the same commit has to
+      # produce the same bytes.
+      - name: Resolve package version and build epoch
         run: |
+          set -euo pipefail
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "FOOTSTRAP_VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
           else
             echo "FOOTSTRAP_VERSION=0.$(date +%y%m%d).${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
           fi
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
 
-      - name: Install host tools
-        run: sudo apt-get update && sudo apt-get install -y zstd xz-utils rsync
+      # THE HALF owfeed DELIBERATELY DOES NOT DO — it packages a directory, it does not build
+      # one. This is the Makefile's Build/Prepare, step for step: concatenate the stylesheet
+      # out of styles/, mangle the private --fs-* names, minify the JS, strip the comments out
+      # of the templates and the shell, stamp FS_VERSION. It also extracts the lifecycle
+      # scripts from the Makefile's own defines, so the SDK path and this one cannot disagree
+      # about what happens at install time.
+      - name: Stage the rootfs
+        run: ./tools/stage.sh
 
-      - name: Download OpenWrt SDK
+      # WITHOUT --frozen-lock, deliberately. That flag re-derives owfeed.lock from
+      # downloads.openwrt.org and fails if it has moved — which is right for a repository that
+      # PUBLISHES a feed, where the set of architectures covered is part of the contract with
+      # subscribers. This one publishes two noarch packages as release assets and fans out into
+      # no architecture at all, so the flag would buy nothing and cost a red release every time
+      # OpenWrt cuts a point release (a `~ 25.12 point release x -> y` diff is enough to stale
+      # the lock). The committed lock still pins which SDK's host apk is used, so the toolchain
+      # does not float either way.
+      - name: Build both packages
+        run: owfeed build
+
+      # The catalogue is a BUILD ARTEFACT, not a file in git, and a silently missing one is
+      # the bug class this area keeps producing: every _() then renders its English msgid and
+      # nothing complains. Asserted against the tree the package actually carries, not against
+      # what the build printed.
+      #
+      # Read out of the ipk because that container is a plain tar and the apk is not — both
+      # legs are packed from the SAME staged directory by the SAME catalogue compiler, so one
+      # is enough to prove the compile happened.
+      #
+      # Counted against the languages in the tree, so adding one and forgetting to wire it up
+      # fails here rather than shipping English to those users.
+      - name: The translation catalogues are in the packages
         run: |
           set -euo pipefail
-          # newest point release of this leg's branch (25.12.x / 24.10.x)
-          #
-          # `|| VAR=''` is what makes the guard below REACHABLE, and it is not noise: under
-          # `set -euo pipefail` a bare `VAR="$(pipeline)"` IS the command, so a failed curl kills
-          # the step right here and the fallback never runs. Both guards were dead — the resolver
-          # silently had no fallback at all, and "SDK filename not found" could not print. Proven:
-          # with the host pointed at an invalid name, the fallback line is never reached.
-          CH_RE="$(printf '%s' '${{ matrix.channel }}' | sed 's/\./\\./g')"
-          LATEST="$(curl -sfL 'https://downloads.openwrt.org/releases/' \
-            | grep -oE "${CH_RE}\.[0-9]+" | sort -V | uniq | tail -n1)" || LATEST=''
-          [ -n "$LATEST" ] || { LATEST='${{ matrix.fallback }}'; echo "release listing failed; falling back"; }
-          echo "Using OpenWrt release: $LATEST"
-          BASE="https://downloads.openwrt.org/releases/$LATEST/targets/x86/64"
-
-          SDK_FILE="$(curl -sfL "$BASE/" | grep -oE 'openwrt-sdk-[^"<]+\.tar\.(zst|xz)' | head -n1)" || SDK_FILE=''
-          [ -n "$SDK_FILE" ] || { echo "SDK filename not found at $BASE"; exit 1; }
-          echo "Using SDK: $SDK_FILE"
-          curl -fL --proto '=https' --proto-redir '=https' "$BASE/$SDK_FILE" -o "$RUNNER_TEMP/sdk.tar"
-
-          # ---- verify the SDK: signature first, checksum under it -------------------------
-          # The SDK is the least verified input in this repo and the only one that ends up INSIDE
-          # the package users install: jsmin.c and i18n-scan.pl — two LINTERS — are pinned by commit
-          # and sha256, while the toolchain that compiles the released artifact arrived on nothing
-          # but TLS.
-          #
-          # `sha256sums` alone does not fix that, and this project already made the argument against
-          # it (CLAUDE.md, on GitHub's asset digest): it is served by the SAME host from the SAME
-          # directory, unsigned, so whoever can replace the tarball replaces the checksum beside it
-          # and the check verifies the attacker's SDK. What makes it a verification is the ed25519
-          # signature over that file, checked with a key pinned from a DIFFERENT host — so
-          # downloads.openwrt.org cannot vouch for itself. See luci-upstream.pin.
-          . luci-theme-footstrap/luci-upstream.pin
-          U="$(tools/build-usign.sh "$RUNNER_TEMP/usign")"
-
-          curl -sfL --proto '=https' --proto-redir '=https' "$BASE/sha256sums" -o "$RUNNER_TEMP/sha256sums"
-          curl -sfL --proto '=https' --proto-redir '=https' "$BASE/sha256sums.sig" -o "$RUNNER_TEMP/sha256sums.sig"
-          curl -sfL --proto '=https' --proto-redir '=https' \
-            "https://raw.githubusercontent.com/openwrt/keyring/$OPENWRT_KEYRING_PIN/usign/${{ matrix.sdk_key }}" \
-            -o "$RUNNER_TEMP/openwrt.pub"
-          echo "${{ matrix.sdk_key_sha256 }}  $RUNNER_TEMP/openwrt.pub" | sha256sum -c - \
-            || { echo "OpenWrt's ${{ matrix.channel }} key does not match its pin — refusing to verify with it"; exit 1; }
-
-          "$U" -V -m "$RUNNER_TEMP/sha256sums" -p "$RUNNER_TEMP/openwrt.pub" -x "$RUNNER_TEMP/sha256sums.sig" \
-            || { echo "BAD SIGNATURE on OpenWrt's sha256sums — refusing to build with this SDK."; \
-                 echo "The keynum this signature names:"; \
-                 sed -n 2p "$RUNNER_TEMP/sha256sums.sig" | base64 -d | xxd -s2 -l8 -p; \
-                 echo "matrix.sdk_key for ${{ matrix.channel }} says: ${{ matrix.sdk_key }}"; \
-                 echo "If those differ, OpenWrt rotated the branch's key — that looks identical to"; \
-                 echo "an attack, so check the keyring before touching the pin. If they match, the"; \
-                 echo "sha256sums really is not the one OpenWrt signed."; exit 1; }
-          echo "OpenWrt sha256sums: signature verified with ${{ matrix.sdk_key }}."
-
-          # Now the checksum means something: it is a line in a file we just authenticated.
-          # `|| WANT=''` for the same reason as LATEST/SDK_FILE above: without it the grep's failure
-          # IS the command under `set -euo pipefail`, so a missing line kills the step right here and
-          # the guard below can never print. The release would die with a bare "exit code 1" naming
-          # nothing.
-          WANT="$(grep -F " *$SDK_FILE" "$RUNNER_TEMP/sha256sums" | cut -d' ' -f1)" || WANT=''
-          [ -n "$WANT" ] || { echo "no sha256 published for $SDK_FILE"; exit 1; }
-          GOT="$(sha256sum "$RUNNER_TEMP/sdk.tar" | cut -d' ' -f1)"
-          [ "$WANT" = "$GOT" ] || { echo "SDK checksum mismatch: want $WANT, got $GOT"; exit 1; }
-          echo "SDK sha256 verified against the signed list."
-
-          case "$SDK_FILE" in
-            *.zst) tar --zstd -xf "$RUNNER_TEMP/sdk.tar" -C "$RUNNER_TEMP" ;;
-            *.xz)  tar -xJf   "$RUNNER_TEMP/sdk.tar" -C "$RUNNER_TEMP" ;;
-          esac
-          SDK_DIR="$(find "$RUNNER_TEMP" -maxdepth 1 -type d -name 'openwrt-sdk*' | head -n1)"
-          [ -n "$SDK_DIR" ] || { echo "SDK dir not found"; exit 1; }
-          echo "SDK_DIR=$SDK_DIR" >> "$GITHUB_ENV"
-
-      # Terser beats jsmin by ~27% (identifier mangling, which jsmin cannot do), so the RELEASED
-      # packages ship terser output and the Makefile turns jsmin off for this build
-      # (FOOTSTRAP_PREMIN=1 -> LUCI_MINIFY_JS:=0 — jsmin over terser output would re-open the
-      # openwrt/luci#8299 regex trap on shapes terser legitimately emits). Minifying the CHECKOUT
-      # before the rsync below keeps the SDK build itself untouched. tools/minify-js.mjs verifies
-      # its own output (parses, require-pragma prologue intact, sane size) and fails the build
-      # otherwise. An SDK user without this step builds the readable source with jsmin as before.
-      - name: Pre-minify theme JS (terser)
-        run: |
-          set -euo pipefail
-          npm ci --ignore-scripts
-          node tools/minify-js.mjs luci-theme-footstrap/htdocs/luci-static/resources
-          echo "FOOTSTRAP_PREMIN=1" >> "$GITHUB_ENV"
-
-      - name: Build package
-        working-directory: ${{ env.SDK_DIR }}
-        run: |
-          set -euo pipefail
-          # copy the theme package dir (preserving its symlinks) into the SDK. The updater moved to its
-          # own repo (VizzleTF/luci-app-footstrap-updater), which builds and releases it there.
-          mkdir -p package/luci-theme-footstrap
-          rsync -a --delete "$GITHUB_WORKSPACE/luci-theme-footstrap/" package/luci-theme-footstrap/
-
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
-
-          echo 'CONFIG_PACKAGE_luci-theme-footstrap=m' >> .config
-          if [ "${{ matrix.use_apk }}" = "y" ]; then
-            echo 'CONFIG_USE_APK=y' >> .config
-          fi
-          make defconfig
-          make package/luci-theme-footstrap/compile V=s FOOTSTRAP_VERSION="$FOOTSTRAP_VERSION" \
-            FOOTSTRAP_PREMIN="${FOOTSTRAP_PREMIN:-}"
-
-          # The translation catalogue is compiled INTO the package (Build/Prepare -> po2lmo), so it is a
-          # build artefact, not a file in git — and a silently missing .lmo is the whole bug class this
-          # area keeps producing: every _() then renders its English msgid and nothing complains.
-          # Assert the catalogue exists in the staged package tree.
-          find build_dir -name 'footstrap-theme.*.lmo' | grep -q . || {
-            echo "no footstrap-theme.<lang>.lmo in the theme package — it would ship untranslated"
+          want=$(find luci-theme-footstrap/i18n -mindepth 2 -name '*.po' | wc -l)
+          [ "$want" -gt 0 ] || { echo "no .po files found — the glob is wrong, not the build"; exit 1; }
+          got=$(tar -xzOf dist/all/luci-theme-footstrap_*_all.ipk ./data.tar.gz \
+                | tar -tz | grep -c 'i18n/footstrap-theme\..*\.lmo' || true)
+          [ "$got" = "$want" ] || {
+            echo "the package carries $got catalogue(s) for $want language(s) — it would ship"
+            echo "some of them untranslated, which reports nothing at runtime"
             exit 1
           }
+          echo "$got translation catalogue(s) in the package."
 
-          mkdir -p "$GITHUB_WORKSPACE/dist"
-          find bin/ -type f \( -name 'luci-theme-footstrap-*.apk' -o -name 'luci-theme-footstrap_*.ipk' \) \
-            -exec cp {} "$GITHUB_WORKSPACE/dist/" \;
-          ls -lah "$GITHUB_WORKSPACE/dist"
+      # EXACTLY ONE theme package per format, by NAME. Load-bearing, not tidiness: a
+      # self-updater in the field resolves the theme by the name-anchored regex
+      # /luci-theme-footstrap[-_][^/]*\.EXT$/ and takes head -1, so a stray extra asset
+      # matching it (a per-language luci-i18n-footstrap package, issue #6) would be mis-picked
+      # and installed as the theme. A router's installed updater cannot be fixed remotely, so
+      # the RELEASE has to stay pickable by the script already there.
+      #
+      # The two formats land in dist/noarch (apk) and dist/all (ipk): apk derives a package's
+      # filename from its name and version alone, so two architectures cannot share a
+      # directory. THE LAYOUT IS KEPT — `owfeed release` in the next job walks exactly those
+      # per-architecture directories to build the manifest, and the flattening happens there,
+      # after it, because a release asset has no directory.
+      - name: Count the assets
+        run: |
+          set -euo pipefail
+          find dist -mindepth 2 -type f \( -name '*.apk' -o -name '*.ipk' \) -print
+          for ext in apk ipk; do
+            n=$(find dist -mindepth 2 -type f -name "*.$ext" | wc -l)
+            [ "$n" = 1 ] || { echo "expected exactly 1 .$ext (theme), got $n — see the note above"; exit 1; }
+            m=$(find dist -mindepth 2 -type f -name "*.$ext" -exec basename {} \; \
+                | grep -cE "^luci-theme-footstrap[-_][^/]*\.$ext$" || true)
+            [ "$m" = 1 ] || { echo "expected exactly 1 luci-theme-footstrap .$ext, got $m"; exit 1; }
+          done
 
-          # EXACTLY ONE theme package per format, by NAME. Load-bearing, not tidiness: a self-updater in
-          # the field resolves the theme by the name-anchored regex /luci-theme-footstrap[-_][^/]*\.EXT$/
-          # and takes head -1, so a stray extra asset matching it (e.g. a per-language luci-i18n-footstrap
-          # package, issue #6) would be mis-picked and installed as the theme. Named-and-counted stops
-          # that. (The updater is a separate repo now and releases its own single asset there.)
-          n=$(ls "$GITHUB_WORKSPACE/dist" | grep -c "\.${{ matrix.fmt }}$" || true)
-          [ "$n" = 1 ] || { echo "expected exactly 1 .${{ matrix.fmt }} (theme), got $n — see the note above"; exit 1; }
-          m=$(ls "$GITHUB_WORKSPACE/dist" | grep -cE "^luci-theme-footstrap[-_][^/]*\.${{ matrix.fmt }}$" || true)
-          [ "$m" = 1 ] || { echo "expected exactly 1 luci-theme-footstrap .${{ matrix.fmt }}, got $m"; exit 1; }
-
+      # dist/root and dist/scripts are staging, not output: the payload tree and the lifecycle
+      # scripts extracted from the Makefile. Uploading them would put the whole rootfs into an
+      # artifact the release job downloads and then globs.
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: luci-theme-footstrap-${{ matrix.fmt }}
-          path: dist/*.${{ matrix.fmt }}
+          name: luci-theme-footstrap-packages
+          path: |
+            dist/noarch
+            dist/all
           if-no-files-found: error
 
   release:
@@ -521,7 +489,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Download all artifacts
+      # The same pin the build job installs, and the argument for verifying it is stronger
+      # here: this job runs `owfeed release`, which writes the signed manifest — the tool that
+      # decides what a router is TOLD about the bytes it is about to install, in the one job
+      # that can reach the signing key.
+      - uses: VizzleTF/owfeed/setup@b1484c3c3f535340340d851e860be28965a35368
+        with:
+          version: v0.1.3
+
+      # One artifact now — both formats come out of a single build job, where they used to come
+      # out of a two-leg matrix. merge-multiple flattens the artifact's own wrapper directory
+      # away and leaves what is INSIDE it alone, so dist/noarch and dist/all arrive intact,
+      # which is the layout `owfeed release` walks.
+      - name: Download the packages
         uses: actions/download-artifact@v8
         with:
           path: dist
@@ -557,71 +537,42 @@ jobs:
       - name: Stage the installer as an asset
         run: cp install.sh dist/install.sh
 
-      # THE MANIFEST — what takes api.github.com out of the install and update path entirely.
+      # THE MANIFEST AND THE SIGNATURES — `owfeed release`, where this job used to hand-roll
+      # both.
       #
-      # Everything the installer and the self-updater used to read out of the release API
-      # (the tag, each asset's name, its size and its sha256) is written into ONE small text
-      # file, published as an asset and SIGNED. A router then fetches it from
+      # WHAT THE MANIFEST IS FOR: it takes api.github.com out of the install and update path
+      # entirely. Everything the installer and the self-updater used to read out of the release
+      # API (the tag, each asset's name, its size and its sha256) is one small text file,
+      # published as an asset and SIGNED. A router fetches it from
       #   https://github.com/<repo>/releases/latest/download/manifest.txt
       # which is the release CDN, not the API: no 60-req/hour budget, and `latest` resolves the
-      # same way `/releases/latest` does (a pre-release is still skipped). Measured on both dev
-      # containers: uclient-fetch follows the two redirects and the bytes match the digest the
-      # API publishes.
+      # same way `/releases/latest` does (a pre-release is still skipped). It is LINE-ORIENTED
+      # text, not JSON, so the router parses it with awk and the scripts need no jsonfilter.
       #
-      # It is a LINE-ORIENTED text file, not JSON, so the router parses it with awk and the
-      # scripts stop needing jsonfilter at all — one less thing between a user and an install.
+      # WHY THE SIGNATURE IS NOT REDUNDANT WITH THE sha256 GitHub PUBLISHES: GitHub COMPUTES its
+      # digest from the uploaded asset. Replace the asset — a leaked write-scoped PAT is enough,
+      # no CI run involved — and the digest is recomputed to match, so the checksum then verifies
+      # the attacker's package. The signing key is not in the repository and a secret cannot be
+      # read back out of GitHub, so that same swap fails here.
+      #
+      # WHY usign AND NOT THE PACKAGE MANAGER'S OWN: `apk add` verifies against /etc/apk/keys,
+      # and putting our key there would make footstrap a trust anchor for EVERYTHING the router
+      # installs — far more authority than a theme needs. opkg (24.10) cannot verify a standalone
+      # .ipk at all. usign, which base-files puts on every OpenWrt image, verifies both formats
+      # with a key that authorises nothing but this package.
       #
       # `repo` is in the file and the reader checks it. One key signs BOTH repos' manifests, so
       # without that line a manifest lifted from the updater's release would verify perfectly
-      # under the theme's name. The signature proves WHO wrote it, never WHAT IT IS ABOUT.
+      # under the theme's name. A signature proves WHO wrote a file, never WHAT IT IS ABOUT.
       #
-      # `size` and the notes digest are here for the same reason as the package digests: the
-      # free-space preflight used to trust an unsigned `@.assets[*].size`, and the confirm
-      # dialog showed release notes nothing had ever checked.
-      - name: Build the release manifest
-        run: |
-          set -euo pipefail
-          cd dist
-          {
-            printf 'footstrap-manifest 1\n'
-            printf 'repo %s\n'     "$GITHUB_REPOSITORY"
-            printf 'tag %s\n'      "$GITHUB_REF_NAME"
-            printf 'version %s\n'  "${GITHUB_REF_NAME#v}"
-            printf 'date %s\n'     "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            printf 'notes %s %s\n' "$(sha256sum notes.md | cut -d' ' -f1)" notes.md
-            for f in *.apk *.ipk; do
-              [ -e "$f" ] || continue
-              # `luci-theme-footstrap-0.10.2-r1.apk` / `luci-theme-footstrap_0.10.2-r1_all.ipk`
-              # -> `luci-theme-footstrap`. The separator before the version is what both naming
-              # schemes agree on, and it is the same `[-_][0-9]` seam the asset regexes use.
-              name=$(printf '%s' "$f" | sed -E 's/[-_][0-9].*$//')
-              printf 'pkg %s %s %s %s %s\n' \
-                "$name" "${f##*.}" "$f" "$(stat -c%s "$f")" "$(sha256sum "$f" | cut -d' ' -f1)"
-            done
-          } > manifest.txt
-          cat manifest.txt
-          # A manifest that names no package is a manifest that would make every router report
-          # "no asset for this release" — the shape of the failure this file exists to prevent.
-          grep -q '^pkg luci-theme-footstrap ' manifest.txt || {
-            echo "the manifest names no theme package — refusing to publish it"; exit 1; }
-
-      # SIGN. This is the only step that can vouch for the bytes a router installs.
-      #
-      # Why a detached signature and not the package manager's own: `apk add` verifies against
-      # /etc/apk/keys, and putting our key there would make footstrap a trust anchor for
-      # EVERYTHING the router installs — far more authority than a theme needs. opkg (24.10)
-      # cannot verify a standalone .ipk at all. usign, which base-files puts on every OpenWrt
-      # image, verifies both formats with a key that authorises nothing but this package.
-      #
-      # Why it is needed at all, given the sha256 the installer already checks: GitHub COMPUTES
-      # that digest from the uploaded asset. Replace the asset — a leaked write-scoped PAT is
-      # enough, no CI run involved — and the digest is recomputed to match. The checksum then
-      # verifies the attacker's package. The signing key is not in the repository, and a secret
-      # cannot be read back out of GitHub, so that same swap fails here.
-      #
-      # Signing lives in the RELEASE job, not the build job: the build job also runs on every
+      # It runs in the RELEASE job, not the build job: the build job also runs on every
       # pull_request, and a secret must never be reachable from a fork's code.
-      - name: Sign the packages
+      #
+      # THE SECRET IS BASE64 OF usign's two-line secret-key FILE — one canonical form, so nothing
+      # has to guess whether newlines survived a copy-paste — and owfeed wants the file itself,
+      # hence the decode. It never touches the disk: written to a step-scoped env var, which is
+      # not in the process table and not in the build tree.
+      - name: Build and sign the release manifest
         env:
           FOOTSTRAP_USIGN_KEY: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
         run: |
@@ -631,77 +582,117 @@ jobs:
             echo "no current installer will accept. Refusing to publish one."
             exit 1
           }
+          OWFEED_RELEASE_KEY="$(printf '%s' "$FOOTSTRAP_USIGN_KEY" | base64 -d)" \
+            owfeed release --repo "$GITHUB_REPOSITORY" --tag "$GITHUB_REF_NAME"
+          cat dist/manifest.txt
 
-          # Built from the commit the ROUTER's own usign is built from (luci-upstream.pin), so
-          # signer and verifier are the same code. The build job builds it too — to check OpenWrt's
-          # sha256sums.sig before trusting the SDK — so the recipe is one script both call, not a
-          # copy each, which is how two `checkout <pin>`s end up on different commits.
+      # install.sh is signed separately because `owfeed release` signs the packages it can see in
+      # the per-architecture directories, and the installer is not one of them — it is not a
+      # package at all. It is signed because it is executable code handed to root. Nothing can
+      # check that signature during `curl | sh` — the script IS the first thing that arrives — so
+      # it is not a link in the install chain; it is there so a careful admin can verify the
+      # installer out of band before running it (the README's verify-then-run recipe), and so the
+      # Pages mirror can carry install.sh.sig beside it.
+      #
+      # usign is built from the commit the ROUTER's own is built from (luci-upstream.pin), so
+      # signer and verifier are the same code.
+      - name: Sign the installer
+        env:
+          FOOTSTRAP_USIGN_KEY: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
+        run: |
+          set -euo pipefail
           U="$(tools/build-usign.sh "$RUNNER_TEMP/usign")"
-
-          # The secret is the base64 of usign's two-line secret-key FILE — one canonical form,
-          # so nothing has to guess whether newlines survived a copy-paste.
           umask 077
           printf '%s' "$FOOTSTRAP_USIGN_KEY" | base64 -d > "$RUNNER_TEMP/sec.key"
           trap 'shred -u "$RUNNER_TEMP/sec.key" 2>/dev/null || rm -f "$RUNNER_TEMP/sec.key"' EXIT
+          "$U" -S -m dist/install.sh -s "$RUNNER_TEMP/sec.key" -x dist/install.sh.sig
+          echo "signed: install.sh"
 
-          # The manifest and the installer are signed alongside the packages, and the manifest is
-          # the one whose signature does the most work: it carries every package's sha256, so
-          # verifying it is what makes the per-package .sig redundant for a manifest-aware reader
-          # (the .sig assets stay published — a self-updater already in the field still fetches
-          # them, and a router's installed updater cannot be fixed remotely).
-          #
-          # install.sh is signed because it is executable code handed to root. Nothing can check
-          # that signature during `curl | sh` — the script IS the first thing that arrives — so it
-          # is not a link in the install chain; it is there so a careful admin can verify the
-          # installer out of band before running it.
-          pub=release.pub
+      # Flatten, then VERIFY EVERY SIGNATURE WITH THE KEY THE ROUTER WILL USE.
+      #
+      # owfeed leaves the packages in dist/noarch and dist/all — apk derives a package's filename
+      # from its name and version alone, so two architectures cannot share a directory — and a
+      # release asset has no directory at all. The manifest names the files without paths, which
+      # is what a router asks for, so flattening is what makes the two agree.
+      #
+      # The verify is not ceremony: a secret rotated in GitHub without the public half being
+      # committed would publish a release that every installer rejects, and the rejection reads
+      # "BAD SIGNATURE" — indistinguishable from the attack the signature exists to stop. Catch
+      # it here, where it is a red build instead of a scare. release.pub is the shipped copy, the
+      # same bytes install.sh embeds (the `check` job holds those two together).
+      - name: Verify what is about to be published
+        run: |
+          set -euo pipefail
+          # Named extensions, not "every file one level down". `owfeed build` also leaves the
+          # staged payload under dist/root when it is run in a working tree, and a blanket move
+          # would sweep the whole rootfs into the release — measured, not guessed. In this job
+          # only the two package directories are downloaded, and the glob says so out loud.
+          for f in dist/*/*.apk dist/*/*.ipk dist/*/*.sig; do
+            [ -e "$f" ] || continue
+            mv "$f" dist/
+          done
+          rmdir dist/*/ 2>/dev/null || true
+          ls -l dist
+
+          U="$(tools/build-usign.sh "$RUNNER_TEMP/usign")"
           n=0
-          for p in $(find dist -maxdepth 1 -type f \
-                       \( -name '*.apk' -o -name '*.ipk' -o -name 'manifest.txt' -o -name 'install.sh' \) \
-                     | sort); do
-            "$U" -S -m "$p" -s "$RUNNER_TEMP/sec.key" -x "$p.sig"
-            # Verify with the key the ROUTER will use. A secret rotated in GitHub without the
-            # public half being committed would otherwise publish a package that every installer
-            # rejects — and the rejection reads "BAD SIGNATURE", which is indistinguishable from
-            # the attack. Catch it here, where it is a red build instead of a scare.
-            "$U" -V -q -m "$p" -x "$p.sig" -p "$pub" || {
-              echo "signature does not verify against $pub — the secret and the shipped key disagree"
+          for p in dist/*.apk dist/*.ipk dist/manifest.txt dist/install.sh; do
+            [ -e "$p" ] || continue
+            [ -s "$p.sig" ] || { echo "no signature for $(basename "$p")"; exit 1; }
+            "$U" -V -q -m "$p" -x "$p.sig" -p release.pub || {
+              echo "signature does not verify against release.pub — the secret and the shipped"
+              echo "key disagree: $(basename "$p")"
               exit 1
             }
-            echo "signed + verified: $(basename "$p")"
+            echo "verified: $(basename "$p")"
             n=$((n + 1))
           done
-          # 4: the theme in each of apk and ipk, plus manifest.txt and install.sh. The same key signs
-          # the updater's releases in its own repo, which is what lets a router cross from an asset
-          # published here to one published there without re-trusting anything.
-          [ "$n" -ge 4 ] || { echo "expected 4 files to sign (2 packages + manifest + installer), signed $n"; exit 1; }
+          # 4: the theme in each of apk and ipk, plus manifest.txt and install.sh. The same key
+          # signs the updater's releases in its own repo, which is what lets a router cross from
+          # an asset published here to one published there without re-trusting anything.
+          [ "$n" -ge 4 ] || { echo "expected 4 signed files (2 packages + manifest + installer), got $n"; exit 1; }
 
           # Named explicitly, not merely counted. The count above passes if some OTHER four files
           # signed, and a release whose manifest is unsigned is one every manifest-aware router
           # REFUSES — which reads as "BAD SIGNATURE", i.e. exactly like an attack.
           [ -s dist/manifest.txt.sig ] || { echo "manifest.txt.sig was not produced"; exit 1; }
 
-          # The .sig assets must not disturb the asset pick of a self-updater ALREADY IN THE FIELD: it
-          # resolves the theme by /luci-theme-footstrap[-_][^/]*\.EXT$/ and takes head -1. A router's
-          # installed updater cannot be fixed remotely, so the RELEASE has to stay pickable by the
-          # script already there. Assert the name-anchored regex resolves to exactly ONE asset (a .sig
-          # ends in .EXT.sig, so it never matches `…\.EXT$`) — re-checking the invariant on the FINAL
-          # set, after signing added the .sig files.
+          # The manifest must NAME the theme, not merely exist: one that names no package makes
+          # every router report "no asset for this release" — the shape of the failure this file
+          # exists to prevent.
+          grep -q '^pkg luci-theme-footstrap ' dist/manifest.txt || {
+            echo "the manifest names no theme package — refusing to publish it"; exit 1; }
+
+          # A FIELDED SELF-UPDATER PARSES THIS POSITIONALLY: `$1=="pkg" && $2==name && $3==ext
+          # {print $4, $5, $6}`, and it cannot be fixed remotely. owfeed puts the architecture
+          # AFTER those six for exactly that reason, so assert the six are still file/size/sha —
+          # a field inserted ahead of them would make every router fetch a URL that 404s.
+          awk '$1=="pkg" && $2=="luci-theme-footstrap" {
+                 if ($4 !~ /\.(apk|ipk)$/ || $5 !~ /^[0-9]+$/ || $6 !~ /^[0-9a-f]{64}$/) {
+                   print "manifest field order changed: a fielded reader would take " $4 \
+                         " for a filename, " $5 " for a size and " $6 " for a digest"; exit 1 }
+                 n++
+               } END { if (n < 2) { print "the manifest names " n " theme package(s), want 2"; exit 1 } }' \
+            dist/manifest.txt
+
+          # The .sig assets must not disturb the asset pick of a self-updater ALREADY IN THE
+          # FIELD: it resolves the theme by /luci-theme-footstrap[-_][^/]*\.EXT$/ and takes
+          # head -1. Assert the name-anchored regex resolves to exactly ONE asset (a .sig ends in
+          # .EXT.sig, so it never matches `…\.EXT$`) — re-checked on the FINAL set, after signing.
           #
           # NOTE the field-migration seam of the split: a fielded self-updater ALSO looks for
-          # /luci-app-footstrap-updater[-_]…/ in THIS repo's release, and now finds none — which its
-          # non-fatal updater leg skips (the router keeps its current updater and still gets theme
-          # updates). To move onto the new repo's updater, a router re-runs install.sh once.
+          # /luci-app-footstrap-updater[-_]…/ in THIS repo's release, and now finds none — which
+          # its non-fatal updater leg skips (the router keeps its current updater and still gets
+          # theme updates). To move onto the new repo's updater, a router re-runs install.sh once.
           for ext in apk ipk; do
             re="^luci-theme-footstrap[-_][^/]*\.$ext$"
-            n=$(ls dist | grep -cE "$re") || true
-            [ "$n" = 1 ] || {
-              echo "a fielded self-updater matching /$re/ would pick $n assets, want exactly 1:"
+            m=$(ls dist | grep -cE "$re") || true
+            [ "$m" = 1 ] || {
+              echo "a fielded self-updater matching /$re/ would pick $m assets, want exactly 1:"
               ls dist | grep -E "$re" || true
               exit 1
             }
           done
-          ls -l dist
 
       # Pinned by COMMIT, not by the `v3` tag: this is the only third-party action in the workflow
       # and the only step in the only job that holds `contents: write`, so whoever can move that tag

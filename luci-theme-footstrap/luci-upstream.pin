@@ -60,13 +60,22 @@ USIGN_PIN=c4c72b1b07945ee192361dc751291a7c98d6adcd
 # mirror's own. To bump: change the commit and re-fetch every key it serves, then update their
 # sha256s — the sha256 is what actually holds the content, exactly as for jsmin.c.
 #
-# Only the COMMIT is here. WHICH key is a property of the branch, not of this file, and the two
-# branches do not share one: 24.10 has a release key of its own (d310c6f2833e97f7) while 25.12 is
-# signed by the unattended-build key (b5043e70f9a75cde). So each leg names its own in build.yml's
-# matrix, beside its channel. Pinning one key for both was wrong in the only way it could be — the
-# 24.10 leg refused to build, which is the gate doing its job on its author.
+# The two branches do NOT share a key: 24.10 has a release key of its own while 25.12 is signed by
+# the unattended-build key. Pinning one for both was wrong in the only way it could be — the 24.10
+# leg refused to build, which is the gate doing its job on its author.
+#
+# Both live here now. They used to sit in .github/workflows/build.yml's matrix, beside the channel
+# they are a property of; that matrix went away with the SDK build (the release is built by owfeed,
+# which fetches and verifies its own host apk). build-apk.sh — the local SDK build, the one path
+# that still needs them — read them out of that file, so leaving them there would have left a
+# convenience script parsing a matrix that no longer exists.
 #
 # The key id IS the file name in the keyring, and it is the keynum usign embeds in the signature. If
-# a build ever comes back "verification failed", read that keynum first (the step prints it): OpenWrt
-# rotating a branch's key looks exactly like an attack.
+# a build ever comes back "verification failed", read that keynum first (the script prints it):
+# OpenWrt rotating a branch's key looks exactly like an attack. The sha256 is what actually holds
+# the content — the id only says which file to fetch.
 OPENWRT_KEYRING_PIN=fbae29d730f81c892f52e0ff00fe867444aeeae6
+OPENWRT_SDK_KEY_2512=b5043e70f9a75cde
+OPENWRT_SDK_KEY_2512_SHA256=d7ac10f9ed1b38033855f3d27c9327d558444fca804c685b17d9dcfb0648228f
+OPENWRT_SDK_KEY_2410=d310c6f2833e97f7
+OPENWRT_SDK_KEY_2410_SHA256=e3624aa9be785362a172595b4919b233268871c4365a9b8da2b42ac41745ad95
