@@ -33,6 +33,8 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 - **The feed is the first way to install this theme, and the installer is the second.** It is carried by [owfeed-packages](https://github.com/VizzleTF/owfeed-packages) for both release lines, and this README mentioned it nowhere — so a reader learned about `install.sh` and never about the path that upgrades with `apk upgrade` and needs no self-updater running at all. The installer keeps its place as what it is genuinely for: a router that cannot add a repository, or has no route to one. The two must not be mixed on one router, and that is now said where somebody reads it before doing it rather than after — `apk add ./file.apk` writes a content-hash pin into `/etc/apk/world`, the pin survives sysupgrade, and the package then never upgrades from the feed again.
 
+- **The installer is signed by `owfeed release` too, and the last hand-rolled usign call leaves the release job.** `--sign-also install.sh`, added in owfeed 0.1.5 for this case, signs a file published beside the packages without putting it in the manifest — the manifest is an inventory of packages a feed ingests, and a feed has no use for an installer. Same key, same signature, one fewer step holding the secret: the release job no longer builds usign from `luci-upstream.pin` to sign one file by hand. `tools/build-usign.sh` stays where it belongs, verifying what is about to be published with the binary the router's own is built from, and `luci-theme-footstrap/build-apk.sh` still uses it for a local SDK build.
+
 ## [0.11.6] — 2026-07-28
 
 ### Fixed

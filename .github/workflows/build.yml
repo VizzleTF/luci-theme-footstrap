@@ -371,9 +371,9 @@ jobs:
       # a tag is a mutable pointer, and this one selects the tool that builds what we ship.
       # `version:` names the same release — the ref pins the action, the input pins the binary,
       # and the two must move together.
-      - uses: VizzleTF/owfeed/setup@b1484c3c3f535340340d851e860be28965a35368
+      - uses: VizzleTF/owfeed/setup@e1e9954e8ba580f6db3e0fa1f206c1bb4123c140
         with:
-          version: v0.1.3
+          version: v0.1.5
 
       # SOURCE_DATE_EPOCH is what makes the packages reproducible. Both containers record
       # mtimes, and a package's identity is a hash over its payload — so without a fixed
@@ -493,9 +493,9 @@ jobs:
       # here: this job runs `owfeed release`, which writes the signed manifest — the tool that
       # decides what a router is TOLD about the bytes it is about to install, in the one job
       # that can reach the signing key.
-      - uses: VizzleTF/owfeed/setup@b1484c3c3f535340340d851e860be28965a35368
+      - uses: VizzleTF/owfeed/setup@e1e9954e8ba580f6db3e0fa1f206c1bb4123c140
         with:
-          version: v0.1.3
+          version: v0.1.5
 
       # One artifact now — both formats come out of a single build job, where they used to come
       # out of a two-leg matrix. merge-multiple flattens the artifact's own wrapper directory
@@ -582,31 +582,21 @@ jobs:
             echo "no current installer will accept. Refusing to publish one."
             exit 1
           }
+          # --sign-also carries the installer. `owfeed release` signs the packages it finds in
+          # the per-architecture directories and the manifest that names them; install.sh is not
+          # a package and does not belong in that inventory — a feed ingesting this release has no
+          # use for an installer. It is signed because it is executable code handed to root.
+          # Nothing can check that signature during `curl | sh` — the script IS the first thing
+          # that arrives — so it is not a link in the install chain; it is there so a careful
+          # admin can verify the installer out of band before running it (the README's
+          # verify-then-run recipe), and so the Pages mirror can carry install.sh.sig beside it.
+          #
+          # This used to be a second step that built usign from luci-upstream.pin and signed the
+          # file by hand. Same key, same signature, one fewer place holding the secret.
           OWFEED_RELEASE_KEY="$(printf '%s' "$FOOTSTRAP_USIGN_KEY" | base64 -d)" \
-            owfeed release --repo "$GITHUB_REPOSITORY" --tag "$GITHUB_REF_NAME"
+            owfeed release --repo "$GITHUB_REPOSITORY" --tag "$GITHUB_REF_NAME" \
+                           --sign-also install.sh
           cat dist/manifest.txt
-
-      # install.sh is signed separately because `owfeed release` signs the packages it can see in
-      # the per-architecture directories, and the installer is not one of them — it is not a
-      # package at all. It is signed because it is executable code handed to root. Nothing can
-      # check that signature during `curl | sh` — the script IS the first thing that arrives — so
-      # it is not a link in the install chain; it is there so a careful admin can verify the
-      # installer out of band before running it (the README's verify-then-run recipe), and so the
-      # Pages mirror can carry install.sh.sig beside it.
-      #
-      # usign is built from the commit the ROUTER's own is built from (luci-upstream.pin), so
-      # signer and verifier are the same code.
-      - name: Sign the installer
-        env:
-          FOOTSTRAP_USIGN_KEY: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
-        run: |
-          set -euo pipefail
-          U="$(tools/build-usign.sh "$RUNNER_TEMP/usign")"
-          umask 077
-          printf '%s' "$FOOTSTRAP_USIGN_KEY" | base64 -d > "$RUNNER_TEMP/sec.key"
-          trap 'shred -u "$RUNNER_TEMP/sec.key" 2>/dev/null || rm -f "$RUNNER_TEMP/sec.key"' EXIT
-          "$U" -S -m dist/install.sh -s "$RUNNER_TEMP/sec.key" -x dist/install.sh.sig
-          echo "signed: install.sh"
 
       # Flatten, then VERIFY EVERY SIGNATURE WITH THE KEY THE ROUTER WILL USE.
       #
