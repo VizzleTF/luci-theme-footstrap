@@ -476,15 +476,40 @@ const _owner = new WeakMap();
 const APP_DEPTH = 3;
 
 /* The router hands this over on every navigation (it holds the resolved segments). Until it does —
- * the initial full load — derive it from the URL, which is the same information the server used. */
+ * the initial full load — ask the SERVER which page it dispatched to. */
 let _curKey = null;
 
 function appKey(segs) {
 	return (segs || []).slice(0, APP_DEPTH).join('/');
 }
 
+/* ---- THE URL IS NOT THE PAGE, and a sheet keyed on the URL is a sheet that dies ----
+ *
+ * `L.env.dispatchpath` is the leaf the SERVER resolved this request to; the address bar holds what
+ * was ASKED for, and LuCI's dispatcher walks a node down to its firstchild without rewriting it.
+ * Two shapes of that, both ordinary:
+ *
+ *   /cgi-bin/luci/admin/status  -> admin/status/overview   the Status menu's OWN link
+ *   /cgi-bin/luci/              -> admin/status/overview   the landing page, on a router with no
+ *                                                          luci-mod-dashboard
+ *
+ * The URL says `admin/status` and `''`; the router, one navigation later, hands
+ * scopeToCurrentPage() the RESOLVED `admin/status/overview`. Those keys can never match, so the
+ * first SPA navigation away from such a page disables the sheets that page owns — and
+ * rehostIntoThemeLayer() has already silenced the app's original <link> for good, so nothing
+ * paints them again for the life of the document. A full-load key that is wrong is worse than no
+ * key at all: it is a sheet that works until you navigate.
+ *
+ * Measured on owrt2512 with luci-app-mwan3, whose status include injects
+ * `#mwan3-service-status > .alert-message { display:inline-block; width:15rem; … }`: full load on
+ * /admin/status renders the card as `inline-block 240px 96px`; System -> General and back leaves
+ * it `block 966px` — every interface card on the Overview stacked full-width. Keyed on the
+ * dispatch path: 240px before and after. */
 function currentKey() {
 	if (_curKey !== null) return _curKey;
+	const dp = L.env && L.env.dispatchpath;
+	if (dp && dp.length) return appKey(dp);
+	/* no env to read (a document that never got the bootstrap): the URL is all there is */
 	const p = location.pathname.replace(/^.*\/cgi-bin\/luci\/?/, '').replace(/\/+$/, '');
 	return appKey(p ? p.split('/') : []);
 }
