@@ -68,7 +68,7 @@
 
 ### Из фида — способ по умолчанию
 
-Тема публикуется в [owfeed-packages](https://github.com/VizzleTF/owfeed-packages), который отдаёт
+Тема публикуется в [owfeed-packages](https://github.com/owfeed/owfeed-packages), который отдаёт
 обе релизные линии. Репозиторий добавляется один раз, дальше тема обновляется вместе со всем
 остальным:
 
@@ -76,8 +76,8 @@
 # OpenWrt 25.12 и новее. Для HTTPS на стоковом образе сперва нужны эти два пакета.
 apk add ca-bundle libustream-mbedtls
 
-wget https://vizzletf.github.io/owfeed-packages/owfeed-packages.pem -O /etc/apk/keys/owfeed-packages.pem
-echo "https://vizzletf.github.io/owfeed-packages/releases/25.12/$(cat /etc/apk/arch)/packages.adb" > /etc/apk/repositories.d/owfeed-packages.list
+wget https://repo.owfeed.org/owfeed-packages.pem -O /etc/apk/keys/owfeed-packages.pem
+echo "https://repo.owfeed.org/releases/25.12/$(cat /etc/apk/arch)/packages.adb" > /etc/apk/repositories.d/owfeed-packages.list
 
 # Сами по себе ни тот, ни другой файл не переживают sysupgrade.
 printf '%s\n' /etc/apk/keys/owfeed-packages.pem /etc/apk/repositories.d/owfeed-packages.list >> /etc/sysupgrade.conf
@@ -89,16 +89,16 @@ apk update && apk add luci-theme-footstrap
 
 ```sh
 # ИМЯ файла ключа — это его id, opkg ищет ключ именно по нему.
-wget https://vizzletf.github.io/owfeed-packages/9040356b214084da -O /etc/opkg/keys/9040356b214084da
+wget https://repo.owfeed.org/9040356b214084da -O /etc/opkg/keys/9040356b214084da
 
-echo "src/gz owfeed-packages https://vizzletf.github.io/owfeed-packages/releases/24.10/$(. /etc/openwrt_release; echo $DISTRIB_ARCH)" >> /etc/opkg/customfeeds.conf
+echo "src/gz owfeed-packages https://repo.owfeed.org/releases/24.10/$(. /etc/openwrt_release; echo $DISTRIB_ARCH)" >> /etc/opkg/customfeeds.conf
 
 opkg update && opkg install luci-theme-footstrap
 ```
 
 Про предупреждения, которые идут с добавлением любого фида — главное из них: установка ключа
 означает доверие этому фиду для **любого** имени пакета, — читайте
-[раздел установки самого фида](https://github.com/VizzleTF/owfeed-packages#install). Эти две минуты
+[раздел установки самого фида](https://github.com/owfeed/owfeed-packages#install). Эти две минуты
 стоят того.
 
 Дальше обновления приезжают через `apk upgrade`. Не запускайте на том же роутере установщик ниже:

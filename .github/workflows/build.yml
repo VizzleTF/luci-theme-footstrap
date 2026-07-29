@@ -5,7 +5,7 @@ name: Build LuCI theme packages
 #   apk  — OpenWrt 25.12+
 #   ipk  — OpenWrt 24.10 (opkg, which calls the same package `all` rather than `noarch`)
 #
-# BOTH COME OUT OF owfeed (https://github.com/VizzleTF/owfeed), not out of the OpenWrt SDK.
+# BOTH COME OUT OF owfeed (https://github.com/owfeed/owfeed), not out of the OpenWrt SDK.
 # The SDK legs downloaded, verified and unpacked a cross toolchain — twice, once per format —
 # to build a package containing not one compiled byte: CSS, ucode templates, browser JS and
 # fonts. What the SDK actually contributed was three things, and owfeed does all three (its
@@ -374,7 +374,7 @@ jobs:
       # against a build attestation before it runs, so the tag is a convenience over a SHA
       # rather than the trust decision. `version:` names the same release: the ref pins the
       # action, the input pins the binary, and the two must move together.
-      - uses: VizzleTF/owfeed/setup@v0.1.7
+      - uses: owfeed/owfeed/setup@v0.1.7
         with:
           version: v0.1.7
 
@@ -517,7 +517,7 @@ jobs:
       # installs `latest` and warns, and a CI result that can change without a commit is not
       # a result.
       - name: Install this build on 25.12 and render its pages
-        uses: VizzleTF/owlab/action@v0.4.1
+        uses: owfeed/owlab/action@v0.4.1
         with:
           version: v0.4.1
           releases: "25.12.5"
@@ -529,7 +529,7 @@ jobs:
             http 200 /cgi-bin/luci/admin/system/system
 
       - name: Install this build on 24.10 and render its pages
-        uses: VizzleTF/owlab/action@v0.4.1
+        uses: owfeed/owlab/action@v0.4.1
         with:
           version: v0.4.1
           releases: "24.10.8"
@@ -553,14 +553,14 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           curl -fsSL -o "$RUNNER_TEMP/owfeed-packages.pem" \
-            https://vizzletf.github.io/owfeed-packages/owfeed-packages.pem
+            https://repo.owfeed.org/owfeed-packages.pem
       - name: Assert the feed serves a working theme
         if: github.event_name != 'pull_request'
-        uses: VizzleTF/owlab/action@v0.4.1
+        uses: owfeed/owlab/action@v0.4.1
         with:
           version: v0.4.1
           releases: "25.12.5"
-          feed: https://vizzletf.github.io/owfeed-packages/releases/25.12/x86_64/packages.adb
+          feed: https://repo.owfeed.org/releases/25.12/x86_64/packages.adb
           feed-key: ${{ runner.temp }}/owfeed-packages.pem
           feed-name: owfeed-packages
           install: luci-theme-footstrap
@@ -586,7 +586,7 @@ jobs:
       # here: this job runs `owfeed release`, which writes the signed manifest — the tool that
       # decides what a router is TOLD about the bytes it is about to install, in the one job
       # that can reach the signing key.
-      - uses: VizzleTF/owfeed/setup@v0.1.7
+      - uses: owfeed/owfeed/setup@v0.1.7
         with:
           version: v0.1.7
 

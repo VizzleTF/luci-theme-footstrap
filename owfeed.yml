@@ -1,4 +1,4 @@
-# How the released packages are built — see https://github.com/VizzleTF/owfeed
+# How the released packages are built — see https://github.com/owfeed/owfeed
 #
 #   ./tools/stage.sh     # produce dist/root, the tree owfeed packages
 #   owfeed build         # dist/noarch/*.apk (25.12) + dist/all/*.ipk (24.10)
@@ -30,7 +30,7 @@ feed:
   # owfeed-packages, which pins our released .apk by sha256 and adds its own signature —
   # so this URL is where a subscriber's apk really fetches it from, and `build` is the only
   # stage this file drives.
-  url: https://vizzletf.github.io/owfeed-packages
+  url: https://repo.owfeed.org
   title: Footstrap
   maintainer: "VizzleTF <vizzletf47@gmail.com>"
   license: Apache-2.0

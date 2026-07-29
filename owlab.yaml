@@ -1,4 +1,4 @@
-# Dev routers for this theme, via owlab (https://github.com/VizzleTF/owlab).
+# Dev routers for this theme, via owlab (https://github.com/owfeed/owlab).
 #
 #   owlab up            build and start every router
 #   owlab sync --watch  rebuild the CSS and push it on every edit
