@@ -3,6 +3,9 @@
 [English](README.md) · **Русский** ·
 **[Песочница — всё можно потрогать без роутера](https://vizzletf.github.io/luci-theme-footstrap/playground.html)**
 
+[![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap.json)](https://owfeed.org/install/ru/)
+[![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap-releases.json)](https://owfeed.org/install/ru/)
+
 <picture>
   <source media="(max-width: 767px)" srcset="assets/readme/phone-menu-dark.png">
   <img src="assets/readme/overview-top-dark.png" width="100%" alt="Тот же обзор в тёмной теме с верхней панелью: меню стоит в строке бренда, контент идёт во всю ширину.">
@@ -79,8 +82,9 @@ apk add ca-bundle libustream-mbedtls
 wget https://repo.owfeed.org/owfeed-packages.pem -O /etc/apk/keys/owfeed-packages.pem
 echo "https://repo.owfeed.org/releases/25.12/$(cat /etc/apk/arch)/packages.adb" > /etc/apk/repositories.d/owfeed-packages.list
 
-# Сами по себе ни тот, ни другой файл не переживают sysupgrade.
-printf '%s\n' /etc/apk/keys/owfeed-packages.pem /etc/apk/repositories.d/owfeed-packages.list >> /etc/sysupgrade.conf
+# Сохранить ключ и репозиторий при обновлении прошивки.
+mkdir -p /lib/upgrade/keep.d
+printf '%s\n' /etc/apk/keys/owfeed-packages.pem /etc/apk/repositories.d/owfeed-packages.list > /lib/upgrade/keep.d/owfeed-packages
 
 apk update && apk add luci-theme-footstrap
 ```
