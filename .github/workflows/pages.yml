@@ -39,7 +39,7 @@ jobs:
       # 22, matching build.yml: eslint 10 / stylelint 17 need Node >= 20.19, and a bare `20`
       # floats on the 20.x line that straddles that floor. Nothing here lints, but `npm ci`
       # installs them and would EBADENGINE.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with: { node-version: '22' }
       - run: npm ci
       - name: Build the portal
@@ -104,7 +104,7 @@ jobs:
             echo "mirrored: $f ($(wc -c < "_site/$f") bytes)"
           done
           echo "mirror of $tag complete."
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with: { path: _site }
 
   deploy:
@@ -115,4 +115,4 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
