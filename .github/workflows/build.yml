@@ -374,9 +374,9 @@ jobs:
       # against a build attestation before it runs, so the tag is a convenience over a SHA
       # rather than the trust decision. `version:` names the same release: the ref pins the
       # action, the input pins the binary, and the two must move together.
-      - uses: owfeed/owfeed/setup@v0.2.1
+      - uses: owfeed/owfeed/setup@v0.3.2
         with:
-          version: v0.2.1
+          version: v0.3.2
 
       # SOURCE_DATE_EPOCH is what makes the packages reproducible. Both containers record
       # mtimes, and a package's identity is a hash over its payload — so without a fixed
@@ -602,9 +602,9 @@ jobs:
       # here: this job runs `owfeed release`, which writes the signed manifest — the tool that
       # decides what a router is TOLD about the bytes it is about to install, in the one job
       # that can reach the signing key.
-      - uses: owfeed/owfeed/setup@v0.2.1
+      - uses: owfeed/owfeed/setup@v0.3.2
         with:
-          version: v0.2.1
+          version: v0.3.2
 
       # One artifact now — both formats come out of a single build job, where they used to come
       # out of a two-leg matrix. merge-multiple flattens the artifact's own wrapper directory
