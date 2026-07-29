@@ -1,6 +1,6 @@
 # 20. Styling a LuCI app so it works under any theme
 
-*Русская версия: [20-luci-app-styling-guide.ru.md](20-luci-app-styling-guide.ru.md).*
+*Русская версия: [20-luci-app-styling-guide_ru.md](20-luci-app-styling-guide_ru.md).*
 
 This is written for authors of `luci-app-*` packages. It is not footstrap-specific advice: every
 rule below comes from a pattern found in a real, popular app, and every one of them is a bug on

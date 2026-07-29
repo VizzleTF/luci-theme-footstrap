@@ -1,0 +1,23 @@
+# SHA pins rot without this. A pinned action is only a decision anyone made if
+# something proposes the update as a diff; otherwise it is a version nobody chose
+# that stops receiving fixes -- the failure mode of pinning without automation.
+#
+# This repository sat two owfeed releases behind for exactly that reason: a pin
+# nobody was reminded about.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev:
+        patterns: ["*"]

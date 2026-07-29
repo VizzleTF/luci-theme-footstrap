@@ -5,7 +5,7 @@ place instead of reloading the whole page. This measures what that is worth, on 
 against stock `luci-theme-bootstrap` and against a third-party theme.
 
 Script: `bench/nav-benchmark.py`. Runs against any OpenWrt 25.12+ router.
-Russian version: [15-benchmark-navigation.ru.md](15-benchmark-navigation.ru.md).
+Russian version: [15-benchmark-navigation_ru.md](15-benchmark-navigation_ru.md).
 
 ## What it measures
 

@@ -367,13 +367,16 @@ jobs:
       # somewhere the release host does not control. The action pins the WORKFLOW that may have
       # produced it, not merely the repository.
       #
-      # Pinned by COMMIT (= tag v0.1.3), like the release action below and for the same reason:
-      # a tag is a mutable pointer, and this one selects the tool that builds what we ship.
-      # `version:` names the same release — the ref pins the action, the input pins the binary,
-      # and the two must move together.
-      - uses: VizzleTF/owfeed/setup@e1e9954e8ba580f6db3e0fa1f206c1bb4123c140
+      # Pinned by TAG, like the release action below, which is the ecosystem's own convention
+      # for VizzleTF/* references and needs saying because the argument usually runs the other
+      # way. A third-party tag is moved by a third party — pin those by commit. This one is
+      # under the same ownership as this repository AND the binary it installs is verified
+      # against a build attestation before it runs, so the tag is a convenience over a SHA
+      # rather than the trust decision. `version:` names the same release: the ref pins the
+      # action, the input pins the binary, and the two must move together.
+      - uses: VizzleTF/owfeed/setup@v0.1.7
         with:
-          version: v0.1.5
+          version: v0.1.7
 
       # SOURCE_DATE_EPOCH is what makes the packages reproducible. Both containers record
       # mtimes, and a package's identity is a hash over its payload — so without a fixed
@@ -475,9 +478,77 @@ jobs:
             dist/all
           if-no-files-found: error
 
+
+  # THE OTHER HALF. Everything above proves the package was BUILT correctly -- the catalogues
+  # are in it, the asset names are pickable, the signature verifies. None of it proves the
+  # thing a user cares about: that installing it produces a router whose pages render.
+  #
+  # owlab is the tool for that, and this repository is the one place in the ecosystem that can
+  # demonstrate the whole path end to end. It runs a real OpenWrt container, installs the
+  # package, LOGS INTO LuCI as root and fetches the theme's own pages -- an unauthenticated
+  # request to /cgi-bin/luci/admin is a redirect to the login form, which is why a hand-written
+  # curl reports 403 on a healthy page and why this is not three lines of shell.
+  #
+  # No key exists anywhere in this job. That is owlab's half of the boundary: it asserts that a
+  # package works and never that anyone should trust it.
+  verify:
+    name: The package works on a real router
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: luci-theme-footstrap-packages
+          path: dist/
+
+      # The freshly built package, installed from a file. This is the gate on this change:
+      # it fails the run before anything is released.
+      #
+      # A theme has no service and no uci section to assert on, so the assertions are the
+      # pages it exists to style, plus the file the self-updater resolves the theme by.
+      - name: Install this build and render its pages
+        uses: VizzleTF/owlab/action@v0.4.0
+        with:
+          releases: "25.12.5 24.10.8"
+          install: dist/*/luci-theme-footstrap-*.apk
+          assert: |
+            package luci-theme-footstrap
+            file /www/luci-static/footstrap/cascade.css
+            http 200 /cgi-bin/luci/admin/status/overview
+            http 200 /cgi-bin/luci/admin/system/system
+
+      # And the published channel, by NAME, out of the signed index -- which is a different
+      # claim entirely. Installing a file proves the package works; installing it by name
+      # proves the index parses, the URL does not redirect somewhere apk will not follow, and
+      # the key on the router matches the one that signed it. A file install cannot fail in
+      # any of those ways, so nothing else in this ecosystem checks them from a router.
+      #
+      # It tests what is ALREADY LIVE, not this build, so it is not a gate on a pull request --
+      # a red run here means the feed is broken, which is not this change's fault and not
+      # something a contributor can fix. On main and on demand only.
+      - name: Install the published theme from the feed, by name
+        if: github.event_name != 'pull_request'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/owfeed-packages.pem" \
+            https://vizzletf.github.io/owfeed-packages/owfeed-packages.pem
+      - name: Assert the feed serves a working theme
+        if: github.event_name != 'pull_request'
+        uses: VizzleTF/owlab/action@v0.4.0
+        with:
+          releases: "25.12.5"
+          feed: https://vizzletf.github.io/owfeed-packages/releases/25.12/x86_64/packages.adb
+          feed-key: ${{ runner.temp }}/owfeed-packages.pem
+          feed-name: owfeed-packages
+          install: luci-theme-footstrap
+          assert: |
+            package luci-theme-footstrap
+            http 200 /cgi-bin/luci/admin/status/overview
+
   release:
     name: Attach packages to release
-    needs: build
+    needs: [build, verify]
     if: startsWith(github.ref, 'refs/tags/v')
     # the one job that writes anything — see the workflow-level `permissions` above
     permissions:
@@ -493,9 +564,9 @@ jobs:
       # here: this job runs `owfeed release`, which writes the signed manifest — the tool that
       # decides what a router is TOLD about the bytes it is about to install, in the one job
       # that can reach the signing key.
-      - uses: VizzleTF/owfeed/setup@e1e9954e8ba580f6db3e0fa1f206c1bb4123c140
+      - uses: VizzleTF/owfeed/setup@v0.1.7
         with:
-          version: v0.1.5
+          version: v0.1.7
 
       # One artifact now — both formats come out of a single build job, where they used to come
       # out of a two-leg matrix. merge-multiple flattens the artifact's own wrapper directory
