@@ -517,9 +517,9 @@ jobs:
       # installs `latest` and warns, and a CI result that can change without a commit is not
       # a result.
       - name: Install this build on 25.12 and render its pages
-        uses: VizzleTF/owlab/action@v0.4.0
+        uses: VizzleTF/owlab/action@v0.4.1
         with:
-          version: v0.4.0
+          version: v0.4.1
           releases: "25.12.5"
           install: dist/noarch/luci-theme-footstrap-*.apk
           assert: |
@@ -529,9 +529,9 @@ jobs:
             http 200 /cgi-bin/luci/admin/system/system
 
       - name: Install this build on 24.10 and render its pages
-        uses: VizzleTF/owlab/action@v0.4.0
+        uses: VizzleTF/owlab/action@v0.4.1
         with:
-          version: v0.4.0
+          version: v0.4.1
           releases: "24.10.8"
           install: dist/all/luci-theme-footstrap_*.ipk
           assert: |
@@ -556,9 +556,9 @@ jobs:
             https://vizzletf.github.io/owfeed-packages/owfeed-packages.pem
       - name: Assert the feed serves a working theme
         if: github.event_name != 'pull_request'
-        uses: VizzleTF/owlab/action@v0.4.0
+        uses: VizzleTF/owlab/action@v0.4.1
         with:
-          version: v0.4.0
+          version: v0.4.1
           releases: "25.12.5"
           feed: https://vizzletf.github.io/owfeed-packages/releases/25.12/x86_64/packages.adb
           feed-key: ${{ runner.temp }}/owfeed-packages.pem
