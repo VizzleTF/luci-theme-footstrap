@@ -508,11 +508,32 @@ jobs:
       #
       # A theme has no service and no uci section to assert on, so the assertions are the
       # pages it exists to style, plus the file the self-updater resolves the theme by.
-      - name: Install this build and render its pages
+      # ONE RELEASE PER STEP, because the container is not interchangeable: 25.12 is apk and
+      # 24.10 is opkg, and neither will install the other's file. A single step naming both
+      # releases and one glob installs an .apk on an opkg router and fails there -- which is
+      # exactly what the first version of this job did.
+      #
+      # `version:` pins the owlab BINARY as well as the action ref. Left out, the action
+      # installs `latest` and warns, and a CI result that can change without a commit is not
+      # a result.
+      - name: Install this build on 25.12 and render its pages
         uses: VizzleTF/owlab/action@v0.4.0
         with:
-          releases: "25.12.5 24.10.8"
-          install: dist/*/luci-theme-footstrap-*.apk
+          version: v0.4.0
+          releases: "25.12.5"
+          install: dist/noarch/luci-theme-footstrap-*.apk
+          assert: |
+            package luci-theme-footstrap
+            file /www/luci-static/footstrap/cascade.css
+            http 200 /cgi-bin/luci/admin/status/overview
+            http 200 /cgi-bin/luci/admin/system/system
+
+      - name: Install this build on 24.10 and render its pages
+        uses: VizzleTF/owlab/action@v0.4.0
+        with:
+          version: v0.4.0
+          releases: "24.10.8"
+          install: dist/all/luci-theme-footstrap_*.ipk
           assert: |
             package luci-theme-footstrap
             file /www/luci-static/footstrap/cascade.css
@@ -537,6 +558,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: VizzleTF/owlab/action@v0.4.0
         with:
+          version: v0.4.0
           releases: "25.12.5"
           feed: https://vizzletf.github.io/owfeed-packages/releases/25.12/x86_64/packages.adb
           feed-key: ${{ runner.temp }}/owfeed-packages.pem
