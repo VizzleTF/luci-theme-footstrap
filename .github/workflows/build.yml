@@ -646,6 +646,36 @@ jobs:
       - name: Stage the installer as an asset
         run: cp install.sh dist/install.sh
 
+      # SIGN EACH PACKAGE WITH THIS REPOSITORY'S OWN KEY, before the manifest is written.
+      #
+      # Order matters: `owfeed release` records each package's size and sha256, and signing
+      # appends bytes. Sign afterwards and the manifest describes files that no longer exist.
+      #
+      # WHAT THIS SIGNATURE IS FOR, given that the feed already signs its index. The index proves
+      # that owfeed-packages published a file; it says nothing about who built it, and it can only
+      # be checked against that feed. This one is inside the .apk, reaches the router, and can be
+      # verified by anyone holding the public half — which is pinned in the feed's keys/ and lives
+      # in this repository's history. It is what makes "this package came from here" checkable by
+      # someone who does not trust the feed at all.
+      #
+      # It is NOT what makes the package installable: apk takes its trust from the signed index,
+      # and a package with no signature at all installs, upgrades and removes normally. This is
+      # evidence, not a gate.
+      #
+      # EC prime256v1, a different key and a different job from the usign one below: usign signs
+      # the manifest that describes the release, this signs the artifacts inside it.
+      - name: Sign the packages with this repository's key
+        env:
+          OWFEED_AUTHOR_KEY: ${{ secrets.OWFEED_AUTHOR_KEY }}
+        run: |
+          set -euo pipefail
+          [ -n "${OWFEED_AUTHOR_KEY:-}" ] || {
+            echo "OWFEED_AUTHOR_KEY is not set. owfeed-packages refuses a package it cannot"
+            echo "attribute, so a release signed by nobody is one the feed will not carry."
+            exit 1
+          }
+          owfeed sign --key env:OWFEED_AUTHOR_KEY dist
+
       # THE MANIFEST AND THE SIGNATURES — `owfeed release`, where this job used to hand-roll
       # both.
       #
