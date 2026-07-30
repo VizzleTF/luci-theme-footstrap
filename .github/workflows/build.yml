@@ -1,9 +1,10 @@
 # luci-theme-footstrap is noarch: one build, two containers (apk for 25.12+, ipk for
 # 24.10), both out of owfeed rather than an OpenWrt SDK. docs/18 has why.
 #
-# Every step here is one line. What each gate is for, and what shipped once because it
-# did not exist, lives in the script it names — tools/*.sh and tools/*.mjs — where it can
-# be read next to the code it explains and run by hand.
+# The release pipeline itself is not here — it is owfeed's `package.yml`, which every
+# repository in this ecosystem shares. What is here is this theme's own gates: each
+# one line, each a script under tools/ whose header says what it is for and what
+# shipped once because it did not exist.
 
 name: Build LuCI theme packages
 
@@ -14,8 +15,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Only the release job writes, and it says so itself. Workflow-wide write handed the
-# token to every pull_request run, including `npm ci`'s lifecycle scripts.
 permissions:
   contents: read
 
@@ -47,8 +46,8 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # Through package.json, not a second copy of the globs: a glob restated here goes
-      # on linting the old path after package.json moves.
+      # Through package.json, not a second copy of the globs: a glob restated here
+      # goes on linting the old path after package.json moves.
       - run: npm run lint:js
       - run: npm run lint:css
 
@@ -67,62 +66,48 @@ jobs:
       - run: echo "JSMIN=$(sh tools/build-jsmin.sh)" >> "$GITHUB_ENV"
       - run: node tools/jsmin-verify.mjs
 
-  build:
-    name: Build the packages
+  # Build, check against throwaway keys, and on a tag sign and publish. The shape is
+  # owfeed's, shared with every other package repository; what is specific to this one
+  # is the three inputs below.
+  package:
+    name: Package
     needs: [check, lint]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-          cache: npm
-      # --ignore-scripts: a dev dependency's lifecycle script has no business running in
-      # the job that produces the released bytes.
-      - run: npm ci --ignore-scripts
+    permissions:
+      contents: write
+    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.0
+    secrets:
+      sign-key: ${{ secrets.FOOTSTRAP_SIGN_KEY }}
+      usign-key: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
+    with:
+      owfeed-version: v0.5.0
+      stage: npm ci --ignore-scripts && ./tools/stage.sh
+      # Writes dist/notes.md and dist/install.sh. Both are assets as well as
+      # documentation: the theme's confirm dialog reads the notes from the release
+      # rather than from the API, and the installer is served from the release CDN
+      # because raw.githubusercontent is rate-limited for the very user who most
+      # needs it (issue #17).
+      pre-release: sh tools/stage-release.sh
+      sign-also: install.sh
+      notes-file: dist/notes.md
+      verify-with: release.pub
 
-      # setup verifies the binary against GitHub's build attestation before running it.
-      # The ref and `version:` name the same release and move together.
-      - uses: owfeed/owfeed/setup@v0.4.5
-        with:
-          version: v0.4.5
-
-      - run: sh tools/build-env.sh
-      - run: ./tools/stage.sh
-
-      # Everything that can be checked without a key: build, sign, index and doctor on
-      # keys owfeed generates and throws away. It leaves dist/ alone.
-      - run: owfeed check
-
-      - run: owfeed build
-      - run: sh tools/check-packages.sh
-
-      # dist/root and dist/scripts are staging, not output.
-      - uses: actions/upload-artifact@v7
-        with:
-          name: luci-theme-footstrap-packages
-          path: |
-            dist/noarch
-            dist/all
-          if-no-files-found: error
-
-  # Everything above proves the package was BUILT correctly. None of it proves the thing
-  # a user cares about: that installing it produces a router whose pages render. owlab
-  # boots a real OpenWrt, installs the package and logs into LuCI to fetch the theme's
-  # own pages — an unauthenticated request is a redirect to the login form, which is why
-  # a hand-written curl reports 403 on a healthy page.
+  # Everything above proves the package was BUILT correctly. None of it proves the
+  # thing a user cares about: that installing it produces a router whose pages render.
+  # owlab boots a real OpenWrt, installs the package and logs into LuCI to fetch the
+  # theme's own pages — an unauthenticated request is a redirect to the login form,
+  # which is why a hand-written curl reports 403 on a healthy page.
   #
   # No key exists anywhere in this job: it asserts that a package works, never that
   # anyone should trust it.
   verify:
     name: The package works on a real router
-    needs: build
+    needs: package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
-          name: luci-theme-footstrap-packages
+          name: owfeed-packages
           path: dist/
 
       # ONE RELEASE PER STEP: 25.12 is apk and 24.10 is opkg, and neither will install
@@ -151,13 +136,14 @@ jobs:
             http 200 /cgi-bin/luci/admin/status/overview
             http 200 /cgi-bin/luci/admin/system/system
 
-      # And the published channel, by NAME, out of the signed index — a different claim
-      # entirely: it proves the index parses, the URL does not redirect somewhere apk
-      # will not follow, and the key on the router matches the one that signed it.
+      # And the published channel, by NAME, out of the signed index — a different
+      # claim entirely: it proves the index parses, the URL does not redirect
+      # somewhere apk will not follow, and the key on the router matches the one that
+      # signed it.
       #
-      # It tests what is ALREADY LIVE rather than this build, so it never fails the job:
-      # a feed mid-DNS-migration would otherwise block a theme release on the health of
-      # a channel this repository does not own.
+      # It tests what is ALREADY LIVE rather than this build, so it never fails the
+      # job: a feed mid-DNS-migration would otherwise block a theme release on the
+      # health of a channel this repository does not own.
       - id: feed-key
         if: github.event_name != 'pull_request'
         run: sh tools/feed-key.sh
@@ -177,64 +163,11 @@ jobs:
             package luci-theme-footstrap
             http 200 /cgi-bin/luci/admin/status/overview
 
-  release:
-    name: Attach packages to release
-    needs: [build, verify]
-    if: startsWith(github.ref, 'refs/tags/v')
-    # the one job that writes anything — see the workflow-level `permissions` above
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: owfeed/owfeed/setup@v0.4.5
-        with:
-          version: v0.4.5
-
-      - uses: actions/download-artifact@v8
-        with:
-          path: dist
-          merge-multiple: true
-
-      - run: sh tools/stage-release.sh
-
-      # The signed manifest, in the one job that can reach the key. It takes
-      # api.github.com out of the install and update path: everything a router used to
-      # read from the release API is one small signed text file on the release CDN.
-      # GitHub's own digest cannot replace it — GitHub recomputes that from whatever
-      # asset is uploaded, so a leaked write-scoped PAT makes it verify the attacker's
-      # package. The secret is not in the repository and cannot be read back out.
-      #
-      # --sign-also carries install.sh: not a package and not in the manifest's
-      # inventory, but executable code handed to root, so an admin can verify it out of
-      # band before running it.
-      - name: Build and sign the release manifest
-        env:
-          FOOTSTRAP_USIGN_KEY: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
-        run: sh tools/sign-release.sh
-
-      - run: sh tools/check-release.sh
-
-      # Pinned by COMMIT: the only third-party action in the workflow, in the only job
-      # holding `contents: write`. Published as a draft and flipped in the next step —
-      # `latest` moves the moment a release is published, and this action uploads assets
-      # after creating it. (= tag v3.)
-      - name: Attach to release (draft)
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228
-        with:
-          files: dist/*
-          body_path: ${{ runner.temp }}/notes.md
-          draft: true
-
-      - env:
-          GH_TOKEN: ${{ github.token }}
-        run: sh tools/publish-release.sh
-
   # Refresh the Pages mirror of the release metadata. Called rather than triggered:
   # `on: release` never fires for a release created with GITHUB_TOKEN.
   pages:
     name: Refresh the Pages mirror
-    needs: release
+    needs: package
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/pages.yml
     permissions:
