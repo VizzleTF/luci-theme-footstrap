@@ -156,11 +156,15 @@ jobs:
           version: v0.5.3
           releases: "24.10.8"
           install: dist/all/luci-theme-footstrap_*.ipk
+          # The same compile as the 25.12 leg, and not redundant: the templates are
+          # identical but the interpreters are not, and a construct 25.12's ucode
+          # accepts is not proof that 24.10's does.
           assert: |
             package luci-theme-footstrap
             file /www/luci-static/footstrap/cascade.css
             http 200 /cgi-bin/luci/admin/status/overview
             http 200 /cgi-bin/luci/admin/system/system
+            exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 
       # And the published channel, by NAME, out of the signed index — a different
       # claim entirely: it proves the index parses, the URL does not redirect
