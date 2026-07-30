@@ -1,24 +1,13 @@
+# luci-theme-footstrap is noarch: one build, two containers (apk for 25.12+, ipk for
+# 24.10), both out of owfeed rather than an OpenWrt SDK. docs/18 has why.
+#
+# The release pipeline itself is not here — it is owfeed's `package.yml`, which every
+# repository in this ecosystem shares. What is here is this theme's own gates: each
+# one line, each a script under tools/ whose header says what it is for and what
+# shipped once because it did not exist.
+
 name: Build LuCI theme packages
 
-# luci-theme-footstrap is noarch (LUCI_PKGARCH:=all), so one build covers every target.
-# Two formats are produced, from ONE staged rootfs:
-#   apk  — OpenWrt 25.12+
-#   ipk  — OpenWrt 24.10 (opkg, which calls the same package `all` rather than `noarch`)
-#
-# BOTH COME OUT OF owfeed (https://github.com/owfeed/owfeed), not out of the OpenWrt SDK.
-# The SDK legs downloaded, verified and unpacked a cross toolchain — twice, once per format —
-# to build a package containing not one compiled byte: CSS, ucode templates, browser JS and
-# fonts. What the SDK actually contributed was three things, and owfeed does all three (its
-# own po2lmo-identical .lmo compiler, the conffiles/scripts sidecars package-pack.mk emits,
-# and the default_postinst wrapper without which /etc/uci-defaults/* never runs).
-#
-# The SDK verification did not leave with the SDK: owfeed fetches the host `apk` out of a
-# release SDK tarball and holds it to the same contour this workflow used to run inline —
-# ed25519 over sha256sums, with OpenWrt's branch key pinned from a different host.
-#
-# What is NOT built here: luci-theme-footstrap/Makefile still describes this package for
-# anyone building it in an SDK or a feed, and the gates that protect that path (scan-marker,
-# jsmin equivalence) are still in `check`/`lint` below. Nothing released comes from it.
 on:
   push:
     tags: ['v*']
@@ -26,555 +15,175 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Read-only by default. Only the release job creates a release, and it declares the write
-# scope itself. The token was workflow-wide before, which handed it to every `pull_request`
-# run — including the `npm ci` in the lint job, i.e. to the lifecycle scripts of every dev
-# dependency. Nothing needs the write scope until there is a tag to publish.
 permissions:
   contents: read
 
 jobs:
-  # Gates that need nothing but python3, awk and sh — so they cost seconds and can
-  # never break the OpenWrt buildbot, which does not have node and never will.
-  # The npm-based gates live in the `lint` job below; both are CI-only, never in the
-  # Makefile. See docs/18.
   check:
     name: Static checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - run: sh tools/check-shell.sh
+      - run: sh tools/scan-marker.sh
+      - run: sh tools/check-release-key.sh
+      - run: luci-theme-footstrap/build-css.sh /tmp/cascade.css
+      - run: python3 tools/audit.py --strict
+      # gettext for update-po; the ucode gate needs only docker, which the runner has.
+      - run: sudo apt-get update && sudo apt-get install -y gettext
+      - run: luci-theme-footstrap/update-po.sh --check
 
-      - name: Shell syntax
-        run: |
-          set -eu
-          # tools/ is in the glob because release-notes.sh is only ever RUN by the release
-          # job — i.e. after both packages have already built. A syntax error in it used to
-          # be discovered at the one moment it costs the most.
-          for f in luci-theme-footstrap/*.sh install.sh tools/*.sh \
-                   luci-theme-footstrap/root/usr/libexec/*.sh \
-                   luci-theme-footstrap/root/etc/uci-defaults/*; do
-            [ -f "$f" ] || continue
-            sh -n "$f" || { echo "syntax error: $f"; exit 1; }
-          done
-
-      # THE TEMPLATES HAD NO PARSER. luci.mk copies ucode/ to the router verbatim and never
-      # compiles it, so a stray brace in header.ut built green, released, and then every
-      # user's LuCI silently fell back to a different theme (the "Theme fallback" indicator,
-      # docs/01) — the one way this repo could ship a completely broken UI with CI all green.
-      #
-      # `ucode -T -c` is LuCI's own trycompile, so this is the same check the router would do,
-      # run before the release instead of after it. ucode is not packaged for Ubuntu; it is
-      # built from the commit pinned in luci-upstream.pin, exactly as jsmin.c is, and for the
-      # same reason — a gate fetched from a moving master is whatever upstream pushed last.
-      - name: Compile-check the ucode templates
-        run: |
-          set -eu
-          . luci-theme-footstrap/luci-upstream.pin
-          sudo apt-get update && sudo apt-get install -y cmake libjson-c-dev
-          git clone -q https://github.com/jow-/ucode "$RUNNER_TEMP/ucode"
-          git -C "$RUNNER_TEMP/ucode" checkout -q "$UCODE_PIN"
-          cmake -S "$RUNNER_TEMP/ucode" -B "$RUNNER_TEMP/ucode/build" -DCMAKE_BUILD_TYPE=Release >/dev/null
-          cmake --build "$RUNNER_TEMP/ucode/build" -j"$(nproc)" >/dev/null
-          UC="$RUNNER_TEMP/ucode/build/ucode"
-
-          # ucode RESOLVES `import` at COMPILE time, so header.ut's two imports must resolve or
-          # nothing compiles. Both are the ROUTER's runtime, not ours: `luci.core` is luci-base's
-          # ucode library (/usr/share/ucode/luci/core.uc) and `uci` is a native ucode binding
-          # (uci.so, built only against libuci). Neither exists on a bare runner, and dragging
-          # luci-base + libuci in to satisfy an import would make this gate a distro build.
-          #
-          # What this gate is for is OUR syntax — a stray brace in a .ut that would make every
-          # user's LuCI fall back to another theme. So stub the two modules and point ucode's
-          # search path at them: the import resolves, the template is parsed for real, and the
-          # stub bodies are never executed (-c compiles, it does not run). If a template ever
-          # imports something new, the compile fails loudly here rather than on the router —
-          # which is exactly the behaviour we want out of a missing stub.
-          STUB="$RUNNER_TEMP/ucode-stubs"
-          mkdir -p "$STUB/luci"
-          printf '%s\n' \
-            'function cursor() { return { get: function() { return null; } }; }' \
-            'export { cursor };' > "$STUB/uci.uc"
-          printf '%s\n' \
-            'function getuid() { return 0; }' \
-            'function getspnam() { return null; }' \
-            'export { getuid, getspnam };' > "$STUB/luci/core.uc"
-
-          n=0
-          for f in $(find luci-theme-footstrap/ucode -name '*.ut'); do
-            "$UC" -T -c -L "$STUB/*.uc" -o /dev/null "$f" || { echo "template does not compile: $f"; exit 1; }
-            n=$((n + 1))
-          done
-          [ "$n" -gt 0 ] || { echo "no .ut templates found — the glob is wrong"; exit 1; }
-          echo "$n ucode template(s) compile."
-
-      # The SDK finds packages by GREPPING their Makefiles for `call BuildPackage` (include/scan.mk).
-      # luci.mk is what calls it here, and the grep cannot see through an include — so a comment
-      # that looks like boilerplate is the only thing that puts this package in the SDK's list.
-      # It was deleted as boilerplate once; both builds went red with an error naming nothing.
-      - name: The SDK can see the package at all
-        run: sh tools/scan-marker.sh
-
-      # rpcd SKIPS an acl.d file it cannot parse, and says nothing. A trailing comma here means the
-      # theme's ACL grant is given to nobody: Save-as-default dies with "Access denied", and neither
-      # the package build nor any other gate notices.
-      - name: rpcd ACL is valid JSON
-        run: |
-          set -eu
-          for f in luci-theme-footstrap/root/usr/share/rpcd/acl.d/*.json; do
-            python3 -m json.tool "$f" >/dev/null || { echo "invalid JSON: $f"; exit 1; }
-            echo "ok: $f"
-          done
-
-      # install.sh verifies the THEME asset's ed25519 signature, so it embeds the release public key —
-      # it runs from `curl | sh` before any package exists. The reference copy is release.pub at the
-      # repo root. A divergence looks exactly like the attack the key stops (the installer rejects every
-      # release with "BAD SIGNATURE"), so compare the two. The SAME key signs the updater's releases in
-      # its own repo (VizzleTF/luci-app-footstrap-updater), where the package ships its own copy.
-      - name: The installer embeds the release key
-        run: |
-          set -eu
-          pub=release.pub
-          want=$(grep -v '^untrusted comment:' "$pub" | tr -d '\n')
-          [ -n "$want" ] || { echo "no key line in $pub"; exit 1; }
-          # every key-shaped line in the installer, deduplicated: a stale copy left behind by a
-          # rotation shows up here as a second value, not as a silent second key
-          got=$(grep -oE 'RW[A-Za-z0-9+/=]{40,}' install.sh | sort -u)
-          [ "$got" = "$want" ] || {
-            echo "install.sh embeds a different release key than release.pub"
-            echo "  release.pub: $want"
-            echo "  installer:   ${got:-<none>}"
-            exit 1
-          }
-          echo "release key matches in both copies."
-
-      - name: Build the stylesheet
-        run: luci-theme-footstrap/build-css.sh /tmp/cascade.css
-
-      - name: CSS/JS audit (undefined vars, shadowed rules, stray !important, colour literals)
-        run: python3 tools/audit.py --strict
-
-      # A string wrapped in _() that has no translation renders in ENGLISH, silently —
-      # which is how the whole Appearance popover stayed English on a Russian LuCI while
-      # every string in it was already marked translatable. Fails if the .pot is stale
-      # (a string was added without rerunning update-po.sh) or if any msgstr is empty.
-      - name: i18n (translation catalogue current and complete)
-        run: |
-          sudo apt-get update && sudo apt-get install -y gettext
-          luci-theme-footstrap/update-po.sh --check
-
-  # npm-based gates. These live HERE and nowhere else: the OpenWrt buildbot has no
-  # node, and luci.mk never needs one — it copies htdocs/ and ucode/ verbatim. Nothing
-  # in package.json is shipped.
+  # npm-based gates, and they live here and nowhere else: the OpenWrt buildbot has no
+  # node, luci.mk never needs one, and nothing in package.json is shipped.
   lint:
     name: Lint + accessibility
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
-
       - run: npm ci
 
-      # Through package.json, not a second copy of the globs: CI is the run that matters, so a
-      # glob restated here goes on linting the old path after package.json moves. This is also
-      # what gives lint:js / lint:css a caller.
-      - name: ESLint (theme JS)
-        run: npm run lint:js
+      # Through package.json, not a second copy of the globs: a glob restated here
+      # goes on linting the old path after package.json moves.
+      - run: npm run lint:js
+      - run: npm run lint:css
 
-      - name: Stylelint (styles/ tree)
-        run: npm run lint:css
+      - run: npx playwright install --with-deps chromium
+      - run: node tools/a11y-gallery.mjs
+      - run: node tools/export-tier.mjs
+      - run: node tools/css-metrics.mjs
+      - run: node tools/fs-orphans.mjs
+      - run: node tools/css-dup.mjs
+      - run: node tools/css-i18n.mjs
+      - run: node tools/mirror.mjs
+      - run: node tools/axes.mjs
+      - run: node tools/chrome-fence.mjs
 
-      - name: Install Chromium for axe
-        run: npx playwright install --with-deps chromium
+      # jsmin-verify finds the shipped JS itself; JSMIN names the binary to test.
+      - run: echo "JSMIN=$(sh tools/build-jsmin.sh)" >> "$GITHUB_ENV"
+      - run: node tools/jsmin-verify.mjs
 
-      # docs/gallery.html renders every widget LuCI (or a third-party luci-app-*) can
-      # emit, and it is a STATIC file — so the whole widget surface of the theme can be
-      # audited here with no router, no session and no network. Runs the full
-      # {light,dark} x {footstrap,hicontrast} matrix, because a palette switcher
-      # multiplies the contrast matrix and that is exactly where failures hide.
-      - name: axe-core (WCAG 2.2 AA over the widget gallery, all palettes x modes)
-        run: node tools/a11y-gallery.mjs
-
-      # The --*-color-* export tier is the contract with OTHER people's packages (podkop,
-      # justclash, stock firewall.js all read it), and axe cannot see it: those widgets are
-      # not in our gallery. Proves every level is legible as text AND as a fill, and that
-      # high/medium/low are actually three different colours — they were once three aliases
-      # of one token, and a flat colour passes every contrast check there is.
-      - name: "Export tier (third-party contract: AA + the ramp is not flat)"
-        run: node tools/export-tier.mjs
-
-      # A ratchet on the sheet's SHAPE. Every `!important` fights an inline or unlayered
-      # declaration that no cascade layer can outrank — stylelint stops a NEW file adding one,
-      # this stops the allowlisted files quietly growing more.
-      # The COUNT lives in tools/css-metrics.mjs and is deliberately not restated here: this
-      # comment said "33 by design" long after three flags in base were removed and the tool
-      # ratcheted to 30, i.e. it named a budget a reader would have used to justify adding one.
-      - name: "CSS metrics ratchet (!important, specificity, empty rules)"
-        run: node tools/css-metrics.mjs
-
-      # Dead CSS, scoped to OUR namespace — and the scoping is what makes it safe. The
-      # coverage contract (CLAUDE.md) forbids pruning a selector just because no page we can
-      # see renders it: a third-party luci-app-* renders widgets stock LuCI never does. But
-      # NOBODY else can emit an `fs-` class, so inside that namespace "nothing we ship emits
-      # it" really does mean dead. This is the check that catches a selector left behind when
-      # its markup is deleted.
-      - name: "Orphaned fs-* selectors (dead CSS in our own namespace)"
-        run: node tools/fs-orphans.mjs
-
-      # The same declaration body written under two DIFFERENT guards (a media query vs an
-      # attribute selector, or two @container queries). No linter can flag this — to a
-      # cascade-aware tool both rules are required, since only one ever matches — yet it is
-      # exactly the shape that drifts. Every such body must be folded into one rule, or
-      # PINNED with @mirror; an unpinned duplicate fails the build.
-      - name: "Duplicated declaration bodies across guards"
-        run: node tools/css-dup.mjs
-
-      # A CSS rule may READ data-title (`content: attr(data-title)`) but must never MATCH its
-      # value. LuCI fills it from the column heading, so the value is the TRANSLATION on a
-      # localised router — an English literal in a selector matches nothing and the rule dies
-      # in ~40 languages while looking alive on the dev box (issue #7: the MAC nowrap was
-      # "fixed", released, and the reporter still had his MAC split in two). Worse, for tables
-      # LuCI builds from the heading's innerText the value is what the heading RENDERS, and the
-      # theme uppercases `.th` — so `[data-title="Description"]` matched ZERO elements
-      # everywhere. Anchor on the column; no translation can reorder one.
-      - name: "No CSS rule keys off a translated data-title value"
-        run: node tools/css-i18n.mjs
-
-      # ...and the other half of that: css-dup only sees bodies that are IDENTICAL, so it
-      # goes quiet the moment two copies drift — exactly when it should shout. This holds
-      # every @mirror-pinned copy byte-identical, across CSS *and* shell (install.sh and
-      # footstrap-selfupdate.sh cannot share a file: the installer is `curl | sh` and runs
-      # before the package that would contain the library exists).
-      - name: "@mirror (pinned duplication stays byte-identical)"
-        run: node tools/mirror.mjs
-
-      # The Appearance axes are implemented TWICE and cannot be merged: head.ut stamps :root
-      # before the first paint (inline, before the module loader exists) and fs-prefs.js /
-      # fs-update.js apply them live. This holds the two to the same contract —
-      # key names, attributes, custom properties, ranges, the rounding default, and the
-      # ordering rule (custom property BEFORE the attribute, or a reload paints one frame with
-      # the previous hue). Its only symptom is a single wrong frame, which nobody reports.
-      - name: "Appearance axes (the pre-paint template agrees with the live appliers)"
-        run: node tools/axes.mjs
-
-      # The chrome is defended from third-party CSS in three places that must name the same element:
-      # header.ut's markup, fs-sheets.js's fence (what keeps an app's !important out of the menu) and
-      # 10-chrome.css's pin (what closes inheritance, which a fence cannot). Same shape as the axes
-      # gate, and proven: breaking the fence constant to `.fs-sidebarTYPO` left the menu completely
-      # unprotected while check, jsmin-verify and eslint all exited 0. A stale copy just stops
-      # defending — no error, no symptom, until the menu breaks on a user's router next to an app we
-      # have never seen. Also holds the dark-mode guard to stampDark: luci-app-openclash writes
-      # data-darkmode onto :root from seven templates, and an unguarded dialect loses the user's
-      # explicit Light choice to their OS setting.
-      - name: "chrome fence (the menu's defences still match the menu)"
-        run: node tools/chrome-fence.mjs
-
-      # /etc/config/footstrap ships as a stub and is WRITTEN AT RUNTIME by Appearance -> "Save as
-      # default". Undeclared, the package manager replaces it on upgrade — so the theme's own
-      # one-click Update wiped the admin's saved defaults, silently, reporting success. Nothing
-      # observable fails: the wipe lands on someone else's router, months later.
-      - name: "conffiles (a shipped /etc/config/* survives an upgrade)"
-        run: node tools/conffiles.mjs
-
-      # THE GATE THAT MAKES SHIPPING MINIFIED JS SAFE.
-      #
-      # luci.mk minifies our JS with jsmin on the buildbot. jsmin decides whether a `/`
-      # opens a regex or a division from a ONE-character lookback against a fixed
-      # allow-list that contains neither `n` (from `return`) nor `>` (from `=>`), so
-      # `return /re/` can make it swallow the rest of the file — WHILE EXITING 0
-      # (openwrt/luci#8299, #8020, #8021, #8256). A non-zero exit code proves nothing.
-      #
-      # So we build the exact same jsmin from luci-base/src/jsmin.c and prove its output
-      # is TOKEN-IDENTICAL to our source. eslint's `wrap-regex` stops the hazardous shape
-      # being written in the first place; this proves it never got through.
-      #
-      # jsmin.c is byte-identical on openwrt-24.10 and master (checked), so one build
-      # covers both releases we support.
-      #
-      # PINNED TO A COMMIT AND CHECKSUMMED, because of what this file IS: we download C
-      # source over the network, compile it, and then run it as the gate that decides
-      # whether our shipped JavaScript is safe. Fetching that from a moving `master` means
-      # the gate is whatever upstream happened to push — and a bad day there (or a poisoned
-      # raw.githubusercontent cache) silently rewrites the check itself. A commit SHA is
-      # immutable; the sha256 says so out loud. Bump both together, deliberately.
-      # The commit and the checksum come from luci-theme-footstrap/luci-upstream.pin, which
-      # update-po.sh sources for ITS borrowed tool as well — one file, so bumping upstream
-      # cannot leave half the toolchain behind.
-      - name: Build jsmin (the same one the buildbot uses)
-        run: |
-          set -eu
-          . ./luci-theme-footstrap/luci-upstream.pin
-          curl -fsSL --proto '=https' --proto-redir '=https' -o /tmp/jsmin.c \
-            "https://raw.githubusercontent.com/openwrt/luci/$LUCI_PIN/modules/luci-base/src/jsmin.c"
-          echo "$JSMIN_SHA256  /tmp/jsmin.c" | sha256sum -c -
-          cc -O2 -o /tmp/jsmin /tmp/jsmin.c
-
-      # WHICH JS SHIPS — asked once, of the thing that decides it.
-      #
-      # The two steps below used to spell out the same pair of globs
-      # (resources/*.js + resources/view/status/include/*.js) independently, so a new JS
-      # directory had to be remembered in both — and if it was added to only one, the other
-      # silently stopped covering it. There is no list: luci.mk copies htdocs/ wholesale, so
-      # every .js under htdocs IS the shipped set. Ask the filesystem.
-      - name: Resolve the shipped JS
-        run: |
-          set -eu
-          # The theme ships browser JS that luci.mk minifies with jsmin. Ask the filesystem — a file
-          # left out silently drops the exit-0 jsmin-corruption check on its JS. (The optional updater
-          # moved to its own repo, which runs this same check there.)
-          files=$(find luci-theme-footstrap/htdocs -name '*.js' | sort | tr '\n' ' ')
-          [ -n "$files" ] || { echo "found no shipped JS — the glue is broken, not the theme"; exit 1; }
-          echo "SHIPPED_JS=$files" >> "$GITHUB_ENV"
-          echo "$files" | tr ' ' '\n'
-
-      - name: jsmin equivalence (minified JS must be the same program)
-        env:
-          JSMIN: /tmp/jsmin
-        run: node tools/jsmin-verify.mjs $SHIPPED_JS
-
+  # No key anywhere in this job. `owfeed check` is build, sign, index and doctor on
+  # keys owfeed generates and throws away, so a pull request exercises the pipeline
+  # that publishes rather than a second one that drifts from it.
   build:
-    needs: [check, lint]
     name: Build the packages
+    needs: [check, lint]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      # Node is a BUILD DEPENDENCY now, where it used to be lint-only. tools/stage.sh
-      # minifies the shipped JS with terser, and on the SDK path that was optional — luci.mk
-      # fell back to jsmin for a buildbot with no node. There is no jsmin here, so a missing
-      # node is a failed build rather than a quietly larger package.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
-      # --ignore-scripts: the staging tools are the only thing needed out of the tree, and a
-      # lifecycle script from a dev dependency has no business running in the job that
-      # produces the released bytes.
+      # --ignore-scripts: a dev dependency's lifecycle script has no business running
+      # in the job that produces the released bytes.
       - run: npm ci --ignore-scripts
 
-      # owfeed's own setup action, which downloads a release binary and VERIFIES IT AGAINST
-      # GITHUB'S BUILD ATTESTATION before it is executed or put on PATH. That is the reason to
-      # prefer it over the `go install …@<sha>` this used to run: `go install` compiles the tool
-      # on every job and trusts whatever the module proxy returns for that revision, while the
-      # SHA256SUMS beside a release is not a check either — the same host serves both, so
-      # whoever can replace the binary replaces the checksum next to it. This project already
-      # makes that argument about GitHub's asset digest and about OpenWrt's `sha256sums`; an
-      # attestation is signed by GitHub's identity and logged publicly, which is evidence from
-      # somewhere the release host does not control. The action pins the WORKFLOW that may have
-      # produced it, not merely the repository.
-      #
-      # Pinned by TAG, like the release action below, which is the ecosystem's own convention
-      # for VizzleTF/* references and needs saying because the argument usually runs the other
-      # way. A third-party tag is moved by a third party — pin those by commit. This one is
-      # under the same ownership as this repository AND the binary it installs is verified
-      # against a build attestation before it runs, so the tag is a convenience over a SHA
-      # rather than the trust decision. `version:` names the same release: the ref pins the
-      # action, the input pins the binary, and the two must move together.
-      - uses: owfeed/owfeed/setup@v0.3.2
+      - uses: owfeed/owfeed/setup@v0.5.0
         with:
-          version: v0.3.2
+          version: v0.5.0
 
-      # SOURCE_DATE_EPOCH is what makes the packages reproducible. Both containers record
-      # mtimes, and a package's identity is a hash over its payload — so without a fixed
-      # epoch, byte-identical content rebuilds into a package that claims to be new, which
-      # invalidates every cached copy and makes an integrity check report tampering that did
-      # not happen.
-      #
-      # The COMMIT's timestamp, not the job's: identity should depend on what went into the
-      # package and on nothing else, so re-running this workflow over the same commit has to
-      # produce the same bytes.
-      - name: Resolve package version and build epoch
-        run: |
-          set -euo pipefail
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "FOOTSTRAP_VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
-          else
-            echo "FOOTSTRAP_VERSION=0.$(date +%y%m%d).${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-          fi
-          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      # The commit's timestamp, not the job's: a package's identity is a hash over its
+      # payload and mkpkg records mtimes, so re-running a release over the same commit
+      # has to produce the same bytes.
+      - run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
 
-      # THE HALF owfeed DELIBERATELY DOES NOT DO — it packages a directory, it does not build
-      # one. This is the Makefile's Build/Prepare, step for step: concatenate the stylesheet
-      # out of styles/, mangle the private --fs-* names, minify the JS, strip the comments out
-      # of the templates and the shell, stamp FS_VERSION. It also extracts the lifecycle
-      # scripts from the Makefile's own defines, so the SDK path and this one cannot disagree
-      # about what happens at install time.
-      - name: Stage the rootfs
-        run: ./tools/stage.sh
+      - run: ./tools/stage.sh
+      - run: owfeed plan
+      - run: owfeed check
+      - run: owfeed build
+      - run: sh tools/check-packages.sh
 
-      # WITHOUT --frozen-lock, deliberately. That flag re-derives owfeed.lock from
-      # downloads.openwrt.org and fails if it has moved — which is right for a repository that
-      # PUBLISHES a feed, where the set of architectures covered is part of the contract with
-      # subscribers. This one publishes two noarch packages as release assets and fans out into
-      # no architecture at all, so the flag would buy nothing and cost a red release every time
-      # OpenWrt cuts a point release (a `~ 25.12 point release x -> y` diff is enough to stale
-      # the lock). The committed lock still pins which SDK's host apk is used, so the toolchain
-      # does not float either way.
-      - name: Build both packages
-        run: owfeed build
-
-      # The catalogue is a BUILD ARTEFACT, not a file in git, and a silently missing one is
-      # the bug class this area keeps producing: every _() then renders its English msgid and
-      # nothing complains. Asserted against the tree the package actually carries, not against
-      # what the build printed.
-      #
-      # Read out of the ipk because that container is a plain tar and the apk is not — both
-      # legs are packed from the SAME staged directory by the SAME catalogue compiler, so one
-      # is enough to prove the compile happened.
-      #
-      # Counted against the languages in the tree, so adding one and forgetting to wire it up
-      # fails here rather than shipping English to those users.
-      - name: The translation catalogues are in the packages
-        run: |
-          set -euo pipefail
-          want=$(find luci-theme-footstrap/i18n -mindepth 2 -name '*.po' | wc -l)
-          [ "$want" -gt 0 ] || { echo "no .po files found — the glob is wrong, not the build"; exit 1; }
-          got=$(tar -xzOf dist/all/luci-theme-footstrap_*_all.ipk ./data.tar.gz \
-                | tar -tz | grep -c 'i18n/footstrap-theme\..*\.lmo' || true)
-          [ "$got" = "$want" ] || {
-            echo "the package carries $got catalogue(s) for $want language(s) — it would ship"
-            echo "some of them untranslated, which reports nothing at runtime"
-            exit 1
-          }
-          echo "$got translation catalogue(s) in the package."
-
-      # EXACTLY ONE theme package per format, by NAME. Load-bearing, not tidiness: a
-      # self-updater in the field resolves the theme by the name-anchored regex
-      # /luci-theme-footstrap[-_][^/]*\.EXT$/ and takes head -1, so a stray extra asset
-      # matching it (a per-language luci-i18n-footstrap package, issue #6) would be mis-picked
-      # and installed as the theme. A router's installed updater cannot be fixed remotely, so
-      # the RELEASE has to stay pickable by the script already there.
-      #
-      # The two formats land in dist/noarch (apk) and dist/all (ipk): apk derives a package's
-      # filename from its name and version alone, so two architectures cannot share a
-      # directory. THE LAYOUT IS KEPT — `owfeed release` in the next job walks exactly those
-      # per-architecture directories to build the manifest, and the flattening happens there,
-      # after it, because a release asset has no directory.
-      - name: Count the assets
-        run: |
-          set -euo pipefail
-          find dist -mindepth 2 -type f \( -name '*.apk' -o -name '*.ipk' \) -print
-          for ext in apk ipk; do
-            n=$(find dist -mindepth 2 -type f -name "*.$ext" | wc -l)
-            [ "$n" = 1 ] || { echo "expected exactly 1 .$ext (theme), got $n — see the note above"; exit 1; }
-            m=$(find dist -mindepth 2 -type f -name "*.$ext" -exec basename {} \; \
-                | grep -cE "^luci-theme-footstrap[-_][^/]*\.$ext$" || true)
-            [ "$m" = 1 ] || { echo "expected exactly 1 luci-theme-footstrap .$ext, got $m"; exit 1; }
-          done
-
-      # dist/root and dist/scripts are staging, not output: the payload tree and the lifecycle
-      # scripts extracted from the Makefile. Uploading them would put the whole rootfs into an
-      # artifact the release job downloads and then globs.
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
+      # dist/root and dist/scripts are staging, not output.
+      - uses: actions/upload-artifact@v7
         with:
-          name: luci-theme-footstrap-packages
+          name: owfeed-packages
           path: |
             dist/noarch
             dist/all
           if-no-files-found: error
 
-
-  # THE OTHER HALF. Everything above proves the package was BUILT correctly -- the catalogues
-  # are in it, the asset names are pickable, the signature verifies. None of it proves the
+  # Everything above proves the package was BUILT correctly. None of it proves the
   # thing a user cares about: that installing it produces a router whose pages render.
+  # owlab boots a real OpenWrt, installs the package and logs into LuCI to fetch the
+  # theme's own pages — an unauthenticated request is a redirect to the login form,
+  # which is why a hand-written curl reports 403 on a healthy page.
   #
-  # owlab is the tool for that, and this repository is the one place in the ecosystem that can
-  # demonstrate the whole path end to end. It runs a real OpenWrt container, installs the
-  # package, LOGS INTO LuCI as root and fetches the theme's own pages -- an unauthenticated
-  # request to /cgi-bin/luci/admin is a redirect to the login form, which is why a hand-written
-  # curl reports 403 on a healthy page and why this is not three lines of shell.
-  #
-  # No key exists anywhere in this job. That is owlab's half of the boundary: it asserts that a
-  # package works and never that anyone should trust it.
+  # No key exists anywhere in this job: it asserts that a package works, never that
+  # anyone should trust it.
   verify:
     name: The package works on a real router
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
       - uses: actions/download-artifact@v8
         with:
-          name: luci-theme-footstrap-packages
+          name: owfeed-packages
           path: dist/
 
-      # The freshly built package, installed from a file. This is the gate on this change:
-      # it fails the run before anything is released.
-      #
-      # A theme has no service and no uci section to assert on, so the assertions are the
-      # pages it exists to style, plus the file the self-updater resolves the theme by.
-      # ONE RELEASE PER STEP, because the container is not interchangeable: 25.12 is apk and
-      # 24.10 is opkg, and neither will install the other's file. A single step naming both
-      # releases and one glob installs an .apk on an opkg router and fails there -- which is
-      # exactly what the first version of this job did.
-      #
-      # `version:` pins the owlab BINARY as well as the action ref. Left out, the action
-      # installs `latest` and warns, and a CI result that can change without a commit is not
-      # a result.
+      # ONE RELEASE PER STEP: 25.12 is apk and 24.10 is opkg, and neither will install
+      # the other's file.
       - name: Install this build on 25.12 and render its pages
-        uses: owfeed/owlab/action@v0.5.1
+        uses: owfeed/owlab/action@v0.5.3
         with:
-          version: v0.5.1
+          version: v0.5.3
           releases: "25.12.5"
           install: dist/noarch/luci-theme-footstrap-*.apk
+          # `exec ucode -T -c` is LuCI's own trycompile, run against the templates as
+          # INSTALLED and with the router's real luci.core and uci — so it needs no
+          # stubs and no interpreter of ours. It replaces a gate that cloned ucode at a
+          # pinned commit and built it with cmake, which ran in CI and nowhere else.
+          # A stray brace here is the one way this repository can ship a completely
+          # broken UI with everything else green: LuCI falls back to another theme and
+          # says nothing.
           assert: |
             package luci-theme-footstrap
             file /www/luci-static/footstrap/cascade.css
             http 200 /cgi-bin/luci/admin/status/overview
             http 200 /cgi-bin/luci/admin/system/system
+            exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 
       - name: Install this build on 24.10 and render its pages
-        uses: owfeed/owlab/action@v0.5.1
+        uses: owfeed/owlab/action@v0.5.3
         with:
-          version: v0.5.1
+          version: v0.5.3
           releases: "24.10.8"
           install: dist/all/luci-theme-footstrap_*.ipk
+          # The same compile as the 25.12 leg, and not redundant: the templates are
+          # identical but the interpreters are not, and a construct 25.12's ucode
+          # accepts is not proof that 24.10's does.
           assert: |
             package luci-theme-footstrap
             file /www/luci-static/footstrap/cascade.css
             http 200 /cgi-bin/luci/admin/status/overview
             http 200 /cgi-bin/luci/admin/system/system
+            exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 
-      # And the published channel, by NAME, out of the signed index -- which is a different
-      # claim entirely. Installing a file proves the package works; installing it by name
-      # proves the index parses, the URL does not redirect somewhere apk will not follow, and
-      # the key on the router matches the one that signed it. A file install cannot fail in
-      # any of those ways, so nothing else in this ecosystem checks them from a router.
+      # And the published channel, by NAME, out of the signed index — a different
+      # claim entirely: it proves the index parses, the URL does not redirect
+      # somewhere apk will not follow, and the key on the router matches the one that
+      # signed it.
       #
-      # It tests what is ALREADY LIVE, not this build, so it neither runs on a pull
-      # request nor fails the job. That second half was missing and it mattered: a feed
-      # whose DNS was mid-migration turned every push to this repository red and, because
-      # `release` needs this job, would have blocked a theme release on the health of a
-      # channel this repository does not own and a contributor cannot fix. A check that
-      # can only be repaired somewhere else is a warning, not a gate.
-      #
-      # It still runs and still says so loudly when the published channel is broken --
-      # that is worth knowing, and nothing else in the ecosystem asks a router whether the
-      # published theme installs by name.
+      # It tests what is ALREADY LIVE rather than this build, so it never fails the
+      # job: a feed mid-DNS-migration would otherwise block a theme release on the
+      # health of a channel this repository does not own.
       - id: feed-key
-        name: Fetch the feed's public key
         if: github.event_name != 'pull_request'
-        run: |
-          if curl -fsSL -o "$RUNNER_TEMP/owfeed-packages.pem" \
-               https://repo.owfeed.org/owfeed-packages.pem; then
-            echo "reachable=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "reachable=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::the published feed is unreachable at https://repo.owfeed.org -- \
-          this build is unaffected, but subscribers cannot update until it is back"
-          fi
+        run: sh tools/feed-key.sh
 
       - name: Assert the feed serves a working theme
         if: github.event_name != 'pull_request' && steps.feed-key.outputs.reachable == 'true'
         continue-on-error: true
-        uses: owfeed/owlab/action@v0.5.1
+        uses: owfeed/owlab/action@v0.5.3
         with:
-          version: v0.5.1
+          version: v0.5.3
           releases: "25.12.5"
           feed: https://repo.owfeed.org/releases/25.12/x86_64/packages.adb
           feed-key: ${{ runner.temp }}/owfeed-packages.pem
@@ -584,290 +193,33 @@ jobs:
             package luci-theme-footstrap
             http 200 /cgi-bin/luci/admin/status/overview
 
+  # The only job that holds a key, and `needs: [build, verify]` is what keeps a tag
+  # from publishing a package no router has installed.
   release:
-    name: Attach packages to release
+    name: Sign and publish
     needs: [build, verify]
     if: startsWith(github.ref, 'refs/tags/v')
-    # the one job that writes anything — see the workflow-level `permissions` above
     permissions:
       contents: write
-    runs-on: ubuntu-latest
-    steps:
-      # Checkout (this job only downloaded artifacts before) — the release body is
-      # built from the tag's CHANGELOG section, so the repo has to be present.
-      - name: Checkout
-        uses: actions/checkout@v7
+    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.0
+    secrets:
+      # The repository already has this key, and owfeed-packages pins its public half.
+      sign-key: ${{ secrets.OWFEED_AUTHOR_KEY }}
+      usign-key: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
+    with:
+      owfeed-version: v0.5.0
+      # Writes dist/notes.md and dist/install.sh. Both are assets as well as
+      # documentation: the theme's confirm dialog reads the notes from the release
+      # rather than from the API, and the installer is served from the release CDN
+      # because raw.githubusercontent is rate-limited for the very user who most
+      # needs it (issue #17).
+      pre-release: sh tools/stage-release.sh
+      sign-also: install.sh
+      notes-file: dist/notes.md
+      verify-with: release.pub
 
-      # The same pin the build job installs, and the argument for verifying it is stronger
-      # here: this job runs `owfeed release`, which writes the signed manifest — the tool that
-      # decides what a router is TOLD about the bytes it is about to install, in the one job
-      # that can reach the signing key.
-      - uses: owfeed/owfeed/setup@v0.3.2
-        with:
-          version: v0.3.2
-
-      # One artifact now — both formats come out of a single build job, where they used to come
-      # out of a two-leg matrix. merge-multiple flattens the artifact's own wrapper directory
-      # away and leaves what is INSIDE it alone, so dist/noarch and dist/all arrive intact,
-      # which is the layout `owfeed release` walks.
-      - name: Download the packages
-        uses: actions/download-artifact@v8
-        with:
-          path: dist
-          merge-multiple: true
-
-      # Turn the tag's CHANGELOG section into a short release body: one line per
-      # change (the bold lead of each bullet), grouped by Fixed/Added/…, with the
-      # install commands tucked into a collapsed block. The verbose rationale in the
-      # changelog is for maintainers and stays out of the release notes.
-      #
-      # It runs HERE, before the manifest and the signing, because the notes are now an
-      # ASSET too (dist/notes.md): the confirm dialog reads them from the release instead of
-      # from `@.body`, which needed api.github.com. The copy in $RUNNER_TEMP is still what
-      # fills the release page's body.
-      - name: Build release notes from the CHANGELOG
-        run: |
-          set -eu
-          ver="${GITHUB_REF_NAME#v}"
-          sh tools/release-notes.sh "$ver" > "$RUNNER_TEMP/notes.md"
-          mkdir -p dist
-          cp "$RUNNER_TEMP/notes.md" dist/notes.md
-          cat "$RUNNER_TEMP/notes.md"
-
-      # THE INSTALLER SHIPS AS A RELEASE ASSET, and that is not a convenience — it is half of
-      # issue #17. The documented one-liner fetches install.sh from raw.githubusercontent.com,
-      # and GitHub's 2025-05-08 changelog names raw as one of the three things it rate-limits
-      # for unauthenticated callers (alongside HTTPS clone and the REST API). So the very user
-      # whose IP has run out of API budget — CGNAT, a shared exit, a DNS-based unblocker — can
-      # fail to download the installer that was supposed to rescue them. Release assets are
-      # served from the release CDN and carry no such budget (measured: `releases/latest/
-      # download/…` answers 302 with no x-ratelimit-* header at all), so the README points at
-      # this asset and raw is only the fallback.
-      - name: Stage the installer as an asset
-        run: cp install.sh dist/install.sh
-
-      # SIGN EACH PACKAGE WITH THIS REPOSITORY'S OWN KEY, before the manifest is written.
-      #
-      # Order matters: `owfeed release` records each package's size and sha256, and signing
-      # appends bytes. Sign afterwards and the manifest describes files that no longer exist.
-      #
-      # WHAT THIS SIGNATURE IS FOR, given that the feed already signs its index. The index proves
-      # that owfeed-packages published a file; it says nothing about who built it, and it can only
-      # be checked against that feed. This one is inside the .apk, reaches the router, and can be
-      # verified by anyone holding the public half — which is pinned in the feed's keys/ and lives
-      # in this repository's history. It is what makes "this package came from here" checkable by
-      # someone who does not trust the feed at all.
-      #
-      # It is NOT what makes the package installable: apk takes its trust from the signed index,
-      # and a package with no signature at all installs, upgrades and removes normally. This is
-      # evidence, not a gate.
-      #
-      # EC prime256v1, a different key and a different job from the usign one below: usign signs
-      # the manifest that describes the release, this signs the artifacts inside it.
-      - name: Sign the packages with this repository's key
-        env:
-          OWFEED_AUTHOR_KEY: ${{ secrets.OWFEED_AUTHOR_KEY }}
-        run: |
-          set -euo pipefail
-          [ -n "${OWFEED_AUTHOR_KEY:-}" ] || {
-            echo "OWFEED_AUTHOR_KEY is not set. owfeed-packages refuses a package it cannot"
-            echo "attribute, so a release signed by nobody is one the feed will not carry."
-            exit 1
-          }
-          owfeed sign --key env:OWFEED_AUTHOR_KEY dist
-
-      # THE MANIFEST AND THE SIGNATURES — `owfeed release`, where this job used to hand-roll
-      # both.
-      #
-      # WHAT THE MANIFEST IS FOR: it takes api.github.com out of the install and update path
-      # entirely. Everything the installer and the self-updater used to read out of the release
-      # API (the tag, each asset's name, its size and its sha256) is one small text file,
-      # published as an asset and SIGNED. A router fetches it from
-      #   https://github.com/<repo>/releases/latest/download/manifest.txt
-      # which is the release CDN, not the API: no 60-req/hour budget, and `latest` resolves the
-      # same way `/releases/latest` does (a pre-release is still skipped). It is LINE-ORIENTED
-      # text, not JSON, so the router parses it with awk and the scripts need no jsonfilter.
-      #
-      # WHY THE SIGNATURE IS NOT REDUNDANT WITH THE sha256 GitHub PUBLISHES: GitHub COMPUTES its
-      # digest from the uploaded asset. Replace the asset — a leaked write-scoped PAT is enough,
-      # no CI run involved — and the digest is recomputed to match, so the checksum then verifies
-      # the attacker's package. The signing key is not in the repository and a secret cannot be
-      # read back out of GitHub, so that same swap fails here.
-      #
-      # WHY usign AND NOT THE PACKAGE MANAGER'S OWN: `apk add` verifies against /etc/apk/keys,
-      # and putting our key there would make footstrap a trust anchor for EVERYTHING the router
-      # installs — far more authority than a theme needs. opkg (24.10) cannot verify a standalone
-      # .ipk at all. usign, which base-files puts on every OpenWrt image, verifies both formats
-      # with a key that authorises nothing but this package.
-      #
-      # `repo` is in the file and the reader checks it. One key signs BOTH repos' manifests, so
-      # without that line a manifest lifted from the updater's release would verify perfectly
-      # under the theme's name. A signature proves WHO wrote a file, never WHAT IT IS ABOUT.
-      #
-      # It runs in the RELEASE job, not the build job: the build job also runs on every
-      # pull_request, and a secret must never be reachable from a fork's code.
-      #
-      # THE SECRET IS BASE64 OF usign's two-line secret-key FILE — one canonical form, so nothing
-      # has to guess whether newlines survived a copy-paste — and owfeed wants the file itself,
-      # hence the decode. It never touches the disk: written to a step-scoped env var, which is
-      # not in the process table and not in the build tree.
-      - name: Build and sign the release manifest
-        env:
-          FOOTSTRAP_USIGN_KEY: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
-        run: |
-          set -euo pipefail
-          [ -n "${FOOTSTRAP_USIGN_KEY:-}" ] || {
-            echo "FOOTSTRAP_USIGN_KEY is not set — a release without a signature is a release"
-            echo "no current installer will accept. Refusing to publish one."
-            exit 1
-          }
-          # --sign-also carries the installer. `owfeed release` signs the packages it finds in
-          # the per-architecture directories and the manifest that names them; install.sh is not
-          # a package and does not belong in that inventory — a feed ingesting this release has no
-          # use for an installer. It is signed because it is executable code handed to root.
-          # Nothing can check that signature during `curl | sh` — the script IS the first thing
-          # that arrives — so it is not a link in the install chain; it is there so a careful
-          # admin can verify the installer out of band before running it (the README's
-          # verify-then-run recipe), and so the Pages mirror can carry install.sh.sig beside it.
-          #
-          # This used to be a second step that built usign from luci-upstream.pin and signed the
-          # file by hand. Same key, same signature, one fewer place holding the secret.
-          OWFEED_RELEASE_KEY="$(printf '%s' "$FOOTSTRAP_USIGN_KEY" | base64 -d)" \
-            owfeed release --repo "$GITHUB_REPOSITORY" --tag "$GITHUB_REF_NAME" \
-                           --sign-also install.sh
-          cat dist/manifest.txt
-
-      # Flatten, then VERIFY EVERY SIGNATURE WITH THE KEY THE ROUTER WILL USE.
-      #
-      # owfeed leaves the packages in dist/noarch and dist/all — apk derives a package's filename
-      # from its name and version alone, so two architectures cannot share a directory — and a
-      # release asset has no directory at all. The manifest names the files without paths, which
-      # is what a router asks for, so flattening is what makes the two agree.
-      #
-      # The verify is not ceremony: a secret rotated in GitHub without the public half being
-      # committed would publish a release that every installer rejects, and the rejection reads
-      # "BAD SIGNATURE" — indistinguishable from the attack the signature exists to stop. Catch
-      # it here, where it is a red build instead of a scare. release.pub is the shipped copy, the
-      # same bytes install.sh embeds (the `check` job holds those two together).
-      - name: Verify what is about to be published
-        run: |
-          set -euo pipefail
-          # Named extensions, not "every file one level down". `owfeed build` also leaves the
-          # staged payload under dist/root when it is run in a working tree, and a blanket move
-          # would sweep the whole rootfs into the release — measured, not guessed. In this job
-          # only the two package directories are downloaded, and the glob says so out loud.
-          for f in dist/*/*.apk dist/*/*.ipk dist/*/*.sig; do
-            [ -e "$f" ] || continue
-            mv "$f" dist/
-          done
-          rmdir dist/*/ 2>/dev/null || true
-          ls -l dist
-
-          U="$(tools/build-usign.sh "$RUNNER_TEMP/usign")"
-          n=0
-          for p in dist/*.apk dist/*.ipk dist/manifest.txt dist/install.sh; do
-            [ -e "$p" ] || continue
-            [ -s "$p.sig" ] || { echo "no signature for $(basename "$p")"; exit 1; }
-            "$U" -V -q -m "$p" -x "$p.sig" -p release.pub || {
-              echo "signature does not verify against release.pub — the secret and the shipped"
-              echo "key disagree: $(basename "$p")"
-              exit 1
-            }
-            echo "verified: $(basename "$p")"
-            n=$((n + 1))
-          done
-          # 4: the theme in each of apk and ipk, plus manifest.txt and install.sh. The same key
-          # signs the updater's releases in its own repo, which is what lets a router cross from
-          # an asset published here to one published there without re-trusting anything.
-          [ "$n" -ge 4 ] || { echo "expected 4 signed files (2 packages + manifest + installer), got $n"; exit 1; }
-
-          # Named explicitly, not merely counted. The count above passes if some OTHER four files
-          # signed, and a release whose manifest is unsigned is one every manifest-aware router
-          # REFUSES — which reads as "BAD SIGNATURE", i.e. exactly like an attack.
-          [ -s dist/manifest.txt.sig ] || { echo "manifest.txt.sig was not produced"; exit 1; }
-
-          # The manifest must NAME the theme, not merely exist: one that names no package makes
-          # every router report "no asset for this release" — the shape of the failure this file
-          # exists to prevent.
-          grep -q '^pkg luci-theme-footstrap ' dist/manifest.txt || {
-            echo "the manifest names no theme package — refusing to publish it"; exit 1; }
-
-          # A FIELDED SELF-UPDATER PARSES THIS POSITIONALLY: `$1=="pkg" && $2==name && $3==ext
-          # {print $4, $5, $6}`, and it cannot be fixed remotely. owfeed puts the architecture
-          # AFTER those six for exactly that reason, so assert the six are still file/size/sha —
-          # a field inserted ahead of them would make every router fetch a URL that 404s.
-          awk '$1=="pkg" && $2=="luci-theme-footstrap" {
-                 if ($4 !~ /\.(apk|ipk)$/ || $5 !~ /^[0-9]+$/ || $6 !~ /^[0-9a-f]{64}$/) {
-                   print "manifest field order changed: a fielded reader would take " $4 \
-                         " for a filename, " $5 " for a size and " $6 " for a digest"; exit 1 }
-                 n++
-               } END { if (n < 2) { print "the manifest names " n " theme package(s), want 2"; exit 1 } }' \
-            dist/manifest.txt
-
-          # The .sig assets must not disturb the asset pick of a self-updater ALREADY IN THE
-          # FIELD: it resolves the theme by /luci-theme-footstrap[-_][^/]*\.EXT$/ and takes
-          # head -1. Assert the name-anchored regex resolves to exactly ONE asset (a .sig ends in
-          # .EXT.sig, so it never matches `…\.EXT$`) — re-checked on the FINAL set, after signing.
-          #
-          # NOTE the field-migration seam of the split: a fielded self-updater ALSO looks for
-          # /luci-app-footstrap-updater[-_]…/ in THIS repo's release, and now finds none — which
-          # its non-fatal updater leg skips (the router keeps its current updater and still gets
-          # theme updates). To move onto the new repo's updater, a router re-runs install.sh once.
-          for ext in apk ipk; do
-            re="^luci-theme-footstrap[-_][^/]*\.$ext$"
-            m=$(ls dist | grep -cE "$re") || true
-            [ "$m" = 1 ] || {
-              echo "a fielded self-updater matching /$re/ would pick $m assets, want exactly 1:"
-              ls dist | grep -E "$re" || true
-              exit 1
-            }
-          done
-
-      # Pinned by COMMIT, not by the `v3` tag: this is the only third-party action in the workflow
-      # and the only step in the only job that holds `contents: write`, so whoever can move that tag
-      # can publish assets under our release. It never sees the signing secret (step-scoped env) and
-      # so cannot re-sign, which is what keeps the blast radius to "assets a router will refuse" —
-      # but a tag is a mutable pointer and this is the wrong place to trust one. (= tag v3.)
-      #
-      # PUBLISHED AS A DRAFT, then flipped in the next step. `latest` moves to a release the moment
-      # it is published, and this action creates the release FIRST and uploads the assets after —
-      # so a router polling in that window resolves `releases/latest/download/manifest.txt` to a
-      # release that has no manifest yet and reports a hard error. A draft is not `latest`, so the
-      # switch happens once, with every asset already in place. The same window existed for the
-      # .apk assets before the manifest; nothing had ever closed it.
-      - name: Attach to release (draft)
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228
-        with:
-          files: dist/*
-          body_path: ${{ runner.temp }}/notes.md
-          draft: true
-
-      # The one instant at which `latest` moves. Everything a router will fetch is already uploaded.
-      - name: Publish the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh release edit "$GITHUB_REF_NAME" --draft=false --repo "$GITHUB_REPOSITORY"
-          # Prove the thing this release exists to serve actually resolves, from the URL a router
-          # uses — not from the API. A 404 here means every install and every update check would
-          # have failed, and this is the last moment it is still a red build rather than a bug
-          # report.
-          for i in 1 2 3 4 5; do
-            if curl -fsSL --retry 2 -o "$RUNNER_TEMP/mf.check" \
-                 "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/manifest.txt"; then
-              break
-            fi
-            [ "$i" = 5 ] && { echo "releases/latest/download/manifest.txt does not resolve"; exit 1; }
-            sleep 5
-          done
-          diff -u dist/manifest.txt "$RUNNER_TEMP/mf.check" || {
-            echo "the manifest served by latest/download is not the one we just built"; exit 1; }
-          echo "manifest.txt resolves through releases/latest/download and matches."
-
-  # Refresh the GitHub Pages mirror of the release metadata (manifest.txt + its signature + the
-  # notes) now that the release is published. Called rather than triggered: `on: release` never
-  # fires for a release created with GITHUB_TOKEN.
+  # Refresh the Pages mirror of the release metadata. Called rather than triggered:
+  # `on: release` never fires for a release created with GITHUB_TOKEN.
   pages:
     name: Refresh the Pages mirror
     needs: release
