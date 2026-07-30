@@ -199,7 +199,8 @@ jobs:
       contents: write
     uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.0
     secrets:
-      sign-key: ${{ secrets.FOOTSTRAP_SIGN_KEY }}
+      # The repository already has this key, and owfeed-packages pins its public half.
+      sign-key: ${{ secrets.OWFEED_AUTHOR_KEY }}
       usign-key: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
     with:
       owfeed-version: v0.5.0
