@@ -85,9 +85,9 @@ jobs:
       # in the job that produces the released bytes.
       - run: npm ci --ignore-scripts
 
-      - uses: owfeed/owfeed/setup@v0.4.5
+      - uses: owfeed/owfeed/setup@v0.5.0
         with:
-          version: v0.4.5
+          version: v0.5.0
 
       # The commit's timestamp, not the job's: a package's identity is a hash over its
       # payload and mkpkg records mtimes, so re-running a release over the same commit
@@ -131,9 +131,9 @@ jobs:
       # ONE RELEASE PER STEP: 25.12 is apk and 24.10 is opkg, and neither will install
       # the other's file.
       - name: Install this build on 25.12 and render its pages
-        uses: owfeed/owlab/action@v0.5.1
+        uses: owfeed/owlab/action@v0.5.3
         with:
-          version: v0.5.1
+          version: v0.5.3
           releases: "25.12.5"
           install: dist/noarch/luci-theme-footstrap-*.apk
           # `exec ucode -T -c` is LuCI's own trycompile, run against the templates as
@@ -151,9 +151,9 @@ jobs:
             exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 
       - name: Install this build on 24.10 and render its pages
-        uses: owfeed/owlab/action@v0.5.1
+        uses: owfeed/owlab/action@v0.5.3
         with:
-          version: v0.5.1
+          version: v0.5.3
           releases: "24.10.8"
           install: dist/all/luci-theme-footstrap_*.ipk
           assert: |
@@ -177,9 +177,9 @@ jobs:
       - name: Assert the feed serves a working theme
         if: github.event_name != 'pull_request' && steps.feed-key.outputs.reachable == 'true'
         continue-on-error: true
-        uses: owfeed/owlab/action@v0.5.1
+        uses: owfeed/owlab/action@v0.5.3
         with:
-          version: v0.5.1
+          version: v0.5.3
           releases: "25.12.5"
           feed: https://repo.owfeed.org/releases/25.12/x86_64/packages.adb
           feed-key: ${{ runner.temp }}/owfeed-packages.pem
