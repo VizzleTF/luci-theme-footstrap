@@ -36,6 +36,3 @@ __pycache__/
 /docker/.env
 # built by docker/hwsim-up.sh for the WSL host kernel; not portable, not source
 /docker/hwsim/*.ko
-
-# Stub modules tools/check-ucode.sh mounts into the container.
-.owfeed-ucode-stubs/

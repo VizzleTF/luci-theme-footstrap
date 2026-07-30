@@ -25,7 +25,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: sh tools/check-shell.sh
-      - run: sh tools/check-ucode.sh
       - run: sh tools/scan-marker.sh
       - run: sh tools/check-release-key.sh
       - run: luci-theme-footstrap/build-css.sh /tmp/cascade.css
@@ -67,30 +66,48 @@ jobs:
       - run: echo "JSMIN=$(sh tools/build-jsmin.sh)" >> "$GITHUB_ENV"
       - run: node tools/jsmin-verify.mjs
 
-  # Build, check against throwaway keys, and on a tag sign and publish. The shape is
-  # owfeed's, shared with every other package repository; what is specific to this one
-  # is the three inputs below.
-  package:
-    name: Package
+  # No key anywhere in this job. `owfeed check` is build, sign, index and doctor on
+  # keys owfeed generates and throws away, so a pull request exercises the pipeline
+  # that publishes rather than a second one that drifts from it.
+  build:
+    name: Build the packages
     needs: [check, lint]
-    permissions:
-      contents: write
-    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.0
-    secrets:
-      sign-key: ${{ secrets.FOOTSTRAP_SIGN_KEY }}
-      usign-key: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
-    with:
-      owfeed-version: v0.5.0
-      stage: npm ci --ignore-scripts && ./tools/stage.sh
-      # Writes dist/notes.md and dist/install.sh. Both are assets as well as
-      # documentation: the theme's confirm dialog reads the notes from the release
-      # rather than from the API, and the installer is served from the release CDN
-      # because raw.githubusercontent is rate-limited for the very user who most
-      # needs it (issue #17).
-      pre-release: sh tools/stage-release.sh
-      sign-also: install.sh
-      notes-file: dist/notes.md
-      verify-with: release.pub
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      # --ignore-scripts: a dev dependency's lifecycle script has no business running
+      # in the job that produces the released bytes.
+      - run: npm ci --ignore-scripts
+
+      - uses: owfeed/owfeed/setup@v0.4.5
+        with:
+          version: v0.4.5
+
+      # The commit's timestamp, not the job's: a package's identity is a hash over its
+      # payload and mkpkg records mtimes, so re-running a release over the same commit
+      # has to produce the same bytes.
+      - run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+
+      - run: ./tools/stage.sh
+      - run: owfeed plan
+      - run: owfeed check
+      - run: owfeed build
+      - run: sh tools/check-packages.sh
+
+      # dist/root and dist/scripts are staging, not output.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: owfeed-packages
+          path: |
+            dist/noarch
+            dist/all
+          if-no-files-found: error
 
   # Everything above proves the package was BUILT correctly. None of it proves the
   # thing a user cares about: that installing it produces a router whose pages render.
@@ -102,7 +119,7 @@ jobs:
   # anyone should trust it.
   verify:
     name: The package works on a real router
-    needs: package
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -119,11 +136,19 @@ jobs:
           version: v0.5.1
           releases: "25.12.5"
           install: dist/noarch/luci-theme-footstrap-*.apk
+          # `exec ucode -T -c` is LuCI's own trycompile, run against the templates as
+          # INSTALLED and with the router's real luci.core and uci — so it needs no
+          # stubs and no interpreter of ours. It replaces a gate that cloned ucode at a
+          # pinned commit and built it with cmake, which ran in CI and nowhere else.
+          # A stray brace here is the one way this repository can ship a completely
+          # broken UI with everything else green: LuCI falls back to another theme and
+          # says nothing.
           assert: |
             package luci-theme-footstrap
             file /www/luci-static/footstrap/cascade.css
             http 200 /cgi-bin/luci/admin/status/overview
             http 200 /cgi-bin/luci/admin/system/system
+            exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 
       - name: Install this build on 24.10 and render its pages
         uses: owfeed/owlab/action@v0.5.1
@@ -164,11 +189,35 @@ jobs:
             package luci-theme-footstrap
             http 200 /cgi-bin/luci/admin/status/overview
 
+  # The only job that holds a key, and `needs: [build, verify]` is what keeps a tag
+  # from publishing a package no router has installed.
+  release:
+    name: Sign and publish
+    needs: [build, verify]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.0
+    secrets:
+      sign-key: ${{ secrets.FOOTSTRAP_SIGN_KEY }}
+      usign-key: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
+    with:
+      owfeed-version: v0.5.0
+      # Writes dist/notes.md and dist/install.sh. Both are assets as well as
+      # documentation: the theme's confirm dialog reads the notes from the release
+      # rather than from the API, and the installer is served from the release CDN
+      # because raw.githubusercontent is rate-limited for the very user who most
+      # needs it (issue #17).
+      pre-release: sh tools/stage-release.sh
+      sign-also: install.sh
+      notes-file: dist/notes.md
+      verify-with: release.pub
+
   # Refresh the Pages mirror of the release metadata. Called rather than triggered:
   # `on: release` never fires for a release created with GITHUB_TOKEN.
   pages:
     name: Refresh the Pages mirror
-    needs: package
+    needs: release
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/pages.yml
     permissions:
