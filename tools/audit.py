@@ -35,9 +35,9 @@ BASE = STYLES / "base"
 # utilities; 95-a11y-media needs it because the flag INVERTS the layer order — the
 # only way one rule can stop animations declared in base as well as in theme.
 BANG_OK = ({"90-responsive.css", "20-overview.css", "95-a11y-media.css", "45-misc.css",
-            # 65-dropdown carries the widget's three `ul` margin flags: ui.js writes `margin`
-            # INLINE on an open list, and only an author !important outranks an inline style.
-            # They moved here with the machinery absorbed from base/80-dropdown.css (deleted).
+            # 65-dropdown carries the widget's `ul` margin flag: ui.js writes `margin` INLINE on
+            # an open list, and only an author !important outranks an inline style. It moved here
+            # with the machinery absorbed from base/80-dropdown.css (deleted).
             "65-dropdown.css"}
            | {p.name for p in (STYLES / "base").glob("*.css")})
 

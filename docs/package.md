@@ -21,13 +21,15 @@ luci-theme-footstrap/
 ├── styles/               CSS SOURCE. Not shipped — luci.mk does not copy it
 ├── i18n/                 translation catalogue. The directory name is NOT `po/` — see below
 │   ├── templates/footstrap.pot
-│   └── ru/footstrap.po
+│   ├── ru/footstrap.po
+│   └── es/footstrap.po
 ├── htdocs/luci-static/   → /www/luci-static/
 │   ├── footstrap/        cascade.css (GENERATED, gitignored), fonts/, logo.svg, cats.svg
 │   └── resources/        menu-footstrap.js, menu-footstrap-common.js, fs-*.js
 ├── root/                 → /
 │   ├── etc/uci-defaults/30_luci-theme-footstrap
 │   ├── etc/config/footstrap                      empty stub, written at runtime
+│   ├── lib/upgrade/keep.d/luci-theme-footstrap   what sysupgrade carries across a flash
 │   └── usr/share/rpcd/acl.d/luci-theme-footstrap.json
 └── ucode/template/themes/footstrap/    → /usr/share/ucode/luci/template/…
     ├── header.ut  footer.ut  sysauth.ut
@@ -100,8 +102,8 @@ The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sour
 2. **`build-css.sh`** → `cascade.css` in the build tree. `cat`/`awk` only, so it runs on the
    OpenWrt buildbot with no host toolchain.
 3. **`mangle-tokens.sh`** — shorten the private `--fs-*` names, 16% of the sheet.
-   **Before** step 5 on purpose: the reserved set is derived by reading the JS and the templates,
-   so it must see them whole. It reads them from the **source** tree, never from
+   **Before** step 4 on purpose: the reserved set is derived by reading the JS and the templates,
+   so it must see them whole — and step 4 is what strips the template comments. It reads them from the **source** tree, never from
    `PKG_BUILD_DIR` — in CI the build tree's JS has already been through terser, its comments are
    gone, and five names that only appear in a comment would stop being reserved. That made the
    shipped sheet depend on *who* built it.
@@ -196,6 +198,12 @@ had no `.conffiles` entry beside base-files' and dnsmasq's.
 Nothing observable fails when this regresses — the wipe happens on somebody else's router, months
 later — so `npm run conffiles` gates it: every shipped `/etc/config/*` must be declared.
 
+The uploaded background is the sibling case with the other answer. `/etc/footstrap/login-bg` is
+written at runtime too, but it lives outside `/etc/config`, so a package upgrade never touches it
+and a conffile entry would be rejected (the package does not ship that path). What *would* eat it is
+a firmware **sysupgrade**, which keeps only what is listed — hence
+`root/lib/upgrade/keep.d/luci-theme-footstrap`.
+
 ## ACL
 
 `root/usr/share/rpcd/acl.d/luci-theme-footstrap.json` grants what the Appearance popover needs to
@@ -210,7 +218,10 @@ The `file.exec` grant for **self-update** is a different one and lives in the up
 see [updates.md](updates.md).
 
 rpcd **skips an unreadable file in `acl.d` and says nothing**, so a stray comma means the grant
-is issued to nobody and nothing else notices. CI validates the JSON.
+is issued to nobody and nothing else notices. `npm run acl` (`tools/check-acl.sh`, also a step in
+CI's `check` job) parses every shipped `acl.d/*.json` and additionally rejects a document that
+parses but grants nothing — a list instead of an object, or an entry with neither `read` nor
+`write`, both of which rpcd accepts just as quietly.
 
 A related trap the popover had to solve: `rpc.js` only raises on the ubus status code when the
 declaration asks it to (`reject: true`). Without it, a per-config ACL refusal — `uci` granted,
@@ -228,7 +239,11 @@ that CI **downloads and RUNS** as gates:
   `_('…')` does neither.
 
 Taken from a moving `master`, these gates would be "whatever upstream pushed last"; the sha256
-says so out loud. The same file pins `UCODE_PIN` (the interpreter CI compiles templates with),
-`USIGN_PIN` (so the signer in CI and the verifier in the field are the same code) and
-`OPENWRT_KEYRING_PIN` — the commit of `openwrt/keyring` the release SDK's signing keys are read
-from, pinned from a *different* host than the tarball they verify.
+says so out loud. The same file pins `USIGN_PIN` (so the signer in CI and the verifier in the field
+are the same code) and `OPENWRT_KEYRING_PIN` — the commit of `openwrt/keyring` the release SDK's
+signing keys are read from, pinned from a *different* host than the tarball they verify.
+
+It deliberately pins **no ucode**. The template compile-check moved into the `verify` containers,
+where the router's own interpreter runs it against the installed templates on both release lines
+([ci.md](ci.md)) — so there is no interpreter to build and no commit to keep current, and the file
+says so in place to stop the pin coming back.

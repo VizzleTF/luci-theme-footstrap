@@ -66,8 +66,8 @@ where `--fs-text` is nearly white.
 The binding constraint: apps read a level as `color:` about as often as `background:`, so **every**
 level must pass AA as text on `--fs-bg`/`--fs-panel`/`--fs-panel2` **and** carry a readable
 `--on-*-color` as a fill. `tools/export-tier.mjs` proves all of it across
-{footstrap, hicontrast} × {light, dark}, including that the ramp is not flat — the only check that
-can catch flatness. Borders are exempt from the text half: `--border-color-low` may legitimately
+{footstrap, hicontrast} × {light, dark} × a sweep of tint hues — 28 combinations and ~1900 contrast
+checks today — including that the ramp is not flat, the only check that can catch flatness. Borders are exempt from the text half: `--border-color-low` may legitimately
 fade into the surface, which is what a hairline is for.
 
 ## Palettes

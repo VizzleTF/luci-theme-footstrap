@@ -99,7 +99,8 @@ a layer. The inversion is what makes that file possible. `audit.py` holds the al
 ## The build
 
 `build-css.sh` concatenates the directories and — **without `--dev`** — runs the result through
-two awk passes: **~357 KB → 134 894 B**. That is not cosmetic: uhttpd serves
+two awk passes: **~357 KB → 135 734 B** (measured 2026-07-31; the figure moves with the tree, the
+ratio does not). That is not cosmetic: uhttpd serves
 `/www/luci-static/*.css` with no gzip, so every byte travels as-is. (The package build shortens
 the private token names on top of that, landing around 120 KB — see [package.md](package.md).)
 

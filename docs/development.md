@@ -34,7 +34,7 @@ boxes cover the pairs.
 
 | id | distro | release | manager | LuCI |
 |---|---|---|---|---|
-| `owrt2512` | OpenWrt | 25.12.4 | apk | http://localhost:8025 |
+| `owrt2512` | OpenWrt | 25.12.5 | apk | http://localhost:8025 |
 | `owrt2410` | OpenWrt | 24.10.8 | opkg | http://localhost:8024 |
 | `imm2512` | ImmortalWrt | 25.12.1 | apk | http://localhost:8026 |
 | `imm2410` | ImmortalWrt | 24.10.6 | opkg | http://localhost:8027 |
@@ -144,12 +144,14 @@ npm run check
 ```
 
 One run covers lint, `audit.py --strict`, the CSS ratchets, orphans, duplicates, `@mirror`, the
-Appearance axes, the chrome fence, the export tier, i18n and axe-core. The full table of what each
-gate holds is in [conventions.md](conventions.md).
+Appearance axes, the chrome fence, the export tier, the rpcd ACL, i18n and axe-core. The full table
+of what each gate holds is in [conventions.md](conventions.md).
 
 `build-css.sh` additionally checks its own brace balance and refuses to write a suspiciously short
-file. CI runs two more gates that need a binary built from the upstream pin
-(`tools/jsmin-verify.mjs` and `ucode -T -c` over every template).
+file. Two gates run in CI and not here: `tools/jsmin-verify.mjs`, which needs a jsmin built from
+`luci-upstream.pin`, and `ucode -T -c` over every template, which the `verify` containers run
+against the installed theme — the same command as above, so locally it is one `owlab exec` rather
+than a build.
 
 Nothing in `package.json` reaches the package: the OpenWrt buildbot has no node.
 
@@ -161,17 +163,21 @@ userland of each release, and assert. Run it before you push anything that chang
 ```sh
 ./tools/stage.sh && owfeed build       # writes dist/noarch/*.apk and dist/all/*.ipk
 
-owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' \
+UT=/usr/share/ucode/luci/template/themes/footstrap
+
+owlab test --release 25.12.5 --install 'dist/noarch/luci-theme-footstrap-*.apk' \
   --assert 'package luci-theme-footstrap' \
   --assert 'file /www/luci-static/footstrap/cascade.css' \
   --assert 'http 200 /cgi-bin/luci/admin/status/overview' \
-  --assert 'http 200 /cgi-bin/luci/admin/system/system'
+  --assert 'http 200 /cgi-bin/luci/admin/system/system' \
+  --assert "exec for f in $UT/*.ut; do ucode -T -c -o /dev/null \"\$f\" || exit 1; done"
 
 owlab test --release 24.10.8 --install 'dist/all/luci-theme-footstrap_*.ipk' \
   --assert 'package luci-theme-footstrap' \
   --assert 'file /www/luci-static/footstrap/cascade.css' \
   --assert 'http 200 /cgi-bin/luci/admin/status/overview' \
-  --assert 'http 200 /cgi-bin/luci/admin/system/system'
+  --assert 'http 200 /cgi-bin/luci/admin/system/system' \
+  --assert "exec for f in $UT/*.ut; do ucode -T -c -o /dev/null \"\$f\" || exit 1; done"
 ```
 
 **Two invocations, one per format, and not one run with two `--release` flags.** `--install` is a
@@ -179,13 +185,18 @@ glob over the host, evaluated once for every router, so `dist/*/luci-theme-foots
 apk box an ipk as well and the install fails on both (measured: `0 of 2 routers passed`). Name the
 format that matches the release.
 
-Those are the same four assertions the `verify` job makes (`.github/workflows/build.yml`), which
+Those are the same five assertions the `verify` job makes (`.github/workflows/build.yml`), which
 installs per format for the same reason — keep the two in step, and add an assertion here whenever
 you add one there. The assertion vocabulary is `package <name>`, `file <path>`,
-`http <code> <path>` and `service <name>`.
+`http <code> <path>`, `service <name>` and `exec <shell>`.
+
+The fifth one is the template gate, and it is why `verify` and not `check` compiles the `.ut`
+files: on the container it is the router's **own** `ucode`, with the real `luci.core` and `uci`
+behind it, so nothing has to be built from a pin and nothing has to be stubbed. It runs on both
+legs — the templates are identical but the interpreters are not.
 
 **Pin exact point releases.** `--release 25.12` or a snapshot works today and fails within days;
-`owlab.yaml` pins `25.12.4` / `24.10.8` for the same reason.
+`owlab.yaml` pins `25.12.5` / `24.10.8` for the same reason.
 
 For anything that is not a pass/fail assertion — a layout change, a popover, an axis — drive the
 running container by hand:
@@ -237,7 +248,7 @@ Through owlab:
 
 ```sh
 owlab build                       # target taken from the first router in owlab.yaml
-owlab build --arch x86_64 --release 25.12.4
+owlab build --arch x86_64 --release 25.12.5
 owlab install owrt2512 dist/luci-theme-footstrap-*.apk
 owlab exec owrt2512 -- 'apk del luci-theme-footstrap'
 ```

@@ -11,7 +11,7 @@ Read this before your first patch. For what the theme *is*, start at
 
 ```sh
 npm run check        # every gate below, in one run; must exit 0 before you push
-owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' \
+owlab test --release 25.12.5 --install 'dist/noarch/luci-theme-footstrap-*.apk' \
   --assert 'package luci-theme-footstrap' \
   --assert 'http 200 /cgi-bin/luci/admin/status/overview'
 ```
@@ -83,9 +83,15 @@ in `base` beats important in `theme`. Two consequences:
 - A legitimate flag fights only what layers cannot outrank: inline `style=` and **unlayered**
   rules injected by an app.
 
-The one sanctioned exception is `theme/95-a11y-media.css`: `prefers-reduced-motion` has to kill
-animations declared in `base` too, and only an important declaration reaches back a layer.
-`audit.py` keeps the allowlist (`BANG_OK`); `css-metrics` caps the count at **26**.
+The one flag sanctioned against *our own* rules is `theme/95-a11y-media.css`:
+`prefers-reduced-motion` has to kill animations declared in `base` too, and only an important
+declaration reaches back a layer. Everything else on the allowlist fights something outside the
+cascade — `theme/90-responsive` and `pages/20-overview` outrank a `style=` written by `29_ports.js`
+and `ui.js`, `theme/45-misc` widens the box the realtime graphs size inline, `theme/65-dropdown`
+carries the `ul` margin flag against `ui.js`'s inline `margin`, and `styles/base` keeps the six
+`.left`/`.right`/… forcing utilities plus two inline-style fighters. `audit.py` keeps that list
+(`BANG_OK`), `.stylelintrc.json` states the reason for each file, `npm run bang-ok` holds the two in
+step, and `css-metrics` caps the total at **26**.
 
 **Win on specificity, never on source order.** Two rules with the same specificity where the
 later one is load-bearing is the same failure as 220 `!important`, only quieter. Cap:
@@ -255,7 +261,8 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `lint` | eslint over `htdocs/` and `ucode/`, stylelint over `styles/` — correctness only, not formatting |
 | `audit` | `audit.py --strict`: undefined `var()`, shadowed declarations, export-tier reads, dead base declarations, stray `!important`, colour literals |
 | `css-metrics` | ratchet: `!important` ≤ 26, max specificity `[1,7,0]`, 0 empty rules |
-| `css-orphans` | dead `fs-*` selectors, both directions |
+| `css-orphans` | dead `fs-*` selectors — it **gates** the forward direction (styled, emitted by nothing) and **reports** the reverse, where an unstyled class is often legitimate (a JS hook, an element riding on inherited styles). A new name in the reverse list wants a look or a line in `JUSTIFIED_UNSTYLED`; it does not fail the build |
+| `acl` | every shipped `acl.d/*.json` parses **and** grants something — rpcd skips an unreadable file silently |
 | `css-dup` | identical declaration bodies under different guards |
 | `mirror` | `@mirror`-pinned copies still byte-identical |
 | `bang-ok` | every `!important` sits in an allowlisted file |
@@ -268,5 +275,7 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `i18n` | `.pot` current, no empty `msgstr` |
 | `a11y` | axe-core WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast} × {untinted,60°,260°} |
 
-Two more run in CI only, because they need a binary built from the upstream pin:
-`tools/jsmin-verify.mjs` and `ucode -T -c` over every template.
+Two more run in CI only. `tools/jsmin-verify.mjs` needs a jsmin built from the commit in
+`luci-upstream.pin`. `ucode -T -c` over every template runs inside the `verify` containers, against
+the installed theme with the router's own interpreter — which is also how you run it locally
+(`owlab exec … ucode -T -c`), so nothing here has to build one.

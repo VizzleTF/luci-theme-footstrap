@@ -117,7 +117,7 @@ defaults:
       ipk: https://github.com/SaltyMonkey/justclash/releases/download/v0.73.0/luci-app-justclash-0.73.0-r1-all.ipk
     # ssclash embeds the Ace editor, which inserts its stylesheets as the FIRST child of
     # <head> — and lazily, adding more on first hover. That is the one adversary that can
-    # invert the cascade layer order (docs/17), and neither of the two above can produce it:
+    # invert the cascade layer order (docs/css.md), and neither of the two above can produce it:
     # a sheet that lands ahead of cascade.css is a different attack on the chrome from a
     # sheet that outranks it. Reproduced here before the fix, and it stays for the next one.
     - name: luci-app-ssclash
@@ -126,7 +126,7 @@ defaults:
 
 routers:
   - id: owrt2512
-    release: "25.12.4"
+    release: "25.12.5"
     ports: { http: 8025, ssh: 2225 }
 
   - id: owrt2410

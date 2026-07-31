@@ -32,28 +32,36 @@ therefore to the lifecycle scripts of every dev dependency.
 
 ## `check` — gates without node
 
-Needs only `sh`, `awk`, `python3`, `perl` and (for the templates) `cmake`. Seconds to run, and it
-cannot break the OpenWrt buildbot, where node does not exist and never will.
+Needs only `sh`, `awk`, `python3` and `perl`. Seconds to run, and it cannot break the OpenWrt
+buildbot, where node does not exist and never will.
 
-1. **`sh -n`** over every package script, `install.sh`, `tools/*.sh` and the uci-defaults. `tools/`
-   is in the glob because `release-notes.sh` runs **only** in the `release` job, so a syntax error
-   there used to surface at the most expensive possible moment.
-2. **Template compilation.** Builds `ucode` from the commit pinned in `luci-upstream.pin` and runs
-   `ucode -T -c` (LuCI's own trycompile) over every `.ut`. The `luci.core`/`uci` imports are router
-   runtime and do not exist on a runner, so they are **stubbed** with `-L`: the template really
-   parses, and the stub bodies never execute (`-c` compiles, it does not run). The gate exists
-   because the templates had **no parser at all** — luci.mk copies `ucode/` verbatim, so a stray
-   brace in `header.ut` built green, shipped, and silently moved every user's LuCI to another theme.
-3. **The ACL is valid JSON.** rpcd **skips** an unreadable file in `acl.d` and says nothing: a stray
-   comma means the grant is issued to nobody, and nothing else notices.
-4. **`build-css.sh`** into a temp file — the script brace-balances its own output and refuses to
+1. **`sh -n`** over `luci-theme-footstrap/*.sh`, `install.sh` and `tools/*.sh` — the scripts that
+   never reach a router. `tools/` is in the glob because `release-notes.sh` runs **only** in the
+   `release` job, so a syntax error there used to surface at the most expensive possible moment.
+   The *payload* scripts are parsed elsewhere: `owfeed doctor` (OWF213) parses everything under
+   `files:` in the `build` job, which covers `/etc/uci-defaults/*` once `tools/stage.sh` has staged
+   it.
+2. **The scan marker.** `include/scan.mk` finds packages by grepping for `call BuildPackage`, which
+   this Makefile only reaches through `luci.mk`'s include — so the literal in its trailing comment
+   is what makes the SDK see the package at all. It has been deleted as boilerplate once.
+3. **The release key** embedded in `install.sh` is the one in `release.pub` — a divergence *within*
+   the repo would reject every release with `BAD SIGNATURE`, which looks exactly like an attack.
+4. **The ACL is valid JSON, and grants something.** rpcd **skips** an unreadable file in `acl.d` and
+   says nothing: a stray comma means the grant is issued to nobody, and nothing else notices. A
+   document that parses but is a list, or an entry with neither `read` nor `write`, is the same
+   silent outcome by another route, so `tools/check-acl.sh` checks the shape too.
+5. **`build-css.sh`** into a temp file — the script brace-balances its own output and refuses to
    write a suspiciously short file. That is a **broken-build floor** (80 KB), a correctness gate,
    not a size budget. There is no upper CSS budget any more.
-5. **`audit.py --strict`** — undefined `var()`, shadowed declarations, export-tier reads from
+6. **`audit.py --strict`** — undefined `var()`, shadowed declarations, export-tier reads from
    `styles/`, dead base declarations, stray `!important`, colour literals.
-6. **i18n**: `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty. A string
+7. **i18n**: `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty. A string
    in `_()` with no translation renders in English **silently** — which is how the whole Appearance
    popover stayed English on a Russian LuCI.
+
+**Template compilation is not here** — it runs in `verify`, on the router, with the real `ucode`.
+It used to clone the interpreter at a pinned commit and build it with cmake, with the router runtime
+stubbed out through `-L`; the container has both for free and stubs nothing.
 
 ## `lint` — the npm gates
 
@@ -95,8 +103,8 @@ mandatory **for the source**.
 There are no numeric size budgets left, for CSS, fonts or JS. Lightness is held by judgement.
 
 Most of what the other jobs run lives in `tools/*.sh` rather than inline in the YAML —
-`check-shell.sh`, `build-jsmin.sh`, `check-packages.sh`, `check-release-key.sh`, `feed-key.sh`,
-`stage-release.sh`. A step that is a script can be run by hand when it fails, and its reasoning
+`check-shell.sh`, `scan-marker.sh`, `check-acl.sh`, `check-release-key.sh`, `build-jsmin.sh`,
+`check-packages.sh`, `feed-key.sh`, `stage-release.sh`. A step that is a script can be run by hand when it fails, and its reasoning
 lives beside the code instead of inside a workflow nobody reads.
 
 ## `build` — owfeed, not the SDK
@@ -168,6 +176,24 @@ owlab action, then renders its pages. On non-PR runs it additionally fetches the
 and asserts the published feed serves a working theme.
 
 That the build "produced an ipk" proves nothing about the ipk; this job is what does.
+
+**Five assertions per leg**, and the fifth is the template gate:
+
+```
+package luci-theme-footstrap
+file /www/luci-static/footstrap/cascade.css
+http 200 /cgi-bin/luci/admin/status/overview
+http 200 /cgi-bin/luci/admin/system/system
+exec for f in …/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
+```
+
+`ucode -T -c` is LuCI's own trycompile, and it runs here against the **installed** templates with
+the router's real `luci.core` and `uci` — no interpreter of ours, no stubs. It runs on **both**
+legs: the templates are identical but the interpreters are not, and a construct 25.12's ucode
+accepts is no proof that 24.10's does. Without it a stray brace in `header.ut` ships green and
+silently moves every user's LuCI to another theme, because luci.mk copies `ucode/` verbatim and
+nothing parses it on the way. The same assertions are what `owlab test` runs locally — see
+[development.md](development.md), and keep the two in step.
 
 ## `release` — signing and publication
 

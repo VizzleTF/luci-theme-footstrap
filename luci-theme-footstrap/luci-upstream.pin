@@ -3,7 +3,7 @@
 #
 # Both are downloaded over the network and then EXECUTED as gates:
 #   - jsmin.c       compiled; decides whether our shipped JS is safe (its regex-vs-division
-#                   lookback can silently eat a file — see CLAUDE.md)
+#                   lookback can silently eat a file — see docs/conventions.md)
 #   - i18n-scan.pl  run by perl; decides whether the translation catalogue is complete
 # Off a moving `master`, the gate would be whatever upstream pushed last.
 #
@@ -16,17 +16,17 @@ LUCI_PIN=5cf20c5741dc34eea0faaf7324ef3751b05fa1f3
 JSMIN_SHA256=0568b14873f27f339cf66a9c43603d0bc8ca501ff62522ea924c6e8daf1be215
 I18N_SCAN_SHA256=a1823d1fdd942f31a105e1e53b401e146bc10527f231e016930b1a5123ef21d3
 
-# The ucode interpreter, built in CI to COMPILE-CHECK the theme's .ut templates — the same
-# class of borrowed, executed tool, so it is pinned in the same place.
+# THERE IS NO UCODE PIN, AND THAT IS DELIBERATE — do not add one back.
 #
-# Why it exists: templates are copied to the router verbatim and never parsed at build time,
-# so a stray brace in header.ut builds green, releases, and then every user's LuCI silently
-# falls back to another theme (docs/01). Nothing else here catches that — sh -n covers the
-# shell, eslint the JS, stylelint the CSS, and the .ut files had no parser at all.
+# The theme's .ut templates still have to be compile-checked: they are copied to the router
+# verbatim and never parsed at build time, so a stray brace in header.ut builds green, releases,
+# and then every user's LuCI silently falls back to another theme (docs/architecture.md).
 #
-# Pinned by COMMIT, not by a tarball sha256: a git object name IS the checksum of its content,
-# and GitHub's generated archives are not guaranteed byte-stable. (= tag v0.0.20250529.)
-UCODE_PIN=be92ebd706339fd4a848b88ee516b1ac4eb62ef8
+# That check used to live here — clone ucode at a pinned commit, build it with cmake, run
+# `ucode -T -c` with the router runtime stubbed out through `-L`. It is now the fifth assertion
+# of the `verify` job (docs/ci.md), which runs the router's OWN interpreter against the INSTALLED
+# templates, on both release lines. Nothing to pin, nothing to build, nothing stubbed — and it
+# checks the interpreter each branch actually ships rather than one commit for both.
 
 # usign — OpenWrt's ed25519 signer. CI builds it to SIGN each release package; the router
 # verifies with the /usr/bin/usign it already has (base-files depends on usign, so it is on
@@ -46,7 +46,7 @@ USIGN_PIN=c4c72b1b07945ee192361dc751291a7c98d6adcd
 # toolchain that compiles the released artifact arrived on nothing but TLS.
 #
 # The sha256 next to the tarball cannot fix that, and the reason is this project's own argument
-# against GitHub's asset digest (CLAUDE.md): `sha256sums` is served by the SAME host, from the SAME
+# against GitHub's asset digest (docs/conventions.md): `sha256sums` is served by the SAME host, from the SAME
 # directory, unsigned — whoever can replace openwrt-sdk-*.tar.zst can replace the checksum beside it,
 # and the check then verifies the attacker's SDK. It is worth keeping for a truncated download; it is
 # not a verification, and the comment in build.yml used to say it was.

@@ -56,6 +56,11 @@ const IGNORE_EXACT = new Set([
  * data attribute (`data-fs-select`, `data-fs-shell`). Matched by what PRECEDES the token, so a class
  * that happens to share a name with one of them is still seen. */
 const NOT_A_CLASS_BEFORE = /(?:--|data-)$/;
+/* A THIRD position: a module FILENAME. `head.ut` globs `/www/luci-static/resources/fs-update.js` on
+ * the server to decide whether the optional updater is installed, and that path is not markup. Keyed
+ * on the `.js` that follows the token, so a class is still seen even if a module is named after it —
+ * the same position-not-name rule as the pragmas above. */
+const NOT_A_CLASS_AFTER = /^\.js\b/;
 
 /* readdirSync(recursive) also returns the directory entries; every caller filters by extension,
  * which drops them. */
@@ -106,6 +111,7 @@ for (const f of SRC) {
 			const name = m[0];
 			if (IGNORE_EXACT.has(name)) continue;
 			if (NOT_A_CLASS_BEFORE.test(line.slice(0, m.index))) continue;
+			if (NOT_A_CLASS_AFTER.test(line.slice(m.index + name.length))) continue;
 			if (!emitted.has(name)) emitted.set(name, `${f.slice(ROOT.length + 1)}:${i + 1}`);
 		}
 	});
@@ -119,6 +125,8 @@ const JUSTIFIED_UNSTYLED = {
 	'fs-title': 'the document <h1> wrapper; hidden by the .fs-sr clip utility beside it, so it stays in the a11y tree',
 	'fs-title-main': 'that <h1>; it rides on base h1 styles and the SPA router keeps its text in sync',
 	'fs-nav-status': 'a JS hook (getElementById): the router\'s aria-live region, hidden by .fs-sr',
+	'fs-search-btn': 'a JS hook (getElementById); the button is styled by its .fs-themerow class',
+	'fs-search-opt-': 'an id PREFIX built in JS (`fs-search-opt-` + i) so the combobox can point aria-activedescendant at a row; the rows themselves are styled by .fs-search-opt',
 };
 
 const orphanCss = [...styled.keys()].filter(c => !emitted.has(c) && !EMITTED_BY_UPDATER.test(c)).sort();
