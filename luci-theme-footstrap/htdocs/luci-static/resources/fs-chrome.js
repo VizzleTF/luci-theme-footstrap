@@ -340,8 +340,13 @@ function renderChrome() {
 
 	if (L.env.dispatchpath.length >= 3) {
 		let node = root, url = '';
+		/* `node.children &&`, exactly as fs-menutree's nodeForSegs() walks it: a node without
+		 * children is an ordinary leaf, and reading `.children[…]` off one is a TypeError that
+		 * escapes renderChrome() — i.e. it takes out the mode menu, the tabs and, on the init path,
+		 * everything menu-footstrap-common wires after it. The walk already tests `node` on each
+		 * step; testing only half of what it dereferences is what left the hole. */
 		for (let i = 0; i < 3 && node; i++) {
-			node = node.children[L.env.dispatchpath[i]];
+			node = node.children && node.children[L.env.dispatchpath[i]];
 			url = url + (url ? '/' : '') + L.env.dispatchpath[i];
 		}
 		if (node)

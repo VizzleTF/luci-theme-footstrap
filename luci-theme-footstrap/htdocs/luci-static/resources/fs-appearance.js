@@ -126,12 +126,19 @@ function wireAppearance(update) {
 			const chooseBtn = E('button', { 'class': 'btn cbi-button', 'type': 'button' }, [ _('Choose image', 'footstrap') ]);
 			const removeBtn = E('button', { 'class': 'btn', 'type': 'button', 'hidden': '' }, [ _('Remove', 'footstrap') ]);
 			const chooseLabel = _('Choose image', 'footstrap');
-			/* Dim: the scrim opacity over the photo — a SHARED router value (fs-prefs writes it straight
-			 * to uci), so NOT bump()-ed. Separate from the Tint's Density above. */
+			/* Dim: the scrim opacity over the photo. An ORDINARY per-browser axis — it is in
+			 * AXIS_KEYS and in snapshotAxes(), so it moves this browser toward or away from the
+			 * router default and must therefore be bump()-ed like every other saved axis. It was
+			 * not, on the strength of a comment that said it wrote straight to uci: true until
+			 * "keep every axis per-browser until Save as default" made it a propAxis and did not
+			 * reach this file. The symptom is the one thing the Save button IS — its own status:
+			 * dragging Dim diverged from the saved default with the button still greyed
+			 * "Saved as default", so the change could not be saved until the popover was closed
+			 * and re-opened (open() calls refreshSave()). Separate from the Tint's strength above. */
 			const dimLabel = _('Dim', 'footstrap');
 			const dim = E('div', { 'class': 'fs-ap-group' }, [
 				E('div', { 'class': 'fs-ap-label' }, [ dimLabel ]),
-				widgets.sliderControl(prefs.currentPhotoDim(), 0, 100, prefs.applyPhotoDim, dimLabel, {
+				widgets.sliderControl(prefs.currentPhotoDim(), 0, 100, bump(prefs.applyPhotoDim), dimLabel, {
 					step: 5,
 					fmt: (v) => v + '%'
 				})
@@ -314,18 +321,27 @@ function wireAppearance(update) {
 	 * this through onUI(). All of it is skipped when the updater is not installed (no badge, no button,
 	 * no check). */
 	if (update) {
+		/* `hasUpdate` is read off whatever check() resolves with, and BOTH ends of that are outside
+		 * this repository: check() reaches GitHub over the network, and it ships in the optional
+		 * updater package, so its rejection contract cannot be read here and must not be assumed.
+		 * A rejection — or a resolve with nothing — was an unhandled rejection in the console of
+		 * every router whose updater could not reach the network, on a control whose entire job is
+		 * to be absent when there is nothing to report. Treat "no answer" as "no update", which is
+		 * the state the toggle-off branch above already paints. */
+		const showUpdate = (u) => {
+			const has = !!(u && u.hasUpdate);
+			btn.classList.toggle('fs-has-update', has);
+			badge.hidden = !has; updateBtn.hidden = !has;
+			if (has)
+				badge.textContent = NEW_VERSION + (u.latest ? ' (' + u.latest + ')' : '');
+		};
 		const applyUpdateUI = () => {
 			if (!update.currentUpdateCheck()) {
 				btn.classList.remove('fs-has-update');
 				badge.hidden = true; updateBtn.hidden = true;
 				return;
 			}
-			update.check().then((u) => {
-				btn.classList.toggle('fs-has-update', !!u.hasUpdate);
-				badge.hidden = !u.hasUpdate; updateBtn.hidden = !u.hasUpdate;
-				if (u.hasUpdate)
-					badge.textContent = NEW_VERSION + (u.latest ? ' (' + u.latest + ')' : '');
-			});
+			Promise.resolve(update.check()).then(showUpdate, () => showUpdate(null));
 		};
 		update.onUI(applyUpdateUI);
 		applyUpdateUI();

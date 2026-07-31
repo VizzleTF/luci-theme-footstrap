@@ -14,7 +14,13 @@
  * override, because a required LuCI module is a singleton and cannot be subclassed (docs/conventions.md).
  * Spec: docs/chrome.md */
 
-const ICONS = {
+/* A NULL PROTOTYPE, because `ICONS[key]` is a lookup by a MENU NODE NAME — a string a third-party
+ * package chooses in its menu.d, not one this theme knows. A plain object literal answers
+ * `constructor` and `__proto__` out of Object.prototype, so a node with either name resolved to a
+ * truthy non-string, skipped the `|| ICONS._default` fallback, and iconSvg() concatenated it into
+ * link.innerHTML below — `function Object() { [native code] }` and `[object Object]` respectively
+ * (measured). The dotted reads (ICONS.vpn, ICONS._default) are unaffected. */
+const ICONS = Object.assign(Object.create(null), {
 	status:   '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
 	system:   '<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>',
 	services: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.6"/>',
@@ -22,7 +28,7 @@ const ICONS = {
 	vpn:      '<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
 	docker:   '<rect x="3" y="11" width="4" height="4" rx=".7"/><rect x="8" y="11" width="4" height="4" rx=".7"/><rect x="13" y="11" width="4" height="4" rx=".7"/><rect x="8" y="6" width="4" height="4" rx=".7"/><path d="M18 13c0 4-3 6-8 6-4 0-7-2-7-4"/>',
 	_default: '<circle cx="12" cy="12" r="8.5"/>'
-};
+});
 
 function iconSvg(name) {
 	const key = String(name || '').toLowerCase();

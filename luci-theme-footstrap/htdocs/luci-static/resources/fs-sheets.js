@@ -254,13 +254,28 @@ const VIEW_SHEETS = 'style:not([data-fs-shell]), link[rel~="stylesheet"]:not([da
  * stamps the new page, so it cannot reach the next page and the document is not spent. One we could
  * not attribute (not re-hostable, so never owned: an @import at the top, a sheet built with
  * insertRule(), anything unreadable) still spends it, which is the pre-existing behaviour and the
- * conservative half. */
+ * conservative half.
+ *
+ * A SILENCED sheet is contained too, and missing that undid the whole of the above for the <link>
+ * half. Re-hosting a <link> owns the @import SHIM and silences the ORIGINAL for good (see
+ * rehostIntoThemeLayer) — but the original stays in the document and a disabled sheet still answers
+ * `cssRules`, so it re-judged as invasive on every ask, was owned by nobody, and this returned true
+ * for the life of the document. Which means the very apps this module was written for
+ * (`luci-app-banip`, `luci-app-adblock`, `luci-app-openclash` — all three inject a <link>) turned
+ * the SPA router off entirely: a full page load on every navigation, from the moment such a page was
+ * opened until the tab was closed. The <style> half never showed it, because a <style> is re-hosted
+ * IN PLACE and therefore owned.
+ *
+ * Sound for the same reason ownership is: `el.sheet.disabled = true` is what decides whether CSS
+ * paints (silence() explains why the element flag alone is not enough), and nothing re-enables it —
+ * scopeToCurrentPage() only ever touches sheets in `_owner`, and the original is deliberately not
+ * one. A sheet that paints nothing cannot poison the next page. */
 function documentPoisoned() {
 	const names = themeNames();
 	return Array.prototype.some.call(
 		document.querySelectorAll(VIEW_SHEETS),
 		(el) => !el.closest('#view')
-			&& (!names || (invasiveSheet(el, names) && !_owner.has(el))));
+			&& (!names || (invasiveSheet(el, names) && !_owner.has(el) && !_silenced.has(el))));
 }
 
 /* ---- an invasive sheet still has to render ITS page: re-host it into the theme LAYER ----
@@ -410,6 +425,11 @@ function textIsSheet(el, live) {
 	} catch (e) { return false; }
 }
 
+/* Sheets taken out of the cascade FOR GOOD — the re-hosted <link> originals. Kept because a
+ * silenced sheet is still an ELEMENT in the document that still answers `cssRules`, so every later
+ * ask re-judges it as invasive; documentPoisoned() explains what that cost. */
+const _silenced = new WeakSet();
+
 /* Take a re-hosted <link> out of the cascade — and MEAN IT.
  *
  * `el.disabled = true` alone does not do it, and the failure is silent and total. The IDL attribute
@@ -429,6 +449,7 @@ function textIsSheet(el, live) {
  * therefore already loaded by the time the immediate pass sees it.
  */
 function silence(el) {
+	_silenced.add(el);
 	el.disabled = true;
 	if (el.sheet) { el.sheet.disabled = true; return; }
 	/* no sheet yet: re-assert once there is one. `once` — the element is marked fsLayered, so this
