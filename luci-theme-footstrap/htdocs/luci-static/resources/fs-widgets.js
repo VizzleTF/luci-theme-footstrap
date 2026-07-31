@@ -52,7 +52,13 @@ function wireDismiss(opts) {
 	const active = () => (opts.when ? opts.when() : true);
 
 	document.addEventListener('click', (ev) => {
-		if (active() && !ev.target.closest(opts.inside))
+		/* `closest?.` — a document-level listener sees whatever anyone dispatches, and a click
+		 * whose target is not an Element (document itself, a text node from a synthetic dispatch)
+		 * has no closest(). The throw would come out of THIS listener, i.e. the menu would stop
+		 * closing its flyouts for the rest of the session. Every other document-level handler in
+		 * the theme already guards it (fs-router's link router, fs-search's shortcuts,
+		 * fs-select's typeahead); this one was the odd one out. */
+		if (active() && !ev.target.closest?.(opts.inside))
 			opts.close();
 	});
 

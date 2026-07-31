@@ -70,6 +70,10 @@
 	#view table.fs-dt.lases:not(.fs-stacked) .td:nth-last-child(5),
 	#view table.fs-dt.leases6:not(:has(:where(.tr.table-titles > :nth-child(6)))):not(.fs-stacked)
 		.td:is(:nth-last-child(5), :nth-last-child(4), :nth-last-child(3)) {
-		white-space: normal; overflow-wrap: anywhere;
+		/* `white-space` is the whole rule now: it is what re-permits wrapping for these columns
+		 * against the nowrap above — and the nowrap is also what keeps IPv4/MAC unbroken, so the
+		 * column plan does not rest on overflow-wrap at all. The break itself is base's default for
+		 * every cell (base/40-tables.css); the copy that stood here moved nothing against 164 cells. */
+		white-space: normal;
 	}
 }

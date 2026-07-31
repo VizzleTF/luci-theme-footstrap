@@ -10,9 +10,8 @@
 	 *   1. Copy the two hicontrast blocks below, rename data-palette to "sunset".
 	 *   2. Set every colour. Two are declared as -base with the live token derived from them,
 	 *      so the hue axes can rotate them with no second copy to keep in sync: the canvas
-	 *      --fs-bg-base → --fs-bg (TINT block) and the accent --fs-accent-base +
-	 *      --fs-accent-lt-base → --fs-accent/--fs-accent-lt (ACCENT block; accent-lt-base is
-	 *      light-only, dark inherits it).
+	 *      --fs-bg-base → --fs-bg (TINT block) and the accent --fs-accent-base → --fs-accent
+	 *      (ACCENT block).
 	 *   3. Set the four INKS (--fs-on-accent/-good/-warn/-danger) — see below.
 	 *   4. Register the name: applyPalette()/currentPalette() in fs-prefs.js and
 	 *      the head.ut pre-paint switch.
@@ -88,11 +87,19 @@
 	 * ============================================================ */
 	:root {
 		--fs-bg: var(--fs-bg-base);
-		/* The UI accent and the logo-gradient's light end, derived from the palette's own
-		 * -base hex — so the accent-hue axis (below) can rotate them without a second copy
-		 * to keep in sync. Absent an accent hue, --fs-accent IS the palette's -base value. */
+		/* The UI accent, derived from the palette's own -base hex — so the accent-hue axis
+		 * (below) can rotate it without a second copy to keep in sync. Absent an accent hue,
+		 * --fs-accent IS the palette's -base value.
+		 *
+		 * There used to be a second pair here, --fs-accent-lt / --fs-accent-lt-base, described
+		 * as "the logo gradient's light end" and rotated beside the accent. The brand mark has
+		 * no gradient: partials/brand.ut draws the OpenWrt arcs with a baked #00b5e2 and one
+		 * mode-flipped ring, so nothing read either token — the pair was defined in both
+		 * palettes, rotated through an oklch(from …) on every accent hue, and listed as a step
+		 * in "TO ADD A COLOURWAY" above, all to paint nothing. Removed rather than left as a
+		 * reserved name, because a comment promising that the accent hue moves the logo is
+		 * worse than no comment: it describes behaviour a reader can verify is absent. */
 		--fs-accent: var(--fs-accent-base);
-		--fs-accent-lt: var(--fs-accent-lt-base);
 		/* The hues the user picked, in degrees (Appearance → Accent / Tint). Declared here,
 		 * not only inline by head.ut/fs-prefs.js, so the stylesheet stands on
 		 * its own: a var() with no definition anywhere is invalid at computed-value time and
@@ -151,11 +158,9 @@
 	 * --fs-focus-ring, the exported --primary-color-*). oklch(from … l c H) keeps the
 	 * palette's exact lightness and chroma and swaps only the hue, so --fs-on-accent's
 	 * contrast (which tracks lightness) holds on every hue — the ink is NOT recomputed.
-	 * --fs-accent-lt rotates with it so the brand mark matches. Off (no data-accent) = the
-	 * palette's own accent. */
+	 * Off (no data-accent) = the palette's own accent. */
 	:root[data-accent] {
 		--fs-accent: oklch(from var(--fs-accent-base) l c var(--fs-accent-h));
-		--fs-accent-lt: oklch(from var(--fs-accent-lt-base) l c var(--fs-accent-h));
 	}
 
 	/* ---- footstrap — GitHub Primer (DEFAULT, also fills bare :root) ---- */
@@ -171,7 +176,6 @@
 		--fs-faint: #68727e;
 		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23656d76" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #0969da;
-		--fs-accent-lt-base: #54aeff;	/* logo-gradient light end (both modes) */
 		/* a tint OF --fs-accent, so mixed FROM it. It used to restate the accent's RGB as a
 		 * literal, which goes stale silently the moment the accent is recoloured (or the
 		 * accent-hue axis rotates it) — the failure that killed the *-rgb bridge. */
@@ -230,7 +234,6 @@
 		--fs-faint: #69727f;
 		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%235b6675" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #0b6fbd;
-		--fs-accent-lt-base: #7ec8ff;	/* logo-gradient light end (both modes) */
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
 		--fs-track: #eaeef4;
 		--fs-good: #0f7a52;

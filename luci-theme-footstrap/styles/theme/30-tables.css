@@ -43,9 +43,11 @@
 		border: 0; border-radius: 0; overflow: visible; background: none;
 	}
 	.cbi-section .table { margin: 0; width: 100%; }
-	/* A data table straight in #view (no section: package-manager, Startup) misses the width
-	 * above, so it sized to preferred width and overflowed the content column. */
-	#view .table[id], table.fs-dt { width: 100%; }
+	/* A data table straight in #view (no section: package-manager, Startup) misses the width above,
+	 * so it sized to preferred width and overflowed the content column — which base already fixes
+	 * for EVERY `.table` (`width: 100%`, base/40-tables.css), and has for as long as both rules have
+	 * existed. Switched off against the 24 tables that match it across eight pages: no computed
+	 * style moved, so the rule only restated a value one layer down. Removed. */
 	/* Config-table fields fill their cell — moved from base with the generic field box in
 	 * theme/60-inputs.css (in base these beat its 210px in-layer; left behind they would lose
 	 * to it by layer), together with the numeric-cell refinement below them. */
@@ -80,9 +82,14 @@
 		text-overflow: ellipsis;
 	}
 	/* width:100% cannot shrink a table below min-content — one long unbreakable value holds the
-	 * floor. Breaking values reflows it into the ~984px column instead of scrolling. DHCP leases
-	 * need finer control (only DUID/IPv6 may break, not IPv4/MAC): pages/50-leases.css. */
-	#view .table[id] .td, table.fs-dt .td { overflow-wrap: anywhere; }
+	 * floor. Breaking values reflows it into the ~984px column instead of scrolling. That break is
+	 * now the DEFAULT for every cell (base/40-tables.css), so the copy that used to sit here —
+	 * `#view .table[id] .td, table.fs-dt .td { overflow-wrap: anywhere }` — said nothing the
+	 * cascade did not already say: switched off against 1941 matching cells across eight pages at
+	 * three widths, not one computed style moved. It is gone rather than kept "for clarity",
+	 * because a second copy of a value is the drift this sheet is written to avoid. DHCP leases
+	 * still need finer control (only DUID/IPv6 may break, not IPv4/MAC) and get it from
+	 * `white-space: nowrap`, not from this property: pages/50-leases.css. */
 	.cbi-section .table .td,
 	.cbi-section .table .th {
 		padding: var(--fs-space-2-5) var(--fs-space-4) var(--fs-space-2-5) 0;

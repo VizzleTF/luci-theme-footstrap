@@ -79,11 +79,24 @@
 	 * flex row then flows them side by side until the fields overflow the card — the exact bug
 	 * a user reported. Give each title and each field its own full-width row (the same stacked
 	 * layout base already uses on a phone), left-aligned, so nothing overflows and the pairs read
-	 * top to bottom. Scoped by :has() to the abnormal multi-field case ONLY — `.cbi-value-field ~
-	 * .cbi-value-field` needs two of them — so every normal single-field row (i.e. every real form
-	 * on the router) keeps its label-beside-field layout untouched. */
-	.cbi-value:has(.cbi-value-field ~ .cbi-value-field) > .cbi-value-title,
-	.cbi-value:has(.cbi-value-field ~ .cbi-value-field) > .cbi-value-field {
+	 * top to bottom. Scoped by :has() to the abnormal multi-PAIR case ONLY, so every normal
+	 * single-field row (i.e. every real form on the router) keeps its label-beside-field layout.
+	 *
+	 * THE TEST IS THE SECOND TITLE, NOT THE SECOND FIELD, and that is the whole of this rule's
+	 * safety. `:has()` is LIVE: it re-evaluates the moment the DOM changes, so keying on
+	 * `.cbi-value-field ~ .cbi-value-field` meant any app that APPENDS a second field to a row at
+	 * runtime — a status line, an output pane, a spinner holder, all ordinary shapes — flipped the
+	 * whole row from "label beside field" to "everything stacked" under the user's finger. Measured
+	 * on the stand: pressing a button in such a row moved that button 31px DOWN with this rule and
+	 * 0px with it disabled, which is the "the buttons jump when I press them" report.
+	 *
+	 * What the rule exists for is several title/field PAIRS in one row, and a pair is announced by
+	 * its TITLE (luci-app-3ginfo-lite's SIM-card row: 3 titles, 3 fields — still matched here).
+	 * A second field with no second title is not a pair, it is an app adding something to the one
+	 * field it already had, and nothing about that asks for a re-layout. Rendered markup is matched
+	 * exactly as before; only the runtime append stops triggering it. */
+	.cbi-value:has(.cbi-value-title ~ .cbi-value-title) > .cbi-value-title,
+	.cbi-value:has(.cbi-value-title ~ .cbi-value-title) > .cbi-value-field {
 		flex: 1 1 100%;
 		margin-inline-start: 0;
 		text-align: start;
@@ -404,7 +417,10 @@
 		}
 		.cbi-value-field select option {
 			padding: var(--fs-space-2) var(--fs-space-3); border-radius: var(--fs-radius-sm); font-size: var(--fs-type);
-			color: var(--fs-text); background: transparent; min-height: 0;
+			/* no `color` here: `select option` above already sets --fs-text, and this restated it
+			 * (switched off against 174 options, nothing moved). `background: transparent` is NOT the
+			 * same — it deliberately undoes that rule's --fs-panel so the row's own hover shows. */
+			background: transparent; min-height: 0;
 		}
 		.cbi-value-field select option::checkmark { display: none; }
 		.cbi-value-field select option:hover, .cbi-value-field select option:focus-visible { background: var(--fs-panel2); }

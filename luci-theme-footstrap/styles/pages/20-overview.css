@@ -279,7 +279,8 @@
 		align-self: center;
 		min-width: 0;
 		white-space: normal;
-		overflow-wrap: anywhere;
+		/* overflow-wrap dropped — base/40-tables.css breaks every cell; the copy that stood here
+		 * moved nothing against 267 matching cells. */
 		padding-inline-end: min(200px, 50%);
 		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-text);
 	}

@@ -85,6 +85,14 @@ const _scrollMem = new Map();
 const _scrollSess = Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 let _histN = 0;
 let _curId = null;
+/* …and it is BOUNDED, because this document outlives every page in it. One entry per history entry
+ * per session, never evicted, is the same shape as the leaks this file already fixes elsewhere (the
+ * action-column resize listener, the view pollers) — small enough that nobody would see it and
+ * unbounded all the same. A browser keeps ~50 entries per tab and the ones past that cannot be
+ * traversed back to, so remembering more offsets than that can never be read. Least-recently-SAVED
+ * goes first: a Map iterates in insertion order and `set` on an existing key does not refresh it,
+ * so the re-save below is delete-then-set. */
+const SCROLL_MEM_MAX = 50;
 function newEntryId() { return _scrollSess + ':' + (++_histN); }
 
 /* adopt the entry we are standing on: reuse its fsid if it has one, stamp one otherwise (entries
@@ -101,7 +109,10 @@ function adoptEntry() {
 function saveScroll() {
 	if (!_curId) return;
 	const sc = document.getElementById('maincontent');
+	_scrollMem.delete(_curId);	/* re-insert, so this entry counts as the most recently saved */
 	_scrollMem.set(_curId, { win: Math.round(window.scrollY) || 0, main: sc ? sc.scrollTop : 0 });
+	while (_scrollMem.size > SCROLL_MEM_MAX)
+		_scrollMem.delete(_scrollMem.keys().next().value);
 }
 
 /* Put the scrollers back where the entry left them — but only once the incoming view has grown that
@@ -351,7 +362,11 @@ function warmedThen(className) {
 	_committed.add(className);
 	const body = _warming.get(className);
 	if (!body) return Promise.resolve();
-	return Promise.race([ body, new Promise((r) => window.setTimeout(r, WARM_WAIT_MS)) ]);
+	/* the loser of the race is cancelled: a prefetch that lands in 40 ms otherwise leaves a 5 s
+	 * timer armed behind every single navigation, doing nothing but keeping its closure alive */
+	let t = 0;
+	return Promise.race([ body, new Promise((r) => { t = window.setTimeout(r, WARM_WAIT_MS); }) ])
+		.finally(() => window.clearTimeout(t));
 }
 
 /* The page we are standing on arrived as a full load, so LuCI has ALREADY required — hence
@@ -475,6 +490,8 @@ function navigate(pathname, push, kbd) {
 	/* kill the outgoing view's plain setInterval pollers too (podkop's log tailer) — a full load
 	 * would have. L.Poll's own tick survives. */
 	clearViewIntervals();
+	/* the outgoing page's links are about to become a detached tree — do not hold one of them */
+	_lastHovered = null;
 	/* run every registered navigation callback — the optional updater's poll-chain cancel (its
 	 * setTimeout would otherwise keep firing fs.exec RPCs and pop its modal over the page we are
 	 * about to open) and the search palette's recent-pages record. The router carries NO static
@@ -485,7 +502,15 @@ function navigate(pathname, push, kbd) {
 	 * The RESOLVED segments are passed in, and that is not convenience: this runs BEFORE L.env is
 	 * re-pointed a few lines down, so a callback reading L.env.dispatchpath for "where are we going"
 	 * would silently record the page being left. */
-	for (const fn of _navCbs) { try { fn(rsegs); } catch (e) {} }
+	/* Logged, not swallowed. A registrant that throws is still isolated — the loop must finish, or a
+	 * broken updater would take the palette's recents and the popover's close with it — but the
+	 * empty catch made a registrant that throws on EVERY navigation indistinguishable from one that
+	 * was never registered, which is the failure mode the .catch at the bottom of this file was
+	 * given a console.error for. */
+	for (const fn of _navCbs) {
+		try { fn(rsegs); }
+		catch (e) { console.error('footstrap: a navigation callback threw', e); }
+	}
 	try { if (typeof ui.hideModal === 'function') ui.hideModal(); } catch (e) {}
 
 	/* point the runtime env at the new node so views, tabs and highlighting read the right
@@ -657,6 +682,23 @@ function linkUrlFrom(ev) {
 	return url.origin === window.location.origin ? url : null;
 }
 
+/* Warm the view module behind an event's link — ONE filter for all three prefetch triggers, and the
+ * same one the click router applies two lines further down: navigate() pushes a bare path, so a link
+ * carrying ?query or #hash full-loads, and warming its module spends a request on a page the SPA
+ * path can never open. The click handler declined those from the start; the three triggers below had
+ * each grown a copy of the URL test without that half. */
+function prefetchFrom(ev) {
+	const url = linkUrlFrom(ev);
+	if (url && !url.search && !url.hash)
+		prefetchView(url.pathname);
+}
+
+/* The last <a> a pointer crossed, kept only to stop `pointerover` re-firing per child span (see the
+ * listener). Cleared on every navigation: an element holds its parent, so retaining one anchor
+ * retains the whole detached tree the content swap has just thrown away — a small leak, but one that
+ * lasts until the pointer happens to cross some other link. */
+let _lastHovered = null;
+
 function wireRouter() {
 	if (_wired) return;
 	_wired = true;
@@ -685,14 +727,11 @@ function wireRouter() {
 	 * EVERY element the pointer crosses — dragging across the process table fires it hundreds of
 	 * times — so bail on the element first: the same <a> re-fires this for every child span it
 	 * contains, and a non-link target is the overwhelmingly common case. */
-	let lastHovered = null;
 	document.addEventListener('pointerover', (ev) => {
 		const a = ev.target.closest?.('a[href]');
-		if (!a || a === lastHovered) return;
-		lastHovered = a;
-		const url = linkUrlFrom(ev);
-		if (url)
-			prefetchView(url.pathname);
+		if (!a || a === _lastHovered) return;
+		_lastHovered = a;
+		prefetchFrom(ev);
 	}, { passive: true });
 
 	/* The pointer is not the only way a link gets chosen, and the other two ways got no prefetch at
@@ -704,16 +743,8 @@ function wireRouter() {
 	 * see: a link that scrolled UNDER a stationary pointer crosses no boundary and fires nothing.
 	 * Neither needs the lastHovered guard above — they fire once per interaction, not per element
 	 * crossed — and warmClass() dedupes per class anyway. */
-	document.addEventListener('focusin', (ev) => {
-		const url = linkUrlFrom(ev);
-		if (url)
-			prefetchView(url.pathname);
-	}, { passive: true });
-	document.addEventListener('pointerdown', (ev) => {
-		const url = linkUrlFrom(ev);
-		if (url)
-			prefetchView(url.pathname);
-	}, { passive: true });
+	document.addEventListener('focusin', prefetchFrom, { passive: true });
+	document.addEventListener('pointerdown', prefetchFrom, { passive: true });
 
 	window.addEventListener('popstate', () => {
 		/* an entry carrying a query belongs to a full load (we only ever push bare paths):

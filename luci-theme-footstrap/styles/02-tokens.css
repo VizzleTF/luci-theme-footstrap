@@ -98,6 +98,13 @@
 		--fs-good-line-hi: color-mix(in srgb, var(--fs-good) 55%, transparent);
 		--fs-warn-line-hi: color-mix(in srgb, var(--fs-warn) 55%, transparent);
 		--fs-danger-line-hi: color-mix(in srgb, var(--fs-danger) 55%, transparent);
+		/* THE WARN ROW HAS NO READER TODAY, and it is kept on purpose — do not "clean it up".
+		 * `good` and `danger` are consumed by the button variants (.cbi-button-positive /
+		 * -negative / -reset, theme/55-buttons.css) and `warn` only by -fill, because LuCI emits
+		 * no warning BUTTON. The row is what makes the next component that needs one reach for a
+		 * token instead of mixing its own percentage, which is the whole reason these four
+		 * strengths are stated once here rather than at each call site. A grep that finds no
+		 * `var(--fs-warn-line)` is therefore expected, not a finding. */
 
 		/* frosted pop surface (top-nav dropdown, rail flyout). NOT merged into --fs-bar-bg
 		 * (88%): a bar is a thin strip the page scrolls under and seeing content ghost

@@ -64,8 +64,16 @@
 		vertical-align: middle;
 	}
 
+	/* No `float` here, and its absence is measured rather than assumed: theme/55-buttons.css makes
+	 * `.cbi-page-actions` a flex container, and float does not apply to a flex item — so the
+	 * `float: left` that used to sit beside this margin computed to `none` and moved nothing. It
+	 * was not merely inert, it was misleading: it read as the one declaration in this file that had
+	 * been missed by the move to logical properties, so the next person to sweep for physical sides
+	 * would have "fixed" a rule that does nothing. There is no context that revives it — print
+	 * hides the whole container (theme/97-print.css). Verified in a live document in both writing
+	 * directions: the button sits 569px from the reading edge with the float and 569px without it,
+	 * and the same before and after removal. */
 	.cbi-page-actions > :not([method="post"]):not(.cbi-button-apply):not(.cbi-button-negative):not(.cbi-button-save):not(.cbi-button-reset) {
-		float: left;
 		margin-inline-end: var(--fs-space-1);
 	}
 

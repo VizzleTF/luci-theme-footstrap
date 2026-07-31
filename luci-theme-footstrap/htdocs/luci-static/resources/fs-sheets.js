@@ -41,6 +41,48 @@ let _themeNames = null;
  * [Symbol.match] resets lastIndex first. Do not call .test() on this one. */
 const NAME_RE = /[.#][A-Za-z_][\w-]*/g;
 
+/* ---- A QUOTED VALUE IS DATA, AND EVERY SCANNER BELOW USED TO READ IT AS SYNTAX ----
+ *
+ * `[title="a,b"]` is ONE selector part carrying a comma; `[href*="("]` is one attribute carrying an
+ * unbalanced paren; `[data-x=".foo"]` names no class at all. Read literally, each of the three
+ * scanners in this file gets a different wrong answer out of the same string:
+ *  - selectorParts() split `.app-row[title="a,b"]` into `.app-row[title="a` and `b"]`. The second
+ *    half carries no class or id, so pinnedToApp() called it UNPINNED and judgeSheet() called the
+ *    sheet invasive — documentPoisoned() then reported the document spent and the SPA fell back to a
+ *    full load on every navigation for the life of the page, which is the exact failure the <link>
+ *    caching bug above was written to end.
+ *  - fenceRules() rejoins the parts with ', ', so that same rule came back as `[title="a, b"]` —
+ *    the app's own selector silently rewritten to match a value it never asked for, by the setter
+ *    reporting success. Deleting a rule is what this file exists to prevent; changing one is worse,
+ *    because nothing looks wrong afterwards.
+ *  - stripPseudoArgs() counts parens, so `[href*="("]` drove `depth` to 1 and never back: the whole
+ *    remainder of the selector was eaten and a part pinned by the app's own id read as unpinned.
+ *
+ * One masker answers it for all three, so the vocabulary cannot disagree with itself the way the
+ * comment above NAME_RE warns about. It replaces the CONTENT of every quoted string with spaces and
+ * is length-preserving 1:1, which is what lets selectorParts() scan the mask and still slice the
+ * ORIGINAL — the fence must write back the app's own bytes, not our reading of them. An escape and
+ * the character it escapes are both content, so `\"` cannot close the string. */
+function maskStrings(text) {
+	let out = '', q = null;
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i];
+		if (q === null) {
+			out += ch;
+			if (ch === '"' || ch === '\'') q = ch;
+			continue;
+		}
+		if (ch === '\\') {
+			out += ' ';
+			if (i + 1 < text.length) { out += ' '; i++; }
+			continue;
+		}
+		out += (ch === q) ? ch : ' ';
+		if (ch === q) q = null;
+	}
+	return out;
+}
+
 /* a re-hosted <style>'s text is no longer what its app wrote — dedupeViewSheets keys on the
  * original, or the app's next identical copy stops looking like a duplicate (see there) */
 const origText = new WeakMap();
@@ -51,8 +93,12 @@ function themeNames() {
 	const props = new Set();	/* every custom property it declares or reads */
 	const walk = (rules) => {
 		for (const r of rules) {
+			/* masked like every other read of a selector: a `.foo` inside one of OUR quoted values
+			 * would enter `names` as a name we style, and pinnedToApp() — which masks — could then
+			 * never match it. That is the harvester-only widening NAME_RE's comment describes, and
+			 * it ends with a foreign selector that does reach the chrome reading as pinned. */
 			if (r.selectorText)
-				(r.selectorText.match(NAME_RE) || []).forEach((n) => names.add(n));
+				(maskStrings(r.selectorText).match(NAME_RE) || []).forEach((n) => names.add(n));
 			if (r.cssText)
 				(r.cssText.match(/--[A-Za-z_][\w-]*/g) || []).forEach((p) => props.add(p));
 			if (r.cssRules) walk(r.cssRules);
@@ -83,27 +129,38 @@ function themeNames() {
  * `.cbi-button-save:not(.custom-save-button` keeps a visible app name (the argument regex needs a
  * closing paren to fire), so the file manager's own motivating rule reads as pinned and is neither
  * judged nor fenced. Measured on the router: `documentPoisoned()` said clean. `:not(a, b)` is
- * ordinary modern CSS, not an exotic. */
+ * ordinary modern CSS, not an exotic.
+ *
+ * Scans the MASK and slices the ORIGINAL (see maskStrings): a comma inside `[title="a,b"]` is a
+ * character in a value, not a separator — while the parts handed back must be the app's own bytes,
+ * because fenceRules() joins them straight back into selectorText. */
 function selectorParts(text) {
+	const scan = maskStrings(text);
 	const out = [];
-	let depth = 0, buf = '';
-	for (const ch of text) {
+	let depth = 0, start = 0;
+	for (let i = 0; i < scan.length; i++) {
+		const ch = scan[i];
 		if (ch === '(') depth++;
 		else if (ch === ')') depth--;
-		if (ch === ',' && depth === 0) { out.push(buf.trim()); buf = ''; continue; }
-		buf += ch;
+		else if (ch === ',' && depth === 0) { out.push(text.slice(start, i).trim()); start = i + 1; }
 	}
-	out.push(buf.trim());
+	out.push(text.slice(start).trim());
 	return out.filter(Boolean);
 }
 
 /* Drop every functional pseudo-class ARGUMENT, nesting included. The old regex
  * (`/:[a-z-]+\([^)]*\)/g`) stops at the first `)`, so `:not(:is(.app))` left a stray `)` and, worse,
- * left `.app` looking like a pin. */
+ * left `.app` looking like a pin.
+ *
+ * Works on the MASK, which does two things at once here: a paren inside `[href*="("]` no longer
+ * drives `depth` into a hole it never comes back from, and the `.foo` in `[data-x=".foo"]` stops
+ * looking like the app's own pin to pinnedToApp() — the only caller. Its output is read by NAME_RE
+ * and never written back to the CSSOM, so masking the content away costs nothing. */
 function stripPseudoArgs(part) {
+	const scan = maskStrings(part);
 	let out = '', depth = 0;
-	for (let i = 0; i < part.length; i++) {
-		const ch = part[i];
+	for (let i = 0; i < scan.length; i++) {
+		const ch = scan[i];
 		if (ch === '(' ) { depth++; if (depth === 1) { out += ' '; continue; } }
 		if (ch === ')') { depth--; continue; }
 		if (!depth) out += ch;

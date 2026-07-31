@@ -358,7 +358,7 @@ const currentTint = TINT.current, applyTint = TINT.apply;
 
 /* Accent-hue axis: ONE hue that recolours the UI accent (solid buttons, toggle knobs, range
  * sliders, focus rings, accented links) while canvas, cards and good/warn/danger stay put — the
- * tint hues the paper, this hues the CHROME. CSS rotates --fs-accent/--fs-accent-lt via
+ * tint hues the paper, this hues the CHROME. CSS rotates --fs-accent via
  * oklch(from … l c H), keeping the palette's lightness and chroma so --fs-on-accent stays legible
  * on every hue (03-palettes.css). 0 = off (the palette's designed accent), same rationale as the
  * tint. head.ut pre-paints it. */
@@ -628,21 +628,34 @@ function _applyLoginBg(tok) {
 
 /* Re-encode the picked image to a bounded JPEG on a canvas. This is a SECURITY step as much as a
  * size one: the canvas keeps only the decoded pixels, so EXIF and any bytes appended past the image
- * are dropped — the uploaded blob is exactly what the browser drew and nothing else. */
+ * are dropped — the uploaded blob is exactly what the browser drew and nothing else.
+ *
+ * THE WHOLE BODY IS GUARDED, because a throw inside an event handler does not reject the promise it
+ * sits in — it escapes as an uncaught error and leaves the promise pending FOREVER. Two real ways
+ * out of `onload`: `getContext('2d')` answers null when the canvas cannot be backed (out of memory
+ * on a low-RAM box is the case this decodes a 25 MB source on), and drawImage/toBlob can throw on
+ * their own. The caller is fs-appearance's file picker, which disables "Choose image" and relabels
+ * it "Uploading…" before the call and restores both in a `.finally()` — so a pending promise means
+ * that button stays disabled and lying for the life of the page. The popover is built ONCE, in
+ * init(), so nothing short of a reload gets it back. */
 function _downscale(file) {
 	return new Promise((resolve, reject) => {
 		const url = URL.createObjectURL(file);
 		const img = new Image();
 		img.onload = () => {
 			URL.revokeObjectURL(url);
-			const scale = Math.min(1, BG_MAX_SIDE / Math.max(img.width, img.height));
-			const w = Math.max(1, Math.round(img.width * scale));
-			const h = Math.max(1, Math.round(img.height * scale));
-			const cv = document.createElement('canvas');
-			cv.width = w; cv.height = h;
-			cv.getContext('2d').drawImage(img, 0, 0, w, h);
-			cv.toBlob((blob) => blob ? resolve(blob) : reject(new Error(_('Could not process the image.', 'footstrap'))),
-				'image/jpeg', BG_QUALITY);
+			try {
+				const scale = Math.min(1, BG_MAX_SIDE / Math.max(img.width, img.height));
+				const w = Math.max(1, Math.round(img.width * scale));
+				const h = Math.max(1, Math.round(img.height * scale));
+				const cv = document.createElement('canvas');
+				cv.width = w; cv.height = h;
+				const ctx = cv.getContext('2d');
+				if (!ctx) throw new Error('no 2d context');
+				ctx.drawImage(img, 0, 0, w, h);
+				cv.toBlob((blob) => blob ? resolve(blob) : reject(new Error(_('Could not process the image.', 'footstrap'))),
+					'image/jpeg', BG_QUALITY);
+			} catch (e) { reject(new Error(_('Could not process the image.', 'footstrap'))); }
 		};
 		img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(_('That file is not a readable image.', 'footstrap'))); };
 		img.src = url;

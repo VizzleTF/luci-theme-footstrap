@@ -53,7 +53,11 @@
 	#packages.fs-stacked .td {
 		display: flex; align-items: baseline; justify-content: flex-end;
 		gap: 0; padding: var(--fs-space-1) 0; border: 0; text-align: end;
-		min-width: 0; width: auto; flex: none;
+		/* `min-width: 0` and `width: auto` are not restated: theme/30-tables.css sets both on
+		 * `.table.fs-stacked .td`, which this table is one of, and switching them off here moved
+		 * nothing across 500 matching cells. `text-align: end` above IS this file's own — it
+		 * overrides that rule's `start`. */
+		flex: none;
 	}
 	/* An auto inline-end margin is what replaces space-between: it eats the whole free line, so the
 	 * value packs flush against the far edge as one unbroken run. The inline-end padding keeps a gutter when the row is
@@ -70,7 +74,9 @@
 	 * says "DESCRIPTION" and the old literal matched ZERO elements on every router, in every
 	 * language (measured). The theme's own CSS was rewriting the string the theme's own CSS keyed
 	 * off. Columns: 1 Package name | 2 Version | 3 Size | 4 Description | 5 actions. */
-	#packages.fs-stacked .td:nth-child(4) { display: block; text-align: start; overflow-wrap: anywhere; word-break: break-word; }
+	/* `overflow-wrap` dropped: base/40-tables.css breaks every cell now and this copy moved nothing
+	 * against 100 matching cells. `word-break` stays — switching IT off moved all 100. */
+	#packages.fs-stacked .td:nth-child(4) { display: block; text-align: start; word-break: break-word; }
 	#packages.fs-stacked .td:nth-child(4)::before { display: block; margin-bottom: var(--fs-space-1); }
 	#packages.fs-stacked .td.cbi-section-actions { justify-content: flex-end; margin-top: var(--fs-space-1-5); }
 	#packages.fs-stacked .td.cbi-section-actions::before,

@@ -83,7 +83,10 @@
 		.cbi-value-field .cbi-dropdown:not(.btn):not(.cbi-button),
 		.cbi-value-field .cbi-dynlist,
 		.cbi-value-field .cbi-select { width: 100%; }
-		#view .fs-ovl .table .td, #view .fs-ovl .table .th { overflow-wrap: anywhere; min-width: 0; }
+		/* min-width only: breaking a long value is base/40-tables.css's default for every cell now,
+		 * and this copy moved nothing when switched off against 126 matching cells. `min-width: 0` is
+		 * NOT redundant — switching that off moved 12 — so it stays. */
+		#view .fs-ovl .table .td, #view .fs-ovl .table .th { min-width: 0; }
 
 		/* Stack each field: label on its own line, control + description full-width below. Side
 		 * by side (space-between) on the desktop squeezes the field — and any

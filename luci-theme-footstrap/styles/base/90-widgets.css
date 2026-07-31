@@ -92,12 +92,22 @@
 	 * geometry. */
 	/* `line-height: 1` centres the glyph in its own box; it was 13.5px under a 20px face — a
 	 * hand-nudge that only lands for one font size, and a half-pixel baseline besides. */
+	/* PHYSICAL, and mirrored by hand below — the same shape as `::-webkit-resizer`
+	 * (theme/60-inputs.css) and the two chevrons (theme/20-shell.css). `float` takes no logical
+	 * keyword this theme can rely on: `inline-end` is newer than the `oklch(from …)` and `:has()`
+	 * this stylesheet already requires only in Chromium, and it is the one property here where a
+	 * browser that does not know the keyword drops the declaration and leaves the cross floating
+	 * nowhere. Measured in a live document at 1400px: the cross sat 549px from the reading edge in
+	 * LTR and 41px in RTL, i.e. it jumped from the end of the heading to its start — in front of
+	 * the title, where a dismissal control is not. It appears in every modal and in every
+	 * `.alert-message`, so this is the RTL bug with the widest reach. */
 	.close {
 		float: right;
 		font-size: var(--fs-type-xl);
 		font-weight: var(--fs-weight-bold);
 		line-height: 1;
 	}
+	:root[dir="rtl"] .close { float: left; }
 
 	.close:hover {
 		text-decoration: none;

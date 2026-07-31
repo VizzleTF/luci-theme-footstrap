@@ -36,7 +36,15 @@ function wire() {
 		const go = () => resolve(
 			(window.__fsUpd
 				? window.L.require('fs-update').then((m) => m, () => null)
-				: Promise.resolve(null)).then(wireAppearance));
+				: Promise.resolve(null)).then(wireAppearance)
+				/* THE CALLER DOES NOT KEEP THIS PROMISE. menu-footstrap-common's init() calls
+				 * `appearance.wire();` for its side effect and neither returns nor awaits it, so the
+				 * `.catch` that guards the rest of that chain never sees a throw from the ~300 lines
+				 * of DOM assembly below — it arrived as an unhandled rejection instead, which is the
+				 * silent failure that chain's own comment was added to end. Log it here, where the
+				 * promise still has an owner; there is no partial recovery to attempt (a half-built
+				 * popover is worse than none), so it stops at saying so. */
+				.catch((e) => console.error('footstrap: Appearance popover failed to wire', e)));
 		if (typeof window.requestIdleCallback === 'function')
 			window.requestIdleCallback(go, { timeout: 2000 });
 		else

@@ -13,9 +13,13 @@
 	 * #modal_overlay rules here gave it another — 30/60% against 18/45%, the same widget at two
 	 * strengths depending on whether it was inside the modal (it always is). Both are the ladder
 	 * in base now (--fs-*-fill for the block, --fs-*-line for its border); the duplicates are
-	 * gone and only geometry is left here — the popup rounded to match the theme's cards (base
-	 * is 3px), plus small rounding on the diff boxes and legend swatches. */
-	#modal_overlay .modal { border-radius: var(--fs-radius-lg); }
+	 * gone and only geometry is left here — small rounding on the diff boxes and legend swatches.
+	 *
+	 * The popup's own radius is NOT restated here any more. It used to be, under a note saying
+	 * base rounds a modal to 3px — base rounds it to `var(--fs-radius-lg)` today, with a comment
+	 * of its own saying a modal is a card, so `#modal_overlay .modal { border-radius:
+	 * var(--fs-radius-lg) }` restated a value one layer down and a stale reason beside it.
+	 * Switched off against the 21 modals that match it: no computed style moved. */
 
 	/* moved from base with the heading ramp (45-misc.css): the `line-height: normal` here beat
 	 * the ramp's tight leading in-layer for a dialog's h4 title, and left behind it would lose

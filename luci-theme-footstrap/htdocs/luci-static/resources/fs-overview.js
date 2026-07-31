@@ -215,6 +215,14 @@ function pollProgressive(includes, containers, first_load) {
 	});
 
 	_inflight = run.finally(() => { _inflight = null; });
+	/* NOBODY AWAITS THIS ON THE FIRST LOAD — the line below hands the caller a fresh
+	 * Promise.resolve() so index.render() can return at once — so a rejection here has no handler
+	 * and surfaces as an unhandled rejection in the console. `run` rejects for one ordinary reason:
+	 * network.flushCache() failing on an expired session, i.e. exactly when the user is already
+	 * being redirected to the login page and the noise is least useful. The sections' own failures
+	 * cannot reach it (fillSection is called inside a try/catch and inc.load() has its own .catch),
+	 * so there is nothing to report that the page has not reported already. */
+	_inflight.catch(() => {});
 
 	/* First load: resolve NOW so index.render() returns its tree and the frames reach #view
 	 * immediately; the sections fill themselves. A poll tick resolves when the data is in —
