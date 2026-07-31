@@ -259,6 +259,78 @@ function fitTables() {
 	});
 }
 
+/* ---- A PINNED ACTIONS COLUMN IS ONLY VALID FOR THE LAYOUT MODE IT WAS MEASURED IN ----
+ *
+ * luci-base's `form.js` (stabilizeActionColumnWidth) measures the widest
+ * `td.cbi-section-actions > div` and writes that number as an INLINE `width` and `min-width` onto the
+ * header cell, the footer cell and every actions cell, caching it in `data-action-col-width`. It does
+ * re-run on window resize — but it only deletes the CACHE, never the inline widths, so the fresh
+ * measurement reads the width it pinned last time. The pin feeds itself and can only ever grow.
+ *
+ * On a stock theme that is invisible: a config table is a table at every width, so every measurement
+ * is taken in the same layout. This theme cards it under `@container fs-content (max-width: 960px)`
+ * (theme/65-dropdown.css), where the actions cell is `flex: 1 1 100%` and its buttons deliberately
+ * spread across the whole card — so a measurement taken there is the CARD's width, and carrying it
+ * into table mode makes the column absurd.
+ *
+ * Measured on the router, Network -> Firewall -> Zones: loaded at 1000px (carded) and grown to
+ * 1280px, the actions column pins 634px, the table renders 1267px inside a 1056px content column and
+ * the column scrolls sideways by 256px — permanently, because upstream's own re-measure reads the
+ * pin. A FRESH load at 1280px renders the same table at 966px with a 192px actions column. Shrinking,
+ * and growing within table mode, were always fine; it is the card -> table crossing that breaks.
+ *
+ * So drop the pin whenever the layout it was measured in stops being the layout on screen. Upstream
+ * re-measures from a clean DOM on its own resize listener and pins the right number; if it does not,
+ * the natural width is what we wanted anyway.
+ *
+ * THE KEY IS THE ROOM, NOT THE MODE, and starting from the mode alone missed half of it: the card ->
+ * table crossing is one way a pin goes stale, and the card simply getting NARROWER is the other. At
+ * 768px this theme has no sidebar (data-narrow) and the column is 712px; at 800px the sidebar returns
+ * and the column is 520px — the viewport grew, the room shrank, and the table was carded on both
+ * sides, so a mode test sees no change at all. Measured: firewall/zones and wireless both kept a
+ * `min-width: 670px` cell in a 520px column, 154px of scroll. Keying on the room catches both, since
+ * a mode change cannot happen without one.
+ *
+ * The room is the parent's content box (fit.roomFor), which the table's own width does not feed back
+ * into — so wiping the pin cannot change the key and set this oscillating. It fires once per CHANGE,
+ * never per tick, so it does not fight upstream for the pin on a polled page. */
+function unpinActionColumn() {
+	for (const t of document.querySelectorAll('#view .table.cbi-section-table')) {
+		if (!t.querySelector('.cbi-section-actions')) continue;
+		/* ---- and CLAIM upstream's resize hook, because under SPA navigation it is a leak ----
+		 *
+		 * stabilizeActionColumnWidth ends by attaching `window.addEventListener('resize', …)` once per
+		 * TABLE ELEMENT, guarded by this expando, and the callback closes over that element. Nothing
+		 * ever removes it. On a stock theme the next page is a full load and the listener dies with the
+		 * document; here the document lives for the whole session, so every visit to a config page
+		 * leaves another listener holding another detached table.
+		 *
+		 * Measured on the router over 120 navigations: window went from 1 resize listener to 31, and a
+		 * heap snapshot 280 navigations wide grew by 26 880 UniqueElementData, 23 600 Text nodes,
+		 * 18 520 EventListener and 1 160 <form> — a straight 11.8 KB per navigation that never
+		 * plateaus once the module cache is full.
+		 *
+		 * Setting the flag before upstream reaches it means the listener is never attached, and nothing
+		 * is lost: what it existed to do — re-measure the column when the width changes — is what the
+		 * wipe below now does, from the room rather than from a window event. The fitter runs
+		 * SYNCHRONOUSLY on the mutation batch that inserts the table (fs-fit rule 2), which is what
+		 * makes claiming it in time possible at all; a table we somehow reach late simply keeps
+		 * upstream's listener, i.e. today's behaviour. */
+		t.__actionColResizeAttached = true;
+		const key = Math.round(fit.roomFor(t));
+		if (t._fsActRoom === key) continue;
+		const seen = (t._fsActRoom !== undefined);
+		t._fsActRoom = key;
+		/* the first sighting is not a CHANGE: nothing has been pinned in another layout yet */
+		if (!seen) continue;
+		delete t.dataset.actionColWidth;
+		t.querySelectorAll('.cbi-section-actions').forEach((el) => {
+			el.style.removeProperty('width');
+			el.style.removeProperty('min-width');
+		});
+	}
+}
+
 /* Does this batch contain anything we could care about? Without it EVERY mutation scheduled a
  * full scan — and the poll rewrites content once a second, so on Overview/Processes/Leases we
  * ran three document-wide querySelectorAll plus a choicesKey() over every option of every
@@ -390,7 +462,7 @@ return baseclass.extend({
 		/* A table must be TAGGED .fs-dt before it can be fitted, and re-tagged whenever the poll
 		 * brings a fresh one back — so the two travel as one fitter, which fs-fit runs now, on
 		 * every content mutation (synchronously, pre-paint) and on every resize of #view. */
-		fit.add(() => { tagDataTables(); fitTables(); resyncValues(); });
+		fit.add(() => { tagDataTables(); fitTables(); unpinActionColumn(); resyncValues(); });
 
 		/* one scan per frame, however many mutations arrive (fit.frame — the theme's shared
 		 * coalescer) */
