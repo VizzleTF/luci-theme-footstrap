@@ -165,7 +165,7 @@ function enhance(sel) {
  *
  * `.table`, not `table.table` — the SAME selector relevant() and STACKABLE use. Stock LuCI
  * happens to emit only real <table>s, but a third-party luci-app-* may emit a <div class="table">
- * (coverage rule, CLAUDE.md), which a tag qualifier would pass over so it could never card. */
+ * (coverage rule, docs/conventions.md), which a tag qualifier would pass over so it could never card. */
 function tagDataTables() {
 	document.querySelectorAll('#view .table:not(.cbi-section-table):not(.fs-dt)').forEach((t) => {
 		/* TWO header markups, and missing the second is why the package list once needed a

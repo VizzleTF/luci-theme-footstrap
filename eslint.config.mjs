@@ -107,7 +107,7 @@ export default [
 			'no-template-curly-in-string': 'warn',
 			'require-atomic-updates': 'warn',
 
-			/* the theme's own house rules, from CLAUDE.md */
+			/* the theme's own house rules, from docs/conventions.md */
 			'no-alert': 'error',
 			'no-console': ['warn', { allow: ['warn', 'error'] }],
 

@@ -1,68 +1,64 @@
-# luci-theme-footstrap (пакет)
+# luci-theme-footstrap (the package)
 
-Тема LuCI для OpenWrt **24.10 и новее** (ucode-шаблоны). Дизайн — макет «OpenWrt
-Status Redesign» (`../docs/08-design-system.md`).
+A LuCI theme for OpenWrt **24.10 and newer** (ucode templates). Installing and using it:
+[the repository README](../README.md). Developer documentation: [`../docs/`](../docs/README.md).
 
-Внутреннее имя: `footstrap`. Media-путь: `/luci-static/footstrap`.
+Internal name: `footstrap`. Media path: `/luci-static/footstrap`.
 
-## Одна тема, одна запись
+## One theme, one entry
 
-В `luci.themes` регистрируется **ровно одна** запись — `Footstrap`
-(`/luci-static/footstrap`). Раскладка (боковое меню / верхняя панель), режим,
-палитра, обои, оттенок, акцент и скругление — **клиентские** оси в поповере
-Appearance: `localStorage` + атрибуты на `:root`, ничего не пишется на роутер.
-Отдельных тем под раскладку или под тёмный режим нет; все легаси-имена
-(`FootstrapSidebar`, `FootstrapOnTop`, `…-dark`/`…-light`) удаляются в
-`root/etc/uci-defaults/30_luci-theme-footstrap`.
+`luci.themes` carries **exactly one** entry, `Footstrap` → `/luci-static/footstrap`. Layout (side
+menu or top bar), mode, palette, wallpaper, tint, accent and rounding are **client** axes in the
+Appearance popover: `localStorage` plus attributes on `:root`, with nothing written to the router.
+There are no per-layout or per-mode themes; every legacy name (`FootstrapSidebar`, `FootstrapOnTop`,
+`…-dark`/`…-light`) is deleted by `root/etc/uci-defaults/30_luci-theme-footstrap`.
 
-Рендерер меню тоже один: `menu-footstrap.js`. Верхняя панель — это его же
-разметка, которую морфит CSS по `:root[data-layout]`. Второго шаблона, второго
-рендерера и симлинка `footstrap-top` не существует.
+There is one menu renderer too, `menu-footstrap.js`. The top bar is its own markup, morphed by CSS
+through `:root[data-layout]`. No second template, no second renderer, no `footstrap-top` symlink.
 
-**Граница темы:** тема даёт хром и дизайн-язык; контент страниц рисует view-JS
-`luci-mod-*`. Единственное исключение — `fs-overview.js`: он не рисует своего
-контента, а только переставляет штатные секции overview. Раньше он лежал в
-ГЛОБАЛЬНОМ каталоге включений `luci-mod-status`, откуда LuCI грузит все `*.js`
-подряд — то есть скачивался и исполнялся на overview у роутеров с ЧУЖОЙ темой
-(замерено headless-браузером на дев-контейнере со стоковой `bootstrap`). Теперь
-это обычный модуль хрома. Подробно — `../docs/08-design-system.md`, раздел
-«Границы», и `../CLAUDE.md`.
+**The theme's boundary:** it supplies the chrome and the design language; page content is drawn by
+the view JS of `luci-mod-*`. The one exception is `fs-overview.js`, which draws no content of its own
+and only re-arranges the stock overview sections.
 
-## Структура
+## Layout
 
 ```
-Makefile                          luci.mk; LUCI_MINIFY_CSS:=0; Build/Prepare (CSS, версия, po2lmo)
-styles/                           ИСТОЧНИК CSS: слои tokens / base / theme / pages
-build-css.sh                      styles/ -> htdocs/luci-static/footstrap/cascade.css
-i18n/                             каталог перевода (НЕ po/ — иначе luci.mk наплодит пакетов)
+Makefile                          luci.mk; LUCI_MINIFY_CSS:=0; Build/Prepare (CSS, mangle, strip,
+                                  version, po2lmo)
+styles/                           CSS SOURCE: layers tokens / base / theme / pages
+build-css.sh                      styles/ → htdocs/luci-static/footstrap/cascade.css
+mangle-tokens.sh                  shorten the private --fs-* names in a built sheet
+strip-templates.sh strip-shell.sh drop comments from .ut and from root/**.sh
+i18n/                             translation catalogue (NOT po/ — see docs/package.md)
 ucode/template/themes/footstrap/  header.ut, footer.ut, sysauth.ut, partials/
-htdocs/luci-static/footstrap/     cascade.css (генерируется), fonts/, cats.svg
-htdocs/luci-static/resources/     menu-footstrap.js (рендерер), menu-footstrap-common.js (bootstrap),
-                                  fs-{menutree,prefs,widgets,chrome,router,sheets,version,appearance}.js,
-                                  fs-fit.js, fs-select.js, fs-overview.js
-root/etc/uci-defaults/            регистрация темы и миграция легаси-имён
-root/usr/share/rpcd/acl.d/        luci-theme-footstrap.json (ACL: uci footstrap — Save-as-default)
+htdocs/luci-static/footstrap/     cascade.css (generated), fonts/, cats.svg, logo.svg
+htdocs/luci-static/resources/     menu-footstrap.js (renderer), menu-footstrap-common.js,
+                                  fs-{fit,menutree,prefs,widgets,chrome,router,sheets,search,
+                                  select,appearance,version,overview}.js
+root/etc/uci-defaults/            registration and legacy-name migration
+root/usr/share/rpcd/acl.d/        ACL: uci footstrap (Save as default) + login-background upload
 ```
 
-Проверка обновлений и самообновление — в ОТДЕЛЬНОМ необязательном пакете
-`luci-app-footstrap-updater` (свой `fs-update.js`, backend `footstrap-selfupdate.sh`,
-ACL `file.exec` и ключ `release.pub`). Без него тема полностью работает — поповер
-показывает версию (из `fs-version.js`) без контролов обновления.
+The update check and the self-update live in a **separate, optional package**,
+`luci-app-footstrap-updater` (its own `fs-update.js`, the `footstrap-selfupdate.sh` backend, a
+`file.exec` ACL and the `release.pub` key). Without it the theme works fully — the popover shows the
+version and no update controls. See [`../docs/updates.md`](../docs/updates.md).
 
-**`cascade.css` не редактируется** — он генерируется `build-css.sh` из `styles/`
-и лежит в `.gitignore`. Цвета правятся в `styles/03-palettes.css`, шкалы и
-токены — в `styles/02-tokens.css`.
+**Do not edit `cascade.css`** — it is generated by `build-css.sh` from `styles/` and is gitignored.
+Colours go in `styles/03-palettes.css`, scales and tokens in `styles/02-tokens.css`.
 
-## Разработка на роутере
+## Working on a router
+
+The normal dev stand is four containers driven by `owlab` from `../owlab.yaml` — see
+[`../docs/development.md`](../docs/development.md). `dev-sync.sh` targets a **hardware** router over
+ssh:
 
 ```sh
-./dev-sync.sh          # залить на ssh router (регистрирует, но НЕ активирует тему)
-# включить вручную:
+./dev-sync.sh          # push to `ssh router` (registers the theme but does NOT activate it)
 ssh router 'uci set luci.main.mediaurlbase=/luci-static/footstrap; uci commit luci; rm -f /tmp/luci-indexcache*'
-# откат:
-ssh router 'uci set luci.main.mediaurlbase=/luci-static/bootstrap; uci commit luci'
+ssh router 'uci set luci.main.mediaurlbase=/luci-static/bootstrap; uci commit luci'   # roll back
 ```
 
-Перед пушем — `npm run check` (eslint, stylelint, axe, экспорт-ярус, i18n,
-`@mirror`, оси Appearance и остальные гейты). Правила и ловушки — в `../CLAUDE.md`;
-сборка пакета — `../docs/05-build-deploy-development.md`.
+Before pushing, run `npm run check` from the repository root. The rules and the traps are in
+[`../docs/conventions.md`](../docs/conventions.md); packaging is in
+[`../docs/package.md`](../docs/package.md).

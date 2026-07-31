@@ -5,7 +5,6 @@ place instead of reloading the whole page. This measures what that is worth, on 
 against stock `luci-theme-bootstrap` and against a third-party theme.
 
 Script: `bench/nav-benchmark.py`. Runs against any OpenWrt 25.12+ router.
-Russian version: [15-benchmark-navigation_ru.md](15-benchmark-navigation_ru.md).
 
 ## What it measures
 
@@ -169,7 +168,7 @@ Prepare the router or the numbers will lie:
   measure the wrong theme. The run will not fail. It will lie.
 - An app with invasive CSS changes what is being measured. If a `luci-app-*` injects a
   `<style>` that paints stock widgets, footstrap contains it per app, but a sheet it cannot
-  attribute still forces a real page load (see [docs/14](14-spa-router.md)). Check `spa_pages`
+  attribute still forces a real page load (see [spa-router.md](spa-router.md)). Check `spa_pages`
   in the JSON: if it is not 38/38, that is why.
 - The script switches the active theme while it runs and restores it in a `finally`. Kill it
   with `kill -9` and you may have to set `luci.main.mediaurlbase` back by hand.

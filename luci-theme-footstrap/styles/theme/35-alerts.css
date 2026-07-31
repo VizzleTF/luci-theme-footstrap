@@ -37,7 +37,7 @@
 	 * ring and three a grey one — that reads as a hierarchy nobody designed, and the difference
 	 * between "not applied yet" and "this is about to fail" hung on one pixel of frame.
 	 *
-	 * The surface carries it instead, at the ladder's named `-fill` step (18%) — the one CLAUDE.md
+	 * The surface carries it instead, at the ladder's named `-fill` step (18%) — the one docs/design-system.md
 	 * describes as the callout/diff surface, which is exactly what an alert is, and which
 	 * 55-buttons.css already uses as a surface twice. NOT a fresh `color-mix(… 12%, --fs-panel)`:
 	 * an unnamed level is how four spellings of one tint appeared here before.

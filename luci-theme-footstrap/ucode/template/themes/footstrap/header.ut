@@ -35,6 +35,11 @@
 		accent:       fsd.accent || '',
 		rounding:     fsd.rounding || '',
 		autocollapse: fsd.autocollapse || '',
+		/* density was saved by saveAsDefault() and then never read back here, so the router-wide
+		 * Density default reached no browser: __fsSD.density stayed '' whatever the config said.
+		 * Nothing catches this — tools/axes.mjs holds the pre-paint against the live applier, and
+		 * both were right; the gap was the SERVER read that feeds them. Found on a live router. */
+		density:      fsd.density || '',
 		/* '' (not the raw undefined) when unset, so head.ut's `!= ''` guard fires — otherwise
 		 * int(undefined) is 0, a VALID value, and the axis defaults to 0 instead of its real default */
 		tint_strength: fsd.tint_strength || '',

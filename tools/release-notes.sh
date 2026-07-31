@@ -2,7 +2,7 @@
 # Build the GitHub-release body from the CHANGELOG — it is GENERATED, never hand-written,
 # so the changelog stays the single source.
 #
-# Every bullet is `- **one-line effect.** then the rationale` (CLAUDE.md). The bold lead is
+# Every bullet is `- **one-line effect.** then the rationale` (docs/releasing.md). The bold lead is
 # what a release reader wants; the rationale is for maintainers. So the notes are just those
 # leads, grouped under their `### Fixed`/`### Added`/… headers. Consequences: a bullet with
 # NO bold lead is silently omitted, and an empty section prints no header.
@@ -70,7 +70,7 @@ extract() {
 }
 
 # A tag whose changelog section does not exist is a FAILED release, not a thin one. This is
-# the only enforcement of CLAUDE.md's rule (rename [Unreleased], commit that, then tag THAT
+# the only enforcement of docs/releasing.md's rule (rename [Unreleased], commit that, then tag THAT
 # commit): warning to stderr and exiting 0 published a release page reading "See the
 # CHANGELOG" for a version the changelog had never heard of.
 summary="$(extract "$changelog")"

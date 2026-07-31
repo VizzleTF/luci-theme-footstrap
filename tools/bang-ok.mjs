@@ -7,7 +7,7 @@
  *
  * Why it needs a gate at all: adding a file to one list and forgetting the other fails SILENTLY in the
  * worse direction — audit.py would flag a legitimate flag as stray, or stylelint would wave a new
- * flag through that audit.py still rejects. CLAUDE.md promises "the same allowlist audit.py uses";
+ * flag through that audit.py still rejects. docs/conventions.md promises "the same allowlist audit.py uses";
  * nothing but this holds it to that.
  *
  * Both lists implicitly include every styles/base/*.css (base carries the .left/.right/.center forcing

@@ -7,12 +7,12 @@
 'require menu-footstrap-common as common';
 
 /* The theme's ONE menu renderer: a vertical #topmenu the CSS also turns into the top bar and the
- * rail flyouts — same markup, no second renderer (CLAUDE.md). The disclosure primitives it builds
+ * rail flyouts — same markup, no second renderer (docs/chrome.md). The disclosure primitives it builds
  * sections on come from fs-widgets and the auto-collapse preference from fs-prefs; the rest of the
  * chrome (mode menu, tabs, rail, router, popover) is bootstrapped by menu-footstrap-common, which
  * this file composes with by injecting renderMainMenu into common.init — a callback, not an
- * override, because a required LuCI module is a singleton and cannot be subclassed (docs/11).
- * Spec: docs/09-sidebar-implementation.md */
+ * override, because a required LuCI module is a singleton and cannot be subclassed (docs/conventions.md).
+ * Spec: docs/chrome.md */
 
 const ICONS = {
 	status:   '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',

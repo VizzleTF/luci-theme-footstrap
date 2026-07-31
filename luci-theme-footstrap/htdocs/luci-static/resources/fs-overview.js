@@ -18,7 +18,7 @@
  * active: the request is right there beside 10_system.js and 20_memory.js. The `L.env.media` gate
  * silenced it, but only after it had already been downloaded and run — a theme package reaching
  * into another module's namespace, which is exactly what this project refuses to do to third-party
- * apps (CLAUDE.md, the three zones). It is a chrome module now, loaded by the chrome, so a router on
+ * apps (docs/conventions.md, the three zones). It is a chrome module now, loaded by the chrome, so a router on
  * another theme never sees it at all.
  *
  * WHAT THAT COST, and why the code below looks the way it does: the old location bought two timing
@@ -254,7 +254,7 @@ function patchOverview() {
 	 * require the view through `window.L` before this observer ever fires — and only when this
 	 * patch won the race against fs-router's own `RT.require`, which is exactly the "sometimes,
 	 * coming from another page" the report described. Same trap as the itemlist calls below
-	 * (docs/14), reached from the other side. */
+	 * (docs/spa-router.md), reached from the other side. */
 	window.L.require('view.status.index').then((idx) => {
 		const proto = idx ? Object.getPrototypeOf(idx) : null;
 		if (!proto || proto.__fsProgressive || typeof proto.poll_status !== 'function')
@@ -278,7 +278,7 @@ function patchOverview() {
  * load of the overview the template's own copies win the race and these are no-ops, as before.
  *
  * Bodies are verbatim from upstream except L.itemlist → window.L.itemlist (the two-L trap,
- * docs/14). */
+ * docs/spa-router.md). */
 function ensureOverviewHelpers() {
 	/* eslint-disable no-var -- these three bodies are copied VERBATIM from LuCI's
 	   admin_status/index.ut so they can be diffed against upstream when it changes.

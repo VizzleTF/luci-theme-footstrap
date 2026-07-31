@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* A RATCHET on the stylesheet's shape: pin the numbers that only get worse by accident, so they
- * cannot drift up one commit at a time. Not style opinions; each is an invariant CLAUDE.md states
+ * cannot drift up one commit at a time. Not style opinions; each is an invariant docs/conventions.md states
  * in prose and nothing enforced. (The CSS size budget and the font-byte budget this once cited as
  * precedent are both GONE — build-css.sh keeps only a broken-build floor.)
  *
@@ -39,7 +39,7 @@ const LIMITS = {
 	 * — does not exist on either release. They were beating the same FILE's open-popover
 	 * `margin-top`; see the note there. */
 	importants: 26,
-	/* The widest selector the theme needs; see the layer rules in CLAUDE.md.
+	/* The widest selector the theme needs; see the layer rules in docs/conventions.md.
 	 *
 	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`. Not sprawl:
 	 * the sidebar gives way to the bar when the CONTENT column would be too narrow, and that

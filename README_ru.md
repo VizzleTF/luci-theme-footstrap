@@ -195,12 +195,40 @@ usign -V -m /tmp/install.sh -x /tmp/install.sh.sig -p /tmp/release.pub && GITHUB
 
 </details>
 
+## Дев-роутеры
+
+Четыре штуки — OpenWrt и ImmortalWrt, 25.12 и 24.10 — из одного файла, на любой ОС. Нужны
+[owlab](https://github.com/owfeed/owlab) и Docker:
+
+```sh
+go install owfeed.org/owlab/cmd/owlab@latest
+owlab up                 # собрать и поднять все четыре
+owlab sync --watch       # пересобирать CSS и заливать на каждую правку
+owlab open owrt2512      # открыть LuCI в браузере
+```
+
+Логин `root`, пароль пустой. Подробности и обоснование — в
+[docs/development.md](docs/development.md).
+
+owlab собирает и настоящий пакет: `owlab build` запускает OpenWrt SDK и пишет `dist/<arch>/`,
+который [owfeed](https://github.com/owfeed/owfeed) подписывает и публикует, причём ни один
+инструмент не зависит от другого. Эта тема — рабочий пример всего пути целиком;
+[ECOSYSTEM.md](https://github.com/owfeed/owfeed/blob/main/docs/ECOSYSTEM.md) — карта.
+
 ## Пишете luci-app?
 
 В [devkit для разработчиков](https://vizzletf.github.io/luci-theme-footstrap/) — сетка цветовых
 токенов, разметка компонентов и проверялка стилей, куда можно вставить свой CSS.
 
 Есть и текстовое руководство:
-[как стилизовать приложение LuCI, чтобы оно работало под любой темой](docs/20-luci-app-styling-guide_ru.md)
+[как стилизовать приложение LuCI, чтобы оно работало под любой темой](docs/luci-app-styling-guide_ru.md)
 — время жизни CSS, неймспейсы, цветовой контракт, детект тёмной темы и что делает эта тема, когда
 приложение нарушает правила. Собрано по 30 реальным приложениям и проверено на роутере.
+
+## Документация
+
+Документация для разработчика — в **[docs/](docs/README.md)**: архитектура, дизайн-система, сборка
+стилей, SPA-роутер, упаковка и релизный ранбук. Она **на английском**; на русском остаются только
+этот README и `CHANGELOG_ru.md`. Начните с [docs/architecture.md](docs/architecture.md) — что такое
+тема, — или с [docs/conventions.md](docs/conventions.md) — правила, которым обязана следовать
+правка.

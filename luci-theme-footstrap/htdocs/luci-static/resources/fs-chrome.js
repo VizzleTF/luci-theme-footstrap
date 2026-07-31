@@ -8,7 +8,7 @@
 /* The chrome AROUND the content: the mode menu, the section tabs, the rail toggle, and the
  * measurements that decide how much room any of it gets. The MAIN menu is not here — it is injected
  * by menu-footstrap.js as a callback (renderMainMenu), because LuCI instantiates every required
- * module into a singleton and so a renderer cannot be a subclass of the chrome (docs/11). */
+ * module into a singleton and so a renderer cannot be a subclass of the chrome (docs/conventions.md). */
 
 /* the injected main-menu renderer; handed over once by the theme's init() */
 let _renderMain = null;
@@ -288,7 +288,7 @@ function clusterFitsBrandRow(bar, menu) {
 	return need <= room;
 }
 /* No observer and no resize listener of our own: fs-fit owns both, and this file used to grow the
- * second one CLAUDE.md warns against. A view renders its .cbi-tabmenu into #view, which fs-fit's
+ * second one docs/conventions.md warns against. A view renders its .cbi-tabmenu into #view, which fs-fit's
  * MutationObserver already watches — and it re-fits SYNCHRONOUSLY (rule 2), where the copy here
  * deferred through fit.schedule(), i.e. the duplicate was strictly the slower path into the same
  * work. #tabmenu is a sibling of #view rather than inside it, but nothing writes it except

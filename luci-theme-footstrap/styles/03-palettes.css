@@ -112,8 +112,8 @@
 		 * and its opacity bounds the effective canvas contrast regardless of what the photo is. Both
 		 * are inert until data-login-bg is present (16-login-bg.css). */
 		--fs-login-bg-url: none;
-		/* --fs-photo-dim is the scrim OPACITY over a File photo (Wallpaper → File → Dim), a SHARED
-		 * router value; head.ut/fs-prefs.js override it inline. The scrim is mixed from --fs-bg-BASE,
+		/* --fs-photo-dim is the scrim OPACITY over a File photo (Wallpaper → File → Dim), a
+		 * per-browser axis like the rest; head.ut/fs-prefs.js override it inline. The scrim is mixed from --fs-bg-BASE,
 		 * NOT --fs-bg, so it is always NEUTRAL — the router-identity Tint colours --fs-bg and must
 		 * never leak onto a photo; the Tint's Density is a separate control. */
 		--fs-photo-dim: 74%;

@@ -1,5 +1,5 @@
 # luci-theme-footstrap is noarch: one build, two containers (apk for 25.12+, ipk for
-# 24.10), both out of owfeed rather than an OpenWrt SDK. docs/18 has why.
+# 24.10), both out of owfeed rather than an OpenWrt SDK. docs/conventions.md has why.
 #
 # The release pipeline itself is not here — it is owfeed's `package.yml`, which every
 # repository in this ecosystem shares. What is here is this theme's own gates: each

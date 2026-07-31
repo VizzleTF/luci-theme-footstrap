@@ -200,13 +200,14 @@ Four of them — OpenWrt and ImmortalWrt, 25.12 and 24.10 — from one file, on 
 OS. Needs [owlab](https://github.com/owfeed/owlab) and Docker:
 
 ```sh
+go install owfeed.org/owlab/cmd/owlab@latest
 owlab up                 # build and start all four
 owlab sync --watch       # rebuild the CSS and push it on every edit
 owlab open owrt2512      # open LuCI in a browser
 ```
 
 Log in as `root` with an empty password. Details and the reasoning are in
-`docs/05-build-deploy-development.md`.
+[docs/development.md](docs/development.md).
 
 owlab also builds the real package — `owlab build` runs the OpenWrt SDK and writes
 `dist/<arch>/`, which [owfeed](https://github.com/owfeed/owfeed) signs and publishes without
@@ -219,6 +220,13 @@ The [developer devkit](https://vizzletf.github.io/luci-theme-footstrap/) has the
 the component markup and a style checker you can paste into.
 
 There is also a written guide:
-[how to style a LuCI app so it works under any theme](docs/20-luci-app-styling-guide.md) — CSS
+[how to style a LuCI app so it works under any theme](docs/luci-app-styling-guide.md) — CSS
 lifetime, namespacing, the colour contract, dark-mode detection, and what this theme does when an app
 breaks the rules. Drawn from 30 real apps and checked on a router.
+
+## Documentation
+
+Developer documentation lives in **[docs/](docs/README.md)** — architecture, the design system, the
+stylesheet build, the SPA router, packaging and the release runbook. Start with
+[docs/architecture.md](docs/architecture.md) for what the theme is, or
+[docs/conventions.md](docs/conventions.md) for the rules a patch has to follow.

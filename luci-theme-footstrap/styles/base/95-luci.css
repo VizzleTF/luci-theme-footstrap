@@ -640,7 +640,7 @@
 
 	/* .fade-in's animation: theme/45-misc.css (fs-fade) — absorbed. The @keyframes above
 	 * STAY though nothing here rides them: `fade-in` is an upstream animation NAME a
-	 * luci-app-* may ride (coverage contract, CLAUDE.md). */
+	 * luci-app-* may ride (coverage contract, docs/conventions.md). */
 	.fade-out {
 		animation: fade-out var(--fs-dur-fade);
 	}

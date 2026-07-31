@@ -246,7 +246,7 @@
 	 * hover: one step UP the same ladder.
 	 *
 	 * THE LABEL IS --fs-text, NOT --fs-accent: never put text of colour C on a translucent tint
-	 * of C (CLAUDE.md). The tint drags the surface toward the text and eats its own contrast —
+	 * of C (docs/design-system.md). The tint drags the surface toward the text and eats its own contrast —
 	 * accent-on-accent-soft measured 4.25:1, an AA failure axe caught the moment the tint went
 	 * in. The role is carried by the fill and the border; the label only has to be legible.
 	 *

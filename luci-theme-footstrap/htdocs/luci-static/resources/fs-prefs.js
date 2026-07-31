@@ -344,9 +344,6 @@ function applyWallpaper(val) {
 	lsSet('fs-wallpaper', v);
 	if (v === 'off') root.removeAttribute('data-wallpaper');
 	else root.setAttribute('data-wallpaper', v);
-	/* write the choice through to the router default too (see _persistBaseline) */
-	_persistBaseline('wallpaper', v);
-	_persistUci('wallpaper', v);
 }
 
 /* Background-tint axis: ONE hue washed into the CANVAS the cards float on (--fs-bg), so a whole
@@ -453,7 +450,8 @@ function currentRail() {
  * OTHER browsers/devices. resetToDefault() is the escape hatch that drops this browser back onto it. */
 const AXIS_KEYS = [
 	'fs-layout', 'fs-darkmode', 'fs-palette', 'fs-wallpaper',
-	'fs-tint', 'fs-accent', 'fs-radius', 'fs-menu-autocollapse', 'fs-tint-strength', 'fs-density'
+	'fs-tint', 'fs-accent', 'fs-radius', 'fs-menu-autocollapse', 'fs-tint-strength', 'fs-density',
+	'fs-photo-dim'
 ];
 /* Tint density: the STRENGTH of the router-identity Tint (the hue washed onto --fs-bg), a per-browser
  * axis paired with the Tint hue — the hue picks the colour, this picks how strong it reads.
@@ -470,6 +468,18 @@ const AXIS_KEYS = [
 const FS_TSTR_DEFAULT = 100;
 const TSTR = propAxis('fs-tint-strength', 'tint_strength', '--fs-tint-strength', 0, 200, FS_TSTR_DEFAULT, (v) => String(v / 100));
 const currentTintStrength = TSTR.current, applyTintStrength = TSTR.apply, tintStrengthDefault = TSTR.def;
+
+/* Photo dim: the scrim opacity over the FILE photo (0–100%). An ordinary per-browser axis, the same
+ * propAxis shape as the Tint's strength — the photo is shared, how strongly THIS browser dims it is
+ * not, and it reaches the router with the others through Save-as-default. It only bites while the
+ * wallpaper is 'file'. Distinct from Tint strength (fs-tint-strength), which colours the canvas.
+ *
+ * Declared up here with the other axis instances, above _resolvedDefault()'s module-init call: a
+ * propAxis is a `const`, so declaring it lower down leaves it in the TDZ at init and the whole
+ * module throws, taking the chrome with it. */
+const FS_PDIM_DEFAULT = 74;
+const PDIM = propAxis('fs-photo-dim', 'photo_dim', '--fs-photo-dim', 0, 100, FS_PDIM_DEFAULT, (v) => (v + '%'));
+const currentPhotoDim = PDIM.current, applyPhotoDim = PDIM.apply, photoDimDefault = PDIM.def;
 /* `reject: true` IS THE WHOLE POINT — without it a refused write arrives as SUCCESS.
  *
  * rpc.js only raises on the ubus status code when the declaration asks it to (`raise: options.reject`
@@ -498,7 +508,8 @@ function snapshotAxes() {
 		rounding: String(currentRadius()),
 		autocollapse: currentAutoCollapse() ? 'on' : 'off',
 		tint_strength: String(currentTintStrength()),
-		density: currentDensity()
+		density: currentDensity(),
+		photo_dim: String(currentPhotoDim())
 	};
 }
 /* The RESOLVED router default (UCI value if set, else the built-in), in snapshotAxes() string form,
@@ -522,7 +533,8 @@ function _resolvedDefault() {
 		rounding: String(radiusDefault()),
 		autocollapse: autoCollapseDefault() ? 'on' : 'off',
 		tint_strength: String(tintStrengthDefault()),
-		density: densityDefault()
+		density: densityDefault(),
+		photo_dim: String(photoDimDefault())
 	};
 }
 let _savedDefault = _resolvedDefault();
@@ -531,21 +543,18 @@ function matchesSavedDefault() {
 	return Object.keys(cur).every((k) => cur[k] === _savedDefault[k]);
 }
 
-/* ---- wallpaper + photo dim write through to /etc/config/footstrap AS THEY CHANGE ----------------
- * Every OTHER axis is per-browser and only reaches the router via Save-as-default. These two do not
- * wait, because the File photo is a ROUTER-SIDE default: the image itself lands in uci on upload, so
- * "which wallpaper shows it" (off/cats/file) and "how dim" belong there too — otherwise a fresh
- * browser, or the pre-login page, would not match what the admin set. The Save-button baseline
- * (_savedDefault, window.__fsSD) is moved in step so the axis does not then read as unsaved; the uci
- * write is best-effort (a read-only session simply keeps the live per-browser value). */
-function _persistBaseline(field, strVal, numVal) {
-	_savedDefault[field] = strVal;
-	setSD(field, (numVal === undefined) ? strVal : numVal);
-}
-function _persistUci(field, strVal) {
-	return _uciSet('footstrap', 'settings', { [field]: strVal })
-		.then(() => _uciCommit('footstrap')).catch(() => null);
-}
+/* ---- /etc/config/footstrap is written by Save-as-default AND BY NOTHING ELSE -------------------
+ * EVERY axis is per-browser and reaches the router only through this button. Two of them used to
+ * write through the moment they changed — `wallpaper` on every pick, `photo_dim` on every drag —
+ * on the argument that the File photo is router-side, so "which wallpaper shows it" and "how dim"
+ * belonged beside the image. The argument does not survive the consequence: choosing Cats in ONE
+ * browser silently re-pointed the router-wide default for every other device, and because the
+ * write also moved the Save baseline, the button did not even light up. A per-browser preference
+ * must never mutate shared state with no way to see that it did.
+ *
+ * The photo FILE stays router-side, because a file cannot live in localStorage — but only its
+ * bytes and its cache-bust token do. Whether a given browser paints it is `fs-wallpaper`, and how
+ * dim it paints it is `fs-photo-dim`: ordinary axes, saved with the rest or not at all. */
 function saveAsDefault() {
 	const snap = snapshotAxes();
 	return _uciSet('footstrap', 'settings', snap)
@@ -665,15 +674,15 @@ function uploadLoginBg(file) {
 			return Promise.reject(new Error(_('Upload failed.', 'footstrap')));
 		/* make the just-written 0600 file world-readable, or uhttpd 403s it (see _fileExec) */
 		return _chmodServeable(BG_PATH)
-			/* write the image AND switch the router default to File in one commit — uploading a photo
-			 * IS the act of making it the background, so a fresh browser and the pre-login page show it
-			 * without a separate Save-as-default. */
-			.then(() => _uciSet('footstrap', 'settings', { login_bg: tok, wallpaper: 'file' }))
+			/* uci gets the TOKEN and nothing else. Uploading a photo is not the same act as making it
+			 * the router-wide background: it puts a file on the router, and which browsers paint it is
+			 * the wallpaper axis, saved with the rest through Save-as-default. Writing `wallpaper:file`
+			 * here would re-point every other device's default from one admin's upload, silently. */
+			.then(() => _uciSet('footstrap', 'settings', { login_bg: tok }))
 			.then(() => _uciCommit('footstrap'))
 			.then(() => {
-				_persistBaseline('wallpaper', 'file');
-				lsSet('fs-wallpaper', 'file');
-				document.documentElement.setAttribute('data-wallpaper', 'file');
+				/* switch THIS browser to the photo — the ordinary axis path, localStorage only */
+				applyWallpaper('file');
 				_applyLoginBg(tok);
 				return tok;
 			});
@@ -690,27 +699,6 @@ function removeLoginBg() {
 		.then(() => { _applyLoginBg(''); });
 }
 
-/* Photo dim: the scrim opacity over the FILE photo (0–100%), and SHARED — one router-wide value in
- * /etc/config/footstrap, not a per-browser axis, because it is a property of the shared photo (like
- * the image). No localStorage: the value comes from window.__fsSD, and dragging the slider writes it
- * straight to uci (coalesced) and updates __fsSD + the live --fs-photo-dim so the reading stays true.
- * Distinct from the Tint's Density (fs-tint-strength) — that colours the canvas, this dims a photo. */
-const FS_PDIM_DEFAULT = 74;
-let _pdimTimer = null;
-function currentPhotoDim() {
-	const d = sd('photo_dim');
-	return (typeof d === 'number' && d >= 0 && d <= 100) ? d : FS_PDIM_DEFAULT;
-}
-function applyPhotoDim(pct) {
-	const root = document.documentElement;
-	const v = Math.max(0, Math.min(100, pct | 0));
-	if (v === FS_PDIM_DEFAULT) root.style.removeProperty('--fs-photo-dim');
-	else root.style.setProperty('--fs-photo-dim', v + '%');
-	setSD('photo_dim', v);
-	/* the slider fires continuously; commit to uci once it settles */
-	if (_pdimTimer) clearTimeout(_pdimTimer);
-	_pdimTimer = setTimeout(() => _persistUci('photo_dim', String(v)), 500);
-}
 
 return baseclass.extend({
 	/* the storage helpers, shared with fs-update.js's own axis */

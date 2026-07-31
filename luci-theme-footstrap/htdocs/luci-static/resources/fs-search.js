@@ -177,7 +177,7 @@ function recentEntries() {
  * session to a page still pays for its module chain. The recents list is the best predictor of that
  * page available anywhere in the theme — an admin lives in three or four of them — and it is already
  * on disk. Walking the whole menu instead would pull every view module on the box, which is the cost
- * docs/22 warns about; five recents is a handful of files.
+ * docs/spa-router.md warns about; five recents is a handful of files.
  *
  * The current page is skipped: wire() has just remembered it, so it heads the list, and it is loaded
  * by definition. saveData is the user saying "not over this link", and speculation is exactly what
@@ -242,7 +242,7 @@ function wire() {
 		note,
 		list
 	]);
-	/* data-fs-chrome marks a Zone 1 ROOT (CLAUDE.md): this is a `position: fixed` overlay parented
+	/* data-fs-chrome marks a Zone 1 ROOT (docs/third-party-apps.md): this is a `position: fixed` overlay parented
 	 * to <body>, i.e. outside the <nav> that carries the mark in header.ut — exactly the shape that
 	 * once left the Appearance popover unfenced while every test said the chrome was defended. */
 	const ov = E('div', {

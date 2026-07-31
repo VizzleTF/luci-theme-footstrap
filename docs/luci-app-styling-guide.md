@@ -1,6 +1,6 @@
-# 20. Styling a LuCI app so it works under any theme
+# Styling a LuCI app so it works under any theme
 
-*Русская версия: [20-luci-app-styling-guide_ru.md](20-luci-app-styling-guide_ru.md).*
+*Русская версия: [luci-app-styling-guide_ru.md](luci-app-styling-guide_ru.md).*
 
 This is written for authors of `luci-app-*` packages. It is not footstrap-specific advice: every
 rule below comes from a pattern found in a real, popular app, and every one of them is a bug on
@@ -10,7 +10,7 @@ specific, it is called out.
 The survey behind it: 20 apps read line by line (OpenClash, passwall/passwall2, ssr-plus, mosdns,
 vssr, ssclash, podkop, justclash, homeproxy, nikki, alist, dockerman, diskman, istore, AdGuardHome,
 netspeedtest, partexp, taskplan, plus stock `openwrt/luci`), and the top-starred apps rendered on a
-live router. Evidence lives in [19](19-third-party-luci-app.md).
+live router. Evidence lives in [third-party-apps.md](third-party-apps.md).
 
 ---
 
@@ -127,7 +127,7 @@ hardcoded colour with extra steps.
 
 ### 3.2. `--fs-*` is footstrap's PRIVATE tier — do not read it
 
-Open `cascade.css` and you will find 78 `--fs-*` custom properties with much better names than the
+Open `cascade.css` and you will find well over a hundred `--fs-*` custom properties with much better names than the
 export tier: `--fs-accent`, `--fs-panel2`, `--fs-radius`, `--fs-dim`, the whole z-index scale. **They
 are not yours.** They are internal, they are renamed and re-derived whenever the theme wants to, and
 no other LuCI theme has them at all. Only the `--*-color-*` names above are a contract.

@@ -18,7 +18,7 @@
  *   fs-prefs       the Appearance axes and their localStorage
  *   fs-widgets     disclosure primitives, the seg/slider controls, popup placement
  *   fs-chrome      mode menu, section tabs, the rail toggle, the "does it still fit" measurements
- *   fs-router      the SPA client router (docs/14)
+ *   fs-router      the SPA client router (docs/spa-router.md)
  *   fs-sheets      the guard against a view's injected CSS repainting every later page
  *   fs-search      the page-search palette (indexes the same tree, on first open)
  *   fs-appearance  the popover
@@ -32,7 +32,7 @@
  *
  * They compose by CALLING each other, never by inheriting: LuCI instantiates every required module
  * into a singleton, so `base.extend` across modules throws and a module cannot subclass another
- * (docs/11 — proven, not assumed). The same constraint is why the MAIN menu arrives as a callback:
+ * (docs/conventions.md — proven, not assumed). The same constraint is why the MAIN menu arrives as a callback:
  * menu-footstrap.js is the one renderer, and it injects renderMainMenu here rather than overriding
  * a method. LuCI raises DependencyError on a require() cycle, so the graph above is a DAG by
  * construction — the shared halves (fs-menutree, fs-prefs) were pulled out precisely so that no two

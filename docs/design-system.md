@@ -1,0 +1,331 @@
+# Design system: tokens, palettes, type
+
+What the theme's values are and why they are those values. How the stylesheet is built and how the
+cascade is kept disciplined: [css.md](css.md). What the chrome does with them:
+[chrome.md](chrome.md).
+
+Reference mock-ups: `docs/design/`.
+
+**There is one system.** One renderer (`menu-footstrap.js`), one template directory, one
+`cascade.css`, one entry in `luci.themes`. Layout (sidebar or top bar) is a **client setting**,
+`:root[data-layout]`, always with an explicit value.
+
+**No colour literals in this page on purpose** — a colour written in two places drifts, and it
+already has: this document was once read as the source for `--accent-soft: rgba(9,105,218,.10)`,
+the very per-component copy the project killed. Values live in `styles/02-tokens.css` and
+`styles/03-palettes.css`, with the reasoning in a comment beside each one.
+
+## Two tiers, and the split is load-bearing
+
+- **The private tier `--fs-*`** (`02-tokens.css`, `03-palettes.css`) — `--fs-bg`, `--fs-panel`,
+  `--fs-panel2`, `--fs-border`, `--fs-text`, `--fs-dim`, `--fs-faint`, `--fs-accent`,
+  `--fs-good/-warn/-danger`, `--fs-track`, plus the radius, z-index, duration and spacing scales.
+  **Every rule in the theme reads this and only this.**
+- **The export tier `--*-color-*`** — the conventional LuCI names (`--primary-color-high`,
+  `--text-color-*`, `--border-color-*`, `--on-*-color`), defined **from** the private tier and read
+  by **nobody** inside the theme. This is not a bridge, it is a one-way export:
+  `audit.py --strict` **fails the build** on any read of an export name from `styles/`.
+
+Why: `:root` is a **shared** scope, and every `luci-app-*` puts its CSS in the same document
+**unlayered**, where it outranks any `@layer`. One app declaring `:root { --accent: … }` — or
+`--radius`, `--text`, `--border`, names anyone would take — silently recoloured the whole theme.
+Reading **export** names from `base` was the wider hole still: `--text-color-high` is a
+*convention*, so an app declares it more readily.
+
+| Hostile `:root` over `gallery.html` | elements recoloured |
+|---|--:|
+| before the split | **312 of 336** (93%) |
+| after | **0** |
+
+The exception is a local variable declared inside the very rule that reads it (`--bd-color`,
+`--fg-color`, `--on-color`, `--focus-color`): a foreign `:root` cannot intercept those.
+
+```css
+/* NO — reading an export name; the gate fails */
+color: var(--text-color-medium);
+/* YES — the private tier */
+color: var(--fs-dim);
+```
+
+Third-party apps get the other side of this contract in
+[luci-app-styling-guide.md](luci-app-styling-guide.md).
+
+### The export tier is a RAMP, not a set of aliases
+
+`high`/`medium`/`low` must be **three different colours**: a consumer asks for a gradation and gets
+whatever we declared. All three were once aliases of one token — and `luci-app-podkop` drew its
+"no data" latency in `--primary-color-low`, i.e. the same bright accent as a live value. **A flat
+colour passes every contrast threshold there is**, so nothing failed; it failed at the user.
+
+The axis of the ramp is **chroma at constant lightness** (`color-mix(in oklch, …, var(--fs-dim))`).
+Both obvious alternatives were measured and rejected: fading `low` toward the surface spends
+contrast the palette does not have (in dark mode every accent on `--fs-panel2` already sits at
+4.56:1, i.e. +0.06 over AA), and pulling `high` toward `--fs-text` collapses the ramp in dark mode
+where `--fs-text` is nearly white.
+
+The binding constraint: apps read a level as `color:` about as often as `background:`, so **every**
+level must pass AA as text on `--fs-bg`/`--fs-panel`/`--fs-panel2` **and** carry a readable
+`--on-*-color` as a fill. `tools/export-tier.mjs` proves all of it across
+{footstrap, hicontrast} × {light, dark}, including that the ramp is not flat — the only check that
+can catch flatness. Borders are exempt from the text half: `--border-color-low` may legitimately
+fade into the surface, which is what a hairline is for.
+
+## Palettes
+
+Two, both in `styles/03-palettes.css`, one self-contained block per (palette × mode):
+**footstrap** (GitHub Primer colours, the default, filling a bare `:root`) and **hicontrast**
+(`data-palette="hicontrast"`). Light mode is the bare `:root`; dark is
+`:root[data-darkmode="true"]`. The file also carries the instructions for adding a palette.
+
+**hicontrast** is the same tokens, deeper and more saturated. Its light accents are deliberately
+darkened: they used to be *brighter* than the defaults, so a palette named "hicontrast" contrasted
+**worse** than the default (`--fs-good` as a label on `--fs-panel` — **2.55:1** against **5.08:1**).
+
+### Ink is per palette AND per mode
+
+`--fs-on-accent` / `--fs-on-good` / `--fs-on-warn` / `--fs-on-danger` live in `03-palettes.css`
+next to the fills they have to be readable on. A dark palette has **light** fills and therefore
+needs **dark** ink: one global `--fs-on-accent: #fff` failed WCAG AA on seven of eight dark fills,
+down to **1.69:1** against a required 4.5. A new palette must define all four and check them
+against its own fills.
+
+## The derived ladder: four steps, and the matrix is deliberately full
+
+A tint of a role is mixed **from** that role, so it follows the palette and cannot go stale. What
+it lacked was a **name**, and an unnamed step drifts silently: the same border was 40% in a table
+and 45% in an action panel, the same diff block 30% in `base` and 18% in `theme`, the same hover
+fill 12% here and 18% there — four forces where the design knows two.
+
+| Step | Strength | What it is |
+|---|--:|---|
+| `-soft` | 12% | a quiet fill — hover on an outline button |
+| `-fill` | 18% | a stronger fill — callout/diff, the invalid ring |
+| `-line` | 40% | a hairline border |
+| `-line-hi` | 55% | the same hairline on hover |
+
+The role × step matrix is **filled completely on purpose**, whether or not anything reads a cell
+today: a hole is exactly where the drift started (`--fs-accent-soft` existed, `good`/`warn`/
+`danger` had no sibling, and every rule invented its own percentage). `--fs-accent-soft` is the one
+member still in `03-palettes.css`, because its strength is the only one that depends on **mode**
+(10% light / 15% dark).
+
+Other derived values: `--fs-glass` (a frosted popup surface, panel at 96%) and `--fs-blur` (one
+blur radius for every frosted surface); `--fs-emboss` / `--fs-text-emboss` (a raised 1px edge);
+`--fs-hover-lift` (the one hover hint that cannot be a colour, since it brightens whatever fill the
+role set — and its **direction depends on mode**: light darkens, dark lightens);
+`--fs-focus-ring` and `--fs-focus-ring-invalid` (which takes `-fill`, not `-soft`: a red ring has
+to read as alarm).
+
+**The bar's blur stays, and that is a decision rather than an oversight.** `--fs-bar-bg` at 88% was
+chosen **for** the blur: content has to show through the strip, and without the blur it shows
+through sharply and reads as dirt under the text. One backdrop layer on one strip is what any
+native mobile navbar does — unlike `theme/15-wallpaper.css`, which **removed** the blur from every
+form button, where it was dozens of layers rather than one. It could not be measured either way:
+a main-thread rAF loop cannot see compositor work, and a headless browser does not rasterise at
+all, so the remaining step is a run on a real phone. Meanwhile there is a proper opt-out —
+`@media (prefers-reduced-transparency: reduce)` in `theme/95-a11y-media.css` switches
+`--fs-bar-bg`/`--fs-glass` to the opaque `--fs-panel` and kills `--fs-blur`. That is both an
+accommodation and a measured line of retreat, and it leaves the choice with the device's owner.
+
+**`--fs-bar-bg` (88%) is deliberately NOT merged with `--fs-glass` (96%)**: the bar is a thin strip
+the page scrolls under, and content showing through is the point; a dropdown carries a menu and has
+to stay readable. **`--fs-scrim` is the theme's one colour literal and stays one**: black at .7 is
+the absence of light behind a dialog, not a shade of any token.
+
+## Scales
+
+**Radius** — one user-facing base (Appearance → Rounding, **0–20 px**), from which three semantic
+radii are derived proportionally: cards/panels/modals/popovers, controls (inputs, buttons,
+dropdowns, tabs, menu items, logo) and small parts (chips, code, insets). Pills and toggles are
+always fully round. Every `border-radius` in `theme`/`pages` reads one of them.
+
+**Z-index** — `--fs-z-*`, and **every z-index in the theme comes from here**. Bottom to top:
+`raise` 2 → `sticky` 50 → `flyout` 70 → `header` 800 → `popover` 850 → `overlay` 900 →
+`tooltip` 1000 → `dropdown` 1100. Before the scale there were nine bare numbers across seven files
+and nothing fixing the order — the Appearance popover drew **on top of** an open modal. As a list,
+that bug is obvious.
+
+**Motion** — four durations, because the UI does four things: `--fs-dur` .15s (state change:
+colour, border, shadow, background, filter), `--fs-dur-move` .2s (transform, max-height),
+`--fs-dur-fade` .25s (something transient going away: spinner, notification), `--fs-dur-fill` .4s
+(a progress bar growing to its value). There were seven durations (.12/.125/.15/.2/.22/.25/.4) and
+four curves, none of them chosen.
+
+**There is deliberately no easing token**: every transition omits the timing function and takes the
+CSS default (`ease`) — one curve, nothing to keep in sync, and fewer bytes than naming it. A rule
+that needs a different curve should justify it in a comment, because it is making a design decision.
+
+**Spacing** — a half-step scale in `02-tokens.css`: `--fs-space-0-5`, `-1`, `-1-5`, `-2`, `-2-5`,
+`-3`, `-3-5`, `-4`, `-5`, `-6`, `-7`, `-8`, `-10` (the number is the step, `-1` = 4 px at normal
+density).
+
+**Density** multiplies both the spacing scale and the shell geometry, through two tokens the
+Density axis sets: `--fs-density-space` and `--fs-density-box`. Compact is `.65` / `.85`, Normal is
+`1` / `1` (a bare `:root`, so the default costs no attribute), Large is `1` / `1.15`. Every spacing
+and geometry token is a `calc()` over one of them — which is why the numbers below are quoted **at
+normal density**.
+
+**Shell geometry** — `--fs-sidebar-w` (224 px), `--fs-rail-w` (68 px), `--fs-content-min` (500 px),
+plus `--fs-content-max` (1280 px), `--fs-content-pad` (28 px) and `--fs-bar-h` (46 px) — **tokens
+rather than literals because the JS reads them**: `fitShell()` uses `getComputedStyle` to subtract
+the sidebar's slice from the viewport and decide whether the remaining column is readable. The JS
+used to keep its own copies against bare literals in the CSS, so narrowing the rail in styles left
+the measurement quietly subtracting the old width. Reading them through `getComputedStyle` is also
+what makes the measurement follow Density for free.
+
+Shadows are `--fs-shadow` (per mode) and `--fs-shadow-pop` (floating surfaces).
+
+## The Appearance axes
+
+The popover is `fs-appearance.js`; the values live in `fs-prefs.js`. In the order it draws them:
+
+| Axis | Values | `localStorage` | `:root` |
+|---|---|---|---|
+| **Layout** | sidebar / top | `fs-layout` | `data-layout` (always explicit) |
+| **Theme** | auto / light / dark | `fs-darkmode` | `data-darkmode` + `data-theme` + `data-bs-theme` |
+| **Palette** | footstrap / hicontrast | `fs-palette` | `data-palette` |
+| **Density** | compact / normal / large | `fs-density` | `data-density` |
+| **Wallpaper** | off / cats / **file** | `fs-wallpaper` | `data-wallpaper` |
+| **Tint** | off, hue 1–360° | `fs-tint` | `data-tint`, `--fs-tint-h` |
+| **Tint strength** | 0–200%, default 100 | `fs-tint-strength` | `--fs-tint-strength` |
+| **Accent** | off, hue 1–360° | `fs-accent` | `data-accent`, `--fs-accent-h` |
+| **Photo dim** | 0–100%, default 74 | `fs-photo-dim` | `--fs-photo-dim` |
+| **Rounding** | 0–20 px, default 12 | `fs-radius` | `--fs-radius-base` |
+| **Submenus** | keep open / auto-collapse | `fs-menu-autocollapse` | — (no attribute) |
+| **Updates** | check / off | — | — |
+
+**Updates is not the theme's axis.** It ships with the optional `luci-app-footstrap-updater`
+package, and the popover draws it only when that package is installed. See
+[updates.md](updates.md).
+
+**Photo dim** is the scrim over a `file` wallpaper. The photo's *bytes* are router-side — a file
+cannot live in `localStorage` — but how strongly a given browser dims it is an ordinary axis.
+
+Three more `fs-` keys are not popover axes: `fs-rail` (the sidebar collapsed to an icon rail,
+toggled in the chrome), `fs-menu-open` (the remembered set of open accordion sections) and
+`fs-recent` (the command palette's history). None of them has a router default, which is why
+`fs-rail` may delete its key on the off state where an axis may not.
+
+### Three layers, and the browser always wins
+
+The effective value of every axis is **`localStorage` ?? router default ?? built-in**.
+
+- The **router default** is what **Appearance → Save as default** writes: `saveAsDefault()` uci-sets
+  the axes into `/etc/config/footstrap`, and the server reads them back into `window.__fsSD`, which
+  `head.ut` stamps. So a new browser, an incognito window or a cleared cache inherits the router's
+  look — including the **pre-login page**, which is the point of putting the wallpaper there.
+- The **built-in** is a bare `:root`.
+- **This browser's own choice overrides the router default in either direction.**
+
+**Every applier therefore stores its choice EXPLICITLY, including the off/default value, and that
+is load-bearing.** Once a router default exists, clearing the key no longer means "the built-in" —
+it means "inherit whatever the router set". An applier that deleted the key on the default value
+could not express "I want the built-in, *not* the router default", so a router-defaulted tint could
+not be turned back off. `lsDel` is reserved for **Reset to default**, which drops back to the router
+default on purpose.
+
+### Nothing else writes to the router
+
+**`/etc/config/footstrap` is written by Save as default and by nothing else.** The only other uci
+writes in the whole popover are the login-background *token* on upload and its blanking on remove —
+the identity of a file that has to live on the router anyway.
+
+Two axes used to write through the moment they changed: `wallpaper` on every pick and `photo_dim`
+on every drag, on the argument that the File photo is router-side, so "which wallpaper shows it"
+and "how dim" belonged beside the image. The argument did not survive its consequence: choosing
+Cats in **one** browser silently re-pointed the router-wide default for every other device — and
+because the write also moved the Save baseline, the button did not even light up. A per-browser
+preference must never mutate shared state with no way to see that it did. Both are ordinary axes
+now.
+
+`/etc/config/footstrap` ships as an empty stub and is written at runtime, which is why it **must be
+declared a conffile** — see [package.md](package.md).
+
+**Every axis is implemented twice** — inline in `partials/head.ut` before first paint, where
+`require` is impossible because the module loader does not exist yet, and live in `fs-prefs.js`.
+The two cannot be merged byte for byte, so `tools/axes.mjs` derives the contract **from the JS** and
+checks the template against it: keys, `:root` attributes, custom properties, the 1–360 ranges, the
+rounding default — and the load-bearing ordering rule, **custom property first, attribute second**.
+Reversed, a reload paints exactly one frame in the previous hue. The gate exists for that one line:
+it would be fixed in the popover and forgotten in the template, and the only symptom is a single
+wrong frame nobody reports.
+
+### Tint and Accent
+
+Both are an angle 1–360°, both rotate `oklch(from …)`, and both default to "off" (no attribute).
+
+- **Tint** (`data-tint`, `--fs-tint-h`) washes a hue into the **canvas** (`--fs-bg`, the surface the
+  cards float on), so a whole LuCI reads as green / purple / amber at a glance. `localStorage` is
+  bound to the **origin**, so "which router is this" comes for free with no server state: the same
+  browser shows the main router green and the access point purple. **Nothing else moves** — cards,
+  chrome and semantic colours keep their palette values, because a status colour recoloured for
+  identification would start lying about status.
+
+  It rotates **chroma and hue rather than mixing a colour in**: `color-mix` in a polar space is a
+  trap (measured on a dark canvas, "2%" and "6%" at hue 165 gave the identical green — the knob
+  controlled nothing).
+
+  **Tint strength** (`--fs-tint-strength`, 0–200%, default 100) is the paired axis: the hue picks
+  the colour, this picks how strongly it reads. It is a multiplier on the tint chroma, it only
+  bites while a hue is set, and it is hidden and moot under a `file` wallpaper, where the tint
+  resets to neutral because the photo covers the canvas. Do not confuse it with **Photo dim**,
+  which darkens that photo rather than colouring the canvas.
+- **Accent** (`data-accent`, `--fs-accent-h`) is the same idea applied to the **interface** colour:
+  the rotation moves every accented control, because they all read `--fs-accent` or a `color-mix()`
+  from it. `oklch(from … l c H)` preserves the palette's lightness and chroma and changes only the
+  hue, so the contrast of `--fs-on-accent` — which follows lightness — holds at any angle. The ink
+  is **not** recomputed.
+
+To avoid a cycle (`--fs-bg` cannot be defined through itself — that is invalid at computed-value
+time and drops the colour silently), the palette declares the raw `--fs-bg-base` /
+`--fs-accent-base` / `--fs-accent-lt-base`, and exactly one block owns the derivation.
+
+## Typography
+
+- **Sans: Manrope, weights 600 and 700.** There is no 400: with only 600/700 present, `normal`
+  resolves to 600 by font matching, so body text renders semibold. Adding 400 is ~13 KB and
+  restyles every page — a decision for the owner, not a bug.
+- **Mono: JetBrains Mono, weight 400 only.** Numeric values, hostnames, versions, port names.
+
+**There is no bold mono and it must not come back.** `<strong>` is a **LABEL** — LuCI writes every
+status as `<strong>MAC:</strong> ac:1f:6b:…` — so on a monospace surface it takes the interface
+face instead (`theme/45-misc.css`; likewise `.ifacebadge` as a badge, and `code`/`pre`, whose
+literal must not inherit the container's emphasis). Before that rule, **227 elements across seven
+pages** rendered in bold mono and the browser fetched `jetbrains-mono-600` (**20 KB**) for the word
+"MAC:" — **30% of all font traffic**. Anything now asking for mono at weight ≥600 gets a synthetic
+bold that smears the monospace grid; if a rule "needs bold mono", the question is whether it is a
+label (then it is not mono at all), not whether to bring 20 KB back.
+
+**Excluding an element from the mono rule is not enough** — it still **inherits** mono from its
+parent. Sans has to be **assigned**. (The first attempt added `strong` to a `:not()` and changed
+nothing at all.)
+
+Sizes (px): card title 14/700; KPI number 27/700 mono; large number 38–40/700 mono; body 13–14;
+uppercase label 11/700 with `letter-spacing:.05em`; micro-caption 11–12 dim. Weight 800 from the
+mock-up is not loaded — 18 KB for six elements; everything that asked for 800 draws at 700.
+
+Fonts are **self-hosted** (the router is offline, plus CSP and privacy): `.woff2` in
+`htdocs/luci-static/footstrap/fonts/`, `@font-face` in `styles/01-fonts.css`. Each face is split by
+`unicode-range` into **latin / latin-ext / cyrillic** — 3 faces × 3 subsets, 9 files,
+**56 436 bytes** in the package. A latin UI fetches only the three latin subsets, **33 960 bytes**,
+and touches neither cyrillic nor latin-ext. The two latin Manrope subsets are preloaded in
+`partials/head.ut` because the chrome itself is drawn with them; JetBrains Mono is not preloaded
+(table cells come long after first paint, and Chrome warned the preload went unused).
+
+There is no numeric font-byte budget in CI any more. Lightness is held by judgement.
+
+## Components: mock-up primitive → LuCI class
+
+| Component | Spec | LuCI class to style |
+|---|---|---|
+| **Panel / card** | `--fs-panel` background, 1px `--fs-border`, `--fs-radius-lg` | `.cbi-section`, `.cbi-map > *`, `.table` containers |
+| **KPI card** | `--fs-radius-lg`; column of uppercase label + mono-27 number + dim caption | no direct analogue — status overview blocks |
+| **Progress bar** | track `--fs-track` at `--fs-radius-pill`; fill `--fs-accent`; value mono/dim over the right edge | `.cbi-progressbar` |
+| **Percent badge** | `font: 11/700; padding: 2px 7px`; colour + `-soft` fill by status | inline status in `.cbi-progressbar`, zonebadge |
+| **Status pill** | `--fs-radius-pill`; `--fs-panel2` fill, `--fs-border`; active text `--fs-good` | `#indicators [data-indicator]` |
+| **Menu item** | `--fs-radius`; active `--fs-accent-soft` on `--fs-accent`; inactive `--fs-dim` | `#topmenu li a`, sidebar nav |
+| **Logo** | 30px square, `--fs-radius`, gradient `--fs-accent` → `--fs-accent-lt`, wifi SVG on `currentColor`, wordmark 16/700 | `.fs-brand`/`.fs-logo` in `partials/brand.ut` |
+| **Table row** | flex, space-between, 1px `--fs-border` bottom; label dim, value mono | `.cbi-value`, `.table .tr` |
+
+Rings, sparklines and port tiles from the mock-up are **content**, drawn by view JS — not something
+a theme can produce. See the boundary in [architecture.md](architecture.md).

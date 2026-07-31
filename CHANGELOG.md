@@ -5,11 +5,29 @@ Notable changes to `luci-theme-footstrap`, newest first. Format is
 [Conventional Commits](https://www.conventionalcommits.org/), versions are
 [SemVer](https://semver.org/). Sections, in fixed order: Added, Changed,
 Deprecated, Removed, Fixed, Security, Performance — one of each per release.
-Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelog-style-and-format.md).
+Style and format guide: [docs/releasing.md](docs/releasing.md).
 
 [CHANGELOG_ru.md](CHANGELOG_ru.md) mirrors this file. Edit both in one commit.
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
+
+## [Unreleased]
+
+### Changed
+
+- **The documentation is rebuilt around one job per page, and the pages that stopped being true are gone.** 26 files became 16, 8132 lines became 4862, and the whole set is English with one Russian mirror for the outward-facing app-authors' guide. Four documents were retired: a 1023-line audit snapshot that already described itself as historical with stale `file:line` references, a design-phase page whose roadmap was closed, an SPA best-practices essay and a sources list — every live constraint in them moved to the page where it actually applies. The jsmin regex trap had been written out six times, the trust chain four, the token tiers four; each now lives in one place and is linked to. Numbers were re-measured against the code rather than copied forward: the stylesheet is 134 894 bytes, not the 111/121/124 KB three pages claimed, `!important` is 26 rather than 33 or 38, CI has six jobs rather than four, and `Build/Prepare` has seven steps rather than four.
+
+- **The invariants the docs deferred to now exist in the repository.** 36 references pointed at a `CLAUDE.md` that is deliberately not committed, and seven more at tooling under `.claude/` that no clone contains — a third of the cross-references led nowhere. They are now `docs/conventions.md`, and the 29 `docs/NN` references embedded in source comments, tools and the workflow were rewritten to the new filenames so the code and the documentation still point at each other.
+
+- **Three mechanisms that were load-bearing and undocumented are written down**: the chrome fence (the marker, the fence and the pin that must agree, and the gate that derives the marker from the markup), the command palette, and why `/etc/config/footstrap` has to be declared a conffile — an undeclared one is replaced on upgrade, so the theme's own Update button wiped the admin's saved defaults and reported success.
+
+- **owlab is a documented requirement, not a convenience.** A change that alters behaviour is not finished until it has run on a real OpenWrt userland on both package managers. Every gate in this repository is static — they read files, and not one of them opens a page — which is exactly why the two bugs above survived a green `npm run check`. `docs/development.md` now covers installing owlab, the fixtures that make the stand useful, and the `owlab test` invocation, one per package format: `--install` is a host-side glob evaluated once per router, so a pattern matching both formats hands the apk box an ipk and fails on both (upstream: owfeed/owlab#2).
+
+### Fixed
+
+- **Picking a wallpaper or dragging the photo-dim slider no longer rewrites the router-wide default for every other device.** Both axes wrote straight to `/etc/config/footstrap` the moment they changed, on the argument that the File photo is router-side so "which wallpaper shows it" and "how dim" belonged beside the image. The argument did not survive its consequence: choosing Cats in one browser silently re-pointed the default every other browser inherits, and because the write also moved the Save baseline, the "Save as default" button did not even light up to say so. Reproduced on a live 25.12 router — one wallpaper click left `footstrap.settings.wallpaper='cats'` and `photo_dim='30'` in uci with nothing pressed. Photo dim is now an ordinary per-browser axis like the other ten, stored in `localStorage` under `fs-photo-dim` and pre-painted from `head.ut`; uploading a photo still writes its cache-bust token, because a file cannot live in `localStorage`, but no longer forces `wallpaper=file` on the whole router. Every appearance axis now reaches `/etc/config/footstrap` through Save as default and through nothing else.
+
+- **The router-wide Density default reached no browser at all.** `Save as default` wrote `density` into `/etc/config/footstrap`, and `header.ut` then never read it back: `fs_defaults` is an explicit list of options and `density` was missing from it, so the server stamped `__fsSD.density` as `""` whatever the config said. A fresh browser inherited the saved layout, palette, tint and rounding, and silently fell back to Normal density. Nothing could catch it — `tools/axes.mjs` holds the pre-paint against the live applier and both were correct; the gap was the server read that feeds them. Found by running the change on a real router rather than by a gate.
 
 ## [0.11.7] — 2026-07-29
 
@@ -3262,6 +3280,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.11.7]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.6...v0.11.7
 [0.11.6]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.5...v0.11.6
 [0.11.5]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.4...v0.11.5
 [0.11.4]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.3...v0.11.4

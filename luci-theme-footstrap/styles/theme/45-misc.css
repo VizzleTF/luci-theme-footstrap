@@ -121,7 +121,7 @@
 	.pager.center { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center; gap: var(--fs-space-2-5); padding: var(--fs-space-3-5) 0; }
 	.pager .text { flex: 0 0 auto; font-size: var(--fs-type); color: var(--fs-dim); }
 
-	/* The heading ramp — absorbed from base wholesale (docs/17, the "native elements and
+	/* The heading ramp — absorbed from base wholesale (docs/css.md, the "native elements and
 	 * typography" category). Stock LuCI hands h2 to a page title and h3/legend to a section
 	 * title, and the heading-card rule below + theme/30-tables.css repaint exactly those two —
 	 * so most of the ramp is only ever rendered by a third-party luci-app-*; it is styled

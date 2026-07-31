@@ -7,7 +7,7 @@
  * do not add a font without adding its notice there.
  *
  * SPLIT BY SCRIPT (unicode-range) — the point of this file. uhttpd serves /www/luci-static/*
- * with NO compression (docs/18), so bytes on disk are bytes on the wire and the fonts are the
+ * with NO compression (docs/css.md), so bytes on disk are bytes on the wire and the fonts are the
  * most expensive thing the theme ships. Each face used to be ONE file carrying Latin AND
  * Cyrillic (19-25 KB), so an English UI paid for every Cyrillic glyph it never draws. Measured
  * in Chromium against the live router over seven pages:

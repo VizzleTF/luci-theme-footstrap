@@ -5,7 +5,7 @@ update machinery is a **separate, optional package in its own repository**
 (`luci-app-footstrap-updater`) — that split is deliberate, see below — but it still
 runs inside the theme's document at runtime, so this doc covers both sides. The
 working invariants (fail-closed, the trust chain, why the worker daemonises) are also
-in CLAUDE.md in condensed form; this doc is the whole picture, from the button press
+in [conventions.md](conventions.md) in condensed form; this doc is the whole picture, from the button press
 to the page reload.
 
 ## Where it lives, and why it is a separate REPOSITORY
@@ -42,7 +42,13 @@ Why separate, not folded into the theme: **no theme module may statically requir
 a `DependencyError` that would take out the whole chrome. A router without the
 updater is an ordinary state: the theme loads `fs-update` at runtime with
 `L.require('fs-update')` from `fs-appearance.js`, resolves it to `null` on failure,
-and simply draws no update controls. The version (from `fs-version.js`, which is the
+and simply draws no update controls.
+
+That require is gated on `window.__fsUpd`, which `partials/head.ut` sets by globbing
+`/www/luci-static/resources/fs-update.js` **on the server**. A bare require on a router without
+the updater is a guaranteed 404 in the browser console, because the module loader has to XHR the
+file to learn it is absent — the server already knows, so it is asked instead. The probe fails
+closed, and the load is deferred to idle so it does not compete with the view's own modules. The version (from `fs-version.js`, which is the
 theme's) always shows; the Update controls only when the updater is installed.
 
 The router↔updater seam is inverted for the same reason: `fs-router.js` exports
@@ -173,7 +179,7 @@ to put anything in the DOM.
 
 **Breaking-change warning.** A coloured banner appears above the notes when the
 release looks like it needs care before updating. The signal is the notes text, and
-the maintainer controls it through the changelog wording (docs/21): the banner fires
+the maintainer controls it through the changelog wording ([releasing.md](releasing.md)): the banner fires
 when the body carries a `### Removed` or `### Security` heading, or the word
 `breaking` (case-insensitive). It is **advisory** — it does not block the update, it
 tells the admin to read the notes first. There is deliberately no version-jump
@@ -349,9 +355,9 @@ Update button → Update (in dialog)
 
 ## See also
 
-- CLAUDE.md — the "update CHECK / self-update", "trust chain" and "Package /
-  registration" sections carry the invariants in condensed form.
-- [docs/14](14-spa-router.md) — the SPA router and `onNavigate`, through which the
+- [conventions.md](conventions.md) — the trust chain and the packaging invariants in
+  condensed form.
+- [spa-router.md](spa-router.md) — the SPA router and `onNavigate`, through which the
   updater cancels its poll on navigation.
-- [docs/13](13-ci-build-distribution.md) — how a release is signed and published
+- [ci.md](ci.md) — how a release is signed and published
   (the other side of the trust chain the self-updater verifies).

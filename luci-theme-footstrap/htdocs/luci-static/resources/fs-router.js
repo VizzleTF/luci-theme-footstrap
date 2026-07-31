@@ -18,7 +18,7 @@
  * Re-instantiation: L.require('view.x') returns a cached SINGLETON whose __init__ (the render)
  * already ran, so calling it again repaints nothing. Take the class off the instance
  * (prototype.constructor) and `new v.constructor()` for a fresh __init__ → load()+render(), which is
- * what a full load does anyway. docs/14.
+ * what a full load does anyway. docs/spa-router.md.
  *
  * The path->node half lives in fs-menutree.js (the chrome needs it too); the "has a view poisoned
  * this document with its CSS?" half in fs-sheets.js. */
@@ -64,7 +64,7 @@ let _navGen = 0;
  * In the top layout the document scrolls and the browser's own scrollRestoration ('auto') restores it
  * on popstate. In the sidebar layout the scroller is #maincontent (.fs-main owns overflow-y), and a
  * browser restores INNER scrollable regions only across full loads, never on a same-document
- * traversal — measured (docs/22 §2): Back opened the incoming page at 0, because the swap empties
+ * traversal — measured (docs/spa-router.md §2): Back opened the incoming page at 0, because the swap empties
  * #view, scrollHeight collapses and the browser clamps scrollTop. So the router records the offset
  * itself. NOT by replaceState on scroll: Safari rate-limits history writes (100 per 30 s) and a
  * scroll listener trips it. Each SPA entry instead carries a session-unique id (fsid) in
@@ -95,7 +95,7 @@ function saveScroll() {
 }
 
 /* Put #maincontent back where the entry left it — but only once the incoming view has grown that
- * much height (docs/22 §5: restoring before the content exists is clamped to 0 and reads as
+ * much height (docs/spa-router.md §5: restoring before the content exists is clamped to 0 and reads as
  * "worked"). The view renders behind an RPC, so poll by frame; a newer navigation cancels via the
  * generation, and a page that never reaches the old height again is simply left at the top. */
 function restoreScroll(top, gen) {
@@ -509,7 +509,7 @@ function navigate(pathname, push, kbd) {
 	 * the browser itself (scrollRestoration is 'auto'), and #maincontent (sidebar layout) is restored
 	 * by the popstate handler from _scrollMem — see restoreScroll(), and do not reach for
 	 * `history.scrollRestoration = 'manual'` here: it is inert for #maincontent and would take the
-	 * top layout's working document restoration away (docs/22 §2). */
+	 * top layout's working document restoration away (docs/spa-router.md §2). */
 	if (push) {
 		window.scrollTo(0, 0);
 		const sc = document.getElementById('maincontent');
@@ -520,7 +520,7 @@ function navigate(pathname, push, kbd) {
 	 * renderChrome() has just done `#topmenu.innerHTML = ''`, so the very <a> the user activated with
 	 * Enter no longer exists: focus falls back to <body>, the next Tab restarts at the skip link, and
 	 * nothing says the page changed — URL, title and #view all moved in silence. So do what a real
-	 * navigation would, and where matters (Sutton's five-prototype study, docs/22 §3): a KEYBOARD
+	 * navigation would, and where matters (Sutton's five-prototype study, docs/spa-router.md §3): a KEYBOARD
 	 * activation (ev.detail === 0) moves focus to the skip link — a small target whose :focus overlay
 	 * tells a sighted keyboard user where they are, with Enter jumping straight to the content; its
 	 * text differs from the live region's announcement below, so the double announcement complements
@@ -538,7 +538,7 @@ function navigate(pathname, push, kbd) {
 	/* Require through the runtime singleton `window.L`, NOT the bare `L` a module factory is handed:
 	 * the dispatcher builds `window.L = new LuCI()` and `ui` augments THAT instance with
 	 * itemlist/showModal/…, so a view required via the bare `L` throws "L.itemlist is not a
-	 * function" mid-render (the two-L trap, docs/14). require/instanceof errors fall back to a real
+	 * function" mid-render (the two-L trap, docs/spa-router.md). require/instanceof errors fall back to a real
 	 * navigation; render-time errors are handled inside LuCI.view, as on a full load.
 	 *
 	 * WHEN to re-instantiate is the subtle part. require() does not hand back a class — it caches an
@@ -727,7 +727,7 @@ document.addEventListener('poll-stop', () => {
  * overview left open in a background tab hammers ubus 24/7 (notably the pricey iwinfo getAssocList)
  * on a low-power router. stop() only clearInterval()s (the queue survives); start() re-arms and runs
  * one immediate step(), so data is fresh on refocus. A poller added while hidden will not auto-start
- * (stop() deletes the tick) — start() picks it up on show: deferred, not lost. docs/14. */
+ * (stop() deletes the tick) — start() picks it up on show: deferred, not lost. docs/spa-router.md. */
 let _visWired = false;
 function wireVisibility() {
 	if (_visWired) return;

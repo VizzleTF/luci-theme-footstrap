@@ -43,7 +43,7 @@ if [ ! -d "$SDK_DIR" ]; then
 	# LINTERS pinned by commit and sha256; the toolchain that compiles the artifact arrives on TLS).
 	# `sha256sums` alone is NOT a verification — it is served by the same host from the same
 	# directory, unsigned, so whoever can replace the tarball replaces the checksum beside it (see
-	# CLAUDE.md on GitHub's asset digest). What makes it one is the ed25519 signature over that file,
+	# docs/conventions.md on GitHub's asset digest). What makes it one is the ed25519 signature over that file,
 	# checked with a key pinned from a DIFFERENT host (github.com/openwrt/keyring). Fails CLOSED.
 	#
 	# Every pin comes from luci-upstream.pin — the keyring commit, usign, and the branch's own

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* The changelog contract (docs/21), held by a machine — because it drifts silently and the
+/* The changelog contract (docs/releasing.md), held by a machine — because it drifts silently and the
  * release page is generated from it.
  *
  * THE BUG THIS EXISTS FOR, found by hand while cutting 0.9.2: `[Unreleased]` had accumulated a
@@ -16,7 +16,7 @@
  * observable on a release page nobody re-reads.
  *
  * WHAT IS DELIBERATELY NOT CHECKED: the prose. "Write the effect, keep the measurement, say what
- * the rule protects" (docs/21) is what makes an entry worth reading, and no scanner can judge it.
+ * the rule protects" (docs/releasing.md) is what makes an entry worth reading, and no scanner can judge it.
  * This holds the mechanical half — the half that breaks the generator.
  */
 import { readFileSync } from 'node:fs';
@@ -24,7 +24,7 @@ import { join } from 'node:path';
 
 import { ROOT } from './lib/root.mjs';
 
-/* Keep a Changelog's order, `Performance` appended (docs/21). The RU mirror's names are the same
+/* Keep a Changelog's order, `Performance` appended (docs/releasing.md). The RU mirror's names are the same
  * list in the same order — that is what lets the two files be compared by INDEX rather than by
  * name, so only the prose language may differ. */
 const CANON = {
@@ -127,7 +127,7 @@ for (const [file, canon] of Object.entries(CANON)) {
 						`drop it silently:\n         ${b.text.slice(0, 72)}…`);
 }
 
-/* THE MIRROR: same facts, only the prose language differs (docs/21). A mirror that lags is worse
+/* THE MIRROR: same facts, only the prose language differs (docs/releasing.md). A mirror that lags is worse
  * than none — the reader cannot tell which copy is stale — and nothing renders differently when it
  * does, so only a comparison finds it. Sections are matched by CANONICAL INDEX, never by name. */
 const en = parse('CHANGELOG.md'), ru = parse('CHANGELOG_ru.md');
@@ -171,7 +171,7 @@ console.log(`changelog: ${vcount} version(s), mirror in lockstep, sections canon
 if (fails.length) {
 	console.error('\nchangelog: FAILED\n');
 	for (const f of fails) console.error(`  ${f}`);
-	console.error('\nThe contract is docs/21-changelog-style-and-format.md. Both files are edited in one commit.');
+	console.error('\nThe contract is docs/releasing.md. Both files are edited in one commit.');
 	process.exit(1);
 }
 

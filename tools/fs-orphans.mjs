@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* Dead-selector check, scoped to the theme's OWN namespace — the scoping is the whole point.
  *
- * PurgeCSS/uncss/coverage-pruning are ACTIVELY DANGEROUS here. CLAUDE.md: "never drop the styling
+ * PurgeCSS/uncss/coverage-pruning are ACTIVELY DANGEROUS here. docs/conventions.md: "never drop the styling
  * of a selector because no shipped LuCI page uses it." Content is rendered by third-party
  * luci-app-* JS, so a `.cbi-*` selector with no example on this router is still styled for the
  * package that emits it on someone else's — anything pruning what it did not SEE rendered
@@ -38,7 +38,7 @@ const IGNORE_EXACT = new Set([
 	/* localStorage keys (fs-update-check lives in the optional updater's own repo, not scanned here) */
 	'fs-darkmode', 'fs-palette', 'fs-wallpaper', 'fs-radius', 'fs-tint', 'fs-accent',
 	'fs-rail', 'fs-layout', 'fs-menu-open', 'fs-menu-autocollapse', 'fs-recent', 'fs-tint-strength',
-	'fs-density',
+	'fs-density', 'fs-photo-dim',
 	/* custom events / id prefixes */
 	'fs-autocollapse', 'fs-sub-', 'fs-topsub-',
 	/* a console log PREFIX (`console.error('fs-fit: a fitter threw')`), not markup. This is the one

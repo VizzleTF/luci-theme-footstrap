@@ -116,7 +116,7 @@ USAGE
       .venv/bin/python -m playwright install chromium
   LUCI_PW=<router-root-password> .venv/bin/python bench/nav-benchmark.py \
       [--ssh-host router] [--runs 5] [--headful]
-  See docs/15-benchmark-navigation.md for the full recipe.
+  See docs/benchmark.md for the full recipe.
 """
 import argparse, json, os, re, statistics, subprocess, sys, time
 

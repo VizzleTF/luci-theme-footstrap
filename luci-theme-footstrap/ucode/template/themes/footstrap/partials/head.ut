@@ -194,9 +194,11 @@
 					if (tsRaw === null) ts = (sd.tint_strength >= 0 ? sd.tint_strength : 100);
 					if (ts >= 0 && ts <= 200 && ts !== 100)
 						root.style.setProperty('--fs-tint-strength', String(ts / 100));
-					/* the File photo's scrim opacity — a SHARED router value (no localStorage), default
-					   74% lives in the CSS token. */
-					const pd = (sd.photo_dim >= 0 ? sd.photo_dim : 74);
+					/* the File photo's scrim opacity — an ordinary per-browser axis, same shape as
+					   the tint strength above; the 74% default lives in the CSS token. */
+					const pdRaw = localStorage.getItem('fs-photo-dim');
+					let pd = parseInt(pdRaw, 10);
+					if (pdRaw === null) pd = (sd.photo_dim >= 0 ? sd.photo_dim : 74);
 					if (pd >= 0 && pd <= 100 && pd !== 74)
 						root.style.setProperty('--fs-photo-dim', pd + '%');
 				} catch (e) {}
