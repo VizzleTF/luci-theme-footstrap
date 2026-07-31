@@ -376,6 +376,13 @@ function wire() {
 
 	btn.addEventListener('click', () => { ov.hidden ? open() : close(); });
 
+	/* Back and Forward are navigations no listener here can see: every close above is a user act on
+	 * the document (Escape, the scrim, the trigger, picking a result). An open palette therefore rode
+	 * a popstate onto the next page, aria-modal and Tab-trapped, while the router moved focus behind
+	 * it. Same reasoning as the Appearance popover's — see fs-appearance.js. returnFocus=false because
+	 * the router places focus itself on a navigation. */
+	router.onNavigate(() => close(false));
+
 	/* Ctrl/Cmd+K is the shortcut every command palette has taught users, and `/` is the one every
 	 * search field on the web has. `/` only when the user is not already typing somewhere: an
 	 * <input>, a contenteditable, or a .cbi-dropdown (fs-select.js gives those their own typeahead,

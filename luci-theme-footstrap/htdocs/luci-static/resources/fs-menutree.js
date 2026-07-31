@@ -104,6 +104,39 @@ function resolveSegs(segs) {
 	return null;
 }
 
+/* ---- readonly is a property of the PATH, not of the leaf ----
+ *
+ * The dispatcher decides it twice over, from two different inputs. apply_tree_acls()
+ * (dispatcher.uc:442) walks the menu JSON handed to the client and marks a NODE readonly when its
+ * OWN `depends.acl` resolves to read-without-write. The request path instead accumulates every
+ * ancestor's acls into ctx.acls and stamps the leaf from the accumulation
+ * (`resolved.node.readonly = !perm`, :1003). So a leaf that declares no acl of its own still comes
+ * back readonly from a real GET, while its node in the tree carries nothing at all.
+ *
+ * Reading the leaf alone therefore loses it, and did: measured on the stand, a full load of
+ * admin/status/logs/syslog reports nodespec.readonly true — the flag sits on `logs`, two levels up —
+ * against false on an SPA arrival, and the same for dmesg and all four realtime graphs. luci.js
+ * implements hasViewPermission() as `!env.nodespec.readonly`, which is what views and luci.js's own
+ * Save/Apply footer key their disabled state off, so on a session with narrower ACLs than root's
+ * this is any page whose SECTION is read-only.
+ *
+ * OR down the path, exactly as check_acl_depends() folds the accumulated list: one read-only acl
+ * anywhere on it is enough. Feed it the RESOLVED segments, since that is the path the dispatcher
+ * accumulates over. */
+function readonlyForSegs(segs) {
+	let node = _tree;
+	if (node && node.readonly === true)
+		return true;
+	for (let i = 0; i < segs.length; i++) {
+		node = node && node.children && node.children[segs[i]];
+		if (!node)
+			return false;
+		if (node.readonly === true)
+			return true;
+	}
+	return false;
+}
+
 /* The view class a menu node instantiates, or null if the node isn't SPA-able. The Status→Overview
  * `template` node maps to view.status.index (its server template just instantiates that — see
  * ensureOverviewHelpers in fs-router.js). Shared by navigate() and the hover prefetch. */
@@ -128,5 +161,6 @@ return baseclass.extend({
 	segsFromPath,
 	currentNode,
 	resolveSegs,
+	readonlyForSegs,
 	viewClassFor
 });

@@ -60,18 +60,27 @@ let _curPath = window.location.pathname;
  * URL/title/chrome. A resolved require whose generation is stale renders nothing. */
 let _navGen = 0;
 
-/* ---- Back must restore the sidebar layout's scroll, and the DOCUMENT is not the scroller there ----
- * In the top layout the document scrolls and the browser's own scrollRestoration ('auto') restores it
- * on popstate. In the sidebar layout the scroller is #maincontent (.fs-main owns overflow-y), and a
- * browser restores INNER scrollable regions only across full loads, never on a same-document
- * traversal — measured (docs/spa-router.md §2): Back opened the incoming page at 0, because the swap empties
- * #view, scrollHeight collapses and the browser clamps scrollTop. So the router records the offset
- * itself. NOT by replaceState on scroll: Safari rate-limits history writes (100 per 30 s) and a
- * scroll listener trips it. Each SPA entry instead carries a session-unique id (fsid) in
- * history.state, and the offsets live in this in-memory Map — lost on a full load, which is exactly
- * when the browser's own scrollable-region restoration takes over. The id is session-prefixed
- * because a bare counter restarts with every document: an entry stamped by a PREVIOUS document of
- * this tab would collide with a fresh one and restore another page's offset. */
+/* ---- Back must restore the scroll of WHICHEVER element is the scroller ----
+ * The two layouts scroll different elements: the sidebar layout pins .fs-shell to 100dvh and gives
+ * overflow-y to .fs-main (#maincontent), the top layout lets the document scroll. A browser restores
+ * an INNER scrollable region only across full loads, never on a same-document traversal — measured
+ * (docs/spa-router.md §2): Back opened the incoming page at 0, because the swap empties #view,
+ * scrollHeight collapses and the browser clamps scrollTop.
+ *
+ * The DOCUMENT scroller was left to the browser's own scrollRestoration ('auto') on the grounds that
+ * it is the case a UA does handle — and that is wrong for the same reason, measured on the stand: in
+ * the top layout, scroll Processes to 400, open System, press Back, and the page opens at 0 (the
+ * sidebar layout, restored here, comes back at 400). The UA restores at the traversal, i.e. BEFORE
+ * this handler swaps #view; the height then collapses under the restored offset and the clamp takes
+ * it back to 0, with nothing left to re-apply it. So record and replay BOTH offsets; the one that is
+ * not this layout's scroller is 0 and skipped.
+ *
+ * NOT by replaceState on scroll: Safari rate-limits history writes (100 per 30 s) and a scroll
+ * listener trips it. Each SPA entry instead carries a session-unique id (fsid) in history.state, and
+ * the offsets live in this in-memory Map — lost on a full load, which is exactly when the browser's
+ * own scrollable-region restoration takes over. The id is session-prefixed because a bare counter
+ * restarts with every document: an entry stamped by a PREVIOUS document of this tab would collide
+ * with a fresh one and restore another page's offset. */
 const _scrollMem = new Map();
 const _scrollSess = Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 let _histN = 0;
@@ -90,23 +99,50 @@ function adoptEntry() {
 /* the outgoing DOM is still on screen at both call sites (the click, the popstate), so this must
  * run BEFORE _curId moves on to the incoming entry */
 function saveScroll() {
+	if (!_curId) return;
 	const sc = document.getElementById('maincontent');
-	if (_curId && sc) _scrollMem.set(_curId, sc.scrollTop);
+	_scrollMem.set(_curId, { win: Math.round(window.scrollY) || 0, main: sc ? sc.scrollTop : 0 });
 }
 
-/* Put #maincontent back where the entry left it — but only once the incoming view has grown that
+/* Put the scrollers back where the entry left them — but only once the incoming view has grown that
  * much height (docs/spa-router.md §5: restoring before the content exists is clamped to 0 and reads as
  * "worked"). The view renders behind an RPC, so poll by frame; a newer navigation cancels via the
- * generation, and a page that never reaches the old height again is simply left at the top. */
-function restoreScroll(top, gen) {
-	if (!top) return;
+ * generation, and a page that never reaches the old height again is simply left at the top. Each
+ * offset is waited for on its OWN scroller, so a layout switched between the two entries restores
+ * whichever half it can rather than blocking on the half that no longer scrolls. */
+function restoreScroll(pos, gen) {
+	if (!pos || (!pos.win && !pos.main)) return;
 	let tries = 300; /* ~5 s at 60 fps — outlasts a slow RPC without polling forever */
 	(function tick() {
 		if (gen !== _navGen || --tries < 0) return;
+		const de = document.documentElement;
 		const sc = document.getElementById('maincontent');
-		if (sc && sc.scrollHeight - sc.clientHeight >= top) sc.scrollTop = top;
-		else requestAnimationFrame(tick);
+		let pending = false;
+		if (pos.main) {
+			if (sc && sc.scrollHeight - sc.clientHeight >= pos.main) sc.scrollTop = pos.main;
+			else pending = true;
+		}
+		if (pos.win) {
+			if (de.scrollHeight - de.clientHeight >= pos.win) window.scrollTo(0, pos.win);
+			else pending = true;
+		}
+		if (pending) requestAnimationFrame(tick);
 	})();
+}
+
+/* ---- the host half of "<host> | <page>" is read ONCE ----
+ * head.ut stamps it and it cannot change within a document, but navigate() used to re-derive it from
+ * the LIVE document.title on every hop — so any page that renames the tab became the host for every
+ * page after it, until a full load. Third-party views do rename it (log viewers, dashboards), and it
+ * takes only one: measured on the stand, a view setting `document.title = 'ACME Dashboard'` left the
+ * next hops reading "ACME Dashboard | Routing", "ACME Dashboard | System". Captured at seed(), i.e.
+ * at chrome init on the full load that started the session; the lazy branch is for a document whose
+ * chrome came up without seed() having run. */
+let _titleHost = null;
+function titleHost() {
+	if (_titleHost === null)
+		_titleHost = (document.title.split('|')[0] || '').trim();
+	return _titleHost;
 }
 
 /* The view class the page CURRENTLY on screen wants (what _curPath resolves to). Read by the
@@ -325,6 +361,7 @@ function seed() {
 	const here = tree.viewClassFor(tree.currentNode());
 	if (here)
 		_seen.add(here);
+	titleHost();	/* before any view can rename the tab — see there */
 	/* the served page's entry needs an id too, or the first Back TO it has nothing to look up */
 	adoptEntry();
 }
@@ -459,9 +496,12 @@ function navigate(pathname, push, kbd) {
 	/* `readonly` is not decoration: luci.js implements hasViewPermission() as
 	 * `!env.nodespec.readonly`, and views (network/interfaces, wireless, the package manager)
 	 * plus luci.js's Save/Apply footer key their disabled state off it. Dropping it handed a
-	 * read-only user LIVE Save/Apply buttons on an SPA nav, where a full load disabled them. */
+	 * read-only user LIVE Save/Apply buttons on an SPA nav, where a full load disabled them —
+	 * and reading it off the LEAF was still dropping it for two thirds of the readonly pages,
+	 * because the dispatcher folds the acls of the whole path into that one flag. See
+	 * fs-menutree's readonlyForSegs(). */
 	L.env.nodespec     = { satisfied: true, action: node.action, title: node.title,
-	                       depends: node.depends, readonly: node.readonly };
+	                       depends: node.depends, readonly: tree.readonlyForSegs(rsegs) };
 
 	/* Keep <body data-page> in sync with the route: the server stamps the dispatch path
 	 * (`ctx.path`) on every full load, and page-scoped CSS keys off it. `rsegs` is the RESOLVED
@@ -491,8 +531,7 @@ function navigate(pathname, push, kbd) {
 	}
 
 	/* titles: <host> | <page> */
-	const host = (document.title.split('|')[0] || '').trim();
-	document.title = node.title ? (host + ' | ' + _(node.title)) : host;
+	document.title = node.title ? (titleHost() + ' | ' + _(node.title)) : titleHost();
 	const tmain = document.querySelector('.fs-title-main');
 	if (tmain && node.title)
 		tmain.textContent = _(node.title);
@@ -505,11 +544,10 @@ function navigate(pathname, push, kbd) {
 	 * can be static rather than a composited sticky layer (issue #7) — so reset it too; scrollTo on
 	 * whichever of the two is not the scroller is a harmless no-op.
 	 *
-	 * A popstate replay resets nothing on purpose: the DOCUMENT scroller (top layout) is restored by
-	 * the browser itself (scrollRestoration is 'auto'), and #maincontent (sidebar layout) is restored
-	 * by the popstate handler from _scrollMem — see restoreScroll(), and do not reach for
-	 * `history.scrollRestoration = 'manual'` here: it is inert for #maincontent and would take the
-	 * top layout's working document restoration away (docs/spa-router.md §2). */
+	 * A popstate replay resets nothing on purpose: BOTH scrollers are restored there from _scrollMem —
+	 * see restoreScroll(). scrollRestoration is left at 'auto': the UA's own attempt lands before the
+	 * swap and is undone by it (§2), so it neither helps nor hurts, and 'manual' would only take away
+	 * the case that does work — a genuine full load. */
 	if (push) {
 		window.scrollTo(0, 0);
 		const sc = document.getElementById('maincontent');

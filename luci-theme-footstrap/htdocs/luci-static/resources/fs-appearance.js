@@ -3,6 +3,7 @@
 'require fs-prefs as prefs';
 'require fs-widgets as widgets';
 'require fs-version as ver';
+'require fs-router as router';
 
 /* The Appearance popover: the DOM that presents the axes. It owns no preference and no update
  * machinery — fs-prefs.js holds the axes, fs-version.js the version string; this file is the dialog
@@ -454,6 +455,23 @@ function wireAppearance(update) {
 	 * flyout from a BUBBLE-phase click listener on document, which never saw the event, so opening
 	 * Appearance from a collapsed rail left the flyout hanging open underneath. */
 	btn.addEventListener('click', () => { pop.hidden ? open() : close(); });
+
+	/* ---- a history traversal is a navigation too, and nothing here can see it ----
+	 * The three ways this popover closes are all USER acts on the document: a click outside, Escape,
+	 * the trigger. Back and Forward are none of them, so an open popover rode a popstate onto the
+	 * next page — measured on the stand: open Appearance, press Back, and the dialog is still up with
+	 * aria-expanded="true" over a page that changed underneath it. A full load closes it by ending the
+	 * document, and the forward path only appeared to work because the click that navigates is itself
+	 * an outside click.
+	 *
+	 * It is a focus bug more than a paint one: the popover is role="dialog" aria-modal="true" and
+	 * wraps Tab at both ends, while navigate() moves focus to #maincontent BEHIND it — an assistive
+	 * technology is then told it is inside a modal dialog whose focus has left the dialog.
+	 *
+	 * returnFocus=false: the router decides where focus goes on a navigation (the skip link for a
+	 * keyboard activation, the content wrapper otherwise), and yanking it back to the trigger here
+	 * would undo that. */
+	router.onNavigate(() => close(false));
 }
 
 return baseclass.extend({
