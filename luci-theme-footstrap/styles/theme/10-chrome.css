@@ -88,7 +88,7 @@
 	 * display:none / visibility:hidden — that removes it from the tab order, which is the
 	 * one thing it exists for. Sits above everything, incl. an open popover. */
 	.fs-skip {
-		position: fixed; top: 8px; left: 8px; z-index: var(--fs-z-dropdown);
+		position: fixed; top: 8px; inset-inline-start: 8px; z-index: var(--fs-z-dropdown);
 		padding: var(--fs-space-2-5) var(--fs-space-4); border-radius: var(--fs-radius);
 		background: var(--fs-accent); color: var(--fs-on-accent);
 		font-weight: var(--fs-weight-bold); font-size: var(--fs-type); text-decoration: none;

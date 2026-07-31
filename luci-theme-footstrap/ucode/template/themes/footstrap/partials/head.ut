@@ -39,6 +39,21 @@
 	   -> -1, because 0 is a real value (a fully transparent scrim). */
 	let _pd = int(fs_defaults.photo_dim);
 	let _sd_pdim = (fs_defaults.photo_dim != '' && _pd >= 0 && _pd <= 100) ? _pd : -1;
+	/* ---- WRITING DIRECTION ----
+	   Nothing in LuCI emits `dir`: the dispatcher stamps `lang` and stops there, and no stock theme
+	   adds one — so a router in Arabic, Persian or Hebrew renders right-to-left text inside a
+	   left-to-right document. That is not a font problem the browser fixes on its own: with `dir`
+	   absent the whole document is `ltr`, so paragraphs align to the wrong edge, a line's trailing
+	   punctuation jumps to the wrong end, and every mirrored affordance (the sidebar, the flyouts,
+	   the chevrons, the tab strip) points the wrong way. The theme owns the <html> element, so this
+	   is the one place that can say it.
+	   Matched on the BASE subtag, so a future `ar-EG` or `fa_IR` is covered; the list is the standard
+	   RTL set rather than only the three LuCI ships catalogues for today (ar, fa, he), because the
+	   cost of a language never installed is one array entry. `ltr` is written explicitly for the same
+	   reason data-layout is: every rule then matches positively. */
+	let _lang = dispatcher.lang ?? 'en';
+	let _lbase = lc(split(_lang, /[-_]/)[0]);
+	let _rtl = index([ 'ar', 'arc', 'ckb', 'dv', 'fa', 'ha', 'he', 'khw', 'ks', 'ps', 'sd', 'ur', 'yi' ], _lbase) >= 0;
 %}
 {# The SERVER always stamps data-layout with an EXPLICIT value (sidebar|top): every layout rule
    then matches POSITIVELY, so a future third layout must opt in rather than inherit the
@@ -46,7 +61,7 @@
    chrome is right with JS off; the script below only overrides it.
    fs_defaults.layout: the router-wide default (Appearance -> Save as default, or uci-defaults'
    `top` seed when migrating an old top-nav install). Absent = sidebar. #}
-<html lang="{{ dispatcher.lang }}" data-layout="{{ fs_defaults.layout == 'top' ? 'top' : 'sidebar' }}">
+<html lang="{{ dispatcher.lang }}" dir="{{ _rtl ? 'rtl' : 'ltr' }}" data-layout="{{ fs_defaults.layout == 'top' ? 'top' : 'sidebar' }}">
 	<head>
 		<meta charset="utf-8">
 		{# entityencode AROUND striptags: striptags drops tags but escapes neither `&` nor quotes,

@@ -32,7 +32,7 @@
 		/* was `10px 10px 9px` — a bottom 1px shy of the top for no reason anyone recorded, which
 		 * is what an inherited number looks like. Symmetric, on the grid. */
 		padding: var(--fs-space-2) var(--fs-space-3);
-		text-align: left;
+		text-align: start;
 	}
 
 	.table .tr:first-child .th {
@@ -49,8 +49,7 @@
 
 	.tr.placeholder > .td {
 		position: absolute;
-		left: 0;
-		right: 0;
+		inset-inline: 0;
 		bottom: 0;
 		text-align: center;
 		line-height: 3em;

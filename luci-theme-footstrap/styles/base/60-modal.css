@@ -45,11 +45,11 @@
 	}
 
 	.modal > .button-row > button:not(:last-of-type) {
-		margin-right: var(--fs-space-2);
+		margin-inline-end: var(--fs-space-2);
 	}
 
 	.modal > .button-row > button:first-of-type {
-		margin-right: auto;
+		margin-inline-end: auto;
 	}
 
 	body.modal-overlay-active {
@@ -58,8 +58,7 @@
 	}
 
 	body.modal-overlay-active #modal_overlay {
-		left: 0;
-		right: 0;
+		inset-inline: 0;
 		opacity: 1;
 		visibility: visible;
 	}

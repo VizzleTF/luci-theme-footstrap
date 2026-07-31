@@ -96,7 +96,7 @@
 	 * a later layer. A dead declaration is deleted, not relocated. */
 	.cbi-dropdown.btn > .open,
 	.cbi-dropdown.cbi-button > .open {
-		margin-left: .5em;
+		margin-inline-start: .5em;
 	}
 	/* display only: the placeholder's ink is the theme's own `li[placeholder]` --fs-faint below
 	 * (base's --fs-dim had already lost to it by layer — moving it would recolour the row) */
@@ -118,7 +118,7 @@
 	.cbi-dropdown > ul > li .hide-close { display: none; }
 	/* the chip divider on a BUTTON dropdown's preview; the form dropdown zeroes it below */
 	.cbi-dropdown > ul > li[display]:not([display="0"]) {
-		border-left: 1px solid var(--fs-border);
+		border-inline-start: 1px solid var(--fs-border);
 	}
 	.cbi-dropdown[empty] > ul {
 		max-width: 1px;
@@ -131,7 +131,7 @@
 	}
 	.cbi-dropdown > ul > li img {
 		vertical-align: middle;
-		margin-right: .25em;
+		margin-inline-end: .25em;
 	}
 	.cbi-dropdown > ul > li > form > input[type="checkbox"] {
 		margin: 0 var(--fs-space-1) 0 0;
@@ -240,7 +240,7 @@
 		 * the thing the scale exists to stop. Absorbed with the machinery above. */
 		min-height: var(--fs-space-5);
 	}
-	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[display]:not([display="0"]) { border-left: 0; }
+	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[display]:not([display="0"]) { border-inline-start: 0; }
 	.cbi-dropdown > ul > li[placeholder] { color: var(--fs-faint); }
 	/* the multiselect's inline filter/create inputs — moved from base with the generic `input`
 	 * box in theme/60-inputs.css: in base these beat it in-layer, left behind they would lose
@@ -307,7 +307,7 @@
 	}
 	.cbi-dropdown[open] > ul.dropdown > li {
 		border-radius: var(--fs-radius-sm); padding: var(--fs-space-2) var(--fs-space-3);
-		border-left: 0; color: var(--fs-text);
+		border-inline-start: 0; color: var(--fs-text);
 		position: relative;
 		/* An OPEN row wraps; only the closed preview ellipsizes. `.cbi-dropdown > ul > li` (0,1,2)
 		 * sets nowrap + overflow:hidden + ellipsis, which is right for the collapsed control — one
@@ -323,7 +323,7 @@
 		border-bottom: 0;
 	}
 	.cbi-dropdown[open] > ul.dropdown > li:not(:last-child)::after {
-		content: ""; position: absolute; left: 11px; right: 11px; bottom: 0;
+		content: ""; position: absolute; inset-inline: 11px; bottom: 0;
 		height: 1px; background: var(--fs-border);
 	}
 	.cbi-dropdown[open] > ul.dropdown > li:hover,
@@ -403,7 +403,7 @@
 		 * why the OpenVPN row stayed one column deep. */
 		.table.cbi-section-table .td {
 			flex: 1 1 100%; min-width: 0; margin: 0;
-			padding: var(--fs-space-1-5) var(--fs-space-2-5) var(--fs-space-1-5) 0; border: 0; text-align: left;
+			padding-block: var(--fs-space-1-5); padding-inline: 0 var(--fs-space-2-5); border: 0; text-align: start;
 			/* same as the data card's cells (theme/30-tables.css): a carded cell holds opaque
 			 * tokens (a real-length IPv6 GUA is 39 chars with no break point — colons are not
 			 * break opportunities), and without `anywhere` one ran 156px past a 360px viewport

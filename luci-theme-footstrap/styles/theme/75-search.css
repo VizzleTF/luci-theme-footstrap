@@ -72,7 +72,7 @@
 	/* the breadcrumb: which section owns the page — the whole point of searching for it */
 	.fs-search-opt-path {
 		flex: 1 1 auto; min-width: 0;
-		color: var(--fs-faint); font-size: var(--fs-type); text-align: right;
+		color: var(--fs-faint); font-size: var(--fs-type); text-align: end;
 		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 	}
 	.fs-search-opt.active .fs-search-opt-path { color: inherit; }

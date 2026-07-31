@@ -47,7 +47,7 @@
 		display: block; border: 0; padding: 0 0 var(--fs-space-4); margin: 0;
 	}
 	.fs-login .cbi-value-title {
-		display: block; text-align: left; width: auto; max-width: none; padding: 0 0 var(--fs-space-1-5);
+		display: block; text-align: start; width: auto; max-width: none; padding: 0 0 var(--fs-space-1-5);
 		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase; color: var(--fs-eyebrow-color);
 	}
 	.fs-login .cbi-value-field {
@@ -62,7 +62,7 @@
 	.fs-login .cbi-page-actions {
 		display: flex; flex-direction: column; gap: var(--fs-space-2-5);
 		background: none; border: 0;
-		padding: 0; margin: var(--fs-space-1-5) 0 0; text-align: left;
+		padding: 0; margin: var(--fs-space-1-5) 0 0; text-align: start;
 	}
 	.fs-login .cbi-page-actions .btn,
 	.fs-login .cbi-page-actions input[type="submit"] {

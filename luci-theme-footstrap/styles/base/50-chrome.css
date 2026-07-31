@@ -16,7 +16,7 @@
 	}
 
 	.dropdown:hover ul.dropdown-menu {
-		left: 0;
+		inset-inline-start: 0;
 	}
 
 	/* Tab-strip visuals (margins, gradients, per-state colours): theme/40-tabs.css —
@@ -49,7 +49,7 @@
 		/* a pill, so it says so — `8px` was half the height above, restated by hand */
 		border-radius: var(--fs-radius-pill);
 		text-align: center;
-		margin-right: var(--fs-space-1);
+		margin-inline-end: var(--fs-space-1);
 		padding: 0 var(--fs-space-1);
 		display: inline-flex;
 		flex-direction: column;
@@ -76,7 +76,7 @@
 	.tabs a.menu:after, .tabs .dropdown-toggle:after {
 		border-top-color: var(--fs-dim);
 		align-self: center;
-		margin-left: var(--fs-space-1);
+		margin-inline-start: var(--fs-space-1);
 	}
 
 	.tabs li.open.menu .menu, .tabs .open.dropdown .dropdown-toggle {
@@ -123,6 +123,6 @@
 	}
 
 	footer ul.breadcrumb {
-		margin-left: auto;
+		margin-inline-start: auto;
 	}
 }

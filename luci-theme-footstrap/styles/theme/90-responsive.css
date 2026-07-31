@@ -41,8 +41,8 @@
 			width: 100%; margin-bottom: 3em;
 		}
 		body[data-page="admin-system-package-manager"] #view label + .cbi-progressbar::after {
-			top: calc(100% + 5px); left: 0; right: auto; bottom: auto;
-			text-align: left; white-space: normal; max-width: 100%;
+			top: calc(100% + 5px); inset-inline: 0 auto; bottom: auto;
+			text-align: start; white-space: normal; max-width: 100%;
 		}
 		/* `> div > label` — the group's TITLE label ("Filter:", "Actions:", "Display LuCI
 		 * translation packages:"), not every label on the page. Written as plain `.controls label`
@@ -149,8 +149,8 @@
 	 * they win from this layer on their own.
 	 * ================================================================== */
 	.cbi-dropdown[open] > ul.dropdown {
-		left: 0 !important;
-		right: auto !important;
+		inset-inline-start: 0 !important;
+		inset-inline-end: auto !important;
 		min-width: 100%;
 		width: max-content;
 		max-width: min(92vw, 420px);

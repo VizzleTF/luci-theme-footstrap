@@ -124,7 +124,7 @@
 		box-shadow: none;
 		padding: var(--fs-space-2) 0;
 		margin: 0 0 var(--fs-card-gap);
-		text-align: right;
+		text-align: end;
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
@@ -164,7 +164,7 @@
 	 * instead, so it reserves its own space and no host padding is involved. */
 
 	input[type="file"]::file-selector-button {
-		margin-right: var(--fs-space-3); padding: var(--fs-space-2) var(--fs-space-3-5);
+		margin-inline-end: var(--fs-space-3); padding: var(--fs-space-2) var(--fs-space-3-5);
 		font-family: var(--fs-font-sans); font-size: var(--fs-type); font-weight: var(--fs-weight);
 		color: var(--fs-text); background: var(--fs-panel2);
 		border: 1px solid var(--fs-border); border-radius: var(--fs-radius-sm); cursor: pointer;
@@ -275,7 +275,7 @@
 		 * is the drift this ladder exists to prevent, and it also sat out the Density axis. */
 		flex: 0 0 auto; width: auto; min-width: var(--fs-ctl-h);
 		min-height: var(--fs-ctl-h-sm); padding: 0 var(--fs-space-3); margin: 0;
-		border: 0; border-left: 1px solid var(--fs-border);
+		border: 0; border-inline-start: 1px solid var(--fs-border);
 		border-radius: 0;
 		background: transparent; color: var(--fs-dim);
 	}
@@ -285,7 +285,7 @@
 		border: 0; border-radius: 0; margin: 0;
 		background: transparent; color: var(--fs-dim);
 		padding: 0 var(--fs-space-3); min-height: var(--fs-ctl-h);
-		border-left: 1px solid var(--fs-border);
+		border-inline-start: 1px solid var(--fs-border);
 	}
 	.control-group:has(> .cbi-input-password) > button.cbi-button-neutral:hover { color: var(--fs-accent); }
 	/* SQUARE, ON THE LADDER: these were the only buttons in the theme set in bare pixels

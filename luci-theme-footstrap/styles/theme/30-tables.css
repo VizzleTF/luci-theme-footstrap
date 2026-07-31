@@ -88,13 +88,13 @@
 		padding: var(--fs-space-2-5) var(--fs-space-4) var(--fs-space-2-5) 0;
 		border: 0; border-bottom: 1px solid var(--fs-border);
 		line-height: 1.45; vertical-align: middle;
-		text-align: left;
+		text-align: start;
 	}
-	/* Row actions hug the right. Base says so too but loses to the `text-align: left` above (an
+	/* Row actions hug the far edge. Base says so too but loses to the `text-align: start` above (an
 	 * earlier layer), so restate it. `.cbi-section-table-cell` is the discriminator:
 	 * form.TableSection's action cells carry it (firewall zones, port forwards); the hand-built
 	 * ones of Wireless (`.td.middle`) and DHCP leases do not, and stay left. */
-	.cbi-section .table .td.cbi-section-table-cell.cbi-section-actions { text-align: right; }
+	.cbi-section .table .td.cbi-section-table-cell.cbi-section-actions { text-align: end; }
 	.cbi-section .table .tr:last-child .td { border-bottom: 0; }
 	.cbi-section .table .th {
 		color: var(--fs-eyebrow-color); font-weight: var(--fs-eyebrow-weight); font-size: var(--fs-type-xs);
@@ -154,7 +154,7 @@
 	.cbi-section .table[id] .tr.placeholder .td,
 	#view .table[id] .tr.placeholder .td,
 	table.fs-dt .tr.placeholder .td {
-		display: block; width: 100%; text-align: left;
+		display: block; width: 100%; text-align: start;
 		color: var(--fs-dim); font-family: var(--fs-font-sans);
 		border-radius: 0 0 var(--fs-radius-lg) var(--fs-radius-lg);
 	}
@@ -172,7 +172,7 @@
 		color: var(--fs-dim); font-weight: var(--fs-weight); width: 40%; white-space: nowrap;
 	}
 	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:last-child:not(:first-child) {
-		font-family: var(--fs-font-mono); color: var(--fs-text); text-align: right;
+		font-family: var(--fs-font-mono); color: var(--fs-text); text-align: end;
 	}
 
 	/* --- The realtime graph legend (status/realtime/{bandwidth,connections,load,wireless}) ---
@@ -402,7 +402,7 @@
 	.table.fs-stacked .tr { display: flex; flex-wrap: wrap; }
 	.table.fs-stacked .td {
 		display: block; min-width: 0; width: auto;
-		padding: var(--fs-space-1-5) var(--fs-space-2-5) var(--fs-space-1-5) 0; border: 0; text-align: left;
+		padding-block: var(--fs-space-1-5); padding-inline: 0 var(--fs-space-2-5); border: 0; text-align: start;
 		overflow-wrap: anywhere; white-space: normal;
 	}
 	/* The column label, lifted above its value (LuCI writes it per cell as data-title).

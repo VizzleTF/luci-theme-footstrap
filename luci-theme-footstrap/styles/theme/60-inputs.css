@@ -141,7 +141,7 @@
 	 * (issue #5.1 — attendedsysupgrade's "Keep settings" confirm: label.btn > input[type=checkbox]
 	 * + text). Restore a gap. The toggle-switch .cbi-checkbox below is unaffected — its input is
 	 * opacity:0, so this margin moves nothing there. */
-	.btn > input[type="checkbox"], .btn > input[type="radio"] { margin-right: .5em; }
+	.btn > input[type="checkbox"], .btn > input[type="radio"] { margin-inline-end: .5em; }
 
 	/* checkbox -> toggle switch
 	 *
@@ -178,7 +178,7 @@
 		content: ""; position: absolute; inset: -4px -2px;
 	}
 	.cbi-checkbox > label::after {
-		content: ""; position: absolute; top: var(--sw-pad); left: var(--sw-pad);
+		content: ""; position: absolute; top: var(--sw-pad); inset-inline-start: var(--sw-pad);
 		width: var(--sw-knob); height: var(--sw-knob); border-radius: 50%;
 		background: var(--fs-dim);
 		/* transform, not `left`: `left` is a layout property, so the knob re-laid out the row on
@@ -254,7 +254,7 @@
 	input[type="checkbox"]::before,
 	input[type="radio"]::before {
 		top: 0;
-		left: 0;
+		inset-inline-start: 0;
 		width: var(--box);
 		height: var(--box);
 		background: linear-gradient(var(--fs-panel), var(--fs-panel2));
@@ -284,7 +284,7 @@
 	input[type="checkbox"]::after,
 	input[type="radio"]::after {
 		top: var(--mark-inset);
-		left: var(--mark-inset);
+		inset-inline-start: var(--mark-inset);
 		width: calc(var(--box) - var(--mark-inset) * 2);
 		height: calc(var(--box) - var(--mark-inset) * 2);
 	}
@@ -561,12 +561,21 @@
 	 * leaves a radius-sized box whose whole right+bottom border IS the quarter curve. (A mask
 	 * would give a shorter arc, but ::-webkit-resizer ignores mask — it filled a solid square —
 	 * and a baked-in SVG colour would not follow the palette or the accent hue.) */
+	/* PHYSICAL on purpose, and mirrored by hand below: ::-webkit-resizer is a UA-drawn corner whose
+	 * side follows the writing direction, and it does not accept logical properties — with only the
+	 * LTR rule the arc drew on the wrong corner in an RTL document (a stray quarter-circle on the
+	 * left of every textarea). */
 	textarea::-webkit-resizer {
 		background: transparent;
 		border-right: 2px solid var(--fs-accent);
 		border-bottom: 2px solid var(--fs-accent);
 		border-bottom-right-radius: var(--fs-radius);
 		margin: calc(16px - var(--fs-radius)) 0 0 calc(16px - var(--fs-radius));
+	}
+	:root[dir="rtl"] textarea::-webkit-resizer {
+		border-right: 0; border-left: 2px solid var(--fs-accent);
+		border-bottom-right-radius: 0; border-bottom-left-radius: var(--fs-radius);
+		margin: calc(16px - var(--fs-radius)) calc(16px - var(--fs-radius)) 0 0;
 	}
 
 	.cbi-input-text:hover, .cbi-input-password:hover, .cbi-input-textarea:hover,

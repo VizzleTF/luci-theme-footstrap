@@ -42,11 +42,11 @@
 	/* the menu rides the brand's row; its flex:1 opens the gap that pushes the right-hand
 	 * cluster to the content column's right edge */
 	:root[data-layout="top"] .fs-sidebar ul.nav {
-		order: 2; flex: 1 1 auto; margin-left: var(--fs-space-2);
+		order: 2; flex: 1 1 auto; margin-inline-start: var(--fs-space-2);
 	}
 	:root[data-layout="top"] .fs-sidebar #indicators,
 	:root[data-layout="top"] .fs-themerow,
-	:root[data-layout="top"] .fs-logout { order: 3; margin-left: 0; }
+	:root[data-layout="top"] .fs-logout { order: 3; margin-inline-start: 0; }
 
 	/* The under-item dropdown anchor, its hover bridge and the clamp are NOT here: they belong to
 	 * the BAR and live unguarded in 20-shell.css. They used to be this file's, and that WAS issue
@@ -79,21 +79,21 @@
 		flex-wrap: wrap; height: auto; padding: var(--fs-space-2-5) var(--fs-space-4);
 	}
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack ul.nav {
-		order: 3; flex: 1 1 100%; margin-left: 0;
+		order: 3; flex: 1 1 100%; margin-inline-start: 0;
 	}
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack #indicators,
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow,
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-logout { order: 2; }
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack #indicators,
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow { margin-left: auto; }
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack #indicators:not(:empty) ~ .fs-themerow { margin-left: 0; }
+	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow { margin-inline-start: auto; }
+	:root[data-layout="top"] .fs-sidebar.fs-bar-stack #indicators:not(:empty) ~ .fs-themerow { margin-inline-start: 0; }
 	/* Two .fs-themerow buttons (Search, then Appearance): exactly like the base bar (20-shell.css),
-	 * only the FIRST rendered right-cluster item may keep margin-left:auto, or flexbox SPLITS the
+	 * only the FIRST rendered far-edge item may keep the auto inline-start margin, or flexbox SPLITS the
 	 * free space between the two autos and Search drifts to mid-bar. The base `.fs-themerow ~
 	 * .fs-themerow` guard is out-specified by the auto rule above (0,4,0 > 0,2,0), so it must be
 	 * restated here. Bites when #indicators is :empty (display:none) — e.g. right after an SPA nav,
 	 * before the poll pill returns. */
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow ~ .fs-themerow { margin-left: 0; }
+	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow ~ .fs-themerow { margin-inline-start: 0; }
 
 	/* The right cluster's own escalation — .fs-ind-compact and .fs-bar-actrow — is NOT here: it
 	 * belongs to the BAR, and the sidebar layout is a bar too once fitShell has stamped

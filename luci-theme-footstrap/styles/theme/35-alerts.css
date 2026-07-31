@@ -7,7 +7,9 @@
 		padding: var(--fs-space-3-5) var(--fs-space-4);
 		border-radius: var(--fs-radius-lg);
 		border: 1px solid var(--fs-border);
-		border-left: 3px solid var(--fs-accent);
+		/* logical: the stripe marks the READING start of the alert, so it swaps sides with the
+		 * document (LuCI ships ar/fa/he catalogues) — physical, it sat on the far edge in RTL. */
+		border-inline-start: 3px solid var(--fs-accent);
 		/* THE SURFACE IS OPAQUE, THE STATUS TINT RIDES ON TOP OF IT. The variants below used to
 		 * REPLACE this with `background: var(--fs-*-fill)` — and a `-fill` is a color-mix with
 		 * TRANSPARENT (02-tokens.css), i.e. an 18% wash with nothing behind it. On a flat --fs-bg
@@ -48,15 +50,15 @@
 	 * from a danger fill to a pale wash: the one button on that page that must look dangerous.
 	 * (Measured: rgb(234,122,116) -> the tint.) */
 	.alert-message.warning:not(.btn) {
-		border-color: var(--fs-border); border-left-color: var(--fs-warn);
+		border-color: var(--fs-border); border-inline-start-color: var(--fs-warn);
 		--fs-alert-tint: var(--fs-warn-fill);
 	}
 	.alert-message.error:not(.btn), .alert-message.danger:not(.btn) {
-		border-color: var(--fs-border); border-left-color: var(--fs-danger);
+		border-color: var(--fs-border); border-inline-start-color: var(--fs-danger);
 		--fs-alert-tint: var(--fs-danger-fill);
 	}
 	.alert-message.success:not(.btn) {
-		border-left-color: var(--fs-good);
+		border-inline-start-color: var(--fs-good);
 		--fs-alert-tint: var(--fs-good-fill);
 	}
 	/* `.info` was styled by nothing — it fell through to the plain panel with an accent stripe,
@@ -71,7 +73,7 @@
 	 * banner, i.e. IN PROGRESS, not done — and stock luci-theme-bootstrap paints notice from
 	 * `--background-color-*`, keeping green for success alone. Informational, so: accent. */
 	.alert-message.info:not(.btn), .alert-message.notice:not(.btn) {
-		border-left-color: var(--fs-accent);
+		border-inline-start-color: var(--fs-accent);
 		--fs-alert-tint: var(--fs-accent-fill);
 	}
 
@@ -146,7 +148,7 @@
 	 * anything LuCI ships, so nothing can focus it today and this matches nothing — but the
 	 * focusability belongs to ui.js, and a third-party app that gives its own tooltip container a
 	 * tabindex gets a keyboard-reachable tooltip the day it does. */
-	.cbi-tooltip-container:focus-within .cbi-tooltip:not(:empty) { left: auto; opacity: 1; }
+	.cbi-tooltip-container:focus-within .cbi-tooltip:not(:empty) { inset-inline-start: auto; opacity: 1; }
 	.cbi-tooltip.info { background: var(--fs-accent); border-color: var(--fs-accent); color: var(--fs-on-accent); }
 	.cbi-tooltip.success { background: var(--fs-good); border-color: var(--fs-good); color: var(--fs-on-good); }
 	.cbi-tooltip.error { background: var(--fs-danger); border-color: var(--fs-danger); color: var(--fs-on-danger); }

@@ -129,7 +129,7 @@
 		 * the cascade proper. On stock, where both are already `stretch`, this is a no-op. */
 		justify-self: stretch;
 		align-self: stretch;
-		text-align: left;
+		text-align: start;
 		background: var(--fs-panel2);
 		border: 1px solid var(--fs-border);
 		border-radius: var(--fs-radius-lg);
@@ -199,7 +199,7 @@
 	/* speed: green when linked, dim when not */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
 		order: 2;								/* below the zone-colour line (child 3, order 1) */
-		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-good); text-align: left;
+		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-good); text-align: start;
 		/* Two halves of one mechanism.
 		 * `nowrap` (and NO `min-width: 0`) = "I do not give way": a flex item's automatic minimum
 		 * size is its min-content, which for nowrap text is the whole string — so the speed cannot be
@@ -217,7 +217,7 @@
 	 * text runs. The 11px flag fights the inline `font-size:80%`. */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) {
 		order: 2;								/* shares the speed's row, below the zone line */
-		text-align: right;
+		text-align: end;
 		/* Grows but never shrinks. Growing is what anchors the figures to the card's right edge on
 		 * EITHER row — sharing the speed's, or one of its own — since `text-align: right` then has a
 		 * box that reaches that edge. `margin-left: auto` would have done the same job on a shared
@@ -240,7 +240,7 @@
 		 * the flex wrap above replaces: the cell now reaches the card's right edge on whichever row
 		 * it lands, so the alignment is one answer and there is no width at which to switch.
 		 * Deleting that threshold IS the fix — it is what had been calibrated on an English string. */
-		text-align: right !important;
+		text-align: end !important;
 	}
 
 	/* Meter rows — any stock .table row carrying a .cbi-progressbar (Memory, Storage, CPU
@@ -272,7 +272,7 @@
 	/* label. Undoes the key/value `white-space: nowrap` on a first column: a mount point
 	 * ("192.168.3.26:/volume1/… (/mnt/hdd_isync)") is one unbreakable line, so the row's
 	 * min-content width blew past the card and Memory/Storage stopped shrinking on a phone.
-	 * padding-right = the gutter for the value, which is pinned over the bar's right edge
+	 * padding-inline-end = the gutter for the value, which is pinned over the bar's far edge
 	 * (::after, out of flow — nothing else reserves space for it). */
 	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
 		grid-column: 1; grid-row: 1;
@@ -280,7 +280,7 @@
 		min-width: 0;
 		white-space: normal;
 		overflow-wrap: anywhere;
-		padding-right: min(200px, 50%);
+		padding-inline-end: min(200px, 50%);
 		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-text);
 	}
 	/* bar cell — spans full width on row 2 */

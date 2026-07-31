@@ -106,7 +106,7 @@
 	}
 
 	dl dd {
-		margin-left: var(--fs-space-2);
+		margin-inline-start: var(--fs-space-2);
 	}
 
 	hr {

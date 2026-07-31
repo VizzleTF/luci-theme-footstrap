@@ -80,11 +80,11 @@
 
 	.table.cbi-section-table .td.cbi-section-table-cell {
 		white-space: nowrap;
-		text-align: right;
+		text-align: end;
 	}
 
 	.td.cbi-section-actions {
-		text-align: right;
+		text-align: end;
 		vertical-align: middle;
 		width: 15%;
 	}
@@ -138,12 +138,12 @@
 		--help-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9.4'/><path d='M8.9 9.4a3.2 3.2 0 1 1 3.9 3.6v1.4'/><path d='M12.8 17.6h-.02'/></svg>");
 
 		position: absolute;
-		left: calc(var(--help-indent) * -1);
+		inset-inline-start: calc(var(--help-indent) * -1);
 		content: "\a0";
 		display: inline-block;
 		width: 1em;
 		height: 1em;
-		margin-right: var(--fs-space-1);
+		margin-inline-end: var(--fs-space-1);
 		background: var(--fs-accent);
 		mask-image: var(--help-icon);
 		mask-size: cover;
@@ -262,7 +262,7 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-		text-align: left;
+		text-align: start;
 		/* `.ifacebox` above is `white-space: nowrap` — right for a plate of one-word labels, wrong
 		 * for THIS plate, whose lines are addresses: an uncompressed IPv6 (`Address:
 		 * 2001:db8:1a2b:3c4d:5e6f:7a8b:9c0d:1e2f/64`) is ~380px of unbreakable text, and the
@@ -341,7 +341,7 @@
 	/* .zonebadge input width: theme/30-tables.css — absorbed with the generic box */
 
 	.zonebadge > .ifacebadge {
-		margin-left: var(--fs-space-0-5);
+		margin-inline-start: var(--fs-space-0-5);
 	}
 
 	.zonebadge-empty {
@@ -455,7 +455,7 @@
 	.uci-change-legend-label > ins,
 	.uci-change-legend-label > del,
 	.uci-change-legend-label > var {
-		margin-right: var(--fs-space-1);
+		margin-inline-end: var(--fs-space-1);
 		width: 16px;
 		height: 16px;
 		display: flex;
@@ -513,7 +513,7 @@
 		display: inline-block;
 		flex: 0 0 auto;
 		vertical-align: middle;
-		margin-right: var(--fs-space-1);
+		margin-inline-end: var(--fs-space-1);
 		width: var(--fs-spin-size);
 		height: var(--fs-spin-size);
 		content: " ";
@@ -575,7 +575,7 @@
 	}
 
 	.cbi-filebrowser .cbi-button-positive {
-		margin-right: .25em;
+		margin-inline-end: .25em;
 	}
 
 	.cbi-filebrowser > div {
@@ -596,7 +596,7 @@
 	}
 
 	.cbi-filebrowser > ul > li > div:last-child {
-		text-align: right;
+		text-align: end;
 	}
 
 	.cbi-filebrowser > ul > li > div:last-child > button {
