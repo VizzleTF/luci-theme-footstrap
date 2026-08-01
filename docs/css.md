@@ -26,7 +26,7 @@ luci-theme-footstrap/
       65-dropdown  70-modal  75-search  90-responsive  95-a11y-media  97-print
     pages/             @layer page     per-page corrections
       10-login  20-overview  30-software  40-sshkeys  50-leases
-      60-assoclist  70-syslog
+      60-assoclist  70-syslog  80-appearance
 ```
 
 Concatenation order is `styles/` → `base/` → `theme/` → `pages/`, and inside each directory the

@@ -239,9 +239,11 @@ Before rendering the new view:
 - `clearViewIntervals()` kills the outgoing view's bare `window.setInterval`s. A full load would
   have killed them; SPA must do it explicitly. `setInterval`/`clearInterval` are hooked at module
   eval and the ids tracked in a `Set`; `L.Poll`'s own 1-second tick is preserved.
-- Cancelling the self-update poll — **but the router does not own it and never names the updater**.
-  The seam is inverted: `fs-router.js` exports `onNavigate(fn)` and the updater registers its
-  `cancel` there, so a missing updater is not a `DependencyError` that takes out the chrome.
+- Running the registered navigation callbacks — **and the router names none of them**. The seam is
+  inverted: `fs-router.js` exports `onNavigate(fn)` and a module registers itself, so an optional
+  module that is not installed is not a `DependencyError` that takes out the chrome. The search
+  palette uses it today (recent pages, close on navigate); it was written for the retired updater's
+  poll cancel.
 - `ui.hideModal()`.
 
 ### `renderChrome()`

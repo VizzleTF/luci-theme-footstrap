@@ -17,7 +17,7 @@ Every page here stands on its own — start wherever your question is.
 
 | Page | Answers |
 |---|---|
-| [design-system.md](design-system.md) | Tokens, palettes, typography, scales, the Appearance axes |
+| [design-system.md](design-system.md) | Tokens, palettes, typography, scales, the appearance axes |
 | [css.md](css.md) | The `styles/` tree, cascade layers, `build-css.sh`, proving a CSS change |
 | [chrome.md](chrome.md) | Sidebar, icon rail, top bar, the menu renderer, the fit measurement |
 | [spa-router.md](spa-router.md) | Client-side navigation: how it works and what it refuses to do |
@@ -44,9 +44,12 @@ and a style checker: <https://vizzletf.github.io/luci-theme-footstrap/>.
 
 ## Not documentation
 
-`gallery.html` renders every widget LuCI can emit, with the real class names — the a11y gate runs
-against it. `devkit.src.html` and `playground.src.html` are the sources of the published portal;
-`design/` holds the reference mock-ups; `screenshots/` and `img/` are assets for the READMEs.
+| File | What it is |
+|---|---|
+| `gallery.html` | every widget LuCI can emit, with the real class names — what the a11y gate runs against |
+| `devkit.src.html` | source of the developer portal (`devkit.html` is generated, never committed) |
+| `playground.src.html` | source of the playground: two real router pages, Status and System → Footstrap, with the axes live |
+| `design/`, `screenshots/`, `img/` | reference mock-ups and README assets |
 
 ## Conventions of these pages
 

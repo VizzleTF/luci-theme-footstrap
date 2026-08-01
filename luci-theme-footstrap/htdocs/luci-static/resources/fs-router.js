@@ -492,18 +492,18 @@ function navigate(pathname, push, kbd) {
 	clearViewIntervals();
 	/* the outgoing page's links are about to become a detached tree — do not hold one of them */
 	_lastHovered = null;
-	/* run every registered navigation callback — the optional updater's poll-chain cancel (its
-	 * setTimeout would otherwise keep firing fs.exec RPCs and pop its modal over the page we are
-	 * about to open) and the search palette's recent-pages record. The router carries NO static
-	 * dependency on the optional updater — a missing one would be a DependencyError that takes out
-	 * the whole chrome — so the edge is inverted: fs-update.js registers its cancel via onNavigate()
-	 * below.
+	/* run every registered navigation callback — today the search palette's recent-pages record and
+	 * its close-on-navigate. The seam is deliberately inverted: a registrant calls onNavigate()
+	 * (below) and the router names nobody, so an optional module that is not installed is not a
+	 * DependencyError that takes out the whole chrome. It was written for the retired updater's
+	 * poll-chain cancel, whose setTimeout would otherwise have kept firing fs.exec RPCs and popped
+	 * its modal over the page being opened; the shape is what a future optional module wants too.
 	 *
 	 * The RESOLVED segments are passed in, and that is not convenience: this runs BEFORE L.env is
 	 * re-pointed a few lines down, so a callback reading L.env.dispatchpath for "where are we going"
 	 * would silently record the page being left. */
 	/* Logged, not swallowed. A registrant that throws is still isolated — the loop must finish, or a
-	 * broken updater would take the palette's recents and the popover's close with it — but the
+	 * broken registrant would take the palette's recents and its close-on-navigate with it — but the
 	 * empty catch made a registrant that throws on EVERY navigation indistinguishable from one that
 	 * was never registered, which is the failure mode the .catch at the bottom of this file was
 	 * given a console.error for. */

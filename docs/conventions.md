@@ -41,7 +41,7 @@ green": run it. `owlab up` gives you four disposable routers from `owlab.yaml`, 
 Why the rule is written down rather than assumed: **every gate in this repository is static.** They
 read files. Not one of them opens a page. The classes of bug they structurally cannot see:
 
-- a preference that writes to the wrong place (the Appearance axes were gated on their *contract*
+- a preference that writes to the wrong place (the appearance axes were gated on their *contract*
   while one of them silently rewrote a router-wide default);
 - anything that only appears once a session, a poller or a second browser exists;
 - a template that compiles and renders the wrong thing;
@@ -187,14 +187,14 @@ pattern that reliably removes anonymous handlers.
 Russian router because somebody's catalogue translates `Top` that way — correct in a bandwidth
 dialog, nonsense on a layout switch.
 
-- Appearance page strings: **use a context** — `_(str, 'footstrap')`.
+- Strings on the Footstrap tab: **use a context** — `_(str, 'footstrap')`.
 - Chrome (Menu, Logout, Skip to content), login and warning strings: **deliberately no context**,
   so they inherit luci-base's translation in the ~40 languages the theme has no catalogue for.
 
 Nothing here fails loudly: `_()` without a catalogue is just English text. `npm run i18n` fails
 if the `.pot` is stale or any `msgstr` is empty.
 
-**Set the custom property BEFORE the attribute.** Every Appearance axis is implemented twice —
+**Set the custom property BEFORE the attribute.** Every appearance axis is implemented twice —
 inline in `partials/head.ut` before first paint (no module loader exists yet) and live in
 `fs-prefs.js` — and the order is load-bearing. Reversed, a reload paints exactly one frame in the
 previous hue: a symptom nobody reports and no other test catches. `tools/axes.mjs` derives the
@@ -216,12 +216,12 @@ work: apk never exports it, so the guard was dead in production.
 user including the admin who just clicked Update. `reload` re-reads `acl.d/*`, which is all this
 package needs.
 
-**One asset per package per format in a release.** The self-updater already installed on
-someone's router picks its asset by name, and GitHub returns assets **sorted by name** — in
-v0.8.4 a `luci-i18n-…` package sorted ahead of `luci-theme-…` and the Update button installed a
-6 KB catalogue instead of the theme, reported success, and offered the same update forever
-(issue #6). A fielded updater cannot be fixed remotely; only the **release** can. CI fails unless
-each package resolves to exactly one asset under its name-anchored regex.
+**One asset per package per format in a release.** `install.sh` picks its asset by name, and GitHub
+returns assets **sorted by name** — in v0.8.4 a `luci-i18n-…` package sorted ahead of
+`luci-theme-…`, so the then-shipped self-updater installed a 6 KB catalogue instead of the theme,
+reported success, and offered the same update forever (issue #6). Code already on somebody's router
+cannot be fixed remotely; only the **release** can. CI fails unless each package resolves to exactly
+one asset under its name-anchored regex.
 
 **The translation catalogue lives in `i18n/`, not `po/`.** `LUCI_LANGUAGES` is `$(wildcard po/*)`,
 so the directory name is what stops luci.mk baking a separate `luci-i18n-footstrap-<lang>`
@@ -233,9 +233,8 @@ in the base image.
 
 ## The trust chain
 
-`install.sh` and the updater's backend both install with `--allow-untrusted`, which means
-**the package manager holds no key of ours**, not that the bytes are unchecked. Verifying them is
-the scripts' own job, in three layers:
+`install.sh` installs with `--allow-untrusted`, which means **the package manager holds no key of
+ours**, not that the bytes are unchecked. Verifying them is the script's own job, in three layers:
 
 1. **A verified TLS channel.** Never `-k` / `--no-check-certificate`, and never as a retry — a
    failed verification *is* the MITM case.
@@ -266,7 +265,7 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `css-dup` | identical declaration bodies under different guards |
 | `mirror` | `@mirror`-pinned copies still byte-identical |
 | `bang-ok` | every `!important` sits in an allowlisted file |
-| `axes` | the pre-paint in `head.ut` agrees with the live Appearance appliers, and `header.ut` reads every saved option back |
+| `axes` | the pre-paint in `head.ut` agrees with the live appearance appliers, and `header.ut` reads every saved option back |
 | `wallpapers` | the size/sha256 pins match `wallpapers/`, and no doodle is in the shipped tree |
 | `chrome-fence` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `export-tier` | the `--*-color-*` contract: each level readable as text on three surfaces, each `--on-*` readable on its fill, and the ramp is not flat |

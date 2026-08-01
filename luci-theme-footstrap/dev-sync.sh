@@ -1,7 +1,7 @@
 #!/bin/sh
-# Залить тему footstrap на роутер (ssh router).
-# ОДНА тема, одна запись в luci.themes; раскладка (sidebar/top) — клиентская
-# настройка в поповере Appearance, а не запись темы. Регистрирует, НЕ активирует.
+# Push the footstrap theme to a HARDWARE router over ssh (containers use owlab).
+# ONE theme, one luci.themes entry; layout (top/sidebar) is a client axis on the Footstrap tab of
+# System -> System, not a theme entry. This registers the theme; it does NOT activate it.
 set -e
 
 R="${1:-router2512}"
@@ -31,17 +31,15 @@ scp -qr "$D"/htdocs/luci-static/$N/* "$R":/www/luci-static/$N/
 # individually, so a FIFTH would be shipped by the package (luci.mk copies htdocs/
 # wholesale) yet silently never reach the dev router — first tested after a release.
 #
-# A TAR OF THE TREE, not `scp *.js`: the flat glob does not descend, and the theme now ships a
-# view (view/footstrap/appearance.js — System -> Appearance). luci.mk copies htdocs/ wholesale,
-# so that file shipped in the package and reached the dev router never — the same class of miss
-# the glob above was written to end, one directory level down. --exclude of nothing: every path
+# A TAR OF THE TREE, not `scp *.js`: the flat glob does not descend, so anything a subdirectory
+# holds shipped in the package (luci.mk copies htdocs/ wholesale) and reached the dev router never —
+# the same class of miss the glob above was written to end, one directory level down. Every path
 # under resources/ is ours to place.
 tar -C "$D/htdocs/luci-static/resources" -cf - . | ssh "$R" "mkdir -p /www/luci-static/resources && tar -C /www/luci-static/resources -xf -"
 
 # stamp the git-derived version into the deployed fs-version.js (the package does the same in
-# Build/Prepare) so the popover shows a real version and the updater's check compares against it. The
-# FILE NAME is part of the contract: FS_VERSION lives in fs-version.js and moving it means changing
-# both seds.
+# Build/Prepare) so the Footstrap tab shows a real version instead of "(dev)". The FILE NAME is part
+# of the contract: FS_VERSION lives in fs-version.js and moving it means changing every sed.
 FS_V="$(git -C "$D" describe --tags --always 2>/dev/null | sed 's/^v//')"
 # if-form, not `[ -n ] && ssh`: under set -e a failed &&-list aborts the whole sync when git
 # describe yields nothing (a copied tree without .git). expr refuses a tag with

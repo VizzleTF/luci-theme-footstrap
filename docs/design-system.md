@@ -67,8 +67,9 @@ The binding constraint: apps read a level as `color:` about as often as `backgro
 level must pass AA as text on `--fs-bg`/`--fs-panel`/`--fs-panel2` **and** carry a readable
 `--on-*-color` as a fill. `tools/export-tier.mjs` proves all of it across
 {footstrap, hicontrast} × {light, dark} × a sweep of tint hues — 28 combinations and ~1900 contrast
-checks today — including that the ramp is not flat, the only check that can catch flatness. Borders are exempt from the text half: `--border-color-low` may legitimately
-fade into the surface, which is what a hairline is for.
+checks today — including that the ramp is not flat, the only check that can catch flatness.
+Borders are exempt from the text half: `--border-color-low` may legitimately fade into the surface,
+which is what a hairline is for.
 
 ## Palettes
 
@@ -134,7 +135,7 @@ the absence of light behind a dialog, not a shade of any token.
 
 ## Scales
 
-**Radius** — one user-facing base (Appearance → Rounding, **0–20 px**), from which three semantic
+**Radius** — one user-facing base (Footstrap tab → Rounding, **0–20 px**), from which three semantic
 radii are derived proportionally: cards/panels/modals/popovers, controls (inputs, buttons,
 dropdowns, tabs, menu items, logo) and small parts (chips, code, insets). Pills and toggles are
 always fully round. Every `border-radius` in `theme`/`pages` reads one of them.
@@ -142,9 +143,8 @@ always fully round. Every `border-radius` in `theme`/`pages` reads one of them.
 **Z-index** — `--fs-z-*`, and **every z-index in the theme comes from here**. Bottom to top:
 `raise` 2 → `sticky` 50 → `flyout` 70 → `header` 800 → `popover` 850 → `overlay` 900 →
 `tooltip` 1000 → `dropdown` 1100. Before the scale there were nine bare numbers across seven files
-and nothing fixing the order — the Appearance popover of the day drew **on top of** an open modal.
-As a list,
-that bug is obvious.
+and nothing fixing the order — the appearance popover of the day drew **on top of** an open modal.
+As a list, that bug is obvious.
 
 **Motion** — four durations, because the UI does four things: `--fs-dur` .15s (state change:
 colour, border, shadow, background, filter), `--fs-dur-move` .2s (transform, max-height),
@@ -176,7 +176,7 @@ what makes the measurement follow Density for free.
 
 Shadows are `--fs-shadow` (per mode) and `--fs-shadow-pop` (floating surfaces).
 
-## The Appearance axes
+## The appearance axes
 
 The controls are `fs-appearance.js`, added as a fifth **tab** on the stock **System → System** page,
 beside General Settings / Logging / Time Synchronization / Language and Style. It watches
@@ -217,7 +217,7 @@ toggled in the chrome), `fs-menu-open` (the remembered set of open accordion sec
 
 The effective value of every axis is **`localStorage` ?? router default ?? built-in**.
 
-- The **router default** is what **Appearance → Save as default** writes: `saveAsDefault()` uci-sets
+- The **router default** is what **Save as default** writes: `saveAsDefault()` uci-sets
   the axes into `/etc/config/footstrap`, and the server reads them back into `window.__fsSD`, which
   `head.ut` stamps. So a new browser, an incognito window or a cleared cache inherits the router's
   look — including the **pre-login page**, which is the point of putting the wallpaper there.

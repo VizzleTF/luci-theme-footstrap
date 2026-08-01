@@ -63,8 +63,9 @@ export default [
 				baseclass: 'readonly',
 				ui: 'readonly',
 				/* the base class every LuCI VIEW extends. Bound by a bare `'require view'`, like the
-				 * rest of this list; it appears here only because the theme grew its one view
-				 * (System -> Appearance) — a theme has no route of its own until it does. */
+				 * rest of this list. The theme ships no view of its own — its axes are a tab
+				 * appended to the stock System -> System page — so this is here for a module that
+				 * composes with one. */
 				view: 'readonly',
 				dom: 'readonly',
 				fs: 'readonly',

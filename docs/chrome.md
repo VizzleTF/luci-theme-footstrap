@@ -43,7 +43,7 @@ layout on a phone. The vertical column is the single guarded override, winning o
 │  ▸ System         │ ├──────────────────────────┤ │
 │  ▸ Network        │ │ footer.fs-footer         │ │
 │  [spacer]         │ └──────────────────────────┘ │
-│  Appearance [◐]   │                              │
+│  [search]         │                              │
 │  ▸ Log out        │                              │
 └──────────────────────────────────────────────────┘
 ```
@@ -105,8 +105,8 @@ depends on the number of sections on that particular router, not on the screen.
 
 ## `header.ut`
 
-- Shared parts live in `partials/` (`head`, `brand`, `appearance`, `logout`, `notices`, `notice`,
-  `search`, `icon`, `footer`). There is no second template directory.
+- Shared parts live in `partials/` (`head`, `brand`, `logout`, `notices`, `notice`, `search`,
+  `icon`, `footer`). There is no second template directory.
 - `<body>` → a `.fs-shell` flex wrapper. Before it, the skip link `.fs-skip`
   ("Skip to content" → `#maincontent`), the first tab stop on the page.
 - **Sidebar** — `<nav class="fs-sidebar" aria-label="Menu">`, deliberately `<nav>`: `<aside>` gives
@@ -116,8 +116,8 @@ depends on the number of sections on that particular router, not on the screen.
   - `<div id="indicators">`;
   - `.fs-navlabel` + `<ul class="nav" id="topmenu">` (filled by the menu JS) + `<ul id="modemenu">`;
   - `.fs-spacer` (`flex:1`);
-  - the search button (`#fs-search-btn`, the command palette below) and Log out. The Appearance
-    button used to sit between them; the axes are a page now (System → Appearance), so the chrome
+  - the search button (`#fs-search-btn`, the command palette below) and Log out. An Appearance
+    button used to sit between them; the axes are a tab on System → System now, so the chrome
     carries one control fewer — see [design-system.md](design-system.md).
 - **Main** — `<main class="fs-main" id="maincontent" tabindex="-1">`: `.fs-title.fs-sr` with the
   `<h1>`, `#fs-nav-status`, and `.fs-content` (warnings, `#tabmenu`, `#view`, footer).
@@ -221,6 +221,6 @@ differently, and why that difference is not an unfinished job: [css.md](css.md).
 
 ## Translation
 
-Every label on the Appearance page carries the `footstrap` `msgctxt`; the chrome (Menu, Logout,
+Every label on the Footstrap tab carries the `footstrap` `msgctxt`; the chrome (Menu, Logout,
 Skip to content) and the login/warning strings deliberately do not. The reasoning — `msgid` is a
 global name shared with every app on the router — is in [conventions.md](conventions.md).

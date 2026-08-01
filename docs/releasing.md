@@ -44,10 +44,10 @@ npm run check
 |---|---|---|
 | #3, #8 | theme styles stopped applying on a foreign package's page (filemanager, OpenClash `*{padding:0!important}`) | `chrome-fence` — the fence/pin/dark-guard still match the chrome; `fs-sheets` re-hosts the foreign sheet |
 | #5 | the `low`/`medium`/`high` ramp was three aliases of one colour, so "no data" lit up like a live value | `export-tier` (three DIFFERENT colours), `audit --strict` |
-| #6 | localisation as separate `luci-i18n-*` packages, so the self-updater pulled a catalogue instead of the theme | `i18n` (catalogue in `i18n/`, not `po/`; current and complete). Asset selection is gated in CI — see below |
+| #6 | localisation as separate `luci-i18n-*` packages, so the then-shipped self-updater pulled a catalogue instead of the theme | `i18n` (catalogue in `i18n/`, not `po/`; current and complete). Asset selection is gated in CI — see below |
 | #9, #11 | config-table row labels and a data-table column vanished or were squeezed | `css-dup` + `mirror` (`@mirror table-card/*`) |
 | all | a rule lost its `!important` or started depending on source order | `css-metrics`, `audit --strict`, `css-orphans` |
-| — | the template pre-paint drifted from the live Appearance appliers | `axes` |
+| — | the template pre-paint drifted from the live appearance appliers | `axes` |
 | — | `[Unreleased]` without a bold lead, or the RU mirror out of sync → an empty release note | `changelog` |
 
 `tools/jsmin-verify.mjs` is not in `check` (it needs a jsmin binary built from the pin) — CI runs
@@ -61,16 +61,16 @@ notes and the asset choice are evaluated at tag time, in the field, months later
 - **The CI gate** (`build` job): exactly N assets per format, each package resolving through its own
   **name-anchored** regex `^<name>[-_][^/]*\.EXT$` to exactly one. A `.sig` ends in `.EXT.sig` and
   does not match `\.EXT$`.
-- **A fielded self-updater** pulls the theme by `/luci-theme-footstrap[-_]…/` and the updater by
-  `/luci-app-footstrap-updater[-_]…/`, then `head -1`. Simulate it against the shape of the coming
-  release:
+- **The reader in the field** — `install.sh`, in its fallback path — pulls the theme by
+  `/luci-theme-footstrap[-_]…/`, then `head -1`. Simulate it against the shape of the coming release:
 
 ```sh
 # on a dev router, RELJSON = the release JSON of the intended shape
-for EXT in apk ipk; do for name in luci-theme-footstrap luci-app-footstrap-updater; do
-  n=$(jsonfilter -i "$RELJSON" -e '@.assets[*].browser_download_url' | grep -Ec "/$name[-_][^/]*\.$EXT\$")
-  echo "$name.$EXT -> n=$n (must be 0 or 1)"
-done; done
+for EXT in apk ipk; do
+  n=$(jsonfilter -i "$RELJSON" -e '@.assets[*].browser_download_url' \
+      | grep -Ec "/luci-theme-footstrap[-_][^/]*\.$EXT\$")
+  echo "$EXT -> n=$n (must be 0 or 1)"
+done
 ```
 
 ## Step 4 — live checks for the areas the diff touched
@@ -191,23 +191,14 @@ Only after everything above has passed:
 5. Push the commit and the tag to `origin` — the only remote (the `git.vaka.work` mirror was removed
    on 2026-07-25).
 6. CI on `v*` builds both formats, signs them, and builds the release body from the changelog. Wait
-   for a green pipeline and check that the release carries the expected number of assets (plus a
-   `.sig` for each) — the theme **and** `luci-app-footstrap-updater`, each resolving to exactly one
-   asset.
+   for a green pipeline and check the release carries the expected assets (plus a `.sig` for each):
+   the theme resolving to exactly one asset per format, the manifest, the installer, the notes.
+7. **Publish the feed.** The theme is installed from owfeed-packages, so a release nobody can
+   `apk upgrade` into is half a release. Merge the version bump against
+   [owfeed-packages](https://github.com/owfeed/owfeed-packages) — its bot opens one for some
+   releases, and where it does not, open it by hand.
 
 A fresh empty `## [Unreleased]` comes back on top with the next substantive commit.
-
-## The updater releases separately
-
-`luci-app-footstrap-updater` lives in [its own repository](https://github.com/VizzleTF/luci-app-footstrap-updater)
-with its own changelog, tags and runbook, signed with the same key. This checklist is about the
-**theme**.
-
-**One-off ordering rule, for the manifest transition: THEME FIRST, then the updater.** `check` and
-`notes` read the **theme's** manifest, so an updater-with-manifest reaching a router before the theme
-has published its first `manifest.txt` answers `ERR: cannot fetch the release manifest` (reproduced
-on a dev router against the pre-manifest v0.10.2). The reverse order is harmless. Once both
-repositories have shipped a manifest release, the order is free again.
 
 ## Sources for the changelog rules
 

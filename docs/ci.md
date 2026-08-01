@@ -56,8 +56,8 @@ buildbot, where node does not exist and never will.
 6. **`audit.py --strict`** — undefined `var()`, shadowed declarations, export-tier reads from
    `styles/`, dead base declarations, stray `!important`, colour literals.
 7. **i18n**: `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty. A string
-   in `_()` with no translation renders in English **silently** — which is how the whole Appearance
-   Appearance tab stayed English on a Russian LuCI.
+   in `_()` with no translation renders in English **silently** — which is how the whole Footstrap
+   tab stayed English on a Russian LuCI.
 
 **Template compilation is not here** — it runs in `verify`, on the router, with the real `ucode`.
 It used to clone the interpreter at a pinned commit and build it with cmake, with the router runtime
@@ -79,7 +79,7 @@ ships. Locally it is all one command, `npm run check`; the full table of what ea
 | `fs-orphans.mjs` | dead `fs-*` selectors (safe only inside our namespace) |
 | `css-dup.mjs` | identical declaration bodies under different guards — no linter calls this an error |
 | `mirror.mjs` | `@mirror`-pinned copies still byte-identical (CSS **and** shell) |
-| `axes.mjs` | the pre-paint in `head.ut` agrees with the live Appearance appliers |
+| `axes.mjs` | the pre-paint in `head.ut` agrees with the live appearance appliers |
 | `chrome-fence.mjs` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `conffiles.mjs` | every shipped `/etc/config/*` is declared a conffile — else the manager replaces it on upgrade |
 | `changelog.mjs` | the changelog contract: sections, order, RU mirror, bold leads |
@@ -104,8 +104,8 @@ There are no numeric size budgets left, for CSS, fonts or JS. Lightness is held 
 
 Most of what the other jobs run lives in `tools/*.sh` rather than inline in the YAML —
 `check-shell.sh`, `scan-marker.sh`, `check-acl.sh`, `check-release-key.sh`, `build-jsmin.sh`,
-`check-packages.sh`, `feed-key.sh`, `stage-release.sh`. A step that is a script can be run by hand when it fails, and its reasoning
-lives beside the code instead of inside a workflow nobody reads.
+`check-packages.sh`, `feed-key.sh`, `stage-release.sh`. A step that is a script can be run by hand
+when it fails, and its reasoning lives beside the code instead of inside a workflow nobody reads.
 
 ## `build` — owfeed, not the SDK
 
@@ -160,14 +160,11 @@ The steps:
    silently missing `.lmo` means every `_()` renders the English msgid with nobody reporting
    anything. Counted against the number of languages in the tree, so adding a language and
    forgetting is a red build rather than quiet English for some users.
-5. **Flatten both packages into `dist/`** (owfeed writes `dist/noarch` and `dist/all`; apk derives
-   the filename from name and version, so two architectures cannot share a directory). A release
-   carries **two** packages per format — the theme and the updater — and CI requires that **each**
-   resolves to **exactly one** asset under its **name-anchored** regex
-   (`luci-theme-footstrap[-_]…` / `luci-app-footstrap-updater[-_]…`). That is not hygiene, it is
-   protection for old routers: see issue #6 in [conventions.md](conventions.md). It is also why the
-   updater is named `luci-app-…` and not `luci-theme-footstrap-updater`, which would collide with
-   the theme's own regex and reopen #6.
+5. **Flatten the packages into `dist/`** (owfeed writes `dist/noarch` and `dist/all`; apk derives
+   the filename from name and version, so two architectures cannot share a directory). CI requires
+   that the theme resolve to **exactly one** asset per format under a **name-anchored** regex
+   (`luci-theme-footstrap[-_]…`). That is not hygiene, it is protection for old routers: see issue
+   #6 in [conventions.md](conventions.md).
 
 ## `verify` — the package works on a real userland
 
@@ -234,9 +231,10 @@ its `.sig`, and the notes.
 **About the manifest and readers in the field.** owfeed's format was copied from this project's own
 manifest, with two differences, both safe by construction: the first line became
 `owfeed-manifest 1` (nobody parses it), and the package architecture was appended to the **end** of
-the `pkg` line. The order of the first six fields is untouchable: the updater installed on a router
-reads them positionally and cannot be fixed remotely — a field inserted before them would make it
-fetch a URL that 404s. The workflow checks that order on every release rather than relying on it.
+the `pkg` line. The order of the first six fields is untouchable: `install.sh` reads them positionally,
+and a copy already on somebody's router cannot be fixed remotely — a field inserted before them
+would make it fetch a URL that 404s. The workflow checks that order on every release rather than
+relying on it.
 
 ## `pages`
 
@@ -254,9 +252,10 @@ nothing can drift.
 
 ## Installation and the trust chain
 
-`install.sh` detects `apk`/`opkg` and installs **both packages** — the theme and
-`luci-app-footstrap-updater` — from the latest (or a given) release, each by name, each from its own
-repository:
+`install.sh` adds the **owfeed-packages** feed (key, repository entry, and a `keep.d` entry so a
+sysupgrade does not lose it) and installs the theme from there, so `apk upgrade` / `opkg upgrade`
+carries it forward afterwards. A release asset is the **fallback**, for a pinned tag (the feed
+carries one version per branch, not history) or a router that cannot reach `repo.owfeed.org`:
 
 ```sh
 wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
@@ -277,13 +276,11 @@ are in [conventions.md](conventions.md).
 `install.sh` has one override, `FOOTSTRAP_ALLOW_UNVERIFIED=1`, for pinning a release older than the
 key. A signature that is **present and wrong** is never overridable.
 
-**The two scripts cannot share a file**: the installer runs from `curl | sh` **before** the package
-that would hold a library exists. So their `fetch()`, host allow-list, asset parsing and
-`verify_sig()` are duplicated and pinned byte-for-byte with `@mirror`. Not ceremony — the copies had
-already drifted three ways. **Since the updater split, the pinned pair lives in the updater's
-repository**; the theme's `install.sh` dropped its `@mirror gh/*` markers in the same commit,
-because a `@mirror` group with one copy is a hard failure. Agreement between the two `install.sh`
-copies across repositories is **not** gated.
+`install.sh` carries its own `fetch()`, host allow-list, asset parsing and `verify_sig()` rather
+than sharing a library: it runs from `wget | sh` **before** any package of ours exists. Those
+functions used to be `@mirror`-pinned against a second copy in the updater's repository; with the
+updater retired there is one copy, and a `@mirror` group with one copy is a hard failure — hence no
+markers.
 
 ## Package formats, and the usual mistake
 

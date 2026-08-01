@@ -26,7 +26,7 @@ luci-theme-footstrap/
 ├── htdocs/luci-static/   → /www/luci-static/
 │   ├── footstrap/        cascade.css (GENERATED, gitignored), fonts/, logo.svg
 │   │                     (the doodle wallpapers are NOT here: wallpapers/ in the repo root,
-│   │                      downloaded on demand — npm run wallpapers), dinos.svg
+│   │                      downloaded on demand — npm run wallpapers)
 │   └── resources/        menu-footstrap.js, menu-footstrap-common.js, fs-*.js
 ├── root/                 → /
 │   ├── etc/uci-defaults/30_luci-theme-footstrap
@@ -35,7 +35,7 @@ luci-theme-footstrap/
 │   └── usr/share/rpcd/acl.d/luci-theme-footstrap.json
 └── ucode/template/themes/footstrap/    → /usr/share/ucode/luci/template/…
     ├── header.ut  footer.ut  sysauth.ut
-    └── partials/{head,brand,logout,notices,notice,appearance,search,icon,footer}.ut
+    └── partials/{head,brand,logout,notices,notice,search,icon,footer}.ut
 ```
 
 `luci.mk` installs by directory presence — no install recipes needed:
@@ -123,7 +123,7 @@ The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sour
 **separate `luci-i18n-footstrap-<lang>` package per language**. That is what v0.8.4 did, and it
 **broke the Update button on every router in the field** (issue #6):
 
-- the self-updater people **already had installed** picks its asset with
+- the self-updater people had installed **at the time** picks its asset with
   `grep -E '\.apk$' | head -1`, and GitHub returns assets **sorted by name**;
   `luci-i18n-…` sorts before `luci-theme-…`. The button installed a 6 KB catalogue instead of the
   theme, reported success, and offered the same update forever.
@@ -145,7 +145,7 @@ refuse the very upgrade that fixes this.
 registration (`dev-sync.sh` runs the same file; nothing else registers the theme).
 
 - Registers **one** entry: `luci.themes.Footstrap=/luci-static/footstrap`. Layout, palette, mode
-  and rounding are **client** switches on the Appearance page.
+  and rounding are **client** switches on the Footstrap tab.
 - The key in `themes.<Name>` is CamelCase without hyphens — a uci option-name limitation.
 - Migrates `mediaurlbase`: legacy `-dark`/`-light`/`-top` paths onto the single path (plus
   `luci.main.footstrap_layout=top`, so a router coming from the old top-bar theme keeps its bar —
@@ -189,7 +189,7 @@ the admin who just clicked Update. `reload` sends SIGHUP, which re-reads
 ## `/etc/config/footstrap` must be a conffile
 
 The package ships `root/etc/config/footstrap` as an **empty stub that is written at runtime**:
-Appearance → "Save as default" has rpcd uci-set the router-wide axes into that very file
+"Save as default" has rpcd uci-set the router-wide axes into that very file
 (`saveAsDefault()` in `fs-prefs.js`).
 
 With no `conffiles` define, the package manager owns it as an ordinary file and **replaces it on
@@ -208,16 +208,16 @@ a firmware **sysupgrade**, which keeps only what is listed — hence
 
 ## ACL
 
-`root/usr/share/rpcd/acl.d/luci-theme-footstrap.json` grants what the Appearance page needs to
-persist a router-wide default and a login background:
+`root/usr/share/rpcd/acl.d/luci-theme-footstrap.json` grants what the Footstrap tab needs to persist
+a router-wide default and a login background:
 
 - `uci` `set`/`commit`, scoped to the `footstrap` config — "Save as default";
 - `cgi-io upload` plus `file` `write`/`remove` on `/etc/footstrap/login-bg` — the wallpaper photo;
 - `file exec` on the single literal command `/bin/chmod 644 /etc/footstrap/login-bg`.
 
 That `file.exec` is the only one the theme ships, and it is one fixed argument-complete command.
-The `file.exec` grant for **self-update** is a different one and lives in the updater's package —
-the theme upgrades through the package feed the installer adds.
+There is no grant for self-update, because there is no self-update: the theme upgrades through the
+package feed the installer adds.
 
 rpcd **skips an unreadable file in `acl.d` and says nothing**, so a stray comma means the grant
 is issued to nobody and nothing else notices. `npm run acl` (`tools/check-acl.sh`, also a step in
