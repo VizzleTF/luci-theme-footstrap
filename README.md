@@ -15,23 +15,20 @@
 
 ## What it does
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/readme/appearance-dark.png">
-  <img align="right" width="35%" src="assets/readme/appearance-light.png" alt="The Footstrap tab on System -> System: layout, theme, palette, density, rounding, submenus, the colour and surface fields, the wallpaper, and Save/Reset as the router default.">
-</picture>
+<img src="assets/readme/appearance-dark.png" width="100%" alt="The Footstrap tab on System → System: layout, theme, palette, density and rounding; the colour fields for accent, the status colours and the surfaces, each with the contrast it lands at in words; the wallpaper picker with the cats doodle behind the page; and Save as default next to the two resets.">
 
 - **Styles apps, not just the stock pages**
 - **Works on a phone**
 - **Light** — no framework, `luci-base` is the only dependency
 - **Faster than bootstrap** — see the numbers below
 - **Upgrades with the router** — installed from the package feed, so `apk upgrade` carries it
-- **Appearance is yours** — nine axes, applied instantly
+- **Appearance is yours** — eighteen axes, applied instantly, in one tab
 
 You pick **Footstrap** once in **System → System → Language and Style**, and everything below lives
 in the **Footstrap** tab on that same page. Every axis is a *client* preference: it applies
 instantly, with no reload.
 
-- **Layout** — side menu or top bar
+- **Layout** — top bar (the default) or the side menu
 - **Theme** — auto (follows your OS), light or dark
 - **Palette** — Footstrap (GitHub Primer colours) or Hi-Contrast
 - **Density** — compact, normal or large
@@ -46,7 +43,6 @@ instantly, with no reload.
 
 A set you like can be saved as the router-wide default, so a fresh browser starts from it.
 
-<br clear="right">
 
 ## Measured, not claimed
 
@@ -142,7 +138,8 @@ release assets is needed — which is the case it exists for.
 ### Then
 
 Pick **Footstrap** in **System → System → Language and Style**, field "Design". That is the only
-thing you set on the router.
+thing you set on the router — everything else lives one tab along, under **Footstrap** on the same
+page, and belongs to your browser rather than to the router.
 
 <details>
 <summary>Why that URL and not <code>raw.githubusercontent.com</code></summary>

@@ -43,7 +43,7 @@ luci-base's own `header.ut` prints is **byte-identical** between branches, so `L
 — which the menu and the SPA router depend on — exists in both.
 
 **The one difference is the package manager**: apk on 25.12+, opkg/`.ipk` on 24.10. CI builds
-both formats; `install.sh` and the updater detect which one the router runs.
+both formats; `install.sh` detects which one the router runs.
 
 ## How LuCI picks a theme
 
@@ -146,17 +146,17 @@ fs-select            (no requirer — the footer loads it directly)
 
 The graph is acyclic and the runtime enforces it: `require()` throws `DependencyError` on a cycle.
 
-**`fs-update` is not in the graph.** The updater ships in a separate repository, and no theme
-module may require it statically — a missing dependency would take out the whole chrome.
-`fs-appearance` loads it at runtime, deferred to idle, and resolves to `null` when absent.
+**There is no update checker in the graph, and there is no longer one to load.** A separate
+`luci-app-footstrap-updater` used to be resolved at runtime, deferred to idle, because a theme
+module may not require a package that might not be installed. It is retired: the installer adds the
+owfeed-packages feed, so `apk upgrade` / `opkg upgrade` carries the theme forward, and a settings
+page has no business reaching GitHub to reimplement that. `fs-version.js` still reports the version
+that is installed — no request, no check.
 
-It does **not** simply try and catch, though: `partials/head.ut` globs
-`/www/luci-static/resources/fs-update.js` on the **server** and hands the client
-`window.__fsUpd`, and the require only happens when that says 1. Without the flag the require is a
-guaranteed 404 in the console of every router that has not installed the updater — the module
-loader XHRs the file to discover it is missing. The probe fails **closed** (a throwing glob → 0 →
-the Updates controls stay hidden), which is the safe side: a false 0 only hides the update UI,
-while a false 1 re-opens the 404.
+The server-side glob that told the client whether the updater was on disk (`window.__fsUpd`) went
+with it. The same trick survives for the doodle wallpapers: `partials/head.ut` globs
+`/www/luci-static/footstrap/{cats,dinos}.svg` and hands the client `window.__fsWp`, so the
+Appearance tab knows which one still needs downloading without a probe request per doodle.
 
 Details of the renderer and the shell: [chrome.md](chrome.md).
 

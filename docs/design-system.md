@@ -142,7 +142,8 @@ always fully round. Every `border-radius` in `theme`/`pages` reads one of them.
 **Z-index** — `--fs-z-*`, and **every z-index in the theme comes from here**. Bottom to top:
 `raise` 2 → `sticky` 50 → `flyout` 70 → `header` 800 → `popover` 850 → `overlay` 900 →
 `tooltip` 1000 → `dropdown` 1100. Before the scale there were nine bare numbers across seven files
-and nothing fixing the order — the Appearance popover drew **on top of** an open modal. As a list,
+and nothing fixing the order — the Appearance popover of the day drew **on top of** an open modal.
+As a list,
 that bug is obvious.
 
 **Motion** — four durations, because the UI does four things: `--fs-dur` .15s (state change:
@@ -207,7 +208,7 @@ The values live in `fs-prefs.js`. In the order it draws them:
 **Photo dim** is the scrim over a `file` wallpaper. The photo's *bytes* are router-side — a file
 cannot live in `localStorage` — but how strongly a given browser dims it is an ordinary axis.
 
-Three more `fs-` keys are not popover axes: `fs-rail` (the sidebar collapsed to an icon rail,
+Three more `fs-` keys are not axes: `fs-rail` (the sidebar collapsed to an icon rail,
 toggled in the chrome), `fs-menu-open` (the remembered set of open accordion sections) and
 `fs-recent` (the command palette's history). None of them has a router default, which is why
 `fs-rail` may delete its key on the off state where an axis may not.
@@ -233,7 +234,7 @@ default on purpose.
 ### Nothing else writes to the router
 
 **`/etc/config/footstrap` is written by Save as default and by nothing else.** The only other uci
-writes in the whole popover are the login-background *token* on upload and its blanking on remove —
+writes on the whole page are the login-background *token* on upload and its blanking on remove —
 the identity of a file that has to live on the router anyway.
 
 Two axes used to write through the moment they changed: `wallpaper` on every pick and `photo_dim`
@@ -253,7 +254,7 @@ The two cannot be merged byte for byte, so `tools/axes.mjs` derives the contract
 checks the template against it: keys, `:root` attributes, custom properties, the 1–360 ranges, the
 rounding default — and the load-bearing ordering rule, **custom property first, attribute second**.
 Reversed, a reload paints exactly one frame in the previous hue. The gate exists for that one line:
-it would be fixed in the popover and forgotten in the template, and the only symptom is a single
+it would be fixed in the live applier and forgotten in the template, and the only symptom is a single
 wrong frame nobody reports.
 
 ### The colour axes, and why the slider went

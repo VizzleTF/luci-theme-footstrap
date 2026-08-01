@@ -88,7 +88,7 @@ Resource JS is copied by **glob** (all of `htdocs/`), not by a list of names. Th
 new file made it into the package (luci.mk copies `htdocs/` wholesale) but silently never reached
 the dev router, so it was first exercised after the release.
 
-What `sync` does **not** do: stamp `FS_VERSION` (the popover shows `dev`) and compile `i18n/*.po`
+What `sync` does **not** do: stamp `FS_VERSION` (the Appearance tab shows `dev`) and compile `i18n/*.po`
 into `.lmo` (strings stay English). Both are done by a real package build, which is where they
 should be verified.
 
@@ -198,7 +198,7 @@ legs — the templates are identical but the interpreters are not.
 **Pin exact point releases.** `--release 25.12` or a snapshot works today and fails within days;
 `owlab.yaml` pins `25.12.4` / `24.10.8` for the same reason.
 
-For anything that is not a pass/fail assertion — a layout change, a popover, an axis — drive the
+For anything that is not a pass/fail assertion — a layout change, a fold, an axis — drive the
 running container by hand:
 
 ```sh

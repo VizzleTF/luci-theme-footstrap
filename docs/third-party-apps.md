@@ -171,7 +171,8 @@ what keeps them agreeing. Proven rather than assumed: breaking the fence constan
 eslint **all exited 0**.
 
 1. **`header.ut` — the markup.** A chrome root **marks itself** with `data-fs-chrome`. The `<nav>`
-   is one; so are the skip link and the Appearance popover, neither of which sits inside it. The
+   is one; so are the skip link, the two sr-only elements and the command palette, none of which sits
+   inside it. The
    mark is what the other two read.
 2. **`fs-sheets.js` — the fence.** `CHROME_FENCE` is appended to a foreign selector's subject so it
    can no longer **match** a chrome element. That is what beats a third party's `!important`: there

@@ -7,9 +7,11 @@ Internal name: `footstrap`. Media path: `/luci-static/footstrap`.
 
 ## One theme, one entry
 
-`luci.themes` carries **exactly one** entry, `Footstrap` → `/luci-static/footstrap`. Layout (side
-menu or top bar), mode, palette, wallpaper, tint, accent and rounding are **client** axes in the
-Appearance popover: `localStorage` plus attributes on `:root`, with nothing written to the router.
+`luci.themes` carries **exactly one** entry, `Footstrap` → `/luci-static/footstrap`. Layout (top bar
+by default, or the side menu), mode, palette, density, wallpaper, rounding and every colour — the
+accent, the three status colours and the four surfaces — are **client** axes on the Footstrap tab of
+System → System: `localStorage` plus attributes and inline properties on `:root`, with nothing
+written to the router until "Save as default" is pressed.
 There are no per-layout or per-mode themes; every legacy name (`FootstrapSidebar`, `FootstrapOnTop`,
 `…-dark`/`…-light`) is deleted by `root/etc/uci-defaults/30_luci-theme-footstrap`.
 

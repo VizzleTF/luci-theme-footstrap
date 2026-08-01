@@ -57,7 +57,7 @@ buildbot, where node does not exist and never will.
    `styles/`, dead base declarations, stray `!important`, colour literals.
 7. **i18n**: `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty. A string
    in `_()` with no translation renders in English **silently** — which is how the whole Appearance
-   popover stayed English on a Russian LuCI.
+   Appearance tab stayed English on a Russian LuCI.
 
 **Template compilation is not here** — it runs in `verify`, on the router, with the real `ucode`.
 It used to clone the interpreter at a pinned commit and build it with cmake, with the router runtime
