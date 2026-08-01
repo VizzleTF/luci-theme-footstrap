@@ -11,7 +11,7 @@ Read this before your first patch. For what the theme *is*, start at
 
 ```sh
 npm run check        # every gate below, in one run; must exit 0 before you push
-owlab test --release 25.12.5 --install 'dist/noarch/luci-theme-footstrap-*.apk' \
+owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' \
   --assert 'package luci-theme-footstrap' \
   --assert 'http 200 /cgi-bin/luci/admin/status/overview'
 ```

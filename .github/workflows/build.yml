@@ -135,7 +135,7 @@ jobs:
         uses: owfeed/owlab/action@v0.5.3
         with:
           version: v0.5.3
-          releases: "25.12.5"
+          releases: "25.12.4"
           install: dist/noarch/luci-theme-footstrap-*.apk
           # `exec ucode -T -c` is LuCI's own trycompile, run against the templates as
           # INSTALLED and with the router's real luci.core and uci — so it needs no
@@ -185,7 +185,7 @@ jobs:
         uses: owfeed/owlab/action@v0.5.3
         with:
           version: v0.5.3
-          releases: "25.12.5"
+          releases: "25.12.4"
           feed: https://repo.owfeed.org/releases/25.12/x86_64/packages.adb
           feed-key: ${{ runner.temp }}/owfeed-packages.pem
           feed-name: owfeed-packages

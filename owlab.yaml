@@ -126,7 +126,13 @@ defaults:
 
 routers:
   - id: owrt2512
-    release: "25.12.5"
+    # 25.12.4, NOT .5: the stand builds from openwrt/rootfs:x86_64-<release>, and that tag has to
+    # EXIST in the registry — 25.12.5 does not publish one, so `owlab up` fails to resolve it and
+    # the whole stand refuses to build. CI's build.yml pins the same number for the same reason;
+    # the two must not drift, or "the local form of the same assertions CI makes" proves them on a
+    # different userland. Check `docker manifest inspect openwrt/rootfs:x86_64-<release>` before
+    # bumping either.
+    release: "25.12.4"
     ports: { http: 8025, ssh: 2225 }
 
   - id: owrt2410

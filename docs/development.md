@@ -34,7 +34,7 @@ boxes cover the pairs.
 
 | id | distro | release | manager | LuCI |
 |---|---|---|---|---|
-| `owrt2512` | OpenWrt | 25.12.5 | apk | http://localhost:8025 |
+| `owrt2512` | OpenWrt | 25.12.4 | apk | http://localhost:8025 |
 | `owrt2410` | OpenWrt | 24.10.8 | opkg | http://localhost:8024 |
 | `imm2512` | ImmortalWrt | 25.12.1 | apk | http://localhost:8026 |
 | `imm2410` | ImmortalWrt | 24.10.6 | opkg | http://localhost:8027 |
@@ -165,7 +165,7 @@ userland of each release, and assert. Run it before you push anything that chang
 
 UT=/usr/share/ucode/luci/template/themes/footstrap
 
-owlab test --release 25.12.5 --install 'dist/noarch/luci-theme-footstrap-*.apk' \
+owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' \
   --assert 'package luci-theme-footstrap' \
   --assert 'file /www/luci-static/footstrap/cascade.css' \
   --assert 'http 200 /cgi-bin/luci/admin/status/overview' \
@@ -196,7 +196,7 @@ behind it, so nothing has to be built from a pin and nothing has to be stubbed. 
 legs — the templates are identical but the interpreters are not.
 
 **Pin exact point releases.** `--release 25.12` or a snapshot works today and fails within days;
-`owlab.yaml` pins `25.12.5` / `24.10.8` for the same reason.
+`owlab.yaml` pins `25.12.4` / `24.10.8` for the same reason.
 
 For anything that is not a pass/fail assertion — a layout change, a popover, an axis — drive the
 running container by hand:
@@ -248,7 +248,7 @@ Through owlab:
 
 ```sh
 owlab build                       # target taken from the first router in owlab.yaml
-owlab build --arch x86_64 --release 25.12.5
+owlab build --arch x86_64 --release 25.12.4
 owlab install owrt2512 dist/luci-theme-footstrap-*.apk
 owlab exec owrt2512 -- 'apk del luci-theme-footstrap'
 ```
