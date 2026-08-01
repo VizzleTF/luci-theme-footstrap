@@ -168,13 +168,56 @@ function enhance(sel) {
  * (coverage rule, docs/conventions.md), which a tag qualifier would pass over so it could never card. */
 function tagDataTables() {
 	document.querySelectorAll('#view .table:not(.cbi-section-table):not(.fs-dt)').forEach((t) => {
-		/* TWO header markups, and missing the second is why the package list once needed a
-		 * stacking block of its own: L.ui.Table emits `.tr.table-titles`, the apk Software page
-		 * emits `.tr.cbi-section-table-titles`. EITHER header = a data table; NEITHER = a
-		 * key/value include (System, Memory), which must never card. */
-		if (t.querySelector('.tr.table-titles, .tr.cbi-section-table-titles'))
-			t.classList.add('fs-dt');
+		/* THREE header markups, and each missing one cost a page. L.ui.Table emits
+		 * `.tr.table-titles`; the apk Software page emits `.tr.cbi-section-table-titles` (missing
+		 * it is why the package list once needed a stacking block of its own); and a third-party
+		 * table may simply use a real `<thead>` — luci-mod-dashboard's device lists are
+		 * `<thead class="thead dashboard-bg"><th class="th nowrap">`, matching neither name. They
+		 * therefore never carded, and because those `th`s are `nowrap` they could not compress
+		 * either: on a phone the right-hand columns were cut off by .fs-main's overflow clip.
+		 * Reported from a router with wifi clients.
+		 *
+		 * `thead`, not `thead tr`: that markup is built by E(), which appends the `<th>`s straight
+		 * to the `<thead>` — the parser's implied row never happens, so a `tr` in the selector finds
+		 * nothing. Read as "the header ROW-ISH element", which is what its children are cells of.
+		 *
+		 * ANY of the three = a data table; NONE = a key/value include (System, Memory), which must
+		 * never card. `thead` is the structural form of the same statement the two classes make, so
+		 * it belongs in the same list rather than in a rule of its own. */
+		const head = t.querySelector('.tr.table-titles, .tr.cbi-section-table-titles, thead');
+		if (!head) return;
+		t.classList.add('fs-dt');
+		labelCells(t, head);
 	});
+}
+
+/* Give every cell the column heading it will show once the table cards.
+ *
+ * The card layout prints `attr(data-title)` above each value (theme/30-tables.css), and LuCI's own
+ * table builders fill that attribute in. A foreign table has no reason to: luci-mod-dashboard emits
+ * bare `<td class="td">`, so carding it would have produced a column of values with nothing saying
+ * which was the hostname and which the signal — worse than the clipped table it replaced.
+ *
+ * The heading is COPIED, not invented: it is the text of the header cell in the same position, so
+ * the card says exactly what the column header says. Never overwrites an existing data-title — if
+ * the app set one, that is the app's answer and it knows more than a positional guess. Cheap enough
+ * to re-run on every fit pass (it is skipped entirely once the cells carry the attribute), which
+ * matters because these tables are POLLED: the rows are replaced wholesale every few seconds, and
+ * the fresh ones arrive without it. */
+function labelCells(t, head) {
+	const titles = [ ...head.children ].map((c) => (c.textContent || '').trim());
+	if (!titles.some(Boolean)) return;
+	for (const row of t.querySelectorAll('.tr, tbody tr')) {
+		if (row === head) continue;
+		const cells = row.children;
+		for (let i = 0; i < cells.length; i++) {
+			if (i >= titles.length || !titles[i]) continue;
+			if (cells[i].hasAttribute('data-title')) continue;
+			/* a cell that spans columns has no single heading to take */
+			if (cells[i].colSpan > 1) continue;
+			cells[i].setAttribute('data-title', titles[i]);
+		}
+	}
 }
 
 /* ---- CARD-STACK A DATA TABLE THAT NO LONGER FITS --------------------------------
