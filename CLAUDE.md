@@ -1,0 +1,174 @@
+# CLAUDE.md
+
+`luci-theme-footstrap` — a LuCI theme for **OpenWrt 24.10 and newer** (and ImmortalWrt). Standalone:
+it ships no framework and depends on nothing but `luci-base`. Page content is rendered client-side
+by app view-JS, so the theme is server chrome (`ucode/template/themes/footstrap/*.ut`) + one
+generated `cascade.css` + `fs-*.js` in `htdocs/luci-static/resources/`.
+
+**Communicate in Russian.** Code, comments, commit messages and PR text stay in English.
+
+`styles/base/` began as a fork of `luci-theme-bootstrap`'s cascade.css and is footstrap's code now:
+**do not call it "the fork" or reintroduce the word bootstrap** into filenames, comments or docs.
+That name is legitimate only for the *other, real* package — the `/luci-static/bootstrap` fallback
+in `uci-defaults`, the `bench/` baseline, and the Apache-2.0 attribution in `styles/00-header.css`.
+
+## Read the doc first
+
+`docs/` is the reference and every page carries the measurement behind each rule. This file is the
+index plus the rules that are easy to break — do not re-derive what a doc already settled.
+
+| Touching | Read |
+|---|---|
+| what LuCI expects of a theme, where the boundary runs | `docs/architecture.md` |
+| the rule list with the gate that holds each one | `docs/conventions.md` |
+| dev routers, pushing a change, proving it | `docs/development.md` |
+| `styles/`, cascade layers, `build-css.sh`, `@mirror` | `docs/css.md` |
+| tokens, palettes, type, the Appearance axes | `docs/design-system.md` |
+| sidebar / bar / rail, the menu renderer, the fit | `docs/chrome.md` |
+| client navigation | `docs/spa-router.md` |
+| foreign `luci-app-*`, the fence | `docs/third-party-apps.md` |
+| Makefile, uci-defaults, postinst/postrm, ACL | `docs/package.md` |
+| CI job graph, owfeed, packaging, the trust chain | `docs/ci.md` |
+| pre-release checklist, changelog contract, runbook | `docs/releasing.md` |
+| the navigation benchmark | `docs/benchmark.md` |
+
+`docs/luci-app-styling-guide.md` (+ `_ru`) is outward-facing, for authors of other packages.
+`docs/gallery.html` renders every widget LuCI or any app can emit — it is what `a11y` and
+`export-tier` measure, and how the theme is checked without a router.
+
+**Repo root is the workspace** (`package.json` gates, `tools/`, `docs/`, `owlab.yaml`,
+`install.sh`); the shipped package is `luci-theme-footstrap/` one level down. Nothing in the root
+ships, and the OpenWrt buildbot has no node.
+
+## Commands
+
+```sh
+npm run check                              # every gate, one run; must exit 0 before pushing
+owlab up | owlab sync --watch | owlab open owrt2512
+./tools/stage.sh && owfeed build           # both formats into dist/
+owlab test --release 25.12.5 --install 'dist/noarch/luci-theme-footstrap-*.apk' --assert …
+ucode -T -c -o /dev/null <template>.ut     # syntax-check a template the way LuCI does
+luci-theme-footstrap/dev-sync.sh <host>    # deploy to a HARDWARE router over ssh
+```
+
+One gate directly: `node tools/<name>.mjs`. Two run in CI only: `tools/jsmin-verify.mjs` (needs a
+jsmin built from `luci-upstream.pin`) and `ucode -T -c` over every template, which the `verify`
+containers run against the installed theme. Two `owlab test` invocations, one per format —
+`--install` is a host-side glob evaluated per router, and the fifth assertion is that same template
+compile.
+
+## Rules that are easy to break
+
+### Verifying
+- **Every gate is static; not one opens a page.** A behaviour change is not finished until it has
+  run on a real userland on **both** package managers (25.12/apk and 24.10/opkg). A stubbed node
+  harness proves a module initialises, nothing more — say which of the two you did.
+- **Prove a CSS change with a computed-style diff, not screenshots.** Live counters move 0.5–1.3% of
+  pixels between two runs of the *same* sheet while a real regression weighs 0.19%.
+- Screenshots and any other scratch artefact go in `../tmp/`, never inside the checkout.
+
+### CSS
+- **`htdocs/luci-static/footstrap/cascade.css` is generated — never edit it.** Source is `styles/`.
+- Layer order `tokens, base, theme, page`, one directory per layer, filename prefix = source order.
+  A later layer beats an earlier one regardless of specificity, so a theme rule never needs
+  `!important` to outrank base.
+- **Read the private `--fs-*` tier only.** The `--*-color-*` export tier is defined from it and read
+  by nobody inside `styles/` (`audit --strict` fails). A hostile `:root` recoloured 312 of 336
+  gallery elements before the split, 0 after.
+- **`!important` is a gated allowlist and inverts layer order.** A flag must fight an inline
+  `style=` or an app's unlayered rule; one that beats another footstrap rule means the rule is in
+  the wrong layer. `theme/95-a11y-media.css` is the one sanctioned exception.
+- **Edit the rule that already styles the selector** — never append a second one. **Win on
+  specificity, never on source order.**
+- **Coverage is a contract.** Never delete a selector because no stock page renders it — some
+  third-party app emits it. `css-orphans` is the only safe dead-CSS search, and only because `fs-*`
+  is ours alone.
+- **No colour literals** (`--fs-scrim` excepted); a tint of X is mixed **from** X. Never reintroduce
+  a component bridge (`--*-rgb`, `--*-hsl`).
+- **Merge a duplicate or pin it in `@mirror`.** An unpinned duplicate is a hard failure, and so is a
+  `@mirror` group with one copy.
+- **`styles/base/` is editable**, but prefer the matching `styles/theme/` file, and justify any base
+  edit that changes output with a near-empty computed diff.
+- **No bold mono**: `<strong>` is a LABEL and must be *assigned* the sans face — excluding it from
+  the mono rule changes nothing, since it still inherits.
+
+### JS
+- One concern per module; `L.require` makes a singleton and throws `DependencyError` on a cycle, so
+  a module can never `extend` another — compose by calling.
+- **All "does it fit" logic lives in `fs-fit.js`.** Measure uncollapsed, re-fit synchronously on a
+  mutation, coalesce on resize. `data-narrow` — not a viewport media query — is the single source of
+  "the sidebar became a bar", and the widths are read from the CSS tokens with `getComputedStyle`,
+  never copied into JS.
+- **Never put a regex literal straight after `return` or `=>`** — jsmin eats the rest of the file
+  and **exits 0**. Wrap it: `return (/^https?:\/\//i.test(a));`. No backtick inside a `${…}`.
+- **Require a stock class through `window.L`** (`const RT = window.L; RT.require(name)`) — the `L` a
+  factory receives has no `ui` helpers, and `require()` caches the first requirer's binding.
+- **`FS_VERSION` stays in `fs-version.js` at that path** — the Makefile, `dev-sync.sh` and
+  `tools/stage.sh` sed it by path; moving it makes every release report "(dev)".
+- **No theme module may statically require `fs-update`.** The updater is a separate repo and package
+  ([luci-app-footstrap-updater](https://github.com/VizzleTF/luci-app-footstrap-updater)) — do not
+  re-add it here. `fs-appearance.js` loads it at runtime and `fs-router` exports `onNavigate(fn)` so
+  the theme never names the optional module.
+- Comments are stripped at package time and git keeps every word — **never trade a "why" away for
+  bytes**. A stale comment is worse than none.
+
+### The chrome, and sharing a document with third-party apps
+- **One theme entry, one template dir, one renderer.** Layout is a **client** axis
+  (`:root[data-layout]`, always an explicit value) — never write a `:not([data-layout=…])` guard and
+  never add a second renderer. The bar is the base; the vertical sidebar is one guarded override
+  that wins on specificity.
+- Three zones: **ours** (`fs-*`, `--fs-*`, `[data-fs-chrome]`), **shared LuCI** (`.cbi-*`, `#view` —
+  where an app is *entitled* to win on specificity), **theirs**. Check who owns a name before
+  "fixing" a collision: `.left`/`.right`/`.center` and `ul.nav` are LuCI's.
+- The chrome is defended by **not matching**: the mark in `header.ut`, the fence in `fs-sheets.js`,
+  the pin in `theme/10-chrome.css` (inherited properties, roots alone). `npm run chrome-fence`
+  derives the mark from the markup and compares whole canonical strings — a token-wise check once
+  passed on a fence that was the exact inverse of one.
+- **A view's CSS is never deleted** — a sheet imported at module eval never comes back. An invasive
+  sheet makes the next navigation a full load instead; only a byte-identical duplicate may be
+  dropped.
+- Every Appearance axis is implemented twice (pre-paint in `partials/head.ut`, live in
+  `fs-prefs.js`) and **the custom property is set BEFORE the attribute** — reversed, a reload paints
+  one frame in the previous hue. `npm run axes` derives the contract from the JS.
+
+### Package and release
+- **`+luci-base` is the whole dependency list and keeping it that way is a constraint.** `curl` is
+  not in OpenWrt's default set — fall back to `uclient-fetch` instead of adding a dep.
+- **The catalogue lives in `i18n/`, not `po/`.** `po/` makes luci.mk emit per-language packages, and
+  a multi-asset release is unpickable by a fielded self-updater (issue #6 — it broke Update on every
+  router in v0.8.4). Each package must resolve to exactly one **name-anchored** asset per format.
+- Anything under `root/etc/config/` MUST be in the `conffiles` define (`npm run conffiles`) — else
+  the manager replaces it on upgrade and the theme's own Update wipes the admin's saved defaults,
+  reporting success.
+- `postinst`/`postrm` use **`rpcd reload`, never `restart`** — restart logs out every LuCI session.
+- A malformed `acl.d/*.json` is skipped by rpcd **silently**, so the grant goes to nobody and only
+  Save-as-default and the background upload break, on someone else's router (`npm run acl`).
+- `root/etc/uci-defaults/30_luci-theme-footstrap` is the single source of registration; fresh
+  install vs upgrade is the marker file `/usr/share/luci-theme-footstrap/.installed`, and **an
+  upgrade must never change the active theme** (`$PKG_UPGRADE` is dead — apk never exports it).
+- Do not set `PKG_VERSION` (git-derived). `LUCI_MINIFY_CSS:=0` — csstidy mangles `:has()` and
+  `color-mix()`.
+- **The trust chain fails closed**: a verified TLS channel (never `-k`, never as a retry), an
+  ed25519 `usign` signature, then GitHub's sha256. The signature is the link that holds — GitHub
+  *computes* the asset digest, so a swapped asset passes the checksum. A missing digest, `.sig` or
+  usign is a refusal, not a downgrade.
+- A `_()` with no catalogue renders silently in English: run `luci-theme-footstrap/update-po.sh`
+  after touching any `_()`. A msgid is a **global** name shared with every app — Appearance labels
+  carry the `footstrap` msgctxt; the chrome, the login/notice sentences and the
+  System/Memory/Storage titles deliberately do not.
+
+## Commits and the changelog
+
+- **Conventional Commits, message in English. Never commit without an explicit instruction.** No
+  co-author / "Generated with" / AI attribution trailers. `origin` is the only remote.
+- **Every substantive commit adds its entry to `## [Unreleased]` in the same commit as the code**,
+  in **both** `CHANGELOG.md` and `CHANGELOG_ru.md`. Sections are `Added / Changed / Deprecated /
+  Removed / Fixed / Security / Performance`, one of each per version, in that fixed order — append
+  into the section that already exists in its canonical slot, never add a second `### Changed` on
+  top.
+- Each entry is `- **one-line effect.** then the rationale`. The bold lead **is** the release note
+  (`release-notes.sh` emits leads only), so it must read on its own — **a bullet with no bold lead
+  is silently dropped from the release**. Write the effect, not the diff; keep the measurement.
+- Cutting a release: `docs/releasing.md`, and the order is load-bearing — checklist, rename the
+  heading and add the compare link in both files, `npm run changelog`, commit, **then** tag that
+  commit.
