@@ -54,7 +54,13 @@ jobs:
           cp docs/gallery.html _site/gallery.html
           luci-theme-footstrap/build-css.sh _site/cascade.css   # gallery loads this by <link>
           cp "$FONTS"/fonts/*.woff2 _site/fonts/
-          cp "$FONTS"/cats.svg "$FONTS"/logo.svg _site/
+          cp "$FONTS"/logo.svg _site/
+          # The doodle wallpapers are NOT in htdocs any more — a router downloads them on demand
+          # (wallpapers/, fs-prefs.js installWallpaper), so the package does not carry 200 KB of
+          # decoration. The playground has no such mechanism and just links them, so the portal
+          # serves them from the repository copy instead. This `cp` used to read them out of
+          # htdocs and broke the Pages build the moment they moved.
+          cp wallpapers/*.svg _site/
       # A FULL MIRROR OF THE LATEST RELEASE — the manifest, its signature, the notes AND THE
       # PACKAGES. A different host from github.com, so a block or an outage covering one need not
       # cover the other.
