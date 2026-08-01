@@ -710,7 +710,11 @@ function resetToSaved() {
  * default because it is the value a bare :root paints, and the three that already have a named
  * const (rounding, tint strength, photo dim) use it, so the numbers cannot drift from the CSS. */
 function resetToBuiltin() {
-	applyLayout('sidebar');
+	/* TOP, not sidebar: the bar is what a bare :root paints (header.ut stamps it when uci says
+	 * nothing), so it is what "the theme as it ships" means. This said 'sidebar' after the default
+	 * flipped and nothing caught it — the button quietly reset to a layout that is no longer the
+	 * default, which is the one thing this button must not do. */
+	applyLayout('top');
 	applyMode('auto');
 	applyPalette('footstrap');
 	applyDensity('normal');
