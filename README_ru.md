@@ -11,6 +11,13 @@
   <img src="assets/readme/overview-top-dark.png" width="100%" alt="Тот же обзор в тёмной теме с верхней панелью: меню стоит в строке бренда, контент идёт во всю ширину.">
 </picture>
 
+```sh
+wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
+```
+
+Добавляет свой фид пакетов и ставит из него — дальше тема обновляется вместе с роутером,
+`apk update && apk upgrade`.
+
 [Ещё скриншоты →](docs/screenshots/)
 
 ## Что умеет
@@ -69,149 +76,16 @@
 
 ## Установка
 
-### Одна строка — установщик сам добавит фид
-
 ```sh
 wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 ```
 
-Он определяет релизную линию и архитектуру, добавляет репозиторий
-[owfeed-packages](https://github.com/owfeed/owfeed-packages) вместе с ключом подписи, защищает и
-ключ, и репозиторий от стирания при обновлении прошивки, а дальше ставит тему через `apk` / `opkg`.
-Последнее и есть смысл: менеджер пакетов знает, откуда тема взялась, поэтому **`apk upgrade` тянет
-её дальше** наравне со всем остальным. Скачанный файл так и остался бы на своей версии, пока кто-то
-не придёт со следующим файлом.
+Скрипт добавляет свой фид пакетов и ставит тему из него, поэтому дальше всё сводится к
+`apk update && apk upgrade` (или `opkg`) — тема обновляется вместе с остальным роутером.
 
-Один раз спросит, ставить ли необязательную проверку обновлений (`FOOTSTRAP_UPDATER=1` / `=0`
-отвечают за вас без вопроса).
-
-Если фид недоступен — или если вы закрепили версию, `... | sh -s v0.9.0`, чего фид отдать не может,
-потому что держит по одной версии на ветку, — установщик уходит на релизный ассет и проверяет его по
-подписанному манифесту. Оба пути описаны ниже.
-
-Добавить любой фид — значит доверять ему **любое** имя пакета, которое он способен отдать; размен
-разобран в [разделе установки самого фида](https://github.com/owfeed/owfeed-packages#install), и эти
-две минуты стоят того.
-
-### Руками, если хочется видеть каждый шаг
-
-```sh
-# OpenWrt 25.12 и новее. Для HTTPS на стоковом образе сперва нужны эти два пакета.
-apk add ca-bundle libustream-mbedtls
-
-wget https://repo.owfeed.org/owfeed-packages.pem -O /etc/apk/keys/owfeed-packages.pem
-echo "https://repo.owfeed.org/releases/25.12/$(cat /etc/apk/arch)/packages.adb" > /etc/apk/repositories.d/owfeed-packages.list
-
-# Сохранить ключ и репозиторий при обновлении прошивки.
-mkdir -p /lib/upgrade/keep.d
-printf '%s\n' /etc/apk/keys/owfeed-packages.pem /etc/apk/repositories.d/owfeed-packages.list > /lib/upgrade/keep.d/owfeed-packages
-
-apk update && apk add luci-theme-footstrap
-```
-
-На 24.10 и старше фид отдаёт ту же тему как ipk, через opkg:
-
-```sh
-# ИМЯ файла ключа — это его id, opkg ищет ключ именно по нему.
-wget https://repo.owfeed.org/9040356b214084da -O /etc/opkg/keys/9040356b214084da
-
-echo "src/gz owfeed-packages https://repo.owfeed.org/releases/24.10/$(. /etc/openwrt_release; echo $DISTRIB_ARCH)" >> /etc/opkg/customfeeds.conf
-
-opkg update && opkg install luci-theme-footstrap
-```
-
-Каким бы способом фид ни добавился, не ставьте на том же роутере **ещё и** скачанный пакет:
-`apk add ./file.apk` пишет в `/etc/apk/world` пин на хеш содержимого, пин переживает sysupgrade, и
-пакет больше никогда не обновится из фида.
-
-### Запасной путь установщика — закреплённая версия или недоступный фид
-
-Та же одна строка уходит сюда сама, когда фид недоступен или закреплён тег:
-
-```sh
-wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh -s v0.9.0
-```
-
-Он достаёт релиз из подписанного манифеста, проверяет подпись ключом, зашитым в установщик, и
-sha256 пакета — по манифесту, после чего ставит файл. Ничего, кроме ассетов релиза, не нужно —
-ради этого случая путь и существует.
-
-### Дальше
-
-Выберите **Footstrap** в **System → System → Language and Style**, поле «Design». Это единственное,
-что задаётся на роутере, — всё остальное лежит на соседней вкладке **Footstrap** той же страницы и
-принадлежит вашему браузеру, а не роутеру.
-
-<details>
-<summary>Почему эта ссылка, а не <code>raw.githubusercontent.com</code></summary>
-
-Ссылка ведёт на **ассет релиза**. GitHub ограничивает raw для неаутентифицированных запросов — 60 в
-час на IP-адрес источника, — и за CGNAT или общим выходом этот лимит часто уже израсходован кем-то
-другим, так что по raw-ссылке может не скачаться сам установщик. У ассетов релиза такого лимита нет.
-Raw по-прежнему работает, если он вам привычнее:
-
-```sh
-wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
-```
-
-Ни установка, ни обновление больше не обращаются к `api.github.com`. Оба читают **подписанный
-манифест**, публикуемый вместе с релизом, поэтому лимит 60/час не может сломать ни установку, ни
-проверку версии (issue #17).
-
-</details>
-
-<details>
-<summary>Если не скачивается</summary>
-
-Если роутеру `github.com` недоступен вовсе, установщик есть и на **зеркале** — на том же хосте,
-откуда он потом возьмёт пакеты, и это наш хост:
-
-```sh
-wget -qO- https://vizzletf.github.io/luci-theme-footstrap/install.sh | sh
-```
-
-Если и этот хост недоступен — повторите через GitHub-прокси:
-
-```sh
-GITHUB_PROXY=https://gh-proxy.com/ sh -c "$(wget -qO- https://gh-proxy.com/https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh)"
-```
-
-Публичные прокси, работавшие на момент написания, — ни один из них не наш, и любой может исчезнуть:
-`https://gh-proxy.com/`, `https://ghproxy.net/`, `https://ghfast.top/`, `https://gh.llkk.cc/`.
-
-`GITHUB_PROXY` подставляется только к github-адресам, пробуется первым и откатывается на прямой
-путь, так что мёртвый прокси не утащит установку за собой. **Пакеты, которые он отдаёт, безопасны
-что бы прокси ни делал** — каждый сверяется с sha256 из подписанного манифеста, так что прокси может
-отдать настоящий релиз либо не отдать ничего, но не что-то другое.
-
-Есть и автоматический запасной путь, не требующий ни прокси, ни решения: если `github.com` не
-отвечает, установщик пробует **зеркало на GitHub Pages** с тем же подписанным манифестом и теми же
-пакетами. Прокси нужен тогда, когда недоступен и этот хост.
-
-</details>
-
-<details>
-<summary>Проверить установщик перед запуском</summary>
-
-**Исключение — сам установщик, и оно стоит десяти секунд внимания.** Однострочник выше отдаёт под
-root скрипт, скачанный через третью сторону, и никакой подписи на этом этапе ещё не проверено:
-цепочка доверия начинается только когда скрипт уже запущен. Если не хочется принимать это на веру —
-проверьте заранее (`usign` есть в каждом образе OpenWrt):
-
-```sh
-P=https://gh-proxy.com/https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download
-wget -qO /tmp/install.sh "$P/install.sh" && wget -qO /tmp/install.sh.sig "$P/install.sh.sig"
-cat > /tmp/release.pub <<'EOF'
-untrusted comment: luci-theme-footstrap release key
-RWQYxjhl4rz41tNZc3dXmnRplRO1ydN1q8as++iPUjZc6SRUCb952L/T
-EOF
-usign -V -m /tmp/install.sh -x /tmp/install.sh.sig -p /tmp/release.pub && GITHUB_PROXY=https://gh-proxy.com/ sh /tmp/install.sh
-```
-
-Ключ выписан выше намеренно: сверьте эти символы с [`release.pub`](release.pub) в репозитории — и
-прокси перестаёт участвовать в решении вообще.
-
-</details>
+После этого выберите **Footstrap** в **System → System → Language and Style**, поле «Design». Это
+единственное, что задаётся на роутере; всё остальное лежит на соседней вкладке **Footstrap** той же
+страницы и принадлежит вашему браузеру.
 
 ## Дев-роутеры
 
