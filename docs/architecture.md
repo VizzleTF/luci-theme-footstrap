@@ -156,7 +156,7 @@ It does **not** simply try and catch, though: `partials/head.ut` globs
 guaranteed 404 in the console of every router that has not installed the updater — the module
 loader XHRs the file to discover it is missing. The probe fails **closed** (a throwing glob → 0 →
 the Updates controls stay hidden), which is the safe side: a false 0 only hides the update UI,
-while a false 1 re-opens the 404. See [updates.md](updates.md).
+while a false 1 re-opens the 404.
 
 Details of the renderer and the shell: [chrome.md](chrome.md).
 
@@ -183,7 +183,8 @@ remaining path. Registration details: [package.md](package.md).
 ```
 /usr/share/ucode/luci/template/themes/footstrap/
         header.ut, footer.ut, sysauth.ut, partials/*.ut
-/www/luci-static/footstrap/            cascade.css (generated), fonts/, logo.svg, cats.svg
+/www/luci-static/footstrap/            cascade.css (generated), fonts/, logo.svg
+                                       (+ cats.svg / dinos.svg once downloaded — not shipped), dinos.svg
 /www/luci-static/resources/            menu-footstrap.js, menu-footstrap-common.js, fs-*.js
 /usr/lib/lua/luci/i18n/footstrap-theme.<lang>.lmo    catalogue, bundled INSIDE the theme package
 /usr/share/rpcd/acl.d/luci-theme-footstrap.json      ACL: uci footstrap + login-bg upload
@@ -197,7 +198,7 @@ The theme supplies the **chrome and the design language**. Page content is drawn
 of `luci-mod-*`, whose structure the app fixes.
 
 The theme **can**: style every stock widget through `cascade.css` and its tokens; own the
-sidebar, top bar, logo, indicators and Appearance popover; re-order the stock overview sections.
+sidebar, top bar, logo and indicators; re-order the stock overview sections.
 
 The theme **cannot**: turn the overview into a KPI dashboard with a memory ring and sparklines —
 that is a view module, a separate `luci-app-*`, not a theme.

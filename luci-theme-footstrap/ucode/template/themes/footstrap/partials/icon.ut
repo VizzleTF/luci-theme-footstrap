@@ -1,8 +1,8 @@
 {#
  The chrome's ONE inline-SVG wrapper, server side. Every icon the templates draw is the same 24x24
  stroked outline and differs only in its path data, but the wrapper was written out at each call
- site — header.ut's rail toggle plus search/appearance/logout — so `stroke-width` and the two
- linecap attributes were four independent copies of a value that is meant to make one icon SET.
+ site — header.ut's rail toggle plus search and logout — so `stroke-width` and the two
+ linecap attributes were independent copies of a value that is meant to make one icon SET.
  fs-widgets.js's svgIcon() is the same wrapper for the icons the JS builds; the two are the server
  and client halves of one look.
 

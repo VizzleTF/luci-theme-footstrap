@@ -23,10 +23,11 @@
 			--fs-emboss: none; --fs-text-emboss: none;
 			--fs-bar-bg: #fff; --fs-glass: #fff; --fs-blur: none;
 		}
-		/* Navigation, the appearance popover and the action buttons cannot be used on paper. */
+		/* Navigation, the search overlay and the action buttons cannot be used on paper. The
+		 * Appearance popover was on this list; it is a PAGE now, and a page prints — an admin
+		 * printing System -> Appearance wants what is on it. */
 		.fs-sidebar.fs-sidebar.fs-sidebar.fs-sidebar,
 		.fs-skip.fs-skip,
-		.fs-appearance-pop.fs-appearance-pop,
 		.fs-search-ov.fs-search-ov,
 		.cbi-page-actions.cbi-page-actions,
 		.cbi-tabmenu.cbi-tabmenu,
@@ -35,8 +36,8 @@
 		.fs-shell.fs-shell.fs-shell.fs-shell { height: auto; overflow: visible; }
 		.fs-main.fs-main.fs-main.fs-main { height: auto; overflow: visible; }
 		.fs-content.fs-content { max-width: none; padding: 0; }
-		/* same selector as 15-wallpaper.css, later in the layer — the cats stay off the paper */
-		:root[data-wallpaper="cats"] :is(.fs-shell, body:not(:has(.fs-shell))) { background-image: none; }
+		/* same selector as 15-wallpaper.css, later in the layer — the doodles stay off the paper */
+		:root:is([data-wallpaper="cats"], [data-wallpaper="dinos"]) :is(.fs-shell, body:not(:has(.fs-shell))) { background-image: none; }
 		/* and the uploaded photo — ink, not decoration, on paper (16-login-bg.css) */
 		:root[data-wallpaper="file"] :is(.fs-shell, body:not(:has(.fs-shell))) { background-image: none; }
 		/* keep a card in one piece where the page allows it */

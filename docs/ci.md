@@ -272,7 +272,7 @@ opkg install luci-theme-footstrap_*.ipk                # 24.10
 
 `--allow-untrusted` means **the package manager holds no key of ours**, not that the bytes are
 unchecked. The three-link chain, and why `usign` rather than the package manager's own signature,
-are in [conventions.md](conventions.md); the update side is in [updates.md](updates.md).
+are in [conventions.md](conventions.md).
 
 `install.sh` has one override, `FOOTSTRAP_ALLOW_UNVERIFIED=1`, for pinning a release older than the
 key. A signature that is **present and wrong** is never overridable.

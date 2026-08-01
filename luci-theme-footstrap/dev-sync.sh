@@ -22,13 +22,21 @@ scp -q  "$D"/ucode/template/themes/$N/*.ut      "$R":/usr/share/ucode/luci/templ
 ssh "$R" "mkdir -p /usr/share/ucode/luci/template/themes/$N/partials"
 scp -q  "$D"/ucode/template/themes/$N/partials/*.ut "$R":/usr/share/ucode/luci/template/themes/$N/partials/
 
-# shared static (cascade.css, fonts, logo)
+# shared static (cascade.css, fonts, logo). The doodle wallpapers are NOT here and not in the
+# package: they are downloaded on demand from GitHub (fs-prefs.js installWallpaper), so the dev
+# router deliberately starts without them — that is the state to test the download dialog in.
 scp -qr "$D"/htdocs/luci-static/$N/* "$R":/www/luci-static/$N/
 
 # EVERY resource JS, by GLOB — never by name. This used to list the four files
 # individually, so a FIFTH would be shipped by the package (luci.mk copies htdocs/
 # wholesale) yet silently never reach the dev router — first tested after a release.
-scp -q  "$D"/htdocs/luci-static/resources/*.js "$R":/www/luci-static/resources/
+#
+# A TAR OF THE TREE, not `scp *.js`: the flat glob does not descend, and the theme now ships a
+# view (view/footstrap/appearance.js — System -> Appearance). luci.mk copies htdocs/ wholesale,
+# so that file shipped in the package and reached the dev router never — the same class of miss
+# the glob above was written to end, one directory level down. --exclude of nothing: every path
+# under resources/ is ours to place.
+tar -C "$D/htdocs/luci-static/resources" -cf - . | ssh "$R" "mkdir -p /www/luci-static/resources && tar -C /www/luci-static/resources -xf -"
 
 # stamp the git-derived version into the deployed fs-version.js (the package does the same in
 # Build/Prepare) so the popover shows a real version and the updater's check compares against it. The
@@ -85,10 +93,8 @@ for _f in "$D"/root/etc/config/*; do
 	scp -q "$_f" "$R":"/tmp/.fs-conf-$_b"
 	ssh "$R" "[ -f /etc/config/$_b ] || { mv /tmp/.fs-conf-$_b /etc/config/$_b; echo '  installed /etc/config/$_b (was absent)'; }; rm -f /tmp/.fs-conf-$_b"
 done
-# The self-update backend, its ACL and the release key now ship in the SEPARATE
-# luci-app-footstrap-updater package — deploy them with that package's own dev-sync.sh. This theme
-# sync intentionally leaves the router in the "updater not installed" state (version shows, no update
-# controls), which is exactly the state to test here.
+# There is no self-update backend to deploy any more: the theme upgrades through the package feed
+# the installer adds, which is what a package manager is for.
 ssh "$R" "/etc/init.d/rpcd reload 2>/dev/null; rm -f /tmp/luci-indexcache*"
 
 ssh "$R" "

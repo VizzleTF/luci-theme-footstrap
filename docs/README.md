@@ -22,7 +22,6 @@ Every page here stands on its own — start wherever your question is.
 | [chrome.md](chrome.md) | Sidebar, icon rail, top bar, the menu renderer, the fit measurement |
 | [spa-router.md](spa-router.md) | Client-side navigation: how it works and what it refuses to do |
 | [third-party-apps.md](third-party-apps.md) | Coexisting with foreign `luci-app-*` |
-| [updates.md](updates.md) | The update check and the one-click self-update |
 
 ## Shipping
 

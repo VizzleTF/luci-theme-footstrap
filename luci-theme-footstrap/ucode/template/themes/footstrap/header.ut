@@ -5,8 +5,18 @@
  Copyright 2026 footstrap theme
  Licensed to the public under the Apache License 2.0.
 
- The chrome's strings (Skip to content, Menu, Collapse menu) are deliberately msgctxt-FREE —
- partials/appearance.ut carries the rule and why the chrome is the exception to it.
+ i18n, AND THE RULE THE OTHER TEMPLATES POINT AT. A msgid is a GLOBAL name: LuCI serves ONE
+ merged catalogue — load_catalog() loads every *.<lang>.lmo in /usr/lib/lua/luci/i18n and a lookup
+ returns the first archive holding the hash — so readdir order decides who owns a string. The
+ Appearance layout toggle rendered "Максимум" on a Russian router (issue #6), because somebody
+ else's catalogue translates the msgid `Top` as "maximum". Anything we leave BARE is a name anyone
+ may take, and contexting cannot be selective.
+
+ So every label in the Appearance page carries the `footstrap` msgctxt (fs-appearance.js), while
+ the CHROME's own strings — Skip to content, Menu, Collapse menu, Search, Log out — are
+ deliberately msgctxt-FREE: inheriting luci-base's translation is a feature in the ~40 languages
+ this theme ships no catalogue for. Same for the login/notice sentences and for
+ System/Memory/Storage in fs-overview.js, which MATCH the stock headings on purpose.
 -#}
 
 {%
@@ -26,28 +36,38 @@
 	   cursor per page render and re-read a package the dispatcher had loaded before calling us —
 	   and left this template reaching for UCI a different way than sysauth.ut does. */
 	const fsd = uci.get_all('footstrap', 'settings') ?? {};
-	const fs_defaults = {
-		layout:       fsd.layout || config.main.footstrap_layout || '',
-		darkmode:     fsd.darkmode || '',
-		palette:      fsd.palette || '',
-		wallpaper:    fsd.wallpaper || '',
-		tint:         fsd.tint || '',
-		accent:       fsd.accent || '',
-		rounding:     fsd.rounding || '',
-		autocollapse: fsd.autocollapse || '',
-		/* density was saved by saveAsDefault() and then never read back here, so the router-wide
-		 * Density default reached no browser: __fsSD.density stayed '' whatever the config said.
-		 * Nothing catches this — tools/axes.mjs holds the pre-paint against the live applier, and
-		 * both were right; the gap was the SERVER read that feeds them. Found on a live router. */
-		density:      fsd.density || '',
-		/* '' (not the raw undefined) when unset, so head.ut's `!= ''` guard fires — otherwise
-		 * int(undefined) is 0, a VALID value, and the axis defaults to 0 instead of its real default */
-		tint_strength: fsd.tint_strength || '',
-		photo_dim:    fsd.photo_dim || '',
+	/* EVERY option saveAsDefault() writes, listed ONCE and read back in a loop.
+	 *
+	 * This used to be a hand-written object literal with one line per axis, and the shape of that
+	 * mistake is on record twice: `density` was saved by saveAsDefault() and then never read back
+	 * here, so the router-wide Density default reached no browser — and when the colour axes landed,
+	 * the same thing happened again to all seven of them at once. The symptom is the worst kind:
+	 * Save as default reports success, the file on disk is correct, and "Reset to saved" drops the
+	 * browser to the BUILT-IN default instead of the saved one, because the value the server hands
+	 * the client for that axis was never there. Nothing else notices — tools/axes.mjs held the
+	 * pre-paint against the live applier and both were right; the gap was the SERVER read that feeds
+	 * them, which is now what tools/axes.mjs checks against snapshotAxes().
+	 *
+	 * '' (not the raw undefined) when unset, so head.ut's `!= ''` guards fire — otherwise
+	 * int(undefined) is 0, a VALID value, and an axis whose 0 is a real choice (rounding, the tint
+	 * strength, the photo dim) would default to 0 instead of to its own default. */
+	const FS_AXES = [
+		'layout', 'darkmode', 'palette', 'wallpaper', 'density',
+		'tint', 'accent', 'good', 'warn', 'danger',
+		'card', 'control', 'bar', 'line',
+		'rounding', 'autocollapse', 'tint_strength', 'photo_dim',
 		/* the uploaded background's cache-bust token (head.ut whitelists it to hex) — the image
-		 * itself is a served file, only this token travels in the page */
-		login_bg:     fsd.login_bg || ''
-	};
+		   itself is a served file, only this token travels in the page. NOT an axis: it has no
+		   browser layer at all, but it reaches the client the same way. */
+		'login_bg'
+	];
+	const fs_defaults = {};
+	for (let k in FS_AXES)
+		fs_defaults[k] = fsd[k] || '';
+	/* the one value with a fallback of its own: the legacy migration seed
+	   luci.main.footstrap_layout=top, which uci-defaults sets for a router upgraded from the old
+	   top-nav theme (a shell script cannot write localStorage). */
+	fs_defaults.layout = fsd.layout || config.main.footstrap_layout || '';
 
 	http.prepare_content('text/html; charset=UTF-8');
 -%}
@@ -107,9 +127,13 @@
 
 				<div class="fs-spacer"></div>
 
-				{# right cluster, in visual order: the poll pill above, then Search, Appearance, Log out #}
+				{# right cluster, in visual order: the poll pill above, then Search, Log out.
+				   APPEARANCE USED TO SIT HERE, a button opening a popover on <body>. It is a page
+				   now — System -> Appearance (admin/system/appearance), rendered by
+				   view/footstrap/appearance.js — reached through the menu like every other settings
+				   page. The axes had outgrown a floating panel; fs-appearance.js's header has the
+				   reasoning. So the chrome carries one control fewer, and the settings carry a URL. #}
 				{% include('themes/footstrap/partials/search') %}
-				{% include('themes/footstrap/partials/appearance') %}
 				{% include('themes/footstrap/partials/logout') %}
 			</nav>
 

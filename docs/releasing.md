@@ -201,7 +201,7 @@ A fresh empty `## [Unreleased]` comes back on top with the next substantive comm
 
 `luci-app-footstrap-updater` lives in [its own repository](https://github.com/VizzleTF/luci-app-footstrap-updater)
 with its own changelog, tags and runbook, signed with the same key. This checklist is about the
-**theme**; release the updater from its own notes. Background: [updates.md](updates.md).
+**theme**.
 
 **One-off ordering rule, for the manifest transition: THEME FIRST, then the updater.** `check` and
 `notes` read the **theme's** manifest, so an updater-with-manifest reaching a router before the theme

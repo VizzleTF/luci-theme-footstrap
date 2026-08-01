@@ -41,6 +41,8 @@ const readJs = (p) => readdirSync(join(ROOT, p), { recursive: true })
 /* every module the theme ships — the axes live across fs-prefs.js and menu-footstrap.js */
 const JS = readJs('luci-theme-footstrap/htdocs/luci-static/resources');
 const HEAD = read('luci-theme-footstrap/ucode/template/themes/footstrap/partials/head.ut');
+/* the SERVER side of the axes: header.ut is what reads /etc/config/footstrap back for head.ut */
+const HEADER = read('luci-theme-footstrap/ucode/template/themes/footstrap/header.ut');
 const TOKENS = read('luci-theme-footstrap/styles/02-tokens.css');
 const STYLES = readTree('luci-theme-footstrap/styles');
 const ORPHANS = read('tools/fs-orphans.mjs');
@@ -64,12 +66,13 @@ const keysIn = (src) => {
 	for (const m of src.matchAll(/^const\s+\w*KEY\w*\s*=\s*'(fs-[a-z-]+)'/gm)) out.add(m[1]);
 	return out;
 };
-/* ...plus the axes built by a FACTORY, which pass their key in as an argument — hueAxis(key, attr,
- * prop) and enumAxis(key, attr, on, off). Those have no lsGet('fs-…') call site at all (the factory
- * body reads a variable), so the scan above misses them entirely and every check below would go
- * quiet on exactly the axes it is meant to hold. Match each factory call by its literal args. */
-const hueAxes = [...JS.matchAll(/hueAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)]
-	.map(([, key, attr, prop]) => ({ key, attr, prop }));
+/* ...plus the axes built by a FACTORY, which pass their key in as an argument — colorAxis(key,
+ * attr, hueProp, colorProp) and enumAxis(key, attr, on, off). Those have no lsGet('fs-…') call site
+ * at all (the factory body reads a variable), so the scan above misses them entirely and every check
+ * below would go quiet on exactly the axes it is meant to hold. Match each factory call by its
+ * literal args. */
+const colorAxes = [...JS.matchAll(/colorAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)]
+	.map(([, key, attr, hueProp, colorProp]) => ({ key, attr, hueProp, colorProp }));
 const enumAxes = [...JS.matchAll(/enumAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)]
 	.map(([, key, attr, on, off]) => ({ key, attr, on, off }));
 /* propAxis(key, sdKey, prop, …) — an inline-property slider (rounding, tint strength). Same reason
@@ -77,8 +80,13 @@ const enumAxes = [...JS.matchAll(/enumAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'
 const propAxes = [...JS.matchAll(/propAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'/g)]
 	.map(([, key, sdKey, prop]) => ({ key, sdKey, prop }));
 
-const jsKeys = new Set([...keysIn(JS), ...hueAxes.map(a => a.key), ...enumAxes.map(a => a.key), ...propAxes.map(a => a.key)]);
-const headKeys = keysIn(HEAD);
+const jsKeys = new Set([...keysIn(JS), ...colorAxes.map(a => a.key), ...enumAxes.map(a => a.key), ...propAxes.map(a => a.key)]);
+/* head.ut pre-paints the five colour axes through ONE local helper, so their keys are arguments
+ * there too and keysIn() cannot see them either — the same blind spot, on the other side. Matched
+ * by the call, and the four literals are what section 2 holds against the JS. */
+const headColorCalls = [...HEAD.matchAll(/colour\(\s*'([^']+)'\s*,[^,]*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)]
+	.map(([, key, attr, hueProp, colorProp]) => ({ key, attr, hueProp, colorProp }));
+const headKeys = new Set([...keysIn(HEAD), ...headColorCalls.map(a => a.key)]);
 
 if (!jsKeys.size) errors.push('found no fs-* localStorage keys in the theme JS — this tool is broken, not the theme');
 
@@ -88,33 +96,65 @@ for (const k of headKeys)
 	if (!jsKeys.has(k))
 		errors.push(`head.ut reads localStorage '${k}', but no theme JS ever writes it — dead pre-paint, or a typo`);
 
-/* ---- 2. the hue axes: key, attribute, custom property, order, range ------------------ */
-if (!hueAxes.length) errors.push('no hueAxis() calls found in the theme JS — did the axis helper get renamed?');
+/* ---- 2. the colour axes: key, attribute, both custom properties, order, range ---------
+ *
+ * A colour axis holds off | a hue 1–360 | a '#rrggbb', and the attribute's VALUE says which of the
+ * last two is in effect. Both sides build all five from one helper — colorAxis() in the JS,
+ * colour() in the pre-paint — so the contract that can drift is the ARGUMENT LIST: a renamed
+ * property or a mistyped attribute on one side and the pre-paint silently stops matching the
+ * stylesheet, whose only symptom is one wrong frame on reload.
+ *
+ * The property-before-attribute ordering is therefore checked ONCE, inside the helper, rather than
+ * per axis: with one helper there is one place it can be wrong, and checking it five times over the
+ * same source text would report the same defect five times. */
+if (!colorAxes.length) errors.push('no colorAxis() calls found in the theme JS — did the axis helper get renamed?');
+if (!headColorCalls.length) errors.push('head.ut no longer pre-paints any colour axis through colour(key, sd, attr, hueProp, colorProp)');
 
-for (const { key, attr, prop } of hueAxes) {
-	const where = `hue axis '${key}'`;
-	if (!headKeys.has(key)) { errors.push(`${where}: head.ut never reads localStorage '${key}' — it will flash on reload`); continue; }
-	const iProp = HEAD.indexOf(`setProperty('${prop}'`);
-	const iAttr = HEAD.indexOf(`setAttribute('${attr}'`);
-	if (iProp < 0) { errors.push(`${where}: head.ut never sets ${prop}`); continue; }
-	if (iAttr < 0) { errors.push(`${where}: head.ut never sets the ${attr} attribute`); continue; }
-	/* THE ordering rule, and the reason this gate exists: a one-line fix that would be made in
-	 * the popover's applier and forgotten in the template, whose only symptom is a single wrong
-	 * frame on reload — which nobody reports and no other test catches. */
+/* the helper's body, where the ordering rule lives */
+const headColourFn = (HEAD.match(/const colour = \([\s\S]*?\n\t{5}\};/) || [''])[0];
+for (const [mode, prop] of [ [ 'hex', 'colorProp' ], [ 'hue', 'hueProp' ] ]) {
+	const iProp = headColourFn.indexOf(`setProperty(${prop}`);
+	const iAttr = headColourFn.indexOf(`setAttribute(attr, '${mode}')`);
+	if (iProp < 0 || iAttr < 0) {
+		errors.push(`head.ut's colour() no longer sets ${prop} and the ${mode} attribute value — the `
+			+ `pre-paint and 03-palettes.css disagree about how a ${mode} axis is stamped`);
+		continue;
+	}
 	if (iProp > iAttr)
-		errors.push(`${where}: head.ut sets the ${attr} attribute BEFORE ${prop}. The property must come `
-			+ `first, or a fresh load paints one frame with the previous hue (or hue 0).`);
-	/* the valid range, as the JS validates it (1..360) */
-	const rangeRe = new RegExp(`getItem\\('${key}'\\)[\\s\\S]{0,200}?>=\\s*1\\s*&&[\\s\\S]{0,40}?<=\\s*360`);
-	if (!rangeRe.test(HEAD))
-		errors.push(`${where}: head.ut does not validate the stored hue as 1..360 the way the JS does `
-			+ `(an out-of-range value would be pre-painted and then rejected by the popover)`);
-	/* the gates' own stamper, held to the same axis it claims to sweep */
-	if (!GALLERY.includes(`'${attr}', '${prop}'`))
-		errors.push(`${where}: tools/lib/gallery.mjs does not stamp ${attr} with ${prop} — the axe and `
+		errors.push(`head.ut's colour() sets data-* = '${mode}' BEFORE ${prop}. The property must come `
+			+ `first, or a fresh load paints one frame in the previous colour.`);
+	else ok.push(`colour pre-paint ${mode}: property before attribute`);
+}
+/* the valid hue range, as the JS validates it (1..360) */
+if (!(/>=\s*1\s*&&[\s\S]{0,40}?<=\s*360/).test(headColourFn))
+	errors.push('head.ut\'s colour() does not validate a stored hue as 1..360 the way normColor() does '
+		+ '(an out-of-range value would be pre-painted and then rejected by the page)');
+
+for (const { key, attr, hueProp, colorProp } of colorAxes) {
+	const where = `colour axis '${key}'`;
+	const head = headColorCalls.find((c) => c.key === key);
+	if (!head) { errors.push(`${where}: head.ut never pre-paints it — it will flash on reload`); continue; }
+	if (head.attr !== attr || head.hueProp !== hueProp || head.colorProp !== colorProp) {
+		errors.push(`${where}: head.ut pre-paints it as (${head.attr}, ${head.hueProp}, ${head.colorProp}) `
+			+ `but the JS applies it as (${attr}, ${hueProp}, ${colorProp}) — one of the two is painting `
+			+ `a token the stylesheet does not read`);
+		continue;
+	}
+	/* the stylesheet's half: both modes have to be declared, or an axis stamps an attribute nothing
+	 * matches. The hex mode of the canvas is the exception — it overwrites --fs-bg inline, so there
+	 * is no rule for it to match and none to look for. */
+	if (!STYLES.includes(`[${attr}="hue"]`))
+		errors.push(`${where}: no :root[${attr}="hue"] rule in styles/ — the pre-paint stamps a mode the `
+			+ `stylesheet does not implement, so the slider would move nothing`);
+	/* the gates' own stamper, held to the same axis it claims to sweep. Only the two axes the
+	 * matrix actually walks (tint, accent) — the status colours are not part of the export-tier
+	 * contract, and asserting a sweep that does not exist would be a demand to write a slower gate
+	 * rather than a defect. */
+	if ((key === 'fs-tint' || key === 'fs-accent') && !GALLERY.includes(`'${attr}', '${hueProp}'`))
+		errors.push(`${where}: tools/lib/gallery.mjs does not stamp ${attr} with ${hueProp} — the axe and `
 			+ `export-tier sweeps would go on reporting this axis in their combination count while every `
 			+ `point of it measured the UNSTAMPED page, which is a pass by not looking`);
-	ok.push(`hue axis ${key.padEnd(10)} -> ${attr}, ${prop}   (key, attr, property, order and range agree; swept by lib/gallery.mjs)`);
+	ok.push(`colour axis ${key.padEnd(10)} -> ${attr}, ${hueProp} / ${colorProp}   (key, attr and both properties agree)`);
 }
 
 /* ---- 2b. the enum axes: key, attribute and the ON value ------------------------------
@@ -146,8 +186,8 @@ for (const { key, attr, on } of enumAxes) {
 /* ...and the converse: an axis lib/gallery.mjs stamps that the JS no longer has is a sweep of a
  * dead attribute, which also reads as "28 combinations" and measures 7. */
 for (const [, attr, prop] of GALLERY.matchAll(/hue\(\w+, '([^']+)', '([^']+)'\)/g))
-	if (!hueAxes.some((a) => a.attr === attr && a.prop === prop))
-		errors.push(`tools/lib/gallery.mjs stamps ${attr}/${prop}, which no hueAxis() in the theme JS `
+	if (!colorAxes.some((a) => a.attr === attr && a.hueProp === prop))
+		errors.push(`tools/lib/gallery.mjs stamps ${attr}/${prop}, which no colorAxis() in the theme JS `
 			+ `declares — the gates sweep an axis the theme does not have`);
 
 /* ---- 2c. EVERY OTHER :root attribute an applier stamps -------------------------------
@@ -168,7 +208,7 @@ for (const [, attr, prop] of GALLERY.matchAll(/hue\(\w+, '([^']+)', '([^']+)'\)/
  * pre-paints do are defensive symmetry, not a requirement — asserting them would have made this gate
  * demand a change that fixes nothing. */
 const OUTBOUND = new Set(['data-theme', 'data-bs-theme', 'data-darkmode']);	/* checked in 3b */
-const factoryAttrs = new Set([...hueAxes.map(a => a.attr), ...enumAxes.map(a => a.attr)]);
+const factoryAttrs = new Set([...colorAxes.map(a => a.attr), ...enumAxes.map(a => a.attr)]);
 const jsSets = new Set([...JS.matchAll(/root\.setAttribute\('(data-[a-z-]+)'/g)].map((m) => m[1]));
 
 for (const attr of jsSets) {
@@ -179,6 +219,39 @@ for (const attr of jsSets) {
 		continue;
 	}
 	ok.push(`axis attr ${attr.padEnd(14)} (the applier stamps it and head.ut pre-paints it)`);
+}
+
+/* ---- 2d. THE SERVER READ: every option Save-as-default writes must be read back -------
+ *
+ * A third implementation nothing held. saveAsDefault() uci-sets the fields snapshotAxes() returns;
+ * header.ut reads /etc/config/footstrap back into `fs_defaults`, head.ut sanitises that into
+ * window.__fsSD, and fs-prefs.js's def() reads it from there. An axis missing from the SERVER read
+ * is written to disk correctly and never comes back: Save as default reports success, the file is
+ * right, and "Reset to saved" drops the browser to the BUILT-IN default because the value the
+ * server hands the client was never there.
+ *
+ * It has happened twice — `density`, then all seven colour and surface axes at once — and neither
+ * time did anything fail: the pre-paint and the live applier agreed with each other, which is all
+ * this file used to check. Derived from snapshotAxes(), the one list that IS the contract. */
+const snapBody = (JS.match(/function snapshotAxes\(\)\s*\{([\s\S]*?)\n\}/) || [, ''])[1];
+const snapFields = [...snapBody.matchAll(/^\s*([a-z_]+):/gm)].map((m) => m[1]);
+const headerAxes = (HEADER.match(/const FS_AXES = \[([\s\S]*?)\]/) || [, ''])[1];
+const headerFields = [...headerAxes.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+
+if (!snapFields.length) errors.push('no snapshotAxes() found in the theme JS — did Save-as-default get renamed?');
+else if (!headerFields.length) errors.push('header.ut no longer declares `const FS_AXES = [...]` — the gate cannot tell which uci options the server reads back');
+else {
+	for (const f of snapFields)
+		if (!headerFields.includes(f))
+			errors.push(`uci option '${f}': saveAsDefault() writes it, but header.ut's FS_AXES does not read `
+				+ `it back — the router default for this axis reaches no browser, so "Reset to saved" `
+				+ `falls through to the built-in and Save-as-default looks like it did nothing`);
+	for (const f of headerFields)
+		if (f !== 'login_bg' && !snapFields.includes(f))
+			errors.push(`uci option '${f}': header.ut reads it back, but snapshotAxes() never writes it — `
+				+ `either a leftover from a removed axis, or the axis is missing from Save-as-default`);
+	if (!errors.length)
+		ok.push(`server read: all ${snapFields.length} saved option(s) are read back by header.ut`);
 }
 
 /* ---- 3. the rounding default: JS, template and CSS token must be the same number ----- */

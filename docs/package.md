@@ -24,7 +24,9 @@ luci-theme-footstrap/
 │   ├── ru/footstrap.po
 │   └── es/footstrap.po
 ├── htdocs/luci-static/   → /www/luci-static/
-│   ├── footstrap/        cascade.css (GENERATED, gitignored), fonts/, logo.svg, cats.svg
+│   ├── footstrap/        cascade.css (GENERATED, gitignored), fonts/, logo.svg
+│   │                     (the doodle wallpapers are NOT here: wallpapers/ in the repo root,
+│   │                      downloaded on demand — npm run wallpapers), dinos.svg
 │   └── resources/        menu-footstrap.js, menu-footstrap-common.js, fs-*.js
 ├── root/                 → /
 │   ├── etc/uci-defaults/30_luci-theme-footstrap
@@ -143,7 +145,7 @@ refuse the very upgrade that fixes this.
 registration (`dev-sync.sh` runs the same file; nothing else registers the theme).
 
 - Registers **one** entry: `luci.themes.Footstrap=/luci-static/footstrap`. Layout, palette, mode
-  and rounding are **client** switches in the Appearance popover.
+  and rounding are **client** switches on the Appearance page.
 - The key in `themes.<Name>` is CamelCase without hyphens — a uci option-name limitation.
 - Migrates `mediaurlbase`: legacy `-dark`/`-light`/`-top` paths onto the single path (plus
   `luci.main.footstrap_layout=top`, so a router coming from the old top-bar theme keeps its bar —
@@ -206,7 +208,7 @@ a firmware **sysupgrade**, which keeps only what is listed — hence
 
 ## ACL
 
-`root/usr/share/rpcd/acl.d/luci-theme-footstrap.json` grants what the Appearance popover needs to
+`root/usr/share/rpcd/acl.d/luci-theme-footstrap.json` grants what the Appearance page needs to
 persist a router-wide default and a login background:
 
 - `uci` `set`/`commit`, scoped to the `footstrap` config — "Save as default";
@@ -215,7 +217,7 @@ persist a router-wide default and a login background:
 
 That `file.exec` is the only one the theme ships, and it is one fixed argument-complete command.
 The `file.exec` grant for **self-update** is a different one and lives in the updater's package —
-see [updates.md](updates.md).
+the theme upgrades through the package feed the installer adds.
 
 rpcd **skips an unreadable file in `acl.d` and says nothing**, so a stray comma means the grant
 is issued to nobody and nothing else notices. `npm run acl` (`tools/check-acl.sh`, also a step in
@@ -223,7 +225,7 @@ CI's `check` job) parses every shipped `acl.d/*.json` and additionally rejects a
 parses but grants nothing — a list instead of an object, or an entry with neither `read` nor
 `write`, both of which rpcd accepts just as quietly.
 
-A related trap the popover had to solve: `rpc.js` only raises on the ubus status code when the
+A related trap the page had to solve: `rpc.js` only raises on the ubus status code when the
 declaration asks it to (`reject: true`). Without it, a per-config ACL refusal — `uci` granted,
 `footstrap` not — **resolves** with status 6 (permission denied) and every `.then()` runs as if the
 file had been written.

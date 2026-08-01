@@ -177,26 +177,32 @@ Shadows are `--fs-shadow` (per mode) and `--fs-shadow-pop` (floating surfaces).
 
 ## The Appearance axes
 
-The popover is `fs-appearance.js`; the values live in `fs-prefs.js`. In the order it draws them:
+The controls are `fs-appearance.js`, added as a fifth **tab** on the stock **System → System** page,
+beside General Settings / Logging / Time Synchronization / Language and Style. It watches
+`body[data-page]` the way `fs-overview.js` does, then appends one `.cbi-tabcontainer` and one `<li>`
+to the group `ui.tabs` has already initialised — by hand, because `initTabGroup()` returns
+immediately on a group carrying `data-initialized` and clearing that flag builds a *second* menu
+beside the first. A theme owns no dispatcher node of its own: a node outlives the theme that
+registered it, so switching themes would leave a menu entry whose view is gone.
+
+The values live in `fs-prefs.js`. In the order it draws them:
 
 | Axis | Values | `localStorage` | `:root` |
 |---|---|---|---|
-| **Layout** | sidebar / top | `fs-layout` | `data-layout` (always explicit) |
+| **Layout** | **top** (default) / sidebar | `fs-layout` | `data-layout` (always explicit) |
 | **Theme** | auto / light / dark | `fs-darkmode` | `data-darkmode` + `data-theme` + `data-bs-theme` |
 | **Palette** | footstrap / hicontrast | `fs-palette` | `data-palette` |
 | **Density** | compact / normal / large | `fs-density` | `data-density` |
-| **Wallpaper** | off / cats / **file** | `fs-wallpaper` | `data-wallpaper` |
-| **Tint** | off, hue 1–360° | `fs-tint` | `data-tint`, `--fs-tint-h` |
+| **Wallpaper** | off / cats / dinos / **file** | `fs-wallpaper` | `data-wallpaper` — the two doodles are downloaded on demand (`wallpapers/`, pinned by sha256) |
+| **Tint** | off, hue 1–360°, `#rrggbb` | `fs-tint` | `data-tint=hue\|hex`, `--fs-tint-h` / `--fs-bg` |
 | **Tint strength** | 0–200%, default 100 | `fs-tint-strength` | `--fs-tint-strength` |
-| **Accent** | off, hue 1–360° | `fs-accent` | `data-accent`, `--fs-accent-h` |
+| **Accent** | off, hue 1–360°, `#rrggbb` | `fs-accent` | `data-accent=hue\|hex`, `--fs-accent-h` / `--fs-accent` |
+| **Good / Warning / Danger** | same shape as Accent | `fs-good`, `fs-warn`, `fs-danger` | `data-good\|warn\|danger`, `--fs-*-h` / `--fs-*` |
+| **Cards / Controls / Sidebar / Borders** | off, `#rrggbb` | `fs-card`, `fs-control`, `fs-bar`, `fs-line` | — (inline `--fs-panel`, `--fs-panel2`, `--fs-bar-bg`, `--fs-border`) |
 | **Photo dim** | 0–100%, default 74 | `fs-photo-dim` | `--fs-photo-dim` |
 | **Rounding** | 0–20 px, default 12 | `fs-radius` | `--fs-radius-base` |
 | **Submenus** | keep open / auto-collapse | `fs-menu-autocollapse` | — (no attribute) |
-| **Updates** | check / off | — | — |
 
-**Updates is not the theme's axis.** It ships with the optional `luci-app-footstrap-updater`
-package, and the popover draws it only when that package is installed. See
-[updates.md](updates.md).
 
 **Photo dim** is the scrim over a `file` wallpaper. The photo's *bytes* are router-side — a file
 cannot live in `localStorage` — but how strongly a given browser dims it is an ordinary axis.
@@ -250,9 +256,31 @@ Reversed, a reload paints exactly one frame in the previous hue. The gate exists
 it would be fixed in the popover and forgotten in the template, and the only symptom is a single
 wrong frame nobody reports.
 
+### The colour axes, and why the slider went
+
+Nine axes take a colour: **Tint** (the canvas), **Accent**, the three status colours **Good /
+Warning / Danger**, and the four surfaces **Cards / Controls / Sidebar / Borders**. Each holds one
+of three things — off, a hue 1–360°, or a `#rrggbb` — and `data-<axis>` carries `hue` or `hex` to
+say which. The surfaces are the exception and hold only a colour: they set an inline custom property
+and no attribute at all (`surfaceAxis` in `fs-prefs.js`), because there is nothing for a rule to
+match.
+
+**The UI offers only the hex field.** The hue slider was here and is gone: rotating a hue keeps the
+palette's chroma, so no angle of it reaches a grey — which is the one thing #20 asked for. The hue
+mode stays in storage and in the stylesheet so a value saved before the change goes on painting.
+
+**The ink over a hex fill is derived, in CSS.** `--fs-on-accent` and the three status inks become
+`oklch(from <fill> clamp(0, (l - .62) * -100, 1) 0 0)` — black above the sRGB crossover, white
+below, chroma zeroed. The rule is written `[data-accent="hex"][data-accent]`: the palette's dark
+block is also (0,2,0) and later in the file, so the single-attribute form lost **in dark mode only**
+and left a grey accent carrying near-black ink at 1.9:1. Surfaces get no derived ink — what reads on
+them is `--fs-text`, a palette token these axes must not move — so the page reports the contrast
+each choice lands at instead.
+
 ### Tint and Accent
 
-Both are an angle 1–360°, both rotate `oklch(from …)`, and both default to "off" (no attribute).
+In HUE mode both are an angle 1–360°, both rotate `oklch(from …)`, and both default to "off" (no
+attribute).
 
 - **Tint** (`data-tint`, `--fs-tint-h`) washes a hue into the **canvas** (`--fs-bg`, the surface the
   cards float on), so a whole LuCI reads as green / purple / amber at a glance. `localStorage` is

@@ -5,7 +5,7 @@
  The markup of a notice lives ONCE, in partials/notice.ut; this file decides only WHICH notices
  there are and what they say.
  The sentences carry no msgctxt on purpose: inheriting luci-base's translation is a feature in
- the ~40 languages this theme has no catalogue for (see partials/appearance.ut).
+ the ~40 languages this theme has no catalogue for (see header.ut).
  Licensed to the public under the Apache License 2.0.
 -#}
 {% if (empty_password): %}

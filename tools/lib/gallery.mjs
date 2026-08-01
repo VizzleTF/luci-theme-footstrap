@@ -45,24 +45,32 @@ export async function serveGallery(cssPath) {
 
 /* Stamp one point of the Appearance matrix onto :root, exactly the way the theme does.
  *
- * THE ONE COPY. It must stay in step with applyMode/applyPalette/hueAxis in
+ * THE ONE COPY. It must stay in step with applyMode/applyPalette/colorAxis in
  * fs-prefs.js and head.ut's pre-paint script — if an axis changes shape, change it
  * here too, or these gates go on proving something that is no longer true.
  *
  * `tint`/`accent`: null (or 0) = off, which CLEARS both attribute and custom property. An
- * untinted router must cost exactly the palette it already had, so "off" is not hue 0. */
+ * untinted router must cost exactly the palette it already had, so "off" is not hue 0.
+ *
+ * Only the HUE half of a colour axis is swept, and that is the honest scope: a hue rotation keeps
+ * the palette's lightness and chroma, so it is a contract these gates can hold the theme to across
+ * the whole wheel. A hex axis is a colour the ADMIN chose against no palette at all — there is no
+ * value of it that could pass or fail, which is why the theme derives readable ink over it in CSS
+ * and the Appearance page reports the ratio instead of a gate asserting one. */
 export async function applyAppearance(page, { mode = 'light', palette = 'footstrap', tint = null, accent = null } = {}) {
 	await page.evaluate(([m, p, t, a]) => {
 		const root = document.documentElement;
 		root.setAttribute('data-darkmode', m === 'dark' ? 'true' : 'false');
 		if (p === 'hicontrast') root.setAttribute('data-palette', 'hicontrast');
 		else root.removeAttribute('data-palette');
-		/* hue axes: the custom property FIRST, then the attribute that switches the mixes on.
-		 * The other order paints one frame with the previous hue — the theme's own ordering rule. */
+		/* colour axes in hue mode: the custom property FIRST, then the attribute that switches the
+		 * rotation on. The other order paints one frame with the previous hue — the theme's own
+		 * ordering rule. The attribute's VALUE says which mode is in effect, so 'hue' is not
+		 * decoration: :root[data-tint="hex"] means something else entirely. */
 		const hue = (val, attr, prop) => {
 			if (!val) { root.removeAttribute(attr); root.style.removeProperty(prop); return; }
 			root.style.setProperty(prop, String(val));
-			root.setAttribute(attr, '');
+			root.setAttribute(attr, 'hue');
 		};
 		hue(t, 'data-tint', '--fs-tint-h');
 		hue(a, 'data-accent', '--fs-accent-h');

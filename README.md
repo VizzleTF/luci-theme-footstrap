@@ -17,27 +17,30 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/appearance-dark.png">
-  <img align="right" width="35%" src="assets/readme/appearance-light.png" alt="The Appearance popover: layout, theme, palette, density, wallpaper, tint, accent, rounding, submenus, updates, and Save/Reset as the router default.">
+  <img align="right" width="35%" src="assets/readme/appearance-light.png" alt="The Footstrap tab on System -> System: layout, theme, palette, density, rounding, submenus, the colour and surface fields, the wallpaper, and Save/Reset as the router default.">
 </picture>
 
 - **Styles apps, not just the stock pages**
 - **Works on a phone**
 - **Light** — no framework, `luci-base` is the only dependency
 - **Faster than bootstrap** — see the numbers below
-- **Updates itself** — one click, signed packages
+- **Upgrades with the router** — installed from the package feed, so `apk upgrade` carries it
 - **Appearance is yours** — nine axes, applied instantly
 
-You pick **Footstrap** once in **System → System → Language and Style**. Every axis in it is a
-*client* preference: it applies instantly, with no reload.
+You pick **Footstrap** once in **System → System → Language and Style**, and everything below lives
+in the **Footstrap** tab on that same page. Every axis is a *client* preference: it applies
+instantly, with no reload.
 
 - **Layout** — side menu or top bar
 - **Theme** — auto (follows your OS), light or dark
 - **Palette** — Footstrap (GitHub Primer colours) or Hi-Contrast
 - **Density** — compact, normal or large
-- **Wallpaper** — off, cats, or an image you upload
+- **Wallpaper** — off, cats, dinosaurs (downloaded on demand, not shipped) or an image you upload
 - **Tint** — washes one hue into the background, so you can tell which router a tab (or a screenshot
   in a ticket) belongs to
-- **Accent** — re-hues buttons, toggles, sliders and focus rings
+- **Colours** — accent and the three status colours, each a hex you type, with the ink over it
+  derived from its lightness and the contrast it lands at reported in words
+- **Surfaces** — cards, controls, the sidebar and the hairlines, same field
 - **Rounding** — corner radius, 0–20px
 - **Submenus** — keep several sections open, or auto-collapse to one
 
@@ -69,10 +72,31 @@ Median page **3.04× faster**, the whole run **2.33×**.
 
 ## Install
 
-### From the feed — the default
+### One line — the installer adds the feed for you
 
-The theme is published in [owfeed-packages](https://github.com/owfeed/owfeed-packages), which
-serves both release lines. Add the repository once and the theme upgrades with everything else:
+```sh
+wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
+```
+
+It detects the release line and the architecture, adds the
+[owfeed-packages](https://github.com/owfeed/owfeed-packages) repository with its signing key,
+protects both from being wiped by a firmware upgrade, and then installs through `apk` / `opkg`.
+That last part is the point: the package manager knows where the theme came from, so **`apk upgrade`
+carries it forward** like anything else. A downloaded file would sit at its version until somebody
+came back with another file.
+
+It asks once whether to add the optional update checker
+(`FOOTSTRAP_UPDATER=1` / `=0` answers it non-interactively).
+
+If the feed cannot be reached — or you pin a version, `... | sh -s v0.9.0`, which the feed cannot
+serve because it carries one version per branch — the installer falls back to a release asset and
+verifies it against a signed manifest. Both paths are described below.
+
+Adding any feed means trusting it for *every* package name it can serve; the trade is spelled out in
+[the feed's own install section](https://github.com/owfeed/owfeed-packages#install), and it is worth
+the two minutes.
+
+### By hand, if you would rather see every step
 
 ```sh
 # OpenWrt 25.12 and later. HTTPS on a stock image needs these two first.
@@ -99,24 +123,21 @@ echo "src/gz owfeed-packages https://repo.owfeed.org/releases/24.10/$(. /etc/ope
 opkg update && opkg install luci-theme-footstrap
 ```
 
-For the warnings that come with adding any feed — chiefly that installing a key trusts that feed for
-*every* package name — read
-[the feed's own install section](https://github.com/owfeed/owfeed-packages#install). It is worth
-the two minutes.
+Whichever way the feed gets added, do not *also* install a downloaded package on the same router:
+`apk add ./file.apk` writes a content-hash pin into `/etc/apk/world` that survives sysupgrade, and
+the package would never upgrade from the feed again.
 
-Updates then come from `apk upgrade`. Do not also run the installer below on the same router: `apk
-add ./file.apk` writes a content-hash pin into `/etc/apk/world` that survives sysupgrade, and the
-package would never upgrade from the feed again.
+### The installer's fallback — a pinned version, or no feed
 
-### With the installer — offline, air-gapped, or no feed
+The same one-liner takes this path automatically when the feed is unreachable or a tag is pinned:
 
 ```sh
-wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
+wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh -s v0.9.0
 ```
 
-For a specific version, pass the tag: `... | sh -s v0.9.0`. This path verifies a signed manifest
-against a key baked into the installer, so it needs nothing but the release assets — which is the
-case it exists for.
+It resolves the release from a signed manifest, checks that signature against a key baked into the
+installer and the package's sha256 against the manifest, and installs the file. Nothing but the
+release assets is needed — which is the case it exists for.
 
 ### Then
 

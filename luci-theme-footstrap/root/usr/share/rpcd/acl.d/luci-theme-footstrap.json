@@ -1,13 +1,48 @@
 {
 	"luci-theme-footstrap": {
-		"description": "Footstrap Appearance router-wide defaults (Save as default) and login background upload",
+		"description": "Footstrap Appearance router-wide defaults (Save as default), the login background upload and the on-demand doodle wallpapers",
+		"read": {
+			"uci": [
+				"footstrap"
+			]
+		},
 		"write": {
-			"ubus": { "uci": [ "set", "commit" ], "file": [ "remove", "exec" ] },
-			"uci": [ "footstrap" ],
-			"cgi-io": [ "upload" ],
+			"ubus": {
+				"uci": [
+					"set",
+					"commit"
+				],
+				"file": [
+					"remove",
+					"exec"
+				]
+			},
+			"uci": [
+				"footstrap"
+			],
+			"cgi-io": [
+				"upload"
+			],
 			"file": {
-				"/etc/footstrap/login-bg": [ "write", "remove" ],
-				"/bin/chmod 644 /etc/footstrap/login-bg": [ "exec" ]
+				"/etc/footstrap/login-bg": [
+					"write",
+					"remove"
+				],
+				"/bin/chmod 644 /etc/footstrap/login-bg": [
+					"exec"
+				],
+				"/www/luci-static/footstrap/cats.svg": [
+					"write"
+				],
+				"/bin/chmod 644 /www/luci-static/footstrap/cats.svg": [
+					"exec"
+				],
+				"/www/luci-static/footstrap/dinos.svg": [
+					"write"
+				],
+				"/bin/chmod 644 /www/luci-static/footstrap/dinos.svg": [
+					"exec"
+				]
 			}
 		}
 	}

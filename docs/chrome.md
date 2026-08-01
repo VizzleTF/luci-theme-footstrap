@@ -116,8 +116,9 @@ depends on the number of sections on that particular router, not on the screen.
   - `<div id="indicators">`;
   - `.fs-navlabel` + `<ul class="nav" id="topmenu">` (filled by the menu JS) + `<ul id="modemenu">`;
   - `.fs-spacer` (`flex:1`);
-  - the search button (`#fs-search-btn`, the command palette below), the Appearance button
-    (`#fs-appearance`) and Log out.
+  - the search button (`#fs-search-btn`, the command palette below) and Log out. The Appearance
+    button used to sit between them; the axes are a page now (System → Appearance), so the chrome
+    carries one control fewer — see [design-system.md](design-system.md).
 - **Main** — `<main class="fs-main" id="maincontent" tabindex="-1">`: `.fs-title.fs-sr` with the
   `<h1>`, `#fs-nav-status`, and `.fs-content` (warnings, `#tabmenu`, `#view`, footer).
 - Must be preserved: `http.prepare_content`, `cbi.js`, the translations script, `node.css`, `css`,
@@ -141,7 +142,7 @@ moved here.
   `<li><a><icon><span class="fs-label">title</span><chevron></a></li>`, active by
   `L.env.dispatchpath`. Icons are mapped by section name with a regex fallback and a generic SVG,
   inlined as strings in the JS (`E()` cannot build SVG — see [conventions.md](conventions.md)).
-  Everything shared — tabs, modes, the Appearance popover, the rail, the SPA router, chrome
+  Everything shared — tabs, modes, the rail, the SPA router, chrome
   measurement — lives in the `fs-*.js` modules that `menu-footstrap-common.js` wires together. Only
   `renderMainMenu` is layout-specific, and it is passed into `common.init()`: composition, not
   inheritance, because LuCI makes a singleton of every baseclass.
@@ -220,6 +221,6 @@ differently, and why that difference is not an unfinished job: [css.md](css.md).
 
 ## Translation
 
-Every label in the Appearance popover carries the `footstrap` `msgctxt`; the chrome (Menu, Logout,
+Every label on the Appearance page carries the `footstrap` `msgctxt`; the chrome (Menu, Logout,
 Skip to content) and the login/warning strings deliberately do not. The reasoning — `msgid` is a
 global name shared with every app on the router — is in [conventions.md](conventions.md).

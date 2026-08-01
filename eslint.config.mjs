@@ -18,11 +18,7 @@ import { utProcessor } from './tools/lib/ut-scripts.mjs';
  * `'require ui'` with no alias binds the bare name and is already a global below; only the aliased
  * form needs deriving. See the config entry at the bottom for why this is read from the source rather
  * than written out.
- *
- * The optional updater (fs-update.js) moved to its own repo (VizzleTF/luci-app-footstrap-updater),
- * which lints and jsmin-checks it there; it still lands in this same /www/luci-static/resources dir on
- * the router and requires the theme's fs-version/fs-prefs/fs-router at runtime, but its source is no
- * longer here to lint. */
+ */
 const HTDOCS_GLOBS = [
 	'luci-theme-footstrap/htdocs/**/*.js',
 ];
@@ -66,6 +62,10 @@ export default [
 				_: 'readonly',
 				baseclass: 'readonly',
 				ui: 'readonly',
+				/* the base class every LuCI VIEW extends. Bound by a bare `'require view'`, like the
+				 * rest of this list; it appears here only because the theme grew its one view
+				 * (System -> Appearance) — a theme has no route of its own until it does. */
+				view: 'readonly',
 				dom: 'readonly',
 				fs: 'readonly',
 				uci: 'readonly',

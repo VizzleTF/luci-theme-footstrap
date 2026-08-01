@@ -17,11 +17,40 @@
 	let _sd_lay  = index([ 'sidebar', 'top' ], fs_defaults.layout) >= 0 ? fs_defaults.layout : '';
 	let _sd_dark = index([ 'auto', 'light', 'dark' ], fs_defaults.darkmode) >= 0 ? fs_defaults.darkmode : '';
 	let _sd_pal  = index([ 'footstrap', 'hicontrast' ], fs_defaults.palette) >= 0 ? fs_defaults.palette : '';
-	let _sd_wall = index([ 'off', 'cats', 'file' ], fs_defaults.wallpaper) >= 0 ? fs_defaults.wallpaper : '';
+	let _sd_wall = index([ 'off', 'cats', 'dinos', 'file' ], fs_defaults.wallpaper) >= 0 ? fs_defaults.wallpaper : '';
 	let _sd_ac   = index([ 'on', 'off' ], fs_defaults.autocollapse) >= 0 ? fs_defaults.autocollapse : '';
 	let _sd_dens = index([ 'compact', 'normal', 'large' ], fs_defaults.density) >= 0 ? fs_defaults.density : '';
-	let _tt = int(fs_defaults.tint),   _sd_tint = (_tt >= 1 && _tt <= 360) ? _tt : 0;
-	let _aa = int(fs_defaults.accent), _sd_acc  = (_aa >= 1 && _aa <= 360) ? _aa : 0;
+	/* The five COLOUR axes (tint, accent, good, warn, danger) each hold one of three things: '' or
+	   '0' for off, '1'..'360' for a hue, or '#rrggbb' for a colour typed into the Appearance page.
+	   Both live forms reach the client as a STRING — the pre-paint below re-reads which it is, the
+	   way fs-prefs.js's normColor() does — so this sanitiser passes through exactly the two shapes
+	   and turns everything else into '' (= no router default). The hex charset is whitelisted for
+	   the same reason login_bg's is: the value is interpolated into the inline data block below, and
+	   writing this file already needs root, so this is defence in depth rather than the only line.
+	   (Do not write the tag name for that block in a comment: tools/lib/ut-scripts.mjs finds the
+	   inline scripts by matching the opening tag, and a mention in prose is one it will match.)
+	   A config written before the axes took colours holds a bare number, which parses identically. */
+	function _sd_color(v) {
+		if (type(v) == 'string' && match(lc(v), /^#[0-9a-f]{6}$/))
+			return lc(v);
+		let n = int(v);
+		return (n >= 1 && n <= 360) ? `${n}` : '';
+	}
+	let _sd_tint = _sd_color(fs_defaults.tint);
+	let _sd_acc  = _sd_color(fs_defaults.accent);
+	let _sd_good = _sd_color(fs_defaults.good);
+	let _sd_warn = _sd_color(fs_defaults.warn);
+	let _sd_dang = _sd_color(fs_defaults.danger);
+	/* the four SURFACE axes (cards, inset controls, the chrome bar, hairlines). Hex or nothing —
+	 * they have no hue mode, so _sd_color's number branch would let a bare '0' through as a value;
+	 * these read '' for off. */
+	function _sd_hex(v) {
+		return (type(v) == 'string' && match(lc(v), /^#[0-9a-f]{6}$/)) ? lc(v) : '';
+	}
+	let _sd_card = _sd_hex(fs_defaults.card);
+	let _sd_ctrl = _sd_hex(fs_defaults.control);
+	let _sd_bar  = _sd_hex(fs_defaults.bar);
+	let _sd_line = _sd_hex(fs_defaults.line);
 	let _rr = int(fs_defaults.rounding);
 	/* rounding 0 is SHARP corners, a real choice, so '' (unset) must map to -1, not 0 */
 	let _sd_round = (fs_defaults.rounding != '' && _rr >= 0 && _rr <= 20) ? _rr : -1;
@@ -56,12 +85,15 @@
 	let _rtl = index([ 'ar', 'arc', 'ckb', 'dv', 'fa', 'ha', 'he', 'khw', 'ks', 'ps', 'sd', 'ur', 'yi' ], _lbase) >= 0;
 %}
 {# The SERVER always stamps data-layout with an EXPLICIT value (sidebar|top): every layout rule
-   then matches POSITIVELY, so a future third layout must opt in rather than inherit the
-   sidebar's rules by not being "top" — never write a :not([data-layout=…]) guard. And the
-   chrome is right with JS off; the script below only overrides it.
+   then matches POSITIVELY, so a future third layout must opt in rather than inherit the other's
+   rules by not being it — never write a :not([data-layout=…]) guard. And the chrome is right with
+   JS off; the script below only overrides it.
    fs_defaults.layout: the router-wide default (Appearance -> Save as default, or uci-defaults'
-   `top` seed when migrating an old top-nav install). Absent = sidebar. #}
-<html lang="{{ dispatcher.lang }}" dir="{{ _rtl ? 'rtl' : 'ltr' }}" data-layout="{{ fs_defaults.layout == 'top' ? 'top' : 'sidebar' }}">
+   `top` seed when migrating an old top-nav install). ABSENT = TOP: the bar is the theme's default
+   layout and the sidebar is the opt-in. Deliberate — the bar is what the theme is built around
+   (every layout rule starts from it, with the vertical column as the one guarded override) and it
+   is what a phone gets at any setting. #}
+<html lang="{{ dispatcher.lang }}" dir="{{ _rtl ? 'rtl' : 'ltr' }}" data-layout="{{ fs_defaults.layout == 'sidebar' ? 'sidebar' : 'top' }}">
 	<head>
 		<meta charset="utf-8">
 		{# entityencode AROUND striptags: striptags drops tags but escapes neither `&` nor quotes,
@@ -69,20 +101,23 @@
 		   must be well-formed. #}
 		<title>{{ entityencode(striptags(`${boardinfo.hostname ?? 'OpenWrt'}${dispatched?.title ? ` | ${_(dispatched.title)}` : ''}`), true) }}</title>
 		{# The router-wide Appearance defaults, read by BOTH the pre-paint below and fs-prefs.js's
-		   current*() (so the popover's controls show the effective default when this browser has no
-		   localStorage of its own). Enums are '', the hues 0 (=off), rounding -1 (=unset) — see the
-		   sanitiser above. #}
-		<script>window.__fsSD={layout:"{{ _sd_lay }}",darkmode:"{{ _sd_dark }}",palette:"{{ _sd_pal }}",wallpaper:"{{ _sd_wall }}",tint:{{ _sd_tint }},accent:{{ _sd_acc }},rounding:{{ _sd_round }},autocollapse:"{{ _sd_ac }}",login_bg:"{{ _sd_lbg }}",tint_strength:{{ _sd_tstr }},photo_dim:{{ _sd_pdim }},density:"{{ _sd_dens }}"};</script>
-		{# The update CHECK lives in the OPTIONAL luci-app-footstrap-updater package, which ships
-		   fs-update.js into /www/luci-static/resources. fs-appearance.js loads it at runtime to light
-		   up the Updates controls — but a bare require on a router WITHOUT the updater 404s in the
-		   browser console (the module loader XHRs the file to learn it is absent). The server can just
-		   look: glob the file and hand the client a flag, so it only requires the module when it is
-		   really there. Fails CLOSED (a throwing probe -> 0 -> controls stay hidden), which is the
-		   safe side: a false 0 only hides the update UI, a false 1 re-opens the 404. #}
-		{%- let _has_upd = false;
-		    try { _has_upd = length(require('fs').glob('/www/luci-static/resources/fs-update.js')) > 0; } catch (e) {} %}
-		<script>window.__fsUpd={{ _has_upd ? 1 : 0 }};</script>
+		   current*() (so the Appearance page's controls show the effective default when this browser
+		   has no localStorage of its own). Enums are '', the colours '' (=off), rounding -1 (=unset)
+		   — see the sanitiser above. #}
+		<script>window.__fsSD={layout:"{{ _sd_lay }}",darkmode:"{{ _sd_dark }}",palette:"{{ _sd_pal }}",wallpaper:"{{ _sd_wall }}",tint:"{{ _sd_tint }}",accent:"{{ _sd_acc }}",good:"{{ _sd_good }}",warn:"{{ _sd_warn }}",danger:"{{ _sd_dang }}",card:"{{ _sd_card }}",control:"{{ _sd_ctrl }}",bar:"{{ _sd_bar }}",line:"{{ _sd_line }}",rounding:{{ _sd_round }},autocollapse:"{{ _sd_ac }}",login_bg:"{{ _sd_lbg }}",tint_strength:{{ _sd_tstr }},photo_dim:{{ _sd_pdim }},density:"{{ _sd_dens }}"};</script>
+		{# WHICH DOODLE WALLPAPERS ARE ON THIS ROUTER. They are not in the package — 77 KB and 128 KB
+		   of decoration would be a fifth of the theme's flash footprint for a picture most installs
+		   never switch on — so Appearance downloads one on demand (fs-prefs.js installWallpaper) and
+		   the server says which ones are already here. A client-side probe would be an extra request per doodle on every page load to
+		   learn something the server can answer for free. Fails CLOSED (a throwing glob -> 0 -> the
+		   page offers the download again), which only costs a re-download; a false 1 would paint a
+		   wallpaper that 404s. #}
+		{%- let _wp = {};
+		    for (let _n in [ 'cats', 'dinos' ]) {
+		        _wp[_n] = 0;
+		        try { _wp[_n] = length(require('fs').glob(`/www/luci-static/footstrap/${_n}.svg`)) > 0 ? 1 : 0; } catch (e) {}
+		    } %}
+		<script>window.__fsWp={cats:{{ _wp.cats }},dinos:{{ _wp.dinos }}};</script>
 		<script>
 			/* Each block below pre-paints one Appearance axis before the first frame, duplicating
 			   a live applier in fs-prefs.js. They cannot share code — this runs before the module
@@ -130,8 +165,9 @@
 			})();
 		</script>
 		<script>
-			/* palette, wallpaper, rounding, tint, accent. Each: localStorage (this browser) wins;
-			   absent -> the router default in window.__fsSD; absent -> the built-in. */
+			/* palette, wallpaper, density, rounding and the five colour axes. Each: localStorage
+			   (this browser) wins; absent -> the router default in window.__fsSD; absent -> the
+			   built-in. */
 			(() => {
 				try {
 					const root = document.querySelector(':root'),
@@ -154,7 +190,7 @@
 
 					let w = localStorage.getItem('fs-wallpaper');
 					if (w === null) w = sd.wallpaper || null;
-					if (w === 'cats' || w === 'file') root.setAttribute('data-wallpaper', w);
+					if (w === 'cats' || w === 'dinos' || w === 'file') root.setAttribute('data-wallpaper', w);
 					else root.removeAttribute('data-wallpaper');
 
 					/* Density: Compact/Normal/Large, a pure token axis (02-tokens multiplies the
@@ -175,26 +211,51 @@
 					if (rRaw === null) r = (sd.rounding >= 0 ? sd.rounding : 12);
 					if (r >= 0 && r <= 20 && r !== 12)
 						root.style.setProperty('--fs-radius-base', r + 'px');
-					/* Tint: a hue (1-360) washed into the page CANVAS so this router is
-					   recognisable at a glance. Absent/0 = off. Set the PROPERTY BEFORE THE
-					   ATTRIBUTE that switches the mixes on, or a reload paints one frame with the
-					   previous hue. */
-					const tRaw = localStorage.getItem('fs-tint');
-					let t = parseInt(tRaw, 10);
-					if (tRaw === null) t = sd.tint | 0;
-					if (t >= 1 && t <= 360) {
-						root.style.setProperty('--fs-tint-h', String(t));
-						root.setAttribute('data-tint', '');
-					}
-					/* Accent: a hue (1-360) rotating the UI accent. Absent/0 = the palette's own.
-					   Property before attribute, as above. */
-					const aRaw = localStorage.getItem('fs-accent');
-					let a = parseInt(aRaw, 10);
-					if (aRaw === null) a = sd.accent | 0;
-					if (a >= 1 && a <= 360) {
-						root.style.setProperty('--fs-accent-h', String(a));
-						root.setAttribute('data-accent', '');
-					}
+					/* The five COLOUR axes: Tint (the page CANVAS, so this router is recognisable
+					   at a glance), Accent (the UI colour) and the three status colours. Each is
+					   off, a HUE 1-360 that rotates the palette's own colour, or a '#rrggbb' that
+					   replaces it outright — mirrors colorAxis()/normColor() in fs-prefs.js.
+					   Set the PROPERTY BEFORE THE ATTRIBUTE that switches the rotation on, or a
+					   reload paints one frame in the previous colour.
+					   The two modes CLEAR each other's property: this script runs once per load, so
+					   nothing here is stale — but the live applier calls the same sequence on a
+					   browser where the other mode was in effect, and axes.mjs holds the two copies
+					   to one shape. */
+					const hex = /^#[0-9a-f]{6}$/i;
+					const colour = (key, sdVal, attr, hueProp, colorProp) => {
+						const raw = localStorage.getItem(key);
+						const v = String((raw === null ? sdVal : raw) ?? '').trim();
+						if (hex.test(v)) {
+							root.style.removeProperty(hueProp);
+							root.style.setProperty(colorProp, v.toLowerCase());
+							root.setAttribute(attr, 'hex');
+							return;
+						}
+						const h = parseInt(v, 10);
+						if (h >= 1 && h <= 360) {
+							root.style.removeProperty(colorProp);
+							root.style.setProperty(hueProp, String(h));
+							root.setAttribute(attr, 'hue');
+						}
+					};
+					colour('fs-tint',   sd.tint,   'data-tint',   '--fs-tint-h',   '--fs-bg');
+					colour('fs-accent', sd.accent, 'data-accent', '--fs-accent-h', '--fs-accent');
+					colour('fs-good',   sd.good,   'data-good',   '--fs-good-h',   '--fs-good');
+					colour('fs-warn',   sd.warn,   'data-warn',   '--fs-warn-h',   '--fs-warn');
+					colour('fs-danger', sd.danger, 'data-danger', '--fs-danger-h', '--fs-danger');
+					/* The four SURFACE axes — the cards, the inset controls, the chrome bar and the
+					   hairlines. Simpler than the colour axes above and deliberately so: no hue
+					   mode and therefore no attribute, just the token or nothing. Mirrors
+					   surfaceAxis() in fs-prefs.js. */
+					const surface = (key, sdVal, prop) => {
+						const raw = localStorage.getItem(key);
+						const v = String((raw === null ? sdVal : raw) ?? '').trim().toLowerCase();
+						if (hex.test(v)) root.style.setProperty(prop, v);
+					};
+					surface('fs-card',    sd.card,    '--fs-panel-base');
+					surface('fs-control', sd.control, '--fs-panel2-base');
+					surface('fs-bar',     sd.bar,     '--fs-bar-bg');
+					surface('fs-line',    sd.line,    '--fs-border-base');
 					/* The uploaded photo's URL: ROUTER-SIDE (the token comes purely from
 					   window.__fsSD — no localStorage). Set the property whenever a valid token
 					   exists; whether it PAINTS is the wallpaper axis above (data-wallpaper="file"),

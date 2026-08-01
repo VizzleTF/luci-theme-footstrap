@@ -3,15 +3,13 @@
 
 /* ---- theme identity: the version footstrap SHIPS, and the repo it came from ----
  *
- * Shown in the Appearance popover's footer with NO network call and NO dependency on the optional
- * updater package (luci-app-footstrap-updater): a router that never installed the updater still sees
- * its own version and the repo link. This module is why the version can show while the whole update
- * machinery is a separate package the theme merely loads at runtime when present.
+ * Shown at the foot of the Appearance tab with NO network call: it is what is installed, not what
+ * is available. Which version is available is the package manager's question — the installer adds
+ * the feed, and `apk upgrade` answers it.
  *
  * FS_VERSION is stamped at build/deploy: the theme Makefile (Build/Prepare) and dev-sync.sh rewrite
  * the '0.0.0-dev' literal below — BY FILE NAME, so this constant cannot move to another file without
- * changing both seds. An unstamped source checkout stays 'dev'. The updater's fs-update.js reads
- * VERSION back from here to compare against the latest GitHub release. */
+ * changing both seds. An unstamped source checkout stays 'dev'. */
 const FS_VERSION = '0.0.0-dev';
 const FS_REPO = 'VizzleTF/luci-theme-footstrap';
 

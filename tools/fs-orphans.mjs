@@ -25,20 +25,22 @@ import * as csstree from 'css-tree';
 import { ROOT } from './lib/root.mjs';
 const PKG = join(ROOT, 'luci-theme-footstrap');
 
-/* fs-* classes the theme STYLES but does not EMIT, because a SEPARATE repo emits them: the optional
- * updater (VizzleTF/luci-app-footstrap-updater) builds the Appearance Update confirm dialog, whose
- * fs-ap-upd-* markup fs-update.js creates — but the theme owns the chrome styling for it. Scoped to a
- * prefix on purpose: only these dialog classes cross the repo boundary. Without this they read as dead
- * CSS (styled, never emitted here), which they are not. */
-const EMITTED_BY_UPDATER = /^fs-ap-upd-/;
-
 /* Names that look like fs-* classes to a regex but are not. Without this the reverse check
  * drowns in custom properties and localStorage keys. */
 const IGNORE_EXACT = new Set([
 	/* localStorage keys (fs-update-check lives in the optional updater's own repo, not scanned here) */
 	'fs-darkmode', 'fs-palette', 'fs-wallpaper', 'fs-radius', 'fs-tint', 'fs-accent',
+	'fs-good', 'fs-warn', 'fs-danger', 'fs-card', 'fs-control', 'fs-bar', 'fs-line',
 	'fs-rail', 'fs-layout', 'fs-menu-open', 'fs-menu-autocollapse', 'fs-recent', 'fs-tint-strength',
 	'fs-density', 'fs-photo-dim',
+	/* the Appearance tab's data-tab value — ui.tabs matches panes and menu items on it, so it is an
+	 * identifier in the stock tab machinery rather than a class of ours */
+	'fs-appearance',
+	/* UI state, not axes: which of the Appearance groups are unlocked for editing */
+	'fs-ui-colours', 'fs-ui-background',
+	/* a sessionStorage key, not a class: the one-shot flag a reset leaves so the reload it triggers
+	 * lands back on the Appearance tab instead of the stock page's remembered one */
+	'fs-ap-return',
 	/* custom events / id prefixes */
 	'fs-autocollapse', 'fs-sub-', 'fs-topsub-',
 	/* a console log PREFIX (`console.error('fs-fit: a fitter threw')`), not markup. This is the one
@@ -126,10 +128,11 @@ const JUSTIFIED_UNSTYLED = {
 	'fs-title-main': 'that <h1>; it rides on base h1 styles and the SPA router keeps its text in sync',
 	'fs-nav-status': 'a JS hook (getElementById): the router\'s aria-live region, hidden by .fs-sr',
 	'fs-search-btn': 'a JS hook (getElementById); the button is styled by its .fs-themerow class',
+	'fs-ap-fold-': 'an id PREFIX built in JS (`fs-ap-fold-` + n) so each folded group\'s button can point aria-controls at its panel; the button and panel are styled by .fs-ap-fold / .fs-ap-body',
 	'fs-search-opt-': 'an id PREFIX built in JS (`fs-search-opt-` + i) so the combobox can point aria-activedescendant at a row; the rows themselves are styled by .fs-search-opt',
 };
 
-const orphanCss = [...styled.keys()].filter(c => !emitted.has(c) && !EMITTED_BY_UPDATER.test(c)).sort();
+const orphanCss = [...styled.keys()].filter(c => !emitted.has(c)).sort();
 const unstyled  = [...emitted.keys()].filter(c => !styled.has(c) && !IGNORE_EXACT.has(c)).sort();
 const unexpected = unstyled.filter(c => !(c in JUSTIFIED_UNSTYLED));
 

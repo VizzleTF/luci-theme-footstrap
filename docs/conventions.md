@@ -187,7 +187,7 @@ pattern that reliably removes anonymous handlers.
 Russian router because somebody's catalogue translates `Top` that way — correct in a bandwidth
 dialog, nonsense on a layout switch.
 
-- Appearance popover strings: **use a context** — `_(str, 'footstrap')`.
+- Appearance page strings: **use a context** — `_(str, 'footstrap')`.
 - Chrome (Menu, Logout, Skip to content), login and warning strings: **deliberately no context**,
   so they inherit luci-base's translation in the ~40 languages the theme has no catalogue for.
 
@@ -266,7 +266,8 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `css-dup` | identical declaration bodies under different guards |
 | `mirror` | `@mirror`-pinned copies still byte-identical |
 | `bang-ok` | every `!important` sits in an allowlisted file |
-| `axes` | the pre-paint in `head.ut` agrees with the live Appearance appliers |
+| `axes` | the pre-paint in `head.ut` agrees with the live Appearance appliers, and `header.ut` reads every saved option back |
+| `wallpapers` | the size/sha256 pins match `wallpapers/`, and no doodle is in the shipped tree |
 | `chrome-fence` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `export-tier` | the `--*-color-*` contract: each level readable as text on three surfaces, each `--on-*` readable on its fill, and the ramp is not flat |
 | `css-i18n` | translatable strings emitted from CSS |

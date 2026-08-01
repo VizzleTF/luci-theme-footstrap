@@ -3,10 +3,11 @@
 'require rpc';
 'require fs-fit as fit';
 
-/* The eight Appearance axes THIS file owns (the popover that presents them is fs-appearance.js). A
- * ninth control, the update check, is not here and not always present: it lives in the OPTIONAL
- * luci-app-footstrap-updater package (fs-update.js) with the updater it switches off, and the popover
- * shows it only when that package is installed. All client-side, instant, persisted in localStorage —
+/* The Appearance axes THIS file owns (the page that presents them is fs-appearance.js,
+ * mounted at admin/system/appearance). The
+ * fourteen are exactly the keys in AXIS_KEYS and the fields in snapshotAxes(), which is the list
+ * Save-as-default writes — if this number and that list disagree, the list is right.
+ * All client-side, instant, persisted in localStorage —
  * no server, no reload — and head.ut's inline script re-applies them before paint, so a reload never
  * flashes the wrong one; tools/axes.mjs holds those two copies to one contract, and it derives that
  * contract from THIS file.
@@ -23,7 +24,7 @@
  * "inherit whatever the router default is". So an applier that lsDel-ed on the default value could
  * not express "I want the built-in, NOT the router default" (you could not turn a router-defaulted
  * tint back off). Every axis therefore records the chosen value, including the off/default one, the
- * way `layout` always has. lsDel is reserved for resetToDefault(), which drops back to the router
+ * way `layout` always has. lsDel is reserved for resetToSaved(), which drops back to the router
  * default on purpose. */
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -215,37 +216,68 @@ function enumAxis(key, attr, on, off) {
 	};
 }
 
-/* A hue axis: 1–360°, 0 = off. Tint and Accent are one axis pointed at two things — same
- * validation, same "0 is off", same off path, same load-bearing ORDERING rule (set the custom
- * property BEFORE the attribute, or a fresh load paints one frame with the previous hue). That rule
- * is exactly what gets fixed in one copy and not the other, so it lives here once. */
-function hueAxis(key, attr, prop) {
+/* A COLOUR axis. Five of them — Tint (the canvas), Accent (the UI colour) and the three status
+ * colours Good/Warn/Danger — are one axis pointed at five tokens: same validation, same "0 is off",
+ * same off path, same load-bearing ORDERING rule (set the custom property BEFORE the attribute, or
+ * a fresh load paints one frame in the previous colour). That rule is exactly what gets fixed in one
+ * copy and not the other, so it lives here once.
+ *
+ * A value is one of THREE things, and the attribute's value says which (03-palettes.css matches on
+ * it):
+ *
+ *   0            off — no attribute, the palette exactly as it shipped.
+ *   1–360        a HUE, set with the slider: CSS rotates the palette's own colour through
+ *                oklch(from … l c H), so lightness and chroma — and therefore every contrast
+ *                margin the palette was measured at — are the palette's, not the user's.
+ *   '#rrggbb'    a COLOUR, typed or picked in the colour field: stamped inline on :root as the live
+ *                token, exactly as entered. The ink over it is derived from its lightness in CSS.
+ *
+ * Both live in ONE localStorage key rather than a colour key beside a hue key, because they are one
+ * question with two ways of answering it: two keys would need a third to say which is in effect, and
+ * that third is the one a pre-paint script forgets. `hueProp` carries the degrees for the rotation,
+ * `colorProp` is the live token a hex value overwrites; a hue value clears the second and a hex
+ * value clears the first, so the two modes can never both be half-applied. */
+const FS_HEX_RE = /^#[0-9a-f]{6}$/i;
+/* 0 | 1..360 | '#rrggbb', from anything — localStorage (always a string), the router default (a
+ * uci string, or a NUMBER from a config written before the axes took colours) or a caller. Anything
+ * unrecognised reads as off, which is the built-in default and the one safe answer. */
+function normColor(v) {
+	if (typeof v === 'number') return (v >= 1 && v <= 360) ? v : 0;
+	if (typeof v !== 'string') return 0;
+	const s = v.trim();
+	if (FS_HEX_RE.test(s)) return s.toLowerCase();
+	const h = parseInt(s, 10);
+	return (h >= 1 && h <= 360) ? h : 0;
+}
+function colorAxis(key, attr, hueProp, colorProp) {
 	const sdKey = key.slice(3);	/* 'fs-tint' -> 'tint', the window.__fsSD field */
-	const def = () => {
-		const d = sd(sdKey);
-		return (typeof d === 'number' && d >= 1 && d <= 360) ? d : 0;
-	};
+	const def = () => normColor(sd(sdKey));
 	return {
 		def,
 		current() {
 			const raw = lsGet(key);
-			if (raw !== null) { const h = parseInt(raw, 10); return (h >= 1 && h <= 360) ? h : 0; }
-			return def();
+			return (raw !== null) ? normColor(raw) : def();
 		},
-		apply(deg) {
+		apply(val) {
 			const root = document.documentElement;
-			const v = Math.max(0, Math.min(360, deg | 0));
-			/* stored EXPLICITLY, including 0=off, so dragging to off overrides a router default hue
-			 * instead of falling back to it. */
+			const v = normColor(val);
+			/* stored EXPLICITLY, including 0=off, so dragging to off overrides a router default
+			 * colour instead of falling back to it. */
 			lsSet(key, String(v));
 			if (!v) {
 				root.removeAttribute(attr);
-				root.style.removeProperty(prop);
+				root.style.removeProperty(hueProp);
+				root.style.removeProperty(colorProp);
+			} else if (typeof v === 'number') {
+				root.style.removeProperty(colorProp);
+				/* the hue FIRST, then the attribute that switches the rotation on — the other
+				 * order paints one frame in the previous colour on a fresh load. */
+				root.style.setProperty(hueProp, String(v));
+				root.setAttribute(attr, 'hue');
 			} else {
-				/* the hue FIRST, then the attribute that switches the mixes on — the other
-				 * order paints one frame with the previous hue on a fresh load. */
-				root.style.setProperty(prop, String(v));
-				root.setAttribute(attr, '');
+				root.style.removeProperty(hueProp);
+				root.style.setProperty(colorProp, v);
+				root.setAttribute(attr, 'hex');
 			}
 		}
 	};
@@ -285,14 +317,19 @@ function propAxis(key, sdKey, prop, min, max, dfl, fmt) {
 const PALETTE = enumAxis('fs-palette', 'data-palette', 'hicontrast', 'footstrap');
 const currentPalette = PALETTE.current, applyPalette = PALETTE.apply;
 
-/* Wallpaper is a THREE-value axis and its own concern (composes with either palette): off (bare
- * canvas), cats (the doodle pattern, 15-wallpaper.css), file (the admin-uploaded photo,
- * 16-login-bg.css). It is not the enumAxis shape (that is two-valued) — data-wallpaper carries the
- * VALUE ('cats'|'file') or is absent for 'off'. The photo BYTES are router-side (currentLoginBg /
- * uploadLoginBg below); this axis only decides whether THIS browser shows them, exactly like it
- * decides cats vs off — so a router-wide photo comes from Save-as-default (wallpaper=file), including
- * the pre-login page. */
-const WALLPAPERS = [ 'cats', 'file' ];		/* the two non-off values; 'off' = bare :root */
+/* Wallpaper is a MULTI-value axis and its own concern (composes with either palette): off (bare
+ * canvas), one of the shipped doodle patterns — cats, dinos (15-wallpaper.css) — or file (the
+ * admin-uploaded photo, 16-login-bg.css). It is not the enumAxis shape (that is two-valued) —
+ * data-wallpaper carries the VALUE or is absent for 'off'. The photo BYTES are router-side
+ * (currentLoginBg / uploadLoginBg below); this axis only decides whether THIS browser shows them,
+ * exactly like it decides a doodle vs off — so a router-wide photo comes from Save-as-default
+ * (wallpaper=file), including the pre-login page.
+ *
+ * The list is what VALIDATES a stored value, so a doodle added to the CSS and not to this array is
+ * one head.ut pre-paints and the live applier then rejects: the page would paint it and the first
+ * touch of any other control would take it away. Adding one means this line, the head.ut whitelist,
+ * the segmented control in fs-appearance.js and the rules in 15-wallpaper.css. */
+const WALLPAPERS = [ 'cats', 'dinos', 'file' ];		/* the non-off values; 'off' = bare :root */
 function wallpaperDefault() {
 	const d = sd('wallpaper');
 	return (WALLPAPERS.indexOf(d) >= 0) ? d : 'off';
@@ -346,30 +383,97 @@ function applyWallpaper(val) {
 	else root.setAttribute('data-wallpaper', v);
 }
 
-/* Background-tint axis: ONE hue washed into the CANVAS the cards float on (--fs-bg), so a whole
- * install reads as green/violet/amber and you can tell which router a tab — or a screenshot in a
- * ticket — belongs to. Cards, chrome and the status colours keep the palette's values: the cue
- * colours the paper, not the UI. Mixed in CSS (:root[data-tint] + an inline --fs-tint-h; the TINT
- * block in 03-palettes.css explains why it stays contrast-safe on every hue). 0 IS "OFF", not
- * "red": a hue wheel wraps, so one end of the slider is free for the off state a hue axis otherwise
- * has no room for. head.ut pre-paints it. */
-const TINT = hueAxis('fs-tint', 'data-tint', '--fs-tint-h');
+/* Background-tint axis: the CANVAS the cards float on (--fs-bg), so a whole install reads as
+ * green/violet/amber and you can tell which router a tab — or a screenshot in a ticket — belongs
+ * to. Cards, chrome and the status colours keep the palette's values: the cue colours the paper,
+ * not the UI. On a hue it is mixed in CSS (:root[data-tint="hue"] + an inline --fs-tint-h; the TINT
+ * block in 03-palettes.css explains why that stays contrast-safe on every hue); on a hex it IS the
+ * canvas. 0 IS "OFF", not "red": a hue wheel wraps, so one end of the slider is free for the off
+ * state a colour axis otherwise has no room for. head.ut pre-paints it. */
+const TINT = colorAxis('fs-tint', 'data-tint', '--fs-tint-h', '--fs-bg');
 const currentTint = TINT.current, applyTint = TINT.apply;
 
-/* Accent-hue axis: ONE hue that recolours the UI accent (solid buttons, toggle knobs, range
- * sliders, focus rings, accented links) while canvas, cards and good/warn/danger stay put — the
- * tint hues the paper, this hues the CHROME. CSS rotates --fs-accent via
- * oklch(from … l c H), keeping the palette's lightness and chroma so --fs-on-accent stays legible
- * on every hue (03-palettes.css). 0 = off (the palette's designed accent), same rationale as the
- * tint. head.ut pre-paints it. */
-const ACCENT = hueAxis('fs-accent', 'data-accent', '--fs-accent-h');
+/* Accent axis: the UI accent (solid buttons, toggle knobs, range sliders, focus rings, accented
+ * links) while canvas, cards and the status colours stay put — the tint colours the paper, this
+ * colours the CHROME. On a hue, CSS rotates --fs-accent via oklch(from … l c H), keeping the
+ * palette's lightness and chroma so --fs-on-accent stays legible without being recomputed; on a hex
+ * the ink IS recomputed, from the entered colour's lightness (03-palettes.css). 0 = off (the
+ * palette's designed accent), same rationale as the tint. head.ut pre-paints it. */
+const ACCENT = colorAxis('fs-accent', 'data-accent', '--fs-accent-h', '--fs-accent');
 const currentAccent = ACCENT.current, applyAccent = ACCENT.apply;
+
+/* The three STATUS colours, the same axis pointed at --fs-good / --fs-warn / --fs-danger. They are
+ * separate axes rather than one "status" knob because they carry separate MEANINGS: an admin who
+ * wants a calmer red has no reason to move the green with it, and every derived tint
+ * (-soft/-fill/-line/-line-hi, the callouts, the diff blocks, the port speeds) is a color-mix() OF
+ * the role, so each follows its own axis with nothing else to update.
+ *
+ * They are exposed to the same recolouring as the accent and are NOT protected from it: a status
+ * colour is information, and an admin who paints Danger green has said so deliberately. What the
+ * theme owes them is the ink over the fill staying readable, which the hex-mode derivation in
+ * 03-palettes.css does, and the contrast readout the Appearance page draws beside each field. */
+/* ---- the SURFACE axes: the sheet the UI is drawn ON, rather than the marks on it ----------
+ *
+ * Accent and the status colours are FIGURES: small, saturated, and each is ink on a surface whose
+ * contrast the theme can then derive. These four are the surfaces themselves — the cards, the
+ * chrome, the inset controls and the hairlines between them — and they behave differently enough
+ * that they are their own factory rather than four more colorAxis instances:
+ *
+ *   - There is no hue mode. Rotating the hue of a near-white card keeps its chroma, which is
+ *     ~0.003: every angle of the wheel produces the same white. The Tint axis is what colours a
+ *     surface by hue, and it does it by SETTING a chroma rather than rotating one.
+ *   - There is no derived ink. What reads on these is --fs-text, a palette token these axes must
+ *     not move; the Appearance page reports the contrast each choice lands at instead.
+ *   - They therefore need no attribute at all: an inline custom property on :root is the whole
+ *     mechanism, and every derived token follows for free because each is a color-mix() of the
+ *     one this sets (--fs-glass and --fs-bar-bg from --fs-panel, the hairline ladder from
+ *     --fs-border). That is also why --fs-bar-bg is a surface of its own here: it is derived from
+ *     --fs-panel and an admin who wants a dark chrome over light cards has to be able to say so.
+ *
+ * Off is lsSet('0'), not a deleted key, for the reason every other axis stores its default
+ * explicitly: once a router default exists, clearing the key means "inherit it". */
+function surfaceAxis(key, sdKey, prop) {
+	const norm = (v) => {
+		const s = (typeof v === 'string') ? v.trim().toLowerCase() : '';
+		return FS_HEX_RE.test(s) ? s : 0;
+	};
+	const def = () => norm(sd(sdKey));
+	return {
+		def,
+		current() {
+			const raw = lsGet(key);
+			return (raw !== null) ? norm(raw) : def();
+		},
+		apply(val) {
+			const v = norm(val);
+			lsSet(key, String(v));
+			if (v) document.documentElement.style.setProperty(prop, v);
+			else document.documentElement.style.removeProperty(prop);
+		}
+	};
+}
+const CARD = surfaceAxis('fs-card', 'card', '--fs-panel-base');
+const currentCard = CARD.current, applyCard = CARD.apply;
+const CONTROL = surfaceAxis('fs-control', 'control', '--fs-panel2-base');
+const currentControl = CONTROL.current, applyControl = CONTROL.apply;
+const BAR = surfaceAxis('fs-bar', 'bar', '--fs-bar-bg');
+const currentBar = BAR.current, applyBar = BAR.apply;
+const LINE = surfaceAxis('fs-line', 'line', '--fs-border-base');
+const currentLine = LINE.current, applyLine = LINE.apply;
+
+
+const GOOD = colorAxis('fs-good', 'data-good', '--fs-good-h', '--fs-good');
+const currentGood = GOOD.current, applyGood = GOOD.apply;
+const WARN = colorAxis('fs-warn', 'data-warn', '--fs-warn-h', '--fs-warn');
+const currentWarn = WARN.current, applyWarn = WARN.apply;
+const DANGER = colorAxis('fs-danger', 'data-danger', '--fs-danger-h', '--fs-danger');
+const currentDanger = DANGER.current, applyDanger = DANGER.apply;
 
 /* Rounding: the propAxis instance (default const + rationale up top). --fs-radius-base in px. */
 const RADIUS = propAxis('fs-radius', 'rounding', '--fs-radius-base', 0, 20, FS_RADIUS_DEFAULT, (v) => (v + 'px'));
 const currentRadius = RADIUS.current, applyRadius = RADIUS.apply, radiusDefault = RADIUS.def;
 
-/* Layout axis: vertical sidebar (default) vs horizontal top bar. ONE template, ONE renderer — CSS
+/* Layout axis: horizontal top bar (the default) vs vertical sidebar. ONE template, ONE renderer — CSS
  * morphs the chrome off :root[data-layout] (head.ut pre-paints it), and toggling re-renders
  * NOTHING: the DOM serves both, and menu-footstrap.js's MutationObserver on data-layout folds the
  * accordion into dropdowns / restores it.
@@ -428,7 +532,7 @@ function applyAutoCollapse(val) {
 /* The sidebar rail's collapsed flag. The BUTTON that flips it is chrome (fs-chrome.js): only the
  * stored state belongs to the preference layer, and fs-update.js needs the ls* helpers anyway.
  * NOT part of the router-wide defaults — it is a transient chrome collapse, not an appearance
- * choice, so it is absent from snapshotAxes()/resetToDefault() below. */
+ * choice, so it is absent from snapshotAxes()/resetToSaved() below. */
 function applyRail(on) {
 	const root = document.documentElement;
 	if (on) { root.setAttribute('data-rail', 'true'); lsSet('fs-rail', 'true'); }
@@ -447,10 +551,12 @@ function currentRail() {
  * snapshotAxes() reads the EFFECTIVE values (currentLayout()/currentMode()/… already fold in this
  * browser's localStorage), so "Save as default" captures exactly what the user sees. It does NOT
  * touch localStorage — this browser keeps overriding, which is the point: the saved default is for
- * OTHER browsers/devices. resetToDefault() is the escape hatch that drops this browser back onto it. */
+ * OTHER browsers/devices. resetToSaved() is the escape hatch that drops this browser back onto it. */
 const AXIS_KEYS = [
 	'fs-layout', 'fs-darkmode', 'fs-palette', 'fs-wallpaper',
-	'fs-tint', 'fs-accent', 'fs-radius', 'fs-menu-autocollapse', 'fs-tint-strength', 'fs-density',
+	'fs-tint', 'fs-accent', 'fs-good', 'fs-warn', 'fs-danger',
+	'fs-card', 'fs-control', 'fs-bar', 'fs-line',
+	'fs-radius', 'fs-menu-autocollapse', 'fs-tint-strength', 'fs-density',
 	'fs-photo-dim'
 ];
 /* Tint density: the STRENGTH of the router-identity Tint (the hue washed onto --fs-bg), a per-browser
@@ -505,6 +611,13 @@ function snapshotAxes() {
 		wallpaper: currentWallpaper(),
 		tint: String(currentTint()),
 		accent: String(currentAccent()),
+		good: String(currentGood()),
+		warn: String(currentWarn()),
+		danger: String(currentDanger()),
+		card: String(currentCard()),
+		control: String(currentControl()),
+		bar: String(currentBar()),
+		line: String(currentLine()),
 		rounding: String(currentRadius()),
 		autocollapse: currentAutoCollapse() ? 'on' : 'off',
 		tint_strength: String(currentTintStrength()),
@@ -530,6 +643,13 @@ function _resolvedDefault() {
 		wallpaper: wallpaperDefault(),
 		tint: String(TINT.def()),
 		accent: String(ACCENT.def()),
+		good: String(GOOD.def()),
+		warn: String(WARN.def()),
+		danger: String(DANGER.def()),
+		card: String(CARD.def()),
+		control: String(CONTROL.def()),
+		bar: String(BAR.def()),
+		line: String(LINE.def()),
 		rounding: String(radiusDefault()),
 		autocollapse: autoCollapseDefault() ? 'on' : 'off',
 		tint_strength: String(tintStrengthDefault()),
@@ -561,10 +681,135 @@ function saveAsDefault() {
 		.then(() => _uciCommit('footstrap'))
 		.then(() => { _savedDefault = snap; });
 }
-/* clear THIS browser's overrides so the router default (or the built-in) takes over; the caller
- * reloads so head.ut re-applies from window.__fsSD in one clean pass. */
-function resetToDefault() {
+/* ---- the two resets, and they are NOT the same escape hatch -----------------------------------
+ *
+ * Both drop this browser's tweaks; they differ in WHAT is underneath, which is the whole point of
+ * the three-layer model (localStorage ?? router default ?? built-in):
+ *
+ *   resetToSaved()    clears the keys, so every axis falls back through the layers — to the ROUTER
+ *                     default where Save-as-default set one, to the built-in where it did not. The
+ *                     browser goes back to INHERITING: a later Save-as-default from another device
+ *                     will show up here too.
+ *   resetToBuiltin()  writes the theme's own defaults EXPLICITLY, which is the only way to say
+ *                     "the theme as it ships, not what this router was told to look like". Clearing
+ *                     the keys cannot express it — that is precisely the sentence that means
+ *                     "inherit the router default" (see the header).
+ *
+ * Both leave /etc/config/footstrap alone: neither is a way to un-save a router default, and an
+ * admin who wants that presses Save as default from the look they want.
+ *
+ * The caller reloads so head.ut re-applies everything in one clean pass — the appliers would each
+ * repaint correctly, but the CONTROLS on the page are built from the values they had at render
+ * time and would go on showing the old ones. */
+function resetToSaved() {
 	AXIS_KEYS.forEach(lsDel);
+}
+
+/* The built-in defaults, written through the ordinary appliers so each one validates its own value
+ * and stamps :root the way it always does. Stated here rather than derived: a "default" is only a
+ * default because it is the value a bare :root paints, and the three that already have a named
+ * const (rounding, tint strength, photo dim) use it, so the numbers cannot drift from the CSS. */
+function resetToBuiltin() {
+	applyLayout('sidebar');
+	applyMode('auto');
+	applyPalette('footstrap');
+	applyDensity('normal');
+	applyWallpaper('off');
+	applyAutoCollapse('off');
+	applyRadius(FS_RADIUS_DEFAULT);
+	applyTintStrength(FS_TSTR_DEFAULT);
+	applyPhotoDim(FS_PDIM_DEFAULT);
+	/* every colour and surface axis back to "the palette's own" */
+	[ applyTint, applyAccent, applyGood, applyWarn, applyDanger,
+		applyCard, applyControl, applyBar, applyLine ].forEach((fn) => fn(0));
+}
+
+/* ---- the doodle wallpapers: FETCHED ON DEMAND, not shipped ------------------------------------
+ *
+ * cats.svg and dinos.svg are 77 KB and 128 KB of decoration, and a theme that a router flashes into
+ * 8 MB of squashfs should not spend 200 KB on two pictures most installs never switch on. They live
+ * in the repository (wallpapers/) and NOT in the package; picking one downloads it, once, and the
+ * Appearance page says how big it is before anything is fetched.
+ *
+ * THE BROWSER FETCHES, NOT THE ROUTER, and that is the whole reason this is workable: the admin's
+ * machine has the internet connection, so a router with no WAN — or one behind exactly the kind of
+ * blocked route this theme is often installed to manage — is not asked to reach GitHub. The bytes
+ * arrive over the browser's own verified TLS, are checked against a sha256 pinned HERE, and only
+ * then are uploaded to the router through the same cgi-io path the login background already uses.
+ *
+ * THE DIGEST IS THE POINT, and it is checked before the file reaches the router, not after: a
+ * raw.githubusercontent URL is a moving target (a branch, not a release asset), and "it came over
+ * https" only says the bytes are the ones that host served, not that they are the bytes this
+ * version of the theme was built against. tools/wallpapers.mjs holds each constant below against
+ * the file in wallpapers/, so a re-traced doodle that forgets to update its hash fails the build
+ * rather than every router's download. */
+const WP_BASE = 'https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/wallpapers/';
+const WP_DIR = '/www/luci-static/footstrap/';
+const WALLPAPER_FILES = {
+	cats:  { bytes: 76751,  sha256: '608dcd8eafa3315fde012e5bf72c0727e8d17d98d5927a8893a31e2aca4842db' },
+	dinos: { bytes: 131345, sha256: 'd4b5168e68dc6c15c4d8570e02d1510b3c7eaa7dbaa64264d7dc175deb163f1b' }
+};
+
+/* Which doodles are already on this router. The SERVER globbed for them (head.ut, the same trick as
+ * the optional updater's __fsUpd): asking the client to probe with a HEAD request per doodle would
+ * be two requests on every page load to learn something the server knows for free. */
+function wallpaperReady(name) {
+	try { return !!(window.__fsWp || {})[name]; } catch (e) { return false; }
+}
+function wallpaperSize(name) {
+	return (WALLPAPER_FILES[name] || {}).bytes || 0;
+}
+
+/* hex sha256 of an ArrayBuffer, through the platform. crypto.subtle is unavailable on an insecure
+ * origin in every current browser — and LuCI over plain http IS one — so this resolves to null
+ * there rather than throwing, and the caller decides what an unverifiable download is worth. */
+function _sha256(buf) {
+	const c = window.crypto && window.crypto.subtle;
+	if (!c) return Promise.resolve(null);
+	return c.digest('SHA-256', buf).then((d) => [...new Uint8Array(d)]
+		.map((b) => b.toString(16).padStart(2, '0')).join(''));
+}
+
+/* Fetch one doodle and put it on the router. Resolves when it is servable, so the caller can switch
+ * the axis on straight afterwards. */
+function installWallpaper(name) {
+	const want = WALLPAPER_FILES[name];
+	if (!want) return Promise.reject(new Error('unknown wallpaper'));
+	if (wallpaperReady(name)) return Promise.resolve();
+	/* no-store: the point of the digest check is that we verified THESE bytes, and a stale
+	 * heuristically-cached copy is bytes nobody verified. */
+	return fetch(WP_BASE + name + '.svg', { cache: 'no-store', credentials: 'omit' })
+		.then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('HTTP ' + r.status))))
+		.then((buf) => {
+			if (buf.byteLength !== want.bytes)
+				return Promise.reject(new Error(_('The download did not match what this theme expects.', 'footstrap')));
+			return _sha256(buf).then((sum) => {
+				/* A null sum is "this browser cannot hash on an insecure origin", not "the file is
+				 * wrong". The length check above still held, the transport was the browser's own
+				 * TLS, and the alternative is refusing the feature to everyone on http — which is
+				 * most LuCI. A WRONG sum is refused outright. */
+				if (sum !== null && sum !== want.sha256)
+					return Promise.reject(new Error(_('The download did not match what this theme expects.', 'footstrap')));
+				const fd = new FormData();
+				fd.append('sessionid', rpc.getSessionID());
+				fd.append('filename', WP_DIR + name + '.svg');
+				fd.append('filedata', new Blob([ buf ], { type: 'image/svg+xml' }), name + '.svg');
+				return fetch(L.env.cgi_base + '/cgi-upload', { method: 'POST', body: fd, credentials: 'same-origin' })
+					.then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))));
+			});
+		})
+		.then((reply) => {
+			if (!reply || reply.failure)
+				return Promise.reject(new Error((reply && reply.failure && reply.failure[1]) || _('Upload failed.', 'footstrap')));
+			/* cgi-upload writes 0600 and uhttpd refuses to SERVE a file that is not world-readable
+			 * (measured: 0600 -> 403, 0644 -> 200) — the same step the login background needs. */
+			return _fileExec('/bin/chmod', [ '644', WP_DIR + name + '.svg' ]);
+		})
+		.then(() => {
+			/* remember it for the rest of this page's life; the next full load learns it from the
+			 * server glob again */
+			try { (window.__fsWp = window.__fsWp || {})[name] = 1; } catch (e) {}
+		});
 }
 
 /* ---- Login/page background upload: ROUTER-SIDE, and deliberately NOT an axis --------------------
@@ -714,7 +959,7 @@ function removeLoginBg() {
 
 
 return baseclass.extend({
-	/* the storage helpers, shared with fs-update.js's own axis */
+	/* the storage helpers */
 	lsGet, lsSet, lsDel, lsGetArr,
 
 	currentMode, applyMode, guardDarkStamp,
@@ -724,13 +969,21 @@ return baseclass.extend({
 	currentRadius, applyRadius,
 	currentTint, applyTint,
 	currentAccent, applyAccent,
+	currentGood, applyGood,
+	currentCard, applyCard,
+	currentControl, applyControl,
+	currentBar, applyBar,
+	currentLine, applyLine,
+	currentWarn, applyWarn,
+	currentDanger, applyDanger,
 	currentLayout, isTopLayout, applyLayout,
 	currentAutoCollapse, applyAutoCollapse,
 	currentRail, applyRail,
 
 	currentLoginBg, loginBgUrl, uploadLoginBg, removeLoginBg,
+	wallpaperReady, wallpaperSize, installWallpaper,
 	currentTintStrength, applyTintStrength,
 	currentPhotoDim, applyPhotoDim,
 
-	saveAsDefault, resetToDefault, matchesSavedDefault
+	saveAsDefault, resetToSaved, resetToBuiltin, matchesSavedDefault
 });

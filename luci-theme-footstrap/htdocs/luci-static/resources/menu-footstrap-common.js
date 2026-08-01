@@ -21,14 +21,10 @@
  *   fs-router      the SPA client router (docs/spa-router.md)
  *   fs-sheets      the guard against a view's injected CSS repainting every later page
  *   fs-search      the page-search palette (indexes the same tree, on first open)
- *   fs-appearance  the popover
+ *   fs-appearance  the Appearance controls, appended to the stock System page
  *   fs-overview    the overview grid — a THEME module, not a luci-mod-status include
- *   fs-version     the shipped version string (shown in the popover, no network)
+ *   fs-version     the shipped version string (shown in the Appearance section, no network)
  *
- * The version CHECK and the one-click self-update (fs-update.js) ship in the OPTIONAL
- * luci-app-footstrap-updater package, not here. No theme module statically requires it — that would
- * make a missing updater a DependencyError that takes out this whole bootstrap. fs-appearance.js
- * loads it at runtime and lights up the Appearance popover's update rows only when it resolves.
  *
  * They compose by CALLING each other, never by inheriting: LuCI instantiates every required module
  * into a singleton, so `base.extend` across modules throws and a module cannot subclass another
@@ -62,6 +58,9 @@ return baseclass.extend({
 			fit.add(chrome.fitChrome);
 
 			chrome.renderChrome();
+			/* Both of these ADD to a stock page rather than owning a route: each watches
+			 * body[data-page] and does nothing anywhere else. A theme may not register a
+			 * dispatcher node — it outlives the theme that registered it. */
 			appearance.wire();
 			/* after setTree(): the palette indexes that tree — lazily, on its first open, but its
 			 * recent-pages list is recorded from the first navigation onwards */

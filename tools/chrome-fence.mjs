@@ -4,8 +4,8 @@
  * completely unprotected and `npm run check`, `jsmin-verify` and `eslint` ALL exited 0.
  *
  *   1. `header.ut` — the markup. A chrome root MARKS itself with `data-fs-chrome`; the <nav> is one,
- *      and so are the skip link and (in fs-appearance.js) the Appearance popover, neither of which is
- *      inside it. The mark is what the other two read.
+ *      and so are the skip link and the two sr-only elements, none of which is inside it. The mark is
+ *      what the other two read.
  *   2. `fs-sheets.js` — CHROME_FENCE, appended to a foreign selector's subject so it can no longer
  *      MATCH a chrome element. This is what beats a third party's `!important`: there is nothing left
  *      to out-rank.
@@ -42,6 +42,7 @@
  * the attributes this theme publishes (`luci-app-openclash`, seven templates). Add a fourth dialect
  * to stampDark and forget the observer's attributeFilter, and that dialect is unguarded — silently.
  */
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { ROOT, read } from './lib/root.mjs';
@@ -49,8 +50,17 @@ import { ROOT, read } from './lib/root.mjs';
 const HEADER = read('luci-theme-footstrap/ucode/template/themes/footstrap/header.ut');
 const SHEETS = read('luci-theme-footstrap/htdocs/luci-static/resources/fs-sheets.js');
 const PREFS = read('luci-theme-footstrap/htdocs/luci-static/resources/fs-prefs.js');
-const APPEARANCE = read('luci-theme-footstrap/htdocs/luci-static/resources/fs-appearance.js');
 const CHROME = read('luci-theme-footstrap/styles/theme/10-chrome.css');
+
+/* Every module the theme ships, concatenated — for the "does any JS build a chrome root" check
+ * below. A GLOB, not a named file: the popover that used to build one lived in fs-appearance.js and
+ * this gate read that one path, so a root moved to another module would have left the check quietly
+ * looking at a file that no longer had one. */
+const RESOURCES = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources');
+const JS = readdirSync(RESOURCES, { recursive: true })
+	.filter((f) => String(f).endsWith('.js'))
+	.map((f) => read(join('luci-theme-footstrap/htdocs/luci-static/resources', String(f))))
+	.join('\n');
 
 const errors = [];
 const ok = [];
@@ -89,20 +99,31 @@ if (!(/^data-fs-/).test(MARK)) {
  * elements un-clipped onto every page; the <nav> alone held). Adding or removing a root is a
  * deliberate act, so it is a deliberate edit here. */
 const EXPECT_ROOTS = 4;
+/* …and how many the JS builds: fs-search.js's command palette, a `position: fixed` overlay parented
+ * to <body> and therefore outside every template root. The Appearance popover used to be the second;
+ * it is a PAGE now (System -> Appearance), and a page renders inside .fs-main, which is Zone 2 —
+ * an app is entitled to win there, so it must NOT be marked.
+ *
+ * Ratcheted like the template count, and for the same reason: a module that mounts a floating panel
+ * on <body> has to come back here and account for it — either it is chrome, and the mark plus this
+ * number move together, or it is not, and it belongs inside #view. The alternative is that it
+ * silently arrives unmarked, which is exactly what this file exists to prevent. */
+const EXPECT_JS_ROOTS = 1;
 const roots = [...MARKUP.matchAll(new RegExp(`<([a-z]+)\\b[^>]*\\b${MARK}\\b`, 'g'))].map((m) => m[1]);
-const jsRoots = [...APPEARANCE.matchAll(new RegExp(`'${MARK}'`, 'g'))].length;
+const jsRoots = [...JS.matchAll(new RegExp(`'${MARK}'`, 'g'))].length;
 ok.push(`chrome mark derived from header.ut: [${MARK}] — ${roots.length} root(s) in the template `
-	+ `(${roots.join(', ')}) + ${jsRoots} in fs-appearance.js`);
+	+ `(${roots.join(', ')}) + ${jsRoots} built by the theme's JS`);
 if (roots.length !== EXPECT_ROOTS)
 	errors.push(`header.ut marks ${roots.length} chrome root(s) with ${MARK} (${roots.join(', ') || 'none'}), `
 		+ `expected ${EXPECT_ROOTS}. Each one is a Zone 1 root that is NOT inside the <nav>: the skip link is a `
 		+ `sibling of .fs-shell, and the sr-only <h1> and live region sit inside .fs-main. An unmarked root is `
 		+ `fenced by nothing and pinned by nothing — silently. If you added or removed one on purpose, say so `
 		+ `by changing EXPECT_ROOTS; if you did not, the mark went missing`);
-if (!jsRoots)
-	errors.push(`fs-appearance.js does not mark anything with ${MARK}. The Appearance popover hangs off `
-		+ `<body>, outside every template root, so an unmarked one is fenced by nothing — which is the `
-		+ `exact gap that made the mark necessary`);
+if (jsRoots !== EXPECT_JS_ROOTS)
+	errors.push(`the theme's JS marks ${jsRoots} chrome root(s) with ${MARK}, expected ${EXPECT_JS_ROOTS}. `
+		+ `A root built in JS lives outside header.ut, so nothing else counts it. If a module now mounts `
+		+ `chrome of its own, say so by changing EXPECT_JS_ROOTS — and make sure it is chrome: anything `
+		+ `rendered inside #view is Zone 2, where an app is entitled to win, and must not carry the mark`);
 
 /* ---- 2. the fence (fs-sheets.js) ------------------------------------------------------ */
 /* ONE canonical string, compared whole. See the header: the token-testing version passed an

@@ -1,0 +1,264 @@
+@layer page {
+	/* ==================================================================
+	 * The Appearance controls, appended to System -> System by fs-appearance.js.
+	 *
+	 * This was a popover on <body>, placed against a chrome button by widgets.placePopover and
+	 * capped to the viewport because eighteen axes plus an upload panel do not fit a floating card
+	 * on a phone in landscape. As part of a page none of that applies: the sections are ordinary
+	 * .cbi-section cards, the width is the content column's, and the scroll is the document's. The
+	 * placement, the max-height clamp, the fade-in and the [hidden] pair went with the popover.
+	 *
+	 * The CONTROLS are still the theme's own primitives (fs-widgets.js), not LuCI form widgets:
+	 * .fs-seg is a radiogroup with a roving tabindex, .fs-range is the Rounding slider. They live in
+	 * the page layer rather than the theme layer because this is the only page that draws them — an
+	 * axis control is not chrome any more.
+	 * ================================================================== */
+
+	.fs-ap { display: flex; flex-direction: column; gap: var(--fs-space-5); }
+	/* Grouping headings INSIDE the tab pane, not cards: the pane is already inside the stock
+	 * .cbi-section card, and a second border around each group is a box in a box. A hairline above
+	 * each group does the same job — except for the first, which sits under the tab strip. */
+	/* the heading row. On a plain group it holds the title; on a FOLDED one the whole row is the
+	 * disclosure button (fs-appearance.js) — full width, so the target is the heading rather than a
+	 * chevron nobody can hit on a phone. */
+	.fs-ap-head { grid-column: 1 / -1; }
+	button.fs-ap-fold {
+		display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-3);
+		inline-size: 100%; padding: 0; margin: 0;
+		background: none; border: 0; cursor: pointer; text-align: start; color: inherit;
+	}
+	button.fs-ap-fold:hover h4 { color: var(--fs-accent); }
+	button.fs-ap-fold:focus-visible { outline: none; box-shadow: var(--fs-focus-ring-solo); border-radius: var(--fs-radius-sm); }
+	/* The chevron: the same 26px box with a two-border ::after that the overview's card toggles
+	 * use (styles/pages/20-overview.css) — one chevron for "this panel opens", drawn once here and
+	 * once there rather than an SVG in one place and borders in the other.
+	 *
+	 * It turns on the SAME attribute that tells a screen reader the state, so the two cannot
+	 * disagree. Rotated with `transform` and not the individual `rotate` property, because that is
+	 * what the overview's copy does and the pair is meant to look identical mid-animation too. */
+	.fs-ap-chev {
+		flex: 0 0 auto; inline-size: 26px; block-size: 26px;
+		display: inline-flex; align-items: center; justify-content: center;
+		color: var(--fs-dim); border-radius: var(--fs-radius-sm);
+	}
+	.fs-ap-chev::after {
+		content: "";
+		width: 7px; height: 7px;
+		border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+		border-radius: 1px;
+		transform: rotate(45deg);			/* closed: chevron down */
+		margin-top: -2px;					/* optical centring of the down chevron */
+		transition: transform var(--fs-dur-move);
+	}
+	button.fs-ap-fold[aria-expanded="true"] .fs-ap-chev::after {
+		transform: rotate(-135deg);			/* open: chevron up */
+		margin-top: var(--fs-space-0-5);
+	}
+	button.fs-ap-fold:hover .fs-ap-chev { color: var(--fs-accent); }
+	/* the panel is the grid, so a folded group lays its rows out exactly like an unfolded section */
+	.fs-ap-body { grid-column: 1 / -1; display: grid; gap: var(--fs-space-3) var(--fs-space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+	/* an explicit `display` DEFEATS the `hidden` attribute (the UA rule is a bare 0,0,1), and hidden
+	 * is what keeps a closed group out of the tab order and the a11y tree */
+	.fs-ap-body[hidden] { display: none; }
+	/* the second heading inside the Colours fold — Surfaces shares the fold, not the heading */
+	.fs-ap-sub {
+		grid-column: 1 / -1; margin: var(--fs-space-2) 0 0;
+		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking);
+		text-transform: uppercase; color: var(--fs-eyebrow-color);
+	}
+	.fs-ap-head h4 {
+		margin: 0;
+		font-size: var(--fs-type); font-weight: var(--fs-weight-bold); color: var(--fs-text);
+	}
+	.fs-ap-section + .fs-ap-section { padding-top: var(--fs-space-4); border-top: 1px solid var(--fs-border); }
+	/* The rows sit in a responsive grid rather than a single column: on a wide screen a column of
+	 * 200px controls beside 900px of empty card is the popover's shape with none of the popover's
+	 * reason for it. min() so the track never demands more than the column has — a fixed 320px
+	 * minimum overflowed the card inside the narrow sidebar layout at 360px. */
+	.fs-ap-section { display: grid; gap: var(--fs-space-3) var(--fs-space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+	.fs-ap-group { display: flex; flex-direction: column; gap: var(--fs-space-1-5); }
+	/* The accordion switch is meaningless in the top layout — its sections are hover dropdowns,
+	 * already exclusive. Hidden HERE, not by a branch in the JS: the page is built once, so a branch
+	 * froze the control to whatever layout it loaded in and the live toggle could never change it. */
+	:root[data-layout="top"] .fs-ap-submenus { display: none; }
+	.fs-ap-label { font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase; color: var(--fs-eyebrow-color); }
+
+	/* Save-as-default / Reset row: two equal buttons, no status text — the Save button's own
+	 * label/disabled state is the status. They take their look from .btn / .cbi-button-action
+	 * (base + theme/55-buttons.css); a disabled .cbi-button-action already greys via base. */
+	/* THREE buttons now, and two of them say "Reset to …", so the row does not fit a phone: at
+	 * 390px the three min-content widths plus the gaps overflowed the card, which on a flex row is
+	 * silent — nothing scrolls, the buttons simply hang past the edge.
+	 *
+	 * `wrap` plus a flex-basis in em is the fix, and the basis is what does the work: `flex: 1`
+	 * alone never wraps (one line, each item squeezed to min-content and past the edge together).
+	 * With a basis of 9em an item that cannot have it moves to the next line and the ones that
+	 * remain still share the width equally — three across on a desktop card, two-and-one on a
+	 * narrow one, one per line when even that will not fit. No media query: the row asks its own
+	 * content, which is the same argument the fit engine rests on. */
+	/* the row spans the grid: it is not one setting among three columns, it is what the whole
+	 * group does, and squeezed into a 300px track its three buttons wrapped even on a desktop */
+	.fs-ap-section > .fs-ap-group:has(.fs-ap-actrow) { grid-column: 1 / -1; }
+	.fs-ap-actrow { display: flex; flex-wrap: wrap; gap: var(--fs-space-2); }
+	.fs-ap-actrow .btn { flex: 1 1 9em; min-inline-size: 0; font-size: var(--fs-type); padding: var(--fs-space-2) var(--fs-space-2-5); cursor: pointer; }
+	.fs-ap-actrow .btn:disabled { cursor: default; }
+	/* the primed Reset (second click confirms) reads as the destructive action it is */
+	.fs-ap-armed { color: var(--fs-on-danger); background: var(--fs-danger); border-color: transparent; }
+	/* Save's only visible failure line (a rejected save rpc — usually a stale session) — shown in
+	 * place of the absent status text, hidden until a save actually fails. */
+	.fs-ap-err { margin-top: var(--fs-space-2); font-size: var(--fs-type-xs); line-height: 1.35; color: var(--fs-danger); }
+
+	/* ---- the colour axes ----
+	 * One row is a swatch, a hex field and the button back to the palette's own colour. */
+	.fs-colorctl { display: flex; flex-direction: column; gap: var(--fs-space-1-5); }
+	.fs-color-row { display: flex; align-items: center; gap: var(--fs-space-2); }
+	/* The native colour swatch. type="color" is drawn by the browser and cannot be restyled beyond
+	 * its box, so the box is what is styled: the inner well is stripped to the frame's edge on both
+	 * engines (WebKit nests two elements, Firefox one) or it paints a white margin inside our
+	 * border. Fixed 34px square so it lines up with the field beside it at every density. */
+	input[type="color"].fs-color-swatch {
+		flex: 0 0 auto; inline-size: 34px; block-size: 34px; padding: 0; cursor: pointer;
+		background: none; border: 1px solid var(--fs-border); border-radius: var(--fs-radius-sm);
+	}
+	input[type="color"].fs-color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+	input[type="color"].fs-color-swatch::-webkit-color-swatch { border: 0; border-radius: calc(var(--fs-radius-sm) - 1px); }
+	input[type="color"].fs-color-swatch::-moz-color-swatch { border: 0; border-radius: calc(var(--fs-radius-sm) - 1px); }
+	/* the hex field is a VALUE, so it is mono and tabular like every other value in the theme —
+	 * and #0969da is exactly the kind of string a proportional face makes hard to read back */
+	input[type="text"].fs-color-hex {
+		flex: 1 1 auto; min-inline-size: 0;
+		font-family: var(--fs-font-mono); font-size: var(--fs-type-xs); font-variant-numeric: tabular-nums;
+		text-transform: lowercase;
+	}
+	.fs-color-clear { flex: 0 0 auto; font-size: var(--fs-type-xs); padding: var(--fs-space-1-5) var(--fs-space-2); cursor: pointer; }
+	.fs-color-clear:disabled { cursor: default; }
+
+	/* What the chosen colour COSTS, measured live against the surface it is read on (fs-widgets'
+	 * contrastRatio). It is a readout, not a validation: the theme derives readable ink over a fill
+	 * but never silently corrects a colour the admin asked for, so this says the number and grades
+	 * it. Three grades, three colours — and the failing one is --fs-danger, which the admin may have
+	 * just recoloured, which is exactly the honest outcome. */
+	.fs-color-contrast { font-size: var(--fs-type-xs); color: var(--fs-dim); font-variant-numeric: tabular-nums; }
+	.fs-contrast-aa { color: var(--fs-good); }
+	.fs-contrast-aa-large { color: var(--fs-warn); }
+	.fs-contrast-low { color: var(--fs-danger); }
+
+	/* ---- presets ----
+	 * A row of colour chips that write the accent axis. Wrapping rather than scrolling:
+	 * there are eight, and a horizontal scroller hides the last ones on exactly the narrow screen
+	 * where the wrap costs nothing. */
+	.fs-ap-presets { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--fs-space-2); }
+	/* The chip's background IS the preset's accent, and both it and --fs-preset-c are set inline by
+	 * the JS, because the colour is the DATA — the table of presets lives in fs-appearance.js and
+	 * restating eight colours here is the copy that goes stale. The label then needs ink that
+	 * follows whatever that colour is, which is the same lightness derivation the hex axes use for
+	 * --fs-on-accent (03-palettes.css): without it the light presets carried white on near-white.
+	 * It is derived from the chip's own colour, NOT from --fs-accent — the chips show eight
+	 * different colours at once, so the live accent is the wrong answer for seven of them. */
+	.fs-preset {
+		/* declared in the rule that reads it, so the sheet stands on its own — an undefined var()
+		 * is invalid at computed-value time and drops the whole declaration SILENTLY. The inline
+		 * value the JS writes overrides this; the fallback is the live accent, which is what the
+		 * palette-default chip shows anyway. */
+		--fs-preset-c: var(--fs-accent);
+		display: inline-flex; align-items: center; gap: var(--fs-space-2);
+		padding: var(--fs-space-1-5) var(--fs-space-2-5);
+		border: 1px solid var(--fs-border); border-radius: var(--fs-radius-pill);
+		cursor: pointer; transition: filter var(--fs-dur), border-color var(--fs-dur);
+		color: oklch(from var(--fs-preset-c) clamp(0, (l - .62) * -100, 1) 0 0);
+	}
+	.fs-preset:hover { filter: var(--fs-hover-lift); border-color: var(--fs-accent-line); }
+	.fs-preset-name { font-size: var(--fs-type-xs); font-weight: var(--fs-weight); white-space: nowrap; }
+
+	/* Wallpaper control: the segmented switch, and — only when File is picked — the upload sub-panel
+	 * below it. The preview shows the uploaded photo at a small fixed aspect so the row height is
+	 * stable; Choose image and Remove share ONE row beneath it, Remove appearing only once a photo
+	 * exists (so Choose takes the full width until then). */
+	.fs-ap-wall { display: flex; flex-direction: column; gap: var(--fs-space-2); }
+	.fs-ap-bg { display: flex; flex-direction: column; gap: var(--fs-space-2); }
+	.fs-ap-bgprev {
+		display: block; width: 100%; height: 84px; object-fit: cover;
+		border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
+	}
+	.fs-ap-bgrow { display: flex; gap: var(--fs-space-2); }
+	.fs-ap-bgrow .btn { flex: 1; font-size: var(--fs-type); padding: var(--fs-space-2) var(--fs-space-2-5); cursor: pointer; }
+	.fs-ap-bgrow .btn:disabled { cursor: default; }
+	/* an explicit `display` DEFEATS the `hidden` attribute (the UA's `[hidden]{display:none}` is a
+	 * bare 0,0,1 rule these out-rank), so the JS's panel.hidden / preview.hidden / removeBtn.hidden
+	 * would not hide the panel for Off/Cats, the empty preview, or a not-yet-uploaded Remove. Restate
+	 * hidden at a specificity that wins. */
+	.fs-ap-bg[hidden], .fs-ap-bgprev[hidden], .fs-ap-bgrow .btn[hidden] { display: none; }
+	/* Under the File wallpaper only the photo Dim is relevant — the router-identity Tint colours the
+	 * canvas the photo covers, so hide the Tint hue AND its strength there (fs-ap-tint marks both). */
+	:root[data-wallpaper="file"] .fs-ap-tint { display: none; }
+	/* and the strength is a multiplier on a chroma WE choose, so it only means anything in hue mode:
+	 * with the tint off there is nothing to scale, and on a hex canvas the colour is the one the
+	 * admin entered, with no chroma of ours in it. (0,3,0) out-ranks .fs-ap-group's own display. */
+	:root:not([data-tint="hue"]) .fs-ap-density { display: none; }
+
+	/* the version line at the foot of the page */
+	.fs-ap-footer {
+		grid-column: 1 / -1;
+		display: flex; flex-direction: column; gap: var(--fs-space-2);
+		margin-top: var(--fs-space-0-5); padding-top: var(--fs-space-2-5); border-top: 1px solid var(--fs-border);
+	}
+	.fs-ap-verrow { display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-2-5); }
+	/* links to the project repo — reads as muted text until hovered */
+	.fs-ap-version { font-size: var(--fs-type-xs); color: var(--fs-dim); font-variant-numeric: tabular-nums; text-decoration: none; }
+	.fs-ap-version:hover { color: var(--fs-accent); text-decoration: underline; }
+
+	.fs-seg {
+		display: flex; gap: var(--fs-space-1); padding: var(--fs-space-1);
+		background: var(--fs-panel2); border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
+	}
+	.fs-seg button {
+		flex: 1; padding: var(--fs-space-1-5) var(--fs-space-2); border: 0; border-radius: var(--fs-radius-sm);
+		background: transparent; color: var(--fs-dim);
+		font: inherit; font-size: var(--fs-type); font-weight: var(--fs-weight); line-height: 1.2;
+		cursor: pointer; white-space: nowrap; transition: background var(--fs-dur), color var(--fs-dur);
+	}
+	.fs-seg button:hover { color: var(--fs-text); }
+	.fs-seg button.active { background: var(--fs-accent); color: var(--fs-on-accent); }
+
+	/* Rounding axis = a range slider + live px readout; track/thumb styled on both the WebKit
+	 * and the Firefox pseudo-elements. Written as `input[type="range"].fs-range` on purpose:
+	 * the generic `input[type="range"]` rule in theme/60-inputs.css is (0,1,1), and while this
+	 * sheet is a LATER layer than that one, the pair was written when both sat in `theme` and a
+	 * bare `.fs-range` (0,1,0) silently lost every declaration here. Keeping the type is also what
+	 * documents that these two rules are about the same element. */
+	.fs-rangewrap { display: flex; align-items: center; gap: var(--fs-space-2-5); }
+	input[type="range"].fs-range {
+		flex: 1 1 auto; min-width: 0; height: 4px; margin: var(--fs-space-1-5) 0;
+		-webkit-appearance: none; appearance: none;
+		background: var(--fs-track); border-radius: var(--fs-radius-pill); cursor: pointer;
+	}
+	/* Thumb is 16px like the generic slider's (theme/60-inputs.css) — same accent circle,
+	 * same 2px panel border; only the TRACK is slimmer here (4px). It said 15px, an off-by-1
+	 * nobody chose. */
+	input[type="range"].fs-range::-webkit-slider-thumb {
+		-webkit-appearance: none; appearance: none;
+		width: 16px; height: 16px; border-radius: 50%;
+		background: var(--fs-accent); border: 2px solid var(--fs-panel); box-shadow: var(--fs-shadow);
+	}
+	input[type="range"].fs-range::-moz-range-thumb {
+		width: 16px; height: 16px; border-radius: 50%;
+		background: var(--fs-accent); border: 2px solid var(--fs-panel); box-shadow: var(--fs-shadow);
+	}
+	input[type="range"].fs-range::-moz-range-track {
+		height: 4px; background: var(--fs-track); border-radius: var(--fs-radius-pill);
+	}
+	/* -solo like the plain range: the hue bar has no border to flip, so the tinted ring was the
+	 * whole indicator and measured 1.15-1.29:1 (02-tokens.css). */
+	input[type="range"].fs-range:focus-visible { outline: none; box-shadow: var(--fs-focus-ring-solo); }
+	.fs-range-val {
+		flex: 0 0 auto; min-width: 34px; text-align: end;
+		font-size: var(--fs-type-xs); font-weight: var(--fs-weight); color: var(--fs-dim); font-variant-numeric: tabular-nums;
+	}
+
+	/* THE HUE SLIDER'S rules were here — a rainbow track under a thumb carrying the axis's live
+	 * colour. The slider is gone from the control (fs-widgets' colorControl): two controls for one
+	 * value read as two settings, and the half that could not reach a grey was the slider. The axis
+	 * still STORES a hue and 03-palettes.css still rotates by one, so a value saved before this goes
+	 * on painting — but nothing draws a wheel any more, and CSS for a control nobody renders is dead
+	 * CSS in our own namespace, which `npm run css-orphans` is there to keep out. */
+}

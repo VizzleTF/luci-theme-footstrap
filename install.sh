@@ -1,10 +1,15 @@
 #!/bin/sh
-# luci-theme-footstrap + luci-app-footstrap-updater installer for OpenWrt 24.10 (ipk) and 25.12+ (apk).
+# luci-theme-footstrap installer for OpenWrt 24.10 (ipk) and 25.12+ (apk).
 #
 # One-line install (run on the router over SSH):
 #   wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 # or:
 #   curl -fsSL https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
+#
+# WHAT IT DOES FIRST: adds the owfeed-packages repository (key, repo entry, and a keep.d entry so a
+# firmware upgrade does not wipe either) and installs through apk/opkg — so `apk upgrade` carries
+# the theme forward afterwards, which a downloaded file never does. The release-asset path below is
+# the FALLBACK, for a pinned tag (the feed holds one version per branch) or an unreachable feed.
 #
 # THAT URL IS THE RELEASE ASSET, NOT raw.githubusercontent.com, and the difference is the whole of
 # issue #17. GitHub's 2025-05-08 changelog rate-limits three things for unauthenticated callers:
@@ -13,29 +18,23 @@
 # deliver the very installer meant to help. Release assets carry no such budget. raw still works and
 # is documented as the fallback; it is simply not the first thing to reach for.
 #
-# Optional: pin the THEME release tag ->  ... | sh -s v0.9.3  (the updater always takes its own latest)
+# Optional: pin the release tag ->  ... | sh -s v0.9.3
 #
-# The installer ASKS whether to install the update checker (luci-app-footstrap-updater). Force the
-# answer without a prompt (scripted installs):  FOOTSTRAP_UPDATER=1 (install) / =0 (theme only).
-#
-# SINCE THE SPLIT the theme and the updater ship from TWO repos with their own tags: the theme from
-# VizzleTF/luci-theme-footstrap, the updater from VizzleTF/luci-app-footstrap-updater. This installer
-# resolves each from its own latest release and verifies both against the one release key. The theme
-# is always installed; the updater is OPTIONAL and the installer asks (or FOOTSTRAP_UPDATER=1/0 decides
-# non-interactively). Licensed Apache-2.0.
+# THERE IS NO UPDATE CHECKER ANY MORE. A separate luci-app-footstrap-updater used to be offered here,
+# because a downloaded package is one the package manager will never upgrade. Installing from the
+# feed removes the reason for it: `apk upgrade` / `opkg upgrade` carries the theme forward like
+# anything else, which is what a package manager is for. Licensed Apache-2.0.
 
 set -e
 
 REPO_THEME="VizzleTF/luci-theme-footstrap"
-REPO_UPDATER="VizzleTF/luci-app-footstrap-updater"
-TAG="${1:-latest}"		# pins the THEME tag only; the updater always resolves its own latest
+TAG="${1:-latest}"
 
 # A signed manifest, published as a release asset and fetched from the release CDN — this is what
 # replaced api.github.com as the source of "which asset, how big, what sha256" (see resolve_manifest).
 # The Pages copies are MIRRORS of the same signed file, for when github.com itself cannot be reached;
 # each holds only its repo's LATEST release, so a pinned tag never looks there.
 MIRROR_THEME="https://vizzletf.github.io/luci-theme-footstrap/manifest.txt"
-MIRROR_UPDATER="https://vizzletf.github.io/luci-app-footstrap-updater/manifest.txt"
 
 # An OPTIONAL prefix put in front of every github.com URL, for networks where GitHub is not reachable
 # at all — `GITHUB_PROXY=https://some-proxy/ sh install.sh`. **Empty by default, and that is a
@@ -68,39 +67,6 @@ case "$GITHUB_PROXY" in
 	''|https://*) ;;
 	*) err "GITHUB_PROXY must be an https:// URL (got: $GITHUB_PROXY)"; exit 1 ;;
 esac
-
-# Decide whether to install the update checker (the luci-app-footstrap-updater package). It is the
-# WHOLE of the "check for new versions / one-click Update" feature — no package, no update controls
-# in the Appearance panel, no network calls to GitHub. So the choice is: do you want update checks?
-#
-# ASKED INTERACTIVELY, but read from /dev/tty, NOT stdin — and that is the crux of a `curl | sh`
-# installer. In the documented one-liner `wget -qO- … | sh`, the shell is reading the SCRIPT from
-# stdin (the pipe), so a plain `read` would swallow the rest of the script, not the user's answer.
-# /dev/tty is the controlling terminal regardless of what stdin is, so the prompt works in BOTH the
-# piped form and podkop's `sh -c "$(wget -qO- …)"` form. (podkop gets away with a plain `read`
-# because its `sh -c "$(…)"` invocation leaves stdin ON the terminal; reading /dev/tty is the form
-# that does not depend on how the user launched us.)
-#
-# FOOTSTRAP_UPDATER=1/0 forces the answer with no prompt (for scripted/cron installs). With no
-# terminal and no override, default to installing it — that is the historical behaviour and the
-# common want, and FOOTSTRAP_UPDATER=0 is the documented way to opt out non-interactively.
-want_updater() {
-	case "${FOOTSTRAP_UPDATER:-}" in
-		0|no|n|false|NO|N|False) return 1 ;;
-		1|yes|y|true|YES|Y|True)  return 0 ;;
-	esac
-	if [ ! -r /dev/tty ]; then
-		info "Non-interactive: installing the update checker (FOOTSTRAP_UPDATER=0 to skip)."
-		return 0
-	fi
-	printf '[?] Install the update checker for one-click theme updates? [Y/n] ' > /dev/tty
-	# read failing (EOF/no input) falls through to the default: install.
-	read -r _ans < /dev/tty || { printf '\n' > /dev/tty; return 0; }
-	case "$_ans" in
-		n|N|no|NO|No) return 1 ;;
-		*)            return 0 ;;
-	esac
-}
 
 printf '\n================================================\n'
 printf '    luci-theme-footstrap installer\n'
@@ -144,6 +110,99 @@ else
 	exit 1
 fi
 ok "Package manager: $PM (installing .$EXT)"
+
+# --- the FEED, and why it is tried first ---------------------------------
+#
+# The theme is published in owfeed-packages, and installing from the feed rather than from a
+# release asset changes what happens AFTER this script ends: `apk upgrade` / `opkg upgrade` sees
+# the theme from then on, and so does every other package from that feed. A downloaded .apk is a
+# file the package manager knows nothing about the origin of — it installs, and then it sits there
+# at that version until somebody comes back with another file.
+#
+# So the feed is the first thing tried, and the release asset is the fallback for the two cases the
+# feed cannot serve: a PINNED tag (the feed carries one version per branch, not history) and a
+# router that cannot reach repo.owfeed.org. Both fall through with a message rather than failing.
+#
+# The keys are pinned HERE, as the feed's own install instructions publish them: apk verifies the
+# index against the PEM, opkg against the usign key. That is what makes this path safe without the
+# per-file signature check the asset path does — the package manager is doing the verifying, which
+# is the whole reason to prefer it.
+FEED_HOST="https://repo.owfeed.org"
+FEED_NAME="owfeed-packages"
+FEED_KEY_APK="$FEED_HOST/owfeed-packages.pem"
+FEED_KEY_OPKG_ID="9040356b214084da"
+
+# Which release branch of the feed to point at. The feed publishes per OpenWrt minor, so this is
+# taken from the ROUTER rather than assumed: a 24.10 box gets 24.10, a 25.12 box gets 25.12.
+# SNAPSHOT and anything unparseable have no branch to pick, so they take the asset path instead.
+feed_branch() {
+	case "${DISTRIB_RELEASE:-}" in
+		''|*SNAPSHOT*) return 1 ;;
+	esac
+	_b=$(printf '%s' "$DISTRIB_RELEASE" | cut -d. -f1,2)
+	case "$_b" in
+		[0-9][0-9].[0-9][0-9]) printf '%s' "$_b" ;;
+		*) return 1 ;;
+	esac
+}
+
+# Add the feed if it is not already configured, then install from it. Returns non-zero on any
+# failure, and every one of them is recoverable — the caller falls back to the release asset.
+#
+# `keep.d` is not optional bookkeeping: sysupgrade wipes /etc/apk/keys and the repositories list
+# unless something claims them, so a router that keeps its settings across a firmware upgrade would
+# come back with the feed silently gone and the theme unupgradable.
+feed_install() {
+	_br=$(feed_branch) || { info "No feed branch for '${DISTRIB_RELEASE:-unknown}' — using the release asset."; return 1; }
+	_pkgs="$1"
+	if [ "$PM" = "apk" ]; then
+		_arch=$(cat /etc/apk/arch 2>/dev/null) || return 1
+		[ -n "$_arch" ] || return 1
+		if [ ! -f /etc/apk/keys/owfeed-packages.pem ]; then
+			info "Adding the $FEED_NAME feed (key + repository)..."
+			# ca-bundle and a TLS-capable fetcher: apk itself has to reach an https repo, and
+			# neither is guaranteed present on a minimal image.
+			apk add --quiet ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
+			fetch "$FEED_KEY_APK" 30 /tmp/owfeed-packages.pem || return 1
+			mkdir -p /etc/apk/keys /etc/apk/repositories.d
+			mv /tmp/owfeed-packages.pem /etc/apk/keys/owfeed-packages.pem
+			printf '%s/releases/%s/%s/packages.adb\n' "$FEED_HOST" "$_br" "$_arch" \
+				> /etc/apk/repositories.d/owfeed-packages.list
+			mkdir -p /lib/upgrade/keep.d
+			printf '%s\n' /etc/apk/keys/owfeed-packages.pem \
+				/etc/apk/repositories.d/owfeed-packages.list > /lib/upgrade/keep.d/owfeed-packages
+			ok "Feed added: $FEED_HOST/releases/$_br/$_arch"
+		else
+			info "The $FEED_NAME feed is already configured."
+		fi
+		apk update >/dev/null 2>&1 || { warn "apk update failed — falling back to the release asset."; return 1; }
+		# shellcheck disable=SC2086
+		apk add $_pkgs || return 1
+	else
+		_arch=$(. /etc/openwrt_release 2>/dev/null; printf '%s' "$DISTRIB_ARCH")
+		[ -n "$_arch" ] || return 1
+		if ! grep -q "$FEED_NAME" /etc/opkg/customfeeds.conf 2>/dev/null; then
+			info "Adding the $FEED_NAME feed (key + repository)..."
+			opkg update >/dev/null 2>&1 || true
+			opkg install ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
+			fetch "$FEED_HOST/$FEED_KEY_OPKG_ID" 30 "/tmp/$FEED_KEY_OPKG_ID" || return 1
+			mkdir -p /etc/opkg/keys
+			mv "/tmp/$FEED_KEY_OPKG_ID" "/etc/opkg/keys/$FEED_KEY_OPKG_ID"
+			printf 'src/gz %s %s/releases/%s/%s\n' "$FEED_NAME" "$FEED_HOST" "$_br" "$_arch" \
+				>> /etc/opkg/customfeeds.conf
+			mkdir -p /lib/upgrade/keep.d
+			printf '%s\n' "/etc/opkg/keys/$FEED_KEY_OPKG_ID" /etc/opkg/customfeeds.conf \
+				> /lib/upgrade/keep.d/owfeed-packages
+			ok "Feed added: $FEED_HOST/releases/$_br/$_arch"
+		else
+			info "The $FEED_NAME feed is already configured."
+		fi
+		opkg update >/dev/null 2>&1 || { warn "opkg update failed — falling back to the release asset."; return 1; }
+		# shellcheck disable=SC2086
+		opkg install $_pkgs || return 1
+	fi
+	return 0
+}
 
 # --- downloader -----------------------------------------------------------
 # fetch <url> <max-seconds> [outfile]  — stdout when no outfile.
@@ -269,7 +328,7 @@ verify_sig() {		# <file> <sigfile> <pubkey-file> -> 0 iff the signature is ours 
 # fetched with `curl | sh` and runs BEFORE any package is installed. The package copy is
 # luci-app-footstrap-updater/root/usr/share/luci-app-footstrap-updater/release.pub — the self-updater
 # reads THAT one — and CI fails the build if the two ever say different things. One key signs both the
-# theme and the updater assets.
+# theme's assets.
 #
 # A public key is public — pinning it here is the point, not a leak. It is what makes a tampered
 # release asset unusable even though the API answer that names the asset comes from the same host
@@ -305,7 +364,7 @@ release_pubkey() {	# writes the key to $1
 #
 # The first line said `footstrap-manifest 1` up to 0.11.6: the file is written by `owfeed
 # release` now (it was hand-rolled in this repo's workflow, and owfeed's own shape was modelled
-# on it). NOTHING PARSES THAT LINE — not this script, not the self-updater — so the rename is
+# on it). NOTHING PARSES THAT LINE — not this script — so the rename is
 # invisible to a router. The trailing `arch` is new for the same reason it is TRAILING: mf_pkg
 # below reads fields 4, 5 and 6 positionally, and a router's installed copy cannot be fixed
 # remotely, so a field inserted before them would have made every update fetch a URL that 404s.
@@ -315,8 +374,8 @@ release_pubkey() {	# writes the key to $1
 # whoever replaced the asset (a leaked write-scoped PAT is enough), and a manifest cannot be, since
 # the signing key is a secret that cannot be read back out. usign over the manifest therefore
 # covers every package hash it lists, which is why the manifest path does not fetch the packages'
-# own .sig files. (Those are still published — a self-updater already in the field fetches them,
-# and a router's installed updater cannot be fixed remotely.)
+# own .sig files. (Those are still published: a router that installed the retired self-updater goes
+# on fetching them, and an installed package cannot be fixed remotely.)
 mf_url() {		# <repo> <tag> -> the manifest URL for that release
 	if [ "$2" = "latest" ]; then
 		printf 'https://github.com/%s/releases/latest/download/manifest.txt' "$1"
@@ -347,7 +406,7 @@ safe_name() {
 # release predates manifests), 2 = signature failed (never overridable — that is not a missing check,
 # it is a failed one), 3 = verified but describes a DIFFERENT repo or tag. That last one is not
 # pedantry: ONE key signs both repos' manifests, so without the `repo` check a manifest lifted from
-# the updater's release verifies perfectly as the theme's. A signature proves who wrote a file, never
+# one repo's release verifies perfectly as another's. A signature proves who wrote a file, never
 # what the file is about.
 #
 # NOTE THE VARIABLE NAMES, because this function was written once with the obvious ones and it was
@@ -469,6 +528,37 @@ resolve_pkg() {		# <repo> <pkg-name> <tag> <mirror> <prefix>
 	return 0
 }
 
+# --- TRY THE FEED FIRST ---------------------------------------------------
+#
+# Everything below this block resolves, downloads and verifies a release ASSET, and it stays: it is
+# what serves a pinned tag and a router that cannot reach the feed. But on the ordinary run — latest
+# version, network fine — installing from the feed is better in the way that matters after the
+# install ends: the package manager knows where the theme came from, so `apk upgrade` /
+# `opkg upgrade` carries it forward.
+#
+# A PINNED TAG SKIPS IT. The feed publishes one version per branch, so `sh install.sh v0.9.3` cannot
+# be answered from it, and quietly installing a different version than the one asked for would be
+# worse than the extra download.
+if [ "$TAG" = "latest" ]; then
+	if feed_install "luci-theme-footstrap"; then
+		# BOTH caches, as postinst/postrm/uci-defaults do: dropping only the index cache leaves a
+		# stale /tmp/luci-modulecache, which bites exactly here — a package that replaces the JS.
+		rm -f /tmp/luci-indexcache* 2>/dev/null || true
+		rm -rf /tmp/luci-modulecache 2>/dev/null || true
+		# reload, NOT restart: restart logs out every LuCI session.
+		[ -x /etc/init.d/rpcd ] && /etc/init.d/rpcd reload >/dev/null 2>&1
+		printf '\n'
+		ok "Installed from the $FEED_NAME feed — \`$PM upgrade\` will keep it current."
+		info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
+		info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
+		info "of System -> System. Each browser keeps its own choices; \"Save as default\" stores"
+		info "the current look as the router-wide starting point."
+		info "Then hard-reload the page (Ctrl+F5)."
+		exit 0
+	fi
+	warn "Installing from the release asset instead."
+fi
+
 info "Resolving the theme release ($TAG) from $REPO_THEME..."
 if ! resolve_pkg "$REPO_THEME" luci-theme-footstrap "$TAG" "$MIRROR_THEME" THEME; then
 	err "Could not resolve a luci-theme-footstrap .$EXT for release '$TAG'."
@@ -504,15 +594,6 @@ if [ "$THEME_SRC" != manifest ] && ! command -v jsonfilter >/dev/null 2>&1; then
 	err "This installer only supports OpenWrt."
 	exit 1
 fi
-
-# The updater ships from its OWN repo, always its own latest — the theme tag does not pin it. It is
-# OPTIONAL: an unreachable updater repo or a release with no updater asset is a warning, not a
-# failure, since the theme alone is a complete install. Named separately, never by a bare `\.$EXT$`
-# glob — a self-updater in the field picks each package by its own name (issue #6).
-info "Resolving the updater release (latest) from $REPO_UPDATER..."
-UPDATER_URL=""
-resolve_pkg "$REPO_UPDATER" luci-app-footstrap-updater latest "$MIRROR_UPDATER" UPDATER \
-	|| warn "Could not resolve an updater package — installing the theme only."
 
 # --- download, verify, install --------------------------------------------
 # TWO checks, answering DIFFERENT attackers, and both fail CLOSED.
@@ -657,20 +738,6 @@ install_pkg_now() {
 
 install_asset "$THEME_URL" "$THEME_SRC" "$THEME_SHA"
 
-# The updater is optional and the user chooses (see want_updater above). A release older than the
-# split simply has no updater asset — then there is nothing to offer or ask about.
-UPDATER_INSTALLED=0
-if [ -z "$UPDATER_URL" ]; then
-	warn "This release publishes no luci-app-footstrap-updater asset — installing the theme only."
-	warn "The Appearance popover will show the version but no update controls."
-elif want_updater; then
-	install_asset "$UPDATER_URL" "$UPDATER_SRC" "$UPDATER_SHA"
-	UPDATER_INSTALLED=1
-else
-	info "Skipping the update checker — the theme shows its version but no update controls."
-	info "Add it any time:  FOOTSTRAP_UPDATER=1 sh install.sh   (or re-run and answer yes)."
-fi
-
 # BOTH caches, as postinst/postrm/uci-defaults do: dropping only the index cache left a stale
 # /tmp/luci-modulecache, which bites exactly here — a package that replaces the theme's JS.
 rm -f /tmp/luci-indexcache* 2>/dev/null || true
@@ -685,13 +752,11 @@ if [ -x /etc/init.d/rpcd ]; then
 fi
 
 printf '\n'
-if [ "$UPDATER_INSTALLED" = 1 ]; then
-	ok "luci-theme-footstrap + luci-app-footstrap-updater installed (translations included)."
-else
-	ok "luci-theme-footstrap installed (translations included)."
-fi
+ok "luci-theme-footstrap installed (translations included)."
+info "It came from a FILE, so \`$PM upgrade\` will not carry it forward — add the"
+info "owfeed-packages feed for upgrades (see the README), or re-run this installer."
 info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
-info "Layout (sidebar / top bar), dark mode, palette, tint and accent all live in"
-info "the \"Appearance\" popover in the menu. Each browser keeps its own choices;"
-	info "\"Save as default\" stores the current look as the router-wide starting point."
+info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
+info "of System -> System. Each browser keeps its own choices; \"Save as default\" stores"
+info "the current look as the router-wide starting point."
 info "Then hard-reload the page (Ctrl+F5)."
