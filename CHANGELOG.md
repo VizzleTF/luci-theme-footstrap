@@ -11,9 +11,11 @@ Style and format guide: [docs/releasing.md](docs/releasing.md).
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
-## [Unreleased]
+## [0.12.0] — 2026-08-01
 
 ### Added
+
+- **БОЛЬШЕ НЕТ АПДЕЙТЕРА. НАСТРОЙКИ ТЕМЫ ПЕРЕЕХАЛИ В СИСТЕМА → СИСТЕМА → ВКЛАДКА FOOTSTRAP.** / **THE UPDATER IS GONE. THE THEME'S SETTINGS MOVED INTO SYSTEM → SYSTEM → THE FOOTSTRAP TAB.** The button in the menu no longer exists. Upgrades now come from the package feed — `apk upgrade` / `opkg upgrade` — which is what the installer sets up; a router that still has `luci-app-footstrap-updater` installed gets its final release, which hands the theme to the feed and then removes itself.
 
 - **Appearance moved into System → System, and every colour in the theme can be set there by hex.** Requested as "the blue theme is cool but sometimes you want grey or black" (#20). Nine colour axes now, where there were two hue knobs: Accent and the three status colours Good/Warning/Danger, plus four SURFACES — the cards, the inset controls, the sidebar/bar and the hairlines — and the canvas Tint. Each takes a `#rrggbb` exactly as entered, through a native swatch and a hex field, with one button back to the palette's own colour. There is no hue slider and that is the point: rotating a hue keeps the palette's chroma, so no angle of it reaches a grey, which is the one thing the request asked for. (The stored hue and the rotation in the stylesheet stay, so a value saved before this goes on painting.) What the theme owes a colour it did not choose is the ink on top of it: `--fs-on-accent` and the three status inks are derived from the entered colour's lightness in CSS — `clamp(0, (l - .62) * -100, 1)`, black above the sRGB crossover and white below it — so a solid button stays pressable at any colour, and the derivation is written `[data-accent="hex"][data-accent]` because at equal specificity the palette's dark block wins on source order: measured on the router, the single-attribute form left a grey accent carrying near-black ink at 1.9:1 in dark mode only. Every field says, in words, whether what you just picked can be read — “Easy to read on a card”, “Hard to read … large text only”, “Too faint to read” — measured live against the surface the colour is actually read on rather than silently corrected. The thresholds are still WCAG AA (4.5:1 for text, 3:1 for a hairline, which is graded as a shape and reads “barely visible” rather than “not enough”, since a faint border is a legitimate thing to want); the ratio itself moved into the title, because “On a card 5.4:1 · AA” was three pieces of jargon for one plain fact and the admin recolouring a router is not a designer. Eight accent presets, two of them neutral. It lives at the foot of the stock System page rather than on a route of its own — a theme must not register a dispatcher node, because the node outlives the theme that registered it — and the chrome's Appearance button is gone with the popover, which used to build fourteen controls and a dialog into every single page load whether or not anyone opened them.
 
@@ -3357,6 +3359,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.12.0]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.7...v0.12.0
 [0.11.7]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.6...v0.11.7
 [0.11.6]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.5...v0.11.6
 [0.11.5]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.4...v0.11.5
