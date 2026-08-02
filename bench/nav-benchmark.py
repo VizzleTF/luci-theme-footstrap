@@ -573,6 +573,22 @@ def main():
           + (f"{ctot[BASELINE] / ctot[FOOTSTRAP]:9.2f}x" if ctot[FOOTSTRAP] else ""))
     print(f"{'per navigation (mean over pages)':40s}"
           + "".join(f"{(ctot[m] / ccov if ccov else float('nan')):10.1f}ms" for m in THEMES))
+
+    # COVERAGE, and it decides whether the table above may be quoted at all. A sample is
+    # dropped when the renderer process was replaced mid-navigation (negative delta, see go()),
+    # and that does not fall evenly: a full-load theme restarts the renderer far more often than
+    # an in-place swap does, so the surviving samples for it are the cheap navigations. Comparing
+    # two themes across such a gap reads as "the SPA theme burns more CPU" when what actually
+    # happened is that the other theme's expensive navigations were thrown away. Measured on
+    # 2026-08-01: footstrap kept 38 of 38 pages, bootstrap 18, proton2025 16.
+    print(f"\n{'pages with a sample from EVERY theme':40s}{ccov:6d} of {len(pages)}")
+    for m in THEMES:
+        kept = sum(1 for dp, _, _ in pages if cmed(m, dp, "TaskDuration") == cmed(m, dp, "TaskDuration"))
+        print(f"  {name(m):20s} kept {kept:3d} of {len(pages)} "
+              f"({len(pages) - kept} dropped: renderer restarted mid-navigation)")
+    if ccov < len(pages) * 0.9:
+        print("  ^ COVERAGE IS PARTIAL AND UNEVEN — do not quote the cross-theme CPU ratio above.\n"
+              "    Compare like with like instead (same nav kind), or re-run until coverage is full.")
     print("\nbreakdown — median per navigation over all pages (ms):")
     for key in CPU_METRICS[1:]:
         row = {m: med([cmed(m, dp, key) for dp, _, _ in pages
