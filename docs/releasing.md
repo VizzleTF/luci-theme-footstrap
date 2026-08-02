@@ -61,8 +61,9 @@ notes and the asset choice are evaluated at tag time, in the field, months later
 - **The CI gate** (`build` job): exactly N assets per format, each package resolving through its own
   **name-anchored** regex `^<name>[-_][^/]*\.EXT$` to exactly one. A `.sig` ends in `.EXT.sig` and
   does not match `\.EXT$`.
-- **The reader in the field** — `install.sh`, in its fallback path — pulls the theme by
-  `/luci-theme-footstrap[-_]…/`, then `head -1`. Simulate it against the shape of the coming release:
+- **The reader in the field** is nobody now — `install.sh` installs from the feed and never picks
+  an asset — but the release must still resolve to one file per format, for a by-hand install and
+  for the Pages mirror. Simulate it against the shape of the coming release:
 
 ```sh
 # on a dev router, RELJSON = the release JSON of the intended shape

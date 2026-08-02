@@ -44,18 +44,16 @@ buildbot, where node does not exist and never will.
 2. **The scan marker.** `include/scan.mk` finds packages by grepping for `call BuildPackage`, which
    this Makefile only reaches through `luci.mk`'s include — so the literal in its trailing comment
    is what makes the SDK see the package at all. It has been deleted as boilerplate once.
-3. **The release key** embedded in `install.sh` is the one in `release.pub` — a divergence *within*
-   the repo would reject every release with `BAD SIGNATURE`, which looks exactly like an attack.
-4. **The ACL is valid JSON, and grants something.** rpcd skips an unreadable file in `acl.d` and
+3. **The ACL is valid JSON, and grants something.** rpcd skips an unreadable file in `acl.d` and
    says nothing: a stray comma means the grant is issued to nobody, and nothing else notices. A
    document that parses but is a list, or an entry with neither `read` nor `write`, is the same
    silent outcome by another route, so `tools/check-acl.sh` checks the shape too.
-5. **`build-css.sh`** into a temp file — the script brace-balances its own output and refuses to
+4. **`build-css.sh`** into a temp file — the script brace-balances its own output and refuses to
    write a suspiciously short file. That is a broken-build floor (80 KB), a correctness gate,
    not a size budget. There is no upper CSS budget any more.
-6. **`audit.py --strict`** — undefined `var()`, shadowed declarations, export-tier reads from
+5. **`audit.py --strict`** — undefined `var()`, shadowed declarations, export-tier reads from
    `styles/`, dead base declarations, stray `!important`, colour literals.
-7. **i18n**: `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty. A string
+6. **i18n**: `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty. A string
    in `_()` with no translation renders in English silently — which is how the whole Footstrap
    tab stayed English on a Russian LuCI.
 
@@ -98,7 +96,7 @@ instead: a build without node still hands the untouched source to jsmin.
 There are no numeric size budgets left, for CSS, fonts or JS. Lightness is held by judgement.
 
 Most of what the other jobs run lives in `tools/*.sh` rather than inline in the YAML —
-`check-shell.sh`, `scan-marker.sh`, `check-acl.sh`, `check-release-key.sh`, `build-jsmin.sh`,
+`check-shell.sh`, `scan-marker.sh`, `check-acl.sh`, `build-jsmin.sh`,
 `check-packages.sh`, `feed-key.sh`, `stage-release.sh`. A step that is a script can be run by hand
 when it fails, and its reasoning lives beside the code instead of inside a workflow nobody reads.
 
@@ -247,35 +245,33 @@ nothing can drift.
 
 ## Installation and the trust chain
 
-`install.sh` adds the owfeed-packages feed (key, repository entry, and a `keep.d` entry so a
-sysupgrade does not lose it) and installs the theme from there, so `apk upgrade` / `opkg upgrade`
-carries it forward afterwards. A release asset is the fallback, for a pinned tag (the feed
-carries one version per branch, not history) or a router that cannot reach `repo.owfeed.org`:
+`install.sh` does one thing: it adds the owfeed-packages feed (key, repository entry, and a
+`keep.d` entry so a sysupgrade does not lose it) and installs the theme from there. `apk upgrade` /
+`opkg upgrade` carries it forward afterwards, which is the whole reason to install from a feed
+rather than from a file.
 
 ```sh
 wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
-# pin a version:  ... | sh -s v0.11.7
 ```
 
-By hand — the **raw file from a release**, never the zip artifact from Actions:
+**What verifies the bytes is the package manager**, against the feed key pinned in the script:
+apk checks the index against `owfeed-packages.pem`, opkg against usign key `9040356b214084da`. The
+script fetches nothing else and installs nothing by hand, so it needs no signature logic of its
+own — that was the release-asset path, and it is gone.
+
+**There is no pinned-tag install and no release-asset fallback.** The feed carries one version per
+branch, so a router that wants an older version, or that cannot reach `repo.owfeed.org`, downloads
+the asset from the release page and installs it by hand — the **raw file from a release**, never
+the zip artifact from Actions:
 
 ```sh
 apk add --allow-untrusted luci-theme-footstrap-*.apk   # 25.12+
 opkg install luci-theme-footstrap_*.ipk                # 24.10
 ```
 
-`--allow-untrusted` means **the package manager holds no key of ours**, not that the bytes are
-unchecked. The three-link chain, and why `usign` rather than the package manager's own signature,
-are in [conventions.md](conventions.md).
-
-`install.sh` has one override, `FOOTSTRAP_ALLOW_UNVERIFIED=1`, for pinning a release older than the
-key. A signature that is **present and wrong** is never overridable.
-
-`install.sh` carries its own `fetch()`, host allow-list, asset parsing and `verify_sig()` rather
-than sharing a library: it runs from `wget | sh` **before** any package of ours exists. Those
-functions used to be `@mirror`-pinned against a second copy in the updater's repository; with the
-updater retired there is one copy, and a `@mirror` group with one copy is a hard failure — hence no
-markers.
+`--allow-untrusted` means the package manager holds no key of ours. The release still publishes a
+signed `manifest.txt` and a detached `.sig` per asset, so a by-hand install can be checked with
+`usign -V -m <pkg> -x <pkg>.sig -p release.pub`. Nothing does it automatically any more.
 
 ## Package formats, and the usual mistake
 

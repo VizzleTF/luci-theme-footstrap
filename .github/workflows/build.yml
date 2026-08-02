@@ -26,7 +26,6 @@ jobs:
       - uses: actions/checkout@v7
       - run: sh tools/check-shell.sh
       - run: sh tools/scan-marker.sh
-      - run: sh tools/check-release-key.sh
       - run: sh tools/check-acl.sh
       - run: luci-theme-footstrap/build-css.sh /tmp/cascade.css
       - run: python3 tools/audit.py --strict

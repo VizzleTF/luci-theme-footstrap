@@ -217,8 +217,9 @@ work: apk never exports it, so the guard was dead in production.
 user including the admin who just clicked Update. `reload` re-reads `acl.d/*`, which is all this
 package needs.
 
-**One asset per package per format in a release.** `install.sh` picks its asset by name, and GitHub
-returns assets **sorted by name** — in v0.8.4 a `luci-i18n-…` package sorted ahead of
+**One asset per package per format in a release.** Nothing on a router picks an asset any more —
+the installer takes the feed — but a reader that does gets one candidate, not a guess: GitHub
+returns assets **sorted by name**, and in v0.8.4 a `luci-i18n-…` package sorted ahead of
 `luci-theme-…`, so the then-shipped self-updater installed a 6 KB catalogue instead of the theme,
 reported success, and offered the same update forever (issue #6). Code already on somebody's router
 cannot be fixed remotely; only the release can. CI fails unless each package resolves to exactly
@@ -234,19 +235,20 @@ in the base image.
 
 ## The trust chain
 
-`install.sh` installs with `--allow-untrusted`, which means **the package manager holds no key of
-ours**, not that the bytes are unchecked. Verifying them is the script's own job, in three layers:
+`install.sh` installs from the owfeed-packages feed, so **the package manager is what verifies the
+bytes**: apk checks the index against `owfeed-packages.pem`, opkg against usign key
+`9040356b214084da`, and both keys are pinned in the script itself — it runs from `wget | sh` before
+any package of ours exists. The script's own fetch of those keys uses a verified TLS channel:
+never `-k` / `--no-check-certificate`, and never as a retry, because a failed verification *is* the
+MITM case.
 
-1. **A verified TLS channel.** Never `-k` / `--no-check-certificate`, and never as a retry — a
-   failed verification *is* the MITM case.
-2. **An ed25519 signature over the package (`usign`)** — the link that actually holds, and the
-   only one that survives a redirect. sha256 alone cannot: GitHub *computes* the asset digest
-   from the uploaded bytes, so whoever can swap an asset gets the digest recomputed for them.
-3. **The sha256 GitHub publishes** — below the signature, catching a truncated download from the
-   asset CDN with a clearer failure.
+The installer no longer downloads release assets, so it carries no sha256, no `usign -V` and no
+`--allow-untrusted`. **The release still signs everything** — a `manifest.txt` plus a detached
+`.sig` per asset, both verified in the `release` job — because that is what a by-hand install and
+a mirror have to be checked against.
 
-**Everything fails closed.** No digest, no `.sig`, no usign on the box — all refuse. A signature
-that is present and wrong is never overridable.
+An ed25519 signature is the link that holds and a sha256 alone cannot: GitHub *computes* the asset
+digest from the uploaded bytes, so whoever can swap an asset gets the digest recomputed for them.
 
 ## Changelog and release
 
