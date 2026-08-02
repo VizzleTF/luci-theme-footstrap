@@ -9,7 +9,7 @@ Read this first if you are new to the codebase.
 
 ## A theme is a server shell plus client assets
 
-LuCI runs on **ucode**, not Lua, since 23.05: dispatcher in `/usr/share/ucode/luci/dispatcher.uc`,
+LuCI runs on ucode, not Lua, since 23.05: dispatcher in `/usr/share/ucode/luci/dispatcher.uc`,
 templates as `*.ut` under `/usr/share/ucode/luci/template/`.
 
 **Page content is rendered on the client.** The server sends a shell — header, an empty

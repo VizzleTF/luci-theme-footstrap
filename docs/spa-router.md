@@ -18,7 +18,7 @@ So the server controls *navigation*, not *rendering*. The router repeats exactly
 does, minus the reload: intercept the click, re-instantiate the view into the existing `#view`,
 update the URL with `history.pushState`.
 
-Count **clickable** nodes, not leaves — the ones `ui.menu.getChildren()` turns into an `<a href>`
+Count clickable nodes, not leaves — the ones `ui.menu.getChildren()` turns into an `<a href>`
 (`satisfied` plus a title). A node with an `action` can have children (`admin/status/nftables`),
 while `rpc/*`, `admin/uci/*` and `admin/menu` never become links. On the test router that is **65**
 nodes, of which SPA serves **62**:
@@ -47,18 +47,18 @@ the same:
 
 - `resolveSegs()` walks `alias` (jump to `action.path` from the root) and `firstchild` (pick a
   child) until it reaches a real node; a hop counter catches a cycle in a foreign `menu.d`.
-- `firstChildOf()`/`nodeWeight()` are a **port** of `resolve_firstchild()`/`node_weight()` from
+- `firstChildOf()`/`nodeWeight()` are a port of `resolve_firstchild()`/`node_weight()` from
   `dispatcher.uc`, not a paraphrase: weight `min(order ?? 9999, 9999)` plus 10000 for a node with
   `auth.login`, the `satisfied`/`title`/`firstchild_ineligible` filters, recursion into a nested
   `firstchild`, ties broken by key order. The ACL check is skipped: the tree the client gets from
   `/admin/menu` is already filtered by the session's ACL.
-- `navigate()` keeps **both** tracks: `segs` (what was clicked) goes to `pushState` and `pathinfo`;
+- `navigate()` keeps both tracks: `segs` (what was clicked) goes to `pushState` and `pathinfo`;
   `rsegs` (the resolved leaf) goes to `requestpath`/`dispatchpath`/`nodespec`/`data-page`/title —
   exactly as a full load does.
 
 Accuracy here is not aesthetics: pick a different child and a click opens one page while F5 on the
 same URL opens another. `rewrite` is deliberately not resolved — it is not in the tree, and a
-mistake in `splice` semantics would open the **wrong** page, which is worse than the reload it
+mistake in `splice` semantics would open the wrong page, which is worse than the reload it
 falls back to.
 
 ## The navigation flow
@@ -93,21 +93,21 @@ falls back to.
    `luci-app-filemanager`'s tab strip is four `<a href="#">` whose handler never calls
    `preventDefault`). If `location.pathname === _curPath`, the page owns the fragment; return.
 
-Because `pushState` stores the **real** dispatcher URL, F5 and deep links work server-side
+Because `pushState` stores the real dispatcher URL, F5 and deep links work server-side
 unchanged.
 
-The router re-stamps `document.body[data-page]` itself, from the **resolved** leaf path
+The router re-stamps `document.body[data-page]` itself, from the resolved leaf path
 (`rsegs.join('-')`), exactly as the server stamps `ctx.path` on a full load. Otherwise the incoming
 page would keep the previous page's `data-page` and the page-scoped CSS in `styles/pages/*` would
 silently not apply.
 
 ## Re-instantiating a view — the main subtlety
 
-`require()` in LuCI returns an **instance**, not a class: the first require constructs the object,
-and a view's `__init__` **is** its render (that is all `ui.instantiateView()` does). The router used
+`require()` in LuCI returns an instance, not a class: the first require constructs the object,
+and a view's `__init__` *is* its render (that is all `ui.instantiateView()` does). The router used
 to `require()` and then build a second instance on top — the page rendered twice and ran **two
-pollers**, permanently doubling the RPC rate. So a new instance is built only on a **repeat** visit.
-A page that arrived by **full load** is already instantiated by LuCI, so its class is seeded into
+pollers**, permanently doubling the RPC rate. So a new instance is built only on a repeat visit.
+A page that arrived by full load is already instantiated by LuCI, so its class is seeded into
 `_seen` at init — otherwise the first SPA return to it would render nothing. The benchmark found
 this; the double render is invisible to the eye.
 
@@ -130,7 +130,7 @@ blunt about it:
 abort. Meanwhile every `await` between the check and the DOM write is a point where the whole event
 loop turns, including an entire foreign navigation.
 
-The router checked the generation **before constructing** rather than at the paint:
+The router checked the generation before constructing rather than at the paint:
 
 ```js
 if (gen !== _navGen) { if (!cached) repairStaleRender(className); return; }
@@ -139,23 +139,23 @@ if (cached) new view.constructor();
 
 `View.__init__` is asynchronous (`ready.then(load).then(render).then(nodes => DOM.content(#view,
 nodes))`), so the write happened two awaits later — and `repairStaleRender()` only ran when
-`!cached`, leaving the **cached** path unprotected, which is the ordinary path once the cache is
+`!cached`, leaving the cached path unprotected, which is the ordinary path once the cache is
 warm. Reproduced: leave a slow cached view (Software) for a fast one (System) after 150 ms and the
 result was stable until F5 — System's URL, title, `data-page` and menu highlight, with Software's
 content in `#view`.
 
-It could not be fixed head-on: `ClassConstructor` **discards** what `__init__` returns, so the
+It could not be fixed head-on: `ClassConstructor` discards what `__init__` returns, so the
 construction promise is unreachable. But `__init__` resolves `this.render` while building its chain
-— that is, **during `new`** — so a wrapper installed on `prototype.render` **before** `new` is the
+— that is, **during `new`** — so a wrapper installed on `prototype.render` before `new` is the
 one that gets bound, and `new` returns synchronously, so the generation can be stamped on the
 **instance** immediately after. On the instance, not in a by-class-name map: A → B → A on a warm
 cache would overwrite the first construction's generation with the second's.
 
-A stale render returns a promise that **never resolves**: the chain simply stops before
+A stale render returns a promise that never resolves: the chain simply stops before
 `dom.content()`. Returning empty nodes would paint a live page blank; throwing would hand LuCI's
 `.catch` an error box to draw into a page that just opened.
 
-An instance we did not create (the singleton from `require()` on a **first** visit, where render
+An instance we did not create (the singleton from `require()` on a first visit, where render
 *is* require and there is nothing to arm) carries no stamp and is left alone — that is what
 `repairStaleRender()` still covers.
 
@@ -163,16 +163,16 @@ An instance we did not create (the singleton from `require()` on a **first** vis
 
 ### Fast double-click on UNCACHED views
 
-`_navGen` cancels a stale navigation only on the **cached** path, where cancelling means "do not
-call `new view.constructor()`". On a **first** visit `require()` **is** the render, inside a promise
+`_navGen` cancels a stale navigation only on the cached path, where cancelling means "do not
+call `new view.constructor()`". On a first visit `require()` *is* the render, inside a promise
 we do not own.
 
 So: click Firewall (not cached), click Wireless 100 ms later. `navigate(Wireless)` flushes the
-`L.Poll` queue **before** Firewall adds its poller; Firewall finishes drawing into a `#view` that
+`L.Poll` queue before Firewall adds its poller; Firewall finishes drawing into a `#view` that
 now belongs to Wireless and registers a poller the flush already missed. What is left is Wireless's
 URL, title, menu and `data-page` with Firewall's content and Firewall's poller — forever.
 
-Fixed by **navigating again**: `repairStaleRender(className)` calls `navigate(_curPath, false)` —
+Fixed by navigating again: `repairStaleRender(className)` calls `navigate(_curPath, false)` —
 `navigate()` *is* the procedure for returning the document to the state a fresh load leaves.
 `push=false` because the URL never moved, only the DOM under it. If `navigate()` refuses (the stale
 view injected invasive CSS) → `location.reload()`, hard.
@@ -184,15 +184,15 @@ nothing to repair.
 ## The two `L` trap
 
 `L` inside a module (the factory parameter) and `window.L` (the runtime instance the dispatcher
-creates) are **different objects**. `ui` hangs its helpers (`itemlist`, `showModal`, `hideTooltip`)
+creates) are different objects. `ui` hangs its helpers (`itemlist`, `showModal`, `hideTooltip`)
 on `window.L`, not on the prototypal `L` factories receive. A required module captures whichever `L`
 `require()` was called on.
 
-So a view **must** be required through `window.L`, or it captures the helper-less `L` and dies
+So a view must be required through `window.L`, or it captures the helper-less `L` and dies
 mid-render on the first `L.itemlist(...)`. In the code: `const RT = window.L; RT.require(className)`.
 
 **The trap propagates down the chain, and the cache makes it a race.** `view/status/index.js` loads
-its includes with **its own** `L`, so the `L` that index.js got is also what `30_network.js` gets —
+its includes with its own `L`, so the `L` that index.js got is also what `30_network.js` gets —
 and that one calls `L.itemlist(...)` directly. One wrong `require` at the top kills the render three
 modules down. And because `require()` caches by class name, the class↔`L` binding is fixed by the
 **first** requirer: on a full load that is always the dispatcher with `window.L`, but on an SPA
@@ -221,18 +221,18 @@ Before rendering the new view:
   non-view poller LuCI adds is a transient reachability check during apply/reboot, so clearing the
   queue is safe.
 
-  *One flush is not enough.* LuCI keeps **one** tick per second and runs a queue entry only when
-  `tick % interval == 0`. The **outgoing** page's surviving tick made the incoming view's poller
+  *One flush is not enough.* LuCI keeps one tick per second and runs a queue entry only when
+  `tick % interval == 0`. The outgoing page's surviving tick made the incoming view's poller
   wait for the next multiple of its interval — up to 5 s. Wireless draws its station list from the
   first poll and sat spinning for **4950 ms** against ~360 ms on a full load.
 
-  *One `stop()` is not enough either*, which is why there are three steps: `stop()` **removes**
+  *One `stop()` is not enough either*, which is why there are three steps: `stop()` removes
   `tick`, and `Poll.add()` only auto-starts when `tick != null`, so the page would not poll at all.
-  `stop()` + `start()` on an **empty** queue gives exactly what a fresh document has. This is not a
+  `stop()` + `start()` on an empty queue gives exactly what a fresh document has. This is not a
   workaround — it is literally upstream's sequence: on a full load `initDOM()` calls `Poll.start()`
   on an empty queue before the view renders.
 - The "Refreshing"/"Paused" indicator used to outlive its own polling: LuCI shows it on `poll-start`,
-  switches it on `poll-stop` and never hides it again, while our `stop()` **dispatches** `poll-stop`
+  switches it on `poll-stop` and never hides it again, while our `stop()` dispatches `poll-stop`
   on every navigation — so moving from a polling page to a non-polling one left "Paused" about
   polling that did not exist. Our own `poll-stop` listener (registered at module eval, therefore
   after LuCI's, therefore running second) hides the pill when the queue is empty.
@@ -258,10 +258,10 @@ A `<style>`/`<link>` a view wrote into `<head>` dies with the document on a full
 **survives an SPA transition** and paints every page afterwards. `luci-app-filemanager` injects
 `.cbi-button-apply, .cbi-button-reset, .cbi-button-save:not(.custom-save-button) { display: none
 !important }` — unlayered *and* important, so it beats every cascade layer: one visit and Save/Reset
-vanished from **every** config page.
+vanished from every config page.
 
 **Removing them on navigation is not an option** — it was tried, and it broke SSClash. A poller is
-recoverable by re-rendering the view; a stylesheet comes back only if the injector runs **again**,
+recoverable by re-rendering the view; a stylesheet comes back only if the injector runs again,
 and a library that imports CSS at module eval never runs again (the module is cached for the life of
 the document). `ace_editor.css` (14 KB of absolutely positioned layers) is imported once — after a
 sweep, returning to the editor gave a black rectangle 2 007 346 px tall. **Deletion is silently
@@ -274,7 +274,7 @@ other way; a fresh document carries no view CSS, so SPA resumes immediately.
 `VIEW_SHEETS` is `style:not([data-fs-shell]), link[rel~="stylesheet"]:not([data-fs-shell])`. The
 `<link>` half is not hypothetical: `luci-app-banip`/`luci-app-adblock` append a `<link …/custom.css>`
 at module eval, and it paints `.cbi-input-text` / `.cbi-input-select` — stock widgets, on every page,
-unlayered. Excluded: `[data-fs-shell]` (the one `<style>` the server emits is **marked**, not
+unlayered. Excluded: `[data-fs-shell]` (the one `<style>` the server emits is marked, not
 guessed) and everything inside `#view` (it dies with the content). LuCI's core injects no runtime
 `<style>` at all (checked in `luci.js`, `ui.js`, `cbi.js`).
 
@@ -287,16 +287,16 @@ CSS takes the slow path, not the broken one. The whole gate costs ~0.3 ms per na
 Three tests in `invasiveSheet()`:
 
 1. **A bare type selector** (`pre`, `*`, `:root`, `svg text` — no class, id or attribute) matches
-   stock markup on any page → invasive. **Unless** its declarations are inert:
-   `inertDeclarations()` passes a rule that declares only custom properties the theme does **not**
+   stock markup on any page → invasive. Unless its declarations are inert:
+   `inertDeclarations()` passes a rule that declares only custom properties the theme does not
    read — it cannot paint us. `luci-app-temp-status` opens with `:root { --app-temp-status-temp: … }`
-   and would otherwise poison the document on selector shape alone. Invasive: any **standard**
+   and would otherwise poison the document on selector shape alone. Invasive: any standard
    property on a bare selector (stock filemanager writes `:root { color-scheme: light dark }`, which
-   re-points every UA widget at the OS setting) and any custom property the theme **does** read —
+   re-points every UA widget at the OS setting) and any custom property the theme *does* read —
    which is the point of the private `--fs-*` tier.
 2. **A stock name with no anchor.** A rule can name a stock widget and still be harmless if it can
    only match inside its own app's markup: `#cbi-podkop-section > .cbi-section-remove` requires a
-   podkop section. What pins it down is a name the theme does **not** know — the app's own. A
+   podkop section. What pins it down is a name the theme does not know — the app's own. A
    selector built entirely from names the theme knows is pinned by nothing and matches the same
    widgets on anyone's page → invasive.
 3. **Functional pseudo-class arguments are stripped** before looking for the anchor — and that is
@@ -304,20 +304,20 @@ Three tests in `invasiveSheet()`:
    also names an app class, but **inside a negation**: it does not require that markup, it excludes it.
 
 **The only safe removal is a byte-identical second copy.** Not removing is expensive where an app
-injects on **every** render: podkop calls `injectGlobalStyles()` from `render()` (4 KB, unguarded)
+injects on every render: podkop calls `injectGlobalStyles()` from `render()` (4 KB, unguarded)
 and `luci-app-mosdns` re-attaches three CodeMirror `<link>`s, so every SPA visit adds a copy the
 browser parses forever. An exact duplicate is safe to drop for the same reason sweeping was not: the
 rules do not go anywhere — the surviving copy is byte-identical, and a library's "have I imported
 this already?" check still finds its sheet. **The FIRST copy is kept**: that is the one the app holds
 a handle to. `watchViewSheets()` observes `<head>` rather than sweeping on navigation, because podkop
-injects from `render()`, which resolves **after** the router's `require()` callback — sweeping on
+injects from `render()`, which resolves after the router's `require()` callback — sweeping on
 navigation left the document carrying one permanently stale copy. The observer cannot loop: a removal
-is a mutation with no **added** nodes, and the handler returns when nothing was added.
+is a mutation with no added nodes, and the handler returns when nothing was added.
 
 ## Module prefetch
 
 `wireRouter()` adds a delegated `pointerover`: entering a link to an SPA-able node `fetch()`es its
-JS module to warm the browser's HTTP cache — **not** `require`, which would run `__init__` and render
+JS module to warm the browser's HTTP cache — not `require`, which would run `__init__` and render
 a foreign view into `#view`. The URL is built by `moduleUrl()` byte-for-byte as `LuCI.require()`
 builds it, or it misses the cache. Deduplicated by class name; errors are swallowed.
 
@@ -331,12 +331,12 @@ RTT. Across six pages: 1713 ms without prefetch → 1184 → **1052**.
 Three traps, each one actually hit:
 
 - **Pragmas cannot be scanned line by line.** On a router the files are minified and every pragma is
-  on one line, so `/^'require …'$/m` finds **nothing** — silently. The first version of this feature
+  on one line, so `/^'require …'$/m` finds nothing — silently. The first version of this feature
   measured its own gain as zero because of it. `luci.js` lexes the leading string literals; we read
   the same file head with one regex.
 - **Six class names have no file**, and requesting one is a guaranteed 404 in the user's console.
   `luci.js` keeps its registry as a literal (`baseclass`, `dom`, `poll`, `request`, `session`,
-  `view`) and answers `require()` for them from memory. **Every** view file's pragmas name `view` and
+  `view`) and answers `require()` for them from memory. Every view file's pragmas name `view` and
   `baseclass`, so the walk trips on this at the first step. `BUILTIN_CLASSES` is that literal copied
   from `luci.js`, not a guess about it.
 - **Speculation stops under an already-clicked link** (`_committed`). After the click, `require()`
@@ -352,8 +352,8 @@ waited for those bytes anyway — but is capped by `WARM_WAIT_MS` so a hung pref
 navigation.
 
 **Three triggers, because a pointer is not the only way to choose a link.** A keyboard user tabs to
-a link and presses Enter, producing **no** pointer event at all — `focusin` covers that.
-`pointerdown` adds the one case `pointerover` misses: a link that scrolled **under** a stationary
+a link and presses Enter, producing no pointer event at all — `focusin` covers that.
+`pointerdown` adds the one case `pointerover` misses: a link that scrolled under a stationary
 cursor crosses no boundary and fires nothing.
 
 **Recent-page warming** lives in `fs-search.js` (`warmRecent()`), because the recents list belongs to
@@ -377,7 +377,7 @@ hand through the "Refreshing" indicator, and an unconditional `start()` would si
 
 A route change fires neither `load` nor a document change, so assistive technology learns nothing:
 focus dies with the `<a>` that the chrome just redrew, and the new `<title>` is not announced. Only
-two things are actually **required** by WCAG 2.2, both level A:
+two things are actually required by WCAG 2.2, both level A:
 
 | SC | Level | Required? |
 |---|---|---|
@@ -390,7 +390,7 @@ So a route announcer is best practice, not conformance. The claim "4.1.3 require
 What the router does: writes `document.title` and syncs the sr-only `<h1>`; focuses
 `#maincontent` with `focus({preventScroll:true})` (scroll is handled a line earlier); announces the
 page in `#fs-nav-status` (`role="status"`, `aria-live="polite"` — not `assertive`, for a
-user-requested navigation). The two texts deliberately **differ** ("Skip to content" vs the page
+user-requested navigation). The two texts deliberately differ ("Skip to content" vs the page
 name), which is the condition under which a focus move and a live region complement rather than
 repeat each other.
 
@@ -433,7 +433,7 @@ DOM is still on screen); restoring is a rAF loop until the height appears, cance
 generation, capped at ~5 s.
 
 `scrollRestoration` is deliberately left alone: `manual` is inert in `sidebar` (the document does not
-scroll) and would **take away** working restoration in `top`.
+scroll) and would take away working restoration in `top`.
 
 ## Boundaries and degradation
 
@@ -454,7 +454,13 @@ scroll) and would **take away** working restoration in `top`.
   a spinner only at 900 ms). The idiom is luci-base's own (`div.spinning` + the `Loading view…`
   msgid), so there is no jump on replacement and the string arrives translated.
 
-## Deliberately NOT fixed
+## What is left alone, and why
+
+Three kinds of not-doing, kept together so the next reader finds the answer before re-deriving it:
+something measured and judged not worth fixing, something that cannot be fixed from here, and
+something that must not be picked up again.
+
+### Deliberately not fixed: timers a departing view leaves behind
 
 **A departing view's `setTimeout` and rAF survive navigation.** The router hooks `setInterval` only.
 Measured: `timeout 22 → 34 (+12) SURVIVED`, `interval 6 → 6 (+0) silenced`,
@@ -463,14 +469,14 @@ Measured: `timeout 22 → 34 (+12) SURVIVED`, `interval 6 → 6 (+0) silenced`,
 But the measurement is synthetic — the tickers were planted by the test — and a search for a real
 victim failed. Across every view on the router (6 installed `luci-app`s), every `setTimeout` is
 one-shot: podkop's toast, package-manager's filter debounce, `system/reboot`'s modal,
-`awaitReconnect`. There is **not one** self-rescheduling `setTimeout` or rAF loop; podkop's log
+`awaitReconnect`. There is not one self-rescheduling `setTimeout` or rAF loop; podkop's log
 tailer, the thing this was for, runs on `setInterval` and is already covered.
 
 **And a blind fix breaks real things**, also verified in the code: `ui.js` keeps tooltips, the
 notification timeout and a `setTimeout(rejectFn, 1000)` on timers, so killing all pending
 `setTimeout` on navigation breaks all of that. A blind `cancelAnimationFrame` **irreversibly breaks
 `fs-fit.js`**: its callback clears the `_rafPending` flag, so a cancelled frame leaves the flag
-`true` **forever** and the fitter dies silently for the rest of the document's life.
+`true` forever and the fitter dies silently for the rest of the document's life.
 
 The asymmetry with `setInterval` is its own justification: the core uses `setInterval` for exactly
 one thing, the `L.Poll` tick, which the hook explicitly preserves (`keep = L.Poll.timer`). "Kill
@@ -478,7 +484,7 @@ everything but one" is a correct operation there and has no equivalent for `setT
 such a view ever appears, the right answer is a targeted cancel through `onNavigate`, not a global
 hook.**
 
-## Still open
+### Still open: in-flight responses
 
 **In-flight responses are not cancelled on leaving.** Measured: an XHR still in flight when you
 navigate is still in flight afterwards and will arrive and run. There is nothing to cancel it with —
@@ -488,11 +494,11 @@ throw away, competing with the page the user actually opened. Honest conclusion:
 fix this** (`L.Request` would have to accept a `signal`). Recorded so nobody hunts for a handle that
 does not exist.
 
-## Explicitly do not touch
+### Explicitly do not touch
 
 - **Navigation API.** It is objectively the better model and cheaper than ours — one `navigate`
   event for every navigation including your own `pushState`, `NavigateEvent.signal`, `intercept()`
-  with `focusReset`/`scroll`. We do not take it on **support** grounds: Baseline "newly available"
+  with `focusReset`/`scroll`. We do not take it on support grounds: Baseline "newly available"
   only since January 2026 (Chrome/Edge since 2022, but **Firefox 147 and Safari 26.2 are January
   2026**), and a router is configured from whatever machine is to hand — a corporate Firefox ESR, a
   macOS stuck on Safari 18. `precommitHandler` is absent from Safari entirely. Revisit around 2027,
@@ -505,7 +511,7 @@ does not exist.
 - **No leaks, and that is a measurement.** 20 navigations across 4 pages, real listeners read
   through CDP `DOMDebugger.getEventListeners` (not a count of `addEventListener` calls — the browser
   deduplicates an identical type/ref/capture triple, and the naive counter lied, showing +5
-  `window:click` per navigation that do not exist). `window` and `document` counts **identical**
+  `window:click` per navigation that do not exist). `window` and `document` counts identical
   before and after; heap **10.0 MB → 10.0 MB**. The centralised `fs-fit.js` (one ResizeObserver for
   the document's life instead of one per view) is the structural reason this is clean.
 - **A full walk of all 65 clickable nodes**, in both layouts, comparing each against a **real full
@@ -519,6 +525,6 @@ does not exist.
 children, and `alias`/`firstchild` nodes almost always do. A leaf walk skips exactly the 8 nodes
 where the bug lived.
 
-Another trap that cost a false alarm: `admin/status/channel_analysis` shows `.spinning` **forever**,
+Another trap that cost a false alarm: `admin/status/channel_analysis` shows `.spinning` forever,
 on SPA and on a full load alike. That is the page's own spinner (an airspace scan), not a stuck view
 spinner. Compare against a full load, never against an expectation.

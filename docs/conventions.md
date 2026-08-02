@@ -69,18 +69,19 @@ color: var(--text-color-medium);                         /* no — audit.py --st
 
 Why: `:root` is one shared scope, and every `luci-app-*` puts its CSS in the same document
 **unlayered**, which outranks any `@layer`. A hostile `:root` recoloured **312 of 336** gallery
-elements before the tiers were split, and 0 after. See [css.md](css.md).
+elements before the tiers were split, and 0 after — the measurement and the two tiers are in
+[design-system.md](design-system.md).
 
 **Put the rule in the right layer instead of reaching for `!important`.** Layer order is
 `tokens, base, theme, page`, and a later layer beats an earlier one regardless of specificity —
 so a `theme` rule never needs a flag to beat `base`.
 
-**`!important` inverts layer order.** Among important declarations the order reverses: important
-in `base` beats important in `theme`. Two consequences:
+**`!important` inverts layer order** — the mechanics and the numbers behind that are in
+[css.md](css.md). Two consequences for a patch:
 
 - If a rule needs a flag to beat **another footstrap rule**, the rule is in the wrong layer.
   Move it or merge the two.
-- A legitimate flag fights only what layers cannot outrank: inline `style=` and **unlayered**
+- A legitimate flag fights only what layers cannot outrank: inline `style=` and unlayered
   rules injected by an app.
 
 The one flag sanctioned against *our own* rules is `theme/95-a11y-media.css`:
@@ -107,8 +108,8 @@ is `--fs-scrim` — black at .7 is the absence of light behind a dialog, not a s
 roots — ours alone, and fenced against foreign CSS); the shared LuCI widget surface (`cbi-*`,
 `.table`, `.alert-message` — ours to style, nobody's to own); and another package's namespace,
 which the theme never reaches into. `fs-overview.js` used to live in `luci-mod-status`'s global
-include directory, where LuCI evaluates **every** `*.js` — so it was downloaded and run on the
-overview of routers using a **different** theme. It is a chrome module now. The fence that keeps
+include directory, where LuCI evaluates every `*.js` — so it was downloaded and run on the
+overview of routers using a different theme. It is a chrome module now. The fence that keeps
 foreign CSS out of zone one is described in [third-party-apps.md](third-party-apps.md).
 
 **Coverage is a contract.** A selector no stock LuCI page renders still gets styled: some
@@ -125,7 +126,7 @@ the copies byte-identical. A `@mirror` group with one copy is a hard failure.
 ## Writing JS
 
 **Never put a regex literal straight after `return` or `=>`.** `jsmin` (which `luci.mk` runs on
-the buildbot) decides whether `/` opens a regex or divides by looking at **one** preceding
+the buildbot) decides whether `/` opens a regex or divides by looking at one preceding
 character, and neither `n` (from `return`) nor `>` (from `=>`) is in its list:
 
 ```js
@@ -203,13 +204,13 @@ contract from the JS and checks the template against it.
 ## Package and registration
 
 **One entry in `luci.themes`** — `Footstrap` → `/luci-static/footstrap`. Layout, mode, palette,
-tint, accent and rounding are **client** axes (`localStorage` + attributes on `:root`), not theme
+tint, accent and rounding are client axes (`localStorage` + attributes on `:root`), not theme
 entries and not a server choice. Do not reintroduce `-dark`/`-light` symlink themes or
 layout-specific entries; `uci-defaults` actively deletes those legacy names.
 
 **Fresh install vs upgrade is decided by a MARKER FILE**,
 `/usr/share/luci-theme-footstrap/.installed` — written last, removed in `postrm`. A fresh install
-may activate the theme; an upgrade must **never** change the active one. `$PKG_UPGRADE` does not
+may activate the theme; an upgrade must never change the active one. `$PKG_UPGRADE` does not
 work: apk never exports it, so the guard was dead in production.
 
 **`rpcd reload`, never `restart`.** rpcd holds sessions in memory; a restart logs out every LuCI
@@ -220,7 +221,7 @@ package needs.
 returns assets **sorted by name** — in v0.8.4 a `luci-i18n-…` package sorted ahead of
 `luci-theme-…`, so the then-shipped self-updater installed a 6 KB catalogue instead of the theme,
 reported success, and offered the same update forever (issue #6). Code already on somebody's router
-cannot be fixed remotely; only the **release** can. CI fails unless each package resolves to exactly
+cannot be fixed remotely; only the release can. CI fails unless each package resolves to exactly
 one asset under its name-anchored regex.
 
 **The translation catalogue lives in `i18n/`, not `po/`.** `LUCI_LANGUAGES` is `$(wildcard po/*)`,

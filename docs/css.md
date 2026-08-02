@@ -1,6 +1,6 @@
 # The stylesheet: source tree, layers, build
 
-`cascade.css` is **generated** from `styles/` and is not in git. This page covers how the tree is
+`cascade.css` is generated from `styles/` and is not in git. This page covers how the tree is
 organised, how the cascade is kept disciplined, how the build works, and how to prove a CSS
 change did what you meant.
 
@@ -30,7 +30,7 @@ luci-theme-footstrap/
 ```
 
 Concatenation order is `styles/` → `base/` → `theme/` → `pages/`, and inside each directory the
-numeric prefix **is** the order.
+numeric prefix is the order.
 
 `base/` came out of one 2300-line file. The split was purely mechanical: not a single rule moved
 within the layer, and the computed-style diff was zero — that was the condition for calling it
@@ -41,7 +41,7 @@ and lives in the `tokens` layer, while rules like
 `:root[data-wallpaper="cats"] .fs-main { background-image: … }` are ordinary styles and would
 lose to `theme` from inside `tokens`. They live in `theme/15-wallpaper.css`.
 
-The directory **cannot** be called `src/` — to `luci.mk` that means C sources.
+The directory cannot be called `src/` — to `luci.mk` that means C sources.
 
 ## Layers
 
@@ -52,7 +52,7 @@ The directory **cannot** be called `src/` — to `luci.mk` that means C sources.
 A later layer beats an earlier one **regardless of selector specificity**. So a `theme` rule
 never has to outrank a `base` rule by specificity or by `!important`.
 
-The **unlayered** level outranks every layer and is deliberately left empty — it is the escape
+The unlayered level outranks every layer and is deliberately left empty — it is the escape
 hatch. `node.css`, which LuCI attaches for individual pages after the theme, also lands there.
 
 ### Layer order is fixed by the FIRST mention of a name, and that can be hijacked
@@ -72,13 +72,13 @@ shaped "fine after a reload, right up until I hover something".
 
 One declaration fixes it: `fs-sheets.js` re-inserts `@layer tokens, base, theme, page;` as a
 **new** `<style>`, first child of `<head>`. New specifically — inserting a sheet recomputes the
-order, moving an existing one does **not** (checked both ways). A static declaration in the
+order, moving an existing one does not (checked both ways). A static declaration in the
 template cannot help: a foreign sheet can still land in front of it, so the answer has to be
 reactive to a `<head>` mutation.
 
 ### `!important` inverts layer order
 
-For important declarations the order is **reversed**: important in `base` beats important in
+For important declarations the order is reversed: important in `base` beats important in
 `theme`, which beats important in `page`.
 
 `base/` is down to **8**: six are the `.left/.right/.center/.top/.middle/.bottom` utilities, whose
@@ -108,7 +108,7 @@ With `--dev` it is a plain `cat`: the output is byte-identical to the concatenat
 file to read on a router, not one to ship.
 
 **Pass 1 — comments.** Strips `/* … */` except the `/*! … */` banner, which is Apache-2.0
-attribution and is copied verbatim. The stripper is **string-aware**: a naive search for the
+attribution and is copied verbatim. The stripper is string-aware: a naive search for the
 nearest `/*` would eat everything up to the next `*/` on the first `content: "/*"`.
 
 **Pass 2 — whitespace CSS ignores anyway**: the space after `:`, spaces around `{ } ; ,`, the
@@ -118,7 +118,7 @@ line. All of it inside the same string-aware pass. The last `;` used to be remov
 data URI with the same two bytes broke the same way. No such pair exists in the tree today — and
 that is precisely how the bug waits for whoever adds the first one.
 
-What is **not** touched, each for its own reason:
+What is not touched, each for its own reason:
 
 - **a single space between selectors** — `.a .b` is a descendant, `.a.b` is not;
 - **spaces inside `calc()`** — mandatory around `*`, `/` and the minus in `calc(100% - 8px)`;
@@ -137,7 +137,7 @@ Selectors and declarations are never rewritten.
    can corrupt a sheet, so an unchanged counter is the proof that it did not. Always counted on a
    comment-stripped copy, otherwise a lone `{` in prose would fail a valid `--dev` build.
 2. **A floor**, `FS_CSS_FLOOR` = 81 920 bytes. A correctness gate, not a size budget: the script
-   refuses to write a suspiciously **short** file — a truncated write, a full disk, a compression
+   refuses to write a suspiciously short file — a truncated write, a full disk, a compression
    that ate the tail — which would ship a sheet missing its second half.
 
 An unknown option is an error rather than an output path (`--devv` once wrote the stylesheet to a
@@ -165,18 +165,18 @@ and parsed, serialising the requests.
 
 ## `@mirror`: duplication you cannot delete but can stop rotting
 
-`css-dup` finds two rules with **identical** declarations under mutually exclusive guards (a media
-query against an attribute selector, two `@container` thresholds). A cascade-aware reader **needs**
+`css-dup` finds two rules with identical declarations under mutually exclusive guards (a media
+query against an attribute selector, two `@container` thresholds). A cascade-aware reader needs
 both copies, so no linter will ever call it an error — and this is exactly the shape that drifts.
 
 The trap it was built for: `css-dup` matches *identical* bodies, so the moment the copies diverge
 they stop being a duplicate and it goes quiet — **precisely when it should shout**.
 
-So every duplicated body must be a **decision**: merge it into one rule, or pin it. There is no
+So every duplicated body must be a decision: merge it into one rule, or pin it. There is no
 numeric budget — a budget is a number nobody defends, and it waves through the next unexplained
 copy for free.
 
-The **body** is pinned, not the rule, so the wrapper goes **inside the braces** (the selectors are
+The body is pinned, not the rule, so the wrapper goes **inside the braces** (the selectors are
 legitimately different; only the declarations must match):
 
 ```css
@@ -209,7 +209,7 @@ A table folds into cards by two different mechanisms, and that is not an unfinis
 
 **A data table is measured.** `fs-fit.js` (through `fitTables` in `fs-select.js`) removes the
 class, reads the width, decides, and sets `.fs-stacked`. The decision depends on what the table
-needs, not on the screen, so `@media` cannot express it: cards can happen at **any** viewport
+needs, not on the screen, so `@media` cannot express it: cards can happen at any viewport
 width. Measuring is safe because a data table holds no widgets.
 
 **A config table (`.cbi-section-table`) is not measured and must stay on
@@ -220,22 +220,22 @@ router: after such a toggle the firewall zone table claimed it needed **1747 px*
 needs **1190 px**, and overflowed its section by **557 px** — an overflow the pure-CSS version
 never had. **The act of measuring was the bug.** Do not "finish the job".
 
-The price is the last irreducible duplicate: the same declarations under a **class** and under an
+The price is the last irreducible duplicate: the same declarations under a class and under an
 `@container`, which CSS cannot factor apart. It is pinned with `@mirror table-card/{label,actions}`.
 
 ## Proving a CSS change
 
 **Screenshots do not work here.** On a live router, uptime, DHCP leases and signal strength give
-0.5–1.3% pixel difference between two runs of the **same** stylesheet, while a real regression
+0.5–1.3% pixel difference between two runs of the same stylesheet, while a real regression
 (buttons switched to a monospace font) weighs 0.19%. The noise buries the signal.
 
 The method that does work: load the page once, snapshot `getComputedStyle` over ~50 properties for
 every element, swap the `<link>` for the second stylesheet, snapshot again. Same DOM, same data —
 so any difference was caused by the CSS.
 
-> The `cssdiff.py` script that implements this is **not in this repository** (it lives with the
-> maintainer's tooling). `audit.py` still mentions it by name. The method is reproducible with
-> Playwright in about forty lines if you need it.
+> `cssdiff.py`, the script the changelog and `audit.py` refer to by name, is the maintainer's own
+> tooling and is not in this repository. Without it, drive the four steps above with Playwright
+> yourself — the result a review asks for is the property diff, not that particular script.
 
 Two traps in the method itself:
 
@@ -247,7 +247,7 @@ Two traps in the method itself:
   identical CSS on both sides. Run a control pass (A = B) to learn each page's noise floor.
 
 Four bugs it caught that a screenshot diff missed: `.cbi-value-field *` painting buttons inside a
-field monospace; a `max-width: 100%` filed under a "phone overflow" banner but sitting **outside**
+field monospace; a `max-width: 100%` filed under a "phone overflow" banner but sitting outside
 its media query; table-row buttons described twice so the height came from one block and the
 padding from another; and an actions column losing its right alignment.
 

@@ -59,8 +59,8 @@ Nothing exotic. A full page load throws away a working runtime and rebuilds it: 
 menu, `luci.js` and `cbi.js`, the translation catalogue, the theme's CSS and JS. Then it renders
 the page. The client router keeps all of that and renders only the page.
 
-You can see it in the request counts. bootstrap fires 15 to 48 requests per navigation and
-proton2025 27 to 72, against 0 to 8 for footstrap, which fetches only the RPC the view needs.
+You can see it in the request counts. bootstrap fires 15 to 47 requests per navigation and
+proton2025 27 to 72, against 0 to 7 for footstrap, which fetches only the RPC the view needs.
 Zero on some pages, because the view is already in memory.
 
 That is also why the win is uneven. It is biggest (8x and up) on light pages, where the page
@@ -292,7 +292,7 @@ July tracks it, and tracks the number of requests a navigation makes:
 | ≤ 1 | 16 | 1498 ms | 1680 ms | **1475 ms** |
 | all 38 | 38 | 4545 ms | 4930 ms | **3886 ms** |
 
-Read the first row: on the light pages the July run behaves like a router with **no** stall, and
+Read the first row: on the light pages the July run behaves like a router with no stall, and
 today's behaves like one with it. On the heavier pages July already paid it — Wireless was 127 ms
 then, 158 ms now and **58 ms** with the stall gone; Repository keys 132 / 156 / **58**. So July was
 a mixed state, not a clean baseline, which is the honest reading of it.

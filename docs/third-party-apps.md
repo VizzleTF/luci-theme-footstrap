@@ -34,10 +34,10 @@ A full page load throws such a `<style>` away with the document, so the app is r
 | `luci-app-mosdns` | three `<link>`s to CodeMirror 5 | every render |
 | ACE (`luci-app-ssclash` and anyone shipping `ace.js`) | `ace_editor.css` (14 KB), `error_marker.css` | **module eval** |
 
-The distinction that matters is **not** `<style>` vs `<link>` — it is **who can put the CSS back**:
+The distinction that matters is not `<style>` vs `<link>` — it is **who can put the CSS back**:
 
-- injected **in render** (filemanager, podkop): the app will repeat it on the next render;
-- injected **at module eval** (ACE, HexEditor, banip, adblock): it will **never** repeat, because
+- injected in render (filemanager, podkop): the app will repeat it on the next render;
+- injected **at module eval** (ACE, HexEditor, banip, adblock): it will never repeat, because
   the module is cached for the life of the document. Deleting such a sheet breaks the app until a
   page reload. That is what happened to SSClash.
 
@@ -84,7 +84,7 @@ structureless black ACE and a 2-million-pixel page.
 
 ### Rule 2. A document holding an "invasive" sheet hands the next page over by full load
 
-A sheet is invasive if it could paint **somebody else's** page. Three tests, all on the facts rather
+A sheet is invasive if it could paint somebody else's page. Three tests, all on the facts rather
 than on a list of names — the set of theme names and custom properties is read out of `cascade.css`
 at runtime, 0.3 ms per transition:
 
@@ -120,7 +120,7 @@ Implementation: `fs-sheets.js` → `themeNames()`, `inertDeclarations()`, `invas
 `documentPoisoned()`. It covers both `<style>` and `<link rel=stylesheet>`; `[data-fs-shell]` and
 everything inside `#view` are excluded. Full detail: [spa-router.md](spa-router.md).
 
-`fs-sheets.js` also re-declares the layer order as a **new** `<style>`, first child of `<head>`,
+`fs-sheets.js` also re-declares the layer order as a new `<style>`, first child of `<head>`,
 because a foreign sheet landing ahead of `cascade.css` inverts the cascade layers — see
 [css.md](css.md).
 
@@ -159,30 +159,30 @@ Two findings that used to be filed as one:
   name and no such property; the correct one is `--text-color-high`. Do not invent `--text-color`
   on our side: that fixes somebody's typo at the price of a name we would then support forever.
 
-The private `--fs-*` tier (~125 properties) is **not** part of the contract and is not addressed to
+The private `--fs-*` tier (~125 properties) is not part of the contract and is not addressed to
 apps — which is exactly why it is separated. See [design-system.md](design-system.md).
 
 ### Rule 7. The chrome is fenced off, in three places that must agree
 
 An app's unlayered `!important` outranks every cascade layer, so the chrome cannot be defended by
-the cascade. It is defended by **not matching**, in three places — and `npm run chrome-fence` is
+the cascade. It is defended by not matching, in three places — and `npm run chrome-fence` is
 what keeps them agreeing. Proven rather than assumed: breaking the fence constant to
 `.fs-sidebarTYPO` left the menu completely unprotected while `npm run check`, `jsmin-verify` and
 eslint **all exited 0**.
 
-1. **`header.ut` — the markup.** A chrome root **marks itself** with `data-fs-chrome`. The `<nav>`
+1. **`header.ut` — the markup.** A chrome root marks itself with `data-fs-chrome`. The `<nav>`
    is one; so are the skip link, the two sr-only elements and the command palette, none of which sits
    inside it. The
    mark is what the other two read.
 2. **`fs-sheets.js` — the fence.** `CHROME_FENCE` is appended to a foreign selector's subject so it
-   can no longer **match** a chrome element. That is what beats a third party's `!important`: there
+   can no longer match a chrome element. That is what beats a third party's `!important`: there
    is nothing left to outrank.
-3. **`theme/10-chrome.css` — the pin.** It closes the one way in a fence cannot: **inheritance**
+3. **`theme/10-chrome.css` — the pin.** It closes the one way in a fence cannot: inheritance
    from `html`/`body`, where no match is needed at all.
 
 The gate **derives the mark from the markup** and never restates it: rename it in `header.ut` and
 the gate re-derives it, then fails on the two copies still saying the old name. The failure it
-prevents has **no symptom** — the fence silently stops fencing, every test stays green, and the menu
+prevents has no symptom — the fence silently stops fencing, every test stays green, and the menu
 breaks on someone else's router months later.
 
 The fence and the pin are each **one canonical string** and are compared whole rather than tested
@@ -244,9 +244,9 @@ the router and rendered) plus cloudflarespeedtest, aliddns, koolproxy, ech-worke
 
 - `luci-app-internet-detector` is the only one of the ten that injects into `<head>` at all, at
   module eval: `:root { --app-id-* }` (its own prefix, so inert by our rule) plus its own `.id-*`
-  classes. Its dark block hangs on `:root[data-darkmode="true"]` — **our** attribute — so dark mode
+  classes. Its dark block hangs on `:root[data-darkmode="true"]` — our attribute — so dark mode
   works for it out of the box. A fourth detection dialect, and we already stamp it.
-- `luci-app-smartdns` is the model: `E('style', [css])` returned **inside** `.cbi-map`, so it dies
+- `luci-app-smartdns` is the model: `E('style', [css])` returned inside `.cbi-map`, so it dies
   with the view.
 - Legacy Lua apps put `<style>` in the page template, including bare `table { … }`. It cannot leak
   (the page is server-rendered and SPA never enters), but light surfaces stay light on a dark
@@ -279,7 +279,7 @@ still passes untouched.
 **What stayed generic, and why it is survivable:** `.centered`, `.rotate`, `.skeleton`, `.toast*`
 have no prefix. The theme does not style them, so by our test they count as pinned to the app and
 are left alone. That is luck, not protection — had the app called a class `.center` or `.table`, it
-would have landed in the shared vocabulary. Advice to authors: prefix **every** name, helpers
+would have landed in the shared vocabulary. Advice to authors: prefix every name, helpers
 included.
 
 **What we borrowed from it:** the loading placeholder. podkop draws a skeleton while its data

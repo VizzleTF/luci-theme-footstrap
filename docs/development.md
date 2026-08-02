@@ -71,20 +71,20 @@ owlab sync --watch            # and thereafter on every edit
 steps are spelled out in `owlab.yaml`:
 
 - `build:` rebuilds `cascade.css` from `styles/` (`build-css.sh --dev`, comments intact) before every
-  push. Without it everything is copied **except** the file LuCI actually requests, and the router
+  push. Without it everything is copied except the file LuCI actually requests, and the router
   404s on its own stylesheet;
 - `install:` maps the package directories onto router paths;
 - `post_sync:` registers the theme and removes legacy directories — here rather than through
   `root/etc/uci-defaults/…`, because `sync` deliberately does not overwrite `/etc/config` or
   `/etc/uci-defaults`: that is router state, not package content;
 - `theme: footstrap` — owlab sets `luci.main.mediaurlbase` after the push. Installing the package
-  only **registers** the theme, which on a dev stand is the opposite of what you want.
+  only registers the theme, which on a dev stand is the opposite of what you want.
 
-Resource JS is copied by **glob** (all of `htdocs/`), never by a list of names. The list was a bug: a
+Resource JS is copied by glob (all of `htdocs/`), never by a list of names. The list was a bug: a
 new file made it into the package (luci.mk copies `htdocs/` wholesale) but silently never reached the
 dev router, so it was first exercised after the release.
 
-What `sync` does **not** do: stamp `FS_VERSION` (the Footstrap tab shows `dev`) and compile
+What `sync` does not do: stamp `FS_VERSION` (the Footstrap tab shows `dev`) and compile
 `i18n/*.po` into `.lmo` (strings stay English). Both belong to a real package build, which is where
 they should be verified.
 
@@ -103,7 +103,7 @@ they should be verified.
 - The menu and dispatcher are cached in `/tmp/luci-indexcache.<hash>.json`. The hash comes from
   menu-file mtimes, so it updates itself — but if things look strange:
   `owlab exec owrt2512 -- 'rm -f /tmp/luci-indexcache*'`.
-- `.ut` templates are **not** cached between requests (ucode compiles on the fly) — an edit to
+- `.ut` templates are not cached between requests (ucode compiles on the fly) — an edit to
   `header.ut` is visible on F5.
 - CSS/JS are cached by the browser. `cascade.css` is served with `?v={{ pkgs_update_time }}`, so
   touching the package database changes the key and an ordinary F5 picks the file up. **Which file
@@ -181,12 +181,8 @@ matches the release.
 Those are the same five assertions the `verify` job makes (`.github/workflows/build.yml`), which
 installs per format for the same reason — keep the two in step, and add an assertion here whenever
 you add one there. The vocabulary is `package <name>`, `file <path>`, `http <code> <path>`,
-`service <name>`, `exec <shell>`.
-
-The fifth assertion is the template gate, and it is why `verify` and not `check` compiles the `.ut`
-files: on the container it is the router's **own** `ucode`, with the real `luci.core` and `uci`
-behind it, so nothing is built from a pin and nothing is stubbed. It runs on both legs — the
-templates are identical, the interpreters are not.
+`service <name>`, `exec <shell>`. Why the fifth one compiles the templates here rather than in
+`check`: [ci.md](ci.md).
 
 **Pin exact point releases.** `--release 25.12` or a snapshot works today and fails within days;
 `owlab.yaml` pins `25.12.4` / `24.10.8` for the same reason.
@@ -203,7 +199,7 @@ owlab open owrt2410            # and again on the other package manager
 ### The routers are pre-populated, and that is what makes them useful
 
 `owlab.yaml` sets `fixtures: [all]`, so each box comes up with seeded networks, clients, wireguard
-peers, port forwards, system data and **wireless config** — the wireless pages render from UCI with
+peers, port forwards, system data and wireless config — the wireless pages render from UCI with
 no radios present, and this theme has to style them.
 
 It also adds a long `packages:` list on top of owlab's stock set, every entry prefixed with `+` so it
@@ -231,7 +227,7 @@ If a change needs a real kernel — not this theme's usual case — a router can
 ./tools/stage.sh && owfeed build     # both formats, seconds, no toolchain
 ```
 
-That is exactly what CI does. `luci-theme-footstrap/build-apk.sh` is a **different** path — a build
+That is exactly what CI does. `luci-theme-footstrap/build-apk.sh` is a different path — a build
 through the OpenWrt SDK, which exists to prove the theme is still buildable by its Makefile,
 `luci.mk` and jsmin for someone who has never heard of owfeed. Releases do not come out of it. Both
 are described in [ci.md](ci.md).

@@ -45,12 +45,12 @@ your sheet to be there for the life of the page.
 **How footstrap reacts** (so you can predict it). Nothing is ever deleted. A sheet in `<head>` is
 left alone — and SPA navigation keeps working — as long as it cannot paint a page that is not yours:
 
-* it names only your own classes (`.ace_*`, `.hexview`, `.myapp-card`), **or**
+* it names only your own classes (`.ace_*`, `.hexview`, `.myapp-card`), or
 * it names a stock widget but *pins* the rule to your markup with a name of your own —
   `#cbi-myapp-section > .cbi-section-remove` and `.myapp-table th.sortable.active` are both fine,
   because without your section, or your table, they match nothing. (A `:not()` argument does not
   count as a pin: `.cbi-button-save:not(.my-save-button)` still matches every stock save button on
-  every page.) **Or**
+  every page.) Or
 * it is a bare selector that declares nothing but your own custom properties —
   `:root { --myapp-accent: … }` is inert; `:root { color-scheme: light dark }` is not.
 
@@ -69,7 +69,7 @@ You are a guest in a document you share with the theme and with every other app.
   dictionary words. Seen in the wild and each one a live collision: `.hidden`, `.label`,
   `.description`, `.centered`, `.skeleton`, `.toast`, `.dialog-title`, `.flex-row`, `.log-line`,
   and `luci-lib-taskd`'s `[hidden] { display: none !important }`.
-- **Custom properties:** declare them on **your** root element, not on `:root`. `:root` is a shared
+- **Custom properties:** declare them on your root element, not on `:root`. `:root` is a shared
   global scope: `luci-app-filemanager`'s hex editor puts `--clr-background`, `--clr-border`,
   `--clr-highlight` there, and the file manager itself writes `color-scheme` there. A theme whose
   tokens happen to share a name is silently repainted. (OpenClash gets this right: its ~90
@@ -120,7 +120,7 @@ This is the whole contract. Nothing else is one.
 hardcoded colour with extra steps.
 
 - **`--warn-color-medium` is CORRECT.** podkop's `var(--warn-color-medium, orange)` (7 uses) resolves
-  on footstrap and paints the themed amber. Do **not** "fix" it to `--warning-color-medium` — that
+  on footstrap and paints the themed amber. Do not "fix" it to `--warning-color-medium` — that
   name is defined by nothing, and the rename would silently drop every one of those 7 declarations
   into the `orange` fallback. (An earlier version of this guide said the opposite. It was wrong.)
 - **`--text-color` (justclash, 6 uses) really does not exist.** It is `--text-color-high`.
@@ -192,7 +192,7 @@ one configuration you happened to look at.
 
 ## 4. Dark mode: `prefers-color-scheme` is the wrong question
 
-`@media (prefers-color-scheme: dark)` reports the **operating system**, not the theme. Every modern
+`@media (prefers-color-scheme: dark)` reports the operating system, not the theme. Every modern
 LuCI theme has its own light/dark switch, and a user who forces dark on a light OS gets your light
 card on their dark page. netspeedtest, vssr, passwall and stock `ustreamer` all have this bug.
 
@@ -223,7 +223,7 @@ In CSS, the same thing:
 :root[data-theme="dark"] .myapp-card { /* only if you truly need a dark-specific override */ }
 ```
 
-- footstrap stamps `data-darkmode`, `data-theme` **and** `data-bs-theme` on `:root`, before first
+- footstrap stamps `data-darkmode`, `data-theme` and `data-bs-theme` on `:root`, before first
   paint, precisely so all three dialects work.
 - The luminance fallback works everywhere — but only because the theme keeps `body`'s background
   **opaque**. Do not assume any single attribute exists.
@@ -289,21 +289,21 @@ A modern theme may re-instantiate your view without ever reloading the document.
 
 ## 8. Checklist
 
-| | |
-|---|---|
-| `<style>` returned inside the view tree, not appended to `<head>` | ✅ |
-| Every class, id and custom property prefixed with the app name | ✅ |
-| No `:root { … }`, no `* { … }`, no imported CSS framework | ✅ |
-| No stock `.cbi-*` / `table` / `pre` selector styled outside the app's own subtree | ✅ |
-| All colours from the 26 `--*-color-*` export names, with a literal fallback; `warn`, not `warning` | ✅ |
-| No `--fs-*` read anywhere — that is footstrap's private tier, not a contract | ✅ |
-| Text on a coloured fill takes its ink from `--on-*-color`, never a hardcoded `#fff` | ✅ |
-| No `!important` used to beat the theme — your CSS is unlayered and already outranks every layer | ✅ |
-| Dark mode read from `data-theme` / `data-bs-theme` / body luminance — never `prefers-color-scheme` | ✅ |
-| Editor theme chosen from the page's mode, not hardcoded | ✅ |
-| Layout keyed to the container, not the viewport | ✅ |
-| `handleSaveApply = null` instead of hiding stock buttons | ✅ |
-| No `window.onload`, no body-level leftovers, no `popstate` hijack, no `z-index: 2147483647` | ✅ |
+Tick every line before you publish:
+
+- [ ] `<style>` returned inside the view tree, not appended to `<head>`
+- [ ] Every class, id and custom property prefixed with the app name
+- [ ] No `:root { … }`, no `* { … }`, no imported CSS framework
+- [ ] No stock `.cbi-*` / `table` / `pre` selector styled outside the app's own subtree
+- [ ] All colours from the 26 `--*-color-*` export names, with a literal fallback; `warn`, not `warning`
+- [ ] No `--fs-*` read anywhere — that is footstrap's private tier, not a contract
+- [ ] Text on a coloured fill takes its ink from `--on-*-color`, never a hardcoded `#fff`
+- [ ] No `!important` used to beat the theme; your CSS is unlayered and already outranks every layer
+- [ ] Dark mode read from `data-theme` / `data-bs-theme` / body luminance, never `prefers-color-scheme`
+- [ ] Editor theme chosen from the page's mode, not hardcoded
+- [ ] Layout keyed to the container, not the viewport
+- [ ] `handleSaveApply = null` instead of hiding stock buttons
+- [ ] No `window.onload`, no body-level leftovers, no `popstate` hijack, no `z-index: 2147483647`
 
 Apps to read as references: **`luci-app-nikki`** (zero injected CSS, zero colour literals, stock forms
 only), stock **`luci-app-ttyd`** (the iframe done right), **`luci-app-smartdns`** (its `<style>` is
@@ -318,7 +318,7 @@ Two rounds of the survey, 30 apps, rendered on a live router under this theme:
 
 * **Most apps are fine.** Of the ten next-most-starred apps (quickfile, tailscale-community,
   smartdns, internet-detector, 3ginfo-lite, cloudflarespeedtest, aliddns, koolproxy, ech-workers,
-  sms-tool), **all ten** keep SPA navigation and none injects anything that can paint another page.
+  sms-tool), all ten keep SPA navigation and none injects anything that can paint another page.
 * **The breakage is concentrated in the big, old ones**, and it is nearly always the same two
   mistakes: CSS put in `<head>` instead of the view tree, and colour hardcoded instead of taken from
   the export tier.

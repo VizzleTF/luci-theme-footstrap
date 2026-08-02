@@ -1,6 +1,6 @@
 # CI and packaging
 
-How footstrap is turned into packages and shipped. The theme is **noarch**
+How footstrap is turned into packages and shipped. The theme is noarch
 (`LUCI_PKGARCH:=all`) and supports **OpenWrt 24.10** (`.ipk`/opkg) and **25.12+** (`.apk`/apk).
 
 What the Makefile and the install scripts do: [package.md](package.md). The release runbook:
@@ -36,7 +36,7 @@ Needs only `sh`, `awk`, `python3` and `perl`. Seconds to run, and it cannot brea
 buildbot, where node does not exist and never will.
 
 1. **`sh -n`** over `luci-theme-footstrap/*.sh`, `install.sh` and `tools/*.sh` — the scripts that
-   never reach a router. `tools/` is in the glob because `release-notes.sh` runs **only** in the
+   never reach a router. `tools/` is in the glob because `release-notes.sh` runs only in the
    `release` job, so a syntax error there used to surface at the most expensive possible moment.
    The *payload* scripts are parsed elsewhere: `owfeed doctor` (OWF213) parses everything under
    `files:` in the `build` job, which covers `/etc/uci-defaults/*` once `tools/stage.sh` has staged
@@ -46,17 +46,17 @@ buildbot, where node does not exist and never will.
    is what makes the SDK see the package at all. It has been deleted as boilerplate once.
 3. **The release key** embedded in `install.sh` is the one in `release.pub` — a divergence *within*
    the repo would reject every release with `BAD SIGNATURE`, which looks exactly like an attack.
-4. **The ACL is valid JSON, and grants something.** rpcd **skips** an unreadable file in `acl.d` and
+4. **The ACL is valid JSON, and grants something.** rpcd skips an unreadable file in `acl.d` and
    says nothing: a stray comma means the grant is issued to nobody, and nothing else notices. A
    document that parses but is a list, or an entry with neither `read` nor `write`, is the same
    silent outcome by another route, so `tools/check-acl.sh` checks the shape too.
 5. **`build-css.sh`** into a temp file — the script brace-balances its own output and refuses to
-   write a suspiciously short file. That is a **broken-build floor** (80 KB), a correctness gate,
+   write a suspiciously short file. That is a broken-build floor (80 KB), a correctness gate,
    not a size budget. There is no upper CSS budget any more.
 6. **`audit.py --strict`** — undefined `var()`, shadowed declarations, export-tier reads from
    `styles/`, dead base declarations, stray `!important`, colour literals.
 7. **i18n**: `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty. A string
-   in `_()` with no translation renders in English **silently** — which is how the whole Footstrap
+   in `_()` with no translation renders in English silently — which is how the whole Footstrap
    tab stayed English on a Russian LuCI.
 
 **Template compilation is not here** — it runs in `verify`, on the router, with the real `ucode`.
@@ -65,7 +65,7 @@ stubbed out through `-L`; the container has both for free and stubs nothing.
 
 ## `lint` — the npm gates
 
-They live in CI **only**: the buildbot has no node and does not need it. Nothing in `package.json`
+They live in CI only: the buildbot has no node and does not need it. Nothing in `package.json`
 ships. Locally it is all one command, `npm run check`; the full table of what each gate holds is in
 [conventions.md](conventions.md). The ones worth naming here:
 
@@ -85,20 +85,15 @@ ships. Locally it is all one command, `npm run check`; the full table of what ea
 | `changelog.mjs` | the changelog contract: sections, order, RU mirror, bold leads |
 | `jsmin-verify.mjs` | the **only** check that catches jsmin's silent corruption (exit 0) |
 
-**About `jsmin-verify`:** luci.mk minifies our JS with jsmin on the buildbot, and jsmin decides
-whether `/` opens a regex by looking at **one** preceding character — neither `n` (from `return`)
-nor `>` (from `=>`) is in its allow-list, so `return /re/` makes it eat the rest of the file **and
-exit 0** (openwrt/luci#8299, #8020, #8021, #8256). **A zero exit proves nothing.** So CI builds that
-same jsmin from `luci-base/src/jsmin.c` and proves the token stream of the output is **identical**
-to the source (acorn). The list of shipped JS is not written by hand — it is `find htdocs -name
-'*.js'`, because luci.mk copies `htdocs/` wholesale, so that *is* the shipped set.
+**About `jsmin-verify`:** jsmin corrupts a file silently and exits 0. The source shape it breaks on,
+and why eslint's `wrap-regex` stands beside this gate, are in [conventions.md](conventions.md); the
+two minification paths are in [package.md](package.md). What CI adds is the proof: it builds that
+same jsmin from `luci-base/src/jsmin.c` at the pinned commit and compares the token stream of the
+output against the source (acorn). The list of shipped JS is not written by hand — it is
+`find htdocs -name '*.js'`, because luci.mk copies `htdocs/` wholesale, so that *is* the shipped set.
 
-**Release minification goes through terser, not jsmin.** The release build runs
-`tools/minify-js.mjs` (terser can mangle identifiers; jsmin cannot) and sets `FOOTSTRAP_PREMIN=1`,
-which turns `LUCI_MINIFY_JS` to `0` — jsmin on top of terser output would reopen #8299 on forms
-terser legitimately emits. A build **without** that step (SDK user, buildbot) keeps the default `1`
-and jsmin minifies the untouched source, which is why `jsmin-verify` and `wrap-regex` remain
-mandatory **for the source**.
+Both gates stay mandatory **for the source**, even though the release build minifies with terser
+instead: a build without node still hands the untouched source to jsmin.
 
 There are no numeric size budgets left, for CSS, fonts or JS. Lightness is held by judgement.
 
@@ -109,7 +104,7 @@ when it fails, and its reasoning lives beside the code instead of inside a workf
 
 ## `build` — owfeed, not the SDK
 
-Both formats are built by **[owfeed](https://github.com/owfeed/owfeed)** from **one** staged rootfs.
+Both formats are built by [owfeed](https://github.com/owfeed/owfeed) from one staged rootfs.
 The SDK legs are gone: the theme is noarch (CSS, templates, browser JS, fonts — not one byte of
 compiled code), and each leg downloaded, verified and unpacked a cross toolchain in order to run
 `cp`. Twice, because 24.10 is opkg and 25.12 is apk.
@@ -135,22 +130,22 @@ That is why it is preferred to `go install …@<sha>`, which compiles the tool i
 whatever the module proxy returns. A `SHA256SUMS` next to a release is not a check either — the same
 host serves both the binary and the sum (the same argument this project makes about GitHub's asset
 digest). An attestation is signed by GitHub's identity, sits in a public transparency log, and the
-action pins the **workflow** that was allowed to issue it. Verified locally on a release binary:
+action pins the workflow that was allowed to issue it. Verified locally on a release binary:
 genuine → exit 0; one byte appended → exit 1; against a foreign repository → exit 1.
 
 The steps:
 
 1. **Resolve the version** — from the tag (`v0.3.6` → `0.3.6`) or a fallback `0.<date>.<run>`. Plus
-   `SOURCE_DATE_EPOCH` = the **commit** timestamp: both containers write mtimes, and a package's
+   `SOURCE_DATE_EPOCH` = the commit timestamp: both containers write mtimes, and a package's
    identity is a hash over its payload, so without a fixed epoch byte-identical content rebuilds
    into a package that *claims* to be new.
 2. **`./tools/stage.sh`** — the half owfeed deliberately does not do ("packages a directory; does
    not build one"). It is `Build/Prepare` from the Makefile, step for step: build `cascade.css`,
    mangle the private `--fs-*` names, minify the JS with terser, strip comments out of the templates
-   and the shell, stamp `FS_VERSION`. It also **extracts postinst/postrm** — by awk over the
+   and the shell, stamp `FS_VERSION`. It also extracts postinst/postrm — by awk over the
    Makefile's `define`s, not as a second copy: a script that runs on somebody else's router months
    later is the worst possible place for two copies to diverge.
-3. **`owfeed build`** — deliberately **without** `--frozen-lock`. That flag re-derives `owfeed.lock`
+3. **`owfeed build`** — deliberately without `--frozen-lock`. That flag re-derives `owfeed.lock`
    from `downloads.openwrt.org` and fails if it moved, which is right for a repository that
    **publishes a feed**, where the covered architecture set is part of the contract with
    subscribers. Here two noarch packages ride as release assets and expand into no architectures, so
@@ -162,13 +157,13 @@ The steps:
    forgetting is a red build rather than quiet English for some users.
 5. **Flatten the packages into `dist/`** (owfeed writes `dist/noarch` and `dist/all`; apk derives
    the filename from name and version, so two architectures cannot share a directory). CI requires
-   that the theme resolve to **exactly one** asset per format under a **name-anchored** regex
+   that the theme resolve to exactly one asset per format under a name-anchored regex
    (`luci-theme-footstrap[-_]…`). That is not hygiene, it is protection for old routers: see issue
    #6 in [conventions.md](conventions.md).
 
 ## `verify` — the package works on a real userland
 
-Downloads the artifact and installs **this build** on real 25.12 and 24.10 containers through the
+Downloads the artifact and installs this build on real 25.12 and 24.10 containers through the
 owlab action, then renders its pages. On non-PR runs it additionally fetches the feed's public key
 and asserts the published feed serves a working theme.
 
@@ -184,8 +179,8 @@ http 200 /cgi-bin/luci/admin/system/system
 exec for f in …/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 ```
 
-`ucode -T -c` is LuCI's own trycompile, and it runs here against the **installed** templates with
-the router's real `luci.core` and `uci` — no interpreter of ours, no stubs. It runs on **both**
+`ucode -T -c` is LuCI's own trycompile, and it runs here against the installed templates with
+the router's real `luci.core` and `uci` — no interpreter of ours, no stubs. It runs on both
 legs: the templates are identical but the interpreters are not, and a construct 25.12's ucode
 accepts is no proof that 24.10's does. Without it a stray brace in `header.ut` ships green and
 silently moves every user's LuCI to another theme, because luci.mk copies `ucode/` verbatim and
@@ -212,7 +207,7 @@ publishing a package no router has installed.
 `tools/stage-release.sh` is our half — the `pre-release` hook. It puts into `dist/` the two assets
 that are not packages, before the manifest is written, because both are signed with everything else:
 
-- **the notes**, from `tools/release-notes.sh` — the tag's changelog section, one **bold lead** per
+- **the notes**, from `tools/release-notes.sh` — the tag's changelog section, one bold lead per
   bullet, grouped by category. They are an *asset* as well as the release body, because the theme's
   confirm dialog reads them from the release rather than from `@.body`, which needed
   `api.github.com`;
@@ -230,7 +225,7 @@ its `.sig`, and the notes.
 
 **About the manifest and readers in the field.** owfeed's format was copied from this project's own
 manifest, with two differences, both safe by construction: the first line became
-`owfeed-manifest 1` (nobody parses it), and the package architecture was appended to the **end** of
+`owfeed-manifest 1` (nobody parses it), and the package architecture was appended to the end of
 the `pkg` line. The order of the first six fields is untouchable: `install.sh` reads them positionally,
 and a copy already on somebody's router cannot be fixed remotely — a field inserted before them
 would make it fetch a URL that 404s. The workflow checks that order on every release rather than
@@ -252,9 +247,9 @@ nothing can drift.
 
 ## Installation and the trust chain
 
-`install.sh` adds the **owfeed-packages** feed (key, repository entry, and a `keep.d` entry so a
+`install.sh` adds the owfeed-packages feed (key, repository entry, and a `keep.d` entry so a
 sysupgrade does not lose it) and installs the theme from there, so `apk upgrade` / `opkg upgrade`
-carries it forward afterwards. A release asset is the **fallback**, for a pinned tag (the feed
+carries it forward afterwards. A release asset is the fallback, for a pinned tag (the feed
 carries one version per branch, not history) or a router that cannot reach `repo.owfeed.org`:
 
 ```sh

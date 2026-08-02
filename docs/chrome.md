@@ -6,7 +6,7 @@ The spec for what `header.ut` and `menu-footstrap.js` draw. Tokens and palettes:
 
 ## Layout is a CLIENT axis, not a theme entry
 
-`luci.themes` holds **one** entry, `Footstrap` → `/luci-static/footstrap`. The sidebar and the top
+`luci.themes` holds one entry, `Footstrap` → `/luci-static/footstrap`. The sidebar and the top
 bar are the same markup and the same renderer; CSS morphs them by `:root[data-layout]`.
 
 - The attribute **always carries an explicit value** (`sidebar` | `top`) and is **stamped by the
@@ -15,13 +15,13 @@ bar are the same markup and the same renderer; CSS morphs them by `:root[data-la
   **positively**, so a future third layout must opt into rules rather than inherit the sidebar's
   by merely not being `top` — which is what `:not([data-layout="top"])` would do, and why that
   guard must not be written. It also keeps the chrome correct with JS disabled.
-- Switching layout **re-renders nothing**: the DOM serves both, CSS changes the chrome, and a
+- Switching layout re-renders nothing: the DOM serves both, CSS changes the chrome, and a
   `MutationObserver` on `data-layout` in `menu-footstrap.js` folds the accordion into dropdowns
   and back.
 - **Migration**: a router that ran the old top-nav theme must keep its bar. A shell script cannot
   write `localStorage`, so `uci-defaults` puts the router default in
   `luci.main.footstrap_layout=top`, `head.ut` stamps it, and the user's own choice overrides it
-  forever. `postrm` deletes the key. Layout is the axis this pattern started with; **every** axis
+  forever. `postrm` deletes the key. Layout is the axis this pattern started with; every axis
   now records its choice explicitly, for the same reason — see the three layers in
   [design-system.md](design-system.md).
 
@@ -48,7 +48,7 @@ layout on a phone. The vertical column is the single guarded override, winning o
 └──────────────────────────────────────────────────┘
 ```
 
-The widths are quoted at **normal density**: `--fs-sidebar-w` and `--fs-rail-w` are `calc()` over
+The widths are quoted at normal density: `--fs-sidebar-w` and `--fs-rail-w` are `calc()` over
 `--fs-density-box`, which the Density axis sets, so Compact and Large move them — and `fitShell()`
 follows for free because it reads the computed token rather than a copy.
 
@@ -100,7 +100,7 @@ floor below which no slice leaves a readable 500 px, and simultaneously the safe
 disabled — no JS means no `data-narrow`, and a phone would otherwise draw the desktop sidebar.
 
 The top bar measures too: it first squeezes the pills (`.fs-dense1/2`), and only if the menu still
-wraps at the tightest step does it move to a **second row** (`.fs-bar-stack`). Whether it fits
+wraps at the tightest step does it move to a second row (`.fs-bar-stack`). Whether it fits
 depends on the number of sections on that particular router, not on the screen.
 
 ## `header.ut`
@@ -134,7 +134,7 @@ the second renderer.
 
 There is no `menu-footstrap-top.js`. **A second layout was never a second design**: the sidebar
 renderer already produced markup its own CSS turns into a horizontal bar on a phone, and it already
-had a flyout mode where a section behaves exactly like a top-menu dropdown. The top layout **is**
+had a flyout mode where a section behaves exactly like a top-menu dropdown. The top layout is
 that mode at desktop width. The one piece of unique logic the deleted file carried, `clampDropdown`,
 moved here.
 
@@ -150,7 +150,7 @@ moved here.
   (`partials/logout.ut`), otherwise it appears twice.
 - **A section with children is a W3C APG disclosure pattern**, not a link: `role="button"`,
   `aria-expanded`, `aria-controls`, Enter/Space, and Escape closes the flyout and returns focus.
-  Deliberately **not** `role="menu"` — APG explicitly says site navigation should not take menubar
+  Deliberately not `role="menu"` — APG explicitly says site navigation should not take menubar
   semantics. `aria-current="page"` goes on the leaf only; a section header is a button, not a link
   to the current page.
 - **`.open` has two meanings**: in the expanded sidebar it is an accordion (several sections at
@@ -162,7 +162,7 @@ moved here.
   stopped meaning anything.
 - `clampDropdown` pushes a dropdown back into the viewport at the right edge. Desktop bar only
   (`topBarMode()`) — on a phone the panel anchors to the left edge of the bar, and in the rail it
-  would fly off sideways. It keeps one scheduled `rAF` **per `<li>`** so it can **cancel** an
+  would fly off sideways. It keeps one scheduled `rAF` **per `<li>`** so it can cancel an
   unfinished measurement when the pointer has moved on; the shared `fit.frame()` coalescer cannot
   express that, and this is a documented exception.
 - Hover opening is pure CSS.
@@ -173,11 +173,11 @@ Mode, palette and layout are all client settings; the pre-paint blocks in `parti
 `:root` before the first frame, one block per axis.
 
 Dark mode: a stored value beats the OS, otherwise `prefers-color-scheme`. The `change` subscription
-is registered **always** (it re-reads storage), so Auto keeps following the system if the user
+is registered always (it re-reads storage), so Auto keeps following the system if the user
 switches to it after load.
 
 **`set()` stamps THREE attributes:** `data-darkmode` (which this theme's CSS reads), plus
-`data-theme` and `data-bs-theme` as **outbound compatibility** for third-party apps that sniff
+`data-theme` and `data-bs-theme` as outbound compatibility for third-party apps that sniff
 them — `luci-app-justclash` hangs 21 rules on `data-theme`, `ssclash` checks `data-bs-theme`
 first. Nothing inside `styles/` may read the latter two. `tools/axes.mjs` holds the set.
 
@@ -189,11 +189,11 @@ More on how foreign apps detect dark mode: [third-party-apps.md](third-party-app
 
 `fs-search.js` finds a page by name instead of by remembering which section owns it. A loaded
 router carries ~200 reachable menu nodes across 11 sections, and some pages appear in no menu list
-at all until you are already there — "Port Forwards" is a **tab** of Network → Firewall.
+at all until you are already there — "Port Forwards" is a tab of Network → Firewall.
 
 - **It costs no request.** The index is built from the same ACL-filtered `/admin/menu` blob the
   chrome already loaded (`fs-menutree`), so the palette knows exactly the pages this session may
-  open: nothing to leak, nothing to 403 on. It is built on the **first open**, not at init — a user
+  open: nothing to leak, nothing to 403 on. It is built on the first open, not at init — a user
   who never searches pays nothing, and only a full load can change the tree.
 - **It indexes tabs**, to `admin/<section>/<page>/<tab>` — four levels, every path the dispatcher
   renders.
@@ -203,7 +203,7 @@ at all until you are already there — "Port Forwards" is a **tab** of Network �
 - Recently visited paths are kept in `localStorage` `fs-recent`, and they are also what
   `warmRecent()` prefetches — see [spa-router.md](spa-router.md).
 
-**Trap it was built around: do not index through `ui.menu.getChildren()`.** On an **alias** node it
+**Trap it was built around: do not index through `ui.menu.getChildren()`.** On an alias node it
 returns a copy whose `children` are the alias *target's*. That is right for drawing a menu and
 wrong for indexing: Network → Firewall is an alias onto the `firewall/zones` view, a leaf, so its
 five tabs came back as an empty list and "port" found nothing on a router that plainly has a Port
@@ -213,10 +213,10 @@ of every aliased page missing.
 ## `fs-select.js`
 
 Turns every stock `<select>` into a styled `ui.Dropdown`, because a native `<select>` popup cannot
-be styled with CSS. The native `<select>` **remains** the form field and must stay
+be styled with CSS. The native `<select>` remains the form field and must stay
 `frameEl.firstChild` — `ui.Select.getValue()` returns `this.node.firstChild.value`.
 
-It also owns `fitTables()`, which folds **data** tables into cards. Why config tables are handled
+It also owns `fitTables()`, which folds data tables into cards. Why config tables are handled
 differently, and why that difference is not an unfinished job: [css.md](css.md).
 
 ## Translation

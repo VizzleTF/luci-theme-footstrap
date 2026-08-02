@@ -8,7 +8,7 @@ How CI builds and signs the packages: [ci.md](ci.md).
 
 ## Why there is a checklist at all
 
-Every closed bug left a **guard** behind — a gate or a live check that catches its return. This page
+Every closed bug left a guard behind — a gate or a live check that catches its return. This page
 is the register: one row per issue, the mechanism, the command, and whether it is automated.
 
 A bug with no guard comes back silently. **If you fix something that has no row here, add a row.**
@@ -23,13 +23,13 @@ git status --short | grep -E 'styles/|menu-footstrap|\.ut$|fs-sheets|fs-select|f
   || echo 'no CSS / renderer / template / fence changes'
 ```
 
-- The diff does **not** touch `styles/`, the renderer, the templates or the fence → the visual and
+- The diff does not touch `styles/`, the renderer, the templates or the fence → the visual and
   fence issues (#1–#5, #7–#11) cannot regress from it. Their gates being green is enough; a live run
   is allowed but not required.
 - The diff touches the matching area → the live check for those issues is mandatory.
 
 **Always mandatory regardless of the diff:** the whole automatic section, plus issue #6 (packaging
-and asset selection) — because #6 breaks at the **release** level rather than in the code, and
+and asset selection) — because #6 breaks at the release level rather than in the code, and
 nothing fails until a router in the field pulls the update.
 
 ## Step 2 — the automatic gates
@@ -55,7 +55,7 @@ it. Locally the cause is covered by eslint's `wrap-regex`, inside `lint`.
 
 ## Step 3 — asset selection (issue #6), separately and always
 
-This is the most fragile part of **every** release and the only one that fails silently: the release
+This is the most fragile part of every release and the only one that fails silently: the release
 notes and the asset choice are evaluated at tag time, in the field, months later.
 
 - **The CI gate** (`build` job): exactly N assets per format, each package resolving through its own
@@ -75,7 +75,7 @@ done
 
 ## Step 4 — live checks for the areas the diff touched
 
-Run on **both** releases (25.12/apk and 24.10/opkg). Compare against **stock bootstrap** wherever
+Run on both releases (25.12/apk and 24.10/opkg). Compare against stock bootstrap wherever
 you are unsure — it is the reference for LuCI behaviour.
 
 | Issue | Page | What to look at |
@@ -140,7 +140,7 @@ Changelog on all three.** Do not "correct" entries toward the other standard.
   what the rule protects against.
 ```
 
-- **The bold lead IS the release note.** `tools/release-notes.sh` extracts **only** the bold lead of
+- **The bold lead IS the release note.** `tools/release-notes.sh` extracts only the bold lead of
   each bullet and groups it by section. So: the lead is mandatory (a bullet without `**…**` silently
   drops out of the release), and it must be a self-contained sentence, because it appears without
   the reasoning behind it.
@@ -180,12 +180,12 @@ from the diff after the fact; a self-reference to a commit hash.
 
 Only after everything above has passed:
 
-1. Rename `[Unreleased]` to `## [x.y.z] — YYYY-MM-DD` in **both** `CHANGELOG.md` and
+1. Rename `[Unreleased]` to `## [x.y.z] — YYYY-MM-DD` in both `CHANGELOG.md` and
    `CHANGELOG_ru.md`, and add the `compare/` link at the bottom of each. Sections in the canonical
-   order, every bullet with a `**bold lead**`.
+   order, every bullet with a `bold lead`.
 2. `npm run changelog` — green.
 3. Commit that change. Message in English, Conventional Commits, **no AI attribution**.
-4. Tag `vx.y.z` on **this** commit. **Never tag first** — the tag must point at a commit that
+4. Tag `vx.y.z` on this commit. **Never tag first** — the tag must point at a commit that
    already contains its own entry, or the release describes a version whose changelog does not yet
    exist.
 5. Push the commit and the tag to `origin` — the only remote (the `git.vaka.work` mirror was removed

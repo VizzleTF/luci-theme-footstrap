@@ -46,7 +46,7 @@ ships, and the OpenWrt buildbot has no node.
 npm run check                              # every gate, one run; must exit 0 before pushing
 owlab up | owlab sync --watch | owlab open owrt2512
 ./tools/stage.sh && owfeed build           # both formats into dist/
-owlab test --release 25.12.5 --install 'dist/noarch/luci-theme-footstrap-*.apk' --assert …
+owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' --assert …
 ucode -T -c -o /dev/null <template>.ut     # syntax-check a template the way LuCI does
 luci-theme-footstrap/dev-sync.sh <host>    # deploy to a HARDWARE router over ssh
 ```
