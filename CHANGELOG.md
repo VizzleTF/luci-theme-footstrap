@@ -11,6 +11,14 @@ Style and format guide: [docs/releasing.md](docs/releasing.md).
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Changed
+
+- **The benchmark on the front page is footstrap 0.12.0, measured on real hardware rather than carried over.** Five runs over 38 pages against bootstrap and proton2025, wallpaper off: 4933 ms against 11 306 and 12 142 — 2.29× total, 3.03× median page, 38/38 navigated in place, and 18.4 s of router CPU against 37.3 s. The totals moved against the July figures and the theme is not why: installing 0.11.7 and 0.12.0 in turn on the same router and the same LuCI gives 4932 against 4930. What moved is the uhttpd keep-alive stall the page already documents — `http_keepalive=0` on that router takes the same tour to **3886 ms**, so a fifth of it is a TCP stall belonging to the web server, and the growth tracks the request count exactly (pages that make no request got faster; pages that make one grew by a median 23.7 ms). Client CPU is left out of this run on purpose: a sample is dropped when the renderer restarts mid-navigation, footstrap kept 38 pages of 38 against bootstrap's 18, and a ratio over that intersection inverts the answer — `bench/nav-benchmark.py` now prints per-theme coverage and refuses the comparison below 90%.
+
+- **`SECURITY.md` lives in `.github/`, and the two orphaned README assets are gone.** GitHub reads the policy from `.github/` as readily as from the root, and `speed.svg` and `overview-sidebar-dark.png` were referenced by nothing after the README was cut down. Everything else in the repository root has to be there: `owlab` takes no path to its config, `owfeed` reads from the working directory, and the linters' configs are found by name.
+
 ## [0.12.0] — 2026-08-01
 
 ### Added
@@ -3359,6 +3367,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[Unreleased]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.12.0...HEAD
 [0.12.0]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.7...v0.12.0
 [0.11.7]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.6...v0.11.7
 [0.11.6]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.11.5...v0.11.6

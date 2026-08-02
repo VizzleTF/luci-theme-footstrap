@@ -161,11 +161,17 @@ compile.
 
 - **Conventional Commits, message in English. Never commit without an explicit instruction.** No
   co-author / "Generated with" / AI attribution trailers. `origin` is the only remote.
-- **Every substantive commit adds its entry to `## [Unreleased]` in the same commit as the code**,
-  in **both** `CHANGELOG.md` and `CHANGELOG_ru.md`. Sections are `Added / Changed / Deprecated /
-  Removed / Fixed / Security / Performance`, one of each per version, in that fixed order — append
-  into the section that already exists in its canonical slot, never add a second `### Changed` on
-  top.
+- **NO COMMIT LANDS WITHOUT ITS CHANGELOG ENTRY.** It goes under `## [Unreleased]`, in the **same
+  commit as the code**, and in **BOTH `CHANGELOG.md` AND `CHANGELOG_ru.md`** — never one now and
+  its mirror later. An entry written afterwards is written from the diff, and the diff is exactly
+  what does not know why. This covers documentation, benchmarks, CI and packaging too, not just
+  code: if the commit is worth making, it is worth one line saying what changed. The only things
+  that skip it are this file and a fix to an `[Unreleased]` entry already written.
+  `npm run changelog` fails on a mismatch between the two files, so a missing mirror is a red gate,
+  not a note for later.
+- Sections are `Added / Changed / Deprecated / Removed / Fixed / Security / Performance`, one of
+  each per version, in that fixed order — append into the section that already exists in its
+  canonical slot, never add a second `### Changed` on top.
 - Each entry is `- **one-line effect.** then the rationale`. The bold lead **is** the release note
   (`release-notes.sh` emits leads only), so it must read on its own — **a bullet with no bold lead
   is silently dropped from the release**. Write the effect, not the diff; keep the measurement.
