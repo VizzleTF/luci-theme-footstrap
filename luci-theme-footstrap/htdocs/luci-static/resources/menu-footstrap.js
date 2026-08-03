@@ -219,15 +219,15 @@ function renderMainMenu(tree, url, level) {
 			 * a link to "#". Not role="menu" — APG is explicit that site navigation must not
 			 * take on the menubar pattern's arrow-key semantics. */
 			/* THE ID MUST BE INJECTIVE, because a menu node name is a string a third-party
-				 * package picks in its own menu.d and two of them may differ only in punctuation.
-				 * `[^a-z0-9]+` -> '-' folded `foo.bar` and `foo-bar` onto ONE id, so two sections at
-				 * the same level emitted the same `id` and both triggers' aria-controls resolved to
-				 * whichever panel stands first in the document — a screen reader is then told the
-				 * closed section owns the open one's contents. Escaping to the code point keeps the
-				 * id readable for the ordinary all-alphanumeric case and cannot collide. */
-				const subId = 'fs-sub-' +
-					String(child.name).replace(/[^a-z0-9]/gi, (c) => '_' + c.charCodeAt(0).toString(16)) +
-					'-' + idx;
+			 * package picks in its own menu.d and two of them may differ only in punctuation.
+			 * `[^a-z0-9]+` -> '-' folded `foo.bar` and `foo-bar` onto ONE id, so two sections at
+			 * the same level emitted the same `id` and both triggers' aria-controls resolved to
+			 * whichever panel stands first in the document — a screen reader is then told the
+			 * closed section owns the open one's contents. Escaping to the code point keeps the
+			 * id readable for the ordinary all-alphanumeric case and cannot collide. */
+			const subId = 'fs-sub-' +
+				String(child.name).replace(/[^a-z0-9]/gi, (c) => '_' + c.charCodeAt(0).toString(16)) +
+				'-' + idx;
 			submenu.id = subId;
 			link.setAttribute('role', 'button');
 			link.setAttribute('aria-controls', subId);

@@ -173,7 +173,7 @@ endef
 # would do — so the constraint that bought the rename is gone, and the cost of keeping it (a
 # catalogue invisible to the project's own translation platform) is not.
 define Build/Prepare/luci-theme-footstrap
-	# luci.mk's Build/Prepare copies only src/ luasrc/ htdocs/ root/ ucode/ po/ into
+	# luci.mk's Build/Prepare copies only src/ luasrc/ htdocs/ root/ ucode/ into
 	# $(PKG_BUILD_DIR), and PKG_LICENSE_FILES resolves against THAT — so the Apache text has to
 	# be put there by hand or the declaration points at nothing.
 	$(CP) $(CURDIR)/LICENSE $(PKG_BUILD_DIR)/

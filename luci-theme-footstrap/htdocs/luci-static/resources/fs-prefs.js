@@ -3,10 +3,11 @@
 'require rpc';
 'require fs-fit as fit';
 
-/* The Appearance axes THIS file owns (the page that presents them is fs-appearance.js,
- * mounted at admin/system/appearance). The
- * fourteen are exactly the keys in AXIS_KEYS and the fields in snapshotAxes(), which is the list
- * Save-as-default writes — if this number and that list disagree, the list is right.
+/* The Appearance axes THIS file owns (the controls that present them are fs-appearance.js, which
+ * appends a tab to the stock System -> System page — a theme owns no dispatcher node, see that
+ * file's header). The twenty-one are exactly the keys in AXIS_KEYS and the fields in
+ * snapshotAxes(), which is the list Save-as-default writes — if this number and that list
+ * disagree, the list is right.
  * All client-side, instant, persisted in localStorage —
  * no server, no reload — and head.ut's inline script re-applies them before paint, so a reload never
  * flashes the wrong one; tools/axes.mjs holds those two copies to one contract, and it derives that
@@ -691,10 +692,15 @@ function snapshotAxes() {
  * twice, 0..20 once, and a bare `sd('palette') || 'footstrap'` where current() whitelists), i.e. a
  * second copy of a validation with no symptom when the two disagree: `matchesSavedDefault()` simply
  * lies, and the Save button IS that answer. `layout` is the one exception and cannot be otherwise —
- * currentLayout() reads the ATTRIBUTE, so this is the only place stating the layout router default. */
+ * currentLayout() reads the ATTRIBUTE, so this is the only place stating the layout router default.
+ * Its fallback is TOP and must stay the third copy of one answer: head.ut stamps `top` when uci
+ * says nothing and resetToBuiltin() applies `top`. It read 'sidebar' here after the default
+ * flipped, and the symptom is silent — on a fresh install matchesSavedDefault() is false before the
+ * user has touched anything, so Save-as-default shows dirty and resetToSaved() lands on the wrong
+ * layout. */
 function _resolvedDefault() {
 	return {
-		layout: sd('layout') || 'sidebar',
+		layout: sd('layout') || 'top',
 		darkmode: modeDefault(),
 		palette: paletteDefault(),
 		wallpaper: wallpaperDefault(),

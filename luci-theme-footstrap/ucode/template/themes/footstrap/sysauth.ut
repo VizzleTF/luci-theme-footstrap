@@ -33,6 +33,12 @@
 		</div>
 	{% endif %}
 
+	{% if (auth_message && !fuser): %}
+		<div class="alert-message">
+			<p>{{ auth_message }}</p>
+		</div>
+	{% endif %}
+
 	<div class="cbi-map">
 		<h2 name="content">{{ _('Authorization Required') }}</h2>
 		<div class="cbi-map-descr">
@@ -51,6 +57,53 @@
 					<input class="cbi-input-text" type="password" name="luci_password" id="luci_password" autocomplete="current-password" />
 				</div>
 			</div>
+			{#
+			 THE LOGIN BACKEND'S OWN FIELDS. The dispatcher hands `auth_fields`, `auth_message`,
+			 `auth_html` and `auth_assets` to whichever sysauth template renders, and a pluggable
+			 backend (luci-plugin-2fa is the in-tree one) puts its OTP input in there. A theme-local
+			 sysauth that drops them is not a login form with a missing extra: the field is never
+			 posted, so on a router with 2FA enabled NOBODY CAN LOG IN while this theme is active,
+			 and the backend's "Too many failed attempts" / "System time is not calibrated" messages
+			 never reach the screen either. This template exists only to pass `blank_page: true`, so
+			 it must stay a superset of the generic one.
+
+			 The leading space inside each conditional attribute is load-bearing: ucode emits the
+			 block with no whitespace of its own, so without it the render reads
+			 `inputmode="numeric"pattern="[0-9]*"` — an HTML parse error browsers recover from and a
+			 validator does not.
+			-#}
+			{% if (auth_fields): %}
+				{% for (let field in auth_fields): %}
+					<div class="cbi-value">
+						<label class="cbi-value-title" for="{{ entityencode(field.name, true) }}">{{ _(field.label ?? field.name) }}</label>
+						<div class="cbi-value-field">
+							<input class="cbi-input-text"
+								type="{{ field.type ?? 'text' }}"
+								name="{{ field.name }}"
+								id="{{ entityencode(field.name, true) }}"
+								{% if (field.placeholder): %} placeholder="{{ field.placeholder }}"{% endif %}
+								{% if (field.inputmode): %} inputmode="{{ field.inputmode }}"{% endif %}
+								{% if (field.pattern): %} pattern="{{ field.pattern }}"{% endif %}
+								{% if (field.maxlength): %} maxlength="{{ field.maxlength }}"{% endif %}
+								{% if (field.autocomplete): %} autocomplete="{{ field.autocomplete }}"{% endif %}
+								{% if (field.required): %} required{% endif %}
+							/>
+						</div>
+					</div>
+				{% endfor %}
+			{% endif %}
+			{% if (auth_html): %}
+				<div class="cbi-value">
+					{{ auth_html }}
+				</div>
+			{% endif %}
+			{% if (auth_assets): %}
+				{% for (let asset in auth_assets): %}
+					{% if (asset.type == 'script'): %}
+						<script src="{{ asset.src }}"></script>
+					{% endif %}
+				{% endfor %}
+			{% endif %}
 		</div></div>
 	</div>
 

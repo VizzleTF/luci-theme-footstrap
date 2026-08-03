@@ -145,11 +145,11 @@
 				<div class="fs-spacer"></div>
 
 				{# right cluster, in visual order: the poll pill above, then Search, Log out.
-				   APPEARANCE USED TO SIT HERE, a button opening a popover on <body>. It is a page
-				   now — System -> Appearance (admin/system/appearance), rendered by
-				   view/footstrap/appearance.js — reached through the menu like every other settings
-				   page. The axes had outgrown a floating panel; fs-appearance.js's header has the
-				   reasoning. So the chrome carries one control fewer, and the settings carry a URL. #}
+				   APPEARANCE USED TO SIT HERE, a button opening a popover on <body>. It is a tab
+				   now — System -> System (admin/system/system), appended to the stock page by
+				   fs-appearance.js's MutationObserver, because a THEME may not own a dispatcher
+				   node. The axes had outgrown a floating panel; fs-appearance.js's header has the
+				   reasoning. So the chrome carries one control fewer. #}
 				{% include('themes/footstrap/partials/search') %}
 				{% include('themes/footstrap/partials/logout') %}
 			</nav>
