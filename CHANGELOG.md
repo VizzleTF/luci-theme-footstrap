@@ -11,6 +11,12 @@ Style and format guide: [docs/releasing.md](docs/releasing.md).
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+
+- **The GitHub Pages portal builds again.** Two breakages, both introduced by the v0.12.1 work and both invisible until CI ran: `mkdir -p _site/fonts` was deleted with the webfonts, and it was the only thing creating `_site` at all, so every `cp` after it failed on "No such file or directory"; and `cp wallpapers/*.svg` no longer matched anything once the two sample patterns moved into `wallpapers/svg/`, which under `set -e` is a failed build. The glob has now broken twice on a move, so it is spelled with the subdirectory and the reason is written next to it.
+
 ## [0.12.1] — 2026-08-03
 
 ### Added
