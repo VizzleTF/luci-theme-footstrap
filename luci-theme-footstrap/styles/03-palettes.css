@@ -150,6 +150,16 @@
 		 * never leak onto a photo; the Tint's Density is a separate control. */
 		--fs-photo-dim: 74%;
 		--fs-photo-scrim: color-mix(in srgb, var(--fs-bg-base) var(--fs-photo-dim), transparent);
+		/* The uploaded PATTERN (Appearance → Wallpaper → Pattern), tiled behind the content by
+		 * 15-wallpaper.css. --fs-pattern-url is the url() head.ut/fs-prefs.js stamp inline and is
+		 * `none` here for the same reason --fs-login-bg-url is: nothing is uploaded yet, and a var()
+		 * with no definition at all is invalid at computed-value time. The other two are ordinary
+		 * per-browser axes the same two places override inline — the tile's edge length and the
+		 * layer's opacity. .2 is where a neutral line reads as a drawing rather than as texture:
+		 * measured on a tinted canvas, .15 was swallowed by the hue. */
+		--fs-pattern-url: none;
+		--fs-pattern-size: 440px;
+		--fs-pattern-strength: .2;
 		/* HOW STRONG THE CUE IS — a chroma, and a function of the HUE, because the canvas is
 		 * not neutral: every palette's canvas is a blue-grey (measured: oklch hue 248–264)
 		 * and the dark one carries chroma .0153 of it. A flat chroma made the blue/violet end

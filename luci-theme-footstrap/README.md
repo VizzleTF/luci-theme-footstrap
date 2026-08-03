@@ -31,7 +31,7 @@ styles/                           CSS SOURCE: layers tokens / base / theme / pag
 build-css.sh                      styles/ → htdocs/luci-static/footstrap/cascade.css
 mangle-tokens.sh                  shorten the private --fs-* names in a built sheet
 strip-templates.sh strip-shell.sh drop comments from .ut and from root/**.sh
-i18n/                             translation catalogue (NOT po/ — see docs/package.md)
+po/                               translation catalogue (Weblate translates this)
 ucode/template/themes/footstrap/  header.ut, footer.ut, sysauth.ut, partials/
 htdocs/luci-static/footstrap/     cascade.css (generated), fonts/, logo.svg
                                   (the doodle wallpapers are downloaded on demand, not shipped)

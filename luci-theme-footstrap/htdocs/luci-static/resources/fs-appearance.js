@@ -1,6 +1,7 @@
 'use strict';
 'require baseclass';
 'require ui';
+'require dom';
 'require fs-prefs as prefs';
 'require fs-widgets as widgets';
 'require fs-version as ver';
@@ -23,62 +24,19 @@
  * section to it, additively, and removes nothing. Off the footstrap theme, or on any other page,
  * nothing runs at all.
  *
- * THERE IS NO UPDATE CHECKER HERE ANY MORE. The theme used to load an optional
- * luci-app-footstrap-updater at runtime and grow an Updates toggle, a "new version" badge and a
- * one-click Update button. It was a workaround for installing from a downloaded file, which the
- * package manager knows nothing about and will never upgrade; the installer adds the package feed
- * now, so `apk upgrade` carries the theme forward with everything else on the router. A theme
- * checking GitHub on a timer to reimplement what the package manager already does was the wrong
- * shape, and it reached the network from a page that has no business doing so. The version line
- * below stays — it costs no request. */
+ * THE VERSION LINE MAKES NO REQUEST and must not grow one. Which version is INSTALLED is what this
+ * page answers; which version is available is the package manager's question, and a theme polling a
+ * release API to re-answer it from a settings page is the wrong shape twice over — it reaches the
+ * network from a page that has no business doing so, and it reimplements `apk upgrade`. */
 
-/* ---- the colour presets --------------------------------------------------------------------
- * A starting point, not a fixed set of themes: each one just sets the ACCENT axis, so the very next
- * edit of a colour field takes over from it and the page carries on as normal. That is why they are
- * stored as the axis value they write rather than as a named "current preset" — there is no such
- * state, nothing has to be un-picked, and a preset overwritten is simply a colour.
- *
- * The accent ALONE, deliberately. A preset that also set the canvas tint made a two-axis change from
- * a one-click control, and undoing half of it meant knowing which half had moved; the surfaces and
- * the status colours are on the page for an admin who wants them.
- *
- * `accent: 0` means "the palette's own", which is what makes the first entry a real reset for the
- * colour half of the page without touching layout, density or the wallpaper.
- *
- * The two neutrals are the reason this list exists: "give me a calm grey interface instead of a
- * blue one" is the request the whole feature came from, and the ink over each is derived from its
- * lightness (03-palettes.css), so they stay pressable in both modes.
- *
- * Nothing here sets the status colours: a preset is a LOOK, and good/warn/danger carry MEANING —
- * shipping a preset that quietly repaints "danger" would be exactly the lie the tint axis is
- * careful not to tell. Their axes are on the page for an admin who wants them. */
-const PRESETS = [
-	{ id: 'palette',  accent: 0 },
-	{ id: 'slate',    accent: '#5b6b7f' },
-	{ id: 'graphite', accent: '#4b5563' },
-	{ id: 'ocean',    accent: '#0284c7' },
-	{ id: 'emerald',  accent: '#0f8a5f' },
-	{ id: 'violet',   accent: '#7048d4' },
-	{ id: 'amber',    accent: '#b45309' },
-	{ id: 'crimson',  accent: '#c02a3a' }
-];
-
-/* The preset NAMES, resolved inside render() rather than beside the table above: a `_()` at module
- * scope runs when the module is evaluated, which on a full load is before window.TR has been
- * fetched, so every label would be the untranslated msgid. Keyed by the same id, so a preset that
- * loses its label is a missing key rather than a silently blank button. */
-function presetLabel(id) {
-	return ({
-		palette:  _('Palette default', 'footstrap'),
-		slate:    _('Slate', 'footstrap'),
-		graphite: _('Graphite', 'footstrap'),
-		ocean:    _('Ocean', 'footstrap'),
-		emerald:  _('Emerald', 'footstrap'),
-		violet:   _('Violet', 'footstrap'),
-		amber:    _('Amber', 'footstrap'),
-		crimson:  _('Crimson', 'footstrap')
-	})[id] || id;
-}
+/* THE COLOUR PRESETS WERE HERE — eight chips that wrote the Accent axis, each painted in the
+ * colour it would set. They are gone, and what they were for is not: the request behind them
+ * (#20, "the blue theme is cool but sometimes you want grey or black") is answered by the Accent
+ * row itself, which takes any #rrggbb and sits three rows below where the chips used to be. A
+ * preset only ever wrote that one axis, so the chips were a second, prettier way to do the thing
+ * the field already does — and they were the one control on this page that looked like nothing
+ * else in LuCI: a bare row of coloured pills starting at the card's edge rather than at the field
+ * column, which is what made the tab read as ragged. */
 
 /* Build the whole form. Returns a promise for one element wire() appends to the stock page.
  *
@@ -111,19 +69,69 @@ function build() {
 	 * measured against, and a preset changes the axes themselves */
 	const repaint = (fn) => (v) => { fn(v); refreshColours(); };
 
-	/* One captioned row: `<div class=fs-ap-group>` + its label + the control. `make` is handed the
-	 * SAME label string the caption renders, because every control in here needs it a second time as
-	 * its aria-label (segControl/sliderControl/colorControl take it as their last argument) — and
-	 * stating it twice is how the visible caption and what a screen reader announces drift apart.
-	 * One literal per axis, used by both, with nothing to keep in sync. `extra` is for the rows that
-	 * carry more than a control (the Save row's action pair and its error line), `opts.cls` for the
-	 * rows CSS has to be able to single out. */
+	/* One captioned row, in LuCI's OWN row shape: `.cbi-value` > `label.cbi-value-title` +
+	 * `.cbi-value-field`. This tab used to draw its own two-column grid of stacked cards — an
+	 * uppercase eyebrow above each control — which made the theme's settings the one page in LuCI
+	 * that did not look like LuCI. Sitting beside General Settings / Logging / Time Synchronization /
+	 * Language and Style, the odd one out was ours.
+	 *
+	 * Nothing here styles those class names: `.cbi-value` is stock, base/30-forms.css and
+	 * theme/60-inputs.css already lay it out (title column, field column, hairline under each row),
+	 * so this page now inherits every future fix to the form layout instead of keeping a private
+	 * copy of it. That also means the row lives on a SHARED surface — Zone 2, where a third-party
+	 * app is entitled to win on specificity — which is exactly right for a page rendered inside
+	 * #view rather than for chrome.
+	 *
+	 * `make` is handed the SAME label string the caption renders, because every control in here
+	 * needs it a second time as its aria-label (segControl/sliderControl/colorControl take it as
+	 * their last argument) — and stating it twice is how the visible caption and what a screen
+	 * reader announces drift apart. One literal per axis, used by both, with nothing to keep in
+	 * sync. `extra` is for the rows that carry more than a control (the Save row's error line),
+	 * `opts.cls` for the rows CSS has to be able to single out. */
 	const group = (label, make, opts) => {
 		const o = opts || {};
-		return E('div', { 'class': 'fs-ap-group' + (o.cls ? ' ' + o.cls : '') }, [
-			E('div', { 'class': 'fs-ap-label' }, [ label ]),
-			make(label)
-		].concat(o.extra || []));
+		return E('div', { 'class': 'cbi-value' + (o.cls ? ' ' + o.cls : '') }, [
+			E('label', { 'class': 'cbi-value-title' }, [ label ]),
+			E('div', { 'class': 'cbi-value-field' }, [ make(label) ].concat(o.extra || []))
+		]);
+	};
+
+	/* ---- the CONTROLS are LuCI's own, not this theme's ------------------------------------------
+	 *
+	 * Every enum axis is a `ui.Select` and every number is a `ui.RangeSlider` — the same widgets the
+	 * form on the other tabs is built from, so a dropdown here is the dropdown an admin already knows
+	 * and the theme's own stylesheet already dresses (`select` in base/30-forms.css,
+	 * `.cbi-range-slider` in theme/60-inputs.css). Both classes exist on the whole range this theme
+	 * supports — checked against luci's own openwrt-24.10 branch, not only against master.
+	 *
+	 * What this replaces is two primitives of ours: a segmented radiogroup with a roving tabindex and
+	 * a range wrapper with a live readout. They were written when this page was a floating popover
+	 * and a `<select>` inside it read as a hole in the card. On a page there is no such argument, and
+	 * a control LuCI maintains is one this theme cannot get wrong on its own.
+	 *
+	 * THE EVENT IS `widget-change`, dispatched by UIElement, not a listener on the inner element —
+	 * that is the seam the widget publishes, and reaching past it to the `<select>` would tie us to
+	 * how it happens to be built today. RangeSlider also emits `widget-update` while the handle
+	 * moves, which is what makes the tile resize UNDER the drag rather than on release; both are
+	 * wired, and the appliers are idempotent so the pair costs nothing. */
+	const selectCtl = (current, choices, apply, label) => {
+		const w = new ui.Select(String(current), choices, { widget: 'select', sort: Object.keys(choices) });
+		const node = w.render();
+		node.setAttribute('aria-label', label);
+		node.addEventListener('widget-change', () => apply(w.getValue()));
+		return node;
+	};
+	const sliderCtl = (current, min, max, apply, label, opts) => {
+		const o = opts || {};
+		const w = new ui.RangeSlider(String(current), {
+			min: min, max: max, step: o.step || 1, calcunits: o.unit || null
+		});
+		const node = w.render();
+		node.setAttribute('aria-label', label);
+		const push = () => apply(parseInt(w.getValue(), 10));
+		node.addEventListener('widget-update', push);
+		node.addEventListener('widget-change', push);
+		return node;
 	};
 
 	/* one colour axis: the shared shape of the rows below. `probe` is the live token the control
@@ -152,32 +160,32 @@ function build() {
 
 	/* ---- section 1: the shell ---- */
 	const shell = [
-		group(_('Layout', 'footstrap'), (label) => widgets.segControl(prefs.currentLayout(), [
-			{ val: 'sidebar', label: _('Sidebar', 'footstrap') },
-			{ val: 'top',     label: _('Top', 'footstrap') }
-		], bump(prefs.applyLayout), label)),
+		group(_('Layout', 'footstrap'), (label) => selectCtl(prefs.currentLayout(), {
+			sidebar: _('Sidebar', 'footstrap'),
+			top:     _('Top', 'footstrap')
+		}, bump(prefs.applyLayout), label)),
 
-		group(_('Theme', 'footstrap'), (label) => widgets.segControl(prefs.currentMode(), [
-			{ val: 'auto',  label: _('Auto', 'footstrap') },
-			{ val: 'light', label: _('Light', 'footstrap') },
-			{ val: 'dark',  label: _('Dark', 'footstrap') }
-		], bump(repaint(prefs.applyMode)), label)),
+		group(_('Theme', 'footstrap'), (label) => selectCtl(prefs.currentMode(), {
+			auto:  _('Auto', 'footstrap'),
+			light: _('Light', 'footstrap'),
+			dark:  _('Dark', 'footstrap')
+		}, bump(repaint(prefs.applyMode)), label)),
 
-		group(_('Palette', 'footstrap'), (label) => widgets.segControl(prefs.currentPalette(), [
-			{ val: 'footstrap',  label: 'Footstrap' },
-			{ val: 'hicontrast', label: 'Hi-Contrast' }
-		], bump(repaint(prefs.applyPalette)), label)),
+		group(_('Palette', 'footstrap'), (label) => selectCtl(prefs.currentPalette(), {
+			footstrap:  'Footstrap',
+			hicontrast: 'Hi-Contrast'
+		}, bump(repaint(prefs.applyPalette)), label)),
 
 		/* Density: how much air the UI uses. Pure token axis — 02-tokens.css multiplies the type and
 		 * space ladders, so every size, gap and padding in the theme follows at once. */
-		group(_('Density', 'footstrap'), (label) => widgets.segControl(prefs.currentDensity(), [
-			{ val: 'compact', label: _('Compact', 'footstrap') },
-			{ val: 'normal',  label: _('Normal', 'footstrap') },
-			{ val: 'large',   label: _('Large', 'footstrap') }
-		], bump(prefs.applyDensity), label)),
+		group(_('Density', 'footstrap'), (label) => selectCtl(prefs.currentDensity(), {
+			compact: _('Compact', 'footstrap'),
+			normal:  _('Normal', 'footstrap'),
+			large:   _('Large', 'footstrap')
+		}, bump(prefs.applyDensity), label)),
 
 		group(_('Rounding', 'footstrap'),
-			(label) => widgets.sliderControl(prefs.currentRadius(), 0, 20, bump(prefs.applyRadius), label)),
+			(label) => sliderCtl(prefs.currentRadius(), 0, 20, bump(prefs.applyRadius), label, { unit: 'px' })),
 
 		/* The top layout has no accordion (its sections are hover dropdowns, already exclusive), so
 		 * this switch is meaningless there. ALWAYS BUILT, HIDDEN BY CSS (:root[data-layout="top"]
@@ -185,39 +193,15 @@ function build() {
 		 * built once, so the branch would freeze the control to the layout the page LOADED in — it
 		 * would stay on screen after a switch to the bar and never appear after a switch away from
 		 * it. Toggling the layout re-renders nothing; CSS morphs the chrome. */
-		group(_('Submenus', 'footstrap'), (label) => widgets.segControl(
-			prefs.currentAutoCollapse() ? 'on' : 'off', [
-				{ val: 'off', label: _('Keep open', 'footstrap') },
-				{ val: 'on',  label: _('Auto-collapse', 'footstrap') }
-			], bump(prefs.applyAutoCollapse), label),
+		group(_('Submenus', 'footstrap'), (label) => selectCtl(
+			prefs.currentAutoCollapse() ? 'on' : 'off', {
+				off: _('Keep open', 'footstrap'),
+				on:  _('Auto-collapse', 'footstrap')
+			}, bump(prefs.applyAutoCollapse), label),
 		{ cls: 'fs-ap-submenus' })
 	];
 
 	/* ---- section 2: colours ---- */
-	/* Applying a preset goes through the same appliers a manual edit does, then refreshes the
-	 * controls: the axes are the only state, so there is nothing else to reconcile and no "which
-	 * preset is active" to get wrong. */
-	function applyPreset(p) {
-		prefs.applyAccent(p.accent);
-		refreshColours();
-		refreshSave();
-	}
-	const presetRow = E('div', { 'class': 'fs-ap-presets' }, PRESETS.map((p) => {
-		const name = presetLabel(p.id);
-		/* the chip shows the preset's own accent; the palette-default entry has no colour of its own,
-		 * so it takes the palette's accent token — which is exactly what picking it produces. The
-		 * colour is written TWICE, as the background and as --fs-preset-c, because CSS cannot read
-		 * an inline background back to derive readable ink from it (styles/pages/80-appearance.css).
-		 * One expression, one source, so the two cannot disagree. */
-		const colour = p.accent || 'var(--fs-accent-base)';
-		const b = E('button', {
-			'class': 'fs-preset', 'type': 'button', 'title': name, 'aria-label': name,
-			'style': 'background:' + colour + ';--fs-preset-c:' + colour
-		}, [ E('span', { 'class': 'fs-preset-name' }, [ name ]) ]);
-		b.addEventListener('click', () => applyPreset(p));
-		return b;
-	}));
-
 	const colours = [
 		/* the caption says what the axis is FOR: "Tint" alone reads as decoration and nobody would
 		 * look for the router-identity cue under it. */
@@ -237,7 +221,7 @@ function build() {
 		 * would announce "Density, radio group" and "Density, slider" with nothing to tell them
 		 * apart. */
 		group(_('Tint strength', 'footstrap'),
-			(label) => widgets.sliderControl(prefs.currentTintStrength(), 0, 200, bump(repaint(prefs.applyTintStrength)), label, {
+			(label) => sliderCtl(prefs.currentTintStrength(), 0, 200, bump(repaint(prefs.applyTintStrength)), label, {
 				step: 5,
 				fmt: (v) => v + '%'
 			}), { cls: 'fs-ap-tint fs-ap-density' }),
@@ -308,23 +292,40 @@ function build() {
 		})
 	];
 
-	/* ---- section 3: the wallpaper, with its upload sub-panel ---- */
-	/* Wallpaper is THREE-valued: Off, Cats (doodle), File (the uploaded photo). Picking File reveals
-	 * the upload sub-panel BELOW the segments — a file input + preview + Remove, shown only in that
-	 * mode. The photo BYTES are router-side (fs-prefs uploads them and stores a token in uci); this
-	 * seg is the per-browser switch that decides whether to paint them, so it is what keeps the Save
-	 * button honest (refreshSave), while Choose/Remove only swap the picture behind whoever is on
-	 * File and never touch the axis. The native file input stays hidden — the styled "Choose image"
-	 * button triggers it. */
-	const wallpaper = group(_('Wallpaper', 'footstrap'), (label) => {
+	/* ---- section 3: the wallpaper and everything that depends on which one is picked ----
+	 *
+	 * Wallpaper is THREE-valued: Off, Pattern (an uploaded SVG, tiled and recoloured) and File (an
+	 * uploaded photo). Each value brings rows with it — the SVG plus Scale/Strength/Colours, or the
+	 * photo plus Dim — and those rows are SIBLINGS of the Wallpaper row, not children of its field.
+	 *
+	 * That is the whole point of this shape. They were nested inside the field at first, which put a
+	 * second `.cbi-value` inside a `.cbi-value-field` and therefore a second 180px caption column
+	 * inside the first: measured on the router, Scale and Strength started 216px right of every
+	 * other control on the page. LuCI has no such construct anywhere, and the eye reads it as two
+	 * forms interleaved. Flat rows, hidden as a group, is what the stock pages do with a dependent
+	 * field — one caption column, one field column, top to bottom.
+	 *
+	 * The select is the per-browser switch that decides whether to paint an image, so it is what
+	 * keeps the Save button honest (refreshSave); Choose/Remove only swap the picture behind
+	 * whoever is in that mode and never touch the axis. Both native file inputs stay hidden — the
+	 * styled buttons trigger them. */
+	const wallpaper = (() => {
 		const err = E('div', { 'class': 'fs-ap-err', 'role': 'alert', 'hidden': '' });
 		const preview = E('img', { 'class': 'fs-ap-bgprev', 'alt': '', 'hidden': '' });
 		/* display:none, not the `hidden` attribute — a bare `hidden=""` still rendered the native
 		 * "Choose File / No file chosen" control; only the styled button below should be visible. */
 		const fileInput = E('input', { 'type': 'file', 'accept': 'image/*', 'style': 'display:none' });
-		const chooseBtn = E('button', { 'class': 'btn cbi-button', 'type': 'button' }, [ _('Choose image', 'footstrap') ]);
-		const removeBtn = E('button', { 'class': 'btn', 'type': 'button', 'hidden': '' }, [ _('Remove', 'footstrap') ]);
 		const chooseLabel = _('Choose image', 'footstrap');
+		const chooseBtn = E('button', { 'class': 'btn cbi-button', 'type': 'button' }, [ chooseLabel ]);
+		const removeBtn = E('button', { 'class': 'btn cbi-button-remove', 'type': 'button', 'hidden': '' }, [ _('Remove', 'footstrap') ]);
+
+		const patErr = E('div', { 'class': 'fs-ap-err', 'role': 'alert', 'hidden': '' });
+		const patPreview = E('img', { 'class': 'fs-ap-bgprev', 'alt': '', 'hidden': '' });
+		const patInput = E('input', { 'type': 'file', 'accept': 'image/svg+xml,.svg', 'style': 'display:none' });
+		const patChooseLabel = _('Choose SVG', 'footstrap');
+		const patChoose = E('button', { 'class': 'btn cbi-button', 'type': 'button' }, [ patChooseLabel ]);
+		const patRemove = E('button', { 'class': 'btn cbi-button-remove', 'type': 'button', 'hidden': '' }, [ _('Remove', 'footstrap') ]);
+
 		/* Dim: the scrim opacity over the photo. An ORDINARY per-browser axis — it is in AXIS_KEYS
 		 * and in snapshotAxes(), so it moves this browser toward or away from the router default and
 		 * must therefore be bump()-ed like every other saved axis. It was not, on the strength of a
@@ -332,71 +333,89 @@ function build() {
 		 * Save as default" made it a propAxis and did not reach this file. The symptom is the one
 		 * thing the Save button IS — its own status. Separate from the Tint's strength above. */
 		const dimLabel = _('Dim', 'footstrap');
-		const dim = E('div', { 'class': 'fs-ap-group' }, [
-			E('div', { 'class': 'fs-ap-label' }, [ dimLabel ]),
-			widgets.sliderControl(prefs.currentPhotoDim(), 0, 100, bump(prefs.applyPhotoDim), dimLabel, {
-				step: 5,
-				fmt: (v) => v + '%'
-			})
-		]);
-		/* the upload sub-panel: the preview, then Choose image and Remove on ONE row below it
-		 * (Remove appears only once an image exists), then the Dim slider */
-		const panel = E('div', { 'class': 'fs-ap-bg', 'hidden': '' }, [
-			fileInput, preview,
-			E('div', { 'class': 'fs-ap-bgrow' }, [ chooseBtn, removeBtn ]),
-			dim, err
-		]);
+		const scaleLabel = _('Scale', 'footstrap');
+		const strengthLabel = _('Strength', 'footstrap');
+		const inkLabel = _('Colours', 'footstrap');
+
+		/* The rows the PATTERN brings. Scale and Strength are live: the appliers write a custom
+		 * property, so the tile behind the page resizes and fades under the drag with nothing to
+		 * reload. Colours decides whether the file's own palette is kept or thrown away for the
+		 * theme's — a mask uses the alpha only, which is right for line art and wrong for artwork
+		 * that carries its own colours, and only whoever picked the file knows which it is. */
+		const patRows = [
+			group(_('Pattern', 'footstrap'),
+				() => E('div', { 'class': 'fs-ap-bgrow' }, [ patChoose, patRemove ]),
+				{ extra: [ patInput, patPreview, patErr ] }),
+			group(scaleLabel, (lbl) => sliderCtl(prefs.currentPatternSize(), 40, 1600,
+				bump(prefs.applyPatternSize), lbl, { step: 20, unit: 'px' })),
+			group(strengthLabel, (lbl) => sliderCtl(prefs.currentPatternStrength(), 0, 100,
+				bump(prefs.applyPatternStrength), lbl, { step: 5, unit: '%' })),
+			group(inkLabel, (lbl) => selectCtl(prefs.currentPatternInk(), {
+				theme:    _('Theme', 'footstrap'),
+				original: _('As in file', 'footstrap')
+			}, bump(prefs.applyPatternInk), lbl))
+		];
+		/* …and the rows the FILE photo brings. */
+		const fileRows = [
+			group(_('File', 'footstrap'),
+				() => E('div', { 'class': 'fs-ap-bgrow' }, [ chooseBtn, removeBtn ]),
+				{ extra: [ fileInput, preview, err ] }),
+			group(dimLabel, (lbl) => sliderCtl(prefs.currentPhotoDim(), 0, 100,
+				bump(prefs.applyPhotoDim), lbl, { step: 5, unit: '%' }))
+		];
 
 		function reflect(tok) {
 			if (tok) { preview.src = prefs.loginBgUrl(tok); preview.hidden = false; removeBtn.hidden = false; }
 			else { preview.removeAttribute('src'); preview.hidden = true; removeBtn.hidden = true; }
 		}
-		function togglePanel(v) { panel.hidden = (v !== 'file'); }
+		function reflectPattern(tok) {
+			if (tok) { patPreview.src = prefs.patternUrl(tok); patPreview.hidden = false; patRemove.hidden = false; }
+			else { patPreview.removeAttribute('src'); patPreview.hidden = true; patRemove.hidden = true; }
+		}
+		/* `hidden` on the ROW, which is why 80-appearance.css restates it at a specificity that beats
+		 * `.cbi-value`'s own display — the UA's bare `[hidden]` rule loses to it. Hidden and not
+		 * removed: the rows are built once and each holds a live control whose value is this
+		 * browser's, so rebuilding them on every switch would be the popover's old bug (a control
+		 * frozen to the state it was constructed in) in a new place. */
+		function togglePanel(v) {
+			patRows.forEach((r) => { r.hidden = (v !== 'pattern'); });
+			fileRows.forEach((r) => { r.hidden = (v !== 'file'); });
+		}
 		reflect(prefs.currentLoginBg());
+		reflectPattern(prefs.currentPattern());
 		togglePanel(prefs.currentWallpaper());
 
 		const setWallpaper = (v) => { prefs.applyWallpaper(v); refreshSave(); togglePanel(v); refreshColours(); };
 
-		/* The two doodles are NOT in the package (fs-prefs.js says why), so picking one for the first
-		 * time is a DOWNLOAD, and a download is something to be asked about rather than started: the
-		 * bytes come from GitHub over the admin's own connection, and an admin on a metered link or
-		 * an air-gapped bench is entitled to say no. The dialog states the size before anything is
-		 * fetched, which is the whole point of asking.
-		 *
-		 * The axis is applied only AFTER the file is on the router. Applying first and downloading
-		 * behind it would paint a `background-image` at a URL that 404s — a wallpaper that silently
-		 * does nothing, on the setting whose entire job is visible. */
-		function pickWallpaper(v) {
-			if (v === 'off' || v === 'file' || prefs.wallpaperReady(v)) { setWallpaper(v); return; }
-			const kb = Math.round(prefs.wallpaperSize(v) / 1024);
-			const dlErr = E('div', { 'class': 'fs-ap-err', 'role': 'alert', 'hidden': '' });
-			const go = E('button', { 'class': 'btn cbi-button-action', 'type': 'button' }, [ _('Download', 'footstrap') ]);
-			const cancel = E('button', { 'class': 'btn', 'type': 'button', 'click': ui.hideModal }, [ _('Cancel', 'footstrap') ]);
-			go.addEventListener('click', () => {
-				go.disabled = true; cancel.disabled = true; dlErr.hidden = true;
-				go.textContent = _('Downloading…', 'footstrap');
-				prefs.installWallpaper(v)
-					.then(() => { ui.hideModal(); setWallpaper(v); })
-					.catch((e) => {
-						dlErr.textContent = String((e && e.message) || e);
-						dlErr.hidden = false;
-						go.disabled = false; cancel.disabled = false;
-						go.textContent = _('Download', 'footstrap');
-					});
-			});
-			ui.showModal(_('Download this wallpaper?', 'footstrap'), [
-				E('p', {}, [ _('This pattern is not part of the theme package. It is about %d kB and is downloaded once, from the project on GitHub, and stored on the router.', 'footstrap').format(kb) ]),
-				dlErr,
-				E('div', { 'class': 'right' }, [ cancel, ' ', go ])
-			]);
-		}
-
-		const seg = widgets.segControl(prefs.currentWallpaper(), [
-			{ val: 'off',  label: _('Off', 'footstrap') },
-			{ val: 'cats', label: _('Cats', 'footstrap') },
-			{ val: 'dinos', label: _('Dinosaurs', 'footstrap') },
-			{ val: 'file', label: _('File', 'footstrap') }
-		], pickWallpaper, label);
+		patChoose.addEventListener('click', () => { patErr.hidden = true; patInput.click(); });
+		patInput.addEventListener('change', () => {
+			const f = patInput.files && patInput.files[0];
+			patInput.value = '';	/* so re-picking the same file fires change again */
+			if (!f) return;
+			patErr.hidden = true; patChoose.disabled = true;
+			patChoose.textContent = _('Uploading…', 'footstrap');
+			prefs.uploadPattern(f)
+				.then((tok) => {
+					reflectPattern(tok);
+					/* uploadPattern already switched THIS browser onto the pattern, so the control has
+					 * to catch up or the page paints the tile while the dropdown still reads Off.
+					 * `dom.callClassMethod` is how LuCI moves one of its own widgets from the outside;
+					 * setWallpaper is then called directly, because a programmatic setValue does NOT
+					 * emit `widget-change` — the event is the user's, and relying on it here would
+					 * leave the rows and the Save button behind. */
+					dom.callClassMethod(seg, 'setValue', 'pattern');
+					setWallpaper('pattern');
+				})
+				.catch((e) => { patErr.textContent = String((e && e.message) || e); patErr.hidden = false; })
+				.finally(() => { patChoose.disabled = false; patChoose.textContent = patChooseLabel; });
+		});
+		patRemove.addEventListener('click', () => {
+			patErr.hidden = true; patRemove.disabled = true;
+			prefs.removePattern()
+				.then(() => reflectPattern(''))
+				.catch((e) => { patErr.textContent = String((e && e.message) || e); patErr.hidden = false; })
+				.finally(() => { patRemove.disabled = false; });
+		});
 
 		chooseBtn.addEventListener('click', () => { err.hidden = true; fileInput.click(); });
 		fileInput.addEventListener('change', () => {
@@ -418,8 +437,18 @@ function build() {
 				.finally(() => { removeBtn.disabled = false; });
 		});
 
-		return E('div', { 'class': 'fs-ap-wall' }, [ seg, panel ]);
-	});
+		let seg;
+		const wallRow = group(_('Wallpaper', 'footstrap'), (label) => {
+			seg = selectCtl(prefs.currentWallpaper(), {
+				off:     _('Off', 'footstrap'),
+				pattern: _('Pattern', 'footstrap'),
+				file:    _('File', 'footstrap')
+			}, setWallpaper, label);
+			return seg;
+		});
+
+		return [ wallRow ].concat(patRows, fileRows);
+	})();
 
 	/* ---- section 4: the router default and the version ---- */
 	/* the version line: read from fs-version.js, which the Makefile stamps at package time. No
@@ -441,7 +470,11 @@ function build() {
 	 * explicitly, which is the only way to say "as the theme ships" on a router that has a saved
 	 * default of its own. Neither touches /etc/config/footstrap. */
 	const resetSavedBtn = E('button', { 'class': 'btn', 'type': 'button' }, [ _('Reset to saved', 'footstrap') ]);
-	const resetBtn = E('button', { 'class': 'btn', 'type': 'button' }, [ _('Reset to default', 'footstrap') ]);
+	/* The stock destructive class, so the button that throws away every local tweak is the red one
+	 * on the page — LuCI paints .cbi-button-negative/.cbi-button-remove from --fs-danger
+	 * (theme/55-buttons.css). "Reset to saved" stays neutral on purpose: it drops this browser back
+	 * onto whatever the router says, which is a step BACK to a shared state rather than a discard. */
+	const resetBtn = E('button', { 'class': 'btn cbi-button-negative', 'type': 'button' }, [ _('Reset to default', 'footstrap') ]);
 	/* Save's only visible failure surface. saveAsDefault() writes /etc/config/footstrap over the
 	 * scoped uci ACL; the realistic failure is the rpc REJECTING — an expired session (403), a
 	 * missing ACL, ubus down — which the old code buried in a title tooltip nobody sees. (A DELETED
@@ -595,9 +628,9 @@ function build() {
 	const page = E('div', { 'class': 'fs-ap' }, [
 		section(_('Interface', 'footstrap'), shell),
 		foldable(_('Colours', 'footstrap'),
-			[ presetRow ].concat(colours, [ E('h5', { 'class': 'fs-ap-sub' }, [ _('Surfaces', 'footstrap') ]) ], surfaces),
+			colours.concat([ E('div', { 'class': 'fs-ap-head fs-ap-sub' }, [ E('h4', {}, [ _('Surfaces', 'footstrap') ]) ]) ], surfaces),
 			'fs-ui-colours'),
-		foldable(_('Background', 'footstrap'), [ wallpaper ], 'fs-ui-background'),
+		foldable(_('Background', 'footstrap'), wallpaper, 'fs-ui-background'),
 		section(_('Defaults', 'footstrap'), defaults)
 	]);
 
@@ -741,6 +774,5 @@ function wire() {
 
 return baseclass.extend({
 	wire,
-	render,
-	PRESETS
+	render
 });

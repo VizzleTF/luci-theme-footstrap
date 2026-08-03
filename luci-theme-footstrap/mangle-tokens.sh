@@ -13,7 +13,7 @@
 # WHY IT IS SAFE, and each clause is a thing that was checked rather than assumed:
 #   * `--fs-*` is the PRIVATE tier. The outbound contract with third-party apps is the `--*-color-*`
 #     export tier, a different prefix, and it is not touched. Verified on the router: no installed
-#     luci-app reads a `--fs-` name, and `fs-update.js` from the updater repo has zero.
+#     luci-app reads a `--fs-` name.
 #   * The RESERVED set is DERIVED, not listed: every `--fs-` name that appears in the theme's JS or
 #     in a .ut template crosses a seam (fs-prefs.js writes `--fs-tint`, head.ut's pre-paint writes
 #     `--fs-radius-base`, fs-chrome.js reads `--fs-sidebar-w` …) and keeps its name. 15 of 123 today.

@@ -85,7 +85,7 @@ new file made it into the package (luci.mk copies `htdocs/` wholesale) but silen
 dev router, so it was first exercised after the release.
 
 What `sync` does not do: stamp `FS_VERSION` (the Footstrap tab shows `dev`) and compile
-`i18n/*.po` into `.lmo` (strings stay English). Both belong to a real package build, which is where
+`po/*.po` into `.lmo` (strings stay English). Both belong to a real package build, which is where
 they should be verified.
 
 ## If you break it

@@ -54,7 +54,7 @@ fi
 # po2lmo.c lib/lmo.c lib/plural_formula.c.) Same basename as the package — see the Makefile.
 if command -v po2lmo >/dev/null 2>&1; then
 	ssh "$R" "mkdir -p /usr/lib/lua/luci/i18n"
-	for po in "$D"/i18n/*/*.po; do
+	for po in "$D"/po/*/*.po; do
 		[ -e "$po" ] || continue
 		lang="$(basename "$(dirname "$po")")"
 		po2lmo "$po" "/tmp/footstrap-theme.$lang.lmo"

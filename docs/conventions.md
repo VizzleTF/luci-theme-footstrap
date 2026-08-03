@@ -225,9 +225,12 @@ reported success, and offered the same update forever (issue #6). Code already o
 cannot be fixed remotely; only the release can. CI fails unless each package resolves to exactly
 one asset under its name-anchored regex.
 
-**The translation catalogue lives in `i18n/`, not `po/`.** `LUCI_LANGUAGES` is `$(wildcard po/*)`,
-so the directory name is what stops luci.mk baking a separate `luci-i18n-footstrap-<lang>`
-package per language. That is the same issue #6.
+**The translation catalogue lives in `po/`.** That is the directory `LUCI_LANGUAGES` globs, so
+luci.mk bakes a `luci-i18n-footstrap-<lang>` package per language exactly as it does for every
+luci-app — and it is the only directory Weblate, which CONTRIBUTING names as the way to translate
+LuCI, can see. It was `i18n/` while a fielded self-updater resolved the theme by name and took
+`head -1` (issue #6); that updater is retired and owfeed builds the release as one artifact per
+format regardless, so the rename no longer bought anything.
 
 **No runtime dependency beyond `+luci-base`.** `curl` is not in OpenWrt's default set (the base
 image ships `uclient-fetch`); fall back, do not depend. `jsonfilter`, `sha256sum` and `usign` are
@@ -269,7 +272,6 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `mirror` | `@mirror`-pinned copies still byte-identical |
 | `bang-ok` | every `!important` sits in an allowlisted file |
 | `axes` | the pre-paint in `head.ut` agrees with the live appearance appliers, and `header.ut` reads every saved option back |
-| `wallpapers` | the size/sha256 pins match `wallpapers/`, and no doodle is in the shipped tree |
 | `chrome-fence` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `export-tier` | the `--*-color-*` contract: each level readable as text on three surfaces, each `--on-*` readable on its fill, and the ramp is not flat |
 | `css-i18n` | translatable strings emitted from CSS |

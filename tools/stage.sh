@@ -90,9 +90,9 @@ fi
 cp -a "$ROOTPART/." "$STAGE/"
 rm -rf "$ROOTPART"
 
-# 6. The version the popover shows and the updater compares against. FOOTSTRAP_VERSION is
-#    what CI injects from the tag; a working tree falls back to its newest tag, and a
-#    checkout with no tags at all keeps fs-version.js's own '0.0.0-dev'.
+# 6. The version the Appearance page shows. FOOTSTRAP_VERSION is what CI injects from the
+#    tag; a working tree falls back to its newest tag, and a checkout with no tags at all
+#    keeps fs-version.js's own '0.0.0-dev'.
 VER="${FOOTSTRAP_VERSION:-$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)}"
 if [ -n "$VER" ]; then
 	sed "s#const FS_VERSION *= *'[^']*'#const FS_VERSION = '$VER'#" \
@@ -107,8 +107,8 @@ else
 	echo "stage: no tag and no FOOTSTRAP_VERSION — staging as $VER" >&2
 fi
 
-# PKG_RELEASE is 1 in the Makefile and the -r1 suffix is part of every asset name a
-# fielded self-updater matches, so it is written here rather than left to owfeed.
+# PKG_RELEASE is 1 in the Makefile and the -r1 suffix is part of every asset name, so it
+# is written here rather than left to owfeed.
 printf '%s-r1\n' "$VER" > "$DIST/VERSION"
 
 # The lifecycle scripts, out of the Makefile's own defines. owfeed wraps them the way

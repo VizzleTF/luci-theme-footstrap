@@ -1,6 +1,6 @@
 #!/bin/sh
-# Rescan the theme sources into i18n/templates/footstrap.pot and merge it into every
-# i18n/<lang>/footstrap.po. Run after adding or changing ANY _('…') string.
+# Rescan the theme sources into po/templates/footstrap.pot and merge it into every
+# po/<lang>/footstrap.po. Run after adding or changing ANY _('…') string.
 #
 #   ./update-po.sh            rescan, merge, report what is still untranslated
 #   ./update-po.sh --check    change nothing; fail if the .pot is stale or a string is
@@ -10,13 +10,14 @@
 # msgid and nothing reports it (the popover said "Palette"/"Rounding"/"Cats" on a Russian
 # LuCI). Hence --check is a gate, not a suggestion.
 #
-# THE DIRECTORY IS `i18n/`, NOT `po/`, AND THAT IS LOAD-BEARING: LUCI_LANGUAGES is
-# `$(wildcard po/*)`, so a po/ dir makes luci.mk emit a separate luci-i18n-footstrap-<lang>
-# package per language — which broke the update button on every router in the field (issue #6;
-# the long note is in the Makefile). The catalogue is bundled into the theme package instead.
+# THE DIRECTORY IS `po/`, which is what LUCI_LANGUAGES globs and what Weblate translates. It was
+# `i18n/` for a while so luci.mk would NOT emit a luci-i18n-footstrap-<lang> package per language
+# (issue #6: a self-updater resolving the theme by name took head -1 and installed the catalogue);
+# that updater is retired and owfeed builds the release as one artifact per format either way, so
+# the rename bought nothing and cost the catalogue its visibility to the translation platform.
 #
-# Nothing here runs on the buildbot — the Makefile calls po2lmo itself. This needs perl +
-# gettext (xgettext, msgmerge, msgfmt), which the OpenWrt build does not.
+# Nothing here runs on the buildbot — luci.mk calls po2lmo itself. This needs perl + gettext
+# (xgettext, msgmerge, msgfmt), which the OpenWrt build does not.
 #
 # The scanner is LuCI's OWN build/i18n-scan.pl, not a grep: it lexes a .ut (rewriting the
 # template into JS before xgettext) and covers the rpcd acl.d/*.json title. A grep for _('…')
@@ -33,7 +34,7 @@ cd "$(dirname "$0")"
 . ./luci-upstream.pin
 SCANNER_URL="https://raw.githubusercontent.com/openwrt/luci/${LUCI_PIN}/build/i18n-scan.pl"
 SCANNER_SHA256="$I18N_SCAN_SHA256"
-POT='i18n/templates/footstrap.pot'
+POT='po/templates/footstrap.pot'
 CHECK=0
 [ "${1:-}" = '--check' ] && CHECK=1
 
@@ -69,7 +70,7 @@ else
 	}
 fi
 
-mkdir -p i18n/templates
+mkdir -p po/templates
 fresh="$(mktemp)"
 # htdocs = the theme JS, ucode = the templates, root = the rpcd ACL title
 perl "$scanner" htdocs ucode root > "$fresh"
@@ -89,7 +90,7 @@ if [ "$CHECK" = 1 ]; then
 	fi
 
 	rc=0
-	for po in i18n/*/*.po; do
+	for po in po/*/*.po; do
 		[ -e "$po" ] || continue
 		# an empty msgstr means the string renders in English for that language
 		missing="$(msgfmt --statistics -o /dev/null "$po" 2>&1 | grep -o '[0-9]* untranslated' || true)"
@@ -106,7 +107,7 @@ fi
 mv "$fresh" "$POT"
 echo "scanned -> $POT ($(grep -c '^msgid' "$POT") strings)"
 
-for po in i18n/*/*.po; do
+for po in po/*/*.po; do
 	[ -e "$po" ] || continue
 	msgmerge --quiet --update --backup=none "$po" "$POT"
 	echo "merged  -> $po: $(msgfmt --statistics -o /dev/null "$po" 2>&1 | tr '\n' ' ')"

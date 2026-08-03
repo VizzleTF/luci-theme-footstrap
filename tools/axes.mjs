@@ -247,7 +247,10 @@ else {
 				+ `it back — the router default for this axis reaches no browser, so "Reset to saved" `
 				+ `falls through to the built-in and Save-as-default looks like it did nothing`);
 	for (const f of headerFields)
-		if (f !== 'login_bg' && !snapFields.includes(f))
+		/* login_bg and pattern are the two uploaded images' cache-bust TOKENS, not axes: they have
+		 * no browser layer, so snapshotAxes() must never write them — the upload path writes each
+		 * one directly. Both still travel to the client through FS_AXES. */
+		if (f !== 'login_bg' && f !== 'pattern' && !snapFields.includes(f))
 			errors.push(`uci option '${f}': header.ut reads it back, but snapshotAxes() never writes it — `
 				+ `either a leftover from a removed axis, or the axis is missing from Save-as-default`);
 	if (!errors.length)

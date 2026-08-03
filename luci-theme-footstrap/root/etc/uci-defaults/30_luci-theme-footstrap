@@ -95,6 +95,16 @@ fi
 # so recreating the symlink here rather than shipping it is what makes it reliable on both filesystems.
 mkdir -p /etc/footstrap 2>/dev/null
 [ -d /www/luci-static/footstrap ] && ln -sf /etc/footstrap/login-bg /www/luci-static/footstrap/bg 2>/dev/null
+# The uploaded PATTERN (Appearance -> Wallpaper -> Pattern) is the same arrangement, with ONE
+# difference that is not cosmetic: the exposed name KEEPS THE .svg EXTENSION. uhttpd types a
+# response by extension, and an SVG served as application/octet-stream is one no browser will
+# paint — as a CSS mask, as a background image or at all.
+[ -d /www/luci-static/footstrap ] && ln -sf /etc/footstrap/pattern.svg /www/luci-static/footstrap/pattern.svg 2>/dev/null
+# The two doodle wallpapers earlier versions downloaded into /www on demand. They were never
+# package files, so no package manager will ever remove them, and nothing serves them any more —
+# the axis they belonged to now paints an admin-uploaded SVG. Left behind they are 200 kB of a
+# router's flash held by a feature that no longer exists.
+rm -f /www/luci-static/footstrap/cats.svg /www/luci-static/footstrap/dinos.svg 2>/dev/null
 
 # these caches embed theme paths — drop them so the switch applies on the next request
 rm -f /tmp/luci-indexcache* 2>/dev/null

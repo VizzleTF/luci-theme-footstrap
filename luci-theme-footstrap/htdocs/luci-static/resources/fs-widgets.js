@@ -72,88 +72,15 @@ function wireDismiss(opts) {
 	});
 }
 
-/* the radiogroup's key map: arrows move by ±1, Home/End jump to an edge (handled by index) */
-const SEG_KEYS = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: 0, End: 0 };
-
-/* One segmented control; highlights the active option, calls onPick on change.
- * `label` is not decoration: the visible caption is a sibling <div> nothing associated with the
- * control, and the selection was carried by a CSS class alone — a screen reader got an unnamed
- * group of unrelated buttons with no indication of which was in effect. It is a radio group. */
-function segControl(current, opts, onPick, label) {
-	const wrap = E('div', { 'class': 'fs-seg', 'role': 'radiogroup', 'aria-label': label || '' });
-
-	/* Select one option and make it the group's single tab stop. role="radio" is a PROMISE of APG
-	 * behaviour, and it was half-kept: the roles were there but every button stayed natively
-	 * tabbable and the arrows did nothing, so a keyboard user tabbed through N stops in a control
-	 * a screen reader had told them was one radio group. axe cannot catch this (it checks names and
-	 * roles, not key handling), which is why `npm run a11y` was green over it. */
-	function select(b, focus) {
-		wrap.querySelectorAll('button').forEach((x) => {
-			const on = (x === b);
-			x.classList.toggle('active', on);
-			x.setAttribute('aria-checked', on ? 'true' : 'false');
-			/* roving tabindex: only the checked radio is in the tab sequence, so Tab enters and
-			 * leaves the GROUP once and the arrows move within it. */
-			x.tabIndex = on ? 0 : -1;
-		});
-		if (focus) b.focus();
-	}
-
-	opts.forEach((o) => {
-		const active = (o.val === current);
-		const b = E('button', {
-			'type': 'button',
-			'class': active ? 'active' : '',
-			'role': 'radio',
-			'aria-checked': active ? 'true' : 'false',
-			'tabindex': active ? '0' : '-1',
-			'data-val': o.val
-		}, [ o.label ]);
-		b.addEventListener('click', () => { onPick(o.val); select(b, false); });
-		wrap.appendChild(b);
-	});
-
-	/* In a radiogroup an arrow both MOVES and SELECTS (APG), and the ends wrap. Home/End are the
-	 * same move to the first/last. Space/Enter reach the button as a native click already. */
-	wrap.addEventListener('keydown', (ev) => {
-		if (!(ev.key in SEG_KEYS)) return;
-		const list = [ ...wrap.querySelectorAll('button') ];
-		if (!list.length) return;
-		const at = list.indexOf(document.activeElement);
-		if (at < 0) return;
-		ev.preventDefault();
-		const next = ev.key === 'Home' ? list[0]
-			: ev.key === 'End' ? list[list.length - 1]
-			: list[(at + SEG_KEYS[ev.key] + list.length) % list.length];
-		onPick(next.getAttribute('data-val'));
-		select(next, true);
-	});
-
-	return wrap;
-}
-
-/* A range slider with a live readout; onInput fires continuously as it drags. Without the label
- * and valuetext a screen reader announced a bare "slider, 12" — no unit, no idea what it adjusts.
- * `opts.fmt` is what the READOUT says AND what the reader is told, so it is not cosmetic: the tint
- * slider's 0 means "off", and announcing "0 degrees" would announce a hue that is not applied. */
-function sliderControl(current, min, max, onInput, label, opts) {
-	const o = opts || {};
-	const fmt = o.fmt || ((v) => v + 'px');
-	const out = E('span', { 'class': 'fs-range-val' }, [ fmt(current) ]);
-	const input = E('input', {
-		'type': 'range', 'class': 'fs-range' + (o.cls ? ' ' + o.cls : ''),
-		'min': String(min), 'max': String(max), 'step': String(o.step || 1), 'value': String(current),
-		'aria-label': label || '',
-		'aria-valuetext': fmt(current)
-	});
-	input.addEventListener('input', () => {
-		const v = parseInt(input.value, 10);
-		out.firstChild.data = fmt(v);
-		input.setAttribute('aria-valuetext', fmt(v));
-		onInput(v);
-	});
-	return E('div', { 'class': 'fs-rangewrap' }, [ input, out ]);
-}
+/* THE SEGMENTED CONTROL AND THE RANGE WRAPPER WERE HERE, and they are not coming back: the
+ * Appearance page draws its enums with `ui.Select` and its numbers with `ui.RangeSlider` — LuCI's
+ * own widgets, present on every release this theme supports and already dressed by this theme's
+ * stylesheet (`select` in base/30-forms.css, `.cbi-range-slider` in theme/60-inputs.css).
+ *
+ * They were written for the floating popover this page used to be, where a native <select> read as
+ * a hole in the card. On a page there is no such argument, and a control LuCI maintains is one this
+ * theme cannot get wrong on its own — the roving tabindex here was itself a bug fix for a
+ * radiogroup that announced one control and offered N tab stops. */
 
 /* ---- colour: reading what the page is ACTUALLY painted, and what that costs in contrast --------
  *
@@ -251,7 +178,7 @@ function colorControl(current, onPick, label, opts) {
 		'inputmode': 'text', 'maxlength': '7', 'aria-label': label || ''
 	});
 	const clear = E('button', { 'class': 'btn fs-color-clear', 'type': 'button' }, [ _('Palette', 'footstrap') ]);
-	const ratio = o.contrast ? E('div', { 'class': 'fs-color-contrast' }) : null;
+	const ratio = o.contrast ? E('div', { 'class': 'cbi-value-description fs-color-contrast' }) : null;
 
 	/* what the axis holds RIGHT NOW — the control keeps no copy of its own, because the page it
 	 * lives on can change the axis behind it (a preset, Reset to default) and a private copy would
@@ -366,8 +293,6 @@ return baseclass.extend({
 	setOpen,
 	wireSpaceKey,
 	wireDismiss,
-	segControl,
-	sliderControl,
 	colorControl,
 	probeColor,
 	toHex,

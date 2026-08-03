@@ -5,3 +5,4 @@
 # NOT a conffile: it lives outside root/etc/config, and tools/conffiles.mjs would reject
 # a conffiles-define entry the package does not ship.
 /etc/footstrap/login-bg
+/etc/footstrap/pattern.svg

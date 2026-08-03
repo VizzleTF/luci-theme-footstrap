@@ -99,8 +99,7 @@
 		.cbi-tabmenu > li.cbi-tab > a,
 		.cbi-dropdown > ul > li[selected],
 		.ifacebox .ifacebox-head.active,
-		.cbi-page-actions .cbi-button-apply,
-		.fs-seg button.active {
+		.cbi-page-actions .cbi-button-apply {
 			outline: 2px solid Highlight;
 			outline-offset: -2px;
 			color: HighlightText;

@@ -318,18 +318,21 @@ const PALETTE = enumAxis('fs-palette', 'data-palette', 'hicontrast', 'footstrap'
 const currentPalette = PALETTE.current, applyPalette = PALETTE.apply;
 
 /* Wallpaper is a MULTI-value axis and its own concern (composes with either palette): off (bare
- * canvas), one of the shipped doodle patterns — cats, dinos (15-wallpaper.css) — or file (the
+ * canvas), pattern (the admin-uploaded SVG, tiled and recoloured — 15-wallpaper.css) or file (the
  * admin-uploaded photo, 16-login-bg.css). It is not the enumAxis shape (that is two-valued) —
- * data-wallpaper carries the VALUE or is absent for 'off'. The photo BYTES are router-side
- * (currentLoginBg / uploadLoginBg below); this axis only decides whether THIS browser shows them,
- * exactly like it decides a doodle vs off — so a router-wide photo comes from Save-as-default
- * (wallpaper=file), including the pre-login page.
+ * data-wallpaper carries the VALUE or is absent for 'off'. BOTH images are router-side
+ * (currentPattern / currentLoginBg below); this axis only decides whether THIS browser paints one,
+ * so a router-wide backdrop comes from Save-as-default, including the pre-login page.
  *
- * The list is what VALIDATES a stored value, so a doodle added to the CSS and not to this array is
+ * The list is what VALIDATES a stored value, so a value added to the CSS and not to this array is
  * one head.ut pre-paints and the live applier then rejects: the page would paint it and the first
  * touch of any other control would take it away. Adding one means this line, the head.ut whitelist,
- * the segmented control in fs-appearance.js and the rules in 15-wallpaper.css. */
-const WALLPAPERS = [ 'cats', 'dinos', 'file' ];		/* the non-off values; 'off' = bare :root */
+ * the segmented control in fs-appearance.js and the rules in 15-wallpaper.css.
+ *
+ * A router upgrading from a version with the downloaded `cats`/`dinos` doodles reads its stored
+ * value here, finds it is not in the list, and falls to 'off' — the files those named are not in
+ * the package and are no longer fetched, so painting them was never an option. */
+const WALLPAPERS = [ 'pattern', 'file' ];		/* the non-off values; 'off' = bare :root */
 function wallpaperDefault() {
 	const d = sd('wallpaper');
 	return (WALLPAPERS.indexOf(d) >= 0) ? d : 'off';
@@ -557,7 +560,7 @@ const AXIS_KEYS = [
 	'fs-tint', 'fs-accent', 'fs-good', 'fs-warn', 'fs-danger',
 	'fs-card', 'fs-control', 'fs-bar', 'fs-line',
 	'fs-radius', 'fs-menu-autocollapse', 'fs-tint-strength', 'fs-density',
-	'fs-photo-dim'
+	'fs-photo-dim', 'fs-pattern-size', 'fs-pattern-strength', 'fs-pattern-ink'
 ];
 /* Tint density: the STRENGTH of the router-identity Tint (the hue washed onto --fs-bg), a per-browser
  * axis paired with the Tint hue — the hue picks the colour, this picks how strong it reads.
@@ -586,6 +589,30 @@ const currentTintStrength = TSTR.current, applyTintStrength = TSTR.apply, tintSt
 const FS_PDIM_DEFAULT = 74;
 const PDIM = propAxis('fs-photo-dim', 'photo_dim', '--fs-photo-dim', 0, 100, FS_PDIM_DEFAULT, (v) => (v + '%'));
 const currentPhotoDim = PDIM.current, applyPhotoDim = PDIM.apply, photoDimDefault = PDIM.def;
+
+/* The PATTERN's two live knobs, and the third that is an enum. All three only bite while the
+ * wallpaper is 'pattern'; all three are ordinary per-browser axes that reach the router through
+ * Save-as-default with the rest — the FILE is shared, how this browser draws it is not.
+ *
+ * Size is the tile's edge in px. 440 is where the old cats doodle read as a drawing rather than as
+ * texture, and it is a sane middle for line art at any density; the range is wide because "how big
+ * is one repeat" is entirely a property of the artwork. Strength is the layer's opacity 0-100 —
+ * the doodles baked .20 into the file with an SVG `<g opacity>` and CSS could not reach it, which
+ * is exactly the knob this replaces.
+ *
+ * Declared up here with the other axis instances, above _resolvedDefault()'s module-init call: a
+ * propAxis is a `const`, so declaring it lower leaves it in the TDZ at init and the whole module
+ * throws, taking the chrome with it. */
+const FS_PSIZE_DEFAULT = 440;
+const PSIZE = propAxis('fs-pattern-size', 'pattern_size', '--fs-pattern-size', 40, 1600, FS_PSIZE_DEFAULT, (v) => (v + 'px'));
+const currentPatternSize = PSIZE.current, applyPatternSize = PSIZE.apply, patternSizeDefault = PSIZE.def;
+const FS_PSTR_DEFAULT = 20;
+const PSTR = propAxis('fs-pattern-strength', 'pattern_strength', '--fs-pattern-strength', 0, 100, FS_PSTR_DEFAULT, (v) => String(v / 100));
+const currentPatternStrength = PSTR.current, applyPatternStrength = PSTR.apply, patternStrengthDefault = PSTR.def;
+/* Ink: 'theme' (the default — the file's alpha, the theme's colour) or 'original' (the file's own
+ * colours, no mask). Two-valued with the default as the bare :root, which is the enumAxis shape. */
+const PINK = enumAxis('fs-pattern-ink', 'data-pattern-ink', 'original', 'theme');
+const currentPatternInk = PINK.current, applyPatternInk = PINK.apply;
 /* `reject: true` IS THE WHOLE POINT — without it a refused write arrives as SUCCESS.
  *
  * rpc.js only raises on the ubus status code when the declaration asks it to (`raise: options.reject`
@@ -622,7 +649,10 @@ function snapshotAxes() {
 		autocollapse: currentAutoCollapse() ? 'on' : 'off',
 		tint_strength: String(currentTintStrength()),
 		density: currentDensity(),
-		photo_dim: String(currentPhotoDim())
+		photo_dim: String(currentPhotoDim()),
+		pattern_size: String(currentPatternSize()),
+		pattern_strength: String(currentPatternStrength()),
+		pattern_ink: currentPatternInk()
 	};
 }
 /* The RESOLVED router default (UCI value if set, else the built-in), in snapshotAxes() string form,
@@ -654,7 +684,10 @@ function _resolvedDefault() {
 		autocollapse: autoCollapseDefault() ? 'on' : 'off',
 		tint_strength: String(tintStrengthDefault()),
 		density: densityDefault(),
-		photo_dim: String(photoDimDefault())
+		photo_dim: String(photoDimDefault()),
+		pattern_size: String(patternSizeDefault()),
+		pattern_strength: String(patternStrengthDefault()),
+		pattern_ink: PINK.def()
 	};
 }
 let _savedDefault = _resolvedDefault();
@@ -723,97 +756,173 @@ function resetToBuiltin() {
 	applyRadius(FS_RADIUS_DEFAULT);
 	applyTintStrength(FS_TSTR_DEFAULT);
 	applyPhotoDim(FS_PDIM_DEFAULT);
+	applyPatternSize(FS_PSIZE_DEFAULT);
+	applyPatternStrength(FS_PSTR_DEFAULT);
+	applyPatternInk('theme');
 	/* every colour and surface axis back to "the palette's own" */
 	[ applyTint, applyAccent, applyGood, applyWarn, applyDanger,
 		applyCard, applyControl, applyBar, applyLine ].forEach((fn) => fn(0));
 }
 
-/* ---- the doodle wallpapers: FETCHED ON DEMAND, not shipped ------------------------------------
+/* ---- the PATTERN: an SVG the admin uploads, tiled and recoloured -------------------------------
  *
- * cats.svg and dinos.svg are 77 KB and 128 KB of decoration, and a theme that a router flashes into
- * 8 MB of squashfs should not spend 200 KB on two pictures most installs never switch on. They live
- * in the repository (wallpapers/) and NOT in the package; picking one downloads it, once, and the
- * Appearance page says how big it is before anything is fetched.
+ * The theme used to ship two doodle patterns by downloading them from the project's GitHub on
+ * demand. A theme in a package feed has no business reaching a third-party host at run time, and
+ * "two drawings somebody else chose" was never the interesting half of the feature — so the bytes
+ * now come from the admin, and the theme's job is to make an arbitrary SVG look like it belongs.
  *
- * THE BROWSER FETCHES, NOT THE ROUTER, and that is the whole reason this is workable: the admin's
- * machine has the internet connection, so a router with no WAN — or one behind exactly the kind of
- * blocked route this theme is often installed to manage — is not asked to reach GitHub. The bytes
- * arrive over the browser's own verified TLS, are checked against a sha256 pinned HERE, and only
- * then are uploaded to the router through the same cgi-io path the login background already uses.
+ * ROUTER-SIDE, like the login photo and for the same reason: a file cannot live in localStorage,
+ * and a pattern is something a router wears, not something one browser does. The path is a FIXED
+ * server-side constant matched exactly by the rpcd ACL, so nothing user-controlled reaches a path.
+ * It lives under /etc so a package upgrade cannot delete it (and keep.d carries it across a
+ * sysupgrade); the served name ENDS IN .svg because uhttpd types a file by extension, and an SVG
+ * served as application/octet-stream is one no browser will paint.
  *
- * THE DIGEST IS THE POINT, and it is checked before the file reaches the router, not after: a
- * raw.githubusercontent URL is a moving target (a branch, not a release asset), and "it came over
- * https" only says the bytes are the ones that host served, not that they are the bytes this
- * version of the theme was built against. tools/wallpapers.mjs holds each constant below against
- * the file in wallpapers/, so a re-traced doodle that forgets to update its hash fails the build
- * rather than every router's download. */
-const WP_BASE = 'https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/wallpapers/';
-const WP_DIR = '/www/luci-static/footstrap/';
-const WALLPAPER_FILES = {
-	cats:  { bytes: 76751,  sha256: '608dcd8eafa3315fde012e5bf72c0727e8d17d98d5927a8893a31e2aca4842db' },
-	dinos: { bytes: 131345, sha256: 'd4b5168e68dc6c15c4d8570e02d1510b3c7eaa7dbaa64264d7dc175deb163f1b' }
-};
+ * HOW IT IS MADE TO FIT is 15-wallpaper.css's mask, not anything done to the bytes: the file
+ * supplies the alpha, the theme supplies the colour, so one upload reads correctly in light mode,
+ * in dark mode and under every palette. The two live knobs — tile size and strength — are ordinary
+ * per-browser axes below.
+ *
+ * WHAT IS REFUSED. An SVG is a document, not a picture: it can carry script, and while a masked or
+ * background image never executes it, the same file fetched directly from its URL would. Uploading
+ * one already needs an authenticated admin session with uci write rights, so this is defence in
+ * depth rather than the only line — but the check is cheap and the failure mode is somebody else's
+ * browser. Scripted or externally-referencing markup is rejected client-side, before anything is
+ * written. */
+const PAT_PATH  = '/etc/footstrap/pattern.svg';			/* cgi-upload target; the ACL grants exactly this */
+const PAT_SERVE = '/luci-static/footstrap/pattern.svg';	/* the uhttpd symlink to PAT_PATH (uci-defaults) */
+const PAT_MAX   = 512 * 1024;							/* a tile that has to reach a router's flash and then every page load */
+/* WHAT MAKES AN UPLOADED SVG UNACCEPTABLE, decided on the PARSED DOCUMENT and not on its text.
+ *
+ * A regex over the source was the first attempt and it was wrong in the way that matters: `\son\w+=`
+ * (meant for `onload=`) also matches `only_selected="false"`, an ordinary Inkscape attribute, so one
+ * of this project's own sample drawings was refused by its own gate. Text matching is guessing at a
+ * grammar the browser already implements — and it guesses in both directions, since an entity or an
+ * odd bit of whitespace hides a real handler from the same regex.
+ *
+ * DOMParser is the parser the file will actually be read by, and parsing is inert: no script runs, no
+ * subresource is fetched, no handler is bound. So the questions become exact ones about nodes:
+ *
+ *   - is it an SVG at all (a parsererror, or a root that is not <svg>, is not an image)
+ *   - does it carry an element that EXECUTES or EMBEDS (script, foreignObject, iframe, …)
+ *   - does it carry a real event-handler attribute — `^on[a-z]+$`, which `only_selected` is not
+ *   - does any value start a `javascript:` url
+ *   - does any href point OFF this router — an SVG that phones home when painted is the exact thing
+ *     this feature stopped doing; `#fragment` and `data:` stay allowed, because that is how a tile
+ *     refers to its own <defs> and how it embeds a bitmap
+ *
+ * A masked or backgrounded SVG never executes anything in any current browser. The check is for the
+ * OTHER way the file can be reached — its own URL, opened directly, same-origin with the session.
+ *
+ * `animate`/`set` are on the list for a second reason as well as the first: they can retarget an
+ * attribute at run time (the classic `<set attributename="href" to="javascript:…">`), and a tile
+ * that animates repaints a full-viewport layer behind every page for as long as LuCI is open. */
+const PAT_BAD_TAGS = [ 'script', 'foreignobject', 'iframe', 'embed', 'object', 'audio', 'video', 'animate', 'set' ];
 
-/* Which doodles are already on this router. The SERVER globbed for them (head.ut, the same trick as
- * the optional updater's __fsUpd): asking the client to probe with a HEAD request per doodle would
- * be two requests on every page load to learn something the server knows for free. */
-function wallpaperReady(name) {
-	try { return !!(window.__fsWp || {})[name]; } catch (e) { return false; }
-}
-function wallpaperSize(name) {
-	return (WALLPAPER_FILES[name] || {}).bytes || 0;
+/* null if the parsed document is fine, otherwise the sentence to show. */
+function _svgObjection(text) {
+	let doc;
+	try { doc = new DOMParser().parseFromString(text, 'image/svg+xml'); }
+	catch (e) { return _('That file is not an SVG image.', 'footstrap'); }
+	const root = doc && doc.documentElement;
+	if (!root || doc.querySelector('parsererror') || root.nodeName.toLowerCase() !== 'svg')
+		return _('That file is not an SVG image.', 'footstrap');
+	const refused = _('That SVG contains script or external references, which this theme will not install.', 'footstrap');
+	const els = [ root ].concat([ ...root.querySelectorAll('*') ]);
+	for (const el of els) {
+		if (PAT_BAD_TAGS.indexOf(el.nodeName.toLowerCase()) >= 0) return refused;
+		const attrs = el.attributes || [];
+		for (let i = 0; i < attrs.length; i++) {
+			const n = attrs[i].name.toLowerCase();
+			const v = String(attrs[i].value || '').trim();
+			/* a REAL handler is `on` + letters and nothing else; `only_selected` is not one */
+			if ((/^on[a-z]+$/).test(n)) return refused;
+			if ((/^javascript:/i).test(v)) return refused;
+			/* off-router reference. A leading `//` is protocol-relative and just as external. */
+			if ((/(?:^|:)href$/).test(n) && (/^(?:[a-z][a-z0-9+.-]*:)?\/\//i).test(v)) return refused;
+		}
+	}
+	return null;
 }
 
-/* hex sha256 of an ArrayBuffer, through the platform. crypto.subtle is unavailable on an insecure
- * origin in every current browser — and LuCI over plain http IS one — so this resolves to null
- * there rather than throwing, and the caller decides what an unverifiable download is worth. */
-function _sha256(buf) {
-	const c = window.crypto && window.crypto.subtle;
-	if (!c) return Promise.resolve(null);
-	return c.digest('SHA-256', buf).then((d) => [...new Uint8Array(d)]
-		.map((b) => b.toString(16).padStart(2, '0')).join(''));
+/* Read the picked file as text so it can be inspected before it is uploaded — and so the thing that
+ * reaches the router is exactly the bytes that were checked. */
+function _readText(file) {
+	return new Promise((resolve, reject) => {
+		const fr = new FileReader();
+		fr.onload = () => resolve(String(fr.result || ''));
+		fr.onerror = () => reject(new Error(_('That file could not be read.', 'footstrap')));
+		fr.readAsText(file);
+	});
 }
 
-/* Fetch one doodle and put it on the router. Resolves when it is servable, so the caller can switch
- * the axis on straight afterwards. */
-function installWallpaper(name) {
-	const want = WALLPAPER_FILES[name];
-	if (!want) return Promise.reject(new Error('unknown wallpaper'));
-	if (wallpaperReady(name)) return Promise.resolve();
-	/* no-store: the point of the digest check is that we verified THESE bytes, and a stale
-	 * heuristically-cached copy is bytes nobody verified. */
-	return fetch(WP_BASE + name + '.svg', { cache: 'no-store', credentials: 'omit' })
-		.then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('HTTP ' + r.status))))
-		.then((buf) => {
-			if (buf.byteLength !== want.bytes)
-				return Promise.reject(new Error(_('The download did not match what this theme expects.', 'footstrap')));
-			return _sha256(buf).then((sum) => {
-				/* A null sum is "this browser cannot hash on an insecure origin", not "the file is
-				 * wrong". The length check above still held, the transport was the browser's own
-				 * TLS, and the alternative is refusing the feature to everyone on http — which is
-				 * most LuCI. A WRONG sum is refused outright. */
-				if (sum !== null && sum !== want.sha256)
-					return Promise.reject(new Error(_('The download did not match what this theme expects.', 'footstrap')));
-				const fd = new FormData();
-				fd.append('sessionid', rpc.getSessionID());
-				fd.append('filename', WP_DIR + name + '.svg');
-				fd.append('filedata', new Blob([ buf ], { type: 'image/svg+xml' }), name + '.svg');
-				return fetch(L.env.cgi_base + '/cgi-upload', { method: 'POST', body: fd, credentials: 'same-origin' })
-					.then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))));
+/* the token the server last saved (window.__fsSD.pattern), validated to the same hex charset the
+ * head.ut sanitiser and the pre-paint keep their own copies of. '' = nothing uploaded. */
+function currentPattern() {
+	const t = sd('pattern');
+	return (typeof t === 'string' && BG_TOKEN_RE.test(t)) ? t : '';
+}
+function patternUrl(tok) { return PAT_SERVE + '?v=' + tok; }
+
+/* set / clear the tile URL live, without a reload. This only supplies the url(); whether it PAINTS
+ * is the Wallpaper axis (data-wallpaper="pattern"). */
+function _applyPattern(tok) {
+	const root = document.documentElement;
+	if (tok) root.style.setProperty('--fs-pattern-url', 'url("' + patternUrl(tok) + '")');
+	else root.style.removeProperty('--fs-pattern-url');
+	setSD('pattern', tok || '');
+}
+
+/* Upload flow, the login photo's exactly: validate -> multipart POST to cgi-io's cgi-upload -> take
+ * the md5 `checksum` from the reply as the cache-bust token -> save that token in uci -> apply live.
+ * No canvas step: re-encoding is what strips a photo's EXIF, and an SVG re-drawn to a canvas would
+ * come back a raster and lose the one property that makes it a tile. The text check above is what
+ * stands in for it. */
+function uploadPattern(file) {
+	if (!file) return Promise.reject(new Error(_('Please choose an SVG file.', 'footstrap')));
+	const isSvg = (/(^image\/svg\+xml$)/i).test(file.type || '') || (/\.svg$/i).test(file.name || '');
+	if (!isSvg) return Promise.reject(new Error(_('Please choose an SVG file.', 'footstrap')));
+	if (file.size > PAT_MAX) return Promise.reject(new Error(_('That file is too large.', 'footstrap')));
+	return _readText(file).then((text) => {
+		const objection = _svgObjection(text);
+		if (objection) return Promise.reject(new Error(objection));
+		const fd = new FormData();
+		fd.append('sessionid', rpc.getSessionID());
+		fd.append('filename', PAT_PATH);
+		fd.append('filedata', new Blob([ text ], { type: 'image/svg+xml' }), 'pattern.svg');
+		return fetch(L.env.cgi_base + '/cgi-upload', { method: 'POST', body: fd, credentials: 'same-origin' })
+			.then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))));
+	}).then((reply) => {
+		if (!reply || reply.failure)
+			return Promise.reject(new Error((reply && reply.failure && reply.failure[1]) || _('Upload failed.', 'footstrap')));
+		const tok = String(reply.checksum || '').toLowerCase();
+		if (!BG_TOKEN_RE.test(tok))
+			return Promise.reject(new Error(_('Upload failed.', 'footstrap')));
+		/* cgi-upload writes 0600 and uhttpd refuses to SERVE a file that is not world-readable
+		 * (measured: 0600 -> 403, 0644 -> 200) — and _chmodServeable checks the COMMAND's exit
+		 * status, not just the ubus call's. */
+		return _chmodServeable(PAT_PATH)
+			/* uci gets the TOKEN and nothing else: putting a file on the router is not the same act
+			 * as making every other device paint it, which is the wallpaper axis and Save-as-default. */
+			.then(() => _uciSet('footstrap', 'settings', { pattern: tok }))
+			.then(() => _uciCommit('footstrap'))
+			.then(() => {
+				/* switch THIS browser onto it — the ordinary axis path, localStorage only */
+				applyWallpaper('pattern');
+				_applyPattern(tok);
+				return tok;
 			});
-		})
-		.then((reply) => {
-			if (!reply || reply.failure)
-				return Promise.reject(new Error((reply && reply.failure && reply.failure[1]) || _('Upload failed.', 'footstrap')));
-			/* cgi-upload writes 0600 and uhttpd refuses to SERVE a file that is not world-readable
-			 * (measured: 0600 -> 403, 0644 -> 200) — the same step the login background needs. */
-			return _fileExec('/bin/chmod', [ '644', WP_DIR + name + '.svg' ]);
-		})
-		.then(() => {
-			/* remember it for the rest of this page's life; the next full load learns it from the
-			 * server glob again */
-			try { (window.__fsWp = window.__fsWp || {})[name] = 1; } catch (e) {}
-		});
+	});
+}
+
+/* Remove: delete the file, blank the token (uci `set` to '', not delete — the scoped ACL grants
+ * set/commit only), clear the tile live. */
+function removePattern() {
+	return _fileRemove(PAT_PATH)
+		.catch(() => null)	/* already gone is success — still blank the token below */
+		.then(() => _uciSet('footstrap', 'settings', { pattern: '' }))
+		.then(() => _uciCommit('footstrap'))
+		.then(() => { _applyPattern(''); });
 }
 
 /* ---- Login/page background upload: ROUTER-SIDE, and deliberately NOT an axis --------------------
@@ -985,7 +1094,10 @@ return baseclass.extend({
 	currentRail, applyRail,
 
 	currentLoginBg, loginBgUrl, uploadLoginBg, removeLoginBg,
-	wallpaperReady, wallpaperSize, installWallpaper,
+	currentPattern, patternUrl, uploadPattern, removePattern,
+	currentPatternSize, applyPatternSize,
+	currentPatternStrength, applyPatternStrength,
+	currentPatternInk, applyPatternInk,
 	currentTintStrength, applyTintStrength,
 	currentPhotoDim, applyPhotoDim,
 

@@ -189,7 +189,6 @@
 	.fs-railtoggle:focus-visible,
 	.fs-themerow:focus-visible,
 	.fs-logout:focus-visible,
-	.fs-seg button:focus-visible,
 	.fs-sidebar ul.nav a:focus-visible {
 		outline: none;
 		box-shadow: var(--fs-focus-ring-solo);

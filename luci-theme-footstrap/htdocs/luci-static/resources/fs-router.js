@@ -283,8 +283,8 @@ function pragmaDeps(src) {
  * dom.js, poll.js, request.js or session.js at all. Every view file's pragmas name `view` and
  * `baseclass`, so a dependency walk hits this on its very first step: measured, warming the recents
  * at idle put 404s for view.js and poll.js in the console of every page load, and the first hover
- * added baseclass.js. This theme already refuses that noise elsewhere (head.ut probes for
- * fs-update.js server-side rather than let a bare require 404), and the same standard applies here.
+ * added baseclass.js. A require() that 404s is noise this theme refuses to make, and the same
+ * standard applies here.
  *
  * A future LuCI adding a seventh built-in would cost one 404 per session — `_prefetched` makes it
  * at most one — and the list is a literal from luci.js, not a guess about it. */
@@ -495,9 +495,7 @@ function navigate(pathname, push, kbd) {
 	/* run every registered navigation callback — today the search palette's recent-pages record and
 	 * its close-on-navigate. The seam is deliberately inverted: a registrant calls onNavigate()
 	 * (below) and the router names nobody, so an optional module that is not installed is not a
-	 * DependencyError that takes out the whole chrome. It was written for the retired updater's
-	 * poll-chain cancel, whose setTimeout would otherwise have kept firing fs.exec RPCs and popped
-	 * its modal over the page being opened; the shape is what a future optional module wants too.
+	 * DependencyError that takes out the whole chrome.
 	 *
 	 * The RESOLVED segments are passed in, and that is not convenience: this runs BEFORE L.env is
 	 * re-pointed a few lines down, so a callback reading L.env.dispatchpath for "where are we going"
@@ -819,9 +817,10 @@ function wireVisibility() {
 }
 
 /* Callbacks to run on every SPA navigation, each handed the resolved segments of the INCOMING page
- * (see navigate() — they run before L.env is re-pointed). Registrants: the optional updater's poll
- * cancel, which is why the registry exists at all (the router keeps no static dependency on that
- * optional module), and fs-search's recent-pages record. */
+ * (see navigate() — they run before L.env is re-pointed). The registry is INVERTED on purpose: a
+ * registrant calls in and the router names nobody, so it can never grow a static dependency on a
+ * module that may not be installed. Registrant today: fs-search's recent-pages record and its
+ * close-on-navigate. */
 const _navCbs = [];
 function onNavigate(fn) { if (typeof fn === 'function') _navCbs.push(fn); }
 

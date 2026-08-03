@@ -105,10 +105,10 @@ compile.
   factory receives has no `ui` helpers, and `require()` caches the first requirer's binding.
 - **`FS_VERSION` stays in `fs-version.js` at that path** — the Makefile, `dev-sync.sh` and
   `tools/stage.sh` sed it by path; moving it makes every release report "(dev)".
-- **No theme module may statically require `fs-update`.** The updater is a separate repo and package
-  ([luci-app-footstrap-updater](https://github.com/VizzleTF/luci-app-footstrap-updater)) — do not
-  re-add it here. `fs-appearance.js` loads it at runtime and `fs-router` exports `onNavigate(fn)` so
-  the theme never names the optional module.
+- **The theme never checks for its own updates and never reaches a third-party host at run time.**
+  Upgrades are the package manager's job (the installer adds the feed). `fs-router` exports
+  `onNavigate(fn)` so an optional module can register itself without the router naming anyone —
+  keep that seam inverted, but do not re-add an updater behind it.
 - Comments are stripped at package time and git keeps every word — **never trade a "why" away for
   bytes**. A stale comment is worse than none.
 
@@ -134,9 +134,11 @@ compile.
 ### Package and release
 - **`+luci-base` is the whole dependency list and keeping it that way is a constraint.** `curl` is
   not in OpenWrt's default set — fall back to `uclient-fetch` instead of adding a dep.
-- **The catalogue lives in `i18n/`, not `po/`.** `po/` makes luci.mk emit per-language packages, and
-  a multi-asset release is unpickable by a fielded self-updater (issue #6 — it broke Update on every
-  router in v0.8.4). Each package must resolve to exactly one **name-anchored** asset per format.
+- **The catalogue lives in `po/`** — what `LUCI_LANGUAGES` globs and what Weblate translates.
+  luci.mk emits the per-language packages; nothing in `Build/Prepare` compiles a catalogue. It was
+  `i18n/` while a fielded self-updater mis-picked a multi-asset release with `head -1` (issue #6);
+  owfeed now builds exactly one theme artifact per format regardless, which `npm run check-packages`
+  still asserts.
 - Anything under `root/etc/config/` MUST be in the `conffiles` define (`npm run conffiles`) — else
   the manager replaces it on upgrade and the theme's own Update wipes the admin's saved defaults,
   reporting success.

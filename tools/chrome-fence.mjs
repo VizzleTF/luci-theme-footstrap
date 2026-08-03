@@ -98,7 +98,7 @@ if (!(/^data-fs-/).test(MARK)) {
  * v0.9.1 damage exactly (popover flattened 12px -> 0 and position: fixed -> static, both sr-only
  * elements un-clipped onto every page; the <nav> alone held). Adding or removing a root is a
  * deliberate act, so it is a deliberate edit here. */
-const EXPECT_ROOTS = 4;
+const EXPECT_ROOTS = 5;	/* + .fs-pattern, the wallpaper's paint layer: a body-level sibling of .fs-shell */
 /* …and how many the JS builds: fs-search.js's command palette, a `position: fixed` overlay parented
  * to <body> and therefore outside every template root. The Appearance popover used to be the second;
  * it is a PAGE now (System -> Appearance), and a page renders inside .fs-main, which is Zone 2 —

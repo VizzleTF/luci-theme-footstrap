@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""README proof shots: overview with the cats wallpaper, sidebar and top layout, dark.
+"""README proof shots: overview with the pattern wallpaper, sidebar and top layout, dark.
+
+The router needs an SVG uploaded as the pattern first (Appearance -> Background -> Pattern);
+wallpapers/svg/cats.svg is what these shots were taken with.
 
 The dev box is a WSL container, so its overview leaks an i5, 15.5 GiB of RAM, a 1 TB disk
 and a 10 GbE port. Polling is stopped and the values are replaced with the ones a real
@@ -143,7 +146,7 @@ try:
             ctx.add_init_script(
                 "try{localStorage.setItem('fs-layout','%s');"
                 "localStorage.setItem('fs-darkmode','true');"
-                "localStorage.setItem('fs-wallpaper','cats');"
+                "localStorage.setItem('fs-wallpaper','pattern');"
                 "}catch(e){}" % ("sidebar" if layout == "phone" else layout))
             ctx.request.post(f"{base}/cgi-bin/luci/", form={"luci_username": "root", "luci_password": PW})
             page = ctx.new_page()

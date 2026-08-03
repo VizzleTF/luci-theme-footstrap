@@ -46,15 +46,16 @@ jobs:
         run: |
           set -e
           npm run devkit
-          FONTS=luci-theme-footstrap/htdocs/luci-static/footstrap
-          mkdir -p _site/fonts
+          MEDIA=luci-theme-footstrap/htdocs/luci-static/footstrap
           cp docs/devkit.html _site/index.html          # portal is the Pages root
           cp docs/devkit.html _site/devkit.html
           cp docs/playground.html _site/playground.html
           cp docs/gallery.html _site/gallery.html
           luci-theme-footstrap/build-css.sh _site/cascade.css   # gallery loads this by <link>
-          cp "$FONTS"/fonts/*.woff2 _site/fonts/
-          cp "$FONTS"/logo.svg _site/
+          # No fonts to copy: the theme carries none. The stylesheet names Manrope and JetBrains
+          # Mono first and the system stack after, so the portal renders in whatever the visitor
+          # has — the same thing a router does.
+          cp "$MEDIA"/logo.svg _site/
           # The doodle wallpapers are NOT in htdocs any more — a router downloads them on demand
           # (wallpapers/, fs-prefs.js installWallpaper), so the package does not carry 200 KB of
           # decoration. The playground has no such mechanism and just links them, so the portal

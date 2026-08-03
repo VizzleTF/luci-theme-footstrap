@@ -54,8 +54,9 @@ function parseComponents(html) {
 }
 
 /* The page must be ONE file (opened off GitHub Pages with no sibling assets), so every url() the
- * stylesheet references — the subset fonts and the wallpaper — is inlined as a data: URI. The
- * assets live under htdocs/luci-static/footstrap/, the same paths the router serves. */
+ * stylesheet references is inlined as a data: URI. The assets live under
+ * htdocs/luci-static/footstrap/, the same paths the router serves. (There are no fonts among them
+ * any more — the theme carries none — but the inliner is generic and stays that way.) */
 const MEDIA = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/footstrap');
 const MIME = { '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png' };
 async function inlineAssets(cssText) {

@@ -99,7 +99,7 @@ Variables a theme template gets: `theme`, `media`, `resource`, `ctx`, `dispatche
   `hidden`**: `hidden` is `display:none`, which drops the element out of the accessibility tree, so
   the `<h1>` effectively did not exist while the SPA router dutifully updated it.
 - `partials/head.ut` sends `cascade.css`, `node.css` and `cbi.js` with `?v={{ pkgs_update_time }}`
-  (uhttpd sends no `Cache-Control`), preloads the two latin Manrope subsets, and passes every
+  (uhttpd sends no `Cache-Control`) and passes every
   interpolation through `entityencode(striptags(...))`.
 
 ## `sysauth.ut` is mandatory for a theme with its own chrome
@@ -150,9 +150,8 @@ that might not be installed. It is retired: the installer adds the owfeed-packag
 reaching GitHub to reimplement that. `fs-version.js` reports the installed version with no request.
 
 The server-side glob that told the client whether the updater was on disk (`window.__fsUpd`) went
-with it. The same trick survives for the doodle wallpapers: `partials/head.ut` globs
-`/www/luci-static/footstrap/{cats,dinos}.svg` and hands the client `window.__fsWp`, so the Footstrap
-tab knows which doodle still needs downloading without a probe request each.
+with it, and nothing globs for an optional file any more: the wallpaper pattern is an upload, so the
+server hands the client its cache-bust token like any other saved value.
 
 Renderer and shell in detail: [chrome.md](chrome.md).
 
@@ -180,7 +179,7 @@ remaining path. Details: [package.md](package.md).
 /usr/share/ucode/luci/template/themes/footstrap/
         header.ut, footer.ut, sysauth.ut, partials/*.ut
 /www/luci-static/footstrap/            cascade.css (generated), fonts/, logo.svg
-                                       (+ cats.svg / dinos.svg once downloaded — not shipped)
+                                       (+ pattern.svg — a symlink to /etc/footstrap, uploaded)
 /www/luci-static/resources/            menu-footstrap.js, menu-footstrap-common.js, fs-*.js
 /usr/lib/lua/luci/i18n/footstrap-theme.<lang>.lmo    catalogue, bundled INSIDE the theme package
 /usr/share/rpcd/acl.d/luci-theme-footstrap.json      ACL: uci footstrap + login-bg upload

@@ -38,7 +38,7 @@ done.
 
 Palettes are split across two files on purpose: `03-palettes.css` holds only token definitions
 and lives in the `tokens` layer, while rules like
-`:root[data-wallpaper="cats"] .fs-main { background-image: … }` are ordinary styles and would
+`:root[data-wallpaper="pattern"] .fs-main { background-color: … }` are ordinary styles and would
 lose to `theme` from inside `tokens`. They live in `theme/15-wallpaper.css`.
 
 The directory cannot be called `src/` — to `luci.mk` that means C sources.

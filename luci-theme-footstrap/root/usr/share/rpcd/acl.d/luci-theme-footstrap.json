@@ -1,6 +1,6 @@
 {
 	"luci-theme-footstrap": {
-		"description": "Footstrap Appearance router-wide defaults (Save as default), the login background upload and the on-demand doodle wallpapers",
+		"description": "Footstrap Appearance router-wide defaults (Save as default) and the login background and pattern uploads",
 		"read": {
 			"uci": [
 				"footstrap"
@@ -31,16 +31,11 @@
 				"/bin/chmod 644 /etc/footstrap/login-bg": [
 					"exec"
 				],
-				"/www/luci-static/footstrap/cats.svg": [
-					"write"
+				"/etc/footstrap/pattern.svg": [
+					"write",
+					"remove"
 				],
-				"/bin/chmod 644 /www/luci-static/footstrap/cats.svg": [
-					"exec"
-				],
-				"/www/luci-static/footstrap/dinos.svg": [
-					"write"
-				],
-				"/bin/chmod 644 /www/luci-static/footstrap/dinos.svg": [
+				"/bin/chmod 644 /etc/footstrap/pattern.svg": [
 					"exec"
 				]
 			}

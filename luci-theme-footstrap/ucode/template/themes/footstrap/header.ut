@@ -56,10 +56,11 @@
 		'tint', 'accent', 'good', 'warn', 'danger',
 		'card', 'control', 'bar', 'line',
 		'rounding', 'autocollapse', 'tint_strength', 'photo_dim',
-		/* the uploaded background's cache-bust token (head.ut whitelists it to hex) — the image
-		   itself is a served file, only this token travels in the page. NOT an axis: it has no
-		   browser layer at all, but it reaches the client the same way. */
-		'login_bg'
+		'pattern_size', 'pattern_strength', 'pattern_ink',
+		/* the two uploaded images' cache-bust tokens (head.ut whitelists both to hex) — the files
+		   themselves are served, only these tokens travel in the page. NOT axes: they have no
+		   browser layer at all, but they reach the client the same way. */
+		'login_bg', 'pattern'
 	];
 	const fs_defaults = {};
 	for (let k in FS_AXES)
@@ -82,6 +83,22 @@
 		there. The SPA router stamps the resolved leaf path, so both ways of arriving agree.
 	#}
 	<body class="lang_{{ dispatcher.lang }} {{ entityencode(striptags(node?.title ?? ''), true) }}" data-page="{{ entityencode(join('-', length(ctx.path) ? ctx.path : ctx.request_path), true) }}">
+		{#
+			The wallpaper PATTERN's paint surface, and nothing else: 15-wallpaper.css masks this
+			element so an uploaded SVG takes the theme's ink. A mask applies to an element's whole
+			rendering, children included, so it cannot go on .fs-shell or on <body> — it needs a
+			layer of its own with nothing in it.
+
+			OUTSIDE the blank_page guard on purpose. The login page renders with blank_page: true
+			(no .fs-shell, no chrome at all), and it is the first page anyone sees: a router whose
+			saved default is Pattern has to show it there too, exactly as the File photo does.
+
+			Inert unless the axis is on — .fs-pattern is display:none by default, so on every other
+			setting this is one empty div that paints nothing.
+
+			data-fs-chrome: Zone 1, ours — see the <nav> below.
+		#}
+		<div class="fs-pattern" data-fs-chrome aria-hidden="true"></div>
 		{% if (!blank_page): %}
 		{#
 			Skip link: jump the menu instead of tabbing through every section on every page.

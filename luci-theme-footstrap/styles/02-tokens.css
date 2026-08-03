@@ -394,6 +394,17 @@
 		 * text, silently. Stated once here so the two cannot drift again. */
 		--fs-control-h: calc(round(up, calc(var(--fs-type) * var(--fs-leading) + var(--fs-space-1) * 2 + 2px), 4px));
 
+		/* HOW WIDE AN ELASTIC CONTROL GETS IN A FORM ROW. A `.cbi-value-field` is `flex: 1`, so
+		 * anything asking for 100% takes the whole card — and a form whose every control ends at a
+		 * different x reads as broken even when each width is defensible on its own. Fixed-width
+		 * controls (a select, a number box) stay at their own 210px; this is the ceiling for the
+		 * ones that stretch: the text/url/search inputs, the dynlist and the range slider.
+		 *
+		 * 440px is not on the 4px step scale and does not want to be — it is a COLUMN WIDTH, the
+		 * same kind of number as the 180px label column beside it, and it was already the figure
+		 * three rules had reached independently. Named here so a fourth one cannot pick 460. */
+		--fs-field-max: 440px;
+
 		/* ---- Stacking scale ----------------------------------------------------
 		 * Every z-index in the theme comes from here. There used to be nine bare numbers
 		 * (2, 40, 50, 60, 70, 800, 900, 1000, 1100) across seven files, with nothing

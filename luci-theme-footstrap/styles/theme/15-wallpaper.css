@@ -1,70 +1,78 @@
 @layer theme {
-	/* Wallpaper axis: a doodle pattern behind the content, composable with any palette. TWO
-	 * doodles ship — cats and dinos — and everything about them except the image and the tile
-	 * size is identical, so the rules below match BOTH through one attribute list and only the
-	 * background-image pair is per-doodle. A second copy of this block per doodle is how the
-	 * fixes below would stop matching: the footer exclusion, the transparent .fs-main and the
-	 * dropdown frost were each argued once, and each would have to be repeated.
+	/* Wallpaper axis, value `pattern`: an SVG the ADMIN uploads, tiled behind the content and
+	 * recoloured by the theme. It composes with any palette, and the recolour is what makes that
+	 * true — the drawing takes --fs-text, so the same file reads correctly in light and in dark
+	 * without the admin editing it.
 	 *
-	 * Cards sit on opaque --fs-panel and cover it, so the doodles show only through the gaps;
-	 * the fill is a low-opacity neutral grey, readable on both light and dark backgrounds.
+	 * WHY A DEDICATED ELEMENT AND NOT A `background-image`. Recolouring an image the browser has
+	 * already rasterised takes `mask-image`: the SVG supplies the ALPHA and the element supplies the
+	 * COLOUR. A mask applies to the element's whole rendering, children included, so it can never go
+	 * on .fs-shell or on <body> — those hold the page. Hence .fs-pattern, emitted as the first
+	 * child of <body> by header.ut AND by sysauth.ut (the login page has no .fs-shell at all), whose
+	 * only job is to be masked.
 	 *
-	 * Painted on exactly ONE element, or two semi-transparent tile layers double up and
-	 * misalign. That element is .fs-shell (chrome AND content) in every layout — not
-	 * .fs-main, because the bar (top layout, and the sidebar collapsed to a phone bar) is
-	 * TRANSLUCENT and the doodles must sit behind it for the page to read as one sheet. The
-	 * vertical sidebar is an opaque --fs-panel column and covers its own tiles: no
-	 * exclusion needed.
+	 * WHY z-index: -1 AND A TRANSPARENT BODY. Inside the root stacking context the paint order is
+	 * html's background, then negative-z children, then every block background. So the layer sits
+	 * ABOVE the canvas and BELOW the content — but body's own opaque --fs-bg would bury it. The
+	 * canvas therefore moves up to :root for this axis and body goes transparent; .fs-main and the
+	 * footer follow for the same reason the doodles needed it. The sidebar is deliberately NOT
+	 * excluded: the bar is translucent (--fs-bar-bg) and the pattern showing behind it is what makes
+	 * the page read as one sheet.
 	 *
-	 * The second half of the selector is the LOGIN page, which has no .fs-shell at all
-	 * (sysauth.ut renders with blank_page: true — just the form on a bare <body>). Every
-	 * other Appearance axis reaches it via `body { background: var(--fs-bg) }`; the
-	 * wallpaper did not, so a router set to Cats showed a flat canvas on the first page you
-	 * ever see. `:not(:has(.fs-shell))` keeps it ONE rule: shell when there is one, body
-	 * when there is not, never both — which is the doubling above. */
-	:root:is([data-wallpaper="cats"], [data-wallpaper="dinos"]) :is(.fs-shell, body:not(:has(.fs-shell))) {
+	 * Cards sit on opaque --fs-panel and cover it, so the pattern shows through the gaps only. */
+	.fs-pattern { display: none; }
+
+	:root[data-wallpaper="pattern"] { background-color: var(--fs-bg); }
+	:root[data-wallpaper="pattern"] body,
+	:root[data-wallpaper="pattern"] .fs-main { background-color: transparent; }
+	:root[data-wallpaper="pattern"] footer.fs-footer { background: transparent; }
+
+	/* `fixed`, so the pattern is one calm backdrop the page scrolls under rather than a strip that
+	 * slides with every table — the same argument the File photo's background-attachment makes.
+	 * --fs-pattern-url is `none` until something is uploaded (head.ut / fs-prefs.js), so the axis
+	 * selected with no file is a bare canvas rather than a broken tile. */
+	:root[data-wallpaper="pattern"] .fs-pattern {
+		display: block;
+		position: fixed;
+		inset: 0;
+		z-index: -1;
+		pointer-events: none;
+		opacity: var(--fs-pattern-strength);
+	}
+	/* THEME INK (the default). The file's own colours are discarded and only its alpha is used, so
+	 * an opaque background inside the SVG would mask as a solid sheet — which is exactly why the
+	 * admin can switch to the file's own colours below. Line art on transparency is the shape this
+	 * mode is for. */
+	:root[data-wallpaper="pattern"]:not([data-pattern-ink="original"]) .fs-pattern {
+		background-color: var(--fs-text);
+		-webkit-mask-image: var(--fs-pattern-url);
+		mask-image: var(--fs-pattern-url);
+		-webkit-mask-repeat: repeat;
+		mask-repeat: repeat;
+		-webkit-mask-size: var(--fs-pattern-size) auto;
+		mask-size: var(--fs-pattern-size) auto;
+	}
+	/* THE FILE'S OWN COLOURS: an ordinary tiled background, no mask. For artwork that carries its
+	 * own palette and would be flattened to one colour by the mask. */
+	:root[data-wallpaper="pattern"][data-pattern-ink="original"] .fs-pattern {
+		background-image: var(--fs-pattern-url);
 		background-repeat: repeat;
+		background-size: var(--fs-pattern-size) auto;
 	}
-	:root[data-wallpaper="cats"] :is(.fs-shell, body:not(:has(.fs-shell))) {
-		background-image: url(cats.svg);
-		background-size: 440px auto;
-	}
-	/* A bigger tile for a bigger drawing, and the number is measured rather than guessed: the
-	 * dinos artwork is a 2048-unit square against the cats' 870 and carries about twice as many
-	 * figures per tile, so at the cats' 440px every animal came out a third of the size and the
-	 * pattern read as texture rather than as doodles. At 880px a dinosaur is a little wider than
-	 * a cat is at 440, which is where the drawing stops reading as a texture. Both files tile
-	 * seamlessly at any size — this is a legibility choice, not a geometric constraint. */
-	:root[data-wallpaper="dinos"] :is(.fs-shell, body:not(:has(.fs-shell))) {
-		background-image: url(dinos.svg);
-		background-size: 880px auto;
-	}
-	/* The doodles' strength is the `<g opacity>` baked into each file (.20) — CSS cannot
-	 * reach inside a background image, so that attribute IS the knob. At .15 a tinted
-	 * canvas swallowed them: on a hued surface a neutral grey line differs from it in
-	 * lightness alone and reads as less of a line.
-	 *
-	 * .fs-main's opaque --fs-bg would hide the shell's single tiling layer — make it
-	 * transparent so the one layer shows through the whole content area (same colour, so
-	 * only the doodles appear). That is what keeps the tiling seam-free instead of adding a
-	 * second, misaligned layer. */
-	:root:is([data-wallpaper="cats"], [data-wallpaper="dinos"]) .fs-main { background-color: transparent; }
-	/* let the doodles show through the footer too */
-	:root:is([data-wallpaper="cats"], [data-wallpaper="dinos"]) footer.fs-footer { background: transparent; }
 
 	/* A CBI form has dozens of .btn/.cbi-button; a backdrop-filter on each is a live
-	 * backdrop-sampling layer over the doodles — costly on weak GPUs, and invisible anyway
+	 * backdrop-sampling layer over the pattern — costly on weak GPUs, and invisible anyway
 	 * since every button is already opaque. Blur dropped from buttons entirely; closed
-	 * dropdowns keep the frost (few of them, and their body can show the doodles through). */
+	 * dropdowns keep the frost (few of them, and their body can show the pattern through). */
 	/* var(--fs-blur), not a literal: one radius for every frosted surface (02-tokens.css), and
 	 * the literal 6px was also invisible to prefers-reduced-transparency, which nulls the token
 	 * (95-a11y-media.css) — the one frost that kept blurring for users who asked for opaque. */
-	:root:is([data-wallpaper="cats"], [data-wallpaper="dinos"]) .cbi-dropdown:not([open]) {
+	:root[data-wallpaper="pattern"] .cbi-dropdown:not([open]) {
 		backdrop-filter: var(--fs-blur);
 		-webkit-backdrop-filter: var(--fs-blur);
 	}
 
-	/* No wash layer behind #view: the wallpaper shows through the gaps between the cards at
+	/* No wash layer behind #view: the pattern shows through the gaps between the cards at
 	 * full strength. Every block that carries text paints an opaque --fs-panel of its own,
 	 * so nothing has to be dimmed globally. */
 }

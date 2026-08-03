@@ -72,7 +72,7 @@
 	 * and a 440px box for a port number reads as a mistake. */
 	.cbi-value-field input[type="text"],
 	.cbi-value-field input[type="url"],
-	.cbi-value-field input[type="search"] { width: 100%; max-width: 440px; }
+	.cbi-value-field input[type="search"] { width: 100%; max-width: var(--fs-field-max); }
 	/* A .cbi-value is designed to hold ONE title+field pair; base lays it out as a flex row —
 	 * label (180px) + field. Some apps cram SEVERAL pairs into one .cbi-value
 	 * (luci-app-3ginfo-lite's "SIM card menu" modal: three title/field pairs in one), and the
@@ -658,7 +658,7 @@
 	.cbi-dynlist {
 		gap: var(--fs-space-1-5);
 		background: transparent; border: 0; padding: 0;
-		min-height: 0; min-width: 240px; max-width: 440px; width: 100%;
+		min-height: 0; min-width: 240px; max-width: var(--fs-field-max); width: 100%;
 		vertical-align: top;
 	}
 	.cbi-dynlist > .item {
@@ -779,7 +779,11 @@
 	/* -solo: the track sets `border: 0` and `outline: none`, so there is no second channel here
 	 * either — the tinted ring was the whole indicator on a 6px bar. */
 	input[type="range"]:focus { box-shadow: var(--fs-focus-ring-solo); }
-	.cbi-range-slider { display: inline-flex; align-items: center; gap: var(--fs-space-3); width: 100%; max-width: 100%; }
+	/* THE SAME CEILING THE ELASTIC TEXT INPUTS TAKE, and the reason is the whole point of the
+	 * token: a `.cbi-value-field` is `flex: 1`, so `width: 100%` here meant the slider ate the
+	 * entire card while the select two rows above stopped at 210px and the readout chip was flung
+	 * to the card's right edge. Every stretching control in a form row now ends at one x. */
+	.cbi-range-slider { display: inline-flex; align-items: center; gap: var(--fs-space-3); width: 100%; max-width: var(--fs-field-max); }
 	.cbi-range-slider-value {
 		background: var(--fs-panel2); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-sm);
 		padding: var(--fs-space-1) var(--fs-space-2); color: var(--fs-accent); font-family: var(--fs-font-mono);

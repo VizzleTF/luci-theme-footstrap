@@ -12,16 +12,15 @@
 # legs are packed from the SAME staged directory by the SAME catalogue compiler, so one
 # is enough to prove the compile happened.
 #
-# EXACTLY ONE THEME PACKAGE PER FORMAT, BY NAME. Load-bearing, not tidiness: a
-# self-updater in the field resolves the theme by /luci-theme-footstrap[-_][^/]*\.EXT$/
-# and takes head -1, so a stray extra asset matching it — a per-language
-# luci-i18n-footstrap package, issue #6 — is mis-picked and installed as the theme. A
-# router's installed updater cannot be fixed remotely, so the release has to stay
-# pickable by the script already there.
+# EXACTLY ONE THEME PACKAGE PER FORMAT, BY NAME. Load-bearing, not tidiness: anything
+# resolving the theme by /luci-theme-footstrap[-_][^/]*\.EXT$/ and taking head -1 —
+# release tooling, an install script, a person reading the assets list — mis-picks a
+# stray extra asset that matches it. A per-language luci-i18n-footstrap package did
+# exactly that (issue #6) and was installed AS the theme, reporting success.
 set -eu
 cd "$(dirname "$0")/.."
 
-want=$(find luci-theme-footstrap/i18n -mindepth 2 -name '*.po' | wc -l)
+want=$(find luci-theme-footstrap/po -mindepth 2 -name '*.po' | wc -l)
 [ "$want" -gt 0 ] || { echo "no .po files found — the glob is wrong, not the build"; exit 1; }
 got=$(tar -xzOf dist/all/luci-theme-footstrap_*_all.ipk ./data.tar.gz \
 	| tar -tz | grep -c 'i18n/footstrap-theme\..*\.lmo' || true)

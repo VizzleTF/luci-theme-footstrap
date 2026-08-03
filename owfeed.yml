@@ -90,12 +90,9 @@ packages:
     # self-updater must not pull curl onto an 8 MB device for one fetch — it falls back to
     # uclient-fetch, which the base image already has.
     depends: [luci-base]
-    # TWO licences, for two bodies of work, exactly as the Makefile's PKG_LICENSE says:
-    # Apache-2.0 for the theme (styles/base began as a fork of luci-theme-bootstrap and the
-    # ucode templates derive from LuCI's own), OFL-1.1 for the webfonts. The OFL text ships
-    # beside them under htdocs/, because these .woff2 are unicode-range subsets whose
-    # subsetter strips the licence out of the font's own metadata.
-    license: Apache-2.0 OFL-1.1
+    # Apache-2.0 alone, exactly as the Makefile's PKG_LICENSE says. The OFL-1.1 half went with
+    # the webfonts: the theme ships no Font Software, so declaring it would be false.
+    license: Apache-2.0
     url: https://github.com/VizzleTF/luci-theme-footstrap
     maintainer: "VizzleTF <vizzletf47@gmail.com>"
     # Which commit produced these bytes, recorded in the package itself. env: because the
@@ -132,5 +129,5 @@ packages:
     # luci-i18n package — same path is a file conflict, and apk refuses the very upgrade
     # that would fix it.
     i18n:
-      from: ./luci-theme-footstrap/i18n
+      from: ./luci-theme-footstrap/po
       basename: footstrap-theme

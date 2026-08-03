@@ -17,7 +17,8 @@
 	let _sd_lay  = index([ 'sidebar', 'top' ], fs_defaults.layout) >= 0 ? fs_defaults.layout : '';
 	let _sd_dark = index([ 'auto', 'light', 'dark' ], fs_defaults.darkmode) >= 0 ? fs_defaults.darkmode : '';
 	let _sd_pal  = index([ 'footstrap', 'hicontrast' ], fs_defaults.palette) >= 0 ? fs_defaults.palette : '';
-	let _sd_wall = index([ 'off', 'cats', 'dinos', 'file' ], fs_defaults.wallpaper) >= 0 ? fs_defaults.wallpaper : '';
+	let _sd_wall = index([ 'off', 'pattern', 'file' ], fs_defaults.wallpaper) >= 0 ? fs_defaults.wallpaper : '';
+	let _sd_pink = index([ 'theme', 'original' ], fs_defaults.pattern_ink) >= 0 ? fs_defaults.pattern_ink : '';
 	let _sd_ac   = index([ 'on', 'off' ], fs_defaults.autocollapse) >= 0 ? fs_defaults.autocollapse : '';
 	let _sd_dens = index([ 'compact', 'normal', 'large' ], fs_defaults.density) >= 0 ? fs_defaults.density : '';
 	/* The five COLOUR axes (tint, accent, good, warn, danger) each hold one of three things: '' or
@@ -68,6 +69,17 @@
 	   -> -1, because 0 is a real value (a fully transparent scrim). */
 	let _pd = int(fs_defaults.photo_dim);
 	let _sd_pdim = (fs_defaults.photo_dim != '' && _pd >= 0 && _pd <= 100) ? _pd : -1;
+	/* the uploaded PATTERN: its cache-bust token, whitelisted to the same hex charset as login_bg
+	   and for the same reason — it is interpolated into the inline data block below and then into a
+	   url(); the served path is FIXED (/luci-static/footstrap/pattern.svg). */
+	let _pt = fs_defaults.pattern;
+	let _sd_pat = (type(_pt) == 'string' && match(_pt, /^[a-f0-9]{6,64}$/)) ? _pt : '';
+	/* the pattern's tile edge in px and the layer's opacity 0-100. Unset -> -1 like rounding: 0 is a
+	   real strength (invisible), and 0 px is not a tile. */
+	let _ps = int(fs_defaults.pattern_size);
+	let _sd_psize = (fs_defaults.pattern_size != '' && _ps >= 40 && _ps <= 1600) ? _ps : -1;
+	let _pst = int(fs_defaults.pattern_strength);
+	let _sd_pstr = (fs_defaults.pattern_strength != '' && _pst >= 0 && _pst <= 100) ? _pst : -1;
 	/* ---- WRITING DIRECTION ----
 	   Nothing in LuCI emits `dir`: the dispatcher stamps `lang` and stops there, and no stock theme
 	   adds one — so a router in Arabic, Persian or Hebrew renders right-to-left text inside a
@@ -104,20 +116,7 @@
 		   current*() (so the Appearance page's controls show the effective default when this browser
 		   has no localStorage of its own). Enums are '', the colours '' (=off), rounding -1 (=unset)
 		   — see the sanitiser above. #}
-		<script>window.__fsSD={layout:"{{ _sd_lay }}",darkmode:"{{ _sd_dark }}",palette:"{{ _sd_pal }}",wallpaper:"{{ _sd_wall }}",tint:"{{ _sd_tint }}",accent:"{{ _sd_acc }}",good:"{{ _sd_good }}",warn:"{{ _sd_warn }}",danger:"{{ _sd_dang }}",card:"{{ _sd_card }}",control:"{{ _sd_ctrl }}",bar:"{{ _sd_bar }}",line:"{{ _sd_line }}",rounding:{{ _sd_round }},autocollapse:"{{ _sd_ac }}",login_bg:"{{ _sd_lbg }}",tint_strength:{{ _sd_tstr }},photo_dim:{{ _sd_pdim }},density:"{{ _sd_dens }}"};</script>
-		{# WHICH DOODLE WALLPAPERS ARE ON THIS ROUTER. They are not in the package — 77 KB and 128 KB
-		   of decoration would be a fifth of the theme's flash footprint for a picture most installs
-		   never switch on — so Appearance downloads one on demand (fs-prefs.js installWallpaper) and
-		   the server says which ones are already here. A client-side probe would be an extra request per doodle on every page load to
-		   learn something the server can answer for free. Fails CLOSED (a throwing glob -> 0 -> the
-		   page offers the download again), which only costs a re-download; a false 1 would paint a
-		   wallpaper that 404s. #}
-		{%- let _wp = {};
-		    for (let _n in [ 'cats', 'dinos' ]) {
-		        _wp[_n] = 0;
-		        try { _wp[_n] = length(require('fs').glob(`/www/luci-static/footstrap/${_n}.svg`)) > 0 ? 1 : 0; } catch (e) {}
-		    } %}
-		<script>window.__fsWp={cats:{{ _wp.cats }},dinos:{{ _wp.dinos }}};</script>
+		<script>window.__fsSD={layout:"{{ _sd_lay }}",darkmode:"{{ _sd_dark }}",palette:"{{ _sd_pal }}",wallpaper:"{{ _sd_wall }}",tint:"{{ _sd_tint }}",accent:"{{ _sd_acc }}",good:"{{ _sd_good }}",warn:"{{ _sd_warn }}",danger:"{{ _sd_dang }}",card:"{{ _sd_card }}",control:"{{ _sd_ctrl }}",bar:"{{ _sd_bar }}",line:"{{ _sd_line }}",rounding:{{ _sd_round }},autocollapse:"{{ _sd_ac }}",login_bg:"{{ _sd_lbg }}",tint_strength:{{ _sd_tstr }},photo_dim:{{ _sd_pdim }},density:"{{ _sd_dens }}",pattern:"{{ _sd_pat }}",pattern_size:{{ _sd_psize }},pattern_strength:{{ _sd_pstr }},pattern_ink:"{{ _sd_pink }}"};</script>
 		<script>
 			/* Each block below pre-paints one Appearance axis before the first frame, duplicating
 			   a live applier in fs-prefs.js. They cannot share code — this runs before the module
@@ -173,14 +172,15 @@
 					const root = document.querySelector(':root'),
 					      sd = window.__fsSD || {};
 					let p = localStorage.getItem('fs-palette');
-					/* legacy 'rvht'/'roman' = default colours + cats wallpaper -> split onto both
-					   axes; legacy 'github' = the footstrap default, now stored explicitly. Migrate
-					   to the current explicit value, do NOT clear (an absent key means "inherit the
-					   router default", which is no longer the same as "the built-in default"). */
-					if (p === 'rvht' || p === 'roman') {
-						localStorage.setItem('fs-wallpaper', 'cats');
-						localStorage.setItem('fs-palette', 'footstrap'); p = 'footstrap';
-					} else if (p === 'github') {
+					/* legacy 'rvht'/'roman' = default colours + a doodle wallpaper, and legacy
+					   'github' = the footstrap default, now stored explicitly. Migrate to the current
+					   explicit value, do NOT clear (an absent key means "inherit the router default",
+					   which is no longer the same as "the built-in default"). The doodles they used to
+					   turn on are gone — the Wallpaper axis now paints an SVG the admin uploads — so
+					   the wallpaper half of that migration has nothing to point at and is dropped;
+					   `fs-wallpaper` keeps whatever it holds and the whitelist below reads a doodle
+					   name as off. */
+					if (p === 'rvht' || p === 'roman' || p === 'github') {
 						localStorage.setItem('fs-palette', 'footstrap'); p = 'footstrap';
 					}
 					/* the default palette is a bare :root; only hicontrast is opt-in. */
@@ -188,9 +188,27 @@
 					if (p === 'hicontrast') root.setAttribute('data-palette', 'hicontrast');
 					else root.removeAttribute('data-palette');
 
+					/* Wallpaper: off | pattern (the uploaded SVG, tiled and recoloured) | file (the
+					   uploaded photo). The url() and the two pattern numbers are set BEFORE the
+					   attribute for the reason every axis here is: the other order paints one frame
+					   with the tile at the previous size. sd.pattern is the cache-bust token, already
+					   whitelisted to hex above, so nothing user-controlled reaches the url(). */
+					const pu = sd.pattern;
+					if (pu) root.style.setProperty('--fs-pattern-url', 'url("/luci-static/footstrap/pattern.svg?v=' + pu + '")');
+					const psRaw = localStorage.getItem('fs-pattern-size');
+					const ps = (psRaw !== null) ? parseInt(psRaw, 10) : sd.pattern_size;
+					if (ps >= 40 && ps <= 1600 && ps !== 440) root.style.setProperty('--fs-pattern-size', ps + 'px');
+					const pstRaw = localStorage.getItem('fs-pattern-strength');
+					const pst = (pstRaw !== null) ? parseInt(pstRaw, 10) : sd.pattern_strength;
+					if (pst >= 0 && pst <= 100 && pst !== 20) root.style.setProperty('--fs-pattern-strength', String(pst / 100));
+					let pi = localStorage.getItem('fs-pattern-ink');
+					if (pi === null) pi = sd.pattern_ink || null;
+					if (pi === 'original') root.setAttribute('data-pattern-ink', 'original');
+					else root.removeAttribute('data-pattern-ink');
+
 					let w = localStorage.getItem('fs-wallpaper');
 					if (w === null) w = sd.wallpaper || null;
-					if (w === 'cats' || w === 'dinos' || w === 'file') root.setAttribute('data-wallpaper', w);
+					if (w === 'pattern' || w === 'file') root.setAttribute('data-wallpaper', w);
 					else root.removeAttribute('data-wallpaper');
 
 					/* Density: Compact/Normal/Large, a pure token axis (02-tokens multiplies the
@@ -304,14 +322,13 @@
 		</script>
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="darkreader-lock">
-		{# The two chrome faces, so they don't wait for cascade.css. crossorigin is required even
-		   same-origin, or the preload is discarded and the font fetched twice. LATIN subsets only
-		   (01-fonts.css splits by unicode-range) — every UI needs ASCII and digits. JetBrains
-		   Mono is NOT preloaded: it paints in table cells the view renders long after first
-		   paint, so its 19 KB only competed with the CSS (Chrome warned the preload went
-		   unused). #}
-		<link rel="preload" href="{{ media }}/fonts/manrope-600-latin.woff2" as="font" type="font/woff2" crossorigin>
-		<link rel="preload" href="{{ media }}/fonts/manrope-700-latin.woff2" as="font" type="font/woff2" crossorigin>
+		{# TWO <link rel=preload> FOR THE CHROME FACES USED TO SIT HERE, and nothing takes their
+		   place: the theme carries no webfonts any more. --fs-font-sans and --fs-font-mono name
+		   Manrope and JetBrains Mono FIRST and the system stack after, so a browser that has
+		   either installed locally uses it and one that does not falls through silently — no
+		   request, no 404, no flash. A preload is not in the stylesheet, which is exactly why it
+		   has to be deleted by hand when the fonts go: dropping the @font-face rules alone left
+		   these two behind and every page still asked the router for the files. #}
 		{# `data-fs-shell` marks the SHELL's own CSS: on every nav the SPA router asks whether a
 		   VIEW put CSS in the document, and this is how it tells its own sheet from an app's. #}
 		<link rel="stylesheet" data-fs-shell href="{{ media }}/cascade.css?v={{ pkgs_update_time }}">

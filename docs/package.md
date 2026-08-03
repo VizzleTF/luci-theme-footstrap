@@ -19,14 +19,14 @@ luci-theme-footstrap/
 ├── update-po.sh          regenerate/verify the translation catalogue
 ├── luci-upstream.pin     pinned openwrt/luci commit + sha256 of the borrowed tools
 ├── styles/               CSS SOURCE. Not shipped — luci.mk does not copy it
-├── i18n/                 translation catalogue. The directory name is NOT `po/` — see below
+├── po/                   translation catalogue; luci.mk turns it into luci-i18n-* packages
 │   ├── templates/footstrap.pot
 │   ├── ru/footstrap.po
 │   └── es/footstrap.po
 ├── htdocs/luci-static/   → /www/luci-static/
 │   ├── footstrap/        cascade.css (GENERATED, gitignored), fonts/, logo.svg
-│   │                     (the doodle wallpapers are NOT here: wallpapers/ in the repo root,
-│   │                      downloaded on demand — npm run wallpapers)
+│   │                     (pattern.svg is NOT here: it is a symlink uci-defaults makes to
+│   │                      /etc/footstrap/pattern.svg, which the admin uploads)
 │   └── resources/        menu-footstrap.js, menu-footstrap-common.js, fs-*.js
 ├── root/                 → /
 │   ├── etc/uci-defaults/30_luci-theme-footstrap
@@ -67,8 +67,7 @@ LUCI_DEPENDS:=+luci-base          # the WHOLE dependency list
 LUCI_PKGARCH:=all                 # noarch: one build for every target
 LUCI_MAINTAINER / LUCI_URL        # otherwise the package claims "OpenWrt LuCI community"
 LUCI_MINIFY_CSS:=0                # see below
-PKG_LICENSE:=Apache-2.0 OFL-1.1   # theme + webfonts; OFL §2 requires carrying the licence text
-                                  # because the subsetter strips it out of the .woff2 metadata
+PKG_LICENSE:=Apache-2.0           # the theme, and nothing else: it carries no webfonts
 include $(TOPDIR)/feeds/luci/luci.mk   # ABSOLUTE, not ../../luci.mk: CI rsyncs the package into
                                        # package/, not into the feed
 ```
@@ -115,29 +114,29 @@ The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sour
 6. **Stamp `FS_VERSION`** into `fs-version.js` with `sed`. The path is part of the contract —
    `dev-sync.sh` and `tools/stage.sh` run the same substitution, so moving the constant means
    fixing three places.
-7. **`po2lmo`** — compile the catalogue **into the theme package**.
+### The catalogue lives in `po/`, and luci.mk owns it
 
-### The catalogue lives in `i18n/`, and that is the most expensive structural rule here
+`LUCI_LANGUAGES` in luci.mk is `$(wildcard po/*)`, so a `po/` directory makes it bake a
+`luci-i18n-footstrap-<lang>` package per language — the ordinary arrangement for everything in the
+luci tree, and the only one [Weblate](https://hosted.weblate.org/engage/openwrt/) can translate,
+which `CONTRIBUTING.md` names as *the* way to translate LuCI. Nothing in this package's own
+`Build/Prepare` touches the catalogue.
 
-`LUCI_LANGUAGES` in luci.mk is `$(wildcard po/*)`. With a `po/` directory present it bakes a
-**separate `luci-i18n-footstrap-<lang>` package per language**. That is what v0.8.4 did, and it
-**broke the Update button on every router in the field** (issue #6):
+It was `i18n/` from v0.8.5 to v0.12.x, which is what stopped the language packages being
+generated. The reason was issue #6: the self-updater people had installed **at the time** picked
+its asset with `grep -E '\.apk$' | head -1`, GitHub returns assets **sorted by name**, and
+`luci-i18n-…` sorts before `luci-theme-…` — so the Update button installed a 6 KB catalogue
+instead of the theme, reported success, and offered the same update forever. A script already on
+somebody's router cannot be fixed remotely, so the *release* was fixed instead.
 
-- the self-updater people had installed **at the time** picks its asset with
-  `grep -E '\.apk$' | head -1`, and GitHub returns assets **sorted by name**;
-  `luci-i18n-…` sorts before `luci-theme-…`. The button installed a 6 KB catalogue instead of the
-  theme, reported success, and offered the same update forever.
-- **A script already on somebody's router cannot be fixed remotely.** Only the *release* can be
-  fixed: one asset per package per format, catalogue bundled inside the theme.
-- Bonus: two packages drift apart, and a theme with a lagging catalogue just draws new strings in
-  English without saying anything.
+That updater is retired, and the release is built by owfeed, which packages this theme as exactly
+one artifact per format whatever luci.mk would have done. The constraint that bought the rename is
+gone; the cost of keeping it — a catalogue the project's own translation platform cannot see — is
+not. `tools/check-packages.sh` still asserts one theme package per format.
 
-Renaming `po/` → `i18n/` is what stops the language packages being generated.
-
-The `.lmo` basename is **`footstrap-theme.<lang>.lmo`**, not `footstrap.<lang>.lmo`.
-`lmo_load_catalog` globs `*.<lang>.lmo` so any basename loads — but a v0.8.4 router still *owns*
-`footstrap.ru.lmo` through the old package, and the same path means a file conflict, so apk would
-refuse the very upgrade that fixes this.
+In the owfeed-built package the `.lmo` basename is **`footstrap-theme.<lang>.lmo`**, not
+`footstrap.<lang>.lmo`: `lmo_load_catalog` globs `*.<lang>.lmo` so any basename loads, and keeping
+the two builds' paths distinct means a router can carry both without a file conflict.
 
 ## uci-defaults: registration
 
@@ -212,7 +211,8 @@ a firmware **sysupgrade**, which keeps only what is listed — hence
 a router-wide default and a login background:
 
 - `uci` `set`/`commit`, scoped to the `footstrap` config — "Save as default";
-- `cgi-io upload` plus `file` `write`/`remove` on `/etc/footstrap/login-bg` — the wallpaper photo;
+- `cgi-io upload` plus `file` `write`/`remove` on `/etc/footstrap/login-bg` and
+  `/etc/footstrap/pattern.svg` — the wallpaper photo and the tiled pattern;
 - `file exec` on the single literal command `/bin/chmod 644 /etc/footstrap/login-bg`.
 
 That `file.exec` is the only one the theme ships, and it is one fixed argument-complete command.

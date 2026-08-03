@@ -28,11 +28,11 @@ const PKG = join(ROOT, 'luci-theme-footstrap');
 /* Names that look like fs-* classes to a regex but are not. Without this the reverse check
  * drowns in custom properties and localStorage keys. */
 const IGNORE_EXACT = new Set([
-	/* localStorage keys (fs-update-check lives in the optional updater's own repo, not scanned here) */
+	/* localStorage keys */
 	'fs-darkmode', 'fs-palette', 'fs-wallpaper', 'fs-radius', 'fs-tint', 'fs-accent',
 	'fs-good', 'fs-warn', 'fs-danger', 'fs-card', 'fs-control', 'fs-bar', 'fs-line',
 	'fs-rail', 'fs-layout', 'fs-menu-open', 'fs-menu-autocollapse', 'fs-recent', 'fs-tint-strength',
-	'fs-density', 'fs-photo-dim',
+	'fs-density', 'fs-photo-dim', 'fs-pattern-size', 'fs-pattern-strength', 'fs-pattern-ink',
 	/* the Appearance tab's data-tab value — ui.tabs matches panes and menu items on it, so it is an
 	 * identifier in the stock tab machinery rather than a class of ours */
 	'fs-appearance',

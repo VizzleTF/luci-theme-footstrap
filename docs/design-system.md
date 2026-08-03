@@ -194,19 +194,30 @@ The values live in `fs-prefs.js`. In the order it draws them:
 | **Theme** | auto / light / dark | `fs-darkmode` | `data-darkmode` + `data-theme` + `data-bs-theme` |
 | **Palette** | footstrap / hicontrast | `fs-palette` | `data-palette` |
 | **Density** | compact / normal / large | `fs-density` | `data-density` |
-| **Wallpaper** | off / cats / dinos / **file** | `fs-wallpaper` | `data-wallpaper` — the two doodles are downloaded on demand (`wallpapers/`, pinned by sha256) |
+| **Wallpaper** | off / pattern / **file** | `fs-wallpaper` | `data-wallpaper` — `pattern` tiles an admin-uploaded SVG through a CSS mask; Scale, Strength and Colours are axes of their own |
 | **Tint** | off, hue 1–360°, `#rrggbb` | `fs-tint` | `data-tint=hue\|hex`, `--fs-tint-h` / `--fs-bg` |
 | **Tint strength** | 0–200%, default 100 | `fs-tint-strength` | `--fs-tint-strength` |
 | **Accent** | off, hue 1–360°, `#rrggbb` | `fs-accent` | `data-accent=hue\|hex`, `--fs-accent-h` / `--fs-accent` |
 | **Good / Warning / Danger** | same shape as Accent | `fs-good`, `fs-warn`, `fs-danger` | `data-good\|warn\|danger`, `--fs-*-h` / `--fs-*` |
 | **Cards / Controls / Sidebar / Borders** | off, `#rrggbb` | `fs-card`, `fs-control`, `fs-bar`, `fs-line` | — (inline `--fs-panel`, `--fs-panel2`, `--fs-bar-bg`, `--fs-border`) |
 | **Photo dim** | 0–100%, default 74 | `fs-photo-dim` | `--fs-photo-dim` |
+| **Pattern scale** | 40–1600 px, default 440 | `fs-pattern-size` | `--fs-pattern-size` |
+| **Pattern strength** | 0–100%, default 20 | `fs-pattern-strength` | `--fs-pattern-strength` |
+| **Pattern colours** | theme / original | `fs-pattern-ink` | `data-pattern-ink=original` |
 | **Rounding** | 0–20 px, default 12 | `fs-radius` | `--fs-radius-base` |
 | **Submenus** | keep open / auto-collapse | `fs-menu-autocollapse` | — (no attribute) |
 
 
-**Photo dim** is the scrim over a `file` wallpaper. The photo's *bytes* are router-side — a file
-cannot live in `localStorage` — but how strongly a given browser dims it is an ordinary axis.
+**Photo dim** is the scrim over a `file` wallpaper, and the three **Pattern** axes are the same
+arrangement for the tiled SVG: both images' *bytes* are router-side — a file cannot live in
+`localStorage` — but how a given browser draws them is an ordinary axis.
+
+**Pattern colours** is the one axis whose off state is the interesting one. On `theme` (the bare
+`:root`) the SVG is painted through a CSS `mask`, so the file supplies alpha and the theme supplies
+`--fs-text`: the same upload reads correctly in both modes and under every palette. On `original`
+the mask is dropped for a plain tiled `background-image`, because a mask flattens artwork that
+carries its own palette to a single colour. Neither the file nor the two numbers are the axis that
+decides whether anything paints — that is `fs-wallpaper`.
 
 Three more `fs-` keys are not axes: `fs-rail` (the sidebar collapsed to an icon rail,
 toggled in the chrome), `fs-menu-open` (the remembered set of open accordion sections) and
@@ -311,10 +322,24 @@ time and drops the colour silently), the palette declares the raw `--fs-bg-base`
 
 ## Typography
 
-- **Sans: Manrope, weights 600 and 700.** There is no 400: with only 600/700 present, `normal`
-  resolves to 600 by font matching, so body text renders semibold. Adding 400 is ~13 KB and
-  restyles every page — a decision for the owner, not a bug.
-- **Mono: JetBrains Mono, weight 400 only.** Numeric values, hostnames, versions, port names.
+**THE THEME CARRIES NO FONTS.** `--fs-font-sans` and `--fs-font-mono` (`02-tokens.css`) name
+Manrope and JetBrains Mono **first** and the system stack after:
+
+```
+--fs-font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+--fs-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+```
+
+A bare family name in `font-family` is matched against the fonts **installed on the visitor's
+machine** before the browser moves down the list, so an admin who has either face installed sees
+the theme drawn in it and one who does not falls through silently — no request, no 404, no flash.
+Measured in the browser on a machine with neither installed: `"Manrope", system-ui` renders at
+exactly the `system-ui` width, while `Impact, system-ui` and `"Courier New", system-ui` render at
+their own — the mechanism works, the theme simply has nothing to add to it.
+
+- **Sans: Manrope where present.** Designed against weights 600 and 700; with a locally installed
+  family that has 400, `normal` resolves to 400 rather than the semibold the design assumed.
+- **Mono: JetBrains Mono where present.** Numeric values, hostnames, versions, port names.
 
 **There is no bold mono and it must not come back.** `<strong>` is a LABEL — LuCI writes every
 status as `<strong>MAC:</strong> ac:1f:6b:…` — so on a monospace surface it takes the interface
@@ -333,15 +358,21 @@ Sizes (px): card title 14/700; KPI number 27/700 mono; large number 38–40/700 
 uppercase label 11/700 with `letter-spacing:.05em`; micro-caption 11–12 dim. Weight 800 from the
 mock-up is not loaded — 18 KB for six elements; everything that asked for 800 draws at 700.
 
-Fonts are self-hosted (the router is offline, plus CSP and privacy): `.woff2` in
-`htdocs/luci-static/footstrap/fonts/`, `@font-face` in `styles/01-fonts.css`. Each face is split by
-`unicode-range` into **latin / latin-ext / cyrillic** — 3 faces × 3 subsets, 9 files,
-**56 436 bytes** in the package. A latin UI fetches only the three latin subsets, **33 960 bytes**,
-and touches neither cyrillic nor latin-ext. The two latin Manrope subsets are preloaded in
-`partials/head.ut` because the chrome itself is drawn with them; JetBrains Mono is not preloaded
-(table cells come long after first paint, and Chrome warned the preload went unused).
+The fonts used to be self-hosted: nine `.woff2` subsets (3 faces × latin / latin-ext / cyrillic)
+under `htdocs/luci-static/footstrap/fonts/`, `@font-face` in `styles/01-fonts.css`, and the two
+latin Manrope subsets preloaded in `partials/head.ut`. They are gone, and the measurement is why:
+**the built package went from 128 290 to 66 690 bytes, −48%** — a far larger share than the raw
+88 kB of `.woff2` suggests, because woff2 is already compressed and gains nothing from the
+package's own compression while everything else does.
 
-There is no numeric font-byte budget in CI any more. Lightness is held by judgement.
+Removing them takes THREE deletions, not one, and the third is the one that hides: the
+`@font-face` block, the files, **and the `<link rel=preload>` pair**. A preload is not in the
+stylesheet, so dropping the rules alone left it behind and every page still asked the router for
+the files — six 404s per page, measured, before that was noticed.
+
+The OFL-1.1 half of `PKG_LICENSE` went with them. OFL §2 requires the notice and licence to travel
+with every copy of the Font Software; with no Font Software in the package, declaring OFL would be
+a false statement about its contents.
 
 ## Components: mock-up primitive → LuCI class
 

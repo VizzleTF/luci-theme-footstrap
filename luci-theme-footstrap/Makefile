@@ -59,17 +59,16 @@ ifneq ($(FOOTSTRAP_PREMIN),)
 LUCI_MINIFY_JS:=0
 endif
 
-# TWO licences, for two bodies of work.
+# Apache-2.0, and not a free choice: styles/base began as a fork of luci-theme-bootstrap's
+# cascade.css, the ucode templates derive from LuCI's own, and a few JS helpers are verbatim
+# copies. The notices travel with it.
 #
-# Apache-2.0 — the theme, and not a free choice: styles/base began as a fork of
-# luci-theme-bootstrap's cascade.css, the ucode templates derive from LuCI's own, and a few JS
-# helpers are verbatim copies. The notices travel with it.
-#
-# OFL-1.1 — the webfonts. OFL §2 requires every copy of the Font Software to carry the
-# copyright notice AND the licence, and these .woff2 are unicode-range SUBSETS whose subsetter
-# strips the licence out of the font's own metadata — so the text ships beside them.
-PKG_LICENSE:=Apache-2.0 OFL-1.1
-PKG_LICENSE_FILES:=LICENSE htdocs/luci-static/footstrap/fonts/OFL.txt
+# THE OFL-1.1 HALF IS GONE WITH THE WEBFONTS. The theme carried subsetted Manrope and JetBrains
+# Mono and had to ship the OFL text beside them (§2 requires the notice and licence with every
+# copy of the Font Software). It ships no Font Software now, so declaring OFL would be a false
+# statement about the package's contents.
+PKG_LICENSE:=Apache-2.0
+PKG_LICENSE_FILES:=LICENSE
 
 # /etc/config/footstrap is SHIPPED as an empty stub and WRITTEN AT RUNTIME: Appearance -> "Save as
 # default" has rpcd uci-set the router-wide axes into that very file (fs-prefs.js saveAsDefault()).
@@ -159,38 +158,24 @@ endef
 # 1. cascade.css is generated, not committed — and styles/ is not in luci.mk's copy list, so
 #    build-css.sh reads it from $(CURDIR) and writes into the build tree. cat/awk only, no host
 #    toolchain: that is why it runs on an OpenWrt buildbot.
-# 2. Stamp the git-derived version into the theme JS (fs-version.js — the string the popover shows and
-#    the optional updater compares against). Skipped when PKG_VERSION is empty, leaving '0.0.0-dev'.
-# 3. Compile the translation catalogue INTO this package.
+# 2. Stamp the git-derived version into the theme JS (fs-version.js — the string the Appearance tab
+#    shows). Skipped when PKG_VERSION is empty, leaving '0.0.0-dev'.
 #
-# THE CATALOGUE SHIPS INSIDE THIS PACKAGE — not how a luci-app does it. Undoing that re-opens
-# two production bugs.
+# THE CATALOGUE IS luci.mk's BUSINESS, and nothing here compiles it. `po/` is the directory
+# LUCI_LANGUAGES globs, so luci.mk emits one `luci-i18n-footstrap-<lang>` package per language the
+# way it does for every luci-app — which is what a package IN THE LUCI TREE has to look like, and
+# what Weblate can see (it translates `po/`, and only `po/`).
 #
-# A `po/` dir makes luci.mk emit a separate `luci-i18n-footstrap-<lang>` package per language.
-# v0.8.4 did, and it broke the update button on every router in the field (issue #6):
-#   1. The release then has several assets, and the `footstrap-selfupdate.sh` users ALREADY
-#      have picks with `grep -E '\.apk$$' | head -1`. GitHub sorts assets BY NAME and
-#      `luci-i18n-…` sorts before `luci-theme-…`, so Update installed the 6 KB catalogue
-#      instead of the theme, reported success, and re-offered the same update forever. An
-#      installed self-updater cannot be fixed remotely — only the RELEASE can, so it stays at
-#      ONE asset per format (CI asserts it).
-#   2. Two packages drift: an _() the older catalogue lacks renders in English, reporting
-#      nothing. Bundled, they cannot disagree.
-# Price: ~3.6 KB of catalogue on an English router.
-#
-# Hence `po/` -> `i18n/`: LUCI_LANGUAGES is `$(wildcard po/*)`, so the rename is what stops the
-# language packages. po2lmo (luci-base/host, already a build dep) lands in hostpkg/bin BEFORE
-# this hook — hence here, not Build/Compile, which a post-include `define` cannot override.
-#
-# Basename `footstrap-theme.<lang>.lmo`, NOT `footstrap.<lang>.lmo`: lmo_load_catalog globs
-# `*.<lang>.lmo` so any basename loads, and a v0.8.4 router still OWNS `footstrap.ru.lmo` via
-# the old luci-i18n package — same path = file conflict = apk refuses the very upgrade that
-# fixes it.
+# It was `i18n/` here for a while, with a po2lmo loop in this hook bundling the catalogue into the
+# theme package, because a multi-package release was mis-picked by a self-updater that resolved the
+# theme by name and took `head -1` (issue #6). That updater is retired and the release is built by
+# owfeed, which packages this theme as exactly one artifact per format regardless of what luci.mk
+# would do — so the constraint that bought the rename is gone, and the cost of keeping it (a
+# catalogue invisible to the project's own translation platform) is not.
 define Build/Prepare/luci-theme-footstrap
 	# luci.mk's Build/Prepare copies only src/ luasrc/ htdocs/ root/ ucode/ po/ into
 	# $(PKG_BUILD_DIR), and PKG_LICENSE_FILES resolves against THAT — so the Apache text has to
-	# be put there by hand or the declaration points at nothing. (The fonts' OFL.txt lives under
-	# htdocs/, which luci.mk already copies.)
+	# be put there by hand or the declaration points at nothing.
 	$(CP) $(CURDIR)/LICENSE $(PKG_BUILD_DIR)/
 	$(SHELL) $(CURDIR)/build-css.sh $(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css
 	# The private `--fs-*` names are 16% of the sheet and mean nothing to a browser — the same trade
@@ -212,12 +197,8 @@ define Build/Prepare/luci-theme-footstrap
 	$(SHELL) $(CURDIR)/strip-templates.sh $(PKG_BUILD_DIR)/ucode
 	# …and the same for the shell under root/ (71% and 95% comment lines). Whole-line `#` only.
 	$(SHELL) $(CURDIR)/strip-shell.sh $(PKG_BUILD_DIR)/root
-	$(if $(PKG_VERSION),$(SED) "s#const FS_VERSION *= *'[^']*'#const FS_VERSION = '$(PKG_VERSION)'#" \
-		$(PKG_BUILD_DIR)/htdocs/luci-static/resources/fs-version.js)
-	$(INSTALL_DIR) $(PKG_BUILD_DIR)/root/usr/lib/lua/luci/i18n
-	$(foreach po,$(wildcard $(CURDIR)/i18n/*/*.po), \
-		po2lmo $(po) \
-			$(PKG_BUILD_DIR)/root/usr/lib/lua/luci/i18n/footstrap-theme.$(notdir $(patsubst %/,%,$(dir $(po)))).lmo;)
+	$(SED) "s#const FS_VERSION *= *'[^']*'#const FS_VERSION = '$(if $(PKG_VERSION),$(PKG_VERSION),$(PKG_SRC_VERSION))'#" \
+		$(PKG_BUILD_DIR)/htdocs/luci-static/resources/fs-version.js
 endef
 
 # Absolute, not a relative path: CI rsyncs this package into package/, not into the feed.
