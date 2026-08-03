@@ -33,8 +33,8 @@ mangle-tokens.sh                  shorten the private --fs-* names in a built sh
 strip-templates.sh strip-shell.sh drop comments from .ut and from root/**.sh
 po/                               translation catalogue (Weblate translates this)
 ucode/template/themes/footstrap/  header.ut, footer.ut, sysauth.ut, partials/
-htdocs/luci-static/footstrap/     cascade.css (generated), fonts/, logo.svg
-                                  (the doodle wallpapers are downloaded on demand, not shipped)
+htdocs/luci-static/footstrap/     cascade.css (generated), logo.svg — no webfonts, and no
+                                  wallpaper: the Pattern is one the admin uploads
 htdocs/luci-static/resources/     menu-footstrap.js (renderer), menu-footstrap-common.js,
                                   fs-{fit,menutree,prefs,widgets,chrome,router,sheets,search,
                                   select,appearance,version,overview}.js

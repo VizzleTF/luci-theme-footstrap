@@ -13,7 +13,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 n=0
-for f in luci-theme-footstrap/*.sh install.sh tools/*.sh; do
+for f in luci-theme-footstrap/*.sh install.sh tools/*.sh wallpapers/*.sh; do
 	[ -f "$f" ] || continue
 	sh -n "$f" || { echo "syntax error: $f"; exit 1; }
 	n=$((n + 1))
