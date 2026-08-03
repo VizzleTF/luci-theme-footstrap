@@ -13,6 +13,10 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ## [Unreleased]
 
+### Added
+
+- **`tools/sync-luci-fork.sh`, and `docs/package.md` explains the two trees it keeps in step.** The copy proposed to openwrt/luci is not this directory copied across: it gets the BUILT stylesheet and leaves `styles/` and the four shell scripts behind, because the other four themes there commit one `cascade.css` and have no build step, and a theme arriving with its own build system asks a reviewer to audit that before they can read a stylesheet. Nothing else is optimised on the way, and that is measured rather than assumed: no package in that tree ships anything pre-minified — the four themes' stylesheets run 17–20 bytes per line and `luci-base`'s JS 28–29 — so the copy keeps its `--fs-*` names unmangled, its comments intact, and hands the JS to luci.mk's own jsmin. The two packages differ by 14% because of it, 76 321 bytes against 66 825.
+
 ### Fixed
 
 - **The GitHub Pages portal builds again.** Two breakages, both introduced by the v0.12.1 work and both invisible until CI ran: `mkdir -p _site/fonts` was deleted with the webfonts, and it was the only thing creating `_site` at all, so every `cp` after it failed on "No such file or directory"; and `cp wallpapers/*.svg` no longer matched anything once the two sample patterns moved into `wallpapers/svg/`, which under `set -e` is a failed build. The glob has now broken twice on a move, so it is spelled with the subdirectory and the reason is written next to it.

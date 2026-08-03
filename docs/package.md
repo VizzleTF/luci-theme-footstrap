@@ -249,3 +249,41 @@ It deliberately pins **no ucode**. The template compile-check moved into the `ve
 where the router's own interpreter runs it against the installed templates on both release lines
 ([ci.md](ci.md)) — so there is no interpreter to build and no commit to keep current, and the file
 says so in place to stop the pin coming back.
+
+## The same package, twice: this tree and the luci tree
+
+The theme is proposed to [openwrt/luci](https://github.com/openwrt/luci) as
+`themes/luci-theme-footstrap`, and the copy that lives there is **not** this directory copied
+across. `tools/sync-luci-fork.sh <path-to-luci>` materialises it, and the difference is one
+decision made twice.
+
+**That tree gets the built stylesheet; this one keeps the layers.** Here, `styles/` is sixteen
+files in four cascade layers whose *order* is the design, and `cascade.css` is a build artefact
+this repository does not even track. There, the other four themes each commit one `cascade.css`
+and have no build step at all — a theme arriving with its own build system asks a reviewer to
+audit that before they can read a stylesheet. So the sheet is generated on this side and
+committed on that one, and `styles/` plus the four shell scripts do not travel.
+
+**Nothing else is optimised on the way.** Measured against the stock tree, no package in
+`openwrt/luci` ships anything pre-minified: the four themes' stylesheets run 17–20 bytes per line
+and `luci-base`'s own JS 28–29, i.e. ordinary source with indentation. So the copy keeps its
+`--fs-*` names unmangled, its templates and shell keep their comments, and the JS goes over
+untouched for `luci.mk` to run **jsmin** across at package time — which is what every other
+package in that tree gets. The release path here does more (terser, `mangle-tokens.sh`, comment
+stripping) and the packages differ by about 14% because of it: 76 321 bytes against 66 825.
+
+The one place the copy still stands out is the sheet itself, at 128 bytes per line against the
+stock 17–20, and the arithmetic is why it stays: unminified it is **438 541 bytes**, eight times
+the largest stock theme, because this repository keeps the *why* beside each rule and in source
+form those comments are 70% of the file. The choice there is not "like everyone else" versus
+"minified" — it is 132 kB of minified sheet against 438 kB of prose.
+
+Two more things the copy changes, both in the Makefile, which is the one file maintained by hand
+on the far side and never overwritten by the sync:
+
+- `include ../../luci.mk`, not `$(TOPDIR)/feeds/luci/luci.mk` — in-tree, that is the path.
+- `PKG_MAINTAINER` rather than `LUCI_MAINTAINER`: 96 of 101 apps in that tree use the former, and
+  the formality bot reads it.
+
+Re-run the sync after any change under `styles/`, or the committed sheet is a stale artefact of a
+source that has moved.
