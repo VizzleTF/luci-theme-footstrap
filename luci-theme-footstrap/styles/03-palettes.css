@@ -2,9 +2,9 @@
 	/* ============================================================
 	 * COLOURWAYS (palettes)
 	 *
-	 * Every colour is a variable; every palette is one self-contained block per mode. Two ship
-	 * — footstrap (GitHub Primer, the default) and hicontrast — but the structure is the point:
-	 * a new colourway is copy-one-pair-and-recolour.
+	 * Every colour is a variable; every palette is one self-contained block per mode. Three ship
+	 * — footstrap (GitHub Primer, the default), hicontrast and bootstrap (the stock LuCI theme's
+	 * colours) — but the structure is the point: a new colourway is copy-one-pair-and-recolour.
 	 *
 	 * TO ADD A COLOURWAY "sunset":
 	 *   1. Copy the two hicontrast blocks below, rename data-palette to "sunset".
@@ -14,8 +14,13 @@
 	 *      the three status colours --fs-good-base / --fs-warn-base / --fs-danger-base (COLOUR
 	 *      AXES block). A palette never declares --fs-good itself.
 	 *   3. Set the four INKS (--fs-on-accent/-good/-warn/-danger) — see below.
-	 *   4. Register the name: applyPalette()/currentPalette() in fs-prefs.js and
-	 *      the head.ut pre-paint switch.
+	 *   4. Register the name in all four places, because each one fails DIFFERENTLY and quietly:
+	 *      the PALETTE axis in fs-prefs.js (live switching), the `_sd_pal` whitelist AND the
+	 *      pre-paint switch in partials/head.ut (a router default outside the whitelist becomes
+	 *      '' and the page paints in the default palette), the label map in fs-appearance.js (an
+	 *      unnamed palette is missing from the picker, not broken), and matrix() in
+	 *      tools/lib/gallery.mjs — a palette absent there is one export-tier.mjs and
+	 *      a11y-gallery.mjs never measure, so it ships ungated.
 	 * Nothing else — layout, components and the --*-color-* export bridge (02-tokens) key off
 	 * these tokens, and every tint/shadow/hairline is a color-mix() OVER them.
 	 *
@@ -32,7 +37,7 @@
 	 * notation (both bridges, --*-hsl then --*-rgb, are gone; foot of 02-tokens.css).
 	 *
 	 * Default: footstrap fills bare :root (no data-palette), so a no-JS load still has
-	 * colours; hicontrast is opt-in via data-palette="hicontrast". Specificity:
+	 * colours; every other colourway is opt-in via its own data-palette value. Specificity:
 	 * :root[data-palette=…][data-darkmode=…] (0,3,0) beats the bare/default blocks, and each
 	 * block sets a COMPLETE token set so the winner fully applies.
 	 * ============================================================ */
@@ -77,7 +82,7 @@
 	 *                     light, 4.61:1 down to 4.40:1 — under AA.
 	 *
 	 * Proven, not assumed: tools/export-tier.mjs runs the AA matrix over six hues × both modes
-	 * × both palettes (it caught that 4.40:1) and tools/a11y-gallery.mjs runs axe over the
+	 * × every palette (it caught that 4.40:1) and tools/a11y-gallery.mjs runs axe over the
 	 * tinted gallery at two extreme hues. Change --fs-tint-c and re-run both.
 	 *
 	 * The shipped chroma is deliberately tiny — the dark floor (.011) is below the chroma the
@@ -347,5 +352,85 @@
 		--fs-on-good: #0a0d13;
 		--fs-on-warn: #0a0d13;
 		--fs-on-danger: #0a0d13;
+	}
+
+	/* ---- classic — the colours of luci-theme-bootstrap, the LuCI default (opt-in) ----
+	 *
+	 * The one palette named after another PACKAGE, because that is what it is: the surfaces,
+	 * greys and semantic colours of the stock theme, so an admin who wants the look they already
+	 * know keeps it and still gets the chrome, the client navigation and the Appearance axes.
+	 *
+	 * Bootstrap computes everything from HSL axes; these are those axes evaluated:
+	 *   --background-color high/medium/low  #ffffff / #f9f9f9 / #f5f5f5   (dark #222 / #282828 / #2c2c2c)
+	 *   --text-color high/medium            #404040 / #808080            (dark #bfbfbf / #7f7f7f)
+	 *   --border-color high/medium          #cccccc / #dddddd            (dark #555555 / #444444)
+	 * The canvas and the card are BOTH --background-color-high: bootstrap is flat and lets the
+	 * border carry the structure, so copying its surfaces means copying that too. panel2 is its
+	 * --background-color-low, the surface it stripes tables and hovers rows with.
+	 *
+	 * WHERE THIS DEVIATES, AND WHY IT HAS TO. Bootstrap's semantic colours do not clear AA on
+	 * bootstrap's own surfaces, and tools/export-tier.mjs holds every palette to 4.5:1 on all
+	 * three — the export tier is what other people's apps print text in. Measured on --fs-panel2:
+	 * success #00ac59 2.73:1, warn #efbd0b 1.61:1, error #f62b12 3.65:1, primary #1976d2 4.22:1;
+	 * dark error #d15653 3.44:1, success #00a66c 4.44:1. So each one is taken from the STEP OF
+	 * BOOTSTRAP'S OWN RAMP that clears it where such a step exists — primary/success/error light
+	 * are its -medium/-low values verbatim — and where none does, the hue and saturation are kept
+	 * and only the value is moved until the colour clears 4.95:1. Warn is the only large move:
+	 * no yellow readable as text on white is still that yellow, which is the same trade the
+	 * default palette made (#946300).
+	 *
+	 * Bootstrap's dark HEADER GRADIENT (#333 → #222, in both modes) is not here: the chrome reads
+	 * --fs-panel, so a palette cannot give the bar its own colour. That would need a chrome token
+	 * pair, which is a change to the chrome, not a colourway. */
+	:root[data-palette="bootstrap"] {
+		/* LIGHT */
+		--fs-bg-base: #ffffff;
+		--fs-panel-base: #ffffff;
+		--fs-panel2-base: #f5f5f5;
+		--fs-border-base: #cccccc;
+		--fs-text: #404040;
+		--fs-dim: #6a6a6a;
+		--fs-faint: #6e6e6e;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%236a6a6a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		/* --primary-color-medium; -high (#1976d2) measured 4.22:1 on --fs-panel2 */
+		--fs-accent-base: #1564c0;
+		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
+		--fs-track: #eeeeee;
+		--fs-good-base: #007936;   /* --success-color-low */
+		--fs-warn-base: #826706;   /* #efbd0b darkened; 1.61:1 as text is not a rounding error */
+		--fs-danger-base: #d00000; /* --error-color-low */
+		/* ink ON the fills above — white clears AA on all four: 5.81/5.54/5.40/5.70 */
+		--fs-on-accent: #fff;
+		--fs-on-good: #fff;
+		--fs-on-warn: #fff;
+		--fs-on-danger: #fff;
+	}
+	:root[data-palette="bootstrap"][data-darkmode="true"] {
+		/* DARK */
+		--fs-bg-base: #222222;
+		--fs-panel-base: #282828;
+		/* bootstrap's --background-color-low in dark is #2c2c2c, and that is the one surface value
+		 * copied rather than reproduced: 0.016 from --fs-panel, under the 0.02 export-tier.mjs
+		 * wants, so an app asking --background-color-high/-low for a gradation got one colour
+		 * twice. Bootstrap's LIGHT pair is 0.039 apart and its dark pair is not — the same ramp
+		 * check catches it in the theme this palette is named after. #303030 is 0.031. */
+		--fs-panel2-base: #303030;
+		--fs-border-base: #444444;
+		--fs-text: #bfbfbf;
+		--fs-dim: #9a9a9a;
+		--fs-faint: #969696;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%239a9a9a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		--fs-accent-base: #53a4c2;
+		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
+		--fs-track: #333333;
+		--fs-good-base: #1aaf7b;
+		--fs-warn-base: #aa9968;
+		--fs-danger-base: #dd807e;
+		/* dark ink: these fills are LIGHT, and bootstrap's own --on-*-color in dark is likewise
+		 * its --background-color-high. #222222 gives 5.65/5.65/5.66/5.65. */
+		--fs-on-accent: #222222;
+		--fs-on-good: #222222;
+		--fs-on-warn: #222222;
+		--fs-on-danger: #222222;
 	}
 }

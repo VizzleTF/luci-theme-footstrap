@@ -310,12 +310,39 @@ function propAxis(key, sdKey, prop, min, max, dfl, fmt) {
 	};
 }
 
-/* Palette: footstrap (GitHub colours) is the default = bare :root; hicontrast is the opt-in
- * variant. Colourway blocks live in styles/03-palettes.css. Legacy 'rvht'/'roman'/'github' are
- * migrated to explicit values by head.ut before paint, so they never reach current() on a loaded
- * page; the stray fallthrough covers them anyway. */
-const PALETTE = enumAxis('fs-palette', 'data-palette', 'hicontrast', 'footstrap');
-const currentPalette = PALETTE.current, applyPalette = PALETTE.apply;
+/* Palette: footstrap (GitHub colours) is the default = bare :root; every other colourway is an
+ * opt-in data-palette value. Colourway blocks live in styles/03-palettes.css.
+ *
+ * This was the two-valued enumAxis shape while there were exactly two palettes, and stopped being
+ * able to express the set the moment a third arrived — an enumAxis has one `on` name and reads
+ * EVERY other stored string, including a real palette, as the default. So it is the
+ * wallpaper/density shape now: a list of the non-default values, which is what VALIDATES a stored
+ * value. A name added to the CSS and not to this array is one head.ut pre-paints and the live
+ * applier then rejects — the page paints it and the first touch of any other control takes it
+ * away.
+ *
+ * Legacy 'rvht'/'roman'/'github' are migrated to explicit values by head.ut before paint, so they
+ * never reach currentPalette() on a loaded page; the stray fallthrough covers them anyway. */
+const PALETTES = [ 'hicontrast', 'bootstrap' ];	/* the non-default values; 'footstrap' = bare :root */
+function paletteDefault() {
+	const d = sd('palette');
+	return (PALETTES.indexOf(d) >= 0) ? d : 'footstrap';
+}
+function currentPalette() {
+	const s = lsGet('fs-palette');
+	if (PALETTES.indexOf(s) >= 0) return s;
+	if (s === 'footstrap') return 'footstrap';
+	if (s === null) return paletteDefault();
+	return 'footstrap';	/* a stray value reads as the built-in default */
+}
+function applyPalette(val) {
+	const root = document.documentElement;
+	const v = (PALETTES.indexOf(val) >= 0) ? val : 'footstrap';
+	/* stored explicitly (including 'footstrap'), so it overrides a router default — see the header */
+	lsSet('fs-palette', v);
+	if (v === 'footstrap') root.removeAttribute('data-palette');
+	else root.setAttribute('data-palette', v);
+}
 
 /* Wallpaper is a MULTI-value axis and its own concern (composes with either palette): off (bare
  * canvas), pattern (the admin-uploaded SVG, tiled and recoloured — 15-wallpaper.css) or file (the
@@ -669,7 +696,7 @@ function _resolvedDefault() {
 	return {
 		layout: sd('layout') || 'sidebar',
 		darkmode: modeDefault(),
-		palette: PALETTE.def(),
+		palette: paletteDefault(),
 		wallpaper: wallpaperDefault(),
 		tint: String(TINT.def()),
 		accent: String(ACCENT.def()),

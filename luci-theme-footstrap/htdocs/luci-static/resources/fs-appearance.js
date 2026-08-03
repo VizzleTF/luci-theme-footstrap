@@ -173,7 +173,10 @@ function build() {
 
 		group(_('Palette', 'footstrap'), (label) => selectCtl(prefs.currentPalette(), {
 			footstrap:  'Footstrap',
-			hicontrast: 'Hi-Contrast'
+			hicontrast: 'Hi-Contrast',
+			/* names the OTHER package, luci-theme-bootstrap, whose colours this palette is —
+			 * so it is a proper noun and stays untranslated, like the two above it */
+			bootstrap:  'Bootstrap'
 		}, bump(repaint(prefs.applyPalette)), label)),
 
 		/* Density: how much air the UI uses. Pure token axis — 02-tokens.css multiplies the type and

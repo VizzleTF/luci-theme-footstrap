@@ -61,7 +61,7 @@ export async function applyAppearance(page, { mode = 'light', palette = 'footstr
 	await page.evaluate(([m, p, t, a]) => {
 		const root = document.documentElement;
 		root.setAttribute('data-darkmode', m === 'dark' ? 'true' : 'false');
-		if (p === 'hicontrast') root.setAttribute('data-palette', 'hicontrast');
+		if (p && p !== 'footstrap') root.setAttribute('data-palette', p);
 		else root.removeAttribute('data-palette');
 		/* colour axes in hue mode: the custom property FIRST, then the attribute that switches the
 		 * rotation on. The other order paints one frame with the previous hue — the theme's own
@@ -87,5 +87,7 @@ export function matrix(tints = [null]) {
 		{ palette: 'footstrap', mode: 'dark' },
 		{ palette: 'hicontrast', mode: 'light' },
 		{ palette: 'hicontrast', mode: 'dark' },
+		{ palette: 'bootstrap', mode: 'light' },
+		{ palette: 'bootstrap', mode: 'dark' },
 	].flatMap((c) => tints.map((tint) => ({ ...c, tint })));
 }

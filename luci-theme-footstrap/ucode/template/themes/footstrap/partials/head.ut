@@ -16,7 +16,7 @@
 	fs_defaults = fs_defaults ?? {};
 	let _sd_lay  = index([ 'sidebar', 'top' ], fs_defaults.layout) >= 0 ? fs_defaults.layout : '';
 	let _sd_dark = index([ 'auto', 'light', 'dark' ], fs_defaults.darkmode) >= 0 ? fs_defaults.darkmode : '';
-	let _sd_pal  = index([ 'footstrap', 'hicontrast' ], fs_defaults.palette) >= 0 ? fs_defaults.palette : '';
+	let _sd_pal  = index([ 'footstrap', 'hicontrast', 'bootstrap' ], fs_defaults.palette) >= 0 ? fs_defaults.palette : '';
 	let _sd_wall = index([ 'off', 'pattern', 'file' ], fs_defaults.wallpaper) >= 0 ? fs_defaults.wallpaper : '';
 	let _sd_pink = index([ 'theme', 'original' ], fs_defaults.pattern_ink) >= 0 ? fs_defaults.pattern_ink : '';
 	let _sd_ac   = index([ 'on', 'off' ], fs_defaults.autocollapse) >= 0 ? fs_defaults.autocollapse : '';
@@ -183,9 +183,12 @@
 					if (p === 'rvht' || p === 'roman' || p === 'github') {
 						localStorage.setItem('fs-palette', 'footstrap'); p = 'footstrap';
 					}
-					/* the default palette is a bare :root; only hicontrast is opt-in. */
+					/* the default palette is a bare :root; every other colourway is opt-in and
+					   carries its own value. The list is the same one fs-prefs.js validates
+					   against — a name in one and not the other paints here and is taken away by
+					   the first live change. */
 					if (p === null) p = sd.palette || null;
-					if (p === 'hicontrast') root.setAttribute('data-palette', 'hicontrast');
+					if (p === 'hicontrast' || p === 'bootstrap') root.setAttribute('data-palette', p);
 					else root.removeAttribute('data-palette');
 
 					/* Wallpaper: off | pattern (the uploaded SVG, tiled and recoloured) | file (the
