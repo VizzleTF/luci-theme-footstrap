@@ -303,8 +303,10 @@ function colorAxis(key, attr, hueProp, colorProp) {
  * EXPLICITLY — including the default, so it overrides a router default (see the header; lsDel would
  * mean "inherit") — and remove the property AT the default, so 02-tokens' own value shows through.
  * They differ ONLY in how the number formats onto the property (px vs a 0..2 multiplier), so that is
- * the one argument that varies. The sd() field name is passed in explicitly: unlike enum/hue it is
- * NOT the key minus 'fs-' ('fs-radius' -> rounding, 'fs-tint-strength' -> tint_strength). */
+ * the one argument that varies. The sd() field name is passed in explicitly because ONE instance
+ * needs a RENAME rather than a spelling: 'fs-radius' -> rounding. The other four would fall out of
+ * the same hyphen fold enumAxis and colorAxis do ('fs-tint-strength' -> tint_strength), but a
+ * factory that is right for four keys out of five is the trap those two walked into. */
 function propAxis(key, sdKey, prop, min, max, dfl, fmt) {
 	const inRange = (n) => (typeof n === 'number' && n >= min && n <= max);
 	const def = () => { const d = sd(sdKey); return inRange(d) ? d : dfl; };

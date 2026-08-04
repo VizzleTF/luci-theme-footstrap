@@ -28,24 +28,38 @@
    because the markup was assumed to be stock LuCI's. It is OURS: name the form instead. #}
 <form method="post" class="fs-login">
 	{#
-	 THE BACKEND'S MESSAGE WINS OVER THE CREDENTIALS ONE, and the order matters more than it looks.
-	 `fuser` is not "the password was wrong" — it is the USERNAME the form posted, set in BOTH
-	 branches of dispatcher.uc that render a sysauth. On the second step of a pluggable login (the
-	 OTP prompt, dispatcher.uc:1018) the credentials were CORRECT and `fuser` is still set, with
-	 `auth_message` carrying what actually happened. The generic template guards its message with
-	 `&& !fuser`, so that step tells the user "Invalid username and/or password!" — about a password
-	 that was right — and swallows "Too many failed attempts" / "System time is not calibrated"
-	 entirely. luci-theme-bootstrap does not make that trade, and neither does this: message first,
-	 credentials as the fallback. `auth_plugin` names the challenge that stopped the login, and it
-	 is the one signal separating "the backend is asking for something" from an ordinary notice.
+	 TWO INDEPENDENT ALERTS, because neither variable on its own says which of the two dispatcher
+	 branches rendered this page — and each of the two spellings in the tree picks one and gets the
+	 other wrong.
+
+	 `fuser` is not "the password was wrong": it is the USERNAME the form posted, set in BOTH
+	 branches. On the second step of a pluggable login (the OTP prompt, dispatcher.uc:1018) the
+	 credentials were CORRECT and `fuser` is still set, so the generic template's
+	 `auth_message && !fuser` reports "Invalid username and/or password!" about a password that was
+	 right and swallows "Too many failed attempts" / "System time is not calibrated" entirely.
+
+	 `auth_message` is not "the password was right" either. The FIRST branch copies it out of
+	 get_challenges() BEFORE the password is checked (dispatcher.uc:956), and that call answers with
+	 a message on every pending result — 'Additional verification required' when the plugin has none
+	 of its own (authplugins.uc:312). So on a router running luci-plugin-2fa both are set at once
+	 whenever a password is rejected, and luci-theme-bootstrap's `elif (fuser)` then never tells
+	 that user their password was wrong.
+
+	 `auth_plugin` is what separates the branches: it is set ONLY in the second one
+	 (dispatcher.uc:1018), i.e. exactly when session_setup() ACCEPTED the credentials. Gate the
+	 credentials alert on `!auth_plugin`, render the message BESIDE it rather than instead of it,
+	 and all four states are covered: a wrong password, a wrong password with a challenge pending
+	 (both alerts), the OTP prompt, a failed OTP. The classes keep them apart once they can appear
+	 together — `error` is the danger variant, the plugin's own notice stays amber.
 	-#}
+	{% if (fuser && !auth_plugin): %}
+		<div class="alert-message error">
+			<p>{{ _('Invalid username and/or password! Please try again.') }}</p>
+		</div>
+	{% endif %}
 	{% if (auth_message): %}
 		<div class="alert-message{% if (auth_plugin): %} warning{% endif %}">
 			<p>{{ auth_message }}</p>
-		</div>
-	{% elif (fuser): %}
-		<div class="alert-message warning">
-			<p>{{ _('Invalid username and/or password! Please try again.') }}</p>
 		</div>
 	{% endif %}
 

@@ -518,12 +518,18 @@ function silence(el) {
  *
  * A foreign sheet is injected by ONE page and has no business painting any other. Before this, an
  * invasive sheet made the whole document spent (documentPoisoned) and the SPA fell back to a full
- * load on the way OUT — correct, but stock LuCI pays it: `view/status/cpu.js` and its four realtime
- * siblings each `document.head.append(E('style', …))` at MODULE EVAL, and that style carries
- * `svg text { fill: #eee; font-size: 9pt }` — real properties on a bare selector, so invasive by the
- * only definition that catches `[class] { padding: 0 !important }`. Measured on the router: 37 of 38
- * pages navigated in-place instead of 38, `status/realtime/load` 15 ms -> 157 ms, and the whole
- * realtime family 2-10x slower.
+ * load on the way OUT — correct, and paid by ORDINARY pages: `luci-app-filemanager`, a stock app,
+ * calls its `insertCss()` at MODULE EVAL and lands two <style>s in <head> (its own rules plus the
+ * HexEditor's), and `luci-app-ssclash` adds four more as the Ace editor initialises. Both carry
+ * real properties on bare selectors (`.hexview:focus`, `.ace_gutter`), which is invasive by the
+ * only definition that also catches `[class] { padding: 0 !important }`.
+ *
+ * Measured on owrt2512, 25.12.4, with ownership taken out of documentPoisoned() and put back:
+ * leaving either page is a FULL LOAD, 5 runs of 5, and with ownership all 5 are in place —
+ * medians 24 ms (filemanager) and 27 ms (ssclash). The control is a page that injects nothing
+ * (System -> General): in place either way. Stock LuCI's own pages inject nothing into <head> on
+ * 24.10/25.12 — the realtime graphs style their SVG text with an inline `style=` attribute — so
+ * what this costs a router is decided entirely by which apps are installed on it.
  *
  * Removing the sheet on the way out is NOT the fix, and it is the obvious one: the append is at
  * module top level, `L.require` caches the module, so a second visit re-runs nothing and the page

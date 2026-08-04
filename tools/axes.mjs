@@ -79,8 +79,13 @@ const enumAxes = [...JS.matchAll(/enumAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'
  * as above: its lsGet(key) sits in the factory body, so keysIn() cannot see the key. Match the call. */
 const propAxes = [...JS.matchAll(/propAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'/g)]
 	.map(([, key, sdKey, prop]) => ({ key, sdKey, prop }));
+/* surfaceAxis(key, sdKey, prop) — a surface repaint (cards, controls, bar, borders). Same blind
+ * spot again, and section 2e needs its sdKey. */
+const surfaceAxes = [...JS.matchAll(/surfaceAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)]
+	.map(([, key, sdKey, prop]) => ({ key, sdKey, prop }));
 
-const jsKeys = new Set([...keysIn(JS), ...colorAxes.map(a => a.key), ...enumAxes.map(a => a.key), ...propAxes.map(a => a.key)]);
+const jsKeys = new Set([...keysIn(JS), ...colorAxes.map(a => a.key), ...enumAxes.map(a => a.key),
+	...propAxes.map(a => a.key), ...surfaceAxes.map(a => a.key)]);
 /* head.ut pre-paints the five colour axes through ONE local helper, so their keys are arguments
  * there too and keysIn() cannot see them either — the same blind spot, on the other side. Matched
  * by the call, and the four literals are what section 2 holds against the JS. */
@@ -259,6 +264,65 @@ else {
 				+ `either a leftover from a removed axis, or the axis is missing from Save-as-default`);
 	if (!errors.length)
 		ok.push(`server read: all ${snapFields.length} saved option(s) are read back by header.ut`);
+}
+
+/* ---- 2e. THE FIELD NAME: every sd() lookup must name a field head.ut actually EMITS ----
+ *
+ * The factories reach the router default through window.__fsSD, and they get the field name two
+ * different ways: enumAxis and colorAxis DERIVE it from the localStorage key (key minus 'fs-',
+ * hyphens folded to underscores, because the key is hyphenated and the uci option is not), while
+ * propAxis and surfaceAxis are HANDED it, since one of them is a rename rather than a spelling
+ * ('fs-radius' -> rounding). Nothing checked either against the template.
+ *
+ * `fs-pattern-ink` is what that cost: a bare slice(3) asked for 'pattern-ink', head.ut emits
+ * `pattern_ink`, so sd() answered undefined forever and the axis reported the BUILT-IN default
+ * however the router was configured — the Ink control said Theme while the pre-paint had already
+ * painted Original, matchesSavedDefault() was false with nothing touched, and pressing
+ * Save-as-default wrote the built-in over the admin's stored value. Every symptom is silent, which
+ * is how it survived a review round (openwrt/luci#8903) and every gate in this file.
+ *
+ * THE DERIVING FACTORIES' FORMULA IS TAKEN FROM THE SOURCE AND RUN, never restated here. Written
+ * the obvious way — repeat `key.slice(3).replace(/-/g, '_')` in this file and compare — the gate
+ * holds head.ut against ITSELF and stays green while fs-prefs.js says something else entirely:
+ * measured by breaking the fold back to a bare slice(3), which such a version passed. */
+const sdLine = (HEAD.match(/window\.__fsSD\s*=\s*\{[^\n]*/) || [''])[0];
+const sdFields = [...sdLine.matchAll(/[{,]\s*([a-z_]+)\s*:/g)].map((m) => m[1]);
+/* `const sdKey = <expr>;` out of the named factory's body, compiled into a function of `key` */
+const sdFormula = (factory) => {
+	const body = JS.match(new RegExp(`function ${factory}\\([^)]*\\)\\s*\\{[\\s\\S]*?\\n\\}`));
+	const expr = body && body[0].match(/const\s+sdKey\s*=\s*([^;]+);/);
+	if (!expr) return null;
+	try { return new Function('key', `return (${expr[1]});`); }
+	catch { return null; }
+};
+const colorFormula = sdFormula('colorAxis');
+const enumFormula = sdFormula('enumAxis');
+if (!colorFormula) errors.push('colorAxis() no longer derives `const sdKey = …` — this gate cannot follow it any more');
+if (!enumFormula) errors.push('enumAxis() no longer derives `const sdKey = …` — this gate cannot follow it any more');
+const sdReaders = [
+	...(colorFormula ? colorAxes.map((a) => ({ ...a, sdKey: colorFormula(a.key), how: "derived from the key by colorAxis" })) : []),
+	...(enumFormula ? enumAxes.map((a) => ({ ...a, sdKey: enumFormula(a.key), how: "derived from the key by enumAxis" })) : []),
+	...propAxes.map((a) => ({ ...a, how: 'passed to propAxis explicitly' })),
+	...surfaceAxes.map((a) => ({ ...a, how: 'passed to surfaceAxis explicitly' })),
+];
+/* the axes read outside a factory spell the field at the call site — hold those too */
+const sdLiterals = [...JS.matchAll(/\bsd\(\s*'([a-z_]+)'\s*\)/g)].map((m) => m[1]);
+
+if (!sdFields.length)
+	errors.push('head.ut no longer emits a `window.__fsSD={…}` object literal on one line — the gate that '
+		+ 'holds every sd() field name against the template cannot read it any more');
+else {
+	for (const a of sdReaders)
+		if (!sdFields.includes(a.sdKey))
+			errors.push(`axis '${a.key}' reads its router default from window.__fsSD.${a.sdKey} (${a.how}), but `
+				+ `head.ut emits no such field — sd() is undefined forever, so the axis reports the built-in `
+				+ `default whatever the router saved, and Save-as-default then overwrites the saved value with it`);
+	for (const f of sdLiterals)
+		if (!sdFields.includes(f))
+			errors.push(`sd('${f}') is read in the theme JS, but head.ut emits no window.__fsSD.${f} — `
+				+ `same silent failure as above: the router default never reaches the browser`);
+	if (!errors.length)
+		ok.push(`sd() fields: ${sdReaders.length} factory axes + ${new Set(sdLiterals).size} direct reads all name a field head.ut emits`);
 }
 
 /* ---- 3. the rounding default: JS, template and CSS token must be the same number ----- */

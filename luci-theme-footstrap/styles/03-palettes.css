@@ -141,7 +141,7 @@
 		 * strength, 0 = none, up to 2. fs-prefs.js/head.ut set it inline (value/100) when the user
 		 * drags the slider; paired with the hue, it is the second half of the router-identity Tint. */
 		--fs-tint-strength: 1;
-		/* The uploaded login/page background (Appearance → Background image). --fs-login-bg-url is
+		/* The uploaded login/page background (Appearance → Wallpaper → File). --fs-login-bg-url is
 		 * the url() head.ut/fs-prefs.js stamp inline; `none` here is the same stand-on-its-own
 		 * default the hues carry above (a var() with no definition is invalid at computed-value
 		 * time). --fs-photo-scrim is the wash laid OVER the photo so on-canvas text stays legible on
