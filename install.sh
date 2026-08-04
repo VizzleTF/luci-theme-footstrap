@@ -35,30 +35,79 @@ printf '\n=== luci-theme-footstrap installer ===\n\n'
 . /etc/openwrt_release
 ok "Detected: ${DISTRIB_DESCRIPTION:-OpenWrt}"
 
-if command -v apk >/dev/null 2>&1; then PM=apk
-elif command -v opkg >/dev/null 2>&1; then PM=opkg
+if command -v apk >/dev/null 2>&1; then PM=apk; INDEX=packages.adb
+elif command -v opkg >/dev/null 2>&1; then PM=opkg; INDEX=Packages.gz
 else err "Neither apk nor opkg found."; exit 1; fi
 ok "Package manager: $PM"
 
+# Read before the branch rather than beside the feed entry, because a router that names
+# no branch picks one by asking the feed which branch carries this architecture.
+if [ "$PM" = apk ]; then
+	ARCH=$(cat /etc/apk/arch) || { err "Cannot read /etc/apk/arch."; exit 1; }
+else
+	ARCH="${DISTRIB_ARCH:-}"
+	[ -n "$ARCH" ] || { err "DISTRIB_ARCH is empty in /etc/openwrt_release."; exit 1; }
+fi
+
 # --- version --------------------------------------------------------------
-# The feed publishes per OpenWrt minor, so the branch comes from the router.
-# SNAPSHOT and anything unparseable have no branch to install from.
+# The feed publishes per OpenWrt minor, so the branch comes from the router. SNAPSHOT
+# and anything unparseable name none, and are served the newest branch of their own
+# package format instead — see FALLBACK_BRANCHES_* below for why that is sound here.
+FALLBACK_BRANCHES_APK="25.12"
+FALLBACK_BRANCHES_OPKG="24.10"
+
+# The feed has no snapshot channel, and not by omission: the two lines owfeed-packages
+# serves ARE the package-format split (apk from 25.12, ipk on 24.10), not a build of the
+# theme per release. A snapshot has no branch of its own to install from, so it gets the
+# newest one its package manager can read.
+#
+# What makes that sound for THIS package and not in general: it is noarch and
+# `+luci-base` is its whole dependency list, so nothing in it was compiled against the
+# branch it is fetched from. A package carrying a binary, or a versioned dependency,
+# must not take this path.
+#
+# Newest first, and each candidate is probed rather than assumed: a branch listed here
+# before it is published — or one that does not carry this router's architecture — falls
+# through to the next instead of writing a repository entry that 404s on every update.
+# The probe's bytes are discarded on purpose. Existence is all it asks, and the index it
+# found is still verified by the package manager against the key pinned above, so a host
+# that lies here buys a feed entry that then fails to verify rather than an install.
+newest_feed_branch() {	# <candidates> -> the first branch that answers
+	for _branch in $1; do
+		if fetch "$FEED_HOST/releases/$_branch/$ARCH/$INDEX" /dev/null 2>/dev/null; then
+			printf '%s' "$_branch"
+			return 0
+		fi
+	done
+	return 1
+}
+
 BRANCH=$(printf '%s' "${DISTRIB_RELEASE:-}" | cut -d. -f1,2)
 case "$BRANCH" in
-	[0-9][0-9].[0-9][0-9]) ;;
-	*) err "footstrap needs a release build of OpenWrt 24.10 or newer (got '${DISTRIB_RELEASE:-unknown}')."; exit 1 ;;
+[0-9][0-9].[0-9][0-9])
+	MAJ=${BRANCH%%.*}; MIN=${BRANCH##*.}
+	if [ "$MAJ" -lt 24 ] || { [ "$MAJ" -eq 24 ] && [ "$MIN" -lt 10 ]; }; then
+		err "footstrap requires OpenWrt 24.10 or newer (detected $DISTRIB_RELEASE)."
+		exit 1
+	fi
+	;;
+*)
+	info "'${DISTRIB_RELEASE:-unknown}' names no feed branch; asking the feed for the newest one..."
+	if [ "$PM" = apk ]; then CANDIDATES="$FALLBACK_BRANCHES_APK"; else CANDIDATES="$FALLBACK_BRANCHES_OPKG"; fi
+	BRANCH=$(newest_feed_branch "$CANDIDATES") || {
+		err "The feed carries no $PM branch for $ARCH (router reports '${DISTRIB_RELEASE:-unknown}')."
+		err "Install the release asset by hand instead:"
+		err "  https://github.com/VizzleTF/luci-theme-footstrap/releases/latest"
+		exit 1
+	}
+	ok "No branch of its own, so the $BRANCH branch it is — the theme is noarch and needs only luci-base."
+	;;
 esac
-MAJ=${BRANCH%%.*}; MIN=${BRANCH##*.}
-if [ "$MAJ" -lt 24 ] || { [ "$MAJ" -eq 24 ] && [ "$MIN" -lt 10 ]; }; then
-	err "footstrap requires OpenWrt 24.10 or newer (detected $DISTRIB_RELEASE)."
-	exit 1
-fi
 
 # --- feed -----------------------------------------------------------------
 # keep.d is not bookkeeping: sysupgrade wipes the keys and the repository list unless
 # something claims them, and the theme would come back unupgradable.
 if [ "$PM" = apk ]; then
-	ARCH=$(cat /etc/apk/arch) || { err "Cannot read /etc/apk/arch."; exit 1; }
 	if [ ! -f /etc/apk/keys/owfeed-packages.pem ]; then
 		info "Adding the $FEED_NAME feed..."
 		apk add --quiet ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
@@ -76,7 +125,6 @@ if [ "$PM" = apk ]; then
 	# `apk add` resolves to the newest version in the feed, so a second run upgrades.
 	apk add "$PKG"
 else
-	ARCH="$DISTRIB_ARCH"
 	if ! grep -q "$FEED_NAME" /etc/opkg/customfeeds.conf 2>/dev/null; then
 		info "Adding the $FEED_NAME feed..."
 		opkg update >/dev/null 2>&1 || true

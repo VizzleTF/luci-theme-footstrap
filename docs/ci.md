@@ -254,6 +254,20 @@ rather than from a file.
 wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 ```
 
+**A snapshot router is served the newest release branch.** The feed publishes one branch per
+OpenWrt minor and has no snapshot channel — owfeed-packages lists exactly two release lines and they
+*are* the package-format split (apk from 25.12, ipk on 24.10), not a build of the theme per release.
+So `SNAPSHOT`, which parses to no branch, gets the newest branch its own package manager can read:
+`FALLBACK_BRANCHES_APK` / `_OPKG` in the script, probed newest-first against
+`releases/<branch>/<arch>/<index>` rather than assumed, so a branch listed before it is published —
+or one that does not carry this router's architecture — falls through instead of writing a
+repository entry that 404s on every update. What makes it sound here and not in general: the theme
+is noarch and `+luci-base` is its whole dependency list, so nothing in it was compiled against the
+branch it comes from. The probe's bytes are discarded; the index it found is still verified below.
+When no candidate answers, the script refuses and points at the release asset — measured in an
+`openwrt/rootfs:x86-64` snapshot container (`apk add` from the 25.12 branch, no `--allow-untrusted`,
+theme registered) and with `/etc/apk/arch` forced to a name the feed does not carry.
+
 **What verifies the bytes is the package manager**, against the feed key pinned in the script:
 apk checks the index against `owfeed-packages.pem`, opkg against usign key `9040356b214084da`. The
 script fetches nothing else and installs nothing by hand, so it needs no signature logic of its
