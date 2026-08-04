@@ -80,6 +80,31 @@
 	let _sd_psize = (fs_defaults.pattern_size != '' && _ps >= 40 && _ps <= 1600) ? _ps : -1;
 	let _pst = int(fs_defaults.pattern_strength);
 	let _sd_pstr = (fs_defaults.pattern_strength != '' && _pst >= 0 && _pst <= 100) ? _pst : -1;
+	/* ---- THE FONTS ----
+	   The theme carries no faces (see the note by the stylesheet link below), so the two stacks in
+	   styles/02-tokens.css are what everyone gets unless the ROUTER names something else here.
+	   Two independent things, either usable alone:
+	     font_sans / font_mono   a font-family stack, printed into a style element further down.
+	     fonts                   the cache-bust token of the @font-face sheet fonts/set-font.sh
+	                             generates when an admin also installs the FILE. Hex, exactly like
+	                             login_bg and pattern, and for the same reason.
+	   Neither is an axis: there is no browser layer, no Appearance control and no entry in
+	   snapshotAxes() — a font is a router-wide decision here, not a per-visitor one.
+
+	   THE CHARSET IS THE WHOLE DEFENCE. A family stack is free text and it is printed UNESCAPED,
+	   so the whitelist has to exclude everything that could end the declaration or the element:
+	   < > ( ) { } ; and the backslash are all absent, which leaves no way to close a style element,
+	   start a second declaration or write a url(). Anything else becomes '' = "no router font".
+	   A Cyrillic or CJK family name is refused by this too — those faces carry a Latin name as well,
+	   and fonts/README.md says to use it. */
+	function _sd_family(v) {
+		return (type(v) == 'string' && length(v) >= 1 && length(v) <= 120 &&
+			match(v, /^[A-Za-z0-9 ,._"'-]+$/)) ? v : '';
+	}
+	let _sd_fsans = _sd_family(fs_defaults.font_sans);
+	let _sd_fmono = _sd_family(fs_defaults.font_mono);
+	let _ft = fs_defaults.fonts;
+	let _sd_ftok = (type(_ft) == 'string' && match(_ft, /^[a-f0-9]{6,64}$/)) ? _ft : '';
 	/* ---- WRITING DIRECTION ----
 	   Nothing in LuCI emits `dir`: the dispatcher stamps `lang` and stops there, and no stock theme
 	   adds one — so a router in Arabic, Persian or Hebrew renders right-to-left text inside a
@@ -325,16 +350,34 @@
 		</script>
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="darkreader-lock">
-		{# TWO <link rel=preload> FOR THE CHROME FACES USED TO SIT HERE, and nothing takes their
-		   place: the theme carries no webfonts any more. --fs-font-sans and --fs-font-mono name
-		   Manrope and JetBrains Mono FIRST and the system stack after, so a browser that has
-		   either installed locally uses it and one that does not falls through silently — no
-		   request, no 404, no flash. A preload is not in the stylesheet, which is exactly why it
-		   has to be deleted by hand when the fonts go: dropping the @font-face rules alone left
-		   these two behind and every page still asked the router for the files. #}
+		{# TWO <link rel=preload> FOR THE CHROME FACES USED TO SIT HERE, and the package still carries
+		   no webfonts: --fs-font-sans and --fs-font-mono name Manrope and JetBrains Mono FIRST and
+		   the system stack after, so a browser that has either installed locally uses it and one
+		   that does not falls through silently — no request, no 404, no flash. What follows the
+		   stylesheet below is the OPT-IN: a router whose admin ran fonts/set-font.sh.
+
+		   The preload pair is why both tags down there are written the way they are. A preload is
+		   not in the stylesheet, so deleting the @font-face rules alone left these two behind and
+		   every page went on asking the router for files that were gone: SIX 404s per page, and
+		   nothing in CSS could have told anyone. So the sheet link is emitted only when the token
+		   says the sheet exists, and the token is written by set-font.sh only after the file is. #}
 		{# `data-fs-shell` marks the SHELL's own CSS: on every nav the SPA router asks whether a
 		   VIEW put CSS in the document, and this is how it tells its own sheet from an app's. #}
 		<link rel="stylesheet" data-fs-shell href="{{ media }}/cascade.css?v={{ pkgs_update_time }}">
+		{% if (_sd_ftok != ''): %}
+		{# The generated @font-face sheet, and ONLY the faces: the families themselves come from the
+		   element below, so `uci set footstrap.settings.font_sans=…` by hand takes effect without
+		   regenerating anything. The token is the sheet's md5 — uhttpd sends no Cache-Control, so
+		   without it a browser applies heuristic freshness and keeps the previous face for days. #}
+		<link rel="stylesheet" data-fs-shell href="{{ media }}/fonts/fonts.css?v={{ _sd_ftok }}">
+		{% endif %}
+		{% if (_sd_fsans != '' || _sd_fmono != ''): %}
+		{# The router's own font stacks. Unlayered, so it beats the `tokens` layer that declares the
+		   defaults no matter what order the two sheets arrive in — a layered rule always loses to an
+		   unlayered one, which is the same reason a theme rule never needs !important to outrank
+		   base. Values are whitelisted at the top of this file; nothing here escapes them. #}
+		<style data-fs-shell>:root { {% if (_sd_fsans != ''): %}--fs-font-sans: {{ _sd_fsans }};{% endif %}{% if (_sd_fmono != ''): %} --fs-font-mono: {{ _sd_fmono }};{% endif %} }</style>
+		{% endif %}
 		<link rel="icon" href="{{ media }}/logo_48.png" sizes="48x48">
 		<link rel="icon" href="{{ media }}/logo.svg" sizes="any">
 		{% if (node?.css): %}

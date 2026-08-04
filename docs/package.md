@@ -24,9 +24,9 @@ luci-theme-footstrap/
 │   ├── ru/footstrap.po
 │   └── es/footstrap.po
 ├── htdocs/luci-static/   → /www/luci-static/
-│   ├── footstrap/        cascade.css (GENERATED, gitignored), fonts/, logo.svg
-│   │                     (pattern.svg is NOT here: it is a symlink uci-defaults makes to
-│   │                      /etc/footstrap/pattern.svg, which the admin uploads)
+│   ├── footstrap/        cascade.css (GENERATED, gitignored), logo.svg
+│   │                     (pattern.svg and fonts/ are NOT here: they are symlinks uci-defaults
+│   │                      makes to /etc/footstrap/, which the admin uploads or installs)
 │   └── resources/        menu-footstrap.js, menu-footstrap-common.js, fs-*.js
 ├── root/                 → /
 │   ├── etc/uci-defaults/30_luci-theme-footstrap
@@ -205,6 +205,24 @@ and a conffile entry would be rejected (the package does not ship that path). Wh
 a firmware **sysupgrade**, which keeps only what is listed — hence
 `root/lib/upgrade/keep.d/luci-theme-footstrap`.
 
+Three things now take that route, and `/etc/footstrap/` is where all of them live: the background,
+the wallpaper pattern, and `/etc/footstrap/fonts/` — the webfonts `fonts/set-font.sh` installs,
+along with the `@font-face` sheet it generates beside them. Each is exposed by a symlink under
+`/www/luci-static/footstrap/` that uci-defaults recreates on **every** install and upgrade rather
+than shipping, because `/www` is repopulated from firmware on a sysupgrade.
+
+The fonts one links a **directory**, and that has two traps which end identically — `ln` exits 0 and
+the link lands at `…/fonts/fonts`, one level too deep, so nothing serves and nothing complains:
+
+- the path is already a symlink to a directory, and `ln -sf` follows it. `-n` is the fix;
+- the path is a **real directory** — which every footstrap before 0.12.1 shipped here, full of the
+  woff2 files it carried — and `-n` does not help. Measured on a 25.12 router: exit 0, link created
+  inside. So the path is cleared first unless it already is the symlink we want, in uci-defaults and
+  in `set-font.sh` alike.
+
+No ACL entry goes with the fonts, and none should: `set-font.sh` is root on the router with a shell,
+not a browser going through rpcd. Nothing in the UI writes those three options.
+
 ## ACL
 
 `root/usr/share/rpcd/acl.d/luci-theme-footstrap.json` grants what the Footstrap tab needs to persist
@@ -213,9 +231,11 @@ a router-wide default and a login background:
 - `uci` `set`/`commit`, scoped to the `footstrap` config — "Save as default";
 - `cgi-io upload` plus `file` `write`/`remove` on `/etc/footstrap/login-bg` and
   `/etc/footstrap/pattern.svg` — the wallpaper photo and the tiled pattern;
-- `file exec` on the single literal command `/bin/chmod 644 /etc/footstrap/login-bg`.
+- `file exec` on two literal commands, `/bin/chmod 644 /etc/footstrap/login-bg` and the same for
+  `/etc/footstrap/pattern.svg` — an upload that is not world-readable is one uhttpd answers with 403.
 
-That `file.exec` is the only one the theme ships, and it is one fixed argument-complete command.
+Those two `file.exec` grants are the only ones the theme ships, and each is one fixed
+argument-complete command.
 There is no grant for self-update, because there is no self-update: the theme upgrades through the
 package feed the installer adds.
 

@@ -60,7 +60,13 @@
 		/* the two uploaded images' cache-bust tokens (head.ut whitelists both to hex) — the files
 		   themselves are served, only these tokens travel in the page. NOT axes: they have no
 		   browser layer at all, but they reach the client the same way. */
-		'login_bg', 'pattern'
+		'login_bg', 'pattern',
+		/* the fonts, same shape and for the same reason: no browser layer, no Appearance control,
+		   no entry in snapshotAxes(). font_sans/font_mono are font-family stacks (head.ut
+		   whitelists the charset and prints them into a style element); `fonts` is the cache-bust
+		   token of the generated @font-face sheet, hex like the two above. All three are written by
+		   fonts/set-font.sh or by hand with `uci set`, never by Save as default. */
+		'font_sans', 'font_mono', 'fonts'
 	];
 	const fs_defaults = {};
 	for (let k in FS_AXES)

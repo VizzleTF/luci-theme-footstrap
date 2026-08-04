@@ -101,6 +101,21 @@ mkdir -p /etc/footstrap 2>/dev/null
 # response by extension, and an SVG served as application/octet-stream is one no browser will
 # paint — as a CSS mask, as a background image or at all.
 [ -d /www/luci-static/footstrap ] && ln -sf /etc/footstrap/pattern.svg /www/luci-static/footstrap/pattern.svg 2>/dev/null
+# The admin-installed webfonts (fonts/set-font.sh) are a whole DIRECTORY rather than one file: the
+# faces plus the @font-face sheet generated next to them. Same arrangement as the two images above,
+# and linking a directory has TWO traps, both of which end with `ln` exiting 0 and the link sitting
+# one level too deep, at .../fonts/fonts — where no browser looks, so the fonts silently do not
+# serve and nothing reports a thing:
+#   - the link already exists and points at a directory: `ln -sf` follows it. `-n` is the fix.
+#   - the path is a REAL directory, which every footstrap before 0.12.1 shipped here full of
+#     woff2 files. `-n` does not help — measured on a 25.12 router: exit 0, link created inside.
+# So clear the path first unless it is already the symlink we want. What is being deleted can only
+# be ours, and its contents are package files of a version that no longer exists.
+if [ -d /www/luci-static/footstrap ]; then
+	[ ! -e /www/luci-static/footstrap/fonts ] || [ -L /www/luci-static/footstrap/fonts ] ||
+		rm -rf /www/luci-static/footstrap/fonts
+	ln -sfn /etc/footstrap/fonts /www/luci-static/footstrap/fonts 2>/dev/null
+fi
 # The two doodle wallpapers earlier versions downloaded into /www on demand. They were never
 # package files, so no package manager will ever remove them, and nothing serves them any more —
 # the axis they belonged to now paints an admin-uploaded SVG. Left behind they are 200 kB of a

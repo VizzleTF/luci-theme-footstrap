@@ -374,6 +374,43 @@ The OFL-1.1 half of `PKG_LICENSE` went with them. OFL §2 requires the notice an
 with every copy of the Font Software; with no Font Software in the package, declaring OFL would be
 a false statement about its contents.
 
+### Putting a font back, per router
+
+The package still ships none. What it ships is the seam: **three uci options in
+`footstrap.settings`**, filled in by `fonts/set-font.sh` (a repository tool, run once on the router)
+or by hand. `fonts/README.md` is the admin-facing page; this is the contract.
+
+| option | what | sanitised in `partials/head.ut` by |
+|---|---|---|
+| `font_sans` | a `font-family` stack, printed into an unlayered `:root` block | `_sd_family()` — `A-Za-z0-9 ,._"'-`, ≤120 chars |
+| `font_mono` | the same for the monospace face | `_sd_family()` |
+| `fonts` | md5 of the generated `@font-face` sheet: the cache key **and** the switch that emits its `<link>` | the hex whitelist `login_bg` and `pattern` use |
+
+The two halves are independent by design. A stack alone costs nothing and renders for whoever has
+that face installed — the same mechanism the defaults above rely on. A stack **plus** a file in
+`/etc/footstrap/fonts/` makes the router serve it, so every visitor gets it.
+
+Three things about the shape are load-bearing:
+
+- **The generated sheet carries `@font-face` and nothing else.** The families come from the template,
+  so `uci set footstrap.settings.font_sans=…` by hand takes effect with nothing regenerated.
+- **The `:root` block is unlayered**, so it beats `layer(tokens)` whatever order the sheets arrive in
+  — the same reason a `theme/` rule never needs `!important` to outrank `base/`. Nothing under
+  `styles/` changed to make this work.
+- **The `<link>` is emitted only when the token is non-empty**, and the token is written only after
+  the file exists. That is the preload lesson above, applied before it could repeat.
+
+None of the three is an **axis**: no localStorage, no Appearance control, no entry in
+`snapshotAxes()` (`tools/axes.mjs` knows them as server-only, beside the two upload tokens). A font
+is a property of the router, not a per-visitor preference — the one Appearance-adjacent setting with
+no browser layer at all.
+
+The weights are where an installed face goes wrong quietly. Body text is 600, so **what a face
+claims decides what is visible**: a single static file declared `400 700` covers both, the browser
+stops synthesising, and every heading renders in the regular face. The script therefore declares one
+static face as `400` alone, a pair as `400 600` + `700`, and leaves `100 900` to be spelled out for
+a variable font.
+
 ## Components: mock-up primitive → LuCI class
 
 | Component | Spec | LuCI class to style |

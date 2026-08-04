@@ -1,9 +1,13 @@
-# Preserve the two admin-uploaded images across sysupgrade: the login/page background
-# (Appearance -> Wallpaper -> File) and the wallpaper pattern (Appearance -> Wallpaper ->
-# Pattern). Both are written at runtime through cgi-upload, so neither is a package file
-# and both survive a package upgrade on their own; a firmware sysupgrade, however, only
-# keeps paths listed here (or in a conffile / /etc/sysupgrade.conf).
-# NOT a conffile: it lives outside root/etc/config, and tools/conffiles.mjs would reject
-# a conffiles-define entry the package does not ship.
+# Preserve what the ADMIN put on this router across sysupgrade: the login/page background
+# (Appearance -> Wallpaper -> File), the wallpaper pattern (Appearance -> Wallpaper -> Pattern) and
+# the webfonts installed by fonts/set-font.sh. All three are written at runtime — an upload or a
+# script, never the package — so all three survive a package upgrade on their own; a firmware
+# sysupgrade, however, only keeps paths listed here (or in a conffile / /etc/sysupgrade.conf).
+# NOT conffiles: they live outside root/etc/config, and tools/conffiles.mjs would reject a
+# conffiles-define entry the package does not ship.
 /etc/footstrap/login-bg
 /etc/footstrap/pattern.svg
+# A directory, and the whole of it: the faces plus the fonts.css generated beside them. Losing the
+# sheet while keeping the faces would leave footstrap.settings.fonts pointing at nothing, which is
+# the one state that costs a 404 on every page.
+/etc/footstrap/fonts

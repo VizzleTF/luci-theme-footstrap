@@ -233,6 +233,13 @@ for (const attr of jsSets) {
  * It has happened twice — `density`, then all seven colour and surface axes at once — and neither
  * time did anything fail: the pre-paint and the live applier agreed with each other, which is all
  * this file used to check. Derived from snapshotAxes(), the one list that IS the contract. */
+/* The uci options header.ut reads back that are NOT axes: they have no browser layer, no Appearance
+ * control and therefore no business in snapshotAxes() — Save as default must never write them.
+ * login_bg and pattern are the two uploaded images' cache-bust tokens, written by the upload path
+ * itself; font_sans, font_mono and fonts are the router's webfont setting, written by
+ * fonts/set-font.sh or by hand. All five still travel to the client through FS_AXES. */
+const SERVER_ONLY = new Set(['login_bg', 'pattern', 'font_sans', 'font_mono', 'fonts']);
+
 const snapBody = (JS.match(/function snapshotAxes\(\)\s*\{([\s\S]*?)\n\}/) || [, ''])[1];
 const snapFields = [...snapBody.matchAll(/^\s*([a-z_]+):/gm)].map((m) => m[1]);
 const headerAxes = (HEADER.match(/const FS_AXES = \[([\s\S]*?)\]/) || [, ''])[1];
@@ -247,10 +254,7 @@ else {
 				+ `it back — the router default for this axis reaches no browser, so "Reset to saved" `
 				+ `falls through to the built-in and Save-as-default looks like it did nothing`);
 	for (const f of headerFields)
-		/* login_bg and pattern are the two uploaded images' cache-bust TOKENS, not axes: they have
-		 * no browser layer, so snapshotAxes() must never write them — the upload path writes each
-		 * one directly. Both still travel to the client through FS_AXES. */
-		if (f !== 'login_bg' && f !== 'pattern' && !snapFields.includes(f))
+		if (!SERVER_ONLY.has(f) && !snapFields.includes(f))
 			errors.push(`uci option '${f}': header.ut reads it back, but snapshotAxes() never writes it — `
 				+ `either a leftover from a removed axis, or the axis is missing from Save-as-default`);
 	if (!errors.length)

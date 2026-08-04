@@ -43,8 +43,11 @@ DEV=0
 rm -rf "$DIST"
 mkdir -p "$STAGE/www" "$STAGE/usr/share/ucode/luci" "$DIST/scripts"
 
-# 1. luci.mk's mapping. `cp -a` keeps the symlinks under htdocs (the font and wallpaper
-#    aliases) as symlinks, which is what the SDK build ships.
+# 1. luci.mk's mapping. `cp -a` rather than `cp -r`, so anything under htdocs that IS a symlink
+#    stays one, which is what the SDK build ships. Nothing there is today: the background, the
+#    pattern and the fonts directory are all aliases uci-defaults makes at runtime under /www,
+#    because /www is repopulated from firmware on a sysupgrade and a shipped link would not
+#    survive it.
 #
 #    root/ is staged BESIDE the payload rather than into it, and merged at the end: it is
 #    the only part strip-shell.sh is pointed at, and the Makefile hands that script
