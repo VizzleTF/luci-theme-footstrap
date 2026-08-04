@@ -136,6 +136,24 @@ uci commit network</pre>
 		<button class="cbi-button cbi-button-save">Save</button>
 		<button class="cbi-button cbi-button-reset">Reset</button>
 	</div>
+	<!-- The SAME control after the user picks the second mode. The class on the wrapper is the one
+	     ui.js chose for the selected value (luci.js's ComboButton `classes` map: 0 -> cbi-button-apply,
+	     1 -> cbi-button-negative), so this is not a variant of the card above but its other half —
+	     and it is the half that was invisible: a blanket `.cbi-page-actions .cbi-dropdown` rule
+	     erased the negative fill and left --fs-on-danger on the page behind it, 1.13:1 in dark. -->
+	<div class="cbi-page-actions">
+		<div class="cbi-dropdown btn cbi-button cbi-button-negative important" tabindex="0" data-idref="g-apply-unchecked">
+			<ul tabindex="-1">
+				<li data-value="0">Save &amp; Apply</li>
+				<li data-value="1" selected display="0">Apply unchecked</li>
+			</ul>
+			<span class="more" tabindex="-1">···</span>
+			<span class="open" tabindex="-1">▾</span>
+			<div><input type="hidden" value="1"></div>
+		</div>
+		<button class="cbi-button cbi-button-save">Save</button>
+		<button class="cbi-button cbi-button-reset">Reset</button>
+	</div>
 </div>
 
 <div class="g-sec">

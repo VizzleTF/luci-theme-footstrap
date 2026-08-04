@@ -7,14 +7,23 @@
 	.dropdown-menu a:hover,
 	.dropdown-menu a:focus-visible { background: var(--fs-panel2); background-image: none; color: var(--fs-accent); }
 
-	/* Split "Save & Apply": a plain dropdown in the action bar carries no frame of its own. */
-	.cbi-page-actions .cbi-dropdown {
+	/* Split "Save & Apply": a plain dropdown in the action bar carries no frame of its own.
+	 *
+	 * The guard is the same `:not(.btn):not(.cbi-button)` the widget rules below use, and it is
+	 * load-bearing: the split control's outer div IS the button, and the class on it is the one
+	 * ui.js picked for the SELECTED mode — `cbi-button-apply` for "Save & Apply", but
+	 * `cbi-button-negative` the moment the user picks "Apply unchecked" (luci.js's ComboButton
+	 * `classes` map). Unguarded, this rule (0,2,0) erased that variant's fill while its ink
+	 * (--fs-on-danger) survived from the variant rule that sets no background — a button painted
+	 * page-on-page: 1.13:1 in dark and 1.06:1 in light, measured on the footer. Only the mode
+	 * repainted below was ever visible. */
+	.cbi-page-actions .cbi-dropdown:not(.btn):not(.cbi-button) {
 		border: 0; border-radius: var(--fs-radius); background: transparent;
 	}
-	/* …except the split control's outer div IS the apply button (ui.js emits
-	 * `.cbi-dropdown.btn.cbi-button.cbi-button-apply`), which the rule above would paint transparent.
-	 * Repainted by SPECIFICITY — it used to be a `.cbi-button-apply` rule written afterwards, i.e. a
-	 * fix that depended on source order. */
+	/* Apply is the one variant with no fill of its own — `.cbi-button-action` and the rest carry
+	 * theirs from theme/55-buttons.css, and `.cbi-button-apply` is filled only where it is THE
+	 * primary action, which is this bar. Painted by SPECIFICITY — it used to be a rule written
+	 * afterwards, i.e. a fix that depended on source order. */
 	.cbi-page-actions .cbi-dropdown.cbi-button-apply,
 	.cbi-page-actions .cbi-dropdown > .cbi-button {
 		background: var(--fs-accent);
