@@ -246,13 +246,26 @@ nothing can drift.
 ## Installation and the trust chain
 
 `install.sh` does one thing: it adds the owfeed-packages feed (key, repository entry, and a
-`keep.d` entry so a sysupgrade does not lose it) and installs the theme from there. `apk upgrade` /
-`opkg upgrade` carries it forward afterwards, which is the whole reason to install from a feed
-rather than from a file.
+`keep.d` entry so a sysupgrade does not lose the key) and installs the theme from there.
+`apk upgrade` / `opkg upgrade` carries it forward afterwards, which is the whole reason to install
+from a feed rather than from a file.
 
 ```sh
 wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 ```
+
+**The repository line goes into the manager's own customfeeds file**, `customfeeds.list` for apk and
+`customfeeds.conf` for opkg — not into a file of the theme's own. apk reads every `*.list` under
+`repositories.d/`, so a private file installs and upgrades just as well; what it cannot do is be
+seen. LuCI's package manager reads exactly three apk paths — `repositories`,
+`repositories.d/distfeeds.list`, `repositories.d/customfeeds.list` — in its rpcd ACL *and* hardcoded
+in `package-manager.js`, so a feed anywhere else is absent from "Configure APK" and cannot be edited
+or removed there. An installer from before this wrote `repositories.d/owfeed-packages.list`, which
+is why the apk branch deletes that file after appending — the same repository configured twice, once
+where the admin can see it and once where they cannot, is worse than either. Neither customfeeds
+file needs a `keep.d` entry: both are conffiles of their manager (`apk-mbedtls`, `opkg`), sysupgrade
+backs up every conffile whose checksum has moved, and `build_list_of_backup_overlay_files` was
+already dropping the duplicate entry the script used to add.
 
 **A snapshot router is served the newest release branch.** The feed publishes one branch per
 OpenWrt minor and has no snapshot channel — owfeed-packages lists exactly two release lines and they

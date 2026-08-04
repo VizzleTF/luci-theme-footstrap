@@ -105,18 +105,34 @@ case "$BRANCH" in
 esac
 
 # --- feed -----------------------------------------------------------------
-# keep.d is not bookkeeping: sysupgrade wipes the keys and the repository list unless
-# something claims them, and the theme would come back unupgradable.
+# keep.d is not bookkeeping: sysupgrade wipes the key unless something claims it, and
+# the theme would come back unupgradable. The repository line itself needs no entry —
+# both managers' customfeeds files are conffiles of the manager (`apk-mbedtls` and
+# `opkg`), and sysupgrade backs up every conffile whose checksum has moved. It listed
+# them anyway until this was measured, and `build_list_of_backup_overlay_files` was
+# already dropping the duplicate.
 if [ "$PM" = apk ]; then
-	if [ ! -f /etc/apk/keys/owfeed-packages.pem ]; then
+	# customfeeds.list rather than a file of our own under repositories.d/. apk reads
+	# every *.list in that directory, so both work for installing — but LuCI's package
+	# manager reads exactly three paths (`repositories`, `distfeeds.list`,
+	# `customfeeds.list`, in its rpcd ACL and hardcoded in its view), so a feed in any
+	# other file is invisible in "Configure APK" and cannot be edited or removed there.
+	# It is also the file OpenWrt ships for this ("add your custom package feeds here")
+	# and the apk counterpart of the opkg branch's customfeeds.conf below.
+	APK_LIST=/etc/apk/repositories.d/customfeeds.list
+	if ! grep -q "$FEED_HOST" "$APK_LIST" 2>/dev/null; then
 		info "Adding the $FEED_NAME feed..."
 		apk add --quiet ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
 		mkdir -p /etc/apk/keys /etc/apk/repositories.d /lib/upgrade/keep.d
 		fetch "$FEED_HOST/owfeed-packages.pem" /etc/apk/keys/owfeed-packages.pem
 		printf '%s/releases/%s/%s/packages.adb\n' "$FEED_HOST" "$BRANCH" "$ARCH" \
-			> /etc/apk/repositories.d/owfeed-packages.list
-		printf '%s\n' /etc/apk/keys/owfeed-packages.pem \
-			/etc/apk/repositories.d/owfeed-packages.list > /lib/upgrade/keep.d/owfeed-packages
+			>> "$APK_LIST"
+		printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
+		# Installers before this one wrote their own file, which apk still reads: left
+		# in place it is the same repository configured twice, in one file the admin
+		# can see and one they cannot. Removed by name and only after the line above
+		# landed, so the feed is never briefly absent.
+		rm -f /etc/apk/repositories.d/owfeed-packages.list
 		ok "Feed added: $FEED_HOST/releases/$BRANCH/$ARCH"
 	else
 		info "The $FEED_NAME feed is already configured."
@@ -133,8 +149,7 @@ else
 		fetch "$FEED_HOST/$FEED_KEY_OPKG" "/etc/opkg/keys/$FEED_KEY_OPKG"
 		printf 'src/gz %s %s/releases/%s/%s\n' "$FEED_NAME" "$FEED_HOST" "$BRANCH" "$ARCH" \
 			>> /etc/opkg/customfeeds.conf
-		printf '%s\n' "/etc/opkg/keys/$FEED_KEY_OPKG" /etc/opkg/customfeeds.conf \
-			> /lib/upgrade/keep.d/owfeed-packages
+		printf '%s\n' "/etc/opkg/keys/$FEED_KEY_OPKG" > /lib/upgrade/keep.d/owfeed-packages
 		ok "Feed added: $FEED_HOST/releases/$BRANCH/$ARCH"
 	else
 		info "The $FEED_NAME feed is already configured."
