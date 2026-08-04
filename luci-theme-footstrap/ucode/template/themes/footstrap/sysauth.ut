@@ -27,15 +27,25 @@
    `form:has(> .cbi-map input[name="luci_username"])` — 49 characters written 17 times, ~0.8 KB —
    because the markup was assumed to be stock LuCI's. It is OURS: name the form instead. #}
 <form method="post" class="fs-login">
-	{% if (fuser): %}
+	{#
+	 THE BACKEND'S MESSAGE WINS OVER THE CREDENTIALS ONE, and the order matters more than it looks.
+	 `fuser` is not "the password was wrong" — it is the USERNAME the form posted, set in BOTH
+	 branches of dispatcher.uc that render a sysauth. On the second step of a pluggable login (the
+	 OTP prompt, dispatcher.uc:1018) the credentials were CORRECT and `fuser` is still set, with
+	 `auth_message` carrying what actually happened. The generic template guards its message with
+	 `&& !fuser`, so that step tells the user "Invalid username and/or password!" — about a password
+	 that was right — and swallows "Too many failed attempts" / "System time is not calibrated"
+	 entirely. luci-theme-bootstrap does not make that trade, and neither does this: message first,
+	 credentials as the fallback. `auth_plugin` names the challenge that stopped the login, and it
+	 is the one signal separating "the backend is asking for something" from an ordinary notice.
+	-#}
+	{% if (auth_message): %}
+		<div class="alert-message{% if (auth_plugin): %} warning{% endif %}">
+			<p>{{ auth_message }}</p>
+		</div>
+	{% elif (fuser): %}
 		<div class="alert-message warning">
 			<p>{{ _('Invalid username and/or password! Please try again.') }}</p>
-		</div>
-	{% endif %}
-
-	{% if (auth_message && !fuser): %}
-		<div class="alert-message">
-			<p>{{ auth_message }}</p>
 		</div>
 	{% endif %}
 
