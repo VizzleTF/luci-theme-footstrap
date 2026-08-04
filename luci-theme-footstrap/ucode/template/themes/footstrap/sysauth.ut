@@ -67,10 +67,14 @@
 			 never reach the screen either. This template exists only to pass `blank_page: true`, so
 			 it must stay a superset of the generic one.
 
-			 The leading space inside each conditional attribute is load-bearing: ucode emits the
-			 block with no whitespace of its own, so without it the render reads
-			 `inputmode="numeric"pattern="[0-9]*"` — an HTML parse error browsers recover from and a
-			 validator does not.
+			 The leading space inside each conditional attribute is load-bearing. ucode's template
+			 lexer eats the whitespace immediately BEFORE a `{%` tag and the newline immediately
+			 AFTER a `%}` — plain tags, no `{%-`/`-%}` needed — so the indentation these lines are
+			 written with never reaches the output. Rendered by a router's own ucode, the generic
+			 template's spelling gives `inputmode="numeric"pattern="[0-9]*"maxlength="6"required`:
+			 an HTML parse error browsers recover from and a validator does not. Measured, not
+			 assumed — `A\n\t{% if (1): %}B{% endif %}\n\t{% if (1): %}C{% endif %}\nD` renders as
+			 `A\nBCD`.
 			-#}
 			{% if (auth_fields): %}
 				{% for (let field in auth_fields): %}

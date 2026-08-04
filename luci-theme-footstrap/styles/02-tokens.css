@@ -306,8 +306,9 @@
 		--fs-type-xl: calc(round(20px * var(--fs-density-type), 1px));	/* page titles */
 		--fs-type-2xl: calc(round(26px * var(--fs-density-type), 1px));	/* h1 — only a third-party app emits a bare one */
 		/* ---- WEIGHT: there are only ever three, and they had six spellings ----------
-		 * The theme ships Manrope 600 and 700 and nothing else (styles/01-fonts.css), so these are
-		 * not a ramp to pick from — they are the two faces that exist, plus the "un-bold this"
+		 * The theme ships no font at all — the stacks name Manrope and JetBrains Mono first and
+		 * fall through to the system faces — so these are not a ramp to pick from: they are the
+		 * two weights a reader is likely to actually have, plus the "un-bold this"
 		 * value. `700` and `bold` were both in use and are the same weight; so are `400` and
 		 * `normal`, and 400 has no face at all (it resolves onto the 600 one — that is why body
 		 * text is semibold by design, and why adding a 400 face would silently restyle every page).

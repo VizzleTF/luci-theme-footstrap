@@ -14,7 +14,6 @@ luci-theme-footstrap/
   build-css.sh
   styles/
     00-header.css      banner + the single @layer declaration
-    01-fonts.css       @font-face, unlayered
     02-tokens.css      @layer tokens   private --fs-* tier + the --*-color-* export tier
     03-palettes.css    @layer tokens   palettes (tokens only)
     base/              @layer base     widget defaults the views count on
@@ -239,10 +238,12 @@ so any difference was caused by the CSS.
 
 Two traps in the method itself:
 
-- **Web fonts.** Both sheets declare the same `@font-face`. Swapping the `<link>` restarts font
-  matching, and a snapshot taken before the font is ready measures fallback metrics — every width
-  on the page shifts by a pixel or two and drowns the real diff (291 false differences on the
-  firewall page). Wait for `document.fonts.ready` before each snapshot.
+- **Web fonts.** Neither sheet ships one any more, but a machine with Manrope or JetBrains Mono
+  installed still resolves them, and any page-supplied `@font-face` restarts font matching when the
+  `<link>` is swapped. A snapshot taken before matching settles measures fallback metrics — every
+  width on the page shifts by a pixel or two and drowns the real diff (291 false differences on the
+  firewall page, back when the faces were bundled). Wait for `document.fonts.ready` before each
+  snapshot.
 - **`admin/status/overview` polls and redraws itself**, so it shows ~18 differences even with
   identical CSS on both sides. Run a control pass (A = B) to learn each page's noise floor.
 

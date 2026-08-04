@@ -79,8 +79,9 @@
 	.fs-logo-ring { fill: #002b49; }
 	:root[data-darkmode="true"] .fs-logo-ring { fill: #e6f4fb; }
 
-	/* 700, not 800: no 800 face is shipped (it drew six elements for 18 KB — 01-fonts.css),
-	 * so 800 silently resolved to 700 anyway. Say so. */
+	/* 700, not 800: the theme ships no faces, so 800 is whatever the reader's Manrope or system
+	 * stack has — 700 for most of them, synthesised for the rest. It already resolved to 700 back
+	 * when the 18 KB face was bundled and dropped for drawing six elements. Say so. */
 	.fs-wordmark { font-size: var(--fs-type-lg); font-weight: var(--fs-weight-bold); letter-spacing: -.01em; }
 
 	/* Skip link — the first tab stop: a keyboard/SR user jumps the whole menu instead of

@@ -172,10 +172,12 @@ _mqDark.addEventListener('change', () => {
  * the same shape as tint strength. */
 const FS_RADIUS_DEFAULT = 12;
 
-/* ---- the three axis SHAPES, each written once ---------------------------------------------
+/* ---- the four axis SHAPES, each written once ------------------------------------------------
  *
- * Five of the axes are three shapes, so the shape lives in a factory and each instance is one line:
- * enumAxis (palette), hueAxis (tint, accent), propAxis (rounding, tint strength). All keep the same
+ * Fifteen of the axes are four shapes, so the shape lives in a factory and each instance is one
+ * line: enumAxis (pattern ink), colorAxis (tint, accent, good, warn, danger), surfaceAxis (cards,
+ * controls, bar, borders), propAxis (rounding, tint strength, photo dim, pattern size, pattern
+ * strength). All keep the same
  * contract: `current()` is localStorage ?? def(), `def()` is the router default alone, `apply()`
  * stores the choice EXPLICITLY (see the header — lsDel would mean "inherit the router default", which
  * is not what picking the built-in means). None use `this`: every export below is a DETACHED method
@@ -188,15 +190,24 @@ const FS_RADIUS_DEFAULT = 12;
  *
  * The remaining axes stay separate; each has a quirk a shared table would need an option for.
  * `mode` stores a value it does not apply (tri-state → matchMedia) and owns an MQL listener; `layout`
- * reads the ATTRIBUTE (the server-migrated default); `wallpaper` is three-valued and persists to the
- * router; `autoCollapse`/`updateCheck` have no :root attribute at all. */
+ * reads the ATTRIBUTE (the server-migrated default); `wallpaper` and `density` are three-valued;
+ * `palette` outgrew the two-value shape when the third one landed; `autoCollapse` has no :root
+ * attribute at all. */
 
 /* A two-value axis: `on` is stamped as the attribute's VALUE, `off` is a bare :root (no attribute).
  * Palette and wallpaper were this shape twice over — current() and apply() agreed line for line
  * down to the stray-value fallthrough, and the two halves of `palette` had already drifted APART in
  * the file (current() at the top, apply() 100 lines below). */
 function enumAxis(key, attr, on, off) {
-	const sdKey = key.slice(3);	/* 'fs-palette' -> 'palette', the window.__fsSD field */
+	/* 'fs-pattern-ink' -> 'pattern_ink', the window.__fsSD field. The UNDERSCORE is the whole
+	 * point: the localStorage key is hyphenated and the uci option is not, so a bare slice(3)
+	 * answered 'pattern-ink' — a field head.ut never emits — and sd() returned undefined forever.
+	 * The axis then reports the BUILT-IN default no matter what the router saved: the Ink control
+	 * shows Theme while head.ut has already pre-painted Original, matchesSavedDefault() is false
+	 * with nothing touched, and pressing Save-as-default writes the built-in over the admin's
+	 * value. Nothing catches it — see the same trap named in propAxis below, which is why THAT
+	 * factory takes the field name explicitly. */
+	const sdKey = key.slice(3).replace(/-/g, '_');
 	const def = () => (sd(sdKey) === on ? on : off);
 	return {
 		def,
@@ -251,7 +262,10 @@ function normColor(v) {
 	return (h >= 1 && h <= 360) ? h : 0;
 }
 function colorAxis(key, attr, hueProp, colorProp) {
-	const sdKey = key.slice(3);	/* 'fs-tint' -> 'tint', the window.__fsSD field */
+	/* 'fs-tint' -> 'tint', the window.__fsSD field. Every colour key happens to be one word, so
+	 * the hyphen fold changes nothing today — it is here because the day one is not, the failure
+	 * is silent in both directions (see enumAxis above). */
+	const sdKey = key.slice(3).replace(/-/g, '_');
 	const def = () => normColor(sd(sdKey));
 	return {
 		def,

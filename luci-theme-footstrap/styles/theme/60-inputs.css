@@ -51,8 +51,8 @@
 	 *     the mono rule made it mono AND weight 700, a face of its own — measured on the live
 	 *     router, 227 elements over seven pages in bold mono, and 20 KB of jetbrains-mono-600
 	 *     fetched to draw them: 30% of the whole font payload. Manrope 700 costs zero bytes and
-	 *     label-vs-value now differs by TYPEFACE, not by weight (the 600 mono face is gone —
-	 *     styles/01-fonts.css).
+	 *     label-vs-value now differs by TYPEFACE, not by weight (the 600 mono face is gone, and
+	 *     so is every other bundled face).
 	 * The label rule itself is in theme/45-misc.css and must ASSIGN the sans face: a <strong>
 	 * merely excluded here still INHERITS mono from .cbi-value-field. Measured — excluding alone
 	 * changed nothing, all 227 still drew bold mono. */
@@ -787,8 +787,8 @@
 	.cbi-range-slider-value {
 		background: var(--fs-panel2); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-sm);
 		padding: var(--fs-space-1) var(--fs-space-2); color: var(--fs-accent); font-family: var(--fs-font-mono);
-		/* NOT 600: there is no bold mono face (styles/01-fonts.css), so 600 would either drag a
-		 * 20 KB file back in or be faked by synthetic emboldening, which smears a monospace grid.
+		/* NOT 600: no face is bundled, so 600 either drags a 20 KB file back in or is faked by
+		 * synthetic emboldening, which smears a monospace grid.
 		 * The chip already reads as emphatic from its surface, border and accent ink. */
 		font-weight: var(--fs-weight-normal); font-size: var(--fs-type); white-space: nowrap;
 	}

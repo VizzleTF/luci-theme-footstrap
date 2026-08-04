@@ -47,7 +47,8 @@ case "$cur" in
 		[ -n "$(uci -q get luci.main.footstrap_layout)" ] || \
 			uci set luci.main.footstrap_layout=top
 		new=/luci-static/footstrap ;;
-	# any other footstrap path (incl. the legacy -dark/-light) -> the sidebar default
+	# any other footstrap path (incl. the legacy -dark/-light) -> the built-in default (the bar):
+	# this branch deliberately sets no footstrap_layout, and absent means top (head.ut)
 	/luci-static/footstrap*)          new=/luci-static/footstrap ;;
 	"") [ "$PKG_UPGRADE" = 1 ] || new=/luci-static/footstrap ;;
 esac
