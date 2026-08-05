@@ -103,10 +103,9 @@ mkdir -p /etc/footstrap 2>/dev/null
 [ -d /www/luci-static/footstrap ] && ln -sf /etc/footstrap/pattern.svg /www/luci-static/footstrap/pattern.svg 2>/dev/null
 # The admin-installed webfonts (/etc/footstrap/fonts, see partials/head.ut) are a whole DIRECTORY
 # rather than one file: the faces plus an @font-face sheet beside them. Same arrangement as the two
-# images above,
-# and linking a directory has TWO traps, both of which end with `ln` exiting 0 and the link sitting
-# one level too deep, at .../fonts/fonts — where no browser looks, so the fonts silently do not
-# serve and nothing reports a thing:
+# images above, and linking a directory has TWO traps, both of which end with `ln` exiting 0 and
+# the link sitting one level too deep, at .../fonts/fonts — where no browser looks, so the fonts
+# silently do not serve and nothing reports a thing:
 #   - the link already exists and points at a directory: `ln -sf` follows it. `-n` is the fix.
 #   - the path is a REAL directory, which every footstrap before 0.12.1 shipped here full of
 #     woff2 files. `-n` does not help — measured on a 25.12 router: exit 0, link created inside.

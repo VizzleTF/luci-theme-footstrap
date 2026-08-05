@@ -107,20 +107,32 @@
 	   A Cyrillic or CJK family name is refused by this too — those faces carry a Latin name as well,
 	   and the tool's README says to use it.
 
-	   THE QUOTE IS THE ONE CHARACTER THE CHARSET CANNOT REFUSE, and it does not end anything — it
-	   EXTENDS. Both quotes have to be in the class (the shipped default is `"Manrope",system-ui,…`),
-	   and a value with an ODD count of either opens a CSS string that runs to the end of the sheet:
-	   `font_sans=My"Font` swallows `; --fs-font-mono: …; }` with it, so a typo in the sans stack
-	   silently costs the MONO one on a router that set that one correctly. Two options this file
-	   calls independent, and one takes the other down. So count them and refuse the odd case: n
-	   quotes split a string into n+1 parts, hence the even-length test. */
+	   THE TWO QUOTES ARE WHAT THE CHARSET CANNOT REFUSE, and neither ends anything — they EXTEND.
+	   Both have to be in the class (the shipped default is `"Manrope",system-ui,…`), and one left
+	   OPEN starts a CSS string that runs to the end of the sheet: `font_sans=My"Font` swallows
+	   `; --fs-font-mono: …; }` with it, so a typo in the sans stack silently costs the MONO one on a
+	   router that set that one correctly. Two options this file calls independent, and one takes
+	   the other down.
+
+	   COUNTING THEM IS NOT THE TEST, because tokenizing is STATEFUL: inside '…' a " is literal and
+	   vice versa. `"O'Reilly Sans", 'Fira Sans` — a family name with an apostrophe next to a stack
+	   whose closing quote was forgotten — holds two of each, so both counts come out even while the
+	   second `'` is still open at the end. So scan in ORDER, the way the value is actually read:
+	   the quote that opens wins until its own kind closes it, and one still open at the end refuses
+	   the value. `for (let c in …)` walks array VALUES in ucode, and split(v, '') on the empty
+	   separator yields one character per element. */
 	function _sd_family(v) {
 		if (!(type(v) == 'string' && length(v) >= 1 && length(v) <= 120 &&
 			match(v, /^[A-Za-z0-9 ,._"'-]+$/)))
 			return '';
-		if ((length(split(v, '"')) % 2) == 0 || (length(split(v, "'")) % 2) == 0)
-			return '';
-		return v;
+		let q = '';
+		for (let c in split(v, '')) {
+			if (q == '')
+				q = (c == '"' || c == "'") ? c : '';
+			else if (c == q)
+				q = '';
+		}
+		return (q == '') ? v : '';
 	}
 	let _sd_fsans = _sd_family(fs_defaults.font_sans);
 	let _sd_fmono = _sd_family(fs_defaults.font_mono);

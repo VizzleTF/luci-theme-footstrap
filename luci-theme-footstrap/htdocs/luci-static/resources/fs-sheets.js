@@ -525,8 +525,8 @@ function silence(el) {
  * `:root { --span-spacing; --clr-background; … }`, the view adds `:root`, `.cbi-page-actions`,
  * `.cbi-button-save:not(.custom-save-button)` and a `td:last-child` riding as the second half of
  * `#file-manager-container th:last-child, td:last-child`. `luci-app-ssclash` adds four more as the
- * Ace editor initialises. Invasive by the only definition that also catches
- * `[class] { padding: 0 !important }`.
+ * Ace editor initialises. Invasive by the only definition that also catches `[class] { padding: 0
+ * !important }`.
  *
  * Measured on owrt2512, 25.12.4, with ownership taken out of documentPoisoned() and put back:
  * leaving either page is a FULL LOAD, 5 runs of 5, and with ownership all 5 are in place —
@@ -539,9 +539,9 @@ function silence(el) {
  * TOP LEVEL happens once, because `L.require` caches the module, so a second visit re-runs nothing
  * and the page renders unstyled — HexEditor's injector above is exactly that shape, and its own
  * `getElementById('hexeditor-styles')` guard never gets a second chance to notice the element is
- * gone, because nothing calls it again. A sheet injected from
- * `render()` would survive removal, but the two cases are indistinguishable from here and only one
- * mechanism can be right for both. Disabling is reversible, which is the whole difference.
+ * gone, because nothing calls it again. A sheet injected from `render()` would survive removal, but
+ * the two cases are indistinguishable from here and only one mechanism can be right for both.
+ * Disabling is reversible, which is the whole difference.
  *
  * OWNER = body[data-page] when the sheet was re-hosted. The order that makes this sound is in
  * fs-router.js: it stamps data-page (line ~371) BEFORE require()ing the view class (~450), so at the
