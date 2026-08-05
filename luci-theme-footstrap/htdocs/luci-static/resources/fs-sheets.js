@@ -519,10 +519,14 @@ function silence(el) {
  * A foreign sheet is injected by ONE page and has no business painting any other. Before this, an
  * invasive sheet made the whole document spent (documentPoisoned) and the SPA fell back to a full
  * load on the way OUT — correct, and paid by ORDINARY pages: `luci-app-filemanager`, a stock app,
- * calls its `insertCss()` at MODULE EVAL and lands two <style>s in <head> (its own rules plus the
- * HexEditor's), and `luci-app-ssclash` adds four more as the Ace editor initialises. Both carry
- * real properties on bare selectors (`.hexview:focus`, `.ace_gutter`), which is invasive by the
- * only definition that also catches `[class] { padding: 0 !important }`.
+ * lands TWO <style>s in <head>. Its HexEditor module calls `injectHexEditorCSS()` at MODULE EVAL
+ * and the view's own `render()` calls `insertCss()` on every arrival; both are invasive on their
+ * BARE selectors, not on the ones pinned to `#file-manager-container` — HexEditor declares
+ * `:root { --span-spacing; --clr-background; … }`, the view adds `:root`, `.cbi-page-actions`,
+ * `.cbi-button-save:not(.custom-save-button)` and a `td:last-child` riding as the second half of
+ * `#file-manager-container th:last-child, td:last-child`. `luci-app-ssclash` adds four more as the
+ * Ace editor initialises. Invasive by the only definition that also catches
+ * `[class] { padding: 0 !important }`.
  *
  * Measured on owrt2512, 25.12.4, with ownership taken out of documentPoisoned() and put back:
  * leaving either page is a FULL LOAD, 5 runs of 5, and with ownership all 5 are in place —
@@ -531,9 +535,13 @@ function silence(el) {
  * 24.10/25.12 — the realtime graphs style their SVG text with an inline `style=` attribute — so
  * what this costs a router is decided entirely by which apps are installed on it.
  *
- * Removing the sheet on the way out is NOT the fix, and it is the obvious one: the append is at
- * module top level, `L.require` caches the module, so a second visit re-runs nothing and the page
- * would render unstyled. Disabling is reversible, which is the whole difference.
+ * Removing the sheet on the way out is NOT the fix, and it is the obvious one: an append at MODULE
+ * TOP LEVEL happens once, because `L.require` caches the module, so a second visit re-runs nothing
+ * and the page renders unstyled — HexEditor's injector above is exactly that shape, and its own
+ * `getElementById('hexeditor-styles')` guard never gets a second chance to notice the element is
+ * gone, because nothing calls it again. A sheet injected from
+ * `render()` would survive removal, but the two cases are indistinguishable from here and only one
+ * mechanism can be right for both. Disabling is reversible, which is the whole difference.
  *
  * OWNER = body[data-page] when the sheet was re-hosted. The order that makes this sound is in
  * fs-router.js: it stamps data-page (line ~371) BEFORE require()ing the view class (~450), so at the

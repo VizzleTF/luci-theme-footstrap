@@ -85,21 +85,42 @@
 	   styles/02-tokens.css are what everyone gets unless the ROUTER names something else here.
 	   Two independent things, either usable alone:
 	     font_sans / font_mono   a font-family stack, printed into a style element further down.
-	     fonts                   the cache-bust token of the @font-face sheet fonts/set-font.sh
-	                             generates when an admin also installs the FILE. Hex, exactly like
-	                             login_bg and pattern, and for the same reason.
+	     fonts                   the cache-bust token (an md5) of an @font-face sheet at
+	                             /etc/footstrap/fonts/fonts.css, for when the admin installs the
+	                             FILES too. Hex, exactly like login_bg and pattern, and for the same
+	                             reason.
+	   THE PACKAGE IS THE SERVING HALF ONLY. It reads these three options, serves whatever is in
+	   /etc/footstrap/fonts (uci-defaults links it under /www) and keeps that directory across a
+	   sysupgrade — it installs no faces and fetches nothing at run time, which is the rule the
+	   whole theme is built on. Putting the files there is the admin's move: drop the .woff2 files
+	   and a fonts.css beside them, then `uci set footstrap.settings.fonts=<md5 of fonts.css>`.
+	   `fonts/set-font.sh` in the theme's OWN repository does exactly that in one line and is NOT
+	   part of this package — it names third-party font hosts, which is precisely what a theme in
+	   this tree must not carry.
 	   Neither is an axis: there is no browser layer, no Appearance control and no entry in
 	   snapshotAxes() — a font is a router-wide decision here, not a per-visitor one.
 
-	   THE CHARSET IS THE WHOLE DEFENCE. A family stack is free text and it is printed UNESCAPED,
+	   THE CHARSET IS MOST OF THE DEFENCE. A family stack is free text and it is printed UNESCAPED,
 	   so the whitelist has to exclude everything that could end the declaration or the element:
 	   < > ( ) { } ; and the backslash are all absent, which leaves no way to close a style element,
 	   start a second declaration or write a url(). Anything else becomes '' = "no router font".
 	   A Cyrillic or CJK family name is refused by this too — those faces carry a Latin name as well,
-	   and fonts/README.md says to use it. */
+	   and the tool's README says to use it.
+
+	   THE QUOTE IS THE ONE CHARACTER THE CHARSET CANNOT REFUSE, and it does not end anything — it
+	   EXTENDS. Both quotes have to be in the class (the shipped default is `"Manrope",system-ui,…`),
+	   and a value with an ODD count of either opens a CSS string that runs to the end of the sheet:
+	   `font_sans=My"Font` swallows `; --fs-font-mono: …; }` with it, so a typo in the sans stack
+	   silently costs the MONO one on a router that set that one correctly. Two options this file
+	   calls independent, and one takes the other down. So count them and refuse the odd case: n
+	   quotes split a string into n+1 parts, hence the even-length test. */
 	function _sd_family(v) {
-		return (type(v) == 'string' && length(v) >= 1 && length(v) <= 120 &&
-			match(v, /^[A-Za-z0-9 ,._"'-]+$/)) ? v : '';
+		if (!(type(v) == 'string' && length(v) >= 1 && length(v) <= 120 &&
+			match(v, /^[A-Za-z0-9 ,._"'-]+$/)))
+			return '';
+		if ((length(split(v, '"')) % 2) == 0 || (length(split(v, "'")) % 2) == 0)
+			return '';
+		return v;
 	}
 	let _sd_fsans = _sd_family(fs_defaults.font_sans);
 	let _sd_fmono = _sd_family(fs_defaults.font_mono);
@@ -354,13 +375,14 @@
 		   no webfonts: --fs-font-sans and --fs-font-mono name Manrope and JetBrains Mono FIRST and
 		   the system stack after, so a browser that has either installed locally uses it and one
 		   that does not falls through silently — no request, no 404, no flash. What follows the
-		   stylesheet below is the OPT-IN: a router whose admin ran fonts/set-font.sh.
+		   stylesheet below is the OPT-IN: a router whose admin installed faces of their own under
+		   /etc/footstrap/fonts (see the option block at the top of this file).
 
 		   The preload pair is why both tags down there are written the way they are. A preload is
 		   not in the stylesheet, so deleting the @font-face rules alone left these two behind and
 		   every page went on asking the router for files that were gone: SIX 404s per page, and
-		   nothing in CSS could have told anyone. So the sheet link is emitted only when the token
-		   says the sheet exists, and the token is written by set-font.sh only after the file is. #}
+		   nothing in CSS could have told anyone. So the sheet link is emitted only when the TOKEN
+		   says the sheet exists — set the option after the file, never before. #}
 		{# `data-fs-shell` marks the SHELL's own CSS: on every nav the SPA router asks whether a
 		   VIEW put CSS in the document, and this is how it tells its own sheet from an app's. #}
 		<link rel="stylesheet" data-fs-shell href="{{ media }}/cascade.css?v={{ pkgs_update_time }}">

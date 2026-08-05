@@ -1,7 +1,7 @@
 # Preserve what the ADMIN put on this router across sysupgrade: the login/page background
 # (Appearance -> Wallpaper -> File), the wallpaper pattern (Appearance -> Wallpaper -> Pattern) and
-# the webfonts installed by fonts/set-font.sh. All three are written at runtime — an upload or a
-# script, never the package — so all three survive a package upgrade on their own; a firmware
+# the webfonts the admin put in /etc/footstrap/fonts. All three are written at runtime — an upload
+# or the admin, never the package — so all three survive a package upgrade on their own; a firmware
 # sysupgrade, however, only keeps paths listed here (or in a conffile / /etc/sysupgrade.conf).
 # NOT conffiles: they live outside root/etc/config, and tools/conffiles.mjs would reject a
 # conffiles-define entry the package does not ship.

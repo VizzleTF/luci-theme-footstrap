@@ -64,8 +64,9 @@
 		/* the fonts, same shape and for the same reason: no browser layer, no Appearance control,
 		   no entry in snapshotAxes(). font_sans/font_mono are font-family stacks (head.ut
 		   whitelists the charset and prints them into a style element); `fonts` is the cache-bust
-		   token of the generated @font-face sheet, hex like the two above. All three are written by
-		   fonts/set-font.sh or by hand with `uci set`, never by Save as default. */
+		   token of the @font-face sheet the admin installs beside the faces, hex like the two above.
+		   All three are written with `uci set` — by hand, or by the one-line installer that lives in
+		   the theme's own repository and not in this package — never by Save as default. */
 		'font_sans', 'font_mono', 'fonts'
 	];
 	const fs_defaults = {};

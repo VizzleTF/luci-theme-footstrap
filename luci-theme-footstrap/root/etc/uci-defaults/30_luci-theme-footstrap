@@ -101,8 +101,9 @@ mkdir -p /etc/footstrap 2>/dev/null
 # response by extension, and an SVG served as application/octet-stream is one no browser will
 # paint — as a CSS mask, as a background image or at all.
 [ -d /www/luci-static/footstrap ] && ln -sf /etc/footstrap/pattern.svg /www/luci-static/footstrap/pattern.svg 2>/dev/null
-# The admin-installed webfonts (fonts/set-font.sh) are a whole DIRECTORY rather than one file: the
-# faces plus the @font-face sheet generated next to them. Same arrangement as the two images above,
+# The admin-installed webfonts (/etc/footstrap/fonts, see partials/head.ut) are a whole DIRECTORY
+# rather than one file: the faces plus an @font-face sheet beside them. Same arrangement as the two
+# images above,
 # and linking a directory has TWO traps, both of which end with `ln` exiting 0 and the link sitting
 # one level too deep, at .../fonts/fonts — where no browser looks, so the fonts silently do not
 # serve and nothing reports a thing:
