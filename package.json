@@ -34,7 +34,7 @@
     "css-tree": "^3.2.1",
     "eslint": "^10.8.0",
     "globals": "^17.8.0",
-    "playwright": "^1.62.0",
+    "playwright": "^1.62.1",
     "stylelint": "^17.14.1",
     "terser": "^5.49.0"
   },
