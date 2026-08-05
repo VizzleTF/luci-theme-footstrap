@@ -17,6 +17,10 @@ wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/w
 | `svg/cats.svg` | 77 kB | 870 units square, reads well around 440 px |
 | `svg/dinos.svg` | 128 kB | 2048 units square, reads well around 880 px |
 
+The copies at `cats.svg` and `dinos.svg` keep the original raw GitHub URLs working for older
+installations and bookmarks. The files in `svg/` are canonical; compatibility copies must remain
+byte-for-byte identical.
+
 Earlier versions of the theme fetched these two from this repository on demand and checked them
 against a pinned sha256. That is gone: a theme in a package feed has no business calling a
 third-party host while a settings page is open, and *your* drawing is the interesting half of the
