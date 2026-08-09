@@ -33,34 +33,54 @@
 		 * is what an inherited number looks like. Symmetric, on the grid. */
 		padding: var(--fs-space-2) var(--fs-space-3);
 		text-align: start;
-		/* AN UNBREAKABLE VALUE MUST NOT LEAVE THE CARD, in ANY .table. Stock has always had this
-		 * (`overflow-wrap: break-word` on every cell); the theme replaced it with a rule that first
-		 * asks what KIND of table it is — theme/30-tables.css breaks long values only for
-		 * `#view .table[id] .td, table.fs-dt .td`, i.e. a table carrying an id or a
-		 * `.tr.table-titles` header row. A third-party status page rendering a key/value
-		 * `<div class="table">` with neither matched nothing, so its cells kept
-		 * `overflow-wrap: normal` and one unbroken token — an ICCID, a firmware string, an APN, a
-		 * base64 key, a DUID — held the column open and pushed the table outside its card.
-		 * Measured against luci-app-3ginfo-lite's own markup (`admin/modem`, three such tables).
-		 *
-		 * NOT scoped to the phone tier, and that was measured rather than assumed. Scoping it to
-		 * `max-width: 767px` looked like the cautious choice and left a hole exactly where the
-		 * column is narrow but the WINDOW is not: with a 130-character token the table escaped its
-		 * card by 147px at 900px, 247px at 800px and 279px at 768px, and was contained at every
-		 * width with this rule unscoped. That is the same argument the fit engine is built on —
-		 * whether something fits is a property of the CONTENT and its column, not of the viewport.
-		 *
-		 * The cost is nil, which is the other half of the decision: across 8 router pages × 4
-		 * widths × 849 text cells, turning this on changes NOTHING — same cell overflows (0), same
-		 * tables past their column (0), same multi-line cells, same mid-word breaks, same total
-		 * line count. It bites only on the unbreakable token it exists for.
-		 *
-		 * `anywhere`, not `break-word`: `break-word` permits the break without reducing the cell's
-		 * min-content contribution, so a `display: table` box still cannot shrink below its widest
-		 * token and the column stays open — tried, and the table stayed 355px wide in a 346px
-		 * column. The narrower `anywhere` rules in theme/ keep winning where they apply. */
-		overflow-wrap: anywhere;
 	}
+
+	/* AN UNBREAKABLE VALUE MUST NOT LEAVE THE CARD, in ANY .table. Stock has always had this
+	 * (`overflow-wrap: break-word` on every cell); the theme replaced it with a rule that first
+	 * asks what KIND of table it is — theme/30-tables.css breaks long values only for
+	 * `#view .table[id] .td, table.fs-dt .td`, i.e. a table carrying an id or a
+	 * `.tr.table-titles` header row. A third-party status page rendering a key/value
+	 * `<div class="table">` with neither matched nothing, so its cells kept
+	 * `overflow-wrap: normal` and one unbroken token — an ICCID, a firmware string, an APN, a
+	 * base64 key, a DUID — held the column open and pushed the table outside its card.
+	 * Measured against luci-app-3ginfo-lite's own markup (`admin/modem`, three such tables).
+	 *
+	 * NOT scoped to the phone tier, and that was measured rather than assumed. Scoping it to
+	 * `max-width: 767px` looked like the cautious choice and left a hole exactly where the
+	 * column is narrow but the WINDOW is not: with a 130-character token the table escaped its
+	 * card by 147px at 900px, 247px at 800px and 279px at 768px, and was contained at every
+	 * width with this rule unscoped. That is the same argument the fit engine is built on —
+	 * whether something fits is a property of the CONTENT and its column, not of the viewport.
+	 *
+	 * The cost is nil, which is the other half of the decision: across 8 router pages × 4
+	 * widths × 849 text cells, turning this on changes NOTHING — same cell overflows (0), same
+	 * tables past their column (0), same multi-line cells, same mid-word breaks, same total
+	 * line count. It bites only on the unbreakable token it exists for.
+	 *
+	 * `anywhere`, not `break-word`: `break-word` permits the break without reducing the cell's
+	 * min-content contribution, so a `display: table` box still cannot shrink below its widest
+	 * token and the column stays open — tried, and the table stayed 355px wide in a 346px
+	 * column. The narrower `anywhere` rules in theme/ keep winning where they apply.
+	 *
+	 * SET PER ROLE, and that is the whole of the second rule: a VALUE may break anywhere, a LABEL
+	 * breaks at words. `.th` and `.td` never match the same element, so neither line depends on the
+	 * other's source order, and the pair rule above keeps only what both cells share.
+	 *
+	 * `anywhere` costs a min-content of ONE CHARACTER. On a value that is the point — the column
+	 * may collapse to nothing rather than push the table out of its card. On a header it is the bug
+	 * it looks like: an auto-layout table hands the surplus to whichever column asks loudest, and
+	 * with every text column's floor at one character the header row is what pays. Measured on
+	 * Status → Processes at 1228px against a Russian catalogue, where the actions column is
+	 * `nowrap` and 477px wide: `PID` came out as "PI/D", `Владелец` as "ВЛ/АД/ЕЛЕ/Ц", `root` in the
+	 * body as "roo/t", and the header row stood 104px tall. With the header floor back at its
+	 * longest WORD: 54px, every label and every owner cell on one line, the value columns 47/94/152
+	 * against 39/49/90, and the table still inside its card to the pixel (issue #32).
+	 *
+	 * `break-word` for the label, not `normal`: a header that IS one long token — a third-party
+	 * table naming a column after a key — must still break rather than overflow. It just may not
+	 * shrink the column below that word, which is what a header row is for. */
+	.table .td { overflow-wrap: anywhere; }
+	.table .th { overflow-wrap: break-word; }
 
 	.table .tr:first-child .th {
 		padding-top: var(--fs-space-2);
