@@ -24,6 +24,27 @@
 		margin-inline: calc(-1 * (var(--fs-card-pad) + 1px));
 	}
 
+	/* …and the same box's frame, which the same inline style paints BLACK: every realtime view
+	 * writes `border:1px solid #000;background:#fff` on it (bandwidth.js, load.js, wireless.js,
+	 * connections.js, channel_analysis.js, and every luci-app-*-status copy of them). Black is a
+	 * colour no palette of this theme contains; on a dark surface the graph reads as a framed
+	 * cut-out, and the frame lands exactly on the card's own border edge because of the bleed
+	 * above. Recoloured to the hairline every other card contour uses (issue #32).
+	 *
+	 * WIDER than the bleed rule on purpose: channel_analysis.js hangs off a bare [data-tab] div and
+	 * must not be bled — but its border is just as black, so the shape here asks only "an
+	 * inline-styled box wrapping an <svg>", one `#view` deep or ten.
+	 *
+	 * Only the COLOUR moves. The 1px stays: it is the graph's own edge, and the plot draws to it.
+	 * `background: #fff` is left alone deliberately — the <svg> is sized to the box's content edge
+	 * (`#view.offsetWidth - 2`, the same arithmetic the bleed restores), so the white never paints;
+	 * a flag against it would be a rule that changes nothing. Only an author !important outranks an
+	 * inline declaration, and `border-color` alone is enough: the width and style already agree
+	 * with what the theme would ask for. */
+	#view div[style]:has(> svg) {
+		border-color: var(--fs-border) !important;
+	}
+
 	/* WCAG 2.2 SC 1.4.1 (Use of Color, A): inside a block of text a link may not be identified
 	 * by COLOUR ALONE — it needs a non-colour cue or 3:1 against the surrounding text, and
 	 * --fs-accent on --fs-text measures 1.4:1 in dark mode. So: underline links in prose.

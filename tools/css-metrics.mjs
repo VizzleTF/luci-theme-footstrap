@@ -37,8 +37,13 @@ const LIMITS = {
 	 * Lowered 31 -> 26: theme/65-dropdown.css's three `ul` margin flags were absorbed cargo from
 	 * luci-theme-bootstrap (no @layer there) whose stated adversary — an inline `margin` from ui.js
 	 * — does not exist on either release. They were beating the same FILE's open-popover
-	 * `margin-top`; see the note there. */
-	importants: 26,
+	 * `margin-top`; see the note there.
+	 *
+	 * Raised 26 -> 27 for the realtime graph's border colour, the same box and the same inline
+	 * style as the bleed above: every stock realtime view writes `border:1px solid #000` on it, and
+	 * black belongs to no palette this theme ships. One property, one flag, and no cascade layer
+	 * can outrank an inline declaration. */
+	importants: 27,
 	/* The widest selector the theme needs; see the layer rules in docs/conventions.md.
 	 *
 	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`. Not sprawl:
