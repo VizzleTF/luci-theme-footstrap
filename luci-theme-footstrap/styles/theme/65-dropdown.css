@@ -249,6 +249,23 @@
 		 * the thing the scale exists to stop. Absorbed with the machinery above. */
 		min-height: var(--fs-space-5);
 	}
+	/* …and the row's CONTENTS, which is where that font was being lost. A MULTI-select wraps every
+	 * item in `<form><label><input type=checkbox> text</label></form>` (ui.js builds the checkbox
+	 * that way), and `.cbi-value-field *` in theme/60-inputs.css hands mono to every descendant of a
+	 * field — it matches that form and that label DIRECTLY, while the rule above only reaches the
+	 * `<li>`, whose font the label then overrides rather than inherits. So the same widget drew two
+	 * fonts depending on one option: a single-select list, whose text sits in the `<li>` itself,
+	 * came out sans; every multi-select list came out mono, in the open menu AND in the closed
+	 * control that lists what is selected. Measured on the router with ui.Dropdown: `<li>` Manrope,
+	 * its `<form>`/`<label>` JetBrains Mono.
+	 *
+	 * It is a LABEL, not a value — the same distinction `<strong>` gets in theme/45-misc.css — and
+	 * mono spacing is what makes a wordy option list look stretched (`3G Band 1`, `LTE B1`, reported
+	 * against luci-app-modeminfo's Bands page). `inherit`, not the token again: the row above is the
+	 * one place the menu's font is chosen. The filter/create `<input>` inside the list is left
+	 * alone: what the user TYPES there is a value. */
+	.cbi-dropdown > ul > li > form,
+	.cbi-dropdown > ul > li label { font-family: inherit; }
 	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[display]:not([display="0"]) { border-inline-start: 0; }
 	.cbi-dropdown > ul > li[placeholder] { color: var(--fs-faint); }
 	/* the multiselect's inline filter/create inputs — moved from base with the generic `input`
@@ -348,6 +365,47 @@
 		background: var(--fs-panel2); color: var(--fs-accent); box-shadow: inset 2px 0 0 var(--fs-accent);
 		/* @endmirror */
 	}
+	/* THE FOCUSED ROW WEARS THE THEME'S RING, not the browser's.
+	 *
+	 * ui.js focuses a row as it opens the menu (the first selected one, or the first row), and the
+	 * UA answers a programmatic focus with `outline: auto` — Chrome's 1px system-blue ring, drawn
+	 * OUTSIDE the row and following its 8px radius, so opening a dropdown that already has a value
+	 * flashed a loud blue capsule around the top row on every single-select and multi-select on the
+	 * router. Every other control in this theme wears --fs-focus-ring; this row wore whatever the
+	 * browser shipped.
+	 *
+	 * Inset rather than the token's outer 3px: the menu clips its own overflow, so an outer ring is
+	 * cut on the first and last rows. The rail is restated INSIDE this ring so a focused row that is
+	 * also selected keeps its rail — a shorthand cannot merge with the one below.
+	 *
+	 * Both selectors carry `[selected]`-level weight on purpose: the selected-row paint below is
+	 * (0,4,1) and a bare `li:focus-visible` ties with it, which would leave the focus ring to source
+	 * order. `docs/conventions.md`: win on specificity, never on order. */
+	.cbi-dropdown[open] > ul.dropdown > li[selected]:focus-visible,
+	.cbi-dropdown[open] > ul.dropdown > li:focus-visible {
+		outline: none;
+		box-shadow: inset 2px 0 0 var(--fs-accent), inset 0 0 0 2px var(--fs-accent-soft);
+	}
+
+	/* A MULTI-select row says "chosen" with its CHECKBOX, so it does not also need the rail.
+	 *
+	 * The rail is `inset 2px 0 0` on a row with an 8px radius, so it is drawn as an ARC, not a bar —
+	 * fine as the single-select cue it was designed for, one row at a time, and wrong down a column
+	 * of them: three chosen bands rendered three blue crescents stacked against the menu's edge and
+	 * read as a broken frame (reported against luci-app-modeminfo's Bands page). The checkbox is a
+	 * non-colour cue in its own right, which is what WCAG 2.2 SC 1.4.1 asks of "selected" — a
+	 * single-select row has none, and keeps the rail.
+	 *
+	 * Written as an override rather than by narrowing the paint below, because those three
+	 * declarations are pinned byte-identical to `select option:checked` in theme/60-inputs.css
+	 * (tools/mirror.mjs) — a native `<select multiple>` option has no checkbox, so the rail is still
+	 * the only cue there and the two must not diverge. `:not(:focus-visible)` keeps this off the
+	 * focused row, so the ring above owns that state alone instead of tying with it. */
+	.cbi-dropdown[multiple][open] > ul.dropdown > li[selected]:not(:focus-visible) { box-shadow: none; }
+	.cbi-dropdown[multiple][open] > ul.dropdown > li[selected]:focus-visible {
+		box-shadow: inset 0 0 0 2px var(--fs-accent-soft);
+	}
+
 	.cbi-dropdown[open] > ul.dropdown > li.create-item { border-top: 1px solid var(--fs-border); margin-top: var(--fs-space-1); }
 	/* The dropdown's "add item" field is a text input and takes the same radius as every other
 	 * one (theme/60-inputs.css). It said 8px here, and won or lost on source order. */

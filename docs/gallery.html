@@ -408,6 +408,52 @@ option two</textarea></div>
 </div>
 
 <div class="g-sec">
+	<h2>cbi-dropdown, MULTIPLE and open</h2>
+	<!-- The other half of the widget, and it is not just the single-select list with checkboxes: a
+	     multi-select wraps every row's text in `<form><label>`, which is a second element for any
+	     descendant rule in a field to hit (it is how the menu lost its sans face to the mono rule
+	     in theme/60-inputs.css). The checkbox carries no `checked` attribute — ui.js paints the
+	     state off `li[selected]` — so copy the shape exactly, including the empty <form>.
+	     Absolutely positioned list, hence the row's bottom margin: gallery staging only. -->
+	<!-- Inside a .cbi-value-field on purpose: that is where a form's dropdown actually lives, and it
+	     is the container whose descendant rule hands out the mono face. Staged bare, the menu never
+	     meets the rule that used to take its font. -->
+	<div class="cbi-value" style="margin-bottom:200px">
+		<label class="cbi-value-title">Network bands</label>
+		<div class="cbi-value-field">
+		<div class="cbi-dropdown" multiple="" optional="" open="" tabindex="0">
+			<ul class="dropdown" tabindex="-1" style="top:38px;max-height:280px">
+				<li data-value="lan" selected="" display="0" tabindex="0" class="focus">
+					<form><input type="checkbox" tabindex="-1"></form><label>lan</label>
+				</li>
+				<li data-value="wan" tabindex="0">
+					<form><input type="checkbox" tabindex="-1"></form><label>wan</label>
+				</li>
+				<li data-value="wg0" selected="" display="1" tabindex="0">
+					<form><input type="checkbox" tabindex="-1"></form><label>wg0</label>
+				</li>
+			</ul>
+			<ul class="preview">
+				<li data-value="lan" selected="" display="0"><form><input type="checkbox" tabindex="-1"></form><label>lan</label></li>
+				<li data-value="wan"><form><input type="checkbox" tabindex="-1"></form><label>wan</label></li>
+				<li data-value="wg0" selected="" display="1"><form><input type="checkbox" tabindex="-1"></form><label>wg0</label></li>
+			</ul>
+			<span class="more" tabindex="-1">···</span>
+			<span class="open" tabindex="-1">▾</span>
+			<div tabindex="0"><input type="hidden" name="g-multi-open" value="lan"></div>
+		</div>
+		</div>
+	</div>
+	<p class="g-note">What to look at: every row is the menu's own face, not the mono a field hands
+		its descendants — the <code>&lt;label&gt;</code> is a LABEL, and mono makes a wordy option list
+		(<code>3G Band 1</code>) read stretched. A chosen row says so with its CHECKBOX, so it does not
+		also wear the accent rail the single-select row above needs: the rail is an inset shadow on a
+		rounded row, i.e. an arc, and a column of them reads as a broken frame. The focused row wears
+		the theme's ring, inset — the browser's own <code>outline: auto</code> is drawn outside the row
+		and the menu clips it.</p>
+</div>
+
+<div class="g-sec">
 	<h2>Tabs</h2>
 	<!-- TWO strips, TWO active markers, and the difference is not cosmetic: `ul.tabs` is the
 	     THEME's own section strip (fs-chrome.js renderTabMenu) and marks the current page with
