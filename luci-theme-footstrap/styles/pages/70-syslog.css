@@ -31,7 +31,12 @@
 	div:has(> #logTextFilter) > label { white-space: nowrap; }
 	#logFacilitySelect, #logSeveritySelect, #logTextFilter, #logMaxRows {
 		flex: 1 1 auto;
+		/* both halves are needed and they answer different layouts: `min-width: 0` lets a FLEX item
+		 * shrink past its content, `max-width: 100%` clamps a GRID item to its track. A <select>
+		 * carries the theme's own 210px field width, which a `minmax(0, 1fr)` track does not
+		 * override — measured at 360px, where both selects hung 3px past the view. */
 		min-width: 0;
+		max-width: 100%;
 	}
 	/* the two numeric-ish fields keep a sane ceiling: a max-rows box as wide as the filter reads as
 	 * a second search field. */
