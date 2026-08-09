@@ -565,6 +565,22 @@ option two</textarea></div>
 	<div class="cbi-progressbar" title="303.37 MiB / 484.11 MiB (62%)"><div style="width:62%"></div></div>
 	<div class="cbi-progressbar" title="3.46 MiB / 242.05 MiB (1%)"><div style="width:1%"></div></div>
 	<div class="cbi-progressbar" title="97%"><div style="width:97%"></div></div>
+	<!-- The same meter as the FIELD of a labelled CBI row, which is what an app building a form row
+	     with ui.js emits (luci-app-modeminfo's Antennas page: one of these per figure). The three
+	     above own their line and take the value above the bar; here the name is already in the left
+	     column, so the value goes beside the meter instead. -->
+	<div class="cbi-value">
+		<label class="cbi-value-title">RSSI</label>
+		<div class="cbi-value-field"><div class="cbi-progressbar" title="-55.9 dBm"><div style="width:72%"></div></div></div>
+	</div>
+	<div class="cbi-value">
+		<label class="cbi-value-title">RSRP</label>
+		<div class="cbi-value-field"><div class="cbi-progressbar" title="-140.0 dBm"><div style="width:2%"></div></div></div>
+	</div>
+	<p class="g-note">What to look at: the two shapes read as one row each. In the bare meters the
+		value sits above the bar's right edge, pairing with whatever names the bar on the line above;
+		in a <code>.cbi-value</code> row it sits after the bar, on the row's own line, and the values
+		line up in a column because the reserve is fixed rather than shrink-wrapped.</p>
 </div>
 
 <div class="g-sec">
