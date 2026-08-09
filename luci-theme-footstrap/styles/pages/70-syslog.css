@@ -1,4 +1,60 @@
 @layer page {
+	/* THE FILTER BAR, which LuCI writes as a run of inline text.
+	 *
+	 * `tools/views.js` (LogreadBox, shared by System Log, Kernel Log and every third-party page
+	 * built on it) emits two bare `<div style="margin-bottom:10px">`, each holding label / control
+	 * pairs with nothing around a pair: `<label>Не</label><input type=checkbox><label>объект:</label>
+	 * <select>…`. Inline flow then breaks wherever the line runs out, and on a phone that is between
+	 * a label and the control it names — reported from a 390px screen, where the second `Не` sat
+	 * alone at the end of one line, `уровень:` opened the next one without it, and `Макс. строк:`
+	 * broke INSIDE the label, leaving `Макс.` on one line and `строк:` on the next with the field it
+	 * belongs to.
+	 *
+	 * Flex with wrapping fixes both halves: a wrap can now only happen BETWEEN items, and a label is
+	 * one unbreakable item, so a pair still separates at worst onto two lines instead of a label
+	 * cutting in half. The fields shrink instead of forcing that: `min-width: 0` undoes the field
+	 * box in theme/60-inputs.css for this row only.
+	 *
+	 * Keyed on the controls' OWN ids rather than on the page: `data-page` differs between the system
+	 * and the kernel log, and a third-party LogreadBox has neither, while ui.js gives these two rows
+	 * the same ids wherever the widget is rendered. The inline `margin: 0 5px` LuCI writes on the
+	 * labels stays as the horizontal spacing — only the ROW gap is ours, so nothing here has to
+	 * fight an inline style. */
+	div:has(> #logFacilitySelect),
+	div:has(> #logTextFilter) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		row-gap: var(--fs-space-2);
+	}
+	div:has(> #logFacilitySelect) > label,
+	div:has(> #logTextFilter) > label { white-space: nowrap; }
+	#logFacilitySelect, #logSeveritySelect, #logTextFilter, #logMaxRows {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+	/* the two numeric-ish fields keep a sane ceiling: a max-rows box as wide as the filter reads as
+	 * a second search field. */
+	#logMaxRows { flex-basis: 6ch; max-width: 12ch; }
+
+	/* ON A PHONE, ONE FILTER PER LINE. Wrapping alone still fills each line greedily, so the second
+	 * `Не` rode the end of the first line while the `уровень:` it inverts opened the next one. The
+	 * first row is a fixed alternation of exactly two filters — invert label, checkbox, name label,
+	 * control, twice — so a four-column grid puts one filter on each line.
+	 *
+	 * The SECOND row is deliberately left to the wrapping above. It holds two filters of different
+	 * shapes (a checkbox filter and a bare `Макс. строк:` pair), so the same four tracks would be
+	 * sized by items that are not each other's counterparts: measured, the max-rows box defined
+	 * column 2 and pushed `содержит:` and its field off the card. Wrapping puts that row's two
+	 * filters on two lines by itself, which is all the grid was for. */
+	@container fs-view (max-width: 560px) {
+		div:has(> #logFacilitySelect) {
+			display: grid;
+			grid-template-columns: auto auto auto minmax(0, 1fr);
+			column-gap: var(--fs-space-1);
+		}
+	}
+
 	/* System Log / Kernel Log (luci-mod-status): the whole log is a readonly
 	 * <textarea id="syslog"> in a bare div, NOT in a .cbi-value-field. Stock bootstrap pairs
 	 * its generic `input, textarea { width: 210px }` with `#syslog { width: 100% }` and wins
