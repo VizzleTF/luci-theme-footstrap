@@ -89,7 +89,7 @@
 		rule — and the overview layout include, which gates on it — silently did not apply
 		there. The SPA router stamps the resolved leaf path, so both ways of arriving agree.
 	#}
-	<body class="lang_{{ dispatcher.lang }} {{ entityencode(striptags(node?.title ?? ''), true) }}" data-page="{{ entityencode(join('-', length(ctx.path) ? ctx.path : ctx.request_path), true) }}">
+	<body class="lang_{{ dispatcher.lang }}" data-page="{{ entityencode(join('-', length(ctx.path) ? ctx.path : ctx.request_path), true) }}">
 		{#
 			The wallpaper PATTERN's paint surface, and nothing else: 15-wallpaper.css masks this
 			element so an uploaded SVG takes the theme's ink. A mask applies to an element's whole

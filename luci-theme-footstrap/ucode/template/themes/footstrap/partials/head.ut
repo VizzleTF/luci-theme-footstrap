@@ -414,10 +414,24 @@
 		{% endif %}
 		<link rel="icon" href="{{ media }}/logo_48.png" sizes="48x48">
 		<link rel="icon" href="{{ media }}/logo.svg" sizes="any">
-		{% if (node?.css): %}
-		{# uhttpd sends no Cache-Control, so without a version key the browser applies HEURISTIC
-		   freshness and can serve a stale app stylesheet for days after an upgrade. #}
-		<link rel="stylesheet" href="{{ resource }}/{{ node.css }}?v={{ pkgs_update_time }}">
+		{% if (dispatched?.css): %}
+		{# The `css` property of the dispatched menu.d node — an app naming a stylesheet the server
+		   should link for its page, instead of the view injecting one at module eval (which is what
+		   fs-sheets.js spends its existence containing).
+
+		   `dispatched`, not `node`: the dispatcher exports the resolved node as `dispatched`
+		   (`runtime.env.dispatched = resolved.node`) and never binds a `node`. Every ucode theme
+		   carried the same typo until it was fixed upstream in openwrt/luci#8920, so the link had
+		   never once been emitted. Requires `css: 'string'` in the dispatcher's node schema, added
+		   by that same commit — on a luci-base without it the property is filtered out of the tree
+		   and this stays false, which is what 24.10 and 25.12 do.
+
+		   uhttpd sends no Cache-Control, so without a version key the browser applies HEURISTIC
+		   freshness and can serve a stale app stylesheet for days after an upgrade.
+
+		   Deliberately NOT `data-fs-shell`: this sheet belongs to one page, so the SPA router must
+		   judge and contain it like any other app sheet rather than let it ride along. #}
+		<link rel="stylesheet" href="{{ resource }}/{{ dispatched.css }}?v={{ pkgs_update_time }}">
 		{% endif %}
 		{% if (css): %}
 		{# no `title` attribute: on a <style> it names a STYLE SHEET SET, making this a "preferred"
