@@ -281,8 +281,35 @@
 		white-space: normal;
 		/* overflow-wrap dropped — base/40-tables.css breaks every cell; the copy that stood here
 		 * moved nothing against 267 matching cells. */
-		padding-inline-end: min(200px, 50%);
+		padding-inline-end: min(230px, 50%);
 		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-text);
+	}
+
+	/* ON A NARROW CARD THE VALUE TAKES ITS OWN LINE — a reserve cannot be made to fit there.
+	 *
+	 * The value is out of flow (the bar's ::after, pinned over its far edge), so the only thing
+	 * keeping it off the label is that padding, and the two are sized by different things: the
+	 * padding is a fraction of the CARD, the value is however wide LuCI's formatter made it.
+	 * `16.66 GiB / 16.66 GiB (100%)` measures 218px in the mono face at --fs-type-xs, and 50% of a
+	 * 380px phone card is 190 — so the figure printed straight through the end of the label:
+	 * "Дисковое пространство330.54 MiB / 7.98 GiB (4%)", reported from a phone. Measured across the
+	 * range: the reserve is at its 230px cap and clear of every value from a ~460px card up, and
+	 * short of the longest ones below that.
+	 *
+	 * Below the threshold the label keeps the whole line and the bar drops by one --fs-type-xs
+	 * line, which is the band the value then sits in — right-aligned, on its own line, above its
+	 * own bar. It costs one line per row on a phone and cannot collide at any label length.
+	 * `fs-view` rather than a container of its own: the Memory/Storage cards are already single
+	 * column at 800px (the grid collapse above), so below 560px the card IS the view minus its
+	 * gutters, and adding `container-type` to the card would size-contain a box the port tiles
+	 * deliberately keep uncontained. */
+	@container fs-view (max-width: 560px) {
+		body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
+			padding-inline-end: 0;
+		}
+		body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .cbi-progressbar {
+			margin-block-start: calc(var(--fs-type-xs) * var(--fs-leading));
+		}
 	}
 	/* bar cell — spans full width on row 2 */
 	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:nth-child(2) {
