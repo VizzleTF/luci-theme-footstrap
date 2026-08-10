@@ -15,21 +15,26 @@
 	 * cutting in half. The fields shrink instead of forcing that: `min-width: 0` undoes the field
 	 * box in theme/60-inputs.css for this row only.
 	 *
-	 * Keyed on the controls' OWN ids rather than on the page: `data-page` differs between the system
-	 * and the kernel log, and a third-party LogreadBox has neither, while ui.js gives these two rows
-	 * the same ids wherever the widget is rendered. The inline `margin: 0 5px` LuCI writes on the
-	 * labels stays as the horizontal spacing — only the ROW gap is ours, so nothing here has to
-	 * fight an inline style. */
-	div:has(> #logFacilitySelect),
-	div:has(> #logTextFilter) {
+	 * Keyed on the ROW's SHAPE, not on the page and not on the controls' ids. `data-page` differs
+	 * between the system and the kernel log and a third-party LogreadBox has neither — but the ids
+	 * are no better: only the System Log is built by `tools/views.js`, and Status → Kernel Log is a
+	 * view of its own (`view/status/dmesg.js`) whose four rows carry `logFromTime`, `logToTime`,
+	 * `invertLogRangeTime`, `invertSeverity` and `invertAscendingSort`, of which an id list written
+	 * against LogreadBox catches none — `logFacilitySelect` appears there only as a `for=`, on a
+	 * label whose control is a time field. Both views wrap their rows in `#content_syslog`, and a
+	 * filter row is exactly one that opens with a `<label>`; the scroll-to-end button's row and the
+	 * log itself do not. That shape holds for any view built the same way.
+	 *
+	 * The inline `margin: 0 5px` LuCI writes on the labels stays as the horizontal spacing — only
+	 * the ROW gap is ours, so nothing here has to fight an inline style. */
+	#content_syslog > div:has(> label) {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		row-gap: var(--fs-space-2);
 	}
-	div:has(> #logFacilitySelect) > label,
-	div:has(> #logTextFilter) > label { white-space: nowrap; }
-	#logFacilitySelect, #logSeveritySelect, #logTextFilter, #logMaxRows {
+	#content_syslog > div:has(> label) > label { white-space: nowrap; }
+	#content_syslog > div:has(> label) > :is(select, input) {
 		flex: 1 1 auto;
 		/* both halves are needed and they answer different layouts: `min-width: 0` lets a FLEX item
 		 * shrink past its content, `max-width: 100%` clamps a GRID item to its track. A <select>
@@ -38,6 +43,8 @@
 		min-width: 0;
 		max-width: 100%;
 	}
+	/* a checkbox is not a field: left to its own 16px, it would otherwise flex to fill the line. */
+	#content_syslog > div:has(> label) > input[type="checkbox"] { flex: 0 0 auto; }
 	/* the two numeric-ish fields keep a sane ceiling: a max-rows box as wide as the filter reads as
 	 * a second search field. */
 	#logMaxRows { flex-basis: 6ch; max-width: 12ch; }
@@ -47,12 +54,18 @@
 	 * first row is a fixed alternation of exactly two filters — invert label, checkbox, name label,
 	 * control, twice — so a four-column grid puts one filter on each line.
 	 *
-	 * The SECOND row is deliberately left to the wrapping above. It holds two filters of different
-	 * shapes (a checkbox filter and a bare `Макс. строк:` pair), so the same four tracks would be
-	 * sized by items that are not each other's counterparts: measured, the max-rows box defined
-	 * column 2 and pushed `содержит:` and its field off the card. Wrapping puts that row's two
-	 * filters on two lines by itself, which is all the grid was for. */
+	 * EVERY OTHER ROW is deliberately left to the wrapping above, because none of them is that
+	 * shape. The System Log's second row holds a checkbox filter beside a bare `Макс. строк:` pair,
+	 * and the same four tracks are then sized by items that are not each other's counterparts:
+	 * measured, the max-rows box defined column 2 and pushed `содержит:` and its field off the card.
+	 * The Kernel Log's rows are three different shapes again — a range with two time fields, a
+	 * severity select with a trailing `and above`, and a lone sort checkbox. Wrapping puts each of
+	 * those on as many lines as it needs, which is all the grid was ever for; the grid is worth its
+	 * one selector only where the alternation is exact. */
 	@container fs-view (max-width: 560px) {
+		/* the id alone, without `#content_syslog >` in front of it: two ids in one selector is
+		 * [2,0,1], past the [1,7,0] ceiling `npm run css-metrics` holds the sheet to, and the row is
+		 * already pinned down by the only id LuCI puts on that select. */
 		div:has(> #logFacilitySelect) {
 			display: grid;
 			grid-template-columns: auto auto auto minmax(0, 1fr);
