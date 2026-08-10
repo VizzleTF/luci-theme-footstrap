@@ -390,6 +390,17 @@ function seed() {
 function documentHasSheet(css) {
 	const want = '/' + css.replace(/^\/+/, '');
 	for (const link of document.querySelectorAll('link[rel~="stylesheet"][href]')) {
+		/* A <link> INSIDE the view tree dies with the swap — it is the one shape fs-sheets.js needs
+		 * no handling for, and every scan there skips it for the same reason (VIEW_SHEETS, and the
+		 * `closest('#view')` guards in documentPoisoned/scopeToCurrentPage/dedupeViewSheets).
+		 * Counting it here would answer the wrong question: `luci-app-nlbwmon` returns
+		 * `E('link', { rel: 'stylesheet', href: L.resource('view/nlbw.css') })` from render(), so
+		 * standing on that page its sheet IS in the document — and it is exactly the sheet the next
+		 * dom.content() throws away. An app in that shape moving to a menu.d `css` is the migration
+		 * #8920 was written for, so the guard has to survive it: leaving from that page must be a
+		 * full load, not a swap into an unstyled document. */
+		if (link.closest('#view'))
+			continue;
 		const href = (link.getAttribute('href') || '').split('?')[0];
 		if (href.endsWith(want))
 			return true;
