@@ -381,6 +381,22 @@ function seed() {
 	adoptEntry();
 }
 
+/* Does this document already carry the stylesheet a menu.d node names?
+ *
+ * The value is a path under /luci-static/resources (`view/foo/foo.css`), and head.ut prints it with
+ * a `?v=` cache key, so compare the PATH only and by suffix — the theme does not get to assume the
+ * resource base, and a re-hosted sheet keeps its element and its href (fs-sheets.js disables the
+ * <link>, it never removes it), which is exactly the "already here" this asks about. */
+function documentHasSheet(css) {
+	const want = '/' + css.replace(/^\/+/, '');
+	for (const link of document.querySelectorAll('link[rel~="stylesheet"][href]')) {
+		const href = (link.getAttribute('href') || '').split('?')[0];
+		if (href.endsWith(want))
+			return true;
+	}
+	return false;
+}
+
 /* Attempt an in-place navigation to `pathname`. Returns true if handled as a
  * SPA nav (caller should preventDefault), false to let the browser do a normal
  * full navigation. `push` adds a history entry (false when replaying popstate).
@@ -402,6 +418,30 @@ function navigate(pathname, push, kbd) {
 	const className = tree.viewClassFor(node);
 	if (!className)
 		return false;
+
+	/* A PAGE WHOSE STYLESHEET ONLY THE SERVER CAN EMIT IS NOT OURS TO SWAP INTO.
+	 *
+	 * A menu.d node may name its own sheet (`"css": "view/foo/foo.css"`), and the server links it
+	 * from <head> on a full load (partials/head.ut). Nothing here can: a swap replaces #view's
+	 * children, it does not re-render a document, so reaching such a page by CLICK would show it
+	 * with the app's CSS missing — while reaching the same page by URL or F5 showed it styled. One
+	 * page, two appearances, decided by how the user got there.
+	 *
+	 * So decline, exactly as the poisoned-document bail above does: speed is traded for
+	 * correctness, never the other way. It costs ONE full load per such page — after it the <link>
+	 * is in the document, this test passes, and every later visit is a swap again (fs-sheets.js
+	 * owns the sheet from then on and re-lights it per page).
+	 *
+	 * Injecting the <link> here instead would work and is deliberately not done: it would put the
+	 * theme in charge of fetching and ordering a foreign stylesheet, which is the job fs-sheets.js
+	 * exists to keep out of the theme. The server already does it correctly.
+	 *
+	 * `node.css` reaches the client because /admin/menu serves the dispatcher's own tree and
+	 * ui.js's scrubMenu() only rewrites `satisfied`. On a luci-base that predates the `css` schema
+	 * entry the property is dropped server-side, so this is simply never true there. */
+	if (typeof node.css === 'string' && node.css !== '' && !documentHasSheet(node.css))
+		return false;
+
 	const rsegs = res.segs;
 
 	/* from here on the navigation is committed */
