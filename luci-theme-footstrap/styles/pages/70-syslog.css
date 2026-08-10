@@ -45,9 +45,13 @@
 	}
 	/* a checkbox is not a field: left to its own 16px, it would otherwise flex to fill the line. */
 	#content_syslog > div:has(> label) > input[type="checkbox"] { flex: 0 0 auto; }
-	/* the two numeric-ish fields keep a sane ceiling: a max-rows box as wide as the filter reads as
-	 * a second search field. */
-	#logMaxRows { flex-basis: 6ch; max-width: 12ch; }
+	/* The max-rows box keeps a sane ceiling: as wide as the free-text filter it reads as a second
+	 * search field. Selected as the row's `number` input, not by its id: `#logMaxRows` alone is
+	 * (1,0,0) and the field rule above is (1,0,3), so the id LOSES — and re-anchoring it under
+	 * `#content_syslog` would put two ids in one selector, [2,0,x], past the [1,7,0] ceiling
+	 * `npm run css-metrics` holds this sheet to. `[type="number"]` is the only one in either log's
+	 * filter bar and it out-specifies at (1,1,3). */
+	#content_syslog > div:has(> label) > input[type="number"] { flex-basis: 6ch; max-width: 12ch; }
 
 	/* ON A PHONE, ONE FILTER PER LINE. Wrapping alone still fills each line greedily, so the second
 	 * `Не` rode the end of the first line while the `уровень:` it inverts opened the next one. The
@@ -63,10 +67,15 @@
 	 * those on as many lines as it needs, which is all the grid was ever for; the grid is worth its
 	 * one selector only where the alternation is exact. */
 	@container fs-view (max-width: 560px) {
-		/* the id alone, without `#content_syslog >` in front of it: two ids in one selector is
-		 * [2,0,1], past the [1,7,0] ceiling `npm run css-metrics` holds the sheet to, and the row is
-		 * already pinned down by the only id LuCI puts on that select. */
-		div:has(> #logFacilitySelect) {
+		/* THE ROW WITH TWO SELECTS, which is the same row `#logFacilitySelect` names — by shape
+		 * because neither spelling of the id survives the arithmetic: `div:has(> #logFacilitySelect)`
+		 * is (1,0,1) and loses to the flex rule above at (1,0,2), while `#content_syslog >` in front
+		 * of it is two ids, [2,0,1], past the [1,7,0] ceiling `npm run css-metrics` holds. Two
+		 * sibling selects is what the `auto auto auto minmax(0, 1fr)` template is sized for — eight
+		 * children, two filters — and it is unique to the System Log's first row: the Kernel Log's
+		 * severity row carries one select, its range row two time fields. (1,0,4) beats the flex
+		 * rule on specificity, not on source order. */
+		#content_syslog > div:has(> label):has(> select ~ select) {
 			display: grid;
 			grid-template-columns: auto auto auto minmax(0, 1fr);
 			column-gap: var(--fs-space-1);
