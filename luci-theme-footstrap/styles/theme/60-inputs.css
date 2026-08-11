@@ -429,7 +429,7 @@
 		 * under AA — the tint of the accent eats its own contrast. */
 		.cbi-value-field select option:checked {
 			/* @mirror selected-row/paint */
-			background: var(--fs-panel2); color: var(--fs-accent); box-shadow: inset 2px 0 0 var(--fs-accent);
+			background: var(--fs-panel2); color: var(--fs-accent); box-shadow: var(--fs-row-rail);
 			/* @endmirror */
 		}
 	}

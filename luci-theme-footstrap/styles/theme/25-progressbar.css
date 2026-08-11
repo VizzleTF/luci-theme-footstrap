@@ -21,50 +21,50 @@
 	}
 	.cbi-progressbar::after {
 		content: attr(title);
-		position: absolute; inset-inline: auto 0; bottom: calc(100% + 4px); top: auto;
+		/* the gap is a scale step, not a literal 4: every other gap in the theme scales with the
+		 * density axis and this one sat outside it. Identical at the default density. */
+		position: absolute; inset-inline: auto 0; bottom: calc(100% + var(--fs-space-1)); top: auto;
 		font-family: var(--fs-font-mono); font-size: var(--fs-type-xs); font-weight: var(--fs-weight-normal);
 		color: var(--fs-dim); white-space: nowrap; text-shadow: none;
 	}
 
-	/* THE BAR IS THE FIELD OF A LABELLED ROW — put the value BESIDE it, not above it.
+	/* THE VALUE SITS BESIDE THE BAR wherever the bar already shares its line with a name.
 	 *
-	 * The placement above the bar (and the stock one it replaced: bootstrap floats the same title
-	 * at `top: -1.4em; left: 0`) assumes the shape the Overview has, where the bar owns a full-width
-	 * line and its name sits on the line above — there the value lands at the far end of the name's
-	 * own line and the two read as one row. A `.cbi-value` row is the other shape: the name is
-	 * already in the LEFT column, on the bar's own line, so a value floating above the bar has
-	 * nothing to pair with. It lands against the row divider instead, nearer the row above than the
-	 * bar it belongs to — reported against luci-app-modeminfo's Antennas page, three of these rows
-	 * per card and every dBm figure reading as though it belonged to the meter above it.
+	 * The default above puts it over the bar's far edge, and that assumes the shape the Overview has:
+	 * the meter owns a full-width line and its name sits on the line above, so the value lands at the
+	 * far end of that name's own line and the two read as one row. (Stock bootstrap assumes the same,
+	 * floating the title at `top: -1.4em; left: 0`.) Two shapes are not that, and they are not each
+	 * other either — CSS cannot ask "does this row carry its own label" — so each is named:
 	 *
-	 * Inline, then: the row becomes `name | meter | value`, one line, values aligned to a single
-	 * column because the reserve is fixed rather than shrink-wrapped. The reserve is
-	 * `2 x --fs-space-10` because the value can be `-140.0 dBm`, half again as wide as the
-	 * `100% (1.2 GiB)` a single step covers in the data-table rule below.
+	 *   `.cbi-value-field > .cbi-progressbar`  the meter IS the field of a CBI form row, an app
+	 *     building `.cbi-value` with ui.js. Reported against luci-app-modeminfo's Antennas page:
+	 *     three such rows per card, every dBm figure reading as though it belonged to the meter above
+	 *     it, because the value lands against the row divider rather than beside its own bar.
+	 *   `.table:has(.tr.table-titles) .td …`   a meter COLUMN in a multi-column data table
+	 *     (luci-app-cpu-status's per-CPU load), where the floated value lands on the row divider too.
 	 *
-	 * Not the same selector as that rule and deliberately so: this is the CBI FORM row (an app
-	 * building a `.cbi-value` with ui.js), that one is a multi-column data table. Both end up
-	 * inline-right; neither can be expressed as the other, because CSS cannot ask "does this row
-	 * carry its own label". The Overview and the package manager keep the value above the bar:
-	 * their meters sit in a `.td` and a bare `.controls` div, neither of which is a field. */
-	.cbi-value-field > .cbi-progressbar { margin-inline-end: calc(var(--fs-space-10) * 2); }
-	.cbi-value-field > .cbi-progressbar::after {
+	 * Both want the same geometry and differ in ONE number, so the geometry is written once and the
+	 * number is the knob: `--fs-meter-value` is the room the out-of-flow value needs. A form row holds
+	 * `-140.0 dBm`, half again as wide as the `100% (1.2 GiB)` of a table cell. The Overview and the
+	 * package manager keep the value above the bar — their meters sit in a `.td` and a bare
+	 * `.controls` div, which is neither shape. */
+	.cbi-value-field > .cbi-progressbar,
+	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar {
+		margin-inline-end: var(--fs-meter-value);
+	}
+	.cbi-value-field > .cbi-progressbar::after,
+	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar::after {
 		inset-inline: calc(100% + var(--fs-space-2)) auto; bottom: auto; top: 50%;
 		transform: translateY(-50%);
+	}
+	.cbi-value-field > .cbi-progressbar { --fs-meter-value: calc(var(--fs-space-10) * 2); }
+	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar {
+		--fs-meter-value: var(--fs-space-10);
+		/* narrower than this it stops reading as a meter at all; the column gives up the rest. */
+		min-width: 60px;
 	}
 
 	/* Progressbar rows in a section table (luci-app-cpu-status): keep the native label | bar
 	 * row, just centre the cells vertically. */
 	.cbi-section .table:not([id]):not(.cbi-section-table) .tr:has(.cbi-progressbar) .td { vertical-align: middle; }
-
-	/* Multi-column DATA tables with a progressbar column (cpu-status per-CPU load): the
-	 * generic meter floats its value ABOVE the bar, which here lands on the row divider.
-	 * Shrink the bar and put the value INLINE to its right, clear of the border. */
-	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar {
-		min-width: 60px; margin-inline-end: var(--fs-space-10);
-	}
-	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar::after {
-		inset-inline: calc(100% + 8px) auto; bottom: auto; top: 50%;
-		transform: translateY(-50%);
-	}
 }

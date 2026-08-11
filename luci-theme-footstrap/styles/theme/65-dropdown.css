@@ -362,7 +362,7 @@
 	 * with a chosen value; the widget shipped that way on every dark router. */
 	.cbi-dropdown[open] > ul.dropdown > li[selected] {
 		/* @mirror selected-row/paint */
-		background: var(--fs-panel2); color: var(--fs-accent); box-shadow: inset 2px 0 0 var(--fs-accent);
+		background: var(--fs-panel2); color: var(--fs-accent); box-shadow: var(--fs-row-rail);
 		/* @endmirror */
 	}
 	/* THE FOCUSED ROW WEARS THE THEME'S RING, not the browser's.
@@ -375,8 +375,9 @@
 	 * browser shipped.
 	 *
 	 * Inset rather than the token's outer 3px: the menu clips its own overflow, so an outer ring is
-	 * cut on the first and last rows. The rail is restated INSIDE this ring so a focused row that is
-	 * also selected keeps its rail — a shorthand cannot merge with the one below.
+	 * cut on the first and last rows. The rail rides INSIDE this ring so a focused row that is also
+	 * selected keeps it — a shorthand cannot merge with the one below, so the two are listed
+	 * together, and `--fs-row-rail` is why that is a reference rather than a third copy.
 	 *
 	 * Both selectors carry `[selected]`-level weight on purpose: the selected-row paint below is
 	 * (0,4,1) and a bare `li:focus-visible` ties with it, which would leave the focus ring to source
@@ -384,7 +385,7 @@
 	.cbi-dropdown[open] > ul.dropdown > li[selected]:focus-visible,
 	.cbi-dropdown[open] > ul.dropdown > li:focus-visible {
 		outline: none;
-		box-shadow: inset 2px 0 0 var(--fs-accent), inset 0 0 0 2px var(--fs-accent-soft);
+		box-shadow: var(--fs-row-rail), inset 0 0 0 2px var(--fs-accent-soft);
 	}
 
 	/* A MULTI-select row says "chosen" with its CHECKBOX, so it does not also need the rail.

@@ -55,6 +55,13 @@
 		--fs-focus-ring: 0 0 0 3px var(--fs-accent-soft);
 		--fs-focus-ring-solo: 0 0 0 2px var(--fs-panel), 0 0 0 5px var(--fs-accent);
 		--fs-focus-ring-invalid: 0 0 0 3px var(--fs-danger-fill);
+		/* THE CHOSEN-ROW RAIL, the same ladder one rung along: a chosen row in a list says so with an
+		 * opaque surface and an inset bar, never with a tint of the accent under accent text (that
+		 * measured 4.21:1 in dark — see theme/65-dropdown.css). Named because it is written in three
+		 * places that cannot be one rule: the open dropdown's row, a native `select option:checked`,
+		 * and the ring the FOCUSED row wears on top of it. The first two are pinned to each other by
+		 * tools/mirror.mjs; the third restated the literal until it had a name. */
+		--fs-row-rail: inset 2px 0 0 var(--fs-accent);
 
 		/* the theme's ONE colour literal, deliberately: black at .7 is the absence of light
 		 * behind a dialog, not a tint of any token — a palette-tinted scrim over a dark page
