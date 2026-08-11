@@ -398,10 +398,17 @@
 		--fs-panel-base: #ffffff;
 		--fs-panel2-base: #f5f5f5;
 		--fs-border-base: #cccccc;
-		--fs-text: #404040;
-		--fs-dim: #6a6a6a;
-		--fs-faint: #6e6e6e;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%236a6a6a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		/* THE INK IS THE ONE PLACE THIS COLOURWAY LEAVES BOOTSTRAP'S OWN VALUES BEHIND, and it is
+		 * the same decision the default palette made: bootstrap's #404040 body and #6a6a6a muted
+		 * tier measure 10.4:1 and 5.0:1 on white, and the muted one carries LuCI's page
+		 * descriptions and every field title — help text you have to lean into. Matched to the
+		 * default palette's light ramp instead, ratio for ratio: 15.7 / 11.7 / 10.0 against its
+		 * 15.8 / 11.8 / 10.0. Neutral greys, so the colourway still reads as bootstrap's — what is
+		 * copied is its hue, not its readability. */
+		--fs-text: #232323;
+		--fs-dim: #383838;
+		--fs-faint: #424242;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23383838" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		/* --primary-color-medium; -high (#1976d2) measured 4.22:1 on --fs-panel2 */
 		--fs-accent-base: #1564c0;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
