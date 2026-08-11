@@ -464,14 +464,22 @@
 		--background-color-medium: color-mix(in srgb, var(--fs-panel) 55%, var(--fs-panel2));
 		--background-color-low: var(--fs-panel2);
 
-		/* --text-color-low cannot move: --fs-dim IS the muted text colour and already
-		 * sits ON the AA floor (4.56:1 on --fs-panel2 in dark), so a fainter step would
-		 * be an illegible grey. It stays equal to -medium — the ramp is still wide, -high
-		 * being --fs-text — and a duplicate beats a value nobody can read. */
+		/* -low used to be a DUPLICATE of -medium, both --fs-dim, on the grounds that a fainter
+		 * step would be illegible: --fs-dim sits on the AA floor in dark (4.56:1 on --fs-panel2)
+		 * and --fs-faint is the fainter one. That held while the two were a hair apart. Light's
+		 * secondary tier has since moved to 11.8:1 (see 03-palettes.css), so the duplicate stopped
+		 * being a rounding decision and started flattening the export: `spread(high, low)` fell to
+		 * 0.082 in the default palette and 0.094 in hicontrast, under the 0.10 the ramp promises —
+		 * an app asking for a gradation would have got one colour twice.
+		 *
+		 * So -low is --fs-faint, the theme's own third ink, and the illegibility that argument
+		 * feared is what the gate below measures rather than assumes: every level is held to AA as
+		 * text on all three surfaces AND as a fill under its --on-* ink, in both modes, across the
+		 * whole palette x tint matrix. --fs-faint clears it everywhere. */
 		--text-color-highest: var(--fs-text);
 		--text-color-high: var(--fs-text);
 		--text-color-medium: var(--fs-dim);
-		--text-color-low: var(--fs-dim);
+		--text-color-low: var(--fs-faint);
 
 		/* borders carry no text, so here -low MAY fade toward the surface: a hairline
 		 * is supposed to disappear into it. */

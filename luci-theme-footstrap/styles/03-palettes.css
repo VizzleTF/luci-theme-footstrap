@@ -257,9 +257,15 @@
 		--fs-panel2-base: #f6f8fa;
 		--fs-border-base: #d0d7de;
 		--fs-text: #1f2328;
-		--fs-dim: #656d76;
-		--fs-faint: #68727e;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23656d76" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		/* The SECONDARY tier carries LuCI's page descriptions and every field title, and at the
+		 * GitHub-light greys it started from (#656d76/#68727e, 5.2:1 and 4.9:1 on the card) that is
+		 * help text a reader has to lean into — reported on the upstream PR by someone reading the
+		 * light theme on a real router. LuCI's pages are technical and their descriptions are the
+		 * part you read once and act on, so this tier is now 11.8:1 and 10.0:1: still a tier below
+		 * the 15.8:1 body ink, which is what keeps a label a label, but no longer a whisper. */
+		--fs-dim: #33383d;
+		--fs-faint: #3d4348;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%2333383d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #0969da;
 		/* a tint OF --fs-accent, so mixed FROM it. It used to restate the accent's RGB as a
 		 * literal, which goes stale silently the moment the accent is recoloured (or the
@@ -315,9 +321,13 @@
 		--fs-panel2-base: #f6f8fb;
 		--fs-border-base: #e4e9f1;
 		--fs-text: #101725;
-		--fs-dim: #5b6675;
-		--fs-faint: #69727f;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%235b6675" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		/* …and this palette's secondary tier moves with it, because the promise in the comment above
+		 * is RELATIVE: 5.8:1 and 4.9:1 were above the default when the default was 5.2:1 and 4.9:1,
+		 * and below it the moment that changed. 13.5:1 and 12.0:1 against the default's 11.8 and
+		 * 10.0. */
+		--fs-dim: #272f3d;
+		--fs-faint: #2e3745;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23272f3d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #0b6fbd;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
 		--fs-track: #eaeef4;
@@ -417,8 +427,13 @@
 		--fs-panel2-base: #303030;
 		--fs-border-base: #444444;
 		--fs-text: #bfbfbf;
+		/* faint == dim here, and that is the deviation this palette allows itself: bootstrap's dark
+		 * has no third ink, and the export tier's -low now follows --fs-faint (02-tokens.css), so
+		 * the #969696 this used to carry landed at 4.46:1 on a tinted --fs-panel2 — under AA for a
+		 * name apps print text in. The step above it is bootstrap's own, so the fainter one gives
+		 * way rather than the ramp. */
 		--fs-dim: #9a9a9a;
-		--fs-faint: #969696;
+		--fs-faint: #9a9a9a;
 		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%239a9a9a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #53a4c2;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
