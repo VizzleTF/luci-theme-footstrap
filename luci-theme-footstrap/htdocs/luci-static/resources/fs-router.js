@@ -381,35 +381,6 @@ function seed() {
 	adoptEntry();
 }
 
-/* Does this document already carry the stylesheet a menu.d node names?
- *
- * The value is a path under /luci-static/resources (`view/foo/foo.css`), and head.ut prints it with
- * a `?v=` cache key, so compare the PATH only and by suffix — the theme does not get to assume the
- * resource base, and a re-hosted sheet keeps its element and its href (fs-sheets.js disables the
- * <link>, it never removes it), which is exactly the "already here" this asks about. */
-function documentHasSheet(css) {
-	const want = '/' + css.replace(/^\/+/, '');
-	for (const link of document.querySelectorAll('link[rel~="stylesheet"][href]')) {
-		/* A <link> INSIDE the view tree dies with the swap — it is the one shape fs-sheets.js needs
-		 * no handling for, and every scan there that asks what OUTLIVES a page skips it for the same
-		 * reason: the `closest('#view')` guards in documentPoisoned/scopeToCurrentPage/
-		 * dedupeViewSheets. (rehostInvasiveSheets has none, and rightly — it asks what paints on
-		 * THIS page, and both the sheet and its shim die with the same swap.)
-		 * Counting it here would answer the wrong question: `luci-app-nlbwmon` returns
-		 * `E('link', { rel: 'stylesheet', href: L.resource('view/nlbw.css') })` from render(), so
-		 * standing on that page its sheet IS in the document — and it is exactly the sheet the next
-		 * dom.content() throws away. An app in that shape moving to a menu.d `css` is the migration
-		 * #8920 was written for, so the guard has to survive it: leaving from that page must be a
-		 * full load, not a swap into an unstyled document. */
-		if (link.closest('#view'))
-			continue;
-		const href = (link.getAttribute('href') || '').split('?')[0];
-		if (href.endsWith(want))
-			return true;
-	}
-	return false;
-}
-
 /* Attempt an in-place navigation to `pathname`. Returns true if handled as a
  * SPA nav (caller should preventDefault), false to let the browser do a normal
  * full navigation. `push` adds a history entry (false when replaying popstate).
@@ -434,25 +405,29 @@ function navigate(pathname, push, kbd) {
 
 	/* A PAGE WHOSE STYLESHEET ONLY THE SERVER CAN EMIT IS NOT OURS TO SWAP INTO.
 	 *
-	 * A menu.d node may name its own sheet (`"css": "view/foo/foo.css"`), and the server links it
-	 * from <head> on a full load (partials/head.ut). Nothing here can: a swap replaces #view's
-	 * children, it does not re-render a document, so reaching such a page by CLICK would show it
-	 * with the app's CSS missing — while reaching the same page by URL or F5 showed it styled. One
-	 * page, two appearances, decided by how the user got there.
+	 * A menu.d node may name its own sheet (`"css": "view/foo/foo.css"`), and the server links it from
+	 * <head> on a full load (partials/head.ut). Nothing here can: a swap replaces #view's children, it
+	 * does not re-render a document, so reaching such a page by CLICK would show it with the app's CSS
+	 * missing — while reaching the same page by URL or F5 showed it styled. One page, two appearances,
+	 * decided by how the user got there.
 	 *
-	 * So decline, exactly as the poisoned-document bail above does: speed is traded for
-	 * correctness, never the other way. It costs ONE full load per such page — after it the <link>
-	 * is in the document, this test passes, and every later visit is a swap again (fs-sheets.js
-	 * owns the sheet from then on and re-lights it per page).
+	 * So decline, exactly as the poisoned-document bail above does: speed is traded for correctness,
+	 * never the other way. It costs ONE full load per such page — after it the <link> is in the
+	 * document, this test passes, and every later visit is a swap again (fs-sheets.js owns the sheet
+	 * from then on and re-lights it per page).
 	 *
-	 * Injecting the <link> here instead would work and is deliberately not done: it would put the
-	 * theme in charge of fetching and ordering a foreign stylesheet, which is the job fs-sheets.js
-	 * exists to keep out of the theme. The server already does it correctly.
+	 * Injecting the <link> here instead would work and is deliberately not done: it would put the theme
+	 * in charge of fetching and ordering a foreign stylesheet, which is the job fs-sheets.js exists to
+	 * keep out of the theme. The server already does it correctly.
 	 *
-	 * `node.css` reaches the client because /admin/menu serves the dispatcher's own tree and
-	 * ui.js's scrubMenu() only rewrites `satisfied`. On a luci-base that predates the `css` schema
-	 * entry the property is dropped server-side, so this is simply never true there. */
-	if (typeof node.css === 'string' && node.css !== '' && !documentHasSheet(node.css))
+	 * The QUESTION is fs-sheets.js's, not this module's: which sheets a document carries, and which of
+	 * them a swap is about to delete, is the one thing that file knows — see documentCarries(). What is
+	 * decided here is only what to do about the answer.
+	 *
+	 * `node.css` reaches the client because /admin/menu serves the dispatcher's own tree and ui.js's
+	 * scrubMenu() only rewrites `satisfied`. On a luci-base that predates the `css` schema entry the
+	 * property is dropped server-side, so this is simply never true there. */
+	if (typeof node.css === 'string' && node.css !== '' && !sheets.documentCarries(node.css))
 		return false;
 
 	const rsegs = res.segs;
