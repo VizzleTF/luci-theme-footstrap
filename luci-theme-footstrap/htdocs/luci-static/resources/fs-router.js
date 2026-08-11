@@ -412,9 +412,13 @@ function navigate(pathname, push, kbd) {
 	 * decided by how the user got there.
 	 *
 	 * So decline, exactly as the poisoned-document bail above does: speed is traded for correctness,
-	 * never the other way. It costs ONE full load per such page — after it the <link> is in the
-	 * document, this test passes, and every later visit is a swap again (fs-sheets.js owns the sheet
-	 * from then on and re-lights it per page).
+	 * never the other way. The cost is one full load per ENTRY INTO A DOCUMENT that lacks the sheet,
+	 * not one per page ever: head.ut emits the link for the DISPATCHED node only, so each full load
+	 * starts a document carrying exactly one such sheet and discards what the previous one had
+	 * gathered. Within that document the page is a swap from then on (fs-sheets.js owns the sheet and
+	 * re-lights it per page) — but two `css`-bearing pages alternating are a full load every time, in
+	 * both directions. That is the trade taken knowingly: an unstyled page is worse than a reload, and
+	 * no in-tree node sets `css` today.
 	 *
 	 * Injecting the <link> here instead would work and is deliberately not done: it would put the theme
 	 * in charge of fetching and ordering a foreign stylesheet, which is the job fs-sheets.js exists to

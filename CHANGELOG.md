@@ -11,6 +11,12 @@ Style and format guide: [docs/releasing.md](docs/releasing.md).
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+
+- **A menu.d stylesheet is matched by its whole path, not by the tail of it.** `documentCarries()` asked whether this document already holds the sheet a node names, and compared hrefs by suffix on the grounds that the resource base was not the theme's to assume. It is: `header.ut` hands the same `resource` value to the runtime that the template prints, so `L.resource(css)` reconstructs the server's href byte for byte and only the cache key has to come off. A suffix is what that assumption cost — anchored at nothing but a `/`, `custom.css` matches any sheet ending in that filename, and two in-tree apps put exactly that in `<head>` at module eval: `luci-app-adblock` and `luci-app-banip` both append `L.resource('view/<app>/custom.css')`, outside `#view`, where this module disables rather than removes them, so they stay for the life of the document. Measured on the router: standing on Adblock → Feeds, a node declaring `"css": "custom.css"` read as already-carried and the router swapped into a page with no stylesheet linked at all; with the whole path compared, the same click is a full load and the page arrives with its sheet. Equality also keeps the failure safe — `L.path()` drops a part that leaves its charset, so a malformed value matches nothing and falls back to a full load. Found in review on openwrt/luci#8903.
+
 ## [0.12.3] — 2026-08-11
 
 ### Changed

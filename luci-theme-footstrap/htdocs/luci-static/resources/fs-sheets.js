@@ -325,14 +325,29 @@ function outlivesPage(el) {
  * this module's because the answer is: a link inside #view is about to be deleted with the rest of
  * the view, and counting it would hand the router a sheet the next dom.content() throws away —
  * `luci-app-nlbwmon` returns E('link', …, L.resource('view/nlbw.css')) from render(), so that shape
- * is real. Compared by PATH and by suffix: head.ut prints `{{ resource }}/{{ dispatched.css }}?v=…`,
- * so neither the resource base nor the cache key is anyone's to assume. */
+ * is real.
+ *
+ * WHOLE PATH, NOT A SUFFIX. head.ut prints `{{ resource }}/{{ dispatched.css }}?v=…`, and the base in
+ * that line is the SAME value the runtime holds: header.ut hands `resource` to `new LuCI({…})`, and
+ * `L.resource()` joins it back exactly, so the server's href is reconstructable rather than guessable
+ * — only the cache key has to come off. A suffix match is what a guess costs: anchored at nothing but
+ * a `/`, `custom.css` matches any sheet ending in that filename, and two in-tree apps append exactly
+ * that to <head> at module eval — `luci-app-adblock` and `luci-app-banip` both add
+ * `L.resource('view/<app>/custom.css')`, outside #view, so outlivesPage() keeps them and this module
+ * disables rather than removes them: they stay for the life of the document. A third-party node
+ * declaring `"css": "custom.css"` would then read as already-carried the moment the user had passed
+ * through Adblock → Feeds, and the router would swap into a page whose stylesheet was never linked —
+ * the one outcome the guard exists to prevent.
+ *
+ * Equality also keeps the failure safe: L.path() drops a part that leaves its charset, so a malformed
+ * `css` yields the bare base and matches no href at all — a full load, which is the correct answer for
+ * a value nobody can serve. */
 function documentCarries(path) {
-	const want = '/' + String(path).replace(/^\/+/, '');
+	const want = L.resource(String(path));
 	for (const link of document.querySelectorAll('link[rel~="stylesheet"][href]')) {
 		if (!outlivesPage(link))
 			continue;
-		if ((link.getAttribute('href') || '').split('?')[0].endsWith(want))
+		if ((link.getAttribute('href') || '').split('?')[0] === want)
 			return true;
 	}
 	return false;
