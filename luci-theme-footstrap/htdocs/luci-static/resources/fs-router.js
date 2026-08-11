@@ -391,8 +391,10 @@ function documentHasSheet(css) {
 	const want = '/' + css.replace(/^\/+/, '');
 	for (const link of document.querySelectorAll('link[rel~="stylesheet"][href]')) {
 		/* A <link> INSIDE the view tree dies with the swap — it is the one shape fs-sheets.js needs
-		 * no handling for, and every scan there skips it for the same reason (VIEW_SHEETS, and the
-		 * `closest('#view')` guards in documentPoisoned/scopeToCurrentPage/dedupeViewSheets).
+		 * no handling for, and every scan there that asks what OUTLIVES a page skips it for the same
+		 * reason: the `closest('#view')` guards in documentPoisoned/scopeToCurrentPage/
+		 * dedupeViewSheets. (rehostInvasiveSheets has none, and rightly — it asks what paints on
+		 * THIS page, and both the sheet and its shim die with the same swap.)
 		 * Counting it here would answer the wrong question: `luci-app-nlbwmon` returns
 		 * `E('link', { rel: 'stylesheet', href: L.resource('view/nlbw.css') })` from render(), so
 		 * standing on that page its sheet IS in the document — and it is exactly the sheet the next

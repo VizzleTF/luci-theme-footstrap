@@ -1,32 +1,34 @@
 @layer page {
 	/* THE FILTER BAR, which LuCI writes as a run of inline text.
 	 *
-	 * `tools/views.js` (LogreadBox, shared by System Log, Kernel Log and every third-party page
-	 * built on it) emits two bare `<div style="margin-bottom:10px">`, each holding label / control
-	 * pairs with nothing around a pair: `<label>Не</label><input type=checkbox><label>объект:</label>
-	 * <select>…`. Inline flow then breaks wherever the line runs out, and on a phone that is between
-	 * a label and the control it names — reported from a 390px screen, where the second `Не` sat
-	 * alone at the end of one line, `уровень:` opened the next one without it, and `Макс. строк:`
-	 * broke INSIDE the label, leaving `Макс.` on one line and `строк:` on the next with the field it
-	 * belongs to.
+	 * Both log views build one: `tools/views.js` (LogreadBox — the System Log, and every third-party
+	 * page built on it) and `view/status/dmesg.js` (the Kernel Log). Each emits bare
+	 * `<div style="margin-bottom:10px">` rows holding label / control pairs with nothing around a
+	 * pair: `<label>Не</label><input type=checkbox><label>объект:</label><select>…`. Inline flow then
+	 * breaks wherever the line runs out, and on a phone that is between a label and the control it
+	 * names — reported from a 390px screen, where the second `Не` sat alone at the end of one line,
+	 * `уровень:` opened the next one without it, and `Макс. строк:` broke INSIDE the label, leaving
+	 * `Макс.` above `строк:` and the field they belong to.
 	 *
-	 * Flex with wrapping fixes both halves: a wrap can now only happen BETWEEN items, and a label is
-	 * one unbreakable item, so a pair still separates at worst onto two lines instead of a label
-	 * cutting in half. The fields shrink instead of forcing that: `min-width: 0` undoes the field
-	 * box in theme/60-inputs.css for this row only.
+	 * ONE RULE OF LAYOUT, TWO TIERS, NO PER-FIELD EXCEPTIONS. The rows are flex, so a wrap can only
+	 * fall BETWEEN items and a label is one unbreakable item. A field may SHRINK to share the line
+	 * (`min-width: 0` undoes the field box in theme/60-inputs.css for these rows) but none of them
+	 * GROWS past its own width — that is what keeps `Макс. строк:` a small box beside a wide search
+	 * field without anything having to name it. The one exception states itself: the free-text filter
+	 * is the only field whose content has no length, so it takes the leftover space.
 	 *
-	 * Keyed on the ROW's SHAPE, not on the page and not on the controls' ids. `data-page` differs
-	 * between the system and the kernel log and a third-party LogreadBox has neither — but the ids
-	 * are no better: only the System Log is built by `tools/views.js`, and Status → Kernel Log is a
-	 * view of its own (`view/status/dmesg.js`) whose four rows carry `logFromTime`, `logToTime`,
-	 * `invertLogRangeTime`, `invertSeverity` and `invertAscendingSort`, of which an id list written
-	 * against LogreadBox catches none — `logFacilitySelect` appears there only as a `for=`, on a
-	 * label whose control is a time field. Both views wrap their rows in `#content_syslog`, and a
-	 * filter row is exactly one that opens with a `<label>`; the scroll-to-end button's row and the
-	 * log itself do not. That shape holds for any view built the same way.
+	 * `input:not([type])` IS that filter, in both views and in that order of certainty: every other
+	 * input under `#content_syslog` states a type (`checkbox` for the four inverts and the sort flag,
+	 * `number` for Max rows and for the Kernel Log's boot-time range), and both views leave the text
+	 * one untyped. Nothing here keys on an id, so a third-party LogreadBox gets the same layout, and
+	 * no rule has to know how many fields a row holds.
 	 *
-	 * The inline `margin: 0 5px` LuCI writes on the labels stays as the horizontal spacing — only
-	 * the ROW gap is ours, so nothing here has to fight an inline style. */
+	 * Scoped by SHAPE for the same reason: `data-page` differs between the two logs and a third-party
+	 * box has neither, while both wrap their rows in `#content_syslog` and a filter row is exactly one
+	 * that opens with a `<label>` — the scroll-to-end button's row and the log itself do not.
+	 *
+	 * The inline `margin: 0 5px` LuCI writes on the labels stays as the horizontal spacing — only the
+	 * ROW gap is ours, so nothing here has to fight an inline style. */
 	#content_syslog > div:has(> label) {
 		display: flex;
 		flex-wrap: wrap;
@@ -35,50 +37,32 @@
 	}
 	#content_syslog > div:has(> label) > label { white-space: nowrap; }
 	#content_syslog > div:has(> label) > :is(select, input) {
-		flex: 1 1 auto;
-		/* both halves are needed and they answer different layouts: `min-width: 0` lets a FLEX item
-		 * shrink past its content, `max-width: 100%` clamps a GRID item to its track. A <select>
-		 * carries the theme's own 210px field width, which a `minmax(0, 1fr)` track does not
-		 * override — measured at 360px, where both selects hung 3px past the view. */
+		/* shrink, never grow. `max-width` is not the same lever as `min-width` and both are needed:
+		 * one lets a flex item go below its content, the other clamps a `<select>` that carries the
+		 * theme's own 210px width — measured at 360px, where both selects hung 3px past the view. */
+		flex: 0 1 auto;
 		min-width: 0;
 		max-width: 100%;
 	}
-	/* a checkbox is not a field: left to its own 16px, it would otherwise flex to fill the line. */
-	#content_syslog > div:has(> label) > input[type="checkbox"] { flex: 0 0 auto; }
-	/* The max-rows box keeps a sane ceiling: as wide as the free-text filter it reads as a second
-	 * search field. Selected as the row's `number` input, not by its id: `#logMaxRows` alone is
-	 * (1,0,0) and the field rule above is (1,0,3), so the id LOSES — and re-anchoring it under
-	 * `#content_syslog` would put two ids in one selector, [2,0,x], past the [1,7,0] ceiling
-	 * `npm run css-metrics` holds this sheet to. `[type="number"]` is the only one in either log's
-	 * filter bar and it out-specifies at (1,1,3). */
-	#content_syslog > div:has(> label) > input[type="number"] { flex-basis: 6ch; max-width: 12ch; }
 
-	/* ON A PHONE, ONE FILTER PER LINE. Wrapping alone still fills each line greedily, so the second
-	 * `Не` rode the end of the first line while the `уровень:` it inverts opened the next one. The
-	 * first row is a fixed alternation of exactly two filters — invert label, checkbox, name label,
-	 * control, twice — so a four-column grid puts one filter on each line.
-	 *
-	 * EVERY OTHER ROW is deliberately left to the wrapping above, because none of them is that
-	 * shape. The System Log's second row holds a checkbox filter beside a bare `Макс. строк:` pair,
-	 * and the same four tracks are then sized by items that are not each other's counterparts:
-	 * measured, the max-rows box defined column 2 and pushed `содержит:` and its field off the card.
-	 * The Kernel Log's rows are three different shapes again — a range with two time fields, a
-	 * severity select with a trailing `and above`, and a lone sort checkbox. Wrapping puts each of
-	 * those on as many lines as it needs, which is all the grid was ever for; the grid is worth its
-	 * one selector only where the alternation is exact. */
-	@container fs-view (max-width: 560px) {
-		/* THE ROW WITH TWO SELECTS, which is the same row `#logFacilitySelect` names — by shape
-		 * because neither spelling of the id survives the arithmetic: `div:has(> #logFacilitySelect)`
-		 * is (1,0,1) and loses to the flex rule above at (1,0,2), while `#content_syslog >` in front
-		 * of it is two ids, [2,0,1], past the [1,7,0] ceiling `npm run css-metrics` holds. Two
-		 * sibling selects is what the `auto auto auto minmax(0, 1fr)` template is sized for — eight
-		 * children, two filters — and it is unique to the System Log's first row: the Kernel Log's
-		 * severity row carries one select, its range row two time fields. (1,0,4) beats the flex
-		 * rule on specificity, not on source order. */
-		#content_syslog > div:has(> label):has(> select ~ select) {
-			display: grid;
-			grid-template-columns: auto auto auto minmax(0, 1fr);
-			column-gap: var(--fs-space-1);
+	/* THE TWO TIERS ARE DISJOINT CONTAINER QUERIES, not a base rule and an override: each states one
+	 * layout in full, so neither can win or lose against the other by source order — the trap the
+	 * first version of this file fell into, where a later generalisation silently out-specified two
+	 * rules that were meant to override it. */
+	@container fs-view (width > 560px) {
+		/* room for a filter and a half at least: the search box takes what the named fields leave. */
+		#content_syslog > div:has(> label) > input:not([type]) { flex: 1 1 12rem; }
+	}
+	@container fs-view (width <= 560px) {
+		/* ONE FIELD PER LINE, its labels on the line above it. Wrapping alone fills each line greedily,
+		 * so the second `Не` rode the end of the first line while the `уровень:` it inverts opened the
+		 * next one — and no flex rule can bind a label to the field that follows it. A full-width basis
+		 * can: the field always starts a line, so whatever labels precede it sit together above it. It
+		 * costs one line per filter on a phone and holds for every row of both views — the range pair,
+		 * the severity select with its trailing `and above`, the lone sort checkbox — without any of
+		 * them being named or counted. A checkbox is not a field and keeps its 16px. */
+		#content_syslog > div:has(> label) > :is(select, input:not([type="checkbox"])) {
+			flex-basis: 100%;
 		}
 	}
 
