@@ -339,9 +339,13 @@ function outlivesPage(el) {
  * through Adblock → Feeds, and the router would swap into a page whose stylesheet was never linked —
  * the one outcome the guard exists to prevent.
  *
- * Equality also keeps the failure safe: L.path() drops a part that leaves its charset, so a malformed
- * `css` yields the bare base and matches no href at all — a full load, which is the correct answer for
- * a value nobody can serve. */
+ * Equality also keeps the failure safe, in the direction that costs only speed. L.path() keeps a part
+ * only if it matches /^(?:[a-zA-Z0-9_.%,;-]+\/)*[a-zA-Z0-9_.%,;-]+$/ — no `+ ~ ( ) @ ! ' $ &`, nothing
+ * non-ASCII, no leading `/` — and drops it otherwise, while head.ut interpolates `css` raw and uhttpd
+ * serves those names without complaint. So a third-party `"css": "view/foo/style(dark).css"` does get
+ * linked and rendered; `want` collapses to the bare base, matches no href, and every entry into that
+ * page is a full load. A suffix compare covered those names, and losing them is what closing the false
+ * positive above costs. No in-tree node sets `css` at all, so the shape is third-party only. */
 function documentCarries(path) {
 	const want = L.resource(String(path));
 	for (const link of document.querySelectorAll('link[rel~="stylesheet"][href]')) {
