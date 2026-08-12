@@ -665,6 +665,28 @@ function appKey(segs) {
  * /admin/status renders the card as `inline-block 240px 96px`; System -> General and back leaves
  * it `block 966px` — every interface card on the Overview stacked full-width. Keyed on the
  * dispatch path: 240px before and after. */
+/* WHO A SHEET INJECTED RIGHT NOW BELONGS TO, when that is not the page the chrome is showing.
+ *
+ * On a FIRST visit the require() of a view IS its render, and a require in flight cannot be
+ * stopped: click a page whose module injects CSS, click away before it lands, and the app's <style>
+ * appears after the router has already stamped data-page for the page that superseded it. Credited
+ * to currentKey() that sheet is bound to the wrong page for the life of the document — disabled on
+ * its own page and ENABLED on one it has no business painting, which for luci-app-filemanager means
+ * `.cbi-button-save { display: none !important }` on somebody else's config form (reproduced on the
+ * stand: the System page came back with no Save button, and stayed that way across return visits).
+ *
+ * So the router names the owner for the duration of such a require (see fs-router.js), and this is
+ * that hint. It is a plain value rather than a stack: two cold requires cannot overlap, because the
+ * second navigation supersedes the first before it starts one. */
+let _ownerHint = null;
+function attributeTo(segs) {
+	_ownerHint = (segs == null) ? null : appKey(segs);
+}
+
+function ownerKey() {
+	return (_ownerHint !== null) ? _ownerHint : currentKey();
+}
+
 function currentKey() {
 	if (_curKey !== null) return _curKey;
 	const dp = L.env && L.env.dispatchpath;
@@ -713,7 +735,7 @@ function rehostIntoThemeLayer(el, universe) {
 		el.dataset.fsLayered = '1';
 		el.after(s);		/* keep source order: ties inside the layer still resolve as they did */
 		silence(el);
-		_owner.set(s, currentKey());	/* the shim paints; the original is silenced for good */
+		_owner.set(s, ownerKey());	/* the shim paints; the original is silenced for good */
 		fenceImported(s, universe.names, Date.now() + 1000);	/* a cache hit lands on the first frame */
 		return;
 	}
@@ -730,7 +752,7 @@ function rehostIntoThemeLayer(el, universe) {
 	 * unpinned all over again and a second pass appends a second fence. The mark is the only thing
 	 * that says the work is done, so it has to be set for every path below, wrapped or not. */
 	el.dataset.fsLayered = '1';
-	_owner.set(el, currentKey());	/* a <style> is re-hosted IN PLACE, so it paints itself */
+	_owner.set(el, ownerKey());	/* a <style> is re-hosted IN PLACE, so it paints itself */
 
 	/* Wrap only if the text still IS the sheet (see textIsSheet). When it is not, the sheet stays
 	 * unlayered — Zone 2 exactly where it already was, which is a trade — rather than lose rules,
@@ -914,6 +936,7 @@ function watchViewSheets() {
 }
 
 return baseclass.extend({
+	attributeTo,
 	documentCarries,
 	documentPoisoned,
 	scopeToCurrentPage,

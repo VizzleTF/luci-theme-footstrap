@@ -697,7 +697,15 @@ function navigate(pathname, push, kbd) {
 		 * repairStaleRender() a mess that only exists because a require in flight cannot be stopped. */
 		if (gen !== _navGen) return null;
 		_seen.add(className);
-		return RT.require(className);
+		/* NAME THE OWNER for the length of this require. On a first visit the require IS the render,
+		 * so any <style> the module injects belongs to THIS page — even if a newer navigation has
+		 * stamped data-page by the time it lands, which is exactly the case repairStaleRender() below
+		 * exists for. Without it fs-sheets credited such a sheet to the page that superseded this one
+		 * and bound it there for the life of the document (measured: luci-app-filemanager's
+		 * `.cbi-button-save { display: none !important }` disabled on its own page and live on
+		 * System -> System, across return visits). */
+		sheets.attributeTo(rsegs);
+		return RT.require(className).finally(() => sheets.attributeTo(null));
 	}).then((view) => {
 		if (view == null) return;
 		if (!(view instanceof RT.view))

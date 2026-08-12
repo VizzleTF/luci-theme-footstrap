@@ -718,8 +718,25 @@ function stopWatch() {
  * page that plainly has tabs, and the tab was never added, silently. ui.tabs itself marks
  * `panes[0].parentNode`, so the panes ARE this element's children; they are simply not identifiable
  * that way. */
+/* Tab groups that belong to the page we just LEFT. The router stamps body[data-page] before the
+ * incoming view renders, and on a warm route #view still holds the outgoing page's DOM at that
+ * moment — so mount() found ITS tab strip and appended the whole Appearance form, plus a live,
+ * clickable "Footstrap" <li>, to another page's tabs. Measured arriving at System -> System from
+ * Network -> DHCP: two builds for one arrival, and for 66 ms on localhost (an RTT or more on a real
+ * router, since the window is the incoming view's load()) the tab sat on the DHCP strip and opened
+ * all 24 Appearance rows when clicked. Every group present at the moment of the stamp is therefore
+ * disqualified; the incoming view's own group is a fresh element and is not in this set. */
+const _staleGroups = new WeakSet();
+function disqualifyCurrentGroups() {
+	const view = document.getElementById('view');
+	if (!view) return;
+	for (const g of view.querySelectorAll('[data-initialized="true"]'))
+		_staleGroups.add(g);
+}
+
 function tabGroup(view) {
 	for (const g of view.querySelectorAll('[data-initialized="true"]')) {
+		if (_staleGroups.has(g)) continue;
 		const menu = g.previousElementSibling;
 		if (menu?.classList.contains('cbi-tabmenu'))
 			return { group: g, menu };
@@ -809,7 +826,12 @@ function watch() {
  * observer inside. */
 function wire() {
 	if (_routeObserver || !document.body) return;
-	_routeObserver = new MutationObserver(() => (onPage() ? watch() : stopWatch()));
+	_routeObserver = new MutationObserver(() => {
+		/* BEFORE deciding anything: whatever is in #view at the moment data-page changes belongs to
+		 * the page being left (see _staleGroups). */
+		disqualifyCurrentGroups();
+		return onPage() ? watch() : stopWatch();
+	});
 	_routeObserver.observe(document.body, { attributes: true, attributeFilter: [ 'data-page' ] });
 	if (onPage()) watch();
 }

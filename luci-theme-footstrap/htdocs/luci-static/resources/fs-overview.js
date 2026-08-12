@@ -196,11 +196,21 @@ function fillSection(inc, container, res) {
 }
 
 let _inflight = null;
+/* WHICH containers the in-flight run is filling. The guard below is module-level because the
+ * duplicate load it kills is module-level, but the frames are per RENDER — so joining a run blindly
+ * joined one that fills SOMEBODY ELSE'S frames. Reproduced: double-click Status → Overview 100 ms
+ * apart, or leave and return inside the first-load window, and the second arrival's sections stayed
+ * at their birth `display:none` for a full poll interval (measured 5.9 s against 0.4 s on a single
+ * arrival) — it had "joined" a run that was filling the frames the content swap had just detached.
+ * Stock LuCI has no such guard and each render fetches its own data, so the blank page is ours. */
+let _inflightFor = null;
 
 function pollProgressive(includes, containers, first_load) {
-	/* A run is already fetching exactly this data — join it instead of starting a second
-	 * stampede of the same RPCs. This is what kills the duplicate load. */
-	if (_inflight)
+	/* A run is already fetching exactly this data, FOR THESE FRAMES — join it instead of starting a
+	 * second stampede of the same RPCs. This is what kills the duplicate load. A run for older
+	 * frames is left to finish into the detached nodes it owns, which costs nothing and is simpler
+	 * than cancelling RPCs that are already in flight. */
+	if (_inflight && _inflightFor === containers)
 		return first_load ? Promise.resolve() : _inflight;
 
 	const run = network.flushCache().then(() => Promise.all(
@@ -222,7 +232,11 @@ function pollProgressive(includes, containers, first_load) {
 		if (ssi) { ssi.style.display = ''; ssi.classList.add('fade-in'); }
 	});
 
-	_inflight = run.finally(() => { _inflight = null; });
+	_inflight = run.finally(() => {
+		/* only if it is still OURS: a newer render may have replaced it while this one was running */
+		if (_inflightFor === containers) { _inflight = null; _inflightFor = null; }
+	});
+	_inflightFor = containers;
 	/* NOBODY AWAITS THIS ON THE FIRST LOAD — the line below hands the caller a fresh
 	 * Promise.resolve() so index.render() can return at once — so a rejection here has no handler
 	 * and surfaces as an unhandled rejection in the console. `run` rejects for one ordinary reason:
