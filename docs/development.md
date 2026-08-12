@@ -217,7 +217,7 @@ If a change needs a real kernel — not this theme's usual case — a router can
   Network/Firewall (section table, dropdown), System/Software (progress), Realtime graphs (SVG),
   login/logout, Reboot. Plus the apply/rollback confirmation sheet, which `ui.js` draws over the
   theme and which custom z-indexes often break.
-- **Modes**: light/dark/auto, both layouts, both palettes, a narrow window, long hostnames and SSIDs.
+- **Modes**: light/dark/auto, both layouts, all three palettes, a narrow window, long hostnames and SSIDs.
 - **There are no breakpoints for "does it fit" — it is a MEASUREMENT.** Drag the window with the
   mouse; do not test specific widths. Why: [chrome.md](chrome.md).
 

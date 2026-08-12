@@ -88,11 +88,12 @@ The one flag sanctioned against *our own* rules is `theme/95-a11y-media.css`:
 `prefers-reduced-motion` has to kill animations declared in `base` too, and only an important
 declaration reaches back a layer. Everything else on the allowlist fights something outside the
 cascade — `theme/90-responsive` and `pages/20-overview` outrank a `style=` written by `29_ports.js`
-and `ui.js`, `theme/45-misc` widens the box the realtime graphs size inline, `theme/65-dropdown`
-carries the `ul` margin flag against `ui.js`'s inline `margin`, and `styles/base` keeps the six
+and `ui.js`, `theme/45-misc` widens the box the realtime graphs size inline and repaints its inline
+black border, `theme/65-dropdown` frees `.hide-close` from a RichListValue's inline `min-width:25vw`,
+and `styles/base` keeps the six
 `.left`/`.right`/… forcing utilities plus two inline-style fighters. `audit.py` keeps that list
 (`BANG_OK`), `.stylelintrc.json` states the reason for each file, `npm run bang-ok` holds the two in
-step, and `css-metrics` caps the total at **26**.
+step, and `css-metrics` caps the total at **27**.
 
 **Win on specificity, never on source order.** Two rules with the same specificity where the
 later one is load-bearing is the same failure as 220 `!important`, only quieter. Cap:
@@ -265,7 +266,7 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 |---|---|
 | `lint` | eslint over `htdocs/` and `ucode/`, stylelint over `styles/` — correctness only, not formatting |
 | `audit` | `audit.py --strict`: undefined `var()`, shadowed declarations, export-tier reads, dead base declarations, stray `!important`, colour literals |
-| `css-metrics` | ratchet: `!important` ≤ 26, max specificity `[1,7,0]`, 0 empty rules |
+| `css-metrics` | ratchet: `!important` ≤ 27, max specificity `[1,7,0]`, 0 empty rules |
 | `css-orphans` | dead `fs-*` selectors — it **gates** the forward direction (styled, emitted by nothing) and **reports** the reverse, where an unstyled class is often legitimate (a JS hook, an element riding on inherited styles). A new name in the reverse list wants a look or a line in `JUSTIFIED_UNSTYLED`; it does not fail the build |
 | `acl` | every shipped `acl.d/*.json` parses **and** grants something — rpcd skips an unreadable file silently |
 | `css-dup` | identical declaration bodies under different guards |
@@ -273,12 +274,12 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `bang-ok` | every `!important` sits in an allowlisted file |
 | `axes` | the pre-paint in `head.ut` agrees with the live appearance appliers, and `header.ut` reads every saved option back |
 | `chrome-fence` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
-| `export-tier` | the `--*-color-*` contract: each level readable as text on three surfaces, each `--on-*` readable on its fill, and the ramp is not flat |
+| `export-tier` | the `--*-color-*` contract: each level readable as text on three surfaces, each `--on-*` readable on its fill, and the ramp is not flat — measured with and without `prefers-contrast: more`, which re-states the inks |
 | `css-i18n` | translatable strings emitted from CSS |
 | `conffiles` | every shipped `/etc/config/*` is declared a conffile — `/etc/config/footstrap` is written at runtime by Save-as-default, and an undeclared one is replaced on upgrade |
 | `changelog` | section set, order, dates, compare links, RU mirror parity, bold leads |
 | `i18n` | `.pot` current, no empty `msgstr` |
-| `a11y` | axe-core WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast} × {untinted,60°,260°} |
+| `a11y` | axe-core WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap} × {untinted,60°,260°} |
 
 Two more run in CI only. `tools/jsmin-verify.mjs` needs a jsmin built from the commit in
 `luci-upstream.pin`. `ucode -T -c` over every template runs inside the `verify` containers, against

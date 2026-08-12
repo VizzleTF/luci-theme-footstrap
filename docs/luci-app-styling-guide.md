@@ -150,7 +150,7 @@ need `!important` to do it.** Unlayered beats every layer, unconditionally. If y
 ### 3.3. What the tier guarantees (and what to do with the guarantee)
 
 footstrap proves all of this in CI (`tools/export-tier.mjs`) across the full matrix of
-{light, dark} × {default, hicontrast} × six tint hues:
+{light, dark} × {default, hicontrast, bootstrap} × seven tint values — 42 combinations:
 
 - **Every level of `text` / `primary` / `success` / `warn` / `error` clears WCAG AA as TEXT** on all
   three `--background-color-*` surfaces. So you may paint any of them as a `color:` and not check.
@@ -160,10 +160,9 @@ footstrap proves all of this in CI (`tools/export-tier.mjs`) across the full mat
   before footstrap made the inks per-palette and per-mode.
 - **`high` / `medium` / `low` are three genuinely different colours**, not three aliases. If you paint
   "no data" in `--primary-color-low`, it *will* read quieter than a live value. (Two caveats worth
-  knowing: `--background-color-*` runs the other way, `high` = raised; and footstrap's
-  `--text-color-low` is currently equal to `-medium` on purpose — the muted grey already sits on the
-  AA floor and a fainter step would be an illegible one. Do not build a design that needs text fainter
-  than `-medium`.)
+  knowing: `--background-color-*` runs the other way, `high` = raised; and `-low` is genuinely the
+  faintest step a palette can afford — every colourway holds it above the AA floor, so text painted
+  in it is legible but has no room to be made fainter still.)
 
 ### 3.4. The palette and tint axes come free — but only on the tier
 

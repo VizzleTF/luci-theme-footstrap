@@ -137,8 +137,8 @@ compile.
 - **The catalogue lives in `po/`** — what `LUCI_LANGUAGES` globs and what Weblate translates.
   luci.mk emits the per-language packages; nothing in `Build/Prepare` compiles a catalogue. It was
   `i18n/` while a fielded self-updater mis-picked a multi-asset release with `head -1` (issue #6);
-  owfeed now builds exactly one theme artifact per format regardless, which `npm run check-packages`
-  still asserts.
+  owfeed now builds exactly one theme artifact per format regardless, which `tools/check-packages.sh`
+  still asserts in CI's build job.
 - Anything under `root/etc/config/` MUST be in the `conffiles` define (`npm run conffiles`) — else
   the manager replaces it on upgrade and the theme's own Update wipes the admin's saved defaults,
   reporting success.

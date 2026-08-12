@@ -93,7 +93,7 @@ Two different tools; confusing them is expensive.
   The source therefore has to stay jsmin-safe — see the regex rule in
   [conventions.md](conventions.md).
 
-### `Build/Prepare` — seven steps, in this order
+### `Build/Prepare` — six steps, in this order
 
 The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sources into
 `PKG_BUILD_DIR`, and edits the **copy**:
@@ -108,7 +108,7 @@ The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sour
    `PKG_BUILD_DIR` — in CI the build tree's JS has already been through terser, its comments are
    gone, and five names that only appear in a comment would stop being reserved. That made the
    shipped sheet depend on *who* built it.
-4. **`strip-templates.sh`** — `{# … #}` out of the `.ut` files, −16 KB of 39. Only the template
+4. **`strip-templates.sh`** — `{# … #}` out of the `.ut` files, −22 KB of 60. Only the template
    comments; the ucode-code `/* … */` deliberately stays.
 5. **`strip-shell.sh`** — whole-line `#` out of the shell under `root/`.
 6. **Stamp `FS_VERSION`** into `fs-version.js` with `sed`. The path is part of the contract —
@@ -277,7 +277,7 @@ The theme is proposed to [openwrt/luci](https://github.com/openwrt/luci) as
 across. `tools/sync-luci-fork.sh <path-to-luci>` materialises it, and the difference is one
 decision made twice.
 
-**That tree gets the built stylesheet; this one keeps the layers.** Here, `styles/` is sixteen
+**That tree gets the built stylesheet; this one keeps the layers.** Here, `styles/` is thirty-nine
 files in four cascade layers whose *order* is the design, and `cascade.css` is a build artefact
 this repository does not even track. There, the other four themes each commit one `cascade.css`
 and have no build step at all — a theme arriving with its own build system asks a reviewer to
@@ -293,10 +293,10 @@ package in that tree gets. The release path here does more (terser, `mangle-toke
 stripping) and the packages differ by about 14% because of it: 76 321 bytes against 66 825.
 
 The one place the copy still stands out is the sheet itself, at 128 bytes per line against the
-stock 17–20, and the arithmetic is why it stays: unminified it is **438 541 bytes**, eight times
+stock 17–20, and the arithmetic is why it stays: unminified it is **467 615 bytes**, eight times
 the largest stock theme, because this repository keeps the *why* beside each rule and in source
 form those comments are 70% of the file. The choice there is not "like everyone else" versus
-"minified" — it is 132 kB of minified sheet against 438 kB of prose.
+"minified" — it is 136 kB of minified sheet against 468 kB of prose.
 
 Two more things the copy changes, both in the Makefile, which is the one file maintained by hand
 on the far side and never overwritten by the sync:

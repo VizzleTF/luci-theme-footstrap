@@ -25,7 +25,7 @@ luci-theme-footstrap/
       65-dropdown  70-modal  75-search  90-responsive  95-a11y-media  97-print
     pages/             @layer page     per-page corrections
       10-login  20-overview  30-software  40-sshkeys  50-leases
-      60-assoclist  70-syslog  80-appearance
+      60-assoclist  70-syslog  80-appearance  90-processes
 ```
 
 Concatenation order is `styles/` → `base/` → `theme/` → `pages/`, and inside each directory the
@@ -93,12 +93,12 @@ flags of 43 and added one that was missing.
 The single exception is `theme/95-a11y-media.css`: `prefers-reduced-motion` has to kill
 animations declared in `base` as well as `theme`, and only an important declaration reaches back
 a layer. The inversion is what makes that file possible. `audit.py` holds the allowlist
-(`BANG_OK`) and `--strict` fails on any flag outside it; `css-metrics` caps the total at **26**.
+(`BANG_OK`) and `--strict` fails on any flag outside it; `css-metrics` caps the total at **27**.
 
 ## The build
 
 `build-css.sh` concatenates the directories and — **without `--dev`** — runs the result through
-two awk passes: **~357 KB → 135 734 B** (measured 2026-07-31; the figure moves with the tree, the
+two awk passes: **467 615 B → 135 655 B** (measured 2026-08-12; the figure moves with the tree, the
 ratio does not). That is not cosmetic: uhttpd serves
 `/www/luci-static/*.css` with no gzip, so every byte travels as-is. (The package build shortens
 the private token names on top of that, landing around 120 KB — see [package.md](package.md).)

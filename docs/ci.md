@@ -71,15 +71,16 @@ ships. Locally it is all one command, `npm run check`; the full table of what ea
 |---|---|
 | `eslint` | including `wrap-regex`, which forbids `return /re/…`, the form jsmin breaks on |
 | `stylelint` | correctness and project invariants only — not a formatter |
-| `a11y-gallery.mjs` | axe-core, WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast} × {untinted,60°,260°} — **12 combinations** |
-| `export-tier.mjs` | the `--*-color-*` contract with foreign apps — axe cannot see it, their widgets are not in the gallery |
-| `css-metrics.mjs` | ratchet: `!important` ≤ 26, max specificity, empty rules |
+| `a11y-gallery.mjs` | axe-core, WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap} × {untinted,60°,260°} — **18 combinations** |
+| `export-tier.mjs` | the `--*-color-*` contract with foreign apps — axe cannot see it, their widgets are not in the gallery. 42 palette × mode × tint combinations, then the six untinted ones again with `prefers-contrast: more` emulated, since that query re-states the ink tokens and so publishes a second tier |
+| `css-metrics.mjs` | ratchet: `!important` ≤ 27, max specificity, empty rules |
 | `fs-orphans.mjs` | dead `fs-*` selectors (safe only inside our namespace) |
 | `css-dup.mjs` | identical declaration bodies under different guards — no linter calls this an error |
 | `mirror.mjs` | `@mirror`-pinned copies still byte-identical (CSS **and** shell) |
 | `axes.mjs` | the pre-paint in `head.ut` agrees with the live appearance appliers |
 | `chrome-fence.mjs` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `conffiles.mjs` | every shipped `/etc/config/*` is declared a conffile — else the manager replaces it on upgrade |
+| `bang-ok.mjs` | the `!important` allowlist in `audit.py` and `.stylelintrc.json` still say the same thing |
 | `changelog.mjs` | the changelog contract: sections, order, RU mirror, bold leads |
 | `jsmin-verify.mjs` | the **only** check that catches jsmin's silent corruption (exit 0) |
 

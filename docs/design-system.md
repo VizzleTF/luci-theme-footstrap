@@ -66,16 +66,18 @@ where `--fs-text` is nearly white.
 The binding constraint: apps read a level as `color:` about as often as `background:`, so every
 level must pass AA as text on `--fs-bg`/`--fs-panel`/`--fs-panel2` and carry a readable
 `--on-*-color` as a fill. `tools/export-tier.mjs` proves all of it across
-{footstrap, hicontrast} × {light, dark} × a sweep of tint hues — 28 combinations and ~1900 contrast
-checks today — including that the ramp is not flat, the only check that can catch flatness.
+{footstrap, hicontrast, bootstrap} × {light, dark} × a sweep of tint hues — 42 combinations and 2856
+contrast checks today — including that the ramp is not flat, the only check that can catch flatness.
 Borders are exempt from the text half: `--border-color-low` may legitimately fade into the surface,
 which is what a hairline is for.
 
 ## Palettes
 
-Two, both in `styles/03-palettes.css`, one self-contained block per (palette × mode):
-**footstrap** (GitHub Primer colours, the default, filling a bare `:root`) and **hicontrast**
-(`data-palette="hicontrast"`). Light mode is the bare `:root`; dark is
+Three, all in `styles/03-palettes.css`, one self-contained block per (palette × mode):
+**footstrap** (GitHub Primer colours, the default, filling a bare `:root`), **hicontrast**
+(`data-palette="hicontrast"`) and **bootstrap** (`data-palette="bootstrap"`, the stock LuCI theme's
+surfaces and greys — its semantic colours and its light ink are raised where they miss AA, which
+that block documents in place). Light mode is the bare `:root`; dark is
 `:root[data-darkmode="true"]`. The file also carries the instructions for adding a palette.
 
 **hicontrast** is the same tokens, deeper and more saturated. Its light accents are deliberately
@@ -160,11 +162,12 @@ that needs a different curve should justify it in a comment, because it is makin
 `-3`, `-3-5`, `-4`, `-5`, `-6`, `-7`, `-8`, `-10` (the number is the step, `-1` = 4 px at normal
 density).
 
-**Density** multiplies both the spacing scale and the shell geometry, through two tokens the
-Density axis sets: `--fs-density-space` and `--fs-density-box`. Compact is `.65` / `.85`, Normal is
-`1` / `1` (a bare `:root`, so the default costs no attribute), Large is `1` / `1.15`. Every spacing
-and geometry token is a `calc()` over one of them — which is why the numbers below are quoted **at
-normal density**.
+**Density** multiplies the type scale, the spacing scale and the shell geometry, through three
+tokens the Density axis sets: `--fs-density-type`, `--fs-density-space` and `--fs-density-box`.
+Compact is `.9` / `.65` / `.85`, Normal is `1` / `1` / `1` (a bare `:root`, so the default costs no
+attribute), Large is `1.15` / `1` / `1.15` — the air gives up the most at Compact and does not grow
+at Large, so the two ends are deliberately not mirror images. Every type, spacing and geometry token
+is a `calc()` over one of them — which is why the numbers below are quoted **at normal density**.
 
 **Shell geometry** — `--fs-sidebar-w` (224 px), `--fs-rail-w` (68 px), `--fs-content-min` (500 px),
 plus `--fs-content-max` (1280 px), `--fs-content-pad` (28 px) and `--fs-bar-h` (46 px) — **tokens
@@ -186,13 +189,16 @@ immediately on a group carrying `data-initialized` and clearing that flag builds
 beside the first. A theme owns no dispatcher node of its own: a node outlives the theme that
 registered it, so switching themes would leave a menu entry whose view is gone.
 
-The values live in `fs-prefs.js`. In the order it draws them:
+The values live in `fs-prefs.js`. Grouped the way the page groups them — **Interface** (Layout,
+Theme, Palette, Density, Rounding, Submenus), then the **Colours** fold (Tint and its strength, the
+four colour axes, the four surface axes), then the **Background** fold (Wallpaper, Dim, Pattern and
+its three axes, File), then **Defaults**:
 
 | Axis | Values | `localStorage` | `:root` |
 |---|---|---|---|
 | **Layout** | **top** (default) / sidebar | `fs-layout` | `data-layout` (always explicit) |
 | **Theme** | auto / light / dark | `fs-darkmode` | `data-darkmode` + `data-theme` + `data-bs-theme` |
-| **Palette** | footstrap / hicontrast | `fs-palette` | `data-palette` |
+| **Palette** | footstrap / hicontrast / bootstrap | `fs-palette` | `data-palette` |
 | **Density** | compact / normal / large | `fs-density` | `data-density` |
 | **Wallpaper** | off / pattern / **file** | `fs-wallpaper` | `data-wallpaper` — `pattern` tiles an admin-uploaded SVG through a CSS mask; Scale, Strength and Colours are axes of their own |
 | **Tint** | off, hue 1–360°, `#rrggbb` | `fs-tint` | `data-tint=hue\|hex`, `--fs-tint-h` / `--fs-bg` |

@@ -39,7 +39,7 @@ Then pick **Footstrap** in **System → System → Language and Style**, field "
 - **Works on a phone**
 - **Faster than bootstrap** — the numbers are below
 - **Upgrades with the router**, from the package feed
-- **Eighteen appearance axes**, applied instantly, in one tab
+- **Twenty-one appearance axes**, applied instantly, in one tab
 
 ## Measured, not claimed
 

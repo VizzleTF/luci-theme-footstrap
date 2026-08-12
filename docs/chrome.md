@@ -160,9 +160,10 @@ moved here.
   the accordion (`restoreAccordion()`) — a plain `closeFlyouts()` was not enough, because it
   stripped `.open` from everything while the markup is not rebuilt on a rail toggle, so "Keep open"
   stopped meaning anything.
-- `clampDropdown` pushes a dropdown back into the viewport at the right edge. Desktop bar only
-  (`topBarMode()`) — on a phone the panel anchors to the left edge of the bar, and in the rail it
-  would fly off sideways. It keeps one scheduled `rAF` **per `<li>`** so it can cancel an
+- `clampDropdown` pushes a dropdown back into the viewport at the right edge. Whenever the chrome is
+  a BAR (`barDropdown()` — the top layout at any width, or a `data-narrow` sidebar), because that is
+  when a panel hangs off its own `<li>`; the rail is excluded, where a flyout is anchored sideways
+  instead. It keeps one scheduled `rAF` **per `<li>`** so it can cancel an
   unfinished measurement when the pointer has moved on; the shared `fit.frame()` coalescer cannot
   express that, and this is a documented exception.
 - Hover opening is pure CSS.
