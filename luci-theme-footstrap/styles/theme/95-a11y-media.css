@@ -113,6 +113,16 @@
 			background: Highlight;
 			forced-color-adjust: none;	/* keep the fill: it IS the state */
 		}
+		/* WHICH PAGE AM I ON. The menu's active item carries its state in exactly the two things
+		 * forced colors drops: a 10%-alpha accent background and the box-shadow rail. Measured with
+		 * the query emulated — all twelve #topmenu links reported the same weight, the same absent
+		 * shadow, the same absent border and the same LinkText colour, so the current page was not
+		 * marked at all. `aria-current="page"` is on the link (menu-footstrap.js), so this was a
+		 * sighted-user loss only. The rail comes back as a real border, which forced colors keeps. */
+		#topmenu li.active > a {
+			border-inline-start: 3px solid Highlight;
+			padding-inline-start: calc(var(--fs-space-3) - 3px);
+		}
 		/* the toggle switch is a bare rounded box in forced colors — give the knob and
 		 * the track an edge so on/off is distinguishable at all */
 		.cbi-checkbox > label { border: 1px solid ButtonBorder; }

@@ -15,7 +15,18 @@
 	 * normal hostname still breaks at its dots), and it lets the flex item's min-content size
 	 * shrink — which is what stops a long name pushing the menu out of the bar. It used to be
 	 * nowrap + ellipsis, which truncated the one string that identifies the router. */
-	.fs-wordmark { overflow-wrap: anywhere; min-width: 0; }
+	/* AND A CEILING ON THE LINES, because the width cap alone bounds the wrong axis. Measured in
+	 * the top bar at 1280px by growing the string: 8 characters give the ordinary 46px bar, 63 (the
+	 * kernel's nodename limit, i.e. the realistic worst case) give 73px, and a hand-set 4000
+	 * character hostname gave a 4273px tall bar with the page content starting below it. Three lines
+	 * is past every real hostname and still a bar; the rest is clipped rather than allowed to push
+	 * the page down. `-webkit-line-clamp` is the only cross-engine spelling of this today and needs
+	 * its two companions, which is why they are here rather than a plain max-height: a max-height cut
+	 * would slice a line in half instead of ending it. */
+	.fs-wordmark {
+		overflow-wrap: anywhere; min-width: 0;
+		display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+	}
 	/* collapse the sidebar to an icon rail. The toggle only EXISTS in the vertical sidebar,
 	 * so its `display` is declared there, not here, or it would just be shadowed. */
 	.fs-railtoggle {

@@ -55,8 +55,16 @@
 	 * rules' job in theme/30-tables.css, next to the real cells it has to line up with. (Upstream
 	 * declares the border-top here; ours would draw the stray line above the header that issue #7
 	 * removed from every other cell.) */
+	/* SPLIT OFF THE :has() HALF, and the split is the point: an engine that cannot parse `:has()`
+	 * throws away the WHOLE rule, siblings included — so a Firefox older than 121 lost the two
+	 * plain selectors above with it, and stacked tables came up with no card labels at all. Same
+	 * declarations, two rules, and the half that needs nothing new survives on its own. */
 	.cbi-section-table-titles.named[data-title]::before,
-	.cbi-section-table-titles.named[data-title] ~ .cbi-section-table-descr.named::before,
+	.cbi-section-table-titles.named[data-title] ~ .cbi-section-table-descr.named::before {
+		content: attr(data-title) " ";
+		display: table-cell;
+		vertical-align: middle;
+	}
 	.cbi-section-table-row[data-title]:not(:has(> .cbi-section-table-titles))::before {
 		content: attr(data-title) " ";
 		display: table-cell;

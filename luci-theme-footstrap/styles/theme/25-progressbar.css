@@ -48,20 +48,36 @@
 	 * `-140.0 dBm`, half again as wide as the `100% (1.2 GiB)` of a table cell. The Overview and the
 	 * package manager keep the value above the bar — their meters sit in a `.td` and a bare
 	 * `.controls` div, which is neither shape. */
-	.cbi-value-field > .cbi-progressbar,
-	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar {
+	/* ONE RULE PER SHAPE, not one selector list for both, and the split is not cosmetic: the table
+	 * half needs `:has()`, and an engine that cannot parse a selector discards the WHOLE rule —
+	 * siblings included. Grouped, the form row (which needs nothing new) lost its placement on such
+	 * an engine along with the cell that was unreachable there anyway. The declarations they share
+	 * are @mirror-pinned instead, so the two copies cannot drift. */
+	.cbi-value-field > .cbi-progressbar {
+		/* @mirror meter/beside */
 		margin-inline-end: var(--fs-meter-value);
+		/* @endmirror */
+		--fs-meter-value: calc(var(--fs-space-10) * 2);
 	}
-	.cbi-value-field > .cbi-progressbar::after,
-	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar::after {
+	.cbi-value-field > .cbi-progressbar::after {
+		/* @mirror meter/beside-value */
 		inset-inline: calc(100% + var(--fs-space-2)) auto; bottom: auto; top: 50%;
 		transform: translateY(-50%);
+		/* @endmirror */
 	}
-	.cbi-value-field > .cbi-progressbar { --fs-meter-value: calc(var(--fs-space-10) * 2); }
 	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar {
+		/* @mirror meter/beside */
+		margin-inline-end: var(--fs-meter-value);
+		/* @endmirror */
 		--fs-meter-value: var(--fs-space-10);
 		/* narrower than this it stops reading as a meter at all; the column gives up the rest. */
 		min-width: 60px;
+	}
+	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar::after {
+		/* @mirror meter/beside-value */
+		inset-inline: calc(100% + var(--fs-space-2)) auto; bottom: auto; top: 50%;
+		transform: translateY(-50%);
+		/* @endmirror */
 	}
 
 	/* Progressbar rows in a section table (luci-app-cpu-status): keep the native label | bar

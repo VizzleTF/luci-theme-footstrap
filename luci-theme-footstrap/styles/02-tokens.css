@@ -315,11 +315,21 @@
 		--fs-ctl-h: calc(38px * var(--fs-density-box));	/* the default control */
 		--fs-ctl-h-lg: calc(44px * var(--fs-density-box));	/* prominent: .btn.large, the login submit */
 
-		--fs-type-xs: calc(round(11px * var(--fs-density-type), 1px));	/* eyebrow, badges, tooltips, dense metadata */
-		--fs-type: calc(round(13px * var(--fs-density-type), 1px));	/* body, tables, fields, menu items — the base */
-		--fs-type-lg: calc(round(16px * var(--fs-density-type), 1px));	/* section titles (h3/legend), alert headings */
-		--fs-type-xl: calc(round(20px * var(--fs-density-type), 1px));	/* page titles */
-		--fs-type-2xl: calc(round(26px * var(--fs-density-type), 1px));	/* h1 — only a third-party app emits a bare one */
+		/* UNROUNDED HERE, ROUNDED IN THE @supports BELOW, and the split is not style: it is the
+		 * difference between a soft failure and no page. `round()` is the YOUNGEST thing this theme
+		 * depends on (Chromium 125, Firefox 118, Safari 15.4 — years after :has(), color-mix() and
+		 * @layer), and a custom property holds any token stream, so an engine without it PARSES these
+		 * fine and fails at SUBSTITUTION: `font-size: var(--fs-type)` is then invalid at
+		 * computed-value time and computes to `unset`. Measured by serving a sheet with `round(`
+		 * renamed: 5881 of 5912 elements on Overview change, body type goes 13px -> 16px, 5880
+		 * font-size and 5733 line-height declarations are lost, and --fs-control-h takes every
+		 * field's min-height with it because it reads --fs-type. Declared this way such an engine
+		 * keeps the whole ladder and pays a fractional pixel at the two non-default densities. */
+		--fs-type-xs: calc(11px * var(--fs-density-type));	/* eyebrow, badges, tooltips, dense metadata */
+		--fs-type: calc(13px * var(--fs-density-type));		/* body, tables, fields, menu items — the base */
+		--fs-type-lg: calc(16px * var(--fs-density-type));	/* section titles (h3/legend), alert headings */
+		--fs-type-xl: calc(20px * var(--fs-density-type));	/* page titles */
+		--fs-type-2xl: calc(26px * var(--fs-density-type));	/* h1 — only a third-party app emits a bare one */
 		/* ---- WEIGHT: there are only ever three, and they had six spellings ----------
 		 * The theme ships no font at all — the stacks name Manrope and JetBrains Mono first and
 		 * fall through to the system faces — so these are not a ramp to pick from: they are the
@@ -409,7 +419,7 @@
 		 * It was a bare 30px in four rules, which was upstream's same arithmetic over upstream's
 		 * 18px leading — so re-scaling the type left every control the wrong height for its own
 		 * text, silently. Stated once here so the two cannot drift again. */
-		--fs-control-h: calc(round(up, calc(var(--fs-type) * var(--fs-leading) + var(--fs-space-1) * 2 + 2px), 4px));
+		--fs-control-h: calc(var(--fs-type) * var(--fs-leading) + var(--fs-space-1) * 2 + 2px);
 
 		/* HOW WIDE AN ELASTIC CONTROL GETS IN A FORM ROW. A `.cbi-value-field` is `flex: 1`, so
 		 * anything asking for 100% takes the whole card — and a form whose every control ends at a
@@ -538,6 +548,28 @@
 
 		--fs-disabled-opacity: .6;
 		color-scheme: light;
+	}
+
+	/* ---- the rounded half of the type ladder, for engines that can round -------------
+	 *
+	 * A fractional font size renders soft, so every size here is meant to land on a whole pixel —
+	 * but `round()` in calc() is younger than everything else this theme needs, and a token that
+	 * uses it on an engine that does not is not a fallback, it is a DELETED token that takes every
+	 * rule reading it (the note by the ladder above has the measurement). So the ladder is declared
+	 * plainly up there and rounded here, where the at-rule can be asked first. --fs-control-h is
+	 * derived from --fs-type and rounds UP to the 4px control ladder for the same reason.
+	 *
+	 * `@supports (width: round(1px, 1px))` and not a `calc()` probe: the function has to be tested
+	 * where a length is expected, and `width` is the plainest property that takes one. */
+	@supports (width: round(1px, 1px)) {
+		:root {
+			--fs-type-xs: calc(round(11px * var(--fs-density-type), 1px));
+			--fs-type: calc(round(13px * var(--fs-density-type), 1px));
+			--fs-type-lg: calc(round(16px * var(--fs-density-type), 1px));
+			--fs-type-xl: calc(round(20px * var(--fs-density-type), 1px));
+			--fs-type-2xl: calc(round(26px * var(--fs-density-type), 1px));
+			--fs-control-h: calc(round(up, calc(var(--fs-type) * var(--fs-leading) + var(--fs-space-1) * 2 + 2px), 4px));
+		}
 	}
 
 	/* ---- the DENSITY axis, and it is exactly two declarations per step ----------------
