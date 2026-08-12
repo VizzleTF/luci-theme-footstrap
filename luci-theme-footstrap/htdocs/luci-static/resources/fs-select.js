@@ -255,6 +255,14 @@ function tagDataTables() {
  * names: a `<thead>` becomes `.thead` and a plain first row of `<th>` becomes `.tr.table-titles` —
  * the two names theme/30-tables.css hides when stacked. */
 function adoptMarkup(t, head) {
+	/* DECIDED ONCE, AT CLAIM TIME, and only for a table that speaks none of this vocabulary. Asking
+	 * the question every pass instead would answer "already adopted" the moment we adopted it — and
+	 * these tables are polled, so the fresh rows that arrive bare afterwards would never be taken.
+	 * Asking it at all is what keeps the theme's hands off LuCI's own markup: the apk Software list
+	 * heads its table with `.tr.cbi-section-table-titles`, and blindly adding `table-titles` to that
+	 * would be the theme rewriting a class LuCI chose. */
+	if (t._fsAdopt === undefined) t._fsAdopt = !t.querySelector('.tr, .thead');
+	if (!t._fsAdopt) return;
 	if (head.tagName === 'THEAD') head.classList.add('thead');
 	else head.classList.add('tr', 'table-titles');
 	const titleRow = (head.firstElementChild && head.firstElementChild.tagName === 'TR') ? head.firstElementChild : head;
