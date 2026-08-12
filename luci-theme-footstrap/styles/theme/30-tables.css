@@ -153,15 +153,20 @@
 	#view .table[id] .tr:last-child .td:last-child,
 	table.fs-dt .tr:last-child .td:last-child { border-bottom-right-radius: var(--fs-radius-lg); }
 	/* Empty table: L.ui.Table adds a single-cell .tr.placeholder ("There are no active leases").
-	 * In a display:table it spans only the first column, so the bottom-corner rounding drew a tiny
-	 * rounded box on the left. Block it to full width, carrying the frame's bottom corners. */
-	.cbi-section .table[id] .tr.placeholder,
-	#view .table[id] .tr.placeholder,
-	table.fs-dt .tr.placeholder { display: block; }
+	 * Spanning it across the table is base's job (base/40-tables.css: absolute, `inset-inline: 0`),
+	 * and the `display: block; width: 100%` that used to be restated here was a second way of saying
+	 * the same thing — it read as the fix while the real one was base's `inset-inline`. What is left
+	 * is the FRAMED table's own flavour: the plate reads as prose, left-aligned like the rows it
+	 * stands in for, and carries the frame's bottom corners so the rounding does not cut across it. */
 	.cbi-section .table[id] .tr.placeholder .td,
 	#view .table[id] .tr.placeholder .td,
 	table.fs-dt .tr.placeholder .td {
-		display: block; width: 100%; text-align: start;
+		/* the framed flavour pads its cells `--fs-space-2-5` a side (above), and that shorthand is in
+		 * THIS layer, so it overrides base's placeholder padding and made the plate 4px taller than
+		 * the row reserved for it — measured on Wireless as 67px inside 63px, printing below the
+		 * frame's bottom border. Put base's number back for this one cell. */
+		padding-block: var(--fs-space-2);
+		text-align: start;
 		color: var(--fs-dim); font-family: var(--fs-font-sans);
 		border-radius: 0 0 var(--fs-radius-lg) var(--fs-radius-lg);
 	}
@@ -459,7 +464,11 @@
 	 * only thing overflow:visible protected. `#view .table.fs-dt.fs-stacked` (1,3,0) outranks the
 	 * frame's `#view .table[id]` (1,2,0) on specificity, not order. */
 	#view .table.fs-dt.fs-stacked { overflow: hidden; }
-	.table.fs-dt.fs-stacked .tr { padding: var(--fs-space-2-5) var(--fs-space-4) var(--fs-space-3); }
+	/* `:not(.placeholder)` — the plate is out of flow (base/40-tables.css) and its row exists only to
+	 * reserve the height it needs. Padding is subtracted from that reservation (border-box), so the
+	 * card's row inset left 41px of the 63px the plate is: measured on Wireless as 10px of text
+	 * hanging below the frame once the table stacked. A row with no rows in it has nothing to inset. */
+	.table.fs-dt.fs-stacked .tr:not(.placeholder) { padding: var(--fs-space-2-5) var(--fs-space-4) var(--fs-space-3); }
 	/* `.fs-stacked .td`, not `.table.fs-dt.fs-stacked .td` — the same elements (the class is only
 	 * ever written onto a .table.fs-dt), but at (0,2,0) instead of (0,4,0): low enough that the
 	 * unguarded `.table .td.col-N` below, at (0,3,0), beats it on SPECIFICITY, not source order. */
@@ -490,4 +499,34 @@
 
 	/* general table cell padding — compact but readable (Startup/Processes/etc) */
 	.table .td { padding-top: var(--fs-space-2); padding-bottom: var(--fs-space-2); }
+
+	/* ---- THE LAST RESORT: a foreign <table> the card stack cannot claim ----
+	 *
+	 * fs-select.js now tags any `#view table` that HAS a header row — `.tr.table-titles`,
+	 * `.tr.cbi-section-table-titles`, a `<thead>`, or a first row made entirely of `<th>` — as
+	 * `.table.fs-dt`, so it is measured and cards like every other data table. What is left here is
+	 * the table with no header at all: a log, a statistics matrix, a layout table. Those must NOT be
+	 * carded even if they overflow — a card prints `data-title` above each value, and a matrix has no
+	 * titles to print, so stacking one produces a column of numbers with nothing saying what they are.
+	 * Comparison is the whole point of that shape; it scrolls instead.
+	 *
+	 * `display: block` + `overflow-x: auto` on the table ITSELF, not on a wrapper: the theme cannot
+	 * add markup around someone else's element, and the block box is what gives it a scroll container.
+	 * The rows still lay out as a table — a `display: block` <table> wraps its children in an
+	 * anonymous table box — so the columns keep lining up.
+	 *
+	 * UNGUARDED, and that is the change: this rule spent its life inside `@media (max-width: 767px)`
+	 * (theme/90-responsive.css), where it was written after a phone report — a wifi-clients dashboard
+	 * whose last column was silently CUT by `.fs-main`'s `overflow-x: clip`, measured at 390px as a
+	 * 388px table in a 356px card. But the viewport was never the fact that mattered: a narrow panel,
+	 * a split window or a 960px tablet reaches the same wall with the query switched off, and the
+	 * clip is just as silent there. Cost at a width where the table fits: nothing at all — `overflow`
+	 * only paints a scrollbar once there is something to scroll. */
+	#view table:not(.table):not(.cbi-section-table):not(.fs-dt) {
+		display: block;
+		max-width: 100%;
+		overflow-x: auto;
+		/* the scroll gesture stops at this table instead of dragging the page sideways */
+		overscroll-behavior-x: contain;
+	}
 }

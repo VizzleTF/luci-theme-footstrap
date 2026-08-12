@@ -247,6 +247,24 @@ write the attributes this theme publishes (`luci-app-openclash` does it in seven
 fourth dialect to `stampDark` and forget the observer's `attributeFilter`, and that dialect is
 unguarded — silently.
 
+### Rule 8. A foreign table is claimed by its HEADER ROW, not by its class
+
+`.table` is LuCI's class, and every table rule the theme has hangs off it — the frame, the cell
+padding, the measured card stack. An app that emits a bare `<table>` matched none of it, so nothing
+tagged it, nothing measured it and `.fs-main`'s `overflow-x: clip` silently CUT its right-hand
+columns; the only thing that ever reached it was a phone-tier scrollbar. `tagDataTables()` now takes
+any `#view table` that has a header row in any of four markups, adds `.table.fs-dt`, and copies the
+column headings into `data-title` so the card has something to print. A table with **no** header row
+is left alone on purpose and scrolls: see [css.md](css.md#which-of-the-three-a-table-gets-and-what-decides-it).
+
+This is deliberately unmeasurable here. A census of `#view table:not(.table):not(.cbi-section-table)`
+over all **196** menu pages on the stand — openclash, justclash, ssclash, dashboard and statistics
+included — found **zero**: everything anyone here emits already carries the class. The rule exists for
+the shape a census cannot reach, which is what the coverage contract means
+([conventions.md](conventions.md)). The three synthetic shapes are checked instead, on Blink and
+WebKit at 1440 px and 390 px: `<thead><tr><th>` and `<tr><th>` both card with the right captions, a
+header-less matrix stays a scrolling matrix at both widths.
+
 ### What the theme cannot do, and should not try
 
 - `@media (prefers-color-scheme)` in an app's CSS is overridden by nothing — it is an OS setting.

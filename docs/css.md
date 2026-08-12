@@ -222,6 +222,46 @@ never had. **The act of measuring was the bug.** Do not "finish the job".
 The price is the last irreducible duplicate: the same declarations under a class and under an
 `@container`, which CSS cannot factor apart. It is pinned with `@mirror table-card/{label,actions}`.
 
+### Which of the three a table gets, and what decides it
+
+Every `<table>` or `<div class="table">` under `#view` lands in exactly one of three tiers, and the
+discriminator is **does it have a header row**, never who wrote it:
+
+| Tier | Reached by | What it does |
+|---|---|---|
+| measured card | a header row **and** not `.cbi-section-table` → `fs-select.js` tags `.table.fs-dt` | folds into labelled cards when it stops fitting, at any width |
+| `@container` card | `.cbi-section-table` | folds at 960 px of content, never measured (above) |
+| scroll | no header row at all | `display: block; overflow-x: auto` on the table itself |
+
+A header row is any of four markups, and each missing one has cost a page: `.tr.table-titles`
+(`L.ui.Table`), `.tr.cbi-section-table-titles` (the apk Software list), a `<thead>` — E()-built, so
+its `<th>`s may hang off it directly with no `<tr>` — and a first row made entirely of `<th>`, which
+is what a foreign app writing plain HTML emits. `labelCells()` then **copies** the heading of the
+column each cell sits in into `data-title`, which is what the card prints above the value; it never
+overwrites one the app set, and it counts COLUMNS rather than cells so a `colspan` does not shift
+every caption after it by one.
+
+The third tier is the deliberate refusal. A card prints `attr(data-title)` above each value, and a
+matrix — a log, a statistics grid, a layout table — has no headings to print, so carding one yields a
+column of numbers with nothing saying what they are. Comparison is that shape's whole point, so it
+scrolls instead. **The scroll rule is not scoped to a phone.** It spent its life inside
+`@media (max-width: 767px)`, which is the same mistake the card stack was built to avoid: whether a
+table fits is a property of its content and its column, and a 400 px panel on a 1600 px desktop hits
+the wall a phone hits. It costs nothing where the table fits — `overflow` paints a scrollbar only
+when there is something to scroll.
+
+### The first column has a floor, and the rest do not
+
+Cells break `anywhere` so an unbreakable value cannot hold a column open (`base/40-tables.css`). The
+first column is exempt and breaks at word boundaries instead, because `anywhere` costs a min-content
+of ONE CHARACTER and auto table layout hands width out by each column's max-content: a two-column
+key/value table whose value is one enormous token starves the key column down to that character.
+Measured against `luci-app-dockerman`'s Environment table, which prints `JSON.stringify()` of every
+field `docker info` returns — 8 000 characters of value took the key column from 95 px to 55 px, and
+the reporter's own host drove it to about one glyph, so the header read `E N T R Y` down the page
+(issue #36). A carded row is exempt from the exemption: once every cell is on its own line there is
+no neighbour left to starve it.
+
 ## Proving a CSS change
 
 **Screenshots do not work here.** On a live router, uptime, DHCP leases and signal strength give

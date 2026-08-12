@@ -83,14 +83,51 @@
 	.table .td { overflow-wrap: anywhere; }
 	.table .th { overflow-wrap: break-word; }
 
+	/* …AND THE FIRST COLUMN IS A LABEL TOO, whichever element it happens to be made of.
+	 *
+	 * `anywhere` costs a min-content of one character (above), and auto table layout hands each
+	 * column its share by MAX-content — so a two-column key/value table whose value is one enormous
+	 * token starves the key column down to that single character, and the header row above it with
+	 * it. Measured against luci-app-dockerman's Environment table (issue #36), which prints
+	 * `JSON.stringify()` of every field `docker info` returns: at 8 000 characters of value the key
+	 * column fell from 95px to 55px and "Driver" started wrapping; on the reporter's own host it
+	 * reached about one glyph, so the column header read "E N T R Y" straight down the page, on
+	 * Firefox 153 and on Blink alike.
+	 *
+	 * `break-word` puts the floor back at the longest WORD — the same trade `.th` makes one line up,
+	 * for the same reason: the first column is the row's identity, and it is what you read the table
+	 * by. fs-select.js makes the same judgement in the other direction (MAX_ID_LINES: past five
+	 * lines the identity has stopped being readable and the table cards instead).
+	 *
+	 * A CARDED row is exempt and must be: `.table.fs-stacked .td` (theme/30-tables.css) restates
+	 * `anywhere` from a later layer, so once every cell is on its own line there is no neighbouring
+	 * column left to starve it and a long value may break wherever it likes. */
+	.table .tr > .td:first-child { overflow-wrap: break-word; }
+
 	.table .tr:first-child .th {
 		padding-top: var(--fs-space-2);
 		font-weight: var(--fs-weight-bold);
 		vertical-align: top;
 	}
 
-	/* the empty-table plate: three lines of leading plus the cell inset it sits in, so it keeps
-	 * the table's own height when there is nothing to show. */
+	/* The empty-table plate: three lines of leading plus the cell inset it sits in, so it keeps
+	 * the table's own height when there is nothing to show.
+	 *
+	 * IT IS OUT OF FLOW ON PURPOSE and stays that way: a single-cell row in a `display: table` spans
+	 * only the FIRST column, so in flow the plate is a narrow box under column one — and, worse, its
+	 * sentence then becomes that column's max-content and WIDENS it (measured: the Container column
+	 * of an empty section went 275px -> 502px when the cell was put back in flow). Absolute takes it
+	 * out of the column sizing entirely and `inset-inline: 0` spans it across the table.
+	 *
+	 * WHAT IT MUST NOT DO IS PIN ITSELF TO THE BOTTOM. It used to say `bottom: 0`, which inside the
+	 * `position: relative` .table means the bottom of the whole TABLE — the same place as its own row
+	 * only while the placeholder is the last row there is. `form.TableSection` renders its `footer`
+	 * into a `<tfoot>` AFTER the `<tbody>`, so on every empty section that declares one the plate
+	 * printed straight across the totals: measured on luci-app-dockerman's Containers, Images and
+	 * Volumes tables (issue #36) as a 1190x35 overlap, the full width of the table, identically on
+	 * Blink and on Gecko 153. With no `bottom` at all an absolutely positioned box keeps its STATIC
+	 * position — where the row actually is — which is what was meant all along, and the reserved row
+	 * height below is what holds that space open. */
 	.tr.placeholder {
 		height: calc(3em + var(--fs-space-4));
 	}
@@ -98,9 +135,16 @@
 	.tr.placeholder > .td {
 		position: absolute;
 		inset-inline: 0;
-		bottom: 0;
 		text-align: center;
 		line-height: 3em;
+		/* …and the plate must be exactly as tall as the row reserved for it, or it hangs out of the
+		 * table at whichever end it is anchored to. `--fs-space-4` is two `--fs-space-2` at every
+		 * density, so this and the row height above are the same number written twice — which is what
+		 * lets the cell keep its own size while the four table flavours go on padding their ordinary
+		 * cells differently (`--fs-space-2` here, `--fs-space-2-5` on a framed data table, and so on).
+		 * Measured on Wireless, whose associated-stations table pads 10px a side: the plate came out
+		 * 67px inside a 63px row and printed 4px BELOW the frame's bottom border. */
+		padding-block: var(--fs-space-2);
 	}
 
 	.tr.drag-over-above,

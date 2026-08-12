@@ -6,32 +6,11 @@
 	 * or table shrink or wrap. Tablets (>=768px) were already clean.
 	 * ================================================================== */
 	@media (max-width: 767px) {
-		/* A FOREIGN <table> — one with none of LuCI's classes — scrolls instead of being cut off.
-		 *
-		 * The theme cards a data table when it stops fitting (.fs-stacked, fs-select.js), but that
-		 * only reaches `.table` markup carrying a header row: `.tr.table-titles` or
-		 * `.tr.cbi-section-table-titles`. A third-party dashboard that emits a plain
-		 * `<table><tr><th>` matches none of it, so nothing measured it, nothing carded it, and
-		 * `.fs-main`'s `overflow-x: clip` silently CUT the right-hand columns — reported on a phone
-		 * against a wifi-clients dashboard whose last column was simply not there. Measured here at
-		 * 390px: the table wanted 388px inside a 356px card and overflowed by 31px, with the card at
-		 * `overflow-x: visible` so there was nothing to scroll.
-		 *
-		 * `display: block` + `overflow-x: auto` on the table itself, not a wrapper: the theme cannot
-		 * add markup around someone else's element, and the block box is what gives it a scroll
-		 * container. The rows still lay out as a table — a `display: block` <table> wraps its own
-		 * children in an anonymous table box — so the columns keep lining up.
-		 *
-		 * Scoped away from every table the theme DOES understand: `.table` (LuCI's div-tables and
-		 * the ones fs-select tags), `.cbi-section-table` (config forms, which card by container)
-		 * and `.fs-dt`. Those have their own answer and must not get a scrollbar instead of it. */
-		#view table:not(.table):not(.cbi-section-table):not(.fs-dt) {
-			display: block;
-			max-width: 100%;
-			overflow-x: auto;
-			/* the scroll gesture stops at this table instead of dragging the page sideways */
-			overscroll-behavior-x: contain;
-		}
+		/* The foreign-<table> scroll fallback used to live here, guarded by this query. It does not
+		 * any more: whether a table fits is a property of its CONTENT and its COLUMN, never of the
+		 * viewport — the same argument the fit engine is built on — and a 400px-wide panel on a
+		 * 1600px desktop needs it exactly as much as a phone does. It is unguarded now, in
+		 * theme/30-tables.css, next to the card stack it is the fallback FOR. */
 
 		/* Must stay INSIDE this @media, and the reason is specificity within ONE layer: the 400px
 		 * cap lives in theme/65-dropdown.css (absorbed there from base) on

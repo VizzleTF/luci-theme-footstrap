@@ -172,10 +172,40 @@ function enhance(sel) {
  *
  * `.table`, not `table.table` — the SAME selector relevant() and STACKABLE use. Stock LuCI
  * happens to emit only real <table>s, but a third-party luci-app-* may emit a <div class="table">
- * (coverage rule, docs/conventions.md), which a tag qualifier would pass over so it could never card. */
+ * (coverage rule, docs/conventions.md), which a tag qualifier would pass over so it could never card.
+ *
+ * `.table` is LuCI's own class, and everything the theme knows how to do with a table hangs off it.
+ * A third-party app that emits a BARE `<table>` — no LuCI classes at all — therefore matched none of
+ * this: nothing tagged it, nothing measured it, nothing carded it, and the only thing that reached it
+ * was a phone-tier scrollbar (theme/90-responsive.css). Reported from a phone against a wifi-clients
+ * dashboard whose last column was simply cut off.
+ *
+ * So the second half of this selector claims those too. It is deliberately UNMEASURABLE on the dev
+ * stand — a census of `#view table:not(.table):not(.cbi-section-table)` over all 196 menu pages,
+ * openclash / justclash / ssclash / dashboard / statistics included, found ZERO. That is the point:
+ * every table anyone here emits already carries the class, so this changes nothing that can be
+ * measured and covers the one shape that cannot be (docs/conventions.md: coverage is a contract). */
+const FOREIGN_TABLE = '#view .table:not(.cbi-section-table):not(.fs-dt), ' +
+	'#view table:not(.table):not(.cbi-section-table):not(.fs-dt)';
+
+/* The FOURTH header markup, and the one only a foreign table produces: `<table><tr><th>…`, with no
+ * `<thead>` for the parser to imply and none of LuCI's class names. It is the exact shape the phone
+ * tier's scroll fallback was written against, so it has to be recognisable here or that table can
+ * still only ever scroll.
+ *
+ * "Every cell in the first row is a `<th>`" is the whole test, and it has to be EVERY: a data row
+ * whose first cell is a row header (`<th scope=row>`) would otherwise be read as the header row and
+ * every value below it captioned with a value. A table with no `<th>` at all — a layout table, a
+ * matrix — returns null and keeps today's behaviour, which is what the scroll fallback is for. */
+function headerRow(t) {
+	const row = t.rows && t.rows[0];
+	if (!row || !row.cells.length) return null;
+	return [ ...row.cells ].every((c) => c.tagName === 'TH') ? row : null;
+}
+
 function tagDataTables() {
-	document.querySelectorAll('#view .table:not(.cbi-section-table):not(.fs-dt)').forEach((t) => {
-		/* THREE header markups, and each missing one cost a page. L.ui.Table emits
+	document.querySelectorAll(FOREIGN_TABLE).forEach((t) => {
+		/* FOUR header markups, and each missing one cost a page. L.ui.Table emits
 		 * `.tr.table-titles`; the apk Software page emits `.tr.cbi-section-table-titles` (missing
 		 * it is why the package list once needed a stacking block of its own); and a third-party
 		 * table may simply use a real `<thead>` — luci-mod-dashboard's device lists are
@@ -188,12 +218,17 @@ function tagDataTables() {
 		 * to the `<thead>` — the parser's implied row never happens, so a `tr` in the selector finds
 		 * nothing. Read as "the header ROW-ISH element", which is what its children are cells of.
 		 *
-		 * ANY of the three = a data table; NONE = a key/value include (System, Memory), which must
+		 * ANY of the four = a data table; NONE = a key/value include (System, Memory), which must
 		 * never card. `thead` is the structural form of the same statement the two classes make, so
-		 * it belongs in the same list rather than in a rule of its own. */
-		const head = t.querySelector('.tr.table-titles, .tr.cbi-section-table-titles, thead');
+		 * it belongs in the same list rather than in a rule of its own; headerRow() is the fourth and
+		 * cannot be, because "the first row is all `<th>`" is not a selector. */
+		const head = t.querySelector('.tr.table-titles, .tr.cbi-section-table-titles, thead') || headerRow(t);
 		if (!head) return;
-		t.classList.add('fs-dt');
+		/* `.table` as well as `.fs-dt`, and only ever ADDED: the theme's whole table vocabulary —
+		 * the frame, the cell padding, the card stack — is written against `.table`, so a foreign
+		 * table that has just been recognised as a data table has to join it or the tag buys nothing.
+		 * A no-op on everything LuCI renders, which carries the class already. */
+		t.classList.add('table', 'fs-dt');
 		labelCells(t, head);
 	});
 }
@@ -212,7 +247,14 @@ function tagDataTables() {
  * matters because these tables are POLLED: the rows are replaced wholesale every few seconds, and
  * the fresh ones arrive without it. */
 function labelCells(t, head) {
-	const titles = [ ...head.children ].map((c) => (c.textContent || '').trim());
+	/* A `<thead>` that was WRITTEN as markup nests a real `<tr>` — the parser inserts one even where
+	 * the author left it out — while one built by E() holds the `<th>`s directly (see above). Reading
+	 * `head.children` blind therefore captioned every cell of a parsed table with the header row's
+	 * ENTIRE text: "HostAddressSignal" over the hostname, over the address and over the signal.
+	 * Measured against a bare `<table><thead><tr><th>` on the stand, which is the shape a
+	 * server-rendered or innerHTML-built foreign table has. */
+	const titleRow = (head.firstElementChild && head.firstElementChild.tagName === 'TR') ? head.firstElementChild : head;
+	const titles = [ ...titleRow.children ].map((c) => (c.textContent || '').trim());
 	if (!titles.some(Boolean)) return;
 	for (const row of t.querySelectorAll('.tr, tbody tr')) {
 		if (row === head) continue;
