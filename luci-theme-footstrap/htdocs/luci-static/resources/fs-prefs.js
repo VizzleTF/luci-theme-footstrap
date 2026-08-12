@@ -27,9 +27,19 @@
  * tint back off). Every axis therefore records the chosen value, including the off/default one, the
  * way `layout` always has. lsDel is reserved for resetToSaved(), which drops back to the router
  * default on purpose. */
-function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+/* A browser can REFUSE storage outright — "block all cookies" for this address in Chrome/Safari,
+ * dom.storage.enabled=false in Firefox, a partitioned WebView — and then every access throws. The
+ * three helpers below still swallow it, because an axis that cannot be remembered must still be
+ * allowed to APPLY; what they no longer do is keep quiet about it. Without this flag the page told a
+ * flat lie: each control took effect, nothing was written, current*() then read null and fell back
+ * to the router default, so matchesSavedDefault() was true and the Save button sat there DISABLED
+ * reading "Saved as default" while the page was painted in three axes the router default does not
+ * carry — and a reload dropped all of them. The Appearance tab asks this and says so once. */
+let _lsBroken = false;
+function storageBroken() { return _lsBroken; }
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { _lsBroken = true; return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { _lsBroken = true; } }
+function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { _lsBroken = true; } }
 
 /* A stored JSON ARRAY, or [] — the shape the two REMEMBERED LISTS use (the search palette's recent
  * paths, the menu's open sections). lsGet above owns the try/catch around localStorage itself; this
@@ -45,7 +55,7 @@ function lsGetArr(k) {
 }
 
 /* the router-wide defaults the server stamped (head.ut). Read at RUNTIME so current*() reports the
- * effective default when this browser has no localStorage — the popover's controls then show what
+ * effective default when this browser has no localStorage — the Appearance tab's controls then show what
  * the page is actually painted as, not a phantom "auto". */
 function sd(k) { try { return (window.__fsSD || {})[k]; } catch (e) { return undefined; } }
 
@@ -371,7 +381,7 @@ function applyPalette(val) {
  * The list is what VALIDATES a stored value, so a value added to the CSS and not to this array is
  * one head.ut pre-paints and the live applier then rejects: the page would paint it and the first
  * touch of any other control would take it away. Adding one means this line, the head.ut whitelist,
- * the segmented control in fs-appearance.js and the rules in 15-wallpaper.css.
+ * the Wallpaper select in fs-appearance.js and the rules in 15-wallpaper.css.
  *
  * A router upgrading from a version with the downloaded `cats`/`dinos` doodles reads its stored
  * value here, finds it is not in the list, and falls to 'off' — the files those named are not in
@@ -576,8 +586,8 @@ function applyAutoCollapse(val) {
 	document.dispatchEvent(new CustomEvent('fs-autocollapse', { detail: { on } }));
 }
 
-/* The sidebar rail's collapsed flag. The BUTTON that flips it is chrome (fs-chrome.js): only the
- * stored state belongs to the preference layer, and fs-update.js needs the ls* helpers anyway.
+/* The sidebar rail's collapsed flag. The BUTTON that flips it is chrome (fs-chrome.js); only the
+ * stored state belongs to the preference layer.
  * NOT part of the router-wide defaults — it is a transient chrome collapse, not an appearance
  * choice, so it is absent from snapshotAxes()/resetToSaved() below. */
 function applyRail(on) {
@@ -609,7 +619,10 @@ const AXIS_KEYS = [
 /* Tint density: the STRENGTH of the router-identity Tint (the hue washed onto --fs-bg), a per-browser
  * axis paired with the Tint hue — the hue picks the colour, this picks how strong it reads.
  * --fs-tint-strength is a multiplier on the tint chroma (03-palettes.css): 100% = the designed
- * strength, 0% = none, up to 200%. It only bites while a Tint hue is set (data-tint), and it is
+ * strength, up to 200%. 0 is not quite "no tint": the palette's canvas carries a slight cast of its
+ * own and the relative colour that applies the tint replaces chroma outright, so 0 leaves a neutral
+ * canvas at the same lightness rather than the untinted one (03-palettes.css measures it). Clearing
+ * the Tint hue is the real off. It only bites while a Tint hue is set (data-tint), and it is
  * hidden and moot under the File wallpaper, where the tint resets to neutral (the photo covers the
  * canvas). A normal per-browser axis: localStorage ?? router default ?? built-in; head.ut pre-paints
  * it; stored explicitly (incl. the 100 default) so it can override a router default, like the hues.
@@ -700,7 +713,7 @@ function snapshotAxes() {
 	};
 }
 /* The RESOLVED router default (UCI value if set, else the built-in), in snapshotAxes() string form,
- * so the popover can grey the Save button out when this browser already shows exactly it. Seeded
+ * so the Appearance tab can grey the Save button out when this browser already shows exactly it. Seeded
  * from window.__fsSD at load and replaced with the just-saved snapshot after saveAsDefault(), so a
  * save flips the match to true without a reload.
  *
@@ -745,7 +758,7 @@ function matchesSavedDefault() {
 	return Object.keys(cur).every((k) => cur[k] === _savedDefault[k]);
 }
 
-/* ---- /etc/config/footstrap is written by Save-as-default AND BY NOTHING ELSE -------------------
+/* ---- no AXIS reaches /etc/config/footstrap except through Save-as-default ----------------------
  * EVERY axis is per-browser and reaches the router only through this button. Two of them used to
  * write through the moment they changed — `wallpaper` on every pick, `photo_dim` on every drag —
  * on the argument that the File photo is router-side, so "which wallpaper shows it" and "how dim"
@@ -789,10 +802,11 @@ function resetToSaved() {
 
 /* The built-in defaults, written through the ordinary appliers so each one validates its own value
  * and stamps :root the way it always does. Stated here rather than derived: a "default" is only a
- * default because it is the value a bare :root paints, and the three that already have a named
- * const (rounding, tint strength, photo dim) use it, so the numbers cannot drift from the CSS. */
+ * default because it is the value a bare :root paints, and the five that already have a named
+ * const (rounding, tint strength, photo dim, pattern size, pattern strength) use it, so the numbers
+ * cannot drift from the CSS. */
 function resetToBuiltin() {
-	/* TOP, not sidebar: the bar is what a bare :root paints (header.ut stamps it when uci says
+	/* TOP, not sidebar: the bar is what a bare :root paints (head.ut stamps it when uci says
 	 * nothing), so it is what "the theme as it ships" means. This said 'sidebar' after the default
 	 * flipped and nothing caught it — the button quietly reset to a layout that is no longer the
 	 * default, which is the one thing this button must not do. */
@@ -955,6 +969,7 @@ function uploadPattern(file) {
 			 * as making every other device paint it, which is the wallpaper axis and Save-as-default. */
 			.then(() => _uciSet('footstrap', 'settings', { pattern: tok }))
 			.then(() => _uciCommit('footstrap'))
+			.catch((e) => _rollbackUpload(PAT_PATH, e))
 			.then(() => {
 				/* switch THIS browser onto it — the ordinary axis path, localStorage only */
 				applyWallpaper('pattern');
@@ -967,8 +982,7 @@ function uploadPattern(file) {
 /* Remove: delete the file, blank the token (uci `set` to '', not delete — the scoped ACL grants
  * set/commit only), clear the tile live. */
 function removePattern() {
-	return _fileRemove(PAT_PATH)
-		.catch(() => null)	/* already gone is success — still blank the token below */
+	return _removeServed(PAT_PATH)
 		.then(() => _uciSet('footstrap', 'settings', { pattern: '' }))
 		.then(() => _uciCommit('footstrap'))
 		.then(() => { _applyPattern(''); });
@@ -990,11 +1004,33 @@ const BG_SERVE = '/luci-static/footstrap/bg';	/* the uhttpd symlink to BG_PATH (
 const BG_MAX_SIDE = 1920;						/* cap the longest side — a router serves this off flash with no gzip, and 1080p covers the screens LuCI is actually admin'd from; still crisp full-screen, far fewer flash/wire bytes */
 const BG_QUALITY  = 0.9;
 const BG_SRC_MAX  = 25 * 1024 * 1024;			/* refuse a source this big before decoding (decode-bomb guard) */
-const _fileRemove = rpc.declare({ object: 'file', method: 'remove', params: [ 'path' ], reject: true });
+/* NO `reject: true` here, unlike every other declare in this file, and that is the whole point: with
+ * it the caller gets an Error whose only account of WHY is a sentence with the ubus code inside it,
+ * so "the file was already gone" and "the router refused to delete it" arrive indistinguishable —
+ * and both callers below used to swallow the rejection whole and report success. Without it the
+ * promise resolves with the ubus status as a NUMBER (rpc.js hands back `msg.result[0]`), which is a
+ * signal this code can actually branch on. */
+const _fileRemoveStatus = rpc.declare({ object: 'file', method: 'remove', params: [ 'path' ] });
+
+/* Delete, treating "not found" as done. Anything else is a real refusal — a read-only or full
+ * overlay, an immutable flag, a path replaced by a non-empty directory — and it must NOT be reported
+ * as a removal: the file stays on flash and stays fetchable WITHOUT A SESSION through the /www
+ * symlink, which is precisely what an admin removing a background for privacy reasons believes they
+ * have just stopped. */
+const UBUS_NOT_FOUND = 4;
+function _removeServed(path) {
+	return _fileRemoveStatus(path).then((res) => {
+		const code = (typeof res === 'number') ? res : parseInt(res, 10);
+		if (code === 0 || code === UBUS_NOT_FOUND || isNaN(code)) return;
+		return Promise.reject(new Error(
+			_('The router refused to delete the file (ubus status %d).', 'footstrap').format(code)));
+	});
+}
 /* cgi-upload writes the file mode 0600, and uhttpd refuses to SERVE a file that is not
  * world-readable (measured: 0600 -> 403, 0644 -> 200), so make it 0644 before it can be fetched. The
- * rpcd ACL grants exec on exactly `/bin/chmod 644 /etc/footstrap/login-bg` — one fixed command, no
- * argument the caller controls. */
+ * rpcd ACL grants exec on exactly two fixed commands — `/bin/chmod 644 /etc/footstrap/login-bg` and
+ * `/bin/chmod 644 /etc/footstrap/pattern.svg`, the two files this module uploads — with no argument
+ * the caller controls. */
 const _fileExec = rpc.declare({ object: 'file', method: 'exec', params: [ 'command', 'params' ], reject: true });
 /* …and the ubus status is only half of it: `file.exec` reports the COMMAND's exit status inside the
  * payload, so a chmod that ran and failed still comes back as a successful call. Unchecked, the
@@ -1015,7 +1051,7 @@ function _chmodServeable(path) {
 const BG_TOKEN_RE = /^[a-f0-9]{6,64}$/;
 
 /* the token the server last saved (window.__fsSD.login_bg), validated to the same hex charset the
- * head.ut sanitiser and pre-paint use — so the popover shows the current background and builds a
+ * head.ut sanitiser and pre-paint use — so the Appearance tab shows the current background and builds a
  * cache-busted preview src. '' = none. */
 function currentLoginBg() {
 	const t = sd('login_bg');
@@ -1041,10 +1077,10 @@ function _applyLoginBg(tok) {
  * sits in — it escapes as an uncaught error and leaves the promise pending FOREVER. Two real ways
  * out of `onload`: `getContext('2d')` answers null when the canvas cannot be backed (out of memory
  * on a low-RAM box is the case this decodes a 25 MB source on), and drawImage/toBlob can throw on
- * their own. The caller is fs-appearance's file picker, which disables "Choose image" and relabels
+ * their own. The caller is the Appearance tab's file picker, which disables "Choose image" and relabels
  * it "Uploading…" before the call and restores both in a `.finally()` — so a pending promise means
- * that button stays disabled and lying for the life of the page. The popover is built ONCE, in
- * init(), so nothing short of a reload gets it back. */
+ * that button stays disabled and lying until the form is rebuilt, which mount() does only when the
+ * stock view re-renders: the next arrival at System -> System, not this one. */
 function _downscale(file) {
 	return new Promise((resolve, reject) => {
 		const url = URL.createObjectURL(file);
@@ -1067,6 +1103,23 @@ function _downscale(file) {
 		img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(_('That file is not a readable image.', 'footstrap'))); };
 		img.src = url;
 	});
+}
+
+/* An upload that has landed but could not be RECORDED must not stay on the router. The two paths
+ * below write the file first (cgi-upload) and the token second (uci), and the second half can fail
+ * on its own: no `settings` section yet, a narrowed uci ACL, ubus busy. The page then showed the
+ * rpc error — honest as far as it went — while the image sat in /etc/footstrap at mode 0644 and was
+ * served to ANYONE at /luci-static/footstrap/bg, because the /www symlink does not depend on the
+ * token. Worse, Remove is hidden exactly when the token is empty, so the page offered no way to
+ * delete what it had just published. Roll the file back instead, and report the failure that
+ * started it — a rollback that itself fails is appended, because at that point the admin has to
+ * know the file is there. */
+function _rollbackUpload(path, cause) {
+	return _removeServed(path).then(
+		() => Promise.reject(cause),
+		() => Promise.reject(new Error(String((cause && cause.message) || cause) + ' — '
+			+ _('the uploaded file could not be removed either; it is still on the router.', 'footstrap')))
+	);
 }
 
 /* Upload flow: validate -> canvas re-encode -> multipart POST to cgi-io's cgi-upload (the same
@@ -1100,6 +1153,7 @@ function uploadLoginBg(file) {
 			 * here would re-point every other device's default from one admin's upload, silently. */
 			.then(() => _uciSet('footstrap', 'settings', { login_bg: tok }))
 			.then(() => _uciCommit('footstrap'))
+			.catch((e) => _rollbackUpload(BG_PATH, e))
 			.then(() => {
 				/* switch THIS browser to the photo — the ordinary axis path, localStorage only */
 				applyWallpaper('file');
@@ -1112,8 +1166,7 @@ function uploadLoginBg(file) {
 /* Remove: delete the file, blank the token (uci `set` to '', not delete — the scoped ACL grants
  * set/commit only), clear the background live. */
 function removeLoginBg() {
-	return _fileRemove(BG_PATH)
-		.catch(() => null)	/* already gone is success — still blank the token below */
+	return _removeServed(BG_PATH)
 		.then(() => _uciSet('footstrap', 'settings', { login_bg: '' }))
 		.then(() => _uciCommit('footstrap'))
 		.then(() => { _applyLoginBg(''); });
@@ -1122,7 +1175,7 @@ function removeLoginBg() {
 
 return baseclass.extend({
 	/* the storage helpers */
-	lsGet, lsSet, lsDel, lsGetArr,
+	lsGet, lsSet, lsDel, lsGetArr, storageBroken,
 
 	currentMode, applyMode, guardDarkStamp,
 	currentPalette, applyPalette,

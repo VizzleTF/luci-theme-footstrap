@@ -11,8 +11,8 @@
  *
  * WHERE IT LIVES. It used to be a popover hanging off a button in the chrome; it is now a TAB on
  * System -> System (admin/system/system), beside General Settings / Logging / Time Synchronization
- * / Language and Style — the page an admin already opens to set the things that are not network. The axes had outgrown a floating panel — eighteen of them, nine
- * carrying a colour field, a swatch and a contrast readout — and a dialog that has to trap Tab,
+ * / Language and Style — the page an admin already opens to set the things that are not network. The axes had outgrown a floating panel — twenty-one of
+ * them, nine carrying a colour field, a swatch and a contrast readout — and a dialog that has to trap Tab,
  * place itself against a viewport edge and stay inside a 320px column is the wrong container for
  * that. Keeping BOTH would have meant every axis rendered twice, which is the failure this file's
  * own history is made of.
@@ -46,9 +46,12 @@
  * the current look to the ROUTER for other browsers. That distinction is the whole model
  * (docs/design-system.md) and it is why this page has no Save/Reset footer of LuCI's own. */
 function render() {
-	/* still a promise: the view awaits it, and keeping the shape means a future asynchronous step
-	 * (or the caller) needs no change. */
-	return Promise.resolve(build());
+	/* A promise, and the build runs INSIDE it rather than as its argument: `Promise.resolve(build())`
+	 * evaluates build() synchronously, so a throw in it unwound out of render() before mount() could
+	 * attach .catch/.finally — leaving mount()'s _building flag set for the life of the document. The
+	 * tab then never built again on that page and nothing was logged, which is both channels silent
+	 * at once. Deferred like this, the same throw lands in the .catch that exists for it. */
+	return Promise.resolve().then(build);
 }
 
 function build() {
@@ -219,15 +222,15 @@ function build() {
 		/* the STRENGTH half of the Tint — how strong the hue reads. Only meaningful in hue mode: a
 		 * hex canvas IS the colour asked for, with no chroma of ours to scale. CSS hides it in the
 		 * other two states (no tint at all, or a hex one). */
-		/* NOT "Density": that is the UI-density segment above, and this string is both the visible
+		/* NOT "Density": that is the UI-density select above, and this string is both the visible
 		 * caption AND the control's aria-label, so two rows would read "Density" and a screen reader
-		 * would announce "Density, radio group" and "Density, slider" with nothing to tell them
+		 * would announce "Density, combo box" and "Density, slider" with nothing to tell them
 		 * apart. */
 		group(_('Tint strength', 'footstrap'),
 			(label) => sliderCtl(prefs.currentTintStrength(), 0, 200, bump(repaint(prefs.applyTintStrength)), label, {
 				step: 5,
-				fmt: (v) => v + '%'
-			}), { cls: 'fs-ap-tint fs-ap-density' }),
+				unit: '%'
+			}), { cls: 'fs-ap-tint fs-ap-tintstr' }),
 
 		/* recolours the accented CONTROLS (buttons/toggles/sliders/focus rings), not the canvas the
 		 * way Tint does. Measured as TEXT on a card, which is the use that fails first: as a fill it
@@ -487,8 +490,21 @@ function build() {
 	const saveErr = E('div', { 'class': 'fs-ap-err', 'role': 'alert', 'hidden': '' });
 
 	/* the Save button IS the status: match -> disabled "Saved as default", diverged -> enabled
-	 * "Save as default". Called after every axis change (via bump). */
+	 * "Save as default". Called after every axis change (via bump).
+	 *
+	 * Unless this browser refuses storage, in which case the status would be a lie in both halves:
+	 * nothing was written, so every current*() reads the ROUTER default back and the comparison is
+	 * true however far the page has been dragged from it. Say what is actually true instead — the
+	 * axes apply and are forgotten on reload — and leave the button enabled, because pushing this
+	 * browser's look to the router is the one thing that still works here. */
 	function refreshSave() {
+		if (prefs.storageBroken()) {
+			saveBtn.disabled = false;
+			saveBtn.textContent = _('Save as default', 'footstrap');
+			saveErr.textContent = _('This browser is not storing preferences (site data is blocked), so a change here lasts until you reload. Saving as default still works and applies to every browser.', 'footstrap');
+			saveErr.hidden = false;
+			return;
+		}
 		const saved = prefs.matchesSavedDefault();
 		saveBtn.disabled = saved;
 		saveBtn.textContent = saved ? _('Saved as default', 'footstrap') : _('Save as default', 'footstrap');
@@ -615,8 +631,9 @@ function build() {
 			open = !open;
 			prefs.lsSet(key, open ? 'on' : 'off');
 			paint();
-			/* the colour controls read the COMPUTED cascade, and a hidden element computes nothing
-			 * useful — so the readouts are filled when the group becomes visible, not before */
+			/* Refreshed on OPEN because the axes below it may have moved while it was collapsed —
+			 * a palette switch or a preset changes what every readout says. Cheap and skipped
+			 * while closed: nothing in that fold is on screen to be wrong. */
 			if (open) refreshColours();
 		});
 		paint();
@@ -637,10 +654,11 @@ function build() {
 		section(_('Defaults', 'footstrap'), defaults)
 	]);
 
-	/* The colour controls read the COMPUTED cascade, which needs them in the document — so the first
-	 * fill cannot happen while the tree is still being assembled above. The view appends this
-	 * element synchronously on return, so a microtask is late enough and early enough: late enough
-	 * that the probe resolves, early enough that nothing has painted a blank field. */
+	/* The first fill, deferred one microtask so the tree above is finished being assembled. It does
+	 * NOT wait for the form to be in the document, and does not need to: every value a readout shows
+	 * comes back through widgets.probeColor(), which keeps its own hidden probe attached to <body>
+	 * and resolves the cascade there — so this runs while the form is still detached (mount() appends
+	 * it a microtask later) and still reads the live palette. */
 	Promise.resolve().then(refreshColours);
 	return page;
 }
@@ -666,7 +684,9 @@ function takeReturn() {
 		return true;
 	} catch (e) { return false; }
 }
-const MARK = 'fs-ap';	/* the built form's own class; also how mount() knows it is already there */
+const MARK = 'fs-ap';
+/* how long the stock view gets to render its tabs before a missing group counts as a failure */
+const TAB_DEADLINE = 5000;	/* the built form's own class; also how mount() knows it is already there */
 const TAB = 'fs-appearance';	/* the pane's data-tab, which ui.tabs' click handler matches on */
 
 let _routeObserver = null, _viewObserver = null, _observedView = null, _building = false;
@@ -692,9 +712,12 @@ function stopWatch() {
  * yet is a page still rendering, not a page without tabs.
  *
  * The flag and the sibling are the whole test, deliberately: the panes themselves are NOT required
- * to be found here. On the stock System page they are not direct children of the marked element at
- * all — the map nests them a level deeper — so a `:scope > .cbi-tabcontainer` check found none and
- * the tab was never added, silently, on a page that plainly has tabs. */
+ * to be found here, and a check for them by CLASS is what failed. A modern pane carries no class at
+ * all — form.js gives it `data-tab` and `data-tab-title` and nothing else, and `.cbi-tabcontainer`
+ * is luci-compat vocabulary from the Lua CBI — so `:scope > .cbi-tabcontainer` matched nothing on a
+ * page that plainly has tabs, and the tab was never added, silently. ui.tabs itself marks
+ * `panes[0].parentNode`, so the panes ARE this element's children; they are simply not identifiable
+ * that way. */
 function tabGroup(view) {
 	for (const g of view.querySelectorAll('[data-initialized="true"]')) {
 		const menu = g.previousElementSibling;
@@ -739,8 +762,10 @@ function mount() {
 			const title = 'Footstrap';
 			/* data-tab-active is deliberately absent: the stock page opens on whichever tab it
 			 * opened on before, and a theme has no business taking that over. */
+			/* The same shape a stock pane has, which is `data-tab` + `data-tab-title` and no class:
+			 * ui.tabs.switchTab reads the attributes, and the `cbi-tabcontainer` class this used to
+			 * carry is luci-compat's, styled by no rule this theme ships. */
 			t.group.appendChild(E('div', {
-				'class': 'cbi-tabcontainer',
 				'data-tab': TAB,
 				'data-tab-title': title
 			}, [ form ]));
@@ -764,6 +789,20 @@ function watch() {
 	_viewObserver = new MutationObserver(mount);
 	_viewObserver.observe(view, { childList: true, subtree: true });
 	mount();
+	/* A DEADLINE on the one failure that is otherwise perfectly silent. tabGroup() reads three
+	 * private ui.tabs facts — the `data-initialized` marker, the `cbi-tabmenu` class on the menu it
+	 * inserts, and `cbi-tab-disabled` on the items — and one of those has already moved between
+	 * 24.10 and 25.12 (`data-tab-group` was dropped with no announcement). If any of the three we do
+	 * read goes the same way, mount() simply returns early on every mutation: the stock page renders
+	 * perfectly, nothing throws, and every Appearance axis becomes unreachable. Say it once, after
+	 * the page has had time to render. */
+	window.setTimeout(() => {
+		const v = document.getElementById('view');
+		if (!onPage() || !v || v.querySelector('.' + MARK) || _building) return;
+		console.error('footstrap: the Appearance tab could not be attached — this page has tabs, but '
+			+ 'ui.tabs no longer marks them the way fs-appearance.js looks for. Every Appearance axis '
+			+ 'is unreachable until that is updated.');
+	}, TAB_DEADLINE);
 }
 
 /* Called by menu-footstrap-common's init, once. Everything route-dependent hangs off the data-page

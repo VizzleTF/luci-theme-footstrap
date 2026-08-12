@@ -8,8 +8,8 @@
  Licensed to the public under the Apache License 2.0.
 -#}
 {% if (dispatcher.lookup("admin/logout")): %}
-<a class="fs-logout" href="{{ dispatcher.build_url('admin/logout') }}" title="{{ _('Logout') }}" aria-label="{{ _('Logout') }}">
+<a class="fs-logout" href="{{ dispatcher.build_url('admin/logout') }}" title="{{ _('Log out') }}" aria-label="{{ _('Log out') }}">
 	{% include('themes/footstrap/partials/icon', { body: '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 12H3m0 0 3-3m-3 3 3 3"/>' }) %}
-	<span class="fs-label">{{ _('Logout') }}</span>
+	<span class="fs-label">{{ _('Log out') }}</span>
 </a>
 {% endif %}

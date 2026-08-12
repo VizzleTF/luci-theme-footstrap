@@ -1,11 +1,15 @@
 'use strict';
 'require baseclass';
-'require fs-prefs as prefs';
 
-/* The theme's own UI primitives: the disclosure pair the menu is built on, the two controls the
- * Appearance popover is built on, and the popup placement both hand-placed popups share. Nothing
- * here knows what it is being used FOR — that is the point, and it is why the menu and the popover
- * can each take what they need without either requiring the other. */
+/* The theme's own UI primitives: the one inline-SVG wrapper, the disclosure pair the menu is built
+ * on, and the colour control the Appearance tab's nine colour axes are built on. Nothing here knows
+ * what it is being used FOR — that is the point, and it is why the menu and the Appearance tab can
+ * each take what they need without either requiring the other.
+ *
+ * A popup PLACEMENT helper lived here too, shared by the menu's dropdown clamp and the Appearance
+ * panel when that was a floating popover on <body>. The panel is a tab on System -> System now
+ * (fs-appearance.js) and places nothing, so the helper had one caller left and went with it; the
+ * edge gap it clamped against belongs to the menu, which is the only thing still clamping. */
 
 /* The chrome's ONE inline-SVG wrapper. Every icon this theme draws is the same 24x24 stroked
  * outline and differs only in its path data, but the wrapper was written out per call site — in the
@@ -112,15 +116,47 @@ function probeColor(expr) {
 	return getComputedStyle(_probe).color;
 }
 
-/* A computed colour string -> [r,g,b] 0..255, or null. Engines do not agree on the notation: both
- * `rgb(9, 105, 218)` and the space-separated `rgb(9 105 218 / .5)` are current, and a colour outside
- * sRGB (which oklch() readily produces) comes back from some engines as `color(srgb .03 .41 .85)`,
- * i.e. 0..1 floats. Take the first three numbers and scale by whether the form is the 0..1 one —
- * the alpha after the slash is deliberately ignored, since every token this reads is opaque. */
+/* A computed colour -> [r,g,b] 0..255, or null. RASTERISED, never parsed out of the string, and that
+ * is not a preference: a computed `color` keeps the SPACE it was authored in, so an axis in hue mode
+ * comes back as `oklch(0.54 0.19 300)`. Read as numbers that is [0.54, 0.19, 300] — three values in
+ * the wrong units, clamped into a colour nobody chose — and every consumer here believed it: the hex
+ * field, the `<input type="color">` swatch beside it and the WCAG readout. Measured on the stand with
+ * `tint=120, accent=300`: a near-white green canvas whose real text contrast is ~16:1 reported #010078 and "Too
+ * faint to read", and confirming the swatch would have written that navy over the admin's own hue.
+ *
+ * Painting one pixel and reading it back asks the engine to do the conversion instead. It is the
+ * same method tools/export-tier.mjs uses, and for the same reason its header gives: "a color-mix()
+ * computes to whatever space it was written in, and `oklch(L C H)` has three numbers that parse
+ * perfectly well — silently and wrongly — as an rgb() triple". The parse survives only as the
+ * fallback for an engine with no 2D context, where the legacy `rgb()`/`color(srgb …)` forms are all
+ * that can appear anyway. */
+let _cx = null;
+function rasterCtx() {
+	if (_cx !== null) return _cx;
+	try {
+		const cv = document.createElement('canvas');
+		cv.width = cv.height = 1;
+		_cx = cv.getContext('2d', { willReadFrequently: true }) || false;
+	} catch (e) { _cx = false; }
+	return _cx;
+}
 function parseColor(s) {
-	const nums = String(s || '').match(/[\d.]+/g);
+	const str = String(s || '');
+	const cx = rasterCtx();
+	if (cx) {
+		/* fillStyle KEEPS the last value it could parse, so a colour this engine rejects would report
+		 * the previous one as a fresh reading — the same trap probeColor() clears its own style for. */
+		cx.fillStyle = '#000';
+		cx.fillStyle = str;
+		cx.clearRect(0, 0, 1, 1);
+		cx.fillRect(0, 0, 1, 1);
+		const d = cx.getImageData(0, 0, 1, 1).data;
+		if (d[3] === 255) return [ d[0], d[1], d[2] ];
+		/* translucent: composite over nothing is meaningless for a readout, so fall through */
+	}
+	const nums = str.match(/[\d.]+/g);
 	if (!nums || nums.length < 3) return null;
-	const unit = (/^color\(/i).test(String(s)) ? 255 : 1;
+	const unit = (/^color\(/i).test(str) ? 255 : 1;
 	return nums.slice(0, 3).map((n) => Math.max(0, Math.min(255, parseFloat(n) * unit)));
 }
 
@@ -258,36 +294,6 @@ function colorControl(current, onPick, label, opts) {
 	return wrap;
 }
 
-/* How close a popup may come to the viewport edge before it is nudged back in. Read by BOTH popups
- * the theme places by hand — the Appearance popover (fs-appearance.js) and the menu's dropdown
- * edge-clamp (menu-footstrap.js) — which had each written their own `8`. */
-const EDGE_GAP = 8;
-
-/* Place the popover next to its trigger and keep it inside the viewport. It is position:fixed on
- * <body> because the sidebar is `overflow-y: auto` (which computes overflow-x to `auto` too), so
- * an absolutely-positioned popover parented to the Appearance row was clipped off the sidebar
- * edge. The top bar opens downward from the button's right edge, the sidebar sideways out of the
- * rail; both are then clamped. */
-function placePopover(btn, pop) {
-	const gap = EDGE_GAP, r = btn.getBoundingClientRect();
-	const w = pop.offsetWidth, h = pop.offsetHeight;
-	const vw = document.documentElement.clientWidth;
-	const vh = document.documentElement.clientHeight;
-	const top_layout = prefs.isTopLayout();
-
-	let left = top_layout ? (r.right - w) : (r.right + gap);
-	let top  = top_layout ? (r.bottom + gap) : (r.bottom - h);
-
-	/* sidebar: if there is no room to the right, fall back above the trigger */
-	if (!top_layout && left + w > vw - gap) {
-		left = r.left;
-		top = r.top - h - gap;
-	}
-
-	pop.style.left = Math.max(gap, Math.min(left, vw - w - gap)) + 'px';
-	pop.style.top  = Math.max(gap, Math.min(top,  vh - h - gap)) + 'px';
-}
-
 return baseclass.extend({
 	svgIcon,
 	setOpen,
@@ -295,7 +301,5 @@ return baseclass.extend({
 	wireDismiss,
 	colorControl,
 	probeColor,
-	toHex,
-	EDGE_GAP,
-	placePopover
+	toHex
 });
