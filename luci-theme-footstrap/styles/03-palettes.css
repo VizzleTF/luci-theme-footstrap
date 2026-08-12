@@ -434,14 +434,19 @@
 		--fs-panel2-base: #303030;
 		--fs-border-base: #444444;
 		--fs-text: #bfbfbf;
-		/* faint == dim here, and that is the deviation this palette allows itself: bootstrap's dark
-		 * has no third ink, and the export tier's -low now follows --fs-faint (02-tokens.css), so
-		 * the #969696 this used to carry landed at 4.46:1 on a tinted --fs-panel2 — under AA for a
-		 * name apps print text in. The step above it is bootstrap's own, so the fainter one gives
-		 * way rather than the ramp. */
-		--fs-dim: #9a9a9a;
+		/* Bootstrap's dark has no third ink — #bfbfbf body, #7f7f7f muted — so the two quiet tiers
+		 * are this palette's own, and AA decides where the fainter one can sit: the export tier's
+		 * -low follows --fs-faint (02-tokens.css), and on a tinted --fs-panel2 the #969696 this
+		 * used to carry measures 4.46:1, under the floor for a name apps print text in. #9a9a9a is
+		 * the first step that clears it, so the FLOOR pins --fs-faint and the step between the
+		 * tiers has to come from above: --fs-dim moves up by the same distance the hicontrast dark
+		 * ramp puts between its own two (12 channel steps), leaving 191 / 166 / 154. Bootstrap's
+		 * muted grey is darker than either, so both are already a deviation; one step more of it
+		 * is cheaper than collapsing --text-color-medium and -low onto one colour, which is the
+		 * thing this revision separates everywhere else. */
+		--fs-dim: #a6a6a6;
 		--fs-faint: #9a9a9a;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%239a9a9a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23a6a6a6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #53a4c2;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
 		--fs-track: #333333;
