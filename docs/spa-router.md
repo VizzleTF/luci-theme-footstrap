@@ -337,8 +337,15 @@ Three traps, each one actually hit:
 - **Six class names have no file**, and requesting one is a guaranteed 404 in the user's console.
   `luci.js` keeps its registry as a literal (`baseclass`, `dom`, `poll`, `request`, `session`,
   `view`) and answers `require()` for them from memory. Every view file's pragmas name `view` and
-  `baseclass`, so the walk trips on this at the first step. `BUILTIN_CLASSES` is that literal copied
-  from `luci.js`, not a guess about it.
+  `baseclass`, so the walk trips on this at the first step. That literal used to be copied here; the
+  rule is now the SHAPE of the name — a class name is a path, so a name with no dot is either one of
+  those virtual classes or a flat library (`ui`, `form`, `network`, `uci`, `rpc`, `fs`,
+  `validation`), and the chrome has already loaded every one of those before a prefetch can run
+  (measured from three landing pages including System → Reboot: all eight were instances on
+  arrival, and a walk over seven pages fetched 10 files, all of them nested). Declining the flat
+  half outright therefore costs nothing measurable and covers a seventh built-in before it ships.
+  The dotted half is asked properly: `require()` attaches a class at its path, so `tools.widgets`
+  reads back as `L.tools.widgets` once any form page has pulled it.
 - **Speculation stops under an already-clicked link** (`_committed`). After the click, `require()`
   fetches the same graph and parallelises parsing with loading; our walk would only race it.
   Measured at 120 ms RTT: 658 ms waiting for the whole subtree against 525 ms racing — for a

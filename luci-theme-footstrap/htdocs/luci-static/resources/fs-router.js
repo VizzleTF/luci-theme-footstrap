@@ -304,38 +304,43 @@ function pragmaDeps(src) {
 	return out;
 }
 
-/* SIX CLASS NAMES HAVE NO FILE, and fetching one is a guaranteed 404 in the user's console. luci.js
- * seeds its class registry with them at load — `const classes = { baseclass: Class, dom: DOM,
- * poll: Poll, request: Request, session: Session, view: View }` — so require() answers them from
- * memory and never asks the network, while `ls /www/luci-static/resources` has no baseclass.js,
- * dom.js, poll.js, request.js or session.js at all. Every view file's pragmas name `view` and
- * `baseclass`, so a dependency walk hits this on its very first step: measured, warming the recents
- * at idle put 404s for view.js and poll.js in the console of every page load, and the first hover
- * added baseclass.js. A require() that 404s is noise this theme refuses to make, and the same
- * standard applies here.
+/* WHICH CLASS NAMES ARE WORTH A PREFETCH, and the answer is the DOTTED ones — that is the whole
+ * rule now, and it used to be a hardcoded list of the six names luci.js seeds its registry with
+ * (`baseclass`, `dom`, `poll`, `request`, `session`, `view`). Those have no file, so fetching one is
+ * a guaranteed 404 in the user's console — measured before the list existed: warming the recents at
+ * idle put 404s for view.js and poll.js into every page load, and the first hover added baseclass.js.
+ * The list worked, and it was a literal copied out of luci.js rather than a guess about it, but it
+ * was still a copy: a seventh built-in would cost one 404 per name per session until this file
+ * caught up with a release of somebody else's software.
  *
- * A future LuCI adding a seventh built-in would cost one 404 per session — `_prefetched` makes it
- * at most one — and the list is a literal from luci.js, not a guess about it. */
-const BUILTIN_CLASSES = new Set([ 'baseclass', 'dom', 'poll', 'request', 'session', 'view' ]);
-
-/* Is this class already instantiated? require() attaches its singleton to the LuCI prototype
- * (`ptr[parts[idx]] = instance`), so a SINGLE-segment name reads back as L[name] — which covers the
- * libs a loaded page has already pulled in (ui, form, uci, rpc, fs, validation, and network/firewall
- * once some network page has been open). Skipping them spends no request on a cache hit nobody needs.
- * `instanceof L.Class` rather than a truthiness test: L.env, L.url and L.get are members too, and a
- * dep whose name collided with one of those would otherwise be skipped without ever being loaded —
- * which is why this cannot be the guard for the six above either: they are seeded as CONSTRUCTORS
- * (and under other names — L.Poll, L.Request, L.Class), so no `instanceof` probe sees them. A DOTTED
- * name (tools.network) is not attached unless its parent already exists, so it is simply fetched —
- * and those are the ones the win comes from. */
+ * The shape of the names answers it without the copy. A LuCI class name is a path — `tools.widgets`
+ * is tools/widgets.js — so a name with no dot is either one of those six virtual classes or one of
+ * the flat libraries (`ui`, `form`, `network`, `uci`, `rpc`, `fs`, `validation`), and those are
+ * already loaded by the time any prefetch runs: this theme's own chrome requires `network` for the
+ * overview grid, which drags in firewall/uci/rpc/validation, and `ui` comes with the widgets.
+ * Measured on the stand from three different landing pages, including the lightest one there is
+ * (System -> Reboot): all eight flat libraries were already instances on arrival, and driving the
+ * prefetch walk over seven pages fetched 10 files, every one of them nested. So the flat half of the
+ * namespace is worth nothing to prefetch and can never be worth a 404 — declining it outright costs
+ * nothing measurable, needs no list, and a future built-in is covered before it ships.
+ *
+ * The dotted half is still asked properly: require() attaches a class at its path (`ptr[parts[i]] =
+ * instance`), so `tools.widgets` reads back as L.tools.widgets once some form page has pulled it,
+ * and a second navigation there spends no request at all. `instanceof L.Class` rather than a
+ * truthiness test: L.env, L.url and L.get are members too. */
 function classLoaded(name) {
-	if (BUILTIN_CLASSES.has(name)) return true;
-	try { return name.indexOf('.') < 0 && window.L[name] instanceof window.L.Class; }
+	if (name.indexOf('.') < 0) return true;
+	try {
+		let ptr = window.L;
+		for (const part of name.split('.')) {
+			ptr = ptr[part];
+			if (ptr == null) return false;
+		}
+		return ptr instanceof window.L.Class;
+	}
 	catch (e) { return false; }
 }
 
-/* view classes already required, i.e. the ones LuCI has an instance cached for. A class NOT in
- * here is rendered by the require() itself (see navigate). */
 const _seen = new Set();
 const _prefetched = new Set();
 /* className -> the promise of ITS OWN body being in the HTTP cache; navigate() waits on that.
