@@ -494,6 +494,35 @@ everything but one" is a correct operation there and has no equivalent for `setT
 such a view ever appears, the right answer is a targeted cancel through `onNavigate`, not a global
 hook.**
 
+### Deliberately not fixed: global listeners a departing view leaves behind
+
+**A view's `window.addEventListener` survives navigation, and hooking it the way `setInterval` is
+hooked would be a one-way deletion — the same mistake as sweeping a view's CSS.** The proposal is
+always the same: wrap `addEventListener`, keep the tuples, `removeEventListener` them all in
+`navigate()`. The asymmetry that makes the interval hook correct is exactly what makes this wrong.
+
+A poller is re-created on every render, so clearing it costs nothing — re-entering the page starts a
+new one. A listener registered at a module's TOP LEVEL is created once, because `L.require` caches
+the module for the life of the document and never runs its factory again. Remove it and it is gone
+for good, on every later visit, with no error and nothing to re-run it. That is the ACE stylesheet
+bug in a different medium (see [third-party-apps.md](third-party-apps.md)).
+
+Which shape the real apps have is a measurement, not a guess. Grepped on owrt2512: **9 view files
+register global listeners** (`system/filemanager`, `system/sshkeys`, `ssclash/config`, ACE itself,
+`justclash/{connections,realtime_logs,status}`, `adblock/dnsreport`, `nlbw/display`) — 15
+registrations, mostly `beforeunload` and `visibilitychange`. Then measured through CDP
+`DOMDebugger.getEventListeners` on `window` and `document`, **8 SPA round trips overview →
+File Manager → overview**, counted at the same page each time: **27 → 28 on the first visit, then
+flat for all 8** (`window:click` +1, once). ACE adds three the same way on ssclash. Nothing
+accumulates, because nothing re-registers — which is the direct evidence that these are module-eval
+registrations, i.e. exactly the ones a sweep would delete permanently.
+
+A sweep also cannot tell them from ours or from LuCI's: `luci.js` and `ui.js` register 21 listeners
+on `document` between them (`validation-failure`, `poll-start`, tooltips), the theme registers its
+own, and a global hook sees one undifferentiated list. **If a view that re-registers per render ever
+appears, the answer is a targeted teardown through `onNavigate`,** the same conclusion the
+`setTimeout`/rAF section reaches.
+
 ### Still open: in-flight responses
 
 **In-flight responses are not cancelled on leaving.** Measured: an XHR still in flight when you
