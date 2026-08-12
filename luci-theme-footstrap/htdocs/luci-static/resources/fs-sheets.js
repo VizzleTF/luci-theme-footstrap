@@ -23,7 +23,8 @@
  *
  * `invasiveSheet()` is that test; its universe is read back from cascade.css itself (same-origin,
  * so `cssRules` is readable) rather than a hand-written list, so it tracks the theme. 0.3 ms per
- * nav. Exempt: `[data-fs-shell]` (the one <style> the server emits — marked, not guessed at) and
+ * nav. Exempt: anything the server marked `[data-fs-shell]` — the shell's own two links and two
+ * styles, marked rather than guessed at (partials/head.ut) — and
  * anything inside `#view` (dies with the content swap); LuCI core injects no <style> at runtime at
  * all (checked: luci.js, ui.js, cbi.js). If cascade.css cannot be read, EVERY view sheet counts as
  * invasive: fail to the slow path, never the broken one. */
@@ -328,7 +329,8 @@ function outlivesPage(el) {
  * is real.
  *
  * WHOLE PATH, NOT A SUFFIX. head.ut prints `{{ resource }}/{{ dispatched.css }}?v=…`, and the base in
- * that line is the SAME value the runtime holds: header.ut hands `resource` to `new LuCI({…})`, and
+ * that line is the SAME value the runtime holds: luci-base's own header.ut hands `resource` to
+ * `new LuCI({…})`, and
  * `L.resource()` joins it back exactly, so the server's href is reconstructable rather than guessable
  * — only the cache key has to come off. A suffix match is what a guess costs: anchored at nothing but
  * a `/`, `custom.css` matches any sheet ending in that filename, and two in-tree apps append exactly
@@ -460,8 +462,14 @@ function documentPoisoned() {
 const CHROME_FENCE = ':where(:not([data-fs-chrome],[data-fs-chrome] *))';
 
 function fenceSelector(part) {
-	/* the getter always normalises a pseudo-element to `::`, incl. legacy `:before` */
-	const i = part.indexOf('::');
+	/* The getter always normalises a pseudo-element to `::`, incl. legacy `:before` — and the split
+	 * point is found on the MASK and sliced out of the ORIGINAL, exactly as selectorParts() does and
+	 * for the same reason: `::` is legal inside a quoted attribute VALUE (an IPv6 literal is the real
+	 * case — `[data-addr*="::"]`, `a[href*="[::1]"]`). Read raw, the fence went INSIDE the quotes and
+	 * the app's rule came back matching a value it never wrote — still valid CSS, so the setter
+	 * reported success and nothing looked wrong afterwards, which this file's header calls the worse
+	 * half of the two failures. */
+	const i = maskStrings(part).indexOf('::');
 	return i < 0 ? part + CHROME_FENCE : part.slice(0, i) + CHROME_FENCE + part.slice(i);
 }
 
@@ -485,8 +493,14 @@ function fenceRules(rules, names) {
 
 /* An @import's rules live in a sheet that is fetched separately, so they are not there the moment
  * the shim is inserted — retry until they are, then fence. Bounded: a sheet that never becomes
- * readable (404, cross-origin) simply stays unfenced, which is where we already were. */
-function fenceImported(styleEl, names, tries) {
+ * readable (404, cross-origin) simply stays unfenced, which is where we already were.
+ *
+ * The bound is a DEADLINE in ms, not a frame count. It was 60 frames described as "~1 s", which is
+ * only true at 60 Hz: the same 60 frames is 2 s on a 30 Hz panel and longer still on a throttled
+ * clock, so the budget moved with the display. Frames remain the retry TICK (they are what the
+ * browser gives for free and a cache hit lands on the first one); only the giving-up point is
+ * measured in time. */
+function fenceImported(styleEl, names, until) {
 	/* no initialiser: every path below assigns (the try, or the catch's null), so `= null`
 	 * here was a dead store — eslint 10 puts no-useless-assignment in recommended and said so. */
 	let rules;
@@ -495,7 +509,15 @@ function fenceImported(styleEl, names, tries) {
 		rules = first && first.styleSheet && first.styleSheet.cssRules;
 	} catch (e) { rules = null; }
 	if (rules) { fenceRules(rules, names); return; }
-	if (tries > 0) requestAnimationFrame(() => fenceImported(styleEl, names, tries - 1));
+	if (Date.now() < until) { requestAnimationFrame(() => fenceImported(styleEl, names, until)); return; }
+	/* GIVING UP IS A REPORTABLE EVENT. The irreversible half already happened — the app's original
+	 * is silenced, the shim owns the page — so a fence that never lands leaves that app's rules
+	 * reaching the chrome while every later pass skips the sheet as handled and documentPoisoned()
+	 * calls the document clean. It is also not only the slow-router case: rAF does not fire in a
+	 * background tab, so a page opened in one and left there passes the deadline without a single
+	 * retry. Rare, silent and it looks like a CSS bug, which is exactly what a console line is for. */
+	console.error('footstrap: could not read the re-hosted @import within the deadline — the sheet '
+		+ 'stays unfenced and may repaint the chrome on this page.', styleEl);
 }
 
 /* What a sheet IS, as text: the rules that are APPLYING, not the markup that may or may not have
@@ -557,11 +579,7 @@ const _silenced = new WeakSet();
  */
 function silence(el) {
 	_silenced.add(el);
-	el.disabled = true;
-	if (el.sheet) { el.sheet.disabled = true; return; }
-	/* no sheet yet: re-assert once there is one. `once` — the element is marked fsLayered, so this
-	 * never re-arms, and a sheet that never loads has nothing to silence. */
-	el.addEventListener('load', () => { if (el.sheet) el.sheet.disabled = true; }, { once: true });
+	setEnabled(el, false);
 }
 
 /* ---- PAGE OWNERSHIP: contain an invasive sheet instead of spending the document ----
@@ -594,7 +612,7 @@ function silence(el) {
  * Disabling is reversible, which is the whole difference.
  *
  * OWNER = body[data-page] when the sheet was re-hosted. The order that makes this sound is in
- * fs-router.js: it stamps data-page (line ~371) BEFORE require()ing the view class (~450), so at the
+ * fs-router.js: navigate() stamps data-page BEFORE it require()s the view class, so at the
  * moment a view module evaluates and appends its <style>, the attribute already names ITS page. On a
  * full load the server stamped it. Either way "now" is the sheet's own page.
  *
@@ -656,9 +674,14 @@ function currentKey() {
 	return appKey(p ? p.split('/') : []);
 }
 
-/* Both halves, for the reason silence() documents: el.disabled is the ELEMENT's flag and
- * el.sheet.disabled is what decides whether the CSS paints, and a still-loading <link> has no
- * .sheet for the assignment to reach. */
+/* BOTH HALVES, for the reason the paragraph above silence() measured: el.disabled is the ELEMENT's
+ * flag and el.sheet.disabled is what decides whether the CSS paints, and a still-loading <link> has
+ * no .sheet for the assignment to reach — so a switch-off also re-asserts once the bytes arrive.
+ * `once` — the element is marked fsLayered by then, so this never re-arms, and a sheet that never
+ * loads has nothing to silence.
+ *
+ * silence() is this with the element remembered, and says so by calling it: the two used to write
+ * the rule out separately, which is one copy of a JUDGEMENT more than this file allows itself. */
 function setEnabled(el, on) {
 	el.disabled = !on;
 	if (el.sheet) el.sheet.disabled = !on;
@@ -691,7 +714,7 @@ function rehostIntoThemeLayer(el, universe) {
 		el.after(s);		/* keep source order: ties inside the layer still resolve as they did */
 		silence(el);
 		_owner.set(s, currentKey());	/* the shim paints; the original is silenced for good */
-		fenceImported(s, universe.names, 60);	/* ~1s of frames; a cache hit lands on the first */
+		fenceImported(s, universe.names, Date.now() + 1000);	/* a cache hit lands on the first frame */
 		return;
 	}
 

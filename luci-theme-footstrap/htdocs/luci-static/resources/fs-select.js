@@ -87,7 +87,7 @@ function enhance(sel) {
 	if (sel.dataset.fsSelect || sel.disabled) return;	/* disabled: NOT marked — it may be enabled later */
 	/* `multiple` and "not in a CBI field" are permanent, so mark it and stop re-testing on
 	 * every scan */
-	if (sel.multiple || !sel.closest('.cbi-value-field, .td.cbi-value-field, .cbi-value')) {
+	if (sel.multiple || !sel.closest('.cbi-value-field, .cbi-value')) {
 		sel.dataset.fsSelect = 'skip';
 		return;
 	}
@@ -100,7 +100,14 @@ function enhance(sel) {
 			sort: false,
 			optional: Object.prototype.hasOwnProperty.call(choices, '')
 		});
-	} catch (e) { return; }
+	} catch (e) {
+		/* Marked, not merely returned from: without the mark the same select is re-selected by
+		 * scan()'s :not([data-fs-select]) on every mutation frame and throws again, forever and
+		 * silently. One loud failure, then left as the stock <select> it already is. */
+		sel.dataset.fsSelect = 'skip';
+		console.error('footstrap: a select could not be enhanced', e);
+		return;
+	}
 
 	const node = dd.render();
 	const ac = new AbortController();
@@ -210,12 +217,19 @@ function labelCells(t, head) {
 	for (const row of t.querySelectorAll('.tr, tbody tr')) {
 		if (row === head) continue;
 		const cells = row.children;
+		/* COLUMN cursor, not the cell index: a cell that spans N columns occupies N of the header's
+		 * slots while advancing the cell index by one, so keying titles off `i` captioned every cell
+		 * AFTER a spanning one with the heading of the column to its left — "Hostname" over an IP
+		 * address, and nothing to say the mapping was guessed. Only the spanning cell itself is left
+		 * uncaptioned, because it has no single heading to take. (A rowspan reaching down from an
+		 * earlier row would shift this too; no LuCI table emits one, and a wrong caption is worse
+		 * than none, so that shape stays unhandled rather than approximated.) */
+		let col = 0;
 		for (let i = 0; i < cells.length; i++) {
-			if (i >= titles.length || !titles[i]) continue;
-			if (cells[i].hasAttribute('data-title')) continue;
-			/* a cell that spans columns has no single heading to take */
-			if (cells[i].colSpan > 1) continue;
-			cells[i].setAttribute('data-title', titles[i]);
+			const span = (cells[i].colSpan > 1) ? cells[i].colSpan : 1;
+			if (span === 1 && col < titles.length && titles[col] && !cells[i].hasAttribute('data-title'))
+				cells[i].setAttribute('data-title', titles[col]);
+			col += span;
 		}
 	}
 }
@@ -243,8 +257,11 @@ const STACKABLE = '#view .table.fs-dt';
  * unreadable ribbon. Do NOT give the cells a min-width so that "cramped" MANUFACTURES an
  * overflow: tried, and it carded the firewall's zone table at 1420px and still overflowed by
  * 39px once carded — a floor big enough to force the overflow is big enough to break the card. */
-const CRAMPED = 568;	/* stock LuCI cards its tables at a 600px viewport; below the 767px
-						 * tier .fs-content pads 16px a side, so 600 -> 568 of room */
+const CRAMPED = 568;	/* stock LuCI cards its tables at a 600px viewport; below the 767px tier
+						 * .fs-content pads var(--fs-space-4) a side, 16px at the default density,
+						 * so 600 -> 568 of room. A fixed number and not a re-read of that token on
+						 * purpose: the threshold is the DESIGN judgement above, and Compact density
+						 * shrinking the gutter to 10px is not a reason to keep a table wider. */
 
 /* The ribbon has one more shape, and CRAMPED cannot see it: the table has room by the number
  * above and still shreds its FIRST column, because auto table layout hands width out by what

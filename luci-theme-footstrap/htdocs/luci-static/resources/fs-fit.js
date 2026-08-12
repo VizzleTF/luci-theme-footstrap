@@ -44,13 +44,11 @@ function schedule() {
 /* Watch an element's size. Any change re-fits everything — the fitters are cheap and few. */
 function watch(el) {
 	if (!el) return;
-	if (!_ro) {
-		if (!window.ResizeObserver) {			/* no RO: fall back to the window */
-			window.addEventListener('resize', schedule);
-			return;
-		}
-		_ro = new ResizeObserver(schedule);
-	}
+	/* No feature test: the shipped CSS needs :has() and container queries, both years younger than
+	 * ResizeObserver in every engine, so a browser that can render this theme at all has it. The
+	 * window-resize fallback that used to sit here was worse than nothing anyway — it cannot see a
+	 * rail collapse or a layout toggle, which is the pair this file uses an observer FOR. */
+	if (!_ro) _ro = new ResizeObserver(schedule);
 	_ro.observe(el);
 }
 

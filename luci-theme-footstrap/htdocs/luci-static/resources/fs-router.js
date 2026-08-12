@@ -47,9 +47,34 @@ const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = 
 	};
 })();
 function clearViewIntervals() {
-	const keep = (L.Poll && L.Poll.timer) || null;
+	/* `L.Poll.timer` is the id of LuCI's OWN 1 s tick, and it is private state — `add`/`remove`/
+	 * `start`/`stop`/`active` are the documented surface, and upstream has already marked the whole
+	 * `L.Poll` alias deprecated (`'require poll'` is its replacement, and neither 24.10 nor 25.12
+	 * ships poll.js yet, so the alias is still the only way in). If that field ever goes, `keep`
+	 * becomes null and this sweep would clear LuCI's tick along with the view's timers — every poll
+	 * on every later page silently dead, from a rename we did not notice. So the missing field is
+	 * not a null: it is a reason to do NOTHING, once, loudly. A view's leftover interval outliving
+	 * its page costs a wasted RPC; killing the global tick costs the router's live data. */
+	/* Asked through the DOCUMENTED half first: active() says whether LuCI's tick is running at all,
+	 * and `timer` is deleted by stop() — so an absent field is the ordinary "nothing to protect"
+	 * case on a page with no pollers, not a sign that upstream moved it. The anomaly worth reporting
+	 * is the pair disagreeing: a tick that is running while the id it runs on has no name we know.
+	 * Then do NOTHING, once, loudly: a view's leftover interval outliving its page costs a wasted
+	 * RPC, whereas clearing LuCI's own tick costs every live value on every later page. */
+	const running = (typeof L.Poll.active === 'function') ? L.Poll.active() : (L.Poll.timer != null);
+	if (running && L.Poll.timer == null) {
+		if (!_pollTimerWarned) {
+			_pollTimerWarned = true;
+			console.error('footstrap: LuCI is polling but L.Poll.timer is not readable — leaving view '
+				+ 'intervals alone rather than risking its tick. fs-router.js needs updating for this '
+				+ 'luci-base.');
+		}
+		return;
+	}
+	const keep = running ? L.Poll.timer : null;
 	_viewIntervals.forEach((id) => { if (id !== keep) window.clearInterval(id); });
 }
+let _pollTimerWarned = false;
 
 let _wired = false;
 /* The pathname whose view is CURRENTLY rendered — popstate compares against it to tell a real
@@ -64,7 +89,7 @@ let _navGen = 0;
  * The two layouts scroll different elements: the sidebar layout pins .fs-shell to 100dvh and gives
  * overflow-y to .fs-main (#maincontent), the top layout lets the document scroll. A browser restores
  * an INNER scrollable region only across full loads, never on a same-document traversal — measured
- * (docs/spa-router.md §2): Back opened the incoming page at 0, because the swap empties #view,
+ * (docs/spa-router.md, "Scroll"): Back opened the incoming page at 0, because the swap empties #view,
  * scrollHeight collapses and the browser clamps scrollTop.
  *
  * The DOCUMENT scroller was left to the browser's own scrollRestoration ('auto') on the grounds that
@@ -116,16 +141,19 @@ function saveScroll() {
 }
 
 /* Put the scrollers back where the entry left them — but only once the incoming view has grown that
- * much height (docs/spa-router.md §5: restoring before the content exists is clamped to 0 and reads as
+ * much height (docs/spa-router.md, "Scroll": restoring before the content exists is clamped to 0 and reads as
  * "worked"). The view renders behind an RPC, so poll by frame; a newer navigation cancels via the
  * generation, and a page that never reaches the old height again is simply left at the top. Each
  * offset is waited for on its OWN scroller, so a layout switched between the two entries restores
  * whichever half it can rather than blocking on the half that no longer scrolls. */
 function restoreScroll(pos, gen) {
 	if (!pos || (!pos.win && !pos.main)) return;
-	let tries = 300; /* ~5 s at 60 fps — outlasts a slow RPC without polling forever */
+	/* A DEADLINE, not a frame count: this was 300 frames called "~5 s", which holds only at 60 Hz —
+	 * the same budget is 10 s on a 30 Hz panel. Frames stay the tick (they are when a paint could
+	 * have changed the height); time decides when to stop waiting for an RPC that is not coming. */
+	const until = Date.now() + 5000;
 	(function tick() {
-		if (gen !== _navGen || --tries < 0) return;
+		if (gen !== _navGen || Date.now() > until) return;
 		const de = document.documentElement;
 		const sc = document.getElementById('maincontent');
 		let pending = false;
@@ -490,7 +518,7 @@ function navigate(pathname, push, kbd) {
 	 * when View.__init__ replaces it there is nothing to see, and the string arrives already
 	 * translated in the ~40 languages this theme ships no catalogue for (the chrome rule — a
 	 * context-free msgid is how we inherit luci-base's translation). */
-	if (!_seen.has(tree.viewClassFor(node))) {
+	if (!_seen.has(className)) {
 		const vp = document.getElementById('view');
 		if (vp) {
 			const s = document.createElement('div');
@@ -541,7 +569,11 @@ function navigate(pathname, push, kbd) {
 		try { fn(rsegs); }
 		catch (e) { console.error('footstrap: a navigation callback threw', e); }
 	}
-	try { if (typeof ui.hideModal === 'function') ui.hideModal(); } catch (e) {}
+	/* ui hard-requires into this module and ui.js defines hideModal unconditionally, so there is no
+	 * feature to test; what is caught is a modal's own teardown throwing, which must not take the
+	 * navigation with it. Reported, not swallowed — the same rule as the loop above. */
+	try { ui.hideModal(); }
+	catch (e) { console.error('footstrap: hideModal threw during a navigation', e); }
 
 	/* point the runtime env at the new node so views, tabs and highlighting read the right
 	 * path. For a fully-matched leaf, request == dispatch path. */
@@ -579,8 +611,8 @@ function navigate(pathname, push, kbd) {
 	 * correctly returns — one dead Back press per stray click. A full load has no such trap. */
 	if (push) {
 		const same = pathname === window.location.pathname;
-		if (_curId == null) _curId = newEntryId();
-		/* a NEW entry gets a new id; re-navigating in place keeps the entry and therefore its id */
+		/* a NEW entry gets a new id; re-navigating in place keeps the entry and therefore its id
+		 * (seed() adopted one before wire() made this function reachable, so there is always one) */
 		if (!same) _curId = newEntryId();
 		history[same ? 'replaceState' : 'pushState']({ fsnav: true, fsid: _curId }, '', pathname);
 	}
@@ -601,7 +633,7 @@ function navigate(pathname, push, kbd) {
 	 *
 	 * A popstate replay resets nothing on purpose: BOTH scrollers are restored there from _scrollMem —
 	 * see restoreScroll(). scrollRestoration is left at 'auto': the UA's own attempt lands before the
-	 * swap and is undone by it (§2), so it neither helps nor hurts, and 'manual' would only take away
+	 * swap and is undone by it (see restoreScroll above), so it neither helps nor hurts, and 'manual' would only take away
 	 * the case that does work — a genuine full load. */
 	if (push) {
 		window.scrollTo(0, 0);
@@ -613,7 +645,8 @@ function navigate(pathname, push, kbd) {
 	 * renderChrome() has just done `#topmenu.innerHTML = ''`, so the very <a> the user activated with
 	 * Enter no longer exists: focus falls back to <body>, the next Tab restarts at the skip link, and
 	 * nothing says the page changed — URL, title and #view all moved in silence. So do what a real
-	 * navigation would, and where matters (Sutton's five-prototype study, docs/spa-router.md §3): a KEYBOARD
+	 * navigation would, and where matters (Sutton's five-prototype study, docs/spa-router.md,
+	 * "Accessibility of a route change"): a KEYBOARD
 	 * activation (ev.detail === 0) moves focus to the skip link — a small target whose :focus overlay
 	 * tells a sighted keyboard user where they are, with Enter jumping straight to the content; its
 	 * text differs from the live region's announcement below, so the double announcement complements
@@ -818,7 +851,8 @@ function wireRouter() {
  * take back what that one just painted. */
 document.addEventListener('poll-stop', () => {
 	if (L.Poll && L.Poll.queue && L.Poll.queue.length === 0) {
-		try { ui.hideIndicator('poll-status'); } catch (e) {}
+		try { ui.hideIndicator('poll-status'); }
+		catch (e) { console.error('footstrap: hideIndicator threw on poll-stop', e); }
 	}
 });
 
@@ -844,7 +878,7 @@ function wireVisibility() {
 			else if (wasActive) {
 				L.Poll.start();
 			}
-		} catch (e) {}
+		} catch (e) { console.error('footstrap: the poll pause/resume threw', e); }
 	});
 }
 

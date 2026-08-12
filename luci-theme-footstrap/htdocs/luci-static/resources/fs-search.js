@@ -24,7 +24,11 @@
 
 /* ---- the index ---------------------------------------------------------- */
 
-/* admin/<section>/<page>/<tab> — four levels is every path LuCI's dispatcher renders. */
+/* How deep below the MODE the walk goes. `depth` counts recursion levels and the walk starts at 1
+ * on a node that already has two segments, so a node at depth N carries N+1 of them: 4 admits
+ * admin/<section>/<page>/<tab>/<subtab>. That is one more than LuCI's own dispatcher renders, and
+ * deliberately so — a third-party node nested deeper is worth finding, and the depth term in the
+ * score below already ranks it last. */
 const MAX_DEPTH = 4;
 
 let _index = null;
@@ -99,6 +103,13 @@ function buildIndex() {
 	return out;
 }
 
+/* Built once per DOCUMENT, and deliberately not re-derived per open: it is a projection of the
+ * client menu tree, which `ui.menu.load()` itself caches for the life of the document. So the
+ * palette is exactly as fresh as the sidebar beside it — a package installed or removed without a
+ * reload is missing from, or still listed in, BOTH. Invalidating only this half would make the two
+ * disagree, which is worse than either being stale; the reload the package manager already prompts
+ * for is what refreshes them together. (Cheap enough to rebuild if that ever changes: 238 nodes on
+ * the dev router.) */
 function index() {
 	if (!_index) _index = buildIndex();
 	return _index;
@@ -190,9 +201,9 @@ function warmRecent() {
 	const paths = _recent.filter((p) => p !== here).slice(0, RECENT_WARM);
 	if (!paths.length) return;
 	/* Nothing waits on this, so it belongs after the page has settled — at idle, with a timeout for a
-	 * page that never goes idle (a busy poll). The fallback is deliberately a LONG timeout, unlike
-	 * fs-appearance's ~1 ms one: that wires a button the user may click immediately, this competes
-	 * with the view's own module fetches and RPCs and must lose that race on purpose. */
+	 * page that never goes idle (a busy poll). The fallback is deliberately a LONG timeout: nothing
+	 * on screen waits for this, so it competes with the view's own module fetches and RPCs and must
+	 * lose that race on purpose. */
 	const go = () => paths.forEach((p) => router.prefetchSegs(p.split('/')));
 	if (typeof window.requestIdleCallback === 'function')
 		window.requestIdleCallback(go, { timeout: 4000 });
@@ -379,8 +390,7 @@ function wire() {
 	/* Back and Forward are navigations no listener here can see: every close above is a user act on
 	 * the document (Escape, the scrim, the trigger, picking a result). An open palette therefore rode
 	 * a popstate onto the next page, aria-modal and Tab-trapped, while the router moved focus behind
-	 * it. Same reasoning as the Appearance popover's — see fs-appearance.js. returnFocus=false because
-	 * the router places focus itself on a navigation. */
+	 * it. returnFocus=false because the router places focus itself on a navigation. */
 	router.onNavigate(() => close(false));
 
 	/* Ctrl/Cmd+K is the shortcut every command palette has taught users, and `/` is the one every

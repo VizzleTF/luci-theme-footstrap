@@ -16,7 +16,7 @@
  *
  *   fs-menutree    path <-> menu node, alias/firstchild resolution (a port of dispatcher.uc)
  *   fs-prefs       the Appearance axes and their localStorage
- *   fs-widgets     disclosure primitives, the seg/slider controls, popup placement
+ *   fs-widgets     the inline-SVG wrapper, the disclosure primitives, the colour control
  *   fs-chrome      mode menu, section tabs, the rail toggle, the "does it still fit" measurements
  *   fs-router      the SPA client router (docs/spa-router.md)
  *   fs-sheets      the guard against a view's injected CSS repainting every later page
@@ -76,7 +76,7 @@ return baseclass.extend({
 			router.wire();
 			router.wireVisibility();
 		/* fs-chrome's renderTabMenu warns about exactly this, and the root chain was left bare: a
-		 * throw anywhere in the calls above took out the menu, the router and the Appearance popover
+		 * throw anywhere in the calls above took out the menu, the router and the Appearance tab
 		 * together, silently. It still fails — there is no sane partial recovery — but loudly. */
 		}).catch((e) => console.error('footstrap: chrome init failed', e));
 	}

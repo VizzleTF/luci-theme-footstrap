@@ -9,7 +9,7 @@
 /* The theme's ONE menu renderer: a vertical #topmenu the CSS also turns into the top bar and the
  * rail flyouts — same markup, no second renderer (docs/chrome.md). The disclosure primitives it builds
  * sections on come from fs-widgets and the auto-collapse preference from fs-prefs; the rest of the
- * chrome (mode menu, tabs, rail, router, popover) is bootstrapped by menu-footstrap-common, which
+ * chrome (mode menu, tabs, rail, router, Appearance tab) is bootstrapped by menu-footstrap-common, which
  * this file composes with by injecting renderMainMenu into common.init — a callback, not an
  * override, because a required LuCI module is a singleton and cannot be subclassed (docs/conventions.md).
  * Spec: docs/chrome.md */
@@ -67,9 +67,8 @@ const OPEN_LI = '#topmenu > li.open';
  * item near the right edge would push its panel past the viewport. Nudge it back inside. Runs at
  * ANY width now that the top bar is measured (no 768 floor); the rail flies panels out sideways
  * and needs a different placement, so it is excluded below. */
-/* the viewport edge gap, defined once in fs-widgets.js — the Appearance popover keeps a popup off
- * the edge by the same amount, and the two used to state it separately */
-const EDGE_GAP = widgets.EDGE_GAP;
+/* how close the panel may come to the viewport edge before it is nudged back in */
+const EDGE_GAP = 8;
 /* Is this panel a BAR dropdown (anchored under its item) rather than a rail flyout (anchored
  * beside it)? Ask what the STYLESHEET asks, exactly as flyoutMode() does: `data-narrow` is what
  * turns the sidebar layout into a bar, and it also disables the rail (the rail's rules are all

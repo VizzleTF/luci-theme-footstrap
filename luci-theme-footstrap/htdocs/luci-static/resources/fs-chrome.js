@@ -151,7 +151,7 @@ function resolveLen(token, dflt) {
  * stylesheet's widths in two different places. Reaching for these means the measurement failed. */
 const GEOM_DFLT = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56 };
 
-let _geom = null, _geomDensity = null;
+let _geom = null, _geomDensity = null, _geomWarned = false;
 function shellGeometry() {
 	const density = document.documentElement.getAttribute('data-density') || '';
 	if (_geom && _geomDensity === density) return _geom;
@@ -170,7 +170,19 @@ function shellGeometry() {
 	 * absent token reports 0 for all four (an abs-positioned empty div with `width:auto` shrinks to
 	 * 0, and 0 is finite, so the per-read fallback above never fires). Neither can be seen in the
 	 * numbers one at a time; the RELATION between them is what gives it away. */
-	_geom = (g.railW > 0 && g.railW < g.sidebarW && g.contentMin > 0) ? g : Object.assign({}, GEOM_DFLT);
+	const sane = (g.railW > 0 && g.railW < g.sidebarW && g.contentMin > 0);
+	/* SAY SO when it fires. The fallback keeps the chrome laid out, which is right — but it lays it
+	 * out on the literals CLAUDE.md forbids copying into JS, so from there on the sidebar folds at a
+	 * width nobody chose while the page still LOOKS correct. Silent, that is how a renamed token
+	 * ships green; one console line is the difference between a mystery and a grep. Once per
+	 * document — this runs on every resize and every mutation. */
+	if (!sane && !_geomWarned) {
+		_geomWarned = true;
+		console.error('footstrap: the chrome widths did not read back from the stylesheet (got '
+			+ JSON.stringify(g) + ') — falling back to the built-in defaults. A --fs-* width token was '
+			+ 'renamed, or a foreign sheet is reaching the measurement probe.');
+	}
+	_geom = sane ? g : Object.assign({}, GEOM_DFLT);
 	return _geom;
 }
 
@@ -236,8 +248,8 @@ function fitChrome() {
 	}
 
 	/* The cluster's own escalation, for EVERY bar — the top layout at any width, and the sidebar
-	 * layout once fitShell has stamped data-narrow. It runs after the menu's, because on the top
-	 * layout .fs-bar-stack has by then given the menu its own row and taken it out of the sum. */
+	 * layout once fitShell has stamped data-narrow. It runs after the menu's, so that when the menu
+	 * did NOT fit, .fs-bar-stack has already given it a row of its own. */
 	if (bar && (topBar || document.documentElement.hasAttribute('data-narrow')))
 		fitCluster(bar, menu);
 }
@@ -268,8 +280,12 @@ function fitCluster(bar, menu) {
 
 /* Add the widths up rather than read positions: the bar is align-items:center over children of
  * differing heights, so offsetTop differs even on ONE row — the same trap the menu measurement
- * documents above. The menu is excluded because it owns a full-width row of its own in every bar
- * (`ul.nav { flex: 1 1 100% }`), so it is never what the cluster competes with. */
+ * documents above. The menu is excluded either way. Where it wraps to a row of its own it plainly
+ * is not competing (`ul.nav { flex: 1 1 100% }` — the sidebar-layout bar, and the top bar once
+ * .fs-bar-stack is set); where it does share the brand's row, un-stacked at `flex: 1 1 auto`
+ * (theme/50-toplayout.css), it is the one child that SHRINKS, so counting its current width would
+ * report the cluster as not fitting whenever the menu happened to be wide. What the cluster has to
+ * fit beside is the brand and the other actions. */
 function clusterFitsBrandRow(bar, menu) {
 	const cs = getComputedStyle(bar);
 	const gap = parseFloat(cs.columnGap) || 0;
@@ -292,8 +308,7 @@ function clusterFitsBrandRow(bar, menu) {
  * MutationObserver already watches — and it re-fits SYNCHRONOUSLY (rule 2), where the copy here
  * deferred through fit.schedule(), i.e. the duplicate was strictly the slower path into the same
  * work. #tabmenu is a sibling of #view rather than inside it, but nothing writes it except
- * renderChrome(), which schedules a fit itself. Resize is fs-fit's ResizeObserver on #view (with a
- * window-resize fallback where there is no RO). */
+ * renderChrome(), which schedules a fit itself. Resize is fs-fit's ResizeObserver on #view. */
 
 /* modes -> #modemenu; drives the injected renderMainMenu for the active mode */
 function renderModeMenu(node, renderMainMenu) {

@@ -34,6 +34,6 @@ return baseclass.extend({
 	 * API paths from, and nothing has needed the bare `owner/name` since. */
 	REPO_URL: 'https://github.com/VizzleTF/luci-theme-footstrap',
 	isReal,
-	/* what the popover's version row prints */
+	/* what the Appearance tab's version row prints */
 	label: () => (isReal() ? ('Footstrap v' + FS_VERSION) : 'Footstrap (dev)')
 });
