@@ -343,54 +343,27 @@ function idTower(t) {
 
 /* ---- AND THE SAME RIBBON IN A COLUMN THAT IS NOT THE FIRST ----
  *
+ * There is no second test for it, and that is the fix rather than an omission.
+ *
  * `idTower` above is deliberately first-column-only, on the grounds that "a value column wrapping to
- * a few lines is a value being shown, not a table falling apart". That holds right up until the value
- * is ONE TOKEN. A cell with spaces in it wraps between words and stays legible at any width; a cell
- * that is a single unbreakable string can only be broken THROUGH, so once its column runs out the
- * text turns into a vertical ribbon of fragments — and, because `overflow-wrap: anywhere` gives such
- * a cell a min-content of one character, the table never overflows and the measurement above never
- * fires. It reports that everything fits, which is true and useless.
+ * a few lines is a value being shown, not a table falling apart". That held right up until the value
+ * was one unbreakable token: `overflow-wrap: anywhere` gave such a cell a min-content of ONE
+ * CHARACTER, so auto table layout was free to starve its column to one character, and `overflows()`
+ * then reported — truthfully, uselessly — that the table fit. Reported from a hardware router at
+ * 700-790px of window: the v4 lease table cards there (its `nowrap` columns give it a floor, so it
+ * really does overflow) while the v6 table beside it shredded the DUID, measured at 5 lines with
+ * 674px of room and 7 at 654px, against 1 line at 1160px.
  *
- * Reported from a hardware router: Status → Overview between roughly 700 and 790px of window. The v4
- * lease table cards there (its IPv4/MAC/IAID columns are `nowrap`, so it has a floor and DOES
- * overflow) while the v6 table beside it stays a table and shreds the DUID — measured on that router
- * at 5 lines with 674px of room, 7 lines at 654px, against 1 line at 1160px. The reporter's screenshot
- * shows three characters to a line, twelve lines tall, beside a v4 table already in cards.
+ * A first pass answered it with a line count, which is a number somebody picks. This asks the table
+ * instead: `fit.wordFloor()` returns the narrowest the table can be without breaking a word through —
+ * per column, the widest WORD it must show, in that column's own font, summed. Past that width the
+ * browser has to cut through a value, and the card view is what shows values whole. So every table
+ * carries its own breakpoint, derived from its own content, and no threshold was chosen anywhere.
  *
- * WHITESPACE IS THE WHOLE DISCRIMINATOR, and it separates the two cases cleanly on real pages. Every
- * multi-line cell on that router at 1440 / 1000 / 860px was dumped and classified: the ONLY tokens
- * that reach three lines are the two DHCPv6 DUIDs. Everything else that goes tall has spaces in it and
- * is wrapping exactly as intended — Processes' command lines (up to 11 lines at 860px), the assoclist's
- * `229.4 Mbit/s, 20 MHz, HE-MCS 9, HE-NSS 2` rates, the `Access Point "vaka" (phy1-ap0)` badges. None
- * of those may card, and none of them does.
- *
- * TWO LINES is the judgement, the way CRAMPED and MAX_ID_LINES are: a token split in two still reads
- * as one value on two lines, and past that it is fragments. On the reporting router that is the whole
- * of the difference — the DUID column is 1 line at 1160px of room, 2 at 910, and 3 or more below 790,
- * which is exactly the band the report came from. */
-const MAX_TOKEN_LINES = 2;
-const HAS_SPACE = /\s/;
-
-function shreddedToken(t) {
-	const rows = t.querySelectorAll('.tr:not(.table-titles):not(.cbi-section-table-titles):not(.placeholder)');
-	if (!rows.length) return false;
-	const cs = getComputedStyle(rows[0]);
-	const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2 || 16;
-	/* the same cheap gate idTower uses, once per ROW before once per CELL: this runs on every poll
-	 * tick over tables that render hundreds of rows, and a row shorter than the threshold cannot
-	 * contain a cell taller than it */
-	const floor = (MAX_TOKEN_LINES + 1) * lh;
-	for (const row of rows) {
-		if (row.clientHeight < floor) continue;
-		for (const cell of row.children) {
-			if (cell.clientHeight < floor) continue;
-			const text = (cell.textContent || '').trim();
-			if (!text || HAS_SPACE.test(text)) continue;
-			if (fit.textLines(cell) > MAX_TOKEN_LINES) return true;
-		}
-	}
-	return false;
-}
+ * On the reporting router, at 1190px of room: leases6 asks for 935, the associated-stations table
+ * for 966, the v4 leases for 645, Processes for 794, Connections for 550 and Startup for 381 — so
+ * the two that were unreadable card at roughly a 1000px window, and the four that were fine keep
+ * being tables until the room they actually need runs out. */
 
 function fitTables() {
 	document.querySelectorAll(STACKABLE).forEach((t) => {
@@ -402,9 +375,8 @@ function fitTables() {
 		const room = fit.roomFor(t);
 		if (!(room > 0)) { if (was) t.classList.add('fs-stacked'); return; }
 
-		/* the two row walks last, cheapest question first: idTower reads one column, shreddedToken
-		 * every cell of a row that is tall enough to hold a ribbon */
-		const stack = room < CRAMPED || fit.overflows(t) || idTower(t) || shreddedToken(t);
+		/* the two row walks last, cheapest first: idTower reads one column, wordFloor every cell */
+		const stack = room < CRAMPED || fit.overflows(t) || idTower(t) || fit.wordFloor(t) > room;
 		/* write only on a real change: the poll re-renders these tables once a second, and
 		 * toggling the class off and on each tick would invalidate style for every row of
 		 * Processes/Leases for nothing */

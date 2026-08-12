@@ -254,26 +254,29 @@ when there is something to scroll.
 
 `fit.overflows()` cannot see either of them, because `overflow-wrap: anywhere` gives a cell a
 min-content of one character: the table always "fits", it just stops being readable. So `fitTables()`
-asks two more questions, both design judgements with a number, both in `fs-select.js`:
+asks two more questions:
 
 - **`idTower` — the first column past `MAX_ID_LINES` (5).** The row's identity squeezed into a tower
   of half-words by a greedy neighbour. Measured on Wireless: 101 px and 5 lines at a 900 px viewport,
   76 px and 8 lines at 800 px, and at no width did the table card (issue #7).
-- **`shreddedToken` — any cell that is ONE TOKEN past `MAX_TOKEN_LINES` (2).** A cell with spaces
-  wraps between words and stays legible; a single unbreakable string can only be broken *through*, so
-  its column running out turns it into a vertical ribbon of fragments. Reported from a router at
-  700–790 px of window, where the v4 lease table cards (its `nowrap` columns give it a floor, so it
-  really does overflow) while the v6 table beside it shreds the DUID: 5 lines at 674 px of room, 7 at
-  654 px, against 1 line at 1160 px.
+- **`fit.wordFloor(t) > room` — the table is narrower than its own content needs.** No number is
+  picked here at all: `wordFloor` returns, per column, the width of the widest WORD that column has
+  to show in that column's own font, summed across columns. Below that width the browser has to cut
+  through a value, and the card view is what shows values whole. Every table therefore carries its
+  own breakpoint, computed from its own rows.
 
-**Whitespace is the whole discriminator**, and it separates the two cases cleanly on real pages. Every
-multi-line cell on a live router was dumped and classified at 1440 / 1000 / 860 px: the only tokens
-reaching three lines are the two DHCPv6 DUIDs. Everything else that goes tall has spaces in it and is
-wrapping as intended — Processes' command lines (11 lines at 860 px), the assoclist's
-`229.4 Mbit/s, 20 MHz, HE-MCS 9` rates, the `Access Point "vaka" (phy1-ap0)` badges. None of those may
-card, and none of them does; a census over all 196 menu pages of the stand at three widths finds **0**
-token cells past two lines. Cost on the worst page there is (Processes at 860 px, 16 rows tall enough
-to hold a ribbon): **0.19 ms** per pass, guarded row-first so a short row is one `clientHeight` read.
+On the reporting router at 1190 px of room, that number is **935** for the DHCPv6 leases, **966** for
+associated stations, **645** for the v4 leases, **794** for Processes, **550** for Connections and
+**381** for Startup — so the two tables that were unreadable card at roughly a 1000 px window while
+the four that were fine stay tables until the room they actually need runs out. Before/after over the
+same DOM: **15 of 136** table-states change on the router, **5 of 88** on the stand.
+
+**The engine cannot be asked this.** Flipping `overflow-wrap` for one layout and reading min-content
+back does not work: Blink returns the same table min-content for `normal`, `break-word` and
+`anywhere` — measured at 645 px on Processes while the widest word alone needs 367 — so the honest
+floor has to be computed, not queried. `wordFloor` measures with a canvas, sampling the font once per
+column and measuring only each column's longest-by-characters word; both approximations are stated in
+the function, and they take the walk over Processes' 114 rows from 6 ms to about **1 ms**.
 
 ### The first column has a floor, and the rest do not
 
