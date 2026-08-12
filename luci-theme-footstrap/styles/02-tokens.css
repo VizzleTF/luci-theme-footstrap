@@ -37,8 +37,8 @@
 		 * measures 1.15 / 1.27 / 1.17 / 1.29 : 1 across palette x mode. That is a GLOW, not an
 		 * indicator: WCAG 1.4.11 wants 3:1 for the thing that tells you where focus is. It is
 		 * legitimate only BESIDE a second channel — every field here also flips border-color to
-		 * --fs-accent, and that change measures 4.88-6.52:1, so the border is the indicator and
-		 * the tint is the halo around it.
+		 * --fs-accent, and that change measures 4.57-7.04:1 across the three palettes x both modes
+		 * x the three surfaces, so the border is the indicator and the tint is the halo around it.
 		 *
 		 * -solo is for a control where the ring is the WHOLE indicator: nothing else about it
 		 * changes on focus. Three groups were relying on the tint alone and therefore showed
@@ -46,7 +46,8 @@
 		 * buttons (10-chrome.css), the section tabs (40-tabs.css) and both range sliders. The
 		 * 2px of surface is what lets it read against a FILLED control too (an accent-filled
 		 * button or the active tab pill would otherwise take an accent ring on an accent box);
-		 * solid accent then measures 5.19 / 5.39 / 6.52 / 8.52 on panel, 4.88-9.14 on the page.
+		 * solid accent then measures 5.19 / 5.39 / 5.22 / 7.04 / 5.81 / 5.24 on panel across the six
+		 * palette x mode blocks, and 4.61-7.55 on the canvas.
 		 * It had been written out as a literal twice (the filled buttons, the active pill) before
 		 * it had a name — the drift shape the ladder exists to prevent.
 		 *
@@ -122,9 +123,9 @@
 		--fs-blur: blur(12px);
 
 		/* the circular-arrows refresh glyph, as a mask so its colour follows the palette
-		 * (--fs-good active / --fs-dim paused). ONE copy: the poll-status pill collapses to it
-		 * both in the rail (20-shell.css) and in the top bar before it stacks (50-toplayout.css),
-		 * and inlining the SVG twice is exactly the drift css-dup exists to catch. STATIC glyph
+		 * (--fs-good active / --fs-dim paused). ONE copy: the poll-status pill collapses to it both
+		 * in the collapsed rail and in the bar's compact cluster (20-shell.css owns both rules), and
+		 * inlining the SVG twice is exactly the drift css-dup exists to catch. STATIC glyph
 		 * on purpose — see the rail note; a spinner makes an idle poll look busy and moves the
 		 * click target that pauses it. */
 		/* OURS. It was derived from Lucide's `refresh-cw` (ISC) — `M21 3v5h-5` was byte-identical,
@@ -153,9 +154,11 @@
 		 * `filter` recolours the TEXT too, and a light-mode solid button is a saturated fill
 		 * with WHITE ink, which cannot get brighter — on --fs-accent (#0969da) white is
 		 * 5.19:1 at rest, brightness(1.08) drops it to 4.59:1 and a visible 1.15 to 4.08:1,
-		 * an AA failure caused by hovering. So light DARKENS (0.90 -> 6.16:1: bigger cue AND
-		 * better contrast); dark, whose fill is light and ink dark, brightens (1.15 -> ~8:1).
-		 * Both move the button away from the page it sits on. */
+		 * an AA failure caused by hovering. So light DARKENS: .90 moves fill and ink together
+		 * and lands at 4.94:1 — a hair under the resting 5.19 rather than the 6.16 you get by
+		 * darkening the fill alone, and still clear of the 4.5 floor that brightening breaks.
+		 * Dark, whose fill is light and ink dark, brightens instead (1.15). Both move the button
+		 * away from the page it sits on, which is what the cue has to do. */
 		--fs-hover-lift: brightness(.90);
 
 		/* ---- MOTION — four durations, because the UI does four things. There used to be
@@ -210,9 +213,10 @@
 		 * localStorage `fs-radius`, pre-painted inline on :root by partials/head.ut before
 		 * first paint); the three semantic radii scale from it proportionally so every
 		 * surface rounds in step, and pills stay fully round. At base 12: card 12, control
-		 * 10, chip 8. Every border-radius in theme/pages reads one of these — the only bare
-		 * px left are 0 / 50% / hairline insets and two that are not a card's corner
-		 * (theme/60-inputs.css 8px = half the 16px scrollbar; theme/70-modal.css 4px). */
+		 * 10, chip 8. Every border-radius in theme/pages reads one of these — the only bare px left
+		 * are 0, 50%, and three that are not a card's corner at all: the checkbox tick box's 2px
+		 * (theme/60-inputs.css) and the 1px on each of the two chevron glyphs (pages/20-overview.css,
+		 * pages/80-appearance.css), which are 7px squares rotated 45°. */
 		--fs-radius-base: 12px;
 		--fs-radius-lg: var(--fs-radius-base);				/* cards, panels, modals, table frame, popovers */
 		--fs-radius: calc(var(--fs-radius-base) * 5 / 6);	/* controls: inputs, buttons, dropdowns, tabs (10 @12) */
@@ -262,7 +266,7 @@
 		 * between a heading and the text under it, where before there was one pixel.
 		 * Ratio is roughly 1.25 per step. Anything that needs a size not on this list is making a
 		 * design decision and should say so in a comment. */
-		/* ---- DENSITY: one axis, two multipliers, and it only works because of the scales ----
+		/* ---- DENSITY: one axis, three multipliers, and it only works because of the scales ----
 		 *
 		 * Compact / Normal / Large is a CLIENT preference (Appearance), stamped as
 		 * :root[data-density] — absent means Normal, so the default costs no attribute and no
@@ -271,16 +275,20 @@
 		 * THREE multipliers, because three different kinds of size want different treatment and one
 		 * knob gets all three wrong:
 		 *
-		 *   --fs-density-type   TEXT. Compact does not touch it at all: "compact" is a request for
-		 *                       less air, not for smaller writing, and shrinking the text is how a
-		 *                       density control turns into an accessibility problem.
+		 *   --fs-density-type   TEXT, and it moves LEAST: .9 at Compact, 1.15 at Large. "Compact" is
+		 *                       a request for less air, not for smaller writing, so the type gives up
+		 *                       a tenth where the air gives up a third — at .9 the base is 12px and
+		 *                       the eyebrow 10px, which is the floor this file is willing to go to,
+		 *                       and only because the user asked for the mode by name.
 		 *   --fs-density-space  pure AIR — padding, margin, gap. This is what actually buys the room,
-		 *                       so it moves the most (.65 at Compact).
+		 *                       so it moves the most (.65 at Compact). It does NOT grow at Large: the
+		 *                       point there is bigger text, and inflating the air with it just reads
+		 *                       as zoom, which is the browser's job.
 		 *   --fs-density-box    boxes that must HOLD text or an icon: the sidebar column, the rail,
 		 *                       the bar height, the square icon buttons, the control-height floors.
-		 *                       These cannot follow the air: with type unchanged, a sidebar cut by
-		 *                       35% would no longer fit the menu labels it exists to show. They move
-		 *                       gently (.85), which is roughly what their own padding gave up.
+		 *                       These cannot follow the air: the type only gives up a tenth, so a
+		 *                       sidebar cut by 35% would no longer fit the menu labels it exists to
+		 *                       show. They move gently (.85 / 1.15).
 		 *
 		 * This is only expressible because every size in the theme now reads one of these tokens:
 		 * before that, a density axis would have meant hunting ~240 literals and would have gone
@@ -378,8 +386,9 @@
 		--fs-space-6: calc(24px * var(--fs-density-space));
 		--fs-space-7: calc(28px * var(--fs-density-space));
 		/* The top of the ladder is sparse on purpose — these three are gutters and insets, not
-		 * rhythm, and each has exactly one or two users (the login card's bottom margin, the gauge's
-		 * right gutter, the room a field leaves for its own chevron). They are named so that no
+		 * rhythm, and each has two or three users: the sidebar accordion's indent and the search
+		 * palette's bottom padding (-7), the room a field leaves for its own chevron (-8), the login
+		 * card's bottom margin and the gauge's two right gutters (-10). They are named so that no
 		 * padding in this theme is an unexplained number, not because a fourth caller is expected. */
 		--fs-space-8: calc(32px * var(--fs-density-space));
 		--fs-space-10: calc(40px * var(--fs-density-space));
@@ -395,7 +404,7 @@
 
 		/* One control height for every field that is a single line — input, select, .cbi-select,
 		 * .cbi-dropdown, and the checkbox/radio row that must line up beside them. DERIVED, not
-		 * measured by hand: the text box (--fs-text x --fs-leading = 19.5px) plus the vertical
+		 * measured by hand: the text box (--fs-type x --fs-leading = 19.5px) plus the vertical
 		 * inset those fields carry (2 x --fs-space-1) plus both 1px borders = 29.5 -> ceil 32.
 		 * It was a bare 30px in four rules, which was upstream's same arithmetic over upstream's
 		 * 18px leading — so re-scaling the type left every control the wrong height for its own
@@ -536,10 +545,12 @@
 	 * Normal is a bare :root — no attribute, no override — so the default path costs nothing and a
 	 * browser that has never touched the control renders identically to before this existed.
 	 *
-	 * Space moves further than type in both directions (0.8/1.25 against 0.92/1.15), because that is
-	 * what the two settings are actually for: Compact is a request for less AIR, not for smaller
-	 * writing — matching them would put body text at 10.4px, under the floor the rest of this file
-	 * defends. At Compact the base is 12px and at Large 15px; the eyebrow never drops below 10px.
+	 * Compact moves the air furthest (space .65 against type .9), because that is what the setting is
+	 * actually for: less AIR, not smaller writing — matching the type to the air would put the body
+	 * at 8.5px, far under the floor the rest of this file defends. Large is the mirror image and not
+	 * the symmetric one: type and box grow to 1.15 while the air stays at 1, so the mode reads as
+	 * bigger text rather than as zoom. At Compact the base is 12px and at Large 15px; the eyebrow
+	 * never drops below 10px.
 	 *
 	 * These multiply the LADDERS, not the rules, so a size that is on a ladder follows the axis for
 	 * free and one that is not silently ignores it. That is the whole reason the ladders came first. */

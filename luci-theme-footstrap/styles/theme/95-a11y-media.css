@@ -53,8 +53,15 @@
 	 *     text's contrast; pull it toward --fs-text. The role hairlines (-line/-line-hi, a 40/55%
 	 *     tint of their role) go to the FULL role colour — a tint exists to be quiet, which is
 	 *     the opposite of what this user asked for.
-	 *   - secondary text: --fs-dim toward --fs-text, and --fs-faint (10-11px eyebrow labels)
-	 *     up to dim's level — small + faint is where AA erodes first.
+	 *   - secondary text: --fs-dim toward --fs-text, and --fs-faint most of the way there too
+	 *     (10-11px eyebrow labels: small + faint is where AA erodes first). NOT all the way onto
+	 *     --fs-dim, which is what this used to say: the two are the export tier's --text-color-
+	 *     medium and -low (02-tokens.css), so collapsing them here republished one colour twice to
+	 *     every app reading the gradation — the exact flattening that file spends twelve lines
+	 *     undoing. 82% against dim's 85% is inside a narrow window, and export-tier.mjs now measures
+	 *     this media query rather than taking it on trust: below 80% the fainter ink drops under AA
+	 *     on footstrap dark's --fs-panel2 (4.51:1 at 80), above 82% the high-to-low ramp falls under
+	 *     the 0.10 spread the tier promises (0.098 at 84). 82 clears both: 4.68:1 and 0.110.
 	 *   - the focus ring: --fs-focus-ring is a tint of the accent (--fs-accent-soft: 10% light,
 	 *     15% dark — the one ladder member whose strength is per MODE, so not the ladder's 12%);
 	 *     at "more contrast" it carries the accent at 60%. Its sibling --fs-focus-ring-solo is
@@ -64,7 +71,7 @@
 		:root {
 			--fs-border: color-mix(in srgb, var(--fs-text) 45%, var(--fs-bg));
 			--fs-dim: color-mix(in srgb, var(--fs-text) 85%, var(--fs-bg));
-			--fs-faint: var(--fs-dim);
+			--fs-faint: color-mix(in srgb, var(--fs-text) 82%, var(--fs-bg));
 			--fs-focus-ring: 0 0 0 3px color-mix(in srgb, var(--fs-accent) 60%, transparent);
 			--fs-accent-line: var(--fs-accent);	--fs-accent-line-hi: var(--fs-accent);
 			--fs-good-line: var(--fs-good);		--fs-good-line-hi: var(--fs-good);

@@ -27,7 +27,7 @@
 	 * THE INKS ARE PER PALETTE AND PER MODE, and that is not a style choice. A single global
 	 * `--fs-on-accent: #fff` used to sit on every accent/good/warn/danger fill (solid buttons,
 	 * the active tab pill, the toggle knob, .fs-seg, the login submit). White holds up on the
-	 * DARK fills of a LIGHT palette and nowhere else: on footstrap dark it measured 2.83–3.70:1
+	 * DARK fills of a LIGHT palette and nowhere else: on footstrap dark it measured 2.77–2.80:1
 	 * and on hicontrast dark --fs-good 1.69:1, where WCAG AA wants 4.5:1 for text and 3:1 for a
 	 * UI shape like the toggle knob. A dark palette has LIGHT fills, so its ink must be DARK.
 	 * Check a new colourway's inks against all four of its own fills: every pair below clears
@@ -74,8 +74,17 @@
 	 * tint was invisible on blue hues and obvious on green ones, i.e. the cue's strength
 	 * depended on WHICH colour you picked. So instead: give the canvas the user's hue at a
 	 * chroma we choose, leave its LIGHTNESS alone (one relative-colour declaration).
-	 *   ONE HONEST KNOB   --fs-tint-c is the strength, in chroma, and behaves the same on
-	 *                     every hue — no gamut clipping at these values, no hue surprise.
+	 *   ONE HONEST KNOB   --fs-tint-c is the strength, in chroma, and in DARK mode it behaves the
+	 *                     same on every hue: no gamut clipping at these values, no hue surprise.
+	 *                     Light mode has less headroom and does clip at the top of the wheel
+	 *                     (measured: footstrap light hue 0 wants 1.011/0.955/0.970 of sRGB and is
+	 *                     clamped to 255,244,247), which costs a few units of the cue's strength but
+	 *                     not its direction — every hue still moves the canvas its own way. The one
+	 *                     surface where that stops being true is a canvas of pure white: on the
+	 *                     bootstrap colourway's #ffffff, 180° and 258° land 1/255 apart, so the cue
+	 *                     is nearly hue-blind there. That is the price of copying a stock theme's
+	 *                     surfaces exactly, and it is why the tint is designed against the default
+	 *                     palette's off-white rather than against white.
 	 *   CONTRAST IS FREE  `l` is copied through, so AA margins barely move. The mix dragged
 	 *                     lightness toward the anchor: an early attempt cost
 	 *                     --primary-color-high on --fs-bg its whole margin in hicontrast
@@ -137,9 +146,18 @@
 		--fs-good-h: 0;
 		--fs-warn-h: 0;
 		--fs-danger-h: 0;
-		/* Tint DENSITY (Appearance → Density), a multiplier on the tint chroma below: 1 = the designed
-		 * strength, 0 = none, up to 2. fs-prefs.js/head.ut set it inline (value/100) when the user
-		 * drags the slider; paired with the hue, it is the second half of the router-identity Tint. */
+		/* Tint strength (Appearance → Tint strength — NOT the Density select, which is the UI-density
+		 * axis and owns that word), a multiplier on the tint chroma below: 1 = the designed strength,
+		 * up to 2. fs-prefs.js/head.ut set it inline (value/100) when the user drags the slider;
+		 * paired with the hue, it is the second half of the router-identity Tint.
+		 *
+		 * 0 IS NOT "the palette back". The rule below is a relative colour that REPLACES chroma, so a
+		 * multiplier of 0 also strips the cast the canvas already had — every palette's canvas is a
+		 * blue-grey (hue 248-264, chroma .0153 dark / .0034 light, measured below), and at 0 it goes
+		 * neutral at the same lightness: footstrap dark rgb(28,33,40) paints as rgb(33,33,33). Small,
+		 * but it is not the untinted page, and it cannot be made into one here — a conditional would
+		 * have to sit on :root itself, which is the one element a style query cannot reach. The true
+		 * off is clearing the Tint hue, which drops data-tint and this rule with it. */
 		--fs-tint-strength: 1;
 		/* The uploaded login/page background (Appearance → Wallpaper → File). --fs-login-bg-url is
 		 * the url() head.ut/fs-prefs.js stamp inline; `none` here is the same stand-on-its-own
@@ -209,9 +227,9 @@
 	 * WHY THE INK IS DERIVED, AND ONLY IN HEX MODE. --fs-on-accent is the ink ON the accent
 	 * fill — a solid button's label, the toggle knob, the active tab pill. The palettes pick it
 	 * per mode against fills they were measured against (white over footstrap light's #0969da is
-	 * 5.19:1; over the dark palette's light fills white collapses to 2.85:1, hence #10151c
+	 * 5.19:1; over the dark palette's light fills white collapses to 2.79:1, hence #10151c
 	 * there). A user-entered colour is measured against nothing, so keeping the palette's ink
-	 * would put white on #ffd400 — 1.2:1, an unreadable button, on the one control whose whole
+	 * would put white on #ffd400 — 1.43:1, an unreadable button, on the one control whose whole
 	 * job is to be pressed.
 	 *
 	 * So in hex mode the ink follows the LIGHTNESS of whatever was entered:
@@ -275,7 +293,7 @@
 		--fs-good-base: #197c36;
 		--fs-warn-base: #946300;
 		--fs-danger-base: #cf222e;
-		/* ink ON the fills above — white clears AA on all four: 5.19/5.08/4.87/5.36 */
+		/* ink ON the fills above — white clears AA on all four: 5.19/5.28/5.19/5.36 */
 		--fs-on-accent: #fff;
 		--fs-on-good: #fff;
 		--fs-on-warn: #fff;
@@ -291,15 +309,15 @@
 		--fs-text: #adbac7;
 		--fs-dim: #8f9cab;
 		--fs-faint: #959ca5;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%238c99a8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%238f9cab" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #569df5;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
 		--fs-track: #373e47;
 		--fs-good-base: #5aad5d;
 		--fs-warn-base: #c79128;
 		--fs-danger-base: #ea7a74;
-		/* dark ink: these fills are LIGHT. White measured 2.85/2.85/2.83/3.70 — a fail on
-		 * all four. #10151c (a shade of --fs-bg) gives 6.43/6.44/6.47/4.95. */
+		/* dark ink: these fills are LIGHT. White measures 2.79/2.77/2.80/2.79 — a fail on
+		 * all four. #10151c (a shade of --fs-bg) gives 6.58/6.61/6.55/6.57. */
 		--fs-on-accent: #10151c;
 		--fs-on-good: #10151c;
 		--fs-on-warn: #10151c;
@@ -364,7 +382,7 @@
 		--fs-on-danger: #0a0d13;
 	}
 
-	/* ---- classic — the colours of luci-theme-bootstrap, the LuCI default (opt-in) ----
+	/* ---- bootstrap — the colours of luci-theme-bootstrap, the LuCI default (opt-in) ----
 	 *
 	 * The one palette named after another PACKAGE, because that is what it is: the surfaces,
 	 * greys and semantic colours of the stock theme, so an admin who wants the look they already
@@ -400,7 +418,7 @@
 		--fs-border-base: #cccccc;
 		/* THE INK IS THE ONE PLACE THIS COLOURWAY LEAVES BOOTSTRAP'S OWN VALUES BEHIND, and it is
 		 * the same decision the default palette made: bootstrap's #404040 body and #6a6a6a muted
-		 * tier measure 10.4:1 and 5.0:1 on white, and the muted one carries LuCI's page
+		 * tier measure 10.4:1 and 5.4:1 on white, and the muted one carries LuCI's page
 		 * descriptions and every field title — help text you have to lean into. Matched to the
 		 * default palette's light ramp instead, ratio for ratio: 15.7 / 11.7 / 10.0 against its
 		 * 15.8 / 11.8 / 10.0. Neutral greys, so the colourway still reads as bootstrap's — what is

@@ -13,7 +13,7 @@
  *                     contrast threshold there is; only a spread check fails on it. podkop
  *                     painted "no data" with --primary-color-low and got the live-value accent.
  *
- * Sweeps the whole {footstrap,hicontrast} x {light,dark} matrix: a palette switcher multiplies
+ * Sweeps the whole {footstrap,hicontrast,bootstrap} x {light,dark} x 7 tint values matrix: a palette switcher multiplies
  * it, and the combination nobody looks at is where this rots.
  *
  *   node tools/export-tier.mjs
@@ -112,7 +112,14 @@ await page.goto(base, { waitUntil: 'load' });
 const failures = [];
 let checks = 0;
 
-for (const { palette, mode, tint } of MATRIX) {
+/* One combination, measured. A function rather than a loop body because the sweep runs TWICE: once
+ * as the theme paints by default, and once with `prefers-contrast: more` emulated — that media
+ * query re-states the ink and hairline tokens (theme/95-a11y-media.css), so it publishes a SECOND
+ * export tier that nothing measured. It shipped one: `--fs-faint` was set to `--fs-dim` there, which
+ * made --text-color-low and -medium the same colour for every app reading the gradation, which is
+ * the exact flattening 02-tokens.css spends twelve lines undoing. Untinted only in that pass: the
+ * query moves the inks, the tint moves the surfaces, and the first pass already walks the wheel. */
+async function runCombo({ palette, mode, tint }, suffix) {
 	await applyAppearance(page, { mode, palette, tint });
 
 	/* Resolve each custom property by RASTERISING it, never by parsing the computed string:
@@ -139,7 +146,7 @@ for (const { palette, mode, tint } of MATRIX) {
 		return out;
 	}, NAMES);
 
-	const where = `${palette}/${mode}${tint === null ? '' : `/tint ${tint}°`}`;
+	const where = `${palette}/${mode}${tint === null ? '' : `/tint ${tint}°`}${suffix}`;
 
 	for (const family of TEXT_FAMILIES)
 		for (const name of levelsOf(family))
@@ -205,6 +212,15 @@ for (const { palette, mode, tint } of MATRIX) {
 			+ `third-party sniffer will read as "${luma < 0.5 ? 'dark' : 'light'}" — the page is ${mode}.`);
 }
 
+for (const combo of MATRIX)
+	await runCombo(combo, '');
+
+const CONTRAST = matrix();
+await page.emulateMedia({ contrast: 'more' });
+for (const combo of CONTRAST)
+	await runCombo(combo, ' + prefers-contrast:more');
+await page.emulateMedia({ contrast: 'no-preference' });
+
 await browser.close();
 close();
 
@@ -213,4 +229,5 @@ if (failures.length) {
 	for (const f of failures) console.error(`  ${f}`);
 	process.exit(1);
 }
-console.log(`export tier: OK — ${checks} checks across ${MATRIX.length} palette x mode x tint combinations`);
+console.log(`export tier: OK — ${checks} checks across ${MATRIX.length} palette x mode x tint combinations, `
+	+ `plus ${CONTRAST.length} of them again under prefers-contrast:more`);
