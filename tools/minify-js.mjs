@@ -7,12 +7,16 @@
  * that crosses a module seam goes through undeclared globals (`L`, `E`, `_`, the `'require x
  * as y'` pragma aliases), which terser never renames.
  *
- * The CI build job runs this over the checkout and then builds with FOOTSTRAP_PREMIN=1, which
- * makes the theme Makefile set LUCI_MINIFY_JS:=0 — jsmin MUST NOT run over terser output:
- * terser legitimately emits `return/^v/.test(s)` shapes, the exact one-character-lookback trap
- * (openwrt/luci#8299) that eats the rest of the file and exits 0. A build without this step
- * (an SDK user, the buildbot) minifies the untouched source with jsmin as before; wrap-regex
- * and tools/jsmin-verify.mjs keep guarding that path.
+ * WHERE IT RUNS: tools/stage.sh, over the STAGED payload — never over the checkout. It rewrites
+ * every file it is handed in place, so pointing it at `luci-theme-footstrap/htdocs` would mangle
+ * and comment-strip the source tree; an npm script that did exactly that used to sit in
+ * package.json with no caller, one `npm run` away from a diff nobody meant to make.
+ *
+ * The Makefile keeps the other half of the contract for an SDK build: FOOTSTRAP_PREMIN=1 makes it
+ * set LUCI_MINIFY_JS:=0, because jsmin MUST NOT run over terser output — terser legitimately emits
+ * `return/^v/.test(s)` shapes, the exact one-character-lookback trap (openwrt/luci#8299) that eats
+ * the rest of the file and exits 0. A build without this step (an SDK user, the buildbot) minifies
+ * the untouched source with jsmin as before; wrap-regex and tools/jsmin-verify.mjs guard that path.
  *
  * fs-version.js is special: Build/Prepare and dev-sync.sh stamp the git version by sed-ing the
  * declaration `const FS_VERSION *= *'…'` — so for that one file the name is RESERVED from the

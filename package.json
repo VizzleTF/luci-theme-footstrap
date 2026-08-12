@@ -22,8 +22,7 @@
     "chrome-fence": "node tools/chrome-fence.mjs",
     "css-i18n": "node tools/css-i18n.mjs",
     "devkit": "node tools/devkit-build.mjs",
-    "changelog": "node tools/changelog.mjs",
-    "minify-js": "node tools/minify-js.mjs luci-theme-footstrap/htdocs/luci-static/resources"
+    "changelog": "node tools/changelog.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

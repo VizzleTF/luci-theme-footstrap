@@ -27,7 +27,15 @@ import { buildCss } from './lib/css.mjs';
 /* Not a CLI flag. It was `--min N`, which put this gate's own threshold on the command line —
  * `--min 99` passes trivially — in a tool whose header rejects "a number nobody defends". It also
  * worked by accident: indexOf returns -1, +1 indexes argv[0] (the node path), Number() is NaN, and
- * `|| 3` caught it. */
+ * `|| 3` caught it.
+ *
+ * SO HERE IS THE DEFENCE, measured on the shipped sheet rather than assumed. At 3 the gate reports
+ * 5 bodies, all pinned. Dropping it to 2 adds exactly five more, and every one of them is a
+ * COINCIDENCE rather than a shared decision: `.fs-logout` and `.cbi-tabmenu.map > li` both take
+ * the base type size and weight; three pairs of unrelated rules both say "become a block"
+ * (display + width). Pinning those with @mirror would assert that changing one means changing the
+ * other, which is false — and a pin that lies is worse than the duplication it describes. Two
+ * declarations is where a body stops being a decision; three is where the gate can insist. */
 const MIN_DECLS = 3;
 
 /* --dev: the pin is a COMMENT, and the squeeze strips comments */

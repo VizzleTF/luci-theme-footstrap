@@ -47,9 +47,10 @@ const SEARCH = [
 	'luci-theme-footstrap/root',
 	'luci-theme-footstrap/htdocs/luci-static/resources',
 	'luci-theme-footstrap/Makefile',
-	/* install.sh is still searched (its LICENSE/legacy-names live here), but its gh/* fetch helpers are
-	 * no longer @mirror-pinned: the twin was footstrap-selfupdate.sh, which moved to the updater's own
-	 * repo (VizzleTF/luci-app-footstrap-updater) where the two are pinned against each other. */
+	/* install.sh is still searched, and today holds no pin at all: its gh/* fetch helpers were
+	 * pinned against footstrap-selfupdate.sh, which moved to the updater's own repo
+	 * (VizzleTF/luci-app-footstrap-updater) where the two are pinned against each other. Left in
+	 * SEARCH so a pin added there is picked up, rather than removed and forgotten. */
 	'install.sh',
 ];
 const EXT = /\.(css|js|sh|ut)$|(^|\/)(Makefile|30_luci-theme-footstrap)$/;

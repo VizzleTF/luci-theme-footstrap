@@ -62,6 +62,15 @@ jobs:
       - run: node tools/axes.mjs
       - run: node tools/chrome-fence.mjs
 
+      # These three were in `npm run check` and in no workflow, i.e. enforced only when a
+      # human remembered to run the whole suite locally. Each guards a failure nothing
+      # observable reports: a conffile the package manager replaces on somebody else's
+      # upgrade, an `!important` that drifted out of the allowlist, a changelog bullet with
+      # no bold lead, which release-notes.sh drops from the release page in silence.
+      - run: node tools/conffiles.mjs
+      - run: node tools/bang-ok.mjs
+      - run: node tools/changelog.mjs
+
       # jsmin-verify finds the shipped JS itself; JSMIN names the binary to test.
       - run: echo "JSMIN=$(sh tools/build-jsmin.sh)" >> "$GITHUB_ENV"
       - run: node tools/jsmin-verify.mjs

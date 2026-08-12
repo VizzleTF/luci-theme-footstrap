@@ -18,12 +18,12 @@
  *
  * Usage: node tools/fs-orphans.mjs
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as csstree from 'css-tree';
 
-import { ROOT } from './lib/root.mjs';
-const PKG = join(ROOT, 'luci-theme-footstrap');
+import { ROOT, filesIn } from './lib/root.mjs';
+const PKG = 'luci-theme-footstrap';
 
 /* Names that look like fs-* classes to a regex but are not. Without this the reverse check
  * drowns in custom properties and localStorage keys. */
@@ -58,16 +58,11 @@ const IGNORE_EXACT = new Set([
  * data attribute (`data-fs-select`, `data-fs-shell`). Matched by what PRECEDES the token, so a class
  * that happens to share a name with one of them is still seen. */
 const NOT_A_CLASS_BEFORE = /(?:--|data-)$/;
-/* A THIRD position: a module FILENAME. `head.ut` globs `/www/luci-static/resources/fs-update.js` on
- * the server to decide whether the optional updater is installed, and that path is not markup. Keyed
- * on the `.js` that follows the token, so a class is still seen even if a module is named after it —
- * the same position-not-name rule as the pragmas above. */
+/* A THIRD position: a module FILENAME. A source line naming `fs-router.js` or `fs-prefs.js` — a
+ * comment cross-reference, or a server-side path test the way head.ut once probed for the retired
+ * updater — is a path, not markup. Keyed on the `.js` that follows the token, so a class is still
+ * seen even if a module is named after it — the same position-not-name rule as the pragmas above. */
 const NOT_A_CLASS_AFTER = /^\.js\b/;
-
-/* readdirSync(recursive) also returns the directory entries; every caller filters by extension,
- * which drops them. */
-const filesIn = (dir, ext) => readdirSync(dir, { recursive: true })
-	.filter((f) => f.endsWith(ext)).map((f) => join(dir, f));
 
 /* ---- what the CSS styles ------------------------------------------------- */
 /* Ids as well as classes: the theme mounts #fs-appearance and #fs-rail-toggle by id, and a
@@ -75,12 +70,12 @@ const filesIn = (dir, ext) => readdirSync(dir, { recursive: true })
  * to ignore the tool. */
 const styled = new Map();
 for (const f of filesIn(join(PKG, 'styles'), '.css')) {
-	const ast = csstree.parse(readFileSync(f, 'utf8'), { positions: true });
+	const ast = csstree.parse(readFileSync(join(ROOT, f), 'utf8'), { positions: true });
 	csstree.walk(ast, (node) => {
 		if (node.type !== 'ClassSelector' && node.type !== 'IdSelector') return;
 		if (!node.name.startsWith('fs-')) return;
 		if (!styled.has(node.name))
-			styled.set(node.name, `${f.slice(ROOT.length + 1)}:${node.loc?.start.line ?? 0}`);
+			styled.set(node.name, `${f}:${node.loc?.start.line ?? 0}`);
 	});
 }
 
@@ -107,14 +102,14 @@ const SRC = [
 	...filesIn(join(PKG, 'htdocs'), '.js'),
 ];
 for (const f of SRC) {
-	const text = stripComments(readFileSync(f, 'utf8'), f);
+	const text = stripComments(readFileSync(join(ROOT, f), 'utf8'), f);
 	text.split('\n').forEach((line, i) => {
 		for (const m of line.matchAll(/\bfs-[a-z0-9-]+/g)) {
 			const name = m[0];
 			if (IGNORE_EXACT.has(name)) continue;
 			if (NOT_A_CLASS_BEFORE.test(line.slice(0, m.index))) continue;
 			if (NOT_A_CLASS_AFTER.test(line.slice(m.index + name.length))) continue;
-			if (!emitted.has(name)) emitted.set(name, `${f.slice(ROOT.length + 1)}:${i + 1}`);
+			if (!emitted.has(name)) emitted.set(name, `${f}:${i + 1}`);
 		}
 	});
 }

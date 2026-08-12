@@ -1,13 +1,11 @@
 #!/usr/bin/env node
-/* Every Appearance axis (dark mode, palette, wallpaper, rounding, tint, accent, rail, layout) is
- * implemented TWICE, and nothing held the copies together:
+/* Every Appearance axis — twenty-five localStorage keys across five axis shapes, from dark mode and
+ * palette to the pattern sliders — is implemented TWICE, and nothing held the copies together:
  *
  *   1. `partials/head.ut` — inline <script>s that read localStorage and stamp :root BEFORE THE
  *      FIRST PAINT, or the page flashes the wrong theme on every reload. They cannot `require` a
  *      LuCI module: the module loader does not exist yet.
- *   2. `fs-prefs.js` — the live appliers behind the Appearance popover. (The update-check control is
- *      NOT one of these: it is not pre-painted, and it lives in the optional updater package, not the
- *      theme tree this gate scans.)
+ *   2. `fs-prefs.js` — the live appliers behind the Appearance tab (System -> System).
  *
  * Forced duplication, like the @mirror cases — but these two can never be byte-identical (inline
  * script vs module), so mirror.mjs cannot hold them. What CAN be held is the CONTRACT: key names,
@@ -24,27 +22,15 @@
  * an axis moved (or added) elsewhere would have left the gate quietly checking nothing. A glob
  * cannot go stale that way.
  */
-import { readdirSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { ROOT, read } from './lib/root.mjs';
-const readTree = (p) => readdirSync(join(ROOT, p), { recursive: true })
-	.filter((f) => f.endsWith('.css'))
-	.map((f) => read(join(p, f)))
-	.join('\n');
-
-const readJs = (p) => readdirSync(join(ROOT, p), { recursive: true })
-	.filter((f) => f.endsWith('.js'))
-	.map((f) => read(join(p, f)))
-	.join('\n');
+import { read, readAll } from './lib/root.mjs';
 
 /* every module the theme ships — the axes live across fs-prefs.js and menu-footstrap.js */
-const JS = readJs('luci-theme-footstrap/htdocs/luci-static/resources');
+const JS = readAll('luci-theme-footstrap/htdocs/luci-static/resources', '.js');
 const HEAD = read('luci-theme-footstrap/ucode/template/themes/footstrap/partials/head.ut');
 /* the SERVER side of the axes: header.ut is what reads /etc/config/footstrap back for head.ut */
 const HEADER = read('luci-theme-footstrap/ucode/template/themes/footstrap/header.ut');
 const TOKENS = read('luci-theme-footstrap/styles/02-tokens.css');
-const STYLES = readTree('luci-theme-footstrap/styles');
+const STYLES = readAll('luci-theme-footstrap/styles', '.css');
 const ORPHANS = read('tools/fs-orphans.mjs');
 /* The THIRD implementation of the axes, and the one nothing held. lib/gallery.mjs stamps them onto
  * :root so a11y-gallery.mjs and export-tier.mjs can sweep the matrix — its own header calls itself
@@ -57,11 +43,22 @@ const GALLERY = read('tools/lib/gallery.mjs');
 const errors = [];
 const ok = [];
 
+/* "did MY section pass?", not "has nothing failed yet". Three sections below used to gate their
+ * success line on the GLOBAL error list being empty, so one unrelated failure earlier in the run
+ * deleted their line from the report — and an operator reading a failure could not tell whether
+ * those checks had passed or never run. */
+const errorMark = () => errors.length;
+const cleanSince = (m) => errors.length === m;
+
 /* ---- 1. every localStorage key the theme uses, taken from the JS -------------------- */
 const keysIn = (src) => {
 	const out = new Set();
 	for (const m of src.matchAll(/(?:lsGet|lsSet|lsDel)\(\s*'(fs-[a-z-]+)'/g)) out.add(m[1]);
-	for (const m of src.matchAll(/localStorage\.(?:getItem|setItem|removeItem)\(\s*'(fs-[a-z-]+)'/g)) out.add(m[1]);
+	/* `lsGet(…)` counts as a read. Both files wrap storage in a helper of that name — fs-prefs.js
+	 * because every read must survive a browser that refuses storage, head.ut's pre-paint for the
+	 * same reason — and a pattern that only knew the bare `localStorage.getItem(` spelling saw 4 of
+	 * head.ut's 15 keys the moment that block started guarding itself, while still reporting OK. */
+	for (const m of src.matchAll(/(?:localStorage\.(?:getItem|setItem|removeItem)|lsGet)\(\s*'(fs-[a-z-]+)'/g)) out.add(m[1]);
 	/* the accordion's remembered set keeps its key in a constant, not at the call site */
 	for (const m of src.matchAll(/^const\s+\w*KEY\w*\s*=\s*'(fs-[a-z-]+)'/gm)) out.add(m[1]);
 	return out;
@@ -164,11 +161,12 @@ for (const { key, attr, hueProp, colorProp } of colorAxes) {
 
 /* ---- 2b. the enum axes: key, attribute and the ON value ------------------------------
  *
- * A two-value axis (palette, wallpaper) stamps the ON value as the attribute's value and removes
- * the attribute for OFF — a bare :root IS the default. Both halves matter: pre-paint the attribute
- * and forget the removal and a browser that has switched the axis back off keeps the old look for
- * one frame; stamp the wrong VALUE ('dark' for 'hicontrast') and the palette block never matches at
- * all, silently, until the popover is touched. */
+ * A two-value axis — pattern ink is the one that ships — stamps the ON value as the attribute's
+ * value and removes the attribute for OFF, so a bare :root IS the default. (Palette and wallpaper
+ * are three-valued and keep appliers of their own; section 2c covers them.) Both halves matter:
+ * pre-paint the attribute and forget the removal and a browser that has switched the axis back off
+ * keeps the old look for one frame; stamp the wrong VALUE and the block never matches at all,
+ * silently, until the Appearance tab is touched. */
 if (!enumAxes.length) errors.push('no enumAxis() calls found in the theme JS — did the axis helper get renamed?');
 
 for (const { key, attr, on } of enumAxes) {
@@ -176,7 +174,7 @@ for (const { key, attr, on } of enumAxes) {
 	if (!headKeys.has(key)) { errors.push(`${where}: head.ut never reads localStorage '${key}' — it will flash on reload`); continue; }
 	if (!HEAD.includes(`setAttribute('${attr}', '${on}')`)) {
 		errors.push(`${where}: head.ut never stamps ${attr}='${on}' — the pre-paint and the live applier `
-			+ `disagree about this axis's ON value, so a fresh load paints the default and the popover `
+			+ `disagree about this axis's ON value, so a fresh load paints the default and the tab `
 			+ `paints the choice`);
 		continue;
 	}
@@ -214,7 +212,13 @@ for (const [, attr, prop] of GALLERY.matchAll(/hue\(\w+, '([^']+)', '([^']+)'\)/
  * demand a change that fixes nothing. */
 const OUTBOUND = new Set(['data-theme', 'data-bs-theme', 'data-darkmode']);	/* checked in 3b */
 const factoryAttrs = new Set([...colorAxes.map(a => a.attr), ...enumAxes.map(a => a.attr)]);
-const jsSets = new Set([...JS.matchAll(/root\.setAttribute\('(data-[a-z-]+)'/g)].map((m) => m[1]));
+/* Both spellings of the receiver, because an applier picked the other one and vanished from this
+ * check: applyLayout() writes `document.documentElement.setAttribute('data-layout', …)` while every
+ * other applier holds it in a local `root`, and a pattern anchored on `root.` therefore derived a
+ * list with the layout axis silently missing — the one shape this section exists to catch. */
+const jsSets = new Set(
+	[...JS.matchAll(/(?:^|[^\w.])(?:root|document\.documentElement)\.setAttribute\('(data-[a-z-]+)'/g)]
+		.map((m) => m[1]));
 
 for (const attr of jsSets) {
 	if (OUTBOUND.has(attr) || factoryAttrs.has(attr)) continue;
@@ -245,6 +249,7 @@ for (const attr of jsSets) {
  * fonts/set-font.sh or by hand. All five still travel to the client through FS_AXES. */
 const SERVER_ONLY = new Set(['login_bg', 'pattern', 'font_sans', 'font_mono', 'fonts']);
 
+const serverReadMark = errorMark();
 const snapBody = (JS.match(/function snapshotAxes\(\)\s*\{([\s\S]*?)\n\}/) || [, ''])[1];
 const snapFields = [...snapBody.matchAll(/^\s*([a-z_]+):/gm)].map((m) => m[1]);
 const headerAxes = (HEADER.match(/const FS_AXES = \[([\s\S]*?)\]/) || [, ''])[1];
@@ -262,7 +267,7 @@ else {
 		if (!SERVER_ONLY.has(f) && !snapFields.includes(f))
 			errors.push(`uci option '${f}': header.ut reads it back, but snapshotAxes() never writes it — `
 				+ `either a leftover from a removed axis, or the axis is missing from Save-as-default`);
-	if (!errors.length)
+	if (cleanSince(serverReadMark))
 		ok.push(`server read: all ${snapFields.length} saved option(s) are read back by header.ut`);
 }
 
@@ -285,6 +290,7 @@ else {
  * the obvious way — repeat `key.slice(3).replace(/-/g, '_')` in this file and compare — the gate
  * holds head.ut against ITSELF and stays green while fs-prefs.js says something else entirely:
  * measured by breaking the fold back to a bare slice(3), which such a version passed. */
+const sdMark = errorMark();
 const sdLine = (HEAD.match(/window\.__fsSD\s*=\s*\{[^\n]*/) || [''])[0];
 const sdFields = [...sdLine.matchAll(/[{,]\s*([a-z_]+)\s*:/g)].map((m) => m[1]);
 /* `const sdKey = <expr>;` out of the named factory's body, compiled into a function of `key` */
@@ -321,7 +327,7 @@ else {
 		if (!sdFields.includes(f))
 			errors.push(`sd('${f}') is read in the theme JS, but head.ut emits no window.__fsSD.${f} — `
 				+ `same silent failure as above: the router default never reaches the browser`);
-	if (!errors.length)
+	if (cleanSince(sdMark))
 		ok.push(`sd() fields: ${sdReaders.length} factory axes + ${new Set(sdLiterals).size} direct reads all name a field head.ut emits`);
 }
 
@@ -344,11 +350,12 @@ else ok.push(`rounding default ${jsRadius[1]}px agrees in the JS, the CSS token 
  * `data-theme` and `data-bs-theme` (the two dialects third-party apps sniff for). Both head.ut's
  * pre-paint and stampDark() write them; one added to one copy and forgotten in the other has a
  * symptom nobody reports — an app's dark styles are dead on a fresh load and come alive the
- * moment you touch the Appearance popover (or vice versa). Derive the set from the JS. */
+ * moment you touch the Appearance tab (or vice versa). Derive the set from the JS. */
 const stampBody = (src, re) => (src.match(re) || [, null])[1];
 const attrsIn = (body) => new Map([...(body || '').matchAll(
 	/setAttribute\('([^']+)',\s*dark\s*\?\s*'([^']+)'\s*:\s*'([^']+)'/g)].map((m) => [m[1], `${m[2]}/${m[3]}`]));
 
+const darkMark = errorMark();
 const jsStamp = attrsIn(stampBody(JS, /function stampDark\([^)]*\)\s*\{([\s\S]*?)\n\}/));
 const headStamp = attrsIn(stampBody(HEAD, /function set\(dark\)\s*\{([\s\S]*?)\n\t\t\t\t\}/));
 
@@ -358,14 +365,14 @@ else {
 	for (const [attr, val] of jsStamp)
 		if (!headStamp.has(attr))
 			errors.push(`dark mode: stampDark() sets ${attr}, head.ut does not — an app sniffing it sees the `
-				+ `wrong mode until the user touches the Appearance popover`);
+				+ `wrong mode until the user touches the Appearance tab`);
 		else if (headStamp.get(attr) !== val)
 			errors.push(`dark mode: ${attr} is '${val}' in the JS but '${headStamp.get(attr)}' in head.ut`);
 	for (const attr of headStamp.keys())
 		if (!jsStamp.has(attr))
 			errors.push(`dark mode: head.ut pre-paints ${attr}, but stampDark() never updates it — toggling the `
 				+ `mode live would leave it stating the mode the page loaded in`);
-	if (!errors.length)
+	if (cleanSince(darkMark))
 		ok.push(`dark mode  -> ${[...jsStamp.keys()].join(', ')}   (pre-paint and live applier stamp the same set)`);
 }
 
@@ -378,8 +385,24 @@ for (const attr of ['data-theme', 'data-bs-theme'])
 			+ `apps, not a theme input. The theme's own dark rules read [data-darkmode].`);
 
 /* ---- 4. css-orphans must know every key, or a new axis breaks that gate -------------- */
+/* The SET LITERAL, not the file. Asking whether `'fs-…'` appears anywhere in fs-orphans.mjs passes
+ * on a key quoted in one of that file's prose comments or in its unrelated JUSTIFIED_UNSTYLED map —
+ * i.e. the gate could report the contract as held while IGNORE_EXACT did not contain the key at all,
+ * which is exactly the phantom dead selector it exists to prevent. Parsed the way bang-ok.mjs parses
+ * its own allowlist: the text between `IGNORE_EXACT = new Set([` and the closing `])`. */
+const ignoreBlock = ORPHANS.match(/IGNORE_EXACT\s*=\s*new Set\(\[([\s\S]*?)\]\)/);
+if (!ignoreBlock)
+	errors.push('tools/fs-orphans.mjs no longer declares IGNORE_EXACT as `new Set([…])` — this check '
+		+ 'reads that literal, and a shape it cannot parse would silently pass every key');
+const ignoreNames = new Set(
+	[...(ignoreBlock ? ignoreBlock[1] : '')
+		/* comments stripped first: that literal is half prose, and a key QUOTED in the reason for
+		 * some other key would otherwise read as a member — the same false pass one level down. */
+		.replace(/\/\*[\s\S]*?\*\//g, ' ')
+		.matchAll(/'([\w-]+)'/g)].map((m) => m[1]));
+
 for (const k of jsKeys)
-	if (!ORPHANS.includes(`'${k}'`))
+	if (!ignoreNames.has(k))
 		errors.push(`tools/fs-orphans.mjs does not list '${k}' in IGNORE_EXACT — it looks like an fs-* CSS `
 			+ `class to that tool's regex, so adding this axis makes css-orphans report a phantom dead selector`);
 

@@ -115,7 +115,7 @@ for (const [file, canon] of Object.entries(CANON)) {
 	/* THE BOLD LEAD IS THE RELEASE NOTE, and a bullet without one is dropped from the release page
 	 * in silence (release-notes.sh keeps only `**…**`). Checked on [Unreleased] and the newest
 	 * version ONLY — those are the two that can still be published. 106 bullets in older sections
-	 * predate the convention (it is unbroken from 0.8.3 up); their notes are long since published,
+	 * predate the convention (it is unbroken from 0.8.4 up — 0.8.3 still has two); their notes are long since published,
 	 * so demanding a rewrite would be a gate policing the past instead of the next release. */
 	const publishable = versions.filter(v => v.id === 'Unreleased').concat(
 		versions.filter(v => v.id !== 'Unreleased').slice(0, 1));

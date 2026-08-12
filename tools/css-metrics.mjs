@@ -26,8 +26,10 @@ import { analyze } from '@projectwallace/css-analyzer';
 import { buildCss } from './lib/css.mjs';
 
 const LIMITS = {
-	/* 18 (theme+pages: 14 fighting an inline or unlayered declaration, 4 the reduced-motion block,
+	/* 19 (theme+pages: 15 fighting an inline or unlayered declaration, 4 the reduced-motion block,
 	 * whose `*` selector cannot beat a component rule in its own layer any other way) + 8 (base).
+	 * By file: 20-overview 8, 90-responsive 4, 95-a11y-media 4, 45-misc 2, 65-dropdown 1, base
+	 * 95-luci 8.
 	 *
 	 * Raised 30 -> 31 for theme/45-misc.css's realtime-graph bleed. It is the sanctioned kind: the
 	 * stock views size their drawing from #view but write `style="width:100%"` on the box they draw

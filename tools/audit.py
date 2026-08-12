@@ -16,7 +16,8 @@ Checks, in print order. The "why" of each sits on the function that implements i
                           palette or dark mode.
 
 No dependencies, any python3; --strict turns the report into a CI gate. A static audit
-cannot see the cascade: for "did this change a computed style?" use cssdiff.py here.
+cannot see the cascade: for "did this change a computed style?" measure it in a browser — the
+method, and why screenshots do not answer it, is docs/css.md "Proving a CSS change".
 """
 import re, sys, pathlib
 
@@ -35,9 +36,11 @@ BASE = STYLES / "base"
 # utilities; 95-a11y-media needs it because the flag INVERTS the layer order — the
 # only way one rule can stop animations declared in base as well as in theme.
 BANG_OK = ({"90-responsive.css", "20-overview.css", "95-a11y-media.css", "45-misc.css",
-            # 65-dropdown carries the widget's `ul` margin flag: ui.js writes `margin` INLINE on
-            # an open list, and only an author !important outranks an inline style. It moved here
-            # with the machinery absorbed from base/80-dropdown.css (deleted).
+            # 65-dropdown carries one flag, `min-width: 0` on `.hide-close`: a RichListValue's
+            # own inline `min-width: 25vw` is what it fights (issue #15), and only an author
+            # !important outranks an inline style. The three `ul` margin flags this note used to
+            # describe are gone — their stated adversary, an inline `margin` from ui.js, exists on
+            # neither release.
             "65-dropdown.css"}
            | {p.name for p in (STYLES / "base").glob("*.css")})
 
@@ -360,7 +363,7 @@ def main():
         [f"{name}:{ln:<4} {sel[:56]}  {{ {prop}: {val[:34]} }}" for name, ln, sel, prop, val in safe],
         "none removable",
         f"({len(safe)} dead) -> every selector of the rule is repainted by theme/page,",
-        "   so deleting these changes no rendered style (prove it with cssdiff.py)")
+        "   so deleting these changes no rendered style (prove it with a computed-style diff)")
     # NOT a report() section: it re-groups by selector rather than listing findings, and it is
     # deliberately NOT counted — the backlog is the to-do list, not a failure.
     if backlog:

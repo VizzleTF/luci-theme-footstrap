@@ -1,6 +1,6 @@
 #!/bin/sh
 # Build luci-theme-footstrap as an OpenWrt .apk via the SDK.
-# The theme is noarch (CSS/JS/templates/fonts only), so the package installs on any
+# The theme is noarch (CSS, JS and templates only — it ships no fonts), so the package installs on any
 # router of that release whatever its CPU architecture.
 #
 #   ./build-apk.sh            # download SDK if needed, then build
@@ -13,9 +13,15 @@
 # has never heard of owfeed — and this is the only way to find out that it does.
 set -e
 
-REL="${OPENWRT_RELEASE:-25.12.2}"
+# The point release and the compiler are both baked into the SDK's filename, so this default goes
+# stale twice over: downloads.openwrt.org keeps only the CURRENT point release of a branch (older
+# ones move to archive.openwrt.org and the fetch 404s), and a toolchain bump changes gcc-14.3.0.
+# Kept in step with owfeed.lock's `point:` for the 25.12 branch — that file is what the release
+# actually builds against. Override for any other: OPENWRT_RELEASE=24.10.8 sh build-apk.sh, and
+# OPENWRT_SDK_FILE=… when the compiler string differs too.
+REL="${OPENWRT_RELEASE:-25.12.5}"
 SDK_BASE="https://downloads.openwrt.org/releases/${REL}/targets/mediatek/filogic"
-SDK_FILE="openwrt-sdk-${REL}-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64.tar.zst"
+SDK_FILE="${OPENWRT_SDK_FILE:-openwrt-sdk-${REL}-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64.tar.zst}"
 SDK_URL="$SDK_BASE/$SDK_FILE"
 # MUST be a case-sensitive fs (ext4/…), NOT an NTFS/9p Windows mount.
 BUILD_DIR="${BUILD_DIR:-/tmp/ow-footstrap-build}"

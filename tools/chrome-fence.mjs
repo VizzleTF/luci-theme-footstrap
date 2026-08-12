@@ -42,10 +42,7 @@
  * the attributes this theme publishes (`luci-app-openclash`, seven templates). Add a fourth dialect
  * to stampDark and forget the observer's attributeFilter, and that dialect is unguarded — silently.
  */
-import { readdirSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { ROOT, read } from './lib/root.mjs';
+import { read, readAll } from './lib/root.mjs';
 
 const HEADER = read('luci-theme-footstrap/ucode/template/themes/footstrap/header.ut');
 const SHEETS = read('luci-theme-footstrap/htdocs/luci-static/resources/fs-sheets.js');
@@ -56,11 +53,7 @@ const CHROME = read('luci-theme-footstrap/styles/theme/10-chrome.css');
  * below. A GLOB, not a named file: the popover that used to build one lived in fs-appearance.js and
  * this gate read that one path, so a root moved to another module would have left the check quietly
  * looking at a file that no longer had one. */
-const RESOURCES = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources');
-const JS = readdirSync(RESOURCES, { recursive: true })
-	.filter((f) => String(f).endsWith('.js'))
-	.map((f) => read(join('luci-theme-footstrap/htdocs/luci-static/resources', String(f))))
-	.join('\n');
+const JS = readAll('luci-theme-footstrap/htdocs/luci-static/resources', '.js');
 
 const errors = [];
 const ok = [];

@@ -3,7 +3,8 @@
  * THE GALLERY, NOT THE ROUTER: LuCI renders content client-side, so auditing a real page needs a
  * router, a session and a network. The gallery is a static file rendering EVERY widget LuCI (or
  * any third-party luci-app-*) can emit, with the real class names — the theme's whole widget
- * surface, checkable in CI with no device. The full {light,dark} x {footstrap,hicontrast} matrix,
+ * surface, checkable in CI with no device. The full {light,dark} x {footstrap,hicontrast,bootstrap}
+ * matrix x three tint states — 18 runs,
  * because a palette switcher multiplies the contrast matrix and colour failures regress silently
  * in the combination nobody looks at: that is how the 1.69:1 white-on-green in hicontrast dark
  * survived as long as it did.

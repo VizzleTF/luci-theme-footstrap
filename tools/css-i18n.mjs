@@ -22,21 +22,18 @@
  * `text-transform` cannot touch an index. Presence tests (`[data-title]`, `:not([data-title])`,
  * `[data-title=""]`) are fine and stay allowed — they ask whether there IS a label, not what it says.
  */
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { ROOT } from './lib/root.mjs';
+import { filesIn, read } from './lib/root.mjs';
 const STYLES = 'luci-theme-footstrap/styles';
 
 /* any data-title comparison carrying a NON-EMPTY value: =, ^=, $=, *=, ~=, |= */
 const BAD = /\[\s*data-title\s*[~^$*|]?=\s*(?:"([^"]+)"|'([^']+)'|([^\]\s"']+))/g;
 
-const files = readdirSync(join(ROOT, STYLES), { recursive: true }).filter((f) => f.endsWith('.css'));
+const files = filesIn(STYLES, '.css');
 const hits = [];
 
 for (const f of files) {
-	const rel = `${STYLES}/${f}`.replace(/\\/g, '/');
-	const src = readFileSync(join(ROOT, rel), 'utf8');
+	const rel = f.replace(/\\/g, '/');
+	const src = read(f);
 	/* strip comments: this file's own rationale quotes the very selectors it bans */
 	const code = src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
 	code.split('\n').forEach((line, i) => {

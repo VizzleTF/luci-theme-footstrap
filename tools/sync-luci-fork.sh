@@ -4,8 +4,8 @@
 #   ./tools/sync-luci-fork.sh ../luci
 #
 # The difference from what lives here is one decision: THE LUCI TREE GETS THE BUILT STYLESHEET,
-# not the source that generates it. Here, `styles/` is the source of truth — sixteen files in four
-# cascade layers whose ORDER is the whole design, and `cascade.css` is a build artefact this
+# not the source that generates it. Here, `styles/` is the source of truth — thirty-nine files in
+# four cascade layers whose ORDER is the whole design, and `cascade.css` is a build artefact this
 # repository does not even track. There, the other four themes each commit one `cascade.css` and
 # have no build step at all, and a theme arriving with a 500-line shell script in `Build/Prepare`
 # is asking a reviewer to audit a build system before they can read a stylesheet.
