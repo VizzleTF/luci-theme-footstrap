@@ -229,8 +229,45 @@ function tagDataTables() {
 		 * table that has just been recognised as a data table has to join it or the tag buys nothing.
 		 * A no-op on everything LuCI renders, which carries the class already. */
 		t.classList.add('table', 'fs-dt');
+		adoptMarkup(t, head);
 		labelCells(t, head);
 	});
+}
+
+/* ...AND THE ROWS AND CELLS INSIDE IT, or the claim is a trap.
+ *
+ * `.table` alone gets the frame and the padding, because those rules end at the table. Everything
+ * that makes the CARD is written one level down — `.table.fs-stacked .tr { display: flex }`, the
+ * `.td[data-title]::before` label, the hidden header row — and a bare foreign `<table>` carries none
+ * of those class names. So the fitter would measure it, decide it no longer fits, set `.fs-stacked`
+ * and change NOTHING: measured at 390px on a bare four-column table, the rows stayed `table-row`,
+ * the cells `table-cell` at 80px each, no label was generated — and `#view .table.fs-dt.fs-stacked`
+ * sets `overflow: hidden`, so the columns were CLIPPED with no scrollbar to reach them. That is
+ * worse than the phone-tier scroll it replaced, which is the whole reason this exists.
+ *
+ * `.tr` / `.td` / `.th` are LuCI's own names for these roles (docs/third-party-apps.md: the shared
+ * zone), and the theme is already writing `.table` onto the same element — this is that one act
+ * carried down to the rows, not a new liberty. Additive only, and cheap enough to re-run every fit
+ * pass: `classList.add` on an element that already has the class is the same `contains` check we
+ * would write to skip it, and these tables are POLLED, so fresh rows arrive bare.
+ *
+ * The HEADER also has to be recognisable as one, or the card shows it as a first row of column
+ * names: a `<thead>` becomes `.thead` and a plain first row of `<th>` becomes `.tr.table-titles` —
+ * the two names theme/30-tables.css hides when stacked. */
+function adoptMarkup(t, head) {
+	if (head.tagName === 'THEAD') head.classList.add('thead');
+	else head.classList.add('tr', 'table-titles');
+	const titleRow = (head.firstElementChild && head.firstElementChild.tagName === 'TR') ? head.firstElementChild : head;
+	for (const c of titleRow.children) c.classList.add('th');
+	/* `t.rows` covers a real <table> whether or not it has a <tbody> — a table built with
+	 * createElement has its <tr> directly under the <table> and `tbody tr` finds nothing. A
+	 * `<div class="table">` has no `.rows` and is LuCI's own markup, which carries the classes. */
+	if (!t.rows) return;
+	for (const row of t.rows) {
+		if (head.contains(row) || row === head) continue;
+		row.classList.add('tr');
+		for (const cell of row.children) cell.classList.add(cell.tagName === 'TH' ? 'th' : 'td');
+	}
 }
 
 /* Give every cell the column heading it will show once the table cards.
