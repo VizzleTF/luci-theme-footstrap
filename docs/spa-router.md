@@ -524,6 +524,17 @@ does not exist.
   `window:click` per navigation that do not exist). `window` and `document` counts identical
   before and after; heap **10.0 MB → 10.0 MB**. The centralised `fs-fit.js` (one ResizeObserver for
   the document's life instead of one per view) is the structural reason this is clean.
+- **A long soak says the same thing about the CACHE, which is the part a SPA is actually accused
+  of.** 72 navigations over 12 distinct pages on 25.12 and 96 on 24.10, sampling always on the same
+  page after a forced GC: after the FIRST pass everything is pinned to the byte — heap
+  **21.16 → 21.13 MB**, DOM nodes 26998 → 26998, listeners 8110 → 8110, documents 13 → 13, poll
+  queue 1, view intervals 1, over the following 60 navigations; on 24.10, 3.68 → 3.66 MB and
+  2116 → 2116 nodes over 96. A full-load run of the same walk sits at 4.4 MB, flat.
+  That difference IS the cache and it is one-time: measured per page, the first visit costs
+  0.02–1.18 MB except `admin/system/package-manager`, whose package index costs **+16.9 MB** and
+  keeps it until a real reload. Nothing the theme owns grows — the structures are `WeakMap`/
+  `WeakSet` or capped (`SCROLL_MEM_MAX`), and the one-per-document `fs-fit` observer is why the
+  listener count does not move at all.
 - **A full walk of all 65 clickable nodes**, in both layouts, comparing each against a **real full
   load of the same URL**: **62 SPA-OK, 0 divergences, 3 fallbacks**. `data-page`, `dispatchpath`,
   `pathinfo`, URL and tab count all match; console clean. Back/Forward through a chain of alias and
