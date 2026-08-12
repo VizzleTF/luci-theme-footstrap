@@ -90,6 +90,25 @@ case "$BRANCH" in
 		err "footstrap requires OpenWrt 24.10 or newer (detected $DISTRIB_RELEASE)."
 		exit 1
 	fi
+	# PROBED, exactly like the fallback path below, and for the reason that path states: a router
+	# on a branch the feed does not publish yet — every 26.x router on the day it ships — otherwise
+	# had a 404 URL written into its repository list, and then `apk update` failed under `set -e`
+	# BEFORE the theme was ever installed. A re-run did not rescue it either: the dead line contains
+	# $FEED_HOST, so the next run took the "already configured" path and died at the same place,
+	# leaving every later `apk update` on that router failing too. Fall back to the newest branch the
+	# feed does answer for — sound here for the same reason the fallback path is: noarch package,
+	# +luci-base its whole dependency list, nothing compiled against the branch it comes from.
+	if ! fetch "$FEED_HOST/releases/$BRANCH/$ARCH/$INDEX" /dev/null 2>/dev/null; then
+		info "The feed does not carry $BRANCH for $ARCH yet; asking it for the newest branch..."
+		if [ "$PM" = apk ]; then CANDIDATES="$FALLBACK_BRANCHES_APK"; else CANDIDATES="$FALLBACK_BRANCHES_OPKG"; fi
+		BRANCH=$(newest_feed_branch "$CANDIDATES") || {
+			err "The feed carries no $PM branch for $ARCH (router reports '${DISTRIB_RELEASE:-unknown}')."
+			err "Install the release asset by hand instead:"
+			err "  https://github.com/VizzleTF/luci-theme-footstrap/releases/latest"
+			exit 1
+		}
+		ok "Using the $BRANCH branch — the theme is noarch and needs only luci-base."
+	fi
 	;;
 *)
 	info "'${DISTRIB_RELEASE:-unknown}' names no feed branch; asking the feed for the newest one..."
@@ -124,7 +143,6 @@ if [ "$PM" = apk ]; then
 		info "Adding the $FEED_NAME feed..."
 		apk add --quiet ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
 		mkdir -p /etc/apk/keys /etc/apk/repositories.d /lib/upgrade/keep.d
-		fetch "$FEED_HOST/owfeed-packages.pem" /etc/apk/keys/owfeed-packages.pem
 		printf '%s/releases/%s/%s/packages.adb\n' "$FEED_HOST" "$BRANCH" "$ARCH" \
 			>> "$APK_LIST"
 		printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
@@ -137,6 +155,14 @@ if [ "$PM" = apk ]; then
 	else
 		info "The $FEED_NAME feed is already configured."
 	fi
+	# The KEY is fetched on every run, not only when the feed line is written. It used to sit inside
+	# the branch above, which meant a rotation could never be repaired by the documented one-liner:
+	# the feed was "already configured", the key was never re-fetched, and `apk update` failed
+	# verification from then on with the header promising that re-running upgrades the theme. It is
+	# one small file, the fetch is verified TLS, and writing it again is idempotent.
+	mkdir -p /etc/apk/keys /lib/upgrade/keep.d
+	fetch "$FEED_HOST/owfeed-packages.pem" /etc/apk/keys/owfeed-packages.pem
+	printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
 	apk update
 	# `apk add` resolves to the newest version in the feed, so a second run upgrades.
 	apk add "$PKG"
@@ -146,14 +172,18 @@ else
 		opkg update >/dev/null 2>&1 || true
 		opkg install ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
 		mkdir -p /etc/opkg/keys /lib/upgrade/keep.d
-		fetch "$FEED_HOST/$FEED_KEY_OPKG" "/etc/opkg/keys/$FEED_KEY_OPKG"
 		printf 'src/gz %s %s/releases/%s/%s\n' "$FEED_NAME" "$FEED_HOST" "$BRANCH" "$ARCH" \
 			>> /etc/opkg/customfeeds.conf
-		printf '%s\n' "/etc/opkg/keys/$FEED_KEY_OPKG" > /lib/upgrade/keep.d/owfeed-packages
 		ok "Feed added: $FEED_HOST/releases/$BRANCH/$ARCH"
 	else
 		info "The $FEED_NAME feed is already configured."
 	fi
+	# Same as the apk leg: the key on every run, so a rotation is repairable by re-running. Here the
+	# key ID is part of the PATH, so a rotation changes the filename too — the old one is left alone
+	# rather than removed, since opkg reads the whole directory and a stale key verifies nothing.
+	mkdir -p /etc/opkg/keys /lib/upgrade/keep.d
+	fetch "$FEED_HOST/$FEED_KEY_OPKG" "/etc/opkg/keys/$FEED_KEY_OPKG"
+	printf '%s\n' "/etc/opkg/keys/$FEED_KEY_OPKG" > /lib/upgrade/keep.d/owfeed-packages
 	opkg update
 	# `opkg install` on an installed package is a no-op even when the feed has a newer
 	# version — it reports "already installed" and exits 0 — so a second run has to ask

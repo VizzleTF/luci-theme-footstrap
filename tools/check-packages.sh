@@ -20,7 +20,12 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-want=$(find luci-theme-footstrap/po -mindepth 2 -name '*.po' | wc -l)
+# `tr -d ' '` on every wc: BSD wc (i.e. every macOS run of this repo's own tooling) pads its count
+# to 8 columns, and the other side of each comparison below is unpadded — `grep -c` prints `2`, the
+# literals are `1`, and `[ … = … ]` is a STRING test. Without the strip the gate is green in CI
+# (GNU coreutils, no padding) and fails locally on a correct package, which teaches the maintainer
+# to ignore it. build-css.sh and sync-luci-fork.sh already strip theirs.
+want=$(find luci-theme-footstrap/po -mindepth 2 -name '*.po' | wc -l | tr -d ' ')
 [ "$want" -gt 0 ] || { echo "no .po files found — the glob is wrong, not the build"; exit 1; }
 got=$(tar -xzOf dist/all/luci-theme-footstrap_*_all.ipk ./data.tar.gz \
 	| tar -tz | grep -c 'i18n/footstrap-theme\..*\.lmo' || true)
@@ -33,7 +38,7 @@ echo "$got translation catalogue(s) in the package."
 
 find dist -mindepth 2 -type f \( -name '*.apk' -o -name '*.ipk' \) -print
 for ext in apk ipk; do
-	n=$(find dist -mindepth 2 -type f -name "*.$ext" | wc -l)
+	n=$(find dist -mindepth 2 -type f -name "*.$ext" | wc -l | tr -d ' ')
 	[ "$n" = 1 ] || { echo "expected exactly 1 .$ext (theme), got $n — see the note in this script"; exit 1; }
 	m=$(find dist -mindepth 2 -type f -name "*.$ext" -exec basename {} \; \
 		| grep -cE "^luci-theme-footstrap[-_][^/]*\.$ext$" || true)

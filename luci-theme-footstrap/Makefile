@@ -21,11 +21,11 @@ PKG_RELEASE:=1
 endif
 
 LUCI_TITLE:=Footstrap Theme
-# +luci-base is the WHOLE list. The self-updater used to hard-require `curl`, which is NOT in
-# OpenWrt's default package set (the base image ships uclient-fetch), so the update button
-# failed on a stock router; it falls back to uclient-fetch rather than pull curl onto an 8 MB
-# device for one API call. jsonfilter and sha256sum ARE in the base image. Do not add a
-# runtime dep for a convenience tool — fall back instead.
+# +luci-base is the WHOLE list, and keeping it that way is the constraint. Nothing this package
+# ships fetches anything at run time any more (the self-updater is retired), so there is no second
+# name to justify — and the rule that got it here stands: the one convenience tool that ever wanted
+# a dep was `curl`, which is NOT in OpenWrt's default set, on an 8 MB device, for one API call. Fall
+# back to what the base image has (uclient-fetch, jsonfilter, sha256sum) or do without.
 LUCI_DEPENDS:=+luci-base
 LUCI_PKGARCH:=all
 # Else luci.mk defaults these to LuCI's own, and the package claims MAINTAINER "OpenWrt LuCI
@@ -159,7 +159,8 @@ endef
 #    build-css.sh reads it from $(CURDIR) and writes into the build tree. cat/awk only, no host
 #    toolchain: that is why it runs on an OpenWrt buildbot.
 # 2. Stamp the git-derived version into the theme JS (fs-version.js — the string the Appearance tab
-#    shows). Skipped when PKG_VERSION is empty, leaving '0.0.0-dev'.
+#    shows). Unconditional: with PKG_VERSION empty it falls back to PKG_SRC_VERSION, which luci.mk
+#    always defines, so only an un-built source checkout keeps the literal '0.0.0-dev'.
 #
 # THE CATALOGUE IS luci.mk's BUSINESS, and nothing here compiles it. `po/` is the directory
 # LUCI_LANGUAGES globs, so luci.mk emits one `luci-i18n-footstrap-<lang>` package per language the
@@ -190,9 +191,9 @@ define Build/Prepare/luci-theme-footstrap
 	$(SHELL) $(CURDIR)/mangle-tokens.sh \
 		$(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css \
 		$(CURDIR)/htdocs/luci-static/resources $(CURDIR)/ucode
-	# Templates are 58% comments and shipped them all. jsmin/terser strip the JS, build-css.sh the
+	# Templates are mostly comments and shipped them all. jsmin/terser strip the JS, build-css.sh the
 	# CSS; the .ut files were simply never included in that trade. Only `{# … #}` goes — see the
-	# script for why the ucode-code `/* … */` deliberately stays. -16 KB of 39, git keeps every word,
+	# script for why the ucode-code `/* … */` deliberately stays. -22 KB of 60, git keeps every word,
 	# and dev-sync.sh does NOT run this: a router you are debugging on keeps its comments.
 	$(SHELL) $(CURDIR)/strip-templates.sh $(PKG_BUILD_DIR)/ucode
 	# …and the same for the shell under root/ (71% and 95% comment lines). Whole-line `#` only.

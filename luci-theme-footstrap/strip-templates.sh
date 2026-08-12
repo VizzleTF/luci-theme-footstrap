@@ -6,7 +6,7 @@
 # Run from the package Makefile (Build/Prepare) over $(PKG_BUILD_DIR), never over the source tree:
 # git keeps every word, the router does not need any of them. Same trade this project already makes
 # for JS (jsmin/terser) and CSS (build-css.sh) — templates were simply never included in it, and
-# they are 58% comments. `{# … #}` alone is 16112 of 39426 bytes (41%).
+# they are mostly comments: `{# … #}` is 22633 of 60227 bytes (38%).
 #
 # sh + awk only, like build-css.sh: an OpenWrt buildbot has no node and this must not become the
 # reason a build needs one.
@@ -23,21 +23,32 @@
 #     strings. Not worth 6.8 KB.
 #
 # Whitespace control is EMULATED, not ignored: `{#- …` also eats the whitespace before the comment
-# and `… -#}` the whitespace after it, which is how ucode itself renders them. Every .ut here opens
-# with a licence block closing `-#}` to swallow the newline before <!DOCTYPE html>; dropping the
-# comment without the trim would put that newline back.
+# and `… -#}` the whitespace after it, which is how ucode itself renders them. Nearly every .ut here
+# opens with a licence block closing `-#}` (footer.ut is one `{% include %}` line and has none);
+# head.ut's is the one that matters, swallowing the newline before its <!DOCTYPE html>, and dropping
+# the comment without the trim would put that newline back.
 set -e
 
 DIR="${1:-}"
 [ -n "$DIR" ] && [ -d "$DIR" ] || { echo "usage: strip-templates.sh <dir>" >&2; exit 1; }
 
+# ONE trap over the file list and whatever temp the loop holds, and the list goes through a file
+# rather than `for f in $(find …)`: the same two fixes as strip-shell.sh, for the same reasons — a
+# checkout path with a space in it was split into words, and an awk failure under `set -e` left a
+# `<file>.tmp<pid>` inside the staged payload, which stage.sh then copies into the package.
+LIST=$(mktemp)
+CUR=""
+trap 'rm -f "$LIST" ${CUR:+"$CUR"}' EXIT INT TERM
+find "$DIR" -name '*.ut' -type f | sort > "$LIST"
+
 before=0
 after=0
 found=0
 
-for f in $(find "$DIR" -name '*.ut' -type f | sort); do
+while IFS= read -r f; do
 	found=$((found + 1))
 	b=$(wc -c < "$f")
+	CUR="$f.tmp$$"
 	awk '
 		BEGIN { RS = "^$" }		# slurp the whole file
 		{
@@ -60,12 +71,13 @@ for f in $(find "$DIR" -name '*.ut' -type f | sort); do
 			}
 			printf "%s", out
 		}
-	' "$f" > "$f.tmp$$"
-	mv "$f.tmp$$" "$f"
+	' "$f" > "$CUR"
+	mv "$CUR" "$f"
+	CUR=""
 	a=$(wc -c < "$f")
 	before=$((before + b))
 	after=$((after + a))
-done
+done < "$LIST"
 
 [ "$found" -gt 0 ] || { echo "strip-templates: no .ut under $DIR" >&2; exit 1; }
 echo "strip-templates: $found file(s), $before -> $after bytes (-$((before - after)))"

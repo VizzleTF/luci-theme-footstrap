@@ -4,9 +4,9 @@
 #   ./mangle-tokens.sh <cascade.css> <reserved-source-dir>...
 #
 # Run from the package Makefile over $(PKG_BUILD_DIR) only — NEVER over a dev build. The names are
-# 16.1% of the sheet (21640 B over 1770 occurrences, 123 distinct) and mean nothing to a browser;
+# 16.6% of the sheet (22586 B over 1824 occurrences, 137 distinct) and mean nothing to a browser;
 # this is the same trade terser already makes for the JS, where top-level identifiers are mangled
-# because a LuCI resource file is function-scoped. Measured: 134240 -> ~119600, i.e. -14.6 KB, and
+# because a LuCI resource file is function-scoped. Measured: 135655 -> 123935, i.e. -11.7 KB, and
 # uhttpd serves /www with no compression, so those are wire bytes on every cold load as well as
 # flash bytes.
 #
@@ -16,12 +16,13 @@
 #     luci-app reads a `--fs-` name.
 #   * The RESERVED set is DERIVED, not listed: every `--fs-` name that appears in the theme's JS or
 #     in a .ut template crosses a seam (fs-prefs.js writes `--fs-tint`, head.ut's pre-paint writes
-#     `--fs-radius-base`, fs-chrome.js reads `--fs-sidebar-w` …) and keeps its name. 15 of 123 today.
+#     `--fs-radius-base`, fs-chrome.js reads `--fs-sidebar-w` …) and keeps its name. 35 of 137 today.
 #     A new one cannot be forgotten, because nothing here names them.
 #   * Point the dirs at the SOURCE tree, not at $(PKG_BUILD_DIR). In CI the build tree's JS has
 #     already been through terser and its comments are gone, so five names that only appear in a
 #     comment stopped being reserved — the same source produced a different sheet depending on who
-#     built it (10 reserved via CI, 15 via a plain SDK build). Reading the source over-reserves by
+#     built it (measured at the time: 10 reserved via CI against 15 via a plain SDK build, of a
+#     smaller reserved set than today's 35). Reading the source over-reserves by
 #     about a kilobyte, and over-reserving is the direction that cannot break anything.
 #   * The scan is STRING-AWARE and reads the WHOLE identifier before deciding. A prefix match would
 #     be a silent corruption: `--fs-space-2` is a prefix of `--fs-space-2-5`.
