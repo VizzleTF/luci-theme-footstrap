@@ -152,20 +152,64 @@ function restoreScroll(pos, gen) {
 	 * the same budget is 10 s on a 30 Hz panel. Frames stay the tick (they are when a paint could
 	 * have changed the height); time decides when to stop waiting for an RPC that is not coming. */
 	const until = Date.now() + 5000;
+
+	/* THE USER OUTRANKS THE SAVED POSITION. Waiting up to five seconds for a slow view to grow means
+	 * the reader may have started using the page in the meantime — and jumping them somewhere else
+	 * two seconds after they began reading is worse than opening at the top, which is what a full
+	 * load does anyway. So any sign that the scroll is THEIRS cancels the restore for good.
+	 *
+	 * Two kinds of sign, because neither covers the other. The three input events are intent even
+	 * when nothing moves yet (a wheel tick on a page too short to scroll, a touch that becomes a
+	 * drag); `scroll` is the catch-all for everything they cannot see — a scrollbar drag, a
+	 * trackpad fling, Find-in-page, an anchor jump, assistive tech. `scroll` also fires for OUR
+	 * OWN writes, asynchronously, so a flag around the write would still be false by the time it
+	 * arrives: the position we last wrote is remembered instead, and a scroll that lands exactly
+	 * there is ours. Landing there by hand is indistinguishable and costs nothing — it is the
+	 * position we were restoring to.
+	 *
+	 * Passive listeners: this must never sit in front of the scroll it is watching for. */
+	let cancelled = false, wroteWin = -1, wroteMain = -1;
+	const stop = () => { cancelled = true; off(); };
+	const onScroll = (ev) => {
+		const t = ev.target;
+		const now = (t === document || t === document.documentElement || t === document.body)
+			? Math.round(window.scrollY) : (t && t.scrollTop);
+		if (now === wroteWin || now === wroteMain) return;	/* our own write coming back */
+		stop();
+	};
+	/* the keys that scroll, and only those: typing in a field must not cancel anything */
+	const SCROLL_KEYS = new Set([ 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' ', 'Spacebar' ]);
+	const onKey = (ev) => { if (SCROLL_KEYS.has(ev.key)) stop(); };
+	const opts = { passive: true, capture: true };
+	function off() {
+		window.removeEventListener('wheel', stop, opts);
+		window.removeEventListener('touchstart', stop, opts);
+		window.removeEventListener('keydown', onKey, opts);
+		window.removeEventListener('scroll', onScroll, opts);
+	}
+	window.addEventListener('wheel', stop, opts);
+	window.addEventListener('touchstart', stop, opts);
+	window.addEventListener('keydown', onKey, opts);
+	/* capture, so the inner scroller (#maincontent in the sidebar layout) is seen too: `scroll`
+	 * does not bubble from an element, but it does travel down the capture phase. */
+	window.addEventListener('scroll', onScroll, opts);
+
 	(function tick() {
-		if (gen !== _navGen || Date.now() > until) return;
+		if (cancelled) return;
+		if (gen !== _navGen || Date.now() > until) { off(); return; }
 		const de = document.documentElement;
 		const sc = document.getElementById('maincontent');
 		let pending = false;
 		if (pos.main) {
-			if (sc && sc.scrollHeight - sc.clientHeight >= pos.main) sc.scrollTop = pos.main;
+			if (sc && sc.scrollHeight - sc.clientHeight >= pos.main) { wroteMain = pos.main; sc.scrollTop = pos.main; }
 			else pending = true;
 		}
 		if (pos.win) {
-			if (de.scrollHeight - de.clientHeight >= pos.win) window.scrollTo(0, pos.win);
+			if (de.scrollHeight - de.clientHeight >= pos.win) { wroteWin = pos.win; window.scrollTo(0, pos.win); }
 			else pending = true;
 		}
 		if (pending) requestAnimationFrame(tick);
+		else off();
 	})();
 }
 
