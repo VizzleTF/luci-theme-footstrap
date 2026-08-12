@@ -11,6 +11,12 @@ Style and format guide: [docs/releasing.md](docs/releasing.md).
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+
+- **banIP, adblock and travelmate stop reporting "No … config found!" on the second visit.** Their views read `uci.load()`'s return value as an existence check, but that call answers "which of these packages did THIS call fetch" and skips whatever is already in uci's cache — so the first visit gets `['banip']` and the second gets `[]`, and the page renders an error notification with nothing under it until a reload. Reported on banIP, where switching between its own tabs and returning to Overview is the ordinary gesture. The apps' reading is wrong, but the divergence is the router's: a config cache that outlives the page that filled it is state a fresh load does not have, exactly like the poll queue and the view intervals already flushed beside it. `navigate()` now unloads it, which is upstream's own idiom for the same thing — `uci.save()` ends with `unload(pkgs); load(pkgs)`. Pending unsaved edits go with the cache, as they do on a full load; changes already saved live on the server and the Unsaved-changes banner is unaffected. Read through `window.L.uci` rather than a `require` pragma, so no page that never touches uci pays for uci.js, and a luci-base that keeps the cache elsewhere gets one loud console error instead of a silent no-op.
+
 ## [0.12.4] — 2026-08-12
 
 ### Changed

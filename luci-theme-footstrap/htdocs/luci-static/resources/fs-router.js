@@ -76,6 +76,63 @@ function clearViewIntervals() {
 }
 let _pollTimerWarned = false;
 
+/* --- uci cache teardown for SPA nav ---
+ * `uci.load()` does not answer "is this config present?" — it answers "which of these packages did
+ * THIS call fetch", skipping every package already in its document-scoped cache:
+ *
+ *     for (…) if (!self.state.values[packages[i]]) { pkgs.push(…); tasks.push(…) }
+ *     return Promise.all(tasks).then(() => pkgs);       // uci.js, luci-base
+ *
+ * Four shipped views read that return value as an existence check and abort on an empty array —
+ * luci-app-banip and luci-app-adblock's overview, luci-app-travelmate's overview and stations:
+ *
+ *     if (!result[3] || result[3].length === 0) { ui.addNotification(…, _('No banIP config found!')); return; }
+ *
+ * On a full load the cache is empty, so the first visit always gets its package name back and the
+ * check passes. Under SPA the document survives, so the SECOND visit gets `[]` and the page renders
+ * as "no config found" — reported against banip, where switching between its own tabs and coming
+ * back to Overview is the ordinary gesture, and unstickable by anything short of a reload.
+ *
+ * The apps' reading of `load()` is wrong, but the DIVERGENCE is ours: a cache that outlives the page
+ * that filled it is state a fresh load does not have, exactly like the poll queue and the view's
+ * intervals above. So drop it on navigation and let the incoming view fetch what it needs.
+ *
+ * `unload()` is upstream's own idiom for this, not a lever we found: `uci.save()` ends with
+ * `self.unload(pkgs); return self.load(pkgs)`. Pending local edits (creates/changes/deletes) go with
+ * it — as they do on a full load, which throws away the whole document. Saved changes are already
+ * on the server and the Unsaved-changes banner reads them from there, so it is unaffected.
+ *
+ * Read through `window.L.uci` rather than a `'require uci'` pragma, deliberately: the class attaches
+ * itself to L's prototype when the FIRST requirer compiles it, so this sees the instance the pages
+ * actually use, and a router that required it would both bind it to its own prototypal L (the two-L
+ * trap, docs/spa-router.md) and pull uci.js onto pages that never touch uci. No instance means no
+ * cache to flush. */
+function flushUciCache() {
+	const uci = window.L ? window.L.uci : null;
+	if (!uci || typeof uci.unload !== 'function') return;
+	/* `state.values` and `loaded` are private, so the same rule as L.Poll.timer applies: a shape we
+	 * do not recognise is a reason to do nothing, once, loudly — never to guess. The two hold
+	 * different halves of the cache (a package whose load is still in flight is in `loaded` alone),
+	 * and unload() clears both, so the names are taken from both. */
+	if (!uci.state || typeof uci.state.values !== 'object' || typeof uci.loaded !== 'object') {
+		if (!_uciCacheWarned) {
+			_uciCacheWarned = true;
+			console.error('footstrap: LuCI.uci keeps its cache somewhere this router does not know, so '
+				+ 'it is left alone. An app that reads uci.load()\'s return value as an existence check '
+				+ 'will report a missing config on the second SPA visit. fs-router.js needs updating for '
+				+ 'this luci-base.');
+		}
+		return;
+	}
+	const names = Object.keys(uci.state.values).concat(Object.keys(uci.loaded));
+	if (names.length) uci.unload(names);
+	/* `state.reorder` is the one half unload() does not clear, and it is deliberately left alone
+	 * rather than reset by hand: with `values` gone, reorderSections() finds no sections to order,
+	 * emits no call and clears the map itself on the next save. Writing to that field would be us
+	 * editing another module's private state, for a difference nothing can observe. */
+}
+let _uciCacheWarned = false;
+
 let _wired = false;
 /* The pathname whose view is CURRENTLY rendered — popstate compares against it to tell a real
  * navigation from a mere fragment change (see there). Seeded from the served page. */
@@ -599,6 +656,9 @@ function navigate(pathname, push, kbd) {
 	/* kill the outgoing view's plain setInterval pollers too (podkop's log tailer) — a full load
 	 * would have. L.Poll's own tick survives. */
 	clearViewIntervals();
+	/* and drop uci's document-scoped config cache, which a full load would not have carried into the
+	 * incoming page either (see flushUciCache) */
+	flushUciCache();
 	/* the outgoing page's links are about to become a detached tree — do not hold one of them */
 	_lastHovered = null;
 	/* run every registered navigation callback — today the search palette's recent-pages record and

@@ -236,6 +236,23 @@ Before rendering the new view:
   on every navigation — so moving from a polling page to a non-polling one left "Paused" about
   polling that did not exist. Our own `poll-stop` listener (registered at module eval, therefore
   after LuCI's, therefore running second) hides the pill when the queue is empty.
+- **uci's config cache is dropped** (`flushUciCache()`). `uci.load()` does not answer "is this
+  config present?" — it answers "which of these packages did THIS call fetch", skipping every
+  package already in `state.values`. Four shipped views read the return value as an existence check
+  (`luci-app-banip` and `luci-app-adblock`'s overview, `luci-app-travelmate`'s overview and
+  stations): `if (!result[3] || result[3].length === 0) → _('No banIP config found!')`. On a full
+  load the cache is empty, so the check passes; under SPA the second visit gets `[]` and the page
+  draws an error notification over an empty view until a reload. The apps' reading is wrong, the
+  divergence is ours — a document-scoped cache outliving the page that filled it is exactly the
+  shape of the poll queue and the stray intervals above. `unload()` is upstream's own idiom for it:
+  `uci.save()` ends with `self.unload(pkgs); return self.load(pkgs)`. Unsaved local edits
+  (`creates`/`changes`/`deletes`) go with it, as they do on a full load; **saved** changes are on
+  the server, so the Unsaved-changes banner is unaffected. Reached through `window.L.uci`, not a
+  `'require uci'` pragma — the class attaches to `L`'s prototype when its first requirer compiles
+  it, so this sees the instance the pages use, does not bind it to the router's prototypal `L` (the
+  two-`L` trap above), and does not pull uci.js onto pages that never touch uci. `state.values` and
+  `loaded` are private, so a shape we do not recognise is one loud `console.error` and no sweep —
+  the same rule as `L.Poll.timer`.
 - `clearViewIntervals()` kills the outgoing view's bare `window.setInterval`s. A full load would
   have killed them; SPA must do it explicitly. `setInterval`/`clearInterval` are hooked at module
   eval and the ids tracked in a `Set`; `L.Poll`'s own 1-second tick is preserved.
