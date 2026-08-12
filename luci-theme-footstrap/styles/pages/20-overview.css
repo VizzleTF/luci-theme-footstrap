@@ -25,20 +25,28 @@
 		justify-content: center;
 		border-radius: var(--fs-radius-sm);
 	}
+	/* The glyph itself is the Appearance fold's, to the byte — one chevron for "this opens", drawn
+	 * in two page files because the two hosts are a stock element keyed by attribute and one of
+	 * ours keyed by class, which no single selector list in one layer can carry. Pinned instead:
+	 * tools/mirror.mjs fails the build if the copies drift (styles/pages/80-appearance.css). */
 	.cbi-title .label[data-indicator="poll-status"]::after {
+		/* @mirror chevron/closed */
 		content: "";
 		width: 7px;
 		height: 7px;
 		border-right: 2px solid currentColor;
 		border-bottom: 2px solid currentColor;
 		border-radius: 1px;
-		transform: rotate(45deg);			/* default: chevron down (collapsed / Show) */
+		transform: rotate(45deg);			/* closed: chevron down */
 		margin-top: -2px;					/* optical centring of the down chevron */
 		transition: transform var(--fs-dur-move);
+		/* @endmirror */
 	}
 	.cbi-title .label[data-indicator="poll-status"][data-style="inactive"]::after {
-		transform: rotate(-135deg);			/* expanded / Hide -> chevron up */
+		/* @mirror chevron/open */
+		transform: rotate(-135deg);			/* open: chevron up */
 		margin-top: var(--fs-space-0-5);
+		/* @endmirror */
 	}
 
 	/* Stock overview layout: fs-overview.js wraps the stock System / Memory / Storage

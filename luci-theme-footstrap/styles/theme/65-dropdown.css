@@ -1,6 +1,9 @@
 @layer theme {
-	/* Generic .dropdown-menu popup — ui.js's split "Save & Apply" menu, plus whatever a third-party
-	 * luci-app-* emits. NOT the theme's nav menu (that is a plain nested <ul>; see 10-chrome.css).
+	/* Generic .dropdown-menu popup. NOTHING in luci-base emits it — the split "Save & Apply" button
+	 * is a `.cbi-dropdown`, a different widget — so this is coverage vocabulary: stock
+	 * luci-theme-bootstrap styles it, a third-party luci-app-* may therefore emit it and expect a
+	 * themed result (the same contract 10-chrome.css states for the same class). NOT the theme's
+	 * nav menu (that is a plain nested <ul>; see 10-chrome.css).
 	 * Hover text is ACCENT to match the open cbi-dropdown list: this is a form control's menu. */
 	.dropdown-menu { background-color: var(--fs-panel); border-color: var(--fs-border); }
 	.dropdown-menu a { color: var(--fs-text); text-shadow: none; }
@@ -284,7 +287,7 @@
 		font-size: 0; line-height: 0; border: 0;
 		position: relative; padding: 0;
 		align-self: stretch;
-		min-width: 34px; min-height: var(--fs-ctl-h-sm);
+		min-width: var(--fs-btn-size); min-height: var(--fs-ctl-h-sm);
 		align-items: center;
 		cursor: pointer;
 	}

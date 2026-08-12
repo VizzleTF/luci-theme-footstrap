@@ -101,7 +101,6 @@
 	.cbi-page-actions .cbi-button-apply + .cbi-button-save,
 	.cbi-page-actions .cbi-button-negative + .cbi-button-save {
 		--on-color: var(--fs-good);
-		border-color: var(--on-color);
-		/* neutral fill: theme/55-buttons.css — absorbed */
+		/* fill + border: theme/55-buttons.css — absorbed */
 	}
 }

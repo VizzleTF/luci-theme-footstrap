@@ -30,8 +30,9 @@
 	button.fs-ap-fold:hover h4 { color: var(--fs-accent); }
 	button.fs-ap-fold:focus-visible { outline: none; box-shadow: var(--fs-focus-ring-solo); border-radius: var(--fs-radius-sm); }
 	/* The chevron: the same 26px box with a two-border ::after that the overview's card toggles
-	 * use (styles/pages/20-overview.css) — one chevron for "this panel opens", drawn once here and
-	 * once there rather than an SVG in one place and borders in the other.
+	 * use (styles/pages/20-overview.css) — one chevron for "this panel opens", drawn here and there
+	 * rather than an SVG in one place and borders in the other, with the glyph itself pinned as
+	 * @mirror chevron/* so the two copies cannot drift.
 	 *
 	 * It turns on the SAME attribute that tells a screen reader the state, so the two cannot
 	 * disagree. Rotated with `transform` and not the individual `rotate` property, because that is
@@ -42,17 +43,23 @@
 		color: var(--fs-dim); border-radius: var(--fs-radius-sm);
 	}
 	.fs-ap-chev::after {
+		/* @mirror chevron/closed */
 		content: "";
-		width: 7px; height: 7px;
-		border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+		width: 7px;
+		height: 7px;
+		border-right: 2px solid currentColor;
+		border-bottom: 2px solid currentColor;
 		border-radius: 1px;
 		transform: rotate(45deg);			/* closed: chevron down */
 		margin-top: -2px;					/* optical centring of the down chevron */
 		transition: transform var(--fs-dur-move);
+		/* @endmirror */
 	}
 	button.fs-ap-fold[aria-expanded="true"] .fs-ap-chev::after {
+		/* @mirror chevron/open */
 		transform: rotate(-135deg);			/* open: chevron up */
 		margin-top: var(--fs-space-0-5);
+		/* @endmirror */
 	}
 	button.fs-ap-fold:hover .fs-ap-chev { color: var(--fs-accent); }
 	/* Stock `.cbi-value` rows stack one per line and carry their own hairline, so a folded group needs
@@ -173,8 +180,11 @@
 	:root[data-wallpaper="file"] .fs-ap-tint { display: none; }
 	/* and the strength is a multiplier on a chroma WE choose, so it only means anything in hue mode:
 	 * with the tint off there is nothing to scale, and on a hex canvas the colour is the one the
-	 * admin entered, with no chroma of ours in it. (0,3,0) out-ranks the stock row's own display. */
-	:root:not([data-tint="hue"]) .fs-ap-density { display: none; }
+	 * admin entered, with no chroma of ours in it. (0,3,0) out-ranks the stock row's own display.
+	 * The class was `fs-ap-density` while this axis was called Tint density; the name moved with the
+	 * label, because Density is the UI-density select four rows above and one name for two rows is
+	 * how the label itself went wrong. */
+	:root:not([data-tint="hue"]) .fs-ap-tintstr { display: none; }
 
 	/* the version line at the foot of the page */
 	.fs-ap-footer {
@@ -189,7 +199,7 @@
 	/* THE SEGMENTED CONTROL AND THE RANGE SLIDER had their rules here — .fs-seg, .fs-rangewrap,
 	 * .fs-range and its readout. Both controls are gone from fs-widgets.js: the page draws its enums
 	 * with `ui.Select` and its numbers with `ui.RangeSlider`, which this theme already styles for
-	 * every other LuCI form (`select` in base/30-forms.css, `.cbi-range-slider` and
+	 * every other LuCI form (`select` in theme/60-inputs.css, `.cbi-range-slider` and
 	 * `input[type="range"]` in theme/60-inputs.css). Two copies of a slider, one of them ours, was
 	 * the thing to delete — not a third. */
 

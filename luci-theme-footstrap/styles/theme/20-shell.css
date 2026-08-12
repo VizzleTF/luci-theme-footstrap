@@ -20,7 +20,8 @@
 	 * so its `display` is declared there, not here, or it would just be shadowed. */
 	.fs-railtoggle {
 		align-items: center; justify-content: center;
-		width: 28px; height: 28px; padding: 0; flex: 0 0 auto;
+		width: calc(28px * var(--fs-density-box)); height: calc(28px * var(--fs-density-box));
+		padding: 0; flex: 0 0 auto;
 		border: 1px solid transparent; border-radius: var(--fs-radius-sm);
 		background: transparent; color: var(--fs-faint); cursor: pointer;
 		transition: background var(--fs-dur), border-color var(--fs-dur), color var(--fs-dur);
@@ -554,9 +555,15 @@
 		 * pre-paint, while data-narrow is written later by fitShell() in an async module. So on a
 		 * <521px phone a rail user had every OTHER rail rule excluded by the floor while these
 		 * two matched, and the "Refreshing" pill painted as a bare 30px green glyph inside the
-		 * phone bar until the modules landed — permanently if they failed. */
+		 * phone bar until the modules landed — permanently if they failed.
+		 *
+		 * The box is --fs-ctl-h-sm and not --fs-btn-size: one step under the bar's compact pill,
+		 * because the rail is 68px wide and the glyph sits in a column of icons rather than in a
+		 * row of equal squares. It was a bare 30px, which is the same size at the default density
+		 * and no size at all at the other two — every other chrome box scales with the Density
+		 * axis, and a literal silently opts out of it (02-tokens.css). */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"] {
-			font-size: 0; width: 30px; height: 30px; padding: 0;
+			font-size: 0; width: var(--fs-ctl-h-sm); height: var(--fs-ctl-h-sm); padding: 0;
 			border: 0; box-shadow: none; background: var(--fs-good);
 			/* @mirror poll-glyph/mask */
 			-webkit-mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
@@ -579,7 +586,7 @@
 		 * Its label is prose and the rail is 68px: measured on the router, that pill wants 86px,
 		 * wraps onto three lines and hangs 34px past the rail's edge over the content (issue #14).
 		 * The pill is not ours to shorten, so it becomes a square in the poll glyph's box and shows
-		 * the COUNT alone — the only part that changes, lifted into data-fs-count by fs-chrome.js
+		 * the COUNT alone — the only part that changes, lifted into data-fs-badge by fs-chrome.js
 		 * because a text node cannot be reached by a selector. `font-size: 0` kills the prose
 		 * without removing it: the label stays in the DOM for a screen reader, and in the `title`
 		 * for the pointer.
@@ -595,7 +602,7 @@
 			/* min-width, not width: the count is unbounded (a big config can queue three digits) and
 			 * a fixed box would clip it. It grows from the poll glyph's square and stops at the
 			 * rail's inner width. */
-			font-size: 0; min-width: 30px; max-width: 100%; height: 30px;
+			font-size: 0; min-width: var(--fs-ctl-h-sm); max-width: 100%; height: var(--fs-ctl-h-sm);
 			box-sizing: border-box; padding: 0 var(--fs-space-1); overflow: hidden;
 			display: inline-flex; align-items: center; justify-content: center;
 		}

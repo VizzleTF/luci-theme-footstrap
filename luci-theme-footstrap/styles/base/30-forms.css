@@ -61,8 +61,8 @@
 		flex: 0 0 180px;
 		/* `end`, not `right`: the label is aligned TOWARDS its field, which is a logical intent.
 		 * NOT the same as base/95-luci.css's `.left/.right/.center` — those are LuCI's forcing
-		 * utilities, emitted 59 times by form.js, and a class named `right` means right in any
-		 * direction. Never sweep those onto start/end. */
+		 * utilities (form.js hands them out at four call sites, eight across luci-base), and a
+		 * class named `right` means right in any direction. Never sweep those onto start/end. */
 		text-align: end;
 	}
 
@@ -190,7 +190,6 @@
 	button[disabled],
 	select[disabled],
 	textarea[disabled],
-	.cbi-select[disabled]::before,
 	.cbi-dropdown[disabled]:not(.btn):not(.cbi-button),
 	input[type="checkbox"][disabled]::before,
 	input[type="checkbox"][disabled]::after,

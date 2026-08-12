@@ -33,10 +33,12 @@
 			overscroll-behavior-x: contain;
 		}
 
-		/* Must stay INSIDE this @media: written unscoped it never took effect (base's
-		 * .cbi-dropdown:not(.btn):not(.cbi-button) is more specific and kept its 400px cap), and
-		 * with base in its own layer it would now cap every dropdown on the desktop too. A
-		 * dropdown must never exceed its field, on a page or in a dialog. */
+		/* Must stay INSIDE this @media, and the reason is specificity within ONE layer: the 400px
+		 * cap lives in theme/65-dropdown.css (absorbed there from base) on
+		 * `.cbi-dropdown:not(.btn):not(.cbi-button)` — (0,3,0) against this rule's (0,1,0) — so
+		 * unscoped this would lose to it everywhere and cap nothing at all. Inside the phone tier
+		 * it is what the narrow width needs: a dropdown must never exceed its field, on a page or
+		 * in a dialog. */
 		.cbi-dropdown { min-width: 0; max-width: 100%; }
 
 		/* Software page (luci-app-package-manager): stack each labeled control; base gives its

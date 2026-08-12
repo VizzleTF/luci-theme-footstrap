@@ -31,7 +31,7 @@
 		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
 	}
 
-	/* keep base's padding-top: 6px — it is tuned for base's align-items: baseline. */
+	/* keep base's padding-top (--fs-space-1) — it is tuned for base's align-items: baseline. */
 	.cbi-value-title {
 		color: var(--fs-dim); font-size: var(--fs-type); font-weight: var(--fs-weight);
 		/* stated, not inherited: the control rule above hands every label `line-height: normal`,
@@ -65,7 +65,8 @@
 
 	/* A text field in a CBI form was a fixed 210px — base's width, straight out of bootstrap's
 	 * cascade. The same 210px holds far LESS here: the field is monospaced (the rule above) and
-	 * padded 11px a side instead of 4, so Attended Sysupgrade's server URL was clipped mid-domain
+	 * padded --fs-space-3 a side (12px at the default density) instead of 4, so Attended
+	 * Sysupgrade's server URL was clipped mid-domain
 	 * — while the .cbi-dynlist directly under it on that same page is 440px wide, which is what
 	 * makes the mismatch the thing you actually see (issue #5). Elastic now, with the dynlist's own
 	 * ceiling so the two line up. Number/date/time keep the fixed width: they hold short values,
@@ -513,10 +514,6 @@
 		line-height: normal;
 		cursor: pointer;
 	}
-	/* The ▾ plate is gone: the chevron is a background on the shell, exactly as on `select`. Hidden
-	 * rather than deleted because base/30-forms.css still names `.cbi-select[disabled]::before` in
-	 * its disabled list — dropping the rule here would leave that one to paint a bare glyph. */
-	.cbi-select::before { display: none; }
 
 	/* spinner / loading */
 	.spinning, .cbi-value em, em.spinning { color: var(--fs-dim); }

@@ -37,10 +37,11 @@
 
 	/* AN UNBREAKABLE VALUE MUST NOT LEAVE THE CARD, in ANY .table. Stock has always had this
 	 * (`overflow-wrap: break-word` on every cell); the theme replaced it with a rule that first
-	 * asks what KIND of table it is — theme/30-tables.css breaks long values only for
-	 * `#view .table[id] .td, table.fs-dt .td`, i.e. a table carrying an id or a
-	 * `.tr.table-titles` header row. A third-party status page rendering a key/value
-	 * `<div class="table">` with neither matched nothing, so its cells kept
+	 * asked what KIND of table it is — it broke long values only for `#view .table[id] .td,
+	 * table.fs-dt .td`, i.e. a table carrying an id or a `.tr.table-titles` header row. That
+	 * narrowing is gone (theme/30-tables.css records its removal) and this rule is the only owner
+	 * now. A third-party status page rendering a key/value `<div class="table">` with neither
+	 * matched nothing, so its cells kept
 	 * `overflow-wrap: normal` and one unbroken token — an ICCID, a firmware string, an APN, a
 	 * base64 key, a DUID — held the column open and pushed the table outside its card.
 	 * Measured against luci-app-3ginfo-lite's own markup (`admin/modem`, three such tables).

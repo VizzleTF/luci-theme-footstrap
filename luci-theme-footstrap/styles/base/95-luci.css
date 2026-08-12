@@ -379,8 +379,11 @@
 
 	#modal_overlay > .modal.login > button.important {
 		/* no !important needed: the ID makes this (1,3,1), which no button rule can reach */
-		/* the login dialog's one action, a step up the scale — it was a bare 120% of whatever the
-		 * button happened to be. */
+		/* Coverage vocabulary, not a live control: nothing in luci-base gives a modal the `login`
+		 * class (ui.showModal takes classes and no call site passes one), and this theme's own
+		 * login is a server-rendered form, not a modal. It is inherited from luci-theme-bootstrap,
+		 * which carries the same selector, so an app that emits it gets a themed result — a step up
+		 * the scale, where it was a bare 120% of whatever the button happened to be. */
 		font-size: var(--fs-type-lg);
 		margin-top: var(--fs-space-2);
 		width: 100%;

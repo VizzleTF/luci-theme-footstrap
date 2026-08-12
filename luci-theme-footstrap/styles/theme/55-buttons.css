@@ -144,8 +144,9 @@
 	 * DANGER role, not the accent one: Reset discards your unsaved changes. (An opaque
 	 * --fs-panel2 was the first attempt and weighed MORE than Save's translucent 10-15% tint: a
 	 * solid surface and a tint do not read as the same fill, whatever their lightness.)
-	 * Label is --fs-text for the same reason as Save's: --fs-dim on --fs-danger-soft measured
-	 * 4.06:1 and failed AA. The role lives in the fill and the border. */
+	 * Label is --fs-text for the same reason as Save's: --fs-dim on --fs-danger-soft measures
+	 * 4.49:1 on --fs-panel in footstrap dark, the worst of the six palette x mode blocks — under
+	 * AA by a hundredth, which is still under it. The role lives in the fill and the border. */
 	.cbi-page-actions .cbi-button-reset {
 		background: var(--fs-danger-soft);
 		border: 1px solid var(--fs-danger-line);

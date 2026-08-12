@@ -59,15 +59,23 @@
 	 *                       -5   -4   -3     -2      -1
 	 *
 	 * so: the hostname, the IPv6 list and DUID may wrap; IPv4/MAC/IAID and the two short trailing
-	 * columns keep the nowrap above. `.leases` vs `.lases` separates the v4 tables by release on its
-	 * own. The v6 table carries the SAME class on both, so it is split on column COUNT — 24.10 has
-	 * exactly five, 25.12+ has six or seven. That count test is wrapped in `:where()` so it costs
-	 * NOTHING: `:has()` otherwise takes its argument's specificity, and `.tr.table-titles >
-	 * :nth-child(6)` alone pushed the selector to [1,8,1], past the sheet's [1,7,0] ceiling. */
-	#view table.fs-dt.leases:not(.fs-stacked) .td:is(:nth-last-child(7), :nth-last-child(4)),
+	 * columns keep the nowrap above. BOTH tables are split on column COUNT, never on the release and
+	 * never on the class name: 24.10 emits five columns in each, 25.12 eight in the v4 table and
+	 * seven in the v6 one. The v4 table is also where upstream's `lases` typo lives — fixed on
+	 * 25.12, still there on 24.10 and on ImmortalWrt's fork of it — so keying the shapes off that
+	 * name meant a one-character upstream fix would hand the 24.10 table the 25.12 column plan and
+	 * silently un-fix issue #7. Both spellings are accepted here and the MARKUP decides, which is
+	 * what base/95-luci.css states as the rule for release-conditioned styling.
+	 *
+	 * The count test is wrapped in `:where()` so it costs NOTHING: `:has()` otherwise takes its
+	 * argument's specificity, and `.tr.table-titles > :nth-child(6)` alone pushed the selector to
+	 * [1,8,1], past the sheet's [1,7,0] ceiling. */
+	#view table.fs-dt:is(.leases, .lases):has(:where(.tr.table-titles > :nth-child(6))):not(.fs-stacked)
+		.td:is(:nth-last-child(7), :nth-last-child(4)),
 	#view table.fs-dt.leases6:has(:where(.tr.table-titles > :nth-child(6))):not(.fs-stacked)
 		.td:is(:nth-last-child(6), :nth-last-child(5), :nth-last-child(4)),
-	#view table.fs-dt.lases:not(.fs-stacked) .td:nth-last-child(5),
+	#view table.fs-dt:is(.leases, .lases):not(:has(:where(.tr.table-titles > :nth-child(6)))):not(.fs-stacked)
+		.td:nth-last-child(5),
 	#view table.fs-dt.leases6:not(:has(:where(.tr.table-titles > :nth-child(6)))):not(.fs-stacked)
 		.td:is(:nth-last-child(5), :nth-last-child(4), :nth-last-child(3)) {
 		/* `white-space` is the whole rule now: it is what re-permits wrapping for these columns
