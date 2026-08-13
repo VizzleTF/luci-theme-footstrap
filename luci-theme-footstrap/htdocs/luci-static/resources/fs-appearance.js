@@ -684,9 +684,9 @@ function takeReturn() {
 		return true;
 	} catch (e) { return false; }
 }
-const MARK = 'fs-ap';
+const MARK = 'fs-ap';	/* the built form's own class; also how mount() knows it is already there */
 /* how long the stock view gets to render its tabs before a missing group counts as a failure */
-const TAB_DEADLINE = 5000;	/* the built form's own class; also how mount() knows it is already there */
+const TAB_DEADLINE = 5000;
 const TAB = 'fs-appearance';	/* the pane's data-tab, which ui.tabs' click handler matches on */
 
 let _routeObserver = null, _viewObserver = null, _observedView = null, _building = false;

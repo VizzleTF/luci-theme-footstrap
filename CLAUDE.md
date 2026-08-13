@@ -37,8 +37,13 @@ index plus the rules that are easy to break — do not re-derive what a doc alre
 `export-tier` measure, and how the theme is checked without a router.
 
 **Repo root is the workspace** (`package.json` gates, `tools/`, `docs/`, `owlab.yaml`,
-`install.sh`); the shipped package is `luci-theme-footstrap/` one level down. Nothing in the root
-ships, and the OpenWrt buildbot has no node.
+`install.sh`); the shipped package is `luci-theme-footstrap/` one level down — same name, one level
+apart, so a path is ambiguous unless it is absolute or rooted. Nothing in the root ships, and the
+OpenWrt buildbot has no node.
+
+**Work from the repo root, not from its parent.** The checkout's parent holds `luci-fork/` (the
+openwrt/luci copy, see below) and `tmp/` and is not a git repository — a session started there
+loads none of this file, and `owlab` exits with `no owlab.yaml found`.
 
 ## Commands
 
@@ -49,7 +54,11 @@ owlab up | owlab sync --watch | owlab open owrt2512
 owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' --assert …
 ucode -T -c -o /dev/null <template>.ut     # syntax-check a template the way LuCI does
 luci-theme-footstrap/dev-sync.sh <host>    # deploy to a HARDWARE router over ssh
+./tools/sync-luci-fork.sh ../luci-fork     # regenerate the openwrt/luci copy
 ```
+
+There is no unit-test suite and nothing to run "a single test": `npm run check` is the whole
+static half, and the other half is a page on a live userland (`owlab`, or a hardware router).
 
 One gate directly: `node tools/<name>.mjs`. Two run in CI only: `tools/jsmin-verify.mjs` (needs a
 jsmin built from `luci-upstream.pin`) and `ucode -T -c` over every template, which the `verify`
@@ -150,6 +159,18 @@ compile.
   upgrade must never change the active theme** (`$PKG_UPGRADE` is dead — apk never exports it).
 - Do not set `PKG_VERSION` (git-derived). `LUCI_MINIFY_CSS:=0` — csstidy mangles `:has()` and
   `color-mix()`.
+- **The luci fork branch is ONE commit, amended — never a second commit on top.**
+  `tools/sync-luci-fork.sh ../luci-fork` regenerates the copy (that tree gets the built
+  `cascade.css`, `styles/` does not travel — `docs/package.md`), then `git commit --amend` reading
+  the author, the **author date** and the `Signed-off-by` trailer back off `HEAD`, then
+  `git push --force-with-lease`. Upstream reviews one patch: a follow-up commit, a rewritten author
+  or a lost sign-off turns the proposal into a series that has to be squashed by hand.
+- **A release is not finished when the tag pipeline is green** — the theme installs from
+  owfeed-packages, so it also has to reach the feed: bump `packages/luci-theme-footstrap/upstream.sh`
+  (the bot opens that PR for some releases and not others), check the sha256s in the diff against
+  the release assets you downloaded, merge, and then read the **served** index rather than the
+  workflow log — `apk adbdump` on `releases/25.12/<arch>/packages.adb` and `Packages.gz` on
+  `releases/24.10/<arch>/`.
 - **The trust chain fails closed**: a verified TLS channel (never `-k`, never as a retry), an
   ed25519 `usign` signature, then GitHub's sha256. The signature is the link that holds — GitHub
   *computes* the asset digest, so a swapped asset passes the checksum. A missing digest, `.sig` or
