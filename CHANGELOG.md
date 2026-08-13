@@ -23,6 +23,8 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 - **`clearViewIntervals()` no longer reads the deprecated `L.Poll` alias without a guard.** It is the one function in the router whose reasoning is about that alias going away, and it was the only place reading it blind; every other read in the file is guarded. With the alias gone the call threw where a throw costs most — `navigate()` runs it after `#view` has been swapped for the "Loading view…" spinner, so measured with the alias removed, one click left the page on the spinner with no view rendered and a `TypeError` in the console. A missing alias is now the same answer as an unreadable timer: sweep nothing, say so once, let the navigation finish.
 
+- **A browser that refuses a 2D canvas context no longer breaks table fitting.** `wordFloor()` created its measuring canvas without checking, so an anti-fingerprinting extension or a WebView with canvas disabled turned every fit pass into a throw — and because the pass strips `fs-stacked` before it measures, the throw escaped with the class already gone: every stackable table left flat, every later table in the pass unfitted, once a second on a polled page. The context is now taken the way `fs-widgets.js` already takes its own, and a refusal makes this one test report nothing rather than take the other two down with it.
+
 ## [0.12.5] — 2026-08-12
 
 ### Fixed

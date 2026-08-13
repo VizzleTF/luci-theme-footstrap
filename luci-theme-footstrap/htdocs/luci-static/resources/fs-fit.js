@@ -23,8 +23,18 @@ const _fitters = [];
 let _rafPending = false;
 let _ro = null, _mo = null;
 /* one canvas for the whole document: wordFloor() measures text with it, and creating one per call
- * is the expensive half of that measurement */
+ * is the expensive half of that measurement. `null` = not asked yet, `false` = asked and refused —
+ * the same three-state slot fs-widgets.js's rasterCtx() keeps, and for the same reason: a browser
+ * with canvas turned off (an anti-fingerprinting extension, a WebView, memory pressure) answers
+ * null, and retrying that on every fit pass is a cost with no chance of a different answer. */
 let _cx = null;
+function textCtx() {
+	if (_cx === null) {
+		try { _cx = document.createElement('canvas').getContext('2d') || false; }
+		catch (e) { _cx = false; }
+	}
+	return _cx;
+}
 const SPACE_RE = /\s+/;
 
 /* Run every fitter NOW, synchronously. A fitter must be idempotent — this fires on every
@@ -155,7 +165,15 @@ return baseclass.extend({
 	wordFloor(t) {
 		const rows = t.querySelectorAll('.tr:not(.table-titles):not(.cbi-section-table-titles):not(.placeholder)');
 		if (!rows.length) return 0;
-		if (!_cx) _cx = document.createElement('canvas').getContext('2d');
+		/* No 2D context, no floor to report — and 0 is the honest answer, not a failure: it says
+		 * "this test has nothing to add", leaving the other two stack tests (does it overflow, is a
+		 * one-token column shredded) to decide. Throwing here would cost far more than the test is
+		 * worth: fs-select's fitTables() strips `fs-stacked` BEFORE it measures (rule 1), and this is
+		 * the last term of that `||`, so the throw would escape the row walk with the class already
+		 * gone — every stackable table left un-stacked, every later table in the pass unfitted, once
+		 * a second on a polled page. */
+		const cx = textCtx();
+		if (!cx) return 0;
 		const floors = [], longest = [];
 		let cols = null;
 		for (const row of rows) {
@@ -181,8 +199,8 @@ return baseclass.extend({
 				else for (const w of text.split(SPACE_RE)) if (w.length > word.length) word = w;
 				if (!(word.length > (longest[i] || 0))) continue;
 				longest[i] = word.length;
-				_cx.font = col.font;
-				const need = _cx.measureText(word).width + (col.tracking * word.length) + col.pad;
+				cx.font = col.font;
+				const need = cx.measureText(word).width + (col.tracking * word.length) + col.pad;
 				if (!(floors[i] >= need)) floors[i] = need;
 			}
 		}
