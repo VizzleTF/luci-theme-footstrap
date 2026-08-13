@@ -331,6 +331,35 @@ injects from `render()`, which resolves after the router's `require()` callback 
 navigation left the document carrying one permanently stale copy. The observer cannot loop: a removal
 is a mutation with no added nodes, and the handler returns when nothing was added.
 
+### Which page a sheet belongs to
+
+A sheet the module re-hosts into the theme layer is remembered with the page it arrived for, and
+`scopeToCurrentPage()` — called by the router right after it stamps `data-page` — enables the ones
+belonging to the page on screen and disables the rest. The key is the **resolved** dispatch path,
+not the URL: `/admin/status` and `/` both resolve to `admin/status/overview`, and a key taken from
+the address bar could never match the one the router hands over one navigation later, so the first
+navigation away disabled the sheets that page owns for good (measured with `luci-app-mwan3`, whose
+status include sizes the interface cards: 240px wide on a full load, 966px after one round trip).
+
+Two things decide the owner, and both exist because **a require in flight cannot be stopped**:
+
+- **The router names the owner for a COLD require** (`sheets.attributeTo(segs, gen)`), because on a
+  first visit the require *is* the render: the module's `<style>` can land after a newer navigation
+  has already stamped `data-page`, and it belongs to the page that asked for it. A require that
+  resolves from LuCI's class cache injects nothing and therefore never touches that slot — it used
+  to, and clearing it a microtask later is what put a superseded page's sheet on the page that
+  superseded it (`luci-app-filemanager`'s `.cbi-button-save { display: none !important }`, live on
+  System → System). The slot carries the navigation generation that set it, so a stale require's
+  cleanup cannot clear a slot a newer one now holds. Two *cold* requires overlapping still credit
+  the older one's sheet to the newer page: LuCI evaluates a view module inside `eval()` in its own
+  `require()`, so nothing observable says which module is running when a `<style>` appears.
+- **A sheet is scoped the moment it is taken**, not at the next navigation — otherwise a late
+  arrival paints whatever page is on screen until the user clicks again. That switch is the **last**
+  step of re-hosting: `el.disabled` is the element's view of `el.sheet.disabled`, and assigning
+  `textContent` (which is how the sheet is wrapped in `@layer theme`) throws the old
+  `CSSStyleSheet` away and builds a fresh, enabled one — so switching off before the wrap switched
+  it back on within the same call.
+
 ## Module prefetch
 
 `wireRouter()` adds a delegated `pointerover`: entering a link to an SPA-able node `fetch()`es its

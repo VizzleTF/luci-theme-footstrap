@@ -676,11 +676,30 @@ function appKey(segs) {
  * stand: the System page came back with no Save button, and stayed that way across return visits).
  *
  * So the router names the owner for the duration of such a require (see fs-router.js), and this is
- * that hint. It is a plain value rather than a stack: two cold requires cannot overlap, because the
- * second navigation supersedes the first before it starts one. */
+ * that hint.
+ *
+ * ONE SLOT, STAMPED WITH THE NAVIGATION THAT SET IT. The router only names an owner for a require
+ * that has yet to evaluate its module, so the common shape — a cold require in flight, the user
+ * clicking on to a page already in LuCI's class cache — no longer touches this slot at all. Two
+ * COLD requires can still overlap, and then the newer one wins the slot: it is the page the user is
+ * looking at, and crediting ITS sheet to the page it superseded would leave the visible page
+ * unpainted, which is the worse of the two errors. The generation stamp is what keeps that from
+ * getting worse still — the older require's `.finally` must not clear a slot the newer one now
+ * holds, or the newer page's own sheet lands unattributed.
+ *
+ * There is no way to do better from here: LuCI evaluates a view module inside `eval()` in its own
+ * `require()` (luci.js), so nothing observable says WHICH module is running when a <style> appears —
+ * `document.currentScript` is null and the injection is synchronous inside a promise chain we do
+ * not own. The remaining hole is therefore two cold requires overlapping, where the first one's
+ * sheet is credited to the second's page — the pre-existing behaviour, now narrowed to that one
+ * case instead of every navigation away from a cold require. */
 let _ownerHint = null;
-function attributeTo(segs) {
+let _ownerGen = -1;
+function attributeTo(segs, gen) {
+	/* a stale require letting go of a slot somebody else now holds: leave it alone */
+	if (segs == null && gen !== _ownerGen) return;
 	_ownerHint = (segs == null) ? null : appKey(segs);
+	_ownerGen = (segs == null) ? -1 : gen;
 }
 
 function ownerKey() {
@@ -723,6 +742,25 @@ function scopeToCurrentPage(segs) {
 	});
 }
 
+/* TAKE A SHEET, AND SCOPE IT IN THE SAME BREATH.
+ *
+ * scopeToCurrentPage() runs on NAVIGATION, so it only ever sees sheets that were already here. A
+ * sheet that arrives afterwards is scoped by nobody until the next click — and the one case where
+ * that matters is precisely the case the owner hint exists for: a cold require whose page the user
+ * has already left injects its <style> into a document showing somebody else's page, and the sheet
+ * paints there until the user navigates again. Measured with a view whose module appends
+ * `body { outline: 3px solid rgb(9,9,9) }`: correctly credited to its own page, and still painting
+ * the outline on the page that superseded it.
+ *
+ * So the stamp and the switch are one act. `ownerKey()` is the page the sheet BELONGS to and
+ * `currentKey()` the page on screen; on every ordinary arrival they are the same string and this is
+ * a no-op. */
+function claimOwner(el) {
+	const key = ownerKey();
+	_owner.set(el, key);
+	if (outlivesPage(el)) setEnabled(el, key === currentKey());
+}
+
 function rehostIntoThemeLayer(el, universe) {
 	if (el.dataset.fsLayered) return;
 
@@ -735,7 +773,7 @@ function rehostIntoThemeLayer(el, universe) {
 		el.dataset.fsLayered = '1';
 		el.after(s);		/* keep source order: ties inside the layer still resolve as they did */
 		silence(el);
-		_owner.set(s, ownerKey());	/* the shim paints; the original is silenced for good */
+		claimOwner(s);	/* the shim paints; the original is silenced for good */
 		fenceImported(s, universe.names, Date.now() + 1000);	/* a cache hit lands on the first frame */
 		return;
 	}
@@ -752,7 +790,6 @@ function rehostIntoThemeLayer(el, universe) {
 	 * unpinned all over again and a second pass appends a second fence. The mark is the only thing
 	 * that says the work is done, so it has to be set for every path below, wrapped or not. */
 	el.dataset.fsLayered = '1';
-	_owner.set(el, ownerKey());	/* a <style> is re-hosted IN PLACE, so it paints itself */
 
 	/* Wrap only if the text still IS the sheet (see textIsSheet). When it is not, the sheet stays
 	 * unlayered — Zone 2 exactly where it already was, which is a trade — rather than lose rules,
@@ -769,6 +806,15 @@ function rehostIntoThemeLayer(el, universe) {
 		el.textContent = '@layer theme {\n' + el.textContent + '\n}';
 	}
 	try { if (el.sheet) fenceRules(el.sheet.cssRules, universe.names); } catch (e) { /* unfenced, not broken */ }
+	/* LAST, because the line above may have re-parsed the sheet. `el.disabled` is not a content
+	 * attribute — it is the element's view of `el.sheet.disabled`, and assigning textContent throws
+	 * the old CSSStyleSheet away and builds a new one, which comes back ENABLED. Claiming before the
+	 * wrap therefore switched a sheet off and then switched it back on within the same call, which is
+	 * how a sheet belonging to a page the user had left went on painting the page that superseded it
+	 * (measured: `body { outline: 3px solid rgb(9,9,9) }` from a still-loading view, live on
+	 * System -> System). Ownership is recorded from the same call either way — ownerKey() is read
+	 * here, while the router's hint still names the page whose module is evaluating. */
+	claimOwner(el);	/* a <style> is re-hosted IN PLACE, so it paints itself */
 }
 
 /* Re-hosting needs the theme's own selectors to tell an invasive sheet from an inert one. If

@@ -61,20 +61,39 @@ function clearViewIntervals() {
 	 * is the pair disagreeing: a tick that is running while the id it runs on has no name we know.
 	 * Then do NOTHING, once, loudly: a view's leftover interval outliving its page costs a wasted
 	 * RPC, whereas clearing LuCI's own tick costs every live value on every later page. */
+	/* …and the ALIAS ITSELF is the first thing that can go — it is the deprecation the paragraph
+	 * above is about, so this function cannot be the one place that reads it blind. Every other
+	 * `L.Poll` read in this file is guarded, and an unguarded one here throws where a throw costs
+	 * most: navigate() calls this AFTER #view has been swapped for the "Loading view…" spinner and
+	 * BEFORE data-page, pushState and the require, so a TypeError would strand every click on the
+	 * spinner with the old URL and the old menu mark — far worse than the leaked interval this
+	 * exists to sweep. No alias is the same answer as an unreadable timer: do NOTHING, once,
+	 * loudly. */
+	if (!L.Poll) {
+		warnPollUnreadable('footstrap: L.Poll is gone from this luci-base, so LuCI\'s own tick cannot be '
+			+ 'told apart from a view\'s timers — leaving view intervals alone. fs-router.js needs '
+			+ 'updating for this luci-base.');
+		return;
+	}
 	const running = (typeof L.Poll.active === 'function') ? L.Poll.active() : (L.Poll.timer != null);
 	if (running && L.Poll.timer == null) {
-		if (!_pollTimerWarned) {
-			_pollTimerWarned = true;
-			console.error('footstrap: LuCI is polling but L.Poll.timer is not readable — leaving view '
-				+ 'intervals alone rather than risking its tick. fs-router.js needs updating for this '
-				+ 'luci-base.');
-		}
+		warnPollUnreadable('footstrap: LuCI is polling but L.Poll.timer is not readable — leaving view '
+			+ 'intervals alone rather than risking its tick. fs-router.js needs updating for this '
+			+ 'luci-base.');
 		return;
 	}
 	const keep = running ? L.Poll.timer : null;
 	_viewIntervals.forEach((id) => { if (id !== keep) window.clearInterval(id); });
 }
+/* ONE line per document whatever went wrong: this runs on every navigation, and a router that
+ * cannot read L.Poll cannot read it on the next click either — a message per click would bury the
+ * console the user is reading it in. */
 let _pollTimerWarned = false;
+function warnPollUnreadable(msg) {
+	if (_pollTimerWarned) return;
+	_pollTimerWarned = true;
+	console.error(msg);
+}
 
 /* --- uci cache teardown for SPA nav ---
  * `uci.load()` does not answer "is this config present?" — it answers "which of these packages did
@@ -806,15 +825,23 @@ function navigate(pathname, push, kbd) {
 		 * repairStaleRender() a mess that only exists because a require in flight cannot be stopped. */
 		if (gen !== _navGen) return null;
 		_seen.add(className);
-		/* NAME THE OWNER for the length of this require. On a first visit the require IS the render,
-		 * so any <style> the module injects belongs to THIS page — even if a newer navigation has
-		 * stamped data-page by the time it lands, which is exactly the case repairStaleRender() below
-		 * exists for. Without it fs-sheets credited such a sheet to the page that superseded this one
-		 * and bound it there for the life of the document (measured: luci-app-filemanager's
-		 * `.cbi-button-save { display: none !important }` disabled on its own page and live on
-		 * System -> System, across return visits). */
-		sheets.attributeTo(rsegs);
-		return RT.require(className).finally(() => sheets.attributeTo(null));
+		/* NAME THE OWNER for the length of this require, AND ONLY WHEN THE MODULE HAS YET TO BE
+		 * EVALUATED. On a first visit the require IS the render, so any <style> the module injects
+		 * belongs to THIS page — even if a newer navigation has stamped data-page by the time it
+		 * lands, which is exactly the case repairStaleRender() below exists for. Without it fs-sheets
+		 * credited such a sheet to the page that superseded this one and bound it there for the life
+		 * of the document (measured: luci-app-filemanager's `.cbi-button-save { display: none
+		 * !important }` disabled on its own page and live on System -> System, across return visits).
+		 *
+		 * `!cached` is what makes the hint survive long enough to be read, and its absence is why the
+		 * measured case stopped being covered. A CACHED require injects nothing — the module was
+		 * evaluated on the first visit and `require()` hands back the singleton — but it still ran
+		 * this line, and its `.finally` fires within a microtask, so the navigation that superseded a
+		 * cold require would set the hint to itself and clear it to null while that require was still
+		 * in flight. The sheet then landed with no hint at all, i.e. credited to the superseding page,
+		 * which is the exact bug. A require that cannot inject has no business naming an owner. */
+		if (!cached) sheets.attributeTo(rsegs, gen);
+		return RT.require(className).finally(() => { if (!cached) sheets.attributeTo(null, gen); });
 	}).then((view) => {
 		if (view == null) return;
 		if (!(view instanceof RT.view))
