@@ -172,13 +172,30 @@
 	.fs-themerow:hover {
 		background: var(--fs-panel2); color: var(--fs-text); opacity: 1;
 	}
-	.fs-sidebar ul.nav > li.active > a,
 	.fs-sidebar ul.nav > li > a.active,
 	.fs-sidebar ul.nav ul a.active,
 	.fs-themerow[aria-expanded="true"],
 	.fs-modemenu li.active a {
 		background: var(--fs-accent-soft); color: var(--fs-accent);
 	}
+	/* ---- THE FILL MARKS THE PAGE, AND A CATEGORY IS NOT A PAGE ----
+	 *
+	 * `li.active` is set on the SECTION that contains the current page as well as on the page's own
+	 * row, so `li.active > a` used to hand the same accent plate to both — on System -> System that
+	 * is two identical plates, one above the other, both reading "System" (issue #37). Measured
+	 * before this rule: the open category and the current leaf were the same fill, the same ink and
+	 * the same 13px/600, differing in 2px of padding.
+	 *
+	 * The markup already says which is which and this only makes the paint agree with it:
+	 * menu-footstrap.js puts `aria-current="page"` on the LEAF alone, because a section header is a
+	 * disclosure control rather than a link to where you are. So the plate stays with the page and
+	 * the ancestor keeps the accent INK — still visibly the branch you are in, without competing
+	 * with the page for the same signal — while an ancestor that is also the page itself is matched
+	 * by `a.active` above and keeps the plate.
+	 *
+	 * Unscoped, like the rule above it: the accordion, the bar's dropdown and the rail's flyout all
+	 * render one markup, and a per-layout copy is what the "one look, every layout" note is about. */
+	.fs-sidebar ul.nav > li.active > a:not(.active) { color: var(--fs-accent); }
 
 	/* Keyboard focus for the chrome controls. Covers the buttons/links the theme itself renders,
 	 * which had only the UA default (menu links: base's thin dotted outline).

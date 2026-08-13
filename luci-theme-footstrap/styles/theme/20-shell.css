@@ -378,7 +378,13 @@
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a {
 			display: flex; align-items: center; gap: var(--fs-space-3);
 			padding: var(--fs-space-2-5) var(--fs-space-3);
-			font-size: var(--fs-type); white-space: normal;
+			/* BOLD is the root level's own signal, and it is the one the type scale can promise:
+			 * `--fs-weight-bold` has a face everywhere, while `--fs-weight-normal` is documented in
+			 * 02-tokens.css as having none of its own — so lightening the CHILDREN instead would
+			 * look like hierarchy on a system stack and like nothing at all on a router whose admin
+			 * installed a 600/700 subset. Only the accordion is deep enough to need the distinction;
+			 * the bar keeps one level of items and is left alone. */
+			font-size: var(--fs-type); font-weight: var(--fs-weight-bold); white-space: normal;
 			line-height: 1.1;
 		}
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a .fs-ico { display: block; }
@@ -407,7 +413,22 @@
 		 * (below) is a popup again but flies its panel out sideways, and brings its own
 		 * horizontal bridge (li.has-sub::after). */
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub > ul::before { content: none; }
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.open > ul { display: flex; margin: var(--fs-space-0-5) 0 var(--fs-space-1-5) var(--fs-space-7); }
+		/* ---- THE OPEN SECTION IS A GROUP, AND IT HAS TO LOOK LIKE ONE ----
+		 *
+		 * An indent alone did not say where a long section ended: after ten children, the next root
+		 * category read as an eleventh child (issue #37). A hairline down the group's reading edge
+		 * draws that boundary, and the wider bottom margin separates the last child from the next
+		 * category — the two cues cost nothing but a border and 6px.
+		 *
+		 * No `:not([data-rail="true"])` guard: in the rail this same `ul` becomes a flyout card,
+		 * whose rule (below) restates `border` and `margin` as shorthands at higher specificity, so
+		 * neither declaration here survives into it. Checked in place rather than assumed. */
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.open > ul {
+			display: flex;
+			margin: var(--fs-space-1) 0 var(--fs-space-3) var(--fs-space-7);
+			padding-inline-start: var(--fs-space-1);
+			border-inline-start: 1px solid var(--fs-border);
+		}
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav ul a { padding: var(--fs-space-2) var(--fs-space-3); }
 
