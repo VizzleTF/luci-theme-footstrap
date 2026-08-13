@@ -88,10 +88,10 @@ function clearViewIntervals() {
 /* ONE line per document whatever went wrong: this runs on every navigation, and a router that
  * cannot read L.Poll cannot read it on the next click either — a message per click would bury the
  * console the user is reading it in. */
-let _pollTimerWarned = false;
+let _pollWarned = false;
 function warnPollUnreadable(msg) {
-	if (_pollTimerWarned) return;
-	_pollTimerWarned = true;
+	if (_pollWarned) return;
+	_pollWarned = true;
 	console.error(msg);
 }
 

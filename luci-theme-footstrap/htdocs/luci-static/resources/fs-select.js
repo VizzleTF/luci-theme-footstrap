@@ -301,11 +301,27 @@ function adoptMarkup(t, head) {
  *
  * The heading is COPIED, not invented: it is the text of the header cell in the same position, so
  * the card says exactly what the column header says. Never overwrites an existing data-title — if
- * the app set one, that is the app's answer and it knows more than a positional guess. Cheap enough
- * to re-run on every fit pass (it is skipped entirely once the cells carry the attribute), which
- * matters because these tables are POLLED: the rows are replaced wholesale every few seconds, and
- * the fresh ones arrive without it. */
+ * the app set one, that is the app's answer and it knows more than a positional guess. Re-run on
+ * every fit pass, because these tables are POLLED: the rows are replaced wholesale every few
+ * seconds and the fresh ones arrive without the attribute. What keeps that affordable is the
+ * early-out below, not the per-cell test at the bottom — the walk is over every cell of every row,
+ * and on the tables LuCI builds itself it could never have anything to do. */
 function labelCells(t, head) {
+	const rows = t.querySelectorAll('.tr, tbody tr');
+	/* ASK THE LAST ROW FIRST, and stop there when it is already captioned.
+	 *
+	 * The walk below is per cell, and since a claimed table is revisited on every fit pass — which is
+	 * a MUTATION pass, not a once-a-second one — the common case has to be answered without it. For
+	 * everything LuCI renders that is "nothing to do at all": ui.Table writes `data-title` itself, so
+	 * the whole table is already captioned and the pass has no work it could ever find.
+	 *
+	 * The LAST row is the question worth asking, because it is the one a poll leaves bare: a batch
+	 * that replaced or appended rows puts the fresh ones at the end, so a captioned last row means the
+	 * captioned rows are the current ones. A row of nothing but spanning cells has no caption to carry
+	 * and falls through to the walk, which is the safe direction — the walk is idempotent. */
+	const last = rows[rows.length - 1];
+	if (last && last !== head && !head.contains(last))
+		for (const c of last.children) if (c.hasAttribute('data-title')) return;
 	/* A `<thead>` that was WRITTEN as markup nests a real `<tr>` — the parser inserts one even where
 	 * the author left it out — while one built by E() holds the `<th>`s directly (see above). Reading
 	 * `head.children` blind therefore captioned every cell of a parsed table with the header row's
@@ -315,7 +331,7 @@ function labelCells(t, head) {
 	const titleRow = (head.firstElementChild && head.firstElementChild.tagName === 'TR') ? head.firstElementChild : head;
 	const titles = [ ...titleRow.children ].map((c) => (c.textContent || '').trim());
 	if (!titles.some(Boolean)) return;
-	for (const row of t.querySelectorAll('.tr, tbody tr')) {
+	for (const row of rows) {
 		if (row === head) continue;
 		const cells = row.children;
 		/* COLUMN cursor, not the cell index: a cell that spans N columns occupies N of the header's

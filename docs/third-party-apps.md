@@ -261,11 +261,17 @@ is left alone on purpose and scrolls: see [css.md](css.md#which-of-the-three-a-t
 replaces the rows inside the element it already has, so a claim that ran once left every batch after
 it without `.tr`/`.td` and without a caption — on a table that may by then be carding, where
 `#view .table.fs-dt.fs-stacked { overflow: hidden }` clips the fresh rows with no scrollbar. Both
-halves are additive and skip what is already done, and the one JUDGEMENT — "does this table speak
-LuCI's row vocabulary, or is it ours to rewrite?" — is still taken once, at claim time, and
-remembered on the element, so LuCI's own markup is never rewritten by a later pass. Measured on
-Processes (114 rows, 5 columns) and the Overview: same tagged/carded/captioned counts as before, no
-long task over eight poll ticks.
+halves are additive, and the one JUDGEMENT — "does this table speak LuCI's row vocabulary, or is it
+ours to rewrite?" — is still taken once, at claim time, and remembered on the element, so LuCI's own
+markup is never rewritten by a later pass.
+
+**Each half answers the common case before it walks anything**, because a fit pass is a mutation
+pass, not a once-a-second one. The adoption returns on its memo. The captioning asks the LAST row —
+the one a poll leaves bare, since a batch that replaced or appended rows puts the fresh ones at the
+end — and stops there when it already carries a caption, which on everything LuCI renders is always
+(`ui.Table` writes `data-title` itself). Measured on Processes, 114 rows and 678 cells: 0.110 ms per
+pass for the full walk against **0.025 ms** with that question asked first. Same tagged, carded and
+captioned counts as before the change, and no long task over eight poll ticks.
 
 This is deliberately unmeasurable here. A census of `#view table:not(.table):not(.cbi-section-table)`
 over all **196** menu pages on the stand — openclash, justclash, ssclash, dashboard and statistics
