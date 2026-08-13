@@ -117,6 +117,54 @@ function build() {
 	 * how it happens to be built today. RangeSlider also emits `widget-update` while the handle
 	 * moves, which is what makes the tile resize UNDER the drag rather than on release; both are
 	 * wired, and the appliers are idempotent so the pair costs nothing. */
+	/* ---- …EXCEPT ON A luci-base THAT HAS NO RANGE SLIDER YET ----
+	 *
+	 * `ui.RangeSlider` arrived in 24.10; 23.05 ships every other widget this page uses (`ui.Select`,
+	 * `ui.Table`, `ui.tabs`, `ui.changes`) but not that one, so on 23.05 the constructor is
+	 * `undefined` and the whole tab used to fail to build — no Appearance page at all, for one
+	 * missing class out of five.
+	 *
+	 * The fallback is the upstream widget's own shape, not a design of ours: the same
+	 * `div.cbi-range-slider` > `input[type=range]` + `output.cbi-range-slider-value` markup, so
+	 * theme/60-inputs.css dresses it without knowing which of the two it got, and the same
+	 * `setUpdateEvents`/`setChangeEvents` pair off `input`/`blur`/`change`, which is what makes the
+	 * widget publish `widget-update` and `widget-change` — both helpers are `ui.AbstractElement`'s
+	 * and are present all the way back. `calcunits`'s `calculate` half is not reproduced because
+	 * this page never passes one; the unit suffix is.
+	 *
+	 * It is reached ONLY when the class is missing (`ui.RangeSlider || RangeSliderShim`), so a
+	 * router that has the real widget keeps it and this code path never runs. */
+	const RangeSliderShim = ui.AbstractElement.extend({
+		__init__(value, options) {
+			this.value = value;
+			this.options = Object.assign({ min: 0, max: 100, step: 1, calcunits: null }, options);
+		},
+		render() {
+			this.sliderEl = E('input', {
+				type: 'range',
+				min: this.options.min,
+				max: this.options.max,
+				step: this.options.step || 'any',
+				value: this.value
+			});
+			this.valueEl = E('output', { 'class': 'cbi-range-slider-value' }, String(this.value));
+			this.node = E('div', { 'class': 'cbi-range-slider' }, [
+				this.sliderEl,
+				this.valueEl,
+				this.options.calcunits ? E('span', { 'class': 'cbi-range-slider-calc-units' }, ' ' + this.options.calcunits) : null
+			].filter(Boolean));
+			this.setUpdateEvents(this.sliderEl, 'input', 'blur');
+			this.setChangeEvents(this.sliderEl, 'change');
+			this.sliderEl.addEventListener('input', () => { this.valueEl.textContent = this.sliderEl.value; });
+			return this.node;
+		},
+		getValue() { return this.sliderEl.value; },
+		setValue(value) {
+			this.sliderEl.value = value;
+			this.valueEl.textContent = this.sliderEl.value;
+		}
+	});
+
 	const selectCtl = (current, choices, apply, label) => {
 		const w = new ui.Select(String(current), choices, { widget: 'select', sort: Object.keys(choices) });
 		const node = w.render();
@@ -126,7 +174,7 @@ function build() {
 	};
 	const sliderCtl = (current, min, max, apply, label, opts) => {
 		const o = opts || {};
-		const w = new ui.RangeSlider(String(current), {
+		const w = new (ui.RangeSlider || RangeSliderShim)(String(current), {
 			min: min, max: max, step: o.step || 1, calcunits: o.unit || null
 		});
 		const node = w.render();

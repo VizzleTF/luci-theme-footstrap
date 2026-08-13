@@ -148,3 +148,14 @@ routers:
     distro: immortalwrt
     release: "24.10.6"
     ports: { http: 8027, ssh: 2227 }
+
+  # ---- 23.05 PROBE (branch wip/23.05, not part of the shipping stand) ----
+  # The oldest release worth asking about: 23.05 already has the ucode
+  # dispatcher and ucode theme templates, so the theme's server half plugs in
+  # unchanged, and what it does NOT have is what this box is for.
+  # Its package set is trimmed rather than inherited: package-manager and
+  # filemanager are 24.10-and-newer apps, and 23.05's own opkg page is the one
+  # to look at instead.
+  - id: owrt2305
+    release: "23.05.6"
+    ports: { http: 8023, ssh: 2223 }

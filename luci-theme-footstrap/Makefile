@@ -205,6 +205,30 @@ endef
 # Absolute, not a relative path: CI rsyncs this package into package/, not into the feed.
 include $(TOPDIR)/feeds/luci/luci.mk
 
+# ---- THE HOOK ABOVE IS ONLY CALLED FROM 24.10 ONWARDS, SO CALL IT HERE ----
+#
+# `Build/Prepare/$(LUCI_NAME)` was added to luci.mk for 24.10. On 23.05 the same file defines
+# Build/Prepare with the identical copy loop and NO hook call, so `Build/Prepare/luci-theme-footstrap`
+# above is simply never run there — and everything this package's build actually does lives in it:
+# cascade.css is GENERATED (the tree carries no stylesheet), the tokens are mangled, the templates
+# and shell are stripped, FS_VERSION is stamped. The package would install and serve a 404 for its
+# own stylesheet, on a release where nothing else about it needs changing.
+#
+# Restated AFTER the include, because a definition before it is the one luci.mk overwrites. The copy
+# loop is luci.mk's own, byte for byte on 23.05 and 25.12 alike — the only difference between the two
+# is the hook line — so this is the same Build/Prepare every release would have run, with the call
+# put back rather than a second build path invented.
+define Build/Prepare
+	for d in luasrc ucode htdocs root src; do \
+	  if [ -d ./$$$$d ]; then \
+	    mkdir -p $(PKG_BUILD_DIR)/$$$$d; \
+		$(CP) ./$$$$d/* $(PKG_BUILD_DIR)/$$$$d/; \
+	  fi; \
+	done
+	$(call Build/Prepare/luci-theme-footstrap)
+	$(call Build/Prepare/Default)
+endef
+
 # THE LINE BELOW IS LOAD-BEARING AND IT IS NOT A SIGNATURE — do not delete it as boilerplate.
 #
 # include/scan.mk builds the package list by GREPPING the Makefiles, not by parsing them:
