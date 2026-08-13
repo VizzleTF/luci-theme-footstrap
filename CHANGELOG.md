@@ -21,6 +21,8 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 - **A claimed foreign table keeps its row classes and its card captions across a poll.** `tagDataTables()` skipped tables it had already tagged, so the adoption ran once per element while the app kept replacing the rows inside it — every batch after the first arrived without `.tr`/`.td` and without a `data-title`, on a table that may by then be carding, where `overflow: hidden` clips them with no scrollbar. That is the exact failure the adoption exists to prevent, arriving one poll later. Both halves are additive and skip what is done, and the one judgement — is this table ours to rewrite, or is it LuCI's own markup? — is still taken once and remembered on the element. Measured on Processes (114 rows, 5 columns) and the Overview: same tagged, carded and captioned counts, and no long task across eight poll ticks.
 
+- **`clearViewIntervals()` no longer reads the deprecated `L.Poll` alias without a guard.** It is the one function in the router whose reasoning is about that alias going away, and it was the only place reading it blind; every other read in the file is guarded. With the alias gone the call threw where a throw costs most — `navigate()` runs it after `#view` has been swapped for the "Loading view…" spinner, so measured with the alias removed, one click left the page on the spinner with no view rendered and a `TypeError` in the console. A missing alias is now the same answer as an unreadable timer: sweep nothing, say so once, let the navigation finish.
+
 ## [0.12.5] — 2026-08-12
 
 ### Fixed
