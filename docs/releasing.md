@@ -87,7 +87,7 @@ you are unsure — it is the reference for LuCI behaviour.
 | #9 | `admin/network/firewall/forwards`, `/snats` (GridSection) | config-table row labels visible (`.fs-stacked` cards / `@container 960`) |
 | #10 | `admin/network/dhcp` (a page with hidden tabs) | no empty scroll below the content |
 | #11 | `admin/status/overview` (client list) | the "Network" column is not crushed, rows are not over-wide |
-| #17 | the release assets, not a page | `manifest.txt` **and** `manifest.txt.sig` are present; `latest/download/manifest.txt` serves that file; `usign -V` passes with `release.pub`; `awk '$1=="pkg"'` yields one line per format; no install or update path touches `api.github.com` |
+| #17 | the release assets, not a page | `manifest.txt` **and** `manifest.txt.sig` are present; `latest/download/manifest.txt` serves that file; `usign -V` passes with `release.pub`; `awk '$1=="pkg"'` yields one line per format; no install or update path touches `api.github.com`. **The manifest is now load-bearing for installs**, not only for readers: a router the feed cannot serve is installed from it (`install.sh` -> `install_from_release`), so a manifest that does not verify is an install that refuses |
 
 **Why #17 is here and not "CI will catch it".** CI does check it (the `release` job compares the
 served `latest/download/manifest.txt` against the built one), but a manifest failure is **invisible

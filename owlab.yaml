@@ -148,3 +148,13 @@ routers:
     distro: immortalwrt
     release: "24.10.6"
     ports: { http: 8027, ssh: 2227 }
+
+  # A SNAPSHOT box, because the installer has a path only it takes: `SNAPSHOT` parses to
+  # no feed branch, so the script asks the feed for the newest one its package manager
+  # can read, and everything about that path — the probe, the fallthrough between
+  # downloaders, the signed-release install when no index answers — is unreachable on a
+  # release router. It is also the userland the theme is least tested against, since it
+  # tracks luci-base's master rather than a release branch.
+  - id: owrtsnap
+    release: "snapshot"
+    ports: { http: 8022, ssh: 2222 }

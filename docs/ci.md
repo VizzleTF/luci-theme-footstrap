@@ -278,28 +278,53 @@ or one that does not carry this router's architecture — falls through instead 
 repository entry that 404s on every update. What makes it sound here and not in general: the theme
 is noarch and `+luci-base` is its whole dependency list, so nothing in it was compiled against the
 branch it comes from. The probe's bytes are discarded; the index it found is still verified below.
-When no candidate answers, the script refuses and points at the release asset — measured in an
-`openwrt/rootfs:x86-64` snapshot container (`apk add` from the 25.12 branch, no `--allow-untrusted`,
-theme registered) and with `/etc/apk/arch` forced to a name the feed does not carry.
+When no candidate answers, the script installs the signed release instead (below) rather than
+refusing — measured in an `openwrt/rootfs` snapshot container (`apk add` from the 25.12 branch, no
+`--allow-untrusted`, theme registered) and with the feed host pointed at a name that does not
+resolve.
 
-**What verifies the bytes is the package manager**, against the feed key pinned in the script:
-apk checks the index against `owfeed-packages.pem`, opkg against usign key `9040356b214084da`. The
-script fetches nothing else and installs nothing by hand, so it needs no signature logic of its
-own — that was the release-asset path, and it is gone.
+**Every downloader on the box is tried, not the first one that exists.** `uclient-fetch` needs
+libustream-mbedtls to speak https at all, and an image that ships wget-ssl or curl instead carries
+the binary without the library — so choosing by existence reported "the feed carries no branch for
+this router" when the truth was "this one tool cannot do TLS here". Reproduced with a
+`uclient-fetch` stub that always fails: the old script printed exactly the field report, the current
+one falls through to `wget` and installs from the feed. None of the three is ever asked to skip
+certificate verification; falling through to the next TOOL is not a downgrade.
 
-**There is no pinned-tag install and no release-asset fallback.** The feed carries one version per
-branch, so a router that wants an older version, or that cannot reach `repo.owfeed.org`, downloads
-the asset from the release page and installs it by hand — the **raw file from a release**, never
-the zip artifact from Actions:
+**What verifies the bytes on the feed path is the package manager**, against the feed key pinned in
+the script: apk checks the index against `owfeed-packages.pem`, opkg against usign key
+`9040356b214084da`.
+
+**There is no pinned-tag install, and the release-asset fallback is automatic but never the first
+choice.** A router that cannot read the feed index at all — an architecture owfeed does not publish,
+a resolver that does not answer, a network that intercepts the host — is installed from the release
+instead of being sent away with a URL, and told plainly that `apk upgrade` will not carry the theme
+forward until the feed works.
+
+That path picks the artifact **from the signed manifest**, never by guessing an asset's name: issue
+#6 was a self-updater that resolved the theme by name and took `head -1`, which on a release
+carrying per-language packages installed a catalogue. `manifest.txt` names exactly one file per
+format with its size and digest, and the chain fails closed in this order — verified TLS, then
+`usign -V` against the release key pinned in the script (the same key as `release.pub`), then the
+manifest's own sha256 over the downloaded artifact. A missing `usign`, a signature that does not
+verify, or a digest that does not match is a refusal, and the script then prints the by-hand URL as
+before. `apk`'s `--allow-untrusted` on this path says only that the `.apk` carries no APK signature
+of its own; what is trusted is the usign signature over the manifest, checked before the file is
+handed to the manager. Measured on 25.12/apk and 24.10/opkg containers, including the refusal: a
+one-character change to the pinned key leaves nothing installed.
+
+A router that wants an OLDER version still does it by hand — the feed carries one version per
+branch — with the **raw file from a release**, never the zip artifact from Actions:
 
 ```sh
 apk add --allow-untrusted luci-theme-footstrap-*.apk   # 25.12+
 opkg install luci-theme-footstrap_*.ipk                # 24.10
 ```
 
-`--allow-untrusted` means the package manager holds no key of ours. The release still publishes a
-signed `manifest.txt` and a detached `.sig` per asset, so a by-hand install can be checked with
-`usign -V -m <pkg> -x <pkg>.sig -p release.pub`. Nothing does it automatically any more.
+`--allow-untrusted` means the package manager holds no key of ours. The release publishes a signed
+`manifest.txt` and a detached `.sig` per asset, so a by-hand install can be checked with
+`usign -V -m <pkg> -x <pkg>.sig -p release.pub` — which is what the installer's own fallback does
+for you.
 
 ## Package formats, and the usual mistake
 

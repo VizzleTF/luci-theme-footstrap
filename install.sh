@@ -15,17 +15,105 @@ FEED_HOST="https://repo.owfeed.org"
 FEED_NAME="owfeed-packages"
 FEED_KEY_OPKG="9040356b214084da"
 PKG="luci-theme-footstrap"
+REPO="VizzleTF/luci-theme-footstrap"
+# `releases/latest/download/…` and never api.github.com: the API is rate-limited per source IP
+# (60/hour, shared by everyone behind one NAT) and needs JSON parsing on a box that may have no
+# jsonfilter. These redirect to the newest tag's assets and are the same URLs the release page
+# links, so they answer for a router that only has an http client.
+RELEASE_BASE="https://github.com/$REPO/releases/latest/download"
+# The RELEASE key, pinned in the script that uses it. It is the same key as release.pub in the
+# repository, and pinning it here is the point: a key fetched beside the file it verifies proves
+# nothing. usign's key id travels inside the signature, so a rotation is a visible failure here
+# rather than a silent acceptance.
+RELEASE_PUBKEY='untrusted comment: luci-theme-footstrap release key
+RWQYxjhl4rz41tNZc3dXmnRplRO1ydN1q8as++iPUjZc6SRUCb952L/T'
 
 info() { printf '[*] %s\n' "$1"; }
 ok()   { printf '[+] %s\n' "$1"; }
 err()  { printf '[-] %s\n' "$1" >&2; }
 
-# Certificates are always verified: this runs as root from `wget | sh`, and a failed
-# verification is the MITM case, not a reason to retry insecurely.
+# EVERY downloader on the box, in turn, until one SUCCEEDS — not the first one that EXISTS.
+#
+# `uclient-fetch` needs libustream-mbedtls (or -openssl) to speak https at all, and a router
+# that has the binary without the library is ordinary: OpenWrt installs it as `wget` only when
+# nothing else claims that name, and an image built with wget-ssl or curl carries both. Choosing
+# by existence therefore turned "this ONE tool cannot do TLS here" into "the feed has no branch
+# for this router" — reported from a SNAPSHOT router whose own `wget` had just downloaded this
+# script over the same protocol, three lines above the refusal.
+#
+# Certificates are always verified: this runs as root from `wget | sh`, and a failed verification
+# is the MITM case, not a reason to retry insecurely. Falling through to the NEXT TOOL is not a
+# downgrade — each one below verifies, and none is ever asked to skip the check.
 fetch() {	# <url> <outfile>
-	if command -v uclient-fetch >/dev/null 2>&1; then uclient-fetch -T 30 -qO "$2" "$1"
-	elif command -v curl >/dev/null 2>&1; then curl -fsSL --proto =https --max-time 30 -o "$2" "$1"
-	else wget -q -T 30 -O "$2" "$1"; fi
+	command -v uclient-fetch >/dev/null 2>&1 && uclient-fetch -T 30 -qO "$2" "$1" && return 0
+	command -v wget >/dev/null 2>&1 && wget -q -T 30 -O "$2" "$1" && return 0
+	command -v curl >/dev/null 2>&1 && curl -fsSL --proto =https --max-time 30 -o "$2" "$1" && return 0
+	return 1
+}
+
+# --- the release, for a router the feed cannot serve ------------------------------------------
+#
+# THE FEED IS STILL THE INSTALL PATH. It is what makes `apk upgrade` / `opkg upgrade` carry the
+# theme forward, and everything below is only reached when the feed cannot be read at all — an
+# architecture owfeed does not publish, a host this router cannot resolve or reach, a network
+# that intercepts it. Before this, that router was told to go and download an asset by hand,
+# which is a worse version of what the script is for.
+#
+# PICKED FROM THE SIGNED MANIFEST, never by guessing an asset's name. That distinction is issue
+# #6: the retired self-updater resolved the theme by name and took `head -1`, which on a release
+# carrying per-language packages installed a catalogue instead of the theme. `manifest.txt` names
+# exactly one file per format with its size and digest, and it is signed — so the name comes from
+# the same statement the signature covers.
+#
+# The chain fails CLOSED and in this order: verified TLS, then usign against the key pinned above,
+# then the manifest's own sha256 over the artifact. A missing usign, a missing signature or a
+# digest that does not match is a refusal — never a downgrade to "install it anyway". `apk`'s
+# --allow-untrusted only says the .apk carries no APK signature of its own; the usign signature
+# over the manifest is what this path trusts, and it is checked before the file is handed over.
+install_from_release() {
+	command -v usign >/dev/null 2>&1 || {
+		err "usign is not installed, so a release artifact cannot be verified here."
+		return 1
+	}
+	_tmp=$(mktemp -d /tmp/footstrap-install.XXXXXX) || return 1
+	printf '%s\n' "$RELEASE_PUBKEY" > "$_tmp/release.pub"
+	info "Fetching the signed release manifest..."
+	if ! fetch "$RELEASE_BASE/manifest.txt" "$_tmp/manifest.txt" ||
+	   ! fetch "$RELEASE_BASE/manifest.txt.sig" "$_tmp/manifest.txt.sig"; then
+		err "Could not download the release manifest from $RELEASE_BASE either."
+		rm -rf "$_tmp"; return 1
+	fi
+	if ! usign -V -q -p "$_tmp/release.pub" -x "$_tmp/manifest.txt.sig" -m "$_tmp/manifest.txt"; then
+		err "The release manifest is not signed by the pinned key — refusing to install."
+		rm -rf "$_tmp"; return 1
+	fi
+	# one line per format: `pkg <name> <format> <file> <size> <sha256> <arch>`
+	_file=$(awk -v p="$PKG" -v f="$PM_FMT" '$1=="pkg" && $2==p && $3==f { print $4 }' "$_tmp/manifest.txt")
+	_sha=$(awk -v p="$PKG" -v f="$PM_FMT" '$1=="pkg" && $2==p && $3==f { print $6 }' "$_tmp/manifest.txt")
+	if [ -z "$_file" ] || [ -z "$_sha" ]; then
+		err "The manifest names no $PM_FMT artifact for $PKG."
+		rm -rf "$_tmp"; return 1
+	fi
+	info "Downloading $_file..."
+	if ! fetch "$RELEASE_BASE/$_file" "$_tmp/$_file"; then
+		err "Could not download $RELEASE_BASE/$_file."
+		rm -rf "$_tmp"; return 1
+	fi
+	_have=$(sha256sum "$_tmp/$_file" | cut -d' ' -f1)
+	if [ "$_have" != "$_sha" ]; then
+		err "$_file does not match the digest the signed manifest gives for it — refusing to install."
+		err "  manifest: $_sha"
+		err "  download: $_have"
+		rm -rf "$_tmp"; return 1
+	fi
+	ok "Signature and digest verified."
+	if [ "$PM" = apk ]; then
+		apk add --allow-untrusted "$_tmp/$_file"
+	else
+		opkg install "$_tmp/$_file"
+	fi
+	rm -rf "$_tmp"
+	return 0
 }
 
 printf '\n=== luci-theme-footstrap installer ===\n\n'
@@ -35,8 +123,10 @@ printf '\n=== luci-theme-footstrap installer ===\n\n'
 . /etc/openwrt_release
 ok "Detected: ${DISTRIB_DESCRIPTION:-OpenWrt}"
 
-if command -v apk >/dev/null 2>&1; then PM=apk; INDEX=packages.adb
-elif command -v opkg >/dev/null 2>&1; then PM=opkg; INDEX=Packages.gz
+# PM_FMT is the manifest's word for the same thing, and the two are deliberately separate: the
+# manager is `apk`/`opkg`, the artifact is `.apk`/`.ipk`, and opkg is the pair where they differ.
+if command -v apk >/dev/null 2>&1; then PM=apk; PM_FMT=apk; INDEX=packages.adb
+elif command -v opkg >/dev/null 2>&1; then PM=opkg; PM_FMT=ipk; INDEX=Packages.gz
 else err "Neither apk nor opkg found."; exit 1; fi
 ok "Package manager: $PM"
 
@@ -101,27 +191,54 @@ case "$BRANCH" in
 	if ! fetch "$FEED_HOST/releases/$BRANCH/$ARCH/$INDEX" /dev/null 2>/dev/null; then
 		info "The feed does not carry $BRANCH for $ARCH yet; asking it for the newest branch..."
 		if [ "$PM" = apk ]; then CANDIDATES="$FALLBACK_BRANCHES_APK"; else CANDIDATES="$FALLBACK_BRANCHES_OPKG"; fi
-		BRANCH=$(newest_feed_branch "$CANDIDATES") || {
-			err "The feed carries no $PM branch for $ARCH (router reports '${DISTRIB_RELEASE:-unknown}')."
-			err "Install the release asset by hand instead:"
-			err "  https://github.com/VizzleTF/luci-theme-footstrap/releases/latest"
-			exit 1
-		}
-		ok "Using the $BRANCH branch — the theme is noarch and needs only luci-base."
+		BRANCH=$(newest_feed_branch "$CANDIDATES") || BRANCH=""
+		if [ -n "$BRANCH" ]; then
+			ok "Using the $BRANCH branch — the theme is noarch and needs only luci-base."
+		fi
 	fi
 	;;
 *)
 	info "'${DISTRIB_RELEASE:-unknown}' names no feed branch; asking the feed for the newest one..."
 	if [ "$PM" = apk ]; then CANDIDATES="$FALLBACK_BRANCHES_APK"; else CANDIDATES="$FALLBACK_BRANCHES_OPKG"; fi
-	BRANCH=$(newest_feed_branch "$CANDIDATES") || {
-		err "The feed carries no $PM branch for $ARCH (router reports '${DISTRIB_RELEASE:-unknown}')."
-		err "Install the release asset by hand instead:"
-		err "  https://github.com/VizzleTF/luci-theme-footstrap/releases/latest"
-		exit 1
-	}
-	ok "No branch of its own, so the $BRANCH branch it is — the theme is noarch and needs only luci-base."
+	BRANCH=$(newest_feed_branch "$CANDIDATES") || BRANCH=""
+	if [ -n "$BRANCH" ]; then
+		ok "No branch of its own, so the $BRANCH branch it is — the theme is noarch and needs only luci-base."
+	fi
 	;;
 esac
+
+# --- no feed for this router: the release, verified ------------------------------------------
+# Reached only when every candidate index failed to download. That is one of two things and the
+# script cannot tell them apart from here, so it says both: either owfeed publishes nothing this
+# router can read, or this router could not reach owfeed — a resolver that does not answer, a
+# clock too far off for TLS, a network that intercepts the host. Naming the URL is what lets the
+# admin decide which, in one command; the old message asserted the first and was wrong whenever
+# it was the second.
+#
+# Either way the theme is INSTALLED, from the signed release, and the run ends there: no feed line
+# is written for a feed that could not be read.
+if [ -z "$BRANCH" ]; then
+	err "Could not read the $PM feed index for $ARCH from $FEED_HOST (router reports '${DISTRIB_RELEASE:-unknown}')."
+	for _b in $CANDIDATES; do err "  tried $FEED_HOST/releases/$_b/$ARCH/$INDEX"; done
+	err "If that opens in a browser, the router could not fetch it — check DNS, the clock, and TLS"
+	err "(uclient-fetch needs libustream-mbedtls; wget-ssl or curl are used instead when present)."
+	info "Installing from the signed release instead; \`$PM upgrade\` will NOT carry the theme forward."
+	install_from_release || {
+		err "Install the release asset by hand instead:"
+		err "  https://github.com/$REPO/releases/latest"
+		exit 1
+	}
+	rm -f /tmp/luci-indexcache* 2>/dev/null || true
+	rm -rf /tmp/luci-modulecache 2>/dev/null || true
+	if [ -x /etc/init.d/rpcd ]; then /etc/init.d/rpcd reload >/dev/null 2>&1 || true; fi
+	printf '\n'
+	ok "Installed from the release. Re-run this script to update, or fix the feed and run it again"
+	ok "to switch to \`$PM upgrade\`."
+	info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
+	info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
+	info "of System -> System. Then hard-reload the page (Ctrl+F5)."
+	exit 0
+fi
 
 # --- feed -----------------------------------------------------------------
 # keep.d is not bookkeeping: sysupgrade wipes the key unless something claims it, and
