@@ -257,6 +257,16 @@ any `#view table` that has a header row in any of four markups, adds `.table.fs-
 column headings into `data-title` so the card has something to print. A table with **no** header row
 is left alone on purpose and scrolls: see [css.md](css.md#which-of-the-three-a-table-gets-and-what-decides-it).
 
+**The claim is re-made on every fit pass, not once per element.** These tables are polled: the app
+replaces the rows inside the element it already has, so a claim that ran once left every batch after
+it without `.tr`/`.td` and without a caption — on a table that may by then be carding, where
+`#view .table.fs-dt.fs-stacked { overflow: hidden }` clips the fresh rows with no scrollbar. Both
+halves are additive and skip what is already done, and the one JUDGEMENT — "does this table speak
+LuCI's row vocabulary, or is it ours to rewrite?" — is still taken once, at claim time, and
+remembered on the element, so LuCI's own markup is never rewritten by a later pass. Measured on
+Processes (114 rows, 5 columns) and the Overview: same tagged/carded/captioned counts as before, no
+long task over eight poll ticks.
+
 This is deliberately unmeasurable here. A census of `#view table:not(.table):not(.cbi-section-table)`
 over all **196** menu pages on the stand — openclash, justclash, ssclash, dashboard and statistics
 included — found **zero**: everything anyone here emits already carries the class. The rule exists for

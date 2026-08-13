@@ -185,8 +185,21 @@ function enhance(sel) {
  * openclash / justclash / ssclash / dashboard / statistics included, found ZERO. That is the point:
  * every table anyone here emits already carries the class, so this changes nothing that can be
  * measured and covers the one shape that cannot be (docs/conventions.md: coverage is a contract). */
-const FOREIGN_TABLE = '#view .table:not(.cbi-section-table):not(.fs-dt), ' +
-	'#view table:not(.table):not(.cbi-section-table):not(.fs-dt)';
+/* NO `:not(.fs-dt)`, and that is the difference between claiming a table once and KEEPING it. These
+ * tables are polled: L.ui.Table.update() and every hand-rolled equivalent replace the rows inside
+ * the element they already have. Excluding what we tagged meant the claim ran exactly once per
+ * element — the rows present at that moment were adopted and captioned, and every batch after it
+ * kept neither `.tr`/`.td` nor `data-title`, on a table that by then may carry `.fs-stacked`, where
+ * `#view .table.fs-dt.fs-stacked { overflow: hidden }` clips the lot with no scrollbar. That is the
+ * exact failure adoptMarkup() was written to prevent, arriving one poll later. LuCI's own tables
+ * were never exposed to it (ui.Table writes those class names and the caption itself), so this is
+ * third-party-only — which is the zone this whole selector exists for.
+ *
+ * Re-running is what the two functions below are already written for: both are additive, both skip
+ * what is already done, and neither re-decides anything (adoptMarkup() settles the "is this ours to
+ * rewrite?" question once, at claim time, and remembers the answer on the element). */
+const FOREIGN_TABLE = '#view .table:not(.cbi-section-table), ' +
+	'#view table:not(.table):not(.cbi-section-table)';
 
 /* The FOURTH header markup, and the one only a foreign table produces: `<table><tr><th>…`, with no
  * `<thead>` for the parser to imply and none of LuCI's class names. It is the exact shape the phone
@@ -255,9 +268,10 @@ function tagDataTables() {
  * names: a `<thead>` becomes `.thead` and a plain first row of `<th>` becomes `.tr.table-titles` —
  * the two names theme/30-tables.css hides when stacked. */
 function adoptMarkup(t, head) {
-	/* DECIDED ONCE, AT CLAIM TIME, and only for a table that speaks none of this vocabulary. Asking
-	 * the question every pass instead would answer "already adopted" the moment we adopted it — and
-	 * these tables are polled, so the fresh rows that arrive bare afterwards would never be taken.
+	/* DECIDED ONCE, AT CLAIM TIME, and only for a table that speaks none of this vocabulary — then
+	 * READ on every pass, because the caller now revisits a table it has already claimed (see
+	 * FOREIGN_TABLE). Asking the question afresh each pass instead would answer "already adopted"
+	 * the moment we adopted it, and the fresh rows a poll brings in bare would never be taken.
 	 * Asking it at all is what keeps the theme's hands off LuCI's own markup: the apk Software list
 	 * heads its table with `.tr.cbi-section-table-titles`, and blindly adding `table-titles` to that
 	 * would be the theme rewriting a class LuCI chose. */
