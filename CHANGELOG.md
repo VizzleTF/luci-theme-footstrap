@@ -11,6 +11,12 @@ Style and format guide: [docs/releasing.md](docs/releasing.md).
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+
+- **The "Applying configuration changes…" dialog no longer prints its spinner on a line of its own.** `ui.changes.displayStatus()` builds that dialog as a block box carrying `alert-message notice spinning` with a `<p>` inside it, and the spinner is a `::before` on the box — an `inline-block` glyph, which is right for the button labels and `em.spinning` texts that are its usual hosts and wrong here: a block child cannot share a line with it, so the message dropped underneath the glyph and against the dialog's start edge. Reported on the luci PR with a screenshot. The alert now lays the two out as a two-column grid — glyph, then everything else — which also survives the shapes `displayStatus()` and `addNotification()` can hand it: measured at 1440px, one `<p>`, `h4` + `<p>` and bare text all used to start 24.6 / 20.6 / 19.5px below the glyph's line and now start on it, and the one-paragraph dialog is 57.5px tall instead of 78.1px.
+
 ## [0.12.5] — 2026-08-12
 
 ### Fixed

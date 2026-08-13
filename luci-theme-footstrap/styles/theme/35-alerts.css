@@ -77,6 +77,46 @@
 		--fs-alert-tint: var(--fs-accent-fill);
 	}
 
+	/* ---- A SPINNING ALERT IS A GLYPH AND A MESSAGE, SIDE BY SIDE ----
+	 *
+	 * The spinner is a `::before` on the element carrying `.spinning` (base/95-luci.css), and it is
+	 * `inline-block` so that it sits in the flow of the button labels and `em.spinning` texts that
+	 * are its usual hosts. This host is neither: `ui.changes.displayStatus()` builds the apply /
+	 * revert / rollback dialog as `showModal('','')` + `classList.add('alert-message', 'notice',
+	 * 'spinning')` + `dom.content(message, E('p', …))`, i.e. a BLOCK box whose content is a BLOCK
+	 * element — so the glyph opened a line box of its own and the message went underneath it,
+	 * against the dialog's start edge. Reported on the luci PR with a screenshot of "Aplicando
+	 * cambios de configuración… 88s" sitting a line below its spinner.
+	 *
+	 * Grid rather than flex, because the caller decides how many children there are and flex would
+	 * lay a second one out BESIDE the first: `displayStatus()` passes one `<p>` today but also
+	 * builds `[E('h4', …), E('p', …)]` for its non-spinning states, and `addNotification(title,
+	 * children, …classes)` takes `spinning` from anyone. Two columns — glyph, then everything else
+	 * — puts the glyph beside the first row and stacks the remaining children under it, for any
+	 * number of them. Measured on 25.12 at 1440px, the three shapes a caller can produce (one `<p>`,
+	 * `h4` + `<p>`, bare text): the content used to start 24.6 / 20.6 / 19.5px BELOW the glyph's
+	 * line and now starts on it, and the one-paragraph dialog is 57.5px tall instead of 78.1px.
+	 *
+	 * `align-items: center` centres the 20px glyph against the first row rather than pinning it to
+	 * the row's top, which is where it reads as "this line is in progress".
+	 *
+	 * The notification variant is untouched by all this and deliberately so: ui.js writes
+	 * `style="display:flex"` on the element itself, and an inline style beats a layered rule, so
+	 * those keep their own flex row — where the glyph is already a flex item on the message's line. */
+	.alert-message.spinning {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		align-items: center;
+		/* `.alert-message`'s own `gap` above is the row gap between stacked children; the column gap
+		 * is the glyph's own spacing and is the smaller step, so it is stated rather than inherited
+		 * from that shorthand. */
+		column-gap: var(--fs-space-2);
+	}
+	/* the glyph is a grid item now, so its inline margin would double the column gap; and it is
+	 * pinned to row 1 so that it stays beside the FIRST child however many follow */
+	.alert-message.spinning::before { grid-row: 1; margin-inline-end: 0; }
+	.alert-message.spinning > * { grid-column: 2; }
+
 	/* h2 is what the theme's own notices emit (the document had no heading above h4 at all); h4 is
 	 * here because a third-party alert may use it, and coverage only grows. h5/h6 joined for the
 	 * same reason — base styled them and the theme did not, so an alert heading looked like an
