@@ -266,12 +266,19 @@ ours to rewrite?" — is still taken once, at claim time, and remembered on the 
 markup is never rewritten by a later pass.
 
 **Each half answers the common case before it walks anything**, because a fit pass is a mutation
-pass, not a once-a-second one. The adoption returns on its memo. The captioning asks the LAST row —
-the one a poll leaves bare, since a batch that replaced or appended rows puts the fresh ones at the
-end — and stops there when it already carries a caption, which on everything LuCI renders is always
-(`ui.Table` writes `data-title` itself). Measured on Processes, 114 rows and 678 cells: 0.110 ms per
-pass for the full walk against **0.025 ms** with that question asked first. Same tagged, carded and
-captioned counts as before the change, and no long task over eight poll ticks.
+pass, not a once-a-second one. The adoption returns on its memo. The captioning skips **per row**:
+a row whose first cell already carries a caption has been walked, so on everything LuCI renders —
+where `ui.Table` writes `data-title` as it builds — the pass costs one attribute read per row and
+nothing else. Measured on Processes, 114 rows and 678 cells: 0.134 ms per pass for the full walk
+against **0.053 ms** with the per-row skip. Same tagged, carded and captioned counts as before the
+change, and no long task over eight poll ticks.
+
+The question is asked of the ROW because no single row speaks for the table. A table-level probe has
+to pick one, and every choice is wrong for some shape: asking the last row stalls forever on a
+`<tfoot>` of per-column totals, which takes captions on the first pass and is never bare again while
+a poll keeps replacing the `<tbody>` above it — reproduced on a live table, where the fresh rows came
+back with no caption at all. Per row there is nothing to guess, and cells replaced inside a
+surviving row arrive bare and are walked like any other.
 
 This is deliberately unmeasurable here. A census of `#view table:not(.table):not(.cbi-section-table)`
 over all **196** menu pages on the stand — openclash, justclash, ssclash, dashboard and statistics
