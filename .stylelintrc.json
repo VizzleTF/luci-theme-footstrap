@@ -111,12 +111,18 @@
         "in 95-luci. theme/95-a11y-media is the reduced-motion block: !important INVERTS",
         "the layer order, so it is the only way one rule can stop animations declared in",
         "base as well as in theme.",
+        "theme/30-tables carries ONE flag, `word-break: normal` on a data table's cells:",
+        "luci-mod-status's processes.js writes style='word-break: break-word' on its Command",
+        "span, which is the deprecated alias for `overflow-wrap: anywhere` and erases the",
+        "column's min-content from an inline declaration — measured on the router, the column",
+        "sat at 126px against a 353px token and no layered rule could move it.",
         "This list is the contract. Adding a file to it needs a reason in the file.",
         "The same list lives in tools/audit.py (BANG_OK); tools/bang-ok.mjs (npm run bang-ok)",
         "fails if the two drift, so a file added here but not there (or vice versa) is caught."
       ],
       "files": [
         "luci-theme-footstrap/styles/base/*.css",
+        "luci-theme-footstrap/styles/theme/30-tables.css",
         "luci-theme-footstrap/styles/theme/45-misc.css",
         "luci-theme-footstrap/styles/theme/65-dropdown.css",
         "luci-theme-footstrap/styles/theme/90-responsive.css",

@@ -253,7 +253,8 @@ unguarded — silently.
 padding, the measured card stack. An app that emits a bare `<table>` matched none of it, so nothing
 tagged it, nothing measured it and `.fs-main`'s `overflow-x: clip` silently CUT its right-hand
 columns; the only thing that ever reached it was a phone-tier scrollbar. `tagDataTables()` now takes
-any `#view table` that has a header row in any of four markups, adds `.table.fs-dt`, and copies the
+any table under a content root — `#view` or the `#modal_overlay` an app's dialog is built in — that
+has a header row in any of four markups, adds `.table.fs-dt`, and copies the
 column headings into `data-title` so the card has something to print. A table with **no** header row
 is left alone on purpose and scrolls: see [css.md](css.md#which-of-the-three-a-table-gets-and-what-decides-it).
 
@@ -296,6 +297,21 @@ header-less matrix stays a scrolling matrix at both widths.
   colours baked into `luci-app-statistics` PNGs) are not our bytes.
 - An app's z-index on its own page is its own page.
 - An app's viewport media queries do not know about our sidebar.
+
+**And what the claim buys it, since 0.12.6.** A claimed table is measured like any other data table,
+which means it gets the whole ladder: honest column floors while it is a table, the expendable
+columns (`hide-xs`/`hide-sm`) dropped by measurement rather than at 767px, one column allowed to
+shred before the table gives up on being a table, and the card as the last rung. A table that has
+**no** header row is never claimed — it cannot card, because a card prints `data-title` and it has
+none — and instead scrolls inside itself if it is measured to overflow, with its first column
+pinned, a tab stop and an accessible name.
+
+**A foreign table that holds a widget is refused the scroll**, and an app author should know why:
+`overflow-x: auto` computes `overflow-y` to `auto` as well (css-overflow-3 §3.1), so a scrolling
+table clips every absolutely positioned thing inside it, and `luci-base`'s `openDropdown()` sizes an
+open list against the nearest scroll parent — which would be the table. If your table holds a
+`ui.Dropdown`, a dynlist or a tooltip container, the theme leaves it alone rather than break the
+control.
 
 ## How to check
 

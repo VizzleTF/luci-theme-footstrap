@@ -65,7 +65,24 @@
 	 *     sentence: it cannot wrap at any width. Scoped to `label` — a real button keeps `pre`.
 	 *   - a `<li>` carrying a checksum ("SHA256: 5d27b68d…") — one unbreakable 64-char token,
 	 *     nothing to wrap at, so it needs `anywhere` rather than a normal break. */
-	#modal_overlay .modal label.btn { white-space: normal; }
+	/* …and `overflow-wrap` with it: `white-space: normal` lets the sentence wrap at its spaces, which
+	 * is not enough for the one it ends with — `/etc/backup/installed_packages.txt` is a single
+	 * ~200px token, so in any dialog narrower than that the label still ran past the box. Measured in
+	 * the gallery at a 320px viewport: the label was 277px inside a 264px column, 13px out. A label
+	 * is prose; a real button keeps `pre` and its intact label.
+	 *
+	 * `min-width: 0` is the other half, and without it the wrap never fires: `.btn` is `inline-flex`,
+	 * so the label is a flex CONTAINER whose automatic minimum size is its content's min-content —
+	 * the same trap the file browser's action block was in one file over.
+	 *
+	 * `anywhere` rather than `break-word`, and that follows the tier doctrine rather than contradicting
+	 * it (base/40-tables.css states it for cells): `break-word` leaves min-content at the widest token,
+	 * and the widest token here is `/etc/backup/installed_packages.txt` — about 240px, which is more
+	 * than the dialog has at 320px, and the anonymous text flex item cannot be given a `min-width` of
+	 * its own. A dialog label has no card to fold into and no scroll to escape into, so containment is
+	 * the only outcome available, exactly as for a key/value cell. Measured at 320px: 277px inside a
+	 * 236px column before, inside it after. */
+	#modal_overlay .modal label.btn { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 	#modal_overlay .modal li { overflow-wrap: anywhere; }
 	#modal_overlay .uci-dialog div > ins,
 	#modal_overlay .uci-dialog div > del,

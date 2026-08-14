@@ -224,7 +224,8 @@ The price is the last irreducible duplicate: the same declarations under a class
 
 ### Which of the three a table gets, and what decides it
 
-Every `<table>` or `<div class="table">` under `#view` lands in exactly one of three tiers, and the
+Every `<table>` or `<div class="table">` under one of the two content roots — `#view`, and the
+`#modal_overlay` that `ui.showModal()` builds its dialog in — lands in exactly one of three tiers, and the
 discriminator is **does it have a header row**, never who wrote it:
 
 | Tier | Reached by | What it does |
@@ -232,6 +233,23 @@ discriminator is **does it have a header row**, never who wrote it:
 | measured card | a header row **and** not `.cbi-section-table` → `fs-select.js` tags `.table.fs-dt` | folds into labelled cards when it stops fitting, at any width |
 | `@container` card | `.cbi-section-table` | folds at 960 px of content, never measured (above) |
 | scroll | no header row at all | `display: block; overflow-x: auto` on the table itself |
+
+**Both roots, and that was a bug for as long as it said one.** The dialog is a sibling of `#view` on
+`<body>`, so a table in it matched no selector this file describes: it was never tagged, never
+captioned, never measured, and — since `fs-fit.js` watched only the one host — never re-measured when
+the dialog replaced its rows. Measured at a 390 px viewport with the wireless scan dialog's own
+markup: the table rendered **373 px wide inside 317 px** of dialog, the Encryption column got **10 px**
+and printed one character per line; carded, it is 317 px with every value on a labelled line. The
+roots are listed once in `fs-select.js` (`ROOTS`) and every query is built from them, because three
+selectors that each name the same two places are three chances to fix only two.
+
+**A dialog is a root only while it is open.** `hideModal()` drops `modal-overlay-active` off `<body>`
+and leaves the markup where it is, and the hidden overlay shrink-fits — measured at **270 px**, i.e.
+**236 px** of room for a table that will be shown at the dialog's real width. Measuring that is both
+waste (every pass, on a polled page) and a decision about a width nobody will see, so the pass asks
+per-pass whether the dialog is open. The flag flips **after** `showModal()` writes the content, so
+`fs-fit.js` watches `body`'s class as well as the two subtrees; without it a dialog's table would
+wait for its next poll to be fitted.
 
 A header row is any of four markups, and each missing one has cost a page: `.tr.table-titles`
 (`L.ui.Table`), `.tr.cbi-section-table-titles` (the apk Software list), a `<thead>` — E()-built, so
@@ -250,45 +268,69 @@ table fits is a property of its content and its column, and a 400 px panel on a 
 the wall a phone hits. It costs nothing where the table fits — `overflow` paints a scrollbar only
 when there is something to scroll.
 
-### Two ways a table falls apart without ever overflowing
+### The floor, and why exactly one tier has one
 
-`fit.overflows()` cannot see either of them, because `overflow-wrap: anywhere` gives a cell a
-min-content of one character: the table always "fits", it just stops being readable. So `fitTables()`
-asks two more questions:
+A cell that may break **anywhere** has a min-content of **one character** — that is what the value
+means (css-text-3 §5.4: the soft wrap opportunities it introduces *are* counted towards min-content,
+which `break-word` does not do). Given that, auto table layout is free to starve a column instead of
+the table overflowing, and `fit.overflows()` — the one question the browser answers exactly — goes
+blind. That single fact produced four per-page `nowrap` rules and three JS heuristics, each
+reconstructing the number the engine had before the theme threw it away.
 
-- **`idTower` — the first column past `MAX_ID_LINES` (5).** The row's identity squeezed into a tower
-  of half-words by a greedy neighbour. Measured on Wireless: 101 px and 5 lines at a 900 px viewport,
-  76 px and 8 lines at 800 px, and at no width did the table card (issue #7).
-- **`fit.wordFloor(t) > room` — the table is narrower than its own content needs.** No number is
-  picked here at all: `wordFloor` returns, per column, the width of the widest WORD that column has
-  to show in that column's own font, summed across columns. Below that width the browser has to cut
-  through a value, and the card view is what shows values whole. Every table therefore carries its
-  own breakpoint, computed from its own rows.
+So the break value follows the tier, and the split is the design:
 
-On the reporting router at 1190 px of room, that number is **935** for the DHCPv6 leases, **966** for
-associated stations, **645** for the v4 leases, **794** for Processes, **550** for Connections and
-**381** for Startup — so the two tables that were unreadable card at roughly a 1000 px window while
-the four that were fine stay tables until the room they actually need runs out. Before/after over the
-same DOM: **15 of 136** table-states change on the router, **5 of 88** on the stand.
+| Tier | Break value | Why |
+|---|---|---|
+| measured data table, while it is a table | `break-word` (`theme/30-tables.css`) | it can card, drop columns or shred one column, so it must tell the truth about what it needs |
+| carded data table | `anywhere` | every value owns the row; there is no neighbour left to starve |
+| config table, key/value include, meter rows, realtime legend | `anywhere` (`base/40-tables.css`) | none of them is measured and none can card on demand — containment is the only outcome available |
+| header row, first column | `break-word` (`base/40-tables.css`) | the labels you read the table by (issues #32, #36) |
 
-**The engine cannot be asked this.** Flipping `overflow-wrap` for one layout and reading min-content
-back does not work: Blink returns the same table min-content for `normal`, `break-word` and
-`anywhere` — measured at 645 px on Processes while the widest word alone needs 367 — so the honest
-floor has to be computed, not queried. `wordFloor` measures with a canvas, sampling the font once per
-column and measuring only each column's longest-by-characters word; both approximations are stated in
-the function, and they take the walk over Processes' 114 rows from 6 ms to about **1 ms**.
+`tools/table-contract.mjs` (`npm run tables`) holds that table to the sheet, selector by selector: a
+fifth place to decide how a cell may break is a hard failure, and so is any of them appearing under a
+viewport query.
 
-### The first column has a floor, and the rest do not
+**One `!important` earns its place here.** `luci-mod-status`'s `processes.js` writes
+`style="word-break: break-word"` on its Command span — the deprecated alias for
+`overflow-wrap: anywhere`, from an inline declaration no layer can outrank. Measured at a 720 px
+viewport: the column sat at **126 px** against a **353 px** token, and forcing that column's
+`overflow-wrap` to each of the three values in turn changed nothing, because the floor was being
+erased one level down. Neutralised, the same table reports **963 px** of need in **688 px** of room —
+the truth the ladder needs.
 
-Cells break `anywhere` so an unbreakable value cannot hold a column open (`base/40-tables.css`). The
-first column is exempt and breaks at word boundaries instead, because `anywhere` costs a min-content
-of ONE CHARACTER and auto table layout hands width out by each column's max-content: a two-column
-key/value table whose value is one enormous token starves the key column down to that character.
-Measured against `luci-app-dockerman`'s Environment table, which prints `JSON.stringify()` of every
-field `docker info` returns — 8 000 characters of value took the key column from 95 px to 55 px, and
-the reporter's own host drove it to about one glyph, so the header read `E N T R Y` down the page
-(issue #36). A carded row is exempt from the exemption: once every cell is on its own line there is
-no neighbour left to starve it.
+**And one rule had to go for any of it to work below 767 px.** `theme/90-responsive.css` used to give
+`table.fs-dt` `display: block`, which discards the table formatting context: the rows become an
+anonymous table sized to the block, so the table can never be wider than its parent and therefore can
+never overflow. With it in place no floor was readable at a phone width, at any break value.
+
+### The ladder: what happens when a table does not fit
+
+`fitTables()` asks one question — does it overflow? — and answers it with the cheapest remedy that
+works, re-measuring at every rung:
+
+1. **it fits** → it stays a table, and nothing was written;
+2. **drop the columns the view marked expendable** (`hide-xs`/`hide-sm`, which `ui.Table` copies from
+   the header cell onto every body cell) and ask again — upstream's own priority hint, honoured by
+   measurement instead of at 767 px;
+3. **let the widest breakable column shred** (`.fs-td-break`; never the first column, never a `nowrap`
+   one) and ask again;
+4. **card it** (`.fs-stacked`).
+
+Rungs 2 and 3 need no threshold, and that is the point: **the guard is the second measurement.** Where
+one long token is the whole problem, breaking that column keeps the table a table; where every column
+is over its share, breaking one changes nothing and the card is right. The only number left in the
+file is `CRAMPED` (568), the judgement that a table below that much room has stopped being a table at
+all — measured, stated, and not derivable from anything.
+
+A table with **no** header row cannot card (a card prints `data-title`, and it has none), so it
+scrolls inside itself instead — `.fs-xscroll`, written only when it is measured to overflow **and**
+holds no widget. That refusal is not caution: `overflow-x: auto` computes `overflow-y` to `auto` as
+well (css-overflow-3 §3.1), so a scrolling table clips every popup inside it, and luci-base sizes an
+open dropdown against the nearest scroll parent. WCAG 2.2 SC 1.4.10 names data tables as the
+exception where two-dimensional scrolling is acceptable, which is what makes this an outcome rather
+than a failure — and the scrolled table keeps its first column pinned, takes a tab stop with
+`role="group"` and a name, and draws a focus ring, because a scroll box the keyboard cannot reach is
+content the keyboard cannot read.
 
 ## Proving a CSS change
 

@@ -35,7 +35,15 @@ BASE = STYLES / "base"
 # widget-internal layout (.cbi-dropdown) and the .left/.right/.center forcing
 # utilities; 95-a11y-media needs it because the flag INVERTS the layer order — the
 # only way one rule can stop animations declared in base as well as in theme.
+# 30-tables carries ONE flag, `word-break: normal` on a data table's cells while it is still a
+# table: luci-mod-status's processes.js:39 writes `style="word-break: break-word"` on its Command
+# span — the deprecated alias for `overflow-wrap: anywhere`, which erases that column's min-content
+# from an INLINE declaration. Measured on the router at 720px: the column sat at 126px against a
+# 353px token, and forcing the column's own overflow-wrap to any of the three values moved nothing,
+# because the floor was being erased one level down. With the flag the same table asks for 963px in
+# 688px of room, which is the truth the fitter needs.
 BANG_OK = ({"90-responsive.css", "20-overview.css", "95-a11y-media.css", "45-misc.css",
+            "30-tables.css",
             # 65-dropdown carries one flag, `min-width: 0` on `.hide-close`: a RichListValue's
             # own inline `min-width: 25vw` is what it fights (issue #15), and only an author
             # !important outranks an inline style. The three `ul` margin flags this note used to
@@ -46,8 +54,11 @@ BANG_OK = ({"90-responsive.css", "20-overview.css", "95-a11y-media.css", "45-mis
 
 # var()s legitimately not defined inside styles/: --zone-color-rgb is written inline on a zone
 # badge by luci-mod-network — the only --*-rgb that may exist (the theme's own RGB and HSL bridges
-# were removed; see 02-tokens.css).
-VAR_ALLOW = {"--zone-color-rgb"}
+# were removed; see 02-tokens.css). --fs-bar-live is written on :root by fs-chrome.js: it is the
+# bar's MEASURED height, which a token cannot be, because the bar grows when the brand wraps or the
+# menu takes a row of its own. Every read of it carries `var(--fs-bar-h)` as the fallback, so a
+# frame rendered before the chrome has been fitted still sticks to the designed height.
+VAR_ALLOW = {"--zone-color-rgb", "--fs-bar-live"}
 
 def _strip_for_balance(s):
     """Drop comments and quoted strings before counting brackets.

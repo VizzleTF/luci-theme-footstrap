@@ -140,8 +140,13 @@
 	.cbi-filebrowser > ul { display: flex; flex-direction: column; gap: var(--fs-space-1); }
 	.cbi-filebrowser > ul > li { align-items: center; flex-wrap: wrap; gap: var(--fs-space-2); }
 	.cbi-filebrowser > ul > li > div:first-child { flex: 1 1 auto; min-width: 0; }
+	/* `0 1 auto`, not `0 0 auto`: the actions block is three buttons (Deselect / Download / Delete) and
+	 * it may WRAP but may not shrink, so on a 320px screen it kept its one-line width and stuck 23px
+	 * out of the browser box — measured in the gallery at 320px, where `Delete` ended past the card.
+	 * Shrinking is what lets its own `flex-wrap` fire; `min-width: 0` is what lets shrinking reach
+	 * below the buttons' min-content, which is the pair every flex item in this theme needs. */
 	.cbi-filebrowser > ul > li > div:last-child {
-		flex: 0 0 auto;
+		flex: 0 1 auto; min-width: 0;
 		display: flex; flex-wrap: wrap; gap: var(--fs-space-2); justify-content: flex-end;
 	}
 	.cbi-filebrowser > ul > li > div:last-child > button { margin: 0; }
@@ -544,7 +549,12 @@
 	}
 	/* width/font-size absorbed from base's generic field box, same numbers — a textarea has
 	 * always sat at the fixed 210px (the elastic rule above names only text/url/search) */
-	textarea { min-height: 84px; line-height: var(--fs-leading); width: 210px; font-size: var(--fs-type); }
+	/* `max-width: 100%` beside the width, because a textarea is the one field whose intrinsic width
+	 * comes from an ATTRIBUTE (`cols`, default 20) rather than from the box: measured at a 300px
+	 * viewport, two textareas in the gallery stood 19px outside their card while every other control
+	 * in the same column fitted. The 210px is the designed width and still applies wherever there is
+	 * room for it. */
+	textarea { min-height: 84px; line-height: var(--fs-leading); width: 210px; max-width: 100%; font-size: var(--fs-type); }
 	/* A textarea's native scrollbar is a square strip and a rounded corner does not clip it, so
 	 * on a scrolling config field the grey bar poked past the radius — a square notch out of the
 	 * frame. Fix: a slim self-rounded thumb floated off the edges (transparent border +
@@ -655,7 +665,12 @@
 	.cbi-dynlist {
 		gap: var(--fs-space-1-5);
 		background: transparent; border: 0; padding: 0;
-		min-height: 0; min-width: 240px; max-width: var(--fs-field-max); width: 100%;
+		/* `min(240px, 100%)`, not a bare 240: the floor is there so a chip's × sits near its text
+		 * rather than floating across a full-width field, and it becomes a defect the moment the
+		 * column is narrower than the floor — measured in the gallery at a 320px viewport, the list
+		 * held 240px inside a 210px field and every chip, the add row and its input stood 29px
+		 * outside the card. A floor that exceeds the room is not a floor, it is an overflow. */
+		min-height: 0; min-width: min(240px, 100%); max-width: var(--fs-field-max); width: 100%;
 		vertical-align: top;
 	}
 	.cbi-dynlist > .item {

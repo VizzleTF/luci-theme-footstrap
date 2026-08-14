@@ -63,6 +63,14 @@
 	 * token and the column stays open — tried, and the table stayed 355px wide in a 346px
 	 * column. The narrower `anywhere` rules in theme/ keep winning where they apply.
 	 *
+	 * THAT IS A CONTAINMENT DEFAULT, and it is right for every tier that has nowhere to put an
+	 * overflow: a key/value include inside a card, the config table (which is never measured), the
+	 * Overview meter rows, the realtime legend. It is exactly wrong for the one tier that IS
+	 * measured — a data table can card, break one column or scroll, so it wants the truth instead,
+	 * and `theme/30-tables.css` gives it `break-word` for as long as it is still a table. The split
+	 * is the whole design: honest floors where a measurement reads them, containment everywhere
+	 * else. Do not "unify" these two by moving either one.
+	 *
 	 * SET PER ROLE, and that is the whole of the second rule: a VALUE may break anywhere, a LABEL
 	 * breaks at words. `.th` and `.td` never match the same element, so neither line depends on the
 	 * other's source order, and the pair rule above keeps only what both cells share.

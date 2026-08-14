@@ -66,18 +66,31 @@
 		body[data-page="admin-system-package-manager"] #view .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: var(--fs-space-2); }
 		body[data-page="admin-system-package-manager"] #view .controls .control-group input { flex: 1 1 140px; min-width: 0; max-width: 100%; }
 
-		/* Diagnostics tool (input + method select + button in one <table> row) has no id and no
-		 * .cbi-section-table, so nothing stacks it — a fixed table layout stayed ~365px wide. */
-		body[data-page="admin-network-diagnostics"] #view .table:not([id]):not(.cbi-section-table),
-		body[data-page="admin-network-diagnostics"] #view .table:not([id]):not(.cbi-section-table) .tr,
-		body[data-page="admin-network-diagnostics"] #view .table:not([id]):not(.cbi-section-table) .td { display: block; width: auto; }
+		/* The Diagnostics stack used to be here, keyed by `body[data-page="admin-network-diagnostics"]`
+		 * and by this 767px query — a page name and a viewport for a fact that is neither. Any app can
+		 * put a field, a select and a button in one header-less `<div class="table">`, and what decides
+		 * whether that row fits is the ROOM: measured at 320px the row needs 338px, and at 900px of
+		 * viewport inside a narrow panel it needs the same. fs-select.js writes `.fs-rowstack` on any
+		 * such table that overflows, at any width, and theme/30-tables.css carries the declarations. */
 
-		/* fs-dt data tables (Startup init.d list, leases, processes) that do NOT card on a phone:
-		 * the row stacking is MEASURED (.fs-stacked, fs-select.js) and carries its own
-		 * `display: block` (theme/30-tables.css), but a table that still fits as a table keeps
-		 * display: table and with it an intrinsic min-width. Block it so its width cannot exceed
-		 * the column. */
-		table.fs-dt { display: block; width: 100%; }
+		/* `table.fs-dt { display: block; width: 100% }` used to sit here, to stop a data table that
+		 * still fitted as a table from exceeding the column with its intrinsic min-width. It is gone,
+		 * and its removal is the reason the rest of this redesign works at phone widths at all.
+		 *
+		 * `display: block` on a <table> DISCARDS the table formatting context: the rows are wrapped in
+		 * an anonymous table sized to the block, so the table can no longer be wider than its parent —
+		 * which means it can never OVERFLOW, which means `fit.overflows()` can never see anything, at
+		 * any width below 767px. Measured on Processes at a 720px viewport with the rule in place: the
+		 * Command column was 126px against a widest token of 353px, and forcing that column's
+		 * `overflow-wrap` to `break-word`, `normal` and `anywhere` in turn produced the same 126px and
+		 * the same "the table fits" every time. The floor could not be read because there was no table
+		 * left to read it from, so every path in the list was shredded mid-word while the fitter,
+		 * truthfully, saw nothing to fix.
+		 *
+		 * What replaces it is the ladder: below 568px of room a data table cards on the design
+		 * judgement alone, and between 568 and 767 it now overflows honestly and the ladder drops the
+		 * expendable columns, breaks one column, or cards. `.fs-main`'s `overflow-x: clip` stays the
+		 * backstop it always was, and nothing reaches it in the sweep. */
 
 		/* generic caps: an input/select must never exceed its field, and long key/value strings
 		 * in the Overview cards must break. */

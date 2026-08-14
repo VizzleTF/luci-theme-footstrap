@@ -60,8 +60,8 @@ msgctxt "footstrap"
 msgid "Clearly visible %s"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-chrome.js:372
-#: ucode/template/themes/footstrap/header.ut:144
+#: htdocs/luci-static/resources/fs-chrome.js:407
+#: ucode/template/themes/footstrap/header.ut:150
 msgid "Collapse menu"
 msgstr ""
 
@@ -132,7 +132,7 @@ msgctxt "footstrap"
 msgid "Easy to read %s"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-chrome.js:372
+#: htdocs/luci-static/resources/fs-chrome.js:407
 msgid "Expand menu"
 msgstr ""
 
@@ -199,7 +199,7 @@ msgctxt "footstrap"
 msgid "Light"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-router.js:501
+#: htdocs/luci-static/resources/fs-router.js:651
 msgid "Loading view…"
 msgstr ""
 
@@ -220,8 +220,8 @@ msgstr ""
 msgid "Memory"
 msgstr ""
 
-#: ucode/template/themes/footstrap/header.ut:141
-#: ucode/template/themes/footstrap/header.ut:152
+#: ucode/template/themes/footstrap/header.ut:147
+#: ucode/template/themes/footstrap/header.ut:158
 msgid "Menu"
 msgstr ""
 
@@ -231,7 +231,7 @@ msgid ""
 "mode should only be used to install a firmware upgrade"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:320
+#: htdocs/luci-static/resources/fs-search.js:327
 msgctxt "footstrap"
 msgid "No pages found"
 msgstr ""
@@ -250,7 +250,7 @@ msgctxt "footstrap"
 msgid "Off"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:237
+#: htdocs/luci-static/resources/fs-search.js:244
 msgctxt "footstrap"
 msgid "Pages"
 msgstr ""
@@ -286,7 +286,7 @@ msgstr ""
 msgid "Please enter your username and password."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:319
+#: htdocs/luci-static/resources/fs-search.js:326
 msgctxt "footstrap"
 msgid "Recently visited"
 msgstr ""
@@ -341,13 +341,13 @@ msgstr ""
 msgid "Search"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:231
-#: htdocs/luci-static/resources/fs-search.js:258
+#: htdocs/luci-static/resources/fs-search.js:238
+#: htdocs/luci-static/resources/fs-search.js:265
 msgctxt "footstrap"
 msgid "Search pages"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:232
+#: htdocs/luci-static/resources/fs-search.js:239
 msgctxt "footstrap"
 msgid "Search pages…"
 msgstr ""
@@ -362,11 +362,11 @@ msgctxt "footstrap"
 msgid "Sidebar and bar"
 msgstr ""
 
-#: ucode/template/themes/footstrap/header.ut:120
+#: ucode/template/themes/footstrap/header.ut:126
 msgid "Skip to content"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:320
+#: htdocs/luci-static/resources/fs-search.js:327
 msgctxt "footstrap"
 msgid "Start typing to find a page"
 msgstr ""
@@ -396,6 +396,10 @@ msgstr ""
 
 #: ucode/template/themes/footstrap/partials/notices.ut:22
 msgid "System running in recovery (initramfs) mode."
+msgstr ""
+
+#: htdocs/luci-static/resources/fs-select.js:587
+msgid "Table"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-prefs.js:893

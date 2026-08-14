@@ -70,8 +70,8 @@ msgctxt "footstrap"
 msgid "Clearly visible %s"
 msgstr "Bien visible %s"
 
-#: htdocs/luci-static/resources/fs-chrome.js:372
-#: ucode/template/themes/footstrap/header.ut:144
+#: htdocs/luci-static/resources/fs-chrome.js:407
+#: ucode/template/themes/footstrap/header.ut:150
 msgid "Collapse menu"
 msgstr "Contraer menú"
 
@@ -144,7 +144,7 @@ msgctxt "footstrap"
 msgid "Easy to read %s"
 msgstr "Se lee bien %s"
 
-#: htdocs/luci-static/resources/fs-chrome.js:372
+#: htdocs/luci-static/resources/fs-chrome.js:407
 msgid "Expand menu"
 msgstr "Expandir menú"
 
@@ -213,7 +213,7 @@ msgctxt "footstrap"
 msgid "Light"
 msgstr "Claro"
 
-#: htdocs/luci-static/resources/fs-router.js:501
+#: htdocs/luci-static/resources/fs-router.js:651
 msgid "Loading view…"
 msgstr "Cargando vista…"
 
@@ -234,8 +234,8 @@ msgstr "Modo de compatibilidad Lua activo"
 msgid "Memory"
 msgstr "Memoria"
 
-#: ucode/template/themes/footstrap/header.ut:141
-#: ucode/template/themes/footstrap/header.ut:152
+#: ucode/template/themes/footstrap/header.ut:147
+#: ucode/template/themes/footstrap/header.ut:158
 msgid "Menu"
 msgstr "Menú"
 
@@ -248,7 +248,7 @@ msgstr ""
 "reiniciar el sistema. Este modo solo debe usarse para instalar una "
 "actualización de firmware"
 
-#: htdocs/luci-static/resources/fs-search.js:320
+#: htdocs/luci-static/resources/fs-search.js:327
 msgctxt "footstrap"
 msgid "No pages found"
 msgstr "No se encontraron páginas"
@@ -267,7 +267,7 @@ msgctxt "footstrap"
 msgid "Off"
 msgstr "Apagado"
 
-#: htdocs/luci-static/resources/fs-search.js:237
+#: htdocs/luci-static/resources/fs-search.js:244
 msgctxt "footstrap"
 msgid "Pages"
 msgstr "Páginas"
@@ -303,7 +303,7 @@ msgstr "Por favor, seleccione un archivo de imagen."
 msgid "Please enter your username and password."
 msgstr "Por favor, ingrese su nombre de usuario y contraseña."
 
-#: htdocs/luci-static/resources/fs-search.js:319
+#: htdocs/luci-static/resources/fs-search.js:326
 msgctxt "footstrap"
 msgid "Recently visited"
 msgstr "Visitado recientemente"
@@ -358,13 +358,13 @@ msgstr "Escala"
 msgid "Search"
 msgstr "Buscar"
 
-#: htdocs/luci-static/resources/fs-search.js:231
-#: htdocs/luci-static/resources/fs-search.js:258
+#: htdocs/luci-static/resources/fs-search.js:238
+#: htdocs/luci-static/resources/fs-search.js:265
 msgctxt "footstrap"
 msgid "Search pages"
 msgstr "Buscar páginas"
 
-#: htdocs/luci-static/resources/fs-search.js:232
+#: htdocs/luci-static/resources/fs-search.js:239
 msgctxt "footstrap"
 msgid "Search pages…"
 msgstr "Buscar páginas…"
@@ -379,11 +379,11 @@ msgctxt "footstrap"
 msgid "Sidebar and bar"
 msgstr "Barra lateral y superior"
 
-#: ucode/template/themes/footstrap/header.ut:120
+#: ucode/template/themes/footstrap/header.ut:126
 msgid "Skip to content"
 msgstr "Saltar al contenido"
 
-#: htdocs/luci-static/resources/fs-search.js:320
+#: htdocs/luci-static/resources/fs-search.js:327
 msgctxt "footstrap"
 msgid "Start typing to find a page"
 msgstr "Empiece a escribir para encontrar una página"
@@ -414,6 +414,10 @@ msgstr "Sistema"
 #: ucode/template/themes/footstrap/partials/notices.ut:22
 msgid "System running in recovery (initramfs) mode."
 msgstr "El sistema se está ejecutando en modo de recuperación (initramfs)."
+
+#: htdocs/luci-static/resources/fs-select.js:587
+msgid "Table"
+msgstr "Tabla"
 
 #: htdocs/luci-static/resources/fs-prefs.js:893
 msgctxt "footstrap"
@@ -470,8 +474,14 @@ msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:504
 msgctxt "footstrap"
-msgid "This browser is not storing preferences (site data is blocked), so a change here lasts until you reload. Saving as default still works and applies to every browser."
-msgstr "Este navegador no guarda preferencias (los datos del sitio están bloqueados), así que un cambio aquí dura hasta que recargues. Guardar como predeterminado sigue funcionando y se aplica a todos los navegadores."
+msgid ""
+"This browser is not storing preferences (site data is blocked), so a change "
+"here lasts until you reload. Saving as default still works and applies to "
+"every browser."
+msgstr ""
+"Este navegador no guarda preferencias (los datos del sitio están "
+"bloqueados), así que un cambio aquí dura hasta que recargues. Guardar como "
+"predeterminado sigue funcionando y se aplica a todos los navegadores."
 
 #: htdocs/luci-static/resources/fs-appearance.js:214
 msgctxt "footstrap"
@@ -555,7 +565,8 @@ msgstr "en el lienzo"
 
 #: htdocs/luci-static/resources/fs-prefs.js:1121
 msgctxt "footstrap"
-msgid "the uploaded file could not be removed either; it is still on the router."
+msgid ""
+"the uploaded file could not be removed either; it is still on the router."
 msgstr "tampoco se pudo eliminar el archivo subido; sigue en el router."
 
 #~ msgid "Logout"

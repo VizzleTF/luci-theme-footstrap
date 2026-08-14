@@ -252,7 +252,30 @@ function fitChrome() {
 	 * did NOT fit, .fs-bar-stack has already given it a row of its own. */
 	if (bar && (topBar || document.documentElement.hasAttribute('data-narrow')))
 		fitCluster(bar, menu);
+
+	publishBarHeight(bar);
 }
+
+/* ---- HOW TALL THE BAR ACTUALLY IS, for whoever has to stick underneath it ----
+ *
+ * A data table's header row sticks while its rows scroll past (theme/30-tables.css). Where the
+ * DOCUMENT scrolls — the top layout, and the sidebar layout once it has become a bar — the sticky
+ * bar is what the header has to clear, and `--fs-bar-h` is only its DESIGNED height: the bar grows
+ * when the brand wraps, when the menu takes a row of its own (.fs-bar-stack) or when the cluster
+ * does (.fs-bar-actrow), and every one of those is decided a few lines above by measurement.
+ * So the measurement is published, and the CSS falls back to the token when it is missing.
+ *
+ * Written only on a CHANGE and rounded to the pixel: this runs on every fit pass, and a custom
+ * property write on :root invalidates style for the whole document. */
+function publishBarHeight(bar) {
+	const root = document.documentElement;
+	if (!bar) return;
+	const h = Math.round(bar.getBoundingClientRect().height);
+	if (!(h > 0) || h === _barH) return;
+	_barH = h;
+	root.style.setProperty('--fs-bar-live', `${h}px`);
+}
+let _barH = 0;
 
 /* ---- does the right-hand cluster still fit beside the brand? ----
  *

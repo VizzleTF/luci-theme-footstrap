@@ -270,6 +270,7 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `css-orphans` | dead `fs-*` selectors — it **gates** the forward direction (styled, emitted by nothing) and **reports** the reverse, where an unstyled class is often legitimate (a JS hook, an element riding on inherited styles). A new name in the reverse list wants a look or a line in `JUSTIFIED_UNSTYLED`; it does not fail the build |
 | `acl` | every shipped `acl.d/*.json` parses **and** grants something — rpcd skips an unreadable file silently |
 | `css-dup` | identical declaration bodies under different guards |
+| `tables` | the table contract: where a cell may break (one allowlist, no viewport queries), the floor holds when a data table is squeezed, a carded cell prints its caption, and no `.cbi-dropdown` sits inside a scroll container |
 | `mirror` | `@mirror`-pinned copies still byte-identical |
 | `bang-ok` | every `!important` sits in an allowlisted file |
 | `axes` | the pre-paint in `head.ut` agrees with the live appearance appliers, and `header.ut` reads every saved option back |

@@ -66,8 +66,8 @@ msgctxt "footstrap"
 msgid "Clearly visible %s"
 msgstr "Хорошо видна %s"
 
-#: htdocs/luci-static/resources/fs-chrome.js:372
-#: ucode/template/themes/footstrap/header.ut:144
+#: htdocs/luci-static/resources/fs-chrome.js:407
+#: ucode/template/themes/footstrap/header.ut:150
 msgid "Collapse menu"
 msgstr "Свернуть меню"
 
@@ -138,7 +138,7 @@ msgctxt "footstrap"
 msgid "Easy to read %s"
 msgstr "Хорошо читается %s"
 
-#: htdocs/luci-static/resources/fs-chrome.js:372
+#: htdocs/luci-static/resources/fs-chrome.js:407
 msgid "Expand menu"
 msgstr "Развернуть меню"
 
@@ -207,7 +207,7 @@ msgctxt "footstrap"
 msgid "Light"
 msgstr "Светлая"
 
-#: htdocs/luci-static/resources/fs-router.js:501
+#: htdocs/luci-static/resources/fs-router.js:651
 msgid "Loading view…"
 msgstr "Загрузка представления…"
 
@@ -228,8 +228,8 @@ msgstr "Включён режим совместимости с Lua"
 msgid "Memory"
 msgstr "Память"
 
-#: ucode/template/themes/footstrap/header.ut:141
-#: ucode/template/themes/footstrap/header.ut:152
+#: ucode/template/themes/footstrap/header.ut:147
+#: ucode/template/themes/footstrap/header.ut:158
 msgid "Menu"
 msgstr "Меню"
 
@@ -241,7 +241,7 @@ msgstr ""
 "Изменения настроек не сохраняются и будут потеряны после перезагрузки. Этот "
 "режим следует использовать только для установки обновления прошивки"
 
-#: htdocs/luci-static/resources/fs-search.js:320
+#: htdocs/luci-static/resources/fs-search.js:327
 msgctxt "footstrap"
 msgid "No pages found"
 msgstr "Страницы не найдены"
@@ -260,7 +260,7 @@ msgctxt "footstrap"
 msgid "Off"
 msgstr "Выкл."
 
-#: htdocs/luci-static/resources/fs-search.js:237
+#: htdocs/luci-static/resources/fs-search.js:244
 msgctxt "footstrap"
 msgid "Pages"
 msgstr "Страницы"
@@ -296,7 +296,7 @@ msgstr "Выберите файл изображения."
 msgid "Please enter your username and password."
 msgstr "Введите имя пользователя и пароль."
 
-#: htdocs/luci-static/resources/fs-search.js:319
+#: htdocs/luci-static/resources/fs-search.js:326
 msgctxt "footstrap"
 msgid "Recently visited"
 msgstr "Недавние"
@@ -351,13 +351,13 @@ msgstr "Масштаб"
 msgid "Search"
 msgstr "Поиск"
 
-#: htdocs/luci-static/resources/fs-search.js:231
-#: htdocs/luci-static/resources/fs-search.js:258
+#: htdocs/luci-static/resources/fs-search.js:238
+#: htdocs/luci-static/resources/fs-search.js:265
 msgctxt "footstrap"
 msgid "Search pages"
 msgstr "Поиск по страницам"
 
-#: htdocs/luci-static/resources/fs-search.js:232
+#: htdocs/luci-static/resources/fs-search.js:239
 msgctxt "footstrap"
 msgid "Search pages…"
 msgstr "Поиск по страницам…"
@@ -372,11 +372,11 @@ msgctxt "footstrap"
 msgid "Sidebar and bar"
 msgstr "Боковая панель и шапка"
 
-#: ucode/template/themes/footstrap/header.ut:120
+#: ucode/template/themes/footstrap/header.ut:126
 msgid "Skip to content"
 msgstr "Перейти к содержимому"
 
-#: htdocs/luci-static/resources/fs-search.js:320
+#: htdocs/luci-static/resources/fs-search.js:327
 msgctxt "footstrap"
 msgid "Start typing to find a page"
 msgstr "Начните вводить название страницы"
@@ -407,6 +407,10 @@ msgstr "Система"
 #: ucode/template/themes/footstrap/partials/notices.ut:22
 msgid "System running in recovery (initramfs) mode."
 msgstr "Система работает в режиме восстановления (initramfs)."
+
+#: htdocs/luci-static/resources/fs-select.js:587
+msgid "Table"
+msgstr "Таблица"
 
 #: htdocs/luci-static/resources/fs-prefs.js:893
 msgctxt "footstrap"
@@ -463,8 +467,14 @@ msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:504
 msgctxt "footstrap"
-msgid "This browser is not storing preferences (site data is blocked), so a change here lasts until you reload. Saving as default still works and applies to every browser."
-msgstr "Этот браузер не хранит настройки (данные сайта заблокированы), поэтому изменение здесь действует до перезагрузки страницы. «Сохранить как умолчание» по-прежнему работает и применяется ко всем браузерам."
+msgid ""
+"This browser is not storing preferences (site data is blocked), so a change "
+"here lasts until you reload. Saving as default still works and applies to "
+"every browser."
+msgstr ""
+"Этот браузер не хранит настройки (данные сайта заблокированы), поэтому "
+"изменение здесь действует до перезагрузки страницы. «Сохранить как "
+"умолчание» по-прежнему работает и применяется ко всем браузерам."
 
 #: htdocs/luci-static/resources/fs-appearance.js:214
 msgctxt "footstrap"
@@ -548,7 +558,8 @@ msgstr "на холсте"
 
 #: htdocs/luci-static/resources/fs-prefs.js:1121
 msgctxt "footstrap"
-msgid "the uploaded file could not be removed either; it is still on the router."
+msgid ""
+"the uploaded file could not be removed either; it is still on the router."
 msgstr "загруженный файл тоже не удалось удалить — он остался на роутере."
 
 #~ msgid "Logout"

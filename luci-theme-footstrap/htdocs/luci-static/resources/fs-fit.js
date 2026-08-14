@@ -1,5 +1,6 @@
 'use strict';
 'require baseclass';
+'require ui';
 
 /* fs-fit — the theme's ONE "does it still fit?" engine; add fit logic here, do not grow a second
  * observer. No CSS query can ask what the CONTENT needs (media = viewport, container =
@@ -21,21 +22,7 @@
 
 const _fitters = [];
 let _rafPending = false;
-let _ro = null, _mo = null;
-/* one canvas for the whole document: wordFloor() measures text with it, and creating one per call
- * is the expensive half of that measurement. `null` = not asked yet, `false` = asked and refused —
- * the same three-state slot fs-widgets.js's rasterCtx() keeps, and for the same reason: a browser
- * with canvas turned off (an anti-fingerprinting extension, a WebView, memory pressure) answers
- * null, and retrying that on every fit pass is a cost with no chance of a different answer. */
-let _cx = null;
-function textCtx() {
-	if (_cx === null) {
-		try { _cx = document.createElement('canvas').getContext('2d') || false; }
-		catch (e) { _cx = false; }
-	}
-	return _cx;
-}
-const SPACE_RE = /\s+/;
+let _ro = null, _mo = null, _moFlag = null;
 
 /* Run every fitter NOW, synchronously. A fitter must be idempotent — this fires on every
  * relevant mutation. */
@@ -69,12 +56,42 @@ function watch(el) {
 /* Rule 2's mutation side. Deliberately NOT filtered by node type: a filter is a second place to
  * get wrong (the table fitter's own once said `table.table`, and LuCI renders most of its tables
  * as DIVs — so the poll never re-measured at all), and run() is a handful of measurements. */
+/* THE CONTENT IS IN TWO PLACES, and watching one of them was a bug with a phone screenshot behind it.
+ *
+ * `ui.showModal` builds its dialog inside `#modal_overlay`, which ui's `__init__` appends to `<body>`
+ * beside #view — so a dialog's content mutates NOTHING inside the observed host. A table opened in the
+ * wireless scan dialog was therefore measured only if some unrelated mutation in #view happened to
+ * run the fitters, and its rows (which that dialog re-renders once a second) were never re-measured
+ * at all. Both roots get the same observer and the same ResizeObserver.
+ *
+ * `require ui` above is what makes the overlay exist by the time this runs: it is created in ui's
+ * constructor, and luci-base instantiates a class exactly once, at the first require. */
 function observeContent() {
 	if (_mo) return;
-	const host = document.getElementById('view') || document.body;
 	_mo = new MutationObserver(run);
-	_mo.observe(host, { childList: true, subtree: true });
-	watch(host);
+	for (const host of [ document.getElementById('view') || document.body, document.getElementById('modal_overlay') ]) {
+		if (!host) continue;
+		_mo.observe(host, { childList: true, subtree: true });
+		watch(host);
+	}
+	/* AND THE MOMENT THE DIALOG BECOMES VISIBLE, which no mutation inside it announces: `showModal`
+	 * writes the content FIRST and adds `modal-overlay-active` to <body> after, so the pass that the
+	 * content mutation triggers still sees a closed dialog (fs-select.js skips one — a hidden overlay
+	 * shrink-fits, so it would be measuring a width the dialog will never have). Nothing else changes
+	 * afterwards, so without this the dialog's table would wait for its first poll to be fitted. One
+	 * attribute, on one element.
+	 *
+	 * A SECOND OBSERVER, and it has to be one — this is a spec fact, not a preference.
+	 * `MutationObserver.observe()` REPLACES the options of an existing registration for the same node,
+	 * so calling it here on `document.body` would have silently dropped the `{childList, subtree}`
+	 * registration above on any page where `#view` does not exist and `body` IS the content host: the
+	 * fitters would then never run on a content mutation again, and nothing would say so.
+	 *
+	 * Merging the two into one call is the other wrong answer: `subtree: true` plus an attribute
+	 * filter wakes `run()` on every class change anywhere in the document, and the poll rewrites
+	 * classes on rows once a second. Two observers, one narrow node each, same callback. */
+	_moFlag = new MutationObserver(run);
+	_moFlag.observe(document.body, { attributes: true, attributeFilter: [ 'class' ] });
 }
 
 return baseclass.extend({
@@ -128,114 +145,18 @@ return baseclass.extend({
 		return p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
 	},
 
-	/* Does `el` need more width than it has been given? */
+	/* Does `el` need more width than it has been given?
+	 *
+	 * THE ONE QUESTION LEFT, and it is the browser's own answer. `wordFloor()` and `textLines()`
+	 * used to stand beside it — a canvas reimplementation of min-content and a line counter — and
+	 * both existed only because the stylesheet lowered every cell's min-content to one character,
+	 * so a starved column produced no overflow for this to read. theme/30-tables.css gives a data
+	 * table an honest floor for as long as it is a table, so the starvation cannot happen and the
+	 * reconstructions are gone: 75 lines of approximation (whitespace-split words, one font per
+	 * column, `iiii` ranked above `WWW`) that cost about 1 ms per pass on a 114-row table and, on
+	 * `WPA2-PSK/CCMP`, claimed 144px where the engine's own floor is 93. */
 	overflows(el) {
 		return el.scrollWidth > this.roomFor(el) + 1;	/* +1: sub-pixel rounding */
-	},
-
-	/* THE NARROWEST THIS TABLE CAN BE WITHOUT BREAKING A WORD THROUGH — its own breakpoint, in px.
-	 *
-	 * Every other "does it fit" question here is asked of the browser. This one cannot be: it is
-	 * exactly the table's min-content width, and `overflow-wrap: anywhere` (base/40-tables.css) makes
-	 * the browser answer ONE CHARACTER per column. That is deliberate — an unbreakable ICCID must not
-	 * push a table nobody measures out of its card — but it means a measured table can be starved to
-	 * a ribbon of fragments and still report, truthfully, that it fits. Asking the engine the honest
-	 * question by flipping `overflow-wrap` for one layout does not work either: Blink returns the same
-	 * min-content for `normal`, `break-word` and `anywhere` on a table (measured — 645px in all three,
-	 * with the widest word alone needing 367), so the number simply is not available from layout.
-	 *
-	 * So compute it: per COLUMN, the width of the widest WORD any of its cells has to show, plus that
-	 * cell's own side padding; summed across columns. A `nowrap`/`pre` column takes its whole text
-	 * instead, because that is what it has committed to showing. Nothing here is a threshold — the
-	 * result is the table's content measured in the table's own fonts, so every table gets its own
-	 * number and none was picked by anyone.
-	 *
-	 * Two approximations, both stated rather than hidden:
-	 *  - the FONT is sampled once per column, from the first data row. A column that changes face
-	 *    row by row would be measured in the first row's; no LuCI table does that, and the
-	 *    alternative is a `getComputedStyle` per cell, which is the expensive call here.
-	 *  - the widest word is picked by CHARACTER COUNT and only that one is measured, so a column of
-	 *    one font is one `measureText` per new maximum instead of one per cell. Within a single font
-	 *    that ranks `iiii` above `WWW`; it costs a few px on the floor and takes the walk over
-	 *    Processes (114 rows) from 6ms to about 1ms.
-	 *
-	 * A `colSpan` cell contributes its whole floor to one column, which over-states that column and
-	 * under-states its neighbours by the same amount — the sum, which is what the caller compares, is
-	 * unaffected. */
-	wordFloor(t) {
-		const rows = t.querySelectorAll('.tr:not(.table-titles):not(.cbi-section-table-titles):not(.placeholder)');
-		if (!rows.length) return 0;
-		/* No 2D context, no floor to report — and 0 is the honest answer, not a failure: it says
-		 * "this test has nothing to add", leaving the other two stack tests (does it overflow, is a
-		 * one-token column shredded) to decide. Throwing here would cost far more than the test is
-		 * worth: fs-select's fitTables() strips `fs-stacked` BEFORE it measures (rule 1), and this is
-		 * the last term of that `||`, so the throw would escape the row walk with the class already
-		 * gone — every stackable table left un-stacked, every later table in the pass unfitted, once
-		 * a second on a polled page. */
-		const cx = textCtx();
-		if (!cx) return 0;
-		const floors = [], longest = [];
-		let cols = null;
-		for (const row of rows) {
-			const cells = row.children;
-			if (!cols) {
-				cols = [];
-				for (const c of cells) {
-					const s = getComputedStyle(c);
-					cols.push({
-						font: `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`,
-						tracking: parseFloat(s.letterSpacing) || 0,
-						pad: parseFloat(s.paddingLeft) + parseFloat(s.paddingRight),
-						whole: (s.whiteSpace === 'nowrap' || s.whiteSpace === 'pre')
-					});
-				}
-			}
-			for (let i = 0; i < cells.length; i++) {
-				const text = (cells[i].textContent || '').trim();
-				if (!text) continue;
-				const col = cols[i] || cols[cols.length - 1];
-				let word = '';
-				if (col.whole) word = text;
-				else for (const w of text.split(SPACE_RE)) if (w.length > word.length) word = w;
-				if (!(word.length > (longest[i] || 0))) continue;
-				longest[i] = word.length;
-				cx.font = col.font;
-				const need = cx.measureText(word).width + (col.tracking * word.length) + col.pad;
-				if (!(floors[i] >= need)) floors[i] = need;
-			}
-		}
-		let sum = 0;
-		for (const f of floors) sum += (f || 0);
-		return sum;
-	},
-
-	/* How many LINE BOXES of text does `el` render? The fact behind "this column has been
-	 * squeezed into a tower" — a cell that has to break its own words is a column that has run
-	 * out of width, which is a thing no viewport query can ask.
-	 *
-	 * NOT height / line-height: the assoclist's first cell is an `.ifacebadge`, a flex COLUMN
-	 * with a 32px icon over the text, so a third of that height is not text at all. Ranges over
-	 * the TEXT NODES only, so an <img> cannot be counted as a line.
-	 *
-	 * Cluster by the rect's TOP, not by vertical overlap: consecutive lines OVERLAP. Measured on
-	 * the router — tops 15-16px apart while each rect is 17-18px tall (the font's box is taller
-	 * than the line advance), so an overlap test merged an 8-line tower into ONE line and the
-	 * whole check silently never fired. Half a line of tolerance also merges what belongs on one
-	 * line: a `<small>` shares the baseline but sits a few px lower, and is not a new line. */
-	textLines(el) {
-		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-		const range = document.createRange();
-		const rects = [];
-		for (let n; (n = walker.nextNode());) {
-			if (!n.nodeValue.trim()) continue;
-			range.selectNodeContents(n);
-			for (const r of range.getClientRects())
-				if (r.width > 0.5 && r.height > 0.5) rects.push(r);
-		}
-		rects.sort((a, b) => a.top - b.top);
-		let lines = 0, top = -Infinity;
-		for (const r of rects)
-			if (r.top - top > r.height * 0.5) { lines++; top = r.top; }
-		return lines;
 	}
+
 });

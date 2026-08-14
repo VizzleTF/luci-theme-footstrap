@@ -22,8 +22,14 @@
 <style>
 	/* gallery chrome only — never part of the theme */
 	body { background: var(--fs-bg); color: var(--fs-text); }
-	.g-wrap { max-width: 1180px; margin: 0 auto; padding: 24px 28px 80px; }
-	.g-bar { position: sticky; top: 0; z-index: 900; display: flex; gap: 10px; align-items: center;
+	/* `min-width: 0` because the theme lays <body> out as a FLEX container, and a flex item's
+	   automatic minimum size is its min-content — so one deliberately unbreakable fixture (the 130-
+	   character token below) stretched this wrapper to its max-width and pushed the whole page
+	   sideways at every viewport. Measured at 390px: body 390, wrapper 1180, document scroll 790.
+	   `width: 100%` is the other half: the item is sized shrink-to-fit on the cross axis, so
+	   `min-width: 0` alone permits shrinking that nothing then asks for. */
+	.g-wrap { width: 100%; max-width: 1180px; min-width: 0; margin: 0 auto; padding: 24px 28px 80px; }
+	.g-bar { position: sticky; top: 0; z-index: 900; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
 	         padding: 12px 0; margin-bottom: 8px; background: var(--fs-bg); border-bottom: 1px solid var(--fs-border); }
 	.g-bar h1 { font-size: 18px; margin: 0; flex: 1 1 auto; }
 	.g-sec { margin: 34px 0 0; }
@@ -31,6 +37,18 @@
 	              color: var(--fs-dim); margin: 0 0 12px; font-weight: 700; }
 	.g-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
 	.g-note { color: var(--fs-dim); font-size: 12px; margin: -4px 0 10px; }
+	/* The pathological fixtures are built to NOT fit — that is what they are for. On a live page the
+	   fitter cards or scrolls them; the gallery has no LuCI JS, so they get a scroll frame here and
+	   the page itself stays measurable. The frame is gallery chrome, never theme. */
+	.g-overwide { overflow-x: auto; overscroll-behavior-x: contain; }
+	/* the dialog is rendered INLINE here (position: static) so it can be looked at; out of its fixed
+	   overlay it has no viewport to be centred in, so cap it to the column it now lives in */
+	/* the theme's own container context: on a page it is `#view` and `.cbi-map` that carry
+	   `container-name: fs-content`, and the config table's card threshold is a @container query
+	   against it. Without one the gallery renders that table in a context no page has. */
+	.g-wrap { container-type: inline-size; container-name: fs-view fs-content; }
+	#modal_overlay { max-width: 100%; }
+	#modal_overlay .modal { max-width: 100%; }
 </style>
 </head>
 <body class="lang_en">
@@ -655,21 +673,31 @@ option two</textarea></div>
 
 <div class="g-sec">
 	<h2>Data table (with id) — leases, processes</h2>
-	<div class="cbi-section">
+	<p class="g-note">On a live page fs-select.js measures this one and cards it when it stops fitting.
+	   The gallery has no LuCI JS, so it is shown in both states: the table in a scroll frame (gallery
+	   chrome, so a narrow viewport does not drag the whole page sideways), and the card below it.</p>
+	<div class="cbi-section g-overwide" tabindex="0" role="group" aria-label="Active DHCPv4 Leases (scrolls)">
 		<h3>Active DHCPv4 Leases</h3>
-		<table class="table" id="status_leases">
+		<!-- `.fs-dt` is written by fs-select.js on a live page (a table with a header row that is not
+		     a config table). The gallery has no LuCI JS, so the fixture carries the tag it would be
+		     given — without it, every rule the measured tier owns (the floor, the sticky header, the
+		     card) is unrepresented here and tools/table-contract.mjs has nothing to measure. -->
+		<table class="table fs-dt" id="status_leases">
 			<tr class="tr table-titles">
 				<th class="th">Hostname</th><th class="th">IPv4 address</th>
 				<th class="th">MAC</th><th class="th">Lease time</th><th class="th">&nbsp;</th>
 			</tr>
+			<!-- `data-title` on every cell, because `ui.Table` writes it on a live page and the card
+			     view prints it: a fixture without it renders a card of unlabelled values, which is
+			     the exact defect the contract gate exists to catch. -->
 			<tr class="tr cbi-rowstyle-1">
-				<td class="td">Watch</td><td class="td">10.11.12.131</td>
-				<td class="td">E6:EF:BA:54:DE:32</td><td class="td">9h 10m 51s</td>
+				<td class="td" data-title="Hostname">Watch</td><td class="td" data-title="IPv4 address">10.11.12.131</td>
+				<td class="td" data-title="MAC">E6:EF:BA:54:DE:32</td><td class="td" data-title="Lease time">9h 10m 51s</td>
 				<td class="td"><button class="cbi-button cbi-button-apply">Reserve IP</button></td>
 			</tr>
 			<tr class="tr cbi-rowstyle-2">
-				<td class="td">iPhone</td><td class="td">10.11.12.182</td>
-				<td class="td">F4:A3:10:96:E0:53</td><td class="td">8h 56m 4s</td>
+				<td class="td" data-title="Hostname">iPhone</td><td class="td" data-title="IPv4 address">10.11.12.182</td>
+				<td class="td" data-title="MAC">F4:A3:10:96:E0:53</td><td class="td" data-title="Lease time">8h 56m 4s</td>
 				<td class="td"><button class="cbi-button cbi-button-apply">Reserve IP</button></td>
 			</tr>
 			<!-- …and the SAME button mid-click, which is the shape issue #22 was reported on:
@@ -679,11 +707,84 @@ option two</textarea></div>
 			     so a regression is visible without a router (issue #15 was the same bug one rule
 			     lower down, and neither was in the gallery). -->
 			<tr class="tr cbi-rowstyle-1">
-				<td class="td">nb-ivan</td><td class="td">10.11.12.144</td>
-				<td class="td">A2:9C:41:07:BB:10</td><td class="td">2h 28m 11s</td>
+				<td class="td" data-title="Hostname">nb-ivan</td><td class="td" data-title="IPv4 address">10.11.12.144</td>
+				<td class="td" data-title="MAC">A2:9C:41:07:BB:10</td><td class="td" data-title="Lease time">2h 28m 11s</td>
 				<td class="td cbi-section-actions"><button class="cbi-button cbi-button-apply spinning" disabled>Reserve IP</button></td>
 			</tr>
 		</table>
+	</div>
+	<!-- the same table in the state the fitter puts it in when it stops fitting: `.fs-stacked` is the
+	     card, and it is what a phone actually gets. Rendered here so the card's own rules — the
+	     `data-title` eyebrow, the half-width cell pairs, the full-width actions row — are visible and
+	     measurable without a router. -->
+	<div class="cbi-section">
+		<h3>…and the same table carded (.fs-stacked)</h3>
+		<table class="table fs-dt fs-stacked" id="status_leases_carded">
+			<tr class="tr table-titles">
+				<th class="th">Hostname</th><th class="th">IPv4 address</th>
+				<th class="th">MAC</th><th class="th">Lease time</th><th class="th">&nbsp;</th>
+			</tr>
+			<tr class="tr cbi-rowstyle-1">
+				<td class="td" data-title="Hostname">Watch</td><td class="td" data-title="IPv4 address">10.11.12.131</td>
+				<td class="td" data-title="MAC">E6:EF:BA:54:DE:32</td><td class="td" data-title="Lease time">9h 10m 51s</td>
+				<td class="td cbi-section-actions"><button class="cbi-button cbi-button-apply">Reserve IP</button></td>
+			</tr>
+		</table>
+	</div>
+
+	<h2>The shapes that broke it — one fixture per report</h2>
+	<!-- These are not decoration: each is the exact value that produced a bug, kept so the contract
+	     gate (tools/table-contract.mjs) has something to squeeze. A theme with no floor starves the
+	     column holding one of these, and the browser then reports, truthfully, that the table fits. -->
+	<div class="cbi-section g-overwide" tabindex="0" role="group" aria-label="Data table with the reported values (scrolls)">
+		<h3>Data table with the reported values</h3>
+		<table class="table fs-dt" id="pathological">
+			<tr class="tr table-titles">
+				<th class="th">Client</th><th class="th">MAC</th><th class="th">Encryption</th>
+				<th class="th">Key</th><th class="th">Package</th>
+			</tr>
+			<tr class="tr cbi-rowstyle-1">
+				<!-- a hyphenated identifier: `break-word` may use the hyphen, which is why
+				     pages/30-software.css still nowraps the package name -->
+				<td class="td">Yandex-Station-Midi-61QK</td>
+				<!-- a colon is NOT a break opportunity: this is one 17-character token (issue #5) -->
+				<td class="td">48:E1:5C:9F:26:20</td>
+				<!-- slash and hyphen ARE break opportunities: the canvas floor used to measure this
+				     at 144px against a real 93 (which is why it carded tables that had room) -->
+				<td class="td">WPA2-PSK/CCMP</td>
+				<!-- 130 characters with nothing to break on: luci-app-3ginfo-lite's ICCID shape -->
+				<td class="td">qHMcYUJ3RJ5Zr1Qz8xN2vB7kL0pW6sT4dG9fH1jK3mP5nR7tV9xZ2bC4eF6gJ8lN0qS2uW4yA6cE8hK1mO3rT5vX7zB9dG1jL3nQ5sU7wY9aD2fH4kM6pR8tV0x</td>
+				<td class="td">luci-app-attendedsysupgrade</td>
+			</tr>
+		</table>
+	</div>
+	<div class="cbi-section g-overwide" tabindex="0" role="group" aria-label="Key/value with an unbreakable value (scrolls)">
+		<h3>Key/value with an unbreakable value (issue #36)</h3>
+		<!-- luci-app-dockerman prints JSON.stringify() of everything `docker info` returns. This tier
+		     has no header row, so it can never card: `overflow-wrap: anywhere` is what keeps it inside
+		     the card, and that is the half of the split base/40-tables.css owns. -->
+		<div class="table">
+			<div class="tr"><div class="td">ENTRYPOINT</div><div class="td">xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</div></div>
+			<div class="tr"><div class="td">Driver</div><div class="td">overlay2</div></div>
+		</div>
+	</div>
+	<div class="cbi-section g-overwide" tabindex="0" role="group" aria-label="Log without a header row (scrolls)">
+		<h3>No header row — a log, which scrolls rather than cards</h3>
+		<!-- `.fs-xscroll` is written by fs-select.js when such a table is MEASURED to overflow and
+		     holds no widget. Carried here so the pinned first column and the focus ring are visible
+		     without a router. -->
+		<div class="table fs-xscroll" tabindex="0" role="group" aria-label="System log (sample)">
+			<div class="tr">
+				<div class="td nowrap">2026-08-14 20:43:11</div><div class="td nowrap">daemon.notice</div>
+				<div class="td nowrap">netifd</div>
+				<div class="td nowrap">Interface wan is now up, protocol dhcp, device eth0.2, metric 0</div>
+			</div>
+			<div class="tr">
+				<div class="td nowrap">2026-08-14 20:43:12</div><div class="td nowrap">daemon.warn</div>
+				<div class="td nowrap">dnsmasq</div>
+				<div class="td nowrap">reducing DNS packet size for nameserver 2001:db8:1a2b:3c4d:5e6f:7a8b:9c0d:1e2f to 1280</div>
+			</div>
+		</div>
 	</div>
 
 	<h2>The forcing utilities (.left/.right/.center + .top/.middle/.bottom)</h2>
@@ -695,7 +796,7 @@ option two</textarea></div>
 	     reduced-motion block, which is what this comment used to claim: there are 22 of those, each
 	     fighting an inline `style=` or an unlayered `<style>` — docs/conventions.md accounts for
 	     every one.) -->
-	<div class="cbi-section">
+	<div class="cbi-section g-overwide" tabindex="0" role="group" aria-label="Forcing utilities table (scrolls)">
 		<table class="table" id="forcing-utils">
 			<tr class="tr table-titles">
 				<th class="th left">left</th><th class="th center">center</th><th class="th right">right</th>
@@ -757,7 +858,11 @@ option two</textarea></div>
 
 <div class="g-sec">
 	<h2>Modal</h2>
-	<div id="modal_overlay" style="position:static;display:block;background:transparent;padding:0">
+	<!-- `opacity`/`visibility`, not just `position`/`display`: base/60-modal.css hides the overlay
+	     until <body> carries `modal-overlay-active`, so this whole section rendered NOTHING — and
+	     axe skips what is invisible, which meant the a11y gate had never once measured a dialog.
+	     The body class is not usable here: it also sets `overflow: hidden; height: 100dvh`. -->
+	<div id="modal_overlay" style="position:static;display:block;background:transparent;padding:0;opacity:1;visibility:visible">
 		<div class="modal" style="margin:0">
 			<h4>Modal title</h4>
 			<p>Modal body — this is what a confirmation or an edit form looks like.</p>

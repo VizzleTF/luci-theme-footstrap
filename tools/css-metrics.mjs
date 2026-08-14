@@ -44,8 +44,16 @@ const LIMITS = {
 	 * Raised 26 -> 27 for the realtime graph's border colour, the same box and the same inline
 	 * style as the bleed above: every stock realtime view writes `border:1px solid #000` on it, and
 	 * black belongs to no palette this theme ships. One property, one flag, and no cascade layer
-	 * can outrank an inline declaration. */
-	importants: 27,
+	 * can outrank an inline declaration.
+	 *
+	 * Raised 27 -> 28 for theme/30-tables.css's `word-break: normal` on a data table's cells. Same
+	 * adversary, one level deeper: luci-mod-status's processes.js writes `word-break: break-word`
+	 * INLINE on its Command span, which is the deprecated alias for `overflow-wrap: anywhere` and
+	 * therefore erases the column's min-content — the exact number the whole table pipeline now
+	 * measures. Measured at 720px of viewport: the column held at 126px against a 353px token with
+	 * every layered remedy tried, and reports 963px of need in 688px of room once the alias is
+	 * neutralised. */
+	importants: 28,
 	/* The widest selector the theme needs; see the layer rules in docs/conventions.md.
 	 *
 	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`. Not sprawl:

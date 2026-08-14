@@ -563,7 +563,12 @@
 	}
 
 	.cbi-filebrowser {
-		min-width: 210px;
+		/* `min(210px, 100%)`, not a bare 210: the floor keeps the file list readable, and a floor
+		 * wider than the field it sits in is not a floor but an overflow — measured at a 300px
+		 * viewport, the panel held 210px inside a 203px field and its whole upload row (the input,
+		 * Upload file, Cancel) stood 7px outside the card. Same shape as the dynlist's floor one file
+		 * over, and the same fix. Nothing moves at any width where the field is wider than 210. */
+		min-width: min(210px, 100%);
 		max-width: 100%;
 		/* width/style only; radius: theme/60-inputs.css — absorbed */
 		border: 1px solid var(--fs-border);

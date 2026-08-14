@@ -170,7 +170,7 @@ function enhance(sel) {
  * `:has(.tr.table-titles)` the style engine re-evaluated on every mutation of these polled tables
  * (Processes/routes/leases). Not a .cbi-section-table — config forms keep their own layout.
  *
- * `.table`, not `table.table` — the SAME selector relevant() and STACKABLE use. Stock LuCI
+ * `.table`, not `table.table` — the SAME selector relevant() and stackables() use. Stock LuCI
  * happens to emit only real <table>s, but a third-party luci-app-* may emit a <div class="table">
  * (coverage rule, docs/conventions.md), which a tag qualifier would pass over so it could never card.
  *
@@ -198,8 +198,46 @@ function enhance(sel) {
  * Re-running is what the two functions below are already written for: both are additive, both skip
  * what is already done, and neither re-decides anything (adoptMarkup() settles the "is this ours to
  * rewrite?" question once, at claim time, and remembers the answer on the element). */
-const FOREIGN_TABLE = '#view .table:not(.cbi-section-table), ' +
-	'#view table:not(.table):not(.cbi-section-table)';
+/* ---- AND `#view` IS NOT THE ONLY PLACE A TABLE LANDS ----
+ *
+ * `ui.showModal` (luci-base ui.js) parks its dialog on `#modal_overlay`, which ui's own `__init__`
+ * appends to `<body>` — a SIBLING of #view, not a descendant. Every selector in this file said
+ * `#view`, so a table in a dialog was reached by none of it: never tagged `.fs-dt`, never
+ * captioned, never measured, never carded. The dialog that shows it is the wireless scan
+ * ("Join Network: Wireless Scan", luci-mod-network/wireless.js — a seven-column table built with
+ * `E('table', {class: 'table'})` and fed to `cbi_update_table`).
+ *
+ * Measured on the stand with that exact markup, at a 390px viewport: in #view the table cards
+ * (`.fs-stacked`, 358px wide, every value on its own labelled line); in the dialog it stayed a
+ * table 373px wide inside 317px of room — 56px past the dialog's edge, with the Encryption column
+ * given 10px and `mixed WPA/WPA2 PSK (CCMP…)` spelled one character per line. Reported from a
+ * phone, and the screenshot is exactly that tower.
+ *
+ * So the roots are listed once, here, and every table query in this file is built from them. The
+ * overlay is a scroll container (base/60-modal.css) and theme/70-modal.css already spends a block
+ * on keeping a wide child from scrolling the dialog off the screen — a table is the widest child
+ * there is, and it belongs to the same rule.
+ *
+ * ---- AND A CLOSED DIALOG IS NOT A CONTENT ROOT, THOUGH IT IS STILL IN THE DOM ----
+ *
+ * `hideModal()` only drops a class off `<body>`; the dialog KEEPS the last markup it was given until
+ * the next `showModal()` overwrites it, and `visibility: hidden` leaves a box behind. Measured after
+ * closing a dialog: the overlay shrink-fits to 270px (its `inset-inline: 0` comes with the open
+ * class), so the table inside reports 236px of room and stacks — a decision taken about a width the
+ * dialog will never have, on rows nobody can see, re-taken on every pass a polled page makes. So the
+ * dialog counts as a root only while it is open, which is the same fact `body.modal-overlay-active`
+ * already carries for the CSS.
+ *
+ * The flag flips AFTER the content is written (`showModal` appends, then adds the class), so a
+ * mutation-driven pass would run one moment too early and never look again — which is why
+ * `fs-fit.js` also watches that class, and why this is a question asked per PASS rather than a
+ * selector fixed at load. */
+const ROOTS = [ '#view', '#modal_overlay' ];
+const inRoots = (sel, roots) => roots.map((r) => `${r} ${sel}`).join(', ');
+const liveRoots = () => (document.body.classList.contains('modal-overlay-active') ? ROOTS : ROOTS.slice(0, 1));
+
+const foreignTables = () => inRoots('.table:not(.cbi-section-table)', liveRoots()) + ', ' +
+	inRoots('table:not(.table):not(.cbi-section-table)', liveRoots());
 
 /* The FOURTH header markup, and the one only a foreign table produces: `<table><tr><th>…`, with no
  * `<thead>` for the parser to imply and none of LuCI's class names. It is the exact shape the phone
@@ -217,7 +255,7 @@ function headerRow(t) {
 }
 
 function tagDataTables() {
-	document.querySelectorAll(FOREIGN_TABLE).forEach((t) => {
+	document.querySelectorAll(foreignTables()).forEach((t) => {
 		/* FOUR header markups, and each missing one cost a page. L.ui.Table emits
 		 * `.tr.table-titles`; the apk Software page emits `.tr.cbi-section-table-titles` (missing
 		 * it is why the package list once needed a stacking block of its own); and a third-party
@@ -270,7 +308,7 @@ function tagDataTables() {
 function adoptMarkup(t, head) {
 	/* DECIDED ONCE, AT CLAIM TIME, and only for a table that speaks none of this vocabulary — then
 	 * READ on every pass, because the caller now revisits a table it has already claimed (see
-	 * FOREIGN_TABLE). Asking the question afresh each pass instead would answer "already adopted"
+	 * foreignTables()). Asking the question afresh each pass instead would answer "already adopted"
 	 * the moment we adopted it, and the fresh rows a poll brings in bare would never be taken.
 	 * Asking it at all is what keeps the theme's hands off LuCI's own markup: the apk Software list
 	 * heads its table with `.tr.cbi-section-table-titles`, and blindly adding `table-titles` to that
@@ -382,96 +420,219 @@ function labelCells(t, head) {
  * table then reported needing 1747px where it really needs 1190px and overflowed its section by
  * 557px — an overflow the CSS-only version never had. A data table has no widgets, which is why
  * it is the one that gets measured. */
-const STACKABLE = '#view .table.fs-dt';
+const stackables = () => inRoots('.table.fs-dt', liveRoots());
 
-/* "Too cramped to be a table any more" — a DESIGN judgement. It has to be one: these tables do
- * NOT overflow when the room runs out (their cells break anywhere), they compress into an
- * unreadable ribbon. Do NOT give the cells a min-width so that "cramped" MANUFACTURES an
- * overflow: tried, and it carded the firewall's zone table at 1420px and still overflowed by
- * 39px once carded — a floor big enough to force the overflow is big enough to break the card. */
+/* "Too cramped to be a table any more" — a DESIGN judgement, and the only number in this file.
+ *
+ * It survives the honest floor below rather than being replaced by it: a four-column table of short
+ * values (Startup, Connections) still FITS at 380px of room, technically, as four ribbons of two
+ * words each. Nothing measures "unreadable", so somebody has to say it, and stock LuCI says 600px of
+ * viewport. Do NOT give the cells a min-width so that "cramped" MANUFACTURES an overflow: tried, and
+ * it carded the firewall's zone table at 1420px and still overflowed by 39px once carded — a floor
+ * big enough to force the overflow is big enough to break the card. */
 const CRAMPED = 568;	/* stock LuCI cards its tables at a 600px viewport; below the 767px tier
 						 * .fs-content pads var(--fs-space-4) a side, 16px at the default density,
 						 * so 600 -> 568 of room. A fixed number and not a re-read of that token on
 						 * purpose: the threshold is the DESIGN judgement above, and Compact density
 						 * shrinking the gutter to 10px is not a reason to keep a table wider. */
 
-/* The ribbon has one more shape, and CRAMPED cannot see it: the table has room by the number
- * above and still shreds its FIRST column, because auto table layout hands width out by what
- * each column DEMANDS. The leftmost column is the row's identity and usually the least greedy —
- * a wide neighbour (a hostname plus an IPv6, a modulation string) simply takes the width, and
- * `overflow-wrap: anywhere` (theme/30-tables.css) lets the identity be squeezed with no floor:
- * it breaks mid-word rather than overflow, so there is no overflow for fit.overflows() to read.
+/* ---- THE REMEDY LADDER: cheapest first, re-measured at every rung ----
  *
- * Measured on the router (Wireless, one station, `Access Point "vaka_devices" (phy6-ap0)`):
- * viewport 900 -> the column is 101px and 5 lines, 850 -> 80px and 7, 800 -> 76px and 8, and at
- * NO width did the table card — a nine-line tower of half-words next to columns with room to
- * spare (issue #7). Below 767 the MAC column drops out (the stock phone contract) and the
- * column springs back to 167px, which is why this only ever bit between roughly 780 and 900.
+ * There used to be four terms in one `||`: `room < CRAMPED`, `overflows()`, `idTower()` (is the first
+ * column a tower of half-words?) and `wordFloor() > room` (does the table need more width than its
+ * own content can be squeezed into?). Three of the four existed because the CSS had told the engine
+ * that any value may break anywhere, which lowers a column's min-content to ONE CHARACTER: with no
+ * floor, a column could be starved instead of the table overflowing, and `overflows()` — the one
+ * question the browser answers exactly — went blind. `wordFloor()` reconstructed the floor with a
+ * canvas and a whitespace split, which is UAX #14 done by hand and wrong in both directions
+ * (`WPA2-PSK/CCMP` measured 144px against a real 93px, so tables carded that had room).
  *
- * So: past this many lines the identity has stopped being readable and the card view — which
- * gives every field its own labelled row — is simply better. A DESIGN judgement like CRAMPED,
- * and it has to be one: any number of lines is legible in isolation. 5 is what the reporter
- * asked for and what the measurements above bracket. Only the first column, and deliberately:
- * a value column wrapping to a few lines is a value being shown, not a table falling apart. */
-const MAX_ID_LINES = 5;
+ * theme/30-tables.css now gives a data table `overflow-wrap: break-word` for as long as it is a
+ * table, so the floor is real again and the overflow is honest. That leaves ONE question — does it
+ * fit? — and a ladder of answers when it does not, each one re-measured:
+ *
+ *   1. it fits                      -> a table, and nothing was written
+ *   2. drop the columns the VIEW marked droppable (`hide-xs`/`hide-sm`) and ask again
+ *   3. let the widest breakable column shred, and ask again
+ *   4. card it
+ *
+ * Rungs 2 and 3 need no threshold, and that is the point: the guard is the second measurement. On a
+ * wide desktop where one base64 key or one process command line is the entire problem, breaking that
+ * column makes the table fit and it stays a table; where every column is over its share, breaking one
+ * changes nothing and the card is right. Nobody picks a fraction.
+ *
+ * Rung 2 is upstream's own priority hint, honoured by measurement instead of by viewport: wireless.js,
+ * connections.js and channel_analysis.js mark their least valuable columns `hide-xs`, `ui.Table`
+ * copies the class from the header cell onto every body cell (ui.js), and until now the theme only
+ * obeyed it below 767px or in a card. */
 
-/* Is any row's leftmost cell a tower? Text lines, not height — fs-fit.textLines() explains why.
- * The height gate in front of it is not premature: this runs on every poll tick (once a second,
- * every mutation), and Processes/Connections render hundreds of rows whose first cell is a PID
- * that cannot be a tower — one cheap read each keeps the Range walk for the cells that could. */
-function idTower(t) {
-	const cells = t.querySelectorAll('.tr > .td:first-child');
-	if (!cells.length) return false;
-	const cs = getComputedStyle(cells[0]);
-	const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2 || 16;
-	for (const cell of cells) {
-		if (cell.clientHeight < MAX_ID_LINES * lh) continue;
-		if (fit.textLines(cell) > MAX_ID_LINES) return true;
+/* Which cells of a table carry the "may shred" mark, as a column index (-1 = none). Kept on the
+ * element so the common case — the same column as last pass — writes nothing at all. */
+function markBreakColumn(t, rows, col) {
+	if (t._fsBreakCol === col) return;
+	t._fsBreakCol = col;
+	for (const row of rows) {
+		const cells = row.children;
+		for (let i = 0; i < cells.length; i++)
+			cells[i].classList.toggle('fs-td-break', i === col);
 	}
+}
+
+/* Rung 3. The widest column that CAN be shredded, which is never the first (it is the row's
+ * identity — issue #36 is precisely that column being starved) and never a `nowrap`/`pre` one
+ * (`overflow-wrap` is inert there, so marking it would buy a layout and no width).
+ *
+ * With honest floors nothing is starved, so when the table overflows every column sits at its own
+ * min-content and the widest one IS the column holding the longest unbreakable token. No canvas, no
+ * text measurement — one `getComputedStyle` and one rect per column of one row. */
+function breakWidestColumn(t) {
+	const rows = t.querySelectorAll('.tr:not(.table-titles):not(.cbi-section-table-titles):not(.placeholder)');
+	if (!rows.length) return false;
+	const cells = rows[0].children;
+	let col = -1, widest = 0;
+	for (let i = 1; i < cells.length; i++) {
+		const ws = getComputedStyle(cells[i]).whiteSpace;
+		if (ws === 'nowrap' || ws === 'pre') continue;
+		const w = cells[i].getBoundingClientRect().width;
+		if (w > widest) { widest = w; col = i; }
+	}
+	if (col < 0) return false;
+	markBreakColumn(t, rows, col);
+	if (!fit.overflows(t)) return true;
+	markBreakColumn(t, rows, -1);
 	return false;
 }
 
-/* ---- AND THE SAME RIBBON IN A COLUMN THAT IS NOT THE FIRST ----
- *
- * There is no second test for it, and that is the fix rather than an omission.
- *
- * `idTower` above is deliberately first-column-only, on the grounds that "a value column wrapping to
- * a few lines is a value being shown, not a table falling apart". That held right up until the value
- * was one unbreakable token: `overflow-wrap: anywhere` gave such a cell a min-content of ONE
- * CHARACTER, so auto table layout was free to starve its column to one character, and `overflows()`
- * then reported — truthfully, uselessly — that the table fit. Reported from a hardware router at
- * 700-790px of window: the v4 lease table cards there (its `nowrap` columns give it a floor, so it
- * really does overflow) while the v6 table beside it shredded the DUID, measured at 5 lines with
- * 674px of room and 7 at 654px, against 1 line at 1160px.
- *
- * A first pass answered it with a line count, which is a number somebody picks. This asks the table
- * instead: `fit.wordFloor()` returns the narrowest the table can be without breaking a word through —
- * per column, the widest WORD it must show, in that column's own font, summed. Past that width the
- * browser has to cut through a value, and the card view is what shows values whole. So every table
- * carries its own breakpoint, derived from its own content, and no threshold was chosen anywhere.
- *
- * On the reporting router, at 1190px of room: leases6 asks for 935, the associated-stations table
- * for 966, the v4 leases for 645, Processes for 794, Connections for 550 and Startup for 381 — so
- * the two that were unreadable card at roughly a 1000px window, and the four that were fine keep
- * being tables until the room they actually need runs out. */
-
 function fitTables() {
-	document.querySelectorAll(STACKABLE).forEach((t) => {
+	document.querySelectorAll(stackables()).forEach((t) => {
 		const was = t.classList.contains('fs-stacked');
+		const wasDrop = t.classList.contains('fs-drop-xs');
 
 		/* fs-fit rule 1: a stacked table is a pile of flex rows and always "fits", so reading
-		 * it as it stands un-stacks it and the next frame stacks it again — oscillation. */
-		t.classList.remove('fs-stacked');
-		const room = fit.roomFor(t);
-		if (!(room > 0)) { if (was) t.classList.add('fs-stacked'); return; }
+		 * it as it stands un-stacks it and the next frame stacks it again — oscillation. Every
+		 * mark the ladder can write comes off here, for the same reason. */
+		t.classList.remove('fs-stacked', 'fs-drop-xs');
+		if (t._fsBreakCol !== undefined && t._fsBreakCol !== -1)
+			markBreakColumn(t, t.querySelectorAll('.tr'), -1);
 
-		/* the two row walks last, cheapest first: idTower reads one column, wordFloor every cell */
-		const stack = room < CRAMPED || fit.overflows(t) || idTower(t) || fit.wordFloor(t) > room;
+		const room = fit.roomFor(t);
+		if (!(room > 0)) {
+			/* detached, hidden, or a dialog that is closed: keep what it had rather than decide
+			 * against a width it does not have */
+			if (was) t.classList.add('fs-stacked');
+			if (wasDrop) t.classList.add('fs-drop-xs');
+			return;
+		}
+
+		/* the one judgement a measurement cannot make, and the only number in this file */
+		let stack = room < CRAMPED;
+		if (!stack && fit.overflows(t)) {
+			/* rung 2 — the view author already said which columns are expendable */
+			if (t.querySelector('.hide-xs, .hide-sm')) t.classList.add('fs-drop-xs');
+			/* rung 3 — one column may shred rather than the whole table becoming a stack of cards */
+			if (fit.overflows(t) && !breakWidestColumn(t)) stack = true;
+		}
+
 		/* write only on a real change: the poll re-renders these tables once a second, and
 		 * toggling the class off and on each tick would invalidate style for every row of
 		 * Processes/Leases for nothing */
-		if (stack) t.classList.add('fs-stacked');
+		if (stack) {
+			t.classList.add('fs-stacked');
+			/* a card gives every value the whole row, so neither remedy has anything left to do */
+			t.classList.remove('fs-drop-xs');
+			if (t._fsBreakCol !== undefined && t._fsBreakCol !== -1)
+				markBreakColumn(t, t.querySelectorAll('.tr'), -1);
+		}
 		else if (was) t.classList.remove('fs-stacked');
+	});
+}
+
+/* ---- AND THE TABLE THAT CANNOT CARD: it scrolls, and it says so ----
+ *
+ * A table with no header row has no captions to print, so a card would give a column of values with
+ * nothing saying what they are — a log, a statistics matrix, a key/value include. Comparison across
+ * rows IS that shape's purpose, which is the one case WCAG 2.2 names in the exception to SC 1.4.10
+ * ("data tables and grids… it is acceptable to provide two-dimensional scrolling for such parts").
+ * theme/30-tables.css already scrolls a BARE `<table>` of that shape; this reaches the one it cannot
+ * name — an app that renders the same thing as `<div class="table">` — and it reaches it by
+ * measurement rather than by selector, which is what makes the widget refusal below possible.
+ *
+ * A SCROLLING TABLE CANNOT HOLD A POPUP. `overflow-x: auto` computes `overflow-y` to `auto` too
+ * (css-overflow-3 §3.1: there is no `auto`/`visible` pair), so it CLIPS every absolutely positioned
+ * thing inside it, and luci-base's `openDropdown()` additionally sizes an open list against the
+ * nearest scroll parent — which would now be the table.
+ *
+ * SO THE ONES THAT HOLD CONTROLS STACK INSTEAD, and refusing to do anything for them was a real
+ * defect rather than caution: Network → Diagnostics is three controls in one header-less row, and at
+ * 320px of room it needs 338 — measured, the row simply ran past `.fs-main`'s clip and the Ping
+ * button was unreachable. Nothing about that shape wants scrolling either: its rows are a FORM, not
+ * data, so there is no comparison across rows to preserve. Rows and cells become blocks, each
+ * control takes the width it was given, the table cannot overflow anything, and no popup is clipped
+ * because nothing became a scroll container.
+ *
+ * That is also what `theme/90-responsive.css` had been doing for this one page since the phone
+ * sweep, keyed by `body[data-page="admin-network-diagnostics"]` and only below 767px. The shape is
+ * not that page's — any app can put a select and a button in a `<div class="table">` — and the width
+ * that matters is the room, not the viewport, so the page rule is gone and the measurement covers
+ * every one of them. */
+const SCROLLABLE = () => inRoots('.table:not(.fs-dt):not(.cbi-section-table)', liveRoots());
+const HOLDS_CONTROLS = '.cbi-dropdown, .cbi-dynlist, .cbi-tooltip-container, .cbi-progressbar, select, input, textarea, [data-tooltip]';
+
+function fitScrollables() {
+	document.querySelectorAll(SCROLLABLE()).forEach((t) => {
+		const was = t.classList.contains('fs-xscroll');
+		const wasStack = t.classList.contains('fs-rowstack');
+		/* rule 1 again: a scrolling box always "fits" — its overflow is inside it — and so does a
+		 * stacked one, whose rows are blocks */
+		t.classList.remove('fs-xscroll', 'fs-rowstack');
+		if (!(fit.roomFor(t) > 0)) {
+			if (was) t.classList.add('fs-xscroll');
+			if (wasStack) t.classList.add('fs-rowstack');
+			return;
+		}
+		const over = fit.overflows(t);
+		const controls = over && !!t.querySelector(HOLDS_CONTROLS);
+		/* a table of CONTROLS stacks; a table of VALUES scrolls and keeps its shape */
+		if (controls) {
+			t.classList.add('fs-rowstack');
+			if (was) {
+				if (t.tabIndex === 0) t.removeAttribute('tabindex');
+				if (t.getAttribute('role') === 'group') t.removeAttribute('role');
+				if (t._fsNamed) { t.removeAttribute('aria-label'); delete t._fsNamed; }
+			}
+			return;
+		}
+		const scroll = over;
+		if (scroll === was) { if (was) t.classList.add('fs-xscroll'); return; }
+		if (scroll) {
+			t.classList.add('fs-xscroll');
+			/* A SCROLL BOX THE KEYBOARD CANNOT REACH IS CONTENT THE KEYBOARD CANNOT READ.
+			 *
+			 * Firefox has made scrollers focusable for years and Chrome since 132, but only when they
+			 * hold no focusable child — a table row full of buttons disqualifies itself — and WebKit
+			 * has not shipped it at all (bug 190870, open since 2018). So say it in the markup: a
+			 * tab stop (SC 2.1.1), a role and a name so what receives focus can be announced
+			 * (SC 4.1.2). `group`, not `region`: a region is a landmark, and a status page with four
+			 * scrolling tables would put four of them in the landmark list.
+			 *
+			 * The name comes from the heading the table sits under, which is what a sighted user
+			 * reads it as; only the fallback is ours to translate. Never overwritten: an app that
+			 * labelled its own table knows better. */
+			if (!t.hasAttribute('tabindex')) t.tabIndex = 0;
+			if (!t.hasAttribute('role')) t.setAttribute('role', 'group');
+			if (!t.hasAttribute('aria-label') && !t.hasAttribute('aria-labelledby')) {
+				const head = t.closest('.cbi-section, fieldset, #view')?.querySelector('h2, h3, h4, legend');
+				const name = (head && head.textContent.trim()) || _('Table');
+				t.setAttribute('aria-label', name);
+				t._fsNamed = true;
+			}
+		}
+		else if (was) {
+			/* it fits again — hand the markup back exactly as it was found */
+			if (t.tabIndex === 0) t.removeAttribute('tabindex');
+			if (t.getAttribute('role') === 'group') t.removeAttribute('role');
+			if (t._fsNamed) { t.removeAttribute('aria-label'); delete t._fsNamed; }
+		}
 	});
 }
 
@@ -511,7 +672,7 @@ function fitTables() {
  * into — so wiping the pin cannot change the key and set this oscillating. It fires once per CHANGE,
  * never per tick, so it does not fight upstream for the pin on a polled page. */
 function unpinActionColumn() {
-	for (const t of document.querySelectorAll('#view .table.cbi-section-table')) {
+	for (const t of document.querySelectorAll(inRoots('.table.cbi-section-table', liveRoots()))) {
 		if (!t.querySelector('.cbi-section-actions')) continue;
 		/* ---- and CLAIM upstream's resize hook, because under SPA navigation it is a leak ----
 		 *
@@ -678,7 +839,7 @@ return baseclass.extend({
 		/* A table must be TAGGED .fs-dt before it can be fitted, and re-tagged whenever the poll
 		 * brings a fresh one back — so the two travel as one fitter, which fs-fit runs now, on
 		 * every content mutation (synchronously, pre-paint) and on every resize of #view. */
-		fit.add(() => { tagDataTables(); fitTables(); unpinActionColumn(); resyncValues(); });
+		fit.add(() => { tagDataTables(); fitTables(); fitScrollables(); unpinActionColumn(); resyncValues(); });
 
 		/* one scan per frame, however many mutations arrive (fit.frame — the theme's shared
 		 * coalescer) */

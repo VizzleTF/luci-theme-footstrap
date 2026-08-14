@@ -1,27 +1,18 @@
 @layer page {
 	/* Associated stations (Overview and Network → Wireless render the same `.assoclist` table).
 	 *
-	 * theme/30-tables.css lets ANY data cell break to fit (`overflow-wrap: anywhere`) — which is
-	 * what reflows a wide table into the content column instead of scrolling it. On a MAC address
-	 * that is wrong: `48:E1:5C:9F:26:20` split over two lines at whatever character happened to
-	 * land on the edge (issue #5), and the column is only ~103px, so it split every time. Stock
-	 * LuCI keeps it on one line.
+	 * `white-space: nowrap` on column 2 used to stand here, because `overflow-wrap: anywhere` split
+	 * `48:E1:5C:9F:26:20` at whatever character landed on the edge (issue #5) in a ~103px column,
+	 * every time.
 	 *
-	 * Exactly the shape pages/50-leases.css already uses, and for the same reason — see the note
-	 * there about why the nowrap is also the table's floor, and why `:not(.fs-stacked)` is the
-	 * whole guard: once fs-select.js has measured that the table no longer fits and carded it, the
-	 * cells must be free to wrap again.
+	 * A MAC has no break opportunity in it — a colon is not one — so the honest floor
+	 * theme/30-tables.css now gives a data table keeps the whole address in one piece without a
+	 * per-page rule, and keeps it for every table that shows one rather than for this one.
 	 *
-	 * Column 2, NOT `[data-title="MAC address"]` — that literal is a translated string and the rule
-	 * was dead on every localised router, which is precisely how the bug was still being reported
-	 * (#7) after it had been "fixed". See the note in pages/50-leases.css.
-	 * Columns: 1 Network | 2 MAC address | 3 Host | 4 Signal/Noise | 5 RX/TX Rate | 6 Disconnect.
-	 *
-	 * ONLY the MAC. Signal/Noise (4) and RX/TX Rate (5) were nowrapped too (v0.9.1, #7) to stop
-	 * `anywhere` splitting "-54/-90 dBm" mid-character — and that was worse: nowrap makes the
-	 * modulation string ("229 Mbit/s, 20 MHz, HE-MCS 9, HE-NSS 2") an unbreakable ~300px block, so
-	 * it ate the row and crushed the Network column to a few characters (reported on #7 against
-	 * 0.9.1). It also raised the table's floor, carding the table on desktops that had room. A wide
-	 * cell that CAN break is the lesser evil: the columns keep their share. */
-	#view table.fs-dt.assoclist:not(.fs-stacked) .td:nth-child(2) { white-space: nowrap; }
+	 * What the old note here was right about, and what the ladder inherits: nowrapping the Signal
+	 * and Rate columns as well (v0.9.1) was WORSE, because it made the modulation string
+	 * ("229 Mbit/s, 20 MHz, HE-MCS 9, HE-NSS 2") an unbreakable ~300px block that ate the row and
+	 * crushed the Network column. A wide cell that CAN break is the lesser evil, and that is exactly
+	 * what rung 3 chooses when it has to choose: the widest breakable column gives way, never the
+	 * identity column. */
 }
