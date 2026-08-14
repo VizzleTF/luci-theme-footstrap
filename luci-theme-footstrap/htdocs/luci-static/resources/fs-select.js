@@ -334,8 +334,16 @@ function labelCells(t, head) {
 		 * totals, which is captioned once and then never bare again while fresh rows keep arriving in
 		 * the `<tbody>` above it (`t.rows` spans thead, tbody and tfoot, and the query above is in
 		 * document order). Asked per row, there is nothing to guess: a fresh row has no caption and is
-		 * walked, a captioned one is skipped, and cells replaced INSIDE a surviving row arrive bare and
-		 * are walked too.
+		 * walked, a captioned one is skipped.
+		 *
+		 * ITS OWN BLIND SPOT, stated because the reader has no other way to learn its shape: the test
+		 * reads the FIRST cell, so a cell replaced inside a row whose first cell survives is skipped
+		 * with the row and stays bare. It is narrower than the table-level probe's — that one stalled
+		 * a whole table forever, this one misses cells 2..n of one row, and only while that row's first
+		 * cell keeps its caption — and nothing in the tree reaches it: `ui.Table.update()` swaps whole
+		 * `<tr>`s, and every hand-rolled equivalent rebuilds the row. Testing every cell instead would
+		 * cost the walk this skip exists to avoid, on every pass of every polled table, to cover a
+		 * shape no emitter produces.
 		 *
 		 * A first cell that can never take a caption — one that spans columns, or whose header text is
 		 * empty — leaves its row walked on every pass. That is the safe direction and it is bounded by
