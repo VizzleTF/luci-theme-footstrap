@@ -125,10 +125,14 @@ function warnPollUnreadable(msg) {
  * itself to L's prototype when the FIRST requirer compiles it, so this sees the instance the pages
  * actually use, and a router that required it would both bind it to its own prototypal L (the two-L
  * trap, docs/spa-router.md) and pull uci.js onto pages that never touch uci. No instance means no
- * cache to flush. */
+ * cache to flush.
+ *
+ * Returns the refill below as a promise the caller must wait on, or null when there is nothing to
+ * wait for. It never rejects — a failed refill is reported and swallowed, because a navigation is
+ * not the place to lose a page over a config the incoming view may not even read. */
 function flushUciCache() {
 	const uci = window.L ? window.L.uci : null;
-	if (!uci || typeof uci.unload !== 'function') return;
+	if (!uci || typeof uci.unload !== 'function') return null;
 	/* `state.values` and `loaded` are private, so the same rule as L.Poll.timer applies: a shape we
 	 * do not recognise is a reason to do nothing, once, loudly — never to guess. The two hold
 	 * different halves of the cache (a package whose load is still in flight is in `loaded` alone),
@@ -141,14 +145,45 @@ function flushUciCache() {
 				+ 'will report a missing config on the second SPA visit. fs-router.js needs updating for '
 				+ 'this luci-base.');
 		}
-		return;
+		return null;
 	}
 	const names = Object.keys(uci.state.values).concat(Object.keys(uci.loaded));
-	if (names.length) uci.unload(names);
+	if (!names.length) return null;
+	uci.unload(names);
 	/* `state.reorder` is the one half unload() does not clear, and it is deliberately left alone
 	 * rather than reset by hand: with `values` gone, reorderSections() finds no sections to order,
 	 * emits no call and clears the map itself on the next save. Writing to that field would be us
 	 * editing another module's private state, for a difference nothing can observe. */
+
+	/* …and put back the three packages luci-base's network.js reads but will never load again.
+	 *
+	 * initNetworkState() loads `network`, `wireless` and `luci` ONCE, fills its own `_state`, and
+	 * from then on answers every caller with `return (_state != null ? Promise.resolve(_state) : _init)`
+	 * — no uci call, ever again, for the life of the document. What it answers WITH, though, is the
+	 * uci cache: `getWifiDevices()` is `uci.sections('wireless', 'wifi-device')`, and a view like
+	 * network/switch reads `uci.sections('network', 'switch')` in its own render(). So dropping those
+	 * packages does not make network.js refetch them — it makes every consumer read an EMPTY config
+	 * until the next full load.
+	 *
+	 * Measured on 24.10, one SPA navigation away from Interfaces: `uci.state.values` {}, and
+	 * `network.getWifiDevices()` 2 devices -> 0. That is Status -> Channel Analysis painting its title
+	 * and its button with no band tabs under them, and Network -> Switch painting its description and
+	 * Save/Apply with no VLAN sections — both correct again after F5, which is exactly how it was
+	 * reported upstream ("only work after reloading the page"). tools/spa-parity.mjs reproduces it in
+	 * one command, and tools/upstream-contract.mjs is what notices if that list of three ever moves.
+	 *
+	 * Refilling them is what a full load hands the incoming view, so navigate() WAITS for it (see the
+	 * Promise.all below): a cached module resolves within a microtask, well before this request lands,
+	 * and the view would read the empty cache we just left it. Only when network.js is really in the
+	 * document — no module, no derived state to keep in step, and no request to spend. The ubus half
+	 * of `_state` stays as stale as upstream leaves it; a view that needs it fresh calls
+	 * network.flushCache() itself, and that is not ours to decide. */
+	if (!window.L.network) return null;
+	const refill = [ 'network', 'wireless', 'luci' ].filter((p) => names.indexOf(p) !== -1);
+	if (!refill.length) return null;
+	return uci.load(refill).catch((e) => {
+		console.error('footstrap: reloading uci ' + refill.join(', ') + ' after a navigation failed', e);
+	});
 }
 let _uciCacheWarned = false;
 
@@ -676,8 +711,9 @@ function navigate(pathname, push, kbd) {
 	 * would have. L.Poll's own tick survives. */
 	clearViewIntervals();
 	/* and drop uci's document-scoped config cache, which a full load would not have carried into the
-	 * incoming page either (see flushUciCache) */
-	flushUciCache();
+	 * incoming page either (see flushUciCache). What it hands back is the refill of the packages
+	 * network.js will never load again — awaited below, before the view renders. */
+	const uciWarm = flushUciCache();
 	/* the outgoing page's links are about to become a detached tree — do not hold one of them */
 	_lastHovered = null;
 	/* run every registered navigation callback — today the search palette's recent-pages record and
@@ -819,7 +855,10 @@ function navigate(pathname, push, kbd) {
 	 * and the wait introduces a window in which we may never get there. Marking it up front would
 	 * make the NEXT navigation take the cached branch — `new view.constructor()` on a class whose
 	 * require() is what renders it — i.e. two renders and two pollers for one page. */
-	warmedThen(className).then(() => {
+	/* `uciWarm` rides alongside the prefetch wait rather than after it: both are in flight already, and
+	 * a view must not be constructed until the uci cache it reads is back (see flushUciCache). It never
+	 * rejects — the refill catches its own failure — so it cannot cost the navigation a full reload. */
+	Promise.all([ warmedThen(className), uciWarm ]).then(() => {
 		/* superseded while waiting: never start the require. On a first visit the require IS the
 		 * render, so starting it here would paint a page the user has already left and hand
 		 * repairStaleRender() a mess that only exists because a require in flight cannot be stopped. */

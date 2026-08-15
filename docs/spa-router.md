@@ -253,6 +253,21 @@ Before rendering the new view:
   two-`L` trap above), and does not pull uci.js onto pages that never touch uci. `state.values` and
   `loaded` are private, so a shape we do not recognise is one loud `console.error` and no sweep —
   the same rule as `L.Poll.timer`.
+- **…except the three packages `network.js` will never load again**, which are put straight back and
+  which the incoming view WAITS for. `initNetworkState()` loads `network`, `wireless` and `luci`
+  once, fills its own `_state`, and from then on answers everyone with
+  `return (_state != null ? Promise.resolve(_state) : _init)` — no uci call ever again for the life
+  of the document — while still answering *out of the uci cache*: `getWifiDevices()` **is**
+  `uci.sections('wireless', 'wifi-device')`, and `view/network/switch` reads
+  `uci.sections('network', 'switch')` in its own `render()`. Dropping those packages therefore does
+  not refresh them; it hands every consumer an empty config until the next full load. Measured on
+  24.10, one navigation away from Interfaces: `uci.state.values` `{}`, `network.getWifiDevices()`
+  2 → 0 — Status → Channel Analysis with no band tabs and Network → Switch with no VLAN sections,
+  both right again after F5, which is how it was reported upstream. The refill is awaited because a
+  *cached* module resolves within a microtask, well before the request lands, and only fires when
+  `L.network` exists: no module, no derived state to keep in step. The ubus half of `_state` stays
+  as stale as upstream leaves it — a view that needs it fresh calls `network.flushCache()`, and that
+  is not the router's call to make.
 - `clearViewIntervals()` kills the outgoing view's bare `window.setInterval`s. A full load would
   have killed them; SPA must do it explicitly. `setInterval`/`clearInterval` are hooked at module
   eval and the ids tracked in a `Set`; `L.Poll`'s own 1-second tick is preserved.
