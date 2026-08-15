@@ -12,9 +12,9 @@ What the Makefile and the install scripts do: [package.md](package.md). The rele
 dispatch.
 
 ```
-check ─┐
-       ├─→ build ─→ verify ─→ release ─→ pages     (release and after: tags only)
-lint ──┘
+check ─┐          ┌─→ verify ─┐
+       ├─→ build ─┤           ├─→ release ─→ pages     (release and after: tags only)
+lint ──┘          └─→ live ───┘
 ```
 
 | Job | What it is |
@@ -23,6 +23,7 @@ lint ──┘
 | `lint` | the npm gates: eslint, stylelint, axe-core, the ratchets |
 | `build` | both package formats, via owfeed |
 | `verify` | installs this very build on real 25.12 and 24.10 userlands and renders its pages |
+| `live` | opens every page of the menu on those userlands and measures it — layout, navigation parity, and the assumptions this theme makes about luci-base |
 | `release` | signs, generates the notes, attaches the assets |
 | `pages` | refreshes the GitHub Pages portal and the release mirror |
 
@@ -183,8 +184,35 @@ the router's real `luci.core` and `uci` — no interpreter of ours, no stubs. It
 legs: the templates are identical but the interpreters are not, and a construct 25.12's ucode
 accepts is no proof that 24.10's does. Without it a stray brace in `header.ut` ships green and
 silently moves every user's LuCI to another theme, because luci.mk copies `ucode/` verbatim and
-nothing parses it on the way. The same assertions are what `owlab test` runs locally — see
-[development.md](development.md), and keep the two in step.
+nothing parses it on the way.
+
+The same assertions are what `owlab test` runs locally — see [development.md](development.md), and
+keep the two in step.
+
+## `live` — the pages behave, not just the package
+
+`verify` proves the package installs and two pages answer 200. That is not the same claim as "the
+pages are right", and the difference is where every field report has lived: #11 a column shredded to
+one character per line, #22 a clipped submenu title, #12 a doubled scrollbar in one engine, #8/#33/#36
+a third-party app laid out wrong, and two pages that came back empty after a client navigation — all
+green under every static gate at the time.
+
+The job boots the same owlab containers a developer runs locally (`owfeed/owlab/setup` puts the CLI
+on PATH; the binary is checked against its build attestation), installs the artifact `build` just
+produced, and runs three gates cheapest-first:
+
+1. `tools/upstream-contract.mjs` — the assumptions about luci-base. It runs first because if one of
+   them has moved, every finding below is downstream of it.
+2. `tools/spa-parity.mjs` — every page opened by a click and by a full load, compared.
+3. `tools/live-audit.mjs` — every page at six widths, ratcheted against
+   `tools/baselines/live-audit.json`.
+4. `tools/install-check.sh` — `install.sh` twice on each router, fresh and over its own result. It
+   goes last because it replaces the build under test with the published release; #16, #28 and #30
+   were all this script, and all on the second run.
+
+**Two routers on a push, one on a pull request.** The second release line doubles the wall clock and
+has not yet been the leg that caught something first; a tag runs both. What each gate holds, and how
+to run it by hand, is in [conventions.md](conventions.md) and [development.md](development.md).
 
 ## `release` — signing and publication
 
@@ -192,7 +220,7 @@ Tags only, and **it is a call into owfeed's own reusable workflow** rather than 
 
 ```yaml
 release:
-  needs: [build, verify]
+  needs: [build, verify, live]
   if: startsWith(github.ref, 'refs/tags/v')
   uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.0
   secrets:    { sign-key: …OWFEED_AUTHOR_KEY, usign-key: …FOOTSTRAP_USIGN_KEY }
@@ -200,7 +228,7 @@ release:
                 sign-also: install.sh, notes-file: dist/notes.md, verify-with: release.pub }
 ```
 
-**This is the only job that holds a key**, and `needs: [build, verify]` is what stops a tag
+**This is the only job that holds a key**, and `needs: [build, verify, live]` is what stops a tag
 publishing a package no router has installed.
 
 `tools/stage-release.sh` is our half — the `pre-release` hook. It puts into `dist/` the two assets

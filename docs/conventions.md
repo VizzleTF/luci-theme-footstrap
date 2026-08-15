@@ -280,7 +280,28 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `conffiles` | every shipped `/etc/config/*` is declared a conffile — `/etc/config/footstrap` is written at runtime by Save-as-default, and an undeclared one is replaced on upgrade |
 | `changelog` | section set, order, dates, compare links, RU mirror parity, bold leads |
 | `i18n` | `.pot` current, no empty `msgstr` |
+| `shell` | every shell script in the source tree parses (`sh -n`) — including `release-notes.sh`, which otherwise fails inside the release job |
+| `marker` | the `call BuildPackage` literal `include/scan.mk` greps for, without which the SDK does not see the package at all |
 | `a11y` | axe-core WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap} × {untinted,60°,260°} |
+
+## The live gates, and why a file cannot answer for a page
+
+`npm run live` — three gates that need a **running owlab router**, which is why they are not in
+`npm run check`. Every gate above measures a file; every bug users have reported was about a page:
+#11 a column shredded to one character per line, #22 a clipped submenu title, #14 an indicator that
+did not fit, #10 phantom scroll from a hidden pane, #12 a doubled scrollbar in one engine, #8/#33/#36
+a third-party app laid out wrong, and — reported on the upstream PR — two pages that came back empty
+after a client navigation while every static gate stayed green.
+
+| Gate | Holds |
+|---|---|
+| `upstream` | the coupling registry: every assumption fs-*.js makes about luci-base (`L.Poll`'s alias and queue, `uci.state.values`/`loaded`, `uci.load()` answering "what did THIS call fetch", `network.js` loading its three packages exactly once, `require()` publishing onto `L`, the modal contract, where `addNotification` puts a banner, an open dropdown being `position: absolute`) checked against the luci-base the router runs. Each failure names the module here that was written against it |
+| `spa-parity` | every menu page opened BOTH ways — by click and by full load — compared on content, on uci's cache, on `network.getWifiDevices()` and on console errors. No baseline: a difference is always a bug |
+| `install-check` | `install.sh` run twice on a stand — fresh, then over its own result — asserting the package is installed, `luci.main.mediaurlbase` points here and `cascade.css` is on disk. Three field reports (#16, #28, #30) were this script alone, all on the second-run path. It leaves the PUBLISHED release installed and re-syncs the working tree afterwards, so it runs last |
+| `live-audit` | every menu page at 320/390/568/768/1024/1440: sideways document scroll, an element past the content column with no scroller, a clipped non-scrolling box, a sub-24px hit target with a neighbour, an operable element with no name, two stacked scrollports, a JS error. Ratcheted against `tools/baselines/live-audit.json` — a NEW signature fails, and `--update` (read the diff first) rewrites it |
+
+`--engine firefox` and `--engine webkit` run the audit in the other two engines, keyed separately in
+the baseline: #12 was Firefox-only, and a chromium run must not bless a finding it never saw.
 
 Two more run in CI only. `tools/jsmin-verify.mjs` needs a jsmin built from the commit in
 `luci-upstream.pin`. `ucode -T -c` over every template runs inside the `verify` containers, against

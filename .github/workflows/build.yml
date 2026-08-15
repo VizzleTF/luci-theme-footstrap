@@ -202,11 +202,68 @@ jobs:
             package luci-theme-footstrap
             http 200 /cgi-bin/luci/admin/status/overview
 
-  # The only job that holds a key, and `needs: [build, verify]` is what keeps a tag
+  # Everything above measures a FILE. This one measures a PAGE, which is where every field report
+  # has come from: a column shredded to one character per line (#11), a clipped submenu title (#22),
+  # a doubled scrollbar in one engine (#12), a third-party app laid out wrong (#8, #33, #36), and a
+  # client navigation that painted less than a full load (upstream review). None of those can fail a
+  # static gate; all of them fail here.
+  #
+  # owlab boots the same containers a developer runs locally, so the gate and the local command are
+  # the same command. Two routers on a push, one on a pull request: the second release line doubles
+  # the wall clock and has never been the one to catch something first.
+  live:
+    name: The pages behave on a real router
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - uses: actions/download-artifact@v8
+        with:
+          name: owfeed-packages
+          path: dist/
+      - uses: owfeed/owlab/setup@v0.5.3
+        with:
+          version: v0.5.3
+
+      - name: Boot the routers and install this build
+        run: |
+          set -eu
+          if [ "${{ github.event_name }}" = "pull_request" ]; then echo "ROUTERS=owrt2512" >> "$GITHUB_ENV"; else echo "ROUTERS=owrt2512 owrt2410" >> "$GITHUB_ENV"; fi
+          . "$GITHUB_ENV"
+          owlab up $ROUTERS
+          for r in $ROUTERS; do
+            case "$r" in
+              *2512|*snap) owlab install "$r" dist/noarch/luci-theme-footstrap-*.apk ;;
+              *)           owlab install "$r" dist/all/luci-theme-footstrap_*.ipk ;;
+            esac
+          done
+
+      # Three gates, cheapest first, so a broken assumption about luci-base is reported before
+      # anything spends twenty minutes rendering pages against it.
+      - run: node tools/upstream-contract.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
+      - run: node tools/spa-parity.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
+      - run: node tools/live-audit.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
+
+      # LAST, because it installs the PUBLISHED release over the build the steps above measured —
+      # and that is the claim: what a user runs is install.sh against the feed, not `apk add` against
+      # a local file. Three field reports (#16, #28, #30) were this script and nothing else, all of
+      # them on the re-install-over-an-existing-copy path, which a fresh install cannot exercise.
+      - run: sh tools/install-check.sh $ROUTERS
+
+      - if: always()
+        run: owlab down || true
+
+  # The only job that holds a key, and `needs: [build, verify, live]` is what keeps a tag
   # from publishing a package no router has installed.
   release:
     name: Sign and publish
-    needs: [build, verify]
+    needs: [build, verify, live]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write

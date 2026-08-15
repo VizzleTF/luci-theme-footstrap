@@ -148,6 +148,43 @@ the installed theme — the same command as above, so locally it is one `owlab e
 
 Nothing in `package.json` reaches the package: the OpenWrt buildbot has no node.
 
+## The live gates: `npm run live`
+
+The static gates read files. Every bug a user has reported was about a **page** — a shredded column,
+a clipped title, a doubled scrollbar, a third-party app laid out wrong, a client navigation that
+painted less than a full load. `npm run live` is the half that opens pages, and it needs stands:
+
+```sh
+owlab up                       # the containers these gates measure
+owlab sync                     # your working tree onto them
+npm run live                   # upstream-contract, then spa-parity, then live-audit
+```
+
+Each is also a command of its own, and each takes `--only <router ids>`:
+
+```sh
+node tools/upstream-contract.mjs --only owrtsnap --verbose   # every assumption, named, one by one
+node tools/spa-parity.mjs --only owrt2410 --pages /admin/network
+node tools/live-audit.mjs --only owrt2512 --widths 320,1440 --pages /admin/status
+```
+
+- **`upstream-contract`** is the registry of what this theme assumes about luci-base — private
+  fields, a deprecated alias, a module that loads uci once and answers out of that cache forever.
+  Run it against **`owrtsnap`** as well: SNAPSHOT tracks luci-base's master, so that is where an
+  assumption breaks first, and a failure names the module here that has to be looked at.
+- **`spa-parity`** has no baseline, because a page reached by a click that differs from the same page
+  reached by a load is always a bug.
+- **`install-check`** (`npm run install-check`, not part of `npm run live`) runs `install.sh` on the
+  stands twice over, because the upgrade path is where every installer report has come from. It
+  installs the published release and re-syncs your tree afterwards — do not run it in the middle of
+  debugging something else.
+- **`live-audit`** is a ratchet: known findings live in `tools/baselines/live-audit.json`, a new
+  signature fails, and `--update` rewrites the file. Read the diff before you update — some findings
+  belong to a third-party app rather than to the theme, and that distinction is the file's whole
+  value. `--engine firefox|webkit` runs the same sweep in another engine, keyed separately in the
+  baseline (a headless Firefox refuses to launch on some macOS setups; the flag is there for CI and
+  for Linux). A new engine needs its own baseline, created by one `--update` run.
+
 ## Proving it on a router: `owlab test`
 
 `owlab test` is the local form of CI's `verify` job: build the packages, install them on a real
