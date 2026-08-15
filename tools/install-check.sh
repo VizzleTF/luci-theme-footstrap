@@ -39,6 +39,9 @@ for r in $routers; do
 	printf '%s: ' "$r"
 	docker cp install.sh "$c:/tmp/fs-install.sh" >/dev/null
 
+	# The version the FEED serves, read from the router's own package manager after the installer has
+	# added the feed — the check below compares against it rather than against a number in this repo,
+	# which would go stale the moment a release lands.
 	pass=1
 	for run in 1 2; do
 		if ! docker exec "$c" sh /tmp/fs-install.sh >"/tmp/install-check-$r-$run.log" 2>&1; then
@@ -55,9 +58,27 @@ for r in $routers; do
 		if ! docker exec "$c" sh -c 'test -s /www/luci-static/footstrap/cascade.css'; then
 			echo; echo "  run $run: cascade.css is missing or empty"; pass=0; break
 		fi
+		# AND THE VERSION MOVED. This is the assertion the gate was missing when it was written, and
+		# the field bug walked straight through the hole: `apk add` on a package already in `world`
+		# leaves the old version in place, prints its usual OK line and exits 0, so "installed,
+		# registered, cascade.css present" was all true while the router still ran the previous
+		# release. Compare what is installed against what the feed serves, on the router itself.
+		if ! docker exec "$c" sh -c '
+			if command -v apk >/dev/null 2>&1; then
+				have=$(apk list -I 2>/dev/null | sed -n "s/^luci-theme-footstrap-\([^ ]*\) .*/\1/p" | head -1)
+				want=$(apk list luci-theme-footstrap 2>/dev/null | sed -n "s/^luci-theme-footstrap-\([^ ]*\) .*/\1/p" | sort -V | tail -1)
+			else
+				have=$(opkg list-installed luci-theme-footstrap 2>/dev/null | awk "{print \$3}")
+				want=$(opkg list luci-theme-footstrap 2>/dev/null | awk "{print \$3}" | sort -V | tail -1)
+			fi
+			[ -n "$have" ] && [ -n "$want" ] && [ "$have" = "$want" ]'; then
+			echo; echo "  run $run: the installed version is not the newest the feed serves"
+			docker exec "$c" sh -c 'apk list -I 2>/dev/null | grep footstrap || opkg list-installed 2>/dev/null | grep footstrap' | sed 's/^/    installed: /'
+			pass=0; break
+		fi
 	done
 
-	if [ "$pass" = 1 ]; then echo "fresh install and re-install over it both leave a working theme"
+	if [ "$pass" = 1 ]; then echo "fresh install and re-install over it both leave the newest version, working"
 	else fail=1; fi
 done
 

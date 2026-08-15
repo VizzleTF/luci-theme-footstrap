@@ -281,8 +281,17 @@ if [ "$PM" = apk ]; then
 	fetch "$FEED_HOST/owfeed-packages.pem" /etc/apk/keys/owfeed-packages.pem
 	printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
 	apk update
-	# `apk add` resolves to the newest version in the feed, so a second run upgrades.
-	apk add "$PKG"
+	# `apk add` ALONE DOES NOT UPGRADE, and the comment that used to sit here said it did. apk 3
+	# reads `add` as "make sure this is present": a package already in `world` and already satisfied
+	# stays at the version it is at, the command prints its usual OK line and exits 0. Reproduced on
+	# a 25.12 stand carrying 0.12.5 with 0.12.7 in the feed — the run ended with
+	# "[+] Installed from the owfeed-packages feed" and `apk list -I` still said 0.12.5. That is the
+	# shape of issues #16, #28 and #30: the installer reports success and changes nothing, and the
+	# only way a user sees it is by reading the version in the Footstrap tab.
+	# `--upgrade` (`-u`) is what asks for the newest the feed carries; it installs on a router that
+	# does not have the theme yet, so this one line covers both paths, exactly as the opkg leg below
+	# already did with its explicit `opkg upgrade`.
+	apk add --upgrade "$PKG"
 else
 	if ! grep -q "$FEED_NAME" /etc/opkg/customfeeds.conf 2>/dev/null; then
 		info "Adding the $FEED_NAME feed..."

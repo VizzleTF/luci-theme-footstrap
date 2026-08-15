@@ -677,6 +677,17 @@
 		 * this rule made them dead.) */
 		justify-content: center;
 		text-align: center;
+		/* AND SPACE THE LINES, because the two links in it become adjacent TARGETS the moment the
+		 * line wraps. The footer is one sentence carrying the LuCI link and the OpenWrt link; on a
+		 * wide screen they sit side by side and nothing is close to anything, but at the width where
+		 * the sentence breaks they land on consecutive lines. With the inherited 1.5 that is a 16px
+		 * line box, i.e. 16px between the two links' centres — inside the 24px envelope WCAG 2.2
+		 * SC 2.5.8 requires around a target smaller than 24x24, which an inline link always is.
+		 * Found by tools/live-audit.mjs on CI's runner and not on the maintainer's stands: the wrap
+		 * width depends on text metrics, so the same 568px viewport breaks the line there and not
+		 * here. 26px, not 24: the criterion is that the two 24px circles must not meet, so 24 is the
+		 * boundary rather than a pass, and 26 leaves the footer visually unchanged on one line. */
+		line-height: 26px;
 	}
 	footer a { color: var(--fs-dim); }
 	footer a:hover { color: var(--fs-accent); }

@@ -11,6 +11,14 @@ Style and format guide: [docs/releasing.md](docs/releasing.md).
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+
+- **The one-line installer upgrades an existing install again.** `apk add` does not upgrade: apk 3 reads it as "make sure this package is present", so a router already carrying the theme kept the version it had while the script printed its usual "Installed from the owfeed-packages feed" and exited 0. Reproduced on a 25.12 stand holding 0.12.5 with 0.12.7 in the feed — after the documented one-liner, `apk list -I` still said 0.12.5, and the only place a user could see it was the version in the Footstrap tab. That is the shape of #16, #28 and #30, and it survived the gate that was written for exactly those reports, because "installed, registered, cascade.css present" was all true. `apk add --upgrade` is what asks for the newest the feed carries, and it installs on a router that has nothing yet, so one line covers both paths — the opkg leg has always asked for the upgrade explicitly. Verified on the stand in both directions: a clean router ends at 0.12.7, and one pinned to 0.12.6 moves to 0.12.7. `tools/install-check.sh` now compares the installed version against what the feed serves, on the router itself, which is the assertion whose absence let this through.
+
+- **The two links in the footer keep 24px between them when the line wraps.** The footer is one sentence carrying the LuCI link and the OpenWrt link; on a wide screen they sit side by side, but at the width where the sentence breaks they land on consecutive lines, and with the inherited 1.5 leading that is 16px between their centres — inside the 24px envelope WCAG 2.2 SC 2.5.8 requires around any target smaller than 24×24, which an inline link always is. Found by the new live gate on CI's runner and not on the maintainer's stands: the wrap width depends on text metrics, so the same 568px viewport breaks the line there and not here. The footer's line box is now 26px rather than 24 — the criterion is that the two circles must not meet, so 24 is the boundary rather than a pass — and nothing moves at any width where the sentence still fits one line.
+
 ## [0.12.7] — 2026-08-15
 
 ### Added

@@ -376,7 +376,6 @@
 		"/admin/status/overview|320|noname|input",
 		"/admin/status/overview|390|noname|input",
 		"/admin/status/overview|568|noname|input",
-		"/admin/status/overview|568|target|a",
 		"/admin/status/overview|768|noname|input",
 		"/admin/status/vnstat2/config|320|overflow|img",
 		"/admin/status/vnstat2/config|320|overflow|input.create-item-input",
