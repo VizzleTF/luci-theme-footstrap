@@ -267,6 +267,7 @@ function fitChrome() {
  *
  * Written only on a CHANGE and rounded to the pixel: this runs on every fit pass, and a custom
  * property write on :root invalidates style for the whole document. */
+let _barH = 0;
 function publishBarHeight(bar) {
 	const root = document.documentElement;
 	if (!bar) return;
@@ -275,7 +276,6 @@ function publishBarHeight(bar) {
 	_barH = h;
 	root.style.setProperty('--fs-bar-live', `${h}px`);
 }
-let _barH = 0;
 
 /* ---- does the right-hand cluster still fit beside the brand? ----
  *

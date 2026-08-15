@@ -200,13 +200,26 @@
 	 * the brand wraps, when the menu takes a row of its own or when the right-hand cluster does, all
 	 * of which fs-chrome.js decides by measurement — so it publishes the measured height as
 	 * `--fs-bar-live` and this reads it, with the designed height as the fallback for the frame
-	 * before the chrome has been fitted. */
-	:root[data-layout="sidebar"]:not([data-narrow]) .table.fs-dt:not(.fs-stacked) .tr.table-titles .th {
+	 * before the chrome has been fitted.
+	 *
+	 * AND A DIALOG IS NEITHER, which is why every one of these selectors names its root. `#modal_overlay`
+	 * is its own scrollport (`overflow: auto`, base/60-modal.css) and the bar does not overlap it, so a
+	 * table in a dialog sticks at 0 in every layout. Given the bar offset instead — which it would have
+	 * been, since the same change made a dialog a table root and its tables `.fs-dt` — the header row
+	 * would pin a whole bar height BELOW the dialog's top edge, with rows scrolling through the empty
+	 * band above it. The wireless scan dialog is exactly that shape. Reported in review.
+	 *
+	 * The ROOT is named inside `:where()`, which costs nothing: naming it plainly took the selector to
+	 * [1,9,0] against the sheet's [1,7,0] ceiling (tools/css-metrics.mjs), and the id is here to say
+	 * WHICH scrollport this offset belongs to, not to win anything. What has to win is the cell rule
+	 * itself, and at [0,6,0] it does. */
+	:where(:root[data-layout="sidebar"]:not([data-narrow]) #view, #modal_overlay)
+		.table.fs-dt:not(.fs-stacked) .tr.table-titles .th {
 		position: sticky; top: 0; z-index: 1;
 		background: var(--fs-panel2);
 	}
-	:root[data-layout="top"] .table.fs-dt:not(.fs-stacked) .tr.table-titles .th,
-	:root[data-narrow] .table.fs-dt:not(.fs-stacked) .tr.table-titles .th {
+	:where(:root[data-layout="top"] #view, :root[data-narrow] #view)
+		.table.fs-dt:not(.fs-stacked) .tr.table-titles .th {
 		position: sticky; top: var(--fs-bar-live, var(--fs-bar-h)); z-index: 1;
 		background: var(--fs-panel2);
 	}

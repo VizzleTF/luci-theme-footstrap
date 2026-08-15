@@ -575,11 +575,48 @@ function fitTables() {
  * not that page's — any app can put a select and a button in a `<div class="table">` — and the width
  * that matters is the room, not the viewport, so the page rule is gone and the measurement covers
  * every one of them. */
-const SCROLLABLE = () => inRoots('.table:not(.fs-dt):not(.cbi-section-table)', liveRoots());
+const scrollables = () => inRoots('.table:not(.fs-dt):not(.cbi-section-table)', liveRoots());
 const HOLDS_CONTROLS = '.cbi-dropdown, .cbi-dynlist, .cbi-tooltip-container, .cbi-progressbar, select, input, textarea, [data-tooltip]';
 
+/* ---- MAKING A SCROLL BOX REACHABLE, AND HANDING THE MARKUP BACK EXACTLY AS IT WAS FOUND ----
+ *
+ * Firefox has made scrollers focusable for years and Chrome since 132, but only when they hold no
+ * focusable child — a table row full of buttons disqualifies itself — and WebKit has not shipped it
+ * at all (bug 190870, open since 2018). So say it in the markup: a tab stop (SC 2.1.1), and a name so
+ * what receives focus can be announced (SC 4.1.2).
+ *
+ * A ROLE IS WRITTEN ONLY WHERE THERE IS NONE TO LOSE. `<div class="table">` has no implicit role and
+ * takes `group`. A real `<table>` must keep the role it already has: HTML-AAM maps `<td>` to `cell`
+ * and `<th>` to `columnheader`/`rowheader` ONLY while the table element's role is `table` (or
+ * `grid`/`treegrid`), so overwriting it with `group` drops every cell to generic — a screen reader
+ * would then read a flat run of text with no rows and no columns, which is the very structure the
+ * SC 1.4.10 exception exists to preserve. `aria-label` works on either, so the name and the tab stop
+ * are unaffected. Reported in review.
+ *
+ * WHAT IS REMOVED IS WHAT WAS WRITTEN, remembered per element rather than inferred from the value:
+ * an app that had its own `tabindex="0"` or `role="group"` on that table got them taken away when the
+ * table later fitted, because "is it 0 / is it group" cannot tell whose it is. */
+function reach(t) {
+	if (!t.hasAttribute('tabindex')) { t.tabIndex = 0; t._fsTab = true; }
+	if (!t.hasAttribute('role') && !(t instanceof HTMLTableElement)) {
+		t.setAttribute('role', 'group');
+		t._fsRole = true;
+	}
+	if (!t.hasAttribute('aria-label') && !t.hasAttribute('aria-labelledby')) {
+		const head = t.closest('.cbi-section, fieldset, #view')?.querySelector('h2, h3, h4, legend');
+		t.setAttribute('aria-label', (head && head.textContent.trim()) || _('Table'));
+		t._fsNamed = true;
+	}
+}
+
+function unreach(t) {
+	if (t._fsTab) { t.removeAttribute('tabindex'); delete t._fsTab; }
+	if (t._fsRole) { t.removeAttribute('role'); delete t._fsRole; }
+	if (t._fsNamed) { t.removeAttribute('aria-label'); delete t._fsNamed; }
+}
+
 function fitScrollables() {
-	document.querySelectorAll(SCROLLABLE()).forEach((t) => {
+	document.querySelectorAll(scrollables()).forEach((t) => {
 		const was = t.classList.contains('fs-xscroll');
 		const wasStack = t.classList.contains('fs-rowstack');
 		/* rule 1 again: a scrolling box always "fits" — its overflow is inside it — and so does a
@@ -595,11 +632,7 @@ function fitScrollables() {
 		/* a table of CONTROLS stacks; a table of VALUES scrolls and keeps its shape */
 		if (controls) {
 			t.classList.add('fs-rowstack');
-			if (was) {
-				if (t.tabIndex === 0) t.removeAttribute('tabindex');
-				if (t.getAttribute('role') === 'group') t.removeAttribute('role');
-				if (t._fsNamed) { t.removeAttribute('aria-label'); delete t._fsNamed; }
-			}
+			if (was) unreach(t);
 			return;
 		}
 		const scroll = over;
@@ -618,21 +651,9 @@ function fitScrollables() {
 			 * The name comes from the heading the table sits under, which is what a sighted user
 			 * reads it as; only the fallback is ours to translate. Never overwritten: an app that
 			 * labelled its own table knows better. */
-			if (!t.hasAttribute('tabindex')) t.tabIndex = 0;
-			if (!t.hasAttribute('role')) t.setAttribute('role', 'group');
-			if (!t.hasAttribute('aria-label') && !t.hasAttribute('aria-labelledby')) {
-				const head = t.closest('.cbi-section, fieldset, #view')?.querySelector('h2, h3, h4, legend');
-				const name = (head && head.textContent.trim()) || _('Table');
-				t.setAttribute('aria-label', name);
-				t._fsNamed = true;
-			}
+			reach(t);
 		}
-		else if (was) {
-			/* it fits again — hand the markup back exactly as it was found */
-			if (t.tabIndex === 0) t.removeAttribute('tabindex');
-			if (t.getAttribute('role') === 'group') t.removeAttribute('role');
-			if (t._fsNamed) { t.removeAttribute('aria-label'); delete t._fsNamed; }
-		}
+		else if (was) unreach(t);
 	});
 }
 

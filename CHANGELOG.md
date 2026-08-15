@@ -11,6 +11,14 @@ Style and format guide: [docs/releasing.md](docs/releasing.md).
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+
+- **A data table inside a dialog pins its header row to the dialog, not a bar-height below it.** The sticky header landed in 0.12.6 written for the page, and the same release made a dialog a table root — so a table in a dialog reached the rule for the first time and took the offset meant for the page's sticky bar. Inside a dialog that offset is wrong twice over: `#modal_overlay` is its own scrollport (`overflow: auto`), and the bar does not overlap it — so in the bar layouts, which is every phone, the header would have pinned a whole bar height below the dialog's top edge with rows scrolling through the empty band above it. The wireless scan dialog is exactly that shape. Every one of these rules now names its root: `#view` takes the measured bar height where the document scrolls and 0 in the vertical sidebar, `#modal_overlay` takes 0 always. Measured on the stand: top layout — page header sticks at 46px (the bar), dialog header at 0; sidebar layout — 0 and 0. Reported in review on the luci PR.
+
+- **A scrolling `<table>` keeps the role it was born with.** The scroll tier gives a table a tab stop and a name so a keyboard user can reach it, and it was also writing `role="group"` — which on a real `<table>` throws away the structure the tab stop exists to protect: HTML-AAM maps `<td>` to `cell` and `<th>` to `columnheader` only while the table element's role is `table`, so a screen reader would have read a flat run of text with no rows and no columns, the exact opposite of what WCAG's own two-dimensional-layout exception preserves. The role is now written only where there is none to lose — a `<div class="table">` — and the name and the tab stop, which work on either, are unchanged. In the same pass the teardown stopped guessing whose attributes it removes: it took `tabindex` away from anything reading `0` and `role` from anything reading `group`, so an app that had set its own lost them the moment its table fitted again. What was written is remembered per element and only that is removed. Verified on three shapes at two widths: a `<table>` keeps no role and loses its tab stop when it fits, a `<div class="table">` gets and loses `group`, and an app-owned table with its own `tabindex`/`role`/`aria-label` is untouched throughout.
+
 ## [0.12.6] — 2026-08-14
 
 ### Changed
