@@ -277,14 +277,19 @@ jobs:
       usign-key: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
     with:
       owfeed-version: v0.5.0
-      # Writes dist/install.sh and the notes into the runner's temp. The installer is an
-      # asset because raw.githubusercontent is rate-limited for the very user who most
-      # needs it (issue #17) and because a signed copy is the only one that can be checked
-      # before it runs as root; the notes fill the release page and are not an asset, since
-      # the package that used to fetch them is retired.
+      # Writes dist/install.sh and release-notes.md. The installer is an asset because
+      # raw.githubusercontent is rate-limited for the very user who most needs it (issue
+      # #17) and because a signed copy is the only one that can be checked before it runs
+      # as root; the notes fill the release page and are NOT an asset, since the package
+      # that used to fetch them is retired — hence a path beside dist/ rather than in it.
+      #
+      # A WORKSPACE PATH, not `${{ runner.temp }}`: at job level a reusable workflow's
+      # `with:` may only read github/needs/vars/inputs, and naming `runner` there is not an
+      # error at edit time — it fails the whole run at STARTUP, with zero jobs and no log
+      # to read (measured: run 31903926488, "failure" with an empty job list).
       pre-release: sh tools/stage-release.sh
       sign-also: install.sh
-      notes-file: ${{ runner.temp }}/notes.md
+      notes-file: release-notes.md
       verify-with: release.pub
 
   # Refresh the Pages mirror of the release metadata. Called rather than triggered:

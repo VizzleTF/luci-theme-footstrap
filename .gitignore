@@ -31,3 +31,6 @@ __pycache__/
 /docker/.env
 # built by docker/hwsim-up.sh for the WSL host kernel; not portable, not source
 /docker/hwsim/*.ko
+
+# written by tools/stage-release.sh in the release job — the release BODY, not an asset
+release-notes.md
