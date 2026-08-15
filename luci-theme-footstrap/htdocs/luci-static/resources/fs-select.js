@@ -591,7 +591,7 @@ const HOLDS_CONTROLS = '.cbi-dropdown, .cbi-dynlist, .cbi-tooltip-container, .cb
  * `grid`/`treegrid`), so overwriting it with `group` drops every cell to generic — a screen reader
  * would then read a flat run of text with no rows and no columns, which is the very structure the
  * SC 1.4.10 exception exists to preserve. `aria-label` works on either, so the name and the tab stop
- * are unaffected. Reported in review.
+ * are unaffected.
  *
  * WHAT IS REMOVED IS WHAT WAS WRITTEN, remembered per element rather than inferred from the value:
  * an app that had its own `tabindex="0"` or `role="group"` on that table got them taken away when the
@@ -639,18 +639,12 @@ function fitScrollables() {
 		if (scroll === was) { if (was) t.classList.add('fs-xscroll'); return; }
 		if (scroll) {
 			t.classList.add('fs-xscroll');
-			/* A SCROLL BOX THE KEYBOARD CANNOT REACH IS CONTENT THE KEYBOARD CANNOT READ.
+			/* A SCROLL BOX THE KEYBOARD CANNOT REACH IS CONTENT THE KEYBOARD CANNOT READ, and the
+			 * tab stop, the name and the conditional role that say so are all reach()'s business —
+			 * its header above carries the reasoning.
 			 *
-			 * Firefox has made scrollers focusable for years and Chrome since 132, but only when they
-			 * hold no focusable child — a table row full of buttons disqualifies itself — and WebKit
-			 * has not shipped it at all (bug 190870, open since 2018). So say it in the markup: a
-			 * tab stop (SC 2.1.1), a role and a name so what receives focus can be announced
-			 * (SC 4.1.2). `group`, not `region`: a region is a landmark, and a status page with four
-			 * scrolling tables would put four of them in the landmark list.
-			 *
-			 * The name comes from the heading the table sits under, which is what a sighted user
-			 * reads it as; only the fallback is ours to translate. Never overwritten: an app that
-			 * labelled its own table knows better. */
+			 * `group`, not `region`: a region is a landmark, and a status page with four scrolling
+			 * tables would put four of them in the landmark list. */
 			reach(t);
 		}
 		else if (was) unreach(t);

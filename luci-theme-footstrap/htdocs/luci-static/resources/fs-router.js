@@ -177,7 +177,22 @@ function flushUciCache() {
 	 * and the view would read the empty cache we just left it. Only when network.js is really in the
 	 * document — no module, no derived state to keep in step, and no request to spend. The ubus half
 	 * of `_state` stays as stale as upstream leaves it; a view that needs it fresh calls
-	 * network.flushCache() itself, and that is not ours to decide. */
+	 * network.flushCache() itself, and that is not ours to decide.
+	 *
+	 * WHAT IT COSTS, and why the cheaper shape was not taken. Awaiting this puts one uci `get` in
+	 * front of the render on a navigation whose module is already cached — measured on the stand over
+	 * 12 alternating navigations between two warm views: 136 ms median without the wait, 159 ms with
+	 * it. `uci.load()` also dispatches `uci-loaded`, which luci-base wires to the change indicator, so
+	 * a second, unawaited `uci.changes()` rides along that `unload()` alone never triggered.
+	 *
+	 * The free alternative is to leave these three OUT of the unload rather than drop and refetch
+	 * them, and it was rejected on what it does to the pages people edit: `network.flushCache()` — the
+	 * one call a view makes when it wants fresh data — reloads its ubus half but calls `uci.load()`
+	 * for the uci half, which is a no-op while the package is still cached. Interfaces and Wireless
+	 * would then render fresh device state over config values from whenever the document first
+	 * touched them, which a full load never does. Dropping and refilling keeps both halves as fresh as
+	 * a full load, and keeps pending local edits behaving as they do everywhere else: discarded by the
+	 * navigation, exactly like the poll queue and the view's intervals above. */
 	if (!window.L.network) return null;
 	const refill = [ 'network', 'wireless', 'luci' ].filter((p) => names.indexOf(p) !== -1);
 	if (!refill.length) return null;
