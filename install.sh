@@ -51,6 +51,55 @@ fetch() {	# <url> <outfile>
 	return 1
 }
 
+# --- what is on the router, and whether anything newer exists ---------------------------------
+#
+# SAY THE VERSION. This script used to end with "Installed from the … feed" whatever happened, and
+# that sentence was equally true of a router that had just kept the version it already had —
+# `apk add` does not upgrade (see the note beside it), so a stale install and a fresh one printed
+# the same line. The number is the one thing that tells them apart, and the only other place a user
+# can read it is the Footstrap tab in LuCI.
+installed_version() {
+	if [ "$PM" = "apk" ]; then
+		apk list -I 2>/dev/null | sed -n "s/^$PKG-\([0-9][^ ]*\) .*/\1/p" | head -1
+	else
+		opkg list-installed 2>/dev/null | sed -n "s/^$PKG - \(.*\)$/\1/p" | head -1
+	fi
+}
+
+# …AND WHETHER THE FEED HAS CAUGHT UP. A release lands on GitHub first and reaches owfeed-packages
+# afterwards, through a pull request against that repository — usually minutes, sometimes a day. In
+# between, a user who installs gets the previous version and has nothing to tell them why: the
+# release page says one number, their router says another, and the install they just ran was
+# correct. So compare and say it in one line, rather than leaving them to wonder whether it failed.
+#
+# `releases/latest/download/manifest.txt`, NOT api.github.com: the API is rate-limited to 60 an hour
+# per address (issue #17) and needs JSON parsing on a box that may have no jsonfilter, while this URL
+# is a plain redirect to the newest tag's asset and is already the file this script picks a package
+# from. Read here for a MESSAGE only — nothing is installed from it and no decision depends on it,
+# so an unreachable GitHub is silence rather than a failure, and no signature is claimed for it.
+feed_lag_note() {	# <installed version>
+	[ -n "$1" ] || return 0
+	_vtmp="/tmp/fs-ver.$$"
+	mkdir -p "$_vtmp" || return 0
+	if fetch "$RELEASE_BASE/manifest.txt" "$_vtmp/manifest.txt"; then
+		# `<pkg>-<version>.apk` but `<pkg>_<version>_<arch>.ipk`, so the trailing `_<arch>` comes off
+		# after the extension does — without it the ipk leg reported "0.13.0-r1_all is out", which is
+		# not a version and never compares equal to what the router has.
+		_rel=$(awk -v p="$PKG" -v f="$PM_FMT" '$1=="pkg" && $2==p && $3==f { print $4 }' "$_vtmp/manifest.txt" \
+			| sed -n "s/^$PKG[-_]\(.*\)\.$PM_FMT$/\1/p" | sed "s/_[a-z0-9]*$//")
+		# Newest-wins with the tools a router has: `sort -V` where busybox provides it. Being
+		# unable to compare is a reason to say NOTHING — never to claim the router is behind.
+		if [ -n "$_rel" ] && [ "$_rel" != "$1" ] &&
+		   [ "$(printf '%s\n%s\n' "$1" "$_rel" | sort -V 2>/dev/null | tail -1)" = "$_rel" ]; then
+			printf '\n'
+			info "Release $_rel is out; this router has $1."
+			info "The feed follows a release through a pull request against owfeed-packages, so it"
+			info "usually catches up within a day — \`$PM upgrade\` will pick it up then."
+		fi
+	fi
+	rm -rf "$_vtmp" 2>/dev/null || true
+}
+
 # --- the release, for a router the feed cannot serve ------------------------------------------
 #
 # THE FEED IS STILL THE INSTALL PATH. It is what makes `apk upgrade` / `opkg upgrade` carry the
@@ -232,6 +281,8 @@ if [ -z "$BRANCH" ]; then
 	rm -rf /tmp/luci-modulecache 2>/dev/null || true
 	if [ -x /etc/init.d/rpcd ]; then /etc/init.d/rpcd reload >/dev/null 2>&1 || true; fi
 	printf '\n'
+	_have=$(installed_version)
+	[ -n "$_have" ] && ok "Installed: $PKG $_have"
 	ok "Installed from the release. Re-run this script to update, or fix the feed and run it again"
 	ok "to switch to \`$PM upgrade\`."
 	info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
@@ -329,7 +380,13 @@ rm -rf /tmp/luci-modulecache 2>/dev/null || true
 if [ -x /etc/init.d/rpcd ]; then /etc/init.d/rpcd reload >/dev/null 2>&1 || true; fi
 
 printf '\n'
-ok "Installed from the $FEED_NAME feed — \`$PM upgrade\` will keep it current."
+_have=$(installed_version)
+if [ -n "$_have" ]; then
+	ok "Installed: $PKG $_have — from the $FEED_NAME feed, \`$PM upgrade\` will keep it current."
+else
+	ok "Installed from the $FEED_NAME feed — \`$PM upgrade\` will keep it current."
+fi
 info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
 info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
 info "of System -> System. Then hard-reload the page (Ctrl+F5)."
+feed_lag_note "$_have"
