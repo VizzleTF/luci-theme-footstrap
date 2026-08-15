@@ -51,6 +51,24 @@ fetch() {	# <url> <outfile>
 	return 1
 }
 
+# THE PACKAGE MANAGER'S CHATTER IS NOT THE USER'S BUSINESS — until it fails.
+#
+# `apk update` prints every repository the router has (nine lines on an ordinary box, none of them
+# ours), and `apk add` prints its progress and its OK line. Running this from `wget | sh` is a
+# one-command gesture, and burying the one sentence that matters — which version ended up on the
+# router — under a dump of somebody else's feed URLs is the opposite of what the gesture is for.
+#
+# So: capture, and speak only on failure, where the same output is the ONLY diagnosis available.
+# Never `>/dev/null`: a silent failure here is a router left half-installed with a green message.
+pm_quiet() {	# <command...>
+	_pmlog="/tmp/fs-install-pm.$$"
+	if "$@" >"$_pmlog" 2>&1; then rm -f "$_pmlog"; return 0; fi
+	err "\`$*\` failed:"
+	tail -15 "$_pmlog" | sed 's/^/    /' >&2
+	rm -f "$_pmlog"
+	return 1
+}
+
 # --- what is on the router, and whether anything newer exists ---------------------------------
 #
 # SAY THE VERSION. This script used to end with "Installed from the … feed" whatever happened, and
@@ -156,10 +174,11 @@ install_from_release() {
 		rm -rf "$_tmp"; return 1
 	fi
 	ok "Signature and digest verified."
+	info "Installing $_file..."
 	if [ "$PM" = apk ]; then
-		apk add --allow-untrusted "$_tmp/$_file"
+		pm_quiet apk add --allow-untrusted "$_tmp/$_file" || { rm -rf "$_tmp"; return 1; }
 	else
-		opkg install "$_tmp/$_file"
+		pm_quiet opkg install "$_tmp/$_file" || { rm -rf "$_tmp"; return 1; }
 	fi
 	rm -rf "$_tmp"
 	return 0
@@ -178,6 +197,11 @@ if command -v apk >/dev/null 2>&1; then PM=apk; PM_FMT=apk; INDEX=packages.adb
 elif command -v opkg >/dev/null 2>&1; then PM=opkg; PM_FMT=ipk; INDEX=Packages.gz
 else err "Neither apk nor opkg found."; exit 1; fi
 ok "Package manager: $PM"
+
+# What is on the router BEFORE anything is installed — the closing line reads "installed",
+# "upgraded" or "already current" off the difference, which is the distinction a user was left to
+# make by hand while the manager's own output scrolled past.
+_before=$(installed_version)
 
 # Read before the branch rather than beside the feed entry, because a router that names
 # no branch picks one by asking the feed which branch carries this architecture.
@@ -282,7 +306,11 @@ if [ -z "$BRANCH" ]; then
 	if [ -x /etc/init.d/rpcd ]; then /etc/init.d/rpcd reload >/dev/null 2>&1 || true; fi
 	printf '\n'
 	_have=$(installed_version)
-	[ -n "$_have" ] && ok "Installed: $PKG $_have"
+	if [ -n "$_have" ] && [ -n "$_before" ] && [ "$_before" != "$_have" ]; then
+		ok "Upgraded $PKG $_before -> $_have"
+	elif [ -n "$_have" ]; then
+		ok "Installed $PKG $_have"
+	fi
 	ok "Installed from the release. Re-run this script to update, or fix the feed and run it again"
 	ok "to switch to \`$PM upgrade\`."
 	info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
@@ -331,7 +359,8 @@ if [ "$PM" = apk ]; then
 	mkdir -p /etc/apk/keys /lib/upgrade/keep.d
 	fetch "$FEED_HOST/owfeed-packages.pem" /etc/apk/keys/owfeed-packages.pem
 	printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
-	apk update
+	info "Updating the package index..."
+	pm_quiet apk update || exit 1
 	# `apk add` ALONE DOES NOT UPGRADE, and the comment that used to sit here said it did. apk 3
 	# reads `add` as "make sure this is present": a package already in `world` and already satisfied
 	# stays at the version it is at, the command prints its usual OK line and exits 0. Reproduced on
@@ -342,7 +371,8 @@ if [ "$PM" = apk ]; then
 	# `--upgrade` (`-u`) is what asks for the newest the feed carries; it installs on a router that
 	# does not have the theme yet, so this one line covers both paths, exactly as the opkg leg below
 	# already did with its explicit `opkg upgrade`.
-	apk add --upgrade "$PKG"
+	info "Installing $PKG..."
+	pm_quiet apk add --upgrade "$PKG" || exit 1
 else
 	if ! grep -q "$FEED_NAME" /etc/opkg/customfeeds.conf 2>/dev/null; then
 		info "Adding the $FEED_NAME feed..."
@@ -361,14 +391,16 @@ else
 	mkdir -p /etc/opkg/keys /lib/upgrade/keep.d
 	fetch "$FEED_HOST/$FEED_KEY_OPKG" "/etc/opkg/keys/$FEED_KEY_OPKG"
 	printf '%s\n' "/etc/opkg/keys/$FEED_KEY_OPKG" > /lib/upgrade/keep.d/owfeed-packages
-	opkg update
+	info "Updating the package index..."
+	pm_quiet opkg update || exit 1
 	# `opkg install` on an installed package is a no-op even when the feed has a newer
 	# version — it reports "already installed" and exits 0 — so a second run has to ask
 	# for the upgrade explicitly. Up to date is not an error for `opkg upgrade`.
+	info "Installing $PKG..."
 	if opkg list-installed | grep -q "^$PKG "; then
-		opkg upgrade "$PKG"
+		pm_quiet opkg upgrade "$PKG" || exit 1
 	else
-		opkg install "$PKG"
+		pm_quiet opkg install "$PKG" || exit 1
 	fi
 fi
 
@@ -381,10 +413,14 @@ if [ -x /etc/init.d/rpcd ]; then /etc/init.d/rpcd reload >/dev/null 2>&1 || true
 
 printf '\n'
 _have=$(installed_version)
-if [ -n "$_have" ]; then
-	ok "Installed: $PKG $_have — from the $FEED_NAME feed, \`$PM upgrade\` will keep it current."
-else
+if [ -z "$_have" ]; then
 	ok "Installed from the $FEED_NAME feed — \`$PM upgrade\` will keep it current."
+elif [ -z "$_before" ]; then
+	ok "Installed $PKG $_have — from the $FEED_NAME feed, \`$PM upgrade\` will keep it current."
+elif [ "$_before" != "$_have" ]; then
+	ok "Upgraded $PKG $_before -> $_have — \`$PM upgrade\` will keep it current."
+else
+	ok "Already current: $PKG $_have — the feed carries nothing newer."
 fi
 info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
 info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
