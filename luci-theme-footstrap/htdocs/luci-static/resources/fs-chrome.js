@@ -4,6 +4,7 @@
 'require fs-fit as fit';
 'require fs-prefs as prefs';
 'require fs-menutree as tree';
+'require fs-version as version';
 
 /* The chrome AROUND the content: the mode menu, the section tabs, the rail toggle, and the
  * measurements that decide how much room any of it gets. The MAIN menu is not here — it is injected
@@ -277,6 +278,40 @@ function publishBarHeight(bar) {
 	root.style.setProperty('--fs-bar-live', `${h}px`);
 }
 
+/* ---- the theme names itself in the footer, beside LuCI and the distribution ----
+ *
+ * The footer's sentence is about what renders this page: LuCI's version, the distribution's, and —
+ * since the markup is the theme's — the theme's. Each of the other two is a link to where that
+ * software lives, so this one is too.
+ *
+ * WRITTEN FROM THE CLIENT, and that is the only reason it is here rather than in footer.ut: the
+ * version is stamped into fs-version.js by file name — the Makefile, tools/stage.sh and dev-sync.sh
+ * all sed that one literal — so a second copy in a template would be a second stamp site to keep in
+ * step, and a footer that quietly disagrees with the Appearance tab is worse than no version at all.
+ * The label is the one fs-version already prints there, dev builds included.
+ *
+ * Once per document: the footer survives a client navigation (navigate() sweeps the children of
+ * .fs-content, and the footer is its sibling), and the guard makes a second call a no-op rather
+ * than a second copy. No request, no translated string: a proper noun and a number. */
+function nameThemeInFooter() {
+	const host = document.querySelector('footer.fs-footer span');
+	if (!host || host.querySelector('.fs-footer-self')) return;
+	const self = E('a', {
+		class: 'fs-footer-self',
+		href: version.REPO_URL,
+		target: '_blank',
+		rel: 'noreferrer',
+	}, version.label());
+	/* AFTER THE DISTRIBUTION, not at the end. The sentence lists the software that renders the page
+	 * — LuCI, the distribution, the theme — and footer.ut appends one more fragment after them that
+	 * is not a component but a state: "Lua compatibility mode active". Landing behind it read as if
+	 * the theme were part of that notice. Two links means the second is the distribution's; with
+	 * anything else there, appending is still correct. */
+	const links = host.querySelectorAll('a');
+	if (links.length >= 2) links[1].after(document.createTextNode(' / '), self);
+	else host.append(document.createTextNode(' / '), self);
+}
+
 /* ---- does the right-hand cluster still fit beside the brand? ----
  *
  * The same question as the menu's, one row up, and it cannot be asked the same way. The cluster is
@@ -459,6 +494,7 @@ function wireIndicatorCounts() {
 return baseclass.extend({
 	setRenderMain,
 	renderChrome,
+	nameThemeInFooter,
 	wireIndicatorCounts,
 	/* registered with fs-fit by the theme's init(): the bar's "does the menu fit beside the brand"
 	 * measurement rides the same engine as the data tables' */

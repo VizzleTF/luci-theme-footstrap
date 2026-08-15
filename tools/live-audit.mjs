@@ -117,9 +117,18 @@ const CHECK = function () {
 		if (inner > 1) out.push({ kind: 'clipped', el: label(el), by: inner });
 	}
 
-	/* 4. hit targets, SC 2.5.8 with the spacing exception */
-	const targets = [ ...document.querySelectorAll('button, a[href], .cbi-button, input[type="checkbox"], input[type="radio"], select, [role="button"]') ]
-		.filter(vis).map((el) => ({ el, r: el.getBoundingClientRect() }));
+	/* 4. hit targets, SC 2.5.8 with the spacing exception.
+	 *
+	 * PER LINE BOX, not per element: an inline link that wraps has one rect per line and
+	 * getBoundingClientRect() returns their UNION, whose centre lies on neither of them — in the
+	 * footer, where three links share three wrapped lines, that phantom centre sat 15px from a real
+	 * one and the gate reported a violation that no pointer can reach. getClientRects() is what the
+	 * criterion is about anyway: the target is the area a finger can land on. */
+	const targets = [];
+	for (const el of document.querySelectorAll('button, a[href], .cbi-button, input[type="checkbox"], input[type="radio"], select, [role="button"]')) {
+		if (!vis(el)) continue;
+		for (const r of el.getClientRects()) targets.push({ el, r });
+	}
 	const centre = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
 	for (const t of targets) {
 		if (t.r.width >= 23.5 && t.r.height >= 23.5) continue;
