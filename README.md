@@ -23,11 +23,20 @@ A LuCI theme for OpenWrt 24.10 and newer. No framework, `luci-base` is the only 
 ## Install
 
 ```sh
-wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
 ```
 
 The script adds its own package feed and installs from it. After that the theme upgrades with the
-router: `apk update && apk upgrade` (or `opkg`).
+router: `apk update && apk upgrade` (or `opkg`). Running it again upgrades the theme and prints what
+it did — installed, upgraded from which version, or already current.
+
+`raw.githubusercontent.com` is rate-limited per address, so if it answers 429 (a shared exit, CGNAT),
+the same script is attached to every release and served from a CDN with no such budget — signed, so
+it can be checked before it is run:
+
+```sh
+wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
+```
 
 Then pick **Footstrap** in **System → System → Language and Style**, field "Design".
 

@@ -23,11 +23,20 @@
 ## Установка
 
 ```sh
-wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
 ```
 
 Скрипт добавляет свой фид пакетов и ставит тему из него. Дальше тема обновляется вместе с роутером:
-`apk update && apk upgrade` (или `opkg`).
+`apk update && apk upgrade` (или `opkg`). Повторный запуск обновляет тему и печатает, что именно
+сделал — поставил, обновил с какой версии или всё уже актуально.
+
+`raw.githubusercontent.com` лимитируется по адресу, поэтому если он ответил 429 (общий выход, CGNAT),
+тот же скрипт приложен к каждому релизу и раздаётся с CDN без такого лимита — с подписью, так что его
+можно проверить до запуска:
+
+```sh
+wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
+```
 
 После этого выберите **Footstrap** в **System → System → Language and Style**, поле «Design».
 

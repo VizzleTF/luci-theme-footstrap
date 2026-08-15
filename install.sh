@@ -1,6 +1,13 @@
 #!/bin/sh
 # luci-theme-footstrap installer for OpenWrt 24.10 (opkg) and 25.12+ (apk).
 #
+#   wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
+#
+# The same script is attached to every release and served from the release CDN, which has no
+# per-address budget — the address raw.githubusercontent.com rate-limits is the one a user behind
+# CGNAT shares with everyone else (issue #17). That copy is signed, so it can be verified before it
+# is run as root:
+#
 #   wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 #
 # It adds the owfeed-packages feed and installs the theme from it, so `apk upgrade` /
