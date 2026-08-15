@@ -28,6 +28,15 @@
  *   console        an uncaught error or a console.error while the page rendered. A view that throws
  *                  paints half of itself and says nothing.
  *
+ * THE BASELINE IS A UNION ACROSS PLATFORMS, not a photograph of one machine. Text metrics differ
+ * between a maintainer's containers and CI's ubuntu runner, and a few findings sit within a pixel or
+ * two of their threshold: the same link is 16px tall in one place and 15 in the other (SC 2.5.8 is a
+ * hard 24), the same tooltip clears the column by 1px here and misses by 2px there. Six signatures
+ * appeared on the runner that had never appeared locally. The magnitude is not part of a signature,
+ * so only these threshold-straddling cases can differ at all — and the honest answer is to hold every
+ * KNOWN finding in one file rather than one file per machine, which would double the maintenance and
+ * leave each half unverifiable from the other.
+ *
  * A BASELINE, NOT A CLEAN SHEET. Some findings belong to the app, not the theme (a third-party page
  * that writes its own 1200px table), and a gate that fails on them is a gate that gets disabled. So
  * every finding is signed `path|width|kind|element` and the known set lives in
