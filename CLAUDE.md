@@ -145,7 +145,7 @@ compile.
   not in OpenWrt's default set — fall back to `uclient-fetch` instead of adding a dep.
 - **The catalogue lives in `po/`** — what `LUCI_LANGUAGES` globs and what Weblate translates.
   luci.mk emits the per-language packages; nothing in `Build/Prepare` compiles a catalogue. It was
-  `i18n/` while a fielded self-updater mis-picked a multi-asset release with `head -1` (issue #6);
+  `i18n/` while a fielded self-update script mis-picked a multi-asset release with `head -1` (#6);
   owfeed now builds exactly one theme artifact per format regardless, which `tools/check-packages.sh`
   still asserts in CI's build job.
 - Anything under `root/etc/config/` MUST be in the `conffiles` define (`npm run conffiles`) — else

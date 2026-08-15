@@ -47,10 +47,9 @@ const SEARCH = [
 	'luci-theme-footstrap/root',
 	'luci-theme-footstrap/htdocs/luci-static/resources',
 	'luci-theme-footstrap/Makefile',
-	/* install.sh is still searched, and today holds no pin at all: its gh/* fetch helpers were
-	 * pinned against footstrap-selfupdate.sh, which moved to the updater's own repo
-	 * (VizzleTF/luci-app-footstrap-updater) where the two are pinned against each other. Left in
-	 * SEARCH so a pin added there is picked up, rather than removed and forgotten. */
+	/* install.sh is still searched and today holds no pin at all — the shell helpers it once mirrored
+	 * belonged to a self-update package that is retired and archived. Left in SEARCH so a pin added
+	 * here later is picked up, rather than removed and forgotten. */
 	'install.sh',
 ];
 const EXT = /\.(css|js|sh|ut)$|(^|\/)(Makefile|30_luci-theme-footstrap)$/;

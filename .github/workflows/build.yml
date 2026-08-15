@@ -277,14 +277,14 @@ jobs:
       usign-key: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
     with:
       owfeed-version: v0.5.0
-      # Writes dist/notes.md and dist/install.sh. Both are assets as well as
-      # documentation: the theme's confirm dialog reads the notes from the release
-      # rather than from the API, and the installer is served from the release CDN
-      # because raw.githubusercontent is rate-limited for the very user who most
-      # needs it (issue #17).
+      # Writes dist/install.sh and the notes into the runner's temp. The installer is an
+      # asset because raw.githubusercontent is rate-limited for the very user who most
+      # needs it (issue #17) and because a signed copy is the only one that can be checked
+      # before it runs as root; the notes fill the release page and are not an asset, since
+      # the package that used to fetch them is retired.
       pre-release: sh tools/stage-release.sh
       sign-also: install.sh
-      notes-file: dist/notes.md
+      notes-file: ${{ runner.temp }}/notes.md
       verify-with: release.pub
 
   # Refresh the Pages mirror of the release metadata. Called rather than triggered:

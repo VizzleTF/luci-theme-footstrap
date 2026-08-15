@@ -143,15 +143,11 @@ fs-select             (no requirer — the footer loads it directly)
 
 The graph is acyclic and the runtime enforces it: `require()` throws `DependencyError` on a cycle.
 
-**There is no update checker, and no longer one to load.** A separate `luci-app-footstrap-updater`
-used to be resolved at runtime, deferred to idle, because a theme module may not require a package
-that might not be installed. It is retired: the installer adds the owfeed-packages feed, so
-`apk upgrade` / `opkg upgrade` carries the theme forward, and a settings page has no business
-reaching GitHub to reimplement that. `fs-version.js` reports the installed version with no request.
-
-The server-side glob that told the client whether the updater was on disk (`window.__fsUpd`) went
-with it, and nothing globs for an optional file any more: the wallpaper pattern is an upload, so the
-server hands the client its cache-bust token like any other saved value.
+**There is no update checker, and nothing that loads one.** The installer adds the owfeed-packages
+feed, so `apk upgrade` / `opkg upgrade` carries the theme forward, and a settings page has no
+business reaching GitHub to reimplement that. `fs-version.js` reports the installed version with no
+request at all. Nothing globs for an optional file at render time either: the wallpaper pattern is an
+upload, so the server hands the client its cache-bust token like any other saved value.
 
 Renderer and shell in detail: [chrome.md](chrome.md).
 

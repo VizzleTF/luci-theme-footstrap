@@ -40,7 +40,7 @@ feed:
 # only the container: opkg calls an architecture-independent package `all` where apk
 # requires `noarch` and rejects `all`. owfeed emits each under the name its manager
 # understands, which is what keeps `luci-theme-footstrap_<v>_all.ipk` byte-for-byte the
-# asset name a self-updater already in the field matches on.
+# asset name a self-update script already in the field matches on.
 releases:
   - line: "25.12"
     default: true
@@ -87,7 +87,7 @@ packages:
 
     description: "A modern, fast LuCI theme."
     # +luci-base is the WHOLE list, and it is the Makefile's LUCI_DEPENDS verbatim. The
-    # self-updater must not pull curl onto an 8 MB device for one fetch — it falls back to
+    # self-update script must not pull curl onto an 8 MB device for one fetch — it falls back to
     # uclient-fetch, which the base image already has.
     depends: [luci-base]
     # Apache-2.0 alone, exactly as the Makefile's PKG_LICENSE says. The OFL-1.1 half went with
@@ -120,7 +120,7 @@ packages:
       post-deinstall: ./dist/scripts/post-deinstall
 
     # The catalogues ship INSIDE this package, not as luci-i18n-footstrap-<lang>: several
-    # assets in one release is what made the fielded self-updater install the 6 KB catalogue
+    # assets in one release is what made the fielded self-update script install the 6 KB catalogue
     # instead of the theme (issue #6), and two packages drift — an _() the older one lacks
     # renders in English and reports nothing.
     #

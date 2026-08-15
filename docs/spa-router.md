@@ -274,7 +274,7 @@ Before rendering the new view:
 - Running the registered navigation callbacks — **and the router names none of them**. The seam is
   inverted: `fs-router.js` exports `onNavigate(fn)` and a module registers itself, so an optional
   module that is not installed is not a `DependencyError` that takes out the chrome. The search
-  palette uses it today (recent pages, close on navigate); it was written for the retired updater's
+  palette uses it today (recent pages, close on navigate); it was written for the retired self-update
   poll cancel.
 - `ui.hideModal()`.
 

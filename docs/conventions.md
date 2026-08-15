@@ -221,7 +221,8 @@ package needs.
 **One asset per package per format in a release.** Nothing on a router picks an asset any more —
 the installer takes the feed — but a reader that does gets one candidate, not a guess: GitHub
 returns assets **sorted by name**, and in v0.8.4 a `luci-i18n-…` package sorted ahead of
-`luci-theme-…`, so the then-shipped self-updater installed a 6 KB catalogue instead of the theme,
+`luci-theme-…`, so the self-update script shipped at the time installed a 6 KB catalogue instead of
+the theme,
 reported success, and offered the same update forever (issue #6). Code already on somebody's router
 cannot be fixed remotely; only the release can. CI fails unless each package resolves to exactly
 one asset under its name-anchored regex.
@@ -229,8 +230,8 @@ one asset under its name-anchored regex.
 **The translation catalogue lives in `po/`.** That is the directory `LUCI_LANGUAGES` globs, so
 luci.mk bakes a `luci-i18n-footstrap-<lang>` package per language exactly as it does for every
 luci-app — and it is the only directory Weblate, which CONTRIBUTING names as the way to translate
-LuCI, can see. It was `i18n/` while a fielded self-updater resolved the theme by name and took
-`head -1` (issue #6); that updater is retired and owfeed builds the release as one artifact per
+LuCI, can see. It was `i18n/` while a fielded self-update script resolved the theme by name and took
+`head -1` (issue #6); that script is retired and owfeed builds the release as one artifact per
 format regardless, so the rename no longer bought anything.
 
 **No runtime dependency beyond `+luci-base`.** `curl` is not in OpenWrt's default set (the base

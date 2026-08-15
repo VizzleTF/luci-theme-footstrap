@@ -22,7 +22,7 @@ endif
 
 LUCI_TITLE:=Footstrap Theme
 # +luci-base is the WHOLE list, and keeping it that way is the constraint. Nothing this package
-# ships fetches anything at run time any more (the self-updater is retired), so there is no second
+# ships fetches anything at run time (the self-update script is retired), so there is no second
 # name to justify — and the rule that got it here stands: the one convenience tool that ever wanted
 # a dep was `curl`, which is NOT in OpenWrt's default set, on an 8 MB device, for one API call. Fall
 # back to what the base image has (uclient-fetch, jsonfilter, sha256sum) or do without.
@@ -168,8 +168,8 @@ endef
 # what Weblate can see (it translates `po/`, and only `po/`).
 #
 # It was `i18n/` here for a while, with a po2lmo loop in this hook bundling the catalogue into the
-# theme package, because a multi-package release was mis-picked by a self-updater that resolved the
-# theme by name and took `head -1` (issue #6). That updater is retired and the release is built by
+# theme package, because a multi-package release was mis-picked by a self-update script that resolved
+# the theme by name and took `head -1` (issue #6). That script is retired and the release is built by
 # owfeed, which packages this theme as exactly one artifact per format regardless of what luci.mk
 # would do — so the constraint that bought the rename is gone, and the cost of keeping it (a
 # catalogue invisible to the project's own translation platform) is not.

@@ -134,7 +134,7 @@ feed_lag_note() {	# <installed version>
 # which is a worse version of what the script is for.
 #
 # PICKED FROM THE SIGNED MANIFEST, never by guessing an asset's name. That distinction is issue
-# #6: the retired self-updater resolved the theme by name and took `head -1`, which on a release
+# #6: the retired self-update script resolved the theme by name and took `head -1`, which on a release
 # carrying per-language packages installed a catalogue instead of the theme. `manifest.txt` names
 # exactly one file per format with its size and digest, and it is signed — so the name comes from
 # the same statement the signature covers.

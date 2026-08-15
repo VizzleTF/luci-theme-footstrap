@@ -67,7 +67,7 @@ jobs:
           # move: once out of htdocs, once into the svg/ subdirectory. `set -e` plus a glob that
           # matches nothing is a failed build, which is the loud outcome and the right one.
           cp wallpapers/svg/*.svg _site/
-      # A FULL MIRROR OF THE LATEST RELEASE — the manifest, its signature, the notes AND THE
+      # A FULL MIRROR OF THE LATEST RELEASE — the manifest, its signature AND THE
       # PACKAGES. A different host from github.com, so a block or an outage covering one need not
       # cover the other.
       #
@@ -95,8 +95,6 @@ jobs:
           fi
           curl -fsSL --retry 2 -o _site/manifest.txt.sig \
             "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/manifest.txt.sig"
-          curl -fsSL --retry 2 -o _site/notes.md \
-            "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/notes.md" || rm -f _site/notes.md
           # THE INSTALLER TOO, and it is not an afterthought: a router that cannot reach github.com
           # cannot fetch install.sh from there either, so a mirror without it leaves the user with a
           # verified way to install and no way to obtain the thing that does the installing. Its

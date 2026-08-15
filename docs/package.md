@@ -123,13 +123,13 @@ which `CONTRIBUTING.md` names as *the* way to translate LuCI. Nothing in this pa
 `Build/Prepare` touches the catalogue.
 
 It was `i18n/` from v0.8.5 to v0.12.x, which is what stopped the language packages being
-generated. The reason was issue #6: the self-updater people had installed **at the time** picked
+generated. The reason was issue #6: the self-update script people had installed **at the time** picked
 its asset with `grep -E '\.apk$' | head -1`, GitHub returns assets **sorted by name**, and
 `luci-i18n-…` sorts before `luci-theme-…` — so the Update button installed a 6 KB catalogue
 instead of the theme, reported success, and offered the same update forever. A script already on
 somebody's router cannot be fixed remotely, so the *release* was fixed instead.
 
-That updater is retired, and the release is built by owfeed, which packages this theme as exactly
+That script is retired, and the release is built by owfeed, which packages this theme as exactly
 one artifact per format whatever luci.mk would have done. The constraint that bought the rename is
 gone; the cost of keeping it — a catalogue the project's own translation platform cannot see — is
 not. `tools/check-packages.sh` still asserts one theme package per format.

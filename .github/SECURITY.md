@@ -1,14 +1,13 @@
 # Security Policy
 
-`luci-theme-footstrap` is a theme for LuCI, the web interface of OpenWrt. Because it runs
-in the browser tab that administers a router, and the optional
-`luci-app-footstrap-updater` package downloads and installs releases on the device, this
-project treats security reports seriously.
+`luci-theme-footstrap` is a theme for LuCI, the web interface of OpenWrt. It runs in the
+browser tab that administers a router, and it is installed on the device from a signed
+package feed, so this project treats security reports seriously.
 
 ## Supported versions
 
 Only the latest published release receives security fixes. The project ships as a rolling
-line of `0.9.x` releases; there are no long-term or maintenance branches. If you are
+line of `0.x` releases; there are no long-term or maintenance branches. If you are
 running an older version, upgrade to the current release before reporting an issue, since
 it may already be fixed.
 
@@ -40,7 +39,7 @@ A useful report has:
 
 - The affected version (or commit) and the OpenWrt / LuCI version it runs on.
 - A description of the issue and the security impact (e.g. stored/reflected XSS,
-  privilege escalation, tampering with the update channel).
+  privilege escalation, tampering with the install or feed channel).
 - Steps to reproduce, ideally with a minimal proof of concept.
 - Any relevant configuration, logs, or screenshots.
 
@@ -48,8 +47,8 @@ A useful report has:
 
 - The theme assets served to the browser (JavaScript, CSS, `ucode` templates) in
   `luci-theme-footstrap/`.
-- The optional updater package in `luci-app-footstrap-updater/`, especially how it
-  resolves, downloads, and installs releases.
+- `install.sh` — how it resolves, verifies and installs the feed and the release, since it
+  runs as root from a piped shell.
 
 Vulnerabilities in OpenWrt, LuCI itself, `rpcd`, `uhttpd`, or third-party `luci-app`
 packages are out of scope here — report those to their respective projects.
