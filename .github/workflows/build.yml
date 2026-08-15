@@ -234,8 +234,11 @@ jobs:
       - name: Boot the routers and install this build
         run: |
           set -eu
-          if [ "${{ github.event_name }}" = "pull_request" ]; then echo "ROUTERS=owrt2512" >> "$GITHUB_ENV"; else echo "ROUTERS=owrt2512 owrt2410" >> "$GITHUB_ENV"; fi
-          . "$GITHUB_ENV"
+          # NOT `. "$GITHUB_ENV"` — that file is a KEY=VALUE list, not a script, so a value with a
+          # space in it ("owrt2512 owrt2410") runs its second word as a command. Set the variable
+          # here and publish it for the later steps.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410"; fi
+          echo "ROUTERS=$ROUTERS" >> "$GITHUB_ENV"
           owlab up $ROUTERS
           for r in $ROUTERS; do
             case "$r" in
