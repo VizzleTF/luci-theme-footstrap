@@ -320,6 +320,7 @@ if [ -z "$BRANCH" ]; then
 	fi
 	ok "Installed from the release. Re-run this script to update, or fix the feed and run it again"
 	ok "to switch to \`$PM upgrade\`."
+	printf '\n'			# the same break between the outcome and the next steps as the feed path
 	info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
 	info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
 	info "of System -> System. Then hard-reload the page (Ctrl+F5)."
@@ -429,6 +430,10 @@ elif [ "$_before" != "$_have" ]; then
 else
 	ok "Already current: $PKG $_have — the feed carries nothing newer."
 fi
+# A blank line between WHAT HAPPENED and WHAT TO DO NEXT: the outcome is the one line a user
+# came for, and with the next-steps block butted straight against it the two read as one
+# paragraph.
+printf '\n'
 info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
 info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
 info "of System -> System. Then hard-reload the page (Ctrl+F5)."
