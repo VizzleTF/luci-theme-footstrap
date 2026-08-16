@@ -16,11 +16,22 @@
 #     `{% … %}` code block, so a `{#` that survives in this tree is a comment BY DEFINITION; if one
 #     ever sat inside a <script> string the template would already be broken. Verified before
 #     writing this: 0 of them appear inside a code block, and every opener has exactly one closer.
-#   * `/* … */` inside `{% … %}` — a ucode CODE comment, 6844 bytes more. NOT touched. Stripping it
-#     needs a lexer that knows ucode strings, and 17 of the `/*` in this tree sit OUTSIDE any code
-#     block (they are CSS/JS comments in inline <style>/<script>). That is exactly the shape that
-#     made the old `sed 's/;}/}/g'` in build-css.sh eat a data-URI: a scanner that cannot see
-#     strings. Not worth 6.8 KB.
+#   * `/* … */` STANDING ON ITS OWN LINES — a code comment, wherever it sits: ucode inside
+#     `{% … %}`, JavaScript inside an inline <script>, CSS inside an inline <style>. 18362 bytes
+#     across this tree, 8 KB of them in the shipped package after gzip, which is 11% of it.
+#
+#     This used to be left alone with the argument that stripping it "needs a lexer that knows
+#     ucode strings" — and that argument is right about the general case and wrong about this one.
+#     The rule here is not "remove /* … */"; it is "remove a comment that OWNS its lines": `/*` is
+#     the first non-blank thing on its line and `*/` is the last non-blank thing on its (possibly
+#     later) line. For that to eat live code, a string literal would have to span lines AND contain
+#     a line that is nothing but a comment — measured across every .ut in this tree: 18362 of 18362
+#     comment bytes are whole-line, zero are inline, and no multi-line template literal contains a
+#     line-leading `/*`. Anything that does not fit the rule is LEFT IN PLACE and counted, so the
+#     day one appears the build says so instead of quietly changing the meaning of a template.
+#
+#     What this deliberately does NOT do is minify: no joining of lines, no touching of anything
+#     that is not a comment from column one. The output still reads like the source, minus the prose.
 #
 # Whitespace control is EMULATED, not ignored: `{#- …` also eats the whitespace before the comment
 # and `… -#}` the whitespace after it, which is how ucode itself renders them. Nearly every .ut here
@@ -71,6 +82,41 @@ while IFS= read -r f; do
 			}
 			printf "%s", out
 		}
+	' "$f" > "$CUR"
+	mv "$CUR" "$f"
+
+	# …and the code comments that own their lines, line by line rather than over the slurped file:
+	# a rule about what a LINE is cannot be expressed over a byte stream, and going line by line is
+	# also what makes it impossible to walk into a string literal by accident (see the header).
+	CUR="$f.tmp$$"
+	awk -v LEFT=0 '
+		function blank(t) { return t ~ /^[ \t\r]*$/ }
+		{
+			line = $0
+			if (!incomment) {
+				# a comment that owns this line: nothing but whitespace before /*
+				if (line ~ /^[ \t]*\/\*/) {
+					# …and if it closes on the same line, the rest of that line must be blank too
+					if (line ~ /\*\//) {
+						rest = line; sub(/^.*\*\//, "", rest)
+						if (blank(rest)) next
+						LEFT++; print line; next			# code after the closer: leave it whole
+					}
+					incomment = 1; next
+				}
+				# an inline comment (code before it) is left alone and counted
+				if (line ~ /\/\*/) LEFT++
+				print line; next
+			}
+			# inside a block comment: it may only end a line, or we would drop live code
+			if (line ~ /\*\//) {
+				rest = line; sub(/^.*\*\//, "", rest)
+				incomment = 0
+				if (!blank(rest)) { LEFT++; print rest }
+			}
+			next
+		}
+		END { if (LEFT > 0) printf "strip-templates: %d comment(s) not on lines of their own, left in place\n", LEFT | "cat 1>&2" }
 	' "$f" > "$CUR"
 	mv "$CUR" "$f"
 	CUR=""

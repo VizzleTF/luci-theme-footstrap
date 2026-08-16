@@ -12,7 +12,7 @@ luci-theme-footstrap/
 ├── Makefile
 ├── build-css.sh          styles/ → cascade.css (cat + awk, no node)
 ├── mangle-tokens.sh      shorten the private --fs-* names in a BUILT sheet
-├── strip-templates.sh    drop {# … #} from .ut
+├── strip-templates.sh    drop the comments from .ut (template and whole-line code)
 ├── strip-shell.sh        drop whole-line # from root/**.sh
 ├── build-apk.sh          SDK build, kept so the theme stays buildable without owfeed
 ├── dev-sync.sh           deploy to a HARDWARE router over ssh (containers use owlab)
@@ -108,8 +108,22 @@ The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sour
    `PKG_BUILD_DIR` — in CI the build tree's JS has already been through terser, its comments are
    gone, and five names that only appear in a comment would stop being reserved. That made the
    shipped sheet depend on *who* built it.
-4. **`strip-templates.sh`** — `{# … #}` out of the `.ut` files, −22 KB of 60. Only the template
-   comments; the ucode-code `/* … */` deliberately stays.
+4. **`strip-templates.sh`** — the comments out of the `.ut` files: `{# … #}` template comments, and
+   `/* … */` code comments **that own their lines**, wherever they sit (ucode inside `{% … %}`,
+   JavaScript inside an inline `<script>`, CSS inside an inline `<style>`). 63 KB of templates
+   become 21 KB, which is **−7.4 KB of the compressed package** — it went from 72.4 KB to 65.2 KB —
+   and −7 KB on every page the router serves, since uhttpd serves `/www` uncompressed.
+
+   The rule is what makes this safe, and it is not "remove `/* … */`": a comment is removed only
+   when `/*` is the first non-blank thing on its line and `*/` the last on its (possibly later)
+   line. To eat live code, a string literal would have to span lines *and* contain a line that is
+   nothing but a comment; measured across every `.ut` here, 18362 of 18362 comment bytes are
+   whole-line, none are inline, and no multi-line template literal contains a line-leading `/*`.
+   Anything that does not fit the rule is left in place and counted — the tree has exactly one such
+   case today, the glob `` `/usr/lib/lua/luci/i18n/*.${lang}.lmo` ``, whose `/*` is in a string.
+   Verified on a live router, not only by reading: the pages the stripped templates serve are
+   byte-identical to the ones the source templates serve, once the comments are removed from both
+   (the only remaining difference is the session id).
 5. **`strip-shell.sh`** — whole-line `#` out of the shell under `root/`.
 6. **Stamp `FS_VERSION`** into `fs-version.js` with `sed`. The path is part of the contract —
    `dev-sync.sh` and `tools/stage.sh` run the same substitution, so moving the constant means
