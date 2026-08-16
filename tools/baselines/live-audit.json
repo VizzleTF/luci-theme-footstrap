@@ -394,6 +394,8 @@
 		"/admin/system/filemanager|1024|noname|input.select-checkbox",
 		"/admin/system/filemanager|1440|noname|input#select-all-checkbox",
 		"/admin/system/filemanager|1440|noname|input.select-checkbox",
+		"/admin/system/filemanager|1440|target|a",
+		"/admin/system/filemanager|1440|target|input.select-checkbox",
 		"/admin/system/filemanager|320|noname|input#select-all-checkbox",
 		"/admin/system/filemanager|320|noname|input.select-checkbox",
 		"/admin/system/filemanager|320|overflow|button.btn",
