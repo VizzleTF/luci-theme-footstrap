@@ -58,8 +58,6 @@ return baseclass.extend({
 			fit.add(chrome.fitChrome);
 
 			chrome.renderChrome();
-			/* once per document — the footer outlives every client navigation */
-			chrome.nameThemeInFooter();
 			/* Both of these ADD to a stock page rather than owning a route: each watches
 			 * body[data-page] and does nothing anywhere else. A theme may not register a
 			 * dispatcher node — it outlives the theme that registered it. */
