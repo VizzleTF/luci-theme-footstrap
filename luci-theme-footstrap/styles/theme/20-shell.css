@@ -686,8 +686,16 @@
 		 * Found by tools/live-audit.mjs on CI's runner and not on the maintainer's stands: the wrap
 		 * width depends on text metrics, so the same 568px viewport breaks the line there and not
 		 * here. 26px, not 24: the criterion is that the two 24px circles must not meet, so 24 is the
-		 * boundary rather than a pass, and 26 leaves the footer visually unchanged on one line. */
-		line-height: 26px;
+		 * boundary rather than a pass, and 26 leaves the footer visually unchanged on one line.
+		 *
+		 * A FLOOR, not a fixed number, and not a bare ratio either. `--fs-type` is
+		 * `calc(13px * --fs-density-type)`, which is 0.9 at Compact and 1.15 at Large, so a plain
+		 * `26px` would be the one leading in this file that ignores the Density axis while the text
+		 * it leads follows it — and a unitless `2` would follow the axis straight back under 24px at
+		 * Compact (11.7px x 2 = 23.4), where the wrap this rule exists for is most likely. `max()`
+		 * is both: 26px at the default and at Compact, 29.9px at Large, tracking the axis in the one
+		 * direction where tracking it is safe. */
+		line-height: max(26px, calc(var(--fs-type) * 2));
 	}
 	footer a { color: var(--fs-dim); }
 	footer a:hover { color: var(--fs-accent); }

@@ -58,11 +58,18 @@ for r in $routers; do
 		if ! docker exec "$c" sh -c 'test -s /www/luci-static/footstrap/cascade.css'; then
 			echo; echo "  run $run: cascade.css is missing or empty"; pass=0; break
 		fi
-		# AND THE VERSION MOVED. This is the assertion the gate was missing when it was written, and
-		# the field bug walked straight through the hole: `apk add` on a package already in `world`
-		# leaves the old version in place, prints its usual OK line and exits 0, so "installed,
-		# registered, cascade.css present" was all true while the router still ran the previous
-		# release. Compare what is installed against what the feed serves, on the router itself.
+		# AND THE VERSION IS NOT OLDER THAN THE FEED'S. This is the assertion the gate was missing
+		# when it was written, and the field bug walked straight through the hole: `apk add` on a
+		# package already in `world` leaves the old version in place, prints its usual OK line and
+		# exits 0, so "installed, registered, cascade.css present" was all true while the router
+		# still ran the previous release.
+		#
+		# NOT equality, and the difference is this job's normal state: in CI the router already
+		# carries the build under test, which the feed has not published yet — a release run has
+		# 0.12.8 installed while the feed serves 0.12.7, and demanding equality failed the opkg leg
+		# on a correct install (the apk leg passed only because `apk list` includes the installed
+		# version among the candidates). What the installer must never do is leave the router BEHIND
+		# the feed; being ahead of it is what a pre-release router looks like.
 		if ! docker exec "$c" sh -c '
 			if command -v apk >/dev/null 2>&1; then
 				have=$(apk list -I 2>/dev/null | sed -n "s/^luci-theme-footstrap-\([^ ]*\) .*/\1/p" | head -1)
@@ -71,8 +78,13 @@ for r in $routers; do
 				have=$(opkg list-installed luci-theme-footstrap 2>/dev/null | awk "{print \$3}")
 				want=$(opkg list luci-theme-footstrap 2>/dev/null | awk "{print \$3}" | sort -V | tail -1)
 			fi
-			[ -n "$have" ] && [ -n "$want" ] && [ "$have" = "$want" ]'; then
-			echo; echo "  run $run: the installed version is not the newest the feed serves"
+			[ -n "$have" ] || exit 1
+			[ -n "$want" ] || exit 0                       # no feed candidate to compare against
+			[ "$have" = "$want" ] && exit 0
+			# behind only if the FEED sorts newest
+			newest=$(printf "%s\n%s\n" "$have" "$want" | sort -V | tail -1)
+			[ "$newest" = "$have" ]'; then
+			echo; echo "  run $run: the router is left BEHIND the version the feed serves"
 			docker exec "$c" sh -c 'apk list -I 2>/dev/null | grep footstrap || opkg list-installed 2>/dev/null | grep footstrap' | sed 's/^/    installed: /'
 			pass=0; break
 		fi

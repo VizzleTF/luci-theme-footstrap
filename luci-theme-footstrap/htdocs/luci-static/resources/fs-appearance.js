@@ -560,7 +560,10 @@ function build() {
 		'class': 'fs-ap-version',
 		'href': ver.REPO_URL,
 		'target': '_blank',
-		'rel': 'noopener noreferrer'
+		/* `noreferrer` alone: it implies noopener wherever it is honoured at all, and the theme's
+		 * other outward links — footer.ut's two and the footer's own — spell it that way. Two
+		 * spellings of one rule is how they drift. */
+		'rel': 'noreferrer'
 	}, [ ver.label() ]);
 
 	const defaults = [

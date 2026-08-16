@@ -29,9 +29,10 @@ function isReal() { return ((/^\d+\.\d+/).test(FS_VERSION)) && !((/-dev$/).test(
 
 return baseclass.extend({
 	VERSION: FS_VERSION,
-	/* the project's page, for the link at the foot of the Appearance tab. One string, used once —
-	 * it was assembled from a separate FS_REPO constant that the retired self-update script needed to build
-	 * API paths from, and nothing has needed the bare `owner/name` since. */
+	/* the project's page: the link at the foot of the Appearance tab, and the one
+	 * nameThemeInFooter() writes into the footer. It was assembled from a separate FS_REPO
+	 * constant that the retired self-update script needed to build API paths from, and nothing
+	 * has needed the bare `owner/name` since. */
 	REPO_URL: 'https://github.com/VizzleTF/luci-theme-footstrap',
 	isReal,
 	/* what the Appearance tab's version row prints */

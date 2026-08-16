@@ -297,11 +297,14 @@ function nameThemeInFooter() {
 	const host = document.querySelector('footer.fs-footer span');
 	if (!host || host.querySelector('.fs-footer-self')) return;
 	const self = E('a', {
-		class: 'fs-footer-self',
-		href: version.REPO_URL,
-		target: '_blank',
-		rel: 'noreferrer',
-	}, version.label());
+		'class': 'fs-footer-self',
+		'href': version.REPO_URL,
+		'target': '_blank',
+		/* `noreferrer` alone, matching footer.ut's own two anchors: it implies noopener in every
+		 * engine that ships `rel=noreferrer` at all, so the pair reads as two rules where there is
+		 * one. fs-appearance.js's link to the same URL spells both — the two are now in step. */
+		'rel': 'noreferrer'
+	}, [ version.label() ]);
 	/* AFTER THE DISTRIBUTION, not at the end. The sentence lists the software that renders the page
 	 * — LuCI, the distribution, the theme — and footer.ut appends one more fragment after them that
 	 * is not a component but a state: "Lua compatibility mode active". Landing behind it read as if
