@@ -224,6 +224,43 @@
 		background: var(--fs-panel2);
 	}
 
+	/* ---- A MEASUREMENT MUST NOT THROW THE READER ----
+	 *
+	 * `fitTables()` decides a data table's tier by taking its marks OFF and asking the engine
+	 * (fs-fit rule 1: a stacked table is a pile of flex rows and always "fits", so it has to be
+	 * measured un-stacked). The reading forces layout, so for the duration of that pass the document
+	 * really is laid out with a table that is several screens taller than the one on screen.
+	 *
+	 * Scroll anchoring is what turns that into a visible bug. The browser keeps the node under the
+	 * reader still by adjusting the scroll offset — and it re-picks that node whenever the offset
+	 * changes for any other reason (css-scroll-anchoring: an anchor is invalidated by a scroll, by a
+	 * suppression trigger, or by its own removal). While the user is scrolling, that is every frame,
+	 * so the pick can land inside a table in the un-stacked state the fitter is about to undo; the
+	 * next frame the mark is back, the node is somewhere else entirely, and the engine faithfully
+	 * "corrects" the offset by the difference. Measured on Status → Overview at 390x844 with the poll
+	 * driving real re-renders while the page scrolled: 18 movements nobody asked for in 1500 frames,
+	 * the worst 1877px, always a pair — down a screenful and back on the next frame. That is the
+	 * page jumping up and down under the reader.
+	 *
+	 * So the tables the fitter re-stamps are declared ineligible as anchors. They are the only
+	 * elements in the document whose layout is deliberately falsified and restored inside one pass,
+	 * and every other node stays eligible — including the section headings around them, which is what
+	 * keeps the good half of anchoring working: a lease appearing or a station leaving still shifts
+	 * nothing, because the engine anchors on a heading and compensates for the height change. That
+	 * half was measured too, before and after: 0px of movement under the reader across six poll ticks
+	 * that grew and shrank a section above the viewport.
+	 *
+	 * NOT on the scroll container, which is the answer that suggests itself and is worse: with
+	 * `html, body, #maincontent { overflow-anchor: none }` the same run still moved 12 times, up to
+	 * 788px, because it also throws away the compensation the paragraph above depends on. Correct
+	 * anchoring, minus the one region that lies about its height.
+	 *
+	 * The cost is that a row of a data table can no longer be the anchor. On the page where that
+	 * would matter most — Processes at 390px, which is one long table — inserting a row above the
+	 * reader moves the content 285px with this rule and 285px without it: those rows were never being
+	 * chosen anyway. */
+	.table.fs-dt { overflow-anchor: none; }
+
 	.cbi-section .table:is([id], .fs-dt) .tr:not(.table-titles):not(.placeholder):hover .td { background: var(--fs-panel2); }
 	.cbi-section .table:is([id], .fs-dt) .tr.table-titles .th { border-bottom-color: var(--fs-border); }
 	/* Contour around the whole data table. A real <table> needs border-collapse:separate or the

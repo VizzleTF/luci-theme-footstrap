@@ -11,6 +11,12 @@ Style and format guide: [docs/releasing.md](docs/releasing.md).
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [Unreleased]
+
+### Fixed
+
+- **The page no longer jumps a screenful up and back while you scroll a polled page.** `fitTables()` decides a data table's tier by taking its marks off and measuring it un-stacked (fs-fit rule 1: a stacked table is a pile of flex rows and always "fits"), and the measurement forces layout — so for the length of that pass the document really is laid out with a table several screens taller than the one on screen. Scroll anchoring then does its job on a lie: it re-picks the node it keeps still whenever the offset changes for another reason, which while you are scrolling is every frame, so the pick can land inside a table in the state the fitter is about to undo, and the next frame it "corrects" the offset by the difference. Measured on Status → Overview at 390x844 with the poll driving real re-renders while the page scrolled: 18 movements nobody asked for in 1500 frames, worst 1877px, always a pair — down a screenful and back. The tables the fitter re-stamps are now declared ineligible as anchors (`.table.fs-dt { overflow-anchor: none }`), which is the smallest region that can be excluded: the same run measures 0 afterwards, on 25.12/apk and 24.10/opkg, at 390, 768 and 1024 and in both layouts, and putting the declaration back reproduces 16 movements up to 1867px. Turning anchoring off on the scroll container instead — the answer that suggests itself — was measured and is worse: 12 movements up to 788px, because it also throws away the compensation that keeps the page still when a lease appears or a station leaves. That half is unchanged: six poll ticks growing and shrinking a section above the viewport move the content 0px, before and after. The cost is that a row of a data table can no longer be the anchor, and on the page where that would matter most — Processes at 390px, one long table — a row inserted above the reader moves the content 285px with the rule and 285px without it.
+
 ## [0.12.8] — 2026-08-15
 
 ### Added
