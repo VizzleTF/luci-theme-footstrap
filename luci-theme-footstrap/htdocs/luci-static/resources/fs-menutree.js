@@ -120,21 +120,47 @@ function resolveSegs(segs) {
  * Save/Apply footer key their disabled state off, so on a session with narrower ACLs than root's
  * this is any page whose SECTION is read-only.
  *
- * OR down the path, exactly as check_acl_depends() folds the accumulated list: one read-only acl
- * anywhere on it is enough. Feed it the RESOLVED segments, since that is the path the dispatcher
- * accumulates over. */
+ * AND down the path, not OR — the operator is the whole of this function and it was the wrong one.
+ * check_acl_depends() (dispatcher.uc:312) is handed ONE list, the concatenation ctx_append() built
+ * from every node's `depends.acl` along the path (:457-470), and it answers `writable = true` as
+ * soon as ANY group in that list grants write. So a page is read-only exactly when NO group on the
+ * path is writable — and since apply_tree_acls() (:436-446) marks a node `readonly` when that
+ * node's own list yields no write, "no group on the path is writable" is "EVERY acl-bearing node on
+ * the path is readonly". One read-only ancestor is not enough: a leaf that declares a writable acl
+ * of its own re-opens the whole path.
+ *
+ * Measured, because a source reading is not a verdict: on the 25.12 stand, `admin/status/logs`
+ * carries the read-only `luci-mod-status-logs` and its child `syslog` was given a writable acl of
+ * its own; a full load then reported `nodespec.readonly` FALSE while this function said true — the
+ * same class of disagreement between a click and an F5 that the leaf-only reading used to produce,
+ * only in the opposite direction, and this time it TAKES AWAY a Save/Apply the server allows.
+ *
+ * A node with no `depends.acl` is not evidence either way and is skipped: the dispatcher puts
+ * nothing into ctx.acls for it. That is also why the answer needs `depends.acl` at all rather than
+ * the `readonly` flag alone — an acl-bearing node the session may write carries no flag, and is
+ * therefore indistinguishable from an ungated node without looking at its acl list. /admin/menu
+ * serves both fields (66 of 243 nodes carry an acl on the stand).
+ *
+ * Feed it the RESOLVED segments, since that is the path the dispatcher accumulates over. */
 function readonlyForSegs(segs) {
 	let node = _tree;
-	if (node && node.readonly === true)
-		return true;
+	let gated = 0, locked = 0;
+	const weigh = (n) => {
+		const acl = n && n.depends && n.depends.acl;
+		if (!acl || !acl.length)
+			return;
+		gated++;
+		if (n.readonly === true)
+			locked++;
+	};
+	weigh(node);
 	for (let i = 0; i < segs.length; i++) {
 		node = node && node.children && node.children[segs[i]];
 		if (!node)
-			return false;
-		if (node.readonly === true)
-			return true;
+			break;
+		weigh(node);
 	}
-	return false;
+	return gated > 0 && gated === locked;
 }
 
 /* The view class a menu node instantiates, or null if the node isn't SPA-able. The Status→Overview

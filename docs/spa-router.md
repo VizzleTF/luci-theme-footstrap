@@ -61,6 +61,27 @@ same URL opens another. `rewrite` is deliberately not resolved — it is not in 
 mistake in `splice` semantics would open the wrong page, which is worse than the reload it
 falls back to.
 
+### `readonly` is folded with AND, not OR
+
+`L.env.nodespec.readonly` drives `L.hasViewPermission()` and therefore the Save/Apply footer, so the
+client has to reach the same answer the dispatcher does. It collects `depends.acl` from every node
+on the dispatch path into one list (`ctx_append`) and asks `check_acl_depends()` once, which
+answers **writable as soon as any group in that list grants write**. So a page is read-only exactly
+when no group on the path is writable — i.e. when *every* acl-bearing node on it is `readonly`, not
+when *one* is. A leaf that declares a writable acl of its own re-opens a path that runs through a
+read-only section.
+
+`readonlyForSegs()` therefore counts acl-bearing nodes and read-only ones and compares the two.
+Nodes without `depends.acl` are skipped: the dispatcher contributes nothing for them, and the flag
+alone cannot distinguish "gated and writable" from "not gated", which is why the fold needs the acl
+list that `/admin/menu` serves (66 of 243 nodes carry one on the stand).
+
+Verified live rather than argued: with `admin/status/logs` (read-only `luci-mod-status-logs`) given a
+child carrying a writable acl, a full load reported `nodespec.readonly` **false** while the previous
+OR fold said true — a Save/Apply the server allows, taken away by a click. `../tmp/readonly-parity.mjs`
+walks the whole menu comparing the server's stamp against both folds; on 110 comparable pages of an
+unmodified stand the two folds agree, and only the constructed case separates them.
+
 ## The navigation flow
 
 `wireRouter()` puts one delegated handler on `document`:
@@ -117,70 +138,85 @@ again repaints nothing. The class is taken from the instance — LuCI's class sy
 and `new instance.constructor()` runs a fresh `__init__` → fresh `load()` + `render()` into `#view`.
 Identical to a full load, which also always starts from a new instance.
 
-### The generation check must sit at the PAINT, not at the dispatch
+### A superseded render cannot be cancelled, so it is given its own page to paint into
 
-`AbortController` is hygiene; a monotonic generation counter is correctness. The primary source is
-blunt about it:
+`AbortController` is hygiene, not correctness. The primary source is blunt about it:
 
 > "It's ok to call `.abort()` after the fetch has already completed, fetch simply ignores it."
 > — Chrome, *Abortable fetch*
 
 `abort()` cancels neither an already-arrived response nor an already-running handler, and
 **`L.Request` in LuCI is XHR that never exposes its `xhr` handle at all** — there is nothing to
-abort. Meanwhile every `await` between the check and the DOM write is a point where the whole event
-loop turns, including an entire foreign navigation.
+abort. `View.__init__` is asynchronous too (`ready.then(load).then(render).then(nodes =>
+DOM.content(document.getElementById('view'), nodes))`), so the write lands two awaits after the
+navigation that started it, and the element it writes into is resolved **at that moment**, not when
+the chain began.
 
-The router checked the generation before constructing rather than at the paint:
+That is the whole problem, and it has exactly two shapes of answer: repair the damage afterwards, or
+arrange for there to be no damage. This router did the first for a year and now does the second.
 
-```js
-if (gen !== _navGen) { if (!cached) repairStaleRender(className); return; }
-if (cached) new view.constructor();
-```
+**What it does now.** Each navigation renders into a `#view` of its own inside a hidden stage, and
+waits for the previous render to finish before it stages anything. A chain that is superseded
+therefore paints into the stage its own navigation created; that stage is then dropped, unswapped,
+and the live page — either the one still on screen or the one the newer navigation committed — never
+sees it. `_navGen` is still the token (a URL is not one: A→B→A is two navigations with one URL), but
+it is now only ever *read* to decide whether a finished render may be swapped in.
 
-`View.__init__` is asynchronous (`ready.then(load).then(render).then(nodes => DOM.content(#view,
-nodes))`), so the write happened two awaits later — and `repairStaleRender()` only ran when
-`!cached`, leaving the cached path unprotected, which is the ordinary path once the cache is
-warm. Reproduced: leave a slow cached view (Software) for a fast one (System) after 150 ms and the
-result was stable until F5 — System's URL, title, `data-page` and menu highlight, with Software's
-content in `#view`.
+**What it replaced**, kept here because the failure modes are worth remembering:
 
-It could not be fixed head-on: `ClassConstructor` discards what `__init__` returns, so the
-construction promise is unreachable. But `__init__` resolves `this.render` while building its chain
-— that is, **during `new`** — so a wrapper installed on `prototype.render` before `new` is the
-one that gets bound, and `new` returns synchronously, so the generation can be stamped on the
-**instance** immediately after. On the instance, not in a by-class-name map: A → B → A on a warm
-cache would overwrite the first construction's generation with the second's.
+- a wrapper installed on `prototype.render` before `new`, which stamped the navigation's generation
+  on the instance and made a stale render return a promise that never resolved. Reproduced before it
+  existed: leave a slow cached view (Software) for a fast one (System) after 150 ms, and the result
+  was stable until F5 — System's URL, title, `data-page` and menu highlight with Software's content
+  in `#view`;
+- `repairStaleRender()`, which re-ran the current navigation after a superseded FIRST render had
+  already painted and registered its pollers — the uncached case, where `require()` *is* the render
+  and there was nothing to cancel;
+- and the cold-route spinner, which emptied `#view` at the click so that something would be moving
+  while the module loaded.
 
-A stale render returns a promise that never resolves: the chain simply stops before
-`dom.content()`. Returning empty nodes would paint a live page blank; throwing would hand LuCI's
-`.catch` an error box to draw into a page that just opened.
+All three are gone: about 80 lines of mechanism, plus the double-render class of bug they existed to
+contain. What replaced them is one rule — *nothing is swapped in until it is finished, and nothing
+is finished twice*.
 
-An instance we did not create (the singleton from `require()` on a first visit, where render
-*is* require and there is nothing to arm) carries no stamp and is left alone — that is what
-`repairStaleRender()` still covers.
+### The stage
 
-**A URL is not a valid token**: A→B→A gives two different navigations with the same URL.
+`stageView()` inserts `<div class="fs-staging"><div id="view"></div></div>` as the **first** child of
+`.fs-content`. `getElementById` returns the first match in tree order, so LuCI's own chain — the
+spinner in `View.__init__` and the `DOM.content()` when the render resolves — writes into the stage
+while the page the user is reading stays untouched.
 
-### Fast double-click on UNCACHED views
+- **Hidden, but laid out.** `visibility: hidden; height: 0; overflow: clip` — never `display: none`:
+  the realtime graphs size themselves from `#view.offsetWidth` inside `render()`, and a
+  `display: none` stage hands them a zero width they keep. The width is the container's, exactly
+  what it will be after the swap.
+- **The swap moves the nodes; it does not swap the element.** The obvious alternative — insert the
+  staged `#view`, delete the old one — changes the identity of `#view`, and this theme binds
+  observers to that element: `fs-fit`'s content MutationObserver and `fs-appearance`'s view observer
+  are registered on the node that existed at chrome init. Swapping the element leaves both watching
+  a detached node, i.e. the fitters silently stop re-running. So the live `#view` keeps its identity
+  and its children are replaced through `dom.content()`, which also reaps the outgoing page's
+  `data-idref` registry entries.
+- **Completion is observed, not assumed.** `renderedIn()` resolves when a child that is not the
+  spinner appears, or when a mutation leaves the stage empty (a view that renders nothing still
+  finishes). A render that has not completed within 15 s is a **failure**, not a completion: swapping
+  a spinner in and releasing the serialization would let the still-running chain paint into a later
+  navigation's stage. It rejects into the same full-load fallback every other error takes.
+- **The cost, stated plainly:** a click during a slow first load waits for that load. Measured
+  against the previous shape on the same stand, six pages, three runs each: warm median 136 ms before
+  and 142 ms after, cold median 197 ms before and 196 ms after — i.e. the same, within noise. The
+  change is not about speed; it is that the outgoing page stays readable instead of being replaced
+  by a spinner, and that three repair mechanisms could be deleted.
 
-`_navGen` cancels a stale navigation only on the cached path, where cancelling means "do not
-call `new view.constructor()`". On a first visit `require()` *is* the render, inside a promise
-we do not own.
+### Saying that a slow navigation is under way
 
-So: click Firewall (not cached), click Wireless 100 ms later. `navigate(Wireless)` flushes the
-`L.Poll` queue before Firewall adds its poller; Firewall finishes drawing into a `#view` that
-now belongs to Wireless and registers a poller the flush already missed. What is left is Wireless's
-URL, title, menu and `data-page` with Firewall's content and Firewall's poller — forever.
-
-Fixed by navigating again: `repairStaleRender(className)` calls `navigate(_curPath, false)` —
-`navigate()` *is* the procedure for returning the document to the state a fresh load leaves.
-`push=false` because the URL never moved, only the DOM under it. If `navigate()` refuses (the stale
-view injected invasive CSS) → `location.reload()`, hard.
-
-Recursion terminates on `currentViewClass()`: if the stale render happened to draw exactly the class
-`_curPath` wants (A → B → A while A was still loading), the DOM and poller are correct and there is
-nothing to repair.
-
+With the outgoing page left on screen, a cold route would otherwise look like a click that did
+nothing: the chrome switches instantly, the content does not move until the module and its first RPC
+land. `#fs-nav-progress` is a two-pixel hairline at the top of the content area, shown only once a
+navigation outlives **150 ms** — below that a bar would flash on and off on every warm click, which
+reads as a glitch rather than as progress. Overlapping navigations share one bar through a counter.
+It animates `transform` and `opacity` only, so it cannot cost the render it reports on, and reduced
+motion keeps the bar and drops the animation.
 ## The two `L` trap
 
 `L` inside a module (the factory parameter) and `window.L` (the runtime instance the dispatcher
@@ -271,6 +307,18 @@ Before rendering the new view:
 - `clearViewIntervals()` kills the outgoing view's bare `window.setInterval`s. A full load would
   have killed them; SPA must do it explicitly. `setInterval`/`clearInterval` are hooked at module
   eval and the ids tracked in a `Set`; `L.Poll`'s own 1-second tick is preserved.
+- **What the router removes by hand goes through `discard()`, not `remove()`.** `dom.data()` does not
+  live on the element: luci.js keeps it in `dom.registry` keyed by a `data-idref` attribute, and the
+  only thing that deletes an entry is `dom.content()`. `#view` is safe — the incoming view's own
+  `dom.content(#view, …)` reaps the outgoing page — but the siblings a template emitted next to it
+  and the runtime notification banners are removed by the router, and `remove()` leaves their
+  entries, and through them the elements and any class instance stored on them, reachable for the
+  life of the document. `discard()` moves the element into a detached container and calls
+  `dom.content(bin, null)`, which reaps the element's own entry as well as its descendants', using
+  only the public API. Measured before writing it: nothing the sweeps remove carries a `data-idref`
+  on the stands today (banners 0, siblings 0) and the registry does not grow across laps (83 entries
+  after the first lap of four pages, 83 after the third) — this closes the class rather than fixes a
+  leak we can see, the same reasoning the table selector uses for a `<table>` with no LuCI classes.
 - Running the registered navigation callbacks — **and the router names none of them**. The seam is
   inverted: `fs-router.js` exports `onNavigate(fn)` and a module registers itself, so an optional
   module that is not installed is not a `DependencyError` that takes out the chrome. The search
@@ -503,10 +551,62 @@ generation, capped at ~5 s.
 `scrollRestoration` is deliberately left alone: `manual` is inert in `sidebar` (the document does not
 scroll) and would take away working restoration in `top`.
 
+**The replay starts at the SWAP, not at the traversal**, and that is a bug the staged render
+introduced rather than a refinement. `restoreScroll()` writes as soon as the scroller is tall enough
+for the saved offset — and while the incoming page renders off screen, the outgoing one is still on
+it, so the height that satisfies the test can be the page being left. Measured in the `top` layout:
+parked at 386, restored to 386 while Processes was still up, then the swap put a shorter page in its
+place and the browser clamped the offset to 197. The popstate handler therefore hands the offset to
+`navigate()` (`_pendingRestore`) and the commit replays it, when there is only one height to read.
+Verified in both layouts afterwards: parked 411 → restored 411 in `top`, 370 → 370 in `sidebar`.
+
+## A dead session ends the document
+
+luci-base answers an expired session with `notifySessionExpiry()`: `Poll.stop()` plus a modal whose
+only button reloads, which the dispatcher then answers with the login form. Every navigation of ours
+does the opposite of both halves — `ui.hideModal()` and `Poll.stop()` + `start()` — so before this
+existed, the first click after the session died dismissed luci-base's own warning and browsed on.
+Measured on the stand: kill the session from inside the document, let one rpc reject
+(`SessionError`, modal up, polling stopped), then click a menu link — the router swapped the view,
+the modal was gone and the page sat on "Loading view…" with every call behind it failing; only a
+reload reached a login form. Now the same click is a full load that lands on the login form.
+
+`watchSession()` (fs-router.js) learns it from luci-base's own two decision points, through the
+documented interceptor APIs:
+
+- `L.Request.addInterceptor` — a `403` carrying `X-LuCI-Login-Required: yes`;
+- `rpc.addInterceptor` — the `session.access` probe luci-base fires after some other call came back
+  `-32002`, when that probe's frame is not JSON-RPC 2.0 or carries an `error` with a code and a
+  message. Those are exactly the conditions under which `rpc.js`'s `handleCallReply()` rejects, i.e.
+  the conditions upstream's own `.catch(notifySessionExpiry)` reacts to.
+
+`access: false` is deliberately not one of them: the probe is declared `expect: { access: true }`,
+so a `false` answer resolves rather than rejects and luci-base carries on. It is an ACL answer, and
+treating it as a dead session would drop a restricted user out of the SPA for the rest of the
+document over a permission they simply do not have. (luci-theme-aurora's otherwise-equivalent gate
+does treat it as expiry.)
+
+Neither interceptor may throw: luci-base runs both through `Promise.all(…).catch(req.reject)`, so an
+exception in there would reject the caller's own request. Both bodies are wrapped.
+
+The flag is never reset — it dies with the document, as the session did — and the visibility handler
+will not restart a poll after it, so a tab coming back into view does not spend a burst of failing
+calls. `tools/upstream-contract.mjs` carries the `expiry-signals` probe for the day upstream renames
+any of it.
+
 ## Boundaries and degradation
 
 - Layout is irrelevant to the router: there is one renderer, and sidebar/top is a client attribute
   the CSS morphs.
+- **A document the router could not have rendered is not one it navigates away from.** `wireRouter()`
+  asks whether the page it booted on resolves to a node the theme can serve; a `call`, `cbi`,
+  `function` or foreign `template` node may carry inline timers set before this module was evaluated,
+  which no teardown of ours can retire — only the document's death. The test is deliberately narrower
+  than "did the path resolve": a path the tree does not know (a wildcard URL such as
+  `admin/network/wireless/radio0.network1`) keeps today's behaviour, or the router would switch
+  itself off on some of the most-used pages in LuCI. On the stands this is a no-op: of 243 menu
+  nodes the 110 `call` and 8 `function` ones answer with JSON or a redirect and never render this
+  theme, and the one `template` node is the Overview, which the router does serve.
 - Third-party apps that register `view` nodes speed up automatically.
 - **Status→Overview** (`template` node `admin_status/index`) is the SPA exception: its server
   template only defines three global helpers and calls `ui.instantiateView('status/index')`. The

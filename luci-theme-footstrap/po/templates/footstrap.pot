@@ -25,7 +25,7 @@ msgctxt "footstrap"
 msgid "Auto-collapse"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:653
+#: htdocs/luci-static/resources/fs-appearance.js:656
 msgctxt "footstrap"
 msgid "Background"
 msgstr ""
@@ -60,13 +60,13 @@ msgctxt "footstrap"
 msgid "Clearly visible %s"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-chrome.js:407
+#: htdocs/luci-static/resources/fs-chrome.js:445
 #: ucode/template/themes/footstrap/header.ut:150
 msgid "Collapse menu"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:344
-#: htdocs/luci-static/resources/fs-appearance.js:650
+#: htdocs/luci-static/resources/fs-appearance.js:653
 msgctxt "footstrap"
 msgid "Colours"
 msgstr ""
@@ -112,7 +112,7 @@ msgctxt "footstrap"
 msgid "Dark"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:654
+#: htdocs/luci-static/resources/fs-appearance.js:657
 msgctxt "footstrap"
 msgid "Defaults"
 msgstr ""
@@ -132,7 +132,7 @@ msgctxt "footstrap"
 msgid "Easy to read %s"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-chrome.js:407
+#: htdocs/luci-static/resources/fs-chrome.js:445
 msgid "Expand menu"
 msgstr ""
 
@@ -166,7 +166,7 @@ msgctxt "footstrap"
 msgid "Hard to read %s — large text only"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:649
+#: htdocs/luci-static/resources/fs-appearance.js:652
 msgctxt "footstrap"
 msgid "Interface"
 msgstr ""
@@ -197,10 +197,6 @@ msgstr ""
 #: htdocs/luci-static/resources/fs-appearance.js:173
 msgctxt "footstrap"
 msgid "Light"
-msgstr ""
-
-#: htdocs/luci-static/resources/fs-router.js:651
-msgid "Loading view…"
 msgstr ""
 
 #: ucode/template/themes/footstrap/sysauth.ut:142
@@ -314,7 +310,7 @@ msgctxt "footstrap"
 msgid "Rounding"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:569
+#: htdocs/luci-static/resources/fs-appearance.js:572
 msgctxt "footstrap"
 msgid "Router default"
 msgstr ""
@@ -385,7 +381,7 @@ msgctxt "footstrap"
 msgid "Submenus"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:651
+#: htdocs/luci-static/resources/fs-appearance.js:654
 msgctxt "footstrap"
 msgid "Surfaces"
 msgstr ""
@@ -398,7 +394,7 @@ msgstr ""
 msgid "System running in recovery (initramfs) mode."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-select.js:587
+#: htdocs/luci-static/resources/fs-select.js:607
 msgid "Table"
 msgstr ""
 

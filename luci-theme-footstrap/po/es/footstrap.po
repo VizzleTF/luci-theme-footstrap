@@ -35,7 +35,7 @@ msgctxt "footstrap"
 msgid "Auto-collapse"
 msgstr "Colapso automático"
 
-#: htdocs/luci-static/resources/fs-appearance.js:653
+#: htdocs/luci-static/resources/fs-appearance.js:656
 msgctxt "footstrap"
 msgid "Background"
 msgstr "Fondo"
@@ -70,13 +70,13 @@ msgctxt "footstrap"
 msgid "Clearly visible %s"
 msgstr "Bien visible %s"
 
-#: htdocs/luci-static/resources/fs-chrome.js:407
+#: htdocs/luci-static/resources/fs-chrome.js:445
 #: ucode/template/themes/footstrap/header.ut:150
 msgid "Collapse menu"
 msgstr "Contraer menú"
 
 #: htdocs/luci-static/resources/fs-appearance.js:344
-#: htdocs/luci-static/resources/fs-appearance.js:650
+#: htdocs/luci-static/resources/fs-appearance.js:653
 msgctxt "footstrap"
 msgid "Colours"
 msgstr "Colores"
@@ -124,7 +124,7 @@ msgctxt "footstrap"
 msgid "Dark"
 msgstr "Oscuro"
 
-#: htdocs/luci-static/resources/fs-appearance.js:654
+#: htdocs/luci-static/resources/fs-appearance.js:657
 msgctxt "footstrap"
 msgid "Defaults"
 msgstr "Predeterminados"
@@ -144,7 +144,7 @@ msgctxt "footstrap"
 msgid "Easy to read %s"
 msgstr "Se lee bien %s"
 
-#: htdocs/luci-static/resources/fs-chrome.js:407
+#: htdocs/luci-static/resources/fs-chrome.js:445
 msgid "Expand menu"
 msgstr "Expandir menú"
 
@@ -180,7 +180,7 @@ msgctxt "footstrap"
 msgid "Hard to read %s — large text only"
 msgstr "Se lee mal %s: solo texto grande"
 
-#: htdocs/luci-static/resources/fs-appearance.js:649
+#: htdocs/luci-static/resources/fs-appearance.js:652
 msgctxt "footstrap"
 msgid "Interface"
 msgstr "Interfaz"
@@ -212,10 +212,6 @@ msgstr "Diseño"
 msgctxt "footstrap"
 msgid "Light"
 msgstr "Claro"
-
-#: htdocs/luci-static/resources/fs-router.js:651
-msgid "Loading view…"
-msgstr "Cargando vista…"
 
 #: ucode/template/themes/footstrap/sysauth.ut:142
 msgid "Log in"
@@ -331,7 +327,7 @@ msgctxt "footstrap"
 msgid "Rounding"
 msgstr "Redondeo"
 
-#: htdocs/luci-static/resources/fs-appearance.js:569
+#: htdocs/luci-static/resources/fs-appearance.js:572
 msgctxt "footstrap"
 msgid "Router default"
 msgstr "Configuración predeterminada del enrutador"
@@ -402,7 +398,7 @@ msgctxt "footstrap"
 msgid "Submenus"
 msgstr "Submenús"
 
-#: htdocs/luci-static/resources/fs-appearance.js:651
+#: htdocs/luci-static/resources/fs-appearance.js:654
 msgctxt "footstrap"
 msgid "Surfaces"
 msgstr "Superficies"
@@ -415,7 +411,7 @@ msgstr "Sistema"
 msgid "System running in recovery (initramfs) mode."
 msgstr "El sistema se está ejecutando en modo de recuperación (initramfs)."
 
-#: htdocs/luci-static/resources/fs-select.js:587
+#: htdocs/luci-static/resources/fs-select.js:607
 msgid "Table"
 msgstr "Tabla"
 
@@ -568,6 +564,9 @@ msgctxt "footstrap"
 msgid ""
 "the uploaded file could not be removed either; it is still on the router."
 msgstr "tampoco se pudo eliminar el archivo subido; sigue en el router."
+
+#~ msgid "Loading view…"
+#~ msgstr "Cargando vista…"
 
 #~ msgid "Logout"
 #~ msgstr "Cerrar sesión"

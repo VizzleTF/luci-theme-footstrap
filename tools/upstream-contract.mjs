@@ -230,6 +230,51 @@ const CONTRACT = [
 		},
 	},
 	{
+		id: 'expiry-signals',
+		what: 'L.Request.addInterceptor() and rpc.addInterceptor() exist, and luci-base still answers a '
+			+ 'dead session through them (403 + X-LuCI-Login-Required, and the session.access probe it '
+			+ 'fires after a -32002)',
+		used_by: 'fs-router.js — watchSession() learns the session is gone and stops claiming navigations, '
+			+ 'so the next click is a full load that lands on the login form',
+		fn: async () => {
+			if (!L.Request || typeof L.Request.addInterceptor !== 'function')
+				return 'L.Request.addInterceptor is gone; a dead session would go unnoticed by the router';
+			const rpc = await L.require('rpc');
+			if (typeof rpc.addInterceptor !== 'function')
+				return 'rpc.addInterceptor is gone; the session.access probe cannot be observed';
+			/* the two signals are luci-base's, so what is asserted here is that luci-base still LOOKS
+			 * at them: notifySessionExpiry is the function both paths end in, and setupDOM is where
+			 * they are wired. A rename upstream leaves the router silent, which is the failure this
+			 * probe exists to name. */
+			if (typeof L.notifySessionExpiry !== 'function')
+				return 'LuCI.prototype.notifySessionExpiry is gone: luci-base no longer ends a dead session '
+					+ 'the way fs-router assumes';
+			return true;
+		},
+	},
+	{
+		id: 'menu-acl-shape',
+		what: '/admin/menu serves depends.acl and the readonly flag per node',
+		used_by: 'fs-menutree.js — readonlyForSegs() folds readonly down the dispatch path the way '
+			+ 'check_acl_depends() does, which needs to tell an acl-bearing writable node from an ungated one',
+		fn: async () => {
+			const ui = await L.require('ui');
+			const tree = await ui.menu.load();
+			let nodes = 0, gated = 0;
+			const walk = (n) => {
+				nodes++;
+				const acl = n && n.depends && n.depends.acl;
+				if (acl && acl.length) gated++;
+				for (const k of Object.keys((n && n.children) || {})) walk(n.children[k]);
+			};
+			walk(tree);
+			if (!nodes) return 'the menu tree is empty';
+			return gated > 0 ? true
+				: 'no node carries depends.acl any more: readonly can no longer be folded client-side '
+					+ '(' + nodes + ' nodes walked)';
+		},
+	},
+	{
 		id: 'session-id',
 		what: 'rpc.getSessionID() answers with the session token',
 		used_by: 'fs-prefs.js posts to cgi-upload with the session in a form FIELD, which is what luci-base\'s own upload does',

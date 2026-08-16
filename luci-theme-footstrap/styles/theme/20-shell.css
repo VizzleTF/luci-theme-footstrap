@@ -662,6 +662,59 @@
 	.fs-indicators { flex-wrap: wrap; }
 	.fs-content { padding: var(--fs-space-5) var(--fs-content-pad); flex: 1 1 auto; width: 100%; max-width: var(--fs-content-max); margin: 0 auto; }
 
+	/* ---------- the staging area a client navigation renders into ----------
+	 * fs-router.js renders the incoming page into a second `#view` inside this wrapper, first in
+	 * tree order, and moves its children into the live one when the render completes — so the page
+	 * on screen is never emptied while the next one loads.
+	 *
+	 * HIDDEN BUT LAID OUT, and the three declarations are not interchangeable. `visibility: hidden`
+	 * takes it off the screen while keeping the box: several views size themselves from the element
+	 * they render into (the realtime graphs read `#view.offsetWidth` inside `render()`), and
+	 * `display: none` would hand them a zero width they keep for the life of the instance. `height:
+	 * 0` is what stops the page under it from moving, and `overflow: clip` keeps the content that
+	 * overflows that zero height from painting anyway — `clip` rather than `hidden` because a
+	 * scroll container would be a new scrollport in the middle of the content column. */
+	.fs-staging { visibility: hidden; height: 0; overflow: clip; }
+
+	/* ---------- and the hairline that says a slow navigation is under way ----------
+	 * Shown only once a navigation outlives 150 ms (fs-router.js), so a warm click never flashes it.
+	 *
+	 * FIXED, AT THE TOP OF THE VIEWPORT, AND A CHILD OF <body> — all three are load-bearing and the
+	 * first draft got two of them wrong. In the content column it is a flex item of `.fs-main`, and
+	 * a column flex container shrank its 2px to ZERO (measured: height 0 in the sidebar layout,
+	 * where `.fs-shell` is 100dvh); with `margin-bottom: -2px` the content painted over what was
+	 * left. And it cannot live inside `.fs-shell` either: that box carries `contain: paint`, which
+	 * makes a fixed descendant position itself against the shell and be clipped by it. At the top of
+	 * the viewport is also where a browser puts its own progress, so it is the least surprising
+	 * place for ours.
+	 *
+	 * `transform` and `opacity` only — both composited, so this cannot cost the render it is
+	 * reporting on. Reduced motion keeps the bar and drops its animation: the information is the
+	 * point, the movement is not. */
+	#fs-nav-progress {
+		position: fixed; inset-inline: 0; top: 0;
+		height: 2px;
+		background: var(--fs-accent);
+		transform: scaleX(0); transform-origin: left center;
+		opacity: 0; pointer-events: none;
+		z-index: var(--fs-z-tooltip);
+	}
+	:root[dir="rtl"] #fs-nav-progress { transform-origin: right center; }
+	#fs-nav-progress[data-state="active"] {
+		opacity: 1;
+		transform: scaleX(.8);
+		transition: transform 2s cubic-bezier(.1, .7, .1, 1), opacity 120ms linear;
+	}
+	#fs-nav-progress[data-state="done"] {
+		opacity: 0;
+		transform: scaleX(1);
+		transition: transform 120ms ease-out, opacity 300ms linear 100ms;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		#fs-nav-progress[data-state="active"],
+		#fs-nav-progress[data-state="done"] { transition: none; transform: scaleX(1); }
+	}
+
 	/* ---------- footer ----------
 	 * Bare `footer`, not `footer.fs-footer`: the theme owns footer paint outright (absorbed
 	 * from base, which keeps only the flex skeleton), so a third-party view emitting its own

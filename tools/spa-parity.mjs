@@ -47,7 +47,17 @@ const measure = async (page) => {
 		return await page.evaluate(() => {
 			const v = document.getElementById('view');
 			const text = (v ? v.textContent : '').replace(/\s+/g, ' ').trim();
-			const out = { chars: text.length, nodes: v ? v.querySelectorAll('*').length : 0, uci: '', wifi: -1 };
+			const out = {
+				chars: text.length, nodes: v ? v.querySelectorAll('*').length : 0, uci: '', wifi: -1,
+				/* The staged render puts a second `#view` in the document on purpose — LuCI's own
+				 * chain resolves `#view` at paint time and must find the stage — but it is
+				 * transient BY CONSTRUCTION, and this is what keeps it so. A stage that outlives
+				 * its navigation is two elements answering to one id for the rest of the document,
+				 * which is where a duplicate id stops being a technicality: the next view would
+				 * paint into the leftover. */
+				views: document.querySelectorAll('#view').length,
+				stages: document.querySelectorAll('.fs-staging').length,
+			};
 			try { out.uci = Object.keys(window.L.uci.state.values || {}).sort().join(','); } catch (e) {}
 			return (window.L.network
 				? window.L.network.getWifiDevices().then((d) => { out.wifi = d.length; return out; }).catch(() => out)
@@ -112,6 +122,10 @@ for (const stand of list) {
 			add('uci', `a full load has ${missing.join(', ')} in uci's cache and the click does not`);
 		if (full.wifi > spa.wifi)
 			add('wifi', `network.getWifiDevices(): ${spa.wifi} on a click, ${full.wifi} on a load`);
+		if (spa.views !== 1 || spa.stages !== 0)
+			add('stage', `after the navigation settled: ${spa.views} #view element(s), ${spa.stages} staging wrapper(s)`);
+		if (full.views !== 1)
+			add('stage', `a full load left ${full.views} #view element(s)`);
 		for (const e of spaErrs.filter((e) => !fullErrs.includes(e)).slice(0, 2))
 			add('console', e);
 		process.stdout.write(findings.some((f) => f.path === path && f.stand === stand.id) ? 'X' : '.');
