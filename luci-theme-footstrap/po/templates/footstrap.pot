@@ -60,7 +60,7 @@ msgctxt "footstrap"
 msgid "Clearly visible %s"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-chrome.js:407
+#: htdocs/luci-static/resources/fs-chrome.js:415
 #: ucode/template/themes/footstrap/header.ut:150
 msgid "Collapse menu"
 msgstr ""
@@ -132,7 +132,7 @@ msgctxt "footstrap"
 msgid "Easy to read %s"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-chrome.js:407
+#: htdocs/luci-static/resources/fs-chrome.js:415
 msgid "Expand menu"
 msgstr ""
 
@@ -394,7 +394,7 @@ msgstr ""
 msgid "System running in recovery (initramfs) mode."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-select.js:607
+#: htdocs/luci-static/resources/fs-select.js:756
 msgid "Table"
 msgstr ""
 
