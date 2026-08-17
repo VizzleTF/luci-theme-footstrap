@@ -132,4 +132,19 @@ rm -f /tmp/luci-indexcache*"
 scp -q "$D"/root/etc/uci-defaults/30_luci-theme-footstrap "$R":/tmp/30_luci-theme-footstrap
 ssh "$R" "PKG_UPGRADE=1 sh /tmp/30_luci-theme-footstrap; rm -f /tmp/30_luci-theme-footstrap /tmp/luci-indexcache*"
 
+
+# ---- BUST THE BROWSER CACHE, or a dev deploy is invisible to the device you are testing on ----
+#
+# head.ut versions every asset with `?v={{ pkgs_update_time }}`, and luci-base derives that from the
+# mtime of the PACKAGE DATABASE (runtime.uc: /lib/apk/db/installed, falling back to
+# /usr/lib/opkg/status). Installing a package moves it; scp'ing files over an existing install does
+# not — so a dev deploy leaves the URL identical while the bytes underneath change, and a browser is
+# entitled to keep serving what it already has. On a phone that is not a theory: a whole afternoon of
+# "still shakes" reports were taken against a stylesheet several deploys old.
+#
+# Touching the database file is what an install would have done to it, so the next page carries a new
+# `?v=` for every asset and nothing can be stale. Router-only, dev-only: nothing in the package does
+# this.
+ssh "$R" 'touch /lib/apk/db/installed 2>/dev/null || touch /usr/lib/opkg/status 2>/dev/null || true'
+
 echo "synced to $R (single Footstrap theme registered, active theme unchanged)"
