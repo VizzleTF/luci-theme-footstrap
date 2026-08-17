@@ -733,12 +733,24 @@ function setEnabled(el, on) {
  * OWN are touched: a clean sheet is harmless and an invasive one we could not attribute still
  * poisons the document, so it keeps the full-load path rather than being silently disabled on its
  * own page. */
-function scopeToCurrentPage(segs) {
+/* `keep` is the page still ON SCREEN, and it exists because a client navigation now has a window in
+ * which two pages are real: the incoming one renders into a hidden stage while the outgoing one is
+ * still being read (fs-router's staged swap). Scoping is needed BEFORE the staged render — a view
+ * must not measure itself through a sheet that does not own its page — but doing both halves then
+ * strips the outgoing page's own stylesheet off content the user is looking at, for the 600-1800 ms
+ * the staging window exists to fill. So the router calls this twice: once with `keep` set to the
+ * page it is leaving, which enables the incoming page's sheets and leaves the departing page's
+ * alone, and once with nothing at the swap, which is the ordinary sweep. */
+function scopeToCurrentPage(segs, keep) {
 	if (segs) _curKey = appKey(segs);
 	const key = currentKey();
+	const spared = (keep && keep.length) ? appKey(keep) : null;
 	document.querySelectorAll(VIEW_SHEETS).forEach((el) => {
 		if (!outlivesPage(el) || !_owner.has(el)) return;
-		setEnabled(el, _owner.get(el) === key);
+		const owner = _owner.get(el);
+		/* the page on screen keeps what it owns until the swap takes it off screen */
+		if (spared !== null && owner === spared && owner !== key) return;
+		setEnabled(el, owner === key);
 	});
 }
 

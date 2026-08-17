@@ -687,8 +687,8 @@ function seed() {
  * still-running chain paint into a later navigation's stage, so it rejects into the same full-load
  * fallback every other error takes. */
 const RENDER_TIMEOUT = 15000;
-/* the promise of the render currently in flight — the document's own first view is not tracked
- * here, because it has already finished by the time the chrome (and therefore this module) runs */
+/* the promise of the render currently in flight — this initial value only covers a document whose
+ * chrome came up without seed() having run; seed() replaces it with the document's own first render */
 let _inflight = Promise.resolve();
 
 function stageView(contentHost) {
@@ -708,14 +708,15 @@ function renderedIn(view) {
 	const painted = () => view.querySelector(':scope > :not(.spinning):not(script)') !== null;
 	if (painted()) return Promise.resolve();
 	return new Promise((resolve, reject) => {
-		let started = false;
 		const timer = window.setTimeout(() => {
 			finish(() => reject(new Error('the view did not render within ' + RENDER_TIMEOUT + ' ms')));
 		}, RENDER_TIMEOUT);
 		const mo = new MutationObserver(() => {
 			/* an empty render finishes too: the spinner is replaced by nothing at all, which is a
-			 * mutation that leaves no element children behind */
-			if (painted() || (started && view.childElementCount === 0)) finish(resolve);
+			 * mutation that leaves no element children behind. No "has it started" flag guards this:
+			 * `painted()` was asked before the observer existed, and an observer only ever fires on a
+			 * mutation, so an empty stage cannot resolve before the render has touched it. */
+			if (painted() || view.childElementCount === 0) finish(resolve);
 		});
 		function finish(settle) {
 			window.clearTimeout(timer);
@@ -723,7 +724,6 @@ function renderedIn(view) {
 			settle();
 		}
 		mo.observe(view, { childList: true });
-		started = true;
 	});
 }
 
@@ -734,6 +734,9 @@ function dropStage(stage) {
 /* Put the staged page on screen: clear what the outgoing page left beside `#view`, move the staged
  * children into the live `#view` through `dom.content()`, and drop the wrapper. */
 function commitStage(stage, contentHost) {
+	/* the outgoing page is going off screen now, so the sheets it owned may finally be darkened —
+	 * the half navigate() spared while it was still being read */
+	sheets.scopeToCurrentPage();
 	sweepAround(contentHost);
 	const live = liveView(contentHost, stage);
 	const nodes = Array.from(stage.view.childNodes);
@@ -895,10 +898,23 @@ function navigate(pathname, push, kbd) {
 
 	/* from here on the navigation is committed */
 	const gen = ++_navGen;
+	/* THE SAVED OFFSET BELONGS TO THIS NAVIGATION, so it is taken out of the module slot here
+	 * rather than read at the swap. Left in the slot it outlives its own navigation: Back sets it,
+	 * a click supersedes that render before it commits, and the clicked page — a page the user
+	 * never asked to be restored — is scrolled to the Back target's offset, under a generation that
+	 * passes because it is the newer one's. Clearing it on the superseded path is not the answer
+	 * either: a second popstate may legitimately have put ITS offset there by then. Reported in
+	 * review. */
+	const restoreTo = _pendingRestore;
+	_pendingRestore = null;
 	_curPath = pathname;	/* what is on screen from now on — read by the popstate handler */
 
 	const contentHost = document.querySelector('.fs-content');
 	if (!contentHost) return false;
+
+	/* the page being LEFT, captured before L.env is re-pointed a few lines down: the sheet scoping
+	 * spares it until the swap takes it off screen (see there) */
+	const leaving = (L.env.dispatchpath || []).slice();
 
 	/* the outgoing page's links are about to become a detached tree — do not hold one of them */
 	_lastHovered = null;
@@ -1079,8 +1095,17 @@ function navigate(pathname, push, kbd) {
 		 * whether it arrives as a full load or a client nav. Without the re-stamp the incoming page
 		 * keeps the previous page's data-page and its scoped styles silently do not apply.
 		 *
-		 * Here rather than at the click, because the outgoing page is still ON SCREEN until the swap:
-		 * stamping the incoming page's name early would restyle the page the user is still reading. */
+		 * WHERE THIS SITS, AND WHAT IT COSTS. It has to be before the staged render: page-scoped CSS
+		 * is keyed on `body[data-page]`, so a view that renders under the wrong value measures itself
+		 * through the wrong rules — and the fitters run inside the stage. It cannot be moved to the
+		 * swap for the same reason. What that buys is a correct incoming page; what it costs is that
+		 * the OUTGOING page, still on screen until the swap, wears the incoming page's name for the
+		 * staging window. The one artifact that is visible today is the Overview's own
+		 * `<h2 name="content">Status</h2>`, hidden by a `body[data-page='admin-status-overview']`
+		 * rule and therefore un-hidden while leaving that page — the same stray heading the sweep at
+		 * the swap removes. Moving the stamp later would trade that for a wrongly measured incoming
+		 * page, which is worse and lasts longer. Reported in review; stated here rather than left as
+		 * a claim the placement does not have. */
 		document.body.setAttribute('data-page', rsegs.join('-'));
 
 		/* …and hand the new page to fs-sheets, which darkens every foreign sheet that belongs to a
@@ -1088,8 +1113,15 @@ function navigate(pathname, push, kbd) {
 		 * invasive sheet stay in the document without spending it — the alternative was a full load
 		 * on the way out of any page carrying one, which stock LuCI's five realtime views all do (see
 		 * the page-ownership block in fs-sheets.js). It must run AFTER the stamp above and BEFORE the
-		 * view renders, so nothing paints through a sheet that no longer owns the page. */
-		sheets.scopeToCurrentPage(rsegs);
+		 * view renders, so nothing paints through a sheet that no longer owns the page.
+		 *
+		 * IN TWO HALVES, because unlike `data-page` this one can be split. Enabling the incoming
+		 * page's sheets is what the staged render needs; DISABLING the outgoing page's is what would
+		 * strip an app's own stylesheet off the content the user is still reading — for the whole
+		 * staging window, which on a cold route is the 600-1800 ms this design exists to fill. So the
+		 * page being left is spared here and swept at the swap (see commitStage). Reported in
+		 * review. */
+		sheets.scopeToCurrentPage(rsegs, leaving);
 
 		const stage = stageView(contentHost);
 		const painted = renderedIn(stage.view);
@@ -1127,11 +1159,7 @@ function navigate(pathname, push, kbd) {
 				if (gen !== _navGen) { dropStage(stage); return; }
 				commitStage(stage, contentHost);
 				/* now, and only now, is there one height to read: the incoming page's */
-				if (_pendingRestore) {
-					const pos = _pendingRestore;
-					_pendingRestore = null;
-					restoreScroll(pos, gen);
-				}
+				if (restoreTo) restoreScroll(restoreTo, gen);
 			})
 			.catch((e) => { dropStage(stage); throw e; });
 	}).catch((e) => {

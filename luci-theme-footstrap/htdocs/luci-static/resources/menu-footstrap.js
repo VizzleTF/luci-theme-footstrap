@@ -312,8 +312,18 @@ return baseclass.extend({
 
 		/* a clamp computed at the old width is wrong at the new one; coalesced via fit.frame
 		 * (the shared coalescer) because resize fires dozens of times a second while a window
-		 * is dragged */
-		window.addEventListener('resize', fit.frame(clearClamps));
+		 * is dragged.
+		 *
+		 * WIDTH ONLY, for the reason fs-fit's observer states at length: every browser on iOS
+		 * fires `resize` continuously while the URL bar slides away, and a clamp computed for a
+		 * width that did not change is work done on a page the user is scrolling. */
+		let lastWidth = window.innerWidth;
+		const reclamp = fit.frame(clearClamps);
+		window.addEventListener('resize', () => {
+			if (window.innerWidth === lastWidth) return;
+			lastWidth = window.innerWidth;
+			reclamp();
+		});
 
 		/* Appearance -> Submenus -> auto-collapse. fs-prefs.js owns the stored value and says only
 		 * that it changed; applying it is entirely ours, because every piece of the state is —

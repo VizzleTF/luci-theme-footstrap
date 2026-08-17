@@ -42,14 +42,46 @@ function schedule() {
 	requestAnimationFrame(() => { _rafPending = false; run(); });
 }
 
-/* Watch an element's size. Any change re-fits everything — the fitters are cheap and few. */
+/* WIDTH ONLY, and this is not an optimisation — it is what makes the theme usable on a phone.
+ *
+ * Every browser on iOS grows and shrinks the viewport HEIGHT while the user scrolls, because the
+ * URL bar slides away and comes back; each step of that animation is a resize, and a ResizeObserver
+ * on #view reports it. Measured with the bar's travel simulated on a 390px viewport — twenty
+ * height-only steps, width untouched — the fitters ran often enough to rewrite 1054 class
+ * attributes, each one a forced synchronous layout of a page the user is scrolling. That is the
+ * juddering reported from an iPhone.
+ *
+ * Nothing a fitter asks is about height: `roomFor()`/`overflows()` compare a table against its
+ * column, `fitChrome()` asks whether the menu fits beside the brand, the rail and the density axes
+ * change widths. A height-only change cannot alter any of those answers — and the one case that
+ * looks like a counter-example is not one: a vertical scrollbar appearing takes WIDTH from the
+ * content box, so the observer sees it as the width change it is.
+ *
+ * Per element, because the roots are observed separately and a dialog can resize while #view does
+ * not. The first entry for an element always counts as a change, so nothing is lost at start-up. */
+const _lastWidth = new WeakMap();
+function onResize(entries) {
+	let widthMoved = false;
+	for (const e of entries) {
+		/* contentRect, not getBoundingClientRect(): the observer already measured it, and asking
+		 * again inside the callback is the forced layout this function exists to avoid. */
+		const w = Math.round(e.contentRect.width);
+		if (_lastWidth.get(e.target) !== w) {
+			_lastWidth.set(e.target, w);
+			widthMoved = true;
+		}
+	}
+	if (widthMoved) schedule();
+}
+
+/* Watch an element's size. A change in WIDTH re-fits everything — the fitters are cheap and few. */
 function watch(el) {
 	if (!el) return;
 	/* No feature test: the shipped CSS needs :has() and container queries, both years younger than
 	 * ResizeObserver in every engine, so a browser that can render this theme at all has it. The
 	 * window-resize fallback that used to sit here was worse than nothing anyway — it cannot see a
 	 * rail collapse or a layout toggle, which is the pair this file uses an observer FOR. */
-	if (!_ro) _ro = new ResizeObserver(schedule);
+	if (!_ro) _ro = new ResizeObserver(onResize);
 	_ro.observe(el);
 }
 

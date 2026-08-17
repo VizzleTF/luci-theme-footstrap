@@ -66,7 +66,7 @@ msgctxt "footstrap"
 msgid "Clearly visible %s"
 msgstr "Хорошо видна %s"
 
-#: htdocs/luci-static/resources/fs-chrome.js:445
+#: htdocs/luci-static/resources/fs-chrome.js:407
 #: ucode/template/themes/footstrap/header.ut:150
 msgid "Collapse menu"
 msgstr "Свернуть меню"
@@ -138,7 +138,7 @@ msgctxt "footstrap"
 msgid "Easy to read %s"
 msgstr "Хорошо читается %s"
 
-#: htdocs/luci-static/resources/fs-chrome.js:445
+#: htdocs/luci-static/resources/fs-chrome.js:407
 msgid "Expand menu"
 msgstr "Развернуть меню"
 
