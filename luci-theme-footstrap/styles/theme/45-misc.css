@@ -134,12 +134,17 @@
 	 * NAMED, deliberately — an unnamed @container binds to the nearest ancestor that happens to
 	 * have a container-type, so giving container-type to any new component would silently
 	 * re-target every unnamed query underneath it.
-	 *   fs-map     this element specifically (a CBI form's content column)
 	 *   fs-view    the overview's grid (pages/20-overview.css, @container 800)
 	 *   fs-content "whatever content column I am in" — carried by BOTH .cbi-map and #view, so a
 	 *              query resolves to the NEAREST of the two. That is the point of sharing it.
+	 *
+	 * ONLY NAMES A QUERY ASKS FOR. `.cbi-map` also carried `fs-map`, for queries that were never
+	 * written — and a name in this list reads as an established seam, so the next rule that wants
+	 * the form's column would have been written against a container the sheet does not really
+	 * publish. The containment on `.cbi-map` stays: it is what makes `fs-content` resolve to the
+	 * form's own column rather than to `#view`.
 	 * ================================================================== */
-	.cbi-map { container-type: inline-size; container-name: fs-map fs-content; }
+	.cbi-map { container-type: inline-size; container-name: fs-content; }
 	#view { container-type: inline-size; container-name: fs-view fs-content; }
 
 	/* A modal is NOT inside #view — ui.js appends #modal_overlay to <body> — so every

@@ -128,10 +128,11 @@
 		/* …and THAT is only half of it, which 0.10.2 got wrong and made worse. The same fork writes
 		 * `align-items:center;justify-items:center` on the grid CONTAINER, so a tile's `justify-self`
 		 * resolves to `center` — and a centred item with `width: auto` is sized `fit-content`, not
-		 * stretched to its track. This card is `container-type: inline-size`, i.e. size-CONTAINED, so
-		 * its max-content contribution is ZERO: releasing the fork's `width:100px` handed the tile a
-		 * fit-content width of nothing but padding, and every row (name, speed, traffic) spilled out
-		 * to the right of a ~17px pill (reported against 0.10.2, ImmortalWrt 25.12 r37854).
+		 * stretched to its track, so releasing the fork's `width:100px` left the tile as narrow as
+		 * its content and the rows spilled out to the right (reported against 0.10.2, ImmortalWrt
+		 * 25.12 r37854; the tile was a ~17px pill then, because the card was still size-contained
+		 * and its max-content contribution was therefore zero — the containment is gone, the
+		 * fit-content sizing is not, and neither is the need to state the self-alignment).
 		 * Stating the self-alignment here needs NO flag — the fork's declarations are `*-items` on the
 		 * PARENT, which only supplies the value when the item says `auto`; a direct `*-self` wins on
 		 * the cascade proper. On stock, where both are already `stretch`, this is a no-op. */
@@ -195,11 +196,13 @@
 	}
 	/* name row + its ::after status dot */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
-		/* Its OWN row — and `width`, NOT `flex-basis: 100%`, which is the obvious way to write this
-		 * and does not work here: the card carries `container-type: inline-size`, so its main size is
-		 * not a definite length to resolve a percentage flex-basis against, and the browser falls
-		 * back to content sizing. Measured on the router: `flex: 0 0 100%` left the name 46px wide,
-		 * sitting beside the speed; `width: 100%` gives it the full 176. */
+		/* Its OWN row — and `width`, NOT `flex-basis: 100%`. The two were not equivalent when this
+		 * was written: the card carried `container-type: inline-size`, so its main size was not a
+		 * definite length for a percentage flex-basis to resolve against and the browser fell back to
+		 * content sizing (measured on the router: `flex: 0 0 100%` left the name 46px wide beside the
+		 * speed, `width: 100%` gave it the full 176). The containment has since been removed — see
+		 * the block above — so the two forms now agree; this one is kept because it says what it
+		 * means and does not depend on the card's sizing staying definite. */
 		flex: 0 0 auto;
 		width: 100%;
 		display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-1-5);

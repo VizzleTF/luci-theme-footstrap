@@ -32,20 +32,45 @@
  * Hooked at module eval — before any view render can set a timer, and LuCI resolves a module's
  * dependencies BEFORE running the dependent's factory, so this runs no later than it used to when
  * it sat in menu-footstrap-common.js itself. */
-const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = new Set()));
+const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = new Map()));
 (function hookIntervals() {
 	if (window.__fsIntervalsHooked) return;
 	window.__fsIntervalsHooked = true;
 	const _si = window.setInterval, _ci = window.clearInterval;
-	window.setInterval = function () {
+	window.setInterval = function (fn, ms) {
 		const id = _si.apply(window, arguments);
-		_viewIntervals.add(id);
+		/* the arguments are kept, not just the id: a paused timer has to be re-armed with what it
+		 * was armed with, and a `setInterval` id carries none of that back */
+		_viewIntervals.set(id, { fn, ms, rest: Array.prototype.slice.call(arguments, 2) });
 		return id;
 	};
 	window.clearInterval = function (id) {
 		_viewIntervals.delete(id);
 		return _ci.apply(window, arguments);
 	};
+	/* A HIDDEN TAB MUST NOT KEEP CALLING THE ROUTER. `wireVisibility()` below stops LuCI's own poll
+	 * when the tab goes away, which is most of the traffic — but a view is free to run a plain
+	 * `setInterval` of its own (luci-app-podkop's log tailer does), and those kept hammering ubus in
+	 * a background tab for as long as it stayed open. The registry that navigation already uses to
+	 * clear them is enough to pause them too: cleared on hide, re-armed on show with the same
+	 * callback and period, so a view that was polling every 3 s is polling every 3 s again and one
+	 * that was cleared meanwhile stays cleared. */
+	let _paused = [];
+	document.addEventListener('visibilitychange', () => {
+		if (document.hidden) {
+			_paused = [];
+			for (const [ id, spec ] of _viewIntervals) {
+				_paused.push(spec);
+				_ci.call(window, id);
+				_viewIntervals.delete(id);
+			}
+		}
+		else {
+			const back = _paused;
+			_paused = [];
+			for (const spec of back) window.setInterval(spec.fn, spec.ms, ...spec.rest);
+		}
+	});
 })();
 function clearViewIntervals() {
 	/* `L.Poll.timer` is the id of LuCI's OWN 1 s tick, and it is private state — `add`/`remove`/
@@ -84,7 +109,8 @@ function clearViewIntervals() {
 		return;
 	}
 	const keep = running ? L.Poll.timer : null;
-	_viewIntervals.forEach((id) => { if (id !== keep) window.clearInterval(id); });
+	/* Map, not Set: the key is the timer id and the value is what it would take to re-arm it */
+	_viewIntervals.forEach((spec, id) => { if (id !== keep) window.clearInterval(id); });
 }
 /* ONE line per document whatever went wrong: this runs on every navigation, and a router that
  * cannot read L.Poll cannot read it on the next click either — a message per click would bury the

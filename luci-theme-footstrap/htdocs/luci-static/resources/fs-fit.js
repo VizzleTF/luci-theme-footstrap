@@ -20,12 +20,22 @@
  * ResizeObserver, not onresize: a rail collapse and a layout toggle change the content width
  * without resizing the window. */
 
-/* THE STYLESHEET MAY ONLY HIDE WHAT THIS FILE WILL SHOW. `theme/30-tables.css` keeps a data table
- * out of the layout until it has been given an answer, which is what stops a freshly polled table
- * from being laid out full-width for a frame — but a rule like that must never outlive the code that
- * clears it. The attribute is written at module eval, so a document where these fitters never ran
- * carries no attribute and every table is visible, exactly as before. */
-try { document.documentElement.dataset.fsFit = '1'; } catch (e) { /* no document, no fitters */ }
+/* THE STYLESHEET MAY ONLY HIDE WHAT THIS FILE WILL SHOW, AND THE ARM BELONGS TO THE DISARM.
+ * `theme/30-tables.css` keeps a data table out of the layout until something marks it `.fs-fitted`.
+ * This attribute is what arms that rule — and it used to be written here, at module eval, while the
+ * only code that ever writes `.fs-fitted` lives in fs-select.js, which the footer requires
+ * SEPARATELY (`partials/footer.ut`: one require for menu-footstrap, another for fs-select, with no
+ * dependency edge between them). A document that loaded this file and not that one — a failed
+ * fetch, a parse error, a throw in fs-select's own init — armed a rule nobody could clear, and every
+ * data table on Status/Leases/Processes/Wireless rendered as nothing at all, silently.
+ *
+ * So the arming is exported instead, and the module that clears the rule is the one that raises it.
+ * A document where fs-select never ran carries no attribute and shows every table exactly as it did
+ * before the rule existed. */
+function armGate() {
+	if (!fittersEnabled()) return;
+	try { document.documentElement.dataset.fsFit = '1'; } catch (e) { /* no document, no gate */ }
+}
 
 const _fitters = [];
 let _rafPending = false;
@@ -124,10 +134,30 @@ let _movingUntil = 0;
 let _lastOffset = null;
 let _sampling = false;
 
-function scrollTop() {
+/* WHICH ELEMENT SCROLLS, ASKED ONCE PER WIDTH RATHER THAN ONCE PER FRAME.
+ *
+ * This function is the one every other pass consults before it dares to measure, and it ran in the
+ * frame loop below for as long as the page moved — so the `scrollHeight`/`clientHeight` probe it
+ * used to make WAS a forced synchronous layout, once per frame, in the middle of the flick this file
+ * exists to keep clear. Worse, a poll tick lands as a microtask that writes classes, so the very
+ * next frame's probe paid for a layout that had just been dirtied; and `touchstart` starts the
+ * sampler, so a plain tap on a button bought ~24 of them.
+ *
+ * The answer cannot change without the room changing: the two layouts scroll different elements and
+ * the switch between them is a width change, which `onResize` already watches and stamps. So the
+ * verdict is cached against that stamp and the offset is then read from the scroller directly —
+ * `scrollTop` on an element and `scrollY` on the window are both free. */
+let _scroller = null, _scrollerAt = -1;
+function scroller() {
+	if (_scrollerAt === _resizeSeq && (_scroller === null || _scroller.isConnected)) return _scroller;
 	const sc = document.getElementById('maincontent');
-	/* the two layouts scroll different elements; whichever is not the scroller answers a constant */
-	return (sc && sc.scrollHeight - sc.clientHeight > 4) ? sc.scrollTop : window.scrollY;
+	_scroller = (sc && sc.scrollHeight - sc.clientHeight > 4) ? sc : null;
+	_scrollerAt = _resizeSeq;
+	return _scroller;
+}
+function scrollTop() {
+	const sc = scroller();
+	return sc ? sc.scrollTop : window.scrollY;
 }
 
 function scrolling() { return Date.now() < _movingUntil; }
@@ -192,6 +222,9 @@ function schedule() {
  *
  * Per element, because the roots are observed separately and a dialog can resize while #view does
  * not. The first entry for an element always counts as a change, so nothing is lost at start-up. */
+/* bumped whenever an observed root changes WIDTH — the only thing that can change which element
+ * scrolls, and therefore what `scroller()` above may cache */
+let _resizeSeq = 0;
 const _lastWidth = new WeakMap();
 function onResize(entries) {
 	let widthMoved = false;
@@ -204,7 +237,7 @@ function onResize(entries) {
 			widthMoved = true;
 		}
 	}
-	if (widthMoved) schedule();
+	if (widthMoved) { _resizeSeq++; schedule(); }
 }
 
 /* Watch an element's size. A change in WIDTH re-fits everything — the fitters are cheap and few. */
@@ -383,6 +416,10 @@ return baseclass.extend({
 	 * read layout asks the first and calls the second; a pass that only writes does neither. */
 	scrolling,
 	deferMeasurement,
+
+	/* Raise the stylesheet's "an unanswered table takes no room" rule. Called by the module that
+	 * answers — see armGate above; nothing else may call it. */
+	armGate,
 
 	/* Re-fit on the next frame, coalesced. (There is no exported `run`: everything that changes
 	 * the available room — the layout toggle, the rail collapse — schedules. Only the mutation

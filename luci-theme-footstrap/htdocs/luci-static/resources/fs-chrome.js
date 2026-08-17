@@ -471,5 +471,20 @@ return baseclass.extend({
 	/* registered with fs-fit by the theme's init(): the bar's "does the menu fit beside the brand"
 	 * measurement rides the same engine as the data tables' */
 	fitChrome,
+
+	/* The width a page's content column has, WITHOUT reading layout. The sidebar (or the rail) eats
+	 * a known amount of the window and the shell adds a known padding, and all three are already
+	 * memoised against the density attribute for `fitShell()`. It is exported because a pass that
+	 * must answer mid-scroll — fs-select's, for a table the poll has just brought in — otherwise has
+	 * only `window.innerWidth`, which in the sidebar layout is the wrong number by exactly the
+	 * sidebar: at an 800px window the column is 520px, so the cheap judgement said "plenty of room"
+	 * for a table that then overflowed and was clipped. */
+	contentWidth() {
+		const g = shellGeometry();
+		const narrow = document.documentElement.hasAttribute('data-narrow');
+		/* in the bar layout the chrome is above the content, not beside it */
+		const cut = narrow ? 0 : (prefs.currentRail() ? g.railW : g.sidebarW);
+		return Math.max(0, window.innerWidth - cut - (g.contentPad * 2));
+	},
 	wireRail
 });

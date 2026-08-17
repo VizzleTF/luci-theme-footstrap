@@ -838,6 +838,24 @@ function rehostInvasiveSheets() {
 	if (!universe) return;
 	document.querySelectorAll(VIEW_SHEETS).forEach((el) => {
 		if (el.dataset.fsLayered) return;
+		/* A SHEET WITH NO RULES YET IS NOT AN INNOCENT SHEET. `insertRule()` produces no mutation
+		 * record of any kind, so an app that appends an empty <style> and fills it later — lazily, on
+		 * first hover, from a `.then()` — is judged here as empty, found not invasive, and never
+		 * looked at again unless some other sheet happens to be added afterwards. Measured: a
+		 * `* { padding: 0 !important }` inserted that way flattened the chrome (the sidebar's 20px
+		 * padding went to 0) and stayed unfenced for the life of the document. One deferred look per
+		 * such element is enough, and it costs nothing in the ordinary case where a <style> arrives
+		 * with its rules already in it. */
+		let rules = null;
+		try { rules = el.sheet && el.sheet.cssRules; } catch (e) { /* cross-origin: judged below */ }
+		if (rules && !rules.length && !el.__fsRecheck) {
+			el.__fsRecheck = true;
+			window.setTimeout(() => {
+				let now;
+				try { now = el.isConnected && el.sheet && el.sheet.cssRules; } catch (e) { return; }
+				if (now && now.length) rehostInvasiveSheets();
+			}, 2000);
+		}
 		if (invasiveSheet(el, universe)) rehostIntoThemeLayer(el, universe);
 	});
 }

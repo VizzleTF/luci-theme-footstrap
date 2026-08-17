@@ -3,6 +3,8 @@
 'require ui';
 'require dom';
 'require fs-fit as fit';
+/* for the content column's width without a layout read — see the mid-scroll branch in fitTables */
+'require fs-chrome as chrome';
 
 /* Theme plain LuCI <select> fields (ui.Select, widget:'select') by rendering a styled
  * cbi-dropdown beside them — a native <select> popup cannot be CSS-styled.
@@ -607,7 +609,12 @@ function fitTables() {
 		 * answer is a write, it forces nothing, and it keeps the fresh table the same shape as the one
 		 * it replaced. */
 		if (fit.scrolling()) {
-			applyDecision(t, known || { stack: window.innerWidth < CRAMPED, drop: false, breakCol: -1 });
+			/* the column's width, not the window's: in the sidebar layout they differ by the sidebar,
+			 * and an 800px window whose column is 520px used to clear CRAMPED and leave the table
+			 * unstacked at full width, clipped by `.fs-main { overflow-x: clip }` until the reader
+			 * held still. `chrome.contentWidth()` answers from memoised tokens and attributes — no
+			 * layout is read here either. */
+			applyDecision(t, known || { stack: chrome.contentWidth() < CRAMPED, drop: false, breakCol: -1 });
 			fit.deferMeasurement();
 			return;
 		}
@@ -651,7 +658,26 @@ function fitTables() {
 		 * an 810px column and wifi_assoclist_table 896px, neither carded, both quietly clipped by
 		 * `.fs-main { overflow-x: clip }` — columns cut off with nothing to say so. The extra question
 		 * is one the pass already has the layout for. */
-		if (known && known.room === room && known.shape === shape && !fit.overflows(t))
+		/* AND THE OTHER DIRECTION, WHICH THAT QUESTION CANNOT ASK. `overflows()` is put to a table
+		 * that is already wearing its remedy, and every remedy makes a table fit by construction: a
+		 * card is a pile of flex rows, `.fs-drop-xs` has hidden the expendable columns, a broken
+		 * column shreds. So the answer is always "it fits", and a remedy applied once could never be
+		 * lifted while the room and the column count held still — a one-way ratchet. The case is
+		 * real: one station with a long hostname makes Associated Stations drop its `hide-xs`
+		 * columns, and those columns stayed hidden after that station left, on a screen with room to
+		 * spare and nothing to say a column existed.
+		 *
+		 * The only honest measurement is of a table with no remedy on it, and taking that on every
+		 * tick would mean stripping the marks on every tick — the strip-measure-restore that lands as
+		 * a visible relayout, which is what the deferral above exists to keep out of a scroll. So the
+		 * re-decision is asked for by the CONTENT instead: a remedied table whose row count has gone
+		 * DOWN has lost something, and losing something is the only way it can stop needing the
+		 * remedy. Rows are counted from the tree, not the layout. A table that keeps its rows keeps
+		 * its answer, which is what makes the poll cheap. */
+		const rows = t.querySelectorAll('.tr').length;
+		const remedied = !!(known && (known.stack || known.drop || known.breakCol !== -1));
+		const shrank = remedied && known.rows !== undefined && rows < known.rows;
+		if (known && known.room === room && known.shape === shape && !shrank && !fit.overflows(t))
 			return;
 
 		/* fs-fit rule 1: a stacked table is a pile of flex rows and always "fits", so reading
@@ -690,6 +716,9 @@ function fitTables() {
 				breakCol: (t._fsBreakCol === undefined) ? -1 : t._fsBreakCol,
 				room,
 				shape,
+				/* what the answer was decided over — a drop below this is the one signal that a
+				 * remedy may no longer be needed (see the fast path above) */
+				rows,
 			});
 			_slots.set(home, slots);
 		}
@@ -1010,10 +1039,26 @@ return baseclass.extend({
 		};
 		scan();
 
+		/* ARM THE STYLESHEET'S GATE FROM HERE, because this is the file that clears it. The rule in
+		 * theme/30-tables.css holds an unanswered data table out of the layout, and `.fs-fitted` —
+		 * the answer — is written nowhere but in this module. Arming it in fs-fit.js meant a document
+		 * that loaded fs-fit and not this file (the footer requires them separately) hid every table
+		 * forever. Raised here, one line before the pass that clears it is registered. */
+		fit.armGate();
+
 		/* A table must be TAGGED .fs-dt before it can be fitted, and re-tagged whenever the poll
-		 * brings a fresh one back — so the two travel as one fitter, which fs-fit runs now, on
-		 * every content mutation (synchronously, pre-paint) and on every resize of #view. */
-		fit.add(() => { tagDataTables(); fitTables(); fitScrollables(); unpinActionColumn(); resyncValues(); });
+		 * brings a fresh one back — so tagging leads, and the passes that depend on it follow.
+		 *
+		 * FIVE REGISTRATIONS, NOT ONE CALLBACK. fs-fit catches per registered fitter, so a throw in
+		 * one of these used to take the other four with it — and the first of them walks third-party
+		 * markup, which is the shape most likely to surprise it. Bundled, a single throw in
+		 * `tagDataTables()` left no table tagged, no table answered, and — with the gate above raised
+		 * — a page with no tables on it at all. Registered separately, each pass fails alone. */
+		fit.add(tagDataTables);
+		fit.add(fitTables);
+		fit.add(fitScrollables);
+		fit.add(unpinActionColumn);
+		fit.add(resyncValues);
 
 		/* one scan per frame, however many mutations arrive (fit.frame — the theme's shared
 		 * coalescer) */

@@ -106,13 +106,23 @@ function probeColor(expr) {
 		/* off-screen rather than display:none — a display:none element still computes `color`, but
 		 * keeping it laid out avoids depending on that being true of every engine. It carries no
 		 * text and no size, so it paints nothing. */
-		_probe = E('span', { 'style': 'position:fixed;left:-9999px;top:0;width:0;height:0;overflow:hidden;pointer-events:none', 'aria-hidden': 'true' });
+		/* EVERY DECLARATION IMPORTANT, and the reason is the same one fs-chrome.js's length probe
+		 * carries (issue #19): this is an unmarked plain element in a document shared with
+		 * `luci-app-*`, the sheet fence deliberately does not spare it, and an app's unlayered
+		 * `span { color: … !important }` or `* { color: … !important }` outranks a layer and a plain
+		 * inline style alike. A probe that loses its own colour reports the app's instead — and this
+		 * probe's answer is written into the hex field, painted into the swatch and graded for
+		 * contrast, so a stolen reading becomes the admin's saved axis on the next confirm. */
+		_probe = E('span', { 'aria-hidden': 'true' });
+		_probe.style.cssText = 'position:fixed!important;left:-9999px!important;top:0!important;'
+			+ 'width:0!important;height:0!important;overflow:hidden!important;'
+			+ 'pointer-events:none!important;';
 		document.body.appendChild(_probe);
 	}
 	/* cleared first: an expression the engine rejects leaves the PREVIOUS colour standing, which
 	 * would report a stale answer as a fresh one. */
-	_probe.style.color = '';
-	_probe.style.color = expr;
+	_probe.style.setProperty('color', '');
+	_probe.style.setProperty('color', expr, 'important');
 	return getComputedStyle(_probe).color;
 }
 
