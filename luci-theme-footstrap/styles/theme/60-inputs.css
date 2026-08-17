@@ -250,9 +250,35 @@
 		 * that has to HOLD an icon, which is what --fs-density-box is defined for. */
 		--box: calc(16px * var(--fs-density-box));
 		--mark-inset: 3px;
+		/* ---- THE DRAWING IS 16px; THE TARGET IS 24px ----
+		 *
+		 * WCAG 2.2 SC 2.5.8 lets an undersized target pass on SPACING — 24px centre to centre — and
+		 * that is what a 16px tick box has always relied on. It holds while the theme decides the
+		 * layout and stops holding the moment a third-party app lays out its own rows: CI's
+		 * luci-app-filemanager listing put this checkbox and a file link inside the 24px, and the
+		 * page gate reported both. A target that passes only because of what someone else's markup
+		 * happens to do is not a target that passes.
+		 *
+		 * So the ELEMENT is 24px and the drawing stays 16px, centred inside it — the two pseudo
+		 * elements below are already absolutely positioned, so centring them costs `inset: 0;
+		 * margin: auto` and nothing else. Nothing moves visually: the box, the tick and the focus
+		 * ring are all drawn by `::before`/`::after` at `--box`, and the element itself has neither
+		 * background nor border. What grows is the area a finger may land on.
+		 *
+		 * `max()`, not a flat 24px: the Large density scales `--box` to 18.4px, and a target must
+		 * never SHRINK when the user asks for a bigger UI. */
+		--hit: max(24px, var(--box));
 		appearance: none;
-		width: var(--box);
-		height: var(--box);
+		width: var(--hit);
+		height: var(--hit);
+		/* …AND THE TARGET DOES NOT COST A ROW ITS HEIGHT. The element is 24px, but it occupies its
+		 * old `--box` in layout: the negative margin pulls the extra area back out of the flow, so
+		 * the box overflows itself symmetrically and everything around it sits exactly where it did.
+		 * Measured on luci-app-filemanager's listing, which is where CI reported the finding: with
+		 * the target simply grown, its rows went 42px -> 51px, i.e. a third-party page redesigned by
+		 * a theme's accessibility fix; with the margin, 43px against 42px and the target still
+		 * answers to a hit test at its centre. */
+		margin: calc((var(--box) - var(--hit)) / 2);
 		color: var(--fg-color);
 		position: relative;
 		display: inline-block;
@@ -272,8 +298,12 @@
 	}
 	input[type="checkbox"]::before,
 	input[type="radio"]::before {
-		top: 0;
-		inset-inline-start: 0;
+		/* centred in the 24px target, and direction-agnostic: `inset: 0; margin: auto` on a box with
+		 * a fixed size is the one centring that needs no translate and therefore behaves the same in
+		 * RTL, where an `inset-inline-start: 50%` + `translate: -50%` pair would push the drawing the
+		 * wrong way. */
+		inset: 0;
+		margin: auto;
 		width: var(--box);
 		height: var(--box);
 		background: linear-gradient(var(--fs-panel), var(--fs-panel2));
@@ -302,8 +332,10 @@
 	}
 	input[type="checkbox"]::after,
 	input[type="radio"]::after {
-		top: var(--mark-inset);
-		inset-inline-start: var(--mark-inset);
+		/* the mark is inset from the DRAWING, and the drawing is centred in the target, so the mark
+		 * centres the same way rather than measuring from the target's own edge */
+		inset: 0;
+		margin: auto;
 		width: calc(var(--box) - var(--mark-inset) * 2);
 		height: calc(var(--box) - var(--mark-inset) * 2);
 	}
