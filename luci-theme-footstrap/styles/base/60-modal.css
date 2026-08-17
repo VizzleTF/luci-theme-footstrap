@@ -54,7 +54,10 @@
 
 	body.modal-overlay-active {
 		overflow: hidden;
-		height: 100dvh;	/* dvh: 100vh counts the mobile URL bar and cropped the modal */
+		/* svh: `100vh` counts the mobile URL bar as if it were not there and cropped the modal, and
+		 * `dvh` re-lays the dialog out on every frame of the bar's slide (theme/20-shell.css). The
+		 * small viewport height is the one that is both correct and still. */
+		height: 100svh;
 	}
 
 	body.modal-overlay-active #modal_overlay {

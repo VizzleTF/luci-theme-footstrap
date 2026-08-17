@@ -210,6 +210,14 @@ function fitShell() {
 }
 
 function fitChrome() {
+	/* Nothing this function asks can change while the reader scrolls — the bar's width, the menu's
+	 * width, the room beside the brand — and every one of those questions is a layout read landing
+	 * in the middle of a flick. Put off until the scrolling stops; see fs-fit.js. */
+	if (fit.scrolling()) {
+		fit.deferMeasurement();
+		return;
+	}
+
 	fitShell();
 
 	const bar = document.querySelector('.fs-sidebar');

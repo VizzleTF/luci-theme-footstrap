@@ -92,9 +92,22 @@
 	.cbi-value-field .ifacebadge { font-family: var(--fs-font-sans); }
 	code, pre { font-weight: var(--fs-weight-normal); }
 
-	/* fade-in used by overview poll */
-	.fade-in { animation: fs-fade var(--fs-dur-fade); }
-	@keyframes fs-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+	/* ---- THE POLL'S `fade-in` IS NOT ANIMATED AT ALL, AND THAT IS THE WHOLE RULE ----
+	 *
+	 * `fade-in` is upstream's class and luci-mod-status re-marks with it on EVERY poll tick — each
+	 * section, and the `div.includes` wrapper that holds all of them. Anything this theme hangs on
+	 * that class therefore replays once a second across the entire content column.
+	 *
+	 * It was a fade plus a 4px slide, which moved the page under the reader; the slide came off
+	 * first, and the fade alone still pulsed the whole column once a second — reported from an
+	 * iPhone as shaking that happens WITHOUT SCROLLING AT ALL, which is what finally named it: a
+	 * poll tick is the only thing that happens on a still page. The stock themes animate nothing
+	 * here, which is why the same router and the same poll are calm under luci-theme-bootstrap.
+	 *
+	 * So the theme animates nothing on it either. The class stays in the markup (it is upstream's
+	 * and other rules may key on it); what is gone is the animation this file used to attach. The
+	 * `fade-in` keyframes in base/95-luci.css stay for the same reason they always did — the NAME is
+	 * upstream's and an app may use it. */
 	.cbi-title-ref { color: var(--fs-accent); }
 	.close { color: var(--fs-text); text-shadow: none; opacity: .6; }
 	.close:hover { opacity: 1; }

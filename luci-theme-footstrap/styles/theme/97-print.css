@@ -3,7 +3,7 @@
 	 * Print. A LuCI page ends up on paper/PDF as documentation — a firewall ruleset in a
 	 * change ticket, an overview in a handover — and without this block it printed the dark
 	 * chrome, the sticky bar, and (in the sidebar layout) ONE page: the shell is
-	 * height:100dvh + overflow:hidden there, so everything past the first viewport was cut.
+	 * height:100svh + overflow:hidden there, so everything past the first viewport was cut.
 	 *
 	 * No `!important` (tools/audit.py allows the flag only in its listed files, and nothing
 	 * here fights an inline style). Where a rule must beat a same-layer chrome rule it wins

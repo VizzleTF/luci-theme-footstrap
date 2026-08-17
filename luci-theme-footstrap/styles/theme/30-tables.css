@@ -537,6 +537,28 @@
 	 * rendered ALL FIVE of its .hide-xs cells; at 760px both were correct. So they key off the CLASS.
 	 * The media query keeps its own copies, for the tables that do NOT stack on a phone and for the
 	 * config tables (@container, never .fs-stacked). The `.col-N` weights need no guard — see below. */
+	/* ---- A TABLE NOBODY HAS ANSWERED FOR YET TAKES NO ROOM ----
+	 *
+	 * A poll tick REPLACES these tables, and a fresh one carries no marks: for the moment between
+	 * landing and being stamped it is laid out as a full-width table — at 390px, several screens
+	 * taller than the card stack it is about to be. The engine re-anchors on that intermediate and
+	 * throws the reader; measured on a remote router at iPhone width, 612px out and back, twice per
+	 * tick. fs-select.js answers in a MutationObserver microtask, i.e. before paint — but only if
+	 * nothing forces layout in between, and an app that reads a width right after rendering does
+	 * exactly that.
+	 *
+	 * So the table waits outside the layout until it has an answer. `display: none` and not
+	 * `visibility: hidden`, because a hidden box still occupies its height, which is the whole
+	 * problem; the wait is a microtask long.
+	 *
+	 * GUARDED ON THE FITTERS BEING ALIVE. `:root[data-fs-fit]` is written by fs-fit.js at module
+	 * eval and by nothing else, so a document where that file never ran — an old cache, a JS error
+	 * before it, a browser that refused the module — shows every table exactly as it did before this
+	 * rule existed. A stylesheet that can hide content on its own is a stylesheet that can hide it
+	 * forever. */
+	:root[data-fs-fit] #view .table.fs-dt:not(.fs-fitted),
+	:root[data-fs-fit] #modal_overlay .table.fs-dt:not(.fs-fitted) { display: none; }
+
 	.table.fs-stacked { display: block; width: 100%; }
 	/* `.fs-drop-xs` is the SAME drop, one rung earlier: fs-select.js writes it on a table that has
 	 * overflowed, before it decides to card, because the view author has already said which columns

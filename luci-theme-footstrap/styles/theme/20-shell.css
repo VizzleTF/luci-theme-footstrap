@@ -94,7 +94,20 @@
 	 * ================================================================== */
 	.fs-shell {
 		display: flex; flex-direction: column;
-		min-height: 100dvh; width: 100%;
+		/* ---- `svh`, NOT `dvh`, AND THAT IS THE PHONE'S WHOLE PROBLEM ----
+		 *
+		 * `dvh` is defined to track the viewport as browser UI comes and goes, and on iOS the URL bar
+		 * slides continuously WHILE THE USER SCROLLS — so a shell keyed on `dvh` is re-laid-out on
+		 * every frame of that animation, which is the shaking reported from an iPhone. `svh` is the
+		 * SMALL viewport height: the value the viewport has with the browser UI shown, and it does
+		 * not move while the UI does. It is also the right value here: this is a floor, so the shell
+		 * must be at least one screenful tall with the bar visible; when the bar hides, the page is
+		 * free to be taller and nothing needs to re-measure.
+		 *
+		 * The whole file follows the same rule below — a height that must not change under the reader
+		 * uses `svh`. Nothing here wants `dvh`'s tracking; that unit is for a thing that should GROW
+		 * as the UI retracts, and this shell is not one. */
+		min-height: 100svh; width: 100%;
 	}
 	.fs-sidebar {
 		display: flex;
@@ -312,11 +325,11 @@
 		 * the ROOT stacking context and sit above the content for free. Confined to the desktop
 		 * sidebar: the top layout and the phone bar keep window scrolling and their sticky bar. */
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-shell {
-			flex-direction: row; height: 100dvh; overflow: hidden;
+			flex-direction: row; height: 100svh; overflow: hidden;
 		}
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-main {
-			height: 100dvh; overflow-y: auto;
-			/* `contain: paint` — the fix for #12. .fs-shell is height:100dvh + overflow:hidden and
+			height: 100svh; overflow-y: auto;
+			/* `contain: paint` — the fix for #12. .fs-shell is height:100svh + overflow:hidden and
 			 * .fs-main is its own overflow:auto scroller, so Chrome never grows the document past the
 			 * viewport. Firefox does: on Обзор (where the .fs-ovl grid makes the column ~2800px tall)
 			 * it propagates ~158px of an out-of-flow descendant's scrollable overflow PAST both
@@ -331,7 +344,7 @@
 			contain: paint;
 		}
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar {
-			width: var(--fs-sidebar-w); height: 100dvh;
+			width: var(--fs-sidebar-w); height: 100svh;
 			flex: 0 0 auto;
 			position: static;
 			flex-direction: column; flex-wrap: nowrap; align-items: normal;
@@ -682,7 +695,7 @@
 	 * FIXED, AT THE TOP OF THE VIEWPORT, AND A CHILD OF <body> — all three are load-bearing and the
 	 * first draft got two of them wrong. In the content column it is a flex item of `.fs-main`, and
 	 * a column flex container shrank its 2px to ZERO (measured: height 0 in the sidebar layout,
-	 * where `.fs-shell` is 100dvh); with `margin-bottom: -2px` the content painted over what was
+	 * where `.fs-shell` is 100svh); with `margin-bottom: -2px` the content painted over what was
 	 * left. And it cannot live inside `.fs-shell` either: that box carries `contain: paint`, which
 	 * makes a fixed descendant position itself against the shell and be clipped by it. At the top of
 	 * the viewport is also where a browser puts its own progress, so it is the least surprising

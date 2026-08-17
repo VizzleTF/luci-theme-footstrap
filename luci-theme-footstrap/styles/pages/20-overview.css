@@ -142,7 +142,21 @@
 		border: 1px solid var(--fs-border);
 		border-radius: var(--fs-radius-lg);
 		padding: var(--fs-space-2) var(--fs-space-3);
-		container-type: inline-size; container-name: fs-port;
+		/* NO `container-type` HERE, and its absence is the fix for a page that jumped every five
+		 * seconds. The card used to be `container-type: inline-size; container-name: fs-port`, for two
+		 * `@container fs-port` queries that were deleted when the flex wrap below replaced their pixel
+		 * threshold (see the note by `text-align: end` further down) — the containment was left behind
+		 * with nothing asking it anything.
+		 *
+		 * It was not free. The poll rewrites these cards once a tick, and a freshly built size-contained
+		 * box is laid out before the containment resolves, so everything below it moved by the same
+		 * amount on every tick: "jerks down by a fixed distance every five seconds", on the reporter's
+		 * own router in Safari. Bisected on that router — the theme's stylesheet cut to its cascade
+		 * layers (tokens+base+theme: still; +this page layer: jumping), then to this one declaration:
+		 * with `container-type: normal` forced on the cards, the page is still.
+		 *
+		 * If a future rule needs a container query here, name the container on a wrapper the poll does
+		 * NOT replace, never on the card itself. */
 		display: flex;
 		/* `flex-direction: row` is NOT redundant: base/95-luci.css paints every .ifacebox
 		 * `display: inline-flex; flex-direction: column`, and the grid this rule used to declare

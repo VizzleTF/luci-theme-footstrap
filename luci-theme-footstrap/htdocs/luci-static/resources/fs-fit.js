@@ -20,20 +20,153 @@
  * ResizeObserver, not onresize: a rail collapse and a layout toggle change the content width
  * without resizing the window. */
 
+/* THE STYLESHEET MAY ONLY HIDE WHAT THIS FILE WILL SHOW. `theme/30-tables.css` keeps a data table
+ * out of the layout until it has been given an answer, which is what stops a freshly polled table
+ * from being laid out full-width for a frame — but a rule like that must never outlive the code that
+ * clears it. The attribute is written at module eval, so a document where these fitters never ran
+ * carries no attribute and every table is visible, exactly as before. */
+try { document.documentElement.dataset.fsFit = '1'; } catch (e) { /* no document, no fitters */ }
+
 const _fitters = [];
 let _rafPending = false;
 let _ro = null, _mo = null, _moFlag = null;
 
-/* Run every fitter NOW, synchronously. A fitter must be idempotent — this fires on every
- * relevant mutation. */
-function run() {
-	for (const fit of _fitters) {
+/* ---- A PASS THAT READS LAYOUT MAY NOT RUN WHILE THE READER SCROLLS ----
+ *
+ * Reading layout — `getBoundingClientRect()`, `clientWidth`, `scrollWidth` — forces the engine to
+ * lay the page out synchronously. Once a second, from a poll tick, in the middle of a flick on a
+ * phone, that is what iOS holds the main thread back to prevent, and it was the largest part of the
+ * shaking reported from an iPhone; a stock theme has no JS in that path at all.
+ *
+ * The rule is stated by each pass rather than by this file, and that is not an oversight — the
+ * central version was written, measured and reverted, because moving the decision here also moved
+ * WHEN the deferred work lands and the device started shaking again. A pass that reads layout asks
+ * `scrolling()` and calls `deferMeasurement()`; a pass that only writes does neither and runs
+ * always. The one that must run always is the marking of a freshly polled table: the stylesheet
+ * keeps an unmarked data table out of the layout, so waiting would leave it invisible for as long
+ * as the reader keeps scrolling. */
+function runAll(list, what) {
+	for (const fit of list) {
 		try { fit(); }
 		/* one broken fitter must take neither the others nor the poll's MutationObserver
 		 * callback with it — that would silently stop ALL re-fitting */
-		catch (e) { console.error('fs-fit: a fitter threw', e); }
+		catch (e) { console.error('fs-fit: a ' + what + ' threw', e); }
 	}
 }
+
+/* Everything that may run right now, with the reader kept where they were.
+ *
+ * ONE PATH: the mutation observer, the coalesced re-fit and the pass that was put off during a
+ * scroll all come through here, so the order — reference, work, correction — is stated once.
+ * `anchorRef()` answers null while the reader scrolls and the correction below does nothing with a
+ * pass that happens mid-scroll costs neither of the two layout reads.
+ *
+ * WHAT MAY RUN MID-SCROLL IS EACH PASS'S OWN ANSWER, not this function's. A pass that only writes —
+ * marking a freshly polled table, which cannot wait because the stylesheet holds an unmarked table
+ * out of the layout — runs always; a pass that reads layout asks `scrolling()` first and calls
+ * `deferMeasurement()`. Deciding it here instead was tried and reverted: it changed WHEN the
+ * deferred work lands, and the device that had the problem started shaking again. */
+/* DEV SWITCH: `localStorage.fsFit = 'off'` stops every fitter. It exists because the only way to
+ * tell "the theme's measuring is what shakes this phone" from "something else is" is to turn the
+ * measuring off ON THAT PHONE, and a laptop cannot answer it. */
+function fittersEnabled() {
+	try { return localStorage.getItem('fsFit') !== 'off'; }
+	catch (e) { return true; }
+}
+function run() {
+	if (!fittersEnabled()) return;
+	runAll(_fitters, 'fitter');
+}
+
+/* ---- IS THE PAGE MOVING RIGHT NOW? — ASKED OF THE POSITION, NEVER OF THE EVENTS ----
+ *
+ * A pass that reads layout must not run while the page moves: on a phone every such read forces a
+ * synchronous layout in the middle of a flick, which is the work iOS holds the main thread back to
+ * prevent. So the passes ask this before measuring, and what they skipped is run once the movement
+ * stops.
+ *
+ * THE FIRST VERSION ASKED THE EVENTS — `scroll`, `wheel`, `touchmove`, plus 200 ms of quiet — and it
+ * was wrong in the one place it mattered. On iOS the momentum keeps carrying the page long after the
+ * finger has gone, and events do not reliably arrive through it; the timer then declared the reader
+ * still and dropped the whole deferred pass — every table stripped and measured, the chrome
+ * re-fitted — into the middle of the glide. That is a stall and a relayout while the page is
+ * visibly moving, and it is the shaking that came BACK when a refactor made less work happen during
+ * the scroll and more of it land in that burst. The measurement that named it: the same device
+ * shook more with strictly less work in the scroll path.
+ *
+ * So movement is read from the SCROLL POSITION. A frame in which the offset differs from the last is
+ * movement, whatever the event stream is doing; the sampler runs only while there is reason to
+ * think the page moves, and stops itself when the offset has held for SCROLL_IDLE. Momentum,
+ * rubber-banding and a programmatic `scrollTo` all look the same to it, which is the point.
+ *
+ * The offset read is one per frame, and it is the cheapest question there is — no geometry, no
+ * element, no forced layout beyond what the frame already needs. */
+/* HOW LONG THE PAGE MUST HOLD STILL BEFORE THE PUT-OFF WORK MAY RUN, and the number is the fix for
+ * the shaking, not a tuning knob.
+ *
+ * 200ms was shorter than the pauses a slow reader leaves. Rocking a page gently at the tables — the
+ * reader's own description of when it happens — the offset stops for a moment between one movement
+ * and the next, this timer called that a stop, and the whole deferred pass landed in the middle of
+ * the gesture: every table stripped of its marks, measured, marked again. That is a full relayout
+ * while the page is visibly moving, and it is what "jerks back and forth" was.
+ *
+ * Measured on a stand with the reader's motion imitated (a slow rock, 60 frames, the error between
+ * what the wheel asked for and what the page did, summed): 137-256px of roughness at 200ms with
+ * every twentieth frame off by 40px, and 59px — the floor, one pixel of rounding per frame, the same
+ * as switching the fitters off entirely — at 250ms and above. 400 is that floor with room to spare,
+ * and still well inside the time a reader takes to look at what they scrolled to. */
+const SCROLL_IDLE = 400;
+/* set by a pass that skipped its measurement because the page was moving; consumed by the sampler
+ * below the moment it stops */
+let _deferred = false;
+function deferMeasurement() { _deferred = true; }
+let _movingUntil = 0;
+let _lastOffset = null;
+let _sampling = false;
+
+function scrollTop() {
+	const sc = document.getElementById('maincontent');
+	/* the two layouts scroll different elements; whichever is not the scroller answers a constant */
+	return (sc && sc.scrollHeight - sc.clientHeight > 4) ? sc.scrollTop : window.scrollY;
+}
+
+function scrolling() { return Date.now() < _movingUntil; }
+
+function sampleMotion() {
+	const y = scrollTop();
+	if (_lastOffset === null || y !== _lastOffset) {
+		_lastOffset = y;
+		_movingUntil = Date.now() + SCROLL_IDLE;
+	}
+	if (scrolling()) { requestAnimationFrame(sampleMotion); return; }
+	_sampling = false;
+	/* the page has held still for SCROLL_IDLE: whatever was put off may run now */
+	if (_deferred) {
+		_deferred = false;
+		const ref = anchorRef();
+		run();
+		scheduleAnchor(ref);
+	}
+}
+
+function noteMotion() {
+	_movingUntil = Date.now() + SCROLL_IDLE;
+	if (_sampling) return;
+	_sampling = true;
+	requestAnimationFrame(sampleMotion);
+}
+
+/* `passive: true` and `capture: true`: this must never sit in front of the scroll it is watching,
+ * and `scroll` does not bubble from an element — it only travels down the capture phase, which is
+ * how the sidebar layout's inner scroller is seen as well as the document. The events only START
+ * the sampler; whether the page is still moving is the sampler's answer, not theirs. */
+(function watchMotion() {
+	const opts = { passive: true, capture: true };
+	window.addEventListener('scroll', noteMotion, opts);
+	window.addEventListener('wheel', noteMotion, opts);
+	window.addEventListener('touchstart', noteMotion, opts);
+	window.addEventListener('touchmove', noteMotion, opts);
+})();
 
 /* Next frame, at most once per frame (rule 3). */
 function schedule() {
@@ -85,6 +218,111 @@ function watch(el) {
 	_ro.observe(el);
 }
 
+/* ---- SCROLL ANCHORING, WHERE THE ENGINE HAS NONE ----
+ *
+ * A poll tick changes the height of what is ABOVE the reader: a lease expires, a station joins, a
+ * section renders one row fewer. An engine with scroll anchoring absorbs that — it moves the scroll
+ * offset by the same amount, so the page under the reader does not move. WebKit has none, and it is
+ * every browser on iOS: measured on the reporter's own router, `content +133px, +134px, +123px,
+ * +108px…` one after another, each next to a `child +1/-1` in a polled section. That is the shaking,
+ * and it is not the tall-intermediate problem the rest of this file solves — the height change here
+ * is REAL, and simply nobody compensates for it.
+ *
+ * So this compensates for it, and only when nobody else did. A reference is taken from the elements
+ * that survive a poll — the section frames — choosing the one that crosses the top of the viewport,
+ * because that is the boundary a reader perceives as "where I am". The fitters run, the reference is
+ * read again, and the offset is moved by however far it drifted.
+ *
+ * WHY THIS IS SAFE ON AN ENGINE THAT DOES ANCHOR, which an earlier attempt got wrong by measuring
+ * the wrong thing: the correction is computed from the REFERENCE, not from the scroll offset. An
+ * anchoring engine has already put the reference back where it was by the time this reads it — the
+ * read forces layout, and the adjustment happens during layout — so the drift is zero and this does
+ * nothing at all. Measuring the offset instead reads an anchoring adjustment as a fault and corrects
+ * a correction, which is exactly how a previous version made Chromium worse (16 movements, 1827px).
+ *
+ * It never fights the user: a page at the very top has no offset to give back and is left alone, and
+ * a drift under a pixel is rounding rather than movement. */
+function anchorRef() {
+	/* NOT WHILE THE READER SCROLLS. Every rect read here is a forced layout, and this runs on every
+	 * content mutation — i.e. once a second, in the middle of a flick, which is the work iOS holds
+	 * the main thread back to avoid. The compensation exists for a page the reader is looking at,
+	 * not for one they are already moving; while they scroll there is nothing to keep still. */
+	if (scrolling()) return null;
+	const frames = document.querySelectorAll('#view .cbi-section, #view > .cbi-section-node, #view > div');
+	for (const el of frames) {
+		const r = el.getBoundingClientRect();
+		/* the frame the viewport's top edge cuts through */
+		if (r.top <= 0 && r.bottom > 0) return { el, top: r.top };
+	}
+	return null;
+}
+/* THE CORRECTION IS UNCONDITIONAL, AND IT IS A NO-OP WHERE THE ENGINE DOES THE JOB.
+ *
+ * There used to be a watching phase here: the first three mutations were only measured, and a
+ * reference that had held still meant "this engine anchors, never touch the offset again". It was
+ * wrong in the way that mattered. WebKit does not anchor, but the drift it leaves is often small —
+ * a value grew a line, a row appeared — so three quiet samples were easy to come by, the
+ * compensation switched itself off for the life of the document, and the page walked downwards a
+ * few pixels at a time, once per poll tick. That is exactly how it was reported: "jerks a little
+ * downwards, all the time".
+ *
+ * Correcting always is safe because the correction is computed from the REFERENCE, not from the
+ * scroll offset: an engine that anchors has already put the reference back by the time this reads
+ * it — the read forces layout, and the adjustment happens during layout — so the drift is zero and
+ * nothing is written. Measuring the OFFSET instead reads an anchoring adjustment as a fault and
+ * corrects a correction, which is how an earlier version made Chromium worse (10 movements up to
+ * 1616px against 0 without it); that mistake is not in this shape.
+ *
+ * Two guards remain, and both are about not fighting the reader: a page at the very top has no
+ * offset to give back, and a drift under a pixel is rounding rather than movement. */
+/* ONCE PER FRAME, AFTER EVERYTHING HAS LANDED — not once per mutation batch.
+ *
+ * A poll tick does not arrive as one mutation: luci-mod-status fills its sections one after another,
+ * and each fill wakes this observer. Correcting on each of them measures a page that is still being
+ * written: the reference is read between two batches, the drift is computed against a layout that
+ * the next batch immediately invalidates, and the correction is wrong by whatever the rest of the
+ * tick brought. The next tick corrects the other way. That is a page that jerks while nobody
+ * touches it, and it is what was reported — with a telling detail: it went away whenever a
+ * diagnostic probe that forced layout on EVERY frame was loaded, because then every reading this
+ * code took happened to be against a settled layout.
+ *
+ * So the reference is taken at the first mutation of a batch and the correction is applied in a
+ * requestAnimationFrame — after the batch, after style and layout have settled, once. A newer
+ * reference is not taken while one is pending: the first one is where the reader actually was. */
+let _anchorPending = null;
+let _anchorFrame = 0;
+/* DEV SWITCH, for the device that has the problem: `localStorage.fsAnchor = 'off'` stops the theme
+ * from ever writing the scroll offset, which is the one thing here that can move a page nobody is
+ * touching. It exists to answer a question a laptop cannot — whether the correction is the cure or
+ * the disease — and comes out with the answer. */
+function anchorEnabled() {
+	try { return localStorage.getItem('fsAnchor') !== 'off'; }
+	catch (e) { return true; }
+}
+function scheduleAnchor(ref) {
+	if (!ref || !anchorEnabled()) return;
+	if (_anchorPending) return;
+	_anchorPending = ref;
+	if (_anchorFrame) return;
+	_anchorFrame = requestAnimationFrame(() => {
+		_anchorFrame = 0;
+		const pending = _anchorPending;
+		_anchorPending = null;
+		applyAnchor(pending);
+	});
+}
+function applyAnchor(ref) {
+	if (!ref || !ref.el.isConnected) return;
+	const sc = document.getElementById('maincontent');
+	const inner = sc && sc.scrollHeight - sc.clientHeight > 4;
+	const at = inner ? sc.scrollTop : window.scrollY;
+	if (at <= 0) return;
+	const drift = ref.el.getBoundingClientRect().top - ref.top;
+	if (Math.abs(drift) < 1) return;
+	if (inner) sc.scrollTop = at + drift;
+	else window.scrollTo(0, at + drift);
+}
+
 /* Rule 2's mutation side. Deliberately NOT filtered by node type: a filter is a second place to
  * get wrong (the table fitter's own once said `table.table`, and LuCI renders most of its tables
  * as DIVs — so the poll never re-measured at all), and run() is a handful of measurements. */
@@ -100,7 +338,12 @@ function watch(el) {
  * constructor, and luci-base instantiates a class exactly once, at the first require. */
 function observeContent() {
 	if (_mo) return;
-	_mo = new MutationObserver(run);
+	_mo = new MutationObserver(() => {
+		/* what the reader is looking at, before the poll's mutation and the fitters move anything */
+		const ref = anchorRef();
+		run();
+		scheduleAnchor(ref);
+	});
 	for (const host of [ document.getElementById('view') || document.body, document.getElementById('modal_overlay') ]) {
 		if (!host) continue;
 		_mo.observe(host, { childList: true, subtree: true });
@@ -136,10 +379,16 @@ return baseclass.extend({
 		fit();
 	},
 
+	/* Is the reader scrolling, and "I could not measure, wake me when they stop". A pass that has to
+	 * read layout asks the first and calls the second; a pass that only writes does neither. */
+	scrolling,
+	deferMeasurement,
+
 	/* Re-fit on the next frame, coalesced. (There is no exported `run`: everything that changes
 	 * the available room — the layout toggle, the rail collapse — schedules. Only the mutation
 	 * observer re-fits synchronously, and that is rule 2's whole point.) */
 	schedule,
+
 
 	/* Coalesce ANY callback into one call per frame (rule 3, for non-fitters): schedule() runs
 	 * EVERY fitter, so a caller wanting only its own work batched cannot use it — three had

@@ -211,6 +211,24 @@ class, reads the width, decides, and sets `.fs-stacked`. The decision depends on
 needs, not on the screen, so `@media` cannot express it: cards can happen at any viewport
 width. Measuring is safe because a data table holds no widgets.
 
+**But a measurement is never taken while the reader is scrolling, and a table that has not been
+answered for takes no room.** Both come from the same failure, reported from an iPhone against a
+remote router: the poll REPLACES these tables, so every tick handed the fitter an unmarked element
+that was laid out full-width for a frame — several screens taller, at 390 px, than the card stack it
+was about to become — and the fit pass itself read layout once per table in the middle of a flick,
+which is exactly the work iOS holds the main thread back to prevent.
+
+So `fs-fit.js` has two registration channels, and which one a pass belongs in is a contract rather
+than a habit: `fit.add()` for a pass that may read layout, which therefore never runs while the
+reader scrolls and is re-run when they stop, and `fit.addAlways()` for a pass that only writes.
+Marking a freshly arrived table is the second kind — it cannot wait, because
+`:root[data-fs-fit] .table.fs-dt:not(.fs-fitted) { display: none }` keeps an unanswered table out of
+the layout until it has an answer. Where does that answer come from without measuring? From the
+SLOT: the section frame survives a poll tick, so the table that was replaced left its decision
+there, keyed by column count and room. The guard on `:root[data-fs-fit]` is what makes the rule
+safe: the attribute is written by this theme's own JS at module eval, so a document where that JS
+never ran shows every table exactly as it did before the rule existed.
+
 **A config table (`.cbi-section-table`) is not measured and must stay on
 `@container fs-content (max-width: 960px)`.** Its rows are full of widgets (`fs-select.js` turns
 every `<select>` into a `ui.Dropdown`), and a widget bakes in the width of the layout it was laid
