@@ -32,7 +32,8 @@
     "live-audit": "node tools/live-audit.mjs",
     "spa-parity": "node tools/spa-parity.mjs",
     "upstream": "node tools/upstream-contract.mjs",
-    "live": "npm run upstream && npm run spa-parity && npm run live-audit",
+    "scroll": "node tools/scroll-jank.mjs",
+    "live": "npm run upstream && npm run spa-parity && npm run live-audit && npm run scroll",
     "install-check": "sh tools/install-check.sh"
   },
   "devDependencies": {

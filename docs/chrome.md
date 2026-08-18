@@ -84,12 +84,29 @@ viewport breakpoint cannot say that: the slice is not a constant (224 px expande
 one breakpoint gave both states the same answer and the rail collapsed at the same width as the
 full sidebar.
 
-`fitShell()` (`fs-chrome.js`) subtracts the slice from `innerWidth` and compares the remainder with
-`--fs-content-min`; it **reads the widths from the CSS tokens** (`--fs-sidebar-w`, `--fs-rail-w`,
-`--fs-content-min`, `--fs-content-pad`) through `getComputedStyle` rather than keeping copies —
-otherwise narrowing the rail in the styles would leave the measurement subtracting the old number,
-and no gate would notice. The result is `data-narrow` on `:root`, read by both the CSS and
-`flyoutMode()` in the JS.
+`fitShell()` (`fs-chrome.js`) subtracts the slice from the root's `clientWidth` and compares the
+remainder with `--fs-content-min`; it **reads the widths from the CSS tokens** (`--fs-sidebar-w`,
+`--fs-rail-w`, `--fs-content-min`, `--fs-content-pad`) through `getComputedStyle` rather than
+keeping copies — otherwise narrowing the rail in the styles would leave the measurement subtracting
+the old number, and no gate would notice. The result is `data-narrow` on `:root`, read by both the
+CSS and `flyoutMode()` in the JS.
+
+**The subtraction itself is `columnWidth()`, and there is exactly one of it.** Two callers need the
+width of the content column — `fitShell()`, deciding whether the sidebar still fits beside it, and
+`contentWidth()`, which answers `fitTables()` mid-scroll where reading layout is forbidden — and
+while the arithmetic was written twice it drifted twice: `--fs-content-pad` is ONE side's gutter and
+`shellGeometry()` already doubles it, so one copy subtracted it twice, and the top-BAR layout has no
+sidebar to subtract although it carries no `data-narrow` either (`fitShell()` removes it on the way
+out). Both errors are invisible in a screenshot and both are worth enough to push a table across
+`fitTables()`'s cramped threshold. The gutter it subtracts is MEASURED off `.fs-content` rather than read from
+`--fs-content-pad`: the same sheet re-paddings that element to 16px a side below 767px while the
+token stays 28, and a media query has no `data-*` to key on — nor may its breakpoint be copied into
+the JS. So the model asks the element what it actually got.
+
+The arithmetic is unit-tested per combination (`tests/chrome-geometry.test.mjs`); whether its inputs
+still describe the real page is checked on a stand, where `live-audit` compares `contentWidth()`
+against the live `.fs-content` box. That check is what caught the gutter, on every page at 320, 390
+and 568.
 
 The measurement, the observer and the coalescing live in `fs-fit.js`, the theme's one "does it
 still fit?" engine (also used by `fitTables` in `fs-select.js`). **Add fit logic there; do not grow

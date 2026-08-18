@@ -69,6 +69,56 @@ const ENGINE = arg('engine', 'chromium');
  * the desktop the reports come from. */
 const WIDTHS = arg('widths', '320,390,568,768,1024,1440').split(',').map(Number);
 const ONLY_PAGES = arg('pages', '');
+/* ENTERING a page at a width is not the same as RESIZING into it, and only one of the two was ever
+ * measured. The sweep below loads each page once at 1440 and then walks the widths, so every
+ * measurement after the first is taken on a page that has already been laid out, fitted and
+ * corrected — and the theme's fitters re-run on the resize, which is exactly the event that hides an
+ * arrival bug. Status → Processes at 768 was reported by a user and reproduced here: the first fit
+ * pass judges a table its own gate is still hiding, caches "no remedy", and only a later mutation
+ * corrects it — on a page that renders once and stands still, none comes, and the table sits 65px
+ * past the column with its columns clipped. Every width in the sweep said the page was fine.
+ *
+ * So one width is also ENTERED, with a load of its own. It is one extra page load per page (~20% of
+ * this gate's runtime) rather than six, because the fault is in the arrival, not in the width: any
+ * width whose layout needs a remedy will do, and 768 is where the sidebar has just folded and a data
+ * table still has to break a column to fit. Its findings are signed `<width>a` so an arrival-only
+ * fault cannot hide behind the identical resize signature. */
+const ARRIVE = Number(arg('arrive', '768'));
+
+/* DOES THE CHROME'S ARITHMETIC STILL DESCRIBE THE PAGE IT IS ABOUT?
+ *
+ * `fs-chrome.contentWidth()` answers "how wide is the content column" WITHOUT reading layout, for
+ * the one pass that may not read it: fs-select's, judging a table the poll brought in while the
+ * reader is mid-flick. It gets there by subtracting the sidebar and the shell's gutter from the
+ * window, and every term is a token read out of the stylesheet — so it is a model of the page, and
+ * a model drifts silently. It has: `--fs-content-pad` was subtracted twice (the token is one side,
+ * shellGeometry already doubles it) and the top-BAR layout kept a 224px sidebar in the sum, both
+ * worth enough to cross fs-select's CRAMPED threshold and card a table that had room.
+ *
+ * The arithmetic per layout is unit-tested (tests/chrome-geometry.test.mjs). What only a real page
+ * can say is whether the INPUTS still describe it — which is this: the model against the box.
+ *
+ * The column is capped by `max-width: var(--fs-content-max)`, and the model deliberately does not
+ * know that (nothing it answers depends on the cap), so the comparison caps it too.
+ */
+const GEOMETRY = function () {
+	const RT = window.L;
+	if (!RT || typeof RT.require !== 'function') return [];
+	return RT.require('fs-chrome').then((chrome) => {
+		const col = document.querySelector('.fs-content');
+		if (!col || typeof chrome.contentWidth !== 'function') return [];
+		const cs = getComputedStyle(col);
+		/* clientWidth is the padding box; the model answers the width the CONTENT gets */
+		const real = col.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+		const cap = parseFloat(cs.maxWidth);
+		let said = chrome.contentWidth();
+		if (Number.isFinite(cap))
+			said = Math.min(said, cap - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+		const off = Math.round(said - real);
+		/* 2px: a fractional layout edge and a subpixel scrollbar are not a drift */
+		return Math.abs(off) > 2 ? [ { kind: 'geometry', el: 'fs-content', by: off } ] : [];
+	}).catch(() => []);
+};
 
 /* Runs INSIDE the page. Kept as one function so what CI measures and what a developer measures
  * cannot be two different definitions of "overflows". */
@@ -209,6 +259,22 @@ for (const stand of list) {
 			let found = [];
 			try { found = await page.evaluate(CHECK); } catch (e) { continue; }
 			for (const f of found) record(w, f);
+			try { for (const f of await page.evaluate(GEOMETRY)) record(w, f); } catch (e) { /* see there */ }
+		}
+
+		/* the arrival, see ARRIVE above: the page reached AT this width rather than resized into it */
+		if (ARRIVE > 0) {
+			await page.setViewportSize({ width: ARRIVE, height: 900 });
+			let arrived = true;
+			try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
+			catch (e) { arrived = false; }
+			if (arrived) {
+				await page.waitForTimeout(1800);
+				let found = [];
+				try { found = await page.evaluate(CHECK); } catch (e) { found = []; }
+				for (const f of found) record(ARRIVE + 'a', f);
+				try { for (const f of await page.evaluate(GEOMETRY)) record(ARRIVE + 'a', f); } catch (e) { /* see there */ }
+			}
 		}
 	}
 	await ctx.close();
@@ -218,7 +284,7 @@ await browser.close();
 
 /* A run narrowed by --pages or --widths visited only part of the baseline, so it may neither rewrite
  * it nor report the rest as fixed. */
-const fullSweep = !ONLY_PAGES && arg('widths', null) === null;
+const fullSweep = !ONLY_PAGES && arg('widths', null) === null && arg('arrive', null) === null;
 
 if (UPDATE) {
 	if (!fullSweep) {

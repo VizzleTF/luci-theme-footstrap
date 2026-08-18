@@ -651,6 +651,34 @@ function fitTables() {
 			return;
 		}
 
+		/* AND THE TABLE ITSELF HAS TO BE MEASURABLE, WHICH ON ITS FIRST PASS IT IS NOT — because
+		 * THIS FILE'S OWN GATE is what hides it. `theme/30-tables.css` holds a `.fs-dt` out of the
+		 * layout until something marks it `.fs-fitted`, so the very first pass over a fresh table
+		 * reads `scrollWidth: 0` — a `display: none` box has no content width — and 0 overflows
+		 * nothing. The pass therefore concluded "it fits", wrote `.fs-fitted`, and CACHED that
+		 * answer against the slot; the table then appeared at its natural width, 777px inside a
+		 * 712px column, columns cut off by `.fs-main { overflow-x: clip }` with no scrollbar and
+		 * nothing to say so.
+		 *
+		 * It usually corrected itself, which is what made it a report rather than a gate failure: a
+		 * second pass ~60 ms later measured the now-visible table and broke its widest column. But
+		 * that pass only exists if something mutates `#view` again, and Status → Processes renders
+		 * once and then stands still. Measured on the stand at 768px, entering the page directly:
+		 * 2 of 8 arrivals on 0.13.1 and 3 of 8 here left the table past the column, and one
+		 * mutation of any kind fixed it instantly.
+		 *
+		 * So a zero measurement is not an answer to anything: lift the gate so the next frame can
+		 * see the table, ask for that frame, and write NOTHING to the slot. The schedule is asked
+		 * for once — on the pass that lifts the gate — so a table hidden for somebody else's reason
+		 * (a closed section, a tab pane) cannot turn this into a frame loop. */
+		if (t.scrollWidth === 0) {
+			if (!t.classList.contains('fs-fitted')) {
+				t.classList.add('fs-fitted');
+				fit.schedule();
+			}
+			return;
+		}
+
 		/* the answer this slot already has, for a table of the same shape in the same room — UNLESS the
 		 * table has since outgrown it. Room and column count are not the whole input: a poll tick can
 		 * put longer values into the same columns, and then a table that fitted a second ago does not.

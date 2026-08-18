@@ -69,6 +69,41 @@ const measure = async (page) => {
 	}
 };
 
+/* WHAT A TRIP THROUGH A BACKGROUND TAB LEAVES BEHIND.
+ *
+ * fs-router pauses a view's own `setInterval` while the tab is hidden and re-arms it on the way
+ * back, which is the one piece of the router's state that a navigation does NOT reset — and it was
+ * wrong in both directions at once: the re-armed timer came back under a fresh id (so the view
+ * could no longer stop its own poller), and while paused it sat outside the registry a navigation
+ * sweeps (so a tab hidden across a click brought the previous page's timers back with it).
+ *
+ * Both are invisible on a page that is merely LOOKED at, and both are cheap to ask here, where a
+ * navigation has just happened: hide, look at what is still armed, show, count the registry again.
+ * `document.hidden` is read-only and is overridden the way the browser's own tooling does — the
+ * page is thrown away by the full load that follows, so the override never outlives this probe. */
+const timerProbe = async (page) => {
+	try {
+		return await page.evaluate(async () => {
+			const reg = window.__fsViewIntervals;
+			if (!reg || typeof reg.size !== 'number') return null;
+			const hide = (v) => {
+				Object.defineProperty(document, 'hidden', { configurable: true, get: () => v });
+				document.dispatchEvent(new Event('visibilitychange'));
+			};
+			const settle = () => new Promise((r) => setTimeout(r, 150));
+			const before = reg.size;
+			hide(true);
+			await settle();
+			/* L.Poll's own tick is deliberately left running — wireVisibility() owns that one */
+			const armedHidden = [ ...reg.values() ].filter((s) => s && s.live != null).length;
+			hide(false);
+			await settle();
+			return { before, armedHidden, after: reg.size };
+		});
+	}
+	catch (e) { return null; }
+};
+
 const list = requireStands(stands(arg('only', '')), 'spa-parity');
 const browser = await chromium.launch();
 const findings = [];
@@ -99,6 +134,7 @@ for (const stand of list) {
 		}, path);
 		await page.waitForTimeout(2600);
 		const spa = await measure(page);
+		const timers = await timerProbe(page);
 		const spaErrs = errs.slice();
 
 		try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
@@ -126,6 +162,15 @@ for (const stand of list) {
 			add('stage', `after the navigation settled: ${spa.views} #view element(s), ${spa.stages} staging wrapper(s)`);
 		if (full.views !== 1)
 			add('stage', `a full load left ${full.views} #view element(s)`);
+		if (timers) {
+			if (timers.armedHidden > 1)
+				add('timers', `${timers.armedHidden} interval(s) still armed in a hidden tab — only `
+					+ 'LuCI\'s own 1 s tick may be, and wireVisibility() stops that one');
+			if (timers.after !== timers.before)
+				add('timers', `the registry held ${timers.before} interval(s) before a hide/show and `
+					+ `${timers.after} after — a timer was lost, duplicated, or re-armed under an id `
+					+ 'the view that owns it does not know');
+		}
 		for (const e of spaErrs.filter((e) => !fullErrs.includes(e)).slice(0, 2))
 			add('console', e);
 		process.stdout.write(findings.some((f) => f.path === path && f.stand === stand.id) ? 'X' : '.');

@@ -37,25 +37,38 @@ const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = 
 	if (window.__fsIntervalsHooked) return;
 	window.__fsIntervalsHooked = true;
 	const _si = window.setInterval, _ci = window.clearInterval;
+	/* THE ID THE CALLER GOT IS THE ID IT KEEPS, whatever the pause below does underneath. The map is
+	 * keyed by that first id and the entry carries `live`, the id the platform has armed RIGHT NOW
+	 * (null while paused) — so a view holding its handle can still stop its own poller after a trip
+	 * through a hidden tab, which is exactly what re-arming under a fresh id took away from it.
+	 * The arguments are kept for the same reason: a `setInterval` id carries none of them back. */
 	window.setInterval = function (fn, ms) {
 		const id = _si.apply(window, arguments);
-		/* the arguments are kept, not just the id: a paused timer has to be re-armed with what it
-		 * was armed with, and a `setInterval` id carries none of that back */
-		_viewIntervals.set(id, { fn, ms, rest: Array.prototype.slice.call(arguments, 2) });
+		_viewIntervals.set(id, { fn, ms, rest: Array.prototype.slice.call(arguments, 2), live: id });
 		return id;
 	};
 	window.clearInterval = function (id) {
+		const spec = _viewIntervals.get(id);
 		_viewIntervals.delete(id);
+		/* A PAUSED TIMER IS ALREADY DISARMED, and its number is the platform's to hand out again —
+		 * clearing it here would stop whatever timer holds it now. Untracked ids fall through
+		 * unchanged: the hook must stay a pass-through for everything it did not arm. */
+		if (spec) return (spec.live == null) ? undefined : _ci.call(window, spec.live);
 		return _ci.apply(window, arguments);
 	};
 	/* A HIDDEN TAB MUST NOT KEEP CALLING THE ROUTER. `wireVisibility()` below stops LuCI's own poll
 	 * when the tab goes away, which is most of the traffic — but a view is free to run a plain
 	 * `setInterval` of its own (luci-app-podkop's log tailer does), and those kept hammering ubus in
 	 * a background tab for as long as it stayed open. The registry that navigation already uses to
-	 * clear them is enough to pause them too: cleared on hide, re-armed on show with the same
+	 * clear them is enough to pause them too: disarmed on hide, re-armed on show with the same
 	 * callback and period, so a view that was polling every 3 s is polling every 3 s again and one
-	 * that was cleared meanwhile stays cleared. */
-	let _paused = [];
+	 * that was cleared meanwhile stays cleared.
+	 *
+	 * A PAUSED TIMER STAYS IN THE REGISTRY, armed on nothing. It was carried in a private list
+	 * beside it, and a list is not what the navigation sweep reads: hide the tab while a navigation
+	 * is in flight (a click, then straight to another tab), and coming back re-armed the timers of
+	 * the page that navigation had already replaced — the sweep had run while they were somewhere
+	 * it could not see. In the map, `clearViewIntervals()` takes them like any other. */
 	document.addEventListener('visibilitychange', () => {
 		if (document.hidden) {
 			/* LuCI'S OWN TICK IS NOT OURS TO PAUSE, and taking it made the page poll FASTER the
@@ -75,18 +88,22 @@ const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = 
 			 * costs a doubling that never stops. Same judgement as clearViewIntervals(). */
 			const keep = pollTickId();
 			if (keep === false) return;
-			_paused = [];
 			for (const [ id, spec ] of _viewIntervals) {
-				if (id === keep) continue;
-				_paused.push(spec);
-				_ci.call(window, id);
-				_viewIntervals.delete(id);
+				if (id === keep || spec.live == null) continue;
+				_ci.call(window, spec.live);
+				spec.live = null;
 			}
 		}
 		else {
-			const back = _paused;
-			_paused = [];
-			for (const spec of back) window.setInterval(spec.fn, spec.ms, ...spec.rest);
+			for (const spec of _viewIntervals.values()) {
+				if (spec.live != null) continue;
+				/* `_si`, not the hook: this timer is already in the registry under the id its
+				 * caller is holding, and re-registering it would key a second entry to a number
+				 * nobody has. The fresh id lives in `spec.live` alone and is never a KEY, so it
+				 * cannot collide with an entry — and the platform hands ids out in sequence, so a
+				 * re-arm cannot be given a number some earlier caller is still holding either. */
+				spec.live = _si.call(window, spec.fn, spec.ms, ...spec.rest);
+			}
 		}
 	});
 })();
@@ -306,6 +323,22 @@ function markExpired() {
 	 * ended, and the very next click sends the user to a login form. */
 	console.warn('footstrap: the LuCI session is gone — every navigation from here is a full load.');
 }
+/* AND THE VERDICT IS NOT A LATCH. It was, and the shape was wrong for a signal read off somebody
+ * else's reply: an interceptor sees `msg` only once the transport succeeded and the body parsed
+ * (rpc.js rejects before that), so a missing frame is not a network flap — but it IS a captive
+ * portal's page, a proxy's error body, one truncated reply. Any of those took the client router off
+ * for the rest of the document while the session was alive throughout, explained by one console
+ * line nobody reads until later.
+ *
+ * A clean `session.access` is the same call the failing one was, so it is evidence in the other
+ * direction and it is taken as such. If the session really has ended no clean one arrives, because
+ * every ubus call carries the same dead sid — the router stays off exactly as long as it should. */
+function markAlive() {
+	if (!_expired) return;
+	_expired = false;
+	console.warn('footstrap: the LuCI session answers again — client navigation is back on.');
+}
+function sessionExpired() { return _expired; }
 function watchSession() {
 	if (_sessionWired) return;
 	_sessionWired = true;
@@ -325,9 +358,22 @@ function watchSession() {
 		rpc.addInterceptor((msg, r) => {
 			try {
 				if (!r || r.object !== 'session' || r.method !== 'access') return;
-				if (!msg || msg.jsonrpc !== '2.0' ||
-				    (msg.error && msg.error.code && msg.error.message))
-					markExpired();
+				if (!msg || msg.jsonrpc !== '2.0') return;
+				/* an `error` carrying both a code and a message is what handleCallReply() rejects
+				 * on, and a rejected session probe is the signal. A frame that is not JSON-RPC 2.0
+				 * is rejected there too, but it says nothing about the SESSION. */
+				if (msg.error && msg.error.code && msg.error.message) { markExpired(); return; }
+				/* AND ONLY `access: true` SAYS THE SESSION IS THERE — measured on the stands, because
+				 * this is the one place where guessing costs the whole fix. A dead sid does not make
+				 * this call fail: `session.access` answers `[0, {access:false}]` with HTTP 200 and no
+				 * error frame at all (the `-32002` arrives on the ORDINARY call, which is what makes
+				 * luci-base fire this probe in the first place). So "the reply parsed" would have
+				 * been read as "the session is back", and the verdict a 403 had just reached would
+				 * be cleared by the very probe that confirms it. `access:false` stays out of BOTH
+				 * answers: an ACL denial for a restricted user looks exactly the same, which is why
+				 * it may not expire a session either. */
+				if (Array.isArray(msg.result) && msg.result[1] && msg.result[1].access === true)
+					markAlive();
 			}
 			catch (e) { /* ditto */ }
 		});
@@ -1503,6 +1549,11 @@ return baseclass.extend({
 	/* exported for the unit suite (tests/router-contract.test.mjs), which drives it against a
 	 * hand-broken `L` — the one way to see the OFF branch without a router that ships one */
 	contractBreaks,
+	/* likewise: tests/interval-pause.test.mjs drives the navigation sweep around a visibilitychange,
+	 * and tests/session-expiry.test.mjs reads the verdict the interceptors reached. navigate() is
+	 * the real caller of the first and `_expired` gates the second — nothing else may call either. */
+	clearViewIntervals,
+	sessionExpired,
 	/* fs-search warms the pages this admin actually uses (its recents) and the arrow-key-highlighted
 	 * result, both of which the pointer/focus triggers above cannot see. The edge points that way
 	 * round — search → router — because the router must keep no dependency on the palette. */

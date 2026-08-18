@@ -86,7 +86,7 @@ ships. Locally it is all one command, `npm run check`; the full table of what ea
 | `jsmin-verify.mjs` | the **only** check that catches jsmin's silent corruption (exit 0) |
 | `npm test` | the unit suite — no browser, ~100 ms, and first in the job for that reason. It holds the branches a stand cannot enter: a luci-base missing a surface the router calls, an alias loop or a `firstchild` tie in a menu tree nobody ships |
 | `size-budget.mjs` | ratchet on the **artefact**: `build-css.sh` + the token mangle for the sheet, terser over a copy of `htdocs/luci-static/resources` for the JS. `--show` prints the per-module table into the log, so a jump is attributable without re-running anything |
-| `build-icons.mjs --check` | the committed app-icon rasters still match `logo.svg` |
+| `build-icons.mjs --check` | the committed app-icon rasters still match `logo.svg` — per channel with a tolerance, plus the maskable invariants (declared size, no alpha, nothing outside the safe zone, a mark in the middle). Not byte equality: that tested the renderer, and a Chromium bump reddened it on a commit that never touched the logo |
 
 **About `jsmin-verify`:** jsmin corrupts a file silently and exits 0. The source shape it breaks on,
 and why eslint's `wrap-regex` stands beside this gate, are in [conventions.md](conventions.md); the
@@ -210,14 +210,18 @@ green under every static gate at the time.
 
 The job boots the same owlab containers a developer runs locally (`owfeed/owlab/setup` puts the CLI
 on PATH; the binary is checked against its build attestation), installs the artifact `build` just
-produced, and runs three gates cheapest-first:
+produced, and runs the live gates cheapest-first:
 
 1. `tools/upstream-contract.mjs` — the assumptions about luci-base. It runs first because if one of
    them has moved, every finding below is downstream of it.
 2. `tools/spa-parity.mjs` — every page opened by a click and by a full load, compared.
-3. `tools/live-audit.mjs` — every page at six widths, ratcheted against
-   `tools/baselines/live-audit.json`.
-4. `tools/install-check.sh` — `install.sh` twice on each router, fresh and over its own result. It
+3. `tools/live-audit.mjs` — every page at six widths (resized into) plus one ENTERED with a load of
+   its own, ratcheted against `tools/baselines/live-audit.json`.
+4. `tools/scroll-jank.mjs` — a real wheel, long enough to meet a poll tick, in both layouts: nothing
+   may re-decide or jump while the page moves. Chromium in CI; the other two engines are a local
+   `--engines chromium,firefox,webkit` because WebKit needs system libraries the runner would have
+   to install for every job.
+5. `tools/install-check.sh` — `install.sh` twice on each router, fresh and over its own result. It
    goes last because it replaces the build under test with the published release; #16, #28 and #30
    were all this script, and all on the second run.
 

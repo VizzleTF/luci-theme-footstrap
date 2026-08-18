@@ -262,6 +262,10 @@ jobs:
       - run: node tools/upstream-contract.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
       - run: node tools/spa-parity.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
       - run: node tools/live-audit.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
+      # Nothing may re-decide or jump while the page moves. Chromium only here: WebKit needs a set
+      # of system libraries (gtk-4, gstreamer) this job would install on every run, and the engine
+      # differences it covers are checked locally before a release (docs/development.md).
+      - run: node tools/scroll-jank.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
 
       # LAST, because it installs the PUBLISHED release over the build the steps above measured —
       # and that is the claim: what a user runs is install.sh against the feed, not `apk add` against

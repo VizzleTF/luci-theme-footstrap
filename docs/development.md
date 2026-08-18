@@ -151,6 +151,17 @@ surface missing (`tests/router-contract.test.mjs`), an alias loop planted by a f
 `firstchild` tie broken by key order, a leaf whose own ACL re-opens a read-only path
 (`tests/menutree.test.mjs`). If a case can be seen on `owlab`, it belongs on `owlab`.
 
+Three more kinds have since earned a place here, and each one is a fault the suite FOUND:
+
+| File | The branch a stand cannot hold still |
+|---|---|
+| `chrome-geometry.test.mjs` | the column's width per combination of layout, rail and window — pure arithmetic over four measured numbers, and the only place every combination can be asked at once. Whether the numbers still describe the page is `live-audit`'s question, not this one |
+| `interval-pause.test.mjs` | a `visibilitychange` landing inside a specific window: a hide across an in-flight navigation, a view clearing its own timer after a hide/show. Both need a race won on purpose; the harness dispatches the event exactly |
+| `session-expiry.test.mjs` | the verdict the two interceptors reach on a reply, in both directions. A stand would have to expire a real session mid-run — a fixture, not a test |
+
+The rule is unchanged: the harness may not fake a measurement. What these drive is a decision made
+from numbers somebody else measured, which is a different thing.
+
 **Everything else** — the static gates:
 
 ```sh
@@ -177,7 +188,7 @@ painted less than a full load. `npm run live` is the half that opens pages, and 
 ```sh
 owlab up                       # the containers these gates measure
 owlab sync                     # your working tree onto them
-npm run live                   # upstream-contract, then spa-parity, then live-audit
+npm run live                   # upstream-contract, spa-parity, live-audit, then scroll-jank
 ```
 
 Each is also a command of its own, and each takes `--only <router ids>`:
@@ -186,6 +197,7 @@ Each is also a command of its own, and each takes `--only <router ids>`:
 node tools/upstream-contract.mjs --only owrtsnap --verbose   # every assumption, named, one by one
 node tools/spa-parity.mjs --only owrt2410 --pages /admin/network
 node tools/live-audit.mjs --only owrt2512 --widths 320,1440 --pages /admin/status
+node tools/scroll-jank.mjs --engines chromium,firefox,webkit   # the other two need installing
 ```
 
 - **`upstream-contract`** is the registry of what this theme assumes about luci-base — private

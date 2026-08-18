@@ -226,8 +226,19 @@ Marking a freshly arrived table is the second kind — it cannot wait, because
 the layout until it has an answer. Where does that answer come from without measuring? From the
 SLOT: the section frame survives a poll tick, so the table that was replaced left its decision
 there, keyed by column count and room. The guard on `:root[data-fs-fit]` is what makes the rule
-safe: the attribute is written by this theme's own JS at module eval, so a document where that JS
-never ran shows every table exactly as it did before the rule existed.
+safe: the attribute is written by the module that CLEARS the rule, so a document where that JS never
+ran shows every table exactly as it did before the rule existed.
+
+**And a table this rule is still hiding may not be judged.** A `display: none` box has no content
+width, so the first pass over a table with no slot to inherit from read `scrollWidth: 0`, found that
+0 overflows nothing, concluded "no remedy" — and CACHED that answer. The table then appeared at its
+natural width: on Status → Processes at 768px, 777px inside a 712px column, columns cut off by
+`.fs-main { overflow-x: clip }` with no scrollbar and nothing to say so. A second pass ~60 ms later
+usually corrected it, which is why it reached a user rather than a gate: that pass exists only if
+something mutates `#view` again, and a page that renders once and stands still never does. So
+`fitTables()` treats a zero measurement as no answer at all — it lifts the gate, asks for one more
+frame, and writes nothing to the slot. Measured entering that page at 768: 2 of 8 arrivals on 0.13.1
+and 3 of 8 mid-fix left the table past the column; 0 of 12 after, on each of the four stands.
 
 **A config table (`.cbi-section-table`) is not measured and must stay on
 `@container fs-content (max-width: 960px)`.** Its rows are full of widgets (`fs-select.js` turns

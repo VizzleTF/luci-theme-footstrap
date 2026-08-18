@@ -154,6 +154,7 @@ const GEOM_DFLT = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56 };
 let _geom = null, _geomDensity = null, _geomWarned = false;
 function shellGeometry() {
 	const density = document.documentElement.getAttribute('data-density') || '';
+	/* the gutter is re-asked even on the memo hit: it moves with the WIDTH, not with the density */
 	if (_geom && _geomDensity === density) return _geom;
 	_geomDensity = density;
 	const px = (name, dflt) => resolveLen(name, dflt);
@@ -161,7 +162,9 @@ function shellGeometry() {
 		contentMin: px('--fs-content-min', GEOM_DFLT.contentMin),
 		sidebarW:   px('--fs-sidebar-w', GEOM_DFLT.sidebarW),
 		railW:      px('--fs-rail-w', GEOM_DFLT.railW),
-		/* the token is ONE side's padding; the column loses it twice */
+		/* the token is ONE side's padding; the column loses it twice. Kept as `tokenPad` because it
+		 * is only the FALLBACK — the gutter that counts is measured, see measureShell() */
+		tokenPad:   px('--fs-content-pad', GEOM_DFLT.contentPad / 2) * 2,
 		contentPad: px('--fs-content-pad', GEOM_DFLT.contentPad / 2) * 2
 	};
 	/* Plausibility, and it costs one comparison: the rail IS the sidebar collapsed, so
@@ -183,21 +186,67 @@ function shellGeometry() {
 			+ 'renamed, or a foreign sheet is reaching the measurement probe.');
 	}
 	_geom = sane ? g : Object.assign({}, GEOM_DFLT);
+	if (_geom.tokenPad === undefined) _geom.tokenPad = _geom.contentPad;
+	/* the token is only the fallback; the gutter that counts is the one measureShell() read */
+	if (_shellPad != null) _geom.contentPad = _shellPad;
 	return _geom;
+}
+
+/* THE GUTTER IS MEASURED WHERE IT IS APPLIED, not read off the token that usually supplies it, and
+ * SO IS THE WINDOW — but both are read HERE, from a fitter, and nowhere else.
+ *
+ * `--fs-content-pad` is what `.fs-content` uses at desktop widths, and `theme/20-shell.css` gives
+ * the same element `padding: var(--fs-space-4)` below 767px: the token says 28px a side while the
+ * column's gutter is 16px there. That is a 24px error in a model this file exists to keep honest,
+ * and `live-audit` found it on every page at 320, 390 and 568 — the same trap the alert-message rule
+ * under that media query carries a paragraph about, repeated in the JS. The breakpoint itself may
+ * NOT come here: a width literal copied into JS is exactly what these reads exist to avoid, and a
+ * media query has no `data-*` to key on either. Asking the element what it actually got is the only
+ * form that cannot drift.
+ *
+ * WHY IT IS A SEPARATE FUNCTION AND WHY ONLY A FITTER CALLS IT. `clientWidth` is a LAYOUT read and
+ * `getComputedStyle` resolves style; `contentWidth()` below is called mid-scroll, by the one pass in
+ * this theme that must answer without reading either (fs-select's, for a table the poll brought in
+ * under the reader's thumb). So the numbers are taken when a fitter runs — which is on every resize
+ * and every content mutation, and never during a flick, because `fitChrome()` defers exactly like
+ * every other measuring pass — and everything after that reads what was stored. Nothing they
+ * describe can change without a resize, and a resize schedules a fit.
+ *
+ * Unlike the token probe above, a hostile app's declaration is not a threat here: `.fs-content`
+ * carries no chrome mark, so an app CAN restyle it, and if it did then that padding IS the column's
+ * real gutter. What the probe must not report is a foreign answer for OUR layout; this reports the
+ * layout as it stands. Before any fitter has run — the login page has no `.fs-content` at all — the
+ * token stands in. */
+let _shellOuter = 0, _shellPad = null;
+function measureShell() {
+	_shellOuter = document.documentElement.clientWidth;
+	const host = document.querySelector('.fs-content');
+	const cs = host ? getComputedStyle(host) : null;
+	const v = cs ? parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) : NaN;
+	if (Number.isFinite(v) && v >= 0) {
+		_shellPad = v;
+		if (_geom) _geom.contentPad = v;
+	}
+}
+
+function columnWidth(g, state) {
+	/* narrow OR top: in both the chrome is above the content, not beside it */
+	const cut = (state.narrow || state.top) ? 0 : (state.rail ? g.railW : g.sidebarW);
+	return Math.max(0, state.outerW - cut - g.contentPad);
 }
 
 function fitShell() {
 	const root = document.documentElement;
+	/* the one place the window and the gutter are read — see measureShell(). It runs in BOTH
+	 * branches: the bar layout decides nothing here, but `contentWidth()` still answers in it. */
+	measureShell();
 	if (prefs.currentLayout() === 'top') {		/* no sidebar, no cut, nothing to decide */
 		root.removeAttribute('data-narrow');
 		return;
 	}
 	const g = shellGeometry();
-	const cut = prefs.currentRail() ? g.railW : g.sidebarW;
-	/* clientWidth, not innerWidth: the column the content actually gets excludes a classic
-	 * scrollbar, and innerWidth includes it — 15-17px of phantom room on Linux/Windows, i.e. the
-	 * 500px floor really fired at ~484. */
-	const content = document.documentElement.clientWidth - cut - g.contentPad;
+	/* asked UNCOLLAPSED — this is the measurement that decides `data-narrow`, so it may not read it */
+	const content = columnWidth(g, { outerW: _shellOuter, rail: prefs.currentRail() });
 	/* toggleAttribute, NOT setAttribute: a same-value setAttribute still QUEUES a mutation record
 	 * (measured in Chromium: 5 identical setAttribute('data-narrow','') -> 5 records; toggleAttribute
 	 * on an already-present attribute -> 0). fitShell runs from fitChrome, which fs-fit calls on every
@@ -476,15 +525,30 @@ return baseclass.extend({
 	 * a known amount of the window and the shell adds a known padding, and all three are already
 	 * memoised against the density attribute for `fitShell()`. It is exported because a pass that
 	 * must answer mid-scroll — fs-select's, for a table the poll has just brought in — otherwise has
-	 * only `window.innerWidth`, which in the sidebar layout is the wrong number by exactly the
+	 * only the window's own width, which in the sidebar layout is the wrong number by exactly the
 	 * sidebar: at an 800px window the column is 520px, so the cheap judgement said "plenty of room"
-	 * for a table that then overflowed and was clipped. */
+	 * for a table that then overflowed and was clipped.
+	 *
+	 * The arithmetic itself is columnWidth()'s, shared with fitShell — see there. All this adds is
+	 * the page's current state, which fitShell is in the middle of deciding and this one reads. */
 	contentWidth() {
-		const g = shellGeometry();
-		const narrow = document.documentElement.hasAttribute('data-narrow');
-		/* in the bar layout the chrome is above the content, not beside it */
-		const cut = narrow ? 0 : (prefs.currentRail() ? g.railW : g.sidebarW);
-		return Math.max(0, window.innerWidth - cut - (g.contentPad * 2));
+		/* NO LAYOUT READ, and that is the whole point of this export: the window's width and the
+		 * column's gutter are whatever the last fitter measured (measureShell), and the three
+		 * attributes below are style, not layout. The bootstrap read is for a caller that arrives
+		 * before any fitter has run, which cannot happen mid-scroll. */
+		if (!_shellOuter) measureShell();
+		const root = document.documentElement;
+		return columnWidth(shellGeometry(), {
+			outerW: _shellOuter,
+			narrow: root.hasAttribute('data-narrow'),
+			top: prefs.isTopLayout(),
+			rail: prefs.currentRail()
+		});
 	},
+
+	/* exported for the unit suite (tests/chrome-geometry.test.mjs): the cut is pure arithmetic over
+	 * four measured numbers, and driving it directly is the only way to hold every combination of
+	 * layout, rail and width without a browser */
+	columnWidth,
 	wireRail
 });

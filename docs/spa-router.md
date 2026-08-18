@@ -306,7 +306,14 @@ Before rendering the new view:
   is not the router's call to make.
 - `clearViewIntervals()` kills the outgoing view's bare `window.setInterval`s. A full load would
   have killed them; SPA must do it explicitly. `setInterval`/`clearInterval` are hooked at module
-  eval and the ids tracked in a `Set`; `L.Poll`'s own 1-second tick is preserved.
+  eval and the timers tracked in a `Map` keyed by **the id the caller was handed**; `L.Poll`'s own
+  1-second tick is preserved. The entry carries what the timer was armed with and `live`, the id the
+  platform has armed right now — `null` while the hidden-tab pause below has it disarmed. Two rules
+  follow, and both were once broken: the caller's id never changes, so a view can still stop its own
+  poller after a trip through a background tab, and a paused timer stays in this Map, so a
+  navigation that happens while the tab is hidden sweeps it like any other instead of having it
+  handed back on the way in. Clearing an id whose entry is paused touches no platform timer at all —
+  that number is the platform's to hand out again.
 - **What the router removes by hand goes through `discard()`, not `remove()`.** `dom.data()` does not
   live on the element: luci.js keeps it in `dom.registry` keyed by a `data-idref` attribute, and the
   only thing that deletes an entry is `dom.content()`. `#view` is safe — the incoming view's own
@@ -576,9 +583,10 @@ documented interceptor APIs:
 
 - `L.Request.addInterceptor` — a `403` carrying `X-LuCI-Login-Required: yes`;
 - `rpc.addInterceptor` — the `session.access` probe luci-base fires after some other call came back
-  `-32002`, when that probe's frame is not JSON-RPC 2.0 or carries an `error` with a code and a
-  message. Those are exactly the conditions under which `rpc.js`'s `handleCallReply()` rejects, i.e.
-  the conditions upstream's own `.catch(notifySessionExpiry)` reacts to.
+  `-32002`, when that probe carries an `error` with a code and a message. That is the condition
+  under which `rpc.js`'s `handleCallReply()` rejects on an ANSWER, i.e. what upstream's own
+  `.catch(notifySessionExpiry)` reacts to. A frame that is not JSON-RPC 2.0 is rejected there too
+  and is deliberately NOT read here: it says the reply is malformed, not that the session ended.
 
 `access: false` is deliberately not one of them: the probe is declared `expect: { access: true }`,
 so a `false` answer resolves rather than rejects and luci-base carries on. It is an ACL answer, and
@@ -589,10 +597,25 @@ does treat it as expiry.)
 Neither interceptor may throw: luci-base runs both through `Promise.all(…).catch(req.reject)`, so an
 exception in there would reject the caller's own request. Both bodies are wrapped.
 
-The flag is never reset — it dies with the document, as the session did — and the visibility handler
-will not restart a poll after it, so a tab coming back into view does not spend a burst of failing
-calls. `tools/upstream-contract.mjs` carries the `expiry-signals` probe for the day upstream renames
-any of it.
+**The verdict is reversible, and that is not a softening of it.** It was a latch, and a latch is the
+wrong shape for a signal read off somebody else's reply: an interceptor sees a message only once the
+transport succeeded and the body parsed (`parseCallReply()` rejects before that), so a missing or
+malformed frame is not a network flap — but it is a captive portal's page, a proxy's error body, one
+truncated reply, and any of those took client navigation off for the rest of the document while the
+session was alive throughout. A `session.access` answering `access: true` proves the sid is
+live, so it counts as evidence the other way and clears the flag. If the session really has ended
+none arrives, because every call carries the same dead sid — the router stays off exactly as long as
+it should, and the visibility handler still will not restart a poll while the flag is up, so a tab
+coming back into view spends no burst of failing calls.
+
+**Which reply means what is measured, not assumed** (all four stands, 24.10 and 25.12, both
+distros): a live sid answers `[0, {access:true}]`, a DEAD one answers `[0, {access:false}]` — HTTP
+200, no error frame — and the `-32002` that made luci-base fire the probe landed on the ordinary
+call before it. So "the reply parsed" is not "the session is there": reading it that way would clear
+the verdict with the very probe that confirms it. `access: false` therefore moves the verdict in
+neither direction, for the same reason it may not expire a session: an ACL denial looks identical. `tools/upstream-contract.mjs` carries the
+`expiry-signals` probe for the day upstream renames any of it; `tests/session-expiry.test.mjs` holds
+both directions.
 
 ## Boundaries and degradation
 
