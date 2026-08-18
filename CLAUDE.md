@@ -49,6 +49,8 @@ loads none of this file, and `owlab` exits with `no owlab.yaml found`.
 
 ```sh
 npm run check                              # every gate, one run; must exit 0 before pushing
+npm test                                   # the unit suite alone (node --test, no browser)
+node tools/build-icons.mjs                 # re-raster the app icons after a logo.svg change
 owlab up | owlab sync --watch | owlab open owrt2512
 ./tools/stage.sh && owfeed build           # both formats into dist/
 owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' --assert …
@@ -57,8 +59,11 @@ luci-theme-footstrap/dev-sync.sh <host>    # deploy to a HARDWARE router over ss
 ./tools/sync-luci-fork.sh ../luci-fork     # regenerate the openwrt/luci copy
 ```
 
-There is no unit-test suite and nothing to run "a single test": `npm run check` is the whole
-static half, and the other half is a page on a live userland (`owlab`, or a hardware router).
+`npm test` (`node --test tests/*.test.mjs`, no browser) is the unit half and it is **deliberately
+narrow**: only the branches a stand cannot enter — a luci-base missing a surface the router calls, an
+alias loop or a `firstchild` tie no shipped menu contains. One file: `node --test tests/<name>.mjs`;
+one case: `--test-name-pattern`. Anything about layout or behaviour belongs on a live userland
+(`owlab`, or a hardware router), never in a stub. `npm run check` is the whole static half.
 
 One gate directly: `node tools/<name>.mjs`. Two run in CI only: `tools/jsmin-verify.mjs` (needs a
 jsmin built from `luci-upstream.pin`) and `ucode -T -c` over every template, which the `verify`
@@ -159,6 +164,10 @@ compile.
   upgrade must never change the active theme** (`$PKG_UPGRADE` is dead — apk never exports it).
 - Do not set `PKG_VERSION` (git-derived). `LUCI_MINIFY_CSS:=0` — csstidy mangles `:has()` and
   `color-mix()`.
+- **Never post a comment on the upstream PR** — not a reply to a review thread, not a status note,
+  not a summary of what was fixed. A review finding is answered in the DIFF and by marking the
+  thread resolved; the commit message and the changelog carry the reasoning. Anything that has to
+  be said to a human is said here, in this session, not on the PR.
 - **The luci fork branch is ONE commit, amended — never a second commit on top.**
   `tools/sync-luci-fork.sh ../luci-fork` regenerates the copy (that tree gets the built
   `cascade.css`, `styles/` does not travel — `docs/package.md`), then `git commit --amend` reading

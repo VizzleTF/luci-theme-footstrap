@@ -45,7 +45,7 @@ Then pick **Footstrap** in **System → System → Language and Style**, field "
 ## What it does
 
 - **Styles every page, stock or not** — but never overwrites what an app styles itself
-- **Works on a phone**
+- **Works on a phone**, and installs to its home screen — icon, own window, no address bar
 - **Faster than bootstrap** — the numbers are below
 - **Upgrades with the router**, from the package feed
 - **Twenty-one appearance axes**, applied instantly, in one tab

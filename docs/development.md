@@ -131,6 +131,26 @@ styles instead: load the page once, swap the `<link>` for the second sheet, snap
 **Behaviour** — on a router, with `owlab test` (next section). The gates cannot see behaviour, and a
 stubbed harness only proves a module loads.
 
+**Pure logic — and only the part a router cannot show you** — with the unit suite:
+
+```sh
+npm test                       # node --test, ~100 ms, no browser and no stand
+node --test tests/menutree.test.mjs        # one file
+node --test --test-name-pattern 'alias' tests/    # one case
+```
+
+`tests/lib/luci-module.mjs` evaluates a shipped `fs-*.js` inside the same wrapper luci.js uses —
+`function (window, document, L, <one param per require pragma>)` — so the file under test is the file
+that ships, not a rewritten copy. `window` and `document` are recorders: they answer the few reads a
+module makes while it evaluates and remember the listeners and timers it registered.
+
+**What belongs here is what a stand cannot produce.** The suite is not a second opinion on layout or
+on behaviour — there is no box, no paint and no event dispatch, and a measurement faked here would be
+worth less than nothing. It is for the branches the two stands can never enter: a luci-base with a
+surface missing (`tests/router-contract.test.mjs`), an alias loop planted by a foreign `menu.d`, a
+`firstchild` tie broken by key order, a leaf whose own ACL re-opens a read-only path
+(`tests/menutree.test.mjs`). If a case can be seen on `owlab`, it belongs on `owlab`.
+
 **Everything else** — the static gates:
 
 ```sh

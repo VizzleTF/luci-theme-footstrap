@@ -84,6 +84,9 @@ ships. Locally it is all one command, `npm run check`; the full table of what ea
 | `bang-ok.mjs` | the `!important` allowlist in `audit.py` and `.stylelintrc.json` still say the same thing |
 | `changelog.mjs` | the changelog contract: sections, order, RU mirror, bold leads |
 | `jsmin-verify.mjs` | the **only** check that catches jsmin's silent corruption (exit 0) |
+| `npm test` | the unit suite — no browser, ~100 ms, and first in the job for that reason. It holds the branches a stand cannot enter: a luci-base missing a surface the router calls, an alias loop or a `firstchild` tie in a menu tree nobody ships |
+| `size-budget.mjs` | ratchet on the **artefact**: `build-css.sh` + the token mangle for the sheet, terser over a copy of `htdocs/luci-static/resources` for the JS. `--show` prints the per-module table into the log, so a jump is attributable without re-running anything |
+| `build-icons.mjs --check` | the committed app-icon rasters still match `logo.svg` |
 
 **About `jsmin-verify`:** jsmin corrupts a file silently and exits 0. The source shape it breaks on,
 and why eslint's `wrap-regex` stands beside this gate, are in [conventions.md](conventions.md); the
@@ -95,7 +98,15 @@ output against the source (acorn). The list of shipped JS is not written by hand
 Both gates stay mandatory **for the source**, even though the release build minifies with terser
 instead: a build without node still hands the untouched source to jsmin.
 
-There are no numeric size budgets left, for CSS, fonts or JS. Lightness is held by judgement.
+**About `size-budget`:** the numeric budgets were dropped once, and the reason they are back is what
+they measure now. The old ones were counted on the SOURCE, which is not what anyone downloads — the
+sheet is concatenated and token-mangled and the JS goes through terser, all of it inside the package
+build, so a developer's edit-and-check loop never sees the artefact at all. That is the shape a
+number drifts in: one feature at a time, each too small to argue with, none of them measured. This
+gate reproduces the package build's asset half and weighs the result. uhttpd serves `/www` with no
+compression, so identity bytes are wire bytes, read off flash by a core that is also routing packets.
+Raising a limit is a decision and wants a comment saying what it bought; lowering one after a cleanup
+is how the slack stops being spendable in silence.
 
 Most of what the other jobs run lives in `tools/*.sh` rather than inline in the YAML —
 `check-shell.sh`, `scan-marker.sh`, `check-acl.sh`, `build-jsmin.sh`,

@@ -596,6 +596,33 @@ any of it.
 
 ## Boundaries and degradation
 
+- **The boot contract: a luci-base without one of the surfaces this router calls turns CLIENT
+  NAVIGATION off — the theme itself keeps working, every link simply becomes a full load.**
+  `wireRouter()` looks up twelve names before it wires anything —
+  `L.require`, `L.Class`, `L.dom.content`, the five `L.env` keys a navigation re-points,
+  `L.Poll.queue`, `L.Poll.start/stop`, `L.Request.addInterceptor`, `rpc.addInterceptor`,
+  `ui.instantiateView`, `ui.hideModal`, `ui.hideIndicator`, `ui.addNotification` — and on a miss it
+  logs *which* and returns. The page is then the server-dispatched MPA the theme was before the
+  router existed: every link a full load, nothing else lost.
+
+  Not a duplicate of [`tools/upstream-contract.mjs`](../tools/upstream-contract.mjs), which asks
+  whether those surfaces still BEHAVE as assumed — the deeper question, and the one that caught the
+  `network.js` coupling. But that gate only ever runs here, against the two userlands this repo owns.
+  A fork, a backport or a distribution that trims `luci.js` is a luci-base nobody in this repo can
+  run, and there the first symptom used to be a click that opened nothing: the interception ran, the
+  swap threw halfway, and the reader was left on a page the theme had half torn down. Existence at
+  boot, semantics in the live gate.
+
+  The check is existence-only on purpose. A probe that called these to see what they answer would
+  have to run them for effect — there is no dry `instantiateView` — and a boot check that navigates
+  is worse than the fault it looks for. `uci` and `L.network` are deliberately out of the list: they
+  are optional at their own call sites (a document that never loaded `network.js` has nothing to
+  refill) and are guarded there.
+
+  The OFF branch cannot be seen on a stand, since both stands ship every name, so it is pinned by
+  [`tests/router-contract.test.mjs`](../tests/router-contract.test.mjs) instead: a hand-broken `L`
+  must name exactly the surface that is gone, a probe that throws counts as a break, and a broken
+  contract must leave the document with no click interception on it at all.
 - Layout is irrelevant to the router: there is one renderer, and sidebar/top is a client attribute
   the CSS morphs.
 - **A document the router could not have rendered is not one it navigates away from.** `wireRouter()`

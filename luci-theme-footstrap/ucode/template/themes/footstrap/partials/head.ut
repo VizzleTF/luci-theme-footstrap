@@ -436,6 +436,34 @@
 		{% endif %}
 		<link rel="icon" href="{{ media }}/logo_48.png" sizes="48x48">
 		<link rel="icon" href="{{ media }}/logo.svg" sizes="any">
+		{# THE ROUTER ON A HOME SCREEN. A phone is where LuCI is opened when something is wrong with
+		   the network, and a browser tab is a poor place to keep it: the manifest lets the admin
+		   install this page as an app, which gets it an icon, its own window and no address bar.
+
+		   Both files are STATIC and cannot be otherwise — a theme may not register a dispatcher node,
+		   so there is nothing here that could render them per request. That fixes two values:
+
+		     start_url/scope — `/cgi-bin/luci/`, uhttpd's own default and the path this template is
+		       being served from on every stock install. An admin who moved LuCI elsewhere gets an
+		       installed app that opens the standard path; the browser tab is unaffected either way.
+		     background/theme_color — the DEFAULT palette's page colour (#f6f8fa). The manifest is
+		       read once at install time and cannot follow a live Appearance change, so it carries
+		       the default rather than a value that would be wrong for everyone who changed it. It
+		       only ever paints the splash and the window chrome, never the page.
+
+		   Chrome offers its install prompt on a secure context only, so over plain HTTP this is
+		   iOS's Add to Home Screen (which reads the manifest and this apple-touch-icon) plus the
+		   icons themselves. Nothing here is on the page's critical path: a manifest is fetched at
+		   idle priority and never blocks a paint.
+
+		   `.json`, NOT the conventional `.webmanifest`, and that is the server's doing: uhttpd's
+		   built-in MIME map has no entry for that extension. Measured on the stand — the same bytes
+		   served as `app.webmanifest` come back `application/octet-stream`, as `t.manifest`
+		   `text/cache-manifest`, and only as `.json` do they come back with a JSON type, which is
+		   what every browser accepts a manifest as. There is no per-extension setting to fix from
+		   here: the map is compiled into uhttpd. #}
+		<link rel="manifest" href="{{ media }}/manifest.json?v={{ pkgs_update_time }}">
+		<link rel="apple-touch-icon" href="{{ media }}/apple-touch-icon.png">
 		{% if (dispatched?.css): %}
 		{# The `css` property of the dispatched menu.d node — an app naming a stylesheet the server
 		   should link for its page, instead of the view injecting one at module eval (which is what

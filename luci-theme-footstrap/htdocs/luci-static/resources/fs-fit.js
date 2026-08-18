@@ -143,16 +143,36 @@ let _sampling = false;
  * next frame's probe paid for a layout that had just been dirtied; and `touchstart` starts the
  * sampler, so a plain tap on a button bought ~24 of them.
  *
- * The answer cannot change without the room changing: the two layouts scroll different elements and
- * the switch between them is a width change, which `onResize` already watches and stamps. So the
- * verdict is cached against that stamp and the offset is then read from the scroller directly —
- * `scrollTop` on an element and `scrollY` on the window are both free. */
-let _scroller = null, _scrollerAt = -1;
+ * WHAT IS ASKED IS ALSO NOT WHAT IT USED TO ASK. "Does this element currently overflow" is a
+ * property of the CONTENT, and it was being memoised against a stamp that only moves when a WIDTH
+ * does: open a short page (no overflow, answer cached as "the window scrolls"), navigate to a tall
+ * one — `#view` keeps its identity and its width, so nothing bumps the stamp — and every pass went
+ * on reading `window.scrollY`, which in the sidebar layout is pinned at 0 by
+ * `.fs-shell { height: 100svh; overflow: hidden }`. The offset then never appeared to move, the
+ * sampler never extended `_movingUntil`, and every mid-scroll guard in this file was inert on
+ * exactly the pages tall enough to scroll.
+ *
+ * The question is "which element does this layout scroll", and the STYLESHEET is what decides it:
+ * `theme/20-shell.css` gives `.fs-main` `overflow-y: auto` for the desktop sidebar layout and
+ * nothing else, so the computed value IS the answer — no content-height probe, no viewport literal
+ * copied out of a media query, and correct the moment the CSS changes. `getComputedStyle` resolves
+ * style, not layout, and the verdict is cached against the resize stamp AND the two attributes that
+ * carry a layout change (`data-layout`, `data-narrow`), so the frame loop reads neither. */
+let _scroller = null, _scrollerAt = -1, _scrollerKey = null;
+function layoutKey() {
+	const root = document.documentElement;
+	return (root.getAttribute('data-layout') || '') + (root.hasAttribute('data-narrow') ? '|narrow' : '');
+}
 function scroller() {
-	if (_scrollerAt === _resizeSeq && (_scroller === null || _scroller.isConnected)) return _scroller;
+	const key = layoutKey();
+	if (_scrollerAt === _resizeSeq && _scrollerKey === key &&
+	    (_scroller === null || _scroller.isConnected))
+		return _scroller;
 	const sc = document.getElementById('maincontent');
-	_scroller = (sc && sc.scrollHeight - sc.clientHeight > 4) ? sc : null;
+	const flow = sc ? window.getComputedStyle(sc).overflowY : '';
+	_scroller = (flow === 'auto' || flow === 'scroll') ? sc : null;
 	_scrollerAt = _resizeSeq;
+	_scrollerKey = key;
 	return _scroller;
 }
 function scrollTop() {
@@ -346,13 +366,14 @@ function scheduleAnchor(ref) {
 }
 function applyAnchor(ref) {
 	if (!ref || !ref.el.isConnected) return;
-	const sc = document.getElementById('maincontent');
-	const inner = sc && sc.scrollHeight - sc.clientHeight > 4;
-	const at = inner ? sc.scrollTop : window.scrollY;
+	/* through scroller(), not a second probe of its own: the two asked the same question in the
+	 * same two lines and could already answer differently within one frame */
+	const sc = scroller();
+	const at = sc ? sc.scrollTop : window.scrollY;
 	if (at <= 0) return;
 	const drift = ref.el.getBoundingClientRect().top - ref.top;
 	if (Math.abs(drift) < 1) return;
-	if (inner) sc.scrollTop = at + drift;
+	if (sc) sc.scrollTop = at + drift;
 	else window.scrollTo(0, at + drift);
 }
 
@@ -409,7 +430,13 @@ return baseclass.extend({
 		if (typeof fit !== 'function') return;
 		_fitters.push(fit);
 		observeContent();
-		fit();
+		/* Caught for the same reason runAll() catches, and this was the one run that was not: a
+		 * fitter that throws on its FIRST run propagated out of add() and out of the theme's init(),
+		 * so every registration after it was never made. With the gate already raised that is a page
+		 * whose data tables are `display: none` for good — nothing left to write `.fs-fitted`. The
+		 * five passes in fs-select.js are registered separately precisely so each fails alone. */
+		try { fit(); }
+		catch (e) { console.error('fs-fit: a fitter threw on registration', e); }
 	},
 
 	/* Is the reader scrolling, and "I could not measure, wake me when they stop". A pass that has to
@@ -425,7 +452,6 @@ return baseclass.extend({
 	 * the available room — the layout toggle, the rail collapse — schedules. Only the mutation
 	 * observer re-fits synchronously, and that is rule 2's whole point.) */
 	schedule,
-
 
 	/* Coalesce ANY callback into one call per frame (rule 3, for non-fitters): schedule() runs
 	 * EVERY fitter, so a caller wanting only its own work batched cannot use it — three had

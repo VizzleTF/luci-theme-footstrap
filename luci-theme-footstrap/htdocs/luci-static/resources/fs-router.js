@@ -58,8 +58,26 @@ const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = 
 	let _paused = [];
 	document.addEventListener('visibilitychange', () => {
 		if (document.hidden) {
+			/* LuCI'S OWN TICK IS NOT OURS TO PAUSE, and taking it made the page poll FASTER the
+			 * longer it was left in a background tab. `L.Poll.start()` arms its 1 s tick with a
+			 * plain `setInterval`, so the hook above catches it like any other id. This listener is
+			 * registered at module eval and wireVisibility()'s in init(), so ours ran first: it
+			 * cleared LuCI's tick with the raw `_ci` and dropped it from the map (leaving
+			 * `L.Poll.timer` naming a dead id, which made the `L.Poll.stop()` right after a no-op),
+			 * and on show it re-armed that tick on an id `L.Poll` knew nothing about — after which
+			 * `start()` armed a second one, because `active()` had nothing to see. Two steps per
+			 * second after one hide/show, three after two, and so on for as long as the reader kept
+			 * coming back. Only a client navigation swept the orphans up.
+			 *
+			 * So the tick is skipped here and wireVisibility() keeps both halves of it. When it
+			 * cannot be told apart from a view's timer, NOTHING is paused: a view's poller running
+			 * in a hidden tab costs a wasted RPC, whereas re-arming LuCI's tick behind its back
+			 * costs a doubling that never stops. Same judgement as clearViewIntervals(). */
+			const keep = pollTickId();
+			if (keep === false) return;
 			_paused = [];
 			for (const [ id, spec ] of _viewIntervals) {
+				if (id === keep) continue;
 				_paused.push(spec);
 				_ci.call(window, id);
 				_viewIntervals.delete(id);
@@ -72,43 +90,52 @@ const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = 
 		}
 	});
 })();
-function clearViewIntervals() {
-	/* `L.Poll.timer` is the id of LuCI's OWN 1 s tick, and it is private state — `add`/`remove`/
-	 * `start`/`stop`/`active` are the documented surface, and upstream has already marked the whole
-	 * `L.Poll` alias deprecated (`'require poll'` is its replacement, and neither 24.10 nor 25.12
-	 * ships poll.js yet, so the alias is still the only way in). If that field ever goes, `keep`
-	 * becomes null and this sweep would clear LuCI's tick along with the view's timers — every poll
-	 * on every later page silently dead, from a rename we did not notice. So the missing field is
-	 * not a null: it is a reason to do NOTHING, once, loudly. A view's leftover interval outliving
-	 * its page costs a wasted RPC; killing the global tick costs the router's live data. */
-	/* Asked through the DOCUMENTED half first: active() says whether LuCI's tick is running at all,
-	 * and `timer` is deleted by stop() — so an absent field is the ordinary "nothing to protect"
-	 * case on a page with no pollers, not a sign that upstream moved it. The anomaly worth reporting
-	 * is the pair disagreeing: a tick that is running while the id it runs on has no name we know.
-	 * Then do NOTHING, once, loudly: a view's leftover interval outliving its page costs a wasted
-	 * RPC, whereas clearing LuCI's own tick costs every live value on every later page. */
-	/* …and the ALIAS ITSELF is the first thing that can go — it is the deprecation the paragraph
-	 * above is about, so this function cannot be the one place that reads it blind. Every other
-	 * `L.Poll` read in this file is guarded, and an unguarded one here throws where a throw costs
-	 * most: navigate() calls this inside the staged render, after the chrome has already switched to
-	 * the incoming page and before its module is required, so a TypeError would leave every click
-	 * showing the previous page's content under the new page's title and menu mark, with the
-	 * navigation dead in a rejected promise — far worse than the leaked interval this exists to
-	 * sweep. No alias is the same answer as an unreadable timer: do NOTHING, once, loudly. */
+/* WHICH id IS LuCI'S OWN TICK — asked in ONE place, because two callers need the answer and both
+ * pay the same price for getting it wrong: the navigation sweep below, and the hidden-tab pause in
+ * the interval hook above (which used to take the tick with the view timers and hand it back on an
+ * id L.Poll had never heard of).
+ *
+ * `L.Poll.timer` is that id, and it is private state — `add`/`remove`/`start`/`stop`/`active` are
+ * the documented surface, and upstream has already marked the whole `L.Poll` alias deprecated
+ * (`'require poll'` is its replacement, and neither 24.10 nor 25.12 ships poll.js yet, so the alias
+ * is still the only way in). If the field is ever renamed, a caller reading it blind would treat
+ * LuCI's tick as a view's: cleared on the next navigation, every poll on every later page silently
+ * dead. So a missing field is not a null — it is a reason to do NOTHING, once, loudly. A view's
+ * leftover interval outliving its page costs a wasted RPC; losing the global tick costs the
+ * router's live data.
+ *
+ * Asked through the DOCUMENTED half first: `active()` says whether the tick is running at all, and
+ * `timer` is deleted by `stop()` — so an absent field is the ordinary "nothing to protect" case on
+ * a page with no pollers, not a sign that upstream moved anything. The anomaly worth reporting is
+ * the pair DISAGREEING: a tick that is running while the id it runs on has no name we know.
+ *
+ * The alias itself is the first thing that can go, so this cannot be the one place that reads it
+ * unguarded either: the sweep is called inside the staged render, after the chrome has switched to
+ * the incoming page and before its module is required, and a TypeError there would leave every
+ * click showing the previous page's content under the new page's title, the navigation dead in a
+ * rejected promise. No alias is the same answer as an unreadable timer.
+ */
+/* -> the tick's id; `null` when LuCI is not polling and there is nothing to protect; `false` when
+ * the two cannot be told apart, which every caller reads as "leave every interval alone". */
+function pollTickId() {
 	if (!L.Poll) {
 		warnPollUnreadable('footstrap: L.Poll is gone from this luci-base, so LuCI\'s own tick cannot be '
 			+ 'told apart from a view\'s timers — leaving view intervals alone. fs-router.js needs '
 			+ 'updating for this luci-base.');
-		return;
+		return false;
 	}
 	const running = (typeof L.Poll.active === 'function') ? L.Poll.active() : (L.Poll.timer != null);
 	if (running && L.Poll.timer == null) {
 		warnPollUnreadable('footstrap: LuCI is polling but L.Poll.timer is not readable — leaving view '
 			+ 'intervals alone rather than risking its tick. fs-router.js needs updating for this '
 			+ 'luci-base.');
-		return;
+		return false;
 	}
-	const keep = running ? L.Poll.timer : null;
+	return running ? L.Poll.timer : null;
+}
+function clearViewIntervals() {
+	const keep = pollTickId();
+	if (keep === false) return;
 	/* Map, not Set: the key is the timer id and the value is what it would take to re-arm it */
 	_viewIntervals.forEach((spec, id) => { if (id !== keep) window.clearInterval(id); });
 }
@@ -1258,9 +1285,73 @@ function bootDocumentIsOurs() {
 	return tree.viewClassFor(node) != null;
 }
 
+/* ---- the boot contract: the luci-base surfaces this router CALLS, looked up before it wires ----
+ *
+ * Every module here is written against somebody else's code, and against parts of it that were never
+ * an API: `L.Poll` is a deprecated alias, `L.dom.content` and `ui.instantiateView` are what `view.ut`
+ * happens to use, `Request.addInterceptor` is how the session probe hears a 403. None of those is a
+ * promise anyone made. tools/upstream-contract.mjs asks whether they still BEHAVE as assumed, which
+ * is the deeper question — but it only ever runs here, against the two userlands this repo owns. On
+ * a router carrying a luci-base that MOVED (a fork, a backport, a distribution that trims luci.js),
+ * the first anyone learns of it is a click that opens nothing: the interception ran, the swap threw
+ * halfway, and the user is left on a page the theme half tore down.
+ *
+ * So: existence is checked at boot, once, and a missing name turns the router OFF rather than on-and-
+ * broken. The page is then the plain server-dispatched MPA the theme was before the router existed —
+ * every link a full load, nothing else lost, and the console says WHICH name is gone so the report
+ * that reaches this repo names it too.
+ *
+ * Deliberately existence-only. A probe that called these to see what they answer would have to run
+ * them for effect (there is no dry `instantiateView`), and a boot check that navigates is worse than
+ * the fault it looks for. Semantics stay in the live gate, which is why both files point at each
+ * other.
+ *
+ * The list is what THIS file calls, and nothing else: `uci` (flushUciCache) and `L.network` are read
+ * through their own guards a few lines from their use, because they are optional there — a document
+ * that never loaded network.js has nothing to refill. */
+const CONTRACT = [
+	[ 'L.require', () => typeof window.L.require === 'function' ],
+	/* classLoaded() tests `instanceof L.Class` to tell a loaded module from L.env/L.url/L.get */
+	[ 'L.Class', () => typeof window.L.Class === 'function' ],
+	[ 'L.dom.content', () => window.L.dom && typeof window.L.dom.content === 'function' ],
+	/* the four L.env keys navigate() RE-POINTS: a view reads them to know which page it is on */
+	[ 'L.env.{base_url,dispatchpath,requestpath,pathinfo,nodespec}', () => {
+		const env = window.L.env;
+		return !!env && [ 'base_url', 'dispatchpath', 'requestpath', 'pathinfo', 'nodespec' ]
+			.every((k) => k in env);
+	} ],
+	[ 'L.Poll.queue', () => window.L.Poll && Array.isArray(window.L.Poll.queue) ],
+	[ 'L.Poll.start/stop', () => window.L.Poll &&
+		typeof window.L.Poll.start === 'function' && typeof window.L.Poll.stop === 'function' ],
+	[ 'L.Request.addInterceptor', () => window.L.Request &&
+		typeof window.L.Request.addInterceptor === 'function' ],
+	[ 'rpc.addInterceptor', () => typeof rpc.addInterceptor === 'function' ],
+	[ 'ui.instantiateView', () => typeof ui.instantiateView === 'function' ],
+	[ 'ui.hideModal', () => typeof ui.hideModal === 'function' ],
+	[ 'ui.hideIndicator', () => typeof ui.hideIndicator === 'function' ],
+	[ 'ui.addNotification', () => typeof ui.addNotification === 'function' ]
+];
+
+/* -> the names that are NOT there, in list order; empty means the document can be navigated.
+ * A probe that throws counts as missing: `L` itself may be a shape nobody here expected. */
+function contractBreaks() {
+	return CONTRACT.filter(([ , present ]) => {
+		try { return !present(); }
+		catch (e) { return true; }
+	}).map(([ name ]) => name);
+}
+
 function wireRouter() {
 	if (_wired) return;
 	_wired = true;
+
+	const broken = contractBreaks();
+	if (broken.length) {
+		console.error('footstrap: this luci-base has no ' + broken.join(', ') +
+			' — the client router stays off and every link is a full page load, which is what the ' +
+			'theme did before it existed. Please report this line: docs/spa-router.md');
+		return;
+	}
 
 	if (!bootDocumentIsOurs())
 		return;
@@ -1409,6 +1500,9 @@ return baseclass.extend({
 	wire: wireRouter,
 	wireVisibility,
 	onNavigate,
+	/* exported for the unit suite (tests/router-contract.test.mjs), which drives it against a
+	 * hand-broken `L` — the one way to see the OFF branch without a router that ships one */
+	contractBreaks,
 	/* fs-search warms the pages this admin actually uses (its recents) and the arrow-key-highlighted
 	 * result, both of which the pointer/focus triggers above cannot see. The edge points that way
 	 * round — search → router — because the router must keep no dependency on the palette. */

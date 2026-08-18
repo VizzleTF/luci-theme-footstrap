@@ -24,7 +24,10 @@ luci-theme-footstrap/
 │   ├── ru/footstrap.po
 │   └── es/footstrap.po
 ├── htdocs/luci-static/   → /www/luci-static/
-│   ├── footstrap/        cascade.css (GENERATED, gitignored), logo.svg
+│   ├── footstrap/        cascade.css (GENERATED, gitignored), logo.svg,
+│   │                     manifest.json + app-icon-{192,512}.png + apple-touch-icon.png
+│   │                     (the rasters are COMMITTED and made by tools/build-icons.mjs — the
+│   │                      buildbot has no browser; `npm run icons` proves they match logo.svg)
 │   │                     (pattern.svg and fonts/ are NOT here: they are symlinks uci-defaults
 │   │                      makes to /etc/footstrap/, which the admin uploads or installs)
 │   └── resources/        menu-footstrap.js, menu-footstrap-common.js, fs-*.js
@@ -53,6 +56,16 @@ absent from git.
 
 **Never edit `cascade.css`.** Colours go in `styles/03-palettes.css`, scales and tokens in
 `styles/02-tokens.css`. See [css.md](css.md).
+
+**The web manifest is a static file, and that is a constraint, not a shortcut.** A theme may not
+register a dispatcher node — it would outlive the theme that registered it — so there is nothing that
+could render the manifest per request. Two values are fixed by that: `start_url`/`scope` are
+`/cgi-bin/luci/`, uhttpd's own default, and `background_color`/`theme_color` are the DEFAULT palette's
+page colour, since the manifest is read once at install time and cannot follow a live Appearance
+change (it paints the splash and the installed window's chrome, never the page). Chrome's install
+prompt needs a secure context, so over plain HTTP what this buys is iOS's Add to Home Screen — which
+reads the manifest and `apple-touch-icon.png` — plus the icons themselves. Regenerate the rasters
+with `node tools/build-icons.mjs` whenever `logo.svg` changes; `npm run icons` fails if you forget.
 
 ## Makefile: what differs from a template theme
 

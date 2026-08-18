@@ -51,8 +51,18 @@ jobs:
       - run: npm run lint:js
       - run: npm run lint:css
 
+      # The unit suite: pure logic only, no browser, ~100 ms. It runs BEFORE the browser
+      # install because it is the fastest thing here and the first to fail on a broken module.
+      - run: npm test
+
       - run: npx playwright install --with-deps chromium
       - run: node tools/a11y-gallery.mjs
+
+      # What the router actually sends, weighed on the real artefact: build-css + the token
+      # mangle for the sheet, terser over a copy of the resources for the JS. And the app
+      # icons, which are committed rasters — this proves they still match logo.svg.
+      - run: node tools/size-budget.mjs --show
+      - run: node tools/build-icons.mjs --check
       - run: node tools/export-tier.mjs
       - run: node tools/css-metrics.mjs
       - run: node tools/fs-orphans.mjs

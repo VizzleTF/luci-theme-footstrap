@@ -654,9 +654,23 @@
 		100% { opacity: 0; }
 	}
 
-	/* .fade-in's animation: theme/45-misc.css (fs-fade) — absorbed. The @keyframes above
-	 * STAY though nothing here rides them: `fade-in` is an upstream animation NAME a
-	 * luci-app-* may ride (coverage contract, docs/conventions.md). */
+	/* THE `fade-in` KEYFRAMES ABOVE STAY THOUGH NOTHING HERE RIDES THEM: `fade-in` is an
+	 * upstream animation NAME a luci-app-* may ride (coverage contract, docs/conventions.md).
+	 * The theme's own rule on the `.fade-in` CLASS is gone on purpose — luci-mod-status re-marks
+	 * with it on every poll tick, so anything hung there replayed once a second across the whole
+	 * column (theme/45-misc.css says it at length).
+	 *
+	 * `fs-fade` is the theme's own, and it is one-shot: the two rules that ride it — the rail
+	 * flyout (theme/20-shell.css) and the search overlay (theme/75-search.css) — each play it
+	 * once, when the surface opens, which is why the 4px rise is right there and was wrong on a
+	 * class the poll rewrites. It sits here beside `fs-spin` because every keyframes in this
+	 * theme does; it was deleted together with the poll's rule and took both fades with it
+	 * silently, since an unresolvable animation-name is simply dropped. */
+	@keyframes fs-fade {
+		from { opacity: 0; transform: translateY(4px); }
+		to { opacity: 1; transform: none; }
+	}
+
 	.fade-out {
 		animation: fade-out var(--fs-dur-fade);
 	}
