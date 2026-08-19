@@ -32,6 +32,15 @@
   `menu-footstrap-common.js`, which every page evaluates before the router exists; the Overview
   layout code stays where it was. Three comments that still described the old ordering say what the
   code does instead.
+- **A foreign stylesheet's gutter no longer outlives the page it came from.** `measureShell()`
+  memoised the content column's padding against density and window width, and neither changes on a
+  client navigation — but `fs-sheets` enables and disables a view's injected CSS on exactly that
+  event, and `.fs-content` carries no chrome mark, so an app is free to re-pad it. Navigating off
+  such a page left the chrome's model holding that app's gutter until the window was resized. The
+  page (`body[data-page]`) is the third term of the key now. Both consumers are lower-bound tests
+  (`< contentMin`, `< CRAMPED`), so the fault could only ever have cost one borderline stacking
+  decision — which is why it is worth three tokens of key rather than a re-read per call.
+
 
 ## [0.13.2] — 2026-08-19
 

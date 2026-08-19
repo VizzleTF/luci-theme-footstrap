@@ -228,11 +228,17 @@ function measureShell() {
 	 * value is what everything downstream is measured against */
 	_shellOuter = document.documentElement.clientWidth;
 	/* The GUTTER, though, is resolved style, and this runs on every mutation batch — once a second
-	 * on any polled page. The two things that move it are the width (a media query re-paddings the
-	 * column below 767px) and the density (the token is `calc(28px * var(--fs-density-space))`), so
-	 * both are the key and an unchanged page resolves nothing. Same trade as the token memo above,
-	 * for the same reason. */
-	const key = (document.documentElement.getAttribute('data-density') || '') + '|' + _shellOuter;
+	 * on any polled page. Three things move it: the width (a media query re-paddings the column
+	 * below 767px), the density (the token is `calc(28px * var(--fs-density-space))`) and the PAGE.
+	 * The third is the one the paragraph above already names and this key used to miss: `.fs-content`
+	 * carries no chrome mark, so a foreign sheet may re-pad it — and `sheets.scopeToCurrentPage()`
+	 * enables and disables those sheets on every client navigation, with no width and no density
+	 * change to notice it by. Navigating off a page whose sheet re-padded the column would otherwise
+	 * leave this pinned at that app's gutter for as long as the width held. `body[data-page]` is the
+	 * one attribute a navigation always restamps, so it is the third term; an unchanged page still
+	 * resolves nothing. Same trade as the token memo above, for the same reason. */
+	const key = (document.documentElement.getAttribute('data-density') || '') + '|' + _shellOuter +
+		'|' + (document.body ? document.body.getAttribute('data-page') || '' : '');
 	if (_padAt === key && _shellPad != null) return;
 	const host = document.querySelector('.fs-content');
 	const cs = host ? getComputedStyle(host) : null;
