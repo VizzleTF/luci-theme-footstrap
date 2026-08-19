@@ -165,7 +165,8 @@ function readonlyForSegs(segs) {
 
 /* The view class a menu node instantiates, or null if the node isn't SPA-able. The Status→Overview
  * `template` node maps to view.status.index (its server template just instantiates that — the
- * globals that template also defines are fs-overview.js's, see ensureOverviewHelpers there). Shared by navigate() and the hover prefetch. */
+ * globals that template also defines are the chrome bootstrap's, see ensureOverviewHelpers in
+ * menu-footstrap-common.js). Shared by navigate() and the hover prefetch. */
 function viewClassFor(node) {
 	if (!node || !node.action || node.satisfied === false)
 		return null;

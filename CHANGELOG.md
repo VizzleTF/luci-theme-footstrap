@@ -20,6 +20,18 @@
   them before, 0px after, and 815px against 0px with the reader parked at the foot of the page.
   `tools/scroll-anchor.mjs` now refills a section the way a poll does as well as growing one — the
   old case inserted a pad, so it never collapsed anything and could not see this.
+- **The Overview's stock helpers can no longer arrive after the page that calls them.** The three
+  globals `admin_status/index.ut` defines in an inline script — `progressbar`, `renderBox`,
+  `renderBadge` — are called bare by stock includes and are this theme's to define on an SPA
+  arrival, where that script never runs. They were defined at `fs-overview.js`'s module eval, which
+  was free while that module sat in the chrome's require prologue and evaluated at chrome init.
+  Making it a page module (0.13.0, to keep 3.8 KB off every other page) turned that into a race: the
+  module is now required DURING the navigation that needs it, in a chain that runs beside the
+  router's own require of the view class, and losing it is a `ReferenceError` thrown from a stock
+  include on a page already committed to the document. The ~40 dependency-free lines moved to
+  `menu-footstrap-common.js`, which every page evaluates before the router exists; the Overview
+  layout code stays where it was. Three comments that still described the old ordering say what the
+  code does instead.
 
 ## [0.13.2] — 2026-08-19
 

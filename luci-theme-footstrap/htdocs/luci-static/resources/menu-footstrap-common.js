@@ -51,6 +51,67 @@ function wirePageModules() {
 	load();
 }
 
+/* THE THREE TEMPLATE GLOBALS STATUS→OVERVIEW NEEDS, DEFINED WHERE ORDER IS GUARANTEED.
+ *
+ * `admin_status/index.ut` defines `progressbar`, `renderBox` and `renderBadge` in an inline script
+ * and then instantiates `view.status.index`; the stock includes (18_cpu, 30_network, 60_wifi…) call
+ * them bare from their own `render()`. An SPA arrival never runs that inline script, so this theme
+ * is their only definition — and a definition that arrives late is a `ReferenceError` thrown from a
+ * stock include on a page already committed to the document.
+ *
+ * THEY LIVE HERE RATHER THAN IN `fs-overview.js` FOR EXACTLY ONE REASON: ordering. While that module
+ * was in the directive prologue it evaluated at chrome init, i.e. before any navigation could
+ * happen, and the guarantee was free. It is a page module now (PAGE_MODULES above) — required
+ * DURING the navigation that needs it, in a chain that races the router's own require of the view
+ * class. fs-overview's chain is the shorter of the two and should win, but nothing orders them, and
+ * losing costs the page. This file is required by the footer on every page and evaluates before the
+ * router exists, so moving the ~40 dependency-free lines here restores the guarantee at a cost of
+ * their own bytes; the 3.8 KB of Overview layout code stays on the Overview.
+ *
+ * Bodies are verbatim from upstream except L.itemlist → window.L.itemlist (the two-L trap,
+ * docs/spa-router.md), and the typeof guards make every one a no-op on a full page load, where the
+ * template's own copies win the race — any theme, as before. */
+function ensureOverviewHelpers() {
+	/* eslint-disable no-var -- these three bodies are copied VERBATIM from LuCI's
+	   admin_status/index.ut so they can be diffed against upstream when it changes.
+	   Modernising the `var`s would silently break that property, which is the whole
+	   reason the copies are safe to carry. */
+	if (typeof window.progressbar !== 'function')
+		window.progressbar = function(query, value, max, byte) {
+			var pg = document.querySelector(query),
+			    vn = parseInt(value) || 0,
+			    mn = parseInt(max) || 100,
+			    fv = byte ? String.format('%1024.2mB', value) : value,
+			    fm = byte ? String.format('%1024.2mB', max) : max,
+			    pc = Math.floor((100 / mn) * vn);
+			if (pg) {
+				pg.firstElementChild.style.width = pc + '%';
+				pg.setAttribute('title', '%s / %s (%d%%)'.format(fv, fm, pc));
+			}
+		};
+	if (typeof window.renderBox !== 'function')
+		window.renderBox = function(title, active, childs) {
+			childs = childs || [];
+			childs.unshift(window.L.itemlist(E('span'), [].slice.call(arguments, 3)));
+			return E('div', { class: 'ifacebox' }, [
+				E('div', { class: 'ifacebox-head center ' + (active ? 'active' : '') },
+					E('strong', title)),
+				E('div', { class: 'ifacebox-body left' }, childs)
+			]);
+		};
+	if (typeof window.renderBadge !== 'function')
+		window.renderBadge = function(icon, title) {
+			return E('span', { class: 'ifacebadge' }, [
+				E('img', { src: icon, title: title || '' }),
+				window.L.itemlist(E('span'), [].slice.call(arguments, 2))
+			]);
+		};
+	/* eslint-enable no-var */
+}
+
+/* Unconditional: the typeof guards make it a no-op wherever the real definitions already exist. */
+ensureOverviewHelpers();
+
 /* The chrome BOOTSTRAP: load the menu tree once, hand it to the parts that need it, and wire them
  * in the right order. It renders nothing itself — every piece lives in its own module:
  *

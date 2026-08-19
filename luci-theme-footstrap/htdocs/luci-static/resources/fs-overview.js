@@ -330,58 +330,14 @@ function patchOverview() {
 	}).catch((e) => console.error('footstrap: overview progressive paint not applied', e));
 }
 
-/* Status→Overview is a `template` node whose server template (admin_status/index.ut) defines 3
- * globals the stock status includes use (18_cpu/20_memory/25_storage/…) and then instantiates
- * view.status.index. Arriving by the theme's SPA router never runs that inline <script>, so define
- * them here, guarded, so a full load's copies (any theme) are not clobbered.
- *
- * This is the OTHER thing the include location used to give for free, and the one that survived the
- * move intact: the definitions had to exist before any include renders, which module eval inside
- * index.load() guaranteed. A chrome module evaluates once, at chrome init — i.e. before any SPA
- * navigation can possibly happen — so the guarantee is now stronger rather than weaker. On a full
- * load of the overview the template's own copies win the race and these are no-ops, as before.
- *
- * Bodies are verbatim from upstream except L.itemlist → window.L.itemlist (the two-L trap,
- * docs/spa-router.md). */
-function ensureOverviewHelpers() {
-	/* eslint-disable no-var -- these three bodies are copied VERBATIM from LuCI's
-	   admin_status/index.ut so they can be diffed against upstream when it changes.
-	   Modernising the `var`s would silently break that property, which is the whole
-	   reason the copies are safe to carry. */
-	if (typeof window.progressbar !== 'function')
-		window.progressbar = function(query, value, max, byte) {
-			var pg = document.querySelector(query),
-			    vn = parseInt(value) || 0,
-			    mn = parseInt(max) || 100,
-			    fv = byte ? String.format('%1024.2mB', value) : value,
-			    fm = byte ? String.format('%1024.2mB', max) : max,
-			    pc = Math.floor((100 / mn) * vn);
-			if (pg) {
-				pg.firstElementChild.style.width = pc + '%';
-				pg.setAttribute('title', '%s / %s (%d%%)'.format(fv, fm, pc));
-			}
-		};
-	if (typeof window.renderBox !== 'function')
-		window.renderBox = function(title, active, childs) {
-			childs = childs || [];
-			childs.unshift(window.L.itemlist(E('span'), [].slice.call(arguments, 3)));
-			return E('div', { class: 'ifacebox' }, [
-				E('div', { class: 'ifacebox-head center ' + (active ? 'active' : '') },
-					E('strong', title)),
-				E('div', { class: 'ifacebox-body left' }, childs)
-			]);
-		};
-	if (typeof window.renderBadge !== 'function')
-		window.renderBadge = function(icon, title) {
-			return E('span', { class: 'ifacebadge' }, [
-				E('img', { src: icon, title: title || '' }),
-				window.L.itemlist(E('span'), [].slice.call(arguments, 2))
-			]);
-		};
-	/* eslint-enable no-var */
-}
-/* Unconditional: the typeof guards make it a no-op wherever the real definitions already exist. */
-ensureOverviewHelpers();
+/* THE THREE TEMPLATE GLOBALS ARE NOT HERE, and where they went is the point. `progressbar`,
+ * `renderBox` and `renderBadge` come from `admin_status/index.ut`'s inline script, which an SPA
+ * arrival never runs, so the theme defines them — but a stock include calls them bare from its own
+ * `render()`, so they must exist before the view class does. While this file was in the chrome's
+ * directive prologue that was free: it evaluated at chrome init. As a page module it is required
+ * during the navigation that needs it, racing the router's require of the view class, so the
+ * definitions moved to `menu-footstrap-common.js`, which every page evaluates before the router
+ * exists. This module keeps only what the Overview itself needs. */
 
 return baseclass.extend({
 	/* Called by menu-footstrap-common's init, once. Everything route-dependent hangs off the

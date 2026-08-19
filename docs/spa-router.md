@@ -660,11 +660,14 @@ both directions.
 - Third-party apps that register `view` nodes speed up automatically.
 - **Status→Overview** (`template` node `admin_status/index`) is the SPA exception: its server
   template only defines three global helpers and calls `ui.instantiateView('status/index')`. The
-  theme reproduces that — `fs-overview.js` calls `ensureOverviewHelpers()` at its own module eval,
-  which defines the helpers idempotently (the template's inline script does not run under SPA), and
-  the router then instantiates `view.status.index`. The helpers are deliberately NOT the router's:
-  they are luci-mod-status's globals, and a router that owned them would be reaching into another
-  module's namespace. Other
+  theme reproduces that — `menu-footstrap-common.js` calls `ensureOverviewHelpers()` at its own
+  module eval, which defines the helpers idempotently (the template's inline script does not run
+  under SPA), and the router then instantiates `view.status.index`. They live in the chrome
+  bootstrap rather than in `fs-overview.js` because that module is a PAGE module: it is required
+  during the navigation that needs it, in a chain that races the router's own require of the view
+  class, and a stock include calling `renderBadge` before it lands throws. The helpers are
+  deliberately NOT the router's either: they are luci-mod-status's globals, and a router that owned
+  them would be reaching into another module's namespace. Other
   `template` nodes → full navigation.
 - Legacy `cbi` and `call`/`function` handlers → full navigation.
 - Any require/instanceof error → `console.error(...)` and `window.location = pathname`. The error is
