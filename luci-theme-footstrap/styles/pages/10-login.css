@@ -23,7 +23,7 @@
 		 * min-content, ~131px, and the description wrapped one word per line. */
 		width: min(400px, calc(100% - 32px));
 		margin: 7vh auto var(--fs-space-10);
-		background: var(--fs-panel); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-lg);
+		background: var(--fs-panel); border: var(--fs-hairline); border-radius: var(--fs-radius-lg);
 		/* the token, not a literal 45%-black 60px halo: that ignored the palette and drew
 		 * a heavy grey cloud under a white card in light mode. */
 		padding: var(--fs-space-6) var(--fs-space-6) var(--fs-space-6); box-shadow: var(--fs-shadow-pop);

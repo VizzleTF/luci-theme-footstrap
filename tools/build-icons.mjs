@@ -12,6 +12,19 @@
  * document — see the dark-mode rule inside logo.svg, which a raster cannot have); these are for the
  * installed app.
  *
+ * WHY THE COMMITTED FILE IS QUANTISED. A browser screenshot is 8-bit RGBA, which is the wrong
+ * encoding for this picture: the icon is a flat background, one ink colour, and the ramp between
+ * them. Reduced to a 32-colour palette the three files fall from 25.9 KB to 7.6 KB — 18.7 KB off
+ * what a phone downloads when it installs the app, and off the flash of every router that ships
+ * the theme — while the worst channel moves by 18 of 255 on 0.2% of the pixels, which is the
+ * antialiased edge of the ring and nothing else. `-dither None` because error diffusion is
+ * neither needed on a two-colour picture nor reproducible enough to commit.
+ *
+ * That step needs ImageMagick, and only when the icons are REGENERATED — a rare operation, on a
+ * developer's machine, like `po2lmo` for update-po.sh. `--check` needs nothing but the browser it
+ * already uses: it compares PIXELS, so a different ImageMagick version producing different bytes
+ * is not a failure, and a redrawn logo still is.
+ *
  * WHY A BACKGROUND AND A MARGIN. `purpose: "any maskable"` means the platform is free to crop the
  * icon to its own shape (a circle on Android, a squircle on iOS), and it guarantees only the middle
  * 80% — the "safe zone" — survives. The mark is drawn at 60% of the canvas, centred, on the default
@@ -38,13 +51,29 @@
  *              on the round crops only some platforms make.
  *   mark       the middle is NOT background, i.e. there is an icon in the icon.
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { ROOT } from './lib/css.mjs';
 
 const MEDIA = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/footstrap');
 const CHECK = process.argv.includes('--check');
+/* 32 keeps the ring's ramp smooth (worst channel 18/255 against a fresh render); 16 saves another
+ * 0.8 KB and takes it to 35, which is visible on the inner curve. */
+const COLOURS = 32;
+
+/* ImageMagick 7 calls it `magick`, 6 `convert`. Resolved once, and only when generating. */
+function quantiser() {
+	for (const bin of [ 'magick', 'convert' ]) {
+		try { execFileSync(bin, [ '-version' ], { stdio: 'ignore' }); return bin; }
+		catch (e) { /* not this one */ }
+	}
+	console.error('\nbuild-icons: needs ImageMagick to quantise the rasters (apt install imagemagick).'
+		+ '\nOnly regeneration needs it — `--check` does not.\n');
+	process.exit(1);
+}
 
 /* the default palette's page colour (styles/03-palettes.css, footstrap/light --fs-bg-base). The
  * icon cannot follow the live palette — it is a file on flash, not a stylesheet — so it carries the
@@ -52,11 +81,22 @@ const CHECK = process.argv.includes('--check');
 const BG = '#f6f8fa';
 const MARK = 0.6;	/* the mark's share of the canvas: the maskable safe zone is 0.8 */
 
+/* ONE RASTER, and the platforms do the scaling they were going to do anyway.
+ *
+ * It was three — 192, 512 and a 180 for `apple-touch-icon` — which is the shape a web app template
+ * hands you, and none of the three earned its place here: a manifest icon set is a list of sizes a
+ * browser may CHOOSE from, and every browser that installs a page picks the largest and downscales
+ * (installability wants one icon of at least 144px). iOS reads the `apple-touch-icon` link rather
+ * than the manifest, and it is equally happy with a 512 square, which `partials/head.ut` now points
+ * at. So a second and third file bought nothing but bytes on flash and two more files to keep in
+ * step with logo.svg.
+ *
+ * Nothing in luci-base could stand in for it, which is the other question worth answering: it ships
+ * functional glyphs (interfaces, signal bars, ports, the cbi file/folder marks) and no logo or
+ * raster of any kind, and every theme carries its own — so an app icon is ours to ship or to not
+ * have. */
 const ICONS = [
-	{ name: 'app-icon-192.png', size: 192 },
 	{ name: 'app-icon-512.png', size: 512 },
-	/* iOS reads this one directly and never looks at the manifest's icons array */
-	{ name: 'apple-touch-icon.png', size: 180 },
 ];
 
 const logo = readFileSync(join(MEDIA, 'logo.svg'), 'utf8');
@@ -130,6 +170,9 @@ async function inspect(tab, committed, fresh, bg) {
 
 const uri = (buf) => 'data:image/png;base64,' + buf.toString('base64');
 
+const QUANT = CHECK ? null : quantiser();
+const scratch = CHECK ? null : mkdtempSync(join(tmpdir(), 'fs-icons-'));
+
 const browser = await chromium.launch();
 /* forced light: logo.svg carries a prefers-color-scheme rule that lightens the ring for a dark tab
  * strip, and an icon rendered under it would be the wrong one on every light home screen */
@@ -145,8 +188,13 @@ for (const icon of ICONS) {
 	const target = join(MEDIA, icon.name);
 
 	if (!CHECK) {
-		writeFileSync(target, png);
-		console.log(icon.name + '  ' + icon.size + 'x' + icon.size + '  ' + png.length + ' B');
+		/* the screenshot is the SOURCE of the committed file, never the committed file itself */
+		const raw = join(scratch, icon.name);
+		writeFileSync(raw, png);
+		execFileSync(QUANT, [ raw, '-strip', '-dither', 'None', '-colors', String(COLOURS), 'PNG8:' + target ]);
+		const out = readFileSync(target).length;
+		console.log(icon.name + '  ' + icon.size + 'x' + icon.size + '  ' + png.length + ' -> ' + out + ' B'
+			+ '  (' + Math.round(100 - 100 * out / png.length) + '% smaller)');
 		continue;
 	}
 
@@ -154,8 +202,15 @@ for (const icon of ICONS) {
 
 	/* the committed file is what ships, so every invariant is asked OF IT, with the fresh render as
 	 * the reference for the one question a file cannot answer about itself */
-	const r = await inspect(tab, uri(readFileSync(target)), uri(png), BG);
 	const say = (msg) => bad.push(icon.name + ': ' + msg);
+	let r;
+	try { r = await inspect(tab, uri(readFileSync(target)), uri(png), BG); }
+	catch (e) {
+		/* an unreadable or undecodable committed file is a finding, not a stack trace: the gate has
+		 * to say WHICH icon is broken, and keep judging the others */
+		say('could not be decoded — ' + (e && e.message ? e.message.split('\n')[0] : e));
+		continue;
+	}
 
 	if (r.w !== icon.size || r.h !== icon.size)
 		say(`is ${r.w}x${r.h}, and the manifest declares ${icon.size}x${icon.size}`);

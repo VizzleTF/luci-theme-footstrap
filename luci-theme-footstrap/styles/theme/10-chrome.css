@@ -68,7 +68,7 @@
 		/* No accent fill — a bordered box, same look as the square buttons in the right
 		 * cluster (.fs-logout, .fs-themerow: 1px var(--fs-border)). The glyph is the OpenWrt
 		 * favicon mark (brand.ut), baked-colour, so color/currentColor is unused here. */
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		display: flex; align-items: center; justify-content: center;
 		flex: 0 0 auto;
 	}

@@ -230,7 +230,7 @@
 		/* was 17px 20px 18px 17px — an asymmetric inset nobody chose; it is a plate, so it takes
 		 * the card's own gutter on every side. */
 		padding: var(--fs-card-pad);
-		border-top: 1px solid var(--fs-border);
+		border-top: var(--fs-hairline);
 		border-radius: 0 0 var(--fs-radius-lg) var(--fs-radius-lg);
 		text-align: end;
 	}

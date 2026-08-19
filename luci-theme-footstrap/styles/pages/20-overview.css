@@ -140,7 +140,7 @@
 		align-self: stretch;
 		text-align: start;
 		background: var(--fs-panel2);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
 		padding: var(--fs-space-2) var(--fs-space-3);
 		/* NO `container-type` HERE, and its absence is the fix for a page that jumped every five

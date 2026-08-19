@@ -32,12 +32,16 @@
  */
 import { chromium } from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands } from './lib/stands.mjs';
+import { classify, representatives, reportReduction, PINNED } from './lib/page-shapes.mjs';
 
 const arg = (name, dflt) => {
 	const i = process.argv.indexOf('--' + name);
 	return i === -1 ? dflt : process.argv[i + 1];
 };
 const ONLY_PAGES = arg('pages', '');
+/* one page per SHAPE rather than every leaf — lib/page-shapes.mjs; `--pages-all` takes them all */
+const ALL_PAGES = process.argv.includes('--pages-all');
+const ALL_STANDS = process.argv.includes('--all');
 /* Every navigation starts here, so each page is reached as a real click from another page rather
  * than from whatever the previous iteration left behind. */
 const ORIGIN = '/admin/status/overview';
@@ -104,21 +108,30 @@ const timerProbe = async (page) => {
 	catch (e) { return null; }
 };
 
-const list = requireStands(stands(arg('only', '')), 'spa-parity');
+const list = requireStands(stands(arg('only', ''), { all: ALL_STANDS }), 'spa-parity');
 const browser = await chromium.launch();
 const findings = [];
 let compared = 0;
 
-for (const stand of list) {
+/* the routers run at the same time: every comparison here is content against content on one router,
+ * so nothing another container does can reach it (see the same note in live-audit.mjs) */
+await Promise.all(list.map(async (stand) => {
 	const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 	const page = await ctx.newPage();
 	const errs = [];
 	page.on('pageerror', (e) => errs.push(String(e).replace(/\s+/g, ' ').slice(0, 120)));
 	await login(page, stand.base);
 
-	for (const path of await menuPaths(page)) {
-		if (DESTRUCTIVE.test(path) || path === ORIGIN) continue;
-		if (ONLY_PAGES && !path.startsWith(ONLY_PAGES)) continue;
+	let paths = (await menuPaths(page)).filter((p) => !DESTRUCTIVE.test(p) && p !== ORIGIN);
+	if (ONLY_PAGES) paths = paths.filter((p) => p.startsWith(ONLY_PAGES));
+	if (!ALL_PAGES && !ONLY_PAGES) {
+		const shapes = await classify(page, stand.base, paths);
+		const { picked, dropped } = representatives(shapes, PINNED);
+		reportReduction(stand.id, picked, dropped, shapes);
+		paths = picked;
+	}
+
+	for (const path of paths) {
 
 		try { await page.goto(stand.base + ORIGIN, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
 		catch (e) { continue; }
@@ -177,7 +190,7 @@ for (const stand of list) {
 	}
 	await ctx.close();
 	process.stdout.write(`\n${stand.id}: ${compared} page(s) compared\n`);
-}
+}));
 await browser.close();
 
 if (findings.length) {

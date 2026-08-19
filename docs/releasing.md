@@ -79,6 +79,18 @@ done
 Run on both releases (25.12/apk and 24.10/opkg). Compare against stock bootstrap wherever
 you are unsure — it is the reference for LuCI behaviour.
 
+**A release runs the WIDE version of the automatic live gates first:**
+
+```sh
+npm run live -- --all --pages-all
+```
+
+Day to day those gates measure two routers and one page per shape, which is what makes them cheap
+enough to run before a push (`docs/development.md`). A release is the one moment where the axes they
+trade away are worth paying for: ImmortalWrt is a different app set on the same luci-base, and a page
+that shares a shape with another is only *probably* the same to this theme. Read the reduction lines
+either way — they name every page that was stood in for.
+
 | Issue | Page | What to look at |
 |---|---|---|
 | #1 | a third-party app with a wide table, firewall zones | the table stacks into cards, does not overflow its section; the content width does not tear |

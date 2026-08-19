@@ -112,7 +112,7 @@
 	hr {
 		margin: var(--fs-space-5) 0;
 		border: 0;
-		border-bottom: 1px solid var(--fs-border);
+		border-bottom: var(--fs-hairline);
 	}
 
 	strong {

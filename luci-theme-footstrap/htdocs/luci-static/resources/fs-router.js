@@ -22,7 +22,12 @@
  * what a full load does anyway. docs/spa-router.md.
  *
  * The path->node half lives in fs-menutree.js (the chrome needs it too); the "has a view poisoned
- * this document with its CSS?" half in fs-sheets.js. */
+ * this document with its CSS?" half in fs-sheets.js.
+ *
+ * WHERE THE PATHS IN THESE COMMENTS RESOLVE: `docs/…`, `tools/…` and `tests/…` name the theme's own
+ * repository (https://github.com/VizzleTF/luci-theme-footstrap), not the tree this file is read in —
+ * the package ships the runtime and nothing else, so none of the three directories travels with it.
+ * Anything a user is asked to quote carries a URL instead; a comment may name the path. */
 
 /* --- stray-interval teardown for SPA nav ---
  * A full load kills every window.setInterval the outgoing page set; SPA nav does not, so a view's
@@ -1393,9 +1398,13 @@ function wireRouter() {
 
 	const broken = contractBreaks();
 	if (broken.length) {
+		/* the URL, not a repository path: this package ships inside openwrt/luci as well, where a
+		 * `docs/` directory does not exist — and this is the one line a stranger is asked to quote,
+		 * on the branch where the theme has already switched half of itself off. */
 		console.error('footstrap: this luci-base has no ' + broken.join(', ') +
 			' — the client router stays off and every link is a full page load, which is what the ' +
-			'theme did before it existed. Please report this line: docs/spa-router.md');
+			'theme did before it existed. Please report this line: ' +
+			'https://github.com/VizzleTF/luci-theme-footstrap/blob/main/docs/spa-router.md');
 		return;
 	}
 
@@ -1546,12 +1555,14 @@ return baseclass.extend({
 	wire: wireRouter,
 	wireVisibility,
 	onNavigate,
-	/* exported for the unit suite (tests/router-contract.test.mjs), which drives it against a
-	 * hand-broken `L` — the one way to see the OFF branch without a router that ships one */
+	/* exported for the unit suite in the theme's own repository (tests/router-contract.test.mjs —
+	 * it is not part of the package, which ships no tests), where it is driven against a
+	 * hand-broken `L`: the one way to see the OFF branch without a router that ships one */
 	contractBreaks,
-	/* likewise: tests/interval-pause.test.mjs drives the navigation sweep around a visibilitychange,
-	 * and tests/session-expiry.test.mjs reads the verdict the interceptors reached. navigate() is
-	 * the real caller of the first and `_expired` gates the second — nothing else may call either. */
+	/* likewise, and likewise out-of-package: interval-pause.test.mjs drives the navigation sweep
+	 * around a visibilitychange and session-expiry.test.mjs reads the verdict the interceptors
+	 * reached. navigate() is the real caller of the first and `_expired` gates the second — nothing
+	 * else may call either. */
 	clearViewIntervals,
 	sessionExpired,
 	/* fs-search warms the pages this admin actually uses (its recents) and the arrow-key-highlighted

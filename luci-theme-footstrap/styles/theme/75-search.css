@@ -27,7 +27,7 @@
 		width: 100%; max-width: 560px; max-height: min(70dvh, 560px);
 		background: var(--fs-glass);
 		backdrop-filter: var(--fs-blur); -webkit-backdrop-filter: var(--fs-blur);
-		border: 1px solid var(--fs-border); border-radius: var(--fs-radius-lg);
+		border: var(--fs-hairline); border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow-pop);
 		overflow: hidden;
 	}
@@ -35,7 +35,7 @@
 	.fs-search-row {
 		display: flex; align-items: center; gap: var(--fs-space-2-5); flex: 0 0 auto;
 		padding: var(--fs-space-3) var(--fs-space-3-5);
-		border-bottom: 1px solid var(--fs-border);
+		border-bottom: var(--fs-hairline);
 	}
 	.fs-search-ico { display: inline-flex; color: var(--fs-faint); }
 	.fs-search-ico .fs-ico { width: 18px; height: 18px; }

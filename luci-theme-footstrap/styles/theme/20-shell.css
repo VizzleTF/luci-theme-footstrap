@@ -118,7 +118,7 @@
 		background: var(--fs-bar-bg);
 		backdrop-filter: var(--fs-blur);
 		-webkit-backdrop-filter: var(--fs-blur);
-		border-inline-end: 0; border-bottom: 1px solid var(--fs-border);
+		border-inline-end: 0; border-bottom: var(--fs-hairline);
 		/* the submenu popups anchor to this bar and must escape it */
 		overflow: visible;
 	}
@@ -175,7 +175,7 @@
 		margin: 0; padding: var(--fs-space-2);
 		background: var(--fs-glass);
 		backdrop-filter: var(--fs-blur); -webkit-backdrop-filter: var(--fs-blur);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg); box-shadow: var(--fs-shadow-pop);
 	}
 	/* an invisible bridge across the 8px gap, so travelling from the item down into the panel
@@ -210,7 +210,7 @@
 		/* see the :not(:empty) rule below — two auto margins would SPLIT the free space between
 		 * them instead of pushing one cluster to the bar's far edge */
 		width: var(--fs-btn-size); height: var(--fs-btn-size); padding: 0;
-		border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
+		border: var(--fs-hairline); border-radius: var(--fs-radius);
 		background: var(--fs-panel2); color: var(--fs-dim);
 		font: inherit; font-weight: var(--fs-weight); font-size: var(--fs-type); line-height: 1.1;
 		text-align: start; cursor: pointer;
@@ -280,7 +280,7 @@
 	.fs-logout {
 		flex: 0 0 auto; order: 2; justify-content: center;
 		width: var(--fs-btn-size); height: var(--fs-btn-size); padding: 0;
-		border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
+		border: var(--fs-hairline); border-radius: var(--fs-radius);
 		background: var(--fs-panel2);
 	}
 	/* on a square button the BORDER carries the state — the fill and the ink come from the
@@ -351,7 +351,7 @@
 			gap: normal; padding: var(--fs-space-5) var(--fs-space-3-5);
 			background: var(--fs-panel);
 			backdrop-filter: none; -webkit-backdrop-filter: none;
-			border-inline-end: 1px solid var(--fs-border); border-bottom: 0;
+			border-inline-end: var(--fs-hairline); border-bottom: 0;
 			box-shadow: none;
 			/* `overflow: auto`, not overflow-y alone: the bar sets `overflow: visible` for its
 			 * popups, and a lone overflow-y here would leave overflow-x visible — which the
@@ -440,7 +440,7 @@
 			display: flex;
 			margin: var(--fs-space-1) 0 var(--fs-space-3) var(--fs-space-7);
 			padding-inline-start: var(--fs-space-1);
-			border-inline-start: 1px solid var(--fs-border);
+			border-inline-start: var(--fs-hairline);
 		}
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav ul a { padding: var(--fs-space-2) var(--fs-space-3); }
@@ -544,7 +544,7 @@
 			position: absolute; inset-inline-start: 100%; top: 50%; transform: translateY(-50%);
 			margin-inline-start: var(--fs-space-2-5); z-index: var(--fs-z-flyout);
 			padding: var(--fs-space-1-5) var(--fs-space-2-5); border-radius: var(--fs-radius-sm);
-			background: var(--fs-panel); border: 1px solid var(--fs-border);
+			background: var(--fs-panel); border: var(--fs-hairline);
 			box-shadow: var(--fs-shadow-pop);
 			color: var(--fs-text); font-size: var(--fs-type); font-weight: var(--fs-weight); white-space: nowrap;
 			opacity: 0; pointer-events: none; transition: opacity var(--fs-dur);
@@ -559,7 +559,7 @@
 			display: none;
 			position: absolute; inset-inline-start: 100%; top: -8px; margin: 0; margin-inline-start: var(--fs-space-2-5);
 			min-width: 196px; padding: var(--fs-space-2); z-index: var(--fs-z-flyout);
-			background: var(--fs-panel); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-lg);
+			background: var(--fs-panel); border: var(--fs-hairline); border-radius: var(--fs-radius-lg);
 			box-shadow: var(--fs-shadow-pop);
 			animation: fs-fade var(--fs-dur);
 		}
@@ -733,7 +733,7 @@
 	 * from base, which keeps only the flex skeleton), so a third-party view emitting its own
 	 * <footer> stays themed too. */
 	footer {
-		padding: var(--fs-space-3-5) var(--fs-content-pad); border-top: 1px solid var(--fs-border);
+		padding: var(--fs-space-3-5) var(--fs-content-pad); border-top: var(--fs-hairline);
 		color: var(--fs-dim); font-size: var(--fs-type); background: var(--fs-bg);
 		/* CENTRE THE FLEX LINE, not just the text: `text-align: center` alone did nothing.
 		 * base makes the footer a flex container and used to add `justify-content:
@@ -822,7 +822,7 @@
 		text-transform: none;
 		font-weight: var(--fs-weight); font-size: var(--fs-type);
 		background: var(--fs-panel2); background-image: none;
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		color: var(--fs-dim);
 		border-radius: var(--fs-radius); padding: 0 var(--fs-space-3); box-shadow: none;
 	}

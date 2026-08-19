@@ -2,7 +2,7 @@
 	/* ---------- panels / cards (cbi) ---------- */
 	.cbi-section, .cbi-map > .cbi-section-node, fieldset.cbi-section, .panel {
 		background: var(--fs-panel);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow);
 	}
@@ -96,7 +96,7 @@
 	.cbi-section .table .td,
 	.cbi-section .table .th {
 		padding: var(--fs-space-2-5) var(--fs-space-4) var(--fs-space-2-5) 0;
-		border: 0; border-bottom: 1px solid var(--fs-border);
+		border: 0; border-bottom: var(--fs-hairline);
 		line-height: 1.45; vertical-align: middle;
 		text-align: start;
 	}
@@ -269,7 +269,7 @@
 	.cbi-section .table[id], #view .table[id],
 	.cbi-section .table.fs-dt, .cbi-section table.fs-dt, table.fs-dt {
 		border-collapse: separate; border-spacing: 0;
-		border: 1px solid var(--fs-border); border-radius: var(--fs-radius-lg);
+		border: var(--fs-hairline); border-radius: var(--fs-radius-lg);
 		/* EXPLICIT, not an omission: the generic `.table` rule below still says `overflow: hidden`
 		 * — which clipped the last column of a wide table — and not repeating it here does not
 		 * stop it applying, which is what kept the bug alive. The corner cells (below) round the
@@ -439,7 +439,7 @@
 	/* Standalone data tables (Startup, Processes, Routes) -> rounded card. Inside a CBI section
 	 * the section already IS the card, so the frame is stripped there (above): no double border. */
 	.table {
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
 		overflow: hidden;
 		background: var(--fs-panel);
@@ -458,9 +458,9 @@
 	 * line the full width and pokes past the frame's rounded bottom corners (overflow: visible). */
 	.table .tr.table-titles > .th,
 	.table .tr.cbi-section-table-titles > .th,
-	.table .tr.cbi-section-table-titles::before { border-bottom: 1px solid var(--fs-border); }
+	.table .tr.cbi-section-table-titles::before { border-bottom: var(--fs-hairline); }
 	.table .tr:not(.table-titles):not(.cbi-section-table-titles):not(:last-child) > .td,
-	.table .tr.cbi-section-table-row:not(:last-child)::before { border-bottom: 1px solid var(--fs-border); }
+	.table .tr.cbi-section-table-row:not(:last-child)::before { border-bottom: var(--fs-hairline); }
 	/* descendant combinator (not >) so a real <table>'s browser-inserted <tbody> is covered
 	 * too — one rule themes every data table, div- or table-based. */
 	.table .tr.table-titles, .table .tr.cbi-section-table-titles {
@@ -767,7 +767,7 @@
 	#modal_overlay .table.fs-xscroll tr > :first-child {
 		position: sticky; left: 0; z-index: 2;
 		background: var(--fs-panel);
-		border-inline-end: 1px solid var(--fs-border);
+		border-inline-end: var(--fs-hairline);
 	}
 	/* a keyboard user reaches the scroll box by tabbing to it (fs-select.js gives it tabindex and a
 	 * name); it has to show that it has focus — outline, not box-shadow, so forced-colors keeps it */

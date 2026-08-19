@@ -25,10 +25,11 @@
  *   node tools/table-contract.mjs [--verbose]
  */
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import * as csstree from 'css-tree';
 import { chromium } from 'playwright';
 import { serveGallery } from './lib/gallery.mjs';
-import { buildCss } from './lib/css.mjs';
+import { buildCss, ROOT } from './lib/css.mjs';
 
 const VERBOSE = process.argv.includes('--verbose');
 const cssPath = buildCss();
@@ -111,6 +112,54 @@ csstree.walk(ast, {
 });
 
 /* ---------------------------------------------------------------- 2. the render */
+/* ---- 3. THE GATE THAT KEEPS A FRESHLY POLLED TABLE OUT OF THE LAYOUT ----
+ *
+ * A poll tick REPLACES a data table, and a fresh one carries no marks: for the moment between
+ * landing and being stamped it is laid out as a full-width table — at 390px several screens taller
+ * than the card stack it is about to become. If anything forces layout in that moment (an app
+ * reading a width right after rendering is enough), the engine re-anchors on the intermediate and
+ * throws the reader: measured on a live router at iPhone width, 612px out and back, twice per tick.
+ *
+ * `theme/30-tables.css` answers it by holding an unanswered table out of the flow, and the rule has
+ * to name the roots a table can land in. fs-select scans `ROOTS`; the stylesheet lists them again.
+ * Two lists of the same fact, so they are derived and compared here: a root added to the JS without
+ * the CSS is a table nothing protects, and the symptom is a page that jumps on a router with an app
+ * that renders tables somewhere new. Verified by removing the rule and reproducing the intermediate:
+ * one unanswered table, 375px tall, at a forced layout on Обзор@390 — 0 with the rule in place.
+ */
+const selJs = readFileSync(join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources/fs-select.js'), 'utf8');
+const rootsDecl = /const ROOTS = \[([^\]]*)\]/.exec(selJs);
+if (!rootsDecl) fails.push('fs-select.js no longer declares ROOTS, so the gate rule cannot be checked against it');
+else {
+	const roots = [ ...rootsDecl[1].matchAll(/'([^']+)'/g) ].map((m) => m[1]);
+	/* what fs-fit arms the rule with, read from the JS rather than assumed */
+	const armed = /dataset\.fsFit\s*=/.test(readFileSync(join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources/fs-fit.js'), 'utf8'));
+	if (!armed) fails.push('fs-fit.js no longer writes the data-fs-fit attribute the gate rule is guarded on');
+
+	const gateSelectors = [];
+	csstree.walk(ast, {
+		visit: 'Rule',
+		enter(node) {
+			const sel = csstree.generate(node.prelude);
+			if (!/\.table\.fs-dt:not\(\.fs-fitted\)/.test(sel)) return;
+			const decls = csstree.generate(node.block);
+			if (!/display:\s*none/.test(decls)) return;
+			for (const part of sel.split(',')) gateSelectors.push(norm(part));
+		}
+	});
+	if (!gateSelectors.length)
+		fails.push('nothing in the sheet holds an unanswered .table.fs-dt out of the layout — the intermediate a poll tick paints is back');
+	for (const root of roots) {
+		const covered = gateSelectors.some((sel) => sel.includes(root) && sel.includes('[data-fs-fit]'));
+		if (!covered)
+			fails.push(`fs-select scans "${root}" for data tables and no guarded rule hides an unanswered one there`);
+	}
+	for (const sel of gateSelectors)
+		if (!/:root\[data-fs-fit\]/.test(sel))
+			fails.push(`the gate rule "${sel}" is not guarded on :root[data-fs-fit] — a document whose JS never ran would hide its tables for good`);
+	if (VERBOSE) console.log(`  gate: ${roots.join(', ')} covered by ${gateSelectors.length} selector(s)`);
+}
+
 const { base, close } = await serveGallery(cssPath);
 const browser = await chromium.launch();
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();

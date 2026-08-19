@@ -149,7 +149,7 @@ function resolveLen(token, dflt) {
  * re-measured against the widths of the density before it. */
 /* The last resort, stated ONCE so the fallbacks and the sanity net below cannot restate the
  * stylesheet's widths in two different places. Reaching for these means the measurement failed. */
-const GEOM_DFLT = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56 };
+const GEOM_DFLT = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56, contentMax: 1280 };
 
 let _geom = null, _geomDensity = null, _geomWarned = false;
 function shellGeometry() {
@@ -162,10 +162,14 @@ function shellGeometry() {
 		contentMin: px('--fs-content-min', GEOM_DFLT.contentMin),
 		sidebarW:   px('--fs-sidebar-w', GEOM_DFLT.sidebarW),
 		railW:      px('--fs-rail-w', GEOM_DFLT.railW),
-		/* the token is ONE side's padding; the column loses it twice. Kept as `tokenPad` because it
-		 * is only the FALLBACK — the gutter that counts is measured, see measureShell() */
-		tokenPad:   px('--fs-content-pad', GEOM_DFLT.contentPad / 2) * 2,
-		contentPad: px('--fs-content-pad', GEOM_DFLT.contentPad / 2) * 2
+		/* the token is ONE side's padding; the column loses it twice. It is also only the FALLBACK:
+		 * measureShell() overwrites this field with the gutter the column actually got, and until it
+		 * has (the login page has no `.fs-content`, and nothing has measured before the first
+		 * fitter) the token is the honest answer. */
+		contentPad: px('--fs-content-pad', GEOM_DFLT.contentPad / 2) * 2,
+		/* the cap the column stops growing at, so the model knows where the surplus becomes margin
+		 * rather than gutter — see columnWidth() */
+		contentMax: px('--fs-content-max', GEOM_DFLT.contentMax)
 	};
 	/* Plausibility, and it costs one comparison: the rail IS the sidebar collapsed, so
 	 * 0 < railW < sidebarW holds by construction. Both known ways this measurement fails destroy
@@ -186,7 +190,6 @@ function shellGeometry() {
 			+ 'renamed, or a foreign sheet is reaching the measurement probe.');
 	}
 	_geom = sane ? g : Object.assign({}, GEOM_DFLT);
-	if (_geom.tokenPad === undefined) _geom.tokenPad = _geom.contentPad;
 	/* the token is only the fallback; the gutter that counts is the one measureShell() read */
 	if (_shellPad != null) _geom.contentPad = _shellPad;
 	return _geom;
@@ -210,21 +213,34 @@ function shellGeometry() {
  * under the reader's thumb). So the numbers are taken when a fitter runs — which is on every resize
  * and every content mutation, and never during a flick, because `fitChrome()` defers exactly like
  * every other measuring pass — and everything after that reads what was stored. Nothing they
- * describe can change without a resize, and a resize schedules a fit.
+ * describe can change without a resize, and a resize schedules a fit; a resize that lands DURING a
+ * scroll is deferred with the rest, so a mid-scroll answer is the geometry as of the last still
+ * moment, which is the trade this whole file is built on.
  *
  * Unlike the token probe above, a hostile app's declaration is not a threat here: `.fs-content`
  * carries no chrome mark, so an app CAN restyle it, and if it did then that padding IS the column's
  * real gutter. What the probe must not report is a foreign answer for OUR layout; this reports the
  * layout as it stands. Before any fitter has run — the login page has no `.fs-content` at all — the
  * token stands in. */
-let _shellOuter = 0, _shellPad = null;
+let _shellOuter = 0, _shellPad = null, _padAt = null;
 function measureShell() {
+	/* the window's own width, every time: fitShell read it before this function existed and the
+	 * value is what everything downstream is measured against */
 	_shellOuter = document.documentElement.clientWidth;
+	/* The GUTTER, though, is resolved style, and this runs on every mutation batch — once a second
+	 * on any polled page. The two things that move it are the width (a media query re-paddings the
+	 * column below 767px) and the density (the token is `calc(28px * var(--fs-density-space))`), so
+	 * both are the key and an unchanged page resolves nothing. Same trade as the token memo above,
+	 * for the same reason. */
+	const key = (document.documentElement.getAttribute('data-density') || '') + '|' + _shellOuter;
+	if (_padAt === key && _shellPad != null) return;
 	const host = document.querySelector('.fs-content');
 	const cs = host ? getComputedStyle(host) : null;
 	const v = cs ? parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) : NaN;
+	/* a failed read leaves the key unset, so the next pass tries again rather than caching a miss */
 	if (Number.isFinite(v) && v >= 0) {
 		_shellPad = v;
+		_padAt = key;
 		if (_geom) _geom.contentPad = v;
 	}
 }
@@ -232,7 +248,15 @@ function measureShell() {
 function columnWidth(g, state) {
 	/* narrow OR top: in both the chrome is above the content, not beside it */
 	const cut = (state.narrow || state.top) ? 0 : (state.rail ? g.railW : g.sidebarW);
-	return Math.max(0, state.outerW - cut - g.contentPad);
+	/* AND THE COLUMN STOPS GROWING. `.fs-content` is `max-width: var(--fs-content-max); margin: 0
+	 * auto`, so past roughly a 1500px window the surplus becomes margin and not column: without the
+	 * cap this answered ~2280 on a 2560px sidebar layout for a column that is 1224 wide. No caller
+	 * can reach that today — both ask a LOWER bound (`< --fs-content-min` here, `< CRAMPED` in
+	 * fs-select) and the cap only binds where both are clear by a factor of two — but this is the
+	 * exported answer to "how wide is the content column", and an answer that is only true below
+	 * 1500px is the kind of thing the next caller inherits without being told. */
+	const room = Math.min(state.outerW - cut, g.contentMax);
+	return Math.max(0, room - g.contentPad);
 }
 
 function fitShell() {
@@ -546,9 +570,10 @@ return baseclass.extend({
 		});
 	},
 
-	/* exported for the unit suite (tests/chrome-geometry.test.mjs): the cut is pure arithmetic over
-	 * four measured numbers, and driving it directly is the only way to hold every combination of
-	 * layout, rail and width without a browser */
+	/* exported for the unit suite in the theme's own repository (tests/chrome-geometry.test.mjs — no
+	 * tests ship in the package): the cut is pure arithmetic over a handful of measured numbers, and
+	 * driving it directly is the only way to hold every combination of layout, rail and width
+	 * without a browser */
 	columnWidth,
 	wireRail
 });

@@ -22,12 +22,12 @@
 		font-family: var(--fs-font-sans); font-weight: var(--fs-weight); line-height: 1.1;
 		color: var(--fs-text);
 		background: var(--fs-panel2);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius);
 		box-shadow: none; text-shadow: none;
 		/* border-COLOR, not `border`: the shorthand animates border-width too — a layout
 		 * animation on every hover instead of a paint one (absorbed from base with the ring) */
-		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+		transition: var(--fs-field-transition);
 	}
 	/* bare `button` rides along: a third-party app's unclassed <button> hovered the same border
 	 * cue in base's old glow rule, and border-color is a no-op on its border: 0 box — harmless
@@ -111,7 +111,7 @@
 	.cbi-section .table[id] .td .cbi-button { padding: var(--fs-space-1) var(--fs-space-2-5); font-size: var(--fs-type); }
 	.alert-message .btn, .alert-message .cbi-button {
 		border-radius: var(--fs-radius); padding: var(--fs-space-2) var(--fs-space-3); font-weight: var(--fs-weight);
-		background: var(--fs-panel2); border: 1px solid var(--fs-border); color: var(--fs-text);
+		background: var(--fs-panel2); border: var(--fs-hairline); color: var(--fs-text);
 	}
 	.alert-message .btn:hover { border-color: var(--fs-accent); color: var(--fs-accent); }
 
@@ -168,7 +168,7 @@
 		margin-inline-end: var(--fs-space-3); padding: var(--fs-space-2) var(--fs-space-3-5);
 		font-family: var(--fs-font-sans); font-size: var(--fs-type); font-weight: var(--fs-weight);
 		color: var(--fs-text); background: var(--fs-panel2);
-		border: 1px solid var(--fs-border); border-radius: var(--fs-radius-sm); cursor: pointer;
+		border: var(--fs-hairline); border-radius: var(--fs-radius-sm); cursor: pointer;
 	}
 	input[type="file"]::file-selector-button:hover { border-color: var(--fs-accent); color: var(--fs-accent); }
 
@@ -190,7 +190,7 @@
 	}
 	.td .cbi-button, .cbi-section-actions .cbi-button, .cbi-section-table .cbi-button {
 		background: transparent; background-image: none;
-		border: 1px solid var(--fs-border); color: var(--fs-dim);
+		border: var(--fs-hairline); color: var(--fs-dim);
 	}
 	.td .cbi-button:hover { border-color: var(--fs-dim); color: var(--fs-text); }
 
@@ -276,7 +276,7 @@
 		 * is the drift this ladder exists to prevent, and it also sat out the Density axis. */
 		flex: 0 0 auto; width: auto; min-width: var(--fs-ctl-h);
 		min-height: var(--fs-ctl-h-sm); padding: 0 var(--fs-space-3); margin: 0;
-		border: 0; border-inline-start: 1px solid var(--fs-border);
+		border: 0; border-inline-start: var(--fs-hairline);
 		border-radius: 0;
 		background: transparent; color: var(--fs-dim);
 	}
@@ -286,7 +286,7 @@
 		border: 0; border-radius: 0; margin: 0;
 		background: transparent; color: var(--fs-dim);
 		padding: 0 var(--fs-space-3); min-height: var(--fs-ctl-h);
-		border-inline-start: 1px solid var(--fs-border);
+		border-inline-start: var(--fs-hairline);
 	}
 	.control-group:has(> .cbi-input-password) > button.cbi-button-neutral:hover { color: var(--fs-accent); }
 	/* SQUARE, ON THE LADDER: these were the only buttons in the theme set in bare pixels
@@ -296,7 +296,7 @@
 	 * --fs-density-box and the pager did not. Square because the glyph is an arrow, not a label. */
 	.pager .btn.prev, .pager .btn.next {
 		flex: 0 0 auto; width: var(--fs-ctl-h); min-width: var(--fs-ctl-h); height: var(--fs-ctl-h); padding: 0;
-		border-radius: var(--fs-radius); border: 1px solid var(--fs-border);
+		border-radius: var(--fs-radius); border: var(--fs-hairline);
 		background: var(--fs-panel2); color: var(--fs-text);
 		display: inline-flex; align-items: center; justify-content: center;
 	}

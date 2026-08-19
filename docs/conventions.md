@@ -275,6 +275,9 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `mirror` | `@mirror`-pinned copies still byte-identical |
 | `bang-ok` | every `!important` sits in an allowlisted file |
 | `axes` | the pre-paint in `head.ut` agrees with the live appearance appliers, and `header.ut` reads every saved option back |
+| `scroll-anchor` (live) | grows something above the reader and asserts the page does not move under them — twice, once with the engine's own scroll anchoring suppressed (the Safari path, forced on any engine with `localStorage.fsEngineAnchor='off'`) and once without, so a fallback that also runs where the engine already corrects is caught as well. Plus a scripted flick up and down: the theme may not correct WHILE the reader moves |
+| `table-tick` (live) | performs a poll tick on purpose — rows out, rows back in, marks stripped, then a forced layout — and fails if the replaced table was laid out before anything answered for it. The intermediate lasts a microtask, so no sampler can see it: with the stylesheet's gate removed this reports 613px on Обзор@390 and 817px on Processes, and nothing with it in place |
+| `page-modules` | the `data-page` → module map in `menu-footstrap-common.js` names the same page each mapped module tests for itself, every mapped module exports the `wire()` the loader calls, and no `'require'` pragma is left for one anywhere — one pragma puts the file back on every page and takes the saving with it |
 | `chrome-fence` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `export-tier` | the `--*-color-*` contract: each level readable as text on three surfaces, each `--on-*` readable on its fill, and the ramp is not flat — measured with and without `prefers-contrast: more`, which re-states the inks |
 | `css-i18n` | translatable strings emitted from CSS |

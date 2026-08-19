@@ -612,8 +612,8 @@ function fitTables() {
 			/* the column's width, not the window's: in the sidebar layout they differ by the sidebar,
 			 * and an 800px window whose column is 520px used to clear CRAMPED and leave the table
 			 * unstacked at full width, clipped by `.fs-main { overflow-x: clip }` until the reader
-			 * held still. `chrome.contentWidth()` answers from memoised tokens and attributes — no
-			 * layout is read here either. */
+			 * held still. `chrome.contentWidth()` answers from what the last fitter measured plus the
+			 * layout attributes — no layout is read here either. */
 			applyDecision(t, known || { stack: chrome.contentWidth() < CRAMPED, drop: false, breakCol: -1 });
 			fit.deferMeasurement();
 			return;

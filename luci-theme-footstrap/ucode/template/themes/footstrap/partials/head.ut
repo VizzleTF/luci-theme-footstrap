@@ -463,7 +463,10 @@
 		   what every browser accepts a manifest as. There is no per-extension setting to fix from
 		   here: the map is compiled into uhttpd. #}
 		<link rel="manifest" href="{{ media }}/manifest.json?v={{ pkgs_update_time }}">
-		<link rel="apple-touch-icon" href="{{ media }}/apple-touch-icon.png">
+		{# iOS reads THIS link and never the manifest's icons array — and it is happy with the 512
+		   square the manifest also uses, which it scales. One raster serves both, see
+		   tools/build-icons.mjs. #}
+		<link rel="apple-touch-icon" href="{{ media }}/app-icon-512.png">
 		{% if (dispatched?.css): %}
 		{# The `css` property of the dispatched menu.d node — an app naming a stylesheet the server
 		   should link for its page, instead of the view injecting one at module eval (which is what

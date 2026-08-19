@@ -25,9 +25,11 @@ luci-theme-footstrap/
 │   └── es/footstrap.po
 ├── htdocs/luci-static/   → /www/luci-static/
 │   ├── footstrap/        cascade.css (GENERATED, gitignored), logo.svg,
-│   │                     manifest.json + app-icon-{192,512}.png + apple-touch-icon.png
-│   │                     (the rasters are COMMITTED and made by tools/build-icons.mjs — the
-│   │                      buildbot has no browser; `npm run icons` proves they match logo.svg)
+│   │                     manifest.json + app-icon-512.png (ONE raster: every browser that
+│   │                     installs a page picks the largest icon and downscales, and iOS reads
+│   │                     the apple-touch-icon LINK, which points at the same file)
+│   │                     (the raster is COMMITTED and made by tools/build-icons.mjs — the
+│   │                      buildbot has no browser; `npm run icons` proves it matches logo.svg)
 │   │                     (pattern.svg and fonts/ are NOT here: they are symlinks uci-defaults
 │   │                      makes to /etc/footstrap/, which the admin uploads or installs)
 │   └── resources/        menu-footstrap.js, menu-footstrap-common.js, fs-*.js
@@ -64,8 +66,17 @@ could render the manifest per request. Two values are fixed by that: `start_url`
 page colour, since the manifest is read once at install time and cannot follow a live Appearance
 change (it paints the splash and the installed window's chrome, never the page). Chrome's install
 prompt needs a secure context, so over plain HTTP what this buys is iOS's Add to Home Screen — which
-reads the manifest and `apple-touch-icon.png` — plus the icons themselves. Regenerate the rasters
-with `node tools/build-icons.mjs` whenever `logo.svg` changes; `npm run icons` fails if you forget.
+reads the `apple-touch-icon` link rather than the manifest — plus the icon itself. Regenerate it with
+`node tools/build-icons.mjs` whenever `logo.svg` changes; `npm run icons` fails if you forget.
+
+The committed file is **quantised to a 32-colour palette**, which is 4.6 KB where the browser's own
+RGBA screenshot is 15.7 KB: the picture is a flat background, one ink colour and the ramp between
+them, so a palette is the right encoding and the worst channel moves by 18 of 255 on 0.2% of the
+pixels. That step is the one thing in this repo that wants **ImageMagick**, and only when
+regenerating — `npm run icons` compares PIXELS in the browser it already runs, so a different
+ImageMagick version is not a failure and a redrawn logo still is. Nothing in luci-base could stand in
+for the icon, which is worth stating: it ships functional glyphs (interfaces, signal bars, ports) and
+no logo or raster of any kind, and every theme carries its own.
 
 ## Makefile: what differs from a template theme
 

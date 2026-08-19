@@ -191,8 +191,13 @@ compile.
 
 ## Commits and the changelog
 
-- **Conventional Commits, message in English. Never commit without an explicit instruction.** No
-  co-author / "Generated with" / AI attribution trailers. `origin` is the only remote.
+- **Conventional Commits, message in English. Never commit OR PUSH without an explicit instruction
+  for that action, each time.** Finished work, green gates, a verified fix or an answered review is
+  not authorization, and yesterday's "commit and push" covers yesterday only. This holds for BOTH
+  remotes — `origin` here, and the openwrt/luci fork behind the PR, where the amend + push
+  `--force-with-lease` sequence is a push like any other. Leave the tree dirty and say what would go
+  in and where it would go; wait to be told. No co-author / "Generated with" / AI attribution
+  trailers. `origin` is the only remote of THIS repository.
 - **NO COMMIT LANDS WITHOUT ITS CHANGELOG ENTRY.** It goes under `## [Unreleased]`, in the **same
   commit as the code**, and in **BOTH `CHANGELOG.md` AND `CHANGELOG_ru.md`** — never one now and
   its mirror later. An entry written afterwards is written from the diff, and the diff is exactly

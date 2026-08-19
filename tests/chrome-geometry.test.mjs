@@ -29,7 +29,7 @@ const chrome = () => loadModule('fs-chrome');
 
 /* what shellGeometry() reads back from 02-tokens.css at the default density — contentPad is the
  * gutter of BOTH sides, exactly as that function returns it */
-const G = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56 };
+const G = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56, contentMax: 1280 };
 
 function width(state) {
 	return chrome().columnWidth(G, Object.assign({ narrow: false, top: false, rail: false }, state));
@@ -67,6 +67,28 @@ test('the gutter is whatever the sheet gave the column, not what the token says'
 	const phone = Object.assign({}, G, { contentPad: 32 });
 	assert.equal(chrome().columnWidth(phone, { outerW: 390, narrow: true, top: false, rail: false }), 358);
 	assert.equal(chrome().columnWidth(phone, { outerW: 568, narrow: true, top: false, rail: false }), 536);
+});
+
+test('an omitted flag means the sidebar is there', () => {
+	/* fitShell() calls this with `{ outerW, rail }` and nothing else, deliberately: it is the pass
+	 * that DECIDES `data-narrow`, so it may not read it, and the top layout returned before it got
+	 * here. Anything that made an absent flag mean something other than "sidebar present" would
+	 * move the fold threshold without touching a line of fitShell. */
+	assert.equal(chrome().columnWidth(G, { outerW: 800, rail: false }), 520);
+	assert.equal(chrome().columnWidth(G, { outerW: 800, rail: true }), 800 - G.railW - G.contentPad);
+});
+
+test('the column stops growing at --fs-content-max', () => {
+	/* `.fs-content` is `max-width: var(--fs-content-max); margin: 0 auto`, so past that width the
+	 * surplus is margin, not column. Without the cap a 2560px sidebar layout answered 2280 for a
+	 * column that is 1224 wide — no caller can reach that region (both ask a lower bound), which is
+	 * exactly why it needs a test rather than a reader's trust. */
+	assert.equal(width({ outerW: 2560 }), G.contentMax - G.contentPad);
+	assert.equal(width({ outerW: 2560, top: true }), G.contentMax - G.contentPad);
+	/* and the cap does not bind before it should: at the width where window-minus-sidebar first
+	 * reaches the cap, the two agree */
+	assert.equal(width({ outerW: G.contentMax + G.sidebarW }), G.contentMax - G.contentPad);
+	assert.equal(width({ outerW: G.contentMax + G.sidebarW - 100 }), G.contentMax - 100 - G.contentPad);
 });
 
 test('a column is never negative', () => {

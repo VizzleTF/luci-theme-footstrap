@@ -5,7 +5,7 @@
 	 * sits under it, and center then pushed the label to the middle of control+description,
 	 * visibly BELOW the control. baseline lines the label up with the field's FIRST line for
 	 * every widget (select, dropdown, toggle, dynlist, textarea). */
-	.cbi-value { justify-content: space-between; gap: var(--fs-space-4); padding: var(--fs-space-2) 0; margin: 0; border-bottom: 1px solid var(--fs-border); }
+	.cbi-value { justify-content: space-between; gap: var(--fs-space-4); padding: var(--fs-space-2) 0; margin: 0; border-bottom: var(--fs-hairline); }
 	/* stacked controls in a field (Local Time: date input + Sync buttons) need breathing room —
 	 * the raw <br> collapses them. Exclude the password reveal group: it must stay seamless. */
 	.cbi-value-field > .control-group { margin-top: var(--fs-space-2); }
@@ -28,7 +28,7 @@
 	 * 10.8 -> 13px on the firewall). border-COLOR, not `border`: the shorthand animates
 	 * border-width too — a layout animation on every hover instead of a paint one. */
 	input, button {
-		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+		transition: var(--fs-field-transition);
 	}
 
 	/* keep base's padding-top (--fs-space-1) — it is tuned for base's align-items: baseline. */
@@ -181,7 +181,7 @@
 		--sw-pad: calc(2px * var(--fs-density-box));
 		display: inline-block; position: relative; margin: 0;
 		width: var(--sw-w); height: var(--sw-h); border-radius: var(--fs-radius-pill);
-		background: var(--fs-track); border: 1px solid var(--fs-border);
+		background: var(--fs-track); border: var(--fs-hairline);
 		cursor: pointer; transition: background var(--fs-dur), border-color var(--fs-dur); vertical-align: middle;
 	}
 	/* The input is opacity:0/0x0, so this label IS the whole hit box of LuCI's most common
@@ -308,7 +308,7 @@
 		height: var(--box);
 		background: linear-gradient(var(--fs-panel), var(--fs-panel2));
 		border: 1px solid var(--bd-color);
-		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+		transition: var(--fs-field-transition);
 	}
 	/* each box states its own radius — one shared 2px re-declared to 50% for the radio would
 	 * be a same-selector shadow inside this layer */
@@ -376,7 +376,7 @@
 		padding: var(--fs-space-1) var(--fs-space-2);
 		background: var(--fs-panel);
 		color: var(--fs-text);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius);
 	}
 	/* base's old `#localtime { width: 300px }` media rule was NOT moved here: the elastic
@@ -410,7 +410,7 @@
 		 * position and two spellings of one number is how they would drift apart */
 		background-repeat: no-repeat; background-position: right var(--fs-space-3) center; background-size: 12px;
 		padding: var(--fs-space-2) var(--fs-space-8) var(--fs-space-2) var(--fs-space-3);
-		border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
+		border: var(--fs-hairline); border-radius: var(--fs-radius);
 		color: var(--fs-text); font-family: var(--fs-font-sans); font-size: var(--fs-type);
 		line-height: 1.3; min-height: var(--fs-ctl-h); cursor: pointer;
 		/* width/display absorbed from base's generic field box: a select's natural width is its
@@ -419,7 +419,7 @@
 		 * inline-block the widget has always computed */
 		width: 210px;
 		display: inline-block;
-		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+		transition: var(--fs-field-transition);
 	}
 	/* group-then-refine, directly under its group: the listbox variant must NOT take the closed
 	 * control's one-line height. A SURFACE token, not an ink one: this once read --fs-on-accent
@@ -449,7 +449,7 @@
 		.cbi-value-field select::picker-icon { display: none; }
 		::picker(select) {
 			appearance: base-select;
-			background: var(--fs-panel); border: 1px solid var(--fs-border);
+			background: var(--fs-panel); border: var(--fs-hairline);
 			border-radius: var(--fs-radius-lg); box-shadow: var(--fs-shadow-pop);
 			padding: var(--fs-space-1-5); margin-top: var(--fs-space-1-5);
 		}
@@ -500,7 +500,7 @@
 		height: var(--fs-ctl-h);
 		color: var(--fs-text);
 		font-size: var(--fs-type);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius);
 		padding: 0;
 		position: relative;
@@ -509,7 +509,7 @@
 		background-repeat: no-repeat;
 		background-position: right var(--fs-space-3) center;
 		background-size: 12px;
-		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+		transition: var(--fs-field-transition);
 	}
 	/* The disabled cue used to live ENTIRELY on the ▾ plate: base/30-forms.css dims
 	 * `.cbi-select[disabled]::before` and never the shell itself. With the plate gone the state had
@@ -571,13 +571,13 @@
 	input[type="color"],
 	textarea {
 		background: var(--fs-panel2);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius);
 		color: var(--fs-text);
 		padding: var(--fs-space-2) var(--fs-space-3);
 		min-height: var(--fs-ctl-h);
 		box-shadow: none;
-		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+		transition: var(--fs-field-transition);
 	}
 	/* width/font-size absorbed from base's generic field box, same numbers — a textarea has
 	 * always sat at the fixed 210px (the elastic rule above names only text/url/search) */
@@ -707,12 +707,12 @@
 	}
 	.cbi-dynlist > .item {
 		background: var(--fs-panel);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-sm);
 		color: var(--fs-text);
 		box-shadow: none;
 		margin: 0;
-		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+		transition: var(--fs-field-transition);
 	}
 	/* a chip is keyboard-removable (ui.js gives it a tabindex), so it needs the ring */
 	.cbi-dynlist > .item:focus {
@@ -730,9 +730,9 @@
 		padding: 0 var(--fs-space-3);
 		color: var(--fs-text);
 		line-height: 2em;
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius);
-		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+		transition: var(--fs-field-transition);
 	}
 	/* the hover cue is the lift, not a colour: the plate's fill is a gradient (see
 	 * --fs-hover-lift in 02-tokens.css) — replaces base's old focus-glow-on-hover */
@@ -748,9 +748,9 @@
 	/* text add-item = one bordered input group (input + + button attached) */
 	.cbi-dynlist > .add-item {
 		align-items: stretch;
-		background: var(--fs-panel2); border: 1px solid var(--fs-border);
+		background: var(--fs-panel2); border: var(--fs-hairline);
 		border-radius: var(--fs-radius-sm); overflow: hidden;
-		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+		transition: var(--fs-field-transition);
 	}
 	.cbi-dynlist > .add-item:focus-within { border-color: var(--fs-accent); box-shadow: var(--fs-focus-ring); }
 	.cbi-dynlist > .add-item > input,
@@ -768,10 +768,10 @@
 	.control-group:has(> .cbi-input-password) {
 		display: inline-flex; align-items: stretch; gap: 0;
 		background: var(--fs-panel2);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius);
 		overflow: hidden;
-		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+		transition: var(--fs-field-transition);
 	}
 	.control-group:has(> .cbi-input-password) > .cbi-input-password {
 		border: 0; border-radius: 0;
@@ -829,7 +829,7 @@
 	 * to the card's right edge. Every stretching control in a form row now ends at one x. */
 	.cbi-range-slider { display: inline-flex; align-items: center; gap: var(--fs-space-3); width: 100%; max-width: var(--fs-field-max); }
 	.cbi-range-slider-value {
-		background: var(--fs-panel2); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-sm);
+		background: var(--fs-panel2); border: var(--fs-hairline); border-radius: var(--fs-radius-sm);
 		padding: var(--fs-space-1) var(--fs-space-2); color: var(--fs-accent); font-family: var(--fs-font-mono);
 		/* NOT 600: no face is bundled, so 600 either drags a 20 KB file back in or is faked by
 		 * synthetic emboldening, which smears a monospace grid.

@@ -22,7 +22,7 @@
 		/* a modal is a CARD — the large radius, like every other panel */
 		border-radius: var(--fs-radius-lg);
 		background: var(--fs-panel);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		/* box-shadow: theme/70-modal.css — absorbed. It was `0 0 3px var(--fs-panel2)`, a shadow in
 		 * the colour of the page (in footstrap light panel2 and bg are the same hex), so the theme
 		 * gives every .modal --fs-shadow-pop instead and this one was dead. */

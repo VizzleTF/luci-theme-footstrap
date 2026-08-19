@@ -6,7 +6,7 @@
 	.alert-message {
 		padding: var(--fs-space-3-5) var(--fs-space-4);
 		border-radius: var(--fs-radius-lg);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		/* logical: the stripe marks the READING start of the alert, so it swaps sides with the
 		 * document (LuCI ships ar/fa/he catalogues) — physical, it sat on the far edge in RTL. */
 		border-inline-start: 3px solid var(--fs-accent);
@@ -201,7 +201,7 @@
 	.label {
 		display: inline-block; padding: var(--fs-space-1) var(--fs-space-2); border-radius: var(--fs-radius-pill);
 		font-size: var(--fs-type-xs); font-weight: var(--fs-weight); line-height: 1.4;
-		background: var(--fs-panel2); border: 1px solid var(--fs-border);
+		background: var(--fs-panel2); border: var(--fs-hairline);
 		color: var(--fs-dim); text-shadow: none; text-transform: none;
 		/* carried over from the absorbed styles/base .label rule */
 		white-space: nowrap; margin: .125em 0 .125em .4em;
@@ -228,7 +228,7 @@
 	.cbi-title .label {
 		font-size: var(--fs-type-xs); font-weight: var(--fs-weight);
 		padding: var(--fs-space-1) var(--fs-space-3); border-radius: var(--fs-radius-pill);
-		background: var(--fs-panel2); border: 1px solid var(--fs-border);
+		background: var(--fs-panel2); border: var(--fs-hairline);
 		color: var(--fs-dim); cursor: pointer; line-height: 1.4;
 		text-transform: none; letter-spacing: 0;
 		margin: 0; min-width: 0; box-shadow: none;

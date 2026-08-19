@@ -175,7 +175,7 @@
 	}
 
 	.ifacebox {
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		margin: 0 var(--fs-space-3);
 		text-align: center;
 		white-space: nowrap;
@@ -190,7 +190,7 @@
 	}
 
 	.ifacebox .ifacebox-head {
-		border-bottom: 1px solid var(--fs-border);
+		border-bottom: var(--fs-hairline);
 		/* the head sits INSIDE the box's 1px border, so its own radius is the box's less that
 		 * border — restating a smaller literal is how the two drifted apart before. */
 		border-radius: calc(var(--fs-radius-sm) - 1px) calc(var(--fs-radius-sm) - 1px) 0 0;
@@ -233,7 +233,7 @@
 	.ifacebadge {
 		display: inline-block;
 		flex-direction: row;
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		padding: var(--fs-space-0-5);
 		/* surface: theme/45-misc.css (flat) — absorbed */
 		color: var(--fs-text);
@@ -409,7 +409,7 @@
 	.uci-dialog div > ins,
 	.uci-dialog div > var {
 		margin-bottom: var(--fs-space-0-5);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		line-height: var(--fs-leading-tight);
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -571,7 +571,7 @@
 		min-width: min(210px, 100%);
 		max-width: 100%;
 		/* width/style only; radius: theme/60-inputs.css — absorbed */
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		display: flex;
 		flex-direction: column;
 		opacity: 0;
@@ -587,7 +587,7 @@
 		text-overflow: ellipsis;
 		margin: .25em .25em 0 .25em;
 		white-space: nowrap;
-		border-bottom: 1px solid var(--fs-border);
+		border-bottom: var(--fs-hairline);
 	}
 
 	.cbi-filebrowser .cbi-button-positive {
@@ -625,7 +625,7 @@
 		flex-wrap: wrap;
 		margin: 0 -.125em .25em -.125em;
 		padding: 0 0 .125em 0;
-		border-bottom: 1px solid var(--fs-border);
+		border-bottom: var(--fs-hairline);
 	}
 
 	.cbi-filebrowser .upload > * {

@@ -9,7 +9,7 @@
 	 * their own entry here. */
 	body[data-page="admin-system-admin-sshkeys"] #view > div {
 		background: var(--fs-panel);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow);
 		padding: var(--fs-space-4);

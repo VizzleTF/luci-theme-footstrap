@@ -228,6 +228,41 @@ five tabs came back as an empty list and "port" found nothing on a router that p
 Forwards page. Measured on the dev router: 78 indexed nodes through `getChildren()`, with every tab
 of every aliased page missing.
 
+## Keeping the reader's place when the engine will not
+
+A poll tick changes the height of things above the reader — a station joins the associated list, a
+lease expires, an interface box grows a line — and everything below it moves. Chromium and Firefox
+hide that with **scroll anchoring**: they pick an element the reader can see and compensate the
+scroll offset so it stays put. **WebKit has never implemented it**, so on Safari and on every iPhone
+the same tick moves the page under the reader's thumb. That is what "the Overview jitters" was, and
+it is why it was reported from Safari and an iPhone while the same router was still in Chrome.
+
+`fs-fit.js` therefore does the job **only where nobody else is doing it**: `ENGINE_ANCHORS` asks the
+platform (`CSS.supports('overflow-anchor', 'auto')` — an engine that does not know the property does
+not have the feature) rather than a browser name, because correcting an offset that the engine also
+corrects means two corrections and a page that jumps the other way.
+
+Three details carry it, and each one was a measured failure first:
+
+- **The reference is what sits at the top of the CONTENT, not the frame the fold cuts through.** A
+  tick that grows something inside that frame leaves the frame's own top exactly where it was —
+  drift 0, measured — while everything after it moves. One hit test below `[data-fs-chrome]` (the
+  bar is sticky and owns the first rows of the viewport; a test at y=1 returns the chrome and the
+  page gets no anchor at all) gives the same element the engine's own algorithm would pick.
+- **It is captured while the page is still, not in the mutation callback.** That callback runs after
+  the DOM changed, so a reference taken there has already moved with it: right for the fitters,
+  which have not run yet, and blind to the tick itself. The resting reference is refreshed after
+  every settled pass, after every correction, and when a scroll stops.
+- **It carries the offset it was taken at.** The reader scrolling and the page growing look the same
+  from the element alone; correcting against a reference from another offset would drag the page
+  back to where the reader had scrolled from.
+
+`tools/scroll-anchor.mjs` holds all of it: it grows 120px above the reader and requires the page to
+stay within two pixels, once with the engine's anchoring suppressed and once without, in both
+layouts, and it flicks the page up and down to prove the theme corrects nothing while the reader is
+moving. With the fallback removed the Safari case reports exactly the reported symptom — 120px of
+page moved under the reader.
+
 ## `fs-select.js`
 
 Turns every stock `<select>` into a styled `ui.Dropdown`, because a native `<select>` popup cannot

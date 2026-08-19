@@ -64,6 +64,18 @@
 		 * tools/mirror.mjs; the third restated the literal until it had a name. */
 		--fs-row-rail: inset 2px 0 0 var(--fs-accent);
 
+		/* THE HAIRLINE, named because it is a decision and not an accident. Every separator in
+		 * this theme is the same one-pixel line in the same border colour — 69 declarations said
+		 * so in longhand, which is 69 places to miss when the answer changes (a 2px line for a
+		 * high-contrast mode, a softer colour, a logical-property rewrite). The shorthand is the
+		 * token, so `border`, `border-top` and friends all take it, and the private tier means it
+		 * costs two characters in the shipped sheet rather than twenty-six. */
+		--fs-hairline: 1px solid var(--fs-border);
+		/* A FIELD REACTING TO FOCUS: the ring arrives and the edge changes colour together, and
+		 * they must stay together — a transition list that drifts apart shows the border moving
+		 * before the ring. Eleven controls ride this. */
+		--fs-field-transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+
 		/* the theme's ONE colour literal, deliberately: black at .7 is the absence of light
 		 * behind a dialog, not a tint of any token — a palette-tinted scrim over a dark page
 		 * dims nothing. A token so the RULES stay literal-free. */

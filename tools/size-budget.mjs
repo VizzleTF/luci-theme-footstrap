@@ -29,18 +29,25 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildCss, ROOT } from './lib/css.mjs';
+import { pageModules } from './lib/page-modules.mjs';
 
 const SHOW = process.argv.includes('--show');
 
 const LIMITS = {
-	/* 126,866 B measured 2026-08-17 (built 138,798, −8.6% from the token mangle). The headroom is
-	 * deliberate and small: a feature's worth of rules should fit without a gate edit, a redesign's
-	 * should not. */
-	cascadeCss: 130_000,
-	/* 84,432 B measured 2026-08-17 over the 14 shipped modules, terser with top-level mangling.
-	 * ALL of them load on every admin page — menu-footstrap-common requires the whole graph — so
-	 * the sum is the honest per-visit number, not a worst case. */
-	resourcesJs: 86_000,
+	/* 125,747 B measured 2026-08-18 (built 137,376, −8.5% from the token mangle) — 1.5 KB of that
+	 * came from naming the hairline and the field transition, which turned 80 longhand declarations
+	 * into two tokens. The headroom is deliberate and small: a feature's worth of rules should fit
+	 * without a gate edit, a redesign's should not. */
+	cascadeCss: 127_000,
+	/* 85,671 B measured 2026-08-18 over the 14 shipped modules, terser with top-level mangling.
+	 * This is the FLASH cost: every module ships, whether or not a given page loads it. */
+	resourcesJs: 87_000,
+	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the
+	 * router is also routing packets over: the same set minus the page modules, which are required
+	 * only on the one page each belongs to (tools/page-modules.mjs). 70,437 B measured 2026-08-18,
+	 * i.e. 15.2 KB less than the sum. Raising it is a decision; lowering it whenever the number
+	 * comes down is the point. */
+	coldJs: 72_000,
 };
 
 function bytes(path) {
@@ -66,10 +73,16 @@ function shippedJs() {
 	cpSync(join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources'), res, { recursive: true });
 	execFileSync(process.execPath, [ join(ROOT, 'tools/minify-js.mjs'), res ],
 		{ stdio: SHOW ? 'inherit' : 'ignore' });
+	/* a page module is not part of a cold visit anywhere but on its own page */
+	const lazy = new Set([ ...pageModules().values() ].map((n) => n + '.js'));
 	const files = readdirSync(res).filter((f) => f.endsWith('.js'))
-		.map((f) => ({ name: f, size: bytes(join(res, f)) }))
+		.map((f) => ({ name: f, size: bytes(join(res, f)), lazy: lazy.has(f) }))
 		.sort((a, b) => b.size - a.size);
-	return { files, size: files.reduce((n, f) => n + f.size, 0) };
+	return {
+		files,
+		size: files.reduce((n, f) => n + f.size, 0),
+		cold: files.filter((f) => !f.lazy).reduce((n, f) => n + f.size, 0)
+	};
 }
 
 const css = shippedCss();
@@ -79,14 +92,17 @@ const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 
 if (SHOW) {
 	console.log('\ncascade.css  ' + kb(css.size).padStart(9) + '  (limit ' + kb(LIMITS.cascadeCss) + ')');
-	console.log('resources/   ' + kb(js.size).padStart(9) + '  (limit ' + kb(LIMITS.resourcesJs) + ')');
-	for (const f of js.files) console.log('   ' + kb(f.size).padStart(9) + '  ' + f.name);
-	console.log('cold total   ' + kb(css.size + js.size).padStart(9) + '\n');
+	console.log('resources/   ' + kb(js.size).padStart(9) + '  (limit ' + kb(LIMITS.resourcesJs) + ', on flash)');
+	console.log('  cold page  ' + kb(js.cold).padStart(9) + '  (limit ' + kb(LIMITS.coldJs) + ', what a visit downloads)');
+	for (const f of js.files) console.log('   ' + kb(f.size).padStart(9) + '  ' + f.name + (f.lazy ? '   (page module)' : ''));
+	console.log('cold total   ' + kb(css.size + js.cold).padStart(9) + '\n');
 }
 
 const over = [];
 if (css.size > LIMITS.cascadeCss)
 	over.push(`cascade.css is ${css.size} B, over its ${LIMITS.cascadeCss} B budget by ${css.size - LIMITS.cascadeCss} B`);
+if (js.cold > LIMITS.coldJs)
+	over.push(`a cold page downloads ${js.cold} B of JS, over its ${LIMITS.coldJs} B budget by ${js.cold - LIMITS.coldJs} B`);
 if (js.size > LIMITS.resourcesJs)
 	over.push(`the shipped JS is ${js.size} B, over its ${LIMITS.resourcesJs} B budget by ${js.size - LIMITS.resourcesJs} B`
 		+ ' (largest: ' + js.files.slice(0, 3).map((f) => f.name + ' ' + kb(f.size)).join(', ') + ')');
@@ -99,4 +115,4 @@ if (over.length) {
 	process.exit(1);
 }
 
-console.log(`ok — cascade.css ${kb(css.size)}, shipped JS ${kb(js.size)}, both within budget.`);
+console.log(`ok — cascade.css ${kb(css.size)}, shipped JS ${kb(js.size)} on flash and ${kb(js.cold)} on a cold page, all within budget.`);

@@ -187,7 +187,7 @@
 	.cbi-map > h2,
 	#view > h2 {
 		background: var(--fs-panel);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow);
 		margin: 0 0 var(--fs-card-gap);
@@ -209,7 +209,7 @@
 	.cbi-map > h2 + .cbi-map-descr,
 	#view > h2 + .cbi-map-descr {
 		background: var(--fs-panel);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-top: 0;
 		border-radius: 0 0 var(--fs-radius-lg) var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow);

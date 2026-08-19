@@ -54,6 +54,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as pw from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands } from './lib/stands.mjs';
+import { classify, representatives, reportReduction, PINNED } from './lib/page-shapes.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINE = resolve(HERE, 'baselines/live-audit.json');
@@ -63,12 +64,21 @@ const arg = (name, dflt) => {
 	return i === -1 ? dflt : process.argv[i + 1];
 };
 const UPDATE = process.argv.includes('--update');
+/* with --update: replace each measured router's set instead of unioning into it. Removes findings
+ * that belong to apps this machine simply does not install, so it is the flag you reach for after
+ * reading the "no longer reproduce" list, not the one you run by habit. */
+const PRUNE = process.argv.includes('--prune');
 const ENGINE = arg('engine', 'chromium');
 /* 320 is the narrowest width WCAG 1.4.10 requires content to reflow to; 390 is the modal phone;
  * 568 is where the theme's own card decision sits; 768 and 1024 bracket the sidebar's fit; 1440 is
  * the desktop the reports come from. */
 const WIDTHS = arg('widths', '320,390,568,768,1024,1440').split(',').map(Number);
 const ONLY_PAGES = arg('pages', '');
+/* Measure one page per SHAPE instead of every leaf of the menu — see lib/page-shapes.mjs for what a
+ * shape is and for the three sets that are never sampled away. `--pages-all` takes them all. */
+const ALL_PAGES = process.argv.includes('--pages-all');
+/* the four routers rather than the OpenWrt pair (lib/stands.mjs) */
+const ALL_STANDS = process.argv.includes('--all');
 /* ENTERING a page at a width is not the same as RESIZING into it, and only one of the two was ever
  * measured. The sweep below loads each page once at 1440 and then walks the widths, so every
  * measurement after the first is taken on a page that has already been laid out, fitted and
@@ -84,6 +94,11 @@ const ONLY_PAGES = arg('pages', '');
  * table still has to break a column to fit. Its findings are signed `<width>a` so an arrival-only
  * fault cannot hide behind the identical resize signature. */
 const ARRIVE = Number(arg('arrive', '768'));
+if (!Number.isFinite(ARRIVE) || ARRIVE < 0) {
+	/* a typo may not turn a check off in silence — that is how a gate stops holding anything */
+	console.error(`live-audit: --arrive wants a width in px (or 0 to skip it), got "${arg('arrive', '')}"`);
+	process.exit(1);
+}
 
 /* DOES THE CHROME'S ARITHMETIC STILL DESCRIBE THE PAGE IT IS ABOUT?
  *
@@ -98,8 +113,10 @@ const ARRIVE = Number(arg('arrive', '768'));
  * The arithmetic per layout is unit-tested (tests/chrome-geometry.test.mjs). What only a real page
  * can say is whether the INPUTS still describe it — which is this: the model against the box.
  *
- * The column is capped by `max-width: var(--fs-content-max)`, and the model deliberately does not
- * know that (nothing it answers depends on the cap), so the comparison caps it too.
+ * The column's `max-width: var(--fs-content-max)` cap is the MODEL's business, not this gate's: it
+ * used to be applied here, to a model that ignored it, which is a compensation that would have gone
+ * on hiding the disagreement it was papering over. columnWidth() caps, so this compares the two
+ * numbers as they are.
  */
 const GEOMETRY = function () {
 	const RT = window.L;
@@ -110,11 +127,7 @@ const GEOMETRY = function () {
 		const cs = getComputedStyle(col);
 		/* clientWidth is the padding box; the model answers the width the CONTENT gets */
 		const real = col.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-		const cap = parseFloat(cs.maxWidth);
-		let said = chrome.contentWidth();
-		if (Number.isFinite(cap))
-			said = Math.min(said, cap - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
-		const off = Math.round(said - real);
+		const off = Math.round(chrome.contentWidth() - real);
 		/* 2px: a fractional layout edge and a subpixel scrollbar are not a drift */
 		return Math.abs(off) > 2 ? [ { kind: 'geometry', el: 'fs-content', by: off } ] : [];
 	}).catch(() => []);
@@ -196,7 +209,28 @@ const CHECK = function () {
 		if (!name) out.push({ kind: 'noname', el: label(el) });
 	}
 
-	/* 6. two stacked scrollports on the shell — the doubled scrollbar of #12 */
+	/* 6. THE GATE THAT KEEPS A FRESH TABLE OUT OF THE LAYOUT, asked of the page rather than of the
+	 * stylesheet. `theme/30-tables.css` holds a `.fs-dt` out of the flow until fs-select stamps it
+	 * `.fs-fitted`, because a poll tick REPLACES these tables and an unstamped one is laid out
+	 * full-width for an instant — several screens taller than the card stack it is about to become
+	 * at phone widths, and the engine re-anchors on that intermediate and throws the reader (612px
+	 * out and back, twice per tick, measured on a remote router at iPhone width). Two ways that
+	 * protection can be absent without anything else looking wrong:
+	 *
+	 *   ungated-table     a data table outside every root the rule names (`#view`, `#modal_overlay`)
+	 *                     — an app that renders one somewhere else gets no gate at all.
+	 *   unanswered-table  a data table that is unstamped AND occupying height right now, which is
+	 *                     the intermediate itself: either the attribute is not armed or the rule did
+	 *                     not reach it. */
+	if (document.documentElement.hasAttribute('data-fs-fit')) {
+		for (const t of document.querySelectorAll('.table.fs-dt')) {
+			if (!t.closest('#view, #modal_overlay')) out.push({ kind: 'ungated-table', el: label(t) });
+			else if (!t.classList.contains('fs-fitted') && t.getBoundingClientRect().height > 0)
+				out.push({ kind: 'unanswered-table', el: label(t), by: Math.round(t.getBoundingClientRect().height) });
+		}
+	}
+
+	/* 7. two stacked scrollports on the shell — the doubled scrollbar of #12 */
 	const shellScrollers = [ document.documentElement, document.body, ...document.querySelectorAll('.fs-shell, .fs-main, .fs-content, #maincontent') ]
 		.filter((el) => el && /(auto|scroll)/.test(getComputedStyle(el).overflowY) && el.scrollHeight > el.clientHeight + 1);
 	if (shellScrollers.length > 1)
@@ -210,12 +244,16 @@ const baseline = (() => {
 	catch (e) { return {}; }
 })();
 
-const list = requireStands(stands(arg('only', '')), 'live-audit');
+const list = requireStands(stands(arg('only', ''), { all: ALL_STANDS }), 'live-audit');
 const browser = await pw[ENGINE].launch();
 const seen = {}, fresh = [];
 let checked = 0;
 
-for (const stand of list) {
+/* THE ROUTERS RUN AT THE SAME TIME. Nothing here is a timing measurement — every finding is a
+ * geometry or a name read out of a settled page — so two containers answering at once cannot change
+ * an answer, and the wall clock is halved. (`scroll-jank` is the one gate that stays sequential,
+ * because frame pacing IS its subject.) */
+await Promise.all(list.map(async (stand) => {
 	let here = 0;
 	const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 	const page = await ctx.newPage();
@@ -232,9 +270,19 @@ for (const stand of list) {
 	const kset = new Set(known);
 	seen[key] = new Set();
 
-	for (const path of await menuPaths(page)) {
-		if (DESTRUCTIVE.test(path)) continue;
-		if (ONLY_PAGES && !path.startsWith(ONLY_PAGES)) continue;
+	let paths = (await menuPaths(page)).filter((p) => !DESTRUCTIVE.test(p));
+	if (ONLY_PAGES) paths = paths.filter((p) => p.startsWith(ONLY_PAGES));
+
+	if (!ALL_PAGES && !ONLY_PAGES) {
+		/* one load per page to read its shape, then one representative per shape — plus every path
+		 * the baseline names and every pinned page, which may never be sampled away */
+		const shapes = await classify(page, stand.base, paths);
+		const { picked, dropped } = representatives(shapes, [ ...known.map((sig) => sig.split('|')[0]), ...PINNED ]);
+		reportReduction(stand.id, picked, dropped, shapes);
+		paths = picked;
+	}
+
+	for (const path of paths) {
 		await page.setViewportSize({ width: 1440, height: 900 });
 		errs.length = 0;
 		try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
@@ -279,12 +327,14 @@ for (const stand of list) {
 	}
 	await ctx.close();
 	process.stdout.write(`${key}: ${seen[key].size} finding(s) over ${here} page(s)\n`);
-}
+}));
 await browser.close();
 
 /* A run narrowed by --pages or --widths visited only part of the baseline, so it may neither rewrite
  * it nor report the rest as fixed. */
-const fullSweep = !ONLY_PAGES && arg('widths', null) === null && arg('arrive', null) === null;
+/* …and a run that measured one page per shape is narrowed like any other: it cannot tell a finding
+ * that stopped happening from a page it did not open. */
+const fullSweep = !ONLY_PAGES && arg('widths', null) === null && arg('arrive', null) === null && ALL_PAGES;
 
 if (UPDATE) {
 	if (!fullSweep) {
@@ -292,11 +342,27 @@ if (UPDATE) {
 		console.error('would drop every signature it did not visit. Drop the narrowing flags.');
 		process.exit(2);
 	}
-	const next = {};
-	for (const id of Object.keys(seen)) next[id] = [ ...seen[id] ].sort();
+	/* ADDING IS SAFE, REMOVING IS A DECISION — and this file is a UNION ACROSS PLATFORMS (see the
+	 * header), which is what makes the difference matter. A run sees the apps THIS machine has: the
+	 * containers here carry openclash and ssclash, CI's carry mwan3, acme and a dashboard. Rewriting
+	 * a router's set from what one machine saw therefore deletes every finding belonging to an app
+	 * it does not have, and the next CI run reports them as new — a red gate produced by a green
+	 * one. So `--update` unions, and prints what did not reproduce; `--prune` is the deliberate act
+	 * of dropping those, for a maintainer who has read the list and knows which are fixes.
+	 *
+	 * Keys the run did not visit are kept whole for the same reason, one axis up: since the default
+	 * stand set became the OpenWrt pair, a plain run measures two of the four routers. */
+	const next = Object.assign({}, baseline);
+	for (const id of Object.keys(seen)) {
+		const now = [ ...seen[id] ];
+		next[id] = PRUNE ? now.sort() : [ ...new Set([ ...(baseline[id] || []), ...now ]) ].sort();
+	}
+	const untouched = Object.keys(baseline).filter((id) => !(id in seen));
 	mkdirSync(dirname(BASELINE), { recursive: true });
 	writeFileSync(BASELINE, JSON.stringify(next, null, '\t') + '\n');
-	console.log('baseline rewritten:', BASELINE);
+	console.log(PRUNE ? 'baseline rewritten (pruned to this run):' : 'baseline updated (union):', BASELINE);
+	if (untouched.length)
+		console.log(`  kept as they were: ${untouched.join(', ')} (not measured by this run)`);
 	process.exit(0);
 }
 

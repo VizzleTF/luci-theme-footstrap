@@ -23,7 +23,7 @@
 		margin: 0 0 var(--fs-card-gap);
 		padding: var(--fs-space-2);
 		background: var(--fs-panel);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow);
 		/* kills a folder-tab baseline gradient (the 1px x 29px background image the strip

@@ -76,7 +76,7 @@
 		margin: 0;
 		font-size: var(--fs-type); font-weight: var(--fs-weight-bold); color: var(--fs-text);
 	}
-	.fs-ap-section + .fs-ap-section { padding-top: var(--fs-space-4); border-top: 1px solid var(--fs-border); }
+	.fs-ap-section + .fs-ap-section { padding-top: var(--fs-space-4); border-top: var(--fs-hairline); }
 	/* THE ROWS ARE STOCK `.cbi-value` NOW and this page states no layout for them at all — caption
 	 * column, field column and the hairline between rows come from base/30-forms.css and
 	 * theme/60-inputs.css, the same rules every other LuCI form is drawn by. What was here before was
@@ -117,7 +117,7 @@
 	 * border. Fixed 34px square so it lines up with the field beside it at every density. */
 	input[type="color"].fs-color-swatch {
 		flex: 0 0 auto; inline-size: 34px; block-size: 34px; padding: 0; cursor: pointer;
-		background: none; border: 1px solid var(--fs-border); border-radius: var(--fs-radius-sm);
+		background: none; border: var(--fs-hairline); border-radius: var(--fs-radius-sm);
 	}
 	input[type="color"].fs-color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
 	input[type="color"].fs-color-swatch::-webkit-color-swatch { border: 0; border-radius: calc(var(--fs-radius-sm) - 1px); }
@@ -162,7 +162,7 @@
 	 * letterboxed photograph. */
 	.fs-ap-bgprev {
 		display: block; width: 100%; max-width: var(--fs-field-max); height: 84px; object-fit: cover;
-		border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
+		border: var(--fs-hairline); border-radius: var(--fs-radius);
 		/* the preview follows the buttons in the field, so the gap belongs ABOVE it */
 		margin-top: var(--fs-space-2);
 	}
@@ -189,7 +189,7 @@
 	/* the version line at the foot of the page */
 	.fs-ap-footer {
 		display: flex; flex-direction: column; gap: var(--fs-space-2);
-		margin-top: var(--fs-space-0-5); padding-top: var(--fs-space-2-5); border-top: 1px solid var(--fs-border);
+		margin-top: var(--fs-space-0-5); padding-top: var(--fs-space-2-5); border-top: var(--fs-hairline);
 	}
 	.fs-ap-verrow { display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-2-5); }
 	/* links to the project repo — reads as muted text until hovered */

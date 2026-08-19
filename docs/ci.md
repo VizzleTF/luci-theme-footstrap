@@ -79,6 +79,7 @@ ships. Locally it is all one command, `npm run check`; the full table of what ea
 | `css-dup.mjs` | identical declaration bodies under different guards — no linter calls this an error |
 | `mirror.mjs` | `@mirror`-pinned copies still byte-identical (CSS **and** shell) |
 | `axes.mjs` | the pre-paint in `head.ut` agrees with the live appearance appliers |
+| `page-modules.mjs` | the page → module map agrees with the modules, and neither is `require`d at eval |
 | `chrome-fence.mjs` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `conffiles.mjs` | every shipped `/etc/config/*` is declared a conffile — else the manager replaces it on upgrade |
 | `bang-ok.mjs` | the `!important` allowlist in `audit.py` and `.stylelintrc.json` still say the same thing |
@@ -215,13 +216,19 @@ produced, and runs the live gates cheapest-first:
 1. `tools/upstream-contract.mjs` — the assumptions about luci-base. It runs first because if one of
    them has moved, every finding below is downstream of it.
 2. `tools/spa-parity.mjs` — every page opened by a click and by a full load, compared.
-3. `tools/live-audit.mjs` — every page at six widths (resized into) plus one ENTERED with a load of
-   its own, ratcheted against `tools/baselines/live-audit.json`.
+3. `tools/live-audit.mjs` — one page per shape at six widths (resized into) plus one ENTERED with a
+   load of its own, ratcheted against `tools/baselines/live-audit.json`. `--update` UNIONS into that
+   file rather than replacing a router's set: the baseline is a union across platforms, and a
+   machine that does not install mwan3 must not delete mwan3's findings.
 4. `tools/scroll-jank.mjs` — a real wheel, long enough to meet a poll tick, in both layouts: nothing
-   may re-decide or jump while the page moves. Chromium in CI; the other two engines are a local
+   may re-decide or jump while the page moves.
+5. `tools/table-tick.mjs` — the poll tick performed deliberately, with the layout forced inside the
+   window fs-select answers in: a replaced data table may not be laid out before it has an answer.
+6. `tools/scroll-anchor.mjs` — content grows above the reader and the page must not move under them,
+   with and without the engine's own scroll anchoring. Chromium in CI; the other two engines are a local
    `--engines chromium,firefox,webkit` because WebKit needs system libraries the runner would have
    to install for every job.
-5. `tools/install-check.sh` — `install.sh` twice on each router, fresh and over its own result. It
+7. `tools/install-check.sh` — `install.sh` twice on each router, fresh and over its own result. It
    goes last because it replaces the build under test with the published release; #16, #28 and #30
    were all this script, and all on the second run.
 

@@ -91,7 +91,7 @@
 		padding: var(--fs-space-2) var(--fs-space-3);
 		margin: 0 0 var(--fs-space-4);
 		background: linear-gradient(to bottom, var(--fs-panel), var(--fs-panel2));
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius);
 		display: flex;
 		flex: 0;

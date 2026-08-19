@@ -130,7 +130,7 @@
 	.cbi-dropdown > ul > li .hide-close { display: none; }
 	/* the chip divider on a BUTTON dropdown's preview; the form dropdown zeroes it below */
 	.cbi-dropdown > ul > li[display]:not([display="0"]) {
-		border-inline-start: 1px solid var(--fs-border);
+		border-inline-start: var(--fs-hairline);
 	}
 	.cbi-dropdown[empty] > ul {
 		max-width: 1px;
@@ -206,7 +206,7 @@
 
 	.cbi-dropdown:not(.btn):not(.cbi-button) {
 		background: var(--fs-panel2);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius);
 		color: var(--fs-text);
 		min-height: var(--fs-ctl-h);
@@ -216,7 +216,7 @@
 		 * 38 -> 42px on the gallery). */
 		height: var(--fs-control-h);
 		font-size: var(--fs-type);
-		transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
+		transition: var(--fs-field-transition);
 		/* Width absorbed from base/30-forms.css, where it was grouped with .cbi-dynlist's — so the
 		 * theme sized the dynlist and base still sized the dropdown, two halves of the same
 		 * decision in two layers. Same numbers, and they are NOT the dynlist's (240/440): a
@@ -325,7 +325,7 @@
 		transition: max-height var(--fs-dur-move);
 		overflow-y: auto;
 		background: var(--fs-panel);
-		border: 1px solid var(--fs-border);
+		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow-pop);
 		padding: var(--fs-space-1-5);
@@ -410,10 +410,10 @@
 		box-shadow: inset 0 0 0 2px var(--fs-accent-soft);
 	}
 
-	.cbi-dropdown[open] > ul.dropdown > li.create-item { border-top: 1px solid var(--fs-border); margin-top: var(--fs-space-1); }
+	.cbi-dropdown[open] > ul.dropdown > li.create-item { border-top: var(--fs-hairline); margin-top: var(--fs-space-1); }
 	/* The dropdown's "add item" field is a text input and takes the same radius as every other
 	 * one (theme/60-inputs.css). It said 8px here, and won or lost on source order. */
-	.cbi-dropdown .create-item-input { background: var(--fs-panel2); border: 1px solid var(--fs-border); border-radius: var(--fs-radius); color: var(--fs-text); }
+	.cbi-dropdown .create-item-input { background: var(--fs-panel2); border: var(--fs-hairline); border-radius: var(--fs-radius); color: var(--fs-text); }
 	/* dropdown add-item (e.g. Community Lists) — the .cbi-dropdown styles itself, so the
 	 * wrapper stays transparent: no double frame. */
 	.cbi-dynlist > .add-item:has(> .cbi-dropdown) {
@@ -457,7 +457,7 @@
 		 * same height when one wraps; see the data card's .tr in theme/30-tables.css. */
 		.table.cbi-section-table .tr {
 			display: flex; flex-wrap: wrap; width: auto;
-			border: 1px solid var(--fs-border);
+			border: var(--fs-hairline);
 			border-radius: var(--fs-radius-lg);
 			background: var(--fs-panel2);
 			padding: var(--fs-space-2) var(--fs-space-3-5) var(--fs-space-3);

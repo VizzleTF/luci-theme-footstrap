@@ -188,7 +188,9 @@ painted less than a full load. `npm run live` is the half that opens pages, and 
 ```sh
 owlab up                       # the containers these gates measure
 owlab sync                     # your working tree onto them
-npm run live                   # upstream-contract, spa-parity, live-audit, then scroll-jank
+npm run live                   # upstream-contract, spa-parity, live-audit, scroll-jank, table-tick, scroll-anchor
+                               #   two routers (the OpenWrt pair), one page per SHAPE
+npm run live -- --all --pages-all   # the four routers and every page: before a tag
 ```
 
 Each is also a command of its own, and each takes `--only <router ids>`:
@@ -198,6 +200,29 @@ node tools/upstream-contract.mjs --only owrtsnap --verbose   # every assumption,
 node tools/spa-parity.mjs --only owrt2410 --pages /admin/network
 node tools/live-audit.mjs --only owrt2512 --widths 320,1440 --pages /admin/status
 node tools/scroll-jank.mjs --engines chromium,firefox,webkit   # the other two need installing
+```
+
+**What a live run measures, and what it deliberately does not.** The gates used to open every leaf
+of the menu on all four routers, which on a box with a couple of `luci-app-*` installed is 169 paths
+per router and over an hour of wall clock — long enough that the honest description of the suite
+became "the thing nobody runs before pushing". Three cuts, none of which changes what a finding
+means:
+
+- **`call` and `function` nodes are not pages.** 105 of those 169 leaves are RPC endpoints an app
+  registers for its own JS; opening one answers JSON. `menuPaths()` returns the leaves that render
+  (`view`, `template`, `cbi`) and are titled.
+- **One page per SHAPE.** A page is classified by what it is MADE OF — data table, config table,
+  form, tabs, editor, svg, file input… (`tools/lib/page-shapes.mjs`) — and one representative of
+  each shape is measured. Every path the baseline names and every page a field report came from
+  (`PINNED`) keeps its seat regardless, every dropped page is printed with the page standing in for
+  it, and a narrowed run may not rewrite the baseline. `--pages-all` measures them all.
+- **Two routers by default** (`lib/stands.mjs`): the pair that differs in package manager and
+  release. `--all` takes the four, and `docs/releasing.md` asks for it before a tag.
+
+The structural gates run their routers CONCURRENTLY — nothing they measure is a timing — while
+`scroll-jank` stays sequential, because frame pacing is its subject.
+
+```sh
 ```
 
 - **`upstream-contract`** is the registry of what this theme assumes about luci-base — private

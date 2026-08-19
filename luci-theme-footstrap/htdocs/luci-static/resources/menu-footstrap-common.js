@@ -5,11 +5,51 @@
 'require fs-menutree as tree';
 'require fs-chrome as chrome';
 'require fs-router as router';
-'require fs-appearance as appearance';
-'require fs-overview as overview';
 'require fs-prefs as prefs';
 'require fs-sheets as sheets';
 'require fs-search as search';
+
+/* PAGE MODULES: TWO OF THESE MODULES ARE FOR ONE PAGE EACH, AND USED TO SHIP WITH EVERY PAGE.
+ *
+ * `fs-appearance` draws the Appearance controls on System -> System and `fs-overview` reshapes
+ * Status -> Overview; each watches `body[data-page]` and does nothing anywhere else, which is the
+ * right design — a theme may not register a dispatcher node, so it cannot own a route. But they
+ * were `require`d in the directive prologue, and a pragma is a hard dependency: luci.js fetches and
+ * evaluates them before this file's factory runs, on EVERY admin page. Measured after terser: 11.5
+ * KB for the Appearance panel and 3.8 KB for the Overview one, on every cold visit to a page that
+ * has neither.
+ *
+ * So the pragma is replaced by the same observation they were doing for themselves, once, here: on
+ * the page they belong to — and only there — the module is required and wired. What each of them
+ * then does is unchanged, including its own observer: `wire()` re-checks the page synchronously, so
+ * a module that arrives after the stamp still starts watching. The dependency EDGE is what moved,
+ * not the behaviour.
+ *
+ * The map duplicates a page name that also lives inside each module, and `npm run page-modules`
+ * derives both sides and fails if they drift — the same trade as the Appearance axes, which are
+ * implemented twice on purpose and held by a gate. */
+const PAGE_MODULES = {
+	'admin-system-system': 'fs-appearance',
+	'admin-status-overview': 'fs-overview'
+};
+const _pageModules = new Map();
+function wirePageModules() {
+	/* through window.L, never the factory's `L`: that one carries no require() of its own */
+	const RT = window.L;
+	const load = () => {
+		const name = PAGE_MODULES[document.body.getAttribute('data-page') || ''];
+		if (!name || _pageModules.has(name)) return;
+		_pageModules.set(name, RT.require(name).then((m) => m.wire()).catch((e) => {
+			/* a page module that will not load costs its own page's extras and nothing else, so it
+			 * is dropped from the map and retried the next time that page comes up */
+			_pageModules.delete(name);
+			console.error('footstrap: ' + name + ' did not load', e);
+		}));
+	};
+	/* the server's stamp is already in the DOM; every later one is the router's */
+	new MutationObserver(load).observe(document.body, { attributes: true, attributeFilter: [ 'data-page' ] });
+	load();
+}
 
 /* The chrome BOOTSTRAP: load the menu tree once, hand it to the parts that need it, and wire them
  * in the right order. It renders nothing itself — every piece lives in its own module:
@@ -58,21 +98,17 @@ return baseclass.extend({
 			fit.add(chrome.fitChrome);
 
 			chrome.renderChrome();
-			/* Both of these ADD to a stock page rather than owning a route: each watches
-			 * body[data-page] and does nothing anywhere else. A theme may not register a
-			 * dispatcher node — it outlives the theme that registered it. */
-			appearance.wire();
 			/* after setTree(): the palette indexes that tree — lazily, on its first open, but its
 			 * recent-pages list is recorded from the first navigation onwards */
 			search.wire();
 			chrome.wireRail();
 			chrome.wireIndicatorCounts();
 			/* BEFORE router.wire(): the router restamps body[data-page] on every SPA navigation,
-			 * and that attribute is what fs-overview keys off. Wiring its observer after the
+			 * and that attribute is what the page modules key off. Wiring the observer after the
 			 * router's would still work today (the first stamp is the server's, already in the
 			 * DOM), but it would make a route change racy against a listener that is not attached
 			 * yet — cheap to order correctly, expensive to debug. */
-			overview.wire();
+			wirePageModules();
 			router.wire();
 			router.wireVisibility();
 		/* fs-chrome's renderTabMenu warns about exactly this, and the root chain was left bare: a
