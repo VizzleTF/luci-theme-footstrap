@@ -95,8 +95,9 @@ const QUIET = async (growth) => {
 	const room = (sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - window.innerHeight);
 	if (room < 600) return { skip: 'page too short to scroll' };
 
-	let unexplained = 0, biggest = 0, expected = 0;
+	let unexplained = 0, biggest = 0, expected = 0, stalls = 0;
 	let last = pos();
+	let lastAt = Date.now();
 	for (let i = 0; i < 24; i++) {
 		const step = (i % 12 < 6) ? 160 : -160;
 		expected = Math.max(0, Math.min(room, last + step));
@@ -110,14 +111,27 @@ const QUIET = async (growth) => {
 		}
 		await wait(70);
 		const now = pos();
+		/* WAS THIS STEP STILL PART OF A FLICK? The theme calls the reader "scrolling" until the
+		 * offset has held still for SCROLL_IDLE (400 ms, fs-fit.js), and a step here is 70 ms — so on
+		 * a machine that keeps up, the whole loop is one motion. A loaded CI runner does not always
+		 * keep up: one step took longer than that, the theme rightly decided the reader had stopped
+		 * and put the two pads' 240px back, and this pass counted the contract working as a
+		 * surprise. A gap that long is not a flick any more, so the step is excluded — and counted
+		 * and printed, because silence about it would make a run that measured nothing look like a
+		 * run that found nothing. */
+		const gap = Date.now() - lastAt;
+		lastAt = Date.now();
 		/* the offset may differ from the request by the growth the engine compensated; what must not
 		 * happen is a correction of the theme's own on top of it while the reader is moving */
 		const off = Math.abs(now - expected);
-		if (off > growth + 4) { unexplained++; biggest = Math.max(biggest, off); }
+		if (off > growth + 4) {
+			if (gap >= 400) stalls++;
+			else { unexplained++; biggest = Math.max(biggest, off); }
+		}
 		last = now;
 	}
 	view.querySelectorAll('[data-fs-probe]').forEach((el) => el.remove());
-	return { unexplained, biggest };
+	return { unexplained, biggest, stalls };
 };
 
 const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'scroll-anchor');
@@ -172,7 +186,8 @@ for (const engine of ENGINES) {
 					findings.push(`${where}: the offset moved on its own ${quiet.unexplained} time(s) mid-flick (worst ${quiet.biggest}px) `
 						+ '— a correction landing inside a scroll is itself a jump');
 				process.stdout.write(`  ${where}  reader moved ${held.moved}px (scroll ${held.scrollDelta >= 0 ? '+' : ''}${held.scrollDelta}, `
-					+ `${held.scroller})  mid-flick surprises ${quiet.unexplained}\n`);
+					+ `${held.scroller})  mid-flick surprises ${quiet.unexplained}`
+					+ (quiet.stalls ? `  (${quiet.stalls} step(s) too slow to still be a flick, not counted)` : '') + '\n');
 				await ctx.close();
 			}
 		}
