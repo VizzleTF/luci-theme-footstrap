@@ -80,6 +80,7 @@ ships. Locally it is all one command, `npm run check`; the full table of what ea
 | `mirror.mjs` | `@mirror`-pinned copies still byte-identical (CSS **and** shell) |
 | `axes.mjs` | the pre-paint in `head.ut` agrees with the live appearance appliers |
 | `page-modules.mjs` | the page → module map agrees with the modules, and neither is `require`d at eval |
+| `table-contract.mjs` | the break points, and the rule that hides an unanswered data table still names every root `fs-select` scans, guarded on `:root[data-fs-fit]` — the selector half of what `table-tick.mjs` then proves on a page |
 | `chrome-fence.mjs` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `conffiles.mjs` | every shipped `/etc/config/*` is declared a conffile — else the manager replaces it on upgrade |
 | `bang-ok.mjs` | the `!important` allowlist in `audit.py` and `.stylelintrc.json` still say the same thing |

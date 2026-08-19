@@ -18,10 +18,16 @@ on:
 permissions:
   contents: read
 
+# EVERY JOB CARRIES A TIMEOUT, because the default is six hours and a hung step is not a failed
+# one: an apt mirror and a playwright download stalled for 68 minutes on two jobs of the 0.13.2
+# tag with GitHub reporting everything operational, and the release sat behind them. The values
+# are the green-run times with room for a slow runner — 18s, 1m24s, 1m14s, 1m28s, and the live
+# job, which is the only long one — so a stall goes red in minutes and a re-run is one click.
 jobs:
   check:
     name: Static checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - run: sh tools/check-shell.sh
@@ -38,6 +44,7 @@ jobs:
   lint:
     name: Lint + accessibility
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -72,6 +79,13 @@ jobs:
       - run: node tools/axes.mjs
       - run: node tools/chrome-fence.mjs
 
+      # Two derived contracts that were in `npm run check` and in no workflow. Both fail the same
+      # way if nobody runs them: the stylesheet's "an unanswered table takes no room" rule stops
+      # naming a root fs-select scans, or the page-module map names a page that no longer exists —
+      # and in each case the page renders with something missing and says nothing about it.
+      - run: node tools/table-contract.mjs
+      - run: node tools/page-modules.mjs
+
       # These three were in `npm run check` and in no workflow, i.e. enforced only when a
       # human remembered to run the whole suite locally. Each guards a failure nothing
       # observable reports: a conffile the package manager replaces on somebody else's
@@ -90,6 +104,7 @@ jobs:
   # that publishes rather than a second one that drifts from it.
   build:
     name: Build the packages
+    timeout-minutes: 25
     needs: [check, lint]
     runs-on: ubuntu-latest
     steps:
@@ -138,6 +153,7 @@ jobs:
   # anyone should trust it.
   verify:
     name: The package works on a real router
+    timeout-minutes: 25
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -223,6 +239,7 @@ jobs:
   # the wall clock and has never been the one to catch something first.
   live:
     name: The pages behave on a real router
+    timeout-minutes: 45
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -257,8 +274,10 @@ jobs:
             esac
           done
 
-      # Three gates, cheapest first, so a broken assumption about luci-base is reported before
-      # anything spends twenty minutes rendering pages against it.
+      # Cheapest first, so a broken assumption about luci-base is reported before anything spends
+      # minutes rendering pages against it. Every one of these measures one representative per PAGE
+      # SHAPE by default (tools/lib/page-shapes.mjs) and names the pages it stood in for; a release
+      # takes the whole menu on all four routers instead (`--all --pages-all`, docs/releasing.md).
       - run: node tools/upstream-contract.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
       - run: node tools/spa-parity.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
       - run: node tools/live-audit.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
@@ -266,6 +285,13 @@ jobs:
       # of system libraries (gtk-4, gstreamer) this job would install on every run, and the engine
       # differences it covers are checked locally before a release (docs/development.md).
       - run: node tools/scroll-jank.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
+      # The two things a poll tick can do to a page nobody is touching: lay out a replaced table
+      # before anything answered for it, and move the page under the reader. The second one is a
+      # WebKit fault by nature — no engine there implements scroll anchoring — and it is still
+      # checked here on chromium, because the gate forces the theme's own fallback on with the
+      # engine's anchoring suppressed, which is the same code path Safari takes.
+      - run: node tools/table-tick.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
+      - run: node tools/scroll-anchor.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
 
       # LAST, because it installs the PUBLISHED release over the build the steps above measured —
       # and that is the claim: what a user runs is install.sh against the feed, not `apk add` against
