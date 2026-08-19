@@ -39,6 +39,13 @@ nothing retried them because nothing had failed. Each attempt now gets its own d
 for apt, seven for playwright, three attempts), so a stall is a retry rather than a blocked release,
 and the job timeout is the backstop behind that rather than the only clock in the job. Each attempt runs in a session of its own and is killed by process GROUP, because `timeout` signals only the child it started: the first version of the helper killed `playwright install --with-deps` and left the `apt-get` beneath it holding the lists lock, after which both retries died in seconds on that lock.
 
+And apt is asked for as little as possible, because retrying a stalled apt is still waiting for a
+stalled apt: a run spent its whole 20-minute budget doing exactly that. `gettext` is installed only
+when `msgfmt`/`msgmerge`/`xgettext` are missing from the image, and `tools/ci-playwright.sh` fetches
+Chromium from Playwright's CDN and then LAUNCHES it — the claim the gates actually need — going to
+apt for the system libraries only if that launch fails. `--with-deps` went through apt every time,
+and apt is the half that stalls.
+
 ## `check` — gates without node
 
 Needs only `sh`, `awk`, `python3` and `perl`. Seconds to run, and it cannot break the OpenWrt

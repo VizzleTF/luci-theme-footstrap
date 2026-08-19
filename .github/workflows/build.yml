@@ -35,11 +35,17 @@ jobs:
       - run: sh tools/check-acl.sh
       - run: luci-theme-footstrap/build-css.sh /tmp/cascade.css
       - run: python3 tools/audit.py --strict
-      # gettext for update-po; the ucode gate needs only docker, which the runner has.
-      # Under tools/ci-retry.sh: apt does not fail when its mirror is unwell, it stalls, and a
-      # stalled step is nothing's problem until the job timeout. Six minutes a try, three tries.
-      - run: sh tools/ci-retry.sh 360 sudo apt-get update
-      - run: sh tools/ci-retry.sh 360 sudo apt-get install -y gettext
+      # gettext for update-po; the ucode gate needs only docker, which the runner has. Asked for
+      # only when the image does not already carry it, and under tools/ci-retry.sh when it does
+      # not: apt does not fail when its mirror is unwell, it stalls, and a stalled step is
+      # nothing's problem until the job timeout.
+      - run: |
+          if command -v msgfmt >/dev/null && command -v msgmerge >/dev/null && command -v xgettext >/dev/null; then
+            echo 'gettext already on this image'
+          else
+            sh tools/ci-retry.sh 300 sudo -n apt-get update
+            sh tools/ci-retry.sh 300 sudo -n apt-get install -y gettext
+          fi
       - run: luci-theme-footstrap/update-po.sh --check
 
   # npm-based gates, and they live here and nowhere else: the OpenWrt buildbot has no
@@ -65,8 +71,9 @@ jobs:
       # install because it is the fastest thing here and the first to fail on a broken module.
       - run: npm test
 
-      # Same clock: --with-deps is apt, and the browser itself comes off Playwright's CDN.
-      - run: sh tools/ci-retry.sh 420 npx playwright install --with-deps chromium
+      # The browser off Playwright's CDN, then a launch to prove it works; apt only if that
+      # fails. `--with-deps` went through apt unconditionally, and apt is the half that stalls.
+      - run: sh tools/ci-playwright.sh
       - run: node tools/a11y-gallery.mjs
 
       # What the router actually sends, weighed on the real artefact: build-css + the token
@@ -253,8 +260,9 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      # Same clock: --with-deps is apt, and the browser itself comes off Playwright's CDN.
-      - run: sh tools/ci-retry.sh 420 npx playwright install --with-deps chromium
+      # The browser off Playwright's CDN, then a launch to prove it works; apt only if that
+      # fails. `--with-deps` went through apt unconditionally, and apt is the half that stalls.
+      - run: sh tools/ci-playwright.sh
       - uses: actions/download-artifact@v8
         with:
           name: owfeed-packages
