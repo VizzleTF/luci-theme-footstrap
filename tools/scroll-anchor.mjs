@@ -95,12 +95,30 @@ const QUIET = async (growth) => {
 	const room = (sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - window.innerHeight);
 	if (room < 600) return { skip: 'page too short to scroll' };
 
+	/* A FLICK THAT NEVER REACHES AN EDGE. Assigning a scrollTop that is already the current one
+	 * fires no scroll event, so a run of steps clamped at 0 or at the bottom is a page standing
+	 * still — 400 ms of that and the theme is right to put the pending growth back, which is the
+	 * theme's contract and not a jump. So the travel is kept inside the page: a margin at each end,
+	 * and a step small enough that six of them fit between the two. */
+	const edge = Math.max(80, Math.min(200, Math.round(room * 0.15)));
+	const lo = edge, hi = room - edge;
+	/* six steps out and six back, from the MIDDLE of that band: half the band is what one direction
+	 * gets, so the step is a twelfth of it. Measured on the stands, where the Overview has 1582px of
+	 * room at 1440 and 4355 at 390 — the old fixed 160px reached the bottom in three steps at 1440
+	 * and stood there for the rest of the half-cycle, which is how a page nobody was scrolling came
+	 * to be measured as a flick. */
+	const reach = Math.max(40, Math.min(160, Math.floor((hi - lo) / 12)));
+
 	let unexplained = 0, biggest = 0, expected = 0, stalls = 0;
-	let last = pos();
+	let last = Math.round((lo + hi) / 2);
+	if (sc) sc.scrollTop = last; else window.scrollTo(0, last);
+	await wait(700);
+	last = pos();
 	let lastAt = Date.now();
+	let movedAt = Date.now();
 	for (let i = 0; i < 24; i++) {
-		const step = (i % 12 < 6) ? 160 : -160;
-		expected = Math.max(0, Math.min(room, last + step));
+		const step = (i % 12 < 6) ? reach : -reach;
+		expected = Math.max(lo, Math.min(hi, last + step));
 		if (sc) sc.scrollTop = expected; else window.scrollTo(0, expected);
 		/* a growth lands mid-flick, which is when the theme must NOT correct */
 		if (i % 6 === 3) {
@@ -121,11 +139,15 @@ const QUIET = async (growth) => {
 		 * run that found nothing. */
 		const gap = Date.now() - lastAt;
 		lastAt = Date.now();
+		if (now !== last) movedAt = Date.now();
+		/* …and the same question asked of the PAGE rather than of the loop: an offset that has not
+		 * changed for SCROLL_IDLE is a page nobody is scrolling, whatever this loop asked for. */
+		const idle = Date.now() - movedAt;
 		/* the offset may differ from the request by the growth the engine compensated; what must not
 		 * happen is a correction of the theme's own on top of it while the reader is moving */
 		const off = Math.abs(now - expected);
 		if (off > growth + 4) {
-			if (gap >= 400) stalls++;
+			if (gap >= 400 || idle >= 400) stalls++;
 			else { unexplained++; biggest = Math.max(biggest, off); }
 		}
 		last = now;
