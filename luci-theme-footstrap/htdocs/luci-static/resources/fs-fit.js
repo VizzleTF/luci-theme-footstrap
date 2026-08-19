@@ -329,12 +329,23 @@ const ENGINE_ANCHORS = (() => {
  * matter — the engine covers the other half. On one that does not, this is the half nobody covers,
  * so the reference is kept from the last still moment instead. */
 let _rest = null;
+/* THE OFFSET IS REMEMBERED EVEN WHEN THE ELEMENT IS NOT, and that is the difference between putting
+ * the reader back on 25.12 and putting them back everywhere. See anchorFor(). `_restPage` goes with
+ * it because a page the reader NAVIGATED away from is not a page whose offset means anything: the
+ * router resets both scrollers on a client navigation and replays them on a Back, and neither is a
+ * clamp to undo. */
+let _restAt = null, _restPage = null;
+function pageStamp() {
+	return (document.body && document.body.getAttribute('data-page')) || '';
+}
 function rememberRest() {
 	if (ENGINE_ANCHORS || scrolling()) return;
 	const ref = anchorRef();
 	/* the offset it was taken at travels with it: a reference is only about the page, and the page
 	 * moving under the reader is a different fact from the reader moving through it */
-	_rest = ref ? { el: ref.el, top: ref.top, at: scrollTop() } : null;
+	_restAt = scrollTop();
+	_restPage = pageStamp();
+	_rest = ref ? { el: ref.el, top: ref.top, at: _restAt } : null;
 }
 
 /* -> the reference to correct against: the pre-mutation one where the engine leaves that to us, the
@@ -343,7 +354,32 @@ function rememberRest() {
  * left the document, or that the reader has since scrolled a screen away from, is not one. */
 function anchorFor() {
 	if (ENGINE_ANCHORS) return anchorRef();
-	if (!_rest || !_rest.el.isConnected) return anchorRef();
+	const at = scrollTop();
+	/* AN OFFSET THAT DROPPED WITH NOBODY SCROLLING, ON THE PAGE IT WAS TAKEN ON, IS A CLAMP.
+	 * All three of those conditions are load-bearing. A clamp only ever moves the offset DOWN — it is the
+	 * page running out of length, never gaining it — and a reader who moved is a reader `scrolling()`
+	 * still answers for: their scroll starts the sampler, while the clamp's own scroll event arrives
+	 * in the rendering step AFTER this microtask. The page stamp is the third: fs-router resets both
+	 * scrollers on a client navigation and replays them on a Back, and neither of those is a clamp to
+	 * undo — restoring there would drag the reader down a page they had just left. */
+	const clamped = (_restAt != null && at < _restAt && !scrolling() && _restPage === pageStamp());
+	/* THE REFERENCE DID NOT SURVIVE THE TICK, WHICH IS THE COMMON CASE RATHER THAN AN EDGE ONE.
+	 * `dom.content()` replaces a section's children with NEW nodes, so the element that happened to
+	 * sit at the top of the content area is gone by the time this runs. Measured on a 24.10 stand,
+	 * where the theme cannot reach the poll at all — `view.status.index` there keeps its step
+	 * function in a closure (no `poll_status` on the prototype), so fs-overview's height pin has
+	 * nothing to hook and every tick empties its sections the hard way: the reference was
+	 * disconnected on the tick that mattered, the fallback took a fresh one, measured a drift the
+	 * ceiling then refused, and the reader stayed 1206px from where they had been.
+	 *
+	 * With no element there is no drift to measure — but there is still a number known exactly, and
+	 * it is the one the engine took: the offset dropped by this much and nothing else happened.
+	 * Giving it back IS the correction, and it cannot run away with the page — if the document really
+	 * is shorter now, the browser clamps the write straight back and the reader keeps the offset they
+	 * already had. The element path below stays preferred where it survives, because it compensates
+	 * the height change the tick brought with it as well. */
+	if (!_rest || !_rest.el.isConnected)
+		return clamped ? { by: _restAt - at } : anchorRef();
 	/* THE READER MOVED, NOT THE PAGE. A reference taken at one offset says nothing about a document
 	 * seen from another: correcting against it would drag the page back to where the reader had
 	 * scrolled FROM. So an offset that is not the one the reference was captured at normally means
@@ -369,8 +405,6 @@ function anchorFor() {
 	 *
 	 * Measured on the same harness with the reader flicking while the swap lands: the theme writes
 	 * no offset at all, before this change and after it. */
-	const at = scrollTop();
-	const clamped = (at < _rest.at && !scrolling());
 	if (at !== _rest.at && !clamped) return anchorRef();
 	/* HOW MUCH OF THE DRIFT IS ALREADY ACCOUNTED FOR. applyAnchor() refuses a correction bigger than
 	 * a viewport because a drift that size normally means the view replaced its whole subtree and
@@ -378,7 +412,7 @@ function anchorFor() {
 	 * with a receipt: the offset dropped by exactly this much with nobody scrolling, so the ceiling
 	 * is raised by that measured amount and by nothing else. Without it the worst clamps — the ones
 	 * that hurt, 690px in a 300px viewport on the harness — were the ones refused. */
-	return { el: _rest.el, top: _rest.top, slack: _rest.at - at };
+	return { el: _rest.el, top: _rest.top, slack: Math.max(0, _rest.at - at) };
 }
 
 function anchorRef() {
@@ -450,12 +484,28 @@ function scheduleAnchor(ref) {
 	});
 }
 function applyAnchor(ref) {
-	if (!ref || !ref.el.isConnected) return;
+	if (!ref) return;
 	/* through scroller(), not a second probe of its own: the two asked the same question in the
 	 * same two lines and could already answer differently within one frame */
 	const sc = scroller();
 	const at = sc ? sc.scrollTop : window.scrollY;
+	/* THE ELEMENT-FREE FORM: give back exactly what the engine clamped away, no geometry read at all
+	 * (anchorFor() explains when this is the only form available). No ceiling here and none wanted:
+	 * the number is not an estimate of where the reader was, it is what the offset lost, and the
+	 * document's own length is what bounds the write.
+	 *
+	 * It runs BEFORE the "a page at the top is left alone" rule below, and has to: a collapse deep
+	 * enough clamps the offset to zero, and that is the worst version of this fault rather than the
+	 * one case to sit out. The rule below is about a drift measured from a reference, where an offset
+	 * of zero means there is nothing to give back. */
+	if (ref.by != null) {
+		if (ref.by < 1) return;
+		if (sc) sc.scrollTop = at + ref.by;
+		else window.scrollTo(0, at + ref.by);
+		return;
+	}
 	if (at <= 0) return;
+	if (!ref.el.isConnected) return;
 	const drift = ref.el.getBoundingClientRect().top - ref.top;
 	if (Math.abs(drift) < 1) return;
 	/* A CORRECTION IS A SCROLL THE READER DID NOT ASK FOR, so an absurd one is a bug rather than a

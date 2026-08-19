@@ -15,11 +15,21 @@
   raises the one-viewport ceiling that had refused exactly the worst jumps. `fs-overview.js` holds
   each section's height across the swap, so on the one page whose poll the theme owns the document
   never gets short enough to be clamped at all: prevention costs one `offsetHeight`, a correction is
-  a scroll the reader did not ask for. Measured in WebKit with the engine's own anchoring off, a
-  30-row section swapped for a 35-row one two screens above the reader: 255px of page moved under
-  them before, 0px after, and 815px against 0px with the reader parked at the foot of the page.
-  `tools/scroll-anchor.mjs` now refills a section the way a poll does as well as growing one — the
-  old case inserted a pad, so it never collapsed anything and could not see this.
+  a scroll the reader did not ask for. That pin reaches one release: 24.10's `view.status.index`
+  keeps its poll step in a closure, so there is no `poll_status` for the theme to replace and every
+  tick there empties its sections the hard way. The correction had to cover it, and could not — the
+  element it anchors to is one `dom.content()` replaces, so on the tick that mattered the reference
+  was gone and a fresh one measured a drift the ceiling refused. It no longer needs the element: an
+  offset that dropped with nobody scrolling, on the page it was taken on, has a number attached, and
+  giving that number back IS the correction. It cannot run away with the page either — if the
+  document really did get shorter, the browser clamps the write straight back.
+  Measured in WebKit with the engine's own anchoring off, a 30-row section swapped for a 35-row one
+  two screens above the reader: 255px of page moved under them before, 0px after, and 815px against
+  0px with the reader parked at the foot of the page. On a 24.10 router, its own poll running and
+  the reader parked 120px from the foot: 1206px of page moved and stayed moved, against a clamp
+  handed back within a single frame after. `tools/scroll-anchor.mjs` now refills a section the way a
+  poll does as well as growing one — the old case inserted a pad, so it never collapsed anything and
+  could not see this.
 - **The Overview's stock helpers can no longer arrive after the page that calls them.** The three
   globals `admin_status/index.ut` defines in an inline script — `progressbar`, `renderBox`,
   `renderBadge` — are called bare by stock includes and are this theme's to define on an SPA

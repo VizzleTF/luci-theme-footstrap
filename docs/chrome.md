@@ -256,29 +256,50 @@ Three details carry it, and each one was a measured failure first:
 - **It carries the offset it was taken at.** The reader scrolling and the page growing look the same
   from the element alone; correcting against a reference from another offset would drag the page
   back to where the reader had scrolled from.
-- **…and an offset that DROPPED with nobody scrolling is the engine, not the reader.** `dom.content()`
-  — what every LuCI poll calls to refresh a section — empties the container before it refills it, and
-  for that moment the document is shorter than the offset the reader is at. The engine clamps the
-  offset into what is left, the section fills again and nothing puts it back. Both facts are needed
-  to tell that from a reader who moved: a clamp only ever moves the offset **down**, and a reader
-  who moved is one `scrolling()` still answers for (their scroll starts the sampler, while the
-  clamp's own scroll event arrives in the rendering step after the mutation callback). The clamped
-  amount is also what raises the one-viewport ceiling on a correction — a drift that big normally
-  means the view replaced its subtree, and a clamp is the one that comes with a receipt.
+- **…and an offset that DROPPED with nobody scrolling, on the page it was taken on, is the engine.**
+  `dom.content()` — what every LuCI poll calls to refresh a section — empties the container before it
+  refills it, and for that moment the document is shorter than the offset the reader is at. The
+  engine clamps the offset into what is left, the section fills again and nothing puts it back. Three
+  conditions separate that from a reader who moved: a clamp only ever moves the offset **down**; a
+  reader who moved is one `scrolling()` still answers for (their scroll starts the sampler, while the
+  clamp's own scroll event arrives in the rendering step after the mutation callback); and the page
+  stamp has not changed, because the router resets both scrollers on a navigation and replays them on
+  a Back, and neither is a clamp to undo. The clamped amount is also what raises the one-viewport
+  ceiling on a correction — a drift that big normally means the view replaced its subtree, and a
+  clamp is the one that comes with a receipt.
+- **The correction does not need the reference to have survived.** `dom.content()` replaces a
+  section's children with new nodes, so the element that happened to sit at the top of the content
+  area usually does not survive the tick that moved the reader — measured on a 24.10 router, where it
+  was disconnected on exactly the tick that mattered and the fallback was left measuring a fresh
+  reference against nothing. With no element there is no drift, but there is still a number known
+  exactly: the offset dropped by this much and nothing else happened, so giving that back **is** the
+  correction. It cannot run away with the page either — if the document really did get shorter, the
+  browser clamps the write back and the reader keeps the offset they already had.
 
 **The Overview does not wait to be corrected.** `fs-overview.js` fills each section through
 `swapContent()`, which holds the container's height across the swap, so the document never gets
 short enough to be clamped in the first place: prevention costs one `offsetHeight`, a correction is
-a scroll the reader did not ask for. It covers only the page whose poll the theme owns — every other
-page's poll reaches `dom.content()` with no theme code in the path, which is why both halves exist.
+a scroll the reader did not ask for. It reaches **one release and one page**: 24.10's
+`view.status.index` keeps its poll step in a closure — there is no `poll_status` on the prototype to
+replace — and every other page's poll calls `dom.content()` with no theme code in the path at all.
+That is why both halves exist, and why the correction had to work without the reference.
+
+**Where the theme still does nothing, and what it costs.** `ENGINE_ANCHORS` asks whether the platform
+supports `overflow-anchor`, and a current WebKit answers yes — so the theme steps aside for it. Its
+anchoring is not the same as Chromium's: measured on both stands, both layouts and both widths with a
+section refilled the way a poll refills one and the reader 60px from the foot of the page, Chromium
+ends where it started and WebKit ends 60px lower. Closing that would mean keeping a resting reference
+on every engine, i.e. a hit test and two rects per settled pass — 3.8 ms on Chromium and 7 ms on
+WebKit with a poll-dirtied layout, once a second, on the phone this file spends its comments
+protecting. It is left to the engine, and written down here instead.
 
 `tools/scroll-anchor.mjs` holds all of it: it grows 120px above the reader and requires the page to
 stay within two pixels, once with the engine's anchoring suppressed and once without, in both
-layouts; it refills a section the way a poll does — emptied, then filled again — and requires the
-same; and it flicks the page up and down to prove the theme corrects nothing while the reader is
-moving. With the fallback removed the Safari case reports exactly the reported symptom — 120px of
-page moved under the reader, and 255px on the swap measured in WebKit with the engine's own
-anchoring off.
+layouts; it refills a section the way a poll does — emptied, then filled again, with the router's own
+poll held for the duration — and requires the same; and it flicks the page up and down to prove the
+theme corrects nothing while the reader is moving. With the fallback removed the Safari case reports
+exactly the reported symptom — 120px of page moved under the reader, 255px on the swap measured in
+WebKit with the engine's own anchoring off, and 690px on a real Overview on the stands.
 
 ## `fs-select.js`
 
