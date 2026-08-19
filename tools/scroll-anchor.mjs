@@ -68,11 +68,19 @@ const HOLD = async (growth) => {
 	 * nothing on purpose, so a growth landing there would measure the guard instead of the anchor */
 	await wait(1200);
 
+	/* THE HOST IS NOT A MARK, and taking it as one made this gate report a jump that was its own.
+	 * `#view` is a `.cbi-section` gap wide enough to hit at 390px, and `elementFromPoint` answers
+	 * with the host there; the host's own top does not move when the pad grows INSIDE it, so a
+	 * correctly compensated page reads as -120px. Measured on imm2410 at 390 in the top layout, both
+	 * with the engine's anchoring and with the theme's, and on the released build as well — the
+	 * instrument, not the theme. Two more rows are tried before giving up, because a gap is a gap
+	 * only at the y it was measured at. */
 	const markAt = (y) => {
 		const el = document.elementFromPoint(Math.round((window.innerWidth || 800) / 2), y);
-		return el && view.contains(el) ? el : null;
+		return el && el !== view && view.contains(el) ? el : null;
 	};
-	const mark = markAt(Math.round((window.innerHeight || 800) * 0.6));
+	const h = window.innerHeight || 800;
+	const mark = markAt(Math.round(h * 0.6)) || markAt(Math.round(h * 0.5)) || markAt(Math.round(h * 0.7));
 	if (!mark) return { skip: 'no content under the reader' };
 	const before = { pos: pos(), top: Math.round(mark.getBoundingClientRect().top) };
 
@@ -140,12 +148,14 @@ const SWAP = async (growth) => {
 	}
 	if (!body || body.offsetHeight < 200) return { skip: 'no section body above the reader big enough to collapse' };
 
-	const mark = (() => {
-		const el = document.elementFromPoint(Math.round((window.innerWidth || 800) / 2),
-			Math.round((window.innerHeight || 800) * 0.6));
-		return el && view.contains(el) ? el : null;
-	})();
-	if (!mark || body.contains(mark)) return { skip: 'nothing under the reader that survives the swap' };
+	const markAt = (y) => {
+		const el = document.elementFromPoint(Math.round((window.innerWidth || 800) / 2), y);
+		/* not the host itself — see markAt in HOLD above for the -120px it reported when it was */
+		return el && el !== view && view.contains(el) && !body.contains(el) ? el : null;
+	};
+	const h = window.innerHeight || 800;
+	const mark = markAt(Math.round(h * 0.6)) || markAt(Math.round(h * 0.5)) || markAt(Math.round(h * 0.7));
+	if (!mark) return { skip: 'nothing under the reader that survives the swap' };
 	const before = { pos: pos(), top: Math.round(mark.getBoundingClientRect().top) };
 
 	/* the two halves of dom.content(), with the layout the engine performs in between made explicit

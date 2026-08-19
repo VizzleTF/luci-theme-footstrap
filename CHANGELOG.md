@@ -50,7 +50,12 @@
   page (`body[data-page]`) is the third term of the key now. Both consumers are lower-bound tests
   (`< contentMin`, `< CRAMPED`), so the fault could only ever have cost one borderline stacking
   decision — which is why it is worth three tokens of key rather than a re-read per call.
-
+- **The scroll gate stopped reporting its own instrument as a jump.** `tools/scroll-anchor.mjs` picks
+  the element under the reader with one hit test, and accepted `#view` itself when the test landed in
+  the gap between two sections — which happens at 390px. The host's own top does not move when
+  content grows inside it, so a page the engine had compensated perfectly read as 120px of movement:
+  two findings on ImmortalWrt 24.10, in the top layout, on the released build as much as on this one.
+  The host is excluded now and two more rows are tried before the case is skipped.
 
 ## [0.13.2] — 2026-08-19
 
