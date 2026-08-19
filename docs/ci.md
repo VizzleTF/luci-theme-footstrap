@@ -37,7 +37,7 @@ server — apt and the Playwright CDN — stall rather than fail: on the 0.13.2 
 playwright steps sat for 68, 68 and 17 minutes with GitHub reporting every system operational, and
 nothing retried them because nothing had failed. Each attempt now gets its own deadline (six minutes
 for apt, seven for playwright, three attempts), so a stall is a retry rather than a blocked release,
-and the job timeout is the backstop behind that rather than the only clock in the job.
+and the job timeout is the backstop behind that rather than the only clock in the job. Each attempt runs in a session of its own and is killed by process GROUP, because `timeout` signals only the child it started: the first version of the helper killed `playwright install --with-deps` and left the `apt-get` beneath it holding the lists lock, after which both retries died in seconds on that lock.
 
 ## `check` — gates without node
 
