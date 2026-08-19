@@ -346,10 +346,39 @@ function anchorFor() {
 	if (!_rest || !_rest.el.isConnected) return anchorRef();
 	/* THE READER MOVED, NOT THE PAGE. A reference taken at one offset says nothing about a document
 	 * seen from another: correcting against it would drag the page back to where the reader had
-	 * scrolled FROM. Anything but the offset it was captured at means take a fresh one — which, on
-	 * the mutation path, is the same as not correcting this tick. */
-	if (_rest.at !== scrollTop()) return anchorRef();
-	return _rest;
+	 * scrolled FROM. So an offset that is not the one the reference was captured at normally means
+	 * take a fresh one — which, on the mutation path, is the same as not correcting this tick.
+	 *
+	 * EXCEPT WHEN THE ENGINE MOVED IT, and that exception is the whole reason a poll tick could
+	 * still throw the Overview across the screen with the compensation above already in place.
+	 * `dom.content()` — what every LuCI poll calls to refresh a section — empties the container
+	 * before it refills it, and for that moment the document is SHORTER than the offset the reader
+	 * is at. The engine clamps the offset to what is left, the container fills again and nothing
+	 * puts the offset back; the reader is simply somewhere else. Measured in WebKit with the
+	 * engine's own anchoring off, a 30-row section swapped for a 35-row one two screens above the
+	 * reader: the offset clamped by 130px and the page moved 255px under them.
+	 *
+	 * The test above cannot tell that from a reader who scrolled, because both changed the offset —
+	 * so it threw away the one reference that describes where the page WAS and took a fresh one
+	 * after the clamp, which measures a drift of zero and corrects nothing. Two facts separate them:
+	 * a clamp only ever moves the offset DOWN (it is the page running out of length, never gaining
+	 * it), and a reader who moved is a reader `scrolling()` still answers for — a scroll of theirs
+	 * fires the event that starts the sampler, while the clamp's own scroll event arrives in the
+	 * rendering step AFTER this microtask. An offset that dropped with nobody scrolling is the
+	 * engine's doing, and the remembered reference is exactly what puts the reader back.
+	 *
+	 * Measured on the same harness with the reader flicking while the swap lands: the theme writes
+	 * no offset at all, before this change and after it. */
+	const at = scrollTop();
+	const clamped = (at < _rest.at && !scrolling());
+	if (at !== _rest.at && !clamped) return anchorRef();
+	/* HOW MUCH OF THE DRIFT IS ALREADY ACCOUNTED FOR. applyAnchor() refuses a correction bigger than
+	 * a viewport because a drift that size normally means the view replaced its whole subtree and
+	 * the reference is describing a page that no longer exists. A clamp is the one drift that big
+	 * with a receipt: the offset dropped by exactly this much with nobody scrolling, so the ceiling
+	 * is raised by that measured amount and by nothing else. Without it the worst clamps — the ones
+	 * that hurt, 690px in a 300px viewport on the harness — were the ones refused. */
+	return { el: _rest.el, top: _rest.top, slack: _rest.at - at };
 }
 
 function anchorRef() {
@@ -432,8 +461,9 @@ function applyAnchor(ref) {
 	/* A CORRECTION IS A SCROLL THE READER DID NOT ASK FOR, so an absurd one is a bug rather than a
 	 * fix: a view that replaced its whole subtree can move a reference by thousands of pixels, and
 	 * jumping there is worse than leaving the page where it is. One viewport is the most a single
-	 * tick can honestly account for. */
-	if (Math.abs(drift) > (window.innerHeight || 0) + 200) return;
+	 * tick can honestly account for — plus whatever the engine is on record for having clamped away
+	 * (`slack`, see anchorFor()), which is measured rather than assumed. */
+	if (Math.abs(drift) > (window.innerHeight || 0) + 200 + (ref.slack || 0)) return;
 	if (sc) sc.scrollTop = at + drift;
 	else window.scrollTo(0, at + drift);
 }

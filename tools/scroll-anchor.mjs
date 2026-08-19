@@ -13,6 +13,10 @@
  *   held      with the engine's anchoring suppressed AND the theme's fallback forced on, a growth
  *             above the fold must move the reader by no more than a pixel or two. That is the
  *             Safari path, exercised on an engine CI actually has.
+ *   swapped  a section refilled the way `dom.content()` refills one — emptied, then filled again —
+ *             must leave the reader where they were too. The moment in between has no height, and a
+ *             document that short is one the engine clamps the offset into; `held` cannot see that,
+ *             because a growth that is only ever inserted never collapses anything.
  *   not twice with the engine's anchoring left alone, the same growth must move the reader just as
  *             little — a fallback that also runs there would correct what the engine already
  *             corrected and throw the page the other way.
@@ -81,6 +85,87 @@ const HOLD = async (growth) => {
 	pad.remove();
 	return { before, after, moved: after.top === null ? null : after.top - before.top,
 		scrollDelta: after.pos - before.pos, scroller: sc ? 'maincontent' : 'window' };
+};
+
+/* Runs in the page: a poll tick the way LuCI actually performs one — `dom.content()` empties the
+ * section before it refills it — and reports where that left the reader.
+ *
+ * WHY THIS IS NOT THE `HOLD` CASE ABOVE. HOLD inserts a pad, so the page only ever gets TALLER and
+ * the reference the theme keeps stays valid the whole time. A real tick passes through a moment
+ * where the section has no height at all, and a document that short is a document the engine clamps
+ * the offset into — the section fills again, nobody puts the offset back, and the reader is
+ * somewhere else. That is the fault Safari reported after the anchoring above already shipped, and
+ * HOLD could not see it: the growth it measures never collapses anything.
+ *
+ * The swap only ever GROWS the section (the same children back plus a pad), so a page parked near
+ * the bottom cannot report the engine's honest end-of-document clamp as a jump. */
+const SWAP = async (growth) => {
+	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+	const view = document.getElementById('view');
+	if (!view) return { skip: 'no view' };
+	const mc = document.getElementById('maincontent');
+	const flow = mc ? getComputedStyle(mc).overflowY : '';
+	const sc = (flow === 'auto' || flow === 'scroll') ? mc : null;
+	const pos = () => (sc ? sc.scrollTop : window.scrollY);
+	const room = (sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - window.innerHeight);
+	if (room < 600) return { skip: 'page too short to scroll' };
+
+	/* THE ROUTER'S OWN POLL IS HELD FOR THE DURATION, and that is what makes this a measurement
+	 * rather than a coin toss. This case performs a tick BY HAND — it has to, to control when the
+	 * container is empty — and a real tick landing in the same window rewrites the very section
+	 * being swapped, taking the probe's own pad with it. Measured before it was stopped: the same
+	 * router and width reported 689px, 577px and 0px on three consecutive runs. `HOLD` and `QUIET`
+	 * only ever insert a pad of their own, so a tick underneath them is noise they survive. */
+	const poll = (window.L && window.L.Poll) || null;
+	const polling = !!(poll && typeof poll.active === 'function' && poll.active());
+	if (polling) poll.stop();
+	try {
+
+	/* as far down as the page goes: what the reader loses to a clamp is what is left below them */
+	const at = room - 60;
+	if (sc) sc.scrollTop = at; else window.scrollTo(0, at);
+	await wait(1200);	/* past SCROLL_IDLE, so the theme has a reference from a still page */
+
+	/* THE TALLEST SECTION BODY THAT IS ENTIRELY ABOVE THE VIEWPORT, and both halves of that matter.
+	 * Tall, because the clamp only bites when what the swap takes away is more than the room left
+	 * below the reader — a stock overview has one, the interface or the DHCP list. Above, because
+	 * "the reader must not move" is only true of a change ABOVE them: a section that straddles the
+	 * fold is a section the theme anchors INSIDE, and content growing below that anchor is content
+	 * that is supposed to move. Measured at 390px before this was pinned down: the theme put the
+	 * reference back exactly where it was and this still called the 120px below it a jump. */
+	let body = null;
+	for (const el of view.querySelectorAll('.cbi-section > div')) {
+		if (el.getBoundingClientRect().bottom > 0) continue;
+		if (!body || el.offsetHeight > body.offsetHeight) body = el;
+	}
+	if (!body || body.offsetHeight < 200) return { skip: 'no section body above the reader big enough to collapse' };
+
+	const mark = (() => {
+		const el = document.elementFromPoint(Math.round((window.innerWidth || 800) / 2),
+			Math.round((window.innerHeight || 800) * 0.6));
+		return el && view.contains(el) ? el : null;
+	})();
+	if (!mark || body.contains(mark)) return { skip: 'nothing under the reader that survives the swap' };
+	const before = { pos: pos(), top: Math.round(mark.getBoundingClientRect().top) };
+
+	/* the two halves of dom.content(), with the layout the engine performs in between made explicit
+	 * — WebKit gets there on its own, and a gate must not depend on when */
+	const kept = Array.prototype.slice.call(body.childNodes);
+	for (const n of kept) body.removeChild(n);
+	const empty = { docH: (sc ? sc.scrollHeight : document.documentElement.scrollHeight), pos: pos() };
+	for (const n of kept) body.appendChild(n);
+	const pad = document.createElement('div');
+	pad.style.height = growth + 'px';
+	pad.dataset.fsProbe = '1';
+	body.appendChild(pad);
+	await wait(800);
+
+	const after = { pos: pos(), top: mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null };
+	pad.remove();
+	return { before, empty, after, moved: after.top === null ? null : after.top - before.top,
+		clamped: before.pos - empty.pos, scroller: sc ? 'maincontent' : 'window' };
+
+	} finally { if (polling) poll.start(); }
 };
 
 /* Runs in the page: a scripted flick up and down while ticks land, reporting any offset change the
@@ -190,8 +275,12 @@ for (const engine of ENGINES) {
 				await page.waitForTimeout(3000);
 
 				const where = `${engine} ${stand.id} @${w} ${layout.padEnd(4)} ${noEngineAnchor ? 'engine-anchoring OFF' : 'engine-anchoring on '}`;
-				let held, quiet;
-				try { held = await page.evaluate(HOLD, GROWTH); quiet = await page.evaluate(QUIET, GROWTH); }
+				let held, swap, quiet;
+				try {
+					held = await page.evaluate(HOLD, GROWTH);
+					swap = await page.evaluate(SWAP, GROWTH);
+					quiet = await page.evaluate(QUIET, GROWTH);
+				}
 				catch (e) { await ctx.close(); continue; }
 
 				if (held.skip || quiet.skip) {
@@ -204,11 +293,18 @@ for (const engine of ENGINES) {
 					findings.push(`${where}: the reader's element was replaced mid-measurement, so nothing was proven`);
 				else if (Math.abs(held.moved) > TOLERANCE)
 					findings.push(`${where}: ${GROWTH}px grew above the reader and the page moved ${held.moved}px under them`);
+				if (swap.skip)
+					process.stdout.write(`  ${where}: the swap measured nothing (${swap.skip})\n`);
+				else if (swap.moved === null)
+					findings.push(`${where}: the reader's element did not survive the swap, so nothing was proven`);
+				else if (Math.abs(swap.moved) > TOLERANCE)
+					findings.push(`${where}: a section was refilled the way a poll refills one and the page moved `
+						+ `${swap.moved}px under the reader (the engine clamped ${swap.clamped}px of offset away)`);
 				if (quiet.unexplained)
 					findings.push(`${where}: the offset moved on its own ${quiet.unexplained} time(s) mid-flick (worst ${quiet.biggest}px) `
 						+ '— a correction landing inside a scroll is itself a jump');
 				process.stdout.write(`  ${where}  reader moved ${held.moved}px (scroll ${held.scrollDelta >= 0 ? '+' : ''}${held.scrollDelta}, `
-					+ `${held.scroller})  mid-flick surprises ${quiet.unexplained}`
+					+ `${held.scroller})  swap moved ${swap.skip ? '-' : swap.moved + 'px'}  mid-flick surprises ${quiet.unexplained}`
 					+ (quiet.stalls ? `  (${quiet.stalls} step(s) too slow to still be a flick, not counted)` : '') + '\n');
 				await ctx.close();
 			}

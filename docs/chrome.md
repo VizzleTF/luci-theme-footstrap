@@ -256,12 +256,29 @@ Three details carry it, and each one was a measured failure first:
 - **It carries the offset it was taken at.** The reader scrolling and the page growing look the same
   from the element alone; correcting against a reference from another offset would drag the page
   back to where the reader had scrolled from.
+- **…and an offset that DROPPED with nobody scrolling is the engine, not the reader.** `dom.content()`
+  — what every LuCI poll calls to refresh a section — empties the container before it refills it, and
+  for that moment the document is shorter than the offset the reader is at. The engine clamps the
+  offset into what is left, the section fills again and nothing puts it back. Both facts are needed
+  to tell that from a reader who moved: a clamp only ever moves the offset **down**, and a reader
+  who moved is one `scrolling()` still answers for (their scroll starts the sampler, while the
+  clamp's own scroll event arrives in the rendering step after the mutation callback). The clamped
+  amount is also what raises the one-viewport ceiling on a correction — a drift that big normally
+  means the view replaced its subtree, and a clamp is the one that comes with a receipt.
+
+**The Overview does not wait to be corrected.** `fs-overview.js` fills each section through
+`swapContent()`, which holds the container's height across the swap, so the document never gets
+short enough to be clamped in the first place: prevention costs one `offsetHeight`, a correction is
+a scroll the reader did not ask for. It covers only the page whose poll the theme owns — every other
+page's poll reaches `dom.content()` with no theme code in the path, which is why both halves exist.
 
 `tools/scroll-anchor.mjs` holds all of it: it grows 120px above the reader and requires the page to
 stay within two pixels, once with the engine's anchoring suppressed and once without, in both
-layouts, and it flicks the page up and down to prove the theme corrects nothing while the reader is
+layouts; it refills a section the way a poll does — emptied, then filled again — and requires the
+same; and it flicks the page up and down to prove the theme corrects nothing while the reader is
 moving. With the fallback removed the Safari case reports exactly the reported symptom — 120px of
-page moved under the reader.
+page moved under the reader, and 255px on the swap measured in WebKit with the engine's own
+anchoring off.
 
 ## `fs-select.js`
 

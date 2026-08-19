@@ -1,3 +1,26 @@
+## [Unreleased]
+
+### Fixed
+
+- **A poll tick no longer throws the page across the screen on Safari and iOS.** The compensation
+  0.13.2 added kept the reader's place for a section that GROWS, and the Overview kept jumping
+  anyway. `dom.content()` — what every LuCI poll calls to refresh a section — empties the container
+  before it refills it, and for that moment the document is shorter than the offset the reader is
+  at: the engine clamps the offset into what is left, the section fills again and nothing puts it
+  back. Reported from Safari on macOS and iOS with the offset moving 200-887px per tick. Both halves
+  are fixed. `fs-fit.js` can now tell a clamp from a reader who scrolled — a clamp only ever moves
+  the offset down, and a reader who moved is one `scrolling()` still answers for, because their
+  scroll starts the sampler while the clamp's own scroll event arrives after the mutation callback —
+  so the reference from the last still moment is kept instead of thrown away, and the clamped amount
+  raises the one-viewport ceiling that had refused exactly the worst jumps. `fs-overview.js` holds
+  each section's height across the swap, so on the one page whose poll the theme owns the document
+  never gets short enough to be clamped at all: prevention costs one `offsetHeight`, a correction is
+  a scroll the reader did not ask for. Measured in WebKit with the engine's own anchoring off, a
+  30-row section swapped for a 35-row one two screens above the reader: 255px of page moved under
+  them before, 0px after, and 815px against 0px with the reader parked at the foot of the page.
+  `tools/scroll-anchor.mjs` now refills a section the way a poll does as well as growing one — the
+  old case inserted a pad, so it never collapsed anything and could not see this.
+
 ## [0.13.2] — 2026-08-19
 
 ### Added
