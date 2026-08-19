@@ -36,7 +36,10 @@ jobs:
       - run: luci-theme-footstrap/build-css.sh /tmp/cascade.css
       - run: python3 tools/audit.py --strict
       # gettext for update-po; the ucode gate needs only docker, which the runner has.
-      - run: sudo apt-get update && sudo apt-get install -y gettext
+      # Under tools/ci-retry.sh: apt does not fail when its mirror is unwell, it stalls, and a
+      # stalled step is nothing's problem until the job timeout. Six minutes a try, three tries.
+      - run: sh tools/ci-retry.sh 360 sudo apt-get update
+      - run: sh tools/ci-retry.sh 360 sudo apt-get install -y gettext
       - run: luci-theme-footstrap/update-po.sh --check
 
   # npm-based gates, and they live here and nowhere else: the OpenWrt buildbot has no
@@ -62,7 +65,8 @@ jobs:
       # install because it is the fastest thing here and the first to fail on a broken module.
       - run: npm test
 
-      - run: npx playwright install --with-deps chromium
+      # Same clock: --with-deps is apt, and the browser itself comes off Playwright's CDN.
+      - run: sh tools/ci-retry.sh 420 npx playwright install --with-deps chromium
       - run: node tools/a11y-gallery.mjs
 
       # What the router actually sends, weighed on the real artefact: build-css + the token
@@ -249,7 +253,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # Same clock: --with-deps is apt, and the browser itself comes off Playwright's CDN.
+      - run: sh tools/ci-retry.sh 420 npx playwright install --with-deps chromium
       - uses: actions/download-artifact@v8
         with:
           name: owfeed-packages

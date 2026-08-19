@@ -31,6 +31,14 @@ lint ──┘          └─→ live ───┘
 workflow-wide, which handed it to every `pull_request` run — including `npm ci` in lint, and
 therefore to the lifecycle scripts of every dev dependency.
 
+**Every job has a `timeout-minutes`, and every network install runs under `tools/ci-retry.sh`.**
+The default job timeout is six hours, and the two things these jobs fetch from somebody else's
+server — apt and the Playwright CDN — stall rather than fail: on the 0.13.2 tag one apt step and two
+playwright steps sat for 68, 68 and 17 minutes with GitHub reporting every system operational, and
+nothing retried them because nothing had failed. Each attempt now gets its own deadline (six minutes
+for apt, seven for playwright, three attempts), so a stall is a retry rather than a blocked release,
+and the job timeout is the backstop behind that rather than the only clock in the job.
+
 ## `check` — gates without node
 
 Needs only `sh`, `awk`, `python3` and `perl`. Seconds to run, and it cannot break the OpenWrt
