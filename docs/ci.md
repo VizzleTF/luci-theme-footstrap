@@ -233,7 +233,10 @@ produced, and runs the live gates cheapest-first:
    them has moved, every finding below is downstream of it.
 2. `tools/spa-parity.mjs` — every page opened by a click and by a full load, compared.
 3. `tools/live-audit.mjs` — one page per shape at six widths (resized into) plus one ENTERED with a
-   load of its own, ratcheted against `tools/baselines/live-audit.json`. `--update` UNIONS into that
+   load of its own — and the arrival records only what the resize at that width did not already
+   say, since a fault both passes see is one fault and a second copy of it is a baseline entry
+   that carries no information and only exists where that app is installed. Ratcheted against
+   `tools/baselines/live-audit.json`. `--update` UNIONS into that
    file rather than replacing a router's set: the baseline is a union across platforms, and a
    machine that does not install mwan3 must not delete mwan3's findings.
 4. `tools/scroll-jank.mjs` — a real wheel, long enough to meet a poll tick, in both layouts: nothing

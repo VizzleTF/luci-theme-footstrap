@@ -293,8 +293,12 @@ await Promise.all(list.map(async (stand) => {
 		if (!(await page.evaluate(() => !!document.getElementById('view')))) continue;
 		checked++; here++;
 
+		/* what the RESIZE pass saw at the arrival width, so the arrival pass can report only what is
+		 * new about arriving. See the arrival block below. */
+		const atArrive = new Set();
 		const record = (width, f) => {
 			const sig = `${path}|${width}|${f.kind}|${f.el}`;
+			if (width === ARRIVE) atArrive.add(`${f.kind}|${f.el}`);
 			seen[key].add(sig);
 			if (!kset.has(sig)) fresh.push({ stand: key, sig, by: f.by });
 		};
@@ -310,7 +314,18 @@ await Promise.all(list.map(async (stand) => {
 			try { for (const f of await page.evaluate(GEOMETRY)) record(w, f); } catch (e) { /* see there */ }
 		}
 
-		/* the arrival, see ARRIVE above: the page reached AT this width rather than resized into it */
+		/* the arrival, see ARRIVE above: the page reached AT this width rather than resized into it.
+		 *
+		 * ONLY WHAT THE RESIZE AT THIS WIDTH DID NOT ALREADY SAY. A fault the same width produces
+		 * either way is one fault, and recording it under a second signature doubles the baseline
+		 * with copies that carry no information — 80 of them on the first CI run after this pass
+		 * landed, every one a `noname` on a third-party widget that the resize at 768 had already
+		 * reported. Worse, they are machine-specific: the baseline is a union across platforms and
+		 * a machine only sees the apps it installs, so a duplicate recorded where those apps exist
+		 * is a red gate everywhere they do not. What survives the filter is what the pass was added
+		 * for: the Processes table that arrives past its column and is corrected by the first
+		 * resize, and the file manager's list, which overflows at 768 on arrival and not on the way
+		 * into 768. */
 		if (ARRIVE > 0) {
 			await page.setViewportSize({ width: ARRIVE, height: 900 });
 			let arrived = true;
@@ -320,8 +335,11 @@ await Promise.all(list.map(async (stand) => {
 				await page.waitForTimeout(1800);
 				let found = [];
 				try { found = await page.evaluate(CHECK); } catch (e) { found = []; }
-				for (const f of found) record(ARRIVE + 'a', f);
-				try { for (const f of await page.evaluate(GEOMETRY)) record(ARRIVE + 'a', f); } catch (e) { /* see there */ }
+				try { found = found.concat(await page.evaluate(GEOMETRY)); } catch (e) { /* see there */ }
+				for (const f of found) {
+					if (atArrive.has(`${f.kind}|${f.el}`)) continue;
+					record(ARRIVE + 'a', f);
+				}
 			}
 		}
 	}
