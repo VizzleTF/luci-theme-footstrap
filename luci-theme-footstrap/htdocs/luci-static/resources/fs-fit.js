@@ -338,6 +338,12 @@ let _restAt = null, _restPage = null;
 function pageStamp() {
 	return (document.body && document.body.getAttribute('data-page')) || '';
 }
+/* -> the memo is void: whoever calls this owns the offset now (see the export below) */
+function forgetRest() {
+	_rest = null;
+	_restAt = null;
+	_restPage = null;
+}
 function rememberRest() {
 	if (ENGINE_ANCHORS || scrolling()) return;
 	const ref = anchorRef();
@@ -587,6 +593,17 @@ return baseclass.extend({
 	 * read layout asks the first and calls the second; a pass that only writes does neither. */
 	scrolling,
 	deferMeasurement,
+
+	/* "THE OFFSET IS MINE NOW, FORGET WHAT YOU REMEMBERED." Called by fs-router where it resets both
+	 * scrollers for an incoming page, and it is not a courtesy — without it the correction below
+	 * fights that reset. The router resets synchronously and stamps `body[data-page]` an await later,
+	 * so between the two there is a window, as long as the incoming view takes to arrive, in which a
+	 * poll tick from the OUTGOING page still fires: the offset is 0, the remembered one is where the
+	 * reader was, nobody is scrolling and the stamp still names the page they came from — every term
+	 * of "the engine clamped this" is true, and the reader would be dragged back down a page they
+	 * have left, with the new page committing mid-scroll. Reported in review on the upstream
+	 * proposal. The stamp cannot close it alone, because it is written afterwards. */
+	forgetRest,
 
 	/* Raise the stylesheet's "an unanswered table takes no room" rule. Called by the module that
 	 * answers — see armGate above; nothing else may call it. */

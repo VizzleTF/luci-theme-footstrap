@@ -5,6 +5,7 @@
 'require fs-menutree as tree';
 'require fs-chrome as chrome';
 'require fs-sheets as sheets';
+'require fs-fit as fit';
 
 /* ---- SPA client router ----
  *
@@ -1091,6 +1092,12 @@ function navigate(pathname, push, kbd) {
 	 * swap and is undone by it (see restoreScroll above), so it neither helps nor hurts, and 'manual' would only take away
 	 * the case that does work — a genuine full load. */
 	if (push) {
+		/* BEFORE the two writes, and the order is the point: fs-fit keeps the offset the reader was
+		 * last still at, so it can tell an engine's clamp from a reader who moved. This reset is
+		 * neither, and it lands a whole require ahead of the `data-page` stamp fs-fit would otherwise
+		 * notice it by — so a poll tick from the page being left would read the reset as a clamp and
+		 * put the reader back on it. Told rather than inferred. */
+		fit.forgetRest();
 		window.scrollTo(0, 0);
 		const sc = document.getElementById('maincontent');
 		if (sc) sc.scrollTo(0, 0);

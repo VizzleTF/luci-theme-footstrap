@@ -285,6 +285,13 @@ place, a real poll tick still clamped 1882px away and left it there. It is gone;
 path is the theme's to hold, and the correction covers what it was meant to cover — same stand, same
 park, corrections on: four clamps in 25 seconds, each handed back inside a single frame.
 
+**The router owns the offset when it navigates.** `fs-router` resets both scrollers for an incoming
+page and stamps `body[data-page]` a require later, so between the two there is a window in which a
+poll tick from the OUTGOING page still fires — an offset of 0, a remembered offset from where the
+reader was, nobody scrolling and the old stamp: every term of "the engine clamped this" is true. The
+router calls `fit.forgetRest()` at the reset rather than leaving the memo to be inferred from a stamp
+written afterwards.
+
 **Where the theme still does nothing, and what it costs.** `ENGINE_ANCHORS` asks whether the platform
 supports `overflow-anchor`, and a current WebKit answers yes — so the theme steps aside for it. Its
 anchoring is not the same as Chromium's: measured on both stands, both layouts and both widths with a
