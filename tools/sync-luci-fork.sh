@@ -22,6 +22,17 @@
 #     packaging step, and the luci tree is source.
 #   * the JS is untouched: luci.mk runs jsmin over it at package time, which is exactly what the
 #     other themes get.
+#   * `po/` does not travel AT ALL. Upstream's CONTRIBUTING.md is explicit — translations are made
+#     in Weblate, not by editing the files — and Weblate writes straight into that tree. A sync
+#     that carried our catalogues would overwrite whatever translators had done since the last
+#     one, silently and in the direction nobody wants. When a msgid CHANGES, that is a deliberate
+#     PR of its own against `themes/luci-theme-footstrap/po/templates/`, not a side effect of this
+#     script.
+#
+# WHAT THIS SCRIPT CANNOT DO FOR YOU: the Makefile is maintained by hand on the far side (it uses
+# `include ../../luci.mk` and PKG_MAINTAINER, see docs/package.md), so a change to OUR Makefile —
+# postinst, postrm, conffiles — does not travel and has to be made there too. It is the one file
+# that can drift without anything noticing, so the sync ends by saying whether it has.
 set -eu
 
 DEST="${1:-}"
@@ -39,6 +50,7 @@ mkdir -p "$OUT"
 rsync -a --delete \
 	--exclude '.git' \
 	--exclude 'Makefile' \
+	--exclude 'po' \
 	--exclude 'styles' \
 	--exclude 'build-css.sh' \
 	--exclude 'mangle-tokens.sh' \
@@ -56,6 +68,8 @@ rsync -a --delete \
 # side, so --delete leaves anything excluded here that a previous sync put there. The build inputs
 # are named again to be removed, and the Makefile is not — it is the one file maintained by hand on
 # the far side. (--delete-excluded would take that too.)
+# `po` is NOT in this list on purpose: it is excluded from the send because Weblate owns it there,
+# which means the copy that is already in that tree must be left exactly where it is.
 for stale in styles build-css.sh mangle-tokens.sh strip-templates.sh strip-shell.sh \
              build-apk.sh dev-sync.sh update-po.sh luci-upstream.pin README.md; do
 	rm -rf "$OUT/$stale"
@@ -67,3 +81,12 @@ sh "$SRC/build-css.sh" "$OUT/htdocs/luci-static/footstrap/cascade.css"
 echo "synced -> $OUT"
 echo "  cascade.css: $(wc -c < "$OUT/htdocs/luci-static/footstrap/cascade.css") bytes (generated, unmangled)"
 echo "  files:       $(find "$OUT" -type f | wc -l | tr -d ' ')"
+
+# The two things this script deliberately does not send, reported rather than assumed. Both are
+# expected to differ — the question is only whether the difference is the one you meant.
+mk_diff=$(diff "$SRC/Makefile" "$OUT/Makefile" 2>/dev/null | grep -c '^[<>]' || true)
+echo "  Makefile:    hand-maintained there, $mk_diff differing line(s) — postinst/postrm/conffiles do NOT travel"
+if [ -d "$OUT/po" ]; then
+	echo "  po/:         left as it is ($(find "$OUT/po" -name '*.po' | wc -l | tr -d ' ') catalogue(s)) — Weblate owns them upstream"
+fi
+echo "  drift:       node tools/fork-drift.mjs $DEST"

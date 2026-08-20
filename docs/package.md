@@ -312,10 +312,27 @@ says so in place to stop the pin coming back.
 
 ## The same package, twice: this tree and the luci tree
 
-The theme is proposed to [openwrt/luci](https://github.com/openwrt/luci) as
-`themes/luci-theme-footstrap`, and the copy that lives there is **not** this directory copied
-across. `tools/sync-luci-fork.sh <path-to-luci>` materialises it, and the difference is one
-decision made twice.
+The theme **is in** [openwrt/luci](https://github.com/openwrt/luci) as
+`themes/luci-theme-footstrap` (merged 2026-08-20), and the copy that lives there is **not** this
+directory copied across. `tools/sync-luci-fork.sh <path-to-luci>` materialises it, and the
+difference is one decision made twice.
+
+**How a change gets there now.** Their `CONTRIBUTING.md` is the authority and the shape is
+ordinary: a feature branch off a fresh `upstream/master`, one PR per change, subject
+`luci-theme-footstrap: <lowercase description>`, a body that says why, and a `Signed-off-by` with a
+real first and last name (a GitHub noreply address is refused). `git push -f` is explicitly the way
+to update a PR — inside your own branch, never on master. Release branches (`openwrt-25.12`, …)
+take bug and security fixes only; a new package never lands on one, which is why the theme reaches
+users of a *release* through owfeed and reaches everyone else with the next OpenWrt release.
+
+**Two things the sync cannot carry, and both have bitten once.** The far side's `Makefile` is
+hand-maintained (`include ../../luci.mk`, `PKG_MAINTAINER`), so `postinst`, `postrm` and
+`conffiles` have to be changed there as well — a postrm cleaned up here and not there is exactly
+the kind of divergence nothing else notices. And `po/` belongs to **Weblate** over there: upstream
+forbids editing catalogues by hand, so the sync no longer sends them, and a msgid change is its own
+deliberate PR against `po/templates/`. `npm run fork-drift` lists every shipped file the two trees
+disagree about and names those two separately; it is a report rather than a gate, because an
+unproposed change is a legitimate difference.
 
 **That tree gets the built stylesheet; this one keeps the layers.** Here, `styles/` is thirty-nine
 files in four cascade layers whose *order* is the design, and `cascade.css` is a build artefact

@@ -57,6 +57,7 @@ owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' 
 ucode -T -c -o /dev/null <template>.ut     # syntax-check a template the way LuCI does
 luci-theme-footstrap/dev-sync.sh <host>    # deploy to a HARDWARE router over ssh
 ./tools/sync-luci-fork.sh ../luci-fork     # regenerate the openwrt/luci copy
+npm run fork-drift                         # what the two trees disagree about
 ```
 
 `npm test` (`node --test tests/*.test.mjs`, no browser) is the unit half and it is **deliberately
@@ -168,12 +169,21 @@ compile.
   not a summary of what was fixed. A review finding is answered in the DIFF and by marking the
   thread resolved; the commit message and the changelog carry the reasoning. Anything that has to
   be said to a human is said here, in this session, not on the PR.
-- **The luci fork branch is ONE commit, amended — never a second commit on top.**
-  `tools/sync-luci-fork.sh ../luci-fork` regenerates the copy (that tree gets the built
-  `cascade.css`, `styles/` does not travel — `docs/package.md`), then `git commit --amend` reading
-  the author, the **author date** and the `Signed-off-by` trailer back off `HEAD`, then
-  `git push --force-with-lease`. Upstream reviews one patch: a follow-up commit, a rewritten author
-  or a lost sign-off turns the proposal into a series that has to be squashed by hand.
+- **The theme is IN openwrt/luci** (merged 2026-08-20 as `6f08de76`), so the proposal branch is
+  history and so is amending it. Upstream work is now one **feature branch per change**, cut from
+  a fresh `upstream/master`, and their `CONTRIBUTING.md` is the authority:
+  - subject `luci-theme-footstrap: <lowercase description>`; a body that says why; **`Signed-off-by`
+    with a real first and last name** — a `@users.noreply.github.com` address is refused;
+  - `git push -f` is explicitly fine *inside your own PR branch* (amend, `rebase -i`) and is how a
+    PR is updated; never on master;
+  - release branches (`openwrt-25.12`, …) take **bug and security fixes only** — no new packages,
+    which is why the theme is not in the 25.12 feed and will not be;
+  - **translations are Weblate's**, not ours: `po/` no longer travels with the sync.
+- **`tools/sync-luci-fork.sh ../luci-fork` materialises the copy, but two things it cannot carry**:
+  the far side's `Makefile` is hand-maintained (postinst/postrm/conffiles must be changed there
+  too) and `po/` is Weblate's. The script says so on every run, and `npm run fork-drift` lists
+  every shipped file the two trees disagree about — a report, not a gate: an unproposed change is
+  a legitimate drift.
 - **A release is not finished when the tag pipeline is green** — the theme installs from
   owfeed-packages, so it also has to reach the feed: bump `packages/luci-theme-footstrap/upstream.sh`
   (the bot opens that PR for some releases and not others), check the sha256s in the diff against

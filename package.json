@@ -33,6 +33,7 @@
     "spa-parity": "node tools/spa-parity.mjs",
     "upstream": "node tools/upstream-contract.mjs",
     "page-modules": "node tools/page-modules.mjs",
+    "fork-drift": "node tools/fork-drift.mjs",
     "scroll": "node tools/scroll-jank.mjs",
     "table-tick": "node tools/table-tick.mjs",
     "anchor": "node tools/scroll-anchor.mjs",

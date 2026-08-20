@@ -12,9 +12,25 @@
   red at 5.25:1 is the one kept where it was. Registered in all four places a palette has to be, so
   `export-tier` and `a11y` now measure 56 combinations rather than 42 — 4352 contrast checks, all
   clear, and axe-core clean across 24 palette × mode × tint points.
+- **`npm run fork-drift` says what the two trees disagree about.** Every shipped file compared
+  against `themes/luci-theme-footstrap` in a luci checkout, with the differences that are supposed
+  to exist named separately from the ones that are not. A report rather than a gate: an unproposed
+  change is a legitimate difference, and a machine without a luci checkout gets a skip instead of a
+  failure.
 
 ### Changed
 
+- **The upstream workflow is a pull request now, not an amended branch.** The theme was merged into
+  openwrt/luci on 2026-08-20, so the one-commit proposal branch is history: changes go as a feature
+  branch off a fresh `upstream/master`, subject `luci-theme-footstrap: …`, `Signed-off-by` with a
+  real name, `push -f` only inside the PR branch. Their `CONTRIBUTING.md` is the authority and
+  `CLAUDE.md`, `docs/package.md` and `docs/design-system.md` now say so.
+- **The sync no longer sends `po/`, and says out loud what it cannot carry.** Upstream translations
+  are Weblate's — editing the catalogues by hand there is explicitly forbidden — so a sync that
+  copied ours would overwrite translators' work in the one direction nobody wants. The far side's
+  `Makefile` is hand-maintained too (`postinst`/`postrm`/`conffiles` do not travel), which had
+  already been missed once: a postrm cleaned up here and left as it was there. Both are now
+  reported on every sync.
 - **The install script is 36 lines instead of 162, and migrates nothing.** `uci-defaults` registered
   the theme and then swept up after every footstrap that ever shipped: eight legacy theme names, four
   legacy media paths, the old top-bar layout carried into `luci.main.footstrap_layout`, two
