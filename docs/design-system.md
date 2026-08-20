@@ -66,19 +66,27 @@ where `--fs-text` is nearly white.
 The binding constraint: apps read a level as `color:` about as often as `background:`, so every
 level must pass AA as text on `--fs-bg`/`--fs-panel`/`--fs-panel2` and carry a readable
 `--on-*-color` as a fill. `tools/export-tier.mjs` proves all of it across
-{footstrap, hicontrast, bootstrap} × {light, dark} × a sweep of tint hues — 42 combinations and 2856
-contrast checks today — including that the ramp is not flat, the only check that can catch flatness.
+{footstrap, hicontrast, bootstrap, 2020} × {light, dark} × a sweep of tint hues — 56 combinations
+and 4352 contrast checks today — including that the ramp is not flat, the only check that can catch flatness.
 Borders are exempt from the text half: `--border-color-low` may legitimately fade into the surface,
 which is what a hairline is for.
 
 ## Palettes
 
-Three, all in `styles/03-palettes.css`, one self-contained block per (palette × mode):
+Four, all in `styles/03-palettes.css`, one self-contained block per (palette × mode):
 **footstrap** (GitHub Primer colours, the default, filling a bare `:root`), **hicontrast**
-(`data-palette="hicontrast"`) and **bootstrap** (`data-palette="bootstrap"`, the stock LuCI theme's
+(`data-palette="hicontrast"`), **bootstrap** (`data-palette="bootstrap"`, the stock LuCI theme's
 surfaces and greys — its semantic colours and its light ink are raised where they miss AA, which
-that block documents in place). Light mode is the bare `:root`; dark is
-`:root[data-darkmode="true"]`. The file also carries the instructions for adding a palette.
+that block documents in place) and **2020** (`data-palette="2020"`, the OpenWrt 2020 theme's
+colourway). Light mode is the bare `:root`; dark is `:root[data-darkmode="true"]`. The file also
+carries the instructions for adding a palette.
+
+**2020** is the CI cyan `#00B5E2` on the navy `#002B49`, which is one scheme and no dark mode in
+the theme it comes from. Here it is a pair, and the split is the interesting part: 2020's own
+scheme IS the dark mode — navy canvas, cyan nearly untouched — while the light mode keeps the hue
+and darkens it, because `#00B5E2` measures **2.09:1** on white and the export tier every app prints
+text in wants 4.5. Its three semantic colours move for the same reason: on white 2020's green is
+2.28:1 and its amber 3.42:1, while its red at 5.25:1 is the one kept where it was.
 
 **hicontrast** is the same tokens, deeper and more saturated. Its light accents are deliberately
 darkened: they used to be *brighter* than the defaults, so a palette named "hicontrast" contrasted
@@ -198,7 +206,7 @@ its three axes, File), then **Defaults**:
 |---|---|---|---|
 | **Layout** | **top** (default) / sidebar | `fs-layout` | `data-layout` (always explicit) |
 | **Theme** | auto / light / dark | `fs-darkmode` | `data-darkmode` + `data-theme` + `data-bs-theme` |
-| **Palette** | footstrap / hicontrast / bootstrap | `fs-palette` | `data-palette` |
+| **Palette** | footstrap / hicontrast / bootstrap / 2020 | `fs-palette` | `data-palette` |
 | **Density** | compact / normal / large | `fs-density` | `data-density` |
 | **Wallpaper** | off / pattern / **file** | `fs-wallpaper` | `data-wallpaper` — `pattern` tiles an admin-uploaded SVG through a CSS mask; Scale, Strength and Colours are axes of their own |
 | **Tint** | off, hue 1–360°, `#rrggbb` | `fs-tint` | `data-tint=hue\|hex`, `--fs-tint-h` / `--fs-bg` |

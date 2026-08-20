@@ -478,4 +478,73 @@
 		--fs-on-warn: #222222;
 		--fs-on-danger: #222222;
 	}
+	/* ============================================================
+	 * 2020 — the OpenWrt 2020 theme's colourway
+	 *
+	 * `luci-theme-openwrt-2020` is one colour scheme and no dark mode: the OpenWrt CI cyan
+	 * (#00B5E2) on the deep navy (#002B49), white content, and three semantic colours
+	 * (#5CB85C / #CC8800 / #CC1111). This palette is that identity carried onto footstrap's
+	 * surfaces — proposed in review as the way its look survives the theme itself.
+	 *
+	 * WHAT MOVED, AND WHY EACH ONE HAD TO. The cyan is the whole identity and it is unreadable as
+	 * text on white: #00B5E2 measures 2.09:1, where the export tier every app prints text in wants
+	 * 4.5:1. So the LIGHT mode keeps the hue and darkens it, while the DARK mode — whose surfaces
+	 * are the navy the cyan was designed against — carries it near enough its own value. That
+	 * split is the point of the pair: 2020's own scheme IS the dark one, and the light mode is
+	 * what footstrap needs to show the same identity on a white page.
+	 *
+	 * The three semantic colours get the same treatment for the same reason: on white, 2020's
+	 * green is 2.28:1, its amber 3.42:1 and its red 5.25:1 — only the red clears AA, and it is the
+	 * only one kept close to its original.
+	 *
+	 * The navy is not the chrome here. In 2020 it is the header and the sidebar; a palette cannot
+	 * give the chrome its own colour (that reads --fs-panel), so in dark mode the navy is the
+	 * CANVAS and the chrome sits on it, which is the nearest thing this theme's structure has. */
+	:root[data-palette="2020"] {
+		/* LIGHT — white content, the CI cyan darkened until it can be read on it */
+		--fs-bg-base: #ffffff;
+		--fs-panel-base: #ffffff;
+		--fs-panel2-base: #eef4f8;
+		--fs-border-base: #c3d2dd;
+		/* navy-tinted neutrals rather than grey: the ink belongs to the same scheme as the accent */
+		--fs-text: #10202b;
+		--fs-dim: #2c4150;
+		--fs-faint: #3d5566;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%232c4150" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		/* #00B5E2 held at hue, taken down until it reads: 5.89:1 on white against its own 2.09:1 */
+		--fs-accent-base: #036c92;
+		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
+		--fs-track: #e3ebf1;
+		--fs-good-base: #276e2a;   /* #5CB85C darkened; 2.28:1 as text is not a rounding error */
+		--fs-warn-base: #8a5a00;   /* #CC8800, same move */
+		--fs-danger-base: #c1121f; /* #CC1111 is 5.25:1 already — the one that stays where it was */
+		/* ink ON the fills above — white clears AA on all four */
+		--fs-on-accent: #fff;
+		--fs-on-good: #fff;
+		--fs-on-warn: #fff;
+		--fs-on-danger: #fff;
+	}
+	:root[data-palette="2020"][data-darkmode="true"] {
+		/* DARK — 2020's own scheme: the navy is the canvas and the cyan is nearly untouched */
+		--fs-bg-base: #002b49;
+		--fs-panel-base: #0a3a58;
+		--fs-panel2-base: #0e4362;
+		--fs-border-base: #1d5a7d;
+		--fs-text: #e6f1f7;
+		--fs-dim: #b8cfdd;
+		--fs-faint: #9dbccd;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23b8cfdd" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		/* the CI cyan, one step up so it clears AA on the lightest of the three surfaces too */
+		--fs-accent-base: #35c6ea;
+		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
+		--fs-track: #123c56;
+		--fs-good-base: #74cc74;   /* #5CB85C lifted for the same reason */
+		--fs-warn-base: #eab346;
+		--fs-danger-base: #ff9d9d;
+		/* these fills are LIGHT, so the ink is the canvas navy itself */
+		--fs-on-accent: #002b49;
+		--fs-on-good: #002b49;
+		--fs-on-warn: #002b49;
+		--fs-on-danger: #002b49;
+	}
 }
