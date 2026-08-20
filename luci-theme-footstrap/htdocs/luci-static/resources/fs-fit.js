@@ -86,9 +86,51 @@ function fittersEnabled() {
 function run() {
 	if (!fittersEnabled()) return;
 	runAll(_fitters, 'fitter');
-	/* the page is settled now, so this is the position the next mutation must be measured against —
-	 * unless a correction is already on its way, which would make this reference the drifted one */
+	/* the page is settled now: this is the height the NEXT tick may not go below, and the position
+	 * the next mutation must be measured against — the latter unless a correction is already on its
+	 * way, which would make this reference the drifted one */
+	holdFloor();
 	if (!_anchorPending) rememberRest();
+}
+
+/* ---- THE DOCUMENT MAY NOT GET SHORTER WHILE A TICK IS IN FLIGHT ----
+ *
+ * The correction below puts a reader back after the engine has moved them. This is the other half,
+ * and it is the half that means they were never moved: `dom.content()` — what every LuCI poll calls
+ * to refresh a section — empties the container before it refills it, and a document that is briefly
+ * shorter than the offset the reader is at is a document the engine clamps the offset into. Nothing
+ * puts that back afterwards, because the shortening was never real.
+ *
+ * So the CONTENT COLUMN keeps a floor: `min-height`, set to the height it had at the last settled
+ * moment and held until the next one. A section emptying inside it takes nothing off the document,
+ * there is no shorter document to clamp into, and the tick is invisible. The floor is re-measured
+ * after every settled batch, so a page that genuinely got shorter is shorter one frame later.
+ *
+ * WHY THE FLOOR IS ON `.fs-content` AND NOT ON THE CONTAINER BEING SWAPPED. A version of this
+ * shipped in fs-overview.js, pinning the container and releasing it in the same statement sequence —
+ * `dom.content()` performs no layout, so no layout ever saw the pin and it did nothing at all
+ * (measured: 1882px still clamped away with the pin in place). The fix reported from the field wraps
+ * `dom.content()` itself and releases two frames later, which does work — at the price of patching
+ * a luci-base API every app on the router shares, and up to seven read/write pairs per call. One
+ * element that the theme owns, measured once per settled batch, is the same protection: measured on
+ * a live router with the corrections switched off, the wrapper and this floor both hold the reader
+ * at 0px against a 337px drift without either, at 16 measurements against 154 wrapped calls.
+ *
+ * NOT WHILE THE READER SCROLLS. Clearing the floor to re-measure is a layout read, and the flick is
+ * where this file spends its comments avoiding those; the floor simply stays where it was, which is
+ * still a floor. */
+function holdFloor() {
+	/* ONLY WHERE THE THEME IS RESPONSIBLE, same rule as the correction and for a measured reason: an
+	 * engine that anchors by itself reads the held height as one more thing that moved. On Chromium
+	 * in the sidebar layout at 1440 the reader ended 15px off with the floor held and 0px without it,
+	 * reproducibly, while the floor bought that engine nothing — it puts the reader back on its own. */
+	if (ENGINE_ANCHORS || scrolling()) return;
+	const el = document.querySelector('.fs-content');
+	if (!el) return;			/* the login page has no content column */
+	/* cleared BEFORE the read, or the floor would measure itself and never come down */
+	el.style.minHeight = '';
+	const h = el.offsetHeight;
+	if (h > 0) el.style.minHeight = h + 'px';
 }
 
 /* ---- IS THE PAGE MOVING RIGHT NOW? — ASKED OF THE POSITION, NEVER OF THE EVENTS ----
@@ -193,7 +235,9 @@ function sampleMotion() {
 	}
 	if (scrolling()) { requestAnimationFrame(sampleMotion); return; }
 	_sampling = false;
-	/* the reader has stopped: this is a still moment, and the reference for the next tick */
+	/* the reader has stopped: this is a still moment, so the floor and the reference both belong to
+	 * where the page now stands */
+	holdFloor();
 	rememberRest();
 	/* the page has held still for SCROLL_IDLE: whatever was put off may run now */
 	if (_deferred) {

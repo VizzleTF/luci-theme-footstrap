@@ -276,14 +276,31 @@ Three details carry it, and each one was a measured failure first:
   correction. It cannot run away with the page either — if the document really did get shorter, the
   browser clamps the write back and the reader keeps the offset they already had.
 
-**Correcting is the whole mechanism, and preventing was tried.** `fs-overview.js` briefly held each
-container's height across `dom.content()`, on the theory that a document that never gets short is a
-document nothing clamps. It never took effect and could not: the pin was written and released inside
-one statement sequence with no layout in between, so no layout ever saw it. Measured on a 25.12
-stand with the theme's corrections switched off (`localStorage.fsAnchor = 'off'`) and the pin in
-place, a real poll tick still clamped 1882px away and left it there. It is gone; nothing in the poll
-path is the theme's to hold, and the correction covers what it was meant to cover — same stand, same
-park, corrections on: four clamps in 25 seconds, each handed back inside a single frame.
+**Two halves: the document does not shrink, and the reader is put back if it did.** The content
+column carries a floor — `min-height` on `.fs-content`, set to the height it had at the last settled
+moment and held until the next one (`holdFloor()`). A section emptying inside it takes nothing off
+the document, so there is no shorter document for the engine to clamp into and the tick is invisible;
+the floor is re-measured after every settled batch, so a page that genuinely got shorter is shorter
+one frame later. Measured on a 25.12 stand with the correction switched off, a real poll tick clamped
+1882px away without the floor and 0px with it; on 24.10, where the theme cannot reach the poll at
+all, the same park went from a 1206px clamp to no offset change at all. On a live router the
+correction alone was still blinking four times in 20 seconds — 2072px away and back inside one frame
+— and with the floor that is 12px.
+
+**The floor runs only where the correction does.** `ENGINE_ANCHORS` gates both: an engine that
+anchors by itself reads a held height as one more thing that moved. Measured on Chromium in the
+sidebar layout at 1440, reproducibly: 15px of reader movement with the floor held, 0px without it,
+and nothing gained either way because that engine puts the reader back on its own.
+
+**A pin on the container itself does not work, and the shape that does was reported from the field.**
+`fs-overview.js` briefly pinned each container across `dom.content()` and released it in the same
+statement sequence — `dom.content()` performs no layout, so nothing ever observed the pin (measured:
+1882px still clamped away with it in place). The report that named it wraps `dom.content()` itself
+and releases two frames later, which does work — at the price of patching a luci-base API every app
+on the router shares, and up to seven read/write pairs per call. One element the theme owns, measured
+once per settled batch, is the same protection: on a live router with the correction off, the wrapper
+and the floor both held the reader at 0px against a 337px drift without either, at 16 measurements
+against 154 wrapped calls.
 
 **The router owns the offset when it navigates.** `fs-router` resets both scrollers for an incoming
 page and stamps `body[data-page]` a require later, so between the two there is a window in which a

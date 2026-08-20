@@ -2,6 +2,24 @@
 
 ### Fixed
 
+- **A poll tick no longer moves the page at all, instead of moving it and being moved back.** The
+  correction shipped in 0.13.3 puts the reader where they were after the engine has clamped an offset
+  away; this is the half that means it never happens. The content column keeps a floor — `min-height`
+  on `.fs-content`, the height it had at the last settled moment, held until the next one — so a
+  section emptying inside it takes nothing off the document and there is nothing shorter to clamp
+  into. Measured with the correction switched off, so the floor is what is being measured: a real poll
+  tick on a 25.12 stand clamped 1882px away without it and 0px with it; on 24.10, where the theme
+  cannot reach the poll at all, a 1206px clamp became no offset change whatsoever. On a live router
+  the correction alone was still blinking four times in 20 seconds — 2072px away and back inside a
+  single frame — and with the floor that is 12px. It runs only where the correction does
+  (`ENGINE_ANCHORS`): an engine that anchors by itself reads a held height as one more thing that
+  moved, measured at 15px of reader movement on Chromium in the sidebar layout against 0px without
+  the floor, and gains nothing from it. The shape came from the field — a report wrapping
+  `dom.content()` itself and releasing two frames later — and does the same work without patching a
+  luci-base API every app on the router shares: 16 measurements per 30 seconds against 154 wrapped
+  calls. `tools/scroll-anchor.mjs` now measures the two halves separately, the floor with the
+  correction silenced.
+
 - **The Overview's height pin is gone: it never took effect, and the reader was relying on the
   correction alone without anyone saying so.** `fs-overview.js` held each container's height across
   `dom.content()` so the document could not get short enough for the engine to clamp the offset into

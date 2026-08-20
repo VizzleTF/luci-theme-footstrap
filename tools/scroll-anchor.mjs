@@ -13,6 +13,10 @@
  *   held      with the engine's anchoring suppressed AND the theme's fallback forced on, a growth
  *             above the fold must move the reader by no more than a pixel or two. That is the
  *             Safari path, exercised on an engine CI actually has.
+ *   floor    the same refill again with the correction switched off (`fsAnchor = 'off'`): the content
+ *             column holds its height between ticks, so the document never gets short enough to be
+ *             clamped and nothing has to be put back. This is the half that keeps the reader from
+ *             seeing even a frame of it, and it can only be measured with the other half silent.
  *   swapped  a section refilled the way `dom.content()` refills one — emptied, then filled again —
  *             must leave the reader where they were too. The moment in between has no height, and a
  *             document that short is one the engine clamps the offset into; `held` cannot see that,
@@ -160,20 +164,41 @@ const SWAP = async (growth) => {
 
 	/* the two halves of dom.content(), with the layout the engine performs in between made explicit
 	 * — WebKit gets there on its own, and a gate must not depend on when */
-	const kept = Array.prototype.slice.call(body.childNodes);
-	for (const n of kept) body.removeChild(n);
-	const empty = { docH: (sc ? sc.scrollHeight : document.documentElement.scrollHeight), pos: pos() };
-	for (const n of kept) body.appendChild(n);
-	const pad = document.createElement('div');
-	pad.style.height = growth + 'px';
-	pad.dataset.fsProbe = '1';
-	body.appendChild(pad);
-	await wait(800);
+	const swap = async () => {
+		const kept = Array.prototype.slice.call(body.childNodes);
+		for (const n of kept) body.removeChild(n);
+		const empty = { docH: (sc ? sc.scrollHeight : document.documentElement.scrollHeight), pos: pos() };
+		for (const n of kept) body.appendChild(n);
+		const pad = document.createElement('div');
+		pad.style.height = growth + 'px';
+		pad.dataset.fsProbe = '1';
+		body.appendChild(pad);
+		await wait(800);
+		const after = { pos: pos(), top: mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null };
+		pad.remove();
+		await wait(700);		/* let the floor come back down before the next pass measures */
+		return { empty, after, moved: after.top === null ? null : after.top - before.top,
+			clamped: before.pos - empty.pos };
+	};
 
-	const after = { pos: pos(), top: mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null };
-	pad.remove();
-	return { before, empty, after, moved: after.top === null ? null : after.top - before.top,
-		clamped: before.pos - empty.pos, scroller: sc ? 'maincontent' : 'window' };
+	const corrected = await swap();
+
+	/* THE SAME SWAP WITH THE CORRECTION SWITCHED OFF, which is what isolates the other half. The
+	 * content column keeps a floor between ticks (fs-fit.js, holdFloor), so a section emptying inside
+	 * it takes nothing off the document and there is nothing for the engine to clamp into. With
+	 * `fsAnchor = 'off'` the theme writes no offset at all, so anything that still moves the reader
+	 * here is the floor failing rather than the correction covering for it. */
+	let floorOnly = { skip: 'no storage' };
+	try {
+		localStorage.setItem('fsAnchor', 'off');
+		floorOnly = await swap();
+	} catch (e) { /* no storage, no second pass */ }
+	finally { try { localStorage.removeItem('fsAnchor'); } catch (e) { /* … */ } }
+
+	return { before, empty: corrected.empty, after: corrected.after, moved: corrected.moved,
+		clamped: corrected.clamped, floorMoved: floorOnly.skip ? null : floorOnly.moved,
+		floorClamped: floorOnly.skip ? null : floorOnly.clamped,
+		scroller: sc ? 'maincontent' : 'window' };
 
 	} finally { if (polling) poll.start(); }
 };
@@ -310,11 +335,24 @@ for (const engine of ENGINES) {
 				else if (Math.abs(swap.moved) > TOLERANCE)
 					findings.push(`${where}: a section was refilled the way a poll refills one and the page moved `
 						+ `${swap.moved}px under the reader (the engine clamped ${swap.clamped}px of offset away)`);
+				/* THE FLOOR IS JUDGED ON THE CLAMP, NOT ON THE MOVEMENT, and only where the theme owns the
+				 * job. With the correction switched off nobody compensates the 120px the probe grows, so
+				 * the reader moves by exactly that and should; what must not happen is the engine taking
+				 * an offset away, which is the fault the floor prevents and the one nothing puts back.
+				 * Where the engine anchors for itself the same subtraction measures its compensation
+				 * rather than a clamp — 629px of it, and the reader still level — so it is not a verdict
+				 * on anything and is printed rather than judged. */
+				if (noEngineAnchor && swap.floorClamped !== null && swap.floorClamped !== undefined && swap.floorClamped > TOLERANCE)
+					findings.push(`${where}: with the correction switched off the engine clamped `
+						+ `${swap.floorClamped}px away — the content column's floor is not holding the document up`);
 				if (quiet.unexplained)
 					findings.push(`${where}: the offset moved on its own ${quiet.unexplained} time(s) mid-flick (worst ${quiet.biggest}px) `
 						+ '— a correction landing inside a scroll is itself a jump');
 				process.stdout.write(`  ${where}  reader moved ${held.moved}px (scroll ${held.scrollDelta >= 0 ? '+' : ''}${held.scrollDelta}, `
-					+ `${held.scroller})  swap moved ${swap.skip ? '-' : swap.moved + 'px'}  mid-flick surprises ${quiet.unexplained}`
+					+ `${held.scroller})  swap moved ${swap.skip ? '-' : swap.moved + 'px'}`
+					+ `  floor alone: clamped ${swap.skip || swap.floorClamped === null ? '-' : swap.floorClamped + 'px'}`
+					+ `, reader ${swap.skip || swap.floorMoved === null ? '-' : swap.floorMoved + 'px'}`
+					+ `  mid-flick surprises ${quiet.unexplained}`
 					+ (quiet.stalls ? `  (${quiet.stalls} step(s) too slow to still be a flick, not counted)` : '') + '\n');
 				await ctx.close();
 			}
