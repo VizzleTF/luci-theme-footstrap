@@ -25,7 +25,7 @@
  *
  * WHAT THAT COST, and why the code below looks the way it does: the old location bought two timing
  * guarantees for free, because LuCI evaluated the file INSIDE index.load(). Both had to be paid for
- * explicitly — see ensureOverviewHelpers() and patchOverview() at the bottom. */
+ * explicitly — see patchOverview() below and ensureOverviewHelpers() in menu-footstrap-common.js. */
 /* section title -> grid role. _() with NO msgctxt on purpose: these must resolve to exactly what
  * luci-mod-status resolves to, or the titles stop matching. Built once — it used to cost an
  * allocation plus three _() lookups per poll tick. */
@@ -191,42 +191,8 @@ function fillSection(inc, container, res) {
 		container.parentNode.style.display = '';
 		container.parentNode.classList.add('fade-in');
 		if (!inc.hide)
-			swapContent(container, content);
+			dom.content(container, content);
 	}
-}
-
-/* WHAT `dom.content()` DOES TO A READER TWO SCREENS DOWN, and the reason a section is filled through
- * here rather than through it directly.
- *
- * `dom.content()` removes every child and then appends the new ones. Between those two halves the
- * section has NO height, and a document that just lost several hundred pixels is a document the
- * engine clamps the scroll offset into: the offset drops to whatever length is left, the section
- * fills again, and nothing puts the offset back. The reader is now somewhere else, once a second,
- * for as long as the Overview is open. Reported from Safari on macOS and iOS with the offset moving
- * 200-887px per tick, and reproduced in WebKit with the engine's own scroll anchoring off: a 30-row
- * section swapped for a 35-row one two screens above the reader moved the page 255px under them —
- * 0px with the height held across the swap.
- *
- * fs-fit's anchoring covers the same fault from the other side (it now recognises a clamped offset
- * and puts the reader back), and it has to: every OTHER page's poll calls `dom.content()` too and no
- * theme code is in that path. This is the half that can be prevented rather than corrected, and
- * prevention is worth the line — a correction is a scroll the reader did not ask for, and on iOS it
- * lands in the middle of whatever momentum the page still has.
- *
- * The cost is one `offsetHeight` per filled section per tick — a forced layout, which this theme
- * spends carefully (fs-fit.js). It is paid because the alternative is not "no layout" but "a layout
- * whose result is the page jumping": the swap dirties this container anyway.
- *
- * The pin is released in the same call, so nothing is left to a later frame that could take the
- * minimum with it if the next tick throws — and a section that legitimately got shorter is shorter
- * again by the time this returns. */
-function swapContent(container, content) {
-	const hold = container.offsetHeight;
-	const prev = container.style.minHeight;
-	if (hold > 0)
-		container.style.minHeight = hold + 'px';
-	try { dom.content(container, content); }
-	finally { if (hold > 0) container.style.minHeight = prev; }
 }
 
 let _inflight = null;

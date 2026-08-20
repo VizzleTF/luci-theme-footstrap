@@ -1,3 +1,18 @@
+## [Unreleased]
+
+### Fixed
+
+- **The Overview's height pin is gone: it never took effect, and the reader was relying on the
+  correction alone without anyone saying so.** `fs-overview.js` held each container's height across
+  `dom.content()` so the document could not get short enough for the engine to clamp the offset into
+  — except the pin was written and released inside one statement sequence with no layout in between,
+  so no layout ever observed it. Measured on a 25.12 stand with the theme's own corrections switched
+  off and the pin still in place: a real poll tick clamped 1882px away and left it there. With the
+  corrections back on and the pin removed, the same park sees four clamps in 25 seconds, each handed
+  back inside a single frame, and the page ends exactly where the reader left it. Reported in review
+  on the upstream proposal; the measurement it doubted was a harness that forced a layout the real
+  poll path does not.
+
 ## [0.13.3] — 2026-08-20
 
 ### Fixed

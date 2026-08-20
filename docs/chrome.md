@@ -276,13 +276,14 @@ Three details carry it, and each one was a measured failure first:
   correction. It cannot run away with the page either — if the document really did get shorter, the
   browser clamps the write back and the reader keeps the offset they already had.
 
-**The Overview does not wait to be corrected.** `fs-overview.js` fills each section through
-`swapContent()`, which holds the container's height across the swap, so the document never gets
-short enough to be clamped in the first place: prevention costs one `offsetHeight`, a correction is
-a scroll the reader did not ask for. It reaches **one release and one page**: 24.10's
-`view.status.index` keeps its poll step in a closure — there is no `poll_status` on the prototype to
-replace — and every other page's poll calls `dom.content()` with no theme code in the path at all.
-That is why both halves exist, and why the correction had to work without the reference.
+**Correcting is the whole mechanism, and preventing was tried.** `fs-overview.js` briefly held each
+container's height across `dom.content()`, on the theory that a document that never gets short is a
+document nothing clamps. It never took effect and could not: the pin was written and released inside
+one statement sequence with no layout in between, so no layout ever saw it. Measured on a 25.12
+stand with the theme's corrections switched off (`localStorage.fsAnchor = 'off'`) and the pin in
+place, a real poll tick still clamped 1882px away and left it there. It is gone; nothing in the poll
+path is the theme's to hold, and the correction covers what it was meant to cover — same stand, same
+park, corrections on: four clamps in 25 seconds, each handed back inside a single frame.
 
 **Where the theme still does nothing, and what it costs.** `ENGINE_ANCHORS` asks whether the platform
 supports `overflow-anchor`, and a current WebKit answers yes — so the theme steps aside for it. Its
