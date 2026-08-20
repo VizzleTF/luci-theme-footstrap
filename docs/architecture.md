@@ -177,9 +177,8 @@ config internal 'themes'
 ```
 
 **Exactly one entry.** Bootstrap registers a symlinked theme per mode (`BootstrapDark`, …);
-footstrap does not, because mode, palette and layout are client axes. `uci-defaults` deletes the
-legacy names (`FootstrapDark`, `FootstrapTop`, …) and migrates `mediaurlbase` onto the single
-remaining path. Details: [package.md](package.md).
+footstrap does not, because mode, palette and layout are client axes. Details:
+[package.md](package.md).
 
 ## The runtime layout on the router
 
@@ -193,7 +192,6 @@ remaining path. Details: [package.md](package.md).
 /www/luci-static/resources/            menu-footstrap.js, menu-footstrap-common.js, fs-*.js
 /usr/lib/lua/luci/i18n/footstrap-theme.<lang>.lmo    catalogue, bundled INSIDE the theme package
 /usr/share/rpcd/acl.d/luci-theme-footstrap.json      ACL: uci footstrap + login-bg upload
-/usr/share/luci-theme-footstrap/.installed           "already installed" marker
 /etc/uci-defaults/30_luci-theme-footstrap            registration
 ```
 

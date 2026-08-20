@@ -18,12 +18,11 @@ bar are the same markup and the same renderer; CSS morphs them by `:root[data-la
 - Switching layout re-renders nothing: the DOM serves both, CSS changes the chrome, and a
   `MutationObserver` on `data-layout` in `menu-footstrap.js` folds the accordion into dropdowns
   and back.
-- **Migration**: a router that ran the old top-nav theme must keep its bar. A shell script cannot
-  write `localStorage`, so `uci-defaults` puts the router default in
-  `luci.main.footstrap_layout=top`, `head.ut` stamps it, and the user's own choice overrides it
-  forever. `postrm` deletes the key. Layout is the axis this pattern started with; every axis
-  now records its choice explicitly, for the same reason — see the three layers in
-  [design-system.md](design-system.md).
+- **The router may carry a default**: `luci.main.footstrap_layout=top` makes the bar the layout a
+  browser starts on, `head.ut` stamps it, and the reader's own choice overrides it forever. A
+  shell script cannot write `localStorage`, which is why the server side of the axis exists at
+  all. Layout is the axis this pattern started with; every axis now records its choice
+  explicitly, for the same reason — see the three layers in [design-system.md](design-system.md).
 
 **The bar is the base; the vertical sidebar is the exception.** The bar is written once with no
 guards (`styles/theme/20-shell.css`) and serves the top layout at any width *and* the sidebar

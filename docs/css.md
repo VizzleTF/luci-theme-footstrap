@@ -199,7 +199,6 @@ seven, plus one whole-file mirror:
 | `table-card/label`, `table-card/actions`, `table-card/actions-inner` | `theme/30-tables.css` (`.fs-stacked`) ↔ `theme/65-dropdown.css` (`@container`) |
 | `ind-badge/paint`, `poll-glyph/mask` | two places in `theme/20-shell.css` (the sidebar and the rail) |
 | `selected-row/paint` | `theme/60-inputs.css` ↔ `theme/65-dropdown.css` |
-| `theme/legacy-names` | `root/etc/uci-defaults/30_luci-theme-footstrap` ↔ `Makefile` |
 | `@same-file LICENSE` | the whole file |
 
 ## The card contract: what is measured and what is not

@@ -207,12 +207,13 @@ contract from the JS and checks the template against it.
 **One entry in `luci.themes`** — `Footstrap` → `/luci-static/footstrap`. Layout, mode, palette,
 tint, accent and rounding are client axes (`localStorage` + attributes on `:root`), not theme
 entries and not a server choice. Do not reintroduce `-dark`/`-light` symlink themes or
-layout-specific entries; `uci-defaults` actively deletes those legacy names.
+layout-specific entries.
 
-**Fresh install vs upgrade is decided by a MARKER FILE**,
-`/usr/share/luci-theme-footstrap/.installed` — written last, removed in `postrm`. A fresh install
-may activate the theme; an upgrade must never change the active one. `$PKG_UPGRADE` does not
-work: apk never exports it, so the guard was dead in production.
+**A fresh install may activate the theme; an upgrade must never change the active one.** What
+tells the two apart is whether the registration was already there: `uci-defaults` writes
+`mediaurlbase` only in the run that first added `luci.themes.Footstrap`, which is the idiom the
+other themes in the tree use. `$PKG_UPGRADE` is checked as well and carries nothing on its own —
+apk never exports it.
 
 **`rpcd reload`, never `restart`.** rpcd holds sessions in memory; a restart logs out every LuCI
 user including the admin who just clicked Update. `reload` re-reads `acl.d/*`, which is all this

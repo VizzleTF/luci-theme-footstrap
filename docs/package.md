@@ -184,24 +184,28 @@ registration (`dev-sync.sh` runs the same file; nothing else registers the theme
 - Registers **one** entry: `luci.themes.Footstrap=/luci-static/footstrap`. Layout, palette, mode
   and rounding are **client** switches on the Footstrap tab.
 - The key in `themes.<Name>` is CamelCase without hyphens — a uci option-name limitation.
-- Migrates `mediaurlbase`: legacy `-dark`/`-light`/`-top` paths onto the single path (plus
-  `luci.main.footstrap_layout=top`, so a router coming from the old top-bar theme keeps its bar —
-  a shell script cannot write `localStorage`); a dangling path goes back to `bootstrap`.
-- Drops LuCI's index and module caches.
+- Links the three admin uploads into `/www`: `bg`, `pattern.svg` and the `fonts/` directory all
+  live in `/etc/footstrap`, because uhttpd serves `/www` only and `/etc` is what a sysupgrade
+  keeps. The pattern keeps its `.svg` name — uhttpd types a response by extension.
 
 **It runs TWICE per install, not once.** Our `postinst` calls it, and OpenWrt's stock
 `default_postinst` separately runs and then deletes every `/etc/uci-defaults/*` in the package.
 The script is idempotent, so this is harmless.
 
-**Fresh install vs upgrade is decided by a marker file**,
-`/usr/share/luci-theme-footstrap/.installed`: written at the very end of the script (a run that
-died halfway is still a fresh install), removed in `postrm` (so a reinstall is fresh again). A
-fresh install may activate the theme; an upgrade must never change the active one.
+**Fresh install vs upgrade is decided by the registration itself.** `mediaurlbase` is written only
+in the run that first added `luci.themes.Footstrap`; on an upgrade the entry is already there, so
+nothing moves a router off the theme it is on. `[ "$PKG_UPGRADE" != 1 ]` is checked beside it, as
+the other themes in the tree do, but carries nothing on its own: apk never exports the variable and
+neither does our postinst.
 
-`[ "$PKG_UPGRADE" != 1 ]` — the classic idiom — is **dead here**: apk never exports the variable
-and neither does our postinst, so the branch was only ever taken by `dev-sync.sh`, which exports
-it by hand. An upgrade that found an empty `mediaurlbase` switched the theme on behind the user's
-back.
+**It migrates nothing from older footstraps, on purpose.** A router is expected to `sysupgrade`
+rather than upgrade single packages, so leftovers go with the image; what remains worth cleaning is
+config, and the one config key this package owns is the theme entry. That was not always so — the
+script used to delete eight legacy theme names, re-point four legacy media paths, carry the old
+top-bar layout into `luci.main.footstrap_layout`, sweep two downloaded wallpapers and a pre-0.12.1
+`fonts/` directory, and fall back to bootstrap if the active theme's files were missing. All of it
+served installs that predate the first version published in the LuCI tree. Requested in review:
+start from the assumption that a user of the official package started there.
 
 ## postinst / postrm
 
@@ -210,18 +214,16 @@ back.
 the admin who just clicked Update. `reload` sends SIGHUP, which re-reads
 `/usr/share/rpcd/acl.d/*`, the only thing this package needs from rpcd.
 
-`postrm` is not a one-liner:
+`postrm` does three things, and exits early on an upgrade (`case "$1" in *upgrade*`) because opkg
+runs the OLD package's postrm mid-upgrade — reverting `mediaurlbase` there is what once flipped
+every updating 24.10 user back to bootstrap:
 
-- deletes **all eight** theme names the package has ever registered (`Footstrap`,
-  `FootstrapDark/Light`, `FootstrapTop{,Dark,Light}`, `FootstrapSidebar`, `FootstrapOnTop`). The
-  list is necessarily duplicated in uci-defaults — postrm runs when that file is already gone —
-  so it is pinned with `@mirror theme/legacy-names` and the copies cannot drift;
-- deletes `luci.main.footstrap_layout` — meaningless to another theme, and left behind it would
-  quietly bring the top bar back on reinstall;
+- deletes `luci.themes.Footstrap`;
 - if our theme is still active, moves `mediaurlbase` back to bootstrap on a **two-part** check
   (both the media directory *and* the ucode template must exist: a one-sided check would hand the
   UI to a half-removed bootstrap, which is the white page this branch was written for);
-- removes `/usr/share/luci-theme-footstrap` (marker included) and does `rpcd reload`.
+- removes `/etc/footstrap` — the admin's uploads, kept out of the package so an upgrade preserves
+  them, and a real removal is the one time they should go — and does `rpcd reload`.
 
 ## `/etc/config/footstrap` must be a conffile
 

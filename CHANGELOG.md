@@ -1,3 +1,23 @@
+## [Unreleased]
+
+### Changed
+
+- **The install script is 36 lines instead of 162, and migrates nothing.** `uci-defaults` registered
+  the theme and then swept up after every footstrap that ever shipped: eight legacy theme names, four
+  legacy media paths, the old top-bar layout carried into `luci.main.footstrap_layout`, two
+  downloaded wallpapers, a pre-0.12.1 `fonts/` directory, a fallback to bootstrap when the active
+  theme's files were missing, and a marker file to tell a fresh install from an upgrade. All of it
+  served routers that predate the first version published in the LuCI tree, and OpenWrt expects a
+  `sysupgrade` rather than a package upgrade, so leftovers go with the image. What remains is the
+  registration, the three symlinks that expose the admin's own uploads out of `/etc`, and the same
+  fresh-vs-upgrade rule the other themes in the tree use — `mediaurlbase` is written only in the run
+  that first added `luci.themes.Footstrap`. Verified on both package managers that the behaviour is
+  unchanged where it matters: a fresh install with a theme already chosen registers and does not
+  switch, an upgrade changes nothing, a fresh install with no `mediaurlbase` activates the theme, and
+  a second run in the same install is a no-op. `postrm` loses the same eight-name list and the
+  marker, so the `@mirror theme/legacy-names` pin that held the two copies together is gone with
+  them. Requested in review by the LuCI maintainer.
+
 ## [0.13.4] — 2026-08-20
 
 ### Fixed

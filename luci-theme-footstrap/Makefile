@@ -93,8 +93,7 @@ define Package/luci-theme-footstrap/postinst
 	# uci-defaults registers the theme; refresh rpcd + drop caches so LuCI sees it without a
 	# reboot. Calling it ourselves is belt-and-braces: OpenWrt's default_postinst also runs
 	# (then deletes) every /etc/uci-defaults/* we ship, so it executes twice per install. It is
-	# idempotent, and its fresh-vs-upgrade marker is written at the end of the first pass, so
-	# that pass still sees a fresh install.
+	# idempotent: the second pass finds the theme already registered and changes nothing.
 	[ -f /etc/uci-defaults/30_luci-theme-footstrap ] && \
 		sh /etc/uci-defaults/30_luci-theme-footstrap >/dev/null 2>&1 || true
 	rm -f /tmp/luci-indexcache* /tmp/luci-modulecache/* >/dev/null 2>&1 || true
@@ -107,33 +106,15 @@ define Package/luci-theme-footstrap/postrm
 #!/bin/sh
 # opkg runs the OLD package's postrm with arg "upgrade" during a version upgrade (proven on 24.10:
 # `prerm upgrade`, then `postrm upgrade`, then the new `postinst configure`) and "remove" on a real
-# removal. On upgrade this script MUST change nothing: reverting mediaurlbase to bootstrap, wiping
-# the theme registration and deleting the .installed marker here is what flipped every updating
-# 24.10 user back to bootstrap — and it defeated uci-defaults' own upgrade guard, because with the
-# marker gone uci-defaults treated the run as "fresh", yet postrm had already set mediaurlbase to
-# bootstrap, which no "fresh" branch re-activates. apk never runs this on upgrade (it uses the new
-# package's pre/post-upgrade), so guarding on the arg is correct for both managers; real removal
-# passes "remove" (opkg) or no arg and proceeds below.
+# removal. On upgrade this script MUST change nothing: reverting mediaurlbase and wiping the theme
+# registration here is what flipped every updating 24.10 user back to bootstrap. apk never runs this
+# on upgrade (it uses the new package's pre/post-upgrade), so guarding on the arg is correct for both
+# managers; real removal passes "remove" (opkg) or no arg and proceeds below.
 case "$$1" in *upgrade*) exit 0 ;; esac
 [ -n "$${IPKG_INSTROOT}" ] || {
-	# Every theme name this package has ever registered. postrm runs when uci-defaults is
-	# already deleted, so it cannot source the list: it is duplicated by necessity and
-	# mirror-pinned so it cannot drift. Only the assignment is byte-identical — the `$$` is
-	# make's escaping.
-# @mirror theme/legacy-names
-LEGACY_THEMES="Footstrap FootstrapDark FootstrapLight FootstrapTop FootstrapTopDark FootstrapTopLight FootstrapSidebar FootstrapOnTop"
-# @endmirror
-	for t in $$LEGACY_THEMES; do
-		uci -q delete "luci.themes.$$t"
-	done
-	# The router's DEFAULT layout, set by uci-defaults when migrating an old top-nav install.
-	# It means nothing to any other theme, and left behind it would silently re-apply the top
-	# bar on a later reinstall.
-	uci -q delete luci.main.footstrap_layout
-	# Don't leave the active theme pointing at the media dir we just removed. The same TWO-part
-	# check uci-defaults uses: a theme needs its media dir AND its ucode template to render, so
-	# a one-part check could hand the UI to a half-removed bootstrap — the blank page this
-	# branch exists to avoid.
+	uci -q delete luci.themes.Footstrap
+	# Don't leave the active theme pointing at the media dir we just removed: a theme needs its
+	# media dir AND its ucode template to render, so both are checked before handing the UI over.
 	case "$$(uci -q get luci.main.mediaurlbase)" in
 		/luci-static/footstrap*)
 			[ -d /www/luci-static/bootstrap ] && \
@@ -141,9 +122,6 @@ LEGACY_THEMES="Footstrap FootstrapDark FootstrapLight FootstrapTop FootstrapTopD
 				uci set luci.main.mediaurlbase=/luci-static/bootstrap ;;
 	esac
 	uci commit luci
-	# The "installed before" marker uci-defaults writes to tell fresh from upgrade. Removing it
-	# makes uninstall-then-reinstall count as fresh again.
-	rm -rf /usr/share/luci-theme-footstrap >/dev/null 2>&1 || true
 	# The admin-uploaded login background (kept out of the package on purpose, so it survives an
 	# upgrade). A real removal is the one time it should go — this branch never runs on upgrade.
 	rm -rf /etc/footstrap >/dev/null 2>&1 || true
