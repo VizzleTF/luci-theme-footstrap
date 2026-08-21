@@ -28,18 +28,54 @@
 		 * a heavy grey cloud under a white card in light mode. */
 		padding: var(--fs-space-6) var(--fs-space-6) var(--fs-space-6); box-shadow: var(--fs-shadow-pop);
 	}
+	/* The router's own name, first line of the card (sysauth.ut) — the shape an appliance console
+	 * uses for this (FortiGate prints the hostname on its login page for the same reason): a
+	 * CENTRED identity block, set apart from the form, above a left-aligned heading and left-aligned
+	 * fields. Centred and separated is what makes the mixed alignment read as deliberate rather than
+	 * as a stray line: the 24px below is the card's own padding, so the block sits in a gutter of the
+	 * same size as the one around it, and the eye takes it as a header rather than as the heading's
+	 * first line.
+	 *
+	 * Still SMALLER than the heading it stands over (16px against the h2's 20px). It answers
+	 * "which box is this", which matters only until you have read it; `Authorization Required`
+	 * answers "what now", which is the page's actual subject. Set larger, the two swap roles and the
+	 * heading reads as a subtitle.
+	 *
+	 * Not a heading element, and that is on purpose — WCAG's outline is about the page's SUBJECT,
+	 * and a second heading above the h2 would announce the login form as two sections. It is a <p>
+	 * in the template.
+	 *
+	 * The eyebrow tokens are NOT reused, though this is an eyebrow's position: they carry
+	 * `text-transform: uppercase`, and a hostname is a name — `Rb5009-Usb` is not what the admin
+	 * typed, and case is the only thing telling two similar names apart on a router farm.
+	 *
+	 * `overflow-wrap: anywhere` because the card is a DEFINITE 400px (above) and a hostname is one
+	 * unbreakable token of up to 63 characters — nothing in it is a break opportunity, so without
+	 * this a long one runs out of the card instead of wrapping inside it. */
+	.fs-login-host {
+		margin: 0 0 var(--fs-space-6); text-align: center;
+		font-size: var(--fs-type-lg); font-weight: var(--fs-weight-bold); color: var(--fs-dim);
+		overflow-wrap: anywhere;
+	}
 	.fs-login .cbi-map,
 	.fs-login .cbi-section,
 	.fs-login .cbi-section-node {
 		background: none; border: 0; padding: 0; margin: 0; box-shadow: none;
 	}
 	/* the login card IS the panel — the generic "heading gets its own card" rule would
-	 * draw a second frame inside it */
-	.fs-login .cbi-map > h2,
+	 * draw a second frame inside it. `h1` because this page has no title bar to carry the
+	 * document's top-level heading (sysauth.ut says why); the card rule in theme/45-misc.css is
+	 * written for `.cbi-map > h2` and so does not reach it, but the reset stays listed — the
+	 * heading's level is not what should decide whether a second frame appears inside this card. */
+	.fs-login .cbi-map > h1,
 	.fs-login .cbi-map-descr {
 		background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0;
 	}
-	.fs-login .cbi-map > h2 {
+	/* the h2's size, on an h1: the ramp puts an h1 at 26px (theme/45-misc.css) and in a 400px card
+	 * that wraps `Authorization Required` onto two lines. The heading was the right SIZE all along
+	 * — only its level was wrong. `margin`, because the ramp gives an h1 a bottom margin and this
+	 * card sets its own rhythm. */
+	.fs-login .cbi-map > h1 {
 		font-size: var(--fs-type-xl); font-weight: var(--fs-weight-bold); letter-spacing: -.01em; margin: 0 0 var(--fs-space-1-5);
 	}
 	.fs-login .cbi-map-descr { color: var(--fs-dim); font-size: var(--fs-type); margin: 0 0 var(--fs-space-5); }

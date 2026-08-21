@@ -1,3 +1,28 @@
+## [Unreleased]
+
+### Added
+
+- **The login page has a top-level heading again.** It renders with no chrome, so header.ut's
+  `.fs-title-main` h1 never reaches it and the document went out with `Authorization Required` as an
+  h2 and no h1 at all — the one sentence saying where you are, and the target of a screen reader's
+  `1` shortcut. Stock LuCI's h2 is inherited from a page that has a title bar above it; this one has
+  none, so the card's heading is the page title and is marked up as one. Set back to the h2's 20px
+  in `10-login.css`: the ramp puts an h1 at 26px, which wraps that string onto two lines in a 400px
+  card, and the size was never what was wrong.
+
+- **The login page says which router it is.** The card carried nothing but `Authorization Required`,
+  so an admin with three of these open in three tabs had only the browser tab's title to tell them
+  apart — and a focused password field hides even that. `sysauth.ut` now prints the hostname above
+  the heading, from the same `ubus system board` call and with the same `?? 'OpenWrt'` fallback and
+  striptags/entityencode pair the chrome's wordmark and `<title>` already use. It discloses nothing
+  new: that string has always reached an unauthenticated browser through `<title>`, in this theme
+  and in every stock one. Centred and set apart by the card's own 24px gutter — the shape an
+  appliance console uses for this — but SMALLER than the heading it stands over and not a heading
+  itself: `Authorization Required` stays the page's one heading, so the outline still has a login
+  form in it rather than a section named after the router. Not in the eyebrow's uppercase either,
+  because a hostname is a name and case is often the only thing separating two of them. Requested
+  as openwrt/luci#8961.
+
 ## [0.14.0] — 2026-08-21
 
 ### Added
