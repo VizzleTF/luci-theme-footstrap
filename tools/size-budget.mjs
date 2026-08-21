@@ -52,8 +52,14 @@ const LIMITS = {
 	 * a reader who scrolled and giving one back with no reference left to measure (fs-fit.js), and
 	 * holding a section's height across the swap that causes it (fs-overview.js). A page that moves
 	 * 200-1206px under the reader once a second is not a page anybody reads, so the bytes are worth
-	 * their flash. */
-	resourcesJs: 88_000,
+	 * their flash.
+	 *
+	 * 88,356 B measured 2026-08-21. The last 356 B are the theme's own range slider, carried for
+	 * 23.05: `ui.RangeSlider` arrived in 24.10, and on the older release its absence took the whole
+	 * Appearance tab with it. A widget the theme only uses where luci-base has none is the cheapest
+	 * form of that support — the alternative was dropping a release that still ships on a lot of
+	 * hardware. */
+	resourcesJs: 88_500,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the
 	 * router is also routing packets over: the same set minus the page modules, which are required
 	 * only on the one page each belongs to (tools/page-modules.mjs). 72,499 B measured 2026-08-20,

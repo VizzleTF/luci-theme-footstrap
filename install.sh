@@ -1,5 +1,7 @@
 #!/bin/sh
-# luci-theme-footstrap installer for OpenWrt 24.10 (opkg) and 25.12+ (apk).
+# luci-theme-footstrap installer for OpenWrt 23.05/24.10 (opkg) and 25.12+ (apk).
+# 23.05 installs from the signed GitHub release; the feed carries the two branches the package
+# FORMAT splits on and nothing else.
 #
 #   wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
 #
@@ -256,9 +258,24 @@ BRANCH=$(printf '%s' "${DISTRIB_RELEASE:-}" | cut -d. -f1,2)
 case "$BRANCH" in
 [0-9][0-9].[0-9][0-9])
 	MAJ=${BRANCH%%.*}; MIN=${BRANCH##*.}
-	if [ "$MAJ" -lt 24 ] || { [ "$MAJ" -eq 24 ] && [ "$MIN" -lt 10 ]; }; then
-		err "footstrap requires OpenWrt 24.10 or newer (detected $DISTRIB_RELEASE)."
+	if [ "$MAJ" -lt 23 ] || { [ "$MAJ" -eq 23 ] && [ "$MIN" -lt 5 ]; }; then
+		err "footstrap requires OpenWrt 23.05 or newer (detected $DISTRIB_RELEASE)."
 		exit 1
+	fi
+	# 23.05 IS SUPPORTED AND HAS NO FEED BRANCH, and that is a decision rather than a gap: the feed
+	# publishes the two branches the package FORMAT splits on (apk from 25.12, ipk on 24.10), and
+	# adding a third for a release whose ipk is byte-identical to 24.10's would be a second copy of
+	# one artefact to sign, serve and keep in step. So 23.05 installs from the signed GitHub release
+	# instead — the same path a router takes when the feed cannot serve it, verified the same way
+	# (usign signature, then the asset digest) and equally re-runnable. What it does not get is
+	# `opkg upgrade`: an update means running this script again.
+	if [ "$MAJ" -eq 23 ]; then
+		info "OpenWrt $DISTRIB_RELEASE: installing from the signed release (the feed carries 24.10 and 25.12 only)."
+		install_from_release || {
+			err "Could not install the release asset on $DISTRIB_RELEASE."
+			exit 1
+		}
+		exit 0
 	fi
 	# PROBED, exactly like the fallback path below, and for the reason that path states: a router
 	# on a branch the feed does not publish yet — every 26.x router on the day it ships — otherwise

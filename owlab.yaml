@@ -149,6 +149,14 @@ routers:
     release: "24.10.6"
     ports: { http: 8027, ssh: 2227 }
 
+  # 23.05, the oldest release this theme claims. It is here because the one thing that broke on it
+  # broke SILENTLY on everything else: `ui.RangeSlider` arrived in 24.10, and the Appearance tab is
+  # built inside one try/catch, so on 23.05 the whole tab died with a console line and nothing else
+  # said a word. A user reported it from the field. The gates cannot catch what they never open.
+  - id: owrt2305
+    release: "23.05.5"
+    ports: { http: 8023, ssh: 2223 }
+
   # A SNAPSHOT box, because the installer has a path only it takes: `SNAPSHOT` parses to
   # no feed branch, so the script asks the feed for the newest one its package manager
   # can read, and everything about that path — the probe, the fallthrough between

@@ -6,7 +6,11 @@
 [![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap.json)](https://owfeed.org/install/)
 [![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap-releases.json)](https://owfeed.org/install/)
 
-A LuCI theme for OpenWrt 24.10 and newer. No framework, `luci-base` is the only dependency.
+A LuCI theme for OpenWrt 23.05 and newer. No framework, `luci-base` is the only dependency.
+
+> **23.05** is supported and gated like the rest: the same live checks run on a 23.05 router before
+> every release. The one thing that release does not have is `ui.RangeSlider` (it arrived in
+> 24.10), so the Appearance sliders are the theme's own there — same markup, same behaviour.
 
 <picture>
   <source media="(max-width: 767px)" srcset="assets/readme/phone-menu-dark.png">

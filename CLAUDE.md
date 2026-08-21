@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-`luci-theme-footstrap` — a LuCI theme for **OpenWrt 24.10 and newer** (and ImmortalWrt). Standalone:
+`luci-theme-footstrap` — a LuCI theme for **OpenWrt 23.05 and newer** (and ImmortalWrt). Standalone:
 it ships no framework and depends on nothing but `luci-base`. Page content is rendered client-side
 by app view-JS, so the theme is server chrome (`ucode/template/themes/footstrap/*.ut`) + one
 generated `cascade.css` + `fs-*.js` in `htdocs/luci-static/resources/`.
@@ -78,6 +78,10 @@ compile.
 - **Every gate is static; not one opens a page.** A behaviour change is not finished until it has
   run on a real userland on **both** package managers (25.12/apk and 24.10/opkg). A stubbed node
   harness proves a module initialises, nothing more — say which of the two you did.
+- **A TAG also requires 23.05** (`owrt2305`), and that is a rule with a bill attached: `ui.RangeSlider`
+  does not exist there, the Appearance tab is built in one try/catch, and the whole tab died on that
+  release for as long as it took a user to report it. `npm run live -- --all` covers it now, and
+  `upstream-contract` states the assumption; neither existed when it broke. docs/releasing.md.
 - **Prove a CSS change with a computed-style diff, not screenshots.** Live counters move 0.5–1.3% of
   pixels between two runs of the *same* sheet while a real regression weighs 0.19%.
 - Screenshots and any other scratch artefact go in `../tmp/`, never inside the checkout.

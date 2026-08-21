@@ -1,5 +1,31 @@
 ## [Unreleased]
 
+### Added
+
+- **OpenWrt 23.05 is a supported release again, and gated like the others.** A user reported that the
+  Appearance tab was empty on 23.05.5 — the whole panel, not one control. The cause was one missing
+  widget: `ui.RangeSlider` arrived in 24.10, the panel is built inside a single try/catch, and the
+  miss took the tab down with one console line and nothing else to notice it. Everything else on
+  that release already worked, which the numbers now say out loud: the chrome, the menu, client
+  navigation, the Overview grid, the palettes, both layout and mode axes, the search palette, styled
+  dropdowns, the tables and Save-as-default all behave, and 74 pages agree between a click and a
+  full load. So the fix is the widget rather than the release: `fs-appearance.js` uses
+  `ui.RangeSlider` where it exists and builds the same thing from `ui.AbstractElement` — the base
+  class LuCI exports on every supported release — where it does not, with the same markup, the same
+  `.cbi-range-slider` classes the stylesheet already dresses, and the same two events. 356 B for a
+  release that still ships on a lot of hardware.
+- **23.05 has a router of its own in the gates.** `owlab.yaml` gains `owrt2305`, `upstream-contract`
+  gains the assumption that a range widget is reachable by one path or the other (exercised, not
+  assumed — the fallback's own machinery is built and rendered in the check), and a release is not
+  taggable until the wide live run has been through it. The bug reached a user because no gate had
+  ever opened a 23.05 router; that is the part worth not repeating.
+- **The installer knows 23.05, and it does not use the feed.** The feed publishes the two branches
+  the package FORMAT splits on — apk from 25.12, ipk on 24.10 — and a 23.05 branch would be a second
+  copy of a byte-identical artefact to sign and keep in step. So `install.sh` recognises the release
+  and installs the signed GitHub asset directly, the same path and the same verification a router
+  gets when the feed cannot serve it. The trade is stated where it is made: no `opkg upgrade` there,
+  an update means running the script again.
+
 ### Fixed
 
 - **The realtime graphs' axis labels are readable again.** Every `<text>` in LuCI's realtime `.svg`
