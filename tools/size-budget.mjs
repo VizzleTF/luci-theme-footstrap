@@ -37,8 +37,13 @@ const LIMITS = {
 	/* 125,747 B measured 2026-08-18 (built 137,376, −8.5% from the token mangle) — 1.5 KB of that
 	 * came from naming the hairline and the field transition, which turned 80 longhand declarations
 	 * into two tokens. The headroom is deliberate and small: a feature's worth of rules should fit
-	 * without a gate edit, a redesign's should not. */
-	cascadeCss: 127_000,
+	 * without a gate edit, a redesign's should not.
+	 *
+	 * 127,142 B measured 2026-08-21: +1.4 KB for the 2020 colourway (two full token blocks, which is
+	 * what a palette costs) and 142 B for two forum-reported fixes — the realtime graph's axis
+	 * labels and the air around a second heading in a card. A palette is the one feature that cannot
+	 * be cheaper: every token is declared per mode or the block does not fully apply. */
+	cascadeCss: 128_500,
 	/* 87,347 B measured 2026-08-20 over the 14 shipped modules, terser with top-level mangling
 	 * (85,671 B on 2026-08-18, before the release's own fixes). This is the FLASH cost: every module
 	 * ships, whether or not a given page loads it.

@@ -32,6 +32,16 @@
 	.cbi-section > h3:first-child,
 	.cbi-section > legend { margin-bottom: var(--fs-space-3); }
 
+	/* A SECOND heading inside the same card — the one that follows a table rather than opening the
+	 * section — had no air at all: measured 0px above it on Status → Overview, where the stock
+	 * includes stack `table + h3 + table` inside one .cbi-section and the heading read as another
+	 * row of the table it was captioning. The rule above cannot cover it: `:first-child` is what
+	 * excludes the one that opens the card, and that one takes its gap from the wrapper instead.
+	 * Reported from the forum. The two values are the ladder's own: a heading is separated from
+	 * what came before by more than it is from what it introduces. */
+	.cbi-section .table + h3 { margin-top: var(--fs-space-5); }
+	.cbi-section h3 + .table { margin-top: var(--fs-space-3); }
+
 	/* ---- tables in cards ----
 	 * Discriminator: a key/value include (System, Memory) has NO id; a data table has one
 	 * (status_leases) or the JS tag .fs-dt. Key/value is not itself a card — no frame, no clip;

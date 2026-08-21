@@ -724,6 +724,22 @@
 		stroke: var(--fs-text) !important;
 	}
 
+	/* …and the axis labels beside them, for the same reason and with a worse symptom. Every <text>
+	 * in the .svg carries an inline fill of the file's own light grey plus a one-pixel black halo,
+	 * drawn for the black background the file assumes rather than for the panel this theme paints
+	 * behind it. On a light palette that grey lands on white at 1.16:1 — the numbers are legible
+	 * only as the shadow around them; --fs-text measures 17.9:1 there, and 14.7:1 on the dark
+	 * panel, where it is the halo that has to go instead. Both come from an inline declaration, so
+	 * both need the flag. Reported from the forum.
+	 *
+	 * The weight is not decoration: the SVG hardcodes a 9pt label, the smallest type this theme
+	 * renders anywhere, and at the regular weight it is also the thinnest. */
+	#view div[style] > svg text[style] {
+		fill: var(--fs-text) !important;
+		text-shadow: none !important;
+		font-weight: var(--fs-weight-bold);
+	}
+
 	/* Overview Hide/Show toggle pills: theme/35-alerts.css (.cbi-title .label) +
 	 * pages/20-overview.css (chevron variant) — absorbed. */
 }

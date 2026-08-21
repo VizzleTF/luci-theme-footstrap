@@ -1,3 +1,21 @@
+## [Unreleased]
+
+### Fixed
+
+- **The realtime graphs' axis labels are readable again.** Every `<text>` in LuCI's realtime `.svg`
+  carries an inline light grey with a one-pixel black halo, drawn for the black background the file
+  assumes rather than for the panel this theme paints behind it: on a light palette that is 1.16:1
+  against white, so the numbers were legible only as the shadow around them. They take `--fs-text`
+  now — 17.9:1 on the light panel, 14.7:1 on the dark one, where the halo is what had to go — and
+  the SVG's hardcoded 9pt label, the smallest type in the theme, is set at the bold weight. The
+  same box's black frame and its clipped width were already handled; only the labels were left.
+  Reported on the OpenWrt forum.
+- **A second heading inside a card is no longer flush against the table above it.** Status →
+  Overview stacks `table + h3 + table` inside one `.cbi-section`, and the heading measured 0px of
+  space above it, reading as one more row of the table it was captioning. The rule that gives the
+  section's FIRST heading its gap cannot cover this one — `:first-child` is what makes it the first
+  — so the pair gets its own: 20px above the heading, 12px below it. Reported on the OpenWrt forum.
+
 ## [0.13.5] — 2026-08-20
 
 ### Added

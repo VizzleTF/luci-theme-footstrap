@@ -52,8 +52,15 @@ const LIMITS = {
 	 * therefore erases the column's min-content — the exact number the whole table pipeline now
 	 * measures. Measured at 720px of viewport: the column held at 126px against a 353px token with
 	 * every layered remedy tried, and reports 963px of need in 688px of room once the alias is
-	 * neutralised. */
-	importants: 28,
+	 * neutralised.
+	 *
+	 * Raised 28 -> 30 for the two flags on the realtime graph's axis labels. Third time on the same
+	 * box and the same adversary: the stock `.svg` writes the fill and a black text-shadow INLINE on
+	 * every <text>, for the black background that file assumes. On a light palette the labels land
+	 * at 1.16:1 against the panel this theme paints behind them, which is legible only as the halo
+	 * around the digits; the fill has to follow --fs-text and the halo has to go, and neither can be
+	 * done from a cascade layer. */
+	importants: 30,
 	/* The widest selector the theme needs; see the layer rules in docs/conventions.md.
 	 *
 	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`. Not sprawl:
