@@ -86,12 +86,62 @@
 	 * classes — only Port tiles carry an icons/port_*.svg icon. Do not unscope.
 	 * Link state = the icon src (*_up = link, *_down = none). Child order: 1 name-head,
 	 * 2 body(icon+speed), 3 zone-bar head, 4 body(traffic). */
-	/* grid wrapper. auto-fit + minmax(126, 200) is count-agnostic: many ports shrink
-	 * toward 126 and wrap; few ports cap at 200 instead of one stretching the full width.
-	 * 2-port device or 24-port switch alike. */
+	/* THE TRACKS PACK THE ROW INSTEAD OF LEAVING AIR BESIDE IT, and every card is the same width.
+	 *
+	 * It was `repeat(auto-fit, minmax(126px, 200px))`, read as "shrink toward 126 when there are
+	 * many ports". A grid does not read that way: `auto-fit` picks the track COUNT from the
+	 * definite MAX of the track function, so the count is always `floor(width / 200)` and the 126
+	 * floor is only ever reached when the column itself is narrower than that. An 11-port switch in
+	 * a 1190px content column therefore got 5 tracks of 200px in THREE rows with 150px of air to
+	 * the right of every one of them, which is what the forum report showed next to a theme that
+	 * puts the same 11 ports on one line.
+	 *
+	 * `minmax(92px, 1fr)` asks it the other way round: with an INDEFINITE max the count comes from
+	 * the 92px min, so the row takes as many tiles as fit at that size and `1fr` then shares the
+	 * remainder EQUALLY between them — every tile on the page is the same width, the short last row
+	 * included, which `auto-fit` + a flex row do not give (a flex line grows its own items, so three
+	 * leftovers ended up 60px wider than the eight above them). `max-width: 200px` on the tile keeps
+	 * the 2-port device from stretching one card across the column.
+	 *
+	 * THE FLOOR IS THE TRAFFIC FIGURE, and it is written as one. The name is clamped to two lines
+	 * now (see the head rule below), so it no longer sets the width of anything; what a card still
+	 * MUST fit whole is `▲ 1024.0 PiB` — the widest string luci.js's `%1024.1mB` can produce, since
+	 * it changes unit at every 1024 and stops at one decimal — and the figures are `nowrap` by
+	 * design, so a card too narrow for one does not wrap it, it pushes it past its own padding,
+	 * silently, because nothing here clips.
+	 *
+	 * The floor is that width, measured rather than guessed: stepping a card 1px at a time until the
+	 * figure fits on one line and the card stops overflowing gives 94px at Normal, 80 at Compact and
+	 * 109 at Large — with the figures at 10px (see the traffic rule below, where that size is picked
+	 * for exactly this reason). Hence `76px * --fs-density-type + two gutters` — the text scales with
+	 * the density axis and the gutter is already a token, so each setting gets its own answer
+	 * (100 / 84 / 111) instead of sharing one number that is wrong on two of them.
+	 *
+	 * Held by two sweeps on the stands: 1800 combinations of name, speed, traffic, width and density
+	 * (five name shapes including a 60-character one and Cyrillic, five speed strings including
+	 * `нет соединения`), and every window width from 320 to 1900 in 10px steps at all three
+	 * densities with 24 cards of maximal content — 0 cards overflowing, 0 figures wrapped, and the
+	 * narrowest card the sweep ever produced was 93px.
+	 *
+	 * Measured on owrt2512, owrt2410 and imm2512 alike, 11 tiles with worst-case content, section
+	 * height in px, before → after:
+	 *   1440px   340 → 153 (5+5+1 tiles of 200px → all 11 on one row of 101px)
+	 *   1024px   340 → 315 (4+4+3 → 8+3)
+	 *    768px   456 → 315 (3+3+3+2 → 6+5)
+	 *    390px  1272 → 640 (ONE 200px tile per row in a 324px column → 3+3+3+2 of 101px)
+	 * A 4-port device keeps its 200px cards on one row at any desktop width, and gains a row at 768
+	 * and 390 where it used to break into 3+1 and 1+1+1+1. At Compact all 11 fit one row.
+	 *
+	 * The flag stays on `grid-template-columns` — that is the property 29_ports.js writes inline. */
 	body[data-page="admin-status-overview"] div:has(> .ifacebox img[src*="/port_"]) {
-		gap: var(--fs-space-2-5);								/* no inline gap — no flag needed */
-		grid-template-columns: repeat(auto-fit, minmax(126px, 200px)) !important;
+		/* 8px, not 10: at the floor below, the gap is what decides whether an 11-port switch takes one
+		 * row or ten-plus-one. A 1190px column fits 11 cards of 101px with 8px between them and 10
+		 * of 110px with 10px — the two px come off the gutter rather than off the card, because the
+		 * card's own floor is a measurement (see below) and the gap is not. No inline gap to fight,
+		 * so no flag. */
+		gap: var(--fs-space-2);
+		--fs-port-min: calc(76px * var(--fs-density-type) + var(--fs-space-3) * 2);
+		grid-template-columns: repeat(auto-fit, minmax(var(--fs-port-min), 1fr)) !important;
 		margin-bottom: 0 !important;
 	}
 	/* FLEX-WRAP, NOT A GRID WITH A THRESHOLD, and that is the fix for issue #7's "съезжает вёрстка".
@@ -116,7 +166,11 @@
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) {
 		margin: 0 !important;
 		min-width: 0 !important;
-		max-width: none !important;
+		/* The cap half of the pair that sizes the tile (the 126px min is on the wrapper's tracks —
+		 * see the note there): 200px is where a 2-port device stops growing, so two ports do not
+		 * become two half-page cards. It carries a flag because stock writes `max-width:100px`
+		 * inline and the ImmortalWrt fork writes its own. */
+		max-width: 200px !important;
 		/* …and `width` too, which stock never writes but a FORK does: on ImmortalWrt 25.12 the tile
 		 * carries `style="margin:.25em;width:100px"` instead of stock's `min-width:70px;max-width:100px`.
 		 * Releasing only the two stock properties left the fork's fixed width in charge, so the grid
@@ -142,7 +196,10 @@
 		background: var(--fs-panel2);
 		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
-		padding: var(--fs-space-2) var(--fs-space-3);
+		/* the horizontal half is what --fs-port-min budgets for (the wrapper rule above), so it stays
+		 * --fs-space-3; the vertical half is one step tighter, because a port card is four short
+		 * lines and every px of leading between them shows. */
+		padding: var(--fs-space-1-5) var(--fs-space-3);
 		/* NO `container-type` HERE, and its absence is the fix for a page that jumped every five
 		 * seconds. The card used to be `container-type: inline-size; container-name: fs-port`, for two
 		 * `@container fs-port` queries that were deleted when the flex wrap below replaced their pixel
@@ -166,7 +223,10 @@
 		 * wrong axis. Cost an hour; state the axis. */
 		flex-direction: row;
 		flex-wrap: wrap;
-		column-gap: var(--fs-space-2); row-gap: var(--fs-space-1);
+		/* row-gap 0: every row inside the card carries its own spacing (the zone bar's margins, the
+		 * name's line box), and a gap on top of that is what made a five-line card 19px taller than
+		 * its content. */
+		column-gap: var(--fs-space-2); row-gap: 0;
 		align-items: baseline;
 	}
 	/* drop the stock icon */
@@ -192,7 +252,7 @@
 		order: 1;
 		flex: 0 0 100%;
 		width: 100%;
-		margin: var(--fs-space-1) 0 var(--fs-space-1-5);
+		margin: var(--fs-space-0-5) 0 var(--fs-space-1);
 	}
 	/* name row + its ::after status dot */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
@@ -205,22 +265,51 @@
 		 * means and does not depend on the card's sizing staying definite. */
 		flex: 0 0 auto;
 		width: 100%;
-		display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-1-5);
+		/* TWO LINES OF NAME, NEVER THREE, and never a name that decides how wide every card is.
+		 *
+		 * The head used to be a flex row — name on one `nowrap` line, status dot pushed to the far
+		 * end — which made the LONGEST INTERFACE NAME the minimum width of every tile on the page:
+		 * `10g-copper` needs 99px, so no card could be narrower than that however little else it
+		 * held. Wrapping alone is not the answer either: `superlongnameport` has no space and no
+		 * hyphen to break at, so `overflow-wrap: anywhere` gave it three ragged lines and the row
+		 * grew to fit them.
+		 *
+		 * So: a `-webkit-box` clamped to two lines, which is the one shape that both wraps AND puts
+		 * an ellipsis where it stops (`text-overflow` alone cannot, it only ever truncates a single
+		 * line). `line-clamp` is written beside the prefixed pair for the engines that have taken
+		 * the unprefixed property; the prefixed spelling is the one that works everywhere today and
+		 * is not going away — it is in the spec's own compat section.
+		 *
+		 * THE STATUS DOT IS GONE, and the name has its width back. It was a second reading of what
+		 * the card already says twice: the speed line reads `no link` in the dim colour instead of a
+		 * rate in the link colour, and the zone bar above it fades with the carrier. A `-webkit-box`
+		 * lays its children out as lines, so the dot could not stay in the flow either — it would
+		 * join the name's text and be clipped away with the second line — and reserving a column for
+		 * it out of flow cost the name 14px of a 99px card, i.e. about two characters of every port
+		 * name on the page.
+		 *
+		 * NO SECOND LINE IS RESERVED, and it was tried the other way first: `min-height: 2lh` held
+		 * every card's colour bar, speed and traffic on its neighbours' line whatever the names did —
+		 * at the cost of 19px of empty air in EVERY card on the ordinary router, where the names are
+		 * `eth1` and `lan1` and not one of them wraps. Measured on the stand: a 5-port device stood
+		 * 126px tall for cards holding three short lines, 107px without the reserve. The ROW is
+		 * levelled by the grid either way (a track is as tall as its tallest card), so the reserve
+		 * only ever aligned the INSIDES of cards whose names differ in height — a 15px step on the
+		 * one row where that happens, against 19px of padding on every card where it does not.
+		 * The explicit `line-height` stays: it is what makes a wrapped name's two lines the theme's
+		 * rhythm rather than the font's own default. */
+		/* ONE LINE, cut with an ellipsis. base/95-luci.css already says `white-space: nowrap`; what
+		 * this adds is the pair that makes the overflow READABLE instead of clipped — and `min-width`,
+		 * because a nowrap box's automatic minimum size is its whole text, which would put the longest
+		 * interface name back in charge of how wide every card is. */
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		line-height: var(--fs-leading);
 		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-text);
 	}
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child::after {
-		content: "";
-		width: 8px; height: 8px;
-		border-radius: 50%;
-		background: var(--fs-good);				/* linked (default) */
-		flex: 0 0 auto;
-	}
-	/* no link (*_down.svg): hollow ring, dim name */
+	/* no link (*_down.svg): dim name, to match the dim speed and the faded zone bar */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child { color: var(--fs-dim); }
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child::after {
-		background: transparent;
-		border: 1.5px solid var(--fs-dim);
-	}
 	/* speed: green when linked, dim when not */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
 		order: 2;								/* below the zone-colour line (child 3, order 1) */
@@ -239,7 +328,7 @@
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) br { display: none; }
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-body:nth-child(2) { color: var(--fs-dim); }
 	/* traffic: tx over rx, as stock's <br> leaves them — CSS cannot reorder br-separated
-	 * text runs. The 11px flag fights the inline `font-size:80%`. */
+	 * text runs. The size flag fights the inline `font-size:80%`. */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) {
 		order: 2;								/* shares the speed's row, below the zone line */
 		text-align: end;
@@ -248,14 +337,30 @@
 		 * box that reaches that edge. `margin-left: auto` would have done the same job on a shared
 		 * row and was the first attempt: wrong, because Chrome counts an auto margin when it breaks
 		 * lines, so the figures took a row of their own even on a card they fitted (measured).
-		 * `flex-shrink: 0` keeps the nowrap figures from being squeezed into an overflow. */
-		flex: 1 0 auto;
+		 * `flex-shrink: 0` keeps the nowrap figures from being squeezed into an overflow.
+		 *
+		 * `flex-basis: 100%` is what makes the figures take a row of their OWN — always, not only on
+		 * a card too narrow to share one. The wrap used to be decided per card by the content, so a
+		 * `no link` port with zero counters kept speed and traffic side by side while the port beside
+		 * it, with a rate and real figures, pushed them apart: two cards of the same width reading as
+		 * two different layouts, and the zone bars, speeds and figures at different heights along the
+		 * row. One shape for every card is worth the line it costs the narrow ones. */
+		flex: 1 0 100%;
 	}
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container {
 		font-family: var(--fs-font-mono);
-		font-size: var(--fs-type-xs) !important;
+		/* 10px at Normal, a step below the theme's --fs-type-xs (11px), and it BUYS WIDTH: this
+		 * figure is the widest thing a port card must fit whole, so its size is what sets the
+		 * card's floor (see the wrapper rule above). One pixel here is 12px off every card —
+		 * measured on the stand, the floor goes 106 -> 94 at Normal, 92 -> 80 at Compact and
+		 * 119 -> 109 at Large. It stays on the density axis; it is off the type
+		 * LADDER because the ladder has no rung here, and a figure that is read as a pair of
+		 * numbers beside a label tolerates the step that body text would not. */
+		font-size: calc(round(10px * var(--fs-density-type), 1px)) !important;
 		color: var(--fs-dim);
-		line-height: var(--fs-leading);
+		/* the tight leading, not the body one: these are two lines of figures read as a block, and
+		 * --fs-leading (1.5) spent 5px of card height on the space between them. */
+		line-height: var(--fs-leading-tight);
 		white-space: nowrap;
 		/* Fights the element's own inline `text-align:left` (29_ports.js) so the ▲/▼ lines align on
 		 * their right edge and the units form a column instead of a ragged edge.
