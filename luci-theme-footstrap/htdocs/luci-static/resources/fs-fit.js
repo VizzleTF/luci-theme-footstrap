@@ -581,7 +581,7 @@ function anchorRef() {
 	};
 	el = null;
 	for (let step = 0; step < 5 && !el; step++)
-		el = pick(Math.min(floor - 1, y + Math.round(floor * 0.12) * step));
+		el = pick(Math.min(floor - 1, y + (Math.round(floor * 0.12) * step)));
 	if (!el) return null;
 	const table = el.closest('.table.fs-dt');
 	if (table) {
