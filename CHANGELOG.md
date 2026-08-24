@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Fixed
+
+- **A block a view builds itself no longer fuses with the card below it.** A view may return a bare widget where a section is expected — `s.render = () => new ui.Textarea(...).render()` hands the map a plain `<div>` with no `.cbi-section` on it, which is what luci-app-irqbalance does for its `/proc/interrupts` snapshot — and nothing gave that block the gap every section carries, so the next section started against it. Reported upstream from Firefox. Stock bootstrap measures the same 0px there; the difference is that a section is a stretch of page in bootstrap and a CARD here, so the missing gap reads as two cards fused. The rule is written against what a map contains rather than against that app: everything luci-base puts in a map and spaces itself — the heading, the description, the action bar, a tabbed map's tab bar and pane, the sections — is excluded, and any other top-level block gets the same 16px a card does.
+
 ## [0.14.1] — 2026-08-24
 
 ### Added

@@ -247,4 +247,21 @@
 	 * SQM, but nothing here is about SQM: it is one class luci-base gives every such section, and
 	 * the gap belongs to the pattern rather than to the page. */
 	.cbi-section-remove { margin-bottom: var(--fs-space-2); }
+
+	/* A TOP-LEVEL BLOCK IN A MAP THAT IS NOT A SECTION still keeps the page's rhythm.
+	 *
+	 * A view may return a bare widget where a section is expected — `s.render = () => new
+	 * ui.Textarea(...).render()` hands the map a plain `<div>` with no `.cbi-section` on it, which is
+	 * what luci-app-irqbalance does for its /proc/interrupts snapshot. Nothing then gives that block
+	 * the gap every section carries, so the next section starts against it. Stock bootstrap measures
+	 * the same 0px, but there a section is a stretch of page and here it is a CARD: the missing gap
+	 * reads as two cards fused, which is what was reported.
+	 *
+	 * Written against what a map contains rather than against that app: the exclusions are the
+	 * children luci-base itself puts there and which own their spacing already — the map heading and
+	 * its description, the page's action bar, a tabbed map's tab bar and its pane, and sections. Anything else is a block the view built,
+	 * and it gets the same 16px as a card. */
+	.cbi-map > *:not(.cbi-section):not(.cbi-map-descr):not(.cbi-page-actions):not(h2):not(legend):not(.cbi-tabmenu):not(.cbi-map-tabbed) {
+		margin-bottom: var(--fs-card-gap);
+	}
 }
