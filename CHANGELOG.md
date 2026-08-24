@@ -1,8 +1,8 @@
-## [Unreleased]
+## [0.14.2] — 2026-08-24
 
 ### Fixed
 
-- **A block a view builds itself no longer fuses with the card below it.** A view may return a bare widget where a section is expected — `s.render = () => new ui.Textarea(...).render()` hands the map a plain `<div>` with no `.cbi-section` on it, which is what luci-app-irqbalance does for its `/proc/interrupts` snapshot — and nothing gave that block the gap every section carries, so the next section started against it. Reported upstream from Firefox. Stock bootstrap measures the same 0px there; the difference is that a section is a stretch of page in bootstrap and a CARD here, so the missing gap reads as two cards fused. The rule is written against what a map contains rather than against that app: everything luci-base puts in a map and spaces itself — the heading, the description, the action bar, a tabbed map's tab bar and pane, the sections — is excluded, and any other top-level block gets the same 16px a card does.
+- **A block a view builds itself no longer fuses with the card below it.** A view may return a bare widget where a section is expected — `s.render = () => new ui.Textarea(...).render()` hands the map a plain `<div>` with no `.cbi-section` on it, which is what luci-app-irqbalance does for its `/proc/interrupts` snapshot — and nothing gave that block the gap every section carries, so the next section started against it. Reported upstream from Firefox. Stock bootstrap measures the same 0px there; the difference is that a section is a stretch of page in bootstrap and a CARD here, so the missing gap reads as two cards fused. The rule is written against what a map contains rather than against that app: everything luci-base puts in a map and spaces itself — the heading, the description, the action bar, a tabbed map's tab bar and pane, the sections — is excluded, and any other top-level block gets the same 16px a card does. An empty placeholder is left alone — Status → Realtime → Wireless mounts a `<div>` with nothing in it, and 16px under a box of zero height is a gap out of nowhere.
 
 ## [0.14.1] — 2026-08-24
 
@@ -4019,6 +4019,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.14.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.13.5...v0.14.0
 [0.13.5]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.13.4...v0.13.5
