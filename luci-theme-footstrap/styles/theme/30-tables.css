@@ -268,7 +268,16 @@
 	 * The cost is that a row of a data table can no longer be the anchor. On the page where that
 	 * would matter most — Processes at 390px, which is one long table — inserting a row above the
 	 * reader moves the content 285px with this rule and 285px without it: those rows were never being
-	 * chosen anyway. */
+	 * chosen anyway.
+	 *
+	 * WHAT COVERS THAT PAGE INSTEAD is fs-fit.js, and it did not until recently: a page that is one
+	 * table has the table as a DIRECT child of `#view`, the theme's own reference climbs out of the
+	 * table to its parent, and the parent was the host — so the climb gave up and nothing held the
+	 * reader there on any engine. It anchors on the TABLE ITSELF in that case now. Its height is
+	 * what this rule calls falsified; where the box STARTS is decided by what sits above it, and that
+	 * is all a reference needs. Measured at 390px with the engine's anchoring suppressed: 120px of
+	 * growth above the fold moved the page 120px before, 0px after, on chromium, firefox and webkit
+	 * alike. */
 	.table.fs-dt { overflow-anchor: none; }
 
 	.cbi-section .table:is([id], .fs-dt) .tr:not(.table-titles):not(.placeholder):hover .td { background: var(--fs-panel2); }

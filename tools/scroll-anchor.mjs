@@ -47,12 +47,40 @@ const arg = (name, dflt) => {
 };
 const ENGINES = arg('engines', 'chromium').split(',').map((s) => s.trim()).filter(Boolean);
 const WIDTHS = arg('widths', '390,1440').split(',').map(Number);
-const PAGE = arg('page', '/admin/status/overview');
+/* TWO SHAPES, not one page, and the second is the one that was never measured. The Overview is
+ * sections with tables inside them; Processes is a single table that is a DIRECT child of `#view`.
+ * That difference decides which element the theme can anchor on — on the second shape the climb out
+ * of the table used to land on the host and give up, so nothing held the reader there at all, on
+ * every engine. The gate had only ever opened the first shape, which is why it passed for as long as
+ * the fault existed. `--page a,b` overrides. */
+const PAGES = arg('page', '/admin/status/overview,/admin/status/processes')
+	.split(',').map((p) => p.trim()).filter(Boolean);
 /* both layouts: they scroll different elements, and the correction has to find the right one */
 const LAYOUTS = [ 'side', 'top' ];
+/* AND EVERY DENSITY, because the axis moves the geometry this gate is about: type and spacing scale,
+ * so a section is a different height, the fold falls on a different element, and the hit test that
+ * finds the reference lands somewhere else. `--density normal` narrows it when iterating. */
+const DENSITIES = arg('density', 'normal,compact,large').split(',').map((d) => d.trim()).filter(Boolean);
 const GROWTH = 120;
 /* a rect edge lands on a fraction; two pixels is not a jump */
 const TOLERANCE = 2;
+
+/* PARK THE READER AND WAIT FOR THE THEME TO NOTICE, rather than for a stopwatch.
+ *
+ * A probe scrolls the page and then has to let the theme settle: fs-fit treats the reader as moving
+ * until SCROLL_IDLE (400ms) of stillness, and only then does it remember where the page stands —
+ * the reference every correction is measured against. Waiting a flat 1200ms for that is a race, and
+ * WebKit loses it: a programmatic `scrollTop` write there does not fire `scroll` on the next frame
+ * the way Chromium and Firefox do, it arrives up to 1.2 SECONDS later. The theme's sampler starts
+ * on that event, so it had not begun settling when the probe grew the page — the reference was the
+ * one from the top of the document, the correction refused it, and the gate reported a jump the
+ * theme is not responsible for (measured: three findings on WebKit, none on the other two engines,
+ * with the theme identical).
+ *
+ * So the wait is on the EVENT and then on the idle window, both bounded: the scroll is dispatched,
+ * we wait for the browser to tell us it happened (or give up after 2.5s), and then wait out
+ * SCROLL_IDLE with room to spare. Deterministic on all three engines, and no slower than before on
+ * the two that were already fast. */
 
 /* Runs in the page: park the reader, grow something above them, report what they saw. */
 const HOLD = async (growth) => {
@@ -67,10 +95,39 @@ const HOLD = async (growth) => {
 	const room = (sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - window.innerHeight);
 	if (room < 600) return { skip: 'page too short to scroll' };
 	const at = Math.min(Math.round(room / 2), 1600);
-	if (sc) sc.scrollTop = at; else window.scrollTo(0, at);
-	/* past SCROLL_IDLE (400ms): inside it the theme treats the reader as still moving and anchors
-	 * nothing on purpose, so a growth landing there would measure the guard instead of the anchor */
-	await wait(1200);
+	/* park the reader and wait for the ENGINE to say the scroll happened — see the note above */
+	const parkAt = async (y) => {
+		const target = sc || window;
+		const landed = new Promise((res) => {
+			let done = false;
+			const on = () => { if (!done) { done = true; target.removeEventListener('scroll', on); res(); } };
+			target.addEventListener('scroll', on, { passive: true });
+			setTimeout(() => { if (!done) { done = true; target.removeEventListener('scroll', on); res(); } }, 2500);
+		});
+		if (sc) sc.scrollTop = y; else window.scrollTo(0, y);
+		await landed;
+		/* AND THEN UNTIL THE THEME SAYS IT IS STILL, which is not the same as SCROLL_IDLE elapsing.
+		 * fs-fit starts its motion sampler on the scroll event and only remembers where the page
+		 * stands once that sampler has been quiet for SCROLL_IDLE; in WebKit the sampler starts late
+		 * enough that a flat wait measured the theme before it had a reference at all — the gate then
+		 * reported a jump on every WebKit run and none on the other two engines, with the theme
+		 * identical. Asking the theme removes the guess: `scrolling` is exported for exactly this
+		 * kind of question. */
+		try {
+			const fit = await window.L.require('fs-fit');
+			/* until the theme has taken a reference AT THIS OFFSET. "Is it scrolling" cannot answer
+			 * that: it says no both before the motion sampler starts and after it finishes, and in
+			 * WebKit those are 1.5s apart — the probe grew the page in between, while the theme still
+			 * had no reference, and the gate reported a jump on every WebKit run and none on the
+			 * other two engines with the theme identical on all three. */
+			for (let i = 0; i < 160; i++) {
+				if (fit.restAt() === (sc ? sc.scrollTop : window.scrollY) && !fit.scrolling()) break;
+				await wait(25);
+			}
+		} catch (e) { /* no module, fall back to the wait below */ }
+		await wait(600);		/* the still moment the theme measures from */
+	};
+	await parkAt(at);
 
 	/* THE HOST IS NOT A MARK, and taking it as one made this gate report a jump that was its own.
 	 * `#view` is a `.cbi-section` gap wide enough to hit at 390px, and `elementFromPoint` answers
@@ -79,12 +136,30 @@ const HOLD = async (growth) => {
 	 * with the engine's anchoring and with the theme's, and on the released build as well — the
 	 * instrument, not the theme. Two more rows are tried before giving up, because a gap is a gap
 	 * only at the y it was measured at. */
-	const markAt = (y) => {
-		const el = document.elementFromPoint(Math.round((window.innerWidth || 800) / 2), y);
-		return el && el !== view && view.contains(el) ? el : null;
+	/* the whole STACK at the point, not just the topmost element: in a grid gap the top of the
+	 * stack is `#view` itself — a host is not a mark, its own top does not move when something
+	 * grows INSIDE it — and the section that gap belongs to is right underneath it. Measured: on
+	 * 25.12's Overview every point down the middle answered `#view`, so all eight runs on that
+	 * release reported "no content under the reader" and measured nothing. */
+	const markAt = (y, x) => {
+		for (const el of document.elementsFromPoint(x, y))
+			if (el !== view && view.contains(el)) return el;
+		return null;
 	};
+	/* THE HIT IS TRIED ACROSS THE VIEWPORT, not at three points down its middle: a mark is anything
+	 * inside #view, and on 25.12's Overview the middle column is a grid gap for most of its height,
+	 * so all three of those points answered `#view` and every run on that release reported "no
+	 * content under the reader" and measured nothing — half the matrix, silently unmeasured. */
 	const h = window.innerHeight || 800;
-	const mark = markAt(Math.round(h * 0.6)) || markAt(Math.round(h * 0.5)) || markAt(Math.round(h * 0.7));
+	const vw = window.innerWidth || 800;
+	let mark = null;
+	for (const fy of [ 0.6, 0.5, 0.7, 0.4, 0.8, 0.35 ]) {
+		for (const fx of [ 0.5, 0.25, 0.75 ]) {
+			mark = markAt(Math.round(h * fy), Math.round(vw * fx));
+			if (mark) break;
+		}
+		if (mark) break;
+	}
 	if (!mark) return { skip: 'no content under the reader' };
 	const before = { pos: pos(), top: Math.round(mark.getBoundingClientRect().top) };
 
@@ -135,8 +210,39 @@ const SWAP = async (growth) => {
 
 	/* as far down as the page goes: what the reader loses to a clamp is what is left below them */
 	const at = room - 60;
-	if (sc) sc.scrollTop = at; else window.scrollTo(0, at);
-	await wait(1200);	/* past SCROLL_IDLE, so the theme has a reference from a still page */
+	/* park the reader and wait for the ENGINE to say the scroll happened — see the note above */
+	const parkAt = async (y) => {
+		const target = sc || window;
+		const landed = new Promise((res) => {
+			let done = false;
+			const on = () => { if (!done) { done = true; target.removeEventListener('scroll', on); res(); } };
+			target.addEventListener('scroll', on, { passive: true });
+			setTimeout(() => { if (!done) { done = true; target.removeEventListener('scroll', on); res(); } }, 2500);
+		});
+		if (sc) sc.scrollTop = y; else window.scrollTo(0, y);
+		await landed;
+		/* AND THEN UNTIL THE THEME SAYS IT IS STILL, which is not the same as SCROLL_IDLE elapsing.
+		 * fs-fit starts its motion sampler on the scroll event and only remembers where the page
+		 * stands once that sampler has been quiet for SCROLL_IDLE; in WebKit the sampler starts late
+		 * enough that a flat wait measured the theme before it had a reference at all — the gate then
+		 * reported a jump on every WebKit run and none on the other two engines, with the theme
+		 * identical. Asking the theme removes the guess: `scrolling` is exported for exactly this
+		 * kind of question. */
+		try {
+			const fit = await window.L.require('fs-fit');
+			/* until the theme has taken a reference AT THIS OFFSET. "Is it scrolling" cannot answer
+			 * that: it says no both before the motion sampler starts and after it finishes, and in
+			 * WebKit those are 1.5s apart — the probe grew the page in between, while the theme still
+			 * had no reference, and the gate reported a jump on every WebKit run and none on the
+			 * other two engines with the theme identical on all three. */
+			for (let i = 0; i < 160; i++) {
+				if (fit.restAt() === (sc ? sc.scrollTop : window.scrollY) && !fit.scrolling()) break;
+				await wait(25);
+			}
+		} catch (e) { /* no module, fall back to the wait below */ }
+		await wait(600);		/* the still moment the theme measures from */
+	};
+	await parkAt(at);
 
 	/* THE TALLEST SECTION BODY THAT IS ENTIRELY ABOVE THE VIEWPORT, and both halves of that matter.
 	 * Tall, because the clamp only bites when what the swap takes away is more than the room left
@@ -145,20 +251,52 @@ const SWAP = async (growth) => {
 	 * fold is a section the theme anchors INSIDE, and content growing below that anchor is content
 	 * that is supposed to move. Measured at 390px before this was pinned down: the theme put the
 	 * reference back exactly where it was and this still called the 120px below it a jump. */
+	/* WHAT A POLL ACTUALLY REPLACES, not one page's idea of it. This looked for `.cbi-section > div`
+	 * alone, which is the Overview's shape — and so the gate measured this fault on the Overview and
+	 * NOWHERE ELSE: Processes, Routes and the realtime pages are a TABLE inside the section, and
+	 * `L.ui.Table` refreshes by replacing its rows, which is the same collapse with a different
+	 * parent. Every one of those runs reported "no section body above the reader big enough to
+	 * collapse" and passed, on the engine where the fault is real. A `.table` body is added to the
+	 * list, and so is a bare `#view > *` for a view that builds neither. */
 	let body = null;
-	for (const el of view.querySelectorAll('.cbi-section > div')) {
-		if (el.getBoundingClientRect().bottom > 0) continue;
+	/* WHAT A POLL REPLACES, and nothing wider. `:scope > div` was in this list and it matched
+	 * `.fs-ovl` — the theme's own wrapper around System/Memory/Storage — so the probe deleted three
+	 * whole sections at once, which no poll does: the stock one refreshes a section's BODY in place
+	 * and never rebuilds the section, let alone the grid around it. The theme's reference lives
+	 * inside that grid, so removing all of it took the reference and its fallback together and the
+	 * gate reported a jump the theme could not have prevented. A section body, a table, a table's
+	 * body: those are the three things `dom.content()` is called on. */
+	for (const el of view.querySelectorAll('.cbi-section > div, .table > .tbody, .table')) {
+		if (el.getBoundingClientRect().bottom > 0) continue;		/* must be entirely above the reader */
+		if (el.contains(view) || el === view) continue;
 		if (!body || el.offsetHeight > body.offsetHeight) body = el;
 	}
-	if (!body || body.offsetHeight < 200) return { skip: 'no section body above the reader big enough to collapse' };
+	if (!body || body.offsetHeight < 200) return { skip: 'nothing above the reader big enough to collapse' };
 
-	const markAt = (y) => {
-		const el = document.elementFromPoint(Math.round((window.innerWidth || 800) / 2), y);
-		/* not the host itself — see markAt in HOLD above for the -120px it reported when it was */
-		return el && el !== view && view.contains(el) && !body.contains(el) ? el : null;
+	/* the whole STACK at the point, not just the topmost element: in a grid gap the top of the
+	 * stack is `#view` itself — a host is not a mark, its own top does not move when something
+	 * grows INSIDE it — and the section that gap belongs to is right underneath it. Measured: on
+	 * 25.12's Overview every point down the middle answered `#view`, so all eight runs on that
+	 * release reported "no content under the reader" and measured nothing. */
+	const markAt = (y, x) => {
+		for (const el of document.elementsFromPoint(x, y))
+			if (el !== view && view.contains(el) && !body.contains(el)) return el;
+		return null;
 	};
+	/* THE HIT IS TRIED ACROSS THE VIEWPORT, not at three points down its middle: a mark is anything
+	 * inside #view, and on 25.12's Overview the middle column is a grid gap for most of its height,
+	 * so all three of those points answered `#view` and every run on that release reported "no
+	 * content under the reader" and measured nothing — half the matrix, silently unmeasured. */
 	const h = window.innerHeight || 800;
-	const mark = markAt(Math.round(h * 0.6)) || markAt(Math.round(h * 0.5)) || markAt(Math.round(h * 0.7));
+	const vw = window.innerWidth || 800;
+	let mark = null;
+	for (const fy of [ 0.6, 0.5, 0.7, 0.4, 0.8, 0.35 ]) {
+		for (const fx of [ 0.5, 0.25, 0.75 ]) {
+			mark = markAt(Math.round(h * fy), Math.round(vw * fx));
+			if (mark) break;
+		}
+		if (mark) break;
+	}
 	if (!mark) return { skip: 'nothing under the reader that survives the swap' };
 	const before = { pos: pos(), top: Math.round(mark.getBoundingClientRect().top) };
 
@@ -284,8 +422,10 @@ for (const engine of ENGINES) {
 	if (!pw[engine]) { console.error(`scroll-anchor: no such engine "${engine}"`); process.exit(1); }
 	const browser = await pw[engine].launch();
 	for (const stand of list) {
+		for (const PAGE of PAGES)
 		for (const w of WIDTHS) {
 			for (const layout of LAYOUTS)
+			for (const density of DENSITIES)
 			for (const noEngineAnchor of [ false, true ]) {
 				const ctx = await browser.newContext({ viewport: { width: w, height: 844 } });
 				/* the Safari path, forced: `fsEngineAnchor=off` makes fs-fit believe the platform has
@@ -303,13 +443,17 @@ for (const engine of ENGINES) {
 				const page = await ctx.newPage();
 				await login(page, stand.base);
 				try {
-					await page.evaluate(async (l) => { (await window.L.require('fs-prefs')).applyLayout(l); }, layout);
+					await page.evaluate(async ([l, d]) => {
+						const prefs = await window.L.require('fs-prefs');
+						prefs.applyLayout(l);
+						prefs.applyDensity(d);
+					}, [ layout, density ]);
 					await page.goto(stand.base + PAGE, { waitUntil: 'domcontentloaded', timeout: 20000 });
 				}
 				catch (e) { await ctx.close(); continue; }
 				await page.waitForTimeout(3000);
 
-				const where = `${engine} ${stand.id} @${w} ${layout.padEnd(4)} ${noEngineAnchor ? 'engine-anchoring OFF' : 'engine-anchoring on '}`;
+				const where = `${engine} ${stand.id} @${w} ${layout.padEnd(4)} ${density.padEnd(7)} ${noEngineAnchor ? 'engine-anchoring OFF' : 'engine-anchoring on '} ${PAGE.replace('/admin/status/', '')}`;
 				let held, swap, quiet;
 				try {
 					held = await page.evaluate(HOLD, GROWTH);

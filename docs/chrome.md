@@ -232,9 +232,11 @@ of every aliased page missing.
 A poll tick changes the height of things above the reader — a station joins the associated list, a
 lease expires, an interface box grows a line — and everything below it moves. Chromium and Firefox
 hide that with **scroll anchoring**: they pick an element the reader can see and compensate the
-scroll offset so it stays put. **WebKit has never implemented it**, so on Safari and on every iPhone
-the same tick moves the page under the reader's thumb. That is what "the Overview jitters" was, and
-it is why it was reported from Safari and an iPhone while the same router was still in Chrome.
+scroll offset so it stays put. **WebKit did not implement it until recently**, so on an older Safari
+and on every iPhone of that vintage the same tick moves the page under the reader's thumb. That is
+what "the Overview jitters" was, and it is why it was reported from Safari and an iPhone while the
+same router was still in Chrome. A current WebKit does anchor — and gets a DIFFERENT half of this
+wrong; see "What an engine that anchors still gets wrong" below.
 
 `fs-fit.js` therefore does the job **only where nobody else is doing it**: `ENGINE_ANCHORS` asks the
 platform (`CSS.supports('overflow-anchor', 'auto')` — an engine that does not know the property does
@@ -308,14 +310,41 @@ reader was, nobody scrolling and the old stamp: every term of "the engine clampe
 router calls `fit.forgetRest()` at the reset rather than leaving the memo to be inferred from a stamp
 written afterwards.
 
-**Where the theme still does nothing, and what it costs.** `ENGINE_ANCHORS` asks whether the platform
-supports `overflow-anchor`, and a current WebKit answers yes — so the theme steps aside for it. Its
-anchoring is not the same as Chromium's: measured on both stands, both layouts and both widths with a
-section refilled the way a poll refills one and the reader 60px from the foot of the page, Chromium
-ends where it started and WebKit ends 60px lower. Closing that would mean keeping a resting reference
-on every engine, i.e. a hit test and two rects per settled pass — 3.8 ms on Chromium and 7 ms on
-WebKit with a poll-dirtied layout, once a second, on the phone this file spends its comments
-protecting. It is left to the engine, and written down here instead.
+**What an engine that anchors still gets wrong.** `ENGINE_ANCHORS` asks whether the platform supports
+`overflow-anchor`, and every current engine answers yes, WebKit included — so the theme steps aside
+from the growth case. Anchoring is not the same promise as "a section can vanish and come back",
+which is what `dom.content()` does on every tick: the container empties, the offset is clamped into a
+document that is briefly shorter, and what the engine does on the way back is its own business.
+Chromium lands where it started. WebKit OVERSHOOTS — measured on both stands, both layouts and both
+widths, a swap that grew a section by 120px moved the offset by 180, leaving the reader 60px up the
+page **on every tick**.
+
+**And the pages where nothing held the reader at all.** Two faults sat behind the same symptom, both
+of them in which ELEMENT the theme takes as its reference. `elementFromPoint` answers with `#view`
+itself wherever the hit lands in a gap between two sections — and the host's own top does not move
+when a poll changes something inside it, so the drift measured against it is zero on every tick, for
+ever. And a page that is ONE TABLE (Processes, Routes, the realtime lists) has that table as a direct
+child of `#view`: the climb out of the table — data tables are excluded as anchors, `30-tables.css`
+explains why — landed on the host and gave up, leaving no reference at all. Since the stylesheet also
+(correctly) tells the engine not to anchor inside those tables, nobody was holding the reader there on
+ANY engine: measured at 390px, 120px of growth above the fold moved the page 120px on chromium,
+firefox and webkit alike. The host is now refused as a reference and the hit is retried down the
+viewport; where the climb would reach the host, the TABLE ITSELF is the reference — its height is
+falsified by the fit pass, its top is not.
+
+`lateDrift()` closes the overshoot without asking who the engine is. Two frames after a mutation — long enough
+for the engine to have finished its own correction — the reference the theme was holding is asked
+where it is now. An engine that got it right reports zero and nothing happens; what is left over is
+what nobody put back, and that is what is given back. Two things it is deliberately NOT: a browser
+test (`CSS.supports` can no longer separate the two behaviours), and a synthetic probe that performs
+the collapse itself (it calls Firefox broken, because a real page puts layout and a frame between the
+collapse and the refill; gating on it cost Chromium and Firefox 15px of drift they did not have).
+
+The price is a resting reference on every engine — a hit test and a rect per settled pass, measured
+on the stands at **0.2 ms typical and 6 ms worst** on a poll-dirtied WebKit layout, never during a
+flick, and skipped entirely while the page is at offset 0 (nothing to be put back to). It fires only
+on a single-shot offset change: `streaming()` — more than one offset change inside one stretch of
+movement — and a user gesture both keep it out, so a correction can never land inside a scroll.
 
 `tools/scroll-anchor.mjs` holds all of it: it grows 120px above the reader and requires the page to
 stay within two pixels, once with the engine's anchoring suppressed and once without, in both
@@ -323,7 +352,11 @@ layouts; it refills a section the way a poll does — emptied, then filled again
 poll held for the duration — and requires the same; and it flicks the page up and down to prove the
 theme corrects nothing while the reader is moving. With the fallback removed the Safari case reports
 exactly the reported symptom — 120px of page moved under the reader, 255px on the swap measured in
-WebKit with the engine's own anchoring off, and 690px on a real Overview on the stands.
+WebKit with the engine's own anchoring off, and 690px on a real Overview on the stands. It runs on
+`chromium,firefox,webkit` in CI now, because the fault above lives on the path a stand-in engine does
+not take, and it waits on `fit.restAt()` rather than on a stopwatch: WebKit starts its motion sampler
+late enough that a flat wait measured the theme before it had a reference at all, which reported a
+jump on every WebKit run with the theme identical on all three engines.
 
 ## `fs-select.js`
 

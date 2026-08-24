@@ -232,6 +232,19 @@
 	 * .cbi-title-buttons`; Status → Channel Analysis puts "Refresh Channels" there, a
 	 * third-party app may put anything). Nothing gave it a bottom margin, so it sat flush
 	 * against the first .cbi-section below and read as part of that card instead of as a
-	 * page-level action. Same 16px every .cbi-section already uses. */
-	.cbi-title-buttons { margin-bottom: var(--fs-card-gap); }
+	 * page-level action. Same 16px every .cbi-section already uses.
+	 *
+	 * And a TOP margin for the same reason at the other edge: the row sits directly under the page
+	 * heading with nothing between them — measured at 0px on Status → Channel Analysis, where
+	 * "Refresh Channels" touched the "Channel Analysis" title (reported upstream against v0.14).
+	 * Half the bottom gap, because a heading and its own action belong together; the full one would
+	 * read as a separate block. */
+	.cbi-title-buttons { margin-block: var(--fs-space-2) var(--fs-card-gap); }
+
+	/* The per-section Delete button (`.cbi-section-remove`, what luci-base renders for every NAMED
+	 * section: SQM's queues, the firewall's zones, any app that lets you add and drop instances) sat
+	 * flush against whatever follows it — usually that section's own tab bar. Reported upstream on
+	 * SQM, but nothing here is about SQM: it is one class luci-base gives every such section, and
+	 * the gap belongs to the pattern rather than to the page. */
+	.cbi-section-remove { margin-bottom: var(--fs-space-2); }
 }

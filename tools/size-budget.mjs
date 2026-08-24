@@ -58,8 +58,23 @@ const LIMITS = {
 	 * 23.05: `ui.RangeSlider` arrived in 24.10, and on the older release its absence took the whole
 	 * Appearance tab with it. A widget the theme only uses where luci-base has none is the cheapest
 	 * form of that support — the alternative was dropping a release that still ships on a lot of
-	 * hardware. */
-	resourcesJs: 88_500,
+	 * hardware.
+	 *
+	 * 89,270 B measured 2026-08-24. The last 770 B keep the reader's place on the two cases the
+	 * engine's own scroll anchoring does not cover, both of them measured on the stands rather than
+	 * assumed: a WebKit that overshoots a section swap by 60px on every tick (it ships anchoring now,
+	 * so `CSS.supports` can no longer tell it apart from Chromium — the drift is measured two frames
+	 * after the mutation instead), and a page that is one long table, where the theme's reference
+	 * climbed out of the table onto `#view` itself and no correction could ever fire. A page that
+	 * creeps 60-120px under the reader once a second is not a page anybody reads.
+	 *
+	 * 89,771 B measured 2026-08-24, and the last 371 B are the same fault's third face: the reference
+	 * itself. A hit that lands in a gap answers with `#view`, one above the first section answers with
+	 * `.fs-content`, and both used to end the search — so on 25.12's Overview at 1440 the theme held
+	 * no reference at all. Searching the element STACK and stepping down the viewport is what buys a
+	 * reference on every page shape, and a surviving ancestor beside it is what keeps one when the
+	 * tick replaces the element it was taken on. */
+	resourcesJs: 89_900,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the
 	 * router is also routing packets over: the same set minus the page modules, which are required
 	 * only on the one page each belongs to (tools/page-modules.mjs). 72,499 B measured 2026-08-20,
@@ -69,8 +84,14 @@ const LIMITS = {
 	 * The last 252 B of it are the three Status→Overview template globals, which moved OUT of the
 	 * page module and into the chrome bootstrap: a page module is required during the navigation
 	 * that needs it, and a stock include calling `renderBadge` before it lands throws. Ordering is
-	 * not something a page module can promise, so the bytes buy it on every page. */
-	coldJs: 73_000,
+	 * not something a page module can promise, so the bytes buy it on every page.
+	 *
+	 * 73,481 B measured 2026-08-24: fs-fit.js is a chrome module, so the 481 B of the anchoring fixes
+	 * above that land in it are downloaded on every page — which is also where they are needed, since
+	 * every page with a poll on it can drift.
+	 *
+	 * 73,982 B measured 2026-08-24 — the reference search above, in the same chrome module. */
+	coldJs: 74_100,
 };
 
 function bytes(path) {

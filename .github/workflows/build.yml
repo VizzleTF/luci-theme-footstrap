@@ -299,12 +299,17 @@ jobs:
       # differences it covers are checked locally before a release (docs/development.md).
       - run: node tools/scroll-jank.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
       # The two things a poll tick can do to a page nobody is touching: lay out a replaced table
-      # before anything answered for it, and move the page under the reader. The second one is a
-      # WebKit fault by nature — no engine there implements scroll anchoring — and it is still
-      # checked here on chromium, because the gate forces the theme's own fallback on with the
-      # engine's anchoring suppressed, which is the same code path Safari takes.
+      # before anything answered for it, and move the page under the reader.
       - run: node tools/table-tick.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
-      - run: node tools/scroll-anchor.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
+      # ON WEBKIT AND FIREFOX TOO, and that is not thoroughness for its own sake: the second fault
+      # used to be described here as "a WebKit fault by nature, no engine there implements scroll
+      # anchoring", and chromium with the engine's anchoring suppressed was taken as standing in for
+      # Safari. WebKit has since SHIPPED anchoring — so it takes the other path now, the one where
+      # the theme stands down — and on that path it overshoots a section swap by 60px per tick,
+      # which the stand-in could not see. Measured on 24.10, both layouts, 390 and 1440.
+      - name: install the other engines
+        run: npx playwright install --with-deps webkit firefox
+      - run: node tools/scroll-anchor.mjs --engines chromium,firefox,webkit --only "$(echo $ROUTERS | tr ' ' ,)"
 
       # LAST, because it installs the PUBLISHED release over the build the steps above measured —
       # and that is the claim: what a user runs is install.sh against the feed, not `apk add` against

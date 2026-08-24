@@ -80,6 +80,35 @@
 		/* @endmirror */
 	}
 
+	/* ...AND BACK ABOVE THE BAR ONCE THAT COLUMN BECOMES A CARD.
+	 *
+	 * The rule above puts the value BESIDE the bar because a table column shares its row with other
+	 * columns and a value floated over the bar would land on the row divider. A carded row is not
+	 * that: `.fs-stacked` gives each cell half the card, so "beside" is outside the cell — the value
+	 * ran across the neighbouring column and over the label above it. Reported twice from a phone
+	 * (`RSSI: 52% (-59dBm)` sitting on SIGNAL STRENGTH and on the Transferred figures next to it),
+	 * on luci-mod-dashboard's Wireless list, at every density.
+	 *
+	 * So the card puts it back where the default has it — over the bar's far edge, on the line the
+	 * label already owns — and buys that line: the bar takes a top margin of one --fs-type-xs line,
+	 * so the value sits between the label and the bar instead of on either. Measured at 390px on all
+	 * three densities: 6-9px of overlap before, none after.
+	 *
+	 * The selector carries `:has(.tr.table-titles)` for specificity alone: that is what the beside-rule
+	 * above matches on, and `:has()` counts its argument — (0,6,0) — so a plainer selector here lost
+	 * and the value stayed beside the bar (measured: `margin-inline-end` still 40px). The title row
+	 * is still in the DOM when the table is carded; the card only hides it. */
+	.cbi-section .table.fs-stacked:has(.tr.table-titles) .td .cbi-progressbar {
+		margin-inline-end: 0;
+		margin-block-start: calc(var(--fs-type-xs) * var(--fs-leading));
+	}
+	.cbi-section .table.fs-stacked:has(.tr.table-titles) .td .cbi-progressbar::after {
+		inset-inline: auto 0;
+		bottom: calc(100% + var(--fs-space-1));
+		top: auto;
+		transform: none;
+	}
+
 	/* Progressbar rows in a section table (luci-app-cpu-status): keep the native label | bar
 	 * row, just centre the cells vertically. */
 	.cbi-section .table:not([id]):not(.cbi-section-table) .tr:has(.cbi-progressbar) .td { vertical-align: middle; }
