@@ -302,14 +302,10 @@ jobs:
       # before anything answered for it, and move the page under the reader.
       - run: node tools/table-tick.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
       # ON WEBKIT AND FIREFOX TOO, and that is not thoroughness for its own sake: the second fault
-      # used to be described here as "a WebKit fault by nature, no engine there implements scroll
-      # anchoring", and chromium with the engine's anchoring suppressed was taken as standing in for
-      # Safari. WebKit has since SHIPPED anchoring — so it takes the other path now, the one where
-      # the theme stands down — and on that path it overshoots a section swap by 60px per tick,
-      # which the stand-in could not see. Measured on 24.10, both layouts, 390 and 1440.
-      - name: install the other engines
-        run: npx playwright install --with-deps webkit firefox
-      - run: node tools/scroll-anchor.mjs --engines chromium,firefox,webkit --only "$(echo $ROUTERS | tr ' ' ,)"
+      # Chromium here; the other two engines have a job of their own (`anchors`), because the
+      # three-engine matrix takes longer than this job's whole budget — it was cancelled at 45
+      # minutes with the sweep still running.
+      - run: node tools/scroll-anchor.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
 
       # LAST, because it installs the PUBLISHED release over the build the steps above measured —
       # and that is the claim: what a user runs is install.sh against the feed, not `apk add` against
@@ -320,11 +316,59 @@ jobs:
       - if: always()
         run: owlab down || true
 
-  # The only job that holds a key, and `needs: [build, verify, live]` is what keeps a tag
+  # THE OTHER TWO ENGINES, on a clock of their own.
+  #
+  # This used to be one more step inside `live`, and it did not fit: three engines across two
+  # routers, two page shapes, two widths, both layouts and all three densities is ~290 measurements,
+  # and the job was cancelled at its 45-minute limit with the sweep still going. Splitting it is not
+  # a way of running less — the whole matrix runs — it is a way of running it beside the rest rather
+  # than inside somebody else's budget.
+  #
+  # WHY THE OTHER ENGINES AT ALL: the fault this gate now hunts lives on the path an engine takes
+  # when it DOES anchor. WebKit shipped anchoring, so chromium-with-anchoring-suppressed no longer
+  # stands in for Safari, and on that path WebKit overshoots a section swap by 60px per tick.
+  # Measured on 24.10, both layouts, 390 and 1440.
+  anchors:
+    name: The reader stays put on every engine
+    timeout-minutes: 75
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: sh tools/ci-playwright.sh
+      - run: npx playwright install --with-deps webkit firefox
+      - uses: actions/download-artifact@v8
+        with:
+          name: owfeed-packages
+          path: dist/
+      - uses: owfeed/owlab/setup@v0.5.3
+        with:
+          version: v0.5.3
+      - name: Boot the routers and install this build
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410"; fi
+          echo "ROUTERS=$ROUTERS" >> "$GITHUB_ENV"
+          owlab up $ROUTERS
+          for r in $ROUTERS; do
+            case "$r" in
+              *2512|*snap) owlab install "$r" dist/noarch/luci-theme-footstrap-*.apk ;;
+              *)           owlab install "$r" dist/all/luci-theme-footstrap_*.ipk ;;
+            esac
+          done
+      - run: node tools/scroll-anchor.mjs --engines firefox,webkit --only "$(echo $ROUTERS | tr ' ' ,)"
+      - if: always()
+        run: owlab down || true
+
+  # The only job that holds a key, and `needs: [build, verify, live, anchors]` is what keeps a tag
   # from publishing a package no router has installed.
   release:
     name: Sign and publish
-    needs: [build, verify, live]
+    needs: [build, verify, live, anchors]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
