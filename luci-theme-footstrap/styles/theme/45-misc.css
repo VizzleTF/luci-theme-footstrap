@@ -260,8 +260,12 @@
 	 * Written against what a map contains rather than against that app: the exclusions are the
 	 * children luci-base itself puts there and which own their spacing already — the map heading and
 	 * its description, the page's action bar, a tabbed map's tab bar and its pane, and sections. Anything else is a block the view built,
-	 * and it gets the same 16px as a card. */
-	.cbi-map > *:not(.cbi-section):not(.cbi-map-descr):not(.cbi-page-actions):not(h2):not(legend):not(.cbi-tabmenu):not(.cbi-map-tabbed) {
+	 * and it gets the same 16px as a card.
+	 *
+	 * `:not(:empty)` because a map can hold a placeholder that renders nothing — Status → Realtime →
+	 * Wireless mounts an empty `<div>` for its graphs — and a gap under a box of zero height is a gap
+	 * out of nowhere (measured: 0px tall, 16px of margin, on that page alone). */
+	.cbi-map > *:not(.cbi-section):not(.cbi-map-descr):not(.cbi-page-actions):not(h2):not(legend):not(.cbi-tabmenu):not(.cbi-map-tabbed):not(:empty) {
 		margin-bottom: var(--fs-card-gap);
 	}
 }
