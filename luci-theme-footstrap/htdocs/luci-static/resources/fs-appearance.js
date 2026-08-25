@@ -763,11 +763,35 @@ function tabGroup(view) {
  * Idempotent through the marker: an observer fires for every mutation, and the form's own
  * construction is a mutation. Without the check it would append itself for as long as it kept
  * noticing itself. */
+/* WHAT WAKES THIS UP WHEN NOTHING ELSE WILL.
+ *
+ * The observer below fires on mutations, and the tab group's readiness is not always one: a map
+ * redraw (Save, without Apply) takes the pane and the tab away with the old group and builds a new
+ * one, and `ui.tabs` stamps `data-initialized` on it as an ATTRIBUTE change that can land after the
+ * last childList change. mount() then found no group, returned, and nothing mutated #view again —
+ * the tab was simply missing until the next navigation. Reported from the field on 25.12.5, on
+ * Chrome and on iOS, as "sometimes it disappears after Save" (openwrt/luci#8903).
+ *
+ * Two answers, because the attribute alone would still depend on ui.tabs stamping it that way: the
+ * observer now watches that attribute, AND a miss schedules a few retries on a widening delay. The
+ * retries stop as soon as the tab is up, and they cost nothing on the path where the first attempt
+ * works — which is every path measured before this. */
+const RETRIES = [ 0, 60, 150, 300, 600, 1200 ];
+let _retryTimer = 0, _retryAt = 0;
+function retryMount() {
+	if (_retryTimer) return;
+	if (_retryAt >= RETRIES.length) return;
+	const delay = RETRIES[_retryAt++];
+	_retryTimer = window.setTimeout(() => { _retryTimer = 0; mount(); }, delay);
+}
+
 function mount() {
 	const view = document.getElementById('view');
-	if (!view || view.querySelector('.' + MARK) || _building) return;
+	if (!view || !onPage()) return;
+	if (view.querySelector('.' + MARK)) { _retryAt = 0; return; }
+	if (_building) return;
 	const tabs = tabGroup(view);
-	if (!tabs) return;
+	if (!tabs) { retryMount(); return; }
 	_building = true;
 	render()
 		.then((form) => {
@@ -810,7 +834,12 @@ function watch() {
 	if (_viewObserver || !view || !onPage()) return;
 	_observedView = view;
 	_viewObserver = new MutationObserver(mount);
-	_viewObserver.observe(view, { childList: true, subtree: true });
+	/* `data-initialized` is in the filter because it is the moment the group becomes usable, and it
+	 * is not always accompanied by a childList change (see retryMount above). */
+	_viewObserver.observe(view, {
+		childList: true, subtree: true,
+		attributes: true, attributeFilter: [ 'data-initialized' ],
+	});
 	mount();
 	/* A DEADLINE on the one failure that is otherwise perfectly silent. tabGroup() reads three
 	 * private ui.tabs facts — the `data-initialized` marker, the `cbi-tabmenu` class on the menu it
@@ -822,6 +851,11 @@ function watch() {
 	window.setTimeout(() => {
 		const v = document.getElementById('view');
 		if (!onPage() || !v || v.querySelector('.' + MARK) || _building) return;
+		/* one last attempt before saying it cannot be done: the complaint below is about ui.tabs
+		 * having changed shape, and that is only true if a fresh look still finds no group */
+		_retryAt = 0;
+		mount();
+		if (v.querySelector('.' + MARK) || _building || tabGroup(v)) return;
 		console.error('footstrap: the Appearance tab could not be attached — this page has tabs, but '
 			+ 'ui.tabs no longer marks them the way fs-appearance.js looks for. Every Appearance axis '
 			+ 'is unreachable until that is updated.');

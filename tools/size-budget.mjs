@@ -89,8 +89,15 @@ const LIMITS = {
 	 * above that land in it are downloaded on every page — which is also where they are needed, since
 	 * every page with a poll on it can drift.
 	 *
-	 * 73,982 B measured 2026-08-24 — the reference search above, in the same chrome module. */
-	coldJs: 74_100,
+	 * 73,982 B measured 2026-08-24 — the reference search above, in the same chrome module.
+	 *
+	 * 74,114 B measured 2026-08-25. Two fixes in fs-appearance.js and fs-fit.js, both reported from
+	 * the field: the Appearance tab was sometimes missing after a Save, because a map redraw rebuilds
+	 * the tab group and ui.tabs marks it ready with an attribute the observer was not watching; and
+	 * the residual anchoring correction did nothing on the tick it exists for, since `dom.content()`
+	 * replaces the element the reference was taken on and the surviving section beside it was never
+	 * used. 132 B for a tab that comes back and a page that does not creep. */
+	coldJs: 74_200,
 };
 
 function bytes(path) {
