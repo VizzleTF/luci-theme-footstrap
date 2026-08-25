@@ -55,10 +55,10 @@
 	 text printed to an UNAUTHENTICATED page, and one containing `&` broke entity parsing here
 	 before it broke anything else (see the <title> note in partials/head.ut).
 
-	 A <p> and NOT a heading: the card's h2 is `Authorization Required` and stays the page's one
+	 A <p> and NOT a heading: the card's h1 is `Authorization Required` and stays the page's one
 	 heading. An outline is about the page's SUBJECT, and a heading above that one would announce
 	 the login form as two sections — a screen reader walking the headings would hear the router's
-	 name as a section title with the form nested under it. It is printed above the h2 and centred
+	 name as a section title with the form nested under it. It is printed above the h1 and centred
 	 (10-login.css) because that is where a reader looks for "which box is this", not because it
 	 outranks anything.
 	-#}

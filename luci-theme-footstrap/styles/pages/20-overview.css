@@ -356,12 +356,10 @@
 		 * 119 -> 109 at Large. It stays on the density axis; it is off the type
 		 * LADDER because the ladder has no rung here, and a figure that is read as a pair of
 		 * numbers beside a label tolerates the step that body text would not. */
-		/* The plain form is the FALLBACK, and the rounded one lives in the `@supports` below — the
-		 * same shape 02-tokens.css uses for the type ladder and for the same reason: an engine
-		 * without `round()` drops the whole declaration, flag included, and the figures then inherit
-		 * a size that was never chosen for them. Stating both here instead reads as one declaration
-		 * shadowing another, which is what `audit --strict` exists to catch. */
-		font-size: calc(10px * var(--fs-density-type)) !important;
+		/* The token, not a literal: --fs-type-2xs is one step below the ladder's smallest and exists
+		 * for these figures (02-tokens.css says why, and rounds it where round() exists). The flag
+		 * fights 29_ports.js's inline `font-size:80%`. */
+		font-size: var(--fs-type-2xs) !important;
 		color: var(--fs-dim);
 		/* the tight leading, not the body one: these are two lines of figures read as a block, and
 		 * --fs-leading (1.5) spent 5px of card height on the space between them. */
@@ -382,14 +380,6 @@
 	 * load, Network connections, …): label + value on one line, bar below. Keyed off the
 	 * progressbar (:has), not per-section, so it covers every such row — including a
 	 * third-party one. The bar itself is theme/25-progressbar.css. */
-	/* the rounded size, where the function exists: a fractional density lands on a whole pixel
-	 * instead of a blurred one. Split from the rule above so the fallback survives without it. */
-	@supports (width: round(1px, 1px)) {
-		body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container {
-			font-size: calc(round(10px * var(--fs-density-type), 1px)) !important;
-		}
-	}
-
 	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)):has(.cbi-progressbar) { display: block; }
 	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) {
 		display: grid;

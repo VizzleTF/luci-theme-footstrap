@@ -337,6 +337,14 @@
 		 * font-size and 5733 line-height declarations are lost, and --fs-control-h takes every
 		 * field's min-height with it because it reads --fs-type. Declared this way such an engine
 		 * keeps the whole ladder and pays a fractional pixel at the two non-default densities. */
+		/* One step BELOW the ladder's smallest, and it exists for one measured reason: the Port
+		 * status card's traffic figures. They are the widest thing a card must fit whole, so their
+		 * size is what sets how narrow a card may be — at --fs-type-xs the floor is 106px, at 10px
+		 * it is 94px, which is what turns ten cards plus a lonely eleventh into one row of eleven.
+		 * A figure read as a pair of numbers beside a label tolerates the step that body text would
+		 * not. Declared here rather than as a literal in the page rule so the density axis stays in
+		 * one place. */
+		--fs-type-2xs: calc(10px * var(--fs-density-type));
 		--fs-type-xs: calc(11px * var(--fs-density-type));	/* eyebrow, badges, tooltips, dense metadata */
 		--fs-type: calc(13px * var(--fs-density-type));		/* body, tables, fields, menu items — the base */
 		--fs-type-lg: calc(16px * var(--fs-density-type));	/* section titles (h3/legend), alert headings */
@@ -575,6 +583,7 @@
 	 * where a length is expected, and `width` is the plainest property that takes one. */
 	@supports (width: round(1px, 1px)) {
 		:root {
+			--fs-type-2xs: calc(round(10px * var(--fs-density-type), 1px));
 			--fs-type-xs: calc(round(11px * var(--fs-density-type), 1px));
 			--fs-type: calc(round(13px * var(--fs-density-type), 1px));
 			--fs-type-lg: calc(round(16px * var(--fs-density-type), 1px));
