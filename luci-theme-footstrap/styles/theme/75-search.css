@@ -9,6 +9,8 @@
 	 * it is the absence of light behind a dialog, not a tint of any palette token. */
 	.fs-search-ov {
 		position: fixed; inset: 0; z-index: var(--fs-z-popover);
+		/* `display` here is what the `hidden` attribute has to beat — base/10-reset.css does that for
+		 * every element now, so this file no longer restates it for the overlay alone. */
 		display: flex; justify-content: center;
 		/* not centred vertically: the box grows DOWNWARD as results come in, and a centred one
 		 * would slide the input out from under the user's eyes on every keystroke */
@@ -17,7 +19,6 @@
 		background: var(--fs-scrim);
 		animation: fs-fade var(--fs-dur-fade);
 	}
-	.fs-search-ov[hidden] { display: none; }
 
 	/* The dialog itself. It is a SCROLL CONTAINER, and that is not decoration: without a cap the
 	 * box grows past a short viewport (a phone in landscape is ~380px tall) and the rows at the
