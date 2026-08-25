@@ -285,18 +285,31 @@ function noteMotion() {
  * inspect, and gating it on `scrolling()` made it fire never (measured: `late:busy` on every tick,
  * because the engine's own correction starts the motion sampler). A gesture is what says the reader
  * is driving, so the gesture is what it asks about. `mousedown` is in the list for the scrollbar
- * thumb and `keydown` for Page Down, neither of which produces a wheel or a touch. */
+ * thumb and `keydown` for Page Down, neither of which produces a wheel or a touch — but those two
+ * answer THIS question only, never `scrolling()`; see the note on the listeners below. */
 let _userUntil = 0;
-function noteUser() {
+function noteIntent() {
 	_userUntil = Date.now() + SCROLL_IDLE;
+}
+function noteUser() {
+	noteIntent();
 	noteMotion();
 }
 
 (function watchMotion() {
 	const opts = { passive: true, capture: true };
 	window.addEventListener('scroll', noteMotion, opts);
-	for (const name of [ 'wheel', 'touchstart', 'touchmove', 'mousedown', 'keydown' ])
+	/* a gesture that IS the scroll: it says both "the reader is driving" and "the page is moving" */
+	for (const name of [ 'wheel', 'touchstart', 'touchmove' ])
 		window.addEventListener(name, noteUser, opts);
+	/* INTENT ONLY. A scrollbar drag and a Page Down do move the page, but they say so themselves —
+	 * both fire `scroll`, which is wired to `noteMotion` above. Feeding them to `noteMotion` as well
+	 * would make `scrolling()` answer yes for 400ms after ANY click and EVERY keystroke, and that
+	 * answer gates every pass in this file that reads layout: measured while typing into a form with
+	 * the window resizing under it, 9 of 10 floor and reference passes were skipped and landed in one
+	 * burst afterwards — the exact failure the note above SCROLL_IDLE describes. */
+	for (const name of [ 'mousedown', 'keydown' ])
+		window.addEventListener(name, noteIntent, opts);
 })();
 
 /* Next frame, at most once per frame (rule 3). */
@@ -443,12 +456,12 @@ function rememberRest() {
 	_rest = ref ? { el: ref.el, top: ref.top, at: _restAt, sec: ref.sec, secTop: ref.secTop } : null;
 }
 
-/* -> the reference to correct against: the pre-mutation one where the engine leaves that to us, the
- * post-mutation one everywhere else, which is what this file has always used. A remembered
- * reference is worth using only while it still describes the reader's position — an element that
- * left the document, or that the reader has since scrolled a screen away from, is not one. */
+/* -> the reference to correct against, on the path where the ENGINE does no anchoring of its own.
+ * That is the only caller: where the engine anchors, the mutation observer holds the pre-mutation
+ * reference itself and hands it to `lateDrift()` instead. A remembered reference is worth using
+ * only while it still describes the reader's position — an element that left the document, or that
+ * the reader has since scrolled a screen away from, is not one. */
 function anchorFor() {
-	if (ENGINE_ANCHORS) return anchorRef();
 	const at = scrollTop();
 	/* AN OFFSET THAT DROPPED WITH NOBODY SCROLLING, ON THE PAGE IT WAS TAKEN ON, IS A CLAMP.
 	 * All three of those conditions are load-bearing. A clamp only ever moves the offset DOWN — it is the
