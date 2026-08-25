@@ -59,8 +59,18 @@ const LIMITS = {
 	 * every <text>, for the black background that file assumes. On a light palette the labels land
 	 * at 1.16:1 against the panel this theme paints behind them, which is legible only as the halo
 	 * around the digits; the fill has to follow --fs-text and the halo has to go, and neither can be
-	 * done from a cascade layer. */
-	importants: 30,
+	 * done from a cascade layer.
+	 *
+	 * Raised 30 -> 31 for `[hidden]` in base/10-reset.css, and this one's adversary is NOT an inline
+	 * style: it is every `display` this theme sets on a class, present and future. `hidden` is the
+	 * platform's own way for a view to say an element is not there — `el.hidden = true`, no CSS
+	 * involved, the only mechanism available to an app that ships no stylesheet — and the UA gives
+	 * it the weakest `display: none` there is, so `.tr`, `.td`, `ul.nav > li`, `.cbi-page-actions`
+	 * and `.ifacebox` all painted a hidden element anyway (measured). No layer can hold that: the
+	 * page layer already carries id-specific `display` rules ([1,7,0] is this file's own ceiling),
+	 * and a rule written tomorrow would re-open the hole. Same family as the forcing utilities base
+	 * is already exempt for — a declaration whose whole job is to outrank the theme's own paint. */
+	importants: 31,
 	/* The widest selector the theme needs; see the layer rules in docs/conventions.md.
 	 *
 	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`. Not sprawl:

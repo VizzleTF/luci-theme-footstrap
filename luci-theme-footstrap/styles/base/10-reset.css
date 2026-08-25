@@ -27,6 +27,21 @@
 		list-style: none;
 	}
 
+	/* `hidden` is the platform's way for a VIEW to say an element is not there, and it is the only
+	 * one available to code that ships no stylesheet — `el.hidden = true`, no CSS involved. The UA
+	 * gives it `display: none` at the weakest possible strength, so any `display` a theme sets on a
+	 * class beats it and the element paints anyway: measured here on `.tr` (table-row), `.td`
+	 * (table-cell), `ul.nav > li` (block), `.cbi-page-actions` (flex) and `.ifacebox` (inline-flex).
+	 * Not one stock page trips it today — LuCI only ever hides elements this theme gives no display
+	 * to — which is exactly why it stayed invisible until an app hid a table row and got a visible
+	 * one back.
+	 *
+	 * The flag is the point, not a workaround for a layer mistake: this must outrank every display
+	 * in tokens/base/theme/page at once, including the id-specific ones in the page layer, and it
+	 * has to keep doing so for rules not written yet. `until-found` is excluded because there
+	 * `display: none` would break the find-in-page reveal the value exists for. */
+	[hidden]:not([hidden="until-found"]) { display: none !important; }
+
 	html {
 		font-size: 100%;
 		height: 100%;
