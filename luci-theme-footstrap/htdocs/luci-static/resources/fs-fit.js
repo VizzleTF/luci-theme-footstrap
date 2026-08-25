@@ -678,14 +678,31 @@ function lateDrift(ref) {
 			 * reader driving (a gesture), and is the offset STREAMING (moving repeatedly, which a
 			 * one-shot compensation never does but a scroll always does). Either one means hands off. */
 			if (!anchorEnabled() || Date.now() < _userUntil || (scrolling() && _steps > 1)) return;
-			if (!ref.el.isConnected || _restPage !== pageStamp()) return;
-			const drift = ref.el.getBoundingClientRect().top - ref.top;
+			if (_restPage !== pageStamp()) return;
+			/* THE TICK USUALLY REPLACES THE ELEMENT THIS WAS TAKEN ON. `dom.content()` swaps a
+			 * section's children, so the node the hit test landed on is gone by the time this runs;
+			 * the section around it is not, and `rememberRest()` stores it for exactly this. Without
+			 * the fallback the correction returned having done nothing on the tick it exists for.
+			 * Same reference, one level out: a section that survived the swap moved by whatever the
+			 * engine failed to put back. */
+			let el = ref.el, was = ref.top;
+			if (!el || !el.isConnected) {
+				if (!ref.sec || !ref.sec.isConnected || ref.secTop == null) return;
+				el = ref.sec; was = ref.secTop;
+			}
+			const drift = el.getBoundingClientRect().top - was;
 			if (Math.abs(drift) < 1) return;			/* the engine put it back */
 			if (Math.abs(drift) > (window.innerHeight || 800)) return;
 			const sc = scroller();
 			const at = sc ? sc.scrollTop : window.scrollY;
 			if (sc) sc.scrollTop = at + drift; else window.scrollTo(0, at + drift);
-			/* the write may have been clamped short; the reader is where they are now */
+			/* THE OFFSET IS BROUGHT FORWARD; THE REFERENCE DOES NOT NEED TO BE. The write moves the
+			 * page by exactly the drift just measured, which puts the reference back at the top it
+			 * was remembered at — so `_rest.top` still describes where it stands and the next tick
+			 * measures zero, not the same drift twice. `_restAt` is the one field the write does
+			 * change (and the write may have been clamped short), so it is re-read here rather than
+			 * assumed. `rememberRest()` cannot do this job: the write starts the motion sampler, and
+			 * that function returns early while the page is moving. */
 			_restAt = scrollTop();
 		});
 	});

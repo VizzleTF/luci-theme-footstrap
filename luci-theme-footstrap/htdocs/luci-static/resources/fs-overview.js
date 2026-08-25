@@ -55,13 +55,15 @@ let _wrapEl = null;
 
 /* A PORT NAME THE CARD HAD TO CUT IS STILL READABLE ON HOVER.
  *
- * styles/pages/20-overview.css clamps a port card's name to two lines with an ellipsis — that is
- * what lets every card be 99px wide instead of as wide as the longest interface name on the device.
- * The name is the one thing on the card that cannot be guessed from the rest of it, so the element
- * carries its own full text as a native tooltip.
+ * styles/pages/20-overview.css cuts a port card's name at one line with an ellipsis (`white-space:
+ * nowrap` comes from base/95-luci.css; what the page rule adds is `min-width: 0` and the pair that
+ * makes the overflow readable) — that is what lets every card take the width the row can spare
+ * instead of the width of the longest interface name on the device. The name is the one thing on
+ * the card that cannot be guessed from the rest of it, so the element carries its own full text as
+ * a native tooltip.
  *
- * NOTHING HERE READS LAYOUT. Asking "was this one actually truncated?" means `scrollHeight` against
- * `clientHeight` per card, i.e. a forced synchronous layout inside the path a poll tick lands on
+ * NOTHING HERE READS LAYOUT. Asking "was this one actually truncated?" means `scrollWidth` against
+ * `clientWidth` per card, i.e. a forced synchronous layout inside the path a poll tick lands on
  * every five seconds — and 29_ports.js REBUILDS these tiles on each of those ticks, so the question
  * would be asked again every time. A title on a name that fits costs a tooltip repeating what is
  * already on screen; a layout read here costs the page.
