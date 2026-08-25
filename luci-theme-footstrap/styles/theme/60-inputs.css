@@ -12,7 +12,13 @@
 	.cbi-value-field > .control-group:not(:has(.cbi-input-password)) {
 		display: inline-flex; flex-wrap: wrap; gap: var(--fs-space-2); align-items: center;
 	}
-	.cbi-value:last-child { border-bottom: 0; }
+	/* The hairline separates one value row from the NEXT one, so it is dropped whenever no value
+	 * row follows — not only at the end of the section. A section that ends with a table, an
+	 * action bar or any other block (irqbalance's toggle above its table, and every app that
+	 * mixes a form row with a widget) drew the line across the top of whatever came next,
+	 * cutting through a framed table's rounded corner. `:last-child` was the special case of
+	 * this, so the two selectors collapse into one. */
+	.cbi-value:not(:has(+ .cbi-value)) { border-bottom: 0; }
 	/* A toggle/checkbox field has NO text baseline: `.cbi-checkbox` is inline-flex with no line
 	 * box, so its synthesised baseline is the box's BOTTOM edge. Under align-items:baseline the row
 	 * then hangs the toggle from the label's baseline and floats it ~5px ABOVE the label, on every

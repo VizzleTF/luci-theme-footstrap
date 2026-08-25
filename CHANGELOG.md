@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Fixed
+
+- **A form row no longer draws its separator across whatever follows it.** The hairline under a `.cbi-value` separates one value row from the NEXT one, but it was only dropped on `:last-child`, so a section that ends its rows and then renders something else — a table, an action bar, any block a view builds itself — got a line lying across the top of it. On a framed table that line cuts through the rounded corner, which is how it was spotted; it is not that page's bug, and the theme's own Appearance tab drew two of them (over the palette group's sub-heading and over the version footer). The rule now asks whether a value row FOLLOWS, which makes `:last-child` a special case of the same question rather than a separate rule. Measured across eight stock pages: the count of drawn separators falls only where a line was dangling (irqbalance 9 → 8, System 39 → 37) and is unchanged on Network, Firewall zones, Router password, DHCP, Overview and Startup; the Appearance tab differs by 0.11% of its pixels, all of it in the two lines that went.
+
 ## [0.14.2] — 2026-08-24
 
 ### Fixed
