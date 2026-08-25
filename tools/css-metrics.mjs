@@ -69,8 +69,15 @@ const LIMITS = {
 	 * and `.ifacebox` all painted a hidden element anyway (measured). No layer can hold that: the
 	 * page layer already carries id-specific `display` rules ([1,7,0] is this file's own ceiling),
 	 * and a rule written tomorrow would re-open the hole. Same family as the forcing utilities base
-	 * is already exempt for — a declaration whose whole job is to outrank the theme's own paint. */
-	importants: 31,
+	 * is already exempt for — a declaration whose whole job is to outrank the theme's own paint.
+	 *
+	 * Raised 31 -> 32 for the SAME flag written twice: the port card's traffic figures fight
+	 * 29_ports.js's inline `font-size:80%`, and the declaration is now stated plainly and again
+	 * with `round()`, the way 02-tokens.css states the type ladder. An engine without `round()`
+	 * drops the whole declaration, flag and all, so a single rounded form would have left that
+	 * engine inheriting a size nobody chose — and the fallback needs the flag for the same reason
+	 * the rounded one does. One adversary, one property, two syntaxes. */
+	importants: 32,
 	/* The widest selector the theme needs; see the layer rules in docs/conventions.md.
 	 *
 	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`. Not sprawl:

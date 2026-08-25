@@ -356,6 +356,12 @@
 		 * 119 -> 109 at Large. It stays on the density axis; it is off the type
 		 * LADDER because the ladder has no rung here, and a figure that is read as a pair of
 		 * numbers beside a label tolerates the step that body text would not. */
+		/* Declared TWICE, as 02-tokens.css declares the type ladder twice and for the same reason: an
+		 * engine without `round()` drops the whole declaration — flag included — and the figures then
+		 * inherit a size that was never chosen for them. The plain form is the fallback; the rounded
+		 * one replaces it wherever the function exists, so a fractional density lands on a whole
+		 * pixel instead of a blurred one. */
+		font-size: calc(10px * var(--fs-density-type)) !important;
 		font-size: calc(round(10px * var(--fs-density-type), 1px)) !important;
 		color: var(--fs-dim);
 		/* the tight leading, not the body one: these are two lines of figures read as a block, and
