@@ -1,7 +1,7 @@
 # CI and packaging
 
 How footstrap is turned into packages and shipped. The theme is noarch
-(`LUCI_PKGARCH:=all`) and supports **OpenWrt 23.05 and 24.10** (`.ipk`/opkg) and **25.12+** (`.apk`/apk).
+(`LUCI_PKGARCH:=all`) and supports **OpenWrt 24.10** (`.ipk`/opkg) and **25.12+** (`.apk`/apk).
 
 What the Makefile and the install scripts do: [package.md](package.md). The release runbook:
 [releasing.md](releasing.md).

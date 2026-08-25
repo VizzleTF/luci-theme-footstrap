@@ -1,6 +1,7 @@
 #!/bin/sh
-# luci-theme-footstrap installer for OpenWrt 23.05/24.10 (opkg) and 25.12+ (apk).
-# 23.05 installs from the signed GitHub release; the feed carries the two branches the package
+# luci-theme-footstrap installer for OpenWrt 24.10 (opkg) and 25.12+ (apk).
+# A 23.05 router is served the pinned final release (0.14.2) instead — see FROZEN_2305_TAG.
+# The feed carries the two branches the package
 # FORMAT splits on and nothing else.
 #
 #   wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
@@ -30,6 +31,13 @@ REPO="VizzleTF/luci-theme-footstrap"
 # jsonfilter. These redirect to the newest tag's assets and are the same URLs the release page
 # links, so they answer for a router that only has an http client.
 RELEASE_BASE="https://github.com/$REPO/releases/latest/download"
+# THE LAST RELEASE THAT RUNS ON 23.05, pinned by tag rather than by "latest". 0.14.2 is where support
+# for that release stops: it is EOL upstream, openwrt/luci declined to carry the one piece of
+# compatibility it needed (#8978), and the theme dropped it rather than keep a widget nobody else
+# wants. A 23.05 router is not refused — it gets that version, verified exactly like any other
+# artifact, and is told plainly that it is the end of the line.
+FROZEN_2305_TAG="v0.14.2"
+FROZEN_2305_BASE="https://github.com/$REPO/releases/download/$FROZEN_2305_TAG"
 # The RELEASE key, pinned in the script that uses it. It is the same key as release.pub in the
 # repository, and pinning it here is the point: a key fetched beside the file it verifies proves
 # nothing. usign's key id travels inside the signature, so a rotation is a visible failure here
@@ -262,19 +270,22 @@ case "$BRANCH" in
 		err "footstrap requires OpenWrt 23.05 or newer (detected $DISTRIB_RELEASE)."
 		exit 1
 	fi
-	# 23.05 IS SUPPORTED AND HAS NO FEED BRANCH, and that is a decision rather than a gap: the feed
-	# publishes the two branches the package FORMAT splits on (apk from 25.12, ipk on 24.10), and
-	# adding a third for a release whose ipk is byte-identical to 24.10's would be a second copy of
-	# one artefact to sign, serve and keep in step. So 23.05 installs from the signed GitHub release
-	# instead — the same path a router takes when the feed cannot serve it, verified the same way
-	# (usign signature, then the asset digest) and equally re-runnable. What it does not get is
-	# `opkg upgrade`: an update means running this script again.
+	# 23.05 GETS THE LAST VERSION THAT RUNS ON IT, not a refusal and not the current one. The theme
+	# supported that release for one widget's sake — `ui.RangeSlider` arrived in 24.10, and its
+	# absence took the whole Appearance tab down — and that support is over: 23.05 is EOL, and
+	# openwrt/luci, where this theme now lives, declined to carry compatibility code for releases it
+	# no longer builds (#8978). Everything up to and including 0.14.2 runs there, so that is what a
+	# 23.05 router installs: pinned by tag, verified by the same signature and digest as any other
+	# artifact, and said out loud so nobody waits for an upgrade that will not come.
 	if [ "$MAJ" -eq 23 ]; then
-		info "OpenWrt $DISTRIB_RELEASE: installing from the signed release (the feed carries 24.10 and 25.12 only)."
+		info "OpenWrt $DISTRIB_RELEASE: installing footstrap ${FROZEN_2305_TAG#v} — the LAST version for 23.05."
+		info "23.05 is end-of-life and the theme no longer develops for it; later versions need 24.10 or newer."
+		RELEASE_BASE="$FROZEN_2305_BASE"
 		install_from_release || {
-			err "Could not install the release asset on $DISTRIB_RELEASE."
+			err "Could not install the ${FROZEN_2305_TAG#v} release asset on $DISTRIB_RELEASE."
 			exit 1
 		}
+		ok "footstrap ${FROZEN_2305_TAG#v} installed. This is the final release for OpenWrt 23.05."
 		exit 0
 	fi
 	# PROBED, exactly like the fallback path below, and for the reason that path states: a router

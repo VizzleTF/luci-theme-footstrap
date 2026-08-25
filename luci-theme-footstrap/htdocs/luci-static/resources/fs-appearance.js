@@ -104,8 +104,9 @@ function build() {
 	 * Every enum axis is a `ui.Select` and every number is a `ui.RangeSlider` — the same widgets the
 	 * form on the other tabs is built from, so a dropdown here is the dropdown an admin already knows
 	 * and the theme's own stylesheet already dresses (`select` in base/30-forms.css,
-	 * `.cbi-range-slider` in theme/60-inputs.css). Both classes exist on the whole range this theme
-	 * supports — checked against luci's own openwrt-24.10 branch, not only against master.
+	 * `.cbi-range-slider` in theme/60-inputs.css). Both classes exist on every release this theme
+	 * supports — checked against luci's own openwrt-24.10 branch, not only against master, because
+	 * `ui.RangeSlider` is exactly the widget that did not exist further back.
 	 *
 	 * What this replaces is two primitives of ours: a segmented radiogroup with a roving tabindex and
 	 * a range wrapper with a live readout. They were written when this page was a floating popover
@@ -124,53 +125,10 @@ function build() {
 		node.addEventListener('widget-change', () => apply(w.getValue()));
 		return node;
 	};
-	/* THE ONE WIDGET THIS THEME CANNOT ASSUME, and the reason 23.05 is a supported release again.
-	 *
-	 * `ui.RangeSlider` arrived in 24.10. On 23.05 it is simply not there, and because this whole
-	 * panel is built inside one try/catch the miss took the ENTIRE Appearance tab with it — a
-	 * console line and an empty tab, reported from the field rather than by a gate, because no gate
-	 * had ever opened a 23.05 router.
-	 *
-	 * So the widget is used where it exists and reproduced where it does not: same DOM, same class
-	 * names (`.cbi-range-slider` and its value child are what theme/60-inputs.css dresses),
-	 * same two events, and the same base class — `ui.AbstractElement` is the name LuCI exports on
-	 * BOTH 23.05 and master, which is what makes `setUpdateEvents`/`setChangeEvents` available to
-	 * the copy. Nothing below this line knows which of the two it got.
-	 *
-	 * Kept deliberately smaller than upstream's: `calculate` is not reproduced, because no axis on
-	 * this page uses it. If one ever does, use the real widget's shape rather than growing this.
-	 *
-	 * Which is also why there is no units span. The real widget renders `.cbi-range-slider-calc-units`
-	 * only when `calculate` produced a value (ui.js gates it on `calculatedvalue`), and no axis here
-	 * passes `calculate` — so rendering it from `calcunits` alone put a `px`/`%` suffix on all five
-	 * sliders on 23.05 and none on 24.10 or later (measured on the stands). A router upgrading off
-	 * 23.05 would have watched them disappear. */
-	const RangeSlider = ui.RangeSlider || ui.AbstractElement.extend({
-		__init__(value, options) {
-			this.value = value;
-			this.options = Object.assign({ min: 0, max: 100, step: 1 }, options);
-		},
-		render() {
-			this.sliderEl = E('input', {
-				type: 'range', min: this.options.min, max: this.options.max,
-				step: this.options.step || 'any', value: this.value
-			});
-			this.valueEl = E('output', { class: 'cbi-range-slider-value' }, String(this.value));
-			const node = E('div', { class: 'cbi-range-slider' }, [ this.sliderEl, this.valueEl ]);
-			this.node = node;
-			this.setUpdateEvents(this.sliderEl, 'input', 'blur');
-			this.setChangeEvents(this.sliderEl, 'change');
-			this.sliderEl.addEventListener('input', () => { this.valueEl.textContent = this.sliderEl.value; });
-			dom.bindClassInstance(node, this);
-			return node;
-		},
-		getValue() { return this.sliderEl.value; },
-		setValue(value) { this.sliderEl.value = value; this.valueEl.textContent = value; }
-	});
 
 	const sliderCtl = (current, min, max, apply, label, opts) => {
 		const o = opts || {};
-		const w = new RangeSlider(String(current), {
+		const w = new ui.RangeSlider(String(current), {
 			min: min, max: max, step: o.step || 1
 		});
 		const node = w.render();

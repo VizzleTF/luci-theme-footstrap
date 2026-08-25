@@ -76,23 +76,24 @@ done
 
 ## Step 4 — live checks for the areas the diff touched
 
-Run on all three releases (25.12/apk, 24.10/opkg and 23.05/opkg). Compare against stock bootstrap
+Run on both releases (25.12/apk and 24.10/opkg). Compare against stock bootstrap
 wherever you are unsure — it is the reference for LuCI behaviour.
 
-**A release runs the WIDE version of the automatic live gates first, and 23.05 is not optional:**
+**A release runs the WIDE version of the automatic live gates first:**
 
 ```sh
-npm run live -- --all --pages-all          # every router owlab boots, including owrt2305
-node tools/upstream-contract.mjs --only owrt2305   # the release with the smallest luci-base
+npm run live -- --all --pages-all          # every router owlab boots
+node tools/upstream-contract.mjs           # what the theme assumes of luci-base, asked on each
 ```
 
-**Why 23.05 has a line of its own.** It is the oldest release this theme claims and the only one
-whose `luci-base` is missing a widget the theme uses: `ui.RangeSlider` arrived in 24.10, and its
-absence took the ENTIRE Appearance tab down — the panel is built inside one try/catch, so the miss
-cost a console line and an empty tab, with nothing else to notice it. It was reported from the field
-by a user on 23.05.5, not by a gate, because no gate had ever opened a 23.05 router. There is one
-now (`owrt2305` in `owlab.yaml`) and `upstream-contract` carries the assumption; a release that has
-not been through both is a release that does not know whether that tab still builds.
+**23.05 used to have a line of its own here, and no longer does.** It was the oldest release the
+theme claimed and the only one whose `luci-base` was missing a widget the theme uses:
+`ui.RangeSlider` arrived in 24.10, and its absence took the ENTIRE Appearance tab down — the panel
+is built inside one try/catch, so the miss cost a console line and an empty tab, reported from the
+field by a user on 23.05.5 rather than by a gate. Support for that release ended at 0.14.2: it is
+EOL, and openwrt/luci declined to carry the compatibility code in the tree the theme now lives in
+(#8978). `install.sh` pins that version for a 23.05 router and says it is the last one; the stand
+and the contract entry that guarded it are gone with the fallback they guarded.
 
 Day to day those gates measure two routers and one page per shape, which is what makes them cheap
 enough to run before a push (`docs/development.md`). A release is the one moment where the axes they

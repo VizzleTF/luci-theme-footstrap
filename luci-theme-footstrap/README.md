@@ -1,6 +1,6 @@
 # luci-theme-footstrap (the package)
 
-A LuCI theme for OpenWrt **23.05 and newer** (ucode templates). Installing and using it:
+A LuCI theme for OpenWrt **24.10 and newer** (ucode templates). Installing and using it:
 [the repository README](../README.md). Developer documentation: [`../docs/`](../docs/README.md).
 
 Internal name: `footstrap`. Media path: `/luci-static/footstrap`.

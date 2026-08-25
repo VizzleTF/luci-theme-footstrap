@@ -1,6 +1,6 @@
 # How LuCI renders a theme
 
-What LuCI expects from a theme on OpenWrt 23.05, 24.10 and 25.12+, and where footstrap plugs into it.
+What LuCI expects from a theme on OpenWrt 24.10 and 25.12+, and where footstrap plugs into it.
 Read this first if you are new to the codebase.
 
 > Verified against `openwrt/luci` at the commit pinned in

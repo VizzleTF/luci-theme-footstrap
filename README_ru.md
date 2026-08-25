@@ -6,12 +6,12 @@
 [![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap.json)](https://owfeed.org/install/ru/)
 [![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap-releases.json)](https://owfeed.org/install/ru/)
 
-Тема LuCI для OpenWrt 23.05 и новее. Без фреймворка, единственная зависимость — `luci-base`.
+Тема LuCI для OpenWrt 24.10 и новее. Без фреймворка, единственная зависимость — `luci-base`.
 
-> **23.05** поддерживается и проверяется наравне с остальными: перед каждым релизом те же живые
-> проверки прогоняются на роутере 23.05. Единственное, чего в этом выпуске нет, — `ui.RangeSlider`
-> (появился в 24.10), поэтому ползунки на вкладке Appearance там свои, с той же разметкой и
-> поведением.
+> **23.05** объявлена EOL, и тема на ней останавливается: **0.14.2** — последняя версия, которая там
+> работает. Установщик ставит на роутер с 23.05 именно её — по фиксированному тегу, с той же
+> проверкой подписи и суммы — и говорит об этом прямо. Более новые версии требуют 24.10 и новее,
+> где есть `ui.RangeSlider`.
 
 <picture>
   <source media="(max-width: 767px)" srcset="assets/readme/phone-menu-dark.png">

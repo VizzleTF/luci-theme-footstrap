@@ -54,11 +54,10 @@ const LIMITS = {
 	 * 200-1206px under the reader once a second is not a page anybody reads, so the bytes are worth
 	 * their flash.
 	 *
-	 * 88,356 B measured 2026-08-21. The last 356 B are the theme's own range slider, carried for
-	 * 23.05: `ui.RangeSlider` arrived in 24.10, and on the older release its absence took the whole
-	 * Appearance tab with it. A widget the theme only uses where luci-base has none is the cheapest
-	 * form of that support — the alternative was dropping a release that still ships on a lot of
-	 * hardware.
+	 * 88,356 B measured 2026-08-21. The last 356 B were the theme's own range slider, carried for
+	 * 23.05, where `ui.RangeSlider` does not exist and its absence took the whole Appearance tab with
+	 * it. Those bytes are gone again: 23.05 is EOL, openwrt/luci declined the compatibility outright
+	 * (#8978), and the theme now claims 24.10 and newer, where the real widget is always there.
 	 *
 	 * 89,270 B measured 2026-08-24. The last 770 B keep the reader's place on the two cases the
 	 * engine's own scroll anchoring does not cover, both of them measured on the stands rather than

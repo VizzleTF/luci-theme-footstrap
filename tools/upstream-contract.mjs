@@ -185,49 +185,21 @@ const CONTRACT = [
 		},
 	},
 	{
-		id: 'widget-base-class',
-		what: 'ui.AbstractElement is the base widget class on every supported release, and it carries '
-			+ 'setUpdateEvents/setChangeEvents — the seam a widget publishes widget-update/widget-change through',
-		used_by: 'fs-appearance.js builds its own range slider from it where ui.RangeSlider does not exist',
-		fn: async () => {
-			const ui = await L.require('ui');
-			if (!ui.AbstractElement) return 'ui.AbstractElement is gone; the Appearance sliders have no base class';
-			for (const m of [ 'setUpdateEvents', 'setChangeEvents', 'getValue', 'setValue' ])
-				if (typeof ui.AbstractElement.prototype[m] !== 'function')
-					return 'ui.AbstractElement.prototype has no ' + m;
-			return true;
-		},
-	},
-	{
 		id: 'slider-widget-available',
-		/* ui.RangeSlider arrived in 24.10. On 23.05 its absence took the WHOLE Appearance tab down —
-		 * one try/catch, one console line, and a user to report it, because no gate had ever opened a
-		 * 23.05 router. Either path is fine; having neither is not. */
-		what: 'a range widget is reachable: ui.RangeSlider (24.10+), or ui.AbstractElement to build one from (23.05)',
+		/* `ui.RangeSlider` arrived in 24.10, which is the oldest release this theme claims. It was
+		 * once probed with a fallback built from `ui.AbstractElement`, because 23.05 has no such
+		 * widget and its absence took the WHOLE Appearance tab down — the panel is built inside one
+		 * try/catch. That release is EOL and support for it is gone, so what is left to check is that
+		 * the real widget is still there and still renders a range input. */
+		what: 'ui.RangeSlider exists and renders an input[type=range]',
 		used_by: 'fs-appearance.js: the number axes — rounding, tint strength, pattern size/strength, photo dim',
 		fn: async () => {
 			const ui = await L.require('ui');
-			if (ui.RangeSlider) {
-				const w = new ui.RangeSlider('5', { min: 0, max: 10 });
-				const node = w.render();
-				const input = node.querySelector('input[type="range"]');
-				return input ? true : 'ui.RangeSlider no longer renders an input[type=range]';
-			}
-			if (!ui.AbstractElement) return 'no ui.RangeSlider and no ui.AbstractElement: nothing to build a slider from';
-			/* the fallback's own machinery, exercised rather than assumed */
-			const Slider = ui.AbstractElement.extend({
-				/* `options` is not optional: setUpdateEvents reads options.datatype off it */
-				__init__(value) { this.value = value; this.options = {}; },
-				render() {
-					this.el = E('input', { type: 'range', min: 0, max: 10, value: this.value });
-					this.setUpdateEvents(this.el, 'input');
-					this.setChangeEvents(this.el, 'change');
-					return E('div', { class: 'cbi-range-slider' }, [ this.el ]);
-				},
-				getValue() { return this.el.value; }
-			});
-			const node = new Slider('5').render();
-			return node.querySelector('input[type="range"]') ? true : 'ui.AbstractElement can no longer carry a slider';
+			if (!ui.RangeSlider) return 'ui.RangeSlider is gone; the Appearance number axes have no widget';
+			const w = new ui.RangeSlider('5', { min: 0, max: 10 });
+			const node = w.render();
+			const input = node.querySelector('input[type="range"]');
+			return input ? true : 'ui.RangeSlider no longer renders an input[type=range]';
 		},
 	},
 	{
