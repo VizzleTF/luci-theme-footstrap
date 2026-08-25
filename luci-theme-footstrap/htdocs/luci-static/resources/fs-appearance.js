@@ -132,17 +132,23 @@ function build() {
 	 * had ever opened a 23.05 router.
 	 *
 	 * So the widget is used where it exists and reproduced where it does not: same DOM, same class
-	 * names (`.cbi-range-slider` and its value/units children are what theme/60-inputs.css dresses),
+	 * names (`.cbi-range-slider` and its value child are what theme/60-inputs.css dresses),
 	 * same two events, and the same base class — `ui.AbstractElement` is the name LuCI exports on
 	 * BOTH 23.05 and master, which is what makes `setUpdateEvents`/`setChangeEvents` available to
 	 * the copy. Nothing below this line knows which of the two it got.
 	 *
 	 * Kept deliberately smaller than upstream's: `calculate` is not reproduced, because no axis on
-	 * this page uses it. If one ever does, use the real widget's shape rather than growing this. */
+	 * this page uses it. If one ever does, use the real widget's shape rather than growing this.
+	 *
+	 * Which is also why there is no units span. The real widget renders `.cbi-range-slider-calc-units`
+	 * only when `calculate` produced a value (ui.js gates it on `calculatedvalue`), and no axis here
+	 * passes `calculate` — so rendering it from `calcunits` alone put a `px`/`%` suffix on all five
+	 * sliders on 23.05 and none on 24.10 or later (measured on the stands). A router upgrading off
+	 * 23.05 would have watched them disappear. */
 	const RangeSlider = ui.RangeSlider || ui.AbstractElement.extend({
 		__init__(value, options) {
 			this.value = value;
-			this.options = Object.assign({ min: 0, max: 100, step: 1, calcunits: null }, options);
+			this.options = Object.assign({ min: 0, max: 100, step: 1 }, options);
 		},
 		render() {
 			this.sliderEl = E('input', {
@@ -150,11 +156,7 @@ function build() {
 				step: this.options.step || 'any', value: this.value
 			});
 			this.valueEl = E('output', { class: 'cbi-range-slider-value' }, String(this.value));
-			const node = E('div', { class: 'cbi-range-slider' }, [
-				this.sliderEl,
-				this.valueEl,
-				this.options.calcunits ? E('span', { class: 'cbi-range-slider-calc-units' }, this.options.calcunits) : null
-			].filter(Boolean));
+			const node = E('div', { class: 'cbi-range-slider' }, [ this.sliderEl, this.valueEl ]);
 			this.node = node;
 			this.setUpdateEvents(this.sliderEl, 'input', 'blur');
 			this.setChangeEvents(this.sliderEl, 'change');
@@ -169,7 +171,7 @@ function build() {
 	const sliderCtl = (current, min, max, apply, label, opts) => {
 		const o = opts || {};
 		const w = new RangeSlider(String(current), {
-			min: min, max: max, step: o.step || 1, calcunits: o.unit || null
+			min: min, max: max, step: o.step || 1
 		});
 		const node = w.render();
 		node.setAttribute('aria-label', label);
@@ -235,7 +237,7 @@ function build() {
 		}, bump(prefs.applyDensity), label)),
 
 		group(_('Rounding', 'footstrap'),
-			(label) => sliderCtl(prefs.currentRadius(), 0, 20, bump(prefs.applyRadius), label, { unit: 'px' })),
+			(label) => sliderCtl(prefs.currentRadius(), 0, 20, bump(prefs.applyRadius), label)),
 
 		/* The top layout has no accordion (its sections are hover dropdowns, already exclusive), so
 		 * this switch is meaningless there. ALWAYS BUILT, HIDDEN BY CSS (:root[data-layout="top"]
@@ -272,8 +274,7 @@ function build() {
 		 * apart. */
 		group(_('Tint strength', 'footstrap'),
 			(label) => sliderCtl(prefs.currentTintStrength(), 0, 200, bump(repaint(prefs.applyTintStrength)), label, {
-				step: 5,
-				unit: '%'
+				step: 5
 			}), { cls: 'fs-ap-tint fs-ap-tintstr' }),
 
 		/* recolours the accented CONTROLS (buttons/toggles/sliders/focus rings), not the canvas the
@@ -397,9 +398,9 @@ function build() {
 				() => E('div', { 'class': 'fs-ap-bgrow' }, [ patChoose, patRemove ]),
 				{ extra: [ patInput, patPreview, patErr ] }),
 			group(scaleLabel, (lbl) => sliderCtl(prefs.currentPatternSize(), 40, 1600,
-				bump(prefs.applyPatternSize), lbl, { step: 20, unit: 'px' })),
+				bump(prefs.applyPatternSize), lbl, { step: 20 })),
 			group(strengthLabel, (lbl) => sliderCtl(prefs.currentPatternStrength(), 0, 100,
-				bump(prefs.applyPatternStrength), lbl, { step: 5, unit: '%' })),
+				bump(prefs.applyPatternStrength), lbl, { step: 5 })),
 			group(inkLabel, (lbl) => selectCtl(prefs.currentPatternInk(), {
 				theme:    _('Theme', 'footstrap'),
 				original: _('As in file', 'footstrap')
@@ -411,7 +412,7 @@ function build() {
 				() => E('div', { 'class': 'fs-ap-bgrow' }, [ chooseBtn, removeBtn ]),
 				{ extra: [ fileInput, preview, err ] }),
 			group(dimLabel, (lbl) => sliderCtl(prefs.currentPhotoDim(), 0, 100,
-				bump(prefs.applyPhotoDim), lbl, { step: 5, unit: '%' }))
+				bump(prefs.applyPhotoDim), lbl, { step: 5 }))
 		];
 
 		function reflect(tok) {
