@@ -733,8 +733,15 @@
 	 * both need the flag. Reported from the forum.
 	 *
 	 * The weight is not decoration: the SVG hardcodes a 9pt label, the smallest type this theme
-	 * renders anywhere, and at the regular weight it is also the thinnest. */
-	#view div[style] > svg text[style] {
+	 * renders anywhere, and at the regular weight it is also the thinnest.
+	 *
+	 * A CHILD COMBINATOR, and the difference is a page: Status → Channel Analysis derives a colour
+	 * per BSSID and paints both the curve and its SSID label with it, so there the inline fill is
+	 * the only thing tying a label to its curve. Those labels are built inside a <g>
+	 * (channel_analysis.js), while the grey axis labels this rule is for — here and in the realtime
+	 * graphs — are direct children of the <svg>. A descendant selector recoloured both and left the
+	 * curves as they were; `> text[style]` reaches only the axis. */
+	#view div[style] > svg > text[style] {
 		fill: var(--fs-text) !important;
 		text-shadow: none !important;
 		font-weight: var(--fs-weight-bold);
