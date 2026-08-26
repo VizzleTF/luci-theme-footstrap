@@ -64,9 +64,9 @@
 	button.fs-ap-fold:hover .fs-ap-chev { color: var(--fs-accent); }
 	/* Stock `.cbi-value` rows stack one per line and carry their own hairline, so a folded group needs
 	 * no layout of its own — it lays its rows out exactly like an unfolded section by doing nothing. */
-	/* an explicit `display` DEFEATS the `hidden` attribute (the UA rule is a bare 0,0,1), and hidden
-	 * is what keeps a closed group out of the tab order and the a11y tree */
-	.fs-ap-body[hidden] { display: none; }
+	/* `hidden` is what keeps a closed group out of the tab order and the a11y tree, and
+	 * base/10-reset.css is what makes the attribute win over a class's `display` — for every
+	 * element, not just this one, so there is nothing to restate here. */
 	/* the second heading inside the Colours fold — Surfaces shares the fold, not the heading. It
 	 * wears the SAME .fs-ap-head h4 as every other section title now; a third heading style on one
 	 * page (h4, folded h4, uppercase eyebrow h5) was a third of the raggedness. Only the space
@@ -169,12 +169,9 @@
 	.fs-ap-bgrow { display: flex; flex-wrap: wrap; gap: var(--fs-space-2); }
 	.fs-ap-bgrow .btn { font-size: var(--fs-type); padding: var(--fs-space-2) var(--fs-space-2-5); cursor: pointer; }
 	.fs-ap-bgrow .btn:disabled { cursor: default; }
-	/* an explicit `display` DEFEATS the `hidden` attribute (the UA's `[hidden]{display:none}` is a
-	 * bare 0,0,1 rule these out-rank), so the JS's row.hidden / preview.hidden / removeBtn.hidden
-	 * would not hide a row that does not apply to the chosen wallpaper, the empty preview, or a
-	 * not-yet-uploaded Remove. Restate hidden at a specificity that wins — `.cbi-value` is the one
-	 * that matters most here, since base gives it `display: flex`. */
-	.cbi-value[hidden], .fs-ap-bgprev[hidden], .fs-ap-bgrow .btn[hidden] { display: none; }
+	/* The JS hides a row that does not apply to the chosen wallpaper, the empty preview and a
+	 * not-yet-uploaded Remove with `el.hidden`; base/10-reset.css makes that attribute beat the
+	 * `display` a class sets, so none of it needs restating here any more. */
 	/* Under the File wallpaper only the photo Dim is relevant — the router-identity Tint colours the
 	 * canvas the photo covers, so hide the Tint hue AND its strength there (fs-ap-tint marks both). */
 	:root[data-wallpaper="file"] .fs-ap-tint { display: none; }

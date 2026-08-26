@@ -85,7 +85,6 @@
 		color: var(--fs-eyebrow-color);
 		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase;
 	}
-	.fs-search-note[hidden] { display: none; }
 
 	/* …and the box's EMPTY STATE when there are no rows at all ("No pages found"), which reads as
 	 * a sentence, not as an eyebrow label. :has() rather than a sibling combinator: the note sits
