@@ -83,6 +83,12 @@ compile.
   declined to carry that code (openwrt/luci#8978). `install.sh` serves a 23.05 router the pinned
   0.14.2 and says it is the last one; the stand, the contract entry and the fallback are gone. The
   floor is 24.10 — `npm run live -- --all` covers what is left. docs/releasing.md.
+- **One fault, one mechanism — and prove that one holds alone.** A second mechanism added "to be
+  safe" must be measured with the first one on its own: if the probe still passes, the spare was
+  never needed and does not ship. The Appearance tab's vanishing after a Save (openwrt/luci#8981)
+  went in with an attribute watch AND a retry ladder, both landed together, both passed; the ladder
+  turned out to catch nothing, and a maintainer had to ask. A suspicion about risk is an experiment
+  to run, not a justification to write into a comment.
 - **Prove a CSS change with a computed-style diff, not screenshots.** Live counters move 0.5–1.3% of
   pixels between two runs of the *same* sheet while a real regression weighs 0.19%.
 - Screenshots and any other scratch artefact go in `../tmp/`, never inside the checkout.
