@@ -100,6 +100,45 @@ compile.
   pixels between two runs of the *same* sheet while a real regression weighs 0.19%.
 - Screenshots and any other scratch artefact go in `../tmp/`, never inside the checkout.
 
+### Comments
+- **Minimally sufficient: the shortest text that still carries the reason.** An inline comment is
+  one line, two if the reason needs a number; a block is justified only when it covers several
+  rules at once, and a module header is a short paragraph, not a page. Anything longer belongs in
+  `docs/`, pointed at from the code in one line. Cut every word that removing does not lose a fact.
+- **A comment says why, not what.** One that restates the line it sits on is deleted, not reworded.
+  What a reader cannot recover from the code is the reason: the constraint, the alternative that
+  failed, the number that was measured.
+- **Carry the measurement, not the adjective.** "overflows" is unfalsifiable; "19-109px of overflow,
+  once per poll tick, on Firewall/DHCP/Wireless" tells the next reader whether the rule still earns
+  its place and how to re-run the check. Same for widths, timings, counts, and the viewport and
+  density they were taken at.
+- **A negative result stays, in one line** — "tried X, it did Y" is the cheapest way to stop the
+  next session re-trying it (`display: none` on top of a zeroed tab pane buys nothing: scrollHeight
+  1039 either way). The narrative around it does not stay: how it was first written, what was
+  renamed, which attempt came in which order. Current state, present tense.
+- **A number or a name in a comment is part of the contract.** 15 comments said the poll re-renders
+  "once a second" while `pollinterval` ships at 5 s — a claim that reads as measured and was not.
+  The comment changes in the same edit as the code, or it becomes a lie git preserves forever.
+- **References are the part that cannot be rebuilt**: issue numbers (#19, openwrt/luci#8981), spec
+  text quoted verbatim (WCAG SC 1.4.10's exception, HTML-AAM), upstream commits, file paths. A
+  compression pass may cut the sentence around them; it may not cut them.
+- **Some comments are code**: `@mirror name/tag` / `@endmirror` (`npm run mirror`), `/* fs:probe */`
+  (`strip-probes.sh`), the eslint `'require …'` pragmas, and the Makefile's buildroot signature line
+  that scan.mk greps for, which must stay last with nothing between it and the text it announces
+  (`npm run marker`). Reword one and a gate or the build breaks — silently, in the Makefile's case.
+- **Formal English, no theatre** — no exclamation, no shouting a fix, no addressing the reader. A
+  module header states purpose and invariants; an inline comment explains the rule it sits above and
+  nothing else. Never stack a second comment on the first: edit the one that is there.
+- **Comments cost no router bytes.** `strip-templates.sh`, `strip-shell.sh` and `build-css.sh` remove
+  every one at package time and git keeps every word, so **never trade a "why" away for bytes**. A
+  stale comment is worse than none.
+- **A comment inside a quoted command string is part of the string** — the `#` lines inside
+  `ssh "$R" "…"` in `dev-sync.sh` keep their escaped backticks and `$`. Run `sh -n` after any such
+  edit.
+- **After a bulk comment pass, prove the code did not move**: a token-stream compare against HEAD for
+  every JS file, a comment-stripped and whitespace-normalised diff for CSS, `.ut`, shell and yaml.
+  That is what caught a deleted Makefile marker and a lost shell escape; no gate would have.
+
 ### CSS
 - **`htdocs/luci-static/footstrap/cascade.css` is generated — never edit it.** Source is `styles/`.
 - Layer order `tokens, base, theme, page`, one directory per layer, filename prefix = source order.
@@ -142,8 +181,6 @@ compile.
   Upgrades are the package manager's job (the installer adds the feed). `fs-router` exports
   `onNavigate(fn)` so an optional module can register itself without the router naming anyone —
   keep that seam inverted, but do not re-add an updater behind it.
-- Comments are stripped at package time and git keeps every word — **never trade a "why" away for
-  bytes**. A stale comment is worse than none.
 
 ### The chrome, and sharing a document with third-party apps
 - **One theme entry, one template dir, one renderer.** Layout is a **client** axis
