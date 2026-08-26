@@ -68,6 +68,10 @@
 	 session_setup() accepted the credentials. Gating the credentials alert on `!auth_plugin` and
 	 rendering the message beside it covers all four states — wrong password, wrong password with a
 	 challenge pending, the OTP prompt, a failed OTP.
+
+	 entityencode where upstream prints raw: without the `!fuser` gate the message renders on the
+	 request that posted the form too, and this page is unauthenticated. A plugin's markup travels
+	 in `auth_html` (dispatcher.uc:952), so this variable is text.
 	-#}
 	{% if (fuser && !auth_plugin): %}
 		<div class="alert-message error">
@@ -76,7 +80,7 @@
 	{% endif %}
 	{% if (auth_message): %}
 		<div class="alert-message{% if (auth_plugin): %} warning{% endif %}">
-			<p>{{ auth_message }}</p>
+			<p>{{ entityencode(auth_message, true) }}</p>
 		</div>
 	{% endif %}
 

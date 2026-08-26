@@ -54,14 +54,16 @@ function wirePageModules() {
  * ordering the two. This file is required by the footer on every page and evaluates before the
  * router exists.
  *
- * Bodies are verbatim from upstream except L.itemlist -> window.L.itemlist (the two-L trap,
- * docs/spa-router.md). The typeof guards make each a no-op on a full page load, where the
- * template's own copies win the race. */
+ * Bodies are verbatim from upstream except for two deltas: L.itemlist -> window.L.itemlist (the
+ * two-L trap, docs/spa-router.md), and renderBox's `[title]` — dom.append parses a scalar child as
+ * innerHTML (luci.js:1395) and an array member as text (:1383), and this file defines the global on
+ * every admin page where upstream defines it on Status -> Overview alone. Same output: nothing in
+ * 24.10, 25.12 or master calls renderBox. The typeof guards make each a no-op on a full page load,
+ * where the template's own copies win the race. */
 function ensureOverviewHelpers() {
-	/* eslint-disable no-var -- these three bodies are verbatim copies of LuCI's
-	   admin_status/index.ut so they can be diffed against upstream when it changes.
-	   Modernising the `var`s would break that property, which is what makes carrying
-	   the copies safe. */
+	/* eslint-disable no-var -- these three bodies are copies of LuCI's admin_status/index.ut so
+	   they can be diffed against upstream when it changes. Modernising the `var`s would break
+	   that property, which is what makes carrying the copies safe. */
 	if (typeof window.progressbar !== 'function')
 		window.progressbar = function(query, value, max, byte) {
 			var pg = document.querySelector(query),
@@ -81,7 +83,7 @@ function ensureOverviewHelpers() {
 			childs.unshift(window.L.itemlist(E('span'), [].slice.call(arguments, 3)));
 			return E('div', { class: 'ifacebox' }, [
 				E('div', { class: 'ifacebox-head center ' + (active ? 'active' : '') },
-					E('strong', title)),
+					E('strong', [title])),
 				E('div', { class: 'ifacebox-body left' }, childs)
 			]);
 		};
