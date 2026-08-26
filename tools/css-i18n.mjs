@@ -1,27 +1,14 @@
 #!/usr/bin/env node
 /* Gate: no CSS rule may key off a `data-title` VALUE.
  *
- * `data-title` is what LuCI stamps on a data cell so a carded table can print the column label
- * (`content: attr(data-title)`). Reading it is fine. MATCHING it is not, and it fails in two
- * independent ways, both of them silent:
+ * `data-title` is what LuCI stamps on a data cell so a carded table can print the column label.
+ * Reading it is fine; MATCHING it is not, and it fails in two independent ways, both silent:
  *
- *   1. IT IS TRANSLATED. LuCI fills the attribute from the column HEADING, so on a Russian router
- *      the cell says `data-title="MAC-адрес"`. A selector carrying the English literal matches
- *      nothing — the rule is dead in ~40 languages while looking perfectly alive on the dev box.
- *      This is not hypothetical: the MAC-address nowrap in pages/60-assoclist.css was fixed,
- *      released, and the reporter (on a Russian router) still had his MAC split over two lines
- *      (issue #7).
- *
- *   2. IT IS RENDER-DEPENDENT. For the tables LuCI builds from the heading's `innerText`, the value
- *      is what the heading RENDERS — and theme/30-tables.css sets `text-transform: uppercase` on
- *      `.th`. So the attribute really reads `data-title="DESCRIPTION"`, and the theme's own CSS was
- *      rewriting the very string the theme's own CSS matched on. pages/30-software.css's
- *      `[data-title="Description"]` rule matched ZERO elements on every router, in every language.
- *
- * Anchor on the COLUMN instead (`.td:nth-child(4)`): a translation cannot reorder columns, and a
- * `text-transform` cannot touch an index. Presence tests (`[data-title]`, `:not([data-title])`,
- * `[data-title=""]`) are fine and stay allowed — they ask whether there IS a label, not what it says.
- */
+ *   1. it is TRANSLATED — LuCI fills the attribute from the column HEADING, so a selector carrying
+ *      the English literal matches nothing and the rule is dead in ~40 languages while looking
+ *      alive on the dev box (issue #7);
+ *   2. it is RENDER-DEPENDENT — for the tables LuCI builds from the heading's `innerText`, the
+ *      value is what the heading renders, which the theme's own CSS uppercases. */
 import { filesIn, read } from './lib/root.mjs';
 const STYLES = 'luci-theme-footstrap/styles';
 

@@ -75,7 +75,7 @@ command -v uci >/dev/null 2>&1 || die "No uci — this is not an OpenWrt router.
 [ -d /usr/share/ucode/luci/template/themes/footstrap ] ||
 	info "luci-theme-footstrap does not look installed here; writing the settings anyway."
 
-# uci refuses to CREATE a config file, only a section within one — and a router that installed a
+# uci refuses to CREATE a config file, only a section within one, and a router that installed a
 # footstrap predating the Appearance defaults has no such file. Same two lines as uci-defaults.
 [ -f /etc/config/footstrap ] || : > /etc/config/footstrap
 uci -q get footstrap.settings >/dev/null 2>&1 || uci set footstrap.settings=footstrap
@@ -120,14 +120,13 @@ fi
 [ -s "$TMP" ] || die "Got an empty file."
 
 # --- what is refused ------------------------------------------------------
-# The same objections the upload page raises, minus the parser: an SVG is a document, it can carry
-# script, and while a masked or backgrounded tile never executes anything, the same file opened at
-# its own URL is same-origin with the admin's session. A shell has no DOMParser, so this is text
-# matching and text matching guesses — which is why the handler pattern is `on` + letters + `=`
-# and not `\son\w+=`: the loose one matches `only_selected="false"`, an ordinary Inkscape
-# attribute, and it refused one of this project's own drawings on a real router. A file that trips
-# a check here is refused rather than cleaned; upload it from the Appearance page if you disagree,
-# where a real parser decides.
+# The same objections the upload page raises, minus the parser: an SVG is a document and can carry
+# script, and while a masked tile never executes anything, the same file opened at its own URL is
+# same-origin with the admin's session. A shell has no DOMParser, so this is text matching and text
+# matching guesses — hence the handler pattern `on` + letters + `=` rather than `\son\w+=`: the
+# loose one matches `only_selected="false"`, an ordinary Inkscape attribute, and refused one of this
+# project's own drawings. A file that trips a check is refused rather than cleaned; upload it from
+# the Appearance page instead, where a real parser decides.
 SIZE_B=$(wc -c < "$TMP" | tr -d ' ')
 [ "$SIZE_B" -le "$PAT_MAX" ] || die "That file is ${SIZE_B} bytes; the theme's cap is ${PAT_MAX}."
 grep -qi '<svg' "$TMP" || die "That file is not an SVG image."
@@ -150,9 +149,9 @@ cat "$TMP" > "$PAT_PATH"
 # uhttpd refuses to SERVE a file that is not world-readable (measured: 0600 -> 403, 0644 -> 200).
 chmod 0644 "$PAT_PATH"
 
-# uhttpd serves only /www and types a response BY EXTENSION, so the exposed name keeps its .svg —
-# an SVG served as application/octet-stream is one no browser will paint. uci-defaults makes this
-# same link on every install and upgrade; make it here too, for a router installed before it did.
+# uhttpd serves only /www and types a response BY EXTENSION, so the exposed name keeps its .svg — an
+# SVG served as application/octet-stream is one no browser paints. uci-defaults makes this same link
+# on every install; repeated here for a router installed before it did.
 if [ -d /www/luci-static/footstrap ]; then
 	ln -sf "$PAT_PATH" "$PAT_SERVE"
 else
@@ -161,8 +160,8 @@ fi
 
 # --- the settings ---------------------------------------------------------
 # `pattern` is the cache-bust token and nothing else: the browser appends it to the served URL, so
-# it must change when the bytes do. The upload page takes cgi-io's md5 `checksum` for it; md5sum
-# here is the same number.
+# it must change when the bytes do. The upload page takes cgi-io's md5 `checksum`; md5sum is the
+# same number.
 TOKEN=$(md5sum "$PAT_PATH" | cut -d' ' -f1)
 uci set footstrap.settings.pattern="$TOKEN"
 uci set footstrap.settings.pattern_size="$SIZE"

@@ -15,101 +15,66 @@
 		position: relative;
 	}
 
-	/* NO per-cell border-top, and that is a fix, not an omission. The theme draws a table's
-	 * separators on the ROW (theme/30-tables.css: header `border-bottom`, then every body row but
-	 * the last), and it reset the cell border only inside `.cbi-section`. A `.table` that LuCI
-	 * renders straight into `#view` — the apk package list, Status → Firewall's nftables — is
-	 * outside that reset, so it kept base's cell border on top of the theme's row border: every
-	 * separator drawn twice, and, because that cell line is straight and runs to the table's very
-	 * edge while the theme's frame is rounded, a square corner cutting across the radius (issue #7,
-	 * "лишняя граница, не имеющая скругления"). */
+	/* No per-cell border-top, and that is a fix rather than an omission: the theme draws a table's
+	 * separators on the ROW (theme/30-tables.css), so a cell border here is a second copy of every
+	 * separator — and because the cell line is straight and runs to the table's very edge while the
+	 * frame is rounded, a square corner cuts across the radius (issue #7). */
 	.table .th, .table .td {
 		display: table-cell;
-		/* middle is deliberate: a cell's content is a mix of text, badges and 36px buttons, and
-		 * top-aligning mixed-height rows reads as a layout fault. (The `Fixme` that sat here was
-		 * upstream bootstrap's own stale marker, imported with the rule.) */
+		/* middle is deliberate: a cell's content is a mix of text, badges and buttons, and
+		 * top-aligning mixed-height rows reads as a layout fault */
 		vertical-align: middle;
-		/* was `10px 10px 9px` — a bottom 1px shy of the top for no reason anyone recorded, which
-		 * is what an inherited number looks like. Symmetric, on the grid. */
 		padding: var(--fs-space-2) var(--fs-space-3);
 		text-align: start;
 	}
 
-	/* AN UNBREAKABLE VALUE MUST NOT LEAVE THE CARD, in ANY .table. Stock has always had this
-	 * (`overflow-wrap: break-word` on every cell); the theme replaced it with a rule that first
-	 * asked what KIND of table it is — it broke long values only for `#view .table[id] .td,
-	 * table.fs-dt .td`, i.e. a table carrying an id or a `.tr.table-titles` header row. That
-	 * narrowing is gone (theme/30-tables.css records its removal) and this rule is the only owner
-	 * now. A third-party status page rendering a key/value `<div class="table">` with neither
-	 * matched nothing, so its cells kept
-	 * `overflow-wrap: normal` and one unbroken token — an ICCID, a firmware string, an APN, a
-	 * base64 key, a DUID — held the column open and pushed the table outside its card.
-	 * Measured against luci-app-3ginfo-lite's own markup (`admin/modem`, three such tables).
+	/* An unbreakable value must not leave the card, in ANY .table. Asking what KIND of table it is
+	 * first leaves a third-party key/value `<div class="table">` matching nothing, so one unbroken
+	 * token — an ICCID, a base64 key, a DUID — holds the column open and pushes the table outside
+	 * its card (measured on 3ginfo-lite).
 	 *
-	 * NOT scoped to the phone tier, and that was measured rather than assumed. Scoping it to
-	 * `max-width: 767px` looked like the cautious choice and left a hole exactly where the
-	 * column is narrow but the WINDOW is not: with a 130-character token the table escaped its
-	 * card by 147px at 900px, 247px at 800px and 279px at 768px, and was contained at every
-	 * width with this rule unscoped. That is the same argument the fit engine is built on —
-	 * whether something fits is a property of the CONTENT and its column, not of the viewport.
-	 *
-	 * The cost is nil, which is the other half of the decision: across 8 router pages × 4
-	 * widths × 849 text cells, turning this on changes NOTHING — same cell overflows (0), same
-	 * tables past their column (0), same multi-line cells, same mid-word breaks, same total
-	 * line count. It bites only on the unbreakable token it exists for.
+	 * Not scoped to the phone tier: that leaves a hole where the column is narrow but the WINDOW is
+	 * not (with a 130-character token the table escaped its card by 147px at 900px and 279px at
+	 * 768px), which is the argument the fit engine is built on — whether something fits is a
+	 * property of the content and its column, not of the viewport. The cost is nil: across 8 pages
+	 * x 4 widths x 849 text cells nothing else changes.
 	 *
 	 * `anywhere`, not `break-word`: `break-word` permits the break without reducing the cell's
 	 * min-content contribution, so a `display: table` box still cannot shrink below its widest
-	 * token and the column stays open — tried, and the table stayed 355px wide in a 346px
-	 * column. The narrower `anywhere` rules in theme/ keep winning where they apply.
+	 * token and the column stays open — tried, and the table stayed 355px wide in a 346px column.
 	 *
-	 * THAT IS A CONTAINMENT DEFAULT, and it is right for every tier that has nowhere to put an
-	 * overflow: a key/value include inside a card, the config table (which is never measured), the
-	 * Overview meter rows, the realtime legend. It is exactly wrong for the one tier that IS
-	 * measured — a data table can card, break one column or scroll, so it wants the truth instead,
-	 * and `theme/30-tables.css` gives it `break-word` for as long as it is still a table. The split
-	 * is the whole design: honest floors where a measurement reads them, containment everywhere
-	 * else. Do not "unify" these two by moving either one.
+	 * That is a CONTAINMENT default, right for every tier with nowhere to put an overflow — a
+	 * key/value include, the config table, the Overview meter rows. It is wrong for the one tier
+	 * that IS measured: a data table can card, break one column or scroll, so it wants the truth
+	 * instead, and theme/30-tables.css gives it `break-word` for as long as it is a table. Do not
+	 * unify the two by moving either.
 	 *
-	 * SET PER ROLE, and that is the whole of the second rule: a VALUE may break anywhere, a LABEL
-	 * breaks at words. `.th` and `.td` never match the same element, so neither line depends on the
-	 * other's source order, and the pair rule above keeps only what both cells share.
+	 * Set per ROLE: a value may break anywhere, a label breaks at words. `anywhere` costs a
+	 * min-content of ONE CHARACTER, which is the point on a value — the column may collapse rather
+	 * than push the table out — and the bug it looks like on a header, since an auto-layout table
+	 * hands the surplus to whichever column asks loudest and the header row pays: measured on
+	 * Processes, `PID` came out as "PI/D" and the header row stood 104px tall, against 54px with
+	 * the floor at its longest word (issue #32).
 	 *
-	 * `anywhere` costs a min-content of ONE CHARACTER. On a value that is the point — the column
-	 * may collapse to nothing rather than push the table out of its card. On a header it is the bug
-	 * it looks like: an auto-layout table hands the surplus to whichever column asks loudest, and
-	 * with every text column's floor at one character the header row is what pays. Measured on
-	 * Status → Processes at 1228px against a Russian catalogue, where the actions column is
-	 * `nowrap` and 477px wide: `PID` came out as "PI/D", `Владелец` as "ВЛ/АД/ЕЛЕ/Ц", `root` in the
-	 * body as "roo/t", and the header row stood 104px tall. With the header floor back at its
-	 * longest WORD: 54px, every label and every owner cell on one line, the value columns 47/94/152
-	 * against 39/49/90, and the table still inside its card to the pixel (issue #32).
-	 *
-	 * `break-word` for the label, not `normal`: a header that IS one long token — a third-party
-	 * table naming a column after a key — must still break rather than overflow. It just may not
-	 * shrink the column below that word, which is what a header row is for. */
+	 * `break-word` for the label, not `normal`: a header that IS one long token must still break
+	 * rather than overflow, it just may not shrink the column below that word. */
 	.table .td { overflow-wrap: anywhere; }
 	.table .th { overflow-wrap: break-word; }
 
-	/* …AND THE FIRST COLUMN IS A LABEL TOO, whichever element it happens to be made of.
+	/* …and the first column is a label too, whichever element it is made of.
 	 *
-	 * `anywhere` costs a min-content of one character (above), and auto table layout hands each
-	 * column its share by MAX-content — so a two-column key/value table whose value is one enormous
-	 * token starves the key column down to that single character, and the header row above it with
-	 * it. Measured against luci-app-dockerman's Environment table (issue #36), which prints
-	 * `JSON.stringify()` of every field `docker info` returns: at 8 000 characters of value the key
-	 * column fell from 95px to 55px and "Driver" started wrapping; on the reporter's own host it
-	 * reached about one glyph, so the column header read "E N T R Y" straight down the page, on
-	 * Firefox 153 and on Blink alike.
+	 * `anywhere` costs a min-content of one character, and auto table layout hands each column its
+	 * share by MAX-content, so a two-column key/value table whose value is one enormous token
+	 * starves the key column down to that character — measured at 8000 characters of value, the key
+	 * column fell from 95px to 55px, and on the reporter's host the header read one glyph per line
+	 * (issue #36, on Firefox and Blink alike).
 	 *
-	 * `break-word` puts the floor back at the longest WORD — the same trade `.th` makes one line up,
-	 * for the same reason: the first column is the row's identity, and it is what you read the table
-	 * by. fs-select.js makes the same judgement in the other direction (MAX_ID_LINES: past five
-	 * lines the identity has stopped being readable and the table cards instead).
+	 * `break-word` puts the floor back at the longest WORD, the same trade `.th` makes above: the
+	 * first column is the row's identity, and it is what you read the table by.
 	 *
-	 * A CARDED row is exempt and must be: `.table.fs-stacked .td` (theme/30-tables.css) restates
-	 * `anywhere` from a later layer, so once every cell is on its own line there is no neighbouring
-	 * column left to starve it and a long value may break wherever it likes. */
+	 * A carded row is exempt and must be: `.table.fs-stacked .td` (theme/30-tables.css) restates
+	 * `anywhere` from a later layer, and once every cell is on its own line there is no
+	 * neighbouring column left to starve. */
 	.table .tr > .td:first-child { overflow-wrap: break-word; }
 
 	.table .tr:first-child .th {
@@ -118,13 +83,12 @@
 		vertical-align: top;
 	}
 
-	/* The empty-table plate: three lines of leading plus the cell inset it sits in, so it keeps
-	 * the table's own height when there is nothing to show.
+	/* The empty-table plate: three lines of leading plus the cell inset it sits in, so it keeps the
+	 * table's own height when there is nothing to show.
 	 *
-	 * IT IS OUT OF FLOW ON PURPOSE and stays that way: a single-cell row in a `display: table` spans
-	 * only the FIRST column, so in flow the plate is a narrow box under column one — and, worse, its
-	 * sentence then becomes that column's max-content and WIDENS it (measured: the Container column
-	 * of an empty section went 275px -> 502px when the cell was put back in flow). Absolute takes it
+	 * Out of flow on purpose: a single-cell row in a `display: table` spans only the FIRST column,
+	 * so in flow the plate is a narrow box under column one and its sentence becomes that column's
+	 * max-content, widening it (275px -> 502px on an empty section). Absolute takes it
 	 * out of the column sizing entirely and `inset-inline: 0` spans it across the table.
 	 *
 	 * WHAT IT MUST NOT DO IS PIN ITSELF TO THE BOTTOM. It used to say `bottom: 0`, which inside the
@@ -147,11 +111,10 @@
 		line-height: 3em;
 		/* …and the plate must be exactly as tall as the row reserved for it, or it hangs out of the
 		 * table at whichever end it is anchored to. `--fs-space-4` is two `--fs-space-2` at every
-		 * density, so this and the row height above are the same number written twice — which is what
-		 * lets the cell keep its own size while the four table flavours go on padding their ordinary
-		 * cells differently (`--fs-space-2` here, `--fs-space-2-5` on a framed data table, and so on).
-		 * Measured on Wireless, whose associated-stations table pads 10px a side: the plate came out
-		 * 67px inside a 63px row and printed 4px BELOW the frame's bottom border. */
+		 * density, so this and the row height above are the same number twice — which is what lets
+		 * the cell keep its own size while the table flavours pad their ordinary cells
+		 * differently. Measured on Wireless, whose table pads 10px a side: the plate came out 67px
+		 * inside a 63px row and printed 4px below the frame's bottom border. */
 		padding-block: var(--fs-space-2);
 	}
 

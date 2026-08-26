@@ -1,19 +1,13 @@
 #!/usr/bin/env node
-/* THE COUPLING REGISTRY: every assumption this theme makes about luci-base, checked against the
+/* The coupling registry: every assumption this theme makes about luci-base, checked against the
  * luci-base a router actually runs.
  *
- * The theme ships no framework and depends on `+luci-base` alone, which means every fs-*.js module
- * is written against somebody else's code — and against parts of it that are not an API. `L.Poll` is
- * a deprecated alias; `uci.state.values` and `uci.loaded` are private; `L.env.dispatchpath` is
- * re-pointed by us on a client navigation; `network.js` loads three uci packages exactly once and
- * answers out of that cache forever. None of those is a promise anyone made, and each is load-
- * bearing here.
- *
- * What made this file necessary: the network.js coupling broke in the field, not in a gate. The
- * router flushed uci's cache on navigation, network.js never reloaded it, and Status → Channel
- * Analysis and Network → Switch came back empty — reported by a reviewer on the upstream PR, three
- * days after the flush shipped. Every static gate was green, because the fact that broke lives in
- * another package's source.
+ * The theme ships no framework and depends on `+luci-base` alone, so every fs-*.js module is written
+ * against somebody else's code — and against parts of it that are not an API: `L.Poll` is a
+ * deprecated alias, `uci.state.values` and `uci.loaded` are private, `L.env.dispatchpath` is
+ * re-pointed by us on a client navigation, and network.js loads three uci packages exactly once and
+ * answers out of that cache forever. None of those is a promise anyone made, and each is
+ * load-bearing here.
  *
  * Each entry names WHAT is assumed, WHO in this repo assumes it, and a probe that answers on a live
  * page. A failure is not "the theme is broken" — it is "this luci-base moved, and the module named
@@ -22,8 +16,7 @@
  *   node tools/upstream-contract.mjs [--only owrt2512,owrt2410] [--verbose]
  *
  * Needs a running owlab router (docs/development.md); run it against SNAPSHOT too, which is where
- * luci-base's master lands first.
- */
+ * luci-base's master lands first. */
 import { chromium } from 'playwright';
 import { stands, login, requireStands } from './lib/stands.mjs';
 

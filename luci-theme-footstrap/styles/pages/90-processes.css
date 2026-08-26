@@ -1,19 +1,14 @@
 @layer page {
-	/* Processes (luci-mod-status): the PID column, which must not split.
+	/* Processes: the PID column, which must not split. No `white-space: nowrap` here any more — the
+	 * floor is general: theme/30-tables.css gives a data table `overflow-wrap: break-word` for as
+	 * long as it is a table, so every column keeps the width of its own widest unbreakable token,
+	 * and a PID is one token. (With `anywhere` on every cell instead, `384` rendered as "38/4" and
+	 * `4810` as "481/0" — 23 of 26 rows, measured at 1228px against a Russian catalogue: issue #32,
+	 * and issue #5 before it.) The one per-page rule that survives (pages/30-software.css) does so
+	 * because a hyphen IS a legal break opportunity and `break-word` will use it.
 	 *
-	 * `white-space: nowrap` used to stand here, and its job was to put a floor back under a column
-	 * that base/40-tables.css had taken it away from: with `overflow-wrap: anywhere` on every cell,
-	 * `384` rendered as "38/4" and `4810` as "481/0" — 23 of 26 rows on the router, measured at
-	 * 1228px against a Russian catalogue (issue #32, and issue #5 before it).
-	 *
-	 * The floor is general now. theme/30-tables.css gives a data table `overflow-wrap: break-word`
-	 * for as long as it is a table, so every column keeps the width of its own widest unbreakable
-	 * token — a PID is one token and cannot be split by anything short of the ladder deciding that
-	 * this column, specifically, must give way. Three per-page rules said the same thing three
-	 * times; the one that survives (pages/30-software.css) survives because a hyphen IS a legal
-	 * break opportunity and `break-word` will use it, which is a different fact.
-	 *
-	 * The measurement that replaced it, on the router at 720px: the Command column reports 353px of
-	 * need against 126px of width, the table asks for 963px in 688px of room, and the ladder marks
-	 * exactly one column breakable — leaving the PID whole without a rule of its own. */
+	 * The measurement that replaced the nowrap, on the router at 720px: the Command column reports
+	 * 353px of need against 126px of width, the table asks for 963px in 688px of room, and the
+	 * ladder marks exactly one column breakable — leaving the PID whole without a rule of its
+	 * own. */
 }

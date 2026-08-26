@@ -21,11 +21,11 @@ PKG_RELEASE:=1
 endif
 
 LUCI_TITLE:=Footstrap Theme
-# +luci-base is the WHOLE list, and keeping it that way is the constraint. Nothing this package
-# ships fetches anything at run time (the self-update script is retired), so there is no second
-# name to justify — and the rule that got it here stands: the one convenience tool that ever wanted
-# a dep was `curl`, which is NOT in OpenWrt's default set, on an 8 MB device, for one API call. Fall
-# back to what the base image has (uclient-fetch, jsonfilter, sha256sum) or do without.
+# +luci-base is the WHOLE list, and keeping it that way is the constraint. Nothing this package ships
+# fetches anything at run time, so there is no second name to justify — and the rule that got it here
+# stands: the one convenience tool that ever wanted a dep was `curl`, which is NOT in OpenWrt's
+# default set, on an 8 MB device, for one API call. Fall back to what the base image has
+# (uclient-fetch, jsonfilter, sha256sum) or do without.
 LUCI_DEPENDS:=+luci-base
 LUCI_PKGARCH:=all
 # Else luci.mk defaults these to LuCI's own, and the package claims MAINTAINER "OpenWrt LuCI
@@ -33,60 +33,55 @@ LUCI_PKGARCH:=all
 LUCI_MAINTAINER:=VizzleTF <vizzletf47@gmail.com>
 LUCI_URL:=https://github.com/VizzleTF/luci-theme-footstrap
 
-# CSS: ship verbatim. luci.mk would run csstidy over it, which is old enough to mangle
-# :has()/color-mix()/nested calc() and break the layout. build-css.sh minifies instead.
+# CSS: ship verbatim. luci.mk would run csstidy over it, which is old enough to mangle :has(),
+# color-mix() and nested calc() and break the layout. build-css.sh minifies instead.
 LUCI_MINIFY_CSS:=0
 #
-# JS: TWO minify paths, chosen by who is building.
+# JS: two minify paths, chosen by who is building.
 #
-# CI (the released packages) pre-minifies with terser BEFORE the SDK build (tools/minify-js.mjs:
-# mangles top-level identifiers too, which jsmin cannot — ~41 KB against jsmin's ~57 KB, −27%)
-# and signals it with FOOTSTRAP_PREMIN=1. jsmin must then stay AWAY from the already-minified
-# output: terser legitimately emits `return/^v/.test(s)`, the exact one-character-lookback trap
-# below, so LUCI_MINIFY_JS goes to 0 for that build.
+# CI (the released packages) pre-minifies with terser BEFORE the SDK build — tools/minify-js.mjs
+# mangles top-level identifiers too, which jsmin cannot: ~41 KB against jsmin's ~57 KB, −27% — and
+# signals it with FOOTSTRAP_PREMIN=1.
+# jsmin must then stay away from the already-minified output: terser legitimately emits
+# `return/^v/.test(s)`, the exact one-character-lookback trap below, so LUCI_MINIFY_JS goes to 0.
 #
-# Everyone else (an SDK user, the buildbot — no node) builds the untouched source and KEEPS
-# luci.mk's default jsmin (LUCI_MINIFY_JS=1): ~105 KB of this tree's JS is comments, and uhttpd
-# serves /www with NO compression, so those are wire AND flash bytes either way.
+# Everyone else (an SDK user, the buildbot — no node) builds the untouched source and keeps
+# luci.mk's default jsmin: ~105 KB of this tree's JS is comments, and uhttpd serves /www with NO
+# compression, so those are wire and flash bytes either way.
 #
-# The catch on the jsmin path, and why the gates exist: jsmin decides `/` = regex-or-division
-# from a ONE-character lookback, and `n` (of `return`) and `>` (of `=>`) are not on its
-# allow-list — so `return /re/` makes it eat the rest of the file AND EXIT 0
-# (openwrt/luci#8299). eslint's `wrap-regex` bans the shape in the SOURCE; tools/jsmin-verify.mjs
-# proves jsmin's output is TOKEN-IDENTICAL to it. Both keep guarding the non-CI path.
+# The catch on the jsmin path, and why the gates exist: jsmin decides regex-or-division from a
+# one-character lookback, and `n` (of `return`) and `>` (of `=>`) are not on its allow-list, so
+# `return /re/` makes it eat the rest of the file AND EXIT 0 (openwrt/luci#8299). eslint's
+# `wrap-regex` bans the shape in the source; tools/jsmin-verify.mjs proves jsmin's output is
+# token-identical to it.
 FOOTSTRAP_PREMIN?=
 ifneq ($(FOOTSTRAP_PREMIN),)
 LUCI_MINIFY_JS:=0
 endif
 
 # Apache-2.0, and not a free choice: styles/base began as a fork of luci-theme-bootstrap's
-# cascade.css, the ucode templates derive from LuCI's own, and a few JS helpers are verbatim
-# copies. The notices travel with it.
+# cascade.css, the ucode templates derive from LuCI's own, and a few JS helpers are verbatim copies.
+# The notices travel with it.
 #
-# THE OFL-1.1 HALF IS GONE WITH THE WEBFONTS. The theme carried subsetted Manrope and JetBrains
-# Mono and had to ship the OFL text beside them (§2 requires the notice and licence with every
-# copy of the Font Software). It ships no Font Software now, so declaring OFL would be a false
-# statement about the package's contents.
+# No OFL-1.1: the theme ships no Font Software, so declaring it would be a false statement about the
+# package's contents.
 PKG_LICENSE:=Apache-2.0
 PKG_LICENSE_FILES:=LICENSE
 
-# /etc/config/footstrap is SHIPPED as an empty stub and WRITTEN AT RUNTIME: Appearance -> "Save as
-# default" has rpcd uci-set the router-wide axes into that very file (fs-prefs.js saveAsDefault()).
-# Without this define the package manager owns it as an ordinary file and REPLACES it on upgrade —
-# so the admin's saved defaults were wiped by the theme's own one-click Update, silently, reported
-# as success. Measured on the dev router: eight options in the live file, package-owned, no
-# .conffiles entry beside base-files'/dnsmasq's. OpenWrt honours this for BOTH formats
-# (include/package-pack.mk: KEEP_$(1) -> apk .conffiles, ipk CONTROL/conffiles), so one define
-# covers 24.10's opkg and 25.12's apk alike. Any future root/etc/config/* must be listed here too.
+# /etc/config/footstrap is SHIPPED as an empty stub and WRITTEN AT RUNTIME: Appearance ->
+# "Save as default" has rpcd uci-set the router-wide axes into that very file. Without this define
+# the package manager owns it as an ordinary file and REPLACES it on upgrade, so the admin's saved
+# defaults are wiped by the theme's own one-click Update, silently and reported as success.
+# OpenWrt honours the define for BOTH formats (include/package-pack.mk), so one covers 24.10's opkg
+# and 25.12's apk alike. Any future root/etc/config/* must be listed here too.
 define Package/luci-theme-footstrap/conffiles
 /etc/config/footstrap
 endef
 
-# RELOAD, NOT RESTART: rpcd holds sessions in memory, so `restart` logs out every LuCI user —
+# reload, never restart: rpcd holds sessions in memory, so `restart` logs out every LuCI user,
 # including the admin who just clicked Update. `reload` sends SIGHUP, which re-reads
 # /usr/share/rpcd/acl.d/*, and that ACL refresh is the only thing this package needs from rpcd.
-# Verified on a live router: a session survives `reload` and dies across `restart`; deleting our
-# acl.d file + `reload` flips `session access` for the self-update script from true to false.
+# Verified on a live router: a session survives `reload` and dies across `restart`.
 define Package/luci-theme-footstrap/postinst
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
@@ -104,12 +99,11 @@ endef
 
 define Package/luci-theme-footstrap/postrm
 #!/bin/sh
-# opkg runs the OLD package's postrm with arg "upgrade" during a version upgrade (proven on 24.10:
-# `prerm upgrade`, then `postrm upgrade`, then the new `postinst configure`) and "remove" on a real
-# removal. On upgrade this script MUST change nothing: reverting mediaurlbase and wiping the theme
-# registration here is what flipped every updating 24.10 user back to bootstrap. apk never runs this
-# on upgrade (it uses the new package's pre/post-upgrade), so guarding on the arg is correct for both
-# managers; real removal passes "remove" (opkg) or no arg and proceeds below.
+# opkg runs the OLD package's postrm with arg "upgrade" during a version upgrade and "remove" on a
+# real removal. On upgrade this script MUST change nothing: reverting mediaurlbase and wiping the
+# theme registration here is what flipped every updating 24.10 user back to bootstrap. apk never
+# runs this on upgrade (it uses the new package's pre/post-upgrade), so guarding on the arg is
+# correct for both managers.
 case "$$1" in *upgrade*) exit 0 ;; esac
 [ -n "$${IPKG_INSTROOT}" ] || {
 	uci -q delete luci.themes.Footstrap
@@ -130,27 +124,22 @@ case "$$1" in *upgrade*) exit 0 ;; esac
 }
 endef
 
-# Runs right after luci.mk copies luasrc/ucode/htdocs/root/src into PKG_BUILD_DIR, so it
-# rewrites the build copy, never the source tree.
+# Runs right after luci.mk copies luasrc/ucode/htdocs/root/src into PKG_BUILD_DIR, so it rewrites
+# the build copy and never the source tree.
 #
 # 1. cascade.css is generated, not committed — and styles/ is not in luci.mk's copy list, so
-#    build-css.sh reads it from $(CURDIR) and writes into the build tree. cat/awk only, no host
-#    toolchain: that is why it runs on an OpenWrt buildbot.
-# 2. Stamp the git-derived version into the theme JS (fs-version.js — the string the Appearance tab
-#    shows). Unconditional: with PKG_VERSION empty it falls back to PKG_SRC_VERSION, which luci.mk
-#    always defines, so only an un-built source checkout keeps the literal '0.0.0-dev'.
+#    build-css.sh reads it from $(CURDIR) and writes into the build tree. cat and awk only, which
+#    is why it runs on an OpenWrt buildbot.
+# 2. Stamp the git-derived version into fs-version.js. Unconditional: with PKG_VERSION empty it
+#    falls back to PKG_SRC_VERSION, which luci.mk always defines, so only an un-built source
+#    checkout keeps the literal '0.0.0-dev'.
 #
-# THE CATALOGUE IS luci.mk's BUSINESS, and nothing here compiles it. `po/` is the directory
-# LUCI_LANGUAGES globs, so luci.mk emits one `luci-i18n-footstrap-<lang>` package per language the
-# way it does for every luci-app — which is what a package IN THE LUCI TREE has to look like, and
-# what Weblate can see (it translates `po/`, and only `po/`).
-#
-# It was `i18n/` here for a while, with a po2lmo loop in this hook bundling the catalogue into the
-# theme package, because a multi-package release was mis-picked by a self-update script that resolved
-# the theme by name and took `head -1` (issue #6). That script is retired and the release is built by
-# owfeed, which packages this theme as exactly one artifact per format regardless of what luci.mk
-# would do — so the constraint that bought the rename is gone, and the cost of keeping it (a
-# catalogue invisible to the project's own translation platform) is not.
+# The catalogue is luci.mk's business and nothing here compiles it. `po/` is the directory
+# LUCI_LANGUAGES globs, so luci.mk emits one `luci-i18n-footstrap-<lang>` package per language, the
+# way it does for every luci-app — which is what a package in the luci tree has to look like, and
+# what Weblate can see. It was `i18n/` while a fielded self-update script mis-picked a multi-asset
+# release with `head -1` (issue #6); that script is retired and owfeed builds one theme artifact
+# per format regardless.
 define Build/Prepare/luci-theme-footstrap
 	# luci.mk's Build/Prepare copies only src/ luasrc/ htdocs/ root/ ucode/ into
 	# $(PKG_BUILD_DIR), and PKG_LICENSE_FILES resolves against THAT — so the Apache text has to
@@ -188,18 +177,16 @@ endef
 # Absolute, not a relative path: CI rsyncs this package into package/, not into the feed.
 include $(TOPDIR)/feeds/luci/luci.mk
 
-# THE LINE BELOW IS LOAD-BEARING AND IT IS NOT A SIGNATURE — do not delete it as boilerplate.
+# The line below is load-bearing and is NOT a signature — do not delete it as boilerplate.
 #
 # include/scan.mk builds the package list by GREPPING the Makefiles, not by parsing them:
 #   find -L package -name Makefile | xargs grep -aHE 'call (Build/DefaultTargets|BuildPackage|KernelPackage)'
-# A Makefile that does not match is not in the list, so it is never dumped, no
-# CONFIG_PACKAGE_* symbol is emitted for it, and `make package/<name>/compile` answers
-# "No rule to make target" — with no error naming the package anywhere in the build.
+# A Makefile that does not match is not in the list, so it is never dumped, no CONFIG_PACKAGE_*
+# symbol is emitted for it, and `make package/<name>/compile` answers "No rule to make target" with
+# no error naming the package anywhere in the build.
 #
-# This theme never calls BuildPackage itself; luci.mk does, at the include above. The grep
-# cannot see that. So the only thing that puts this package into the SDK's list is the literal
-# text on the next line — which is why every luci-* Makefile carries it.
-# Deleting it as a useless comment is exactly what broke the build (both formats, silently).
-# tools/scan-marker.sh re-derives the grep from scan.mk and fails the build if it goes missing.
+# This theme never calls BuildPackage itself; luci.mk does, at the include above, and the grep
+# cannot see that. So the only thing that puts this package into the SDK's list is the literal text
+# on the next line. tools/scan-marker.sh re-derives the grep from scan.mk and fails the build if it
+# goes missing.
 # call BuildPackage - OpenWrt buildroot signature
-

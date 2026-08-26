@@ -1,14 +1,12 @@
 @layer theme {
-	/* ==================================================================
-	 * Tab strips — one component, four entry points. LuCI emits a strip under four selectors
-	 * with no markup difference worth honouring:
+	/* ---- tab strips: one component, four entry points ----
+	 * LuCI emits a strip under four selectors with no markup difference worth honouring:
 	 *   #tabmenu ul.tabs      page tabs, rendered into the server shell
 	 *   ul.cbi-tabmenu.mode   mode switcher (Available / Installed / Updates)
 	 *   .tabs                 view tabs (Routing -> IPv4 / IPv6)
 	 *   .cbi-tabmenu          CBI form tabs (System -> General / Logging / …)
-	 * They agree on everything except the active marker: `.active` for `ul.tabs`, `.cbi-tab`
-	 * for every `.cbi-tabmenu` flavour. All four render as pills in a card.
-	 * ================================================================== */
+	 * They agree on everything except the active marker: `.active` for `ul.tabs`, `.cbi-tab` for
+	 * every `.cbi-tabmenu` flavour. All four render as pills in a card. */
 	#tabmenu { margin-bottom: 0; }
 
 	/* the card */
@@ -95,17 +93,15 @@
 	/* ---- keyboard focus: a ring that survives the ACTIVE pill ----
 	 *
 	 * base/50-chrome.css drew it as `outline: 2px solid var(--fs-accent)` inset by -2px, which is
-	 * invisible on exactly the tab most likely to be focused: the active pill's own background IS
-	 * --fs-accent (rule above; measured on the router, both are rgb(86,157,245)). Tabbing across a
-	 * strip, the ring vanished the moment it reached the current page's tab.
+	 * invisible on exactly the tab most likely to be focused, the active pill's own background being
+	 * that same accent (measured on the router: both rgb(86,157,245)).
 	 *
-	 * ONE rule now, and the token is --fs-focus-ring-solo for both states: a tab flips nothing else
-	 * on focus, so the ring IS the indicator, and the tinted --fs-focus-ring measures 1.15-1.29:1
-	 * against the strip — the first version of this fix took it for the inactive pill and swapped
-	 * one invisible indicator for another. -solo's 2px surface gap is also what lets the same
-	 * value serve the ACTIVE pill, whose background is the accent the ring is drawn in.
-	 * box-shadow, not outline, because the strip clips (which is why the outline was inset in the
-	 * first place) and a shadow is not clipped by the scroll container. */
+	 * One rule for both states, on --fs-focus-ring-solo: a tab flips nothing else on focus, so the
+	 * ring IS the indicator, and the tinted --fs-focus-ring measures 1.15-1.29:1 against the strip —
+	 * the first version of this fix took that tint for the inactive pill and swapped one invisible
+	 * indicator for another.
+	 * -solo's 2px surface gap is also what lets one value serve the active pill. box-shadow, not
+	 * outline, because the strip clips and a shadow is not clipped by the scroll container. */
 	#tabmenu ul.tabs > li > a:focus-visible,
 	ul.cbi-tabmenu.mode > li > a:focus-visible,
 	.tabs > li > a:focus-visible,

@@ -1,18 +1,16 @@
 #!/bin/sh
-# Build the GitHub-release body from the CHANGELOG — it is GENERATED, never hand-written,
-# so the changelog stays the single source.
+# Build the GitHub-release body from the CHANGELOG — generated, never hand-written, so the changelog
+# stays the single source.
 #
-# Every bullet is `- **one-line effect.** then the rationale` (docs/releasing.md). The bold lead is
-# what a release reader wants; the rationale is for maintainers. So the notes are just those
-# leads, grouped under their `### Fixed`/`### Added`/… headers. Consequences: a bullet with
-# NO bold lead is silently omitted, and an empty section prints no header.
+# Every bullet is `- **one-line effect.** then the rationale` (docs/releasing.md): the bold lead is
+# what a release reader wants, the rationale is for maintainers. So the notes are those leads,
+# grouped under their `###` headers — which means a bullet with NO bold lead is silently omitted,
+# and an empty section prints no header.
 #
-# CHANGELOG.md is primary; the CHANGELOG_ru.md mirror's summary is appended under a divider,
-# so the release page carries both languages.
+# CHANGELOG.md is primary; the CHANGELOG_ru.md mirror's summary is appended under a divider.
 #
-# Usage: release-notes.sh <version> [changelog-file]
-#   <version>  e.g. 0.7.18 (no leading v); matches the `## [0.7.18]` heading.
-# Prints to stdout. Pure sh + awk, so the release job needs no node.
+# Usage: release-notes.sh <version> [changelog-file], version without the leading v.
+# Prints to stdout. Pure sh and awk, so the release job needs no node.
 set -eu
 
 ver="${1:?usage: release-notes.sh <version> [changelog]}"

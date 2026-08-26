@@ -1,10 +1,9 @@
 @layer base {
-	/* `.btn` and `.cbi-button` are interchangeable in LuCI markup; a row action carries
-	 * both plus a `-<variant>` class (edit, remove, apply, save). The paint (box, fill,
-	 * radius) is theme/55-buttons.css's — absorbed, along with the `.item::after` member,
-	 * whose plate now lives with the dynlist in theme/60-inputs.css. Left here: --on-color
-	 * (NOT paint — base/95-luci.css masks the spinner glyph with it, so it must track the
-	 * variant), and what theme does not restate. */
+	/* `.btn` and `.cbi-button` are interchangeable in LuCI markup; a row action carries both plus a
+	 * `-<variant>` class. The paint — box, fill, radius — is theme/55-buttons.css's, along with the
+	 * `.item::after` member, whose plate now lives with the dynlist in theme/60-inputs.css. What is
+	 * left here is --on-color, which is not paint: base/95-luci.css masks the spinner glyph with
+	 * it, so it must track the variant. */
 	.btn,
 	.cbi-button {
 		--on-color: var(--fs-text);
@@ -22,16 +21,12 @@
 		color: var(--fs-danger);
 	}
 
-	/* `--on-color` ONLY. The `border-color: var(--on-color)` that used to sit in each of these was
-	 * dead on arrival and had been for as long as the theme has painted buttons: theme/55-buttons.css
-	 * sets `border` on `.cbi-button, .btn`, and a later layer beats this one whatever the
-	 * specificity — so a `.cbi-button-edit` never wore the accent border declared here, it wore
-	 * `--fs-border` from the theme. (Proven, not reasoned: stripping them changes no computed style
-	 * over docs/gallery.html, which renders every one of these variants.)
-	 *
-	 * `--on-color` stays because it is NOT paint: base/95-luci.css masks the spinner glyph
-	 * (`.spinning::before`) with it, so it has to track the button's variant. The colour a variant
-	 * WEARS is theme/55-buttons.css's business, in one place. */
+	/* `--on-color` only. A `border-color` here would be dead: theme/55-buttons.css sets `border` on
+	 * `.cbi-button, .btn`, and a later layer beats this one whatever the specificity, so the
+	 * variant wears the theme's colour either way — proven, not reasoned: stripping the ones that
+	 * used to sit here changes no computed style over docs/gallery.html, which renders every one of
+	 * these variants. `--on-color` stays because it is not paint — base/95-luci.css masks the
+	 * spinner glyph with it. */
 	.cbi-button-positive,
 	.cbi-button-fieldadd,
 	.cbi-button-add,
@@ -64,23 +59,16 @@
 		vertical-align: middle;
 	}
 
-	/* No `float` here, and its absence is measured rather than assumed: theme/55-buttons.css makes
-	 * `.cbi-page-actions` a flex container, and float does not apply to a flex item — so the
-	 * `float: left` that used to sit beside this margin computed to `none` and moved nothing. It
-	 * was not merely inert, it was misleading: it read as the one declaration in this file that had
-	 * been missed by the move to logical properties, so the next person to sweep for physical sides
-	 * would have "fixed" a rule that does nothing. There is no context that revives it — print
+	/* No `float` here: theme/55-buttons.css makes `.cbi-page-actions` a flex container, and float
+	 * does not apply to a flex item, so one would compute to `none` and move nothing while reading
+	 * like a physical side the logical-property sweep had missed. No context revives it — print
 	 * hides the whole container (theme/97-print.css). Verified in a live document in both writing
-	 * directions: the button sits 569px from the reading edge with the float and 569px without it,
-	 * and the same before and after removal. */
+	 * directions: the button sits 569px from the reading edge with the float and 569px without. */
 	.cbi-page-actions > :not([method="post"]):not(.cbi-button-apply):not(.cbi-button-negative):not(.cbi-button-save):not(.cbi-button-reset) {
 		margin-inline-end: var(--fs-space-1);
 	}
 
-	/* Fills and borders: theme/55-buttons.css — absorbed. --on-color stays (the spinner mask, see
-	 * above). The `border-color` that used to be here carried a stale note claiming theme did not
-	 * set it on `.cbi-page-actions .cbi-button-apply` — theme/55-buttons.css sets `border: 1px solid
-	 * transparent` on exactly that selector, and has for a while. */
+	/* fills and borders: theme/55-buttons.css — absorbed. --on-color stays (the spinner mask). */
 	.btn.primary,
 	.cbi-button-action.important,
 	.cbi-page-actions .cbi-button-apply,

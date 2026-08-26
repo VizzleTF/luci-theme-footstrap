@@ -1,10 +1,9 @@
-# luci-theme-footstrap is noarch: one build, two containers (apk for 25.12+, ipk for
-# 24.10), both out of owfeed rather than an OpenWrt SDK. docs/conventions.md has why.
+# luci-theme-footstrap is noarch: one build, two containers (apk for 25.12+, ipk for 24.10), both
+# out of owfeed rather than an OpenWrt SDK. docs/conventions.md has why.
 #
-# The release pipeline itself is not here — it is owfeed's `package.yml`, which every
-# repository in this ecosystem shares. What is here is this theme's own gates: each
-# one line, each a script under tools/ whose header says what it is for and what
-# shipped once because it did not exist.
+# The release pipeline itself is owfeed's `package.yml`, shared by every repository in this
+# ecosystem. What is here is this theme's own gates: each one line, each a script under tools/ whose
+# header says what it is for.
 
 name: Build LuCI theme packages
 
@@ -18,11 +17,11 @@ on:
 permissions:
   contents: read
 
-# EVERY JOB CARRIES A TIMEOUT, because the default is six hours and a hung step is not a failed
-# one: an apt mirror and a playwright download stalled for 68 minutes on two jobs of the 0.13.2
-# tag with GitHub reporting everything operational, and the release sat behind them. The values
-# are the green-run times with room for a slow runner — 18s, 1m24s, 1m14s, 1m28s, and the live
-# job, which is the only long one — so a stall goes red in minutes and a re-run is one click.
+# EVERY JOB CARRIES A TIMEOUT, because the default is six hours and a hung step is not a failed one:
+# an apt mirror and a playwright download stalled for 68 minutes on two jobs of the 0.13.2 tag with
+# GitHub reporting everything operational. The values are the green-run times with room for a slow
+# runner — 18s, 1m24s, 1m14s, 1m28s, and the live job, which is the only long one — so a stall goes
+# red in minutes and a re-run is one click.
 jobs:
   check:
     name: Static checks
@@ -35,10 +34,9 @@ jobs:
       - run: sh tools/check-acl.sh
       - run: luci-theme-footstrap/build-css.sh /tmp/cascade.css
       - run: python3 tools/audit.py --strict
-      # gettext for update-po; the ucode gate needs only docker, which the runner has. Asked for
-      # only when the image does not already carry it, and under tools/ci-retry.sh when it does
-      # not: apt does not fail when its mirror is unwell, it stalls, and a stalled step is
-      # nothing's problem until the job timeout.
+      # gettext for update-po; the ucode gate needs only docker. Asked for only when the image does
+      # not already carry it, and under tools/ci-retry.sh: apt does not fail when its mirror is
+      # unwell, it stalls, and a stalled step is nothing's problem until the job timeout.
       - run: |
           if command -v msgfmt >/dev/null && command -v msgmerge >/dev/null && command -v xgettext >/dev/null; then
             echo 'gettext already on this image'
@@ -48,8 +46,8 @@ jobs:
           fi
       - run: luci-theme-footstrap/update-po.sh --check
 
-  # npm-based gates, and they live here and nowhere else: the OpenWrt buildbot has no
-  # node, luci.mk never needs one, and nothing in package.json is shipped.
+  # npm-based gates, and they live here and nowhere else: the OpenWrt buildbot has no node, luci.mk
+  # never needs one, and nothing in package.json is shipped.
   lint:
     name: Lint + accessibility
     runs-on: ubuntu-latest
@@ -62,13 +60,13 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # Through package.json, not a second copy of the globs: a glob restated here
-      # goes on linting the old path after package.json moves.
+      # Through package.json, not a second copy of the globs: a glob restated here goes on linting
+      # the old path after package.json moves.
       - run: npm run lint:js
       - run: npm run lint:css
 
-      # The unit suite: pure logic only, no browser, ~100 ms. It runs BEFORE the browser
-      # install because it is the fastest thing here and the first to fail on a broken module.
+      # The unit suite: pure logic, no browser, ~100 ms. Before the browser install because it is
+      # the fastest thing here and the first to fail on a broken module.
       - run: npm test
 
       # The browser off Playwright's CDN, then a launch to prove it works; apt only if that
@@ -76,9 +74,9 @@ jobs:
       - run: sh tools/ci-playwright.sh
       - run: node tools/a11y-gallery.mjs
 
-      # What the router actually sends, weighed on the real artefact: build-css + the token
-      # mangle for the sheet, terser over a copy of the resources for the JS. And the app
-      # icons, which are committed rasters — this proves they still match logo.svg.
+      # What the router actually sends, weighed on the real artefact: build-css plus the token mangle
+      # for the sheet, terser over a copy of the resources for the JS. And the app icons, which are
+      # committed rasters — this proves they still match logo.svg.
       - run: node tools/size-budget.mjs --show
       - run: node tools/build-icons.mjs --check
       - run: node tools/export-tier.mjs
@@ -90,18 +88,17 @@ jobs:
       - run: node tools/axes.mjs
       - run: node tools/chrome-fence.mjs
 
-      # Two derived contracts that were in `npm run check` and in no workflow. Both fail the same
-      # way if nobody runs them: the stylesheet's "an unanswered table takes no room" rule stops
-      # naming a root fs-select scans, or the page-module map names a page that no longer exists —
-      # and in each case the page renders with something missing and says nothing about it.
+      # Two derived contracts that were in `npm run check` and in no workflow. Both fail the same way
+      # if nobody runs them: the stylesheet's "an unanswered table takes no room" rule stops naming a
+      # root fs-select scans, or the page-module map names a page that no longer exists — and the
+      # page then renders with something missing and says nothing about it.
       - run: node tools/table-contract.mjs
       - run: node tools/page-modules.mjs
 
-      # These three were in `npm run check` and in no workflow, i.e. enforced only when a
-      # human remembered to run the whole suite locally. Each guards a failure nothing
-      # observable reports: a conffile the package manager replaces on somebody else's
-      # upgrade, an `!important` that drifted out of the allowlist, a changelog bullet with
-      # no bold lead, which release-notes.sh drops from the release page in silence.
+      # These three were enforced only when a human remembered to run the whole suite locally. Each
+      # guards a failure nothing observable reports: a conffile the package manager replaces on
+      # somebody else's upgrade, an `!important` that drifted out of the allowlist, a changelog
+      # bullet with no bold lead, which release-notes.sh drops from the release page in silence.
       - run: node tools/conffiles.mjs
       - run: node tools/bang-ok.mjs
       - run: node tools/changelog.mjs
@@ -110,9 +107,9 @@ jobs:
       - run: echo "JSMIN=$(sh tools/build-jsmin.sh)" >> "$GITHUB_ENV"
       - run: node tools/jsmin-verify.mjs
 
-  # No key anywhere in this job. `owfeed check` is build, sign, index and doctor on
-  # keys owfeed generates and throws away, so a pull request exercises the pipeline
-  # that publishes rather than a second one that drifts from it.
+  # No key anywhere in this job. `owfeed check` is build, sign, index and doctor on keys owfeed
+  # generates and throws away, so a pull request exercises the pipeline that publishes rather than a
+  # second one that drifts from it.
   build:
     name: Build the packages
     timeout-minutes: 25
@@ -126,17 +123,17 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      # --ignore-scripts: a dev dependency's lifecycle script has no business running
-      # in the job that produces the released bytes.
+      # --ignore-scripts: a dev dependency's lifecycle script has no business running in the job that
+      # produces the released bytes.
       - run: npm ci --ignore-scripts
 
       - uses: owfeed/owfeed/setup@v0.5.0
         with:
           version: v0.5.0
 
-      # The commit's timestamp, not the job's: a package's identity is a hash over its
-      # payload and mkpkg records mtimes, so re-running a release over the same commit
-      # has to produce the same bytes.
+      # The commit's timestamp, not the job's: a package's identity is a hash over its payload and
+      # mkpkg records mtimes, so re-running a release over the same commit must produce the same
+      # bytes.
       - run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
 
       - run: ./tools/stage.sh
@@ -154,14 +151,14 @@ jobs:
             dist/all
           if-no-files-found: error
 
-  # Everything above proves the package was BUILT correctly. None of it proves the
-  # thing a user cares about: that installing it produces a router whose pages render.
-  # owlab boots a real OpenWrt, installs the package and logs into LuCI to fetch the
-  # theme's own pages — an unauthenticated request is a redirect to the login form,
-  # which is why a hand-written curl reports 403 on a healthy page.
+  # Everything above proves the package was BUILT correctly. None of it proves what a user cares
+  # about: that installing it produces a router whose pages render. owlab boots a real OpenWrt,
+  # installs the package and logs into LuCI to fetch the theme's own pages — an unauthenticated
+  # request is a redirect to the login form, which is why a hand-written curl reports 403 on a
+  # healthy page.
   #
-  # No key exists anywhere in this job: it asserts that a package works, never that
-  # anyone should trust it.
+  # No key exists anywhere in this job: it asserts that a package works, never that anyone should
+  # trust it.
   verify:
     name: The package works on a real router
     timeout-minutes: 25
@@ -174,21 +171,17 @@ jobs:
           name: owfeed-packages
           path: dist/
 
-      # ONE RELEASE PER STEP: 25.12 is apk and 24.10 is opkg, and neither will install
-      # the other's file.
+      # ONE RELEASE PER STEP: 25.12 is apk and 24.10 is opkg, and neither installs the other's file.
       - name: Install this build on 25.12 and render its pages
         uses: owfeed/owlab/action@v0.5.3
         with:
           version: v0.5.3
           releases: "25.12.4"
           install: dist/noarch/luci-theme-footstrap-*.apk
-          # `exec ucode -T -c` is LuCI's own trycompile, run against the templates as
-          # INSTALLED and with the router's real luci.core and uci — so it needs no
-          # stubs and no interpreter of ours. It replaces a gate that cloned ucode at a
-          # pinned commit and built it with cmake, which ran in CI and nowhere else.
-          # A stray brace here is the one way this repository can ship a completely
-          # broken UI with everything else green: LuCI falls back to another theme and
-          # says nothing.
+          # `exec ucode -T -c` is LuCI's own trycompile, run against the templates as INSTALLED
+          # and with the router's real luci.core and uci, so it needs no stubs. A stray brace here
+          # is the one way this repository can ship a completely broken UI with everything else
+          # green: LuCI falls back to another theme and says nothing.
           assert: |
             package luci-theme-footstrap
             file /www/luci-static/footstrap/cascade.css
@@ -202,9 +195,8 @@ jobs:
           version: v0.5.3
           releases: "24.10.8"
           install: dist/all/luci-theme-footstrap_*.ipk
-          # The same compile as the 25.12 leg, and not redundant: the templates are
-          # identical but the interpreters are not, and a construct 25.12's ucode
-          # accepts is not proof that 24.10's does.
+          # The same compile as the 25.12 leg, and not redundant: the templates are identical but
+          # the interpreters are not, and what 25.12's ucode accepts 24.10's may not.
           assert: |
             package luci-theme-footstrap
             file /www/luci-static/footstrap/cascade.css
@@ -212,14 +204,13 @@ jobs:
             http 200 /cgi-bin/luci/admin/system/system
             exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 
-      # And the published channel, by NAME, out of the signed index — a different
-      # claim entirely: it proves the index parses, the URL does not redirect
-      # somewhere apk will not follow, and the key on the router matches the one that
-      # signed it.
+      # And the published channel, by NAME, out of the signed index — a different claim: that the
+      # index parses, the URL does not redirect somewhere apk will not follow, and the key on the
+      # router matches the one that signed it.
       #
-      # It tests what is ALREADY LIVE rather than this build, so it never fails the
-      # job: a feed mid-DNS-migration would otherwise block a theme release on the
-      # health of a channel this repository does not own.
+      # It tests what is ALREADY LIVE rather than this build, so it never fails the job: a feed
+      # mid-DNS-migration would otherwise block a theme release on a channel this repository does
+      # not own.
       - id: feed-key
         if: github.event_name != 'pull_request'
         run: sh tools/feed-key.sh
@@ -239,11 +230,10 @@ jobs:
             package luci-theme-footstrap
             http 200 /cgi-bin/luci/admin/status/overview
 
-  # Everything above measures a FILE. This one measures a PAGE, which is where every field report
-  # has come from: a column shredded to one character per line (#11), a clipped submenu title (#22),
-  # a doubled scrollbar in one engine (#12), a third-party app laid out wrong (#8, #33, #36), and a
-  # client navigation that painted less than a full load (upstream review). None of those can fail a
-  # static gate; all of them fail here.
+  # Everything above measures a FILE. This one measures a PAGE, which is where every field report has
+  # come from: a column shredded to one character per line (#11), a clipped submenu title (#22), a
+  # doubled scrollbar in one engine (#12), a third-party app laid out wrong (#8, #33, #36), a client
+  # navigation that painted less than a full load (upstream review). None can fail a static gate.
   #
   # owlab boots the same containers a developer runs locally, so the gate and the local command are
   # the same command. Two routers on a push, one on a pull request: the second release line doubles
@@ -275,8 +265,7 @@ jobs:
         run: |
           set -eu
           # NOT `. "$GITHUB_ENV"` — that file is a KEY=VALUE list, not a script, so a value with a
-          # space in it ("owrt2512 owrt2410") runs its second word as a command. Set the variable
-          # here and publish it for the later steps.
+          # space in it ("owrt2512 owrt2410") runs its second word as a command.
           if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410"; fi
           echo "ROUTERS=$ROUTERS" >> "$GITHUB_ENV"
           owlab up $ROUTERS
@@ -288,29 +277,28 @@ jobs:
           done
 
       # Cheapest first, so a broken assumption about luci-base is reported before anything spends
-      # minutes rendering pages against it. Every one of these measures one representative per PAGE
-      # SHAPE by default (tools/lib/page-shapes.mjs) and names the pages it stood in for; a release
-      # takes the whole menu on all four routers instead (`--all --pages-all`, docs/releasing.md).
+      # minutes rendering pages against it. Each measures one representative per PAGE SHAPE by
+      # default (tools/lib/page-shapes.mjs) and names the pages it stood in for; a release takes the
+      # whole menu on all four routers instead (`--all --pages-all`, docs/releasing.md).
       - run: node tools/upstream-contract.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
       - run: node tools/spa-parity.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
       - run: node tools/live-audit.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
-      # Nothing may re-decide or jump while the page moves. Chromium only here: WebKit needs a set
-      # of system libraries (gtk-4, gstreamer) this job would install on every run, and the engine
-      # differences it covers are checked locally before a release (docs/development.md).
+      # Nothing may re-decide or jump while the page moves. Chromium only here: WebKit needs system
+      # libraries (gtk-4, gstreamer) this job would install on every run, and the engine differences
+      # it covers are checked locally before a release (docs/development.md).
       - run: node tools/scroll-jank.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
       # The two things a poll tick can do to a page nobody is touching: lay out a replaced table
       # before anything answered for it, and move the page under the reader.
       - run: node tools/table-tick.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
-      # ON WEBKIT AND FIREFOX TOO, and that is not thoroughness for its own sake: the second fault
       # Chromium here; the other two engines have a job of their own (`anchors`), because the
-      # three-engine matrix takes longer than this job's whole budget — it was cancelled at 45
-      # minutes with the sweep still running.
+      # three-engine matrix takes longer than this job's whole budget — cancelled at 45 minutes with
+      # the sweep still running.
       - run: node tools/scroll-anchor.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
 
-      # LAST, because it installs the PUBLISHED release over the build the steps above measured —
-      # and that is the claim: what a user runs is install.sh against the feed, not `apk add` against
-      # a local file. Three field reports (#16, #28, #30) were this script and nothing else, all of
-      # them on the re-install-over-an-existing-copy path, which a fresh install cannot exercise.
+      # LAST, because it installs the PUBLISHED release over the build the steps above measured — and
+      # that is the claim: what a user runs is install.sh against the feed, not `apk add` against a
+      # local file. Three field reports (#16, #28, #30) were this script and nothing else, all on the
+      # re-install-over-an-existing-copy path, which a fresh install cannot exercise.
       - run: sh tools/install-check.sh $ROUTERS
 
       - if: always()
@@ -318,16 +306,15 @@ jobs:
 
   # THE OTHER TWO ENGINES, on a clock of their own.
   #
-  # This used to be one more step inside `live`, and it did not fit: three engines across two
-  # routers, two page shapes, two widths, both layouts and all three densities is ~290 measurements,
-  # and the job was cancelled at its 45-minute limit with the sweep still going. Splitting it is not
-  # a way of running less — the whole matrix runs — it is a way of running it beside the rest rather
+  # This was one more step inside `live` and it did not fit: three engines across two routers, two
+  # page shapes, two widths, both layouts and all three densities is ~290 measurements, and the job
+  # was cancelled at its 45-minute limit. Splitting it runs the whole matrix beside the rest rather
   # than inside somebody else's budget.
   #
-  # WHY THE OTHER ENGINES AT ALL: the fault this gate now hunts lives on the path an engine takes
-  # when it DOES anchor. WebKit shipped anchoring, so chromium-with-anchoring-suppressed no longer
-  # stands in for Safari, and on that path WebKit overshoots a section swap by 60px per tick.
-  # Measured on 24.10, both layouts, 390 and 1440.
+  # Why the other engines at all: the fault this gate hunts lives on the path an engine takes when it
+  # DOES anchor. WebKit shipped anchoring, so chromium-with-anchoring-suppressed no longer stands in
+  # for Safari, and on that path WebKit overshoots a section swap by 60px per tick. Measured on
+  # 24.10, both layouts, 390 and 1440.
   anchors:
     name: The reader stays put on every engine
     timeout-minutes: 75
@@ -380,22 +367,21 @@ jobs:
     with:
       owfeed-version: v0.5.0
       # Writes dist/install.sh and release-notes.md. The installer is an asset because
-      # raw.githubusercontent is rate-limited for the very user who most needs it (issue
-      # #17) and because a signed copy is the only one that can be checked before it runs
-      # as root; the notes fill the release page and are NOT an asset, since the package
-      # that used to fetch them is retired — hence a path beside dist/ rather than in it.
+      # raw.githubusercontent is rate-limited for the very user who most needs it (issue #17) and
+      # because a signed copy is the only one checkable before it runs as root; the notes fill the
+      # release page and are not an asset, hence a path beside dist/ rather than in it.
       #
-      # A WORKSPACE PATH, not `${{ runner.temp }}`: at job level a reusable workflow's
-      # `with:` may only read github/needs/vars/inputs, and naming `runner` there is not an
-      # error at edit time — it fails the whole run at STARTUP, with zero jobs and no log
-      # to read (measured: run 31903926488, "failure" with an empty job list).
+      # A WORKSPACE PATH, not `${{ runner.temp }}`: at job level a reusable workflow's `with:` may
+      # only read github/needs/vars/inputs, and naming `runner` there is not an error at edit time —
+      # it fails the whole run at STARTUP, with zero jobs and no log to read (measured: run
+      # 31903926488, "failure" with an empty job list).
       pre-release: sh tools/stage-release.sh
       sign-also: install.sh
       notes-file: release-notes.md
       verify-with: release.pub
 
-  # Refresh the Pages mirror of the release metadata. Called rather than triggered:
-  # `on: release` never fires for a release created with GITHUB_TOKEN.
+  # Refresh the Pages mirror of the release metadata. Called rather than triggered: `on: release`
+  # never fires for a release created with GITHUB_TOKEN.
   pages:
     name: Refresh the Pages mirror
     needs: release

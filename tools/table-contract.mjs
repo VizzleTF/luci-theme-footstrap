@@ -1,29 +1,25 @@
 #!/usr/bin/env node
-/* THE TABLE CONTRACT, held to the sheet and to the render.
+/* The table contract, held to the sheet and to the render.
  *
- * Every table in this theme reaches one of a small number of outcomes, and which one is decided by
- * measurement (fs-select.js's ladder) rather than by a breakpoint. What a gate CAN hold is the two
- * halves that measurement rests on, and both halves have been broken before by a change that looked
- * local:
+ * Every table in this theme reaches one of a few outcomes, decided by measurement (fs-select.js's
+ * ladder) rather than by a breakpoint. What a gate CAN hold is the three things that measurement
+ * rests on, each of which has been broken by a change that looked local:
  *
- *   1. WHERE THE BREAK VALUES LIVE. `overflow-wrap: anywhere` lowers a cell's min-content to one
+ *   1. where the break values live. `overflow-wrap: anywhere` lowers a cell's min-content to one
  *      character (css-text-3 §5.4), which is right for a tier with nowhere to put an overflow and
- *      catastrophic for the tier that is measured — it makes the browser answer "it fits" while a
- *      column is being starved. The split between the two is the whole design, so it is asserted
- *      selector by selector, in the built sheet, with no browser involved.
- *
- *   2. WHAT THE RENDER DOES. docs/gallery.html carries a fixture per tier, including the shapes
+ *      catastrophic for the tier that is measured — the browser then answers "it fits" while a
+ *      column is starved.
+ *   2. what the render does. docs/gallery.html carries a fixture per tier, including the shapes
  *      that only ever appeared in bug reports (a 130-character token, an 8 000-character value, a
- *      MAC, a hyphenated identifier). This renders them, walks a probe width down, and asserts the
- *      floor holds, the card prints its captions, and nothing that scrolls is left unreachable.
+ *      MAC, a hyphenated identifier).
+ *   3. the gate that keeps an unanswered table out of the layout.
  *
- * WHAT IT CANNOT ASSERT, and the doc says so rather than letting a green gate read as coverage: the
- * gallery ships CSS only — no LuCI JS — so which class the ladder picks, the pathological-column
- * pick, the poll, the dialog flag and `roomFor` under the real chrome belong to the live sweep on
- * the owlab stands (tools/table-sweep.mjs).
+ * WHAT IT CANNOT ASSERT, so a green run is not read as coverage: the gallery ships CSS only — no
+ * LuCI JS — so which class the ladder picks, the pathological-column pick, the poll, the dialog
+ * flag and `roomFor` under the real chrome belong to the live gates (tools/table-tick.mjs,
+ * tools/live-audit.mjs).
  *
- *   node tools/table-contract.mjs [--verbose]
- */
+ * Usage: node tools/table-contract.mjs [--verbose] */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as csstree from 'css-tree';
@@ -37,12 +33,12 @@ const css = readFileSync(cssPath, 'utf8');
 const fails = [];
 const notes = [];
 
-/* ---------------------------------------------------------------- 1. the sheet
+/* ---- 1. the sheet ----
  *
- * Each entry is a selector that is ALLOWED to carry that break value on a cell, with the reason it
- * is allowed. Anything else carrying one is a failure — not because the value is wrong in itself,
- * but because a fifth place to decide how a column may break is how the four per-page rules and the
- * three JS heuristics happened in the first place. */
+ * Each entry is a selector ALLOWED to carry that break value on a cell, with the reason. Anything
+ * else carrying one is a failure — not because the value is wrong in itself, but because a fifth
+ * place to decide how a column may break is how the four per-page rules and the three JS heuristics
+ * happened in the first place. */
 const BREAK_OK = {
 	'anywhere': [
 		{ sel: '.table .td', why: 'base: the containment default for every tier that cannot card or scroll' },
@@ -112,21 +108,18 @@ csstree.walk(ast, {
 });
 
 /* ---------------------------------------------------------------- 2. the render */
-/* ---- 3. THE GATE THAT KEEPS A FRESHLY POLLED TABLE OUT OF THE LAYOUT ----
+/* ---- 3. the gate that keeps a freshly polled table out of the layout ----
  *
  * A poll tick REPLACES a data table, and a fresh one carries no marks: for the moment between
- * landing and being stamped it is laid out as a full-width table — at 390px several screens taller
- * than the card stack it is about to become. If anything forces layout in that moment (an app
- * reading a width right after rendering is enough), the engine re-anchors on the intermediate and
- * throws the reader: measured on a live router at iPhone width, 612px out and back, twice per tick.
+ * landing and being stamped it is laid out as a full-width table, at 390px several screens taller
+ * than the card stack it is about to become. If anything forces layout in that moment, the engine
+ * re-anchors on the intermediate and throws the reader.
  *
- * `theme/30-tables.css` answers it by holding an unanswered table out of the flow, and the rule has
- * to name the roots a table can land in. fs-select scans `ROOTS`; the stylesheet lists them again.
- * Two lists of the same fact, so they are derived and compared here: a root added to the JS without
- * the CSS is a table nothing protects, and the symptom is a page that jumps on a router with an app
- * that renders tables somewhere new. Verified by removing the rule and reproducing the intermediate:
- * one unanswered table, 375px tall, at a forced layout on Обзор@390 — 0 with the rule in place.
- */
+ * theme/30-tables.css answers it by holding an unanswered table out of the flow, and the rule has to
+ * name the roots a table can land in. fs-select scans `ROOTS`; the stylesheet lists them again, so
+ * the two are derived and compared here — a root added to the JS without the CSS is a table nothing
+ * protects, and the symptom is a page that jumps on a router with an app that renders tables
+ * somewhere new. */
 const selJs = readFileSync(join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources/fs-select.js'), 'utf8');
 const rootsDecl = /const ROOTS = \[([^\]]*)\]/.exec(selJs);
 if (!rootsDecl) fails.push('fs-select.js no longer declares ROOTS, so the gate rule cannot be checked against it');

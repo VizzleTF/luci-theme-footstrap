@@ -1,14 +1,12 @@
 #!/bin/sh
 # Every shell script in the SOURCE tree parses.
 #
-# The payload is not here: `owfeed doctor` parses everything under `files:` (OWF213),
-# which covers /etc/uci-defaults/* and /usr/libexec/* once tools/stage.sh has staged
-# them. What is left is the scripts that never reach a router and that owfeed therefore
-# cannot see.
+# The payload is not here: `owfeed doctor` parses everything under `files:` (OWF213), which covers
+# /etc/uci-defaults/* and /usr/libexec/* once tools/stage.sh has staged them. What is left is the
+# scripts that never reach a router.
 #
-# tools/ is in the glob because release-notes.sh is only ever RUN by the release job,
-# i.e. after both packages have already built. A syntax error in it used to be found at
-# the one moment it costs the most.
+# tools/ is in the glob because release-notes.sh is only ever run by the release job, i.e. after
+# both packages have built — a syntax error in it would be found at the one moment it costs most.
 set -eu
 cd "$(dirname "$0")/.."
 

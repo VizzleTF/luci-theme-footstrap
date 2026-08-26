@@ -1,6 +1,6 @@
 @layer base {
-	/* The modal overlay ui.js shows for config diffs, uploads and login, plus the
-	 * colour variants shared by .btn / .alert-message / .cbi-tooltip. */
+	/* the modal overlay ui.js shows for config diffs, uploads and login, plus the colour variants
+	 * shared by .btn / .alert-message / .cbi-tooltip */
 	#modal_overlay {
 		position: fixed;
 		top: 0;
@@ -15,7 +15,7 @@
 
 	.modal {
 		width: 90%;
-		/* clear of the sticky bar, and centred. Was `5em auto` — a rhythm in the dialog's own font. */
+		/* clear of the sticky bar, and centred */
 		margin: var(--fs-space-6) auto;
 		min-height: var(--fs-control-h);
 		max-width: 600px;
@@ -23,11 +23,9 @@
 		border-radius: var(--fs-radius-lg);
 		background: var(--fs-panel);
 		border: var(--fs-hairline);
-		/* box-shadow: theme/70-modal.css — absorbed. It was `0 0 3px var(--fs-panel2)`, a shadow in
-		 * the colour of the page (in footstrap light panel2 and bg are the same hex), so the theme
-		 * gives every .modal --fs-shadow-pop instead and this one was dead. */
-		/* was `1em 1em .5em 1em` — a bottom half the top because the button row below carries its
-		 * own margin. The card's own gutter on every side; the button row's spacing is its business. */
+		/* box-shadow: theme/70-modal.css — absorbed; the old one was a shadow in the colour of the
+		 * page, and the theme gives every .modal --fs-shadow-pop instead */
+		/* the card's own gutter on every side; the button row's spacing is its own business */
 		padding: var(--fs-card-pad);
 		min-width: 270px;
 	}
@@ -54,9 +52,9 @@
 
 	body.modal-overlay-active {
 		overflow: hidden;
-		/* svh: `100vh` counts the mobile URL bar as if it were not there and cropped the modal, and
-		 * `dvh` re-lays the dialog out on every frame of the bar's slide (theme/20-shell.css). The
-		 * small viewport height is the one that is both correct and still. */
+		/* svh: `100vh` counts the mobile URL bar as if it were not there and crops the modal, while
+		 * `dvh` re-lays the dialog out on every frame of the bar's slide. The small viewport height
+		 * is the one that is both correct and still. */
 		height: 100svh;
 	}
 
@@ -66,19 +64,18 @@
 		visibility: visible;
 	}
 
-	/* the cross inside a button/alert: `line-height: 1` centres the glyph in its own box, where
-	 * this said 18px — upstream's leading, which stopped matching the moment the scale moved. */
+	/* the cross inside a button or alert: `line-height: 1` centres the glyph in its own box, where a
+	 * fixed leading stops matching the moment the type scale moves */
 	.btn .close, .alert-message .close {
 		font-family: var(--fs-font-sans);
 		line-height: 1;
 	}
 
-	/* THE WHOLE COLOUR-WORD BLOCK IS ABSORBED — do not re-add any of it.
-	 *
-	 * `.btn.<word>` -> theme/55-buttons.css. `.alert-message.<word>` -> theme/35-alerts.css, which
-	 * paints plain `.alert-message`: a later layer beats this one whatever the specificity, so
-	 * every variant here was already dead for the alert. `.cbi-tooltip.<word>` -> theme/35-alerts.css
-	 * as well; those were genuinely alive and genuinely un-themed, and the note that used to sit
-	 * here said so ("theme does not claim those") for as long as nothing rendered them. The gallery
-	 * renders all four now, which is what turned the claim into a measurement. */
+	/* The whole colour-word block is absorbed — do not re-add any of it. `.btn.<word>` lives in
+	 * theme/55-buttons.css, `.alert-message.<word>` and `.cbi-tooltip.<word>` in
+	 * theme/35-alerts.css. The alert variants were already dead: theme paints plain
+	 * `.alert-message`, and a later layer beats this one whatever the specificity. The tooltip
+	 * variants were not — they were alive and un-themed, which is why the note that used to sit
+	 * here said the theme did not claim them; the gallery renders all four now, and that is what
+	 * turned the claim into a measurement. */
 }

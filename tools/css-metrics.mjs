@@ -1,91 +1,51 @@
 #!/usr/bin/env node
-/* A RATCHET on the stylesheet's shape: pin the numbers that only get worse by accident, so they
- * cannot drift up one commit at a time. Not style opinions; each is an invariant docs/conventions.md states
- * in prose and nothing enforced. (The CSS size budget and the font-byte budget this once cited as
- * precedent are both GONE — build-css.sh keeps only a broken-build floor.)
+/* A ratchet on the stylesheet's shape: pin the numbers that only get worse by accident, so they
+ * cannot drift up one commit at a time. Not style opinions — each is an invariant
+ * docs/conventions.md states in prose and nothing else enforces.
  *
- *   IMPORTANTS — which declarations may carry `!important` is documented: a fact about the
- *     cascade, not a preference. The count lives in LIMITS below and nowhere else — this header
- *     used to restate it and had already drifted a digit, which is the failure build.yml refuses
- *     to repeat by name. stylelint's `declaration-no-important` + allowlist stops a NEW file adding one;
- *     this stops the allowlisted files growing more. A RATCHET: it was 33 while three flags in base
- *     were fighting footstrap's own rules rather than an inline one — the cascade answers that with
- *     a later layer, so they are gone and the number came down with them. Tighten it again whenever
- *     a flag goes, so it cannot drift back.
- *   MAX SPECIFICITY — "do not let source order carry meaning… win on specificity instead." A rule
- *     needing a wilder selector than anything else is usually fighting a battle a cascade layer
- *     should have won for it.
+ *   IMPORTANTS — which declarations may carry `!important` is documented: a fact about the cascade,
+ *     not a preference. The count lives in LIMITS below and nowhere else, this header having
+ *     already drifted a digit when it restated it. stylelint's allowlist stops a NEW file adding
+ *     one; this stops the allowlisted files growing more.
+ *   MAX SPECIFICITY — "do not let source order carry meaning… win on specificity instead"
+ *     (docs/conventions.md). A rule needing a wilder selector than anything else is usually
+ *     fighting a battle a cascade layer should have won for it.
  *   EMPTY RULES — always a mistake, and the concatenating build cannot see one.
  *
  * Lower a number when you make it true. Raising one is a decision, and wants a comment.
  *
- * Usage: node tools/css-metrics.mjs [--show]
+ *   node tools/css-metrics.mjs [--show]      (--show also prints rule/selector/declaration counts)
  */
 import { readFileSync } from 'node:fs';
 import { analyze } from '@projectwallace/css-analyzer';
 import { buildCss } from './lib/css.mjs';
 
 const LIMITS = {
-	/* 19 (theme+pages: 15 fighting an inline or unlayered declaration, 4 the reduced-motion block,
-	 * whose `*` selector cannot beat a component rule in its own layer any other way) + 8 (base).
-	 * By file: 20-overview 8, 90-responsive 4, 95-a11y-media 4, 45-misc 2, 65-dropdown 1, base
-	 * 95-luci 8.
+	/* The current split: theme and pages carry the flags that fight an inline or unlayered declaration
+	 * plus the reduced-motion block, whose `*` selector cannot beat a component rule in its own layer
+	 * any other way; base carries the forcing utilities and `[hidden]`.
 	 *
-	 * Raised 30 -> 31 for theme/45-misc.css's realtime-graph bleed. It is the sanctioned kind: the
-	 * stock views size their drawing from #view but write `style="width:100%"` on the box they draw
-	 * into, so inside our padded card the canvas is 34px short and the newest samples are clipped —
-	 * and an inline declaration is exactly what no cascade layer can outrank.
+	 * `[hidden]` in base/10-reset.css is the one flag whose adversary is NOT an inline style: it is
+	 * every `display` this theme sets on a class. The UA gives `hidden` the weakest `display: none`
+	 * there is, so `.tr`, `.td`, `ul.nav > li`, `.cbi-page-actions` and `.ifacebox` all painted a
+	 * hidden element anyway (measured), and no layer can hold that — a rule written tomorrow would
+	 * re-open the hole.
 	 *
-	 * Lowered 31 -> 26: theme/65-dropdown.css's three `ul` margin flags were absorbed cargo from
-	 * luci-theme-bootstrap (no @layer there) whose stated adversary — an inline `margin` from ui.js
-	 * — does not exist on either release. They were beating the same FILE's open-popover
-	 * `margin-top`; see the note there.
-	 *
-	 * Raised 26 -> 27 for the realtime graph's border colour, the same box and the same inline
-	 * style as the bleed above: every stock realtime view writes `border:1px solid #000` on it, and
-	 * black belongs to no palette this theme ships. One property, one flag, and no cascade layer
-	 * can outrank an inline declaration.
-	 *
-	 * Raised 27 -> 28 for theme/30-tables.css's `word-break: normal` on a data table's cells. Same
-	 * adversary, one level deeper: luci-mod-status's processes.js writes `word-break: break-word`
-	 * INLINE on its Command span, which is the deprecated alias for `overflow-wrap: anywhere` and
-	 * therefore erases the column's min-content — the exact number the whole table pipeline now
-	 * measures. Measured at 720px of viewport: the column held at 126px against a 353px token with
-	 * every layered remedy tried, and reports 963px of need in 688px of room once the alias is
-	 * neutralised.
-	 *
-	 * Raised 28 -> 30 for the two flags on the realtime graph's axis labels. Third time on the same
-	 * box and the same adversary: the stock `.svg` writes the fill and a black text-shadow INLINE on
-	 * every <text>, for the black background that file assumes. On a light palette the labels land
-	 * at 1.16:1 against the panel this theme paints behind them, which is legible only as the halo
-	 * around the digits; the fill has to follow --fs-text and the halo has to go, and neither can be
-	 * done from a cascade layer.
-	 *
-	 * Raised 30 -> 31 for `[hidden]` in base/10-reset.css, and this one's adversary is NOT an inline
-	 * style: it is every `display` this theme sets on a class, present and future. `hidden` is the
-	 * platform's own way for a view to say an element is not there — `el.hidden = true`, no CSS
-	 * involved, the only mechanism available to an app that ships no stylesheet — and the UA gives
-	 * it the weakest `display: none` there is, so `.tr`, `.td`, `ul.nav > li`, `.cbi-page-actions`
-	 * and `.ifacebox` all painted a hidden element anyway (measured). No layer can hold that: the
-	 * page layer already carries id-specific `display` rules ([1,7,0] is this file's own ceiling),
-	 * and a rule written tomorrow would re-open the hole. Same family as the forcing utilities base
-	 * is already exempt for — a declaration whose whole job is to outrank the theme's own paint.
-	 *
-	 * Raised 31 -> 32 for the SAME flag written twice: the port card's traffic figures fight
-	 * 29_ports.js's inline `font-size:80%`, and the declaration is now stated plainly and again
-	 * with `round()`, the way 02-tokens.css states the type ladder. An engine without `round()`
-	 * drops the whole declaration, flag and all, so a single rounded form would have left that
-	 * engine inheriting a size nobody chose — and the fallback needs the flag for the same reason
-	 * the rounded one does. One adversary, one property, two syntaxes. */
+	 * A raise is a decision and wants a line saying what was bought — the realtime-graph bleed is the
+	 * sanctioned kind, the stock views writing `style="width:100%"` on the box they draw into, which
+	 * no cascade layer can outrank. The port card's traffic figures are the other shape: one
+	 * adversary, one property, two syntaxes, because an engine without `round()` drops the whole
+	 * declaration, flag and all, and the fallback needs the flag for the same reason the rounded
+	 * form does. A lowering is free and should be taken whenever a flag turns out to have no
+	 * adversary. */
 	importants: 32,
 	/* The widest selector the theme needs; see the layer rules in docs/conventions.md.
 	 *
-	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`. Not sprawl:
-	 * the sidebar gives way to the bar when the CONTENT column would be too narrow, and that
-	 * depends on the sidebar's own cut (224px expanded, 68px as a rail) — so it cannot be a
-	 * media query and has to be an attribute. Every rule in the vertical and rail blocks
-	 * therefore carries one attribute more; the deepest is the rail's paused-poll glyph at
-	 * [1,7,0]. The ratchet did its job: it made the increase a decision, not a drift. */
+	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`: the sidebar gives
+	 * way to the bar when the CONTENT column would be too narrow, which depends on the sidebar's own
+	 * cut, so it cannot be a media query and has to be an attribute — every rule in the vertical and
+	 * rail blocks therefore carries one attribute more. The ratchet did its job: it made the
+	 * increase a decision rather than a drift. */
 	maxSpecificity: [1, 7, 0],
 	emptyRules: 0,
 };

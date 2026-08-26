@@ -1,15 +1,15 @@
 /* Load one shipped `fs-*.js` the way luci.js loads it, so a unit test can call its exports.
  *
  * A LuCI resource file is NOT an ES module and cannot be `import`ed: it has no exports, it ends in a
- * bare `return`, and its dependencies arrive as PARAMETERS named by the `'require x as y'` pragmas in
- * its directive prologue. luci.js evaluates it as the body of
+ * bare `return`, and its dependencies arrive as PARAMETERS named by the `'require x as y'` pragmas
+ * in its directive prologue. luci.js evaluates it as the body of
  *
  *     function (window, document, L, <one param per pragma>) { … }
  *
- * with `E` and `_` reached through `window`. This reproduces exactly that call, which is the only
- * honest way to test the file that ships — a rewritten copy in ESM syntax would be a second source
- * of truth, and the interesting bugs live in the seam this wrapper IS (see tools/minify-js.mjs, where
- * the same derivation stops terser handing `L` to one of its own variables).
+ * with `E` and `_` reached through `window`. This reproduces that call, which is the only honest way
+ * to test the file that ships — a rewritten copy in ESM syntax would be a second source of truth,
+ * and the interesting bugs live in the seam this wrapper IS (see tools/minify-js.mjs, where the same
+ * derivation stops terser handing `L` to one of its own variables).
  *
  * The alias is derived the way luci.js derives it: the `as` name, else the dependency with every
  * non-word character replaced. A dependency with no stub is handed an empty object rather than
@@ -18,8 +18,7 @@
  * What this is NOT: a browser. There is no layout, no CSS and no event dispatch — `window` and
  * `document` here record what a module ASKS FOR (listeners, timers) and answer the few reads a
  * module makes at eval. Anything that needs a real box on a real page belongs on a stand
- * (docs/development.md), and the suite says so rather than faking a measurement.
- */
+ * (docs/development.md). */
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

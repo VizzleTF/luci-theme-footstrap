@@ -1,37 +1,29 @@
 @layer theme {
-	/* ==================================================================
-	 * THE TOP-LAYOUT BAR — :root[data-layout="top"], EVERY width.
+	/* ---- the top-layout bar: :root[data-layout="top"], every width ----
 	 *
-	 * A DELTA, not a layout. The bar itself (sticky, blurred, row, popup submenus, square icon
-	 * buttons, right cluster) is the UNGUARDED base in 20-shell.css — the bar is what the chrome
-	 * IS unless the vertical sidebar overrides it; see the note there. This file adds what the
-	 * TOP-LAYOUT bar wants on top of that base:
+	 * A DELTA, not a layout. The bar itself — sticky, blurred, row, popup submenus, square icon
+	 * buttons, right cluster — is the unguarded base in 20-shell.css, the bar being what the chrome
+	 * IS unless the vertical sidebar overrides it. This file adds what the top-layout bar wants on
+	 * top of that:
 	 *   - a designed bar height, and padding aligned to the content column;
 	 *   - the menu on the brand's row instead of wrapped beneath it.
 	 *
-	 * NO `@media` floor. The top bar used to gate these deltas at `min-width: 768px` and fall back
-	 * to the phone bar below it — but "does the menu fit on the brand's row?" is a property of the
-	 * CONTENT (5 sections stock, eleven with a few luci-app-*), not of the viewport, so the whole
-	 * bar is now MEASURED: fs-chrome.js (fitChrome) shrinks the pills, then collapses the poll pill
-	 * to an icon, then stacks the menu onto its own row — at any width. The under-item dropdown and
-	 * its clamp therefore apply at every width too (menu-footstrap.js clampDropdown, no longer
-	 * gated on 768) — and, since issue #19, in every bar STATE as well, which is why they sit in
-	 * the base rather than here. There is no distinct left-pinned phone bar any more, in either
-	 * layout: one bar, one dropdown anchor.
-	 * ================================================================== */
+	 * No `@media` floor: "does the menu fit on the brand's row?" is a property of the CONTENT (5
+	 * sections stock, eleven with a few luci-app-*), not of the viewport, so the whole bar is
+	 * MEASURED — fs-chrome.js shrinks the pills, collapses the poll pill to an icon, then stacks the
+	 * menu onto its own row, at any width. The under-item dropdown and its clamp therefore apply at
+	 * every width too. */
 	:root[data-layout="top"] .fs-sidebar {
 		/* min-height, not height: the bar has a designed height but must be able to GROW —
 		 * a long hostname wraps onto a second line inside the capped brand (20-shell.css),
 		 * and a fixed height would clip it. */
 		min-height: var(--fs-bar-h); height: auto;
 		gap: var(--fs-space-3);
-		/* nowrap while the menu rides the brand's row. Without it flexbox wraps the BAR,
-		 * carrying the menu onto a second line by itself while its own pills stay in one
-		 * row — a stacked bar in everything but the styling (the right cluster keeps its
-		 * single-row ordering, and the bar silently grew to 120px). It also destroys the
-		 * fits-on-one-row MEASUREMENT, because a menu handed a whole row of course fits.
-		 * Forbidding the wrap forces the menu to share the row and to wrap its OWN pills
-		 * when it cannot — which is exactly the signal fitChrome measures. */
+		/* nowrap while the menu rides the brand's row. Without it flexbox wraps the BAR, carrying the
+		 * menu onto a second line by itself while its own pills stay in one row — a stacked bar in
+		 * everything but the styling. It also destroys the fits-on-one-row measurement, a menu handed
+		 * a whole row of course fitting. Forbidding the wrap forces the menu to share the row and to
+		 * wrap its OWN pills when it cannot, which is the signal fitChrome measures. */
 		flex-wrap: nowrap;
 		/* align the bar's contents to the .fs-content column, so the brand and the menu line
 		 * up with the headings and the cards below */
@@ -65,16 +57,13 @@
 	/* the bar replaces the sidebar's 22px top padding with the top-nav's 26px */
 	:root[data-layout="top"] .fs-content { padding-top: var(--fs-space-6); }
 
-	/* ==================================================================
-	 * THE MENU DOES NOT FIT ON THE BRAND'S ROW — .fs-bar-stack
+	/* ---- the menu does not fit on the brand's row: .fs-bar-stack ----
 	 *
-	 * Set by fs-chrome.js (fitChrome), NOT by a media query. Whether the menu fits beside the
-	 * brand depends on how many sections the router HAS — 5 on a stock install, eleven with a few
-	 * luci-app-* packages — so the width at which the bar must stack is a property of the CONTENT,
-	 * not of the device, and a hard-coded breakpoint gets it wrong in both directions. The JS
-	 * shrinks the pills first (.fs-dense1/2, theme/10-chrome.css), then collapses the poll pill
-	 * (.fs-ind-compact, below), and stacks only when even that still overflows.
-	 * ================================================================== */
+	 * Set by fs-chrome.js (fitChrome), not by a media query: whether the menu fits beside the brand
+	 * depends on how many sections the router HAS, so the width at which the bar must stack is a
+	 * property of the content and a hard-coded breakpoint gets it wrong in both directions. The JS
+	 * shrinks the pills first, then collapses the poll pill, and stacks only when even that still
+	 * overflows. */
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack {
 		flex-wrap: wrap; height: auto; padding: var(--fs-space-2-5) var(--fs-space-4);
 	}
@@ -87,12 +76,12 @@
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack #indicators,
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow { margin-inline-start: auto; }
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack #indicators:not(:empty) ~ .fs-themerow { margin-inline-start: 0; }
-	/* Two .fs-themerow buttons (Search, then Appearance): exactly like the base bar (20-shell.css),
-	 * only the FIRST rendered far-edge item may keep the auto inline-start margin, or flexbox SPLITS the
-	 * free space between the two autos and Search drifts to mid-bar. The base `.fs-themerow ~
-	 * .fs-themerow` guard is out-specified by the auto rule above (0,4,0 > 0,2,0), so it must be
-	 * restated here. Bites when #indicators is :empty (display:none) — e.g. right after an SPA nav,
-	 * before the poll pill returns. */
+	/* Two .fs-themerow buttons, Search then Appearance: only the FIRST rendered far-edge item may
+	 * keep the auto inline-start margin, exactly as in the base bar, or flexbox splits the free
+	 * space between the two autos and Search drifts to mid-bar. The base `.fs-themerow ~
+	 * .fs-themerow` guard is out-specified by the auto rule above (0,4,0 against 0,2,0), so it must
+	 * be restated here. Bites when #indicators is :empty — right after an SPA nav, before
+	 * the poll pill returns. */
 	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow ~ .fs-themerow { margin-inline-start: 0; }
 
 	/* The right cluster's own escalation — .fs-ind-compact and .fs-bar-actrow — is NOT here: it

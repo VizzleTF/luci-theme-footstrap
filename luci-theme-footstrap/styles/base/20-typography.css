@@ -1,22 +1,19 @@
 @layer base {
 	/* The body box, links, and the type scale a view inherits from plain markup.
 	 * body background/padding/font-family: theme/20-shell.css — absorbed.
-	 *
-	 * Every size and gutter here reads the scale in 02-tokens.css. It used to state literals —
-	 * 13/18 with 9px and 8.5px halves, a 30/24/18/16/14/13 heading ramp, a 25px list indent — which
-	 * was luci-theme-bootstrap's scale rather than a decision anyone made about Manrope. */
+	 * Every size and gutter here reads the scale in 02-tokens.css rather than stating a literal. */
 	body {
 		font-size: var(--fs-type);
 		font-weight: var(--fs-weight-normal);
 		/* unitless: it inherits as a FACTOR, so a 20px heading gets 30px of leading instead of the
-		 * flat 18px a length would push down onto it and clip. */
+		 * flat length that would clip it */
 		line-height: var(--fs-leading);
 		color: var(--fs-text);
 		min-height: 100%;
 		display: flex;
 		flex-direction: column;
-		/* gutter, not `overflow-y: scroll`: same no-reflow guarantee, without a dead
-		 * scrollbar down every short page. */
+		/* gutter, not `overflow-y: scroll`: the same no-reflow guarantee without a dead scrollbar
+		 * down every short page */
 		scrollbar-gutter: stable;
 	}
 
@@ -45,11 +42,9 @@
 		font-size: var(--fs-type);
 		font-weight: var(--fs-weight-normal);
 		margin-bottom: var(--fs-space-2);
-		/* prose, so no orphans: LuCI's descriptions are one or two sentences of help text and a
-		 * single trailing word on its own line reads as a rendering fault. `pretty`, not
-		 * `balance` — balance is capped at a few lines and re-flows the WHOLE block, which is for
-		 * headings; pretty only reworks the tail. Unsupported browsers ignore it and wrap as
-		 * before, so there is nothing to guard. */
+		/* prose, so no orphans: a single trailing word on its own line reads as a rendering fault.
+		 * `pretty`, not `balance` — balance is capped at a few lines and re-flows the whole block,
+		 * which is for headings. An unsupporting browser ignores it. */
 		text-wrap: pretty;
 	}
 
@@ -61,8 +56,7 @@
 	/* The heading ramp lives in theme/45-misc.css — absorbed whole (weights, sizes, ink);
 	 * theme/30-tables.css owns `legend`. Only the `<h_ small>` treatment remains here. */
 
-	/* One rule for every `<h_ small>`: relative, so it tracks whatever step its heading sits on
-	 * instead of the four hand-set sizes (18/14/14/12) this used to carry. */
+	/* one rule for every `<h_ small>`, relative so it tracks whatever step its heading sits on */
 	h1 small,
 	h2 small,
 	h3 small,
@@ -141,8 +135,8 @@
 	}
 
 	code {
-		/* panel2 (6.45:1), not a border-level surface: --fs-text on the latter is 4.40:1
-		 * in dark — under AA. Still reads as a chip. */
+		/* panel2 (6.45:1), not a border-level surface: --fs-text on the latter is 4.40:1 in dark,
+		 * under AA */
 		background-color: var(--fs-panel2);
 		color: var(--fs-text);
 		padding: 1px var(--fs-space-1);

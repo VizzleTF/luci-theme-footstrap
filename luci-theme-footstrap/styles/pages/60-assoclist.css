@@ -1,18 +1,15 @@
 @layer page {
-	/* Associated stations (Overview and Network → Wireless render the same `.assoclist` table).
+	/* Associated stations (Overview and Network -> Wireless render the same `.assoclist` table).
 	 *
-	 * `white-space: nowrap` on column 2 used to stand here, because `overflow-wrap: anywhere` split
-	 * `48:E1:5C:9F:26:20` at whatever character landed on the edge (issue #5) in a ~103px column,
-	 * every time.
+	 * No `white-space: nowrap` on the MAC column any more, though one stood here while
+	 * `overflow-wrap: anywhere` split `48:E1:5C:9F:26:20` at whatever character landed on the edge
+	 * of a ~103px column, every time (issue #5). A MAC has no break opportunity in it — a colon is
+	 * not one — so the honest floor theme/30-tables.css gives a data table keeps the whole address
+	 * in one piece, for every table that shows one rather than for this one.
 	 *
-	 * A MAC has no break opportunity in it — a colon is not one — so the honest floor
-	 * theme/30-tables.css now gives a data table keeps the whole address in one piece without a
-	 * per-page rule, and keeps it for every table that shows one rather than for this one.
-	 *
-	 * What the old note here was right about, and what the ladder inherits: nowrapping the Signal
-	 * and Rate columns as well (v0.9.1) was WORSE, because it made the modulation string
-	 * ("229 Mbit/s, 20 MHz, HE-MCS 9, HE-NSS 2") an unbreakable ~300px block that ate the row and
-	 * crushed the Network column. A wide cell that CAN break is the lesser evil, and that is exactly
-	 * what rung 3 chooses when it has to choose: the widest breakable column gives way, never the
-	 * identity column. */
+	 * Do not nowrap the Signal and Rate columns either: that makes the modulation string
+	 * ("229 Mbit/s, 20 MHz, HE-MCS 9, HE-NSS 2") an unbreakable ~300px block that eats the row and
+	 * crushes the Network column. A wide cell that CAN break is the lesser evil, and that is what
+	 * rung 3 of fs-select.js's remedy ladder chooses when it has to choose: the widest breakable
+	 * column gives way, never the identity column. */
 }

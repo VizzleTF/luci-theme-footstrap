@@ -1,23 +1,14 @@
 /* The --*-color-* export tier is a CONTRACT with other people's packages, and axe cannot see it:
  * those widgets ship in their packages, not in the gallery. It is the only part of this theme
- * anything outside it reads — on the dev router: luci-app-podkop, luci-app-justclash (eleven
- * files), stock firewall.js / status/cpu.js. Written against luci-theme-bootstrap, they read a
- * level as `color:` about as often as `background:`, so each level owes three things:
+ * anything outside it reads, and the apps that do were written against luci-theme-bootstrap, where
+ * a level is read as `color:` about as often as `background:`. So each level owes three things:
  *
- *   LEGIBLE AS TEXT   AA (4.5:1) on all three surfaces. Bootstrap does NOT manage this (its
- *                     --primary-color-low is 3.6:1 on its own dark panel); that caps our ramp.
- *   LEGIBLE AS A FILL the matching --on-*-color clears AA on top of the level, so an app's
- *                     filled chip stays readable.
- *   ACTUALLY A RAMP   high/medium/low must be three DIFFERENT colours. They were once three
+ *   LEGIBLE AS TEXT   AA (4.5:1) on all three surfaces. Bootstrap does not manage this (its
+ *                     --primary-color-low is 3.6:1 on its own dark panel), which caps our ramp.
+ *   LEGIBLE AS A FILL the matching --on-*-color clears AA on top of the level.
+ *   A REAL GRADATION  high/medium/low must be three distinguishable colours. They were once three
  *                     aliases of ONE token and nothing caught it — a flat colour passes every
- *                     contrast threshold there is; only a spread check fails on it. podkop
- *                     painted "no data" with --primary-color-low and got the live-value accent.
- *
- * Sweeps the whole {footstrap,hicontrast,bootstrap} x {light,dark} x 7 tint values matrix: a palette switcher multiplies
- * it, and the combination nobody looks at is where this rots.
- *
- *   node tools/export-tier.mjs
- */
+ *                     contrast threshold there is; only a spread check fails on it. */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -113,12 +104,11 @@ const failures = [];
 let checks = 0;
 
 /* One combination, measured. A function rather than a loop body because the sweep runs TWICE: once
- * as the theme paints by default, and once with `prefers-contrast: more` emulated — that media
- * query re-states the ink and hairline tokens (theme/95-a11y-media.css), so it publishes a SECOND
- * export tier that nothing measured. It shipped one: `--fs-faint` was set to `--fs-dim` there, which
- * made --text-color-low and -medium the same colour for every app reading the gradation, which is
- * the exact flattening 02-tokens.css spends twelve lines undoing. Untinted only in that pass: the
- * query moves the inks, the tint moves the surfaces, and the first pass already walks the wheel. */
+ * as the theme paints by default, and once with `prefers-contrast: more` emulated — that query
+ * re-states the ink and hairline tokens, so it publishes a SECOND export tier that nothing else
+ * measures. It shipped one: `--fs-faint` was set to `--fs-dim` there, making --text-color-low and
+ * -medium the same colour for every app reading the gradation. Untinted only in that pass, the
+ * query moving the inks while the tint moves the surfaces. */
 async function runCombo({ palette, mode, tint }, suffix) {
 	await applyAppearance(page, { mode, palette, tint });
 
@@ -176,20 +166,18 @@ async function runCombo({ palette, mode, tint }, suffix) {
 				`(${hi} vs ${lo}) — the ramp is FLAT: an app asking for a gradation gets one colour three times`);
 	}
 
-	/* ---- dark mode must be SNIFFABLE, and <body> is what everyone sniffs -----------------
+	/* ---- dark mode must be sniffable, and <body> is what everyone sniffs ----
 	 *
-	 * An app with dark styles must decide whether the page is dark, and there is no standard to
-	 * ask. The one method needing no cooperation from the theme — hence everybody's fallback — is
-	 * the LUMINANCE of getComputedStyle(document.body).backgroundColor: luci-app-ssclash
+	 * An app with dark styles must decide whether the page is dark, and there is no standard to ask.
+	 * The one method needing no cooperation from the theme — hence everybody's fallback — is the
+	 * LUMINANCE of getComputedStyle(document.body).backgroundColor: luci-app-ssclash
 	 * (0.299/0.587/0.114), OpenClash (isDarkBackground, 0.2126/0.7152/0.0722, which then stamps
 	 * `data-darkmode` on OUR :root from it), passwall's four node-widgets (YIQ).
 	 *
 	 * So `body` must carry an OPAQUE background on the correct side of the midpoint in every
-	 * palette x mode. Paint the page on :root (or an ::after wallpaper) leaving `body`
-	 * transparent, or fade it with an alpha, and the readback is `rgba(0, 0, 0, 0)` — which
-	 * OpenClash's sniffer does not even match against its /rgb\(/ test, so it concludes "light"
-	 * and repaints our DARK page light. The canvas rasterises the alpha as the white page showing
-	 * through, so a faded dark body reads light: exactly the failure to catch. */
+	 * palette x mode. Paint the page on :root leaving `body` transparent, or fade it with an alpha,
+	 * and the readback is `rgba(0, 0, 0, 0)`, which those sniffers read as LIGHT — the canvas
+	 * rasterises the alpha as the white page showing through, so a faded dark body reads light. */
 	const bodyBg = await page.evaluate(() => {
 		const cv = document.createElement('canvas');
 		cv.width = cv.height = 1;

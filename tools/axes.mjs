@@ -1,27 +1,21 @@
 #!/usr/bin/env node
-/* Every Appearance axis — twenty-five localStorage keys across five axis shapes, from dark mode and
- * palette to the pattern sliders — is implemented TWICE, and nothing held the copies together:
+/* Every Appearance axis — twenty-five localStorage keys across five axis shapes — is implemented
+ * TWICE, and nothing else holds the copies together:
  *
  *   1. `partials/head.ut` — inline <script>s that read localStorage and stamp :root BEFORE THE
  *      FIRST PAINT, or the page flashes the wrong theme on every reload. They cannot `require` a
- *      LuCI module: the module loader does not exist yet.
- *   2. `fs-prefs.js` — the live appliers behind the Appearance tab (System -> System).
+ *      LuCI module: the loader does not exist yet.
+ *   2. `fs-prefs.js` — the live appliers behind the Appearance tab.
  *
- * Forced duplication, like the @mirror cases — but these two can never be byte-identical (inline
- * script vs module), so mirror.mjs cannot hold them. What CAN be held is the CONTRACT: key names,
- * :root attributes, custom properties, valid ranges, the default — and the load-bearing rule:
+ * Forced duplication, like the @mirror cases, but these two can never be byte-identical, so
+ * mirror.mjs cannot hold them. What CAN be held is the CONTRACT: key names, :root attributes,
+ * custom properties, valid ranges — and the load-bearing rule:
  *
  *      set the custom property BEFORE the attribute that switches the mixes on,
  *      or a fresh load paints one frame with the previous hue.
  *
- * The contract is DERIVED FROM THE JS, not restated here a third time: read the axes out of the
- * theme's resource modules, then hold head.ut (plus the CSS token and fs-orphans' ignore list) to
- * them. Add an axis and the gate tells you what you forgot.
- *
- * The JS side is the WHOLE resources tree concatenated, deliberately: it used to name one file, and
- * an axis moved (or added) elsewhere would have left the gate quietly checking nothing. A glob
- * cannot go stale that way.
- */
+ * The JS side is the WHOLE resources tree concatenated, deliberately: it used to name one file,
+ * and an axis moved (or added) elsewhere would have left the gate quietly checking nothing. */
 import { read, readAll } from './lib/root.mjs';
 
 /* every module the theme ships — the axes live across fs-prefs.js and menu-footstrap.js */
@@ -32,12 +26,10 @@ const HEADER = read('luci-theme-footstrap/ucode/template/themes/footstrap/header
 const TOKENS = read('luci-theme-footstrap/styles/02-tokens.css');
 const STYLES = readAll('luci-theme-footstrap/styles', '.css');
 const ORPHANS = read('tools/fs-orphans.mjs');
-/* The THIRD implementation of the axes, and the one nothing held. lib/gallery.mjs stamps them onto
- * :root so a11y-gallery.mjs and export-tier.mjs can sweep the matrix — its own header calls itself
- * "THE ONE COPY" and it was the forgotten one. Renaming --fs-tint-h there left every gate at exit 0
- * while export-tier reported "28 palette x mode x tint combinations" and silently measured an
- * UNTINTED page in 21 of them: 7 distinct results presented as 28. A gate that measures the wrong
- * thing quietly is worse than no gate — which is the sentence that file opens with. */
+/* The third implementation of the axes, and the one nothing held: lib/gallery.mjs stamps them onto
+ * :root so a11y-gallery.mjs and export-tier.mjs can sweep the matrix. Renaming `--fs-tint-h` there
+ * left every gate at exit 0 while export-tier reported 28 combinations and silently measured an
+ * UNTINTED page in 21 of them — 7 distinct results presented as 28. */
 const GALLERY = read('tools/lib/gallery.mjs');
 
 const errors = [];
@@ -98,17 +90,15 @@ for (const k of headKeys)
 	if (!jsKeys.has(k))
 		errors.push(`head.ut reads localStorage '${k}', but no theme JS ever writes it — dead pre-paint, or a typo`);
 
-/* ---- 2. the colour axes: key, attribute, both custom properties, order, range ---------
+/* ---- 2. the colour axes: key, attribute, both custom properties, order, range ----
  *
- * A colour axis holds off | a hue 1–360 | a '#rrggbb', and the attribute's VALUE says which of the
- * last two is in effect. Both sides build all five from one helper — colorAxis() in the JS,
- * colour() in the pre-paint — so the contract that can drift is the ARGUMENT LIST: a renamed
- * property or a mistyped attribute on one side and the pre-paint silently stops matching the
- * stylesheet, whose only symptom is one wrong frame on reload.
+ * A colour axis holds off | a hue 1-360 | a '#rrggbb', and the attribute's VALUE says which of the
+ * last two is in effect. Both sides build all five from one helper, so the contract that can drift
+ * is the ARGUMENT LIST: a renamed property or a mistyped attribute on one side and the pre-paint
+ * silently stops matching the stylesheet, whose only symptom is one wrong frame on reload.
  *
- * The property-before-attribute ordering is therefore checked ONCE, inside the helper, rather than
- * per axis: with one helper there is one place it can be wrong, and checking it five times over the
- * same source text would report the same defect five times. */
+ * The property-before-attribute ordering is therefore checked once, inside the helper, rather than
+ * per axis. */
 if (!colorAxes.length) errors.push('no colorAxis() calls found in the theme JS — did the axis helper get renamed?');
 if (!headColorCalls.length) errors.push('head.ut no longer pre-paints any colour axis through colour(key, sd, attr, hueProp, colorProp)');
 
@@ -159,14 +149,12 @@ for (const { key, attr, hueProp, colorProp } of colorAxes) {
 	ok.push(`colour axis ${key.padEnd(10)} -> ${attr}, ${hueProp} / ${colorProp}   (key, attr and both properties agree)`);
 }
 
-/* ---- 2b. the enum axes: key, attribute and the ON value ------------------------------
+/* ---- 2b. the enum axes: key, attribute and the ON value ----
  *
- * A two-value axis — pattern ink is the one that ships — stamps the ON value as the attribute's
- * value and removes the attribute for OFF, so a bare :root IS the default. (Palette and wallpaper
- * are three-valued and keep appliers of their own; section 2c covers them.) Both halves matter:
- * pre-paint the attribute and forget the removal and a browser that has switched the axis back off
- * keeps the old look for one frame; stamp the wrong VALUE and the block never matches at all,
- * silently, until the Appearance tab is touched. */
+ * A two-value axis stamps the ON value as the attribute's value and removes the attribute for OFF,
+ * so a bare :root IS the default. Both halves matter: pre-paint the attribute and forget the
+ * removal and a browser that has switched the axis back off keeps the old look for one frame; stamp
+ * the wrong VALUE and the block never matches at all, silently, until the tab is touched. */
 if (!enumAxes.length) errors.push('no enumAxis() calls found in the theme JS — did the axis helper get renamed?');
 
 for (const { key, attr, on } of enumAxes) {
@@ -193,23 +181,16 @@ for (const [, attr, prop] of GALLERY.matchAll(/hue\(\w+, '([^']+)', '([^']+)'\)/
 		errors.push(`tools/lib/gallery.mjs stamps ${attr}/${prop}, which no colorAxis() in the theme JS `
 			+ `declares — the gates sweep an axis the theme does not have`);
 
-/* ---- 2c. EVERY OTHER :root attribute an applier stamps -------------------------------
+/* ---- 2c. every other :root attribute an applier stamps ----
  *
- * The hue and enum checks above only cover the two FACTORY shapes. The axes that keep their own
- * applier — wallpaper (three-valued) and density (three-valued) — stamped a `data-*` attribute that
- * nothing held to head.ut at all: rename it on one side and the pre-paint silently stops matching,
- * whose only symptom is one wrong frame on reload, which is the exact failure this file exists for.
+ * The checks above cover the two FACTORY shapes only. An axis that keeps its own applier stamps a
+ * `data-*` attribute nothing holds to head.ut: rename it on one side and the pre-paint silently
+ * stops matching, with one wrong frame on reload as the only symptom.
  *
- * Derived, not listed: take the attributes the JS appliers stamp and require head.ut to stamp each
- * one too.
+ * Derived, not listed: take the attributes the JS appliers stamp and require head.ut to stamp each.
  *
- * It deliberately does NOT require the matching removeAttribute, and the reason is worth keeping:
- * the first version of this check did, and it failed on `data-rail` — which is correct code. The
- * pre-paint runs on a FRESH document where :root carries nothing but what the SERVER wrote (only
- * `data-layout`), so there is never a stale attribute to clear; an axis whose off-state is a deleted
- * key (applyRail lsDel's) simply falls through its `if` and is already right. The removals the other
- * pre-paints do are defensive symmetry, not a requirement — asserting them would have made this gate
- * demand a change that fixes nothing. */
+ * It deliberately does not require the matching removeAttribute — `data-rail` is correct code that
+ * does not have one. */
 const OUTBOUND = new Set(['data-theme', 'data-bs-theme', 'data-darkmode']);	/* checked in 3b */
 const factoryAttrs = new Set([...colorAxes.map(a => a.attr), ...enumAxes.map(a => a.attr)]);
 /* Both spellings of the receiver, because an applier picked the other one and vanished from this
@@ -230,18 +211,16 @@ for (const attr of jsSets) {
 	ok.push(`axis attr ${attr.padEnd(14)} (the applier stamps it and head.ut pre-paints it)`);
 }
 
-/* ---- 2d. THE SERVER READ: every option Save-as-default writes must be read back -------
+/* ---- 2d. the server read: every option Save-as-default writes must be read back ----
  *
- * A third implementation nothing held. saveAsDefault() uci-sets the fields snapshotAxes() returns;
- * header.ut reads /etc/config/footstrap back into `fs_defaults`, head.ut sanitises that into
- * window.__fsSD, and fs-prefs.js's def() reads it from there. An axis missing from the SERVER read
- * is written to disk correctly and never comes back: Save as default reports success, the file is
- * right, and "Reset to saved" drops the browser to the BUILT-IN default because the value the
- * server hands the client was never there.
+ * saveAsDefault() uci-sets the fields snapshotAxes() returns; header.ut reads
+ * /etc/config/footstrap back into `fs_defaults`, head.ut sanitises that into window.__fsSD, and
+ * fs-prefs.js's def() reads it from there. An axis missing from the SERVER read is written to disk
+ * correctly and never comes back: Save reports success, the file is right, and "Reset to saved"
+ * drops the browser to the BUILT-IN default.
  *
  * It has happened twice — `density`, then all seven colour and surface axes at once — and neither
- * time did anything fail: the pre-paint and the live applier agreed with each other, which is all
- * this file used to check. Derived from snapshotAxes(), the one list that IS the contract. */
+ * time did anything fail. */
 /* The uci options header.ut reads back that are NOT axes: they have no browser layer, no Appearance
  * control and therefore no business in snapshotAxes() — Save as default must never write them.
  * login_bg and pattern are the two uploaded images' cache-bust tokens, written by the upload path
@@ -271,29 +250,24 @@ else {
 		ok.push(`server read: all ${snapFields.length} saved option(s) are read back by header.ut`);
 }
 
-/* ---- 2e. THE FIELD NAME: every sd() lookup must name a field head.ut actually EMITS ----
+/* ---- 2e. the field name: every sd() lookup must name a field head.ut actually emits ----
  *
- * The factories reach the router default through window.__fsSD, and they get the field name two
- * different ways: enumAxis and colorAxis DERIVE it from the localStorage key (key minus 'fs-',
- * hyphens folded to underscores, because the key is hyphenated and the uci option is not), while
- * propAxis and surfaceAxis are HANDED it, since one of them is a rename rather than a spelling
- * ('fs-radius' -> rounding). Nothing checked either against the template.
+ * The factories reach the router default through window.__fsSD and get the field name two ways:
+ * enumAxis and colorAxis DERIVE it from the localStorage key (key minus 'fs-', hyphens folded to
+ * underscores), while propAxis and surfaceAxis are HANDED it, one of them being a rename rather
+ * than a spelling. Nothing else checks either against the template.
  *
- * `fs-pattern-ink` is what that cost: a bare slice(3) asked for 'pattern-ink', head.ut emits
- * `pattern_ink`, so sd() answered undefined forever and the axis reported the BUILT-IN default
- * however the router was configured — the Ink control said Theme while the pre-paint had already
- * painted Original, matchesSavedDefault() was false with nothing touched, and pressing
- * Save-as-default wrote the built-in over the admin's stored value. Every symptom is silent, which
- * is how it survived a review round (openwrt/luci#8903) and every gate in this file.
- *
- * THE DERIVING FACTORIES' FORMULA IS TAKEN FROM THE SOURCE AND RUN, never restated here. Written
- * the obvious way — repeat `key.slice(3).replace(/-/g, '_')` in this file and compare — the gate
- * holds head.ut against ITSELF and stays green while fs-prefs.js says something else entirely:
- * measured by breaking the fold back to a bare slice(3), which such a version passed. */
+ * `fs-pattern-ink` is what that cost: a bare slice(3) asks for 'pattern-ink' where head.ut emits
+ * `pattern_ink`, so sd() answers undefined forever and the axis reports the built-in default
+ * however the router is configured. Every symptom is silent, which is how it survived a review
+ * round (openwrt/luci#8903) and every other gate in this file. */
 const sdMark = errorMark();
 const sdLine = (HEAD.match(/window\.__fsSD\s*=\s*\{[^\n]*/) || [''])[0];
 const sdFields = [...sdLine.matchAll(/[{,]\s*([a-z_]+)\s*:/g)].map((m) => m[1]);
-/* `const sdKey = <expr>;` out of the named factory's body, compiled into a function of `key` */
+/* THE DERIVING FACTORIES' FORMULA IS TAKEN FROM THE SOURCE AND RUN, never restated here. Written
+ * the obvious way — repeat the fold in this file and compare — the gate holds head.ut against
+ * ITSELF and stays green while fs-prefs.js says something else entirely: measured by breaking the
+ * fold back to a bare slice(3), which such a version passed. */
 const sdFormula = (factory) => {
 	const body = JS.match(new RegExp(`function ${factory}\\([^)]*\\)\\s*\\{[\\s\\S]*?\\n\\}`));
 	const expr = body && body[0].match(/const\s+sdKey\s*=\s*([^;]+);/);
@@ -344,13 +318,13 @@ else if (!(jsRadius[1] === cssRadius[1] && cssRadius[1] === headRadius[1]))
 		+ `head.ut cannot read the CSS token (it runs before the stylesheet), so this is the only thing checking it.`);
 else ok.push(`rounding default ${jsRadius[1]}px agrees in the JS, the CSS token and head.ut`);
 
-/* ---- 3b. the dark-mode attributes: the same SET, same values, in both places -----------
+/* ---- 3b. the dark-mode attributes: the same SET, same values, in both places ----
  *
  * Dark mode is announced three times: `data-darkmode` (what this theme's CSS reads) plus
- * `data-theme` and `data-bs-theme` (the two dialects third-party apps sniff for). Both head.ut's
- * pre-paint and stampDark() write them; one added to one copy and forgotten in the other has a
- * symptom nobody reports — an app's dark styles are dead on a fresh load and come alive the
- * moment you touch the Appearance tab (or vice versa). Derive the set from the JS. */
+ * `data-theme` and `data-bs-theme` (the dialects third-party apps sniff for). Both head.ut's
+ * pre-paint and stampDark() write them, and one added to one copy and forgotten in the other has a
+ * symptom nobody reports — an app's dark styles dead on a fresh load and alive the moment the
+ * Appearance tab is touched. Derive the set from the JS. */
 const stampBody = (src, re) => (src.match(re) || [, null])[1];
 const attrsIn = (body) => new Map([...(body || '').matchAll(
 	/setAttribute\('([^']+)',\s*dark\s*\?\s*'([^']+)'\s*:\s*'([^']+)'/g)].map((m) => [m[1], `${m[2]}/${m[3]}`]));

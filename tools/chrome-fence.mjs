@@ -1,47 +1,21 @@
 #!/usr/bin/env node
-/* The chrome is defended from third-party CSS in three places that must agree, and nothing held
- * them together. Proven, not assumed: breaking the fence constant to `.fs-sidebarTYPO` left the menu
- * completely unprotected and `npm run check`, `jsmin-verify` and `eslint` ALL exited 0.
+/* The chrome is defended from third-party CSS in three places that must agree, and nothing else
+ * holds them together: breaking the fence constant to `.fs-sidebarTYPO` leaves the menu completely
+ * unprotected while `npm run check`, `jsmin-verify` and `eslint` all exit 0.
  *
- *   1. `header.ut` — the markup. A chrome root MARKS itself with `data-fs-chrome`; the <nav> is one,
- *      and so are the skip link and the two sr-only elements, none of which is inside it. The mark is
- *      what the other two read.
+ *   1. `header.ut` — the markup. A chrome root MARKS itself with `data-fs-chrome`; the <nav> is
+ *      one, and so are the skip link and the two sr-only elements, none of which is inside it.
  *   2. `fs-sheets.js` — CHROME_FENCE, appended to a foreign selector's subject so it can no longer
- *      MATCH a chrome element. This is what beats a third party's `!important`: there is nothing left
- *      to out-rank.
- *   3. `theme/10-chrome.css` — the pin, which closes the one way in a fence cannot: INHERITANCE from
- *      `html`/`body`, where no match is needed at all.
+ *      MATCH a chrome element, which is what beats a third party's `!important`.
+ *   3. `theme/10-chrome.css` — the pin, which closes the way a fence cannot: inheritance.
  *
  * The mark is DERIVED FROM THE MARKUP here, never restated: rename it in header.ut and this gate
- * re-derives it, then fails on the two copies that still say the old one. That is the whole point —
- * the failure it prevents has NO symptom. The fence silently stops fencing, every test stays green,
- * and the menu breaks on someone else's router months later, next to an app we never saw.
+ * re-derives it, then fails on the two copies that still say the old one.
  *
- * The fence and the pin are each ONE canonical string, so this gate compares the whole string rather
- * than testing it for tokens. That is not pedantry — it is the hole the token version had. Its four
- * independent `includes()` checks all passed on `:where(:not(.fs-sidebar), .fs-sidebar *)`, a
- * plausible botched edit that is the exact INVERSE of a fence: it stops sparing the chrome and starts
- * TARGETING it. A gate whose thesis is "a stale copy just stops defending, silently" cannot be the
- * thing that waves that through.
- *
- * The shapes the strings encode, each a measured bug and not an imagined one:
- *  - `:where()` in both. It contributes ZERO specificity. Drop it from the fence and every app rule
- *    silently gains a point, re-ordering the app's stylesheet against itself on its own page. Drop it
- *    from the pin and the pin (0,1,0) starts fighting the chrome's own rules on source order.
- *  - The fence must cover the root AND its subtree (`[m], [m] *`); the root alone leaves every menu
- *    element inside it exposed.
- *  - The pin must cover the root ALONE, which it now states itself (`:not([m] *)`) instead of relying
- *    on nobody ever nesting a mark. Pinning descendants was measured and it broke the chrome's own
- *    inheritance: a direct declaration beats an inherited one even when the inherited one is ours,
- *    costing `.fs-label` its `nowrap` and forcing `text-align` from `start` to `left` on 302 elements
- *    — which breaks every RTL language LuCI ships.
- *  - The pin may only carry INHERITED properties. A non-inherited one there is a style decision
- *    wearing a guard's coat, and at 0,0,0 it would lose to everything anyway.
- *
- * Lastly it holds the dark-mode guard to `stampDark`: the guard exists because third parties write
- * the attributes this theme publishes (`luci-app-openclash`, seven templates). Add a fourth dialect
- * to stampDark and forget the observer's attributeFilter, and that dialect is unguarded — silently.
- */
+ * The fence and the pin are each ONE canonical string, compared whole rather than tested for
+ * tokens. That is the hole the token version had: its four independent `includes()` checks all
+ * passed on `:where(:not(.fs-sidebar), .fs-sidebar *)`, the exact INVERSE of a fence — it stops
+ * sparing the chrome and starts TARGETING it. */
 import { read, readAll } from './lib/root.mjs';
 
 const HEADER = read('luci-theme-footstrap/ucode/template/themes/footstrap/header.ut');
@@ -85,22 +59,20 @@ if (!(/^data-fs-/).test(MARK)) {
 	console.error('Nobody outside this theme may emit an fs-* name — that is what makes the fence safe.');
 	process.exit(1);
 }
-/* Every root that carries it. RATCHETED, not merely reported: this count is the whole thesis that
- * "the chrome is NOT one element". Reporting it and gating only the JS root left the template side
- * unguarded — deleting the mark from the skip link printed "3 root(s)" and exited 0, which is the
- * v0.9.1 damage exactly (popover flattened 12px -> 0 and position: fixed -> static, both sr-only
- * elements un-clipped onto every page; the <nav> alone held). Adding or removing a root is a
- * deliberate act, so it is a deliberate edit here. */
+/* Every root that carries it, RATCHETED rather than merely reported: this count is the whole thesis
+ * that the chrome is not one element. Gating only the JS root leaves the template side unguarded —
+ * deleting the mark from the skip link printed "3 root(s)" and exited 0, which is the v0.9.1 damage
+ * exactly (popover flattened 12px -> 0 and `position: fixed` -> `static`, both sr-only elements
+ * un-clipped onto every page; the <nav> alone held). Adding or removing a root is a deliberate act,
+ * so it is a deliberate edit here. */
 const EXPECT_ROOTS = 5;	/* + .fs-pattern, the wallpaper's paint layer: a body-level sibling of .fs-shell */
 /* …and how many the JS builds: fs-search.js's command palette, a `position: fixed` overlay parented
- * to <body> and therefore outside every template root. The Appearance popover used to be the second;
- * it is a PAGE now (System -> Appearance), and a page renders inside .fs-main, which is Zone 2 —
- * an app is entitled to win there, so it must NOT be marked.
+ * to <body> and therefore outside every template root. A page rendered inside .fs-main is zone 2,
+ * where an app is entitled to win, so it must NOT be marked.
  *
- * Ratcheted like the template count, and for the same reason: a module that mounts a floating panel
- * on <body> has to come back here and account for it — either it is chrome, and the mark plus this
- * number move together, or it is not, and it belongs inside #view. The alternative is that it
- * silently arrives unmarked, which is exactly what this file exists to prevent. */
+ * Ratcheted like the template count: a module that mounts a floating panel on <body> has to come
+ * back here and account for it — either it is chrome, and the mark plus this number move together,
+ * or it is not, and it belongs inside #view. */
 const EXPECT_JS_ROOTS = 1;
 const roots = [...MARKUP.matchAll(new RegExp(`<([a-z]+)\\b[^>]*\\b${MARK}\\b`, 'g'))].map((m) => m[1]);
 const jsRoots = [...JS.matchAll(new RegExp(`'${MARK}'`, 'g'))].length;

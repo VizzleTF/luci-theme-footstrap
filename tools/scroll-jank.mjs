@@ -1,15 +1,14 @@
 #!/usr/bin/env node
-/* THE SCROLL GATE: nothing may re-decide, blink or jump under a reader who is scrolling.
+/* The scroll gate: nothing may re-decide, blink or jump under a reader who is scrolling.
  *
- * `fs-fit.js` is built around one promise — a pass that reads layout does not run while the page is
- * moving; it defers, and takes its measurement when the reader stops. Every table remedy rides that
- * promise: cards, dropped columns, a shredded column. Break it and the reader sees the thing this
- * theme is most often reported for — a table that cards and un-cards under the thumb, a column that
- * appears and vanishes, content that jumps because something above it changed height mid-flick.
+ * fs-fit.js is built around one promise — a pass that reads layout does not run while the page is
+ * moving; it defers, and measures when the reader stops. Every table remedy rides that promise:
+ * cards, dropped columns, a shredded column. Break it and the reader sees what this theme is most
+ * often reported for.
  *
- * None of that is visible in a file, and none of it is visible in a screenshot either: the page is
- * correct before the scroll and correct after it. It only exists DURING. So this gate scrolls, with
- * a real wheel, and watches:
+ * None of that is visible in a file, and none of it in a screenshot either: the page is correct
+ * before the scroll and correct after it. It only exists DURING, so this gate scrolls, with a real
+ * wheel, and watches:
  *
  *   remedy    a table that already had a decision changing it while the page moves. The contract is
  *             zero. A table the poll brings in mid-scroll is NOT this — it is answered from the slot
@@ -21,20 +20,15 @@
  *             has not tested the interesting case, which is why the wheel runs long enough to meet
  *             one — measured on the stand: Overview replaces 12 tables in a 6.6 s scroll.
  *
- * BOTH LAYOUTS, because they scroll different elements: the bar layout scrolls the document, the
- * sidebar scrolls `.fs-main`, and `fs-fit.js` reads whichever the STYLESHEET made the scroller.
- *
  * EVERY ENGINE THE PROJECT SUPPORTS, because the three differ in precisely the mechanisms this
  * depends on: scroll anchoring is Chromium's alone, WebKit keeps firing `scroll` through its
  * momentum long after the wheel stops, and Firefox delivers a ResizeObserver callback on a
- * different tick. Chromium alone is the default because it is the one CI always has; the other two
- * need `npx playwright install firefox webkit` and their system libraries.
+ * different tick. Chromium alone is the default because it is the one CI always has.
  *
  *   node tools/scroll-jank.mjs [--only owrt2512] [--engines chromium,firefox,webkit]
  *                              [--pages /admin/status/overview,…] [--widths 768,1440]
  *
- * Needs a running owlab router (docs/development.md).
- */
+ * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
 import { stands, login, requireStands } from './lib/stands.mjs';
 

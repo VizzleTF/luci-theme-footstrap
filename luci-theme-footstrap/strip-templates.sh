@@ -3,41 +3,32 @@
 #
 #   ./strip-templates.sh <dir>
 #
-# Run from the package Makefile (Build/Prepare) over $(PKG_BUILD_DIR), never over the source tree:
-# git keeps every word, the router does not need any of them. Same trade this project already makes
-# for JS (jsmin/terser) and CSS (build-css.sh) — templates were simply never included in it, and
-# they are mostly comments: `{# … #}` is 22633 of 60227 bytes (38%).
+# Run from the package Makefile over $(PKG_BUILD_DIR), never over the source tree: git keeps every
+# word and the router needs none of them. Same trade this project makes for JS and CSS, and
+# templates are mostly comments — `{# … #}` is 38% of their bytes.
 #
-# sh + awk only, like build-css.sh: an OpenWrt buildbot has no node and this must not become the
-# reason a build needs one.
+# sh and awk only, like build-css.sh: an OpenWrt buildbot has no node.
 #
-# WHAT IS AND IS NOT TOUCHED, and the distinction is the whole safety argument:
+# What is and is not touched, which is the whole safety argument:
 #   * `{# … #}` — a TEMPLATE comment. ucode treats `{#` as a comment opener everywhere outside a
-#     `{% … %}` code block, so a `{#` that survives in this tree is a comment BY DEFINITION; if one
-#     ever sat inside a <script> string the template would already be broken. Verified before
-#     writing this: 0 of them appear inside a code block, and every opener has exactly one closer.
-#   * `/* … */` STANDING ON ITS OWN LINES — a code comment, wherever it sits: ucode inside
-#     `{% … %}`, JavaScript inside an inline <script>, CSS inside an inline <style>. 18362 bytes
-#     across this tree, 8 KB of them in the shipped package after gzip, which is 11% of it.
+#     `{% … %}` code block, so a `{#` that survives in this tree is a comment by definition.
+#     Verified: 0 of them appear inside a code block, and every opener has exactly one closer.
+#   * `/* … */` STANDING ON ITS OWN LINES — a code comment, wherever it sits: ucode, JavaScript in
+#     an inline <script>, CSS in an inline <style>.
 #
-#     This used to be left alone with the argument that stripping it "needs a lexer that knows
-#     ucode strings" — and that argument is right about the general case and wrong about this one.
-#     The rule here is not "remove /* … */"; it is "remove a comment that OWNS its lines": `/*` is
-#     the first non-blank thing on its line and `*/` is the last non-blank thing on its (possibly
-#     later) line. For that to eat live code, a string literal would have to span lines AND contain
-#     a line that is nothing but a comment — measured across every .ut in this tree: 18362 of 18362
-#     comment bytes are whole-line, zero are inline, and no multi-line template literal contains a
-#     line-leading `/*`. Anything that does not fit the rule is LEFT IN PLACE and counted, so the
-#     day one appears the build says so instead of quietly changing the meaning of a template.
+#     The rule is not "remove /* … */" but "remove a comment that OWNS its lines": `/*` is the first
+#     non-blank thing on its line and `*/` the last non-blank thing on its. For that to eat live
+#     code a string literal would have to span lines AND contain a line that is nothing but a
+#     comment — measured across every .ut here: 18362 of 18362 comment bytes are whole-line.
+#     Anything that does not fit the rule is left in place and counted.
 #
-#     What this deliberately does NOT do is minify: no joining of lines, no touching of anything
-#     that is not a comment from column one. The output still reads like the source, minus the prose.
+#     It deliberately does not minify: no joining of lines, no touching of anything that is not a
+#     comment from column one.
 #
 # Whitespace control is EMULATED, not ignored: `{#- …` also eats the whitespace before the comment
-# and `… -#}` the whitespace after it, which is how ucode itself renders them. Nearly every .ut here
-# opens with a licence block closing `-#}` (footer.ut is one `{% include %}` line and has none);
-# head.ut's is the one that matters, swallowing the newline before its <!DOCTYPE html>, and dropping
-# the comment without the trim would put that newline back.
+# and `… -#}` the whitespace after it, which is how ucode itself renders them. head.ut's licence
+# block is the one that matters — its `-#}` swallows the newline before <!DOCTYPE html>, and
+# dropping the comment without the trim would put that newline back.
 set -e
 
 DIR="${1:-}"

@@ -1,9 +1,9 @@
-/* fs-router's BOOT CONTRACT: the router must turn itself off on a luci-base that moved.
+/* fs-router's boot contract: the router must turn itself off on a luci-base that moved.
  *
- * Why this is a unit test and not a stand run: the fault it guards is a luci-base this repo does not
- * have. Both stands ship the surfaces, so a live check can only ever see the healthy branch — the
- * only way to exercise the OFF branch is to hand the module an `L` with a hole in it, which is
- * exactly what a hostile fork or a trimmed distribution does at someone else's house.
+ * A unit test rather than a stand run, because the fault it guards is a luci-base this repo does not
+ * have: both stands ship the surfaces, so a live check only ever sees the healthy branch. The only
+ * way to exercise the OFF branch is to hand the module an `L` with a hole in it, which is what a
+ * hostile fork or a trimmed distribution does at someone else's house.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

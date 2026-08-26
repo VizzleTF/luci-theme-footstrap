@@ -1,24 +1,10 @@
 /* Extract the inline <script> bodies from a ucode .ut template so ESLint can lint them.
  *
- * WHY THIS EXISTS: the browser JS inside the templates was the ONLY JS in the theme that nothing
- * checked. eslint runs over `htdocs/**` and jsmin (via luci.mk) minifies the same tree; a .ut is
- * copied to the router verbatim, so neither ever looked at it. That left the pre-paint in
- * partials/head.ut — the most load-bearing script in the theme, it stamps :root before the first
- * frame — outside every gate, and its only failure symptom is a wrong frame nobody reports.
- *
- * WHAT IS LINTED: a <script> with a body and NO ucode interpolation (`{{ … }}`, `{% … %}`). Those
- * blocks are plain JS already; the template engine copies them through untouched.
- *
- * WHAT IS NOT, AND WHY IT IS SAFE: a block the server interpolates is not JS until it is rendered
- * — `{{ https_ports }}.forEach(…)` does not parse — so it cannot be handed to a JS parser as-is.
- * Rather than substitute placeholders and lint a fiction, those blocks must be DATA ONLY: a single
- * statement handing a server value to a pure-JS block that IS linted (see head.ut's window.__fsSD
- * and sysauth.ut's window.__fsHttps). `assertDataOnly()` below enforces that, so logic cannot hide
- * in the one shape the linter is blind to.
- *
- * LINE NUMBERS: each body is padded with the newlines and spaces that precede it in the template,
- * so a message's line/column point at the .ut file itself. No remapping in postprocess.
- */
+ * The browser JS inside the templates is otherwise the only JS in the theme that nothing checks:
+ * eslint runs over `htdocs/**` and jsmin minifies the same tree, while a .ut is copied to the
+ * router verbatim. That leaves the pre-paint in partials/head.ut — the most load-bearing script in
+ * the theme, stamping :root before the first frame — outside every gate, with a wrong frame nobody
+ * reports as its only failure symptom. */
 
 /* <script> with no `src`. `[^>]*` covers attributes we do use (`data-fs-shell` is on <style>, but
  * a future <script> attribute must not silently drop the block from the lint). */

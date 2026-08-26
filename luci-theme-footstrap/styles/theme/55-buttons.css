@@ -35,25 +35,22 @@
 	.cbi-button:hover, .btn:hover, button:hover,
 	input[type="button"]:hover, input[type="submit"]:hover, input[type="reset"]:hover { border-color: var(--fs-dim); }
 
-	/* Keyboard focus — not decoration: without this a button shows NOTHING on focus. The
+	/* Keyboard focus, not decoration: without this a button shows nothing on focus. The
 	 * `box-shadow: none` above kills any stray focus glow (theme beats base regardless of
-	 * specificity), and the UA outline only ever shows on :focus-visible, which this rule
-	 * restyles — so Save, Save & Apply, Reset, every row action and the login submit would
-	 * otherwise look untabbable. A plain mouse :focus deliberately shows nothing: base's old
-	 * glow rang every clicked button, and the pressed cue below already answers the click.
-	 * Same --fs-focus-ring as every field, so focus looks like one thing. */
+	 * specificity), and the UA outline only ever shows on :focus-visible, which this rule restyles.
+	 * A plain mouse :focus deliberately shows nothing — a glow rings every clicked button, and the
+	 * pressed cue below already answers the click. Same --fs-focus-ring as every field. */
 	.cbi-button:focus-visible, .btn:focus-visible,
 	input[type="button"]:focus-visible, input[type="submit"]:focus-visible, input[type="reset"]:focus-visible {
 		outline: none;
 		border-color: var(--fs-accent);
 		box-shadow: var(--fs-focus-ring);
 	}
-	/* Solid variants sit ON --fs-accent/--fs-good/--fs-danger, so an accent-tinted ring is
-	 * invisible against them: ring in the surface colour with an accent halo. That halo was
-	 * written out here as a literal ending in --fs-accent-soft — a 10-15% tint, i.e. 1.15-1.29:1
-	 * against the surface, so the only thing this rule really painted was the 2px gap. It is
-	 * --fs-focus-ring-solo now: same geometry, solid accent, and one name for the four rules that
-	 * had been spelling it out. */
+	/* Solid variants sit ON --fs-accent/--fs-good/--fs-danger, so an accent-tinted ring is invisible
+	 * against them: ring in the surface colour with an accent halo. Written out as a literal ending
+	 * in --fs-accent-soft, that halo was a 10-15% tint at 1.15-1.29:1 and the only thing it painted
+	 * was the 2px gap; --fs-focus-ring-solo is the same geometry with a solid accent, under one
+	 * name. */
 	.cbi-button-positive:focus-visible, .cbi-button-action:focus-visible,
 	.cbi-button-negative:focus-visible, .cbi-button-remove:focus-visible,
 	.cbi-button-apply:focus-visible, .cbi-button-save:focus-visible,
@@ -71,14 +68,12 @@
 		box-shadow: inset 0 2px 4px color-mix(in srgb, var(--fs-border) 40%, transparent);
 	}
 
-	/* Solid variants — THREE fills, not six. `.cbi-button-*` is what LuCI's own views emit;
-	 * `.btn.<colour-word>` is what a third-party luci-app-* tends to emit, and base/60-modal.css
-	 * paints those words with gradients that are DEAD — the plain `.btn` rule above sets
-	 * background/border/color in a LATER layer, which wins regardless of specificity, so an
-	 * unclaimed `.btn.danger` would render as a neutral grey button with no colour cue.
-	 * Coverage is a contract, so the theme claims them — in the SAME rule as their
-	 * .cbi-button-* twin, because written apart (which they were, twenty lines away with a
-	 * byte-identical body) a recolour lands on one half and not the other. */
+	/* Solid variants — three fills, not six. `.cbi-button-*` is what LuCI's own views emit and
+	 * `.btn.<colour-word>` what a third-party luci-app-* tends to emit, and base paints those words
+	 * with gradients that are dead: the plain `.btn` rule above sets background, border and colour
+	 * in a later layer, so an unclaimed `.btn.danger` renders as a neutral grey button with no
+	 * colour cue. Coverage is a contract, so the theme claims them — in the SAME rule as their
+	 * .cbi-button-* twin, because written apart a recolour lands on one half and not the other. */
 	.cbi-button-positive, .btn.success {
 		background: var(--fs-good); border-color: transparent; color: var(--fs-on-good);
 	}
@@ -139,14 +134,14 @@
 		display: inline-flex; align-items: center; justify-content: center;
 		vertical-align: middle;
 	}
-	/* Reset takes the SAME STEP of the ladder as Save (-soft at rest, -fill on hover), so the two
-	 * read as equally weighted secondary actions beside the solid Save & Apply — but off the
-	 * DANGER role, not the accent one: Reset discards your unsaved changes. (An opaque
-	 * --fs-panel2 was the first attempt and weighed MORE than Save's translucent 10-15% tint: a
-	 * solid surface and a tint do not read as the same fill, whatever their lightness.)
-	 * Label is --fs-text for the same reason as Save's: --fs-dim on --fs-danger-soft measures
-	 * 4.49:1 on --fs-panel in footstrap dark, the worst of the six palette x mode blocks — under
-	 * AA by a hundredth, which is still under it. The role lives in the fill and the border. */
+	/* Reset takes the same step of the ladder as Save (-soft at rest, -fill on hover), so the two read
+	 * as equally weighted secondary actions beside the solid Save & Apply — but off the DANGER role,
+	 * not the accent one: Reset discards your unsaved changes. (An opaque --fs-panel2 was the first
+	 * attempt and weighed MORE than Save's translucent 10-15% tint: a solid surface and a tint do
+	 * not read as the same fill, whatever their lightness.) The label is --fs-text for the same
+	 * reason as Save's — --fs-dim on
+	 * --fs-danger-soft measures 4.49:1 in the worst palette x mode block, under AA by a hundredth.
+	 * The role lives in the fill and the border. */
 	.cbi-page-actions .cbi-button-reset {
 		background: var(--fs-danger-soft);
 		border: 1px solid var(--fs-danger-line);
@@ -157,12 +152,12 @@
 		border-color: var(--fs-danger-line-hi);
 	}
 
-	/* THERE IS NO `.spinning` PADDING LADDER HERE ANY MORE, and it must not come back. It used to
-	 * be seven selectors reserving room for the absolutely-positioned glyph base draws — each one
-	 * climbing a class above whatever else padded that element. The ladder lost twice in the field
-	 * (issues #15 and #22, the second to a 0,5,0 data-table rule), and every loss looks the same:
-	 * the spinner draws on top of the label, silently. base/95-luci.css puts the glyph IN THE FLOW
-	 * instead, so it reserves its own space and no host padding is involved. */
+	/* There is no `.spinning` padding ladder here, and it must not come back: seven selectors
+	 * reserving room for an absolutely-positioned glyph, each climbing a class above whatever else
+	 * padded that element. The ladder lost twice in the field (issues #15 and #22), and every loss
+	 * looks the same — the spinner draws on top of the label, silently; #22 lost to a 0,5,0
+	 * data-table rule. base/95-luci.css puts the
+	 * glyph IN THE FLOW instead, so it reserves its own space. */
 
 	input[type="file"]::file-selector-button {
 		margin-inline-end: var(--fs-space-3); padding: var(--fs-space-2) var(--fs-space-3-5);
@@ -172,18 +167,15 @@
 	}
 	input[type="file"]::file-selector-button:hover { border-color: var(--fs-accent); color: var(--fs-accent); }
 
-	/* ==================================================================
-	 * Row-action buttons (Edit / Delete / Start-Stop) in a table or a .cbi-section-actions
-	 * container. Compact so tables stay dense. Neutral outline by default; the variants colour
-	 * the ones that carry meaning (Edit = accent, Delete = danger). The neutral :hover comes
-	 * FIRST on purpose — it used to sit last and greyed the coloured variants back out on hover,
-	 * which only an !important on their colours hid. Equal specificity, so a variant hover must
-	 * be written after it.
+	/* Row-action buttons (Edit / Delete / Start-Stop) in a table or a .cbi-section-actions container.
+	 * Compact so tables stay dense: neutral outline by default, with the variants colouring the ones
+	 * that carry meaning. The neutral :hover comes FIRST on purpose — last, it greys the coloured
+	 * variants back out on hover, which only an !important on their colours hides. Equal
+	 * specificity, so a variant hover must be written after it.
 	 *
-	 * WCAG 2.2 SC 2.5.8 (Target Size, AA): a pointer target must be >= 24x24 px, or spaced so
-	 * 24px circles centred on adjacent targets do not overlap. At 28px tall with a 1px margin
-	 * either side the circles DID overlap, so the exemption did not apply. 32px clears it.
-	 * ================================================================== */
+	 * WCAG 2.2 SC 2.5.8: a pointer target must be >= 24x24 px, or spaced so 24px circles centred on
+	 * adjacent targets do not overlap. At 28px tall with a 1px margin either side the circles DO
+	 * overlap, so the exemption does not apply; 32px clears it. */
 	.td .cbi-button, .td .btn, .cbi-section-actions .cbi-button, .cbi-section-actions .btn,
 	.cbi-section-table .cbi-button {
 		min-height: var(--fs-ctl-h-sm); padding: 0 var(--fs-space-3); font-size: var(--fs-type);
@@ -242,17 +234,16 @@
 		text-shadow: none;
 	}
 	/* Save carries a TINT at rest, not a bare outline: beside the solid Save & Apply a fully
-	 * transparent button reads as disabled rather than secondary. The steps come off the role
-	 * ladder (02-tokens.css) instead of being invented — -soft (12%) at rest, -fill (18%) on
-	 * hover: one step UP the same ladder.
+	 * transparent button reads as disabled rather than secondary. The steps come off the role ladder
+	 * (02-tokens.css) — -soft (12%) at rest, -fill (18%) on hover, one step up the same ladder.
 	 *
-	 * THE LABEL IS --fs-text, NOT --fs-accent: never put text of colour C on a translucent tint
-	 * of C (docs/design-system.md). The tint drags the surface toward the text and eats its own contrast —
-	 * accent-on-accent-soft measured 4.25:1, an AA failure axe caught the moment the tint went
-	 * in. The role is carried by the fill and the border; the label only has to be legible.
+	 * The label is --fs-text, not --fs-accent: never put text of colour C on a translucent tint of C
+	 * (docs/design-system.md). The tint drags the surface toward the text and eats its own contrast
+	 * — accent on accent-soft measures 4.25:1, an AA failure. The role is carried by the fill and
+	 * the border.
 	 *
-	 * `filter: none` cancels the shared hover's --fs-hover-lift: on a translucent tint a
-	 * brightness shift washes the fill out instead of deepening it. */
+	 * `filter: none` cancels the shared hover's --fs-hover-lift: on a translucent tint a brightness
+	 * shift washes the fill out instead of deepening it. */
 	.cbi-page-actions .cbi-button-save,
 	.cbi-page-actions .cbi-button-apply + .cbi-button-save,
 	.cbi-page-actions .cbi-button-negative + .cbi-button-save {

@@ -1,20 +1,18 @@
 @layer page {
-	/* LOGIN — the SERVER-rendered form of themes/footstrap/sysauth.ut, as a centred card.
+	/* LOGIN — the server-rendered form of themes/footstrap/sysauth.ut, as a centred card.
 	 *
-	 * Scoped by `.fs-login`, a class that template puts on the form. It used to be found by
-	 * `form:has(> .cbi-map input[name="luci_username"])`, on the assumption that the markup was
-	 * stock LuCI's and unnameable — 49 characters × 17 rules, ~0.8 KB of the stylesheet. The
-	 * form is ours; naming it is free. (ui.js builds no login form of its own — it has no
-	 * `luci_username` anywhere — so nothing else ever matched those selectors.)
+	 * Scoped by `.fs-login`, a class that template puts on the form: the form is ours, so naming it
+	 * is free, where the `form:has(> .cbi-map input[name="luci_username"])` it replaced cost 49
+	 * characters × 17 rules, ~0.8 KB of the stylesheet. Nothing else ever matched that selector —
+	 * ui.js builds no login form of its own and has no `luci_username` anywhere.
 	 *
-	 * The theme ships its own sysauth.ut so the page carries NO chrome: without one, LuCI
-	 * falls back to the generic template, which includes the header WITHOUT blank_page and
-	 * draws the whole sidebar around a page whose only control is a password field.
+	 * The theme ships its own sysauth.ut so the page carries NO chrome: without one, LuCI falls back
+	 * to the generic template, which includes the header without blank_page and draws the whole
+	 * sidebar around a page whose only control is a password field.
 	 *
-	 * Do NOT turn this into a modal (form in a <section hidden>, revealed by a view module).
-	 * Tried: BLANK PAGE, NO WAY TO LOG IN — the view runs before a session exists, its RPCs
-	 * answer "Access denied", the promise rejects, render() never runs. Server-rendered, the
-	 * form works with JS off. */
+	 * Do not turn this into a modal (form in a `<section hidden>`, revealed by a view module): the
+	 * view runs before a session exists, its RPCs answer "Access denied", render() never runs, and
+	 * the page is blank with no way to log in. Server-rendered, the form works with JS off. */
 	.fs-login {
 		/* A DEFINITE width, never `max-width`: the card is a direct flex item of <body>
 		 * (base/20-typography.css makes body a flex column so the footer can margin-top:auto),
@@ -28,22 +26,18 @@
 		 * a heavy grey cloud under a white card in light mode. */
 		padding: var(--fs-space-6) var(--fs-space-6) var(--fs-space-6); box-shadow: var(--fs-shadow-pop);
 	}
-	/* The router's own name, first line of the card (sysauth.ut) — the shape an appliance console
-	 * uses for this (FortiGate prints the hostname on its login page for the same reason): a
-	 * CENTRED identity block, set apart from the form, above a left-aligned heading and left-aligned
-	 * fields. Centred and separated is what makes the mixed alignment read as deliberate rather than
-	 * as a stray line: the 24px below is the card's own padding, so the block sits in a gutter of the
-	 * same size as the one around it, and the eye takes it as a header rather than as the heading's
-	 * first line.
+	/* The router's own name, first line of the card (sysauth.ut): a centred identity block, set apart
+	 * from the form, above a left-aligned heading and left-aligned fields — the shape an appliance
+	 * console uses. Centred and separated is what makes the mixed alignment read as deliberate
+	 * rather than as a stray line, the 24px gap below being the card's own padding.
 	 *
-	 * Still SMALLER than the heading it stands over (16px against the h2's 20px). It answers
-	 * "which box is this", which matters only until you have read it; `Authorization Required`
-	 * answers "what now", which is the page's actual subject. Set larger, the two swap roles and the
-	 * heading reads as a subtitle.
+	 * Still smaller than the heading it stands over (16px against its 20px): it answers "which box
+	 * is this", which matters only until you have read it, while `Authorization Required` answers
+	 * "what now", the page's actual subject. Set larger, the two swap roles and the heading reads
+	 * as a subtitle.
 	 *
-	 * Not a heading element, and that is on purpose — WCAG's outline is about the page's SUBJECT,
-	 * and a second heading above the h2 would announce the login form as two sections. It is a <p>
-	 * in the template.
+	 * Not a heading element, on purpose: the outline is about the page's subject, and a heading
+	 * above it would announce the login form as two sections.
 	 *
 	 * The eyebrow tokens are NOT reused, though this is an eyebrow's position: they carry
 	 * `text-transform: uppercase`, and a hostname is a name — `Rb5009-Usb` is not what the admin

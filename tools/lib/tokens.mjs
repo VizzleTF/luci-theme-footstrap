@@ -1,17 +1,13 @@
-/* The --*-color-* export tier, parsed out of styles/02-tokens.css — the ONE place it is defined.
+/* The --*-color-* export tier, parsed out of styles/02-tokens.css — the one place it is defined.
  *
- * This lived inside devkit-build.mjs while export-tier.mjs hand-wrote its own cross-product of
- * families x levels, and the two had already disagreed: devkit knew --text-color-highest, the GATE
- * did not. So that name was defined, shipped, read by apps and inspected by nothing — setting it to
- * #808080 (~3.95:1 on a light --fs-bg, a real AA failure) passed with "export tier: OK — 1820
- * checks". A gate whose subject is a hand-written list checks the list, not the contract.
+ * A gate that hand-writes its own cross-product of families x levels checks the list, not the
+ * contract: one such list knew --text-color-highest and the other did not, so that name was
+ * defined, shipped, read by apps and inspected by nothing — setting --text-color-highest to #808080
+ * (~3.95:1 on a light --fs-bg, a real AA failure) passed with "export tier: OK — 1820 checks".
+ * Derived here and consumed by both, so a level added to the tokens is measured on the next run.
  *
- * Derived here, consumed by both. A level added to the tokens gets measured on the next run without
- * anyone remembering to widen a constant.
- *
- * Names come back WITHOUT the leading `--`: that is the shape devkit.src.html renders (`'var(--' +
- * name + ')'`), and export-tier.mjs adds it back.
- */
+ * Names come back WITHOUT the leading `--`: that is the shape devkit.src.html renders
+ * (`'var(--' + name + ')'`), and export-tier.mjs adds it back. */
 
 /* Families in the order the devkit renders them. The regex is the gate on what counts as the tier:
  * --fs-* is private and deliberately not surfaced — see the token file's own header. */

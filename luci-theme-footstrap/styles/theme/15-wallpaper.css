@@ -1,25 +1,24 @@
 @layer theme {
-	/* Wallpaper axis, value `pattern`: an SVG the ADMIN uploads, tiled behind the content and
-	 * recoloured by the theme. It composes with any palette, and the recolour is what makes that
-	 * true — the drawing takes --fs-text, so the same file reads correctly in light and in dark
-	 * without the admin editing it.
+	/* Wallpaper axis, value `pattern`: an SVG the admin uploads, tiled behind the content and
+	 * recoloured by the theme, so the same file reads correctly in light and dark and under any
+	 * palette without being edited.
 	 *
-	 * WHY A DEDICATED ELEMENT AND NOT A `background-image`. Recolouring an image the browser has
-	 * already rasterised takes `mask-image`: the SVG supplies the ALPHA and the element supplies the
-	 * COLOUR. A mask applies to the element's whole rendering, children included, so it can never go
-	 * on .fs-shell or on <body> — those hold the page. Hence .fs-pattern, emitted as the first
-	 * child of <body> by header.ut AND by sysauth.ut (the login page has no .fs-shell at all), whose
-	 * only job is to be masked.
+	 * A dedicated element rather than a `background-image`, because recolouring a rasterised image
+	 * takes `mask-image` — the SVG supplies the alpha, the element the colour — and a mask applies
+	 * to the element's whole rendering, children included, so it can never go on .fs-shell or
+	 * <body>. Hence .fs-pattern, emitted as the first child of <body> by header.ut and sysauth.ut
+	 * (the login page has no .fs-shell), whose only job is to be masked.
 	 *
-	 * WHY z-index: -1 AND A TRANSPARENT BODY. Inside the root stacking context the paint order is
-	 * html's background, then negative-z children, then every block background. So the layer sits
-	 * ABOVE the canvas and BELOW the content — but body's own opaque --fs-bg would bury it. The
+	 * z-index: -1 with a transparent body, because inside the root stacking context the paint order
+	 * is html's background, then negative-z children, then every block background: the layer sits
+	 * above the canvas and below the content, but body's own opaque --fs-bg would bury it. The
 	 * canvas therefore moves up to :root for this axis and body goes transparent; .fs-main and the
-	 * footer follow for the same reason the doodles needed it. The sidebar is deliberately NOT
-	 * excluded: the bar is translucent (--fs-bar-bg) and the pattern showing behind it is what makes
-	 * the page read as one sheet.
+	 * footer paint their own --fs-bg and follow for the same reason. The sidebar is deliberately
+	 * not excluded —
+	 * the bar is translucent and the pattern showing behind it is what makes the page read as one
+	 * sheet.
 	 *
-	 * Cards sit on opaque --fs-panel and cover it, so the pattern shows through the gaps only. */
+	 * Cards sit on opaque --fs-panel, so the pattern shows through the gaps only. */
 	.fs-pattern { display: none; }
 
 	:root[data-wallpaper="pattern"] { background-color: var(--fs-bg); }

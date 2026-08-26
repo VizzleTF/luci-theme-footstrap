@@ -1,19 +1,13 @@
 #!/usr/bin/env node
-/* The set of files allowed to carry an `!important` is a contract, and it is stated TWICE — once in
- * tools/audit.py (BANG_OK, the Python gate) and once in .stylelintrc.json (the override that turns
- * declaration-no-important off for those files). The two run in different runtimes and cannot share
- * an import (Python vs a JSON config), exactly like head.ut ↔ fs-prefs.js — so this holds the CONTRACT
- * instead: derive the list from each and fail if they disagree.
+/* The set of files allowed to carry an `!important` is a contract stated twice — in tools/audit.py
+ * (BANG_OK) and in .stylelintrc.json (the override that turns declaration-no-important off for
+ * those files). The two run in different runtimes and cannot share an import, so this holds the
+ * contract instead: derive the list from each and fail if they disagree.
  *
- * Why it needs a gate at all: adding a file to one list and forgetting the other fails SILENTLY in the
- * worse direction — audit.py would flag a legitimate flag as stray, or stylelint would wave a new
- * flag through that audit.py still rejects. docs/conventions.md promises "the same allowlist audit.py uses";
- * nothing but this holds it to that.
- *
- * Both lists implicitly include every styles/base/*.css (base carries the .left/.right/.center forcing
- * utilities and two inline-style fighters). Only the non-base, explicitly-named files are compared by
- * name; the base glob is asserted present on each side.
- */
+ * Adding a file to one list and forgetting the other fails silently in the worse direction —
+ * audit.py flags a legitimate flag as stray, or stylelint waves a new flag through that audit.py
+ * still rejects. docs/conventions.md promises "the same allowlist audit.py uses"; nothing but this
+ * holds it to that. Both lists implicitly include every styles/base/*.css. */
 import { join, basename } from 'node:path';
 
 import { ROOT, read } from './lib/root.mjs';

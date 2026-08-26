@@ -28,26 +28,22 @@
 		color: var(--fs-dim); white-space: nowrap; text-shadow: none;
 	}
 
-	/* THE VALUE SITS BESIDE THE BAR wherever the bar already shares its line with a name.
+	/* The value sits BESIDE the bar wherever the bar already shares its line with a name.
 	 *
-	 * The default above puts it over the bar's far edge, and that assumes the shape the Overview has:
-	 * the meter owns a full-width line and its name sits on the line above, so the value lands at the
-	 * far end of that name's own line and the two read as one row. (Stock bootstrap assumes the same,
-	 * floating the title at `top: -1.4em; left: 0`.) Two shapes are not that, and they are not each
-	 * other either — CSS cannot ask "does this row carry its own label" — so each is named:
+	 * The default above puts it over the bar's far edge, which assumes the Overview's shape: the
+	 * meter owns a full-width line and its name sits on the line above, so the value lands at the
+	 * far end of that name's line and the two read as one row. Two shapes are not that, and CSS
+	 * cannot ask whether a row carries its own label, so each is named:
 	 *
-	 *   `.cbi-value-field > .cbi-progressbar`  the meter IS the field of a CBI form row, an app
-	 *     building `.cbi-value` with ui.js. Reported against luci-app-modeminfo's Antennas page:
-	 *     three such rows per card, every dBm figure reading as though it belonged to the meter above
-	 *     it, because the value lands against the row divider rather than beside its own bar.
-	 *   `.table:has(.tr.table-titles) .td …`   a meter COLUMN in a multi-column data table
-	 *     (luci-app-cpu-status's per-CPU load), where the floated value lands on the row divider too.
+	 *   `.cbi-value-field > .cbi-progressbar`  the meter IS the field of a CBI form row, where the
+	 *     value otherwise lands against the row divider rather than beside its own bar
+	 *   `.table:has(.tr.table-titles) .td …`   a meter COLUMN in a multi-column data table, where
+	 *     the floated value lands on the row divider too
 	 *
-	 * Both want the same geometry and differ in ONE number, so the geometry is written once and the
-	 * number is the knob: `--fs-meter-value` is the room the out-of-flow value needs. A form row holds
-	 * `-140.0 dBm`, half again as wide as the `100% (1.2 GiB)` of a table cell. The Overview and the
-	 * package manager keep the value above the bar — their meters sit in a `.td` and a bare
-	 * `.controls` div, which is neither shape. */
+	 * Both want the same geometry and differ in one number, so the geometry is written once and
+	 * `--fs-meter-value` is the knob: a form row holds `-140.0 dBm`, half again as wide as a table
+	 * cell's `100% (1.2 GiB)`. The Overview and the package manager keep the value above the bar,
+	 * their meters being neither shape. */
 	/* ONE RULE PER SHAPE, not one selector list for both, and the split is not cosmetic: the table
 	 * half needs `:has()`, and an engine that cannot parse a selector discards the WHOLE rule —
 	 * siblings included. Grouped, the form row (which needs nothing new) lost its placement on such
@@ -80,24 +76,21 @@
 		/* @endmirror */
 	}
 
-	/* ...AND BACK ABOVE THE BAR ONCE THAT COLUMN BECOMES A CARD.
+	/* …and back above the bar once that column becomes a card.
 	 *
-	 * The rule above puts the value BESIDE the bar because a table column shares its row with other
-	 * columns and a value floated over the bar would land on the row divider. A carded row is not
-	 * that: `.fs-stacked` gives each cell half the card, so "beside" is outside the cell — the value
-	 * ran across the neighbouring column and over the label above it. Reported twice from a phone
-	 * (`RSSI: 52% (-59dBm)` sitting on SIGNAL STRENGTH and on the Transferred figures next to it),
-	 * on luci-mod-dashboard's Wireless list, at every density.
+	 * The rule above puts the value beside the bar because a table column shares its row with other
+	 * columns. A carded row is not that: `.fs-stacked` gives each cell half the card, so "beside"
+	 * is outside the cell and the value runs across the neighbouring column and over the label
+	 * above it (reported twice from a phone, at every density).
 	 *
-	 * So the card puts it back where the default has it — over the bar's far edge, on the line the
-	 * label already owns — and buys that line: the bar takes a top margin of one --fs-type-xs line,
-	 * so the value sits between the label and the bar instead of on either. Measured at 390px on all
-	 * three densities: 6-9px of overlap before, none after.
+	 * So the card puts it back over the bar's far edge and buys it a line: the bar takes a top
+	 * margin of one --fs-type-xs line, so the value sits between the label and the bar instead of
+	 * on either. 6-9px of overlap before, none after.
 	 *
-	 * The selector carries `:has(.tr.table-titles)` for specificity alone: that is what the beside-rule
-	 * above matches on, and `:has()` counts its argument — (0,6,0) — so a plainer selector here lost
-	 * and the value stayed beside the bar (measured: `margin-inline-end` still 40px). The title row
-	 * is still in the DOM when the table is carded; the card only hides it. */
+	 * The selector carries `:has(.tr.table-titles)` for specificity alone — that is what the
+	 * beside-rule above matches on, and `:has()` counts its argument, which makes it (0,6,0), so a
+	 * plainer selector here loses (measured: `margin-inline-end` still 40px). The title row is
+	 * still in the DOM when the table is carded; the card only hides it. */
 	.cbi-section .table.fs-stacked:has(.tr.table-titles) .td .cbi-progressbar {
 		margin-inline-end: 0;
 		margin-block-start: calc(var(--fs-type-xs) * var(--fs-leading));

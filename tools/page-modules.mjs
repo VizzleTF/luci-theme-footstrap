@@ -1,28 +1,18 @@
 #!/usr/bin/env node
-/* THE PAGE-MODULE CONTRACT: a module that belongs to one page must be loaded on that page, and on
- * no other — and the two halves of that sentence live in two files.
+/* The page-module contract: a module that belongs to one page must be loaded on that page and on no
+ * other, and the two halves of that sentence live in two files.
  *
  * `fs-appearance` and `fs-overview` add to a stock page rather than owning a route (a theme may not
- * register a dispatcher node), so each watches `body[data-page]` and acts on one value. They used to
- * be `require`d in menu-footstrap-common.js's directive prologue, which made them a hard dependency
- * of the chrome: luci.js fetched and evaluated both on every admin page, 15.3 KB after terser for
- * panels that page did not have. Now menu-footstrap-common carries a MAP from `data-page` to module
- * name and requires the module when that page appears.
+ * register a dispatcher node), so each watches `body[data-page]` and acts on one value. Required
+ * from the chrome's directive prologue they would be a hard dependency, fetched and evaluated on
+ * every admin page — 15.3 KB after terser for panels that page does not have — so
+ * menu-footstrap-common carries a MAP from `data-page` to module name instead.
  *
- * That map repeats a string each module also tests for itself, and a repeat that nothing checks is a
- * bug waiting for the day someone renames a page node: the map would keep loading nothing while the
- * module keeps waiting for a stamp that never comes, and the only symptom is a panel that quietly
- * stopped appearing. So this derives BOTH sides from the source and compares them:
- *
- *   * the map's keys and values, read out of menu-footstrap-common.js;
- *   * the `data-page` value each mapped module compares itself against, read out of that module;
- *   * that no `'require <module>'` pragma is left anywhere, because one pragma anywhere in the
- *     graph puts the file back on every page and takes the saving with it;
- *   * that each mapped module exports a `wire`, which is what the loader calls.
- *
- * Same shape as tools/axes.mjs: two implementations of one fact, held together by a derivation
- * rather than by a comment asking the next person to remember.
- */
+ * That map repeats a page name each module also carries, which is what this gate holds together —
+ * along with the rule that no `'require <module>'` pragma may survive anywhere, because one pragma
+ * anywhere in the graph puts the file back on every page and takes the saving with it. Same shape as
+ * tools/axes.mjs: two implementations of one fact, held together by a derivation rather than by a
+ * comment asking the next person to remember. */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pageModules, RESOURCES as RES, LOADER } from './lib/page-modules.mjs';

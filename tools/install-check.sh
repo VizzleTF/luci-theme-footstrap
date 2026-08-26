@@ -1,25 +1,22 @@
 #!/bin/sh
-# THE INSTALLER GATE: install.sh, run twice, on a real router.
+# The installer gate: install.sh, run twice, on a real router.
 #
-# Three field reports were the installer and nothing else — #16 ("doesn't work with 0.10.0"), #28
-# ("says it upgraded, still the old version"), #30 ("does not upgrade an older version on 25.12/apk").
-# Every one of them was in the half no gate reached: `sh -n` proves the script parses, and
-# `owlab test` installs the BUILT package with the package manager directly, which is not what a user
-# runs. What a user runs is this script, against the published feed, on a router that may already
-# have the theme.
+# Three field reports were the installer and nothing else (#16, #28, #30), all in the half no gate
+# reached: `sh -n` proves the script parses, and `owlab test` installs the BUILT package with the
+# package manager directly, which is not what a user runs. What a user runs is this script, against
+# the published feed, on a router that may already have the theme.
 #
-# So: copy install.sh onto a stand, run it, then run it AGAIN over its own result — the upgrade path,
-# which is the one all three reports were about, and the one that cannot be exercised by a fresh
-# install. After each run the package must be present, `luci.main.mediaurlbase` must point at this
-# theme, and the theme's own files must be on disk.
+# So: copy install.sh onto a stand, run it, then run it AGAIN over its own result — the upgrade
+# path, which is what all three reports were about and cannot be exercised by a fresh install. After
+# each run the package must be present, `luci.main.mediaurlbase` must point at this theme, and the
+# theme's own files must be on disk.
 #
-# It installs the PUBLISHED release, not this working tree, and that is the point: it is the path
-# users take. Afterwards the stand is left with that release installed — run `owlab sync` to put your
-# working tree back, which is what the last line does.
+# It installs the PUBLISHED release rather than this working tree, that being the path users take,
+# and leaves the stand with that release installed — `owlab sync` puts the working tree back.
 #
 #   sh tools/install-check.sh [router-id ...]        (default: every running router)
 #
-# Needs owlab and a stand with network access (the installer fetches the feed index).
+# Needs owlab and a stand with network access.
 set -eu
 cd "$(dirname "$0")/.."
 

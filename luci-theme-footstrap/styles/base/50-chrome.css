@@ -1,7 +1,6 @@
 @layer base {
-	/* Page chrome: the sticky <header> band, dropdown anchoring, the tab strip,
-	 * breadcrumbs, footer. styles/theme/ repaints these; what stays here is the
-	 * geometry a view can rely on whatever the skin. */
+	/* Page chrome: the sticky <header> band, dropdown anchoring, the tab strip, breadcrumbs and the
+	 * footer. styles/theme/ repaints these; what stays here is the geometry a view can rely on. */
 	header {
 		position: sticky;
 		top: 0;
@@ -35,10 +34,10 @@
 		outline: none;
 	}
 
-	/* The tab focus ring lives in theme/40-tabs.css now, and it had to move: an accent outline is
-	 * invisible on the ACTIVE pill, whose fill is that same accent. The rule that stood here was
-	 * repainted by the theme in full (same selectors, `outline: none` + a box-shadow ring), so
-	 * leaving it would only be a dead declaration audit.py --strict reports. */
+	/* the tab focus ring lives in theme/40-tabs.css: an accent outline is invisible on the ACTIVE
+	 * pill, whose fill is that same accent. The theme repaints the rule that stood here in full
+	 * (same selectors), so a copy left behind would be a dead declaration tools/audit.py --strict
+	 * reports. */
 
 	.cbi-tab-disabled[data-errors]::after {
 		content: attr(data-errors);
@@ -46,7 +45,7 @@
 		color: var(--fs-on-danger);
 		height: var(--fs-space-4);
 		min-width: var(--fs-space-4);
-		/* a pill, so it says so — `8px` was half the height above, restated by hand */
+		/* a pill, so it says so, rather than half the height above restated by hand */
 		border-radius: var(--fs-radius-pill);
 		text-align: center;
 		margin-inline-end: var(--fs-space-1);
@@ -62,17 +61,17 @@
 		margin: calc(var(--fs-space-2) * -1) 0 var(--fs-space-4) 0;
 	}
 
-	/* hangs directly under the tab strip. `top: 35px` was that strip's height written out again —
-	 * a hidden pair with whatever sizes the tab. 100% IS the strip's height, by definition. */
+	/* hangs directly under the tab strip: 100% IS the strip's height by definition, where a literal
+	 * would be a hidden pair with whatever sizes the tab */
 	.tabs .menu-dropdown, .tabs .dropdown-menu {
 		top: 100%;
 		border-width: 1px;
-		/* square top-LEFT only: the panel hangs off the tab above it and the two share that
-		 * corner. Was a bare `0 6px 6px 6px`. */
+		/* square top-left only: the panel hangs off the tab above it and the two share that
+		 * corner */
 		border-radius: 0 var(--fs-radius) var(--fs-radius) var(--fs-radius);
 	}
 
-	/* the caret beside a tab's label: centred on the text box rather than nudged 15px down it. */
+	/* the caret beside a tab's label, centred on the text box rather than nudged down it */
 	.tabs a.menu:after, .tabs .dropdown-toggle:after {
 		border-top-color: var(--fs-dim);
 		align-self: center;
@@ -110,11 +109,10 @@
 		color: var(--fs-dim);
 	}
 
-	/* Footer paint: theme/20-shell.css — absorbed. Left: the flex skeleton the layout
-	 * needs — margin-top:auto pins the footer to the bottom of the flex-column body.
-	 * Do not re-add `justify-content: space-between` / `footer span { margin-bottom }`:
-	 * they came from a two-column footer this theme does not have and only pushed the
-	 * single credit <span> off centre; theme centres it, so they are dead too. */
+	/* Footer paint: theme/20-shell.css — absorbed. Left: the flex skeleton, where margin-top:auto
+	 * pins the footer to the bottom of the flex-column body. Do not re-add
+	 * `justify-content: space-between` or a span margin — they came from a two-column footer this
+	 * theme does not have. */
 	footer {
 		margin-top: auto;
 		display: flex;

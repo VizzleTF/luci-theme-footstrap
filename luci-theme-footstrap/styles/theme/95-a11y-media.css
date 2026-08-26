@@ -1,20 +1,17 @@
 @layer theme {
-	/* ==================================================================
-	 * prefers-reduced-motion — a medical accommodation: vestibular disorders make sliding,
-	 * fading and spinning UI genuinely nauseating. Honoured globally rather than per-component;
-	 * every transition and keyframe in this theme is decoration, none carries information.
+	/* prefers-reduced-motion — a medical accommodation: vestibular disorders make sliding, fading and
+	 * spinning UI genuinely nauseating. Honoured globally rather than per component; every
+	 * transition and keyframe in this theme is decoration and none carries information.
 	 *
-	 * WHY !important HERE — the documented exception, and NOT the same kind as the 14 in theme/
-	 * and pages/ that fight an inline `style=` or an unlayered \3c style>. A cascade layer cannot
-	 * help: styles/base sets transitions and animations too, and !important INVERTS the layer
-	 * order (an important declaration in base would beat a normal one here). Only an important
-	 * declaration reaches all of them at once. This is the canonical form of the rule as
-	 * published by the WCAG working group. DO NOT COPY THE FLAG OUT OF THIS BLOCK.
+	 * The !important here is the documented exception, and not the same kind as the ones that fight
+	 * an inline `style=`: a cascade layer cannot help, since styles/base sets transitions too and
+	 * !important INVERTS the layer order, so only an important declaration reaches all of them at
+	 * once. This is the canonical form as published by the WCAG working group. DO NOT COPY THE FLAG
+	 * OUT OF THIS BLOCK.
 	 *
-	 * .01ms rather than 0s: a zero duration means `transitionend`/`animationend` never fire at
-	 * all, and JS that waits for one (LuCI's modal teardown does) would hang.
-	 * scroll-behavior: smooth scrolling is motion too — a jump is what this user asked for.
-	 * ================================================================== */
+	 * .01ms rather than 0s: a zero duration means `transitionend`/`animationend` never fire, and JS
+	 * that waits for one (LuCI's modal teardown does) would hang. `scroll-behavior` is on the list
+	 * because smooth scrolling is motion too, and a jump is what this user asked for. */
 	@media (prefers-reduced-motion: reduce) {
 		*, *::before, *::after {
 			animation-duration: .01ms !important;
@@ -24,15 +21,11 @@
 		}
 	}
 
-	/* ==================================================================
-	 * prefers-reduced-transparency — the user asked the OS for opaque surfaces (visual clutter,
-	 * low vision, or plain preference). Every frosted surface in this theme is a translucent
-	 * fill + backdrop-filter blur; both go: the fill becomes the opaque panel, and the blur —
-	 * the single most expensive paint on a phone GPU (the sticky bar's backdrop is
-	 * resampled on every scrolled frame) — has nothing left to show through anyway. This also
-	 * gives a measured escape hatch on devices where the bar blur is too costly, without
-	 * taking the frosted design away from everyone else.
-	 * ================================================================== */
+	/* prefers-reduced-transparency — the user asked the OS for opaque surfaces. Every frosted surface
+	 * in this theme is a translucent fill plus a backdrop-filter blur, and both go: the fill becomes
+	 * the opaque panel, and the blur — the most expensive paint on a phone GPU, the sticky bar's
+	 * backdrop being resampled on every scrolled frame — has nothing left to show through. This also
+	 * gives a measured escape hatch on devices where that blur is too costly. */
 	@media (prefers-reduced-transparency: reduce) {
 		:root {
 			--fs-bar-bg: var(--fs-panel);
@@ -45,28 +38,23 @@
 		}
 	}
 
-	/* ==================================================================
-	 * prefers-contrast — the user asked the OS for MORE contrast, but (unlike forced-colors)
-	 * left the palette to us. Same mechanism as reduced-transparency above: re-state the tokens,
-	 * and every rule that reads them follows. What moves and why:
+	/* prefers-contrast — the user asked the OS for MORE contrast but, unlike forced-colors, left the
+	 * palette to us. Same mechanism as reduced-transparency: re-state the tokens and every rule that
+	 * reads them follows. What moves and why:
 	 *   - the hairlines: --fs-border is the most-read line in the theme and sits at ~20% of the
-	 *     text's contrast; pull it toward --fs-text. The role hairlines (-line/-line-hi, a 40/55%
-	 *     tint of their role) go to the FULL role colour — a tint exists to be quiet, which is
-	 *     the opposite of what this user asked for.
+	 *     text's contrast, so it is pulled toward --fs-text. The role hairlines (-line/-line-hi, a
+	 *     40/55% tint of their role) go to the FULL role colour — a tint exists to be quiet, which
+	 *     is the opposite of what this user asked for.
 	 *   - secondary text: --fs-dim toward --fs-text, and --fs-faint most of the way there too
-	 *     (10-11px eyebrow labels: small + faint is where AA erodes first). NOT all the way onto
-	 *     --fs-dim, which is what this used to say: the two are the export tier's --text-color-
-	 *     medium and -low (02-tokens.css), so collapsing them here republished one colour twice to
-	 *     every app reading the gradation — the exact flattening that file spends twelve lines
-	 *     undoing. 82% against dim's 85% is inside a narrow window, and export-tier.mjs now measures
-	 *     this media query rather than taking it on trust: below 80% the fainter ink drops under AA
-	 *     on footstrap dark's --fs-panel2 (4.51:1 at 80), above 82% the high-to-low ramp falls under
-	 *     the 0.10 spread the tier promises (0.098 at 84). 82 clears both: 4.68:1 and 0.110.
-	 *   - the focus ring: --fs-focus-ring is a tint of the accent (--fs-accent-soft: 10% light,
-	 *     15% dark — the one ladder member whose strength is per MODE, so not the ladder's 12%);
-	 *     at "more contrast" it carries the accent at 60%. Its sibling --fs-focus-ring-solo is
-	 *     already the SOLID accent and needs no restatement here.
-	 * ================================================================== */
+	 *     (10-11px eyebrow labels are where AA erodes first). Not all the way ONTO --fs-dim: the two
+	 *     are the export tier's --text-color-medium and -low, so collapsing them republishes one
+	 *     colour twice to every app reading the gradation. 82% is a window tools/export-tier.mjs
+	 *     measures rather than takes on trust: below 80 the fainter ink drops under AA on footstrap
+	 *     dark's --fs-panel2 (4.51:1 at 80), above 82 the high-to-low ramp falls under the 0.10
+	 *     spread the tier promises (0.098 at 84); 82 clears both, at 4.68:1 and 0.110.
+	 *   - the focus ring: --fs-focus-ring is a tint of the accent (--fs-accent-soft, 10% light and
+	 *     15% dark), so at "more contrast" it carries the accent at 60% instead. Its sibling
+	 *     --fs-focus-ring-solo is already the solid accent and needs no restatement here. */
 	@media (prefers-contrast: more) {
 		:root {
 			--fs-border: color-mix(in srgb, var(--fs-text) 45%, var(--fs-bg));
@@ -80,26 +68,24 @@
 		}
 	}
 
-	/* ==================================================================
-	 * forced-colors (Windows High Contrast) — the OS replaces every colour the theme picked, and
-	 * background-color on most elements is forced to the system canvas. Any state carried by
-	 * BACKGROUND ALONE therefore vanishes: the active tab pill, the checked toggle and the
-	 * selected dropdown row all looked exactly like their inactive siblings — a correctness bug,
-	 * not a cosmetic one. Re-state those states with a BORDER/OUTLINE, which forced-colors keeps,
-	 * in system colour keywords so they follow the user's scheme.
-	 * ================================================================== */
+	/* forced-colors (Windows High Contrast) — the OS replaces every colour the theme picked, and
+	 * background-color on most elements is forced to the system canvas, so any state carried by
+	 * BACKGROUND alone vanishes: the active tab pill, the checked toggle and the selected dropdown
+	 * row all look exactly like their inactive siblings, which is a correctness bug rather than a
+	 * cosmetic one. Re-state those states with a border or outline, which forced-colors keeps, in
+	 * system colour keywords so they follow the user's scheme. */
 	@media (forced-colors: active) {
-		/* active tab / selected dropdown row / checked toggle: outline the state.
+		/* Active tab, selected dropdown row, checked toggle: outline the state.
 		 *
-		 * `.ifacebox-head.active` and Apply joined the list rather than getting a rule of their own:
-		 * they are the same KIND of state — carried by a background, with no word to fall back on —
-		 * and it is the same repair. "This port is up" was indistinguishable from a dead port, and
-		 * Save & Apply did not read as a BUTTON at all: it is a .cbi-dropdown wrapper, so with its
-		 * fill forced to Canvas only the label inside the <li> kept a highlight, leaving what looks
-		 * like selected text beside a bare chevron (see tmp/decisions/4-forcedcolors-actionbar).
-		 * NOT extended to the alert and .label variants: the audit's proposal there was to encode
-		 * severity in border-style (dashed/dotted/double), and a border style is not a scale anyone
-		 * can learn — the honest repair is a word or an icon in the markup, which is ui.js's. */
+		 * `.ifacebox-head.active` and Apply join the list rather than getting a rule of their own,
+		 * being the same KIND of state — carried by a background, with no word to fall back on — and
+		 * the same repair. "This port is up" was indistinguishable from a dead port, and Save & Apply
+		 * did not read as a BUTTON at all: it is a .cbi-dropdown wrapper, so with its fill forced to
+		 * Canvas only the label inside the <li> kept a highlight.
+		 *
+		 * Not extended to the alert and .label variants: encoding severity in border-style is not a
+		 * scale anyone can learn, and the honest repair is a word or an icon in the markup, which is
+		 * ui.js's. */
 		#tabmenu ul.tabs > li.active > a,
 		ul.cbi-tabmenu.mode > li.cbi-tab > a,
 		.tabs > li.active > a,
@@ -113,11 +99,10 @@
 			background: Highlight;
 			forced-color-adjust: none;	/* keep the fill: it IS the state */
 		}
-		/* WHICH PAGE AM I ON. The menu's active item carries its state in exactly the two things
-		 * forced colors drops: a 10%-alpha accent background and the box-shadow rail. Measured with
-		 * the query emulated — all twelve #topmenu links reported the same weight, the same absent
-		 * shadow, the same absent border and the same LinkText colour, so the current page was not
-		 * marked at all. `aria-current="page"` is on the link (menu-footstrap.js), so this was a
+		/* Which page am I on: the menu's active item carries its state in exactly the two things forced
+		 * colors drops, a 10%-alpha accent background and the box-shadow rail. Measured with the query
+		 * emulated, all twelve #topmenu links reported the same weight, shadow, border and colour, so
+		 * the current page was not marked at all. `aria-current="page"` is on the link, so this was a
 		 * sighted-user loss only. The rail comes back as a real border, which forced colors keeps. */
 		#topmenu li.active > a {
 			border-inline-start: 3px solid Highlight;

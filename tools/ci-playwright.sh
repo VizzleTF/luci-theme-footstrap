@@ -1,28 +1,26 @@
 #!/bin/sh
-# THE BROWSER THE GATES DRIVE, WITHOUT GOING THROUGH APT UNLESS IT IS ACTUALLY NEEDED.
+# The browser the gates drive, without going through apt unless it is actually needed.
 #
 #   sh tools/ci-playwright.sh
 #
 # `npx playwright install --with-deps chromium` is two installs in one: the browser off Playwright's
-# CDN, and a list of system libraries off apt. On this repository's runners the apt half is what
-# stalls — three steps of the 0.13.2 tag sat for 68, 68 and 17 minutes, and a later run spent its
-# whole 20-minute budget retrying it — while the CDN half has never been the slow one. The libraries
-# it installs are, on GitHub's ubuntu image, already there.
+# CDN and a list of system libraries off apt. On this repository's runners the apt half is what
+# stalls — three steps of one tag sat for 68, 68 and 17 minutes — while the CDN half has never been
+# the slow one, and the libraries are already present on GitHub's ubuntu image.
 #
-# So: fetch the browser, then PROVE it launches. That is the claim the gates actually need, and it
-# is a better one than "apt exited 0" — a browser that installs and cannot start is the same red
-# job one step later. Only if the launch fails do we go to apt for the libraries, which is where a
-# self-hosted or a trimmed image would land.
+# So: fetch the browser, then PROVE it launches, which is the claim the gates need and a better one
+# than "apt exited 0". Only if the launch fails do we go to apt, which is where a self-hosted or
+# trimmed image would land.
 #
 # Both installs run under tools/ci-retry.sh, which puts each attempt on a clock and kills its
-# process GROUP, because a killed apt otherwise keeps /var/lib/apt/lists/lock and every retry after
-# it dies on the lock rather than on the network.
+# process GROUP: a killed apt otherwise keeps /var/lib/apt/lists/lock and every retry dies on the
+# lock rather than on the network.
 set -eu
 
 cd "$(dirname "$0")/.."
 
-# One engine by name: the gates that need firefox or webkit are local (docs/development.md), and
-# installing them here would triple both halves of this.
+# One engine by name: the gates that need firefox or webkit run in the `anchors` job, which
+# installs them itself. Installing them here would triple both halves of this.
 sh tools/ci-retry.sh 300 npx playwright install chromium
 
 launches() {

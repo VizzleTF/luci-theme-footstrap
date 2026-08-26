@@ -1,35 +1,24 @@
 #!/usr/bin/env node
-/* THE NAVIGATION GATE: a page opened by a click must be the same page a full load gives.
+/* The navigation gate: a page opened by a click must be the same page a full load gives.
  *
  * The theme replaces LuCI's full-page navigation with a client router (docs/spa-router.md), and that
  * is one long list of things a fresh document does for free: an empty uci cache, an empty poll
  * queue, no stray intervals, no leftover notifications, a re-stamped body[data-page], a view
- * constructed rather than a cached singleton reused. Every one of those has been wrong at least once
- * — "four places where a client navigation stopped matching a full load", "close three races the
- * client router opens", and most recently the uci flush that left `network.js` answering out of an
- * empty cache, which emptied Status → Channel Analysis and Network → Switch for a reviewer three
- * days after it shipped.
+ * constructed rather than a cached singleton reused. Every one of those has been wrong at least
+ * once.
  *
- * So this gate does not check the router's mechanics. It opens every page BOTH ways and compares
- * what the user ends up with:
- *
- *   content    how much the view painted, and how many elements it built. A view that renders half
- *              of itself is the shape every one of those regressions took.
- *   uci        which config packages are in uci's cache. This is the one that catches a state bug
- *              with no visible symptom on a stand: Channel Analysis renders the same 32 characters
- *              either way on a router with no real radios, while `uci.state.values` was `{}` after a
- *              click and held network, wireless and luci after a load.
- *   wifi       network.getWifiDevices().length, for the same reason one level up: the module answers
- *              out of that cache and never reloads it.
- *   console    an error thrown on the click path that a full load does not produce.
+ * So this gate does not check the router's mechanics: it opens every page BOTH ways and compares
+ * what the user ends up with — how much the view painted, which config packages are in uci's cache
+ * (the axis that catches a state bug with no visible symptom: a page can render the same characters
+ * either way while `uci.state.values` is `{}` after a click), how many wifi devices network.js
+ * answers with, and whether the click path threw where a full load did not.
  *
  * There is no baseline: a difference between the two ways of opening the same page is always a bug,
  * and if a page is legitimately different it does not belong in the menu.
  *
- *   node tools/spa-parity.mjs [--only owrt2512,owrt2410] [--pages /admin/network]
+ *   node tools/spa-parity.mjs [--only owrt2512,owrt2410] [--pages /admin/network] [--pages-all]
  *
- * Needs a running owlab router (docs/development.md).
- */
+ * Needs a running owlab router (docs/development.md). */
 import { chromium } from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands } from './lib/stands.mjs';
 import { classify, representatives, reportReduction, PINNED } from './lib/page-shapes.mjs';
@@ -53,12 +42,11 @@ const measure = async (page) => {
 			const text = (v ? v.textContent : '').replace(/\s+/g, ' ').trim();
 			const out = {
 				chars: text.length, nodes: v ? v.querySelectorAll('*').length : 0, uci: '', wifi: -1,
-				/* The staged render puts a second `#view` in the document on purpose — LuCI's own
-				 * chain resolves `#view` at paint time and must find the stage — but it is
-				 * transient BY CONSTRUCTION, and this is what keeps it so. A stage that outlives
-				 * its navigation is two elements answering to one id for the rest of the document,
-				 * which is where a duplicate id stops being a technicality: the next view would
-				 * paint into the leftover. */
+				/* The staged render puts a second `#view` in the document on purpose — LuCI's own chain
+				 * resolves `#view` at paint time and must find the stage — but it is transient BY
+				 * CONSTRUCTION, and this is what keeps it so: a stage that outlives its navigation is
+				 * two elements answering to one id for the rest of the document, and the next view
+				 * would paint into the leftover. */
 				views: document.querySelectorAll('#view').length,
 				stages: document.querySelectorAll('.fs-staging').length,
 			};
@@ -73,18 +61,18 @@ const measure = async (page) => {
 	}
 };
 
-/* WHAT A TRIP THROUGH A BACKGROUND TAB LEAVES BEHIND.
+/* What a trip through a background tab leaves behind.
  *
  * fs-router pauses a view's own `setInterval` while the tab is hidden and re-arms it on the way
- * back, which is the one piece of the router's state that a navigation does NOT reset — and it was
- * wrong in both directions at once: the re-armed timer came back under a fresh id (so the view
- * could no longer stop its own poller), and while paused it sat outside the registry a navigation
- * sweeps (so a tab hidden across a click brought the previous page's timers back with it).
+ * back, the one piece of the router's state a navigation does not reset — and it was wrong in both
+ * directions at once: the re-armed timer came back under a fresh id, so the view could no longer
+ * stop its own poller, and while paused it sat outside the registry a navigation sweeps, so a tab
+ * hidden across a click brought the previous page's timers back.
  *
- * Both are invisible on a page that is merely LOOKED at, and both are cheap to ask here, where a
- * navigation has just happened: hide, look at what is still armed, show, count the registry again.
- * `document.hidden` is read-only and is overridden the way the browser's own tooling does — the
- * page is thrown away by the full load that follows, so the override never outlives this probe. */
+ * Both are invisible on a page that is merely looked at, and both are cheap to ask here, where a
+ * navigation has just happened. `document.hidden` is read-only and is overridden the way the
+ * browser's own tooling does — the page is thrown away by the full load that follows, so the
+ * override never outlives this probe. */
 const timerProbe = async (page) => {
 	try {
 		return await page.evaluate(async () => {

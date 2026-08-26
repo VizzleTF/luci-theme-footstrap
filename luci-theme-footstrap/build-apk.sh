@@ -1,24 +1,21 @@
 #!/bin/sh
-# Build luci-theme-footstrap as an OpenWrt .apk via the SDK.
-# The theme is noarch (CSS, JS and templates only — it ships no fonts), so the package installs on any
-# router of that release whatever its CPU architecture.
+# Build luci-theme-footstrap as an OpenWrt .apk via the SDK. The theme is noarch, so the package
+# installs on any router of that release whatever its CPU architecture.
 #
 #   ./build-apk.sh            # download SDK if needed, then build
 #   BUILD_DIR=~/x ./build-apk.sh
 #
-# THIS IS NOT HOW THE RELEASE IS BUILT any more — `./tools/stage.sh && owfeed build` is, and
-# it produces both formats in seconds without a toolchain (see owfeed.yml). What this script
-# exercises is the OTHER path: the Makefile, luci.mk, jsmin, and the SDK's own packaging. That
-# path still has to work — the theme should stay buildable in an SDK or a feed by someone who
-# has never heard of owfeed — and this is the only way to find out that it does.
+# This is NOT how the release is built — `./tools/stage.sh && owfeed build` is, and it produces both
+# formats in seconds without a toolchain. What this exercises is the OTHER path: the Makefile,
+# luci.mk, jsmin and the SDK's own packaging, which has to keep working for anyone building the
+# theme in an SDK or a feed without owfeed.
 set -e
 
 # The point release and the compiler are both baked into the SDK's filename, so this default goes
-# stale twice over: downloads.openwrt.org keeps only the CURRENT point release of a branch (older
-# ones move to archive.openwrt.org and the fetch 404s), and a toolchain bump changes gcc-14.3.0.
-# Kept in step with owfeed.lock's `point:` for the 25.12 branch — that file is what the release
-# actually builds against. Override for any other: OPENWRT_RELEASE=24.10.8 sh build-apk.sh, and
-# OPENWRT_SDK_FILE=… when the compiler string differs too.
+# stale twice over: downloads.openwrt.org keeps only the CURRENT point release of a branch, and a
+# toolchain bump changes the gcc string. Kept in step with owfeed.lock's `point:` for the 25.12
+# branch, which is what the release builds against. Override with OPENWRT_RELEASE=… and
+# OPENWRT_SDK_FILE=… for any other.
 REL="${OPENWRT_RELEASE:-25.12.5}"
 SDK_BASE="https://downloads.openwrt.org/releases/${REL}/targets/mediatek/filogic"
 SDK_FILE="${OPENWRT_SDK_FILE:-openwrt-sdk-${REL}-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64.tar.zst}"

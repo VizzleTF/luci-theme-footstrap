@@ -1,46 +1,34 @@
 @layer theme {
-	/* ---- the menu's floor: pin what a foreign rule can reach by INHERITANCE ----
+	/* ---- the chrome's floor: pin what a foreign rule can reach by INHERITANCE ----
 	 *
 	 * fs-sheets.js fences the chrome out of a third-party selector, so nothing foreign MATCHES a
-	 * menu element any more. Inheritance is the way in that a fence cannot close: a rule on `html`
-	 * or `body` is an ANCESTOR, and excluding it is meaningless — the value arrives from above.
-	 * Measured on the router against a hostile rule on `html` with every declaration flagged:
-	 * font-style reached 166 of the menu's 169 elements, word-spacing and text-align 157,
-	 * letter-spacing and text-transform 156, cursor 46. font-family, color, font-size, line-height
-	 * and font-weight reached NONE — because the chrome already states those itself. That is the
-	 * whole fix: state the rest too.
+	 * chrome element. Inheritance is the way in a fence cannot close: a rule on `html` or `body` is
+	 * an ancestor, and excluding it is meaningless. Measured against a hostile flagged rule on
+	 * `html`: font-style reached 166 of the menu's 169 elements, word-spacing and text-align 157,
+	 * letter-spacing and text-transform 156, cursor 46 — while font-family, color, font-size,
+	 * line-height and font-weight reached none,
+	 * because the chrome already states those. The fix is to state the rest too.
 	 *
-	 * Inheritance is not a cascade competitor. It only supplies a value when NO declaration matches
-	 * the element, so any declaration of our own — normal, unflagged, at zero specificity — beats an
-	 * inherited `!important`. Hence no `!important` here, and none is needed.
+	 * Inheritance is not a cascade competitor: it supplies a value only when no declaration matches
+	 * the element, so any declaration of ours — unflagged, at zero specificity — beats an inherited
+	 * `!important`. Hence no `!important` here.
 	 *
-	 * It keys off `[data-fs-chrome]` — the mark a chrome root carries in the markup (header.ut) — and
-	 * not off `.fs-sidebar`, because the chrome is not one element: the skip link sits beside
-	 * .fs-shell and the Appearance popover hangs off <body>, so a pin naming the menu left both of
-	 * them inheriting straight from `html`. The fence (fs-sheets.js) reads the same mark, so the two
-	 * halves of Zone 1's defence cannot cover different sets of elements. `npm run chrome-fence`
-	 * derives the mark from the markup and holds both to it.
+	 * It keys off `[data-fs-chrome]`, the mark a chrome root carries in the markup (header.ut), not
+	 * off `.fs-sidebar`: the chrome is not one element, and a pin naming the menu leaves the skip
+	 * link and the search overlay inheriting straight from `html`. The fence (fs-sheets.js) reads
+	 * the same mark, so the two halves of zone 1's defence cannot cover different sets of elements,
+	 * and `npm run chrome-fence` derives the mark from the markup and holds both to it.
 	 *
-	 * It goes on the ROOT ALONE — and says so IN THE SELECTOR (`:not([data-fs-chrome] *)`: a marked
-	 * element that is not inside a marked element), rather than trusting whoever adds the next marker
-	 * to have read this comment. A nested marker is otherwise a direct declaration on a descendant,
-	 * which is exactly the 302-element bug below, and no gate can see it: the markers live in a
-	 * template with conditional blocks, so "is this one inside that one" is not a question a text
-	 * scanner can answer. CSS can answer it, so let CSS answer it. That is the whole design.
-	 * Inheritance
-	 * flows from the nearest ancestor that has a value: pinning the root breaks the chain from `html`
-	 * once, and every descendant then inherits OUR value — while the chrome's own inheritance keeps
-	 * working. Pinning descendants too was measured and it broke exactly that: a direct declaration
-	 * beats an inherited one even when the inherited one is ours, so `.fs-label` lost the `nowrap` it
-	 * inherits (labels would wrap), `.fs-railtoggle` lost its centring, and `text-align` was forced
-	 * from `start` to `left` on 302 elements — `start` follows the writing direction and `left` does
-	 * not, so that alone would have broken every RTL language LuCI ships. Hence `text-align: start`,
-	 * not `left`. Nothing below a root needs a pin: a foreign rule can no longer MATCH a chrome
-	 * element (fs-sheets.js fences it), so `html`/`body` is the only way in and the root closes it.
+	 * It goes on the ROOT alone, and says so in the SELECTOR (`:not([data-fs-chrome] *)`) rather
+	 * than trusting whoever adds the next marker to have read this: the markers live in a template
+	 * with conditional blocks, so "is this one inside that one" is not a question a text scanner can
+	 * answer, and CSS can. Pinning descendants too is worse than useless — a direct declaration
+	 * beats an inherited one even when the inherited one is ours, so `.fs-label` loses the `nowrap`
+	 * it inherits and `text-align` is forced from `start` to `left` on 302 elements, which alone
+	 * breaks every RTL language LuCI ships. Hence `text-align: start`, never `left`.
 	 *
-	 * `:where()` keeps it at 0,0,0 so every existing chrome rule outranks it — the pin is a floor,
-	 * never a ceiling. Only inherited properties belong here; a non-inherited one would be a plain
-	 * style decision wearing a guard's coat. */
+	 * `:where()` keeps it at 0,0,0 so every existing chrome rule outranks it: the pin is a floor,
+	 * never a ceiling. Only inherited properties belong here. */
 	:where([data-fs-chrome]:not([data-fs-chrome] *)) {
 		font-style: normal;
 		font-variant: normal;
@@ -150,15 +138,14 @@
 	ul.nav > li { display: block; }
 	ul.nav a { line-height: 19px; text-decoration: none; }
 
-	/* `.dropdown-menu` is emitted by NOBODY here: not by this theme (its menu is a plain nested
-	 * `ul`), and not by luci-base — grepped, zero hits outside stylesheets. It stays styled purely
-	 * under the coverage contract: it is theme vocabulary (stock luci-theme-bootstrap carries 14
-	 * rules for it), so a third-party luci-app-* is entitled to emit it and expect a themed result.
-	 * A selector with no on-router example today is styled for the package that emits it tomorrow.
-	 * Each item anchors its own nested popup, hence position: relative.
+	/* `.dropdown-menu` is emitted by nobody here — not by this theme, whose menu is a plain nested
+	 * `ul`, and not by luci-base. It stays styled under the coverage contract: it is theme
+	 * vocabulary (stock luci-theme-bootstrap carries 14 rules for it), so a third-party luci-app-*
+	 * is entitled to emit it and expect a themed result. Each item anchors its own nested popup,
+	 * hence position: relative.
 	 *
 	 * This comment used to claim ui.js emits it for the split Save & Apply button. It does not —
-	 * that button is a `.cbi-dropdown`, a different widget entirely. */
+	 * that button is a `.cbi-dropdown`, a different widget. */
 	.dropdown-menu li { display: block; position: relative; }
 	/* wins over `ul.nav a` above: the popup sets its own denser rhythm */
 	ul.nav .dropdown-menu a, .dropdown-menu a { line-height: 18px; }
@@ -178,32 +165,27 @@
 	.fs-modemenu li.active a {
 		background: var(--fs-accent-soft); color: var(--fs-accent);
 	}
-	/* ---- THE FILL MARKS THE PAGE, AND A CATEGORY IS NOT A PAGE ----
+	/* ---- the fill marks the PAGE, and a category is not a page ----
 	 *
-	 * `li.active` is set on the SECTION that contains the current page as well as on the page's own
-	 * row, so `li.active > a` used to hand the same accent plate to both — on System -> System that
-	 * is two identical plates, one above the other, both reading "System" (issue #37). Measured
-	 * before this rule: the open category and the current leaf were the same fill, the same ink and
-	 * the same 13px/600, differing in 2px of padding.
+	 * `li.active` is set on the SECTION containing the current page as well as on the page's own
+	 * row, so `li.active > a` hands the same accent plate to both — two identical plates, one above
+	 * the other, on System -> System (issue #37): measured before this rule, the open category and
+	 * the current leaf carried the same fill, the same ink and the same 13px/600, differing in 2px
+	 * of padding.
 	 *
-	 * The markup already says which is which and this only makes the paint agree with it:
-	 * menu-footstrap.js puts `aria-current="page"` on the LEAF alone, because a section header is a
-	 * disclosure control rather than a link to where you are. So the plate stays with the page and
-	 * the ancestor keeps the accent INK — still visibly the branch you are in, without competing
-	 * with the page for the same signal — while an ancestor that is also the page itself is matched
-	 * by `a.active` above and keeps the plate.
+	 * The markup already says which is which: menu-footstrap.js puts `aria-current="page"` on the
+	 * LEAF alone, a section header being a disclosure control rather than a link to where you are.
+	 * So the plate stays with the page and the ancestor keeps the accent INK, while an ancestor
+	 * that is also the page is matched by `a.active` above and keeps the plate.
 	 *
-	 * Unscoped, like the rule above it: the accordion, the bar's dropdown and the rail's flyout all
-	 * render one markup, and a per-layout copy is what the "one look, every layout" note is about. */
+	 * Unscoped, like the rule above it: the accordion, the bar's dropdown and the rail's flyout are
+	 * one markup. */
 	.fs-sidebar ul.nav > li.active > a:not(.active) { color: var(--fs-accent); }
 
-	/* Keyboard focus for the chrome controls. Covers the buttons/links the theme itself renders,
-	 * which had only the UA default (menu links: base's thin dotted outline).
-	 *
-	 * --fs-focus-ring-solo, not --fs-focus-ring: none of these flips a border on focus, so the
-	 * ring is the entire indicator, and the tinted ring measures 1.15-1.29:1 against the sidebar
-	 * — i.e. tabbing through the WHOLE MENU showed nothing at 3:1. See the two-ring contract in
-	 * 02-tokens.css: the tint is only legitimate beside a second channel. */
+	/* Keyboard focus for the chrome controls, which otherwise have only the UA default.
+	 * --fs-focus-ring-solo, not --fs-focus-ring: none of these flips a border on focus, so the ring
+	 * is the entire indicator, and the tinted ring measures 1.15-1.29:1 against the sidebar — i.e.
+	 * tabbing the whole menu shows nothing at 3:1 (the two-ring contract in 02-tokens.css). */
 	.fs-railtoggle:focus-visible,
 	.fs-themerow:focus-visible,
 	.fs-logout:focus-visible,
@@ -212,12 +194,11 @@
 		box-shadow: var(--fs-focus-ring-solo);
 	}
 
-	/* The page-wide accent signals no widget rule covers. All three follow the palette:
-	 *   ::selection      — the UA default (opaque blue) ignores palette and dark mode;
-	 *   caret-color      — inherits from :root into every field, one declaration;
-	 *   accent-color     — the theme's own checkboxes are appearance:none drawings and never
-	 *                      see it, but a third-party luci-app-*'s NATIVE checkbox/radio/
-	 *                      progress does — outbound theming in the spirit of the export tier. */
+	/* The page-wide accent signals no widget rule covers, all following the palette:
+	 *   ::selection      the UA default (opaque blue) ignores palette and dark mode
+	 *   caret-color      inherits from :root into every field, in one declaration
+	 *   accent-color     the theme's own checkboxes are appearance:none drawings and never see it,
+	 *                    but a third-party app's native checkbox/radio/progress does */
 	::selection { background: var(--fs-accent); color: var(--fs-on-accent); }
 	:root { caret-color: var(--fs-accent); accent-color: var(--fs-accent); }
 }

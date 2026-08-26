@@ -1,40 +1,28 @@
 #!/usr/bin/env node
 /* @mirror — turn duplication you cannot delete into duplication that cannot ROT.
  *
- * Some duplication is forced, not chosen: CSS cannot share a declaration block across two
- * mutually-exclusive guards (the stacked table's card layout is needed under a CLASS —
- * .fs-stacked, the measured data table — AND under a CONTAINER QUERY: the config table, which
- * cannot be measured, see fs-select.js); and `install.sh` is fetched with `curl | sh` and runs
- * BEFORE the package exists, so it cannot source a library shipping inside the package — yet it
- * must do exactly what `footstrap-selfupdate.sh` does (fetch over a verified channel, pin the
- * asset host, check the sha256).
+ * Some duplication is forced rather than chosen: CSS cannot share a declaration block across two
+ * mutually exclusive guards — the stacked table's card layout is needed under a CLASS (.fs-stacked,
+ * the measured data table) AND under a CONTAINER QUERY (the config table, which cannot be measured;
+ * see fs-select.js). A script fetched with `curl | sh` and running BEFORE the package exists cannot
+ * source a library shipping inside that package, yet has to do exactly what it does.
  *
- * THE TRAP, and the reason for this tool: a structural duplicate detector (tools/css-dup.mjs)
- * matches bodies that are IDENTICAL, so the moment two copies diverge it goes QUIET — exactly
- * when it should shout. Not hypothetical: `fetch()` in install.sh and footstrap-selfupdate.sh
- * had ALREADY drifted three ways (different backend order, one with no timeout on its
- * first-choice tool, one missing the https redirect pin) and nothing said a word. So: tag every
- * copy, assert they stay byte-identical.
- *
- *   shell / JS:   # @mirror <group>/<role>      …lines…      # @endmirror
- *   CSS:          /* @mirror <group>/<role> *\/  …rule…      /* @endmirror *\/
- *
- * Comparison ignores common leading indent and trailing whitespace (a copy may nest deeper);
- * everything else must match. A group with only ONE copy is an error too: a mirror of one is a
- * tag someone forgot to delete when the other copy died, and it enforces nothing.
- */
+ * The trap: a structural duplicate detector (tools/css-dup.mjs) matches bodies that are IDENTICAL,
+ * so it goes QUIET the moment two copies diverge — exactly when it should shout. Not hypothetical:
+ * the fetch helper existed twice and had ALREADY drifted three ways (different backend order, one
+ * with no timeout on its first-choice tool, one missing the https redirect pin) and nothing said a
+ * word. So: tag every copy, assert they stay byte-identical. */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import { ROOT } from './lib/root.mjs';
 
-/* Whole FILES pinned byte-identical — the same argument one level up: duplication a tool forces
- * on you, made un-rottable. The Apache-2.0 text must exist twice and neither copy can go:
- *   LICENSE                        — the repo root, the only place GitHub looks
- *   luci-theme-footstrap/LICENSE   — the PACKAGE: PKG_LICENSE_FILES resolves against
- *                                    $(PKG_BUILD_DIR), into which luci.mk copies only the
- *                                    package source dirs; CI rsyncs only the package dir into
- *                                    the SDK, so the root file is unreachable from $(CURDIR).
+/* Whole FILES pinned byte-identical — the same argument one level up. The Apache-2.0 text must
+ * exist twice and neither copy can go:
+ *   LICENSE                        the repo root, the only place GitHub looks
+ *   luci-theme-footstrap/LICENSE   the PACKAGE: PKG_LICENSE_FILES resolves against
+ *                                  $(PKG_BUILD_DIR), into which only the package source dirs are
+ *                                  copied, so the root file is unreachable from $(CURDIR).
  * A licence text cannot carry an @mirror comment without ceasing to be the licence text. */
 const SAME_FILE = [
 	['LICENSE', 'luci-theme-footstrap/LICENSE'],

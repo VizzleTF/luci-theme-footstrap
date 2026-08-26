@@ -1,28 +1,20 @@
 #!/bin/sh
-# RUN A NETWORK INSTALL UNDER A CLOCK, AND AGAIN IF IT STALLS.
+# Run a network install under a clock, and again if it stalls.
 #
 #   sh tools/ci-retry.sh <seconds> <command…>
 #
-# Why this exists: the two things a job of ours fetches from somebody else's server — apt (gettext,
-# and the system libraries `playwright install --with-deps` pulls) and the Playwright CDN — do not
-# fail when the far side is unwell. They STALL. On the 0.13.2 tag one apt step and two playwright
-# steps sat for 68, 68 and 17 minutes with GitHub reporting every system operational, and a hung
-# step is not a failed step: nothing retries it, the job's own timeout is the only thing that ends
-# it, and the release waits behind a download.
+# The two things a job of ours fetches from somebody else's server — apt and the Playwright CDN — do
+# not fail when the far side is unwell, they STALL, and a hung step is not a failed step: nothing
+# retries it and the job's own timeout is the only thing that ends it. So each attempt gets a
+# deadline of its own; a genuinely broken command still fails on the first attempt.
 #
-# So each attempt gets a deadline instead of the job's. A stall is then a retry a few minutes in
-# rather than a red tag half an hour later, and a genuinely broken command still fails on the first
-# attempt and only costs the retries.
-#
-# THE ATTEMPT IS A PROCESS GROUP, not a process. `timeout` signals the child it started and nothing
+# The attempt is a process GROUP, not a process: `timeout` signals the child it started and nothing
 # below it, so killing `npx playwright install --with-deps` leaves the `apt-get` it spawned running
-# and holding /var/lib/apt/lists/lock — which is exactly what happened on the first version of this
-# script: attempt 1 timed out, attempts 2 and 3 died in seconds on "Could not get lock … held by
-# process 2376 (apt-get)", and the retry proved nothing. `setsid` puts each attempt in a session of
-# its own so the whole tree can be signalled by negative pid, and the locks and any half-configured
-# package are cleared before the next attempt.
+# and holding /var/lib/apt/lists/lock — after which every retry dies in seconds on the lock and
+# proves nothing. `setsid` puts each attempt in a session of its own so the whole tree can be
+# signalled by negative pid, and the locks are cleared before the next attempt.
 #
-# This is a CI runner and nothing else: it kills by process GROUP and deletes apt's lock files,
+# This is for a CI runner and nothing else: it kills by process group and deletes apt's lock files,
 # which is only safe because the machine is ephemeral and runs one job.
 set -eu
 

@@ -1,34 +1,20 @@
 @layer page {
-	/* THE FILTER BAR, which LuCI writes as a run of inline text.
+	/* The filter bar, which LuCI writes as a run of inline text. Both log views build one —
+	 * `tools/views.js` (LogreadBox: the System Log and every third-party page built on it) and
+	 * `view/status/dmesg.js` (the Kernel Log) — emitting bare `<div style="margin-bottom:10px">`
+	 * rows of label/control pairs with nothing around a pair. Inline flow then breaks wherever the
+	 * line runs out, and on a phone that is between a label and the control it names — or inside
+	 * the label itself.
 	 *
-	 * Both log views build one: `tools/views.js` (LogreadBox — the System Log, and every third-party
-	 * page built on it) and `view/status/dmesg.js` (the Kernel Log). Each emits bare
-	 * `<div style="margin-bottom:10px">` rows holding label / control pairs with nothing around a
-	 * pair: `<label>Не</label><input type=checkbox><label>объект:</label><select>…`. Inline flow then
-	 * breaks wherever the line runs out, and on a phone that is between a label and the control it
-	 * names — reported from a 390px screen, where the second `Не` sat alone at the end of one line,
-	 * `уровень:` opened the next one without it, and `Макс. строк:` broke INSIDE the label, leaving
-	 * `Макс.` above `строк:` and the field they belong to.
+	 * One rule of layout, two tiers, no per-field exceptions. The rows are flex, so a wrap can only
+	 * fall BETWEEN items and a label is one unbreakable item; a field may shrink to share the line.
 	 *
-	 * ONE RULE OF LAYOUT, TWO TIERS, NO PER-FIELD EXCEPTIONS. The rows are flex, so a wrap can only
-	 * fall BETWEEN items and a label is one unbreakable item. A field may SHRINK to share the line
-	 * (`min-width: 0` undoes the field box in theme/60-inputs.css for these rows) but none of them
-	 * GROWS past its own width — that is what keeps `Макс. строк:` a small box beside a wide search
-	 * field without anything having to name it. The one exception states itself: the free-text filter
-	 * is the only field whose content has no length, so it takes the leftover space.
+	 * Scoped by SHAPE: `data-page` differs between the two logs and a third-party box has neither,
+	 * while both wrap their rows in `#content_syslog` and a filter row is exactly one that opens
+	 * with a `<label>` — the scroll-to-end button's row and the log itself do not.
 	 *
-	 * `input:not([type])` IS that filter, in both views and in that order of certainty: every other
-	 * input under `#content_syslog` states a type (`checkbox` for the four inverts and the sort flag,
-	 * `number` for Max rows and for the Kernel Log's boot-time range), and both views leave the text
-	 * one untyped. Nothing here keys on an id, so a third-party LogreadBox gets the same layout, and
-	 * no rule has to know how many fields a row holds.
-	 *
-	 * Scoped by SHAPE for the same reason: `data-page` differs between the two logs and a third-party
-	 * box has neither, while both wrap their rows in `#content_syslog` and a filter row is exactly one
-	 * that opens with a `<label>` — the scroll-to-end button's row and the log itself do not.
-	 *
-	 * The inline `margin: 0 5px` LuCI writes on the labels stays as the horizontal spacing — only the
-	 * ROW gap is ours, so nothing here has to fight an inline style. */
+	 * Only the ROW gap is ours: the inline `margin: 0 5px` LuCI writes on the labels stays as the
+	 * horizontal spacing, so nothing here has to fight an inline style. */
 	#content_syslog > div:has(> label) {
 		display: flex;
 		flex-wrap: wrap;
@@ -50,31 +36,32 @@
 	 * first version of this file fell into, where a later generalisation silently out-specified two
 	 * rules that were meant to override it. */
 	@container fs-view (width > 560px) {
-		/* room for a filter and a half at least: the search box takes what the named fields leave. */
+		/* room for a filter and a half at least: the free-text filter takes what the named fields
+		 * leave. `input:not([type])` IS that filter, in both views: every other input under
+		 * `#content_syslog` states a type (`checkbox` for the four inverts and the sort flag, `number`
+		 * for Max rows and for the Kernel Log's boot-time range), and both views leave the text one
+		 * untyped — so nothing here keys on an id or has to know how many fields a row holds. */
 		#content_syslog > div:has(> label) > input:not([type]) { flex: 1 1 12rem; }
 	}
 	@container fs-view (width <= 560px) {
-		/* ONE FIELD PER LINE, its labels on the line above it. Wrapping alone fills each line greedily,
-		 * so the second `Не` rode the end of the first line while the `уровень:` it inverts opened the
-		 * next one — and no flex rule can bind a label to the field that follows it. A full-width basis
-		 * can: the field always starts a line, so whatever labels precede it sit together above it. It
-		 * costs one line per filter on a phone and holds for every row of both views — the range pair,
-		 * the severity select with its trailing `and above`, the lone sort checkbox — without any of
-		 * them being named or counted. A checkbox is not a field and keeps its 16px. */
+		/* One field per line, its labels on the line above it. Wrapping alone fills each line greedily,
+		 * so a leading label rides the end of the previous line while the field it belongs to opens the
+		 * next — and no flex rule can bind a label to the field that follows it. A full-width basis
+		 * can: the field always starts a line, so whatever labels precede it sit together above it.
+		 * It costs one line per filter on a phone and holds for every row of both views without any
+		 * of them being named. A checkbox is not a field and keeps its 16px. */
 		#content_syslog > div:has(> label) > :is(select, input:not([type="checkbox"])) {
 			flex-basis: 100%;
 		}
 	}
 
-	/* System Log / Kernel Log (luci-mod-status): the whole log is a readonly
-	 * <textarea id="syslog"> in a bare div, NOT in a .cbi-value-field. Stock bootstrap pairs
-	 * its generic `input, textarea { width: 210px }` with `#syslog { width: 100% }` and wins
-	 * on SPECIFICITY — but this theme's generic field box lives in the `theme` LAYER, and a
-	 * layer beats specificity, so the same pair in `base` lost and the log rendered as a
-	 * 210px column (measured on 25.12). The rule is absorbed HERE, above the generic's layer;
-	 * it is bootstrap's own coverage relocated, not a page hack. Mono at the data tables'
-	 * size, `pre` because log lines are lines, and a vertical-only resize grip — a sideways
-	 * grip would just re-create the squeeze. */
+	/* System Log / Kernel Log: the whole log is a readonly `<textarea id="syslog">` in a bare div, not
+	 * in a .cbi-value-field. Stock bootstrap pairs its generic `input, textarea { width: 210px }`
+	 * with `#syslog { width: 100% }` and wins on specificity — but this theme's generic field box
+	 * lives in the `theme` layer, and a layer beats specificity, so the same pair in `base` loses and
+	 * the log rendered as a 210px column (measured on 25.12). The rule is absorbed here, above the
+	 * generic's layer. Mono at the data tables' size, `pre` because log lines are lines, and a
+	 * vertical-only resize grip — a sideways grip would just re-create the squeeze. */
 	#syslog {
 		width: 100%;
 		min-height: 500px;

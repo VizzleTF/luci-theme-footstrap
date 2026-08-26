@@ -1,36 +1,30 @@
 #!/bin/sh
-# Stage the theme's rootfs for owfeed — the half of the build that owfeed deliberately
-# does not do.
+# Stage the theme's rootfs for owfeed — the half of the build owfeed deliberately does not do.
 #
 #   ./tools/stage.sh              # dist/root + dist/VERSION + dist/scripts
 #   FOOTSTRAP_VERSION=0.12.0 ./tools/stage.sh
 #
-# `owfeed build` packages a DIRECTORY; it does not build one. Everything the OpenWrt SDK
-# used to do for us on the way in — concatenate the stylesheet, mangle the private custom
-# properties, strip the comments out of the templates and the shell, stamp the version —
-# has to happen before it, and that is what this file is. The one step it does NOT do is
-# the translation catalogue: owfeed compiles the .po files itself (i18n: in owfeed.yml),
-# byte-identical to po2lmo, so requiring po2lmo would put a C build of luci-base in front
-# of anyone packaging this theme.
+# `owfeed build` packages a DIRECTORY; it does not build one. Everything the OpenWrt SDK used to do
+# on the way in — concatenate the stylesheet, mangle the private custom properties, strip the
+# comments out of the templates and the shell, stamp the version — has to happen before it. The one
+# step it does NOT do is the translation catalogue: owfeed compiles the .po files itself,
+# byte-identical to po2lmo, and requiring po2lmo would put a C build of luci-base in front of anyone
+# packaging this theme.
 #
-# THE ORDER IS THE MAKEFILE'S, and it is not arbitrary — see Build/Prepare in
-# luci-theme-footstrap/Makefile, which this mirrors step for step:
+# The order is the Makefile's, step for step (see Build/Prepare there):
 #
-#   1. copy       luci.mk's install mapping: htdocs -> /www, ucode -> /usr/share/ucode/luci,
-#                 root -> /
+#   1. copy       luci.mk's install mapping: htdocs -> /www, ucode -> /usr/share/ucode/luci, root -> /
 #   2. build-css  cascade.css is generated from styles/ and is not in the tree
 #   3. mangle     the private --fs-* names, reading the reserved set from the SOURCE
-#   4. minify     terser over the staged JS (in CI this ran over the checkout, before the
-#                 rsync into the SDK; there is no SDK now, so it runs over the staged copy)
+#   4. minify     terser over the staged JS
 #   5. strip      {# … #} out of the templates, whole-line # out of the shell
-#   6. stamp      FS_VERSION, after the minify — minify-js.mjs keeps that declaration
-#                 verbatim precisely so this sed still matches
+#   6. stamp      FS_VERSION, after the minify — minify-js.mjs keeps that declaration verbatim
+#                 precisely so this sed still matches
 #
-# WHY THE LIFECYCLE SCRIPTS ARE EXTRACTED FROM THE MAKEFILE rather than kept as files
-# beside it: they exist in the Makefile already, they are the thing an SDK build installs,
-# and two copies of a postrm that only runs on somebody else's router months later is the
-# worst duplication in this repo to let rot. The Makefile stays the single source; owfeed
-# is handed what it holds. `$$` is make's escaping for a literal `$`, so it is undone here.
+# The lifecycle scripts are EXTRACTED from the Makefile rather than kept as files beside it: they
+# exist there already, they are what an SDK build installs, and two copies of a postrm that only
+# runs on somebody else's router months later is the worst duplication in this repo to let rot. `$$`
+# is make's escaping for a literal `$`, so it is undone here.
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -44,17 +38,14 @@ rm -rf "$DIST"
 mkdir -p "$STAGE/www" "$STAGE/usr/share/ucode/luci" "$DIST/scripts"
 
 # 1. luci.mk's mapping. `cp -a` rather than `cp -r`, so anything under htdocs that IS a symlink
-#    stays one, which is what the SDK build ships. Nothing there is today: the background, the
-#    pattern and the fonts directory are all aliases uci-defaults makes at runtime under /www,
-#    because /www is repopulated from firmware on a sysupgrade and a shipped link would not
-#    survive it.
+#    stays one. Nothing there is today: the background, the pattern and the fonts directory are
+#    aliases uci-defaults makes at runtime under /www, /www being repopulated from firmware on a
+#    sysupgrade.
 #
-#    root/ is staged BESIDE the payload rather than into it, and merged at the end: it is
-#    the only part strip-shell.sh is pointed at, and the Makefile hands that script
-#    $(PKG_BUILD_DIR)/root — a directory holding nothing but shell and one JSON. Merged
-#    first, the script would be handed /www and /usr/share/ucode as well, which is neither
-#    the set it was reasoned about over nor a set it will accept (it exits non-zero on a
-#    subtree with no shell in it).
+#    root/ is staged BESIDE the payload and merged at the end: it is the only part strip-shell.sh is
+#    pointed at, and the Makefile hands that script a directory holding nothing but shell and one
+#    JSON. Merged first, the script would be handed /www and /usr/share/ucode as well, which it
+#    exits non-zero on.
 ROOTPART="$DIST/.root"
 cp -a "$SRC/htdocs/." "$STAGE/www/"
 cp -a "$SRC/ucode/."  "$STAGE/usr/share/ucode/luci/"

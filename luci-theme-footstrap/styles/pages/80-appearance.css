@@ -1,18 +1,15 @@
 @layer page {
-	/* ==================================================================
-	 * The Appearance controls, appended to System -> System by fs-appearance.js.
+	/* The Appearance controls, appended to System -> System by fs-appearance.js.
 	 *
-	 * This was a popover on <body>, placed against a chrome button by widgets.placePopover and
-	 * capped to the viewport because eighteen axes plus an upload panel do not fit a floating card
-	 * on a phone in landscape. As part of a page none of that applies: the sections are ordinary
-	 * .cbi-section cards, the width is the content column's, and the scroll is the document's. The
-	 * placement, the max-height clamp, the fade-in and the [hidden] pair went with the popover.
+	 * This was a popover on <body>, capped to the viewport because eighteen axes plus an upload
+	 * panel do not fit a floating card on a phone in landscape. As part of a page none of that
+	 * applies: the sections are ordinary .cbi-section cards, the width is the content column's and
+	 * the scroll is the document's — so the placement, the max-height clamp, the fade-in and the
+	 * [hidden] pair a floating card needed are all gone.
 	 *
-	 * The CONTROLS are still the theme's own primitives (fs-widgets.js), not LuCI form widgets:
-	 * .fs-seg is a radiogroup with a roving tabindex, .fs-range is the Rounding slider. They live in
-	 * the page layer rather than the theme layer because this is the only page that draws them — an
-	 * axis control is not chrome any more.
-	 * ================================================================== */
+	 * What is left in the theme's own namespace — the `.fs-ap-*` folds, sections, previews and
+	 * version line below — lives in the page layer rather than the theme layer, because this is
+	 * the only page that draws it: an axis control is not chrome. */
 
 	.fs-ap { display: flex; flex-direction: column; gap: var(--fs-space-5); }
 	/* Grouping headings INSIDE the tab pane, not cards: the pane is already inside the stock
@@ -29,14 +26,14 @@
 	}
 	button.fs-ap-fold:hover h4 { color: var(--fs-accent); }
 	button.fs-ap-fold:focus-visible { outline: none; box-shadow: var(--fs-focus-ring-solo); border-radius: var(--fs-radius-sm); }
-	/* The chevron: the same 26px box with a two-border ::after that the overview's card toggles
-	 * use (styles/pages/20-overview.css) — one chevron for "this panel opens", drawn here and there
-	 * rather than an SVG in one place and borders in the other, with the glyph itself pinned as
-	 * @mirror chevron/* so the two copies cannot drift.
+	/* The chevron: the same box with a two-border ::after that the overview's card toggles use
+	 * (styles/pages/20-overview.css) — one
+	 * chevron for "this panel opens", drawn here and there rather than an SVG in one place and
+	 * borders in the other, with the glyph pinned as @mirror chevron/* so the copies cannot drift.
 	 *
 	 * It turns on the SAME attribute that tells a screen reader the state, so the two cannot
-	 * disagree. Rotated with `transform` and not the individual `rotate` property, because that is
-	 * what the overview's copy does and the pair is meant to look identical mid-animation too. */
+	 * disagree. Rotated with `transform` rather than the individual `rotate` property, because that
+	 * is what the overview's copy does and the pair must look identical mid-animation. */
 	.fs-ap-chev {
 		flex: 0 0 auto; inline-size: 26px; block-size: 26px;
 		display: inline-flex; align-items: center; justify-content: center;
@@ -77,12 +74,13 @@
 		font-size: var(--fs-type); font-weight: var(--fs-weight-bold); color: var(--fs-text);
 	}
 	.fs-ap-section + .fs-ap-section { padding-top: var(--fs-space-4); border-top: var(--fs-hairline); }
-	/* THE ROWS ARE STOCK `.cbi-value` NOW and this page states no layout for them at all — caption
-	 * column, field column and the hairline between rows come from base/30-forms.css and
-	 * theme/60-inputs.css, the same rules every other LuCI form is drawn by. What was here before was
-	 * a responsive two-column grid of stacked cards with an uppercase eyebrow above each control: it
-	 * fitted a floating popover, and beside General Settings / Language and Style it made the theme's
-	 * own tab the one page in LuCI that did not look like LuCI. Deleting the grid is the change. */
+	/* The rows are stock `.cbi-value` and this page states no layout for them at all: caption column,
+	 * field column and the hairline between rows come from base/30-forms.css and theme/60-inputs.css,
+	 * the rules every other LuCI form is drawn by. What stood here was a responsive two-column grid
+	 * of stacked cards with an uppercase eyebrow above each control: it fitted a floating popover,
+	 * and beside General Settings / Language and Style it made the theme's own tab the one page in
+	 * LuCI that did not look like LuCI. Deleting that grid is the change — do not restate a layout
+	 * for these rows. */
 	/* The accordion switch is meaningless in the top layout — its sections are hover dropdowns,
 	 * already exclusive. Hidden HERE, not by a branch in the JS: the page is built once, so a branch
 	 * froze the control to whatever layout it loaded in and the live toggle could never change it. */
@@ -152,14 +150,10 @@
 	 * started at the card's edge instead of at the field column, and everything it did the Accent
 	 * row does with any colour rather than eight. */
 
-	/* The uploaded image's PREVIEW and the two buttons under it. Both live in an ordinary
-	 * `.cbi-value-field` now — the sub-panel that used to wrap them is gone, along with the second
-	 * caption column it nested inside the first.
-	 *
-	 * The preview is a thumbnail, not a banner: capped to the same field ceiling as every other
-	 * stretching control and to a fixed height, so the row keeps one shape whatever the image's
-	 * aspect is. It ran the full width of the card before, which made an SVG tile look like a
-	 * letterboxed photograph. */
+	/* The uploaded image's preview and the two buttons under it, both in an ordinary
+	 * `.cbi-value-field`. The preview is a thumbnail, not a banner: capped to the same field ceiling
+	 * as every other stretching control and to a fixed height, so the row keeps one shape whatever
+	 * the image's aspect is — full width makes an SVG tile look like a letterboxed photograph. */
 	.fs-ap-bgprev {
 		display: block; width: 100%; max-width: var(--fs-field-max); height: 84px; object-fit: cover;
 		border: var(--fs-hairline); border-radius: var(--fs-radius);
@@ -177,10 +171,9 @@
 	:root[data-wallpaper="file"] .fs-ap-tint { display: none; }
 	/* and the strength is a multiplier on a chroma WE choose, so it only means anything in hue mode:
 	 * with the tint off there is nothing to scale, and on a hex canvas the colour is the one the
-	 * admin entered, with no chroma of ours in it. (0,3,0) out-ranks the stock row's own display.
-	 * The class was `fs-ap-density` while this axis was called Tint density; the name moved with the
-	 * label, because Density is the UI-density select four rows above and one name for two rows is
-	 * how the label itself went wrong. */
+	 * admin entered. (0,3,0) out-ranks the stock row's own display. Not named after Density: that is
+	 * the UI-density select four rows above, and one name for two rows is how the label itself went
+	 * wrong. */
 	:root:not([data-tint="hue"]) .fs-ap-tintstr { display: none; }
 
 	/* the version line at the foot of the page */
@@ -193,17 +186,13 @@
 	.fs-ap-version { font-size: var(--fs-type-xs); color: var(--fs-dim); font-variant-numeric: tabular-nums; text-decoration: none; }
 	.fs-ap-version:hover { color: var(--fs-accent); text-decoration: underline; }
 
-	/* THE SEGMENTED CONTROL AND THE RANGE SLIDER had their rules here — .fs-seg, .fs-rangewrap,
-	 * .fs-range and its readout. Both controls are gone from fs-widgets.js: the page draws its enums
+	/* No rules here for a segmented control or a range slider of our own: the page draws its enums
 	 * with `ui.Select` and its numbers with `ui.RangeSlider`, which this theme already styles for
-	 * every other LuCI form (`select` in theme/60-inputs.css, `.cbi-range-slider` and
-	 * `input[type="range"]` in theme/60-inputs.css). Two copies of a slider, one of them ours, was
-	 * the thing to delete — not a third. */
+	 * every other LuCI form. Two copies of a slider, one of them ours, was the thing to delete. */
 
-	/* THE HUE SLIDER'S rules were here — a rainbow track under a thumb carrying the axis's live
-	 * colour. The slider is gone from the control (fs-widgets' colorControl): two controls for one
-	 * value read as two settings, and the half that could not reach a grey was the slider. The axis
-	 * still STORES a hue and 03-palettes.css still rotates by one, so a value saved before this goes
-	 * on painting — but nothing draws a wheel any more, and CSS for a control nobody renders is dead
-	 * CSS in our own namespace, which `npm run css-orphans` is there to keep out. */
+	/* No rules here for a hue slider either: the control is gone from fs-widgets' colorControl, two
+	 * controls for one value reading as two settings, and the half that could not reach a grey was
+	 * the slider. The axis still stores a hue and 03-palettes.css still rotates by one, so a saved
+	 * value goes on painting — but CSS for a control nobody renders is dead CSS in our own
+	 * namespace, which `npm run css-orphans` exists to keep out. */
 }

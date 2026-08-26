@@ -1,15 +1,13 @@
-/* fs-menutree is a PORT of dispatcher.uc's resolution, and a port is only worth what it agrees with.
- *
- * The stakes are stated in the module itself: resolve a `firstchild` differently from the server and
- * a click opens one page while F5 opens another, on the same URL. The stands prove the agreement for
- * the trees THEY carry; these cases pin the rules the trees happen not to exercise — a tie broken by
- * key order, a login node sorted last, a firstchild whose only children are themselves unresolvable,
- * an alias loop planted by a foreign menu.d — none of which any shipped menu contains, and all of
- * which the next installed app is free to introduce.
+/* fs-menutree is a PORT of dispatcher.uc's resolution, and a port is only worth what it agrees
+ * with: resolve a `firstchild` differently from the server and a click opens one page while F5 opens
+ * another, on the same URL. The stands prove the agreement for the trees they carry; these cases pin
+ * the rules those trees happen not to exercise — a tie broken by key order, a login node sorted
+ * last, a firstchild whose only children are themselves unresolvable, an alias loop planted by a
+ * foreign menu.d — none of which any shipped menu contains, and all of which the next installed app
+ * is free to introduce.
  *
  * `readonlyForSegs` gets the same treatment for the opposite reason: the AND-down-the-path rule was
- * measured wrong once in each direction (module comment), and both directions are cheap to pin here.
- */
+ * measured wrong once in each direction (module comment), and both directions are cheap to pin. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModule, fakeL } from './lib/luci-module.mjs';

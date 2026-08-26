@@ -5,10 +5,9 @@
 #   owlab open owrt2512 open LuCI in a browser
 #   owlab doctor        what this machine supports
 #
-# Four routers rather than one, because the three axes that change how this
-# theme renders are the package manager (apk on 25.12, opkg on 24.10), the
-# LuCI feed (upstream vs a fork's patched one), and the release. Only all four
-# boxes cover every pairing.
+# Four routers rather than one, because the three axes that change how this theme renders are the
+# package manager (apk on 25.12, opkg on 24.10), the LuCI feed (upstream vs a fork's patched one)
+# and the release. Only all four boxes cover every pairing.
 
 version: 1
 
@@ -16,25 +15,21 @@ project:
   name: luci-theme-footstrap
   theme: footstrap
 
-  # The package lives in a subdirectory, so the install mapping is stated
-  # rather than left to the default.
+  # The package lives in a subdirectory, so the install mapping is stated rather than defaulted.
   install:
     luci-theme-footstrap/htdocs: /www
     luci-theme-footstrap/ucode: /usr/share/ucode/luci
     luci-theme-footstrap/root: /
 
-  # cascade.css is concatenated from styles/ and is not in the tree. Without
-  # this, a sync copies everything except the file LuCI asks for and the
-  # router serves a 404 for its own stylesheet.
+  # cascade.css is concatenated from styles/ and is not in the tree. Without this a sync copies
+  # everything except the file LuCI asks for, and the router serves a 404 for its own stylesheet.
   build: ./luci-theme-footstrap/build-css.sh luci-theme-footstrap/htdocs/luci-static/footstrap/cascade.css --dev
 
-  # Runs on the router after every sync. This is the half of an install that
-  # copying files does not cover: the package's own uci-defaults registers the
-  # theme, and owlab's `theme:` above then selects it.
+  # Runs on the router after every sync: the half of an install that copying files does not cover.
+  # The package's own uci-defaults registers the theme, and owlab's `theme:` above then selects it.
   #
-  # Registration is written out rather than sourced from
-  # root/etc/uci-defaults/30_luci-theme-footstrap, because sync deliberately
-  # never overwrites /etc/uci-defaults — that directory is the router's state.
+  # Registration is written out rather than sourced from root/etc/uci-defaults/30_luci-theme-footstrap,
+  # because sync deliberately never overwrites /etc/uci-defaults — that directory is router state.
   post_sync: |
     uci -q set luci.themes.Footstrap=/luci-static/footstrap
     uci -q commit luci
@@ -43,28 +38,22 @@ project:
 defaults:
   fidelity: basic
   arch: auto
-  # Everything, including the seeded wireless config: this theme has to style
-  # the wireless pages too, and they render from UCI with no radios present.
+  # Everything, including the seeded wireless config: this theme has to style the wireless pages
+  # too, and they render from UCI with no radios present.
   fixtures: [all]
 
-  # Added ON TOP of owlab's stock set, which is already what a shipping
-  # OpenWrt router has. Every entry is prefixed with +, so this list adds to
-  # that rather than replacing it — an unprefixed list would define the router
-  # outright and quietly drop everything owlab installs by default.
+  # Added ON TOP of owlab's stock set, which is already what a shipping OpenWrt router has. Every
+  # entry is prefixed with +, so this list adds rather than replacing — an unprefixed list would
+  # define the router outright and drop everything owlab installs by default.
   #
-  # Entries that the stock set also contains are kept rather than trimmed.
-  # This file is the theme's test surface: each name here is something the
-  # theme is checked against, and it should stay readable as that list
-  # regardless of what owlab's defaults happen to include this month.
+  # Entries the stock set also contains are kept rather than trimmed: this file is the theme's test
+  # surface, and each name here is something the theme is checked against.
   #
-  # It is long on purpose. A stock router renders a handful of menus, and a
-  # theme whose dev box shows a handful of menus is a theme nobody can look
-  # at — the sections, tabs, tables and widgets that need styling live in the
-  # apps.
+  # It is long on purpose. A stock router renders a handful of menus, and the sections, tabs, tables
+  # and widgets that need styling live in the apps.
   #
-  # curl is deliberately absent: it is not in OpenWrt's default set, and the
-  # self-updater's uclient-fetch fallback exists precisely because of that.
-  # Installing it here would hide that bug class on the dev box.
+  # curl is deliberately absent: it is not in OpenWrt's default set, and the uclient-fetch fallback
+  # exists precisely because of that. Installing it here would hide that bug class on the dev box.
   packages:
     - +luci
     - +luci-app-firewall
@@ -96,18 +85,16 @@ defaults:
     - +iw
     - +iwinfo
     - +hostapd-utils
-    # dropbear ships no sftp-server and OpenSSH 9+ scp speaks SFTP by
-    # default, so without this every scp against the box fails. This is the
-    # one package here that is not about fidelity.
+    # dropbear ships no sftp-server and OpenSSH 9+ scp speaks SFTP by default, so without this every
+    # scp against the box fails. The one package here that is not about fidelity.
     - +openssh-sftp-server
 
-  # Third-party apps whose stylesheets this theme has to share a document
-  # with. They are the hardest case the theme handles, and no text file can
-  # reason about them: justclash ships no .css at all — every rule is built
-  # from its view JS at runtime.
+  # Third-party apps whose stylesheets this theme has to share a document with. They are the hardest
+  # case the theme handles, and no text file can reason about them: justclash ships no .css at all —
+  # every rule is built from its view JS at runtime.
   #
-  # These are unsigned dev fixtures. They are pinned to exact releases and
-  # installed without signature verification; nothing here ships.
+  # Unsigned dev fixtures: pinned to exact releases and installed without signature verification.
+  # Nothing here ships.
   extra_packages:
     - name: luci-app-openclash
       apk: https://github.com/vernesong/OpenClash/releases/download/v0.47.116/luci-app-openclash-0.47.116.apk
@@ -115,23 +102,20 @@ defaults:
     - name: luci-app-justclash
       apk: https://github.com/SaltyMonkey/justclash/releases/download/v0.73.0/luci-app-justclash-0.73.0-r1.apk
       ipk: https://github.com/SaltyMonkey/justclash/releases/download/v0.73.0/luci-app-justclash-0.73.0-r1-all.ipk
-    # ssclash embeds the Ace editor, which inserts its stylesheets as the FIRST child of
-    # <head> — and lazily, adding more on first hover. That is the one adversary that can
-    # invert the cascade layer order (docs/css.md), and neither of the two above can produce it:
-    # a sheet that lands ahead of cascade.css is a different attack on the chrome from a
-    # sheet that outranks it. Reproduced here before the fix, and it stays for the next one.
+    # ssclash embeds the Ace editor, which inserts its stylesheets as the FIRST child of <head>, and
+    # lazily, adding more on first hover. That is the one adversary that can invert the cascade layer
+    # order (docs/css.md), and neither of the two above can produce it: a sheet that lands ahead of
+    # cascade.css is a different attack on the chrome from one that outranks it.
     - name: luci-app-ssclash
       apk: https://github.com/zerolabnet/ssclash/releases/download/v4.7.0/luci-app-ssclash-4.7.0-r1.apk
       ipk: https://github.com/zerolabnet/ssclash/releases/download/v4.7.0/luci-app-ssclash_4.7.0-r1_all.ipk
 
 routers:
   - id: owrt2512
-    # 25.12.4, NOT .5: the stand builds from openwrt/rootfs:x86_64-<release>, and that tag has to
-    # EXIST in the registry — 25.12.5 does not publish one, so `owlab up` fails to resolve it and
-    # the whole stand refuses to build. CI's build.yml pins the same number for the same reason;
-    # the two must not drift, or "the local form of the same assertions CI makes" proves them on a
-    # different userland. Check `docker manifest inspect openwrt/rootfs:x86_64-<release>` before
-    # bumping either.
+    # 25.12.4, NOT .5: the stand builds from openwrt/rootfs:x86_64-<release> and that tag has to
+    # EXIST in the registry — 25.12.5 publishes none, so `owlab up` cannot resolve it. CI's build.yml
+    # pins the same number for the same reason and the two must not drift. Check
+    # `docker manifest inspect openwrt/rootfs:x86_64-<release>` before bumping either.
     release: "25.12.4"
     ports: { http: 8025, ssh: 2225 }
 
@@ -149,12 +133,10 @@ routers:
     release: "24.10.6"
     ports: { http: 8027, ssh: 2227 }
 
-  # A SNAPSHOT box, because the installer has a path only it takes: `SNAPSHOT` parses to
-  # no feed branch, so the script asks the feed for the newest one its package manager
-  # can read, and everything about that path — the probe, the fallthrough between
-  # downloaders, the signed-release install when no index answers — is unreachable on a
-  # release router. It is also the userland the theme is least tested against, since it
-  # tracks luci-base's master rather than a release branch.
+  # A SNAPSHOT box, because the installer has a path only it takes: `SNAPSHOT` parses to no feed
+  # branch, so the script asks the feed for the newest one its package manager can read, and
+  # everything about that path is unreachable on a release router. It is also the userland the theme
+  # is least tested against, since it tracks luci-base's master rather than a release branch.
   - id: owrtsnap
     release: "snapshot"
     ports: { http: 8022, ssh: 2222 }

@@ -1,29 +1,15 @@
 #!/usr/bin/env node
-/* A RATCHET on what the ROUTER SENDS: the bytes of the shipped stylesheet and of the shipped JS.
+/* A ratchet on what the ROUTER SENDS: the bytes of the shipped stylesheet and of the shipped JS.
  *
- * uhttpd serves /www with no compression, so identity bytes ARE wire bytes, and every one of them is
- * read off flash and pushed by a single-core CPU that is also routing packets. The theme has no
- * build step a developer runs before committing — the package build is where cascade.css is
- * concatenated, the private token names are mangled and terser goes over the JS — so nothing in a
- * normal edit-and-check loop ever shows what the artefact weighs. That is exactly the shape a number
- * drifts in: one feature at a time, each too small to argue with, none of them measured.
+ * uhttpd serves /www with no compression, so identity bytes ARE wire bytes, read off flash and
+ * pushed by a single-core CPU that is also routing packets. The theme has no build step a developer
+ * runs before committing — the package build is where cascade.css is concatenated, the private
+ * token names are mangled and terser goes over the JS — so nothing in a normal edit-and-check loop
+ * shows what the artefact weighs, which is the shape a number drifts in.
  *
- * So this gate reproduces the package build's asset half and weighs the result:
+ * So this gate reproduces the package build's asset half and weighs the result.
  *
- *   cascade.css   build-css.sh, then mangle-tokens.sh with the reserved set derived from the SOURCE
- *                 tree (Build/Prepare's own order and its own arguments — a mangle that stopped
- *                 working would show up here as +16% rather than silently)
- *   resources/*.js  a COPY of the shipped directory through tools/minify-js.mjs, which is what
- *                 tools/stage.sh runs over the staged payload for a release
- *
- * It is not a style opinion and not a cap on features: raising a limit is a decision, and it wants a
- * comment saying what was bought. Lower one whenever the number comes down, so the slack a cleanup
- * won cannot be spent silently by the next commit. (`css-metrics.mjs` is the same idea for the
- * cascade's shape; this file is the one for its weight — the size budget it once cited as precedent
- * had been dropped, and this is it back, measured on the real artefact rather than on the source.)
- *
- * Usage: node tools/size-budget.mjs [--show]
- */
+ * Usage: node tools/size-budget.mjs [--show] */
 import { cpSync, mkdtempSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -34,69 +20,23 @@ import { pageModules } from './lib/page-modules.mjs';
 const SHOW = process.argv.includes('--show');
 
 const LIMITS = {
-	/* 125,747 B measured 2026-08-18 (built 137,376, −8.5% from the token mangle) — 1.5 KB of that
-	 * came from naming the hairline and the field transition, which turned 80 longhand declarations
-	 * into two tokens. The headroom is deliberate and small: a feature's worth of rules should fit
-	 * without a gate edit, a redesign's should not.
-	 *
-	 * 127,142 B measured 2026-08-21: +1.4 KB for the 2020 colourway (two full token blocks, which is
-	 * what a palette costs) and 142 B for two forum-reported fixes — the realtime graph's axis
-	 * labels and the air around a second heading in a card. A palette is the one feature that cannot
-	 * be cheaper: every token is declared per mode or the block does not fully apply. */
+	/* The CSS budget, measured after the token mangle: 127,142 B on 2026-08-21, the last 1.5 KB of
+	 * it the 2020 colourway and two forum-reported fixes. The headroom is deliberate and small: a
+	 * feature's worth of rules should fit without a gate edit, a redesign's should not. A raise wants
+	 * a line saying what bought it — a palette is the one feature that cannot be cheaper, every
+	 * token being declared per mode or the block does not fully apply. */
 	cascadeCss: 128_500,
-	/* 87,347 B measured 2026-08-20 over the 14 shipped modules, terser with top-level mangling
-	 * (85,671 B on 2026-08-18, before the release's own fixes). This is the FLASH cost: every module
-	 * ships, whether or not a given page loads it.
-	 *
-	 * The last 541 B of it are the clamp the Overview kept jumping on: telling a clamped offset from
-	 * a reader who scrolled and giving one back with no reference left to measure (fs-fit.js), and
-	 * holding a section's height across the swap that causes it (fs-overview.js). A page that moves
-	 * 200-1206px under the reader once a second is not a page anybody reads, so the bytes are worth
-	 * their flash.
-	 *
-	 * 88,356 B measured 2026-08-21. The last 356 B were the theme's own range slider, carried for
-	 * 23.05, where `ui.RangeSlider` does not exist and its absence took the whole Appearance tab with
-	 * it. Those bytes are gone again: 23.05 is EOL, openwrt/luci declined the compatibility outright
-	 * (#8978), and the theme now claims 24.10 and newer, where the real widget is always there.
-	 *
-	 * 89,270 B measured 2026-08-24. The last 770 B keep the reader's place on the two cases the
-	 * engine's own scroll anchoring does not cover, both of them measured on the stands rather than
-	 * assumed: a WebKit that overshoots a section swap by 60px on every tick (it ships anchoring now,
-	 * so `CSS.supports` can no longer tell it apart from Chromium — the drift is measured two frames
-	 * after the mutation instead), and a page that is one long table, where the theme's reference
-	 * climbed out of the table onto `#view` itself and no correction could ever fire. A page that
-	 * creeps 60-120px under the reader once a second is not a page anybody reads.
-	 *
-	 * 89,771 B measured 2026-08-24, and the last 371 B are the same fault's third face: the reference
-	 * itself. A hit that lands in a gap answers with `#view`, one above the first section answers with
-	 * `.fs-content`, and both used to end the search — so on 25.12's Overview at 1440 the theme held
-	 * no reference at all. Searching the element STACK and stepping down the viewport is what buys a
-	 * reference on every page shape, and a surviving ancestor beside it is what keeps one when the
-	 * tick replaces the element it was taken on. */
+	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
+	 * whether or not a given page loads it. 89,771 B on 2026-08-24, the last 371 B buying a scroll
+	 * reference on every page shape — searching the element stack rather than one hit, and keeping a
+	 * surviving ancestor beside it. A raise wants a line saying what bought it. */
 	resourcesJs: 89_900,
-	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the
-	 * router is also routing packets over: the same set minus the page modules, which are required
-	 * only on the one page each belongs to (tools/page-modules.mjs). 72,499 B measured 2026-08-20,
-	 * i.e. 14.5 KB less than the sum. Raising it is a decision; lowering it whenever the number
-	 * comes down is the point.
-	 *
-	 * The last 252 B of it are the three Status→Overview template globals, which moved OUT of the
-	 * page module and into the chrome bootstrap: a page module is required during the navigation
-	 * that needs it, and a stock include calling `renderBadge` before it lands throws. Ordering is
-	 * not something a page module can promise, so the bytes buy it on every page.
-	 *
-	 * 73,481 B measured 2026-08-24: fs-fit.js is a chrome module, so the 481 B of the anchoring fixes
-	 * above that land in it are downloaded on every page — which is also where they are needed, since
-	 * every page with a poll on it can drift.
-	 *
-	 * 73,982 B measured 2026-08-24 — the reference search above, in the same chrome module.
-	 *
-	 * 74,114 B measured 2026-08-25. Two fixes in fs-appearance.js and fs-fit.js, both reported from
-	 * the field: the Appearance tab was sometimes missing after a Save, because a map redraw rebuilds
-	 * the tab group and ui.tabs marks it ready with an attribute the observer was not watching; and
-	 * the residual anchoring correction did nothing on the tick it exists for, since `dom.content()`
-	 * replaces the element the reference was taken on and the surviving section beside it was never
-	 * used. 132 B for a tab that comes back and a page that does not creep. */
+	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router is
+	 * also routing packets over: the same set minus the page modules, which are required only on the
+	 * one page each belongs to (tools/page-modules.mjs). 74,114 B on 2026-08-25, the last 132 B two
+	 * field-reported fixes: the Appearance tab coming back after a Save (openwrt/luci#8981) and the
+	 * residual anchoring correction firing on the tick it exists for. Raising it is a decision;
+	 * lowering it whenever the number comes down is the point. */
 	coldJs: 74_200,
 };
 

@@ -3,36 +3,30 @@
 #
 #   ./mangle-tokens.sh <cascade.css> <reserved-source-dir>...
 #
-# Run from the package Makefile over $(PKG_BUILD_DIR) only — NEVER over a dev build. The names are
-# 16.6% of the sheet (22586 B over 1824 occurrences, 137 distinct) and mean nothing to a browser;
-# this is the same trade terser already makes for the JS, where top-level identifiers are mangled
-# because a LuCI resource file is function-scoped. Measured: 135655 -> 123935, i.e. -11.7 KB, and
-# uhttpd serves /www with no compression, so those are wire bytes on every cold load as well as
-# flash bytes.
+# Run from the package Makefile over $(PKG_BUILD_DIR) only, never over a dev build. The names are
+# 16.6% of the sheet and mean nothing to a browser; this is the same trade terser makes for the JS.
+# Measured: 135655 -> 123935 bytes, and uhttpd serves /www with no compression, so those are wire
+# bytes on every cold load as well as flash bytes.
 #
-# WHY IT IS SAFE, and each clause is a thing that was checked rather than assumed:
+# Why it is safe, each clause checked rather than assumed:
 #   * `--fs-*` is the PRIVATE tier. The outbound contract with third-party apps is the `--*-color-*`
 #     export tier, a different prefix, and it is not touched. Verified on the router: no installed
 #     luci-app reads a `--fs-` name.
-#   * The RESERVED set is DERIVED, not listed: every `--fs-` name that appears in the theme's JS or
-#     in a .ut template crosses a seam (fs-prefs.js writes `--fs-tint`, head.ut's pre-paint writes
-#     `--fs-radius-base`, fs-chrome.js reads `--fs-sidebar-w` …) and keeps its name. 35 of 137 today.
-#     A new one cannot be forgotten, because nothing here names them.
-#   * Point the dirs at the SOURCE tree, not at $(PKG_BUILD_DIR). In CI the build tree's JS has
-#     already been through terser and its comments are gone, so five names that only appear in a
-#     comment stopped being reserved — the same source produced a different sheet depending on who
-#     built it (measured at the time: 10 reserved via CI against 15 via a plain SDK build, of a
-#     smaller reserved set than today's 35). Reading the source over-reserves by
-#     about a kilobyte, and over-reserving is the direction that cannot break anything.
-#   * The scan is STRING-AWARE and reads the WHOLE identifier before deciding. A prefix match would
-#     be a silent corruption: `--fs-space-2` is a prefix of `--fs-space-2-5`.
-#   * The short names are `--a`…`--z`, `--A`…`--Z`, then `--aa`… . The shortest custom property
-#     otherwise present in this sheet is 5 characters (`--box`), so a collision is impossible;
-#     the script re-checks that instead of trusting it.
+#   * The RESERVED set is DERIVED, not listed: every `--fs-` name appearing in the theme's JS or in
+#     a .ut template crosses a seam and keeps its name, so a new one cannot be forgotten.
+#   * Point the dirs at the SOURCE tree, not at $(PKG_BUILD_DIR): in CI the build tree's JS has
+#     already been through terser and its comments are gone, so a name that only appears in a
+#     comment stops being reserved and the same source produces a different sheet depending on who
+#     built it. Reading the source over-reserves by about a kilobyte, which is the direction that
+#     cannot break anything.
+#   * The scan is string-aware and reads the WHOLE identifier before deciding: a prefix match would
+#     be a silent corruption, `--fs-space-2` being a prefix of `--fs-space-2-5`.
+#   * The short names are `--a`…`--z`, `--A`…`--Z`, then `--aa`…. The shortest custom property
+#     otherwise present is 5 characters, so a collision is impossible; the script re-checks that
+#     rather than trusting it.
 #
 # What it costs: the SHIPPED sheet is unreadable when debugging on a router. Everything that reads
-# the theme's own names — dev-sync.sh, galdiff.py, the a11y gate, docs/gallery.html (4 references)
-# and docs/devkit (29) — runs against an unmangled build, which is why this is a package-build step
+# the theme's own names runs against an unmangled build, which is why this is a package-build step
 # and not part of build-css.sh. Verify a change here with cssdiff.py, mangled against plain.
 set -e
 

@@ -1,22 +1,18 @@
 #!/usr/bin/env node
-/* Dead-selector check, scoped to the theme's OWN namespace — the scoping is the whole point.
+/* Dead-selector check, scoped to the theme's OWN namespace, and the scoping is the whole point.
  *
- * PurgeCSS/uncss/coverage-pruning are ACTIVELY DANGEROUS here. docs/conventions.md: "never drop the styling
- * of a selector because no shipped LuCI page uses it." Content is rendered by third-party
- * luci-app-* JS, so a `.cbi-*` selector with no example on this router is still styled for the
- * package that emits it on someone else's — anything pruning what it did not SEE rendered
- * un-themes other people's apps. We never ask "was this rule exercised".
+ * PurgeCSS and friends are actively dangerous here: content is rendered by third-party luci-app-*
+ * JS, so a `.cbi-*` selector with no example on this router is still styled for the package that
+ * emits it on someone else's, and anything pruning what it did not SEE rendered un-themes other
+ * people's apps (docs/conventions.md). We never ask "was this rule exercised".
  *
- * `.fs-*` is OURS: only this theme's templates and JS can emit one. So inside that namespace, and
+ * `.fs-*` is OURS: only this theme's templates and JS can emit one, so inside that namespace, and
  * only there, "nothing we ship emits this class" really does mean dead. Every LuCI/cbi class is
- * ignored on purpose — that is the set the contract protects.
+ * ignored on purpose — that is the set the coverage contract protects.
  *
- *   FORWARD  — styled but never emitted: left behind when markup is deleted (would have caught
- *              .fs-topnav/.fs-mainmenu when the top-nav template went).
+ *   FORWARD  — styled but never emitted: left behind when markup is deleted. Gated.
  *   REVERSE  — emitted but never styled: dead markup, a typo, or something riding on inherited
- *              base styles by accident.
- *
- * Usage: node tools/fs-orphans.mjs
+ *              base styles. Reported only.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -48,12 +44,11 @@ const IGNORE_EXACT = new Set([
 	 * below for why the blanket list of module names was the wrong fix. */
 	'fs-fit',
 ]);
-/* MODULE NAMES are not classes — and they are handled by STRIPPING the two places a module is
- * REFERENCED (the `'require fs-x as y'` pragma, and footer.ut's `L.require('fs-x')`), not by listing
- * the names. Listing every module was the first fix and it is wrong the moment a module is named
- * after the markup it owns: `fs-appearance` is BOTH a module and the id of the button that opens it,
- * so ignoring the NAME to silence the pragma also silenced the real `#fs-appearance` — and the tool
- * duly reported a live selector as dead CSS. Blind the scan to a POSITION, never to a name. */
+/* Module names are not classes, and they are handled by STRIPPING the two places a module is
+ * referenced (the `'require fs-x as y'` pragma and footer.ut's `L.require('fs-x')`), never by
+ * listing the names: a module may be named after the markup it owns — `fs-appearance` is BOTH a
+ * module and an id — so ignoring the NAME to silence the pragma also silences the real selector,
+ * and the tool reports a live one as dead CSS. Blind the scan to a POSITION, never to a name. */
 /* Two more POSITIONS in which an fs-* token is not a class: a custom property (`--fs-accent`) and a
  * data attribute (`data-fs-select`, `data-fs-shell`). Matched by what PRECEDES the token, so a class
  * that happens to share a name with one of them is still seen. */

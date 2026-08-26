@@ -1,34 +1,9 @@
-/* WHICH PAGES ARE WORTH MEASURING, AND WHY MOST OF THEM ARE NOT.
+/* Which pages are worth measuring, and why most of them are not.
  *
- * The live gates walked every leaf of the router's menu — 37 pages on a bare OpenWrt, 146 across
- * four containers — and measured each one at six widths. That is honest and it is also mostly
- * repetition: the theme does not know what a page is ABOUT, only what it is MADE OF. Network →
- * Routes and Status → Routes are the same data table twice; the dozen `luci-app-*` forms are one
- * `.cbi-map` with different labels in it. Nothing the gates ask can come out differently for two
- * pages built from the same parts, so the second one costs eight seconds and buys nothing.
- *
- * So a page is classified by its SHAPE — the set of structures the theme actually styles and
- * measures — and one representative of each shape is measured. The classification runs on the live
- * page rather than off a list of paths kept here, because a list of paths goes stale the moment an
- * app is installed and a shape does not.
- *
- * WHAT KEEPS THIS HONEST, since a gate that skips things is a gate that can skip the thing that
- * broke:
- *
- *   * every path named in the baseline is measured, whatever its shape. The ratchet's own findings
- *     are the one set that may never be sampled away, or a fixed finding and a skipped page look
- *     the same from here.
- *   * PINNED paths are measured too: the pages the field reports came from (the shredded column of
- *     #11, the clipped submenu of #22, the doubled scrollbar of #12, the arrival that reached a
- *     user on Processes) keep their seat regardless of what else shares their shape.
- *   * every dropped page is REPORTED with the page that stands in for it. A cap nobody can see is a
- *     cap nobody can argue with.
- *   * a narrowed run may not rewrite the baseline. `--update` needs the full sweep, the same way it
- *     already refuses after `--pages` or `--widths`.
- *
- * The discovery pass costs one load per page — about a fifth of what measuring it costs — and the
- * saving is the other four fifths of every page that is a duplicate of one already measured.
- */
+ * Walking every leaf of the router's menu is 37 pages on a bare OpenWrt and 146 across four
+ * containers, each at six widths — honest, and mostly repetition: the theme does not know what a
+ * page is ABOUT, only what it is MADE OF. Two pages built from the same parts cannot answer
+ * differently, so the sweep is over SHAPES rather than over pages. */
 
 /* Runs INSIDE the page. The flags are the things the gates measure or the theme reshapes; two pages
  * with the same set exercise the same code in `fs-select`, `fs-fit` and the stylesheet. Order is

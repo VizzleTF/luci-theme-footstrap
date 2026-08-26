@@ -6,31 +6,28 @@
 #   ./update-po.sh --check    change nothing; fail if the .pot is stale or a string is
 #                             untranslated. The CI gate.
 #
-# A missing translation CANNOT fail loudly — an uncompiled _() falls through to its English
-# msgid and nothing reports it (the popover said "Palette"/"Rounding"/"Cats" on a Russian
-# LuCI). Hence --check is a gate, not a suggestion.
+# A missing translation cannot fail loudly — an uncompiled _() falls through to its English msgid
+# and nothing reports it — so --check is a gate rather than a suggestion.
 #
-# THE DIRECTORY IS `po/`, which is what LUCI_LANGUAGES globs and what Weblate translates. It was
-# `i18n/` for a while so luci.mk would NOT emit a luci-i18n-footstrap-<lang> package per language
-# (issue #6: a self-updater resolving the theme by name took head -1 and installed the catalogue);
-# that updater is retired and owfeed builds the release as one artifact per format either way, so
-# the rename bought nothing and cost the catalogue its visibility to the translation platform.
+# The directory is `po/`, which is what LUCI_LANGUAGES globs and what Weblate translates. Naming it
+# `i18n/` stops luci.mk emitting a per-language package, which mattered while a self-updater
+# resolved the theme by name and took head -1 (issue #6); that updater is retired and owfeed builds
+# one artifact per format either way, so the rename only cost the catalogue its visibility to the
+# translation platform.
 #
-# Nothing here runs on the buildbot — luci.mk calls po2lmo itself. This needs perl + gettext
-# (xgettext, msgmerge, msgfmt), which the OpenWrt build does not.
+# Nothing here runs on the buildbot — luci.mk calls po2lmo itself. This needs perl and gettext,
+# which the OpenWrt build does not.
 #
-# The scanner is LuCI's OWN build/i18n-scan.pl, not a grep: it lexes a .ut (rewriting the
-# template into JS before xgettext) and covers the rpcd acl.d/*.json title. A grep for _('…')
-# would miss the ACL string and choke on any apostrophe.
+# The scanner is LuCI's OWN build/i18n-scan.pl rather than a grep: it lexes a .ut, rewriting the
+# template into JS before xgettext, and covers the rpcd acl.d/*.json title. A grep would miss the
+# ACL string and choke on any apostrophe.
 set -eu
 
 cd "$(dirname "$0")"
 
-# Pinned to a COMMIT, not `master`, and checksummed: a perl script we fetch over the network
-# and then EXECUTE, and the gate deciding whether the catalogue is complete. Off a moving
-# branch, the gate is whatever upstream pushed last. luci-upstream.pin is the single source of
-# the commit and both checksums (CI sources it too) — they were once written out separately
-# here and in the workflow, with nothing holding them together.
+# Pinned to a commit and checksummed: a perl script fetched over the network and then EXECUTED, and
+# the gate deciding whether the catalogue is complete. Off a moving branch, the gate is whatever
+# upstream pushed last. luci-upstream.pin is the single source of the commit and both checksums.
 . ./luci-upstream.pin
 SCANNER_URL="https://raw.githubusercontent.com/openwrt/luci/${LUCI_PIN}/build/i18n-scan.pl"
 SCANNER_SHA256="$I18N_SCAN_SHA256"

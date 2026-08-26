@@ -1,24 +1,16 @@
 #!/usr/bin/env node
-/* The changelog contract (docs/releasing.md), held by a machine — because it drifts silently and the
+/* The changelog contract (docs/releasing.md), held by a machine, because it drifts silently and the
  * release page is generated from it.
  *
- * THE BUG THIS EXISTS FOR, found by hand while cutting 0.9.2: `[Unreleased]` had accumulated a
+ * The bug this exists for, found by hand while cutting 0.9.2: `[Unreleased]` had accumulated a
  * DUPLICATE `### Changed` (and `Fixed` sat before `Removed`) across several commits, each of which
- * looked fine on its own. `tools/release-notes.sh` prints a header the first time it meets each
- * `###`, so the GitHub release would have carried TWO "Changed" groups. Nothing failed: not
- * `npm run check`, not the build, not the release job — the notes are generated at tag time, by
- * which point the tag is already pushed and the page already published.
+ * looked fine on its own, and `tools/release-notes.sh` prints a header the first time it meets each
+ * `###` — so the release page would have carried two "Changed" groups. Nothing failed, the notes
+ * being generated at tag time, by which point the tag is pushed and the page published.
  *
- * WHY A GATE AND NOT A REVIEW: every fault here is invisible in the diff that causes it. A commit
- * appends `### Changed` to the top of `[Unreleased]` without knowing another one added it at the
- * bottom; the mirror falls a bullet behind; a bullet loses its bold lead and simply never appears
- * in the release. All of them are one line, all of them survive review, and all of them are only
- * observable on a release page nobody re-reads.
- *
- * WHAT IS DELIBERATELY NOT CHECKED: the prose. "Write the effect, keep the measurement, say what
- * the rule protects" (docs/releasing.md) is what makes an entry worth reading, and no scanner can judge it.
- * This holds the mechanical half — the half that breaks the generator.
- */
+ * A gate rather than a review, because every fault here is invisible in the diff that causes it.
+ * The prose is deliberately NOT checked: what makes an entry worth reading is beyond a scanner,
+ * so this holds the mechanical half — the half that breaks the generator. */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

@@ -1,43 +1,32 @@
 #!/usr/bin/env node
-/* THE READER'S PLACE, ON AN ENGINE THAT WILL NOT KEEP IT.
+/* The reader's place, on an engine that will not keep it.
  *
- * A poll tick changes the height of things above the reader — a station joins the associated list, a
- * lease expires, an interface box grows a line — and the page below it moves. Chromium and Firefox
- * hide that with scroll anchoring: they compensate the offset so the reader stays where they were.
- * WebKit has never implemented it, so on Safari and on every iPhone the same tick moves the page
- * under the reader's thumb, which is what "the Overview jitters" is.
+ * A poll tick changes the height of things above the reader and the page below moves. Chromium and
+ * Firefox hide that with scroll anchoring; WebKit has never implemented it, so on Safari and on
+ * every iPhone the same tick moves the page under the reader's thumb.
  *
- * The theme now does that job where nobody else does (`fs-fit.js`, ENGINE_ANCHORS). This gate holds
- * both halves of that sentence, because both can break silently:
+ * The theme does that job where nobody else does (fs-fit.js, ENGINE_ANCHORS). This gate holds both
+ * halves of that sentence, since both can break silently:
  *
  *   held      with the engine's anchoring suppressed AND the theme's fallback forced on, a growth
- *             above the fold must move the reader by no more than a pixel or two. That is the
- *             Safari path, exercised on an engine CI actually has.
- *   floor    the same refill again with the correction switched off (`fsAnchor = 'off'`): the content
+ *             above the fold must move the reader by no more than a pixel or two.
+ *   floor     the same refill with the correction switched off (`fsAnchor = 'off'`): the content
  *             column holds its height between ticks, so the document never gets short enough to be
- *             clamped and nothing has to be put back. This is the half that keeps the reader from
- *             seeing even a frame of it, and it can only be measured with the other half silent.
- *   swapped  a section refilled the way `dom.content()` refills one — emptied, then filled again —
- *             must leave the reader where they were too. The moment in between has no height, and a
- *             document that short is one the engine clamps the offset into; `held` cannot see that,
- *             because a growth that is only ever inserted never collapses anything.
+ *             clamped. It can only be measured with the other half silent.
+ *   swapped   a section refilled the way `dom.content()` refills one — emptied, then filled again —
+ *             must leave the reader where they were too. The moment in between has no height, and
+ *             `held` cannot see that: a growth only ever inserted never collapses anything.
  *   not twice with the engine's anchoring left alone, the same growth must move the reader just as
- *             little — a fallback that also runs there would correct what the engine already
- *             corrected and throw the page the other way.
- *   quiet     while the reader is SCROLLING, the theme must not correct at all: the compensation is
- *             for a page being read, not for one already moving, and a correction landing inside a
- *             flick is itself a jump. Measured as the scroll offset following the wheel and nothing
- *             else — a scripted flick up and down across several ticks.
+ *             little — a fallback that also ran there would throw the page the other way.
+ *   quiet     while the reader is SCROLLING the theme must not correct at all: a correction landing
+ *             inside a flick is itself a jump.
  *
  * The growth is inserted rather than waited for: a real tick depends on what the router's radios are
- * doing, and a gate that only fails when a station happens to join is not a gate. `#view`'s first
- * child is the unambiguous place — everything below it moves, whatever either side considers "the
- * fold".
+ * doing, and a gate that only fails when a station happens to join is not a gate.
  *
  *   node tools/scroll-anchor.mjs [--only owrt2512] [--engines chromium,firefox] [--widths 390,1440]
  *
- * Needs a running owlab router (docs/development.md).
- */
+ * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
 import { stands, login, requireStands } from './lib/stands.mjs';
 
@@ -47,12 +36,11 @@ const arg = (name, dflt) => {
 };
 const ENGINES = arg('engines', 'chromium').split(',').map((s) => s.trim()).filter(Boolean);
 const WIDTHS = arg('widths', '390,1440').split(',').map(Number);
-/* TWO SHAPES, not one page, and the second is the one that was never measured. The Overview is
- * sections with tables inside them; Processes is a single table that is a DIRECT child of `#view`.
- * That difference decides which element the theme can anchor on — on the second shape the climb out
- * of the table used to land on the host and give up, so nothing held the reader there at all, on
- * every engine. The gate had only ever opened the first shape, which is why it passed for as long as
- * the fault existed. `--page a,b` overrides. */
+/* Two shapes, not one page: the Overview is sections with tables inside them, Processes a single
+ * table that is a direct child of `#view`. That difference decides which element the theme can
+ * anchor on — on the second shape the climb out of the table used to land on the host and give up,
+ * so nothing held the reader at all, on every engine, while a gate that only opened the first shape
+ * passed throughout. `--page a,b` overrides. */
 const PAGES = arg('page', '/admin/status/overview,/admin/status/processes')
 	.split(',').map((p) => p.trim()).filter(Boolean);
 /* both layouts: they scroll different elements, and the correction has to find the right one */
@@ -65,22 +53,16 @@ const GROWTH = 120;
 /* a rect edge lands on a fraction; two pixels is not a jump */
 const TOLERANCE = 2;
 
-/* PARK THE READER AND WAIT FOR THE THEME TO NOTICE, rather than for a stopwatch.
+/* Park the reader and wait for the THEME to notice, rather than for a stopwatch.
  *
  * A probe scrolls the page and then has to let the theme settle: fs-fit treats the reader as moving
- * until SCROLL_IDLE (400ms) of stillness, and only then does it remember where the page stands —
- * the reference every correction is measured against. Waiting a flat 1200ms for that is a race, and
- * WebKit loses it: a programmatic `scrollTop` write there does not fire `scroll` on the next frame
- * the way Chromium and Firefox do, it arrives up to 1.2 SECONDS later. The theme's sampler starts
- * on that event, so it had not begun settling when the probe grew the page — the reference was the
- * one from the top of the document, the correction refused it, and the gate reported a jump the
- * theme is not responsible for (measured: three findings on WebKit, none on the other two engines,
- * with the theme identical).
+ * until SCROLL_IDLE (400 ms) of stillness and only then remembers where the page stands — the
+ * reference every correction is measured against. A flat wait is a race WebKit loses: a programmatic
+ * `scrollTop` write there does not fire `scroll` on the next frame, it arrives up to 1.2 seconds
+ * later, so the sampler had not begun settling when the probe grew the page (measured: three
+ * findings on WebKit, none on the other two engines, with the theme identical).
  *
- * So the wait is on the EVENT and then on the idle window, both bounded: the scroll is dispatched,
- * we wait for the browser to tell us it happened (or give up after 2.5s), and then wait out
- * SCROLL_IDLE with room to spare. Deterministic on all three engines, and no slower than before on
- * the two that were already fast. */
+ * So the wait is on the EVENT and then on the idle window, both bounded. */
 
 /* Runs in the page: park the reader, grow something above them, report what they saw. */
 const HOLD = async (growth) => {
@@ -129,18 +111,15 @@ const HOLD = async (growth) => {
 	};
 	await parkAt(at);
 
-	/* THE HOST IS NOT A MARK, and taking it as one made this gate report a jump that was its own.
-	 * `#view` is a `.cbi-section` gap wide enough to hit at 390px, and `elementFromPoint` answers
-	 * with the host there; the host's own top does not move when the pad grows INSIDE it, so a
-	 * correctly compensated page reads as -120px. Measured on imm2410 at 390 in the top layout, both
-	 * with the engine's anchoring and with the theme's, and on the released build as well — the
-	 * instrument, not the theme. Two more rows are tried before giving up, because a gap is a gap
-	 * only at the y it was measured at. */
-	/* the whole STACK at the point, not just the topmost element: in a grid gap the top of the
-	 * stack is `#view` itself — a host is not a mark, its own top does not move when something
-	 * grows INSIDE it — and the section that gap belongs to is right underneath it. Measured: on
+	/* The host is not a mark, and taking it as one makes this gate report a jump that is its own:
+	 * `#view` is a `.cbi-section` gap wide enough to hit at 390px, its own top does not move when the
+	 * pad grows INSIDE it, and a correctly compensated page then reads as -120px. Measured: on
 	 * 25.12's Overview every point down the middle answered `#view`, so all eight runs on that
-	 * release reported "no content under the reader" and measured nothing. */
+	 * release reported "no content under the reader" and measured nothing.
+	 *
+	 * So the whole STACK at the point is read rather than the topmost element — the section a grid
+	 * gap belongs to is right underneath it — and two more rows are tried before giving up, a gap
+	 * being a gap only at the y it was measured at. */
 	const markAt = (y, x) => {
 		for (const el of document.elementsFromPoint(x, y))
 			if (el !== view && view.contains(el)) return el;
@@ -177,15 +156,10 @@ const HOLD = async (growth) => {
 /* Runs in the page: a poll tick the way LuCI actually performs one — `dom.content()` empties the
  * section before it refills it — and reports where that left the reader.
  *
- * WHY THIS IS NOT THE `HOLD` CASE ABOVE. HOLD inserts a pad, so the page only ever gets TALLER and
- * the reference the theme keeps stays valid the whole time. A real tick passes through a moment
- * where the section has no height at all, and a document that short is a document the engine clamps
- * the offset into — the section fills again, nobody puts the offset back, and the reader is
- * somewhere else. That is the fault Safari reported after the anchoring above already shipped, and
- * HOLD could not see it: the growth it measures never collapses anything.
- *
- * The swap only ever GROWS the section (the same children back plus a pad), so a page parked near
- * the bottom cannot report the engine's honest end-of-document clamp as a jump. */
+ * Not the HOLD case above: HOLD inserts a pad, so the page only ever gets TALLER and the reference
+ * the theme keeps stays valid. A real tick passes through a moment where the section has no height
+ * at all, and a document that short is one the engine clamps the offset into; the section fills
+ * again, nobody puts the offset back, and the reader is somewhere else. */
 const SWAP = async (growth) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
@@ -197,12 +171,12 @@ const SWAP = async (growth) => {
 	const room = (sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - window.innerHeight);
 	if (room < 600) return { skip: 'page too short to scroll' };
 
-	/* THE ROUTER'S OWN POLL IS HELD FOR THE DURATION, and that is what makes this a measurement
-	 * rather than a coin toss. This case performs a tick BY HAND — it has to, to control when the
-	 * container is empty — and a real tick landing in the same window rewrites the very section
-	 * being swapped, taking the probe's own pad with it. Measured before it was stopped: the same
-	 * router and width reported 689px, 577px and 0px on three consecutive runs. `HOLD` and `QUIET`
-	 * only ever insert a pad of their own, so a tick underneath them is noise they survive. */
+	/* The router's own poll is held for the duration, which is what makes this a measurement rather
+	 * than a coin toss: this case performs a tick BY HAND, to control when the container is empty,
+	 * and a real tick landing in the same window rewrites the very section being swapped. Measured
+	 * before it was stopped, the same router and width reported 689px, 577px and 0px on three
+	 * consecutive runs. HOLD and QUIET only insert a pad of their own, so a tick underneath them is
+	 * noise they survive. */
 	const poll = (window.L && window.L.Poll) || null;
 	const polling = !!(poll && typeof poll.active === 'function' && poll.active());
 	if (polling) poll.stop();
@@ -244,27 +218,23 @@ const SWAP = async (growth) => {
 	};
 	await parkAt(at);
 
-	/* THE TALLEST SECTION BODY THAT IS ENTIRELY ABOVE THE VIEWPORT, and both halves of that matter.
-	 * Tall, because the clamp only bites when what the swap takes away is more than the room left
-	 * below the reader — a stock overview has one, the interface or the DHCP list. Above, because
-	 * "the reader must not move" is only true of a change ABOVE them: a section that straddles the
-	 * fold is a section the theme anchors INSIDE, and content growing below that anchor is content
-	 * that is supposed to move. Measured at 390px before this was pinned down: the theme put the
-	 * reference back exactly where it was and this still called the 120px below it a jump. */
-	/* WHAT A POLL ACTUALLY REPLACES, not one page's idea of it. This looked for `.cbi-section > div`
-	 * alone, which is the Overview's shape — and so the gate measured this fault on the Overview and
-	 * NOWHERE ELSE: Processes, Routes and the realtime pages are a TABLE inside the section, and
-	 * `L.ui.Table` refreshes by replacing its rows, which is the same collapse with a different
-	 * parent. Every one of those runs reported "no section body above the reader big enough to
-	 * collapse" and passed, on the engine where the fault is real. A `.table` body is added to the
-	 * list, and so is a bare `#view > *` for a view that builds neither. */
+	/* The tallest section body that is ENTIRELY ABOVE the viewport, and both halves matter. Tall,
+	 * because the clamp only bites when what the swap takes away is more than the room left below the
+	 * reader. Above, because "the reader must not move" is only true of a change above them: a
+	 * section that straddles the fold is one the theme anchors INSIDE, and content growing below that
+	 * anchor is supposed to move. */
+	/* What a poll actually replaces, not one page's idea of it. Looking for `.cbi-section > div` alone
+	 * is the Overview's shape, so the gate measures this fault there and nowhere else: Processes,
+	 * Routes and the realtime pages are a TABLE inside the section, and `L.ui.Table` refreshes by
+	 * replacing its rows — the same collapse with a different parent — so every one of those runs
+	 * reported "no section body big enough to collapse" and passed on the engine where the fault is
+	 * real. */
 	let body = null;
-	/* WHAT A POLL REPLACES, and nothing wider. `:scope > div` was in this list and it matched
-	 * `.fs-ovl` — the theme's own wrapper around System/Memory/Storage — so the probe deleted three
-	 * whole sections at once, which no poll does: the stock one refreshes a section's BODY in place
-	 * and never rebuilds the section, let alone the grid around it. The theme's reference lives
-	 * inside that grid, so removing all of it took the reference and its fallback together and the
-	 * gate reported a jump the theme could not have prevented. A section body, a table, a table's
+	/* What a poll replaces, and nothing wider. `:scope > div` also matches `.fs-ovl`, the theme's own
+	 * wrapper around System/Memory/Storage, so the probe deletes three whole sections at once, which
+	 * no poll does — the stock one refreshes a section's BODY in place. The theme's reference lives
+	 * inside that grid, so removing all of it takes the reference and its fallback together and the
+	 * gate reports a jump the theme could not have prevented. A section body, a table, a table's
 	 * body: those are the three things `dom.content()` is called on. */
 	for (const el of view.querySelectorAll('.cbi-section > div, .table > .tbody, .table')) {
 		if (el.getBoundingClientRect().bottom > 0) continue;		/* must be entirely above the reader */
@@ -387,14 +357,12 @@ const QUIET = async (growth) => {
 		}
 		await wait(70);
 		const now = pos();
-		/* WAS THIS STEP STILL PART OF A FLICK? The theme calls the reader "scrolling" until the
-		 * offset has held still for SCROLL_IDLE (400 ms, fs-fit.js), and a step here is 70 ms — so on
-		 * a machine that keeps up, the whole loop is one motion. A loaded CI runner does not always
-		 * keep up: one step took longer than that, the theme rightly decided the reader had stopped
-		 * and put the two pads' 240px back, and this pass counted the contract working as a
-		 * surprise. A gap that long is not a flick any more, so the step is excluded — and counted
-		 * and printed, because silence about it would make a run that measured nothing look like a
-		 * run that found nothing. */
+		/* Was this step still part of a flick? The theme calls the reader "scrolling" until the offset
+		 * has held still for SCROLL_IDLE (400 ms, fs-fit.js), and a step here is 70 ms, so on a machine
+		 * that keeps up the whole loop is one motion. A loaded CI runner does not always keep up, and a
+		 * step that took longer has the theme rightly deciding the reader stopped. A gap that long is
+		 * not a flick, so the step is excluded — and counted and printed, because silence would make a
+		 * run that measured nothing look like a run that found nothing. */
 		const gap = Date.now() - lastAt;
 		lastAt = Date.now();
 		if (now !== last) movedAt = Date.now();
@@ -479,13 +447,12 @@ for (const engine of ENGINES) {
 				else if (Math.abs(swap.moved) > TOLERANCE)
 					findings.push(`${where}: a section was refilled the way a poll refills one and the page moved `
 						+ `${swap.moved}px under the reader (the engine clamped ${swap.clamped}px of offset away)`);
-				/* THE FLOOR IS JUDGED ON THE CLAMP, NOT ON THE MOVEMENT, and only where the theme owns the
-				 * job. With the correction switched off nobody compensates the 120px the probe grows, so
-				 * the reader moves by exactly that and should; what must not happen is the engine taking
-				 * an offset away, which is the fault the floor prevents and the one nothing puts back.
-				 * Where the engine anchors for itself the same subtraction measures its compensation
-				 * rather than a clamp — 629px of it, and the reader still level — so it is not a verdict
-				 * on anything and is printed rather than judged. */
+				/* The floor is judged on the CLAMP, not on the movement, and only where the theme owns the job:
+				 * with the correction switched off nobody compensates the pad the probe grows, so the
+				 * reader moves by exactly that and should. What must not happen is the engine taking an
+				 * offset away. Where the engine anchors for itself the same subtraction measures its
+				 * compensation rather than a clamp — 629px of it, and the reader still level — so it is
+				 * printed rather than judged. */
 				if (noEngineAnchor && swap.floorClamped !== null && swap.floorClamped !== undefined && swap.floorClamped > TOLERANCE)
 					findings.push(`${where}: with the correction switched off the engine clamped `
 						+ `${swap.floorClamped}px away — the content column's floor is not holding the document up`);

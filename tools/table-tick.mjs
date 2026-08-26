@@ -1,34 +1,22 @@
 #!/usr/bin/env node
-/* THE POLL TICK, PERFORMED ON PURPOSE: does a freshly replaced data table ever get laid out before
+/* The poll tick, performed on purpose: does a freshly replaced data table ever get laid out before
  * anything has answered for it?
  *
- * This is the mechanism behind "the Overview jumps": luci-base's poll does not append a row, it
- * REPLACES the table, and the replacement carries none of the marks fs-select stamps. For the moment
- * between landing and being stamped the table is a full-width table — at 390px several screens
- * taller than the card stack it is about to become — and if anything forces layout in that moment,
- * the engine re-anchors on the intermediate and throws the reader. Measured on a live router at
- * iPhone width: 612px out and back, twice per tick.
- *
- * `theme/30-tables.css` holds an unanswered table out of the flow, and `tools/table-contract.mjs`
- * proves the rule names every root fs-select scans. What a stylesheet check cannot prove is that the
- * rule REACHES the table on a real page — the attribute is armed by JS, the roots are ids an app
- * could duplicate, and a `display` an app sets on `.table` at higher specificity would win. So this
- * does it live.
+ * luci-base's poll does not append a row, it REPLACES the table, and the replacement carries none of
+ * the marks fs-select stamps. For the moment between landing and being stamped the table is a
+ * full-width table — at 390px several screens taller than the card stack it is about to become — and
+ * if anything forces layout in that moment the engine re-anchors on the intermediate and throws the
+ * reader (612px out and back, twice per tick, on a live router at iPhone width).
  *
  * WHY A DELIBERATE TICK RATHER THAN WATCHING A REAL ONE. The intermediate lasts a microtask:
  * fs-select answers in a MutationObserver callback, before paint, so a per-frame sampler never sees
  * it — measured, with the rule removed, as 0 frames out of 108 while the page grew by 269px. The
  * only way to observe the state is to force layout inside that window, which is exactly what an app
- * reading a width right after rendering does, and what this reproduces:
- *
- *     rows out, rows back in, marks stripped, then read a height.
- *
- * With the rule: 0 unanswered tables with height. Without it: 1, and 375px of it.
+ * reading a width right after rendering does, and what this reproduces.
  *
  *   node tools/table-tick.mjs [--only owrt2512] [--widths 390,768] [--pages /admin/status/overview]
  *
- * Needs a running owlab router (docs/development.md).
- */
+ * Needs a running owlab router (docs/development.md). */
 import { chromium } from 'playwright';
 import { stands, login, requireStands } from './lib/stands.mjs';
 

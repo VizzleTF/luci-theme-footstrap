@@ -40,15 +40,14 @@
 	}
 	.fs-search-ico { display: inline-flex; color: var(--fs-faint); }
 	.fs-search-ico .fs-ico { width: 18px; height: 18px; }
-	/* The input carries no frame of its own — the ROW is the field, and the box around it is the
+	/* The input carries no frame of its own — the ROW is the field and the box around it is the
 	 * dialog. Two classes (0,2,0) on purpose: the generic field box in 60-inputs.css is
-	 * `input[type="text"], …` (0,1,1), which outranks a single class in the same layer whatever
-	 * the source order — measured, it painted this input with the page-field border, panel2 fill,
-	 * 8px/11px padding and a focus ring inside the dialog's own frame.
+	 * `input[type="text"], …` (0,1,1) and outranks a single class in the same layer whatever the
+	 * source order — measured, it painted this input with the page-field border, the panel2 fill,
+	 * 8px/11px of padding and a focus ring inside the dialog's own frame.
 	 *
-	 * 16px is not the theme's body size and is deliberate: a font-size below 16px makes iOS
-	 * Safari zoom the page when the field takes focus, and this one takes focus the moment the
-	 * palette opens. */
+	 * 16px rather than the theme's body size, deliberately: a font-size below 16px makes iOS Safari
+	 * zoom the page when the field takes focus, and this one takes focus as the palette opens. */
 	.fs-search-row .fs-search-input {
 		flex: 1 1 auto; min-width: 0;
 		margin: 0; padding: 0; border: 0; min-height: 0; background: transparent;

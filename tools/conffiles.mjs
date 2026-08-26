@@ -1,26 +1,21 @@
 #!/usr/bin/env node
-/* Every shipped /etc/config/* must be declared a conffile — or the package manager eats it.
+/* Every shipped /etc/config/* must be declared a conffile, or the package manager eats it.
  *
- * THE BUG THIS EXISTS FOR, measured on the dev router, not reasoned:
  * `root/etc/config/footstrap` ships as an empty stub and is WRITTEN AT RUNTIME — Appearance ->
- * "Save as default" has rpcd uci-set the router-wide axes into that very file (fs-prefs.js
- * saveAsDefault()). With no `conffiles` define, the package manager owns it as an ordinary file
- * and REPLACES it on upgrade, so the admin's saved defaults were wiped by the theme's own
- * one-click Update — silently, and reported as success. The live router held eight options, was
- * package-owned, and had no `.conffiles` entry beside base-files'/dnsmasq's.
+ * "Save as default" has rpcd uci-set the router-wide axes into that very file. With no `conffiles`
+ * define, the package manager owns it as an ordinary file and REPLACES it on upgrade, so the
+ * admin's saved defaults are wiped by the theme's own one-click Update, silently and reported as
+ * success.
  *
- * WHY A GATE AND NOT JUST THE FIX: nothing observable fails. The wipe happens on someone else's
- * router, months later, at the moment they upgrade — the exact "silent, nobody reports it" class
- * the other gates here exist for. Adding a second config file and forgetting the define would
- * reintroduce it with no test, no lint and no diff to catch it.
+ * A gate rather than just the fix, because nothing observable fails: the wipe happens on someone
+ * else's router, months later, at the moment they upgrade.
  *
  * OpenWrt honours the define for BOTH formats (include/package-pack.mk: KEEP_$(1) -> apk
  * .conffiles / .conffiles_static, ipk CONTROL/conffiles), so one define covers 24.10's opkg and
  * 25.12's apk alike.
  *
- * Deliberately a TEXT check on the Makefile, not a package build: the gate must run on a dev box
- * and in the lint job, neither of which has an OpenWrt SDK.
- */
+ * Deliberately a TEXT check, not a package build: the gate must run on a dev box and in the lint
+ * job, neither of which has an OpenWrt SDK. */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -45,14 +40,13 @@ const declared = m
 	? m[1].split('\n').map(s => s.trim()).filter(s => s && !s.startsWith('#')).sort()
 	: [];
 
-/* …and what owfeed.yml declares, which is the copy that governs THE RELEASED PACKAGE. The
- * Makefile describes the SDK path; nothing we publish comes from it since the build moved to
- * owfeed, so a `conffiles` correct in one file and missing from the other protects exactly
- * nobody while still reading as protected. Both are checked, and they must agree.
+/* …and what owfeed.yml declares, which is the copy that governs THE RELEASED PACKAGE. The Makefile
+ * describes the SDK path, and nothing published comes from it since the build moved to owfeed, so a
+ * `conffiles` correct in one file and missing from the other protects nobody while reading as
+ * protected. Both are checked and must agree.
  *
- * A text match, like the Makefile one above and for the same reason: this gate runs on a dev
- * box and in the lint job, and neither should need a YAML parser to answer a question about
- * one list of paths. */
+ * A text match, like the Makefile one above: this gate runs on a dev box and in the lint job, and
+ * neither should need a YAML parser to answer a question about one list of paths. */
 const yml = readFileSync(OWFEED, 'utf8');
 const y = yml.match(/^\s*conffiles:\s*\[([^\]]*)\]/m);
 const owfeedDeclared = y

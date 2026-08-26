@@ -1,32 +1,28 @@
-/* THE LIVE HALF OF THE GATES: one place that knows how to reach a running router, log into LuCI and
+/* The live half of the gates: one place that knows how to reach a running router, log into LuCI and
  * enumerate its pages.
  *
- * Every static gate in this repo measures a FILE. The bugs that reached users measured a PAGE:
- * a column shredded to one character per line (#11), a submenu title clipped (#22), a doubled
- * scrollbar in Firefox (#12), a third-party app's tabs laid out wrong (#36, #33, #8), a client
- * navigation that painted less than a full load (upstream review). None of those can be seen in a
- * stylesheet; all of them are one query away on a live page. This module is what the live gates
- * share so they cannot drift apart on how a router is found or how a menu is walked.
+ * Every static gate here measures a FILE. The bugs that reached users measured a PAGE — a column
+ * shredded to one character per line (#11), a submenu title clipped (#22), a doubled scrollbar in
+ * Firefox (#12), a third-party app's tabs laid out wrong (#36, #33, #8), a client navigation that
+ * painted less than a full load (upstream review). None can be seen in a stylesheet; all are one
+ * query away on a live page.
  *
  * The routers are owlab's — `owlab status -json` names each one and the port it answers on, so
  * nothing here hard-codes a port or a container name. Nothing here boots anything either: a gate
- * that starts and stops containers by itself is a gate nobody runs locally.
- */
+ * that starts and stops containers by itself is a gate nobody runs locally. */
 import { execFileSync } from 'node:child_process';
 
-/* THE TWO ROUTERS A GATE RUNS ON BY DEFAULT, and why it is two rather than four.
+/* The two routers a gate runs on by default, and why it is two rather than four.
  *
- * owlab boots four: OpenWrt and ImmortalWrt, each on 25.12 and 24.10. Three axes vary across them —
- * the package manager (apk vs opkg), the LuCI release, and the distribution — and only two of those
- * can change what this theme is measured against. ImmortalWrt is the same luci-base as its OpenWrt
- * twin with a different brand and a different app set; it has never been the leg that caught
- * something first, and every gate run on it doubles a wall clock that is already the reason people
- * skip running the gates at all.
+ * owlab boots four: two distributions x two releases. Three axes vary across them — the package
+ * manager, the LuCI release and the distribution — and only two can change what this theme is
+ * measured against: the second distribution is the same luci-base with a different brand and app
+ * set, has never been the leg that caught something first, and doubles a wall clock that is already
+ * the reason people skip running the gates.
  *
  * So the default is the OpenWrt pair, which still covers both package managers and both release
- * lines, and `--all` (or `--only imm2512,…`) takes the full set. `docs/releasing.md` asks for the
- * full set before a tag, where the wall clock is worth paying and a distribution difference is
- * exactly the kind of thing a release should not discover afterwards. */
+ * lines, and `--all` (or `--only imm2512,…`) takes the full set. docs/releasing.md asks for the full
+ * set before a tag, where the wall clock is worth paying. */
 export const CORE = [ 'owrt2512', 'owrt2410' ];
 
 /* Every RUNNING owlab router, newest release first, or an empty array when owlab is absent — the
@@ -77,11 +73,11 @@ export async function login(page, base) {
 	}
 }
 
-/* Every LEAF of the router's own menu tree, as LuCI itself resolves it — not a list of paths we
- * keep in the repo, which would go stale the moment an app is installed or a release moves a page.
+/* Every LEAF of the router's own menu tree, as LuCI itself resolves it — not a list of paths kept
+ * in the repo, which would go stale the moment an app is installed or a release moves a page.
  *
  * `L.ui.menu.load()` returns the tree ALREADY rooted at `admin`, so the walk starts with an empty
- * path: seeding it with the root's name produced `/admin/admin/...` and a sweep of 404s that looked
+ * path: seeding it with the root's name produces `/admin/admin/...` and a sweep of 404s that looks
  * like a clean run. */
 export async function menuPaths(page, opts = {}) {
 	/* `L.ui` is only there once ui.js has been required by something on the page, and how soon that
@@ -89,12 +85,11 @@ export async function menuPaths(page, opts = {}) {
 	 * the 24.10 leg with "Cannot read properties of undefined (reading 'menu')" while 25.12 was fine.
 	 * Wait for the runtime, then ask for the module by name rather than hoping somebody else did. */
 	await page.waitForFunction(() => window.L && typeof window.L.require === 'function', null, { timeout: 20000 });
-	/* ONLY THE LEAVES THAT ARE PAGES. A dispatcher tree carries far more than the menu shows: on a
+	/* Only the leaves that are PAGES. A dispatcher tree carries far more than the menu shows: on a
 	 * router with openclash and justclash installed, 105 of its 169 leaves are `call` nodes — RPC
-	 * endpoints an app registers so its own JS can reach them — plus eight `function` nodes and the
-	 * untitled plumbing (`/admin/ubus`, `/admin/uci/apply_rollback`, `/admin/menu`). None of them
-	 * renders a page: opening one answers JSON or nothing at all, so a gate that measured layout on
-	 * it measured an empty `#view`, and the sweep spent two thirds of its wall clock proving that.
+	 * endpoints an app registers for its own JS — plus `function` nodes and the untitled plumbing.
+	 * None renders a page, so a gate that measured layout on one measured an empty `#view` and spent
+	 * two thirds of its wall clock proving that.
 	 *
 	 * `view` and `template` are the two that paint (plus `cbi` on an old enough app), and a node the
 	 * menu does not title is not a page a user can reach. `{ all: true }` returns the raw walk, for a

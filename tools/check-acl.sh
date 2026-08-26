@@ -1,18 +1,15 @@
 #!/bin/sh
 # Every rpcd ACL this package ships is valid JSON, and grants something.
 #
-# rpcd SKIPS an unreadable file in /usr/share/rpcd/acl.d and says nothing. A stray comma
-# therefore issues the grant to NOBODY, and nothing else in the system notices: the package
-# installs, the theme draws, and Appearance -> "Save as default" and the login-background
-# upload fail on the user's router with no error anywhere. Nothing observable fails here
-# either, which is why it is a gate rather than a habit — docs/package.md, docs/ci.md.
+# rpcd SKIPS an unreadable file in /usr/share/rpcd/acl.d and says nothing, so a stray comma issues
+# the grant to NOBODY and nothing else notices: the package installs, the theme draws, and
+# Save-as-default and the upload fail on the user's router with no error anywhere.
 #
-# The shape is checked as well as the syntax: a document that parses but is a list, or an
-# entry with neither `read` nor `write`, is accepted by rpcd and grants exactly nothing —
-# the same silent outcome by a different route.
+# The shape is checked as well as the syntax: a document that parses but is a list, or an entry with
+# neither `read` nor `write`, is accepted by rpcd and grants exactly nothing.
 #
-# Node-less on purpose: this runs in CI's `check` job beside audit.py, which already
-# requires python3, and the OpenWrt buildbot has no node.
+# Node-less on purpose: this runs in CI's `check` job beside audit.py, which already requires
+# python3, and the OpenWrt buildbot has no node.
 set -eu
 cd "$(dirname "$0")/.."
 

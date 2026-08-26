@@ -1,56 +1,20 @@
 #!/usr/bin/env node
-/* Rasterise the app icons the web manifest points at, from the one logo the theme already ships.
+/* Rasterise the app icons the web manifest points at, from the one logo the theme ships.
  *
  * The PNGs are COMMITTED, not built at package time: the OpenWrt buildbot has no node and no
  * browser, and `Build/Prepare` may only run cat/awk-grade tools. So this is a developer's tool, run
- * when the logo changes, and its output is reviewed like any other asset. Running it must be
- * reproducible — same logo in, same bytes out — which is why the page it screenshots is pinned here
- * rather than described in a doc.
+ * when the logo changes, and its output is reviewed like any other asset — which is why the page it
+ * screenshots is pinned here rather than described in a doc.
  *
- * WHY NOT AN SVG ICON IN THE MANIFEST. Chrome accepts one and Safari's Add to Home Screen does not,
- * and the home screen is the whole point of the manifest. The SVG stays the favicon (it is a live
- * document — see the dark-mode rule inside logo.svg, which a raster cannot have); these are for the
- * installed app.
+ * Not an SVG icon in the manifest: Chrome accepts one and Safari's Add to Home Screen does not, and
+ * the home screen is the point of the manifest. The SVG stays the favicon, being a live document
+ * (see the dark-mode rule inside logo.svg) that a raster cannot be.
  *
- * WHY THE COMMITTED FILE IS QUANTISED. A browser screenshot is 8-bit RGBA, which is the wrong
- * encoding for this picture: the icon is a flat background, one ink colour, and the ramp between
- * them. Reduced to a 32-colour palette the three files fall from 25.9 KB to 7.6 KB — 18.7 KB off
- * what a phone downloads when it installs the app, and off the flash of every router that ships
- * the theme — while the worst channel moves by 18 of 255 on 0.2% of the pixels, which is the
- * antialiased edge of the ring and nothing else. `-dither None` because error diffusion is
- * neither needed on a two-colour picture nor reproducible enough to commit.
+ *   node tools/build-icons.mjs [--check]
  *
- * That step needs ImageMagick, and only when the icons are REGENERATED — a rare operation, on a
- * developer's machine, like `po2lmo` for update-po.sh. `--check` needs nothing but the browser it
- * already uses: it compares PIXELS, so a different ImageMagick version producing different bytes
- * is not a failure, and a redrawn logo still is.
- *
- * WHY A BACKGROUND AND A MARGIN. `purpose: "any maskable"` means the platform is free to crop the
- * icon to its own shape (a circle on Android, a squircle on iOS), and it guarantees only the middle
- * 80% — the "safe zone" — survives. The mark is drawn at 60% of the canvas, centred, on the default
- * palette's page colour, so no crop can bite into it and a transparent PNG never lands on a black
- * home screen with an invisible dark-blue ring.
- *
- * Usage: node tools/build-icons.mjs [--check]
- *   --check re-renders and compares against the committed PNGs — for CI, so a logo edit cannot ship
- *           with stale icons.
- *
- * WHAT --check COMPARES, AND WHY NOT BYTES. It compared the two files byte for byte, which is a test
- * of the RENDERER, not of the icon: a Chromium bump moves a subpixel and the gate goes red on a
- * commit that never touched logo.svg, with no diff to show for it. What it now asks is what an
- * installed icon has to be true of:
- *
- *   pixels     the committed raster still matches a fresh render, per channel, with a tolerance —
- *              a logo edit moves whole regions and lands far outside it, an engine's antialiasing
- *              does not. Decoded in the same Chromium, so this needs no image dependency at all.
- *   canvas     the size the manifest declares is the size on flash.
- *   opaque     no alpha anywhere. A transparent PNG lands on a black home screen as an invisible
- *              dark-blue ring, which is the failure the background exists to stop.
- *   safe zone  everything outside the middle 80% is background and nothing else — the guarantee
- *              `purpose: maskable` gives, and the one an over-eager logo edit would break silently
- *              on the round crops only some platforms make.
- *   mark       the middle is NOT background, i.e. there is an icon in the icon.
- */
+ * `--check` is the GATE half (npm run icons): it re-renders and compares against the committed
+ * PNGs, so a logo edit cannot ship with stale icons. It needs nothing but the browser — only
+ * regeneration needs ImageMagick. */
 import { readFileSync, writeFileSync, existsSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -60,8 +24,12 @@ import { ROOT } from './lib/css.mjs';
 
 const MEDIA = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/footstrap');
 const CHECK = process.argv.includes('--check');
-/* 32 keeps the ring's ramp smooth (worst channel 18/255 against a fresh render); 16 saves another
- * 0.8 KB and takes it to 35, which is visible on the inner curve. */
+/* Quantised because a browser screenshot is 8-bit RGBA and this picture is a flat background, one
+ * ink and the ramp between: measured back when three sizes were committed, the set fell from
+ * 25.9 KB to 7.6 KB. 32 keeps the ring's ramp smooth (worst channel 18/255 against a fresh
+ * render); 16 saves another 0.8 KB and takes it to 35, which is visible on the inner curve.
+ * `-dither None` because error diffusion is neither needed on a two-colour picture nor
+ * reproducible enough to commit. */
 const COLOURS = 32;
 
 /* ImageMagick 7 calls it `magick`, 6 `convert`. Resolved once, and only when generating. */
@@ -81,20 +49,13 @@ function quantiser() {
 const BG = '#f6f8fa';
 const MARK = 0.6;	/* the mark's share of the canvas: the maskable safe zone is 0.8 */
 
-/* ONE RASTER, and the platforms do the scaling they were going to do anyway.
+/* One raster, and the platforms do the scaling they were going to do anyway. A manifest icon set is
+ * a list of sizes a browser may CHOOSE from, and every browser that installs a page picks the
+ * largest and downscales; iOS reads the `apple-touch-icon` link rather than the manifest and is
+ * equally happy with the same 512 square. A second and third file buys nothing but bytes on flash
+ * and two more files to keep in step with logo.svg.
  *
- * It was three — 192, 512 and a 180 for `apple-touch-icon` — which is the shape a web app template
- * hands you, and none of the three earned its place here: a manifest icon set is a list of sizes a
- * browser may CHOOSE from, and every browser that installs a page picks the largest and downscales
- * (installability wants one icon of at least 144px). iOS reads the `apple-touch-icon` link rather
- * than the manifest, and it is equally happy with a 512 square, which `partials/head.ut` now points
- * at. So a second and third file bought nothing but bytes on flash and two more files to keep in
- * step with logo.svg.
- *
- * Nothing in luci-base could stand in for it, which is the other question worth answering: it ships
- * functional glyphs (interfaces, signal bars, ports, the cbi file/folder marks) and no logo or
- * raster of any kind, and every theme carries its own — so an app icon is ours to ship or to not
- * have. */
+ * Nothing in luci-base could stand in for it: it ships functional glyphs and no logo. */
 const ICONS = [
 	{ name: 'app-icon-512.png', size: 512 },
 ];
@@ -110,7 +71,10 @@ const page = (size) => `<!doctype html><meta charset="utf-8"><style>
 /* HOW FAR A PIXEL AND AN ICON MAY DRIFT. `CHANNEL` is per-channel, on 0-255: a renderer's
  * antialiasing moves an edge by a shade or two, and a mark that changed shape moves whole regions
  * to a different colour entirely. `SHARE` is how much of the canvas may drift that far at all —
- * the mark's outline is a small part of it, and a redrawn logo is never a rounding difference. */
+ * the mark's outline is a small part of it, and a redrawn logo is never a rounding difference.
+ *
+ * Not a byte comparison: that tests the RENDERER, not the icon — a Chromium bump moves a subpixel
+ * and the gate goes red on a commit that never touched logo.svg, with no diff to show for it. */
 const CHANNEL = 12;
 const SHARE = 0.02;
 /* the safe zone `purpose: maskable` guarantees; outside it a platform may crop anything away */

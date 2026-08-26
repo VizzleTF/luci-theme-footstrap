@@ -1,19 +1,12 @@
-/* THE repo root, and the two things every gate does with it. ONE copy.
+/* The repo root, and the reads every gate does through it: `read`, `filesIn`, `readAll`. One copy.
  *
- * `join(dirname(fileURLToPath(import.meta.url)), '..')` was written out in ten tools, and
- * `lib/css.mjs` and `lib/gallery.mjs` each exported a THIRD spelling of the same path (one level
- * deeper, so with a different number of '..'). Three levels of truth about where the repo is, none
- * of them wrong yet, all of them free to drift the moment a tool moves between `tools/` and
- * `tools/lib/` — at which point the boilerplate silently resolves one directory off and every
- * read fails with ENOENT pointing at a path nobody wrote.
+ * `join(dirname(fileURLToPath(import.meta.url)), '..')` written out per tool is three levels of
+ * truth about where the repo is, all free to drift the moment a tool moves between `tools/` and
+ * `tools/lib/` — at which point the boilerplate resolves one directory off and every read fails
+ * with ENOENT pointing at a path nobody wrote.
  *
- * `read` was identical in three tools. `filesIn` is the readdir-recursive + extension filter those
- * tools had each re-derived, and `readAll` the "one tree, concatenated" read that axes.mjs and
- * chrome-fence.mjs both reason about — each copy with its own idea of whether directories needed
- * excluding. Two callers stay on their own walk on purpose: mirror.mjs takes a MIXED list of files
- * and directories, and minify-js.mjs takes roots outside the repo (it runs over the staged payload),
- * so neither is asking the question this helper answers.
- */
+ * Two callers stay on their own walk on purpose: mirror.mjs takes a MIXED list of files and
+ * directories, and minify-js.mjs takes roots outside the repo (it runs over the staged payload). */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

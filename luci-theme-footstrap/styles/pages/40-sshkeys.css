@@ -1,12 +1,12 @@
 @layer page {
-	/* SSH-Keys renders its whole view as a single bare <div> in #view with no .cbi-section
-	 * wrapper, so its text sat frameless over the wallpaper while every other page gets an
-	 * opaque --fs-panel card. No section markup to hook, so give that lone wrapper the same
-	 * card (mirrors theme/30-tables.css `.cbi-section`).
+	/* SSH-Keys renders its whole view as a single bare <div> in #view with no .cbi-section wrapper, so
+	 * its text sits frameless over the wallpaper while every other page gets an opaque card. There
+	 * is no section markup to hook, so that lone wrapper is given the same card (the values are
+	 * theme/30-tables.css's `.cbi-section`).
 	 *
-	 * Scoped to this page on purpose: a general "card any bare #view > div" was tried and
-	 * reverted — it also wrapped whole tabbed views (Startup). Other bare-view pages get
-	 * their own entry here. */
+	 * Scoped to this page on purpose: a general "card any bare #view > div" was tried and reverted —
+	 * it also wrapped whole tabbed views (Startup). Other bare-view pages get their own entry
+	 * here. */
 	body[data-page="admin-system-admin-sshkeys"] #view > div {
 		background: var(--fs-panel);
 		border: var(--fs-hairline);

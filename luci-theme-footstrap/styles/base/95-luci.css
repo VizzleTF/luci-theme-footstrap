@@ -10,13 +10,11 @@
 	/* #syslog: absorbed into pages/70-syslog.css — in base it LOST to the theme layer's generic
 	 * form-field box (a layer beats specificity), so the log rendered as a 210px column. */
 
-	/* `:not(.placeholder)` — a hover cue promises a row you can act on, and the empty-table row
-	 * ("There are no active port maps.") is not one. The theme's own row hover already spares it
-	 * (theme/30-tables.css, issue #5.2), but this rule paints the CELL, which nothing in a later
-	 * layer was undoing: measured on Services → UPnP, whose table is `.table.cbi-section-table` with
-	 * a `tr placeholder` that carries no `.cbi-section-table-row` class, so the theme's guarded rule
-	 * never matched it — the cell still lit to --fs-panel2 (issue #15). Fixing it here rather than
-	 * repainting it later keeps one hover contract instead of two. */
+	/* `:not(.placeholder)`: a hover cue promises a row you can act on, and the empty-table row is
+	 * not one. The theme's row hover already spares it (theme/30-tables.css, issue #5.2), but this
+	 * rule paints the CELL, and a placeholder row carrying no `.cbi-section-table-row` class
+	 * escapes that guard — measured on UPnP (issue #15).
+	 * Fixed here rather than repainted later, so there is one hover contract. */
 	.cbi-section-table .tr:not(.placeholder):hover .td,
 	.cbi-section-table .tr:not(.placeholder):hover .th,
 	.cbi-section-table .tr:not(.placeholder):hover::before {
@@ -31,15 +29,13 @@
 		font-weight: var(--fs-weight-bold);
 	}
 
-	/* The GridSection name column, and on 24.10 the THEME draws the whole of it — this is the one
-	 * place the two releases' markup genuinely differs, and one stylesheet serves both.
-	 * 25.12's form.js renders the name as a real `th` + `td.cbi-section-table-titles` and keeps
-	 * `data-title` on the row only for the touch-sort drag handle; 24.10 renders no cell at all and
-	 * expects `::before` to generate the column from `data-title`. Upstream ships a different
-	 * cascade.css per branch (25.12's says `content: none`, 24.10's `content: attr(data-title) " "`),
-	 * so taking 25.12's copy verbatim deleted the Name column on every 24.10 router — the header and
-	 * every rule's name, on Firewall -> Port forwards / NAT rules (issue #9, reproduced on the 24.10
-	 * container, unchanged on 25.12).
+	/* The GridSection name column, where the two releases' markup genuinely differs and one
+	 * stylesheet serves both: 25.12's form.js renders the name as a real `th` plus
+	 * `td.cbi-section-table-titles` and keeps `data-title` on the row only for the drag handle,
+	 * while 24.10 renders no cell at all and expects `::before` to generate the column from
+	 * `data-title`. Upstream ships a different cascade.css per branch (25.12's says
+	 * `content: none`, 24.10's `content: attr(data-title) " "`), so taking 25.12's copy verbatim
+	 * deletes the Name column on every 24.10 router (issue #9).
 	 *
 	 * Each row type therefore asks the MARKUP, never the release:
 	 *   header — carries `data-title` on 24.10 only; 25.12 appends a real `th` instead.
@@ -202,16 +198,14 @@
 		text-shadow: var(--fs-text-emboss);
 	}
 
-	/* The !important fights luci-mod-network's inline zone-colour `style=` — a raw zone
-	 * colour is too bright on a dark panel, so re-mix it at .4/.3.
+	/* The !important fights luci-mod-network's inline zone-colour `style=`: a raw zone colour is too
+	 * bright on a dark panel, so it is re-mixed at .4/.3.
 	 *
-	 * NO FALLBACK on --zone-color-rgb: load-bearing, do not "fix" it. LuCI sets that var
-	 * inline only where there IS a zone colour; elsewhere (the overview's .ifacebox-head,
-	 * carrying a plain inline background-color) it is missing, so the declaration is
-	 * invalid at computed-value time and — being !important — resolves to `unset`, wiping
-	 * that inline background. That is the DESIRED outcome. A fallback grey makes the rule
-	 * apply there instead, tinting five interface boxes that today correctly show the panel
-	 * behind them (measured, cssdiff.py). */
+	 * No fallback on --zone-color-rgb, and that is load-bearing: LuCI sets that var inline only
+	 * where there IS a zone colour, so elsewhere the declaration is invalid at computed-value time
+	 * and, being !important, resolves to `unset` and wipes the plain inline background — which is
+	 * the desired outcome. A fallback grey makes the rule apply there and tints five interface
+	 * boxes that correctly show the panel behind them (measured, computed-style diff). */
 	[data-darkmode="true"] .zonebadge[style],
 	[data-darkmode="true"] .ifacebox-head[style] {
 		background: linear-gradient(rgba(var(--zone-color-rgb), .4), rgba(var(--zone-color-rgb), .3)) !important;
@@ -271,19 +265,16 @@
 		flex-direction: column;
 		height: 100%;
 		text-align: start;
-		/* `.ifacebox` above is `white-space: nowrap` — right for a plate of one-word labels, wrong
-		 * for THIS plate, whose lines are addresses: an uncompressed IPv6 (`Address:
-		 * 2001:db8:1a2b:3c4d:5e6f:7a8b:9c0d:1e2f/64`) is ~380px of unbreakable text, and the
-		 * Overview's upstream boxes are flex items that shrink. Measured on the fork container at
-		 * a 390px viewport: the box ended at x=348 and the address ran to x=393 — 45px of text
-		 * printed outside its own border, over the card behind it.
+		/* `.ifacebox` above is `white-space: nowrap`, which is right for a plate of one-word labels
+		 * and wrong for this one, whose lines are addresses: an uncompressed IPv6 is ~380px of
+		 * unbreakable text and these boxes are flex items that shrink, so the text prints outside
+		 * its own border: measured at a 390px viewport, the box ended at x=348 and the address ran
+		 * to x=393, 45px of text over the card behind it.
 		 *
-		 * `normal` alone does not fix it and is the obvious half-fix: an address has no spaces, so
-		 * there is nothing to wrap AT. `overflow-wrap: anywhere` is what allows a break inside the
-		 * token — and `anywhere` rather than `break-word` on purpose, because only `anywhere`
-		 * lowers the box's min-content size, so flexbox can shrink the item to the line instead of
-		 * handing it a width its content will overflow. The Interfaces page had this fixed for its
-		 * own copy (`#cbi-network-interface .ifacebox-body`, below); the status plate never did. */
+		 * `normal` alone is the obvious half-fix — an address has no spaces to wrap at.
+		 * `overflow-wrap: anywhere` allows a break inside the token, and `anywhere` rather than
+		 * `break-word` because only it lowers the box's min-content size, so flexbox can shrink
+		 * the item to the line. */
 		white-space: normal;
 		overflow-wrap: anywhere;
 	}
@@ -501,23 +492,20 @@
 	 * one spinner a motion-sensitive user could not turn off. theme/95-a11y-media.css now
 	 * stops it like everything else. (The circle under the arc is rotationally symmetric,
 	 * so spinning the whole box looks identical.) */
-	/* ---- THE GLYPH SITS IN THE FLOW, AND THAT IS THE FIX FOR A WHOLE BUG CLASS ----
+	/* ---- the glyph sits in the flow, which is the fix for a whole bug class ----
 	 *
-	 * It used to be `position: absolute; left: var(--fs-space-2)` over a `position: relative`
-	 * host, which means the host had to be told to leave room for it — a `padding-left` in
-	 * theme/55-buttons.css that had to OUT-RANK whatever else was padding that element. That is a
-	 * race nobody can win: every padding rule aimed at a button is a candidate, and the loser is
-	 * silent — the glyph simply draws on top of the label. Twice reported from the field, each
-	 * time by a more specific rule than the last: issue #15 (`.td .cbi-button`, 0,2,0 — Network →
-	 * Interfaces, "Restart") and issue #22 (`.cbi-section .table[id] .td .cbi-button`, 0,5,0 —
-	 * the overview's DHCP leases, "Reserve IP"), where the ladder had padding-left at 10px against
-	 * the 32px the glyph needs. A third rule would have done it again.
+	 * Absolutely positioned, the host has to be told to leave room for it — a `padding-left` that
+	 * must out-rank whatever else pads that element. That race cannot be won: every padding rule
+	 * aimed at a button is a candidate and the loser is silent, the glyph simply drawing on top of
+	 * the label. Twice reported from the field, each time by a more specific rule than the last:
+	 * issue #15 (`.td .cbi-button`, 0,2,0) and issue #22, whose
+	 * `.cbi-section .table[id] .td .cbi-button` is 0,5,0 — there the ladder had padding-left at
+	 * 10px against the 32px the glyph needs.
 	 *
-	 * In the flow the glyph reserves its OWN space, so no host needs a padding at all and there is
-	 * nothing left to out-rank. `flex: 0 0 auto` because the buttons are `inline-flex` and a flex
-	 * item with a mask is squeezable; `vertical-align: middle` for the non-flex hosts (`em.spinning`
-	 * = "Loading…", `#view > div.spinning`). The centring that `top: 50%` + a derived margin used
-	 * to do is now the host's own `align-items: center` / baseline alignment. */
+	 * In the flow the glyph reserves its own space, so no host needs a padding and there is nothing
+	 * to out-rank. `flex: 0 0 auto` because the buttons are `inline-flex` and a flex item with a
+	 * mask is squeezable; `vertical-align: middle` for the non-flex hosts. The centring is the
+	 * host's own align-items or baseline alignment. */
 	.spinning::before {
 		--spinner-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' stroke='%23000' stroke-width='3' fill='none'><circle cx='10' cy='10' r='8' stroke-opacity='.5'/><path d='M10 2c4 0 8 4 8 8'/></svg>");
 
@@ -654,18 +642,15 @@
 		100% { opacity: 0; }
 	}
 
-	/* THE `fade-in` KEYFRAMES ABOVE STAY THOUGH NOTHING HERE RIDES THEM: `fade-in` is an
-	 * upstream animation NAME a luci-app-* may ride (coverage contract, docs/conventions.md).
-	 * The theme's own rule on the `.fade-in` CLASS is gone on purpose — luci-mod-status re-marks
-	 * with it on every poll tick, so anything hung there replayed once a second across the whole
-	 * column (theme/45-misc.css says it at length).
+	/* The `fade-in` keyframes above stay although nothing here rides them: it is an upstream
+	 * animation NAME a luci-app-* may ride (coverage contract, docs/conventions.md). The theme's own
+	 * rule on the `.fade-in` CLASS is gone on purpose — luci-mod-status re-marks with it on every
+	 * poll tick, so anything hung there replays on every tick across the whole column.
 	 *
-	 * `fs-fade` is the theme's own, and it is one-shot: the two rules that ride it — the rail
-	 * flyout (theme/20-shell.css) and the search overlay (theme/75-search.css) — each play it
-	 * once, when the surface opens, which is why the 4px rise is right there and was wrong on a
-	 * class the poll rewrites. It sits here beside `fs-spin` because every keyframes in this
-	 * theme does; it was deleted together with the poll's rule and took both fades with it
-	 * silently, since an unresolvable animation-name is simply dropped. */
+	 * `fs-fade` is the theme's own and is one-shot: the rail flyout and the search overlay each
+	 * play it once, when the surface opens, which is why its 4px rise is right there and wrong on
+	 * a class the poll rewrites. Both keyframes live here because every keyframes in this theme
+	 * does, and an unresolvable animation-name is simply dropped, silently. */
 	@keyframes fs-fade {
 		from { opacity: 0; transform: translateY(4px); }
 		to { opacity: 1; transform: none; }
@@ -697,17 +682,15 @@
 	}
 
 	/* Statistics renders its graphs as PNGs on a white ground, so dark mode inverts them. 180deg is
-	 * not a nudge of upstream's 150 — it is the arithmetic: invert() maps every hue to h+180, so
-	 * rotating 180 back restores the ORIGINAL hue while keeping the inverted lightness.
+	 * arithmetic rather than taste: invert() maps every hue to h+180, so rotating 180 back restores
+	 * the original hue while keeping the inverted lightness. Read back off collectd's own cpu
+	 * series, at 150deg System (h=0) came back at h=301 and User (h=240) at h=180 — 59 and 60
+	 * degrees out, i.e. the blue plot was drawn cyan. At 180deg all three primaries are exact.
 	 *
-	 * Measured on collectd's own cpu-plugin series, reading the rendered pixel back: at 150deg
-	 * System (red, h=0) came back at h=301 and User (blue, h=240) at h=180 — 59 and 60 degrees out,
-	 * i.e. the blue plot was drawn CYAN. At 180deg all three primaries are exact.
-	 *
-	 * It is NOT exact for every colour and cannot be: CSS hue-rotate is a linear matrix
-	 * approximation, not a true HSL rotation, so a non-primary survives only approximately —
-	 * Wait I/O (amber, h=41) still lands 13deg out at 180. Do not "fix" that by tuning the angle:
-	 * moving off 180 trades an exact red/green/blue for a marginally better amber. */
+	 * It is not exact for every colour and cannot be: CSS hue-rotate is a linear matrix
+	 * approximation, so a non-primary survives only approximately (amber lands 13deg out). Do not
+	 * tune the angle — moving off 180 trades an exact red/green/blue for a marginally better
+	 * amber. */
 	[data-darkmode="true"] [data-page="admin-statistics-graphs"] [data-plugin] img {
 		filter: invert(100%) hue-rotate(180deg);
 	}
@@ -724,23 +707,20 @@
 		stroke: var(--fs-text) !important;
 	}
 
-	/* …and the axis labels beside them, for the same reason and with a worse symptom. Every <text>
-	 * in the .svg carries an inline fill of the file's own light grey plus a one-pixel black halo,
-	 * drawn for the black background the file assumes rather than for the panel this theme paints
-	 * behind it. On a light palette that grey lands on white at 1.16:1 — the numbers are legible
-	 * only as the shadow around them; --fs-text measures 17.9:1 there, and 14.7:1 on the dark
-	 * panel, where it is the halo that has to go instead. Both come from an inline declaration, so
-	 * both need the flag. Reported from the forum.
+	/* …and the axis labels beside them: every <text> in the .svg carries an inline fill of the
+	 * file's own light grey plus a black halo, drawn for the black background the file assumes
+	 * rather than for the panel this theme paints. On a light palette that grey lands on white at
+	 * 1.16:1, legible only as the shadow around it, against 17.9:1 for --fs-text, and 14.7:1 on the
+	 * dark panel, where it is the halo that has to go instead. Both come from an inline
+	 * declaration, so both need the flag.
 	 *
 	 * The weight is not decoration: the SVG hardcodes a 9pt label, the smallest type this theme
-	 * renders anywhere, and at the regular weight it is also the thinnest.
+	 * renders, and at the regular weight also the thinnest.
 	 *
-	 * A CHILD COMBINATOR, and the difference is a page: Status → Channel Analysis derives a colour
-	 * per BSSID and paints both the curve and its SSID label with it, so there the inline fill is
-	 * the only thing tying a label to its curve. Those labels are built inside a <g>
-	 * (channel_analysis.js), while the grey axis labels this rule is for — here and in the realtime
-	 * graphs — are direct children of the <svg>. A descendant selector recoloured both and left the
-	 * curves as they were; `> text[style]` reaches only the axis. */
+	 * A CHILD combinator, and the difference is a page: Channel Analysis derives a colour per BSSID
+	 * and paints both the curve and its SSID label with it, and those labels are built inside a
+	 * <g>, while the grey axis labels are direct children of the <svg>. A descendant selector
+	 * recolours both and leaves the curves as they were; `> text[style]` reaches only the axis. */
 	#view div[style] > svg > text[style] {
 		fill: var(--fs-text) !important;
 		text-shadow: none !important;

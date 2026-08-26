@@ -1,9 +1,8 @@
 @layer base {
 	/* Element reset (Meyer, trimmed to what a LuCI view can emit). */
 
-	/* scroll-margin-top: an anchor jump must clear the sticky bar or it lands underneath
-	 * it (WCAG 2.2 SC 2.4.11). Token, never a literal — the bar is 46px, not the 40 this
-	 * used to guess. */
+	/* scroll-margin-top: an anchor jump must clear the sticky bar or it lands underneath it
+	 * (WCAG 2.2 SC 2.4.11). The token, never a literal — the bar is 46px. */
 	*, *::before, *::after {
 		scroll-margin-top: var(--fs-bar-h);
 		margin: 0;
@@ -27,19 +26,16 @@
 		list-style: none;
 	}
 
-	/* `hidden` is the platform's way for a VIEW to say an element is not there, and it is the only
-	 * one available to code that ships no stylesheet — `el.hidden = true`, no CSS involved. The UA
-	 * gives it `display: none` at the weakest possible strength, so any `display` a theme sets on a
-	 * class beats it and the element paints anyway: measured here on `.tr` (table-row), `.td`
-	 * (table-cell), `ul.nav > li` (block), `.cbi-page-actions` (flex) and `.ifacebox` (inline-flex).
-	 * Not one stock page trips it today — LuCI only ever hides elements this theme gives no display
-	 * to — which is exactly why it stayed invisible until an app hid a table row and got a visible
-	 * one back.
+	/* `hidden` is how a VIEW says an element is not there, and the only way available to code that
+	 * ships no stylesheet. The UA gives it `display: none` at the weakest possible strength, so any
+	 * `display` a theme sets on a class beats it and the element paints anyway: measured here on
+	 * `.tr` (table-row), `.td` (table-cell), `ul.nav > li` (block), `.cbi-page-actions` (flex) and
+	 * `.ifacebox` (inline-flex).
 	 *
 	 * The flag is the point, not a workaround for a layer mistake: this must outrank every display
 	 * in tokens/base/theme/page at once, including the id-specific ones in the page layer, and it
-	 * has to keep doing so for rules not written yet. `until-found` is excluded because there
-	 * `display: none` would break the find-in-page reveal the value exists for. */
+	 * has to keep doing so for rules not written yet. `until-found` is excluded
+	 * because there `display: none` would break the find-in-page reveal the value exists for. */
 	[hidden]:not([hidden="until-found"]) { display: none !important; }
 
 	html {
@@ -47,11 +43,9 @@
 		height: 100%;
 	}
 
-	/* :focus-visible, not :focus — the ring is for the keyboard; a mouse click focuses too and
-	 * the UA heuristic keeps the ring off it. Replaces the 2001-era `thin dotted` (plus its
-	 * `a:hover, a:active { outline: 0 }` companion, needless once the ring is keyboard-only):
-	 * dotted 1px was the only focus indicator generic links had, and it is near-invisible on
-	 * a dark panel. */
+	/* :focus-visible, not :focus — the ring is for the keyboard, and the UA heuristic keeps it off a
+	 * mouse click. A 1px dotted outline is near-invisible on a dark panel, and it was the only focus
+	 * indicator generic links had. */
 	a:focus-visible {
 		outline: 2px solid var(--fs-accent);
 		outline-offset: 2px;
@@ -96,8 +90,8 @@
 
 	input[type="search"] {
 		appearance: textfield;
-		/* NO box-sizing: content-box. It contradicts the universal border-box above;
-		 * the theme sizes fields by padding, so a search box came out ~22px too wide. */
+		/* no box-sizing: content-box — it contradicts the universal border-box above, and the
+		 * theme sizes fields by padding, so a search box comes out ~22px too wide */
 	}
 
 	input[type="search"]::-webkit-search-decoration {
@@ -110,16 +104,14 @@
 		font-family: var(--fs-font-mono);
 	}
 
-	/* LuCI's .control-group is bootstrap's JOINED input-group: the trailing button was pulled back
-	 * over the input so their 1px borders coincided, and its left corners were squared to match.
-	 * This theme does not join controls — theme/55-buttons.css gives every button the full token
-	 * radius, and a LAYER beats base unconditionally, so the squared corners never applied while
-	 * the pull-back still did: the button's ROUNDED left corner sat on top of the input's rounded
-	 * right corner (issue #7 — package-manager's Filter/Clear and "Download and install"/OK).
-	 * Separate controls with a real gap instead.
+	/* LuCI's .control-group is bootstrap's JOINED input-group: the trailing button pulled back over
+	 * the input so their borders coincided, with its left corners squared to match. This theme does
+	 * not join controls — every button takes the full token radius from a later layer, so the
+	 * squared corners never apply while the pull-back still does and the button's rounded corner
+	 * sits on the input's (issue #7). Separate controls with a real gap instead.
 	 *
 	 * The password reveal is the one group that IS joined, and theme/60-inputs.css builds that seam
-	 * itself (one border around the group, `gap: 0`) — it does not need the pull-back either. */
+	 * itself (one border around the group, `gap: 0`). */
 	.control-group {
 		display: inline-flex;
 		gap: var(--fs-space-2);

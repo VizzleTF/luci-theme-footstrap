@@ -1,17 +1,14 @@
-/* Shared harness for the two playwright gates that render docs/gallery.html: a11y-gallery.mjs
- * (axe, WCAG 2.2 AA) and export-tier.mjs (the outbound --*-color-* contract). Nothing here ships.
+/* Shared harness for the two playwright gates that render docs/gallery.html: a11y-gallery.mjs (axe,
+ * WCAG 2.2 AA) and export-tier.mjs (the outbound --*-color-* contract). Nothing here ships.
  *
- * Both gates repeated the same ~20 lines (serve the gallery on an ephemeral port, stamp the
- * Appearance axes onto :root). The stamping is what mattered: each gate's
- * `applyAppearance()` was one more copy of rules that already live in fs-prefs.js
- * and head.ut's pre-paint script — including the load-bearing one:
+ * Both gates repeated the same ~20 lines — serve the gallery on an ephemeral port, stamp the
+ * Appearance axes onto :root — and the stamping is what mattered: each copy restated rules that
+ * already live in fs-prefs.js and head.ut's pre-paint, including the load-bearing one:
  *
  *     set --fs-tint-h BEFORE the data-tint attribute
  *
  * If the tint gains a second custom property, or accent joins the sweep, a forgotten copy goes on
- * testing the OLD shape and passing. A gate that silently measures the wrong thing is worse than
- * no gate. One copy.
- */
+ * testing the OLD shape and passing. One copy. */
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
@@ -45,18 +42,17 @@ export async function serveGallery(cssPath) {
 
 /* Stamp one point of the Appearance matrix onto :root, exactly the way the theme does.
  *
- * THE ONE COPY. It must stay in step with applyMode/applyPalette/colorAxis in
- * fs-prefs.js and head.ut's pre-paint script — if an axis changes shape, change it
- * here too, or these gates go on proving something that is no longer true.
+ * The one copy. It must stay in step with applyMode/applyPalette/colorAxis in fs-prefs.js and
+ * head.ut's pre-paint, or these gates go on proving something that is no longer true.
  *
- * `tint`/`accent`: null (or 0) = off, which CLEARS both attribute and custom property. An
+ * `tint`/`accent`: null (or 0) is off, which CLEARS both attribute and custom property — an
  * untinted router must cost exactly the palette it already had, so "off" is not hue 0.
  *
  * Only the HUE half of a colour axis is swept, and that is the honest scope: a hue rotation keeps
  * the palette's lightness and chroma, so it is a contract these gates can hold the theme to across
- * the whole wheel. A hex axis is a colour the ADMIN chose against no palette at all — there is no
- * value of it that could pass or fail, which is why the theme derives readable ink over it in CSS
- * and the Appearance page reports the ratio instead of a gate asserting one. */
+ * the whole wheel. A hex axis is a colour the ADMIN chose against no palette at all — no value of it
+ * could pass or fail, which is why the theme derives readable ink over it in CSS and the Appearance
+ * page reports the ratio instead of a gate asserting one. */
 export async function applyAppearance(page, { mode = 'light', palette = 'footstrap', tint = null, accent = null } = {}) {
 	await page.evaluate(([m, p, t, a]) => {
 		const root = document.documentElement;

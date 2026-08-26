@@ -1,25 +1,19 @@
 @layer theme {
-	/* base/60-modal.css draws the dialog's elevation as `0 0 3px var(--fs-panel2)`, and in
-	 * footstrap light --fs-panel2 and --fs-bg are the SAME hex (#f6f8fa): the shadow under the
-	 * top of the z-stack was drawn in the exact colour of the page behind it (measured 1.00:1;
-	 * dark is 1.27, hicontrast 1.06/1.14 — a glow, never a shadow, since panel2 is LIGHTER than
-	 * the canvas). Every other floating surface in the theme — the open dropdown, ::picker(select),
-	 * the rail flyout, the search box, the appearance popover — already takes --fs-shadow-pop.
-	 * Unscoped `.modal`, not `#modal_overlay .modal`: .modal is reachable outside the overlay, and
-	 * the layer beats base at equal specificity without a specificity fight. */
+	/* base/60-modal.css draws the dialog's elevation in --fs-panel2, which in footstrap light is the
+	 * same hex as --fs-bg: the shadow under the top of the z-stack drawn in the exact colour of the
+	 * page behind it (1.00:1 light, 1.27 dark — a glow, never a shadow, panel2 being lighter than
+	 * the canvas). Every other floating surface in the theme takes --fs-shadow-pop. Unscoped
+	 * `.modal`, not `#modal_overlay .modal`: .modal is reachable outside the overlay, and the layer
+	 * beats base at equal specificity. */
 	.modal { box-shadow: var(--fs-shadow-pop); }
 
-	/* The uci-changes diff used to be painted TWICE: base gave it one set of tints and five
-	 * #modal_overlay rules here gave it another — 30/60% against 18/45%, the same widget at two
-	 * strengths depending on whether it was inside the modal (it always is). Both are the ladder
-	 * in base now (--fs-*-fill for the block, --fs-*-line for its border); the duplicates are
-	 * gone and only geometry is left here — small rounding on the diff boxes and legend swatches.
+	/* The uci-changes diff takes its tints from the ladder in base (--fs-*-fill for the block,
+	 * --fs-*-line for its border) and nowhere else — a second set here paints the same widget at two
+	 * strengths depending on whether it is inside the modal, which it always is. Only geometry is
+	 * left here: small rounding on the diff boxes and legend swatches.
 	 *
-	 * The popup's own radius is NOT restated here any more. It used to be, under a note saying
-	 * base rounds a modal to 3px — base rounds it to `var(--fs-radius-lg)` today, with a comment
-	 * of its own saying a modal is a card, so `#modal_overlay .modal { border-radius:
-	 * var(--fs-radius-lg) }` restated a value one layer down and a stale reason beside it.
-	 * Switched off against the 21 modals that match it: no computed style moved. */
+	 * The popup's own radius is not restated: base rounds a modal to `var(--fs-radius-lg)` with a
+	 * comment saying a modal is a card. */
 
 	/* moved from base with the heading ramp (45-misc.css): the `line-height: normal` here beat
 	 * the ramp's tight leading in-layer for a dialog's h4 title, and left behind it would lose
@@ -50,38 +44,29 @@
 	.modal:has(.cbi-map) { max-width: min(1100px, 94vw); }
 
 	/* A modal must never gain a HORIZONTAL scroll: #modal_overlay is the scroll container
-	 * (base/60-modal.css, `overflow: auto`) and the dialog is centred in it with `margin: auto`,
-	 * so one over-wide child scrolls the modal's own left edge off the screen — the dialog is
-	 * still there, just unreachable-looking (reported from a phone, with the flash-image dialog
-	 * cut in half). Measured over the gallery's copy of it at a 360px viewport: the overlay
-	 * wanted 634px of scroll against 530px of room, the `backup_pkgs` label ending 132px past
-	 * the dialog's right edge. Both numbers are 0 now.
+	 * (base/60-modal.css, `overflow: auto`) and the dialog is centred in it with `margin: auto`, so
+	 * one over-wide child scrolls the modal's own
+	 * left edge off the screen — the dialog still there, just unreachable-looking. Measured at
+	 * 360px: the overlay wanted 634px of scroll against 530px of room.
 	 *
-	 * Two children do it, and both are stock LuCI markup:
-	 *   - `<label class="btn">` — flash.js writes each checkbox row as one ("Keep settings and
-	 *     retain the current configuration", "Include in backup a list of current installed
-	 *     packages at /etc/backup/installed_packages.txt"). `.btn` is `white-space: pre`
-	 *     (base/70-buttons.css), which is right for a BUTTON's own label and wrong for a
-	 *     sentence: it cannot wrap at any width. Scoped to `label` — a real button keeps `pre`.
-	 *   - a `<li>` carrying a checksum ("SHA256: 5d27b68d…") — one unbreakable 64-char token,
-	 *     nothing to wrap at, so it needs `anywhere` rather than a normal break. */
+	 * Two children do it, both stock LuCI markup:
+	 *   - `<label class="btn">` — flash.js writes each checkbox row as one, and `.btn` is
+	 *     `white-space: pre`, which is right for a button's own label and wrong for a sentence, so
+	 *     it cannot wrap at any width. Scoped to `label`; a real button keeps `pre`.
+	 *   - a `<li>` carrying a checksum, one unbreakable 64-character token. */
 	/* …and `overflow-wrap` with it: `white-space: normal` lets the sentence wrap at its spaces, which
-	 * is not enough for the one it ends with — `/etc/backup/installed_packages.txt` is a single
-	 * ~200px token, so in any dialog narrower than that the label still ran past the box. Measured in
-	 * the gallery at a 320px viewport: the label was 277px inside a 264px column, 13px out. A label
-	 * is prose; a real button keeps `pre` and its intact label.
+	 * is not enough for a label ending in a ~200px path token — in any dialog narrower than that the
+	 * label still runs past the box. Measured in the gallery at a 320px viewport: the label was 277px
+	 * inside a 264px column, 13px out.
 	 *
 	 * `min-width: 0` is the other half, and without it the wrap never fires: `.btn` is `inline-flex`,
-	 * so the label is a flex CONTAINER whose automatic minimum size is its content's min-content —
-	 * the same trap the file browser's action block was in one file over.
+	 * so the label is a flex CONTAINER whose automatic minimum size is its content's min-content.
 	 *
-	 * `anywhere` rather than `break-word`, and that follows the tier doctrine rather than contradicting
-	 * it (base/40-tables.css states it for cells): `break-word` leaves min-content at the widest token,
-	 * and the widest token here is `/etc/backup/installed_packages.txt` — about 240px, which is more
-	 * than the dialog has at 320px, and the anonymous text flex item cannot be given a `min-width` of
-	 * its own. A dialog label has no card to fold into and no scroll to escape into, so containment is
-	 * the only outcome available, exactly as for a key/value cell. Measured at 320px: 277px inside a
-	 * 236px column before, inside it after. */
+	 * `anywhere` rather than `break-word`, which follows the tier doctrine rather than contradicting
+	 * it (base/40-tables.css states it for cells): `break-word` leaves min-content at the widest
+	 * token, and the widest token here is wider
+	 * than the dialog at 320px, while the anonymous text flex item cannot be given a `min-width` of
+	 * its own. A dialog label has no card to fold into. */
 	#modal_overlay .modal label.btn { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 	#modal_overlay .modal li { overflow-wrap: anywhere; }
 	#modal_overlay .uci-dialog div > ins,
@@ -92,14 +77,13 @@
 	/* same token as the diff blocks above — a literal 4px sat outside the Rounding axis */
 	#modal_overlay .uci-change-legend-label > var { border-radius: var(--fs-radius-sm); overflow: hidden; }
 
-	/* A CHANGED option is `<var><ins>uci set …</ins></var>`: the outer plate is rounded above, the
-	 * coloured fill is the child — and `overflow: hidden` does NOT round it, because the child never
-	 * reaches the corner it would be clipped at (the parent holds it 3px in: 1px border + 2px
-	 * padding). So the plate had rounded corners with a square green block sitting inside them, and
-	 * the legend's own "Option changed"/"Option removed" swatches were squares inside circles
-	 * (issue #14 — the two "Section" swatches, which have no child, were already round).
-	 * The child takes the parent's radius minus that 3px inset, which is what makes the two curves
-	 * concentric; `max()` keeps it at 0 rather than going negative when Rounding is turned down. */
+	/* A changed option is `<var><ins>uci set …</ins></var>`: the outer plate is rounded above and the
+	 * coloured fill is the child, and `overflow: hidden` does not round it, because the child never
+	 * reaches the corner it would be clipped at — the parent holds it 3px in (1px border plus 2px
+	 * padding). So the plate has rounded corners with a square block inside them, and the legend's
+	 * swatches are squares inside circles (issue #14). The child takes the parent's radius minus
+	 * that inset, which makes the two curves concentric; `max()` keeps it at 0 rather than negative
+	 * when Rounding is turned down. */
 	#modal_overlay .uci-dialog var > ins,
 	#modal_overlay .uci-dialog var > del {
 		border-radius: max(0px, calc(var(--fs-radius-sm) - 3px));

@@ -1,20 +1,16 @@
 /* Accessibility gate — axe-core (WCAG 2.2 AA) over docs/gallery.html.
  *
- * THE GALLERY, NOT THE ROUTER: LuCI renders content client-side, so auditing a real page needs a
- * router, a session and a network. The gallery is a static file rendering EVERY widget LuCI (or
- * any third-party luci-app-*) can emit, with the real class names — the theme's whole widget
- * surface, checkable in CI with no device. The full {light,dark} x {footstrap,hicontrast,bootstrap}
- * matrix x three tint states — 18 runs,
- * because a palette switcher multiplies the contrast matrix and colour failures regress silently
- * in the combination nobody looks at: that is how the 1.69:1 white-on-green in hicontrast dark
- * survived as long as it did.
+ * The gallery, not the router: LuCI renders content client-side, so auditing a real page needs a
+ * router, a session and a network. The gallery is a static file rendering every widget LuCI or a
+ * third-party luci-app-* can emit, with the real class names — the theme's whole widget surface,
+ * checkable in CI with no device. The full palette x mode x tint matrix is 24 runs, because a
+ * palette switcher multiplies the contrast matrix and colour failures regress silently in the
+ * combination nobody looks at: that is how the 1.69:1 white-on-green in hicontrast dark survived
+ * as long as it did.
  *
- * Fails on `serious`/`critical` only. `moderate`/`minor` print but do not gate: the gallery
- * renders widgets out of any page context (isolated <table>s, headings with no document outline),
- * tripping landmark and heading-order rules that say nothing about the theme.
- *
- *   node tools/a11y-gallery.mjs
- */
+ * Fails on `serious`/`critical` only; `moderate`/`minor` print but do not gate, the gallery
+ * rendering widgets out of any page context (isolated <table>s, headings with no document
+ * outline), which trips landmark and heading-order rules that say nothing about the theme. */
 import { chromium } from 'playwright';
 import { AxeBuilder } from '@axe-core/playwright';
 import { serveGallery, applyAppearance, matrix } from './lib/gallery.mjs';
@@ -46,17 +42,15 @@ for (const { mode, palette, tint } of MATRIX) {
 
 	const { violations } = await new AxeBuilder({ page })
 		.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-		/* THE ONE EXCLUSION, and it is a piece of markup, not a rule.
+		/* The one exclusion, and it is a piece of markup rather than a rule.
 		 *
-		 * A multi-select `.cbi-dropdown` row is `<form><input type=checkbox tabindex=-1
-		 * onclick=preventDefault></form><label>text</label>` — ui.js's own shape. The label neither
-		 * wraps the input nor carries `for`, so axe reports `label` (critical) on every row; the
-		 * checkbox is PRESENTATIONAL there (it is out of the tab order and its clicks are
-		 * cancelled — the `<li>` carries the tabindex and the interaction), and nothing in a
-		 * stylesheet can add the association. Excluding the input keeps the row itself measured,
-		 * which is the point of rendering an open menu here: colour-contrast on a chosen row is a
-		 * theme decision and this is the only place it is checked. Narrow on purpose — the exclusion
-		 * names the input, not the section. Fix it upstream and delete this. */
+		 * A multi-select `.cbi-dropdown` row is ui.js's own shape: the label neither wraps the input
+		 * nor carries `for`, so axe reports `label` (critical) on every row. The checkbox is
+		 * PRESENTATIONAL there — out of the tab order, its clicks cancelled, with the `<li>` carrying
+		 * the interaction — and nothing in a stylesheet can add the association. Excluding the input
+		 * keeps the row itself measured, which is why an open menu is rendered here at all: contrast
+		 * on a chosen row is a theme decision and this is the only place it is checked. Narrow on
+		 * purpose: the exclusion names the input, not the section. Fix it upstream and delete this. */
 		.exclude('.cbi-dropdown[multiple] li > form > input[type="checkbox"]')
 		.analyze();
 

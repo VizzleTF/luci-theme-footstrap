@@ -3,44 +3,41 @@
 #   ./tools/stage.sh     # produce dist/root, the tree owfeed packages
 #   owfeed build         # dist/noarch/*.apk (25.12) + dist/all/*.ipk (24.10)
 #
-# WHY THIS REPLACED THE SDK. The theme is noarch — CSS, templates, fonts and browser JS,
-# not one compiled byte — and the SDK build spent ~5 minutes per format downloading and
-# verifying a cross toolchain to run `cp`. Twice, because 24.10's opkg and 25.12's apk are
-# different containers. What the SDK actually contributed was three things, and owfeed does
-# all three: the .lmo catalogues (its own compiler, byte-identical to po2lmo), the
-# conffiles/ scripts sidecars package-pack.mk emits, and the default_postinst wrapper that
-# makes /etc/uci-defaults/* run at all.
+# Why this replaced the SDK: the theme is noarch — CSS, templates and browser JS, not one compiled
+# byte — and the SDK build spent ~5 minutes per format downloading and verifying a cross toolchain to
+# run `cp`, twice, because 24.10's opkg and 25.12's apk are different containers. What the SDK
+# contributed was three things owfeed also does: the .lmo catalogues (byte-identical to po2lmo), the
+# conffiles/scripts sidecars package-pack.mk emits, and the default_postinst wrapper that makes
+# /etc/uci-defaults/* run at all.
 #
-# The SDK verification did not go away with it: owfeed fetches the host `apk` out of a
-# release SDK and holds it to the same ed25519 signature over sha256sums, with the key
-# pinned from a different host.
+# The SDK verification did not go away with it: owfeed fetches the host `apk` out of a release SDK
+# and holds it to the same ed25519 signature over sha256sums, with the key pinned from another host.
 #
-# luci-theme-footstrap/Makefile STAYS, and is not a second source of truth: tools/stage.sh
-# reads the lifecycle scripts out of it, and CI keeps the gates that protect an SDK build
-# (scan-marker, jsmin equivalence). Anyone can still build this theme in an OpenWrt SDK;
-# nothing we release comes from one.
+# luci-theme-footstrap/Makefile stays, and is not a second source of truth: tools/stage.sh reads the
+# lifecycle scripts out of it, and CI keeps the gates that protect an SDK build (scan-marker, jsmin
+# equivalence). Anyone can still build this theme in an OpenWrt SDK; nothing we release comes from
+# one.
 
 version: 1
 
 feed:
   name: footstrap
-  # This repository publishes RELEASE ASSETS, not a feed of its own: an installed key is a
-  # trust anchor for every package name, which is more authority than one theme should ask
-  # for (owfeed's README makes the same argument). The feed that carries this package is
-  # owfeed-packages, which pins our released .apk by sha256 and adds its own signature —
-  # so this URL is where a subscriber's apk really fetches it from, and `build` is the only
-  # stage this file drives.
+  # This repository publishes RELEASE ASSETS, not a feed of its own: an installed key is a trust
+  # anchor for every package name, which is more authority than one theme should ask for. The feed
+  # that carries this package is owfeed-packages, which pins our released .apk by sha256 and adds its
+  # own signature — so this URL is where a subscriber's apk really fetches it from, and `build` is
+  # the only stage this file drives.
   url: https://repo.owfeed.org
   title: Footstrap
   maintainer: "VizzleTF <vizzletf47@gmail.com>"
   license: Apache-2.0
   homepage: https://github.com/VizzleTF/luci-theme-footstrap
 
-# Both lines, from one staged tree. 25.12+ is apk, 24.10 is opkg, and the difference is not
-# only the container: opkg calls an architecture-independent package `all` where apk
-# requires `noarch` and rejects `all`. owfeed emits each under the name its manager
-# understands, which is what keeps `luci-theme-footstrap_<v>_all.ipk` byte-for-byte the
-# asset name a self-update script already in the field matches on.
+# Both lines, from one staged tree. 25.12+ is apk, 24.10 is opkg, and the difference is not only the
+# container: opkg calls an architecture-independent package `all` where apk requires `noarch` and
+# rejects `all`. owfeed emits each under the name its manager understands, which keeps
+# `luci-theme-footstrap_<v>_all.ipk` byte-for-byte the asset name a fielded self-update script
+# matches on.
 releases:
   - line: "25.12"
     default: true
@@ -48,86 +45,78 @@ releases:
   - line: "24.10"
     format: ipk
 
-# NO `signing:` BLOCK, and its absence is the point. Those keys sign a feed's INDEX — usign
-# for opkg, EC for apk, each manager verifying only its own scheme — and this repository never
-# builds one: it publishes release assets, and the feed that carries them signs its index with
-# its own key at the far end. What vouches for our bytes is `owfeed release`, whose usign
-# signatures over the packages and the manifest are made in the release job, where the secret
-# is reachable and the build job cannot see it.
+# NO `signing:` BLOCK, and its absence is the point. Those keys sign a feed's INDEX — usign for opkg,
+# EC for apk — and this repository never builds one: it publishes release assets, and the feed that
+# carries them signs its index with its own key at the far end. What vouches for our bytes is
+# `owfeed release`, whose usign signatures over the packages and the manifest are made in the release
+# job, where the secret is reachable and the build job cannot see it.
 #
-# It was declared here up to 0.11.6, naming two environment variables nothing ever read: owfeed
-# ≤ v0.1.2 demanded an index key at config-load time for any ipk line, so `owfeed build`
-# refused to start without it. Fixed in v0.1.3 — the requirement moved to `owfeed index`, where
-# the key is actually used.
+# Declaring it here does not work: up to 0.11.6 it named two environment variables nothing read,
+# because owfeed <= v0.1.2 demanded an index key at config-load time for any ipk line. Fixed in
+# v0.1.3, where the requirement moved to `owfeed index`.
 #
 # If a feed is ever published from here: FOOTSTRAP_USIGN_KEY is the BASE64 of usign's two-line
-# secret-key file (one canonical form, so a copy-paste cannot mangle the newlines) and owfeed
-# wants the file itself, so decode it into place rather than pointing `usign-key` at the secret
-# as it stands.
+# secret-key file (one canonical form, so a copy-paste cannot mangle the newlines) and owfeed wants
+# the file itself, so decode it into place.
 
-# Required by the schema, and unused here: `publish` is the stage that hands a built feed
-# to a host, and this repository stops after `build`. Named github-pages because that is
-# where the Pages workflow already serves this project's release mirror from — if a feed is
-# ever published from this repo, it goes there, and it would have to share that one
-# deployment with the portal (Pages allows a single artifact per site).
+# Required by the schema and unused here: `publish` hands a built feed to a host, and this repository
+# stops after `build`. Named github-pages because that is where the Pages workflow already serves the
+# release mirror from, and Pages allows a single artifact per site.
 publish:
   - target: github-pages
 
 packages:
   - name: luci-theme-footstrap
     build: mkpkg
-    # Never "all" here: apk rejects `all` as uninstallable, which is why OpenWrt's own
-    # package-pack.mk rewrites LUCI_PKGARCH:=all into arch:noarch on the way to mkpkg. The
-    # ipk leg gets `all` from owfeed, not from this line.
+    # Never "all" here: apk rejects `all` as uninstallable, which is why OpenWrt's package-pack.mk
+    # rewrites LUCI_PKGARCH:=all into arch:noarch on the way to mkpkg. The ipk leg gets `all` from
+    # owfeed, not from this line.
     arch: noarch
-    # Written by tools/stage.sh from the tag (CI) or the newest tag (a working tree), with
-    # the -r1 that PKG_RELEASE:=1 puts on every asset name.
+    # Written by tools/stage.sh from the tag (CI) or the newest tag (a working tree), with the -r1
+    # that PKG_RELEASE:=1 puts on every asset name.
     version-from: file:./dist/VERSION
     files: ./dist/root
 
     description: "A modern, fast LuCI theme."
-    # +luci-base is the WHOLE list, and it is the Makefile's LUCI_DEPENDS verbatim. The
-    # self-update script must not pull curl onto an 8 MB device for one fetch — it falls back to
-    # uclient-fetch, which the base image already has.
+    # +luci-base is the WHOLE list, and it is the Makefile's LUCI_DEPENDS verbatim. Nothing may pull
+    # curl onto an 8 MB device for one fetch — uclient-fetch is already in the base image.
     depends: [luci-base]
-    # Apache-2.0 alone, exactly as the Makefile's PKG_LICENSE says. The OFL-1.1 half went with
-    # the webfonts: the theme ships no Font Software, so declaring it would be false.
+    # Apache-2.0 alone, as the Makefile's PKG_LICENSE says. No OFL-1.1: the theme ships no Font
+    # Software, so declaring it would be false.
     license: Apache-2.0
     url: https://github.com/VizzleTF/luci-theme-footstrap
     maintainer: "VizzleTF <vizzletf47@gmail.com>"
-    # Which commit produced these bytes, recorded in the package itself. env: because the
-    # value changes with every commit and belongs in CI, not in a committed file.
+    # Which commit produced these bytes, recorded in the package itself. env: because the value
+    # changes with every commit and belongs in CI, not in a committed file.
     repo-commit: env:GITHUB_SHA
 
-    # /etc/config/footstrap ships as a stub and is WRITTEN AT RUNTIME by Appearance ->
-    # "Save as default". Undeclared, the package manager owns it as an ordinary file and
-    # replaces it on upgrade — so the theme's own one-click Update wiped the admin's saved
-    # defaults, silently, reporting success. Any future root/etc/config/* goes here too
-    # (tools/conffiles.mjs holds this list to the tree).
+    # /etc/config/footstrap ships as a stub and is WRITTEN AT RUNTIME by Appearance -> "Save as
+    # default". Undeclared, the package manager owns it as an ordinary file and replaces it on
+    # upgrade, so the theme's own one-click Update wipes the admin's saved defaults and reports
+    # success. Any future root/etc/config/* goes here too (tools/conffiles.mjs holds this list to
+    # the tree).
     conffiles: ["/etc/config/footstrap"]
 
-    # Extracted from the Makefile's own defines by tools/stage.sh, so the SDK path and this
-    # one cannot disagree about what happens at install time. owfeed adds the
-    # default_postinst / default_prerm wrapper around them, exactly as package-pack.mk does.
+    # Extracted from the Makefile's own defines by tools/stage.sh, so the SDK path and this one
+    # cannot disagree about what happens at install time. owfeed adds the default_postinst /
+    # default_prerm wrapper around them, exactly as package-pack.mk does.
     #
-    # NOTE for the 24.10 leg: owfeed's ipk container emits postinst and prerm only, so
-    # post-deinstall reaches apk but not opkg today. On 24.10 that loses the removal cleanup
-    # (unregistering the theme, putting mediaurlbase back to bootstrap) — a real removal
-    # only, never an upgrade, which the script's own `case "$1" in *upgrade*` guard already
-    # exits on.
+    # For the 24.10 leg: owfeed's ipk container emits postinst and prerm only, so post-deinstall
+    # reaches apk but not opkg today. On 24.10 that loses the removal cleanup (unregistering the
+    # theme, putting mediaurlbase back) — a real removal only, never an upgrade, which the script's
+    # own `case "$1" in *upgrade*` guard already exits on.
     scripts:
       post-install: ./dist/scripts/post-install
       post-deinstall: ./dist/scripts/post-deinstall
 
-    # The catalogues ship INSIDE this package, not as luci-i18n-footstrap-<lang>: several
-    # assets in one release is what made the fielded self-update script install the 6 KB catalogue
-    # instead of the theme (issue #6), and two packages drift — an _() the older one lacks
-    # renders in English and reports nothing.
+    # The catalogues ship INSIDE this package, not as luci-i18n-footstrap-<lang>: several assets in
+    # one release is what made the fielded self-update script install the 6 KB catalogue instead of
+    # the theme (issue #6), and two packages drift — an _() the older one lacks renders in English
+    # and reports nothing.
     #
     # basename `footstrap-theme`, NOT `footstrap`: lmo_load_catalog globs *.<lang>.lmo so any
-    # basename loads, and a v0.8.4 router still OWNS footstrap.ru.lmo through the old
-    # luci-i18n package — same path is a file conflict, and apk refuses the very upgrade
-    # that would fix it.
+    # basename loads, and a v0.8.4 router still owns footstrap.ru.lmo through the old luci-i18n
+    # package — same path is a file conflict, and apk refuses the very upgrade that would fix it.
     i18n:
       from: ./luci-theme-footstrap/po
       basename: footstrap-theme

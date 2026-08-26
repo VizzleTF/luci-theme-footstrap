@@ -2,17 +2,19 @@
  *
  * docs/devkit.html is GENERATED (like cascade.css) and gitignored. It is the page an external
  * luci-app-* author opens to see what to copy, which token to read and what not to do, without a
- * router and without this repo. The source of every part is a file that already exists here, so
- * nothing is hand-copied and nothing can drift:
+ * router and without this repo. Every part comes from a file that already exists here, so nothing
+ * is hand-copied and nothing can drift:
  *
- *   - the stylesheet         ← build-css.sh (the real cascade.css, inlined)
- *   - the 26-name export tier ← styles/02-tokens.css (parsed — the ONE contract apps may read)
- *   - the component catalogue ← docs/gallery.html (the single source of real widget markup)
- *   - the chrome + prose      ← docs/devkit.src.html (authored: Start-here, Rules, Checklist)
+ *   - the stylesheet         <- build-css.sh (the real cascade.css, inlined)
+ *   - the export tier        <- styles/02-tokens.css (parsed — the one contract apps may read)
+ *   - the component catalogue <- docs/gallery.html (the single source of real widget markup)
+ *   - the chrome and prose   <- docs/devkit.src.html
  *
- * The DOM→E() conversion and click-to-copy happen in the BROWSER off the rendered preview node, so
- * the code a dev copies always matches what they see. Run: node tools/devkit-build.mjs
- */
+ * It writes a second page from the same inlined stylesheet: docs/playground.html, from
+ * docs/playground.src.html.
+ *
+ * The DOM->E() conversion and click-to-copy happen in the BROWSER off the rendered preview node,
+ * so the code a dev copies always matches what they see. */
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { buildCss } from './lib/css.mjs';

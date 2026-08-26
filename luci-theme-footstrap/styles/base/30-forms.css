@@ -14,12 +14,11 @@
 		padding-top: var(--fs-space-5);
 	}
 
-	/* Control typography STAYS IN BASE, deliberately — the one absorption that was tried and
-	 * reverted (measured): as a bare-element rule in the theme layer it out-ranked every CLASSED
-	 * base refinement regardless of specificity — `.zonebadge-empty { font-size: smaller }` lost
-	 * to it and the firewall's zone badges grew from 10.8 to 13px. In base, classed rules beat it
-	 * on specificity, which is the contract they were written against. `select` is not a member:
-	 * its face/size/leading live in its own theme rule (60-inputs.css). */
+	/* Control typography stays in BASE: moved to the theme layer, a bare-element rule out-ranks
+	 * every classed base refinement regardless of specificity, and the firewall's zone badges grew
+	 * from 10.8 to 13px. In base, classed rules beat it on specificity, which is the contract they
+	 * were written against. `select` is not a member — its face, size and leading live in
+	 * 60-inputs.css. */
 	label,
 	input,
 	button {
@@ -37,32 +36,29 @@
 	}
 
 	.cbi-value-field {
-		/* logical, not margin-left: this is the gap AFTER the label column, and LuCI ships four
-		 * RTL languages (ar/fa/he/ur). Identical to margin-left while :root carries no dir=rtl —
-		 * which nothing in openwrt/luci sets today — so this buys nothing yet and costs nothing;
-		 * it is here so the geometry is already correct if dir is ever stamped. */
+		/* logical, not margin-left: this is the gap AFTER the label column, and LuCI ships four RTL
+		 * languages (ar/fa/he/ur). Identical to margin-left while nothing in openwrt/luci stamps
+		 * dir=rtl, so it costs nothing and is already correct if one ever does. */
 		margin-inline-start: var(--fs-space-5);
 		flex: 1;
-		/* a flex item won't shrink below min-content by default, so a nested table or one
-		 * long unbreakable value pushed the whole row out of the card */
+		/* a flex item will not shrink below min-content by default, so a nested table or one long
+		 * unbreakable value pushes the whole row out of the card */
 		min-width: 0;
 	}
 
 	/* size + ink: theme/60-inputs.css (`.cbi-value-title`) — absorbed. Left: the label
 	 * column's geometry, which theme does not touch. */
 	.cbi-value label.cbi-value-title {
-		/* the nudge that lands the label's first baseline on the field's. Retuned for the 1.5
-		 * leading in 20-typography.css — it was 6px against a hard 18px line box.
-		 * line-height: theme/60-inputs.css (.cbi-value-title) — absorbed with the control rule
-		 * that made it necessary. */
+		/* the nudge that lands the label's first baseline on the field's, tuned for the unitless
+		 * leading in 20-typography.css */
 		padding-top: var(--fs-space-1);
-		/* 180px is a column WIDTH, not a rhythm: it is what fits LuCI's longest option labels
-		 * beside a field, so it is not on the 4px step scale and does not want to be. */
+		/* 180px is a column WIDTH, not a rhythm — what fits LuCI's longest option labels beside a
+		 * field — so it is deliberately not on the 4px step scale */
 		flex: 0 0 180px;
 		/* `end`, not `right`: the label is aligned TOWARDS its field, which is a logical intent.
-		 * NOT the same as base/95-luci.css's `.left/.right/.center` — those are LuCI's forcing
-		 * utilities (form.js hands them out at four call sites, eight across luci-base), and a
-		 * class named `right` means right in any direction. Never sweep those onto start/end. */
+		 * Not the same as base/95-luci.css's `.left/.right/.center`, which are LuCI's forcing
+		 * utilities — a class named `right` means right in any direction. Never sweep those onto
+		 * start/end. */
 		text-align: end;
 	}
 
@@ -83,9 +79,9 @@
 
 	/* The shared field box (the 210px x control-height default, #localtime's widening, and the
 	 * per-widget escapes: file, button types, checkbox/radio, .cbi-select, readonly, the
-	 * cell-filling widths): theme/60-inputs.css — absorbed WHOLE. The escapes had to move with
-	 * the box: each beat it here in-layer, and left behind they would lose to a theme rule by
-	 * layer no matter their specificity. */
+	 * cell-filling widths) lives in theme/60-inputs.css — absorbed whole. The escapes had to move
+	 * with the box: each beat it here in-layer, and left behind they would lose to a theme rule by
+	 * layer whatever their specificity. */
 
 	.cbi-dynlist {
 		height: auto;
@@ -170,9 +166,9 @@
 		gap: var(--fs-space-1);
 	}
 
-	/* .cbi-select (the shell, its inner <select>, the ▾ plate): theme/60-inputs.css — absorbed
-	 * whole. Do not re-add an option rule here either: layer beats specificity, so theme's bare
-	 * `option` outranks even `.cbi-select select option:checked`. */
+	/* .cbi-select lives in theme/60-inputs.css — absorbed whole. Do not re-add an option rule here
+	 * either: layer beats specificity, so theme's bare `option` outranks even
+	 * `.cbi-select select option:checked`. */
 
 	/* Checkbox/radio drawing: theme/60-inputs.css — absorbed whole (it undoes the generic input
 	 * box, which lives there now). */
@@ -181,10 +177,9 @@
 		color: var(--fs-dim);
 	}
 
-	/* Transitions and the focus/hover ring: absorbed onto the theme's one ring token
-	 * (--fs-focus-ring / --fs-focus-ring-invalid) in theme/55-buttons.css, 60-inputs.css and
-	 * 65-dropdown.css. The old generic glow here rang every clicked button and every hovered
-	 * widget in a second, unnamed focus style — the absorption was a redesign, not a move. */
+	/* Transitions and the focus/hover ring are the theme's one ring token (--fs-focus-ring /
+	 * --fs-focus-ring-invalid). A generic glow here rings every clicked button and every hovered
+	 * widget in a second, unnamed focus style. */
 
 	input[disabled],
 	button[disabled],
@@ -207,9 +202,8 @@
 		padding: 0 0 var(--fs-space-3) var(--fs-space-3);
 	}
 
-	/* `gap`, not the -3px/+3px negative-margin pair this carried: that trick predates flex gap and
-	 * it leaks — the outer -3px pulls the row 3px into whatever sits beside it, which is why the
-	 * children had to pay it back. One gap says the same thing and stays inside the box. */
+	/* `gap`, not a negative-margin pair: that trick predates flex gap and leaks, the outer -3px
+	 * pulling the row into whatever sits beside it */
 	.cbi-section-create {
 		display: inline-flex;
 		align-items: center;
@@ -222,25 +216,23 @@
 
 	/* the input's cell-filling width: theme/60-inputs.css — absorbed with the generic box */
 
-	/* .cbi-page-actions paint: theme/55-buttons.css — absorbed. The legacy `.actions`
-	 * plate has no theme override, so it stays (coverage: some luci-app-* still emits it). */
+	/* .cbi-page-actions paint: theme/55-buttons.css — absorbed. The legacy `.actions` plate has no
+	 * theme override, so it stays: some luci-app-* still emits it. */
 	.actions {
 		background: var(--fs-panel2);
 		margin-bottom: var(--fs-space-4);
-		/* was 17px 20px 18px 17px — an asymmetric inset nobody chose; it is a plate, so it takes
-		 * the card's own gutter on every side. */
+		/* a plate, so it takes the card's own gutter on every side */
 		padding: var(--fs-card-pad);
 		border-top: var(--fs-hairline);
 		border-radius: 0 0 var(--fs-radius-lg) var(--fs-radius-lg);
 		text-align: end;
 	}
 
-	/* PHYSICAL, mirrored by hand — see the note on `.close` in base/90-widgets.css for why `float`
-	 * does not take a logical keyword here. This one contradicted its OWN container: `.actions`
-	 * above sets `text-align: end`, which follows the writing direction, while the float did not,
-	 * so in RTL the plate aligned its content to the left while the secondary action stayed on the
-	 * right — the two halves of one row pulling opposite ways. Measured in a live document at
-	 * 1400px: 582px from the reading edge in LTR, 10px in RTL. */
+	/* Physical, mirrored by hand — see `.close` in base/90-widgets.css for why `float` takes no
+	 * logical keyword. Unmirrored it contradicts its own container: `.actions` above sets
+	 * `text-align: end`, which follows the writing direction, so in RTL the plate aligns its
+	 * content one way and the secondary action the other. Measured in a live document at 1400px:
+	 * 582px from the reading edge in LTR, 10px in RTL. */
 	.actions .secondary-action,
 	.cbi-page-actions .secondary-action{
 		float: right;

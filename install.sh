@@ -1,8 +1,7 @@
 #!/bin/sh
-# luci-theme-footstrap installer for OpenWrt 24.10 (opkg) and 25.12+ (apk).
-# A 23.05 router is served the pinned final release (0.14.2) instead — see FROZEN_2305_TAG.
-# The feed carries the two branches the package
-# FORMAT splits on and nothing else.
+# luci-theme-footstrap installer for OpenWrt 24.10 (opkg) and 25.12+ (apk). A 23.05 router is served
+# the pinned final release instead — see FROZEN_2305_TAG. The feed carries the two branches the
+# package FORMAT splits on and nothing else.
 #
 #   wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
 #
@@ -13,11 +12,9 @@
 #
 #   wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 #
-# It adds the owfeed-packages feed and installs the theme from it, so `apk upgrade` /
-# `opkg upgrade` carries the theme forward afterwards. The feed index is verified by the
-# package manager against the key pinned below.
-#
-# Running it again upgrades the theme to the newest version in the feed. Licensed Apache-2.0.
+# It adds the owfeed-packages feed and installs the theme from it, so `apk upgrade` / `opkg upgrade`
+# carries the theme forward afterwards; the feed index is verified by the package manager against
+# the key pinned below. Running it again upgrades the theme. Licensed Apache-2.0.
 
 set -e
 
@@ -28,20 +25,19 @@ PKG="luci-theme-footstrap"
 REPO="VizzleTF/luci-theme-footstrap"
 # `releases/latest/download/…` and never api.github.com: the API is rate-limited per source IP
 # (60/hour, shared by everyone behind one NAT) and needs JSON parsing on a box that may have no
-# jsonfilter. These redirect to the newest tag's assets and are the same URLs the release page
-# links, so they answer for a router that only has an http client.
+# jsonfilter.
+# These redirect to the newest tag's assets and are the URLs the release page links.
 RELEASE_BASE="https://github.com/$REPO/releases/latest/download"
-# THE LAST RELEASE THAT RUNS ON 23.05, pinned by tag rather than by "latest". 0.14.2 is where support
-# for that release stops: it is EOL upstream, openwrt/luci declined to carry the one piece of
-# compatibility it needed (#8978), and the theme dropped it rather than keep a widget nobody else
-# wants. A 23.05 router is not refused — it gets that version, verified exactly like any other
-# artifact, and is told plainly that it is the end of the line.
+# The last release that runs on 23.05, pinned by tag rather than by "latest": that release is EOL
+# upstream, openwrt/luci declined to carry the one piece of compatibility it needed (#8978), and the
+# theme dropped it rather than keep a widget nobody else wants. A 23.05 router is not refused — it
+# gets that version, verified exactly like any other artifact, and is told it is the end of the
+# line.
 FROZEN_2305_TAG="v0.14.2"
 FROZEN_2305_BASE="https://github.com/$REPO/releases/download/$FROZEN_2305_TAG"
-# The RELEASE key, pinned in the script that uses it. It is the same key as release.pub in the
-# repository, and pinning it here is the point: a key fetched beside the file it verifies proves
-# nothing. usign's key id travels inside the signature, so a rotation is a visible failure here
-# rather than a silent acceptance.
+# The RELEASE key, pinned in the script that uses it: a key fetched beside the file it verifies
+# proves nothing. usign's key id travels inside the signature, so a rotation is a visible failure
+# here rather than a silent acceptance.
 RELEASE_PUBKEY='untrusted comment: luci-theme-footstrap release key
 RWQYxjhl4rz41tNZc3dXmnRplRO1ydN1q8as++iPUjZc6SRUCb952L/T'
 
@@ -49,18 +45,15 @@ info() { printf '[*] %s\n' "$1"; }
 ok()   { printf '[+] %s\n' "$1"; }
 err()  { printf '[-] %s\n' "$1" >&2; }
 
-# EVERY downloader on the box, in turn, until one SUCCEEDS — not the first one that EXISTS.
+# Every downloader on the box, in turn, until one SUCCEEDS — not the first one that EXISTS.
 #
-# `uclient-fetch` needs libustream-mbedtls (or -openssl) to speak https at all, and a router
-# that has the binary without the library is ordinary: OpenWrt installs it as `wget` only when
-# nothing else claims that name, and an image built with wget-ssl or curl carries both. Choosing
-# by existence therefore turned "this ONE tool cannot do TLS here" into "the feed has no branch
-# for this router" — reported from a SNAPSHOT router whose own `wget` had just downloaded this
-# script over the same protocol, three lines above the refusal.
+# `uclient-fetch` needs libustream-mbedtls (or -openssl) to speak https at all, and a router with
+# the binary and without the library is ordinary. Choosing by existence therefore turns "this ONE
+# tool cannot do TLS here" into "the feed has no branch for this router".
 #
-# Certificates are always verified: this runs as root from `wget | sh`, and a failed verification
-# is the MITM case, not a reason to retry insecurely. Falling through to the NEXT TOOL is not a
-# downgrade — each one below verifies, and none is ever asked to skip the check.
+# Certificates are always verified: this runs as root from `wget | sh`, and a failed verification is
+# the MITM case rather than a reason to retry insecurely. Falling through to the next tool is not a
+# downgrade — each one verifies, and none is ever asked to skip the check.
 fetch() {	# <url> <outfile>
 	command -v uclient-fetch >/dev/null 2>&1 && uclient-fetch -T 30 -qO "$2" "$1" && return 0
 	command -v wget >/dev/null 2>&1 && wget -q -T 30 -O "$2" "$1" && return 0
@@ -68,14 +61,13 @@ fetch() {	# <url> <outfile>
 	return 1
 }
 
-# THE PACKAGE MANAGER'S CHATTER IS NOT THE USER'S BUSINESS — until it fails.
+# The package manager's chatter is not the user's business — until it fails.
 #
-# `apk update` prints every repository the router has (nine lines on an ordinary box, none of them
-# ours), and `apk add` prints its progress and its OK line. Running this from `wget | sh` is a
-# one-command gesture, and burying the one sentence that matters — which version ended up on the
-# router — under a dump of somebody else's feed URLs is the opposite of what the gesture is for.
+# `apk update` prints every repository the router has, and `apk add` prints its progress. Running
+# this from `wget | sh` is a one-command gesture, and burying the one sentence that matters — which
+# version ended up on the router — under a dump of somebody else's feed URLs defeats it.
 #
-# So: capture, and speak only on failure, where the same output is the ONLY diagnosis available.
+# So: capture, and speak only on failure, where the same output is the only diagnosis available.
 # Never `>/dev/null`: a silent failure here is a router left half-installed with a green message.
 pm_quiet() {	# <command...>
 	_pmlog="/tmp/fs-install-pm.$$"
@@ -88,11 +80,10 @@ pm_quiet() {	# <command...>
 
 # --- what is on the router, and whether anything newer exists ---------------------------------
 #
-# SAY THE VERSION. This script used to end with "Installed from the … feed" whatever happened, and
-# that sentence was equally true of a router that had just kept the version it already had —
-# `apk add` does not upgrade (see the note beside it), so a stale install and a fresh one printed
-# the same line. The number is the one thing that tells them apart, and the only other place a user
-# can read it is the Footstrap tab in LuCI.
+# Say the version. "Installed from the … feed" is equally true of a router that kept the version it
+# already had — `apk add` does not upgrade — so a stale install and a fresh one print the same line.
+# The number is the one thing that tells them apart, and the only other place a user can read it is
+# the Footstrap tab in LuCI.
 installed_version() {
 	if [ "$PM" = "apk" ]; then
 		apk list -I 2>/dev/null | sed -n "s/^$PKG-\([0-9][^ ]*\) .*/\1/p" | head -1
@@ -101,17 +92,14 @@ installed_version() {
 	fi
 }
 
-# …AND WHETHER THE FEED HAS CAUGHT UP. A release lands on GitHub first and reaches owfeed-packages
+# …and whether the feed has caught up. A release lands on GitHub first and reaches owfeed-packages
 # afterwards, through a pull request against that repository — usually minutes, sometimes a day. In
-# between, a user who installs gets the previous version and has nothing to tell them why: the
-# release page says one number, their router says another, and the install they just ran was
-# correct. So compare and say it in one line, rather than leaving them to wonder whether it failed.
+# between, a user who installs gets the previous version with nothing to tell them why. So compare
+# and say it in one line.
 #
-# `releases/latest/download/manifest.txt`, NOT api.github.com: the API is rate-limited to 60 an hour
-# per address (issue #17) and needs JSON parsing on a box that may have no jsonfilter, while this URL
-# is a plain redirect to the newest tag's asset and is already the file this script picks a package
-# from. Read here for a MESSAGE only — nothing is installed from it and no decision depends on it,
-# so an unreachable GitHub is silence rather than a failure, and no signature is claimed for it.
+# `releases/latest/download/manifest.txt`, not api.github.com, for the rate-limit and jsonfilter
+# reasons above. Read here for a MESSAGE only — nothing is installed from it and no decision depends
+# on it, so an unreachable GitHub is silence rather than a failure, and no signature is claimed.
 feed_lag_note() {	# <installed version>
 	[ -n "$1" ] || return 0
 	_vtmp="/tmp/fs-ver.$$"
@@ -137,23 +125,21 @@ feed_lag_note() {	# <installed version>
 
 # --- the release, for a router the feed cannot serve ------------------------------------------
 #
-# THE FEED IS STILL THE INSTALL PATH. It is what makes `apk upgrade` / `opkg upgrade` carry the
+# The feed is still the install path: it is what makes `apk upgrade` / `opkg upgrade` carry the
 # theme forward, and everything below is only reached when the feed cannot be read at all — an
-# architecture owfeed does not publish, a host this router cannot resolve or reach, a network
-# that intercepts it. Before this, that router was told to go and download an asset by hand,
-# which is a worse version of what the script is for.
+# architecture owfeed does not publish, a host this router cannot resolve or reach, a network that
+# intercepts it.
 #
-# PICKED FROM THE SIGNED MANIFEST, never by guessing an asset's name. That distinction is issue
-# #6: the retired self-update script resolved the theme by name and took `head -1`, which on a release
-# carrying per-language packages installed a catalogue instead of the theme. `manifest.txt` names
-# exactly one file per format with its size and digest, and it is signed — so the name comes from
-# the same statement the signature covers.
+# Picked from the SIGNED MANIFEST, never by guessing an asset's name: resolving the theme by name
+# and taking `head -1` is what installed a catalogue instead of the theme (issue #6). `manifest.txt`
+# names exactly one file per format with its size and digest, and it is signed, so the name comes
+# from the same statement the signature covers.
 #
 # The chain fails CLOSED and in this order: verified TLS, then usign against the key pinned above,
-# then the manifest's own sha256 over the artifact. A missing usign, a missing signature or a
-# digest that does not match is a refusal — never a downgrade to "install it anyway". `apk`'s
-# --allow-untrusted only says the .apk carries no APK signature of its own; the usign signature
-# over the manifest is what this path trusts, and it is checked before the file is handed over.
+# then the manifest's own sha256 over the artifact. A missing usign, a missing signature or a digest
+# that does not match is a refusal, never a downgrade. `apk`'s --allow-untrusted only says the .apk
+# carries no APK signature of its own; the usign signature over the manifest is what this path
+# trusts, and it is checked before the file is handed over.
 install_from_release() {
 	command -v usign >/dev/null 2>&1 || {
 		err "usign is not installed, so a release artifact cannot be verified here."
@@ -236,22 +222,19 @@ fi
 FALLBACK_BRANCHES_APK="25.12"
 FALLBACK_BRANCHES_OPKG="24.10"
 
-# The feed has no snapshot channel, and not by omission: the two lines owfeed-packages
-# serves ARE the package-format split (apk from 25.12, ipk on 24.10), not a build of the
-# theme per release. A snapshot has no branch of its own to install from, so it gets the
-# newest one its package manager can read.
+# The feed has no snapshot channel, and not by omission: the two lines owfeed-packages serves ARE
+# the package-format split (apk from 25.12, ipk on 24.10), not a build of the theme per release. A
+# snapshot has no branch of its own, so it gets the newest one its package manager can read.
 #
-# What makes that sound for THIS package and not in general: it is noarch and
-# `+luci-base` is its whole dependency list, so nothing in it was compiled against the
-# branch it is fetched from. A package carrying a binary, or a versioned dependency,
-# must not take this path.
+# What makes that sound for THIS package and not in general: it is noarch and `+luci-base` is its
+# whole dependency list, so nothing in it was compiled against the branch it is fetched from. A
+# package carrying a binary, or a versioned dependency, must not take this path.
 #
-# Newest first, and each candidate is probed rather than assumed: a branch listed here
-# before it is published — or one that does not carry this router's architecture — falls
-# through to the next instead of writing a repository entry that 404s on every update.
-# The probe's bytes are discarded on purpose. Existence is all it asks, and the index it
-# found is still verified by the package manager against the key pinned above, so a host
-# that lies here buys a feed entry that then fails to verify rather than an install.
+# Newest first, and each candidate is probed rather than assumed: a branch listed here before it is
+# published — or one that does not carry this router's architecture — falls through to the next
+# instead of writing a repository entry that 404s on every update. The probe's bytes are discarded;
+# existence is all it asks, and the index it found is still verified by the package manager against
+# the pinned key.
 newest_feed_branch() {	# <candidates> -> the first branch that answers
 	for _branch in $1; do
 		if fetch "$FEED_HOST/releases/$_branch/$ARCH/$INDEX" /dev/null 2>/dev/null; then
@@ -318,10 +301,9 @@ esac
 # --- no feed for this router: the release, verified ------------------------------------------
 # Reached only when every candidate index failed to download. That is one of two things and the
 # script cannot tell them apart from here, so it says both: either owfeed publishes nothing this
-# router can read, or this router could not reach owfeed — a resolver that does not answer, a
-# clock too far off for TLS, a network that intercepts the host. Naming the URL is what lets the
-# admin decide which, in one command; the old message asserted the first and was wrong whenever
-# it was the second.
+# router can read, or this router could not reach owfeed — a resolver that does not answer, a clock
+# too far off for TLS, a network that intercepts the host. Naming the URL is what lets the admin
+# decide which, in one command.
 #
 # Either way the theme is INSTALLED, from the signed release, and the run ends there: no feed line
 # is written for a feed that could not be read.
@@ -356,12 +338,11 @@ if [ -z "$BRANCH" ]; then
 fi
 
 # --- feed -----------------------------------------------------------------
-# keep.d is not bookkeeping: sysupgrade wipes the key unless something claims it, and
-# the theme would come back unupgradable. The repository line itself needs no entry —
-# both managers' customfeeds files are conffiles of the manager (`apk-mbedtls` and
-# `opkg`), and sysupgrade backs up every conffile whose checksum has moved. It listed
-# them anyway until this was measured, and `build_list_of_backup_overlay_files` was
-# already dropping the duplicate.
+# keep.d is not bookkeeping: sysupgrade wipes the key unless something claims it, and the theme
+# would come back unupgradable. The repository line itself needs no entry — both managers'
+# customfeeds files are conffiles of the manager (`apk-mbedtls` and `opkg`), and sysupgrade backs
+# up every conffile whose checksum has moved. It listed them anyway until this was measured, and
+# `build_list_of_backup_overlay_files` was already dropping the duplicate.
 if [ "$PM" = apk ]; then
 	# customfeeds.list rather than a file of our own under repositories.d/. apk reads
 	# every *.list in that directory, so both work for installing — but LuCI's package

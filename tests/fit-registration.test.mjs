@@ -1,14 +1,13 @@
-/* fs-fit's REGISTRATION run: a fitter that throws must not take the ones registered after it.
+/* fs-fit's registration run: a fitter that throws must not take the ones registered after it.
  *
- * The five passes in fs-select.js are registered separately so that each fails alone, and every
- * later run goes through runAll()'s try/catch — but `add()` used to call the new fitter bare, so a
- * throw on its FIRST run propagated out of the theme's init() and the four registrations behind it
- * were never made. With the "an unanswered table takes no room" gate already raised, that is a page
- * whose data tables are `display: none` permanently.
+ * The five passes in fs-select.js are registered separately so each fails alone, and every later run
+ * goes through runAll()'s try/catch — but a bare call in `add()` lets a throw on the FIRST run
+ * propagate out of init(), so the registrations behind it are never made. With the "an unanswered
+ * table takes no room" gate already raised, that is a page whose data tables are `display: none`
+ * permanently.
  *
  * A stand cannot show this: no shipped fitter throws, and one that did would be a bug fixed rather
- * than a case to keep. Driving `add()` directly is the only way to hold the guarantee.
- */
+ * than a case to keep. Driving `add()` directly is the only way to hold the guarantee. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModule, installBrowserGlobals } from './lib/luci-module.mjs';

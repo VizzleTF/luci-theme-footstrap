@@ -1,50 +1,25 @@
-/* Pre-minify the theme's shipped JS with terser, IN PLACE, before the SDK build.
+/* Pre-minify the theme's shipped JS with terser, in place, before the SDK build.
  *
- * Why terser and not jsmin: jsmin strips comments and whitespace only — identifiers are wire
- * bytes, and uhttpd serves /www with no compression. Measured on this tree: jsmin ~57 KB,
- * terser (mangle toplevel) ~41 KB — −27%. Top-level mangling is safe BECAUSE a LuCI resource
- * file is evaluated inside a function wrapper: its top level is function scope, and everything
- * that crosses a module seam goes through undeclared globals (`L`, `E`, `_`, the `'require x
- * as y'` pragma aliases), which terser never renames.
+ * terser rather than jsmin: jsmin strips comments and whitespace only, while identifiers are wire
+ * bytes and uhttpd serves /www with no compression — measured on this tree, jsmin ~57 KB against
+ * terser's ~41 KB. Top-level mangling is safe BECAUSE a LuCI resource file is evaluated inside a
+ * function wrapper: its top level is function scope, and everything crossing a module seam goes
+ * through undeclared globals (`L`, `E`, `_`, the pragma aliases), which terser never renames.
  *
- * WHERE IT RUNS: tools/stage.sh, over the STAGED payload — never over the checkout. It rewrites
- * every file it is handed in place, so pointing it at `luci-theme-footstrap/htdocs` would mangle
- * and comment-strip the source tree; an npm script that did exactly that used to sit in
- * package.json with no caller, one `npm run` away from a diff nobody meant to make.
+ * It runs from tools/stage.sh over the STAGED payload, never over the checkout: it rewrites every
+ * file it is handed in place.
  *
- * The Makefile keeps the other half of the contract for an SDK build: FOOTSTRAP_PREMIN=1 makes it
- * set LUCI_MINIFY_JS:=0, because jsmin MUST NOT run over terser output — terser legitimately emits
+ * The Makefile keeps the other half of the contract: FOOTSTRAP_PREMIN=1 makes it set
+ * LUCI_MINIFY_JS:=0, because jsmin MUST NOT run over terser output — terser legitimately emits
  * `return/^v/.test(s)` shapes, the exact one-character-lookback trap (openwrt/luci#8299) that eats
- * the rest of the file and exits 0. A build without this step (an SDK user, the buildbot) minifies
- * the untouched source with jsmin as before; wrap-regex and tools/jsmin-verify.mjs guard that path.
+ * the rest of the file and exits 0. A build without this step minifies the untouched source with
+ * jsmin as before; wrap-regex and tools/jsmin-verify.mjs guard that path.
  *
- * fs-version.js is special: Build/Prepare and dev-sync.sh stamp the git version by sed-ing the
- * declaration `const FS_VERSION *= *'…'` — so for that one file the name is RESERVED from the
- * mangle, quotes stay single, and the tool FAILS unless the declaration survives verbatim
- * enough for the sed to match. Silently losing it would make every release report "(dev)".
- *
- * THE SEAM NAMES ARE RESERVED, AND THE LIST IS DERIVED — this is what the paragraph above got
- * wrong, at the cost of a broken release. It is true that terser never RENAMES a free variable
- * like `L`; what it will happily do is CREATE one. A LuCI resource file is the body of
- * `function(window, document, L, …aliases)`, but terser is handed the file on its own, so to it
- * the top level is global scope and `L` is just a name nobody declared — i.e. a name it is free
- * to hand to a mangled variable. `fs-sheets.js` gained two top-level bindings, the generator
- * reached `L`, and the shipped file opened with `const L=…`: "Identifier 'L' has already been
- * declared", the module never loaded, and the whole chrome went with it (v0.11.6, pulled).
- *
- * So the free variables of the SOURCE are reserved, computed per file rather than listed: `L`,
- * `E`, `_`, `window`, `document`, every `'require x as y'` alias, every browser global the file
- * touches. A new seam name cannot be forgotten because nothing here names them.
- *
- * Three self-checks per file, because a silent mis-minify here ships broken chrome:
- *  - the output must PARSE (acorn, same options jsmin-verify uses);
- *  - the directive prologue must be IDENTICAL — the `'require x as y'` pragmas are how LuCI
- *    resolves dependencies, and a compress option that dropped them would leave every module
- *    loading with no dependencies and no error at minify time;
- *  - NOTHING the output declares may collide with a name the source uses freely. That is the
- *    check that would have caught the `const L` above; `reserved` is the fix, this is the proof,
- *    and they are derived from the same computation so they cannot disagree.
- */
+ * THE SEAM NAMES ARE RESERVED, AND THE LIST IS DERIVED. Terser never RENAMES a free variable like
+ * `L`, but it will happily CREATE one: handed the file on its own, it takes the top level for
+ * global scope and `L` for a name nobody declared, i.e. one it may give to a mangled variable. So
+ * the free variables of the SOURCE are reserved, computed per file rather than listed — a new seam
+ * name cannot be forgotten because nothing here names them. */
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import * as acorn from 'acorn';
@@ -121,22 +96,20 @@ function freeNames(src) {
 	return new Set([...used].filter((n) => !bound.has(n)));
 }
 
-/* THE WRAPPER'S PARAMETERS, which are bound whether the file mentions them or not — and that is
- * the half a "free variables of the source" answer gets wrong. luci.js evaluates a resource file
- * as `function(window, document, L, <one arg per require pragma>) { … }`, so those names are
- * ALREADY declared in the scope terser is minifying into. `fs-sheets.js` never reads `L` outside
- * a comment, so it is not free by any AST measure — and terser handed `L` to a top-level
- * `const`, which is a redeclaration of the parameter and a SyntaxError before a line of it runs.
+/* The wrapper's parameters, which are bound whether the file mentions them or not — the half a
+ * "free variables of the source" answer gets wrong. luci.js evaluates a resource file as
+ * `function(window, document, L, <one arg per require pragma>) { … }`, so those names are already
+ * declared in the scope terser minifies into: a file that never reads `L` outside a comment is not
+ * free of it by any AST measure, and terser handing `L` to a top-level `const` is a redeclaration
+ * of the parameter and a SyntaxError before a line of it runs.
  *
- * The alias is derived exactly the way luci.js derives it (`as` name, else the dependency with
- * every non-word character replaced), so this list cannot drift from what the loader binds. */
+ * The alias is derived exactly the way luci.js derives it, so this list cannot drift. */
 function wrapperParams(src) {
-	/* `E` and `_` are not parameters — luci.js puts them on `window` — so shadowing one is legal
-	 * and, for a file that never reads it, harmless. They are reserved anyway: three files came
-	 * back declaring `const E=…`, and the difference between "harmless" and "the element factory
-	 * is gone" is whether some future line reads E from a place the AST cannot see (a template
-	 * this file evals, a string handed to another module). 40 bytes across the tree buys not
-	 * having to make that judgement per file. */
+	/* `E` and `_` are not parameters — luci.js puts them on `window` — so shadowing one is legal and,
+	 * for a file that never reads it, harmless. They are reserved anyway: three files came back
+	 * declaring `const E=…`, and the difference between "harmless" and "the element factory is gone"
+	 * is whether some future line reads E from a place the AST cannot see. 40 bytes across the tree
+	 * buys not having to make that judgement per file. */
 	const names = new Set([ 'window', 'document', 'L', 'E', '_' ]);
 	for (const d of directives(src).split('\n')) {
 		const m = /^require[ \t]+(\S+)(?:[ \t]+as[ \t]+([a-zA-Z_]\S*))?$/.exec(d);
@@ -177,6 +150,8 @@ for (const f of files) {
 	const min = res.code;
 	try {
 		acorn.parse(min, ACORN);
+		/* a lost require pragma raises nothing at minify time: the module would simply load with no
+		 * dependencies, on the router, for good */
 		if (directives(min) !== directives(src))
 			throw new Error('directive prologue changed — a require pragma was lost');
 		/* The one that matters most: a name the source only USES must not come back DECLARED.

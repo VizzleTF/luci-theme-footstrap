@@ -1,41 +1,29 @@
 #!/usr/bin/env node
 /* Structural duplicate detector: the SAME declaration body under DIFFERENT guards.
  *
- * NO LINTER DOES THIS. stylelint catches one selector twice in a file, or one property twice in
- * a block; neither sees two rules with different selectors, under mutually-exclusive guards (a
- * media query vs an attribute selector, two @container thresholds), carrying an IDENTICAL
- * declaration set. To a cascade-aware tool both are REQUIRED — only one ever matches — so it is
- * findable only structurally, and it is exactly the shape that drifts: this theme had the same
- * bar under `@media(max-width:767px)` and under `:root[data-layout=top]`, 55 of ~75 declarations
- * identical.
+ * No linter does this. stylelint catches one selector twice in a file, or one property twice in a
+ * block; neither sees two rules with different selectors, under mutually exclusive guards, carrying
+ * an identical declaration set. To a cascade-aware tool both are required — only one ever matches —
+ * so it is findable only structurally, and it is exactly the shape that drifts: this theme had the
+ * same bar under a media query and under an attribute selector, 55 of ~75 declarations identical.
  *
- * NO BUDGET, deliberately: there used to be a numeric one (2), and a number nobody defends lets
- * the next unexplained copy in for free the moment somebody raises it. Duplication a CSS-language
- * limit forces on you is legitimate; it just has to be a decision. So every duplicated body is
- * folded into one rule, or PINNED: each copy wrapped in
- * `/* @mirror <group>/<role> *\/ … /* @endmirror *\/` — INSIDE the braces, since the selectors
- * legitimately differ and only the declarations must match — which tools/mirror.mjs then holds
- * byte-identical. Untagged = hard failure. The pin is not ceremony: THIS detector matches only
- * IDENTICAL bodies, so it goes quiet the moment two copies diverge, exactly when it should shout.
- *
- * Usage: node tools/css-dup.mjs
- */
+ * No budget, deliberately: a number nobody defends lets the next unexplained copy in for free the
+ * moment somebody raises it. Every duplicated body is folded into one rule or PINNED with
+ * `@mirror`, which tools/mirror.mjs then holds byte-identical. The pin is not ceremony: THIS
+ * detector matches only IDENTICAL bodies, so it goes quiet the moment two copies diverge —
+ * exactly when it should shout. */
 import { readFileSync } from 'node:fs';
 import * as csstree from 'css-tree';
 import { buildCss } from './lib/css.mjs';
 
-/* Not a CLI flag. It was `--min N`, which put this gate's own threshold on the command line —
- * `--min 99` passes trivially — in a tool whose header rejects "a number nobody defends". It also
- * worked by accident: indexOf returns -1, +1 indexes argv[0] (the node path), Number() is NaN, and
- * `|| 3` caught it.
+/* Not a CLI flag: `--min N` would put this gate's own threshold on the command line, in a tool whose
+ * header rejects "a number nobody defends".
  *
- * SO HERE IS THE DEFENCE, measured on the shipped sheet rather than assumed. At 3 the gate reports
- * 5 bodies, all pinned. Dropping it to 2 adds exactly five more, and every one of them is a
- * COINCIDENCE rather than a shared decision: `.fs-logout` and `.cbi-tabmenu.map > li` both take
- * the base type size and weight; three pairs of unrelated rules both say "become a block"
- * (display + width). Pinning those with @mirror would assert that changing one means changing the
- * other, which is false — and a pin that lies is worse than the duplication it describes. Two
- * declarations is where a body stops being a decision; three is where the gate can insist. */
+ * The defence, measured on the shipped sheet: at 3 the gate reports 5 bodies, all pinned. Dropping
+ * it to 2 adds five more, every one a coincidence rather than a shared decision — two unrelated
+ * rules both taking the base type size, three pairs both saying "become a block". Pinning those
+ * with @mirror would assert that changing one means changing the other, which is false, and a pin
+ * that lies is worse than the duplication it describes. */
 const MIN_DECLS = 3;
 
 /* --dev: the pin is a COMMENT, and the squeeze strips comments */

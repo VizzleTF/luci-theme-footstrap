@@ -3,20 +3,17 @@
 #
 #   ./strip-probes.sh <dir>
 #
-# WHAT A PROBE IS. A handful of module-private functions are also listed in the module's
-# `baseclass.extend({…})` for one reason: a gate in this repository calls them. `fs-fit.restAt()`
-# tells tools/scroll-anchor.mjs that the theme has taken its reference at the offset the probe
-# parked at; `fs-router.sessionExpired()` and friends do the same for the unit suite. Nothing on a
-# router ever calls them — the functions themselves are used inside their own module, and it is only
-# the export line that exists for the tests.
+# A handful of module-private functions are also listed in the module's `baseclass.extend({…})` for
+# one reason: a gate in this repository calls them. Nothing on a router does — the functions
+# themselves are used inside their own module, and only the export line exists for the tests.
 #
 # So the line is marked and removed on the way into a package: the checkout keeps the seam the gates
-# need, and the router gets a module surface that is only what the theme itself calls. The same
-# trade as strip-templates.sh and strip-shell.sh, one line instead of a comment block.
+# need and the router gets a module surface that is only what the theme calls. Same trade as
+# strip-templates.sh and strip-shell.sh.
 #
-# ONLY a line that ends with the marker, and the line must be a complete export entry —
-# anything else is left in place and reported, because a half-removed object literal is a module
-# that does not parse and a theme that does not load.
+# Only a line that ends with the marker, and the line must be a complete export entry — anything
+# else is left in place and reported, a half-removed object literal being a module that does not
+# parse and a theme that does not load.
 set -e
 
 DIR="${1:-}"

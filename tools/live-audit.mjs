@@ -1,54 +1,37 @@
 #!/usr/bin/env node
-/* THE PAGE GATE: every page the router's menu offers, at every width that matters, measured for the
- * five things that have actually reached users.
+/* The page gate: every page the router's menu offers, at every width that matters, measured for the
+ * faults that have actually reached users.
  *
- * The static gates read the stylesheet; every field report so far was about a PAGE. #11 a column
- * shredded to one character per line, #22 a submenu title clipped, #14 an indicator that did not fit
- * the sidebar, #10 a hidden tab pane leaving phantom scroll, #12 a doubled scrollbar in Firefox,
- * #5/#15/#32/#33/#36 a widget or a whole app laid out wrong. Not one of them is visible in a file,
- * and every one of them is one DOM query away on a live page. This is that query, run everywhere.
+ * The static gates read the stylesheet; every field report so far was about a PAGE — a column
+ * shredded to one character per line (#11), a submenu title clipped (#22), an indicator that did
+ * not fit the sidebar (#14), a hidden tab pane leaving phantom scroll (#10), a doubled scrollbar
+ * in Firefox (#12), a widget or a whole app laid out wrong (#5, #15, #32, #33, #36). Not one is
+ * visible in a file, and every one is one DOM query away on a live page.
  *
- * WHAT IT LOOKS FOR, and why each one is here:
+ * WHAT IT LOOKS FOR: `doc-scroll` (the document scrolls sideways — the symptom users report as
+ * "вёрстка плывёт", #1), `overflow` (past the content column with nothing to scroll it back),
+ * `clipped` (a non-scroller whose content is wider than itself), `target` (a hit target under
+ * 24x24 CSS px with a neighbour inside 24px of its centre — WCAG 2.2 SC 2.5.8 with its spacing
+ * exception), `noname` (an operable element with no accessible name — SC 4.1.2, the one a11y
+ * failure a stylesheet CAN cause), `ungated-table`/`unanswered-table` (see below),
+ * `nested-scroll` (two scrollports stacked on the shell), `geometry` (the chrome's model against
+ * the real box) and `console` (a view that threw while rendering). The width sweep starts at 320,
+ * which is the narrowest reflow WCAG 1.4.10 requires.
  *
- *   doc-scroll     the document scrolls sideways. The single symptom users describe as "вёрстка
- *                  плывёт" (#1) and the only one that needs no interpretation.
- *   overflow       an element's right edge is past the content column and no scroll container owns
- *                  it, i.e. it is unreachable rather than scrollable — the Diagnostics Ping button
- *                  shape, measured at 320px of room needing 338.
- *   clipped        a box that is not a scroller has content wider than itself: `overflow: hidden`
- *                  or `clip` eats it silently, which is what `.fs-main`'s backstop does when a
- *                  table has no remedy left.
- *   target         a hit target under 24x24 CSS px with another target within 24px of its centre —
- *                  WCAG 2.2 SC 2.5.8 with its own spacing exception, the rule the chevron hit-area
- *                  fix (#2-class) was about.
- *   noname         an operable element with no accessible name — SC 4.1.2, and the one a11y failure
- *                  a stylesheet CAN cause, by hiding the text a control's name came from.
- *   nested-scroll  two scrollports stacked on the shell: the doubled scrollbar of #12, which only
- *                  ever appeared on one page in one engine.
- *   console        an uncaught error or a console.error while the page rendered. A view that throws
- *                  paints half of itself and says nothing.
- *
- * THE BASELINE IS A UNION ACROSS PLATFORMS, not a photograph of one machine. Text metrics differ
- * between a maintainer's containers and CI's ubuntu runner, and a few findings sit within a pixel or
- * two of their threshold: the same link is 16px tall in one place and 15 in the other (SC 2.5.8 is a
- * hard 24), the same tooltip clears the column by 1px here and misses by 2px there. Six signatures
- * appeared on the runner that had never appeared locally. The magnitude is not part of a signature,
- * so only these threshold-straddling cases can differ at all — and the honest answer is to hold every
- * KNOWN finding in one file rather than one file per machine, which would double the maintenance and
- * leave each half unverifiable from the other.
- *
- * A BASELINE, NOT A CLEAN SHEET. Some findings belong to the app, not the theme (a third-party page
- * that writes its own 1200px table), and a gate that fails on them is a gate that gets disabled. So
- * every finding is signed `path|width|kind|element` and the known set lives in
- * tools/baselines/live-audit.json: a NEW signature fails the run, a signature that stopped appearing
- * is printed so the baseline can shrink. Ratchet, exactly like css-metrics.mjs.
+ * A BASELINE, NOT A CLEAN SHEET. Some findings belong to the app, not the theme, and a gate that
+ * fails on them is a gate that gets disabled. So every finding is signed `path|width|kind|element`
+ * and the known set lives in tools/baselines/live-audit.json: a NEW signature fails the run, a
+ * signature that stopped appearing is printed so the baseline can shrink. A ratchet, exactly like
+ * css-metrics.mjs. The file is a UNION ACROSS PLATFORMS, not a photograph of one machine — text
+ * metrics differ between a maintainer's containers and CI's runner, and a few findings sit within
+ * a pixel of their threshold.
  *
  *   node tools/live-audit.mjs [--only owrt2512,owrt2410] [--widths 320,390,768,1440]
- *                             [--pages /admin/status] [--update] [--engine chromium|firefox|webkit]
+ *                             [--pages /admin/status] [--pages-all] [--all] [--arrive 768]
+ *                             [--update] [--prune] [--engine chromium|firefox|webkit]
  *
  * Needs a running owlab router (docs/development.md). `--update` rewrites the baseline: read the
- * diff before you do that — it is the whole value of the file.
- */
+ * diff before you do that — it is the whole value of the file. */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -79,20 +62,17 @@ const ONLY_PAGES = arg('pages', '');
 const ALL_PAGES = process.argv.includes('--pages-all');
 /* the four routers rather than the OpenWrt pair (lib/stands.mjs) */
 const ALL_STANDS = process.argv.includes('--all');
-/* ENTERING a page at a width is not the same as RESIZING into it, and only one of the two was ever
- * measured. The sweep below loads each page once at 1440 and then walks the widths, so every
- * measurement after the first is taken on a page that has already been laid out, fitted and
- * corrected — and the theme's fitters re-run on the resize, which is exactly the event that hides an
- * arrival bug. Status → Processes at 768 was reported by a user and reproduced here: the first fit
- * pass judges a table its own gate is still hiding, caches "no remedy", and only a later mutation
- * corrects it — on a page that renders once and stands still, none comes, and the table sits 65px
- * past the column with its columns clipped. Every width in the sweep said the page was fine.
+/* Entering a page at a width is not the same as RESIZING into it. A sweep that loads each page once
+ * and then walks the widths takes every measurement after the first on a page that has already been
+ * laid out, fitted and corrected — and the fitters re-run on the resize, which is exactly the event
+ * that hides an arrival bug: a first fit pass judges a table its own gate is still hiding, caches
+ * "no remedy", and on a page that renders once and stands still no later mutation corrects it —
+ * the table then sits 65px past its column.
  *
- * So one width is also ENTERED, with a load of its own. It is one extra page load per page (~20% of
- * this gate's runtime) rather than six, because the fault is in the arrival, not in the width: any
- * width whose layout needs a remedy will do, and 768 is where the sidebar has just folded and a data
- * table still has to break a column to fit. Its findings are signed `<width>a` so an arrival-only
- * fault cannot hide behind the identical resize signature. */
+ * So ONE width is also entered, with a load of its own: the fault is in the arrival, not in the
+ * width, so any width whose layout needs a remedy will do, and 768 is where the sidebar has just
+ * folded and a data table still has to break a column to fit. Its findings are signed `<width>a`
+ * so an arrival-only fault cannot hide behind the identical resize signature. */
 const ARRIVE = Number(arg('arrive', '768'));
 if (!Number.isFinite(ARRIVE) || ARRIVE < 0) {
 	/* a typo may not turn a check off in silence — that is how a gate stops holding anything */
@@ -100,24 +80,14 @@ if (!Number.isFinite(ARRIVE) || ARRIVE < 0) {
 	process.exit(1);
 }
 
-/* DOES THE CHROME'S ARITHMETIC STILL DESCRIBE THE PAGE IT IS ABOUT?
+/* Does the chrome's arithmetic still describe the page it is about?
  *
  * `fs-chrome.contentWidth()` answers "how wide is the content column" WITHOUT reading layout, for
- * the one pass that may not read it: fs-select's, judging a table the poll brought in while the
- * reader is mid-flick. It gets there by subtracting the sidebar and the shell's gutter from the
- * window, and every term is a token read out of the stylesheet — so it is a model of the page, and
- * a model drifts silently. It has: `--fs-content-pad` was subtracted twice (the token is one side,
- * shellGeometry already doubles it) and the top-BAR layout kept a 224px sidebar in the sum, both
- * worth enough to cross fs-select's CRAMPED threshold and card a table that had room.
- *
- * The arithmetic per layout is unit-tested (tests/chrome-geometry.test.mjs). What only a real page
- * can say is whether the INPUTS still describe it — which is this: the model against the box.
- *
- * The column's `max-width: var(--fs-content-max)` cap is the MODEL's business, not this gate's: it
- * used to be applied here, to a model that ignored it, which is a compensation that would have gone
- * on hiding the disagreement it was papering over. columnWidth() caps, so this compares the two
- * numbers as they are.
- */
+ * the one pass that may not read it. It gets there by subtracting the sidebar and the shell's
+ * gutter from the window, every term a token read out of the stylesheet — so it is a model of the
+ * page, and a model drifts silently. It has: the gutter was once subtracted twice, and the top-bar
+ * layout kept a sidebar in the sum, both worth enough to cross fs-select's CRAMPED threshold and
+ * card a table that had room. */
 const GEOMETRY = function () {
 	const RT = window.L;
 	if (!RT || typeof RT.require !== 'function') return [];
@@ -159,13 +129,13 @@ const CHECK = function () {
 	const docScroll = Math.round(document.documentElement.scrollWidth - document.documentElement.clientWidth);
 	if (docScroll > 1) out.push({ kind: 'doc-scroll', el: 'document', by: docScroll });
 
-	/* 2. reach: past the content column with nothing to scroll it back. 1.5px because a border-box
-	 * edge lands on a fraction at some zoom levels and a half-pixel is not a defect.
+	/* 2. reach: past the content column with nothing to scroll it back. 1.5px because a border-box edge
+	 * lands on a fraction at some zoom levels.
 	 *
-	 * INSIDE an <svg> nothing is laid out by the CSS box model — the stock realtime views draw a
-	 * polyline wider than the viewport ON PURPOSE and slide it leftwards one sample at a time, so
-	 * every one of its points reported as "past the column" while the drawing was correct. The
-	 * <svg> element itself is still measured, which is the box the theme actually sizes. */
+	 * Inside an <svg> nothing is laid out by the CSS box model — the stock realtime views draw a
+	 * polyline wider than the viewport on purpose and slide it leftwards — so every one of its points
+	 * reports as "past the column" while the drawing is correct. The <svg> element itself is still
+	 * measured, that being the box the theme sizes. */
 	for (const el of host.querySelectorAll('*')) {
 		if (!vis(el) || inScroller(el) || el.ownerSVGElement) continue;
 		const r = el.getBoundingClientRect();
@@ -182,11 +152,10 @@ const CHECK = function () {
 
 	/* 4. hit targets, SC 2.5.8 with the spacing exception.
 	 *
-	 * PER LINE BOX, not per element: an inline link that wraps has one rect per line and
-	 * getBoundingClientRect() returns their UNION, whose centre lies on neither of them — in the
-	 * footer, where three links share three wrapped lines, that phantom centre sat 15px from a real
-	 * one and the gate reported a violation that no pointer can reach. getClientRects() is what the
-	 * criterion is about anyway: the target is the area a finger can land on. */
+	 * Per LINE BOX, not per element: an inline link that wraps has one rect per line and
+	 * getBoundingClientRect() returns their union, whose centre lies on neither — in the footer that
+	 * phantom centre sat 15px from a real one and the gate reported a violation no pointer can
+	 * reach. getClientRects() is what the criterion is about anyway. */
 	const targets = [];
 	for (const el of document.querySelectorAll('button, a[href], .cbi-button, input[type="checkbox"], input[type="radio"], select, [role="button"]')) {
 		if (!vis(el)) continue;
@@ -209,19 +178,12 @@ const CHECK = function () {
 		if (!name) out.push({ kind: 'noname', el: label(el) });
 	}
 
-	/* 6. THE GATE THAT KEEPS A FRESH TABLE OUT OF THE LAYOUT, asked of the page rather than of the
-	 * stylesheet. `theme/30-tables.css` holds a `.fs-dt` out of the flow until fs-select stamps it
+	/* 6. The gate that keeps a fresh table out of the layout, asked of the page rather than of the
+	 * stylesheet. theme/30-tables.css holds a `.fs-dt` out of the flow until fs-select stamps it
 	 * `.fs-fitted`, because a poll tick REPLACES these tables and an unstamped one is laid out
-	 * full-width for an instant — several screens taller than the card stack it is about to become
-	 * at phone widths, and the engine re-anchors on that intermediate and throws the reader (612px
-	 * out and back, twice per tick, measured on a remote router at iPhone width). Two ways that
-	 * protection can be absent without anything else looking wrong:
-	 *
-	 *   ungated-table     a data table outside every root the rule names (`#view`, `#modal_overlay`)
-	 *                     — an app that renders one somewhere else gets no gate at all.
-	 *   unanswered-table  a data table that is unstamped AND occupying height right now, which is
-	 *                     the intermediate itself: either the attribute is not armed or the rule did
-	 *                     not reach it. */
+	 * full-width for an instant, which the engine re-anchors on. Two ways that protection can be
+	 * absent without anything else looking wrong: a data table outside every root the rule names,
+	 * and a table the fitter never stamped. */
 	if (document.documentElement.hasAttribute('data-fs-fit')) {
 		for (const t of document.querySelectorAll('.table.fs-dt')) {
 			if (!t.closest('#view, #modal_overlay')) out.push({ kind: 'ungated-table', el: label(t) });
@@ -314,18 +276,13 @@ await Promise.all(list.map(async (stand) => {
 			try { for (const f of await page.evaluate(GEOMETRY)) record(w, f); } catch (e) { /* see there */ }
 		}
 
-		/* the arrival, see ARRIVE above: the page reached AT this width rather than resized into it.
+		/* The arrival (see ARRIVE above): the page reached AT this width rather than resized into it.
 		 *
-		 * ONLY WHAT THE RESIZE AT THIS WIDTH DID NOT ALREADY SAY. A fault the same width produces
-		 * either way is one fault, and recording it under a second signature doubles the baseline
-		 * with copies that carry no information — 80 of them on the first CI run after this pass
-		 * landed, every one a `noname` on a third-party widget that the resize at 768 had already
-		 * reported. Worse, they are machine-specific: the baseline is a union across platforms and
-		 * a machine only sees the apps it installs, so a duplicate recorded where those apps exist
-		 * is a red gate everywhere they do not. What survives the filter is what the pass was added
-		 * for: the Processes table that arrives past its column and is corrected by the first
-		 * resize, and the file manager's list, which overflows at 768 on arrival and not on the way
-		 * into 768. */
+		 * Only what the resize at this width did not already say. A fault the same width produces
+		 * either way is one fault, and recording it under a second signature doubles the baseline with
+		 * copies that carry no information — and those copies are machine-specific, since the baseline
+		 * is a union across platforms and a machine only sees the apps it installs, so a duplicate
+		 * recorded where those apps exist is a red gate everywhere they do not. */
 		if (ARRIVE > 0) {
 			await page.setViewportSize({ width: ARRIVE, height: 900 });
 			let arrived = true;
@@ -360,16 +317,11 @@ if (UPDATE) {
 		console.error('would drop every signature it did not visit. Drop the narrowing flags.');
 		process.exit(2);
 	}
-	/* ADDING IS SAFE, REMOVING IS A DECISION — and this file is a UNION ACROSS PLATFORMS (see the
-	 * header), which is what makes the difference matter. A run sees the apps THIS machine has: the
-	 * containers here carry openclash and ssclash, CI's carry mwan3, acme and a dashboard. Rewriting
-	 * a router's set from what one machine saw therefore deletes every finding belonging to an app
-	 * it does not have, and the next CI run reports them as new — a red gate produced by a green
-	 * one. So `--update` unions, and prints what did not reproduce; `--prune` is the deliberate act
-	 * of dropping those, for a maintainer who has read the list and knows which are fixes.
-	 *
-	 * Keys the run did not visit are kept whole for the same reason, one axis up: since the default
-	 * stand set became the OpenWrt pair, a plain run measures two of the four routers. */
+	/* Adding is safe, removing is a decision — and this file is a UNION ACROSS PLATFORMS, which is what
+	 * makes the difference matter: a run sees the apps THIS machine has. Rewriting a router's set
+	 * from what one machine saw deletes every finding belonging to an app it does not have, and the
+	 * next CI run reports them as new — a red gate produced by a green one. So `--update` unions and
+	 * prints what did not reproduce, while `--prune` is the deliberate act of dropping those. */
 	const next = Object.assign({}, baseline);
 	for (const id of Object.keys(seen)) {
 		const now = [ ...seen[id] ];
@@ -387,9 +339,9 @@ if (UPDATE) {
 /* A signature that stopped appearing is not a failure — it is a fix, and the baseline should shrink
  * to match. Printed, never gating: a page an app no longer installs would otherwise fail the run.
  *
- * Only a FULL sweep may say that, though: a run narrowed by --pages or --widths did not visit most
- * of the baseline, and reporting the rest as "no longer reproduces" is how a baseline gets emptied
- * by someone debugging one page. */
+ * Only a FULL sweep may say that: a run narrowed by --pages or --widths did not visit most of the
+ * baseline, and reporting the rest as "no longer reproduces" is how a baseline gets emptied by
+ * someone debugging one page. */
 let stale = 0;
 for (const id of Object.keys(seen))
 	for (const sig of baseline[id] || [])

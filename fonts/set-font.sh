@@ -7,20 +7,18 @@
 #   sh set-font.sh remove
 #
 # Run it ON THE ROUTER, as root. The theme ships no webfonts — it names Manrope and JetBrains Mono
-# first and the system stack after, so a visitor who has either installed sees it and everyone else
-# falls through. This script is how an admin adds one back, in either of two independent ways:
+# first and the system stack after — so this script is how an admin adds one back, two ways:
 #
 #   a NAME only          footstrap.settings.font_sans / .font_mono, a plain font-family stack.
-#                        Nothing is downloaded and nothing is served; it renders for the visitors
-#                        who have that font installed locally. Editable by hand with `uci set`.
-#   a NAME and a FILE    the .woff2 is written under /etc/footstrap/fonts, exposed under /www, and
-#                        an @font-face sheet is generated next to it. THIS router serves the font,
-#                        so every visitor sees it.
+#                        Nothing is downloaded or served; it renders for visitors who have that font
+#                        installed locally. Editable by hand with `uci set`.
+#   a NAME and a FILE    the .woff2 is written under /etc/footstrap/fonts, exposed under /www, and an
+#                        @font-face sheet is generated beside it. THIS router serves the font.
 #
 # No font is named or hosted here on purpose: a family shortcut would be somebody else's licence and
 # somebody else's host, written into this repository. You bring the URL or the file.
 #
-# The theme itself never fetches any of this: a theme in a package feed has no business calling a
+# The theme itself never fetches any of this — a theme in a package feed has no business calling a
 # third-party host at run time. This script is the admin doing it deliberately, once. Apache-2.0.
 
 set -eu
@@ -32,7 +30,7 @@ SHEET="$FONT_DIR/fonts.css"
 FACES="$FONT_DIR/faces"				# what is installed, so a later run can regenerate the sheet
 FONT_MAX=524288					# 512 kB per face, the same cap the pattern upload enforces
 
-# The tails from styles/02-tokens.css. A value with a comma in it is taken as a COMPLETE stack and
+# The tails from styles/02-tokens.css. A value containing a comma is taken as a COMPLETE stack and
 # these are not appended — that is how you drop the fallbacks or write your own.
 SANS_TAIL='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
 MONO_TAIL='ui-monospace, SFMono-Regular, Menlo, monospace'
@@ -92,8 +90,8 @@ while [ $# -gt 0 ]; do
 done
 
 [ -z "$WHAT" ] || [ "$WHAT" = remove ] || die "'$WHAT' is not a command. Try --help."
-# Before the empty-invocation check below, so that a file with no name gets the reason rather than
-# the whole usage text.
+# Before the empty-invocation check below, so a file with no name gets the reason rather than the
+# whole usage text.
 [ -z "$SANS_FILE$SANS_BOLD$SANS_WEIGHT" ] || [ -n "$SANS" ] ||
 	die "A sans file needs --sans NAME too: the @font-face has to be named something."
 [ -z "$MONO_FILE$MONO_BOLD$MONO_WEIGHT" ] || [ -n "$MONO" ] ||
@@ -102,7 +100,7 @@ if [ -z "$WHAT" ] && [ -z "$SANS" ] && [ -z "$MONO" ]; then usage; exit 1; fi
 
 # The charset partials/head.ut accepts, stated here so a typo is refused where it is typed rather
 # than dropped in silence at render time. It excludes < > ( ) { } ; and the backslash, which is what
-# makes the value safe to print into the page unescaped — the same defence login_bg's hex has.
+# makes the value safe to print into the page unescaped.
 family_ok() {	# <stack>
 	[ -n "$1" ] || return 1
 	[ "${#1}" -le 120 ] || return 1
@@ -126,9 +124,9 @@ case "$FONT_MAX" in ''|*[!0-9]*) die "--max takes a number of bytes." ;; esac
 # synthesises 600 and 700 and the page reads as designed. A real variable font has the weights, so
 # say so: --sans-weight '100 900'.
 #
-# With a bold file there are two real faces, and the split has to land on 600 rather than on 700 for
-# the same reason: body text asks for 600, and whichever face claims it is the one the page is set
-# in. Regular takes 400-600, bold takes 700.
+# With a bold file there are two real faces, and the split has to land on 600 rather than on 700
+# for the same reason: body text asks for 600, and whichever face claims it is the one the page is
+# set in. Regular takes 400-600, bold takes 700.
 [ -n "$SANS_WEIGHT" ] || { [ -n "$SANS_BOLD" ] && SANS_WEIGHT='400 600' || SANS_WEIGHT=400; }
 [ -n "$MONO_WEIGHT" ] || { [ -n "$MONO_BOLD" ] && MONO_WEIGHT='400 600' || MONO_WEIGHT=400; }
 
@@ -138,7 +136,7 @@ command -v uci >/dev/null 2>&1 || die "No uci — this is not an OpenWrt router.
 [ -d /usr/share/ucode/luci/template/themes/footstrap ] ||
 	info "luci-theme-footstrap does not look installed here; writing the settings anyway."
 
-# uci refuses to CREATE a config file, only a section within one — and a router that installed a
+# uci refuses to CREATE a config file, only a section within one, and a router that installed a
 # footstrap predating the Appearance defaults has no such file. Same two lines as uci-defaults.
 [ -f /etc/config/footstrap ] || : > /etc/config/footstrap
 uci -q get footstrap.settings >/dev/null 2>&1 || uci set footstrap.settings=footstrap
@@ -168,20 +166,17 @@ TMPD="/tmp/fs-font.$$"
 mkdir -p "$TMPD"
 trap 'rm -rf "$TMPD"' EXIT INT TERM
 
-# The first four bytes ARE the format. Read with head and compared as text, because a router has no
-# way to read them as hex: busybox is built without the `od` applet on all four of this project's dev
-# routers (25.12 and 24.10, OpenWrt and ImmortalWrt) — `od: applet not found`. That costs one thing,
-# and the messages below are written around it: a command substitution drops NUL bytes, so `wOF2`
-# and `wOFF` arrive intact while a TrueType file, whose signature is 0x00010000, arrives as a lone
-# 0x01 and cannot be told from any other binary. The catch-all therefore names the conversion too,
-# instead of pretending to know what the file is.
+# The first four bytes ARE the format. Read with head and compared as text, because busybox on all
+# four dev routers is built without the `od` applet. That costs one thing, and the messages below are
+# written around it: a command substitution drops NUL bytes, so `wOF2` and `wOFF` arrive intact while
+# a TrueType file (signature 0x00010000) arrives as a lone 0x01 and cannot be told from any other
+# binary. The catch-all therefore names the conversion instead of pretending to know the format.
 signature() {	# <file> -> the first four bytes, as text
 	head -c 4 "$1" 2>/dev/null
 }
 
-# What is refused, and why each one. A font file is not a document — it cannot carry script the way
-# an SVG can — so this is about the two things that actually go wrong on a router: a file that is
-# not a font, and a file that fills the overlay.
+# What is refused, and why. A font file cannot carry script the way an SVG can, so this is about the
+# two things that go wrong on a router: a file that is not a font, and a file that fills the overlay.
 stage() {	# <slot> <src> -> writes $TMPD/<slot>.font and $TMPD/<slot>.fmt
 	slot="$1"; src="$2"; out="$TMPD/$slot.font"
 	if [ -f "$src" ]; then
@@ -200,7 +195,7 @@ stage() {	# <slot> <src> -> writes $TMPD/<slot>.font and $TMPD/<slot>.fmt
 	# A .ttf or .otf is refused rather than served: there is no compressor on a router, and the same
 	# face is three to five times the bytes uncompressed. Convert it on your own machine first.
 	# The extension follows the SIGNATURE, never the source name: uhttpd types a response by
-	# extension, and a woff1 body served as .woff2 is a file that describes itself twice, wrongly.
+	# extension, and a woff1 body served as .woff2 describes itself wrongly.
 	case "$(signature "$out")" in
 		wOF2) echo woff2 > "$TMPD/$slot.fmt" ;;
 		wOFF) echo woff  > "$TMPD/$slot.fmt" ;;
@@ -211,8 +206,8 @@ stage() {	# <slot> <src> -> writes $TMPD/<slot>.font and $TMPD/<slot>.fmt
 	esac
 }
 
-# slot|src, newline separated so a path with a space in it survives. A slot is staged only when its
-# side was named on the command line.
+# slot|src, newline separated so a path with a space survives. A slot is staged only when its side
+# was named on the command line.
 SLOTS=""
 add_slot() {	# <slot> <src>
 	[ -n "$2" ] || return 0
@@ -242,8 +237,8 @@ IFS="$OLDIFS"
 
 # --- room for it ----------------------------------------------------------
 # A full overlay does not fail loudly: `uci commit` writes a truncated config and reports nothing,
-# and the next boot reads what is left. So check before writing, with the new bytes counted twice —
-# once for the file, once for the copy the filesystem makes while writing it.
+# and the next boot reads what is left. So check before writing, counting the new bytes twice — once
+# for the file, once for the copy the filesystem makes while writing it.
 STAGED=0
 for f in "$TMPD"/*.font; do
 	[ -f "$f" ] || continue
@@ -268,16 +263,16 @@ chmod 0755 /etc/footstrap "$FONT_DIR"
 # Naming a side replaces it whole: the file that is there belongs to the name that was there.
 drop_role() {	# <sans|mono>
 	rm -f "$FONT_DIR/$1.woff2" "$FONT_DIR/$1.woff" "$FONT_DIR/$1-bold.woff2" "$FONT_DIR/$1-bold.woff"
-	# grep exits 1 when nothing survives the filter, which is a normal outcome here and not an
-	# error — the redirect has already produced the empty file we want.
+	# grep exits 1 when nothing survives the filter, which is normal here: the redirect has already
+	# produced the empty file we want.
 	grep -v "^$1|" "$FACES" > "$FACES.new" || true
 	mv "$FACES.new" "$FACES"
 }
 [ -z "$SANS" ] || drop_role sans
 [ -z "$MONO" ] || drop_role mono
 
-# `role|weight|filename`, one line per installed face. The sheet is regenerated from this file and
-# not from the arguments, so naming only the mono side leaves the sans faces exactly where they are.
+# `role|weight|filename`, one line per installed face. The sheet is regenerated from this file rather
+# than from the arguments, so naming only the mono side leaves the sans faces where they are.
 install_face() {	# <slot> <role> <weight>
 	[ -f "$TMPD/$1.font" ] || return 0
 	dest="$1.$(cat "$TMPD/$1.fmt")"
@@ -293,8 +288,7 @@ install_face mono-bold mono 700
 
 # --- the settings ---------------------------------------------------------
 # A value with a comma is a complete stack and is written as typed; a bare family name gets the
-# theme's own fallbacks, so a visitor without the font still lands on system-ui rather than on the
-# browser's default serif.
+# theme's fallbacks, so a visitor without the font lands on system-ui rather than the default serif.
 stack() {	# <name> <tail>
 	case "$1" in *,*) printf '%s' "$1" ;; *) printf '%s, %s' "$1" "$2" ;; esac
 }
@@ -321,8 +315,8 @@ if [ -s "$FACES" ]; then
 			case "$role" in sans) name="$SANS_NAME" ;; mono) name="$MONO_NAME" ;; *) continue ;; esac
 			[ -n "$name" ] || continue
 			case "$(signature "$FONT_DIR/$file")" in wOF2) fmt=woff2 ;; *) fmt=woff ;; esac
-			# The file name is fixed, so the URL needs a version key of its own: without it a
-			# browser that cached the previous face keeps drawing it after a re-run.
+			# The file name is fixed, so the URL needs a version key: without it a browser that
+			# cached the previous face keeps drawing it after a re-run.
 			v=$(md5sum "$FONT_DIR/$file" | cut -d' ' -f1)
 			printf '@font-face { font-family: "%s"; src: url("%s/%s?v=%s") format("%s"); font-weight: %s; font-style: normal; font-display: swap; }\n' \
 				"$name" "$FONT_URL" "$file" "$v" "$fmt" "$weight"
@@ -337,14 +331,12 @@ fi
 uci set footstrap.settings.fonts="$TOKEN"
 uci commit footstrap
 
-# uhttpd serves only /www and follows symlinks. Linking a DIRECTORY has two traps and both end the
-# same way — `ln` exits 0 and the link lands at .../fonts/fonts, one level too deep, where no
-# browser looks: an existing symlink to a directory is followed (that is what -n prevents), and a
-# REAL directory is entered (which -n does not prevent — measured on a 25.12 router: exit 0, link
-# created inside). Every footstrap before 0.12.1 shipped exactly such a directory here, full of the
-# woff2 files it used to carry, so this is the ordinary case on an upgraded router, not a corner.
-# uci-defaults does the same two steps on every install; do them here too, for a router whose
-# installed theme predates them.
+# uhttpd serves only /www and follows symlinks. Linking a DIRECTORY has two traps that both end the
+# same way — `ln` exits 0 and the link lands at .../fonts/fonts, one level too deep: an existing
+# symlink to a directory is followed (-n prevents that), and a REAL directory is entered (-n does
+# not). Every footstrap before 0.12.1 shipped such a directory here, so this is the ordinary case on
+# an upgraded router. uci-defaults does the same two steps on every install; repeated here for a
+# router whose installed theme predates them.
 if [ -d /www/luci-static/footstrap ]; then
 	if [ -e "$FONT_SERVE" ] && [ ! -L "$FONT_SERVE" ]; then
 		info "Clearing the old $FONT_SERVE directory (webfonts a footstrap before 0.12.1 shipped)."
@@ -359,8 +351,8 @@ fi
 [ -z "$SANS" ] || ok "Sans: $(uci -q get footstrap.settings.font_sans)"
 [ -z "$MONO" ] || ok "Mono: $(uci -q get footstrap.settings.font_mono)"
 if [ -n "$TOKEN" ]; then
-	# The count is what is on the router now, not what this run installed: naming one side leaves
-	# the other side's faces exactly where they were.
+	# The count is what is on the router now, not what this run installed: naming one side leaves the
+	# other side's faces where they were.
 	ok "$(grep -c . "$FACES") face(s) on this router, $(du -sk "$FONT_DIR" | cut -f1) kB of flash, served from $FONT_URL/."
 else
 	info "No font file installed: the names above render only for visitors who have that font."

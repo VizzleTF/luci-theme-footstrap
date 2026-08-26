@@ -1,22 +1,17 @@
-/* A VIEW'S TIMER MUST SURVIVE A HIDDEN TAB AS ITSELF — same handle, and still the router's to sweep.
+/* A view's timer must survive a hidden tab as ITSELF — same handle, and still the router's to sweep.
  *
  * fs-router hooks `setInterval` so a client navigation can clear what the outgoing page left
- * running, and the hidden-tab pause rides that same registry: a background tab stops calling ubus
- * for a view that polls on its own. Both are right; the way it was done was not, and neither half
- * can be seen from a stand without winning a race:
+ * running, and the hidden-tab pause rides that same registry. Both are right; the way it was done
+ * was not, and neither half can be seen from a stand without winning a race:
  *
- *   * the pause CLEARED each timer and re-armed it on show, which hands back a NEW id. A view that
- *     kept its id to stop its own poller (a log tailer's stop button, a teardown) was then holding
- *     a dead number: `clearInterval(id)` did nothing and the timer ran on.
- *   * the paused timers were carried in a private array, out of the registry the navigation sweep
- *     reads. Hide the tab while a navigation is in flight, come back, and the previous page's
- *     timers were armed again — for a page that no longer exists, and the sweep that would have
- *     caught them had already run.
+ *   * the pause CLEARED each timer and re-armed it on show, which hands back a NEW id, so a view
+ *     holding its own handle to stop its poller was left with a dead number;
+ *   * a paused timer carried outside the registry is one a navigation sweep cannot see, so a tab
+ *     hidden across a click brings the previous page's timers back.
  *
  * So a paused timer STAYS in the registry (armed on nothing) instead of leaving it, and the handle
  * the view holds keeps naming it. Driven here rather than on a stand because both faults need a
- * visibilitychange to land inside a specific window; the harness dispatches it exactly.
- */
+ * visibilitychange to land inside a specific window; the harness dispatches it exactly. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModule, installBrowserGlobals, fakeWindow, fakeDocument, fakeL } from './lib/luci-module.mjs';

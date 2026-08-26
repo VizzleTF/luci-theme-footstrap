@@ -1,16 +1,16 @@
 #!/bin/sh
-# The OpenWrt SDK finds packages by GREP, not by parsing. include/scan.mk:
+# The OpenWrt SDK finds packages by GREP, not by parsing (include/scan.mk):
 #
 #   find -L $(SCAN_DIR) -name Makefile | xargs grep -aHE 'call (Build/DefaultTargets|BuildPackage|KernelPackage)'
 #
-# Whatever that grep does not match is not in the package list: no dump, no CONFIG_PACKAGE_*
-# symbol, and `make package/luci-theme-footstrap/compile` answers "No rule to make target" —
-# without one line anywhere in the build naming the package. This theme calls BuildPackage
-# nowhere itself; luci.mk does it at the include, and the grep cannot see that. The literal
-# `call BuildPackage` in the Makefile's trailing comment is the whole reason the SDK sees us.
+# Whatever that grep does not match is not in the package list: no dump, no CONFIG_PACKAGE_* symbol,
+# and `make package/luci-theme-footstrap/compile` answers "No rule to make target" without one line
+# anywhere naming the package. This theme calls BuildPackage nowhere itself — luci.mk does it at the
+# include, which the grep cannot see — so the literal `call BuildPackage` in the Makefile's trailing
+# comment is the whole reason the SDK sees us.
 #
-# It reads like boilerplate, so it was deleted as boilerplate, and both package builds went red
-# with an error that pointed at nothing. This is the gate that says so out loud.
+# It reads like boilerplate, so it was deleted as boilerplate and both package builds went red with
+# an error that pointed at nothing.
 set -eu
 
 for mk in luci-theme-footstrap/Makefile; do

@@ -1,6 +1,6 @@
 @layer base {
-	/* Small widgets a view or a third-party luci-app-* can drop anywhere: tooltip,
-	 * progress bar, zone badge, button states, close cross, alert box, .label pill. */
+	/* small widgets a view or a third-party luci-app-* can drop anywhere: tooltip, progress bar,
+	 * zone badge, button states, close cross, alert box, .label pill */
 	/* .cbi-title-ref colour: theme/45-misc.css — absorbed. The arrow stays: content,
 	 * not paint. */
 	.cbi-title-ref::after {
@@ -14,13 +14,11 @@
 	.cbi-tooltip {
 		position: absolute;
 		z-index: var(--fs-z-tooltip);
-		/* logical: `left: -10000px` in an RTL document parks the tooltip 10 000px past the
-		 * INLINE-END edge, which is scrollable overflow — every page grew a 10 000px horizontal
-		 * scrollbar in ar/fa/he (measured). Past the inline-START edge is unreachable in both
-		 * directions, which is what parking means. */
+		/* logical: `left: -10000px` in an RTL document parks the tooltip past the INLINE-END edge,
+		 * which is scrollable overflow — every page grew a 10000px horizontal scrollbar in ar/fa/he
+		 * (measured). Past the inline-start edge is unreachable in both directions. */
 		inset-inline-start: -10000px;
-		/* box-shadow: theme/35-alerts.css — absorbed (was `0 0 2px var(--fs-border)`, a hairline
-		 * halo on a surface that floats over arbitrary content) */
+		/* box-shadow: theme/35-alerts.css — absorbed */
 		border-radius: var(--fs-radius-sm);
 		background: var(--fs-panel);
 		white-space: pre;
@@ -47,8 +45,7 @@
 		margin: -1.6em 0 0 -5px;
 		border-radius: var(--fs-radius-sm);
 		pointer-events: none;
-		/* box-shadow: theme/35-alerts.css now states ONE elevation for every .cbi-tooltip, so this
-		 * specialisation no longer needs one of its own */
+		/* box-shadow: theme/35-alerts.css states one elevation for every .cbi-tooltip */
 	}
 
 	.zonebadge .cbi-tooltip > * {
@@ -90,13 +87,13 @@
 
 	/* close cross — colour, shadow, opacities: theme/70-modal.css — absorbed. Left:
 	 * geometry. */
-	/* `line-height: 1` centres the glyph in its own box; it was 13.5px under a 20px face — a
-	 * hand-nudge that only lands for one font size, and a half-pixel baseline besides. */
-	/* PHYSICAL, and mirrored by hand below — the same shape as `::-webkit-resizer`
+	/* `line-height: 1` centres the glyph in its own box; it was 13.5px under a 20px face, and a
+	 * hand-nudged length only lands for one font size */
+	/* Physical, and mirrored by hand below — the same shape as `::-webkit-resizer`
 	 * (theme/60-inputs.css) and the two chevrons (theme/20-shell.css). `float` takes no logical
-	 * keyword this theme can rely on: `inline-end` is newer than the `oklch(from …)` and `:has()`
-	 * this stylesheet already requires only in Chromium, and it is the one property here where a
-	 * browser that does not know the keyword drops the declaration and leaves the cross floating
+	 * keyword this theme can rely on: `inline-end` is newer than
+	 * the `oklch(from …)` and `:has()` this sheet already requires only in Chromium, and a browser
+	 * that does not know the keyword drops the declaration and leaves the cross floating
 	 * nowhere. Measured in a live document at 1400px: the cross sat 549px from the reading edge in
 	 * LTR and 41px in RTL, i.e. it jumped from the end of the heading to its start — in front of
 	 * the title, where a dismissal control is not. It appears in every modal and in every
@@ -113,8 +110,7 @@
 		text-decoration: none;
 	}
 
-	/* alert paint (surface, ink, border, radius, shadow, padding): theme/35-alerts.css —
-	 * absorbed. Left: geometry + the white-space reset, which theme does not set. */
+	/* alert paint: theme/35-alerts.css — absorbed. Left: geometry and the white-space reset. */
 	.alert-message {
 		position: relative;
 		margin-bottom: var(--fs-space-2);
@@ -125,17 +121,14 @@
 		margin-top: 1px;
 	}
 
-	/* color + margin + the content reset (border/leading/background/padding):
-	 * theme/35-alerts.css — absorbed; the reset had to move with the heading ramp. */
+	/* colour, margin and the content reset: theme/35-alerts.css — absorbed with the heading ramp */
 
 	.alert-message button {
 		margin: var(--fs-space-1) 0;
 	}
 
-	/* `.label` pill + variants: theme/35-alerts.css — absorbed. So is the indicator pill:
-	 * ui.js's showIndicator() only ever emits into #indicators, which theme/20-shell.css
-	 * paints, so every `header [data-indicator]` is one of those. Left: the three
-	 * properties theme does not touch. */
+	/* `.label` pill and variants: theme/35-alerts.css — absorbed, as is the indicator pill
+	 * (showIndicator() only ever emits into #indicators, which theme/20-shell.css paints). */
 	header [data-indicator] {
 		white-space: nowrap;
 		text-shadow: none;

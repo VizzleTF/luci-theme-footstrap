@@ -1,10 +1,10 @@
 @layer theme {
-	/* value rows.
+	/* Value rows.
 	 * display:flex + align-items:baseline come from base — do not restate, and do not switch to
-	 * center: a row's field can be taller than its control because a `.cbi-value-description`
-	 * sits under it, and center then pushed the label to the middle of control+description,
-	 * visibly BELOW the control. baseline lines the label up with the field's FIRST line for
-	 * every widget (select, dropdown, toggle, dynlist, textarea). */
+	 * center: a row's field can be taller than its control when a `.cbi-value-description` sits
+	 * under it, and center then pushes the label to the middle of control+description, visibly
+	 * below the control. baseline lines the label up with the field's first line for every
+	 * widget. */
 	.cbi-value { justify-content: space-between; gap: var(--fs-space-4); padding: var(--fs-space-2) 0; margin: 0; border-bottom: var(--fs-hairline); }
 	/* stacked controls in a field (Local Time: date input + Sync buttons) need breathing room —
 	 * the raw <br> collapses them. Exclude the password reveal group: it must stay seamless. */
@@ -12,19 +12,16 @@
 	.cbi-value-field > .control-group:not(:has(.cbi-input-password)) {
 		display: inline-flex; flex-wrap: wrap; gap: var(--fs-space-2); align-items: center;
 	}
-	/* The hairline separates one value row from the NEXT one, so it is dropped whenever no value
-	 * row follows — not only at the end of the section. A section that ends with a table, an
-	 * action bar or any other block (irqbalance's toggle above its table, and every app that
-	 * mixes a form row with a widget) drew the line across the top of whatever came next,
-	 * cutting through a framed table's rounded corner. `:last-child` was the special case of
-	 * this, so the two selectors collapse into one. */
+	/* The hairline separates one value row from the NEXT one, so it is dropped whenever no value row
+	 * follows — not only at the end of the section. A section ending with a table or an action bar
+	 * otherwise draws the line across the top of whatever comes next, cutting through a framed
+	 * table's rounded corner. `:last-child` was the special case of this. */
 	.cbi-value:not(:has(+ .cbi-value)) { border-bottom: 0; }
-	/* A toggle/checkbox field has NO text baseline: `.cbi-checkbox` is inline-flex with no line
-	 * box, so its synthesised baseline is the box's BOTTOM edge. Under align-items:baseline the row
-	 * then hangs the toggle from the label's baseline and floats it ~5px ABOVE the label, on every
-	 * toggle row across the UI. Centre those rows instead — but ONLY when no help sentence sits under
-	 * the control: with a `.cbi-value-description` present, centring drops the label to the middle
-	 * of control+description, the exact regression the align-items comment above warns about. */
+	/* A toggle/checkbox field has no text baseline: `.cbi-checkbox` is inline-flex with no line box,
+	 * so its synthesised baseline is the box's BOTTOM edge and align-items:baseline floats the
+	 * toggle ~5px above the label. Centre those rows instead — but only where no help sentence sits
+	 * under the control, since centring then drops the label to the middle of control+description,
+	 * the regression the comment above warns about. */
 	.cbi-value:not(:has(.cbi-value-description)):has(> .cbi-value-field > .cbi-checkbox, > .cbi-value-field > div > .cbi-radio) {
 		align-items: center;
 	}
@@ -46,22 +43,18 @@
 		 * that made it necessary. */
 		line-height: var(--fs-leading);
 	}
-	/* Mono is for the *values* a field holds. The exclusions:
-	 *   BUTTONS (Sync with browser, Start/Restart/Stop) are chrome, not data — excluded here
-	 *     rather than relying on theme/55-buttons.css being concatenated later. :where() keeps
-	 *     the exclusion at zero specificity, so the <select> rule below still wins its own font.
-	 *   .cbi-value-description is LuCI's inline HELP SENTENCE and lives INSIDE .cbi-value-field —
-	 *     this rule was setting prose in JetBrains Mono.
-	 *   `strong`/`b` — the most expensive line in this theme. LuCI writes `<strong>MAC:</strong>
-	 *     ac:1f:6b:…`: the strong is the LABEL, the text after it the value. Feeding the label to
-	 *     the mono rule made it mono AND weight 700, a face of its own — measured on the live
-	 *     router, 227 elements over seven pages in bold mono, and 20 KB of jetbrains-mono-600
-	 *     fetched to draw them: 30% of the whole font payload. Manrope 700 costs zero bytes and
-	 *     label-vs-value now differs by TYPEFACE, not by weight (the 600 mono face is gone, and
-	 *     so is every other bundled face).
-	 * The label rule itself is in theme/45-misc.css and must ASSIGN the sans face: a <strong>
-	 * merely excluded here still INHERITS mono from .cbi-value-field. Measured — excluding alone
-	 * changed nothing, all 227 still drew bold mono. */
+	/* Mono is for the VALUES a field holds. The exclusions:
+	 *   buttons are chrome, not data — excluded here rather than relying on 55-buttons.css being
+	 *     concatenated later. `:where()` keeps the exclusion at zero specificity, so the <select>
+	 *     rule below still wins its own font.
+	 *   .cbi-value-description is LuCI's inline HELP SENTENCE and lives inside .cbi-value-field.
+	 *   `strong`/`b` — LuCI writes `<strong>MAC:</strong> ac:1f:6b:…`, so the strong is the LABEL
+	 *     and the text after it the value. Feeding the label to the mono rule makes it mono AND
+	 *     weight 700, a face of its own: 227 elements over seven pages in bold mono, and 20 KB of a
+	 *     600-weight mono face fetched to draw them.
+	 * The label rule itself is in theme/45-misc.css and must ASSIGN the sans face: a <strong> merely
+	 * excluded here still INHERITS mono from .cbi-value-field — excluding it alone was measured and
+	 * changed nothing. */
 	.cbi-value-field,
 	.cbi-value-field *:where(:not(.btn, .cbi-button, .cbi-value-description)) { font-family: var(--fs-font-mono); }
 	/* text-wrap: the help sentence is a <div>, so base's prose rule (which reaches `p` and the
@@ -69,39 +62,26 @@
 	 * sits in the field column. Same reasoning as there. */
 	.cbi-value-description { font-family: var(--fs-font-sans); text-wrap: pretty; }
 
-	/* A text field in a CBI form was a fixed 210px — base's width, straight out of bootstrap's
-	 * cascade. The same 210px holds far LESS here: the field is monospaced (the rule above) and
-	 * padded --fs-space-3 a side (12px at the default density) instead of 4, so Attended
-	 * Sysupgrade's server URL was clipped mid-domain
-	 * — while the .cbi-dynlist directly under it on that same page is 440px wide, which is what
-	 * makes the mismatch the thing you actually see (issue #5). Elastic now, with the dynlist's own
-	 * ceiling so the two line up. Number/date/time keep the fixed width: they hold short values,
-	 * and a 440px box for a port number reads as a mistake. */
+	/* A text field in a CBI form is not a fixed 210px: that width is base's, and the same 210px
+	 * holds far less here — the field is monospaced and padded --fs-space-3 a side instead of 4,
+	 * so a server URL was clipped mid-domain while the .cbi-dynlist directly under it is 440px
+	 * wide (issue #5). Elastic, with the dynlist's own
+	 * ceiling so the two line up. Number/date/time keep the fixed width: they hold short values, and
+	 * a 440px box for a port number reads as a mistake. */
 	.cbi-value-field input[type="text"],
 	.cbi-value-field input[type="url"],
 	.cbi-value-field input[type="search"] { width: 100%; max-width: var(--fs-field-max); }
-	/* A .cbi-value is designed to hold ONE title+field pair; base lays it out as a flex row —
-	 * label (180px) + field. Some apps cram SEVERAL pairs into one .cbi-value
-	 * (luci-app-3ginfo-lite's "SIM card menu" modal: three title/field pairs in one), and the
-	 * flex row then flows them side by side until the fields overflow the card — the exact bug
-	 * a user reported. Give each title and each field its own full-width row (the same stacked
-	 * layout base already uses on a phone), left-aligned, so nothing overflows and the pairs read
-	 * top to bottom. Scoped by :has() to the abnormal multi-PAIR case ONLY, so every normal
-	 * single-field row (i.e. every real form on the router) keeps its label-beside-field layout.
+	/* A .cbi-value is designed to hold ONE title+field pair, and base lays it out as a flex row. Some
+	 * apps cram several pairs into one .cbi-value, and the flex row then flows them side by side
+	 * until the fields overflow the card. Give each title and each field its own full-width row —
+	 * the stacked layout base already uses on a phone — scoped by `:has()` to the abnormal
+	 * multi-PAIR case only, so every normal single-field row keeps its label-beside-field layout.
 	 *
-	 * THE TEST IS THE SECOND TITLE, NOT THE SECOND FIELD, and that is the whole of this rule's
-	 * safety. `:has()` is LIVE: it re-evaluates the moment the DOM changes, so keying on
-	 * `.cbi-value-field ~ .cbi-value-field` meant any app that APPENDS a second field to a row at
-	 * runtime — a status line, an output pane, a spinner holder, all ordinary shapes — flipped the
-	 * whole row from "label beside field" to "everything stacked" under the user's finger. Measured
-	 * on the stand: pressing a button in such a row moved that button 31px DOWN with this rule and
-	 * 0px with it disabled, which is the "the buttons jump when I press them" report.
-	 *
-	 * What the rule exists for is several title/field PAIRS in one row, and a pair is announced by
-	 * its TITLE (luci-app-3ginfo-lite's SIM-card row: 3 titles, 3 fields — still matched here).
-	 * A second field with no second title is not a pair, it is an app adding something to the one
-	 * field it already had, and nothing about that asks for a re-layout. Rendered markup is matched
-	 * exactly as before; only the runtime append stops triggering it. */
+	 * The test is the second TITLE, not the second field, and that is the whole of this rule's
+	 * safety: `:has()` is live, so keying on a second field means any app that appends one at
+	 * runtime — a status line, an output pane, a spinner holder — flips the row from "label beside
+	 * field" to "everything stacked" under the user's finger. Measured: pressing a button in such a
+	 * row moved that button 31px down. */
 	.cbi-value:has(.cbi-value-title ~ .cbi-value-title) > .cbi-value-title,
 	.cbi-value:has(.cbi-value-title ~ .cbi-value-title) > .cbi-value-field {
 		flex: 1 1 100%;
@@ -126,22 +106,16 @@
 	.cbi-filebrowser > ul > li:hover { background: var(--fs-panel2); }
 	.cbi-filebrowser .upload { border-top-color: var(--fs-border); }
 
-	/* A FILE-BROWSER ROW COULD NOT HOLD ITS OWN BUTTONS, and the row CLIPPED what did not fit
-	 * instead of showing it — `Delete` came out sliced by the browser's border. base sizes the row
-	 * by PROPORTION (name `flex: 10`, actions `flex: 3`), which was sound for base's own ~20px
-	 * buttons sitting in a text-height row; this theme's button is 36px tall with 14px of side
-	 * padding, and a file row carries up to three of them (Deselect, Download, Delete). At 23% of
-	 * the row they do not fit, base gives the browser's children no padding, and
-	 * `.cbi-filebrowser > *` is `overflow: hidden` — so a button touched the clip box on BOTH axes,
-	 * right edge and top edge, and lost its rounded corners to it. A shaved corner reads as a broken
-	 * button, not as a missing 8px.
+	/* A file-browser row must hold its own buttons, and the row CLIPS what does not fit rather than
+	 * showing it. base sizes the row by proportion (name `flex: 10`, actions `flex: 3`), which is
+	 * sound for base's own ~20px buttons in a text-height row; this theme's button is 36px tall with
+	 * 14px of side padding and a file row carries up to three of them, so at 23% of the row they do
+	 * not fit — and `.cbi-filebrowser > *` is `overflow: hidden`, so a button touches the clip box
+	 * on both axes and loses its rounded corners, which reads as a broken button.
 	 *
 	 * So: size the action column to its CONTENT and let the name give way (a name can ellipsize, a
-	 * button cannot), give the children a real gutter, and space the rows — with none, one row's
-	 * button ran into the next row's. It wraps rather than clips when even that is not enough.
-	 *
-	 * This widget takes two clicks inside luci-app-firewall's ipsets or the wireless page to reach
-	 * on a router, which is why it went unseen; docs/gallery.html now renders it open. */
+	 * button cannot), give the children a real gutter, and space the rows. It wraps rather than
+	 * clips when even that is not enough. */
 	.cbi-filebrowser > * { border-bottom-color: var(--fs-border); padding: var(--fs-space-1-5) var(--fs-space-2); }
 	.cbi-filebrowser > ul { display: flex; flex-direction: column; gap: var(--fs-space-1); }
 	.cbi-filebrowser > ul > li { align-items: center; flex-wrap: wrap; gap: var(--fs-space-2); }
@@ -170,14 +144,13 @@
 
 	/* checkbox -> toggle switch
 	 *
-	 * The pill, the knob and the knob's travel are all on --fs-density-box, and every one of them
-	 * used to be a bare literal — so LuCI's most common control was the only one in the theme that
-	 * ignored the Density axis outright: 40x22 at Compact, 40x22 at Large, while every button and
-	 * field around it moved (38 -> 32.3 -> 43.7). 02-tokens.css states the rule the other way round:
-	 * "add a size OUTSIDE these ladders and it silently stops responding to the axis". The switch is
-	 * a box that holds a knob, which is the box tier by definition; the pager buttons were moved off
-	 * bare pixels for exactly this reason (55-buttons.css). Local names, not new global tokens: one
-	 * component needs one number and three things derived from it. */
+	 * The pill, the knob and the knob's travel are all on --fs-density-box. As bare literals they
+	 * make LuCI's most common control the only one in the theme that ignores the Density axis, while
+	 * every button and field around it moves: measured, the switch held 40x22 at Compact and at
+	 * Large while the fields beside it went 38 -> 32.3 -> 43.7. The switch is a box that holds a
+	 * knob, which is the
+	 * box tier by definition. Local names rather than new global tokens: one component needs one
+	 * number and three things derived from it. */
 	.cbi-checkbox { display: inline-flex; align-items: center; }
 	.cbi-checkbox > input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
 	.cbi-checkbox > label {
@@ -190,15 +163,15 @@
 		background: var(--fs-track); border: var(--fs-hairline);
 		cursor: pointer; transition: background var(--fs-dur), border-color var(--fs-dur); vertical-align: middle;
 	}
-	/* The input is opacity:0/0x0, so this label IS the whole hit box of LuCI's most common
-	 * control — and at 22px tall it sits under the 24px floor of WCAG 2.5.8. The floor is about
-	 * the CLICKABLE area, not the drawing: an invisible overlay stretches the target to 44x30
-	 * without fattening the pill (the visual 44x24 version was tried and looked bloated).
-	 * position:absolute, so it adds nothing to layout; the knob keeps ::after.
+	/* The input is opacity:0 at 0x0, so this label IS the whole hit box of LuCI's most common
+	 * control — and at 22px tall it sits under the 24px floor of WCAG 2.5.8. The floor is about the
+	 * CLICKABLE area, not the drawing: an invisible overlay stretches the target to 44x30 without
+	 * fattening the pill (a visual 44x24 was tried and looked bloated). position:absolute, so it
+	 * adds nothing to layout; the knob keeps ::after.
 	 *
-	 * The inset stays LITERAL while the pill above scales: this is an accessibility floor, and a
-	 * floor that shrinks with a density setting is not one. At Compact the pill is 34x18.7, so the
-	 * target is 38x26.7 — still over the 24px minimum (measured). */
+	 * The inset stays literal while the pill above scales: this is an accessibility floor, and a
+	 * floor that shrinks with a density setting is not one. At Compact the target is still 38x26.7,
+	 * over the minimum. */
 	.cbi-checkbox > label::before {
 		content: ""; position: absolute; inset: -4px -2px;
 	}
@@ -212,39 +185,35 @@
 		transition: transform var(--fs-dur-move), background var(--fs-dur);
 	}
 	.cbi-checkbox > input[type="checkbox"]:checked + label { background: var(--fs-accent); border-color: transparent; }
-	/* The travel is derived rather than hand-written (it was a literal 18px), so it cannot drift out
-	 * of step with the three sizes above. The `- 2px` is the pill's two 1px BORDERS and is the whole
-	 * subtlety: --sw-w is a border-box width, while an absolutely-positioned ::after is placed
-	 * against the PADDING box, so the room the knob actually has is 2px less. Deriving it without
-	 * that term overshoots by 2px and the knob lands off-centre against its own left inset
-	 * (measured: travel 20px where symmetry wants 18). The border does not scale with density, so
-	 * the term stays literal. */
+	/* The travel is derived rather than hand-written, so it cannot drift out of step with the three
+	 * sizes above. The `- 2px` is the pill's two 1px BORDERS and is the whole subtlety: --sw-w is a
+	 * border-box width, while an absolutely-positioned ::after is placed against the PADDING box, so
+	 * the knob has 2px less room and deriving without that term lands it off-centre — the travel
+	 * comes out 20px where symmetry wants 18. The border does not scale with density, so the term
+	 * stays literal. */
 	.cbi-checkbox > input[type="checkbox"]:checked + label::after {
 		transform: translateX(calc(var(--sw-w) - var(--sw-knob) - var(--sw-pad) * 2 - 2px));
 		background: var(--fs-on-accent);
 	}
-	/* The real checkbox is opacity:0 / 0x0 above, so base's `input:focus::before` glow paints on
-	 * a 0x0 box — invisible. The <label> IS the switch, so the ring goes there. Without it the
-	 * single most common control in LuCI showed nothing under keyboard focus.
+	/* The real checkbox is opacity:0 at 0x0 above, so base's `input:focus::before` glow paints on a
+	 * 0x0 box. The <label> IS the switch, so the ring goes there, or the most common control in LuCI
+	 * shows nothing under keyboard focus.
 	 *
-	 * -solo, because on the CHECKED switch — which is half the switches on any page — neither
-	 * other channel exists: the rule above fills the track with --fs-accent and sets
-	 * `border-color: transparent`, so this border flip is accent on accent (measured on the
-	 * gallery: fill rgb(86,157,245), border rgba(86,157,245,.97)) and the tinted ring was
-	 * accent at .15 alpha. A checked, keyboard-focused toggle showed literally nothing. */
+	 * -solo, because on the CHECKED switch — half the switches on any page — neither other channel
+	 * exists: the rule above fills the track with --fs-accent and sets `border-color: transparent`,
+	 * so the border flip is accent on accent (measured: fill rgb(86,157,245) against a border of the
+	 * same accent at .97 alpha) and the tinted ring is accent at .15 alpha. */
 	.cbi-checkbox > input[type="checkbox"]:focus-visible + label {
 		border-color: var(--fs-accent);
 		box-shadow: var(--fs-focus-ring-solo);
 	}
 	.cbi-checkbox > input[type="checkbox"]:disabled + label { opacity: var(--fs-disabled-opacity); cursor: not-allowed; }
 
-	/* RAW checkbox/radio — the drawing, absorbed from base whole: it undoes the generic `input`
-	 * box below (width/height/padding/background/border), and left behind in base every one of
-	 * those overrides would lose to that rule by layer. The box is 16px on the grid; the
-	 * tick/dot is inset FROM it rather than restating its own number — the three used to be
-	 * 14/2/10 by hand, so resizing the box left the mark off-centre. LuCI's own forms wrap
-	 * checkboxes in the .cbi-checkbox toggle above; the raw drawing is what a third-party
-	 * app's bare markup gets. */
+	/* Raw checkbox/radio — the drawing, absorbed from base whole: it undoes the generic `input` box
+	 * below, and left in base every one of those overrides would lose to that rule by layer. The box
+	 * is 16px on the grid and the tick or dot is inset FROM it rather than restating its own number,
+	 * so resizing the box cannot leave the mark off-centre. LuCI's own forms wrap checkboxes in the
+	 * .cbi-checkbox toggle above; the raw drawing is what a third-party app's bare markup gets. */
 	input[type="checkbox"],
 	input[type="radio"] {
 		--bd-color: var(--fs-border);
@@ -256,20 +225,18 @@
 		 * that has to HOLD an icon, which is what --fs-density-box is defined for. */
 		--box: calc(16px * var(--fs-density-box));
 		--mark-inset: 3px;
-		/* ---- THE DRAWING IS 16px; THE TARGET IS 24px ----
+		/* ---- the drawing is 16px; the target is 24px ----
 		 *
-		 * WCAG 2.2 SC 2.5.8 lets an undersized target pass on SPACING — 24px centre to centre — and
-		 * that is what a 16px tick box has always relied on. It holds while the theme decides the
-		 * layout and stops holding the moment a third-party app lays out its own rows: CI's
-		 * luci-app-filemanager listing put this checkbox and a file link inside the 24px, and the
-		 * page gate reported both. A target that passes only because of what someone else's markup
-		 * happens to do is not a target that passes.
+		 * WCAG 2.2 SC 2.5.8 lets an undersized target pass on SPACING — 24px centre to centre — which
+		 * is what a 16px tick box has always relied on. That holds while the theme decides the layout
+		 * and stops the moment a third-party app lays out its own rows, putting this checkbox and a
+		 * link inside the 24px. A target that passes only because of somebody else's markup is not a
+		 * target that passes.
 		 *
-		 * So the ELEMENT is 24px and the drawing stays 16px, centred inside it — the two pseudo
-		 * elements below are already absolutely positioned, so centring them costs `inset: 0;
-		 * margin: auto` and nothing else. Nothing moves visually: the box, the tick and the focus
-		 * ring are all drawn by `::before`/`::after` at `--box`, and the element itself has neither
-		 * background nor border. What grows is the area a finger may land on.
+		 * So the ELEMENT is 24px and the drawing stays 16px, centred inside it: the two pseudo
+		 * elements are already absolutely positioned, so centring costs `inset: 0; margin: auto`.
+		 * Nothing moves visually — the box, the tick and the focus ring are all drawn by the pseudo
+		 * elements, and the element itself has neither background nor border.
 		 *
 		 * `max()`, not a flat 24px: the Large density scales `--box` to 18.4px, and a target must
 		 * never SHRINK when the user asks for a bigger UI. */
@@ -277,13 +244,11 @@
 		appearance: none;
 		width: var(--hit);
 		height: var(--hit);
-		/* …AND THE TARGET DOES NOT COST A ROW ITS HEIGHT. The element is 24px, but it occupies its
-		 * old `--box` in layout: the negative margin pulls the extra area back out of the flow, so
-		 * the box overflows itself symmetrically and everything around it sits exactly where it did.
-		 * Measured on luci-app-filemanager's listing, which is where CI reported the finding: with
-		 * the target simply grown, its rows went 42px -> 51px, i.e. a third-party page redesigned by
-		 * a theme's accessibility fix; with the margin, 43px against 42px and the target still
-		 * answers to a hit test at its centre. */
+		/* …and the target does not cost a row its height: the element is 24px but occupies its old
+		 * `--box` in layout, the negative margin pulling the extra area back out of the flow so the
+		 * box overflows itself symmetrically. Measured on a third-party listing: rows went 42px ->
+		 * 51px with the target simply grown, and 43px with the margin, the target still answering to
+		 * a hit test at its centre. */
 		margin: calc((var(--box) - var(--hit)) / 2);
 		color: var(--fg-color);
 		position: relative;
@@ -368,13 +333,12 @@
 		--fg-color: var(--fs-danger);
 	}
 
-	/* The generic field box — absorbed from base's `input, textarea, select, …` group; each other
-	 * member lives with its component rule now (select/.cbi-select above, textarea/dropdown in
-	 * theirs). Bare `input` keeps the historical 210px box as the fallback for every type the
-	 * exhaustive text-input list below does not name — and for a typeless <input>, which IS a
-	 * text input. The widget types that must NOT wear this box (checkbox/radio, file,
-	 * button/submit/reset, range) carry their own theme rules: a base override would lose to
-	 * this rule by layer no matter its specificity, which is why they were absorbed together. */
+	/* The generic field box, absorbed from base's `input, textarea, select, …` group; each other
+	 * member lives with its component rule now. Bare `input` keeps the historical 210px box as the
+	 * fallback for every type the exhaustive text-input list below does not name — and for a
+	 * typeless <input>, which IS a text input. The widget types that must NOT wear this box carry
+	 * their own theme rules: a base override would lose to this rule by layer whatever its
+	 * specificity. */
 	input {
 		display: inline-block;
 		width: 210px;
@@ -439,17 +403,14 @@
 	option { font-size: 100%; line-height: 2em; }
 	select option { background: var(--fs-panel); color: var(--fs-text); }
 
-	/* Native <select> drop list: the OS renders it, so the `select option` colours above are
-	 * ignored on most platforms (a stock white list on a dark theme). Chromium's
-	 * customisable-select (`appearance: base-select`) renders the picker in the DOM, so it can be
-	 * themed like the .cbi-dropdown menu. @supports-gated: browsers without it keep the styled
-	 * closed control + the native list.
+	/* Native <select> drop list: the OS renders it, so the `select option` colours above are ignored
+	 * on most platforms. Chromium's customisable-select (`appearance: base-select`) renders the
+	 * picker in the DOM, so it can be themed like the .cbi-dropdown menu; @supports-gated, and
+	 * browsers without it keep the styled closed control plus the native list.
 	 *
-	 * Scoped to `.cbi-value-field select` ONLY: a third-party app can mount a raw <select>
-	 * outside the CBI form and drive it its own way (podkop-plus rebuilds its device filter via
-	 * select.replaceChildren), and early Chrome builds (~135) mis-render such a select as a
-	 * single-item list — the app's dropdown then looks broken. Those sit outside
-	 * .cbi-value-field, so this scope leaves them native. */
+	 * Scoped to `.cbi-value-field select` only: a third-party app can mount a raw <select> outside
+	 * the CBI form and drive it its own way, and early Chrome builds mis-render such a select as a
+	 * single-item list. Those sit outside .cbi-value-field, so this scope leaves them native. */
 	@supports (appearance: base-select) {
 		.cbi-value-field select { appearance: base-select; }
 		.cbi-value-field select::picker-icon { display: none; }
@@ -478,23 +439,17 @@
 		}
 	}
 
-	/* .cbi-select — the legacy luci-compat shell (a div around a native <select>). Absorbed from
-	 * base whole: the generic field box, the shell's own paint (padding 0 + the two-stop gradient
-	 * + the ▾ plate) and a focus ring on the theme's one token. The shell is a DIV, so
-	 * display/width must be stated — they do not fall out of any UA default.
-	 * :not(select) because the class also appears ON a bare <select> (docs/gallery.html renders
-	 * that shape): a replaced element cannot draw the ::before ▾, so shell paint there means a
-	 * gradient with no glyph — that shape keeps the themed-select rules above instead. */
-	/* IT PAINTS LIKE THE THEMED <select>, because it is the same control wearing an older shell.
-	 * It used to be the theme's only skeuomorphic surface: `linear-gradient(--fs-panel, --fs-border)`
-	 * on the box AND again on the ▾ plate. In the dark palettes --fs-border is LIGHTER than the
-	 * panel, so it was also the only control that got brighter towards the bottom. Nothing else in
-	 * the theme has a gradient at all.
-	 * The geometry below is not invented — it is the `select` rule above, property for property
-	 * (panel2 fill, the palette-aware --fs-select-chevron at the same position and size, the same
-	 * --fs-ctl-h floor, the same 210px box), so a legacy shell and a modern select line up in one
-	 * form column. This is the non-JS fallback: the people who see it already have something
-	 * broken, and it should not additionally look like a control from another theme. */
+	/* .cbi-select — the legacy luci-compat shell (a div around a native <select>), absorbed from base
+	 * whole: the generic field box, the shell's own paint and a focus ring on the theme's token. The
+	 * shell is a DIV, so display and width must be stated. `:not(select)` because the class also
+	 * appears ON a bare <select>: a replaced element cannot draw the ::before chevron, so shell
+	 * paint there means a gradient with no glyph. */
+	/* It paints like the themed <select>, being the same control in an older shell — never a
+	 * skeuomorphic surface of its own: a gradient from panel to border is lighter at the bottom in
+	 * the dark palettes, and nothing else in the theme has a gradient at all. The geometry below is
+	 * the `select` rule above, property for property, so a legacy shell and a modern select line up
+	 * in one form column. This is the non-JS fallback: the people who see it already have something
+	 * broken. */
 	.cbi-select:not(select) {
 		display: inline-block;
 		width: 210px;
@@ -561,13 +516,11 @@
 	/* spinner / loading */
 	.spinning, .cbi-value em, em.spinning { color: var(--fs-dim); }
 
-	/* Text inputs & other field widgets — round + theme to match the selects/dropdowns (base
-	 * leaves them at radius 3 / white). Excludes checkbox/radio (toggles) and file (above).
+	/* Text inputs and other field widgets, rounded and themed to match the selects and dropdowns
+	 * (base leaves them at radius 3 and white). Excludes checkbox/radio and file, handled above.
 	 *
-	 * The type list must be EXHAUSTIVE: an omission does not fall back to "unstyled", it falls
-	 * back to BASE, which still paints a stock white 3px-radius field. color/datetime-local/
-	 * month/week were missing and rendered as visibly different widgets next to a themed input
-	 * in the same form. */
+	 * The type list must be EXHAUSTIVE: an omission does not fall back to "unstyled", it falls back
+	 * to BASE, which still paints a stock white 3px-radius field beside a themed one. */
 	.cbi-input-text, .cbi-input-password, .cbi-input-textarea,
 	.cbi-section-create-name, .cbi-value-field input.create-item-input,
 	input[type="text"], input[type="password"], input[type="number"],
@@ -593,17 +546,16 @@
 	 * in the same column fitted. The 210px is the designed width and still applies wherever there is
 	 * room for it. */
 	textarea { min-height: 84px; line-height: var(--fs-leading); width: 210px; max-width: 100%; font-size: var(--fs-type); }
-	/* A textarea's native scrollbar is a square strip and a rounded corner does not clip it, so
-	 * on a scrolling config field the grey bar poked past the radius — a square notch out of the
-	 * frame. Fix: a slim self-rounded thumb floated off the edges (transparent border +
-	 * background-clip: padding-box), a transparent track, and a track margin keeping the thumb
-	 * clear of the corners — nothing square ever reaches one.
+	/* A textarea's native scrollbar is a square strip and a rounded corner does not clip it, so on a
+	 * scrolling config field the grey bar pokes past the radius as a square notch. Fix: a slim
+	 * self-rounded thumb floated off the edges (transparent border plus background-clip:
+	 * padding-box), a transparent track, and a track margin keeping the thumb clear of the corners.
 	 *
-	 * Deliberately NO `scrollbar-width`/`scrollbar-color`: either makes Chromium switch to the
-	 * STANDARD scrollbar and ignore this whole ::-webkit block — and that standard bar is the
-	 * square, unclipped one that caused the bug. Firefox has no ::-webkit and clips natively.
+	 * Deliberately no `scrollbar-width`/`scrollbar-color`: either makes Chromium switch to the
+	 * standard scrollbar and ignore this whole ::-webkit block — and that standard bar is the
+	 * square, unclipped one. Firefox has no ::-webkit and clips natively.
 	 *
-	 * 16px wide so ::-webkit-resizer (sized off the scrollbar) gets a bigger grab area; the 5px
+	 * 16px wide so ::-webkit-resizer, sized off the scrollbar, gets a bigger grab area; the 5px
 	 * transparent thumb border still leaves it 6px visible. */
 	textarea::-webkit-scrollbar { width: 16px; height: 16px; }
 	textarea::-webkit-scrollbar-track { background: transparent; margin: var(--fs-space-4) 0 var(--fs-space-2-5); }
@@ -615,13 +567,12 @@
 	/* The bottom-right square where the vertical bar meets the resize grip defaulted to white
 	 * and poked past the rounded corner — transparent, so the frame shows. */
 	textarea::-webkit-scrollbar-corner { background: transparent; }
-	/* The resize grip HIGHLIGHTS the frame's bottom-right corner ("this field is resizable") —
-	 * an accent arc tracing the frame's own radius (= the Rounding setting), no straight legs.
-	 * Two borders + the corner radius draw the arc; the legs vanish because the box is shrunk to
-	 * exactly the radius: the resizer is the scrollbar's 16px, so a `16px − radius` margin
-	 * leaves a radius-sized box whose whole right+bottom border IS the quarter curve. (A mask
-	 * would give a shorter arc, but ::-webkit-resizer ignores mask — it filled a solid square —
-	 * and a baked-in SVG colour would not follow the palette or the accent hue.) */
+	/* The resize grip highlights the frame's bottom-right corner — an accent arc tracing the frame's
+	 * own radius, with no straight legs. Two borders plus the corner radius draw the arc, and the
+	 * legs vanish because the box is shrunk to exactly the radius: the resizer is the scrollbar's
+	 * 16px, so a `16px − radius` margin leaves a radius-sized box whose right and bottom border IS
+	 * the quarter curve. (A mask would give a shorter arc, but ::-webkit-resizer ignores mask, and a
+	 * baked-in SVG colour would not follow the palette.) */
 	/* PHYSICAL on purpose, and mirrored by hand below: ::-webkit-resizer is a UA-drawn corner whose
 	 * side follows the writing direction, and it does not accept logical properties — with only the
 	 * LTR rule the arc drew on the wrong corner in an RTL document (a stray quarter-circle on the
@@ -660,13 +611,11 @@
 		outline: none;
 	}
 
-	/* Invalid state keeps the danger cue. `.cbi-value-error input` is the LUA-CBI path and it
-	 * belongs HERE, not in base: base/70-buttons.css does declare a red border-color for it, but
-	 * the rule above sets the `border` SHORTHAND, and a shorthand in a later layer wipes the
-	 * longhand out regardless of specificity. Probed on the gallery — the field rendered
-	 * --fs-border grey, so every third-party app on luci-compat (which emits .cbi-value-error
-	 * from full_valueheader.htm) had lost its field-error cue entirely, while the modern
-	 * .cbi-input-invalid path worked. */
+	/* Invalid state keeps the danger cue. `.cbi-value-error input` is the Lua-CBI path and belongs
+	 * HERE, not in base: base does declare a red border-color for it, but the rule above sets the
+	 * `border` SHORTHAND, and a shorthand in a later layer wipes the longhand out regardless of
+	 * specificity — so every third-party app on luci-compat rendered the field in --fs-border grey
+	 * and had lost its field-error cue while the modern .cbi-input-invalid path worked. */
 	.cbi-input-invalid, input.cbi-input-invalid, textarea.cbi-input-invalid,
 	.cbi-value-error input, .cbi-value-error textarea {
 		border-color: var(--fs-danger);
@@ -792,18 +741,14 @@
 	 * to the last row — give it a real gap instead. */
 	.cbi-section-create, .cbi-section-create.cbi-tblsection-create { margin-top: var(--fs-space-3); }
 
-	/* `.hidden` must win over every component rule in this layer — CBI dependency hiding was
-	 * leaking podkop's conditional fields back onto the page, and the enumerated list that fixed
-	 * that (`.cbi-value.hidden`, `.cbi-section.hidden`, `tr.hidden`, …) only ever covered the
-	 * elements someone had already been bitten by. The one it did NOT cover is the Enter-key
-	 * submit every legacy Lua page carries: luci-compat's cbi/header.htm opens each form with
-	 * `<input type="submit" value="Save" class="hidden">`, and an ATTRIBUTE selector counts as a
-	 * class — theme/55-buttons.css's `input[type="submit"]` is 0,1,1 against a bare `.hidden`'s
-	 * 0,1,0, so it won, and a stray "Save" button floated above the page title on every
-	 * luci-compat view (issue #12, luci-app-openvpn). Doubling the class states the invariant
-	 * ONCE at 0,2,0 instead of chasing elements: hidden is hidden, whatever the element and
-	 * whatever component rule this layer also matched. An `!important` would have done it too,
-	 * and would have inverted the layer order for every future override — this does not. */
+	/* `.hidden` must win over every component rule in this layer. An enumerated list
+	 * (`.cbi-value.hidden`, `.cbi-section.hidden`, …) only ever covers the elements someone has
+	 * already been bitten by, and the one it misses is the Enter-key submit every legacy Lua page
+	 * carries: luci-compat opens each form with `<input type="submit" class="hidden">`, and an
+	 * attribute selector counts as a class, so `input[type="submit"]` at (0,1,1) beats a bare
+	 * `.hidden` at (0,1,0) and a stray "Save" button floats above the page title (issue #12).
+	 * Doubling the class states the invariant once at (0,2,0) instead of chasing elements. An
+	 * `!important` would do it too, and would invert the layer order for every future override. */
 	.hidden.hidden { display: none; }
 	/* RangeSlider (UIRangeSlider) — the one LuCI widget base leaves to native browser rendering.
 	 * Token-driven track/thumb. */

@@ -1,25 +1,16 @@
 #!/usr/bin/env node
-/* WHAT THIS TREE AND THE LuCI TREE DISAGREE ABOUT, and which of those disagreements are supposed
- * to exist.
- *
- * The theme now lives in two places: here, where it is developed and released, and in
- * openwrt/luci as `themes/luci-theme-footstrap`, where it ships with the distribution. Three
- * kinds of difference are possible between them and only one of them is a problem:
+/* What this tree and the openwrt/luci tree disagree about, and which of those disagreements are
+ * supposed to exist. Three kinds are possible and only one is a problem:
  *
  *   EXPECTED   the copy over there gets the BUILT `cascade.css` and no `styles/`, no build or
- *              release scripts, no README — `tools/sync-luci-fork.sh` says why. Reported as a
- *              count and nothing more.
- *   HAND-HELD  the Makefile is maintained by hand on the far side (`include ../../luci.mk`,
- *              PKG_MAINTAINER), and `po/` belongs to Weblate there. A change to either on this
- *              side does NOT travel: this is the report that says so out loud, because it is the
- *              one that has already been missed once — a postrm cleaned up here and not there.
- *   DRIFT      anything else. A shipped file that differs is either a change that has not been
- *              proposed upstream yet, or one that landed there and was never brought back.
+ *              release scripts, no README (tools/sync-luci-fork.sh says why). Reported as a count.
+ *   HAND-HELD  the Makefile is maintained by hand on the far side and `po/` belongs to Weblate
+ *              there, so a change to either on this side does not travel. Said out loud because it
+ *              has already been missed once: a postrm cleaned up here and not there.
+ *   DRIFT      anything else — a shipped file the two trees disagree about.
  *
- * It is a REPORT, not a verdict: an in-flight PR is a legitimate drift, and so is an upstream
- * commit this repository has not merged yet. It exits non-zero only when it cannot look
- * (a checkout that is not there is a skip, not a failure), so `npm run check` can call it
- * anywhere and it stays quiet on a machine with no luci checkout.
+ * A REPORT, not a verdict: an in-flight PR is a legitimate drift, and so is an upstream commit this
+ * repository has not merged yet. A checkout that is not there is a skip, not a failure.
  *
  *   node tools/fork-drift.mjs [path-to-luci-checkout]      (default: ../luci-fork)
  */

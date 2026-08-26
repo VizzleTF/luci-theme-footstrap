@@ -1,115 +1,77 @@
 #!/usr/bin/env python3
 """
-nav-benchmark.py — measure per-page navigation time of luci-theme-footstrap
-(client-side SPA router) vs the stock luci-theme-bootstrap (full page reload),
-walking the *standard* LuCI pages one by one and waiting for each to fully
-render before the next.
+nav-benchmark.py — per-page navigation time of luci-theme-footstrap (client-side SPA router) against
+the stock luci-theme-bootstrap (full page reload), walking the standard LuCI pages one by one.
 
 WHAT IT MEASURES
-  For every standard page it times, in wall-clock milliseconds, the interval
-  from "navigation intent" to "view fully rendered":
-    - footstrap: a real in-app click on the menu link -> the theme's SPA router
-      re-instantiates the view into #view (no page reload).
-    - bootstrap: a full navigation to the page URL -> browser reloads the whole
-      shell, re-parses/re-runs luci.js+cbi.js, re-fetches translations, rebuilds
-      the menu, then renders the view.
-  Both themes render page content into the SAME #view element (the dispatcher
-  emits it regardless of theme), so the "rendered" condition is identical and
-  the comparison is apples-to-apples: user-perceived click-to-usable time.
+  Wall-clock milliseconds from navigation intent to "view fully rendered": for footstrap a real
+  in-app click on the menu link, for bootstrap a full navigation to the page URL. Both themes render
+  into the SAME #view element (the dispatcher emits it regardless of theme), so the rendered
+  condition is identical and the comparison is user-perceived click-to-usable time.
 
 METHOD (per theme)
   1. Activate the theme (uci luci.main.mediaurlbase), clear the LuCI caches.
   2. Fresh browser context, log in.
-  3. WARM pass: walk every page once, unmeasured, so HTTP cache + LuCI module
-     cache are populated (steady state — matches "after each has loaded once").
-  4. MEASURED passes (--runs, default 5): walk every page again, timing each
-     arrival. Report the MEDIAN per page to suppress noise.
-  Also counts network requests fired during each transition (SPA fetches only
-  the RPC it needs; a full reload re-requests the shell + scripts, even if 304).
+  3. WARM pass: walk every page once, unmeasured, so the HTTP and module caches are populated.
+  4. MEASURED passes (--runs, default 5): walk again, timing each arrival; report the MEDIAN.
+  Network requests per transition are counted too — a full reload re-requests the shell and scripts
+  even when every answer is a 304.
 
-CPU — TWO TABLES, BECAUSE "CPU LOAD" IS TWO DIFFERENT QUESTIONS
-  Wall-clock time answers "how long did I wait". It does not answer "what did
-  this cost", and the two can disagree: a theme could be fast because it makes
-  the ROUTER do the work, or fast on the router while burning the client's
-  battery. So both ends are measured, by different means, and reported apart.
+CPU — TWO TABLES, BECAUSE "CPU LOAD" IS TWO QUESTIONS
+  Wall-clock answers "how long did I wait", not "what did this cost", and the two can disagree: a
+  theme can be fast because it makes the ROUTER do the work, or fast on the router while burning the
+  client's battery. Both ends are measured, by different means, and reported apart.
 
-  ROUTER (bench/…: "router CPU"). Measured ON the router, from /proc, at the
-  edges of each theme's measured passes — never per navigation, because an ssh
-  round trip per nav would add both latency to the timing table and CPU to the
-  thing being measured.
+  ROUTER. Read on the router from /proc at the edges of each theme's measured passes, never per
+  navigation: an ssh round trip per nav would add latency to the timing table and CPU to the thing
+  being measured.
 
-  A LuCI view POLLS while it is open (status readouts, once a second), and that
-  is router CPU nobody navigated for. Measured naively, the pass window mixes
-  the two and the mixture flatters the fast theme twice: it serves the tour with
-  less CPU *and* finishes sooner, so it also pays less polling. So the polling
-  rate is measured separately, per theme, parked on one fixed page with nothing
-  else happening, and the table prints all three — the tour's total, the polling
-  rate, and the remainder divided by the navigation count. The first number is
-  the honest answer to "what did this tour cost my router"; the third is the
-  honest answer to "what does one navigation cost".
+  A view POLLS while it is open, and that is router CPU nobody navigated for. Measured naively the
+  window mixes the two and the mixture flatters the fast theme twice — less CPU for the tour AND a
+  shorter tour, so less polling. So the polling rate is measured separately, parked on one fixed
+  page, and the table prints the tour's total, the polling rate, and the remainder per navigation.
 
-  Two ways of counting, and the first is the attributable one:
-    - web stack: utime+stime+cutime+cstime of uhttpd, rpcd and ubusd. The
-      cutime/cstime halves are what make this work: uhttpd forks a CGI per
-      request and a reaped child's CPU lands in its parent's counters, so the
-      ucode that renders the shell IS counted (verified on the router: 10 shell
-      renders moved uhttpd's cutime+cstime by 41 jiffies, i.e. ~41 ms each,
-      while rpcd — which the login page never calls — did not move at all).
-      This attributes cost to the web stack and ignores unrelated router noise.
-    - whole box: the /proc/stat busy delta, i.e. "CPU load" in the plain sense.
-      Includes everything else the router is doing, so an IDLE BASELINE is
-      measured before and after the run and printed beside it. Do not read the
-      box figure without the baseline.
-  Window length comes from the ROUTER's own /proc/uptime, so a clock offset
-  between host and router cannot skew it. Jiffies are converted at 100 Hz —
-  USER_HZ, which is a fixed kernel ABI constant for /proc, not CONFIG_HZ.
+  Two ways of counting, the first being the attributable one:
+    - web stack: utime+stime+cutime+cstime of uhttpd, rpcd and ubusd. The cutime/cstime halves are
+      what make it work: uhttpd forks a CGI per request and a reaped child's CPU lands in its
+      parent's counters, so the ucode that renders the shell IS counted (measured: 10 shell renders
+      moved uhttpd's cutime+cstime by 41 jiffies, while rpcd did not move at all).
+    - whole box: the /proc/stat busy delta. Includes everything else the router is doing, so an IDLE
+      BASELINE is measured before and after and printed beside it. Do not read one without the other.
+  The window length comes from the ROUTER's own /proc/uptime, so a host/router clock offset cannot
+  skew it. Jiffies convert at 100 Hz — USER_HZ, a fixed kernel ABI constant for /proc, not CONFIG_HZ.
 
-  NOTE FOR ANYONE RUNNING THIS IN A CONTAINER: /proc/stat inside a Docker
-  container is the HOST's (measured: byte-identical to the host's own), so the
-  "whole box" figure there would include this very benchmark's browser. The web
-  stack figure is per-process and stays correct. The published numbers come from
-  real hardware for exactly this reason.
+  In a container /proc/stat is the HOST's, so the "whole box" figure would include this benchmark's
+  own browser; the per-process web-stack figure stays correct. The published numbers come from real
+  hardware for that reason.
 
-  CLIENT (bench/…: "client CPU"). Per navigation and precise, from CDP
-  Performance.getMetrics deltas: TaskDuration (main-thread task time) with a
-  ScriptDuration / RecalcStyleDuration / LayoutDuration / V8CompileDuration
-  breakdown. Verified on the router that these counters are monotonic across a
-  full page navigation — the renderer process is reused for a same-origin load,
-  so a bootstrap reload accumulates rather than resetting; a negative delta
-  (process replaced) is detected and the sample dropped rather than counted as 0.
+  CLIENT. Per navigation, from CDP Performance.getMetrics deltas: TaskDuration with a ScriptDuration
+  / RecalcStyleDuration / LayoutDuration / V8CompileDuration breakdown. These counters are monotonic
+  across a full navigation — the renderer process is reused for a same-origin load — so a negative
+  delta means the process was replaced and the sample is dropped rather than counted as 0.
 
-  Two things to know before quoting the client numbers. TaskDuration is ALL
-  main-thread task time in the window, so it includes whatever the open page was
-  doing anyway — the named parts (script/style/layout) sum to a small fraction of
-  it, and the rest is HTML parsing, network task dispatch, GC and timers. And
-  V8CompileDuration is ~0.1 ms in both themes on a warm cache, i.e. compiling
-  luci.js/cbi.js is NOT where a full reload loses: V8's code cache makes the
-  re-compile nearly free, so the reload's cost is the shell, the re-fetch and the
-  re-render. It is printed anyway, because "this is not the reason" is worth
-  seeing rather than assuming.
+  Two caveats before quoting them. TaskDuration is ALL main-thread task time in the window, so the
+  named parts sum to a fraction of it and the rest is HTML parsing, network dispatch, GC and timers.
+  And V8CompileDuration is ~0.1 ms in both themes on a warm cache: compiling luci.js/cbi.js is NOT
+  where a full reload loses, V8's code cache makes it nearly free, and the cost is the shell, the
+  re-fetch and the re-render. Printed anyway, because "this is not the reason" is worth seeing.
 
 STANDARD PAGES
-  Discovered live from /admin/menu: every node the menu can turn into a link
-  (satisfied + titled) at depth >= 3, whose *resolved* target is a standard LuCI
-  page. Third-party app pages are excluded by construction (see STANDARD_VIEWS).
+  Discovered live from /admin/menu: every node the menu can turn into a link (satisfied + titled) at
+  depth >= 3 whose RESOLVED target is a standard LuCI page. Third-party pages are excluded by
+  construction (STANDARD_VIEWS).
 
-  Three things this deliberately does NOT do, each of which used to hide pages:
-    - it does not stop at depth 3. The tab leaves (Realtime x5, Logs x2,
-      Administration x5, Firewall x5) are click-navigable — they are just clicked
-      in #tabmenu instead of the main menu — and they are 17 of the 39 pages.
-    - it does not require action.type == 'view'. A menu link can be an `alias`
-      (Firewall, System Log, Realtime Graphs), a `firstchild` (Administration) or
-      the overview `template`; the theme's router resolves all of them, and the
-      user clicks them more than anything else. Benchmarking only `view` nodes
-      measured the theme everywhere except its front door.
-    - it does not filter on the view path alone: package-manager's view path has
-      no module prefix at all, so a prefix filter silently dropped it.
+  Three things it deliberately does not do, each of which used to hide pages:
+    - it does not stop at depth 3. The tab leaves (Realtime, Logs, Administration, Firewall) are
+      click-navigable, just in #tabmenu, and they are 17 of the 39 pages.
+    - it does not require action.type == 'view'. A menu link can be an `alias`, a `firstchild` or the
+      overview `template`; the router resolves all of them and users click them most. Benchmarking
+      only `view` nodes measured the theme everywhere except its front door.
+    - it does not filter on the view path alone: package-manager's view path has no module prefix, so
+      a prefix filter silently dropped it.
 
-  Excluded on purpose:
-    - admin/status/channel_analysis — its time is a 5 s hardware radio scan, not
-      theme work, and re-running it 12x would disrupt the router's own wifi.
-    - attendedsysupgrade — it talks to sysupgrade.openwrt.org; that would time the
-      internet, not the theme.
+  Excluded on purpose: admin/status/channel_analysis (its time is a 5 s radio scan, and 12 runs would
+  disrupt the router's wifi) and attendedsysupgrade (it times the internet, not the theme).
 
 USAGE
   python3 -m venv .venv && .venv/bin/pip install playwright && \
@@ -124,38 +86,33 @@ FOOTSTRAP = "/luci-static/footstrap"        # sidebar variant (simple menu)
 BOOTSTRAP = "/luci-static/bootstrap"        # stock baseline
 PROTON    = "/luci-static/proton2025"       # luci-theme-proton2025, a third-party theme
 
-# Every theme in the run, baseline first. Only footstrap has a client router, so it
-# is the only one navigated by clicking a link; the others get a real full navigation,
-# which is what a click does in them anyway. Add a theme here and it joins the table —
-# it must already be installed and registered in `luci.themes` on the router.
+# Every theme in the run, baseline first. Only footstrap has a client router, so it is the only one
+# navigated by clicking a link; the others get a real full navigation, which is what a click does in
+# them anyway. A theme added here must already be registered in `luci.themes` on the router.
 THEMES = [BOOTSTRAP, PROTON, FOOTSTRAP]
 BASELINE = BOOTSTRAP
 
-# A page counts as standard if the view it resolves to belongs to a module that
-# ships with a stock OpenWrt LuCI: luci-mod-status / -system / -network (whose
-# firewall views live under firewall/) and the package manager. Matching the
-# resolved VIEW path, not the menu path, is what keeps a third-party app out even
-# when it hangs itself under admin/system.
+# A page counts as standard if the view it resolves to belongs to a module that ships with a stock
+# LuCI: luci-mod-status / -system / -network (whose firewall views live under firewall/) and the
+# package manager. Matching the resolved VIEW path rather than the menu path keeps a third-party app
+# out even when it hangs itself under admin/system.
 STANDARD_VIEWS = ("status/", "system/", "network/", "firewall/", "package-manager")
 OVERVIEW_TPL   = "admin_status/index"       # the one template node that is a page
 EXCLUDE_PATHS  = ("admin/status/channel_analysis",)   # radio scan — see docstring
 
-# Tag the outgoing view's nodes; LuCI renders a view with dom.content(#view, …),
-# which REPLACES the children, so "no tagged node left" == "the new page is up".
+# Tag the outgoing view's nodes; LuCI renders with dom.content(#view, …), which REPLACES the
+# children, so "no tagged node left" means the new page is up.
 STALE = ("(()=>{const v=document.getElementById('view'); if(!v) return;"
          "for (const c of v.children) c.setAttribute('data-bench-old','');})()")
 
-# Rendered = #view has content, nothing is spinning, and none of it is the page we
-# just navigated AWAY from.
+# Rendered = #view has content, nothing is spinning, and none of it is the page we navigated away
+# from.
 #
-# The stale check is not a nicety. A SPA nav leaves the old view on screen until
-# the new one renders, so a condition that only asks "does #view have children"
-# is true the instant the click lands — it would time the previous page. The old
-# harness papered over that by first waiting up to 3 s for a spinner to appear as
-# a "nav acknowledged" gate, which broke the other way: a view whose module is
-# already cached renders with no spinner frame at all, so the wait ran its full
-# 3 s timeout and reported ~3017 ms for pages that were in fact the FASTEST ones.
-# Eight pages were mis-timed that way. Marker in, spinner gate out.
+# The stale check is not a nicety. A SPA nav leaves the old view on screen until the new one renders,
+# so a condition that only asks "does #view have children" is true the instant the click lands and
+# would time the previous page. Waiting for a spinner instead does not work: a view whose module is
+# cached renders with no spinner frame at all, so the wait ran its full 3 s timeout and reported
+# ~3017 ms for the FASTEST pages — eight of them.
 RENDERED = (
     "(()=>{const v=document.getElementById('view');"
     "if(!v || v.children.length===0) return false;"
@@ -173,16 +130,16 @@ def sh(host, cmd):
 # ---------------------------------------------------------------------------
 # router-side CPU
 # ---------------------------------------------------------------------------
-# ONE ssh round trip per sample. Everything is read from /proc, including the
-# clock: the window length comes from the router's own uptime so that a clock
-# offset between this host and the router cannot turn into a bogus percentage.
+# ONE ssh round trip per sample. Everything is read from /proc, including the clock: the window
+# length comes from the router's own uptime, so a host/router clock offset cannot become a bogus
+# percentage.
 CPU_PROBE = (
     "for p in $(pgrep uhttpd) $(pgrep rpcd) $(pgrep ubusd); do "
     "  awk '{print $14+$15+$16+$17}' /proc/$p/stat 2>/dev/null; "
     "done | awk '{s+=$1} END{printf \"stack %d\\n\", s+0}'; "
-    # $1 is the literal "cpu", so: 2 user, 3 nice, 4 system, 5 idle, 6 iowait,
-    # 7 irq, 8 softirq, 9 steal. busy excludes idle AND iowait (waiting is not
-    # burning). The double space after "cpu" collapses under awk's default FS.
+    # $1 is the literal "cpu": 2 user, 3 nice, 4 system, 5 idle, 6 iowait, 7 irq, 8 softirq,
+    # 9 steal. busy excludes idle AND iowait (waiting is not burning). The double space after "cpu"
+    # collapses under awk's default FS.
     "awk '/^cpu /{printf \"busy %d\\nidle %d\\n\", $2+$3+$4+$7+$8+$9, $5+$6}' /proc/stat; "
     "awk '{printf \"up %s\\n\", $1}' /proc/uptime; "
     "awk '{printf \"load %s\\n\", $1}' /proc/loadavg; "
@@ -190,9 +147,8 @@ CPU_PROBE = (
 )
 USER_HZ = 100   # /proc/<pid>/stat is in USER_HZ, a fixed ABI constant (not CONFIG_HZ)
 
-# Where to park to measure the polling rate, and for how long. The overview is
-# the right page: it is the one users leave open, and it polls the most, so the
-# rate is well above the jiffy floor. Long enough that a 10 ms jiffy is noise.
+# Where to park to measure the polling rate, and for how long. The overview is the right page: it is
+# the one users leave open and it polls the most, so the rate sits well above the jiffy floor.
 POLL_PAGE = "admin/status/overview"
 POLL_SECS = 10
 
@@ -309,8 +265,8 @@ def wait_render(page, t_start):
 def nav_footstrap(page, base, dp):
     """SPA: real in-app click on the menu link (fires the theme's click handler)."""
     sel = f'a[href$="/cgi-bin/luci/{dp}"], a[href$="/{dp}"]'
-    # locate the link (may be inside a collapsed section — a programmatic click
-    # still bubbles to the document handler, so visibility is irrelevant)
+    # the link may sit inside a collapsed section; a programmatic click still bubbles to the
+    # document handler, so visibility is irrelevant
     found = page.evaluate(
         "(sel)=>{const a=document.querySelector(sel); if(!a) return false;"
         " a.click(); return true;}", sel)
@@ -322,11 +278,8 @@ def nav_bootstrap(page, http, dp):
     return True
 
 
-# The renderer's own CPU counters, in the order the breakdown is printed.
-# TaskDuration is the headline (all main-thread task time); the rest are the
-# parts of it worth naming. V8CompileDuration is the one that separates a full
-# reload from an SPA nav: a reload re-compiles luci.js/cbi.js, a nav compiles
-# nothing.
+# The renderer's own CPU counters, in the order the breakdown is printed. TaskDuration is the
+# headline (all main-thread task time); the rest are the parts of it worth naming.
 CPU_METRICS = ("TaskDuration", "ScriptDuration", "V8CompileDuration",
                "RecalcStyleDuration", "LayoutDuration")
 
@@ -361,9 +314,9 @@ def run_theme(p, http, base, media, pages, runs, login):
     def go(dp):
         reqs["n"] = 0
         cpu0 = client_cpu(cdp)
-        # a marker on `window` dies with a full page load and survives an in-place
-        # swap: the only honest way to tell a SPA nav from a router fallback, and
-        # without it a 1.0x row looks like a slow SPA instead of a full reload.
+        # a marker on `window` dies with a full page load and survives an in-place swap: the only
+        # honest way to tell a SPA nav from a router fallback. Without it a 1.0x row reads as a slow
+        # SPA instead of a full reload.
         page.evaluate("() => { window.__benchmark = 1; }")
         page.evaluate(STALE)
         t = time.perf_counter()

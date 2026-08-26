@@ -1,8 +1,8 @@
-# Publishes the developer portal to GitHub Pages. devkit.html is generated (like cascade.css), so
-# it is built here, never committed. The gallery is published too — it needs a real cascade.css +
-# the font/wallpaper assets next to it, so those are copied in.
+# Publishes the developer portal to GitHub Pages. devkit.html is generated (like cascade.css), so it
+# is built here, never committed. The gallery is published too — it needs a real cascade.css and the
+# wallpaper assets next to it, so those are copied in.
 #
-# One-time setup by a maintainer: repo Settings → Pages → Source = "GitHub Actions".
+# One-time setup by a maintainer: repo Settings -> Pages -> Source = "GitHub Actions".
 name: pages
 
 on:
@@ -17,9 +17,9 @@ on:
       - 'tools/lib/gallery.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
-  # Called by build.yml's release job once the release is published — that is what refreshes the
-  # release-metadata mirror below. It cannot be `on: release`, because an event raised by
-  # GITHUB_TOKEN does not trigger another workflow.
+  # Called by build.yml's release job once the release is published, which is what refreshes the
+  # release-metadata mirror below. It cannot be `on: release`: an event raised by GITHUB_TOKEN does
+  # not trigger another workflow.
   workflow_call:
 
 permissions:
@@ -36,9 +36,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # 22, matching build.yml: eslint 10 / stylelint 17 need Node >= 20.19, and a bare `20`
-      # floats on the 20.x line that straddles that floor. Nothing here lints, but `npm ci`
-      # installs them and would EBADENGINE.
+      # 22, matching build.yml: eslint 10 / stylelint 17 need Node >= 20.19, and a bare `20` floats
+      # on the 20.x line that straddles that floor. Nothing here lints, but `npm ci` installs them
+      # and would EBADENGINE.
       - uses: actions/setup-node@v7
         with: { node-version: '22' }
       - run: npm ci
@@ -48,9 +48,8 @@ jobs:
           npm run devkit
           MEDIA=luci-theme-footstrap/htdocs/luci-static/footstrap
           # `mkdir -p _site` is not decoration: nothing else here creates the directory. It used to
-          # be made as a side effect of `mkdir -p _site/fonts`, and removing that line with the
-          # webfonts took the portal's whole output directory with it — every `cp` below then failed
-          # on "No such file or directory".
+          # be a side effect of `mkdir -p _site/fonts`, and removing that line with the webfonts
+          # took the portal's whole output directory with it.
           mkdir -p _site
           cp docs/devkit.html _site/index.html          # portal is the Pages root
           cp docs/devkit.html _site/devkit.html
@@ -61,29 +60,26 @@ jobs:
           # Mono first and the system stack after, so the portal renders in whatever the visitor
           # has — the same thing a router does.
           cp "$MEDIA"/logo.svg _site/
-          # The two sample patterns the playground links. They are not in the package at all — the
+          # The two sample patterns the playground links. They are not in the package — the
           # Wallpaper axis takes an SVG the admin uploads — so the portal serves them from the
-          # repository copy. The path is `wallpapers/svg/`, and this glob has now broken twice on a
-          # move: once out of htdocs, once into the svg/ subdirectory. `set -e` plus a glob that
-          # matches nothing is a failed build, which is the loud outcome and the right one.
+          # repository copy. This glob has broken twice on a move; `set -e` plus a glob that matches
+          # nothing is a failed build, which is the loud outcome and the right one.
           cp wallpapers/svg/*.svg _site/
-      # A FULL MIRROR OF THE LATEST RELEASE — the manifest, its signature AND THE
-      # PACKAGES. A different host from github.com, so a block or an outage covering one need not
-      # cover the other.
+      # A FULL MIRROR OF THE LATEST RELEASE — the manifest, its signature AND THE PACKAGES, on a
+      # different host from github.com, so a block or an outage covering one need not cover the
+      # other.
       #
-      # THE PACKAGES ARE THE POINT, and a metadata-only mirror would have been theatre: a release
-      # asset URL redirects THROUGH github.com, so a router that cannot reach github.com cannot
-      # fetch the package either — mirroring only the manifest moves the failure two lines later
-      # and fixes nothing. What makes mirroring the packages safe is that the manifest is signed
-      # and carries their sha256: bytes from the mirror are held to exactly the same hash as bytes
-      # from GitHub, so the mirror is never trusted, only used.
+      # The packages are the point: a release asset URL redirects THROUGH github.com, so a router
+      # that cannot reach github.com cannot fetch the package either, and mirroring only the
+      # manifest moves the failure two lines later. What makes mirroring the packages safe is that
+      # the manifest is signed and carries their sha256, so mirror bytes are held to the same hash
+      # as GitHub's: the mirror is never trusted, only used.
       #
-      # PULLED FROM THE RELEASE on every Pages build, never committed and never assembled here:
+      # Pulled from the release on every Pages build, never committed and never assembled here:
       # this workflow also fires on a docs push, and a build that did not carry the release forward
-      # would silently empty the mirror. One source, copied.
+      # would silently empty the mirror.
       #
-      # Fails OPEN — a repo with no manifest release yet publishes the portal without a mirror,
-      # which is exactly the state every reader already handles.
+      # Fails OPEN — a repo with no manifest release yet publishes the portal without a mirror.
       - name: Mirror the latest release
         run: |
           set -eu
@@ -95,18 +91,17 @@ jobs:
           fi
           curl -fsSL --retry 2 -o _site/manifest.txt.sig \
             "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/manifest.txt.sig"
-          # THE INSTALLER TOO, and it is not an afterthought: a router that cannot reach github.com
-          # cannot fetch install.sh from there either, so a mirror without it leaves the user with a
-          # verified way to install and no way to obtain the thing that does the installing. Its
-          # signature rides along so the script can be checked before it is run as root — the one
-          # link the trust chain cannot cover on its own (see the README's verify-then-run recipe).
+          # The installer too: a router that cannot reach github.com cannot fetch install.sh from
+          # there either, so a mirror without it leaves the user with a verified way to install and
+          # no way to obtain the installer. Its signature rides along so the script can be checked
+          # before it runs as root — the one link the trust chain cannot cover on its own.
           for f in install.sh install.sh.sig; do
             curl -fsSL --retry 2 -o "_site/$f" \
               "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/$f" || rm -f "_site/$f"
           done
-          # Every package the manifest names, under the name the manifest gives it — the same string
-          # a router will ask this mirror for. Reading the file list out of the manifest instead of
-          # globbing the release is what keeps the two in step.
+          # Every package the manifest names, under the name the manifest gives it — the same
+          # string a router asks this mirror for. Reading the file list out of the manifest rather
+          # than globbing the release is what keeps the two in step.
           tag=$(awk '$1=="tag"{print $2; exit}' _site/manifest.txt)
           awk '$1=="pkg"{print $4}' _site/manifest.txt | while read -r f; do
             curl -fsSL --retry 2 -o "_site/$f" \

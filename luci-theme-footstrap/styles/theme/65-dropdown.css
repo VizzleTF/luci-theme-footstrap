@@ -1,10 +1,10 @@
 @layer theme {
-	/* Generic .dropdown-menu popup. NOTHING in luci-base emits it — the split "Save & Apply" button
-	 * is a `.cbi-dropdown`, a different widget — so this is coverage vocabulary: stock
-	 * luci-theme-bootstrap styles it, a third-party luci-app-* may therefore emit it and expect a
-	 * themed result (the same contract 10-chrome.css states for the same class). NOT the theme's
-	 * nav menu (that is a plain nested <ul>; see 10-chrome.css).
-	 * Hover text is ACCENT to match the open cbi-dropdown list: this is a form control's menu. */
+	/* Generic .dropdown-menu popup. Nothing in luci-base emits it — the split "Save & Apply" button is
+	 * a `.cbi-dropdown`, a different widget — so this is coverage vocabulary: stock
+	 * luci-theme-bootstrap styles it, so a third-party luci-app-* may emit it and expect a themed
+	 * result — theme/10-chrome.css claims the same class for the same reason. Not the theme's nav
+	 * menu, which is a plain nested <ul>.
+	 * Hover text is accent to match the open cbi-dropdown list: this is a form control's menu. */
 	.dropdown-menu { background-color: var(--fs-panel); border-color: var(--fs-border); }
 	.dropdown-menu a { color: var(--fs-text); text-shadow: none; }
 	.dropdown-menu a:hover,
@@ -14,12 +14,10 @@
 	 *
 	 * The guard is the same `:not(.btn):not(.cbi-button)` the widget rules below use, and it is
 	 * load-bearing: the split control's outer div IS the button, and the class on it is the one
-	 * ui.js picked for the SELECTED mode — `cbi-button-apply` for "Save & Apply", but
-	 * `cbi-button-negative` the moment the user picks "Apply unchecked" (luci.js's ComboButton
-	 * `classes` map). Unguarded, this rule (0,2,0) erased that variant's fill while its ink
-	 * (--fs-on-danger) survived from the variant rule that sets no background — a button painted
-	 * page-on-page: 1.13:1 in dark and 1.06:1 in light, measured on the footer. Only the mode
-	 * repainted below was ever visible. */
+	 * ui.js picked for the SELECTED mode — `cbi-button-apply`, or `cbi-button-negative` the moment
+	 * the user picks "Apply unchecked" (luci.js's ComboButton `classes` map). Unguarded, this rule
+	 * (0,2,0) erases that variant's fill while its ink survives from the variant rule that sets no
+	 * background: a button painted page-on-page, at 1.06-1.13:1. */
 	.cbi-page-actions .cbi-dropdown:not(.btn):not(.cbi-button) {
 		border: 0; border-radius: var(--fs-radius); background: transparent;
 	}
@@ -38,25 +36,15 @@
 	.cbi-page-actions .cbi-dropdown > .cbi-button:hover { filter: var(--fs-hover-lift); }
 
 	/* ---- cbi-dropdown widget: the JS select used across all forms ----
-	 * Restyled to the design dropdown (panel2, rounded, chevron, focus ring) + themed open list.
-	 * A native <select> is styled separately.
+	 * Restyled to the design dropdown (panel2, rounded, chevron, focus ring) with a themed open
+	 * list. A native <select> is styled separately.
 	 *
-	 * The widget's MACHINERY is here too — absorbed from base/80-dropdown.css whole. ui.js drives
-	 * it purely through attributes ([open], [multiple], [empty], [more], [display], [selected]);
-	 * the rules below turn those into a working combobox. The display state machine is UNFLAGGED:
-	 * upstream resolved the states with !important, but flag-vs-flag falls back to
-	 * specificity-then-order anyway, so the machine below states the SAME resolution openly (see
-	 * the state-machine block). The `ul` margins were flagged too, on the stated grounds that ui.js
-	 * writes `margin` INLINE on an open list. IT DOES NOT — grepped on both releases: ui.js touches
-	 * only `top`/`left`/`right`/`maxHeight`/`bottom` on that `ul`, and only under `'ontouchstart' in
-	 * window` (see 90-responsive.css, where the flags that fight THOSE live). The flags came in with
-	 * the absorbed widget from luci-theme-bootstrap, which has no @layer and needed one to beat its
-	 * own `ul { margin: 0 0 10px 25px }`; here the layer split does that for free. They were not
-	 * idle, though — they were beating THIS FILE: `margin: 0 !important` on (0,1,1) out-ranked the
-	 * open popover's own `margin-top` at (0,2,1) below, so the list sat 1px off the control instead
-	 * of the designed 6px, and the two `.btn` rules then needed flags of their own purely to escape
-	 * the first one. Measured on the gallery: dropping all three moves exactly one value (that gap,
-	 * 1px -> 7px) and nothing else. */
+	 * The widget's MACHINERY is here too, absorbed from base whole. ui.js drives it purely through
+	 * attributes ([open], [multiple], [empty], [more], [display], [selected]) and the rules below
+	 * turn those into a working combobox. The display state machine is UNFLAGGED: upstream resolved
+	 * the states with !important, but flag-vs-flag falls back to specificity-then-order anyway, so
+	 * the machine below states the same resolution openly. The flags came in with the absorbed
+	 * widget from a theme with no @layer, which needed them to beat its own bare `ul` rule. */
 	.cbi-dropdown {
 		display: inline-flex;
 		cursor: pointer;
@@ -150,12 +138,11 @@
 	}
 
 	/* ---- the display state machine, on specificity ----
-	 * Every shower OUT-SPECIFIES the hider it overrides: li[display] (0,2,2) > the li hider
-	 * (0,1,2); [open] > ul.dropdown > li (0,3,2) likewise; the placeholder rules (0,5,2 and
-	 * 0,6,2) > the placeholder hider (0,4,2); the form rule (0,4,3) > its hider (0,1,3).
-	 * [empty]'s block (0,2,2) loses to [open]'s flex (0,3,2) deliberately — an open empty list
-	 * still lays out as a popup — which is exactly the resolution the old flags produced among
-	 * themselves (importance never separated them; specificity always did). */
+	 * Every shower out-specifies the hider it overrides: li[display] (0,2,2) over the li hider
+	 * (0,1,2); [open] > ul.dropdown > li (0,3,2) likewise; the placeholder rules (0,5,2 and 0,6,2)
+	 * over the placeholder hider (0,4,2); the form rule (0,4,3) over its hider (0,1,3). [empty]'s
+	 * block (0,2,2) loses to [open]'s flex (0,3,2) deliberately — an open empty list still lays out
+	 * as a popup — which is the resolution the old flags produced among themselves. */
 	.cbi-dropdown > ul > li[display],
 	.cbi-dropdown[open] > ul.preview,
 	.cbi-dropdown[open] > ul.dropdown > li,
@@ -166,13 +153,11 @@
 		flex-grow: 1;
 		display: flex;
 	}
-	/* The ONE state the old flags actually carried: a closed optional single dropdown with an
-	 * empty value. ui.js hands the [display] attribute to the placeholder row itself
-	 * (`sel[0] ?? items[0]`), and the placeholder hider (0,4,2) out-specifies the generic
-	 * li[display] shower (0,2,2) — unflagged, the closed control rendered EMPTY (this is the
-	 * "popup collapses" the old base comment measured). :not([open]) keeps this out of the open
-	 * list, where the [optional][open] rule below owns the row — the states cannot overlap, so
-	 * nothing here rests on source order. */
+	/* The one state the old flags actually carried: a closed optional single dropdown with an empty
+	 * value. ui.js hands the [display] attribute to the placeholder row itself, and the placeholder
+	 * hider (0,4,2) out-specifies the generic li[display] shower (0,2,2), so unflagged the closed
+	 * control renders EMPTY. `:not([open])` keeps this out of the open list, where the
+	 * [optional][open] rule below owns the row. */
 	.cbi-dropdown:not([open]):not(.btn):not(.cbi-button) > ul > li[placeholder][display] {
 		flex-grow: 1;
 		display: flex;
@@ -185,17 +170,13 @@
 		display: flex;
 	}
 	.cbi-dropdown[open] > ul.dropdown > li .hide-open { display: none; }
-	/* `min-width` because the thing that overflows an open row is a CHILD with an inline width, so
-	 * wrapping the row (theme/65 below) cannot reach it: form.js's RichListValue writes the
-	 * description block as `<div class="hide-close" style="min-width:25vw">`, which assumes the list
-	 * grows to fit — true on a theme that leaves ul.dropdown unbounded, false here (capped at
-	 * min(92vw, 420px), 90-responsive.css). The inline floor is a VIEWPORT fraction, so the wider the
-	 * screen the worse it gets: measured on a live router at 2559px, 25vw = 640px inside a 406px row
-	 * — scrollWidth 664 vs clientWidth 406, and the row's own `overflow: hidden` cut "…for routing
-	 * with/withou" mid-word, losing the whole "Requires hardware NAT support" sentence (issue #15,
-	 * reported again after 0.10.1, whose fix only addressed the row). At 1280px the same option fits,
-	 * which is why it does not reproduce on a laptop. An author !important is the only thing that
-	 * outranks an inline declaration; releasing the floor lets the text wrap inside its row. */
+	/* `min-width` because the thing that overflows an open row is a CHILD with an inline width, which
+	 * wrapping the row cannot reach: form.js's RichListValue writes the description block with an
+	 * inline `min-width:25vw`, assuming the list grows to fit — true on a theme that leaves
+	 * ul.dropdown unbounded, false here (capped at min(92vw, 420px), 90-responsive.css). The inline
+	 * floor is a VIEWPORT fraction, so the wider the screen the worse it gets: at 2559px, 25vw is
+	 * 640px inside a 406px row and the row's own `overflow: hidden` cut the sentence mid-word
+	 * (issue #15). An author !important is the only thing that outranks an inline declaration. */
 	.cbi-dropdown[open] > ul.dropdown > li .hide-close { display: initial; min-width: 0 !important; }
 	.cbi-dropdown[open] > ul.dropdown > li:last-child {
 		margin-bottom: 0;
@@ -252,21 +233,16 @@
 		 * the thing the scale exists to stop. Absorbed with the machinery above. */
 		min-height: var(--fs-space-5);
 	}
-	/* …and the row's CONTENTS, which is where that font was being lost. A MULTI-select wraps every
-	 * item in `<form><label><input type=checkbox> text</label></form>` (ui.js builds the checkbox
-	 * that way), and `.cbi-value-field *` in theme/60-inputs.css hands mono to every descendant of a
-	 * field — it matches that form and that label DIRECTLY, while the rule above only reaches the
-	 * `<li>`, whose font the label then overrides rather than inherits. So the same widget drew two
-	 * fonts depending on one option: a single-select list, whose text sits in the `<li>` itself,
-	 * came out sans; every multi-select list came out mono, in the open menu AND in the closed
-	 * control that lists what is selected. Measured on the router with ui.Dropdown: `<li>` Manrope,
-	 * its `<form>`/`<label>` JetBrains Mono.
+	/* …and the row's CONTENTS, which is where that font is otherwise lost. A MULTI-select wraps every
+	 * item in `<form><label><input type=checkbox> text</label></form>`, and `.cbi-value-field *` in
+	 * theme/60-inputs.css hands mono to every descendant of a field — matching that form and label
+	 * directly, while the rule above only reaches the `<li>`. So the same widget draws two fonts
+	 * depending on one option: a single-select list sans, every multi-select list mono, in the open
+	 * menu and in the closed control alike.
 	 *
-	 * It is a LABEL, not a value — the same distinction `<strong>` gets in theme/45-misc.css — and
-	 * mono spacing is what makes a wordy option list look stretched (`3G Band 1`, `LTE B1`, reported
-	 * against luci-app-modeminfo's Bands page). `inherit`, not the token again: the row above is the
-	 * one place the menu's font is chosen. The filter/create `<input>` inside the list is left
-	 * alone: what the user TYPES there is a value. */
+	 * It is a LABEL, not a value — the distinction `<strong>` gets in theme/45-misc.css — and mono
+	 * spacing is what makes a wordy option list look stretched. `inherit`, not the token again: the
+	 * row above is the one place the menu's font is chosen. */
 	.cbi-dropdown > ul > li > form,
 	.cbi-dropdown > ul > li label { font-family: inherit; }
 	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[display]:not([display="0"]) { border-inline-start: 0; }
@@ -304,12 +280,11 @@
 		border-right: 2px solid var(--fs-dim); border-bottom: 2px solid var(--fs-dim);
 		transform: translateY(-2px) rotate(45deg);	/* optical centre of a "v" */
 	}
-	/* A BUTTON dropdown (Save & Apply, Diagnostics) draws that chevron on the button's own FILL, where
-	 * --fs-dim is a grey nobody measured against it — on the accent-filled Save & Apply it read as a
-	 * smudge, not an arrow. currentColor takes whatever ink the variant already set, so there is no
-	 * second list of variants to keep in sync (the same reason base draws this widget's divider with
-	 * a colourless `border-left`). The form-control dropdown keeps the muted chevron on purpose:
-	 * there the arrow is an affordance beside the value, not the content. */
+	/* A BUTTON dropdown draws that chevron on the button's own FILL, where --fs-dim is a grey nobody
+	 * measured against it — on the accent-filled Save & Apply it reads as a smudge rather than an
+	 * arrow. currentColor takes whatever ink the variant already set, so there is no second list of
+	 * variants to keep in sync. The form-control dropdown keeps the muted chevron on purpose: there
+	 * the arrow is an affordance beside the value, not the content. */
 	.cbi-dropdown.btn > .open::after,
 	.cbi-dropdown.cbi-button > .open::after { border-color: currentColor; }
 
@@ -338,14 +313,12 @@
 		border-radius: var(--fs-radius-sm); padding: var(--fs-space-2) var(--fs-space-3);
 		border-inline-start: 0; color: var(--fs-text);
 		position: relative;
-		/* An OPEN row wraps; only the closed preview ellipsizes. `.cbi-dropdown > ul > li` (0,1,2)
-		 * sets nowrap + overflow:hidden + ellipsis, which is right for the collapsed control — one
-		 * line showing the current value — and wrong for the menu: the list is capped at
-		 * min(92vw, 420px) (90-responsive.css), so an option that carries a description ran out of
-		 * box and was cut mid-word. Measured on Network → Firewall, "Hardware flow offloading":
-		 * "Requires hardware NAT support…" ended at the box edge with no ellipsis, because the cut
-		 * fell inside a nested element (issue #15). Raising the cap instead would let one verbose
-		 * option decide the width of every menu on the page. */
+		/* An OPEN row wraps; only the closed preview ellipsizes. `.cbi-dropdown > ul > li` sets nowrap
+		 * plus ellipsis, which is right for the collapsed control — one line showing the current
+		 * value — and wrong for the menu: the list is capped at min(92vw, 420px), so an option
+		 * carrying a description runs out of box and is cut mid-word, with no ellipsis because the
+		 * cut falls inside a nested element (issue #15). Raising the cap instead would let one
+		 * verbose option decide the width of every menu on the page. */
 		white-space: normal; overflow-wrap: anywhere;
 		/* no border-bottom divider: on a rounded box it curls up at the corners. The straight
 		 * inset strip below (::after) is the divider, so the hover pill stays rounded. */
@@ -357,54 +330,45 @@
 	}
 	.cbi-dropdown[open] > ul.dropdown > li:hover,
 	.cbi-dropdown[open] > ul.dropdown > li.focus { background: var(--fs-panel2); color: var(--fs-accent); }
-	/* After hover on purpose: hovering the selected row must still read as selected.
-	 * The surface is OPAQUE (--fs-panel2) and the accent is carried by the inset rail, not by a
-	 * tint of itself: accent text on --fs-accent-soft (a translucent tint of the accent) measured
-	 * 4.21:1 in dark, under the 4.5:1 AA floor — the tint drags the background toward the text and
-	 * eats its own contrast. axe never saw it because no gallery case rendered an OPEN dropdown
-	 * with a chosen value; the widget shipped that way on every dark router. */
+	/* After hover on purpose: hovering the selected row must still read as selected. The surface is
+	 * OPAQUE (--fs-panel2) and the accent is carried by the inset rail, not by a tint of itself:
+	 * accent text on --fs-accent-soft measures 4.21:1 in dark, under AA — the tint drags the
+	 * background toward the text and eats its own contrast. axe never saw it, no gallery case
+	 * rendering an OPEN dropdown with a chosen value. */
 	.cbi-dropdown[open] > ul.dropdown > li[selected] {
 		/* @mirror selected-row/paint */
 		background: var(--fs-panel2); color: var(--fs-accent); box-shadow: var(--fs-row-rail);
 		/* @endmirror */
 	}
-	/* THE FOCUSED ROW WEARS THE THEME'S RING, not the browser's.
+	/* The focused row wears the theme's ring, not the browser's: ui.js focuses a row as it opens the
+	 * menu, and the UA answers a programmatic focus with `outline: auto` — a system-blue capsule
+	 * around the top row of every dropdown that already has a value.
 	 *
-	 * ui.js focuses a row as it opens the menu (the first selected one, or the first row), and the
-	 * UA answers a programmatic focus with `outline: auto` — Chrome's 1px system-blue ring, drawn
-	 * OUTSIDE the row and following its 8px radius, so opening a dropdown that already has a value
-	 * flashed a loud blue capsule around the top row on every single-select and multi-select on the
-	 * router. Every other control in this theme wears --fs-focus-ring; this row wore whatever the
-	 * browser shipped.
+	 * Inset rather than the token's outer 3px, because the menu clips its own overflow and an outer
+	 * ring is cut on the first and last rows. The rail rides INSIDE this ring so a focused row that
+	 * is also selected keeps it — a shorthand cannot merge with the one below, so the two are listed
+	 * together and `--fs-row-rail` keeps that a reference rather than a third copy.
 	 *
-	 * Inset rather than the token's outer 3px: the menu clips its own overflow, so an outer ring is
-	 * cut on the first and last rows. The rail rides INSIDE this ring so a focused row that is also
-	 * selected keeps it — a shorthand cannot merge with the one below, so the two are listed
-	 * together, and `--fs-row-rail` is why that is a reference rather than a third copy.
-	 *
-	 * Both selectors carry `[selected]`-level weight on purpose: the selected-row paint below is
-	 * (0,4,1) and a bare `li:focus-visible` ties with it, which would leave the focus ring to source
-	 * order. `docs/conventions.md`: win on specificity, never on order. */
+	 * Both selectors carry `[selected]`-level weight on purpose: the selected-row paint above is
+	 * (0,4,2) and a bare `li:focus-visible` would tie with it, leaving the focus ring to source
+	 * order. */
 	.cbi-dropdown[open] > ul.dropdown > li[selected]:focus-visible,
 	.cbi-dropdown[open] > ul.dropdown > li:focus-visible {
 		outline: none;
 		box-shadow: var(--fs-row-rail), inset 0 0 0 2px var(--fs-accent-soft);
 	}
 
-	/* A MULTI-select row says "chosen" with its CHECKBOX, so it does not also need the rail.
-	 *
-	 * The rail is `inset 2px 0 0` on a row with an 8px radius, so it is drawn as an ARC, not a bar —
+	/* A MULTI-select row says "chosen" with its CHECKBOX, so it does not also need the rail. The rail
+	 * is `inset 2px 0 0` on a row with an 8px radius, so it draws as an ARC rather than a bar —
 	 * fine as the single-select cue it was designed for, one row at a time, and wrong down a column
-	 * of them: three chosen bands rendered three blue crescents stacked against the menu's edge and
-	 * read as a broken frame (reported against luci-app-modeminfo's Bands page). The checkbox is a
-	 * non-colour cue in its own right, which is what WCAG 2.2 SC 1.4.1 asks of "selected" — a
-	 * single-select row has none, and keeps the rail.
+	 * of them, where three chosen rows read as a broken frame. The checkbox is a non-colour cue in
+	 * its own right, which is what WCAG 2.2 SC 1.4.1 asks of "selected"; a single-select row has
+	 * none and keeps the rail.
 	 *
 	 * Written as an override rather than by narrowing the paint below, because those three
 	 * declarations are pinned byte-identical to `select option:checked` in theme/60-inputs.css
 	 * (tools/mirror.mjs) — a native `<select multiple>` option has no checkbox, so the rail is still
-	 * the only cue there and the two must not diverge. `:not(:focus-visible)` keeps this off the
-	 * focused row, so the ring above owns that state alone instead of tying with it. */
+	 * the only cue there. `:not(:focus-visible)` keeps this off the focused row. */
 	.cbi-dropdown[multiple][open] > ul.dropdown > li[selected]:not(:focus-visible) { box-shadow: none; }
 	.cbi-dropdown[multiple][open] > ul.dropdown > li[selected]:focus-visible {
 		box-shadow: inset 0 0 0 2px var(--fs-accent-soft);
@@ -429,27 +393,25 @@
 		width: 100%;
 	}
 
-	/* Below ~960px of available width a multi-dropdown row no longer fits — card each config row.
-	 * Same shape as the fs-dt stack (theme/30-tables.css): label ABOVE its cell, a read-only cell
-	 * half the row, a widget cell the whole width — so an OpenVPN instance (6 columns) folds into
-	 * 3 short lines instead of 6 right-flushed label:value ones.
+	/* Below ~960px of available width a multi-dropdown row no longer fits, so each config row cards.
+	 * Same shape as the fs-dt stack (theme/30-tables.css): label above its cell, a read-only cell
+	 * half the row, a widget cell the whole width.
 	 *
-	 * A @container, NOT the measurement the data tables use, and it must stay one: these rows are
+	 * A @container, not the measurement the data tables use, and it must stay one: these rows are
 	 * full of widgets that bake in a width from the layout they were rendered in, so un-collapsing
-	 * one to take a reading CHANGES what is read — on the router the firewall zone table then
-	 * claimed 1747px where it really needs 1190px, and overflowed its section by 557px. Do NOT
-	 * "finish the job" by measuring it. */
+	 * one to take a reading CHANGES what is read — the firewall zone table then claimed 1747px
+	 * where it needs 1190px. Do not "finish the job" by measuring it. */
 	@container fs-content (max-width: 960px) {
 		.table.cbi-section-table,
 		.table.cbi-section-table .tbody,
 		.table.cbi-section-table .td { display: block; width: auto; }
-		/* Hide the header in BOTH markups — a card repeats every label, so the header is a duplicate
-		 * that only ran off the right edge. form.js wraps titles+descr in a `.thead`; the Lua CBI
-		 * half the third-party apps still render through (luci-app-openvpn) emits a bare
-		 * `tr.cbi-section-table-titles` with no .thead, which is why hiding only `.thead` left the
-		 * OpenVPN header on screen. `.tr.table-titles` is deliberately NOT listed: it comes from
-		 * L.ui.Table, which never renders a .cbi-section-table — that header is hidden by the fs-dt
-		 * stack in theme/30-tables.css. */
+		/* Hide the header in BOTH markups — a card repeats every label, so the header is a duplicate that
+		 * only runs off the right edge. form.js wraps titles and descriptions in a `.thead`, while the
+		 * Lua CBI that many third-party apps still render through emits a bare
+		 * `tr.cbi-section-table-titles` with no .thead, which is why hiding only `.thead` left
+		 * luci-app-openvpn's header on screen. `.tr.table-titles` is deliberately not listed:
+		 * it comes from L.ui.Table, which never renders a .cbi-section-table, and is hidden by the
+		 * fs-dt stack in theme/30-tables.css. */
 		.table.cbi-section-table .thead,
 		.table.cbi-section-table .tr.cbi-section-table-titles,
 		.table.cbi-section-table .tr.cbi-section-table-descr { display: none; }
@@ -465,13 +427,12 @@
 		}
 		.table.cbi-section-table .tr:hover { background: var(--fs-panel2); }
 		/* `.table.cbi-section-table`, not `.cbi-section-table`: the desktop cell padding is written as
-		 * `.table.cbi-section-table .td` (theme/30-tables.css) and outranks a class-lighter selector,
-		 * so a plainer one here silently kept the desktop padding.
+		 * `.table.cbi-section-table .td` and outranks a class-lighter selector, so a plainer one here
+		 * silently keeps the desktop padding.
 		 *
 		 * margin: 0 is load-bearing. The Lua CBI gives a table CELL the same `.cbi-value-field` class
-		 * a FORM field carries, and base indents that class by 20px. A stacked cell then measured
-		 * 50% + 20px, two no longer fit on a line, and each pair-cell wrapped to its own — which is
-		 * why the OpenVPN row stayed one column deep. */
+		 * a FORM field carries, and base indents that class by 20px, so a stacked cell measures
+		 * 50% + 20px, two no longer fit on a line, and each pair-cell wraps to its own. */
 		.table.cbi-section-table .td {
 			flex: 1 1 100%; min-width: 0; margin: 0;
 			padding-block: var(--fs-space-1-5); padding-inline: 0 var(--fs-space-2-5); border: 0; text-align: start;
@@ -530,14 +491,12 @@
 
 	/* ---- widget popups must escape the table card ----
 	 * The standalone-table card (theme/30-tables.css) clips row backgrounds to its rounded corners
-	 * with `overflow: hidden`. But a form table (Diagnostics: three command widgets in one row) also
-	 * holds .cbi-dropdown widgets whose open list is absolutely positioned — the clip cropped it at
-	 * the table's edge and dragged the table's box around with it. So drop the clip where a widget
-	 * lives; the `.cbi-dropdown[open]` z-index above lifts the list over the following (unpositioned)
-	 * cards.
+	 * with `overflow: hidden`, but a form table also holds .cbi-dropdown widgets whose open list is
+	 * absolutely positioned — the clip crops it at the table's edge. So drop the clip where a widget
+	 * lives; the `.cbi-dropdown[open]` z-index above lifts the list over the following cards.
 	 *
 	 * Dropping it squares the frame off, though: a real <table> inherits `border-collapse: collapse`,
-	 * which IGNORES border-radius — the card's corners came from the clip, not the border. The
+	 * which ignores border-radius — the card's corners came from the clip, not the border. The
 	 * separated model restores them, and at zero spacing it lays out identically. */
 	.table:has(.cbi-dropdown),
 	.table:has(.cbi-dynlist) {

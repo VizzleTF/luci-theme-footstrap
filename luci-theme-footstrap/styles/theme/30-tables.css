@@ -32,13 +32,12 @@
 	.cbi-section > h3:first-child,
 	.cbi-section > legend { margin-bottom: var(--fs-space-3); }
 
-	/* A SECOND heading inside the same card — the one that follows a table rather than opening the
-	 * section — had no air at all: measured 0px above it on Status → Overview, where the stock
-	 * includes stack `table + h3 + table` inside one .cbi-section and the heading read as another
-	 * row of the table it was captioning. The rule above cannot cover it: `:first-child` is what
-	 * excludes the one that opens the card, and that one takes its gap from the wrapper instead.
-	 * Reported from the forum. The two values are the ladder's own: a heading is separated from
-	 * what came before by more than it is from what it introduces. */
+	/* A second heading inside the same card — the one that follows a table rather than opening the
+	 * section — has no air at all: on Status -> Overview the stock includes stack `table + h3 +
+	 * table` inside one .cbi-section, and the heading reads as another row of the table above it.
+	 * The rule above cannot cover it, `:first-child` being what excludes the one that opens the
+	 * card. The two values are the ladder's own: a heading is separated from what came before by
+	 * more than from what it introduces. */
 	.cbi-section .table + h3 { margin-top: var(--fs-space-5); }
 	.cbi-section h3 + .table { margin-top: var(--fs-space-3); }
 
@@ -71,38 +70,31 @@
 	}
 	.table.cbi-section-table .td.cbi-section-table-cell select,
 	.table.cbi-section-table .td.cbi-section-table-cell .cbi-select { width: inherit; }
-	/* THE FILTER ROW (form.js renderHeaderRows, `filterrow` + uci luci.main.tablefilters) is the
-	 * one place a field cannot claim the width it wants: it lives in a table HEADER cell, so the
-	 * column is as wide as the DATA under it, not as wide as the box. The rule above already makes
-	 * it fill that cell — what did not fit was the TEXT. LuCI writes the placeholder as `Filter ` +
-	 * the column title, and the theme's field is 13px type inside 12px of side padding, so on a
-	 * Russian firewall page "Фильтр Внутризональная пересылка" ran out of box and Firefox sliced it
-	 * mid-glyph (issue #12). The flag column is the worse half: form.js writes `width: 30px` INLINE
-	 * there (its filter takes one character), of which the theme's padding ate 24 — leaving less
-	 * than one glyph of room for "0/1", which rendered as a single clipped digit.
+	/* The filter row (form.js renderHeaderRows) is the one place a field cannot claim the width it
+	 * wants: it lives in a table HEADER cell, so the column is as wide as the DATA under it. The
+	 * rule above makes it fill that cell; what does not fit is the TEXT, LuCI writing the
+	 * placeholder as `Filter ` plus the column title, so a long translated title is sliced
+	 * mid-glyph (issue #12). The flag column is the worse half: form.js writes `width: 30px` inline
+	 * there, of which the theme's padding ate 24, leaving less than one glyph.
 	 *
-	 * Denser box and denser type buy back ~20px per column and make the 30px one legible; the
-	 * ellipsis is what changes the FAILURE: a placeholder too long for its column now ENDS, instead
-	 * of being cut through a letter. Nothing is lost to it — the column title says the same word
-	 * directly above, which is the only reason shortening is honest here. No !important, so the
-	 * inline 30px still stands: it is upstream's sizing for a one-character field, and correct. */
+	 * A denser box and denser type buy back ~20px per column; the ellipsis changes the FAILURE, a
+	 * placeholder too long for its column now ending instead of being cut through a letter. Nothing
+	 * is lost to it — the column title says the same word directly above. No !important, so the
+	 * inline 30px still stands: it is upstream's sizing for a one-character field. */
 	.table.cbi-section-table .cbi-section-filter {
 		padding: var(--fs-space-1) var(--fs-space-1-5);
 		font-size: var(--fs-type-xs);
 		text-overflow: ellipsis;
 	}
 	/* width:100% cannot shrink a table below min-content — one long unbreakable value holds the
-	 * floor. Breaking values reflows it into the ~984px column instead of scrolling. That break is
-	 * now the DEFAULT for every cell (base/40-tables.css), so the copy that used to sit here —
-	 * `#view .table[id] .td, table.fs-dt .td { overflow-wrap: anywhere }` — said nothing the
-	 * cascade did not already say: switched off against 1941 matching cells across eight pages at
-	 * three widths, not one computed style moved.
+	 * floor. Breaking values reflows it into the column instead of scrolling, and that break is the
+	 * DEFAULT for every cell (base/40-tables.css), so a copy here would say nothing the cascade does
+	 * not.
 	 *
-	 * A rule on this property is back a few lines down, and it is the INVERSE of that one rather than
-	 * a copy: a data table gets `break-word` while it is still a table, so its columns keep a floor
-	 * and an overflow can be seen. Read that block before touching either. DHCP leases still need
-	 * finer control (only DUID/IPv6 may break, not IPv4/MAC) and get it from `white-space: nowrap`,
-	 * not from this property: pages/50-leases.css. */
+	 * A rule on this property is back a few lines down, and it is the INVERSE rather than a copy: a
+	 * data table gets `break-word` while it is still a table, so its columns keep a floor and an
+	 * overflow can be seen. Read that block before touching either. DHCP leases need finer control
+	 * (only DUID/IPv6 may break) and get it from `white-space: nowrap`: pages/50-leases.css. */
 	.cbi-section .table .td,
 	.cbi-section .table .th {
 		padding: var(--fs-space-2-5) var(--fs-space-4) var(--fs-space-2-5) 0;
@@ -124,66 +116,58 @@
 	/* --- DATA tables ([id] or JS-tagged .fs-dt): leases, wifi, processes, routes … ---
 	 * Symmetric padding so cells clear the table's own contour (below).
 	 *
-	 * `:is([id], .fs-dt)` = ONE discriminator at ONE specificity. The two names for "data table" were
-	 * two selector lists at DIFFERENT weights — `.cbi-section .table[id] .td` (0,4,0) vs
-	 * `table.fs-dt .td` (0,2,1), the latter losing to the key/value default (0,3,0) — so a table
-	 * known only by the JS tag kept the key/value padding (flush left) and got no mono face, no row
-	 * hover, no header rule. Live: Status → Routing emits <table class="table"> with no id. */
+	 * `:is([id], .fs-dt)` is one discriminator at ONE specificity: written as two selector lists the
+	 * two names for "data table" land at different weights — `.cbi-section .table[id] .td` (0,4,0)
+	 * against `table.fs-dt .td` (0,2,1), the latter losing to the key/value default (0,3,0) — so a
+	 * table known only by the JS tag keeps the flush-left padding, with no mono face, no row hover
+	 * and no header rule. Status -> Routing emits exactly that shape. */
 	.cbi-section .table:is([id], .fs-dt) .td,
 	.cbi-section .table:is([id], .fs-dt) .th,
 	table.fs-dt .td, table.fs-dt .th { padding: var(--fs-space-2-5) var(--fs-space-3); }
 	.cbi-section .table:is([id], .fs-dt) .td { font-family: var(--fs-font-mono); font-size: var(--fs-type); color: var(--fs-text); }
 
-	/* ---- THE FLOOR, AND IT BELONGS TO THE ONE TIER A MEASUREMENT READS ----
+	/* ---- the floor, and it belongs to the one tier a measurement reads ----
 	 *
-	 * `base/40-tables.css` breaks every value `anywhere`, which is the ONE break value that also
-	 * lowers the cell's min-content contribution — to a single character. That is what keeps a table
-	 * nobody measures inside its card, and it is why the key/value includes, the config table and the
-	 * meter rows are safe today. It is also a LIE told to the engine: with no floor, auto table layout
-	 * is free to starve a column, and the browser then answers "it fits" — truthfully, uselessly.
-	 * `pages/30-software.css` states the consequence outright: "`anywhere` hides the overflow by
-	 * shredding a cell, so nothing is left for fit.overflows() to read". Four per-page rules and three
-	 * JS heuristics existed to reconstruct the number the engine had before the theme threw it away.
+	 * `base/40-tables.css` breaks every value `anywhere`, the one break value that also lowers the
+	 * cell's min-content contribution — to a single character. That is what keeps a table nobody
+	 * measures inside its card, and it is also a LIE told to the engine: with no floor, auto table
+	 * layout is free to starve a column and the browser answers "it fits", truthfully and uselessly.
 	 *
 	 * So the floor goes back exactly where it is READ: a data table, while it is still a table.
-	 * `break-word` breaks the same values in the same places — the two values differ ONLY in whether
-	 * the break counts towards min-content (css-text-3 §5.4) — so nothing about the rendering of a
-	 * long token changes; what changes is that the column can no longer be starved below it, and an
-	 * overflow becomes visible to `fit.overflows()`.
+	 * `break-word` breaks the same values in the same places — the two differ only in whether the
+	 * break counts towards min-content (css-text-3 §5.4) — so nothing about the rendering changes;
+	 * what changes is that the column can no longer be starved below it, and an overflow becomes
+	 * visible to `fit.overflows()`.
 	 *
 	 * `:not(.fs-stacked)` is the whole guard, and it is the state the fitter measures in (it strips
-	 * the class first, fs-fit rule 1). Once carded, every cell has the row to itself, there is no
-	 * neighbouring column left to starve, and `anywhere` is right again — theme/30-tables.css's card
-	 * block restates it a few hundred lines down.
+	 * the class first, fs-fit rule 1). Once carded, every cell has the row to itself.
 	 *
 	 * base/40-tables.css is deliberately NOT touched: `break-word` there was tried and recorded as a
-	 * failure (a table stayed 355px wide in a 346px column, and .fs-main clips), because a tier with
-	 * no card and no scroll has nowhere to put the overflow. */
+	 * failure (a table stayed 355px wide in a 346px column, and .fs-main clips), a tier with no card
+	 * and no scroll having nowhere to put the overflow. */
 	.table.fs-dt:not(.fs-stacked) .td { overflow-wrap: break-word; }
 	/* …and the ONE column the fitter decided may be shredded rather than card the whole table. Written
 	 * by fs-select.js on the cells of a single column, stripped before every measurement. (0,5,0) — it
 	 * beats the floor above on specificity, not on source order. */
 	.table.fs-dt:not(.fs-stacked) .td.fs-td-break { overflow-wrap: anywhere; }
 
-	/* ---- AND THE ONE FLAG, BECAUSE THE VIEW WRITES ITS SHREDDING INLINE ----
+	/* ---- and the one flag, because the view writes its shredding inline ----
 	 *
-	 * `luci-mod-status`'s processes.js:39 emits `E('span', {'style': 'word-break: break-word'},
-	 * proc.COMMAND)`. `word-break: break-word` is the deprecated alias whose defined meaning is
-	 * "`word-break: normal` plus `overflow-wrap: anywhere`" (css-text-3 §5.1) — so it lowers the
-	 * cell's min-content to a single character, from an INLINE declaration that no cascade layer can
-	 * outrank. Measured on the router at a 720px viewport: the Command column sat at 126px against a
-	 * widest token of 353px, and forcing the column's `overflow-wrap` to break-word, normal and
-	 * anywhere in turn changed nothing at all — the floor was being erased one level down, inside the
-	 * span. With `word-break` neutralised the same table asks for 963px in 688px of room, which is the
-	 * truth, and the fitter can act on it.
+	 * `luci-mod-status`'s processes.js emits `E('span', {'style': 'word-break: break-word'}, …)`.
+	 * `word-break: break-word` is the deprecated alias defined as "`word-break: normal` plus
+	 * `overflow-wrap: anywhere`" (css-text-3 §5.1), so it lowers the cell's min-content to a single
+	 * character from an INLINE declaration no cascade layer can outrank: measured at 720px, the
+	 * Command column sat at 126px against a widest token of 353px and forcing the column's
+	 * `overflow-wrap` any of three ways changed nothing, the floor being erased inside the span.
+	 * Neutralised, the same table asks for 963px in 688px of room, which is the truth.
 	 *
-	 * This does not overrule the view's intent, it re-times it: the column may still shred, but now
+	 * This re-times the view's intent rather than overruling it: the column may still shred, but
 	 * when the fitter marks it (`.fs-td-break`, one rung before carding) rather than always. Buttons
-	 * and inputs are excluded — `base/10-reset.css` gives them `break-all` deliberately, and a control
-	 * label is not a value being read.
+	 * and inputs are excluded — base gives them `break-all` deliberately, and a control label is not
+	 * a value being read.
 	 *
-	 * The `!important` is the sanctioned kind (docs/conventions.md): it fights an inline `style=`,
-	 * which is the one adversary a layer cannot reach. */
+	 * The `!important` is the sanctioned kind: it fights an inline `style=`, the one adversary a
+	 * layer cannot reach. */
 	.table.fs-dt:not(.fs-stacked) .td,
 	.table.fs-dt:not(.fs-stacked) .td :not(button):not(.btn):not(input):not(select):not(textarea) {
 		word-break: normal !important;
@@ -191,38 +175,27 @@
 
 	/* Whether a table cards, breaks one column or scrolls is MEASURED (fs-select.js), at any width. */
 
-	/* ---- THE HEADER ROW STAYS WHILE THE ROWS GO PAST ----
+	/* ---- the header row stays while the rows go past ----
 	 *
-	 * Processes renders 114 rows, Connections a few hundred, the lease tables dozens: past the first
-	 * screenful the column headings are gone and every value is an unlabelled string of digits. The
-	 * card view solves that by printing the heading above each value; a table that FITS had no
-	 * equivalent, and scrolling back up to read which column is which is the oldest complaint about
-	 * data tables there is.
+	 * Processes renders 114 rows and Connections a few hundred: past the first screenful the column
+	 * headings are gone and every value is an unlabelled string of digits. The card view solves that
+	 * by printing the heading above each value; a table that FITS had no equivalent.
 	 *
 	 * On the CELLS, not the row: `position: sticky` needs a box with a background, and in the
 	 * separated border model a row's background does not travel with a sticky cell — the heading
-	 * would float over the rows with the values showing through it. So each `.th` sticks, and each
-	 * carries the header's own fill.
+	 * would float over the rows with the values showing through. So each `.th` sticks and carries
+	 * the header's own fill.
 	 *
-	 * WHAT IT STICKS TO depends on which box is scrolling. In the vertical sidebar `.fs-main` is its
-	 * own scroller and nothing overlaps its top edge, so the offset is 0. In the bar layouts the
-	 * DOCUMENT scrolls under a sticky bar, and that bar's height is not `--fs-bar-h`: it grows when
-	 * the brand wraps, when the menu takes a row of its own or when the right-hand cluster does, all
-	 * of which fs-chrome.js decides by measurement — so it publishes the measured height as
-	 * `--fs-bar-live` and this reads it, with the designed height as the fallback for the frame
-	 * before the chrome has been fitted.
+	 * What it sticks TO depends on which box scrolls. In the vertical sidebar `.fs-main` is its own
+	 * scroller and nothing overlaps its top edge, so the offset is 0. In the bar layouts the
+	 * DOCUMENT scrolls under a sticky bar whose height is not `--fs-bar-h` — it grows when the brand
+	 * wraps, when the menu takes a row or when the cluster does, all decided by measurement — so
+	 * fs-chrome.js publishes `--fs-bar-live` and this reads it, with the designed height as the
+	 * fallback for the frame before the chrome has been fitted.
 	 *
-	 * AND A DIALOG IS NEITHER, which is why every one of these selectors names its root. `#modal_overlay`
-	 * is its own scrollport (`overflow: auto`, base/60-modal.css) and the bar does not overlap it, so a
-	 * table in a dialog sticks at 0 in every layout. Given the bar offset instead — which it would have
-	 * been, since the same change made a dialog a table root and its tables `.fs-dt` — the header row
-	 * would pin a whole bar height BELOW the dialog's top edge, with rows scrolling through the empty
-	 * band above it. The wireless scan dialog is exactly that shape. Reported in review.
-	 *
-	 * The ROOT is named inside `:where()`, which costs nothing: naming it plainly took the selector to
-	 * [1,9,0] against the sheet's [1,7,0] ceiling (tools/css-metrics.mjs), and the id is here to say
-	 * WHICH scrollport this offset belongs to, not to win anything. What has to win is the cell rule
-	 * itself, and at [0,6,0] it does. */
+	 * And a dialog is neither, which is why every one of these selectors names its root. The roots
+	 * ride in `:where()` so they cost nothing: spelled out they weigh (1,9,0) against the (1,7,0)
+	 * ceiling tools/css-metrics.mjs enforces, while the cell rule that has to win is (0,6,0). */
 	:where(:root[data-layout="sidebar"]:not([data-narrow]) #view, #modal_overlay)
 		.table.fs-dt:not(.fs-stacked) .tr.table-titles .th {
 		position: sticky; top: 0; z-index: 1;
@@ -234,50 +207,25 @@
 		background: var(--fs-panel2);
 	}
 
-	/* ---- A MEASUREMENT MUST NOT THROW THE READER ----
+	/* ---- a measurement must not throw the reader ----
 	 *
 	 * `fitTables()` decides a data table's tier by taking its marks OFF and asking the engine
-	 * (fs-fit rule 1: a stacked table is a pile of flex rows and always "fits", so it has to be
-	 * measured un-stacked). The reading forces layout, so for the duration of that pass the document
-	 * really is laid out with a table that is several screens taller than the one on screen.
+	 * (fs-fit rule 1), and the reading forces layout, so for that pass the document really is laid
+	 * out with a table several screens taller than the one on screen.
 	 *
-	 * Scroll anchoring is what turns that into a visible bug. The browser keeps the node under the
-	 * reader still by adjusting the scroll offset — and it re-picks that node whenever the offset
-	 * changes for any other reason (css-scroll-anchoring: an anchor is invalidated by a scroll, by a
-	 * suppression trigger, or by its own removal). While the user is scrolling, that is every frame,
-	 * so the pick can land inside a table in the un-stacked state the fitter is about to undo; the
-	 * next frame the mark is back, the node is somewhere else entirely, and the engine faithfully
-	 * "corrects" the offset by the difference. Measured on Status → Overview at 390x844 with the poll
-	 * driving real re-renders while the page scrolled: 18 movements nobody asked for in 1500 frames,
-	 * the worst 1877px, always a pair — down a screenful and back on the next frame. That is the
-	 * page jumping up and down under the reader.
+	 * Scroll anchoring turns that into a visible bug: the browser keeps the node under the reader
+	 * still by adjusting the offset, and re-picks that node whenever the offset changes for any
+	 * other reason — which, while the user scrolls, is every frame. The pick can land inside a table
+	 * in the un-stacked state the fitter is about to undo, and the next frame the engine faithfully
+	 * corrects the offset by the difference. Measured on the Overview at 390x844 with the poll
+	 * driving real re-renders: 18 movements nobody asked for in 1500 frames, the worst 1877px,
+	 * always a pair.
 	 *
-	 * So the tables the fitter re-stamps are declared ineligible as anchors. They are the only
-	 * elements in the document whose layout is deliberately falsified and restored inside one pass,
-	 * and every other node stays eligible — including the section headings around them, which is what
-	 * keeps the good half of anchoring working: a lease appearing or a station leaving still shifts
-	 * nothing, because the engine anchors on a heading and compensates for the height change. That
-	 * half was measured too, before and after: 0px of movement under the reader across six poll ticks
-	 * that grew and shrank a section above the viewport.
-	 *
-	 * NOT on the scroll container, which is the answer that suggests itself and is worse: with
+	 * So the tables the fitter re-stamps are declared ineligible as anchors — and only they, because
+	 * every other node staying eligible is what keeps the good half of anchoring working. NOT on the
+	 * scroll container, which is the answer that suggests itself and is worse: with
 	 * `html, body, #maincontent { overflow-anchor: none }` the same run still moved 12 times, up to
-	 * 788px, because it also throws away the compensation the paragraph above depends on. Correct
-	 * anchoring, minus the one region that lies about its height.
-	 *
-	 * The cost is that a row of a data table can no longer be the anchor. On the page where that
-	 * would matter most — Processes at 390px, which is one long table — inserting a row above the
-	 * reader moves the content 285px with this rule and 285px without it: those rows were never being
-	 * chosen anyway.
-	 *
-	 * WHAT COVERS THAT PAGE INSTEAD is fs-fit.js, and it did not until recently: a page that is one
-	 * table has the table as a DIRECT child of `#view`, the theme's own reference climbs out of the
-	 * table to its parent, and the parent was the host — so the climb gave up and nothing held the
-	 * reader there on any engine. It anchors on the TABLE ITSELF in that case now. Its height is
-	 * what this rule calls falsified; where the box STARTS is decided by what sits above it, and that
-	 * is all a reference needs. Measured at 390px with the engine's anchoring suppressed: 120px of
-	 * growth above the fold moved the page 120px before, 0px after, on chromium, firefox and webkit
-	 * alike. */
+	 * 788px, having thrown that compensation away as well. */
 	.table.fs-dt { overflow-anchor: none; }
 
 	.cbi-section .table:is([id], .fs-dt) .tr:not(.table-titles):not(.placeholder):hover .td { background: var(--fs-panel2); }
@@ -310,12 +258,10 @@
 	.cbi-section .table[id] .tr:last-child .td:last-child,
 	#view .table[id] .tr:last-child .td:last-child,
 	table.fs-dt .tr:last-child .td:last-child { border-bottom-right-radius: var(--fs-radius-lg); }
-	/* Empty table: L.ui.Table adds a single-cell .tr.placeholder ("There are no active leases").
-	 * Spanning it across the table is base's job (base/40-tables.css: absolute, `inset-inline: 0`),
-	 * and the `display: block; width: 100%` that used to be restated here was a second way of saying
-	 * the same thing — it read as the fix while the real one was base's `inset-inline`. What is left
-	 * is the FRAMED table's own flavour: the plate reads as prose, left-aligned like the rows it
-	 * stands in for, and carries the frame's bottom corners so the rounding does not cut across it. */
+	/* Empty table: L.ui.Table adds a single-cell .tr.placeholder. Spanning it across the table is
+	 * base's job (base/40-tables.css); what is left here is the FRAMED table's own flavour — the
+	 * plate reads as prose, left-aligned like the rows it stands in for, and carries the frame's
+	 * bottom corners so the rounding does not cut across it. */
 	.cbi-section .table[id] .tr.placeholder .td,
 	#view .table[id] .tr.placeholder .td,
 	table.fs-dt .tr.placeholder .td {
@@ -330,14 +276,14 @@
 	}
 
 	/* --- KEY/VALUE tables: System, Memory ---
-	 * "no id" is NOT enough: form.TableSection/GridSection also render `.table.cbi-section-table`
-	 * with no id (ddns, firewall zones, port forwards), and width:40%/nowrap on their first column
-	 * starved the data columns (dates broke mid-token). So exclude it and .fs-dt explicitly.
+	 * "no id" is not enough: form.TableSection/GridSection also render `.table.cbi-section-table`
+	 * with no id, where a 40%/nowrap first column starves the data columns. So exclude it and .fs-dt
+	 * explicitly.
 	 *
 	 * Also exclude the realtime graph legend: `[style*="table-layout"]` is the one no-id `.table`
-	 * LuCI hands an inline `table-layout:fixed` (status/realtime/*, see below), where a 40% first
-	 * column would only starve the other five. A DDNS-style multi-column status table (no id, no
-	 * inline layout) is NOT excluded — it keeps the key/value first column exactly as before. */
+	 * LuCI hands an inline `table-layout:fixed`, where a 40% first column would only starve the
+	 * other five. A DDNS-style multi-column status table is not excluded and keeps the key/value
+	 * first column. */
 	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:first-child {
 		color: var(--fs-dim); font-weight: var(--fs-weight); width: 40%; white-space: nowrap;
 	}
@@ -345,16 +291,13 @@
 		font-family: var(--fs-font-mono); color: var(--fs-text); text-align: end;
 	}
 
-	/* --- The realtime graph legend (status/realtime/{bandwidth,connections,load,wireless}) ---
-	 * The one no-id `.table` LuCI renders with inline `table-layout:fixed;width:100%` and SIX cells
-	 * per row (label/value ×3: UDP/Average/Peak). `fixed` splits the row into six equal columns, so
-	 * on a phone each is ~1/6 of the content width (~52px at 375px) and the `Average:`/`Peak:` labels
-	 * overflow onto the value beside them (measured). Stock luci-theme-bootstrap folds the six cells
-	 * into label/value PAIRS on a narrow screen (each cell 50%, three stacked rows) and the labels
-	 * fit; do the same. `display:flex` on the row takes the cells out of the fixed table layout (no
-	 * !important needed — a class rule in `theme` beats the UA `display:table-row`), so the inline
-	 * `table-layout:fixed` no longer bites. Keyed on that inline attribute so ONLY this legend is
-	 * touched — never System/Memory, never a DDNS-style multi-column status table. */
+	/* --- the realtime graph legend (status/realtime/*) ---
+	 * The one no-id `.table` LuCI renders with inline `table-layout:fixed;width:100%` and six cells
+	 * per row. `fixed` splits the row into six equal columns, so on a phone each is ~1/6 of the
+	 * content width and the labels overflow onto the value beside them. Stock luci-theme-bootstrap
+	 * folds the six cells into label/value PAIRS on a narrow screen; do the same. `display:flex` on
+	 * the row takes the cells out of the fixed table layout, so the inline `table-layout` no longer
+	 * bites. Keyed on that inline attribute so only this legend is touched. */
 	@media (max-width: 767px) {
 		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt)[style*="table-layout"] .tr {
 			display: flex; flex-wrap: wrap;
@@ -375,50 +318,37 @@
 	 * against the card's --fs-radius corners (issue #5.4). Scoped to the status box: the small
 	 * firewall zone .ifacebadge chips want to stay tight. Follows the Rounding axis via the token. */
 	.network-status-table .ifacebox-body .ifacebadge { border-radius: var(--fs-radius); }
-	/* ...and the head has to round WITH the box. It sits inside the box's 1px border and carries the
-	 * zone colour as an inline background, so its own corners are what you see: base pairs a 4px box
-	 * with a 3px head, but the line above bumps only the BOX to --fs-radius (10px by default), which
-	 * left a 3px head whose square corners cut straight through the rounding — the zone colour
-	 * visibly spilling past the corner on Network → Interfaces (issue #7).
-	 * Minus the 1px border the head is inset by; max() because the Rounding axis goes down to 0,
-	 * where a bare subtraction is negative — an invalid declaration, silently dropped, which would
-	 * put base's 3px back. */
+	/* …and the head has to round WITH the box: it sits inside the box's 1px border and carries the
+	 * zone colour as an inline background, so its own corners are what you see, and a 3px head
+	 * inside a 10px box cuts straight through the rounding with the zone colour spilling past the
+	 * corner (issue #7). Minus the 1px border it is inset by; max() because the Rounding axis goes
+	 * down to 0, where a bare subtraction is negative — an invalid declaration, silently dropped. */
 	.cbi-section .ifacebox > .ifacebox-head {
 		--fs-head-radius: max(0px, calc(var(--fs-radius) - 1px));
 		border-radius: var(--fs-head-radius) var(--fs-head-radius) 0 0;
 	}
 
 	/* Inactive tab panes. Base's [data-tab-title] rule sets height:0/overflow:hidden, collapsing only
-	 * the CONTENT box — padding/border/margin still draw empty bars (podkop and Network → Interfaces
-	 * put data-tab-active on a .cbi-section: 18px/22px padding + 16px margin of phantom strip), and a
-	 * pane left in flow inflates scrollHeight (Interfaces scrolled ~585px past the footer, Network →
-	 * DNS another ~750px). Zeroing the box does both jobs; measured on the router, hiding the pane
-	 * with display:none buys nothing on top of it (Interfaces scrollHeight 1039 either way, DNS 1347).
+	 * the CONTENT box — padding, border and margin still draw empty bars, and a pane left in flow
+	 * inflates scrollHeight (Interfaces scrolled ~585px past the footer, Network -> DNS another
+	 * ~750px). Zeroing the box does both jobs, and hiding the pane with `display: none` on top of
+	 * that buys nothing (Interfaces scrollHeight 1039 either way).
 	 *
-	 * It is `visibility`, and NOT `display: none`, because a display:none pane has no width, and a
-	 * view is entitled to measure one: stock channel_analysis.js builds its channel axis from
-	 * `graph.offsetWidth` in a requestAnimationFrame, ONCE — for the pane that starts inactive it read
-	 * 0, so every channel offset landed at x≈0 and the 5GHz graph stayed a collapsed blob at the left
-	 * edge for the life of the page, since nothing ever re-measures it (grid x-span 0px vs the 1147px
-	 * it needs; luci-theme-bootstrap has no such bug because it hides panes exactly this way).
-	 * `visibility: hidden` keeps the pane laid out at full width while still taking it out of the
-	 * a11y tree and the tab order, and height:0 + overflow:hidden keep it out of the scroll.
+	 * It is `visibility`, not `display: none`, because a display:none pane has no width and a view
+	 * is entitled to measure one: stock channel_analysis.js builds its channel axis from
+	 * `graph.offsetWidth` once, in a rAF, so a pane that starts inactive reads 0 and the 5GHz graph
+	 * stays a collapsed blob for the life of the page. `visibility: hidden` keeps the pane laid out
+	 * at full width while still taking it out of the a11y tree and the tab order, and
+	 * height:0 + overflow:hidden keep it out of the scroll.
 	 *
-	 * Hence ANY [data-tab-title], not just .cbi-section ones (DNS renders each tab as a bare <div>).
-	 * Tab-menu <li>s carry data-tab but never data-tab-title, so the bar is untouched; the :not() also
-	 * covers first render, where LuCI has set active="true" on the shown tab only.
+	 * `position: relative` is what makes that overflow hold: an absolutely positioned descendant is
+	 * clipped only by an overflow ancestor in its own containing-block chain, and a collapsed pane of
+	 * ordinary markup has none — the theme supplies them itself, the toggle switch parking its real
+	 * checkbox at `position: absolute` (theme/60-inputs.css). Measured: DHCP and DNS scrolled 1841px
+	 * against 1110px of content on 24.10 and 1925 vs 1439 on 25.12, i.e. ~500-700px of empty page
+	 * under the footer (issue #10).
 	 *
-	 * `position: relative` is what makes the overflow above actually hold, and it is not cosmetic:
-	 * an ABSOLUTELY positioned descendant is clipped by an overflow ancestor only if that ancestor
-	 * is in its containing-block chain, and a collapsed pane full of ordinary markup contains no
-	 * positioned ancestor at all — so those escape to the initial containing block, keep the static
-	 * position they were laid out at deep inside the hidden pane, and grow the DOCUMENT scroll box
-	 * that .fs-main's own scroller cannot even reach. The theme supplies them itself: the toggle
-	 * switch parks the real checkbox at `position: absolute` (theme/60-inputs.css), so every hidden
-	 * pane holding a flag leaked one. Measured on the router: DHCP and DNS scrolled 1841px against
-	 * 1110px of content on 24.10 and 1925 vs 1439 on 25.12 — ~500-700px of empty page under the
-	 * footer (issue #10); with this, the document is exactly the viewport and .fs-main's scroll is
-	 * untouched. Nothing paints differently — the pane is `visibility: hidden`. */
+	 * Hence any [data-tab-title], not just .cbi-section ones. */
 	[data-tab-title]:not([data-tab-active="true"]) {
 		visibility: hidden;
 		position: relative;
@@ -437,19 +367,16 @@
 	/* denser data tables (dhcp static leases, section-tables) */
 	.cbi-section-table .th, .cbi-section-table .td,
 	/* The `::before` is the GridSection name CELL on 24.10, where form.js renders none and base
-	 * generates the column from `data-title` (styles/base/95-luci.css). It is not a `.th`/`.td`, so
-	 * every cell rule below has to name it too, or the column it draws lines up with nothing. Listing
-	 * `.tr::before` unqualified is safe and deliberate: base names exactly the rows that get one, and
-	 * a pseudo-element whose content is `none` generates NO BOX — so on 25.12, which renders a real
-	 * cell instead, these declarations have nothing to apply to. */
+	 * generates the column from `data-title` (base/95-luci.css). It is not a `.th`/`.td`, so every
+	 * cell rule below has to name it too, or the column it draws lines up with nothing. Listing
+	 * `.tr::before` unqualified is safe: base names exactly the rows that get one, and a
+	 * pseudo-element whose content is `none` generates no box. */
 	.table.cbi-section-table .th, .table.cbi-section-table .td,
 	.table.cbi-section-table .tr::before { padding: var(--fs-space-2) var(--fs-space-3) var(--fs-space-2) 0; }
-	/* The zero padding-LEFT above is right only INSIDE a card: the .cbi-section supplies that gutter
-	 * itself, so the first column lines up with the card's own 16px. Outside one it is wrong —
-	 * Status → Firewall renders `.table.cbi-section-table` in a bare <div>, so the table draws its
-	 * OWN frame (`.table`, below) and the header text ended up glued to that frame's rounded corner
-	 * (issue #7). A table carrying its own frame pads its own cells, like every other standalone
-	 * data table here. */
+	/* The zero padding-left above is right only INSIDE a card, where the .cbi-section supplies that
+	 * gutter itself. Outside one it is wrong — Status -> Firewall renders `.table.cbi-section-table`
+	 * in a bare <div>, so the table draws its own frame and the header text ends up glued to that
+	 * frame's rounded corner (issue #7). A table carrying its own frame pads its own cells. */
 	.table.cbi-section-table:not(.cbi-section *):not(.cbi-section-node *) .th,
 	.table.cbi-section-table:not(.cbi-section *):not(.cbi-section-node *) .td { padding: var(--fs-space-2-5) var(--fs-space-3); }
 	.cbi-section-table .tr.cbi-section-table-titles .th,
@@ -463,18 +390,15 @@
 		overflow: hidden;
 		background: var(--fs-panel);
 	}
-	/* SEPARATORS GO ON THE CELLS, NOT ON THE ROWS, and that is not a preference: the frame above
-	 * needs `border-collapse: separate` (a collapsed table silently drops the radius), and in the
-	 * separated model a ROW's border is not painted at all. These two rules used to sit on the .tr,
-	 * so on every framed data table — the apk package list, Processes, Routes — they painted
-	 * NOTHING. What actually drew the lines was base's per-cell `border-top`, which nobody had asked
-	 * for and which also ran along the table's TOP edge, straight across the frame's rounded corners
-	 * (issue #7: "лишняя граница, не имеющая скругления"). base no longer sets it, and the lines are
-	 * declared here, where they paint. Remove one and the other is not a fallback — you get a table
-	 * with no separators at all, which is exactly what the first attempt at this shipped.
+	/* Separators go on the CELLS, not on the rows, and that is not a preference: the frame above needs
+	 * `border-collapse: separate` (a collapsed table silently drops the radius), and in the separated
+	 * model a row's border is not painted at all — on the .tr these rules paint nothing, and what
+	 * draws the lines is base's per-cell `border-top`, which also runs along the table's top edge
+	 * across the frame's rounded corners (issue #7). base no longer sets it, and the lines are
+	 * declared here, where they paint. Remove one and the other is not a fallback.
 	 *
 	 * `:not(:last-child)` lives IN the body-row selector: a trailing bottom border draws a straight
-	 * line the full width and pokes past the frame's rounded bottom corners (overflow: visible). */
+	 * line the full width and pokes past the frame's rounded bottom corners. */
 	.table .tr.table-titles > .th,
 	.table .tr.cbi-section-table-titles > .th,
 	.table .tr.cbi-section-table-titles::before { border-bottom: var(--fs-hairline); }
@@ -491,14 +415,12 @@
 		letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase;
 		background: transparent;
 	}
-	/* The row's NAME, and it must read the same on both releases: 25.12 renders a real
-	 * `.td.cbi-section-table-titles`, 24.10 base's `::before`. Both are a LABEL, not a value, so both
-	 * take the UI face — the surrounding value cells are mono, and `.cbi-value-field`
-	 * (theme/60-inputs.css) hands the 25.12 cell that mono while base's
-	 * `.cbi-section-table-titles { font-weight: bold }` makes it bold: no 700 mono face ships, so
-	 * every port-forward and NAT rule name was drawn in SYNTHETIC bold mono, smearing the grid on the
-	 * one string in the row that is a name. Specificity (0,3,0), not source order, is what beats the
-	 * (0,1,0) mono rule. */
+	/* The row's NAME, which must read the same on both releases: 25.12 renders a real
+	 * `.td.cbi-section-table-titles`, 24.10 base's `::before`. Both are a LABEL, not a value, so
+	 * both take the UI face — the surrounding value cells are mono, and base makes this one bold, so
+	 * with no 700 mono face shipped every rule name is drawn in synthetic bold mono, smearing the
+	 * grid on the one string in the row that is a name. Specificity (0,3,0), not source order, is
+	 * what beats the (0,1,0) mono rule. */
 	.table.cbi-section-table .td.cbi-section-table-titles,
 	.table.cbi-section-table .tr.cbi-section-table-row::before {
 		font-family: var(--fs-font-sans); font-weight: var(--fs-weight-bold); color: var(--fs-text);
@@ -525,66 +447,55 @@
 	 * the style engine re-evaluated on every mutation of these polled tables (processes,
 	 * routes, leases). */
 
-	/* ---- THE CARD STACK: one copy, every DATA table, no @container threshold ----
+	/* ---- the card stack: one copy, every data table, no @container threshold ----
 	 *
-	 * Was three thresholds (568 here, 780 DHCP leases, 800 apk list); the last two each carried
-	 * their own COPY of these declarations, because CSS cannot share a block across two @container
-	 * thresholds — 55 duplicated declarations, free to drift. All three really asked "does it
-	 * OVERFLOW?", which the browser can compute: fs-select.js measures it and sets .fs-stacked, so
-	 * every table (a third-party luci-app-*'s included, whose column count we cannot know) finds
-	 * its own width. Only the judgement a measurement cannot make survives, in fs-select.js:
-	 * 568 = "too cramped to be a table at all".
+	 * Three @container thresholds meant two copies of these declarations, CSS being unable to share
+	 * a block across thresholds — 55 duplicated declarations, free to drift. All three really asked
+	 * "does it OVERFLOW?", which the browser can compute: fs-select.js measures it and sets
+	 * .fs-stacked, so every table finds its own width, a third-party app's included. Only the
+	 * judgement a measurement cannot make survives, in fs-select.js: "too cramped to be a table".
 	 *
-	 * A CONFIG table (.cbi-section-table) is deliberately NOT here and keeps its @container (960,
-	 * theme/65-dropdown.css). Its rows hold widgets that bake in a width from the layout they were
-	 * rendered in, so un-collapsing one to read it CHANGES what is read: on the router the firewall
-	 * zone table then claimed it needed 1747px where it really needs 1190px, and overflowed its
-	 * section by 557px. Do NOT "finish the job" by measuring it.
+	 * A config table (.cbi-section-table) is deliberately not here and keeps its @container
+	 * (theme/65-dropdown.css): its rows hold widgets that bake in a width from the layout they were
+	 * rendered in, so un-collapsing one to read it CHANGES what is read — the firewall zone table
+	 * then claimed 1747px where it needs 1190px. Do not "finish the job" by measuring it.
 	 *
 	 * Shape = stock LuCI's phone layout: label ABOVE its value, cell = half the row. Label:value on
-	 * ONE line with the value right-flushed cost a leases row 7 full-width lines and gave the value
-	 * ~40% of the width (a badge/SVG/DUID then wrapped under its own label anyway); half-width pairs
-	 * fold it into 4. Values stay LEFT-aligned: MAC/DUID/rates are opaque strings.
+	 * one line with the value right-flushed costs a leases row 7 full-width lines and gives the
+	 * value ~40% of the width; half-width pairs fold it into 4. Values stay left-aligned.
 	 *
-	 * ONE CONTRACT — do not split it again. The stack is MEASURED, so it fires at ANY width, but
-	 * `display: block` and the `.hide-xs`/`.hide-sm` drops used to live only inside
-	 * `@media (max-width: 767px)` (theme/90-responsive.css), so a table stacked above the phone tier
-	 * got the card with neither. The window is real: the sidebar layout's content column is
-	 * (viewport - 224 - 56), so between ~768 and 860px it is already below CRAMPED while that query
-	 * is off. Measured at 790/820/850px — status_leases stacked with `display: table` still in force
-	 * (keeping the intrinsic min-width `display: block` exists to prevent) and wifi_assoclist_table
-	 * rendered ALL FIVE of its .hide-xs cells; at 760px both were correct. So they key off the CLASS.
-	 * The media query keeps its own copies, for the tables that do NOT stack on a phone and for the
-	 * config tables (@container, never .fs-stacked). The `.col-N` weights need no guard — see below. */
-	/* ---- A TABLE NOBODY HAS ANSWERED FOR YET TAKES NO ROOM ----
+	 * ONE CONTRACT — do not split it again. The stack is MEASURED and fires at ANY width, while
+	 * `display: block` and the `.hide-xs`/`.hide-sm` drops once lived only inside
+	 * `@media (max-width: 767px)` (theme/90-responsive.css). The window between the two is real: the
+	 * sidebar layout's content column is (viewport - 224 - 56), so from ~768 to 860px it is already
+	 * below CRAMPED while that query is off. Measured at 790/820/850px, status_leases stacked with
+	 * `display: table` still in force and wifi_assoclist_table rendered all five of its .hide-xs
+	 * cells; at 760px both were correct. So they key off the CLASS. */
+	/* ---- a table nobody has answered for yet takes no room ----
 	 *
 	 * A poll tick REPLACES these tables, and a fresh one carries no marks: for the moment between
-	 * landing and being stamped it is laid out as a full-width table — at 390px, several screens
-	 * taller than the card stack it is about to be. The engine re-anchors on that intermediate and
-	 * throws the reader; measured on a remote router at iPhone width, 612px out and back, twice per
-	 * tick. fs-select.js answers in a MutationObserver microtask, i.e. before paint — but only if
-	 * nothing forces layout in between, and an app that reads a width right after rendering does
-	 * exactly that.
+	 * landing and being stamped it is laid out as a full-width table, several screens taller than
+	 * the card stack it is about to be. The engine re-anchors on that intermediate and throws the
+	 * reader 612px out and back, twice per tick. fs-select.js answers in a MutationObserver
+	 * microtask, i.e. before paint — but only if nothing forces layout in between, and an app that
+	 * reads a width right after rendering does exactly that.
 	 *
-	 * So the table waits outside the layout until it has an answer. `display: none` and not
-	 * `visibility: hidden`, because a hidden box still occupies its height, which is the whole
-	 * problem; the wait is a microtask long.
+	 * So the table waits outside the layout until it has an answer. `display: none`, not
+	 * `visibility: hidden`, because a hidden box still occupies its height.
 	 *
-	 * GUARDED ON THE FITTERS BEING ALIVE. `:root[data-fs-fit]` is written by fs-fit.js at module
-	 * eval and by nothing else, so a document where that file never ran — an old cache, a JS error
-	 * before it, a browser that refused the module — shows every table exactly as it did before this
-	 * rule existed. A stylesheet that can hide content on its own is a stylesheet that can hide it
+	 * Guarded on the fitters being alive: `:root[data-fs-fit]` is written by fs-fit.js and by
+	 * nothing else, so a document where that file never ran shows every table exactly as before this
+	 * rule existed. A stylesheet that can hide content on its own is one that can hide it
 	 * forever. */
 	:root[data-fs-fit] #view .table.fs-dt:not(.fs-fitted),
 	:root[data-fs-fit] #modal_overlay .table.fs-dt:not(.fs-fitted) { display: none; }
 
 	.table.fs-stacked { display: block; width: 100%; }
-	/* `.fs-drop-xs` is the SAME drop, one rung earlier: fs-select.js writes it on a table that has
+	/* `.fs-drop-xs` is the same drop one rung earlier: fs-select.js writes it on a table that has
 	 * overflowed, before it decides to card, because the view author has already said which columns
 	 * are expendable and a table with two fewer columns often fits. Same declaration, so the two
-	 * selectors share the block rather than repeating it — and the class is what makes the drop a
-	 * MEASURED decision instead of the 767px viewport guess it used to be (theme/90-responsive.css
-	 * keeps that copy for the tables that never card). */
+	 * selectors share the block, and the class is what makes the drop a MEASURED decision rather
+	 * than a viewport guess (theme/90-responsive.css keeps that copy for tables that never card). */
 	.table.fs-stacked .td.hide-sm, .table.fs-stacked .th.hide-sm,
 	.table.fs-stacked .td.hide-xs, .table.fs-stacked .th.hide-xs,
 	.table.fs-drop-xs .td.hide-sm, .table.fs-drop-xs .th.hide-sm,
@@ -607,11 +518,10 @@
 	}
 	/* The column label, lifted above its value (LuCI writes it per cell as data-title).
 	 *
-	 * PINNED: the config table (theme/65-dropdown.css) needs these exact declarations under its
-	 * @container guard, and CSS cannot share a block between a CLASS and a CONTAINER QUERY — the two
+	 * Pinned: the config table (theme/65-dropdown.css) needs these exact declarations under its
+	 * @container guard, and CSS cannot share a block between a class and a container query — the two
 	 * guards do not OR. tools/mirror.mjs keeps the copies byte-identical; edit one and the build
-	 * fails until you edit the other. (A duplicate detector goes QUIET once two copies differ —
-	 * exactly when it should shout.) */
+	 * fails until you edit the other, a duplicate detector going quiet once two copies differ. */
 	.table.fs-stacked .td[data-title]::before {
 		/* @mirror table-card/label */
 		content: attr(data-title); display: block; margin-bottom: var(--fs-space-1);
@@ -647,17 +557,14 @@
 
 	/* --- the DATA table's flavour (L.ui.Table, tagged .fs-dt) ---
 	 * Clip rows to the frame's corners: zebra paints its background on the .tr and the frame is
-	 * overflow:visible, so a striped row's SQUARE background poked past the 12px corners. Safe once
-	 * stacked: a flex-wrap row fits the width, so there is no horizontal column left to clip — the
-	 * only thing overflow:visible protected. `#view .table.fs-dt.fs-stacked` (1,3,0) outranks the
-	 * frame's `#view .table[id]` (1,2,0) on specificity, not order.
+	 * overflow:visible, so a striped row's square background pokes past the corners. Safe once
+	 * stacked — a flex-wrap row fits the width, so there is no horizontal column left to clip, which
+	 * is the only thing overflow:visible protected. `#view .table.fs-dt.fs-stacked` (1,3,0) outranks
+	 * the frame's `#view .table[id]` (1,2,0) on specificity, not on order.
 	 *
 	 * `#modal_overlay` as well, because the FRAME already reaches a dialog and this clip did not: a
-	 * data table inside a dialog's `.cbi-section` (a form modal, an app's own dialog) takes the frame
-	 * from `.cbi-section .table[id]` above, so it has the same 12px corners with the same zebra
-	 * painted square across them. Measured on the stand with one table built twice, at 390px: both
-	 * copies `border-radius: 12px`, both rows `rgb(246, 248, 251)`, `overflow: hidden` in #view and
-	 * `visible` in the dialog. Same markup, same frame, one of them clipped. */
+	 * data table inside a dialog's `.cbi-section` takes the frame from `.cbi-section .table[id]`
+	 * above and has the same corners with the same zebra painted square across them. */
 	#view .table.fs-dt.fs-stacked,
 	#modal_overlay .table.fs-dt.fs-stacked { overflow: hidden; }
 	/* `:not(.placeholder)` — the plate is out of flow (base/40-tables.css) and its row exists only to
@@ -670,18 +577,15 @@
 	 * unguarded `.table .td.col-N` below, at (0,3,0), beats it on SPECIFICITY, not source order. */
 	.fs-stacked .td { flex: 1 1 50%; }
 
-	/* ---- COLUMN WEIGHTS: ONE unguarded block, unguarded ON PURPOSE ----
-	 * A weight (1-10) is a share of a CARDED row — the JS says which cell is a narrow badge and which
-	 * the wide status text (wireless.js col-2/3/4, connections.js col-7); without it every cell falls
-	 * back to the flat 50% above and the badge gets as much room as the text.
+	/* ---- column weights: one unguarded block, unguarded on purpose ----
+	 * A weight (1-10) is a share of a CARDED row — the JS says which cell is a narrow badge and
+	 * which the wide status text; without it every cell falls back to the flat 50% above.
 	 *
-	 * Do NOT copy them under a guard (a first pass did: twenty rules, two guards, free to drift).
-	 * `flex` applies only to a FLEX ITEM, and a `.td` becomes one exactly when its `.tr` turns into a
-	 * flex container — i.e. when the table cards, by EITHER mechanism (`.fs-stacked`, measured at any
-	 * width; or the config table's `@container fs-content (max-width: 960px)`, which can card on a
-	 * 1200px desktop). Anywhere else they are inert. So one copy serves the phone tier, the measured
-	 * stack and the config table — which got its weights for the first time (cssdiff: nothing else
-	 * moved). Basis N*30px, as in stock, so the weights compose the same way. */
+	 * Do not copy them under a guard. `flex` applies only to a FLEX ITEM, and a `.td` becomes one
+	 * exactly when its `.tr` turns into a flex container — by either mechanism (`.fs-stacked`,
+	 * measured at any width, or the config table's @container, which can card on a 1200px desktop).
+	 * Anywhere else they are inert, so one copy serves all three tiers. Basis N*30px, as in stock,
+	 * so the weights compose the same way. */
 	.table .td.col-1,  .table .th.col-1  { flex: 1 1 30px; }
 	.table .td.col-2,  .table .th.col-2  { flex: 2 2 60px; }
 	.table .td.col-3,  .table .th.col-3  { flex: 3 3 90px; }
@@ -696,45 +600,38 @@
 	/* general table cell padding — compact but readable (Startup/Processes/etc) */
 	.table .td { padding-top: var(--fs-space-2); padding-bottom: var(--fs-space-2); }
 
-	/* ---- THE LAST RESORT: a foreign <table> the card stack cannot claim ----
+	/* ---- the last resort: a foreign <table> the card stack cannot claim ----
 	 *
-	 * fs-select.js now tags any `#view table` that HAS a header row — `.tr.table-titles`,
-	 * `.tr.cbi-section-table-titles`, a `<thead>`, or a first row made entirely of `<th>` — as
-	 * `.table.fs-dt`, so it is measured and cards like every other data table. What is left here is
-	 * the table with no header at all: a log, a statistics matrix, a layout table. Those must NOT be
-	 * carded even if they overflow — a card prints `data-title` above each value, and a matrix has no
-	 * titles to print, so stacking one produces a column of numbers with nothing saying what they are.
-	 * Comparison is the whole point of that shape; it scrolls instead.
+	 * fs-select.js tags any `#view table` that HAS a header row as `.table.fs-dt`, so it is measured
+	 * and cards like every other data table. What is left here is the table with no header at all: a
+	 * log, a statistics matrix, a layout table. Those must not be carded even if they overflow — a
+	 * card prints `data-title` above each value, and a matrix has no titles to print, so stacking one
+	 * produces a column of numbers with nothing saying what they are. Comparison is the point of
+	 * that shape; it scrolls instead.
 	 *
-	 * `display: block` + `overflow-x: auto` on the table ITSELF, not on a wrapper: the theme cannot
-	 * add markup around someone else's element, and the block box is what gives it a scroll container.
-	 * The rows still lay out as a table — a `display: block` <table> wraps its children in an
-	 * anonymous table box — so the columns keep lining up.
+	 * `display: block` plus `overflow-x: auto` on the table ITSELF, not on a wrapper: the theme
+	 * cannot add markup around someone else's element, and the block box is what gives it a scroll
+	 * container. The rows still lay out as a table, a `display: block` <table> wrapping its children
+	 * in an anonymous table box.
 	 *
-	 * UNGUARDED, and that is the change: this rule spent its life inside `@media (max-width: 767px)`
-	 * (theme/90-responsive.css), where it was written after a phone report — a wifi-clients dashboard
-	 * whose last column was silently CUT by `.fs-main`'s `overflow-x: clip`, measured at 390px as a
-	 * 388px table in a 356px card. But the viewport was never the fact that mattered: a narrow panel,
-	 * a split window or a 960px tablet reaches the same wall with the query switched off, and the
-	 * clip is just as silent there. Cost at a width where the table fits: nothing at all — `overflow`
-	 * only paints a scrollbar once there is something to scroll.
+	 * Unguarded by a media query, because the viewport was never the fact that mattered: a narrow
+	 * panel or a split window overflows at any width, and a phone report is only where it was
+	 * noticed first.
 	 *
-	 * And a dialog is the worst place to leave it out. `#modal_overlay` is the SCROLL CONTAINER
-	 * (base/60-modal.css) and the dialog is centred in it with `margin: auto`, so an over-wide child
-	 * does not scroll itself — it scrolls the dialog's own left edge off the screen (theme/70-modal.css
-	 * spends a block on the two stock children that did it). A table is the widest child there is.
-	 * Measured at 390px with a four-column `nowrap` log table, no header row, built twice: in #view it
-	 * scrolls inside itself (358px shown of 636px, page scroll 0); in a dialog it rendered 636px wide
-	 * in 317px of room and gave the overlay 282px of horizontal scroll. */
+	 * A dialog is the worst place to leave it out, hence the `#modal_overlay` half of the selector:
+	 * the overlay is the scroll container (base/60-modal.css) and the dialog is centred in it with
+	 * `margin: auto`, so an over-wide child scrolls the dialog's own edge off the screen instead of
+	 * scrolling itself. Measured at 390px with a four-column `nowrap` log table: in #view it scrolls
+	 * inside itself (358px shown of 636px, page scroll 0); in a dialog it rendered 636px wide in
+	 * 317px of room and gave the overlay 282px of horizontal scroll. */
 	/* `.fs-xscroll` is the same outcome reached the other way: fs-select.js writes it on a `.table`
-	 * that has NO header row and has actually been measured to overflow — the shape a bare `<table>`
-	 * selector cannot reach, because a third-party app may render its log as `<div class="table">`.
-	 * A class rather than a selector, and MEASURED rather than declared, for one reason that is
-	 * spec-level: `overflow-x: auto` forces `overflow-y` to compute to `auto` as well
-	 * (css-overflow-3 §3.1 — there is no `auto`/`visible` pair), so a table given this becomes a clip
-	 * for every popup inside it. LuCI's own `ui.js` then walks up from an open dropdown and finds the
-	 * TABLE as the scroll parent, and sizes the list against it. So the fitter refuses the class to any
-	 * table holding a widget, and this rule can stay free of a `:has()` exclusion ladder. */
+	 * with no header row that has been measured to overflow — the shape a bare `<table>` selector
+	 * cannot reach, a third-party app being free to render its log as `<div class="table">`. A class
+	 * rather than a selector, and measured rather than declared, for a spec-level reason:
+	 * `overflow-x: auto` forces `overflow-y` to compute to `auto` too (css-overflow-3 §3.1), so a
+	 * table given this becomes a clip for every popup inside it, and ui.js then walks up from an open
+	 * dropdown, finds the TABLE as the scroll parent and sizes the list against it. The fitter
+	 * refuses the class to any table holding a widget, so this rule needs no `:has()` ladder. */
 	#view table:not(.table):not(.cbi-section-table):not(.fs-dt),
 	#modal_overlay table:not(.table):not(.cbi-section-table):not(.fs-dt),
 	#view .table.fs-xscroll, #modal_overlay .table.fs-xscroll {
@@ -749,18 +646,17 @@
 		scrollbar-width: thin;
 	}
 
-	/* ---- A TABLE OF CONTROLS STACKS: it is a form that happens to be laid out as a table ----
+	/* ---- a table of controls stacks: it is a form laid out as a table ----
 	 *
-	 * Written by fs-select.js on a header-less table that overflows and holds a control (Network →
-	 * Diagnostics: a host field, a method select and a Ping button in one row). Scrolling one of these
-	 * is not an option — the popup inside would be clipped by the scroll container it just became —
-	 * and doing nothing left it cut: measured at 320px of room, the row needed 338 and the button was
-	 * past `.fs-main`'s clip with no way to reach it.
+	 * Written by fs-select.js on a header-less table that overflows and holds a control. Scrolling
+	 * one is not an option — the popup inside would be clipped by the scroll container it just
+	 * became — and doing nothing leaves it cut: at 320px of room the row needed 338 and the button
+	 * was past `.fs-main`'s clip with no way to reach it.
 	 *
-	 * `display: block` on all three levels, which is the ONE place this theme wants it: the rows are a
-	 * form, so there is nothing to compare across them and nothing to keep in columns. Each control
-	 * then takes the width of the line it was given, and the table cannot exceed its parent by
-	 * construction. Nothing here creates a scroll container, so an open dropdown still escapes. */
+	 * `display: block` on all three levels, the one place this theme wants it: the rows are a form,
+	 * so there is nothing to compare across them and nothing to keep in columns. Each control takes
+	 * the width of its line and the table cannot exceed its parent by construction. Nothing here
+	 * creates a scroll container, so an open dropdown still escapes. */
 	.table.fs-rowstack,
 	.table.fs-rowstack .tr,
 	.table.fs-rowstack .td,
@@ -769,17 +665,16 @@
 	 * vertical rhythm instead, or the controls sit flush against each other */
 	.table.fs-rowstack .td { padding-inline: 0; padding-block: var(--fs-space-1); }
 
-	/* ---- WHAT MAKES A SCROLLED TABLE READABLE: the row keeps its name ----
+	/* ---- what makes a scrolled table readable: the row keeps its name ----
 	 *
-	 * Scrolling a table sideways takes the identity column away first, which leaves a screenful of
-	 * values belonging to nothing. Pinning the first cell of every row is the one thing a card view
-	 * gives for free and a scrolled table does not, and no LuCI theme does it — a survey of 45 of
-	 * them found sticky used on section titles and never on a column.
+	 * Scrolling a table sideways takes the identity column away first, leaving a screenful of values
+	 * belonging to nothing. Pinning the first cell of every row is the one thing a card view gives
+	 * for free and a scrolled table does not.
 	 *
-	 * The cells need their own background (the row's does not travel with a sticky cell in the
-	 * separated model, same as the header above) and a hairline on the inline end, so the pinned
+	 * The cells need their own background (a row's does not travel with a sticky cell in the
+	 * separated model, as for the header above) and a hairline on the inline end, so the pinned
 	 * column reads as an edge rather than as text sliding over text. `z-index: 2` keeps it over the
-	 * sticky header's `1` where the two cross, which is the corner cell. */
+	 * sticky header's `1` where the two cross, at the corner cell. */
 	#view .table.fs-xscroll .tr > :first-child,
 	#modal_overlay .table.fs-xscroll .tr > :first-child,
 	#view .table.fs-xscroll tr > :first-child,

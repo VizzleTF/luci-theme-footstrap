@@ -1,11 +1,10 @@
 #!/bin/sh
 # Fetch the published feed's public key, and report whether the feed answered at all.
 #
-# Writes `reachable=true|false` to $GITHUB_OUTPUT rather than failing: the step that
-# uses it tests what is ALREADY LIVE, not this build. A feed whose DNS is mid-migration
-# would otherwise turn every push red and block a theme release on the health of a
-# channel this repository does not own and a contributor cannot fix. A check that can
-# only be repaired somewhere else is a warning, not a gate.
+# Writes `reachable=true|false` to $GITHUB_OUTPUT rather than failing: the step that uses it tests
+# what is ALREADY LIVE, not this build, so a feed whose DNS is mid-migration would otherwise turn
+# every push red over a channel this repository does not own. A check that can only be repaired
+# somewhere else is a warning, not a gate.
 set -eu
 : "${RUNNER_TEMP:=${TMPDIR:-/tmp}}"
 : "${GITHUB_OUTPUT:=/dev/stdout}"

@@ -1,18 +1,14 @@
 #!/bin/sh
-# Build the exact jsmin the OpenWrt buildbot minifies our JS with.
+# Build the exact jsmin the OpenWrt buildbot minifies our JS with. Prints the path to the binary;
+# tools/jsmin-verify.mjs reads it from $JSMIN.
 #
-# Prints the path to the binary; tools/jsmin-verify.mjs reads it from $JSMIN.
+# Pinned to a commit and checksummed, because of what this file is: C source fetched over the
+# network, compiled, and then run as the gate that decides whether our shipped JavaScript is safe.
+# From a moving `master` the gate would be whatever upstream pushed last. Both the SHA and the
+# sha256 live in luci-theme-footstrap/luci-upstream.pin, which update-po.sh sources for its own
+# borrowed tool, so bumping upstream cannot leave half the toolchain behind.
 #
-# PINNED TO A COMMIT AND CHECKSUMMED, because of what this file is: C source fetched
-# over the network, compiled, and then run as the gate that decides whether our shipped
-# JavaScript is safe. From a moving `master` the gate would be whatever upstream pushed
-# last, and a bad day there — or a poisoned raw.githubusercontent cache — would silently
-# rewrite the check itself. A commit SHA is immutable and the sha256 says so out loud.
-# Both live in luci-theme-footstrap/luci-upstream.pin, which update-po.sh sources for its
-# own borrowed tool: one file, so bumping upstream cannot leave half the toolchain behind.
-#
-# jsmin.c is byte-identical on openwrt-24.10 and master, so one build covers both
-# releases this theme supports.
+# jsmin.c is byte-identical on openwrt-24.10 and master, so one build covers both releases.
 set -eu
 cd "$(dirname "$0")/.."
 

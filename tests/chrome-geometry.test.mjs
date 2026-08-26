@@ -1,24 +1,19 @@
-/* THE CHROME'S CUT, asked once and answered the same way twice.
+/* The chrome's cut, asked once and answered the same way twice.
  *
- * "How wide is the content column" is asked in two places for two different reasons: `fitShell()`
- * decides whether the sidebar still fits beside it, and `contentWidth()` answers a table's
- * mid-scroll question, where reading layout is forbidden. They are the same arithmetic — the window
- * less the sidebar (or the rail, or nothing) less the shell's gutter — and they were written twice,
- * so they drifted:
+ * "How wide is the content column" is asked in two places for two reasons: `fitShell()` decides
+ * whether the sidebar still fits beside it, and `contentWidth()` answers a table's mid-scroll
+ * question, where reading layout is forbidden. They are the same arithmetic — the window less the
+ * sidebar (or the rail, or nothing) less the shell's gutter — and written twice they drifted:
+ * `--fs-content-pad` is one side's padding, already doubled by shellGeometry(), and contentWidth
+ * subtracted it a second time: 56 CSS px of column that does not exist. And `data-narrow` is not the
+ * only chrome with no sidebar beside it — fitShell returns early on the top-BAR layout and removes
+ * the attribute on the way out, so contentWidth, which read only that attribute, went on
+ * subtracting a 224px sidebar from a window that has none.
  *
- *   * `--fs-content-pad` is ONE side's padding and `shellGeometry()` already doubles it. fitShell
- *     subtracted it once, contentWidth twice: 56 CSS px of column that does not exist.
- *   * `data-narrow` is not the only chrome with no sidebar beside it. fitShell returns early on the
- *     top-BAR layout (it has no sidebar to fold), and it removes the attribute on the way out — so
- *     contentWidth, which read only that attribute, went on subtracting a 224px sidebar from a
- *     window that has none.
- *
- * Both are pure arithmetic over four numbers, and neither is visible in a screenshot: the wrong
- * answer only matters when it crosses fs-select's CRAMPED threshold, and then it cards a table that
- * had room and un-cards it a moment later. So the arithmetic is one exported function and this is
- * its table. What that function may NOT check — that its inputs describe the real page — is checked
- * on a stand: tools/live-audit.mjs compares contentWidth() against the live `.fs-content` box.
- */
+ * Neither is visible in a screenshot: the wrong answer only matters when it crosses fs-select's
+ * CRAMPED threshold, and then it cards a table that had room and un-cards it a moment later. What
+ * this test may NOT check — that the inputs describe the real page — is checked on a stand, where
+ * tools/live-audit.mjs compares contentWidth() against the live `.fs-content` box. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModule, installBrowserGlobals } from './lib/luci-module.mjs';

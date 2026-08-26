@@ -1,8 +1,7 @@
 #!/bin/sh
 
-# Registration, and the three symlinks that expose what the admin uploads. Nothing here migrates a
-# router off an older footstrap: OpenWrt expects a sysupgrade rather than a package upgrade, so
-# leftovers go with the image, and the cleanup that is worth doing is config rather than files.
+# Registration, plus the three symlinks that expose what the admin uploads. Nothing here migrates a
+# router off an older footstrap: OpenWrt expects a sysupgrade rather than a package upgrade.
 
 changed=0
 
@@ -15,15 +14,15 @@ set_opt() {
 set_opt themes.Footstrap /luci-static/footstrap
 
 # A fresh install may pick the theme; an upgrade must never move a router off the theme it is on.
-# `changed` is what tells the two apart — on an upgrade the entry is already there — and it carries
-# the decision on its own, because apk exports no PKG_UPGRADE.
+# `changed` is what tells the two apart — on an upgrade the entry is already there — and it has to
+# carry the decision alone, because apk exports no PKG_UPGRADE.
 if [ "${PKG_UPGRADE:-}" != 1 ] && [ "$changed" = 1 ]; then
 	set_opt main.mediaurlbase /luci-static/footstrap
 fi
 
 [ "$changed" = 1 ] && uci commit luci
 
-# uhttpd serves /www only, so the admin's own uploads live in /etc — where a sysupgrade keeps them
+# uhttpd serves /www only, so the admin's uploads live in /etc — where a sysupgrade keeps them
 # (lib/upgrade/keep.d) — and are reached through symlinks. The pattern keeps its .svg name: uhttpd
 # types a response by extension, and an SVG sent as octet-stream paints nowhere.
 mkdir -p /etc/footstrap
