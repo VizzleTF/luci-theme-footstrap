@@ -95,8 +95,15 @@ const HOLD = async (growth) => {
 		 * reported a jump on every WebKit run and none on the other two engines, with the theme
 		 * identical. Asking the theme removes the guess: `scrolling` is exported for exactly this
 		 * kind of question. */
-		try {
-			const fit = await window.L.require('fs-fit');
+		const fit = await window.L.require('fs-fit').then((m) => m, () => null);
+		/* A theme that answers but cannot say where it rested is a FAILURE, not a fallback. This
+		 * used to be one try/catch around both, so a stripped export threw a TypeError that read as
+		 * "no theme here" and the sweep quietly went back to the flat wait below — which is the
+		 * WebKit flake this call exists to remove, and it measured nothing while saying nothing. */
+		if (fit && typeof fit.restAt !== 'function')
+			throw new Error('fs-fit is loaded but exports no restAt(): the sweep cannot tell when '
+				+ 'the theme has taken its reference, and a flat wait is not a substitute');
+		if (fit) {
 			/* until the theme has taken a reference AT THIS OFFSET. "Is it scrolling" cannot answer
 			 * that: it says no both before the motion sampler starts and after it finishes, and in
 			 * WebKit those are 1.5s apart — the probe grew the page in between, while the theme still
@@ -106,7 +113,7 @@ const HOLD = async (growth) => {
 				if (fit.restAt() === (sc ? sc.scrollTop : window.scrollY) && !fit.scrolling()) break;
 				await wait(25);
 			}
-		} catch (e) { /* no module, fall back to the wait below */ }
+		}
 		await wait(600);		/* the still moment the theme measures from */
 	};
 	await parkAt(at);
@@ -202,8 +209,15 @@ const SWAP = async (growth) => {
 		 * reported a jump on every WebKit run and none on the other two engines, with the theme
 		 * identical. Asking the theme removes the guess: `scrolling` is exported for exactly this
 		 * kind of question. */
-		try {
-			const fit = await window.L.require('fs-fit');
+		const fit = await window.L.require('fs-fit').then((m) => m, () => null);
+		/* A theme that answers but cannot say where it rested is a FAILURE, not a fallback. This
+		 * used to be one try/catch around both, so a stripped export threw a TypeError that read as
+		 * "no theme here" and the sweep quietly went back to the flat wait below — which is the
+		 * WebKit flake this call exists to remove, and it measured nothing while saying nothing. */
+		if (fit && typeof fit.restAt !== 'function')
+			throw new Error('fs-fit is loaded but exports no restAt(): the sweep cannot tell when '
+				+ 'the theme has taken its reference, and a flat wait is not a substitute');
+		if (fit) {
 			/* until the theme has taken a reference AT THIS OFFSET. "Is it scrolling" cannot answer
 			 * that: it says no both before the motion sampler starts and after it finishes, and in
 			 * WebKit those are 1.5s apart — the probe grew the page in between, while the theme still
@@ -213,7 +227,7 @@ const SWAP = async (growth) => {
 				if (fit.restAt() === (sc ? sc.scrollTop : window.scrollY) && !fit.scrolling()) break;
 				await wait(25);
 			}
-		} catch (e) { /* no module, fall back to the wait below */ }
+		}
 		await wait(600);		/* the still moment the theme measures from */
 	};
 	await parkAt(at);
@@ -385,6 +399,9 @@ const QUIET = async (growth) => {
 const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'scroll-anchor');
 const findings = [];
 let runs = 0;
+/* one line out of a Playwright error: the rest is a stack through the evaluate wrapper, and the
+ * first line is the sentence the browser or this file actually wrote */
+const first = (e) => String((e && e.message) || e).split('\n')[0].trim();
 
 for (const engine of ENGINES) {
 	if (!pw[engine]) { console.error(`scroll-anchor: no such engine "${engine}"`); process.exit(1); }
@@ -409,6 +426,7 @@ for (const engine of ENGINES) {
 						});
 					});
 				const page = await ctx.newPage();
+				const where = `${engine} ${stand.id} @${w} ${layout.padEnd(4)} ${density.padEnd(7)} ${noEngineAnchor ? 'engine-anchoring OFF' : 'engine-anchoring on '} ${PAGE.replace('/admin/status/', '')}`;
 				await login(page, stand.base);
 				try {
 					await page.evaluate(async ([l, d]) => {
@@ -418,17 +436,28 @@ for (const engine of ENGINES) {
 					}, [ layout, density ]);
 					await page.goto(stand.base + PAGE, { waitUntil: 'domcontentloaded', timeout: 20000 });
 				}
-				catch (e) { await ctx.close(); continue; }
+				catch (e) {
+					findings.push(`${where}: the page could not be opened — ${first(e)}`);
+					await ctx.close();
+					continue;
+				}
 				await page.waitForTimeout(3000);
 
-				const where = `${engine} ${stand.id} @${w} ${layout.padEnd(4)} ${density.padEnd(7)} ${noEngineAnchor ? 'engine-anchoring OFF' : 'engine-anchoring on '} ${PAGE.replace('/admin/status/', '')}`;
 				let held, swap, quiet;
 				try {
 					held = await page.evaluate(HOLD, GROWTH);
 					swap = await page.evaluate(SWAP, GROWTH);
 					quiet = await page.evaluate(QUIET, GROWTH);
 				}
-				catch (e) { await ctx.close(); continue; }
+				/* A cell that threw proved nothing, and dropping it without a word is how a sweep comes
+				 * back green having measured a fraction of what it was asked to. That is not a theory:
+				 * `fs-fit.restAt()` was stripped out of the package, every measurement threw, and both
+				 * of these catches took the whole run down to "0 run(s)" and exit 0. */
+				catch (e) {
+					findings.push(`${where}: the measurement threw — ${first(e)}`);
+					await ctx.close();
+					continue;
+				}
 
 				if (held.skip || quiet.skip) {
 					process.stdout.write(`  ${where}: ${held.skip || quiet.skip}\n`);
@@ -477,6 +506,11 @@ if (findings.length) {
 	for (const f of findings) console.error('  ' + f);
 	console.error('\nfs-fit.js keeps the reader\'s place where the engine does not (ENGINE_ANCHORS), and must');
 	console.error('stay out of the way where it does. docs/chrome.md.\n');
+	process.exit(1);
+}
+/* A sweep that measured nothing has not shown that the reader stays put, so it may not say so. */
+if (!runs) {
+	console.error('\nscroll-anchor: 0 run(s) — every cell was skipped, so nothing was measured.\n');
 	process.exit(1);
 }
 console.log(`scroll-anchor: ${runs} run(s), the reader stayed put with and without the engine's own anchoring.`);

@@ -683,8 +683,15 @@ return baseclass.extend({
 	 * than the anchor. Nothing else can answer it — "is it scrolling" says no both before the motion
 	 * sampler starts and after it finishes, 1.5 seconds apart in WebKit. Waiting a flat interval
 	 * instead was tried: tools/scroll-anchor.mjs then reported a jump on every WebKit run and none
-	 * on the other two engines, with the theme identical on all three. */
-	restAt: () => _restAt,	/* fs:probe */
+	 * on the other two engines, with the theme identical on all three.
+	 *
+	 * It carries no probe marker, and the four exports that do are the contrast: those are read by
+	 * node tests against this checkout, this one by a browser sweep against the INSTALLED package.
+	 * Marked, it was stripped out of the package and the sweep fell back to that same flat wait --
+	 * 14 findings on one router, every one of them WebKit, every one on the Overview, and not a
+	 * word about the missing method, because the call sits in a try/catch written for "no theme
+	 * here at all". */
+	restAt: () => _restAt,
 
 	/* "the offset is mine now, forget what you remembered": called by fs-router when it resets both
 	 * scrollers for an incoming page. The router resets synchronously and stamps `body[data-page]`
