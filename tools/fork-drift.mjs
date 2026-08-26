@@ -30,8 +30,8 @@ if (!existsSync(join(DEST, 'luci.mk')) || !existsSync(OUT)) {
 
 /* the sync's own exclude list, restated as the shape of an EXPECTED difference */
 const NOT_SENT = [ 'styles', 'build-css.sh', 'mangle-tokens.sh', 'strip-templates.sh',
-	'strip-shell.sh', 'build-apk.sh', 'dev-sync.sh', 'update-po.sh', 'luci-upstream.pin',
-	'README.md', '.DS_Store' ];
+	'strip-shell.sh', 'strip-probes.sh', 'build-apk.sh', 'dev-sync.sh', 'update-po.sh',
+	'luci-upstream.pin', 'README.md', '.DS_Store' ];
 const HAND_HELD = [ 'Makefile', 'po' ];
 /* generated on this side, committed on that one */
 const GENERATED = [ 'htdocs/luci-static/footstrap/cascade.css' ];
