@@ -89,6 +89,13 @@ compile.
   went in with an attribute watch AND a retry ladder, both landed together, both passed; the ladder
   turned out to catch nothing, and a maintainer had to ask. A suspicion about risk is an experiment
   to run, not a justification to write into a comment.
+- **`/security-review` before every release and every upstream PR.** It reads the branch diff, so it
+  is run once the branch is final and before the tag or the `gh pr create` — not after. The surface
+  worth the pass is small and always the same: the installer's signature chain, any new shell that
+  runs over a build tree, the login template (that page is unauthenticated), sinks in the browser JS,
+  and the packaging pipeline. A maintainer asked outright whether one had been done
+  (openwrt/luci#8981); "yes, and here is what it covered" is a one-line answer only if the pass
+  actually happened.
 - **Prove a CSS change with a computed-style diff, not screenshots.** Live counters move 0.5–1.3% of
   pixels between two runs of the *same* sheet while a real regression weighs 0.19%.
 - Screenshots and any other scratch artefact go in `../tmp/`, never inside the checkout.

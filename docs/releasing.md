@@ -53,6 +53,12 @@ npm run check
 `tools/jsmin-verify.mjs` is not in `check` (it needs a jsmin binary built from the pin) — CI runs
 it. Locally the cause is covered by eslint's `wrap-regex`, inside `lint`.
 
+`/security-review` runs beside it, on the diff this release carries, before the tag. It is not a
+gate and cannot be — it reads a diff rather than a tree — which is why it is named here instead:
+the pass is worth the minute on the five things a theme can actually get wrong (the installer's
+signature chain, new shell running over a build tree, the unauthenticated login template, sinks in
+the browser JS, the packaging pipeline), and a maintainer has asked outright whether one was done.
+
 ## Step 3 — asset selection (issue #6), separately and always
 
 This is the most fragile part of every release and the only one that fails silently: the release
