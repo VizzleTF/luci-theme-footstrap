@@ -174,6 +174,11 @@ define Build/Prepare/luci-theme-footstrap
 	# script for why the ucode-code `/* … */` deliberately stays. -22 KB of 60, git keeps every word,
 	# and dev-sync.sh does NOT run this: a router you are debugging on keeps its comments.
 	$(SHELL) $(CURDIR)/strip-templates.sh $(PKG_BUILD_DIR)/ucode
+	# The gate-only exports (`/* fs:probe */`). A handful of module-private functions are also
+	# listed in a module's baseclass so a gate in the source repository can call them — nothing on a
+	# router does. The functions stay; the export line goes, so the surface a package carries is the
+	# one the theme itself uses.
+	$(SHELL) $(CURDIR)/strip-probes.sh $(PKG_BUILD_DIR)/htdocs/luci-static/resources
 	# …and the same for the shell under root/ (71% and 95% comment lines). Whole-line `#` only.
 	$(SHELL) $(CURDIR)/strip-shell.sh $(PKG_BUILD_DIR)/root
 	$(SED) "s#const FS_VERSION *= *'[^']*'#const FS_VERSION = '$(if $(PKG_VERSION),$(PKG_VERSION),$(PKG_SRC_VERSION))'#" \

@@ -56,6 +56,7 @@ rsync -a --delete \
 	--exclude 'mangle-tokens.sh' \
 	--exclude 'strip-templates.sh' \
 	--exclude 'strip-shell.sh' \
+	--exclude 'strip-probes.sh' \
 	--exclude 'build-apk.sh' \
 	--exclude 'dev-sync.sh' \
 	--exclude 'update-po.sh' \
@@ -71,9 +72,14 @@ rsync -a --delete \
 # `po` is NOT in this list on purpose: it is excluded from the send because Weblate owns it there,
 # which means the copy that is already in that tree must be left exactly where it is.
 for stale in styles build-css.sh mangle-tokens.sh strip-templates.sh strip-shell.sh \
-             build-apk.sh dev-sync.sh update-po.sh luci-upstream.pin README.md; do
+             strip-probes.sh build-apk.sh dev-sync.sh update-po.sh luci-upstream.pin README.md; do
 	rm -rf "$OUT/$stale"
 done
+
+# The gate-only exports do not travel either. They exist so a gate in THIS repository can call a
+# module-private function; upstream has no such gate, and a module surface nobody calls is dead
+# weight there. The functions stay — only the export line goes (strip-probes.sh).
+sh "$SRC/strip-probes.sh" "$OUT/htdocs/luci-static/resources"
 
 # the artefact the far side commits, generated from the layers on this side
 sh "$SRC/build-css.sh" "$OUT/htdocs/luci-static/footstrap/cascade.css"

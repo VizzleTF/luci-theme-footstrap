@@ -79,7 +79,11 @@ else
 	#    and is the direction that cannot break the theme.
 	"$SRC/mangle-tokens.sh" "$CSS" "$SRC/htdocs/luci-static/resources" "$SRC/ucode"
 
-	# 4. terser. On the SDK path this was optional (luci.mk's jsmin was the fallback for a
+	# 4. The gate-only exports, BEFORE terser — the marker is a comment, and terser takes every
+	#    comment with it. See strip-probes.sh for what a probe is and why a router does not need it.
+	"$SRC/strip-probes.sh" "$STAGE/www/luci-static/resources"
+
+	#    …then terser. On the SDK path this was optional (luci.mk's jsmin was the fallback for a
 	#    buildbot with no node); there is no jsmin here, so it is the only minifier and a
 	#    missing node is a failed build rather than a bigger package.
 	node "$ROOT/tools/minify-js.mjs" "$STAGE/www/luci-static/resources"
