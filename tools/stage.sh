@@ -63,12 +63,20 @@ if [ "$DEV" = 1 ]; then
 else
 	"$SRC/build-css.sh" "$CSS"
 
-	# 3. The private --fs-* tier, renamed to one- and two-letter names. The reserved set is
-	#    DERIVED by reading the theme's JS and templates — from $SRC, the SOURCE, never from
-	#    the staged copy: after step 4 the staged JS has no comments left, and five names that
-	#    are only mentioned in one would stop being reserved. Over-reserving costs a kilobyte
-	#    and is the direction that cannot break the theme.
-	"$SRC/mangle-tokens.sh" "$CSS" "$SRC/htdocs/luci-static/resources" "$SRC/ucode"
+	# 3. The private --fs-* tier, renamed to one- and two-letter names — in the sheet AND on the
+	#    far side of the seam, the staged JS and templates, with the same map. The 36 names that
+	#    cross the seam used to be reserved and cost 8,574 B of the sheet on their own
+	#    (`--fs-accent` 1,452 B); renaming both sides together takes 4.5 KB more off the wire.
+	#
+	#    Safe only because every `--fs-` reference in the JS and the templates is a WHOLE string
+	#    literal — `setProperty('--fs-accent', …)`, never `'--fs-' + role`. Checked across all 89
+	#    sites. If one is ever composed, the sheet renames and the JS keeps asking for a name that
+	#    no longer exists, silently, which is why mangle-tokens.sh says so at its --rewrite flag.
+	#
+	#    The staged copies are rewritten, never $SRC: this runs before terser, so the staged JS
+	#    still has its comments and a name mentioned only in one is renamed there too, harmlessly.
+	"$SRC/mangle-tokens.sh" "$CSS" "$SRC/htdocs/luci-static/resources" "$SRC/ucode" \
+		--rewrite "$STAGE/www/luci-static/resources" "$STAGE/usr/share/ucode/luci"
 
 	# 4. The gate-only exports, BEFORE terser — the marker is a comment, and terser takes every
 	#    comment with it. See strip-probes.sh for what a probe is and why a router does not need it.
@@ -94,6 +102,11 @@ else
 	#    manifest's indentation. Both are fetched by a browser, and uhttpd sends them uncompressed
 	#    like everything else.
 	"$SRC/strip-assets.sh" "$STAGE/www/luci-static/footstrap"
+
+	#    …and the app icon's compressed stream, which build-icons.mjs leaves as Chromium's encoder
+	#    wrote it: the same pixels re-deflated are 581 B smaller, and it is a manifest icon a
+	#    browser fetches over the same uncompressed channel.
+	node "$ROOT/tools/repack-png.mjs" "$STAGE/www/luci-static/footstrap"
 fi
 
 # root/ joins the payload once it has been stripped — see the note at step 1.

@@ -210,7 +210,12 @@
 	:root[data-warn="hex"][data-warn]     { --fs-on-warn:   oklch(from var(--fs-warn)   clamp(0, (l - .62) * -100, 1) 0 0); }
 	:root[data-danger="hex"][data-danger] { --fs-on-danger: oklch(from var(--fs-danger) clamp(0, (l - .62) * -100, 1) 0 0); }
 
-	/* ---- footstrap — GitHub Primer (DEFAULT, also fills bare :root) ---- */
+	/* ---- footstrap — GitHub Primer (DEFAULT, also fills bare :root) ----
+	 * `[data-palette="footstrap"]` never matches — both appliers REMOVE the attribute for the
+	 * default rather than stamp it (fs-prefs.js listAxis, partials/head.ut:216) — and it is kept
+	 * anyway: dropping it leaves a bare `:root` that duplicates the derive rule above, and merging
+	 * those two would put one palette's raw values in the block that derives every palette's. 86 B
+	 * to keep the two roles apart. */
 	:root,
 	:root[data-palette="footstrap"] {
 		/* LIGHT */

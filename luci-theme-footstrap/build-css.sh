@@ -33,14 +33,52 @@ done
 
 TMP="$OUT.tmp.$$"
 # $TMP.min too: an awk failure used to leave it behind next to the real output.
-trap 'rm -f "$TMP" "$TMP.min"' EXIT
+trap 'rm -f "$TMP" "$TMP.min" "$TMP.layer"' EXIT
 mkdir -p "$(dirname "$OUT")"
 
+# One `@layer X{` per LAYER, not one per FILE. Every source file carries its own wrapper so it can
+# be read and edited alone; concatenated, that is 38 copies of the same six-to-eleven bytes, 554 of
+# them, plus two files that are all comment and emit nothing but `@layer page{}`.
+#
+# The wrapper now comes from the DIRECTORY, so a file filed under the wrong layer would be silently
+# re-layered instead of just being wrong — hence the check that each file opens with the layer its
+# directory means. A file with no wrapper at all (00-header.css: the banner and the layer-order
+# statement) is copied through, and must come before the wrapped ones or it would land inside the
+# block.
+emit_layer() {
+	layer="$1"; shift
+	body="$TMP.layer"
+	: > "$body"
+	for f in "$@"; do
+		if head -1 "$f" | grep -q '^@layer '; then
+			head -1 "$f" | grep -q "^@layer $layer {\$" || {
+				echo "build-css: $f is in a $layer directory but does not open with '@layer $layer {'" >&2
+				rm -f "$body"; exit 1; }
+			# the file's own wrapper: its first line, and its last line, which is that wrapper's `}`
+			sed '1d;$d' "$f" >> "$body"
+		elif [ -s "$body" ]; then
+			echo "build-css: $f has no @layer wrapper but follows one that does — it would be" >&2
+			echo "build-css: swallowed into the $layer block instead of staying above it." >&2
+			rm -f "$body"; exit 1
+		else
+			cat "$f"
+		fi
+	done
+	if [ -s "$body" ]; then
+		printf '@layer %s {\n' "$layer"
+		cat "$body"
+		printf '}\n'
+	fi
+	rm -f "$body"
+}
+
 # glob expands in filename order
-cat "$D"/styles/*.css \
-    "$D"/styles/base/*.css \
-    "$D"/styles/theme/*.css \
-    "$D"/styles/pages/*.css > "$TMP"
+{
+	emit_layer tokens "$D"/styles/*.css
+	emit_layer base   "$D"/styles/base/*.css
+	emit_layer theme  "$D"/styles/theme/*.css
+	emit_layer page   "$D"/styles/pages/*.css
+} > "$TMP"
 
 # Strip /* … */, keep /*! … */ (the licence banner), drop indentation and blank lines.
 #

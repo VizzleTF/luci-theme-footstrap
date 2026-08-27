@@ -33,19 +33,44 @@ set -e
 CSS="${1:-}"
 [ -n "$CSS" ] && [ -f "$CSS" ] || { echo "usage: mangle-tokens.sh <cascade.css> <dir>..." >&2; exit 1; }
 shift
+# --rewrite <dir>… : the seam names are mangled TOO, and the same map is applied to the JS and
+# templates in those directories. Without it they are reserved, which is the safe default and what
+# an SDK build (no second pass to rewrite) needs.
+#
+# The seam is safe to rename only because every `--fs-` reference on the far side is a WHOLE string
+# literal — `setProperty('--fs-accent', …)`, never `'--fs-' + role`. Checked across all 89 sites;
+# if one is ever composed, this flag renames the CSS and the JS keeps asking for a name that no
+# longer exists, silently. The 36 seam names cost 8,574 B in the sheet, `--fs-accent` alone 1,452.
+REWRITE=""
+RESERVE_DIRS=""
+REWRITE_DIRS=""
+seen=""
+for a in "$@"; do
+	if [ "$a" = "--rewrite" ]; then seen=1; REWRITE=1; continue; fi
+	if [ -n "$seen" ]; then REWRITE_DIRS="$REWRITE_DIRS $a"; else RESERVE_DIRS="$RESERVE_DIRS $a"; fi
+done
+# shellcheck disable=SC2086 -- the dirs are ours, and a path with a space would already have broken
+# every other loop in this package's build
+set -- $RESERVE_DIRS
+
 [ $# -gt 0 ] || { echo "mangle-tokens: no reserved-source dir given" >&2; exit 1; }
 
 RES="$CSS.reserved.$$"
 MAP="$CSS.map.$$"
-trap 'rm -f "$RES" "$MAP" "$CSS.tmp.$$"' EXIT
+trap 'rm -f "$RES" "$MAP" "$MAP.ord" "$CSS.tmp.$$"' EXIT
 
-# every --fs- name mentioned anywhere in the JS or the templates keeps its name
-for d in "$@"; do
-	[ -d "$d" ] || { echo "mangle-tokens: $d is not a directory" >&2; exit 1; }
-	find "$d" -type f \( -name '*.js' -o -name '*.ut' \) -exec cat {} +
-done | grep -oE -- '--fs-[a-z0-9-]+' | sort -u > "$RES"
+if [ -n "$REWRITE" ]; then
+	# nothing is reserved: every name is renamed here and in the far side together
+	: > "$RES"
+else
+	# every --fs- name mentioned anywhere in the JS or the templates keeps its name
+	for d in "$@"; do
+		[ -d "$d" ] || { echo "mangle-tokens: $d is not a directory" >&2; exit 1; }
+		find "$d" -type f \( -name '*.js' -o -name '*.ut' \) -exec cat {} +
+	done | grep -oE -- '--fs-[a-z0-9-]+' | sort -u > "$RES"
 
-[ -s "$RES" ] || { echo "mangle-tokens: reserved set came out EMPTY — refusing (a seam name would be renamed and the theme would break silently)" >&2; exit 1; }
+	[ -s "$RES" ] || { echo "mangle-tokens: reserved set came out EMPTY — refusing (a seam name would be renamed and the theme would break silently)" >&2; exit 1; }
+fi
 
 awk -v RESFILE="$RES" -v MAPFILE="$MAP" '
 	function isname(c) { return (c ~ /[A-Za-z0-9_-]/) }
@@ -122,3 +147,34 @@ before=$(wc -c < "$CSS")
 mv "$CSS.tmp.$$" "$CSS"
 after=$(wc -c < "$CSS")
 echo "mangle-tokens: $before -> $after bytes (-$((before - after))), $(wc -l < "$RES") name(s) reserved"
+
+# ---- the far side of the seam, renamed with the same map ----
+if [ -n "$REWRITE" ]; then
+	[ -s "$MAP" ] || { echo "mangle-tokens: --rewrite asked for, but the map is empty" >&2; exit 1; }
+	# NEVER the checkout. This rewrites files in place, so a target under the directory this script
+	# itself lives in is the source tree, and renaming the seam there destroys it — measured the
+	# hard way: a mistake in the argument split sent $SRC here instead of $STAGE and rewrote eight
+	# shipped modules and a template before anything noticed.
+	SELF_DIR=$(cd "$(dirname "$0")" && pwd -P)
+	for d in $REWRITE_DIRS; do
+		abs=$(cd "$d" 2>/dev/null && pwd -P) || { echo "mangle-tokens: --rewrite target $d is not a directory" >&2; exit 1; }
+		case "$abs/" in
+			"$SELF_DIR"/*) echo "mangle-tokens: --rewrite target $d is inside the source tree ($SELF_DIR) — refusing, this rewrites in place" >&2; exit 1 ;;
+		esac
+	done
+	# longest first, or `--fs-accent` would rewrite the head of `--fs-accent-h`
+	awk '{ print $1, $3 }' "$MAP" | awk '{ print length($1), $0 }' | sort -rn | cut -d" " -f2- > "$MAP.ord"
+	touched=0
+	for d in $REWRITE_DIRS; do
+		[ -d "$d" ] || { echo "mangle-tokens: --rewrite target $d is not a directory" >&2; exit 1; }
+		for f in $(find "$d" -type f \( -name '*.js' -o -name '*.ut' \)); do
+			awk -v MAPF="$MAP.ord" '
+				BEGIN { while ((getline l < MAPF) > 0) { split(l, a, " "); from[++k] = a[1]; to[k] = a[2] } }
+				{ for (x = 1; x <= k; x++) gsub(from[x], to[x]); print }
+			' "$f" > "$f.tmp$$" && mv "$f.tmp$$" "$f"
+			touched=$((touched + 1))
+		done
+	done
+	rm -f "$MAP.ord"
+	echo "mangle-tokens: seam renamed in $touched file(s)"
+fi
