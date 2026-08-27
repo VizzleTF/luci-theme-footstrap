@@ -72,8 +72,12 @@
 	 * language (measured). The theme's own CSS was rewriting the string the theme's own CSS keyed
 	 * off. Columns: 1 Package name | 2 Version | 3 Size | 4 Description | 5 actions. */
 	/* `overflow-wrap` dropped: base/40-tables.css breaks every cell now and this copy moved nothing
-	 * against 100 matching cells. `word-break` stays — switching IT off moved all 100. */
-	#packages.fs-stacked .td:nth-child(4) { display: block; text-align: start; word-break: break-word; }
+	 * against 100 matching cells. `word-break` has now gone the same way for a different reason: its
+	 * neutraliser in theme/30-tables.css stopped excusing carded tables, so this sat under a flag and
+	 * could not be read. Nothing renders differently — `break-word` is `word-break: normal` plus
+	 * `overflow-wrap: anywhere` and the theme already gives every stacked cell the second half;
+	 * measured at 390px, this cell is 322 x 103 px on either side of the change. */
+	#packages.fs-stacked .td:nth-child(4) { display: block; text-align: start; }
 	#packages.fs-stacked .td:nth-child(4)::before { display: block; margin-bottom: var(--fs-space-1); }
 	#packages.fs-stacked .td.cbi-section-actions { justify-content: flex-end; margin-top: var(--fs-space-1-5); }
 	#packages.fs-stacked .td.cbi-section-actions::before,

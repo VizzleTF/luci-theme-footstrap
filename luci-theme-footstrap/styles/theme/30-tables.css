@@ -167,9 +167,17 @@
 	 * a value being read.
 	 *
 	 * The `!important` is the sanctioned kind: it fights an inline `style=`, the one adversary a
-	 * layer cannot reach. */
-	.table.fs-dt:not(.fs-stacked) .td,
-	.table.fs-dt:not(.fs-stacked) .td :not(button):not(.btn):not(input):not(select):not(textarea) {
+	 * layer cannot reach.
+	 *
+	 * A CARD IS NOT EXEMPT, though `:not(.fs-stacked)` stood here. The inline alias damages the
+	 * MEASUREMENT, and a carded table is not measured — but it is not the only adversary. LuCI's
+	 * luci-mod-dashboard ships `.Dashboard … .devices-info .tr .td:first-child { word-break:
+	 * break-all }` in view/dashboard/css/custom.css with no layer around it, and `break-all` splits a
+	 * token that would have fitted: measured at 390px, `t3e-syp.home.iot` over six lines and the
+	 * caption `HOSTNAME` cut as `HOSTNA`/`ME`. A card's own breaking is unchanged — `.td` below keeps
+	 * `overflow-wrap: anywhere`, so a token too long for the line still breaks. */
+	.table.fs-dt .td,
+	.table.fs-dt .td :not(button):not(.btn):not(input):not(select):not(textarea) {
 		word-break: normal !important;
 	}
 
@@ -510,7 +518,12 @@
 	 * a flex-start neighbour stays short and its separator paints 52px higher — a broken line
 	 * mid-card (measured). Stretched, both cells take the flex line's height and the
 	 * separators meet; content still sits at the top (the cells are blocks). */
-	.table.fs-stacked .tr { display: flex; flex-wrap: wrap; }
+	/* A `<tfoot>` with no `.tr` inside it IS the row — see the footer block below for which view
+	 * writes which shape. Here rather than in a rule of its own: `css-dup` compares bodies of three
+	 * declarations or more, so a second copy of these two would sit unflagged until they diverged. */
+	.table.fs-stacked .tr,
+	.table.fs-stacked tfoot:not(:has(> .tr)),
+	.table.fs-stacked .tfoot:not(:has(> .tr)) { display: flex; flex-wrap: wrap; }
 	.table.fs-stacked .td {
 		display: block; min-width: 0; width: auto;
 		padding-block: var(--fs-space-1-5); padding-inline: 0 var(--fs-space-2-5); border: 0; text-align: start;
@@ -529,9 +542,15 @@
 		text-transform: uppercase; color: var(--fs-eyebrow-color);
 		/* @endmirror */
 	}
+	/* A footer cell is the fourth member here, and it has to carry `[data-title]` in its own selector
+	 * to win: `.table.fs-stacked tfoot .td::before` is (0,3,1) against the caption rule's (0,4,0) and
+	 * loses wherever it is written. Measured on the wifi footer with the titles stamped: `content`
+	 * computed to "SSID" over `Total：`. With the attribute it is (0,4,1) and (0,5,0). */
 	.table.fs-stacked .td.cbi-section-actions::before,
 	.table.fs-stacked .td:not([data-title])::before,
-	.table.fs-stacked .td[data-title=""]::before { content: none; }
+	.table.fs-stacked .td[data-title=""]::before,
+	.table.fs-stacked tfoot .td[data-title]::before,
+	.table.fs-stacked .tfoot .td[data-title]::before { content: none; }
 	/* The row's buttons are not a label/value pair — full width below the pairs.
 	 * PINNED with the config table's copy — see above. */
 	.table.fs-stacked .td.cbi-section-actions {
@@ -555,6 +574,23 @@
 	.table.fs-stacked .td > *,
 	.table.fs-stacked .td .ifacebadge { min-width: 0; max-width: 100%; }
 
+	/* ---- the footer, in both shapes upstream writes it ----
+	 *
+	 * A `<tfoot>` is still a table-footer-group inside a `display: block` table, so in a card it drew
+	 * as a box beside the cards: measured at 390px on the station list, 186px wide against 354.
+	 * `20_lan.js` builds `tfoot > tr > td` and needs only the footer out of the way, the `.tr` above
+	 * already being a flex row; `30_wifi.js` appends the `<td>`s to the `<tfoot>` through E(), where
+	 * no parser runs and no row is implied, so there the footer has to become the row — that arm is
+	 * up with the `.tr` rule. `:has(> .tr)` tells them apart.
+	 *
+	 * An empty footer cell goes entirely: a card is a list of facts and an empty cell is not one. The
+	 * captions are suppressed up in the `content: none` group, for the specificity reason stated
+	 * there. */
+	.table.fs-stacked tfoot:has(> .tr),
+	.table.fs-stacked .tfoot:has(> .tr) { display: block; }
+	.table.fs-stacked tfoot .td:empty,
+	.table.fs-stacked .tfoot .td:empty { display: none; }
+
 	/* --- the DATA table's flavour (L.ui.Table, tagged .fs-dt) ---
 	 * Clip rows to the frame's corners: zebra paints its background on the .tr and the frame is
 	 * overflow:visible, so a striped row's square background pokes past the corners. Safe once
@@ -572,10 +608,28 @@
 	 * card's row inset left 41px of the 63px the plate is: measured on Wireless as 10px of text
 	 * hanging below the frame once the table stacked. A row with no rows in it has nothing to inset. */
 	.table.fs-dt.fs-stacked .tr:not(.placeholder) { padding: var(--fs-space-2-5) var(--fs-space-4) var(--fs-space-3); }
-	/* `.fs-stacked .td`, not `.table.fs-dt.fs-stacked .td` — the same elements (the class is only
-	 * ever written onto a .table.fs-dt), but at (0,2,0) instead of (0,4,0): low enough that the
-	 * unguarded `.table .td.col-N` below, at (0,3,0), beats it on SPECIFICITY, not source order. */
-	.fs-stacked .td { flex: 1 1 50%; }
+	/* ---- the pair width, and the adversary specificity cannot reach ----
+	 *
+	 * Half the row is what makes the card a card. It was `.fs-stacked .td` at (0,2,0), deliberately
+	 * low so the unguarded `.table .td.col-N` below, at (0,3,0), could beat it on specificity rather
+	 * than source order — which holds against every rule in a LAYER and none outside one.
+	 * luci-mod-dashboard ships `@media (max-width: 640px) { .Dashboard … .tr .td { flex: 2 2 10% } }`
+	 * unlayered, and that beats every layered rule at any specificity: measured at 390px, four cells
+	 * of a station row at 81px on one line, `flex-basis` computing to 10% — the pairs never formed.
+	 *
+	 * Hence the flag, the sanctioned kind. Spent narrowly, and by SELECTOR because a flag would
+	 * outrank these two families as well: `.cbi-section-actions` is a full-width line of buttons,
+	 * `[class*="col-"]` is the view author's own weight. The third `:not()` is not one of those — it
+	 * is how this rule loses to the meter below, both being flagged: without it (0,5,0) beats (0,4,0)
+	 * and the meter silently keeps half a line. */
+	.table.fs-stacked .td:not(.cbi-section-actions):not([class*="col-"]):not(:has(.cbi-progressbar)) {
+		flex: 1 1 50% !important;
+	}
+	/* A meter takes the whole line: `.cbi-progressbar::after` prints the bar's title above its right
+	 * edge (25-progressbar.css), which in a card is where the cell's own caption sits — measured at
+	 * 390px, `SIGNAL STRENGTH` and `RSSI: 65% (-57dBm)` drawn over each other. Beside the bar instead
+	 * would be paid out of the bar, too short at half a row to read as one. */
+	.table.fs-stacked .td:has(.cbi-progressbar) { flex: 1 1 100% !important; }
 
 	/* ---- column weights: one unguarded block, unguarded on purpose ----
 	 * A weight (1-10) is a share of a CARDED row — the JS says which cell is a narrow badge and

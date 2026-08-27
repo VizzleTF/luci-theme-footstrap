@@ -37,8 +37,20 @@ const LIMITS = {
 	 * adversary, one property, two syntaxes, because an engine without `round()` drops the whole
 	 * declaration, flag and all, and the fallback needs the flag for the same reason the rounded
 	 * form does. A lowering is free and should be taken whenever a flag turns out to have no
-	 * adversary. */
-	importants: 32,
+	 * adversary.
+	 *
+	 * The card's two cell widths (theme/30-tables.css) buy the third adversary a layer cannot reach:
+	 * a sheet in NO layer, which beats every layered rule at any specificity. luci-mod-dashboard
+	 * ships one — measured at 390px, four cells of a station row at 81px on a single line with
+	 * `flex-basis` computing to its 10%, so the card's pairs never formed. Two rather than one
+	 * because a meter cell needs the whole line where a pair needs half, and those cannot be one
+	 * declaration.
+	 *
+	 * Count these by PARSING, not by grepping: `grep -o '!important'` over styles/ answers far more,
+	 * most of it the word inside the comments that justify the flags. What is ratcheted is important
+	 * declarations in the BUILT sheet — css-tree is already a devDependency:
+	 *   csstree.walk(ast, { visit: 'Declaration', enter: (n) => { if (n.important) count++; } }) */
+	importants: 33,
 	/* The widest selector the theme needs; see the layer rules in docs/conventions.md.
 	 *
 	 * Raised 6 -> 7 when the vertical sidebar's guard gained `:not([data-narrow])`: the sidebar gives
