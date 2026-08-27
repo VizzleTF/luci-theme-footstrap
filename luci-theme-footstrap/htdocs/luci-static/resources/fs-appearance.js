@@ -3,7 +3,7 @@
 'require ui';
 'require dom';
 'require fs-prefs as prefs';
-'require fs-widgets as widgets';
+'require fs-assets as assets';
 'require fs-version as ver';
 
 /* The Appearance controls: the DOM that presents the axes. It owns no preference — fs-prefs.js
@@ -21,6 +21,201 @@
  *
  * The version line makes no request and must not grow one: which version is INSTALLED is what this
  * page answers, and which is available is the package manager's question. */
+
+/* ---- colour: reading what the page is actually painted ----
+ *
+ * This lived in fs-widgets.js, which the menu and the search palette also require — so the whole
+ * colour engine was downloaded on every admin page to be used on this one. It is 3 KB of probe,
+ * canvas and WCAG arithmetic that nothing outside this form has ever called: `colorControl` was
+ * fs-widgets' only colour export and this file its only consumer. */
+
+/* ---- colour: reading what the page is actually painted ----
+ *
+ * Two questions no stored value answers: what colour a role is right now (the palette's own while
+ * the axis is off — there is deliberately no copy of the palette in JS), and what contrast the
+ * user's colour lands at. Both are about the computed cascade, so both are asked of the browser.
+ *
+ * `getComputedStyle(root).getPropertyValue('--fs-accent')` answers neither: a custom property
+ * computes to the token stream after var() substitution, so `oklch(from … l c H)` comes back
+ * unevaluated. Setting the expression as a real `color` and reading it back makes the browser
+ * resolve it — relative colour, color-mix() and the tint's calc() are what the theme is made of.
+ * One hidden probe is reused; an element per query would thrash layout on every slider drag. */
+let _probe = null;
+function probeColor(expr) {
+	if (!_probe) {
+		/* Off-screen rather than display:none, so the reading does not depend on a display:none
+		 * element computing `color` in every engine. It has no text and no size, so it paints
+		 * nothing.
+		 *
+		 * Every declaration is !important (issue #19): this is an unmarked element in a document
+		 * shared with `luci-app-*`, and an app's unlayered `span { color: … !important }` outranks
+		 * a layer and a plain inline style alike. A probe that loses its own colour reports the
+		 * app's, which then becomes the admin's saved axis on the next confirm. */
+		_probe = E('span', { 'aria-hidden': 'true' });
+		_probe.style.cssText = 'position:fixed!important;left:-9999px!important;top:0!important;'
+			+ 'width:0!important;height:0!important;overflow:hidden!important;'
+			+ 'pointer-events:none!important;';
+		document.body.appendChild(_probe);
+	}
+	/* cleared first: an expression the engine rejects leaves the previous colour standing, which
+	 * would report a stale answer as a fresh one */
+	_probe.style.setProperty('color', '');
+	_probe.style.setProperty('color', expr, 'important');
+	return getComputedStyle(_probe).color;
+}
+
+/* A computed colour -> [r,g,b] 0..255, or null. Rasterised, not parsed: a computed `color` keeps
+ * the space it was authored in, so `oklch(0.54 0.19 300)` would parse as three numbers in the
+ * wrong units and produce a colour nobody chose — measured: #010078, graded "Too faint to read",
+ * in the hex field, the swatch and the contrast readout alike. Painting one pixel makes the engine
+ * convert instead (tools/export-tier.mjs uses the same method). The string parse remains only as
+ * the fallback for an engine with no 2D context, where only the legacy `rgb()`/`color(srgb …)`
+ * forms can appear. */
+let _cx = null;
+function rasterCtx() {
+	if (_cx !== null) return _cx;
+	try {
+		const cv = document.createElement('canvas');
+		cv.width = cv.height = 1;
+		_cx = cv.getContext('2d', { willReadFrequently: true }) || false;
+	} catch (e) { _cx = false; }
+	return _cx;
+}
+function parseColor(s) {
+	const str = String(s || '');
+	const cx = rasterCtx();
+	if (cx) {
+		/* fillStyle keeps the last value it could parse, so a colour this engine rejects would
+		 * report the previous one as a fresh reading — the trap probeColor() clears for */
+		cx.fillStyle = '#000';
+		cx.fillStyle = str;
+		cx.clearRect(0, 0, 1, 1);
+		cx.fillRect(0, 0, 1, 1);
+		const d = cx.getImageData(0, 0, 1, 1).data;
+		if (d[3] === 255) return [ d[0], d[1], d[2] ];
+		/* translucent: composite over nothing is meaningless for a readout, so fall through */
+	}
+	const nums = str.match(/[\d.]+/g);
+	if (!nums || nums.length < 3) return null;
+	const unit = (/^color\(/i).test(str) ? 255 : 1;
+	return nums.slice(0, 3).map((n) => Math.max(0, Math.min(255, parseFloat(n) * unit)));
+}
+
+/* WCAG 2.x relative luminance and contrast ratio, on sRGB. Used only to report: the theme states
+ * what a colour costs and leaves the choice with the user, never correcting it (03-palettes.css
+ * derives the ink over a fill, which is a different question). */
+function luminance(rgb) {
+	const c = rgb.map((v) => {
+		const x = v / 255;
+		return (x <= .03928) ? (x / 12.92) : Math.pow((x + .055) / 1.055, 2.4);
+	});
+	return (.2126 * c[0]) + (.7152 * c[1]) + (.0722 * c[2]);
+}
+function contrastRatio(fgExpr, bgExpr) {
+	const fg = parseColor(probeColor(fgExpr)), bg = parseColor(probeColor(bgExpr));
+	if (!fg || !bg) return null;
+	const a = luminance(fg), b = luminance(bg);
+	return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+}
+
+/* #rrggbb, because <input type="color"> accepts nothing else. An unparseable colour becomes black
+ * rather than throwing: the text field beside the swatch is the authoritative one. */
+function toHex(s) {
+	const rgb = parseColor(s) || [ 0, 0, 0 ];
+	return '#' + rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+}
+
+/* One colour axis: a native swatch, a hex field and a button back to the palette's own colour.
+ * Reports through onPick as a hex string, or 0 for "back to the palette", either of which the
+ * caller hands straight to fs-prefs.js's colorAxis.
+ *
+ * There is no hue slider and one is not coming back: rotating a hue keeps the palette's chroma,
+ * so no angle of it reaches a grey. The axis still accepts a stored hue (1–360) and the stylesheet
+ * still rotates the palette by one, so a saved value goes on working.
+ *
+ * `opts.probe` is the live token the effective colour is read back from, so the field shows the
+ * palette's colour while the axis is off without a copy of the palette in JS. `opts.contrast` is
+ * the pair whose ratio is reported under the row. */
+function colorControl(current, onPick, label, opts) {
+	const o = opts || {};
+
+	/* type=color leaves the picker to the browser: accessible without reimplementing a colour
+	 * wheel, and native on a phone. The text field beside it takes a pasted hex and is the
+	 * fallback where the browser draws no picker. */
+	const swatch = E('input', { 'type': 'color', 'class': 'fs-color-swatch', 'aria-label': label || '' });
+	const field = E('input', {
+		'type': 'text', 'class': 'fs-color-hex', 'spellcheck': 'false', 'autocomplete': 'off',
+		'inputmode': 'text', 'maxlength': '7', 'aria-label': label || ''
+	});
+	const clear = E('button', { 'class': 'btn fs-color-clear', 'type': 'button' }, [ _('Palette', 'footstrap') ]);
+	const ratio = o.contrast ? E('div', { 'class': 'cbi-value-description fs-color-contrast' }) : null;
+
+	/* what the axis holds right now: the page can change it behind this control (a preset, Reset
+	 * to default), so a private copy would go stale. `current` is only the build-time value. */
+	const currentOf = o.read || (() => current);
+
+	/* Repaint everything that mirrors the axis. Called after every edit, and through the returned
+	 * refresh() after a preset, palette switch or dark-mode flip — each changes what the palette's
+	 * own colour is while this axis stays off. */
+	function reflect(v) {
+		const live = probeColor(o.probe);
+		const hex = (typeof v === 'string') ? v : toHex(live);
+		swatch.value = hex;
+		/* do not fight the user mid-edit: `#0` is a legal prefix, and overwriting the field on
+		 * every keystroke made the input impossible to type into */
+		if (document.activeElement !== field) field.value = hex;
+		/* the button back to the palette doubles as the axis state readout: enabled means the axis
+		 * holds a colour of its own, disabled means the field shows the palette's */
+		clear.disabled = !v;
+		if (!ratio) return;
+		const r = contrastRatio(o.contrast.fg, o.contrast.bg);
+		if (r === null) { ratio.textContent = ''; ratio.removeAttribute('title'); return; }
+		/* The readout states what the ratio means; the number itself stays in the title.
+		 * Thresholds are WCAG AA: 4.5:1 for body text, 3:1 for large text and for a UI shape, so a
+		 * hairline is graded on the second (`kind: 'shape'`) and warns rather than fails — a faint
+		 * border is a legitimate choice.
+		 *
+		 * Class names are written out whole: tools/fs-orphans.mjs sweeps dead CSS by matching
+		 * fs-* tokens in the source, and a concatenated name is invisible to it. */
+		const where = o.contrast.label;
+		const grade = (o.contrast.kind === 'shape')
+			? ((r >= 3)
+				? { cls: 'fs-contrast-aa', text: _('Clearly visible %s', 'footstrap').format(where) }
+				: { cls: 'fs-contrast-aa-large', text: _('Barely visible %s', 'footstrap').format(where) })
+			: (r >= 4.5)
+				? { cls: 'fs-contrast-aa', text: _('Easy to read %s', 'footstrap').format(where) }
+				: (r >= 3)
+					? { cls: 'fs-contrast-aa-large', text: _('Hard to read %s — large text only', 'footstrap').format(where) }
+					: { cls: 'fs-contrast-low', text: _('Too faint to read %s', 'footstrap').format(where) };
+		ratio.className = 'fs-color-contrast ' + grade.cls;
+		ratio.textContent = grade.text;
+		ratio.title = _('Contrast %s:1 (WCAG AA wants %s:1 here)', 'footstrap')
+			.format(r.toFixed(1), (o.contrast.kind === 'shape') ? '3' : '4.5');
+	}
+
+	const pick = (v) => { onPick(v); reflect(v); };
+
+	swatch.addEventListener('input', () => pick(swatch.value.toLowerCase()));
+	/* commit on blur and Enter, not per keystroke: a half-typed `#0096` would repaint the page
+	 * under the cursor. An unparseable value snaps back to what the axis holds, so the field
+	 * cannot claim a colour the page is not painted in. */
+	const commit = () => {
+		const v = field.value.trim().toLowerCase();
+		if ((/^#[0-9a-f]{6}$/).test(v)) pick(v);
+		else reflect(currentOf());
+	};
+	field.addEventListener('blur', commit);
+	field.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); commit(); } });
+	clear.addEventListener('click', () => pick(0));
+
+	const wrap = E('div', { 'class': 'fs-colorctl' + (o.cls ? ' ' + o.cls : '') }, [
+		E('div', { 'class': 'fs-color-row' }, [ swatch, field, clear ])
+	].concat(ratio ? [ ratio ] : []));
+	/* the caller decides when this runs: probeColor() needs the document, and this control is not
+	 * in it yet */
+	wrap.fsRefresh = () => reflect(currentOf());
+	return wrap;
+}
 
 /* Build the whole form. Returns a promise for one element wire() appends to the stock page.
  *
@@ -69,6 +264,9 @@ function build() {
 		]);
 	};
 
+	/* the three literals every colour row repeats; a string literal survives minification intact */
+	const CARD_BG = 'var(--fs-panel)', INK = 'var(--fs-text)', ON_CARD = _('on a card', 'footstrap');
+
 	/* ---- the controls are LuCI's own ----
 	 *
 	 * Every enum axis is a `ui.Select` and every number a `ui.RangeSlider`: the widgets the other
@@ -105,7 +303,7 @@ function build() {
 	/* one colour axis: `probe` is the live token the control reads the effective colour back from,
 	 * `contrast` the pair it reports */
 	const colourGroup = (label, axis, probe, contrast, opts) => group(label, (lbl) => {
-		const ctl = widgets.colorControl(axis.current(), bump(axis.apply), lbl, {
+		const ctl = colorControl(axis.current(), bump(axis.apply), lbl, {
 			probe: probe,
 			read: axis.current,
 			contrast: contrast,
@@ -195,29 +393,16 @@ function build() {
 		 * as a link or status label it carries only itself. It is also what answers #20 ("sometimes
 		 * you want grey or black"), taking any #rrggbb — the colour-chip presets that once sat here
 		 * are not coming back. */
-		colourGroup(_('Accent', 'footstrap'), {
-			current: prefs.currentAccent, apply: prefs.applyAccent
-		}, 'var(--fs-accent)', {
-			fg: 'var(--fs-accent)', bg: 'var(--fs-panel)', label: _('on a card', 'footstrap')
-		}),
-
-		colourGroup(_('Good', 'footstrap'), {
-			current: prefs.currentGood, apply: prefs.applyGood
-		}, 'var(--fs-good)', {
-			fg: 'var(--fs-good)', bg: 'var(--fs-panel)', label: _('on a card', 'footstrap')
-		}),
-
-		colourGroup(_('Warning', 'footstrap'), {
-			current: prefs.currentWarn, apply: prefs.applyWarn
-		}, 'var(--fs-warn)', {
-			fg: 'var(--fs-warn)', bg: 'var(--fs-panel)', label: _('on a card', 'footstrap')
-		}),
-
-		colourGroup(_('Danger', 'footstrap'), {
-			current: prefs.currentDanger, apply: prefs.applyDanger
-		}, 'var(--fs-danger)', {
-			fg: 'var(--fs-danger)', bg: 'var(--fs-panel)', label: _('on a card', 'footstrap')
-		})
+		/* Four status roles, one shape: the role's own colour read against a card. Written out
+		 * eight times between here and the surfaces below, they cost their repeated literals in
+		 * full — a string is not mangled — so the rows are data and the row is stated once. */
+		...[
+			[ _('Accent', 'footstrap'),  prefs.currentAccent, prefs.applyAccent, 'var(--fs-accent)' ],
+			[ _('Good', 'footstrap'),    prefs.currentGood,   prefs.applyGood,   'var(--fs-good)' ],
+			[ _('Warning', 'footstrap'), prefs.currentWarn,   prefs.applyWarn,   'var(--fs-warn)' ],
+			[ _('Danger', 'footstrap'),  prefs.currentDanger, prefs.applyDanger, 'var(--fs-danger)' ]
+		].map(([ label, current, apply, ink ]) =>
+			colourGroup(label, { current, apply }, ink, { fg: ink, bg: CARD_BG, label: ON_CARD }))
 	];
 
 	/* ---- the surfaces: the sheet the UI is drawn on ----
@@ -229,30 +414,15 @@ function build() {
 	 * — and below that it is decoration, which a hairline is entitled to be, so the readout states
 	 * the number and leaves the call to the admin. */
 	const surfaces = [
-		colourGroup(_('Cards', 'footstrap'), {
-			current: prefs.currentCard, apply: prefs.applyCard
-		}, 'var(--fs-panel)', {
-			fg: 'var(--fs-text)', bg: 'var(--fs-panel)', label: _('on a card', 'footstrap')
-		}),
-
-		colourGroup(_('Controls', 'footstrap'), {
-			current: prefs.currentControl, apply: prefs.applyControl
-		}, 'var(--fs-panel2)', {
-			fg: 'var(--fs-text)', bg: 'var(--fs-panel2)', label: _('on a control', 'footstrap')
-		}),
-
-		colourGroup(_('Sidebar and bar', 'footstrap'), {
-			current: prefs.currentBar, apply: prefs.applyBar
-		}, 'var(--fs-bar-bg)', {
-			fg: 'var(--fs-text)', bg: 'var(--fs-bar-bg)', label: _('in the sidebar', 'footstrap')
-		}),
-
-
-		colourGroup(_('Borders', 'footstrap'), {
-			current: prefs.currentLine, apply: prefs.applyLine
-		}, 'var(--fs-border)', {
-			fg: 'var(--fs-border)', bg: 'var(--fs-panel)', label: _('on a card', 'footstrap'), kind: 'shape'
-		})
+		/* Same rows, one column wider: a surface reports the ink read ON it, which is --fs-text
+		 * for the three that carry body text and the hairline itself for the border. */
+		...[
+			[ _('Cards', 'footstrap'),           prefs.currentCard,    prefs.applyCard,    CARD_BG,             INK,                  CARD_BG,             ON_CARD ],
+			[ _('Controls', 'footstrap'),        prefs.currentControl, prefs.applyControl, 'var(--fs-panel2)',  INK,                  'var(--fs-panel2)',  _('on a control', 'footstrap') ],
+			[ _('Sidebar and bar', 'footstrap'), prefs.currentBar,     prefs.applyBar,     'var(--fs-bar-bg)',  INK,                  'var(--fs-bar-bg)',  _('in the sidebar', 'footstrap') ],
+			[ _('Borders', 'footstrap'),         prefs.currentLine,    prefs.applyLine,    'var(--fs-border)',  'var(--fs-border)',   CARD_BG,             ON_CARD, 'shape' ]
+		].map(([ label, current, apply, probe, fg, bg, where, kind ]) =>
+			colourGroup(label, { current, apply }, probe, { fg, bg, label: where, kind }))
 	];
 
 	/* ---- section 3: the wallpaper and the rows each value brings ----
@@ -341,53 +511,48 @@ function build() {
 
 		const setWallpaper = (v) => { prefs.applyWallpaper(v); refreshSave(); togglePanel(v); refreshColours(); };
 
-		patChoose.addEventListener('click', () => { patErr.hidden = true; patInput.click(); });
-		patInput.addEventListener('change', () => {
-			const f = patInput.files && patInput.files[0];
-			patInput.value = '';	/* so re-picking the same file fires change again */
-			if (!f) return;
-			patErr.hidden = true; patChoose.disabled = true;
-			patChoose.textContent = _('Uploading…', 'footstrap');
-			prefs.uploadPattern(f)
-				.then((tok) => {
-					reflectPattern(tok);
-					/* uploadPattern already switched this browser onto the pattern, so the control
-					 * must catch up or the page paints the tile while the dropdown reads Off.
-					 * `dom.callClassMethod` is how LuCI moves its own widgets from outside;
-					 * setWallpaper is then called directly, because a programmatic setValue emits
-					 * no `widget-change`. */
-					dom.callClassMethod(seg, 'setValue', 'pattern');
-					setWallpaper('pattern');
-				})
-				.catch((e) => { patErr.textContent = String((e && e.message) || e); patErr.hidden = false; })
-				.finally(() => { patChoose.disabled = false; patChoose.textContent = patChooseLabel; });
-		});
-		patRemove.addEventListener('click', () => {
-			patErr.hidden = true; patRemove.disabled = true;
-			prefs.removePattern()
-				.then(() => reflectPattern(''))
-				.catch((e) => { patErr.textContent = String((e && e.message) || e); patErr.hidden = false; })
-				.finally(() => { patRemove.disabled = false; });
+		/* Both uploads present the same three controls and the same four states — pick, upload,
+		 * report, remove — so the wiring is stated once. What differs is `after`: the pattern also
+		 * has to move the Wallpaper dropdown, because the upload switched this browser onto the
+		 * tile and the page would otherwise paint it while the control still read Off.
+		 *
+		 * The file input is cleared on every change so re-picking the SAME file fires `change`
+		 * again, and the button carries its own busy state: the label is restored in `finally`, or
+		 * a failed upload leaves "Uploading…" standing for the life of the form. */
+		const wireUploader = (u) => {
+			const fail = (e) => { u.err.textContent = String((e && e.message) || e); u.err.hidden = false; };
+			u.choose.addEventListener('click', () => { u.err.hidden = true; u.input.click(); });
+			u.input.addEventListener('change', () => {
+				const f = u.input.files && u.input.files[0];
+				u.input.value = '';
+				if (!f) return;
+				u.err.hidden = true; u.choose.disabled = true;
+				u.choose.textContent = _('Uploading…', 'footstrap');
+				u.upload(f)
+					.then((tok) => { u.reflect(tok); if (u.after) u.after(tok); })
+					.catch(fail)
+					.finally(() => { u.choose.disabled = false; u.choose.textContent = u.label; });
+			});
+			u.remove.addEventListener('click', () => {
+				u.err.hidden = true; u.remove.disabled = true;
+				u.drop().then(() => u.reflect('')).catch(fail)
+					.finally(() => { u.remove.disabled = false; });
+			});
+		};
+
+		wireUploader({
+			choose: patChoose, remove: patRemove, input: patInput, err: patErr,
+			label: patChooseLabel, reflect: reflectPattern,
+			upload: assets.uploadPattern, drop: assets.removePattern,
+			/* `dom.callClassMethod` is how LuCI moves its own widgets from outside; setWallpaper is
+			 * then called directly, because a programmatic setValue emits no `widget-change`. */
+			after: () => { dom.callClassMethod(seg, 'setValue', 'pattern'); setWallpaper('pattern'); }
 		});
 
-		chooseBtn.addEventListener('click', () => { err.hidden = true; fileInput.click(); });
-		fileInput.addEventListener('change', () => {
-			const f = fileInput.files && fileInput.files[0];
-			fileInput.value = '';	/* so re-picking the same file fires change again */
-			if (!f) return;
-			err.hidden = true; chooseBtn.disabled = true;
-			chooseBtn.textContent = _('Uploading…', 'footstrap');
-			prefs.uploadLoginBg(f)
-				.then(reflect)
-				.catch((e) => { err.textContent = String((e && e.message) || e); err.hidden = false; })
-				.finally(() => { chooseBtn.disabled = false; chooseBtn.textContent = chooseLabel; });
-		});
-		removeBtn.addEventListener('click', () => {
-			err.hidden = true; removeBtn.disabled = true;
-			prefs.removeLoginBg()
-				.then(() => reflect(''))
-				.catch((e) => { err.textContent = String((e && e.message) || e); err.hidden = false; })
-				.finally(() => { removeBtn.disabled = false; });
+		wireUploader({
+			choose: chooseBtn, remove: removeBtn, input: fileInput, err: err,
+			label: chooseLabel, reflect: reflect,
+			upload: assets.uploadLoginBg, drop: assets.removeLoginBg
 		});
 
 		let seg;
@@ -536,7 +701,8 @@ function build() {
 	function foldable(title, rows, key) {
 		const id = 'fs-ap-fold-' + (++foldSeq);
 		let open = (prefs.lsGet(key) === 'on');
-		const body = E('div', { 'class': 'fs-ap-body', 'id': id }, rows);
+		/* id only: `aria-controls` needs one, and no rule has ever styled the panel itself */
+		const body = E('div', { 'id': id }, rows);
 		const btn = E('button', {
 			'type': 'button', 'class': 'fs-ap-fold', 'aria-expanded': String(open), 'aria-controls': id
 		}, [
@@ -577,8 +743,8 @@ function build() {
 	]);
 
 	/* The first fill, deferred one microtask so the tree above is finished. It does not wait for
-	 * the form to be in the document: every readout resolves through widgets.probeColor(), whose
-	 * hidden probe is attached to <body>, so a detached form still reads the live palette. */
+	 * the form to be in the document: every readout resolves inside fs-widgets against a hidden
+	 * probe attached to <body>, so a detached form still reads the live palette. */
 	Promise.resolve().then(refreshColours);
 	return page;
 }
@@ -761,6 +927,5 @@ function wire() {
 }
 
 return baseclass.extend({
-	wire,
-	render
+	wire
 });

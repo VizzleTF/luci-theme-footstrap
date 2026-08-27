@@ -64,6 +64,16 @@ const colorAxes = [...JS.matchAll(/colorAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s
 	.map(([, key, attr, hueProp, colorProp]) => ({ key, attr, hueProp, colorProp }));
 const enumAxes = [...JS.matchAll(/enumAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)]
 	.map(([, key, attr, on, off]) => ({ key, attr, on, off }));
+/* listAxis(key, attr, VALUES, 'dflt', …) — the same shape with more than one stamped value, so the
+ * third argument is the name of an array rather than a literal and the values are read from THAT
+ * declaration. Same blind spot as the others: the lsGet(key) is inside the factory, so keysIn()
+ * cannot see the key and the call is what has to be matched. */
+const listAxes = [...JS.matchAll(/listAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*([A-Z_]+)\s*,\s*'([^']+)'/g)]
+	.map(([, key, attr, listName, dflt]) => {
+		const decl = JS.match(new RegExp(`const ${listName} = \\[([^\\]]*)\\]`));
+		const values = decl ? [...decl[1].matchAll(/'([^']+)'/g)].map((m) => m[1]) : [];
+		return { key, attr, listName, dflt, values };
+	});
 /* propAxis(key, sdKey, prop, …) — an inline-property slider (rounding, tint strength). Same reason
  * as above: its lsGet(key) sits in the factory body, so keysIn() cannot see the key. Match the call. */
 const propAxes = [...JS.matchAll(/propAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'/g)]
@@ -74,6 +84,7 @@ const surfaceAxes = [...JS.matchAll(/surfaceAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s
 	.map(([, key, sdKey, prop]) => ({ key, sdKey, prop }));
 
 const jsKeys = new Set([...keysIn(JS), ...colorAxes.map(a => a.key), ...enumAxes.map(a => a.key),
+	...listAxes.map(a => a.key),
 	...propAxes.map(a => a.key), ...surfaceAxes.map(a => a.key)]);
 /* head.ut pre-paints the five colour axes through ONE local helper, so their keys are arguments
  * there too and keysIn() cannot see them either — the same blind spot, on the other side. Matched
@@ -174,6 +185,39 @@ for (const { key, attr, on } of enumAxes) {
 	ok.push(`enum axis ${key.padEnd(10)} -> ${attr}='${on}'   (key, attr and both directions agree)`);
 }
 
+/* The list-shaped axes, held the same way — and they need their own loop rather than 2c's blanket
+ * check below, because the moment their attribute becomes factory-stamped 2c skips it. Written
+ * without one and the gate went QUIET on all three: `data-density` renamed on either side alone was
+ * reported by nothing, which is the exact failure this whole file exists to prevent.
+ *
+ * head.ut pre-paints these as a chain of literal comparisons rather than a list, so the check is
+ * that every value the JS will stamp appears there as a stamp, and that the removal is there too. */
+for (const { key, attr, values, listName } of listAxes) {
+	const where = `list axis '${key}'`;
+	if (!values.length) { errors.push(`${where}: ${listName} is not a list of string literals this gate can read`); continue; }
+	if (!headKeys.has(key)) { errors.push(`${where}: head.ut never reads localStorage '${key}' — it will flash on reload`); continue; }
+	/* Looked for in the LINES THAT STAMP, not anywhere in the file: every one of these values also
+	 * appears in head.ut's own sanitiser whitelist a hundred lines up, so a file-wide search reports
+	 * a value the pre-paint has stopped stamping as present. Measured by deleting `'large'` from the
+	 * stamp and watching the gate stay green. */
+	const stampLines = HEAD.split('\n')
+		.map((l, i, all) => (l.includes(`setAttribute('${attr}'`) ? all.slice(Math.max(0, i - 2), i + 1).join('\n') : ''))
+		.join('\n');
+	const missing = values.filter((v) => !stampLines.includes(`'${v}'`));
+	if (missing.length) {
+		errors.push(`${where}: head.ut never stamps ${attr} for ${missing.map((v) => `'${v}'`).join(', ')} — `
+			+ `the pre-paint and the live applier disagree about this axis's values, so a fresh load `
+			+ `paints the default and the tab paints the choice`);
+		continue;
+	}
+	if (!HEAD.includes(`removeAttribute('${attr}')`)) {
+		errors.push(`${where}: head.ut never removes ${attr} — the default is a bare :root, so without `
+			+ `the removal the pre-paint can only ever turn this axis on`);
+		continue;
+	}
+	ok.push(`list axis ${key.padEnd(10)} -> ${attr}=${values.map((v) => `'${v}'`).join('|')}   (key, attr and both directions agree)`);
+}
+
 /* ...and the converse: an axis lib/gallery.mjs stamps that the JS no longer has is a sweep of a
  * dead attribute, which also reads as "28 combinations" and measures 7. */
 for (const [, attr, prop] of GALLERY.matchAll(/hue\(\w+, '([^']+)', '([^']+)'\)/g))
@@ -192,7 +236,8 @@ for (const [, attr, prop] of GALLERY.matchAll(/hue\(\w+, '([^']+)', '([^']+)'\)/
  * It deliberately does not require the matching removeAttribute — `data-rail` is correct code that
  * does not have one. */
 const OUTBOUND = new Set(['data-theme', 'data-bs-theme', 'data-darkmode']);	/* checked in 3b */
-const factoryAttrs = new Set([...colorAxes.map(a => a.attr), ...enumAxes.map(a => a.attr)]);
+const factoryAttrs = new Set([...colorAxes.map(a => a.attr), ...enumAxes.map(a => a.attr),
+	...listAxes.map(a => a.attr)]);
 /* Both spellings of the receiver, because an applier picked the other one and vanished from this
  * check: applyLayout() writes `document.documentElement.setAttribute('data-layout', …)` while every
  * other applier holds it in a local `root`, and a pattern anchored on `root.` therefore derived a
@@ -276,12 +321,15 @@ const sdFormula = (factory) => {
 	catch { return null; }
 };
 const colorFormula = sdFormula('colorAxis');
-const enumFormula = sdFormula('enumAxis');
+/* enumAxis() delegates to listAxis(), so the fold is stated once, there — and both families are
+ * held to it. */
+const enumFormula = sdFormula('listAxis');
 if (!colorFormula) errors.push('colorAxis() no longer derives `const sdKey = …` — this gate cannot follow it any more');
-if (!enumFormula) errors.push('enumAxis() no longer derives `const sdKey = …` — this gate cannot follow it any more');
+if (!enumFormula) errors.push('listAxis() no longer derives `const sdKey = …` — this gate cannot follow it any more');
 const sdReaders = [
 	...(colorFormula ? colorAxes.map((a) => ({ ...a, sdKey: colorFormula(a.key), how: "derived from the key by colorAxis" })) : []),
 	...(enumFormula ? enumAxes.map((a) => ({ ...a, sdKey: enumFormula(a.key), how: "derived from the key by enumAxis" })) : []),
+	...(enumFormula ? listAxes.map((a) => ({ ...a, sdKey: enumFormula(a.key), how: "derived from the key by listAxis" })) : []),
 	...propAxes.map((a) => ({ ...a, how: 'passed to propAxis explicitly' })),
 	...surfaceAxes.map((a) => ({ ...a, how: 'passed to surfaceAxis explicitly' })),
 ];

@@ -203,14 +203,11 @@
 					const root = document.querySelector(':root'),
 					      sd = window.__fsSD || {};
 					let p = lsGet('fs-palette');
-					/* Legacy palette names migrated to the current explicit value, never cleared:
-					   an absent key means "inherit the router default", which is not "the built-in
-					   default". The migration is already redundant — fs-prefs.js's currentPalette()
-					   ends `return 'footstrap'`, so a stray value reads as the built-in default there
-					   too — and deleting this block changes nothing unless that line goes with it. */
-					if (p === 'rvht' || p === 'roman' || p === 'github') {
-						localStorage.setItem('fs-palette', 'footstrap'); p = 'footstrap';
-					}
+					/* A stray or retired palette name needs no migration here: it fails the list
+					   below and paints the bare :root, and listAxis() in fs-prefs.js ends the same
+					   way, so the live applier agrees. The three legacy names ('rvht', 'roman',
+					   'github') were rewritten here until this comment replaced them — the block
+					   was measured as changing nothing, and it ran on every page load. */
 					/* the default palette is a bare :root; every other colourway is opt-in. The list
 					   is the same one fs-prefs.js validates against — a name in one and not the
 					   other paints here and is taken away by the first live change. */
@@ -307,7 +304,7 @@
 					   failure would be silent. */
 					const lb = sd.login_bg;
 					if (lb && (/^[a-f0-9]{6,64}$/).test(lb))
-						root.style.setProperty('--fs-login-bg-url', "url('/luci-static/footstrap/bg?v=" + lb + "')");
+						root.style.setProperty('--fs-login-bg-url', 'url("/luci-static/footstrap/bg?v=' + lb + '")');
 					/* the Tint's strength (default 100% = the designed chroma) */
 					const tsRaw = lsGet('fs-tint-strength');
 					let ts = parseInt(tsRaw, 10);

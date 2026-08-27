@@ -15,7 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildCss, ROOT } from './lib/css.mjs';
-import { pageModules } from './lib/page-modules.mjs';
+import { coldModules } from './lib/page-modules.mjs';
 
 const SHOW = process.argv.includes('--show');
 
@@ -27,20 +27,31 @@ const LIMITS = {
 	 * token being declared per mode or the block does not fully apply. */
 	cascadeCss: 128_500,
 	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
-	 * whether or not a given page loads it. 89,771 B on 2026-08-24, the last 371 B buying a scroll
-	 * reference on every page shape — searching the element stack rather than one hit, and keeping a
-	 * surviving ancestor beside it. A raise wants a line saying what bought it. */
-	resourcesJs: 89_900,
-	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router is
-	 * also routing packets over: the same set minus the page modules, which are required only on the
-	 * one page each belongs to (tools/page-modules.mjs). 74,220 B on 2026-08-27, the last 106 B
-	 * moving the poll floor off the content column and onto the containers a poll empties: one
-	 * element became a list, so a clear pass, a read pass and a write pass replaced three lines.
-	 * What it bought is on both sides of the fault — a floor that no longer suppresses the engine's
-	 * own scroll anchoring (120px of unanswered growth on Chromium and Firefox with it on the
-	 * column), and a clamp of 2167px reduced to none. Raising it is a decision; lowering it whenever
-	 * the number comes down is the point. */
-	coldJs: 74_300,
+	 * whether or not a given page loads it. 87,992 B on 2026-08-27, down 1,316 B on the refactor
+	 * described below — it shrinks flash as well as the wire, because the two upload flows and the
+	 * three list axes each became one and four repeated messages became four constants. A raise
+	 * wants a line saying what bought it. */
+	resourcesJs: 88_200,
+	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
+	 * is also routing packets over: the set walked from the footer's two entry points
+	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
+	 *
+	 * The number came DOWN 302 B on the day the walk replaced the page-module map, and nothing
+	 * bought it: the map names the two modules the loader pulls per page, so a module reached only
+	 * from one of those was counted cold while no cold page fetches it. `fs-version.js` is the
+	 * standing example — 281 B required by `fs-appearance` alone, charged to every page.
+	 *
+	 * 65,257 B on 2026-08-27, down 8,939 B across one refactor — 12% of what every admin page used
+	 * to fetch. Two things were being downloaded everywhere to be used in one place: the upload
+	 * machinery (a DOMParser pass, a canvas re-encode, a chmod and a rollback) now in
+	 * `fs-assets.js`, and the colour engine (a probe, a canvas, the WCAG arithmetic and the colour
+	 * control) now in `fs-appearance.js` itself — `colorControl` was fs-widgets' only colour export
+	 * and the Appearance form its only caller, while the menu and the search palette, which are on
+	 * every page, use four icon and disclosure helpers and nothing else. The rest is the two upload
+	 * flows collapsed onto one factory and palette/wallpaper/density onto the axis factory the
+	 * other four axes already used. Lowering it whenever the number comes down is the point;
+	 * raising it is a decision that wants a line saying what bought it. */
+	coldJs: 65_400,
 };
 
 function bytes(path) {
@@ -66,8 +77,12 @@ function shippedJs() {
 	cpSync(join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources'), res, { recursive: true });
 	execFileSync(process.execPath, [ join(ROOT, 'tools/minify-js.mjs'), res ],
 		{ stdio: SHOW ? 'inherit' : 'ignore' });
-	/* a page module is not part of a cold visit anywhere but on its own page */
-	const lazy = new Set([ ...pageModules().values() ].map((n) => n + '.js'));
+	/* What a cold visit fetches, walked from the footer's two `L.require()` calls rather than read
+	 * off the page-module map. The map names the two modules the loader pulls per page, but a
+	 * module reached only from one of those is just as absent from a cold visit — and counting the
+	 * map alone charged every page for `fs-version.js`, which only `fs-appearance` requires. */
+	const cold = new Set([ ...coldModules() ].map((n) => n + '.js'));
+	const lazy = new Set(readdirSync(res).filter((f) => f.endsWith('.js') && !cold.has(f)));
 	const files = readdirSync(res).filter((f) => f.endsWith('.js'))
 		.map((f) => ({ name: f, size: bytes(join(res, f)), lazy: lazy.has(f) }))
 		.sort((a, b) => b.size - a.size);
