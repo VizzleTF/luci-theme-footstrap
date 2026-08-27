@@ -1155,36 +1155,52 @@ function bootDocumentIsOurs() {
  *
  * The list is what THIS file calls. `uci` (flushUciCache) and `L.network` are read through their own
  * guards at their use, being optional there. */
-const CONTRACT = [
-	[ 'L.require', () => typeof window.L.require === 'function' ],
+const CONTRACT_FNS = [
+	'L.require',
 	/* classLoaded() tests `instanceof L.Class` to tell a loaded module from L.env/L.url/L.get */
-	[ 'L.Class', () => typeof window.L.Class === 'function' ],
-	[ 'L.dom.content', () => window.L.dom && typeof window.L.dom.content === 'function' ],
+	'L.Class',
+	'L.dom.content',
+	/* a slash in the leaf is several functions on one object: the pair is only ever there or gone
+	 * together, so one name in the report is the whole finding */
+	'L.Poll.start/stop',
+	'L.Request.addInterceptor',
+	'rpc.addInterceptor',
+	'ui.instantiateView',
+	'ui.hideModal',
+	'ui.hideIndicator',
+	'ui.addNotification'
+];
+
+/* the roots are resolved per probe, not once: `window.L` is what the two-L trap makes load-bearing
+ * (docs/spa-router.md), and `ui`/`rpc` are this module's own requires */
+function hasFns(path) {
+	const seg = path.split('.');
+	const leaf = seg.pop();
+	let node = { L: window.L, ui: ui, rpc: rpc }[seg.shift()];
+	for (const k of seg) node = node[k];
+	return leaf.split('/').every((n) => typeof node[n] === 'function');
+}
+
+/* the two surfaces that are not functions */
+const CONTRACT_REST = [
 	/* the L.env keys navigate() re-points, plus the base_url moduleUrl() reads */
 	[ 'L.env.{base_url,dispatchpath,requestpath,pathinfo,nodespec}', () => {
 		const env = window.L.env;
 		return !!env && [ 'base_url', 'dispatchpath', 'requestpath', 'pathinfo', 'nodespec' ]
 			.every((k) => k in env);
 	} ],
-	[ 'L.Poll.queue', () => window.L.Poll && Array.isArray(window.L.Poll.queue) ],
-	[ 'L.Poll.start/stop', () => window.L.Poll &&
-		typeof window.L.Poll.start === 'function' && typeof window.L.Poll.stop === 'function' ],
-	[ 'L.Request.addInterceptor', () => window.L.Request &&
-		typeof window.L.Request.addInterceptor === 'function' ],
-	[ 'rpc.addInterceptor', () => typeof rpc.addInterceptor === 'function' ],
-	[ 'ui.instantiateView', () => typeof ui.instantiateView === 'function' ],
-	[ 'ui.hideModal', () => typeof ui.hideModal === 'function' ],
-	[ 'ui.hideIndicator', () => typeof ui.hideIndicator === 'function' ],
-	[ 'ui.addNotification', () => typeof ui.addNotification === 'function' ]
+	[ 'L.Poll.queue', () => Array.isArray(window.L.Poll.queue) ]
 ];
 
 /* -> the names that are not there, in list order; empty means the document can be navigated. A
  * probe that throws counts as missing: `L` itself may be a shape nobody here expected. */
 function contractBreaks() {
-	return CONTRACT.filter(([ , present ]) => {
-		try { return !present(); }
+	const gone = (probe) => {
+		try { return !probe(); }
 		catch (e) { return true; }
-	}).map(([ name ]) => name);
+	};
+	return CONTRACT_FNS.filter((path) => gone(() => hasFns(path)))
+		.concat(CONTRACT_REST.filter(([ , probe ]) => gone(probe)).map(([ name ]) => name));
 }
 
 function wireRouter() {
