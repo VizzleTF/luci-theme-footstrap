@@ -7,7 +7,6 @@
 'require fs-router as router';
 'require fs-prefs as prefs';
 'require fs-sheets as sheets';
-'require fs-search as search';
 
 /* Page modules: `fs-appearance` (System -> System) and `fs-overview` (Status -> Overview) each
  * serve one page and are required only on it. A `require` pragma would make them a hard
@@ -40,6 +39,85 @@ function wirePageModules() {
 	/* the server's stamp is already in the DOM; every later one is the router's */
 	new MutationObserver(load).observe(document.body, { attributes: true, attributeFilter: [ 'data-page' ] });
 	load();
+}
+
+/* ---- the search palette, held at arm's length ----
+ *
+ * The palette is 5 KB and opens on a keystroke most sessions never press, so it is not required
+ * here: this holds the shortcut and fetches the module on the first gesture. What CANNOT wait is
+ * the recents list — it has to be written on every navigation, or it is empty on the first open —
+ * and the warm pass that uses it, so both live here, in the file every page already loads.
+ *
+ * The palette reads the list back from localStorage when it opens, so the two halves share the key
+ * and nothing else. */
+const RECENT_KEY = 'fs-recent';
+const RECENT_MAX = 8;
+const RECENT_WARM = 5;
+
+function remember(segs) {
+	if (!Array.isArray(segs) || !segs.length) return;
+	const path = segs.join('/');
+	const recent = prefs.lsGetArr(RECENT_KEY).filter((x) => typeof x === 'string');
+	prefs.lsSet(RECENT_KEY, JSON.stringify([ path ].concat(recent.filter((p) => p !== path)).slice(0, RECENT_MAX)));
+}
+
+/* ---- warm the pages this admin actually uses ----
+ *
+ * The router's per-link prefetch needs a hover, tap or focus first, so a session's first visit to a
+ * page still pays for its module chain. The recents list is the best predictor available and is
+ * already on disk; warming the whole menu instead would pull every view module on the box
+ * (docs/spa-router.md).
+ *
+ * The current page is skipped — remember() has just recorded it and it is loaded by definition.
+ * Under saveData nothing speculative runs; the per-link prefetch stays, since it follows a
+ * deliberate hover or tap. Nothing waits on this, so it runs at idle, with a long fallback delay:
+ * it competes with the view's own module fetches and RPCs and must lose that race. */
+function warmRecent() {
+	try { if (navigator.connection && navigator.connection.saveData) return; } catch (e) {}
+	const here = (L.env.dispatchpath || []).join('/');
+	const paths = prefs.lsGetArr(RECENT_KEY)
+		.filter((p) => typeof p === 'string' && p !== here).slice(0, RECENT_WARM);
+	if (!paths.length) return;
+	const go = () => paths.forEach((p) => router.prefetchSegs(p.split('/')));
+	if (typeof window.requestIdleCallback === 'function')
+		window.requestIdleCallback(go, { timeout: 4000 });
+	else
+		window.setTimeout(go, 2000);
+}
+
+function wireSearch() {
+	const btn = document.getElementById('fs-search-btn');
+	if (!btn) return;
+	const RT = window.L;
+
+	/* the page this full load landed on; onNavigate covers the SPA path afterwards */
+	remember(L.env.dispatchpath || []);
+	router.onNavigate(remember);
+	warmRecent();
+
+	/* One fetch, on the first gesture. The module builds its overlay and opens itself; every later
+	 * gesture reaches the same instance, `require` being a singleton. */
+	let pending = false;
+	const open = () => {
+		if (pending) return;
+		pending = true;
+		RT.require('fs-search').then((m) => { pending = false; m.open(); },
+			(e) => { pending = false; console.error('footstrap: fs-search did not load', e); });
+	};
+
+	btn.addEventListener('click', open);
+	/* the same two shortcuts the palette used to own, with the same guard: `/` must not steal a
+	 * keystroke from someone typing into a field, a contenteditable, or a .cbi-dropdown, where
+	 * fs-select.js's typeahead reads it as a search character */
+	document.addEventListener('keydown', (ev) => {
+		if (ev.defaultPrevented) return;
+		if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && (ev.key === 'k' || ev.key === 'K')) {
+			ev.preventDefault(); open(); return;
+		}
+		if (ev.key !== '/' || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+		if (ev.target.closest?.('input, textarea, select, [contenteditable], .cbi-dropdown')) return;
+		ev.preventDefault(); open();
+	});
 }
 
 /* The three template globals Status -> Overview needs, defined where ordering is guaranteed.
@@ -140,9 +218,7 @@ return baseclass.extend({
 			fit.add(chrome.fitChrome);
 
 			chrome.renderChrome();
-			/* after setTree(): the palette indexes that tree on first open, and records recent
-			 * pages from the first navigation onwards */
-			search.wire();
+			wireSearch();
 			chrome.wireRail();
 			chrome.wireIndicatorCounts();
 			/* before router.wire(): the router restamps body[data-page] on every SPA navigation,

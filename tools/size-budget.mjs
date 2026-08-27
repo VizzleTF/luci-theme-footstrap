@@ -32,7 +32,9 @@ const LIMITS = {
 	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
 	 * whether or not a given page loads it. 86,737 B on 2026-08-27.
 	 *
-	 * This one went UP 337 B on the day the Appearance axes moved to `fs-axes.js`, and that was the
+	 * This one goes UP whenever a module splits: 337 B when the Appearance axes moved to
+	 * `fs-axes.js`, another 432 B when the search palette stopped being required on every page and
+	 * its recents bookkeeping moved into the loader. Both are the same trade, and that was the
 	 * trade: a second module costs its own prologue and its own export names, and it took 5.7 KB
 	 * off what every page DOWNLOADS. Flash is the cheaper side — a JFFS2 or UBIFS overlay
 	 * compresses it at about 0.39x, while uhttpd sends the wire bytes uncompressed at 1.0x, so a
@@ -41,7 +43,7 @@ const LIMITS = {
 	 * described below — it shrinks flash as well as the wire, because the two upload flows and the
 	 * three list axes each became one and four repeated messages became four constants. A raise
 	 * wants a line saying what bought it. */
-	resourcesJs: 87_000,
+	resourcesJs: 87_600,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -61,7 +63,7 @@ const LIMITS = {
 	 * flows collapsed onto one factory and palette/wallpaper/density onto the axis factory the
 	 * other four axes already used. Lowering it whenever the number comes down is the point;
 	 * raising it is a decision that wants a line saying what bought it. */
-	coldJs: 58_500,
+	coldJs: 54_600,
 };
 
 function bytes(path) {

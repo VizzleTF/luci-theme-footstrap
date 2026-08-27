@@ -2,6 +2,12 @@
 
 ### Changed
 
+- **The search palette stopped riding along on every page and now arrives when it is opened.** 5 KB of overlay, index and keyboard handling was required by the loader, so every admin page fetched it for a keystroke most sessions never press. The shortcut stays where it always ran — the loader holds the button, Ctrl+K and `/`, with the same guard that keeps `/` from stealing a keystroke out of a field, a contenteditable or a dropdown's typeahead — and the module is fetched on the first gesture. `require` is a singleton, so every later open reaches the same instance and costs nothing.
+
+  What could not wait moved with the shortcut rather than staying behind it: the recents list has to be written on every navigation or it is empty the first time the palette opens, and the warm pass that prefetches those pages runs on load. Both live in the loader now; the palette reads the list back from localStorage when it opens, so the two halves share one key and nothing else. A cold page fell from 57.0 KB to 53.3 KB, the loader growing 1,172 B against the palette's 5,109 B leaving.
+
+  Held on both package managers: an ordinary page fetches the palette zero times, the first Ctrl+K fetches it once and opens it with the input focused, typing filters the list, Escape closes it, and the button triggers the same path.
+
 - **The nineteen Appearance axes stopped shipping to every admin page.** `fs-prefs` is required by the chrome, the menu and the search palette, so it is fetched everywhere — and of its sixty-one exports the cold path called eight: the storage wrappers, dark mode, layout, density, rail and auto-collapse. The rest — five colour axes, four surface axes, five property sliders, palette, wallpaper, pattern ink, the snapshot, and Save-as-default with its two resets — is reached only from the Appearance form and the two uploads, both page modules. It is `fs-axes.js` now, and `fs-prefs` went from 9,202 B to 3,098 B. A cold page fell from 62.7 KB to 57.0 KB.
 
   What stayed behind is what something on an ordinary page actually applies: `guardDarkStamp` defends the dark stamp against a third-party app everywhere, `tools/chrome-fence.mjs` holds `stampDark()` to that file by path, and `tools/scroll-anchor.mjs` and `tools/scroll-jank.mjs` stamp layout and density through `L.require('fs-prefs')` to sweep their matrix. `tools/axes.mjs` needed no change at all: it reads the whole resources directory rather than a path, and its own comment says why — an axis moved elsewhere would otherwise have left it quietly checking nothing.

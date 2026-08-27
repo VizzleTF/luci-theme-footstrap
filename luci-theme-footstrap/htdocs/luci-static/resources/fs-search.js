@@ -143,69 +143,28 @@ function search(q, limit) {
 const RECENT_KEY = 'fs-recent';
 const RECENT_MAX = 8;
 
-/* prefs.lsGetArr owns the parse, the corruption guard and the Array check; only the
- * "these are paths" filter belongs here */
-function loadRecent() {
-	return prefs.lsGetArr(RECENT_KEY).filter((x) => typeof x === 'string');
-}
-
-let _recent = loadRecent();
-
-function remember(segs) {
-	if (!Array.isArray(segs) || !segs.length) return;
-	const path = segs.join('/');
-	_recent = [ path ].concat(_recent.filter((p) => p !== path)).slice(0, RECENT_MAX);
-	prefs.lsSet(RECENT_KEY, JSON.stringify(_recent));
-}
-
+/* The list is WRITTEN by menu-footstrap-common.js, which is on every page — this module is not any
+ * more, and a palette that only loads when it is opened cannot be what records where the admin has
+ * been. Read here, at open time, so it is always current. `prefs.lsGetArr` owns the parse, the
+ * corruption guard and the Array check; only the "these are paths" filter belongs here. */
 function recentEntries() {
+	const recent = prefs.lsGetArr(RECENT_KEY).filter((x) => typeof x === 'string');
 	const byPath = new Map(index().map((e) => [ e.path, e ]));
-	return _recent.map((p) => byPath.get(p)).filter(Boolean).slice(0, RECENT_MAX);
-}
-
-/* ---- warm the pages this admin actually uses ----
- *
- * The router's per-link prefetch needs a hover, tap or focus first, so a session's first visit to
- * a page still pays for its module chain. The recents list is the best predictor available and is
- * already on disk; warming the whole menu instead would pull every view module on the box
- * (docs/spa-router.md).
- *
- * The current page is skipped — wire() has just remembered it and it is loaded by definition.
- * Under saveData nothing speculative runs; the per-link prefetch stays, since it follows a
- * deliberate hover or tap. */
-const RECENT_WARM = 5;
-
-function warmRecent() {
-	try { if (navigator.connection && navigator.connection.saveData) return; } catch (e) {}
-	const here = (L.env.dispatchpath || []).join('/');
-	const paths = _recent.filter((p) => p !== here).slice(0, RECENT_WARM);
-	if (!paths.length) return;
-	/* Nothing waits on this, so it runs at idle, with a timeout for a page that never goes idle (a
-	 * busy poll). The fallback delay is long on purpose: this competes with the view's own module
-	 * fetches and RPCs and must lose that race. */
-	const go = () => paths.forEach((p) => router.prefetchSegs(p.split('/')));
-	if (typeof window.requestIdleCallback === 'function')
-		window.requestIdleCallback(go, { timeout: 4000 });
-	else
-		window.setTimeout(go, 2000);
+	return recent.map((p) => byPath.get(p)).filter(Boolean).slice(0, RECENT_MAX);
 }
 
 /* ---- the palette -------------------------------------------------------- */
 
 const MAX_RESULTS = 20;
 
-function wire() {
-	const btn = document.getElementById('fs-search-btn');
-	if (!btn) return;
+/* Built on the first open and kept — the overlay, its listeners and the index survive for the life
+ * of the document, so a second Ctrl+K costs nothing. Until then this module is not even fetched:
+ * menu-footstrap-common.js holds the shortcut and requires this on the first gesture. */
+let _built = null;
 
-	/* remember the page this full load landed on: onNavigate below covers the SPA path, this
-	 * covers an F5, a non-SPA-able node and the first page of a session */
-	remember(L.env.dispatchpath || []);
-	/* the callback is handed the resolved segments of the INCOMING page; L.env still points at
-	 * the outgoing one when the router fires its callbacks */
-	router.onNavigate(remember);
-	/* after remember(), so the page we stand on heads the list and is the one skipped */
-	warmRecent();
+function build() {
+	const btn = document.getElementById('fs-search-btn');
+	if (!btn) return null;
 
 	const input = E('input', {
 		'type': 'text',
@@ -384,8 +343,16 @@ function wire() {
 		ev.preventDefault();
 		open();
 	});
+
+	return { open, close };
+}
+
+/* the one entry point: build if this is the first gesture, then open */
+function openPalette() {
+	if (!_built) _built = build();
+	if (_built) _built.open();
 }
 
 return baseclass.extend({
-	wire
+	open: openPalette
 });
