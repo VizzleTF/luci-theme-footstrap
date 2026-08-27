@@ -78,6 +78,7 @@ const PAT_MAX   = 512 * 1024;							/* a tile that has to reach a router's flash
  * time (`<set attributename="href" to="javascript:…">`), and a tile that animates repaints a
  * full-viewport layer behind every page. */
 const PAT_BAD_TAGS = [ 'script', 'foreignobject', 'iframe', 'embed', 'object', 'audio', 'video', 'animate', 'set' ];
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /* null if the parsed document is fine, otherwise the sentence to show. */
 function _svgObjection(text) {
@@ -85,17 +86,36 @@ function _svgObjection(text) {
 	try { doc = new DOMParser().parseFromString(text, 'image/svg+xml'); }
 	catch (e) { return MSG_NOT_SVG; }
 	const root = doc && doc.documentElement;
-	if (!root || doc.querySelector('parsererror') || root.nodeName.toLowerCase() !== 'svg')
+	/* An SVG is its ROOT'S NAMESPACE, not its root's spelling. `nodeName` is the qualified name, so
+	 * it answers both questions wrong at once: `<svg xmlns="http://www.w3.org/1999/xhtml">` reads as
+	 * `svg` and is admitted although it is an XHTML document that executes on all three engines,
+	 * while `<s:svg xmlns:s="http://www.w3.org/2000/svg">` reads as `s:svg` and is turned away
+	 * although it is an ordinary picture. */
+	if (!root || doc.querySelector('parsererror') ||
+		root.localName.toLowerCase() !== 'svg' || root.namespaceURI !== SVG_NS)
 		return MSG_NOT_SVG;
 	const refused = _('That SVG contains script or external references, which this theme will not install.', 'footstrap');
+	/* A processing instruction can attach an XSLT stylesheet carried INSIDE this same document, and
+	 * the transform's output is a document this walk never sees: `<xsl:element name="script">`
+	 * builds the element by name, so nothing here is called script. Measured executing on Firefox
+	 * (Chromium and WebKit decline to run XSLT on an image/svg+xml document). A tile has no use for
+	 * one, and without the PI the embedded stylesheet is never applied. */
+	for (const n of doc.childNodes) if (n.nodeType === Node.PROCESSING_INSTRUCTION_NODE) return refused;
 	const els = [ root ].concat([ ...root.querySelectorAll('*') ]);
 	for (const el of els) {
-		if (PAT_BAD_TAGS.indexOf(el.nodeName.toLowerCase()) >= 0) return refused;
+		/* localName, never nodeName: in an XML document nodeName carries the namespace PREFIX, so
+		 * `<s:script xmlns:s="http://www.w3.org/2000/svg">` reads as `s:script` and walks straight
+		 * past a list of names — measured executing on all three engines, as does the same element
+		 * put in the xhtml namespace. localName is `script` for every one of those spellings. */
+		if (PAT_BAD_TAGS.indexOf((el.localName || el.nodeName).toLowerCase()) >= 0) return refused;
 		const attrs = el.attributes || [];
 		for (let i = 0; i < attrs.length; i++) {
 			const n = attrs[i].name.toLowerCase();
 			const v = String(attrs[i].value || '').trim();
-			/* a REAL handler is `on` + letters and nothing else; `only_selected` is not one */
+			/* a REAL handler is `on` + letters and nothing else; `only_selected` is not one. The
+			 * qualified name is right here, unlike on the element above: a prefixed `s:onload` or
+			 * `xlink:onload` fires on none of the three engines, so matching localName would only
+			 * refuse files that do nothing. */
 			if ((/^on[a-z]+$/).test(n)) return refused;
 			if ((/^javascript:/i).test(v)) return refused;
 			/* off-router reference. A leading `//` is protocol-relative and just as external. */

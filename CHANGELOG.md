@@ -96,6 +96,18 @@
 
 - **The login page encodes an auth plugin's message instead of printing it raw.** The theme drops upstream's `!fuser` gate on `auth_message` on purpose — `fuser` is set on the second step of a pluggable login too, so gating on it reports "Invalid username and/or password!" about a password that was right and swallows the backend's own messages. The cost of covering all four states is that the message also renders on the request that posted the form, and that page is unauthenticated: a plugin echoing the submitted username back would reflect it. The dispatcher hands markup over in its own `auth_html` (`dispatcher.uc:952`), so a plugin that needs tags already has a variable for them and this one is text — `entityencode` takes nothing away and closes the widening the gate bought.
 
+- **An SVG wallpaper carrying script could pass the upload check three different ways, all of them a misread of an XML name.** `_svgObjection()` asked for `nodeName`, which in an XML document is the QUALIFIED name — the namespace prefix included — so it answered the wrong question everywhere it was used.
+
+  On an element: `<s:script xmlns:s="http://www.w3.org/2000/svg">` reads as `s:script`, matches nothing in the refusal list, and is an ordinary `SVGScriptElement` to the browser. Measured executing on Chromium, Firefox and WebKit alike, as does the same element placed in the xhtml namespace. It compares `localName` now, which is `script` for every spelling of it.
+
+  On the root: an SVG is its root's NAMESPACE, not its root's spelling, and `nodeName` got that wrong in both directions at once. `<svg xmlns="http://www.w3.org/1999/xhtml">` was admitted as a picture although it is an XHTML document — script inside it runs on all three engines — while `<s:svg xmlns:s="http://www.w3.org/2000/svg">` was turned away although it is an ordinary tile. The root is now checked by `localName` and `namespaceURI` together, which closes the first and stops refusing the second.
+
+  And a vector that no name check can see: a `<?xml-stylesheet?>` processing instruction attaches an XSLT stylesheet carried inside the same document, and `<xsl:element name="script">` builds the element by NAME, so no node in the file being walked is called script at all. That one runs on Firefox (Chromium and WebKit decline XSLT on an `image/svg+xml` document) and is refused by declining any processing instruction — a tile has no use for one, and without the PI the embedded stylesheet is never applied.
+
+  Each mechanism was measured to be necessary on its own: `localName` alone does not see the XSLT case, refusing the PI alone does not see the prefixed tag, and neither sees a root in the wrong namespace. What was measured NOT to be necessary is left out — a prefixed `s:onload` or `xlink:onload` fires on none of the three engines, so the attribute walk still reads the qualified name and matching `localName` there would only refuse files that do nothing.
+
+  It matters because the file is reachable at its own URL: `uci-defaults` symlinks `/www/luci-static/footstrap/pattern.svg` at it and uhttpd serves it as `image/svg+xml`, same-origin with the admin's session, where the mask that hides script on a page does not apply. Uploading still needs an authenticated session with uci write rights, so this is the defence in depth the check was written to be — against a tile the admin downloaded from somewhere. Held on a live 25.12 router through the real Appearance uploader.
+
 ## [0.14.2] — 2026-08-24
 
 ### Fixed
