@@ -89,6 +89,11 @@ else
 	node "$ROOT/tools/minify-prepaint.mjs" "$STAGE/usr/share/ucode/luci"
 
 	"$SRC/strip-shell.sh" "$ROOTPART"
+
+	#    …and the two static assets nothing else touches: the SVG favicon's comment and the
+	#    manifest's indentation. Both are fetched by a browser, and uhttpd sends them uncompressed
+	#    like everything else.
+	"$SRC/strip-assets.sh" "$STAGE/www/luci-static/footstrap"
 fi
 
 # root/ joins the payload once it has been stripped — see the note at step 1.

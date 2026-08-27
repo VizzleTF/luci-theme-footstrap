@@ -142,7 +142,7 @@ for (const f of files) {
 	const res = await minify(src, {
 		parse: { bare_returns: true },
 		/* directives:false = do NOT remove them — the pragmas ARE directives */
-		compress: { directives: false },
+		compress: { directives: false, toplevel: true, passes: 3 },
 		mangle: { toplevel: true, reserved: [ ...free, ...(isVersion ? [ 'FS_VERSION' ] : []) ] },
 		/* quote_style 1 = single quotes, so the version sed's '[^']*' still matches */
 		format: isVersion ? { quote_style: 1 } : {}
@@ -162,6 +162,14 @@ for (const f of files) {
 			throw new Error(`the minifier declared ${clash.join(', ')} — a name this file gets from the LuCI wrapper`);
 		if (isVersion && !VERSION_DECL.test(min))
 			throw new Error('the FS_VERSION declaration did not survive — the version sed would miss');
+		/* …and that the declaration is still REFERENCED. `compress.toplevel` is free to inline a
+		 * const that is only read: the declaration would survive for the Makefile's sed to stamp,
+		 * every reader would carry the pre-stamp literal, and every release would report
+		 * "Footstrap (dev)" with no gate saying otherwise. Three occurrences today — one
+		 * declaration, two reads in label(). */
+		if (isVersion && (min.match(/FS_VERSION/g) || []).length < 2)
+			throw new Error('FS_VERSION was inlined — the declaration survives for the sed to stamp, '
+				+ 'but nothing reads it any more, so a stamped release would still say "(dev)"');
 		/* a floor, not a budget: an empty/truncated write must not ship (build-css.sh's rule) */
 		if (!min || min.length < 100 || min.length >= src.length)
 			throw new Error(`implausible output size ${min && min.length} (source ${src.length})`);

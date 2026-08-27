@@ -135,9 +135,19 @@ squeeze() {
 					prev = (length(out) ? substr(out, length(out), 1) : lastc)
 					nxt  = (i <= n ? substr(line, i, 1) : "")
 					# drop it entirely next to a delimiter; otherwise it may be a combinator
-					if (prev == "" || prev == "{" || prev == "}" || prev == ";" || prev == "," || prev == ":")
+					#
+					# `>` is a delimiter too, and the only one that is itself a combinator: a
+					# space either side of it is decoration. 516 of them in the sheet, so it is
+					# 1,032 B — the file header used to guess "~200 bytes" for this whole pass.
+					# Safe because a `>` outside a string can only be the child combinator: the
+					# sheet has no media range syntax (`@media (width > 600px)`), and the 107
+					# `>` inside string literals never reach here, the scanner having copied them
+					# verbatim above. `~` and `+` are deliberately NOT joined: `[attr~=v]` and
+					# `calc(100% - 10px)` make them ambiguous without tracking bracket depth,
+					# and they are worth 14 B and 34 B.
+					if (prev == "" || prev == "{" || prev == "}" || prev == ";" || prev == "," || prev == ":" || prev == ">")
 						continue
-					if (nxt == "{" || nxt == "}" || nxt == ";" || nxt == "," || nxt == "")
+					if (nxt == "{" || nxt == "}" || nxt == ";" || nxt == "," || nxt == "" || nxt == ">")
 						continue
 					out = out " "; lastreal = " "
 					continue

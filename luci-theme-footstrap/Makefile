@@ -170,6 +170,10 @@ define Build/Prepare/luci-theme-footstrap
 	$(SHELL) $(CURDIR)/strip-probes.sh $(PKG_BUILD_DIR)/htdocs/luci-static/resources
 	# …and the same for the shell under root/ (71% and 95% comment lines). Whole-line `#` only.
 	$(SHELL) $(CURDIR)/strip-shell.sh $(PKG_BUILD_DIR)/root
+	# The two static assets luci.mk has no step for: the SVG favicon carries a 753-byte comment and
+	# the manifest its indentation, and both are fetched by every browser over a link uhttpd does
+	# not compress. awk only, so this runs on a buildbot with no node.
+	$(SHELL) $(CURDIR)/strip-assets.sh $(PKG_BUILD_DIR)/htdocs/luci-static/footstrap
 	$(SED) "s#const FS_VERSION *= *'[^']*'#const FS_VERSION = '$(if $(PKG_VERSION),$(PKG_VERSION),$(PKG_SRC_VERSION))'#" \
 		$(PKG_BUILD_DIR)/htdocs/luci-static/resources/fs-version.js
 endef
