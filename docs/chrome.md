@@ -277,21 +277,27 @@ Three details carry it, and each one was a measured failure first:
   correction. It cannot run away with the page either — if the document really did get shorter, the
   browser clamps the write back and the reader keeps the offset they already had.
 
-**Two halves: the document does not shrink, and the reader is put back if it did.** The content
-column carries a floor — `min-height` on `.fs-content`, set to the height it had at the last settled
-moment and held until the next one (`holdFloor()`). A section emptying inside it takes nothing off
-the document, so there is no shorter document for the engine to clamp into and the tick is invisible;
-the floor is re-measured after every settled batch, so a page that genuinely got shorter is shorter
-one frame later. Measured on a 25.12 stand with the correction switched off, a real poll tick clamped
-1882px away without the floor and 0px with it; on 24.10, where the theme cannot reach the poll at
-all, the same park went from a 1206px clamp to no offset change at all. On a live router the
-correction alone was still blinking four times in 20 seconds — 2072px away and back inside one frame
-— and with the floor that is 12px.
+**Two halves: the document does not shrink, and the reader is put back if it did.** Every container
+a poll empties carries a floor — `min-height` at the height it had at the last settled moment, held
+until the next one (`holdFloor()`, over `.cbi-section > div, .table > .tbody, .table`: what
+`dom.content()` is called on and nothing wider). A container emptying takes nothing off the document,
+so there is no shorter document for the engine to clamp into and the tick is invisible; the floors
+are re-measured after every settled batch, so a page that genuinely got shorter is shorter one frame
+later. Measured on a 25.12 stand with the correction switched off, a real poll tick clamped 1882px
+away without the floor and 0px with it; on 24.10, where the theme cannot reach the poll at all, the
+same park went from a 1206px clamp to no offset change at all.
 
-**The floor runs only where the correction does.** `ENGINE_ANCHORS` gates both: an engine that
-anchors by itself reads a held height as one more thing that moved. Measured on Chromium in the
-sidebar layout at 1440, reproducibly: 15px of reader movement with the floor held, 0px without it,
-and nothing gained either way because that engine puts the reader back on its own.
+**The floor is on the containers because it may not be on the column.** `min-height` on an ancestor
+of the engine's own anchor is a scroll-anchoring suppression trigger — css-scroll-anchoring-1 §2.2.2
+lists it, and Blink's list (`css_properties.json5`, `invalidate: [..., "scroll-anchor"]`) is wider
+still — so a floor on `.fs-content`, where this used to live, turned the engine's anchoring off in
+exchange for holding the document up. Measured with it there: 120px grew above the reader and the
+page moved all 120px under them, on Chromium and Firefox alike; and the 15px this file used to quote
+for the same configuration was taken before `47e636d` gave anchoring engines a live reference, and
+was never re-taken. The suppression walks only the path from the anchor to the scroller, and a
+container that empties is never on it — either the anchor was inside it, in which case the engine has
+lost the anchor anyway, or the anchor is elsewhere and this container is its sibling. So the floor
+now runs on every engine, and the engine's own anchoring keeps working beside it.
 
 **A pin on the container itself does not work, and the shape that does was reported from the field.**
 `fs-overview.js` briefly pinned each container across `dom.content()` and released it in the same
@@ -335,16 +341,26 @@ falsified by the fit pass, its top is not.
 `lateDrift()` closes the overshoot without asking who the engine is. Two frames after a mutation — long enough
 for the engine to have finished its own correction — the reference the theme was holding is asked
 where it is now. An engine that got it right reports zero and nothing happens; what is left over is
-what nobody put back, and that is what is given back. Two things it is deliberately NOT: a browser
-test (`CSS.supports` can no longer separate the two behaviours), and a synthetic probe that performs
-the collapse itself (it calls Firefox broken, because a real page puts layout and a frame between the
-collapse and the refill; gating on it cost Chromium and Firefox 15px of drift they did not have).
+what nobody put back, and that is what is given back. It answers GROWTH only: the collapse is the
+floor's, and the page it still matters on is the one that is a single data table, where the
+stylesheet has told the engine not to anchor and nobody else is holding the reader. Two things it is
+deliberately NOT: a browser test (`CSS.supports` can no longer separate the two behaviours), and a
+synthetic probe that performs the collapse itself (it calls Firefox broken, because a real page puts
+layout and a frame between the collapse and the refill; gating on it cost Chromium and Firefox 15px
+of drift they did not have).
 
 The price is a resting reference on every engine — a hit test and a rect per settled pass, measured
 on the stands at **0.2 ms typical and 6 ms worst** on a poll-dirtied WebKit layout, never during a
 flick, and skipped entirely while the page is at offset 0 (nothing to be put back to). It fires only
-on a single-shot offset change: `streaming()` — more than one offset change inside one stretch of
-movement — and a user gesture both keep it out, so a correction can never land inside a scroll.
+where THE OFFSET HAS NOT MOVED since the reference was taken — `scrollTop() !== ref.at` and it sits
+the tick out — plus a user gesture keeping it out, so a correction can never land inside a scroll.
+Asking `scrolling()` instead does not work here and asking the sampler's step count is not enough:
+the engine's own compensation moves the offset and starts the sampler, and in WebKit a programmatic
+scroll's event arrives up to 1.2 s late, so the sampler is often not running at all while a flick is.
+Both of those let a correction through mid-flick — 161px on `@390 side`, 320px on `@1440 side`, both
+on webkit/Overview. `ref.at` and not `_restAt`, because `run()` re-remembers between the mutation and
+this frame, and where the sampler has not started that re-take records the offset the reader has
+already flicked to.
 
 `tools/scroll-anchor.mjs` holds all of it: it grows 120px above the reader and requires the page to
 stay within two pixels, once with the engine's anchoring suppressed and once without, in both

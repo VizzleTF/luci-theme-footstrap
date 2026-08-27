@@ -33,11 +33,14 @@ const LIMITS = {
 	resourcesJs: 89_900,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router is
 	 * also routing packets over: the same set minus the page modules, which are required only on the
-	 * one page each belongs to (tools/page-modules.mjs). 74,114 B on 2026-08-25, the last 132 B two
-	 * field-reported fixes: the Appearance tab coming back after a Save (openwrt/luci#8981) and the
-	 * residual anchoring correction firing on the tick it exists for. Raising it is a decision;
-	 * lowering it whenever the number comes down is the point. */
-	coldJs: 74_200,
+	 * one page each belongs to (tools/page-modules.mjs). 74,220 B on 2026-08-27, the last 106 B
+	 * moving the poll floor off the content column and onto the containers a poll empties: one
+	 * element became a list, so a clear pass, a read pass and a write pass replaced three lines.
+	 * What it bought is on both sides of the fault — a floor that no longer suppresses the engine's
+	 * own scroll anchoring (120px of unanswered growth on Chromium and Firefox with it on the
+	 * column), and a clamp of 2167px reduced to none. Raising it is a decision; lowering it whenever
+	 * the number comes down is the point. */
+	coldJs: 74_300,
 };
 
 function bytes(path) {

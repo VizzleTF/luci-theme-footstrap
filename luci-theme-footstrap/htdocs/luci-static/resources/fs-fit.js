@@ -67,9 +67,9 @@ function fittersEnabled() {
 function run() {
 	if (!fittersEnabled()) return;
 	runAll(_fitters, 'fitter');
-	/* the page is settled: this is the height the next tick may not go below, and the position the
-	 * next mutation is measured against — unless a correction is already on its way, which would
-	 * make this reference the drifted one */
+	/* make the document whole again before anything lays it out, then take the position the next
+	 * mutation is measured against — unless a correction is already on its way, which would make
+	 * this reference the drifted one */
 	holdFloor();
 	if (!_anchorPending) rememberRest();
 }
@@ -77,34 +77,44 @@ function run() {
 /* ---- the document may not get shorter while a tick is in flight ----
  *
  * `dom.content()` — what every LuCI poll calls to refresh a section — empties the container before
- * it refills it, and the engine clamps the reader's offset into the briefly shorter document.
- * Nothing puts that back, because the shortening was never real.
+ * it refills it, and a layout taken while it is empty clamps the reader's offset into a document
+ * that was never really that short. Nothing puts that back.
  *
- * So the content column keeps a floor: `min-height` at the height it had at the last settled
- * moment. A section emptying inside it takes nothing off the document, so there is nothing to clamp
- * into. Re-measured after every settled batch, so a page that genuinely got shorter follows one
- * frame later.
+ * So each container that a poll empties carries a floor: `min-height` at the height it had at the
+ * last settled moment, written BEFORE the tick rather than during it. That distinction is the whole
+ * mechanism — pinning the container from inside the same statement sequence does nothing, because
+ * `dom.content()` performs no layout and no layout ever sees the pin (measured: 1882px still
+ * clamped away with the pin in place). A floor already standing when the container empties needs no
+ * layout to be seen.
  *
- * The floor is on `.fs-content` and not on the container being swapped: pinning the container in
- * the same statement sequence does nothing, since `dom.content()` performs no layout and no layout
- * ever sees the pin (measured: 1882px still clamped away with the pin in place). Wrapping
- * `dom.content()` itself works, at the price of patching a luci-base API every app shares and up to
- * seven read/write pairs per call; one theme-owned element measured once per batch holds the reader
- * just as still (0px against a 337px drift), at 16 measurements against 154 wrapped calls.
+ * The floor is on those containers and NOT on the column around them, which is where it used to be.
+ * `min-height` on an ancestor of the engine's own anchor is a suppression trigger —
+ * css-scroll-anchoring-1 §2.2.2 lists it, and Blink's list (css_properties.json5,
+ * `invalidate: [..., "scroll-anchor"]`) is wider still — so a floor on the column bought the clamp
+ * back by turning the engine's anchoring off: 120px grew above the reader and the page moved all
+ * 120px under them, on Chromium and Firefox alike. The suppression walks only the path from the
+ * anchor to the scroller, and a container that empties is never on it: either the anchor was inside
+ * it, in which case the engine has lost the anchor anyway, or the anchor is elsewhere and this
+ * container is a sibling.
  *
- * Not while the reader scrolls: clearing the floor to re-measure is a layout read, and the floor
- * staying where it was is still a floor. */
+ * Wrapping `dom.content()` itself also works, at the price of patching a luci-base API every app
+ * shares and up to seven read/write pairs per call. */
+const SHRINKS = '.cbi-section > div, .table';
+
+/* The floor is the height the next tick may not go below, one per container. Cleared before the
+ * read, or each floor measures itself and never comes down; batched into one clear, one read pass
+ * and one write pass, so the whole sweep costs a single forced layout rather than one per element.
+ *
+ * Not while the reader scrolls: clearing to re-measure is a layout read, and a floor staying where
+ * it was is still a floor. */
 function holdFloor() {
-	/* only where the theme is responsible: an engine that anchors by itself reads the held height as
-	 * one more thing that moved (15px off with the floor held, 0px without), and gains nothing from
-	 * it */
-	if (ENGINE_ANCHORS || scrolling()) return;
-	const el = document.querySelector('.fs-content');
-	if (!el) return;			/* the login page has no content column */
-	/* cleared before the read, or the floor measures itself and never comes down */
-	el.style.minHeight = '';
-	const h = el.offsetHeight;
-	if (h > 0) el.style.minHeight = h + 'px';
+	if (scrolling()) return;
+	const host = document.getElementById('view');
+	if (!host) return;			/* the login page has no view */
+	const els = host.querySelectorAll(SHRINKS), hs = [];
+	els.forEach((el) => { el.style.minHeight = ''; });
+	els.forEach((el) => hs.push(el.offsetHeight));
+	els.forEach((el, i) => { if (hs[i] > 0) el.style.minHeight = hs[i] + 'px'; });
 }
 
 /* ---- is the page moving right now? asked of the position, never of the events ----
@@ -172,20 +182,14 @@ function scrollTop() {
 }
 
 function scrolling() { return Date.now() < _movingUntil; }
-/* how many times the offset has moved in this stretch: >1 is a scroll, 1 is a compensation.
- * `lateDrift()` is the only caller that needs to tell the two apart. */
-let _steps = 0;
-
 function sampleMotion() {
 	const y = scrollTop();
 	if (_lastOffset === null || y !== _lastOffset) {
-		if (_lastOffset !== null) _steps++;
 		_lastOffset = y;
 		_movingUntil = Date.now() + SCROLL_IDLE;
 	}
 	if (scrolling()) { requestAnimationFrame(sampleMotion); return; }
 	_sampling = false;
-	_steps = 0;
 	/* the reader has stopped, so the floor and the reference both belong to where the page now
 	 * stands */
 	holdFloor();
@@ -524,12 +528,22 @@ function lateDrift(ref) {
 	_lateFrame = requestAnimationFrame(() => {
 		_lateFrame = requestAnimationFrame(() => {
 			_lateFrame = 0;
-			/* not `scrolling()`: the engine's own compensation moves the offset and starts the
-			 * motion sampler, so gating on it skips every tick this exists for. Two narrower
-			 * questions instead — is the reader driving (a gesture), and is the offset streaming
-			 * (moving repeatedly, which a one-shot compensation never does). */
-			if (!anchorEnabled() || Date.now() < _userUntil || (scrolling() && _steps > 1)) return;
+			if (!anchorEnabled() || Date.now() < _userUntil) return;
 			if (_restPage !== pageStamp()) return;
+			/* THE OFFSET, NOT THE EVENT STREAM. `scrolling()` cannot answer this one: the engine's
+			 * own compensation moves the offset and starts the motion sampler, so gating on it
+			 * skips every tick this exists for — and in WebKit a programmatic scroll's event
+			 * arrives up to 1.2s late, so the sampler is often not running at all when a flick is
+			 * in progress. Asking where the offset stands answers both: the reference was taken
+			 * with the reference on a still page, so an offset anywhere else means the reader has
+			 * moved since, and whatever this would put back they have already scrolled past. A
+			 * correction landing inside a flick is itself a jump (161px, webkit/Overview).
+			 *
+			 * `ref.at` and not `_restAt`: run() re-remembers between the mutation and this frame,
+			 * and where the sampler has not started yet — WebKit again — that re-take records the
+			 * offset the reader has already flicked to, so comparing against it compares a value
+			 * with itself and lets the correction through (320px, @1440 side, .fs-main scrolling). */
+			if (scrollTop() !== ref.at) return;
 			/* the tick usually replaces the element this was taken on, so without the section
 			 * fallback the correction does nothing on the tick it exists for */
 			let el = ref.el, was = ref.top;
@@ -617,23 +631,22 @@ function applyAnchor(ref) {
 function observeContent() {
 	if (_mo) return;
 	_mo = new MutationObserver(() => {
-		/* One correction per engine, and which one depends on whether the engine does the job.
+		/* The theme corrects only where the engine will not. Where it anchors, growth above the
+		 * reader is the engine's job and the floor covers the collapse, so there is nothing left for
+		 * a correction to do: one written here would read its reference in the same instant the poll
+		 * mutated the page, and after a scroll WebKit hands back the new `scrollTop` before the
+		 * layout that goes with it, so the drift measures the reader's own move and the correction
+		 * undoes it — measured, the page went back to 0 from 591 on every run. A residual check two
+		 * frames later was carried for that engine and is gone: with the floor on the containers
+		 * rather than on the column the collapse it answered no longer happens, and its own
+		 * correction landed inside a flick (161px, webkit/Overview, scroll-anchor).
 		 *
-		 * Where it anchors, an immediate correction is harmful: its reference is read here, in the
-		 * same instant the poll mutated the page, and after a scroll WebKit hands back the new
-		 * `scrollTop` before the layout that goes with it, so the drift measures the reader's own
-		 * move and the correction undoes it — measured, the page went back to 0 from 591 on every
-		 * run. That engine needs the RESIDUE two frames later, once its own anchoring has run —
-		 * lateDrift().
-		 *
-		 * Where it does not anchor, nobody else puts the reader back within the frame, so the
-		 * immediate correction stays, measured against the reference from the last still page. */
+		 * Where the engine does not anchor at all — Safari before 27 — nobody puts the reader back
+		 * within the frame, so the immediate correction stays, measured against the reference from
+		 * the last still page. */
 		const settled = _rest;
 		const ref = ENGINE_ANCHORS ? null : anchorFor();
 		run();
-		/* one or the other, never a fallthrough: where the engine does not anchor, `anchorFor()`
-		 * returning nothing means it DECIDED not to correct this tick, and handing that case to the
-		 * deferred path lands the correction inside a flick instead */
 		if (ENGINE_ANCHORS) lateDrift(settled);
 		else scheduleAnchor(ref);
 	});
