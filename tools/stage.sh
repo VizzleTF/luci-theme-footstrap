@@ -81,6 +81,13 @@ else
 
 	# 5. Comments out of the templates and out of the shell.
 	"$SRC/strip-templates.sh" "$STAGE/usr/share/ucode/luci"
+
+	#    …then the pre-paint scripts inside those templates, which strip-templates.sh deliberately
+	#    leaves alone (it removes comments and nothing else). These are the most expensive bytes in
+	#    the package: they sit in the HTML document itself, so every page load pays them before a
+	#    single module is fetched — the login page included, which fetches no modules at all.
+	node "$ROOT/tools/minify-prepaint.mjs" "$STAGE/usr/share/ucode/luci"
+
 	"$SRC/strip-shell.sh" "$ROOTPART"
 fi
 
