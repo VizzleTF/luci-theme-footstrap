@@ -22,10 +22,6 @@
 		border-spacing: 0;
 	}
 
-	ol, ul {
-		list-style: none;
-	}
-
 	/* `hidden` is how a VIEW says an element is not there, and the only way available to code that
 	 * ships no stylesheet. The UA gives it `display: none` at the weakest possible strength, so any
 	 * `display` a theme sets on a class beats it and the element paints anyway: measured here on

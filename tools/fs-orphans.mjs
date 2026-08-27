@@ -88,7 +88,10 @@ function stripComments(text, file) {
 		/* `'require fs-chrome as chrome';` names a MODULE, not a class — and blanking the POSITION
 		 * rather than the name is what lets a module share its name with the markup it owns. */
 		.replace(/^'require\s+[^']*';\s*$/gm, ' ')
-		.replace(/L\.require\('[^']*'\)/g, ' ');
+		.replace(/L\.require\('[^']*'\)/g, ' ')
+		/* …and so does the page-module map, for the same reason: its values are module names, and
+		 * `fs-overview` was reported as markup emitted and never styled on the strength of one. */
+		.replace(/const PAGE_MODULES = \{[^}]*\}/g, ' ');
 }
 
 const emitted = new Map();
