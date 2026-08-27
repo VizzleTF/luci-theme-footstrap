@@ -24,14 +24,24 @@ const LIMITS = {
 	 * it the 2020 colourway and two forum-reported fixes. The headroom is deliberate and small: a
 	 * feature's worth of rules should fit without a gate edit, a redesign's should not. A raise wants
 	 * a line saying what bought it — a palette is the one feature that cannot be cheaper, every
-	 * token being declared per mode or the block does not fully apply. */
-	cascadeCss: 128_500,
+	 * token being declared per mode or the block does not fully apply.
+	 *
+	 * 125,795 B on 2026-08-27, down 1,051 B when the squeeze learned that `>` is a delimiter like
+	 * `{` and `,`: 516 child combinators were carrying a space either side. */
+	cascadeCss: 127_400,
 	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
-	 * whether or not a given page loads it. 87,992 B on 2026-08-27, down 1,316 B on the refactor
+	 * whether or not a given page loads it. 86,737 B on 2026-08-27.
+	 *
+	 * This one went UP 337 B on the day the Appearance axes moved to `fs-axes.js`, and that was the
+	 * trade: a second module costs its own prologue and its own export names, and it took 5.7 KB
+	 * off what every page DOWNLOADS. Flash is the cheaper side — a JFFS2 or UBIFS overlay
+	 * compresses it at about 0.39x, while uhttpd sends the wire bytes uncompressed at 1.0x, so a
+	 * byte moved off the cold path is worth more than a byte added to flash. Earlier the same day
+	 * it came down 2,567 B on the refactor
 	 * described below — it shrinks flash as well as the wire, because the two upload flows and the
 	 * three list axes each became one and four repeated messages became four constants. A raise
 	 * wants a line saying what bought it. */
-	resourcesJs: 88_200,
+	resourcesJs: 87_000,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -51,7 +61,7 @@ const LIMITS = {
 	 * flows collapsed onto one factory and palette/wallpaper/density onto the axis factory the
 	 * other four axes already used. Lowering it whenever the number comes down is the point;
 	 * raising it is a decision that wants a line saying what bought it. */
-	coldJs: 65_400,
+	coldJs: 58_500,
 };
 
 function bytes(path) {
@@ -75,6 +85,12 @@ function shippedJs() {
 	const dir = mkdtempSync(join(process.env.RUNNER_TEMP || tmpdir(), 'fs-js-'));
 	const res = join(dir, 'resources');
 	cpSync(join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources'), res, { recursive: true });
+	/* the gate-only exports go FIRST, exactly as tools/stage.sh:75 does it — the marker is a
+	 * comment and terser takes every comment with it, so a run that minified first would weigh a
+	 * surface the router never receives. Measured: 115 B of difference, which is enough to fail a
+	 * budget over bytes that do not ship. */
+	execFileSync(join(ROOT, 'luci-theme-footstrap/strip-probes.sh'), [ res ],
+		{ stdio: SHOW ? 'inherit' : 'ignore' });
 	execFileSync(process.execPath, [ join(ROOT, 'tools/minify-js.mjs'), res ],
 		{ stdio: SHOW ? 'inherit' : 'ignore' });
 	/* What a cold visit fetches, walked from the footer's two `L.require()` calls rather than read

@@ -3,6 +3,7 @@
 'require ui';
 'require dom';
 'require fs-prefs as prefs';
+'require fs-axes as axes';
 'require fs-assets as assets';
 'require fs-version as ver';
 
@@ -335,7 +336,7 @@ function build() {
 			dark:  _('Dark', 'footstrap')
 		}, bump(repaint(prefs.applyMode)), label)),
 
-		group(_('Palette', 'footstrap'), (label) => selectCtl(prefs.currentPalette(), {
+		group(_('Palette', 'footstrap'), (label) => selectCtl(axes.currentPalette(), {
 			footstrap:  'Footstrap',
 			hicontrast: 'Hi-Contrast',
 			/* names the OTHER package, luci-theme-bootstrap, whose colours this palette is —
@@ -343,7 +344,7 @@ function build() {
 			bootstrap:  'Bootstrap',
 			/* names the OTHER package again, luci-theme-openwrt-2020, whose colourway this is */
 			'2020':     'OpenWrt 2020'
-		}, bump(repaint(prefs.applyPalette)), label)),
+		}, bump(repaint(axes.applyPalette)), label)),
 
 		group(_('Density', 'footstrap'), (label) => selectCtl(prefs.currentDensity(), {
 			compact: _('Compact', 'footstrap'),
@@ -352,7 +353,7 @@ function build() {
 		}, bump(prefs.applyDensity), label)),
 
 		group(_('Rounding', 'footstrap'),
-			(label) => sliderCtl(prefs.currentRadius(), 0, 20, bump(prefs.applyRadius), label)),
+			(label) => sliderCtl(axes.currentRadius(), 0, 20, bump(axes.applyRadius), label)),
 
 		/* The top layout has no accordion, so this switch is meaningless there: always built,
 		 * hidden by CSS (:root[data-layout="top"] .fs-ap-submenus). Do not wrap it in an
@@ -371,7 +372,7 @@ function build() {
 		/* the caption says what the axis is for: "Tint" alone reads as decoration, and nobody
 		 * would look for the router-identity cue under it */
 		colourGroup(_('Tint (router identification)', 'footstrap'), {
-			current: prefs.currentTint, apply: prefs.applyTint
+			current: axes.currentTint, apply: axes.applyTint
 		}, 'var(--fs-bg)', {
 			/* the canvas is the one axis with no derived ink: its text is --fs-text, a palette
 			 * token this axis must not move, so the ratio is reported instead of corrected */
@@ -384,7 +385,7 @@ function build() {
 		 * Not called "Density": that is the select above, and this string is both the caption and
 		 * the aria-label, so a screen reader would announce two rows under one name. */
 		group(_('Tint strength', 'footstrap'),
-			(label) => sliderCtl(prefs.currentTintStrength(), 0, 200, bump(repaint(prefs.applyTintStrength)), label, {
+			(label) => sliderCtl(axes.currentTintStrength(), 0, 200, bump(repaint(axes.applyTintStrength)), label, {
 				step: 5
 			}), { cls: 'fs-ap-tint fs-ap-tintstr' }),
 
@@ -397,10 +398,10 @@ function build() {
 		 * eight times between here and the surfaces below, they cost their repeated literals in
 		 * full — a string is not mangled — so the rows are data and the row is stated once. */
 		...[
-			[ _('Accent', 'footstrap'),  prefs.currentAccent, prefs.applyAccent, 'var(--fs-accent)' ],
-			[ _('Good', 'footstrap'),    prefs.currentGood,   prefs.applyGood,   'var(--fs-good)' ],
-			[ _('Warning', 'footstrap'), prefs.currentWarn,   prefs.applyWarn,   'var(--fs-warn)' ],
-			[ _('Danger', 'footstrap'),  prefs.currentDanger, prefs.applyDanger, 'var(--fs-danger)' ]
+			[ _('Accent', 'footstrap'),  axes.currentAccent, axes.applyAccent, 'var(--fs-accent)' ],
+			[ _('Good', 'footstrap'),    axes.currentGood,   axes.applyGood,   'var(--fs-good)' ],
+			[ _('Warning', 'footstrap'), axes.currentWarn,   axes.applyWarn,   'var(--fs-warn)' ],
+			[ _('Danger', 'footstrap'),  axes.currentDanger, axes.applyDanger, 'var(--fs-danger)' ]
 		].map(([ label, current, apply, ink ]) =>
 			colourGroup(label, { current, apply }, ink, { fg: ink, bg: CARD_BG, label: ON_CARD }))
 	];
@@ -417,10 +418,10 @@ function build() {
 		/* Same rows, one column wider: a surface reports the ink read ON it, which is --fs-text
 		 * for the three that carry body text and the hairline itself for the border. */
 		...[
-			[ _('Cards', 'footstrap'),           prefs.currentCard,    prefs.applyCard,    CARD_BG,             INK,                  CARD_BG,             ON_CARD ],
-			[ _('Controls', 'footstrap'),        prefs.currentControl, prefs.applyControl, 'var(--fs-panel2)',  INK,                  'var(--fs-panel2)',  _('on a control', 'footstrap') ],
-			[ _('Sidebar and bar', 'footstrap'), prefs.currentBar,     prefs.applyBar,     'var(--fs-bar-bg)',  INK,                  'var(--fs-bar-bg)',  _('in the sidebar', 'footstrap') ],
-			[ _('Borders', 'footstrap'),         prefs.currentLine,    prefs.applyLine,    'var(--fs-border)',  'var(--fs-border)',   CARD_BG,             ON_CARD, 'shape' ]
+			[ _('Cards', 'footstrap'),           axes.currentCard,    axes.applyCard,    CARD_BG,             INK,                  CARD_BG,             ON_CARD ],
+			[ _('Controls', 'footstrap'),        axes.currentControl, axes.applyControl, 'var(--fs-panel2)',  INK,                  'var(--fs-panel2)',  _('on a control', 'footstrap') ],
+			[ _('Sidebar and bar', 'footstrap'), axes.currentBar,     axes.applyBar,     'var(--fs-bar-bg)',  INK,                  'var(--fs-bar-bg)',  _('in the sidebar', 'footstrap') ],
+			[ _('Borders', 'footstrap'),         axes.currentLine,    axes.applyLine,    'var(--fs-border)',  'var(--fs-border)',   CARD_BG,             ON_CARD, 'shape' ]
 		].map(([ label, current, apply, probe, fg, bg, where, kind ]) =>
 			colourGroup(label, { current, apply }, probe, { fg, bg, label: where, kind }))
 	];
@@ -471,30 +472,30 @@ function build() {
 			group(_('Pattern', 'footstrap'),
 				() => E('div', { 'class': 'fs-ap-bgrow' }, [ patChoose, patRemove ]),
 				{ extra: [ patInput, patPreview, patErr ] }),
-			group(scaleLabel, (lbl) => sliderCtl(prefs.currentPatternSize(), 40, 1600,
-				bump(prefs.applyPatternSize), lbl, { step: 20 })),
-			group(strengthLabel, (lbl) => sliderCtl(prefs.currentPatternStrength(), 0, 100,
-				bump(prefs.applyPatternStrength), lbl, { step: 5 })),
-			group(inkLabel, (lbl) => selectCtl(prefs.currentPatternInk(), {
+			group(scaleLabel, (lbl) => sliderCtl(axes.currentPatternSize(), 40, 1600,
+				bump(axes.applyPatternSize), lbl, { step: 20 })),
+			group(strengthLabel, (lbl) => sliderCtl(axes.currentPatternStrength(), 0, 100,
+				bump(axes.applyPatternStrength), lbl, { step: 5 })),
+			group(inkLabel, (lbl) => selectCtl(axes.currentPatternInk(), {
 				theme:    _('Theme', 'footstrap'),
 				original: _('As in file', 'footstrap')
-			}, bump(prefs.applyPatternInk), lbl))
+			}, bump(axes.applyPatternInk), lbl))
 		];
 		/* …and the rows the FILE photo brings. */
 		const fileRows = [
 			group(_('File', 'footstrap'),
 				() => E('div', { 'class': 'fs-ap-bgrow' }, [ chooseBtn, removeBtn ]),
 				{ extra: [ fileInput, preview, err ] }),
-			group(dimLabel, (lbl) => sliderCtl(prefs.currentPhotoDim(), 0, 100,
-				bump(prefs.applyPhotoDim), lbl, { step: 5 }))
+			group(dimLabel, (lbl) => sliderCtl(axes.currentPhotoDim(), 0, 100,
+				bump(axes.applyPhotoDim), lbl, { step: 5 }))
 		];
 
 		function reflect(tok) {
-			if (tok) { preview.src = prefs.loginBgUrl(tok); preview.hidden = false; removeBtn.hidden = false; }
+			if (tok) { preview.src = axes.loginBgUrl(tok); preview.hidden = false; removeBtn.hidden = false; }
 			else { preview.removeAttribute('src'); preview.hidden = true; removeBtn.hidden = true; }
 		}
 		function reflectPattern(tok) {
-			if (tok) { patPreview.src = prefs.patternUrl(tok); patPreview.hidden = false; patRemove.hidden = false; }
+			if (tok) { patPreview.src = axes.patternUrl(tok); patPreview.hidden = false; patRemove.hidden = false; }
 			else { patPreview.removeAttribute('src'); patPreview.hidden = true; patRemove.hidden = true; }
 		}
 		/* `hidden` on the row, which 80-appearance.css restates at a specificity beating
@@ -505,11 +506,11 @@ function build() {
 			patRows.forEach((r) => { r.hidden = (v !== 'pattern'); });
 			fileRows.forEach((r) => { r.hidden = (v !== 'file'); });
 		}
-		reflect(prefs.currentLoginBg());
-		reflectPattern(prefs.currentPattern());
-		togglePanel(prefs.currentWallpaper());
+		reflect(axes.currentLoginBg());
+		reflectPattern(axes.currentPattern());
+		togglePanel(axes.currentWallpaper());
 
-		const setWallpaper = (v) => { prefs.applyWallpaper(v); refreshSave(); togglePanel(v); refreshColours(); };
+		const setWallpaper = (v) => { axes.applyWallpaper(v); refreshSave(); togglePanel(v); refreshColours(); };
 
 		/* Both uploads present the same three controls and the same four states — pick, upload,
 		 * report, remove — so the wiring is stated once. What differs is `after`: the pattern also
@@ -557,7 +558,7 @@ function build() {
 
 		let seg;
 		const wallRow = group(_('Wallpaper', 'footstrap'), (label) => {
-			seg = selectCtl(prefs.currentWallpaper(), {
+			seg = selectCtl(axes.currentWallpaper(), {
 				off:     _('Off', 'footstrap'),
 				pattern: _('Pattern', 'footstrap'),
 				file:    _('File', 'footstrap')
@@ -607,14 +608,14 @@ function build() {
 			saveErr.hidden = false;
 			return;
 		}
-		const saved = prefs.matchesSavedDefault();
+		const saved = axes.matchesSavedDefault();
 		saveBtn.disabled = saved;
 		saveBtn.textContent = saved ? _('Saved as default', 'footstrap') : _('Save as default', 'footstrap');
 	}
 	saveBtn.addEventListener('click', () => {
 		saveBtn.disabled = true;
 		saveErr.hidden = true;
-		prefs.saveAsDefault()
+		axes.saveAsDefault()
 			.then(() => { saveErr.hidden = true; })
 			/* on failure refreshSave re-enables the button so the user can retry; the usual cause
 			 * is a stale session, which a reload fixes. The raw rpc error stays in a title
@@ -650,8 +651,8 @@ function build() {
 			location.reload();
 		});
 	}
-	twoClick(resetSavedBtn, _('Reset to saved', 'footstrap'), prefs.resetToSaved);
-	twoClick(resetBtn, _('Reset to default', 'footstrap'), prefs.resetToBuiltin);
+	twoClick(resetSavedBtn, _('Reset to saved', 'footstrap'), axes.resetToSaved);
+	twoClick(resetBtn, _('Reset to default', 'footstrap'), axes.resetToBuiltin);
 	refreshSave();	/* correct label and enabled state before the first paint */
 
 	const versionLink = E('a', {

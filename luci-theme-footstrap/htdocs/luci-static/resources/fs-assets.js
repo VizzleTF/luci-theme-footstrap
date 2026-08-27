@@ -1,7 +1,7 @@
 'use strict';
 'require baseclass';
 'require rpc';
-'require fs-prefs as prefs';
+'require fs-axes as axes';
 
 /* fs-assets — putting a file ON THE ROUTER, and taking it off again.
  *
@@ -10,15 +10,13 @@
  * chmod that makes a freshly written 0600 file servable, and the rollback that runs when the token
  * write fails after the bytes have landed.
  *
- * It is a module of its own because of WHERE it is needed. `fs-prefs` is required by the chrome,
- * the search palette and the menu, so it is fetched on every admin page; this machinery is reached
- * only from the Appearance tab, one page out of nearly two hundred. Kept beside the axes it was
- * ~4 KB of DOMParser, canvas and rpc plumbing downloaded to a router's browser on the way to the
- * DHCP page.
+ * It is a module of its own because of WHERE it is needed: this machinery is reached only from the
+ * Appearance tab, one page out of nearly two hundred, and it was ~4 KB of DOMParser, canvas and rpc
+ * plumbing downloaded to a router's browser on the way to the DHCP page.
  *
- * The seam is deliberate: the TOKEN accessors and the two live appliers stay in `fs-prefs`, because
- * the Appearance previews and head.ut's pre-paint both read them, and because `sd()` stays private
- * to that module. What moved is the machinery, which nothing but an upload has ever called. */
+ * The token accessors and the two live appliers live in `fs-axes` beside the axes themselves — the
+ * Appearance previews and head.ut's pre-paint read the same fields — so this file requires that one
+ * and nothing else of the theme's. */
 
 /* `reject: true` is load-bearing: without it a refused write arrives as SUCCESS. rpc.js raises on
  * the ubus status code only when the declaration asks it to, and otherwise hands the code back as
@@ -248,7 +246,7 @@ function assetAxis(o) {
 				return Promise.reject(new Error((reply && reply.failure && reply.failure[1])
 					|| MSG_UPLOAD_FAILED));
 			const tok = String(reply.checksum || '').toLowerCase();
-			if (!prefs.tokenOk(tok)) return Promise.reject(new Error(MSG_UPLOAD_FAILED));
+			if (!axes.tokenOk(tok)) return Promise.reject(new Error(MSG_UPLOAD_FAILED));
 			/* cgi-upload writes 0600 and uhttpd refuses to serve a file that is not world-readable
 			 * (0600 -> 403, 0644 -> 200); _chmodServeable checks the command's exit status, not
 			 * just the ubus call's */
@@ -260,7 +258,7 @@ function assetAxis(o) {
 				.catch((e) => _rollbackUpload(o.path, e))
 				.then(() => {
 					/* switch this browser onto it: the ordinary axis path, localStorage only */
-					prefs.applyWallpaper(o.wallpaper);
+					axes.applyWallpaper(o.wallpaper);
 					o.apply(tok);
 					return tok;
 				});
@@ -280,7 +278,7 @@ function assetAxis(o) {
  * back a raster, so the parsed-document check above stands in for it. */
 const PATTERN = assetAxis({
 	path: PAT_PATH, filename: 'pattern.svg', field: 'pattern', wallpaper: 'pattern',
-	apply: (tok) => prefs.applyPattern(tok),
+	apply: (tok) => axes.applyPattern(tok),
 	prepare: (file) => {
 		if (!file) return Promise.reject(new Error(MSG_PICK_SVG));
 		const isSvg = (/(^image\/svg\+xml$)/i).test(file.type || '') || (/\.svg$/i).test(file.name || '');
@@ -299,7 +297,7 @@ const PATTERN = assetAxis({
  * grant for BG_PATH. */
 const LOGIN_BG = assetAxis({
 	path: BG_PATH, filename: 'login-bg', field: 'login_bg', wallpaper: 'file',
-	apply: (tok) => prefs.applyLoginBg(tok),
+	apply: (tok) => axes.applyLoginBg(tok),
 	prepare: (file) => {
 		if (!file || !(/^image\//).test(file.type || ''))
 			return Promise.reject(new Error(_('Please choose an image file.', 'footstrap')));
