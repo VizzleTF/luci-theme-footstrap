@@ -45,8 +45,14 @@ for (const file of templates(dir)) {
 	const out = [];
 	let last = 0, touched = false;
 
-	/* the open tag is kept verbatim: it may carry attributes, and one of them may be ucode */
-	const re = /(<script\b[^>]*>)([\s\S]*?)(<\/script>)/g;
+	/* The open tag is kept verbatim: it may carry attributes, and one of them may be ucode.
+	 *
+	 * Case-insensitive, and the closing tag takes attributes too, because HTML's parser does: a
+	 * `</SCRIPT>` or a `</script foo>` this missed would not merely leave one block unminified —
+	 * `[\s\S]*?` would run on to the NEXT block's `</script>` and the replacement would swallow
+	 * every byte of template between the two. Our templates are all lower case today; the cost of
+	 * assuming they stay that way is a silently mangled page (CodeQL js/bad-tag-filter). */
+	const re = /(<script\b[^>]*>)([\s\S]*?)(<\/script\b[^>]*>)/gi;
 	let m;
 	while ((m = re.exec(src)) !== null) {
 		const [ whole, open, body, close ] = m;
