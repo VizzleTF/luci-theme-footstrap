@@ -774,14 +774,14 @@ const MARK = 'fs-ap';	/* the built form's class, and how mount() knows it is alr
 const TAB_DEADLINE = 5000;
 const TAB = 'fs-appearance';	/* the pane's data-tab, which ui.tabs' click handler matches on */
 
-let _routeObserver = null, _viewObserver = null, _observedView = null, _building = false;
+let _routeObserver = null, _viewObserver = null, _observedRoot = null, _building = false;
 
 function onPage() { return (document.body.getAttribute('data-page') || '') === PAGE; }
 
 function stopWatch() {
 	if (_viewObserver) _viewObserver.disconnect();
 	_viewObserver = null;
-	_observedView = null;
+	_observedRoot = null;
 }
 
 /* The stock tab GROUP: the element whose children are the panes, which ui.tabs marks
@@ -831,24 +831,20 @@ function tabGroup(view) {
  *
  * A map redraw (Save without Apply) rebuilds the group and `ui.tabs` stamps `data-initialized` as
  * an attribute change that can land after the last childList change, so the observer watches that
- * attribute too and a miss schedules retries on a widening delay — otherwise the tab is missing
- * until the next navigation (openwrt/luci#8903). */
-const RETRIES = [ 0, 60, 150, 300, 600, 1200 ];
-let _retryTimer = 0, _retryAt = 0;
-function retryMount() {
-	if (_retryTimer) return;
-	if (_retryAt >= RETRIES.length) return;
-	const delay = RETRIES[_retryAt++];
-	_retryTimer = window.setTimeout(() => { _retryTimer = 0; mount(); }, delay);
-}
-
+ * attribute too — otherwise the tab is missing until the next navigation (openwrt/luci#8903).
+ *
+ * A ladder of retries on a widening delay shipped beside that watch and is gone: instrumented over
+ * ten sessions on both package managers — a full load, an SPA return, a Save and a Save & Apply —
+ * it mounted the tab zero times, only ever arming a timer that woke to find the work done. The
+ * deadline below could once be seen mounting it, but only because watch() was binding the observer
+ * to a node the router was about to replace; with that fixed the deadline is a diagnostic again. */
 function mount() {
 	const view = document.getElementById('view');
 	if (!view || !onPage()) return;
-	if (view.querySelector('.' + MARK)) { _retryAt = 0; return; }
+	if (view.querySelector('.' + MARK)) return;
 	if (_building) return;
 	const tabs = tabGroup(view);
-	if (!tabs) { retryMount(); return; }
+	if (!tabs) return;			/* not built yet; the observer calls again when it is */
 	_building = true;
 	render()
 		.then((form) => {
@@ -882,13 +878,23 @@ function mount() {
 
 function watch() {
 	const view = document.getElementById('view');
-	if (_viewObserver && _observedView !== view) stopWatch();
+	/* The CONTAINER, by id — not `#view`, which is not the same element for long. A client
+	 * navigation builds a fresh one before it is in the document and swaps it in afterwards, while
+	 * watch() runs on the `data-page` stamp, which comes first: the node bound here then reported
+	 * `isConnected: false` while `#view` and `#maincontent` were both alive, and a Save's redraw
+	 * produced four mutation batches that reached no callback at all. `#maincontent` outlives every
+	 * swap, so the swap is itself a childList record. Save put the tab back in 250 ms after this,
+	 * against 1,750-2,250 ms of waiting for the deadline before it. */
+	const root = document.getElementById('maincontent') || view;
+	if (_viewObserver && _observedRoot !== root) stopWatch();
 	if (_viewObserver || !view || !onPage()) return;
-	_observedView = view;
+	_observedRoot = root;
 	_viewObserver = new MutationObserver(mount);
-	/* `data-initialized` is the moment the group becomes usable, and it does not always come with
-	 * a childList change (see retryMount above) */
-	_viewObserver.observe(view, {
+	/* `data-initialized` is when the group becomes usable, and the filter is load-bearing — proven
+	 * by staging openwrt/luci#8903 rather than waiting for it: tear the tab, the pane and the
+	 * attribute down in one task, restore the attribute ALONE 1,200 ms later, and the tab is back
+	 * 4 ms after it. Without the filter it never comes back. No ordinary Save separates the two. */
+	_viewObserver.observe(root, {
 		childList: true, subtree: true,
 		attributes: true, attributeFilter: [ 'data-initialized' ],
 	});
@@ -900,13 +906,11 @@ function watch() {
 	 * early on every mutation: the stock page renders, nothing throws, and every Appearance axis
 	 * is unreachable. */
 	window.setTimeout(() => {
+		/* It asks, it does not repair: with the observer on a node that survives a navigation the
+		 * repair this used to attempt became unreachable, and the whole matrix passes without it.
+		 * A group still found here means the observer is working, so there is nothing to report. */
 		const v = document.getElementById('view');
-		if (!onPage() || !v || v.querySelector('.' + MARK) || _building) return;
-		/* one last attempt: the complaint below claims ui.tabs changed shape, which is only true
-		 * if a fresh look still finds no group */
-		_retryAt = 0;
-		mount();
-		if (v.querySelector('.' + MARK) || _building || tabGroup(v)) return;
+		if (!onPage() || !v || v.querySelector('.' + MARK) || _building || tabGroup(v)) return;
 		console.error('footstrap: the Appearance tab could not be attached — this page has tabs, but '
 			+ 'ui.tabs no longer marks them the way fs-appearance.js looks for. Every Appearance axis '
 			+ 'is unreachable until that is updated.');
