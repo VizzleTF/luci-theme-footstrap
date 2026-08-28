@@ -104,16 +104,22 @@ function arrange() {
  * coalesced and one observer per #view node. The SPA router may replace #view between visits, so
  * re-attach when the observed node is no longer the current one — a singleton bound to the first
  * #view would watch a detached tree and the grid would never apply again. */
-let _observer = null, _observedView = null, _routeObserver = null;
+let _observer = null, _observedRoot = null, _routeObserver = null;
 function stopWatch() {
 	if (_observer) _observer.disconnect();
 	_observer = null;
-	_observedView = null;
+	_observedRoot = null;
 	_wrapEl = null;	/* the grid belongs to the #view we are leaving */
 }
 function watch() {
 	const view = document.getElementById('view');
-	if (_observer && _observedView !== view)
+	/* `#maincontent`, not `#view`: a client navigation builds a fresh `#view` before it is in the
+	 * document and swaps it in afterwards, and this runs on the `data-page` stamp, which comes
+	 * first — so the observer bound here read `isConnected: false` after one round trip and the
+	 * grid stopped being re-arranged on every poll tick, silently, until the next full load. The
+	 * shell's column outlives every swap. Same fault, same fix as fs-appearance.js. */
+	const root = document.getElementById('maincontent') || view;
+	if (_observer && _observedRoot !== root)
 		stopWatch();
 	arrange();
 	/* a chrome module is alive on every page, so without the route check an observer would attach
@@ -121,11 +127,11 @@ function watch() {
 	if (_observer || !view ||
 	    (document.body.getAttribute('data-page') || '') !== 'admin-status-overview')
 		return;
-	_observedView = view;
+	_observedRoot = root;
 	/* one arrange() per frame, however many mutations a poll tick delivers (fit.frame — the
 	 * theme's shared coalescer, fs-fit.js) */
 	_observer = new MutationObserver(fit.frame(arrange));
-	_observer.observe(view, { childList: true, subtree: true });
+	_observer.observe(root, { childList: true, subtree: true });
 }
 
 /* A chrome module is instantiated once per page load, so it has to notice SPA navigation itself.
