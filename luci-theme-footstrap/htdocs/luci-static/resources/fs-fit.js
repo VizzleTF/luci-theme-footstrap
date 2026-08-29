@@ -99,6 +99,11 @@ function run() {
  *
  * Wrapping `dom.content()` itself also works, at the price of patching a luci-base API every app
  * shares and up to seven read/write pairs per call. */
+/* The three things `dom.content()` is called on: a section body, a table, and a TABLE'S BODY. The
+ * third was missing and cost a release: on 24.10's Overview the section is a table, so nothing here
+ * matched, the floor held nothing, and a poll emptying it took 58px off the document under the
+ * reader — on ImmortalWrt 24.10 with a webkit engine, where no CI job looks. tools/scroll-anchor.mjs
+ * looks for the same three and says why. */
 const SHRINKS = '.cbi-section > div, .table';
 
 /* The floor is the height the next tick may not go below, one per container. Cleared before the
@@ -521,12 +526,19 @@ function anchorEnabled() {
  * reports zero and this does nothing. Same guards as the main correction — not while the reader
  * scrolls, not across a navigation, never more than a viewport. */
 let _lateFrame = 0;
+
 function lateDrift(ref) {
 	/* the reference from BEFORE this tick, captured by the caller: one taken after the mutation
 	 * describes the page as the mutation left it, so its drift is zero by construction */
 	if (_lateFrame || !ref) return;
 	_lateFrame = requestAnimationFrame(() => {
-		_lateFrame = requestAnimationFrame(() => {
+		const seen = scrollTop();
+		/* STILL FOR SCROLL_IDLE, the interval this file already calls a page nobody is scrolling.
+		 * A frame is not long enough to tell a flick from a still page: a flick moves the offset in
+		 * steps of tens of milliseconds and two rAFs (~16 ms) fall inside one step, so the offset
+		 * reads the same twice while the page is plainly moving. 120 ms was still short enough to
+		 * let one 160px correction through on a loaded runner. */
+		_lateFrame = window.setTimeout(() => {
 			_lateFrame = 0;
 			if (!anchorEnabled() || Date.now() < _userUntil) return;
 			if (_restPage !== pageStamp()) return;
@@ -543,7 +555,12 @@ function lateDrift(ref) {
 			 * and where the sampler has not started yet — WebKit again — that re-take records the
 			 * offset the reader has already flicked to, so comparing against it compares a value
 			 * with itself and lets the correction through (320px, @1440 side, .fs-main scrolling). */
-			if (scrollTop() !== ref.at) return;
+			/* Still, not equal to the reference. An anchoring engine moves the offset ITSELF to keep
+			 * the reader over content that grew — measured on webkit/Overview, +658px of offset
+			 * against 600px of growth — so an offset that merely differs is the engine working, and
+			 * refusing on that leaves the engine's own residual (58px) uncorrected. What must not be
+			 * touched is a page still in motion, which is asked directly instead. */
+			if (scrollTop() !== seen) return;
 			/* the tick usually replaces the element this was taken on, so without the section
 			 * fallback the correction does nothing on the tick it exists for */
 			let el = ref.el, was = ref.top;
@@ -563,7 +580,7 @@ function lateDrift(ref) {
 			 * it is re-read rather than assumed; `rememberRest()` cannot do it, since the write
 			 * starts the motion sampler and that function returns early while the page moves. */
 			_restAt = scrollTop();
-		});
+		}, SCROLL_IDLE);
 	});
 }
 
