@@ -362,6 +362,23 @@ on webkit/Overview. `ref.at` and not `_restAt`, because `run()` re-remembers bet
 this frame, and where the sampler has not started that re-take records the offset the reader has
 already flicked to.
 
+**The theme's own put-off pass moves the page too, and nothing was looking.** A tick landing while
+the offset is in motion leaves its measurements to the pass that runs once the page holds still, and
+that pass re-lays the tables and rewrites every floor. `min-height` is itself a suppression trigger
+on the path to the anchor, so the engine's compensation can be off in exactly the frame that pass
+needs it: on ImmortalWrt 24.10/WebKit the pass's 88 `min-height` writes and a 58px jump of the offset
+land in the SAME frame, 429 ms after the mutation — `@390`, top layout, large density, Overview, one
+cell out of 48, and the offset moved with no write of the theme's own (every programmatic scroll
+write was intercepted and none came). `lateDrift()` is blind to it: scheduled from the mutation on
+the same `SCROLL_IDLE`, it read a drift of zero three milliseconds before the page moved.
+`settleDrift()` measures around that pass instead, and SYNCHRONOUSLY — the reader cannot scroll
+between two statements, so what it sees is the pass's own doing, and `getBoundingClientRect()` is the
+operation an engine must flush a pending adjustment before (css-scroll-anchoring-1 §2.2: the
+suppression window ends at the end of the event loop iteration, or before the next operation whose
+result would differ, whichever is sooner), so the read after the pass is a flush rather than a race.
+Measured two frames later instead, it closed that cell and corrected INSIDE A FLICK on three others,
+160px each.
+
 `tools/scroll-anchor.mjs` holds all of it: it grows 120px above the reader and requires the page to
 stay within two pixels, once with the engine's anchoring suppressed and once without, in both
 layouts; it refills a section the way a poll does — emptied, then filled again, with the router's own

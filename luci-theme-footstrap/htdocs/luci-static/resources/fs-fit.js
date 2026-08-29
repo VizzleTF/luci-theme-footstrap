@@ -99,27 +99,95 @@ function run() {
  *
  * Wrapping `dom.content()` itself also works, at the price of patching a luci-base API every app
  * shares and up to seven read/write pairs per call. */
-/* The three things `dom.content()` is called on: a section body, a table, and a TABLE'S BODY. The
- * third was missing and cost a release: on 24.10's Overview the section is a table, so nothing here
- * matched, the floor held nothing, and a poll emptying it took 58px off the document under the
- * reader — on ImmortalWrt 24.10 with a webkit engine, where no CI job looks. tools/scroll-anchor.mjs
- * looks for the same three and says why. */
+/* A section body and a table: what `dom.content()` is called on and this can hold. Its third target,
+ * a table's BODY, is deliberately absent — a floor there holds nothing. `min-height` is undefined on
+ * a table box (CSS 2.1 §10.7) and WebKit acts on that: a `.table.cbi-section-table` carrying a 313px
+ * floor still collapsed to 30px and the document lost 284px (webkit, /admin/network/firewall, 24.10
+ * and 25.12 alike; Chromium holds the 313px), and writing the floor on the `.tbody` instead loses
+ * the same 284px. 24.10 has no `.tbody` at all: its Overview renders `<table class="table">` with the
+ * rows directly inside, and the container a poll empties there is `.cbi-section > div`.
+ * tools/scroll-anchor.mjs looks for all three when it picks a box to collapse, which is a different
+ * question from which box can carry a floor. */
 const SHRINKS = '.cbi-section > div, .table';
 
-/* The floor is the height the next tick may not go below, one per container. Cleared before the
- * read, or each floor measures itself and never comes down; batched into one clear, one read pass
- * and one write pass, so the whole sweep costs a single forced layout rather than one per element.
+/* What the container would stand at with no floor under it, asked of the CONTENT rather than by
+ * taking the floor off and re-measuring.
  *
- * Not while the reader scrolls: clearing to re-measure is a layout read, and a floor staying where
- * it was is still a floor. */
+ * Clearing `min-height` to re-measure was the obvious way and is the expensive one: `min-height` is
+ * a scroll-anchoring suppression trigger on the path from the anchor to the scroller
+ * (css-scroll-anchoring-1 §3.2), so a clear, a forced layout and a write back tell the engine to
+ * drop its own compensation for that frame — the theme switching off the very thing it relies on,
+ * once per tick.
+ *
+ * The span of the children answers the same question with reads alone. It is the box's content
+ * height plus what the box adds below it; a collapsed margin on the last child can put it a few
+ * pixels out, which a floor can afford — the floor is a lower bound on a height that is about to be
+ * replaced, not a layout the page is drawn to.
+ *
+ * An empty container answers 0, and the caller keeps the standing floor for exactly that reason:
+ * `dom.content()` empties before it refills, and 0 is the number the floor exists to refuse. */
+function naturalHeight(el) {
+	const last = el.lastElementChild;
+	if (!last) return 0;
+	const box = el.getBoundingClientRect();
+	const end = last.getBoundingClientRect();
+	if (!end.height && !end.width) return 0;		/* a last child out of the flow says nothing */
+	const cs = window.getComputedStyle(el);
+	const below = parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth);
+	return Math.round(end.bottom - box.top + (below || 0));
+}
+
+/* The floor is the height the next tick may not go below, one per container. Read in one pass and
+ * written in another, so the sweep costs a single forced layout rather than one per element.
+ *
+ * WRITTEN ONLY WHERE THE VALUE CHANGES, which is the difference between a floor and a page the
+ * engine refuses to anchor: see naturalHeight() above. Measured over 25 s of real polling on the
+ * Overview at 390px, the clear-and-rewrite shape wrote style 1550 times on 25.12 and 170 times on
+ * ImmortalWrt 24.10, of which 75 and 62 carried a value that had actually moved — the rest were
+ * suppression bought for nothing.
+ *
+ * Not while the reader scrolls: a rect read is a forced layout, and a floor staying where it was is
+ * still a floor. */
+/* The floor is the height the next tick may not go below, one per box. Read in one pass and written
+ * in another, so the sweep costs a single forced layout rather than one per element.
+ *
+ * WRITTEN ONLY WHERE THE VALUE CHANGES, which is the difference between a floor and a page the
+ * engine refuses to anchor: see naturalHeight() above. Measured over 25 s of real polling on the
+ * Overview at 390px, the clear-and-rewrite shape wrote style 1550 times on 25.12 and 170 times on
+ * ImmortalWrt 24.10, of which 75 and 62 carried a value that had actually moved — the rest were
+ * suppression bought for nothing. It is 45 writes, all of them real, on both.
+ *
+ * AND NOT ON A TABLE BOX, which cannot hold it: `min-height` is undefined there (CSS 2.1 §10.7) and
+ * WebKit acts on that — a `.table.cbi-section-table` wearing a 313px floor still collapsed to 30px
+ * when its rows went, and the document lost 284px on /admin/network/firewall, the same on 24.10 and
+ * 25.12, while Chromium held the 313px. The `.tbody` inside it is a table box too and loses the same
+ * 284px. So the floor climbs to the first box that is not one — the section — where the same
+ * emptied `.tbody` costs the document 0px on both engines. `getComputedStyle` resolves style, not
+ * layout, so the climb adds no forced layout of its own.
+ *
+ * Not while the reader scrolls: a rect read is a forced layout, and a floor staying where it was is
+ * still a floor. */
 function holdFloor() {
 	if (scrolling()) return;
 	const host = document.getElementById('view');
 	if (!host) return;			/* the login page has no view */
-	const els = host.querySelectorAll(SHRINKS), hs = [];
-	els.forEach((el) => { el.style.minHeight = ''; });
-	els.forEach((el) => hs.push(el.offsetHeight));
-	els.forEach((el, i) => { if (hs[i] > 0) el.style.minHeight = hs[i] + 'px'; });
+	const boxes = [], hs = [];
+	host.querySelectorAll(SHRINKS).forEach((el) => {
+		let box = el;
+		while (box && box !== host && window.getComputedStyle(box).display.startsWith('table'))
+			box = box.parentElement;
+		/* several tables in one section climb to the same box; it needs one floor, not one each */
+		if (!box || box === host || boxes.indexOf(box) !== -1) return;
+		boxes.push(box);
+		hs.push(naturalHeight(box));
+	});
+	boxes.forEach((box, i) => {
+		/* zero is an empty box, and the floor it already wears is what holds it up — the moment this
+		 * whole mechanism exists for */
+		if (hs[i] <= 0) return;
+		const px = hs[i] + 'px';
+		if (box.style.minHeight !== px) box.style.minHeight = px;
+	});
 }
 
 /* ---- is the page moving right now? asked of the position, never of the events ----
@@ -202,6 +270,11 @@ function sampleMotion() {
 	/* the page has held still for SCROLL_IDLE: whatever was put off may run now */
 	if (_deferred) {
 		_deferred = false;
+		/* where the reference stands BEFORE the put-off pass re-lays the page — see settleDrift() */
+		const settled = _rest;
+		const before = (settled && settled.el && settled.el.isConnected)
+			? settled.el.getBoundingClientRect().top
+			: ((settled && settled.sec && settled.sec.isConnected) ? settled.sec.getBoundingClientRect().top : null);
 		/* No correction for this batch. Both available references are wrong for a page the reader
 		 * has just scrolled through: a fresh one is read against an offset WebKit may not have laid
 		 * out yet (the theme then undoes the reader's own move), and the one from the last still
@@ -210,7 +283,57 @@ function sampleMotion() {
 		 * the fitters re-measure what the scroll already showed rather than growing the page — and
 		 * the next mutation corrects against a reference taken while the page was still. */
 		run();
+		if (ENGINE_ANCHORS) settleDrift(settled, before);
 	}
+}
+
+/* ---- the put-off pass moves the page too, and nothing was looking ----
+ *
+ * A tick landing while the offset is in motion leaves its measurements to the block above, and that
+ * pass then re-lays the tables it could not measure. An anchoring engine answers that layout change
+ * the way it answers any other — and `min-height`, which the floor writes on every container, is
+ * itself a suppression trigger on the path to the anchor (css-scroll-anchoring-1 §3.2), so the
+ * engine's compensation can be switched off by the very pass that needs it. Measured on
+ * ImmortalWrt 24.10/WebKit: this pass's 88 `min-height` writes and a 58px jump of the offset land in
+ * the SAME frame, 429 ms after the mutation (@390, top layout, large density, Overview).
+ *
+ * `lateDrift()` cannot see it: it is scheduled from the mutation on the same SCROLL_IDLE, so it
+ * measures ALONGSIDE this pass rather than after it — it read a drift of zero three milliseconds
+ * before the page moved, and scroll-anchor reported those 58px on that cell alone out of 48.
+ *
+ * MEASURED SYNCHRONOUSLY AROUND THE PASS, not a frame or an idle window later. Two reasons, and the
+ * second cost a run: the reader cannot scroll between two statements, so what this sees is the
+ * pass's doing and nothing else — a version that looked two frames later corrected inside a flick on
+ * three cells of the same sweep. And `getBoundingClientRect()` is exactly the operation the spec
+ * makes the engine flush a pending adjustment before, so the read after the pass sees the engine's
+ * answer rather than racing it (§2.2: the suppression window ends at the end of the event loop
+ * iteration, or before the next operation whose result would differ, whichever is sooner). */
+function settleDrift(ref, before) {
+	if (before == null || !ref) return;
+	if (!anchorEnabled() || Date.now() < _userUntil) return;
+	if (_restPage !== pageStamp()) return;
+	const el = (ref.el && ref.el.isConnected) ? ref.el : ((ref.sec && ref.sec.isConnected) ? ref.sec : null);
+	if (el) putBack(el, before);
+}
+
+/* Give the reader back what moved under them: the one write both corrections make, and the rules
+ * that write obeys.
+ *
+ * A drift under a pixel is rounding, and an engine that answered for it reads the same. One
+ * viewport is the ceiling, a drift that size being a view that replaced its whole subtree rather
+ * than a tick — anchorFor() raises it for the one drift that big with a receipt, a measured clamp.
+ *
+ * The write moves the page by exactly the drift measured, so the reference is back at the top it
+ * was remembered at and the next tick measures zero. Only `_restAt` moves, and the write may have
+ * been clamped short, so it is re-read rather than assumed; `rememberRest()` cannot do it, since
+ * the write starts the motion sampler and that function returns early while the page moves. */
+function putBack(el, was) {
+	const drift = el.getBoundingClientRect().top - was;
+	if (Math.abs(drift) < 1 || Math.abs(drift) > (window.innerHeight || 800)) return;
+	const sc = scroller();
+	const at = sc ? sc.scrollTop : window.scrollY;
+	if (sc) sc.scrollTop = at + drift; else window.scrollTo(0, at + drift);
+	_restAt = scrollTop();
 }
 
 function noteMotion() {
@@ -563,23 +686,8 @@ function lateDrift(ref) {
 			if (scrollTop() !== seen) return;
 			/* the tick usually replaces the element this was taken on, so without the section
 			 * fallback the correction does nothing on the tick it exists for */
-			let el = ref.el, was = ref.top;
-			if (!el || !el.isConnected) {
-				if (!ref.sec || !ref.sec.isConnected || ref.secTop == null) return;
-				el = ref.sec; was = ref.secTop;
-			}
-			const drift = el.getBoundingClientRect().top - was;
-			if (Math.abs(drift) < 1) return;			/* the engine put it back */
-			if (Math.abs(drift) > (window.innerHeight || 800)) return;
-			const sc = scroller();
-			const at = sc ? sc.scrollTop : window.scrollY;
-			if (sc) sc.scrollTop = at + drift; else window.scrollTo(0, at + drift);
-			/* The write moves the page by exactly the drift measured, which puts the reference back
-			 * at the top it was remembered at, so `_rest.top` still holds and the next tick
-			 * measures zero. Only `_restAt` changes, and the write may have been clamped short, so
-			 * it is re-read rather than assumed; `rememberRest()` cannot do it, since the write
-			 * starts the motion sampler and that function returns early while the page moves. */
-			_restAt = scrollTop();
+			if (ref.el && ref.el.isConnected) putBack(ref.el, ref.top);
+			else if (ref.sec && ref.sec.isConnected && ref.secTop != null) putBack(ref.sec, ref.secTop);
 		}, SCROLL_IDLE);
 	});
 }

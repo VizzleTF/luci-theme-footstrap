@@ -42,8 +42,15 @@ const LIMITS = {
 	 * it came down 2,567 B on the refactor
 	 * described below — it shrinks flash as well as the wire, because the two upload flows and the
 	 * three list axes each became one and four repeated messages became four constants. A raise
-	 * wants a line saying what bought it. */
-	resourcesJs: 87_600,
+	 * wants a line saying what bought it.
+	 *
+	 * 87,905 B on 2026-08-29, up 305 B for three faults in how the reader's place is kept, all three
+	 * on the engine no CI job looks at: the poll's put-off pass moved the page 58px under the reader
+	 * on ImmortalWrt 24.10/WebKit and nothing was measuring it; the floor was rewritten on every
+	 * container every tick, which is a scroll-anchoring suppression trigger — 1550 style writes per
+	 * 25 s of polling, 75 of them carrying a value that had moved, now 45 and all real; and the floor
+	 * was written on table boxes, where WebKit ignores `min-height` and the document lost 284px. */
+	resourcesJs: 87_950,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -62,8 +69,12 @@ const LIMITS = {
 	 * every page, use four icon and disclosure helpers and nothing else. The rest is the two upload
 	 * flows collapsed onto one factory and palette/wallpaper/density onto the axis factory the
 	 * other four axes already used. Lowering it whenever the number comes down is the point;
-	 * raising it is a decision that wants a line saying what bought it. */
-	coldJs: 54_600,
+	 * raising it is a decision that wants a line saying what bought it.
+	 *
+	 * 54,953 B on 2026-08-29, up 353 B against the 54,600 B it replaced: `fs-fit.js` is on the cold path, and this is the wire half
+	 * of the three anchoring fixes the flash budget above spells out. The reader losing their place
+	 * on a poll tick is the fault users report; 353 B is what answering it on WebKit costs. */
+	coldJs: 55_000,
 };
 
 function bytes(path) {
