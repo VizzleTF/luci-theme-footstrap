@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Changed
+
+- **`npm run check` is three tiers now, and two new gates run inside it.** The 25 checks are split by what they cost: `check:fast` needs no browser and no CSS build, `check:mid` builds the sheet, `check:slow` drives a browser. Nothing was dropped — the 23 that were there are all still there, plus `makefile-contract` and `smoke`. Two more exist beside them: `smoke` brings every module up in a real DOM in ~1.4 s, and `computed-diff` compares the worktree against HEAD over every element of the gallery in ~4 s, with a `--control` mode that runs the same sheet twice and must report zero. `tools/bg.sh` detaches a long run and logs it into `../tmp/`.
+
 ## [0.14.3] — 2026-08-29
 
 ### Changed
