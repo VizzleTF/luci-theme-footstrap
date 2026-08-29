@@ -49,8 +49,14 @@ const LIMITS = {
 	 * on ImmortalWrt 24.10/WebKit and nothing was measuring it; the floor was rewritten on every
 	 * container every tick, which is a scroll-anchoring suppression trigger — 1550 style writes per
 	 * 25 s of polling, 75 of them carrying a value that had moved, now 45 and all real; and the floor
-	 * was written on table boxes, where WebKit ignores `min-height` and the document lost 284px. */
-	resourcesJs: 87_950,
+	 * was written on table boxes, where WebKit ignores `min-height` and the document lost 284px.
+	 *
+	 * 88,426 B on 2026-08-29, up 476 B for `watchThemeColor()`: the browser's own chrome — a mobile
+	 * address bar, the Android task-switcher card, an installed PWA's title bar — painted white over
+	 * a dark page, because the theme shipped no `<meta name="theme-color">` and a static one cannot
+	 * follow a palette. One observer on :root covers all 25 axes; a call in each applier would have
+	 * been the cheaper bytes and the more expensive rule. */
+	resourcesJs: 88_450,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -73,8 +79,12 @@ const LIMITS = {
 	 *
 	 * 54,953 B on 2026-08-29, up 353 B against the 54,600 B it replaced: `fs-fit.js` is on the cold path, and this is the wire half
 	 * of the three anchoring fixes the flash budget above spells out. The reader losing their place
-	 * on a poll tick is the fault users report; 353 B is what answering it on WebKit costs. */
-	coldJs: 55_000,
+	 * on a poll tick is the fault users report; 353 B is what answering it on WebKit costs.
+	 *
+	 * 55,474 B on 2026-08-29, up 474 B: `fs-prefs.js` is on the cold path and carries the
+	 * theme-color repaint the flash budget above spells out. Every page pays it because every page
+	 * is the one a phone may be showing. */
+	coldJs: 55_500,
 };
 
 function bytes(path) {

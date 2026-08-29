@@ -1,0 +1,79 @@
+@layer tokens {
+	/* Static twins for every token whose value is a color-mix(), for a browser that has none.
+	 *
+	 * Last in the tokens layer on purpose: it has to outrank 02-tokens.css AND the per-palette
+	 * definitions in 03-palettes.css, and directory order is source order (build-css.sh).
+	 *
+	 * Why a whole file rather than a fallback declaration in front of each color-mix(): a custom
+	 * property keeps whatever token stream it is given, so the failure is deferred to the point of USE
+	 * — `background: var(--fs-good-soft)` becomes invalid at computed-value time and computes to
+	 * `unset`, which is `initial` for a non-inherited property. IACVT does not fall back to an earlier
+	 * declaration in the same block, so the two-declaration trick that works for `background:
+	 * color-mix(…)` written literally does nothing for a token. 38 tokens are affected; without this
+	 * block a browser below the floor paints borders in currentcolor and loses every soft surface.
+	 *
+	 * color-mix() lands in Chrome 111, Firefox 113 and Safari 16.2 (all 2022-2023). See docs/css.md
+	 * for the theme's browser floor and which feature sets it.
+	 *
+	 * The rules: a tint over transparent degrades to `transparent` — an absent surface never lowers
+	 * contrast, while a solid version of the same colour under its own text does. A hairline degrades
+	 * to the solid colour it is a fraction of. A focus ring degrades to the -solo ring, which is
+	 * already color-mix-free, because an invisible focus ring is an accessibility regression rather
+	 * than a cosmetic one. */
+	@supports not (color: color-mix(in srgb, red 50%, transparent)) {
+		:root {
+			/* tints: absent, not solid */
+			--fs-accent-soft: transparent;
+			--fs-good-soft: transparent;
+			--fs-warn-soft: transparent;
+			--fs-danger-soft: transparent;
+			--fs-accent-fill: transparent;
+			--fs-good-fill: transparent;
+			--fs-warn-fill: transparent;
+			--fs-danger-fill: transparent;
+
+			/* hairlines: the solid colour they are a fraction of */
+			--fs-accent-line: var(--fs-accent);
+			--fs-good-line: var(--fs-good);
+			--fs-warn-line: var(--fs-warn);
+			--fs-danger-line: var(--fs-danger);
+			--fs-accent-line-hi: var(--fs-accent);
+			--fs-good-line-hi: var(--fs-good);
+			--fs-warn-line-hi: var(--fs-warn);
+			--fs-danger-line-hi: var(--fs-danger);
+
+			/* the two rings, restated: -soft and -fill are transparent above, and a ring nobody can
+			 * see is worse than a heavy one. -solo is already color-mix-free and measured. */
+			--fs-focus-ring: var(--fs-focus-ring-solo);
+			--fs-focus-ring-invalid: 0 0 0 2px var(--fs-panel), 0 0 0 5px var(--fs-danger);
+
+			/* surfaces that are a near-opaque panel anyway */
+			--fs-glass: var(--fs-panel);
+			--fs-bar-bg: var(--fs-panel);
+			--background-color-medium: var(--fs-panel2);
+
+			/* depth cues: dropped rather than approximated — each is a 1px highlight whose whole
+			 * purpose is subtlety, and an opaque one reads as a stray line. */
+			--fs-emboss: none;
+			--fs-text-emboss: none;
+			--fs-shadow-bar: 0 1px 0 var(--fs-border);
+
+			/* the scrim over an uploaded photo: --fs-photo-dim is a percentage this cannot apply, so
+			 * take the fixed dialog scrim. Losing it entirely would leave login text over a photo. */
+			--fs-photo-scrim: var(--fs-scrim);
+
+			/* export tier — third-party apps read these, so they must resolve to something.
+			 * -medium keeps the hue, -low degrades to the dim text colour it was mixed toward. */
+			--border-color-high: var(--fs-border);
+			--border-color-low: var(--fs-border);
+			--primary-color-medium: var(--fs-accent);
+			--primary-color-low: var(--fs-dim);
+			--error-color-medium: var(--fs-danger);
+			--error-color-low: var(--fs-dim);
+			--success-color-medium: var(--fs-good);
+			--success-color-low: var(--fs-dim);
+			--warn-color-medium: var(--fs-warn);
+			--warn-color-low: var(--fs-dim);
+		}
+	}
+}

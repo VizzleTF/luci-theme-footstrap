@@ -519,9 +519,14 @@
 	 * mid-card (measured). Stretched, both cells take the flex line's height and the
 	 * separators meet; content still sits at the top (the cells are blocks). */
 	/* A `<tfoot>` with no `.tr` inside it IS the row — see the footer block below for which view
-	 * writes which shape. Here rather than in a rule of its own: `css-dup` compares bodies of three
-	 * declarations or more, so a second copy of these two would sit unflagged until they diverged. */
-	.table.fs-stacked .tr,
+	 * writes which shape.
+	 *
+	 * TWO rules, not one list: a selector list is not forgiving, so a browser without `:has()`
+	 * (Firefox before 121) throws away the WHOLE list, and `.table.fs-stacked .tr` — every card on
+	 * every stacked table — loses `display: flex` with it. Split, the `:has()` half degrades alone.
+	 * The duplicated body is under `css-dup`'s three-declaration floor, so it will not be flagged;
+	 * the two must change together. */
+	.table.fs-stacked .tr { display: flex; flex-wrap: wrap; }
 	.table.fs-stacked tfoot:not(:has(> .tr)),
 	.table.fs-stacked .tfoot:not(:has(> .tr)) { display: flex; flex-wrap: wrap; }
 	.table.fs-stacked .td {

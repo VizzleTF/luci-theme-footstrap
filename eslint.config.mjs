@@ -3,6 +3,7 @@ import globals from 'globals';
 import stylistic from '@stylistic/eslint-plugin';
 import { readFileSync, readdirSync } from 'node:fs';
 import { utProcessor } from './tools/lib/ut-scripts.mjs';
+import { plugin as fsPlugin } from './tools/lib/eslint-no-unsanitized.mjs';
 
 /* ESLint for the theme's browser JS. Runs in CI and locally, never on the OpenWrt buildbot: it has
  * no node and needs none — luci.mk copies htdocs/ verbatim.
@@ -43,7 +44,7 @@ export default [
 	{ files: HTDOCS_GLOBS, ...js.configs.recommended },
 	{
 		files: HTDOCS_GLOBS,
-		plugins: { '@stylistic': stylistic },
+		plugins: { '@stylistic': stylistic, fs: fsPlugin },
 		languageOptions: {
 			ecmaVersion: 2023,
 			sourceType: 'script',
@@ -120,6 +121,11 @@ export default [
 			 * core (8.53). Both close a measured drift: arrow-parens stood at 62 with against 21 without,
 			 * mixed inside single files, and no-mixed-operators covers `e && e.message || e`, correct by
 			 * precedence and unreadable by design. Neither can change behaviour; both are autofixable. */
+			/* HTML parsed from a string: three `= ''` clears and one icon concatenation, all safe, none
+			 * checked by anything until this rule. tools/lib/eslint-no-unsanitized.mjs carries the
+			 * allowlist and the reason a plugin dependency was not taken instead. */
+			'fs/no-unsanitized-html': 'error',
+
 			'@stylistic/arrow-parens': ['error', 'always'],
 			'@stylistic/no-mixed-operators': 'error',
 		},

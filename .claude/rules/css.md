@@ -26,6 +26,13 @@ description: The cascade layers, the token tiers, and how a CSS change is proved
 - **Coverage is a contract.** Never delete a selector because no stock page renders it — some
   third-party app emits it. `css-orphans` is the only safe dead-CSS search, and only because `fs-*`
   is ours alone.
+- **The browser floor is Chrome 108 / Firefox 101 / Safari 15.4**, derived from the sheet by
+  `npm run css-floor` and stated in `docs/css.md`. Two shapes fail it: a `:has()` compound sharing
+  a selector list with one that has none (the list is not forgiving — the whole rule dies below
+  the floor; split it or wrap it in `:is()`), and a CSS feature the sheet has not used before,
+  until it is classified hard/soft in `tools/css-floor.mjs`. A token built with `color-mix()`
+  needs its static twin in `styles/04-nocolormix.css`: a custom property fails at the point of
+  USE, so no fallback declaration in the same block can catch it.
 - **No colour literals** (`--fs-scrim` excepted); a tint of X is mixed **from** X. Never reintroduce
   a component bridge (`--*-rgb`, `--*-hsl`).
 - **Merge a duplicate or pin it in `@mirror`.** An unpinned duplicate is a hard failure, and so is a

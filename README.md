@@ -7,6 +7,9 @@
 [![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap-releases.json)](https://owfeed.org/install/)
 
 A LuCI theme for OpenWrt 24.10 and newer. No framework, `luci-base` is the only dependency.
+Browsers: **Chrome 108, Firefox 101, Safari 15.4** and newer. Older ones render a plainer page
+rather than a broken one; the floor is derived from the stylesheet by a gate and written down in
+[docs/css.md](docs/css.md#the-browser-floor).
 
 > **23.05** is end-of-life and the theme stops there: **0.14.2** is the last version that runs on it.
 > The installer serves that release to a 23.05 router — pinned, signed and verified like any other —

@@ -16,6 +16,7 @@ luci-theme-footstrap/
     00-header.css      banner + the single @layer declaration
     02-tokens.css      @layer tokens   private --fs-* tier + the --*-color-* export tier
     03-palettes.css    @layer tokens   palettes (tokens only)
+    04-nocolormix.css  @layer tokens   static twins for the 38 color-mix() tokens
     base/              @layer base     widget defaults the views count on
       10-reset  20-typography  30-forms  40-tables  50-chrome
       60-modal  70-buttons  90-widgets  95-luci
@@ -94,6 +95,51 @@ The single exception is `theme/95-a11y-media.css`: `prefers-reduced-motion` has 
 animations declared in `base` as well as `theme`, and only an important declaration reaches back
 a layer. The inversion is what makes that file possible. `audit.py` holds the allowlist
 (`BANG_OK`) and `--strict` fails on any flag outside it; `css-metrics` caps the total at **27**.
+
+## The browser floor
+
+The theme has never declared one, and the sheet quietly moved it twice. `npm run css-floor` now
+derives it from the built stylesheet and fails if this section disagrees.
+
+<!-- css-floor -->
+**Chrome 108**, **Firefox 101**, **Safari 15.4** — below that the page is wrong, not plainer.
+<!-- /css-floor -->
+
+That floor is set by `@layer`, `:is()`/`:where()`, `:focus-visible`, `svh`/`dvh`, `accent-color`
+and the logical properties. Nothing on the list has a fallback worth writing: a theme whose layers
+are ignored is not a theme.
+
+Four features are used **above** the floor and are progressive — the rule does not apply and the
+page is plainer:
+
+| Feature | Chrome / Firefox / Safari | What is lost below it |
+|---|---|---|
+| `:has()` | 105 / 121 / 15.4 | 59 refinements: port tiles, password control-group, stacked-table footers |
+| `color-mix()` | 111 / 113 / 16.2 | the 38 mixed tokens fall back to `styles/04-nocolormix.css` |
+| `@container` | 105 / 110 / 16.0 | five width adaptations inside `fs-view` / `fs-content` |
+| `text-wrap: pretty`, `scrollbar-width` | — | typographic polish |
+
+Two rules follow, and the gate holds both.
+
+**A `:has()` part never shares a selector list with a part that has none.** A selector list is not
+forgiving: one unsupported compound invalidates the whole rule. `.table.fs-stacked .tr,
+.table.fs-stacked tfoot:not(:has(> .tr))` was one rule, so Firefox 115 ESR lost `display: flex` on
+every stacked card — a broken mobile table, not a missing refinement. Split it, or wrap the list in
+`:is()`, which *is* forgiving and drops only the compound it cannot parse.
+
+**A token built with `color-mix()` gets a static twin in `04-nocolormix.css`.** A custom property
+keeps any token stream it is handed, so the failure is deferred to the point of use: `background:
+var(--fs-good-soft)` becomes invalid at computed-value time and computes to `unset`. That is not a
+fall back to the previous declaration — the ordinary two-declaration trick does nothing for a
+token, which is why the twins are a file and not a prelude. Tints degrade to `transparent`
+(an absent surface never lowers contrast), hairlines to the solid colour they are a fraction of,
+and the focus ring to `--fs-focus-ring-solo`, which was already mix-free.
+
+Adding any CSS feature the sheet has not used before fails `css-floor` until it is classified in
+`tools/css-floor.mjs` as hard or soft and the baseline is refreshed with
+`node tools/css-floor.mjs --update`. The JS floor is lower and is not the constraint: the SPA
+router uses nothing younger than `ResizeObserver`, and `requestIdleCallback` and `CSS.supports`
+are both feature-detected.
 
 ## The build
 

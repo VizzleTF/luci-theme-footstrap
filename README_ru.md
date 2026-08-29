@@ -7,6 +7,9 @@
 [![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap-releases.json)](https://owfeed.org/install/ru/)
 
 Тема LuCI для OpenWrt 24.10 и новее. Без фреймворка, единственная зависимость — `luci-base`.
+Браузеры: **Chrome 108, Firefox 101, Safari 15.4** и новее. Более старые получают страницу проще
+оформленную, а не сломанную; порог выводится из таблицы стилей гейтом и записан в
+[docs/css.md](docs/css.md#the-browser-floor).
 
 > **23.05** объявлена EOL, и тема на ней останавливается: **0.14.2** — последняя версия, которая там
 > работает. Установщик ставит на роутер с 23.05 именно её — по фиксированному тегу, с той же

@@ -56,7 +56,7 @@ measure, and how the theme is checked without a router.
 ## Commands
 
 ```sh
-npm run check                              # T1: all 25 gates; exit 0 before pushing
+npm run check                              # T1: all 26 gates; exit 0 before pushing
 npm run check:fast                         # the 16 that need no browser and no CSS build
 npm test                                   # T0: the unit suite alone (node --test, no browser)
 npm run smoke                              # T1: modules come up in a real DOM (~1.4 s)

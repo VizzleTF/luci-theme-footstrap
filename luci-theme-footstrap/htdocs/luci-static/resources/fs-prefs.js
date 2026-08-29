@@ -140,6 +140,44 @@ function guardDarkStamp() {
 		attributeFilter: ['data-darkmode', 'data-theme', 'data-bs-theme']
 	});
 }
+/* ---- the browser's own chrome follows the page ----
+ *
+ * `<meta name="theme-color">` is what colours a mobile address bar, the Android task-switcher card
+ * and an installed PWA's title bar. head.ut ships it at the default palette's page colour, which is
+ * all a static template can know; from here it tracks the live one.
+ *
+ * Read from the BODY's computed background, not from `--fs-bg`: a custom property returns its token
+ * stream, so a palette whose page colour is a color-mix() would put `color-mix(in srgb, …)` in the
+ * attribute, and 21 of the axes reach the canvas through one mix or another.
+ *
+ * One observer rather than a call in each applier: the colour is a function of :root's attributes
+ * and inline properties — mode, palette, tint, its strength — and every axis already writes exactly
+ * those. Adding an axis therefore needs nothing here. Coalesced into a frame because the tint and
+ * strength sliders write on every input event, and getComputedStyle forces style resolution. */
+function paintThemeColor() {
+	const meta = document.querySelector('meta[name="theme-color"]');
+	if (!meta || !document.body) return;
+	const bg = getComputedStyle(document.body).backgroundColor;
+	/* a transparent body means the sheet has not applied yet; keep the server's value */
+	if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') meta.setAttribute('content', bg);
+}
+
+function watchThemeColor() {
+	let queued = false;
+	const paint = () => {
+		queued = false;
+		paintThemeColor();
+	};
+	const schedule = () => {
+		if (queued) return;
+		queued = true;
+		window.requestAnimationFrame(paint);
+	};
+	paintThemeColor();
+	new MutationObserver(schedule).observe(document.documentElement,
+		{ attributes: true, attributeFilter: [ 'style', 'class', 'data-darkmode', 'data-palette', 'data-wallpaper' ] });
+}
+
 /* "Auto" means follow the OS continuously, not only at page load. Only while the effective mode is
  * auto: an explicit browser choice, or an explicit router default with no browser override. */
 _mqDark.addEventListener('change', () => {
@@ -316,7 +354,7 @@ return baseclass.extend({
 	/* the two axis shapes, so the nineteen axes in fs-axes.js can be built from them */
 	listAxis, enumAxis,
 
-	currentMode, applyMode, modeDefault, guardDarkStamp,
+	currentMode, applyMode, modeDefault, guardDarkStamp, watchThemeColor,
 	currentDensity, applyDensity, densityDefault,
 	currentLayout, applyLayout, isTopLayout,
 	currentAutoCollapse, applyAutoCollapse, autoCollapseDefault,

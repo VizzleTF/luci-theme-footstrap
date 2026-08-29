@@ -148,10 +148,16 @@
 		   localStorage. See the sanitiser above for the unset encodings. #}
 		<script>window.__fsSD={layout:"{{ _sd_lay }}",darkmode:"{{ _sd_dark }}",palette:"{{ _sd_pal }}",wallpaper:"{{ _sd_wall }}",tint:"{{ _sd_tint }}",accent:"{{ _sd_acc }}",good:"{{ _sd_good }}",warn:"{{ _sd_warn }}",danger:"{{ _sd_dang }}",card:"{{ _sd_card }}",control:"{{ _sd_ctrl }}",bar:"{{ _sd_bar }}",line:"{{ _sd_line }}",rounding:{{ _sd_round }},autocollapse:"{{ _sd_ac }}",login_bg:"{{ _sd_lbg }}",tint_strength:{{ _sd_tstr }},photo_dim:{{ _sd_pdim }},density:"{{ _sd_dens }}",pattern:"{{ _sd_pat }}",pattern_size:{{ _sd_psize }},pattern_strength:{{ _sd_pstr }},pattern_ink:"{{ _sd_pink }}"};</script>
 		<script>
-			/* Each block below pre-paints one Appearance axis before the first frame, duplicating a
+			/* Each IIFE below pre-paints one Appearance axis before the first frame, duplicating a
 			   live applier in fs-prefs.js. They cannot share code — this runs before the module
 			   loader exists — so tools/axes.mjs derives the contract (keys, attributes, properties,
 			   ranges, default, order) from the JS and holds this template to it.
+
+			   ONE element for all of them, and exactly two in this file: the data blob above carries
+			   interpolations and this one carries none. That is the split tools/lib/ut-scripts.mjs
+			   keys off — an interpolated body is not JS until the server renders it, so it is exempt
+			   from the lint and everything mergeable into it would go unchecked with it. Two is also
+			   what a Content-Security-Policy would need nonces for, should uhttpd ever send one.
 			   Precedence for every axis: localStorage ?? router default (window.__fsSD) ?? built-in.
 			   Dark mode: a saved preference, else the router default, else the OS. */
 			(() => {
@@ -189,8 +195,7 @@
 					set(m.matches);
 				});
 			})();
-		</script>
-		<script>
+
 			/* the remaining axes, in the precedence stated above. */
 			(() => {
 				/* Guarded per read, not once around the block: a browser that refuses storage throws
@@ -320,8 +325,7 @@
 						root.style.setProperty('--fs-photo-dim', pd + '%');
 				} catch (e) {}
 			})();
-		</script>
-		<script>
+
 			/* the icon-rail preference, so a reload does not flash the full sidebar first. Not a
 			   router-wide default: a transient chrome collapse, not an appearance choice. */
 			(() => {
@@ -330,8 +334,7 @@
 						document.querySelector(':root').setAttribute('data-rail', 'true');
 				} catch (e) {}
 			})();
-		</script>
-		<script>
+
 			/* the client's saved layout overrides the server's stamp above, before paint. Only a
 			   known value is honoured: a corrupt one leaves the stamp standing rather than blanking
 			   the attribute every layout rule matches on. */
@@ -345,6 +348,17 @@
 		</script>
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="darkreader-lock">
+		{# The colour a mobile browser paints its own chrome with — address bar, task switcher, the
+		   installed app's title bar. Without it a dark page keeps a white bar above it.
+
+		   The literal is the default palette's page colour and the SAME value manifest.json carries,
+		   for the same reason: neither file can be rendered per request. It is a starting value
+		   only — fs-prefs.js repaints this tag from the live body background, so it follows palette,
+		   mode and every tint axis. tests/theme-color.test.mjs holds the two literals equal.
+
+		   One tag, no `media` pair: a media-qualified tag would win over this one for a viewer whose
+		   OS is dark but who chose light HERE, and the choice is the theme's to honour. #}
+		<meta name="theme-color" content="#f6f8fa">
 		{# The sheet link below is emitted only when the TOKEN says the sheet exists — set the option
 		   after the file, never before. A preload is not in the stylesheet, so dropping the
 		   @font-face rules alone left the pair behind and every page went on asking the router for

@@ -16,6 +16,7 @@
     "tables": "node tools/table-contract.mjs",
     "css-orphans": "node tools/fs-orphans.mjs",
     "css-metrics": "node tools/css-metrics.mjs",
+    "css-floor": "node tools/css-floor.mjs",
     "test": "node --test \"tests/*.test.mjs\"",
     "size": "node tools/size-budget.mjs",
     "icons": "node tools/build-icons.mjs --check",
@@ -42,7 +43,7 @@
     "smoke": "node tools/smoke.mjs",
     "computed-diff": "node tools/computed-diff.mjs",
     "check:fast": "npm run lint && npm run shell && npm run marker && npm run audit && npm run conffiles && npm run acl && npm run makefile-contract && npm run test && npm run css-orphans && npm run css-i18n && npm run mirror && npm run bang-ok && npm run axes && npm run page-modules && npm run chrome-fence && npm run changelog",
-    "check:mid": "npm run css-metrics && npm run css-dup && npm run size && npm run i18n",
+    "check:mid": "npm run css-metrics && npm run css-floor && npm run css-dup && npm run size && npm run i18n",
     "check:slow": "npm run tables && npm run export-tier && npm run icons && npm run a11y && npm run smoke",
     "makefile-contract": "node tools/makefile-contract.mjs"
   },

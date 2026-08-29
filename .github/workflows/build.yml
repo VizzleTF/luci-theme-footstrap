@@ -81,6 +81,11 @@ jobs:
       - run: node tools/build-icons.mjs --check
       - run: node tools/export-tier.mjs
       - run: node tools/css-metrics.mjs
+      # The browser floor, derived from the built sheet rather than asserted in a doc: it fails
+      # when docs/css.md and the stylesheet disagree, when a `:has()` compound shares a selector
+      # list with one that has none (the list is not forgiving, so the whole rule dies), and when
+      # a CSS feature nobody has classified appears.
+      - run: node tools/css-floor.mjs
       - run: node tools/fs-orphans.mjs
       - run: node tools/css-dup.mjs
       - run: node tools/css-i18n.mjs

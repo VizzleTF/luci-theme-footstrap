@@ -409,6 +409,21 @@ manufactures its own findings — `owlab exec <stand> -- /etc/init.d/log restart
 lines gave 3 findings, 1 line gave none). `/admin/services/acme/logread` has a `textarea` with no
 accessible name in 25.12's app; 24.10 does not render it at all.
 
+**A live gate that says "no owlab router is running" may be looking at the wrong PATH.** Every one
+of them shells out to `owlab status -json` (`tools/lib/stands.mjs`) and treats a failed spawn as
+an empty router list, so a shell that cannot see `owlab` — `go install` puts it in `~/go/bin`,
+which a login shell exports and `tools/bg.sh` does not — reports exit 2 and measures nothing,
+with four containers up. The two apart: `docker ps` lists the stands while `owlab status -json`
+fails. Export the path into the detached command itself:
+`tools/bg.sh sh -c 'export PATH=$HOME/go/bin:$PATH; node tools/live-audit.mjs'`.
+
+**A live gate killed by a timeout reports a browser bug, not a finding.** `page.waitForTimeout:
+Target page, context or browser has been closed` with an empty `log: []` is the gate being
+SIGTERMed mid-run — `live-audit` over two routers is 113 page renders and does not fit in five
+minutes. The two apart: a real finding prints `path|width|kind|element` lines and a count; a
+killed run prints a Playwright stack. Never re-run it with a bigger timeout — that is what T2
+means: `tools/bg.sh`, report the run-id, read the log in a later turn.
+
 **When a live gate goes red, build the PARENT COMMIT.** Package it, install it the same way, run the
 same narrowed check. A finding that reproduces there did not come from the change under test. That is
 how the anchor regression in 0.14.3 was pinned to one commit out of thirty-seven, and how both

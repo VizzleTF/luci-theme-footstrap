@@ -205,6 +205,7 @@ return baseclass.extend({
 		 * below swallows a menu failure. */
 		sheets.watchViewSheets();
 		prefs.guardDarkStamp();		/* same, for a third party stamping :root */
+		prefs.watchThemeColor();	/* the mobile address bar, from the live page colour */
 
 		ui.menu.load().then((menu) => {
 			tree.setTree(menu);

@@ -90,6 +90,7 @@ ships. Locally it is all one command, `npm run check`; the full table of what ea
 | `a11y-gallery.mjs` | axe-core, WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap} × {untinted,60°,260°} — **18 combinations** |
 | `export-tier.mjs` | the `--*-color-*` contract with foreign apps — axe cannot see it, their widgets are not in the gallery. 42 palette × mode × tint combinations, then the six untinted ones again with `prefers-contrast: more` emulated, since that query re-states the ink tokens and so publishes a second tier |
 | `css-metrics.mjs` | ratchet: `!important` ≤ 27, max specificity, empty rules |
+| `css-floor.mjs` | the browser floor derived from the built sheet against the one stated in `docs/css.md`, plus the two shapes that break below it: a `:has()` compound sharing a selector list with one that has none, and a CSS feature nobody has classified |
 | `fs-orphans.mjs` | dead `fs-*` selectors (safe only inside our namespace) |
 | `css-dup.mjs` | identical declaration bodies under different guards — no linter calls this an error |
 | `mirror.mjs` | `@mirror`-pinned copies still byte-identical (CSS **and** shell) |
