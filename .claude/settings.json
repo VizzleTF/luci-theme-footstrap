@@ -5,8 +5,8 @@
     "BASH_MAX_TIMEOUT_MS": "300000"
   },
   "attribution": {
-    "commit": false,
-    "pr": false,
+    "commit": "",
+    "pr": "",
     "sessionUrl": false
   },
   "permissions": {
