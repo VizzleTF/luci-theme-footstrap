@@ -29,7 +29,7 @@ const RESOURCES = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources'
 /* The leading run of string-literal statements. Scanned line-wise rather than parsed: the prologue
  * is by definition the head of the file, one directive per line in this tree (eslint keeps it so),
  * and a test harness that needed a JS parser to start would be a dependency for nothing. */
-function pragmas(src) {
+export function pragmas(src) {
 	const out = [];
 	for (const line of src.split('\n')) {
 		const m = (/^\s*'([^']*)'\s*;\s*$/).exec(line);
@@ -39,7 +39,7 @@ function pragmas(src) {
 	return out;
 }
 
-function aliasFor(pragma) {
+export function aliasFor(pragma) {
 	const m = (/^require\s+(\S+)(?:\s+as\s+([A-Za-z_]\S*))?$/).exec(pragma);
 	if (!m) return null;
 	return { dep: m[1], alias: m[2] || m[1].replace(/[^A-Za-z0-9_]/g, '_') };

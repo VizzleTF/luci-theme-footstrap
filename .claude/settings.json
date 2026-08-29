@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "120000",
+    "BASH_MAX_TIMEOUT_MS": "300000"
+  },
+  "attribution": {
+    "commit": false,
+    "pr": false,
+    "sessionUrl": false
+  },
+  "permissions": {
+    "deny": [
+      "Edit(**/cascade.css)",
+      "Edit(tmp/**)",
+      "Edit(**/docs/screenshots/**)",
+      "Bash(gh pr comment:*)",
+      "Bash(gh pr review:*)",
+      "Bash(gh api:*)",
+      "Bash(gh issue comment:*)",
+      "mcp__github__add_issue_comment",
+      "mcp__github__create_pull_request_review"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(owlab test:*)",
+      "Bash(owlab up:*)",
+      "Bash(npm run live:*)",
+      "Bash(npm run bench:*)"
+    ],
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run changelog:*)",
+      "Bash(npm run computed-diff:*)",
+      "Bash(npm run smoke:*)",
+      "Bash(node tools/*)",
+      "Bash(ucode -T -c *)",
+      "Bash(tools/bg.sh:*)",
+      "Bash(sh -n *)",
+      "Bash(npm run check:fast:*)",
+      "Bash(npm run makefile-contract:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit *)",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/precommit-gate.sh",
+            "statusMessage": "Checking the changelog contract"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/branch-guard.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

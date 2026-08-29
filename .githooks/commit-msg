@@ -1,0 +1,32 @@
+#!/bin/sh
+# Strip AI-attribution trailers from a commit message, whatever produced them.
+#
+# The project forbids Co-Authored-By, "Generated with", and any Claude/AI attribution in a commit or
+# a PR body. A settings key (`attribution`) says the same thing to one client; this hook says it to
+# every client, including a client whose default changes in an update. openwrt/luci refuses a
+# `@users.noreply.github.com` address on a sign-off, so Signed-off-by is deliberately NOT touched.
+#
+# Enable with: git config core.hooksPath .githooks
+set -eu
+
+MSG=$1
+[ -f "$MSG" ] || exit 0
+
+TMP="$MSG.footstrap"
+
+# One pass, three shapes: the trailer, the generator line, and the session link. `Co-authored-by` is
+# case-insensitive in git's own trailer parsing, so match it that way here too.
+sed \
+	-e '/^[Cc][Oo]-[Aa]uthored-[Bb]y:/d' \
+	-e '/^Claude-Session:/d' \
+	-e '/[Gg]enerated with \[*Claude/d' \
+	-e '/🤖 Generated with/d' \
+	-e '/^Co-authored by Claude/d' \
+	"$MSG" >"$TMP"
+
+# A stripped trailer block leaves the message ending in a blank paragraph. Drop trailing blank lines
+# only — an interior blank separates subject from body and is load-bearing.
+awk '{l[NR]=$0} END{n=NR; while(n>0 && l[n] ~ /^[[:space:]]*$/) n--; for(i=1;i<=n;i++) print l[i]}' \
+	"$TMP" >"$TMP.2"
+mv "$TMP.2" "$MSG"
+rm -f "$TMP"

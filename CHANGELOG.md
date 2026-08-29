@@ -8,6 +8,8 @@
 
 - **`docs/development.md` records the stand's own traps, with the check that tells each one apart.** Six of them, each of which cost a measurement that read as a regression in the theme: `owlab sync` ships a dev build rather than a package, opkg silently skips a reinstall at the same version, a forced reinstall hands the theme back to bootstrap, `owlab exec` eats short flags, `owlab test` fights the stands that are already up, and two live-audit findings belong to their apps rather than to the theme. `docs/releasing.md` gains the matching step: a release is measured on an INSTALLED package, one `owlab test` per format.
 
+- **Two rules that were only ever remembered are enforced by git hooks now.** `.githooks/commit-msg` strips AI-attribution trailers whatever produced them, and `.githooks/pre-push` refuses a push whose `npm run check` does not exit 0 — a gate stated only in an agent's rule file is a gate the next contributor never runs. `Signed-off-by` is deliberately untouched, since openwrt/luci requires it. Enable with `git config core.hooksPath .githooks`; `--no-verify` remains the deliberate bypass. The session hooks beside them hold the changelog contract on `git commit`, refuse an edit while HEAD is the default branch, and say so out loud when a session starts where the project's rules do not load.
+
 ## [0.14.3] — 2026-08-29
 
 ### Changed

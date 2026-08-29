@@ -1,0 +1,32 @@
+#!/bin/sh
+# `npm run check` must exit 0 before a push. That is a requirement on everyone, not only on an
+# agent, and a gate that only the agent's rule file states is a gate the next contributor never
+# runs. Deliberate bypass: git push --no-verify.
+#
+# Enable with: git config core.hooksPath .githooks
+set -eu
+
+# A delete-only push (`git push origin :branch`) changes no tree, so there is nothing to check. The
+# stdin format is: <local ref> <local sha> <remote ref> <remote sha>, one line per ref.
+ALL_DELETES=1
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+	[ -z "${local_sha:-}" ] && continue
+	case "$local_sha" in
+		0000000000000000000000000000000000000000) ;;
+		*) ALL_DELETES=0 ;;
+	esac
+done
+[ "$ALL_DELETES" = 1 ] && exit 0
+
+if ! command -v npm >/dev/null 2>&1; then
+	echo "pre-push: npm not found, and npm run check is the gate this push needs." >&2
+	echo "Install node, or push with --no-verify and say in the PR that the gates did not run." >&2
+	exit 1
+fi
+
+echo "pre-push: npm run check ..." >&2
+if ! npm run check; then
+	echo >&2
+	echo "pre-push: npm run check failed. Fix it, or push with --no-verify if you know why." >&2
+	exit 1
+fi
