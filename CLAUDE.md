@@ -7,15 +7,27 @@ generated `cascade.css` + `fs-*.js` in `htdocs/luci-static/resources/`.
 
 **Communicate in Russian.** Code, comments, commit messages and PR text stay in English.
 
+**The floor is 24.10.** 23.05 support ended at 0.14.2: `ui.RangeSlider` arrived in 24.10, the
+Appearance tab is built in one try/catch, and the whole tab died there until a user reported it —
+upstream declined to carry that code (openwrt/luci#8978). `install.sh` serves a 23.05 router the
+pinned 0.14.2 and says it is the last one. `docs/releasing.md`.
+
 `styles/base/` began as a fork of `luci-theme-bootstrap`'s cascade.css and is footstrap's code now:
 **do not call it "the fork" or reintroduce the word bootstrap** into filenames, comments or docs.
 That name is legitimate only for the *other, real* package — the `/luci-static/bootstrap` fallback
 in `uci-defaults`, the `bench/` baseline, and the Apache-2.0 attribution in `styles/00-header.css`.
 
+**Repo root is the workspace** (`package.json` gates, `tools/`, `docs/`, `owlab.yaml`,
+`install.sh`); the shipped package is `luci-theme-footstrap/` one level down — same name, one level
+apart, so a path is ambiguous unless it is absolute or rooted. Nothing in the root ships, and the
+OpenWrt buildbot has no node. **Work from the repo root, not from its parent**: the parent holds
+`luci-fork/` and `tmp/`, is not a git repository, loads none of this file, and makes `owlab` exit
+with `no owlab.yaml found`. `.claude/hooks/session-start.sh` says so at startup.
+
 ## Read the doc first
 
-`docs/` is the reference and every page carries the measurement behind each rule. This file is the
-index plus the rules that are easy to break — do not re-derive what a doc already settled.
+`docs/` is the reference and every page carries the measurement behind each rule. Do not re-derive
+what a doc already settled.
 
 | Touching | Read |
 |---|---|
@@ -32,75 +44,96 @@ index plus the rules that are easy to break — do not re-derive what a doc alre
 | pre-release checklist, changelog contract, runbook | `docs/releasing.md` |
 | the navigation benchmark | `docs/benchmark.md` |
 
-`docs/luci-app-styling-guide.md` (+ `_ru`) is outward-facing, for authors of other packages.
-`docs/gallery.html` renders every widget LuCI or any app can emit — it is what `a11y` and
-`export-tier` measure, and how the theme is checked without a router.
+`docs/luci-app-styling-guide.md` (+ `_ru`) is outward-facing. `docs/gallery.html` renders every
+widget LuCI or any app can emit — it is what `a11y`, `export-tier`, `computed-diff` and `smoke`
+measure, and how the theme is checked without a router.
 
-**Repo root is the workspace** (`package.json` gates, `tools/`, `docs/`, `owlab.yaml`,
-`install.sh`); the shipped package is `luci-theme-footstrap/` one level down — same name, one level
-apart, so a path is ambiguous unless it is absolute or rooted. Nothing in the root ships, and the
-OpenWrt buildbot has no node.
-
-**Work from the repo root, not from its parent.** The checkout's parent holds `luci-fork/` (the
-openwrt/luci copy, see below) and `tmp/` and is not a git repository — a session started there
-loads none of this file, and `owlab` exits with `no owlab.yaml found`.
+**The rules for one area load with that area** — `.claude/rules/css.md` (`styles/**`),
+`js.md` (`htdocs/**/*.js`), `chrome.md` (`*.ut`, `fs-*.js`), `package.md` (Makefile, `root/**`,
+`po/**`), `changelog.md` (`CHANGELOG*.md`). Cutting a release is `/release`; openwrt/luci work is
+`/upstream-pr`. Read the matching file before editing there; the rules below apply everywhere.
 
 ## Commands
 
 ```sh
-npm run check                              # every gate, one run; must exit 0 before pushing
-npm test                                   # the unit suite alone (node --test, no browser)
+npm run check                              # T1: all 25 gates; exit 0 before pushing
+npm run check:fast                         # the 16 that need no browser and no CSS build
+npm test                                   # T0: the unit suite alone (node --test, no browser)
+npm run smoke                              # T1: modules come up in a real DOM (~1.4 s)
+npm run computed-diff                      # T1: worktree vs HEAD, computed styles (~4 s)
+tools/bg.sh <cmd>                          # T2: detach, print the run-id, log into ../tmp/
 node tools/build-icons.mjs                 # re-raster the app icons after a logo.svg change
 owlab up | owlab sync --watch | owlab open owrt2512
 ./tools/stage.sh && owfeed build           # both formats into dist/
 owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' --assert …
 ucode -T -c -o /dev/null <template>.ut     # syntax-check a template the way LuCI does
 luci-theme-footstrap/dev-sync.sh <host>    # deploy to a HARDWARE router over ssh
-./tools/sync-luci-fork.sh ../luci-fork     # regenerate the openwrt/luci copy
 npm run fork-drift                         # what the two trees disagree about
 ```
 
-`npm test` (`node --test tests/*.test.mjs`, no browser) is the unit half and it is **deliberately
-narrow**: only the branches a stand cannot enter — a luci-base missing a surface the router calls, an
-alias loop or a `firstchild` tie no shipped menu contains. One file: `node --test tests/<name>.mjs`;
-one case: `--test-name-pattern`. Anything about layout or behaviour belongs on a live userland
-(`owlab`, or a hardware router), never in a stub. `npm run check` is the whole static half.
+## Verifying
 
-One gate directly: `node tools/<name>.mjs`. Two run in CI only: `tools/jsmin-verify.mjs` (needs a
-jsmin built from `luci-upstream.pin`) and `ucode -T -c` over every template, which the `verify`
-containers run against the installed theme. Two `owlab test` invocations, one per format —
-`--install` is a host-side glob evaluated per router, and the fifth assertion is that same template
-compile.
+Every gate sits in exactly one tier, and the tier says who runs it and whether waiting on it is
+allowed. Tiering removes nothing: the release matrix in `/release` and `docs/releasing.md` is
+unchanged, and CI runs its jobs on every pull request regardless of what was run in a session.
 
-## Rules that are easy to break
+**T0 — always, foreground, 60 s.** `npm test`; the ONE `node tools/<name>.mjs` that covers the file
+just edited (the map is in each `.claude/rules/` file and in `docs/conventions.md`);
+`ucode -T -c -o /dev/null` over each template touched this session. Nothing else runs by reflex.
 
-### Verifying
-- **Every gate is static; not one opens a page.** A behaviour change is not finished until it has
-  run on a real userland on **both** package managers (25.12/apk and 24.10/opkg). A stubbed node
-  harness proves a module initialises, nothing more — say which of the two you did.
-- **23.05 is over, at 0.14.2.** It cost one widget (`ui.RangeSlider` arrived in 24.10, the Appearance
-  tab is built in one try/catch, and the whole tab died there until a user reported it) and upstream
-  declined to carry that code (openwrt/luci#8978). `install.sh` serves a 23.05 router the pinned
-  0.14.2 and says it is the last one; the stand, the contract entry and the fallback are gone. The
-  floor is 24.10 — `npm run live -- --all` covers what is left. docs/releasing.md.
+**T1 — on an explicit request, 5 min.** `npm run check` once, when the branch is otherwise finished
+— not before every edit. `npm run smoke` and `npm run computed-diff` after a JS or CSS change:
+seconds each, and they catch the regression that is in the file rather than in the page.
+
+**T2 — never blocked on.** `owlab up|test`, `npm run live`, `bench/nav-benchmark.py`, the live
+computed diff, `jsmin-verify`, the full token-stream compare. Started detached through `tools/bg.sh`
+or left to CI, run-id reported the moment it starts. Reading the log is a separate turn the
+maintainer asks for: `tail -n 40 ../tmp/<run-id>.log`.
+
+- **Foreground rule: no bash call runs longer than 5 minutes.** A command that would is T2 by
+  definition — start it detached, name the run-id, move on. Idling against a running command is a
+  defect, not diligence. A command that hits its timeout is never re-run with a larger one; it moves
+  to T2. Enforced by `BASH_MAX_TIMEOUT_MS` in `.claude/settings.json`.
+- **A tier is lowered by the maintainer, never by the agent.** "This T2 gate is not needed here" is
+  not a judgement available to make: the gate is started detached, or waived out loud.
+- **The definition of done is not the list the agent verifies.** "Has run on a real userland on
+  **both** package managers (25.12/apk and 24.10/opkg)" stays the release contract, held by CI's
+  `verify` job and by the maintainer. It is not a per-edit obligation and never a reason to stop
+  working. Still say which of the two a run actually covered — a stubbed harness proves a module
+  initialises, nothing more, and a cheap gate never earns a release the right to skip owlab.
+- **These T2 gates run in CI on every pull request and are not reproduced locally**: `lint` (every
+  npm gate plus `jsmin-verify`), `build` (both formats), `verify` (this build installed on a real
+  25.12 AND a real 24.10 userland, plus the `ucode -T -c` sweep), `live` and `anchors`. Read them
+  with `gh run view`. CI narrows two axes on a PR and widens them on a push or tag: `live` and
+  `anchors` boot owrt2512 only, so the 24.10 half of a behaviour claim comes from a push, a tag, or
+  a detached local run.
+- **A finding about the stands goes in `docs/development.md`, in the same session it was found.**
+  Not in a commit message, not only in the changelog, not in a comment on the code it happened to
+  touch: the next person hits it while measuring something unrelated, and the only place they will
+  look is the page about dev routers. "The stand's own traps" is that section. Each entry says what
+  it looked like, what it actually was, and the command that tells the two apart — a trap written
+  down without its check is a story. The same holds for a gate that reports something the theme did
+  not do: name the page and how to prove it is the app's.
 - **One fault, one mechanism — and prove that one holds alone.** A second mechanism added "to be
   safe" must be measured with the first one on its own: if the probe still passes, the spare was
   never needed and does not ship. The Appearance tab's vanishing after a Save (openwrt/luci#8981)
   went in with an attribute watch AND a retry ladder, both landed together, both passed; the ladder
   turned out to catch nothing, and a maintainer had to ask. A suspicion about risk is an experiment
-  to run, not a justification to write into a comment.
+  to run, not a justification to write into a comment. That experiment is T2: run it detached, and
+  the spare does not ship until its log has been read and its result stated.
 - **`/security-review` before every release and every upstream PR.** It reads the branch diff, so it
-  is run once the branch is final and before the tag or the `gh pr create` — not after. The surface
-  worth the pass is small and always the same: the installer's signature chain, any new shell that
-  runs over a build tree, the login template (that page is unauthenticated), sinks in the browser JS,
-  and the packaging pipeline. A maintainer asked outright whether one had been done
-  (openwrt/luci#8981); "yes, and here is what it covered" is a one-line answer only if the pass
-  actually happened.
+  runs once the branch is final and before the tag or the `gh pr create` — not after, and not per
+  edit. Surface: the installer's signature chain, any new shell that runs over a build tree, the
+  login template (that page is unauthenticated), sinks in the browser JS, the packaging pipeline. A
+  maintainer asked outright whether one had been done (openwrt/luci#8981).
 - **Prove a CSS change with a computed-style diff, not screenshots.** Live counters move 0.5–1.3% of
-  pixels between two runs of the *same* sheet while a real regression weighs 0.19%.
-- Screenshots and any other scratch artefact go in `../tmp/`, never inside the checkout.
+  pixels between two runs of the *same* sheet while a real regression weighs 0.19%. Cheap half:
+  `npm run computed-diff`. Live half: T2, and not finished until its numbers are read and quoted.
+- Screenshots, `tools/bg.sh` logs and any other scratch artefact go in `../tmp/`, never inside the
+  checkout. Partly enforced by `permissions.deny` in `.claude/settings.json`.
 
-### Comments
+## Comments
+
 - **Minimally sufficient: the shortest text that still carries the reason.** An inline comment is
   one line, two if the reason needs a number; a block is justified only when it covers several
   rules at once, and a module header is a short paragraph, not a page. Anything longer belongs in
@@ -137,146 +170,22 @@ compile.
   edit.
 - **After a bulk comment pass, prove the code did not move**: a token-stream compare against HEAD for
   every JS file, a comment-stripped and whitespace-normalised diff for CSS, `.ut`, shell and yaml.
-  That is what caught a deleted Makefile marker and a lost shell escape; no gate would have.
+  That is what caught a deleted Makefile marker and a lost shell escape; no gate would have. The
+  full-tree compare is T2 — `tools/bg.sh`, and the pass is not finished until its output has been
+  read and reported.
 
-### CSS
-- **`htdocs/luci-static/footstrap/cascade.css` is generated — never edit it.** Source is `styles/`.
-- Layer order `tokens, base, theme, page`, one directory per layer, filename prefix = source order.
-  A later layer beats an earlier one regardless of specificity, so a theme rule never needs
-  `!important` to outrank base.
-- **Read the private `--fs-*` tier only.** The `--*-color-*` export tier is defined from it and read
-  by nobody inside `styles/` (`audit --strict` fails). A hostile `:root` recoloured 312 of 336
-  gallery elements before the split, 0 after.
-- **`!important` is a gated allowlist and inverts layer order.** A flag must fight an inline
-  `style=` or an app's unlayered rule; one that beats another footstrap rule means the rule is in
-  the wrong layer. `theme/95-a11y-media.css` is the one sanctioned exception.
-- **Edit the rule that already styles the selector** — never append a second one. **Win on
-  specificity, never on source order.**
-- **Coverage is a contract.** Never delete a selector because no stock page renders it — some
-  third-party app emits it. `css-orphans` is the only safe dead-CSS search, and only because `fs-*`
-  is ours alone.
-- **No colour literals** (`--fs-scrim` excepted); a tint of X is mixed **from** X. Never reintroduce
-  a component bridge (`--*-rgb`, `--*-hsl`).
-- **Merge a duplicate or pin it in `@mirror`.** An unpinned duplicate is a hard failure, and so is a
-  `@mirror` group with one copy.
-- **`styles/base/` is editable**, but prefer the matching `styles/theme/` file, and justify any base
-  edit that changes output with a near-empty computed diff.
-- **No bold mono**: `<strong>` is a LABEL and must be *assigned* the sans face — excluding it from
-  the mono rule changes nothing, since it still inherits.
+## Commits
 
-### JS
-- One concern per module; `L.require` makes a singleton and throws `DependencyError` on a cycle, so
-  a module can never `extend` another — compose by calling.
-- **All "does it fit" logic lives in `fs-fit.js`.** Measure uncollapsed, re-fit synchronously on a
-  mutation, coalesce on resize. `data-narrow` — not a viewport media query — is the single source of
-  "the sidebar became a bar", and the widths are read from the CSS tokens with `getComputedStyle`,
-  never copied into JS.
-- **Never put a regex literal straight after `return` or `=>`** — jsmin eats the rest of the file
-  and **exits 0**. Wrap it: `return (/^https?:\/\//i.test(a));`. No backtick inside a `${…}`.
-- **Require a stock class through `window.L`** (`const RT = window.L; RT.require(name)`) — the `L` a
-  factory receives has no `ui` helpers, and `require()` caches the first requirer's binding.
-- **`FS_VERSION` stays in `fs-version.js` at that path** — the Makefile, `dev-sync.sh` and
-  `tools/stage.sh` sed it by path; moving it makes every release report "(dev)".
-- **The theme never checks for its own updates and never reaches a third-party host at run time.**
-  Upgrades are the package manager's job (the installer adds the feed). `fs-router` exports
-  `onNavigate(fn)` so an optional module can register itself without the router naming anyone —
-  keep that seam inverted, but do not re-add an updater behind it.
+**Conventional Commits, message in English. Never commit OR PUSH without an explicit instruction for
+that action, each time.** Finished work, green gates, a verified fix or an answered review is not
+authorization, and yesterday's "commit and push" covers yesterday only. This holds for BOTH remotes
+— `origin` here (the only remote of THIS repository), and the openwrt/luci fork behind the PR, where
+the amend + push `--force-with-lease` sequence is a push like any other. Leave the tree dirty and
+say what would go in and where it would go; wait to be told. No co-author / "Generated with" / AI
+attribution trailers.
 
-### The chrome, and sharing a document with third-party apps
-- **One theme entry, one template dir, one renderer.** Layout is a **client** axis
-  (`:root[data-layout]`, always an explicit value) — never write a `:not([data-layout=…])` guard and
-  never add a second renderer. The bar is the base; the vertical sidebar is one guarded override
-  that wins on specificity.
-- Three zones: **ours** (`fs-*`, `--fs-*`, `[data-fs-chrome]`), **shared LuCI** (`.cbi-*`, `#view` —
-  where an app is *entitled* to win on specificity), **theirs**. Check who owns a name before
-  "fixing" a collision: `.left`/`.right`/`.center` and `ul.nav` are LuCI's.
-- The chrome is defended by **not matching**: the mark in `header.ut`, the fence in `fs-sheets.js`,
-  the pin in `theme/10-chrome.css` (inherited properties, roots alone). `npm run chrome-fence`
-  derives the mark from the markup and compares whole canonical strings — a token-wise check once
-  passed on a fence that was the exact inverse of one.
-- **A view's CSS is never deleted** — a sheet imported at module eval never comes back. An invasive
-  sheet makes the next navigation a full load instead; only a byte-identical duplicate may be
-  dropped.
-- Every Appearance axis is implemented twice (pre-paint in `partials/head.ut`, live in
-  `fs-prefs.js`) and **the custom property is set BEFORE the attribute** — reversed, a reload paints
-  one frame in the previous hue. `npm run axes` derives the contract from the JS.
-
-### Package and release
-- **`+luci-base` is the whole dependency list and keeping it that way is a constraint.** `curl` is
-  not in OpenWrt's default set — fall back to `uclient-fetch` instead of adding a dep.
-- **The catalogue lives in `po/`** — what `LUCI_LANGUAGES` globs and what Weblate translates.
-  luci.mk emits the per-language packages; nothing in `Build/Prepare` compiles a catalogue. It was
-  `i18n/` while a fielded self-update script mis-picked a multi-asset release with `head -1` (#6);
-  owfeed now builds exactly one theme artifact per format regardless, which `tools/check-packages.sh`
-  still asserts in CI's build job.
-- Anything under `root/etc/config/` MUST be in the `conffiles` define (`npm run conffiles`) — else
-  the manager replaces it on upgrade and the theme's own Update wipes the admin's saved defaults,
-  reporting success.
-- `postinst`/`postrm` use **`rpcd reload`, never `restart`** — restart logs out every LuCI session.
-- A malformed `acl.d/*.json` is skipped by rpcd **silently**, so the grant goes to nobody and only
-  Save-as-default and the background upload break, on someone else's router (`npm run acl`).
-- `root/etc/uci-defaults/30_luci-theme-footstrap` is the single source of registration; fresh
-  install vs upgrade is the marker file `/usr/share/luci-theme-footstrap/.installed`, and **an
-  upgrade must never change the active theme** (`$PKG_UPGRADE` is dead — apk never exports it).
-- Do not set `PKG_VERSION` (git-derived). `LUCI_MINIFY_CSS:=0` — csstidy mangles `:has()` and
-  `color-mix()`.
-- **Never post a comment on the upstream PR** — not a reply to a review thread, not a status note,
-  not a summary of what was fixed. A review finding is answered in the DIFF and by marking the
-  thread resolved; the commit message and the changelog carry the reasoning. Anything that has to
-  be said to a human is said here, in this session, not on the PR.
-- **The theme is IN openwrt/luci** (merged 2026-08-20 as `6f08de76`), so the proposal branch is
-  history and so is amending it. Upstream work is now one **feature branch per change**, cut from
-  a fresh `upstream/master`, and their `CONTRIBUTING.md` is the authority:
-  - subject `luci-theme-footstrap: <lowercase description>`; a body that says why; **`Signed-off-by`
-    with a real first and last name** — a `@users.noreply.github.com` address is refused;
-  - `git push -f` is explicitly fine *inside your own PR branch* (amend, `rebase -i`) and is how a
-    PR is updated; never on master;
-  - release branches (`openwrt-25.12`, …) take **bug and security fixes only** — no new packages,
-    which is why the theme is not in the 25.12 feed and will not be;
-  - **translations are Weblate's**, not ours: `po/` no longer travels with the sync.
-- **`tools/sync-luci-fork.sh ../luci-fork` materialises the copy, but two things it cannot carry**:
-  the far side's `Makefile` is hand-maintained (postinst/postrm/conffiles must be changed there
-  too) and `po/` is Weblate's. The script says so on every run, and `npm run fork-drift` lists
-  every shipped file the two trees disagree about — a report, not a gate: an unproposed change is
-  a legitimate drift.
-- **A release is not finished when the tag pipeline is green** — the theme installs from
-  owfeed-packages, so it also has to reach the feed: bump `packages/luci-theme-footstrap/upstream.sh`
-  (the bot opens that PR for some releases and not others), check the sha256s in the diff against
-  the release assets you downloaded, merge, and then read the **served** index rather than the
-  workflow log — `apk adbdump` on `releases/25.12/<arch>/packages.adb` and `Packages.gz` on
-  `releases/24.10/<arch>/`.
-- **The trust chain fails closed**: a verified TLS channel (never `-k`, never as a retry), an
-  ed25519 `usign` signature, then GitHub's sha256. The signature is the link that holds — GitHub
-  *computes* the asset digest, so a swapped asset passes the checksum. A missing digest, `.sig` or
-  usign is a refusal, not a downgrade.
-- A `_()` with no catalogue renders silently in English: run `luci-theme-footstrap/update-po.sh`
-  after touching any `_()`. A msgid is a **global** name shared with every app — Appearance labels
-  carry the `footstrap` msgctxt; the chrome, the login/notice sentences and the
-  System/Memory/Storage titles deliberately do not.
-
-## Commits and the changelog
-
-- **Conventional Commits, message in English. Never commit OR PUSH without an explicit instruction
-  for that action, each time.** Finished work, green gates, a verified fix or an answered review is
-  not authorization, and yesterday's "commit and push" covers yesterday only. This holds for BOTH
-  remotes — `origin` here, and the openwrt/luci fork behind the PR, where the amend + push
-  `--force-with-lease` sequence is a push like any other. Leave the tree dirty and say what would go
-  in and where it would go; wait to be told. No co-author / "Generated with" / AI attribution
-  trailers. `origin` is the only remote of THIS repository.
-- **NO COMMIT LANDS WITHOUT ITS CHANGELOG ENTRY.** It goes under `## [Unreleased]`, in the **same
-  commit as the code**, and in **BOTH `CHANGELOG.md` AND `CHANGELOG_ru.md`** — never one now and
-  its mirror later. An entry written afterwards is written from the diff, and the diff is exactly
-  what does not know why. This covers documentation, benchmarks, CI and packaging too, not just
-  code: if the commit is worth making, it is worth one line saying what changed. The only things
-  that skip it are this file and a fix to an `[Unreleased]` entry already written.
-  `npm run changelog` fails on a mismatch between the two files, so a missing mirror is a red gate,
-  not a note for later.
-- Sections are `Added / Changed / Deprecated / Removed / Fixed / Security / Performance`, one of
-  each per version, in that fixed order — append into the section that already exists in its
-  canonical slot, never add a second `### Changed` on top.
-- Each entry is `- **one-line effect.** then the rationale`. The bold lead **is** the release note
-  (`release-notes.sh` emits leads only), so it must read on its own — **a bullet with no bold lead
-  is silently dropped from the release**. Write the effect, not the diff; keep the measurement.
-- Cutting a release: `docs/releasing.md`, and the order is load-bearing — checklist, rename the
-  heading and add the compare link in both files, `npm run changelog`, commit, **then** tag that
-  commit.
+`git commit` and `git push` are `ask` in `.claude/settings.json`; the trailers are stripped by
+`attribution` there and by `.githooks/commit-msg`, which holds whatever the client does. Every
+commit carries its changelog entry in both files — `.claude/rules/changelog.md`, enforced by
+`.claude/hooks/precommit-gate.sh`. **Never post a comment on the upstream PR**: a review finding is
+answered in the DIFF and by resolving the thread (`/upstream-pr`, enforced by `permissions.deny`).

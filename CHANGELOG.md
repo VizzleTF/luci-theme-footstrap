@@ -4,6 +4,10 @@
 
 - **`npm run check` is three tiers now, and two new gates run inside it.** The 25 checks are split by what they cost: `check:fast` needs no browser and no CSS build, `check:mid` builds the sheet, `check:slow` drives a browser. Nothing was dropped — the 23 that were there are all still there, plus `makefile-contract` and `smoke`. Two more exist beside them: `smoke` brings every module up in a real DOM in ~1.4 s, and `computed-diff` compares the worktree against HEAD over every element of the gallery in ~4 s, with a `--control` mode that runs the same sheet twice and must report zero. `tools/bg.sh` detaches a long run and logs it into `../tmp/`.
 
+- **The rules that apply to one area now load with that area.** CLAUDE.md carried every rule for every file, so a CSS edit read the packaging rules and a Makefile edit read the JS ones. The per-area rules moved to `.claude/rules/*.md`, each declaring the paths it governs — `css.md` for `styles/**`, `js.md` for the shipped modules, `chrome.md` for the templates and `fs-*`, `package.md` for the Makefile and `root/**`, `changelog.md` for both changelogs. CLAUDE.md keeps what applies everywhere and shrank from 282 lines to 191. Nothing was dropped: every rule checked for is in one file or the other.
+
+- **`docs/development.md` records the stand's own traps, with the check that tells each one apart.** Six of them, each of which cost a measurement that read as a regression in the theme: `owlab sync` ships a dev build rather than a package, opkg silently skips a reinstall at the same version, a forced reinstall hands the theme back to bootstrap, `owlab exec` eats short flags, `owlab test` fights the stands that are already up, and two live-audit findings belong to their apps rather than to the theme. `docs/releasing.md` gains the matching step: a release is measured on an INSTALLED package, one `owlab test` per format.
+
 ## [0.14.3] — 2026-08-29
 
 ### Changed

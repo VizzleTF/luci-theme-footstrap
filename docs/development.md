@@ -179,6 +179,54 @@ the installed theme — the same command as above, so locally it is one `owlab e
 
 Nothing in `package.json` reaches the package: the OpenWrt buildbot has no node.
 
+### The two cheap browser gates: `smoke` and `computed-diff`
+
+Between the static gates and a stand there is a step that costs seconds and catches the regression
+that is in the FILE rather than in the page. Both drive `docs/gallery.html` — every widget LuCI or a
+third-party app can emit, with the real class names, and no router.
+
+```sh
+npm run smoke            # ~1.4 s: the modules come up in a real DOM, the axes stamp in order
+npm run computed-diff    # ~4 s: worktree vs HEAD, getComputedStyle over every element
+npm run computed-diff -- --control    # the same sheet twice; must be 0
+```
+
+`smoke` evaluates `fs-fit`, `fs-prefs`, `fs-axes`, `fs-select`, `fs-chrome` and `fs-router` the way
+luci.js does — the prologue's `'require x as y'` pragmas become the factory's parameters, one copy
+of that derivation shared with `tests/lib/luci-module.mjs` — and then watches each colour axis write
+`--fs-<x>-h` before `data-<x>`. What it adds over `npm test` is the box: the unit suite's window and
+document RECORD calls rather than answer them, so a module that throws the first time it measures
+something passes there and fails on a router. Proven to bite: inverting the two writes in
+`fs-axes.js` turns five checks red.
+
+`computed-diff` builds the stylesheet at `HEAD` with `git archive` (so an uncommitted edit cannot
+leak into the BEFORE side), loads the gallery once, and swaps the `<link>`. Its floor is 0, and two
+measurements were needed to get there — the reference sheet is swapped onto ITSELF before the first
+snapshot, because a colour from a sheet parsed with the document serialises `oklab(…)` and the same
+colour from one attached later serialises `color(srgb …)` (28 phantom differences in light, 0 in
+dark); and every running animation is awaited, because a `span.cbi-tooltip` fade was caught at
+`opacity 0.00245647` by one snapshot and finished by the other. It reports rather than judges unless
+given `--max N`.
+
+**Neither replaces a userland run, and a green one never earns a release the right to skip owlab.**
+The gallery has every widget and none of the pages: no menu, no chrome, no session, no third-party
+sheet, no rpc, no container query answered by a real viewport, and every dependency in `smoke` is a
+stub. They are early detectors. The release matrix is unchanged — `owlab test` on both formats,
+`npm run live -- --all`, `npm run check`, `/security-review` (releasing.md).
+
+### Git hooks
+
+The repository keeps its hooks in `.githooks/`, which is not active until you point git at it:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+`commit-msg` strips Co-Authored-By, `Claude-Session:` and "Generated with" trailers from whatever
+wrote them, and leaves `Signed-off-by` alone — openwrt/luci refuses a sign-off with a
+`@users.noreply.github.com` address, so that line is load-bearing. `pre-push` runs `npm run check`;
+`git push --no-verify` is the deliberate bypass and says so on the way past.
+
 ## The live gates: `npm run live`
 
 The static gates read files. Every bug a user has reported was about a **page** — a shredded column,
@@ -304,6 +352,67 @@ the bug class `install.sh`'s `uclient-fetch` fallback exists for.
 
 If a change needs a real kernel — not this theme's usual case — a router can be raised to
 `fidelity: vm`, which runs it under QEMU instead of in a container.
+
+## The stand's own traps
+
+Every one of these cost a measurement that read as a regression in the theme. They are written down
+because each was hit more than once.
+
+**`owlab sync` does not ship what a router gets.** It copies `htdocs/` and `ucode/` straight from the
+checkout and builds `cascade.css` with `--dev`: no minifier, no pre-paint minifier, no template
+strip, no token mangle, no PNG repack. Anything touching the build pipeline has to be measured on a
+package — `./tools/stage.sh && owfeed build`, then install. The seam mangle is visible from the
+browser: on a packaged build `getComputedStyle(document.documentElement).getPropertyValue('--fs-accent')`
+comes back empty, because the name is `--aX` there.
+
+**opkg does not reinstall a package whose version already matches.** `PKG_VERSION` is git-derived and
+does not move between rebuilds of one commit, so on 24.10 `owlab install` answers
+`… is up to date.` and leaves the previous files in place while apk reinstalls happily. Three rounds
+of an anchor fix were measured on the OLD build this way. Prove the bytes arrived:
+
+```sh
+md5sum dist/root/www/luci-static/resources/fs-fit.js
+owlab exec owrt2410 -- md5sum /www/luci-static/resources/fs-fit.js
+```
+
+When they differ, force it through docker — `owlab install` has no flag for it:
+
+```sh
+docker cp dist/all/*.ipk owlab-luci-theme-footstrap-owrt2410:/tmp/theme.ipk
+docker exec owlab-luci-theme-footstrap-owrt2410 opkg install --force-reinstall /tmp/theme.ipk
+```
+
+**…and a forced install leaves the stand on stock bootstrap.** It runs postrm, which hands
+`luci.main.mediaurlbase` to another theme exactly as [package.md](package.md) requires. The next gate
+then measures bootstrap and reports the theme as broken — 78 findings on one anchor sweep, 156 on the
+next, every one of them the wrong theme. Put it back:
+
+```sh
+owlab exec owrt2410 -- uci set luci.main.mediaurlbase=/luci-static/footstrap
+owlab exec owrt2410 -- uci commit luci
+```
+
+**`owlab exec` eats short flags.** Everything after `--` still goes through owlab's own flag parser,
+so `sh -c '…'` fails with `--config: stat n=0; for t in …` and `ucode -T -c -o /dev/null` fails with
+`--config: stat -o`. stdin is not forwarded either. Put the script in the staged tree, sync it, and
+run it by path: `owlab exec <stand> -- sh /www/_probe.sh`.
+
+**`owlab test` fights the stands that are already up.** It synthesises its own router on host port
+2222, and with stands running the bind fails — after it has already removed one of the existing
+containers. Either take the stands down first, or assert the five `verify` things by hand on a
+running stand. If you do it by hand, log IN: an unauthenticated `curl` answers 403 and proves
+nothing.
+
+**Two live-audit findings are never the theme.** `/admin/services/banip/processing_log` prints the
+system log, and the log grows with every sync and restart done while working, so a long session
+manufactures its own findings — `owlab exec <stand> -- /etc/init.d/log restart` and re-measure (309
+lines gave 3 findings, 1 line gave none). `/admin/services/acme/logread` has a `textarea` with no
+accessible name in 25.12's app; 24.10 does not render it at all.
+
+**When a live gate goes red, build the PARENT COMMIT.** Package it, install it the same way, run the
+same narrowed check. A finding that reproduces there did not come from the change under test. That is
+how the anchor regression in 0.14.3 was pinned to one commit out of thirty-seven, and how both
+findings above were shown to belong to their apps.
 
 ## The test matrix
 

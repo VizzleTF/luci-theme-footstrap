@@ -92,6 +92,23 @@ npm run live -- --all --pages-all          # every router owlab boots
 node tools/upstream-contract.mjs           # what the theme assumes of luci-base, asked on each
 ```
 
+**And the package on both formats, before the tag.** `npm run live` measures a *synced* tree; a
+release is *installed*, and that is a different claim — two `owlab test` invocations, one per
+format, never one run with two `--release` flags (`--install` is a host-side glob evaluated per
+router, so `dist/*/…` hands the apk box an ipk too: `0 of 2 routers passed`). The five assertions
+and the exact flags are in [development.md](development.md#proving-it-on-a-router-owlab-test); the
+fifth is the `ucode -T -c` sweep over every installed template.
+
+```sh
+./tools/stage.sh && owfeed build
+owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' --assert …
+owlab test --release 24.10.8 --install 'dist/all/luci-theme-footstrap_*.ipk'   --assert …
+```
+
+Both of these are long runs: start them detached with `tools/bg.sh` and read the logs out of
+`../tmp/`. **A release is not cut until every log above has been read** — a detached run nobody
+opened is not a green gate, and the tier a check sits in never changes what the release requires.
+
 **23.05 used to have a line of its own here, and no longer does.** It was the oldest release the
 theme claimed and the only one whose `luci-base` was missing a widget the theme uses:
 `ui.RangeSlider` arrived in 24.10, and its absence took the ENTIRE Appearance tab down — the panel
