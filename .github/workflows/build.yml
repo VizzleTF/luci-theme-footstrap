@@ -105,6 +105,10 @@ jobs:
       # somebody else's upgrade, an `!important` that drifted out of the allowlist, a changelog
       # bullet with no bold lead, which release-notes.sh drops from the release page in silence.
       - run: node tools/conffiles.mjs
+      # po/, tools/stage.sh and owfeed.yml each repeat the language list, and a language
+      # missing from the last one stages into a directory nothing packages: the build stays
+      # green and that translation simply does not ship.
+      - run: node tools/i18n-packages.mjs
       - run: node tools/bang-ok.mjs
       - run: node tools/changelog.mjs
 

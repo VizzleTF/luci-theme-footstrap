@@ -30,7 +30,7 @@ LUCI_DEPENDS:=+luci-base
 LUCI_PKGARCH:=all
 # Else luci.mk defaults these to LuCI's own, and the package claims MAINTAINER "OpenWrt LuCI
 # community" / URL openwrt/luci.
-LUCI_MAINTAINER:=VizzleTF <vizzletf47@gmail.com>
+LUCI_MAINTAINER:=Ivan Kvashonkin <vizzlef@gmail.com>
 LUCI_URL:=https://github.com/VizzleTF/luci-theme-footstrap
 
 # CSS: ship verbatim. luci.mk would run csstidy over it, which is old enough to mangle :has(),

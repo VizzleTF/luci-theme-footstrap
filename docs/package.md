@@ -25,7 +25,7 @@ luci-theme-footstrap/
 │   └── es/footstrap.po
 ├── htdocs/luci-static/   → /www/luci-static/
 │   ├── footstrap/        cascade.css (GENERATED, gitignored), logo.svg,
-│   │                     manifest.json + app-icon-512.png (ONE raster: every browser that
+│   │                     manifest.json + app-icon-192.png (ONE raster: every browser that
 │   │                     installs a page picks the largest icon and downscales, and iOS reads
 │   │                     the apple-touch-icon LINK, which points at the same file)
 │   │                     (the raster is COMMITTED and made by tools/build-icons.mjs — the
@@ -167,14 +167,27 @@ its asset with `grep -E '\.apk$' | head -1`, GitHub returns assets **sorted by n
 instead of the theme, reported success, and offered the same update forever. A script already on
 somebody's router cannot be fixed remotely, so the *release* was fixed instead.
 
-That script is retired, and the release is built by owfeed, which packages this theme as exactly
-one artifact per format whatever luci.mk would have done. The constraint that bought the rename is
-gone; the cost of keeping it — a catalogue the project's own translation platform cannot see — is
-not. `tools/check-packages.sh` still asserts one theme package per format.
+That script is retired, and the release is built by owfeed. From 0.14.4 the owfeed build emits the
+same set luci.mk would: **`luci-theme-footstrap`, plus one `luci-i18n-footstrap-<lang>` per
+language**, with the catalogue at `footstrap.<lang>.lmo` and a `uci-defaults` line registering the
+language in LuCI's own menu. `tools/stage.sh` builds the per-language staging trees, `owfeed.yml`
+declares one package each, and `tools/i18n-packages.mjs` fails the build when those three lists
+disagree.
 
-In the owfeed-built package the `.lmo` basename is **`footstrap-theme.<lang>.lmo`**, not
-`footstrap.<lang>.lmo`: `lmo_load_catalog` globs `*.<lang>.lmo` so any basename loads, and keeping
-the two builds' paths distinct means a router can carry both without a file conflict.
+Between v0.12.x and 0.14.3 the catalogues rode **inside** the theme under the basename
+`footstrap-theme.<lang>.lmo`. That cost every router 10,992 B of flash and 4,821 B of the `.apk`,
+including the majority reading English, and it was the bundling that forced the odd basename in the
+first place — a router still owning `footstrap.<lang>.lmo` through the old language package would
+otherwise have hit a file conflict. Split back out under luci.mk's own names, that conflict is an
+ordinary upgrade of the same package instead. Measured on both stands: upgrading the theme takes the
+old `footstrap-theme.*.lmo` away with it, and installing `luci-i18n-footstrap-ru` puts
+`footstrap.ru.lmo` down in its place, with `luci.languages.ru` registered and the chrome rendering
+in Russian.
+
+`install.sh` reads `luci.main.lang` after installing the theme and fetches the matching package
+best-effort, so the split does not silently un-translate a router on the upgrade that introduces it.
+A language with no catalogue, `en`, and `auto` are all no-ops there. `tools/check-packages.sh`
+asserts one theme package per format, one catalogue per language package, and none in the theme.
 
 ## uci-defaults: registration
 

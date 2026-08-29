@@ -180,10 +180,13 @@ The steps:
    subscribers. Here two noarch packages ride as release assets and expand into no architectures, so
    the flag buys nothing and costs a red release on every OpenWrt point release. The committed lock
    still pins which SDK the host `apk` comes from, so the toolchain does not float.
-4. **Assert the catalogues are in the package.** It is compiled in and absent from git, and a
-   silently missing `.lmo` means every `_()` renders the English msgid with nobody reporting
-   anything. Counted against the number of languages in the tree, so adding a language and
-   forgetting is a red build rather than quiet English for some users.
+4. **Assert the catalogues.** A `.lmo` is compiled in and absent from git, and a silently missing
+   one means every `_()` renders the English msgid with nobody reporting anything. Each language
+   ships as its own `luci-i18n-footstrap-<lang>`, so the assertion is one catalogue named
+   `footstrap.<lang>.lmo` per language package, a uci-defaults line registering that language, and
+   **none in the theme** — two packages owning one path is an install apk refuses. Counted against
+   the languages in `po/`, so adding one and forgetting to declare its package is a red build
+   rather than quiet English for some users.
 5. **Flatten the packages into `dist/`** (owfeed writes `dist/noarch` and `dist/all`; apk derives
    the filename from name and version, so two architectures cannot share a directory). CI requires
    that the theme resolve to exactly one asset per format under a name-anchored regex

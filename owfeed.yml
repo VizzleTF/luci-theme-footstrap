@@ -29,7 +29,7 @@ feed:
   # the only stage this file drives.
   url: https://repo.owfeed.org
   title: Footstrap
-  maintainer: "VizzleTF <vizzletf47@gmail.com>"
+  maintainer: "Ivan Kvashonkin <vizzlef@gmail.com>"
   license: Apache-2.0
   homepage: https://github.com/VizzleTF/luci-theme-footstrap
 
@@ -85,7 +85,7 @@ packages:
     # Software, so declaring it would be false.
     license: Apache-2.0
     url: https://github.com/VizzleTF/luci-theme-footstrap
-    maintainer: "VizzleTF <vizzletf47@gmail.com>"
+    maintainer: "Ivan Kvashonkin <vizzlef@gmail.com>"
     # Which commit produced these bytes, recorded in the package itself. env: because the value
     # changes with every commit and belongs in CI, not in a committed file.
     repo-commit: env:GITHUB_SHA
@@ -109,14 +109,53 @@ packages:
       post-install: ./dist/scripts/post-install
       post-deinstall: ./dist/scripts/post-deinstall
 
-    # The catalogues ship INSIDE this package, not as luci-i18n-footstrap-<lang>: several assets in
-    # one release is what made the fielded self-update script install the 6 KB catalogue instead of
-    # the theme (issue #6), and two packages drift — an _() the older one lacks renders in English
-    # and reports nothing.
-    #
-    # basename `footstrap-theme`, NOT `footstrap`: lmo_load_catalog globs *.<lang>.lmo so any
-    # basename loads, and a v0.8.4 router still owns footstrap.ru.lmo through the old luci-i18n
-    # package — same path is a file conflict, and apk refuses the very upgrade that would fix it.
+# ---- one package per language ----
+#
+# The catalogues used to ship inside the theme. They cost 10,992 B on flash and 4,821 B of the .apk,
+# and every router paid it — including the ones reading English, which is most of them. Split out,
+# a Russian router installs luci-i18n-footstrap-ru and nobody else carries a byte.
+#
+# The reason they were bundled is in git and half of it has expired: "several assets in one release
+# made the fielded self-update script install the 6 KB catalogue instead of the theme (issue #6)" —
+# that script is retired, and the Makefile says so. What remains is that two packages can drift, an
+# `_()` the older catalogue lacks rendering in English with nothing reporting it. That is the same
+# trade every luci-app-* in the tree makes, and `update-po.sh --check` already fails a build whose
+# catalogues are behind the source.
+#
+# NAMES AND PATHS ARE luci.mk's, not ours: `luci-i18n-$(LUCI_BASENAME)-<lang>` with LUCI_BASENAME
+# `footstrap`, and the catalogue basename `footstrap`, so `po2lmo` in an SDK build and owfeed here
+# produce the same file in the same package for the same router. That also puts these packages back
+# on the name a v0.8.4 router already has installed, so the file it owns is upgraded rather than
+# fought over — bundling them was what forced the `footstrap-theme` basename in the first place.
+#
+# The per-language staging directories come from tools/stage.sh (it also writes the uci-defaults
+# line that puts the language in LuCI's menu); tools/i18n-packages.mjs holds po/, that script and
+# this list to each other, so adding a language cannot half-land.
+
+  - name: luci-i18n-footstrap-ru
+    build: mkpkg
+    arch: noarch
+    version-from: file:./dist/VERSION
+    files: ./dist/i18n-ru
+    description: "Footstrap theme - Russian translation"
+    depends: [luci-theme-footstrap]
+    license: Apache-2.0
+    url: https://github.com/VizzleTF/luci-theme-footstrap
+    maintainer: "Ivan Kvashonkin <vizzlef@gmail.com>"
     i18n:
-      from: ./luci-theme-footstrap/po
-      basename: footstrap-theme
+      from: ./dist/po-ru
+      basename: footstrap
+
+  - name: luci-i18n-footstrap-es
+    build: mkpkg
+    arch: noarch
+    version-from: file:./dist/VERSION
+    files: ./dist/i18n-es
+    description: "Footstrap theme - Spanish translation"
+    depends: [luci-theme-footstrap]
+    license: Apache-2.0
+    url: https://github.com/VizzleTF/luci-theme-footstrap
+    maintainer: "Ivan Kvashonkin <vizzlef@gmail.com>"
+    i18n:
+      from: ./dist/po-es
+      basename: footstrap

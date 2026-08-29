@@ -9,6 +9,7 @@
     "a11y": "node tools/a11y-gallery.mjs",
     "audit": "python3 tools/audit.py --strict",
     "conffiles": "node tools/conffiles.mjs",
+    "i18n-packages": "node tools/i18n-packages.mjs",
     "acl": "sh tools/check-acl.sh",
     "export-tier": "node tools/export-tier.mjs",
     "i18n": "luci-theme-footstrap/update-po.sh --check",
@@ -42,7 +43,7 @@
     "install-check": "sh tools/install-check.sh",
     "smoke": "node tools/smoke.mjs",
     "computed-diff": "node tools/computed-diff.mjs",
-    "check:fast": "npm run lint && npm run shell && npm run marker && npm run audit && npm run conffiles && npm run acl && npm run makefile-contract && npm run test && npm run css-orphans && npm run css-i18n && npm run mirror && npm run bang-ok && npm run axes && npm run page-modules && npm run chrome-fence && npm run changelog",
+    "check:fast": "npm run lint && npm run shell && npm run marker && npm run audit && npm run conffiles && npm run acl && npm run i18n-packages && npm run makefile-contract && npm run test && npm run css-orphans && npm run css-i18n && npm run mirror && npm run bang-ok && npm run axes && npm run page-modules && npm run chrome-fence && npm run changelog",
     "check:mid": "npm run css-metrics && npm run css-floor && npm run css-dup && npm run size && npm run i18n",
     "check:slow": "npm run tables && npm run export-tier && npm run icons && npm run a11y && npm run smoke",
     "makefile-contract": "node tools/makefile-contract.mjs"

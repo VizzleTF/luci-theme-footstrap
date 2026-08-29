@@ -153,4 +153,47 @@ extract postinst "$DIST/scripts/post-install"
 extract postrm   "$DIST/scripts/post-deinstall"
 chmod +x "$DIST/scripts/"*
 
+# ---- one package per language, the way luci.mk emits them ----
+#
+# The catalogues used to ship INSIDE the theme: 10,992 B on flash and 4,821 B of the .apk, paid by
+# every router including the ones reading English. Split out, a Russian router installs
+# luci-i18n-footstrap-ru and nobody else carries it.
+#
+# owfeed's `i18n.from` compiles every language under one directory into one package, so each
+# language gets its own staging directory holding only its own .po — that is all these two loops
+# build. The package NAMES are luci.mk's (`luci-i18n-$(LUCI_BASENAME)-<lang>`, and LUCI_BASENAME is
+# `footstrap`), and so is the catalogue basename, so an SDK build and this one produce the same
+# package for the same router.
+#
+# The uci-defaults line is luci.mk's too: without it the language never appears in LuCI's own
+# language menu, and the catalogue loads only for someone who set the language by hand.
+# The label is LuCI's own, copied from luci.mk's LUCI_LANG.<code> table rather than invented: it is
+# what the language menu shows, and every luci-i18n-* package on the router writes the same string
+# for the same code. A language with no entry here stops the build — registering the bare code would
+# put "ru" in a menu that reads "Русский (Russian)" everywhere else.
+# tools/i18n-packages.mjs holds this table, po/ and owfeed.yml to each other.
+lang_name() {			# <code> -> the label LuCI shows
+	case "$1" in
+		es) echo 'Español (Spanish)' ;;
+		ru) echo 'Русский (Russian)' ;;
+		*)  echo '' ;;
+	esac
+}
+for po in "$SRC"/po/*/; do
+	[ -d "$po" ] || continue
+	lang=$(basename "$po")
+	[ "$lang" = templates ] && continue
+	[ -n "$(find "$po" -maxdepth 1 -name '*.po' -print -quit)" ] || continue
+	label=$(lang_name "$lang")
+	[ -n "$label" ] || {
+		echo "stage: po/$lang has no label in lang_name() — add LuCI's own LUCI_LANG.$lang" >&2
+		exit 1
+	}
+	mkdir -p "$DIST/po-$lang/$lang" "$DIST/i18n-$lang/etc/uci-defaults"
+	cp "$po"*.po "$DIST/po-$lang/$lang/"
+	printf "uci set luci.languages.%s='%s'; uci commit luci\n" \
+		"$(echo "$lang" | tr - _)" "$label" \
+		> "$DIST/i18n-$lang/etc/uci-defaults/luci-i18n-footstrap-$lang"
+done
+
 echo "staged $DIST/root at $(cat "$DIST/VERSION")"

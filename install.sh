@@ -44,6 +44,7 @@ RWQYxjhl4rz41tNZc3dXmnRplRO1ydN1q8as++iPUjZc6SRUCb952L/T'
 info() { printf '[*] %s\n' "$1"; }
 ok()   { printf '[+] %s\n' "$1"; }
 err()  { printf '[-] %s\n' "$1" >&2; }
+warn() { printf '[!] %s\n' "$1" >&2; }
 
 # Every downloader on the box, in turn, until one SUCCEEDS — not the first one that EXISTS.
 #
@@ -140,7 +141,10 @@ feed_lag_note() {	# <installed version>
 # that does not match is a refusal, never a downgrade. `apk`'s --allow-untrusted only says the .apk
 # carries no APK signature of its own; the usign signature over the manifest is what this path
 # trusts, and it is checked before the file is handed over.
+# <package name>, defaulting to the theme: the language catalogues are named in the same signed
+# manifest and are fetched through the same chain.
 install_from_release() {
+	_want="${1:-$PKG}"
 	command -v usign >/dev/null 2>&1 || {
 		err "usign is not installed, so a release artifact cannot be verified here."
 		return 1
@@ -158,10 +162,10 @@ install_from_release() {
 		rm -rf "$_tmp"; return 1
 	fi
 	# one line per format: `pkg <name> <format> <file> <size> <sha256> <arch>`
-	_file=$(awk -v p="$PKG" -v f="$PM_FMT" '$1=="pkg" && $2==p && $3==f { print $4 }' "$_tmp/manifest.txt")
-	_sha=$(awk -v p="$PKG" -v f="$PM_FMT" '$1=="pkg" && $2==p && $3==f { print $6 }' "$_tmp/manifest.txt")
+	_file=$(awk -v p="$_want" -v f="$PM_FMT" '$1=="pkg" && $2==p && $3==f { print $4 }' "$_tmp/manifest.txt")
+	_sha=$(awk -v p="$_want" -v f="$PM_FMT" '$1=="pkg" && $2==p && $3==f { print $6 }' "$_tmp/manifest.txt")
 	if [ -z "$_file" ] || [ -z "$_sha" ]; then
-		err "The manifest names no $PM_FMT artifact for $PKG."
+		err "The manifest names no $PM_FMT artifact for $_want."
 		rm -rf "$_tmp"; return 1
 	fi
 	info "Downloading $_file..."
@@ -185,6 +189,50 @@ install_from_release() {
 	fi
 	rm -rf "$_tmp"
 	return 0
+}
+
+# --- the catalogue for the language this router is set to ---------------------------------------
+#
+# The translations used to ride inside the theme, so every router carried both of them and nobody
+# had to ask for one. They are `luci-i18n-footstrap-<lang>` now, which takes 4,821 B off the theme
+# for the majority reading English — and would silently un-translate a Russian router on the upgrade
+# that introduces the split, since the theme's own catalogue leaves with the old package.
+#
+# So: read the language LuCI is actually set to and fetch that one, best effort. A missing package
+# is not a failure — most languages have no catalogue, and `en` never does. Nothing here runs when
+# the router is on the default (unset, or `auto`, which means "follow the browser" and names no
+# single catalogue to install).
+install_language() {
+	_lang=$(uci -q get luci.main.lang 2>/dev/null || true)
+	case "$_lang" in
+		''|auto|en) return 0 ;;
+	esac
+	_lpkg="luci-i18n-footstrap-$_lang"
+	if [ "$1" = feed ]; then
+		# ASKED FOR FIRST, then installed. Most languages have no catalogue, and letting the
+		# install fail instead prints fifteen lines of the package manager's own diagnosis
+		# (pm_quiet's failure tail) in front of a message that says nothing is wrong.
+		if [ "$PM" = apk ]; then
+			apk list "$_lpkg" 2>/dev/null | grep -q . || {
+				info "No $_lpkg in the feed — the theme's own strings stay in English."; return 0; }
+		else
+			opkg list "$_lpkg" 2>/dev/null | grep -q . || {
+				info "No $_lpkg in the feed — the theme's own strings stay in English."; return 0; }
+		fi
+		info "Fetching the $_lang translation ($_lpkg)..."
+		if [ "$PM" = apk ]; then
+			pm_quiet apk add --upgrade "$_lpkg" || {
+				warn "Could not install $_lpkg — the theme stays in English."; return 0; }
+		else
+			pm_quiet opkg install "$_lpkg" || pm_quiet opkg upgrade "$_lpkg" || {
+				warn "Could not install $_lpkg — the theme stays in English."; return 0; }
+		fi
+	else
+		info "Fetching the $_lang translation ($_lpkg)..."
+		install_from_release "$_lpkg" || {
+			warn "The release manifest names no $_lpkg — the theme stays in English."; return 0; }
+	fi
+	ok "Translation installed: $_lang"
 }
 
 printf '\n=== luci-theme-footstrap installer ===\n\n'
@@ -318,6 +366,7 @@ if [ -z "$BRANCH" ]; then
 		err "  https://github.com/$REPO/releases/latest"
 		exit 1
 	}
+	install_language release
 	rm -f /tmp/luci-indexcache* 2>/dev/null || true
 	rm -rf /tmp/luci-modulecache 2>/dev/null || true
 	if [ -x /etc/init.d/rpcd ]; then /etc/init.d/rpcd reload >/dev/null 2>&1 || true; fi
@@ -420,6 +469,8 @@ else
 		pm_quiet opkg install "$PKG" || exit 1
 	fi
 fi
+
+install_language feed
 
 # Both caches, as postinst does: a stale /tmp/luci-modulecache bites exactly here, on a
 # package that replaces the theme's JS. reload, never restart — restart logs out every

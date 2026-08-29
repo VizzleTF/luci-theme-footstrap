@@ -17,10 +17,11 @@ is not yours, weeks later. Four of them are now held by `npm run makefile-contra
 - **`+luci-base` is the whole dependency list and keeping it that way is a constraint.** `curl` is
   not in OpenWrt's default set — fall back to `uclient-fetch` instead of adding a dep.
 - **The catalogue lives in `po/`** — what `LUCI_LANGUAGES` globs and what Weblate translates.
-  luci.mk emits the per-language packages; nothing in `Build/Prepare` compiles a catalogue. It was
-  `i18n/` while a fielded self-update script mis-picked a multi-asset release with `head -1` (#6);
-  owfeed now builds exactly one theme artifact per format regardless, which `tools/check-packages.sh`
-  still asserts in CI's build job.
+  luci.mk emits the per-language packages and so does owfeed: `luci-i18n-footstrap-<lang>`, catalogue
+  `footstrap.<lang>.lmo`, plus a uci-defaults line registering the language. The theme itself carries
+  NO catalogue — two packages owning one path is an install apk refuses. `po/`, `tools/stage.sh`
+  (staging trees + the language label) and `owfeed.yml` all repeat the language list and are held
+  together by `npm run i18n-packages`; `tools/check-packages.sh` asserts the built set.
 - Anything under `root/etc/config/` MUST be in the `conffiles` define (`npm run conffiles`) — else
   the manager replaces it on upgrade and the theme's own Update wipes the admin's saved defaults,
   reporting success.

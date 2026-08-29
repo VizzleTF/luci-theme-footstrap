@@ -51,13 +51,19 @@ const MARK = 0.6;	/* the mark's share of the canvas: the maskable safe zone is 0
 
 /* One raster, and the platforms do the scaling they were going to do anyway. A manifest icon set is
  * a list of sizes a browser may CHOOSE from, and every browser that installs a page picks the
- * largest and downscales; iOS reads the `apple-touch-icon` link rather than the manifest and is
- * equally happy with the same 512 square. A second and third file buys nothing but bytes on flash
- * and two more files to keep in step with logo.svg.
+ * largest and downscales; iOS reads the `apple-touch-icon` link rather than the manifest. A second
+ * and third file buys nothing but bytes on flash and two more files to keep in step with logo.svg.
+ *
+ * 192, not 512. A PNG is the one file in this package gzip cannot touch — 3,960 B of the 4,098 on
+ * flash survived compression, 5.4% of the whole .apk for one icon — and the mark is a flat two-tone
+ * glyph, so the pixels above 192 carry no detail. 192 is also the size Chrome requires to offer the
+ * install prompt at all, and iOS scales whatever `apple-touch-icon` names to 180. Measured as the
+ * package ships them, quantised and repacked: 512 was 4,098 B, 192 is 1,481 B — 2,617 B off the
+ * .apk, 3.6% of it.
  *
  * Nothing in luci-base could stand in for it: it ships functional glyphs and no logo. */
 const ICONS = [
-	{ name: 'app-icon-512.png', size: 512 },
+	{ name: 'app-icon-192.png', size: 192 },
 ];
 
 const logo = readFileSync(join(MEDIA, 'logo.svg'), 'utf8');
