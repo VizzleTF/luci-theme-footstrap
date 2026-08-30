@@ -43,6 +43,8 @@
 
 ### Fixed
 
+- **The seal routes by predicate, not by a catch-all glob, and the live job fits its limit again.** Sealing the browser to the router's origin was written as a route over every URL, which hands EVERY request to a JS callback — including the hundreds the router itself serves — and each round trip through the client costs time. Measured in CI on the same three stands: 17m26s and 17m5s without the seal, 45m19s with it, which is the live job's 45-minute limit and a cancelled run. A predicate is evaluated inside Playwright, so a request to the router is never intercepted at all and only the few going elsewhere reach the handler.
+
 - **The view transition takes both of its promises.** `swapIn()` handled `ready` and left `finished` alone, and `finished` rejects with whatever the update callback threw — so one fault in `commitStage()` would reach the console twice, the throw and an unhandled rejection behind it. Measured on a page whose callback throws: two `pageerror`s with only `ready` handled, one with both. 18 B on a cold page, and the budget was raised by exactly that.
 
 

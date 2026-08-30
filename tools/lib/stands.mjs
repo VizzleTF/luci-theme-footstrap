@@ -87,13 +87,14 @@ export function stands(only, { all = false } = {}) {
  * for itself is not a fetch. */
 export async function sealToRouter(ctx, base) {
 	const host = new URL(base).host;
-	await ctx.route('**/*', (route) => {
-		const url = route.request().url();
-		if (url.startsWith('data:') || url.startsWith('blob:')) return route.continue();
-		let h;
-		try { h = new URL(url).host; } catch (e) { return route.continue(); }
-		return (h === host) ? route.continue() : route.abort();
-	});
+	/* The predicate form, never a catch-all glob: a glob route hands EVERY request to a JS callback,
+	 * including the hundreds the router itself serves, and each round trip through the client costs
+	 * time and disables the browser's own handling. A predicate is evaluated by Playwright, so a request to
+	 * the router is never intercepted at all — only the handful going elsewhere reach the handler.
+	 * The glob version pushed CI's live job from 17 minutes past its 45-minute limit. */
+	await ctx.route(
+		(url) => url.host !== host && url.protocol !== 'data:' && url.protocol !== 'blob:',
+		(route) => route.abort());
 }
 
 /* LuCI answers an unauthenticated request with the login form, not a 403 page — so every live gate
