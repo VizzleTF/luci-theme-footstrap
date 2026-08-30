@@ -329,7 +329,15 @@ jobs:
   # for Safari, and on that path WebKit overshoots a section swap by 60px per tick. Measured on
   # 24.10, both layouts, 390 and 1440.
   anchors:
-    name: The reader stays put on every engine
+    # ONE JOB PER ENGINE, and it is the release's critical path that pays for it: this gate ran
+    # 52 minutes against live's 17 on the same three routers, so the whole pipeline was as slow as
+    # its slowest job. firefox and webkit share nothing — separate browsers, separate runs of the
+    # same sweep — so splitting them halves the wall clock and measures exactly as much.
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [ firefox, webkit ]
+    name: The reader stays put (${{ matrix.engine }})
     timeout-minutes: 75
     needs: build
     runs-on: ubuntu-latest
@@ -341,7 +349,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: sh tools/ci-playwright.sh
-      - run: npx playwright install --with-deps webkit firefox
+      # only the engine this shard drives: installing both cost ~1 minute of every run for a
+      # browser it never launches
+      - run: npx playwright install --with-deps ${{ matrix.engine }}
       - uses: actions/download-artifact@v8
         with:
           name: owfeed-packages
@@ -364,7 +374,16 @@ jobs:
               *)           owlab install "$r" dist/all/luci-theme-footstrap_*.ipk ;;
             esac
           done
-      - run: node tools/scroll-anchor.mjs --engines firefox,webkit --only "$(echo $ROUTERS | tr ' ' ,)"
+      # A pull request crosses the axes that were measured to change this gate's answer — the two
+      # scrollers, both anchoring modes, all three page shapes. A push and a tag add back the ones
+      # that were measured not to (every width against every layout, all three densities), because
+      # that measurement is of today's theme and a release is where being wrong about it is
+      # expensive. 12 cells per router against 48.
+      - name: The sweep
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then FULL=""; else FULL="--full"; fi
+          node tools/scroll-anchor.mjs --engines ${{ matrix.engine }} \
+            --only "$(echo $ROUTERS | tr ' ' ,)" $FULL
       - if: always()
         run: owlab down || true
 

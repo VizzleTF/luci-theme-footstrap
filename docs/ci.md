@@ -248,9 +248,11 @@ produced, and runs the live gates cheapest-first:
 5. `tools/table-tick.mjs` — the poll tick performed deliberately, with the layout forced inside the
    window fs-select answers in: a replaced data table may not be laid out before it has an answer.
 6. `tools/scroll-anchor.mjs` — content grows above the reader and the page must not move under them,
-   with and without the engine's own scroll anchoring. Chromium in CI; the other two engines are a local
-   `--engines chromium,firefox,webkit` because WebKit needs system libraries the runner would have
-   to install for every job.
+   with and without the engine's own scroll anchoring. It runs in its OWN job, one shard per engine
+   (`anchors`), not here: at 52 minutes against this job's 17 it was the whole release's critical
+   path, and firefox and webkit share nothing, so the two halves run at once. Its sweep is narrow on
+   a pull request and `--full` on a push — the axes it drops were measured not to change its answer,
+   and a push is where being wrong about that must still be caught.
 7. `tools/install-check.sh` — `install.sh` twice on each router, fresh and over its own result. It
    goes last because it replaces the build under test with the published release; #16, #28 and #30
    were all this script, and all on the second run.

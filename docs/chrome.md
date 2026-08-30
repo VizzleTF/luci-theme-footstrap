@@ -380,8 +380,8 @@ Measured two frames later instead, it closed that cell and corrected INSIDE A FL
 160px each.
 
 `tools/scroll-anchor.mjs` holds all of it: it grows 120px above the reader and requires the page to
-stay within two pixels, once with the engine's anchoring suppressed and once without, in both
-layouts; it refills a section the way a poll does — emptied, then filled again, with the router's own
+stay within two pixels, once with the engine's anchoring suppressed and once without, on both
+scrollers; it refills a section the way a poll does — emptied, then filled again, with the router's own
 poll held for the duration — and requires the same; and it flicks the page up and down to prove the
 theme corrects nothing while the reader is moving. With the fallback removed the Safari case reports
 exactly the reported symptom — 120px of page moved under the reader, 255px on the swap measured in
@@ -390,6 +390,18 @@ WebKit with the engine's own anchoring off, and 690px on a real Overview on the 
 not take, and it waits on `fit.restAt()` rather than on a stopwatch: WebKit starts its motion sampler
 late enough that a flat wait measured the theme before it had a reference at all, which reported a
 jump on every WebKit run with the theme identical on all three engines.
+
+The sweep crosses three page shapes and two scrollers, and both sets are what a measurement left
+standing rather than what looked thorough. The shapes: the Overview refills section BODIES, the
+realtime Connections table has its ROWS replaced under a poll, and Processes is one table that is a
+direct child of `#view` — the climb out of that one used to land on the host and give up. Processes
+proves the climb and never the swap: its single block is 6397px against 6108px of scroll on
+owrt2512, so it can never sit entirely above the reader, which is what a swap needs. Wireless was
+measured and dropped (812px of scroll at 390px wide, 0 at 1440). The scrollers: of `1440 side`,
+`1440 top`, `390 side` and `390 top`, only the first scrolls `#maincontent` and the other three
+scroll the window, so the sweep keeps the first and the narrowest. Density is one value for the same
+reason — across 72 Overview cells, normal, compact and large reported the same two outcomes and
+nothing else. `--full` crosses all of them anyway, and CI does that on a push and a tag.
 
 ## `fs-select.js`
 

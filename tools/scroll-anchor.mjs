@@ -24,7 +24,10 @@
  * The growth is inserted rather than waited for: a real tick depends on what the router's radios are
  * doing, and a gate that only fails when a station happens to join is not a gate.
  *
- *   node tools/scroll-anchor.mjs [--only owrt2512] [--engines chromium,firefox] [--widths 390,1440]
+ *   node tools/scroll-anchor.mjs [--only owrt2512] [--engines chromium,firefox] [--full]
+ *
+ * The default sweep crosses the axes that were measured to change its answer; `--full` adds the
+ * ones that were measured not to (see SCROLLERS and DENSITIES) and is what CI runs on a push.
  *
  * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
@@ -35,20 +38,61 @@ const arg = (name, dflt) => {
 	return i === -1 ? dflt : process.argv[i + 1];
 };
 const ENGINES = arg('engines', 'chromium').split(',').map((s) => s.trim()).filter(Boolean);
-const WIDTHS = arg('widths', '390,1440').split(',').map(Number);
-/* Two shapes, not one page: the Overview is sections with tables inside them, Processes a single
- * table that is a direct child of `#view`. That difference decides which element the theme can
- * anchor on — on the second shape the climb out of the table used to land on the host and give up,
- * so nothing held the reader at all, on every engine, while a gate that only opened the first shape
- * passed throughout. `--page a,b` overrides. */
-const PAGES = arg('page', '/admin/status/overview,/admin/status/processes')
+/* `--full` restores the axes this sweep used to cross in full: every width against every layout,
+ * and all three densities. Measured on 132 cells, they multiply the sweep without dividing its
+ * answers — see SCROLLERS and DENSITIES. CI crosses them on a push and a tag, where an hour is
+ * affordable and a narrowing that turns out to be wrong is caught before a release. */
+const FULL = process.argv.includes('--full');
+
+/* Three shapes, because the shape decides what the theme can anchor ON, and each of these breaks
+ * differently:
+ *
+ *   overview     sections whose BODIES a poll refills (`.cbi-section > div`, every 5 s). The only
+ *                page here where a refilled block is ever entirely above the reader, so the
+ *                `swapped` scenario is measured here and nowhere else.
+ *   dhcp         a table under a section whose ROWS a poll replaces — what `L.ui.Table` does, and
+ *                the shape a third-party app is most likely to emit. The leases are stable (32 and
+ *                36 rows on the stands), which is what makes it a repeatable cell.
+ *   processes    one table, a direct child of `#view`. The climb out of it used to land on the host
+ *                and give up, so nothing held the reader at all, on every engine, while a gate that
+ *                only opened the first shape passed throughout. It does not poll and its single
+ *                block is taller than the page scrolls (6397px against 6108px on owrt2512), so it
+ *                proves the CLIMB and never the swap.
+ *
+ * `--page a,b` overrides. Two pages were measured and NOT taken, which is the cheaper half of this
+ * list to lose:
+ *
+ *   wireless     812px of scroll at 390px wide and 0 at 1440, so every cell of it skipped.
+ *   connections  the realtime page. Its length follows the conntrack table, so the same cell
+ *                reported 958px of scroll in one run and 400px in the next — a cell that is not
+ *                repeatable is not a gate. And the block this sweep swaps there is not the block
+ *                its poll replaces: emptying the section `div` moved the reader 252px against a
+ *                120px pad while the block itself measured the same height before and after
+ *                (`grewOnItsOwn` 0), the same way swapping `.fs-ovl` deletes three sections no poll
+ *                touches. What produced the other 132px was not established. */
+const PAGES = arg('page', '/admin/status/overview,/admin/network/dhcp,/admin/status/processes')
 	.split(',').map((p) => p.trim()).filter(Boolean);
-/* both layouts: they scroll different elements, and the correction has to find the right one */
-const LAYOUTS = [ 'side', 'top' ];
-/* AND EVERY DENSITY, because the axis moves the geometry this gate is about: type and spacing scale,
- * so a section is a different height, the fold falls on a different element, and the hit test that
- * finds the reference lands somewhere else. `--density normal` narrows it when iterating. */
-const DENSITIES = arg('density', 'normal,compact,large').split(',').map((d) => d.trim()).filter(Boolean);
+
+/* WIDTH AND LAYOUT ARE ONE AXIS, and it has two values, not four. What this gate measures is which
+ * element the correction has to scroll, and only one of the four combinations scrolls anything but
+ * the window:
+ *
+ *   1440 side → #maincontent      1440 top → window      390 side → window      390 top → window
+ *
+ * So the sweep crosses the two scrollers and keeps the narrow viewport, where the pages are three
+ * times longer and there is most to scroll past. The other two combinations repeated a measurement
+ * the first two had already made. */
+const SCROLLERS = FULL
+	? [ 1440, 390 ].flatMap((width) => [ 'side', 'top' ].map((layout) => ({ width, layout })))
+	: [ { width: 1440, layout: 'side' }, { width: 390, layout: 'side' } ];
+
+/* One density. The axis moves the geometry — type and spacing scale, so a section is a different
+ * height and the fold falls elsewhere — but it does not move the ANSWER: across all 72 Overview
+ * cells of a full sweep, normal, compact and large reported the same two outcomes and nothing else
+ * (`anchor on` clamped 0-1px with the reader still; `anchor off` clamped 59-60px with the reader
+ * moved 60-61px). Three densities measured one thing three times. `--density a,b` widens it. */
+const DENSITIES = arg('density', FULL ? 'normal,compact,large' : 'normal')
+	.split(',').map((d) => d.trim()).filter(Boolean);
 const GROWTH = 120;
 /* a rect edge lands on a fraction; two pixels is not a jump */
 const TOLERANCE = 2;
@@ -68,7 +112,12 @@ const TOLERANCE = 2;
 const HOLD = async (growth) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
-	if (!view || view.children.length < 2) return { skip: 'nothing to grow' };
+	/* A page that rendered at all, not one that rendered a particular way. Counting `#view`'s children
+	 * was a stand-in for that and got it wrong: the realtime Connections page puts everything inside a
+	 * single `.cbi-map`, so one child meant 3219px of content read as an empty page and every cell of
+	 * that shape skipped. What "nothing to grow" has to mean is that there is nothing under `#view`;
+	 * whether there is enough of it to scroll is the next check's question, and it asks it in pixels. */
+	if (!view || !view.firstElementChild) return { skip: 'nothing to grow' };
 	const mc = document.getElementById('maincontent');
 	const flow = mc ? getComputedStyle(mc).overflowY : '';
 	const sc = (flow === 'auto' || flow === 'scroll') ? mc : null;
@@ -432,13 +481,19 @@ const UNOPENED_TOLERANCE = 0.02;
  * first line is the sentence the browser or this file actually wrote */
 const first = (e) => String((e && e.message) || e).split('\n')[0].trim();
 
+/* THE STANDS RUN AT THE SAME TIME, the way live-audit and spa-parity already do. Nothing measured
+ * here is a frame rate: every wait is on an EVENT (the scroll landing, `fit.restAt()` reporting a
+ * reference at this offset) with a bounded fallback, so three routers answering at once cannot move
+ * an answer — unlike scroll-jank, whose subject IS frame pacing and which therefore stays serial.
+ *
+ * This gate was the whole release's critical path: 52 minutes against live's 17, on the same three
+ * routers, because it was the only live gate still walking them one after another. */
 for (const engine of ENGINES) {
 	if (!pw[engine]) { console.error(`scroll-anchor: no such engine "${engine}"`); process.exit(1); }
 	const browser = await pw[engine].launch();
-	for (const stand of list) {
+	await Promise.all(list.map(async (stand) => {
 		for (const PAGE of PAGES)
-		for (const w of WIDTHS) {
-			for (const layout of LAYOUTS)
+		for (const { width: w, layout } of SCROLLERS) {
 			for (const density of DENSITIES)
 			for (const noEngineAnchor of [ false, true ]) {
 				const ctx = await browser.newContext({ viewport: { width: w, height: 844 } });
@@ -529,7 +584,7 @@ for (const engine of ENGINES) {
 				await ctx.close();
 			}
 		}
-	}
+	}));
 	await browser.close();
 }
 
