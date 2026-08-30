@@ -243,8 +243,27 @@ await Promise.all(list.map(async (stand) => {
 	const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 	const page = await ctx.newPage();
 	const errs = [];
-	page.on('pageerror', (e) => errs.push(String(e).replace(/\s+/g, ' ').slice(0, 120)));
-	page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().replace(/\s+/g, ' ').slice(0, 120)); });
+	/* A FETCH THAT FAILED IS NOT THIS THEME'S. The theme reaches no third-party host at run time —
+	 * that is a rule of the package, not an accident (CLAUDE.md; the one convenience tool that ever
+	 * wanted `curl` was refused over it) — so a console line about a resource that would not load,
+	 * or an app's own updater giving up on an HTTP status, can only belong to somebody else's code.
+	 *
+	 * They are dropped rather than baselined because the text carries the stand's own port
+	 * (`http://localhost:8024/…`), so a baseline entry would be keyed to a port and go stale the
+	 * moment owlab hands out a different one.
+	 *
+	 * Measured: `luci-app-ssclash` asks GitHub for the latest mihomo release on two of its pages,
+	 * and on a GitHub Actions runner — whose egress IP is shared and rate-limited — that answers
+	 * 403. Nine findings across three routers, none of them reproducible here, all of them the
+	 * runner's network rather than the page's markup. Anything that is not a network failure is
+	 * still recorded: a TypeError out of a view, an unhandled rejection, our own broken require. */
+	const NETWORK_NOISE = /Failed to load resource|net::ERR_|ERR_INTERNET_DISCONNECTED|HTTP \d{3}\b/i;
+	const note = (text) => {
+		const line = text.replace(/\s+/g, ' ').slice(0, 120);
+		if (!NETWORK_NOISE.test(line)) errs.push(line);
+	};
+	page.on('pageerror', (e) => note(String(e)));
+	page.on('console', (m) => { if (m.type() === 'error') note(m.text()); });
 	await login(page, stand.base);
 
 	/* Baselines are per ENGINE as well as per router: a second engine finds different things (the
