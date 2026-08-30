@@ -27,8 +27,14 @@ const LIMITS = {
 	 * token being declared per mode or the block does not fully apply.
 	 *
 	 * 125,795 B on 2026-08-27, down 1,051 B when the squeeze learned that `>` is a delimiter like
-	 * `{` and `,`: 516 child combinators were carrying a space either side. */
-	cascadeCss: 127_400,
+	 * `{` and `,`: 516 child combinators were carrying a space either side.
+	 *
+	 * 127,699 B on 2026-08-30, up 299 B for the Overview card restyle: the key/value dividers gone,
+	 * the label demoted below the figure it introduces, the active interface head saying "up" in the
+	 * status colour instead of a full-bleed accent fill, and the data tables one step tighter. All
+	 * of it keyed on the SHAPE of a table rather than on the three cards the grid used to name, so a
+	 * third-party include of the same shape gets it too. */
+	cascadeCss: 128_000,
 	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
 	 * whether or not a given page loads it. 86,737 B on 2026-08-27.
 	 *

@@ -341,7 +341,9 @@
 		/* overflow-wrap dropped — base/40-tables.css breaks every cell; the copy that stood here
 		 * moved nothing against 267 matching cells. */
 		padding-inline-end: min(230px, 50%);
-		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-text);
+		/* colour and weight are the shared label rule at the end of this file; the size is here
+		 * because it is this row's geometry, not its typography */
+		font-size: var(--fs-type);
 	}
 
 	/* On a narrow card the value takes its own line — a reserve cannot be made to fit there.
@@ -371,11 +373,86 @@
 
 	/* Drop the per-row dividers theme/30-tables.css adds (.cbi-section .table .td) —
 	 * cleaner card. No !important: that rule is `theme`, this file is `page`, so the later
-	 * layer already wins. */
-	body[data-page="admin-status-overview"] :is(.fs-ovl-mem, .fs-ovl-sto) .table .td,
-	body[data-page="admin-status-overview"] :is(.fs-ovl-mem, .fs-ovl-sto) .table .th,
-	body[data-page="admin-status-overview"] :is(.fs-ovl-mem, .fs-ovl-sto) .cbi-value { border-bottom: 0; }
-	/* System key/value table draws its dividers on .tr (not .td) — remove those too */
-	body[data-page="admin-status-overview"] :is(.fs-ovl-mem, .fs-ovl-sto) .table .tr { border-bottom: 0; }
+	 * layer already wins.
+	 *
+	 * Keyed on the table's SHAPE rather than on the three cards the grid happens to name: a
+	 * key/value table is one with no header row, which is the same test the meter rows above
+	 * already use. Naming `.fs-ovl-mem/-sto` left System ruled at 1px per row — nine dividers down
+	 * a card whose two columns are a name and its value, where the alignment already says which is
+	 * which — and gave a third-party include of the same shape nothing at all. A DATA table
+	 * (`.tr.table-titles` present: DHCP leases, the wifi station list) keeps its dividers: there
+	 * the row is one record among many and the rule is what separates the records. */
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .td,
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .th,
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr { border-bottom: 0; }
+	/* Its own rule, not a fourth line in the list above: `.cbi-value` carries no `:has()`, and a
+	 * selector list is not forgiving — below the browser floor the whole list would be discarded,
+	 * dividers and all (npm run css-floor, .claude/rules/css.md). */
+	body[data-page="admin-status-overview"] .cbi-section .cbi-value { border-bottom: 0; }
+
+	/* The name in a key/value row is the QUIET half — the figure beside it is what the card is
+	 * read for. It came out at --fs-weight (600) in --fs-text, i.e. heavier and brighter than the
+	 * value it introduces, which is the ranking inverted: four bold lines down a Memory card
+	 * competing with the four numbers they label. --fs-dim at normal weight is what the System
+	 * table's first column already resolved to, so the meter cards now read as the same family.
+	 * Data tables are excluded by the same header-row test as the dividers above: there the first
+	 * column is a record's name, not a caption. */
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .td:first-child {
+		font-weight: var(--fs-weight-normal);
+		color: var(--fs-dim);
+	}
+
+	/* ---- the active interface box ----
+	 *
+	 * theme/45-misc.css fills `.ifacebox-head.active` with --fs-accent and inks it --fs-on-accent.
+	 * On a form that is one small badge; on the Overview it is a full-bleed bar of saturated colour
+	 * across the card — three of them at once here (IPv4 Upstream, radio0, radio1), each louder
+	 * than the data underneath and than the page's own controls. The state it encodes is "this
+	 * interface is up", which is a STATUS, so it is said in the status colour and in the text
+	 * rather than in a fill: --fs-good on the same --fs-panel2 every other head carries.
+	 *
+	 * Scoped to this page deliberately: the same head on Network -> Interfaces sits among many
+	 * boxes where the fill is doing real work telling them apart. */
+	body[data-page="admin-status-overview"] .cbi-section .ifacebox .ifacebox-head.active {
+		background: var(--fs-panel2);
+		color: var(--fs-good);
+		font-weight: var(--fs-weight);
+	}
+
+	/* `L.itemlist` wraps every caption in <strong>, which theme/30-tables.css leaves at 700 — so
+	 * inside an interface box the captions (Protocol, Address, Gateway, DNS) are the boldest text
+	 * on the card and the addresses they introduce are not. Same inversion as the key/value rule
+	 * above, same answer; the value keeps --fs-text and needs no rule of its own. */
+	body[data-page="admin-status-overview"] .cbi-section .ifacebox-body strong {
+		font-weight: var(--fs-weight-normal);
+		color: var(--fs-dim);
+	}
+
+	/* The meter's own figure, promoted to match the label it now outranks.
+	 *
+	 * theme/25-progressbar.css prints `attr(title)` above the bar at --fs-type-xs in --fs-dim,
+	 * which was the right pairing while the label beside it was 600 in --fs-text. With the label
+	 * moved down (above), a dim 11px figure left the row with nothing at full strength: on Memory
+	 * that is four bars whose only readable text is the caption. The number is what the card is
+	 * for, so it takes the body size and the body ink; the bar and the placement are untouched.
+	 *
+	 * Overview only. The same meter on Software and in the package manager sits in a form row
+	 * where the value is beside its own field label, not carrying the row on its own. */
+	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .cbi-progressbar::after {
+		font-size: var(--fs-type);
+		color: var(--fs-text);
+	}
+
+	/* Row height in the Overview's DATA tables (DHCP leases, the wifi station list).
+	 *
+	 * theme/30-tables.css pads a data cell for a page that IS a table, where the row is the unit of
+	 * work and the padding is its hit target. On the Overview the same table is a card's contents,
+	 * read at a glance and never clicked except on its buttons, and eight leases at that height are
+	 * most of a screen: the DHCP card measures 740px against a System card of 440. One step down
+	 * the space ladder, so it follows the density axis like everything else, and only here. */
+	body[data-page="admin-status-overview"] .cbi-section .table:has(.tr.table-titles) .td,
+	body[data-page="admin-status-overview"] .cbi-section .table:has(.tr.table-titles) .th {
+		padding-block: var(--fs-space-1-5);
+	}
 
 }
