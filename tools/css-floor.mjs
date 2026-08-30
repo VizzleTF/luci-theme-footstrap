@@ -38,6 +38,11 @@ const FEATURES = {
 	'prop:text-wrap':      { kind: 'soft', chrome: 117, firefox: 137, safari: 17.5 },
 	'prop:scrollbar-width':{ kind: 'soft', chrome: 121, firefox: 64,  safari: 18.2 },
 	'prop:overflow-anchor':{ kind: 'soft', chrome: 56,  firefox: 66,  safari: 99 },
+	/* view transitions: the swap animates where they exist and is instant where they do not
+	 * (fs-router.js only starts one when the API answers). Baseline 2025-10-14. */
+	'pseudoel:view-transition':     { kind: 'soft', chrome: 111, firefox: 144, safari: 18 },
+	'pseudoel:view-transition-old': { kind: 'soft', chrome: 111, firefox: 144, safari: 18 },
+	'pseudoel:view-transition-new': { kind: 'soft', chrome: 111, firefox: 144, safari: 18 },
 
 	/* HARD: no fallback exists and the page is wrong without them. */
 	'atrule:layer':        { kind: 'hard', chrome: 99,  firefox: 97,  safari: 15.4 },

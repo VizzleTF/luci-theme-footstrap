@@ -720,6 +720,28 @@ function commitStage(stage, contentHost) {
 	dropStage(stage);
 }
 
+/* ---- the commit is the one frame of a navigation worth animating ----
+ *
+ * `commitStage()` is a synchronous DOM move, so a view transition here wraps a FRAME, not a render:
+ * the update callback settles in the same tick and the API's rendering suppression cannot outlive
+ * it. Wrapping navigate() instead would freeze the page for the whole chain — 136-196 ms median
+ * (docs/spa-router.md) and up to RENDER_TIMEOUT on a cold route.
+ *
+ * The scroll restore runs INSIDE the callback: `::view-transition` is a fixed overlay of the old
+ * pixels, and a scroll that lands after the snapshot slides the live page under a still image.
+ *
+ * Reduced motion is answered by not starting a transition at all, rather than by a zeroed animation:
+ * the `*` rule in theme/95-a11y-media.css does not reach a pseudo tree, and skipping also saves the
+ * snapshot. Read per navigation, so an OS change needs no listener.
+ *
+ * `ready` rejects when the transition is skipped — a hidden document, a duplicate name — which is a
+ * normal outcome and not an error to report; the swap itself has happened either way. */
+function swapIn(commit) {
+	const mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+	if ((mq && mq.matches) || typeof document.startViewTransition !== 'function') { commit(); return; }
+	document.startViewTransition(commit).ready.catch(() => {});
+}
+
 /* The `#view` the document keeps between navigations, i.e. the one the observers are bound to:
  * whichever `#view` is not the stage. A document that has none gets one, once. */
 function liveView(contentHost, stage) {
@@ -1072,9 +1094,11 @@ function navigate(pathname, push, kbd) {
 				/* superseded while rendering: the chain painted into its own stage, so drop it and
 				 * leave the live page to the newer navigation */
 				if (gen !== _navGen) { dropStage(stage); return; }
-				commitStage(stage, contentHost);
-				/* now, and only now, is there one height to read: the incoming page's */
-				if (restoreTo) restoreScroll(restoreTo, gen);
+				swapIn(() => {
+					commitStage(stage, contentHost);
+					/* now, and only now, is there one height to read: the incoming page's */
+					if (restoreTo) restoreScroll(restoreTo, gen);
+				});
 			})
 			.catch((e) => { dropStage(stage); throw e; });
 	}).catch((e) => {
