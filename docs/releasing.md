@@ -121,7 +121,7 @@ EOL, and openwrt/luci declined to carry the compatibility code in the tree the t
 (#8978). `install.sh` pins that version for a 23.05 router and says it is the last one; the stand
 and the contract entry that guarded it are gone with the fallback they guarded.
 
-Day to day those gates measure two routers and one page per shape, which is what makes them cheap
+Day to day those gates measure three routers and one page per shape, which is what makes them cheap
 enough to run before a push (`docs/development.md`). A release is the one moment where the axes they
 trade away are worth paying for: ImmortalWrt is a different app set on the same luci-base, and a page
 that shares a shape with another is only *probably* the same to this theme. Read the reduction lines

@@ -297,7 +297,12 @@ const CONTRACT = [
 	},
 ];
 
-const list = requireStands(stands(arg('only', '')), 'upstream-contract');
+/* `--all`, like every other live gate. Without it this one silently measured the CORE pair while
+ * the release matrix (`npm run live -- --all`, docs/releasing.md) says every router owlab boots —
+ * so the assumptions were never checked on the two immortalwrt stands, and the run said
+ * "2 router(s)" in a report nobody compared against the four it had asked for. */
+const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }),
+	'upstream-contract');
 const browser = await chromium.launch();
 let failed = 0;
 

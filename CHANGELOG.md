@@ -1,4 +1,4 @@
-## [Unreleased]
+## [0.14.4] — 2026-08-30
 
 ### Changed
 
@@ -29,6 +29,16 @@
 - **Two rules that were only ever remembered are enforced by git hooks now.** `.githooks/commit-msg` strips AI-attribution trailers whatever produced them, and `.githooks/pre-push` refuses a push whose `npm run check` does not exit 0 — a gate stated only in an agent's rule file is a gate the next contributor never runs. `Signed-off-by` is deliberately untouched, since openwrt/luci requires it. Enable with `git config core.hooksPath .githooks`; `--no-verify` remains the deliberate bypass. The session hooks beside them hold the changelog contract on `git commit`, refuse an edit while HEAD is the default branch, and say so out loud when a session starts where the project's rules do not load.
 
 ### Fixed
+
+- **A button's label wraps in a narrow column, so an app that packs two of them into one `inline-flex` still fits.** Found by the live sweep and nearly written off as the app's: `ssclash`'s split button overflowed the content column by 36px at 320, and the theme sets no width on it. Pointing the stand at the stock theme settled it — under bootstrap the same page overflows by nothing. The wrapper takes its buttons' max-content, and this theme's button measures 295px where stock's measures 245: 12px of that is the wider side padding, the rest is the face, which is wider than the system stack even at 13px against stock's 14. Narrowing the buttons would be re-typesetting the theme to suit one app, so the label is allowed to wrap instead — under `@container fs-view (max-width: 360px)`, where it happens, with `min-width: 0` so the flex line can act on it. Nothing changes where the label already fits: the same button measures 295px at 390 and at 1440, exactly as before.
+
+  `word-break: normal` goes with it. `base/10-reset.css` gives every button `break-all`, carried over from the fork and inert while the label could not wrap at all; the moment it could, the label broke mid-word — `Сохранить и перезагрузить ко` / `нфиг`. `overflow-wrap: break-word` keeps the escape hatch for a single word wider than the button, which is what `break-all` was there for.
+
+- **A reload landing at the wrong moment could leave the router without the `luci` ubus object, and the postinst now checks.** Reported from the field on a SNAPSHOT router: `luci/getFeatures`, `luci/getTimezones` and `luci/getMountPoints` all answering `-32000 Object not found`, the system time blank, an RPCError box per call, nine days of uptime and a reboot as the cure. The theme calls none of those methods — they are `luci-base`'s and `luci-mod-system`'s — but its postinst does call `rpcd reload`, and the note beside that call was wrong about what reload does. Measured on a snapshot stand, where the object comes from the ucode plugin `/usr/share/rpcd/ucode/luci`: remove the file and reload, and `ubus list` loses `luci` and does not get it back on its own; restore the file and reload, and it returns. So reload re-reads the PLUGINS as well as the ACLs, and one that races another package replacing that file takes the object down with it. The postinst asks whether the object is there and reloads once more if it is not — a second reload rather than a restart, because reload already does everything restart would do to the plugin set and restart only adds logging every admin out. Proven on the stand: object removed, install, object back and `getFeatures` answering.
+
+- **The port card's speed field wraps, so a no-link label is readable in every language.** `нет соединения` measures 127px in a card that gives it 127 and was CLIPPED, not ellipsised — the reader saw `нет соедине`, and the same holds for any language whose "no link" is more than one short word. The field was `white-space: nowrap`, which is right for the speeds it was designed around (`1GbE`, `10 GbE`) and wrong for the label that shares the box. It wraps now, without `min-width: 0`: that would let the flex line squeeze the box to the 77px left beside the port image and break the label mid-word (`соедине` / `ния`), where the automatic minimum keeps the break between words. Short speeds have nothing to wrap at and do not move.
+
+- **`upstream-contract` ignored `--all` and quietly measured half the matrix.** The release runbook asks for `npm run live -- --all`, "every router owlab boots", and five of the six live gates honour that flag. This one called `stands()` without it, so it always took the CORE pair and reported "17 assumption(s) hold on 2 router(s)" — a true sentence about a set nobody asked for, with the two immortalwrt stands never checked. That is the failure `tools/lib/stands.mjs` names in its own comment: a gate that silently measures a different set than it claims is worse than a slow one.
 
 - **A stacked table lost its layout entirely in a browser without `:has()`.** `.table.fs-stacked .tr` shared a selector list with two `tfoot:not(:has(> .tr))` compounds, and a selector list is not forgiving: one unsupported part invalidates the whole rule. In Firefox before 121 — ESR 115 included — every card on every stacked table therefore lost `display: flex`, which is a broken mobile table rather than a missing refinement. The rule is two rules now, and `css-floor` fails on the shape.
 
@@ -4201,6 +4211,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.14.4]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.3...v0.14.4
 [0.14.3]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.2...v0.14.3
 [0.14.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.0...v0.14.1

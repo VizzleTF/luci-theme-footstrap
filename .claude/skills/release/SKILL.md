@@ -1,7 +1,6 @@
 ---
 name: release
 description: Cut a footstrap release — the pre-tag matrix, the changelog rename, the tag, and publishing the feed. Use when asked to cut, tag or ship a release, or to check whether a release is ready.
-disable-model-invocation: true
 ---
 
 # Cutting a release

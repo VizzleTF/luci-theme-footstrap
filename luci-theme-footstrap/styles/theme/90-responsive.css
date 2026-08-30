@@ -3,6 +3,39 @@
 	 * viewport is silently CUT on the right rather than scrolled to. A device sweep found the
 	 * offenders below; each fix lets the control or table shrink or wrap. Tablets were already
 	 * clean. */
+	/* A pair of buttons an app packs into one `inline-flex` must be allowed to wrap its labels.
+	 *
+	 * `white-space: pre` on a button is stock — luci-theme-bootstrap sets it too — and it holds
+	 * while the label is short. Ours are wider than stock at the same job: measured on
+	 * ssclash's split button at 320, `Сохранить и перезагрузить конфигурацию` is 295px against
+	 * stock's 245, because this theme's face is wider than the system stack even at a smaller
+	 * size (13px vs 14px), and the 14px side padding adds 12 of the 50. The app's wrapper is
+	 * `inline-flex`, so it takes the buttons' max-content — 324px inside a 288px column — and
+	 * overflows by 36. Stock fits only because its buttons are narrower.
+	 *
+	 * Narrowing the buttons would be re-typesetting the theme to suit one app. Letting the label
+	 * wrap costs nothing where it already fits — a short label has no wrap point — and turns the
+	 * one case that does not into two lines. Scoped to the width where it happens: at 390 the
+	 * same page is clean.
+	 *
+	 * `min-width: 0` with it, or the automatic minimum keeps the button at its longest word and
+	 * the flex line cannot shrink it at all.
+	 *
+	 * `word-break: normal` is the third half of it. base/10-reset.css gives every button
+	 * `break-all` — carried over from the fork, and inert while the label cannot wrap at all. The
+	 * moment it can, `break-all` takes precedence over word boundaries and the label breaks mid-word
+	 * (`Сохранить и перезагрузить ко` / `нфиг`). `overflow-wrap: break-word` keeps the escape hatch
+	 * for a single word wider than the button, which is what `break-all` was there for. */
+	@container fs-view (max-width: 360px) {
+		#view .cbi-button, #view .btn,
+		#view input[type="button"], #view input[type="submit"], #view input[type="reset"] {
+			white-space: normal;
+			min-width: 0;
+			word-break: normal;
+			overflow-wrap: break-word;
+		}
+	}
+
 	@media (max-width: 767px) {
 		/* The foreign-<table> scroll fallback used to live here, guarded by this query. It does not
 		 * any more: whether a table fits is a property of its CONTENT and its COLUMN, never of the

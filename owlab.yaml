@@ -139,4 +139,8 @@ routers:
   # is least tested against, since it tracks luci-base's master rather than a release branch.
   - id: owrtsnap
     release: "snapshot"
-    ports: { http: 8022, ssh: 2222 }
+    # ssh 2228, NOT 2222: 2222 is the port a developer machine's own sshd usually listens on, and
+    # docker refuses the bind with "address already in use" — which is why this stand had never come
+    # up, and why every gate that claimed the snapshot line was measuring two routers instead of
+    # three. docs/development.md, "The stand's own traps".
+    ports: { http: 8022, ssh: 2228 }

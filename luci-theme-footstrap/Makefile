@@ -79,9 +79,29 @@ define Package/luci-theme-footstrap/conffiles
 endef
 
 # reload, never restart: rpcd holds sessions in memory, so `restart` logs out every LuCI user,
-# including the admin who just clicked Update. `reload` sends SIGHUP, which re-reads
-# /usr/share/rpcd/acl.d/*, and that ACL refresh is the only thing this package needs from rpcd.
-# Verified on a live router: a session survives `reload` and dies across `restart`.
+# including the admin who just clicked Update. A session survives `reload` and dies across
+# `restart` — verified on a live router.
+#
+# AND RELOAD RE-READS THE PLUGINS, not only /usr/share/rpcd/acl.d/*. That correction matters,
+# because it is what makes the check below necessary rather than decorative. Measured on a
+# SNAPSHOT stand, where the `luci` object comes from the ucode plugin
+# /usr/share/rpcd/ucode/luci (24.10 and 25.12 use /usr/libexec/rpcd/luci):
+#
+#   file removed  + reload  -> `ubus list` loses `luci`     (and it does NOT come back on its own)
+#   file removed  + restart -> still gone
+#   file restored + reload  -> back
+#
+# So a reload that lands while another package is replacing that file leaves rpcd without the
+# object, and every luci/getFeatures, luci/getTimezones and luci/getMountPoints call answers
+# `-32000 Object not found` until something reloads it again — the page then renders with the
+# system time blank and an RPCError box per call. Reported from the field on a SNAPSHOT router,
+# cleared by a reboot; nine days of uptime before it, so it was an upgrade that did it.
+#
+# Hence: reload, then ASK whether the object is there, and reload once more if it is not. A second
+# reload and not a restart, because the table above is the whole argument — reload already does
+# everything restart would do to the plugin set, and restart adds only the logout. If the object is
+# still missing after that, it is not this package's reload that removed it, and throwing every
+# admin out of LuCI would not bring it back.
 define Package/luci-theme-footstrap/postinst
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
@@ -93,6 +113,12 @@ define Package/luci-theme-footstrap/postinst
 		sh /etc/uci-defaults/30_luci-theme-footstrap >/dev/null 2>&1 || true
 	rm -f /tmp/luci-indexcache* /tmp/luci-modulecache/* >/dev/null 2>&1 || true
 	/etc/init.d/rpcd reload >/dev/null 2>&1 || true
+	# see the note above the define: a reload that raced another package's file replacement leaves
+	# rpcd without the `luci` object, and nothing brings it back on its own
+	ubus list 2>/dev/null | grep -qx luci || {
+		sleep 1
+		/etc/init.d/rpcd reload >/dev/null 2>&1 || true
+	}
 }
 exit 0
 endef

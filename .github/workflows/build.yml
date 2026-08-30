@@ -275,7 +275,11 @@ jobs:
           set -eu
           # NOT `. "$GITHUB_ENV"` — that file is a KEY=VALUE list, not a script, so a value with a
           # space in it ("owrt2512 owrt2410") runs its second word as a command.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410"; fi
+          # The three OpenWrt lines the theme supports: both package managers plus the snapshot
+          # box, which tracks luci-base master and so fails on an upstream change before a user
+          # reports it. ImmortalWrt is deliberately absent — same luci-base, different brand,
+          # never the leg that caught something first; run it locally with --all when curious.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410 owrtsnap"; fi
           echo "ROUTERS=$ROUTERS" >> "$GITHUB_ENV"
           owlab up $ROUTERS
           for r in $ROUTERS; do
@@ -347,7 +351,11 @@ jobs:
           version: v0.5.3
       - name: Boot the routers and install this build
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410"; fi
+          # The three OpenWrt lines the theme supports: both package managers plus the snapshot
+          # box, which tracks luci-base master and so fails on an upstream change before a user
+          # reports it. ImmortalWrt is deliberately absent — same luci-base, different brand,
+          # never the leg that caught something first; run it locally with --all when curious.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410 owrtsnap"; fi
           echo "ROUTERS=$ROUTERS" >> "$GITHUB_ENV"
           owlab up $ROUTERS
           for r in $ROUTERS; do

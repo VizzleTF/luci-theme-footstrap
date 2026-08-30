@@ -242,14 +242,23 @@
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
 		order: 2;								/* below the zone-colour line (child 3, order 1) */
 		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-good); text-align: start;
-		/* Two halves of one mechanism.
-		 * `nowrap` with no `min-width: 0` means "I do not give way": a flex item's automatic minimum
-		 * size is its min-content, which for nowrap text is the whole string, so the speed cannot be
-		 * squeezed and the TRAFFIC is what wraps.
-		 * `flex-grow: 1` means "I take the slack", which pushes the traffic to the right edge while
+		/* `flex-grow: 1` means "I take the slack", which pushes the traffic to the right edge while
 		 * the two share a row. `margin-left: auto` on the traffic is wrong: Chrome counts it when
-		 * breaking lines, so the figures take a row of their own even on a card they fit. */
-		flex: 1 1 auto; white-space: nowrap;
+		 * breaking lines, so the figures take a row of their own even on a card they fit.
+		 *
+		 * The text WRAPS, and the automatic minimum size is what keeps the wrap tidy. This field used
+		 * to be `nowrap`, which holds for the speeds themselves (`1GbE`, `10 GbE`) and breaks on the
+		 * no-link label — one short word in English, three in most other languages. `нет соединения`
+		 * measured 127px in a card that gives it 127 and was CLIPPED, not ellipsised: the reader saw
+		 * `нет соедине`. A label that cannot be read is worse than a card one line taller.
+		 *
+		 * NO `min-width: 0` with it. That would let the flex line squeeze this box to 77px — the
+		 * width left beside the port image, which shares this box — and the label then broke mid-word
+		 * (`соедине` / `ния`). Left at `auto` the box keeps its min-content, which for wrapping text
+		 * is the longest WORD, so the label breaks between words and the short speeds, having nothing
+		 * to wrap at, do not move at all. `overflow-wrap` is the last resort for a language whose
+		 * single word is wider than the card. */
+		flex: 1 1 auto; white-space: normal; overflow-wrap: break-word;
 	}
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) br { display: none; }
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-body:nth-child(2) { color: var(--fs-dim); }

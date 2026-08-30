@@ -264,8 +264,12 @@ means:
   each shape is measured. Every path the baseline names and every page a field report came from
   (`PINNED`) keeps its seat regardless, every dropped page is printed with the page standing in for
   it, and a narrowed run may not rewrite the baseline. `--pages-all` measures them all.
-- **Two routers by default** (`lib/stands.mjs`): the pair that differs in package manager and
-  release. `--all` takes the four, and `docs/releasing.md` asks for it before a tag.
+- **Three routers by default** (`lib/stands.mjs`, `CORE`): 25.12/apk, 24.10/opkg and the snapshot
+  box. The first two are the package managers; the third tracks luci-base master, which is where an
+  upstream change shows up before it reaches a release. `--all` adds the two ImmortalWrt stands
+  (`OPTIONAL`) — worth reading, not worth blocking on. A gate that takes `--only` must honour
+  `--all` too: `upstream-contract` read one and ignored the other, and silently measured a subset of
+  what the release runbook asked for.
 
 The structural gates run their routers CONCURRENTLY — nothing they measure is a timing — while
 `scroll-jank` stays sequential, because frame pacing is its subject.
@@ -423,6 +427,22 @@ SIGTERMed mid-run — `live-audit` over two routers is 113 page renders and does
 minutes. The two apart: a real finding prints `path|width|kind|element` lines and a count; a
 killed run prints a Playwright stack. Never re-run it with a bigger timeout — that is what T2
 means: `tools/bg.sh`, report the run-id, read the log in a later turn.
+
+**"It is the app's markup" is a claim, and switching the stand to bootstrap is how you check it.**
+A finding on a third-party page reads as the app's, and the reflex is to write it into the baseline.
+Point the stand at the stock theme instead, re-measure the same page at the same width, and compare:
+
+```sh
+owlab exec owrt2512 -- uci set luci.main.mediaurlbase=/luci-static/bootstrap
+owlab exec owrt2512 -- uci commit luci                 # …and put it back afterwards
+```
+
+Three `overflow` findings on `ssclash/config` at 320 looked like the app's split button, which is an
+`inline-flex` the app styles inline — and the theme sets no width on it at all. Under bootstrap the
+same page overflowed by nothing: the wrapper takes its buttons' max-content, and this theme's
+buttons are 295px where stock's are 245, its face being wider than the system stack even at a
+smaller size. The finding was ours. A baseline entry would have hidden it for good, which is what
+makes the ratchet worth only as much as the judgement behind each line.
 
 **When a live gate goes red, build the PARENT COMMIT.** Package it, install it the same way, run the
 same narrowed check. A finding that reproduces there did not come from the change under test. That is

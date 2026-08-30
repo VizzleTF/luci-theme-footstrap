@@ -255,8 +255,11 @@ produced, and runs the live gates cheapest-first:
    goes last because it replaces the build under test with the published release; #16, #28 and #30
    were all this script, and all on the second run.
 
-**Two routers on a push, one on a pull request.** The second release line doubles the wall clock and
-has not yet been the leg that caught something first; a tag runs both. What each gate holds, and how
+**Three routers on a push, one on a pull request.** The push set is the OpenWrt lines the theme
+supports — 25.12/apk, 24.10/opkg and the snapshot box, which tracks luci-base's master and so fails
+on an upstream change before a user reports it. ImmortalWrt is not in it: same luci-base, different
+brand and app set, never the leg that caught something first. Run it locally with `--all` when a
+finding smells distribution-specific. What each gate holds, and how
 to run it by hand, is in [conventions.md](conventions.md) and [development.md](development.md).
 
 ## `release` — signing and publication
