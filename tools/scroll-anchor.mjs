@@ -28,7 +28,7 @@
  *
  * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
-import { stands, login, requireStands } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
 const arg = (name, dflt) => {
 	const i = process.argv.indexOf('--' + name);
@@ -442,6 +442,7 @@ for (const engine of ENGINES) {
 			for (const density of DENSITIES)
 			for (const noEngineAnchor of [ false, true ]) {
 				const ctx = await browser.newContext({ viewport: { width: w, height: 844 } });
+				await sealToRouter(ctx, stand.base);
 				/* the Safari path, forced: `fsEngineAnchor=off` makes fs-fit believe the platform has
 				 * no anchoring of its own, and the stylesheet turns the engine's off for real, so the
 				 * two agree about which of them is responsible */

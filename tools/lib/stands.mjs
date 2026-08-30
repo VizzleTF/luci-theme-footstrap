@@ -67,6 +67,35 @@ export function stands(only, { all = false } = {}) {
 	return running;
 }
 
+/* Cut the browser off from everything except the router under test.
+ *
+ * A live gate measures what THIS theme renders. Anything a page fetches from the open internet is
+ * somebody else's code reaching somebody else's host, and it can only add noise: `luci-app-ssclash`
+ * asks GitHub for the latest mihomo release on two of its pages, and on a CI runner — whose egress
+ * IP is shared and rate-limited — that answers 403. Nine console findings across three routers, on
+ * a release that had nothing to do with any of them, none of it reproducible off the runner.
+ *
+ * Blocking is better than filtering the message afterwards, and better than dropping the app from
+ * the stands: the app stays (its lazily-inserted Ace stylesheets are the one adversary that can
+ * invert the cascade layer order — owlab.yaml), the request simply never leaves. The gates stop
+ * depending on the network, on a rate limit, and on how fast github.com answers today.
+ *
+ * `abort`, not a fake 200: an invented response is a lie the page then renders. The abort still
+ * writes `net::ERR_FAILED` to the console, which live-audit's own network-noise filter drops.
+ *
+ * The router's own origin passes, and so do data:/blob: — a stylesheet or an icon the page builds
+ * for itself is not a fetch. */
+export async function sealToRouter(ctx, base) {
+	const host = new URL(base).host;
+	await ctx.route('**/*', (route) => {
+		const url = route.request().url();
+		if (url.startsWith('data:') || url.startsWith('blob:')) return route.continue();
+		let h;
+		try { h = new URL(url).host; } catch (e) { return route.continue(); }
+		return (h === host) ? route.continue() : route.abort();
+	});
+}
+
 /* LuCI answers an unauthenticated request with the login form, not a 403 page — so every live gate
  * has to log in before it can measure anything. owlab's routers are root with an empty password
  * (`owlab status` prints it); a hardware router is not what these gates run against. */

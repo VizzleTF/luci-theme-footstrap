@@ -36,7 +36,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as pw from 'playwright';
-import { stands, login, menuPaths, DESTRUCTIVE, requireStands } from './lib/stands.mjs';
+import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
 import { classify, representatives, reportReduction, PINNED } from './lib/page-shapes.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -241,6 +241,7 @@ let checked = 0;
 await Promise.all(list.map(async (stand) => {
 	let here = 0;
 	const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+	await sealToRouter(ctx, stand.base);
 	const page = await ctx.newPage();
 	const errs = [];
 	/* A FETCH THAT FAILED IS NOT THIS THEME'S. The theme reaches no third-party host at run time —
@@ -257,7 +258,14 @@ await Promise.all(list.map(async (stand) => {
 	 * 403. Nine findings across three routers, none of them reproducible here, all of them the
 	 * runner's network rather than the page's markup. Anything that is not a network failure is
 	 * still recorded: a TypeError out of a view, an unhandled rejection, our own broken require. */
-	const NETWORK_NOISE = /Failed to load resource|net::ERR_|ERR_INTERNET_DISCONNECTED|HTTP \d{3}\b/i;
+	/* Every spelling a blocked or failed request reaches the console in. `Failed to fetch` is
+	 * Chromium's rejection of a fetch(), `Load failed` is WebKit's and `NetworkError` Firefox's;
+	 * `net::ERR_` is what stands.mjs's own seal produces when it aborts the request. An app may
+	 * wrap any of them in its own sentence, in its own language — ssclash says
+	 * `Не удалось получить последний релиз: TypeError: Failed to fetch` — so the match is on the
+	 * engine's words inside the line, never on the app's. */
+	const NETWORK_NOISE =
+		/Failed to load resource|Failed to fetch|Load failed|NetworkError|net::ERR_|ERR_INTERNET_DISCONNECTED|HTTP \d{3}\b/i;
 	const note = (text) => {
 		const line = text.replace(/\s+/g, ' ').slice(0, 120);
 		if (!NETWORK_NOISE.test(line)) errs.push(line);

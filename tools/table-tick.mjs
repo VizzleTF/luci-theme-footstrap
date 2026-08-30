@@ -18,7 +18,7 @@
  *
  * Needs a running owlab router (docs/development.md). */
 import { chromium } from 'playwright';
-import { stands, login, requireStands } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
 const arg = (name, dflt) => {
 	const i = process.argv.indexOf('--' + name);
@@ -66,6 +66,7 @@ let ticks = 0;
 for (const stand of list) {
 	for (const w of WIDTHS) {
 		const ctx = await browser.newContext({ viewport: { width: w, height: 844 } });
+		await sealToRouter(ctx, stand.base);
 		const page = await ctx.newPage();
 		await login(page, stand.base);
 		for (const path of PAGES) {

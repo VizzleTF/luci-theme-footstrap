@@ -18,7 +18,7 @@
  * Needs a running owlab router (docs/development.md); run it against SNAPSHOT too, which is where
  * luci-base's master lands first. */
 import { chromium } from 'playwright';
-import { stands, login, requireStands } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
 const VERBOSE = process.argv.includes('--verbose');
 const arg = (name, dflt) => {
@@ -308,6 +308,7 @@ let failed = 0;
 
 for (const stand of list) {
 	const ctx = await browser.newContext();
+	await sealToRouter(ctx, stand.base);
 	const page = await ctx.newPage();
 	await login(page, stand.base);
 	/* a page with a #view and the full module set loaded — Status → Overview is on every router */

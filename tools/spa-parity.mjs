@@ -20,7 +20,7 @@
  *
  * Needs a running owlab router (docs/development.md). */
 import { chromium } from 'playwright';
-import { stands, login, menuPaths, DESTRUCTIVE, requireStands } from './lib/stands.mjs';
+import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
 import { classify, representatives, reportReduction, PINNED } from './lib/page-shapes.mjs';
 
 const arg = (name, dflt) => {
@@ -105,6 +105,7 @@ let compared = 0;
  * so nothing another container does can reach it (see the same note in live-audit.mjs) */
 await Promise.all(list.map(async (stand) => {
 	const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+	await sealToRouter(ctx, stand.base);
 	const page = await ctx.newPage();
 	const errs = [];
 	page.on('pageerror', (e) => errs.push(String(e).replace(/\s+/g, ' ').slice(0, 120)));
