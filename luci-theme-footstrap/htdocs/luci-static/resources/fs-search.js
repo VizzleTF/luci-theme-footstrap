@@ -99,6 +99,46 @@ function index() {
 	return _index;
 }
 
+/* ---- extra sources -------------------------------------------------------
+ *
+ * An optional package can add rows to the same list — one indexes the SECTION titles inside each
+ * page, so "footstrap" finds System -> Appearance. A source hands over entries in the shape
+ * buildIndex() produces and nothing else: the matching, the ranking and the rendering stay here,
+ * or two lists would disagree about what a hit is.
+ *
+ * Registration is a GLOBAL ARRAY, not an export a package requires. This module is fetched on the
+ * first gesture and most sessions never make it; a package that had to `require` it to register
+ * would pull it onto every page and pay its 4.5 KB for a palette nobody opened. Pushing a function
+ * onto `window.__fsSearchSources` costs the package nothing and names no one in either direction.
+ *
+ * `window.__fsSearchGen` is how a source says its data grew — a harvester fills in over a session
+ * — and the stamp below is what rebuilds the pool when it does. */
+const _sources = [];
+let _pool = null, _stamp = -1;
+
+function globalSources() {
+	return Array.isArray(window.__fsSearchSources) ? window.__fsSearchSources : [];
+}
+
+function addSource(fn) {
+	_sources.push(fn);
+	_pool = null;
+}
+function refresh() {
+	_pool = null;
+}
+function pool() {
+	const all = _sources.concat(globalSources());
+	const stamp = all.length + (window.__fsSearchGen || 0);
+	if (_pool && stamp === _stamp) return _pool;
+	_stamp = stamp;
+	_pool = all.reduce((rows, fn) => {
+		try { return rows.concat(fn() || []); }
+		catch (e) { console.error('footstrap: a search source threw', e); return rows; }
+	}, index().slice());
+	return _pool;
+}
+
 /* ---- matching ----------------------------------------------------------- */
 
 /* Every whitespace-separated token must hit something: a second word means AND. Deliberately not
@@ -118,7 +158,7 @@ function search(q, limit) {
 	if (!toks.length) return [];
 
 	const hits = [];
-	for (const e of index()) {
+	for (const e of pool()) {
 		let sum = 0;
 		for (const tok of toks) {
 			const s = tokenScore(e, tok);
@@ -252,8 +292,16 @@ function build() {
 				e.trail.length ? E('span', { 'class': 'fs-search-opt-path' }, [ e.trail.join(' › ') ]) : ''
 			]);
 			/* close before the click reaches the router, which re-renders the chrome underneath;
-			 * no focus return, the user is going elsewhere */
-			a.addEventListener('click', () => close(false));
+			 * no focus return, the user is going elsewhere.
+			 *
+			 * `onTake` is how a row from an extra source finishes the job the href cannot: a
+			 * section row's href can only reach the PAGE, so the source that produced it opens the
+			 * tab and scrolls to the section itself. It fires for a click and for Enter alike —
+			 * Enter synthesises this very click. */
+			a.addEventListener('click', () => {
+				close(false);
+				if (typeof e.onTake === 'function') e.onTake();
+			});
 			a.addEventListener('pointermove', () => { if (at !== i) setActive(i); });
 			list.appendChild(a);
 			return a;
@@ -354,5 +402,7 @@ function openPalette() {
 }
 
 return baseclass.extend({
-	open: openPalette
+	open: openPalette,
+	/* the seam an optional package registers through; see addSource() */
+	addSource, refresh
 });
