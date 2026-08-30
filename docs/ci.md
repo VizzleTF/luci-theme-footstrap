@@ -231,7 +231,19 @@ green under every static gate at the time.
 
 The job boots the same owlab containers a developer runs locally (`owfeed/owlab/setup` puts the CLI
 on PATH; the binary is checked against its build attestation), installs the artifact `build` just
-produced, and runs the live gates cheapest-first:
+produced, and runs the live gates.
+
+**It is three jobs, not one.** Once `anchors` moved out, this was the release's critical path at
+1545s — 1370s of gates, of which spa-parity is 448, live-audit 427 and everything else 495 together.
+Those are the three slices (`parity`, `audit`, `motion`), each booting its own routers for 157s it
+does not share, so the wall clock is the longest slice and not the sum. `fail-fast` is off: a parity
+failure says nothing about whether the reader stays put. Where two gates share a slice they also
+share the page shapes they read, through `FS_SHAPES` — classifying is one load and a 1200ms settle
+per page of the menu, and both gates used to do it back to back (measured: live-audit 421s alone,
+303s after spa-parity had already read the same router).
+
+Cheapest-first still holds inside `motion`, which opens with upstream-contract at 7s; it can no
+longer come before the other two slices, which are on runners of their own.
 
 1. `tools/upstream-contract.mjs` — the assumptions about luci-base. It runs first because if one of
    them has moved, every finding below is downstream of it.
@@ -254,8 +266,9 @@ produced, and runs the live gates cheapest-first:
    a pull request and `--full` on a push — the axes it drops were measured not to change its answer,
    and a push is where being wrong about that must still be caught.
 7. `tools/install-check.sh` — `install.sh` twice on each router, fresh and over its own result. It
-   goes last because it replaces the build under test with the published release; #16, #28 and #30
-   were all this script, and all on the second run.
+   goes last in its slice because it replaces the build under test with the published release; #16,
+   #28 and #30 were all this script, and all on the second run. That replacement is also why it may
+   not share a router with a gate still measuring the build — which a slice of its own guarantees.
 
 **Three routers on a push, one on a pull request.** The push set is the OpenWrt lines the theme
 supports — 25.12/apk, 24.10/opkg and the snapshot box, which tracks luci-base's master and so fails

@@ -298,8 +298,14 @@ const SWAP = async (growth) => {
 	 * no poll does — the stock one refreshes a section's BODY in place. The theme's reference lives
 	 * inside that grid, so removing all of it takes the reference and its fallback together and the
 	 * gate reports a jump the theme could not have prevented. A section body, a table, a table's
-	 * body: those are the three things `dom.content()` is called on. */
-	for (const el of view.querySelectorAll('.cbi-section > div, .table > .tbody, .table')) {
+	 * body: those are the three things `dom.content()` is called on.
+	 *
+	 * `.cbi-section-descr` is excluded for the same reason and was the same mistake one level down:
+	 * it is a section's DESCRIPTION, appended once when the section renders (luci-base form.js) and
+	 * never replaced by a tick. On DHCP at 1440 wide with the top bar it is the tallest `div` under a
+	 * section that sits above the reader, so the probe emptied it and reported 121px of movement on
+	 * firefox and webkit — a collapse of static text that no poll performs. */
+	for (const el of view.querySelectorAll('.cbi-section > div:not(.cbi-section-descr), .table > .tbody, .table')) {
 		if (el.getBoundingClientRect().bottom > 0) continue;		/* must be entirely above the reader */
 		if (el.contains(view) || el === view) continue;
 		if (!body || el.offsetHeight > body.offsetHeight) body = el;

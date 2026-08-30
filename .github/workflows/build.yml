@@ -122,7 +122,11 @@ jobs:
   build:
     name: Build the packages
     timeout-minutes: 25
-    needs: [check, lint]
+    # `check` alone, not `lint`. Nothing the linter says changes what this job packs, and it sat in
+    # front of every live gate: 107 seconds of the critical path for an answer none of them reads.
+    # `release` names `lint` itself, so a red linter still publishes nothing — that guarantee moved
+    # rather than went.
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -248,10 +252,24 @@ jobs:
   # the same command. Two routers on a push, one on a pull request: the second release line doubles
   # the wall clock and has never been the one to catch something first.
   live:
-    name: The pages behave on a real router
+    # THREE SLICES, because this job was the release's critical path once `anchors` stopped being it:
+    # 1545s, of which the gates are 1370 and the three heaviest are 448 (spa-parity), 427
+    # (live-audit) and 495 (the rest together). Split that way each slice boots its own routers —
+    # 157s it does not share — and the job's wall clock is its longest slice rather than their sum.
+    # fail-fast is off: a parity failure says nothing about whether the reader stays put.
+    strategy:
+      fail-fast: false
+      matrix:
+        slice: [ parity, audit, motion ]
+    name: The pages behave on a real router (${{ matrix.slice }})
     timeout-minutes: 45
     needs: build
     runs-on: ubuntu-latest
+    env:
+      # Where a gate leaves the page shapes it read, so a second one in the same slice does not walk
+      # the whole menu again — one load and a 1200ms settle per page. Inside the runner's temp, so it
+      # cannot outlive the install it describes (tools/lib/page-shapes.mjs).
+      FS_SHAPES: ${{ runner.temp }}/page-shapes
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -289,30 +307,44 @@ jobs:
             esac
           done
 
-      # Cheapest first, so a broken assumption about luci-base is reported before anything spends
-      # minutes rendering pages against it. Each measures one representative per PAGE SHAPE by
-      # default (tools/lib/page-shapes.mjs) and names the pages it stood in for; a release takes the
-      # whole menu on all four routers instead (`--all --pages-all`, docs/releasing.md).
-      - run: node tools/upstream-contract.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
-      - run: node tools/spa-parity.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
-      - run: node tools/live-audit.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
-      # Nothing may re-decide or jump while the page moves. Chromium only here: WebKit needs system
-      # libraries (gtk-4, gstreamer) this job would install on every run, and the engine differences
-      # it covers are checked locally before a release (docs/development.md).
-      - run: node tools/scroll-jank.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
-      # The two things a poll tick can do to a page nobody is touching: lay out a replaced table
-      # before anything answered for it, and move the page under the reader.
-      - run: node tools/table-tick.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
-      # Chromium here; the other two engines have a job of their own (`anchors`), because the
-      # three-engine matrix takes longer than this job's whole budget — cancelled at 45 minutes with
-      # the sweep still running.
-      - run: node tools/scroll-anchor.mjs --only "$(echo $ROUTERS | tr ' ' ,)"
-
-      # LAST, because it installs the PUBLISHED release over the build the steps above measured — and
-      # that is the claim: what a user runs is install.sh against the feed, not `apk add` against a
-      # local file. Three field reports (#16, #28, #30) were this script and nothing else, all on the
-      # re-install-over-an-existing-copy path, which a fresh install cannot exercise.
-      - run: sh tools/install-check.sh $ROUTERS
+      # Each gate measures one representative per PAGE SHAPE by default (tools/lib/page-shapes.mjs)
+      # and names the pages it stood in for; a release takes the whole menu on all four routers
+      # instead (`--all --pages-all`, docs/releasing.md).
+      #
+      # `motion` opens with upstream-contract at 7s, so a broken assumption about luci-base is still
+      # reported before anything spends minutes rendering pages against it — it cannot come before
+      # the other two slices any more, since they are on runners of their own.
+      - name: The gates of this slice
+        run: |
+          set -eu
+          O="$(echo $ROUTERS | tr ' ' ,)"
+          case "${{ matrix.slice }}" in
+            parity)
+              node tools/spa-parity.mjs --only "$O"
+              ;;
+            audit)
+              node tools/live-audit.mjs --only "$O"
+              ;;
+            motion)
+              node tools/upstream-contract.mjs --only "$O"
+              # Nothing may re-decide or jump while the page moves. Chromium only here: WebKit needs
+              # system libraries (gtk-4, gstreamer) this job would install on every run, and the
+              # engine differences it covers are checked locally before a release.
+              node tools/scroll-jank.mjs --only "$O"
+              # The two things a poll tick can do to a page nobody is touching: lay out a replaced
+              # table before anything answered for it, and move the page under the reader.
+              node tools/table-tick.mjs --only "$O"
+              # Chromium here; the other two engines have a job of their own (`anchors`).
+              node tools/scroll-anchor.mjs --only "$O"
+              # LAST, because it installs the PUBLISHED release over the build everything above
+              # measured — and that is the claim: what a user runs is install.sh against the feed,
+              # not `apk add` against a local file. Three field reports (#16, #28, #30) were this
+              # script and nothing else, all on the re-install-over-an-existing-copy path, which a
+              # fresh install cannot exercise. It replaces the build, so it may not share a router
+              # with a slice still measuring one — which is exactly what a slice of its own buys.
+              sh tools/install-check.sh $ROUTERS
+              ;;
+          esac
 
       - if: always()
         run: owlab down || true
@@ -387,11 +419,12 @@ jobs:
       - if: always()
         run: owlab down || true
 
-  # The only job that holds a key, and `needs: [build, verify, live, anchors]` is what keeps a tag
-  # from publishing a package no router has installed.
+  # The only job that holds a key, and its `needs` is what keeps a tag from publishing a package no
+  # router has installed. `lint` is named here rather than inherited through `build`, which stopped
+  # waiting for it: the gate has to hold a release, not the packing step.
   release:
     name: Sign and publish
-    needs: [build, verify, live, anchors]
+    needs: [build, verify, live, anchors, lint]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
