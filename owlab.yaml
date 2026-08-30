@@ -33,6 +33,11 @@ project:
   post_sync: |
     uci -q set luci.themes.Footstrap=/luci-static/footstrap
     uci -q commit luci
+    # Every asset is served as `?v=<PKG_VERSION>-<pkgs_update_time>`, the mtime of the package
+    # database, which a sync never touches — so the browser keeps the modules it has and the page
+    # runs a mixture of old and new. Both paths, because which one exists depends on the release
+    # (docs/development.md, "Caches while iterating").
+    for db in /lib/apk/db/installed /usr/lib/opkg/status; do [ -f "$db" ] && touch "$db"; done
     rm -rf /www/luci-static/footstrap-top /usr/share/ucode/luci/template/themes/footstrap-top
 
 defaults:
