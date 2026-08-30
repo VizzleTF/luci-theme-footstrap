@@ -443,11 +443,20 @@ containers. Either take the stands down first, or assert the five `verify` thing
 running stand. If you do it by hand, log IN: an unauthenticated `curl` answers 403 and proves
 nothing.
 
-**Two live-audit findings are never the theme.** `/admin/services/banip/processing_log` prints the
-system log, and the log grows with every sync and restart done while working, so a long session
-manufactures its own findings — `owlab exec <stand> -- /etc/init.d/log restart` and re-measure (309
-lines gave 3 findings, 1 line gave none). `/admin/services/acme/logread` has a `textarea` with no
-accessible name in 25.12's app; 24.10 does not render it at all.
+**Reset the syslog BEFORE a live run, not after it reports.**
+`/admin/services/banip/processing_log` prints the system log as page content, so the page grows with
+every install, sync and `rpcd reload` done while working — a long session manufactures its own
+findings (309 lines gave 3, one line gave none). Treating that as something to diagnose afterwards
+costs a full re-run each time; it cost three in one session here. Put it in the run instead:
+
+```sh
+for c in owrt2512 owrt2410 owrtsnap; do
+    docker exec owlab-luci-theme-footstrap-$c /etc/init.d/log restart
+done
+```
+
+`/admin/services/acme/logread` has a `textarea` with no accessible name in 25.12's app; 24.10 does
+not render it at all.
 
 **A live gate that says "no owlab router is running" may be looking at the wrong PATH.** Every one
 of them shells out to `owlab status -json` (`tools/lib/stands.mjs`) and treats a failed spawn as

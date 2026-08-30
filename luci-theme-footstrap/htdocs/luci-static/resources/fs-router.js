@@ -735,11 +735,18 @@ function commitStage(stage, contentHost) {
  * snapshot. Read per navigation, so an OS change needs no listener.
  *
  * `ready` rejects when the transition is skipped — a hidden document, a duplicate name — which is a
- * normal outcome and not an error to report; the swap itself has happened either way. */
+ * normal outcome and not an error to report; the swap itself has happened either way.
+ *
+ * BOTH promises are taken, and `finished` is not decoration: it rejects with whatever the callback
+ * threw, so leaving it alone turns one fault into two console lines — the throw itself and an
+ * unhandled rejection behind it. Measured on a page whose callback throws: two `pageerror`s with
+ * only `ready` handled, one with both. The extra line is noise in a log the live gates read. */
 function swapIn(commit) {
 	const mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
 	if ((mq && mq.matches) || typeof document.startViewTransition !== 'function') { commit(); return; }
-	document.startViewTransition(commit).ready.catch(() => {});
+	const t = document.startViewTransition(commit);
+	t.ready.catch(() => {});
+	t.finished.catch(() => {});
 }
 
 /* The `#view` the document keeps between navigations, i.e. the one the observers are bound to:

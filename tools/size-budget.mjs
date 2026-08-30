@@ -114,8 +114,13 @@ const LIMITS = {
 	 * budget above spells out — the chrome's require of the named plugins (205 B) and
 	 * `fs-menutree`'s new export (14 B). The 427 B in `fs-search` is NOT here, which is the whole
 	 * reason a source registers through a global instead of requiring the palette: a page where
-	 * nobody opens the palette must not download it. */
-	coldJs: 56_000,
+	 * nobody opens the palette must not download it.
+	 *
+	 * 56,018 B on 2026-08-30, up 18 B: `swapIn()` takes the view transition's `finished` promise as
+	 * well as `ready`. `finished` rejects with whatever the update callback threw, so leaving it
+	 * alone turns one fault into two console lines — measured on a page whose callback throws: two
+	 * `pageerror`s with only `ready` handled, one with both. */
+	coldJs: 56_060,
 };
 
 function bytes(path) {
