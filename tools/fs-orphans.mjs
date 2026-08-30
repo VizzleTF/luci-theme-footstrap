@@ -39,10 +39,6 @@ const IGNORE_EXACT = new Set([
 	'fs-ap-return',
 	/* custom events / id prefixes */
 	'fs-autocollapse', 'fs-sub-', 'fs-topsub-',
-	/* a console log PREFIX (`console.error('fs-fit: a fitter threw')`), not markup. This is the one
-	 * name still ignored BY NAME, and it is safe only because nothing styles `.fs-fit`; see the note
-	 * below for why the blanket list of module names was the wrong fix. */
-	'fs-fit',
 ]);
 /* Module names are not classes, and they are handled by STRIPPING the two places a module is
  * referenced (the `'require fs-x as y'` pragma and footer.ut's `L.require('fs-x')`), never by
@@ -81,17 +77,35 @@ for (const f of filesIn(join(PKG, 'styles'), '.css')) {
 function stripComments(text, file) {
 	if (file.endsWith('.ut'))
 		return text.replace(/\{#[\s\S]*?#\}/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ')
-			.replace(/L\.require\('[^']*'\)/g, ' ');	/* footer.ut mounts the modules by name */
+			.replace(/\b[A-Za-z_$][\w$]*\.require\('[^']*'\)/g, ' ');	/* footer.ut mounts the modules by name */
 	return text
 		.replace(/\/\*[\s\S]*?\*\//g, ' ')					/* block */
 		.replace(/(^|[^:])\/\/.*$/gm, '$1')				/* line (keep http://) */
 		/* `'require fs-chrome as chrome';` names a MODULE, not a class — and blanking the POSITION
 		 * rather than the name is what lets a module share its name with the markup it owns. */
 		.replace(/^'require\s+[^']*';\s*$/gm, ' ')
-		.replace(/L\.require\('[^']*'\)/g, ' ')
+		/* ANY receiver, not just `L`: .claude/rules/js.md requires a stock class to be pulled through
+		 * `window.L` (`const RT = window.L; RT.require(name)`), so the canonical call site is
+		 * `RT.require('fs-search')` — and a pattern anchored on the letter `L` walked straight past
+		 * it. That is how the lazy search palette (0.14.3) turned its own module name into a class
+		 * "emitted but never styled": the position was right, the receiver was not. */
+		.replace(/\b[A-Za-z_$][\w$]*\.require\('[^']*'\)/g, ' ')
 		/* …and so does the page-module map, for the same reason: its values are module names, and
 		 * `fs-overview` was reported as markup emitted and never styled on the strength of one. */
-		.replace(/const PAGE_MODULES = \{[^}]*\}/g, ' ');
+		.replace(/const PAGE_MODULES = \{[^}]*\}/g, ' ')
+		/* A THIRD position, and the last one a module name reaches: this theme's console messages,
+		 * which all start `footstrap: ` and name the module they are about —
+		 * `console.error('footstrap: fs-search did not load', e)`. That one line is what put
+		 * `.fs-search` in the "emitted but never styled" list. IGNORE_EXACT already carries
+		 * `fs-fit` for exactly this reason and said in its own comment that the blanket list was
+		 * the wrong fix; this is that fix, by position, and that entry is gone with it.
+		 *
+		 * Two spellings, because the messages have two: most start `footstrap: ` and a few name the
+		 * module instead (`console.error('fs-fit: a fitter threw')`). The second pattern takes the
+		 * FIRST string argument of any console call — the message slot — so a class passed as a
+		 * later argument is still seen. */
+		.replace(/'footstrap: [^']*'/g, ' ')
+		.replace(/console\.\w+\(\s*'[^']*'/g, ' ');
 }
 
 const emitted = new Map();

@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Fixed
+
+- **`css-orphans` reported a module name as dead markup, and the fix is the one its own comment asked for.** `.fs-search` came up as "emitted but never styled" from the moment the search palette became lazy in 0.14.3: the gate strips module names by POSITION rather than by name — the `'require …'` pragma, `L.require('…')`, the page-module map — and the palette is reached two ways neither pattern covered. `RT.require('fs-search')` is the first: `.claude/rules/js.md` requires a stock class to be pulled through `window.L`, so the canonical call site is not spelled `L.`, and a pattern anchored on that letter walked past it. The second is the failure message beside it, `console.error('footstrap: fs-search did not load', e)` — a log line, not markup. Both are stripped by position now: any receiver's `require('…')`, any `'footstrap: …'` string, and the first string argument of any `console` call, which is the message slot. `fs-fit` leaves `IGNORE_EXACT` with them — it was the one name still ignored by name, for exactly this reason, and its own comment said the blanket list was the wrong fix. Proven both ways: the report is clean, and a `.fs-dead-probe` rule dropped into the sheet is still caught as dead CSS.
+
 ## [0.14.4] — 2026-08-30
 
 ### Changed
