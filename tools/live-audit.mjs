@@ -123,7 +123,12 @@ const CHECK = function () {
 	};
 
 	const host = document.getElementById('view') || document.body;
-	const hostRight = host.getBoundingClientRect().right;
+	const hostRect = host.getBoundingClientRect();
+	const hostRight = hostRect.right;
+	/* A vertical scrollbar takes width from the content column but not from its border box, so a
+	 * page long enough to scroll measures differently from the same page that is not — which is why
+	 * a finding seen in CI need not reproduce on a stand. Reported with every overflow. */
+	const scrollbar = Math.round(window.innerWidth - document.documentElement.clientWidth);
 
 	/* 1. the document itself */
 	const docScroll = Math.round(document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -139,7 +144,25 @@ const CHECK = function () {
 	for (const el of host.querySelectorAll('*')) {
 		if (!vis(el) || inScroller(el) || el.ownerSVGElement) continue;
 		const r = el.getBoundingClientRect();
-		if (r.width && r.right > hostRight + 1.5) out.push({ kind: 'overflow', el: label(el), by: Math.round(r.right - hostRight) });
+		if (!r.width || r.right <= hostRight + 1.5) continue;
+		/* THE NUMBER ALONE IS NOT ACTIONABLE. `table#packages (2)` says two pixels and nothing about
+		 * WHICH box is two pixels too wide — the element itself, or a parent it fills at 100%. That
+		 * is a day of guessing on a finding that does not reproduce off the runner, so the boxes are
+		 * printed with it: the element, the column it overflows, its parent, and whether a scrollbar
+		 * was taking width at the time. Only `by` carries this; the signature the baseline is keyed
+		 * on stays `path|width|kind|element`. */
+		const p = el.parentElement;
+		const pr = p ? p.getBoundingClientRect() : null;
+		const px = (n) => Math.round(n);
+		out.push({
+			kind: 'overflow',
+			el: label(el),
+			by: `${px(r.right - hostRight)}px  el ${px(r.width)}`
+				+ ` · host ${px(hostRect.width)}`
+				+ (pr ? ` · parent ${label(p)} ${px(pr.width)}` : '')
+				+ ` · ${getComputedStyle(el).boxSizing}`
+				+ (scrollbar ? ` · scrollbar ${scrollbar}` : ''),
+		});
 	}
 
 	/* 3. clipped: a non-scrolling box holding content wider than itself. Only the containers the

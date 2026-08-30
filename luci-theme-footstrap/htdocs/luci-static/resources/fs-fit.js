@@ -885,9 +885,20 @@ return baseclass.extend({
 	 * theme/30-tables.css gives a data table an honest min-content floor for as long as it is a
 	 * table, so a starved column really does overflow. Do not reconstruct min-content in JS — a
 	 * canvas approximation cost ~1ms per pass on a 114-row table and claimed 144px where the
-	 * engine's own floor is 93. */
+	 * engine's own floor is 93.
+	 *
+	 * TWO measurements, because a table overflows in two directions and `scrollWidth` only sees one.
+	 * A `display: table` box does not clip: when min-content needs more than it was given it GROWS
+	 * PAST its parent, so its scrollWidth and clientWidth rise together and the overflow is
+	 * invisible from inside — the same trap `roomFor()` above is written around. The box's own
+	 * width is what the reader sees sticking out, and it is what tools/live-audit.mjs measures
+	 * (`right > host + 1.5`). Taking the larger of the two makes this test answer the question the
+	 * gate asks: `#packages` on a fresh snapshot router came out 2px past the content column at
+	 * 1440 and stayed un-carded, because scrollWidth alone said it fitted. */
 	overflows(el) {
-		return el.scrollWidth > this.roomFor(el) + 1;	/* +1: sub-pixel rounding */
+		const room = this.roomFor(el);
+		const grown = el.getBoundingClientRect().width;
+		return Math.max(el.scrollWidth, grown) > room + 1;	/* +1: sub-pixel rounding */
 	}
 
 });
