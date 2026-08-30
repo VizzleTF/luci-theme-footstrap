@@ -362,6 +362,42 @@ If a change needs a real kernel — not this theme's usual case — a router can
 Every one of these cost a measurement that read as a regression in the theme. They are written down
 because each was hit more than once.
 
+**`docs/playground.html` draws Port status as STOCK, and that is the build's doing, not the theme's.**
+The whole port reskin in `styles/pages/20-overview.css` is scoped to
+`.ifacebox:has(img[src*="/port_"])`, and `tools/devkit-build.mjs` inlines every asset as a `data:`
+URI on its way into the page — so the icon's `src` no longer contains `/port_`, not one of those
+rules matches, and the tiles render as luci-mod-status shipped them: icon visible, name centred, zone
+bar unplaced. Reading that as "the reskin regressed" is the trap; the tiles are correct on a router
+and under `owlab`. Tell the two apart without leaving the browser — 0 on the playground, one per
+port on a real page:
+
+```js
+document.querySelectorAll('#view .ifacebox:has(img[src*="/port_"])').length
+```
+
+Everything else on that page — System, Memory, Storage, Network, DHCP, Wireless — is faithful, so the
+playground stays the cheap way to judge a card's typography. Only the port tiles are off.
+
+**`RPC call to uci/get failed: Access denied` on arrival is LuCI's, not the theme's.** It is thrown
+once, BEFORE the login form is submitted: `luci.js` asks for `uci get luci` with the all-zero session
+id and rpcd refuses, which is what it is supposed to do. It reads as a regression because a
+`pageerror` listener attached before the first navigation catches it and reports it against whatever
+was being measured. Prove whose it is by splitting the capture at the login — the same error appears
+on a stand carrying no local change:
+
+```
+before login: RPC call to uci/get failed with error -32002: Access denied
+after  login: none
+```
+
+**A page-scoped rule is invisible to `computed-diff` and `a11y`.** Both gates load
+`docs/gallery.html`, which carries no `body[data-page]`, so a rule written
+`body[data-page="admin-status-overview"] …` matches nothing there: the diff reports 0 differences and
+axe reports no violations, and neither has looked at the change. Green on such an edit means "not
+measured", not "no effect" — take the reading off the playground or a stand, and compute any contrast
+the rule introduces by hand. Measured this way for the Overview card restyle: `--fs-good` on
+`--fs-panel2` is 4.59:1 at its worst (footstrap/dark) across all four palettes, both modes.
+
 **`owlab sync` does not ship what a router gets.** It copies `htdocs/` and `ucode/` straight from the
 checkout and builds `cascade.css` with `--dev`: no minifier, no pre-paint minifier, no template
 strip, no token mangle, no PNG repack. Anything touching the build pipeline has to be measured on a
