@@ -265,11 +265,6 @@ jobs:
     timeout-minutes: 45
     needs: build
     runs-on: ubuntu-latest
-    env:
-      # Where a gate leaves the page shapes it read, so a second one in the same slice does not walk
-      # the whole menu again — one load and a 1200ms settle per page. Inside the runner's temp, so it
-      # cannot outlive the install it describes (tools/lib/page-shapes.mjs).
-      FS_SHAPES: ${{ runner.temp }}/page-shapes
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -299,6 +294,12 @@ jobs:
           # never the leg that caught something first; run it locally with --all when curious.
           if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410 owrtsnap"; fi
           echo "ROUTERS=$ROUTERS" >> "$GITHUB_ENV"
+          # Where a gate leaves the page shapes it read, so a second one in the same slice does not
+          # walk the whole menu again — one load and a 1200ms settle per page. Set here rather than
+          # in the job's `env`, where $RUNNER_TEMP is not available: the `runner` context exists
+          # inside a step. Under the runner's temp, so it cannot outlive the install it describes
+          # (tools/lib/page-shapes.mjs).
+          echo "FS_SHAPES=$RUNNER_TEMP/page-shapes" >> "$GITHUB_ENV"
           owlab up $ROUTERS
           for r in $ROUTERS; do
             case "$r" in
