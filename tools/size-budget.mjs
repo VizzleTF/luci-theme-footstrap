@@ -55,8 +55,14 @@ const LIMITS = {
 	 * address bar, the Android task-switcher card, an installed PWA's title bar — painted white over
 	 * a dark page, because the theme shipped no `<meta name="theme-color">` and a static one cannot
 	 * follow a palette. One observer on :root covers all 25 axes; a call in each applier would have
-	 * been the cheaper bytes and the more expensive rule. */
-	resourcesJs: 88_450,
+	 * been the cheaper bytes and the more expensive rule.
+	 *
+	 * 88,701 B on 2026-08-30, up 219 B for `swapIn()`: the router's commit is wrapped in a view
+	 * transition, so a navigation cross-fades where the browser has the API and cuts where it does
+	 * not. The bytes are the feature — there is no CSS-only form of it, the animation has to be
+	 * started from the one synchronous frame in the navigation. The 32 B ahead of it came in with
+	 * `fix(fit): see a table that grew past its parent`, which raised no budget. */
+	resourcesJs: 88_750,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -83,8 +89,12 @@ const LIMITS = {
 	 *
 	 * 55,474 B on 2026-08-29, up 474 B: `fs-prefs.js` is on the cold path and carries the
 	 * theme-color repaint the flash budget above spells out. Every page pays it because every page
-	 * is the one a phone may be showing. */
-	coldJs: 55_500,
+	 * is the one a phone may be showing.
+	 *
+	 * 55,749 B on 2026-08-30, up 219 B: `fs-router.js` is on the cold path and carries the view
+	 * transition around the swap that the flash budget above spells out; 30 B of the rise is the
+	 * table-overflow fix that preceded it. */
+	coldJs: 55_800,
 };
 
 function bytes(path) {
