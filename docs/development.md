@@ -462,7 +462,27 @@ Target page, context or browser has been closed` with an empty `log: []` is the 
 SIGTERMed mid-run — `live-audit` over two routers is 113 page renders and does not fit in five
 minutes. The two apart: a real finding prints `path|width|kind|element` lines and a count; a
 killed run prints a Playwright stack. Never re-run it with a bigger timeout — that is what T2
-means: `tools/bg.sh`, report the run-id, read the log in a later turn.
+means: `tools/bg.sh`, report the run-id, and pair it with a waiter (below).
+
+**A detached run needs a waiter, or it is a run nobody reads.** `tools/bg.sh` calls `setsid`: the
+process outlives the shell that started it and nothing announces its end. The log and a `.status`
+file next to it are the whole interface, and `.status` appears only when the run is over — which
+makes "is it done?" a question you have to keep asking, and therefore one that gets forgotten. It
+was forgotten three times in a single session here, twice while somebody was waiting on the answer,
+each time for 15-30 minutes after the chain had already finished.
+
+Start the waiter in the same turn as the run, so finishing wakes you instead of you polling it:
+
+```sh
+tools/bg.sh sh -c '…'            # prints run-id and log path
+# then, as a background command of its own:
+until [ -f ../tmp/<run-id>.status ]; do sleep 30; done
+echo "exit: $(cat ../tmp/<run-id>.status)"; grep -E '^[a-z-]+:' ../tmp/<run-id>.log
+```
+
+The waiter costs nothing while the run is going and turns the result into an event. A run whose log
+nobody opened is not a green gate — that rule is older than this note; the waiter is what makes it
+practical to honour.
 
 **"It is the app's markup" is a claim, and switching the stand to bootstrap is how you check it.**
 A finding on a third-party page reads as the app's, and the reflex is to write it into the baseline.

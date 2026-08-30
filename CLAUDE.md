@@ -87,8 +87,22 @@ seconds each, and they catch the regression that is in the file rather than in t
 
 **T2 — never blocked on.** `owlab up|test`, `npm run live`, `bench/nav-benchmark.py`, the live
 computed diff, `jsmin-verify`, the full token-stream compare. Started detached through `tools/bg.sh`
-or left to CI, run-id reported the moment it starts. Reading the log is a separate turn the
-maintainer asks for: `tail -n 40 ../tmp/<run-id>.log`.
+or left to CI, run-id reported the moment it starts: `tail -n 40 ../tmp/<run-id>.log`.
+
+**Detached is not unattended.** `tools/bg.sh` uses `setsid`, so nothing upstream of it — no task
+list, no completion event — knows the run exists; the only trace is the log and the `.status` file
+beside it. A run started and then forgotten is the failure mode this tier invites, and it is
+expensive: three times in one session a chain finished green or red and nobody looked for another
+15-30 minutes, twice while the maintainer was waiting on exactly that answer. So every `bg.sh` call
+is paired, in the same turn, with something that WAKES you when it ends — a background wait on its
+`.status` file is enough:
+
+```sh
+until [ -f ../tmp/<run-id>.status ]; do sleep 30; done; cat ../tmp/<run-id>.status
+```
+
+Report the result unprompted when it arrives. "I started it" is not a status, and being asked
+"what's there?" means the pairing was skipped.
 
 - **Foreground rule: no bash call runs longer than 5 minutes.** A command that would is T2 by
   definition — start it detached, name the run-id, move on. Idling against a running command is a
