@@ -55,8 +55,14 @@ const LIMITS = {
 	 * address bar, the Android task-switcher card, an installed PWA's title bar — painted white over
 	 * a dark page, because the theme shipped no `<meta name="theme-color">` and a static one cannot
 	 * follow a palette. One observer on :root covers all 25 axes; a call in each applier would have
-	 * been the cheaper bytes and the more expensive rule. */
-	resourcesJs: 88_450,
+	 * been the cheaper bytes and the more expensive rule.
+	 *
+	 * 88,482 B on 2026-08-30, up 32 B for the second measurement in `overflows()`. A `display:
+	 * table` grows past its parent instead of clipping, so scrollWidth and clientWidth rise
+	 * together and the overflow is invisible from inside: `#packages` sat 1226px wide in a 1224px
+	 * column with scrollWidth 1224, and the fit engine said it fitted while the live gate reported
+	 * the two pixels the reader can see. 32 B is what asking the box its own width costs. */
+	resourcesJs: 88_500,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -83,8 +89,11 @@ const LIMITS = {
 	 *
 	 * 55,474 B on 2026-08-29, up 474 B: `fs-prefs.js` is on the cold path and carries the
 	 * theme-color repaint the flash budget above spells out. Every page pays it because every page
-	 * is the one a phone may be showing. */
-	coldJs: 55_500,
+	 * is the one a phone may be showing.
+	 *
+	 * 55,530 B on 2026-08-30, up 30 B: `fs-fit.js` is on the cold path and carries the second
+	 * measurement in `overflows()` the flash budget above spells out. */
+	coldJs: 55_560,
 };
 
 function bytes(path) {
