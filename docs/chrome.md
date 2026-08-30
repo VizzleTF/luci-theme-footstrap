@@ -217,8 +217,14 @@ at all until you are already there — "Port Forwards" is a tab of Network → F
 - **It does not call the router.** Every result is a real `<a href>`, so a click bubbles to the
   router's own document-level handler and takes the SPA path (or falls back to a full load when the
   node is not SPA-able) with no second copy of that decision. Enter synthesises the same click.
-- Recently visited paths are kept in `localStorage` `fs-recent`, and they are also what
-  `warmRecent()` prefetches — see [spa-router.md](spa-router.md).
+- **Recently visited rows are kept in `localStorage` `fs-recent`, one key each.** A page's key is
+  its menu path; a row from a companion source carries its own `key`, because what it points at has
+  no dispatcher node — the sections source keys one `admin/system/system#Footstrap`, the page plus
+  the section's own heading. Only the key is stored: the title is resolved through the pool on
+  every render, so it follows the UI language and a row nothing produces any more is dropped
+  instead of shown dead. `menu-footstrap-common` owns the writer (`remember()`, exported for a
+  source that has to record its own row) and `warmRecent()` prefetches the page half of each key —
+  see [spa-router.md](spa-router.md).
 
 **Trap it was built around: do not index through `ui.menu.getChildren()`.** On an alias node it
 returns a copy whose `children` are the alias *target's*. That is right for drawing a menu and

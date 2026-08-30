@@ -76,8 +76,14 @@ const LIMITS = {
 	 * `footstrap.settings.plugin` names (205 B); `fs-menutree` exports raw node presence, which is
 	 * what lets a plugin gate a command on the menu node carrying its ACL group (14 B). It buys
 	 * section search and the `:` command line WITHOUT either shipping in the theme — the first
-	 * consumer, `luci-app-footstrap-palette`, weighs 12,970 B and none of it is here. */
-	resourcesJs: 89_400,
+	 * consumer, `luci-app-footstrap-palette`, weighs 12,970 B and none of it is here.
+	 *
+	 * 89,522 B on 2026-08-31, up 122 B for the recents list keying rows instead of paths: the
+	 * palette can recall a SECTION now, which had no key of its own and so left only the page it
+	 * sits on in the list. 53 B in `fs-search` (resolve a recent row against the pool, not the
+	 * index) and 69 B in `menu-footstrap-common` (`remember()` takes a key and is exported for the
+	 * source that produced the row; `warmRecent()` warms the page half of one). */
+	resourcesJs: 89_522,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -119,8 +125,13 @@ const LIMITS = {
 	 * 56,018 B on 2026-08-30, up 18 B: `swapIn()` takes the view transition's `finished` promise as
 	 * well as `ready`. `finished` rejects with whatever the update callback threw, so leaving it
 	 * alone turns one fault into two console lines — measured on a page whose callback throws: two
-	 * `pageerror`s with only `ready` handled, one with both. */
-	coldJs: 56_060,
+	 * `pageerror`s with only `ready` handled, one with both.
+	 *
+	 * 56,129 B on 2026-08-31, up 69 B: the cold half of the recents change the flash budget above
+	 * spells out. `menu-footstrap-common` is on every page because the list has to be written on
+	 * every navigation; `fs-search`'s 53 B is not here, the palette still being fetched on the
+	 * first gesture. */
+	coldJs: 56_129,
 };
 
 function bytes(path) {

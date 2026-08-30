@@ -104,7 +104,9 @@ function index() {
  * An optional package can add rows to the same list — one indexes the SECTION titles inside each
  * page, so "footstrap" finds System -> Appearance. A source hands over entries in the shape
  * buildIndex() produces and nothing else: the matching, the ranking and the rendering stay here,
- * or two lists would disagree about what a hit is.
+ * or two lists would disagree about what a hit is. Two fields are the source's alone: `onTake`,
+ * called when the row is chosen, and `key`, what the recents list stores it under when its `path`
+ * is not its own (see keyOf).
  *
  * Registration is a GLOBAL ARRAY, not an export a package requires. This module is fetched on the
  * first gesture and most sessions never make it; a package that had to `require` it to register
@@ -177,20 +179,31 @@ function search(q, limit) {
 /* What the palette shows before anything is typed: an admin lives in three or four pages, so the
  * empty state is its most-used view.
  *
- * Only the path is stored, never the title — the title is resolved through the index on every
- * render, so it follows the UI language and a page removed with its package drops out instead of
- * lingering as a dead row. */
+ * Only the KEY is stored, never the title — the title is resolved through the pool on every
+ * render, so it follows the UI language and a row whose package went away drops out instead of
+ * lingering as a dead row. A page's key is its menu path; a row from a source carries its own
+ * `key`, because a section has no dispatcher node and therefore no path that is only its own —
+ * the sections source keys one `admin/system/system#Footstrap`, the page it is on plus its own
+ * heading. */
 const RECENT_KEY = 'fs-recent';
 const RECENT_MAX = 8;
+
+/* the string a row is remembered under, and the one menu-footstrap-common's remember() writes */
+function keyOf(e) {
+	return e.key || e.path;
+}
 
 /* The list is WRITTEN by menu-footstrap-common.js, which is on every page — this module is not any
  * more, and a palette that only loads when it is opened cannot be what records where the admin has
  * been. Read here, at open time, so it is always current. `prefs.lsGetArr` owns the parse, the
- * corruption guard and the Array check; only the "these are paths" filter belongs here. */
+ * corruption guard and the Array check; only the "these are keys" filter belongs here. */
 function recentEntries() {
 	const recent = prefs.lsGetArr(RECENT_KEY).filter((x) => typeof x === 'string');
-	const byPath = new Map(index().map((e) => [ e.path, e ]));
-	return recent.map((p) => byPath.get(p)).filter(Boolean).slice(0, RECENT_MAX);
+	/* pool(), not index(): a section is recalled exactly as a page is. Against the index alone a
+	 * section key resolved to nothing and the row silently vanished, so taking "Footstrap" left
+	 * only "System" in the list — the page path is all either row carries. */
+	const byKey = new Map(pool().map((e) => [ keyOf(e), e ]));
+	return recent.map((k) => byKey.get(k)).filter(Boolean).slice(0, RECENT_MAX);
 }
 
 /* ---- the palette -------------------------------------------------------- */

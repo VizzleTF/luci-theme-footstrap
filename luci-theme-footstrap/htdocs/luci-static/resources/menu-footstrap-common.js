@@ -54,11 +54,20 @@ const RECENT_KEY = 'fs-recent';
 const RECENT_MAX = 8;
 const RECENT_WARM = 5;
 
-function remember(segs) {
-	if (!Array.isArray(segs) || !segs.length) return;
-	const path = segs.join('/');
+/* A key is a menu path, or a page path plus the heading of a section inside it
+ * (`admin/system/system#Footstrap`) — a section has no dispatcher node to name it, and only the
+ * source that produced the row can build that half. Exported for exactly that: the writer stays
+ * one function, or the two halves would drift on the cap and the de-duplication. */
+function remember(key) {
+	if (typeof key !== 'string' || !key) return;
 	const recent = prefs.lsGetArr(RECENT_KEY).filter((x) => typeof x === 'string');
-	prefs.lsSet(RECENT_KEY, JSON.stringify([ path ].concat(recent.filter((p) => p !== path)).slice(0, RECENT_MAX)));
+	prefs.lsSet(RECENT_KEY, JSON.stringify([ key ].concat(recent.filter((p) => p !== key)).slice(0, RECENT_MAX)));
+}
+
+/* the page half of a key: what the router can navigate to and what warmRecent() prefetches */
+function pageOf(key) {
+	const h = key.indexOf('#');
+	return h < 0 ? key : key.slice(0, h);
 }
 
 /* ---- warm the pages this admin actually uses ----
@@ -75,8 +84,10 @@ function remember(segs) {
 function warmRecent() {
 	try { if (navigator.connection && navigator.connection.saveData) return; } catch (e) {}
 	const here = (L.env.dispatchpath || []).join('/');
-	const paths = prefs.lsGetArr(RECENT_KEY)
-		.filter((p) => typeof p === 'string' && p !== here).slice(0, RECENT_WARM);
+	/* Keys, not paths: a section key names the page it sits on, and two sections of one page must
+	 * warm it once — the module chain is the page's. */
+	const keys = prefs.lsGetArr(RECENT_KEY).filter((p) => typeof p === 'string');
+	const paths = [ ...new Set(keys.map(pageOf)) ].filter((p) => p !== here).slice(0, RECENT_WARM);
 	if (!paths.length) return;
 	const go = () => paths.forEach((p) => router.prefetchSegs(p.split('/')));
 	if (typeof window.requestIdleCallback === 'function')
@@ -91,8 +102,9 @@ function wireSearch() {
 	const RT = window.L;
 
 	/* the page this full load landed on; onNavigate covers the SPA path afterwards */
-	remember(L.env.dispatchpath || []);
-	router.onNavigate(remember);
+	const rememberSegs = (segs) => remember((segs || []).join('/'));
+	rememberSegs(L.env.dispatchpath);
+	router.onNavigate(rememberSegs);
 	warmRecent();
 
 	/* One fetch, on the first gesture. The module builds its overlay and opens itself; every later
@@ -219,6 +231,10 @@ ensureOverviewHelpers();
  * halves (fs-menutree, fs-prefs) are separate modules. */
 
 return baseclass.extend({
+	/* the seam a companion package writes its own rows into the recents list through; see
+	 * remember() for what a key is */
+	remember,
+
 	init(renderMainMenu) {
 		/* First, and outside the promise: a third-party sheet that outranks the chrome is already
 		 * painting (fs-sheets: openclash's `* { margin: 0; padding: 0 }`). Deferring this to
