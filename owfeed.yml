@@ -156,7 +156,11 @@ packages:
     #
     # opkg has no conditional form of this — `Recommends:` is executed but unconditional, and would
     # put Russian on every 24.10 router — so that leg is covered by install.sh instead.
-    install-if: [ "luci-theme-footstrap={version}", "luci-i18n-base-ru" ]
+    # WAITING ON AN OWFEED RELEASE. The field is implemented and tested upstream (owfeed 1b7a1ab)
+    # but not in a tagged version, and CI pins `owfeed-version: v0.5.0` — which rejects unknown keys
+    # rather than ignoring them, so declaring it here fails the build job outright. Restore both
+    # entries together with the version bump in .github/workflows/build.yml.
+    # install-if: [ "luci-theme-footstrap={version}", "luci-i18n-base-ru" ]
 
   - name: luci-i18n-footstrap-es
     build: mkpkg
@@ -171,5 +175,5 @@ packages:
     i18n:
       from: ./dist/po-es
       basename: footstrap
-    # see luci-i18n-footstrap-ru above
-    install-if: [ "luci-theme-footstrap={version}", "luci-i18n-base-es" ]
+    # see luci-i18n-footstrap-ru above, including why it is commented out
+    # install-if: [ "luci-theme-footstrap={version}", "luci-i18n-base-es" ]
