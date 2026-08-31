@@ -140,7 +140,7 @@ jobs:
       # produces the released bytes.
       - run: npm ci --ignore-scripts
 
-      - uses: owfeed/owfeed/setup@v0.5.0
+      - uses: owfeed/owfeed/setup@v0.5.1
         with:
           version: v0.5.0
 
@@ -435,7 +435,7 @@ jobs:
       sign-key: ${{ secrets.OWFEED_AUTHOR_KEY }}
       usign-key: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
     with:
-      owfeed-version: v0.5.0
+      owfeed-version: v0.5.1
       # Writes dist/install.sh and release-notes.md. The installer is an asset because
       # raw.githubusercontent is rate-limited for the very user who most needs it (issue #17) and
       # because a signed copy is the only one checkable before it runs as root; the notes fill the
