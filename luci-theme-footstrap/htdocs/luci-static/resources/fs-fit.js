@@ -334,6 +334,27 @@ function putBack(el, was) {
 	const at = sc ? sc.scrollTop : window.scrollY;
 	if (sc) sc.scrollTop = at + drift; else window.scrollTo(0, at + drift);
 	_restAt = scrollTop();
+	/* AND WHERE THE ELEMENT ACTUALLY LANDED, which is not always `was`. The line above used to be
+	 * the whole of it, on the reasoning this comment states — the write is exactly the drift, so the
+	 * element is back at the top it was remembered at. It is not whenever the write was CLAMPED
+	 * SHORT, a case the line above already allows for by re-reading the offset: the page had less
+	 * room than the drift asked for, the element stops wherever the clamp left it, and `_rest` goes
+	 * on naming a top nothing can reach. Every later tick then measures that unreachable difference
+	 * and spends it on the reader: measured on webkit/Overview @390 top, `_rest` claiming 93.02 for
+	 * an element standing at 105, and the reader 12px off on the next tick (52px at normal density).
+	 *
+	 * Two rects on a layout the write has already forced. The section half is re-read for the same
+	 * reason and cannot be measured by the same probe — the sweep's swap returns the very nodes it
+	 * took out, so `_rest.el` survives it and the fallback is never reached, while a real
+	 * `dom.content()` puts NEW nodes in and lateDrift() corrects against `sec`/`secTop` instead.
+	 *
+	 * `_rest.at` is deliberately NOT touched: it belongs to anchorFor(), on the path where the
+	 * engine does no anchoring, and this fault is on the other one — measured, the sweep is green
+	 * on all 18 cells of the failing axis without it. */
+	if (_rest) {
+		if (_rest.el && _rest.el.isConnected) _rest.top = _rest.el.getBoundingClientRect().top;
+		if (_rest.sec && _rest.sec.isConnected) _rest.secTop = _rest.sec.getBoundingClientRect().top;
+	}
 }
 
 function noteMotion() {

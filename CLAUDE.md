@@ -37,6 +37,7 @@ what a doc already settled.
 | `styles/`, cascade layers, `build-css.sh`, `@mirror` | `docs/css.md` |
 | tokens, palettes, type, the Appearance axes | `docs/design-system.md` |
 | sidebar / bar / rail, the menu renderer, the fit | `docs/chrome.md` |
+| the reader's place through a poll tick — floor, reference, the three corrections | `docs/anchoring.md` |
 | client navigation | `docs/spa-router.md` |
 | foreign `luci-app-*`, the fence | `docs/third-party-apps.md` |
 | Makefile, uci-defaults, postinst/postrm, ACL | `docs/package.md` |

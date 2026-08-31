@@ -82,8 +82,15 @@ const LIMITS = {
 	 * palette can recall a SECTION now, which had no key of its own and so left only the page it
 	 * sits on in the list. 53 B in `fs-search` (resolve a recent row against the pool, not the
 	 * index) and 69 B in `menu-footstrap-common` (`remember()` takes a key and is exported for the
-	 * source that produced the row; `warmRecent()` warms the page half of one). */
-	resourcesJs: 89_522,
+	 * source that produced the row; `warmRecent()` warms the page half of one).
+	 *
+	 * 89,663 B on 2026-08-31, up 141 B: `putBack()` re-reads where the element actually landed, not
+	 * only the offset. A write the page clamped short stops the element somewhere other than the top
+	 * it was remembered at, and every later tick then corrects to a position nothing can reach — 12px
+	 * and 52px of reader, webkit/Overview @390 top. Two rects on a layout the write has already
+	 * forced; the third field the memo carries, `_rest.at`, is NOT written, and the sweep is green
+	 * on all 18 cells of that axis without it. */
+	resourcesJs: 89_663,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -130,8 +137,11 @@ const LIMITS = {
 	 * 56,129 B on 2026-08-31, up 69 B: the cold half of the recents change the flash budget above
 	 * spells out. `menu-footstrap-common` is on every page because the list has to be written on
 	 * every navigation; `fs-search`'s 53 B is not here, the palette still being fetched on the
-	 * first gesture. */
-	coldJs: 56_129,
+	 * first gesture.
+	 *
+	 * 56,270 B on 2026-08-31, up the same 141 B as the flash budget: `fs-fit.js` is on the cold path
+	 * and carries the whole anchoring fix — every page is one a poll tick can move under the reader. */
+	coldJs: 56_270,
 };
 
 function bytes(path) {

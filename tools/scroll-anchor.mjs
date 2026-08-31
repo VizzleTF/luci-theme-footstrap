@@ -25,6 +25,7 @@
  * doing, and a gate that only fails when a station happens to join is not a gate.
  *
  *   node tools/scroll-anchor.mjs [--only owrt2512] [--engines chromium,firefox] [--full]
+ *   … [--width 390] [--layout top] [--bail]   one cell, stopping at the first finding
  *
  * The default sweep crosses the axes that were measured to change its answer; `--full` adds the
  * ones that were measured not to (see SCROLLERS and DENSITIES) and is what CI runs on a push.
@@ -43,6 +44,11 @@ const ENGINES = arg('engines', 'chromium').split(',').map((s) => s.trim()).filte
  * answers — see SCROLLERS and DENSITIES. CI crosses them on a push and a tag, where an hour is
  * affordable and a narrowing that turns out to be wrong is caught before a release. */
 const FULL = process.argv.includes('--full');
+/* Stop at the first finding. A full sweep is 144 cells and tens of minutes, so an answer that only
+ * arrives at the end is one nobody can iterate against — a fix attempt cost a whole sweep to learn
+ * it had failed in the third cell. CI never passes this: how WIDE a fault is is half of what the
+ * sweep says. */
+const BAIL = process.argv.includes('--bail');
 
 /* Three shapes, because the shape decides what the theme can anchor ON, and each of these breaks
  * differently:
@@ -82,9 +88,16 @@ const PAGES = arg('page', '/admin/status/overview,/admin/network/dhcp,/admin/sta
  * So the sweep crosses the two scrollers and keeps the narrow viewport, where the pages are three
  * times longer and there is most to scroll past. The other two combinations repeated a measurement
  * the first two had already made. */
-const SCROLLERS = FULL
-	? [ 1440, 390 ].flatMap((width) => [ 'side', 'top' ].map((layout) => ({ width, layout })))
-	: [ { width: 1440, layout: 'side' }, { width: 390, layout: 'side' } ];
+const SCROLLERS = (() => {
+	const all = FULL
+		? [ 1440, 390 ].flatMap((width) => [ 'side', 'top' ].map((layout) => ({ width, layout })))
+		: [ { width: 1440, layout: 'side' }, { width: 390, layout: 'side' } ];
+	/* `--width 390 --layout top` narrows the sweep to the cell a finding names, which is what turns
+	 * a fix attempt from a sweep into a minute. Neither is set in CI, where the axes above are the
+	 * contract. */
+	const w = arg('width', ''), l = arg('layout', '');
+	return all.filter((c) => (!w || String(c.width) === w) && (!l || c.layout === l));
+})();
 
 /* One density. The axis moves the geometry — type and spacing scale, so a section is a different
  * height and the fold falls elsewhere — but it does not move the ANSWER: across all 72 Overview
@@ -467,7 +480,13 @@ const QUIET = async (growth) => {
 };
 
 const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'scroll-anchor');
+/* Printed as it is found, not held until the end: the first finding is the whole answer for someone
+ * iterating on a fix, and the list below is what says how many cells and which axes. */
 const findings = [];
+const found = (line) => {
+	findings.push(line);
+	process.stdout.write(`  FINDING ${line}\n`);
+};
 /* Cells whose page never loaded. They are NOT findings: this gate measures where the reader ends up
  * after a layout change, and a page that did not open measured nothing at all. Reported separately,
  * and fatal only in bulk — see UNOPENED_TOLERANCE below. */
@@ -517,6 +536,8 @@ for (const engine of ENGINES) {
 		for (const { width: w, layout } of SCROLLERS) {
 			for (const density of DENSITIES)
 			for (const noEngineAnchor of [ false, true ]) {
+				/* --bail: the cells after the first finding measure the same fix attempt again */
+				if (BAIL && findings.length) return;
 				const ctx = await browser.newContext({ viewport: { width: w, height: 844 } });
 				await sealToRouter(ctx, stand.base);
 				/* the Safari path, forced: `fsEngineAnchor=off` makes fs-fit believe the platform has
@@ -576,13 +597,13 @@ for (const engine of ENGINES) {
 				if (held.moved === null)
 					findings.push(`${where}: the reader's element was replaced mid-measurement, so nothing was proven`);
 				else if (Math.abs(held.moved) > TOLERANCE)
-					findings.push(`${where}: ${GROWTH}px grew above the reader and the page moved ${held.moved}px under them`);
+					found(`${where}: ${GROWTH}px grew above the reader and the page moved ${held.moved}px under them`);
 				if (swap.skip)
 					process.stdout.write(`  ${where}: the swap measured nothing (${swap.skip})\n`);
 				else if (swap.moved === null)
-					findings.push(`${where}: the reader's element did not survive the swap, so nothing was proven`);
+					found(`${where}: the reader's element did not survive the swap, so nothing was proven`);
 				else if (Math.abs(swap.moved) > TOLERANCE)
-					findings.push(`${where}: a section was refilled the way a poll refills one and the page moved `
+					found(`${where}: a section was refilled the way a poll refills one and the page moved `
 						+ `${swap.moved}px under the reader (the engine clamped ${swap.clamped}px of offset away)`);
 				/* The floor is judged on the CLAMP, not on the movement, and only where the theme owns the job:
 				 * with the correction switched off nobody compensates the pad the probe grows, so the
@@ -591,10 +612,10 @@ for (const engine of ENGINES) {
 				 * compensation rather than a clamp — 629px of it, and the reader still level — so it is
 				 * printed rather than judged. */
 				if (noEngineAnchor && swap.floorClamped !== null && swap.floorClamped !== undefined && swap.floorClamped > TOLERANCE)
-					findings.push(`${where}: with the correction switched off the engine clamped `
+					found(`${where}: with the correction switched off the engine clamped `
 						+ `${swap.floorClamped}px away — the content column's floor is not holding the document up`);
 				if (quiet.unexplained)
-					findings.push(`${where}: the offset moved on its own ${quiet.unexplained} time(s) mid-flick (worst ${quiet.biggest}px) `
+					found(`${where}: the offset moved on its own ${quiet.unexplained} time(s) mid-flick (worst ${quiet.biggest}px) `
 						+ '— a correction landing inside a scroll is itself a jump');
 				process.stdout.write(`  ${where}  reader moved ${held.moved}px (scroll ${held.scrollDelta >= 0 ? '+' : ''}${held.scrollDelta}, `
 					+ `${held.scroller})  swap moved ${swap.skip ? '-' : swap.moved + 'px'}`

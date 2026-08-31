@@ -235,6 +235,10 @@ of every aliased page missing.
 
 ## Keeping the reader's place when the engine will not
 
+**Every mechanism, what each is for and what the sweep measures without it, is in
+[anchoring.md](anchoring.md).** What follows here is the chrome's own half: which element a
+correction may take, and why.
+
 A poll tick changes the height of things above the reader — a station joins the associated list, a
 lease expires, an interface box grows a line — and everything below it moves. Chromium and Firefox
 hide that with **scroll anchoring**: they pick an element the reader can see and compensate the
@@ -331,6 +335,21 @@ Chromium lands where it started. WebKit OVERSHOOTS — measured on both stands, 
 widths, a swap that grew a section by 120px moved the offset by 180, leaving the reader 60px up the
 page **on every tick**.
 
+**The memo is a pair, and a clamped correction splits it.** `putBack()` is the one write either
+correction makes: it moves the offset by the drift it measured, and it used to update `_restAt`
+alone, on the reasoning that the element is now back at the top it was remembered at. It is not,
+whenever the write was clamped short — a page already at its end cannot scroll the last pixels — and
+then `_rest.top` names a position nothing can reach while `_restAt` has already moved on. The next
+tick corrects to that impossible top and takes the reader with it: measured on webkit/Overview at
+390 wide in the top layout, `_rest` claiming 93.02 for an element standing at 105, and the reader
+12px off after the tick (52px on the density beside it). Where the element actually landed is
+re-read after the write — for the reference and for the section it falls back to — which is two
+rects on a layout the write has already forced. `_rest.at` is left alone: it is read only by
+`anchorFor()`, on the path where the engine does no anchoring, and the sweep is green on all 18
+cells of the failing axis without touching it. **This only became visible when WebKit
+gained anchoring**: on the engine-anchoring path the theme corrects from a memo it keeps across
+ticks, where before it took a fresh reference on every mutation.
+
 **And the pages where nothing held the reader at all.** Two faults sat behind the same symptom, both
 of them in which ELEMENT the theme takes as its reference. `elementFromPoint` answers with `#view`
 itself wherever the hit lands in a gap between two sections — and the host's own top does not move
@@ -396,6 +415,13 @@ WebKit with the engine's own anchoring off, and 690px on a real Overview on the 
 not take, and it waits on `fit.restAt()` rather than on a stopwatch: WebKit starts its motion sampler
 late enough that a flat wait measured the theme before it had a reference at all, which reported a
 jump on every WebKit run with the theme identical on all three engines.
+
+**Findings print as they are found, and one cell can be run alone.** A `--full` sweep is 144 cells
+and tens of minutes, so a run that only speaks at the end costs a whole sweep per fix attempt — five
+attempts at the fault above were measured that way before the flags existed. Each finding is printed
+the moment it is made (`FINDING …`), `--bail` ends the run at the first one, and `--width 390
+--layout top` narrows the sweep to the cell a finding names: the same measurement then takes a
+minute. CI passes none of them — how WIDE a fault is is half of what the sweep says.
 
 The sweep crosses three page shapes and two scrollers, and both sets are what a measurement left
 standing rather than what looked thorough. The shapes: the Overview refills section BODIES, the
