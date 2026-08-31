@@ -108,16 +108,7 @@ const TOLERANCE = 2;
  *
  * So the wait is on the EVENT and then on the idle window, both bounded. */
 
-/* Runs in the page: park the reader, grow something above them, report what they saw.
- *
- * The router's poll is held here too, though this case only INSERTS. It used to run underneath, on
- * the reasoning that a pad the probe adds survives a tick landing beside it — and the pad does. The
- * REFERENCE does not: a tick calls `dom.content()` on the section the reader happens to be over, and
- * the element this probe measured the page by is gone before the second read. Measured on the tag
- * build: `the reader's element was replaced mid-measurement` on webkit/Overview at 1440 side, on
- * owrt2512 and owrt2410 both, and on no other engine — WebKit is slow enough here to lose that race
- * repeatably. The growth is synthetic in either case, so a real tick underneath adds nothing but the
- * chance of measuring nothing. */
+/* Runs in the page: park the reader, grow something above them, report what they saw. */
 const HOLD = async (growth) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
@@ -134,10 +125,6 @@ const HOLD = async (growth) => {
 
 	const room = (sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - window.innerHeight);
 	if (room < 600) return { skip: 'page too short to scroll' };
-	const poll = (window.L && window.L.Poll) || null;
-	const polling = !!(poll && typeof poll.active === 'function' && poll.active());
-	if (polling) poll.stop();
-	try {
 	const at = Math.min(Math.round(room / 2), 1600);
 	/* park the reader and wait for the ENGINE to say the scroll happened — see the note above */
 	const parkAt = async (y) => {
@@ -220,8 +207,6 @@ const HOLD = async (growth) => {
 	pad.remove();
 	return { before, after, moved: after.top === null ? null : after.top - before.top,
 		scrollDelta: after.pos - before.pos, scroller: sc ? 'maincontent' : 'window' };
-
-	} finally { if (polling) poll.start(); }
 };
 
 /* Runs in the page: a poll tick the way LuCI actually performs one — `dom.content()` empties the
@@ -246,8 +231,8 @@ const SWAP = async (growth) => {
 	 * than a coin toss: this case performs a tick BY HAND, to control when the container is empty,
 	 * and a real tick landing in the same window rewrites the very section being swapped. Measured
 	 * before it was stopped, the same router and width reported 689px, 577px and 0px on three
-	 * consecutive runs. HOLD holds it too, for the reference rather than the pad — see the note there.
-	 * QUIET only inserts a pad of its own, so a tick underneath it is noise it survives. */
+	 * consecutive runs. HOLD and QUIET only insert a pad of their own, so a tick underneath them is
+	 * noise they survive. */
 	const poll = (window.L && window.L.Poll) || null;
 	const polling = !!(poll && typeof poll.active === 'function' && poll.active());
 	if (polling) poll.stop();
