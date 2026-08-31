@@ -433,9 +433,16 @@ const QUIET = async (growth) => {
 	 * still — 400 ms of that and the theme is right to put the pending growth back, which is the
 	 * theme's contract and not a jump. So the travel is kept inside the page: a margin at each end,
 	 * and a step small enough that six of them fit between the two. */
-	/* the ticks this case measures against — see the note above */
+	/* The ticks this case measures against — see the note above. Started BEFORE the park and given
+	 * a tick's worth of time, because `Poll.start()` performs one synchronously: started later, that
+	 * first tick lands inside the flick this case is timing, and the sweep reports the jump it came
+	 * to look for. Measured in CI: `the offset moved on its own mid-flick (worst 145.5px)` on
+	 * firefox/owrt2410 @390 top compact, from starting the poll two statements further down. */
 	const poll = (window.L && window.L.Poll) || null;
-	if (poll && typeof poll.active === 'function' && !poll.active()) poll.start();
+	if (poll && typeof poll.active === 'function' && !poll.active()) {
+		poll.start();
+		await wait(1500);
+	}
 
 	const edge = Math.max(80, Math.min(200, Math.round(room * 0.15)));
 	const lo = edge, hi = room - edge;
