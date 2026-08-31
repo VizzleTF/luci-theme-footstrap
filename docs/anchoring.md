@@ -95,6 +95,16 @@ mechanism is supposed to hold. `tools/scroll-anchor.mjs`, `--width`/`--layout` t
 `--full` to cross the rest; every number below is what the sweep printed. A cell is only counted
 when it repeats — a lone finding on one pass is the parallel-stand noise `development.md` describes.
 
+**The poll belongs to one case of the sweep, and that is part of the measurement.** `Poll.start()`
+performs a tick synchronously (luci-base), so a case that restores the poll on its way out fires a
+real tick into the case that runs next — HOLD doing that had SWAP measuring the floor under a live
+tick, and CI reported 120px of unheld floor on a cell every other build calls green. HOLD and SWAP
+therefore leave it stopped, and QUIET — whose subject IS ticks landing mid-flick — starts it before
+it parks, with a tick's worth of time to land: started later, that first tick lands inside the very
+flick being timed and the sweep reports the jump it came to look for (145.5px, firefox/owrt2410
+@390 top compact). Both shapes are in [development.md](development.md), with what tells them apart
+from a theme fault.
+
 | mechanism | without it | needed |
 |---|---|---|
 | `holdFloor()` | reader moved 568px @390 top and 610px @1440 side; the clamp took 444px and 610px | yes — the largest effect of any of them |
