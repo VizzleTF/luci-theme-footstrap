@@ -130,6 +130,18 @@ function naturalHeight(el) {
 	const last = el.lastElementChild;
 	if (!last) return 0;
 	const box = el.getBoundingClientRect();
+	/* A BOX WITH NO HEIGHT OF ITS OWN HOLDS NOTHING UP, and asking its content how tall it would be
+	 * gets an answer about a page that is not on screen. `visibility: hidden` leaves children in the
+	 * layout with rects of their own, so an inactive tab pane — collapsed to height 0 by
+	 * theme/30-tables.css — measures its full content here and the floor then pins that collapse
+	 * open: on Network -> Interfaces the hidden `device` pane held 893px, and the active pane's
+	 * content sat that much further down the page (issue #41, reported against a third-party page
+	 * and reproduced on the stock one). The clear-and-remeasure shape this replaced read the
+	 * collapsed height and wrote nothing, which is the behaviour restored here.
+	 *
+	 * A container a tick has just emptied also measures 0, and that is the same answer for the same
+	 * reason: the floor it already wears is what holds it up, and holdFloor() leaves it alone. */
+	if (!box.height) return 0;
 	const end = last.getBoundingClientRect();
 	if (!end.height && !end.width) return 0;		/* a last child out of the flow says nothing */
 	const cs = window.getComputedStyle(el);

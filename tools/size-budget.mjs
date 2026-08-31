@@ -89,8 +89,13 @@ const LIMITS = {
 	 * it was remembered at, and every later tick then corrects to a position nothing can reach — 12px
 	 * and 52px of reader, webkit/Overview @390 top. Two rects on a layout the write has already
 	 * forced; the third field the memo carries, `_rest.at`, is NOT written, and the sweep is green
-	 * on all 18 cells of that axis without it. */
-	resourcesJs: 89_663,
+	 * on all 18 cells of that axis without it.
+	 *
+	 * 89,691 B on 2026-08-31, up 28 B: `naturalHeight()` refuses a box with no height of its own, so
+	 * the floor stops pinning a collapsed tab pane open — 893px of hidden pane on Network ->
+	 * Interfaces, and the active pane's content that far down the page (issue #41). One rect field,
+	 * on a rect the function already reads. */
+	resourcesJs: 89_691,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -140,8 +145,10 @@ const LIMITS = {
 	 * first gesture.
 	 *
 	 * 56,270 B on 2026-08-31, up the same 141 B as the flash budget: `fs-fit.js` is on the cold path
-	 * and carries the whole anchoring fix — every page is one a poll tick can move under the reader. */
-	coldJs: 56_270,
+	 * and carries the whole anchoring fix — every page is one a poll tick can move under the reader.
+	 *
+	 * 56,298 B on 2026-08-31, up the same 28 B: the floor lives in `fs-fit.js`, on the cold path. */
+	coldJs: 56_298,
 };
 
 function bytes(path) {

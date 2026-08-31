@@ -41,6 +41,13 @@ Three things about it are load-bearing and each was a measured failure first:
   284px. The floor climbs to the first box that is not a table.
 - **Written before the tick.** Pinning from inside the same statement sequence does nothing —
   `dom.content()` performs no layout, so no layout ever sees the pin: 1882px still clamped away.
+- **Not on a box that has no height of its own.** `naturalHeight()` measures the CONTENT — the last
+  child's bottom against the box's top — and `visibility: hidden` leaves that content in the layout,
+  so a collapsed tab pane answers with its full height and the floor pins the collapse open. On
+  Network → Interfaces the hidden `device` pane held 893px and the active pane's content sat that
+  far down the page (issue #41). The clear-and-remeasure shape this replaced read the collapsed
+  height and wrote nothing; refusing a zero-height box restores that, and gives the same answer for
+  a container a tick has just emptied — whose floor is already standing.
 
 ## What the reader was looking at: `anchorRef()` and the memo
 
