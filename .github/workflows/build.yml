@@ -142,7 +142,7 @@ jobs:
 
       - uses: owfeed/owfeed/setup@v0.5.1
         with:
-          version: v0.5.0
+          version: v0.5.1
 
       # The commit's timestamp, not the job's: a package's identity is a hash over its payload and
       # mkpkg records mtimes, so re-running a release over the same commit must produce the same
@@ -429,7 +429,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.0
+    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.1
     secrets:
       # The repository already has this key, and owfeed-packages pins its public half.
       sign-key: ${{ secrets.OWFEED_AUTHOR_KEY }}
