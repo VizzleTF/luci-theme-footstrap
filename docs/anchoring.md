@@ -103,11 +103,27 @@ when it repeats — a lone finding on one pass is the parallel-stand noise `deve
 | `putBack()` re-reading where the element landed | −52px on five passes out of five; with it, 0px on five out of five | yes, measured as a frequency because one pass is not evidence |
 | `ENGINE_ANCHORS` | forcing "no engine anchors" on an engine that does: 120px on Processes | yes — the detection picks the path, and running both corrections is what throws the page the other way |
 | the guards on a page in motion (`scrollTop() !== seen`, `_userUntil`) | 6 findings per scroller, on BOTH engines and all three pages: the offset moved on its own mid-flick, worst 185-520px | yes, and it is the only mechanism here that fails on Chromium-class engines too |
-| `settleDrift()` | nothing, on any axis the sweep crosses | **not measurable here.** It answers a tick that landed while the offset was moving, whose measurements the deferred pass inherits; the sweep's flick never leaves one behind. Its own note carries the measurement it was written for — 88 `min-height` writes and a 58px jump in the same frame, 429 ms after the mutation, ImmortalWrt 24.10/WebKit @390 top large |
+| `settleDrift()` | −60px on 2 passes out of 7, against 0 out of 6 with it — **on `imm2410 @390 top large`, webkit, and nowhere else** | yes. It answers a tick that landed while the offset was moving, so it is a race and a single pass does not see it: the first sweep that crossed this mechanism called it unmeasurable, and it took the cell its own note names (88 `min-height` writes and a 58px jump in the same frame, ImmortalWrt 24.10/WebKit) plus five repeats to catch it |
 | `anchorRef()` refusing to run while scrolling | nothing measurable | **not measurable here** — it is a cost guard, not a correctness one: every rect read there is a forced layout and this runs on every content mutation |
 | `anchorRef()` refusing `#view` as the reference | nothing on the current pages | **not measurable here.** The hit test is retried across the viewport, so it now finds real content where it used to land in a grid gap; the refusal is what keeps a future layout from silently anchoring on the host, whose own top never moves (drift 0 for ever, half the matrix silently unmeasured when it did) |
 
-**Three of them the sweep cannot reach**, and that is a finding about the sweep. Each is held by the
-measurement in its own comment rather than by a gate, so a change there is not caught by CI: extend
-`tools/scroll-anchor.mjs` before touching one, or accept that the proof is historical.
+And four parts that carry the machinery rather than decide anything, so there is nothing to ablate:
+
+| part | why it is not in the table above |
+|---|---|
+| `rememberRest()` and `_rest` / `_restAt` / `_restPage` | the memo itself. Removing it removes every correction at once, which is what the rows above already measure one at a time |
+| `forgetRest()` | belongs to navigation, not to a tick: the router calls it when it resets both scrollers, and `spa-parity` is what covers that |
+| `.table.fs-dt { overflow-anchor: none }` (`theme/30-tables.css`) | tells the ENGINE not to anchor inside a table whose layout the fit pass falsifies mid-pass. The sweep measures the theme's corrections, not the engine's choice of anchor |
+| `_scrollMem` / `saveScroll` / `restoreScroll` (`fs-router.js`) | per history entry, not per tick — see [spa-router.md](spa-router.md) |
+
+**Two of them the sweep cannot reach**, and that is a finding about the sweep. Both are held by the
+measurement in their own comment rather than by a gate, so a change there is not caught by CI:
+extend `tools/scroll-anchor.mjs` before touching one, or accept that the proof is historical.
+
+A third, `settleDrift()`, looked like one of them until it was measured on the right cell. Adding a
+separate assertion for it — read the reference after the flick, again once the deferred pass has
+run, and fail on the difference — caught **nothing** across four sweeps on two engines while the
+mechanism was disabled, so it was not kept: what does catch it is the swap case already in the
+sweep, on `imm2410 @390 top large`, repeated. **An optional stand is the only place a mechanism of
+this theme is measurable**, which is worth knowing before `--only` is narrowed to the core three.
 
