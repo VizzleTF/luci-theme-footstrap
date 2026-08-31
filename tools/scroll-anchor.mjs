@@ -234,7 +234,7 @@ const HOLD = async (growth) => {
 	return { before, after, moved: after.top === null ? null : after.top - before.top,
 		scrollDelta: after.pos - before.pos, scroller: sc ? 'maincontent' : 'window' };
 
-	} finally { if (polling) poll.start(); }
+	} finally { /* the poll stays stopped — see the note on QUIET, which starts it again */ }
 };
 
 /* Runs in the page: a poll tick the way LuCI actually performs one — `dom.content()` empties the
@@ -405,11 +405,19 @@ const SWAP = async (growth) => {
 		floorClamped: floorOnly.skip ? null : floorOnly.clamped,
 		scroller: sc ? 'maincontent' : 'window' };
 
-	} finally { if (polling) poll.start(); }
+	} finally { /* the poll stays stopped — see the note on QUIET, which starts it again */ }
 };
 
 /* Runs in the page: a scripted flick up and down while ticks land, reporting any offset change the
  * wheel did not ask for. */
+/* THE POLL IS STARTED HERE AND NOWHERE ELSE, and the two cases before this leave it stopped rather
+ * than handing it back. `Poll.start()` calls `step()` SYNCHRONOUSLY (luci-base, luci.js), so a case
+ * that restores the poll on its way out fires a real tick into the case that runs next: measured in
+ * CI, HOLD returning the poll put a live tick under SWAP's floor measurement and the sweep reported
+ * `the content column's floor is not holding the document up`, 120px, on webkit/owrt2410 @390 top
+ * compact — a cell that is green at v0.14.2, green before that change and green again when it was
+ * reverted, on a theme those three builds share. This case WANTS ticks landing mid-flick, so it is
+ * the one that starts them. */
 const QUIET = async (growth) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
@@ -425,6 +433,10 @@ const QUIET = async (growth) => {
 	 * still — 400 ms of that and the theme is right to put the pending growth back, which is the
 	 * theme's contract and not a jump. So the travel is kept inside the page: a margin at each end,
 	 * and a step small enough that six of them fit between the two. */
+	/* the ticks this case measures against — see the note above */
+	const poll = (window.L && window.L.Poll) || null;
+	if (poll && typeof poll.active === 'function' && !poll.active()) poll.start();
+
 	const edge = Math.max(80, Math.min(200, Math.round(room * 0.15)));
 	const lo = edge, hi = room - edge;
 	/* six steps out and six back, from the MIDDLE of that band: half the band is what one direction
