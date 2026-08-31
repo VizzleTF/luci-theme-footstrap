@@ -142,9 +142,12 @@ feed_lag_note() {	# <installed version>
 # carries no APK signature of its own; the usign signature over the manifest is what this path
 # trusts, and it is checked before the file is handed over.
 # <package name>, defaulting to the theme: the language catalogues are named in the same signed
-# manifest and are fetched through the same chain.
+# manifest and are fetched through the same chain. <base> defaults to the newest release and is
+# given explicitly when a specific tag is wanted — see install_language(), which pins the catalogue
+# to the version of the theme the router actually ended up with.
 install_from_release() {
 	_want="${1:-$PKG}"
+	_base="${2:-$RELEASE_BASE}"
 	command -v usign >/dev/null 2>&1 || {
 		err "usign is not installed, so a release artifact cannot be verified here."
 		return 1
@@ -152,9 +155,9 @@ install_from_release() {
 	_tmp=$(mktemp -d /tmp/footstrap-install.XXXXXX) || return 1
 	printf '%s\n' "$RELEASE_PUBKEY" > "$_tmp/release.pub"
 	info "Fetching the signed release manifest..."
-	if ! fetch "$RELEASE_BASE/manifest.txt" "$_tmp/manifest.txt" ||
-	   ! fetch "$RELEASE_BASE/manifest.txt.sig" "$_tmp/manifest.txt.sig"; then
-		err "Could not download the release manifest from $RELEASE_BASE either."
+	if ! fetch "$_base/manifest.txt" "$_tmp/manifest.txt" ||
+	   ! fetch "$_base/manifest.txt.sig" "$_tmp/manifest.txt.sig"; then
+		err "Could not download the release manifest from $_base either."
 		rm -rf "$_tmp"; return 1
 	fi
 	if ! usign -V -q -p "$_tmp/release.pub" -x "$_tmp/manifest.txt.sig" -m "$_tmp/manifest.txt"; then
@@ -169,8 +172,8 @@ install_from_release() {
 		rm -rf "$_tmp"; return 1
 	fi
 	info "Downloading $_file..."
-	if ! fetch "$RELEASE_BASE/$_file" "$_tmp/$_file"; then
-		err "Could not download $RELEASE_BASE/$_file."
+	if ! fetch "$_base/$_file" "$_tmp/$_file"; then
+		err "Could not download $_base/$_file."
 		rm -rf "$_tmp"; return 1
 	fi
 	_have=$(sha256sum "$_tmp/$_file" | cut -d' ' -f1)
@@ -202,23 +205,33 @@ install_from_release() {
 # is not a failure — most languages have no catalogue, and `en` never does. Nothing here runs when
 # the router is on the default (unset, or `auto`, which means "follow the browser" and names no
 # single catalogue to install).
+#
+# NOT IN THE FEED IS NOT THE END OF THE PATH. A release reaches owfeed-packages through a pull
+# request against that repository, so a package that is NEW — which these two were, in 0.14.4 — is
+# absent from the feed for as long as that takes, and every Russian router upgrading in that window
+# would be told its language is unavailable while the signed asset for it sits in the release.
+# So the release is the fallback, through the same verified chain the theme itself takes when the
+# feed cannot serve the router at all, and `$PM upgrade` picks the package up from the feed once it
+# lands there.
 install_language() {
 	_lang=$(uci -q get luci.main.lang 2>/dev/null || true)
 	case "$_lang" in
 		''|auto|en) return 0 ;;
 	esac
 	_lpkg="luci-i18n-footstrap-$_lang"
+	# ASKED FOR FIRST, then installed. Most languages have no catalogue, and letting the install
+	# fail instead prints fifteen lines of the package manager's own diagnosis (pm_quiet's failure
+	# tail) in front of a message that says nothing is wrong.
+	_in_feed=no
 	if [ "$1" = feed ]; then
-		# ASKED FOR FIRST, then installed. Most languages have no catalogue, and letting the
-		# install fail instead prints fifteen lines of the package manager's own diagnosis
-		# (pm_quiet's failure tail) in front of a message that says nothing is wrong.
 		if [ "$PM" = apk ]; then
-			apk list "$_lpkg" 2>/dev/null | grep -q . || {
-				info "No $_lpkg in the feed — the theme's own strings stay in English."; return 0; }
+			apk list "$_lpkg" 2>/dev/null | grep -q . && _in_feed=yes
 		else
-			opkg list "$_lpkg" 2>/dev/null | grep -q . || {
-				info "No $_lpkg in the feed — the theme's own strings stay in English."; return 0; }
+			opkg list "$_lpkg" 2>/dev/null | grep -q . && _in_feed=yes
 		fi
+	fi
+
+	if [ "$_in_feed" = yes ]; then
 		info "Fetching the $_lang translation ($_lpkg)..."
 		if [ "$PM" = apk ]; then
 			pm_quiet apk add --upgrade "$_lpkg" || {
@@ -228,9 +241,20 @@ install_language() {
 				warn "Could not install $_lpkg — the theme stays in English."; return 0; }
 		fi
 	else
+		# The catalogue is pinned to the TAG THE INSTALLED THEME CAME FROM, not to `latest`: the
+		# feed trails the release by up to a day, so a router that just took 0.14.3 from the feed
+		# would otherwise get 0.14.4's catalogue — and a catalogue knows only the strings of its own
+		# version, rendering the rest in English with nothing reporting it.
+		_lbase="$RELEASE_BASE"
+		if [ "$1" = feed ]; then
+			info "The feed carries no $_lpkg yet; taking it from the signed release."
+			_lver=$(installed_version)
+			[ -n "$_lver" ] && _lbase="https://github.com/$REPO/releases/download/v${_lver%-r*}"
+		fi
 		info "Fetching the $_lang translation ($_lpkg)..."
-		install_from_release "$_lpkg" || {
-			warn "The release manifest names no $_lpkg — the theme stays in English."; return 0; }
+		install_from_release "$_lpkg" "$_lbase" || {
+			warn "No $_lpkg in the release either — the theme's own strings stay in English."
+			return 0; }
 	fi
 	ok "Translation installed: $_lang"
 }

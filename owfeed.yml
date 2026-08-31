@@ -145,6 +145,18 @@ packages:
     i18n:
       from: ./dist/po-ru
       basename: footstrap
+    # WHAT MAKES THE SPLIT SURVIVE AN UPGRADE NOBODY SUPERVISES. `depends` points from the
+    # catalogue to the theme, so installing or upgrading the THEME never pulls a catalogue in:
+    # measured on a stand, a Russian router on 0.14.3 taking 0.14.4 through the feed lost every
+    # `.lmo` with the old package and gained no new one — the theme went back to English and
+    # nothing said why (issue #41). `install-if` is apk's answer: install this by yourself once
+    # both are true. The pin re-fires the rule on every upgrade of the theme; `luci-i18n-base-ru`
+    # is what "this router is Russian" looks like to a package manager, which cannot read
+    # `uci luci.main.lang`.
+    #
+    # opkg has no conditional form of this — `Recommends:` is executed but unconditional, and would
+    # put Russian on every 24.10 router — so that leg is covered by install.sh instead.
+    install-if: [ "luci-theme-footstrap={version}", "luci-i18n-base-ru" ]
 
   - name: luci-i18n-footstrap-es
     build: mkpkg
@@ -159,3 +171,5 @@ packages:
     i18n:
       from: ./dist/po-es
       basename: footstrap
+    # see luci-i18n-footstrap-ru above
+    install-if: [ "luci-theme-footstrap={version}", "luci-i18n-base-es" ]

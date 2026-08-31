@@ -673,8 +673,39 @@ function build() {
 	];
 
 
+	/* ---- the catalogue this router has not got ----
+	 *
+	 * The theme's translations are their own packages since 0.14.4, the way every `luci-app-*`
+	 * ships them, and nothing in a package manager can read `uci luci.main.lang` to fetch the right
+	 * one: apk learns it from `install-if` against `luci-i18n-base-<lang>` (owfeed.yml), opkg has no
+	 * conditional form of that at all, and a router upgraded from 0.14.3 through the feed simply
+	 * loses the catalogue that used to ride inside the theme (issue #41). `install.sh` covers its
+	 * own path; this covers the one nobody ran a script on.
+	 *
+	 * ASKED OF THE PAGE, not of the package list: the theme has no ubus call of its own and must not
+	 * grow one for this. `_()` returns its argument unchanged when no catalogue answers, so asking
+	 * for a string the catalogue certainly carries is the whole test.
+	 *
+	 * `Layout` is that string — a caption this very form renders, present in every catalogue under `po/`. A word
+	 * that only LOOKS certain is worse than no check: `Appearance` is in the source but obsolete in
+	 * the catalogues (`#~ msgid`), so testing it reported "not translated" on a router whose
+	 * Russian catalogue was installed and working.
+	 *
+	 * The language comes from the document, not from `L.env`, which carries no language field at
+	 * all — the dispatcher stamps `<html lang>` and that is what the page knows.
+	 *
+	 * Nothing is shown on an English or `auto` router, where there is no catalogue to miss. */
+	const lang = (document.documentElement.getAttribute('lang') || '').trim();
+	const untranslated = lang && lang !== 'en' && lang !== 'auto' &&
+		_('Layout', 'footstrap') === 'Layout';
+	const missing = untranslated ? E('div', { 'class': 'fs-ap-verrow fs-ap-i18n' }, [
+		E('span', {}, [ _('This theme is not translated on this router yet.', 'footstrap') + ' ' ]),
+		E('code', {}, [ 'luci-i18n-footstrap-' + lang ])
+	]) : '';
+
 	defaults.push(E('div', { 'class': 'fs-ap-footer' }, [
-		E('div', { 'class': 'fs-ap-verrow' }, [ versionLink ])
+		E('div', { 'class': 'fs-ap-verrow' }, [ versionLink ]),
+		missing
 	]));
 
 	/* not .cbi-section: inside a tab pane that is a card within a card, and the stock tabs put

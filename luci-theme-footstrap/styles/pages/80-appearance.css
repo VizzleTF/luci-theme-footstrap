@@ -186,6 +186,18 @@
 	.fs-ap-version { font-size: var(--fs-type-xs); color: var(--fs-dim); font-variant-numeric: tabular-nums; text-decoration: none; }
 	.fs-ap-version:hover { color: var(--fs-accent); text-decoration: underline; }
 
+	/* The line that names the missing catalogue package. Same weight as the version beside it —
+	 * it is a fact about this router, not a warning: nothing is broken, one package is absent.
+	 * Wraps, because the package name is 24 characters and the column is narrow at 390px. */
+	.fs-ap-i18n {
+		flex-wrap: wrap;
+		font-size: var(--fs-type-xs);
+		color: var(--fs-dim);
+	}
+	/* the chip is base/20-typography.css's `code`; only the size follows the line it sits in, which
+	 * is a step smaller than body text */
+	.fs-ap-i18n code { font-size: inherit; }
+
 	/* No rules here for a segmented control or a range slider of our own: the page draws its enums
 	 * with `ui.Select` and its numbers with `ui.RangeSlider`, which this theme already styles for
 	 * every other LuCI form. Two copies of a slider, one of them ours, was the thing to delete. */

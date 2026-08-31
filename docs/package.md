@@ -184,9 +184,37 @@ old `footstrap-theme.*.lmo` away with it, and installing `luci-i18n-footstrap-ru
 `footstrap.ru.lmo` down in its place, with `luci.languages.ru` registered and the chrome rendering
 in Russian.
 
+**A package manager cannot read `uci luci.main.lang`, so the catalogue has to install itself.**
+`depends` points from the catalogue to the theme, which means installing or upgrading the THEME
+pulls in nothing: measured on a stand, a Russian router on 0.14.3 taking 0.14.4 through the feed lost
+every `.lmo` with the old package and gained no new one — English theme, nothing said why (issue
+#41). Three mechanisms cover the three ways a router can arrive at the new shape, and none of them
+covers all of it:
+
+| path | what carries it |
+|---|---|
+| `install.sh`, install or re-run | reads `luci.main.lang` and fetches the catalogue, from the feed or — when the feed has not got it yet — from the signed release, pinned to the tag the installed theme came from |
+| `apk upgrade` on 25.12+ | `install-if: luci-theme-footstrap={version} luci-i18n-base-<lang>` in `owfeed.yml`: apk installs the catalogue by itself once the theme is at that version and the router already carries that language's LuCI base. The pin re-fires the rule on every theme upgrade |
+| `opkg upgrade` on 24.10 | nothing. opkg's `Recommends:` is executed but unconditional — it would put Russian on every 24.10 router — and a postinst cannot call opkg, which holds an exclusive lock for the whole run. This leg is `install.sh` or nothing |
+
+`install-if` needs at least two entries with one pinned by `=` (apk-package(5)); `{version}` is
+expanded by owfeed to the version being built, so a release does not hand-edit the pin.
+
+Where none of the three fired, the Appearance tab says so: it asks `_('Layout', 'footstrap')` — a
+string every catalogue carries — and, when the answer comes back untranslated on a non-English
+router, names the package. That check is why `Appearance` is the wrong string to test: it is
+obsolete in the catalogues (`#~ msgid`) and reported "not translated" on a router whose Russian
+catalogue was installed and working.
+
 `install.sh` reads `luci.main.lang` after installing the theme and fetches the matching package
 best-effort, so the split does not silently un-translate a router on the upgrade that introduces it.
-A language with no catalogue, `en`, and `auto` are all no-ops there. `tools/check-packages.sh`
+A language with no catalogue, `en`, and `auto` are all no-ops there. **A feed that does not carry
+the catalogue is not the end of that path**: a new package reaches owfeed-packages through a pull
+request against it, so `luci-i18n-footstrap-ru` and `-es` were absent from the feed for as long as
+that took while the signed assets sat in the release — the installer falls back to the release,
+through the same verified chain, and pins it to the tag the INSTALLED theme came from rather than to
+`latest`, because the feed trails the release by up to a day and a catalogue knows only the strings
+of its own version. `tools/check-packages.sh`
 asserts one theme package per format, one catalogue per language package, and none in the theme.
 
 ## uci-defaults: registration

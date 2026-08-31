@@ -94,8 +94,13 @@ const LIMITS = {
 	 * 89,691 B on 2026-08-31, up 28 B: `naturalHeight()` refuses a box with no height of its own, so
 	 * the floor stops pinning a collapsed tab pane open — 893px of hidden pane on Network ->
 	 * Interfaces, and the active pane's content that far down the page (issue #41). One rect field,
-	 * on a rect the function already reads. */
-	resourcesJs: 89_691,
+	 * on a rect the function already reads.
+	 *
+	 * 89,989 B on 2026-08-31, up 298 B: the Appearance tab names the translation package when the
+	 * router has not got it — the other half of issue #41, since the catalogues are their own
+	 * packages now and nothing else on a router can say which one is missing. `fs-appearance` is
+	 * required on ONE page, so this is flash rather than a cold download. */
+	resourcesJs: 89_989,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.

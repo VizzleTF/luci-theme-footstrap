@@ -345,6 +345,13 @@ nothing can drift.
 `apk upgrade` / `opkg upgrade` carries it forward afterwards, which is the whole reason to install
 from a feed rather than from a file.
 
+It then installs the catalogue for `luci.main.lang`, and **the feed not carrying that package is not
+a refusal**: a release reaches owfeed-packages through a pull request, so a NEW package — which
+`luci-i18n-footstrap-<lang>` was in 0.14.4 — is missing from the feed until that merges, while the
+signed asset for it is already in the release. The fallback takes it from the release through the
+chain below, pinned to the tag the installed theme came from, and `apk upgrade` picks the package up
+from the feed once it lands there.
+
 ```sh
 wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 ```
