@@ -116,8 +116,15 @@ const LIMITS = {
 	 * 90,978 B on 2026-09-01, up 288 B: a table inside a box the APP scrolls is left as a table
 	 * (docs/third-party-apps.md rule 9) — luci-app-filemanager's listing came out as cards on a
 	 * 1280px screen with 1224px of column beside it. A walk from the table to the content root,
-	 * asked once per decision. */
-	resourcesJs: 90_978,
+	 * asked once per decision.
+	 *
+	 * 90,861 B on 2026-09-01, DOWN 117 B, and the two halves are unrelated. `swapIn()` is gone with
+	 * the view transition it started, which cost the reader up to 3,728 ms of the page they had
+	 * navigated away from on WebKit (docs/spa-router.md); fs-fit spends most of it back on a third
+	 * observer, for `data-tab-active` — a tab switch mutates no node, so nothing woke the sweep and
+	 * the outgoing pane held its floor: 2432px of blank above System -> Startup's textarea, for the
+	 * life of a page that does not poll. */
+	resourcesJs: 90_861,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -175,8 +182,11 @@ const LIMITS = {
 	 *
 	 * 56,999 B on 2026-09-01, up the same 541 B: still `fs-fit.js`, still on every page.
 	 *
-	 * 57,287 B on 2026-09-01, up the same 288 B: `fs-fit.js` and `fs-select.js`, both cold. */
-	coldJs: 57_287,
+	 * 57,287 B on 2026-09-01, up the same 288 B: `fs-fit.js` and `fs-select.js`, both cold.
+	 *
+	 * 57,170 B on 2026-09-01, down the same 117 B: `fs-router.js` and `fs-fit.js` are both cold, and
+	 * the transition coming out is worth more than the tab observer going in. */
+	coldJs: 57_170,
 };
 
 function bytes(path) {

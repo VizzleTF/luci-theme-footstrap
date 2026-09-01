@@ -379,6 +379,21 @@ live gates on two schemes and one of them has a self-signed certificate. Compari
 `uci set luci.main.mediaurlbase='/luci-static/bootstrap'`, which needs no reinstall: the fallback
 theme is already on the router (`uci-defaults`).
 
+**A layout fault can be invisible on one release line because that luci-base happens to mutate the
+page, not because the theme is right.** The poll floor left on an outgoing tab pane (issue #75,
+`docs/anchoring.md`) reproduces on 25.12 — 2432px of blank above System → Startup's textarea, for
+the life of a page that never polls — and the same v0.14.6 build on the 24.10 stand cleared it
+within 200 ms of the switch, some other mutation there having woken the sweep. A stand that is green
+is evidence about that stand. What tells the two apart is measuring the mechanism rather than the
+symptom: click a tab and read the floor off the pane the reader left, on each stand.
+
+```sh
+# after switching tabs, on any page with a tab strip
+[...document.querySelectorAll('#view [data-tab-title]')]
+  .filter(p => p.getAttribute('data-tab-active') !== 'true' && p.style.minHeight)
+  .map(p => p.getAttribute('data-tab-title') + '=' + p.style.minHeight)      # must be []
+```
+
 **`Poll.start()` fires a tick synchronously, so a probe that hands the poll back poisons the probe
 after it.** luci-base's `start()` sets the interval and then calls `step()` on the spot, which means
 restoring the poll on the way out of one measurement drops a real tick into the beginning of the

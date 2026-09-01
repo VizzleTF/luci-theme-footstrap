@@ -32,7 +32,7 @@ function armGate() {
 
 const _fitters = [];
 let _rafPending = false;
-let _ro = null, _mo = null, _moFlag = null;
+let _ro = null, _mo = null, _moFlag = null, _moTabs = null;
 
 /* ---- a pass that reads layout may not run while the reader scrolls ----
  *
@@ -879,8 +879,9 @@ function observeContent() {
 		if (ENGINE_ANCHORS) lateDrift(settled);
 		else scheduleAnchor(ref);
 	});
-	for (const host of [ document.getElementById('view') || document.body, document.getElementById('modal_overlay') ]) {
-		if (!host) continue;
+	const hosts = [ document.getElementById('view') || document.body, document.getElementById('modal_overlay') ]
+		.filter(Boolean);
+	for (const host of hosts) {
 		_mo.observe(host, { childList: true, subtree: true });
 		watch(host);
 	}
@@ -896,6 +897,25 @@ function observeContent() {
 	 * change in the document, and the poll rewrites row classes on every tick. */
 	_moFlag = new MutationObserver(run);
 	_moFlag.observe(document.body, { attributes: true, attributeFilter: [ 'class' ] });
+
+	/* A TAB SWITCH IS A LAYOUT CHANGE WITH NO MUTATION IN IT. `ui.tabs` moves no node — it writes
+	 * `data-tab-active` on the panes — so the {childList} registration above never wakes, and the
+	 * floor the outgoing pane wears stands until something else sweeps. `min-height` beats the
+	 * `height: 0` an inactive pane is collapsed with (theme/30-tables.css), so that floor is blank
+	 * page above whatever the reader just opened: measured on 25.12, System -> Startup left 2432px
+	 * of it and the "Local Startup" textarea read as missing (#75), Network -> Interfaces 1299px
+	 * until the next poll tick, i.e. one `pollinterval`. A page that does not poll never gets that
+	 * tick and keeps the blank for the life of the page.
+	 *
+	 * `run()` direct, not the observer above: the anchoring corrections answer a poll tick that
+	 * moved the page under a still reader, and a tab the reader clicked is neither.
+	 *
+	 * A THIRD observer for the reason the second one exists — observe() replaces the options of a
+	 * registration for the same node. The filter keeps it to the one attribute: `subtree: true` on
+	 * `class` would wake run() on every row the poll rewrites. */
+	_moTabs = new MutationObserver(run);
+	for (const host of hosts)
+		_moTabs.observe(host, { attributes: true, attributeFilter: [ 'data-tab-active' ], subtree: true });
 }
 
 return baseclass.extend({

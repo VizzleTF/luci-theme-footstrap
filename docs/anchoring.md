@@ -30,7 +30,7 @@ taken while it is empty clamps the reader's offset into a document that was neve
 and nothing puts that back. So each container a poll empties carries a `min-height` at the height it
 had at the last settled moment, written BEFORE the tick rather than during it.
 
-Seven things about it are load-bearing and each was a measured failure first:
+Eight things about it are load-bearing and each was a measured failure first:
 
 - **On the containers, not on the column.** `min-height` on an ancestor of the engine's own anchor
   suppresses the engine's anchoring (css-scroll-anchoring-1 §2.2.2), so a floor on the column bought
@@ -79,6 +79,22 @@ Seven things about it are load-bearing and each was a measured failure first:
   pane comes back. This is what the clear-and-remeasure shape did for free by clearing every floor
   each tick; measured on the stand, one build per version: 1043px on v0.14.3, 3201 on v0.14.4, 2308
   on v0.14.5.
+- **And the switch has to wake the sweep.** Clearing a floor at the next pass is not clearing it: a
+  tab switch moves no node — `ui.tabs` writes `data-tab-active` on the panes — so the
+  `{childList, subtree}` observer on `#view` never fires and the outgoing pane keeps its floor until
+  something else mutates the page. On a page that polls that is one `pollinterval`, which is the
+  "it puts itself right after a few seconds" in the reports; on a page that does not poll it is the
+  life of the page. Measured on 25.12 at 1440px, with the `visibility` clear above already in:
+  System → Startup left 2432px of floor on `Initscripts`, the document at 3304px and the "Local
+  Startup" textarea 2716px down, permanently — read as a missing textarea (#75, and forum post 68
+  against 0.14.4); Network → Interfaces left 1299px for one tick. A third MutationObserver, filtered
+  to `data-tab-active`, runs the same sweep: 900px and 1348px, at the switch. It calls `run()`
+  rather than going through the observer that carries the anchoring corrections — those answer a
+  poll tick that moved the page under a still reader, and a tab the reader clicked is neither.
+  Whether the blank is ever SEEN is release-dependent and the mechanism is not: on the 24.10 stand
+  the same v0.14.6 build cleared both floors within 200 ms of the switch, something else in that
+  luci-base having mutated `#view`. It is not a thing to rely on — that is the whole point of
+  waking the sweep from the switch itself.
 
 ## What the reader was looking at: `anchorRef()` and the memo
 
