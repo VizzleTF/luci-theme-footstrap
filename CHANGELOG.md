@@ -1,3 +1,11 @@
+## [Unreleased]
+
+### Fixed
+
+- **A container that empties for good stops holding the page open.** The floor is meant to survive the pass that empties a container and come off once it refills; a container that never refills kept it for the life of the page — 1299px of `min-height` on Network → Interfaces, the document standing at 1720px around no content at all. Two things had to change and each was measured to be necessary alone. A box qualifies for a floor through its CHILDREN, so emptying it takes it out of the sweep's selector and the sweep can no longer see the floor it wrote: every floor is marked `data-fs-floor` now and found again by the mark. And the second look has to be SCHEDULED — every other pass is driven by the MutationObserver on `#view`, and a page that has stopped changing produces no further mutation, so "clear it if it is still empty next pass" never got a next pass. The wait is one poll interval (`L.env.pollinterval`, 5 s by default), because that is how long a container that is genuinely refilling may take. Introduced in 0.14.4 by `dc69b80`, which moved the floor from the element a tick replaces to a container that outlives it; 0.14.6 fixed the collapsed-tab-pane half of the same fault and not this one. Measured: document 1720px → 900px on Interfaces, 1624px → 900px on DHCP.
+
+- **The floor is the height the box actually needs.** It was measured to the bottom of the last ELEMENT in the container, and a box whose content ends in text ends below its last element: `.cbi-section-descr` on /admin/network/dhcp measured 115px against the 156px it stands at, so the document was free to shrink 41px under the reader during the very tick the floor exists for. The tail after the last element is measured with a Range now. A Range over the whole box is not what ships and the comment says so: it takes in whatever is out of the flow and writes a floor 98px TALLER than the box on the Overview, which is the same blank page seen from the other side. Against `offsetHeight` — what the pre-0.14.4 shape wrote — the worst disagreement is now 2px across 36 floors on owrt2512, 23 on owrt2410 and 36 on owrtsnap.
+
 ## [0.14.6] — 2026-09-01
 
 ### Changed

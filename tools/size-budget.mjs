@@ -104,8 +104,15 @@ const LIMITS = {
 	 * 90,149 B on 2026-09-01, up 160 B: a box the reader cannot see gives its floor back, so a tab
 	 * pane stops carrying the height it had while it was open — 1265px of dead page on Network ->
 	 * Interfaces, and the reader's tab starting below it (issue #41 again). The style the climb
-	 * already resolves is kept rather than re-read, and the pass carries one more array. */
-	resourcesJs: 90_149,
+	 * already resolves is kept rather than re-read, and the pass carries one more array.
+	 *
+	 * 90,690 B on 2026-09-01, up 541 B: the floor is measured to the end of the CONTENT and is given
+	 * back when a container empties for good — 41px of floor missing under the reader on
+	 * /admin/network/dhcp, 1299px of it holding blank page on Network -> Interfaces. Three parts, and
+	 * `tools/floor-contract.mjs` measures each: a Range over the tail after the last element, the
+	 * `data-fs-floor` mark that lets the sweep find a floor whose box has left the selector, and the
+	 * one scheduled second pass, without which nothing revisits a page that has stopped mutating. */
+	resourcesJs: 90_690,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -159,8 +166,10 @@ const LIMITS = {
 	 *
 	 * 56,298 B on 2026-08-31, up the same 28 B: the floor lives in `fs-fit.js`, on the cold path.
 	 *
-	 * 56,458 B on 2026-09-01, up the same 160 B: releasing that floor is in `fs-fit.js` too. */
-	coldJs: 56_458,
+	 * 56,458 B on 2026-09-01, up the same 160 B: releasing that floor is in `fs-fit.js` too.
+	 *
+	 * 56,999 B on 2026-09-01, up the same 541 B: still `fs-fit.js`, still on every page. */
+	coldJs: 56_999,
 };
 
 function bytes(path) {

@@ -30,7 +30,7 @@ taken while it is empty clamps the reader's offset into a document that was neve
 and nothing puts that back. So each container a poll empties carries a `min-height` at the height it
 had at the last settled moment, written BEFORE the tick rather than during it.
 
-Five things about it are load-bearing and each was a measured failure first:
+Seven things about it are load-bearing and each was a measured failure first:
 
 - **On the containers, not on the column.** `min-height` on an ancestor of the engine's own anchor
   suppresses the engine's anchoring (css-scroll-anchoring-1 §2.2.2), so a floor on the column bought
@@ -50,6 +50,25 @@ Five things about it are load-bearing and each was a measured failure first:
   a container a tick has just emptied — whose floor is already standing. It still fires on a box
   that is zero-height while VISIBLE: 4 of them over an 80-page sweep of owrt2512, on Overview and on
   a third-party settings page.
+- **Measured to the end of the CONTENT, not to the last element.** A box whose content ends in text
+  ends below its last element: `.cbi-section-descr` on /admin/network/dhcp measured 115px against
+  the 156px it stands at, and a floor 41px short is a document free to shrink under the reader
+  during the tick the floor exists for. The tail after the last element is measured with a Range;
+  `selectNodeContents()` over the WHOLE box is not what ships — it takes in whatever is out of the
+  flow and writes a floor 98px TALLER than the box on the Overview, which is the same blank page
+  seen from the other side. Held to the old shape's answer by `tools/floor-contract.mjs`: 33 floors
+  on owrt2512, worst 2px against what `offsetHeight` says.
+- **Taken off a box that empties for good.** The floor survives the pass that empties a container —
+  that is the whole mechanism — but a container still empty on the NEXT pass is not refilling, and
+  its floor is then blank page nothing takes back: 1299px on Network → Interfaces, with the document
+  standing at 1720px around no content at all. Two parts, and each was measured to be necessary on
+  its own. A box qualifies for a floor through its CHILDREN, so emptying it takes it out of
+  `SHRINKS` and the sweep can no longer even see the floor it wrote — hence `data-fs-floor`, and a
+  sweep that looks for its own mark. And the second pass has to be SCHEDULED: every other pass is
+  driven by the MutationObserver on `#view`, and a page that has stopped changing produces no
+  further mutation, so "clear it next pass" never gets a next pass. One poll interval
+  (`L.env.pollinterval`, 5 s by default) is the wait, because that is how long a container that is
+  genuinely refilling may take.
 - **Given back when the box goes out of sight.** Refusing to write a floor is not enough once one is
   standing: `min-height` beats the `height: 0` an inactive tab pane is collapsed with, so a pane the
   reader leaves keeps the height it had while open and the tab they switched to starts below it —
