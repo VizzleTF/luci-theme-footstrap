@@ -30,7 +30,9 @@ description: Module composition, the jsmin traps, and what fs-fit owns.
 
 `npm run lint:js` is the T0 gate. Then the one that covers what you touched: `axes` for `fs-prefs`
 or `fs-axes`, `chrome-fence` for `fs-sheets`/`fs-prefs`, `page-modules` for the page→module map,
-`css-orphans` if a `fs-*` class name moved.
+`css-orphans` if a `fs-*` class name moved, `floor` (T2, live) for anything in `holdFloor()` or
+`naturalHeight()` — it is the only gate that reads a floor's height back and empties a box to see
+the floor come off.
 
 `npm run smoke` (T1, ~1.4 s) evaluates `fs-fit`, `fs-prefs`, `fs-axes`, `fs-select`, `fs-chrome` and
 `fs-router` against a REAL DOM on the gallery and watches the colour axes stamp `--fs-<x>-h` before

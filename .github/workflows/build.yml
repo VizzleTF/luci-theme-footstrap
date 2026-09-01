@@ -335,6 +335,10 @@ jobs:
               # The two things a poll tick can do to a page nobody is touching: lay out a replaced
               # table before anything answered for it, and move the page under the reader.
               node tools/table-tick.mjs --only "$O"
+              # …and the third: hold the page open with a floor that is the wrong height, or that
+              # nothing ever takes off. Both shipped (0.14.4 and 0.14.6) and neither is visible in a
+              # file or on a page that is only loaded.
+              node tools/floor-contract.mjs --only "$O"
               # Chromium here; the other two engines have a job of their own (`anchors`).
               node tools/scroll-anchor.mjs --only "$O"
               # LAST, because it installs the PUBLISHED release over the build everything above
