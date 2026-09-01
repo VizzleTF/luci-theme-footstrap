@@ -492,6 +492,21 @@ function fitTables() {
 			return;
 		}
 
+		/* SOMEBODY ELSE'S SCROLLER, SOMEBODY ELSE'S DECISION. An app that puts its table in a box of
+		 * its own with `overflow-x: auto` has already answered the question this file asks, and
+		 * every answer here would overrule it: inside a 598px box a wide table overflows by
+		 * definition, so the ladder ends in a card stack however much room the page has.
+		 * luci-app-filemanager parks its listing in a `div.resizeable` of exactly that width and
+		 * came out as cards on a 1280px screen, with 1224px of column beside it (docs/third-party-
+		 * apps.md: what the theme may do to a foreign table). Asked before the slot's answer is
+		 * applied, so a table that was carded before this rule existed is un-carded rather than
+		 * re-carded. */
+		if (fit.inScroller(t)) {
+			t.classList.add('fs-fitted');
+			t.classList.remove('fs-stacked', 'fs-drop-xs');
+			return;
+		}
+
 		/* the column count, read from the tree: asking forces no layout */
 		const shape = shapeOf(t);
 

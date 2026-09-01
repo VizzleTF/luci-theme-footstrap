@@ -111,8 +111,13 @@ const LIMITS = {
 	 * /admin/network/dhcp, 1299px of it holding blank page on Network -> Interfaces. Three parts, and
 	 * `tools/floor-contract.mjs` measures each: a Range over the tail after the last element, the
 	 * `data-fs-floor` mark that lets the sweep find a floor whose box has left the selector, and the
-	 * one scheduled second pass, without which nothing revisits a page that has stopped mutating. */
-	resourcesJs: 90_690,
+	 * one scheduled second pass, without which nothing revisits a page that has stopped mutating.
+	 *
+	 * 90,978 B on 2026-09-01, up 288 B: a table inside a box the APP scrolls is left as a table
+	 * (docs/third-party-apps.md rule 9) — luci-app-filemanager's listing came out as cards on a
+	 * 1280px screen with 1224px of column beside it. A walk from the table to the content root,
+	 * asked once per decision. */
+	resourcesJs: 90_978,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -168,8 +173,10 @@ const LIMITS = {
 	 *
 	 * 56,458 B on 2026-09-01, up the same 160 B: releasing that floor is in `fs-fit.js` too.
 	 *
-	 * 56,999 B on 2026-09-01, up the same 541 B: still `fs-fit.js`, still on every page. */
-	coldJs: 56_999,
+	 * 56,999 B on 2026-09-01, up the same 541 B: still `fs-fit.js`, still on every page.
+	 *
+	 * 57,287 B on 2026-09-01, up the same 288 B: `fs-fit.js` and `fs-select.js`, both cold. */
+	coldJs: 57_287,
 };
 
 function bytes(path) {

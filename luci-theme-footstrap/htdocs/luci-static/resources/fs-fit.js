@@ -1003,6 +1003,21 @@ return baseclass.extend({
 		const room = this.roomFor(el);
 		const grown = el.getBoundingClientRect().width;
 		return Math.max(el.scrollWidth, grown) > room + 1;	/* +1: sub-pixel rounding */
+	},
+
+	/* IS SOMEBODY ELSE ALREADY SCROLLING THIS? An app that puts its table in a box of its own with
+	 * `overflow-x: auto` has answered the overflow question itself, and the theme re-laying that
+	 * table overrules a decision that was not its to take: luci-app-filemanager parks its listing in
+	 * a 598px `div.resizeable` and the whole table came out as cards on a 1280px screen, where the
+	 * page had 1224px of room and the reader had asked for none of it.
+	 *
+	 * The walk stops at the content root, so the theme's own scrollers are not this test's business:
+	 * `#modal_overlay` is the dialog's scroller (base/60-modal.css) and the scroll fallback the theme
+	 * gives a foreign table is on the TABLE itself (theme/30-tables.css), not on an ancestor. */
+	inScroller(el) {
+		for (let p = el.parentElement; p && p.id !== 'view' && p.id !== 'modal_overlay'; p = p.parentElement)
+			if ((/(auto|scroll)/).test(window.getComputedStyle(p).overflowX)) return true;
+		return false;
 	}
 
 });

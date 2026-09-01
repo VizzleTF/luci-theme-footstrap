@@ -289,6 +289,29 @@ the shape a census cannot reach, which is what the coverage contract means
 WebKit at 1440 px and 390 px: `<thead><tr><th>` and `<tr><th>` both card with the right captions, a
 header-less matrix stays a scrolling matrix at both widths.
 
+### Rule 9. A table inside the app's OWN scroller is the app's business
+
+The fit pass cards a data table when it needs more width than it has been given. Inside a box the
+app scrolls itself, that question has already been answered by somebody else, and every answer the
+ladder can give overrules it: within a 598px box a wide table overflows by definition, so the
+remedy ends in a card stack however much room the page has around it.
+
+Measured on `luci-app-filemanager`, which parks its listing in `#file-list-container.resizeable`
+(`resize: both; overflow: auto`, and no width of its own, so the browser's default box is what the
+reader gets): the listing came out as cards on a 1280px screen with 1224px of column beside it.
+Carded on the 0.14.3 package too, so this is not a regression of the fit rework — it is a case the
+rule never covered.
+
+`fit.inScroller()` walks from the table to the content root and answers whether any ancestor scrolls
+horizontally; `fs-select.js` asks BEFORE it applies the slot's remembered answer, so a table carded
+by an older build is un-carded rather than carded again. The walk stops at `#view` and
+`#modal_overlay` on purpose: the dialog's own scroller is the theme's (`base/60-modal.css`), and the
+scroll fallback the theme gives a foreign table is on the TABLE itself (`theme/30-tables.css`), not
+on an ancestor — neither may switch this rule on for everything.
+
+Swept over all 95 menu pages of a stand at 390px: **one** table matches, the file manager's. No
+stock page has a data table inside a scroller of its own, so nothing that cards today stops carding.
+
 ### What the theme cannot do, and should not try
 
 - `@media (prefers-color-scheme)` in an app's CSS is overridden by nothing — it is an OS setting.
