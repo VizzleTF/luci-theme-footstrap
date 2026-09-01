@@ -208,29 +208,28 @@ while the page the user is reading stays untouched.
   change is not about speed; it is that the outgoing page stays readable instead of being replaced
   by a spinner, and that three repair mechanisms could be deleted.
 
-### The swap is the one frame worth animating
+### The swap is not animated, and what it cost to try
 
-`commitStage()` is a synchronous DOM move, so it is wrapped in `document.startViewTransition()`
-(`swapIn()`): the browser cross-fades a FRAME, not a render. Wrapping `navigate()` instead would
-freeze the page for the whole chain — the API suppresses rendering until the update callback
-settles, and that callback would then span 136-196 ms in the median and up to `RENDER_TIMEOUT`.
-`restoreScroll` runs INSIDE the callback for the same reason the stamp order matters elsewhere:
-`::view-transition` is a fixed overlay of the old pixels, and a scroll landing after the snapshot
-slides the live page under a still image.
+`commitStage()` is a synchronous DOM move, and 0.14.4 wrapped it in `document.startViewTransition()`
+to cross-fade it. The reasoning held for the callback and not for the CAPTURE the engine takes
+before entering it, which the page cannot bound. Measured at 390px on the stands:
 
-**No `view-transition-name` is declared anywhere, and that is the design.** The staged render keeps
-a second `#view` in the document, two elements under one name make `ready` reject and the transition
-skip, and a named element taller than the snapshot containing block is clipped in its own snapshot —
-which every long status page is. The root snapshot is viewport-sized; bar, rail and sidebar are
-identical in both halves, so what visibly cross-fades is the content column.
+| navigation (WebKit) | with the transition | with it skipped |
+|---|---|---|
+| Overview -> /admin/system/system, swap lands at | 3,728 ms | 206 ms |
+| the same, longest main-thread task | 2,143 ms | 213 ms |
+| Overview -> /admin/status/realtime, update callback at | 2,844 ms | — |
 
-140 ms against the UA's 250 ms, because the warm navigation underneath measures 136-142 ms and a
-transition longer than the work it covers reads as lag. `::view-transition` carries
-`pointer-events: none` — the pseudo covers the viewport and would otherwise take every click for the
-length of the animation. Reduced motion starts no transition at all rather than zeroing a duration:
-the `*` rule in `theme/95-a11y-media.css` cannot reach a pseudo tree, and skipping also saves the
-snapshot. Same-document view transitions are Baseline as of 2025-10-14 (Chrome 111, Safari 18,
-Firefox 144); below that the API is absent and the swap stays instant.
+Chromium captured the same navigations in 15-40 ms and paid none of it. Until the swap lands the
+reader is looking at the page they navigated away from, under the new URL — a report of "the
+section is not where I expect it, F5 fixes it" (issue #42) is that seen from the outside, F5 being a
+full load, which starts no transition.
+
+A deadline does not hold it. `skipTransition()` does run the update callback at once — 3-5 ms on
+WebKit, Chromium and Firefox — but it has to be called from a timer, and the capture is holding the
+thread that timer needs: a 150 ms deadline fired at 1,944 ms, after the callback it existed to
+pre-empt. So the cross-fade is gone, along with `::view-transition` in `theme/20-shell.css`. It can
+come back when the capture can be measured before it is spent.
 
 ### Saying that a slow navigation is under way
 

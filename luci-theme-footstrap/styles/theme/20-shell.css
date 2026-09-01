@@ -682,27 +682,6 @@
 		#fs-nav-progress[data-state="done"] { transition: none; transform: scaleX(1); }
 	}
 
-	/* ---- and the swap itself, when the browser can animate it ----
-	 * The commit is one synchronous DOM move (fs-router.js, swapIn), so this animates a frame rather
-	 * than a render. Same-document view transitions are Baseline since 2025-10-14 (Chrome 111,
-	 * Safari 18, Firefox 144); below that the property parses to nothing and the swap stays instant.
-	 *
-	 * NO `view-transition-name` anywhere, and that is the design: naming `#view` would put two
-	 * elements under one name while the stage is still in the document (fs-router.js stages a second
-	 * `#view`), and a duplicate name aborts the transition; a named element taller than the snapshot
-	 * containing block is also clipped in its own snapshot, which every long status page is. The root
-	 * snapshot is viewport-sized, and bar, rail and sidebar are identical in both halves — what
-	 * visibly cross-fades is the content column.
-	 *
-	 * 140ms against the UA's 250ms: the warm navigation this sits on measures 136-142ms median
-	 * (docs/spa-router.md), and a transition longer than the work it covers reads as lag.
-	 *
-	 * `pointer-events`: the `::view-transition` pseudo covers the viewport and would take every click
-	 * for the length of the animation. Reduced motion is handled in fs-router.js, not here — the `*`
-	 * rule in 95-a11y-media.css cannot reach a pseudo tree. */
-	::view-transition { pointer-events: none; }
-	::view-transition-old(root), ::view-transition-new(root) { animation-duration: 140ms; }
-
 	/* ---------- footer ----------
 	 * Bare `footer`, not `footer.fs-footer`: the theme owns footer paint outright (absorbed
 	 * from base, which keeps only the flex skeleton), so a third-party view emitting its own

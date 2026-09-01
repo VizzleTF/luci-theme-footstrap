@@ -720,34 +720,25 @@ function commitStage(stage, contentHost) {
 	dropStage(stage);
 }
 
-/* ---- the commit is the one frame of a navigation worth animating ----
+/* ---- the swap is a DOM move, and nothing wraps it ----
  *
- * `commitStage()` is a synchronous DOM move, so a view transition here wraps a FRAME, not a render:
- * the update callback settles in the same tick and the API's rendering suppression cannot outlive
- * it. Wrapping navigate() instead would freeze the page for the whole chain — 136-196 ms median
- * (docs/spa-router.md) and up to RENDER_TIMEOUT on a cold route.
+ * 0.14.4 wrapped `commitStage()` in `document.startViewTransition()` to cross-fade the swap, on the
+ * reasoning that the commit is one synchronous DOM move and so the API would be animating a frame
+ * rather than a render. What that reasoning did not cover is the CAPTURE, which the engine performs
+ * before it enters the update callback and which the page cannot bound: measured on WebKit at
+ * 390px, a client navigation to /admin/system/system spent 2,143 ms in a single main-thread task
+ * with the transition and 213 ms without it, and the swap itself landed at 3,728 ms against 206 ms.
+ * The reader spends that time looking at the page they navigated away from, under the new URL —
+ * which is what a report of "the section is not where I expect it, F5 fixes it" looks like from the
+ * outside (issue #42), F5 being a full load and starting no transition.
  *
- * The scroll restore runs INSIDE the callback: `::view-transition` is a fixed overlay of the old
- * pixels, and a scroll that lands after the snapshot slides the live page under a still image.
- *
- * Reduced motion is answered by not starting a transition at all, rather than by a zeroed animation:
- * the `*` rule in theme/95-a11y-media.css does not reach a pseudo tree, and skipping also saves the
- * snapshot. Read per navigation, so an OS change needs no listener.
- *
- * `ready` rejects when the transition is skipped — a hidden document, a duplicate name — which is a
- * normal outcome and not an error to report; the swap itself has happened either way.
- *
- * BOTH promises are taken, and `finished` is not decoration: it rejects with whatever the callback
- * threw, so leaving it alone turns one fault into two console lines — the throw itself and an
- * unhandled rejection behind it. Measured on a page whose callback throws: two `pageerror`s with
- * only `ready` handled, one with both. The extra line is noise in a log the live gates read. */
-function swapIn(commit) {
-	const mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
-	if ((mq && mq.matches) || typeof document.startViewTransition !== 'function') { commit(); return; }
-	const t = document.startViewTransition(commit);
-	t.ready.catch(() => {});
-	t.finished.catch(() => {});
-}
+ * A deadline was tried and does not hold: `skipTransition()` runs the update callback at once
+ * (3-5 ms on WebKit, Chromium and Firefox alike), but it has to be called from a timer, and the
+ * capture is holding the thread that timer needs — the 150 ms deadline fired at 1,944 ms, after the
+ * callback it was there to pre-empt. Chromium captures the same navigations in 15-40 ms and pays
+ * none of this; an effect that is free on one engine and seconds on another, with no way to tell
+ * them apart before spending them, is not worth a reader's navigation. It can come back when a
+ * capture can be measured without one. */
 
 /* The `#view` the document keeps between navigations, i.e. the one the observers are bound to:
  * whichever `#view` is not the stage. A document that has none gets one, once. */
@@ -1101,11 +1092,9 @@ function navigate(pathname, push, kbd) {
 				/* superseded while rendering: the chain painted into its own stage, so drop it and
 				 * leave the live page to the newer navigation */
 				if (gen !== _navGen) { dropStage(stage); return; }
-				swapIn(() => {
-					commitStage(stage, contentHost);
-					/* now, and only now, is there one height to read: the incoming page's */
-					if (restoreTo) restoreScroll(restoreTo, gen);
-				});
+				commitStage(stage, contentHost);
+				/* now, and only now, is there one height to read: the incoming page's */
+				if (restoreTo) restoreScroll(restoreTo, gen);
 			})
 			.catch((e) => { dropStage(stage); throw e; });
 	}).catch((e) => {
