@@ -22,9 +22,9 @@
 	 * languages while looking alive here, which is how issue #7 survived.
 	 *
 	 * Worse, for tables whose rows LuCI builds from the heading's `innerText` the value is what the
-	 * heading RENDERS, and theme/30-tables.css uppercases `.th`: the theme's own CSS rewrites the
-	 * string the theme's own CSS matches on, so such a rule matches nothing on any router in any
-	 * language.
+	 * heading RENDERS, so any transform the theme puts on `.th` rewrites the string the theme's own
+	 * CSS matches on. That is not hypothetical: `.th` carried `text-transform: uppercase` until
+	 * issue #39, and every such rule matched nothing on any router in any language.
 	 *
 	 * Anchor on the COLUMN instead: `tools/css-i18n.mjs` fails the build on any `[data-title="…"]`
 	 * value match, so this cannot come back. */

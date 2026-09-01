@@ -372,6 +372,16 @@ Sizes (px): card title 14/700; KPI number 27/700 mono; large number 38–40/700 
 uppercase label 11/700 with `letter-spacing:.05em`; micro-caption 11–12 dim. Weight 800 from the
 mock-up is not loaded — 18 KB for six elements; everything that asked for 800 draws at 700.
 
+**A table's column heading is not one of those labels.** It carries the size, the weight, the
+tracking and the faint ink, and NOT `text-transform: uppercase`: the string is the app's, and
+uppercasing it printed LuCI's own `IPv4 address` as `IPV4 ADDRESS`, which reads as a typo rather
+than as a style (issue #39). It is also the string LuCI copies into `data-title` for the card view,
+from `innerText` — so a transform here rewrites the label the cards print and any selector keyed on
+it. Four rules hold that decision together: `.cbi-section .table .th` and the title row in
+`theme/30-tables.css`, the card label mirrored into `theme/65-dropdown.css`, and the alert's table
+in `theme/35-alerts.css`. The chrome's own eyebrows — menu section labels, KPI captions, the search
+palette's group headings — stay uppercase; they are the theme's words, not an app's.
+
 The fonts used to be self-hosted: nine `.woff2` subsets (3 faces × latin / latin-ext / cyrillic)
 under `htdocs/luci-static/footstrap/fonts/`, `@font-face` in `styles/01-fonts.css`, and the two
 latin Manrope subsets preloaded in `partials/head.ut`. They are gone, and the measurement is why:

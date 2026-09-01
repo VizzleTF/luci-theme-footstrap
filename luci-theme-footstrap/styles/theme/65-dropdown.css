@@ -461,7 +461,7 @@
 			/* @mirror table-card/label */
 			content: attr(data-title); display: block; margin-bottom: var(--fs-space-1);
 			font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking);
-			text-transform: uppercase; color: var(--fs-eyebrow-color);
+			color: var(--fs-eyebrow-color);
 			/* @endmirror */
 		}
 		/* The row's buttons are not a label/value pair: full width, each button stretching to

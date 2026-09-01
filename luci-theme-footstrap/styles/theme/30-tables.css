@@ -108,9 +108,15 @@
 	 * ones of Wireless (`.td.middle`) and DHCP leases do not, and stay left. */
 	.cbi-section .table .td.cbi-section-table-cell.cbi-section-actions { text-align: end; }
 	.cbi-section .table .tr:last-child .td { border-bottom: 0; }
+	/* Case is the app's, not the theme's: `text-transform: uppercase` stood here and printed LuCI's
+	 * own `IPv4 address` as `IPV4 ADDRESS`, which reads as a typo in a column heading rather than as
+	 * a style (issue #39). Everything else that made these read as headings — the smaller size, the
+	 * weight, the faint ink, the tracking — stays. Four rules carry the same decision: the title row
+	 * below, the card label (mirrored into theme/65-dropdown.css) and the alert's table in
+	 * theme/35-alerts.css. */
 	.cbi-section .table .th {
 		color: var(--fs-eyebrow-color); font-weight: var(--fs-eyebrow-weight); font-size: var(--fs-type-xs);
-		text-transform: uppercase; letter-spacing: var(--fs-eyebrow-tracking);
+		letter-spacing: var(--fs-eyebrow-tracking);
 	}
 
 	/* --- DATA tables ([id] or JS-tagged .fs-dt): leases, wifi, processes, routes … ---
@@ -420,7 +426,7 @@
 	.table .tr.table-titles .th, .table .tr.cbi-section-table-titles .th,
 	.table .tr.cbi-section-table-titles::before {
 		color: var(--fs-eyebrow-color); font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight);
-		letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase;
+		letter-spacing: var(--fs-eyebrow-tracking);
 		background: transparent;
 	}
 	/* The row's NAME, which must read the same on both releases: 25.12 renders a real
@@ -544,7 +550,7 @@
 		/* @mirror table-card/label */
 		content: attr(data-title); display: block; margin-bottom: var(--fs-space-1);
 		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking);
-		text-transform: uppercase; color: var(--fs-eyebrow-color);
+		color: var(--fs-eyebrow-color);
 		/* @endmirror */
 	}
 	/* A footer cell is the fourth member here, and it has to carry `[data-title]` in its own selector

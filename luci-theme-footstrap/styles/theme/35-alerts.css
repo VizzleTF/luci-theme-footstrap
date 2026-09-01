@@ -130,14 +130,14 @@
 	/* --fs-text, not --fs-eyebrow-color: everywhere else an eyebrow sits on --fs-panel, but here the
 	 * surface is a status tint, and the muted ink does not survive it — measured on the firmware
 	 * table over the warning fill, hicontrast/light: 3.35-3.36:1 against AA's 4.5. The eyebrow still
-	 * reads as one from its case, tracking and size; only the ink changes. */
+	 * reads as one from its tracking and size; only the ink changes. */
 	.alert-message .table .th,
 	/* The title-row selectors are not decoration: `.table .tr.table-titles .th` in 30-tables.css is
 	 * FOUR classes (0,4,0) and out-ranks the plain one above (0,3,0), so without these the header
 	 * kept the eyebrow ink no matter what this rule said — being later in the sheet buys nothing
 	 * against a heavier selector, which is the point of the "never win on source order" rule. */
 	.alert-message .table .tr.table-titles .th,
-	.alert-message .table .tr.cbi-section-table-titles .th { color: var(--fs-text); font-weight: var(--fs-eyebrow-weight); font-size: var(--fs-type-xs); text-transform: uppercase; letter-spacing: var(--fs-eyebrow-tracking); }
+	.alert-message .table .tr.cbi-section-table-titles .th { color: var(--fs-text); font-weight: var(--fs-eyebrow-weight); font-size: var(--fs-type-xs); letter-spacing: var(--fs-eyebrow-tracking); }
 	/* the column gap is --fs-space-3 like every other cell in the theme; --fs-space-3-5 here was the
 	 * only 14px cell gap in the sheet, and nothing above defends it — the comment covers flattening
 	 * the frame, not the rhythm. (The row density stays --fs-space-2: a table inside an alert is a
