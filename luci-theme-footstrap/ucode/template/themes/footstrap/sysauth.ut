@@ -187,8 +187,31 @@
 			input.focus();
 
 		/* if the router also serves HTTPS, hop over to it before the password goes over this
-		 * connection; the <img> probe is upstream's trick for proving the TLS port answers first */
-		if (document.location.protocol === 'https:') return;
+		 * connection; the <img> probe is upstream's trick for proving the TLS port answers first
+		 *
+		 * THE HOP CAN ARRIVE WITHOUT THE SESSION. On Chromium the jump from http to https is
+		 * cross-site — schemeful same-site puts the two schemes in different sites — so the
+		 * browser withholds LuCI's `SameSite=strict` cookie (dispatcher.uc) on exactly that
+		 * navigation and a reader already logged in over https lands back on this form: 403 to
+		 * the hop against 200 to curl carrying the cookie, measured on a stand serving both
+		 * schemes. Firefox sends it and answers 200 straight away.
+		 *
+		 * So where this form is what the hop landed on, it is asked again once, over the same
+		 * scheme: that navigation is same-site everywhere and carries the cookie. The retry is
+		 * bounded by the REFERRER rather than by a marker in the URL — after it, the referrer is
+		 * this https page instead of the http one, so a reader who genuinely has no session sees
+		 * this form once and stays on it. A `#…` marker was tried and is not what ships: on
+		 * Firefox the retry never runs, so nothing takes the fragment back off the address. */
+		if (document.location.protocol === 'https:') {
+			/* the host is compared as a PARSED origin, not as a prefix of the string:
+			 * `http://192.168.1.1.example.com` starts with `http://192.168.1.1` */
+			const from = document.referrer ? new URL(document.referrer) : null;
+
+			if (from && from.protocol === 'http:' && from.hostname === window.location.hostname)
+				window.location.replace(window.location.href);
+
+			return;
+		}
 
 		const { hostname, pathname } = window.location;
 

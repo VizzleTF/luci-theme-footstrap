@@ -362,6 +362,23 @@ If a change needs a real kernel — not this theme's usual case — a router can
 Every one of these cost a measurement that read as a regression in the theme. They are written down
 because each was hit more than once.
 
+**A stand serves http only, so nothing about the login page's https hop can be measured on it as it
+comes.** `uhttpd` has the certificate already; what is missing is the listener, and owlab publishes
+port 80 alone — the https side is reached on the container's own address rather than through
+localhost:
+
+```sh
+docker exec owlab-luci-theme-footstrap-owrt2512 sh -c \
+	"uci set uhttpd.main.listen_https='0.0.0.0:443'; uci commit uhttpd; /etc/init.d/uhttpd restart"
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+	owlab-luci-theme-footstrap-owrt2512      # -> curl -k https://<ip>/cgi-bin/luci
+```
+
+Put it back with `uci delete uhttpd.main.listen_https` — a stand left listening on 443 answers the
+live gates on two schemes and one of them has a self-signed certificate. Comparing against stock is
+`uci set luci.main.mediaurlbase='/luci-static/bootstrap'`, which needs no reinstall: the fallback
+theme is already on the router (`uci-defaults`).
+
 **`Poll.start()` fires a tick synchronously, so a probe that hands the poll back poisons the probe
 after it.** luci-base's `start()` sets the interval and then calls `step()` on the spot, which means
 restoring the poll on the way out of one measurement drops a real tick into the beginning of the
