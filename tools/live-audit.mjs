@@ -14,7 +14,7 @@
  * 24x24 CSS px with a neighbour inside 24px of its centre — WCAG 2.2 SC 2.5.8 with its spacing
  * exception), `noname` (an operable element with no accessible name — SC 4.1.2, the one a11y
  * failure a stylesheet CAN cause), `ungated-table`/`unanswered-table` (see below),
- * `nested-scroll` (two scrollports stacked on the shell), `geometry` (the chrome's model against
+ * `nested-scroll` (two scrollports stacked on the shell), `dead-floor` (see below), `geometry` (the chrome's model against
  * the real box) and `console` (a view that threw while rendering). The width sweep starts at 320,
  * which is the narrowest reflow WCAG 1.4.10 requires.
  *
@@ -215,7 +215,20 @@ const CHECK = function () {
 		}
 	}
 
-	/* 7. two stacked scrollports on the shell — the doubled scrollbar of #12 */
+	/* 7. A poll floor left on a box the reader cannot see. `min-height` beats the `height: 0` an
+	 * inactive tab pane is collapsed with, so a floor that outlives the pane's visibility pins the
+	 * collapse open and the page carries the pane's whole height as blank: 1265px on Network ->
+	 * Interfaces, twice shipped (issue #41, 0.14.4 and again 0.14.5) and never visible in a file.
+	 * `visibility` inherits, so this also names a floor sitting on a box inside a collapsed pane.
+	 * Measured against the 0.14.5 build on owrt2512 @1440: 25 findings, none with the fix. */
+	if (document.documentElement.hasAttribute('data-fs-fit')) {
+		for (const el of document.querySelectorAll('#view [style*="min-height"]')) {
+			if (getComputedStyle(el).visibility === 'hidden')
+				out.push({ kind: 'dead-floor', el: label(el), by: el.style.minHeight });
+		}
+	}
+
+	/* 8. two stacked scrollports on the shell — the doubled scrollbar of #12 */
 	const shellScrollers = [ document.documentElement, document.body, ...document.querySelectorAll('.fs-shell, .fs-main, .fs-content, #maincontent') ]
 		.filter((el) => el && /(auto|scroll)/.test(getComputedStyle(el).overflowY) && el.scrollHeight > el.clientHeight + 1);
 	if (shellScrollers.length > 1)

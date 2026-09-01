@@ -99,8 +99,13 @@ const LIMITS = {
 	 * 89,989 B on 2026-08-31, up 298 B: the Appearance tab names the translation package when the
 	 * router has not got it — the other half of issue #41, since the catalogues are their own
 	 * packages now and nothing else on a router can say which one is missing. `fs-appearance` is
-	 * required on ONE page, so this is flash rather than a cold download. */
-	resourcesJs: 89_989,
+	 * required on ONE page, so this is flash rather than a cold download.
+	 *
+	 * 90,149 B on 2026-09-01, up 160 B: a box the reader cannot see gives its floor back, so a tab
+	 * pane stops carrying the height it had while it was open — 1265px of dead page on Network ->
+	 * Interfaces, and the reader's tab starting below it (issue #41 again). The style the climb
+	 * already resolves is kept rather than re-read, and the pass carries one more array. */
+	resourcesJs: 90_149,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -152,8 +157,10 @@ const LIMITS = {
 	 * 56,270 B on 2026-08-31, up the same 141 B as the flash budget: `fs-fit.js` is on the cold path
 	 * and carries the whole anchoring fix — every page is one a poll tick can move under the reader.
 	 *
-	 * 56,298 B on 2026-08-31, up the same 28 B: the floor lives in `fs-fit.js`, on the cold path. */
-	coldJs: 56_298,
+	 * 56,298 B on 2026-08-31, up the same 28 B: the floor lives in `fs-fit.js`, on the cold path.
+	 *
+	 * 56,458 B on 2026-09-01, up the same 160 B: releasing that floor is in `fs-fit.js` too. */
+	coldJs: 56_458,
 };
 
 function bytes(path) {

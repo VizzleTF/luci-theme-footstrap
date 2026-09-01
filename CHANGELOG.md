@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Fixed
+
+- **A tab pane stops holding the page open after the reader leaves it.** The poll floor writes `min-height`, and `min-height` beats the `height: 0` an inactive pane is collapsed with — so a pane that carried a floor while it was open kept that height once it closed, and the tab the reader switched to started that far down an otherwise empty page: 1265px of it on Network → Interfaces at 25.12 and 1114px at 24.10, the document standing at 2308px against 1043 (issue #41). 0.14.5 stopped the floor being WRITTEN on a collapsed pane, which is a different case and not this one: a pane whose floor is already standing measures a height of its own, so the check could never see it. The floor is now given back wherever the resolved `visibility` is `hidden` — it inherits, so one check covers every box inside a collapsed pane — and re-measured on the tick after the pane comes back. This is what the clear-and-remeasure shape did for free until 0.14.4 replaced it (`dc69b80`), by clearing every floor on every tick. Measured on the stand, one build per version, document height after switching tabs: 1043px on 0.14.3, 3201px on 0.14.4, 2308px on 0.14.5, 1043px here. `live-audit` fails on a `dead-floor` now — an inline `min-height` on a box whose resolved `visibility` is `hidden` — which is what both shipped versions would have tripped on a plain page load, no tab switching needed: 25 of them on owrt2512 @1440 against the 0.14.5 build, none with this one.
+
 ## [0.14.5] — 2026-08-31
 
 ### Added

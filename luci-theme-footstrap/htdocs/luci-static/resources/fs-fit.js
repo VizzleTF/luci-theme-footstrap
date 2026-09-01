@@ -149,17 +149,6 @@ function naturalHeight(el) {
 	return Math.round(end.bottom - box.top + (below || 0));
 }
 
-/* The floor is the height the next tick may not go below, one per container. Read in one pass and
- * written in another, so the sweep costs a single forced layout rather than one per element.
- *
- * WRITTEN ONLY WHERE THE VALUE CHANGES, which is the difference between a floor and a page the
- * engine refuses to anchor: see naturalHeight() above. Measured over 25 s of real polling on the
- * Overview at 390px, the clear-and-rewrite shape wrote style 1550 times on 25.12 and 170 times on
- * ImmortalWrt 24.10, of which 75 and 62 carried a value that had actually moved — the rest were
- * suppression bought for nothing.
- *
- * Not while the reader scrolls: a rect read is a forced layout, and a floor staying where it was is
- * still a floor. */
 /* The floor is the height the next tick may not go below, one per box. Read in one pass and written
  * in another, so the sweep costs a single forced layout rather than one per element.
  *
@@ -183,17 +172,32 @@ function holdFloor() {
 	if (scrolling()) return;
 	const host = document.getElementById('view');
 	if (!host) return;			/* the login page has no view */
-	const boxes = [], hs = [];
+	const boxes = [], hs = [], gone = [];
 	host.querySelectorAll(SHRINKS).forEach((el) => {
-		let box = el;
-		while (box && box !== host && window.getComputedStyle(box).display.startsWith('table'))
+		let box = el, cs = window.getComputedStyle(el);
+		while (box && box !== host && cs.display.startsWith('table')) {
 			box = box.parentElement;
+			if (box) cs = window.getComputedStyle(box);
+		}
 		/* several tables in one section climb to the same box; it needs one floor, not one each */
 		if (!box || box === host || boxes.indexOf(box) !== -1) return;
 		boxes.push(box);
-		hs.push(naturalHeight(box));
+		/* `visibility` inherits, so this is equally true of every box inside a collapsed pane */
+		const hidden = cs.visibility === 'hidden';
+		gone.push(hidden);
+		hs.push(hidden ? 0 : naturalHeight(box));
 	});
 	boxes.forEach((box, i) => {
+		/* A BOX THE READER CANNOT SEE GIVES ITS FLOOR BACK. `min-height` beats the `height: 0` an
+		 * inactive tab pane is collapsed with (theme/30-tables.css), so a floor written while the pane
+		 * was open pins the collapse open once it closes: on Network -> Interfaces the `interface`
+		 * pane held its 1265px after the reader left it, and the tab they were looking at started
+		 * that far down the page (issue #41). The clear-and-remeasure shape this replaced in 0.14.4
+		 * cleared every floor each tick, so a pane going inactive lost its own on the next one; only
+		 * a box that cannot hold anything up is cleared here, and it is re-measured the tick after it
+		 * comes back. A collapsed pane whose floor is still standing also measures a height of its
+		 * own, which is why refusing to write is not enough. */
+		if (gone[i]) { if (box.style.minHeight) box.style.minHeight = ''; return; }
 		/* zero is an empty box, and the floor it already wears is what holds it up — the moment this
 		 * whole mechanism exists for */
 		if (hs[i] <= 0) return;
