@@ -148,6 +148,7 @@ either way — they name every page that was stood in for.
 | #7 | `admin/system/package-manager` | the theme's favicon; buttons do not overlap the inputs; no stray unrounded table border |
 | #9 | `admin/network/firewall/forwards`, `/snats` (GridSection) | config-table row labels visible (`.fs-stacked` cards / `@container 960`) |
 | #10 | `admin/network/dhcp` (a page with hidden tabs) | no empty scroll below the content |
+| #41, #75 | `admin/network/network`, `admin/system/startup` (a page with a tab strip) | switch tabs: the pane the reader LEFT keeps no `min-height`, and the tab they opened starts where the page starts. `floor-contract` asks it automatically — it clicks the strip and reads the inactive panes — because the fault is invisible on a page that is only loaded and, on a page that does not poll, never goes away by itself |
 | #11 | `admin/status/overview` (client list) | the "Network" column is not crushed, rows are not over-wide |
 | #17 | the release assets, not a page | `manifest.txt` **and** `manifest.txt.sig` are present; `latest/download/manifest.txt` serves that file; `usign -V` passes with `release.pub`; `awk '$1=="pkg"'` yields one line per format; no install or update path touches `api.github.com`. **The manifest is now load-bearing for installs**, not only for readers: a router the feed cannot serve is installed from it (`install.sh` -> `install_from_release`), so a manifest that does not verify is an install that refuses |
 

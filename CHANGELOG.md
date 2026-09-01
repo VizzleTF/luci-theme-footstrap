@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Added
+
+- **The floor gate switches a tab, because that is the fault it could not see.** `tools/floor-contract.mjs` asked two questions — is the floor the right height, and does it ever come off — and both are answered on a page that is only loaded. The third fault ships as the same blank page and needs a gesture: `ui.tabs` writes `data-tab-active` and moves no node, so nothing woke the sweep that takes the floor off, and the pane the reader left held its `min-height` — 2432px above System → Startup's textarea, for the life of a page that never polls (#75, forum posts 68 and 73). The gate now clicks the real tab strip and reads the panes the reader cannot see; a stale floor on one of them is a finding that names the pane, the two document heights and how far down the opened tab starts. `docs/releasing.md` carries the row.
+
 ## [0.14.7] — 2026-09-02
 
 ### Added

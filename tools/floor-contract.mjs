@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-/* The poll floor, asked the two questions no other gate asks: is it the RIGHT height, and does it
- * ever come off?
+/* The poll floor, asked the three questions no other gate asks: is it the RIGHT height, does it
+ * ever come off, and does it come off IN TIME?
  *
  * `holdFloor()` in fs-fit.js pins `min-height` on the containers a poll empties, so the document
  * cannot get shorter under the reader while `dom.content()` refills them (docs/anchoring.md). Both
@@ -21,6 +21,13 @@
  * tick and measured `offsetHeight` — correct, at 1550 style writes per 25 s of polling, each one a
  * scroll-anchoring suppression. This gate is what lets the cheaper shape stay: it holds it to the
  * old one's answer.
+ *
+ *   TOO LATE and it is the same blank page for as long as it stands. A tab switch writes
+ *   `data-tab-active` and moves no node, so the sweep that takes the floor off has nothing to wake
+ *   it: the pane the reader left kept 2432px of `min-height` on System -> Startup, and the tab they
+ *   opened started below it — for one poll interval on a page that polls, and for the life of a
+ *   page that does not (#75, forum posts 68 and 73). `min-height` beats the `height: 0` an inactive
+ *   pane is collapsed with, which is why refusing to WRITE a floor there was never enough.
  *
  *   node tools/floor-contract.mjs [--only owrt2512] [--all] [--pages /admin/network/network,…]
  *
@@ -64,6 +71,39 @@ const ACCURACY = () => {
 	return { floors: out, unmarked };
 };
 
+/* Switch to the next tab and read what the pane the reader LEFT is still wearing.
+ *
+ * The click is the real one — `ui.tabs` writes `data-tab-active` on the panes and moves no node, so
+ * a synthetic attribute write would be measuring this gate rather than the theme. What must be true
+ * the moment the switch lands: no inactive pane carries an inline `min-height`. It is checked after
+ * a beat rather than in the same frame because the sweep runs from a MutationObserver callback, one
+ * microtask after the attribute. */
+const TAB_SWITCH = () => {
+	const tabs = [ ...document.querySelectorAll('#view .cbi-tabmenu li a') ];
+	if (tabs.length < 2) return null;
+	const panes = () => [ ...document.querySelectorAll('#view [data-tab-title]') ];
+	const open = panes().find((p) => p.getAttribute('data-tab-active') === 'true');
+	const from = open ? open.getAttribute('data-tab-title') : '?';
+	const doc = document.documentElement.scrollHeight;
+	const next = tabs.findIndex((a) => a.parentElement.className.indexOf('cbi-tab-disabled') !== -1);
+	tabs[next === -1 ? 1 : next].click();
+	return { from, doc };
+};
+
+const TAB_AFTER = () => {
+	const panes = [ ...document.querySelectorAll('#view [data-tab-title]') ];
+	const open = panes.find((p) => p.getAttribute('data-tab-active') === 'true');
+	return {
+		to: open ? open.getAttribute('data-tab-title') : '?',
+		/* the pane the reader can see must start where the page starts, and the ones they cannot
+		 * must hold nothing up */
+		openTop: open ? Math.round(open.getBoundingClientRect().top + window.scrollY) : null,
+		stale: panes.filter((p) => p.getAttribute('data-tab-active') !== 'true' && p.style.minHeight)
+			.map((p) => (p.getAttribute('data-tab-title') || '?') + '=' + p.style.minHeight),
+		doc: document.documentElement.scrollHeight,
+	};
+};
+
 /* Empty the tallest floored box the way a tick does, and DO NOT refill it: a container that is not
  * coming back must not keep holding the page open. Returns what to look at afterwards. */
 const EMPTY_TALLEST = () => {
@@ -97,7 +137,7 @@ const RELEASE_WAIT = Number(arg('wait', '0')) || 13000;
 const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'floor-contract');
 const browser = await chromium.launch();
 const findings = [];
-let boxes = 0, worst = 0, released = 0;
+let boxes = 0, worst = 0, released = 0, switches = 0;
 
 for (const stand of list) {
 	const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -130,6 +170,23 @@ for (const stand of list) {
 
 		process.stdout.write(`  ${where}  ${r.floors.length} floor(s), worst ${
 			r.floors.reduce((a, f) => Math.abs(f.delta) > Math.abs(a) ? f.delta : a, 0)}px\n`);
+
+		/* …and the switch, on a page that has a tab strip. Before the release test, which empties
+		 * a box: the floors this reads are the ones a settled page wrote. */
+		const tabBefore = await page.evaluate(TAB_SWITCH);
+		if (tabBefore) {
+			await page.waitForTimeout(600);
+			const tabAfter = await page.evaluate(TAB_AFTER);
+			if (tabAfter.stale.length)
+				findings.push(`${where}: switching from "${tabBefore.from}" to "${tabAfter.to}" left `
+					+ `${tabAfter.stale.join(', ')} on a pane the reader cannot see — that floor IS blank `
+					+ `page above the tab they opened, document ${tabBefore.doc} -> ${tabAfter.doc}, `
+					+ `its content ${tabAfter.openTop}px down`);
+			else
+				process.stdout.write(`  ${where}  tab "${tabBefore.from}" -> "${tabAfter.to}": no floor left `
+					+ `standing, document ${tabBefore.doc} -> ${tabAfter.doc}\n`);
+			switches++;
+		}
 
 		/* …and the release, on the tallest floor this page carries */
 		const before = await page.evaluate(EMPTY_TALLEST);
@@ -164,4 +221,4 @@ if (findings.length) {
 	process.exit(1);
 }
 console.log(`floor-contract: ${boxes} floor(s) over ${list.length} router(s), worst ${worst}px against the box, `
-	+ `${released} released after emptying.`);
+	+ `${released} released after emptying, ${switches} released on a tab switch.`);
