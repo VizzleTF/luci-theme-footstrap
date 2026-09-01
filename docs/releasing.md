@@ -90,10 +90,24 @@ wherever you are unsure — it is the reference for LuCI behaviour.
 
 **A release runs the WIDE version of the automatic live gates first:**
 
+**and `npm run live -- …` cannot carry those flags**: `live` is six `npm run` calls joined by `&&`,
+and npm appends the arguments after the LAST of them, so `--all --pages-all` reached `anchor` alone
+and every gate before it ran its default set. Measured on 2026-09-01: the composed line the shell
+echoes ends `… && npm run anchor --all --pages-all`, and `live-audit` logged
+`node tools/live-audit.mjs` with no arguments. Each gate is therefore called by hand:
+
 ```sh
-npm run live -- --all --pages-all          # every router owlab boots
-node tools/upstream-contract.mjs           # what the theme assumes of luci-base, asked on each
+node tools/live-audit.mjs  --all --pages-all   # every router owlab boots, every page
+node tools/spa-parity.mjs  --all --pages-all
+node tools/table-tick.mjs  --all
+node tools/scroll-anchor.mjs --all
+node tools/upstream-contract.mjs --all         # what the theme assumes of luci-base, asked on each
 ```
+
+The two ImmortalWrt legs are not in any baseline — the wide run reports 2125 signatures there, 60 of
+them read, all `noname` on luci-base's own `input.cbi-section-create-name` (`form.js`, built with no
+label, placeholder or `aria-label`). They are worth reading and do not block a tag:
+`tools/lib/stands.mjs` says why.
 
 **And the package on both formats, before the tag.** `npm run live` measures a *synced* tree; a
 release is *installed*, and that is a different claim — two `owlab test` invocations, one per

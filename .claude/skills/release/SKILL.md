@@ -34,7 +34,7 @@ them detached with `tools/bg.sh` and report the run-ids, then read the logs.
 |---|---|
 | `npm run check` | one run, exit 0. The static half, 25 gates |
 | `owlab test`, **both formats** | two invocations, one per format — never one run with two `--release` flags |
-| `npm run live -- --all --pages-all` | every router owlab boots, every page; plus `node tools/upstream-contract.mjs` |
+| the wide live gates | one call per gate — `npm run live -- …` does not forward its flags, `docs/releasing.md` |
 | `/security-review` | on the final branch diff, **before** the tag |
 
 ```sh
