@@ -1,4 +1,4 @@
-## [Unreleased]
+## [0.14.7] — 2026-09-02
 
 ### Добавлено
 
@@ -4320,6 +4320,7 @@
   вложенный `calc()`, что ломало вёрстку напрочь. Минификация JS вернулась в 0.7.12, когда
   безопасность jsmin подтвердил гейт эквивалентности токенов.
 
+[0.14.7]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.6...v0.14.7
 [0.14.6]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.5...v0.14.6
 [0.14.5]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.4...v0.14.5
 [0.14.4]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.3...v0.14.4
