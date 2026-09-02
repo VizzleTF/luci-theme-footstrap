@@ -119,6 +119,21 @@ The top bar measures too: it first squeezes the pills (`.fs-dense1/2`), and only
 wraps at the tightest step does it move to a second row (`.fs-bar-stack`). Whether it fits
 depends on the number of sections on that particular router, not on the screen.
 
+**And it pins its own height while it measures.** Rule 1 says take the class off and ask the engine,
+but the bar is the one fitter whose element sits ABOVE the reader on every page: `fs-bar-stack` is
+what gives the menu its own row, so for the widths where the menu does not need one the bar answers
+a row shorter than it stands — 98px against 65px at 767px, 123px against 115px at 480px, on
+owrt2512. That height is what the engine lays the rest of the page out against for the length of the
+pass. Chromium and Firefox put the reader back afterwards; Safari implements no scroll anchoring on
+any platform, and an iPhone reported the Overview creeping upward once per poll tick, bisected there
+to this pass. So `fitChrome()` writes `min-height` at the settled height before it strips the
+classes and takes it off after — the measurement is unchanged, and the box the page is laid out
+against does not move. `tools/fit-quiet.mjs` (`npm run quiet`, in `live`) hands the bar a
+`classList` of its own and reads the height back at the instant the classes come off: 0px of dip
+with the pin, 8px and 33px without it. The symptom itself does not reproduce headless — the pass is
+one synchronous task and both engines restore the offset once the bar is back, measured at half the
+page and at its bottom — which is why the gate watches the cause.
+
 ## `header.ut`
 
 - Shared parts live in `partials/` (`head`, `brand`, `logout`, `notices`, `notice`, `search`,

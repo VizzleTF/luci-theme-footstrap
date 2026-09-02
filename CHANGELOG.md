@@ -10,7 +10,11 @@
 
 ### Fixed
 
+- **The top bar stops moving the page while it measures itself.** Rule 1 says take the class off and ask the engine, and the bar is the one fitter whose element is ABOVE the reader on every page: with `fs-bar-stack` off it is a row shorter, and every pixel of that is page that moves under them. Chromium and Firefox put the reader back afterwards; Safari implements no scroll anchoring on any platform, so an iPhone had the Overview creeping upward once per poll tick and never coming back — bisected on the device itself, where switching the chrome's fit off stopped it and switching the tables' re-measure off did not. `fitChrome()` now writes `min-height` at the settled height before it strips the classes and takes it off after: the measurement is unchanged, and the box the page is laid out against does not move. Held by `npm run quiet`, which reports 0px of dip with the pin and 8px and 33px without it.
+
 - **A floor on a box the sweep can no longer see.** A floor climbs off a table box to the first box that is not one, and that box need not be in the sweep's own selector — so emptying the table under it took the whole section out of the sweep and the floor stayed for the life of the page: 927px on /admin/network/network, 13 s after the section emptied. Every floor now carries `data-fs-floor` and the sweep looks for its own mark as well as for the selector; matching on inline `min-height` instead would sweep off the ones an app wrote for itself.
+
+- **The bar re-fits the moment an indicator arrives.** The indicator cluster is in the chrome, which the fit engine does not watch — `#view` and the dialog are its roots — so flexbox answered first and the whole page sat 91px lower for 708 ms until something else woke the pass (WebKit at 390px, in the narrow bar). The observer that already watches `#indicators` for the rail's badge now calls the fit in the same pre-paint callback, on a `childList` record only: the poll pill rewrites its label every tick, and a fit per tick is a cost the theme refuses.
 
 ## [0.14.7] — 2026-09-02
 

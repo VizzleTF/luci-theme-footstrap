@@ -261,6 +261,22 @@ function fitChrome() {
 	 * fitShell's data-narrow, and is untouched here.) */
 	const topBar = !!bar && !!menu && prefs.isTopLayout();
 
+	/* THE BAR MAY NOT GET SHORTER WHILE IT IS BEING MEASURED. The three classes below are taken off
+	 * so the menu can be asked whether it fits on one row (fs-fit rule 1), and on a narrow bar that
+	 * makes the whole chrome one row instead of two for that layout — every pixel of it above the
+	 * reader, who is moved by exactly as much and moved back a moment later. Chromium and Firefox
+	 * hide it behind their scroll anchoring; Safari implements none, on any platform, so on an
+	 * iPhone this is the Overview creeping up once per poll tick. Reported from one, and bisected to
+	 * this pass on the reporter's own router: `?off=chromefit` stopped it, `?off=measure` (the
+	 * tables' own re-measure) did not.
+	 *
+	 * `min-height`, not `height`: the pass may legitimately need MORE room a moment later — that is
+	 * what `fs-bar-stack` is for — and a floor lets it grow while refusing the shrink. It comes off
+	 * before `publishBarHeight()`, which must measure the bar the reader actually gets. */
+	const pinned = bar ? Math.round(bar.getBoundingClientRect().height) : 0;
+	const hadMinH = bar ? bar.style.minHeight : '';
+	if (pinned > 0) bar.style.minHeight = pinned + 'px';
+
 	if (bar) bar.classList.remove('fs-bar-stack', 'fs-ind-compact', 'fs-bar-actrow');
 	fitTabStrips();
 	/* ---- does the main menu fit on the brand's row? ----
@@ -291,6 +307,7 @@ function fitChrome() {
 	if (bar && (topBar || document.documentElement.hasAttribute('data-narrow')))
 		fitCluster(bar, menu);
 
+	if (pinned > 0) bar.style.minHeight = hadMinH;
 	publishBarHeight(bar);
 }
 
@@ -470,8 +487,30 @@ function wireIndicatorCounts() {
 
 	/* ui.showIndicator replaces the label's text node on an update and appends the span on the
 	 * first change of the session, so childList, subtree and characterData all matter. Our own
-	 * attribute writes do not re-enter: attributes are not observed. */
-	new MutationObserver(stamp).observe(box, { childList: true, subtree: true, characterData: true });
+	 * attribute writes do not re-enter: attributes are not observed.
+	 *
+	 * AND THE BAR IS RE-FITTED HERE, because a pill arriving is a layout change the fit engine
+	 * cannot see: fs-fit watches `#view` and the dialog, and `#indicators` is in the chrome. The
+	 * cluster then wraps — flexbox answers first — and the compact form only follows when something
+	 * else happens to wake the pass. Measured on WebKit at 390px in the narrow sidebar bar, a second
+	 * indicator beside the poll pill pushed the whole page down 91px and held it there for 708 ms,
+	 * until `fs-ind-compact` landed at 771 ms and it snapped back: a lurch down and up, once per
+	 * appearance, which is what "the Overview twitches, as if an invisible loading bar came and
+	 * went" is from the reader's side. Called from the same callback as `stamp()`, so the decision
+	 * is taken in the microtask before paint and the wrapped frame is never drawn. It cannot
+	 * re-enter: `fitChrome()` writes classes on the BAR and attributes here, and neither is what
+	 * this observer watches.
+	 *
+	 * ON A PILL ARRIVING OR LEAVING, not on its text: `ui.showIndicator` rewrites the poll pill's
+	 * label on every tick, and a fit is a handful of forced layouts — running one per tick to answer
+	 * a label that did not change width is the cost this file spends its measurements avoiding. A
+	 * childList record is the cluster gaining or losing a member, which is the layout change that
+	 * wraps it. */
+	new MutationObserver((recs) => {
+		stamp();
+		if (recs.some((r) => r.type === 'childList' && r.target === box)) fitChrome();
+	})
+		.observe(box, { childList: true, subtree: true, characterData: true });
 	stamp();
 }
 
