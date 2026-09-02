@@ -4,6 +4,14 @@
 
 - **The floor gate switches a tab, because that is the fault it could not see.** `tools/floor-contract.mjs` asked two questions — is the floor the right height, and does it ever come off — and both are answered on a page that is only loaded. The third fault ships as the same blank page and needs a gesture: `ui.tabs` writes `data-tab-active` and moves no node, so nothing woke the sweep that takes the floor off, and the pane the reader left held its `min-height` — 2432px above System → Startup's textarea, for the life of a page that never polls (#75, forum posts 68 and 73). The gate now clicks the real tab strip and reads the panes the reader cannot see; a stale floor on one of them is a finding that names the pane, the two document heights and how far down the opened tab starts. `docs/releasing.md` carries the row.
 
+### Changed
+
+- **The anchoring is 0.14.3's again.** The floor is cleared and the box re-measured with `offsetHeight` on every pass, and one reference taken before the tick is put back after it. What 0.14.4-0.14.6 grew on top of that goes: the content reader (`naturalHeight()`) and the three mechanisms that repaired what it got wrong on a hidden pane, on a box ending in text and on a container that empties for good; the second correction around the deferred pass (`settleDrift()`); and the shared writer that re-read where the element had landed (`putBack()`). Each was measured and each worked — the numbers are kept in `docs/anchoring.md` — but together they made the floor's value depend on four decisions taken in the same pass, and those are the releases the reports are about. The clear costs a forced layout per box per pass and answers 0 for anything the page is not showing, which is what all four repairs were reconstructing. 1,097 B of shipped JS with them.
+
+### Fixed
+
+- **A floor on a box the sweep can no longer see.** A floor climbs off a table box to the first box that is not one, and that box need not be in the sweep's own selector — so emptying the table under it took the whole section out of the sweep and the floor stayed for the life of the page: 927px on /admin/network/network, 13 s after the section emptied. Every floor now carries `data-fs-floor` and the sweep looks for its own mark as well as for the selector; matching on inline `min-height` instead would sweep off the ones an app wrote for itself.
+
 ## [0.14.7] — 2026-09-02
 
 ### Added

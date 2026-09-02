@@ -99,133 +99,50 @@ function run() {
  *
  * Wrapping `dom.content()` itself also works, at the price of patching a luci-base API every app
  * shares and up to seven read/write pairs per call. */
-/* A section body and a table: what `dom.content()` is called on and this can hold. Its third target,
- * a table's BODY, is deliberately absent — a floor there holds nothing. `min-height` is undefined on
- * a table box (CSS 2.1 §10.7) and WebKit acts on that: a `.table.cbi-section-table` carrying a 313px
- * floor still collapsed to 30px and the document lost 284px (webkit, /admin/network/firewall, 24.10
- * and 25.12 alike; Chromium holds the 313px), and writing the floor on the `.tbody` instead loses
- * the same 284px. 24.10 has no `.tbody` at all: its Overview renders `<table class="table">` with the
- * rows directly inside, and the container a poll empties there is `.cbi-section > div`.
- * tools/scroll-anchor.mjs looks for all three when it picks a box to collapse, which is a different
- * question from which box can carry a floor. */
+/* The three things `dom.content()` is called on: a section body, a table, and a TABLE'S BODY. The
+ * third was missing and cost a release: on 24.10's Overview the section is a table, so nothing here
+ * matched, the floor held nothing, and a poll emptying it took 58px off the document under the
+ * reader — on ImmortalWrt 24.10 with a webkit engine, where no CI job looks. tools/scroll-anchor.mjs
+ * looks for the same three and says why. */
 const SHRINKS = '.cbi-section > div, .table';
 
-/* A box qualifies for a floor through its CHILDREN, so emptying it takes it out of `SHRINKS` — and
- * a floor nothing sweeps any more is a floor nothing can take off: measured on Network ->
- * Interfaces, a section emptied of its table kept 1299px of `min-height` for the life of the page.
- * Every floor this writes is marked, so the sweep finds its own work again whatever became of the
- * markup underneath. The attribute is in the theme's own namespace and says nothing to CSS. */
+/* A floor is swept off the box that wears it, and the climb below can put one on a box that is not
+ * in SHRINKS itself — so emptying the table under it takes the whole section out of the sweep and
+ * the floor stays for the life of the page: 927px of blank on /admin/network/network, 13 s after
+ * the section emptied (tools/floor-contract.mjs). Every floor is marked, so the sweep finds its own
+ * work again whatever became of the markup underneath. The attribute is in the theme's own
+ * namespace and says nothing to CSS; matching on inline `min-height` instead would sweep off the
+ * ones an app wrote for itself. */
 const FLOORED = '[data-fs-floor]';
 
-/* What the container would stand at with no floor under it, asked of the CONTENT rather than by
- * taking the floor off and re-measuring.
+/* The floor is the height the next tick may not go below, one per container. Cleared before the
+ * read, or each floor measures itself and never comes down; batched into one clear, one read pass
+ * and one write pass, so the whole sweep costs a single forced layout rather than one per element.
  *
- * Clearing `min-height` to re-measure was the obvious way and is the expensive one: `min-height` is
- * a scroll-anchoring suppression trigger on the path from the anchor to the scroller
- * (css-scroll-anchoring-1 §3.2), so a clear, a forced layout and a write back tell the engine to
- * drop its own compensation for that frame — the theme switching off the very thing it relies on,
- * once per tick.
+ * Not while the reader scrolls: clearing to re-measure is a layout read, and a floor staying where
+ * it was is still a floor.
  *
- * The span of the children answers the same question with reads alone. It is the box's content
- * height plus what the box adds below it; a collapsed margin on the last child can put it a few
- * pixels out, which a floor can afford — the floor is a lower bound on a height that is about to be
- * replaced, not a layout the page is drawn to.
+ * AND NOT ON A TABLE BOX, WHICH CANNOT HOLD IT. `min-height` is undefined on a table box (CSS 2.1
+ * §10.7) and WebKit acts on that: a `.table` wearing a 313px floor still collapsed to 30px when its
+ * rows went, and the document lost 284px on /admin/network/firewall — Chromium held the 313px. So
+ * the floor climbs to the first box that is not a table, where the same emptied table costs 0px on
+ * both engines. `getComputedStyle` resolves style, not layout, so the climb adds no forced layout.
  *
- * An empty container answers 0, and the caller keeps the standing floor for exactly that reason:
- * `dom.content()` empties before it refills, and 0 is the number the floor exists to refuse. */
-function naturalHeight(el) {
-	const last = el.lastElementChild;
-	if (!last) return 0;
-	const box = el.getBoundingClientRect();
-	/* A BOX WITH NO HEIGHT OF ITS OWN HOLDS NOTHING UP, and asking its content how tall it would be
-	 * gets an answer about a page that is not on screen. `visibility: hidden` leaves children in the
-	 * layout with rects of their own, so an inactive tab pane — collapsed to height 0 by
-	 * theme/30-tables.css — measures its full content here and the floor then pins that collapse
-	 * open: on Network -> Interfaces the hidden `device` pane held 893px, and the active pane's
-	 * content sat that much further down the page (issue #41, reported against a third-party page
-	 * and reproduced on the stock one). The clear-and-remeasure shape this replaced read the
-	 * collapsed height and wrote nothing, which is the behaviour restored here.
-	 *
-	 * A container a tick has just emptied also measures 0, and that is the same answer for the same
-	 * reason: the floor it already wears is what holds it up, and holdFloor() leaves it alone. */
-	if (!box.height) return 0;
-	const end = last.getBoundingClientRect();
-	if (!end.height && !end.width) return 0;		/* a last child out of the flow says nothing */
-	let bottom = end.bottom;
-	/* AND THE TEXT AFTER IT. A box whose content ends in text ends below its last ELEMENT, and
-	 * measuring to that element writes a floor shorter than the box: `.cbi-section-descr` on
-	 * /admin/network/dhcp measured 115px against the 156px it stands at, and a floor 41px short lets
-	 * the document shrink under the reader during the very tick the floor is there to hold.
-	 *
-	 * Only the tail, not `selectNodeContents(el)`: a Range over the whole box takes in whatever is
-	 * out of the flow inside it and writes a floor TALLER than the box instead — 205px against 107
-	 * on the Overview, which is the same blank page seen from the other side. */
-	if (last.nextSibling) {
-		const tail = document.createRange();
-		tail.setStartAfter(last);
-		tail.setEnd(el, el.childNodes.length);
-		const box2 = tail.getBoundingClientRect();
-		if (box2.height || box2.width) bottom = Math.max(bottom, box2.bottom);
-	}
-	const cs = window.getComputedStyle(el);
-	const below = parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth);
-	return Math.round(bottom - box.top + (below || 0));
-}
-
-/* The floor is the height the next tick may not go below, one per box. Read in one pass and written
- * in another, so the sweep costs a single forced layout rather than one per element.
+ * Reported from an iPhone as the Overview sinking a little every five seconds: LuCI's poll takes
+ * the whole `table.table` out of the first card and puts a new one back — measured on the stand,
+ * once per `pollinterval`, 482px — and between the two the section is empty. On WebKit the floor on
+ * the table held nothing, the offset was clamped into a document that short, and the reader was
+ * left further down than they had been.
  *
- * WRITTEN ONLY WHERE THE VALUE CHANGES, which is the difference between a floor and a page the
- * engine refuses to anchor: see naturalHeight() above. Measured over 25 s of real polling on the
- * Overview at 390px, the clear-and-rewrite shape wrote style 1550 times on 25.12 and 170 times on
- * ImmortalWrt 24.10, of which 75 and 62 carried a value that had actually moved — the rest were
- * suppression bought for nothing. It is 45 writes, all of them real, on both.
- *
- * AND NOT ON A TABLE BOX, which cannot hold it: `min-height` is undefined there (CSS 2.1 §10.7) and
- * WebKit acts on that — a `.table.cbi-section-table` wearing a 313px floor still collapsed to 30px
- * when its rows went, and the document lost 284px on /admin/network/firewall, the same on 24.10 and
- * 25.12, while Chromium held the 313px. The `.tbody` inside it is a table box too and loses the same
- * 284px. So the floor climbs to the first box that is not one — the section — where the same
- * emptied `.tbody` costs the document 0px on both engines. `getComputedStyle` resolves style, not
- * layout, so the climb adds no forced layout of its own.
- *
- * Not while the reader scrolls: a rect read is a forced layout, and a floor staying where it was is
- * still a floor. */
-/* Boxes that measured empty on the LAST pass, so a floor that is holding nothing up can be told
- * from one that is holding the page still while `dom.content()` refills. WeakSet: a box the router
- * has replaced is garbage, and this must not be what keeps it alive. */
-const emptied = new WeakSet();
-
-/* Off in one place, so the mark and the style can never disagree about who wears a floor. */
-function dropFloor(box) {
-	if (box.style.minHeight) box.style.minHeight = '';
-	box.removeAttribute('data-fs-floor');
-}
-
-/* THE SECOND LOOK HAS TO BE SCHEDULED, not waited for. Every other pass here is driven by the
- * MutationObserver on `#view`, and a container that empties and stays empty produces no further
- * mutation — so "clear it if it is still empty next pass" never gets a next pass, and the floor
- * stands for the life of the page (measured: 1299px on Network -> Interfaces).
- *
- * One poll interval, because that is how long a container that is genuinely refilling may take: the
- * router's own `pollinterval` when the page will say it, and its shipped default of 5 s otherwise.
- * Shorter risks taking the floor away from a tick still in flight, which is the 568px clamp this
- * whole mechanism exists to stop. */
-let _emptyCheck = null;
-
-function checkEmptyLater() {
-	if (_emptyCheck) return;
-	let secs = 5;
-	try { secs = (window.L && L.env && L.env.pollinterval) || 5; } catch (e) { /* not on a LuCI page */ }
-	_emptyCheck = setTimeout(() => { _emptyCheck = null; run(); }, secs * 1000);
-}
-
+ * The climb is the ONE part of the 0.14.4 floor kept: this pass still clears and re-measures, so a
+ * box that cannot hold anything up measures 0 with its floor off and gets none — which is why the
+ * collapsed tab pane of issue #41 cannot come back with it. */
 function holdFloor() {
 	if (scrolling()) return;
 	const host = document.getElementById('view');
 	if (!host) return;			/* the login page has no view */
-	const boxes = [], hs = [], gone = [];
-	host.querySelectorAll(SHRINKS + ', ' + FLOORED).forEach((el) => {
+	const boxes = [], hs = [];
+	host.querySelectorAll(SHRINKS).forEach((el) => {
 		let box = el, cs = window.getComputedStyle(el);
 		while (box && box !== host && cs.display.startsWith('table')) {
 			box = box.parentElement;
@@ -234,42 +151,13 @@ function holdFloor() {
 		/* several tables in one section climb to the same box; it needs one floor, not one each */
 		if (!box || box === host || boxes.indexOf(box) !== -1) return;
 		boxes.push(box);
-		/* `visibility` inherits, so this is equally true of every box inside a collapsed pane */
-		const hidden = cs.visibility === 'hidden';
-		gone.push(hidden);
-		hs.push(hidden ? 0 : naturalHeight(box));
 	});
+	host.querySelectorAll(FLOORED).forEach((box) => { if (boxes.indexOf(box) === -1) boxes.push(box); });
+	boxes.forEach((box) => { box.style.minHeight = ''; });
+	boxes.forEach((box) => hs.push(box.offsetHeight));
 	boxes.forEach((box, i) => {
-		/* A BOX THE READER CANNOT SEE GIVES ITS FLOOR BACK. `min-height` beats the `height: 0` an
-		 * inactive tab pane is collapsed with (theme/30-tables.css), so a floor written while the pane
-		 * was open pins the collapse open once it closes: on Network -> Interfaces the `interface`
-		 * pane held its 1265px after the reader left it, and the tab they were looking at started
-		 * that far down the page (issue #41). The clear-and-remeasure shape this replaced in 0.14.4
-		 * cleared every floor each tick, so a pane going inactive lost its own on the next one; only
-		 * a box that cannot hold anything up is cleared here, and it is re-measured the tick after it
-		 * comes back. A collapsed pane whose floor is still standing also measures a height of its
-		 * own, which is why refusing to write is not enough. */
-		if (gone[i]) { dropFloor(box); return; }
-		/* ZERO IS AN EMPTY BOX, and the floor it already wears is what holds it up — the moment this
-		 * whole mechanism exists for, since `dom.content()` empties before it refills.
-		 *
-		 * But only for the one pass. A box that is still empty on the next one is not refilling, and
-		 * its floor is then blank page that nothing takes back: measured on Network -> Interfaces,
-		 * a section emptied and left alone keeps 1299px of `min-height` for the life of the page,
-		 * with the document standing at 1720px around no content at all. That is what 0.14.4 changed
-		 * by replacing clear-and-remeasure, which read the collapsed height and wrote nothing. */
-		if (hs[i] <= 0) {
-			if (!box.style.minHeight) return;
-			if (emptied.has(box)) { dropFloor(box); emptied.delete(box); }
-			else { emptied.add(box); checkEmptyLater(); }
-			return;
-		}
-		emptied.delete(box);
-		const px = hs[i] + 'px';
-		if (box.style.minHeight !== px) {
-			box.style.minHeight = px;
-			box.setAttribute('data-fs-floor', '');
-		}
+		if (hs[i] > 0) { box.style.minHeight = hs[i] + 'px'; box.setAttribute('data-fs-floor', ''); }
+		else box.removeAttribute('data-fs-floor');
 	});
 }
 
@@ -353,11 +241,6 @@ function sampleMotion() {
 	/* the page has held still for SCROLL_IDLE: whatever was put off may run now */
 	if (_deferred) {
 		_deferred = false;
-		/* where the reference stands BEFORE the put-off pass re-lays the page — see settleDrift() */
-		const settled = _rest;
-		const before = (settled && settled.el && settled.el.isConnected)
-			? settled.el.getBoundingClientRect().top
-			: ((settled && settled.sec && settled.sec.isConnected) ? settled.sec.getBoundingClientRect().top : null);
 		/* No correction for this batch. Both available references are wrong for a page the reader
 		 * has just scrolled through: a fresh one is read against an offset WebKit may not have laid
 		 * out yet (the theme then undoes the reader's own move), and the one from the last still
@@ -366,77 +249,6 @@ function sampleMotion() {
 		 * the fitters re-measure what the scroll already showed rather than growing the page — and
 		 * the next mutation corrects against a reference taken while the page was still. */
 		run();
-		if (ENGINE_ANCHORS) settleDrift(settled, before);
-	}
-}
-
-/* ---- the put-off pass moves the page too, and nothing was looking ----
- *
- * A tick landing while the offset is in motion leaves its measurements to the block above, and that
- * pass then re-lays the tables it could not measure. An anchoring engine answers that layout change
- * the way it answers any other — and `min-height`, which the floor writes on every container, is
- * itself a suppression trigger on the path to the anchor (css-scroll-anchoring-1 §3.2), so the
- * engine's compensation can be switched off by the very pass that needs it. Measured on
- * ImmortalWrt 24.10/WebKit: this pass's 88 `min-height` writes and a 58px jump of the offset land in
- * the SAME frame, 429 ms after the mutation (@390, top layout, large density, Overview).
- *
- * `lateDrift()` cannot see it: it is scheduled from the mutation on the same SCROLL_IDLE, so it
- * measures ALONGSIDE this pass rather than after it — it read a drift of zero three milliseconds
- * before the page moved, and scroll-anchor reported those 58px on that cell alone out of 48.
- *
- * MEASURED SYNCHRONOUSLY AROUND THE PASS, not a frame or an idle window later. Two reasons, and the
- * second cost a run: the reader cannot scroll between two statements, so what this sees is the
- * pass's doing and nothing else — a version that looked two frames later corrected inside a flick on
- * three cells of the same sweep. And `getBoundingClientRect()` is exactly the operation the spec
- * makes the engine flush a pending adjustment before, so the read after the pass sees the engine's
- * answer rather than racing it (§2.2: the suppression window ends at the end of the event loop
- * iteration, or before the next operation whose result would differ, whichever is sooner). */
-function settleDrift(ref, before) {
-	if (before == null || !ref) return;
-	if (!anchorEnabled() || Date.now() < _userUntil) return;
-	if (_restPage !== pageStamp()) return;
-	const el = (ref.el && ref.el.isConnected) ? ref.el : ((ref.sec && ref.sec.isConnected) ? ref.sec : null);
-	if (el) putBack(el, before);
-}
-
-/* Give the reader back what moved under them: the one write both corrections make, and the rules
- * that write obeys.
- *
- * A drift under a pixel is rounding, and an engine that answered for it reads the same. One
- * viewport is the ceiling, a drift that size being a view that replaced its whole subtree rather
- * than a tick — anchorFor() raises it for the one drift that big with a receipt, a measured clamp.
- *
- * The write moves the page by exactly the drift measured, so the reference is back at the top it
- * was remembered at and the next tick measures zero. Only `_restAt` moves, and the write may have
- * been clamped short, so it is re-read rather than assumed; `rememberRest()` cannot do it, since
- * the write starts the motion sampler and that function returns early while the page moves. */
-function putBack(el, was) {
-	const drift = el.getBoundingClientRect().top - was;
-	if (Math.abs(drift) < 1 || Math.abs(drift) > (window.innerHeight || 800)) return;
-	const sc = scroller();
-	const at = sc ? sc.scrollTop : window.scrollY;
-	if (sc) sc.scrollTop = at + drift; else window.scrollTo(0, at + drift);
-	_restAt = scrollTop();
-	/* AND WHERE THE ELEMENT ACTUALLY LANDED, which is not always `was`. The line above used to be
-	 * the whole of it, on the reasoning this comment states — the write is exactly the drift, so the
-	 * element is back at the top it was remembered at. It is not whenever the write was CLAMPED
-	 * SHORT, a case the line above already allows for by re-reading the offset: the page had less
-	 * room than the drift asked for, the element stops wherever the clamp left it, and `_rest` goes
-	 * on naming a top nothing can reach. Every later tick then measures that unreachable difference
-	 * and spends it on the reader: measured on webkit/Overview @390 top, `_rest` claiming 93.02 for
-	 * an element standing at 105, and the reader 12px off on the next tick (52px at normal density).
-	 *
-	 * Two rects on a layout the write has already forced. The section half is re-read for the same
-	 * reason and cannot be measured by the same probe — the sweep's swap returns the very nodes it
-	 * took out, so `_rest.el` survives it and the fallback is never reached, while a real
-	 * `dom.content()` puts NEW nodes in and lateDrift() corrects against `sec`/`secTop` instead.
-	 *
-	 * `_rest.at` is deliberately NOT touched: it belongs to anchorFor(), on the path where the
-	 * engine does no anchoring, and this fault is on the other one — measured, the sweep is green
-	 * on all 18 cells of the failing axis without it. */
-	if (_rest) {
-		if (_rest.el && _rest.el.isConnected) _rest.top = _rest.el.getBoundingClientRect().top;
-		if (_rest.sec && _rest.sec.isConnected) _rest.secTop = _rest.sec.getBoundingClientRect().top;
 	}
 }
 
@@ -790,8 +602,23 @@ function lateDrift(ref) {
 			if (scrollTop() !== seen) return;
 			/* the tick usually replaces the element this was taken on, so without the section
 			 * fallback the correction does nothing on the tick it exists for */
-			if (ref.el && ref.el.isConnected) putBack(ref.el, ref.top);
-			else if (ref.sec && ref.sec.isConnected && ref.secTop != null) putBack(ref.sec, ref.secTop);
+			let el = ref.el, was = ref.top;
+			if (!el || !el.isConnected) {
+				if (!ref.sec || !ref.sec.isConnected || ref.secTop == null) return;
+				el = ref.sec; was = ref.secTop;
+			}
+			const drift = el.getBoundingClientRect().top - was;
+			if (Math.abs(drift) < 1) return;			/* the engine put it back */
+			if (Math.abs(drift) > (window.innerHeight || 800)) return;
+			const sc = scroller();
+			const at = sc ? sc.scrollTop : window.scrollY;
+			if (sc) sc.scrollTop = at + drift; else window.scrollTo(0, at + drift);
+			/* The write moves the page by exactly the drift measured, which puts the reference back
+			 * at the top it was remembered at, so `_rest.top` still holds and the next tick
+			 * measures zero. Only `_restAt` changes, and the write may have been clamped short, so
+			 * it is re-read rather than assumed; `rememberRest()` cannot do it, since the write
+			 * starts the motion sampler and that function returns early while the page moves. */
+			_restAt = scrollTop();
 		}, SCROLL_IDLE);
 	});
 }
@@ -898,17 +725,13 @@ function observeContent() {
 	_moFlag = new MutationObserver(run);
 	_moFlag.observe(document.body, { attributes: true, attributeFilter: [ 'class' ] });
 
-	/* A TAB SWITCH IS A LAYOUT CHANGE WITH NO MUTATION IN IT. `ui.tabs` moves no node — it writes
-	 * `data-tab-active` on the panes — so the {childList} registration above never wakes, and the
-	 * floor the outgoing pane wears stands until something else sweeps. `min-height` beats the
-	 * `height: 0` an inactive pane is collapsed with (theme/30-tables.css), so that floor is blank
-	 * page above whatever the reader just opened: measured on 25.12, System -> Startup left 2432px
-	 * of it and the "Local Startup" textarea read as missing (#75), Network -> Interfaces 1299px
-	 * until the next poll tick, i.e. one `pollinterval`. A page that does not poll never gets that
-	 * tick and keeps the blank for the life of the page.
-	 *
-	 * `run()` direct, not the observer above: the anchoring corrections answer a poll tick that
-	 * moved the page under a still reader, and a tab the reader clicked is neither.
+	/* A TAB SWITCH MUTATES NO NODE. ui.tabs writes `data-tab-active` on the panes, so the
+	 * {childList} registration above never wakes and the floor the pane wore while it was open
+	 * stays on it — and `min-height` beats the `height: 0` an inactive pane is collapsed with
+	 * (theme/30-tables.css), so that floor IS blank page above the tab the reader just opened.
+	 * Measured on 25.12, /admin/network/network, Interfaces -> Devices: 1299px left standing, the
+	 * document at 2647px against 1720 and the content the reader came for 1559px down, still there
+	 * 13 s later on a page whose poll never mutates #view (tools/floor-contract.mjs, issue #75).
 	 *
 	 * A THIRD observer for the reason the second one exists — observe() replaces the options of a
 	 * registration for the same node. The filter keeps it to the one attribute: `subtree: true` on
@@ -916,6 +739,7 @@ function observeContent() {
 	_moTabs = new MutationObserver(run);
 	for (const host of hosts)
 		_moTabs.observe(host, { attributes: true, attributeFilter: [ 'data-tab-active' ], subtree: true });
+
 }
 
 return baseclass.extend({

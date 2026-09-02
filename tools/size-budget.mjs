@@ -123,8 +123,22 @@ const LIMITS = {
 	 * navigated away from on WebKit (docs/spa-router.md); fs-fit spends most of it back on a third
 	 * observer, for `data-tab-active` — a tab switch mutates no node, so nothing woke the sweep and
 	 * the outgoing pane held its floor: 2432px of blank above System -> Startup's textarea, for the
-	 * life of a page that does not poll. */
-	resourcesJs: 90_861,
+	 * life of a page that does not poll.
+	 *
+	 * 90,922 B on 2026-09-02, up 61 B: the bar re-fits the moment an indicator pill arrives. The
+	 * cluster is in the chrome, which the fit engine does not watch — `#view` and the dialog are its
+	 * roots — so flexbox answered first and the whole page sat 91px lower for 708 ms until something
+	 * else woke the pass (measured on WebKit at 390px, in the narrow sidebar bar). The observer that
+	 * already watches `#indicators` for the rail's badge now calls the fit in the same pre-paint
+	 * callback, on a childList record only: the poll pill rewrites its label every tick, and a fit
+	 * per tick is the cost this file exists to refuse.
+	 *
+	 * 89,825 B on 2026-09-02, down 1,097 B: the anchoring in `fs-fit.js` is 0.14.3's again — one
+	 * reference taken before the tick and put back after it, instead of the natural-height reader,
+	 * the deferred empty sweep and the two late corrections 0.14.4-0.14.6 grew on top of it. What
+	 * stays out of the revert is the floor's own bookkeeping: the climb off a table box, the
+	 * `data-fs-floor` mark the sweep finds its own work by, and the tab-switch observer. */
+	resourcesJs: 89_825,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -185,8 +199,14 @@ const LIMITS = {
 	 * 57,287 B on 2026-09-01, up the same 288 B: `fs-fit.js` and `fs-select.js`, both cold.
 	 *
 	 * 57,170 B on 2026-09-01, down the same 117 B: `fs-router.js` and `fs-fit.js` are both cold, and
-	 * the transition coming out is worth more than the tab observer going in. */
-	coldJs: 57_170,
+	 * the transition coming out is worth more than the tab observer going in.
+	 *
+	 * 57,231 B on 2026-09-02, up the same 61 B: `fs-chrome.js` is on the cold path, the bar being
+	 * on every page.
+	 *
+	 * 56,134 B on 2026-09-02, down the same 1,097 B: `fs-fit.js` is cold, and the anchoring revert
+	 * is all of it. */
+	coldJs: 56_134,
 };
 
 function bytes(path) {

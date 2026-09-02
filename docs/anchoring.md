@@ -30,7 +30,17 @@ taken while it is empty clamps the reader's offset into a document that was neve
 and nothing puts that back. So each container a poll empties carries a `min-height` at the height it
 had at the last settled moment, written BEFORE the tick rather than during it.
 
-Eight things about it are load-bearing and each was a measured failure first:
+The shape is 0.14.3's again: every floor is cleared, the box re-measured with `offsetHeight`, and
+the floor written back where that answer is above zero. 0.14.4-0.14.6 replaced the clear with a
+reader over the content (`naturalHeight()`), and then spent three more mechanisms repairing what
+that reader got wrong on a hidden pane, on a box that ends in text and on a container that empties
+for good. Each of those was measured and each worked; together they were a floor whose value
+depended on four decisions taken in the same pass, and the releases carrying them are the ones the
+reports are about. The clear costs a forced layout per box per pass and answers 0 for anything the
+page is not showing, which is the answer all four repairs were reconstructing.
+
+What stayed out of the revert is the floor's own bookkeeping. Six things are load-bearing, and each
+was a measured failure first:
 
 - **On the containers, not on the column.** `min-height` on an ancestor of the engine's own anchor
   suppresses the engine's anchoring (css-scroll-anchoring-1 §2.2.2), so a floor on the column bought
@@ -41,60 +51,34 @@ Eight things about it are load-bearing and each was a measured failure first:
   284px. The floor climbs to the first box that is not a table.
 - **Written before the tick.** Pinning from inside the same statement sequence does nothing —
   `dom.content()` performs no layout, so no layout ever sees the pin: 1882px still clamped away.
-- **Not on a box that has no height of its own.** `naturalHeight()` measures the CONTENT — the last
-  child's bottom against the box's top — and `visibility: hidden` leaves that content in the layout,
-  so a collapsed tab pane answers with its full height and the floor pins the collapse open. On
-  Network → Interfaces the hidden `device` pane held 893px and the active pane's content sat that
-  far down the page (issue #41). The clear-and-remeasure shape this replaced read the collapsed
-  height and wrote nothing; refusing a zero-height box restores that, and gives the same answer for
-  a container a tick has just emptied — whose floor is already standing. It still fires on a box
-  that is zero-height while VISIBLE: 4 of them over an 80-page sweep of owrt2512, on Overview and on
-  a third-party settings page.
-- **Measured to the end of the CONTENT, not to the last element.** A box whose content ends in text
-  ends below its last element: `.cbi-section-descr` on /admin/network/dhcp measured 115px against
-  the 156px it stands at, and a floor 41px short is a document free to shrink under the reader
-  during the tick the floor exists for. The tail after the last element is measured with a Range;
-  `selectNodeContents()` over the WHOLE box is not what ships — it takes in whatever is out of the
-  flow and writes a floor 98px TALLER than the box on the Overview, which is the same blank page
-  seen from the other side. Held to the old shape's answer by `tools/floor-contract.mjs`: 33 floors
-  on owrt2512, worst 2px against what `offsetHeight` says.
-- **Taken off a box that empties for good.** The floor survives the pass that empties a container —
-  that is the whole mechanism — but a container still empty on the NEXT pass is not refilling, and
-  its floor is then blank page nothing takes back: 1299px on Network → Interfaces, with the document
-  standing at 1720px around no content at all. Two parts, and each was measured to be necessary on
-  its own. A box qualifies for a floor through its CHILDREN, so emptying it takes it out of
-  `SHRINKS` and the sweep can no longer even see the floor it wrote — hence `data-fs-floor`, and a
-  sweep that looks for its own mark. And the second pass has to be SCHEDULED: every other pass is
-  driven by the MutationObserver on `#view`, and a page that has stopped changing produces no
-  further mutation, so "clear it next pass" never gets a next pass. One poll interval
-  (`L.env.pollinterval`, 5 s by default) is the wait, because that is how long a container that is
-  genuinely refilling may take.
-- **Given back when the box goes out of sight.** Refusing to write a floor is not enough once one is
-  standing: `min-height` beats the `height: 0` an inactive tab pane is collapsed with, so a pane the
-  reader leaves keeps the height it had while open and the tab they switched to starts below it —
-  1265px of dead page on Network → Interfaces at 25.12, 1114px at 24.10, the document at 2308px
-  against 1043 (issue #41). Such a box also measures a height of its own, which is why the check
-  above cannot see it. The floor is cleared where the resolved `visibility` is `hidden` — which
-  inherits, so it covers every box inside a collapsed pane — and re-measured on the tick after the
-  pane comes back. This is what the clear-and-remeasure shape did for free by clearing every floor
-  each tick; measured on the stand, one build per version: 1043px on v0.14.3, 3201 on v0.14.4, 2308
-  on v0.14.5.
-- **And the switch has to wake the sweep.** Clearing a floor at the next pass is not clearing it: a
-  tab switch moves no node — `ui.tabs` writes `data-tab-active` on the panes — so the
-  `{childList, subtree}` observer on `#view` never fires and the outgoing pane keeps its floor until
-  something else mutates the page. On a page that polls that is one `pollinterval`, which is the
-  "it puts itself right after a few seconds" in the reports; on a page that does not poll it is the
-  life of the page. Measured on 25.12 at 1440px, with the `visibility` clear above already in:
-  System → Startup left 2432px of floor on `Initscripts`, the document at 3304px and the "Local
-  Startup" textarea 2716px down, permanently — read as a missing textarea (#75, and forum post 68
-  against 0.14.4); Network → Interfaces left 1299px for one tick. A third MutationObserver, filtered
-  to `data-tab-active`, runs the same sweep: 900px and 1348px, at the switch. It calls `run()`
-  rather than going through the observer that carries the anchoring corrections — those answer a
-  poll tick that moved the page under a still reader, and a tab the reader clicked is neither.
-  Whether the blank is ever SEEN is release-dependent and the mechanism is not: on the 24.10 stand
-  the same v0.14.6 build cleared both floors within 200 ms of the switch, something else in that
-  luci-base having mutated `#view`. It is not a thing to rely on — that is the whole point of
-  waking the sweep from the switch itself.
+- **Cleared and re-measured, not read off the content.** The clear is what makes every other
+  question answer itself. A collapsed tab pane measures 0 and keeps no floor, where a content reader
+  measured its full height through `visibility: hidden` and pinned the collapse open (893px on
+  Network → Interfaces, issue #41). A container the tick has just emptied measures 0 too, which is
+  why the write is guarded on the height rather than on the box. Held against the shape it replaced
+  by `tools/floor-contract.mjs`, which strips every floor and re-measures: 60 floors on owrt2512,
+  worst 1px.
+- **Found by its own mark.** A box qualifies for a floor through its CHILDREN, and the climb above
+  can put one on a box that is not in `SHRINKS` at all — so emptying the table under it takes the
+  whole section out of the sweep and the floor stays for the life of the page: 927px on
+  /admin/network/network, 13 s after the section emptied. Every floor carries `data-fs-floor` and
+  the sweep looks for its own mark as well as for the selector. Matching on inline `min-height`
+  instead would sweep off the ones an app wrote for itself.
+- **And a tab switch has to wake the sweep.** Clearing a floor at the next pass is not clearing it:
+  a tab switch moves no node — `ui.tabs` writes `data-tab-active` on the panes — so the
+  `{childList, subtree}` observer on `#view` never fires, and `min-height` beats the `height: 0` an
+  inactive pane is collapsed with. The pane the reader left keeps the height it had while it was
+  open and the tab they opened starts below it. On a page that polls that lasts one `pollinterval`,
+  which is the "it puts itself right after a few seconds" in the reports; on a page that does not
+  poll, the life of the page. Measured on 25.12 at 1440px: System → Startup left 2432px of floor on
+  `Initscripts`, the document at 3304px and the "Local Startup" textarea 2716px down — read as a
+  missing textarea (#75, and forum post 68 against 0.14.4); Network → Interfaces left 1299px, the
+  document at 2647px against 1720. A third MutationObserver, filtered to `data-tab-active`, runs the
+  same sweep at the switch. It calls `run()` rather than going through the observer that carries the
+  anchoring corrections — those answer a poll tick that moved the page under a still reader, and a
+  tab the reader clicked is neither. Whether the blank is ever SEEN is release-dependent and the
+  mechanism is not: on the 24.10 stand the same v0.14.6 build cleared both floors within 200 ms of
+  the switch, something else in that luci-base having mutated `#view`.
 
 ## What the reader was looking at: `anchorRef()` and the memo
 
@@ -116,12 +100,12 @@ not a clamp to undo.
 |---|---|---|
 | `applyAnchor()` via `scheduleAnchor()` | the engine does NOT anchor | the whole correction, one rAF after the mutation, against `anchorFor()`'s reference |
 | `lateDrift()` | the engine anchors | only what the engine left behind, a frame plus `SCROLL_IDLE` later, against the memo from before the tick |
-| `settleDrift()` | the engine anchors | the same, around the deferred pass that runs when the reader stops — that pass re-lays tables and its `min-height` writes can suppress the engine's own compensation |
 
-All three end in **`putBack(el, was)`**, the one write any of them makes: it moves the offset by the
-drift it measured, then re-reads the offset (the write may have been clamped short) **and where the
-element actually landed** — a clamped write leaves it somewhere other than `was`, and a memo that
-goes on naming `was` asks every later tick to spend an unreachable difference on the reader.
+Each ends in one write and reads nothing back. A third correction around the deferred pass
+(`settleDrift()`), and a shared writer that re-read where the element had landed after a clamped
+write (`putBack()`), shipped in 0.14.4-0.14.6 and went out with the revert: both were measured to
+work — the rows below say by how much — and both are a correction the theme applies on top of
+another correction, which is the shape the reports are about.
 
 ## What must never be corrected
 
@@ -164,10 +148,8 @@ from a theme fault.
 | `holdFloor()` | reader moved 568px @390 top and 610px @1440 side; the clamp took 444px and 610px | yes — the largest effect of any of them |
 | `scheduleAnchor()` / `applyAnchor()` | 3 findings per scroller with the engine's anchoring off, every one the full 120px of growth: nobody corrects at all | yes, and it is the whole correction on Safari < 26 |
 | `lateDrift()` | 120px on Overview and on Processes, both scrollers, with the engine anchoring | yes — the engine's residual is not small |
-| `putBack()` re-reading where the element landed | −52px on five passes out of five; with it, 0px on five out of five | yes, measured as a frequency because one pass is not evidence |
 | `ENGINE_ANCHORS` | forcing "no engine anchors" on an engine that does: 120px on Processes | yes — the detection picks the path, and running both corrections is what throws the page the other way |
 | the guards on a page in motion (`scrollTop() !== seen`, `_userUntil`) | 6 findings per scroller, on BOTH engines and all three pages: the offset moved on its own mid-flick, worst 185-520px | yes, and it is the only mechanism here that fails on Chromium-class engines too |
-| `settleDrift()` | −60px on 2 passes out of 7, against 0 out of 6 with it — **on `imm2410 @390 top large`, webkit, and nowhere else** | yes. It answers a tick that landed while the offset was moving, so it is a race and a single pass does not see it: the first sweep that crossed this mechanism called it unmeasurable, and it took the cell its own note names (88 `min-height` writes and a 58px jump in the same frame, ImmortalWrt 24.10/WebKit) plus five repeats to catch it |
 | `anchorRef()` refusing to run while scrolling | nothing measurable | **not measurable here** — it is a cost guard, not a correctness one: every rect read there is a forced layout and this runs on every content mutation |
 | `anchorRef()` refusing `#view` as the reference | nothing on the current pages | **not measurable here.** The hit test is retried across the viewport, so it now finds real content where it used to land in a grid gap; the refusal is what keeps a future layout from silently anchoring on the host, whose own top never moves (drift 0 for ever, half the matrix silently unmeasured when it did) |
 
@@ -184,10 +166,14 @@ And four parts that carry the machinery rather than decide anything, so there is
 measurement in their own comment rather than by a gate, so a change there is not caught by CI:
 extend `tools/scroll-anchor.mjs` before touching one, or accept that the proof is historical.
 
-A third, `settleDrift()`, looked like one of them until it was measured on the right cell. Adding a
-separate assertion for it — read the reference after the flick, again once the deferred pass has
-run, and fail on the difference — caught **nothing** across four sweeps on two engines while the
-mechanism was disabled, so it was not kept: what does catch it is the swap case already in the
-sweep, on `imm2410 @390 top large`, repeated. **An optional stand is the only place a mechanism of
-this theme is measurable**, which is worth knowing before `--only` is narrowed to the core three.
+**Two mechanisms were measured here and are no longer in the tree**, and their numbers are the
+reason the revert stops where it does rather than an argument to put them back. `putBack()`
+re-reading where the element landed: −52px on five passes out of five, 0px on five with it.
+`settleDrift()`: −60px on 2 passes out of 7 against 0 out of 6 with it, **on `imm2410 @390 top
+large`, webkit, and nowhere else** — a race a single pass cannot see, which took that cell (88
+`min-height` writes and a 58px jump in the same frame) plus five repeats to catch, and which a
+purpose-built assertion caught nothing of across four sweeps. **An optional stand is the only place
+a mechanism of this theme is measurable**, which is worth knowing before `--only` is narrowed to the
+core three. Both belong to the layer 0.14.7.1 removed: a correction that repairs another correction
+is what the reports were about, and neither fault they answer has been reported since.
 
