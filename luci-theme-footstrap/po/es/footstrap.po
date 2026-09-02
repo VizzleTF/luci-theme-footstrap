@@ -35,7 +35,7 @@ msgctxt "footstrap"
 msgid "Auto-collapse"
 msgstr "Colapso automático"
 
-#: htdocs/luci-static/resources/fs-appearance.js:783
+#: htdocs/luci-static/resources/fs-appearance.js:794
 msgctxt "footstrap"
 msgid "Background"
 msgstr "Fondo"
@@ -54,11 +54,6 @@ msgstr "Bordes"
 msgctxt "footstrap"
 msgid "Cards"
 msgstr "Tarjetas"
-
-#: htdocs/luci-static/resources/fs-appearance.js:771
-msgctxt "footstrap"
-msgid "Changes apply at once and live in this browser."
-msgstr "Los cambios se aplican al instante y viven en este navegador."
 
 #: htdocs/luci-static/resources/fs-appearance.js:454
 msgctxt "footstrap"
@@ -81,7 +76,7 @@ msgid "Collapse menu"
 msgstr "Contraer menú"
 
 #: htdocs/luci-static/resources/fs-appearance.js:465
-#: htdocs/luci-static/resources/fs-appearance.js:780
+#: htdocs/luci-static/resources/fs-appearance.js:791
 msgctxt "footstrap"
 msgid "Colours"
 msgstr "Colores"
@@ -128,7 +123,7 @@ msgctxt "footstrap"
 msgid "Dark"
 msgstr "Oscuro"
 
-#: htdocs/luci-static/resources/fs-appearance.js:784
+#: htdocs/luci-static/resources/fs-appearance.js:795
 msgctxt "footstrap"
 msgid "Defaults"
 msgstr "Predeterminados"
@@ -166,6 +161,15 @@ msgstr ""
 "Valores predeterminados de Apariencia de Footstrap para el router (Guardar "
 "como predeterminado) y subida del fondo de inicio de sesión y del patrón"
 
+#: htdocs/luci-static/resources/fs-appearance.js:782
+msgctxt "footstrap"
+msgid ""
+"Footstrap theme settings apply at once and are stored permanently in this "
+"browser."
+msgstr ""
+"Los ajustes del tema Footstrap se aplican al instante y se guardan de forma "
+"permanente en este navegador."
+
 #: ucode/template/themes/footstrap/partials/notices.ut:24
 msgid "Go to firmware upgrade..."
 msgstr "Ir a la actualización del firmware..."
@@ -184,7 +188,7 @@ msgctxt "footstrap"
 msgid "Hard to read %s — large text only"
 msgstr "Se lee mal %s: solo texto grande"
 
-#: htdocs/luci-static/resources/fs-appearance.js:779
+#: htdocs/luci-static/resources/fs-appearance.js:790
 msgctxt "footstrap"
 msgid "Interface"
 msgstr "Interfaz"
@@ -208,7 +212,7 @@ msgid "Large"
 msgstr "Grande"
 
 #: htdocs/luci-static/resources/fs-appearance.js:328
-#: htdocs/luci-static/resources/fs-appearance.js:700
+#: htdocs/luci-static/resources/fs-appearance.js:711
 msgctxt "footstrap"
 msgid "Layout"
 msgstr "Diseño"
@@ -320,21 +324,43 @@ msgctxt "footstrap"
 msgid "Reset to default"
 msgstr "Restablecer a valores predeterminados"
 
+#: htdocs/luci-static/resources/fs-appearance.js:675
+msgctxt "footstrap"
+msgid "Reset to default — go back to the theme's built-in look."
+msgstr ""
+"«Restablecer al predeterminado»: vuelve al aspecto original del tema."
+
 #: htdocs/luci-static/resources/fs-appearance.js:584
 #: htdocs/luci-static/resources/fs-appearance.js:654
 msgctxt "footstrap"
 msgid "Reset to saved"
 msgstr "Restablecer a lo guardado"
 
+#: htdocs/luci-static/resources/fs-appearance.js:674
+msgctxt "footstrap"
+msgid "Reset to saved — drop this browser's changes and follow the router."
+msgstr ""
+"«Restablecer al guardado»: descarta los cambios de este navegador y sigue al "
+"router."
+
 #: htdocs/luci-static/resources/fs-appearance.js:355
 msgctxt "footstrap"
 msgid "Rounding"
 msgstr "Redondeo"
 
-#: htdocs/luci-static/resources/fs-appearance.js:670
+#: htdocs/luci-static/resources/fs-appearance.js:681
 msgctxt "footstrap"
 msgid "Router default"
 msgstr "Configuración predeterminada del enrutador"
+
+#: htdocs/luci-static/resources/fs-appearance.js:783
+msgctxt "footstrap"
+msgid ""
+"Save & Apply at the foot of the page belongs to the System form and does not "
+"store them."
+msgstr ""
+"El botón «Guardar y aplicar» al pie de la página pertenece al formulario del "
+"Sistema y no los guarda."
 
 #: htdocs/luci-static/resources/fs-appearance.js:578
 #: htdocs/luci-static/resources/fs-appearance.js:606
@@ -342,6 +368,14 @@ msgstr "Configuración predeterminada del enrutador"
 msgctxt "footstrap"
 msgid "Save as default"
 msgstr "Guardar como predeterminado"
+
+#: htdocs/luci-static/resources/fs-appearance.js:673
+msgctxt "footstrap"
+msgid ""
+"Save as default — store the current look on the router, for every browser."
+msgstr ""
+"«Guardar como predeterminado»: guarda el aspecto actual en el router, para "
+"todos los navegadores."
 
 #: htdocs/luci-static/resources/fs-appearance.js:613
 msgctxt "footstrap"
@@ -402,7 +436,7 @@ msgctxt "footstrap"
 msgid "Submenus"
 msgstr "Submenús"
 
-#: htdocs/luci-static/resources/fs-appearance.js:781
+#: htdocs/luci-static/resources/fs-appearance.js:792
 msgctxt "footstrap"
 msgid "Surfaces"
 msgstr "Superficies"
@@ -482,7 +516,7 @@ msgstr ""
 "bloqueados), así que un cambio aquí dura hasta que recargues. Guardar como "
 "predeterminado sigue funcionando y se aplica a todos los navegadores."
 
-#: htdocs/luci-static/resources/fs-appearance.js:702
+#: htdocs/luci-static/resources/fs-appearance.js:713
 msgctxt "footstrap"
 msgid "This theme is not translated on this router yet."
 msgstr "Este tema aún no está traducido en este router."
@@ -496,15 +530,6 @@ msgstr "Tinte (identificación del enrutador)"
 msgctxt "footstrap"
 msgid "Tint strength"
 msgstr "Intensidad del tinte"
-
-#: htdocs/luci-static/resources/fs-appearance.js:772
-msgctxt "footstrap"
-msgid ""
-"To keep them on the router, use Save as default under Defaults — not Save & "
-"Apply at the foot of the page."
-msgstr ""
-"Para guardarlos en el router, usa «Guardar como predeterminado» en "
-"Predeterminados, no «Guardar y aplicar» al pie de la página."
 
 #: htdocs/luci-static/resources/fs-appearance.js:190
 msgctxt "footstrap"
@@ -574,13 +599,11 @@ msgstr "tampoco se pudo eliminar el archivo subido; sigue en el router."
 
 #~ msgctxt "footstrap"
 #~ msgid ""
-#~ "Everything here applies the moment you change it and is remembered in "
-#~ "this browser only — the Save & Apply button at the foot of the page "
-#~ "belongs to the System form and does not store it."
+#~ "To keep them on the router, use Save as default under Defaults — not Save "
+#~ "& Apply at the foot of the page."
 #~ msgstr ""
-#~ "Todo lo de aquí se aplica en el momento en que lo cambias y se recuerda "
-#~ "solo en este navegador: el botón «Guardar y aplicar» del pie de la página "
-#~ "pertenece al formulario del Sistema y no lo guarda."
+#~ "Para guardarlos en el router, usa «Guardar como predeterminado» en "
+#~ "Predeterminados, no «Guardar y aplicar» al pie de la página."
 
 #~ msgctxt "footstrap"
 #~ msgid ""

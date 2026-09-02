@@ -31,7 +31,7 @@ msgctxt "footstrap"
 msgid "Auto-collapse"
 msgstr "Сворачивать"
 
-#: htdocs/luci-static/resources/fs-appearance.js:783
+#: htdocs/luci-static/resources/fs-appearance.js:794
 msgctxt "footstrap"
 msgid "Background"
 msgstr "Фон"
@@ -50,11 +50,6 @@ msgstr "Границы"
 msgctxt "footstrap"
 msgid "Cards"
 msgstr "Карточки"
-
-#: htdocs/luci-static/resources/fs-appearance.js:771
-msgctxt "footstrap"
-msgid "Changes apply at once and live in this browser."
-msgstr "Изменения применяются сразу и живут в этом браузере."
 
 #: htdocs/luci-static/resources/fs-appearance.js:454
 msgctxt "footstrap"
@@ -77,7 +72,7 @@ msgid "Collapse menu"
 msgstr "Свернуть меню"
 
 #: htdocs/luci-static/resources/fs-appearance.js:465
-#: htdocs/luci-static/resources/fs-appearance.js:780
+#: htdocs/luci-static/resources/fs-appearance.js:791
 msgctxt "footstrap"
 msgid "Colours"
 msgstr "Цвета"
@@ -122,7 +117,7 @@ msgctxt "footstrap"
 msgid "Dark"
 msgstr "Тёмная"
 
-#: htdocs/luci-static/resources/fs-appearance.js:784
+#: htdocs/luci-static/resources/fs-appearance.js:795
 msgctxt "footstrap"
 msgid "Defaults"
 msgstr "Умолчания"
@@ -160,6 +155,15 @@ msgstr ""
 "Общие настройки внешнего вида Footstrap для роутера (Сохранить как "
 "умолчание), загрузка фонового изображения и узора"
 
+#: htdocs/luci-static/resources/fs-appearance.js:782
+msgctxt "footstrap"
+msgid ""
+"Footstrap theme settings apply at once and are stored permanently in this "
+"browser."
+msgstr ""
+"Настройки темы Footstrap применяются сразу и сохраняются в этом браузере "
+"навсегда."
+
 #: ucode/template/themes/footstrap/partials/notices.ut:24
 msgid "Go to firmware upgrade..."
 msgstr "Перейти к обновлению прошивки..."
@@ -178,7 +182,7 @@ msgctxt "footstrap"
 msgid "Hard to read %s — large text only"
 msgstr "Плохо читается %s — только крупный текст"
 
-#: htdocs/luci-static/resources/fs-appearance.js:779
+#: htdocs/luci-static/resources/fs-appearance.js:790
 msgctxt "footstrap"
 msgid "Interface"
 msgstr "Интерфейс"
@@ -202,7 +206,7 @@ msgid "Large"
 msgstr "Крупно"
 
 #: htdocs/luci-static/resources/fs-appearance.js:328
-#: htdocs/luci-static/resources/fs-appearance.js:700
+#: htdocs/luci-static/resources/fs-appearance.js:711
 msgctxt "footstrap"
 msgid "Layout"
 msgstr "Раскладка"
@@ -313,21 +317,42 @@ msgctxt "footstrap"
 msgid "Reset to default"
 msgstr "Сбросить к умолчанию"
 
+#: htdocs/luci-static/resources/fs-appearance.js:675
+msgctxt "footstrap"
+msgid "Reset to default — go back to the theme's built-in look."
+msgstr "«Сбросить к умолчанию» — вернуть встроенный вид темы."
+
 #: htdocs/luci-static/resources/fs-appearance.js:584
 #: htdocs/luci-static/resources/fs-appearance.js:654
 msgctxt "footstrap"
 msgid "Reset to saved"
 msgstr "Сбросить к сохранённым"
 
+#: htdocs/luci-static/resources/fs-appearance.js:674
+msgctxt "footstrap"
+msgid "Reset to saved — drop this browser's changes and follow the router."
+msgstr ""
+"«Сбросить к сохранённому» — отменить правки этого браузера и следовать "
+"роутеру."
+
 #: htdocs/luci-static/resources/fs-appearance.js:355
 msgctxt "footstrap"
 msgid "Rounding"
 msgstr "Скругление"
 
-#: htdocs/luci-static/resources/fs-appearance.js:670
+#: htdocs/luci-static/resources/fs-appearance.js:681
 msgctxt "footstrap"
 msgid "Router default"
 msgstr "По умолчанию для роутера"
+
+#: htdocs/luci-static/resources/fs-appearance.js:783
+msgctxt "footstrap"
+msgid ""
+"Save & Apply at the foot of the page belongs to the System form and does not "
+"store them."
+msgstr ""
+"Кнопка «Сохранить и применить» внизу страницы принадлежит форме «Система» и "
+"их не сохраняет."
 
 #: htdocs/luci-static/resources/fs-appearance.js:578
 #: htdocs/luci-static/resources/fs-appearance.js:606
@@ -335,6 +360,14 @@ msgstr "По умолчанию для роутера"
 msgctxt "footstrap"
 msgid "Save as default"
 msgstr "Сохранить по умолчанию"
+
+#: htdocs/luci-static/resources/fs-appearance.js:673
+msgctxt "footstrap"
+msgid ""
+"Save as default — store the current look on the router, for every browser."
+msgstr ""
+"«Сохранить по умолчанию» — записать текущий вид на роутер, для всех "
+"браузеров."
 
 #: htdocs/luci-static/resources/fs-appearance.js:613
 msgctxt "footstrap"
@@ -395,7 +428,7 @@ msgctxt "footstrap"
 msgid "Submenus"
 msgstr "Подменю"
 
-#: htdocs/luci-static/resources/fs-appearance.js:781
+#: htdocs/luci-static/resources/fs-appearance.js:792
 msgctxt "footstrap"
 msgid "Surfaces"
 msgstr "Поверхности"
@@ -475,7 +508,7 @@ msgstr ""
 "изменение здесь действует до перезагрузки страницы. «Сохранить как "
 "умолчание» по-прежнему работает и применяется ко всем браузерам."
 
-#: htdocs/luci-static/resources/fs-appearance.js:702
+#: htdocs/luci-static/resources/fs-appearance.js:713
 msgctxt "footstrap"
 msgid "This theme is not translated on this router yet."
 msgstr "Тема ещё не переведена на этом роутере."
@@ -489,15 +522,6 @@ msgstr "Оттенок (опознание роутера)"
 msgctxt "footstrap"
 msgid "Tint strength"
 msgstr "Насыщенность оттенка"
-
-#: htdocs/luci-static/resources/fs-appearance.js:772
-msgctxt "footstrap"
-msgid ""
-"To keep them on the router, use Save as default under Defaults — not Save & "
-"Apply at the foot of the page."
-msgstr ""
-"Чтобы сохранить их на роутере, нажмите «Сохранить по умолчанию» в разделе «По "
-"умолчанию», а не «Сохранить и применить» внизу страницы."
 
 #: htdocs/luci-static/resources/fs-appearance.js:190
 msgctxt "footstrap"
@@ -567,13 +591,11 @@ msgstr "загруженный файл тоже не удалось удали�
 
 #~ msgctxt "footstrap"
 #~ msgid ""
-#~ "Everything here applies the moment you change it and is remembered in "
-#~ "this browser only — the Save & Apply button at the foot of the page "
-#~ "belongs to the System form and does not store it."
+#~ "To keep them on the router, use Save as default under Defaults — not Save "
+#~ "& Apply at the foot of the page."
 #~ msgstr ""
-#~ "Всё на этой странице применяется в момент изменения и запоминается только "
-#~ "в этом браузере — кнопка «Сохранить и применить» внизу страницы "
-#~ "принадлежит форме «Система» и настройки внешнего вида не сохраняет."
+#~ "Чтобы сохранить их на роутере, нажмите «Сохранить по умолчанию» в разделе "
+#~ "«По умолчанию», а не «Сохранить и применить» внизу страницы."
 
 #~ msgctxt "footstrap"
 #~ msgid ""

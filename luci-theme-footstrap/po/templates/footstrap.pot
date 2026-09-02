@@ -25,7 +25,7 @@ msgctxt "footstrap"
 msgid "Auto-collapse"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:783
+#: htdocs/luci-static/resources/fs-appearance.js:794
 msgctxt "footstrap"
 msgid "Background"
 msgstr ""
@@ -43,11 +43,6 @@ msgstr ""
 #: htdocs/luci-static/resources/fs-appearance.js:421
 msgctxt "footstrap"
 msgid "Cards"
-msgstr ""
-
-#: htdocs/luci-static/resources/fs-appearance.js:771
-msgctxt "footstrap"
-msgid "Changes apply at once and live in this browser."
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:454
@@ -71,7 +66,7 @@ msgid "Collapse menu"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:465
-#: htdocs/luci-static/resources/fs-appearance.js:780
+#: htdocs/luci-static/resources/fs-appearance.js:791
 msgctxt "footstrap"
 msgid "Colours"
 msgstr ""
@@ -116,7 +111,7 @@ msgctxt "footstrap"
 msgid "Dark"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:784
+#: htdocs/luci-static/resources/fs-appearance.js:795
 msgctxt "footstrap"
 msgid "Defaults"
 msgstr ""
@@ -152,6 +147,13 @@ msgid ""
 "background and pattern uploads"
 msgstr ""
 
+#: htdocs/luci-static/resources/fs-appearance.js:782
+msgctxt "footstrap"
+msgid ""
+"Footstrap theme settings apply at once and are stored permanently in this "
+"browser."
+msgstr ""
+
 #: ucode/template/themes/footstrap/partials/notices.ut:24
 msgid "Go to firmware upgrade..."
 msgstr ""
@@ -170,7 +172,7 @@ msgctxt "footstrap"
 msgid "Hard to read %s — large text only"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:779
+#: htdocs/luci-static/resources/fs-appearance.js:790
 msgctxt "footstrap"
 msgid "Interface"
 msgstr ""
@@ -194,7 +196,7 @@ msgid "Large"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:328
-#: htdocs/luci-static/resources/fs-appearance.js:700
+#: htdocs/luci-static/resources/fs-appearance.js:711
 msgctxt "footstrap"
 msgid "Layout"
 msgstr ""
@@ -303,10 +305,20 @@ msgctxt "footstrap"
 msgid "Reset to default"
 msgstr ""
 
+#: htdocs/luci-static/resources/fs-appearance.js:675
+msgctxt "footstrap"
+msgid "Reset to default — go back to the theme's built-in look."
+msgstr ""
+
 #: htdocs/luci-static/resources/fs-appearance.js:584
 #: htdocs/luci-static/resources/fs-appearance.js:654
 msgctxt "footstrap"
 msgid "Reset to saved"
+msgstr ""
+
+#: htdocs/luci-static/resources/fs-appearance.js:674
+msgctxt "footstrap"
+msgid "Reset to saved — drop this browser's changes and follow the router."
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:355
@@ -314,9 +326,16 @@ msgctxt "footstrap"
 msgid "Rounding"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:670
+#: htdocs/luci-static/resources/fs-appearance.js:681
 msgctxt "footstrap"
 msgid "Router default"
+msgstr ""
+
+#: htdocs/luci-static/resources/fs-appearance.js:783
+msgctxt "footstrap"
+msgid ""
+"Save & Apply at the foot of the page belongs to the System form and does not "
+"store them."
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:578
@@ -324,6 +343,12 @@ msgstr ""
 #: htdocs/luci-static/resources/fs-appearance.js:613
 msgctxt "footstrap"
 msgid "Save as default"
+msgstr ""
+
+#: htdocs/luci-static/resources/fs-appearance.js:673
+msgctxt "footstrap"
+msgid ""
+"Save as default — store the current look on the router, for every browser."
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:613
@@ -385,7 +410,7 @@ msgctxt "footstrap"
 msgid "Submenus"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:781
+#: htdocs/luci-static/resources/fs-appearance.js:792
 msgctxt "footstrap"
 msgid "Surfaces"
 msgstr ""
@@ -459,7 +484,7 @@ msgid ""
 "every browser."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:702
+#: htdocs/luci-static/resources/fs-appearance.js:713
 msgctxt "footstrap"
 msgid "This theme is not translated on this router yet."
 msgstr ""
@@ -472,13 +497,6 @@ msgstr ""
 #: htdocs/luci-static/resources/fs-appearance.js:387
 msgctxt "footstrap"
 msgid "Tint strength"
-msgstr ""
-
-#: htdocs/luci-static/resources/fs-appearance.js:772
-msgctxt "footstrap"
-msgid ""
-"To keep them on the router, use Save as default under Defaults — not Save & "
-"Apply at the foot of the page."
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:190

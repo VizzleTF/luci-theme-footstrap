@@ -664,12 +664,31 @@ function build() {
 		'rel': 'noreferrer'
 	}, [ ver.label() ]);
 
+	/* One clause per button, in LuCI's own help-sentence idiom and under the buttons themselves,
+	 * because that is where the question is asked: with all three named "save"/"reset" and two of
+	 * them resets, the row does not say which state each lands in (forum topic 251930, post 90 —
+	 * "what is the difference on 'reset to saved' and 'reset to default'?"). Three lines rather
+	 * than a paragraph: three parts want a list, and each is read on its own.
+	 *
+	 * Text nodes separated by <br>, NOT a child per line: `.cbi-value-field *` in
+	 * theme/60-inputs.css hands mono to every descendant and excludes `.cbi-value-description`
+	 * itself, so a wrapped line becomes a descendant that the exclusion does not reach — measured,
+	 * all three lines came out monospace. Text nodes inherit the sans face from the container, and
+	 * one container also means one `?` glyph with every line aligned under it. */
+	const buttonHelp = E('div', { 'class': 'cbi-value-description fs-ap-help' }, [
+		_('Save as default — store the current look on the router, for every browser.', 'footstrap'),
+		E('br'),
+		_('Reset to saved — drop this browser\'s changes and follow the router.', 'footstrap'),
+		E('br'),
+		_('Reset to default — go back to the theme\'s built-in look.', 'footstrap')
+	]);
+
 	const defaults = [
 		/* the one row whose control is a pair of buttons, each named by its own text, so `make`
 		 * ignores the caption rather than re-using it as an aria-label */
 		group(_('Router default', 'footstrap'),
 			() => E('div', { 'class': 'fs-ap-actrow' }, [ saveBtn, resetSavedBtn, resetBtn ]),
-			{ extra: saveErr })
+			{ extra: [ buttonHelp, saveErr ] })
 	];
 
 
@@ -768,8 +787,8 @@ function build() {
 	 * the misreading happens before anyone scrolls to Defaults. A bare `.alert-message`:
 	 * theme/35-alerts.css keeps the tinted variants for a STATUS and a flat panel for a note. */
 	const note = E('div', { 'class': 'alert-message fs-ap-note' }, [
-		E('p', {}, [ _('Changes apply at once and live in this browser.', 'footstrap') ]),
-		E('p', {}, [ _('To keep them on the router, use Save as default under Defaults — not Save & Apply at the foot of the page.', 'footstrap') ])
+		E('p', {}, [ _('Footstrap theme settings apply at once and are stored permanently in this browser.', 'footstrap') ]),
+		E('p', {}, [ _('Save & Apply at the foot of the page belongs to the System form and does not store them.', 'footstrap') ])
 	]);
 
 	/* Colours and Surfaces are one fold: the same job, split into two headings only because a

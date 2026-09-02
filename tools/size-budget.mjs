@@ -145,8 +145,16 @@ const LIMITS = {
 	 * button that stores what they had just changed (forum topic 251930). The alternative was
 	 * cheaper in bytes and worse: the ones who misread it are the ones who never reach the Defaults
 	 * section where the real button is. `fs-appearance.js` is NOT on the cold path — only the System
-	 * page fetches it — so the download budget below does not move. */
-	resourcesJs: 90_090,
+	 * page fetches it — so the download budget below does not move.
+	 *
+	 * 90,438 B on 2026-09-02, up another 348 B: the same page now also says what each of the three
+	 * Defaults buttons does, one clause each, under the buttons themselves. Two of them are resets
+	 * and all three read as "save"/"reset", so the row never said which state each lands in — asked
+	 * outright on the forum (topic 251930, post 90: "what is the difference on 'reset to saved' and
+	 * 'reset to default'?"). Help belongs at the control that raises the question, which is why this
+	 * is three sentences at the buttons rather than a longer banner at the top. Still off the cold
+	 * path, still 54.8 KB downloaded. */
+	resourcesJs: 90_438,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.

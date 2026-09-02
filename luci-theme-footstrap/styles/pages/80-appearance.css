@@ -17,6 +17,9 @@
 	 * makes a two-sentence note look loose against every other alert on the theme. */
 	.fs-ap-note p:first-child { margin-top: 0; }
 	.fs-ap-note p:last-child { margin-bottom: 0; }
+	/* The Defaults row's help sits under a row of buttons rather than a field, so it needs the gap
+	 * the shared rule gives it after text (base/95-luci.css sets --fs-space-1). */
+	.fs-ap-help { margin-top: var(--fs-space-2); }
 	/* Grouping headings INSIDE the tab pane, not cards: the pane is already inside the stock
 	 * .cbi-section card, and a second border around each group is a box in a box. A hairline above
 	 * each group does the same job — except for the first, which sits under the tab strip. */
