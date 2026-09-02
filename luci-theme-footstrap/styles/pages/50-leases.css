@@ -72,4 +72,43 @@
 		 * every cell (base/40-tables.css); the copy that stood here moved nothing against 164 cells. */
 		white-space: normal;
 	}
+
+	/* ---- and the STATIC LEASES table, which is a config table and got none of the above ----
+	 *
+	 * It carries no `.fs-dt` mark, so neither the nowrap nor the column plan reaches it, and an
+	 * address column starved below its token simply WRAPS. Wrapping is invisible to the fit ladder:
+	 * `fs-select.js` escalates on OVERFLOW, and a table that wraps does not overflow — so the reader
+	 * gets `10.1.20.12` over two lines and no card, which is issue #39. Measured at large density,
+	 * with the table still un-carded: the IPv4 column 104px inside a 1044px content column on 25.12
+	 * (top layout, 1100px viewport) and 99px inside 966px on snapshot (sidebar, 1280px). Normal
+	 * density clears it at every width measured — 117-156px, one line.
+	 *
+	 * The remedy is the one the status tables above already rest on: give the opaque columns a floor
+	 * of their own, and the ladder sees the overflow and cards the table. MAC and IPv4 only; the
+	 * hostname, the DUID/IPv6 hex and the two tag columns are the ones that may wrap, exactly as
+	 * there.
+	 *
+	 * `#cbi-dhcp-host` is the section id LuCI derives from `config host` in /etc/config/dhcp — the
+	 * same on 24.10 and 25.12+, and not translated. Counting from the END for the reason stated
+	 * above; here the plan does not shift at all, both releases render nine columns:
+	 *
+	 *     Hostname  MAC  IPv4  Lease time  DUID  IPv6-Suffix  Tag  Match Tag  (actions)
+	 *       -9      -8    -7       -6       -5       -4        -3     -2         -1
+	 *
+	 * One id and no `#view` in front of it: the sheet's ceiling is [1,7,0] (`css-metrics`), and a
+	 * page file anchoring on its own id is what `#packages` in pages/30-software.css does too.
+	 *
+	 * ABOVE THE CARD THRESHOLD ONLY, and `:not(.fs-stacked)` is not that threshold: a config table
+	 * cards under `@container fs-content (max-width: 960px)` (theme/65-dropdown.css) and never wears
+	 * the measured `.fs-stacked` mark, which belongs to data tables. Without this guard the nowrap
+	 * survives into the card, where a cell is half a row: measured at 320px, the MAC cell asked for
+	 * 133px inside 112 and the section clipped it — six live-audit findings on two routers, caused
+	 * by the fix rather than by the fault. `not (max-width: 960px)` rather than a 961 twin, so the
+	 * two queries cannot drift apart; an engine without container queries drops the block and gets
+	 * today's wrapping back, which is the degradation this rule can afford. */
+	@container fs-content not (max-width: 960px) {
+		#cbi-dhcp-host .table:not(.fs-stacked) .td:is(:nth-last-child(8), :nth-last-child(7)) {
+			white-space: nowrap;
+		}
+	}
 }
