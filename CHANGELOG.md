@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Added
+
+- **A note above the Appearance controls: the Save button under them is not this page's.** The tab is mounted inside the stock System form, so LuCI's own Save & Apply footer sits under a page it does not save — asked on the forum (topic 251930). Two lines say where saving actually is: changes apply at once and live in this browser, and "Save as default" under Defaults is what puts them on the router. Above the first section rather than beside that button, because the misreading happens before anyone scrolls to Defaults. 265 B of shipped JS, almost all of it the two sentences; a cold page downloads none of it, `fs-appearance.js` being fetched only by the System page.
+
 ## [0.14.9] — 2026-09-02
 
 ### Added

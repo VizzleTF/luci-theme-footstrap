@@ -763,9 +763,19 @@ function build() {
 		]);
 	}
 
+	/* This tab is mounted in the stock System form, so LuCI's own Save & Apply footer sits under a
+	 * page it does not save — asked on the forum, topic 251930. Above the first section, because
+	 * the misreading happens before anyone scrolls to Defaults. A bare `.alert-message`:
+	 * theme/35-alerts.css keeps the tinted variants for a STATUS and a flat panel for a note. */
+	const note = E('div', { 'class': 'alert-message fs-ap-note' }, [
+		E('p', {}, [ _('Changes apply at once and live in this browser.', 'footstrap') ]),
+		E('p', {}, [ _('To keep them on the router, use Save as default under Defaults — not Save & Apply at the foot of the page.', 'footstrap') ])
+	]);
+
 	/* Colours and Surfaces are one fold: the same job, split into two headings only because a
 	 * figure and the sheet it sits on are read differently */
 	const page = E('div', { 'class': 'fs-ap' }, [
+		note,
 		section(_('Interface', 'footstrap'), shell),
 		foldable(_('Colours', 'footstrap'),
 			colours.concat([ E('div', { 'class': 'fs-ap-head fs-ap-sub' }, [ E('h4', {}, [ _('Surfaces', 'footstrap') ]) ]) ], surfaces),

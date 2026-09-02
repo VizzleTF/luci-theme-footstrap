@@ -12,6 +12,11 @@
 	 * the only page that draws it: an axis control is not chrome. */
 
 	.fs-ap { display: flex; flex-direction: column; gap: var(--fs-space-5); }
+	/* The page note (fs-appearance.js). Only the outer margins: `.alert-message p` carries
+	 * --fs-space-1 top and bottom, which at the box's own edges adds to the panel's padding and
+	 * makes a two-sentence note look loose against every other alert on the theme. */
+	.fs-ap-note p:first-child { margin-top: 0; }
+	.fs-ap-note p:last-child { margin-bottom: 0; }
 	/* Grouping headings INSIDE the tab pane, not cards: the pane is already inside the stock
 	 * .cbi-section card, and a second border around each group is a box in a box. A hairline above
 	 * each group does the same job — except for the first, which sits under the tab strip. */

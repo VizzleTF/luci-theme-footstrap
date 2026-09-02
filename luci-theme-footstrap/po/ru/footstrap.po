@@ -31,7 +31,7 @@ msgctxt "footstrap"
 msgid "Auto-collapse"
 msgstr "Сворачивать"
 
-#: htdocs/luci-static/resources/fs-appearance.js:773
+#: htdocs/luci-static/resources/fs-appearance.js:783
 msgctxt "footstrap"
 msgid "Background"
 msgstr "Фон"
@@ -51,6 +51,11 @@ msgctxt "footstrap"
 msgid "Cards"
 msgstr "Карточки"
 
+#: htdocs/luci-static/resources/fs-appearance.js:771
+msgctxt "footstrap"
+msgid "Changes apply at once and live in this browser."
+msgstr "Изменения применяются сразу и живут в этом браузере."
+
 #: htdocs/luci-static/resources/fs-appearance.js:454
 msgctxt "footstrap"
 msgid "Choose SVG"
@@ -66,13 +71,13 @@ msgctxt "footstrap"
 msgid "Clearly visible %s"
 msgstr "Хорошо видна %s"
 
-#: htdocs/luci-static/resources/fs-chrome.js:430
+#: htdocs/luci-static/resources/fs-chrome.js:447
 #: ucode/template/themes/footstrap/header.ut:138
 msgid "Collapse menu"
 msgstr "Свернуть меню"
 
 #: htdocs/luci-static/resources/fs-appearance.js:465
-#: htdocs/luci-static/resources/fs-appearance.js:770
+#: htdocs/luci-static/resources/fs-appearance.js:780
 msgctxt "footstrap"
 msgid "Colours"
 msgstr "Цвета"
@@ -117,7 +122,7 @@ msgctxt "footstrap"
 msgid "Dark"
 msgstr "Тёмная"
 
-#: htdocs/luci-static/resources/fs-appearance.js:774
+#: htdocs/luci-static/resources/fs-appearance.js:784
 msgctxt "footstrap"
 msgid "Defaults"
 msgstr "Умолчания"
@@ -137,7 +142,7 @@ msgctxt "footstrap"
 msgid "Easy to read %s"
 msgstr "Хорошо читается %s"
 
-#: htdocs/luci-static/resources/fs-chrome.js:430
+#: htdocs/luci-static/resources/fs-chrome.js:447
 msgid "Expand menu"
 msgstr "Развернуть меню"
 
@@ -173,7 +178,7 @@ msgctxt "footstrap"
 msgid "Hard to read %s — large text only"
 msgstr "Плохо читается %s — только крупный текст"
 
-#: htdocs/luci-static/resources/fs-appearance.js:769
+#: htdocs/luci-static/resources/fs-appearance.js:779
 msgctxt "footstrap"
 msgid "Interface"
 msgstr "Интерфейс"
@@ -390,7 +395,7 @@ msgctxt "footstrap"
 msgid "Submenus"
 msgstr "Подменю"
 
-#: htdocs/luci-static/resources/fs-appearance.js:771
+#: htdocs/luci-static/resources/fs-appearance.js:781
 msgctxt "footstrap"
 msgid "Surfaces"
 msgstr "Поверхности"
@@ -403,7 +408,7 @@ msgstr "Система"
 msgid "System running in recovery (initramfs) mode."
 msgstr "Система работает в режиме восстановления (initramfs)."
 
-#: htdocs/luci-static/resources/fs-select.js:647
+#: htdocs/luci-static/resources/fs-select.js:662
 msgid "Table"
 msgstr "Таблица"
 
@@ -485,6 +490,15 @@ msgctxt "footstrap"
 msgid "Tint strength"
 msgstr "Насыщенность оттенка"
 
+#: htdocs/luci-static/resources/fs-appearance.js:772
+msgctxt "footstrap"
+msgid ""
+"To keep them on the router, use Save as default under Defaults — not Save & "
+"Apply at the foot of the page."
+msgstr ""
+"Чтобы сохранить их на роутере, нажмите «Сохранить по умолчанию» в разделе «По "
+"умолчанию», а не «Сохранить и применить» внизу страницы."
+
 #: htdocs/luci-static/resources/fs-appearance.js:190
 msgctxt "footstrap"
 msgid "Too faint to read %s"
@@ -550,6 +564,24 @@ msgctxt "footstrap"
 msgid ""
 "the uploaded file could not be removed either; it is still on the router."
 msgstr "загруженный файл тоже не удалось удалить — он остался на роутере."
+
+#~ msgctxt "footstrap"
+#~ msgid ""
+#~ "Everything here applies the moment you change it and is remembered in "
+#~ "this browser only — the Save & Apply button at the foot of the page "
+#~ "belongs to the System form and does not store it."
+#~ msgstr ""
+#~ "Всё на этой странице применяется в момент изменения и запоминается только "
+#~ "в этом браузере — кнопка «Сохранить и применить» внизу страницы "
+#~ "принадлежит форме «Система» и настройки внешнего вида не сохраняет."
+
+#~ msgctxt "footstrap"
+#~ msgid ""
+#~ "To make the current look the router's default for every browser, use Save "
+#~ "as default under Defaults below."
+#~ msgstr ""
+#~ "Чтобы текущий вид стал умолчанием роутера для всех браузеров, нажмите "
+#~ "«Сохранить по умолчанию» в разделе «По умолчанию» ниже."
 
 #~ msgid "Loading view…"
 #~ msgstr "Загрузка представления…"

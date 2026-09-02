@@ -137,8 +137,16 @@ const LIMITS = {
 	 * reference taken before the tick and put back after it, instead of the natural-height reader,
 	 * the deferred empty sweep and the two late corrections 0.14.4-0.14.6 grew on top of it. What
 	 * stays out of the revert is the floor's own bookkeeping: the climb off a table box, the
-	 * `data-fs-floor` mark the sweep finds its own work by, and the tab-switch observer. */
-	resourcesJs: 89_825,
+	 * `data-fs-floor` mark the sweep finds its own work by, and the tab-switch observer.
+	 *
+	 * 90,090 B on 2026-09-02, up 265 B, and almost all of it is the two sentences themselves: the
+	 * Appearance page now says where saving is. Its tab is mounted inside the stock System form, so
+	 * LuCI's own Save & Apply footer sits under a page it does not save, and readers took it for the
+	 * button that stores what they had just changed (forum topic 251930). The alternative was
+	 * cheaper in bytes and worse: the ones who misread it are the ones who never reach the Defaults
+	 * section where the real button is. `fs-appearance.js` is NOT on the cold path — only the System
+	 * page fetches it — so the download budget below does not move. */
+	resourcesJs: 90_090,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
