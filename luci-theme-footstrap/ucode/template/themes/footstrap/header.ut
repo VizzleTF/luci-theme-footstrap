@@ -33,8 +33,8 @@
 	   already loaded. */
 	const fsd = uci.get_all('footstrap', 'settings') ?? {};
 	/* Every option saveAsDefault() writes, listed once and read back in a loop. A hand-written
-	 * literal with one line per axis drops an axis silently: Save as default reports success, the
-	 * file on disk is correct, and "Reset to saved" lands on the BUILT-IN default because the value
+	 * literal with one line per axis drops an axis silently: Save to router reports success, the
+	 * file on disk is correct, and "Reset to router" lands on the BUILT-IN look because the value
 	 * the server hands the client was never there. tools/axes.mjs checks this list against
 	 * snapshotAxes().
 	 *

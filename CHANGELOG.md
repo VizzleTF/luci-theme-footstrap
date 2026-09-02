@@ -2,6 +2,9 @@
 
 ### Added
 
+- **One word per state in the Defaults row, and "default" is not one of them.** The three buttons are `Save to router`, `Reset to router` and `Reset to built-in`, under a `Saving` section and a `Saved look` caption. "default" used to name the router's stored look in "Save as default" and the theme's built-in one in "Reset to default", while the router's look also answered to "saved" in "Reset to saved" — three names for two states, and the forum asked outright what the difference between the two resets was (topic 251930, post 92). The row now reads as one save and two resets over two named states. A zero-height spacer keeps the destructive reset off the save button's elbow, since the two differ by a single word; both resets still ask for a second click.
+
+
 - **The Appearance page says where saving is, at both places the question is asked.** Two lines above the controls — Footstrap theme settings apply at once and are stored permanently in this browser, and the Save & Apply footer under them belongs to the System form — plus one clause per button under the Defaults row: what "Save as default" stores on the router, and which state each of the two resets lands in. Both came from the same forum thread (topic 251930, posts 83 and 90), and the second half is the half a banner cannot do: with all three buttons named "save"/"reset", the row never said that "Reset to saved" follows the router while "Reset to default" restores the theme's built-in look. 613 B of shipped JS, almost all of it the sentences themselves; a cold page downloads none of it, `fs-appearance.js` being fetched only by the System page.
 
 ## [0.14.9] — 2026-09-02

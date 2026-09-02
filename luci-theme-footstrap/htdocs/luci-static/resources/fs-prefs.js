@@ -12,7 +12,7 @@
  *
  * ---- three layers, and the browser always wins ----
  * Every axis resolves as localStorage ?? router-default ?? built-in. The router default is
- * Appearance -> Save as default (written to /etc/config/footstrap, read back into window.__fsSD);
+ * Appearance -> Save to router (written to /etc/config/footstrap, read back into window.__fsSD);
  * the built-in is a bare :root. A new browser inherits the router default; this browser's own
  * choice overrides it in either direction.
  *
@@ -24,7 +24,7 @@
 /* A browser can refuse storage outright (blocked cookies, dom.storage.enabled=false, a partitioned
  * WebView) and then every access throws. The helpers below swallow it, because an axis that cannot
  * be remembered must still APPLY, but they record it: otherwise current*() reads null, falls back
- * to the router default, and the Save button sits disabled reading "Saved as default" over a page
+ * to the router's look, and the Save button sits disabled reading "Saved to router" over a page
  * painted in axes the router default does not carry. */
 let _lsBroken = false;
 function storageBroken() { return _lsBroken; }
@@ -331,7 +331,7 @@ function currentRail() {
 	return document.documentElement.getAttribute('data-rail') === 'true';
 }
 
-/* ---- Save as default: write the current effective axes to /etc/config/footstrap ----
+/* ---- Save to router: write the current effective axes to /etc/config/footstrap ----
  * The scoped rpcd ACL (config 'footstrap' only) lets the admin's session set and commit those
  * options; rpcd validates the config/section/option names, so no value reaches a shell. The server
  * reads them back on the next load and head.ut's sanitiser clamps each before it becomes

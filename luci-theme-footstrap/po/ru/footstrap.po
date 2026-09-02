@@ -31,7 +31,7 @@ msgctxt "footstrap"
 msgid "Auto-collapse"
 msgstr "Сворачивать"
 
-#: htdocs/luci-static/resources/fs-appearance.js:794
+#: htdocs/luci-static/resources/fs-appearance.js:806
 msgctxt "footstrap"
 msgid "Background"
 msgstr "Фон"
@@ -72,7 +72,7 @@ msgid "Collapse menu"
 msgstr "Свернуть меню"
 
 #: htdocs/luci-static/resources/fs-appearance.js:465
-#: htdocs/luci-static/resources/fs-appearance.js:791
+#: htdocs/luci-static/resources/fs-appearance.js:803
 msgctxt "footstrap"
 msgid "Colours"
 msgstr "Цвета"
@@ -82,7 +82,7 @@ msgctxt "footstrap"
 msgid "Compact"
 msgstr "Компактно"
 
-#: htdocs/luci-static/resources/fs-appearance.js:644
+#: htdocs/luci-static/resources/fs-appearance.js:648
 msgctxt "footstrap"
 msgid "Confirm reset"
 msgstr "Подтвердить сброс"
@@ -102,7 +102,7 @@ msgctxt "footstrap"
 msgid "Could not process the image."
 msgstr "Не удалось обработать изображение."
 
-#: htdocs/luci-static/resources/fs-appearance.js:624
+#: htdocs/luci-static/resources/fs-appearance.js:628
 msgctxt "footstrap"
 msgid "Could not save the default. Reload the page and try again."
 msgstr "Не удалось сохранить умолчание. Обновите страницу и повторите."
@@ -116,11 +116,6 @@ msgstr "Опасность"
 msgctxt "footstrap"
 msgid "Dark"
 msgstr "Тёмная"
-
-#: htdocs/luci-static/resources/fs-appearance.js:795
-msgctxt "footstrap"
-msgid "Defaults"
-msgstr "Умолчания"
 
 #: htdocs/luci-static/resources/fs-appearance.js:349
 msgctxt "footstrap"
@@ -149,13 +144,13 @@ msgstr "Файл"
 
 #: root/usr/share/rpcd/acl.d/luci-theme-footstrap.json:3
 msgid ""
-"Footstrap Appearance router-wide defaults (Save as default) and the login "
+"Footstrap Appearance router-wide look (Save to router) and the login "
 "background and pattern uploads"
 msgstr ""
-"Общие настройки внешнего вида Footstrap для роутера (Сохранить как "
-"умолчание), загрузка фонового изображения и узора"
+"Общий для роутера вид Footstrap («Сохранить на роутер»), а также загрузка "
+"фонового изображения и узора"
 
-#: htdocs/luci-static/resources/fs-appearance.js:782
+#: htdocs/luci-static/resources/fs-appearance.js:794
 msgctxt "footstrap"
 msgid ""
 "Footstrap theme settings apply at once and are stored permanently in this "
@@ -182,7 +177,7 @@ msgctxt "footstrap"
 msgid "Hard to read %s — large text only"
 msgstr "Плохо читается %s — только крупный текст"
 
-#: htdocs/luci-static/resources/fs-appearance.js:790
+#: htdocs/luci-static/resources/fs-appearance.js:802
 msgctxt "footstrap"
 msgid "Interface"
 msgstr "Интерфейс"
@@ -206,7 +201,7 @@ msgid "Large"
 msgstr "Крупно"
 
 #: htdocs/luci-static/resources/fs-appearance.js:328
-#: htdocs/luci-static/resources/fs-appearance.js:711
+#: htdocs/luci-static/resources/fs-appearance.js:723
 msgctxt "footstrap"
 msgid "Layout"
 msgstr "Раскладка"
@@ -311,28 +306,29 @@ msgctxt "footstrap"
 msgid "Remove"
 msgstr "Убрать"
 
-#: htdocs/luci-static/resources/fs-appearance.js:588
-#: htdocs/luci-static/resources/fs-appearance.js:655
+#: htdocs/luci-static/resources/fs-appearance.js:592
+#: htdocs/luci-static/resources/fs-appearance.js:659
 msgctxt "footstrap"
-msgid "Reset to default"
-msgstr "Сбросить к умолчанию"
+msgid "Reset to built-in"
+msgstr "Сбросить к встроенному"
 
-#: htdocs/luci-static/resources/fs-appearance.js:675
+#: htdocs/luci-static/resources/fs-appearance.js:687
 msgctxt "footstrap"
-msgid "Reset to default — go back to the theme's built-in look."
-msgstr "«Сбросить к умолчанию» — вернуть встроенный вид темы."
-
-#: htdocs/luci-static/resources/fs-appearance.js:584
-#: htdocs/luci-static/resources/fs-appearance.js:654
-msgctxt "footstrap"
-msgid "Reset to saved"
-msgstr "Сбросить к сохранённым"
-
-#: htdocs/luci-static/resources/fs-appearance.js:674
-msgctxt "footstrap"
-msgid "Reset to saved — drop this browser's changes and follow the router."
+msgid "Reset to built-in — go back to the look the theme ships with."
 msgstr ""
-"«Сбросить к сохранённому» — отменить правки этого браузера и следовать "
+"«Сбросить к встроенному» — вернуть вид, с которым поставляется тема."
+
+#: htdocs/luci-static/resources/fs-appearance.js:588
+#: htdocs/luci-static/resources/fs-appearance.js:658
+msgctxt "footstrap"
+msgid "Reset to router"
+msgstr "Сбросить к виду роутера"
+
+#: htdocs/luci-static/resources/fs-appearance.js:685
+msgctxt "footstrap"
+msgid "Reset to router — drop this browser's changes and follow the router."
+msgstr ""
+"«Сбросить к виду роутера» — отменить правки этого браузера и следовать "
 "роутеру."
 
 #: htdocs/luci-static/resources/fs-appearance.js:355
@@ -340,12 +336,7 @@ msgctxt "footstrap"
 msgid "Rounding"
 msgstr "Скругление"
 
-#: htdocs/luci-static/resources/fs-appearance.js:681
-msgctxt "footstrap"
-msgid "Router default"
-msgstr "По умолчанию для роутера"
-
-#: htdocs/luci-static/resources/fs-appearance.js:783
+#: htdocs/luci-static/resources/fs-appearance.js:795
 msgctxt "footstrap"
 msgid ""
 "Save & Apply at the foot of the page belongs to the System form and does not "
@@ -355,24 +346,35 @@ msgstr ""
 "их не сохраняет."
 
 #: htdocs/luci-static/resources/fs-appearance.js:578
-#: htdocs/luci-static/resources/fs-appearance.js:606
-#: htdocs/luci-static/resources/fs-appearance.js:613
+#: htdocs/luci-static/resources/fs-appearance.js:610
+#: htdocs/luci-static/resources/fs-appearance.js:617
 msgctxt "footstrap"
-msgid "Save as default"
-msgstr "Сохранить по умолчанию"
+msgid "Save to router"
+msgstr "Сохранить на роутер"
 
-#: htdocs/luci-static/resources/fs-appearance.js:673
+#: htdocs/luci-static/resources/fs-appearance.js:683
 msgctxt "footstrap"
 msgid ""
-"Save as default — store the current look on the router, for every browser."
+"Save to router — store this look on the router. Browsers with a look of "
+"their own keep it."
 msgstr ""
-"«Сохранить по умолчанию» — записать текущий вид на роутер, для всех "
-"браузеров."
+"«Сохранить на роутер» — записать этот вид на роутер. Браузеры со своим видом "
+"его сохранят."
 
-#: htdocs/luci-static/resources/fs-appearance.js:613
+#: htdocs/luci-static/resources/fs-appearance.js:693
 msgctxt "footstrap"
-msgid "Saved as default"
-msgstr "Сохранено по умолчанию"
+msgid "Saved look"
+msgstr "Сохранённый вид"
+
+#: htdocs/luci-static/resources/fs-appearance.js:617
+msgctxt "footstrap"
+msgid "Saved to router"
+msgstr "Сохранено на роутере"
+
+#: htdocs/luci-static/resources/fs-appearance.js:807
+msgctxt "footstrap"
+msgid "Saving"
+msgstr "Сохранение"
 
 #: htdocs/luci-static/resources/fs-appearance.js:463
 msgctxt "footstrap"
@@ -428,7 +430,7 @@ msgctxt "footstrap"
 msgid "Submenus"
 msgstr "Подменю"
 
-#: htdocs/luci-static/resources/fs-appearance.js:792
+#: htdocs/luci-static/resources/fs-appearance.js:804
 msgctxt "footstrap"
 msgid "Surfaces"
 msgstr "Поверхности"
@@ -497,7 +499,7 @@ msgstr ""
 "На этом роутере не задан пароль. Установите пароль root, чтобы защитить веб-"
 "интерфейс."
 
-#: htdocs/luci-static/resources/fs-appearance.js:607
+#: htdocs/luci-static/resources/fs-appearance.js:611
 msgctxt "footstrap"
 msgid ""
 "This browser is not storing preferences (site data is blocked), so a change "
@@ -508,7 +510,7 @@ msgstr ""
 "изменение здесь действует до перезагрузки страницы. «Сохранить как "
 "умолчание» по-прежнему работает и применяется ко всем браузерам."
 
-#: htdocs/luci-static/resources/fs-appearance.js:713
+#: htdocs/luci-static/resources/fs-appearance.js:725
 msgctxt "footstrap"
 msgid "This theme is not translated on this router yet."
 msgstr "Тема ещё не переведена на этом роутере."
@@ -588,6 +590,26 @@ msgctxt "footstrap"
 msgid ""
 "the uploaded file could not be removed either; it is still on the router."
 msgstr "загруженный файл тоже не удалось удалить — он остался на роутере."
+
+#~ msgctxt "footstrap"
+#~ msgid "Defaults"
+#~ msgstr "Умолчания"
+
+#~ msgctxt "footstrap"
+#~ msgid "Reset to saved"
+#~ msgstr "Сбросить к сохранённым"
+
+#~ msgctxt "footstrap"
+#~ msgid "Router default"
+#~ msgstr "По умолчанию для роутера"
+
+#~ msgctxt "footstrap"
+#~ msgid "Save as default"
+#~ msgstr "Сохранить по умолчанию"
+
+#~ msgctxt "footstrap"
+#~ msgid "Saved as default"
+#~ msgstr "Сохранено по умолчанию"
 
 #~ msgctxt "footstrap"
 #~ msgid ""

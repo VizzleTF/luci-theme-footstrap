@@ -35,7 +35,7 @@ msgctxt "footstrap"
 msgid "Auto-collapse"
 msgstr "Colapso automático"
 
-#: htdocs/luci-static/resources/fs-appearance.js:794
+#: htdocs/luci-static/resources/fs-appearance.js:806
 msgctxt "footstrap"
 msgid "Background"
 msgstr "Fondo"
@@ -76,7 +76,7 @@ msgid "Collapse menu"
 msgstr "Contraer menú"
 
 #: htdocs/luci-static/resources/fs-appearance.js:465
-#: htdocs/luci-static/resources/fs-appearance.js:791
+#: htdocs/luci-static/resources/fs-appearance.js:803
 msgctxt "footstrap"
 msgid "Colours"
 msgstr "Colores"
@@ -86,7 +86,7 @@ msgctxt "footstrap"
 msgid "Compact"
 msgstr "Compacto"
 
-#: htdocs/luci-static/resources/fs-appearance.js:644
+#: htdocs/luci-static/resources/fs-appearance.js:648
 msgctxt "footstrap"
 msgid "Confirm reset"
 msgstr "Confirmar restablecimiento"
@@ -106,7 +106,7 @@ msgctxt "footstrap"
 msgid "Could not process the image."
 msgstr "No se pudo procesar la imagen."
 
-#: htdocs/luci-static/resources/fs-appearance.js:624
+#: htdocs/luci-static/resources/fs-appearance.js:628
 msgctxt "footstrap"
 msgid "Could not save the default. Reload the page and try again."
 msgstr ""
@@ -122,11 +122,6 @@ msgstr "Peligro"
 msgctxt "footstrap"
 msgid "Dark"
 msgstr "Oscuro"
-
-#: htdocs/luci-static/resources/fs-appearance.js:795
-msgctxt "footstrap"
-msgid "Defaults"
-msgstr "Predeterminados"
 
 #: htdocs/luci-static/resources/fs-appearance.js:349
 msgctxt "footstrap"
@@ -155,13 +150,13 @@ msgstr "Archivo"
 
 #: root/usr/share/rpcd/acl.d/luci-theme-footstrap.json:3
 msgid ""
-"Footstrap Appearance router-wide defaults (Save as default) and the login "
+"Footstrap Appearance router-wide look (Save to router) and the login "
 "background and pattern uploads"
 msgstr ""
-"Valores predeterminados de Apariencia de Footstrap para el router (Guardar "
-"como predeterminado) y subida del fondo de inicio de sesión y del patrón"
+"Aspecto de Footstrap para todo el router («Guardar en el router») y subida de "
+"la imagen de fondo y del patrón"
 
-#: htdocs/luci-static/resources/fs-appearance.js:782
+#: htdocs/luci-static/resources/fs-appearance.js:794
 msgctxt "footstrap"
 msgid ""
 "Footstrap theme settings apply at once and are stored permanently in this "
@@ -188,7 +183,7 @@ msgctxt "footstrap"
 msgid "Hard to read %s — large text only"
 msgstr "Se lee mal %s: solo texto grande"
 
-#: htdocs/luci-static/resources/fs-appearance.js:790
+#: htdocs/luci-static/resources/fs-appearance.js:802
 msgctxt "footstrap"
 msgid "Interface"
 msgstr "Interfaz"
@@ -212,7 +207,7 @@ msgid "Large"
 msgstr "Grande"
 
 #: htdocs/luci-static/resources/fs-appearance.js:328
-#: htdocs/luci-static/resources/fs-appearance.js:711
+#: htdocs/luci-static/resources/fs-appearance.js:723
 msgctxt "footstrap"
 msgid "Layout"
 msgstr "Diseño"
@@ -318,42 +313,38 @@ msgctxt "footstrap"
 msgid "Remove"
 msgstr "Eliminar"
 
+#: htdocs/luci-static/resources/fs-appearance.js:592
+#: htdocs/luci-static/resources/fs-appearance.js:659
+msgctxt "footstrap"
+msgid "Reset to built-in"
+msgstr "Restablecer al integrado"
+
+#: htdocs/luci-static/resources/fs-appearance.js:687
+msgctxt "footstrap"
+msgid "Reset to built-in — go back to the look the theme ships with."
+msgstr ""
+"«Restablecer al integrado»: vuelve al aspecto con el que se distribuye el "
+"tema."
+
 #: htdocs/luci-static/resources/fs-appearance.js:588
-#: htdocs/luci-static/resources/fs-appearance.js:655
+#: htdocs/luci-static/resources/fs-appearance.js:658
 msgctxt "footstrap"
-msgid "Reset to default"
-msgstr "Restablecer a valores predeterminados"
+msgid "Reset to router"
+msgstr "Restablecer al del router"
 
-#: htdocs/luci-static/resources/fs-appearance.js:675
+#: htdocs/luci-static/resources/fs-appearance.js:685
 msgctxt "footstrap"
-msgid "Reset to default — go back to the theme's built-in look."
+msgid "Reset to router — drop this browser's changes and follow the router."
 msgstr ""
-"«Restablecer al predeterminado»: vuelve al aspecto original del tema."
-
-#: htdocs/luci-static/resources/fs-appearance.js:584
-#: htdocs/luci-static/resources/fs-appearance.js:654
-msgctxt "footstrap"
-msgid "Reset to saved"
-msgstr "Restablecer a lo guardado"
-
-#: htdocs/luci-static/resources/fs-appearance.js:674
-msgctxt "footstrap"
-msgid "Reset to saved — drop this browser's changes and follow the router."
-msgstr ""
-"«Restablecer al guardado»: descarta los cambios de este navegador y sigue al "
-"router."
+"«Restablecer al del router»: descarta los cambios de este navegador y sigue "
+"al router."
 
 #: htdocs/luci-static/resources/fs-appearance.js:355
 msgctxt "footstrap"
 msgid "Rounding"
 msgstr "Redondeo"
 
-#: htdocs/luci-static/resources/fs-appearance.js:681
-msgctxt "footstrap"
-msgid "Router default"
-msgstr "Configuración predeterminada del enrutador"
-
-#: htdocs/luci-static/resources/fs-appearance.js:783
+#: htdocs/luci-static/resources/fs-appearance.js:795
 msgctxt "footstrap"
 msgid ""
 "Save & Apply at the foot of the page belongs to the System form and does not "
@@ -363,24 +354,35 @@ msgstr ""
 "Sistema y no los guarda."
 
 #: htdocs/luci-static/resources/fs-appearance.js:578
-#: htdocs/luci-static/resources/fs-appearance.js:606
-#: htdocs/luci-static/resources/fs-appearance.js:613
+#: htdocs/luci-static/resources/fs-appearance.js:610
+#: htdocs/luci-static/resources/fs-appearance.js:617
 msgctxt "footstrap"
-msgid "Save as default"
-msgstr "Guardar como predeterminado"
+msgid "Save to router"
+msgstr "Guardar en el router"
 
-#: htdocs/luci-static/resources/fs-appearance.js:673
+#: htdocs/luci-static/resources/fs-appearance.js:683
 msgctxt "footstrap"
 msgid ""
-"Save as default — store the current look on the router, for every browser."
+"Save to router — store this look on the router. Browsers with a look of "
+"their own keep it."
 msgstr ""
-"«Guardar como predeterminado»: guarda el aspecto actual en el router, para "
-"todos los navegadores."
+"«Guardar en el router»: guarda este aspecto en el router. Los navegadores con "
+"un aspecto propio lo conservan."
 
-#: htdocs/luci-static/resources/fs-appearance.js:613
+#: htdocs/luci-static/resources/fs-appearance.js:693
 msgctxt "footstrap"
-msgid "Saved as default"
-msgstr "Guardado como predeterminado"
+msgid "Saved look"
+msgstr "Aspecto guardado"
+
+#: htdocs/luci-static/resources/fs-appearance.js:617
+msgctxt "footstrap"
+msgid "Saved to router"
+msgstr "Guardado en el router"
+
+#: htdocs/luci-static/resources/fs-appearance.js:807
+msgctxt "footstrap"
+msgid "Saving"
+msgstr "Guardado"
 
 #: htdocs/luci-static/resources/fs-appearance.js:463
 msgctxt "footstrap"
@@ -436,7 +438,7 @@ msgctxt "footstrap"
 msgid "Submenus"
 msgstr "Submenús"
 
-#: htdocs/luci-static/resources/fs-appearance.js:792
+#: htdocs/luci-static/resources/fs-appearance.js:804
 msgctxt "footstrap"
 msgid "Surfaces"
 msgstr "Superficies"
@@ -505,7 +507,7 @@ msgstr ""
 "Este enrutador no tiene contraseña. Configure una contraseña de "
 "administrador para proteger la interfaz web."
 
-#: htdocs/luci-static/resources/fs-appearance.js:607
+#: htdocs/luci-static/resources/fs-appearance.js:611
 msgctxt "footstrap"
 msgid ""
 "This browser is not storing preferences (site data is blocked), so a change "
@@ -516,7 +518,7 @@ msgstr ""
 "bloqueados), así que un cambio aquí dura hasta que recargues. Guardar como "
 "predeterminado sigue funcionando y se aplica a todos los navegadores."
 
-#: htdocs/luci-static/resources/fs-appearance.js:713
+#: htdocs/luci-static/resources/fs-appearance.js:725
 msgctxt "footstrap"
 msgid "This theme is not translated on this router yet."
 msgstr "Este tema aún no está traducido en este router."
@@ -596,6 +598,26 @@ msgctxt "footstrap"
 msgid ""
 "the uploaded file could not be removed either; it is still on the router."
 msgstr "tampoco se pudo eliminar el archivo subido; sigue en el router."
+
+#~ msgctxt "footstrap"
+#~ msgid "Defaults"
+#~ msgstr "Predeterminados"
+
+#~ msgctxt "footstrap"
+#~ msgid "Reset to saved"
+#~ msgstr "Restablecer a lo guardado"
+
+#~ msgctxt "footstrap"
+#~ msgid "Router default"
+#~ msgstr "Configuración predeterminada del enrutador"
+
+#~ msgctxt "footstrap"
+#~ msgid "Save as default"
+#~ msgstr "Guardar como predeterminado"
+
+#~ msgctxt "footstrap"
+#~ msgid "Saved as default"
+#~ msgstr "Guardado como predeterminado"
 
 #~ msgctxt "footstrap"
 #~ msgid ""

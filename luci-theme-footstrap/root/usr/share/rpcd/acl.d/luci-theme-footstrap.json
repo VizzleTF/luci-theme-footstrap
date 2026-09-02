@@ -1,6 +1,6 @@
 {
 	"luci-theme-footstrap": {
-		"description": "Footstrap Appearance router-wide defaults (Save as default) and the login background and pattern uploads",
+		"description": "Footstrap Appearance router-wide look (Save to router) and the login background and pattern uploads",
 		"read": {
 			"uci": [
 				"footstrap"

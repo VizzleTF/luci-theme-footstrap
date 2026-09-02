@@ -153,8 +153,16 @@ const LIMITS = {
 	 * outright on the forum (topic 251930, post 90: "what is the difference on 'reset to saved' and
 	 * 'reset to default'?"). Help belongs at the control that raises the question, which is why this
 	 * is three sentences at the buttons rather than a longer banner at the top. Still off the cold
-	 * path, still 54.8 KB downloaded. */
-	resourcesJs: 90_438,
+	 * path, still 54.8 KB downloaded.
+	 *
+	 * 90,497 B on 2026-09-02, up 59 B: the three buttons are renamed. "default" named the router's
+	 * look in "Save as default" and the theme's in "Reset to default", while the router's look also
+	 * answered to "saved" — three names for two states, and the forum asked what the difference
+	 * was (topic 251930, post 92). One word per state now: `router` and `built-in`. The rise is the
+	 * longer labels plus the spacer that keeps the destructive reset off the save button's elbow;
+	 * the CSS side paid for itself by dropping a margin rule that duplicated
+	 * `.cbi-value-description`'s own. */
+	resourcesJs: 90_497,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.

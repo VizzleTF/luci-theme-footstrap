@@ -378,7 +378,7 @@ function resetToBuiltin() {
 	 * 0, which is "the palette's own".
 	 *
 	 * Stated as calls rather than carried in AXES: a fourth column of thunks measured 297 B against
-	 * this list, and a wrong value here is what the Save button's "Reset to default" shows on the
+	 * this list, and a wrong value here is what the Save button's "Reset to built-in" shows on the
 	 * first click — the one state no static gate can see and the live check does. */
 	prefs.applyLayout('top');
 	prefs.applyMode('auto');

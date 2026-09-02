@@ -25,7 +25,7 @@ msgctxt "footstrap"
 msgid "Auto-collapse"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:794
+#: htdocs/luci-static/resources/fs-appearance.js:806
 msgctxt "footstrap"
 msgid "Background"
 msgstr ""
@@ -66,7 +66,7 @@ msgid "Collapse menu"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:465
-#: htdocs/luci-static/resources/fs-appearance.js:791
+#: htdocs/luci-static/resources/fs-appearance.js:803
 msgctxt "footstrap"
 msgid "Colours"
 msgstr ""
@@ -76,7 +76,7 @@ msgctxt "footstrap"
 msgid "Compact"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:644
+#: htdocs/luci-static/resources/fs-appearance.js:648
 msgctxt "footstrap"
 msgid "Confirm reset"
 msgstr ""
@@ -96,7 +96,7 @@ msgctxt "footstrap"
 msgid "Could not process the image."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:624
+#: htdocs/luci-static/resources/fs-appearance.js:628
 msgctxt "footstrap"
 msgid "Could not save the default. Reload the page and try again."
 msgstr ""
@@ -109,11 +109,6 @@ msgstr ""
 #: htdocs/luci-static/resources/fs-appearance.js:336
 msgctxt "footstrap"
 msgid "Dark"
-msgstr ""
-
-#: htdocs/luci-static/resources/fs-appearance.js:795
-msgctxt "footstrap"
-msgid "Defaults"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:349
@@ -143,11 +138,11 @@ msgstr ""
 
 #: root/usr/share/rpcd/acl.d/luci-theme-footstrap.json:3
 msgid ""
-"Footstrap Appearance router-wide defaults (Save as default) and the login "
+"Footstrap Appearance router-wide look (Save to router) and the login "
 "background and pattern uploads"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:782
+#: htdocs/luci-static/resources/fs-appearance.js:794
 msgctxt "footstrap"
 msgid ""
 "Footstrap theme settings apply at once and are stored permanently in this "
@@ -172,7 +167,7 @@ msgctxt "footstrap"
 msgid "Hard to read %s — large text only"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:790
+#: htdocs/luci-static/resources/fs-appearance.js:802
 msgctxt "footstrap"
 msgid "Interface"
 msgstr ""
@@ -196,7 +191,7 @@ msgid "Large"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:328
-#: htdocs/luci-static/resources/fs-appearance.js:711
+#: htdocs/luci-static/resources/fs-appearance.js:723
 msgctxt "footstrap"
 msgid "Layout"
 msgstr ""
@@ -299,26 +294,26 @@ msgctxt "footstrap"
 msgid "Remove"
 msgstr ""
 
+#: htdocs/luci-static/resources/fs-appearance.js:592
+#: htdocs/luci-static/resources/fs-appearance.js:659
+msgctxt "footstrap"
+msgid "Reset to built-in"
+msgstr ""
+
+#: htdocs/luci-static/resources/fs-appearance.js:687
+msgctxt "footstrap"
+msgid "Reset to built-in — go back to the look the theme ships with."
+msgstr ""
+
 #: htdocs/luci-static/resources/fs-appearance.js:588
-#: htdocs/luci-static/resources/fs-appearance.js:655
+#: htdocs/luci-static/resources/fs-appearance.js:658
 msgctxt "footstrap"
-msgid "Reset to default"
+msgid "Reset to router"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:675
+#: htdocs/luci-static/resources/fs-appearance.js:685
 msgctxt "footstrap"
-msgid "Reset to default — go back to the theme's built-in look."
-msgstr ""
-
-#: htdocs/luci-static/resources/fs-appearance.js:584
-#: htdocs/luci-static/resources/fs-appearance.js:654
-msgctxt "footstrap"
-msgid "Reset to saved"
-msgstr ""
-
-#: htdocs/luci-static/resources/fs-appearance.js:674
-msgctxt "footstrap"
-msgid "Reset to saved — drop this browser's changes and follow the router."
+msgid "Reset to router — drop this browser's changes and follow the router."
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:355
@@ -326,12 +321,7 @@ msgctxt "footstrap"
 msgid "Rounding"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:681
-msgctxt "footstrap"
-msgid "Router default"
-msgstr ""
-
-#: htdocs/luci-static/resources/fs-appearance.js:783
+#: htdocs/luci-static/resources/fs-appearance.js:795
 msgctxt "footstrap"
 msgid ""
 "Save & Apply at the foot of the page belongs to the System form and does not "
@@ -339,21 +329,32 @@ msgid ""
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:578
-#: htdocs/luci-static/resources/fs-appearance.js:606
-#: htdocs/luci-static/resources/fs-appearance.js:613
+#: htdocs/luci-static/resources/fs-appearance.js:610
+#: htdocs/luci-static/resources/fs-appearance.js:617
 msgctxt "footstrap"
-msgid "Save as default"
+msgid "Save to router"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:673
+#: htdocs/luci-static/resources/fs-appearance.js:683
 msgctxt "footstrap"
 msgid ""
-"Save as default — store the current look on the router, for every browser."
+"Save to router — store this look on the router. Browsers with a look of "
+"their own keep it."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:613
+#: htdocs/luci-static/resources/fs-appearance.js:693
 msgctxt "footstrap"
-msgid "Saved as default"
+msgid "Saved look"
+msgstr ""
+
+#: htdocs/luci-static/resources/fs-appearance.js:617
+msgctxt "footstrap"
+msgid "Saved to router"
+msgstr ""
+
+#: htdocs/luci-static/resources/fs-appearance.js:807
+msgctxt "footstrap"
+msgid "Saving"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-appearance.js:463
@@ -410,7 +411,7 @@ msgctxt "footstrap"
 msgid "Submenus"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:792
+#: htdocs/luci-static/resources/fs-appearance.js:804
 msgctxt "footstrap"
 msgid "Surfaces"
 msgstr ""
@@ -476,7 +477,7 @@ msgid ""
 "protect the web interface."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:607
+#: htdocs/luci-static/resources/fs-appearance.js:611
 msgctxt "footstrap"
 msgid ""
 "This browser is not storing preferences (site data is blocked), so a change "
@@ -484,7 +485,7 @@ msgid ""
 "every browser."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:713
+#: htdocs/luci-static/resources/fs-appearance.js:725
 msgctxt "footstrap"
 msgid "This theme is not translated on this router yet."
 msgstr ""
