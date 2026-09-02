@@ -16,7 +16,6 @@
       "Edit(**/docs/screenshots/**)",
       "Bash(gh pr comment:*)",
       "Bash(gh pr review:*)",
-      "Bash(gh api:*)",
       "Bash(gh issue comment:*)",
       "mcp__github__add_issue_comment",
       "mcp__github__create_pull_request_review"
@@ -31,6 +30,7 @@
     ],
     "allow": [
       "Bash(git status:*)",
+      "Bash(gh api:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git show:*)",

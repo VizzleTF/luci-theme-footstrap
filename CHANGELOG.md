@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Changed
+
+- **`gh api` is a read the session takes without asking, and the four posting paths stay denied.** It sat in `permissions.deny` next to `gh pr comment`, `gh pr review`, `gh issue comment` and the two MCP review calls, but the fence those five hold is "a review finding is answered in the DIFF, never in a comment" — `gh api` is how a CI run's log, a check's conclusion and a review's threads are read at all, and denying it turned every `gh run view` follow-up into a prompt. Moved to `permissions.allow`; the pattern is `Bash(gh api:*)`, so a POST through it is not fenced and the rule against commenting is held by CLAUDE.md and `/upstream-pr` rather than by the matcher.
+
 ## [0.14.8] — 2026-09-02
 
 ### Added
