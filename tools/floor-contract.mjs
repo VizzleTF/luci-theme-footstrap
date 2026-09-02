@@ -14,8 +14,9 @@
  *   TOO TALL, or never taken off, and the floor IS the blank page: a section emptied of its table
  *   kept 1299px of `min-height` for the life of the page, and the reader's tab started that far
  *   down (issue #41). A box qualifies for a floor through its CHILDREN, so emptying it takes it out
- *   of the sweep's selector — which is why every floor is marked `data-fs-floor` and found again by
- *   the mark.
+ *   of the sweep's selector, so a floor is found here by the inline `min-height` it IS. The 0.14.4
+ *   shape marked each one with an attribute and was reverted with the rest of that release's
+ *   anchoring; this gate outlived it.
  *
  * Both were shipped, four releases apart, and 0.14.3 had neither: it cleared every floor on every
  * tick and measured `offsetHeight` — correct, at 1550 style writes per 25 s of polling, each one a
@@ -56,7 +57,7 @@ const SLACK = Number(arg('slack', '4'));
  * per tick and this gate does it once per page. */
 const ACCURACY = () => {
 	const out = [];
-	for (const el of document.querySelectorAll('#view [data-fs-floor]')) {
+	for (const el of document.querySelectorAll('#view [style*="min-height"]')) {
 		const floor = Math.round(parseFloat(el.style.minHeight) || 0);
 		const keep = el.style.minHeight;
 		el.style.minHeight = '';
@@ -64,11 +65,7 @@ const ACCURACY = () => {
 		el.style.minHeight = keep;
 		out.push({ cls: (el.className || el.tagName).split(' ')[0], floor, bare, delta: floor - bare });
 	}
-	/* An inline min-height inside #view that carries no mark is either an app's own or a floor this
-	 * sweep can no longer find — the second is the bug, and the two are told apart in the report. */
-	const unmarked = [ ...document.querySelectorAll('#view [style*="min-height"]:not([data-fs-floor])') ]
-		.map((el) => (el.className || el.tagName).split(' ')[0]);
-	return { floors: out, unmarked };
+	return { floors: out, unmarked: [] };
 };
 
 /* Switch to the next tab and read what the pane the reader LEFT is still wearing.
@@ -107,7 +104,7 @@ const TAB_AFTER = () => {
 /* Empty the tallest floored box the way a tick does, and DO NOT refill it: a container that is not
  * coming back must not keep holding the page open. Returns what to look at afterwards. */
 const EMPTY_TALLEST = () => {
-	const el = [ ...document.querySelectorAll('#view [data-fs-floor]') ]
+	const el = [ ...document.querySelectorAll('#view [style*="min-height"]') ]
 		.sort((a, b) => parseFloat(b.style.minHeight) - parseFloat(a.style.minHeight))[0];
 	if (!el) return null;
 	window.__fsFloorBox = el;
@@ -126,7 +123,19 @@ const AFTER = () => {
 	         /* …and a poll that REFILLED it earns its floor back, so the box is judged only while it
 	          * is still empty. Both are true on the Overview, whose tick rewrites whole sections. */
 	         empty: !el.childElementCount && !(el.textContent || '').trim(),
-	         min: el.style.minHeight, marked: el.hasAttribute('data-fs-floor'),
+	         min: el.style.minHeight,
+	         /* WHAT THE EMPTY BOX STANDS AT WITH NO FLOOR UNDER IT. A box empty of children is not
+	          * empty of padding and border, and a floor at exactly that height holds nothing up:
+	          * /admin/network/network's section measures 34px either way. The blank page is a floor
+	          * TALLER than the box, so the two are asked apart the way the theme itself does it —
+	          * clear, measure, put back. */
+	         bare: (() => {
+	                 const was = el.style.minHeight;
+	                 el.style.minHeight = '';
+	                 const h = Math.round(el.getBoundingClientRect().height);
+	                 el.style.minHeight = was;
+	                 return h;
+	         })(),
 	         h: Math.round(el.getBoundingClientRect().height), doc: document.documentElement.scrollHeight };
 };
 
@@ -199,14 +208,14 @@ for (const stand of list) {
 			continue;
 		}
 		released++;
-		if (after.min)
+		const held = after.min ? Math.round(parseFloat(after.min) - after.bare) : 0;
+		if (held > SLACK)
 			findings.push(`${where}: ${before.cls} emptied and left empty still wears ${after.min} `
-				+ `after ${Math.round(RELEASE_WAIT / 1000)}s — ${after.h}px of page holding nothing, `
+				+ `after ${Math.round(RELEASE_WAIT / 1000)}s — ${held}px more than the empty box `
+				+ `stands at (${after.bare}px), which is that much page holding nothing, `
 				+ `document ${before.doc} -> ${after.doc}`);
-		else if (after.marked)
-			findings.push(`${where}: ${before.cls} gave its floor back but kept data-fs-floor — the mark and `
-				+ 'the style disagree about who wears one');
-		process.stdout.write(`  ${where}  emptied ${before.cls}: ${before.min} -> ${after.min || 'released'}, `
+		process.stdout.write(`  ${where}  emptied ${before.cls}: ${before.min} -> `
+			+ `${after.min ? after.min + ' over ' + after.bare + 'px of box' : 'released'}, `
 			+ `document ${before.doc} -> ${after.doc}\n`);
 	}
 	await ctx.close();

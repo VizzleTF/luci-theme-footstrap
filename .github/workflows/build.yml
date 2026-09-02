@@ -339,6 +339,10 @@ jobs:
               # nothing ever takes off. Both shipped (0.14.4 and 0.14.6) and neither is visible in a
               # file or on a page that is only loaded.
               node tools/floor-contract.mjs --only "$O"
+              # …and the fourth is the chrome doing it to itself: the bar strips its layout classes
+              # to measure whether the menu fits a row, and is a row shorter while it asks. Reported
+              # from an iPhone, where no engine anchoring puts the reader back.
+              node tools/fit-quiet.mjs --only "$O"
               # Chromium here; the other two engines have a job of their own (`anchors`).
               node tools/scroll-anchor.mjs --only "$O"
               # LAST, because it installs the PUBLISHED release over the build everything above

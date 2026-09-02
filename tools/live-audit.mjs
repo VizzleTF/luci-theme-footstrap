@@ -215,15 +215,24 @@ const CHECK = function () {
 		}
 	}
 
-	/* 7. A poll floor left on a box the reader cannot see. `min-height` beats the `height: 0` an
-	 * inactive tab pane is collapsed with, so a floor that outlives the pane's visibility pins the
-	 * collapse open and the page carries the pane's whole height as blank: 1265px on Network ->
-	 * Interfaces, twice shipped (issue #41, 0.14.4 and again 0.14.5) and never visible in a file.
-	 * `visibility` inherits, so this also names a floor sitting on a box inside a collapsed pane.
-	 * Measured against the 0.14.5 build on owrt2512 @1440: 25 findings, none with the fix. */
+	/* 7. A poll floor that HOLDS PAGE the reader cannot see. `min-height` beats the `height: 0` an
+	 * inactive tab pane is collapsed with, so a floor written on the PANE pins the collapse open and
+	 * the page carries the pane's whole height as blank: 1265px on Network -> Interfaces, twice
+	 * shipped (issue #41, 0.14.4 and again 0.14.5) and never visible in a file.
+	 *
+	 * THE PANE, or a hidden box that nothing clips — not every floor under a collapsed pane.
+	 * `visibility` inherits, so a naive test names every box inside one, and those hold nothing: the
+	 * pane is `height: 0; overflow: hidden`, so a floor on a child is clipped away. Measured on the
+	 * 0.14.3 floor shape, which writes one on every container it sweeps: 25 such floors on
+	 * /admin/network/dhcp and 7 on /admin/services/nlbw/display at 320px, and stripping all 32
+	 * changed the document by 0px. Flagging them cost 408 findings that named nothing — a gate that
+	 * cries at a shape rather than at a symptom is a gate that gets baselined into silence. */
 	if (document.documentElement.hasAttribute('data-fs-fit')) {
 		for (const el of document.querySelectorAll('#view [style*="min-height"]')) {
-			if (getComputedStyle(el).visibility === 'hidden')
+			if (getComputedStyle(el).visibility !== 'hidden') continue;
+			const pane = el.closest('[data-tab-title]:not([data-tab-active="true"])');
+			/* the pane itself wearing one, or a hidden floor with no collapsed pane above it */
+			if (pane === el || !pane)
 				out.push({ kind: 'dead-floor', el: label(el), by: el.style.minHeight });
 		}
 	}
