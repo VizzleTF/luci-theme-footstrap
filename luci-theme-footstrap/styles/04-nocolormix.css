@@ -9,7 +9,7 @@
 	 * — `background: var(--fs-good-soft)` becomes invalid at computed-value time and computes to
 	 * `unset`, which is `initial` for a non-inherited property. IACVT does not fall back to an earlier
 	 * declaration in the same block, so the two-declaration trick that works for `background:
-	 * color-mix(…)` written literally does nothing for a token. 38 tokens are affected; without this
+	 * color-mix(…)` written literally does nothing for a token. 36 tokens are affected; without this
 	 * block a browser below the floor paints borders in currentcolor and loses every soft surface.
 	 *
 	 * color-mix() lands in Chrome 111, Firefox 113 and Safari 16.2 (all 2022-2023). See docs/css.md
@@ -61,6 +61,12 @@
 			/* the scrim over an uploaded photo: --fs-photo-dim is a percentage this cannot apply, so
 			 * take the fixed dialog scrim. Losing it entirely would leave login text over a photo. */
 			--fs-photo-scrim: var(--fs-scrim);
+
+			/* placeholder ink: the quietest ink the palette states outright. Below the floor the
+			 * hint is back to reading like a value, which is the pre-0.14.9 look and still the
+			 * safer degradation — an unresolvable token takes `color` down to `unset`, and an
+			 * inherited near-black placeholder over a light field beats an unstyled one. */
+			--fs-placeholder: var(--fs-faint);
 
 			/* export tier — third-party apps read these, so they must resolve to something.
 			 * -medium keeps the hue, -low degrades to the dim text colour it was mixed toward. */

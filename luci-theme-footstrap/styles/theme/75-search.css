@@ -55,7 +55,10 @@
 		font-family: inherit; font-size: var(--fs-type-lg); font-weight: var(--fs-weight); line-height: 1.4;
 	}
 	.fs-search-row .fs-search-input:focus { outline: none; box-shadow: none; }
-	.fs-search-row .fs-search-input::placeholder { color: var(--fs-faint); font-weight: var(--fs-weight); }
+	/* one placeholder ink for the whole theme (03-palettes.css) — this row is not measured by
+	 * `placeholder-ink`, the gallery having no search dialog, and must not drift from the fields
+	 * that are */
+	.fs-search-row .fs-search-input::placeholder { color: var(--fs-placeholder); font-weight: var(--fs-weight); }
 
 	.fs-search-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--fs-space-1-5); }
 

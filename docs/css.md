@@ -16,7 +16,7 @@ luci-theme-footstrap/
     00-header.css      banner + the single @layer declaration
     02-tokens.css      @layer tokens   private --fs-* tier + the --*-color-* export tier
     03-palettes.css    @layer tokens   palettes (tokens only)
-    04-nocolormix.css  @layer tokens   static twins for the 38 color-mix() tokens
+    04-nocolormix.css  @layer tokens   static twins for the 36 color-mix() tokens
     base/              @layer base     widget defaults the views count on
       10-reset  20-typography  30-forms  40-tables  50-chrome
       60-modal  70-buttons  90-widgets  95-luci
@@ -115,7 +115,7 @@ page is plainer:
 | Feature | Chrome / Firefox / Safari | What is lost below it |
 |---|---|---|
 | `:has()` | 105 / 121 / 15.4 | 59 refinements: port tiles, password control-group, stacked-table footers |
-| `color-mix()` | 111 / 113 / 16.2 | the 38 mixed tokens fall back to `styles/04-nocolormix.css` |
+| `color-mix()` | 111 / 113 / 16.2 | the 36 mixed tokens fall back to `styles/04-nocolormix.css` |
 | `@container` | 105 / 110 / 16.0 | five width adaptations inside `fs-view` / `fs-content` |
 | `text-wrap: pretty`, `scrollbar-width` | — | typographic polish |
 

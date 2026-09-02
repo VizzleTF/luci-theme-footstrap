@@ -52,6 +52,13 @@
 	 *     measures rather than takes on trust: below 80 the fainter ink drops under AA on footstrap
 	 *     dark's --fs-panel2 (4.51:1 at 80), above 82 the high-to-low ramp falls under the 0.10
 	 *     spread the tier promises (0.098 at 84); 82 clears both, at 4.68:1 and 0.110.
+	 *   - --fs-placeholder, in BOTH modes. It is the one token the theme ships deliberately under AA
+	 *     (3.99-4.48:1 light, 3.43-6.05:1 dark): a hint has to move far enough not to read as a
+	 *     typed value, and a dark palette has only 6.45:1 of ink to spend. A reader who asked the OS
+	 *     for more contrast has said which of the two they want, so the mixes go back to the
+	 *     AA-clearing 62% and 80% — 4.98:1 and 4.61:1, at 37% and 20% of the ink-to-field range
+	 *     instead of 44% and 34%. Only --fs-placeholder-mix moves: the mix itself is spelt once, in
+	 *     03-palettes.css. `placeholder-ink` measures this pass as well.
 	 *   - the focus ring: --fs-focus-ring is a tint of the accent (--fs-accent-soft, 10% light and
 	 *     15% dark), so at "more contrast" it carries the accent at 60% instead. Its sibling
 	 *     --fs-focus-ring-solo is already the solid accent and needs no restatement here. */
@@ -65,7 +72,12 @@
 			--fs-good-line: var(--fs-good);		--fs-good-line-hi: var(--fs-good);
 			--fs-warn-line: var(--fs-warn);		--fs-warn-line-hi: var(--fs-warn);
 			--fs-danger-line: var(--fs-danger);	--fs-danger-line-hi: var(--fs-danger);
+			/* the placeholder is the one token shipped under AA (see the note above); this reader
+			 * asked for contrast, so both modes buy the AA ink back, at the percentages that clear
+			 * it. Light here, dark in the block below — per mode exactly as in 03-palettes.css. */
+			--fs-placeholder-mix: 62%;
 		}
+		:root[data-darkmode="true"] { --fs-placeholder-mix: 80%; }
 	}
 
 	/* forced-colors (Windows High Contrast) — the OS replaces every colour the theme picked, and

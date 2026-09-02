@@ -18,8 +18,9 @@ the very per-component copy the project killed. Values live in `styles/02-tokens
 ## Two tiers, and the split is load-bearing
 
 - **The private tier `--fs-*`** (`02-tokens.css`, `03-palettes.css`) — `--fs-bg`, `--fs-panel`,
-  `--fs-panel2`, `--fs-border`, `--fs-text`, `--fs-dim`, `--fs-faint`, `--fs-accent`,
-  `--fs-good/-warn/-danger`, `--fs-track`, plus the radius, z-index, duration and spacing scales.
+  `--fs-panel2`, `--fs-border`, `--fs-text`, `--fs-dim`, `--fs-faint`, `--fs-placeholder`,
+  `--fs-accent`, `--fs-good/-warn/-danger`, `--fs-track`, plus the radius, z-index, duration and
+  spacing scales.
   **Every rule in the theme reads this and only this.**
 - **The export tier `--*-color-*`** — the conventional LuCI names (`--primary-color-high`,
   `--text-color-*`, `--border-color-*`, `--on-*-color`), defined from the private tier and read
@@ -99,6 +100,31 @@ next to the fills they have to be readable on. A dark palette has light fills an
 needs dark ink: one global `--fs-on-accent: #fff` failed WCAG AA on seven of eight dark fills,
 down to **1.69:1** against a required 4.5. A new palette must define all four and check them
 against its own fills.
+
+### The fourth ink is the one that says "nothing here"
+
+`--fs-text`, `--fs-dim` and `--fs-faint` are three weights of a value. `--fs-placeholder` is not a
+weight of anything — it is what a field shows when it holds NOTHING, and LuCI puts the option's
+default there (`form.Value.placeholder`). Drawn in `--fs-dim` it measured 11.12:1 on footstrap
+light's field fill against the value's own 14.84:1, near enough that two forum readers reported
+fields as holding values they had never typed.
+
+It is mixed from `--fs-text` toward `--fs-panel2` in oklch, because the step is a lightness one, and
+the PERCENTAGE is per mode rather than per palette — 55% light, 64% dark. Dark is the constrained
+half: its ink starts at 6.45:1 on the field against light's 14.84:1, so the same percentage there
+would buy a hint nobody can read.
+
+**This is the one token the theme ships deliberately under AA** — 3.99-4.48:1 in light, 3.43-6.05:1
+in dark, at 43-44% and 33-35% of the ink-to-field range — because a hint mistaken for a value makes a
+reader configure the wrong thing, while a hint at 3.43:1 makes them look twice. The AA-clearing mixes
+were measured first and moved 37% and 20%: the same fault, quieter. 3:1 (SC 1.4.11) is the line not
+crossed, and `prefers-contrast: more` buys the AA ink back in both modes
+(`theme/95-a11y-media.css`): that reader has said which of the two they want.
+
+`placeholder-ink` holds both ends across the eight palette/mode combinations and runs each of them
+again under the query. It is the only gate that can: axe-core does not measure `::placeholder` at
+all, and it is excluded from the `li[placeholder]` row that carries the same ink, since a rule
+reaching half a decision would fail it.
 
 ## The derived ladder: four steps, and the matrix is deliberately full
 

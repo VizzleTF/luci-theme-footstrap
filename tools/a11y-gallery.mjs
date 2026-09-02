@@ -52,6 +52,15 @@ for (const { mode, palette, tint } of MATRIX) {
 		 * on a chosen row is a theme decision and this is the only place it is checked. Narrow on
 		 * purpose: the exclusion names the input, not the section. Fix it upstream and delete this. */
 		.exclude('.cbi-dropdown[multiple] li > form > input[type="checkbox"]')
+		/* The second, and it is a DECISION rather than markup: `li[placeholder]` is the theme's
+		 * placeholder ink, which ships deliberately under AA — a hint mistaken for a value makes a
+		 * reader configure the wrong thing, and only a hint far enough from the body ink stops that
+		 * (styles/03-palettes.css has the argument and the numbers). axe measures this row because
+		 * ui.js renders it as real text, and skips the `placeholder` ATTRIBUTE beside it, which
+		 * carries the same ink for the same reason — so the rule reaches half the decision and
+		 * fails it. `placeholder-ink` is the gate that holds this token instead, with its own two
+		 * thresholds and a prefers-contrast pass where the AA ink comes back. */
+		.exclude('.cbi-dropdown li[placeholder]')
 		.analyze();
 
 	const hard = violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');

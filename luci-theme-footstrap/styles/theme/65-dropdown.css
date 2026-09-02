@@ -98,8 +98,8 @@
 	.cbi-dropdown.cbi-button > .open {
 		margin-inline-start: .5em;
 	}
-	/* display only: the placeholder's ink is the theme's own `li[placeholder]` --fs-faint below
-	 * (base's --fs-dim had already lost to it by layer — moving it would recolour the row) */
+	/* display only: the placeholder's ink is the theme's own `li[placeholder]` --fs-placeholder
+	 * below — the same token base/30-forms.css gives the attribute */
 	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[placeholder] {
 		display: none;
 	}
@@ -246,7 +246,16 @@
 	.cbi-dropdown > ul > li > form,
 	.cbi-dropdown > ul > li label { font-family: inherit; }
 	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[display]:not([display="0"]) { border-inline-start: 0; }
-	.cbi-dropdown > ul > li[placeholder] { color: var(--fs-faint); }
+	/* The same ink the `placeholder` attribute takes in base/30-forms.css — "-- Please choose --" is
+	 * the absence of a value, not one.
+	 *
+	 * It repeats the row rule's two selectors instead of writing `> ul > li[placeholder]` once,
+	 * because that shorter form (0,2,2) LOSES to the row's own `color: var(--fs-text)` (0,3,2) and
+	 * the placeholder row rendered in the value's ink on every form dropdown — dead from the day it
+	 * was written, and only visible once `placeholder-ink` measured the row. Each selector here
+	 * out-specifies its counterpart above: (0,4,2) over (0,3,2), (0,3,2) over (0,2,2). */
+	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[placeholder],
+	.cbi-dropdown > ul.dropdown > li[placeholder] { color: var(--fs-placeholder); }
 	/* the multiselect's inline filter/create inputs — moved from base with the generic `input`
 	 * box in theme/60-inputs.css: in base these beat it in-layer, left behind they would lose
 	 * to it by layer and render as free-standing 210px fields inside the open list */

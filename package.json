@@ -7,6 +7,7 @@
     "lint:js": "eslint luci-theme-footstrap/htdocs && eslint luci-theme-footstrap/ucode",
     "lint:css": "stylelint \"luci-theme-footstrap/styles/**/*.css\"",
     "a11y": "node tools/a11y-gallery.mjs",
+    "placeholder": "node tools/placeholder-ink.mjs",
     "audit": "python3 tools/audit.py --strict",
     "conffiles": "node tools/conffiles.mjs",
     "i18n-packages": "node tools/i18n-packages.mjs",
@@ -47,7 +48,7 @@
     "computed-diff": "node tools/computed-diff.mjs",
     "check:fast": "npm run lint && npm run shell && npm run marker && npm run audit && npm run conffiles && npm run acl && npm run i18n-packages && npm run makefile-contract && npm run test && npm run css-orphans && npm run css-i18n && npm run mirror && npm run bang-ok && npm run axes && npm run page-modules && npm run chrome-fence && npm run changelog",
     "check:mid": "npm run css-metrics && npm run css-floor && npm run css-dup && npm run size && npm run i18n",
-    "check:slow": "npm run tables && npm run export-tier && npm run icons && npm run a11y && npm run smoke",
+    "check:slow": "npm run tables && npm run export-tier && npm run icons && npm run a11y && npm run placeholder && npm run smoke",
     "makefile-contract": "node tools/makefile-contract.mjs"
   },
   "devDependencies": {

@@ -44,6 +44,7 @@ npm run check
 |---|---|---|
 | #3, #8 | theme styles stopped applying on a foreign package's page (filemanager, OpenClash `*{padding:0!important}`) | `chrome-fence` — the fence/pin/dark-guard still match the chrome; `fs-sheets` re-hosts the foreign sheet |
 | #5 | the `low`/`medium`/`high` ramp was three aliases of one colour, so "no data" lit up like a live value | `export-tier` (three DIFFERENT colours), `audit --strict` |
+| forum 82-83 | the `placeholder` attribute and the unset dropdown row were drawn in the body inks, so an option's DEFAULT read as a value the reader had typed | `placeholder-ink` (a hint is ≥40% light / ≥30% dark of the ink-to-field range away from the value, and still 3:1, with every combination re-run under `prefers-contrast: more`) |
 | #6 | localisation as separate `luci-i18n-*` packages, so the self-update script shipped at the time pulled a catalogue instead of the theme | `i18n` (catalogue current and complete); `tools/check-packages.sh` asserts exactly one theme package per format, but runs in CI's build job rather than inside `check` |
 | #9, #11 | config-table row labels and a data-table column vanished or were squeezed | `css-dup` + `mirror` (`@mirror table-card/*`) |
 | all | a rule lost its `!important` or started depending on source order | `css-metrics`, `audit --strict`, `css-orphans` |

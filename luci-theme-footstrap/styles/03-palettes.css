@@ -18,8 +18,8 @@
 	 *      pre-paint switch in partials/head.ut (a router default outside the whitelist becomes
 	 *      '' and the page paints in the default palette), the label map in fs-appearance.js (an
 	 *      unnamed palette is missing from the picker, not broken), and matrix() in
-	 *      tools/lib/gallery.mjs — a palette absent there is one export-tier.mjs and
-	 *      a11y-gallery.mjs never measure, so it ships ungated.
+	 *      tools/lib/gallery.mjs — a palette absent there is one export-tier.mjs,
+	 *      a11y-gallery.mjs and placeholder-ink.mjs never measure, so it ships ungated.
 	 * Nothing else: layout, components and the --*-color-* export bridge key off these tokens, and
 	 * every tint, shadow and hairline is a color-mix() over them.
 	 *
@@ -99,6 +99,26 @@
 		--fs-good: var(--fs-good-base);
 		--fs-warn: var(--fs-warn-base);
 		--fs-danger: var(--fs-danger-base);
+		/* The ink of a value that is NOT there — the `placeholder` attribute and the dropdown's
+		 * `li[placeholder]` row. LuCI writes an option's DEFAULT there (`form.Value.placeholder`:
+		 * 128 for the log buffer, 514 for the log port), so an ink that reads as body text tells
+		 * the reader a field is set when it is empty — reported against 0.14.8, forum topic 251930
+		 * posts 82-83. --fs-dim was that ink and is not far enough away: on footstrap light's
+		 * --fs-panel2 it measures 11.12:1 against the text's 14.84:1, which is two blacks.
+		 *
+		 * Derived, not hand-listed per palette, so it follows a palette that has not been written
+		 * yet. The formula is spelt once and the STRENGTH is a token of its own, because it is the
+		 * only part that varies — per mode here, and again under prefers-contrast:more
+		 * (theme/95-a11y-media.css); restating the whole mix in each of those four places cost 79 B
+		 * of shipped sheet and gave three more copies to keep in step. That is also why it lives
+		 * here rather than in 02-tokens.css's ladder — the same reason --fs-accent-soft does.
+		 *
+		 * Light lands at 3.99-4.48:1 across the four palettes, 43-44% of the way from the value's
+		 * ink to the field: under AA on purpose, see the dark half below for the whole argument.
+		 * oklch because the step is a LIGHTNESS one — srgb at the same 55% stops at 3.58:1. Held by
+		 * `npm run placeholder`. */
+		--fs-placeholder-mix: 55%;
+		--fs-placeholder: color-mix(in oklch, var(--fs-text) var(--fs-placeholder-mix), var(--fs-panel2));
 		/* The hues the user picked, in degrees. Declared here and not only inline by
 		 * head.ut/fs-prefs.js, so the stylesheet stands on its own: a var() with no definition
 		 * anywhere is invalid at computed-value time and takes the whole declaration down. */
@@ -158,6 +178,18 @@
 	:root[data-darkmode="true"] {
 		--fs-tint-c: calc((.011 + .016 * max(0, cos((var(--fs-tint-h) - 258) * 1deg))
 			- .004 * max(0, cos((var(--fs-tint-h) - 55) * 1deg))) * var(--fs-tint-strength));
+		/* 64%, against the 55% above, and the difference is what a dark palette can afford: its ink
+		 * starts at 6.45:1 on --fs-panel2 where the light one has 14.84:1, so the same percentage
+		 * would buy a hint nobody can read. It lands at 3.43-6.05:1, 33-35% of the range.
+		 *
+		 * BOTH modes ship below AA, and that is the decision this token exists to record: a hint
+		 * mistaken for a value makes a reader configure the wrong thing, while a hint at 3.43:1
+		 * makes them look twice. The AA-clearing mixes (62/80%) were measured first and moved only
+		 * 37% and 20% of the range — the same fault, quieter. 3:1 (SC 1.4.11, and SC 1.4.3's
+		 * large-text floor) is the line NOT crossed, worst 3.43:1; prefers-contrast:more buys the
+		 * AA ink back in both modes (theme/95-a11y-media.css); and `placeholder-ink` holds all
+		 * three states, axe-core being excluded from this row for the same reason. */
+		--fs-placeholder-mix: 64%;
 	}
 	:root[data-tint="hue"] { --fs-bg: oklch(from var(--fs-bg-base) l var(--fs-tint-c) var(--fs-tint-h)); }
 

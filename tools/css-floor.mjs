@@ -16,7 +16,7 @@
  * HARD vs SOFT is the whole judgement. HARD means a browser without it renders something broken or
  * unreadable, so its versions set the floor the theme claims. SOFT means the rule simply does not
  * apply and the page is plainer — those never raise the floor. `color-mix()` is SOFT only because
- * styles/04-nocolormix.css gives all 38 tokens static twins; delete that file and it is HARD.
+ * styles/04-nocolormix.css gives all 36 tokens static twins; delete that file and it is HARD.
  *
  * The claimed floor lives in docs/css.md between the two `css-floor` markers and is compared
  * against the computed one, so the doc cannot drift from the sheet.

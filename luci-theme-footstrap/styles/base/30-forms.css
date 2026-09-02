@@ -173,8 +173,10 @@
 	/* Checkbox/radio drawing: theme/60-inputs.css — absorbed whole (it undoes the generic input
 	 * box, which lives there now). */
 
+	/* --fs-placeholder, not --fs-dim: a placeholder carries the option's DEFAULT and must not read
+	 * as a value the reader typed (03-palettes.css has the numbers). */
 	::placeholder {
-		color: var(--fs-dim);
+		color: var(--fs-placeholder);
 	}
 
 	/* Transitions and the focus/hover ring are the theme's one ring token (--fs-focus-ring /

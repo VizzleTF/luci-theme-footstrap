@@ -1,8 +1,18 @@
 ## [Unreleased]
 
+### Added
+
+- **A gate that reads the placeholder ink back, because axe-core does not.** `tools/placeholder-ink.mjs` (`npm run placeholder`, in `check:slow`). Every `placeholder` attribute and every `li[placeholder]` row on `docs/gallery.html`, over all eight palette/mode combinations: the hint must have travelled at least 40% of the way from the field's own ink to its fill in light and 30% in dark (oklab lightness), and still measure 3:1 on that fill. Every combination runs a second time under `prefers-contrast: more`, where the query hands the AA ink back and the two thresholds swap. 3:1 rather than AA's 4.5 is the argument itself — the reported fault is one end, an unreadable hint the other, and a hint that clears AA has not moved far enough to stop reading as a value. `a11y` is excluded from the `li[placeholder]` row for the same decision: axe measures that row as text and skips the attribute carrying the same ink, so its rule reaches half of it. axe-core's colour-contrast rule skips `::placeholder` entirely, so nothing else could see the fault, and the ink was legal by every threshold the theme already measured. It found a second one on its first run: the dropdown's own placeholder colour had never applied.
+
 ### Changed
 
+- **The placeholder is a fourth ink now, not the body one.** `--fs-placeholder`, mixed from `--fs-text` toward the field's fill in oklch — 55% in light, 64% in dark. `--fs-dim` and `--fs-faint` are weights of a VALUE, and at 11.12:1 and 9.42:1 against the value's own 14.84:1 on footstrap light they are three blacks; the new ink lands at 3.99-4.48:1, 43-44% of the way from the value to the field, and at 3.43-6.05:1 and 33-35% in dark, where the ink starts at 6.45:1 and the same percentage would buy a hint nobody can read. This is the one token the theme ships deliberately under AA — a hint mistaken for a value makes a reader configure the wrong thing, while a hint at 3.43:1 makes them look twice, and the AA-clearing mixes moved only 37% and 20% of the range: the same fault, quieter. 3:1 (SC 1.4.11) is the line not crossed. `prefers-contrast: more` buys the AA ink back in both modes, that reader having said which of the two they want. Static twin in `04-nocolormix.css`.
+
 - **`gh api` is a read the session takes without asking, and the four posting paths stay denied.** It sat in `permissions.deny` next to `gh pr comment`, `gh pr review`, `gh issue comment` and the two MCP review calls, but the fence those five hold is "a review finding is answered in the DIFF, never in a comment" — `gh api` is how a CI run's log, a check's conclusion and a review's threads are read at all, and denying it turned every `gh run view` follow-up into a prompt. Moved to `permissions.allow`; the pattern is `Bash(gh api:*)`, so a POST through it is not fenced and the rule against commenting is held by CLAUDE.md and `/upstream-pr` rather than by the matcher.
+
+### Fixed
+
+- **A placeholder no longer reads as a value the reader typed.** LuCI writes an option's DEFAULT into the `placeholder` attribute (`form.Value.placeholder`: 128 for the log buffer, 514 for the log port) and renders an unset dropdown as a `li[placeholder]` row; both were drawn in the body inks, so the Local and Remote Ports fields looked like they held those numbers — two readers reported it against 0.14.8 (forum topic 251930, posts 82-83). Both now take `--fs-placeholder`. The dropdown row needed more than a token: `.cbi-dropdown > ul > li[placeholder]` (0,2,2) lost to the menu row's own `color: var(--fs-text)` (0,3,2), so that rule had never applied on a form dropdown and the row rendered in the value's ink in both modes. It repeats the row rule's two selectors and wins on specificity.
 
 ## [0.14.8] — 2026-09-02
 
