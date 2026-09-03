@@ -13,39 +13,65 @@
     "deny": [
       "Edit(**/cascade.css)",
       "Edit(tmp/**)",
-      "Edit(**/docs/screenshots/**)",
-      "Bash(gh pr comment:*)",
-      "Bash(gh pr review:*)",
-      "Bash(gh issue comment:*)",
-      "mcp__github__add_issue_comment",
-      "mcp__github__create_pull_request_review"
+      "Edit(**/docs/screenshots/**)"
+    ],
+    "additionalDirectories": [
+      "../tmp"
     ],
     "ask": [
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(owlab test:*)",
-      "Bash(owlab up:*)",
       "Bash(npm run live:*)",
-      "Bash(npm run bench:*)"
+      "Bash(luci-theme-footstrap/dev-sync.sh:*)",
+      "Bash(./luci-theme-footstrap/dev-sync.sh:*)",
+      "Bash(ssh:*)",
+      "Bash(git stash:*)",
+      "Bash(git clean:*)",
+      "Bash(git restore:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git checkout -- :*)",
+      "Bash(git add -A:*)",
+      "Bash(git add --all:*)",
+      "Bash(git add .:*)"
     ],
     "allow": [
       "Bash(git status:*)",
-      "Bash(gh api:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git show:*)",
       "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(gh api:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
       "Bash(npm test:*)",
       "Bash(npm run check:*)",
+      "Bash(npm run lint:*)",
       "Bash(npm run changelog:*)",
       "Bash(npm run computed-diff:*)",
       "Bash(npm run smoke:*)",
+      "Bash(npm run makefile-contract:*)",
       "Bash(node tools/*)",
+      "Bash(node .claude/tooling/*)",
       "Bash(ucode -T -c *)",
-      "Bash(tools/bg.sh:*)",
       "Bash(sh -n *)",
-      "Bash(npm run check:fast:*)",
-      "Bash(npm run makefile-contract:*)"
+      "Bash(md5sum:*)",
+      "Bash(tools/bg.sh:*)",
+      "Bash(tools/bg-wait.sh:*)",
+      "Bash(./tools/stage.sh:*)",
+      "Bash(owfeed build:*)",
+      "Bash(owlab up:*)",
+      "Bash(owlab down:*)",
+      "Bash(owlab sync:*)",
+      "Bash(owlab test:*)",
+      "Bash(owlab exec:*)",
+      "Bash(owlab status:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker exec owlab-*)",
+      "Read(../tmp/**)",
+      "Write(../tmp/**)",
+      "Edit(../tmp/**)"
     ]
   },
   "hooks": {
@@ -58,15 +84,6 @@
             "if": "Bash(git commit *)",
             "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/precommit-gate.sh",
             "statusMessage": "Checking the changelog contract"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|NotebookEdit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/branch-guard.sh"
           }
         ]
       }

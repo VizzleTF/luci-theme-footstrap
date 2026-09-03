@@ -22,7 +22,7 @@ that holds it.
 
 ```sh
 npm ci
-npm run check:fast   # the 16 gates that need no browser and no CSS build
+npm run check:fast   # the static subset: no browser, no CSS build
 npm run check        # all of them; must exit 0 before you open a pull request
 ```
 

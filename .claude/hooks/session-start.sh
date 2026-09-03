@@ -13,11 +13,6 @@ add() { NOTES="${NOTES}${NOTES:+
 
 [ -f owlab.yaml ] || add "No owlab.yaml in $(pwd): this session was NOT started at the repo root, so CLAUDE.md, .claude/rules/ and .claude/settings.json are not loaded and every owlab command will exit with 'no owlab.yaml found'. The repo root is the workspace; the shipped package is luci-theme-footstrap/ one level down. Ask the user to restart from the root rather than working around it."
 
-BRANCH=$(git branch --show-current 2>/dev/null || true)
-case "$BRANCH" in
-	main|master) add "HEAD is $BRANCH. Edits are blocked by .claude/hooks/branch-guard.sh until a feature branch exists; FS_ALLOW_MAIN=1 in the session environment lifts it." ;;
-esac
-
 [ -n "$NOTES" ] || exit 0
 
 jq -n --arg c "$NOTES" '{

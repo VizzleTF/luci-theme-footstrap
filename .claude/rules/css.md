@@ -2,7 +2,7 @@
 paths:
   - "**/styles/**/*.css"
   - "**/cascade.css"
-  - "luci-theme-footstrap/build-css.sh"
+  - "**/build-css.sh"
 description: The cascade layers, the token tiers, and how a CSS change is proved.
 ---
 
@@ -44,20 +44,9 @@ description: The cascade layers, the token tiers, and how a CSS change is proved
 
 ## Proving the change
 
-`npm run computed-diff` (T1, ~4 s) is the cheap half: it builds the worktree stylesheet and the one
-at `HEAD`, loads `docs/gallery.html` once, and diffs `getComputedStyle` over 725 elements × 62
-properties at two Appearance points. `--control` runs the SAME sheet on both sides and must report
-0; that 0 is the threshold and it is measured, not chosen. Two corrections it took to get there, both
-worth keeping in mind when reading a diff:
-
-- the reference sheet is swapped onto itself before the first snapshot, because a colour computed
-  from a sheet parsed with the document serialises as `oklab(…)` and the same colour from a sheet
-  attached afterwards as `color(srgb …)` — 28 phantom differences in light, 0 in dark;
-- every running animation is awaited, because one `span.cbi-tooltip` fade was caught mid-flight at
-  `opacity 0.00245647` by one snapshot and finished by the other.
-
-The gallery is not a router. It has every widget and none of the pages — no menu, no chrome, no
-third-party sheet, no container query answered by a real viewport — so a clean computed diff is an
-early result, not a release. The live half stays `npm run live` and `owlab test` (T2), and the
-method there needs its own control pass: on a router the same sheet twice moves 0.5-1.3% of pixels
-while a real regression weighs 0.19%. Never screenshots. Method and traps: `docs/css.md`.
+`npm run computed-diff` (T1, ~4 s) is the cheap half; `--control` runs the same sheet on both sides
+and must report 0. The gallery has every widget and none of the pages, so a clean diff is an early
+result, not a release: the live half is `npm run live` and `owlab test` (T2), where the same sheet
+twice moves 0.5-1.3% of pixels and a real regression weighs 0.19% — never screenshots. Method and
+the two corrections the gate needed: `docs/css.md` "Proving a CSS change", `docs/development.md`
+"The two cheap browser gates".

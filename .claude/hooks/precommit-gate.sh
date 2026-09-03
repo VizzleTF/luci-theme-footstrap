@@ -10,6 +10,13 @@
 # older Claude Code with no `if` support would otherwise pay node's startup on every bash call.
 set -eu
 
+# Without jq the hook cannot read the command at all. Say so and stand aside: a hook that exits
+# non-zero here blocks nothing anyway, it only prints a shell error before every bash call.
+if ! command -v jq >/dev/null 2>&1; then
+	echo "precommit-gate: jq not found, the changelog contract is NOT being enforced" >&2
+	exit 0
+fi
+
 IN=$(cat)
 CMD=$(printf '%s' "$IN" | jq -r '.tool_input.command // ""')
 
@@ -35,7 +42,12 @@ deny() {
 
 # `git commit -a` stages tracked changes as it runs, so the staged index is not what the commit
 # will hold. Compare against HEAD in that case, and against the index otherwise.
-case "$CMD" in
+#
+# Only the part before the first quote is searched: the message is always quoted, and scanning the
+# whole line made `git commit -m "add -a flag"` read as `-a` — which compares against HEAD, sees
+# every dirty file in the tree, and denies a commit that holds none of them.
+FLAGS=${CMD%%[\"\']*}
+case "$FLAGS" in
 	*' -a'*|*' --all'*) FILES=$(git diff --name-only HEAD 2>/dev/null || true) ;;
 	*) FILES=$(git diff --cached --name-only 2>/dev/null || true) ;;
 esac
@@ -59,7 +71,7 @@ fi
 # lead. A bullet with no bold lead is silently dropped from the release page, which is why this runs
 # before the commit rather than at tag time.
 if ! OUT=$(node tools/changelog.mjs 2>&1); then
-	deny "npm run changelog failed, so this commit would land a broken changelog: $OUT"
+	deny "node tools/changelog.mjs failed, so this commit would land a broken changelog: $OUT"
 fi
 
 exit 0

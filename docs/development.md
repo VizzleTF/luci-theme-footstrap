@@ -294,6 +294,22 @@ The structural gates run their routers CONCURRENTLY — nothing they measure is 
   baseline (a headless Firefox refuses to launch on some macOS setups; the flag is there for CI and
   for Linux). A new engine needs its own baseline, created by one `--update` run.
 
+### The probe rig: `.claude/tooling/`
+
+Ad-hoc Playwright probes against a running stand, kept for reuse and not gates: nothing there is in
+`package.json`, nothing ships, nothing runs in `check`. `lib.mjs` is the shared half — `PORTS`
+(stand → host port), `login`, `PAGES` (the ACL-filtered menu tree as a page list), `SNAP` (one chrome
+snapshot: sidebar width, menu items, sheet counts, poll queue) and `navAndCheck` (SPA-vs-full-load
+through a sentinel). Every probe takes the stand as its first argument and writes to `../tmp/`:
+
+```sh
+node .claude/tooling/<probe>.mjs owrt2512 [arg]
+```
+
+The ones worth knowing by name — `parity.mjs`, `overflow.mjs`, `resize.mjs`, `adversary.mjs`,
+`traffic.mjs` — say what they measure at the top of each file. `preview-venv/` beside them is a
+gitignored Python venv holding a second Playwright for `docs/screenshots/capture.py`.
+
 ## Proving it on a router: `owlab test`
 
 `owlab test` is the local form of CI's `verify` job: build the packages, install them on a real
@@ -356,6 +372,25 @@ the bug class `install.sh`'s `uclient-fetch` fallback exists for.
 
 If a change needs a real kernel — not this theme's usual case — a router can be raised to
 `fidelity: vm`, which runs it under QEMU instead of in a container.
+
+### Proving it on hardware
+
+No gate runs against hardware: `tools/lib/stands.mjs` enumerates owlab routers only. A hardware run
+happens on the maintainer's explicit word for one change, never by reflex, and `dev-sync.sh` and
+`ssh` are `ask` in `.claude/settings.json` so that word is given at the prompt.
+
+1. Pre-check that the fallback exists, and record where the router is now:
+   `ssh <host> 'ls -d /www/luci-static/bootstrap /usr/share/ucode/luci/template/themes/bootstrap/header.ut && uci get luci.main.mediaurlbase'`.
+   Either path missing: stop. A broken template falls back to the first working theme in
+   `luci.themes`, and with no bootstrap on the box there is nothing to fall back to.
+2. `luci-theme-footstrap/dev-sync.sh <host>` — registers the theme, activates nothing, reloads rpcd
+   (never restarts it) and busts the asset cache. It keeps no backup: the rollback is uci.
+3. Sweep the templates the way LuCI will:
+   `ssh <host> 'for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut /usr/share/ucode/luci/template/themes/footstrap/partials/*.ut; do ucode -T -c -o /dev/null "$f" || echo FAIL $f; done'`.
+4. `curl -s -o /dev/null -w '%{http_code}' http://<host>/cgi-bin/luci/` — 200 on the login page.
+   Admin paths answer 403 unauthenticated and prove nothing; the pages are clicked by a person.
+5. Rollback, if anything above fails or a page is wrong:
+   `ssh <host> 'uci set luci.main.mediaurlbase=/luci-static/bootstrap; uci commit luci; rm -f /tmp/luci-indexcache*'`.
 
 ## The stand's own traps
 
@@ -548,18 +583,31 @@ makes "is it done?" a question you have to keep asking, and therefore one that g
 was forgotten three times in a single session here, twice while somebody was waiting on the answer,
 each time for 15-30 minutes after the chain had already finished.
 
-Start the waiter in the same turn as the run, so finishing wakes you instead of you polling it:
+Start the waiter in the same turn as the run, as a background command, so finishing wakes you
+instead of you polling it:
 
 ```sh
 tools/bg.sh sh -c '…'            # prints run-id and log path
-# then, as a background command of its own:
-until [ -f ../tmp/<run-id>.status ]; do sleep 30; done
-echo "exit: $(cat ../tmp/<run-id>.status)"; grep -E '^[a-z-]+:' ../tmp/<run-id>.log
+tools/bg-wait.sh <run-id>        # blocks until .status exists, prints `exit: N` and the `name:` lines
 ```
 
 The waiter costs nothing while the run is going and turns the result into an event. A run whose log
 nobody opened is not a green gate — that rule is older than this note; the waiter is what makes it
 practical to honour.
+
+It stops on three things rather than one: the `.status` file, the run's own pid disappearing
+(`<run-id>.pid`, written by the inner shell — a run killed by SIGKILL, by a reboot or by the
+machine sleeping never writes a status, and waiting for that file alone waits forever), and a cap,
+`tools/bg-wait.sh <run-id> [interval] [max]`, 7200 s by default. The last two print
+`exit: process-gone` and `exit: timeout` and exit 2: a waiter still alive when the session ends
+wakes it later with a verdict nobody asked for.
+
+**`tools/bg.sh` refuses `ssh`, `scp`, `sftp`, `rsync`, `dev-sync.sh`, `git push`, `git commit`,
+`git tag` and `gh pr|release|issue`.** The wrapper is allow-listed in `.claude/settings.json` and
+the permission engine matches the first word of a command, so it cannot see an `ssh` inside
+`tools/bg.sh sh -c '…'` — the form every T2 gate uses — and the wrapper would carry that command
+straight past the `ask` rule guarding the hardware router, the one thing a wrong run breaks for a
+person. Those commands run in the foreground, where the prompt reaches the human.
 
 **"It is the app's markup" is a claim, and switching the stand to bootstrap is how you check it.**
 A finding on a third-party page reads as the app's, and the reflex is to write it into the baseline.

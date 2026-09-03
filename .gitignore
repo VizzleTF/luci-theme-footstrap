@@ -13,8 +13,6 @@
 *.swp
 # macOS finder droppings — one had already been committed under docs/
 .DS_Store
-# preview screenshots
-.claude/skills/footstrap-preview/out/
 # page review screenshots
 page-review/
 # built packages
@@ -34,3 +32,11 @@ __pycache__/
 
 # written by tools/stage-release.sh in the release job — the release BODY, not an asset
 release-notes.md
+
+# personal Claude Code state: skills pulled by `npx skills add` (a symlink into .agents/), the
+# installer's lock, the playwright venv behind .claude/tooling/, and the per-machine settings override
+/.agents/
+/.claude/skills/minimalist-ui
+/skills-lock.json
+/.claude/tooling/preview-venv/
+/.claude/settings.local.json

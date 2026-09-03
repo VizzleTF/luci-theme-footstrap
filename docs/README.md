@@ -12,6 +12,7 @@ Every page here stands on its own — start wherever your question is.
 | [architecture.md](architecture.md) | What LuCI expects from a theme, and where footstrap plugs into it |
 | [conventions.md](conventions.md) | The rules a patch must follow, and which gate holds each one |
 | [development.md](development.md) | Bring up a dev router, push a change, prove it works |
+| [crew.md](crew.md) | How a session is split between the lead thread and the role subagents |
 
 ## How it is built
 

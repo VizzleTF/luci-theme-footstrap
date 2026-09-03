@@ -34,14 +34,7 @@ or `fs-axes`, `chrome-fence` for `fs-sheets`/`fs-prefs`, `page-modules` for the 
 `naturalHeight()` — it is the only gate that reads a floor's height back and empties a box to see
 the floor come off.
 
-`npm run smoke` (T1, ~1.4 s) evaluates `fs-fit`, `fs-prefs`, `fs-axes`, `fs-select`, `fs-chrome` and
-`fs-router` against a REAL DOM on the gallery and watches the colour axes stamp `--fs-<x>-h` before
-`data-<x>`. That is what it adds over `npm test`, whose window and document record calls rather than
-answer them: a module that throws the first time it measures a box passes the unit suite and fails
-on a router. It is an early detector and nothing more — every dependency there is a stub, so
-behaviour on a page is still `owlab test` and `npm run live` (T2), and a green smoke never earns a
-release the right to skip them.
-
-`npm test` stays deliberately narrow: only the branches a stand cannot enter — a luci-base missing a
-surface the router calls, an alias loop or a `firstchild` tie no shipped menu contains. Anything
-about layout or behaviour belongs on a live userland, never in a stub.
+`npm run smoke` (T1, ~1.4 s) runs the modules against a real DOM on the gallery with every
+dependency stubbed; `npm test` covers only the branches a stand cannot enter. Neither answers for
+a page: behaviour is `owlab test` and the live gates (T2), and a green smoke never earns a release
+the right to skip them. `docs/development.md` "The two cheap browser gates".
