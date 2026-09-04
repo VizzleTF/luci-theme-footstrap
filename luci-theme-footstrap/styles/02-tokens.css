@@ -169,6 +169,17 @@
 		--fs-bar-bg: color-mix(in srgb, var(--fs-panel) 88%, transparent);
 		/* height of that bar, and the scroll-margin every anchor target needs to clear it
 		 * (base/10-reset.css): if the two drift, an in-page jump lands under the bar */
+		/* The chrome's own controls — the square buttons (search, appearance, log out) and the poll
+		 * pill — ride the bar rather than cutting panel-coloured holes in it: the bar is one surface,
+		 * and a control on it is carried by its hairline, not by a second fill. `transparent`, not a
+		 * copy of --fs-bar-bg, so the strip's own translucency is not applied twice.
+		 *
+		 * This gives up what `.label`'s comment in theme/35-alerts.css leans on — that a coloured
+		 * variant sits on --fs-panel2, where the palette guarantees >=4.5:1 by construction. On the
+		 * bar the backdrop is now whatever the strip lands on, so the ratio is a MEASURED fact per
+		 * palette rather than a guaranteed one; the numbers live in the changelog entry. A palette that
+		 * needs the old behaviour sets this back to var(--fs-panel2). */
+		--fs-bar-ctl-bg: transparent;
 		--fs-bar-h: calc(46px * var(--fs-density-box));
 		/* the square icon button in the bar and rail: the logo box, the .fs-themerow controls,
 		 * Log out and the collapsed poll pill are one size, so the right cluster reads as a row
@@ -508,6 +519,32 @@
 		--fs-density-box: 1.15;
 		--fs-density-space: 1;
 	}
+
+	/* ---- the content-width axis ----
+	 *
+	 * No :root[data-content-width] blocks here (issue #44 moved this from a three-step picker to a
+	 * slider): the value is a real px length written straight onto --fs-content-max as an inline
+	 * style by fs-axes.js's propAxis, the same shape Rounding uses, and read back exactly as before
+	 * by `.fs-content`, the modal width calc and the top layout's centring padding
+	 * (theme/20-shell.css, theme/50-toplayout.css) — deliberately including the modal, which follows
+	 * the column on purpose rather than keeping its own separate cap the reader would have to
+	 * reconcile against.
+	 *
+	 * The range is 1280-3840, and neither end is derived from this file: 1280 (--fs-content-max
+	 * above) is the value the theme has always drawn, so the slider's left end IS today's look and
+	 * the axis can never go narrower than the default — a difference from every other numeric axis,
+	 * none of which has a floor that also has to be the default. --fs-content-min (500px) was the
+	 * rule this axis had to stay clear of; with 1280 as the floor it is now a property of the range
+	 * instead, 780px below the nearest point the slider can reach. 3840 stands in for "uncapped": no
+	 * CSS viewport width in ordinary use reaches it, since even a physical 4K panel reports a scaled
+	 * CSS width well under it — and `columnWidth()`'s `Math.min(state.outerW - cut, g.contentMax)`
+	 * needs a real px length either way, `none`/`100%` failing both the `calc()` in
+	 * 50-toplayout.css and `px()`'s getComputedStyle probe in fs-chrome.js.
+	 *
+	 * Step 128px: 2,560px of travel at 20 stops, matching Rounding/Photo dim/Pattern strength's stop
+	 * count rather than Pattern scale's near-pixel drag — a stop here should move a table's column
+	 * count, not shave a pixel off a margin, and 128 is the largest round number that divides the
+	 * range into stops that few. */
 
 	:root[data-darkmode="true"] {
 		/* palette colours are in 03-palettes.css; only mode-level, palette-independent

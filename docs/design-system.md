@@ -74,13 +74,25 @@ which is what a hairline is for.
 
 ## Palettes
 
-Four, all in `styles/03-palettes.css`, one self-contained block per (palette × mode):
+Five, all in `styles/03-palettes.css`, one self-contained block per (palette × mode):
 **footstrap** (GitHub Primer colours, the default, filling a bare `:root`), **hicontrast**
 (`data-palette="hicontrast"`), **bootstrap** (`data-palette="bootstrap"`, the stock LuCI theme's
 surfaces and greys — its semantic colours and its light ink are raised where they miss AA, which
-that block documents in place) and **2020** (`data-palette="2020"`, the OpenWrt 2020 theme's
-colourway). Light mode is the bare `:root`; dark is `:root[data-darkmode="true"]`. The file also
-carries the instructions for adding a palette.
+that block documents in place), **2020** (`data-palette="2020"`, the OpenWrt 2020 theme's
+colourway) and **forum** (`data-palette="forum"`, the OpenWrt forum's Discourse colourway). Light
+mode is the bare `:root`; dark is `:root[data-darkmode="true"]`. The file also carries the
+instructions for adding a palette.
+
+**forum** is sampled straight off forum.openwrt.org's own `getComputedStyle`, one read per colour
+scheme rather than a guess: light ink `#222`/page `#fff`/accent `#0088cc`, dark ink `#ddd`/page
+`#222`/accent `#0f82af`, plus its success, danger and highlight (search-hit) colours. None of the
+six clears 4.5:1 as text on the surface Discourse pairs it with — its own contrast rules are for a
+filled pill or an icon, not for the export tier every app prints text in — so each is walked the
+way 2020's cyan was, hue and saturation held while lightness moves until AA clears (worst case
+1.07:1 on white, for the yellow search-highlight that has no footstrap analogue and fills `--fs-warn`
+instead, being the only status colour Discourse's scheme leaves spare). The forum's header bar
+(`rgb(0, 43, 73)`) is not carried into either mode: its own dark scheme already has a canvas
+colour, `#222`, unlike 2020's theme which had none to sample.
 
 **2020** is the CI cyan `#00B5E2` on the navy `#002B49`, which is one scheme and no dark mode in
 the theme it comes from. Here it is a pair, and the split is the interesting part: 2020's own
@@ -232,7 +244,7 @@ its three axes, File), then **Defaults**:
 |---|---|---|---|
 | **Layout** | **top** (default) / sidebar | `fs-layout` | `data-layout` (always explicit) |
 | **Theme** | auto / light / dark | `fs-darkmode` | `data-darkmode` + `data-theme` + `data-bs-theme` |
-| **Palette** | footstrap / hicontrast / bootstrap / 2020 | `fs-palette` | `data-palette` |
+| **Palette** | footstrap / hicontrast / bootstrap / 2020 / forum | `fs-palette` | `data-palette` |
 | **Density** | compact / normal / large | `fs-density` | `data-density` |
 | **Wallpaper** | off / pattern / **file** | `fs-wallpaper` | `data-wallpaper` — `pattern` tiles an admin-uploaded SVG through a CSS mask; Scale, Strength and Colours are axes of their own |
 | **Tint** | off, hue 1–360°, `#rrggbb` | `fs-tint` | `data-tint=hue\|hex`, `--fs-tint-h` / `--fs-bg` |

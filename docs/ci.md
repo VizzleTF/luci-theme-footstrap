@@ -87,8 +87,8 @@ ships. Locally it is all one command, `npm run check`; the full table of what ea
 |---|---|
 | `eslint` | including `wrap-regex`, which forbids `return /re/…`, the form jsmin breaks on |
 | `stylelint` | correctness and project invariants only — not a formatter |
-| `a11y-gallery.mjs` | axe-core, WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap} × {untinted,60°,260°} — **18 combinations** |
-| `export-tier.mjs` | the `--*-color-*` contract with foreign apps — axe cannot see it, their widgets are not in the gallery. 42 palette × mode × tint combinations, then the six untinted ones again with `prefers-contrast: more` emulated, since that query re-states the ink tokens and so publishes a second tier |
+| `a11y-gallery.mjs` | axe-core, WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap,2020,forum} × {untinted,60°,260°} — **30 combinations** |
+| `export-tier.mjs` | the `--*-color-*` contract with foreign apps — axe cannot see it, their widgets are not in the gallery. 70 palette × mode × tint combinations, then the ten untinted ones again with `prefers-contrast: more` emulated, since that query re-states the ink tokens and so publishes a second tier |
 | `css-metrics.mjs` | ratchet: `!important` ≤ 27, max specificity, empty rules |
 | `css-floor.mjs` | the browser floor derived from the built sheet against the one stated in `docs/css.md`, plus the two shapes that break below it: a `:has()` compound sharing a selector list with one that has none, and a CSS feature nobody has classified |
 | `fs-orphans.mjs` | dead `fs-*` selectors (safe only inside our namespace) |

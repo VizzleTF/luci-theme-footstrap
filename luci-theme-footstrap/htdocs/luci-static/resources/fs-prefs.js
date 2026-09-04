@@ -192,10 +192,10 @@ _mqDark.addEventListener('change', () => {
 
 /* ---- the four axis shapes, each written once ----
  *
- * Fifteen axes are four shapes, so the shape lives in a factory and each instance is one line:
+ * Sixteen axes are four shapes, so the shape lives in a factory and each instance is one line:
  * enumAxis (pattern ink), colorAxis (tint, accent, good, warn, danger), surfaceAxis (cards,
  * controls, bar, borders), propAxis (rounding, tint strength, photo dim, pattern size, pattern
- * strength). Same contract throughout: `current()` is localStorage ?? def(), `def()` is the router
+ * strength, content width). Same contract throughout: `current()` is localStorage ?? def(), `def()` is the router
  * default alone, `apply()` stores the choice explicitly. None use `this` — every export is a
  * detached method reference, so a `this` here would throw on the first call.
  *
@@ -272,6 +272,11 @@ const DENSITIES = [ 'compact', 'large' ];	/* the two non-default values; 'normal
 const DENSITY = listAxis('fs-density', 'data-density', DENSITIES, 'normal', () => fit.schedule());
 const currentDensity = DENSITY.current, applyDensity = DENSITY.apply,
 	densityDefault = DENSITY.def;
+
+/* Content width lives entirely in fs-axes.js now (a propAxis like Rounding, issue #44): unlike
+ * Density it sets no attribute, so nothing here or in fs-chrome.js needs to read one, and
+ * currentContentWidth()/applyContentWidth() have no caller outside the Appearance tab — the one
+ * thing that kept Density's shape in this cold-path file. */
 /* Background-tint axis: the canvas the cards float on (--fs-bg), so a whole install reads as one
  * colour and a tab or a screenshot says which router it belongs to. Cards, chrome and the status
  * colours keep the palette's values — the cue colours the paper, not the UI. On a hue it is mixed

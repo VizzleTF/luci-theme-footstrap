@@ -138,9 +138,15 @@ const GEOM_DFLT = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56, c
 let _geom = null, _geomDensity = null, _geomWarned = false;
 function shellGeometry() {
 	const density = document.documentElement.getAttribute('data-density') || '';
+	/* contentMax moves with data-content-width (02-tokens.css), the other three widths do not, but
+	 * they are one memo and the axis's own applier calls fit.schedule() same as Density's — folded
+	 * into the same key rather than a second one, or a content-width change alone would hit the
+	 * density-only key and go on answering the previous contentMax until density also changed */
+	const cwidth = document.documentElement.getAttribute('data-content-width') || '';
+	const key = density + '|' + cwidth;
 	/* the gutter is re-asked even on a memo hit: it moves with the width, not the density */
-	if (_geom && _geomDensity === density) return _geom;
-	_geomDensity = density;
+	if (_geom && _geomDensity === key) return _geom;
+	_geomDensity = key;
 	const px = (name, dflt) => resolveLen(name, dflt);
 	const g = {
 		contentMin: px('--fs-content-min', GEOM_DFLT.contentMin),

@@ -190,6 +190,7 @@
 		display: flex; flex-wrap: wrap; gap: var(--fs-space-1-5);
 		order: 2; margin-inline-start: auto; padding: 0;
 	}
+
 	.fs-themerow {
 		display: flex; align-items: center; justify-content: center;
 		flex: 0 0 auto; order: 2; margin-inline-start: auto;
@@ -197,7 +198,7 @@
 		 * them instead of pushing one cluster to the bar's far edge */
 		width: var(--fs-btn-size); height: var(--fs-btn-size); padding: 0;
 		border: var(--fs-hairline); border-radius: var(--fs-radius);
-		background: var(--fs-panel2); color: var(--fs-dim);
+		background: var(--fs-bar-ctl-bg); color: var(--fs-dim);
 		font: inherit; font-weight: var(--fs-weight); font-size: var(--fs-type); line-height: 1.1;
 		text-align: start; cursor: pointer;
 		transition: background var(--fs-dur), border-color var(--fs-dur), color var(--fs-dur);
@@ -262,7 +263,7 @@
 		flex: 0 0 auto; order: 2; justify-content: center;
 		width: var(--fs-btn-size); height: var(--fs-btn-size); padding: 0;
 		border: var(--fs-hairline); border-radius: var(--fs-radius);
-		background: var(--fs-panel2);
+		background: var(--fs-bar-ctl-bg);
 	}
 	/* on a square button the BORDER carries the state — the fill and the ink come from the
 	 * shared hover/active groups in 10-chrome.css */
@@ -769,7 +770,11 @@
 		min-height: var(--fs-btn-size);
 		text-transform: none;
 		font-weight: var(--fs-weight); font-size: var(--fs-type);
-		background: var(--fs-panel2); background-image: none;
+		/* the bar's control surface, not the panel: this pill sits in the same row as the square
+		 * buttons and wears what they wear. Verified on the live DOM rather than by reading —
+		 * ui.js emits the indicator as a bare `<span data-indicator=…>` with NO class, so a rule
+		 * written against `.label` (as one here briefly was) matches nothing at all. */
+		background: var(--fs-bar-ctl-bg); background-image: none;
 		border: var(--fs-hairline);
 		color: var(--fs-dim);
 		border-radius: var(--fs-radius); padding: 0 var(--fs-space-3); box-shadow: none;

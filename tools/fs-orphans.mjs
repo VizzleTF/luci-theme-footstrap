@@ -29,6 +29,7 @@ const IGNORE_EXACT = new Set([
 	'fs-good', 'fs-warn', 'fs-danger', 'fs-card', 'fs-control', 'fs-bar', 'fs-line',
 	'fs-rail', 'fs-layout', 'fs-menu-open', 'fs-menu-autocollapse', 'fs-recent', 'fs-tint-strength',
 	'fs-density', 'fs-photo-dim', 'fs-pattern-size', 'fs-pattern-strength', 'fs-pattern-ink',
+	'fs-content-width',
 	/* the Appearance tab's data-tab value — ui.tabs matches panes and menu items on it, so it is an
 	 * identifier in the stock tab machinery rather than a class of ours */
 	'fs-appearance',

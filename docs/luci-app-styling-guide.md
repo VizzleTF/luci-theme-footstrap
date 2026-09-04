@@ -150,7 +150,7 @@ need `!important` to do it.** Unlayered beats every layer, unconditionally. If y
 ### 3.3. What the tier guarantees (and what to do with the guarantee)
 
 footstrap proves all of this in CI (`tools/export-tier.mjs`) across the full matrix of
-{light, dark} × {default, hicontrast, bootstrap, 2020} × seven tint values — 56 combinations:
+{light, dark} × {default, hicontrast, bootstrap, 2020, forum} × seven tint values — 70 combinations:
 
 - **Every level of `text` / `primary` / `success` / `warn` / `error` clears WCAG AA as TEXT** on all
   three `--background-color-*` surfaces. So you may paint any of them as a `color:` and not check.

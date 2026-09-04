@@ -45,8 +45,23 @@ const LIMITS = {
 	 * written as `input[type="checkbox"] + ` 128,127 (+138). The head-room was 11 B, so no form of
 	 * the fix fitted;
 	 * the limit goes to 128,512 rather than to the exact number, or the next one-selector bug fix
-	 * needs a gate edit of its own. */
-	cascadeCss: 128_512,
+	 * needs a gate edit of its own.
+	 *
+	 * 129,193 B on 2026-09-04, up 1,166 B for the fifth colourway, `forum` — the OpenWrt forum's
+	 * own Discourse scheme (03-palettes.css). A palette is the one feature this budget's own note
+	 * above says cannot be made cheaper: every token declared per mode, twice, or the block does
+	 * not fully apply. Measured against `2020`, the closest precedent (2,379 B light + 1,106 B
+	 * dark = 3,485 B raw before mangling): `forum`'s extra weight is the six sampled colours
+	 * needing a moved-value AND a "measured X, now Y" comment each, in both modes, because none of
+	 * the six cleared AA on the surface Discourse itself pairs them with. The limit goes to
+	 * 129,700, 507 B of head-room, matching the margin this budget shipped with before.
+	 *
+	 * 129,309 B on 2026-09-04, up 116 B for the content-width axis (issue #44): 02-tokens.css's
+	 * `--fs-content-max`/`--fs-content-min` pair and 03-palettes.css's per-mode override are
+	 * cheap, but they are still declared twice for the same reason every other axis is. The limit
+	 * stays at 129,700 — 391 B of head-room, down from the 507 the forum raise left, because
+	 * nothing about THIS axis needed more. */
+	cascadeCss: 129_700,
 	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
 	 * whether or not a given page loads it. 86,737 B on 2026-08-27.
 	 *
@@ -173,8 +188,21 @@ const LIMITS = {
 	 * was (topic 251930, post 92). One word per state now: `router` and `built-in`. The rise is the
 	 * longer labels plus the spacer that keeps the destructive reset off the save button's elbow;
 	 * the CSS side paid for itself by dropping a margin rule that duplicated
-	 * `.cbi-value-description`'s own. */
-	resourcesJs: 90_497,
+	 * `.cbi-value-description`'s own.
+	 *
+	 * 90,519 B on 2026-09-04, up 22 B for the fifth colourway, `forum`, the companion raise to
+	 * `cascadeCss` above: the picker's label entry in `fs-appearance.js` and the name added to
+	 * `fs-axes.js`'s `PALETTES` array, on the flash side only — `fs-appearance.js` is a page
+	 * module, so a cold visit that never opens Appearance still downloads none of it
+	 * (`coldJs` does not move). The limit goes to 90,600, 81 B of head-room.
+	 *
+	 * 91,095 B on 2026-09-04, up 576 B for the content-width axis (issue #44), split across every
+	 * file `fs-density` already touches: 255 B of it is `fs-prefs.js`'s `CONTENT_WIDTH` listAxis
+	 * and `fs-chrome.js`'s `shellGeometry()` memo key, BOTH on the cold path (the shared budget
+	 * below moves by exactly this much); the remaining 321 B is page-only — `fs-axes.js`'s
+	 * snapshot/reset/default wiring and `fs-appearance.js`'s picker group. The limit goes to
+	 * 91,200, 105 B of head-room. */
+	resourcesJs: 91_200,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -241,8 +269,15 @@ const LIMITS = {
 	 * on every page.
 	 *
 	 * 56,134 B on 2026-09-02, down the same 1,097 B: `fs-fit.js` is cold, and the anchoring revert
-	 * is all of it. */
-	coldJs: 56_134,
+	 * is all of it.
+	 *
+	 * 56,389 B on 2026-09-04, up 255 B for the content-width axis's cold half (issue #44): `fs-prefs.js`'s
+	 * `CONTENT_WIDTH` listAxis and `fs-chrome.js`'s `shellGeometry()` memo key, matching the
+	 * `resourcesJs` rise above exactly, because both live in modules every page loads — the fit has
+	 * to know the axis before Appearance is ever opened. The remaining 321 B of that raise is
+	 * `fs-axes.js`/`fs-appearance.js`, both page modules, so this number does not move for them.
+	 * The limit goes to 56,450, 61 B of head-room. */
+	coldJs: 56_450,
 };
 
 function bytes(path) {

@@ -87,5 +87,7 @@ export function matrix(tints = [null]) {
 		{ palette: 'bootstrap', mode: 'dark' },
 		{ palette: '2020', mode: 'light' },
 		{ palette: '2020', mode: 'dark' },
+		{ palette: 'forum', mode: 'light' },
+		{ palette: 'forum', mode: 'dark' },
 	].flatMap((c) => tints.map((tint) => ({ ...c, tint })));
 }

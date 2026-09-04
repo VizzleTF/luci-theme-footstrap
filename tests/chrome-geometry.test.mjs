@@ -90,6 +90,21 @@ test('a column is never negative', () => {
 	assert.equal(width({ outerW: 10 }), 0);
 });
 
+/* issue #44: the Content width axis (fs-axes.js CWIDTH) raises --fs-content-max past the 1280px
+ * default by overriding the token, not by changing columnWidth()'s arithmetic — so the cap test
+ * above is re-run at other caps rather than edited. The axis is a slider over 1280-3840, so the
+ * caps here are arbitrary points in that range and one at each end, not named steps. */
+test('the column stops growing at a raised cap, wherever the slider puts it', () => {
+	const cap = (n) => Object.assign({}, G, { contentMax: n });
+	const cw = (g, outerW) => chrome().columnWidth(g, { outerW, narrow: false, top: false, rail: false });
+	for (const n of [ 1280, 1440, 1600, 2200, 3840 ]) {
+		/* below the cap it is the window that binds, exactly as at the default */
+		assert.equal(cw(cap(n), n), n - G.sidebarW - G.contentPad);
+		/* past it the cap holds the column rather than letting it follow the window */
+		assert.equal(cw(cap(n), 5000), n - G.contentPad);
+	}
+});
+
 test('the fold threshold is the same arithmetic fitShell folds on', () => {
 	/* fitShell(): data-narrow iff the column is under --fs-content-min. At exactly the floor the
 	 * sidebar stays — the comparison is `<`, and this is the boundary a token change moves. */

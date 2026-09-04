@@ -2,8 +2,9 @@
 	/* ---- colourways (palettes) ----
 	 *
 	 * Every colour is a variable and every palette is one self-contained block per mode, so a new
-	 * colourway is copy-one-pair-and-recolour. Four ship: footstrap (GitHub Primer, the default),
-	 * hicontrast, bootstrap (the stock LuCI theme's colours) and 2020.
+	 * colourway is copy-one-pair-and-recolour. Five ship: footstrap (GitHub Primer, the default),
+	 * hicontrast, bootstrap (the stock LuCI theme's colours), 2020 (the OpenWrt 2020 theme's
+	 * colourway) and forum (the OpenWrt forum's Discourse colourway).
 	 *
 	 * TO ADD A COLOURWAY "sunset":
 	 *   1. Copy the two hicontrast blocks below, rename data-palette to "sunset".
@@ -506,5 +507,94 @@
 		--fs-on-good: #002b49;
 		--fs-on-warn: #002b49;
 		--fs-on-danger: #002b49;
+	}
+	/* ---- forum — the OpenWrt forum's Discourse colourway (opt-in) ----
+	 *
+	 * Sampled from forum.openwrt.org's own `getComputedStyle(document.documentElement)`, one read
+	 * per colour scheme: LIGHT --primary #222 (ink) / --secondary #fff (page) / --tertiary #0088cc
+	 * (accent) / --quaternary and --danger both #e45735 / --success #009900 / --highlight #ffff4d;
+	 * DARK --primary #ddd / --secondary #222 / --tertiary #0f82af / --danger #e45735 (unchanged
+	 * from light) / --success #1ca551 / --highlight #a87137. Discourse names quaternary and
+	 * danger as one colour in light and two in dark (#c14924); footstrap has no fifth semantic
+	 * slot, so the dark quaternary is not carried — --fs-danger reads the site's own --danger.
+	 *
+	 * The header bar's navy (rgb(0,43,73) = #002b49) is not here: it is the forum's masthead, not
+	 * its dark canvas — --secondary is #222 in BOTH the forum's own light and dark schemes (ink
+	 * and page swap places, the page itself never turns navy). 2020's dark canvas is navy because
+	 * that theme has no dark scheme of its own to sample; forum does, and it says #222. The chrome
+	 * reads --fs-panel regardless (2020's own note, above), so the bar could not carry it anyway.
+	 *
+	 * None of the six sampled colours clears 4.5:1 as TEXT on the surface its own scheme pairs it
+	 * with — Discourse checks contrast for its own use (a filled pill, an icon), not for the
+	 * export tier every app prints text in — so every one of them is moved the way 2020's cyan
+	 * was: hue and saturation held, lightness walked until the ratio clears. --fs-highlight has no
+	 * footstrap analogue (it marks a search hit, not a status) and the sampled #ffff4d is a
+	 * background wash — 1.07:1 on white — so it fills the one status slot forum's own scheme has
+	 * no colour for, --fs-warn, exactly as its LIGHTNESS says: the brightest of the four before the
+	 * move, still the one furthest from AA after it. */
+	:root[data-palette="forum"] {
+		/* LIGHT — the forum's own page, exactly: white canvas, near-black ink */
+		--fs-bg-base: #ffffff;
+		--fs-panel-base: #ffffff;
+		--fs-panel2-base: #f0f0f0;
+		--fs-border-base: #dddddd;
+		--fs-text: #222222;
+		--fs-dim: #3d3d3d;
+		--fs-faint: #4a4a4a;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%233d3d3d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		/* --tertiary #0088cc measures 3.89:1 on white; #0074ad held the hue at 5.12:1 there but
+		 * only 4.49:1 on --fs-panel2, under the 4.5:1 floor the export tier holds every surface to;
+		 * #0073ac holds it at 5.19:1 on white and 4.55:1 on --fs-panel2 */
+		--fs-accent-base: #0073ac;
+		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
+		--fs-track: #eeeeee;
+		/* --success #009900 measured 3.78:1, #008000 5.14:1; --quaternary/--danger #e45735
+		 * measured 3.68:1, #c63c1b 5.17:1; --highlight #ffff4d measured 1.07:1 as text, #717100
+		 * 5.17:1 — see the block comment above for why highlight fills warn */
+		--fs-good-base: #008000;
+		--fs-warn-base: #717100;
+		--fs-danger-base: #c63c1b;
+		/* white on the fills above: 5.19/5.14/5.17/5.17 */
+		--fs-on-accent: #fff;
+		--fs-on-good: #fff;
+		--fs-on-warn: #fff;
+		--fs-on-danger: #fff;
+	}
+	:root[data-palette="forum"][data-darkmode="true"] {
+		/* DARK — the forum's own dark scheme: #222 canvas, #ddd ink, both exactly as sampled */
+		--fs-bg-base: #222222;
+		--fs-panel-base: #262626;
+		--fs-panel2-base: #2e2e2e;
+		--fs-border-base: #3a3a3a;
+		--fs-text: #dddddd;
+		--fs-dim: #a3a3a3;
+		--fs-faint: #969696;
+		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23a3a3a3" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+		/* --tertiary #0f82af measured 3.66:1 on --fs-bg and 3.12:1 on --fs-panel2, both under the
+		 * 4.5:1 the export tier wants for a colour printed as text; #13a8e3 holds the hue at
+		 * 5.86:1 on --fs-bg and 5.00:1 on --fs-panel2 */
+		--fs-accent-base: #13a8e3;
+		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
+		--fs-track: #333333;
+		/* --success #1ca551 measured 4.24:1 on --fs-panel2, #1fb65a 5.11:1; --danger #e45735
+		 * measured 3.69:1, #eb8066 5.05:1; --highlight #a87137 measured 3.29:1, #c99259 5.00:1 —
+		 * same reasoning as the light block for why highlight fills warn */
+		--fs-good-base: #1fb65a;
+		--fs-warn-base: #c99259;
+		--fs-danger-base: #eb8066;
+		/* dark ink: these fills are light, and #222222 (= --fs-bg-base) gives 5.86/5.98/5.86/5.92 */
+		--fs-on-accent: #222222;
+		--fs-on-good: #222222;
+		--fs-on-warn: #222222;
+		--fs-on-danger: #222222;
+		/* The masthead, and the one place the forum's navy belongs. rgb(0,43,73) is what
+		   forum.openwrt.org paints its header with in its DARK scheme — measured live; its light
+		   scheme has a white header (--header_background #ffffff, ink #333333), which is what this
+		   palette's light half already gives, so the navy is declared here and only here.
+		   color-mix, not a flat fill: --fs-bar-bg is 88% of the panel over the page on purpose (a
+		   bar is a thin strip the page ghosts through, 02-tokens.css), and a flat colour would drop
+		   that. Over this palette's #222 canvas the strip lands near #06294a, where the bar's own
+		   ink (#dddddd) measures 9.9:1 and its dimmed ink (#a3a3a3) 5.4:1. */
+		--fs-bar-bg: color-mix(in srgb, #002b49 88%, transparent);
 	}
 }

@@ -2,6 +2,7 @@
 'require baseclass';
 'require rpc';
 'require fs-prefs as prefs';
+'require fs-fit as fit';
 
 /* fs-axes — the nineteen Appearance axes and the Save-as-default machinery.
  *
@@ -79,8 +80,14 @@ function colorAxis(key, attr, hueProp, colorProp) {
  * in how the number formats onto the property, which is the one varying argument. The prefs.sd() field
  * name is passed explicitly because one instance needs a rename rather than a spelling
  * ('fs-radius' -> rounding), and a factory right for four keys out of five is the trap enumAxis and
- * colorAxis name above. */
-function propAxis(key, sdKey, prop, min, max, dfl, fmt) {
+ * colorAxis name above.
+ *
+ * `after`, like listAxis's, is optional and runs once the property is set: every propAxis instance
+ * but Content width only repaints a rule that reads the token, so none of the other five pass it.
+ * Content width moves --fs-content-max, which shellGeometry() (fs-chrome.js) reads to decide
+ * data-narrow, so its applier must re-run the fit or the chrome goes on deciding against the width
+ * the column had a moment ago. */
+function propAxis(key, sdKey, prop, min, max, dfl, fmt, after) {
 	const inRange = (n) => (typeof n === 'number' && n >= min && n <= max);
 	const def = () => { const d = prefs.sd(sdKey); return inRange(d) ? d : dfl; };
 	return {
@@ -96,6 +103,7 @@ function propAxis(key, sdKey, prop, min, max, dfl, fmt) {
 			prefs.lsSet(key, String(v));
 			if (v === dfl) root.style.removeProperty(prop);
 			else root.style.setProperty(prop, fmt(v));
+			if (after) after();
 		}
 	};
 }
@@ -111,7 +119,7 @@ function propAxis(key, sdKey, prop, min, max, dfl, fmt) {
  * Legacy names ('rvht'/'roman'/'github') are migrated by head.ut before paint, so they never reach
  * currentPalette() on a loaded page; the stray fallthrough covers them anyway. */
 
-const PALETTES = [ 'hicontrast', 'bootstrap', '2020' ];	/* the non-default values; 'footstrap' = bare :root */
+const PALETTES = [ 'hicontrast', 'bootstrap', '2020', 'forum' ];	/* the non-default values; 'footstrap' = bare :root */
 const PALETTE = prefs.listAxis('fs-palette', 'data-palette', PALETTES, 'footstrap');
 const currentPalette = PALETTE.current, applyPalette = PALETTE.apply;
 
@@ -209,6 +217,19 @@ const currentDanger = DANGER.current, applyDanger = DANGER.apply;
 const RADIUS = propAxis('fs-radius', 'rounding', '--fs-radius-base', 0, 20, FS_RADIUS_DEFAULT, (v) => (v + 'px'));
 const currentRadius = RADIUS.current, applyRadius = RADIUS.apply, radiusDefault = RADIUS.def;
 
+/* Content width (issue #44): how far the reader lets the column grow past --fs-content-max's own
+ * 1280px. A propAxis like Rounding, pointed at that one token — the range comment lives in
+ * 02-tokens.css, next to the token it bounds, and is not restated here.
+ *
+ * The one propAxis instance that moves chrome geometry: shellGeometry() (fs-chrome.js) reads
+ * --fs-content-max on every fit, so dragging the slider must re-run it through the SAME
+ * fit.schedule() every other geometry-affecting axis calls, or the sidebar goes on folding at the
+ * width the column had before the drag. */
+const FS_CWIDTH_DEFAULT = 1280;
+const CWIDTH = propAxis('fs-content-width', 'content_width', '--fs-content-max', 1280, 3840,
+	FS_CWIDTH_DEFAULT, (v) => (v + 'px'), () => fit.schedule());
+const currentContentWidth = CWIDTH.current, applyContentWidth = CWIDTH.apply, contentWidthDefault = CWIDTH.def;
+
 /* Layout axis: horizontal top bar (the default) vs vertical sidebar. One template, one renderer —
  * CSS morphs the chrome off :root[data-layout] and toggling re-renders nothing; menu-footstrap.js
  * observes the attribute and folds the accordion into dropdowns or restores it.
@@ -222,7 +243,7 @@ const AXIS_KEYS = [
 	'fs-accent', 'fs-good', 'fs-warn', 'fs-danger', 'fs-card', 'fs-control',
 	'fs-bar', 'fs-line', 'fs-radius', 'fs-menu-autocollapse', 'fs-tint-strength',
 	'fs-density', 'fs-photo-dim', 'fs-pattern-size', 'fs-pattern-strength',
-	'fs-pattern-ink'
+	'fs-pattern-ink', 'fs-content-width'
 ];
 /* Tint strength: a multiplier on the tint chroma (03-palettes.css), 100% being the designed
  * strength and 200% the cap. 0 is not quite "no tint" — the relative colour that applies the tint
@@ -291,7 +312,8 @@ function snapshotAxes() {
 		photo_dim: String(currentPhotoDim()),
 		pattern_size: String(currentPatternSize()),
 		pattern_strength: String(currentPatternStrength()),
-		pattern_ink: currentPatternInk()
+		pattern_ink: currentPatternInk(),
+		content_width: String(currentContentWidth())
 	};
 }
 /* The resolved router default (the uci value if set, else the built-in) in snapshotAxes() string
@@ -326,7 +348,8 @@ function _resolvedDefault() {
 		photo_dim: String(photoDimDefault()),
 		pattern_size: String(patternSizeDefault()),
 		pattern_strength: String(patternStrengthDefault()),
-		pattern_ink: PINK.def()
+		pattern_ink: PINK.def(),
+		content_width: String(contentWidthDefault())
 	};
 }
 let _savedDefault = _resolvedDefault();
@@ -401,6 +424,7 @@ function resetToBuiltin() {
 	applyPatternSize(FS_PSIZE_DEFAULT);
 	applyPatternStrength(FS_PSTR_DEFAULT);
 	applyPatternInk('theme');
+	applyContentWidth(FS_CWIDTH_DEFAULT);
 }
 
 /* ---- the two uploaded wallpapers, browser side ----
@@ -473,6 +497,7 @@ return baseclass.extend({
 	currentPatternSize, applyPatternSize,
 	currentPatternStrength, applyPatternStrength,
 	currentPatternInk, applyPatternInk,
+	currentContentWidth, applyContentWidth, contentWidthDefault,
 
 	currentPattern, patternUrl, applyPattern,
 	currentLoginBg, loginBgUrl, applyLoginBg,

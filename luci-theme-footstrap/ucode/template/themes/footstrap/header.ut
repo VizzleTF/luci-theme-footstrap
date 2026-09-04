@@ -45,7 +45,7 @@
 		'tint', 'accent', 'good', 'warn', 'danger',
 		'card', 'control', 'bar', 'line',
 		'rounding', 'autocollapse', 'tint_strength', 'photo_dim',
-		'pattern_size', 'pattern_strength', 'pattern_ink',
+		'pattern_size', 'pattern_strength', 'pattern_ink', 'content_width',
 		/* the two uploaded images' cache-bust tokens (head.ut whitelists both to hex); the files
 		   themselves are served. Not axes — they have no browser layer — but they reach the client
 		   the same way. */

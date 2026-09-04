@@ -16,11 +16,15 @@
 	   before the include, so a `?? {}` here would only hide that contract from a second caller. */
 	let _sd_lay  = index([ 'sidebar', 'top' ], fs_defaults.layout) >= 0 ? fs_defaults.layout : '';
 	let _sd_dark = index([ 'auto', 'light', 'dark' ], fs_defaults.darkmode) >= 0 ? fs_defaults.darkmode : '';
-	let _sd_pal  = index([ 'footstrap', 'hicontrast', 'bootstrap', '2020' ], fs_defaults.palette) >= 0 ? fs_defaults.palette : '';
+	let _sd_pal  = index([ 'footstrap', 'hicontrast', 'bootstrap', '2020', 'forum' ], fs_defaults.palette) >= 0 ? fs_defaults.palette : '';
 	let _sd_wall = index([ 'off', 'pattern', 'file' ], fs_defaults.wallpaper) >= 0 ? fs_defaults.wallpaper : '';
 	let _sd_pink = index([ 'theme', 'original' ], fs_defaults.pattern_ink) >= 0 ? fs_defaults.pattern_ink : '';
 	let _sd_ac   = index([ 'on', 'off' ], fs_defaults.autocollapse) >= 0 ? fs_defaults.autocollapse : '';
 	let _sd_dens = index([ 'compact', 'normal', 'large' ], fs_defaults.density) >= 0 ? fs_defaults.density : '';
+	/* issue #44: how far the content column may grow past --fs-content-max's 1280px default.
+	   header.ut's FS_AXES carries 'content_width', so a saved router default reaches this. */
+	let _cw = int(fs_defaults.content_width);
+	let _sd_cwidth = (fs_defaults.content_width != '' && _cw >= 1280 && _cw <= 3840) ? _cw : -1;
 	/* The five colour axes each hold one of three things: '' or '0' for off, '1'..'360' for a hue,
 	   or '#rrggbb'. Both live forms reach the client as a string, and the pre-paint re-reads which
 	   it is the way fs-prefs.js's normColor() does, so this passes through exactly those two shapes
@@ -147,7 +151,7 @@
 		   current*(), so the Appearance controls show the effective default when this browser has no
 		   localStorage. See the sanitiser above for the unset encodings. #}
 		<script>window.__fsPlugins={{ sprintf('%J', fs_plugins) }};</script>
-		<script>window.__fsSD={layout:"{{ _sd_lay }}",darkmode:"{{ _sd_dark }}",palette:"{{ _sd_pal }}",wallpaper:"{{ _sd_wall }}",tint:"{{ _sd_tint }}",accent:"{{ _sd_acc }}",good:"{{ _sd_good }}",warn:"{{ _sd_warn }}",danger:"{{ _sd_dang }}",card:"{{ _sd_card }}",control:"{{ _sd_ctrl }}",bar:"{{ _sd_bar }}",line:"{{ _sd_line }}",rounding:{{ _sd_round }},autocollapse:"{{ _sd_ac }}",login_bg:"{{ _sd_lbg }}",tint_strength:{{ _sd_tstr }},photo_dim:{{ _sd_pdim }},density:"{{ _sd_dens }}",pattern:"{{ _sd_pat }}",pattern_size:{{ _sd_psize }},pattern_strength:{{ _sd_pstr }},pattern_ink:"{{ _sd_pink }}"};</script>
+		<script>window.__fsSD={layout:"{{ _sd_lay }}",darkmode:"{{ _sd_dark }}",palette:"{{ _sd_pal }}",wallpaper:"{{ _sd_wall }}",tint:"{{ _sd_tint }}",accent:"{{ _sd_acc }}",good:"{{ _sd_good }}",warn:"{{ _sd_warn }}",danger:"{{ _sd_dang }}",card:"{{ _sd_card }}",control:"{{ _sd_ctrl }}",bar:"{{ _sd_bar }}",line:"{{ _sd_line }}",rounding:{{ _sd_round }},autocollapse:"{{ _sd_ac }}",login_bg:"{{ _sd_lbg }}",tint_strength:{{ _sd_tstr }},photo_dim:{{ _sd_pdim }},density:"{{ _sd_dens }}",pattern:"{{ _sd_pat }}",pattern_size:{{ _sd_psize }},pattern_strength:{{ _sd_pstr }},pattern_ink:"{{ _sd_pink }}",content_width:{{ _sd_cwidth }}};</script>
 		<script>
 			/* Each IIFE below pre-paints one Appearance axis before the first frame, duplicating a
 			   live applier in fs-prefs.js. They cannot share code — this runs before the module
@@ -218,7 +222,7 @@
 					   is the same one fs-prefs.js validates against — a name in one and not the
 					   other paints here and is taken away by the first live change. */
 					if (p === null) p = sd.palette || null;
-					if (p === 'hicontrast' || p === 'bootstrap' || p === '2020') root.setAttribute('data-palette', p);
+					if (p === 'hicontrast' || p === 'bootstrap' || p === '2020' || p === 'forum') root.setAttribute('data-palette', p);
 					else root.removeAttribute('data-palette');
 
 					/* Wallpaper: off | pattern (the uploaded SVG, tiled and recoloured) | file (the
@@ -251,6 +255,17 @@
 					if (dn === null) dn = sd.density || null;
 					if (dn === 'compact' || dn === 'large') root.setAttribute('data-density', dn);
 					else root.removeAttribute('data-density');
+
+					/* Content width (issue #44): how far the column may grow past the 1280px
+					   default, as a px length rather than a step name — the slider is continuous.
+					   Written only when it differs from the default, so an untouched theme paints
+					   from the bare :root exactly as it did before this axis existed.
+					   sd.content_width is -1 when unset. */
+					const cwRaw = lsGet('fs-content-width');
+					let cw = parseInt(cwRaw, 10);
+					if (cwRaw === null) cw = (sd.content_width >= 1280 ? sd.content_width : 1280);
+					if (cw >= 1280 && cw <= 3840 && cw !== 1280)
+						root.style.setProperty('--fs-content-max', cw + 'px');
 
 					/* Rounding 0-20px (02-tokens derives the control and chip radii from it). The
 					   default is a literal, this running before the stylesheet, so axes.mjs is the
