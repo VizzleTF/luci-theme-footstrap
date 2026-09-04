@@ -150,10 +150,22 @@
 	 * Large while the fields beside it went 38 -> 32.3 -> 43.7. The switch is a box that holds a
 	 * knob, which is the
 	 * box tier by definition. Local names rather than new global tokens: one component needs one
-	 * number and three things derived from it. */
-	.cbi-checkbox { display: inline-flex; align-items: center; }
+	 * number and three things derived from it.
+	 *
+	 * Scoped to `.cbi-checkbox > label[for]`, not a bare `.cbi-checkbox > label`: ui.js's
+	 * Checkbox.render() appends a SECOND label when `tooltip` is set (form.Flag.tooltip — e.g.
+	 * luci-app-firewall's zones.js on `masq`), `label.cbi-tooltip-container` holding the hint icon,
+	 * and the bare selector painted it as a second switch too — measured on the gallery's tooltip
+	 * fixture, both labels 40x22 at rgb(55,62,71), flush against each other with no gap. `[for]` is
+	 * the discriminator rather than `input[type="checkbox"] + label`: Checkbox.render() always
+	 * builds the switch label as `E('label', { 'for': id })` and the tooltip label with no `for` at
+	 * all, so the attribute alone tells the two apart, at a fifth of the bytes — the sibling
+	 * combinator repeated across five rules (this one, its ::before/::after, and the two
+	 * forced-colors rules in 95-a11y-media.css) put cascade.css 186 B over its budget; rescoping
+	 * dropped it back under. */
+	.cbi-checkbox { display: inline-flex; align-items: center; gap: var(--fs-space-2); }
 	.cbi-checkbox > input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
-	.cbi-checkbox > label {
+	.cbi-checkbox > label[for] {
 		--sw-w: calc(40px * var(--fs-density-box));
 		--sw-h: calc(22px * var(--fs-density-box));
 		--sw-knob: calc(16px * var(--fs-density-box));
@@ -172,10 +184,10 @@
 	 * The inset stays literal while the pill above scales: this is an accessibility floor, and a
 	 * floor that shrinks with a density setting is not one. At Compact the target is still 38x26.7,
 	 * over the minimum. */
-	.cbi-checkbox > label::before {
+	.cbi-checkbox > label[for]::before {
 		content: ""; position: absolute; inset: -4px -2px;
 	}
-	.cbi-checkbox > label::after {
+	.cbi-checkbox > label[for]::after {
 		content: ""; position: absolute; top: var(--sw-pad); inset-inline-start: var(--sw-pad);
 		width: var(--sw-knob); height: var(--sw-knob); border-radius: 50%;
 		background: var(--fs-dim);
@@ -184,6 +196,17 @@
 		transform: translateX(0);
 		transition: transform var(--fs-dur-move), background var(--fs-dur);
 	}
+	/* The tooltip-container label (above) is now unstyled by the switch rules, so it falls back to
+	 * the browser's plain inline label plus base's `cursor: help` — the icon glyph, no pill. It still
+	 * needs a gap from the switch, and `.cbi-checkbox`'s own `gap` above gives it one instead of a
+	 * margin declared here: the checkbox input inside that flex row is `position: absolute`, so it is
+	 * never a flex item, and `gap` only ever opens BETWEEN flex items — an ordinary `.cbi-checkbox`
+	 * with just the switch label has one flex item and gets no gap at all (measured: cb1's box is
+	 * still 40px wide, unchanged), while the tooltip fixture's two labels get exactly one. --fs-space-2
+	 * (8px), same number the removed margin used — the gap the theme already uses beside an inline
+	 * checkbox glyph (`.btn > input[type="checkbox"]` above) — measured on the gallery fixture: top
+	 * edges 0.5px apart (the icon glyph's own line box, not this gap) and left-to-right edge 8px,
+	 * both unchanged from before this rescope. */
 	.cbi-checkbox > input[type="checkbox"]:checked + label { background: var(--fs-accent); border-color: transparent; }
 	/* The travel is derived rather than hand-written, so it cannot drift out of step with the three
 	 * sizes above. The `- 2px` is the pill's two 1px BORDERS and is the whole subtlety: --sw-w is a

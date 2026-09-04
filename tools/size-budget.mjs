@@ -33,8 +33,20 @@ const LIMITS = {
 	 * the label demoted below the figure it introduces, the active interface head saying "up" in the
 	 * status colour instead of a full-bleed accent fill, and the data tables one step tighter. All
 	 * of it keyed on the SHAPE of a table rather than on the three cards the grid used to name, so a
-	 * third-party include of the same shape gets it too. */
-	cascadeCss: 128_000,
+	 * third-party include of the same shape gets it too.
+	 *
+	 * 128,027 B on 2026-09-04, up 38 B to stop the toggle switch painting ui.Checkbox's SECOND
+	 * label. `render()` appends `label.cbi-tooltip-container` next to the switch whenever the option
+	 * carries a tooltip (form.Flag.tooltip — luci-app-firewall's `masq` is where users met it), and
+	 * a bare `.cbi-checkbox > label` gave that label the pill too: a dead grey switch where the hint
+	 * icon belongs. `[for]` is the discriminator — the switch label has it, the tooltip label never
+	 * does — and it is the cheapest one: measured, HEAD 127,989 B; `[for]` over the five rules 128,014
+	 * (+25); the 8px `gap` that separates the icon from the switch 128,027 (+38 in all); the same fix
+	 * written as `input[type="checkbox"] + ` 128,127 (+138). The head-room was 11 B, so no form of
+	 * the fix fitted;
+	 * the limit goes to 128,512 rather than to the exact number, or the next one-selector bug fix
+	 * needs a gate edit of its own. */
+	cascadeCss: 128_512,
 	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
 	 * whether or not a given page loads it. 86,737 B on 2026-08-27.
 	 *

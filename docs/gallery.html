@@ -213,6 +213,23 @@ uci commit network</pre>
 					<div class="cbi-checkbox"><input id="cb1" type="checkbox" checked><label for="cb1"></label></div>
 				</div>
 			</div>
+			<!-- ui.Checkbox with `tooltip` set (form.Flag.tooltip, e.g. luci-app-firewall's zones.js
+			     `masq` — "IPv4 Masquerading"), markup exactly as ui.js's Checkbox.render() emits it:
+			     the switch label immediately after the input, THEN a second label.cbi-tooltip-container
+			     holding the icon glyph and its .cbi-tooltip popup. Two states, since the bug this covers
+			     (a dead second switch pill painted where the icon belongs) showed on both. -->
+			<div class="cbi-value">
+				<label class="cbi-value-title" for="cb-tt-on">Checkbox + tooltip (checked)</label>
+				<div class="cbi-value-field">
+					<div class="cbi-checkbox"><input id="cb-tt-on" type="checkbox" checked><label for="cb-tt-on"></label><label class="cbi-tooltip-container">⚠️<div class="cbi-tooltip">Limited masquerading enabled</div></label></div>
+				</div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title" for="cb-tt-off">Checkbox + tooltip (unchecked)</label>
+				<div class="cbi-value-field">
+					<div class="cbi-checkbox"><input id="cb-tt-off" type="checkbox"><label for="cb-tt-off"></label><label class="cbi-tooltip-container">⚠️<div class="cbi-tooltip">Limited masquerading enabled</div></label></div>
+				</div>
+			</div>
 			<div class="cbi-value">
 				<label class="cbi-value-title">Radio</label>
 				<div class="cbi-value-field">
