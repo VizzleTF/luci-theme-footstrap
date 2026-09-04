@@ -67,10 +67,20 @@ for r in $routers; do
 		# on a correct install (the apk leg passed only because `apk list` includes the installed
 		# version among the candidates). What the installer must never do is leave the router BEHIND
 		# the feed; being ahead of it is what a pre-release router looks like.
+		# The `want` expression inside filters the apk candidates down to THIS feed's. Since the
+		# theme was accepted into the official openwrt/luci feed, `apk list` answers with two builds
+		# of one name: ours, and one luci.mk stamps from git's commit date (26.246.70755~4fd72fd).
+		# That stamp only grows with the calendar, so a plain `sort -V | tail -1` always picks the
+		# foreign build and calls a correctly installed router "behind" - which is what failed this
+		# gate on owrt2512 and owrtsnap, while owrt2410 passed because its 24.10 feed carries no
+		# theme at all. The greps are the SAME rule install.sh pins with (`<26`, see
+		# is_foreign_luci_build() there): a leading number of 26 or more is not this feed's version.
+		# The comment lives HERE, not inside the payload: everything between the quotes below is a
+		# STRING, and a `#` line in it would be shipped to the container as code.
 		if ! docker exec "$c" sh -c '
 			if command -v apk >/dev/null 2>&1; then
 				have=$(apk list -I 2>/dev/null | sed -n "s/^luci-theme-footstrap-\([^ ]*\) .*/\1/p" | head -1)
-				want=$(apk list luci-theme-footstrap 2>/dev/null | sed -n "s/^luci-theme-footstrap-\([^ ]*\) .*/\1/p" | sort -V | tail -1)
+				want=$(apk list luci-theme-footstrap 2>/dev/null | sed -n "s/^luci-theme-footstrap-\([^ ]*\) .*/\1/p" | grep -v "^2[6-9]\." | grep -v "^[3-9][0-9]\." | sort -V | tail -1)
 			else
 				have=$(opkg list-installed luci-theme-footstrap 2>/dev/null | awk "{print \$3}")
 				want=$(opkg list luci-theme-footstrap 2>/dev/null | awk "{print \$3}" | sort -V | tail -1)
