@@ -401,7 +401,10 @@
 		background-image: var(--fs-select-chevron);
 		/* right inset from the scale, not a literal 12 — the .cbi-select shell below states the same
 		 * position and two spellings of one number is how they would drift apart */
-		background-repeat: no-repeat; background-position: right var(--fs-space-3) center; background-size: 12px;
+		/* two 6px bands forming the V, the far one a band-width further in; --fs-space-3 stays the
+		 * single spelling of the inset, as the note above says */
+		background-repeat: no-repeat; background-size: 6px 6px;
+		background-position: right calc(var(--fs-space-3) - 1px) center, right calc(var(--fs-space-3) + 5px) center;
 		padding: var(--fs-space-2) var(--fs-space-8) var(--fs-space-2) var(--fs-space-3);
 		border: var(--fs-hairline); border-radius: var(--fs-radius);
 		color: var(--fs-text); font-family: var(--fs-font-sans); font-size: var(--fs-type);
@@ -491,8 +494,8 @@
 		background-color: var(--fs-panel2);
 		background-image: var(--fs-select-chevron);
 		background-repeat: no-repeat;
-		background-position: right var(--fs-space-3) center;
-		background-size: 12px;
+		background-size: 6px 6px;
+		background-position: right calc(var(--fs-space-3) - 1px) center, right calc(var(--fs-space-3) + 5px) center;
 		transition: var(--fs-field-transition);
 	}
 	/* The disabled cue used to live ENTIRELY on the ▾ plate: base/30-forms.css dims

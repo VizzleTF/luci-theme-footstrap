@@ -263,7 +263,6 @@
 		 * label. */
 		--fs-dim: #33383d;
 		--fs-faint: #3d4348;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%2333383d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #0969da;
 		/* a tint OF --fs-accent, mixed FROM it: a restated literal goes stale the moment the accent
 		 * is recoloured or the accent-hue axis rotates it */
@@ -288,7 +287,6 @@
 		--fs-text: #adbac7;
 		--fs-dim: #8f9cab;
 		--fs-faint: #959ca5;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%238f9cab" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #569df5;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
 		--fs-track: #373e47;
@@ -321,7 +319,6 @@
 		 * 12.0:1 against the default palette's 11.8 and 10.0 */
 		--fs-dim: #272f3d;
 		--fs-faint: #2e3745;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23272f3d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #0b6fbd;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
 		--fs-track: #eaeef4;
@@ -343,7 +340,6 @@
 		--fs-text: #e8edf5;
 		--fs-dim: #9ba6b8;
 		--fs-faint: #8f9aad;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%239ba6b8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #3ba7ff;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 14%, transparent);
 		--fs-track: #1b2230;
@@ -397,7 +393,6 @@
 		--fs-text: #232323;
 		--fs-dim: #383838;
 		--fs-faint: #424242;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23383838" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		/* --primary-color-medium; -high (#1976d2) measured 4.22:1 on --fs-panel2 */
 		--fs-accent-base: #1564c0;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
@@ -431,7 +426,6 @@
 		 * than collapsing --text-color-medium and -low onto one colour. */
 		--fs-dim: #a6a6a6;
 		--fs-faint: #9a9a9a;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23a6a6a6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		--fs-accent-base: #53a4c2;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
 		--fs-track: #333333;
@@ -471,7 +465,6 @@
 		--fs-text: #10202b;
 		--fs-dim: #2c4150;
 		--fs-faint: #3d5566;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%232c4150" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		/* #00B5E2 held at hue, taken down until it reads: 5.89:1 on white against its own 2.09:1 */
 		--fs-accent-base: #036c92;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
@@ -494,7 +487,6 @@
 		--fs-text: #e6f1f7;
 		--fs-dim: #b8cfdd;
 		--fs-faint: #9dbccd;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23b8cfdd" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		/* the CI cyan, one step up so it clears AA on the lightest of the three surfaces too */
 		--fs-accent-base: #35c6ea;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
@@ -541,7 +533,6 @@
 		--fs-text: #222222;
 		--fs-dim: #3d3d3d;
 		--fs-faint: #4a4a4a;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%233d3d3d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		/* --tertiary #0088cc measures 3.89:1 on white; #0074ad held the hue at 5.12:1 there but
 		 * only 4.49:1 on --fs-panel2, under the 4.5:1 floor the export tier holds every surface to;
 		 * #0073ac holds it at 5.19:1 on white and 4.55:1 on --fs-panel2 */
@@ -569,7 +560,6 @@
 		--fs-text: #dddddd;
 		--fs-dim: #a3a3a3;
 		--fs-faint: #969696;
-		--fs-select-chevron: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23a3a3a3" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
 		/* --tertiary #0f82af measured 3.66:1 on --fs-bg and 3.12:1 on --fs-panel2, both under the
 		 * 4.5:1 the export tier wants for a colour printed as text; #13a8e3 holds the hue at
 		 * 5.86:1 on --fs-bg and 5.00:1 on --fs-panel2 */

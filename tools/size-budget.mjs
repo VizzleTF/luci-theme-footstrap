@@ -61,7 +61,14 @@ const LIMITS = {
 	 * cheap, but they are still declared twice for the same reason every other axis is. The limit
 	 * stays at 129,700 — 391 B of head-room, down from the 507 the forum raise left, because
 	 * nothing about THIS axis needed more. */
-	cascadeCss: 129_700,
+	/* 127,027 B on 2026-09-04, DOWN 2,166 B: the select's chevron stopped being an SVG data-URI. A
+	 * URI cannot read var(), so the stroke colour had to be written into the string and the whole
+	 * declaration was repeated per palette and per mode - ten copies of one glyph. Two gradient
+	 * bands take their colour from --fs-dim at paint time, so there is one declaration for the whole
+	 * theme and a new palette costs nothing for it. The limit follows the number DOWN rather than
+	 * banking the room: a ratchet that keeps slack it did not earn is not a ratchet. 127,600 leaves
+	 * the same ~500 B of head-room this budget has always run on. */
+	cascadeCss: 127_600,
 	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
 	 * whether or not a given page loads it. 86,737 B on 2026-08-27.
 	 *

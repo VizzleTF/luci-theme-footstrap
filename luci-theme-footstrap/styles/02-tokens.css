@@ -180,6 +180,18 @@
 		 * palette rather than a guaranteed one; the numbers live in the changelog entry. A palette that
 		 * needs the old behaviour sets this back to var(--fs-panel2). */
 		--fs-bar-ctl-bg: transparent;
+		/* The select's chevron, drawn rather than fetched. It used to be an inline SVG data-URI, and
+		 * a URI cannot read var() — the stroke colour had to be written INTO the string, so the
+		 * declaration was repeated once per palette and once per mode: ten copies of one glyph, ~2.4 KB
+		 * of the shipped sheet, and ten chances for a palette to be recoloured while its chevron was
+		 * not. Two gradient bands cost one declaration and take their colour from the palette's own
+		 * --fs-dim at paint time, so a new palette gets a correct chevron for free. The 45% / 55% stops
+		 * are the band's thickness; the two layers are positioned by the rules that use this, since
+		 * only they know the field's inset. What is given up is the round line cap the SVG had, which
+		 * at 12px is not visible — compared side by side before the swap. */
+		--fs-select-chevron:
+			linear-gradient(-45deg, transparent 45%, var(--fs-dim) 45% 55%, transparent 55%),
+			linear-gradient(45deg, transparent 45%, var(--fs-dim) 45% 55%, transparent 55%);
 		--fs-bar-h: calc(46px * var(--fs-density-box));
 		/* the square icon button in the bar and rail: the logo box, the .fs-themerow controls,
 		 * Log out and the collapsed poll pill are one size, so the right cluster reads as a row
