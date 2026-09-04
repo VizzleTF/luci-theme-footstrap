@@ -1,3 +1,13 @@
+## [Unreleased]
+
+### Fixed
+
+- **`apk add --upgrade` now pins the theme and its catalogues below `26`, so `install.sh` no longer moves a router onto the official openwrt/luci feed's build of this theme.** apk resolves a bare name to the highest version across every configured repository, and `luci.mk` stamps a LuCI-carried package from git's commit date instead of this project's own numbering — measured on owrt2512 (OpenWrt 25.12.4, apk-tools 3.0.5): `luci-theme-footstrap-26.246.70755~4fd72fd` from `feeds/luci/…` outranks owfeed's own `0.14.10-r1`, so the installer's plain `apk add --upgrade "$PKG"` installed the official build instead — reported as "Upgraded … -> 26.246.70755~4fd72fd", a move to a different publisher's code that predates this release (no rpcd-reload fix, no checkbox-tooltip fix), not an upgrade. `<26` is a ceiling, not a pin, picked because the LuCI stamp only grows with the calendar — `apk version -t` puts `26.246.70755~4fd72fd` and `27.1.1~abc` both `>` it, while `0.14.10-r1`, `1.0.0-r1` and `25.99.99-r1` all compare `<` — so it excludes every LuCI-stamped build for good and leaves this project's own numbering majors 1 through 25 to grow into.
+  - `luci-i18n-footstrap-<lang>` gets the same constraint for the same reason: both catalogues exist in both feeds at both versions.
+  - `--upgrade` stays rather than becoming a plain `add`: with the constraint it also REPAIRS a router that already took the official build (measured: "Downgrading luci-theme-footstrap (26.246.70755~4fd72fd -> 0.14.10-r1)").
+  - The closing message no longer calls that repair an "Upgrade" — it now reads "Moved … back onto the owfeed-packages feed's build" whenever the previous version was a LuCI-stamped one.
+  - opkg is unchanged, with the reason now in a comment: it has no `world` file and no version-constraint syntax on `install`/`upgrade`, and the official 24.10 feed does not carry the theme at all today (checked on owrt2410: `opkg info luci-theme-footstrap` names only this project's own `0.14.9-r1`); if that changes, the fallback is the signed-release install path the script already has. `docs/ci.md`.
+
 ## [0.14.10] — 2026-09-04
 
 ### Added

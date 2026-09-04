@@ -93,6 +93,16 @@ installed_version() {
 	fi
 }
 
+# Whether a version STRING came from the official openwrt/luci feed rather than this project's own:
+# luci.mk stamps a LuCI-carried build from git's commit date (`26.246.70755~4fd72fd`, measured on
+# 25.12.4/apk-tools 3.0.5), and that leading number only grows with the calendar — see the `<26`
+# apk constraint below. Used only to word the closing message honestly; the constraint is what
+# actually keeps apk off that build.
+is_foreign_luci_build() {	# <version>
+	_maj=$(printf '%s' "$1" | sed -n 's/^\([0-9]\{1,\}\)\..*/\1/p')
+	[ -n "$_maj" ] && [ "$_maj" -ge 26 ]
+}
+
 # …and whether the feed has caught up. A release lands on GitHub first and reaches owfeed-packages
 # afterwards, through a pull request against that repository — usually minutes, sometimes a day. In
 # between, a user who installs gets the previous version with nothing to tell them why. So compare
@@ -234,7 +244,10 @@ install_language() {
 	if [ "$_in_feed" = yes ]; then
 		info "Fetching the $_lang translation ($_lpkg)..."
 		if [ "$PM" = apk ]; then
-			pm_quiet apk add --upgrade "$_lpkg" || {
+			# Same collision as the theme package itself (see the `<26` comment above the theme's
+			# `apk add`, near the feed install below): `$_lpkg` exists in both feeds too, and the
+			# official one's LuCI-stamped version always outranks this project's.
+			pm_quiet apk add --upgrade "$_lpkg<26" || {
 				warn "Could not install $_lpkg — the theme stays in English."; return 0; }
 		else
 			pm_quiet opkg install "$_lpkg" || pm_quiet opkg upgrade "$_lpkg" || {
@@ -397,7 +410,13 @@ if [ -z "$BRANCH" ]; then
 	printf '\n'
 	_have=$(installed_version)
 	if [ -n "$_have" ] && [ -n "$_before" ] && [ "$_before" != "$_have" ]; then
-		ok "Upgraded $PKG $_before -> $_have"
+		if is_foreign_luci_build "$_before"; then
+			# Not an upgrade: $_before was the official openwrt/luci feed's build, numbered higher
+			# but predating this release — see is_foreign_luci_build() above.
+			ok "Moved $PKG back onto this project's build: $_before -> $_have"
+		else
+			ok "Upgraded $PKG $_before -> $_have"
+		fi
 	elif [ -n "$_have" ]; then
 		ok "Installed $PKG $_have"
 	fi
@@ -461,8 +480,23 @@ if [ "$PM" = apk ]; then
 	# `--upgrade` (`-u`) is what asks for the newest the feed carries; it installs on a router that
 	# does not have the theme yet, so this one line covers both paths, exactly as the opkg leg below
 	# already did with its explicit `opkg upgrade`.
+	#
+	# `<26`: apk resolves a bare name to the HIGHEST version across every configured repository, not
+	# the one just added above — and this theme is now ALSO carried by the official openwrt/luci feed,
+	# where luci.mk stamps the version from git's commit date instead of this project's own numbering
+	# (measured on 25.12.4/apk-tools 3.0.5: `luci-theme-footstrap-26.246.70755~4fd72fd`, from
+	# `feeds/luci/…`, next to owfeed's own `0.14.10-r1`). That stamp only grows with the calendar, so a
+	# bare `apk add --upgrade "$PKG"` moves the router to the OTHER publisher's code — one that
+	# predates this release, not an upgrade to it (field report: "Upgraded … -> 26.246.70755~4fd72fd").
+	# `apk version -t` confirms `26.246.70755~4fd72fd` and `27.1.1~abc` both compare `>` against `26`,
+	# while `0.14.10-r1`, `1.0.0-r1` and `25.99.99-r1` all compare `<` — so `<26` excludes every
+	# LuCI-stamped build for good and still leaves this project's own numbering majors 1-25 to grow
+	# into. DO NOT "tidy" this to `<1` — it would start rejecting this project's own future releases.
+	# `--upgrade` with the constraint also REPAIRS a router that already took the official build: it
+	# downgrades back to ours (measured: "Downgrading luci-theme-footstrap (26.246.70755~4fd72fd ->
+	# 0.14.10-r1)"), which is why `--upgrade` stays rather than becoming a plain `add`.
 	info "Installing $PKG..."
-	pm_quiet apk add --upgrade "$PKG" || exit 1
+	pm_quiet apk add --upgrade "$PKG<26" || exit 1
 else
 	if ! grep -q "$FEED_NAME" /etc/opkg/customfeeds.conf 2>/dev/null; then
 		info "Adding the $FEED_NAME feed..."
@@ -486,6 +520,15 @@ else
 	# `opkg install` on an installed package is a no-op even when the feed has a newer
 	# version — it reports "already installed" and exits 0 — so a second run has to ask
 	# for the upgrade explicitly. Up to date is not an error for `opkg upgrade`.
+	#
+	# No `<26` here: opkg has no `world` file and no version-constraint syntax on `install`/
+	# `upgrade`, so there is no opkg equivalent of the apk leg's fix above. Left as plain
+	# `opkg upgrade "$PKG"` because the collision it would guard against does not exist today —
+	# the official 24.10 feed carries no luci-theme-footstrap at all yet (checked on owrt2410:
+	# `opkg info luci-theme-footstrap` names only this project's own `0.14.9-r1`). If that ever
+	# changes, there is no constraint to add here; the fallback is already written — bypass feed
+	# resolution entirely and install the signed release artifact directly
+	# (`install_from_release`), the same path a router with no matching feed branch already takes.
 	info "Installing $PKG..."
 	if opkg list-installed | grep -q "^$PKG "; then
 		pm_quiet opkg upgrade "$PKG" || exit 1
@@ -510,7 +553,14 @@ if [ -z "$_have" ]; then
 elif [ -z "$_before" ]; then
 	ok "Installed $PKG $_have — from the $FEED_NAME feed, \`$PM upgrade\` will keep it current."
 elif [ "$_before" != "$_have" ]; then
-	ok "Upgraded $PKG $_before -> $_have — \`$PM upgrade\` will keep it current."
+	if is_foreign_luci_build "$_before"; then
+		# Not an upgrade: $_before was the official openwrt/luci feed's build — a higher, unrelated
+		# version number from a different publisher, not a newer release of this project. The `<26`
+		# constraint on the apk install above is what just moved the router back onto owfeed's build.
+		ok "Moved $PKG back onto the $FEED_NAME feed's build: $_before -> $_have"
+	else
+		ok "Upgraded $PKG $_before -> $_have — \`$PM upgrade\` will keep it current."
+	fi
 else
 	ok "Already current: $PKG $_have — the feed carries nothing newer."
 fi

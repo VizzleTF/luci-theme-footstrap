@@ -396,6 +396,36 @@ certificate verification; falling through to the next TOOL is not a downgrade.
 the script: apk checks the index against `owfeed-packages.pem`, opkg against usign key
 `9040356b214084da`.
 
+**The theme is now also carried by the official openwrt/luci feed, and a bare `apk add` picks that
+build instead of owfeed's.** apk resolves a name it is given with no version constraint to the
+HIGHEST version across every configured repository, not the one the repository line just added
+serves — and luci.mk stamps a LuCI-carried package from git's commit date rather than this
+project's own numbering. Measured on owrt2512 (OpenWrt 25.12.4, apk-tools 3.0.5):
+
+```
+# apk list luci-theme-footstrap
+luci-theme-footstrap-0.14.10-r1            noarch {luci-theme-footstrap}   ← owfeed
+luci-theme-footstrap-26.246.70755~4fd72fd  noarch {feeds/luci/…}           ← official feed
+```
+
+`install.sh`'s `apk add --upgrade "$PKG"` moved a router onto the second line — reported as
+"Upgraded luci-theme-footstrap 0.14.9-r1 -> 26.246.70755~4fd72fd", which is not an upgrade: that
+build predates this release (no rpcd-reload fix, no checkbox-tooltip fix) and comes from a
+different publisher. The fix is a version constraint the script now applies to both the theme and
+its `luci-i18n-footstrap-*` catalogues, `apk add --upgrade "$PKG<26"`, which both picks owfeed's
+build over the official one and REPAIRS a router that already has the official one (`--upgrade`
+still applies, so it downgrades, measured: "Downgrading luci-theme-footstrap
+(26.246.70755~4fd72fd -> 0.14.10-r1)"). `26` is a ceiling, not a version pin: `apk version -t`
+confirms `26.246.70755~4fd72fd` and `27.1.1~abc` both compare `>` against `26` — the LuCI stamp
+only grows with the calendar — while `0.14.10-r1`, `1.0.0-r1` and `25.99.99-r1` all compare `<`,
+so the constraint excludes every LuCI-stamped build for good and leaves this project's own
+numbering majors 1 through 25 to grow into. opkg has no `world` file and no version-constraint
+syntax on `install`/`upgrade`, so this has no opkg equivalent; left alone because the official
+24.10 feed does not carry the theme today (checked on owrt2410, `opkg info luci-theme-footstrap`
+names only this project's own `0.14.9-r1`) — if that changes, the fallback is the signed-release
+install path this script already has (`install_from_release`), which bypasses feed resolution
+entirely.
+
 **There is no pinned-tag install, and the release-asset fallback is automatic but never the first
 choice.** A router that cannot read the feed index at all — an architecture owfeed does not publish,
 a resolver that does not answer, a network that intercepts the host — is installed from the release
