@@ -20,24 +20,45 @@ fi
 # this the wrapper launders any command past the `ask` fence on the hardware router and on
 # publishing. The fence has to live here, where the whole command line is visible.
 #
-# Scanned as words, not substrings, so `sshd` or a path ending in `-ssh` does not trip it; the
-# quoting and the shell operators are folded to spaces first so a nested `sh -c '…'` is scanned too.
-SCAN=$(printf ' %s ' "$*" | tr '\n\t"`;&|()<>'"'"'\\' ' ' | tr -s ' ')
+# This is a guardrail against the wrapper laundering a command past a permission rule, not a
+# sandbox: it reads the text of the command, so it can be fooled by anything the text itself does
+# not reveal (an alias, a script that shells out, a binary named to match nothing here). What it
+# does catch is scanned as words, not substrings, so `sshd` or a path ending in `-ssh` does not
+# trip it. Backslashes are deleted (not folded to a separator) BEFORE the quoting and shell
+# operators are folded to spaces, so `s\sh` collapses to the `ssh` it will actually become when the
+# shell reassembles it, rather than scanning as two harmless words.
+SCAN=$(printf ' %s ' "$*" | tr -d '\\' | tr '\n\t"`;&|()<>'"'"'' ' ' | tr -s ' ')
 set -f                     # $SCAN is split into words, never globbed: a run may carry a literal `*`
+prev=''
 for word in $SCAN; do
+	# Path forms (`/usr/bin/ssh`, `./ssh`) walk past a bare-word match, so the same names are
+	# checked with a `*/name` form too; `*dev-sync.sh` already had this shape and is the model.
 	case "$word" in
-		ssh | scp | sftp | rsync | *dev-sync.sh)
+		ssh | scp | sftp | rsync | */ssh | */scp | */sftp | */rsync | *dev-sync.sh)
 			echo "refused: '$word' goes through the human, not through a detached wrapper." >&2
 			echo "tools/bg.sh is allow-listed, so a command run through it never reaches the 'ask' rule that guards this one. Run it in the foreground." >&2
 			exit 2 ;;
 	esac
+	# Publishing is `git`/`gh` plus a subcommand, and a path defeats a literal `git push`
+	# substring match the same way it defeats the ssh check above; the basename of the PREVIOUS
+	# word is what a shell would actually run, so that is what is compared here.
+	case "${prev##*/}" in
+		git)
+			case "$word" in
+				push | commit | tag)
+					echo "refused: committing, pushing and publishing are given per action by the human (CLAUDE.md), and a detached run cannot be given anything." >&2
+					exit 2 ;;
+			esac ;;
+		gh)
+			case "$word" in
+				pr | release | issue)
+					echo "refused: committing, pushing and publishing are given per action by the human (CLAUDE.md), and a detached run cannot be given anything." >&2
+					exit 2 ;;
+			esac ;;
+	esac
+	prev=$word
 done
 set +f
-case "$SCAN" in
-	*' git push '* | *' git commit '* | *' git tag '* | *' gh pr '* | *' gh release '* | *' gh issue '*)
-		echo "refused: committing, pushing and publishing are given per action by the human (CLAUDE.md), and a detached run cannot be given anything." >&2
-		exit 2 ;;
-esac
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 TMP=$(dirname -- "$ROOT")/tmp

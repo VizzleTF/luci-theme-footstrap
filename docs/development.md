@@ -582,6 +582,28 @@ containers. Either take the stands down first, or assert the five `verify` thing
 running stand. If you do it by hand, log IN: an unauthenticated `curl` answers 403 and proves
 nothing.
 
+**`owlab up` can fail to rebuild the full five-router set, and the failure looks like the theme's
+containers are gone.** The 24.10 leg dies in the image build on opkg index drift:
+
+```
+opkg_install_pkg: Checksum or size mismatch for package bash
+target owrt2410: failed to solve: … exit code: 255
+```
+
+Docker's build cancels the ImmortalWrt and snapshot legs the moment that one fails, so one stale
+index entry takes down a run that was asked to rebuild all five. **Do not take the running stands
+down while `up` is broken this way** — a `--rebuild` or a plain `up` that fails partway may not
+hand them back, and there is no volume to recover from. The way round it, used for the 0.14.10
+pre-tag matrix: `owlab test --release <version> --install <artifact> --assert …` synthesises its
+own router and reads no `owlab.yaml`, so it needs no image rebuild at all. Run it from a scratch
+directory rather than the checkout — the containers are named after the cwd, so this also keeps it
+from colliding with (or replacing) the project's own stands:
+
+```sh
+mkdir -p ../tmp/owlab-test-pretag && cd ../tmp/owlab-test-pretag
+owlab test --release 25.12.4 --install '/path/to/dist/noarch/luci-theme-footstrap-*.apk' --assert …
+```
+
 **Reset the syslog BEFORE a live run, not after it reports.**
 `/admin/services/banip/processing_log` prints the system log as page content, so the page grows with
 every install, sync and `rpcd reload` done while working — a long session manufactures its own
