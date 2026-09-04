@@ -874,6 +874,31 @@ option two</textarea></div>
 </div>
 
 <div class="g-sec">
+	<h2>The chrome bar (#indicators, .fs-themerow, .fs-logout)</h2>
+	<!-- The bar's own controls, in the shape the chrome really emits: the buttons come from
+	     ucode/template/themes/footstrap/partials/search.ut and logout.ut, and #indicators is the
+	     empty div header.ut leaves for LuCI (`<div id="indicators" class="fs-indicators">`), which
+	     ui.js fills with a BARE `<span data-indicator=…>` — no class, which is exactly why a theme
+	     rule written against `.label` painted nothing and no gate noticed. Nothing here needs the
+	     chrome JS: fs-chrome.js only adds .fs-ind-compact/.fs-bar-actrow by measurement, and their
+	     absence is the ordinary wide-bar case this fixture stands for. -->
+	<div class="fs-sidebar" style="position:static">
+		<div class="fs-indicators" id="indicators">
+			<span data-indicator="poll-status" data-style="active">Refreshing</span>
+			<span data-indicator="uci-changes" data-clickable="true">Unsaved: 3</span>
+		</div>
+		<button type="button" class="fs-themerow" aria-label="Search">
+			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
+			<span class="fs-label">Search</span>
+		</button>
+		<a class="fs-logout" href="#" aria-label="Log out">
+			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M14 12h7m0 0-3-3m3 3-3 3"/></svg>
+			<span class="fs-label">Log out</span>
+		</a>
+	</div>
+</div>
+
+<div class="g-sec">
 	<h2>Modal</h2>
 	<!-- `opacity`/`visibility`, not just `position`/`display`: base/60-modal.css hides the overlay
 	     until <body> carries `modal-overlay-active`, so this whole section rendered NOTHING — and
