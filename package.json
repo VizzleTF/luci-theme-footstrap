@@ -65,6 +65,6 @@
     "terser": "^5.49.2"
   },
   "overrides": {
-    "fast-uri": "^3.1.5"
+    "fast-uri": "^3.1.6"
   }
 }
