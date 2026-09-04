@@ -78,46 +78,105 @@ define Package/luci-theme-footstrap/conffiles
 /etc/config/footstrap
 endef
 
-# reload, never restart: rpcd holds sessions in memory, so `restart` logs out every LuCI user,
-# including the admin who just clicked Update. A session survives `reload` and dies across
-# `restart` — verified on a live router.
+# NO `rpcd reload` HERE, on install or removal — it used to be, and it was the more dangerous of
+# the two rpcd calls this package could make. Measured on an owrt2512 stand:
 #
-# AND RELOAD RE-READS THE PLUGINS, not only /usr/share/rpcd/acl.d/*. That correction matters,
-# because it is what makes the check below necessary rather than decorative. Measured on a
-# SNAPSHOT stand, where the `luci` object comes from the ucode plugin
-# /usr/share/rpcd/ucode/luci (24.10 and 25.12 use /usr/libexec/rpcd/luci):
+# 1. RELOAD IS A RE-EXEC, NOT A REFRESH. `/etc/init.d/rpcd reload` is `procd_send_signal rpcd` ->
+#    SIGHUP -> rpcd freezes sessions and calls exec_self(): a full re-exec that re-scans the plugin
+#    dirs and dlopen()s every .so. A plugin file that is absent or mid-write at that instant is
+#    DROPPED, past one stderr line, and does NOT come back on its own:
 #
-#   file removed  + reload  -> `ubus list` loses `luci`     (and it does NOT come back on its own)
-#   file removed  + restart -> still gone
-#   file restored + reload  -> back
+#      mv /usr/lib/rpcd/file.so /tmp/ ; rpcd reload   -> `ubus list` loses `file`
+#      file restored, no reload                       -> still missing
+#      reload (or restart)                             -> back
 #
-# So a reload that lands while another package is replacing that file leaves rpcd without the
-# object, and every luci/getFeatures, luci/getTimezones and luci/getMountPoints call answers
-# `-32000 Object not found` until something reloads it again — the page then renders with the
-# system time blank and an RPCError box per call. Reported from the field on a SNAPSHOT router,
-# cleared by a reboot; nine days of uptime before it, so it was an upgrade that did it.
+#    First measured this way on the `luci` ucode plugin (24.10/25.12: /usr/libexec/rpcd/luci) — a
+#    reload racing another package's file replacement left every luci/getFeatures,
+#    luci/getTimezones and luci/getMountPoints call answering `-32000 Object not found`, reported
+#    from the field on a SNAPSHOT router, cleared only by a reboot. The SAME race hits `file`, and
+#    losing `file` is worse: it is what makes System -> Backup/Flash Firmware's "Reset to
+#    defaults" row silently disappear. view/system/flash.js computes has_rootfs_data from
+#    /proc/mtd and /proc/mounts read through fs.trimmed(), wrapped in L.resolveDefault(..., '') —
+#    so the -32000 `file` answers with reads as "no overlay" instead of as an error (OpenWrt forum
+#    thread 251930, posts 97 and 109 — "fixed" by installing an unrelated package whose OWN
+#    postinst reload happened to re-register `file`).
 #
-# Hence: reload, then ASK whether the object is there, and reload once more if it is not. A second
-# reload and not a restart, because the table above is the whole argument — reload already does
-# everything restart would do to the plugin set, and restart adds only the logout. If the object is
-# still missing after that, it is not this package's reload that removed it, and throwing every
-# admin out of LuCI would not bring it back.
+# 2. THIS PACKAGE HAS NOTHING FOR A RELOAD TO REFRESH. It registers no rpcd object at all — no
+#    /usr/libexec/rpcd/* script, no /usr/lib/rpcd/*.so, only root/usr/share/rpcd/acl.d/*.json — so
+#    a reload here only runs the dlopen risk above for every OTHER plugin, for zero gain of its own.
+#
+# 3. rpcd READS acl.d/*.json AT LOGIN, not only at start or on SIGHUP. Measured: narrow
+#    rpcd.@login[0].read/write from '*' to an explicit group list, remove the ACL file with rpcd
+#    already running -> `session access` for uci footstrap write answers false; put the file back
+#    with NO reload, log in again -> true. A fresh login already sees a just-installed ACL.
+#
+# 4. On a stock router, root's rpcd login grants read='*' write='*' — blanket. `session access`
+#    answers true even for an INVENTED object (measured against `uci totally_made_up_pkg_xyz`), so
+#    the theme's ACL group is irrelevant to a root session from the start.
+#
+# The one case #3 does not cover: a session that logged in BEFORE this install, on a RESTRICTED
+# (non-'*') rpcd login — its in-memory ACL set predates the new grant, and only a fresh login
+# re-reads acl.d. Measured: that session stays false until it is forced to re-authenticate.
+# Ending the session (not reloading rpcd) fixes exactly that, with a narrower blast radius: the
+# postinst below ends a session only when a fresh login would actually gain the scope — denied
+# uci/footstrap/write right now, AND its own username's rpcd login lists this theme's ACL group —
+# so a restricted login the theme's grant was never added to (a second admin account, a monitoring
+# script's login) is left running: re-authenticating would deny it exactly the same as before.
+# Verified verbatim on the stand: a blanket-root session survived, a stale restricted session was
+# destroyed, the unauthenticated all-zero session was left untouched, and a fresh login answered
+# true. The one visible price: an admin on a restricted account WHOSE LOGIN ALREADY LISTS the
+# theme's group is logged out by their own install action and must log back in — the narrowest set
+# this can be, since a session whose login never grants the group gains nothing from re-logging in.
 define Package/luci-theme-footstrap/postinst
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
-	# uci-defaults registers the theme; refresh rpcd + drop caches so LuCI sees it without a
-	# reboot. Calling it ourselves is belt-and-braces: OpenWrt's default_postinst also runs
-	# (then deletes) every /etc/uci-defaults/* we ship, so it executes twice per install. It is
+	# uci-defaults registers the theme; drop the LuCI caches so it is seen without a reboot.
+	# Calling it ourselves is belt-and-braces: OpenWrt's default_postinst also runs (then
+	# deletes) every /etc/uci-defaults/* we ship, so it executes twice per install. It is
 	# idempotent: the second pass finds the theme already registered and changes nothing.
 	[ -f /etc/uci-defaults/30_luci-theme-footstrap ] && \
 		sh /etc/uci-defaults/30_luci-theme-footstrap >/dev/null 2>&1 || true
 	rm -f /tmp/luci-indexcache* /tmp/luci-modulecache/* >/dev/null 2>&1 || true
-	/etc/init.d/rpcd reload >/dev/null 2>&1 || true
-	# see the note above the define: a reload that raced another package's file replacement leaves
-	# rpcd without the `luci` object, and nothing brings it back on its own
-	ubus list 2>/dev/null | grep -qx luci || {
-		sleep 1
-		/etc/init.d/rpcd reload >/dev/null 2>&1 || true
+	# See the note above the define: no reload. Instead, end a session only when re-authenticating
+	# would actually hand it the theme's scope: it must be denied uci/footstrap/write right now
+	# AND its own rpcd login entry must list this theme's ACL group, in either read or write — a
+	# denied session whose login never grants that group (a second admin account or a monitoring
+	# script's login the theme was never added to) stays denied after a fresh login too, so ending
+	# it would only cost someone a session for nothing. Guarded on the `session` object existing at
+	# all (a router with rpcd built without ubus session support just does nothing here).
+	ubus list 2>/dev/null | grep -qx session && {
+		for s in $$(ubus call session list 2>/dev/null | grep -o '"ubus_rpc_session": "[a-f0-9]*"' | cut -d'"' -f4); do
+			# skips the all-zero session: that one is the UNAUTHENTICATED default and is never
+			# denied anything by an ACL, so it is not this sweep's business.
+			case "$$s" in *[!0]*) ;; *) continue ;; esac
+			ubus call session access "{\"ubus_rpc_session\":\"$$s\",\"scope\":\"uci\",\"object\":\"footstrap\",\"function\":\"write\"}" 2>/dev/null | grep -q true && continue
+			# A '*' login already answered true above and never reaches here. What is left is a
+			# denied session: only destroy it if ITS OWN username's rpcd login actually lists the
+			# theme's ACL group, so a fresh login would gain the scope this sweep is chasing.
+			u=$$(ubus call session get "{\"ubus_rpc_session\":\"$$s\"}" 2>/dev/null | grep -o '"username": *"[^"]*"' | cut -d'"' -f4)
+			[ -n "$$u" ] || continue
+			# Enumerate every login section from `uci show`, not a `uci -q get` index count: the
+			# latter stops at the FIRST section with no username option (a login block missing that
+			# option is legal UCI) and never looks at any section past it — fails safe (a session is
+			# kept, never wrongly destroyed) but skips real sections. `while read` takes one line at
+			# a time instead of `for`'s word-splitting, because a username may itself contain a
+			# space, which would otherwise split one section's line into two and skip it. The loop
+			# runs in a subshell, so its answer cannot survive in a variable — it is echoed out and
+			# captured instead. A show line's value comes single-quoted
+			# (`rpcd.@login[0].username='root'`), stripped below.
+			grant=$$(uci show rpcd 2>/dev/null | grep -F .username= | while read -r kv; do
+				sect=$${kv%%.username=*}
+				un=$${kv#*.username=}
+				un=$${un#\'}
+				un=$${un%\'}
+				[ "$$un" = "$$u" ] || continue
+				for grp in $$(uci -q get "$$sect.read") $$(uci -q get "$$sect.write"); do
+					[ "$$grp" = luci-theme-footstrap ] && { echo 1; break 2; }
+				done
+			done)
+			[ -n "$$grant" ] || continue
+			ubus call session destroy "{\"ubus_rpc_session\":\"$$s\"}" >/dev/null 2>&1 || true
+		done
 	}
 }
 exit 0
@@ -146,7 +205,9 @@ case "$$1" in *upgrade*) exit 0 ;; esac
 	# upgrade). A real removal is the one time it should go — this branch never runs on upgrade.
 	rm -rf /etc/footstrap >/dev/null 2>&1 || true
 	rm -f /tmp/luci-indexcache* /tmp/luci-modulecache/* >/dev/null 2>&1 || true
-	/etc/init.d/rpcd reload >/dev/null 2>&1 || true	# see the postinst note: reload keeps sessions
+	# No rpcd reload here either — see the postinst note. A removal drops nothing rpcd needs to
+	# be told about (no plugin object, ever); a session still holding the now-gone ACL group is
+	# simply denied uci/footstrap/write on its next call, which is the correct answer anyway.
 }
 endef
 

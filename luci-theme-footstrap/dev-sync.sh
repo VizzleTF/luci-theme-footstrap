@@ -100,7 +100,12 @@ for _f in "$D"/root/etc/config/*; do
 done
 # There is no self-update backend to deploy any more: the theme upgrades through the package feed
 # the installer adds, which is what a package manager is for.
-ssh "$R" "/etc/init.d/rpcd reload 2>/dev/null; rm -f /tmp/luci-indexcache*"
+#
+# No rpcd reload here either — same race as the Makefile's postinst note (Package/luci-theme-
+# footstrap/postinst): this copies files onto a router where the theme registers no rpcd object,
+# rpcd re-reads acl.d/*.json at LOGIN (not only on reload), and a developer's root session already
+# carries read='*' write='*', so the theme's ACL group is irrelevant to it regardless.
+ssh "$R" "rm -f /tmp/luci-indexcache*"
 
 ssh "$R" "
 # Sweep every pre-consolidation name, including $N-top: the top bar is not a theme any more, so a
