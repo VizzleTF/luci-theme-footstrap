@@ -26,8 +26,22 @@ case "$CMD" in
 	*) exit 0 ;;
 esac
 
+# Resolved BEFORE the `cd` below, or a hook invoked by a relative path would resolve `$0` against
+# the wrong directory. settings.json passes an absolute `${CLAUDE_PROJECT_DIR}/...`, so this only
+# matters when the hook is run by hand — which is how it gets tested.
+HOOK_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd -P)
+
 CWD=$(printf '%s' "$IN" | jq -r '.cwd // ""')
 [ -n "$CWD" ] && cd "$CWD"
+
+# The contract belongs to THIS repository, and a session commits in others: owfeed-packages, and
+# the openwrt/luci fork behind an upstream PR. Neither tree has a CHANGELOG.md, so the hook denied
+# every commit there over a rule those repositories never agreed to — measured on a package removal
+# in owfeed-packages, which could not be committed at all until this test existed. The hook ships
+# inside .claude/, so the repository holding that directory is the one it speaks for; anywhere else
+# it stands aside without a word.
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || true)
+[ "$GIT_ROOT" = "$HOOK_ROOT" ] || exit 0
 
 deny() {
 	jq -n --arg r "$1" '{

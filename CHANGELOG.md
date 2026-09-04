@@ -8,6 +8,8 @@
   - The closing message no longer calls that repair an "Upgrade" — it now reads "Moved … back onto the owfeed-packages feed's build" whenever the previous version was a LuCI-stamped one.
   - opkg is unchanged, with the reason now in a comment: it has no `world` file and no version-constraint syntax on `install`/`upgrade`, and the official 24.10 feed does not carry the theme at all today (checked on owrt2410: `opkg info luci-theme-footstrap` names only this project's own `0.14.9-r1`); if that changes, the fallback is the signed-release install path the script already has. `docs/ci.md`.
 
+- **The changelog contract stops denying commits in repositories that never signed it.** `precommit-gate.sh` matched any `git commit` in the session and demanded both changelog files, so a commit in `owfeed-packages` — a feed repository with no `CHANGELOG.md` at all — could not be made: a package removal there was blocked outright. The hook now resolves the repository that holds its own `.claude/` directory and compares it against `git rev-parse --show-toplevel`, standing aside silently anywhere else; the contract still binds every commit in this tree. `HOOK_ROOT` is resolved before the hook `cd`s into the tool call's working directory, or a hook invoked by a relative path — the way it is tested by hand — would resolve `$0` against the wrong directory.
+
 ## [0.14.10] — 2026-09-04
 
 ### Added
