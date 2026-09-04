@@ -102,6 +102,13 @@ unprompted when it arrives. "I started it" is not a status. `docs/development.md
   behaviour claim comes from a push, a tag, or a detached local run.
 - **A finding about the stands goes in `docs/development.md`, "The stand's own traps", in the same
   session** — what it looked like, what it was, and the command that tells the two apart.
+- **A fault in the tooling itself gets an issue in the tool's own repository** — `owlab`
+  (`owfeed.org/owlab` → github.com/owfeed/owlab) and `owfeed` (github.com/owfeed/owfeed), both with
+  issues open. The trap note says how to work around it here; the issue is how it gets fixed there,
+  and without one the next session rediscovers it from scratch. Draft it with the command, the exact
+  error text, the tool version (`owlab version`) and the host — then it is **published only on the
+  maintainer's explicit word, like every other publication**; drafting is the agent's, posting is
+  not.
 - **One fault, one mechanism — prove that one holds alone.** A spare added "to be safe" is measured
   with the first on its own; if the probe still passes, it does not ship (openwrt/luci#8981).
 - **`/security-review` before every release and every upstream PR**, on the final branch diff.
