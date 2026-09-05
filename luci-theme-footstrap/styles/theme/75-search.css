@@ -26,8 +26,7 @@
 	.fs-search-box {
 		display: flex; flex-direction: column; min-height: 0;
 		width: 100%; max-width: 560px; max-height: min(70dvh, 560px);
-		background: var(--fs-glass);
-		backdrop-filter: var(--fs-blur); -webkit-backdrop-filter: var(--fs-blur);
+		background: var(--fs-panel);
 		border: var(--fs-hairline); border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow-pop);
 		overflow: hidden;

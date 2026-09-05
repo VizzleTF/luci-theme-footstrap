@@ -104,8 +104,6 @@
 		flex-direction: row; flex-wrap: wrap; align-items: center;
 		gap: var(--fs-space-2-5); padding: var(--fs-space-2-5) var(--fs-space-4);
 		background: var(--fs-bar-bg);
-		backdrop-filter: var(--fs-blur);
-		-webkit-backdrop-filter: var(--fs-blur);
 		border-inline-end: 0; border-bottom: var(--fs-hairline);
 		/* the submenu popups anchor to this bar and must escape it */
 		overflow: visible;
@@ -159,8 +157,7 @@
 		position: absolute; inset-inline: 0 auto; top: calc(100% + 8px); z-index: var(--fs-z-flyout);
 		width: max-content; min-width: 200px; max-width: calc(100vw - 32px);
 		margin: 0; padding: var(--fs-space-2);
-		background: var(--fs-glass);
-		backdrop-filter: var(--fs-blur); -webkit-backdrop-filter: var(--fs-blur);
+		background: var(--fs-panel);
 		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg); box-shadow: var(--fs-shadow-pop);
 	}
@@ -323,7 +320,6 @@
 			flex-direction: column; flex-wrap: nowrap; align-items: normal;
 			gap: normal; padding: var(--fs-space-5) var(--fs-space-3-5);
 			background: var(--fs-panel);
-			backdrop-filter: none; -webkit-backdrop-filter: none;
 			border-inline-end: var(--fs-hairline); border-bottom: 0;
 			box-shadow: none;
 			/* `overflow: auto`, not overflow-y alone: the bar sets `overflow: visible` for its
@@ -388,7 +384,7 @@
 			width: auto; min-width: 0; max-width: none;
 			flex-direction: column; gap: var(--fs-space-0-5);
 			margin: 0 0 0 var(--fs-space-7); padding: 0;
-			background: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+			background: none;
 			border: 0; border-radius: 0; box-shadow: none;
 			overflow: hidden;
 		}

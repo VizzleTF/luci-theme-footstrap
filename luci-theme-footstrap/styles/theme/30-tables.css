@@ -4,7 +4,6 @@
 		background: var(--fs-panel);
 		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
-		box-shadow: var(--fs-shadow);
 	}
 	.cbi-section { padding: var(--fs-card-pad); margin-bottom: var(--fs-card-gap); }
 	/* a bare <legend>; the ones inside a .cbi-section are covered below. The ink is the heading

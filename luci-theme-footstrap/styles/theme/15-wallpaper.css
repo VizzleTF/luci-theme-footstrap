@@ -59,18 +59,6 @@
 		background-size: var(--fs-pattern-size) auto;
 	}
 
-	/* A CBI form has dozens of .btn/.cbi-button; a backdrop-filter on each is a live
-	 * backdrop-sampling layer over the pattern — costly on weak GPUs, and invisible anyway
-	 * since every button is already opaque. Blur dropped from buttons entirely; closed
-	 * dropdowns keep the frost (few of them, and their body can show the pattern through). */
-	/* var(--fs-blur), not a literal: one radius for every frosted surface (02-tokens.css), and
-	 * the literal 6px was also invisible to prefers-reduced-transparency, which nulls the token
-	 * (95-a11y-media.css) — the one frost that kept blurring for users who asked for opaque. */
-	:root[data-wallpaper="pattern"] .cbi-dropdown:not([open]) {
-		backdrop-filter: var(--fs-blur);
-		-webkit-backdrop-filter: var(--fs-blur);
-	}
-
 	/* No wash layer behind #view: the pattern shows through the gaps between the cards at
 	 * full strength. Every block that carries text paints an opaque --fs-panel of its own,
 	 * so nothing has to be dimmed globally. */

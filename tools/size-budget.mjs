@@ -82,7 +82,7 @@ const LIMITS = {
 	 * in the same pass and KEPT: unprefixed masking ships only from Chrome 120 against a floor of
 	 * 108 — docs/css.md now carries that table so the next reader does not drop them from memory.
 	 * Limit 126,700. */
-	cascadeCss: 126_700,
+	cascadeCss: 125_300,
 	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
 	 * whether or not a given page loads it. 86,737 B on 2026-08-27.
 	 *

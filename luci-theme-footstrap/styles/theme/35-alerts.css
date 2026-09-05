@@ -22,7 +22,6 @@
 		background-color: var(--fs-panel);
 		background-image: linear-gradient(var(--fs-alert-tint, transparent), var(--fs-alert-tint, transparent));
 		color: var(--fs-text);
-		box-shadow: var(--fs-shadow);
 		gap: var(--fs-space-3);
 	}
 	/* ---- status lives in the stripe and the surface; the ring is always neutral ----

@@ -21,16 +21,11 @@
 		}
 	}
 
-	/* prefers-reduced-transparency — the user asked the OS for opaque surfaces. Every frosted surface
-	 * in this theme is a translucent fill plus a backdrop-filter blur, and both go: the fill becomes
-	 * the opaque panel, and the blur — the most expensive paint on a phone GPU, the sticky bar's
-	 * backdrop being resampled on every scrolled frame — has nothing left to show through. This also
-	 * gives a measured escape hatch on devices where that blur is too costly. */
+	/* prefers-reduced-transparency — the user asked the OS for opaque surfaces. Every surface in the
+	 * theme is opaque already: no blur, an opaque bar, opaque pop surfaces. The one thing left is the
+	 * wash over an uploaded photo. */
 	@media (prefers-reduced-transparency: reduce) {
 		:root {
-			--fs-bar-bg: var(--fs-panel);
-			--fs-glass: var(--fs-panel);
-			--fs-blur: none;
 			/* the uploaded background is a translucent wash over a photo — exactly the effect this
 			 * user asked the OS to drop. Make the scrim opaque so the canvas is flat, not a photo
 			 * ghosting through (16-login-bg.css lays it over the image as one background layer). */

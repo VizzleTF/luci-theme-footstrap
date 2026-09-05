@@ -153,7 +153,6 @@
 		background: var(--fs-panel);
 		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
-		box-shadow: var(--fs-shadow);
 		margin: 0 0 var(--fs-card-gap);
 		padding: var(--fs-space-4);
 		font-size: var(--fs-type-xl);
@@ -176,7 +175,6 @@
 		border: var(--fs-hairline);
 		border-top: 0;
 		border-radius: 0 0 var(--fs-radius-lg) var(--fs-radius-lg);
-		box-shadow: var(--fs-shadow);
 		margin: 0 0 var(--fs-card-gap);
 		padding: 0 var(--fs-space-4) var(--fs-space-4);
 		color: var(--fs-dim);

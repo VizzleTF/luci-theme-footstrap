@@ -47,16 +47,7 @@
 			--fs-focus-ring: var(--fs-focus-ring-solo);
 			--fs-focus-ring-invalid: 0 0 0 2px var(--fs-panel), 0 0 0 5px var(--fs-danger);
 
-			/* surfaces that are a near-opaque panel anyway */
-			--fs-glass: var(--fs-panel);
-			--fs-bar-bg: var(--fs-panel);
 			--background-color-medium: var(--fs-panel2);
-
-			/* depth cues: dropped rather than approximated — each is a 1px highlight whose whole
-			 * purpose is subtlety, and an opaque one reads as a stray line. */
-			--fs-emboss: none;
-			--fs-text-emboss: none;
-			--fs-shadow-bar: 0 1px 0 var(--fs-border);
 
 			/* the scrim over an uploaded photo: --fs-photo-dim is a percentage this cannot apply, so
 			 * take the fixed dialog scrim. Losing it entirely would leave login text over a photo. */

@@ -177,7 +177,6 @@
 		white-space: nowrap;
 		/* surface: theme/45-misc.css (flat) — absorbed */
 		border-radius: var(--fs-radius-sm);
-		box-shadow: var(--fs-emboss);
 		display: inline-flex;
 		flex-direction: column;
 		/* a plate of single-line labels, not prose */
@@ -192,10 +191,6 @@
 		border-radius: calc(var(--fs-radius-sm) - 1px) calc(var(--fs-radius-sm) - 1px) 0 0;
 		padding: var(--fs-space-0-5);
 		/* surface + ink: theme/45-misc.css — absorbed */
-	}
-
-	.ifacebox .ifacebox-head[style] {
-		text-shadow: var(--fs-text-emboss);
 	}
 
 	/* The !important fights luci-mod-network's inline zone-colour `style=`: a raw zone colour is too
@@ -231,9 +226,7 @@
 		padding: var(--fs-space-0-5);
 		/* surface: theme/45-misc.css (flat) — absorbed */
 		color: var(--fs-text);
-		text-shadow: var(--fs-text-emboss);
 		border-radius: var(--fs-radius-sm);
-		box-shadow: var(--fs-emboss);
 		cursor: default;
 		/* a badge is one line of label — the tight step, like .ifacebox above */
 		line-height: var(--fs-leading-tight);
@@ -328,7 +321,6 @@
 		display: inline-block;
 		white-space: nowrap;
 		color: var(--fs-text);
-		text-shadow: var(--fs-text-emboss);
 	}
 
 	.zonebadge > em,

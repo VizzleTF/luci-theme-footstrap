@@ -19,14 +19,9 @@
 		 * friends) live in those blocks too, beside the fills they must be legible against: a
 		 * dark palette has light fills and needs a dark ink, and one global `#fff` failed WCAG AA
 		 * on seven of the eight dark-palette fills (down to 1.69:1). */
-		--fs-shadow: 0 1px 3px rgba(15,23,37,.08);
 		/* pop surfaces (menus, dropdown lists, the select picker): one value rather than a
 		 * literal per site */
 		--fs-shadow-pop: 0 12px 34px rgba(0,0,0,.30);
-		/* the top bar's edge: a drop below plus a 1px inset seam, both a quiet 25% of the border
-		 * colour */
-		--fs-shadow-bar: 0 1px 3px color-mix(in srgb, var(--fs-border) 25%, transparent),
-		                 inset 0 -1px 0 color-mix(in srgb, var(--fs-border) 25%, transparent);
 		/* ---- two focus rings, and which one a control takes is the contract ----
 		 * -soft is a TINT (10-15% of the accent), measuring 1.15-1.29:1 on the surface it lands
 		 * on: a glow, not an indicator, where WCAG 1.4.11 wants 3:1. It is legitimate only beside
@@ -105,13 +100,6 @@
 		 * instead of mixing its own percentage. A grep finding no `var(--fs-warn-line)` is
 		 * expected. */
 
-		/* frosted pop surface (top-nav dropdown, rail flyout), deliberately not merged into
-		 * --fs-bar-bg (88%): a bar is a thin strip the page ghosts through on purpose, while a
-		 * dropdown carries a whole menu and must stay readable */
-		--fs-glass: color-mix(in srgb, var(--fs-panel) 96%, transparent);
-		/* one blur radius for every frosted surface — the bar said 10px and the pops 12px */
-		--fs-blur: blur(12px);
-
 		/* The circular-arrows refresh glyph, as a mask so its colour follows the palette
 		 * (--fs-good active, --fs-dim paused). One copy: the poll pill collapses to it both in the
 		 * rail and in the bar's compact cluster. A static glyph on purpose — a spinner makes an
@@ -128,10 +116,6 @@
 		 * sized at two call sites. The two sites legitimately differ in technique — the rail masks
 		 * the element and drops the border, the bar keeps the bordered square — but not in size. */
 		--fs-icon-refresh-sz: calc(18px * var(--fs-density-type));
-
-		/* the 1px raised edge on a plate carrying text, plus its text shadow */
-		--fs-emboss: inset 0 1px 0 color-mix(in srgb, var(--fs-panel) 5%, transparent);
-		--fs-text-emboss: 0 1px 1px color-mix(in srgb, var(--fs-panel) 75%, transparent);
 
 		/* Hover cue for a solid control — the one cue that cannot be a colour, the fill it shifts
 		 * being whatever the role token says. Per mode, and the DIRECTION FLIPS: `filter`
@@ -166,21 +150,24 @@
 		--fs-sidebar-w: calc(224px * var(--fs-density-box));		/* the expanded vertical sidebar's column */
 		--fs-rail-w: calc(68px * var(--fs-density-box));		/* ...and the same sidebar collapsed to its icon rail */
 		--fs-content-min: 500px;	/* below this a content column stops being readable */
-		/* translucent blurred bar surface: the top-nav bar and the sidebar's phone bar are one
-		 * component in two markups, so one token keeps their glass tint identical */
-		--fs-bar-bg: color-mix(in srgb, var(--fs-panel) 88%, transparent);
+		/* the bar's surface: the top-nav bar and the sidebar's phone bar are one component in two
+		 * markups, so one token keeps the two identical. OPAQUE on purpose. It was 88% of the panel
+		 * under a 12px backdrop blur, and the pair was measured on the page most favourable to it —
+		 * a pattern wallpaper at full strength, the bar sitting over scrolled content: dropping the
+		 * blur moved 0.04% of the pixels, and what the translucency actually bought was the page
+		 * showing through the chrome, which reads as a glitch rather than as glass. */
+		--fs-bar-bg: var(--fs-panel);
 		/* height of that bar, and the scroll-margin every anchor target needs to clear it
 		 * (base/10-reset.css): if the two drift, an in-page jump lands under the bar */
 		/* The chrome's own controls — the square buttons (search, appearance, log out) and the poll
 		 * pill — ride the bar rather than cutting panel-coloured holes in it: the bar is one surface,
-		 * and a control on it is carried by its hairline, not by a second fill. `transparent`, not a
-		 * copy of --fs-bar-bg, so the strip's own translucency is not applied twice.
+		 * and a control on it is carried by its hairline, not by a second fill. `transparent`, so the
+		 * control shows the bar itself rather than a second surface stacked on it.
 		 *
-		 * This gives up what `.label`'s comment in theme/35-alerts.css leans on — that a coloured
-		 * variant sits on --fs-panel2, where the palette guarantees >=4.5:1 by construction. On the
-		 * bar the backdrop is now whatever the strip lands on, so the ratio is a MEASURED fact per
-		 * palette rather than a guaranteed one; the numbers live in the changelog entry. A palette that
-		 * needs the old behaviour sets this back to var(--fs-panel2). */
+		 * The backdrop a control lands on is therefore --fs-bar-bg, which is --fs-panel: the same
+		 * construction `.label`'s comment in theme/35-alerts.css leans on, so a coloured variant keeps
+		 * its >=4.5:1 by the palette's guarantee rather than by measurement. A palette that wants the
+		 * old panel2 hole sets this back to var(--fs-panel2). */
 		--fs-bar-ctl-bg: transparent;
 		/* The select's chevron, drawn rather than fetched. It used to be an inline SVG data-URI, and
 		 * a URI cannot read var() — the stroke colour had to be written INTO the string, so the
@@ -563,7 +550,6 @@
 	:root[data-darkmode="true"] {
 		/* palette colours are in 03-palettes.css; only mode-level, palette-independent
 		 * tokens live here */
-		--fs-shadow: 0 1px 2px rgba(0,0,0,.4);
 		--fs-disabled-opacity: .45;
 		/* the hover cue flips direction here (see --fs-hover-lift): a dark-mode solid button is a
 		 * light fill with dark ink, so brightening moves it away from both the page and its own

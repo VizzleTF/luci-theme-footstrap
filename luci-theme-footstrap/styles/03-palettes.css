@@ -580,10 +580,8 @@
 		   forum.openwrt.org paints its header with in its DARK scheme — measured live; its light
 		   scheme has a white header (--header_background #fff, ink #333), which is what this
 		   palette's light half already gives, so the navy is declared here and only here.
-		   color-mix, not a flat fill: --fs-bar-bg is 88% of the panel over the page on purpose (a
-		   bar is a thin strip the page ghosts through, 02-tokens.css), and a flat colour would drop
-		   that. Over this palette's #222 canvas the strip lands near #06294a, where the bar's own
-		   ink (#ddd) measures 9.9:1 and its dimmed ink (#a3a3a3) 5.4:1. */
-		--fs-bar-bg: color-mix(in srgb, #002b49 88%, transparent);
+		   A flat fill, like --fs-bar-bg everywhere (02-tokens.css): the bar's own ink (#ddd)
+		   measures 10.7:1 on it and its dimmed ink (#a3a3a3) 5.8:1. */
+		--fs-bar-bg: #002b49;
 	}
 }

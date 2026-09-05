@@ -17,9 +17,8 @@
 			--fs-bg: #fff; --fs-panel: #fff; --fs-panel2: #f4f4f4;
 			--fs-text: #000; --fs-dim: #333; --fs-faint: #555;
 			--fs-border: #bbb; --fs-track: #ddd;
-			--fs-shadow: none; --fs-shadow-pop: none; --fs-shadow-bar: none;
-			--fs-emboss: none; --fs-text-emboss: none;
-			--fs-bar-bg: #fff; --fs-glass: #fff; --fs-blur: none;
+			--fs-shadow-pop: none;
+			--fs-bar-bg: #fff;
 		}
 		/* Navigation, the search overlay and the action buttons cannot be used on paper. The
 		 * Appearance popover was on this list; it is a PAGE now, and a page prints — an admin

@@ -793,13 +793,11 @@
 		appearance: none;
 		width: 16px; height: 16px; border-radius: 50%;
 		background: var(--fs-accent); border: 2px solid var(--fs-panel);
-		box-shadow: var(--fs-shadow); cursor: pointer;
+		cursor: pointer;
 	}
 	input[type="range"]::-moz-range-thumb {
 		width: 16px; height: 16px; border-radius: 50%;
 		background: var(--fs-accent); border: 2px solid var(--fs-panel); cursor: pointer;
-		/* same shadow the -webkit thumb carries — Firefox had silently drifted flat */
-		box-shadow: var(--fs-shadow);
 	}
 	input[type="range"]::-moz-range-track { background: var(--fs-track); height: 6px; border-radius: var(--fs-radius-pill); }
 	/* -solo: the track sets `border: 0` and `outline: none`, so there is no second channel here

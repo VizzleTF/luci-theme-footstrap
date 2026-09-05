@@ -722,6 +722,47 @@ buttons are 295px where stock's are 245, its face being wider than the system st
 smaller size. The finding was ours. A baseline entry would have hidden it for good, which is what
 makes the ratchet worth only as much as the judgement behind each line.
 
+**A `<style>` injected into a live page is eaten by the theme's own fence.** Playwright's
+`addStyleTag` appends a `<style>` to `<head>`; `fs-sheets.js` observes that, re-hosts it into
+`@layer theme` and scopes its selectors to the current view. A rule aimed at the chrome then matches
+nothing and its `!important` has nothing left to win, so the screenshot is byte-identical to the one
+without the rule — a silent zero that reads as "the effect is invisible". Three PNGs shot this way
+shared one sha256. Inject through a constructed sheet instead, which is not a DOM node and is not
+observed:
+
+```js
+const s = new CSSStyleSheet(); s.replaceSync('* { box-shadow: none !important }');
+document.adoptedStyleSheets = [...document.adoptedStyleSheets, s];
+```
+
+Whichever way it goes in, read the property back with `getComputedStyle` in the same evaluate and
+print it beside the measurement: `blur(12px)` turning into `none` is what proves the variant is a
+variant. A control that changes something obvious — a transparent bar — separates a broken injection
+from an effect that genuinely does not show.
+
+**Playwright's JS coverage does not accumulate across page loads, whatever `resetOnNavigation`
+says.** `startJSCoverage({ resetOnNavigation: false })` around a fifteen-page run and one
+`stopJSCoverage()` at the end returns the LAST document only — measured, 30 entries with `fs-fit.js`
+appearing once after fifteen full loads, and `fs-axes`, `fs-assets`, `fs-appearance`, `fs-overview`
+absent entirely because the last page does not load them. Every "never ran" number taken that way is
+an artefact. Start and stop the coverage around EACH scenario and merge outside the browser, keyed
+on `file|functionName|startOffset`, counting a function as live when any scenario ran it: the same
+run then reports `fs-sheets` at 3 dead functions rather than 27.
+
+Three things make a coverage sweep of this theme lie even when the merge is right, and each cost a
+pass:
+
+- **The stands run `data-layout="top"`.** `fitShell()` returns before `shellGeometry()` in that
+  layout, so the whole sidebar branch reads as dead. Set `fs-layout` to `sidebar` in a scenario of
+  its own.
+- **The Appearance panel is a tab INSIDE the System page**, whose own selects come first in
+  document order. `page.$$('select')` picks Log level and Language; the axes are never touched.
+  Find the row by its label — and the labels are translated, so match the rendered text, not the
+  English source string.
+- **A branch can be unreachable by engine, not by code.** `fs-fit.js` takes the non-anchoring path
+  only where the engine does not anchor; `localStorage.fsEngineAnchor = 'off'` is the switch that
+  reaches it from Chromium.
+
 **When a live gate goes red, build the PARENT COMMIT.** Package it, install it the same way, run the
 same narrowed check. A finding that reproduces there did not come from the change under test. That is
 how the anchor regression in 0.14.3 was pinned to one commit out of thirty-seven, and how both

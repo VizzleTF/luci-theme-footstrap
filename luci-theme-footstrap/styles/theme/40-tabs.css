@@ -23,7 +23,6 @@
 		background: var(--fs-panel);
 		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
-		box-shadow: var(--fs-shadow);
 		/* kills a folder-tab baseline gradient (the 1px x 29px background image the strip
 		 * conventionally carries) by zeroing its size rather than restating it — base's copy is
 		 * absorbed, but any gradient a view or third-party app sets is sized away too */
