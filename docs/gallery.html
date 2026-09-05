@@ -600,8 +600,25 @@ option two</textarea></div>
 	<div class="cbi-progressbar" title="303.37 MiB / 484.11 MiB (62%)"><div style="width:62%"></div></div>
 	<div class="cbi-progressbar" title="3.46 MiB / 242.05 MiB (1%)"><div style="width:1%"></div></div>
 	<div class="cbi-progressbar" title="97%"><div style="width:97%"></div></div>
+	<!-- The three below are what window.progressbar() itself writes (menu-footstrap-common.js), not
+	     hand-authored markup like the three above: role, aria-value* and — the reason these exist at
+	     all — data-fs-level, which is the ONLY thing 25-progressbar.css's warn/danger rules match.
+	     Nothing above carried that attribute, so computed-diff, a11y and export-tier never rendered
+	     those two rules at all; a clean run proved nothing about them. None of the three carries
+	     aria-label: none sits in a .cbi-value row or a table cell, so the function finds no label and
+	     writes no attribute at all — the accessible name then falls back to `title`, the same reading
+	     the visible `::after` shows (menu-footstrap-common.js, findProgressbarLabel). -->
+	<div class="cbi-progressbar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+		aria-valuenow="42" aria-valuetext="203.37 MiB / 484.11 MiB (42%)"
+		title="203.37 MiB / 484.11 MiB (42%)"><div style="width:42%"></div></div>
+	<div class="cbi-progressbar" data-fs-level="warn" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+		aria-valuenow="85" aria-valuetext="411.49 MiB / 484.11 MiB (85%)"
+		title="411.49 MiB / 484.11 MiB (85%)"><div style="width:85%"></div></div>
+	<div class="cbi-progressbar" data-fs-level="danger" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+		aria-valuenow="96" aria-valuetext="464.75 MiB / 484.11 MiB (96%)"
+		title="464.75 MiB / 484.11 MiB (96%)"><div style="width:96%"></div></div>
 	<!-- The same meter as the FIELD of a labelled CBI row, which is what an app building a form row
-	     with ui.js emits (luci-app-modeminfo's Antennas page: one of these per figure). The three
+	     with ui.js emits (luci-app-modeminfo's Antennas page: one of these per figure). The six
 	     above own their line and take the value above the bar; here the name is already in the left
 	     column, so the value goes beside the meter instead. -->
 	<div class="cbi-value">
@@ -832,6 +849,24 @@ option two</textarea></div>
 </div>
 
 <div class="g-sec">
+	<h2>Key/value table, narrow container (System -&gt; System at 390px)</h2>
+	<p class="g-note">The @container fs-content query below only fires inside a container narrower than
+	   560px. `.g-wrap` (this page's only other fs-content container) never gets that narrow, so
+	   without a fixture of its own this rule is unrendered and computed-diff reads 0 for it. The
+	   340px `.cbi-map` here stands in for the sidebar layout's cramped content column.</p>
+	<div class="cbi-map" style="max-width: 340px">
+		<div class="cbi-section">
+			<h3>System</h3>
+			<div class="table">
+				<div class="tr"><div class="td">Firmware Version</div><div class="td">OpenWrt 24.10.5 r28134-cb8087f118</div></div>
+				<div class="tr"><div class="td">Kernel Version</div><div class="td">6.6.104</div></div>
+				<div class="tr"><div class="td">Architecture</div><div class="td">ARMv8 Processor rev 4</div></div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="g-sec">
 	<h2>CBI section table — firewall zones, port forwards</h2>
 	<div class="cbi-section cbi-tblsection">
 		<h3>Zones</h3>
@@ -931,6 +966,35 @@ option two</textarea></div>
 				<button class="cbi-button cbi-button-action important">Continue</button>
 			</div>
 		</div>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>Overview card header — disclosure control (pages/20-overview.css)</h2>
+	<!-- fs-overview.js wireDisclosure() promotes the card heading to role="button", with the
+	     keyboard-only pieces (tabindex, aria-expanded, aria-controls) plus a hand cursor and a
+	     focus ring from the theme (pages/20-overview.css). The wrapper differs by release
+	     (fs-overview.js headerEl()): 25.12 wraps the heading in `.cbi-title`, 24.10 leaves a bare
+	     `<h3>` as the section's own first child, and the theme rule has to reach both — this is
+	     the specimen that measures it, computed-diff otherwise reading 0 for this file. Appended
+	     after Modal; nothing above is touched or reordered. -->
+	<div class="cbi-section">
+		<div class="cbi-title">
+			<h3 role="button" tabindex="0" aria-controls="g-ovl-panel-1" aria-expanded="true">System
+				<span class="label" data-indicator="poll-status" data-style="inactive" aria-hidden="true">Hide</span>
+			</h3>
+		</div>
+		<div id="g-ovl-panel-1">
+			<div class="table">
+				<div class="tr"><div class="td">Hostname</div><div class="td">OpenWrt</div></div>
+				<div class="tr"><div class="td">Model</div><div class="td">Generic</div></div>
+			</div>
+		</div>
+	</div>
+	<div class="cbi-section">
+		<h3 role="button" tabindex="0" aria-expanded="false">Memory
+			<span class="label" data-indicator="poll-status" data-style="active" aria-hidden="true">Show</span>
+		</h3>
 	</div>
 </div>
 

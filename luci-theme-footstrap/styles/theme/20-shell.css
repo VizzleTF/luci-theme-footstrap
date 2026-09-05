@@ -782,4 +782,14 @@
 	 * so "Refreshing" showed a text caret. */
 	.fs-indicators [data-indicator][data-clickable],
 	#indicators [data-indicator][data-clickable] { cursor: pointer; }
+	/* fs-chrome.js promotes a clickable indicator to role="button" with Enter and Space, so
+	 * it is a control now and takes the control ring the buttons beside it take (55-buttons.css)
+	 * rather than the UA outline it was left with. `:focus-visible`, not `:focus`: a pointer press
+	 * on the pill should not draw a ring, the same rule every other control here follows. */
+	.fs-indicators [data-indicator][data-clickable]:focus-visible,
+	#indicators [data-indicator][data-clickable]:focus-visible {
+		outline: none;
+		border-color: var(--fs-accent);
+		box-shadow: var(--fs-focus-ring);
+	}
 }

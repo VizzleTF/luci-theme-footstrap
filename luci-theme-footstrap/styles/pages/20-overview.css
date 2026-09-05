@@ -12,16 +12,24 @@
 	 * drifted). Only the overview-specific chevron toggle stays.
 	 * index.js emits a span with a raw "Hide"/"Show" text node + data-style (expanded =
 	 * inactive, collapsed = active); data-indicator='poll-status' is unique to these
-	 * toggles. font-size:0 hides the word, ::after borders draw the chevron. */
+	 * toggles. font-size:0 hides the word, ::after borders draw the chevron.
+	 *
+	 * The card HEADER is the disclosure control now (fs-overview.js wireDisclosure()); this pill is
+	 * marked aria-hidden there and stays only as its glyph, so the border and fill that made it read
+	 * as its own 26px button are dropped — 16px, matching the rail toggle's own chevron glyph
+	 * (theme/20-shell.css `.fs-railtoggle .fs-ico`), and --fs-faint rather than the pill's --fs-dim,
+	 * a step quieter since it is decoration rather than a target now. */
 	.cbi-title .label[data-indicator="poll-status"] {
 		font-size: 0;
-		width: 26px;
-		height: 26px;
+		width: 16px;
+		height: 16px;
 		padding: 0;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: var(--fs-radius-sm);
+		background: none;
+		border: 0;
+		color: var(--fs-faint);
 	}
 	/* The glyph itself is the Appearance fold's, to the byte — one chevron for "this opens", drawn
 	 * in two page files because the two hosts are a stock element keyed by attribute and one of
@@ -46,6 +54,37 @@
 		margin-top: var(--fs-space-0-5);
 		/* @endmirror */
 	}
+
+	/* The header itself (fs-overview.js wireDisclosure() stamps role="button"): a hand cursor for a
+	 * pointer user, a focus ring for a keyboard one — the same ring every other interactive control
+	 * in this theme draws (theme/35-alerts.css `.cbi-title .label:focus-visible`, the pill's own
+	 * former ring, now the header's).
+	 *
+	 * Two selectors, not one: fs-overview.js's headerEl() reads `.cbi-title h3, :scope > h3` because
+	 * the wrapper itself differs by release — 25.12 renders `.cbi-title > h3`, 24.10 a bare `<h3>`
+	 * straight inside `.cbi-section`, no `.cbi-title` at all. `[role="button"]` is the anchor either
+	 * way, so a heading wireDisclosure() left untouched — one with nothing to collapse — is never
+	 * matched. Measured on a 24.10 FORM: without the second arm the attributes and the keyboard
+	 * worked but `cursor` stayed `auto`, `box-shadow` `none`, and focus drew only the UA outline.
+	 * On a live 24.10 the arm does not fire at all today, and that is not a fault in it: OpenWrt
+	 * 24.10.8 renders no hide/show control on an Overview card, so wireDisclosure() stamps nothing
+	 * there and 0 of the page 14 `<h3>`s carry the role (measured on owlab owrt2410). The arm
+	 * guards a SHAPE of markup, not a release — it is what keeps the styling with the behaviour on
+	 * whichever release grows the control next. */
+	:is(.cbi-title h3, .cbi-section > h3)[role="button"] {
+		cursor: pointer;
+		border-radius: var(--fs-radius-sm);
+	}
+	:is(.cbi-title h3, .cbi-section > h3)[role="button"]:focus-visible {
+		outline: none;
+		box-shadow: var(--fs-focus-ring);
+	}
+
+	/* An empty `.cbi-section` LuCI still renders when a stock include has nothing to show: title
+	 * "-", the poll pill its only content, 72px tall on the live Overview (seventh there — a
+	 * fixture is not proof of position, docs/findings.md "An empty card with `-` as its title").
+	 * Real and cosmetic, so fs-overview.js's hideEmptyCard() marks it and this drops it. */
+	body[data-page="admin-status-overview"] .cbi-section.fs-ovl-empty { display: none; }
 
 	/* Stock overview layout: fs-overview.js wraps the stock System / Memory / Storage
 	 * sections in .fs-ovl; this is the grid only — System left across both rows, Memory +

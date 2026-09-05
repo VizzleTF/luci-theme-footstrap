@@ -82,7 +82,19 @@ const LIMITS = {
 	 * in the same pass and KEPT: unprefixed masking ships only from Chrome 120 against a floor of
 	 * 108 — docs/css.md now carries that table so the next reader does not drop them from memory.
 	 * Limit 126,700. */
-	cascadeCss: 125_300,
+	/* 126,481 B on 2026-09-05, up 1,689 B for the accessibility pass, measured file by file against
+	 * the same HEAD (124,792 B): the poll pill's `role="button"` ring on
+	 * `[data-clickable]:focus-visible` (20-shell.css, 185 B); the meter's warn/danger fill on
+	 * `[data-fs-level]` (25-progressbar.css, 144 B); the sub-560px key/value table stack — label
+	 * promoted to an eyebrow above its value instead of a starved 40%-width column, the single
+	 * biggest piece (30-tables.css, 694 B); the range slider's WCAG 2.2 SC 2.5.8 target split, a
+	 * transparent 24px hit box around the still-6px painted track (60-inputs.css, 295 B); the
+	 * Overview card header becoming the disclosure control, the pill demoted to a 16px glyph, and
+	 * the empty-card hide (20-overview.css, 284 B); and the Appearance version link's invisible
+	 * 88x25 hit-box overlay, the same idiom as the checkbox's (80-appearance.css, 87 B).
+	 * 45-misc.css's container-name doc line cost nothing — comment only. The limit goes to 127,000,
+	 * 519 B of head-room. */
+	cascadeCss: 127_000,
 	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
 	 * whether or not a given page loads it. 86,737 B on 2026-08-27.
 	 *
@@ -228,7 +240,19 @@ const LIMITS = {
 	 * uhttpd serves these files with no compression, so identity bytes are wire bytes, and terser
 	 * has no pass that folds duplicate literals. Loader pragmas (`require fs-fit as fit`) are the
 	 * biggest repeats in the tree and are untouchable - they are code. Limit 91,380. */
-	resourcesJs: 91_380,
+	/* 93,761 B on 2026-09-05, up 2,830 B for the accessibility pass, measured per module against the
+	 * same HEAD with `--show`: `fs-overview.js` 3.0 -> 4.1 KB (the card header becoming the one
+	 * focusable disclosure control — role, tabindex, aria-expanded, aria-controls, Enter and Space —
+	 * plus the meter annotation on every poll tick and the empty-card hide); `menu-footstrap-common.js`
+	 * 3.3 -> 4.2 KB (`annotateMeter`/`annotateMeters`/`parseMeterPercent`: the reading parsed out of
+	 * `title`, role=progressbar, the four aria-value attributes, the name from the row label, and
+	 * `data-fs-level`); `fs-select.js` 9.5 -> 9.9 KB (the unconditional table/rowgroup/row/columnheader/
+	 * cell chain, unconditional because a media or container state is not visible from JS); and
+	 * `fs-chrome.js` 6.3 -> 6.7 KB (the poll indicator promoted to a button with a name and keyboard).
+	 * What it bought is four WCAG failures closed — 2.1.1 and 4.1.2 on 14 elements per Overview,
+	 * 1.3.1 on every table the theme restyles, 4.1.2 on every meter. The limit goes to 94,000, 239 B
+	 * of head-room. */
+	resourcesJs: 94_000,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -303,7 +327,14 @@ const LIMITS = {
 	 * to know the axis before Appearance is ever opened. The remaining 321 B of that raise is
 	 * `fs-axes.js`/`fs-appearance.js`, both page modules, so this number does not move for them.
 	 * The limit goes to 56,450, 61 B of head-room. */
-	coldJs: 56_450,
+	/* 57,894 B on 2026-09-05, up 1,676 B: three of the four modules the accessibility pass grew are
+	 * cold — `menu-footstrap-common.js` (+0.9 KB), `fs-select.js` (+0.4 KB) and `fs-chrome.js`
+	 * (+0.4 KB), all loaded on every page. The fourth, `fs-overview.js` (+1.1 KB), is a page module
+	 * and does not land here, which is why this number moves by less than the flash budget above.
+	 * The meter annotation is the biggest single piece and is cold by construction: a stock Overview
+	 * include draws its bar from its OWN local `progressbar()`, so the theme cannot annotate from a
+	 * page module alone. The limit goes to 58,100, 206 B of head-room. */
+	coldJs: 58_100,
 };
 
 function bytes(path) {

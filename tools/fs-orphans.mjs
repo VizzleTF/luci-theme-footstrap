@@ -138,6 +138,7 @@ const JUSTIFIED_UNSTYLED = {
 	'fs-search-btn': 'a JS hook (getElementById); the button is styled by its .fs-themerow class',
 	'fs-ap-fold-': 'an id PREFIX built in JS (`fs-ap-fold-` + n) so each folded group\'s button can point aria-controls at its panel; the button and panel are styled by .fs-ap-fold / .fs-ap-body',
 	'fs-search-opt-': 'an id PREFIX built in JS (`fs-search-opt-` + i) so the combobox can point aria-activedescendant at a row; the rows themselves are styled by .fs-search-opt',
+	'fs-ovl-panel-': 'an id PREFIX built in JS (`fs-ovl-panel-` + n) so a disclosure header can point aria-controls at its panel; the panel itself rides on the card\'s own styling, unclassed',
 };
 
 const orphanCss = [...styled.keys()].filter(c => !emitted.has(c)).sort();

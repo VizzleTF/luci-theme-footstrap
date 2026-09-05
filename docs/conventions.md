@@ -124,6 +124,12 @@ mutually exclusive guards — a shape no linter calls an error and the shape tha
 duplicate body must be either merged or wrapped in `@mirror`, and `tools/mirror.mjs` then holds
 the copies byte-identical. A `@mirror` group with one copy is a hard failure.
 
+**A `display` rule on `.table`/`.thead`/`.tbody`/`.tfoot`/`.tr`/`.th`/`.td` needs a role to match.**
+A `display` other than `table`/`table-row`/`table-cell`/… drops the implicit `table`/`row`/`cell`
+role HTML-AAM derives from it (WCAG 1.3.1), and `fs-select.js`'s role map is what puts it back.
+`tools/table-contract.mjs` holds both directions: it fails if the role map shrinks and it fails if a
+theme selector sets `display` on one of these classes with no entry in the map to pair with it.
+
 ## Writing JS
 
 **Never put a regex literal straight after `return` or `=>`.** `jsmin` (which `luci.mk` runs on

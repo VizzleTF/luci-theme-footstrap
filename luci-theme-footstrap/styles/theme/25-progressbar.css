@@ -19,6 +19,16 @@
 		border-radius: var(--fs-radius-pill);
 		transition: width var(--fs-dur-fill);
 	}
+	/* Colour carries the reading too, not length alone: `data-fs-level` is set from JS
+	 * (menu-footstrap-common.js, FS_METER_WARN/FS_METER_DANGER — 80/92%, a decision, not a
+	 * measurement) on every poll tick. Solid tokens, matching the accent fill above — no
+	 * color-mix, so no static twin is owed to 04-nocolormix.css. */
+	.cbi-progressbar[data-fs-level="warn"] > div {
+		background: var(--fs-warn);
+	}
+	.cbi-progressbar[data-fs-level="danger"] > div {
+		background: var(--fs-danger);
+	}
 	.cbi-progressbar::after {
 		content: attr(title);
 		/* the gap is a scale step, not a literal 4: every other gap in the theme scales with the

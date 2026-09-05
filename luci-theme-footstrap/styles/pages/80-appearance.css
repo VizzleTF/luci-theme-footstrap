@@ -192,8 +192,13 @@
 	}
 	.fs-ap-verrow { display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-2-5); }
 	/* links to the project repo — reads as muted text until hovered */
-	.fs-ap-version { font-size: var(--fs-type-xs); color: var(--fs-dim); font-variant-numeric: tabular-nums; text-decoration: none; }
+	.fs-ap-version { position: relative; font-size: var(--fs-type-xs); color: var(--fs-dim); font-variant-numeric: tabular-nums; text-decoration: none; }
 	.fs-ap-version:hover { color: var(--fs-accent); text-decoration: underline; }
+	/* the link's own box was 84x17 (owrt2512/390x844, Appearance tab), under the 24px floor of
+	 * WCAG 2.2 SC 2.5.8 on height. Same fix as `.cbi-checkbox > label[for]::before` in
+	 * theme/60-inputs.css: an invisible, absolutely-positioned overlay grows the hit box to
+	 * 88x25 without moving the text or growing `.fs-ap-verrow`, since the overlay is out of flow. */
+	.fs-ap-version::before { content: ""; position: absolute; inset: -4px -2px; }
 
 	/* The line that names the missing catalogue package. Same weight as the version beside it —
 	 * it is a fact about this router, not a warning: nothing is broken, one package is absent.

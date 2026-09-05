@@ -480,6 +480,35 @@ function wireRail() {
  * stays in the label for screen readers, and in `title` for the pointer. */
 const IND_DOT = '•';
 
+/* Idempotent attribute write, so a poll tick that finds nothing changed touches no DOM — same
+ * shape as `fsSyncAttr` in menu-footstrap-common.js, restated rather than imported (that file does
+ * not export it). */
+function syncIndAttr(el, name, value) {
+	if (value === null) {
+		if (el.hasAttribute(name)) el.removeAttribute(name);
+	} else if (el.getAttribute(name) !== value) {
+		el.setAttribute(name, value);
+	}
+}
+
+/* A CLICKABLE `[data-indicator]` (the poll pill, "Unsaved Changes: N", …) ships as a bare
+ * span: no role, name or tabindex, so Tab skips it and a screen reader
+ * announces a run of text with no name, role or state (WCAG 2.1.1, 4.1.2). ui.showIndicator's own
+ * click handler already lives on this exact element — this only adds the second, W3C-APG way to
+ * reach it; it does not add a competing one. The name is the pill's own prose ("Refreshing"),
+ * never invented. Enter/Space call el.click() because a <span>, unlike an <a>, gets neither key
+ * for free (contrast fs-widgets.js's wireSpaceKey, written for an <a role="button">); calling
+ * click() cannot double-fire the mouse handler, since a keydown is not a click. */
+function wireIndicatorKeyboard(el) {
+	if (el.dataset.fsWired) return;
+	el.dataset.fsWired = '1';
+	el.addEventListener('keydown', (ev) => {
+		if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
+		ev.preventDefault();
+		el.click();
+	});
+}
+
 function wireIndicatorCounts() {
 	const box = document.getElementById('indicators');
 	if (!box) return;
@@ -491,6 +520,18 @@ function wireIndicatorCounts() {
 			el.setAttribute('data-fs-badge', m ? m[1] : IND_DOT);
 			/* the rail hides the prose; the tooltip is where it stays reachable by pointer */
 			el.setAttribute('title', txt);
+			/* Only a CLICKABLE indicator becomes a control. `ui.showIndicator` sets
+			 * `data-clickable` only when it was handed a handler, and a status-only pill is
+			 * given none (luci-base ui.js; `battstatus.js` calls it with a null handler) — a
+			 * `role="button"` tabstop with nothing behind it is worse than the bare span it
+			 * replaces. The ring and the pointer cursor in theme/20-shell.css are scoped to
+			 * `[data-clickable]` for the same reason; the two must not disagree. */
+			if (el.hasAttribute('data-clickable')) {
+				syncIndAttr(el, 'role', 'button');
+				syncIndAttr(el, 'tabindex', '0');
+				syncIndAttr(el, 'aria-label', txt.trim() || null);
+				wireIndicatorKeyboard(el);
+			}
 		});
 	}
 

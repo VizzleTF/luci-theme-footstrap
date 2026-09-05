@@ -316,6 +316,66 @@ function labelCells(t, head) {
 	}
 }
 
+/* ---- WCAG 1.3.1: a `display` override must not cost a table its own roles ----
+ *
+ * theme/*.css restyles `display` on `.table`/`.thead`/`.tbody`/`.tfoot`/`.tr`/`.th`/`.td` in over
+ * twenty places — `.fs-stacked`, `.fs-rowstack`, the config table's own `@container`, the phone
+ * `@media`, the Overview meter row, the software page's carded description column, the 560px
+ * key/value card added alongside this file — scattered across selectors this module cannot see the
+ * live state of (a media query, a container query, a class some other pass toggled). A `display`
+ * other than `table`/`table-row`/`table-cell`/… drops the IMPLICIT `table`/`row`/`cell` role
+ * HTML-AAM derives from it: measured on Overview's key/value cards, `display: block`/`grid`/`block`
+ * (table/row/cell) at both 1440 and 390px, and on the 390px card stack, `block`/`none`/`block` —
+ * neither carries a role, so the column a value belongs to is never announced.
+ *
+ * Rather than pair each of those twenty-odd rules with a role write timed to its own trigger — a
+ * race with every one of them — the role is written UNCONDITIONALLY, matching what a plain
+ * `<table>` already carries implicitly. That costs nothing while the table IS a table and survives
+ * the moment any of those rules land. tools/table-contract.mjs holds the pairing: a future
+ * `display` rule on one of these classes with no role to match is what it is written to catch.
+ *
+ * The whole chain, every pass — a `role="cell"` with nothing above it saying `row`, or a `row` with
+ * nothing above IT saying `table`/`rowgroup`, reads worse than no roles at all. One flat query per
+ * class keeps it whole without walking each table by hand: `.tr`/`.th`/`.td` are LuCI's own names,
+ * always written together with `.table` (adoptMarkup() above never adds one without the others), so
+ * a class query alone reaches the whole subtree. `.thead`/`.tbody`/`.tfoot` are the same for a
+ * div-based table; a REAL `<thead>`/`<tbody>`/`<tfoot>` this file never classes (20_lan.js's and
+ * 30_wifi.js's `<tfoot>`, theme/30-tables.css:570/634) is reached by tag name instead. */
+const TABLE_ROLE_CLASSES = [
+	[ '.table', 'table' ],
+	[ '.thead', 'rowgroup' ],
+	[ '.tbody', 'rowgroup' ],
+	[ '.tfoot', 'rowgroup' ],
+	[ '.tr', 'row' ],
+	[ '.th', 'columnheader' ],
+	[ '.td', 'cell' ],
+];
+const TABLE_ROLE_TAGS = [
+	[ 'thead', 'rowgroup' ],
+	[ 'tbody', 'rowgroup' ],
+	[ 'tfoot', 'rowgroup' ],
+];
+
+/* idempotent, the same idiom as menu-footstrap-common.js's fsSyncAttr: a node that already carries
+ * the right role is a no-op read, so a poll tick re-rendering the same table on every tick touches
+ * no DOM and wakes no attribute observer. Not imported for one line — this file has none of that
+ * module's other exports to justify the dependency. */
+function setRole(el, role) {
+	if (el.getAttribute('role') !== role) el.setAttribute('role', role);
+}
+
+/* A hidden row/cell (`.tr.cbi-section-table-descr`, `.td.hide-xs`/`.hide-sm` under `.fs-stacked`/
+ * `.fs-drop-xs`) drops out of the accessibility tree on `display: none` alone — the role written
+ * here changes nothing about that, since a role is inert on a box the engine never generates. */
+function roleTables() {
+	TABLE_ROLE_CLASSES.forEach(([ sel, role ]) => {
+		document.querySelectorAll(inRoots(sel, liveRoots())).forEach((el) => setRole(el, role));
+	});
+	TABLE_ROLE_TAGS.forEach(([ sel, role ]) => {
+		document.querySelectorAll(inRoots(sel, liveRoots())).forEach((el) => setRole(el, role));
+	});
+}
+
 /* ---- card-stack a data table that no longer fits ----
  *
  * Measuring, scheduling and the observers are fs-fit.js; this file supplies only the decision.
@@ -890,12 +950,14 @@ return baseclass.extend({
 		fit.armGate();
 
 		/* A table must be tagged .fs-dt before it can be fitted, and re-tagged whenever the poll
-		 * brings a fresh one back, so tagging leads.
+		 * brings a fresh one back, so tagging leads; roleTables() follows it directly so a class
+		 * adoptMarkup() just added carries its role in the same pass rather than waiting a tick.
 		 *
-		 * Five registrations, not one callback: fs-fit catches per registered fitter, and the first
+		 * Six registrations, not one callback: fs-fit catches per registered fitter, and the first
 		 * of these walks third-party markup. Bundled, one throw in `tagDataTables()` leaves no table
 		 * tagged and — with the gate above raised — a page with no tables on it at all. */
 		fit.add(tagDataTables);
+		fit.add(roleTables);
 		fit.add(fitTables);
 		fit.add(fitScrollables);
 		fit.add(unpinActionColumn);

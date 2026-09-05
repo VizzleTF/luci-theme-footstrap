@@ -782,32 +782,78 @@
 	 * `!important` would do it too, and would invert the layer order for every future override. */
 	.hidden.hidden { display: none; }
 	/* RangeSlider (UIRangeSlider) — the one LuCI widget base leaves to native browser rendering.
-	 * Token-driven track/thumb. */
+	 * Token-driven track/thumb.
+	 * The INPUT box is the WCAG 2.2 SC 2.5.8 target (24px min): it used to be the 6px track
+	 * itself, measured 258x6 on owrt2512/390x844 (System > System). Box and paint split here —
+	 * a transparent 24px box, the 6px bar drawn by the track pseudo-element inside it.
+	 *
+	 * A flat `height: 24px` DOES move the row, and not through `.cbi-range-slider`'s own cross
+	 * size — that stayed 29.5px throughout, already pinned by the value chip beside it. It moves
+	 * through the enclosing LINE BOX: `.cbi-value-field` lays this element out as ordinary inline
+	 * content, and the line's height is anchored on where `.cbi-range-slider` (inline-flex, no
+	 * baseline-participating child) reports ITS baseline to the ancestor line — which tracks the
+	 * first flex item's own edge and moved with the input's box. Measured before either fix below:
+	 * `.cbi-value-field` +2.75px (Chromium) / +2.5px (Firefox), `.cbi-value` +1.5px / +1.0px,
+	 * track/thumb ~1.25px lower.
+	 *
+	 * First half of the fix is the checkbox's own trick (`--hit`/`--box` below): grow the box for
+	 * the hit target, then pull the extra area back out of flow with a symmetric negative margin
+	 * so the box overflows itself around its old centre instead of pushing something taller. 6px
+	 * was the box before this rule; -9px is (6px - 24px) / 2. This is what keeps a BARE range
+	 * input (no `.cbi-range-slider` wrapper, no taller sibling — a third-party app's own markup)
+	 * from growing its own row, the same way the checkbox's margin protects a row with no toggle
+	 * label beside it. Measured on its own, though, it left THIS row's growth above unchanged: the
+	 * line-box placement of `.cbi-range-slider` tracks the input's own edge, not the flow space the
+	 * margin trick frees up, so the second half below is still needed on top of it. */
 	input[type="range"] {
 		appearance: none;
-		width: 100%; height: 6px; min-height: 0; padding: 0;
-		background: var(--fs-track); border: 0; border-radius: var(--fs-radius-pill);
+		width: 100%; height: 24px; min-height: 0; padding: 0;
+		margin-block: -9px;
+		background: transparent; border: 0; border-radius: 0;
 		outline: none; box-shadow: none; cursor: pointer;
+	}
+	input[type="range"]::-webkit-slider-runnable-track {
+		width: 100%; height: 6px;
+		background: var(--fs-track); border: 0; border-radius: var(--fs-radius-pill);
+	}
+	input[type="range"]::-moz-range-track {
+		width: 100%; height: 6px;
+		background: var(--fs-track); border: 0; border-radius: var(--fs-radius-pill);
 	}
 	input[type="range"]::-webkit-slider-thumb {
 		appearance: none;
 		width: 16px; height: 16px; border-radius: 50%;
 		background: var(--fs-accent); border: 2px solid var(--fs-panel);
 		cursor: pointer;
+		/* WebKit centres the thumb on the INPUT's box, not the track: (6 - 16) / 2 = -5px pulls
+		 * it back onto the 6px track. Firefox centres ::-moz-range-thumb on the track itself. */
+		margin-top: -5px;
 	}
 	input[type="range"]::-moz-range-thumb {
 		width: 16px; height: 16px; border-radius: 50%;
 		background: var(--fs-accent); border: 2px solid var(--fs-panel); cursor: pointer;
 	}
-	input[type="range"]::-moz-range-track { background: var(--fs-track); height: 6px; border-radius: var(--fs-radius-pill); }
 	/* -solo: the track sets `border: 0` and `outline: none`, so there is no second channel here
-	 * either — the tinted ring was the whole indicator on a 6px bar. */
-	input[type="range"]:focus { box-shadow: var(--fs-focus-ring-solo); }
+	 * either — the tinted ring was the whole indicator on a 6px bar. Set on the track pseudo,
+	 * not the input, so the ring still hugs the 6px bar rather than the 24px hit box. */
+	input[type="range"]:focus::-webkit-slider-runnable-track { box-shadow: var(--fs-focus-ring-solo); }
+	input[type="range"]:focus::-moz-range-track { box-shadow: var(--fs-focus-ring-solo); }
 	/* THE SAME CEILING THE ELASTIC TEXT INPUTS TAKE, and the reason is the whole point of the
 	 * token: a `.cbi-value-field` is `flex: 1`, so `width: 100%` here meant the slider ate the
 	 * entire card while the select two rows above stopped at 210px and the readout chip was flung
-	 * to the card's right edge. Every stretching control in a form row now ends at one x. */
-	.cbi-range-slider { display: inline-flex; align-items: center; gap: var(--fs-space-3); width: 100%; max-width: var(--fs-field-max); }
+	 * to the card's right edge. Every stretching control in a form row now ends at one x.
+	 *
+	 * `vertical-align: middle` answers the second half of the 24px-target growth explained above
+	 * `input[type="range"]`. Default (`baseline`) places this inline-flex box in its line by the
+	 * edge of its first flex item — the range input — so that edge moving 6px -> 24px still pushed
+	 * `.cbi-value-field`'s line taller even with the margin trick already in place. `middle` places
+	 * the box by its own total height instead, which the margin trick already held at its old
+	 * 29.5px (pinned by the value chip, unaffected by the input's growth), decoupling the two.
+	 * Measured on the gallery slider fixture, both engines, this rule plus the margin trick against
+	 * HEAD: `.cbi-value-field` +0.000px in both, `.cbi-value` -0.187px (Chromium) / -0.183px
+	 * (Firefox) — under a fifth of a CSS px, not a pixel a screen can render differently. Box
+	 * unchanged at 258x24. */
+	.cbi-range-slider { display: inline-flex; align-items: center; vertical-align: middle; gap: var(--fs-space-3); width: 100%; max-width: var(--fs-field-max); }
 	.cbi-range-slider-value {
 		background: var(--fs-panel2); border: var(--fs-hairline); border-radius: var(--fs-radius-sm);
 		padding: var(--fs-space-1) var(--fs-space-2); color: var(--fs-accent); font-family: var(--fs-font-mono);

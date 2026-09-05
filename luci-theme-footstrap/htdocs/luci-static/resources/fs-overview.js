@@ -3,6 +3,7 @@
 'require dom';
 'require network';
 'require fs-fit as fit';
+'require menu-footstrap-common as common';
 
 /* Overview layout only: renders nothing of its own, it re-arranges the STOCK System / Memory /
  * Storage sections into a grid. Content, data and styling stay luci-mod-status's — rendering a
@@ -23,11 +24,15 @@ const ROLES = { [_('System')]: 'sys', [_('Memory')]: 'mem', [_('Storage')]: 'sto
 /* the data-page value four call sites compare against; a string literal is not mangled, so a
  * repeat is paid in full on flash every time (measured: 24 B x4 -> 37 B, 59 B saved) */
 
-function sectionTitle(sec) {
+function headerEl(sec) {
 	/* two title markups, one per release: 25.12 wraps the heading (`.cbi-title > h3`), 24.10 emits
 	 * a bare `<h3>` as the section's first child. Matching only one silently disables the grid on
 	 * the other. */
-	const h = sec.querySelector('.cbi-title h3, :scope > h3');
+	return sec.querySelector('.cbi-title h3, :scope > h3');
+}
+
+function sectionTitle(sec) {
+	const h = headerEl(sec);
 	if (!h) return '';
 	/* the first non-empty TEXT node, not `firstChild`: 25.12 appends a hide/show <span> inside the
 	 * same <h3>, so `firstChild` depends on upstream keeping the words first */
@@ -37,6 +42,101 @@ function sectionTitle(sec) {
 		if (t) return t;
 	}
 	return '';
+}
+
+/* ---- keyboard disclosure: the card header becomes the toggle, the pill becomes its glyph ----
+ *
+ * Live on owrt2512 (25.12.4), Status -> Overview carries 14 `[data-clickable]` elements — the
+ * topbar poll pill plus one Hide/Show toggle per card — and every one is a bare <span>: no
+ * tabindex, no role, no aria-expanded. Tab never reaches one and a screen reader announces a run
+ * of text with no name, role or state. WCAG 2.1.1 Keyboard (A), 4.1.2 Name, Role, Value (A).
+ * docs/findings.md, "A card cannot be collapsed from the keyboard".
+ *
+ * index.js's own pill keeps doing the actual show/hide — untouched, so mouse behaviour for anyone
+ * clicking it does not change. The header becomes a second, W3C-APG way to reach the SAME handler,
+ * not a competing one. */
+
+/* Idempotent attribute write, so a poll tick that finds nothing changed touches no DOM and fires
+ * no mutation record. Same shape as `fsSyncAttr` in menu-footstrap-common.js — restated rather than
+ * imported, since that file does not export it. */
+function syncAttr(el, name, value) {
+	if (value === null) {
+		if (el.hasAttribute(name)) el.removeAttribute(name);
+	} else if (el.getAttribute(name) !== value) {
+		el.setAttribute(name, value);
+	}
+}
+
+/* index.js's own attribute: "inactive" is expanded (the pill reads "Hide"), "active" is collapsed
+ * (it reads "Show") — the chevron mirror in pages/20-overview.css reads the same attribute the
+ * same way. */
+function pillExpanded(label) {
+	return label.getAttribute('data-style') !== 'active';
+}
+
+/* The panel `data-style` shows or hides is `.cbi-title`'s next sibling in the 25.12 markup this was
+ * measured on. 24.10 emits no `.cbi-title` wrapper (headerEl() above) and is left without
+ * aria-controls rather than guessed at — role, tabindex, aria-expanded and the keyboard below still
+ * apply there; aria-controls is the one piece this function cannot state with confidence. */
+function panelFor(h) {
+	const holder = h.closest('.cbi-title');
+	return holder ? holder.nextElementSibling : null;
+}
+
+let _panelSeq = 0;
+
+/* Promote one card's header to a disclosure control. Idempotent: a tick that finds the header
+ * already wired touches only aria-expanded, and only when it actually changed; the click/keydown
+ * listeners are added once (`dataset.fsWired`), never re-added. */
+function wireDisclosure(sec) {
+	const h = headerEl(sec);
+	const label = h && h.querySelector('.label[data-indicator="poll-status"]');
+	if (!h || !label) return;	/* not this card's shape — left alone rather than guessed at */
+
+	const panel = panelFor(h);
+	if (panel && !panel.id) panel.id = 'fs-ovl-panel-' + (_panelSeq++);
+
+	syncAttr(h, 'role', 'button');
+	syncAttr(h, 'tabindex', '0');
+	syncAttr(h, 'aria-controls', panel ? panel.id : null);
+	syncAttr(h, 'aria-expanded', pillExpanded(label) ? 'true' : 'false');
+	/* the header now carries the pill's name, role and state; a screen reader user tabbing past it
+	 * to a second, unlabelled clickable span would hear an unexplained duplicate control — same
+	 * reasoning as the aria-hidden on svgIcon()'s output, fs-widgets.js:12 */
+	syncAttr(label, 'aria-hidden', 'true');
+
+	if (h.dataset.fsWired) return;
+	h.dataset.fsWired = '1';
+
+	h.addEventListener('click', (ev) => {
+		/* a click landing on the pill itself already ran index.js's own handler; forwarding here
+		 * too would toggle the card twice */
+		if (ev.target.closest?.('[data-indicator="poll-status"]') !== label) label.click();
+		syncAttr(h, 'aria-expanded', pillExpanded(label) ? 'true' : 'false');
+	});
+	/* the pill is an <a>-less <span>, so neither key is native here — contrast
+	 * fs-widgets.js's wireSpaceKey, written for an <a role="button">, which gets Enter for free
+	 * and needs only Space added */
+	h.addEventListener('keydown', (ev) => {
+		if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
+		ev.preventDefault();
+		label.click();
+	});
+}
+
+/* A `.cbi-section` LuCI still renders when a stock include has nothing to show this tick: title
+ * "-", the poll pill its only content, 72px tall on the live Overview — seventh there (a fixture is
+ * not proof of position: docs/playground.html puts it first). Real and cosmetic, so it is
+ * suppressed rather than left as a rung in the tab order with nothing behind its own name. */
+function hideEmptyCard(sec) {
+	if (sectionTitle(sec) === '-') sec.classList.add('fs-ovl-empty');
+}
+
+function tidyCards(view) {
+	view.querySelectorAll('.cbi-section').forEach((sec) => {
+		hideEmptyCard(sec);
+		wireDisclosure(sec);
+	});
 }
 
 /* the wrapper we built, so the poll-tick fast path costs one property read */
@@ -75,6 +175,18 @@ function arrange() {
 	if (!view) return;
 
 	nameTooltips(view);
+	/* 20_memory.js, 25_storage.js and 30_network.js each call their OWN local progressbar(), not
+	 * the theme's window.progressbar (menu-footstrap-common.js), so the reading and colour those
+	 * bars need are stamped on here instead — on the same poll-tick callback nameTooltips() already
+	 * runs on, ahead of the fast-path return below: dom.content() rewrites a section's title every
+	 * tick even when the wrapper survives, so a bar's reading is stale on every tick this line is
+	 * skipped. */
+	common.annotateMeters(view);
+	/* Same reasoning, same placement: dom.content() rewrites a card's body every tick even when the
+	 * wrapper survives, so a card that is only now getting its title text needs wiring on this
+	 * pass, not just the first one. tidyCards() is its own idempotent write (wireDisclosure(),
+	 * hideEmptyCard() above), so a tick that changes nothing here touches no DOM either. */
+	tidyCards(view);
 
 	/* Fast path: the poll lands here on every tick, forever, and the stock poll never rebuilds
 	 * the .cbi-section wrappers, so the grid survives. Deliberately not a disconnect() — if a
@@ -276,7 +388,10 @@ function patchOverview() {
 
 /* `progressbar`, `renderBox` and `renderBadge` are defined in menu-footstrap-common.js, not here:
  * a stock include calls them bare from its own render(), so they must exist before the view class
- * does, and this page module is required during the navigation that races it. */
+ * does, and this page module is required during the navigation that races it. `annotateMeters` is
+ * required from that same module (see arrange()) rather than duplicated: it is not a template
+ * global, so nothing forces it to live there, but the threshold split and label lookup it shares
+ * with `window.progressbar` would drift into two copies otherwise. */
 
 return baseclass.extend({
 	/* called once by menu-footstrap-common's init; everything route-dependent hangs off the

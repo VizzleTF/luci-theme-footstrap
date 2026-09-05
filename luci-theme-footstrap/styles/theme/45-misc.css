@@ -110,8 +110,8 @@
 	 * a container-type, so giving container-type to any new component would silently re-target every
 	 * unnamed query underneath it:
 	 *   fs-view    the overview's grid (pages/20-overview.css, @container 800)
-	 *   fs-content "whatever content column I am in", carried by both .cbi-map and #view, so a query
-	 *              resolves to the nearer of the two. */
+	 *   fs-content "whatever content column I am in", carried by .cbi-map, #view and .modal (below),
+	 *              so a query resolves to the nearest of the three. */
 	.cbi-map { container-type: inline-size; container-name: fs-content; }
 	#view { container-type: inline-size; container-name: fs-view fs-content; }
 

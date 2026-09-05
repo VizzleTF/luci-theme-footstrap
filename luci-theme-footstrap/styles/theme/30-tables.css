@@ -303,6 +303,43 @@
 	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:last-child:not(:first-child) {
 		font-family: var(--fs-font-mono); color: var(--fs-text); text-align: end;
 	}
+	/* Below ~560px of container width the 40%/nowrap column above starves the value: measured on
+	 * System -> System at 390px content width, Firmware Version wrapped onto 5 lines and Kernel
+	 * Version/Architecture onto 2 each, most of the 130px label column sitting empty. Stack it like
+	 * the other card idioms in this file — label as an eyebrow above its value — instead of holding
+	 * a fixed-fraction column at any width. A width win, not a height one: measured on the gallery's
+	 * key/value specimen (a 340px .cbi-map, docs/gallery.html), stacking cost the card +44.9% height
+	 * (202.6 -> 293.5px) for the value column widening x1.67 (183.6 -> 306px) and Firmware Version's
+	 * line count dropping from two to one. (The five lines above are the live 390px page, where the
+	 * value is longer than the specimen carries — the shape is the same, the count is not.)
+	 *
+	 * 560 is the second threshold named on fs-content; the config table's card (theme/65-dropdown.css)
+	 * is the first, at 960, for a row full of widgets that bake in a layout width. This one holds two
+	 * plain text cells, so it can stay two-column down to a narrower width before the label needs the
+	 * row to itself.
+	 *
+	 * `:first-child:first-child` / `:last-child:last-child` double the tail pseudo-class to outrank
+	 * the two rules above at identical specificity otherwise — the `.hidden.hidden` idiom
+	 * (theme/60-inputs.css) — rather than win on source order, which the next edit to either rule
+	 * could invert.
+	 *
+	 * The value's right-flush alignment above is a two-column device: with the label gone from the
+	 * row, right-flushing floats the value away from its own caption. Left-aligned instead, so the
+	 * card reads top-to-bottom as caption then value, matching every other stacked cell in this file. */
+	@container fs-content (max-width: 560px) {
+		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .tr {
+			display: block;
+		}
+		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:first-child:first-child {
+			display: block; width: auto; white-space: normal;
+			font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight);
+			letter-spacing: var(--fs-eyebrow-tracking); color: var(--fs-eyebrow-color);
+			text-transform: uppercase;
+		}
+		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:last-child:last-child:not(:first-child) {
+			display: block; width: auto; text-align: start;
+		}
+	}
 
 	/* --- the realtime graph legend (status/realtime/*) ---
 	 * The one no-id `.table` LuCI renders with inline `table-layout:fixed;width:100%` and six cells

@@ -397,6 +397,65 @@ happens on the maintainer's explicit word for one change, never by reflex, and `
 Every one of these cost a measurement that read as a regression in the theme. They are written down
 because each was hit more than once.
 
+**On a Windows checkout, most npm-run gates fail before they measure anything, and the failure is
+the host, not the theme.** Tell one apart from the other by re-running the SAME gate the SAME way
+on a clean `HEAD` — a host fault fails there too, identically.
+
+- `npm run lint:js`, `npm run lint:css` and other npm-script entry points fail outright: the
+  packages under `node_modules/.bin` have no `.cmd` shim on this host. Call the binary directly
+  instead of through npm: `node node_modules/eslint/bin/eslint.js <path>`,
+  `node node_modules/stylelint/bin/stylelint.mjs "<glob>"`.
+- Any gate that builds the sheet (`css-metrics`, `css-floor`, `table-contract`, `smoke`,
+  `computed-diff`, `a11y`, `export-tier`) fails with `EFTYPE`: `tools/lib/css.mjs` runs
+  `build-css.sh` through `execFileSync`, and Windows cannot execute a shell script directly.
+  The workaround this session used is a `NODE_OPTIONS=--import` loader hook that intercepts the
+  build call and re-issues it through `sh`, run from a copy of the tree in `../tmp/` so the checkout
+  is never written to.
+- `tools/computed-diff.mjs` additionally hands `tar -C` a `C:\…` path, which `tar` refuses — it
+  needs a POSIX path.
+- `python3` resolves to the Microsoft Store stub and fails with "Python was not found"; the working
+  interpreter on this host is named `python` — matters for `python3 tools/audit.py --strict`.
+
+**None of the above means the live half is out of reach — it runs fine, just not from the Windows
+side of this checkout.** `owlab` is already installed in WSL (`~/go/bin/owlab`), its containers are
+already up, and the full `npm run live` gate passes there against the very same tree, mounted at
+`/mnt/c/...`. The recipe this session used for every WSL call:
+
+```sh
+MSYS_NO_PATHCONV=1 wsl.exe -- bash -c 'PATH=$HOME/go/bin:$HOME/.nvm/versions/node/v24.12.0/bin:/usr/local/bin:/usr/bin:/bin; export PATH; cd /mnt/c/Users/IVAN/Documents/home/openwrt/luci-theme-footstrap; <command>'
+```
+
+- `MSYS_NO_PATHCONV=1` is load-bearing: without it Git Bash rewrites the POSIX `/mnt/c/...` argument
+  into a Windows-shaped path before `wsl.exe` ever sees it, and the `cd` fails with "No such file or
+  directory" on a line that reads correctly.
+- The `PATH=` has to be assigned by hand and kept short: the inherited Windows PATH carries spaces
+  and parentheses (`Program Files`, `NVIDIA Corporation (x86)`), and `export PATH=<that>` inside
+  `bash -c '...'` fails with `syntax error near unexpected token '('`.
+- Node in WSL lives under nvm (`~/.nvm/versions/node/v24.12.0/bin`), which is not on PATH by
+  default: leave it out and a live `node` on Windows still reads as `node: command not found`
+  inside the WSL shell.
+- The same recipe also clears the static gates that need a built sheet: `node tools/size-budget.mjs`
+  run this way needs no loader-hook workaround at all, because `build-css.sh` executes normally
+  under WSL's own `sh`.
+
+Two traps sit in the calling convention itself, each cost a retry:
+
+- shell variables inside `wsl.exe -- bash -c '...'` collapse to empty before `bash` ever starts —
+  `$R`, `$T`, `$?` in the single-quoted string belong to Git Bash, not to WSL — so `> $T/gate-$n.log`
+  turns into `> /gate--.log` and `cd $R/luci-theme-footstrap` into `cd /luci-theme-footstrap`. Write
+  the script to a file and call `wsl.exe -- bash <path>.sh` instead of inlining it.
+- **detaching through `tools/bg.sh` inside a one-shot `wsl.exe` call does not survive**: WSL tears
+  the session down together with the process it was running, and the log is left with only its
+  header — no `.status`, no `.pid`. It works only when the WSL session behind the run stays alive
+  for the whole duration, not merely for the `wsl.exe` invocation that started it.
+
+**`mangle-tokens.sh` fails on a `C:\...`-shaped path with `mv: cannot stat ...tmp.NNN`, and the gate
+that surfaces it never mentions the script by name.** Like `build-css.sh`, it needs a POSIX path;
+`tools/size-budget.mjs` calls it and inherits the failure as its own. A failed run also leaves
+droppings in the checkout ROOT — files named like `C<...>cascade.css.tmp.248` — that have to be
+removed by hand: `git clean` is not safe here, because the same root holds untracked files that are
+wanted.
+
 **A stand serves http only, so nothing about the login page's https hop can be measured on it as it
 comes.** `uhttpd` has the certificate already; what is missing is the listener, and owlab publishes
 port 80 alone — the https side is reached on the container's own address rather than through

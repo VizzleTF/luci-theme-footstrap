@@ -213,6 +213,7 @@
 		"pseudoel:-webkit-scrollbar-thumb",
 		"pseudoel:-webkit-scrollbar-track",
 		"pseudoel:-webkit-search-decoration",
+		"pseudoel:-webkit-slider-runnable-track",
 		"pseudoel:-webkit-slider-thumb",
 		"pseudoel:after",
 		"pseudoel:before",

@@ -153,6 +153,88 @@ function loadPlugins() {
 	});
 }
 
+/* warn/danger split for the meter fill (theme/25-progressbar.css): a DECISION, not a measurement —
+ * 20% of an 84 MiB overlay and 20% of an 8 GiB disk are different news at the same reading, and a
+ * plain percentage is kept anyway so every meter on the page reads the same way. */
+const FS_METER_WARN = 80;
+const FS_METER_DANGER = 92;
+
+/* Write an attribute only when the value actually changes, so a poll tick that reads the same
+ * numbers back touches no DOM and fires no attribute-mutation observer. `value === null` removes
+ * the attribute instead of writing the string "null". */
+function fsSyncAttr(el, name, value) {
+	if (value === null) {
+		if (el.hasAttribute(name)) el.removeAttribute(name);
+	} else if (el.getAttribute(name) !== value) {
+		el.setAttribute(name, value);
+	}
+}
+
+/* The meter's name, if the markup already states one — never invented. A `.cbi-value` row's own
+ * label (the RSSI/RSRP gallery shape) or a key/value table row's first cell (Memory, Storage, CPU
+ * load on Overview) each stand for the whole row; a bare meter with neither (Software's disk-space
+ * bar, the package manager) gets no `aria-label` written at all, and Chromium's accessible-name
+ * computation then falls back to `title` — which is the reading, not a name ("95 / 100 (95%)"),
+ * measured with `Accessibility.getPartialAXTree`. That fallback cannot be closed from here: `title`
+ * is the ONLY source `::after { content: attr(title) }` has for the visible percentage
+ * (styles/theme/25-progressbar.css), so removing it would blank the bar for a sighted reader too. */
+function findProgressbarLabel(pg) {
+	const row = pg.closest('.cbi-value');
+	let label = row ? row.querySelector('.cbi-value-title') : null;
+	if (!label) {
+		const tr = pg.closest('.tr');
+		if (tr) {
+			const own = pg.closest('.td, td');
+			const cell = tr.querySelector('.td, td');
+			if (cell && cell !== own) label = cell;
+		}
+	}
+	return label;
+}
+
+/* The percentage inside a meter's `title`, in either shape a caller writes it in: `window.progressbar`
+ * below composes `'%s / %s (%d%%)'`, parenthesised and preceded by the byte/localised reading, but a
+ * bare meter markup may carry just `'97%'` with nothing around it (docs/gallery.html). Both are
+ * anchored at the end of the string so neither can match a stray "%" earlier in a localised reading;
+ * an empty title or one with no percentage at all yields null, on purpose — nothing to annotate.
+ * `%d` is the unclamped percentage, so the result can still read past 100 or under 0 and is clamped
+ * by the caller, the same way `window.progressbar` clamps its own `level`, below. Exported for
+ * tests/meter.test.mjs, which is the only caller that needs the parse on its own. */
+function parseMeterPercent(title) {
+	if (title == null) return null;
+	const m = (/\((-?\d+)%\)\s*$/).exec(title) || (/(-?\d+)%\s*$/).exec(title);
+	return m ? parseInt(m[1], 10) : null;
+}
+
+/* The attribute work `window.progressbar` and a bare `.cbi-progressbar` node both need — Status ->
+ * Overview's own 20_memory.js, 25_storage.js and 30_network.js (luci-mod-status) declare and call
+ * their OWN local `progressbar()`, a straight copy of the same upstream body, so this theme's
+ * global never runs on the meters those stock includes actually draw. `annotateMeters()` below
+ * walks the DOM after the fact instead of owning every writer; the threshold split and the name
+ * logic stay in this one function either way, so the two callers cannot drift apart. */
+function annotateMeter(pg) {
+	const title = pg.getAttribute('title');
+	const pc = parseMeterPercent(title);
+	if (pc == null) return;
+	const level = pc < 0 ? 0 : (pc > 100 ? 100 : pc);
+	fsSyncAttr(pg, 'role', 'progressbar');
+	fsSyncAttr(pg, 'aria-valuemin', '0');
+	fsSyncAttr(pg, 'aria-valuemax', '100');
+	fsSyncAttr(pg, 'aria-valuenow', String(level));
+	fsSyncAttr(pg, 'aria-valuetext', title);
+	const label = findProgressbarLabel(pg);
+	fsSyncAttr(pg, 'aria-label', label ? label.textContent.trim() : null);
+	fsSyncAttr(pg, 'data-fs-level',
+		level >= FS_METER_DANGER ? 'danger' : (level >= FS_METER_WARN ? 'warn' : null));
+}
+
+/* Every `.cbi-progressbar[title]` under `root` — the markup itself, not who last drew it. Called
+ * from fs-overview.js's own poll-tick observer (see there for why this file does not run a second
+ * one); `fsSyncAttr` above makes a re-run over an unchanged bar a no-op read. */
+function annotateMeters(root) {
+	(root || document).querySelectorAll('.cbi-progressbar[title]').forEach(annotateMeter);
+}
+
 /* The three template globals Status -> Overview needs, defined where ordering is guaranteed.
  *
  * `admin_status/index.ut` defines `progressbar`, `renderBox` and `renderBadge` in an inline script
@@ -165,29 +247,45 @@ function loadPlugins() {
  * ordering the two. This file is required by the footer on every page and evaluates before the
  * router exists.
  *
- * Bodies are verbatim from upstream except for two deltas: L.itemlist -> window.L.itemlist (the
- * two-L trap, docs/spa-router.md), and renderBox's `[title]` — dom.append parses a scalar child as
+ * Bodies are verbatim from upstream except for three deltas: L.itemlist -> window.L.itemlist (the
+ * two-L trap, docs/spa-router.md); renderBox's `[title]` — dom.append parses a scalar child as
  * innerHTML (luci.js:1395) and an array member as text (:1383), and this file defines the global on
- * every admin page where upstream defines it on Status -> Overview alone. Same output: nothing in
- * 24.10, 25.12 or master calls renderBox. The typeof guards make each a no-op on a full page load,
- * where the template's own copies win the race. */
+ * every admin page where upstream defines it on Status -> Overview alone; and progressbar's
+ * accessibility attributes (role, aria-value*, data-fs-level) — upstream's copy writes the reading
+ * into `title` alone, which nothing reads back for a screen reader off a generated `::after`. Same
+ * output on the other two: nothing in 24.10, 25.12 or master calls renderBox, and progressbar's
+ * `title` and fill width are untouched.
+ *
+ * `renderBox`/`renderBadge` keep the `typeof` guard: a full page load runs the template's inline
+ * `<script>` first, in document order, before this module evaluates, so upstream has already
+ * declared both — the guard just avoids overwriting an identical body. `progressbar` CANNOT reuse
+ * that guard: upstream's copy of the same name wins that exact race, and it is the one WITHOUT the
+ * accessibility attributes below. Guarded, the theme's version only ever won when a page other than
+ * Status -> Overview loaded first and the SPA router then navigated here without a reload — which
+ * is a real gap, not the common case. The assignment is unconditional so the accessible copy always
+ * wins, on a full load and on an SPA arrival alike. */
 function ensureOverviewHelpers() {
 	/* eslint-disable no-var -- these three bodies are copies of LuCI's admin_status/index.ut so
 	   they can be diffed against upstream when it changes. Modernising the `var`s would break
 	   that property, which is what makes carrying the copies safe. */
-	if (typeof window.progressbar !== 'function')
-		window.progressbar = function(query, value, max, byte) {
-			var pg = document.querySelector(query),
-			    vn = parseInt(value) || 0,
-			    mn = parseInt(max) || 100,
-			    fv = byte ? String.format('%1024.2mB', value) : value,
-			    fm = byte ? String.format('%1024.2mB', max) : max,
-			    pc = Math.floor((100 / mn) * vn);
-			if (pg) {
-				pg.firstElementChild.style.width = pc + '%';
-				pg.setAttribute('title', '%s / %s (%d%%)'.format(fv, fm, pc));
-			}
-		};
+	window.progressbar = function(query, value, max, byte) {
+		var pg = document.querySelector(query),
+		    vn = parseInt(value) || 0,
+		    mn = parseInt(max) || 100,
+		    fv = byte ? String.format('%1024.2mB', value) : value,
+		    fm = byte ? String.format('%1024.2mB', max) : max,
+		    pc = Math.floor((100 / mn) * vn),
+		    reading = '%s / %s (%d%%)'.format(fv, fm, pc);
+		if (pg) {
+			pg.firstElementChild.style.width = pc + '%';
+			pg.setAttribute('title', reading);
+			/* Accessible value, colour and name: annotateMeter() re-parses `reading` back out
+			 * of `title` rather than reusing `pc` here directly, so a bare `.cbi-progressbar`
+			 * this function never touched is annotated the identical way — the clamp, the
+			 * label lookup and the warn/danger split stay in that one function. */
+			annotateMeter(pg);
+		}
+	};
 	if (typeof window.renderBox !== 'function')
 		window.renderBox = function(title, active, childs) {
 			childs = childs || [];
@@ -234,6 +332,15 @@ return baseclass.extend({
 	/* the seam a companion package writes its own rows into the recents list through; see
 	 * remember() for what a key is */
 	remember,
+
+	/* the seam fs-overview.js calls, on its own already-coalesced poll-tick observer, to annotate
+	 * the meters a stock Status -> Overview include draws with its own local progressbar() */
+	annotateMeters,
+
+	/* module-private otherwise: tests/meter.test.mjs drives the percent parse and the clamp/threshold
+	 * split directly rather than through a live `.cbi-progressbar[title]` walk */
+	parseMeterPercent,	/* fs:probe */
+	annotateMeter,	/* fs:probe */
 
 	init(renderMainMenu) {
 		/* First, and outside the promise: a third-party sheet that outranks the chrome is already
