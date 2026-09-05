@@ -259,10 +259,24 @@ Only after everything above has passed:
 6. CI on `v*` builds both formats, signs them, and builds the release body from the changelog. Wait
    for a green pipeline and check the release carries the expected assets (plus a `.sig` for each):
    the theme resolving to exactly one asset per format, the manifest, the installer, the notes.
-7. **Publish the feed.** The theme is installed from owfeed-packages, so a release nobody can
-   `apk upgrade` into is half a release. Merge the version bump against
-   [owfeed-packages](https://github.com/owfeed/owfeed-packages) — its bot opens one for some
-   releases, and where it does not, open it by hand.
+7. **Publish the feed, and do not trust the bot to finish it.** The theme is installed from
+   owfeed-packages, so a release nobody can `apk upgrade` into is half a release. The hourly job
+   there opens the version-bump pull request and says it "will merge itself once the checks pass".
+   Measured on 0.14.10, it does neither on its own, and both halves are mechanical:
+   - its pull request is authored by `app/github-actions`, and that repository's
+     `fork-pr-contributor-approval` policy holds the `pull_request` check run in `action_required`
+     until a person approves it. The job dispatches its own run of the same workflow, which goes
+     green, but the automerge waits on the held one. **Approve it** (`gh api -X POST
+     repos/owfeed/owfeed-packages/actions/runs/<id>/approve`), or the PR sits open with a green
+     check beside it.
+   - after the merge, `Publish` does not start: it triggers on a push to `main`, and a push made
+     with `GITHUB_TOKEN` does not trigger workflows. **Dispatch it by hand**
+     (`gh workflow run publish.yml --repo owfeed/owfeed-packages`).
+
+   Then read the **served** index rather than the workflow log — `apk adbdump` on
+   `releases/25.12/<arch>/packages.adb`, `Packages.gz` on `releases/24.10/<arch>/` — and confirm the
+   new version is there. Tracked as [owfeed-packages#53](https://github.com/owfeed/owfeed-packages/issues/53);
+   when that is fixed, this step goes back to being one sentence.
 
 A fresh empty `## [Unreleased]` comes back on top with the next substantive commit.
 
