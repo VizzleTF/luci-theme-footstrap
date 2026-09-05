@@ -231,7 +231,11 @@
 					   sd.pattern is whitelisted to hex above, so nothing user-controlled reaches
 					   the url(). */
 					const pu = sd.pattern;
-					if (pu) root.style.setProperty('--fs-pattern-url', 'url("/luci-static/footstrap/pattern.svg?v=' + pu + '")');
+					/* /cgi-bin, not a /www symlink: a plain static SVG is a same-origin document
+					   that runs script opened directly (OpenWrt forum thread 251930); this path
+					   is the CGI handler that answers with CSP 'none' + sandbox instead — see
+					   fs-axes.js's PAT_SERVE, which this string must keep matching. */
+					if (pu) root.style.setProperty('--fs-pattern-url', 'url("/cgi-bin/luci-theme-footstrap-pattern?v=' + pu + '")');
 					const psRaw = lsGet('fs-pattern-size');
 					const ps = (psRaw !== null) ? parseInt(psRaw, 10) : sd.pattern_size;
 					if (ps >= 40 && ps <= 1600 && ps !== 440) root.style.setProperty('--fs-pattern-size', ps + 'px');

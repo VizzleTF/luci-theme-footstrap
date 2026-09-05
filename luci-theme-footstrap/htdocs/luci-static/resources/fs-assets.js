@@ -43,17 +43,22 @@ const _uciCommit = rpc.declare({ object: 'uci', method: 'commit', params: [ 'con
  * Router-side, like the login photo and for the same reason — a file cannot live in localStorage,
  * and a pattern is something a router wears. The path is a fixed server-side constant matched
  * exactly by the rpcd ACL, so nothing user-controlled reaches a path. It lives under /etc so a
- * package upgrade cannot delete it (keep.d carries it across a sysupgrade), and the served name
- * ends in .svg because uhttpd types a file by extension.
+ * package upgrade cannot delete it (keep.d carries it across a sysupgrade). It keeps the .svg name
+ * for its own sake — the CGI handler that now serves it (root/www/cgi-bin) sets Content-Type
+ * itself and does not rely on uhttpd's by-extension typing the way the login photo's /www symlink
+ * still does.
  *
  * How it is made to fit is 15-wallpaper.css's mask, not anything done to the bytes: the file
  * supplies the alpha and the theme the colour, so one upload reads correctly in both modes and
  * under every palette.
  *
  * What is refused: an SVG is a document, not a picture, and while a masked or background image
- * never executes script, the same file fetched from its own URL would. Uploading already needs an
- * authenticated admin session with uci write rights, so this is defence in depth — but the check is
- * cheap and the failure mode is somebody else's browser. */
+ * never executes script, the same file fetched from its own URL would (OpenWrt forum thread
+ * 251930) — which is what the server-side handler (root/www/cgi-bin) now closes with response
+ * headers a browser will not execute. THIS check runs in the uploading admin's OWN browser and is
+ * not a defence at all: a `curl` POST to the same cgi-io path skips it entirely, and the rpcd ACL
+ * authorises that POST regardless of what wrote it. It exists only so an admin who uploads a bad
+ * file by mistake is told so before it lands, and the cost of running it is cheap. */
 const PAT_PATH  = '/etc/footstrap/pattern.svg';			/* cgi-upload target; the ACL grants exactly this */
 const PAT_MAX   = 512 * 1024;							/* a tile that has to reach a router's flash and then every page load */
 /* What makes an uploaded SVG unacceptable, decided on the PARSED document and not on its text: a
@@ -65,19 +70,30 @@ const PAT_MAX   = 512 * 1024;							/* a tile that has to reach a router's flash
  * no subresource is fetched, no handler is bound. So the questions are exact ones about nodes:
  *
  *   - is it an SVG at all (a parsererror, or a root that is not <svg>, is not an image)
- *   - does it carry an element that executes or embeds (script, foreignObject, iframe, …)
+ *   - does it carry an element that executes or embeds (script, foreignObject, iframe, style, …)
  *   - does it carry a real event-handler attribute — `^on[a-z]+$`
  *   - does any value start a `javascript:` url
- *   - does any href point off this router; `#fragment` and `data:` stay allowed, being how a tile
- *     refers to its own <defs> and embeds a bitmap
+ *   - does any href point off this router — a leading `//`, or a `data:`/`blob:`/`about:` payload
+ *   - does any element carry a `style` attribute
  *
  * The check is for the way the file can be reached that a mask does not cover: its own URL, opened
  * directly, same-origin with the session.
  *
  * `animate`/`set` are listed for a second reason as well: they can retarget an attribute at run
  * time (`<set attributename="href" to="javascript:…">`), and a tile that animates repaints a
- * full-viewport layer behind every page. */
-const PAT_BAD_TAGS = [ 'script', 'foreignobject', 'iframe', 'embed', 'object', 'audio', 'video', 'animate', 'set' ];
+ * full-viewport layer behind every page.
+ *
+ * `style` is refused both as an ELEMENT and as an ATTRIBUTE: a `<style>@import
+ * url("//attacker/x.css")</style>` reaches off-router with no script and no href at all, and a
+ * `style="…url(…)…"` attribute does the same per-element. `data:`/`blob:`/`about:` were allowed
+ * through `href`/`xlink:href` before this pass, on the theory that a tile only ever uses `data:` to
+ * embed its own bitmap — closed anyway, because the same scheme admits `data:text/html` and
+ * `data:image/svg+xml`, and telling those apart from a `data:image/png` bitmap means parsing the
+ * URI's own MIME token, which is exactly the kind of grammar-guessing this file avoids everywhere
+ * else. The cost is real: an admin embedding a bitmap inside the tile now needs a second uploaded
+ * asset referenced by a same-origin URL instead of a `data:` href — the tile itself is unaffected,
+ * since 15-wallpaper.css never used one. */
+const PAT_BAD_TAGS = [ 'script', 'foreignobject', 'iframe', 'embed', 'object', 'audio', 'video', 'animate', 'set', 'style' ];
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /* null if the parsed document is fine, otherwise the sentence to show. */
@@ -118,8 +134,17 @@ function _svgObjection(text) {
 			 * refuse files that do nothing. */
 			if ((/^on[a-z]+$/).test(n)) return refused;
 			if ((/^javascript:/i).test(v)) return refused;
-			/* off-router reference. A leading `//` is protocol-relative and just as external. */
-			if ((/(?:^|:)href$/).test(n) && (/^(?:[a-z][a-z0-9+.-]*:)?\/\//i).test(v)) return refused;
+			/* a `style=""` attribute reaches the same `url()` grammar as a `<style>` element,
+			 * per-element instead of per-document — refused for the same reason that tag is. */
+			if (n === 'style') return refused;
+			if ((/(?:^|:)href$/).test(n)) {
+				/* off-router reference. A leading `//` is protocol-relative and just as external. */
+				if ((/^(?:[a-z][a-z0-9+.-]*:)?\/\//i).test(v)) return refused;
+				/* `data:`/`blob:`/`about:` can carry a second document (text/html, image/svg+xml)
+				 * behind an href that looks like a same-document reference — see the comment above
+				 * PAT_BAD_TAGS for why this is a blanket refusal and not a MIME-token check. */
+				if ((/^(?:data|blob|about):/i).test(v)) return refused;
+			}
 		}
 	}
 	return null;

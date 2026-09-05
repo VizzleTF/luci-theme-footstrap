@@ -438,7 +438,12 @@ function resetToBuiltin() {
  * layer — one admin uploads once and every device sees it, pre-login included. So they are absent
 
  * from AXIS_KEYS, snapshotAxes() and matchesSavedDefault(), and must not move the Save button. */
-const PAT_SERVE = '/luci-static/footstrap/pattern.svg';	/* the uhttpd symlink the uci-default makes */
+/* NOT a /www symlink, unlike BG_SERVE below: an SVG served as a plain static file is a same-origin
+ * document that runs script opened directly (OpenWrt forum thread 251930). This CGI handler reads
+ * the fixed /etc/footstrap/pattern.svg path itself and answers with CSP 'none' + sandbox and
+ * nosniff, headers uhttpd cannot attach to a static file — see the uci-default and the handler for
+ * the rest of the reasoning. Painting stays exactly as before: a URL is a URL to a mask-image. */
+const PAT_SERVE = '/cgi-bin/luci-theme-footstrap-pattern';
 function currentPattern() {
 	const t = prefs.sd('pattern');
 	return (typeof t === 'string' && BG_TOKEN_RE.test(t)) ? t : '';
@@ -454,7 +459,10 @@ function applyPattern(tok) {
 	prefs.setSD('pattern', tok || '');
 }
 
-const BG_SERVE = '/luci-static/footstrap/bg';	/* the uhttpd symlink the uci-default makes */
+/* Still the plain uhttpd symlink the uci-default makes, unlike PAT_SERVE above: fs-assets.js
+ * re-encodes every login-bg upload to a JPEG on a canvas before it is sent, so the stored bytes
+ * are pixels only — there is no script grammar left in a raster for a direct hit to run. */
+const BG_SERVE = '/luci-static/footstrap/bg';
 /* the cache-bust token charset, an md5/sha hex string. One copy here; head.ut's ucode sanitiser
  * and the pre-paint inline script keep their own identical copies unavoidably, running before this
  * module — see the axes contract in head.ut. */
