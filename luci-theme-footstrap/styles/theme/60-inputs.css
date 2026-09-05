@@ -313,17 +313,9 @@
 	}
 	/* keyboard/click focus rings on the DRAWN box — the theme's one ring token, replacing
 	 * base's old generic glow; :focus (not :focus-visible) keeps the pre-absorption behaviour
-	 * of ringing a clicked box */
-	input[type="checkbox"]:focus::before,
-	input[type="radio"]:focus::before {
-		border-color: var(--fs-accent);
-		box-shadow: var(--fs-focus-ring);
-	}
-	input[type="checkbox"].cbi-input-invalid:focus::before,
-	input[type="radio"].cbi-input-invalid:focus::before {
-		border-color: var(--fs-danger);
-		box-shadow: var(--fs-focus-ring-invalid);
-	}
+	 * of ringing a clicked box. Both states (plain and invalid) are declared once, further
+	 * down this file, in the selector lists every other same-body ring joins — see the two
+	 * `--fs-focus-ring`/`--fs-focus-ring-invalid` rules below the text-input group. */
 	input[type="checkbox"]::after,
 	input[type="radio"]::after {
 		/* the mark is inset from the DRAWING, and the drawing is centred in the target, so the mark
@@ -423,7 +415,7 @@
 	 * listbox in dark mode. `height: inherit` absorbed from base with the width above — without
 	 * it the fixed box would cap a multi-row listbox at one line. */
 	select[multiple] { background-color: var(--fs-panel2); color: var(--fs-text); height: inherit; }
-	select:focus { border-color: var(--fs-accent); box-shadow: var(--fs-focus-ring); outline: none; }
+	/* :focus joins the shared accent ring in the text-input group below. */
 	/* absorbed from base's reset: 100% (= inherit) keeps the option on its select's size, and
 	 * only <option> needs the 2em leading — the other controls carry line-height: normal above */
 	option { font-size: 100%; line-height: 2em; }
@@ -505,15 +497,8 @@
 		opacity: var(--fs-disabled-opacity);
 		pointer-events: none;
 	}
-	.cbi-select.focus {
-		border-color: var(--fs-accent);
-		box-shadow: var(--fs-focus-ring);
-	}
-	/* the alarm must survive focus: .focus above would repaint an invalid shell accent */
-	.cbi-select.cbi-input-invalid.focus {
-		border-color: var(--fs-danger);
-		box-shadow: var(--fs-focus-ring-invalid);
-	}
+	/* .focus and .cbi-input-invalid.focus join the shared accent/danger ring rules further down
+	 * this file — same two bodies as every other :focus/:focus-within ring on this token. */
 	/* the native <select> inside the shell: invisible, filling it, clearing the ▾ plate on the
 	 * right. The inset is a scale step; the right margin is the plate's width, so it stays
 	 * em-relative to the glyph it clears. Every themed-select declaration above (chevron,
@@ -624,26 +609,57 @@
 	/* bare `input:focus` absorbed from base's generic glow onto the same ring: it is the fallback
 	 * for the types the list does not name and for a typeless <input>; on checkbox/radio it lands
 	 * on the invisible element box UNDER the drawn ::before ring above — coincident boxes, one
-	 * visible ring, as the old glow behaved */
+	 * visible ring, as the old glow behaved. `select:focus` and the keyboard-removable dynlist
+	 * chip (ui.js gives it a tabindex) join here rather than repeating the same three
+	 * declarations under their own selector: one shared body instead of three, 149 B off
+	 * cascade.css. */
 	.cbi-input-text:focus, .cbi-input-password:focus, .cbi-input-textarea:focus,
 	.cbi-section-create-name:focus,
 	input:focus,
 	input[type="text"]:focus, input[type="password"]:focus, input[type="number"]:focus,
 	input[type="email"]:focus, input[type="url"]:focus, input[type="search"]:focus,
 	input[type="tel"]:focus, input[type="date"]:focus, input[type="time"]:focus,
-	textarea:focus {
+	textarea:focus,
+	select:focus,
+	.cbi-dynlist > .item:focus {
 		border-color: var(--fs-accent);
 		box-shadow: var(--fs-focus-ring);
 		outline: none;
+	}
+	/* The plain accent ring above, restated for four components whose selector cannot join that
+	 * list without changing what it matches (a pseudo-element, a legacy shell class, two
+	 * `:focus-within` containers) — same two declarations, one shared body instead of four, 186 B
+	 * off cascade.css. `:is()` around the `:has()` compound keeps the list forgiving: unwrapped, a
+	 * `:has()` compound sharing a selector list with plain ones fails the WHOLE rule below the
+	 * floor (Firefox < 121; docs/css.md "Two shapes fail it"), instead of just losing that one
+	 * selector. */
+	input[type="checkbox"]:focus::before, input[type="radio"]:focus::before,
+	.cbi-select.focus,
+	.cbi-dynlist > .add-item:focus-within,
+	.control-group:is(:has(> .cbi-input-password)):focus-within {
+		border-color: var(--fs-accent);
+		box-shadow: var(--fs-focus-ring);
 	}
 
 	/* Invalid state keeps the danger cue. `.cbi-value-error input` is the Lua-CBI path and belongs
 	 * HERE, not in base: base does declare a red border-color for it, but the rule above sets the
 	 * `border` SHORTHAND, and a shorthand in a later layer wipes the longhand out regardless of
 	 * specificity — so every third-party app on luci-compat rendered the field in --fs-border grey
-	 * and had lost its field-error cue while the modern .cbi-input-invalid path worked. */
+	 * and had lost its field-error cue while the modern .cbi-input-invalid path worked.
+	 *
+	 * `.cbi-input-invalid:focus` is not redundant with the rule it sits beside: the generic
+	 * `input:focus` above is (0,1,1) and would repaint a focused invalid field accent, and
+	 * `.cbi-input-invalid:focus` at (0,2,0) is what stops it — the TYPED `:focus` rules above are
+	 * (0,2,1) and still outrank this, so a typed invalid field focuses accent, exactly as before
+	 * the absorption. The checkbox/radio `::before` ring and the legacy `.cbi-select` shell need
+	 * the identical danger body for the same reason on their own elements — one shared rule
+	 * instead of four, 186 B off cascade.css. */
+	input[type="checkbox"].cbi-input-invalid:focus::before,
+	input[type="radio"].cbi-input-invalid:focus::before,
+	.cbi-select.cbi-input-invalid.focus,
 	.cbi-input-invalid, input.cbi-input-invalid, textarea.cbi-input-invalid,
-	.cbi-value-error input, .cbi-value-error textarea {
+	.cbi-value-error input, .cbi-value-error textarea,
+	.cbi-input-invalid:focus {
 		border-color: var(--fs-danger);
 		box-shadow: var(--fs-focus-ring-invalid);
 	}
@@ -652,13 +668,6 @@
 	 * the input, so half of one state lived in a layer the theme cannot reach. */
 	.cbi-input-invalid.cbi-dropdown:not(.btn):not(.cbi-button),
 	.cbi-input-invalid.cbi-dropdown:not([open]) > ul > li { border-color: var(--fs-danger); }
-	/* the alarm must survive focus: the generic `input:focus` above is (0,1,1) and would repaint
-	 * a focused invalid field accent; (0,2,0) outranks it. The TYPED :focus rules (0,2,1) still
-	 * outrank this — a typed invalid field focuses accent, exactly as before the absorption. */
-	.cbi-input-invalid:focus {
-		border-color: var(--fs-danger);
-		box-shadow: var(--fs-focus-ring-invalid);
-	}
 
 	/* readonly keeps its faded border — moved from base with the generic box (its border-color
 	 * longhand would lose to the box's `border` shorthand by layer). The doubled [readonly] is
@@ -695,12 +704,8 @@
 		margin: 0;
 		transition: var(--fs-field-transition);
 	}
-	/* a chip is keyboard-removable (ui.js gives it a tabindex), so it needs the ring */
-	.cbi-dynlist > .item:focus {
-		border-color: var(--fs-accent);
-		box-shadow: var(--fs-focus-ring);
-		outline: none;
-	}
+	/* a chip is keyboard-removable (ui.js gives it a tabindex): :focus joins the shared accent
+	 * ring in the text-input group above. */
 	/* The chip's × plate is a BUTTON in base's paint group (`.item::after, .btn, .cbi-button`) —
 	 * absorbed with it, bare as base had it (coverage: an .item outside a dynlist keeps its
 	 * plate). The machinery — content/position/edges/align — stays in base with the widget. */
@@ -733,7 +738,7 @@
 		border-radius: var(--fs-radius-sm); overflow: hidden;
 		transition: var(--fs-field-transition);
 	}
-	.cbi-dynlist > .add-item:focus-within { border-color: var(--fs-accent); box-shadow: var(--fs-focus-ring); }
+	/* :focus-within joins the shared accent ring in the text-input group above. */
 	.cbi-dynlist > .add-item > input,
 	/* `width: auto` keeps the flex basis in charge: this input sits INSIDE .cbi-value-field, so the
 	 * elastic width above would otherwise hand it 100% of the field on top of `flex: 1 1 auto`. */
@@ -759,10 +764,8 @@
 		background: transparent; box-shadow: none;
 		min-height: var(--fs-ctl-h);
 	}
-	.control-group:has(> .cbi-input-password):focus-within {
-		border-color: var(--fs-accent);
-		box-shadow: var(--fs-focus-ring);
-	}
+	/* :focus-within (wrapped in :is() for the shared list) joins the accent ring in the
+	 * text-input group above. */
 	/* base pulls .cbi-section-create up 3px to hug a table border, which glues the "Add" button
 	 * to the last row — give it a real gap instead. */
 	.cbi-section-create, .cbi-section-create.cbi-tblsection-create { margin-top: var(--fs-space-3); }

@@ -134,6 +134,9 @@ function resolveLen(token, dflt) {
  * The defaults are stated once so the fallbacks and the sanity net below cannot restate the
  * stylesheet's widths in two places. Reaching for them means the measurement failed. */
 const GEOM_DFLT = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56, contentMax: 1280 };
+/* the class name toggled below by fitShell's own escalation and by fitCluster's (measured: 16 B x3
+ * -> 25 B, 23 B saved) */
+const CLASS_IND_COMPACT = 'fs-ind-compact';
 
 let _geom = null, _geomDensity = null, _geomWarned = false;
 function shellGeometry() {
@@ -283,7 +286,7 @@ function fitChrome() {
 	const hadMinH = bar ? bar.style.minHeight : '';
 	if (pinned > 0) bar.style.minHeight = pinned + 'px';
 
-	if (bar) bar.classList.remove('fs-bar-stack', 'fs-ind-compact', 'fs-bar-actrow');
+	if (bar) bar.classList.remove('fs-bar-stack', CLASS_IND_COMPACT, 'fs-bar-actrow');
 	fitTabStrips();
 	/* ---- does the main menu fit on the brand's row? ----
 	 * It depends on how many sections THIS router has (stock 5, a loaded box 11), not on the
@@ -300,7 +303,7 @@ function fitChrome() {
 		/* first step before stacking: collapse the poll pill (~90px) to an icon square and
 		 * re-measure — often enough to keep the menu on the brand's row
 		 * (theme/50-toplayout.css) */
-		bar.classList.add('fs-ind-compact');
+		bar.classList.add(CLASS_IND_COMPACT);
 		fitTabStrips();
 		if (!stripFitsOneRow(menu)) {
 			bar.classList.add('fs-bar-stack');
@@ -351,7 +354,7 @@ function fitCluster(bar, menu) {
 	if (clusterFitsBrandRow(bar, menu))
 		return;
 
-	bar.classList.add('fs-ind-compact');
+	bar.classList.add(CLASS_IND_COMPACT);
 	if (clusterFitsBrandRow(bar, menu))
 		return;
 

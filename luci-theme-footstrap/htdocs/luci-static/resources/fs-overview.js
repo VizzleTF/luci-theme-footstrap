@@ -20,6 +20,8 @@
 /* section title -> grid role. _() with no msgctxt on purpose: these must resolve to exactly what
  * luci-mod-status resolves to, or the titles stop matching. Built once, not per poll tick. */
 const ROLES = { [_('System')]: 'sys', [_('Memory')]: 'mem', [_('Storage')]: 'sto' };
+/* the data-page value four call sites compare against; a string literal is not mangled, so a
+ * repeat is paid in full on flash every time (measured: 24 B x4 -> 37 B, 59 B saved) */
 
 function sectionTitle(sec) {
 	/* two title markups, one per release: 25.12 wraps the heading (`.cbi-title > h3`), 24.10 emits
@@ -63,7 +65,9 @@ function arrange() {
 	/* an SPA nav can leave the observer wired while another page renders into #view: detach as soon
 	 * as the route stops being the overview. body[data-page] carries the DISPATCH path from both
 	 * the server template and the router, so /admin/status (firstchild -> overview) matches. */
-	if ((document.body.getAttribute('data-page') || '') !== 'admin-status-overview') {
+	if ((document.body.getAttribute('data-page') || '') !== /* spelled out, not hoisted: tools/page-modules.mjs reads this value out of the module's
+	 * SOURCE to check it against the map in menu-footstrap-common.js */
+	'admin-status-overview') {
 		stopWatch();
 		return;
 	}

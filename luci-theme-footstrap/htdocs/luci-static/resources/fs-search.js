@@ -219,12 +219,18 @@ function build() {
 	const btn = document.getElementById('fs-search-btn');
 	if (!btn) return null;
 
+	/* the list's id, said three times below as an id, a class and aria-controls (measured: 17 B x3
+	 * -> 26 B, 25 B saved) */
+	const ID_SEARCH_LIST = 'fs-search-list';
+	/* the attribute name toggled below and stated once more as its own starting value (measured:
+	 * 15 B x3 -> 27 B, 18 B saved) */
+	const ATTR_EXPANDED = 'aria-expanded';
 	const input = E('input', {
 		'type': 'text',
 		'class': 'fs-search-input',
 		'role': 'combobox',
-		'aria-controls': 'fs-search-list',
-		'aria-expanded': 'true',
+		'aria-controls': ID_SEARCH_LIST,
+		[ATTR_EXPANDED]: 'true',
 		'aria-autocomplete': 'list',
 		'aria-label': _('Search pages', 'footstrap'),
 		'placeholder': _('Search pages…', 'footstrap'),
@@ -232,7 +238,7 @@ function build() {
 		'autocapitalize': 'off',
 		'spellcheck': 'false'
 	});
-	const list = E('div', { 'id': 'fs-search-list', 'class': 'fs-search-list', 'role': 'listbox', 'aria-label': _('Pages', 'footstrap') });
+	const list = E('div', { 'id': ID_SEARCH_LIST, 'class': ID_SEARCH_LIST, 'role': 'listbox', 'aria-label': _('Pages', 'footstrap') });
 	const note = E('div', { 'class': 'fs-search-note' });
 	const ico = E('span', { 'class': 'fs-search-ico' });
 	ico.innerHTML = widgets.svgIcon('<circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/>');
@@ -329,7 +335,7 @@ function build() {
 	function open() {
 		if (!ov.hidden) return;
 		ov.hidden = false;
-		btn.setAttribute('aria-expanded', 'true');
+		btn.setAttribute(ATTR_EXPANDED, 'true');
 		input.value = '';
 		render('');
 		input.focus();
@@ -338,7 +344,7 @@ function build() {
 	function close(returnFocus = true) {
 		if (ov.hidden) return;
 		ov.hidden = true;
-		btn.setAttribute('aria-expanded', 'false');
+		btn.setAttribute(ATTR_EXPANDED, 'false');
 		if (returnFocus) btn.focus();
 	}
 

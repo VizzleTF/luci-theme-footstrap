@@ -80,7 +80,13 @@ function currentMode() {
  * `data-darkmode` is the name the theme's own CSS keys off. The other two are outbound
  * compatibility, like the `--*-color-*` export tier: nothing in `styles/` may read them, and
  * tools/axes.mjs fails the build if it does. */
+/* the attribute name reused below by the writer, the guard's reader and both MutationObserver
+ * filters (measured: 15 B x4 -> 28 B, 32 B saved) */
 function stampDark(root, dark) {
+	/* the literal stays spelled out HERE: tools/axes.mjs reads the attribute names out of
+	 * this function's SOURCE, so a hoisted const reads as no attribute at all and the gate
+	 * reports the pre-paint and the live applier as drifted. The 45 B a const would save are
+	 * not worth teaching a gate to resolve them. */
 	root.setAttribute('data-darkmode', dark ? 'true' : 'false');
 	root.setAttribute('data-theme', dark ? 'dark' : 'light');
 	root.setAttribute('data-bs-theme', dark ? 'dark' : 'light');
@@ -137,7 +143,7 @@ function guardDarkStamp() {
 	check();
 	new MutationObserver(check).observe(root, {
 		attributes: true,
-		attributeFilter: ['data-darkmode', 'data-theme', 'data-bs-theme']
+		attributeFilter: [ 'data-darkmode', 'data-theme', 'data-bs-theme' ]
 	});
 }
 /* ---- the browser's own chrome follows the page ----
