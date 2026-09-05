@@ -450,6 +450,18 @@ rare (~10% of reloads) and narrow (≤55 ms), a self-inflicted one is nearly eve
 stop when the event under test does. Poll serially — re-fire the moment the previous call settles,
 which is a natural 42–85 ms on this stand — rather than on a timer.
 
+**A "does this style reach the page?" probe lies in three ways, and all three say the same thing:
+the rule is fine and the measurement is not.** Verifying today's CSS on a live stand produced three
+false negatives in a row. The theme's controls transition (`transition: box-shadow var(--fs-dur)`,
+150 ms), so a computed style read immediately after `.focus()` samples the START of the animation —
+`oklab(0 0 0 / 0) 0px 0px 0px 0px`, a transparent ring — and reads as "no ring applied"; wait past
+the duration and it is `color(srgb 0.035 0.41 0.85 / 0.1) 0 0 0 3px`, exactly `--fs-focus-ring`. A
+page's only native `<select>` is `display: none`, because LuCI replaces every CBI select with a
+`.cbi-dropdown` widget, so focusing it measures nothing — mount a raw one, which is also what a
+third-party app outside the CBI form does. And a modern Chromium aliases `-webkit-mask-image` onto
+the standard property in the CSSOM, so `cssText` never shows the prefix: that check is textual,
+against the built sheet, and cannot be done in a browser at all.
+
 **Both stands run `data-layout="top"`, so a crawl that does not switch layouts measures none of the
 sidebar.** The whole `[data-layout="sidebar"]` family — the open-submenu rules, the rail, the
 narrow fold — renders on no page of a default sweep, and a coverage run reports every one of those

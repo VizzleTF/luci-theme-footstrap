@@ -109,7 +109,7 @@ That floor is set by `@layer`, `:is()`/`:where()`, `:focus-visible`, `svh`/`dvh`
 and the logical properties. Nothing on the list has a fallback worth writing: a theme whose layers
 are ignored is not a theme.
 
-Four features are used **above** the floor and are progressive — the rule does not apply and the
+Five features are used **above** the floor and are progressive — the rule does not apply and the
 page is plainer:
 
 | Feature | Chrome / Firefox / Safari | What is lost below it |
@@ -118,6 +118,7 @@ page is plainer:
 | `color-mix()` | 111 / 113 / 16.2 | the 36 mixed tokens fall back to `styles/04-nocolormix.css` |
 | `@container` | 105 / 110 / 16.0 | five width adaptations inside `fs-view` / `fs-content` |
 | `text-wrap: pretty`, `scrollbar-width` | — | typographic polish |
+| `backdrop-filter` | — / 103 / — | Firefox 101-102 (the stated floor) get no blur behind the bar or a dialog — the `-webkit-` prefix does not help Firefox, which never shipped one |
 
 Two rules follow, and the gate holds both.
 
@@ -140,6 +141,21 @@ Adding any CSS feature the sheet has not used before fails `css-floor` until it 
 `node tools/css-floor.mjs --update`. The JS floor is lower and is not the constraint: the SPA
 router uses nothing younger than `ResizeObserver`, and `requestIdleCallback` and `CSS.supports`
 are both feature-detected.
+
+### Vendor prefixes still in the sheet
+
+Every prefix earns its place here or it goes — checked against MDN's browser-compat-data and
+caniuse each time, not carried forward on habit. `-webkit-mask-image` is the one that looks safe
+to cut and is not: it was nearly dropped from memory alone before the version was actually
+checked.
+
+| Prefix | Cost | Status (checked 2026-09-05) |
+|---|---|---|
+| `-webkit-mask-image` / `-webkit-mask-size` / `-webkit-mask-repeat` / `-webkit-mask` | 450 B | **required** — unprefixed masking ships only from Chrome 120; the floor is 108 |
+| `-webkit-backdrop-filter` | 214 B | **required** — unprefixed `backdrop-filter` ships only from Safari 18; the floor is 15.4 |
+| `-webkit-line-clamp` + `-webkit-box-orient` | 49 B | **required** — no standard line-clamp equivalent at the floor |
+| `::-webkit-scrollbar-thumb` | 56 B | **required** — no standard scrollbar-styling equivalent at the floor |
+| `-webkit-appearance` | 96 B, 4 occurrences | **removed 2026-09-05** — unprefixed `appearance` ships from Chrome 84 / Firefox 80 / Safari 15.4 (MDN BCD; caniuse gives Chrome 83), all at or above the floor |
 
 ## The build
 

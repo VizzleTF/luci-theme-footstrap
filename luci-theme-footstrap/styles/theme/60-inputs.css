@@ -387,8 +387,10 @@
 	 * lives in 03-palettes.css per palette/mode block, because a URI cannot read var(); it
 	 * replaced a hardcoded grey that ignored palette and dark mode. */
 	select, select.cbi-input-select, .cbi-value-field select {
-		/* -webkit- only: Firefox has had the unprefixed property since 80. */
-		appearance: none; -webkit-appearance: none;
+		/* unprefixed only: the floor (Chrome 108/Firefox 101/Safari 15.4) clears unprefixed
+		 * `appearance` everywhere (Chrome 84, Firefox 80, Safari 15.4 — docs/css.md). -webkit- was
+		 * 96 B across these four rules for nothing this sheet still has to run on. */
+		appearance: none;
 		background-color: var(--fs-panel2);
 		background-image: var(--fs-select-chevron);
 		/* right inset from the scale, not a literal 12 — the .cbi-select shell below states the same
@@ -506,7 +508,7 @@
 	 * one inside the 32px shell. */
 	.cbi-select select,
 	.cbi-select select:focus {
-		appearance: none; -webkit-appearance: none;
+		appearance: none;
 		outline: none;
 		border: none;
 		background: transparent;
@@ -782,13 +784,13 @@
 	/* RangeSlider (UIRangeSlider) — the one LuCI widget base leaves to native browser rendering.
 	 * Token-driven track/thumb. */
 	input[type="range"] {
-		-webkit-appearance: none; appearance: none;
+		appearance: none;
 		width: 100%; height: 6px; min-height: 0; padding: 0;
 		background: var(--fs-track); border: 0; border-radius: var(--fs-radius-pill);
 		outline: none; box-shadow: none; cursor: pointer;
 	}
 	input[type="range"]::-webkit-slider-thumb {
-		-webkit-appearance: none; appearance: none;
+		appearance: none;
 		width: 16px; height: 16px; border-radius: 50%;
 		background: var(--fs-accent); border: 2px solid var(--fs-panel);
 		box-shadow: var(--fs-shadow); cursor: pointer;

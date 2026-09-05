@@ -79,7 +79,9 @@
 		 * The role x step matrix is complete on purpose, read or not: a gap is how the drift
 		 * starts, since a rule wanting a level that does not exist invents a percentage.
 		 * --fs-accent-soft is the one member not here — its strength differs per MODE (10% light,
-		 * 15% dark; hicontrast 10/14) — so it sits in the palette blocks. */
+		 * 15% dark; hicontrast dark 14%). LIGHT is identical across every palette and lives as one
+		 * declaration in 03-palettes.css's shared :root instead; DARK still varies by palette (one
+		 * differs by a digit) and stays declared per palette block. */
 		--fs-good-soft: color-mix(in srgb, var(--fs-good) 12%, transparent);
 		--fs-warn-soft: color-mix(in srgb, var(--fs-warn) 12%, transparent);
 		--fs-danger-soft: color-mix(in srgb, var(--fs-danger) 12%, transparent);

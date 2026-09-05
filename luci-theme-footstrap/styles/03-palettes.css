@@ -65,7 +65,7 @@
 	 *   one honest knob   --fs-tint-c is the strength, in chroma. Light mode has less headroom and
 	 *                     does clip at the top of the wheel, which costs a few units of strength
 	 *                     but not the direction. On a canvas of pure WHITE the cue is nearly
-	 *                     hue-blind — on bootstrap's #ffffff, 180° and 258° land 1/255 apart —
+	 *                     hue-blind — on bootstrap's #fff, 180° and 258° land 1/255 apart —
 	 *                     which is the price of copying a stock theme's surfaces.
 	 *   contrast is free  `l` is copied through, so AA margins barely move; the mix dragged
 	 *                     lightness toward the anchor and cost one export level 4.61 -> 4.40:1.
@@ -84,6 +84,12 @@
 		 * rotate it with no second copy to keep in sync. Absent an accent hue, --fs-accent IS the
 		 * palette's -base value. */
 		--fs-accent: var(--fs-accent-base);
+		/* a tint OF --fs-accent, mixed FROM it: a restated literal goes stale the moment the accent
+		 * is recoloured or the accent-hue axis rotates it. LIGHT strength only — every palette's
+		 * light block wanted the identical 10%, so this one declaration replaces five copies; a
+		 * dark block still declares its own (15%, hicontrast 14%: 02-tokens.css line ~81) and wins
+		 * on specificity. */
+		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
 		/* the three status colours, derived from the palette's -base hex for the reason the accent
 		 * is: an axis rotating a token the palettes declared directly would need a second copy of
 		 * every value to rotate from */
@@ -253,7 +259,7 @@
 	:root[data-palette="footstrap"] {
 		/* LIGHT */
 		--fs-bg-base: #f6f8fa;
-		--fs-panel-base: #ffffff;
+		--fs-panel-base: #fff;
 		--fs-panel2-base: #f6f8fa;
 		--fs-border-base: #d0d7de;
 		--fs-text: #1f2328;
@@ -264,9 +270,6 @@
 		--fs-dim: #33383d;
 		--fs-faint: #3d4348;
 		--fs-accent-base: #0969da;
-		/* a tint OF --fs-accent, mixed FROM it: a restated literal goes stale the moment the accent
-		 * is recoloured or the accent-hue axis rotates it */
-		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
 		--fs-track: #eaeef2;
 		--fs-good-base: #197c36;
 		--fs-warn-base: #946300;
@@ -311,7 +314,7 @@
 		 * white ink, and both uses want >=4.5:1 against white. At 5.22/5.35/5.93/5.80 they are
 		 * genuinely above the default palette, which is what the name promises. */
 		--fs-bg-base: #eef1f6;
-		--fs-panel-base: #ffffff;
+		--fs-panel-base: #fff;
 		--fs-panel2-base: #f6f8fb;
 		--fs-border-base: #e4e9f1;
 		--fs-text: #101725;
@@ -320,7 +323,6 @@
 		--fs-dim: #272f3d;
 		--fs-faint: #2e3745;
 		--fs-accent-base: #0b6fbd;
-		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
 		--fs-track: #eaeef4;
 		--fs-good-base: #0f7a52;
 		--fs-warn-base: #8a5a00;
@@ -360,9 +362,9 @@
 	 * they already know keeps it and still gets the chrome, the client navigation and the axes.
 	 *
 	 * Bootstrap computes everything from HSL axes; these are those axes evaluated:
-	 *   --background-color high/medium/low  #ffffff / #f9f9f9 / #f5f5f5   (dark #222 / #282828 / #2c2c2c)
+	 *   --background-color high/medium/low  #fff / #f9f9f9 / #f5f5f5   (dark #222 / #282828 / #2c2c2c)
 	 *   --text-color high/medium            #404040 / #808080            (dark #bfbfbf / #7f7f7f)
-	 *   --border-color high/medium          #cccccc / #dddddd            (dark #555555 / #444444)
+	 *   --border-color high/medium          #ccc / #ddd            (dark #555 / #444)
 	 * The canvas and the card are both --background-color-high: bootstrap is flat and lets the
 	 * border carry the structure. panel2 is its --background-color-low, the surface it stripes
 	 * tables and hovers rows with.
@@ -381,10 +383,10 @@
 	 * to the chrome, not a colourway. */
 	:root[data-palette="bootstrap"] {
 		/* LIGHT */
-		--fs-bg-base: #ffffff;
-		--fs-panel-base: #ffffff;
+		--fs-bg-base: #fff;
+		--fs-panel-base: #fff;
 		--fs-panel2-base: #f5f5f5;
-		--fs-border-base: #cccccc;
+		--fs-border-base: #ccc;
 		/* The ink is the one place this colourway leaves bootstrap's own values behind, the same
 		 * decision the default palette made: its #404040 body and #6a6a6a muted tier measure
 		 * 10.4:1 and 5.4:1 on white, and the muted one carries every field title. Matched to the
@@ -395,8 +397,7 @@
 		--fs-faint: #424242;
 		/* --primary-color-medium; -high (#1976d2) measured 4.22:1 on --fs-panel2 */
 		--fs-accent-base: #1564c0;
-		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
-		--fs-track: #eeeeee;
+		--fs-track: #eee;
 		--fs-good-base: #007936;   /* --success-color-low */
 		--fs-warn-base: #826706;   /* #efbd0b darkened; 1.61:1 as text is not a rounding error */
 		--fs-danger-base: #d00000; /* --error-color-low */
@@ -408,14 +409,14 @@
 	}
 	:root[data-palette="bootstrap"][data-darkmode="true"] {
 		/* DARK */
-		--fs-bg-base: #222222;
+		--fs-bg-base: #222;
 		--fs-panel-base: #282828;
 		/* bootstrap's own dark --background-color-low (#2c2c2c) sits 0.016 from --fs-panel, under
 		 * the 0.02 the ramp check wants, so an app asking high/-low for a gradation gets one colour
 		 * twice; #303030 is 0.031. Its light pair is 0.039 apart, so the same check catches this in
 		 * the theme this palette is named after. */
 		--fs-panel2-base: #303030;
-		--fs-border-base: #444444;
+		--fs-border-base: #444;
 		--fs-text: #bfbfbf;
 		/* Bootstrap's dark has no third ink, so the two quiet tiers are this palette's own and AA
 		 * decides where the fainter one sits: the export tier's -low follows --fs-faint, and on a
@@ -428,16 +429,16 @@
 		--fs-faint: #9a9a9a;
 		--fs-accent-base: #53a4c2;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
-		--fs-track: #333333;
+		--fs-track: #333;
 		--fs-good-base: #1aaf7b;
 		--fs-warn-base: #aa9968;
 		--fs-danger-base: #dd807e;
 		/* dark ink: these fills are light, and bootstrap's own --on-*-color in dark is likewise its
-		 * --background-color-high. #222222 gives 5.65/5.65/5.66/5.65. */
-		--fs-on-accent: #222222;
-		--fs-on-good: #222222;
-		--fs-on-warn: #222222;
-		--fs-on-danger: #222222;
+		 * --background-color-high. #222 gives 5.65/5.65/5.66/5.65. */
+		--fs-on-accent: #222;
+		--fs-on-good: #222;
+		--fs-on-warn: #222;
+		--fs-on-danger: #222;
 	}
 	/* ---- 2020 — the OpenWrt 2020 theme's colourway ----
 	 *
@@ -457,8 +458,8 @@
 	 * reads --fs-panel, so in dark mode the navy is the CANVAS and the chrome sits on it. */
 	:root[data-palette="2020"] {
 		/* LIGHT — white content, the CI cyan darkened until it can be read on it */
-		--fs-bg-base: #ffffff;
-		--fs-panel-base: #ffffff;
+		--fs-bg-base: #fff;
+		--fs-panel-base: #fff;
 		--fs-panel2-base: #eef4f8;
 		--fs-border-base: #c3d2dd;
 		/* navy-tinted neutrals rather than grey: the ink belongs to the same scheme as the accent */
@@ -467,11 +468,10 @@
 		--fs-faint: #3d5566;
 		/* #00B5E2 held at hue, taken down until it reads: 5.89:1 on white against its own 2.09:1 */
 		--fs-accent-base: #036c92;
-		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
 		--fs-track: #e3ebf1;
 		--fs-good-base: #276e2a;   /* #5CB85C darkened; 2.28:1 as text is not a rounding error */
-		--fs-warn-base: #8a5a00;   /* #CC8800, same move */
-		--fs-danger-base: #c1121f; /* #CC1111 is 5.25:1 already — the one that stays where it was */
+		--fs-warn-base: #8a5a00;   /* #C80, same move */
+		--fs-danger-base: #c1121f; /* #C11 is 5.25:1 already — the one that stays where it was */
 		/* ink ON the fills above — white clears AA on all four */
 		--fs-on-accent: #fff;
 		--fs-on-good: #fff;
@@ -503,8 +503,8 @@
 	/* ---- forum — the OpenWrt forum's Discourse colourway (opt-in) ----
 	 *
 	 * Sampled from forum.openwrt.org's own `getComputedStyle(document.documentElement)`, one read
-	 * per colour scheme: LIGHT --primary #222 (ink) / --secondary #fff (page) / --tertiary #0088cc
-	 * (accent) / --quaternary and --danger both #e45735 / --success #009900 / --highlight #ffff4d;
+	 * per colour scheme: LIGHT --primary #222 (ink) / --secondary #fff (page) / --tertiary #08c
+	 * (accent) / --quaternary and --danger both #e45735 / --success #090 / --highlight #ffff4d;
 	 * DARK --primary #ddd / --secondary #222 / --tertiary #0f82af / --danger #e45735 (unchanged
 	 * from light) / --success #1ca551 / --highlight #a87137. Discourse names quaternary and
 	 * danger as one colour in light and two in dark (#c14924); footstrap has no fifth semantic
@@ -526,20 +526,19 @@
 	 * move, still the one furthest from AA after it. */
 	:root[data-palette="forum"] {
 		/* LIGHT — the forum's own page, exactly: white canvas, near-black ink */
-		--fs-bg-base: #ffffff;
-		--fs-panel-base: #ffffff;
+		--fs-bg-base: #fff;
+		--fs-panel-base: #fff;
 		--fs-panel2-base: #f0f0f0;
-		--fs-border-base: #dddddd;
-		--fs-text: #222222;
+		--fs-border-base: #ddd;
+		--fs-text: #222;
 		--fs-dim: #3d3d3d;
 		--fs-faint: #4a4a4a;
-		/* --tertiary #0088cc measures 3.89:1 on white; #0074ad held the hue at 5.12:1 there but
+		/* --tertiary #08c measures 3.89:1 on white; #0074ad held the hue at 5.12:1 there but
 		 * only 4.49:1 on --fs-panel2, under the 4.5:1 floor the export tier holds every surface to;
 		 * #0073ac holds it at 5.19:1 on white and 4.55:1 on --fs-panel2 */
 		--fs-accent-base: #0073ac;
-		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
-		--fs-track: #eeeeee;
-		/* --success #009900 measured 3.78:1, #008000 5.14:1; --quaternary/--danger #e45735
+		--fs-track: #eee;
+		/* --success #090 measured 3.78:1, #008000 5.14:1; --quaternary/--danger #e45735
 		 * measured 3.68:1, #c63c1b 5.17:1; --highlight #ffff4d measured 1.07:1 as text, #717100
 		 * 5.17:1 — see the block comment above for why highlight fills warn */
 		--fs-good-base: #008000;
@@ -553,11 +552,11 @@
 	}
 	:root[data-palette="forum"][data-darkmode="true"] {
 		/* DARK — the forum's own dark scheme: #222 canvas, #ddd ink, both exactly as sampled */
-		--fs-bg-base: #222222;
+		--fs-bg-base: #222;
 		--fs-panel-base: #262626;
 		--fs-panel2-base: #2e2e2e;
 		--fs-border-base: #3a3a3a;
-		--fs-text: #dddddd;
+		--fs-text: #ddd;
 		--fs-dim: #a3a3a3;
 		--fs-faint: #969696;
 		/* --tertiary #0f82af measured 3.66:1 on --fs-bg and 3.12:1 on --fs-panel2, both under the
@@ -565,26 +564,26 @@
 		 * 5.86:1 on --fs-bg and 5.00:1 on --fs-panel2 */
 		--fs-accent-base: #13a8e3;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
-		--fs-track: #333333;
+		--fs-track: #333;
 		/* --success #1ca551 measured 4.24:1 on --fs-panel2, #1fb65a 5.11:1; --danger #e45735
 		 * measured 3.69:1, #eb8066 5.05:1; --highlight #a87137 measured 3.29:1, #c99259 5.00:1 —
 		 * same reasoning as the light block for why highlight fills warn */
 		--fs-good-base: #1fb65a;
 		--fs-warn-base: #c99259;
 		--fs-danger-base: #eb8066;
-		/* dark ink: these fills are light, and #222222 (= --fs-bg-base) gives 5.86/5.98/5.86/5.92 */
-		--fs-on-accent: #222222;
-		--fs-on-good: #222222;
-		--fs-on-warn: #222222;
-		--fs-on-danger: #222222;
+		/* dark ink: these fills are light, and #222 (= --fs-bg-base) gives 5.86/5.98/5.86/5.92 */
+		--fs-on-accent: #222;
+		--fs-on-good: #222;
+		--fs-on-warn: #222;
+		--fs-on-danger: #222;
 		/* The masthead, and the one place the forum's navy belongs. rgb(0,43,73) is what
 		   forum.openwrt.org paints its header with in its DARK scheme — measured live; its light
-		   scheme has a white header (--header_background #ffffff, ink #333333), which is what this
+		   scheme has a white header (--header_background #fff, ink #333), which is what this
 		   palette's light half already gives, so the navy is declared here and only here.
 		   color-mix, not a flat fill: --fs-bar-bg is 88% of the panel over the page on purpose (a
 		   bar is a thin strip the page ghosts through, 02-tokens.css), and a flat colour would drop
 		   that. Over this palette's #222 canvas the strip lands near #06294a, where the bar's own
-		   ink (#dddddd) measures 9.9:1 and its dimmed ink (#a3a3a3) 5.4:1. */
+		   ink (#ddd) measures 9.9:1 and its dimmed ink (#a3a3a3) 5.4:1. */
 		--fs-bar-bg: color-mix(in srgb, #002b49 88%, transparent);
 	}
 }
