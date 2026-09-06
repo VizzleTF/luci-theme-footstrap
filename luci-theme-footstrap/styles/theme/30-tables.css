@@ -327,17 +327,36 @@
 	 * row, right-flushing floats the value away from its own caption. Left-aligned instead, so the
 	 * card reads top-to-bottom as caption then value, matching every other stacked cell in this file. */
 	@container fs-content (max-width: 560px) {
+		/* Stacked, the row's own `.td, .th` rule above (line 97) still spends a FULL cell padding
+		 * on each half of the pair — 10px top + 10px bottom on the caption, the same on the value,
+		 * plus a hairline under EACH — 40px of padding-block and two dividers for one caption/value
+		 * pair, so the gap inside a pair (caption to its own value) equalled the gap between pairs
+		 * and the pair read as two rows, not one. Same fix as the meter row's
+		 * (pages/20-overview.css): move the rhythm off the CELLS onto the ROW. `--fs-space-1 0
+		 * --fs-space-1-5` — 4px + 6px, a quarter of the 40px it replaces — is the pair's own outer
+		 * padding, and the hairline moves with it so a stack outside the Overview page (which zeroes
+		 * it separately) draws ONE divider per pair instead of one under the caption as well. With
+		 * the cells at `padding: 0`, caption and value sit flush against each other — nothing between
+		 * them but line-height — and the record boundary is the one line the reader can see. */
 		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .tr {
 			display: block;
+			padding: var(--fs-space-1) 0 var(--fs-space-1-5);
+			border: 0;
+			border-bottom: var(--fs-hairline);
+		}
+		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .tr:last-child {
+			border-bottom: 0;
 		}
 		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:first-child:first-child {
 			display: block; width: auto; white-space: normal;
+			padding: 0; border: 0;
 			font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight);
 			letter-spacing: var(--fs-eyebrow-tracking); color: var(--fs-eyebrow-color);
 			text-transform: uppercase;
 		}
 		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:last-child:last-child:not(:first-child) {
 			display: block; width: auto; text-align: start;
+			padding: 0; border: 0;
 		}
 	}
 

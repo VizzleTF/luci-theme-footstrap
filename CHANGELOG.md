@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Changed
+
+- **The stacked key/value card halves the padding it spent on both halves of every pair.** Under `@container fs-content (max-width: 560px)` (the Overview's System card is the one live page of this shape; a header-less key/value table from any app is the other) `.td, .th` kept the row's own `padding: var(--fs-space-2-5) … 0` and hairline even after stacking, so a pair spent 10px + 10px + a hairline under the caption and the same under the value — 42px of chrome for two lines, the caption-to-its-own-value gap equal to the gap between pairs, so the pair read as two rows. The rhythm now sits on the `.tr` instead — `padding: var(--fs-space-1) 0 var(--fs-space-1-5)` (4px/6px) plus one hairline, moved off the cells (`padding: 0; border: 0`) and dropped on the last row — the same move the meter row's own fix made in `pages/20-overview.css`. Measured on the gallery's key/value specimen (`docs/gallery.html`, the 340px `.cbi-map`, 3 pairs): a pair 76.8px → 45.8px, the card 309.5px → 217.5px (-29.7%). `pages/20-overview.css`'s border-zeroing already names `.tr` alongside `.td`/`.th`, so it already zeroes the new row-level hairline on the Overview page with no edit of its own.
+
 ## [0.14.11] — 2026-09-05
 
 ### Added
