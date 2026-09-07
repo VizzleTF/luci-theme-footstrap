@@ -351,6 +351,16 @@ const SWAP = async (growth) => {
 		if (!body || el.offsetHeight > body.offsetHeight) body = el;
 	}
 	if (!body || body.offsetHeight < 200) return { skip: 'nothing above the reader big enough to collapse' };
+	/* Named for the guard below: `body` living inside `.fs-ovl` (System/Memory/Storage's own grid,
+	 * fs-overview.js) can grow by the full pad and move the DOCUMENT by nothing — the grid's row
+	 * tracks size off the taller column, so a shorter column growing 120px never reaches the
+	 * scroller. Measured live: `div#fs-ovl-panel-0` at 291px grew the document 0px on both
+	 * owrtsnap@900 and owrt2410@1200 — a cell that would otherwise print "moved 0px" and read as
+	 * the correction working. */
+	const bodyDesc = body.tagName.toLowerCase() + (body.id ? '#' + body.id : '')
+		+ (body.className ? '.' + String(body.className).trim().replace(/\s+/g, '.') : '');
+	const bodyH0 = body.offsetHeight;
+	const docH = () => (sc ? sc.scrollHeight : document.documentElement.scrollHeight);
 
 	/* the whole STACK at the point, not just the topmost element: in a grid gap the top of the
 	 * stack is `#view` itself — a host is not a mark, its own top does not move when something
@@ -398,6 +408,7 @@ const SWAP = async (growth) => {
 	/* the two halves of dom.content(), with the layout the engine performs in between made explicit
 	 * — WebKit gets there on its own, and a gate must not depend on when */
 	const swap = async () => {
+		const startDocH = docH();
 		const kept = Array.prototype.slice.call(body.childNodes);
 		for (const n of kept) body.removeChild(n);
 		const empty = { docH: (sc ? sc.scrollHeight : document.documentElement.scrollHeight), pos: pos() };
@@ -408,10 +419,20 @@ const SWAP = async (growth) => {
 		body.appendChild(pad);
 		await wait(800);
 		const after = { pos: pos(), top: mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null };
+		/* The offset the swap actually asked the scroller to move by — separate from `clamped`
+		 * (what the engine took OUT of a document momentarily empty) and from `moved` (what the
+		 * reader's mark shows). A cell that reports `clamped 0px` because the engine declined to
+		 * anchor reads identically here to one where the mark itself misreported; this term is
+		 * the one number both a healthy pass and a false one can be told apart by. */
+		const offsetDelta = after.pos - before.pos;
+		/* Did the pad reach the SCROLLER at all — see the note on `bodyDesc` above. A grid whose
+		 * row tracks size off a sibling column can absorb the whole 120px inside `body` without the
+		 * document growing by a pixel, which is a different failure from "the reader didn't move". */
+		const grewDoc = docH() - startDocH;
 		pad.remove();
 		await wait(700);		/* let the floor come back down before the next pass measures */
 		return { empty, after, moved: after.top === null ? null : after.top - before.top,
-			clamped: before.pos - empty.pos };
+			clamped: before.pos - empty.pos, offsetDelta, grewDoc };
 	};
 
 	const corrected = await swap();
@@ -429,8 +450,11 @@ const SWAP = async (growth) => {
 	finally { try { localStorage.removeItem('fsAnchor'); } catch (e) { /* … */ } }
 
 	return { before, empty: corrected.empty, after: corrected.after, moved: corrected.moved,
-		clamped: corrected.clamped, floorMoved: floorOnly.skip ? null : floorOnly.moved,
+		clamped: corrected.clamped, offsetDelta: corrected.offsetDelta, grewDoc: corrected.grewDoc,
+		bodyDesc, bodyH: bodyH0,
+		floorMoved: floorOnly.skip ? null : floorOnly.moved,
 		floorClamped: floorOnly.skip ? null : floorOnly.clamped,
+		floorOffsetDelta: floorOnly.skip ? null : floorOnly.offsetDelta,
 		scroller: sc ? 'maincontent' : 'window' };
 
 	} finally { /* the poll stays stopped — see the note on QUIET, which starts it again */ }
@@ -635,6 +659,19 @@ for (const engine of ENGINES) {
 					continue;
 				}
 
+				/* A cell that grew `body` by the full pad without the DOCUMENT growing has proven
+				 * nothing: `.fs-ovl`'s grid sizes a row off its taller column, so a shorter column
+				 * (`div#fs-ovl-panel-0`, 291px, on owrtsnap@900 and owrt2410@1200) can absorb 120px
+				 * and leave the scroller untouched — `swap.moved` then reads 0 for the same reason a
+				 * correctly-anchored page would, and the two are indistinguishable without this
+				 * check. Folded into `swap.skip` rather than a separate branch so it is excluded from
+				 * the pass line below the same way "nothing to collapse" already is — a skip, not a
+				 * silent pass: it says the growth never reached what it was measuring. */
+				if (!swap.skip && typeof swap.grewDoc === 'number' && swap.grewDoc < GROWTH - TOLERANCE
+						&& swap.grewDoc < GROWTH / 2)
+					swap.skip = `the ${GROWTH}px pad only grew the document ${swap.grewDoc}px `
+						+ `(${swap.bodyDesc}, ${swap.bodyH}px) — the growth never reached the scroller`;
+
 				if (held.skip || quiet.skip) {
 					process.stdout.write(`  ${where}: ${held.skip || quiet.skip}\n`);
 					await ctx.close();
@@ -664,10 +701,16 @@ for (const engine of ENGINES) {
 				if (quiet.unexplained)
 					found(`${where}: the offset moved on its own ${quiet.unexplained} time(s) mid-flick (worst ${quiet.biggest}px) `
 						+ '— a correction landing inside a scroll is itself a jump');
+				/* signed for readability: a positive offset is the scroller compensating for growth
+				 * above the reader, which is what tells "the engine declined to anchor" (0px here)
+				 * apart from "the mark misreported" (moved itself would be the tell, not this term) */
+				const signed = (v) => (v === null || v === undefined ? '-' : (v >= 0 ? '+' : '') + v);
 				process.stdout.write(`  ${where}  reader moved ${held.moved}px (scroll ${held.scrollDelta >= 0 ? '+' : ''}${held.scrollDelta}, `
-					+ `${held.scroller})  swap moved ${swap.skip ? '-' : swap.moved + 'px'}`
+					+ `${held.scroller})  swap moved ${swap.skip ? '-' : swap.moved + 'px'} `
+					+ `[offset ${swap.skip ? '-' : signed(swap.offsetDelta)}]`
 					+ `  floor alone: clamped ${swap.skip || swap.floorClamped === null ? '-' : swap.floorClamped + 'px'}`
-					+ `, reader ${swap.skip || swap.floorMoved === null ? '-' : swap.floorMoved + 'px'}`
+					+ `, reader ${swap.skip || swap.floorMoved === null ? '-' : swap.floorMoved + 'px'} `
+					+ `[offset ${swap.skip || swap.floorOffsetDelta === null ? '-' : signed(swap.floorOffsetDelta)}]`
 					+ `  mid-flick surprises ${quiet.unexplained}`
 					+ (quiet.stalls ? `  (${quiet.stalls} step(s) too slow to still be a flick, not counted)` : '') + '\n');
 				await ctx.close();

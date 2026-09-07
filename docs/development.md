@@ -798,24 +798,28 @@ itself — declare the three apps once on a release router and alias the list on
 `owrtsnap` with none, rather than routing them through `defaults:`.
 
 **An ordinary `packages:` entry can go missing on `owrtsnap` too, and it is not the kmod-tun
-mechanism above even though the symptom looks the same.** Task 0177: a `scroll-anchor` finding on
+mechanism above even though the symptom looks the same — and the entry that goes missing is not
+fixed, so do not name one here as if it were.** Task 0177: a `scroll-anchor` finding on
 `owrtsnap @1440 side compact` traced to the Overview page rendering 12 `.cbi-section` there against
-`owrt2512`'s 13 — `luci-app-https-dns-proxy` absent. `apk info -R` shows neither it nor its
-`https-dns-proxy` binary needs a kernel module
-(`ca-bundle libc libcares libcurl4 libev jsonfilter resolveip` only), which rules out the
-kmods-index gap; `/var/log/apk.log` from the box's own most
-recent boot instead named the KMOD-needing packages failing (`luci-app-mwan3`, `-sqm`, `-nlbwmon`,
-`-openvpn`, `luci-proto-wireguard`/`-openconnect` — the same `ERROR: unable to select packages`
-the kmods gap produces) while `luci-app-https-dns-proxy` installed clean in that same run.
-`feeds/luci` and `feeds/packages` build the snapshot index independently, and a `luci-app-*`/binary pair
-that agrees on version when both are fresh (`-2026.05.06-r1`, observed matching on this box) can
-briefly disagree while one side has moved and the other has not mirrored yet — the same class of
-drift as the kmods index, on an ordinary package rather than a kernel module, and not reproducible
-on demand for that reason. Not fixed by a version pin: `owlab.yaml`'s `packages:` list carries no
-version syntax, and pinning one would go stale as the snapshot feed prunes old builds (a release
-branch keeps them for the branch's life; snapshot does not). Recorded instead, beside the package
-list in `owlab.yaml` — check `apk info -e <pkg>` / `/var/log/apk.log` on `owrtsnap` for this shape
-before treating a snapshot-only section-count or DOM-count difference as a theme finding.
+`owrt2512`'s 13 — `luci-app-https-dns-proxy` absent that day. `apk info -R` shows neither it nor its
+`https-dns-proxy` binary needs a kernel module (`ca-bundle libc libcares libcurl4 libev jsonfilter
+resolveip` only), which rules out the kmods-index gap; `/var/log/apk.log` from that boot instead
+named the KMOD-needing packages failing (`luci-app-mwan3`, `-sqm`, `-nlbwmon`, `-openvpn`,
+`luci-proto-wireguard`/`-openconnect` — the same `ERROR: unable to select packages` the kmods gap
+produces) while `luci-app-https-dns-proxy` installed clean in that same run. By task 0178,
+`https-dns-proxy` installed clean on every stand and `luci-app-mwan3` was the one missing instead
+(no `90_mwan3.js`; the same `unable to select packages` line in `apk.log`, this time for `mwan3`,
+`nlbwmon`, `openvpn` and `sqm` together). Two different names in two sessions IS the finding:
+`feeds/luci` and `feeds/packages` build the snapshot index independently, and a `luci-app-*`/binary
+pair that agrees on version when both are fresh can briefly disagree while one side has moved and
+the other has not mirrored yet — the same class of drift as the kmods index, on an ordinary package
+rather than a kernel module, and not reproducible on demand for that reason. Not fixed by a version
+pin: `owlab.yaml`'s `packages:` list carries no version syntax, and pinning one would go stale as
+the snapshot feed prunes old builds (a release branch keeps them for the branch's life; snapshot
+does not). Check what is missing TODAY rather than trust a name in this paragraph: `apk info -e
+<pkg>` for a `+luci-app-*` in `owlab.yaml`, or `grep 'unable to select' /var/log/apk.log`, on
+`owrtsnap` — before treating a snapshot-only section-count or DOM-count difference as a theme
+finding.
 
 **`mangle-tokens.sh` fails on a `C:\...`-shaped path with `mv: cannot stat ...tmp.NNN`, and the gate
 that surfaces it never mentions the script by name.** Like `build-css.sh`, it needs a POSIX path;
