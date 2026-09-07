@@ -79,6 +79,81 @@ pm_quiet() {	# <command...>
 	return 1
 }
 
+# How many repository lines each manager was asked to read, right before feed_refresh() below
+# needs it to tell "one feed missing" from "none answered". Comments and blank lines excluded so
+# the count matches what the manager itself attempts.
+apk_repo_count() {
+	{ cat /etc/apk/repositories 2>/dev/null; cat /etc/apk/repositories.d/*.list 2>/dev/null; } \
+		| sed 's/#.*//' | grep -c '[^[:space:]]' || true
+}
+
+opkg_feed_count() {
+	{ cat /etc/opkg/distfeeds.conf 2>/dev/null; cat /etc/opkg/customfeeds.conf 2>/dev/null; } \
+		| grep -c '^[[:space:]]*src' || true
+}
+
+# `apk update` / `opkg update` return non-zero the instant ANY configured feed is unreachable, even
+# when the rest answered fine — this project's own snapshot stand hits it on every run: an
+# `openwrt/rootfs:x86_64-master` image unrebuilt since May 2026 pins a kmods sub-index the feed's
+# rolling retention window has already dropped (CI run 34112646188). Under a bare `|| exit 1` that
+# took the whole install down before the theme was ever fetched.
+#
+# "packages available > 0" is NOT the signal that tells partial refresh from total failure: with
+# every feed unreachable, apk still prints "8 unavailable, 0 stale; 136 distinct packages available"
+# and exits non-zero — those 136 are the INSTALLED database, not anything the refresh just read
+# (owfeed/owlab#18's own measurement, on the same shape of failure). What separates the two is the
+# "N unavailable" count against how many feeds were CONFIGURED: N < configured means at least one
+# feed answered and the rest of the index is usable; N == configured means none did. opkg prints no
+# such summary line, so the same distinction is drawn by counting "Failed to download" lines against
+# the configured feed count instead — opkg hits the identical shape (exit 1 with one bad feed of
+# eight on 24.10.8, exit 7 with the network cut), so neither manager's own exit code decides this.
+#
+# Tolerating "some feed unreachable" must not tolerate OUR OWN feed being the one — without it
+# there is no fresh package to install, so continuing means either installing nothing (a router
+# with no cached index) or silently keeping whatever owfeed-packages index apk/opkg already had
+# from a prior run while printing "[+] Installed …" (security review, task 0176: `repo.owfeed.org`
+# is a distinct host from the stock feeds, so an on-path/DNS attacker can blackhole it alone while
+# the others answer, and the old `_bad < _total` tolerance let the run continue and report success
+# on a stale index). Both managers print the FULL URL of a repository they could not reach in
+# their own failure lines (apk: `ERROR:`/`WARNING:` naming the index URL; opkg: `Failed to
+# download <url>`), so grepping those lines for `$FEED_HOST` — the exact string this same script
+# wrote into the repository entry a few lines below, not `$FEED_NAME` or any other label an admin
+# could have edited — cannot drift from the line that was actually written. Checked before the
+# tolerance below, so our own feed failing fails closed regardless of how many other feeds
+# answered.
+feed_refresh() {	# apk | opkg
+	_pmlog="/tmp/fs-install-pm.$$"
+	if "$1" update >"$_pmlog" 2>&1; then rm -f "$_pmlog"; return 0; fi
+	if [ "$1" = apk ]; then
+		_bad=$(sed -n 's/^\([0-9][0-9]*\) unavailable,.*/\1/p' "$_pmlog" | tail -1)
+		_total=$(apk_repo_count)
+		_failpat='ERROR:|WARNING:'
+	else
+		_bad=$(grep -c 'Failed to download' "$_pmlog" || true)
+		_total=$(opkg_feed_count)
+		_failpat='Failed to download'
+	fi
+	if grep -E "$_failpat" "$_pmlog" 2>/dev/null | grep -qF "$FEED_HOST"; then
+		err "\`$1 update\` could not reach $FEED_HOST — this project's own feed. Without it there is"
+		err "nothing new to install, so this is not tolerated even though other feeds answered:"
+		grep -E "$_failpat" "$_pmlog" | sed 's/^/    /' >&2
+		rm -f "$_pmlog"
+		return 1
+	fi
+	if [ -n "${_bad:-}" ] && [ "${_total:-0}" -gt 0 ] 2>/dev/null && [ "$_bad" -gt 0 ] 2>/dev/null \
+	   && [ "$_bad" -lt "$_total" ]; then
+		warn "\`$1 update\` could not reach $_bad of $_total configured feed(s) — continuing with what"
+		warn "the rest served; a package that lives only on the missing one will be reported missing:"
+		grep -E 'ERROR:|WARNING:|Failed to download' "$_pmlog" | sed 's/^/    /' >&2
+		rm -f "$_pmlog"
+		return 0
+	fi
+	err "\`$1 update\` failed:"
+	tail -15 "$_pmlog" | sed 's/^/    /' >&2
+	rm -f "$_pmlog"
+	return 1
+}
+
 # --- what is on the router, and whether anything newer exists ---------------------------------
 #
 # Say the version. "Installed from the … feed" is equally true of a router that kept the version it
@@ -469,7 +544,7 @@ if [ "$PM" = apk ]; then
 	fetch "$FEED_HOST/owfeed-packages.pem" /etc/apk/keys/owfeed-packages.pem
 	printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
 	info "Updating the package index..."
-	pm_quiet apk update || exit 1
+	feed_refresh apk || exit 1
 	# `apk add` ALONE DOES NOT UPGRADE, and the comment that used to sit here said it did. apk 3
 	# reads `add` as "make sure this is present": a package already in `world` and already satisfied
 	# stays at the version it is at, the command prints its usual OK line and exits 0. Reproduced on
@@ -516,7 +591,7 @@ else
 	fetch "$FEED_HOST/$FEED_KEY_OPKG" "/etc/opkg/keys/$FEED_KEY_OPKG"
 	printf '%s\n' "/etc/opkg/keys/$FEED_KEY_OPKG" > /lib/upgrade/keep.d/owfeed-packages
 	info "Updating the package index..."
-	pm_quiet opkg update || exit 1
+	feed_refresh opkg || exit 1
 	# `opkg install` on an installed package is a no-op even when the feed has a newer
 	# version — it reports "already installed" and exits 0 — so a second run has to ask
 	# for the upgrade explicitly. Up to date is not an error for `opkg upgrade`.

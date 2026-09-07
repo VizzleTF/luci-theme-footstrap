@@ -1271,6 +1271,60 @@ not answer and its packages will be missing`. `owrtsnap` is back in `live`/`anch
 `live-snapshot` is gone; what is worth knowing going forward is the shape of that line in a log, not
 how to survive its absence.
 
+**`install.sh` carried the identical trap one layer down, and "packages available > 0" turned out
+not to be the signal that separates a partial refresh from a total one.** Task 0175, run 34112646188:
+`install-check` red on `owrtsnap` at `apk update`, same dead kmods sub-index as above, but this time
+inside the installer's own `set -e`, which had no per-package loop after it to absorb the exit —
+every install on that stand died before the theme was ever fetched. The obvious fix (treat apk's
+own "N unavailable, M stale; K distinct packages available" line as fine whenever K > 0) is wrong:
+with every feed unreachable, apk still printed `8 unavailable, 0 stale; 136 distinct packages
+available` and exited non-zero — those 136 are rows already in the **installed** database, not
+anything the refresh just read, so K is nonzero on a total failure too. What actually separates the
+two is the `N unavailable` count against how many feeds were **configured** to begin with (counted
+from `/etc/apk/repositories` + `/etc/apk/repositories.d/*.list`): `N < configured` means at least one
+feed answered, `N == configured` means none did. opkg prints no such summary line and is affected
+identically (exit 1 with one bad feed of eight on 24.10.8, exit 7 with the network cut), so the same
+comparison is drawn there by counting `Failed to download` lines against the configured
+`distfeeds.conf`/`customfeeds.conf` entries instead. Neither manager's own exit code decides this in
+either implementation — `install.sh`'s `feed_refresh()`.
+
+**That tolerance turned out to be too even-handed: a security review (task 0176) found it let this
+project's OWN feed, `repo.owfeed.org`, be the one silently skipped.** `repo.owfeed.org` is a distinct
+host from every stock OpenWrt feed, so an on-path/DNS attacker can blackhole it alone while the rest
+answer — `_bad < _total`, the old code returned 0, and the script went on to install whatever
+owfeed-packages index apk/opkg already had cached from a prior run while printing "[+] Installed …".
+Reproduced live rather than argued: on `owrt2512` (9 configured feeds) with a `127.0.0.1
+repo.owfeed.org` `/etc/hosts` entry and the 8 stock feeds left open, `apk update` itself reported the
+router's cached copy as merely `stale` (`0 unavailable, 1 stale; 11286 distinct packages available`,
+exit 1) — a shape the OLD counter never even tolerated (`_bad` reads 0, not 1, so the pre-fix code
+already fell through to the generic failure here) but a fresh-index router would read as `unavailable`
+and the old code WOULD tolerate. `feed_refresh()` now checks, before the tolerance, whether `$FEED_HOST`
+— the literal string this same script writes into the repository line a few lines below, not
+`$FEED_NAME` or any label an admin could rename — appears in a failure line (apk: `ERROR:`/`WARNING:`;
+opkg: `Failed to download`, both of which print the full failing URL in real router output, confirmed
+on both managers below). If it does, the refresh fails closed with a message naming this project's own
+feed specifically, regardless of how many other feeds answered. Verified on live stands, all four
+shapes: `owrtsnap`'s real dead kmods sub-index (unrelated host) still tolerates and installs, unchanged
+from the paragraph above; `owrt2512` (apk) and `owrt2410` (opkg) with `repo.owfeed.org` blocked and
+every stock feed open now fail closed with `` `apk/opkg update` could not reach https://repo.owfeed.org
+— this project's own feed`` and install nothing, where the old code's tolerance would have gone on to
+`apk add`/`opkg install` against a stale cache; both routers with every feed healthy install clean, no
+warning; `owrt2512` fully disconnected from its docker network still fails the way it always did,
+naming the unreachable host and refusing rather than claiming success.
+
+**A verification trap worth naming for the next session: opkg's OWN counting is looser than apk's, in
+the other direction.** Blocking `downloads.openwrt.org` (the host behind all 7 of `owrt2410`'s stock
+feeds, `/etc/opkg/distfeeds.conf`) while `repo.owfeed.org` stayed open made `feed_refresh()`'s pre-fix
+`_bad` counter read 14 against 8 configured — opkg logs each unreachable feed on TWO lines that both
+match the substring `Failed to download` (`*** Failed to download the package list from <url>` and
+` * opkg_download: Failed to download <url>, wget returned N.`), so `grep -c 'Failed to download'`
+double-counts every failure. `_bad >= _total` therefore reads as "none answered" even when most did,
+and the refresh fails closed rather than tolerating — safe (it never installs from a worse index than
+it would otherwise refuse), but it makes opkg's tolerance narrower than the comment above claims and
+narrower than apk's, which reads its own reported `N unavailable` count rather than grepping its log.
+Not this task's fix (`install.sh`'s boundary here is the own-feed decision alone, not the general
+counting shape) — flagged for whoever next touches `feed_refresh()`'s opkg branch.
+
 ## The test matrix
 
 - **Pages**: Status/Overview (tables, ifacebox), Network/Interfaces (zonebadge, modals),
