@@ -124,27 +124,6 @@ defaults:
     - +luci-i18n-dashboard-ru
     - +luci-i18n-attendedsysupgrade-ru
 
-  # Third-party apps whose stylesheets this theme has to share a document with. They are the hardest
-  # case the theme handles, and no text file can reason about them: justclash ships no .css at all —
-  # every rule is built from its view JS at runtime.
-  #
-  # Unsigned dev fixtures: pinned to exact releases and installed without signature verification.
-  # Nothing here ships.
-  extra_packages:
-    - name: luci-app-openclash
-      apk: https://github.com/vernesong/OpenClash/releases/download/v0.47.116/luci-app-openclash-0.47.116.apk
-      ipk: https://github.com/vernesong/OpenClash/releases/download/v0.47.116/luci-app-openclash_0.47.116_all.ipk
-    - name: luci-app-justclash
-      apk: https://github.com/SaltyMonkey/justclash/releases/download/v0.73.0/luci-app-justclash-0.73.0-r1.apk
-      ipk: https://github.com/SaltyMonkey/justclash/releases/download/v0.73.0/luci-app-justclash-0.73.0-r1-all.ipk
-    # ssclash embeds the Ace editor, which inserts its stylesheets as the FIRST child of <head>, and
-    # lazily, adding more on first hover. That is the one adversary that can invert the cascade layer
-    # order (docs/css.md), and neither of the two above can produce it: a sheet that lands ahead of
-    # cascade.css is a different attack on the chrome from one that outranks it.
-    - name: luci-app-ssclash
-      apk: https://github.com/zerolabnet/ssclash/releases/download/v4.7.0/luci-app-ssclash-4.7.0-r1.apk
-      ipk: https://github.com/zerolabnet/ssclash/releases/download/v4.7.0/luci-app-ssclash_4.7.0-r1_all.ipk
-
 routers:
   - id: owrt2512
     # 25.12.4, NOT .5: the stand builds from openwrt/rootfs:x86_64-<release> and that tag has to
@@ -153,25 +132,65 @@ routers:
     # `docker manifest inspect openwrt/rootfs:x86_64-<release>` before bumping either.
     release: "25.12.4"
     ports: { http: 8025, ssh: 2225 }
+    # Third-party apps whose stylesheets this theme has to share a document with. They are the
+    # hardest case the theme handles, and no text file can reason about them: justclash ships no
+    # .css at all — every rule is built from its view JS at runtime.
+    #
+    # Unsigned dev fixtures: pinned to exact releases and installed without signature verification.
+    # Nothing here ships.
+    #
+    # Anchored here and aliased onto the other three RELEASE routers, not `defaults:` — owlab's
+    # `extra_packages` merge is additive only (append(default, router), no subtraction syntax,
+    # internal/config/config.go), so a router-scoped list has to start from a router, not from a
+    # default every router inherits. `owrtsnap` below carries no alias: these three are pinned
+    # builds against release branches (openclash/ssclash need kmod-tun, which resolves through a
+    # kmods index keyed to the box's exact kernel git hash) and the snapshot box's baked kernel is
+    # never the one downloads.openwrt.org/snapshots is currently publishing kmods for — confirmed
+    # 2026-09-07: `apk add` 404s the kmods packages.adb for the running 6.18.33 hash and both apps
+    # fail to resolve `kmod-tun`, while justclash (no kernel module) installs cleanly on the same
+    # box. `owlab up` reported that partial result as its own exit 1 (by design — see
+    # `reportMissingExtras` in owlab's own source), which the fix is to stop asking for.
+    extra_packages: &third_party_apps
+      - name: luci-app-openclash
+        apk: https://github.com/vernesong/OpenClash/releases/download/v0.47.116/luci-app-openclash-0.47.116.apk
+        ipk: https://github.com/vernesong/OpenClash/releases/download/v0.47.116/luci-app-openclash_0.47.116_all.ipk
+      - name: luci-app-justclash
+        apk: https://github.com/SaltyMonkey/justclash/releases/download/v0.73.0/luci-app-justclash-0.73.0-r1.apk
+        ipk: https://github.com/SaltyMonkey/justclash/releases/download/v0.73.0/luci-app-justclash-0.73.0-r1-all.ipk
+      # ssclash embeds the Ace editor, which inserts its stylesheets as the FIRST child of <head>,
+      # and lazily, adding more on first hover. That is the one adversary that can invert the
+      # cascade layer order (docs/css.md), and neither of the two above can produce it: a sheet
+      # that lands ahead of cascade.css is a different attack on the chrome from one that outranks
+      # it.
+      - name: luci-app-ssclash
+        apk: https://github.com/zerolabnet/ssclash/releases/download/v4.7.0/luci-app-ssclash-4.7.0-r1.apk
+        ipk: https://github.com/zerolabnet/ssclash/releases/download/v4.7.0/luci-app-ssclash_4.7.0-r1_all.ipk
 
   - id: owrt2410
     release: "24.10.8"
     ports: { http: 8024, ssh: 2224 }
+    extra_packages: *third_party_apps
 
   - id: imm2512
     distro: immortalwrt
     release: "25.12.1"
     ports: { http: 8026, ssh: 2226 }
+    extra_packages: *third_party_apps
 
   - id: imm2410
     distro: immortalwrt
     release: "24.10.6"
     ports: { http: 8027, ssh: 2227 }
+    extra_packages: *third_party_apps
 
   # A SNAPSHOT box, because the installer has a path only it takes: `SNAPSHOT` parses to no feed
   # branch, so the script asks the feed for the newest one its package manager can read, and
   # everything about that path is unreachable on a release router. It is also the userland the theme
   # is least tested against, since it tracks luci-base's master rather than a release branch.
+  #
+  # No `extra_packages` here, on purpose: see the comment on owrt2512's `&third_party_apps` for the
+  # kmod-tun / kmods-index mismatch that makes openclash and ssclash permanently unresolvable on
+  # this box. The theme still installs and every other gate this leg runs still runs.
   - id: owrtsnap
     release: "snapshot"
     # ssh 2228, NOT 2222: 2222 is the port a developer machine's own sshd usually listens on, and

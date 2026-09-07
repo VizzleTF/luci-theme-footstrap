@@ -781,6 +781,22 @@ Two traps sit in the calling convention itself, each cost a retry:
   at its header line with no `.status` file ever appearing, no matter how long `bg-wait.sh` is left
   polling it.
 
+**`owlab.yaml`'s `extra_packages` under `defaults:` reaches every router, including the snapshot
+box, and a package that box cannot resolve fails `owlab up` for the whole lab — not just the
+missing package.** `defaults.extra_packages` merges additively onto whatever a router adds
+(`internal/config/config.go` in owlab, no subtraction syntax), so there is no way to opt a router
+OUT of a list declared in `defaults:`; the only lever is to not put it there. Reproduced 2026-09-07,
+`owlab up --rebuild owrtsnap`: openclash and ssclash need `kmod-tun`, which resolves through a kmods
+index keyed to the box's exact kernel git hash, and `downloads.openwrt.org/snapshots` was not
+currently publishing kmods for the box's baked `6.18.33` hash — `apk add` 404s that index and both
+apps fail to resolve, permanently, until the box's kernel and the live kmods feed happen to agree
+again. justclash carries no kernel module and installed cleanly on the same box, which is why it was
+never in the failure list — same feed, different dependency shape, not a fluke. `owlab up`'s
+non-zero exit here is correct by design (`reportMissingExtras`, owfeed/owlab#18's sibling): it is
+the config asking every router for packages one of them cannot ever have. Fix is in `owlab.yaml`
+itself — declare the three apps once on a release router and alias the list onto the others, leaving
+`owrtsnap` with none, rather than routing them through `defaults:`.
+
 **`mangle-tokens.sh` fails on a `C:\...`-shaped path with `mv: cannot stat ...tmp.NNN`, and the gate
 that surfaces it never mentions the script by name.** Like `build-css.sh`, it needs a POSIX path;
 `tools/size-budget.mjs` calls it and inherits the failure as its own. A failed run also leaves

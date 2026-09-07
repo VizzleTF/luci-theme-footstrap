@@ -277,6 +277,17 @@ brand and app set, never the leg that caught something first. Run it locally wit
 finding smells distribution-specific. What each gate holds, and how
 to run it by hand, is in [conventions.md](conventions.md) and [development.md](development.md).
 
+**The snapshot box carries no third-party extras (`owlab.yaml`, `owrtsnap`).** openclash and
+ssclash pull `kmod-tun`, which resolves through a kmods index keyed to the box's exact kernel git
+hash, and the box's baked kernel is never the one `downloads.openwrt.org/snapshots` is currently
+publishing kmods for — permanent drift, not a stale image. Measured 2026-09-07: `apk add` 404s the
+kmods `packages.adb` for the running `6.18.33` hash and both apps fail; justclash (no kernel module)
+installs cleanly on the same box, which is why it was never in the failure list. `owlab`'s own
+`extra_packages` merge is additive only (`defaults:` plus what a router adds, no subtraction), so
+the three apps are declared once, on `owrt2512`, and aliased onto the other release routers instead
+of living in `defaults:` — `owrtsnap` gets none. The snapshot leg still runs every other gate; only
+these three apps are untested there.
+
 ## `release` — signing and publication
 
 Tags only, and **it is a call into owfeed's own reusable workflow** rather than steps of ours:
