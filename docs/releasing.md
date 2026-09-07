@@ -254,12 +254,28 @@ Only after everything above has passed:
 4. Tag `vx.y.z` on this commit. **Never tag first** — the tag must point at a commit that
    already contains its own entry, or the release describes a version whose changelog does not yet
    exist.
-5. Push the commit and the tag to `origin` — the only remote (the `git.vaka.work` mirror was removed
+5. **Before pushing, read the recent runs on `main`**: `gh run list --limit 6` — on the maintainer's
+   Windows machine `gh` is not on `PATH` in Git Bash or WSL, and must be called by its full path,
+   `"/c/Program Files/GitHub CLI/gh.exe" run list --limit 6`. A run already red before your push
+   stays red after it, and `release` does not fire until whatever it currently gates on is green —
+   so a tag pushed onto a broken pipeline cannot publish. A pre-existing failure is not something to
+   push past: it is either an infrastructure condition to be fixed first, or a real regression that
+   has nothing to do with this release but will still hold it. `v0.14.12` was tagged onto exactly
+   this: the previous commit on `main` had already failed the same way the day before, on the same
+   upstream condition, and nobody looked before the tag went out.
+6. Push the commit and the tag to `origin` — the only remote (the `git.vaka.work` mirror was removed
    on 2026-07-25).
-6. CI on `v*` builds both formats, signs them, and builds the release body from the changelog. Wait
-   for a green pipeline and check the release carries the expected assets (plus a `.sig` for each):
-   the theme resolving to exactly one asset per format, the manifest, the installer, the notes.
-7. **Publish the feed, and do not trust the bot to finish it.** The theme is installed from
+7. CI on `v*` builds both formats, signs them, and builds the release body from the changelog, but
+   `release` does not run until whatever it gates on is green, by design — deliberately, so that a
+   tag cannot publish a package no router has installed. The consequence is exactly what bit
+   `v0.14.12`: any one red leg holds the whole release, including a leg red for a reason that has
+   nothing to do with the diff — infrastructure or an upstream feed, not this release's code. **The
+   release is not cut until the tag's own run is read, job by job, not merely waited on**: `gh run
+   view <id>` for the job list, `gh run view --job <id> --log-failed` for the failing step's log; say
+   plainly whether the cause is this diff, an infrastructure condition, or an upstream feed. Only
+   then check the release carries the expected assets (plus a `.sig` for each): the theme resolving
+   to exactly one asset per format, the manifest, the installer, the notes.
+8. **Publish the feed, and do not trust the bot to finish it.** The theme is installed from
    owfeed-packages, so a release nobody can `apk upgrade` into is half a release. The hourly job
    there opens the version-bump pull request and says it "will merge itself once the checks pass".
    Measured on 0.14.10, it does neither on its own, and both halves are mechanical:

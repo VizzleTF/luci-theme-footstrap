@@ -66,13 +66,23 @@ exactly one. Simulate it against the shape of the coming release — the loop is
 2. `npm run changelog` — green.
 3. Commit that change. Conventional Commits, English, **no AI attribution**.
 4. Tag `vx.y.z` on this commit. **Never tag first.**
-5. Push the commit and the tag to `origin` — the only remote.
-6. Wait for a green pipeline; check the release carries the expected assets plus a `.sig` for each.
-7. **Publish the feed.** The theme installs from owfeed-packages, so a release nobody can
+5. **Before pushing, read the recent runs on `main`**: `gh run list --limit 6` (on the maintainer's
+   Windows machine `gh` is not on `PATH` in Git Bash or WSL — call it by its full path,
+   `"/c/Program Files/GitHub CLI/gh.exe" run list --limit 6`). A run already red before your push is
+   still red after it, and `release` does not fire until whatever it currently gates on is green: a
+   tag pushed onto a broken pipeline cannot publish. A pre-existing failure needs an owner before you
+   tag — either an infrastructure condition to fix first, or a real regression that has nothing to
+   do with this release but will still hold it.
+6. Push the commit and the tag to `origin` — the only remote.
+7. **The release is not cut until the tag's own run is read, job by job** — not "wait for green".
+   `gh run view <id>` for the job list, `gh run view --job <id> --log-failed` for the failing
+   step's log; say whether a red job is the diff, infrastructure, or an upstream feed. Then check
+   the release carries the expected assets plus a `.sig` for each.
+8. **Publish the feed.** The theme installs from owfeed-packages, so a release nobody can
    `apk upgrade` into is half a release. Bump `packages/luci-theme-footstrap/upstream.sh`, check the
    sha256s in the diff against the assets you downloaded, merge, then read the **served** index
    rather than the workflow log: `apk adbdump` on `releases/25.12/<arch>/packages.adb` and
    `Packages.gz` on `releases/24.10/<arch>/`.
 
-Steps 3–5 need an explicit instruction from the maintainer, each time. `git commit` and `git push`
-are `ask` in `.claude/settings.json` for exactly this reason.
+Steps 3, 4 and 6 need an explicit instruction from the maintainer, each time. `git commit` and
+`git push` are `ask` in `.claude/settings.json` for exactly this reason.
