@@ -186,9 +186,9 @@ jobs:
 
       # ONE RELEASE PER STEP: 25.12 is apk and 24.10 is opkg, and neither installs the other's file.
       - name: Install this build on 25.12 and render its pages
-        uses: owfeed/owlab/action@v0.5.3
+        uses: owfeed/owlab/action@v0.6.1
         with:
-          version: v0.5.3
+          version: v0.6.1
           releases: "25.12.4"
           install: dist/noarch/luci-theme-footstrap-*.apk
           # `exec ucode -T -c` is LuCI's own trycompile, run against the templates as INSTALLED
@@ -203,9 +203,9 @@ jobs:
             exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 
       - name: Install this build on 24.10 and render its pages
-        uses: owfeed/owlab/action@v0.5.3
+        uses: owfeed/owlab/action@v0.6.1
         with:
-          version: v0.5.3
+          version: v0.6.1
           releases: "24.10.8"
           install: dist/all/luci-theme-footstrap_*.ipk
           # The same compile as the 25.12 leg, and not redundant: the templates are identical but
@@ -231,9 +231,9 @@ jobs:
       - name: Assert the feed serves a working theme
         if: github.event_name != 'pull_request' && steps.feed-key.outputs.reachable == 'true'
         continue-on-error: true
-        uses: owfeed/owlab/action@v0.5.3
+        uses: owfeed/owlab/action@v0.6.1
         with:
-          version: v0.5.3
+          version: v0.6.1
           releases: "25.12.4"
           feed: https://repo.owfeed.org/releases/25.12/x86_64/packages.adb
           feed-key: ${{ runner.temp }}/owfeed-packages.pem
@@ -279,28 +279,20 @@ jobs:
         with:
           name: owfeed-packages
           path: dist/
-      - uses: owfeed/owlab/setup@v0.5.3
+      - uses: owfeed/owlab/setup@v0.6.1
         with:
-          version: v0.5.3
+          version: v0.6.1
 
       - name: Boot the routers and install this build
         run: |
           set -eu
           # NOT `. "$GITHUB_ENV"` — that file is a KEY=VALUE list, not a script, so a value with a
           # space in it ("owrt2512 owrt2410") runs its second word as a command.
-          # The two PINNED OpenWrt lines the theme supports: both package managers, on releases
-          # whose feeds do not move under a run. owrtsnap (tracks luci-base master, catches an
-          # upstream change before a user reports it) moved to `live-snapshot`, a job of its own
-          # that `release` does not `need`, because its feed is rebuilt continuously and the kmods
-          # index is named after the kernel hash — a slightly older snapshot image just stops
-          # existing, no code change involved. Measured on runs 34036001267 and 34095751675: both
-          # green on these two lines, both red on owrtsnap alone, `apk update` under `set -eu`
-          # failing with `wget: exited with error 8` / `unexpected end of file` on the kmods index
-          # before owlab's own per-package loop — already tolerant — gets a turn. A retry does not
-          # help; this is a 404, not a stall. ImmortalWrt is deliberately absent — same luci-base,
-          # different brand, never the leg that caught something first; run it locally with --all
-          # when curious.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410"; fi
+          # The three OpenWrt lines the theme supports: both package managers plus the snapshot
+          # box, which tracks luci-base master and so fails on an upstream change before a user
+          # reports it. ImmortalWrt is deliberately absent — same luci-base, different brand,
+          # never the leg that caught something first; run it locally with --all when curious.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410 owrtsnap"; fi
           echo "ROUTERS=$ROUTERS" >> "$GITHUB_ENV"
           # Where a gate leaves the page shapes it read, so a second one in the same slice does not
           # walk the whole menu again — one load and a 1200ms settle per page. Set here rather than
@@ -366,69 +358,6 @@ jobs:
       - if: always()
         run: owlab down || true
 
-  # THE SNAPSHOT LEG, INFORMATIVE AND NEVER GATING. owrtsnap tracks luci-base's master so it can
-  # fail on an upstream change before a user reports it — the value `live` used to carry it for —
-  # but its feed is rebuilt continuously and the kmods index is named after the kernel hash, so
-  # `apk update` under `set -eu` can 404 on an image that has not changed at all: measured on runs
-  # 34036001267 and 34095751675, both green on `owrt2512`/`owrt2410` and red here on the identical
-  # commit, before owlab's own per-package loop (already tolerant, `|| echo "owlab: skip …"`) gets
-  # a turn. A retry does not help — it is a 404, not a stall (that is what tools/ci-retry.sh is
-  # for). `continue-on-error` plus this job's absence from `release`'s `needs` is what stops that
-  # from blocking a tag a third time; the job still boots, still runs the same gates `live` runs
-  # for the two pinned routers, and still shows failed (not skipped, not silently green) on a
-  # genuine finding — a maintainer reads this job, `release` does not wait for it. One router
-  # instead of `live`'s three is roughly a third of that job's wall clock, so the three slices run
-  # sequentially here rather than as a matrix of jobs of their own.
-  live-snapshot:
-    name: The pages behave on the snapshot box (informative, not gating)
-    if: github.event_name != 'pull_request'
-    continue-on-error: true
-    timeout-minutes: 45
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-          cache: npm
-      - run: npm ci
-      - run: sh tools/ci-playwright.sh
-      - uses: actions/download-artifact@v8
-        with:
-          name: owfeed-packages
-          path: dist/
-      - uses: owfeed/owlab/setup@v0.5.3
-        with:
-          version: v0.5.3
-
-      - name: Boot the router and install this build
-        run: |
-          set -eu
-          echo "FS_SHAPES=$RUNNER_TEMP/page-shapes" >> "$GITHUB_ENV"
-          owlab up owrtsnap
-          owlab install owrtsnap dist/noarch/luci-theme-footstrap-*.apk
-
-      # The same gates `live`'s three slices run against the two pinned routers, run here
-      # sequentially against this one. scroll-anchor is chromium-only, matching `motion`'s own
-      # scope — the other two engines are `anchors`, which does not carry owrtsnap at all (see the
-      # comment there).
-      - name: The gates
-        run: |
-          set -eu
-          node tools/spa-parity.mjs --only owrtsnap
-          node tools/live-audit.mjs --only owrtsnap
-          node tools/upstream-contract.mjs --only owrtsnap
-          node tools/scroll-jank.mjs --only owrtsnap
-          node tools/table-tick.mjs --only owrtsnap
-          node tools/floor-contract.mjs --only owrtsnap
-          node tools/fit-quiet.mjs --only owrtsnap
-          node tools/scroll-anchor.mjs --only owrtsnap
-          sh tools/install-check.sh owrtsnap
-
-      - if: always()
-        run: owlab down || true
-
   # THE OTHER TWO ENGINES, on a clock of their own.
   #
   # This was one more step inside `live` and it did not fit: three engines across two routers, two
@@ -468,20 +397,16 @@ jobs:
         with:
           name: owfeed-packages
           path: dist/
-      - uses: owfeed/owlab/setup@v0.5.3
+      - uses: owfeed/owlab/setup@v0.6.1
         with:
-          version: v0.5.3
+          version: v0.6.1
       - name: Boot the routers and install this build
         run: |
-          # The two PINNED OpenWrt lines, same reasoning as `live` (above): owrtsnap's feed 404s
-          # on its own rebuild schedule with no code change involved (runs 34036001267,
-          # 34095751675), so it does not belong on a job `release` needs. Its scroll-anchor
-          # coverage (chromium only, matching `motion`'s own scope) now runs inside
-          # `live-snapshot` instead of costing a second 75-minute cross-engine leg here for a
-          # router this gate was never the one to catch something first on. ImmortalWrt is
-          # deliberately absent — same luci-base, different brand, never the leg that caught
-          # something first; run it locally with --all when curious.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410"; fi
+          # The three OpenWrt lines the theme supports: both package managers plus the snapshot
+          # box, which tracks luci-base master and so fails on an upstream change before a user
+          # reports it. ImmortalWrt is deliberately absent — same luci-base, different brand,
+          # never the leg that caught something first; run it locally with --all when curious.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410 owrtsnap"; fi
           echo "ROUTERS=$ROUTERS" >> "$GITHUB_ENV"
           owlab up $ROUTERS
           for r in $ROUTERS; do
@@ -505,9 +430,7 @@ jobs:
 
   # The only job that holds a key, and its `needs` is what keeps a tag from publishing a package no
   # router has installed. `lint` is named here rather than inherited through `build`, which stopped
-  # waiting for it: the gate has to hold a release, not the packing step. `live-snapshot` is
-  # DELIBERATELY absent here — owrtsnap's feed is somebody else's infrastructure on somebody else's
-  # rebuild schedule, and a release must not wait on that (docs/ci.md, `live` / `live-snapshot`).
+  # waiting for it: the gate has to hold a release, not the packing step.
   release:
     name: Sign and publish
     needs: [build, verify, live, anchors, lint]

@@ -12,10 +12,9 @@ What the Makefile and the install scripts do: [package.md](package.md). The rele
 dispatch.
 
 ```
-check ─┐          ┌─→ verify ─────┐
-       ├─→ build ─┤               ├─→ release ─→ pages     (release and after: tags only)
-lint ──┘          └─→ live ───────┘
-                   └╌╌→ live-snapshot     (informative only — release does not `need` it)
+check ─┐          ┌─→ verify ─┐
+       ├─→ build ─┤           ├─→ release ─→ pages     (release and after: tags only)
+lint ──┘          └─→ live ───┘
 ```
 
 | Job | What it is |
@@ -24,9 +23,7 @@ lint ──┘          └─→ live ───────┘
 | `lint` | the npm gates: eslint, stylelint, axe-core, the ratchets |
 | `build` | both package formats, via owfeed |
 | `verify` | installs this very build on real 25.12 and 24.10 userlands and renders its pages |
-| `live` | opens every page of the menu on `owrt2512`/`owrt2410` and measures it — layout, navigation parity, and the assumptions this theme makes about luci-base |
-| `live-snapshot` | the same gates, once, against `owrtsnap` alone — informative, `continue-on-error`, not in `release`'s `needs` (below) |
-| `anchors` | the reader-stays-put sweep on the other two engines, `owrt2512`/`owrt2410` only — same reasoning as `live` |
+| `live` | opens every page of the menu on those userlands and measures it — layout, navigation parity, and the assumptions this theme makes about luci-base |
 | `release` | signs, generates the notes, attaches the assets |
 | `pages` | refreshes the GitHub Pages portal and the release mirror |
 
@@ -273,28 +270,12 @@ longer come before the other two slices, which are on runners of their own.
    #28 and #30 were all this script, and all on the second run. That replacement is also why it may
    not share a router with a gate still measuring the build — which a slice of its own guarantees.
 
-**Two routers on a push, one on a pull request — both pinned releases.** `owrt2512`/`owrt2410` are
-the OpenWrt lines the theme supports, and their feeds are fixed once that release ships. ImmortalWrt
-is not in it: same luci-base, different brand and app set, never the leg that caught something
-first. Run it locally with `--all` when a finding smells distribution-specific. What each gate
-holds, and how to run it by hand, is in [conventions.md](conventions.md) and
-[development.md](development.md).
-
-**The snapshot box is a job of its own, `live-snapshot`, and it does not gate a release.**
-`owrtsnap` tracks luci-base's master, which is the whole reason for running against it: it can fail
-on an upstream change before a user reports it, still-runs, still-reports, still shows failed in the
-run for a maintainer to read. What it must not do is hold a release hostage to somebody else's
-infrastructure: OpenWrt rebuilds the snapshot feed continuously and names the kmods index after the
-kernel hash, so `apk update` can 404 on an image that has not changed at all — measured on runs
-`34036001267` and `34095751675`, both green on `owrt2512`/`owrt2410` and red on `owrtsnap` alone, on
-the same commit, before owlab's own per-package loop (already tolerant of a package missing from a
-feed) gets a turn. A retry does not help there — a 404 is not a stall, which is what
-`tools/ci-retry.sh` is for. `live-snapshot` runs the same gates `live` runs, once, sequentially,
-against `owrtsnap` alone, carries `continue-on-error: true`, and is deliberately absent from
-`release`'s `needs` below — a genuine finding still turns the job red, it just does not stop a tag
-from publishing. `anchors` (the cross-engine reader-stays-put sweep, below) never carried `owrtsnap`
-at all going forward: its chromium-only slice of that coverage now lives inside `live-snapshot`, and
-the other two engines were never the leg that caught an upstream-luci-base change first.
+**Three routers on a push, one on a pull request.** The push set is the OpenWrt lines the theme
+supports — 25.12/apk, 24.10/opkg and the snapshot box, which tracks luci-base's master and so fails
+on an upstream change before a user reports it. ImmortalWrt is not in it: same luci-base, different
+brand and app set, never the leg that caught something first. Run it locally with `--all` when a
+finding smells distribution-specific. What each gate holds, and how
+to run it by hand, is in [conventions.md](conventions.md) and [development.md](development.md).
 
 ## `release` — signing and publication
 
@@ -311,10 +292,7 @@ release:
 ```
 
 **This is the only job that holds a key**, and `needs: [build, verify, live]` is what stops a tag
-publishing a package no router has installed. `live-snapshot` is deliberately not in that list: it
-runs against `owrtsnap`, whose feed is somebody else's infrastructure on somebody else's rebuild
-schedule, and a release must not wait on that (above, and the comment beside `release` in the
-workflow itself).
+publishing a package no router has installed.
 
 `tools/stage-release.sh` is our half — the `pre-release` hook. It writes the release notes where the
 workflow reads them and puts the one non-package asset into `dist/`, before the manifest is written,

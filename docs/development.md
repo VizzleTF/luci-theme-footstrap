@@ -1235,6 +1235,26 @@ not whatever is sitting in `dist/`:
 git archive <tag> | tar -x -C /clean/checkout && (cd /clean/checkout && ./tools/stage.sh)
 ```
 
+**A dead feed no longer reds `owrtsnap`'s boot — owlab 0.6.1 made the refresh partial instead of
+fatal, closing the trap this note used to teach around.** Through owlab 0.5.3, stage-3 opened
+`apk update`/`opkg update` under a bare `set -eu`, so one unreachable feed took the whole install
+down before owlab's own per-package loop — already tolerant of a package missing from a feed — got a
+turn; the snapshot rootfs pins its kmods index to a kernel hash the feed's retention window keeps only
+a handful of, so an image a few weeks old 404s on that one sub-index on every run with no code change
+involved (owfeed/owlab#18, closed within the hour; `live`/`anchors` had carried a containment for it,
+`live-snapshot`, `continue-on-error` and absent from `release`'s `needs`, task 0172/0173). `owlab`
+0.6.1's `internal/pkgmgr.UpdateShell` now continues the refresh once at least one feed has answered
+and only aborts when none has — reproduced locally (`owlab up owrtsnap`, `owlab install owrtsnap
+dist/noarch/luci-theme-footstrap-*.apk`, task 0173) against a freshly downloaded `owlab 0.6.1`
+binary, not the WSL install's drifted dev build: the identical 404 still prints
+(`ERROR: wget: exited with error 8` / `unexpected end of file` on
+`kmods/6.18.33-1-70e27cfe28d8cb55760256504e7c02fe/packages.adb`), but the router boots and the
+package installs anyway, and the log now names the gap rather than staying silent about it —
+`owlab: apk update: partial refresh, 7 feed(s) read, 10206 packages available; the feed above did
+not answer and its packages will be missing`. `owrtsnap` is back in `live`/`anchors` and
+`live-snapshot` is gone; what is worth knowing going forward is the shape of that line in a log, not
+how to survive its absence.
+
 ## The test matrix
 
 - **Pages**: Status/Overview (tables, ifacebox), Network/Interfaces (zonebadge, modals),
