@@ -166,6 +166,23 @@ And four parts that carry the machinery rather than decide anything, so there is
 measurement in their own comment rather than by a gate, so a change there is not caught by CI:
 extend `tools/scroll-anchor.mjs` before touching one, or accept that the proof is historical.
 
+**The sweep's own mark has to be a faithful proxy, and `position: sticky` is a way for it not to
+be.** `markAt()` already refuses `#view` and `.cbi-section-descr` for the same underlying reason —
+a candidate whose top cannot move the way the page around it moves makes `after.top - before.top`
+answer a question that is not "did the reader move". A sticky element's top is a third such
+candidate: pinned to its stuck offset for as long as it stays stuck, so a mark that lands on one
+measures the stick state, not the reader. Task 0177 found this live rather than by inspection — a
+run on `owrtsnap @1440 side compact` landed its mark on `th.th`, the sidebar's own sticky table
+header (`theme/30-tables.css`), where `owrt2512` landed on `td.td` for the same page and point. It
+did not fire there (`headerWasPinned=true, tableTop=-166`, moved 0 across every repeat), which is
+why the finding itself needed no fix; the trap was that nothing made that true on purpose. A
+synthetic sticky header reproduces the failure directly: `markAt()` without the guard read
+`rect.top` as 0 on every growth from 0 to 120px, while a plain sibling at the same point moved with
+the page — a mark there would pass however badly the theme failed. `markAt()` now walks each
+candidate's ancestors up to `#view` and skips one with `position: sticky` anywhere in that chain,
+the same "detect and reject" shape as the other two exclusions, in both copies of the function
+(`HOLD` and `SWAP`) since both pick a mark the same way.
+
 **Two mechanisms were measured here and are no longer in the tree**, and their numbers are the
 reason the revert stops where it does rather than an argument to put them back. `putBack()`
 re-reading where the element landed: −52px on five passes out of five, 0px on five with it.

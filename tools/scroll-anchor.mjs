@@ -202,9 +202,21 @@ const HOLD = async (growth) => {
 	 * So the whole STACK at the point is read rather than the topmost element — the section a grid
 	 * gap belongs to is right underneath it — and two more rows are tried before giving up, a gap
 	 * being a gap only at the y it was measured at. */
+	/* STICKY EXCLUDED FOR THE SAME REASON AS #view: a `position: sticky` element's rect.top is
+	 * pinned to its stuck offset for as long as it stays stuck, so `after.top - before.top` stops
+	 * being a faithful proxy for the reader's place the moment the stick state does — or does not —
+	 * change across the measurement. Confirmed live: a sticky mark on a synthetic page reported
+	 * moved=0 on every growth from 0 to 120px while a plain sibling at the same point moved with the
+	 * page, so the check would silently pass however badly the theme failed there. The walk climbs
+	 * to `view` because a plain child of a stuck header inherits the same pinned top. */
 	const markAt = (y, x) => {
-		for (const el of document.elementsFromPoint(x, y))
-			if (el !== view && view.contains(el)) return el;
+		for (const el of document.elementsFromPoint(x, y)) {
+			if (el === view || !view.contains(el)) continue;
+			let stuck = false;
+			for (let a = el; a && a !== view; a = a.parentElement)
+				if (getComputedStyle(a).position === 'sticky') { stuck = true; break; }
+			if (!stuck) return el;
+		}
 		return null;
 	};
 	/* THE HIT IS TRIED ACROSS THE VIEWPORT, not at three points down its middle: a mark is anything
@@ -345,9 +357,25 @@ const SWAP = async (growth) => {
 	 * grows INSIDE it — and the section that gap belongs to is right underneath it. Measured: on
 	 * 25.12's Overview every point down the middle answered `#view`, so all eight runs on that
 	 * release reported "no content under the reader" and measured nothing. */
+	/* STICKY EXCLUDED FOR THE SAME REASON AS #view AND `.cbi-section-descr`: a `position: sticky`
+	 * element's rect.top is pinned to its stuck offset for as long as it stays stuck, so
+	 * `after.top - before.top` stops being a faithful proxy for the reader's place the moment the
+	 * stick state does — or does not — change across the measurement. Found live on owrtsnap: the
+	 * mark landed on `th.th`, the sidebar's own sticky table header (theme/30-tables.css), where
+	 * owrt2512 gave `td.td` for the same page and point. It did not fire in the runs that found it
+	 * (`headerWasPinned=true, tableTop=-166`, moved 0 throughout) — but a synthetic sticky header
+	 * reproduces the failure directly: rect.top read 0 on every growth from 0 to 120px while a plain
+	 * sibling at the same point moved with the page, so a mark landing there would pass however
+	 * badly the theme failed. The walk climbs to `view` because a plain child of a stuck header
+	 * inherits the same pinned top. */
 	const markAt = (y, x) => {
-		for (const el of document.elementsFromPoint(x, y))
-			if (el !== view && view.contains(el) && !body.contains(el)) return el;
+		for (const el of document.elementsFromPoint(x, y)) {
+			if (el === view || !view.contains(el) || body.contains(el)) continue;
+			let stuck = false;
+			for (let a = el; a && a !== view; a = a.parentElement)
+				if (getComputedStyle(a).position === 'sticky') { stuck = true; break; }
+			if (!stuck) return el;
+		}
 		return null;
 	};
 	/* THE HIT IS TRIED ACROSS THE VIEWPORT, not at three points down its middle: a mark is anything

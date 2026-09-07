@@ -191,6 +191,26 @@ routers:
   # No `extra_packages` here, on purpose: see the comment on owrt2512's `&third_party_apps` for the
   # kmod-tun / kmods-index mismatch that makes openclash and ssclash permanently unresolvable on
   # this box. The theme still installs and every other gate this leg runs still runs.
+  #
+  # THE ORDINARY `packages:` LIST ABOVE CAN ALSO INSTALL SHORT HERE, and unlike the kmod-tun case
+  # this is not permanent and carries no fix to pin against. Task 0177: a scroll-anchor finding on
+  # this box (owrtsnap @1440 side compact) traced to Overview showing 12 `.cbi-section` against
+  # owrt2512's 13 — `luci-app-https-dns-proxy` absent. `apk info -R` shows neither it nor its
+  # `https-dns-proxy` binary depends on a kernel module (`ca-bundle libc libcares libcurl4 libev
+  # jsonfilter resolveip` only), so this is not the kmod-tun mechanism above; `/var/log/apk.log`
+  # from the same box's most recent boot instead shows the KMOD-NEEDING packages (`luci-app-mwan3`,
+  # `-sqm`, `-nlbwmon`, `-openvpn`, `luci-proto-wireguard`/`-openconnect`) failing with the same
+  # `ERROR: unable to select packages` the kmods-index gap above produces, while
+  # `luci-app-https-dns-proxy` installed clean in that same run — so the package that went missing
+  # for the anchoring finding is not reproducibly the one this comment can name today. `feeds/luci`
+  # and `feeds/packages` are two git repos built into the snapshot index independently, and a
+  # `luci-app-*`/binary pair (both `-2026.05.06-r1` when they agree) can briefly disagree while one
+  # side has moved and the other has not yet mirrored — the same class of drift as the kmods index,
+  # just for an ordinary feed package rather than a kernel module. Not pinned: `packages:` here has
+  # no version syntax, and a hard pin would go stale as the snapshot feed prunes old builds (unlike
+  # a release branch, which keeps them for the branch's life) — the next person reading a
+  # snapshot-only section-count or DOM-count difference should check `apk info -e <pkg>` /
+  # `/var/log/apk.log` on `owrtsnap` for this shape before treating it as a theme finding.
   - id: owrtsnap
     release: "snapshot"
     # ssh 2228, NOT 2222: 2222 is the port a developer machine's own sshd usually listens on, and
