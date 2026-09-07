@@ -137,25 +137,31 @@ Menu JS lives in `htdocs/luci-static/resources/` — **not** in the theme direct
 menu-footstrap        → ui, fs-fit, fs-prefs, fs-widgets, menu-footstrap-common
 menu-footstrap-common → ui, fs-fit, fs-menutree, fs-chrome, fs-router,
                         fs-prefs, fs-sheets, fs-search
-fs-appearance         → fs-widgets, fs-version, …
 fs-select             (no requirer — the footer loads it directly)
-fs-appearance         (PAGE MODULE — required by menu-footstrap-common when
-fs-overview             body[data-page] says the page is theirs, see below)
+fs-overview           (PAGE MODULE — required by menu-footstrap-common when
+                         body[data-page] says the page is theirs, see below)
 ```
 
 The graph is acyclic and the runtime enforces it: `require()` throws `DependencyError` on a cycle.
 
-**Two modules are loaded by PAGE, not by pragma.** `fs-appearance` draws the Appearance controls on
-System → System and `fs-overview` reshapes Status → Overview; each watches `body[data-page]` and does
-nothing anywhere else, because a theme may not register a dispatcher node and so cannot own a route.
-A `'require'` pragma, though, is a hard dependency — luci.js evaluates the module before the
-requirer's factory runs, on every admin page, which cost 15.3 KB of terser output on every cold visit
-to a page that had neither panel. So `menu-footstrap-common.js` carries a map from `data-page` to
-module name and requires the module when that page appears (server-stamped or router-stamped, the
-same attribute either way). The modules are unchanged, including their own observers: `wire()`
-re-checks the page synchronously, so one that arrives after the stamp still starts watching. The map
-repeats a page name each module also tests, and `npm run page-modules` derives both sides and fails
-if they drift.
+**One module is loaded by PAGE, not by pragma.** `fs-overview` reshapes Status → Overview, watches
+`body[data-page]` and does nothing anywhere else, because that page is `luci-mod-status`'s own — a
+theme may register a dispatcher node of its own (`fs-appearance` does, below), but that adds a
+route, it does not hand over one another package already owns. A `'require'` pragma, though, is a
+hard dependency — luci.js evaluates the module before the requirer's factory runs, on every admin
+page — so `menu-footstrap-common.js`
+carries a map from `data-page` to module name and requires the module when that page appears
+(server-stamped or router-stamped, the same attribute either way). The module is unchanged, including
+its own observer: `wire()` re-checks the page synchronously, so one that arrives after the stamp
+still starts watching. The map repeats a page name the module also tests, and `npm run page-modules`
+derives both sides and fails if they drift.
+
+`fs-appearance` (the Appearance controls) used to be the map's other entry, stapled onto System →
+System the same way. It now owns a route of its own, `/admin/system/footstrap`
+(`root/usr/share/luci/menu.d/luci-theme-footstrap.json`, dispatched to
+`view/footstrap/appearance.js`), which requires it by pragma like any ordinary view — an ordinary
+dependency, not a page-watching module, because a theme with a route no longer needs the
+`body[data-page]` workaround for the page it owns.
 
 **There is no update checker, and nothing that loads one.** The installer adds the owfeed-packages
 feed, so `apk upgrade` / `opkg upgrade` carries the theme forward, and a settings page has no

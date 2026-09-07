@@ -108,6 +108,16 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		/* the ellipsis above did nothing: a flex item's automatic minimum floors it at its OWN
+		 * content width until `min-width` says otherwise, so `overflow: hidden` never engaged and a
+		 * value longer than the box ran past it instead of eliding — measured at 320px, RU cut
+		 * mid-glyph 132px (Compact) / 225px (Normal) / 280px (Large) on https-dns-proxy, 66px on
+		 * nlbw/config, 70px inside the network interface-edit modal. No `title`/`aria-label` here on
+		 * purpose: the full string stays in the DOM and the accessibility tree, so a screen reader
+		 * still gets it whole — a `title` is not announced on touch, and an `aria-label` carrying the
+		 * SHORTENED text would violate WCAG 2.5.3 (the accessible name must contain the visible
+		 * text). */
+		min-width: 0;
 		flex-shrink: 1;
 		flex-grow: 1;
 		align-items: center;
@@ -409,8 +419,18 @@
 	 * A @container, not the measurement the data tables use, and it must stay one: these rows are
 	 * full of widgets that bake in a width from the layout they were rendered in, so un-collapsing
 	 * one to take a reading CHANGES what is read — the firewall zone table then claimed 1747px
-	 * where it needs 1190px. Do not "finish the job" by measuring it. */
-	@container fs-content (max-width: 960px) {
+	 * where it needs 1190px. Do not "finish the job" by measuring it.
+	 *
+	 * 992, not 960: the query reads `.cbi-map` (theme/45-misc.css), one level above the `.cbi-section`
+	 * that actually holds the table, and never subtracts what that level spends — `--fs-card-pad` on
+	 * both sides, 32px at the density every page but Compact ships. Measured live (task 0163):
+	 * firewall/zones' `.cbi-map` sat at 968px, 936px once the section's own padding was out, and its
+	 * six RU headers needed 1017px — 968 cleared the un-adjusted 960px check and the table never
+	 * carded, clipping the header row 49-65px with no scroller anywhere near it (English's shorter
+	 * headers happened to fit the same 968px, which is why only RU showed it). 992 = 960 + 32 makes
+	 * the check ask what it always meant to: whether the SECTION's own content, not the map's, has
+	 * cleared 960px. */
+	@container fs-content (max-width: 992px) {
 		.table.cbi-section-table,
 		.table.cbi-section-table .tbody,
 		.table.cbi-section-table .td { display: block; width: auto; }

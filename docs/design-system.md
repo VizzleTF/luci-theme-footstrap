@@ -183,7 +183,7 @@ the absence of light behind a dialog, not a shade of any token.
 
 ## Scales
 
-**Radius** — one user-facing base (Footstrap tab → Rounding, **0–20 px**), from which three semantic
+**Radius** — one user-facing base (Footstrap page → Rounding, **0–20 px**), from which three semantic
 radii are derived proportionally: cards/panels/modals/popovers, controls (inputs, buttons,
 dropdowns, tabs, menu items, logo) and small parts (chips, code, insets). Pills and toggles are
 always fully round. Every `border-radius` in `theme`/`pages` reads one of them.
@@ -227,13 +227,18 @@ Shadows are `--fs-shadow` (per mode) and `--fs-shadow-pop` (floating surfaces).
 
 ## The appearance axes
 
-The controls are `fs-appearance.js`, added as a fifth tab on the stock **System → System** page,
-beside General Settings / Logging / Time Synchronization / Language and Style. It watches
-`body[data-page]` the way `fs-overview.js` does, then appends one `.cbi-tabcontainer` and one `<li>`
-to the group `ui.tabs` has already initialised — by hand, because `initTabGroup()` returns
-immediately on a group carrying `data-initialized` and clearing that flag builds a *second* menu
-beside the first. A theme owns no dispatcher node of its own: a node outlives the theme that
-registered it, so switching themes would leave a menu entry whose view is gone.
+The controls are `fs-appearance.js`, which builds the form; `view/footstrap/appearance.js`
+dispatches it at a route of its own, **System → Footstrap** (`admin/system/footstrap`, registered
+in `root/usr/share/luci/menu.d/luci-theme-footstrap.json`, ACL-gated the same as any `luci-app-*`
+page). It used to be a fifth tab stapled onto the stock **System → System** page instead, beside
+General Settings / Logging / Time Synchronization / Language and Style — watching `body[data-page]`
+the way `fs-overview.js` does, then appending one `.cbi-tabcontainer` and one `<li>` to the group
+`ui.tabs` had already initialised by hand, because `initTabGroup()` returns immediately on a group
+carrying `data-initialized` and clearing that flag builds a *second* menu beside the first. That
+workaround stood in for a route: a `luci-theme-*` package was believed unable to register a
+dispatcher node of its own. It can — the entry belongs to the package, not to being the *active*
+theme, so it is present for exactly as long as the package is installed, regardless of which theme
+is selected — and `docs/architecture.md` has the boundary that replaced the old belief.
 
 The values live in `fs-prefs.js`. Grouped the way the page groups them — **Interface** (Layout,
 Theme, Palette, Density, Rounding, Submenus), then the **Colours** fold (Tint and its strength, the
@@ -488,3 +493,31 @@ a variable font.
 
 Rings, sparklines and port tiles from the mock-up are content, drawn by view JS — not something
 a theme can produce. See the boundary in [architecture.md](architecture.md).
+
+### Meter polarity
+
+`annotateMeter()` (`menu-footstrap-common.js`) colours a `.cbi-progressbar` from its fill
+percentage — 80%/92% warn/danger, `docs/conventions.md` — but a fill is not always "how much is
+used". Forum #134 (2026-09-06) caught Status -> Overview's memory row 0, "Total Available" /
+«Свободно», turning yellow at 91% full: a HIGH reading there is healthy, not a warning. Row 4,
+"Swap free" / «Свободно в подкачке», is worse — a fully free swap reads 100% and showed permanent
+danger on an otherwise healthy router. Both measured live on owrt2512 and owrt2410, en and ru.
+
+Three decisions, each keyed on the row's own label — `_(msgid)`, no msgctxt, the same match
+`ROLES` in `fs-overview.js` already makes, verified against `modules/luci-base/po/ru/base.po`:
+every msgid used here has an entry there, so it is in the `base` domain loaded on EVERY admin
+page, not one only Status -> Overview fetches (unlike `_('Free')`, absent from that catalogue,
+which comes back untranslated wherever it is tried — the trap this rule exists to avoid falling
+into a second time):
+
+1. **Inverted** ("Total Available", "Swap free"): the warn/danger split fires on a LOW reading —
+   `100 - FS_METER_WARN` / `100 - FS_METER_DANGER`, not a second pair of numbers, because an
+   inverted bar asks the identical health question ("how much headroom is left") from the other
+   end of the same fill.
+2. **Neutral** ("Buffered", "Cached"): no colour, ever. A full page cache is the kernel doing its
+   job, not a resource running out — colouring it "danger" would say something false.
+3. **Unrecognised** (everything else, including any bar a third-party app draws): keeps the plain
+   fill-based rule. Seventeen bars measured live on Overview alone (storage, active connections)
+   are used-based and carry no name this theme special-cases, and an app's own meter is unnamed by
+   construction — so fill-based stays the FALLBACK. A wrong colour on the rare inverted app meter
+   this theme has never seen is the accepted cost of not going dark on the common, correct case.

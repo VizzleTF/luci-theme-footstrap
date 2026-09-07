@@ -130,6 +130,32 @@ role HTML-AAM derives from it (WCAG 1.3.1), and `fs-select.js`'s role map is wha
 `tools/table-contract.mjs` holds both directions: it fails if the role map shrinks and it fails if a
 theme selector sets `display` on one of these classes with no entry in the map to pair with it.
 
+**A flex item's automatic minimum size defaults to its CONTENT size, and `overflow` is what zeroes
+it.** Any flex item with no explicit `min-width` (row axis) or `min-height` (column axis) still has
+one: the *automatic minimum size*, which resolves to the item's min-content box unless the item's
+own `overflow` is something other than `visible`, in which case the automatic minimum drops to zero
+(CSS Flexbox §4.5). One cause, four symptoms in one session, in both directions:
+
+- `.cbi-checkbox` is `inline-flex` and its pill had no `flex-shrink: 0` — the automatic minimum let
+  the pill compress below its declared `--sw-w` while the knob kept its literal size and a travel
+  distance derived from the width the pill no longer had.
+- Under 767px a form label is `flex: 1 1 100%` with no `min-width` on ssclash — its automatic
+  minimum fell back to content width and it escaped its own section.
+- A closed dropdown's `overflow: hidden; text-overflow: ellipsis` were already correct and inert:
+  the automatic minimum held the `li` at content width, so there was nothing left to clip.
+- The opposite fault, same rule: `overflow: hidden` on a row-action button zeroed *its* automatic
+  minimum, so `flex-grow` divided the row by count instead of by need and every button converged on
+  one width at every viewport — a desktop regression shipped as the fix for a phone one.
+
+Before adding a declaration to a flex item, name which of the two behaviours it needs: a button that
+must actually shrink wants `overflow: hidden` (or an explicit `min-width: 0`) to reach zero; a label
+or a pill that must clip while holding its own width wants the overflow property paired with an
+explicit `min-width`/`max-width` that is not `auto`, so the automatic minimum never gets a vote.
+**No gate holds this rule in general.** `pseudo-loc` catches the first shape after the fact — a
+caption that grew and then overflowed its shrunk pill reads as a finding — but not the third: an
+inert `text-overflow: ellipsis` produces no overflow at all, because the box it sits on was never
+given the room to shrink in the first place, and nothing measures a clip rule that never fires.
+
 ## Writing JS
 
 **Never put a regex literal straight after `return` or `=>`.** `jsmin` (which `luci.mk` runs on

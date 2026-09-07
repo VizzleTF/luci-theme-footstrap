@@ -150,8 +150,9 @@
 				<div class="fs-spacer"></div>
 
 				{# right cluster, in visual order: the poll pill above, then Search, Log out. The
-				   Appearance controls are a tab on System -> System, appended by fs-appearance.js,
-				   because a theme may not own a dispatcher node. #}
+				   Appearance controls are their own page, System -> Footstrap, registered by the
+				   theme's own menu.d entry (docs/architecture.md) — no tab, no fs-appearance.js
+				   mounting of any kind reaches this header. #}
 				{% include('themes/footstrap/partials/search') %}
 				{% include('themes/footstrap/partials/logout') %}
 			</nav>

@@ -108,9 +108,14 @@ uci commit network</pre>
 	<div class="g-row">
 		<a class="btn" href="#">.btn</a>
 		<a class="btn primary" href="#">.btn.primary</a>
-		<input type="button" value="input[type=button]">
-		<input type="submit" value="input[type=submit]">
-		<input type="reset" value="input[type=reset]">
+		<!-- native input[type=button/submit/reset]: a REAL caption, not the markup that produces the
+		     control — the old `value="input[type=button]"` was gallery documentation wearing the
+		     control's own face, and pseudo-loc grew that 19-character syntax (not a real button's
+		     caption) into a 28-character one, 47-64.5px past this row's flex parent at 320px/Large.
+		     No real page ever emits this string as a button's label; a real one says "Submit". -->
+		<input type="button" value="Button">
+		<input type="submit" value="Submit">
+		<input type="reset" value="Reset">
 	</div>
 	<div class="g-row">
 		<a class="btn danger" href="#">.btn.danger</a>
@@ -184,6 +189,18 @@ uci commit network</pre>
 				<label class="cbi-value-title" for="g-text">Text input</label>
 				<div class="cbi-value-field"><input id="g-text" type="text" class="cbi-input-text" value="OpenWrt"></div>
 			</div>
+			<!-- task 0147 (second RU sweep), finding 1: under 767px theme/90-responsive.css restates
+			     `flex: 1 1 100%` on the label (stacked above the field), and a flex item's automatic
+			     minimum size is content-based once that basis is not smaller than the content — a
+			     label whose text has too few break points renders at its own min-content instead of
+			     the row's width. Sweep-measured on ssclash's settings form at 320px: 320px wide in a
+			     254-276px row, the section clipped 33-50px with no scroller. The run below has no
+			     space for the middle third on purpose, the shape that broke it; a normal RU sentence
+			     with ordinary word breaks does not need this fixture to pass. -->
+			<div class="cbi-value">
+				<label class="cbi-value-title" for="g-longlabel">Автоматическоепереподключениексерверу при обрыве</label>
+				<div class="cbi-value-field"><input id="g-longlabel" type="text" class="cbi-input-text" value=""></div>
+			</div>
 			<div class="cbi-value">
 				<label class="cbi-value-title" for="g-pass">Password</label>
 				<div class="cbi-value-field"><input id="g-pass" type="password" class="cbi-input-password" value="secret"></div>
@@ -207,10 +224,19 @@ uci commit network</pre>
 					<select id="g-msel" multiple size="3"><option selected>one</option><option>two</option><option>three</option></select>
 				</div>
 			</div>
+			<!-- task 0145: a caption-less `div.cbi-checkbox` never gives the pill a sibling flex item
+			     to shrink against, so this fixture stayed green through the whole life of the
+			     pill-shrink/knob-overhang bug — every gallery gate, computed-diff included, measured
+			     a switch that could never fail this way. `label.cbi-checkbox > input + label[for] +
+			     TEXT` is package-manager.js's and banip's real markup (a raw checkbox with an inline
+			     caption, not the ui.Checkbox widget), and the caption is the RU string the bug was
+			     measured against: 'Автоматически удалять неиспользуемые зависимости', long enough to
+			     shrink the pill at default density on every phone width — EN only broke it at
+			     Density=Large. -->
 			<div class="cbi-value">
 				<label class="cbi-value-title" for="cb1">Checkbox (toggle)</label>
 				<div class="cbi-value-field">
-					<div class="cbi-checkbox"><input id="cb1" type="checkbox" checked><label for="cb1"></label></div>
+					<label class="cbi-checkbox"><input id="cb1" type="checkbox" checked><label for="cb1"></label> Автоматически удалять неиспользуемые зависимости</label>
 				</div>
 			</div>
 			<!-- ui.Checkbox with `tooltip` set (form.Flag.tooltip, e.g. luci-app-firewall's zones.js
@@ -353,6 +379,11 @@ option two</textarea></div>
 		     button. Its padding has to out-rank the dropdown box's own `padding: 0` — the one case
 		     the spinner's !important used to exist for, and the one nothing rendered. -->
 		<div class="cbi-dropdown btn cbi-button cbi-button-apply spinning" tabindex="0"><ul><li>Applying…</li></ul><span class="open">▾</span></div>
+		<!-- Field dropdown (not .btn/.cbi-button) with a value longer than its 400px cap — the
+		     https-dns-proxy/nlbw-config/interface-edit shape task 0149 measured cutting mid-glyph at
+		     320px (RU: 132/225/280px past the box at Compact/Normal/Large). No `title`/`aria-label`:
+		     the ellipsis is visual only, the full string stays in the DOM and the accessibility tree. -->
+		<div class="cbi-dropdown" tabindex="0"><ul><li class="focus" display="0">Автоматический выбор лучшего доступного вышестоящего DNS-сервера по задержке отклика</li></ul><span class="open">▾</span></div>
 	</div>
 	<p class="g-note">Closed controls only. The open list — and the create-item row that goes with it —
 		is in the Combobox section below.</p>
@@ -505,6 +536,12 @@ option two</textarea></div>
 	<ul class="cbi-tabmenu">
 		<li class="cbi-tab"><a href="#">Mode A</a></li>
 		<li class="cbi-tab-disabled"><a href="#">Mode B</a></li>
+		<!-- adblock's Overview page, RU: a `.cbi-tabmenu > li` label that is a sentence, not a word.
+		     Narrow the window and this is the one that used to escape its column (measured at
+		     320px/Density Large: 293px in a 264px column, 28.6px past it, no scroller) — the `a`
+		     already ellipsises (base/50-chrome.css) but the li's own `max-width: none` never let it
+		     shrink that far. EN has no fixture this long because EN never broke. -->
+		<li class="cbi-tab"><a href="#">Настройки межсетевого экрана</a></li>
 	</ul>
 </div>
 
@@ -670,7 +707,13 @@ option two</textarea></div>
 	     full length, because that is the case that broke: `.ifacebox` is `white-space: nowrap`,
 	     an address has no spaces to wrap at, and the plate is a flex item that shrinks — so the
 	     address printed outside its own border (measured at a 390px viewport: 45px past it).
-	     Narrow the window here and the text must stay inside the box. -->
+	     Narrow the window here and the text must stay inside the box.
+
+	     The third plate is the RU HEAD, the sibling bug: the head inherits the same `nowrap` and
+	     had no override at all, so a sentence-length caption (LuCI's RU string for "IPv4 Upstream")
+	     ran straight out of the box: measured at 320px/Density Large, 301px in a 288px column,
+	     41.3px past #view, with the .cbi-section clipped by 42px and no scroller. EN has no fixture
+	     this long because EN never broke. -->
 	<div class="network-status-table">
 		<div class="ifacebox">
 			<div class="ifacebox-head center active"><strong>IPv4 Upstream</strong></div>
@@ -684,6 +727,12 @@ option two</textarea></div>
 			<div class="ifacebox-body left">
 				<span><strong>Protocol:</strong> Static address<br><strong>Prefix Delegated:</strong> 2001:db8:1a2b:3c4e:5e6f:7a8b:9c0d::/64<br><strong>Address:</strong> 2001:db8:1a2b:3c4d:5e6f:7a8b:9c0d:1e2f/64<br><strong>Gateway:</strong> 2001:db8:1a2b:3c4d::1<br><strong>Connected:</strong> 8d 12h 0m 57s</span>
 				<div><span class="ifacebadge"><img src="/luci-static/resources/icons/ethernet.svg" width="16" alt=""><span><strong>Device:</strong> Ethernet Adapter: "wwan0"<br><strong>MAC address:</strong> C6:68:C6:D1:EF:25</span></span></div>
+			</div>
+		</div>
+		<div class="ifacebox">
+			<div class="ifacebox-head center active"><strong>Подключение IPv4 (внешняя сеть)</strong></div>
+			<div class="ifacebox-body left">
+				<span><strong>Протокол:</strong> Статический адрес<br><strong>Адрес:</strong> 203.0.113.42/24<br><strong>Шлюз:</strong> 203.0.113.1<br><strong>Соединение:</strong> 8d 12h 0m 57s</span>
 			</div>
 		</div>
 	</div>
@@ -820,7 +869,6 @@ option two</textarea></div>
 			</div>
 		</div>
 	</div>
-
 	<h2>The forcing utilities (.left/.right/.center + .top/.middle/.bottom)</h2>
 	<!-- LuCI writes these on a cell to OVERRIDE the table's own alignment — `<td class="td right">`
 	     — which is why they carry an `!important`: a bare `.right` (0,1,0) loses to the theme's
@@ -896,6 +944,66 @@ option two</textarea></div>
 			</tr>
 		</table>
 		<div class="cbi-section-create"><button class="cbi-button cbi-button-add">Add</button></div>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>CBI section table — header reflow at the card boundary (RU, task 0163)</h2>
+	<p class="g-note">`.cbi-map` pinned to 968px — firewall/zones' own measured content column at
+	   1024px, live, RU. The card fires on THIS element (theme/45-misc.css), one level above
+	   `.cbi-section`'s own `--fs-card-pad`, so 968px here only hands the table 936px. The six real
+	   header strings below need ~1017px at the word floor (base/40-tables.css) — before the 992px
+	   fix (theme/65-dropdown.css) this table stayed a table at 968px and clipped its own header row
+	   with no scroller in reach; 968 now clears 992 and the table cards instead.</p>
+	<div class="cbi-map" style="max-width: 968px">
+		<div class="cbi-section cbi-tblsection">
+			<h3>Зоны</h3>
+			<table class="table cbi-section-table">
+				<tr class="tr cbi-section-table-titles">
+					<th class="th cbi-section-table-cell">Зона ⇒ Перенаправления</th>
+					<th class="th cbi-section-table-cell">Входящий трафик</th>
+					<th class="th cbi-section-table-cell">Исходящий трафик</th>
+					<th class="th cbi-section-table-cell">Внутризональная пересылка</th>
+					<th class="th cbi-section-table-cell">Маскарадинг IPv4</th>
+					<th class="th cbi-section-table-cell cbi-section-actions">&nbsp;</th>
+				</tr>
+				<tr class="tr cbi-section-table-row cbi-rowstyle-1">
+					<td class="td cbi-value-field cbi-section-table-cell">lan</td>
+					<td class="td cbi-value-field cbi-section-table-cell">принимать</td>
+					<td class="td cbi-value-field cbi-section-table-cell">принимать</td>
+					<td class="td cbi-value-field cbi-section-table-cell">да</td>
+					<td class="td cbi-value-field cbi-section-table-cell">нет</td>
+					<td class="td cbi-section-table-cell nowrap cbi-section-actions">
+						<button class="btn cbi-button cbi-button-edit">Правка</button>
+					</td>
+				</tr>
+			</table>
+		</div>
+	</div>
+</div>
+
+<!-- task 0147 (second RU sweep), finding 3: base/95-luci.css sizes each row-action button
+     `flex: 1 1 4em` inside `.td.cbi-section-actions`, a plain <table>/.td markup (Startup, not
+     form.js's .cbi-section-table above) with no per-row carding. A definite flex-basis caps the
+     automatic minimum at 4em once the row runs out of room, so a caption longer than that shrinks
+     the BOX below its own text instead of the text — theme/55-buttons.css's ellipsis is what stops
+     the overflow from painting onto the next button. Captions are the real Startup strings. -->
+<div class="g-sec">
+	<h2>Row actions, plain table (Startup-style, no .cbi-section-table)</h2>
+	<div class="cbi-section">
+		<div class="table" style="max-width: 340px">
+			<div class="tr">
+				<div class="td">dnsmasq</div>
+				<div class="td cbi-section-actions">
+					<form>
+						<button class="cbi-button cbi-button-positive">Запустить</button>
+						<button class="cbi-button">Перезапустить</button>
+						<button class="cbi-button cbi-button-negative">Остановить</button>
+						<button class="cbi-button">Принудительно завершить</button>
+					</form>
+				</div>
+			</div>
+		</div>
 	</div>
 </div>
 

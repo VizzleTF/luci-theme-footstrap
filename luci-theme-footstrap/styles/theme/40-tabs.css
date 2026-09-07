@@ -42,11 +42,31 @@
 	ul.cbi-tabmenu.mode > li,
 	.tabs > li,
 	.cbi-tabmenu > li {
-		height: auto; max-width: none;
+		height: auto;
 		margin: 0; padding: 0;
 		border: 0; background: none;
 		border-radius: var(--fs-radius);
 		color: var(--fs-dim);
+	}
+
+	/* the theme's own page tabs and the mode switcher never carry a sentence-length label, so
+	 * `none` is right for them — `ul.cbi-tabmenu.mode > li` below wins specificity over the plain
+	 * `.cbi-tabmenu > li` rule that follows, so the mode pills stay `none` regardless of order. */
+	#tabmenu ul.tabs > li,
+	ul.cbi-tabmenu.mode > li,
+	.tabs > li {
+		max-width: none;
+	}
+
+	/* the PLAIN CBI form tabs (ui.js, not the mode switcher): adblock's Overview page names one
+	 * "Настройки межсетевого экрана", measured 293px in a 264px column at 320px/Large — 28.6px past
+	 * it, section clipped by 30px; EN measured 0. The `a` already carries `white-space: nowrap;
+	 * overflow: hidden; text-overflow: ellipsis` (base/50-chrome.css) — it never engaged because the
+	 * li's `max-width: none` left its automatic minimum size at the label's full content width, so
+	 * flexbox never shrank it. `100%` is smaller than that content width once the column is, which
+	 * is exactly the case that broke; everywhere the tab already fits, this is a no-op. */
+	.cbi-tabmenu > li {
+		max-width: 100%;
 	}
 
 	#tabmenu ul.tabs > li > a,

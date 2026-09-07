@@ -94,7 +94,26 @@ const LIMITS = {
 	 * 88x25 hit-box overlay, the same idiom as the checkbox's (80-appearance.css, 87 B).
 	 * 45-misc.css's container-name doc line cost nothing — comment only. The limit goes to 127,000,
 	 * 519 B of head-room. */
-	cascadeCss: 127_000,
+	/* 127,100 B on 2026-09-06, up ~267 B net (roughly 509 B for the day's seven RU/overflow
+	 * fixes, 242 B of it won back the same day) — the technical routes were tried first and
+	 * exhausted: dropping a scroller returned 217 B, narrowing the row-action selector to
+	 * `.cbi-section-actions .cbi-button`/`.btn` (dropping the redundant bare `.td .cbi-button,
+	 * .td .btn` pair, `theme/55-buttons.css`) another 25 B, 242 B in all, and the sheet still
+	 * lands 1 B over. What the remaining ~267 B bought: the toggle switch's knob no longer leaves
+	 * its pill when a caption sits beside it (`flex-shrink: 0`, `theme/60-inputs.css`) — visible
+	 * on every Russian phone at default density; a form label no longer escapes its section
+	 * (`min-width: 0`, `base/30-forms.css`), which had left it unreachable behind a clipped card;
+	 * the interface-box head wraps instead of overflowing its card by 41px (`base/95-luci.css`);
+	 * a tab menu item truncates instead of escaping its column (`theme/40-tabs.css`); the Save &
+	 * Apply footer wraps instead of squeezing its own caption (`theme/55-buttons.css`); row-action
+	 * captions stop painting over their neighbours, without moving a single desktop width
+	 * (`theme/55-buttons.css`); and a closed dropdown's value ellipsises instead of being cut
+	 * mid-glyph (`min-width: 0`, `theme/65-dropdown.css`). Two of those seven — the form label
+	 * and the interface-box head — had left text completely UNREACHABLE, with no scroller
+	 * anywhere near it, not merely ugly: that is what buys the raise here rather than a further
+	 * trim. The limit goes to 127,500, 400 B of head-room (127,100 B measured; a later
+		 * commit moved the sheet 99 B past the 127,001 B this note was written against). */
+	cascadeCss: 127_500,
 	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
 	 * whether or not a given page loads it. 86,737 B on 2026-08-27.
 	 *

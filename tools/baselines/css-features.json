@@ -234,6 +234,7 @@
 		"unit:s",
 		"unit:svh",
 		"unit:vh",
-		"unit:vw"
+		"unit:vw",
+		"value:overflow=clip"
 	]
 }

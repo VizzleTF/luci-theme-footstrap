@@ -100,7 +100,9 @@
 
 	/* The @container PLUMBING for the responsive tables — only WHICH boxes are query containers, under
 	 * what names. The card rules are not here: a CBI section table cards under `@container
-	 * fs-content (max-width: 960px)` (theme/65-dropdown.css), and a data table cards by MEASUREMENT
+	 * fs-content (max-width: 992px)` (theme/65-dropdown.css — 992, not the row's own 960px floor,
+	 * because the query reads THIS element, one level above the `.cbi-section` that spends
+	 * `--fs-card-pad` before the table ever sees the width), and a data table cards by MEASUREMENT
 	 * (.fs-stacked, fs-select.js) at any width.
 	 *
 	 * Query the CONTENT width, not the viewport: the sidebar eats width, so a viewport breakpoint

@@ -18,6 +18,12 @@
  * apply and the page is plainer — those never raise the floor. `color-mix()` is SOFT only because
  * styles/04-nocolormix.css gives all 36 tokens static twins; delete that file and it is HARD.
  *
+ * Classification is by PROPERTY, which misses a VALUE with its own support story — `overflow` is
+ * ancient but `overflow: clip` (task 0151) is Safari 16, and the property-only check said nothing
+ * while the sheet sailed a version past its own declared floor. VALUES below is the same table for
+ * that narrower case: only checked for the exact property/value pairs listed, because most values
+ * share their property's support and a blanket value scan would be noise no one reads.
+ *
  * The claimed floor lives in docs/css.md between the two `css-floor` markers and is compared
  * against the computed one, so the doc cannot drift from the sheet.
  */
@@ -57,6 +63,33 @@ const FEATURES = {
 	'prop:padding-block':  { kind: 'hard', chrome: 87,  firefox: 66,  safari: 14.1 },
 	'prop:color-scheme':   { kind: 'hard', chrome: 81,  firefox: 96,  safari: 13 },
 };
+
+/* `overflow: clip` (and the `overflow-x`/`overflow-y` longhands) support Safari 16 while `overflow`
+ * itself is ancient — measured (task 0151, node measure-clip-scratch.mjs, since deleted) on both
+ * declared sites, `.fs-main`'s `overflow-x: clip` and `.fs-staging`'s `overflow: clip`: a browser
+ * that drops the unrecognised value leaves the longhand at its initial `visible`, which the CSS
+ * Overflow spec's cross-axis rule then corrects to `auto` wherever the other axis is already
+ * non-visible (the desktop sidebar's `.fs-main`, `overflow-y: auto`) and leaves genuinely `visible`
+ * where it is not (the top/narrow layouts, and `.fs-staging`'s own two-axis shorthand) — a sideways
+ * scrollbar in the first case, whole-page horizontal scroll in the second, neither of which is a
+ * broken page: it is exactly how stock LuCI (no `clip` at all) already renders. `.fs-staging` stays
+ * `visibility: hidden` regardless of which value its `overflow` resolves to — nothing inside the
+ * staged view sets `visibility: visible` on itself, only `body.modal-overlay-active #modal_overlay`
+ * does that, and that element lives outside `.fs-staging` — so the uncontained overflow never
+ * paints. SOFT on both counts. */
+const VALUES = {
+	'value:overflow=clip': {
+		kind: 'soft', chrome: 90, firefox: 94, safari: 16,
+		props: [ 'overflow', 'overflow-x', 'overflow-y' ], value: 'clip',
+	},
+};
+const VALUE_PROPS = new Map();
+for (const [ key, v ] of Object.entries(VALUES))
+	for (const p of v.props) {
+		if (!VALUE_PROPS.has(p)) VALUE_PROPS.set(p, []);
+		VALUE_PROPS.get(p).push(key);
+	}
+const ALL = { ...FEATURES, ...VALUES };
 
 const css = readFileSync(buildCss(), 'utf8');
 const ast = csstree.parse(css, { parseValue: true });
@@ -98,8 +131,19 @@ csstree.walk(ast, {
 		if (node.type === 'PseudoElementSelector') seen.add(`pseudoel:${node.name}`);
 		if (node.type === 'Function') seen.add(`fn:${node.name.toLowerCase()}`);
 		if (node.type === 'Dimension') seen.add(`unit:${node.unit.toLowerCase()}`);
-		if (node.type === 'Declaration' && !node.property.startsWith('--'))
-			seen.add(`prop:${node.property.replace(/^-\w+-/, '').toLowerCase()}`);
+		if (node.type === 'Declaration' && !node.property.startsWith('--')) {
+			const prop = node.property.replace(/^-\w+-/, '').toLowerCase();
+			seen.add(`prop:${prop}`);
+			const keys = VALUE_PROPS.get(prop);
+			if (keys)
+				csstree.walk(node.value, {
+					enter(vn) {
+						if (vn.type !== 'Identifier') return;
+						const name = vn.name.toLowerCase();
+						for (const key of keys) if (VALUES[key].value === name) seen.add(key);
+					},
+				});
+		}
 	},
 });
 
@@ -116,7 +160,7 @@ csstree.walk(ast, {
 });
 
 const baseline = new Set(JSON.parse(readFileSync(BASELINE, 'utf8')).known);
-const unknown = [ ...seen ].filter((k) => !baseline.has(k) && !FEATURES[k]).sort();
+const unknown = [ ...seen ].filter((k) => !baseline.has(k) && !ALL[k]).sort();
 
 if (process.argv.includes('--update')) {
 	const known = [ ...new Set([ ...baseline, ...seen ]) ].sort();
@@ -131,7 +175,7 @@ if (process.argv.includes('--update')) {
 
 const floor = {};
 for (const e of ENGINES) floor[e] = 0;
-for (const [ key, f ] of Object.entries(FEATURES)) {
+for (const [ key, f ] of Object.entries(ALL)) {
 	if (f.kind !== 'hard' || !seen.has(key)) continue;
 	for (const e of ENGINES) if (f[e] > floor[e]) floor[e] = f[e];
 }
@@ -154,7 +198,7 @@ if (!block) {
 }
 
 console.log(`computed hard floor: ${ENGINES.map((e) => `${e} ${floor[e]}`).join(', ')}`);
-const soft = Object.entries(FEATURES).filter(([ k, f ]) => f.kind === 'soft' && seen.has(k));
+const soft = Object.entries(ALL).filter(([ k, f ]) => f.kind === 'soft' && seen.has(k));
 console.log(`progressive (no floor raised): ${soft.map(([ k ]) => k).join(', ') || 'none'}`);
 
 let bad = false;

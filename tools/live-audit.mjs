@@ -28,13 +28,29 @@
  *
  *   node tools/live-audit.mjs [--only owrt2512,owrt2410] [--widths 320,390,768,1440]
  *                             [--pages /admin/status] [--pages-all] [--all] [--arrive 768]
- *                             [--update] [--prune] [--engine chromium|firefox|webkit]
+ *                             [--update] [--prune] [--engine chromium|firefox|webkit] [--lang ru]
  *
  * Needs a running owlab router (docs/development.md). `--update` rewrites the baseline: read the
- * diff before you do that — it is the whole value of the file. */
+ * diff before you do that — it is the whole value of the file.
+ *
+ * `--lang` (task 0162): the checks that read TEXT LENGTH — `overflow`, `clipped`, `doc-scroll` — are
+ * pinned to whatever language the router happens to answer in, and the default is English (Playwright's
+ * browser locale is en-US, and `luci.main.lang=auto` resolves against it). Switching a router to
+ * Russian by hand and running the unmodified gate produced 77 findings on one stand and 70 on the
+ * other — not regressions, RU text is measurably longer (docs/gallery.html's pseudo-loc gate uses
+ * 1.3-1.6x for the same reason) — and every one would have failed the run, because the baseline held
+ * only what English measured. `--lang` sets `luci.main.lang` on each router before the sweep (`en`
+ * maps to `auto`, same convention as `.claude/tooling/lang.mjs`) and restores `auto` after, and the
+ * baseline key gets the language appended exactly like `--engine` already appends the engine — a
+ * Russian-only overflow is a REAL, distinct signature, not the English baseline's problem, so it earns
+ * its own entry (`owrt2512@ru`) rather than either failing every English run or being silently
+ * swallowed into the language-agnostic checks (`noname`, `target`, `console`, …) which do not need
+ * this at all. The alternative — recording only language-independent findings — would have hidden the
+ * ssclash label/section bug this task started from, which WAS a length fault. */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import * as pw from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
 import { classify, representatives, reportReduction, PINNED } from './lib/page-shapes.mjs';
@@ -52,6 +68,24 @@ const UPDATE = process.argv.includes('--update');
  * reading the "no longer reproduce" list, not the one you run by habit. */
 const PRUNE = process.argv.includes('--prune');
 const ENGINE = arg('engine', 'chromium');
+/* the language the router is measured in — see the file header. `en` is the default and maps to
+ * `auto`, which is what every existing baseline entry was collected against. */
+const LANG = arg('lang', 'en');
+if (!/^[a-z]{2,3}(-[a-zA-Z0-9]+)?$/.test(LANG)) {
+	console.error(`live-audit: --lang wants a language code (or "en"), got "${LANG}"`);
+	process.exit(1);
+}
+/* uci wants `auto`, never the literal `en` — LuCI ships no catalogue for English, it's the source
+ * strings, so `en` names in this file are the AUDIT's language, not a `uci luci.main.lang` value. */
+const setRouterLang = (id, code) => {
+	try {
+		execFileSync('owlab', [ 'exec', id, '--', 'uci', 'set', `luci.main.lang=${code === 'en' ? 'auto' : code}` ], { stdio: 'ignore' });
+		execFileSync('owlab', [ 'exec', id, '--', 'uci', 'commit', 'luci' ], { stdio: 'ignore' });
+	} catch (e) {
+		console.error(`live-audit: could not set luci.main.lang on ${id} (${e.message})`);
+		process.exit(2);
+	}
+};
 /* 320 is the narrowest width WCAG 1.4.10 requires content to reflow to; 390 is the modal phone;
  * 568 is where the theme's own card decision sits; 768 and 1024 bracket the sidebar's fit; 1440 is
  * the desktop the reports come from. */
@@ -262,118 +296,132 @@ let checked = 0;
  * because frame pacing IS its subject.) */
 await Promise.all(list.map(async (stand) => {
 	let here = 0;
-	const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-	await sealToRouter(ctx, stand.base);
-	const page = await ctx.newPage();
-	const errs = [];
-	/* A FETCH THAT FAILED IS NOT THIS THEME'S. The theme reaches no third-party host at run time —
-	 * that is a rule of the package, not an accident (CLAUDE.md; the one convenience tool that ever
-	 * wanted `curl` was refused over it) — so a console line about a resource that would not load,
-	 * or an app's own updater giving up on an HTTP status, can only belong to somebody else's code.
-	 *
-	 * They are dropped rather than baselined because the text carries the stand's own port
-	 * (`http://localhost:8024/…`), so a baseline entry would be keyed to a port and go stale the
-	 * moment owlab hands out a different one.
-	 *
-	 * Measured: `luci-app-ssclash` asks GitHub for the latest mihomo release on two of its pages,
-	 * and on a GitHub Actions runner — whose egress IP is shared and rate-limited — that answers
-	 * 403. Nine findings across three routers, none of them reproducible here, all of them the
-	 * runner's network rather than the page's markup. Anything that is not a network failure is
-	 * still recorded: a TypeError out of a view, an unhandled rejection, our own broken require. */
-	/* Every spelling a blocked or failed request reaches the console in. `Failed to fetch` is
-	 * Chromium's rejection of a fetch(), `Load failed` is WebKit's and `NetworkError` Firefox's;
-	 * `net::ERR_` is what stands.mjs's own seal produces when it aborts the request. An app may
-	 * wrap any of them in its own sentence, in its own language — ssclash says
-	 * `Не удалось получить последний релиз: TypeError: Failed to fetch` — so the match is on the
-	 * engine's words inside the line, never on the app's. */
-	const NETWORK_NOISE =
-		/Failed to load resource|Failed to fetch|Load failed|NetworkError|net::ERR_|ERR_INTERNET_DISCONNECTED|HTTP \d{3}\b/i;
-	const note = (text) => {
-		const line = text.replace(/\s+/g, ' ').slice(0, 120);
-		if (!NETWORK_NOISE.test(line)) errs.push(line);
-	};
-	page.on('pageerror', (e) => note(String(e)));
-	page.on('console', (m) => { if (m.type() === 'error') note(m.text()); });
-	await login(page, stand.base);
-
-	/* Baselines are per ENGINE as well as per router: a second engine finds different things (the
-	 * doubled scrollbar of #12 was Firefox-only), and mixing the two sets would let a chromium run
-	 * bless a firefox finding it never saw. */
-	const key = ENGINE === 'chromium' ? stand.id : `${stand.id}@${ENGINE}`;
-	const known = baseline[key] || [];
-	const kset = new Set(known);
-	seen[key] = new Set();
-
-	let paths = (await menuPaths(page)).filter((p) => !DESTRUCTIVE.test(p));
-	if (ONLY_PAGES) paths = paths.filter((p) => p.startsWith(ONLY_PAGES));
-
-	if (!ALL_PAGES && !ONLY_PAGES) {
-		/* one load per page to read its shape, then one representative per shape — plus every path
-		 * the baseline names and every pinned page, which may never be sampled away */
-		const shapes = await classify(page, stand.base, paths);
-		const { picked, dropped } = representatives(shapes, [ ...known.map((sig) => sig.split('|')[0]), ...PINNED ]);
-		reportReduction(stand.id, picked, dropped, shapes);
-		paths = picked;
-	}
-
-	for (const path of paths) {
-		await page.setViewportSize({ width: 1440, height: 900 });
-		errs.length = 0;
-		try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
-		catch (e) { continue; }
-		/* a view renders behind an RPC; give it the time a user would wait before judging it */
-		await page.waitForTimeout(1800);
-		/* a page the router refuses (an app in the menu whose ACL says no) is not a layout finding */
-		if (!(await page.evaluate(() => !!document.getElementById('view')))) continue;
-		checked++; here++;
-
-		/* what the RESIZE pass saw at the arrival width, so the arrival pass can report only what is
-		 * new about arriving. See the arrival block below. */
-		const atArrive = new Set();
-		const record = (width, f) => {
-			const sig = `${path}|${width}|${f.kind}|${f.el}`;
-			if (width === ARRIVE) atArrive.add(`${f.kind}|${f.el}`);
-			seen[key].add(sig);
-			if (!kset.has(sig)) fresh.push({ stand: key, sig, by: f.by });
+	/* Set BEFORE the sweep and restored to `auto` in the `finally` below regardless of outcome — a
+	 * run may never leave a router parked in a language a later, unflagged run silently inherits,
+	 * which is exactly the incident this flag exists to stop happening again. */
+	setRouterLang(stand.id, LANG);
+	try {
+		const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+		await sealToRouter(ctx, stand.base);
+		const page = await ctx.newPage();
+		const errs = [];
+		/* A FETCH THAT FAILED IS NOT THIS THEME'S. The theme reaches no third-party host at run time —
+		 * that is a rule of the package, not an accident (CLAUDE.md; the one convenience tool that ever
+		 * wanted `curl` was refused over it) — so a console line about a resource that would not load,
+		 * or an app's own updater giving up on an HTTP status, can only belong to somebody else's code.
+		 *
+		 * They are dropped rather than baselined because the text carries the stand's own port
+		 * (`http://localhost:8024/…`), so a baseline entry would be keyed to a port and go stale the
+		 * moment owlab hands out a different one.
+		 *
+		 * Measured: `luci-app-ssclash` asks GitHub for the latest mihomo release on two of its pages,
+		 * and on a GitHub Actions runner — whose egress IP is shared and rate-limited — that answers
+		 * 403. Nine findings across three routers, none of them reproducible here, all of them the
+		 * runner's network rather than the page's markup. Anything that is not a network failure is
+		 * still recorded: a TypeError out of a view, an unhandled rejection, our own broken require. */
+		/* Every spelling a blocked or failed request reaches the console in. `Failed to fetch` is
+		 * Chromium's rejection of a fetch(), `Load failed` is WebKit's and `NetworkError` Firefox's;
+		 * `net::ERR_` is what stands.mjs's own seal produces when it aborts the request. An app may
+		 * wrap any of them in its own sentence, in its own language — ssclash says
+		 * `Не удалось получить последний релиз: TypeError: Failed to fetch` — so the match is on the
+		 * engine's words inside the line, never on the app's. */
+		const NETWORK_NOISE =
+			/Failed to load resource|Failed to fetch|Load failed|NetworkError|net::ERR_|ERR_INTERNET_DISCONNECTED|HTTP \d{3}\b/i;
+		const note = (text) => {
+			const line = text.replace(/\s+/g, ' ').slice(0, 120);
+			if (!NETWORK_NOISE.test(line)) errs.push(line);
 		};
-		for (const e of errs.slice(0, 3)) record(0, { kind: 'console', el: e });
+		page.on('pageerror', (e) => note(String(e)));
+		page.on('console', (m) => { if (m.type() === 'error') note(m.text()); });
+		await login(page, stand.base);
 
-		for (const w of WIDTHS) {
-			await page.setViewportSize({ width: w, height: 900 });
-			/* the fitters run on a resize observer and settle within a frame or two */
-			await page.waitForTimeout(220);
-			let found = [];
-			try { found = await page.evaluate(CHECK); } catch (e) { continue; }
-			for (const f of found) record(w, f);
-			try { for (const f of await page.evaluate(GEOMETRY)) record(w, f); } catch (e) { /* see there */ }
+		/* Baselines are per ENGINE and per LANGUAGE, as well as per router: a second engine finds different
+		 * things (the doubled scrollbar of #12 was Firefox-only), a second language finds different things
+		 * for the reason the file header gives, and mixing either pair of sets would let one run bless a
+		 * finding it never saw. Suffixes compose (`owrt2512@ru@firefox`) rather than picking one. */
+		const keySuffixes = [];
+		if (LANG !== 'en') keySuffixes.push(LANG);
+		if (ENGINE !== 'chromium') keySuffixes.push(ENGINE);
+		const key = keySuffixes.length ? `${stand.id}@${keySuffixes.join('@')}` : stand.id;
+		const known = baseline[key] || [];
+		const kset = new Set(known);
+		seen[key] = new Set();
+
+		let paths = (await menuPaths(page)).filter((p) => !DESTRUCTIVE.test(p));
+		if (ONLY_PAGES) paths = paths.filter((p) => p.startsWith(ONLY_PAGES));
+
+		if (!ALL_PAGES && !ONLY_PAGES) {
+			/* one load per page to read its shape, then one representative per shape — plus every path
+			 * the baseline names and every pinned page, which may never be sampled away */
+			const shapes = await classify(page, stand.base, paths);
+			const { picked, dropped } = representatives(shapes, [ ...known.map((sig) => sig.split('|')[0]), ...PINNED ]);
+			reportReduction(stand.id, picked, dropped, shapes);
+			paths = picked;
 		}
 
-		/* The arrival (see ARRIVE above): the page reached AT this width rather than resized into it.
-		 *
-		 * Only what the resize at this width did not already say. A fault the same width produces
-		 * either way is one fault, and recording it under a second signature doubles the baseline with
-		 * copies that carry no information — and those copies are machine-specific, since the baseline
-		 * is a union across platforms and a machine only sees the apps it installs, so a duplicate
-		 * recorded where those apps exist is a red gate everywhere they do not. */
-		if (ARRIVE > 0) {
-			await page.setViewportSize({ width: ARRIVE, height: 900 });
-			let arrived = true;
+		for (const path of paths) {
+			await page.setViewportSize({ width: 1440, height: 900 });
+			errs.length = 0;
 			try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
-			catch (e) { arrived = false; }
-			if (arrived) {
-				await page.waitForTimeout(1800);
+			catch (e) { continue; }
+			/* a view renders behind an RPC; give it the time a user would wait before judging it */
+			await page.waitForTimeout(1800);
+			/* a page the router refuses (an app in the menu whose ACL says no) is not a layout finding */
+			if (!(await page.evaluate(() => !!document.getElementById('view')))) continue;
+			checked++; here++;
+
+			/* what the RESIZE pass saw at the arrival width, so the arrival pass can report only what is
+			 * new about arriving. See the arrival block below. */
+			const atArrive = new Set();
+			const record = (width, f) => {
+				const sig = `${path}|${width}|${f.kind}|${f.el}`;
+				if (width === ARRIVE) atArrive.add(`${f.kind}|${f.el}`);
+				seen[key].add(sig);
+				if (!kset.has(sig)) fresh.push({ stand: key, sig, by: f.by });
+			};
+			for (const e of errs.slice(0, 3)) record(0, { kind: 'console', el: e });
+
+			for (const w of WIDTHS) {
+				await page.setViewportSize({ width: w, height: 900 });
+				/* the fitters run on a resize observer and settle within a frame or two */
+				await page.waitForTimeout(220);
 				let found = [];
-				try { found = await page.evaluate(CHECK); } catch (e) { found = []; }
-				try { found = found.concat(await page.evaluate(GEOMETRY)); } catch (e) { /* see there */ }
-				for (const f of found) {
-					if (atArrive.has(`${f.kind}|${f.el}`)) continue;
-					record(ARRIVE + 'a', f);
+				try { found = await page.evaluate(CHECK); } catch (e) { continue; }
+				for (const f of found) record(w, f);
+				try { for (const f of await page.evaluate(GEOMETRY)) record(w, f); } catch (e) { /* see there */ }
+			}
+
+			/* The arrival (see ARRIVE above): the page reached AT this width rather than resized into it.
+			 *
+			 * Only what the resize at this width did not already say. A fault the same width produces
+			 * either way is one fault, and recording it under a second signature doubles the baseline with
+			 * copies that carry no information — and those copies are machine-specific, since the baseline
+			 * is a union across platforms and a machine only sees the apps it installs, so a duplicate
+			 * recorded where those apps exist is a red gate everywhere they do not. */
+			if (ARRIVE > 0) {
+				await page.setViewportSize({ width: ARRIVE, height: 900 });
+				let arrived = true;
+				try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
+				catch (e) { arrived = false; }
+				if (arrived) {
+					await page.waitForTimeout(1800);
+					let found = [];
+					try { found = await page.evaluate(CHECK); } catch (e) { found = []; }
+					try { found = found.concat(await page.evaluate(GEOMETRY)); } catch (e) { /* see there */ }
+					for (const f of found) {
+						if (atArrive.has(`${f.kind}|${f.el}`)) continue;
+						record(ARRIVE + 'a', f);
+					}
 				}
 			}
 		}
+		await ctx.close();
+		process.stdout.write(`${key}: ${seen[key].size} finding(s) over ${here} page(s)\n`);
+	} finally {
+		/* Never leave a router parked off `auto` — the next unflagged run must not silently inherit
+		 * this one's language, which is the exact shape of the incident this flag exists to close. */
+		setRouterLang(stand.id, 'en');
 	}
-	await ctx.close();
-	process.stdout.write(`${key}: ${seen[key].size} finding(s) over ${here} page(s)\n`);
 }));
 await browser.close();
 

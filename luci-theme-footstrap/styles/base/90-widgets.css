@@ -21,7 +21,13 @@
 		/* box-shadow: theme/35-alerts.css — absorbed */
 		border-radius: var(--fs-radius-sm);
 		background: var(--fs-panel);
-		white-space: pre;
+		/* `pre`, not `pre-wrap`, NEVER wraps — task 0162: live-audit measured a firewall rule-jump
+		 * tooltip (`nftables/iptables`, "Chain POSTROUTING, Rule #1") 65-72px past the column at
+		 * 320px, spaces and all, because `pre` disables wrapping outright regardless of where a space
+		 * sits. `pre-wrap` keeps every literal run of whitespace this rule was carried for — the same
+		 * reason `35-alerts.css`'s validation tooltip and a multi-line firewall hint still read
+		 * correctly — while letting the browser wrap at one of them once the line is too long. */
+		white-space: pre-wrap;
 		padding: var(--fs-space-0-5) var(--fs-space-1);
 		opacity: 0;
 		transition: opacity var(--fs-dur-fade);

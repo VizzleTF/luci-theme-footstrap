@@ -140,6 +140,15 @@
 		background-color: var(--fs-panel2);
 		color: var(--fs-text);
 		padding: 1px var(--fs-space-1);
+		/* task 0162: a WireGuard public key (`admin/status/wireguard`, one 44-char base64 run, no
+		 * space or hyphen anywhere in it) sits inside an inline `<code>` with no width of its own —
+		 * `white-space` stays `normal` (inherited), so the run never finds a space to wrap at and
+		 * measured 64px past the content column at 320px. `overflow-wrap: anywhere`, the same
+		 * escape hatch every other opaque, user-supplied token in this sheet already carries
+		 * (a MAC in pages/60-assoclist.css, a hostname in pages/10-login.css): it only ever fires
+		 * once a line would otherwise overflow, so a short inline snippet that already fits wraps
+		 * nowhere differently. */
+		overflow-wrap: anywhere;
 	}
 
 	pre {

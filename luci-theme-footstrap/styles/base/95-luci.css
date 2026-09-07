@@ -206,12 +206,20 @@
 		background: linear-gradient(rgba(var(--zone-color-rgb), .4), rgba(var(--zone-color-rgb), .3)) !important;
 	}
 
+	/* `.ifacebox` above is `white-space: nowrap` — right for a plate of one-word head labels, wrong
+	 * for the body's own stat/address lines once they are long enough to need a break: measured
+	 * three times under three different scopes before this rule (Network overview's
+	 * `#cbi-network-interface`, the upstream plates' `.network-status-table`, and — pseudo-loc,
+	 * gallery's plain Port-tile fixture with no `port_*.svg` icon — a 320px/Large stat line "1000
+	 * Mbit/s / 1.2 GiB / 8.3 GiB" already 33px past a 118px box in PLAIN ENGLISH, no translation
+	 * involved) — the base rule owns it once instead of a fourth scoped copy the next real page
+	 * would need again. `overflow-wrap: anywhere`, not `break-word`: only `anywhere` lowers the
+	 * box's own min-content, letting the flex item actually shrink to the tile (65-dropdown.css's
+	 * own reasoning for the same two properties). */
 	.ifacebox .ifacebox-body {
 		padding: var(--fs-space-1);
-	}
-
-	#cbi-network-interface .ifacebox-body {
 		white-space: normal;
+		overflow-wrap: anywhere;
 	}
 
 	#cbi-network-interface .ifacebox img {
@@ -258,16 +266,18 @@
 		flex-direction: column;
 		height: 100%;
 		text-align: start;
-		/* `.ifacebox` above is `white-space: nowrap`, which is right for a plate of one-word labels
-		 * and wrong for this one, whose lines are addresses: an uncompressed IPv6 is ~380px of
-		 * unbreakable text and these boxes are flex items that shrink, so the text prints outside
-		 * its own border: measured at a 390px viewport, the box ended at x=348 and the address ran
-		 * to x=393, 45px of text over the card behind it.
-		 *
-		 * `normal` alone is the obvious half-fix — an address has no spaces to wrap at.
-		 * `overflow-wrap: anywhere` allows a break inside the token, and `anywhere` rather than
-		 * `break-word` because only it lowers the box's min-content size, so flexbox can shrink
-		 * the item to the line. */
+		/* the wrap fix (an uncompressed IPv6 is ~380px of unbreakable text, measured 45px over the
+		 * card at 390px before it shipped) now lives on `.ifacebox .ifacebox-body` above, generalised
+		 * to every plate rather than restated per scope — this rule keeps only what is unique to the
+		 * upstream layout: full-height flex column, address-block start alignment. */
+	}
+
+	/* The head got the port tiles' `nowrap` (short one-word labels: "wan", "lan2") but sits in the
+	 * SAME shrinking flex item as the body above, and RU's "IPv4 Upstream" caption is a sentence,
+	 * not a word: "Подключение IPv4 (внешняя сеть)" measured 301px in a 288px column at 320px/
+	 * Density Large, 41.3px past #view, with the .cbi-section clipped by 42px and no scroller — EN
+	 * at the same width and density: 0. Same two declarations as the body, same reasoning. */
+	.network-status-table .ifacebox-head {
 		white-space: normal;
 		overflow-wrap: anywhere;
 	}
@@ -572,6 +582,21 @@
 
 	.cbi-filebrowser .cbi-button-positive {
 		margin-inline-end: .25em;
+	}
+
+	/* `.cbi-filebrowser > *` above gives every row `nowrap` + ellipsis on the assumption that a row
+	 * is ONE LINE OF TEXT — true for the path and each listing row, false for `.right`: its content
+	 * is the upload strip (its own flex row) plus the Create/Cancel buttons, none of it text that an
+	 * ellipsis can stand in for. `nowrap`, inherited by `.upload` and its Browse button, was blocking
+	 * the wrap that button already had (`flex-wrap: wrap`, theme/60-inputs.css) from ever firing, and
+	 * `overflow: hidden` had no ellipsis to show for a clipped BUTTON — pseudo-loc measured Cancel's
+	 * label rendered 76px past this box with no "…" drawn, the severe case the gate's own docs call
+	 * "text the reader cannot reach", not the accepted dropdown/tab shape. `normal` restores the
+	 * ordinary wrap a button row gets everywhere else in the theme; `visible` undoes a clip a
+	 * text-only rule has no business applying to a row of controls. */
+	.cbi-filebrowser > .right {
+		white-space: normal;
+		overflow: visible;
 	}
 
 	.cbi-filebrowser > div {

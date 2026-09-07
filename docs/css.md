@@ -109,7 +109,7 @@ That floor is set by `@layer`, `:is()`/`:where()`, `:focus-visible`, `svh`/`dvh`
 and the logical properties. Nothing on the list has a fallback worth writing: a theme whose layers
 are ignored is not a theme.
 
-Four features are used **above** the floor and are progressive — the rule does not apply and the
+Five features are used **above** the floor and are progressive — the rule does not apply and the
 page is plainer:
 
 | Feature | Chrome / Firefox / Safari | What is lost below it |
@@ -118,6 +118,7 @@ page is plainer:
 | `color-mix()` | 111 / 113 / 16.2 | the 36 mixed tokens fall back to `styles/04-nocolormix.css` |
 | `@container` | 105 / 110 / 16.0 | five width adaptations inside `fs-view` / `fs-content` |
 | `text-wrap: pretty`, `scrollbar-width` | — | typographic polish |
+| `overflow: clip` value | 90 / 94 / 16.0 | `.fs-main`'s `overflow-x: clip` and `.fs-staging`'s `overflow: clip` drop, and the browser's own cross-axis correction (CSS Overflow 3) takes over: a sideways scrollbar on the desktop sidebar's `.fs-main` (its sibling axis is already `overflow-y: auto`) or, in the top/narrow layouts and on `.fs-staging`, whole-page horizontal scroll — exactly how stock LuCI (no `clip` at all) already renders. `.fs-staging` also stays `visibility: hidden` regardless, since nothing inside a staged view sets `visibility: visible` on itself, so nothing is exposed. Measured with `overflow-x`/`overflow` forced to `initial` in a live Chromium, task 0151 |
 
 Two rules follow, and the gate holds both.
 
@@ -140,6 +141,12 @@ Adding any CSS feature the sheet has not used before fails `css-floor` until it 
 `node tools/css-floor.mjs --update`. The JS floor is lower and is not the constraint: the SPA
 router uses nothing younger than `ResizeObserver`, and `requestIdleCallback` and `CSS.supports`
 are both feature-detected.
+
+Classification is by PROPERTY, which misses a value with its own support story: `overflow` is
+ancient, `overflow: clip` is Safari 16, and the gate said nothing while the value shipped a version
+past the floor above. `css-floor`'s `VALUES` table checks the exact property/value pairs worth
+tracking — most values share their property's support, so this stays a short, explicit list rather
+than a scan of every value in the sheet.
 
 ### Vendor prefixes still in the sheet
 

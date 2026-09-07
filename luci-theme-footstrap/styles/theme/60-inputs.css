@@ -152,6 +152,16 @@
 	 * box tier by definition. Local names rather than new global tokens: one component needs one
 	 * number and three things derived from it.
 	 *
+	 * flex-shrink: 0 below (task 0145): `.cbi-checkbox` is the flex row, and a caption after the
+	 * pill — `label.cbi-checkbox > input + label[for] + TEXT`, package-manager.js's and banip's real
+	 * markup, not the caption-less div the gallery had — makes the pill a SECOND, shrinkable flex
+	 * item. Unshrunk it stays exactly --sw-w; measured shrunk on the live Install dialog on both
+	 * stands, RU/Normal/390px gave a used width of 30.17px against 40 declared and a knob 6.83px past
+	 * the pill's right edge, EN/Large/360px 36.22 against 46 declared and a 6.47px overhang —
+	 * flex-shrink: 0 alone took both to -3.00px and -3.31px (the knob safely inside the pill, not
+	 * flush with it), so a second guard (e.g. min-width: var(--sw-w), redundant with a non-shrinking
+	 * flex-basis) was not needed and does not ship.
+	 *
 	 * Scoped to `.cbi-checkbox > label[for]`, not a bare `.cbi-checkbox > label`: ui.js's
 	 * Checkbox.render() appends a SECOND label when `tooltip` is set (form.Flag.tooltip — e.g.
 	 * luci-app-firewall's zones.js on `masq`), `label.cbi-tooltip-container` holding the hint icon,
@@ -163,14 +173,21 @@
 	 * combinator repeated across five rules (this one, its ::before/::after, and the two
 	 * forced-colors rules in 95-a11y-media.css) put cascade.css 186 B over its budget; rescoping
 	 * dropped it back under. */
-	.cbi-checkbox { display: inline-flex; align-items: center; gap: var(--fs-space-2); }
+	/* `overflow-wrap: anywhere`: the caption after the pill is a plain text flex item, which already
+	 * wraps at spaces on its own — this is only for the one WORD that does not fit even at the row's
+	 * own full width. Measured on this exact caption (see the pill's own comment below): pseudo-loc
+	 * grows "неиспользуемые" (14 letters) to 20, wide enough on its own to push the whole row 24.6px
+	 * past `.cbi-value-field` at 320px/Large with no scroller — a real Russian compound this length
+	 * is not implausible (the theme already ships an untranslated one), so the row should absorb it
+	 * by breaking the word, not by escaping its column. */
+	.cbi-checkbox { display: inline-flex; align-items: center; gap: var(--fs-space-2); overflow-wrap: anywhere; }
 	.cbi-checkbox > input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
 	.cbi-checkbox > label[for] {
 		--sw-w: calc(40px * var(--fs-density-box));
 		--sw-h: calc(22px * var(--fs-density-box));
 		--sw-knob: calc(16px * var(--fs-density-box));
 		--sw-pad: calc(2px * var(--fs-density-box));
-		display: inline-block; position: relative; margin: 0;
+		display: inline-block; position: relative; margin: 0; flex-shrink: 0;
 		width: var(--sw-w); height: var(--sw-h); border-radius: var(--fs-radius-pill);
 		background: var(--fs-track); border: var(--fs-hairline);
 		cursor: pointer; transition: background var(--fs-dur), border-color var(--fs-dur); vertical-align: middle;

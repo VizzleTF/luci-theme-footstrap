@@ -38,8 +38,8 @@
 
 	/* A config-form modal (Bridge device options, firewall rule …) is only 600px wide by
 	 * default — cramped for a form with a table (Bridge VLAN filtering, whose .cbi-map container
-	 * then falls under the 960px card threshold and cards even on a big screen). Fluid via vw:
-	 * widens toward 1100 on desktop (the container clears 960 and tables stay tables), stays
+	 * then falls under the 992px card threshold and cards even on a big screen). Fluid via vw:
+	 * widens toward 1100 on desktop (the container clears 992 and tables stay tables), stays
 	 * narrow (cards) on tablet/phone. */
 	.modal:has(.cbi-map) { max-width: min(1100px, 94vw); }
 

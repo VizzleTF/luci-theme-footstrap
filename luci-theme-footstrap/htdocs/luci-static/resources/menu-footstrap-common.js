@@ -8,18 +8,21 @@
 'require fs-prefs as prefs';
 'require fs-sheets as sheets';
 
-/* Page modules: `fs-appearance` (System -> System) and `fs-overview` (Status -> Overview) each
- * serve one page and are required only on it. A `require` pragma would make them a hard
- * dependency — luci.js fetches and evaluates before this factory runs — costing 11.5 KB and 3.8 KB
- * after terser on every admin page that has neither.
+/* Page modules: `fs-overview` (Status -> Overview) adds to a stock page rather than owning a
+ * route, so it is required only there. A `require` pragma would make it a hard dependency —
+ * luci.js fetches and evaluates before this factory runs — costing 3.8 KB after terser on every
+ * admin page that has no overview grid.
  *
- * Each module keeps its own `body[data-page]` observer; `wire()` re-checks the page
+ * `fs-appearance` used to be the other entry here (System -> System) until it got a route of its
+ * own (`/admin/system/footstrap`, `view/footstrap/appearance.js`) and the tab it had been stapled
+ * onto came out; a page reached by menu.d is loaded by the dispatcher, not by this map.
+ *
+ * The module keeps its own `body[data-page]` observer; `wire()` re-checks the page
  * synchronously, so a module arriving after the stamp still starts watching.
  *
- * The map duplicates a page name that also lives inside each module; `npm run page-modules`
+ * The map duplicates a page name that also lives inside the module; `npm run page-modules`
  * derives both sides and fails on drift. */
 const PAGE_MODULES = {
-	'admin-system-system': 'fs-appearance',
 	'admin-status-overview': 'fs-overview'
 };
 const _pageModules = new Map();
@@ -158,6 +161,35 @@ function loadPlugins() {
  * plain percentage is kept anyway so every meter on the page reads the same way. */
 const FS_METER_WARN = 80;
 const FS_METER_DANGER = 92;
+/* The same two thresholds, read off the OTHER end of the bar: forum #134 caught a memory row whose
+ * fill is "how much is left", not "how much is used" — a 91% "Total Available" reading is healthy,
+ * not a warning, and a 100%-full "Swap free" is the BEST possible reading, not permanent danger
+ * (both measured live, docs/design-system.md "Meter polarity"). `100 - FS_METER_WARN/DANGER` rather
+ * than a second pair of numbers: an inverted bar and a used-based one are the same health question
+ * ("how much headroom is left") asked from opposite ends of one fill, so a future change to the
+ * used-based split moves this one with it instead of drifting apart. */
+const FS_METER_INVERTED_WARN = 100 - FS_METER_WARN;
+const FS_METER_INVERTED_DANGER = 100 - FS_METER_DANGER;
+
+/* Row labels this theme has SEEN misread, matched the same way fs-overview.js's `ROLES` matches a
+ * card title: `_(msgid)` against the msgid luci-mod-status's own 20_memory.js used to build the
+ * row, no msgctxt, so it resolves to the exact string that include rendered. Verified against
+ * modules/luci-base/po/ru/base.po (the i18n-scan target for every luci-mod-status string that
+ * carries no msgctxt of its own — the same catalogue "System"/"Memory"/"Storage" already resolve
+ * from for `ROLES`): all four msgids below have a `ru` entry there, so they are in the domain
+ * loaded on EVERY admin page, not a per-view one — unlike `_('Free')`, which has no entry in that
+ * file at all and comes back as the literal English word wherever it is tried. That is what makes
+ * evaluating these two Sets once, at module scope, on whichever page happens to load first, safe:
+ * the string is the same from every admin page, not only from Status -> Overview.
+ *
+ * INVERTED: the fill is "how much is left" — the warn/danger split above has to fire on a LOW
+ * reading. NEUTRAL: a cache or buffer is the kernel doing its job, not a resource running out;
+ * colouring it at any reading says something false, so it gets none, ever. Everything else keeps
+ * the plain fill-based rule below — seventeen bars measured live (storage, active connections) are
+ * used-based with no name this theme recognises, and a third-party app's own meter is unnamed by
+ * construction, so the fill-based default has to stay the FALLBACK, not a shrinking allow-list. */
+const FS_METER_INVERTED = new Set([ _('Total Available'), _('Swap free') ]);
+const FS_METER_NEUTRAL = new Set([ _('Buffered'), _('Cached') ]);
 
 /* Write an attribute only when the value actually changes, so a poll tick that reads the same
  * numbers back touches no DOM and fires no attribute-mutation observer. `value === null` removes
@@ -192,17 +224,24 @@ function findProgressbarLabel(pg) {
 	return label;
 }
 
-/* The percentage inside a meter's `title`, in either shape a caller writes it in: `window.progressbar`
- * below composes `'%s / %s (%d%%)'`, parenthesised and preceded by the byte/localised reading, but a
- * bare meter markup may carry just `'97%'` with nothing around it (docs/gallery.html). Both are
- * anchored at the end of the string so neither can match a stray "%" earlier in a localised reading;
- * an empty title or one with no percentage at all yields null, on purpose — nothing to annotate.
- * `%d` is the unclamped percentage, so the result can still read past 100 or under 0 and is clamped
- * by the caller, the same way `window.progressbar` clamps its own `level`, below. Exported for
+/* The percentage inside a meter's `title`, in any shape a caller writes it in: `window.progressbar`
+ * below composes `'%s / %s (%d%%)'`, parenthesised and preceded by the byte/localised reading; a
+ * bare meter markup may carry just `'97%'` with nothing around it (docs/gallery.html); and the
+ * package-manager's own disk bar (`view/system/packages.js`, not this theme's) leads with it
+ * instead — `'6% used (62.91 GiB used of 1006.85 GiB, 943.95 GiB free)'`, measured live, ru
+ * `'6% использовано (…)'` the same shape. The first two are anchored at the END of the string, so
+ * neither can match a stray "%" earlier in a localised reading; tried first, so an ordinary
+ * `'X / Y (Z%)'` title is never misread by the rule below. The third is anchored at the START and
+ * tried only when both fail: digits immediately followed by `%`, nothing before them — it cannot
+ * match the leading "62" of "62.91 GiB" (a decimal point follows those digits, not `%`), so it
+ * cannot pick a wrong number out of a title carrying several. An empty title or one with no
+ * percentage in any of the three shapes yields null, on purpose — nothing to annotate. `%d` is the
+ * unclamped percentage, so the result can still read past 100 or under 0 and is clamped by the
+ * caller, the same way `window.progressbar` clamps its own `level`, below. Exported for
  * tests/meter.test.mjs, which is the only caller that needs the parse on its own. */
 function parseMeterPercent(title) {
 	if (title == null) return null;
-	const m = (/\((-?\d+)%\)\s*$/).exec(title) || (/(-?\d+)%\s*$/).exec(title);
+	const m = (/\((-?\d+)%\)\s*$/).exec(title) || (/(-?\d+)%\s*$/).exec(title) || (/^(-?\d+)%/).exec(title);
 	return m ? parseInt(m[1], 10) : null;
 }
 
@@ -223,9 +262,23 @@ function annotateMeter(pg) {
 	fsSyncAttr(pg, 'aria-valuenow', String(level));
 	fsSyncAttr(pg, 'aria-valuetext', title);
 	const label = findProgressbarLabel(pg);
-	fsSyncAttr(pg, 'aria-label', label ? label.textContent.trim() : null);
-	fsSyncAttr(pg, 'data-fs-level',
-		level >= FS_METER_DANGER ? 'danger' : (level >= FS_METER_WARN ? 'warn' : null));
+	const name = label ? label.textContent.trim() : '';
+	fsSyncAttr(pg, 'aria-label', label ? name : null);
+	/* Polarity: an unrecognised bar (a third-party app's own meter included — see the Sets above)
+	 * keeps the plain fill-based rule, on purpose. A wrong red is worse than a missing colour, but a
+	 * MISSING colour on the common case — a used-based fill, which is what an app most often draws —
+	 * is worse still, and this theme has no signal at all to tell an unnamed app meter apart from
+	 * one of the seventeen used-based bars measured live on Overview alone. */
+	let dataLevel = null;
+	if (FS_METER_NEUTRAL.has(name)) {
+		/* never coloured: see the comment on the Set */
+	} else if (FS_METER_INVERTED.has(name)) {
+		dataLevel = level <= FS_METER_INVERTED_DANGER ? 'danger'
+			: (level <= FS_METER_INVERTED_WARN ? 'warn' : null);
+	} else {
+		dataLevel = level >= FS_METER_DANGER ? 'danger' : (level >= FS_METER_WARN ? 'warn' : null);
+	}
+	fsSyncAttr(pg, 'data-fs-level', dataLevel);
 }
 
 /* Every `.cbi-progressbar[title]` under `root` — the markup itself, not who last drew it. Called
@@ -318,7 +371,7 @@ ensureOverviewHelpers();
  *   fs-router      the SPA client router (docs/spa-router.md)
  *   fs-sheets      the guard against a view's injected CSS repainting every later page
  *   fs-search      the page-search palette (indexes the same tree, on first open)
- *   fs-appearance  the Appearance controls, appended to the stock System page
+ *   fs-appearance  the Appearance controls, drawn by its own routed page (menu.d, not this map)
  *   fs-overview    the overview grid — a theme module, not a luci-mod-status include
  *   fs-version     the shipped version string
  *

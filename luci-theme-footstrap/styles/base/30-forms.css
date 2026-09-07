@@ -60,6 +60,22 @@
 		 * utilities — a class named `right` means right in any direction. Never sweep those onto
 		 * start/end. */
 		text-align: end;
+		/* theme/90-responsive.css restates `flex: 1 1 100%` under 767px (label above field), and a
+		 * PERCENTAGE flex-basis is still a "specified size suggestion" only once it is smaller than
+		 * the automatic (content) minimum — with no `min-width` stated there or here, a label whose
+		 * text has too few break points renders at its own min-content instead of the row's width, a
+		 * flex item's automatic minimum size doing exactly what it always does. Sweep-measured on
+		 * ssclash's settings form at 320px: a Russian label rendered 320px wide inside a 254-276px
+		 * row (Compact/Normal/Large), the section clipped 33-50px with no scroller to reach the rest,
+		 * 0 with the English string in the same box. Reproduced locally the same shape with a
+		 * synthetic unbroken run in the gallery's own fixture (docs/gallery.html) — real RU option
+		 * text with normal word breaks does not need to hit this floor at all once the item can
+		 * shrink to the row's own width instead of its content's.
+		 *
+		 * `min-width: 0` here, not in theme/90-responsive.css: that file restates `flex`, never
+		 * `min-width`, so a value stated on the desktop rule survives the later layer's flex-basis
+		 * change untouched — the cascade only overrides the PROPERTIES a later rule actually sets. */
+		min-width: 0;
 	}
 
 	.cbi-value > .cbi-section,

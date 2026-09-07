@@ -94,6 +94,36 @@ defaults:
     # scp against the box fails. The one package here that is not about fidelity.
     - +openssh-sftp-server
 
+    # The Russian catalogues, one per app above, pinned here after the first RU sweep found three
+    # overflow faults English never showed: RU strings run longer, and this theme's gates rendered
+    # English only until 2026-09-06, so a caption that clips at a Cyrillic length went unmeasured.
+    # The sweep installed these by hand; without a pin here the next `owlab up` would wipe them and
+    # the next sweep would start over. One entry per luci-app-* above that ships a translation —
+    # `luci-i18n-opkg-ru`, `-wireguard-ru` and `-openconnect-ru` are deliberately ABSENT: neither
+    # feed (25.12/apk, 24.10/opkg) publishes them, and `owlab up` fails resolving a name neither has.
+    - +luci-i18n-base-ru
+    - +luci-i18n-firewall-ru
+    - +luci-i18n-package-manager-ru
+    - +luci-i18n-banip-ru
+    - +luci-i18n-adblock-ru
+    - +luci-i18n-ddns-ru
+    - +luci-i18n-upnp-ru
+    - +luci-i18n-statistics-ru
+    - +luci-i18n-nlbwmon-ru
+    - +luci-i18n-sqm-ru
+    - +luci-i18n-vnstat2-ru
+    - +luci-i18n-wol-ru
+    - +luci-i18n-watchcat-ru
+    - +luci-i18n-filemanager-ru
+    - +luci-i18n-ttyd-ru
+    - +luci-i18n-https-dns-proxy-ru
+    - +luci-i18n-mwan3-ru
+    - +luci-i18n-acme-ru
+    - +luci-i18n-samba4-ru
+    - +luci-i18n-openvpn-ru
+    - +luci-i18n-dashboard-ru
+    - +luci-i18n-attendedsysupgrade-ru
+
   # Third-party apps whose stylesheets this theme has to share a document with. They are the hardest
   # case the theme handles, and no text file can reason about them: justclash ships no .css at all —
   # every rule is built from its view JS at runtime.

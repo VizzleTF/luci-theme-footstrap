@@ -179,7 +179,7 @@ the installed theme — the same command as above, so locally it is one `owlab e
 
 Nothing in `package.json` reaches the package: the OpenWrt buildbot has no node.
 
-### The two cheap browser gates: `smoke` and `computed-diff`
+### The three cheap browser gates: `smoke`, `computed-diff` and `pseudo-loc`
 
 Between the static gates and a stand there is a step that costs seconds and catches the regression
 that is in the FILE rather than in the page. Both drive `docs/gallery.html` — every widget LuCI or a
@@ -187,7 +187,7 @@ third-party app can emit, with the real class names, and no router.
 
 ```sh
 npm run smoke            # ~1.4 s: the modules come up in a real DOM, the axes stamp in order
-npm run computed-diff    # ~4 s: worktree vs HEAD, getComputedStyle over every element
+npm run computed-diff    # ~4 s per viewport: worktree vs HEAD, getComputedStyle over every element
 npm run computed-diff -- --control    # the same sheet twice; must be 0
 ```
 
@@ -208,9 +208,112 @@ dark); and every running animation is awaited, because a `span.cbi-tooltip` fade
 `opacity 0.00245647` by one snapshot and finished by the other. It reports rather than judges unless
 given `--max N`.
 
+**It runs at two viewports, not one** (task 0145): 1280 (every page's design width) and 390x844 (a
+phone point). A property that only diverges once a flex row is narrower than its own content is
+invisible at 1280 by construction — the switch-knob overhang bug measured 0 differences there on
+`worktree vs HEAD` with the fix reverted, and a `width` difference (26.80px vs 40px declared) only at
+390. `a11y` and `export-tier` still take Playwright's 1280 default alone; the gap this closes is
+`computed-diff`'s.
+
+`pseudo-loc` catches what neither of the other two can: a box sized for the ENGLISH string it was
+built against. Both `smoke` and `computed-diff` render the gallery exactly once, in English, and a
+toggle knob left its pill on every Russian phone at default density (task 0145) is invisible to a
+gate that never renders a longer string. `pseudo-loc` replaces every visible text node and
+text-carrying attribute in the gallery with a pseudo-localised form — each word 45% longer, Latin
+letters swapped for accented look-alikes, no translation catalogue or router needed — and asserts
+nothing overflows its box, escapes its parent, or is clipped with no scroller to reach it, at 320
+and 390 CSS px across all three densities.
+
+```sh
+npm run pseudo-loc            # ~4 s: 6 width x density points, English vs pseudo-localised
+npm run pseudo-loc -- --verbose      # every finding, not just the first 8 per kind
+npm run pseudo-loc -- --eps 4        # raise the tolerance; re-check the intact tree still passes first
+```
+
+Every shape is measured TWICE per point — once on the page as loaded (English), once after
+pseudo-localisation — and a finding is only reported if it both exceeds the tolerance AND *grew* by
+more than `--eps` between the two. Without that, `docs/gallery.html` reports overflow that is
+already there in plain English (13 such findings at 320px measured on this tree: a synthetic
+unbroken RU compound built to exercise `min-width: 0`, a breadcrumb path, an iface stat line) —
+real, but not caused by translation length and not this gate's fault to raise. Three more
+false-positive shapes are guarded structurally rather than by a threshold: an empty `.modal` LuCI
+keeps in the DOM at all times would read as a host with a clean sheet if it were ever measured, so
+every check requires `getClientRects().length > 0`, which also excludes a collapsed submenu's links
+— they carry an ordinary computed `display` while their `<ul>` ancestor is `display: none`, and a
+hidden ancestor gives every descendant zero client rects; and a deliberately fixed foreign width
+(the filemanager's 600px case, already decided in `tools/baselines/live-audit.json`) is excused by a
+plain selector ALLOW list, the same shape as `a11y-gallery.mjs`'s `.exclude()` — this gate keeps no
+baseline file of its own, so an allowlist is the only place left to record the decision.
+
+**Proven to bite**: `flex-shrink: 0` on `.cbi-checkbox > label[for]` (`styles/theme/60-inputs.css`,
+task 0145) reverted in a scratch copy outside this checkout. Intact: 117 findings, none naming the
+switch. Reverted: 123 findings, +6 — one per width/density point — every one `<label for="cb1">`
+itself, self-overflow 15-25px: the knob (`::after`, `position: absolute`) stays anchored to the
+pill's declared width while the pill shrinks under the caption pseudo-localisation just grew.
+
+**What to do when it fires**: read the element, width, density and measured `by` in the output.
+If it names something already accepted (a torture fixture, gallery chrome, a contract another gate
+owns) it is an ALLOW-list candidate with the same one-line justification the existing two entries
+carry — not a reason to raise `--eps` globally, which would blind the check everywhere at once
+instead of at the one place that earned the exception. Otherwise it is a real finding: report it (do
+not fix it in the same change unless that change's own purpose was already this element) with the
+element, width, density and `by` from the output, the way any other gate's finding gets triaged.
+
+**Tier: folded into `check:slow`** (task 0155), same cost class as `smoke`/`a11y`/`export-tier` —
+one headless Chromium, a few seconds. `check:mid` was never a candidate (it is the browser-free
+static half — CSS metrics, floor, duplicates, size, i18n).
+
+The 117 findings task 0152 left untriaged (9 distinct root elements, everything else the same
+element at another width/density) were the reason it stayed standalone until now: folding an
+unreviewed set into `check:slow` would have turned every future `npm run check` red for pages
+nobody had looked at yet. Each of the 9 was one of two things, never a third — `--eps` was not
+touched:
+  - a REAL fault, fixed in CSS: the Port-status tile's stat line and the upload strip's Create/
+    Cancel row were both `white-space: nowrap` inherited from a text-only ellipsis rule
+    (`styles/base/95-luci.css`) with no text to ellipsis — a nested flex row, not a sentence — so a
+    grown label escaped or clipped with no "…" to show for it; the checkbox caption's one
+    unbreakable word (a plausible real RU compound, not a torture string) needed `overflow-wrap:
+    anywhere` it did not have. One gallery fixture was the fault instead of the CSS: three
+    `<input>` demo captions read as raw markup (`value="input[type=button]"`), a string no real
+    button ever carries, and grew past their row on that alone;
+  - an accepted shape, ALLOW-listed in `tools/pseudo-loc.mjs` with the reasoning inline: three were
+    the SAME dropdown-ellipsis precedent (task 0149) by other selectors — the breadcrumb path, the
+    tab strip's long RU label, the filename column all shrink-then-ellipsis correctly and merely
+    *measure* as self-overflow the way any truncated element does; one is the meter's reserve,
+    already measured and margin-tolerant, marginal even in English, where pseudo-loc's own bracket
+    wrapper (not a translation) tips it over; one is `#g-longlabel` itself, the gallery's own
+    deliberately-unbreakable torture compound, which no CSS fixes by construction.
+
+117 -> 0 findings; `npm run pseudo-loc` is green on the intact tree and now runs on every
+`npm run check`.
+
+**Task 0161 (verification of the triage above) found the ALLOW walk itself over-scoped**: it climbed
+from every matched element to `<body>`, excusing every ancestor along the way, not just the element a
+selector named — `scrollWidth` is cumulative, so one `.table` or one accepted dropdown silenced its
+`.cbi-section`, then its `.g-sec`, then everything else sharing that ancestor. Measured: 311 of 822
+elements and 14 of 22 gallery sections read as unmeasurable, including all four buttons of the "Row
+actions, plain table (Startup-style)" fixture the same triage had just added — a reverted
+`flex-basis: auto` (`styles/theme/55-buttons.css`) would have gone undetected. Fixed to match only the
+elements each selector names (no ancestor climb); re-running then surfaced 66 findings, every one a
+duplicate of the same three already-accepted leaves (`#g-longlabel`, `.cbi-progressbar`, `.table`)
+pushing their own CONTAINER's `scrollWidth` over — not a new fault, the cumulative-`scrollWidth`
+mechanism working exactly as documented, just no longer hidden. Each container is now named explicitly
+with `:has()` against the leaf that causes it, and `.g-wrap` — the gallery's own outermost wrapper, not
+a widget any router page renders — is excused outright, since it reads as "widest content on the page"
+for as long as any of the three exists anywhere on it. Separately, `.table *`'s wildcard also swallowed
+every row-action BUTTON inside a `.td.cbi-section-actions` cell, unrelated to the no-JS-carding
+contract that entry exists for; narrowed with `:not(.cbi-section-actions, .cbi-section-actions *)`, and
+reverting `flex-basis: auto` to check reproduces exactly the expected finding (6 points, self-overflow
+on "Принудительно завершить"), confirming the fixture is now actually measured, not merely present.
+The SELF check's `eps + margin` tolerance had a second latent flaw, unrelated to scoping: a NEGATIVE
+margin (`.zonebadge .cbi-tooltip`, `styles/base/90-widgets.css`: `margin: -1.6em 0 0 -5px`, an overlap
+trick, not reserved room) drove `eps + margin` below zero, which widens the pass condition instead of
+narrowing it and can report `by` as low as 0px — clamped with `Math.max(0, …)` so a negative margin now
+costs nothing, the same as carrying none.
+
 **Neither replaces a userland run, and a green one never earns a release the right to skip owlab.**
 The gallery has every widget and none of the pages: no menu, no chrome, no session, no third-party
-sheet, no rpc, no container query answered by a real viewport, and every dependency in `smoke` is a
+sheet, no rpc, and every dependency in `smoke` is a
 stub. They are early detectors. The release matrix is unchanged — `owlab test` on both formats,
 `npm run live -- --all`, `npm run check`, `/security-review` (releasing.md).
 
@@ -292,7 +395,212 @@ The structural gates run their routers CONCURRENTLY — nothing they measure is 
   belong to a third-party app rather than to the theme, and that distinction is the file's whole
   value. `--engine firefox|webkit` runs the same sweep in another engine, keyed separately in the
   baseline (a headless Firefox refuses to launch on some macOS setups; the flag is there for CI and
-  for Linux). A new engine needs its own baseline, created by one `--update` run.
+  for Linux). A new engine needs its own baseline, created by one `--update` run. `--lang ru` (task
+  0162, below) runs the same sweep against a Russian router, keyed `<stand>@ru` — the two suffixes
+  compose (`owrt2512@ru@firefox`).
+
+### `live-audit`'s baseline is not a clean sheet, and neither entry nor language may be assumed
+
+A baseline that is just a list of strings has no room to say WHY a signature stays — and a signature
+with no reason is, on inspection, indistinguishable from a bug nobody looked at twice. That is
+exactly how `/admin/services/ssclash/settings|320|clipped|div.cbi-section` sat in this file: ordinary
+in shape, present since ssclash was first added to the dev routers, never singled out. Task 0162
+opened every surviving signature rather than trust the shape.
+
+**Two unrelated causes can share one signature — the exact trap that hid this one.** The RU-only
+label fix already in this changelog (`min-width: 0`, `base/30-forms.css`, "a form label escaping its
+section") closes a `.cbi-value-title` clip in a NORMAL settings row. It does nothing for the entry
+above, which is a SEPARATE widget on the SAME page: ssclash's own "Additional Settings" panel renders
+`style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); …"` inline, on
+markup the app owns outright — a 320px column FLOOR that cannot fit inside a 320px content column
+once the section's own padding is subtracted, in ANY language. Measured live on both stands, English
+and Russian alike: `div.cbi-section` clipped 50px, `label` overflowing 49px, with no scroller to
+reach either — a live, real, currently-reproducing finding, not a leftover from before the label fix,
+and not fixable from this theme's stylesheet without overriding one app's own inline `style`
+attribute, which `docs/third-party-apps.md`'s fence exists to protect the CHROME from, not to hand
+back the other way onto an app's content. Filed as an accepted, app-owned limitation — but named,
+this time, instead of sitting anonymous.
+
+**What the rest of the surviving 200 (owrt2512) / 200 (owrt2410) signatures turned out to be** (194 /
+200 at the time of the audit below; task 0167 restored six live `owrt2512` signatures a later baseline
+rewrite had dropped — see "Task 0167" further down), grouped
+by the shape a probe against the live page actually showed (`el.outerHTML`, not just the selector):
+
+- **`noname` (144 signatures) is core LuCI CBI or bundled third-party markup with no accessible
+  name** — `input.cbi-section-create-name` (mwan3, acme: the "add a new section" field every
+  `TypedSection` renders), a bare `textarea`/`textarea#logfile`/`textarea#syslog` (adblock, banip,
+  acme, dmesg: LuCI's own `form.TextValue`, whose `.cbi-value-title` label carries no `for=`),
+  `textarea.ace_text-input` (ssclash: the ACE editor's own hidden input proxy), filemanager's bulk
+  `input.select-checkbox`. None of it is markup this theme ships or a stylesheet can fix — a `title`
+  or `aria-label` here would need a JS template edit inside luci-base or inside the app, both outside
+  this package's fence.
+- **`overflow`/`clipped` on `div.radio-info`, `span.ssid`/`.bssid`/`.chan`/`.rate`/`span.associations`
+  etc. (`/admin/dashboard`) is a third-party dashboard app's own custom widget** — verified none of
+  `radio-info`, `wifi-info`, `settings-info`, `router-status-wifi`, `dashboard-bg`, `box-s1` exist
+  anywhere in `styles/` (`grep -rl` came back empty); the theme supplies no rule for any of it.
+- **`div.ace_layer`/`.ace_line`/`.ace_line_group` overflow (ssclash config/log, every width) is the
+  bundled ACE code editor's own internal virtualised rendering** — third-party library code, not this
+  theme's DOM.
+- **The vnstat2 `overflow` group (`li`, `span.hide-open`, `img`, `input.create-item-input`) is a
+  measurement blind spot, not a live one.** `.cbi-dropdown[empty] > ul { max-width: 1px }`
+  (`theme/65-dropdown.css`) is deliberate — an unselected multiselect's placeholder list collapses to
+  a functional zero width, and the visible control shows a plain "unspecified" instead (confirmed
+  with a screenshot of the actual closed control). `live-audit`'s `overflow` check only excludes an
+  ancestor that `scrolls()` (`auto`/`scroll`); it has no notion of `overflow: hidden`, so a box that
+  is correctly and totally invisible still measures as one whose content escaped it. Same shape as
+  the already-documented empty-`.modal` trap above — accepted, not a defect, and not worth teaching
+  the check a new blind spot's opposite blind spot for three low-traffic signatures.
+- **`div#file-list-container`/`table#file-table` overflow, `button.btn`/`a.symlink-name` sizing, and
+  the `Failed to load config` console line are filemanager's own inline pixel width** (`style="width:
+  400px; …"`, JS-set) and its own row/icon sizing — the same app and the same shape already named in
+  `tools/pseudo-loc.mjs`'s ALLOW list ("the filemanager's 600px case, already decided").
+  `ssclash/config|320|target|a` and the filemanager target entries match the precedent `af0b05d`
+  already set: an app's own link, under 24px, is the app's sizing choice.
+- **`/admin/status/mwan3/overview` and `/admin/status/overview`'s `clipped|div.cbi-section` (2px) is
+  sub-pixel rounding** — the file's own header already names this class of finding ("a few findings
+  sit within a pixel of their threshold"); 2px against a 1px trigger is noise, not a box that lost
+  content.
+- **`/admin/statistics/graphs`'s `img` overflow (every width up to 1024; it fits at 1440) is a
+  server-rendered RRD graph at its own native pixel width**, with no scroller and no theme rule for a
+  bare `img` — a real piece of usability debt (a phone cannot see the whole graph) but not a
+  regression this session caused or a fix that fits its file list; noted here rather than silently
+  accepted forever. **Which of those widths a single sweep actually catches is itself unreliable**:
+  the first `--lang ru --update` run recorded only 320/390 for `owrt2512@ru` (`owrt2410@ru` got all
+  five in the same run), and a plain reverify straight afterwards found 568/768 firing on
+  `owrt2512@ru` that the update had missed — the graph is drawn from a `blob:` URL the page builds
+  itself, and whether that draw has landed by the time `CHECK` reads the `<img>`'s box at a given
+  resize step is a race this gate does not control. A second `--update --lang ru` closed the gap;
+  a future sweep that reports fewer of these five than before on either `@ru` key is this same race
+  losing, not a fix, and needs a re-run before it is trusted as "no longer reproduces."
+
+**58 signatures no longer reproduced anywhere on either stand and are gone** (33 on owrt2512, 25 on
+owrt2410, 1 of the 58 replaced rather than dropped outright — filemanager's `a.directory-link` target
+finding became `a.symlink-name`, the same under-24px row height on a different row). Three shapes
+account for all of it: the two fixes below closed the nftables tooltip's whole overflowing subtree
+(`li`, `small.cbi-tooltip`, `span.jump`, `ul`, `table.table`, `td`/`th`/`tr`) and wireguard's `code` +
+`span`; a `768a` arrival-only signature stopped differing from its own `768` resize signature once ACE
+and dmesg's timing settled (a dedupe artefact, not a fix); and ssclash's own `320|target|a` and one ACL
+console line stopped reproducing on their own, the app's dev-router version having moved since
+`af0b05d` baselined them. Verified with `node tools/live-audit.mjs --pages-all --update --prune`,
+diffed against the git `HEAD` copy rather than trusted from the run's own "no longer reproduce" count.
+
+**Two real, live CSS faults, found and closed in this session** (`base/20-typography.css`,
+`base/90-widgets.css` — see the changelog for the measured numbers): a WireGuard public key inside an
+inline `<code>` had no `overflow-wrap`, and a firewall rule-jump tooltip's `white-space: pre` refused
+to wrap at all, both regardless of language. Reverting either live and re-running
+`node tools/live-audit.mjs --pages /admin/status/wireguard` /
+`--pages /admin/status/nftables/iptables` reproduces the exact pre-fix signature (`small.cbi-tooltip`
+72px, `span.jump` 27px on owrt2512) — the ratchet fires on its own regression, not merely on faith
+that the fix once worked.
+
+### English alone was never enough, and RU is now its own ratchet, not a merge
+
+Switching a stand to Russian by hand and running the unmodified gate produced 77 (owrt2512) / 70
+(owrt2410) findings before this task, every one of which would have failed a run that only ever knew
+an English baseline — not because anything regressed, but because RU text is measurably longer
+(`docs/gallery.html`'s own `pseudo-loc` gate assumes 1.3-1.6x for the same reason) and the checks that
+read box geometry (`overflow`, `clipped`, `doc-scroll`) are exactly the ones text length moves.
+
+Three structural options, and why the one shipped is `--lang`'s per-language SUFFIXED key
+(`owrt2512@ru`, composing with `--engine` the same way `@firefox` already does):
+
+1. **Merge RU findings into the existing per-stand key.** Rejected: a signature's presence would no
+   longer say which language it needs to reproduce in, so re-verifying it later (as this task had to,
+   for the ssclash entry) would require re-discovering the language by hand every time.
+2. **A language-agnostic baseline — record a finding only if it reproduces in BOTH languages.**
+   Rejected outright: this is the shape of the bug the whole task started from. It would have kept
+   hiding a REAL, length-only fault (the wireguard/nftables pair this session fixed) behind the
+   English half of the pair passing clean.
+3. **Stay English-only, forever.** The status quo before this task, and the reason it exists.
+
+`--lang`'s suffix keeps every existing invariant the file already had for `--engine` — a per-language
+UNION, `--update`/`--prune` still refuse anything short of a full sweep, and a narrowed run still
+cannot rewrite what it did not visit — while making a Russian-only finding exactly as loud as an
+English one, never louder (it fails ITS OWN key, not the plain one) and never silent.
+
+`owrt2512@ru` (255) and `owrt2410@ru` (254) are now baselined by `node tools/live-audit.mjs
+--pages-all --update --lang ru`, restoring `luci.main.lang` to `auto` on both routers when it exits
+(a `finally` block, so a crash mid-sweep cannot leave a router parked in Russian for the next
+unflagged run to silently inherit — see "Two `live-audit` sweeps against the same stand fight over
+its language" below, which is exactly that failure mode from a second cause). Most of it
+(192 / 199) is the SAME signature English already carries — a `noname`, `target` or app-owned finding
+that has nothing to do with string length reproduces in either language identically. 62 (owrt2512) /
+55 (owrt2410) are RU-only, and two shapes account for nearly all of them: the dashboard widget's extra
+spans (`span.associations`, `span.encryption`, `span.label` — the same app-owned widget as the EN
+group above, just more of its rows long enough to clip in translation) and filemanager's fixed-width
+table clipping harder with longer RU column headers (`table#file-table`) — both already-accepted
+groups, reproducing worse rather than differently.
+
+**One RU-only group was neither of those, and was a real defect, filed rather than fixed in this
+task**: `/admin/network/firewall/zones`, `firewall/custom`, `services/ddns` and `services/samba4` —
+four unrelated apps sharing one `TypedSection` table shape — clipped their WHOLE `table.table` (every
+`th`/`tr`/`td` in it) inside `div#cbi-firewall-zone` / `#cbi-ddns-service` / `#cbi-samba4-sambashare`
+at 1024px, RU only. Measured live on owrt2512: the firewall zones table's six `<th>` cells (`Зона ⇒
+Перенаправления`, `Входящий трафик`, `Исходящий трафик`, `Внутризональная пересылка`, `Маскарадинг
+IPv4`, plus the actions column) total 1017px inside a 968px `#view` column — 49-65px short, with no
+scroller anywhere near it. Left open rather than fixed here for the same reason task 0161's
+closed-dropdown case was filed instead of forced: the theme's own history with pinned/resized table
+columns is exactly where past fixes went wrong twice over (`f702d15`, `c71c920`), and a `TypedSection`
+reflow needed its own measured card, not a same-night patch bolted onto a baseline-triage task's file
+list.
+
+**Closed by task 0163, not as a width or a language special case.** `.cbi-section-table` already had
+a card at `@container fs-content (max-width: 960px)` (theme/65-dropdown.css) — the SAME machinery a
+config table with inline widgets already uses below that width, so a `TypedSection` reflow reused it
+rather than inventing a scroll fallback (this table can hold `.cbi-dropdown`/`.cbi-dynlist` widgets
+whose open list a scroll container would clip, the exact trap `.fs-xscroll` is deliberately kept away
+from). The query itself was reading the wrong box: `fs-content` binds to `.cbi-map`, one level above
+the `.cbi-section` that actually holds the table and spends `--fs-card-pad` (16px a side, 32px total
+at every density but Compact) before the table ever sees the width. Firewall zones' `.cbi-map` sat at
+968px — clearing the un-adjusted 960px check — while the SECTION handed the table only 936px for a
+1017px header. 992 (960 + 32) is the same check asking what it always meant to; it holds for any
+column count, any language, and any viewport, because it corrects a fixed offset in the query's own
+reference frame rather than a pixel this one page happened to need. A `.cbi-map`-pinned specimen
+reproducing the exact 968px/1017px numbers is now in `docs/gallery.html`, so `npm run computed-diff`
+reads the header row's `.th`/`.td` switching `display: table-cell` -> `block` without a router.
+
+Neither existing browser gate would have caught this on its own: `pseudo-loc` only measures 320/390px
+(the phone range) and this table has a full page of room there, while `computed-diff` renders the
+gallery at 1280 and 390, neither of which lands in the 936-992px band that mattered — the fixture's
+own `.cbi-map` pin is what makes the boundary visible without one. `live-audit --lang ru` is the gate
+that actually saw it live and is the one to re-run (`--pages /admin/network/firewall/zones
+/admin/network/firewall/custom /admin/services/ddns /admin/services/samba4 --lang ru`, T2) before
+pruning the `owrt2512@ru`/`owrt2410@ru` baseline entries this finding left behind
+(`1024|clipped|div#cbi-*`/`1024|overflow|table.table` and its children) — not done in this task, which
+had no router to verify against.
+
+**Task 0167 is that re-run, and it is where the RU/EN stale-count asymmetry (95 vs 3) traces to.**
+`live-audit --lang ru --pages-all` on both stands reported the fixed pages' whole sub-tree gone —
+46 signatures on `owrt2512@ru`, 45 on `owrt2410@ru`, every one `firewall/zones`/`firewall/custom`/
+`ddns`/`samba4|1024|…` — confirming the 992px fix above live rather than by inspection. Those 91 are
+pruned; nothing else the sweep called stale was, and the reason is the same shape as the RRD-graph
+race already on this page: **a run that fails to reproduce a signature once is not proof it is
+gone.** `--prune` REPLACES a language key with exactly what one sweep saw, and a first attempt at
+this task did exactly that — dropped six live `/admin/services/acme/logread|*|noname|textarea#syslog`
+signatures from `owrt2512@ru` along with the 91 real ones, because that particular sweep's `noname`
+check read the `<textarea id="syslog">` as named. The check treats `el.textContent.trim()` as a name
+(`CHECK`'s rule 5, `tools/live-audit.mjs`), and this textarea's content IS the log line LuCI's own
+view writes into it, so whether the signature fires depends on whether the page's own `logread()`
+RPC has resolved by the time the 1800ms check runs — the same asynchronous-content race the RRD
+`img` already gets a pass for, not a fix. A probe against the live page (`el.outerHTML`, `acme`'s own
+`admin/services/acme/logread` menu entry, static, not per-certificate) confirmed the textarea and its
+`.cbi-section-descr` label carry no accessible name either way; only the transient log line changes.
+The six are restored to `owrt2512` (English) and `owrt2512@ru` — `noname` does not depend on
+language — with the same reason the rest of the `noname` group above already carries: LuCI's own
+`form.TextValue`, no `for=`, an app the theme does not own the markup of. Not restored on `owrt2410`:
+`/admin/services/acme/logread` does not render there at all (see "Reset the syslog" below). Three
+more signatures survived the same reasoning for the same underlying cause: `owrt2410@ru`'s
+`banip/processing_log|320|doc-scroll|document` and two `geometry|fs-content` entries need enough
+accumulated log content to overflow the page at all, and a freshly booted container's log is short —
+exactly the state dependence "Reset the syslog BEFORE a live run" already names for this page. A
+sweep against a fresh container proves nothing about the finding's shape on a long-running one, so
+these stay rather than being pruned on one clean run's word.
+
+**`--lang ru` is not part of `npm run live`'s default sweep** — doubling every router's wall clock on
+every run for a class of fault that moves only when copy or CSS changes is not proportionate at T0/T1.
+Run it explicitly (`node tools/live-audit.mjs --pages-all --lang ru`, T2, detached) before a release
+and after any change to a string-heavy page or to `overflow`/`white-space`/flex-basis CSS — the same
+occasions `pseudo-loc` already earns its keep on.
 
 ### The probe rig: `.claude/tooling/`
 
@@ -397,6 +705,20 @@ happens on the maintainer's explicit word for one change, never by reflex, and `
 Every one of these cost a measurement that read as a regression in the theme. They are written down
 because each was hit more than once.
 
+**Two `live-audit` sweeps against the same stand fight over its language, and the result reads as a
+theme regression that is really two processes racing.** `--lang` sets `luci.main.lang` for the whole
+sweep and restores it on exit — safe against ONE sweep crashing, not against a SECOND sweep (or a
+manual `uci set luci.main.lang=ru` for a side probe) touching the same router while the first is still
+mid-flight: whichever write lands last wins for every page load after it, so a page fetched between
+the two writes is measured in whichever language happened to be live at that instant, filed under
+whichever key the confused sweep was running as. Measured directly (task 0162): a stray backgrounded
+`live-audit` process from an earlier, abandoned launch attempt survived unnoticed alongside the real
+one, both hammering `owrt2512`/`owrt2410` at once, and the English pass reported 19 "NEW" findings —
+every one Russian dashboard text (`span.associations`, `span.encryption`) under the PLAIN `owrt2512`
+key — because the stray process's own `--lang ru` write landed mid-sweep. `ps aux | grep live-audit`
+before trusting a "NEW finding" that names text in the wrong language; a live-audit run is exclusive
+use of whatever stand it names, the same as `--prune`'s own exclusive claim on the baseline file.
+
 **On a Windows checkout, most npm-run gates fail before they measure anything, and the failure is
 the host, not the theme.** Tell one apart from the other by re-running the SAME gate the SAME way
 on a clean `HEAD` — a host fault fails there too, identically.
@@ -447,7 +769,17 @@ Two traps sit in the calling convention itself, each cost a retry:
 - **detaching through `tools/bg.sh` inside a one-shot `wsl.exe` call does not survive**: WSL tears
   the session down together with the process it was running, and the log is left with only its
   header — no `.status`, no `.pid`. It works only when the WSL session behind the run stays alive
-  for the whole duration, not merely for the `wsl.exe` invocation that started it.
+  for the whole duration, not merely for the `wsl.exe` invocation that started it — which a session
+  driven from Git Bash on Windows never gives it: every `wsl.exe` call from there is its own
+  subprocess that returns and tears down, so the `setsid`-detached child dies with it the moment the
+  call completes, before a T2 gate (`owlab`, docker, anything living in WSL) has had time to finish.
+  Four T2 runs were lost to exactly this before the tester stopped routing them through `tools/bg.sh`
+  from Git Bash and used the harness's own background runner instead — the Bash tool's
+  `run_in_background: true`, which keeps the process (and the WSL session under it) alive for as
+  long as the harness itself runs, paired with the Monitor/notification mechanism rather than
+  `tools/bg-wait.sh`. Tell the two apart by the log: a `tools/bg.sh` run started this way stops dead
+  at its header line with no `.status` file ever appearing, no matter how long `bg-wait.sh` is left
+  polling it.
 
 **`mangle-tokens.sh` fails on a `C:\...`-shaped path with `mv: cannot stat ...tmp.NNN`, and the gate
 that surfaces it never mentions the script by name.** Like `build-css.sh`, it needs a POSIX path;
@@ -573,6 +905,18 @@ theme was not involved — the same cell is green at v0.14.2 and on every build 
 and the finding follows the PROBE across four runs. The stopped poll now stays stopped until QUIET,
 the one case that wants ticks landing mid-flick, starts it. Tell this apart from a theme fault by
 the shape: a floor finding that only CI sees, on a cell a local repeat cannot reproduce.
+
+**LuCI keeps an EMPTY `.modal` in the DOM at all times, and a probe that trusts the class name alone
+measures inside it.** `base/60-modal.css`'s host is rendered once per document and left behind,
+zero-content, whenever no dialog is open; `document.querySelector('.modal')` finds THAT element on
+every page that has never opened one, not the live dialog a page that HAS opened one is currently
+showing. A probe built on the assumption "`.modal` exists only while a dialog is open" reports a
+CLEAN SHEET everywhere — no overflow, no clipped text, no failing contrast — because it is reading a
+hidden, childless box, not the modal's actual content. The second RU sweep (task 0147) hit this on
+four pages in a row before the shape was named: every one of them "passed" a modal-content check that
+had nothing to check. Tell the two apart before trusting a modal probe: check that the element is
+actually visible (`getComputedStyle(el).display !== 'none'` and a non-zero `getBoundingClientRect()`)
+AND that it has at least one child — an empty, hidden `.modal` clears neither.
 
 **A hand-written replay of a probe is not the probe, and on the anchor sweep it was green six times
 over a fault that was real.** Chasing `scroll-anchor`'s webkit finding, six standalone scripts
@@ -814,10 +1158,12 @@ pass:
 - **The stands run `data-layout="top"`.** `fitShell()` returns before `shellGeometry()` in that
   layout, so the whole sidebar branch reads as dead. Set `fs-layout` to `sidebar` in a scenario of
   its own.
-- **The Appearance panel is a tab INSIDE the System page**, whose own selects come first in
-  document order. `page.$$('select')` picks Log level and Language; the axes are never touched.
-  Find the row by its label — and the labels are translated, so match the rendered text, not the
-  English source string.
+- **The Appearance panel is its own page now** (`/admin/system/footstrap`) — before it had a route
+  it was a tab INSIDE the System page, whose own selects came first in document order, and
+  `page.$$('select')` picked Log level and Language while the axes went untouched. The page still
+  has selects of its own (Layout, Theme, Palette, …), so find the row by its label rather than
+  position — and the labels are translated, so match the rendered text, not the English source
+  string.
 - **A branch can be unreachable by engine, not by code.** `fs-fit.js` takes the non-anchoring path
   only where the engine does not anchor; `localStorage.fsEngineAnchor = 'off'` is the switch that
   reaches it from Chromium.
@@ -826,6 +1172,68 @@ pass:
 same narrowed check. A finding that reproduces there did not come from the change under test. That is
 how the anchor regression in 0.14.3 was pinned to one commit out of thirty-seven, and how both
 findings above were shown to belong to their apps.
+
+**`owlab up` alone leaves `luci.main.mediaurlbase` at `/luci-static/bootstrap` on both stands, so a
+probe run right after boot silently measures the STOCK theme instead of this one.** `up` only starts
+the containers; it is `owlab sync <stand>` that installs the package and points the router at it. A
+task-0145 probe run straight after `owlab up` reproduced nothing because the pill it was reading was
+`/luci-static/bootstrap`'s own, unmodified by anything in this tree. `owlab exec <stand> -- uci get
+luci.main.mediaurlbase` tells the two apart: `/luci-static/bootstrap` means sync never ran (or the
+value was reset for a stock-vs-theme comparison and never put back), `/luci-static/footstrap` means
+the stand is actually measuring this theme.
+
+**A mouse click parks focus and re-seats sequential navigation, so a probe that clicks before
+pressing Tab reports the skip link unreachable.** Whatever the click landed on becomes
+`document.activeElement`, and every Tab after it walks the sequence relative to THAT element, not
+from the top of the document — a click anywhere past the skip link in tab order puts it behind
+everything the click already skipped. Start the walk from the document, not from a click:
+
+```js
+document.activeElement.tagName   // 'BODY' right after a fresh load — Tab from here reaches
+                                  // the skip link first; anything else means a click already moved it
+```
+
+**Collapsed submenus carry an ordinary computed `display` on their links while the parent `ul` is
+`display: none`, so a probe reading `getComputedStyle(link).display` sees them as laid out.** The
+`display: none` sits on the ancestor `ul`, not on each `<a>`, and `getComputedStyle` answers only for
+the element it is asked about — a collapsed link can read `display: flex` and still have a zero
+rect. Filter on the box, not the property: `link.getClientRects().length` is `0` for every element
+inside a `display: none` ancestor regardless of what its own `display` says.
+
+**`$?` is unreliable in this WSL bash** — `false; echo $?` prints `0`. What sits between the two
+commands was not isolated this session; the workaround is not diagnosing it. Read each tool's own
+printed verdict instead — PASS/FAIL text, a finding count, `bg-wait.sh`'s own `exit: N` line — never
+the shell's exit code after the fact. This is the worst trap on this page because it fails
+*silently*: a chain that trusts `$?` reports a red gate as green with nothing in the log to say so.
+
+**On System → System, `button.cbi-button-apply` selects "Скопир. из браузера" (Copy from browser),
+not the Apply-changes control.** The page renders more than one element carrying that class, and the
+Apply control itself is a `.cbi-dropdown` widget, not a `<button>`: the selector that actually reaches
+it is `.cbi-page-actions .cbi-dropdown.cbi-button-apply li[data-value="0"]`. A repro battery keyed on
+the bare class name clicked the wrong element on every run and reported NOT REPRODUCED for a fault
+that was real.
+
+**`npm`, `python3` and any `*.sh` gate cannot run from the Windows side of this checkout at all** —
+not merely degraded the way the `.cmd`-shim and `EFTYPE` notes above describe. `npm run smoke` dies
+with `EFTYPE: spawnSync … build-css.sh`, and `sh tools/check-acl.sh` resolves `python3` mid-script to
+the Microsoft Store alias. Run these under WSL, with node put on `PATH` by hand — a non-login
+`bash -c` never sources nvm's shim on its own:
+
+```sh
+export PATH="$HOME/.nvm/versions/node/v24.12.0/bin:$PATH"
+```
+
+**A leftover `dist/` in the checkout can be labelled with a version it is not, and a size comparison
+against it moves in the wrong direction.** A leftovers audit found one stamped `0.14.11-r1` that
+built to 69,945 B / 73,649 B (CSS/JS) against the tag's true 69,475 B / 73,186 B — a stale artefact
+from a run that never got a clean rebuild after later commits landed, still carrying the old
+package's name. Comparing a new change against that directory would have read as the package
+shrinking when it was in fact growing. The reliable baseline is a fresh build from the tag itself,
+not whatever is sitting in `dist/`:
+
+```sh
+git archive <tag> | tar -x -C /clean/checkout && (cd /clean/checkout && ./tools/stage.sh)
+```
 
 ## The test matrix
 

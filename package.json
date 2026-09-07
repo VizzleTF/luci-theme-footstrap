@@ -46,9 +46,10 @@
     "install-check": "sh tools/install-check.sh",
     "smoke": "node tools/smoke.mjs",
     "computed-diff": "node tools/computed-diff.mjs",
+    "pseudo-loc": "node tools/pseudo-loc.mjs",
     "check:fast": "npm run lint && npm run shell && npm run marker && npm run audit && npm run conffiles && npm run acl && npm run i18n-packages && npm run makefile-contract && npm run test && npm run css-orphans && npm run css-i18n && npm run mirror && npm run bang-ok && npm run axes && npm run page-modules && npm run chrome-fence && npm run changelog",
     "check:mid": "npm run css-metrics && npm run css-floor && npm run css-dup && npm run size && npm run i18n",
-    "check:slow": "npm run tables && npm run export-tier && npm run icons && npm run a11y && npm run placeholder && npm run smoke",
+    "check:slow": "npm run tables && npm run export-tier && npm run icons && npm run a11y && npm run placeholder && npm run smoke && npm run pseudo-loc",
     "makefile-contract": "node tools/makefile-contract.mjs"
   },
   "devDependencies": {

@@ -10,15 +10,19 @@
 /* The Appearance controls: the DOM that presents the axes. It owns no preference — fs-prefs.js
  * holds the axes and fs-version.js the version string; this file is the form they are shown in.
  *
- * It is a tab on System -> System, beside General Settings / Logging / Time Synchronization /
- * Language and Style. Twenty-one axes, nine of them with a colour field, a swatch and a contrast
- * readout, do not fit a floating popover that has to trap Tab and stay inside a 320px column, and
- * keeping both containers would render every axis twice.
- *
- * The form is appended by a MutationObserver rather than by a route of its own, the same boundary
- * fs-overview.js sits on: a theme may not own a dispatcher node, because the node outlives the
- * theme that registered it and the menu would keep an entry whose view is gone. So the theme owns
- * no menu.d and no view — it watches for the stock page, adds one section and removes nothing.
+ * Built once, for the dispatched page: `view/footstrap/appearance.js` — a menu entry, an ordinary
+ * route — calls `renderStandalone()` below, the whole surface this file exposes. Before the page
+ * existed the same form was stapled onto a tab on System -> System instead, watching for the stock
+ * form's own tab strip with a MutationObserver, a 5 s deadline, a `body[data-page]` tracker, a
+ * stale-group WeakSet disqualifying the outgoing page's own DOM from a false match, and a
+ * sessionStorage flag so a reset's reload landed back on the tab rather than whichever one LuCI
+ * remembered. A Save & Apply on a real router once lost that tab outright, never reproduced on
+ * either stand — a mount stapled onto another app's own render is a timing dependency on that
+ * render, by construction, and the most likely account of a user report that could never be
+ * reproduced either way. All of it is gone now that the page owns a route of its own. Twenty-one
+ * axes, nine of them with a colour field, a swatch and a contrast readout, do not fit a floating
+ * popover that has to trap Tab and stay inside a 320px column, and keeping both containers would
+ * render every axis twice.
  *
  * The version line makes no request and must not grow one: which version is INSTALLED is what this
  * page answers, and which is available is the package manager's question. */
@@ -218,20 +222,17 @@ function colorControl(current, onPick, label, opts) {
 	return wrap;
 }
 
-/* Build the whole form. Returns a promise for one element wire() appends to the stock page.
+/* Build the whole form. Returns the root element, for renderStandalone() below to hand to the
+ * page's own render().
  *
  * Everything applies immediately and there is nothing to save: every axis is this browser's, in
  * localStorage, and the page repaints under the control as it moves. Only "Save to router" writes
  * anything, pushing the current look to the ROUTER for other browsers. That distinction is the
- * model (docs/design-system.md), and why this page has no Save/Reset footer of LuCI's own. */
-function render() {
-	/* build() runs inside the promise, not as its argument: `Promise.resolve(build())` evaluates it
-	 * synchronously, so a throw unwinds out of render() before mount() can attach .catch/.finally
-	 * and leaves _building set for the life of the document — the tab then never builds again and
-	 * nothing is logged. */
-	return Promise.resolve().then(build);
-}
-
+ * model (docs/design-system.md), and why this page has no Save/Reset footer of LuCI's own —
+ * view/footstrap/appearance.js nulls handleSave/handleSaveApply/handleReset, which is what actually
+ * drops it: view.js's own default footer (Save & Apply | Apply unchecked | Save | Reset, wired to
+ * apply_rollback) renders and runs otherwise, POSTing on a form with nothing staged (measured,
+ * live, before that null). */
 function build() {
 	/* every saved axis re-checks the Save button after applying, so it greys the moment this
 	 * browser matches the saved default and un-greys when it diverges. Wrapped around the appliers
@@ -659,7 +660,8 @@ function build() {
 	});
 	/* Two-click confirm on both: discarding local tweaks is destructive and a native confirm() is
 	 * banned in this UI. Arming one disarms the other, so a primed button cannot be fired by a
-	 * click meant for its neighbour. Each reload lands back on this tab — see armReturn(). */
+	 * click meant for its neighbour. Each reload lands back on this same page — an ordinary route,
+	 * unlike the tab this once needed a sessionStorage flag to return to. */
 	const armed = new Map();
 	function disarm(btn, label) {
 		armed.delete(btn);
@@ -677,7 +679,6 @@ function build() {
 			}
 			disarm(btn, label);
 			run();
-			armReturn();
 			location.reload();
 		});
 	}
@@ -812,13 +813,15 @@ function build() {
 		]);
 	}
 
-	/* This tab is mounted in the stock System form, so LuCI's own Save & Apply footer sits under a
-	 * page it does not save — asked on the forum, topic 251930. Above the first section, because
-	 * the misreading happens before anyone scrolls to Defaults. A bare `.alert-message`:
-	 * theme/35-alerts.css keeps the tinted variants for a STATUS and a flat panel for a note. */
+	/* Above the first section, because the misreading this once caused (the tab sat inside the stock
+	 * System form, so LuCI's own Save & Apply footer sat under a page it did not save — forum topic
+	 * 251930) happened before anyone scrolled to Defaults. The dispatched page has no such footer to
+	 * misread: view/footstrap/appearance.js nulls handleSave/handleSaveApply/handleReset, so
+	 * view.js's addFooter() renders nothing here, and the caveat sentence that once named it is
+	 * gone with the tab. A bare `.alert-message`: theme/35-alerts.css keeps the tinted variants for
+	 * a STATUS and a flat panel for a note. */
 	const note = E('div', { 'class': 'alert-message fs-ap-note' }, [
-		E('p', {}, [ _('Footstrap theme settings apply at once and are stored permanently in this browser.', 'footstrap') ]),
-		E('p', {}, [ _('Save & Apply at the foot of the page belongs to the System form and does not store them.', 'footstrap') ])
+		E('p', {}, [ _('Footstrap theme settings apply at once and are stored permanently in this browser.', 'footstrap') ])
 	]);
 
 	/* Colours and Surfaces are one fold: the same job, split into two headings only because a
@@ -840,187 +843,9 @@ function build() {
 	return page;
 }
 
-/* ---- mounting it on the stock System page ----
- *
- * The same shape as fs-overview.js's: a chrome module is instantiated once per page load, so it
- * notices SPA navigation itself through `body[data-page]`, which the server template and fs-router
- * both stamp with the dispatch path. */
-const PAGE = 'admin-system-system';
-/* A reset reloads the page, and a reload opens the tab LuCI remembers — never this one, since
- * ui.tabs only knows the tabs it built itself. sessionStorage rather than a URL fragment: the
- * fragment is the stock page's business, and a stale one would re-open this tab on every later
- * visit. The key is read once and removed, so it survives exactly one reload. */
-const RETURN_KEY = 'fs-ap-return';
-function armReturn() { try { sessionStorage.setItem(RETURN_KEY, '1'); } catch (e) {} }
-function takeReturn() {
-	try {
-		if (sessionStorage.getItem(RETURN_KEY) === null) return false;
-		sessionStorage.removeItem(RETURN_KEY);
-		return true;
-	} catch (e) { return false; }
-}
-const MARK = 'fs-ap';	/* the built form's class, and how mount() knows it is already there */
-/* how long the stock view gets to render its tabs before a missing group counts as a failure */
-const TAB_DEADLINE = 5000;
-const TAB = 'fs-appearance';	/* the pane's data-tab, which ui.tabs' click handler matches on */
-
-let _routeObserver = null, _viewObserver = null, _observedRoot = null, _building = false;
-
-function onPage() { return (document.body.getAttribute('data-page') || '') === PAGE; }
-
-function stopWatch() {
-	if (_viewObserver) _viewObserver.disconnect();
-	_viewObserver = null;
-	_observedRoot = null;
-}
-
-/* The stock tab GROUP: the element whose children are the panes, which ui.tabs marks
- * data-initialized when it builds the menu; the menu it inserted is that element's previous
- * sibling. Both are read from the DOM, because a group that is not initialised yet is a page still
- * rendering, not a page without tabs.
- *
- * The flag and the sibling are the whole test. The panes are deliberately not looked for by class:
- * a modern pane carries none — form.js gives it `data-tab` and `data-tab-title`, and
- * `.cbi-tabcontainer` is luci-compat vocabulary — so matching on that silently finds nothing on a
- * page that plainly has tabs.
- *
- * Groups belonging to the page just left are disqualified: the router stamps body[data-page]
- * before the incoming view renders, and #view still holds the outgoing page's DOM at that moment,
- * so mount() would append the form and a clickable "Footstrap" <li> to another page's tab strip:
- * arriving at System -> System from Network -> DHCP that was two builds for one arrival, and the
- * tab sat on the DHCP strip for 66 ms on localhost (an RTT or more on a real router).
- * The incoming view's own group is a fresh element and is not in this set. */
-const _staleGroups = new WeakSet();
-function disqualifyCurrentGroups() {
-	const view = document.getElementById('view');
-	if (!view) return;
-	for (const g of view.querySelectorAll('[data-initialized="true"]'))
-		_staleGroups.add(g);
-}
-
-function tabGroup(view) {
-	for (const g of view.querySelectorAll('[data-initialized="true"]')) {
-		if (_staleGroups.has(g)) continue;
-		const menu = g.previousElementSibling;
-		if (menu?.classList.contains('cbi-tabmenu'))
-			return { group: g, menu };
-	}
-	return null;
-}
-
-/* Append the pane and its tab once the stock view has rendered. LuCI's system.js resolves its own
- * promises before it puts anything in #view, so there is nothing to hook but the DOM — hence the
- * observer, which also covers the view being re-rendered (a Save & Apply redraws the map).
- *
- * The tab is added by hand rather than by calling ui.tabs.initTabGroup again: that returns
- * immediately on a group carrying data-initialized, and clearing the flag to re-run it builds a
- * second menu beside the first and drops the stock tabs' click bindings. One <li>, the same click
- * handler ui.tabs binds to every other tab, and the pane that handler expects.
- *
- * Idempotent through the marker, since the form's own construction is a mutation the observer sees.
- *
- * A map redraw (Save without Apply) rebuilds the group and `ui.tabs` stamps `data-initialized` as
- * an attribute change that can land after the last childList change, so the observer watches that
- * attribute too — otherwise the tab is missing until the next navigation (openwrt/luci#8903).
- *
- * A ladder of retries on a widening delay shipped beside that watch and is gone: instrumented over
- * ten sessions on both package managers — a full load, an SPA return, a Save and a Save & Apply —
- * it mounted the tab zero times, only ever arming a timer that woke to find the work done. The
- * deadline below could once be seen mounting it, but only because watch() was binding the observer
- * to a node the router was about to replace; with that fixed the deadline is a diagnostic again. */
-function mount() {
-	const view = document.getElementById('view');
-	if (!view || !onPage()) return;
-	if (view.querySelector('.' + MARK)) return;
-	if (_building) return;
-	const tabs = tabGroup(view);
-	if (!tabs) return;			/* not built yet; the observer calls again when it is */
-	_building = true;
-	render()
-		.then((form) => {
-			/* re-check: render() resolves on a microtask, and the view may have been replaced or
-			 * navigated away from meanwhile */
-			const v = document.getElementById('view');
-			if (!onPage() || !v || v.querySelector('.' + MARK)) return;
-			const t = tabGroup(v);
-			if (!t) return;
-			/* Named after the theme, not after what it does: beside four stock tabs that are all
-			 * "what this page configures", a fifth called Appearance would read as another facet
-			 * of the router. A proper noun, so deliberately untranslated. */
-			const title = 'Footstrap';
-			/* data-tab-active is deliberately absent: the stock page opens on whichever tab it
-			 * opened on before, and a theme has no business taking that over. The pane's shape is
-			 * a stock pane's — `data-tab` + `data-tab-title`, no class. */
-			t.group.appendChild(E('div', {
-				'data-tab': TAB,
-				'data-tab-title': title
-			}, [ form ]));
-			const link = E('a', { 'href': '#' }, [ title ]);
-			link.addEventListener('click', ui.tabs.switchTab.bind(ui.tabs));
-			t.menu.appendChild(E('li', { 'class': 'cbi-tab-disabled', 'data-tab': TAB }, [ link ]));
-			/* if this load is the one a reset asked for, open on it: clicking the link goes through
-			 * ui.tabs' own switchTab, so nothing here reimplements the switch */
-			if (takeReturn()) link.click();
-		})
-		.catch((e) => console.error('footstrap: the Appearance tab failed to build', e))
-		.finally(() => { _building = false; });
-}
-
-function watch() {
-	const view = document.getElementById('view');
-	/* The CONTAINER, by id — not `#view`, which is not the same element for long. A client
-	 * navigation builds a fresh one before it is in the document and swaps it in afterwards, while
-	 * watch() runs on the `data-page` stamp, which comes first: the node bound here then reported
-	 * `isConnected: false` while `#view` and `#maincontent` were both alive, and a Save's redraw
-	 * produced four mutation batches that reached no callback at all. `#maincontent` outlives every
-	 * swap, so the swap is itself a childList record. Save put the tab back in 250 ms after this,
-	 * against 1,750-2,250 ms of waiting for the deadline before it. */
-	const root = document.getElementById('maincontent') || view;
-	if (_viewObserver && _observedRoot !== root) stopWatch();
-	if (_viewObserver || !view || !onPage()) return;
-	_observedRoot = root;
-	_viewObserver = new MutationObserver(mount);
-	/* `data-initialized` is when the group becomes usable, and the filter is load-bearing — proven
-	 * by staging openwrt/luci#8903 rather than waiting for it: tear the tab, the pane and the
-	 * attribute down in one task, restore the attribute ALONE 1,200 ms later, and the tab is back
-	 * 4 ms after it. Without the filter it never comes back. No ordinary Save separates the two. */
-	_viewObserver.observe(root, {
-		childList: true, subtree: true,
-		attributes: true, attributeFilter: [ 'data-initialized' ],
-	});
-	mount();
-	/* A deadline on an otherwise silent failure. tabGroup() reads two private ui.tabs facts — the
-	 * `data-initialized` marker and the `cbi-tabmenu` class on the menu — and mount() writes a
-	 * third, `cbi-tab-disabled` on the item it appends; one such fact has already moved between
-	 * 24.10 and 25.12 (`data-tab-group` was dropped unannounced). If another does, mount() returns
-	 * early on every mutation: the stock page renders, nothing throws, and every Appearance axis
-	 * is unreachable. */
-	window.setTimeout(() => {
-		/* It asks, it does not repair: with the observer on a node that survives a navigation the
-		 * repair this used to attempt became unreachable, and the whole matrix passes without it.
-		 * A group still found here means the observer is working, so there is nothing to report. */
-		const v = document.getElementById('view');
-		if (!onPage() || !v || v.querySelector('.' + MARK) || _building || tabGroup(v)) return;
-		console.error('footstrap: the Appearance tab could not be attached — this page has tabs, but '
-			+ 'ui.tabs no longer marks them the way fs-appearance.js looks for. Every Appearance axis '
-			+ 'is unreachable until that is updated.');
-	}, TAB_DEADLINE);
-}
-
-/* called once by menu-footstrap-common's init; everything route-dependent hangs off the data-page
- * observer inside */
-function wire() {
-	if (_routeObserver || !document.body) return;
-	_routeObserver = new MutationObserver(() => {
-		/* before deciding anything: whatever is in #view when data-page changes belongs to the
-		 * page being left (see _staleGroups) */
-		disqualifyCurrentGroups();
-		return onPage() ? watch() : stopWatch();
-	});
-	_routeObserver.observe(document.body, { attributes: true, attributeFilter: [ 'data-page' ] });
-	if (onPage()) watch();
-}
-
 return baseclass.extend({
-	wire
+	/* the dispatched page's whole render(): view/footstrap/appearance.js calls this and nothing
+	 * else in this file — no mount, no observer, no deadline, no tab. A menu entry and a route did
+	 * that job instead; see the file's own header comment for what used to live here. */
+	renderStandalone: () => Promise.resolve().then(build)
 });

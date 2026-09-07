@@ -148,7 +148,8 @@ page and at its bottom — which is why the gate watches the cause.
   - `.fs-navlabel` + `<ul class="nav" id="topmenu">` (filled by the menu JS) + `<ul id="modemenu">`;
   - `.fs-spacer` (`flex:1`);
   - the search button (`#fs-search-btn`, the command palette below) and Log out. An Appearance
-    button used to sit between them; the axes are a tab on System → System now, so the chrome
+    button used to sit between them; the axes are their own menu entry now
+    (`/admin/system/footstrap`, previously a tab stapled onto System → System), so the chrome
     carries one control fewer — see [design-system.md](design-system.md).
 - **Main** — `<main class="fs-main" id="maincontent" tabindex="-1">`: `.fs-title.fs-sr` with the
   `<h1>`, `#fs-nav-status`, and `.fs-content` (warnings, `#tabmenu`, `#view`, footer).

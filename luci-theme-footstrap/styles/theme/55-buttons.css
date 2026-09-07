@@ -124,6 +124,22 @@
 		align-items: center;
 		justify-content: flex-end;
 		gap: var(--fs-space-2);
+		/* The design call: WRAP the bar rather than let its items shrink into it. Save/Reset are
+		 * plain text with no ellipsis, so their min-content protects them — a no-wrap row's shrink
+		 * factor lands entirely on the Save & Apply split control, whose caption DOES have an
+		 * ellipsis to give (theme/65-dropdown.css) and so absorbs the whole squeeze. Measured on the
+		 * gallery's own fixture (EN "Save & Apply"): a no-wrap row cut it by up to 87px at 320px/
+		 * Normal and 119px at 320px/Large, worse than the numbers this bug was filed against
+		 * (43-68px on a live page, where the sidebar leaves less room than the gallery's isolated
+		 * card) — same fault, same direction, this fixture just has less room to give.
+		 * `flex-wrap: wrap` sends the split control (or Save+Reset) to its own line once they no
+		 * longer fit one, so the caption is squeezed only by its OWN box, never by a sibling's:
+		 * the same fixture measures 0px cut at every width/density this bug was filed against, RU
+		 * or EN, after this one line. The caption still owns an ellipsis for the genuine edge it
+		 * cannot solve — a full RU sentence at Large density in a 320px column has nowhere left to
+		 * grow even alone on its line (measured: 33px still short there) — and that is the right
+		 * place for it to give, not a sibling button's unrelated width. */
+		flex-wrap: wrap;
 	}
 	.cbi-page-actions .cbi-button,
 	.cbi-page-actions .btn {
@@ -176,9 +192,39 @@
 	 * WCAG 2.2 SC 2.5.8: a pointer target must be >= 24x24 px, or spaced so 24px circles centred on
 	 * adjacent targets do not overlap. At 28px tall with a 1px margin either side the circles DO
 	 * overlap, so the exemption does not apply; 32px clears it. */
-	.td .cbi-button, .td .btn, .cbi-section-actions .cbi-button, .cbi-section-actions .btn,
+	.cbi-section-actions .cbi-button, .cbi-section-actions .btn,
 	.cbi-section-table .cbi-button {
 		min-height: var(--fs-ctl-h-sm); padding: 0 var(--fs-space-3); font-size: var(--fs-type);
+		/* `.td .cbi-button, .td .btn` dropped (task 0151): the action cells this was filed against
+		 * (form.TableSection's `.td.cbi-section-table-cell.cbi-section-actions`, per 30-tables.css's
+		 * own discriminator) are already reached by `.cbi-section-actions .cbi-button`/`.btn` below —
+		 * `.cbi-section-actions` sits on the .td itself, so the descendant selector matches with no
+		 * `.td` needed. What the bare `.td` reached and those two do not is every OTHER button in
+		 * every OTHER cell: measured collateral, 14 buttons including the icon-only rail drag handle
+		 * and a plain-cell "Reserve IP" (Wireless's hand-built `.td.middle`, DHCP leases — neither
+		 * carries `.cbi-section-actions`), `overflow: hidden` re-baselining an inline-block and
+		 * growing the DHCP leases rows 50px -> 50.84px (10 rows at 1280) for nothing that clipped.
+		 * base/95-luci.css sizes each button `flex: 1 1 4em` inside `.td.cbi-section-actions`. A
+		 * DEFINITE flex-basis is what let the fix below regress the desktop: with `overflow: hidden`
+		 * alone, the automatic minimum for a definite basis resolves to 0 in EVERY row regardless of
+		 * room, so `flex-grow` divides by count instead of by need even where nothing needed to
+		 * shrink — measured live on Firewall Zones at 1440px, three buttons that read 37.66/97.73/
+		 * 89.69px in v0.14.11 converged to 75.02/75.03/75.03px, 11-21px of caption ellipsised for
+		 * zero gain (same row total, 225.08px, either way). `flex-basis: auto` is the one-property
+		 * fix: it hands sizing back to CONTENT, so the automatic minimum is the caption's own
+		 * min-content again and `flex-grow` only ever redistributes genuine slack — reproduced
+		 * locally (docs/gallery.html's Startup fixture, unconstrained): auto restores the exact
+		 * v0.14.11 widths (101.58/137.72/112.08/230.25px) at 1440, 0px moved, with `overflow: hidden`
+		 * left in place. `overflow: hidden` + the ellipsis below still answer the original fault —
+		 * a row genuinely narrower than its captions' combined content now shrinks BELOW their
+		 * min-content, not before, and the caption gives (ellipsis), never the neighbour's box.
+		 * Sweep-measured on real captions at every density: 14-19px on Startup, 12-13px on
+		 * "Клонировать", 16-18px on "Перезапустить"/"Перезагрузить", 5px on "Принудительно
+		 * завершить" — 0 with the English caption in the same row. `.cbi-page-actions`'s
+		 * `flex-wrap: wrap` (above) does not reach these — that selector is the Save/Apply footer,
+		 * not a table row, and this is a different container with no line to wrap onto. */
+		flex-basis: auto;
+		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 	}
 	.td .cbi-button, .cbi-section-actions .cbi-button, .cbi-section-table .cbi-button {
 		background: transparent; background-image: none;

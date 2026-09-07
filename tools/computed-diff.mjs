@@ -12,10 +12,16 @@
  * it is measured rather than chosen — run `--control` whenever the gallery gains a widget.
  *
  * This does not replace the live run. The gallery has every widget and none of the pages: no menu,
- * no chrome, no third-party sheet, no container query answered by a real viewport. It catches the
- * regression that is IN the stylesheet; owlab catches the one that is in the page.
+ * no chrome, no third-party sheet. It catches the regression that is IN the stylesheet; owlab
+ * catches the one that is in the page.
  *
- *   node tools/computed-diff.mjs                 # worktree vs HEAD, light + dark
+ * Two viewports run, not one (task 0145): every other gallery gate — this one included, until now —
+ * takes Playwright's 1280 default (`a11y`, `export-tier`) or sets it explicitly (line below), so a
+ * declared width that only drifts once a flex row is narrower than its own content never shows up.
+ * cb1's own bug was exactly that shape: 0 diffs at 1280 with the fix reverted, a `width` diff at 390.
+ * A container query answered by 1280 alone was answered by nothing; VIEWPORTS below is the fix.
+ *
+ *   node tools/computed-diff.mjs                 # worktree vs HEAD, light + dark, both viewports
  *   node tools/computed-diff.mjs --control       # the same sheet twice: the threshold, must be 0
  *   node tools/computed-diff.mjs --against v0.15.0 --full --max 0
  */
@@ -37,6 +43,21 @@ const MAX = opt('--max', null);
 const POINTS = flag('--full')
 	? matrix([null])
 	: [{ palette: 'footstrap', mode: 'light', tint: null }, { palette: 'footstrap', mode: 'dark', tint: null }];
+
+/* Two viewports, not one. 1280 is every page's design width (docs/development.md); 390x844 is the
+ * phone point task 0145's own bug was measured against (styles/theme/60-inputs.css) and the one this
+ * repo already reaches for on a phone-width claim (owrt2512/390x844 elsewhere in that file). The gap
+ * this closes: a caption turns the switch pill into a SECOND, shrinkable flex item only once the row
+ * is narrower than the pill + caption's combined natural width, which never happens at 1280 — so a
+ * declared `width` sitting at exactly `--sw-w` on both sides of a diff there proves nothing, the flex
+ * shrink that broke it never engaged. Measured with the flex-shrink:0 fix reverted in a scratch copy:
+ * cb1's used width holds at 40.00px on both sides at 1280 (0 diffs, the bug invisible), and at 390 it
+ * splits 40.00px (worktree) vs 26.80px (reverted HEAD) — a 13.20px `width` difference the 1280 pass
+ * cannot see at any density. */
+const VIEWPORTS = [
+	{ width: 1280, height: 900, label: '1280' },
+	{ width: 390, height: 844, label: '390' },
+];
 
 /* The properties read on every element. This list IS the contract: a property missing from it is a
  * regression this gate cannot see, so add rather than trim. Layout first, then box, then ink — the
@@ -153,37 +174,44 @@ const b = await serveGallery(cssNow);
 const originB = new URL(b.base).origin;
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const page = await browser.newPage({ viewport: VIEWPORTS[0] });
 
 let total = 0;
 const report = [];
 
-for (const point of POINTS) {
-	await page.goto(a.base, { waitUntil: 'load' });
-	await applyAppearance(page, point);
-	await settle(page);
+for (const vp of VIEWPORTS) {
+	await page.setViewportSize({ width: vp.width, height: vp.height });
 
-	/* Swap A onto itself before the FIRST snapshot, so both snapshots are taken in the same state.
-	 * Measured: without this, a control pass (the same stylesheet on both sides) reported 28
-	 * differences in light and 0 in dark — every one of them a colour re-serialised across the swap,
-	 * `oklab(0.539907 -0.0412925 -0.186042 / 0.4)` becoming
-	 * `color(srgb 0.0352941 0.411765 0.854902 / 0.4)` on border-top-color, border-bottom-color and
-	 * box-shadow. The values are the same colour; only the serialisation of a computed colour
-	 * differs between a sheet parsed with the document and one attached afterwards. Symmetry costs
-	 * one extra load and takes the floor to 0, which is what makes a non-zero diff readable as
-	 * causal rather than as a number to compare against a remembered baseline. */
-	await swapSheet(page, `${new URL(a.base).origin}/cascade.css`);
-	const n = await page.evaluate(snapshot, PROPS);
+	for (const point of POINTS) {
+		await page.goto(a.base, { waitUntil: 'load' });
+		await applyAppearance(page, point);
+		await settle(page);
 
-	await swapSheet(page, `${originB}/cascade.css`);
-	/* The swap does not touch :root, so the axes stamped before it are still in force. Re-stamping
-	 * here would be the bug this gate exists to catch, dressed as a fixture. */
-	const { structural, diffs } = await page.evaluate(compare, { props: PROPS, cap: CAP });
+		/* Swap A onto itself before the FIRST snapshot, so both snapshots are taken in the same state.
+		 * Measured: without this, a control pass (the same stylesheet on both sides) reported 28
+		 * differences in light and 0 in dark — every one of them a colour re-serialised across the swap,
+		 * `oklab(0.539907 -0.0412925 -0.186042 / 0.4)` becoming
+		 * `color(srgb 0.0352941 0.411765 0.854902 / 0.4)` on border-top-color, border-bottom-color and
+		 * box-shadow. The values are the same colour; only the serialisation of a computed colour
+		 * differs between a sheet parsed with the document and one attached afterwards. Symmetry costs
+		 * one extra load and takes the floor to 0, which is what makes a non-zero diff readable as
+		 * causal rather than as a number to compare against a remembered baseline. */
+		await swapSheet(page, `${new URL(a.base).origin}/cascade.css`);
+		const n = await page.evaluate(snapshot, PROPS);
 
-	const label = `${point.palette}/${point.mode}${point.tint ? `/tint${point.tint}` : ''}`;
-	if (structural) { report.push({ label, structural, diffs: [], n }); total += 1; continue; }
-	report.push({ label, structural: null, diffs, n });
-	total += diffs.length;
+		await swapSheet(page, `${originB}/cascade.css`);
+		/* The swap does not touch :root, so the axes stamped before it are still in force. Re-stamping
+		 * here would be the bug this gate exists to catch, dressed as a fixture. */
+		const { structural, diffs } = await page.evaluate(compare, { props: PROPS, cap: CAP });
+
+		/* The viewport is part of the label, not just the point: a `width` diff that only exists at
+		 * 390 and not at 1280 is unreadable as "width: … -> …" alone once two viewports run — task
+		 * 0145's own fixture is exactly a diff that is silent at 1280 and loud at 390. */
+		const label = `${vp.label}/${point.palette}/${point.mode}${point.tint ? `/tint${point.tint}` : ''}`;
+		if (structural) { report.push({ label, structural, diffs: [], n }); total += 1; continue; }
+		report.push({ label, structural: null, diffs, n });
+		total += diffs.length;
+	}
 }
 
 await browser.close();
@@ -191,7 +219,7 @@ a.close();
 b.close();
 
 const side = CONTROL ? 'the SAME stylesheet on both sides' : `worktree vs ${REF}`;
-console.log(`computed-diff: ${side}, ${report[0]?.n ?? 0} elements x ${PROPS.length} properties, ${POINTS.length} appearance point(s)`);
+console.log(`computed-diff: ${side}, ${report[0]?.n ?? 0} elements x ${PROPS.length} properties, ${POINTS.length} appearance point(s) x ${VIEWPORTS.length} viewport(s) (${VIEWPORTS.map((v) => v.label).join(', ')})`);
 
 for (const r of report) {
 	if (r.structural) { console.log(`  ${r.label}: ${r.structural}`); continue; }
