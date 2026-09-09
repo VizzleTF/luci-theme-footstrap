@@ -343,8 +343,13 @@ jobs:
               # to measure whether the menu fits a row, and is a row shorter while it asks. Reported
               # from an iPhone, where no engine anchoring puts the reader back.
               node tools/fit-quiet.mjs --only "$O"
-              # Chromium here; the other two engines have a job of their own (`anchors`).
-              node tools/scroll-anchor.mjs --only "$O"
+              # Chromium here; the other two engines have a job of their own (`anchors`). Density
+              # was never crossed on this leg before task latenet — normal only, on every push and
+              # every pull request alike — so chromium's own DENSITIES axis (compact, large) went
+              # unmeasured here. `--full` on a push/tag only, the same split `anchors` already
+              # makes for its own axes, below.
+              if [ "${{ github.event_name }}" = "pull_request" ]; then FULL=""; else FULL="--full"; fi
+              node tools/scroll-anchor.mjs --only "$O" $FULL
               # LAST, because it installs the PUBLISHED release over the build everything above
               # measured — and that is the claim: what a user runs is install.sh against the feed,
               # not `apk add` against a local file. Three field reports (#16, #28, #30) were this

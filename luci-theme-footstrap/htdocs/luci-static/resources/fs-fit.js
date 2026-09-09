@@ -400,6 +400,22 @@ const ENGINE_ANCHORS = (() => {
 	catch (e) { return true; }
 })();
 
+/* Support for the property is not proof it is doing the job on THIS page: CI showed a real engine
+ * decline to anchor a container refill on two separate passes, `overflow-anchor` still reading
+ * `true` throughout — a case `ENGINE_ANCHORS` above cannot see, because it is asked once, at load,
+ * of the platform. `lateDrift()` below already computes the residual after every refill the theme
+ * did not itself correct, so the evidence is left to accumulate rather than guessed at up front:
+ * two residuals it actually had to write back — task latenet's four-way ablation measured that
+ * write landing 419-420ms after the refill — and the observer stops trusting this engine with the
+ * REST of the session, moving to the anchorFor()/scheduleAnchor() path instead, measured 7-36ms on
+ * the same refill. One residual is left as headroom for a single one-off rather than tripping on
+ * the first. Never a browser name, only a count: an engine that keeps the reference itself never
+ * reaches the write this counts — Chromium and Firefox measure 0 residuals today — so the switch
+ * cannot trip for them. `docs/anchoring.md`, "Who is responsible", carries the numbers. */
+const LATE_MISS_LIMIT = 2;
+let _lateMisses = 0;
+let _engineTrusted = ENGINE_ANCHORS;
+
 /* What the reader was looking at, captured while the page was still. `anchorRef()` runs from the
  * mutation observer, i.e. after the DOM changed: right for the FITTERS, which have not run yet, and
  * blind to the mutation itself. An anchoring engine covers that other half; where none does, the
@@ -645,6 +661,9 @@ function lateDrift(ref) {
 			 * it is re-read rather than assumed; `rememberRest()` cannot do it, since the write
 			 * starts the motion sampler and that function returns early while the page moves. */
 			_restAt = scrollTop();
+			/* This engine did not keep the reference across a container refill, once more on this
+			 * page — see LATE_MISS_LIMIT above for what happens once that has been measured twice. */
+			if (++_lateMisses >= LATE_MISS_LIMIT) _engineTrusted = false;
 		}, SCROLL_IDLE);
 	});
 }
@@ -727,9 +746,15 @@ function observeContent() {
 		 * within the frame, so the immediate correction stays, measured against the reference from
 		 * the last still page. */
 		const settled = _rest;
-		const ref = ENGINE_ANCHORS ? null : anchorFor();
+		/* `_engineTrusted`, not `ENGINE_ANCHORS`: the platform check above answers once, at load,
+		 * whether the property exists — it cannot see an engine that has it but declines to use it
+		 * on a given refill, which is what `lateDrift()`'s own residual count is for (LATE_MISS_LIMIT
+		 * above). Once that has happened twice this session the fork moves here too, so the engine
+		 * gets no third 420ms-late chance at a correction the fast path already does in 7-36ms. */
+		const trustEngine = _engineTrusted;
+		const ref = trustEngine ? null : anchorFor();
 		run();
-		if (ENGINE_ANCHORS) lateDrift(settled);
+		if (trustEngine) lateDrift(settled);
 		else scheduleAnchor(ref);
 	});
 	const hosts = [ document.getElementById('view') || document.body, document.getElementById('modal_overlay') ]

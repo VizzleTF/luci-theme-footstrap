@@ -15,16 +15,23 @@
  *             column holds its height between ticks, so the document never gets short enough to be
  *             clamped. It can only be measured with the other half silent.
  *   swapped   a section refilled the way `dom.content()` refills one — emptied, then filled again —
- *             must leave the reader where they were too. The moment in between has no height, and
- *             `held` cannot see that: a growth only ever inserted never collapses anything.
+ *             must leave the reader where they were too, and PROMPTLY: sampled every frame for
+ *             `SWAP_WINDOW` (900ms, well past lateDrift()'s measured 419-420ms), a drift that never
+ *             falls back under tolerance is one finding ("never came back") and one that does but
+ *             past `LATE_MS` (200ms — task latenet's four-way ablation put the theme's own fallback
+ *             at 7-36ms and an engine's late residual at 419-420ms, and this sits between the two
+ *             with margin either side) is another ("corrected late") — a single fixed-delay read
+ *             cannot tell those apart, and used to fold them into the same `moved 0px`. The moment in
+ *             between the empty and the refill has no height, and `held` cannot see that: a growth
+ *             only ever inserted never collapses anything.
  *   not twice with the engine's anchoring left alone, the same growth must move the reader just as
  *             little — a fallback that also ran there would throw the page the other way.
  *   quiet     while the reader is SCROLLING the theme must not correct at all: a correction landing
  *             inside a flick is itself a jump.
  *   tick      while the reader is PARKED and nothing is inserted, a REAL poll tick — the engine's own
- *             anchoring included — must not move the offset either. `held`/`swapped` close inside
- *             800ms and `quiet` discards a still 400ms; a correction landing between those windows
- *             (WebKit's own, measured 421ms) passed all three and is what this row exists to catch.
+ *             anchoring included — must not move the offset either. `held` closes inside 800ms and
+ *             `quiet` discards a still 400ms; a correction landing between those windows (WebKit's
+ *             own, measured 421ms) passed both and is what this row exists to catch.
  *
  * The growth in `held`/`swapped`/`quiet` is inserted rather than waited for: a real tick depends on
  * what the router's radios are doing, and a gate that only fails when a station happens to join is
@@ -123,6 +130,19 @@ const TOLERANCE = 2;
 /* how many REAL poll ticks TICK insists on before it will trust a 0px reading — see the note on
  * TICK below for why fewer would pass a fault this gate exists to catch */
 const TICK_COUNT = 3;
+/* How late a correction may land before the drift it leaves is itself a finding — separate from
+ * SWAP simply never seeing one at all. Measured (task latenet's four-way SWAP ablation): the
+ * theme's own fallback (`applyAnchor` via `scheduleAnchor`) lands 7-36ms after a refill; an engine
+ * that anchors but did not keep the reference through THIS refill is caught by the theme's
+ * `lateDrift()` (fs-fit.js) at 419-420ms, one rAF plus `SCROLL_IDLE` later. 200ms sits roughly
+ * midway between those two clusters, with well over 150ms of headroom on either side, so ordinary
+ * jitter on a loaded runner cannot cross it either way — and it is what a maintainer reading a
+ * report would call the difference between "instant" and "a jump". */
+const LATE_MS = 200;
+/* How long SWAP watches a refill before it may call a correction "never came". Long enough to hold
+ * lateDrift()'s measured 419-420ms with real margin for a loaded runner; short enough that a cell
+ * that truly never corrects does not sit idle. */
+const SWAP_WINDOW = 900;
 
 /* Park the reader and wait for the THEME to notice, rather than for a stopwatch.
  *
@@ -250,15 +270,24 @@ const HOLD = async (growth) => {
 	if (!mark) return { skip: 'no content under the reader' };
 	const before = { pos: pos(), top: Math.round(mark.getBoundingClientRect().top) };
 
+	/* Sliced from HERE, not from navigation — the writes `parkAt()` already made to reach this
+	 * offset are not this measurement's business. `window.__fsW` is an init-script wrapper around
+	 * `scrollTo`/`scrollBy`, the `scrollTop` setter and `Element.scrollTo`
+	 * (../tmp/task-holdreg/hold-probe.mjs), read back only when a finding needs it: a -505px HOLD
+	 * reading on firefox/owrt2512 @1440 top compact was chased a full round before before.top/
+	 * after.top were printed at all — before.top read 503 on every local run, so after.top≈0 was
+	 * the mark landing at the viewport top, a different event from a failed correction. */
+	const w0 = (window.__fsW || []).length;
 	const pad = document.createElement('div');
 	pad.style.height = growth + 'px';
 	view.insertBefore(pad, view.firstChild);
 	await wait(800);
 
 	const after = { pos: pos(), top: mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null };
+	const writes = (window.__fsW || []).slice(w0);
 	pad.remove();
 	return { before, after, moved: after.top === null ? null : after.top - before.top,
-		scrollDelta: after.pos - before.pos, scroller: sc ? 'maincontent' : 'window' };
+		scrollDelta: after.pos - before.pos, scroller: sc ? 'maincontent' : 'window', writes };
 
 	} finally { /* the poll stays stopped — see the note on QUIET, which starts it again */ }
 };
@@ -270,7 +299,7 @@ const HOLD = async (growth) => {
  * the theme keeps stays valid. A real tick passes through a moment where the section has no height
  * at all, and a document that short is one the engine clamps the offset into; the section fills
  * again, nobody puts the offset back, and the reader is somewhere else. */
-const SWAP = async (growth) => {
+const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
 	if (!view) return { skip: 'no view' };
@@ -431,8 +460,26 @@ const SWAP = async (growth) => {
 		pad.style.height = growth + 'px';
 		pad.dataset.fsProbe = '1';
 		body.appendChild(pad);
-		await wait(800);
-		const after = { pos: pos(), top: mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null };
+		/* WHEN the mark comes back, not only WHETHER — see LATE_MS above. A single read at a fixed
+		 * delay cannot tell "never corrected" from "corrected after the maintainer would call it a
+		 * jump": both look identical if the delay lands after the fault has resolved and before a
+		 * true non-correction would have. Sampled every frame for winMs instead — long enough to
+		 * hold lateDrift()'s 419-420ms correction with margin for a loaded runner — noting the
+		 * first frame the drift falls back under tolerance. */
+		const t0 = performance.now();
+		const w0 = (window.__fsW || []).length;
+		let correctedAt = null, lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
+		await new Promise((done) => {
+			const frame = () => {
+				lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
+				if (correctedAt === null && lastTop !== null && Math.abs(lastTop - before.top) <= tol)
+					correctedAt = Math.round(performance.now() - t0);
+				if (performance.now() - t0 < winMs) requestAnimationFrame(frame); else done();
+			};
+			requestAnimationFrame(frame);
+		});
+		const after = { pos: pos(), top: lastTop };
+		const writes = (window.__fsW || []).slice(w0);
 		/* The offset the swap actually asked the scroller to move by — separate from `clamped`
 		 * (what the engine took OUT of a document momentarily empty) and from `moved` (what the
 		 * reader's mark shows). A cell that reports `clamped 0px` because the engine declined to
@@ -446,7 +493,7 @@ const SWAP = async (growth) => {
 		pad.remove();
 		await wait(700);		/* let the floor come back down before the next pass measures */
 		return { empty, after, moved: after.top === null ? null : after.top - before.top,
-			clamped: before.pos - empty.pos, offsetDelta, grewDoc };
+			clamped: before.pos - empty.pos, offsetDelta, grewDoc, correctedAt, writes };
 	};
 
 	const corrected = await swap();
@@ -465,6 +512,9 @@ const SWAP = async (growth) => {
 
 	return { before, empty: corrected.empty, after: corrected.after, moved: corrected.moved,
 		clamped: corrected.clamped, offsetDelta: corrected.offsetDelta, grewDoc: corrected.grewDoc,
+		correctedAt: corrected.correctedAt,
+		late: corrected.correctedAt !== null && corrected.correctedAt > lateMs,
+		writes: corrected.writes,
 		bodyDesc, bodyH: bodyH0,
 		floorMoved: floorOnly.skip ? null : floorOnly.moved,
 		floorClamped: floorOnly.skip ? null : floorOnly.clamped,
@@ -729,6 +779,25 @@ for (const engine of ENGINES) {
 				if (BAIL && findings.length) return;
 				const ctx = await browser.newContext({ viewport: { width: w, height: 844 } });
 				await sealToRouter(ctx, stand.base);
+				/* HOLD and SWAP's own record of every scroll write made during their measurement
+				 * window — read back only when a finding needs it, which is what told a real failed
+				 * correction apart from a mark that legitimately reached the top of the viewport (a
+				 * -505px HOLD reading, firefox owrt2512 @1440 top compact, chased a full round before
+				 * that distinction was made). Borrowed from ../tmp/task-holdreg/hold-probe.mjs. */
+				await ctx.addInitScript(() => {
+					window.__fsW = [];
+					const rec = (how, val) => { try { window.__fsW.push({ t: Math.round(performance.now()), how, val: Math.round(val) }); } catch (e) { /* … */ } };
+					const st = window.scrollTo;
+					window.scrollTo = function (...a) { rec('window.scrollTo', typeof a[0] === 'object' ? (a[0] && a[0].top) : a[1]); return st.apply(this, a); };
+					const sb = window.scrollBy;
+					window.scrollBy = function (...a) { rec('window.scrollBy', typeof a[0] === 'object' ? (a[0] && a[0].top) : a[1]); return sb.apply(this, a); };
+					const d = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+					Object.defineProperty(Element.prototype, 'scrollTop', { configurable: true, enumerable: d.enumerable,
+						get() { return d.get.call(this); },
+						set(v) { rec('scrollTop=' + (this.id || this.className || this.tagName), v); return d.set.call(this, v); } });
+					const es = Element.prototype.scrollTo;
+					if (es) Element.prototype.scrollTo = function (...a) { rec('el.scrollTo=' + (this.id || this.className || this.tagName), typeof a[0] === 'object' ? (a[0] && a[0].top) : a[1]); return es.apply(this, a); };
+				});
 				/* the Safari path, forced: `fsEngineAnchor=off` makes fs-fit believe the platform has
 				 * no anchoring of its own, and the stylesheet turns the engine's off for real, so the
 				 * two agree about which of them is responsible */
@@ -779,7 +848,7 @@ for (const engine of ENGINES) {
 						? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
 						: await page.evaluate(TICK, TICK_COUNT);
 					held = await page.evaluate(HOLD, GROWTH);
-					swap = await page.evaluate(SWAP, GROWTH);
+					swap = await page.evaluate(SWAP, [ GROWTH, TOLERANCE, LATE_MS, SWAP_WINDOW ]);
 					quiet = await page.evaluate(QUIET, GROWTH);
 				}
 				/* A cell that threw proved nothing, and dropping it without a word is how a sweep comes
@@ -811,17 +880,41 @@ for (const engine of ENGINES) {
 					continue;
 				}
 				runs++;
+				const geom = (h) => `before.top=${h && h.before ? h.before.top : '-'} after.top=${h && h.after ? h.after.top : '-'}`;
 				if (held.moved === null)
 					findings.push(`${where}: the reader's element was replaced mid-measurement, so nothing was proven`);
-				else if (Math.abs(held.moved) > TOLERANCE)
-					found(`${where}: ${GROWTH}px grew above the reader and the page moved ${held.moved}px under them`);
+				else if (Math.abs(held.moved) > TOLERANCE) {
+					/* ONE FLAKE IN ~216 CELLS MUST NOT FAIL A RUN ON ITS OWN. A -505px HOLD finding on
+					 * firefox owrt2512 @1440 top compact was chased for a full round and never
+					 * reproduced locally: before.top read 503 every run, so after.top≈0 was the mark
+					 * landing at the viewport top — a different event from a failed correction — and
+					 * nothing here printed the geometry that would have said so at the time. Both
+					 * readings are printed now, and a second measurement is taken before either one
+					 * becomes a finding. */
+					const held2 = await page.evaluate(HOLD, GROWTH);
+					if (held2.moved !== null && Math.abs(held2.moved) > TOLERANCE)
+						found(`${where}: ${GROWTH}px grew above the reader and the page moved ${held.moved}px `
+							+ `under them (${geom(held)}); re-measured: ${held2.moved}px (${geom(held2)})`
+							+ ((held.writes && held.writes.length) ? ` — writes: ${JSON.stringify(held.writes)}` : ''));
+					else
+						process.stdout.write(`  ${where}: HOLD read ${held.moved}px once (${geom(held)}) but `
+							+ `${held2.moved}px on re-measure (${geom(held2)}) — one flake, not a finding\n`);
+				}
 				if (swap.skip)
 					process.stdout.write(`  ${where}: the swap measured nothing (${swap.skip})\n`);
 				else if (swap.moved === null)
 					found(`${where}: the reader's element did not survive the swap, so nothing was proven`);
 				else if (Math.abs(swap.moved) > TOLERANCE)
-					found(`${where}: a section was refilled the way a poll refills one and the page moved `
-						+ `${swap.moved}px under the reader (the engine clamped ${swap.clamped}px of offset away)`);
+					/* `correctedAt` is null here BY CONSTRUCTION: swap() only sets it once the drift has
+					 * fallen back under tolerance, so a moved this large at the end of the window means
+					 * it never did — NEVER CORRECTED, not corrected late. */
+					found(`${where}: a section was refilled the way a poll refills one and the page never `
+						+ `came back — still ${swap.moved}px off after ${SWAP_WINDOW}ms `
+						+ `(the engine clamped ${swap.clamped}px of offset away)`);
+				else if (swap.correctedAt !== null && swap.correctedAt > LATE_MS)
+					found(`${where}: a section was refilled the way a poll refills one and the correction `
+						+ `landed ${swap.correctedAt}ms after the refill (over the ${LATE_MS}ms late `
+						+ `threshold — visible to the reader as a jump)`);
 				/* The floor is judged on the CLAMP, not on the movement, and only where the theme owns the job:
 				 * with the correction switched off nobody compensates the pad the probe grows, so the
 				 * reader moves by exactly that and should. What must not happen is the engine taking an
@@ -846,9 +939,11 @@ for (const engine of ENGINES) {
 				 * above the reader, which is what tells "the engine declined to anchor" (0px here)
 				 * apart from "the mark misreported" (moved itself would be the tell, not this term) */
 				const signed = (v) => (v === null || v === undefined ? '-' : (v >= 0 ? '+' : '') + v);
-				process.stdout.write(`  ${where}  reader moved ${held.moved}px (scroll ${held.scrollDelta >= 0 ? '+' : ''}${held.scrollDelta}, `
-					+ `${held.scroller})  swap moved ${swap.skip ? '-' : swap.moved + 'px'} `
+				process.stdout.write(`  ${where}  reader moved ${held.moved}px (${geom(held)}, `
+					+ `scroll ${held.scrollDelta >= 0 ? '+' : ''}${held.scrollDelta}, ${held.scroller})`
+					+ `  swap moved ${swap.skip ? '-' : swap.moved + 'px'} `
 					+ `[offset ${swap.skip ? '-' : signed(swap.offsetDelta)}]`
+					+ `  corrected ${swap.skip ? '-' : (swap.correctedAt === null ? 'never' : swap.correctedAt + 'ms')}`
 					+ `  floor alone: clamped ${swap.skip || swap.floorClamped === null ? '-' : swap.floorClamped + 'px'}`
 					+ `, reader ${swap.skip || swap.floorMoved === null ? '-' : swap.floorMoved + 'px'} `
 					+ `[offset ${swap.skip || swap.floorOffsetDelta === null ? '-' : signed(swap.floorOffsetDelta)}]`
