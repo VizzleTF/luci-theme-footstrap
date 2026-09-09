@@ -353,7 +353,16 @@ const LIMITS = {
 	 * The meter annotation is the biggest single piece and is cold by construction: a stock Overview
 	 * include draws its bar from its OWN local `progressbar()`, so the theme cannot annotate from a
 	 * page module alone. The limit goes to 58,100, 206 B of head-room. */
-	coldJs: 58_100,
+	/* 58,182 B on 2026-09-09, up 134 B for the WebKit anchor suppression: WebKit 26 ships
+	 * `overflow-anchor` too, so `CSS.supports('overflow-anchor', 'auto')` no longer separates the
+	 * engine that anchors correctly from the one that does not. `ENGINE_MISANCHORS`
+	 * (`-webkit-hyphenate-limit-before`) and the `data-fs-anchor-suppress` write it gates are what
+	 * keep WebKit's own anchoring suppressed instead of raced — 21-41px of Overview drift per poll
+	 * tick otherwise, put back 421ms late (docs/anchoring.md). `fs-fit.js` is cold, so every page
+	 * pays it. The commit cost 243 B as written; folding the two `CSS.supports` probes onto one
+	 * helper and the two `data-fs-*` root writes onto another recovered 109 B of that. The limit
+	 * goes to 58,250, 68 B of head-room. */
+	coldJs: 58_250,
 };
 
 function bytes(path) {

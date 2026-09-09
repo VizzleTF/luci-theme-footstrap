@@ -27,7 +27,12 @@
  * arming is exported and the module that clears the rule is the one that raises it. */
 function armGate() {
 	if (!fittersEnabled()) return;
-	try { document.documentElement.dataset.fsFit = '1'; } catch (e) { /* no document, no gate */ }
+	/* WRITTEN AS THE LITERAL `dataset.fsFit`, never through a helper: tools/table-contract.mjs
+	 * reads this file for exactly that spelling to prove the gate rule is still armed, and an
+	 * indirection hides the write from it. The behaviour survives being factored out; the
+	 * contract does not. */
+	try { document.documentElement.dataset.fsFit = '1'; }
+	catch (e) { /* no document, no flag to write */ }
 }
 
 const _fitters = [];
@@ -281,14 +286,23 @@ function noteUser() {
 (function watchMotion() {
 	const opts = { passive: true, capture: true };
 	window.addEventListener('scroll', noteMotion, opts);
-	/* a gesture that IS the scroll: the reader is driving and the page is moving */
-	for (const name of [ 'wheel', 'touchstart', 'touchmove' ])
+	/* A gesture that IS the scroll, from the second event on: `touchmove` and `wheel` fire only once
+	 * the page has already moved, so unlike `touchstart` they mean motion, not just presence.
+	 * `scroll` (above) and momentum still start the sampler for whatever the first frame of a flick
+	 * misses. */
+	for (const name of [ 'wheel', 'touchmove' ])
 		window.addEventListener(name, noteUser, opts);
-	/* Intent only. A scrollbar drag and a Page Down move the page and say so themselves, through
+	/* Intent only: says the reader is present, not that the page is moving. `touchstart` used to sit
+	 * above and feed `noteMotion` too, so a stationary tap on a tab declared the page moving for
+	 * SCROLL_IDLE (400ms) and gated `fitChrome()` with it — the freshly drawn tab strip painted at
+	 * full padding and only shrank once the sampler saw the page still, ~400ms after the tap. Real
+	 * motion is read from the scroll POSITION by `sampleMotion`, not the event: `touchmove` and
+	 * `scroll` above, plus momentum, all still start it, so nothing that actually moves the page
+	 * loses its guard. A scrollbar drag and a Page Down move the page and say so themselves, through
 	 * `scroll`. Feeding them to `noteMotion` too would make `scrolling()` answer yes for 400ms after
 	 * any click and every keystroke, which gates every layout-reading pass in this file: while
 	 * typing into a form, 9 of 10 passes were skipped and landed in one burst afterwards. */
-	for (const name of [ 'mousedown', 'keydown' ])
+	for (const name of [ 'mousedown', 'keydown', 'touchstart' ])
 		window.addEventListener(name, noteIntent, opts);
 })();
 
@@ -364,14 +378,54 @@ function watch(el) {
  * below). Correcting the offset in an engine that also corrects it means two corrections and a
  * page that jumps the other way, so this is asked of the platform rather than of a browser name —
  * `overflow-anchor` is the property that turns the feature off, and an engine that does not know it
- * does not have it. */
+ * does not have it.
+ *
+ * Task wkanchor: WebKit 26 shipped `overflow-anchor`, so that question now gets `true` from every
+ * engine and can no longer tell "has none" apart from "has one that mis-fires". Measured on the
+ * Overview, reader parked, real poll ticks, nothing above the fold changing height by even a pixel:
+ * WebKit's own anchoring still moved the offset +21px — no `scrollTo`, no `scrollTop` setter
+ * recorded (../tmp/task-overview12/tick-probe.mjs) — and lateDrift() below wrote it back one rAF +
+ * SCROLL_IDLE later, measured 421/421/408ms after the tick: correct, and too late not to read as a
+ * jump. So the job is taken away from the engine on exactly the engine that gets it wrong, rather
+ * than corrected twice — `theme/20-shell.css` turns the platform's own anchoring off on the
+ * scroller for the same engine ENGINE_MISANCHORS identifies below, and ENGINE_ANCHORS has to agree
+ * with it or the "two corrections" fault this file already warns about reopens in a subtler shape:
+ * the CSS side thinking the engine is out while this one still waits for it. */
+/* Both feature tests below are `CSS.supports`, defended against an engine — or a stub, in a
+ * node-run test — with no `CSS` object at all; one function shared between them is what pays this
+ * section's own way back under the wire budget, since jsmin/terser fold no duplicate literal
+ * (`docs/conventions.md`, "Carry the measurement" — measured, tools/size-budget.mjs). `dflt` is the
+ * answer when the probe itself cannot run, and the two calls below do not agree on it. */
+function cssSupports(prop, val, dflt) {
+	try { return typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports(prop, val); }
+	catch (e) { return dflt; }
+}
+/* Not `overflow-anchor` — every engine claims it now — and not a browser name (the platform,
+ * never a browser, is this file's own rule above). `-webkit-hyphenate-limit-before` is a
+ * non-standard WebKit hyphenation extension (Apple/WebKit docs, shipped since Safari 5.1) that
+ * Blink and Gecko have never implemented under either spelling: measured against the three
+ * engines Playwright bundles with this checkout, `CSS.supports` answers false on Chromium and
+ * Firefox and true on WebKit. `-webkit-touch-callout` was tried first and rejected: it answers
+ * false on a touch-LESS WebKit build too (this checkout's own WebKit, a desktop UA), so it
+ * names a CAPABILITY rather than the engine and would leave every non-touch Safari undetected.
+ * `dflt` is `false` here: unreadable is not claimed as a fault that could not be measured. */
+const ENGINE_MISANCHORS = cssSupports('-webkit-hyphenate-limit-before', '2', false);
+/* Written once, at module eval, never re-read: `theme/20-shell.css` keys its `overflow-anchor: none`
+ * off this same attribute, so the browser's own anchoring is actually suppressed wherever this file
+ * decides to own the correction instead of it — see the note above on why the two have to travel
+ * together. */
+if (ENGINE_MISANCHORS) {
+	try { document.documentElement.dataset.fsAnchorSuppress = '1'; }
+	catch (e) { /* no document, no flag to write */ }
+}
 const ENGINE_ANCHORS = (() => {
 	/* dev switch: `localStorage.fsEngineAnchor = 'off'` makes any engine take the non-anchoring
 	 * path, which is otherwise only reachable on a machine with Safari on it */
 	try { if (localStorage.getItem('fsEngineAnchor') === 'off') return false; }
 	catch (e) { /* no storage, no switch */ }
-	try { return typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('overflow-anchor', 'auto'); }
-	catch (e) { return true; }		/* unreadable: assume it is handled rather than fight it */
+	if (ENGINE_MISANCHORS) return false;
+	/* `dflt` is `true` here: unreadable is assumed handled rather than fought */
+	return cssSupports('overflow-anchor', 'auto', true);
 })();
 
 /* What the reader was looking at, captured while the page was still. `anchorRef()` runs from the

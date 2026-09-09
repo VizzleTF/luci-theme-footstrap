@@ -2,6 +2,26 @@
 	/* FOOTSTRAP SHELL — layout + chrome over styles/base.
 	 * Markup: ucode/template/themes/footstrap/header.ut · spec: docs/chrome.md */
 
+	/* Task wkanchor: turn the PLATFORM's own scroll anchoring off wherever fs-fit.js has already
+	 * decided it mis-fires (`ENGINE_MISANCHORS`, `data-fs-anchor-suppress` — WebKit's own anchoring
+	 * moved the offset +21px on a poll tick that grew nothing above the reader, docs/anchoring.md).
+	 * Only that attribute gates it: an engine ENGINE_ANCHORS trusts (Chromium, Firefox) never gets
+	 * this rule and keeps doing its own job, measured 0px before and after this attribute existed.
+	 *
+	 * The scroller ITSELF is not enough on its own: `html`/`body` cover the window-scrolling layouts
+	 * (bar, and the sidebar collapsed to one under `data-narrow`), `#maincontent`/`.fs-main` the
+	 * desktop sidebar's own scroller, and `#view`/`#view *` are what
+	 * `tools/scroll-anchor.mjs --engines webkit` actually forced off to measure the theme's own
+	 * correction in isolation (0px there) — carried over unchanged rather than narrowed to an
+	 * unmeasured subset. */
+	:root[data-fs-anchor-suppress],
+	:root[data-fs-anchor-suppress] body,
+	:root[data-fs-anchor-suppress] #maincontent,
+	:root[data-fs-anchor-suppress] .fs-main,
+	:root[data-fs-anchor-suppress] #view,
+	:root[data-fs-anchor-suppress] #view * {
+		overflow-anchor: none;
+	}
 
 	body {
 		padding: 0;

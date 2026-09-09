@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /* The reader's place, on an engine that will not keep it.
  *
- * A poll tick changes the height of things above the reader and the page below moves. Chromium and
- * Firefox hide that with scroll anchoring; WebKit has never implemented it, so on Safari and on
- * every iPhone the same tick moves the page under the reader's thumb.
+ * A poll tick changes the height of things above the reader and the page below moves. Chromium,
+ * Firefox and — since WebKit 26 — Safari all hide that with scroll anchoring of their own
+ * (docs/anchoring.md, `ENGINE_ANCHORS`); an older WebKit and every iPhone before it had none, and a
+ * current one can still get the COLLAPSE case wrong (task wkanchor, and the `tick` row below).
  *
- * The theme does that job where nobody else does (fs-fit.js, ENGINE_ANCHORS). This gate holds both
- * halves of that sentence, since both can break silently:
+ * The theme does that job where nobody else does (fs-fit.js, ENGINE_ANCHORS). This gate holds every
+ * half of that sentence, since each can break silently:
  *
  *   held      with the engine's anchoring suppressed AND the theme's fallback forced on, a growth
  *             above the fold must move the reader by no more than a pixel or two.
@@ -20,9 +21,15 @@
  *             little — a fallback that also ran there would throw the page the other way.
  *   quiet     while the reader is SCROLLING the theme must not correct at all: a correction landing
  *             inside a flick is itself a jump.
+ *   tick      while the reader is PARKED and nothing is inserted, a REAL poll tick — the engine's own
+ *             anchoring included — must not move the offset either. `held`/`swapped` close inside
+ *             800ms and `quiet` discards a still 400ms; a correction landing between those windows
+ *             (WebKit's own, measured 421ms) passed all three and is what this row exists to catch.
  *
- * The growth is inserted rather than waited for: a real tick depends on what the router's radios are
- * doing, and a gate that only fails when a station happens to join is not a gate.
+ * The growth in `held`/`swapped`/`quiet` is inserted rather than waited for: a real tick depends on
+ * what the router's radios are doing, and a gate that only fails when a station happens to join is
+ * not a gate. `tick` is the one case that measures a real one anyway, for the fault only a real tick
+ * can show.
  *
  *   node tools/scroll-anchor.mjs [--only owrt2512] [--engines chromium,firefox] [--full]
  *   … [--width 390] [--layout top] [--bail]   one cell, stopping at the first finding
@@ -79,19 +86,23 @@ const BAIL = process.argv.includes('--bail');
 const PAGES = arg('page', '/admin/status/overview,/admin/network/dhcp,/admin/status/processes')
 	.split(',').map((p) => p.trim()).filter(Boolean);
 
-/* WIDTH AND LAYOUT ARE ONE AXIS, and it has two values, not four. What this gate measures is which
- * element the correction has to scroll, and only one of the four combinations scrolls anything but
- * the window:
+/* WIDTH AND LAYOUT ARE ONE AXIS FOR HOLD/SWAP/QUIET, and it has two values, not four: what those
+ * three measure is which element the correction has to scroll, and only one of the four
+ * combinations scrolls anything but the window:
  *
  *   1440 side → #maincontent      1440 top → window      390 side → window      390 top → window
  *
- * So the sweep crosses the two scrollers and keeps the narrow viewport, where the pages are three
- * times longer and there is most to scroll past. The other two combinations repeated a measurement
- * the first two had already made. */
+ * `tick` (task wkanchor) does not fit that reduction: at 390 wide both `side` and `top` collapse the
+ * sidebar into the same bar chrome and scroll the same window, but `data-layout` itself is still
+ * either value underneath that collapse, and something in what THAT leaves in the DOM is what
+ * decides whether WebKit's own scroll anchoring misfires — measured on owrt2512/Overview, one real
+ * tick with the reader parked: 0px peak-to-peak at 390 side, 41px at 390 top, same page, same tick,
+ * same engine. So `top` stays in the default axis for that one case rather than only under `--full`
+ * — a PR that reintroduces this fault would otherwise only be caught on a push or a tag. */
 const SCROLLERS = (() => {
 	const all = FULL
 		? [ 1440, 390 ].flatMap((width) => [ 'side', 'top' ].map((layout) => ({ width, layout })))
-		: [ { width: 1440, layout: 'side' }, { width: 390, layout: 'side' } ];
+		: [ { width: 1440, layout: 'side' }, { width: 390, layout: 'side' }, { width: 390, layout: 'top' } ];
 	/* `--width 390 --layout top` narrows the sweep to the cell a finding names, which is what turns
 	 * a fix attempt from a sweep into a minute. Neither is set in CI, where the axes above are the
 	 * contract. */
@@ -109,6 +120,9 @@ const DENSITIES = arg('density', FULL ? 'normal,compact,large' : 'normal')
 const GROWTH = 120;
 /* a rect edge lands on a fraction; two pixels is not a jump */
 const TOLERANCE = 2;
+/* how many REAL poll ticks TICK insists on before it will trust a 0px reading — see the note on
+ * TICK below for why fewer would pass a fault this gate exists to catch */
+const TICK_COUNT = 3;
 
 /* Park the reader and wait for the THEME to notice, rather than for a stopwatch.
  *
@@ -550,6 +564,110 @@ const QUIET = async (growth) => {
 	return { unexplained, biggest, stalls };
 };
 
+/* Runs in the page: park the reader, LEAVE THE POLL RUNNING, and watch the offset across several
+ * REAL ticks — no synthetic pad, nothing inserted by the probe at all.
+ *
+ * HOLD and SWAP stop the poll (see the note on QUIET) and both close their case inside 800ms; QUIET
+ * starts the poll but its subject is a reader in MOTION, and it discards any step where the offset
+ * held still for 400ms. None of the three ever watches a PARKED reader across a tick the poll fires
+ * on its own — which is exactly the shape of task wkanchor's fault: WebKit's own scroll anchoring
+ * moved the offset +21px on a tick where nothing above the reader changed height by even a pixel
+ * (no `scrollTo`, no `scrollTop` setter recorded — the probe in ../tmp/task-overview12/tick-probe.mjs
+ * is what caught that), and lateDrift() (fs-fit.js) wrote it back one rAF + SCROLL_IDLE later,
+ * measured 421/421/408ms after the tick. Both HOLD/SWAP's 800ms window and QUIET's 400ms-still
+ * discard read that pair as "the reader stayed put" — the correction landing inside their own
+ * tolerance, not outside it — which is why this gate held green through it. */
+const TICK = async (ticks) => {
+	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+	const view = document.getElementById('view');
+	if (!view) return { skip: 'no view' };
+	const mc = document.getElementById('maincontent');
+	const flow = mc ? getComputedStyle(mc).overflowY : '';
+	const sc = (flow === 'auto' || flow === 'scroll') ? mc : null;
+	const pos = () => (sc ? sc.scrollTop : window.scrollY);
+	const room = (sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - window.innerHeight);
+	if (room < 600) return { skip: 'page too short to scroll' };
+
+	const poll = (window.L && window.L.Poll) || null;
+	/* An empty queue polls nothing to watch. `L.Poll.queue` is not a new liberty taken with a
+	 * private property — fs-router.js already reads it directly (`L.Poll.queue.length === 0`), so
+	 * this asks the same question the theme itself asks. Processes registers none (docs/anchoring.md:
+	 * "it does not poll"), and starting the interval anyway would just wait out HARD_TIMEOUT below for
+	 * a tick that can never land. */
+	if (!poll || !Array.isArray(poll.queue) || poll.queue.length === 0)
+		return { skip: 'this page registers no poll — nothing to tick' };
+	if (typeof poll.active === 'function' && !poll.active()) poll.start();
+
+	/* NOT room/2 — HOLD and SWAP only need SOME room below the reader, but this case's fault is
+	 * where the reader rests relative to the FOLD, not to the document's total length: on a page
+	 * `room` puts room/2 thousands of pixels past where anything was misbehaving, and a run parked
+	 * there measured 0px on 3/3 tries while ../tmp/task-overview12/tick-probe.mjs kept finding 21px
+	 * peak-to-peak at the same page's default park, ~0.6 viewport heights down — the same fraction
+	 * `anchorRef()` (fs-fit.js) already uses to find the fold, because a reader who just opened a
+	 * page rests roughly one screen down into it, not in its middle. */
+	const at = Math.min(Math.round((window.innerHeight || 800) * 0.6), room);
+	/* park the reader and wait for the ENGINE to say the scroll happened — see the note on HOLD */
+	const parkAt = async (y) => {
+		const target = sc || window;
+		const landed = new Promise((res) => {
+			let done = false;
+			const on = () => { if (!done) { done = true; target.removeEventListener('scroll', on); res(); } };
+			target.addEventListener('scroll', on, { passive: true });
+			setTimeout(() => { if (!done) { done = true; target.removeEventListener('scroll', on); res(); } }, 2500);
+		});
+		if (sc) sc.scrollTop = y; else window.scrollTo(0, y);
+		await landed;
+		const fit = await window.L.require('fs-fit').then((m) => m, () => null);
+		if (fit && typeof fit.restAt !== 'function')
+			throw new Error('fs-fit is loaded but exports no restAt(): the sweep cannot tell when '
+				+ 'the theme has taken its reference, and a flat wait is not a substitute');
+		if (fit) {
+			for (let i = 0; i < 160; i++) {
+				if (fit.restAt() === (sc ? sc.scrollTop : window.scrollY) && !fit.scrolling()) break;
+				await wait(25);
+			}
+		}
+		await wait(600);		/* the still moment the theme measures from */
+	};
+	await parkAt(at);
+
+	/* NOT counted by MutationObserver batch — tried first, and wrong: one real tick on the Overview
+	 * refills System, Memory and Storage as three separate `dom.content()` calls, each its own
+	 * microtask-batched callback, so 3 "mutations" landed inside a SINGLE real tick and the case
+	 * exited after 500ms of quiet having watched about two seconds of page time — long before the
+	 * three real, 5-SECOND-APART ticks this case exists to cross. That version measured 0px on 3/3
+	 * tries on the exact cell ../tmp/task-overview12/tick-probe.mjs was, at the time, reporting 21px
+	 * peak-to-peak on. So the budget is TIME, off the page's own `L.env.pollinterval` — what
+	 * `Poll.add()` itself defaults an interval to when a caller gives none (luci-base) — rather than
+	 * off how many mutation callbacks happened to fire. */
+	const interval = (window.L && window.L.env && Number(window.L.env.pollinterval)) || 5;
+	let mutations = 0;
+	const mo = new MutationObserver(() => { mutations++; });
+	mo.observe(view, { childList: true, subtree: true });
+
+	const samples = [];
+	const start = performance.now();
+	/* `ticks` real intervals, plus one more tick's worth of headroom for lateDrift's correction
+	 * (measured up to 421ms after the mutation, fs-fit.js) to land inside the window instead of
+	 * just past its close. */
+	const budget = (ticks + 1) * interval * 1000 + 1500;
+	await new Promise((done) => {
+		const frame = () => {
+			samples.push(pos());
+			if (performance.now() - start < budget) requestAnimationFrame(frame); else done();
+		};
+		requestAnimationFrame(frame);
+	});
+	mo.disconnect();
+
+	if (mutations === 0)
+		return { skip: `no tick landed in ${Math.round(performance.now() - start)}ms — the poll did not run` };
+
+	const mn = Math.min(...samples), mx = Math.max(...samples);
+	return { moved: Math.round((mx - mn) * 10) / 10, mutations, samples: samples.length,
+		scroller: sc ? 'maincontent' : 'window' };
+};
+
 const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'scroll-anchor');
 /* Printed as it is found, not held until the end: the first finding is the whole answer for someone
  * iterating on a fix, and the list below is what says how many cells and which axes. */
@@ -643,8 +761,23 @@ for (const engine of ENGINES) {
 				}
 				await page.waitForTimeout(3000);
 
-				let held, swap, quiet;
+				let held, swap, quiet, tick;
 				try {
+					/* TICK FIRST, and on the page exactly as it loaded — HOLD's pad, SWAP's two
+					 * removeChild/appendChild cycles and QUIET's two dozen scripted flicks all perturb
+					 * whatever the engine had picked as its own anchor node, and TICK measures whether
+					 * a REAL tick misbehaves on ITS OWN, not after three probes have already leaned on
+					 * the page. Measured: run after them, on this same page, TICK read 0px on a cell
+					 * ../tmp/task-overview12/tick-probe.mjs (a fresh navigation) was reporting 21px
+					 * peak-to-peak on at the time — the same fix, the same page, only its position in
+					 * the sequence differed. Only against the REAL engine: with `noEngineAnchor` the
+					 * stylesheet above already turns anchoring off for the whole page, which is
+					 * precisely what TICK exists to watch for misbehaving — running it there would
+					 * measure the theme's own correction against nothing, the question HOLD/SWAP
+					 * already answer with a synthetic pad. */
+					tick = noEngineAnchor
+						? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
+						: await page.evaluate(TICK, TICK_COUNT);
 					held = await page.evaluate(HOLD, GROWTH);
 					swap = await page.evaluate(SWAP, GROWTH);
 					quiet = await page.evaluate(QUIET, GROWTH);
@@ -701,6 +834,14 @@ for (const engine of ENGINES) {
 				if (quiet.unexplained)
 					found(`${where}: the offset moved on its own ${quiet.unexplained} time(s) mid-flick (worst ${quiet.biggest}px) `
 						+ '— a correction landing inside a scroll is itself a jump');
+				/* THE PARKED READER, ACROSS REAL TICKS — see the note on TICK. Nothing here inserted the
+				 * growth: a page that ticks at all and still moves is the engine's own anchoring (or its
+				 * absence of one), the fault HOLD/SWAP's synthetic pad and QUIET's motion cannot reach. */
+				if (tick.skip)
+					process.stdout.write(`  ${where}: TICK measured nothing (${tick.skip})\n`);
+				else if (Math.abs(tick.moved) > TOLERANCE)
+					found(`${where}: the reader drifted ${tick.moved}px across real poll ticks `
+						+ `(${tick.mutations} mutation(s) observed) while parked and nobody scrolling`);
 				/* signed for readability: a positive offset is the scroller compensating for growth
 				 * above the reader, which is what tells "the engine declined to anchor" (0px here)
 				 * apart from "the mark misreported" (moved itself would be the tell, not this term) */
@@ -712,7 +853,8 @@ for (const engine of ENGINES) {
 					+ `, reader ${swap.skip || swap.floorMoved === null ? '-' : swap.floorMoved + 'px'} `
 					+ `[offset ${swap.skip || swap.floorOffsetDelta === null ? '-' : signed(swap.floorOffsetDelta)}]`
 					+ `  mid-flick surprises ${quiet.unexplained}`
-					+ (quiet.stalls ? `  (${quiet.stalls} step(s) too slow to still be a flick, not counted)` : '') + '\n');
+					+ (quiet.stalls ? `  (${quiet.stalls} step(s) too slow to still be a flick, not counted)` : '')
+					+ `  tick drift ${tick.skip ? '-' : tick.moved + 'px/' + tick.mutations + 'mut'}` + '\n');
 				await ctx.close();
 			}
 		}

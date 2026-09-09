@@ -23,6 +23,26 @@ detection exists to avoid.
 `localStorage.fsEngineAnchor = 'off'` forces the second path on any engine — that is how the sweep
 reaches it, and how a Safari-only report is reproduced on a machine that has no Safari.
 
+**`overflow-anchor` stopped being able to say "this engine's anchoring can be trusted", the day
+WebKit shipped it too — task wkanchor.** All three now answer `true`, but WebKit's own anchoring can
+still get a tick wrong that grows nothing above the reader at all: parked mid-page with real poll
+ticks landing (`tools/scroll-anchor.mjs`'s `tick` case), the offset still moved — no `scrollTo`, no
+`scrollTop` setter recorded — 21px on the Overview's default park
+(`../tmp/task-overview12/tick-probe.mjs`), 41px at 390 wide in the bar/top layout. `lateDrift()`
+already wrote that back, one rAF plus `SCROLL_IDLE` later — measured 421/421/408ms after the tick —
+which is not wrong, just late enough to read as a jump.
+
+`ENGINE_MISANCHORS` (`fs-fit.js`) is the second question this now takes, once the first says the
+platform anchors at all: not `overflow-anchor` again (every engine claims it) and not a browser name
+(the same rule as above) — `-webkit-hyphenate-limit-before`, a non-standard WebKit hyphenation
+extension Blink and Gecko have never implemented, answers `false` on Chromium and Firefox and `true`
+on WebKit. `-webkit-touch-callout` was tried first and rejected: it answers `false` on a touch-less
+desktop WebKit build too, so it names a capability rather than the engine and would leave a non-touch
+Safari undetected. Where it answers `true`, `fs-fit.js` writes `data-fs-anchor-suppress` on `:root`
+once, at module eval — `ENGINE_ANCHORS` reads the same flag and returns `false`, taking the
+non-engine correction path for exactly the engine whose own anchoring is being turned off, never for
+one whose anchoring is trusted (below).
+
 ## The document may not get shorter: `holdFloor()`
 
 `dom.content()` — what every LuCI poll calls — empties a container before it refills it. A layout
@@ -120,6 +140,14 @@ another correction, which is the shape the reports are about.
 `theme/30-tables.css` sets `overflow-anchor: none` on `.table.fs-dt` — the data tables the fit pass
 re-lays. Without it the engine anchors inside a table whose layout the theme is about to falsify.
 
+`theme/20-shell.css` sets the same property, unconditionally within its own selector list, on
+`html`, `body`, `#maincontent`, `.fs-main`, `#view` and `#view *` — but only under
+`:root[data-fs-anchor-suppress]`, the attribute `ENGINE_MISANCHORS` writes (above). Chromium and
+Firefox never see the attribute and keep anchoring exactly as before; WebKit does, and stops
+anchoring the whole document rather than one table. The selector list is the same one
+`tools/scroll-anchor.mjs` already forces on to test the theme's own correction against a real
+engine's anchoring turned off — carried over rather than narrowed to an unmeasured subset.
+
 ## Navigation is a different question
 
 `fs-router.js` keeps its own scroll memory (`_scrollMem`, `saveScroll`/`restoreScroll`) so Back
@@ -149,9 +177,30 @@ from a theme fault.
 | `scheduleAnchor()` / `applyAnchor()` | 3 findings per scroller with the engine's anchoring off, every one the full 120px of growth: nobody corrects at all | yes, and it is the whole correction on Safari < 26 |
 | `lateDrift()` | 120px on Overview and on Processes, both scrollers, with the engine anchoring | yes — the engine's residual is not small |
 | `ENGINE_ANCHORS` | forcing "no engine anchors" on an engine that does: 120px on Processes | yes — the detection picks the path, and running both corrections is what throws the page the other way |
+| `ENGINE_MISANCHORS` / `data-fs-anchor-suppress` | WebKit's own anchoring left running on a parked reader, real ticks landing, nothing above the reader growing: 21-41px (task wkanchor, `tick` case) | yes — WebKit is trusted by the first question (`overflow-anchor` support) and gets the correction wrong anyway; without this, `lateDrift()` corrects it 421ms late instead of the engine never having moved the offset at all |
 | the guards on a page in motion (`scrollTop() !== seen`, `_userUntil`) | 6 findings per scroller, on BOTH engines and all three pages: the offset moved on its own mid-flick, worst 185-520px | yes, and it is the only mechanism here that fails on Chromium-class engines too |
 | `anchorRef()` refusing to run while scrolling | nothing measurable | **not measurable here** — it is a cost guard, not a correctness one: every rect read there is a forced layout and this runs on every content mutation |
 | `anchorRef()` refusing `#view` as the reference | nothing on the current pages | **not measurable here.** The hit test is retried across the viewport, so it now finds real content where it used to land in a grid gap; the refusal is what keeps a future layout from silently anchoring on the host, whose own top never moves (drift 0 for ever, half the matrix silently unmeasured when it did) |
+
+**A correction that is merely LATE reads as "the reader stayed put" to every case that closes before
+it lands — task wkanchor.** `held`/`swapped` insert their own growth and close within 800ms of it;
+`quiet` discards any step where the offset held still for 400ms, since its own subject is a reader
+in motion. WebKit's mis-anchoring is neither: nothing is inserted, the reader is parked, and
+`lateDrift()`'s correction lands 421ms after the tick — past `quiet`'s 400ms-still discard and well
+inside `held`/`swapped`'s 800ms window, but neither of those two ever watches a PARKED reader across
+a REAL tick, only a synthetic one it grew itself. `tick` is the fourth case this shape needed: it
+parks the reader, leaves the poll running rather than stopping it (the one thing `held`/`swapped` do
+that this case cannot), and watches the offset across ticks timed off the page's own
+`L.env.pollinterval` — a fixed multiple of `pollinterval` was tried first and rejected, since one
+real tick on the Overview batches System/Memory/Storage into several separate `MutationObserver`
+callbacks and a count-based stop read all of them as separate ticks, closing the case after about
+two seconds of page time and reporting 0px on the exact cell a time-based window (and
+`tick-probe.mjs`) reported 21px on. Also layout-dependent in a way the other three cases are not:
+0px at `390 side` (the sidebar collapsed to a bar under `data-narrow`) against 41px at `390 top` (the
+bar layout proper) — same page, same tick, same engine, `data-layout` still carrying a difference
+under the collapse that `held`/`swapped`/`quiet` never needed to know about, since which element
+scrolls is the same either way. `390 top` joins the default (non-`--full`) axis for every case as a
+result, not only `tick`'s own — a regression here would otherwise only be caught on a push or a tag.
 
 And four parts that carry the machinery rather than decide anything, so there is nothing to ablate:
 
