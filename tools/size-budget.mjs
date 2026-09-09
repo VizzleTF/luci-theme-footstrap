@@ -405,7 +405,21 @@ const LIMITS = {
 	 * `[data-field]` (~49 B), which is what keeps the poll's per-tick row-class rewrites from waking
 	 * the sweep (`fit-quiet` and the anchor `tick` case both still read 0 px after this). The limit
 	 * goes to 58,650, 68 B of head-room. */
-	coldJs: 58_650,
+	/* 58,858 B on 2026-09-09, up 208 B for the witness that cannot be blind (task blindref):
+	 * `lateDrift()` asked ONE element whether the page had moved, and `anchorRef()` picks that
+	 * element by hit-testing the top of the viewport — so it can sit above the container a tick
+	 * refilled and honestly read zero, which the code took for "the engine put it back". Measured
+	 * in CI on four runs across four SHAs: a compact-density reference at top -362 read 0px of
+	 * drift on 13 refills out of 13 while the reader sat 120px off (webkit/owrtsnap @1440 side).
+	 * The mutation record's own target — the container that actually grew, measured against the
+	 * height `data-fs-floor` pinned it at — is the second witness, and it cannot make that mistake:
+	 * it IS the growth rather than a guess at what moved, and it reads 0 where nothing grew, so a
+	 * false witness can only ever REFUSE here, never write. Trimmed from 456 B across three
+	 * redesigns before landing here; the remainder is the record plumbing and the cross-check
+	 * against the offset. The limit goes to 58,900, 42 B of head-room — the fourth raise today, and
+	 * every one of them bought a mechanism replacing a narrower patch. What the cold path is
+	 * carrying is worth an audit of its own before the next one. */
+	coldJs: 58_900,
 };
 
 function bytes(path) {

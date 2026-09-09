@@ -608,7 +608,7 @@ function anchorEnabled() {
  * scrolls, not across a navigation, never more than a viewport. */
 let _lateFrame = 0;
 
-function lateDrift(ref) {
+function lateDrift(ref, grow) {
 	/* the reference from BEFORE this tick, captured by the caller: one taken after the mutation
 	 * describes the page as the mutation left it, so its drift is zero by construction */
 	if (_lateFrame || !ref) return;
@@ -649,7 +649,24 @@ function lateDrift(ref) {
 				if (!ref.sec || !ref.sec.isConnected || ref.secTop == null) return;
 				el = ref.sec; was = ref.secTop;
 			}
-			const drift = el.getBoundingClientRect().top - was;
+			let drift = el.getBoundingClientRect().top - was;
+			/* THE WITNESS CAN BE BLIND. `el`/`ref.sec` is whatever anchorRef() hit-tested at the fold
+			 * on the LAST still page — it is not guaranteed to sit below the container this tick
+			 * actually refilled, and an element's own top does not move when growth happens somewhere
+			 * it is not connected to. Measured live: a compact-density reference at top -362 read 0px
+			 * of drift on 13 of 13 refills while the reader sat 120px off (CI, webkit/owrtsnap @1440
+			 * side, task blindref). `grow` — the mutation record's OWN target measured by the caller
+			 * (observeContent()) against the height `data-fs-floor` pinned it at before this tick —
+			 * cannot make that mistake: it IS what the refilled container actually grew by, not a
+			 * guess at what moved, and it is 0 where nothing did, so a false witness only ever REFUSES
+			 * here, never writes. Cross-checked against the offset actually moved since the reference
+			 * was taken (`seen`, not a fresh read — the guard above already proved it has not
+			 * changed): an engine that anchored moves it by (about) the growth, one that declined
+			 * leaves it where it was. */
+			if (Math.abs(drift) < 1 && grow > 1) {
+				const g = grow - (seen - ref.at);
+				if (Math.abs(g) >= 1) drift = g;
+			}
 			if (Math.abs(drift) < 1) return;			/* the engine put it back */
 			if (Math.abs(drift) > (window.innerHeight || 800)) return;
 			const sc = scroller();
@@ -731,7 +748,7 @@ function applyAnchor(ref) {
  * constructor, and luci-base instantiates a class once, at the first require. */
 function observeContent() {
 	if (_mo) return;
-	_mo = new MutationObserver(() => {
+	_mo = new MutationObserver((records) => {
 		/* The theme corrects only where the engine will not. Where it anchors, growth above the
 		 * reader is the engine's job and the floor covers the collapse, so there is nothing left for
 		 * a correction to do: one written here would read its reference in the same instant the poll
@@ -753,8 +770,27 @@ function observeContent() {
 		 * gets no third 420ms-late chance at a correction the fast path already does in 7-36ms. */
 		const trustEngine = _engineTrusted;
 		const ref = trustEngine ? null : anchorFor();
+		/* THE RECORD'S OWN TARGET, read before run() below rewrites its floor for the NEXT tick — the
+		 * only place this callback sees which container a poll actually refilled, as opposed to
+		 * whichever element anchorRef() happened to hit-test at the fold, which need not be connected
+		 * to THIS growth at all (task blindref). A record's target already wearing `data-fs-floor` IS
+		 * the box holdFloor() pinned at its last settled height, so its height against that pin, taken
+		 * NOW — the mutation already happened, so this is its final height; nothing here waits on the
+		 * engine, which only ever moves the SCROLL POSITION, never an element's own size — is the
+		 * growth lateDrift() needs, in pixels rather than a live reference to carry forward. Only
+		 * worth finding where the engine is trusted to correct on its own — scheduleAnchor() below
+		 * reads its own reference geometrically. */
+		let grew = 0;
+		if (trustEngine) {
+			const r = records.find((m) => m.type === 'childList' && m.target.hasAttribute('data-fs-floor'));
+			/* a box freshly wearing its FIRST floor has no "before" to measure against — parseFloat
+			 * of an unset `min-height` is NaN, `|| 0` reads as "no growth" rather than false growth
+			 * the size of the whole box */
+			const before = r && (parseFloat(r.target.style.minHeight) || 0);
+			if (before) grew = r.target.offsetHeight - before;
+		}
 		run();
-		if (trustEngine) lateDrift(settled);
+		if (trustEngine) lateDrift(settled, grew);
 		else scheduleAnchor(ref);
 	});
 	const hosts = [ document.getElementById('view') || document.body, document.getElementById('modal_overlay') ]

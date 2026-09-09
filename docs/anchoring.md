@@ -109,6 +109,53 @@ skip the `.fs-ovl` grid case uses). Widening what `SWAP` can measure — a small
 size, or picking a body nearer the fold instead of the tallest one entirely above it — is a change to
 what the case tests, not a flag on top of it, and is out of scope here.
 
+## A witness that cannot be blind: the growth itself (task blindref)
+
+`lateDrift()`'s drift is `el.getBoundingClientRect().top - was`, and `el` is whatever `anchorRef()`
+hit-tested at the fold the last time the page was still — not guaranteed to sit below the container
+THIS tick refilled, and an element's own top does not move when growth happens somewhere it is not
+connected to. Reproduced on CI, the same finding across three SHAs (1e88310, 7ff9e56, 76b3c7a):
+`webkit owrtsnap @1440 side compact, engine-anchoring on, overview` — a section refilled the way a
+poll refills one and the page never came back, still 120px off after the 900ms `SWAP_WINDOW`. Of
+`lateDrift()`'s five refusals, `drift < 1px` fired 13 of 13 refills — `anchorRef()`'s hit test lands
+on a different element per density (a plain `DIV` at top -362 in compact, `DIV.network-status-table`
+at top -33 in normal), and the compact one sits where the growth never reaches it: a reference there
+reads 0px whether the engine corrected or not, and the code reads that zero as "the engine put it
+back." `_lateMisses` never advanced (identical numbers on 7ff9e56, before the counter existed)
+because incrementing needs a WRITE and `lateDrift()` never wrote one — the raw scroll offset stayed
+at `+0` for the whole window, `SWAP`'s own diagnostic metric confirming the theme's net never
+engaged at all.
+
+`lateDrift()` now takes a second witness that cannot make that mistake: `grow`, the height the
+mutation's own target actually gained. `observeContent()`'s `MutationObserver` callback receives
+`records` (previously discarded) and finds the first `childList` record whose target already wears
+`data-fs-floor` — the mark `holdFloor()` writes at "the height it had at the last settled moment,
+written BEFORE the tick" (below) — and reads its `offsetHeight` against that pin right there in the
+callback: the mutation has already happened, so this IS the container's final height, and nothing
+here waits on the engine, which only ever moves the SCROLL POSITION, never an element's own size. A
+carried-forward number cannot misread the way a live reference can if the container is later gone.
+Where `el`'s own drift already reads under 1px AND `grow` is over 1px, the residual is `grow` minus
+however much the offset already moved since the reference was taken (`seen - ref.at` — `seen`, not a
+fresh read, since the guard above it already proved the offset has not changed since): an engine
+that anchored moves the offset by (about) the growth, one that declined leaves it where it was. The
+other four refusals (`_lateFrame` already pending, the page navigated away, the reader is moving,
+over a viewport) are untouched — the fault was never the tolerance, only that the question was asked
+of an element that need not have moved.
+
+**The gate had to learn to say which refusal fired, too.** `SWAP`'s "never came back" finding string
+omitted `swap.writes` — the scroll-write log — though the "corrected late" finding beside it already
+carried it, which is exactly why three CI runs of the same finding could not say whether the theme
+wrote nothing at all or wrote somewhere the mark did not see. Both branches now print it: an empty
+array means `lateDrift()` never wrote, matching `_lateMisses` staying at 0.
+
+**Proof.** Rebuilt `owrtsnap`, webkit, `@1440 side compact`: `swap moved 0px [offset +120] corrected
+16ms` — where CI read `still 120px off … [writes: []]` before the fix (the fault itself did not
+reproduce locally even before the fix, on the rebuilt image — CI's three SHAs are the reproduction).
+`normal` and `large` stay green on the same cell. Chromium and Firefox stay at 0px on every
+default-axis cell of `overview` this sweep reaches. `fit-quiet` (0px peak-to-peak, 3 widths) and
+`SWAP`'s own `TICK` case (0px, 20 mutations observed) are unmoved — the hot path this task touches
+runs on every anchoring pass, not only the one CI caught.
+
 ## The document may not get shorter: `holdFloor()`
 
 `dom.content()` — what every LuCI poll calls — empties a container before it refills it. A layout

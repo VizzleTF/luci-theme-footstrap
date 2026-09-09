@@ -907,14 +907,19 @@ for (const engine of ENGINES) {
 				else if (Math.abs(swap.moved) > TOLERANCE)
 					/* `correctedAt` is null here BY CONSTRUCTION: swap() only sets it once the drift has
 					 * fallen back under tolerance, so a moved this large at the end of the window means
-					 * it never did — NEVER CORRECTED, not corrected late. */
+					 * it never did — NEVER CORRECTED, not corrected late. `writes` — HOLD's finding
+					 * already appends it, this one did not, which is why three CI runs of the same finding
+					 * could not say whether the theme ever attempted a correction: an empty array here means
+					 * it never wrote, a non-empty one means it wrote somewhere the mark did not see. */
 					found(`${where}: a section was refilled the way a poll refills one and the page never `
 						+ `came back — still ${swap.moved}px off after ${SWAP_WINDOW}ms `
-						+ `(the engine clamped ${swap.clamped}px of offset away)`);
+						+ `(the engine clamped ${swap.clamped}px of offset away)`
+						+ ` — writes: ${JSON.stringify(swap.writes || [])}`);
 				else if (swap.correctedAt !== null && swap.correctedAt > LATE_MS)
 					found(`${where}: a section was refilled the way a poll refills one and the correction `
 						+ `landed ${swap.correctedAt}ms after the refill (over the ${LATE_MS}ms late `
-						+ `threshold — visible to the reader as a jump)`);
+						+ `threshold — visible to the reader as a jump)`
+						+ ((swap.writes && swap.writes.length) ? ` — writes: ${JSON.stringify(swap.writes)}` : ''));
 				/* The floor is judged on the CLAMP, not on the movement, and only where the theme owns the job:
 				 * with the correction switched off nobody compensates the pad the probe grows, so the
 				 * reader moves by exactly that and should. What must not happen is the engine taking an
