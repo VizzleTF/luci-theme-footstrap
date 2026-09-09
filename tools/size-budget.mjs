@@ -362,7 +362,23 @@ const LIMITS = {
 	 * pays it. The commit cost 243 B as written; folding the two `CSS.supports` probes onto one
 	 * helper and the two `data-fs-*` root writes onto another recovered 109 B of that. The limit
 	 * goes to 58,250, 68 B of head-room. */
-	coldJs: 58_250,
+	/* 58,109 B on 2026-09-09, DOWN 101 B — task barpin found the diagnosis behind the raise above
+	 * wrong and reverts it. `fitChrome()` (fs-chrome.js) pinned the bar's `min-height` against
+	 * SHRINKING during its own measurement pass but never against GROWING, so the bar itself
+	 * walked up to 107px taller than its settled height and back inside one synchronous pass —
+	 * measured by extending `tools/fit-quiet.mjs` to watch both directions instead of only the
+	 * dip — and every engine, not only WebKit, paints between the poll's own separate section
+	 * refreshes and follows that walk 1:1. WebKit was never mis-anchoring; it was the one engine
+	 * with no scroll anchoring of its own to absorb what the bar was actually doing. With the bar
+	 * pinned both ways for the pass, the same probe that measured 21-41px on WebKit reads 0px at
+	 * 390/top with NO suppression at all, 26 s of real poll ticks
+	 * (`../tmp/task-toplayout/top-probe.mjs --unsuppress`) — `ENGINE_MISANCHORS` and the
+	 * `data-fs-anchor-suppress` write it drove (fs-fit.js, theme/20-shell.css) are gone. Two parts,
+	 * measured separately: removing `ENGINE_MISANCHORS` and the CSS rule it drove returns 162 B on
+	 * its own; pinning the bar both ways for the pass (fs-chrome.js) costs 61 B back, the real fix
+	 * for the fault the reverted mechanism never actually held. The limit goes to 58,200, 91 B of
+	 * head-room — DOWN from 58,250, because the number it was raised for was never real. */
+	coldJs: 58_200,
 };
 
 function bytes(path) {

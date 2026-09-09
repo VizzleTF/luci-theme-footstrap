@@ -1349,6 +1349,43 @@ narrower than apk's, which reads its own reported `N unavailable` count rather t
 Not this task's fix (`install.sh`'s boundary here is the own-feed decision alone, not the general
 counting shape) — flagged for whoever next touches `feed_refresh()`'s opkg branch.
 
+**Installing npm packages from WSL instead of from Windows leaves every gate looking broken, when
+only the install is.** An install run from WSL writes `node_modules/.bin/` as POSIX symlinks
+(`eslint@ -> ../eslint/bin/eslint.js`), which Windows cannot execute — every `npm run <gate>` from
+Git Bash then dies with `'eslint' is not recognized as an internal or external command`, and the git
+`pre-push` hook fails the same way, reading exactly like a red gate rather than a bad install.
+Installed from Windows instead, npm writes three wrappers per package (`eslint`, `eslint.cmd`,
+`eslint.ps1`), and the extensionless one is a sh script WSL can run too — one install serves both
+sides. The install itself has to be invoked as `node "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js"
+ci --ignore-scripts` from Git Bash: `cmd.exe /c npm ci` from Git Bash silently does nothing (MSYS
+rewrites `/c` into a path before `cmd.exe` ever sees it), and PowerShell refuses `npm` outright (next
+trap). `--ignore-scripts` is deliberate — the browsers the gates need live in WSL, and a second
+Windows-side copy is a few hundred MB nobody runs. Verified this session: `npm run lint` passes from
+both Git Bash and WSL off one Windows-side install.
+
+**A fresh Windows-side `npm ci` needs `chmod +x node_modules/.bin/*` from WSL before WSL can run any
+of it, and the fix does not survive the next install.** `/mnt/c` on this machine mounts
+`metadata,umask=0077,fmask=0177` (`/etc/wsl.conf`), so every file npm just wrote from Windows arrives
+world-unexecutable — the sh wrappers the trap above depends on are present and correct, but
+`npm run lint` inside WSL still dies, this time with `sh: 1: eslint: Permission denied`. Because
+`metadata` is on, one `chmod` sticks across reboots — but not across a fresh `npm ci`, which writes
+new files under the mount's default mode again. Diagnose with `ls -l node_modules/.bin/eslint` (mode
+`0600` is the trap) and `mount | grep " /mnt/c "` (confirms the `fmask`).
+
+**PowerShell is not a fallback for the symlink trap above — `npm` does not run there at all on this
+machine.** `npm.ps1 cannot be loaded because running scripts is disabled on this system` is
+PowerShell's own execution policy refusing the wrapper script outright, unrelated to the WSL symlink
+issue and not fixed by installing from the "right" side. Git Bash and `cmd` (called directly, not
+through `cmd.exe /c` from Git Bash) are unaffected.
+
+**`${PIPESTATUS[0]}` reads back empty in this WSL bash, the same way `$?` is already unreliable here
+— and it fails silently, not loudly.** A piped `npm run check | tee log.txt; echo
+"CHECK_EXIT=${PIPESTATUS[0]}"` printed `CHECK_EXIT=` — empty, not a number — and the empty string
+read as "not the literal failure text" to whatever was watching it, while the run had actually
+failed on the size budget. The gate's own printed output was the only place the failure showed.
+Judge a WSL gate by what it printed, never by a captured status of any kind — `$?`, `PIPESTATUS`, or
+otherwise.
+
 ## The test matrix
 
 - **Pages**: Status/Overview (tables, ifacebox), Network/Interfaces (zonebadge, modals),

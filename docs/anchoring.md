@@ -24,24 +24,40 @@ detection exists to avoid.
 reaches it, and how a Safari-only report is reproduced on a machine that has no Safari.
 
 **`overflow-anchor` stopped being able to say "this engine's anchoring can be trusted", the day
-WebKit shipped it too — task wkanchor.** All three now answer `true`, but WebKit's own anchoring can
-still get a tick wrong that grows nothing above the reader at all: parked mid-page with real poll
-ticks landing (`tools/scroll-anchor.mjs`'s `tick` case), the offset still moved — no `scrollTo`, no
-`scrollTop` setter recorded — 21px on the Overview's default park
-(`../tmp/task-overview12/tick-probe.mjs`), 41px at 390 wide in the bar/top layout. `lateDrift()`
-already wrote that back, one rAF plus `SCROLL_IDLE` later — measured 421/421/408ms after the tick —
-which is not wrong, just late enough to read as a jump.
+WebKit shipped it too — task wkanchor.** All three now answer `true`, and parked mid-page with real
+poll ticks landing (`tools/scroll-anchor.mjs`'s `tick` case), the offset still moved on WebKit — no
+`scrollTo`, no `scrollTop` setter recorded — 21px on the Overview's default park
+(`../tmp/task-overview12/tick-probe.mjs`), 41px at 390 wide in the bar/top layout. Task wkanchor read
+that as WebKit's own scroll anchoring getting a real correction wrong and shipped `ENGINE_MISANCHORS`
+(`fs-fit.js`, `-webkit-hyphenate-limit-before`) to turn WebKit's anchoring off on the theme's own
+scroller wherever it fired, `overflow-anchor: none` under `data-fs-anchor-suppress`
+(`theme/20-shell.css`). `lateDrift()` had already been writing the drift back one rAF plus
+`SCROLL_IDLE` later — measured 421/421/408ms after the tick — and the new mechanism was meant to make
+that correction unnecessary rather than merely late.
 
-`ENGINE_MISANCHORS` (`fs-fit.js`) is the second question this now takes, once the first says the
-platform anchors at all: not `overflow-anchor` again (every engine claims it) and not a browser name
-(the same rule as above) — `-webkit-hyphenate-limit-before`, a non-standard WebKit hyphenation
-extension Blink and Gecko have never implemented, answers `false` on Chromium and Firefox and `true`
-on WebKit. `-webkit-touch-callout` was tried first and rejected: it answers `false` on a touch-less
-desktop WebKit build too, so it names a capability rather than the engine and would leave a non-touch
-Safari undetected. Where it answers `true`, `fs-fit.js` writes `data-fs-anchor-suppress` on `:root`
-once, at module eval — `ENGINE_ANCHORS` reads the same flag and returns `false`, taking the
-non-engine correction path for exactly the engine whose own anchoring is being turned off, never for
-one whose anchoring is trusted (below).
+**That diagnosis was wrong — task barpin.** Nothing about WebKit's own anchoring was misfiring: the
+bar itself was moving. `fitChrome()` (fs-chrome.js) pins the bar's box against SHRINKING while it
+measures whether the menu still fits, so the question can be asked with the layout classes off, but
+until this task it pinned only that direction — with the classes off, and again as `fs-bar-stack`/
+`fs-ind-compact` are added back one at a time, the bar's OWN height was free to answer whatever its
+content needed at that instant, up to 107px taller than its settled height, one synchronous pass at a
+time. `fitChrome()` runs once per poll-driven mutation, and the Overview's own poll batches
+System/Memory/Storage into several separate `MutationObserver` callbacks rather than one — so the
+walk landed as a sequence of real, differently-sized boxes with a paint between them, and EVERY
+engine followed it, not only WebKit. Chromium and Firefox hid that behind their own scroll anchoring,
+each correcting its own move before the next one landed; WebKit has no anchoring of its own to hide
+behind, so the walk showed up directly as drift, and `lateDrift()` — built to clean up after an
+anchoring engine's own residual — was instead cleaning up after this. `tools/fit-quiet.mjs`, extended
+to watch the bar's height in both directions rather than only the dip, measured the walk directly:
+230 → 202 → 164 → 144 → 123 → 131 → 123px against a settled 123px, 107px of growth a floor alone
+never sees. `fitChrome()` now pins the bar's height BOTH ways for the whole decision and releases the
+pin only once the final class set is chosen, right before the height is published — nothing the pass
+measures (`stripFitsOneRow()`'s `offsetTop`, `clusterFitsBrandRow()`'s widths) reads the bar's own
+height, so the pin changes nothing about which classes get chosen. With that in place, the same
+probe that measured 21-41px on WebKit reads 0px at 390/top with the suppression removed entirely, 26s
+of real poll ticks (`../tmp/task-toplayout/top-probe.mjs --unsuppress`) — `ENGINE_MISANCHORS` and
+`data-fs-anchor-suppress` are gone from the tree (`fs-fit.js`, `theme/20-shell.css`): there was never
+a WebKit-specific fault for them to hold.
 
 ## The document may not get shorter: `holdFloor()`
 
@@ -140,13 +156,13 @@ another correction, which is the shape the reports are about.
 `theme/30-tables.css` sets `overflow-anchor: none` on `.table.fs-dt` — the data tables the fit pass
 re-lays. Without it the engine anchors inside a table whose layout the theme is about to falsify.
 
-`theme/20-shell.css` sets the same property, unconditionally within its own selector list, on
-`html`, `body`, `#maincontent`, `.fs-main`, `#view` and `#view *` — but only under
-`:root[data-fs-anchor-suppress]`, the attribute `ENGINE_MISANCHORS` writes (above). Chromium and
-Firefox never see the attribute and keep anchoring exactly as before; WebKit does, and stops
-anchoring the whole document rather than one table. The selector list is the same one
-`tools/scroll-anchor.mjs` already forces on to test the theme's own correction against a real
-engine's anchoring turned off — carried over rather than narrowed to an unmeasured subset.
+Task wkanchor added the same property, unconditionally within its own selector list, on `html`,
+`body`, `#maincontent`, `.fs-main`, `#view` and `#view *` — under `:root[data-fs-anchor-suppress]`,
+the attribute `ENGINE_MISANCHORS` used to write. Task barpin removed both: the attribute was gating a
+correction for a WebKit fault that was never real (above), so turning the whole document's anchoring
+off under it bought nothing measurable once the actual cause — the bar's own box changing height
+inside `fitChrome()`'s measurement pass — was fixed. `theme/20-shell.css` carries no anchoring rule
+outside the tables one above.
 
 ## Navigation is a different question
 
@@ -177,15 +193,20 @@ from a theme fault.
 | `scheduleAnchor()` / `applyAnchor()` | 3 findings per scroller with the engine's anchoring off, every one the full 120px of growth: nobody corrects at all | yes, and it is the whole correction on Safari < 26 |
 | `lateDrift()` | 120px on Overview and on Processes, both scrollers, with the engine anchoring | yes — the engine's residual is not small |
 | `ENGINE_ANCHORS` | forcing "no engine anchors" on an engine that does: 120px on Processes | yes — the detection picks the path, and running both corrections is what throws the page the other way |
-| `ENGINE_MISANCHORS` / `data-fs-anchor-suppress` | WebKit's own anchoring left running on a parked reader, real ticks landing, nothing above the reader growing: 21-41px (task wkanchor, `tick` case) | yes — WebKit is trusted by the first question (`overflow-anchor` support) and gets the correction wrong anyway; without this, `lateDrift()` corrects it 421ms late instead of the engine never having moved the offset at all |
 | the guards on a page in motion (`scrollTop() !== seen`, `_userUntil`) | 6 findings per scroller, on BOTH engines and all three pages: the offset moved on its own mid-flick, worst 185-520px | yes, and it is the only mechanism here that fails on Chromium-class engines too |
 | `anchorRef()` refusing to run while scrolling | nothing measurable | **not measurable here** — it is a cost guard, not a correctness one: every rect read there is a forced layout and this runs on every content mutation |
 | `anchorRef()` refusing `#view` as the reference | nothing on the current pages | **not measurable here.** The hit test is retried across the viewport, so it now finds real content where it used to land in a grid gap; the refusal is what keeps a future layout from silently anchoring on the host, whose own top never moves (drift 0 for ever, half the matrix silently unmeasured when it did) |
 
+`ENGINE_MISANCHORS`/`data-fs-anchor-suppress` is not in the table above — task barpin removed it
+from the tree entirely rather than leaving a row that says "not needed". The 21-41px it was built to
+answer was real (below), but the cause was `fitChrome()`'s own bar changing height inside its
+measurement pass, not WebKit's anchoring; once that pin covers both directions the drift is 0px on
+WebKit with no suppression at all, so there was nothing left for the attribute to gate.
+
 **A correction that is merely LATE reads as "the reader stayed put" to every case that closes before
 it lands — task wkanchor.** `held`/`swapped` insert their own growth and close within 800ms of it;
 `quiet` discards any step where the offset held still for 400ms, since its own subject is a reader
-in motion. WebKit's mis-anchoring is neither: nothing is inserted, the reader is parked, and
+in motion. The fault `tick` was built for is neither: nothing is inserted, the reader is parked, and
 `lateDrift()`'s correction lands 421ms after the tick — past `quiet`'s 400ms-still discard and well
 inside `held`/`swapped`'s 800ms window, but neither of those two ever watches a PARKED reader across
 a REAL tick, only a synthetic one it grew itself. `tick` is the fourth case this shape needed: it

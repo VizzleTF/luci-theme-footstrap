@@ -373,59 +373,31 @@ function watch(el) {
  * It never fights the user: a page at the top has no offset to give back, and a drift under a pixel
  * is rounding. */
 /* Does the engine anchor at all? Chromium and Firefox do — measured with their anchoring
- * suppressed, a 120px growth above the fold moves the reader 120px, and 0px with it on. An older
- * WebKit does not, and a current one anchors but gets the COLLAPSE case wrong instead (lateDrift()
- * below). Correcting the offset in an engine that also corrects it means two corrections and a
- * page that jumps the other way, so this is asked of the platform rather than of a browser name —
- * `overflow-anchor` is the property that turns the feature off, and an engine that does not know it
- * does not have it.
+ * suppressed, a 120px growth above the fold moves the reader 120px, and 0px with it on. So this is
+ * asked of the platform rather than of a browser name — `overflow-anchor` is the property that
+ * turns the feature off, and an engine that does not know it does not have it. Defended against an
+ * engine — or a stub, in a node-run test — with no `CSS` object at all; unreadable answers `true`
+ * (assumed handled rather than fought).
  *
- * Task wkanchor: WebKit 26 shipped `overflow-anchor`, so that question now gets `true` from every
- * engine and can no longer tell "has none" apart from "has one that mis-fires". Measured on the
- * Overview, reader parked, real poll ticks, nothing above the fold changing height by even a pixel:
- * WebKit's own anchoring still moved the offset +21px — no `scrollTo`, no `scrollTop` setter
- * recorded (../tmp/task-overview12/tick-probe.mjs) — and lateDrift() below wrote it back one rAF +
- * SCROLL_IDLE later, measured 421/421/408ms after the tick: correct, and too late not to read as a
- * jump. So the job is taken away from the engine on exactly the engine that gets it wrong, rather
- * than corrected twice — `theme/20-shell.css` turns the platform's own anchoring off on the
- * scroller for the same engine ENGINE_MISANCHORS identifies below, and ENGINE_ANCHORS has to agree
- * with it or the "two corrections" fault this file already warns about reopens in a subtler shape:
- * the CSS side thinking the engine is out while this one still waits for it. */
-/* Both feature tests below are `CSS.supports`, defended against an engine — or a stub, in a
- * node-run test — with no `CSS` object at all; one function shared between them is what pays this
- * section's own way back under the wire budget, since jsmin/terser fold no duplicate literal
- * (`docs/conventions.md`, "Carry the measurement" — measured, tools/size-budget.mjs). `dflt` is the
- * answer when the probe itself cannot run, and the two calls below do not agree on it. */
-function cssSupports(prop, val, dflt) {
-	try { return typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports(prop, val); }
-	catch (e) { return dflt; }
-}
-/* Not `overflow-anchor` — every engine claims it now — and not a browser name (the platform,
- * never a browser, is this file's own rule above). `-webkit-hyphenate-limit-before` is a
- * non-standard WebKit hyphenation extension (Apple/WebKit docs, shipped since Safari 5.1) that
- * Blink and Gecko have never implemented under either spelling: measured against the three
- * engines Playwright bundles with this checkout, `CSS.supports` answers false on Chromium and
- * Firefox and true on WebKit. `-webkit-touch-callout` was tried first and rejected: it answers
- * false on a touch-LESS WebKit build too (this checkout's own WebKit, a desktop UA), so it
- * names a CAPABILITY rather than the engine and would leave every non-touch Safari undetected.
- * `dflt` is `false` here: unreadable is not claimed as a fault that could not be measured. */
-const ENGINE_MISANCHORS = cssSupports('-webkit-hyphenate-limit-before', '2', false);
-/* Written once, at module eval, never re-read: `theme/20-shell.css` keys its `overflow-anchor: none`
- * off this same attribute, so the browser's own anchoring is actually suppressed wherever this file
- * decides to own the correction instead of it — see the note above on why the two have to travel
- * together. */
-if (ENGINE_MISANCHORS) {
-	try { document.documentElement.dataset.fsAnchorSuppress = '1'; }
-	catch (e) { /* no document, no flag to write */ }
-}
+ * Task wkanchor shipped a second question here, `ENGINE_MISANCHORS`
+ * (`-webkit-hyphenate-limit-before`), reasoning WebKit 26's own anchoring got a real correction
+ * wrong: +21-41px on the Overview, reader parked, real poll ticks, nothing above the fold growing
+ * by even a pixel. Task barpin found the real mover instead — `fitChrome()` (fs-chrome.js) pinned
+ * the bar against SHRINKING during its own measurement pass but not against GROWING, so the bar
+ * itself walked up to 107px taller than its settled height and back inside that one pass, on every
+ * engine; WebKit was never mis-anchoring, it was the one engine with no scroll anchoring of its own
+ * to absorb what the bar was actually doing. With `fitChrome()` pinned both ways, the same probe
+ * that measured +21-41px reads 0px on WebKit at 390/top with NO suppression at all
+ * (`../tmp/task-toplayout/top-probe.mjs --unsuppress`, 26s of real ticks) — `ENGINE_MISANCHORS` and
+ * the `data-fs-anchor-suppress` write it drove are gone with it; see `docs/anchoring.md`. */
 const ENGINE_ANCHORS = (() => {
 	/* dev switch: `localStorage.fsEngineAnchor = 'off'` makes any engine take the non-anchoring
 	 * path, which is otherwise only reachable on a machine with Safari on it */
 	try { if (localStorage.getItem('fsEngineAnchor') === 'off') return false; }
 	catch (e) { /* no storage, no switch */ }
-	if (ENGINE_MISANCHORS) return false;
-	/* `dflt` is `true` here: unreadable is assumed handled rather than fought */
-	return cssSupports('overflow-anchor', 'auto', true);
+	try { return typeof CSS !== 'undefined' && typeof CSS.supports === 'function'
+		? CSS.supports('overflow-anchor', 'auto') : true; }
+	catch (e) { return true; }
 })();
 
 /* What the reader was looking at, captured while the page was still. `anchorRef()` runs from the

@@ -415,11 +415,13 @@ jobs:
               *)           owlab install "$r" dist/all/luci-theme-footstrap_*.ipk ;;
             esac
           done
-      # A pull request crosses the axes that were measured to change this gate's answer — the two
-      # scrollers, both anchoring modes, all three page shapes. A push and a tag add back the ones
-      # that were measured not to (every width against every layout, all three densities), because
-      # that measurement is of today's theme and a release is where being wrong about it is
-      # expensive. 12 cells per router against 48.
+      # A pull request crosses the axes that were measured to change this gate's answer — three
+      # width/layout cells (1440 side and 390 side, plus 390 top for the one WebKit-only tick
+      # misfire that measures 0px at 390 side and 41px at 390 top, task wkanchor), both anchoring
+      # modes, all three page shapes. A push and a tag add back the ones that were measured not to
+      # (every width against every layout, all three densities), because that measurement is of
+      # today's theme and a release is where being wrong about it is expensive. 18 cells per router
+      # against 72.
       - name: The sweep
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then FULL=""; else FULL="--full"; fi

@@ -1,24 +1,17 @@
 #!/usr/bin/env node
-/* The chrome may not get shorter while it measures itself.
+/* The chrome may not change height while it measures itself, in EITHER direction.
  *
  * `fitChrome()` decides whether the menu fits on the brand's row by taking the bar's layout classes
- * off and asking the engine (fs-fit rule 1). `fs-bar-stack` is what gives a narrow menu a row of its
- * own, so for the width where the menu needs that row the bar is a row SHORTER while the question is
- * being asked — and every pixel of the bar is above the reader. Measured on owrt2512 at 767px: the
- * bar stands at 98px and answers 65px with the classes off, 33px of it above whatever the reader is
- * looking at.
- *
- * Chromium and Firefox put the reader back; Safari implements no scroll anchoring, on any platform
- * (MDN: `overflow-anchor` ships in neither), and an iPhone reported the Overview creeping upward
- * once per poll tick. Bisected there with switches in a diagnostic build: `?off=chromefit` stopped
- * it, `?off=measure` — the tables' own re-measure — did not.
- *
- * WHAT THIS GATE CAN AND CANNOT SEE. The symptom does not reproduce headless: the pass is one
- * synchronous task, so no frame is painted inside it, and both engines restore the offset once the
- * bar is back (measured, 390/480/767px, at half the page and at its bottom: 0px lost either way).
- * So the gate watches the CAUSE and not the symptom — it hands the bar a classList of its own and
- * reads its height at the instant the pass takes the classes off. That height is what an engine
- * without anchoring lays out against, and it may not be below the height the bar settled at.
+ * off and asking the engine (fs-fit rule 1), then walks it back through `fs-ind-compact`/
+ * `fs-bar-stack` one step at a time. Every step is a real, differently-sized box: with the classes
+ * off the bar is free to answer whatever height its content currently needs, taller as well as
+ * shorter than where it settles. Measured with the two hooks below, on owrt2512 at 767px: the bar
+ * walked 230 -> 202 -> 164 -> 144 -> 123 -> 131 -> 123px against a settled 123px — 41px of dip AND
+ * 107px of growth, in the same pass (`../tmp/task-toplayout/pass-probe.mjs`). A gate that only
+ * watched the dip (this file, before) never saw the 107px at all, and that is exactly the shape
+ * `accc451` shipped against: WebKit was not anchoring wrongly, every engine paints between the
+ * poll's own separate section refreshes and follows this walk 1:1 — WebKit was only the one engine
+ * with no scroll anchoring of its own to hide it behind (docs/anchoring.md).
  *
  *   node tools/fit-quiet.mjs [--only owrt2512] [--all] [--engine chromium|webkit]
  *
@@ -31,38 +24,40 @@ const arg = (name, dflt) => {
 	return i === -1 ? dflt : process.argv[i + 1];
 };
 const ENGINE = arg('engine', 'chromium');
-/* Both sides of the decision: 390px is where the menu takes its own row and the bar is TALLER with
- * the classes off, 767px is where it does not and the bar is 33px shorter. Only the second can move
- * a reader, and only that width would have caught it. */
+/* Both sides of the decision: 390px is where the menu takes its own row and the bar walks taller
+ * before it settles, 767px is where it does not and the walk is mostly a dip. Only widths that
+ * drive the escalation move the bar at all, and both are needed to see either direction. */
 const WIDTHS = (arg('widths', '390,480,767')).split(',').map(Number);
 const SLACK = Number(arg('slack', '2'));
 
-/* The bar gets a classList of its own, so the pass announces itself: a live DOMTokenList carries no
- * pointer back to its element, and the height wanted here is the one that exists between the remove
- * and the restore — inside a task no observer and no frame gets to run in. */
+/* Every forced layout `fitChrome()`'s own decision performs — `stripFitsOneRow()`'s `offsetTop` and
+ * `getClientRects()` reads (fs-chrome.js) — is a moment an engine with no scroll anchoring could
+ * paint against, so the bar's own height is sampled at each one, peak AND trough against the height
+ * it had when the pass started. A live DOMTokenList carries no pointer back to its element and a
+ * class-write hook only fires when the BAR's own class list changes — most of the walk comes from
+ * `fitTabStrips()` toggling `fs-dense1`/`fs-dense2` on the MENU, which reflows the bar around it
+ * with no write to the bar's own attributes at all — so the hook sits on the two reads instead,
+ * same as `../tmp/task-toplayout/pass-probe.mjs`, which is what found the 107px this gate used to
+ * miss. */
 const WATCH = () => {
 	const bar = document.querySelector('.fs-sidebar');
 	if (!bar) return;
-	const real = bar.classList;
-	window.__fsBar = { dip: 0, at: 0, calls: 0, settled: Math.round(bar.getBoundingClientRect().height) };
-	const proxy = new Proxy(real, {
-		get(t, k) {
-			const v = t[k];
-			if (typeof v !== 'function') return v;
-			if (k !== 'remove') return v.bind(t);
-			return (...names) => {
-				const out = v.apply(t, names);
-				if (names.indexOf('fs-bar-stack') !== -1) {
-					const h = Math.round(bar.getBoundingClientRect().height);
-					const w = window.__fsBar;
-					w.calls++;
-					if (w.settled - h > w.dip) { w.dip = w.settled - h; w.at = h; }
-				}
-				return out;
-			};
-		},
+	const settled = Math.round(bar.getBoundingClientRect().height);
+	window.__fsBar = { settled, min: settled, max: settled, samples: 0 };
+	const sample = () => {
+		const h = Math.round(bar.getBoundingClientRect().height);
+		const w = window.__fsBar;
+		w.samples++;
+		if (h < w.min) w.min = h;
+		if (h > w.max) w.max = h;
+	};
+	const d = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetTop');
+	Object.defineProperty(HTMLElement.prototype, 'offsetTop', {
+		configurable: true, enumerable: d.enumerable,
+		get() { const v = d.get.call(this); sample(); return v; },
 	});
-	Object.defineProperty(bar, 'classList', { get: () => proxy, configurable: true });
+	const gcr = Element.prototype.getClientRects;
+	Element.prototype.getClientRects = function () { const v = gcr.apply(this, arguments); sample(); return v; };
 };
 
 const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'fit-quiet');
@@ -98,20 +93,24 @@ for (const stand of list) {
 		});
 		if (r.skip) { process.stdout.write(`  ${stand.id} @${width}: ${r.skip}\n`); await ctx.close(); continue; }
 		const where = `${stand.id} @${width}px`;
-		if (!r.calls) {
+		if (!r.samples) {
 			findings.push(`${where}: the chrome never re-fitted, so this gate proved nothing — a poll `
 				+ `tick and a resize both have to reach fitChrome()`);
 			await ctx.close();
 			continue;
 		}
 		runs++;
-		if (r.dip > worst) worst = r.dip;
-		if (r.dip > SLACK)
-			findings.push(`${where}: the bar measured itself at ${r.at}px having settled at `
-				+ `${r.settled}px — ${r.dip}px taken off ABOVE the reader, inside a task no engine `
-				+ `paints in and Safari never compensates for. fs-chrome.js pins the bar's `
-				+ `min-height for the pass; that pin is what this reads back`);
-		process.stdout.write(`  ${where}  settled ${r.settled}px, ${r.calls} pass(es), dip ${r.dip}px\n`);
+		const dip = r.settled - r.min;
+		const grow = r.max - r.settled;
+		const pp = r.max - r.min;
+		if (pp > worst) worst = pp;
+		if (dip > SLACK || grow > SLACK)
+			findings.push(`${where}: the bar walked ${r.min}-${r.max}px having settled at ${r.settled}px `
+				+ `— ${dip}px of dip and ${grow}px of growth (${pp}px peak-to-peak), inside a pass no `
+				+ `engine paints in and Safari never compensates for. fs-chrome.js pins the bar's height `
+				+ `both ways for the pass; that pin is what this reads back`);
+		process.stdout.write(`  ${where}  settled ${r.settled}px, ${r.samples} sample(s), `
+			+ `${r.min}-${r.max}px (${pp}px peak-to-peak)\n`);
 		await ctx.close();
 	}
 }
@@ -120,8 +119,8 @@ await browser.close();
 if (findings.length) {
 	console.error(`\nfit-quiet: ${findings.length} finding(s)\n`);
 	for (const f of findings) console.error('  ' + f);
-	console.error('\nThe pass is fitChrome() in fs-chrome.js, the reason is in docs/chrome.md.\n');
+	console.error('\nThe pass is fitChrome() in fs-chrome.js, the reason is in docs/anchoring.md.\n');
 	process.exit(1);
 }
-console.log(`fit-quiet: ${ENGINE}, ${runs} width(s) over ${list.length} router(s), worst ${worst}px — `
-	+ 'the chrome measured itself without getting shorter.');
+console.log(`fit-quiet: ${ENGINE}, ${runs} width(s) over ${list.length} router(s), worst ${worst}px `
+	+ 'peak-to-peak — the chrome measured itself without changing height.');

@@ -270,21 +270,33 @@ function fitChrome() {
 	 * fitShell's data-narrow, and is untouched here.) */
 	const topBar = !!bar && !!menu && prefs.isTopLayout();
 
-	/* THE BAR MAY NOT GET SHORTER WHILE IT IS BEING MEASURED. The three classes below are taken off
-	 * so the menu can be asked whether it fits on one row (fs-fit rule 1), and on a narrow bar that
-	 * makes the whole chrome one row instead of two for that layout — every pixel of it above the
-	 * reader, who is moved by exactly as much and moved back a moment later. Chromium and Firefox
-	 * hide it behind their scroll anchoring; Safari implements none, on any platform, so on an
-	 * iPhone this is the Overview creeping up once per poll tick. Reported from one, and bisected to
-	 * this pass on the reporter's own router: `?off=chromefit` stopped it, `?off=measure` (the
-	 * tables' own re-measure) did not.
+	/* THE BAR MAY NOT CHANGE HEIGHT WHILE IT IS BEING MEASURED, IN EITHER DIRECTION. The three
+	 * classes below are taken off so the menu can be asked whether it fits on one row (fs-fit
+	 * rule 1), and while they are off the bar's OWN box is free to answer any height its content
+	 * currently needs — not only shorter. A `min-height` floor alone stops the shrink but not the
+	 * grow: with the classes off and `fs-dense1`/`fs-dense2` stripped by `fitTabStrips()`, this pass
+	 * measured the bar walking 230 -> 202 -> 164 -> 144 -> 123 -> 131 -> 123px against a settled
+	 * 123px on owrt2512 at 767px — 107px of growth a floor never sees, on top of the shrink it does
+	 * — each step landing between two of the poll's own separate section refreshes, so the browser
+	 * paints in between and the reader is moved by exactly as much, on Chromium and Firefox as well
+	 * as Safari (`tools/fit-quiet.mjs`, `../tmp/task-toplayout/pass-probe.mjs`). `min-height` alone
+	 * was measured to `accc451`'s WebKit-only diagnosis instead — WebKit's own scroll anchoring
+	 * looked like the whole story only because it is the one engine with no anchoring at all to hide
+	 * this walk behind; Chromium and Firefox absorb it the same way they absorb any other layout
+	 * change, which is not the same as not producing it.
 	 *
-	 * `min-height`, not `height`: the pass may legitimately need MORE room a moment later — that is
-	 * what `fs-bar-stack` is for — and a floor lets it grow while refusing the shrink. It comes off
-	 * before `publishBarHeight()`, which must measure the bar the reader actually gets. */
+	 * So both `min-height` AND `height` are pinned to the SAME value for the whole decision — a hard
+	 * pin, not a floor — because nothing this pass measures (`stripFitsOneRow()`'s `offsetTop`,
+	 * `clusterFitsBrandRow()`'s widths) reads the BAR's own height; `overflow: visible`
+	 * (`theme/20-shell.css`) means a row the pin is too short for still lays out and measures
+	 * correctly, it only paints past the pinned box's edge, which is invisible for the one
+	 * synchronous pass before the pin comes off. The pin is released only once the final class set
+	 * is decided — after `fitCluster()`, before `publishBarHeight()` — which must measure the bar
+	 * the reader actually gets. */
 	const pinned = bar ? Math.round(bar.getBoundingClientRect().height) : 0;
 	const hadMinH = bar ? bar.style.minHeight : '';
-	if (pinned > 0) bar.style.minHeight = pinned + 'px';
+	const hadH = bar ? bar.style.height : '';
+	if (pinned > 0) { bar.style.minHeight = pinned + 'px'; bar.style.height = pinned + 'px'; }
 
 	if (bar) bar.classList.remove('fs-bar-stack', CLASS_IND_COMPACT, 'fs-bar-actrow');
 	fitTabStrips();
@@ -316,7 +328,7 @@ function fitChrome() {
 	if (bar && (topBar || document.documentElement.hasAttribute('data-narrow')))
 		fitCluster(bar, menu);
 
-	if (pinned > 0) bar.style.minHeight = hadMinH;
+	if (pinned > 0) { bar.style.minHeight = hadMinH; bar.style.height = hadH; }
 	publishBarHeight(bar);
 }
 
