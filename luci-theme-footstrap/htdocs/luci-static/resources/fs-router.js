@@ -607,6 +607,15 @@ function seed() {
 	/* the served page's entry needs an id too, or the first Back TO it has nothing to look up */
 	adoptEntry();
 
+	/* Page-scoped CSS keys off `#view[data-page]` and `.fs-content[data-page]`, not `body`
+	 * (commitStage) — but the server stamps only `body`, so a document that never took a client
+	 * navigation would otherwise have neither. Copied, not recomputed: the server's value is
+	 * already the resolved dispatch path (header.ut, `ctx.path`), and re-deriving it here from the
+	 * tree could disagree with what the served markup actually carries. */
+	const curPage = document.body ? (document.body.getAttribute('data-page') || '') : '';
+	const contentHost = document.querySelector('.fs-content');
+	if (contentHost) contentHost.setAttribute('data-page', curPage);
+
 	/* The document's own first render is the first link in the chain. A navigation waits for the
 	 * previous render because a LuCI view chain resolves `#view` at paint time and would otherwise
 	 * paint into the newer navigation's stage — and the first chain, `view.ut`'s inline
@@ -619,7 +628,10 @@ function seed() {
 	 * keeps a document whose first view never renders from turning every later click into a
 	 * rejected promise. */
 	const vp = document.getElementById('view');
-	if (vp) _inflight = renderedIn(vp).catch(() => {});
+	if (vp) {
+		vp.setAttribute('data-page', curPage);
+		_inflight = renderedIn(vp).catch(() => {});
+	}
 }
 
 /* ---- the incoming page is rendered off screen and swapped in when it is ready ----
@@ -711,6 +723,18 @@ function commitStage(stage, contentHost) {
 	sheets.scopeToCurrentPage();
 	sweepAround(contentHost);
 	const live = liveView(contentHost, stage);
+	/* …and the page-scoped CSS identity moves forward with it. `stage.view` carries the incoming
+	 * page's name from navigate() (spared there the same way the sheets above were); this is the
+	 * commit that finally moves it onto the element the reader is about to see and onto
+	 * `.fs-content`, which the same CSS uses for content that sits beside `#view` rather than
+	 * inside it (the Overview's stray `<h2 name="content">`, styles/pages/20-overview.css). Until
+	 * this line the LIVE `#view` and `.fs-content` still carried the OUTGOING page's name, so its
+	 * own page-scoped rules kept matching for the whole staging window. */
+	const page = stage.view.getAttribute('data-page');
+	if (page != null) {
+		live.setAttribute('data-page', page);
+		if (contentHost) contentHost.setAttribute('data-page', page);
+	}
 	const nodes = Array.from(stage.view.childNodes);
 	const dom = window.L ? window.L.dom : null;
 	if (live && dom && typeof dom.content === 'function')
@@ -753,9 +777,9 @@ function liveView(contentHost, stage) {
 
 /* Clear what the outgoing page left as a SIBLING of #view inside .fs-content: dom.content()
  * replaces only #view's own children, so anything a page emitted next to it rides along — the
- * Overview template's `<h2 name="content">Status</h2>` is hidden by a `body[data-page=…]` rule and
- * would show on every later page. Keep only the chrome that legitimately outlives a page (tabs,
- * server notices, <noscript>) and the stage.
+ * Overview template's `<h2 name="content">Status</h2>` is hidden by a `.fs-content[data-page=…]`
+ * rule (styles/pages/20-overview.css) and would show on every later page. Keep only the chrome
+ * that legitimately outlives a page (tabs, server notices, <noscript>) and the stage.
  *
  * …and the RUNTIME notifications, which live one level up: `ui.addNotification()` inserts into
  * #maincontent while the sweep above reaches only children of .fs-content. A full load clears them,
@@ -942,19 +966,16 @@ function navigate(pathname, push, kbd) {
 	 * on the layout — in the sidebar layout the window does not scroll, `.fs-shell` being 100dvh
 	 * with `.fs-main` owning overflow-y (issue #7) — and scrollTo on the other is a no-op.
 	 *
+	 * The WRITE is at commitStage now, not here — see there. `_rest` is forgotten here regardless:
+	 * it is the reference fs-fit tells a reader-caused scroll from an engine's clamp with, and the
+	 * reader is committed to leaving this page from this point on, so a mutation the outgoing page's
+	 * own poller makes during the staging window (before clearViewIntervals, further down this
+	 * chain) must not be read against a reference that belongs to a page about to go away.
+	 *
 	 * A popstate replay resets nothing: both scrollers are restored there from _scrollMem.
 	 * scrollRestoration stays 'auto' — the UA's own attempt lands before the swap and is undone by
 	 * it, so it neither helps nor hurts, while 'manual' would take away the genuine full load. */
-	if (push) {
-		/* before the two writes: fs-fit keeps the offset the reader was last still at, to tell an
-		 * engine's clamp from a reader who moved. This reset is neither, and it lands a whole
-		 * require ahead of the `data-page` stamp fs-fit would notice it by, so a poll tick from the
-		 * page being left would read it as a clamp. */
-		fit.forgetRest();
-		window.scrollTo(0, 0);
-		const sc = document.getElementById('maincontent');
-		if (sc) sc.scrollTo(0, 0);
-	}
+	if (push) fit.forgetRest();
 
 	/* ---- what a full load does for a keyboard/screen-reader user, and the SPA does not ----
 	 * renderChrome() has just emptied #topmenu, so the <a> the user activated with Enter no longer
@@ -966,7 +987,7 @@ function navigate(pathname, push, kbd) {
 	 * rather than repeats the live region below. A pointer activation — and a popstate replay,
 	 * whose modality is unknowable — keeps the wrapper focus, since focusing the skip link there
 	 * would flash its overlay on every mouse click. preventScroll, because the scroll position is
-	 * decided just above. */
+	 * the OUTGOING page's own — untouched until commitStage — and must stay that way here too. */
 	const skip = kbd ? document.querySelector('.fs-skip') : null;
 	const main = skip || document.getElementById('maincontent');
 	if (main) main.focus({ preventScroll: true });
@@ -1041,16 +1062,18 @@ function navigate(pathname, push, kbd) {
 		const uciWarm = flushUciCache();
 
 		/* Keep <body data-page> in sync with the route: the server stamps the dispatch path on every
-		 * full load and page-scoped CSS keys off it. `rsegs` is the resolved leaf, so a firstchild
-		 * URL yields the same value however it is reached; without the re-stamp the incoming page
-		 * keeps the previous page's name and its scoped styles silently do not apply.
+		 * full load, and fs-chrome/fs-fit/fs-overview/menu-footstrap-common read it off `body` as the
+		 * ROUTE'S identity — a cache-invalidation key and a "did the page change" flag, never a CSS
+		 * scope. `rsegs` is the resolved leaf, so a firstchild URL yields the same value however it
+		 * is reached. It sits before the staged render because those modules' own fitting and module
+		 * loading must react to the incoming route before that render runs, same as always.
 		 *
-		 * It must sit before the staged render, because a view rendering under the wrong value
-		 * measures itself through the wrong rules and the fitters run inside the stage. The cost is
-		 * that the OUTGOING page, still on screen until the swap, wears the incoming page's name for
-		 * the staging window — visible today only as the Overview's stray heading, which the sweep
-		 * at the swap removes anyway. Moving the stamp later would trade that for a wrongly measured
-		 * incoming page. */
+		 * Page-scoped CSS no longer keys off `body[data-page]` — see the #view/`.fs-content` stamps
+		 * below, which is where that identity now actually lives. Measured before the split: this
+		 * write alone stopped 33 rules in styles/pages/20-overview.css from matching the OUTGOING
+		 * page for the whole staging window (1407 ms on a cold require), growing the document 211px
+		 * and moving the reader 140px — corrected here, not "visible today only as the Overview's
+		 * stray heading" as this comment used to claim. docs/spa-router.md, "The staging window". */
 		document.body.setAttribute('data-page', rsegs.join('-'));
 
 		/* …and hand the new page to fs-sheets, which darkens every foreign sheet belonging to a
@@ -1065,6 +1088,13 @@ function navigate(pathname, push, kbd) {
 		sheets.scopeToCurrentPage(rsegs, leaving);
 
 		const stage = stageView(contentHost);
+		/* The stage's OWN identity, so the incoming render measures itself under its own page-scoped
+		 * CSS (styles/pages/*.css keys off `#view[data-page]` now, not `body[data-page]`) while it is
+		 * still hidden. The LIVE `#view` and `.fs-content` are not touched here — they keep the
+		 * OUTGOING page's value, set at that page's own commitStage, until this navigation reaches
+		 * its own commitStage and moves it forward. Same two-phase shape fs-sheets uses above:
+		 * the incoming half is spared for the render, the outgoing half is swept at the swap. */
+		stage.view.setAttribute('data-page', rsegs.join('-'));
 		const painted = renderedIn(stage.view);
 		_seen.add(className);
 		/* Name the owner for the length of this require, and only when the module has yet to be
@@ -1093,6 +1123,20 @@ function navigate(pathname, push, kbd) {
 				 * leave the live page to the newer navigation */
 				if (gen !== _navGen) { dropStage(stage); return; }
 				commitStage(stage, contentHost);
+				/* Reset both scrollers to the top HERE, in the same synchronous turn as the content
+				 * swap above: a full load starts a new page at the top, and doing it here — rather
+				 * than at the click, where it used to sit — means the reader keeps reading the
+				 * OUTGOING page from wherever they were for the whole staging window instead of
+				 * being thrown to its top the moment they click. Measured with the require held open
+				 * (1.2 s, ../tmp/task-navflash/navflash-slow.mjs): `y` used to hit 0 within 12 ms of
+				 * the click and stay there through the swap; moved here it stays at the reader's own
+				 * offset for the whole window and reaches 0 in the same frame the new page appears.
+				 * docs/anchoring.md, "The scroll reset". */
+				if (push) {
+					window.scrollTo(0, 0);
+					const sc = document.getElementById('maincontent');
+					if (sc) sc.scrollTo(0, 0);
+				}
 				/* now, and only now, is there one height to read: the incoming page's */
 				if (restoreTo) restoreScroll(restoreTo, gen);
 			})

@@ -22,6 +22,7 @@
 import { chromium } from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
 import { classify, representatives, reportReduction, PINNED } from './lib/page-shapes.mjs';
+import { read } from './lib/root.mjs';
 
 const arg = (name, dflt) => {
 	const i = process.argv.indexOf('--' + name);
@@ -96,6 +97,116 @@ const timerProbe = async (page) => {
 	catch (e) { return null; }
 };
 
+/* ---- the staging window itself, not just what arrives after it ----
+ *
+ * Every check below samples AFTER commitStage, which is exactly how 1407 ms of the OUTGOING page
+ * standing unstyled went unmeasured (task navstamp): `body[data-page]` used to flip to the
+ * incoming name at the click, and every page-scoped rule for the page still on screen stopped
+ * matching for the whole require — 33 rules in styles/pages/20-overview.css, +211px of document,
+ * the reader moved 140px. fs-router.js now keys that CSS off `#view[data-page]`/
+ * `.fs-content[data-page]` instead, spared until commitStage the same way fs-sheets spares a
+ * page's stylesheets (fs-router.js, docs/spa-router.md "The staging window").
+ *
+ * Sampled here mid-flight, with the incoming view's own module fetch held open long enough to
+ * have a window to sample in: a stand's own staging window is ~210 ms against 1.2 s on real
+ * hardware (../tmp/task-navflash/navflash.mjs), too short to catch this without the same fake
+ * slow route that probe uses. */
+const STAGING_ROUTE = '**/luci-static/resources/view/**';
+const STAGING_DELAY_MS = 1200;
+const STAGING_CASES = [
+	/* the Overview's own stray `<h2 name="content">` (view.ut) is hidden by
+	 * `.fs-content[data-page="admin-status-overview"] h2[name="content"]`
+	 * (styles/pages/20-overview.css) — present only right after a full load, before the first SPA
+	 * nav sweeps it, which is exactly the ORIGIN every case below full-loads to first. */
+	{ from: '/admin/status/overview', to: '/admin/system/package-manager',
+	  owned: '#maincontent h2[name="content"]', prop: 'display', want: 'none' },
+	/* package-manager's own page CSS (styles/pages/30-software.css) has no single always-present
+	 * element as reliable as the Overview's heading, so only the height half is checked here — the
+	 * half the card asks to prove on this page by name. */
+	{ from: '/admin/system/package-manager', to: '/admin/status/overview' },
+];
+
+/* ---- the narrow-viewport pass ----
+ *
+ * theme/90-responsive.css still scopes ~11 package-manager rules through
+ * `body[data-page="admin-system-package-manager"]`, inside `@media (max-width: …px)` — the same
+ * scope bug STAGING_CASES above was written for, one layer over, and invisible to every case
+ * above because they all run at the 1440px context (see below): that query never matches there.
+ * The width is read out of the file, not hard-coded, so an edit to the breakpoint cannot make
+ * this pass silently stop testing anything. */
+const NARROW_CSS_PATH = 'luci-theme-footstrap/styles/theme/90-responsive.css';
+function narrowBreakpoint() {
+	const m = read(NARROW_CSS_PATH).match(/@media\s*\(max-width:\s*(\d+)px\)/);
+	if (!m)
+		throw new Error(`spa-parity: no @media (max-width) in ${NARROW_CSS_PATH} to size the narrow-viewport pass off of`);
+	return Number(m[1]);
+}
+const NARROW_WIDTH = narrowBreakpoint();
+const NARROW_STAGING_CASES = [
+	/* `body[data-page="admin-system-package-manager"] #view .controls > div:not(.pager) { display:
+	 * block !important }` stacks each labelled control. Leaving the page, mid-flight the outgoing
+	 * `#view`/`.fs-content` still carry the OUTGOING name (commitStage), but `body`'s is already the
+	 * incoming route's (navigate(), fs-router.js) — an unfixed body-scoped rule here stops matching
+	 * and the row reverts to its unstacked flex layout while the reader is still looking at it. */
+	{ from: '/admin/system/package-manager', to: '/admin/status/overview',
+	  owned: '#view .controls > div:not(.pager)', prop: 'display', want: 'block' },
+];
+
+async function stagingWindowCheck(page, stand, findings, cases = STAGING_CASES, widthLabel) {
+	for (const c of cases) {
+		let before, mid;
+		try {
+			await page.goto(stand.base + c.from, { waitUntil: 'domcontentloaded', timeout: 20000 });
+		}
+		catch (e) { continue; }
+		await page.waitForTimeout(1400);
+		before = await page.evaluate((c) => {
+			const el = c.owned ? document.querySelector(c.owned) : null;
+			return { docH: document.documentElement.scrollHeight,
+			         prop: el ? getComputedStyle(el)[c.prop] : null };
+		}, c);
+
+		/* held open only for the click below, not for the goto()/settle above: slowing the
+		 * outgoing page's own load would tell us nothing about the staging window */
+		await page.route(STAGING_ROUTE, async (route) => {
+			await new Promise((r) => setTimeout(r, STAGING_DELAY_MS));
+			/* the prefetch fetch() and require()'s own XHR can both name the same URL, and a route
+			 * already settled by the other rejects a second continue() — nothing this probe reads
+			 * depends on which of the two wins */
+			try { await route.continue(); } catch (e) {}
+		});
+		await page.evaluate((to) => {
+			const href = '/cgi-bin/luci' + to;
+			let a = [ ...document.querySelectorAll('a[href]') ].find((x) => x.getAttribute('href') === href);
+			if (!a) { a = document.createElement('a'); a.href = href; a.textContent = 'probe'; document.getElementById('view').append(a); }
+			a.click();
+		}, c.to);
+		/* mid-flight: well inside the held-open fetch, well before commitStage can run */
+		await page.waitForTimeout(500);
+		mid = await page.evaluate((c) => {
+			const el = c.owned ? document.querySelector(c.owned) : null;
+			return { docH: document.documentElement.scrollHeight,
+			         prop: el ? getComputedStyle(el)[c.prop] : null,
+			         staged: document.querySelectorAll('.fs-staging').length };
+		}, c);
+		await page.unroute(STAGING_ROUTE);
+		/* let the held-open navigation actually finish before the next case reuses this page */
+		await page.waitForTimeout(STAGING_DELAY_MS + 1000);
+
+		const add = (detail) => findings.push({ stand: stand.id,
+			path: c.from + ' -> ' + c.to + (widthLabel ? ` @${widthLabel}px` : ''), kind: 'staging', detail });
+		if (mid.staged === 0) {
+			add('the fake-slow route never caught a staging window — this case measured nothing');
+			continue;
+		}
+		if (mid.docH !== before.docH)
+			add(`the outgoing page's document height moved during the staging window: ${before.docH} -> ${mid.docH}px`);
+		if (c.owned && mid.prop !== c.want)
+			add(`${c.owned} read ${JSON.stringify(mid.prop)} mid-flight, wanted ${JSON.stringify(c.want)} — `
+				+ 'the outgoing page\'s own rule stopped matching');
+	}
+}
+
 const list = requireStands(stands(arg('only', ''), { all: ALL_STANDS }), 'spa-parity');
 const browser = await chromium.launch();
 const findings = [];
@@ -110,6 +221,16 @@ await Promise.all(list.map(async (stand) => {
 	const errs = [];
 	page.on('pageerror', (e) => errs.push(String(e).replace(/\s+/g, ' ').slice(0, 120)));
 	await login(page, stand.base);
+
+	await stagingWindowCheck(page, stand, findings);
+
+	/* the narrow pass: its own context, since theme/90-responsive.css's rules never match at 1440px */
+	const narrowCtx = await browser.newContext({ viewport: { width: NARROW_WIDTH, height: 900 } });
+	await sealToRouter(narrowCtx, stand.base);
+	const narrowPage = await narrowCtx.newPage();
+	await login(narrowPage, stand.base);
+	await stagingWindowCheck(narrowPage, stand, findings, NARROW_STAGING_CASES, NARROW_WIDTH);
+	await narrowCtx.close();
 
 	let paths = (await menuPaths(page)).filter((p) => !DESTRUCTIVE.test(p) && p !== ORIGIN);
 	if (ONLY_PAGES) paths = paths.filter((p) => p.startsWith(ONLY_PAGES));

@@ -101,8 +101,10 @@ unmodified stand the two folds agree, and only the constructed case separates th
      page normally;
    - otherwise: teardown → update `L.env` → `body[data-page]` → `pushState` (or **`replaceState`**
      if the already-open page was clicked — a second entry would make one Back press dead) →
-     `renderChrome()` → `scrollTo(0, 0)` → focus `#maincontent` and announce the new title in the
-     polite live region → re-instantiate the view;
+     `renderChrome()` → forget the anchoring reference → focus `#maincontent` and announce the new
+     title in the polite live region → re-instantiate the view → **commit**: swap the staged content
+     in, THEN `scrollTo(0, 0)` — see "The staging window" for why the scroll reset moved off the
+     click and `body[data-page]` no longer decides the page-scoped CSS on its own;
    - `return true` → `preventDefault`.
 
    Every committed navigation increments `_navGen`.
@@ -118,9 +120,10 @@ Because `pushState` stores the real dispatcher URL, F5 and deep links work serve
 unchanged.
 
 The router re-stamps `document.body[data-page]` itself, from the resolved leaf path
-(`rsegs.join('-')`), exactly as the server stamps `ctx.path` on a full load. Otherwise the incoming
-page would keep the previous page's `data-page` and the page-scoped CSS in `styles/pages/*` would
-silently not apply.
+(`rsegs.join('-')`), exactly as the server stamps `ctx.path` on a full load — `body[data-page]` is
+read by fs-chrome/fs-fit/fs-overview/menu-footstrap-common as the route's own identity (a cache key,
+a "did the page change" flag), never as a CSS scope. Page-scoped CSS is a separate question, answered
+below in "The staging window".
 
 ## Re-instantiating a view — the main subtlety
 
@@ -207,6 +210,75 @@ while the page the user is reading stays untouched.
   and 142 ms after, cold median 197 ms before and 196 ms after — i.e. the same, within noise. The
   change is not about speed; it is that the outgoing page stays readable instead of being replaced
   by a spinner, and that three repair mechanisms could be deleted.
+
+### The staging window
+
+**The rule this fix establishes: the OUTGOING page keeps its own identity — its page-scoped CSS and
+its scroll position — until `commitStage()` actually takes it off screen.** The staging window is
+real time on a real router (~210 ms on a stand, 1.2 s measured with a first-visit require, task
+navstamp), not a single tick, and for the whole of it two pages are real at once: the outgoing one,
+still the only thing the reader sees, and the incoming one, rendering into the hidden stage above.
+
+Before this fix, `document.body.setAttribute('data-page', …)` — the write "The navigation flow"
+above still shows — ran at the START of that window, because the STAGED render needs it: a view
+measuring itself under the wrong page's rules is a real bug (fs-fit's floors and tables key off
+tokens the page-scoped sheet can move). But `body` is the ancestor of BOTH pages at once — the live
+`#view`, still showing the outgoing page, and the hidden stage — so one write could only be right for
+one of them, and it was written for the incoming one. Every `body[data-page="<outgoing>"]` rule in
+`styles/pages/*.css` stopped matching the page still on screen for the whole window. Measured,
+Overview → another page: the attribute flipped at 19 ms, the swap landed at 1,426 ms — 1,407 ms with
+33 rules in `styles/pages/20-overview.css` not applying (port icons, `.fs-ovl-empty`, the stray
+`h2[name="content"]`, the progressbar tables), the document growing 211px and the reader's own
+scroll position moving from y=1792 to y=1932 under them, with no navigation of their own. Isolated
+with no navigation at all, flipping `body[data-page]` alone on a standing page: docH 3584 → 3795
+(+211px), y 1792 → 1932, identical on `owrt2512` and `owrt2410`. Package-manager, the other page with
+its own `styles/pages/*` file, measured -18px the same way.
+
+**The fix gives the two pages two different anchors instead of one shared one**, the same two-phase
+shape `fs-sheets`' `scopeToCurrentPage(rsegs, leaving)` already uses for a page's own injected
+stylesheets (sparing the outgoing page's own sheets until the swap, above): `#view[data-page]` for
+content the STAGE writes into — the incoming name, from the moment `stageView()` creates it, so the
+staged render still measures itself under its own rules — and `#view[data-page]` /
+`.fs-content[data-page]` on the LIVE elements, which keep the OUTGOING name until `commitStage()`
+moves it forward. `styles/pages/20-overview.css`, `30-software.css` and `40-sshkeys.css` key off
+`#view[data-page]` now for anything the page renders inside `#view`, and off
+`.fs-content[data-page]` for the one thing that is not — the dispatcher's own stray
+`h2[name="content"]`, a SIBLING of `#view` inside `.fs-content` rather than a descendant of it.
+`body[data-page]` is untouched and still written at the same point in the flow: it is read by
+fs-chrome/fs-fit/fs-overview/menu-footstrap-common as the route's own identity, never as a CSS scope,
+and moving it would change when THEY react with no benefit to the CSS question this fix answers.
+
+**A second file carried the identical bug, unnoticed longer because nothing sampled the width it
+lives at.** `styles/theme/90-responsive.css` scopes ~11 package-manager rules — the phone-width
+control stacking, inside `@media (max-width: 767px)` — through the same `body[data-page="admin-
+system-package-manager"]` selector `styles/pages/*.css` used before this fix. Every gate run against
+the fix above sampled at the 1440px desktop context, where that media query never matches, so the
+same mechanism survived the whole task unmeasured: leaving the page, mid-flight `body`'s value is
+already the incoming route's while the outgoing content is still on screen, so the rule stops
+matching and the stacked layout reverts to its unstacked flex row for the rest of the window. Fixed
+the same way, re-scoped to `#view[data-page="admin-system-package-manager"]`.
+
+**The scroll reset moved too, off the click and onto the same commit.** `window.scrollTo(0, 0)` used
+to run synchronously at the click, before the staged render — so the reader was thrown to the top of
+the OUTGOING page for the whole staging window, the other half of what a slow navigation reads as a
+jump. Measured with the incoming module's fetch held open 1.2 s
+(`../tmp/task-navflash/navflash-slow.mjs`): `y` used to reach 0 within 12 ms of the click and stay
+there through the swap; moved into the same synchronous turn as `commitStage()`, it stays at the
+reader's own offset for the whole window and reaches 0 in the same frame the new page's content
+does. `fit.forgetRest()` stays at the click — it only invalidates a stale anchoring reference, which
+must happen as soon as the reader is committed to leaving, not at the swap. `docs/anchoring.md`,
+"The scroll reset", has the fuller reasoning and the numbers.
+
+`tools/spa-parity.mjs`'s `stagingWindowCheck()` is what proves this holds: it samples the outgoing
+page's document height and one of its page-scoped rules mid-flight, between the click and
+`commitStage()`, with the same held-open fetch `navflash-slow.mjs` uses — sampling only after
+arrival, which is what every other check in that gate does, is exactly how this went unmeasured. It
+now runs twice: once in the 1440px context every other check in this gate uses, and once in its own
+context at the width read out of `90-responsive.css`'s own `@media (max-width: …)` rule (767px, not
+hard-coded, so an edit to the breakpoint cannot make the pass silently stop testing anything) — the
+pass that caught the narrow-viewport rules above. On `owrt2512`, before the re-scope: `#view
+.controls > div:not(.pager)` read `flex` mid-flight where the stacked layout wants `block`, document
+height moving 22340 → 22172px; after, 0px movement and the rule holding `block`.
 
 ### The swap is not animated, and what it cost to try
 

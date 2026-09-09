@@ -80,18 +80,34 @@
 		box-shadow: var(--fs-focus-ring);
 	}
 
+	/* Every page-scoped selector below anchors on `:where(#view)[data-page="…"]`, not a bare
+	 * `#view[data-page="…"]`: an id contributes (1,0,0), and this file's deepest chain (the
+	 * progressbar row's `.td:first-child` selector, further down) already carries the rest past
+	 * tools/css-metrics.mjs's ratchet on its own — `#view` on top of it measured [1,9,0], over the
+	 * ceiling of [1,7,0]. `:where(#view)` matches the exact same single element (an id is a valid
+	 * :where() argument) but contributes ZERO specificity, so nothing about which element matches
+	 * changes — including the `> div` case in 40-sshkeys.css, where a wider `:where(#view,
+	 * .fs-content)` was tried and rejected: `.fs-content` is #view's ANCESTOR, so its own `> div`
+	 * arm would have matched #view itself (a `<div>`, per fs-router.js's stageView()) rather than
+	 * #view's children — a different element, not the same one at lower specificity. Measured after:
+	 * [1,7,0], the ceiling now held by an unrelated selector elsewhere in the sheet. */
+
 	/* An empty `.cbi-section` LuCI still renders when a stock include has nothing to show: title
 	 * "-", the poll pill its only content, 72px tall on the live Overview (seventh there — a
 	 * fixture is not proof of position, docs/findings.md "An empty card with `-` as its title").
 	 * Real and cosmetic, so fs-overview.js's hideEmptyCard() marks it and this drops it. */
-	body[data-page="admin-status-overview"] .cbi-section.fs-ovl-empty { display: none; }
+	:where(#view)[data-page="admin-status-overview"] .cbi-section.fs-ovl-empty { display: none; }
 
 	/* Stock overview layout: fs-overview.js wraps the stock System / Memory / Storage
 	 * sections in .fs-ovl; this is the grid only — System left across both rows, Memory +
 	 * Storage right. Stock styling and data untouched. */
 	/* the chrome already shows the page title, so the stock <h2> is a duplicate */
-	body[data-page="admin-status-overview"] #view > h2[name="content"],
-	body[data-page="admin-status-overview"] #maincontent h2[name="content"] { display: none; }
+	/* the chrome already shows the page title, so the stock <h2> is a duplicate.
+	 * Scoped through .fs-content, not #view: the heading is a SIBLING of #view (a
+	 * dispatcher template emits it before the div), so it needs the OUTGOING page's
+	 * identity for the whole staging window, spared until commitStage the same way
+	 * fs-sheets spares a page's stylesheets — fs-router.js. */
+	.fs-content[data-page="admin-status-overview"] h2[name="content"] { display: none; }
 	.fs-ovl {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
@@ -132,7 +148,7 @@
 	 *
 	 * `minmax(92px, 1fr)` asks it the other way round: with an indefinite max the count comes from
 	 * the 92px min, so the row takes as many tiles as fit and `1fr` shares the remainder equally. */
-	body[data-page="admin-status-overview"] div:has(> .ifacebox img[src*="/port_"]) {
+	:where(#view)[data-page="admin-status-overview"] div:has(> .ifacebox img[src*="/port_"]) {
 		/* 8px, not 10: at the floor below, the gap is what decides whether an 11-port switch takes one
 		 * row or ten-plus-one. A 1190px column fits 11 cards of 101px with 8px between them and 10
 		 * of 110px with 10px — the two px come off the gutter rather than off the card, because the
@@ -163,7 +179,7 @@
 	 *
 	 * Flexbox asks the real question for free: the two cells sit on one row while they fit and the
 	 * traffic drops to its own row when they do not. */
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) {
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) {
 		margin: 0 !important;
 		min-width: 0 !important;
 		/* The cap half of the pair that sizes the tile (the 126px min is on the wrapper's tracks —
@@ -220,12 +236,12 @@
 		align-items: baseline;
 	}
 	/* drop the stock icon */
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) img { display: none; }
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) img { display: none; }
 	/* base/95-luci.css draws a border-bottom on EVERY .ifacebox-head; the port card carries
 	 * two heads (the name, child 1, and the zone-colour line, child 3), so that is two grey
 	 * dividers stacked around the colour line. Drop them — the colour line is the only
 	 * divider this card wants. Page layer beats base, no !important needed. */
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) .ifacebox-head { border-bottom: 0; border-radius: 0; }
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) .ifacebox-head { border-bottom: 0; border-radius: 0; }
 	/* Zone-colour bar (child 3): WAN red, LAN green — the stock Port-status indicator that
 	 * distinguishes the Internet port from the LAN ports (issue #13). Its inner .zonebadge segments
 	 * already carry firewall.getZoneColorStyle() inline and a `.cbi-tooltip` naming the zone, so
@@ -233,7 +249,7 @@
 	 * speed/traffic bodies, where it reads as the card's divider. `order` puts it there — without it
 	 * the bodies fall in source order and the bar splits speed from traffic. No `overflow` or
 	 * `border-radius`: both clip the absolutely-positioned tooltip. */
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:nth-child(3) {
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:nth-child(3) {
 		order: 1;
 		flex: 0 0 100%;
 		width: 100%;
@@ -242,7 +258,7 @@
 	/* The name row, with no status dot: the speed line and the zone bar already report the carrier,
 	 * and a `-webkit-box` lays its children out as lines, so a dot could not stay in the flow — it
 	 * would join the name's text and be clipped with the second line. */
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
 		/* Its own row, and `width` rather than `flex-basis: 100%`: the two agree now that the card's
 		 * size containment is gone (see above), and this form says what it means without depending on
 		 * the card's sizing staying definite. */
@@ -276,9 +292,9 @@
 		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-text);
 	}
 	/* no link (*_down.svg): dim name, to match the dim speed and the faded zone bar */
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child { color: var(--fs-dim); }
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child { color: var(--fs-dim); }
 	/* speed: green when linked, dim when not */
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
 		order: 2;								/* below the zone-colour line (child 3, order 1) */
 		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-good); text-align: start;
 		/* `flex-grow: 1` means "I take the slack", which pushes the traffic to the right edge while
@@ -299,11 +315,11 @@
 		 * single word is wider than the card. */
 		flex: 1 1 auto; white-space: normal; overflow-wrap: break-word;
 	}
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) br { display: none; }
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-body:nth-child(2) { color: var(--fs-dim); }
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) br { display: none; }
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-body:nth-child(2) { color: var(--fs-dim); }
 	/* traffic: tx over rx, as stock's <br> leaves them — CSS cannot reorder br-separated
 	 * text runs. The size flag fights the inline `font-size:80%`. */
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) {
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) {
 		order: 2;								/* shares the speed's row, below the zone line */
 		text-align: end;
 		/* Grows but never shrinks. Growing is what anchors the figures to the card's right edge on either
@@ -317,7 +333,7 @@
 		 * cards of the same width reading as two different layouts. */
 		flex: 1 0 100%;
 	}
-	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container {
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container {
 		font-family: var(--fs-font-mono);
 		/* 10px at Normal, a step below the theme's --fs-type-xs (11px), and it BUYS WIDTH: this figure
 		 * is the widest thing a port card must fit whole, so its size sets the card's floor — one pixel
@@ -345,8 +361,8 @@
 	 * load, Network connections, …): label + value on one line, bar below. Keyed off the
 	 * progressbar (:has), not per-section, so it covers every such row — including a
 	 * third-party one. The bar itself is theme/25-progressbar.css. */
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)):has(.cbi-progressbar) { display: block; }
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) {
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)):has(.cbi-progressbar) { display: block; }
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		gap: var(--fs-space-1) var(--fs-space-2-5);
@@ -358,8 +374,8 @@
 		border: 0;
 		position: relative;
 	}
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar):last-child { padding-bottom: var(--fs-space-0-5); }
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td {
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar):last-child { padding-bottom: var(--fs-space-0-5); }
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td {
 		display: block;
 		/* beats base's `.td[width="33%"]` with no flag: the includes set a width
 		 * ATTRIBUTE, not an inline style, so a later layer wins. */
@@ -372,7 +388,7 @@
 	 * min-content width blew past the card and Memory/Storage stopped shrinking on a phone.
 	 * padding-inline-end = the gutter for the value, which is pinned over the bar's far edge
 	 * (::after, out of flow — nothing else reserves space for it). */
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
 		grid-column: 1; grid-row: 1;
 		align-self: center;
 		min-width: 0;
@@ -398,15 +414,15 @@
 	 * `container-type` to the card would size-contain a box the port tiles deliberately keep
 	 * uncontained (see the note by `padding` above). */
 	@container fs-view (max-width: 560px) {
-		body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
+		:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
 			padding-inline-end: 0;
 		}
-		body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .cbi-progressbar {
+		:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .cbi-progressbar {
 			margin-block-start: calc(var(--fs-type-xs) * var(--fs-leading));
 		}
 	}
 	/* bar cell — spans full width on row 2 */
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:nth-child(2) {
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:nth-child(2) {
 		grid-column: 1 / -1; grid-row: 2;
 	}
 
@@ -421,13 +437,13 @@
 	 * which — and gave a third-party include of the same shape nothing at all. A DATA table
 	 * (`.tr.table-titles` present: DHCP leases, the wifi station list) keeps its dividers: there
 	 * the row is one record among many and the rule is what separates the records. */
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .td,
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .th,
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr { border-bottom: 0; }
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .td,
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .th,
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr { border-bottom: 0; }
 	/* Its own rule, not a fourth line in the list above: `.cbi-value` carries no `:has()`, and a
 	 * selector list is not forgiving — below the browser floor the whole list would be discarded,
 	 * dividers and all (npm run css-floor, .claude/rules/css.md). */
-	body[data-page="admin-status-overview"] .cbi-section .cbi-value { border-bottom: 0; }
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .cbi-value { border-bottom: 0; }
 
 	/* The name in a key/value row is the QUIET half — the figure beside it is what the card is
 	 * read for. It came out at --fs-weight (600) in --fs-text, i.e. heavier and brighter than the
@@ -436,7 +452,7 @@
 	 * table's first column already resolved to, so the meter cards now read as the same family.
 	 * Data tables are excluded by the same header-row test as the dividers above: there the first
 	 * column is a record's name, not a caption. */
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .td:first-child {
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .td:first-child {
 		font-weight: var(--fs-weight-normal);
 		color: var(--fs-dim);
 	}
@@ -452,7 +468,7 @@
 	 *
 	 * Scoped to this page deliberately: the same head on Network -> Interfaces sits among many
 	 * boxes where the fill is doing real work telling them apart. */
-	body[data-page="admin-status-overview"] .cbi-section .ifacebox .ifacebox-head.active {
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .ifacebox .ifacebox-head.active {
 		background: var(--fs-panel2);
 		color: var(--fs-good);
 		font-weight: var(--fs-weight);
@@ -462,7 +478,7 @@
 	 * inside an interface box the captions (Protocol, Address, Gateway, DNS) are the boldest text
 	 * on the card and the addresses they introduce are not. Same inversion as the key/value rule
 	 * above, same answer; the value keeps --fs-text and needs no rule of its own. */
-	body[data-page="admin-status-overview"] .cbi-section .ifacebox-body strong {
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .ifacebox-body strong {
 		font-weight: var(--fs-weight-normal);
 		color: var(--fs-dim);
 	}
@@ -477,7 +493,7 @@
 	 *
 	 * Overview only. The same meter on Software and in the package manager sits in a form row
 	 * where the value is beside its own field label, not carrying the row on its own. */
-	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .cbi-progressbar::after {
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .cbi-progressbar::after {
 		font-size: var(--fs-type);
 		color: var(--fs-text);
 	}
@@ -489,8 +505,8 @@
 	 * read at a glance and never clicked except on its buttons, and eight leases at that height are
 	 * most of a screen: the DHCP card measures 740px against a System card of 440. One step down
 	 * the space ladder, so it follows the density axis like everything else, and only here. */
-	body[data-page="admin-status-overview"] .cbi-section .table:has(.tr.table-titles) .td,
-	body[data-page="admin-status-overview"] .cbi-section .table:has(.tr.table-titles) .th {
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:has(.tr.table-titles) .td,
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:has(.tr.table-titles) .th {
 		padding-block: var(--fs-space-1-5);
 	}
 

@@ -170,6 +170,34 @@ outside the tables one above.
 returns the reader where they were. That is per history entry, not per tick, and none of the above
 applies to it — see [spa-router.md](spa-router.md).
 
+### The scroll reset (task navstamp)
+
+A forward click resets both scrollers to the top — `window.scrollTo(0, 0)` and the same on
+`#maincontent` — because a full load starts the new page there and the in-place swap has to match
+it. That write used to run synchronously at the click, before the staged render, alongside the
+`body[data-page]` stamp `spa-router.md`'s "The staging window" covers. It now runs in the same
+synchronous turn as `commitStage()`, at the swap, instead.
+
+**Measured, with the incoming module's fetch held open 1.2 s so the window is long enough to
+sample** (`../tmp/task-navflash/navflash-slow.mjs`, `owrt2512`): at the click, `y` reached 0 within
+12 ms and stayed there for the whole staging window — the reader, still looking at the OUTGOING
+page (this doc's other corrections are about ITS position not moving; this one is about it moving to
+a position the reader did not choose), found themselves at its top before they had any reason to be.
+Moved to the commit, `y` stays at the reader's own offset — 1878px in the measured run — for the
+entire window and reaches 0 in the same frame the incoming page's content replaces it, matching what
+a full load looks like: one page, one position, both changing together.
+
+**Why this is safe to move and the anchoring corrections above are not touched by it.** Every
+mechanism on this page corrects a scroller that is meant to STAY PUT while the document under it
+grows or shrinks — a poll tick, a floor collapsing, an image loading. A forward navigation is the one
+case that is deliberately going to move the reader, by design, to a page they chose; moving the
+WRITE that does that later does not turn it into a case those mechanisms need to answer for. What
+does have to stay where it is: `fit.forgetRest()`, which merely invalidates the anchoring reference a
+now-superseded page held. That runs at the click, unmoved — the reader is committed to leaving from
+that point on, and a mutation the outgoing page's own poller makes during the staging window (before
+`clearViewIntervals()` runs, later in the same chain) must not be read against a reference that
+belongs to a page about to go away, whether or not the scroll write that follows has happened yet.
+
 ## Is each one still needed
 
 One mechanism disabled at a time, on the agent's own stand so nothing else moves, over the axes that

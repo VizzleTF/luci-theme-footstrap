@@ -378,7 +378,20 @@ const LIMITS = {
 	 * its own; pinning the bar both ways for the pass (fs-chrome.js) costs 61 B back, the real fix
 	 * for the fault the reverted mechanism never actually held. The limit goes to 58,200, 91 B of
 	 * head-room — DOWN from 58,250, because the number it was raised for was never real. */
-	coldJs: 58_200,
+	/* 58,455 B on 2026-09-09, up 255 B for the staging window (task navstamp): `body[data-page]`
+	 * was stamped with the INCOMING page's name at the start of every client navigation, and
+	 * `body` is the shared ancestor of the live and the staged render at once, so every
+	 * `styles/pages/*` rule stopped matching the page still on screen — measured at 1407 ms, 33
+	 * rules, +211 px of document and 140 px of reader movement on the Overview, −18 px on the
+	 * package manager (`../tmp/task-navflash/`). The fix gives the two renders two anchors: the
+	 * hidden stage's `#view` carries the incoming name from the moment it exists, the live one
+	 * keeps the outgoing name until `commitStage()` — the two-phase shape `fs-sheets`'
+	 * `scopeToCurrentPage()` already used. The same turn is where `window.scrollTo(0, 0)` moved
+	 * to: it used to fire 12 ms after the click and hold the reader at the top of a page they had
+	 * not left yet. Cheaper shapes were considered and are not available — the sparing has to be
+	 * per-render, and a render that cannot name itself cannot be styled while it is staged. The
+	 * limit goes to 58,500, 45 B of head-room. */
+	coldJs: 58_500,
 };
 
 function bytes(path) {
