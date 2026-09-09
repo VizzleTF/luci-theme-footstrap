@@ -391,7 +391,21 @@ const LIMITS = {
 	 * not left yet. Cheaper shapes were considered and are not available — the sparing has to be
 	 * per-render, and a render that cannot name itself cannot be styled while it is staged. The
 	 * limit goes to 58,500, 45 B of head-room. */
-	coldJs: 58_500,
+	/* 58,582 B on 2026-09-09, up 82 B for the hide-in-place sweep (task spoilerfloor): `holdFloor()`
+	 * writes a `min-height` and clears it on the next `run()`, but nothing woke `run()` when content
+	 * was hidden WITHOUT moving a node — `observeContent()` watched childList, `class` on <body> and
+	 * `data-tab-active`, and a fold that only sets `hidden`/`aria-expanded` wakes none of them. The
+	 * floor taken while a section was open simply stayed: measured 731 -> 1485 -> 1485 px on the
+	 * Appearance panel (754 px of empty ground, still there 21 s later on a page that never polls)
+	 * and 308 px against 50 px of content on System -> Time Synchronization after unticking "Enable
+	 * NTP client" — stock LuCI `form.js`, so this reached every user, not only the Appearance panel.
+	 * The existing tab-pane observer was widened rather than a fourth one added — measured: a
+	 * separate observer 223 B, merged and braced 115 B, the shipped form 82 B — and its two parts
+	 * are both load-bearing: the attribute list (~33 B) and the `class` filter narrowed to
+	 * `[data-field]` (~49 B), which is what keeps the poll's per-tick row-class rewrites from waking
+	 * the sweep (`fit-quiet` and the anchor `tick` case both still read 0 px after this). The limit
+	 * goes to 58,650, 68 B of head-room. */
+	coldJs: 58_650,
 };
 
 function bytes(path) {

@@ -41,10 +41,56 @@ const arg = (name, dflt) => {
 	return i === -1 ? dflt : process.argv[i + 1];
 };
 
-/* Pages that carry the three shapes a floor is written on: a tabbed map of tables (Interfaces), a
- * status page of tables a poll rewrites (Overview), and a form page whose sections end in prose —
- * the shape that caught the short measurement. */
-const PAGES = arg('pages', '/admin/network/network,/admin/status/overview,/admin/network/dhcp').split(',');
+/* Pages that carry the shapes a floor is written on: a tabbed map of tables (Interfaces), a
+ * status page of tables a poll rewrites (Overview), a form page whose sections end in prose — the
+ * shape that caught the short measurement — plus the two that carry content hidden IN PLACE
+ * (FOLD_TRIGGER/DEPENDS_TRIGGER below): Footstrap's own Appearance disclosure, and a stock form
+ * whose `depends()` hides a row with no node moving at all (System -> System, Time
+ * Synchronization). Neither trigger fires on a page that does not offer it, so adding both here
+ * costs nothing on the other three. */
+const PAGES = arg('pages', '/admin/network/network,/admin/status/overview,/admin/network/dhcp,'
+	+ '/admin/system/footstrap,/admin/system/system').split(',');
+
+/* Opens then closes the one `.fs-ap-fold` disclosure Footstrap's Appearance panel carries — the
+ * OPEN half mutates nodes (refreshColours()) and is not the fault; the CLOSE half writes `hidden`
+ * and `aria-expanded` only, no node moving, which is what ACCURACY below must catch once this has
+ * run. null where the page has no such control. */
+const FOLD_TRIGGER = async (page) => {
+	const has = await page.evaluate(() => !!document.querySelector('#view .fs-ap-fold'));
+	if (!has) return null;
+	const click = () => page.evaluate(() => document.querySelector('#view .fs-ap-fold').click());
+	await click();
+	await page.waitForTimeout(1200);
+	await click();
+	await page.waitForTimeout(1200);
+	return true;
+};
+
+/* Switches to the tab a stock "Time Synchronization"/"Синхронизация времени" section lives on and
+ * unticks its first checkbox — form.js's setActive() answers by toggling the CLASS `hidden` on the
+ * `[data-field]` row, not the attribute, so this is the one trigger ACCURACY cannot see without a
+ * class-based observer. null where the page carries no such tab or control. */
+const DEPENDS_TRIGGER = async (page) => {
+	const tabbed = await page.evaluate(() => {
+		const a = [ ...document.querySelectorAll('#view .cbi-tabmenu li a') ]
+			.find((x) => /time|время/i.test(x.textContent || ''));
+		if (!a) return false;
+		a.click();
+		return true;
+	});
+	if (!tabbed) return null;
+	await page.waitForTimeout(1200);
+	const clicked = await page.evaluate(() => {
+		const pane = document.querySelector('#view [data-tab-active="true"]') || document.querySelector('#view');
+		const cb = pane.querySelector('input[type="checkbox"]');
+		if (!cb) return false;
+		cb.click();
+		return true;
+	});
+	if (!clicked) return null;
+	await page.waitForTimeout(1800);
+	return true;
+};
 
 /* A floor is a lower bound on a height that is about to be replaced, not a layout the page is drawn
  * to, so it may sit a pixel or two off what the box measures: a collapsed bottom margin on the last
@@ -146,7 +192,7 @@ const RELEASE_WAIT = Number(arg('wait', '0')) || 13000;
 const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'floor-contract');
 const browser = await chromium.launch();
 const findings = [];
-let boxes = 0, worst = 0, released = 0, switches = 0;
+let boxes = 0, worst = 0, released = 0, switches = 0, folds = 0, depends = 0;
 
 for (const stand of list) {
 	const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -160,10 +206,19 @@ for (const stand of list) {
 		/* long enough for a settled tick to have written the floors it is going to write */
 		await page.waitForTimeout(7000);
 
+		/* content hidden IN PLACE, before ACCURACY reads a floor — the two triggers ARE the case:
+		 * the sweep's own accuracy check catches the discrepancy on its own once the DOM is left
+		 * in the state closing/hiding leaves it in (docs/anchoring.md). */
+		const where = `${stand.id} ${path}`;
+		let fold, dep;
+		try { fold = await FOLD_TRIGGER(page); } catch (e) { fold = null; }
+		if (fold) { folds++; process.stdout.write(`  ${where}  fold opened then closed\n`); }
+		try { dep = await DEPENDS_TRIGGER(page); } catch (e) { dep = null; }
+		if (dep) { depends++; process.stdout.write(`  ${where}  a depends() row switched off\n`); }
+
 		let r;
 		try { r = await page.evaluate(ACCURACY); }
 		catch (e) { continue; }
-		const where = `${stand.id} ${path}`;
 		if (!r.floors.length) { process.stdout.write(`  ${where}: no floor standing\n`); continue; }
 
 		for (const f of r.floors) {
@@ -230,4 +285,5 @@ if (findings.length) {
 	process.exit(1);
 }
 console.log(`floor-contract: ${boxes} floor(s) over ${list.length} router(s), worst ${worst}px against the box, `
-	+ `${released} released after emptying, ${switches} released on a tab switch.`);
+	+ `${released} released after emptying, ${switches} released on a tab switch, ${folds} fold(s) `
+	+ `closed, ${depends} depends() row(s) switched off.`);

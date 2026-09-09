@@ -776,20 +776,35 @@ function observeContent() {
 	_moFlag = new MutationObserver(run);
 	_moFlag.observe(document.body, { attributes: true, attributeFilter: [ 'class' ] });
 
-	/* A TAB SWITCH MUTATES NO NODE. ui.tabs writes `data-tab-active` on the panes, so the
-	 * {childList} registration above never wakes and the floor the pane wore while it was open
-	 * stays on it — and `min-height` beats the `height: 0` an inactive pane is collapsed with
-	 * (theme/30-tables.css), so that floor IS blank page above the tab the reader just opened.
-	 * Measured on 25.12, /admin/network/network, Interfaces -> Devices: 1299px left standing, the
-	 * document at 2647px against 1720 and the content the reader came for 1559px down, still there
-	 * 13 s later on a page whose poll never mutates #view (tools/floor-contract.mjs, issue #75).
+	/* A TAB SWITCH — OR A DISCLOSURE CLOSING, OR A depends() ROW HIDING — MUTATES NO NODE. ui.tabs
+	 * writes `data-tab-active` on the panes and fs-appearance.js's foldable() closes by writing
+	 * `hidden`/`aria-expanded` only, so the `{childList}` registration above never wakes for either
+	 * and the floor taken while the content was open/visible just stays — `min-height` beats the
+	 * `height: 0` a hidden pane collapses with (theme/30-tables.css), so that floor IS blank page.
+	 * Measured on 25.12, /admin/network/network, Interfaces -> Devices: a tab switch left 1299px
+	 * standing, the document at 2647px against 1720, still there 13s later on a page whose poll
+	 * never mutates #view (tools/floor-contract.mjs, issue #75); the disclosure shape measured
+	 * 731/1485/1485 (open/close/still-1485) on /admin/system/footstrap before this observer
+	 * covered it, 731/1485/731 with it (docs/anchoring.md).
+	 *
+	 * STOCK LuCI HIDES A ROW THE SAME WAY, WIDER: form.js's setActive() — what every `depends()`
+	 * calls — toggles the CLASS `hidden` on the `[data-field]` element, not the attribute. `class`
+	 * cannot join `data-tab-active`/`hidden`/`aria-expanded` in this filter unguarded — the poll
+	 * rewrites row classes on every tick, and an unfiltered `class` watch would call run(), a
+	 * forced layout, on every one of them (see _moFlag's own comment) — so a `class` record only
+	 * counts where the mutated element itself carries `data-field`, a property check with no
+	 * forced layout, once per delivered record rather than once per poll tick. Measured: System ->
+	 * System -> Time Synchronization, unticking "Enable NTP client", left 258px of empty ground
+	 * before this filter existed and 0px with it (../tmp/task-spoilerfloor/probe3.mjs).
 	 *
 	 * A THIRD observer for the reason the second one exists — observe() replaces the options of a
-	 * registration for the same node. The filter keeps it to the one attribute: `subtree: true` on
-	 * `class` would wake run() on every row the poll rewrites. */
-	_moTabs = new MutationObserver(run);
+	 * registration for the same node; ONE registration per host covers all four attributes since
+	 * none of this needs `subtree: true` on a different scope than `data-tab-active` already has. */
+	_moTabs = new MutationObserver((records) =>
+		records.some((r) => r.attributeName !== 'class' || r.target.dataset.field) && run());
 	for (const host of hosts)
-		_moTabs.observe(host, { attributes: true, attributeFilter: [ 'data-tab-active' ], subtree: true });
+		_moTabs.observe(host, { attributes: true,
+			attributeFilter: [ 'data-tab-active', 'hidden', 'aria-expanded', 'class' ], subtree: true });
 
 }
 

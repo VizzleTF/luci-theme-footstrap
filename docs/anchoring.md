@@ -165,6 +165,34 @@ was a measured failure first:
   tab the reader clicked is neither. Whether the blank is ever SEEN is release-dependent and the
   mechanism is not: on the 24.10 stand the same v0.14.6 build cleared both floors within 200 ms of
   the switch, something else in that luci-base having mutated `#view`.
+- **And hiding content IN PLACE has to wake the sweep too, not only a tab strip.**
+  `fs-appearance.js`'s `foldable()` OPENS a disclosure by mutating nodes (`refreshColours()`, a
+  childList change the first observer already sees) but CLOSES it by writing `hidden` on the panel
+  and `aria-expanded` on the button only — the same asymmetry as a tab pane, one level down, and it
+  is why the floor only ever grows: /admin/system/footstrap, "Colours", measured 731px before
+  opening, 1485px open, and STAYED at 1485px after closing again, 754px of empty ground still there
+  21s later on a page that never polls (`../tmp/task-spoilerfloor`); "Background" has the same shape
+  at 55px held. **Stock LuCI has it too, wider than the theme:** `form.js`'s `setActive()` — what
+  every `depends()` calls — hides a row by toggling the CLASS `hidden` on the `[data-field]` element,
+  not the attribute, so it wakes nothing that watches attributes alone. System → System, Time
+  Synchronization, unticking "Enable NTP client": 308px of floor held against a 50px bare section,
+  258px of empty ground, unchanged 10s later. `_moTabs` closes both, rather than a fourth
+  `MutationObserver` instance: one more registration on the SAME node replaces the one before it, so
+  `data-tab-active` grows into `attributeFilter: ['data-tab-active', 'hidden', 'aria-expanded',
+  'class']` on the same call, over the same two hosts, instead of paying for a second instance and a
+  second `for` loop over `hosts` — measured at 108 B less minified than a separate observer wired the
+  same way. `hidden` and `aria-expanded` are cheap to watch across the whole subtree — nothing
+  rewrites them on a poll tick — but **`class` is not**: `_moFlag`'s own comment is why watching it
+  unfiltered would call `run()` on every row a tick rewrites. So a `class` record only wakes the
+  sweep where the mutated element itself carries `data-field` (`r.target.dataset.field`, cheaper
+  minified than `hasAttribute()` and just as correct — the value is a cbid, never empty where the
+  attribute is present) — once per delivered record, a property read with no forced layout, not once
+  per poll tick — and `hidden`/`aria-expanded`/`data-tab-active` records wake it unconditionally.
+  `tools/floor-contract.mjs` gained the two triggers this needs (a disclosure open-then-close, a
+  `depends()` row switched off) — its ACCURACY check already caught the discrepancy outright once
+  something exercised it. Cost: 82 B minified over `tools/size-budget.mjs`'s `coldJs` limit (45 B of
+  head-room before this fix), the array and the filter both irreducible without dropping coverage —
+  reported rather than raised, per the budget's own rule.
 
 ## What the reader was looking at: `anchorRef()` and the memo
 
