@@ -107,6 +107,21 @@ still describe the real page is checked on a stand, where `live-audit` compares 
 against the live `.fs-content` box. That check is what caught the gutter, on every page at 320, 390
 and 568.
 
+**`contentWidth()`'s width is compared fresh on every call, not just cached from the last fitter.**
+`_shellOuter` (the window width `columnWidth()` subtracts from) is written only by `measureShell()`,
+which only `fitShell()` calls, and `fitChrome()` steps aside for the whole `SCROLL_IDLE` window
+(400 ms, `fs-fit.js`) whenever `fit.scrolling()` answers yes — a resize starts that window the same
+way a flick does. A caller landing inside it — `fitTables()`'s, most of all, since it asks mid-scroll
+by design — got the PREVIOUS viewport's width: a resize from 568 to 390 still answered 568 for up to
+220 of the 400 ms, and the same shape held at every step of `live-audit`'s width list (−70 at
+320→390, −178 at 568→768 read backwards, −256 at 1024→1440 — always exactly the gap between the two
+adjacent widths). `contentWidth()` now compares `document.documentElement.clientWidth` against
+`_shellOuter` on every call and re-runs `measureShell()` when they differ, rather than only when
+`_shellOuter` was still unset. That comparison is the one layout read the function's "no layout
+read" promise was already conditional on (the bootstrap branch made the same call); doing it on
+every call costs nothing when nothing moved, since nothing invalidated layout between one read and
+the next.
+
 The measurement, the observer and the coalescing live in `fs-fit.js`, the theme's one "does it
 still fit?" engine (also used by `fitTables` in `fs-select.js`). **Add fit logic there; do not grow
 a second observer.**

@@ -1386,6 +1386,20 @@ failed on the size budget. The gate's own printed output was the only place the 
 Judge a WSL gate by what it printed, never by a captured status of any kind — `$?`, `PIPESTATUS`, or
 otherwise.
 
+**A `geometry|fs-content` finding whose offset equals the gap between two adjacent entries in the
+gate's own `WIDTHS` is a staleness race, not a layout break — re-sample at 620 ms before believing
+it.** `live-audit` samples `contentWidth()` at 220 ms after each `setViewportSize`; `fitChrome()`
+steps aside for the whole `SCROLL_IDLE` window (400 ms, `fs-fit.js`) whenever `fit.scrolling()`
+answers yes, and a resize starts that window too, so a sample taken inside it reads the PREVIOUS
+width, not the one the gate just set. Task staleouter: `owrt2410 /admin/status/vnstat2/config | 568
+| geometry | fs-content (-178)` — `-178` is exactly `568 - 390`, the gap between those two widths in
+`live-audit`'s own list, and the same shape held at every step (`-70` at 320→390, `-256` at
+1024→1440). Confirmed with `probe2.mjs`/`probe3.mjs` (`../tmp/task-vnstat/`): `model=358 real=536
+scrolling=true` at 220 ms, `off=0` once resampled past 620 ms. Fixed in `fs-chrome.js`'s
+`contentWidth()`, which now re-reads the window's width on every call rather than trusting the last
+fitter's cache (`docs/chrome.md`, "`data-narrow`: ..."); do not "fix" a live recurrence of this shape
+by making the gate sample later instead — that would hide the same staleness from a real reader.
+
 ## The test matrix
 
 - **Pages**: Status/Overview (tables, ifacebox), Network/Interfaces (zonebadge, modals),

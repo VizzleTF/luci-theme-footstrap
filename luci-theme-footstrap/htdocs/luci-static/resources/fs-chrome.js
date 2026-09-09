@@ -182,18 +182,20 @@ function shellGeometry() {
 	return _geom;
 }
 
-/* The window's width and the column's gutter are read here, from a fitter, and nowhere else.
+/* The window's width and the column's gutter are read here, from a fitter or from
+ * `contentWidth()`'s own staleness check below — nowhere else.
  *
  * The gutter is measured where it is applied rather than read off `--fs-content-pad`: below 767px
  * `theme/20-shell.css` re-pads `.fs-content` to `var(--fs-space-4)`, so the token says 28px a side
  * while the real gutter is 16px. The breakpoint may not be restated here — a width literal in JS is
  * what these reads exist to avoid — so the element is asked what it actually got.
  *
- * Only a fitter calls this because `clientWidth` is a layout read and `getComputedStyle` resolves
- * style, while `contentWidth()` below must answer mid-scroll without either (fs-select's pass, for
- * a table the poll brought in under the reader's thumb). A fitter runs on every resize and content
- * mutation and defers during a flick, so a mid-scroll answer is the geometry as of the last still
- * moment.
+ * `clientWidth` is a layout read and `getComputedStyle` resolves style, so a fitter is the one
+ * caller allowed to reach BOTH unconditionally: it defers the whole pass during a flick
+ * (`fit.scrolling()`, fs-fit.js) rather than pay either mid-scroll. `contentWidth()` reaches only
+ * the first (comparison, not the write) on every call, and this function's own body only when
+ * that comparison says the width moved — its answer is otherwise the geometry as of the last still
+ * moment, exactly what a fitter last measured.
  *
  * A hostile declaration is no threat here: `.fs-content` carries no chrome mark, so if an app
  * re-pads it then that padding IS the column's gutter. Before any fitter has run — the login page
@@ -584,18 +586,32 @@ return baseclass.extend({
 	 * data tables' */
 	fitChrome,
 
-	/* The width a page's content column has, without reading layout: the sidebar or rail eats a
-	 * known amount of the window and the shell adds a known padding, all memoised for fitShell().
-	 * Exported because a pass answering mid-scroll (fs-select's, for a table the poll just brought
-	 * in) otherwise has only the window width, which in the sidebar layout is wrong by exactly the
-	 * sidebar — at 800px the column is 520px, so a table judged to have room overflows.
+	/* The width a page's content column has: the sidebar or rail eats a known amount of the
+	 * window and the shell adds a known padding, all memoised for fitShell(). Exported because a
+	 * pass answering mid-scroll (fs-select's, for a table the poll just brought in) otherwise has
+	 * only the window width, which in the sidebar layout is wrong by exactly the sidebar — at
+	 * 800px the column is 520px, so a table judged to have room overflows.
 	 *
 	 * The arithmetic is columnWidth()'s; this only adds the page's current state. */
 	contentWidth() {
-		/* no layout read: the window width and gutter are whatever the last fitter measured, and
-		 * the three attributes below are style. The bootstrap read serves a caller arriving
-		 * before any fitter has run, which cannot happen mid-scroll. */
-		if (!_shellOuter) measureShell();
+		/* `_shellOuter` is refreshed only by measureShell(), which only fitShell() calls, and
+		 * fitChrome() steps ASIDE FOR THE WHOLE SCROLL_IDLE WINDOW (400ms, fs-fit.js) whenever
+		 * fit.scrolling() answers yes — including for a resize that lands mid-flick, since a
+		 * resize is exactly what starts that window (fs-fit.js's resize observer feeds the same
+		 * motion sampler `scrolling()` reads). A caller landing in that window, most of all
+		 * fs-select's, got the width the PREVIOUS viewport had: at 568px settling to 390px, model
+		 * stayed 568 for up to 220ms of the 400 (measured: −178px, exactly 568−390;
+		 * ../tmp/task-vnstat/probe2.mjs, probe3.mjs; live-audit's `geometry|fs-content` finding on
+		 * owrt2410, CI run 34364446910).
+		 *
+		 * So the window's own width is compared fresh on every call, not only when `_shellOuter`
+		 * is still zero. `clientWidth` is the one read the old "no layout read" promise here was
+		 * already conditional on: the bootstrap branch (no fitter has run yet) made this exact
+		 * call through measureShell(). A plain `!==` compares against the cached width for free —
+		 * nothing invalidated layout since the last read, so this costs nothing when nothing
+		 * moved — and measureShell()'s own further reads (the resolved gutter) only run when the
+		 * comparison says the width actually did. */
+		if (document.documentElement.clientWidth !== _shellOuter) measureShell();
 		const root = document.documentElement;
 		return columnWidth(shellGeometry(), {
 			outerW: _shellOuter,
