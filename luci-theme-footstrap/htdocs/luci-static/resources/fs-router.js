@@ -419,14 +419,53 @@ function restoreScroll(pos, gen) {
 	 * asynchronously, so a flag around the write would already be false — the position last written
 	 * is remembered instead, and a scroll landing exactly there is ours.
 	 *
-	 * Passive listeners: this must never sit in front of the scroll it watches for. */
+	 * Passive listeners: this must never sit in front of the scroll it watches for.
+	 *
+	 * AND ONLY ON AN AXIS THIS `pos` ACTUALLY CARRIES. One `cancelled` flag serves both scrollers, so
+	 * an event on the axis this layout does NOT use — a stray write to the other scroller, from
+	 * anywhere in the document, while THIS one is still waiting for its content to grow tall enough —
+	 * used to read as "the reader scrolled" and cancel the whole restore, killing the axis that WAS
+	 * legitimately pending over one that was never being restored at all. Reproduced without a real
+	 * router (`../tmp/task-back/repro2.mjs`): a bare `window.scrollTo(0, 111)` from an unrelated
+	 * script while the sidebar layout's `#maincontent` restore was still pending left the reader at 0
+	 * for the rest of the 5 s window instead of the parked 3000; scoping the check to the axis `pos`
+	 * carries fixes it, samples unchanged (3000).
+	 *
+	 * A SAME-axis false alarm survives that fix: the browser's OWN traversal restore lands on the
+	 * scroller BEFORE this handler swaps `#view` (see the comment above the function), and the swap
+	 * that follows briefly leaves the incoming page shorter than the saved offset — `commitStage()`
+	 * moves the outgoing page's nodes out before the incoming page's have finished growing under
+	 * their own RPCs. The engine then clamps the scroller BACK to whatever height exists NOW, firing
+	 * an ordinary `scroll` event that looks exactly like a reader's, and it lands before this tick has
+	 * ever written anything (`wroteWin`/`wroteMain` still -1), so the "our own write coming back"
+	 * check above cannot catch it either. Measured live (owrt2512b @1440, `/admin/status/overview` <-
+	 * package-manager, Back): the UA restores `window.scrollY` to the parked 2684 in the same tick
+	 * `popstate` fires, `commitStage()` leaves the document ~900px tall for one frame, and the next
+	 * native `scroll` event reports `y=0` a whole 5 s before this function's own deadline — cancelling
+	 * a restore that had not yet had the height to attempt. A clamp cannot land anywhere but the
+	 * scroller's OWN current ceiling, and the reader cannot have scrolled PAST a height that does not
+	 * exist yet, so a scroll landing exactly there while that ceiling is still short of the saved
+	 * offset is the engine settling, not input — every real gesture that could produce it (a
+	 * scrollbar drag past the same limit, in particular) already flows through the direct
+	 * wheel/touchstart/keydown listeners below regardless of what onScroll decides. */
 	let cancelled = false, wroteWin = -1, wroteMain = -1;
 	const stop = () => { cancelled = true; off(); };
 	const onScroll = (ev) => {
 		const t = ev.target;
-		const now = (t === document || t === document.documentElement || t === document.body)
-			? Math.round(window.scrollY) : (t && t.scrollTop);
-		if (now === wroteWin || now === wroteMain) return;	/* our own write coming back */
+		const isWin = (t === document || t === document.documentElement || t === document.body);
+		if (isWin) {
+			if (!pos.win) return;
+			if (Math.round(window.scrollY) === wroteWin) return;	/* our own write coming back */
+			const de = document.documentElement;
+			const ceiling = Math.max(0, de.scrollHeight - de.clientHeight);
+			if (ceiling < pos.win && Math.round(window.scrollY) === ceiling) return;	/* the page settling */
+		}
+		else {
+			if (!pos.main) return;
+			if (t && t.scrollTop === wroteMain) return;	/* our own write coming back */
+			const ceiling = t ? Math.max(0, t.scrollHeight - t.clientHeight) : 0;
+			if (ceiling < pos.main && t && t.scrollTop === ceiling) return;	/* the page settling */
+		}
 		stop();
 	};
 	/* the keys that scroll, and only those: typing in a field must not cancel anything */
@@ -974,8 +1013,13 @@ function navigate(pathname, push, kbd) {
 	 *
 	 * A popstate replay resets nothing: both scrollers are restored there from _scrollMem.
 	 * scrollRestoration stays 'auto' — the UA's own attempt lands before the swap and is undone by
-	 * it, so it neither helps nor hurts, while 'manual' would take away the genuine full load. */
-	if (push) fit.forgetRest();
+	 * it, so it neither helps nor hurts, while 'manual' would take away the genuine full load.
+	 *
+	 * `forgetRest()` was gated on `push` despite the comment above already claiming "regardless" — a
+	 * Back replay is leaving this page exactly as much as a click does, so the outgoing page's stale
+	 * anchoring reference survived a popstate and could still be read against the page being
+	 * restored into once fs-fit's own mutation observer next fires on it. */
+	fit.forgetRest();
 
 	/* ---- what a full load does for a keyboard/screen-reader user, and the SPA does not ----
 	 * renderChrome() has just emptied #topmenu, so the <a> the user activated with Enter no longer

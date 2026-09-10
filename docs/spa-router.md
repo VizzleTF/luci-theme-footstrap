@@ -662,6 +662,56 @@ place and the browser clamped the offset to 197. The popstate handler therefore 
 `navigate()` (`_pendingRestore`) and the commit replays it, when there is only one height to read.
 Verified in both layouts afterwards: parked 411 → restored 411 in `top`, 370 → 370 in `sidebar`.
 
+**One `cancelled` flag guarded both scrollers, so an event on the axis a given `pos` does not even
+carry could cancel the OTHER axis's restore.** `restoreScroll()`'s `onScroll` listener reads any
+'scroll' event that does not match its own last write as the reader taking over — right for the
+scroller this call is actually restoring, wrong for the other one: `#maincontent` never scrolls in
+`top` and the document never scrolls in `sidebar`, so a write to the axis THIS `pos` leaves at 0 is
+never the reader outscrolling a restore that was never running there. Reproduced without a router
+(`../tmp/task-back/repro2.mjs`, real Chromium via Playwright, `fs-router.js` unmodified, `fs-fit.js`
+not even loaded): a bare `window.scrollTo(0, 111)` fired from an unrelated script while the sidebar
+layout's `#maincontent` restore was still waiting for its content to grow tall enough left the reader
+at 0 for the rest of the 5 s window instead of the parked 3000px — the write never touched
+`#maincontent` at all, but the single shared cancellation flag stopped that restore anyway. Scoping
+the check to the axis `pos` actually carries fixes it: `../tmp/task-back/router-before.js` (today's
+code) samples `[0,0,0,0,0,…]`; fixed, `[0,0,3000,3000,3000,…]`, top layout unaffected either way.
+
+**`fit.forgetRest()` was gated on `push`, so a Back replay never cleared it — despite the comment
+right above the call already saying "regardless".** A stale anchoring reference from the page being
+LEFT has no more business surviving a Back than it does a click: the reader is committed to leaving
+that page exactly the same way in both cases, and fs-fit's own mutation observer runs on whatever
+commitStage() swaps in either way. Now called unconditionally.
+
+**Both fixes above were necessary and neither was sufficient: `spa-parity`'s live `back-scroll` case
+still dropped the reader to 0 on a real router** (`/admin/status/overview` <- package-manager, Back —
+owrt2512b, owrt2410b, owrtsnapb, both the 1440px and the narrow context) after they shipped, which is
+what this paragraph fixes. The mechanism is a THIRD, same-axis false alarm that a synthetic page never
+produces because it never shrinks: the browser restores the scroller to the saved offset on the
+traversal itself, BEFORE this handler ever runs (see above) — and `commitStage()`'s own DOM swap then
+briefly leaves the incoming page shorter than that offset while its RPCs are still in flight, so the
+engine clamps the scroller straight back down. That clamp fires an ordinary `scroll` event, on the
+SAME axis `pos` is restoring, before `restoreScroll()`'s own tick has written anything at all
+(`wroteWin`/`wroteMain` still `-1`), so neither the cross-axis fix above nor the "our own write coming
+back" check can tell it apart from a reader taking over — and once `onScroll` calls `stop()`, the
+restore is cancelled for the rest of the 5 s window with the page still growing underneath it.
+Measured live (owrt2512b, 1440px): the UA's own traversal restore lands `window.scrollY` at the
+parked 2684 in the same tick as `popstate`; `commitStage()` leaves `document.documentElement` at
+~900px one frame later; the resulting native `scroll` event reports `y=0`, five whole seconds before
+this function's own deadline, and used to end the restore right there.
+
+Fixed by teaching `onScroll` the one shape a genuine reader cannot produce: a `scroll` landing exactly
+at the scroller's OWN current ceiling (`scrollHeight - clientHeight`) while that ceiling is still
+SHORTER than the saved offset. Nobody can scroll past a height that does not exist yet, so a report
+that lands precisely at today's maximum is the engine settling a page that has not finished growing,
+not input — and every real gesture that could otherwise land there (a scrollbar dragged to the same
+limit, in particular) already stops the restore through the direct `wheel`/`touchstart`/`keydown`
+listeners regardless of what `onScroll` decides. Verified live on all three `b` stands, both widths,
+after the fix: `owrt2512b` 1440px 2684 -> 2683, 767px 3500 -> 3500; `owrtsnap` (`owrtsnapb`) 1440px
+2473 -> 2473, 767px 3127 -> 3127 — and the `@390 top` shape from the original probe
+(`../tmp/task-noref/D-nav.txt`) reproduced and closed the same way in the synthetic harness this
+session added (`../tmp/task-back2/`). The cross-axis fix's own repro (`../tmp/task-back/repro2.mjs`)
+still samples `[0,0,3000,3000,…]` unchanged.
+
 ## A dead session ends the document
 
 luci-base answers an expired session with `notifySessionExpiry()`: `Poll.stop()` plus a modal whose

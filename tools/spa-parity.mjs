@@ -207,6 +207,81 @@ async function stagingWindowCheck(page, stand, findings, cases = STAGING_CASES, 
 	}
 }
 
+/* ---- browser Back must restore the reader's own scroll offset ----
+ *
+ * Nothing above drives HISTORY at all: stagingWindowCheck proves the swap itself, but a reader who
+ * scrolls down, opens another page and presses Back is a full round trip through fs-router.js's
+ * `_scrollMem`/`restoreScroll()` that no case here exercised — task-back's card was opened against
+ * exactly this gap. Scroll down on `from`, click into `to`, go Back, and read whichever element
+ * `saveScroll()`/`restoreScroll()` would have used AT THIS WIDTH: `#maincontent` where its own
+ * `overflow-y` computes to `auto`/`scroll` (the sidebar layout), the document otherwise (the top
+ * layout) — docs/spa-router.md, "Scroll". Run at both the 1440px context every case above uses and
+ * the narrow one, since the two layouts genuinely scroll different elements. */
+const BACK_CASES = [
+	{ from: ORIGIN, to: '/admin/system/package-manager' },
+];
+const BACK_SETTLE_MS = 3000;
+/* rounding plus the odd late layout pass, not a tolerance for the bug itself: task-back's own
+ * measurement was a reader dropped to 0 from ~3274px, orders of magnitude past this */
+const BACK_TOLERANCE_PX = 40;
+
+function readScrollOffset(page, useDoc) {
+	return page.evaluate((doc) => {
+		const sc = document.getElementById('maincontent');
+		return doc ? Math.round(window.scrollY) : (sc ? sc.scrollTop : 0);
+	}, useDoc);
+}
+function writeScrollOffset(page, useDoc, v) {
+	return page.evaluate(({ doc, v }) => {
+		const sc = document.getElementById('maincontent');
+		if (doc) window.scrollTo(0, v);
+		else if (sc) sc.scrollTop = v;
+	}, { doc: useDoc, v });
+}
+
+async function backRestoreCheck(page, stand, findings, widthLabel) {
+	for (const c of BACK_CASES) {
+		const label = `${c.from} -> ${c.to}` + (widthLabel ? ` @${widthLabel}px (Back)` : ' (Back)');
+		const add = (detail) => findings.push({ stand: stand.id, path: label, kind: 'back-scroll', detail });
+
+		try { await page.goto(stand.base + c.from, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
+		catch (e) { continue; }
+		await page.waitForTimeout(1400);
+
+		/* which scroller THIS width uses, read the same way fs-fit.js's own scroller() does — never
+		 * assumed from the layout name, which a CSS edit could move independently of this gate */
+		const useDoc = await page.evaluate(() => {
+			const sc = document.getElementById('maincontent');
+			const flow = sc ? getComputedStyle(sc).overflowY : '';
+			return !(flow === 'auto' || flow === 'scroll');
+		});
+
+		await writeScrollOffset(page, useDoc, 100000);	/* as far as this page allows */
+		const parked = await readScrollOffset(page, useDoc);
+		if (parked < 80) {
+			add(`${c.from} has no room to scroll at this width (parked at ${parked}px) — this case `
+				+ 'proves nothing here');
+			continue;
+		}
+
+		await page.evaluate((to) => {
+			const href = '/cgi-bin/luci' + to;
+			let a = [ ...document.querySelectorAll('a[href]') ].find((x) => x.getAttribute('href') === href);
+			if (!a) { a = document.createElement('a'); a.href = href; a.textContent = 'probe'; document.getElementById('view').append(a); }
+			a.click();
+		}, c.to);
+		await page.waitForTimeout(1400);
+
+		await page.goBack();
+		await page.waitForTimeout(BACK_SETTLE_MS);
+		const restored = await readScrollOffset(page, useDoc);
+
+		if (Math.abs(restored - parked) > BACK_TOLERANCE_PX)
+			add(`parked at ${parked}px, Back restored ${restored}px — the reader was dropped `
+				+ `${parked - restored}px from where they were`);
+	}
+}
+
 const list = requireStands(stands(arg('only', ''), { all: ALL_STANDS }), 'spa-parity');
 const browser = await chromium.launch();
 const findings = [];
@@ -223,6 +298,7 @@ await Promise.all(list.map(async (stand) => {
 	await login(page, stand.base);
 
 	await stagingWindowCheck(page, stand, findings);
+	await backRestoreCheck(page, stand, findings);
 
 	/* the narrow pass: its own context, since theme/90-responsive.css's rules never match at 1440px */
 	const narrowCtx = await browser.newContext({ viewport: { width: NARROW_WIDTH, height: 900 } });
@@ -230,6 +306,7 @@ await Promise.all(list.map(async (stand) => {
 	const narrowPage = await narrowCtx.newPage();
 	await login(narrowPage, stand.base);
 	await stagingWindowCheck(narrowPage, stand, findings, NARROW_STAGING_CASES, NARROW_WIDTH);
+	await backRestoreCheck(narrowPage, stand, findings, NARROW_WIDTH);
 	await narrowCtx.close();
 
 	let paths = (await menuPaths(page)).filter((p) => !DESTRUCTIVE.test(p) && p !== ORIGIN);
