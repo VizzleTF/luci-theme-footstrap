@@ -311,7 +311,9 @@ verify_one() {
 
 # The workflow's own advisory step: "Assert the feed serves a working theme" — gated on push and
 # on the feed answering, `continue-on-error: true`. Tests the ALREADY-PUBLISHED channel, never
-# this build; a failure here is reported, never counted as this run's own FAIL.
+# this build; a failure here is reported, never counted as this run's own FAIL. Not measured is not
+# a pass either, in either place: the workflow's "Report whether the published feed was measured"
+# step and the SKIP below both come from `tools/feed-key.sh report`.
 verify_feed() {
 	name="verify-feed-live"
 	if [ "$DRY" = 1 ]; then
@@ -324,8 +326,11 @@ verify_feed() {
 	out="$RUNDIR/feed-key.out"
 	: >"$out"
 	RUNNER_TEMP="$RUNDIR" GITHUB_OUTPUT="$out" sh tools/feed-key.sh >"$log" 2>&1
+	# The verdict sentence is `tools/feed-key.sh report`'s in both places, so a skip here and a skip
+	# in the workflow are the same words and not two paraphrases that drift apart.
 	if ! grep -q '^reachable=true' "$out" 2>/dev/null; then
-		skip "$name" "feed unreachable (or feed-key.sh failed) — see $log; this is the workflow's own non-blocking case"
+		skip "$name" "NOT MEASURED — the published feed did not answer; see $log (the workflow's own non-blocking case)"
+		FEED_REACHABLE=false FEED_OUTCOME=skipped sh tools/feed-key.sh report | sed 's/^/       /'
 		return
 	fi
 	scratch="$RUNDIR/owlab-test-feed"
@@ -340,12 +345,15 @@ verify_feed() {
 			--assert 'package luci-theme-footstrap' \
 			--assert 'http 200 /cgi-bin/luci/admin/status/overview'
 	) >>"$log" 2>&1; then
+		outcome=success
 		echo "PASS"
 		printf '%s\tPASS\t%s\n' "$name" "$log" >>"$RESULTS"
 	else
+		outcome=failure
 		echo "FAIL (advisory — the published feed, not this build; the workflow marks this continue-on-error)"
 		printf '%s\tFAIL(advisory)\t%s\n' "$name" "$log" >>"$RESULTS"
 	fi
+	FEED_REACHABLE=true FEED_OUTCOME="$outcome" sh tools/feed-key.sh report | sed 's/^/       /'
 }
 
 job_verify() {

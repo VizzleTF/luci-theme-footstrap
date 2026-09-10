@@ -201,6 +201,13 @@ and asserts the published feed serves a working theme.
 
 That the build "produced an ipk" proves nothing about the ipk; this job is what does.
 
+**When the feed does not answer, the assertion is skipped and says so.** `tools/feed-key.sh` still
+reports `reachable=false` rather than failing — the claim is about a channel this repository does not
+own — but the run now ends with "Report whether the published feed was measured", which writes
+*measured and passed*, *measured and failed* or *NOT MEASURED* into the run's annotations and job
+summary. A green `verify` no longer looks the same whether the feed was tested or never asked;
+`tools/ci-local.sh verify` prints the same sentence from the same script.
+
 **Five assertions per leg**, and the fifth is the template gate:
 
 ```
