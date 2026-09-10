@@ -437,6 +437,73 @@ pre-existing fault in the miss-count's own asymmetry (it never cross-checks `com
 investigation. `fit-quiet` (0px peak-to-peak, all widths, all three routers) and `npm run check` are
 unaffected: this is additive bookkeeping on a path only a refused `holdFloor()` ever reaches.
 
+## `_rest`'s own baseline goes stale mid-tick — task nine, open
+
+Task wkrefill's own residual note (previous section) named the shape without chasing it: "the
+miss-count's own asymmetry... never cross-checks `compensated` when `drift` reads large rather than
+near-zero." This task traced that asymmetry to its source and found it is wider than the miss-count
+alone.
+
+**The mechanism.** `lateDrift()`'s baseline (`ref`/`settled`, passed in as `_rest` from BEFORE the
+current tick's own `run()`) is only ever refreshed by three things: a WRITE inside `lateDrift()`
+itself (forced, `rememberRest(true)`, task refill2's own fix), `scheduleAnchor()`'s forced call on
+the untrusted path, and — unforced, unconditional, synchronous — `run()`'s own bare `rememberRest()`
+call on EVERY mutation the trusted path does NOT write for. That bare call reads `anchorRef()`'s
+geometry in the SAME microtask as the mutation, before the engine has had a rendering step to react
+— a mid-transition snapshot, not the settled one `lateDrift()` itself takes 420ms later. Where the
+engine settles in one step this is invisible; where it settles gradually (measured live on webkit —
+`scrollTop()` still moving 400-900ms after a mutation, task nine's own instrumented
+`rememberRest()`) it is not, and the mid-transition value becomes the baseline the NEXT mutation's
+own drift is measured against, indistinguishable from a real residual. Confirmed at four call sites:
+`run()`'s own line (the main path), `_moFlag`'s and `_moTabs`'s bare `run()` calls (a poll's own
+request-in-flight class and a `depends()` re-evaluation can each land inside the same tick as a
+growth), and `sampleMotion()`'s deferred-batch `run()`.
+
+**Reproduced directly** (`../tmp/task-nine/probe-overview.mjs`, never synced to a shared stand,
+instrumented copy only): three back-to-back growth/shrink cycles on `/admin/status/overview`,
+webkit/owrt2410. `_rest.at` drifted 60-120px from the offset the reference was actually taken at,
+purely from the ordinary sequence of bare `rememberRest()` calls chasing a still-settling offset —
+`_engineTrusted` tripped false on a section the reader never saw move (the mirror of task missrule's
+own fault: there, the theme's OWN rounding was counted as an engine failure; here, the theme's own
+STALE BASELINE is).
+
+**Two fixes measured, one shipped, one reverted — read before trying either again.**
+
+1. *Refresh `_rest` in `lateDrift()`'s own no-write exits too* (the blind-branch miss, and the plain
+   `drift < 1` return), mirroring task refill2's existing write-path fix, gated on `grow > 1 ||
+   floorShrink > 1` so an uneventful tick pays nothing extra. Low-risk, principled, and measured to
+   change NOTHING on its own (`--only owrt2512,owrt2410,owrtsnap`, all three engines: still 8-10
+   findings, same shapes) — because the very next mutation's own bare `run()` call overwrites
+   whatever this just fixed before it is ever read. **Shipped** (it does not regress anything and the
+   write-path already uses the identical pattern), but it is not the fix on its own.
+2. *Defer `run()`'s own bare call the same way `_anchorPending` already defers it for the untrusted
+   path* — skip the unforced `rememberRest()` on a trusted tick that has a reference to hand
+   `lateDrift()`, at all four call sites above, so lateDrift()'s own settle-verified capture is the
+   ONLY thing that ever touches `_rest` on a tick it is watching. This DID close the specific traced
+   case (`_rest.at` stayed accurate for all three refills in the isolated probe). It also introduced a
+   NEW failure at full-sweep scale that was not visible in the isolated probe: `webkit/owrt2410 @390
+   top overview` reported `refill 1/3 left the reader 120px off (corrected 22ms)` — the engine
+   corrected briefly, then something moved the page the FULL, uncompensated growth away from it,
+   worse than the fault being fixed. Likely cause, not yet confirmed: deferring `run()`'s bare call
+   removes a "self-healing" property it incidentally had — even an imperfect mid-transition snapshot
+   gets overwritten on the NEXT tick, so a reference that went stale for a reason OTHER than this
+   mechanism (this session's own probe runs `REPEAT` after `SWAP`, whose own "floor alone" ablation
+   phase runs with the correction path different from the rest of the sweep) no longer self-corrects
+   and persists into `REPEAT`'s own park. **Reverted** — the sweep as a whole went from 9-10 findings
+   to 9, but with a new, unproven-safe shape among them, which is not the trade this task's acceptance
+   asked for.
+
+**What is not yet tried.** Narrowing the defer to `_lateFrame`'s own pending window rather than
+"trusted + has a reference" unconditionally — measured NOT to help the specific M1→M2 case this task
+traced (`_lateFrame` clears at the top of its own `setTimeout`, ~420ms after the mutation that armed
+it, and the interfering mutation in the traced case arrives ~900ms later, well outside that window)
+without ALSO moving the `_lateFrame = 0` reset to the end of the callback — untried, because it
+changes refusal 1's own timing contract (`lateDrift()`'s doc comment: "one per tick, whichever batch
+armed it first") in a way this task did not have the budget to re-measure against `SWAP`/`TICK`/
+`QUIET` as well as `REPEAT`. The isolated-probe proof above (`../tmp/task-nine/probe-overview.mjs`)
+is scratch, not committed, and the exact shape of the full-sweep regression above was not chased past
+naming it — the next session should reproduce it on its own before trying fix 2 again.
+
 ## The document may not get shorter: `holdFloor()`
 
 `dom.content()` — what every LuCI poll calls — empties a container before it refills it. A layout

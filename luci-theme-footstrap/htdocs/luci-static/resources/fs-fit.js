@@ -885,13 +885,44 @@ function lateDrift(ref, grow, floorShrink) {
 					/* fresh distrust starts the recovery count at 0 too — a streak from a PREVIOUS
 					 * spell of distrust proves nothing about this one */
 					if (++_lateMisses >= LATE_MISS_LIMIT) { _engineTrusted = false; _lateHits = 0; }
+					/* MIRROR OF task refill2's WRITE-PATH FIX, ON THE NO-WRITE PATH — task nine.
+					 * A miss here means the OFFSET did not fully move; it does not mean this tick's
+					 * geometry is unknown. Leaving `_rest` as `run()`'s own mid-transition capture (the
+					 * DOM already changed, nothing had compensated yet) makes THAT stale snapshot the
+					 * `ref.at`/`was` the NEXT tick measures against, same as the write path used to
+					 * before `rememberRest(true)` was added there. `seen` and `el`'s rect, just read,
+					 * ARE the true current position — uncorrected, but real — so the next comparison
+					 * should start from here, not from before this tick began. Measured, `../tmp/
+					 * task-nine/`: without this, `firefox owrt2410 @390 top overview` counted a SECOND
+					 * phantom miss off the stale baseline and tripped `_engineTrusted` false while
+					 * REPEAT's own mark never moved (misses [true,true,false]) — e0b6db4's fault on the
+					 * other side of the same comparison. */
+					rememberRest(true);
 					return;
 				}
 				/* else: within table-row rounding — drift is still whatever it was (< 1 per the guard
 				 * above), so the plain `drift < 1` return two lines down is what fires, unwritten and
 				 * uncounted: the engine did the job. */
 			}
-			if (Math.abs(drift) < 1) return;			/* the engine put it back */
+			if (Math.abs(drift) < 1) {
+				/* SAME MIRROR AS ABOVE, FOR THE "engine already got it right" EXIT — task nine.
+				 * Gated on `grow` OR `floorShrink`, not unconditional: a tick where this floored box
+				 * neither grew nor shrank pays nothing extra here (P5), and `run()`'s own synchronous
+				 * reference is only ever wrong relative to what THIS tick's mutation did. `grow` alone
+				 * is not enough — REPEAT's own SHRINK leg (the pad it removes between refills) is a
+				 * real box change `grow` reads as <=1 (growth witness is deliberately one-sided,
+				 * task detector), so gating on `grow > 1` alone left the SAME hole one level down: the
+				 * shrink between refill 1 and refill 2 left `_rest` at run()'s mid-transition capture,
+				 * and refill 2 read ITS drift against that stale baseline. Where it did change (either
+				 * way) and the engine handled it without a write, `run()`'s snapshot is still what the
+				 * NEXT tick's `lateDrift()` would measure against — masking a real residual as "small"
+				 * until it surfaces as a flat, un-recovered offset. Measured, `../tmp/task-nine/`:
+				 * gating on `grow > 1` alone left `/admin/network/dhcp @390` at 47-59px off on the
+				 * second of three back-to-back refills, unchanged — chromium/firefox/webkit alike,
+				 * `_engineTrusted` true throughout. */
+				if (grow > 1 || floorShrink > 1) rememberRest(true);
+				return;						/* the engine put it back */
+			}
 			if (Math.abs(drift) > (window.innerHeight || 800)) return;
 			const sc = scroller();
 			const at = sc ? sc.scrollTop : window.scrollY;
