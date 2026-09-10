@@ -39,4 +39,17 @@ if (hits.length) {
 	process.exit(1);
 }
 
+/* An empty selection reads exactly like a clean sweep: "0 files, no rule keys off …" and exit 0
+ * are what an empty or missing styles/ produces too. MEASURED is the current count (40); the floor
+ * sits well under it so the sheet can grow or shrink without tripping this, but a run that read no
+ * files at all is not a pass — it is a run that checked nothing. */
+const MEASURED_FILES = 40;
+const FILES_FLOOR = 20;
+if (files.length < FILES_FLOOR) {
+	console.error(`\nFAIL: measured only ${files.length} CSS file(s) under styles/ (last real run: `
+		+ `${MEASURED_FILES}) — styles/ is missing, empty, or far short of the theme's own sheet. `
+		+ `This is not a clean run; it is a run that found nothing to check.`);
+	process.exit(1);
+}
+
 console.log(`css-i18n: ${files.length} files, no rule keys off a translated data-title value.`);

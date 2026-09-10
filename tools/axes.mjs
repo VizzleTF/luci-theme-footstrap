@@ -242,9 +242,28 @@ const factoryAttrs = new Set([...colorAxes.map(a => a.attr), ...enumAxes.map(a =
  * check: applyLayout() writes `document.documentElement.setAttribute('data-layout', …)` while every
  * other applier holds it in a local `root`, and a pattern anchored on `root.` therefore derived a
  * list with the layout axis silently missing — the one shape this section exists to catch. */
+/* `[a-z-]+` used to stop at the first character outside that class — silently, with no error and
+ * no changed exit code. Renaming `data-rail` to `data-raiL` (one uppercase letter) made the WHOLE
+ * match fail (nothing between 'data-' and the closing quote can satisfy both the class and the
+ * literal quote that follows it), so the attribute dropped out of `jsSets` and this section's loop
+ * had nothing to say about it — the exact "check disappears" shape this section exists to catch.
+ * `\w` covers upper-case, digits and underscore, so a rename lands IN the derived set instead of
+ * falling out of it, and the loop below can still compare it against head.ut. */
 const jsSets = new Set(
-	[...JS.matchAll(/(?:^|[^\w.])(?:root|document\.documentElement)\.setAttribute\('(data-[a-z-]+)'/g)]
+	[...JS.matchAll(/(?:^|[^\w.])(?:root|document\.documentElement)\.setAttribute\('(data-[\w-]+)'/g)]
 		.map((m) => m[1]));
+
+/* A derived list with no expected size is the same hole one level up: a regex that stopped
+ * matching ANY call (not just one attribute) would empty `jsSets` and the loop below would report
+ * nothing — zero findings, indistinguishable from "every axis agrees". Measured today:
+ * data-layout and data-rail are the two bespoke appliers this section holds; the floor sits at
+ * that count, not at 0. */
+const MIN_2C_ATTRS = 2;
+if (jsSets.size < MIN_2C_ATTRS)
+	errors.push(`only ${jsSets.size} axis attribute(s) matched by the (root|document.documentElement)`
+		+ `.setAttribute(...) scan in section 2c — expected at least ${MIN_2C_ATTRS} (data-layout, `
+		+ `data-rail). A derived list this short has likely stopped matching one of them rather than `
+		+ `run out of axes to find.`);
 
 for (const attr of jsSets) {
 	if (OUTBOUND.has(attr) || factoryAttrs.has(attr)) continue;

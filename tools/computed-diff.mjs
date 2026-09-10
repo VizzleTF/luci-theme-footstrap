@@ -237,6 +237,33 @@ for (const r of report) {
 	}
 }
 
+/* Below this line a real diff count is a JUDGEMENT CALL (`--max` makes it one; plain output is a
+ * report a human reads) — but "the page never rendered" is not a judgement call, it is a broken
+ * harness, and it used to read exactly like a clean pass: a blank gallery snapshots 0 elements on
+ * both sides, `els.length === before.out.length` (0 === 0) skips the structural check, the diff
+ * loop never runs, and "0 difference(s) total" prints — indistinguishable from the real thing this
+ * gate is trusted to prove. Both checks below run UNCONDITIONALLY, independent of --control/--max,
+ * because a run that measured nothing is not a report either — it is nothing to report.
+ *
+ * MEASURED is the current per-point count (853 elements on docs/gallery.html, task-gate-audit);
+ * the floor sits far under it so a widget added or removed never trips it, and only a gallery that
+ * failed to render — 0, or a handful of elements from a bare error page — does. */
+const MEASURED_ELEMENTS = 853;
+const ELEMENTS_FLOOR = 200;
+const empty = report.filter((r) => (r.n ?? 0) < ELEMENTS_FLOOR);
+if (empty.length) {
+	console.error(`\nFAIL: measured only ${empty[0].n} element(s) at ${empty[0].label} (last real run: `
+		+ `~${MEASURED_ELEMENTS}) — the gallery did not render. This is not "0 differences"; it is `
+		+ `nothing measured, on ${empty.length}/${report.length} point(s).`);
+	process.exit(1);
+}
+const structural = report.filter((r) => r.structural);
+if (structural.length) {
+	console.error(`\nFAIL: the DOM itself changed shape, which no property list can diff — see the `
+		+ `"element count changed" line(s) above.`);
+	process.exit(1);
+}
+
 if (CONTROL) {
 	if (total === 0) { console.log('control pass: 0 differences. The gallery has no noise floor; any non-zero diff above is causal.'); process.exit(0); }
 	console.error(`control pass FAILED with ${total} difference(s): the same stylesheet disagreed with itself, so the harness is unstable and no diff it reports can be read as causal.`);

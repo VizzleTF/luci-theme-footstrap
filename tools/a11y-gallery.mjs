@@ -34,11 +34,48 @@ const browser = await chromium.launch();
 const ctx = await browser.newContext();
 let failed = 0;
 
+/* Nothing below asserted the gallery actually rendered: a blank page still runs the axe pass 24
+ * times, gets an empty violations array back every time, and prints "clean across all 24
+ * combinations" — a pass that measured nothing reads exactly like a pass that measured everything.
+ * MEASURED is the current node count (853, task-gate-audit); the floor sits far under it so a
+ * widget added or removed never trips it. Checked once, not per-combination, since a page that
+ * renders once renders the same DOM every time here (only :root attributes move). */
+const EXCLUDE_DROPDOWN = '.cbi-dropdown[multiple] li > form > input[type="checkbox"]';
+const EXCLUDE_PLACEHOLDER = '.cbi-dropdown li[placeholder]';
+const MEASURED_NODES = 853;
+const NODES_FLOOR = 200;
+const errorOut = (msg) => { console.error(`\nFAIL: ${msg}`); process.exit(1); };
+
 for (const { mode, palette, tint } of MATRIX) {
 	const page = await ctx.newPage();
 	await page.goto(base, { waitUntil: 'load' });
 	await applyAppearance(page, { mode, palette, tint });
 	await page.waitForTimeout(400);   /* let the webfonts settle before measuring contrast */
+
+	const nodeCount = await page.evaluate(() => document.querySelectorAll('*').length);
+	if (nodeCount < NODES_FLOOR) {
+		console.error(`\nFAIL: the gallery rendered only ${nodeCount} node(s) (last real run: `
+			+ `~${MEASURED_NODES}) at ${palette}/${mode} — this is not a clean sweep, it is a blank `
+			+ `or broken page. axe-core cannot find a violation on markup that never rendered.`);
+		process.exit(1);
+	}
+	/* The two exclude() selectors below are unverified by axe itself: if either stops matching, the
+	 * exclusion silently widens (excludes nothing, which is safe) or the row it used to carve out
+	 * goes back to being measured wrong — a labelless checkbox or under-AA placeholder ink flagged
+	 * as a real violation, OR the selector rots to matching something else and hides a genuine
+	 * fault. Both directions are silent without this. */
+	const [dropdownHits, placeholderHits] = await page.evaluate(([a, b]) => (
+		[document.querySelectorAll(a).length, document.querySelectorAll(b).length]
+	), [EXCLUDE_DROPDOWN, EXCLUDE_PLACEHOLDER]);
+	if (!dropdownHits)
+		errorOut(`exclude('${EXCLUDE_DROPDOWN}') matched nothing at ${palette}/${mode} — the open `
+			+ `multi-select fixture is gone or the selector no longer names it, and axe is measuring `
+			+ `nothing where this exclusion used to carve out a known-presentational checkbox`);
+	if (!placeholderHits)
+		errorOut(`exclude('${EXCLUDE_PLACEHOLDER}') matched nothing at ${palette}/${mode} — the `
+			+ `placeholder-ink fixture is gone or the selector no longer names it; placeholder-ink.mjs `
+			+ `is the gate that actually holds this token, but this exclusion existing for nothing `
+			+ `means nobody is excluding it on purpose any more`);
 
 	const { violations } = await new AxeBuilder({ page })
 		.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -51,7 +88,7 @@ for (const { mode, palette, tint } of MATRIX) {
 		 * keeps the row itself measured, which is why an open menu is rendered here at all: contrast
 		 * on a chosen row is a theme decision and this is the only place it is checked. Narrow on
 		 * purpose: the exclusion names the input, not the section. Fix it upstream and delete this. */
-		.exclude('.cbi-dropdown[multiple] li > form > input[type="checkbox"]')
+		.exclude(EXCLUDE_DROPDOWN)
 		/* The second, and it is a DECISION rather than markup: `li[placeholder]` is the theme's
 		 * placeholder ink, which ships deliberately under AA — a hint mistaken for a value makes a
 		 * reader configure the wrong thing, and only a hint far enough from the body ink stops that
@@ -60,7 +97,7 @@ for (const { mode, palette, tint } of MATRIX) {
 		 * carries the same ink for the same reason — so the rule reaches half the decision and
 		 * fails it. `placeholder-ink` is the gate that holds this token instead, with its own two
 		 * thresholds and a prefers-contrast pass where the AA ink comes back. */
-		.exclude('.cbi-dropdown li[placeholder]')
+		.exclude(EXCLUDE_PLACEHOLDER)
 		.analyze();
 
 	const hard = violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
