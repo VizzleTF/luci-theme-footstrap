@@ -156,6 +156,35 @@ export async function menuPaths(page, opts = {}) {
  * translated and the paths are not. */
 export const DESTRUCTIVE = /\/(logout|reboot|flash|backup|shutdown)(\/|$)/;
 
+/* The literal clone owlab boots beside `owrt2512`, `owrt2410` and `owrtsnap` (`owlab.yaml`, task
+ * sweepspeed) — same distro, release and package manager, its own container answering its own
+ * ubus — for exactly this: a sweep can treat the pair as one logical stand with twice the
+ * concurrency, without changing which release lines it covers. Auto-paired only when the caller did
+ * not already name the twin explicitly: `--only owrt2512,owrt2512b` means "measure both,
+ * separately", and this must not silently halve that into "measure the union once." Returns a Map
+ * keyed by the BASE stand's id; empty when owlab has no `-b` set running, so a caller with the old
+ * three-stand lab degrades to exactly today's behaviour. */
+export function pairStands(list) {
+	let out;
+	try {
+		out = execFileSync('owlab', [ 'status', '-json' ], { encoding: 'utf8', stdio: [ 'ignore', 'pipe', 'ignore' ] });
+	} catch (e) { return new Map(); }
+	let parsed;
+	try { parsed = JSON.parse(out); } catch (e) { return new Map(); }
+	const running = (parsed.routers || []).filter((r) => r.state === 'running' && r.http_port);
+	const byId = new Map(running.map((r) => [ r.id, r ]));
+	const explicit = new Set(list.map((s) => s.id));
+	const pairs = new Map();
+	for (const s of list) {
+		const twinId = s.id + 'b';
+		if (explicit.has(twinId)) continue;
+		const t = byId.get(twinId);
+		if (t) pairs.set(s.id, { id: t.id, base: `http://localhost:${t.http_port}/cgi-bin/luci`,
+			release: t.release, distro: t.distro, pkg: t.package_manager });
+	}
+	return pairs;
+}
+
 /* No stand, no verdict — and a gate that quietly reports success on zero routers is worse than one
  * that fails, because it looks the same as a clean run in a log. */
 export function requireStands(list, name) {

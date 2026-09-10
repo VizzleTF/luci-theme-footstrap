@@ -398,6 +398,16 @@ The structural gates run their routers CONCURRENTLY — nothing they measure is 
   for Linux). A new engine needs its own baseline, created by one `--update` run. `--lang ru` (task
   0162, below) runs the same sweep against a Russian router, keyed `<stand>@ru` — the two suffixes
   compose (`owrt2512@ru@firefox`).
+- **`scroll-anchor`** (task sweepspeed) runs its requested engines concurrently rather than one after
+  another, and — when an `-b` twin of a stand is up (`owlab.yaml`'s matched pairs, `owrt2512`/
+  `owrt2512b` and the like) — splits that stand's own cell list across the two containers instead of
+  walking it with one. Neither changes which cells run: every combination the axes define still runs
+  exactly once, findings from either container print under the base stand's id. `--no-pair` turns the
+  splitting off (for measuring the pairing itself, or a run that wants the twin left idle); `--only
+  owrt2512,owrt2512b` measures both explicitly instead of pairing them. `--quick` is the fast local
+  loop — one stand, the Overview page alone, the default axes — and prints what it left out on every
+  run; it is not a substitute for a full `npm run anchor` or CI's own `--full` sweep, and is never set
+  by CI.
 
 ### `live-audit`'s baseline is not a clean sheet, and neither entry nor language may be assumed
 

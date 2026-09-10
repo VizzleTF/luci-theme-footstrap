@@ -58,7 +58,7 @@
  *
  * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
-import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter, pairStands } from './lib/stands.mjs';
 
 const arg = (name, dflt) => {
 	const i = process.argv.indexOf('--' + name);
@@ -75,6 +75,12 @@ const FULL = process.argv.includes('--full');
  * it had failed in the third cell. CI never passes this: how WIDE a fault is is half of what the
  * sweep says. */
 const BAIL = process.argv.includes('--bail');
+/* A local iteration loop, not the sweep CI runs: the first stand only, the Overview page alone, the
+ * default width/layout/density axes (task sweepspeed). Says what it left out on every run, loudly,
+ * so a clean `--quick` is never mistaken for a clean sweep — the same reason a page that never
+ * opened is reported apart from a pass rather than folded into one. `--only`/`--page` still override
+ * when given explicitly; CI never sets this flag. */
+const QUICK = process.argv.includes('--quick');
 
 /* Three shapes, because the shape decides what the theme can anchor ON, and each of these breaks
  * differently:
@@ -102,7 +108,8 @@ const BAIL = process.argv.includes('--bail');
  *                120px pad while the block itself measured the same height before and after
  *                (`grewOnItsOwn` 0), the same way swapping `.fs-ovl` deletes three sections no poll
  *                touches. What produced the other 132px was not established. */
-const PAGES = arg('page', '/admin/status/overview,/admin/network/dhcp,/admin/status/processes')
+const PAGES = arg('page', QUICK ? '/admin/status/overview'
+	: '/admin/status/overview,/admin/network/dhcp,/admin/status/processes')
 	.split(',').map((p) => p.trim()).filter(Boolean);
 
 /* WIDTH AND LAYOUT ARE ONE AXIS FOR HOLD/SWAP/QUIET, and it has two values, not four: what those
@@ -897,7 +904,15 @@ const TICK = async (ticks) => {
 		scroller: sc ? 'maincontent' : 'window' };
 };
 
-const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'scroll-anchor');
+let list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'scroll-anchor');
+/* `--quick`'s stand narrowing: the first stand `stands()` handed back, unless `--only` already said
+ * which ones — an explicit `--only` is the caller overriding the default, and `--quick` narrowing it
+ * again on top would make the flag's own effect depend on argument order. */
+if (QUICK && !arg('only', '')) list = list.slice(0, 1);
+/* Each `-b` twin owlab boots beside a release line (task sweepspeed) is a second container for the
+ * SAME measurement, not a fourth release line — see the note on `pairStands()`. `--no-pair` is the
+ * escape hatch for debugging the pairing itself, or for a run that wants the twin left idle. */
+const PAIRS = process.argv.includes('--no-pair') ? new Map() : pairStands(list);
 /* Printed as it is found, not held until the end: the first finding is the whole answer for someone
  * iterating on a fix, and the list below is what says how many cells and which axes. */
 const findings = [];
@@ -910,6 +925,14 @@ const found = (line) => {
  * and fatal only in bulk — see UNOPENED_TOLERANCE below. */
 const unopened = [];
 let runs = 0;
+
+if (QUICK) {
+	console.log(`scroll-anchor --quick: ${ENGINES.join(',')} on ${list.map((s) => s.id).join(',')} `
+		+ `only, page ${PAGES.join(',')} only, default width/layout/density axes. This is NOT the full `
+		+ 'sweep: it skips every other stand, both other page shapes (dhcp, processes), and — without '
+		+ '--full — compact/large density and every scroller but 1440 side/390 side/390 top. Run without '
+		+ '--quick (`npm run anchor`, or CI\'s own `--full` sweep) before trusting a clean result.\n');
+}
 
 /* A single `page.goto` in CI is not reliable enough to fail a release on. Two runs an hour apart on
  * the same commit died on webkit/owrt2410 with `page.goto: Timeout 20000ms exceeded` and
@@ -939,239 +962,285 @@ const UNOPENED_TOLERANCE = 0.02;
  * first line is the sentence the browser or this file actually wrote */
 const first = (e) => String((e && e.message) || e).split('\n')[0].trim();
 
-/* THE STANDS RUN AT THE SAME TIME, the way live-audit and spa-parity already do. Nothing measured
- * here is a frame rate: every wait is on an EVENT (the scroll landing, `fit.restAt()` reporting a
- * reference at this offset) with a bounded fallback, so three routers answering at once cannot move
- * an answer — unlike scroll-jank, whose subject IS frame pacing and which therefore stays serial.
+/* Reuse a logged-in session across every cell aimed at the same physical container, instead of
+ * performing the POST-and-redirect login flow once per cell. Captured with a throwaway context and
+ * handed to every context a worker opens afterward; `login()` still runs on each of them and still
+ * re-authenticates for real the moment a cookie has expired (LuCI's own session timeout) — this
+ * removes the ROUND TRIP for the common case, it does not replace the check. */
+async function captureSession(browser, base) {
+	const ctx = await browser.newContext();
+	await sealToRouter(ctx, base);
+	const page = await ctx.newPage();
+	await login(page, base);
+	const state = await ctx.storageState();
+	await ctx.close();
+	return state;
+}
+
+/* One cell, against ONE physical container — every case in this file, run once, findings printed
+ * under `reportId` rather than under `base`'s own container id, so a cell an owlab `-b` twin
+ * happened to draw reads identically to one the base container drew (see `pairStands()`). Pulled out
+ * of the sweep below so a worker can run its own slice of the cell list without duplicating what
+ * used to be the loop body. */
+async function runCell(browser, engine, reportId, base, sessionState, { PAGE, width: w, layout, density, noEngineAnchor }) {
+	const ctx = await browser.newContext({ viewport: { width: w, height: 844 }, storageState: sessionState });
+	await sealToRouter(ctx, base);
+	/* HOLD and SWAP's own record of every scroll write made during their measurement
+	 * window — read back only when a finding needs it, which is what told a real failed
+	 * correction apart from a mark that legitimately reached the top of the viewport (a
+	 * -505px HOLD reading, firefox owrt2512 @1440 top compact, chased a full round before
+	 * that distinction was made). Borrowed from ../tmp/task-holdreg/hold-probe.mjs. */
+	await ctx.addInitScript(() => {
+		window.__fsW = [];
+		const rec = (how, val) => { try { window.__fsW.push({ t: Math.round(performance.now()), how, val: Math.round(val) }); } catch (e) { /* … */ } };
+		const st = window.scrollTo;
+		window.scrollTo = function (...a) { rec('window.scrollTo', typeof a[0] === 'object' ? (a[0] && a[0].top) : a[1]); return st.apply(this, a); };
+		const sb = window.scrollBy;
+		window.scrollBy = function (...a) { rec('window.scrollBy', typeof a[0] === 'object' ? (a[0] && a[0].top) : a[1]); return sb.apply(this, a); };
+		const d = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+		Object.defineProperty(Element.prototype, 'scrollTop', { configurable: true, enumerable: d.enumerable,
+			get() { return d.get.call(this); },
+			set(v) { rec('scrollTop=' + (this.id || this.className || this.tagName), v); return d.set.call(this, v); } });
+		const es = Element.prototype.scrollTo;
+		if (es) Element.prototype.scrollTo = function (...a) { rec('el.scrollTo=' + (this.id || this.className || this.tagName), typeof a[0] === 'object' ? (a[0] && a[0].top) : a[1]); return es.apply(this, a); };
+	});
+	/* the Safari path, forced: `fsEngineAnchor=off` makes fs-fit believe the platform has
+	 * no anchoring of its own, and the stylesheet turns the engine's off for real, so the
+	 * two agree about which of them is responsible */
+	if (noEngineAnchor)
+		await ctx.addInitScript(() => {
+			try { localStorage.setItem('fsEngineAnchor', 'off'); } catch (e) { /* no storage */ }
+			document.addEventListener('DOMContentLoaded', () => {
+				const s = document.createElement('style');
+				s.textContent = 'html, body, #maincontent, .fs-main, #view, #view * { overflow-anchor: none !important; }';
+				document.head.appendChild(s);
+			});
+		});
+	const page = await ctx.newPage();
+	const where = `${engine} ${reportId} @${w} ${layout.padEnd(4)} ${density.padEnd(7)} ${noEngineAnchor ? 'engine-anchoring OFF' : 'engine-anchoring on '} ${PAGE.replace('/admin/status/', '')}`;
+	await login(page, base);
+	try {
+		await page.evaluate(async ([l, d]) => {
+			const prefs = await window.L.require('fs-prefs');
+			prefs.applyLayout(l);
+			prefs.applyDensity(d);
+		}, [ layout, density ]);
+		await openPage(page, base + PAGE);
+	}
+	catch (e) {
+		/* NOT a finding: a page that never opened says nothing about where the reader
+		 * ended up. Kept apart and counted — see UNOPENED_TOLERANCE. */
+		unopened.push(`${where}: ${first(e)}`);
+		await ctx.close();
+		return;
+	}
+	await page.waitForTimeout(3000);
+
+	let held, swap, quiet, tick, repeat;
+	try {
+		/* TICK FIRST, and on the page exactly as it loaded — HOLD's pad, SWAP's two
+		 * removeChild/appendChild cycles and QUIET's two dozen scripted flicks all perturb
+		 * whatever the engine had picked as its own anchor node, and TICK measures whether
+		 * a REAL tick misbehaves on ITS OWN, not after three probes have already leaned on
+		 * the page. Measured: run after them, on this same page, TICK read 0px on a cell
+		 * ../tmp/task-overview12/tick-probe.mjs (a fresh navigation) was reporting 21px
+		 * peak-to-peak on at the time — the same fix, the same page, only its position in
+		 * the sequence differed. Only against the REAL engine: with `noEngineAnchor` the
+		 * stylesheet above already turns anchoring off for the whole page, which is
+		 * precisely what TICK exists to watch for misbehaving — running it there would
+		 * measure the theme's own correction against nothing, the question HOLD/SWAP
+		 * already answer with a synthetic pad. */
+		tick = noEngineAnchor
+			? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
+			: await page.evaluate(TICK, TICK_COUNT);
+		held = await page.evaluate(HOLD, GROWTH);
+		swap = await page.evaluate(SWAP, [ GROWTH, TOLERANCE, LATE_MS, SWAP_WINDOW ]);
+		/* only against the REAL engine — same reasoning as TICK above: with `noEngineAnchor`
+		 * the fallback already runs every refill, so `_engineTrusted` has nothing to say. */
+		repeat = noEngineAnchor
+			? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
+			: await page.evaluate(REPEAT, [ GROWTH, TOLERANCE, REPEAT_TIMES ]);
+		quiet = await page.evaluate(QUIET, GROWTH);
+	}
+	/* A cell that threw proved nothing, and dropping it without a word is how a sweep comes
+	 * back green having measured a fraction of what it was asked to. That is not a theory:
+	 * `fs-fit.restAt()` was stripped out of the package, every measurement threw, and both
+	 * of these catches took the whole run down to "0 run(s)" and exit 0. */
+	catch (e) {
+		findings.push(`${where}: the measurement threw — ${first(e)}`);
+		await ctx.close();
+		return;
+	}
+
+	/* A cell that grew `body` by the full pad without the DOCUMENT growing has proven
+	 * nothing: `.fs-ovl`'s grid sizes a row off its taller column, so a shorter column
+	 * (`div#fs-ovl-panel-0`, 291px, on owrtsnap@900 and owrt2410@1200) can absorb 120px
+	 * and leave the scroller untouched — `swap.moved` then reads 0 for the same reason a
+	 * correctly-anchored page would, and the two are indistinguishable without this
+	 * check. Folded into `swap.skip` rather than a separate branch so it is excluded from
+	 * the pass line below the same way "nothing to collapse" already is — a skip, not a
+	 * silent pass: it says the growth never reached what it was measuring. */
+	if (!swap.skip && typeof swap.grewDoc === 'number' && swap.grewDoc < GROWTH - TOLERANCE
+			&& swap.grewDoc < GROWTH / 2)
+		swap.skip = `the ${GROWTH}px pad only grew the document ${swap.grewDoc}px `
+			+ `(${swap.bodyDesc}, ${swap.bodyH}px) — the growth never reached the scroller`;
+	/* the same `.fs-ovl` grid guard as SWAP's, above — REPEAT walks the same candidates */
+	if (!repeat.skip && typeof repeat.grewDoc === 'number' && repeat.grewDoc < GROWTH - TOLERANCE
+			&& repeat.grewDoc < GROWTH / 2)
+		repeat.skip = `the ${GROWTH}px pad only grew the document ${repeat.grewDoc}px `
+			+ `(${repeat.bodyDesc}, ${repeat.bodyH}px) — the growth never reached the scroller`;
+
+	if (held.skip || quiet.skip) {
+		process.stdout.write(`  ${where}: ${held.skip || quiet.skip}\n`);
+		await ctx.close();
+		return;
+	}
+	runs++;
+	const geom = (h) => `before.top=${h && h.before ? h.before.top : '-'} after.top=${h && h.after ? h.after.top : '-'}`;
+	if (held.moved === null)
+		findings.push(`${where}: the reader's element was replaced mid-measurement, so nothing was proven`);
+	else if (Math.abs(held.moved) > TOLERANCE) {
+		/* ONE FLAKE IN ~216 CELLS MUST NOT FAIL A RUN ON ITS OWN. A -505px HOLD finding on
+		 * firefox owrt2512 @1440 top compact was chased for a full round and never
+		 * reproduced locally: before.top read 503 every run, so after.top≈0 was the mark
+		 * landing at the viewport top — a different event from a failed correction — and
+		 * nothing here printed the geometry that would have said so at the time. Both
+		 * readings are printed now, and a second measurement is taken before either one
+		 * becomes a finding. */
+		const held2 = await page.evaluate(HOLD, GROWTH);
+		if (held2.moved !== null && Math.abs(held2.moved) > TOLERANCE)
+			found(`${where}: ${GROWTH}px grew above the reader and the page moved ${held.moved}px `
+				+ `under them (${geom(held)}); re-measured: ${held2.moved}px (${geom(held2)})`
+				+ ((held.writes && held.writes.length) ? ` — writes: ${JSON.stringify(held.writes)}` : ''));
+		else
+			process.stdout.write(`  ${where}: HOLD read ${held.moved}px once (${geom(held)}) but `
+				+ `${held2.moved}px on re-measure (${geom(held2)}) — one flake, not a finding\n`);
+	}
+	if (swap.skip)
+		process.stdout.write(`  ${where}: the swap measured nothing (${swap.skip})\n`);
+	else if (swap.moved === null)
+		found(`${where}: the reader's element did not survive the swap, so nothing was proven`);
+	else if (Math.abs(swap.moved) > TOLERANCE)
+		/* `correctedAt` is null here BY CONSTRUCTION: swap() only sets it once the drift has
+		 * fallen back under tolerance, so a moved this large at the end of the window means
+		 * it never did — NEVER CORRECTED, not corrected late. `writes` — HOLD's finding
+		 * already appends it, this one did not, which is why three CI runs of the same finding
+		 * could not say whether the theme ever attempted a correction: an empty array here means
+		 * it never wrote, a non-empty one means it wrote somewhere the mark did not see. */
+		found(`${where}: a section was refilled the way a poll refills one and the page never `
+			+ `came back — still ${swap.moved}px off after ${SWAP_WINDOW}ms `
+			+ `(the engine clamped ${swap.clamped}px of offset away)`
+			+ ` — writes: ${JSON.stringify(swap.writes || [])}`);
+	else if (swap.correctedAt !== null && swap.correctedAt > LATE_MS)
+		found(`${where}: a section was refilled the way a poll refills one and the correction `
+			+ `landed ${swap.correctedAt}ms after the refill (over the ${LATE_MS}ms late `
+			+ `threshold — visible to the reader as a jump)`
+			+ ((swap.writes && swap.writes.length) ? ` — writes: ${JSON.stringify(swap.writes)}` : ''));
+	/* The floor is judged on the CLAMP, not on the movement, and only where the theme owns the job:
+	 * with the correction switched off nobody compensates the pad the probe grows, so the
+	 * reader moves by exactly that and should. What must not happen is the engine taking an
+	 * offset away. Where the engine anchors for itself the same subtraction measures its
+	 * compensation rather than a clamp — 629px of it, and the reader still level — so it is
+	 * printed rather than judged. */
+	if (noEngineAnchor && swap.floorClamped !== null && swap.floorClamped !== undefined && swap.floorClamped > TOLERANCE)
+		found(`${where}: with the correction switched off the engine clamped `
+			+ `${swap.floorClamped}px away — the content column's floor is not holding the document up`);
+	if (quiet.unexplained)
+		found(`${where}: the offset moved on its own ${quiet.unexplained} time(s) mid-flick (worst ${quiet.biggest}px) `
+			+ '— a correction landing inside a scroll is itself a jump');
+	/* THE PARKED READER, ACROSS REAL TICKS — see the note on TICK. Nothing here inserted the
+	 * growth: a page that ticks at all and still moves is the engine's own anchoring (or its
+	 * absence of one), the fault HOLD/SWAP's synthetic pad and QUIET's motion cannot reach. */
+	if (tick.skip)
+		process.stdout.write(`  ${where}: TICK measured nothing (${tick.skip})\n`);
+	else if (Math.abs(tick.moved) > TOLERANCE)
+		found(`${where}: the reader drifted ${tick.moved}px across real poll ticks `
+			+ `(${tick.mutations} mutation(s) observed) while parked and nobody scrolling`);
+	/* SEVERAL REFILLS ON ONE PAGE — see the note on REPEAT. Two things are watched apart,
+	 * because they are two different faults: the reader actually moving (a correction ran
+	 * where it should not have, or none ran where one should have) is a finding regardless
+	 * of the trust flag; the flag going false while the reader never moved at all is a
+	 * SEPARATE finding — the engine was doing the job the whole time, and the switch took
+	 * the correction away from it anyway (task missrule). */
+	if (repeat.skip)
+		process.stdout.write(`  ${where}: REPEAT measured nothing (${repeat.skip})\n`);
+	else {
+		const jumped = repeat.refills.find((r) => r.moved === null || Math.abs(r.moved) > TOLERANCE);
+		if (jumped)
+			found(`${where}: refill ${jumped.i + 1}/${REPEAT_TIMES} on the same section left the `
+				+ `reader ${jumped.moved === null ? 'without a surviving reference' : jumped.moved + 'px off'} `
+				+ `(engineTrusted ${jumped.engineTrusted}, corrected ${jumped.correctedAt === null ? 'never' : jumped.correctedAt + 'ms'})`
+				+ (jumped.writes && jumped.writes.length ? ` — writes: ${JSON.stringify(jumped.writes)}` : ''));
+		else if (repeat.trustedBefore === true && repeat.trustedAfter === false)
+			found(`${where}: _engineTrusted went false after ${REPEAT_TIMES} refills the reader `
+				+ `never moved for — the engine was anchoring correctly the whole time `
+				+ `(misses: ${JSON.stringify(repeat.refills.map((r) => r.engineTrusted))})`);
+	}
+	/* signed for readability: a positive offset is the scroller compensating for growth
+	 * above the reader, which is what tells "the engine declined to anchor" (0px here)
+	 * apart from "the mark misreported" (moved itself would be the tell, not this term) */
+	const signed = (v) => (v === null || v === undefined ? '-' : (v >= 0 ? '+' : '') + v);
+	process.stdout.write(`  ${where}  reader moved ${held.moved}px (${geom(held)}, `
+		+ `scroll ${held.scrollDelta >= 0 ? '+' : ''}${held.scrollDelta}, ${held.scroller})`
+		+ `  swap moved ${swap.skip ? '-' : swap.moved + 'px'} `
+		+ `[offset ${swap.skip ? '-' : signed(swap.offsetDelta)}]`
+		+ `  corrected ${swap.skip ? '-' : (swap.correctedAt === null ? 'never' : swap.correctedAt + 'ms')}`
+		+ `  floor alone: clamped ${swap.skip || swap.floorClamped === null ? '-' : swap.floorClamped + 'px'}`
+		+ `, reader ${swap.skip || swap.floorMoved === null ? '-' : swap.floorMoved + 'px'} `
+		+ `[offset ${swap.skip || swap.floorOffsetDelta === null ? '-' : signed(swap.floorOffsetDelta)}]`
+		+ `  mid-flick surprises ${quiet.unexplained}`
+		+ (quiet.stalls ? `  (${quiet.stalls} step(s) too slow to still be a flick, not counted)` : '')
+		+ `  tick drift ${tick.skip ? '-' : tick.moved + 'px/' + tick.mutations + 'mut'}`
+		+ `  ${REPEAT_TIMES}x repeat ${repeat.skip ? '-' : repeat.refills.map((r) => (r.moved === null ? '?' : r.moved) + 'px').join('/')} `
+		+ `trusted ${repeat.skip ? '-' : `${repeat.trustedBefore}->${repeat.trustedAfter}`}` + '\n');
+	await ctx.close();
+}
+
+/* THE STANDS RUN AT THE SAME TIME, the way live-audit and spa-parity already do, and so — since
+ * task sweepspeed — do the ENGINES: nothing measured here is a frame rate, every wait is on an EVENT
+ * (the scroll landing, `fit.restAt()` reporting a reference at this offset) with a bounded fallback,
+ * so several routers and several browsers answering at once cannot move an answer — unlike
+ * scroll-jank, whose subject IS frame pacing and which therefore stays serial.
  *
- * This gate was the whole release's critical path: 52 minutes against live's 17, on the same three
- * routers, because it was the only live gate still walking them one after another. */
-for (const engine of ENGINES) {
+ * This gate was once the whole release's critical path at 52 minutes against live's 17 (docs/ci.md);
+ * CI's own fix was to shard firefox and webkit onto separate runners, which a single local process
+ * cannot do — what this can do instead is stop paying for them one after another IN that process.
+ * Each engine gets its own browser, and the three (or however many `--engines` named) now launch and
+ * run concurrently rather than in the `for` loop's own sequence. */
+await Promise.all(ENGINES.map(async (engine) => {
 	if (!pw[engine]) { console.error(`scroll-anchor: no such engine "${engine}"`); process.exit(1); }
 	const browser = await pw[engine].launch();
 	await Promise.all(list.map(async (stand) => {
+		/* One flat list of GROUPS per stand — a group is both `noEngineAnchor` states of the same
+		 * page/scroller/density, kept together rather than split by raw cell index. TICK and REPEAT
+		 * only run with the engine's own anchoring live (~26s of real poll ticks between them), so a
+		 * plain `i % workers.length` over individual cells hands one worker every expensive cell and
+		 * the other every cheap one — measured live, task sweepspeed: 16 anchor-OFF cells done against
+		 * 4 anchor-ON ones at the same wall-clock point, the split defeating its own purpose. Splitting
+		 * whole groups keeps every worker's share an even mix of both. */
+		const groups = [];
 		for (const PAGE of PAGES)
-		for (const { width: w, layout } of SCROLLERS) {
-			for (const density of DENSITIES)
-			for (const noEngineAnchor of [ false, true ]) {
+			for (const { width, layout } of SCROLLERS)
+				for (const density of DENSITIES)
+					groups.push([ false, true ].map((noEngineAnchor) => ({ PAGE, width, layout, density, noEngineAnchor })));
+		const twin = PAIRS.get(stand.id);
+		const workers = twin ? [ stand.base, twin.base ] : [ stand.base ];
+		/* Split evenly across the pair rather than handing the twin a copy of the same list — every
+		 * cell still runs exactly once, on whichever of the two containers gets to it, so the sweep
+		 * is exactly as wide as before and the wall clock for THIS stand is roughly halved. */
+		const perWorker = workers.map(() => []);
+		groups.forEach((g, i) => perWorker[i % workers.length].push(...g));
+		const sessions = await Promise.all(workers.map((base) => captureSession(browser, base)));
+		await Promise.all(workers.map(async (base, wi) => {
+			for (const cell of perWorker[wi]) {
 				/* --bail: the cells after the first finding measure the same fix attempt again */
 				if (BAIL && findings.length) return;
-				const ctx = await browser.newContext({ viewport: { width: w, height: 844 } });
-				await sealToRouter(ctx, stand.base);
-				/* HOLD and SWAP's own record of every scroll write made during their measurement
-				 * window — read back only when a finding needs it, which is what told a real failed
-				 * correction apart from a mark that legitimately reached the top of the viewport (a
-				 * -505px HOLD reading, firefox owrt2512 @1440 top compact, chased a full round before
-				 * that distinction was made). Borrowed from ../tmp/task-holdreg/hold-probe.mjs. */
-				await ctx.addInitScript(() => {
-					window.__fsW = [];
-					const rec = (how, val) => { try { window.__fsW.push({ t: Math.round(performance.now()), how, val: Math.round(val) }); } catch (e) { /* … */ } };
-					const st = window.scrollTo;
-					window.scrollTo = function (...a) { rec('window.scrollTo', typeof a[0] === 'object' ? (a[0] && a[0].top) : a[1]); return st.apply(this, a); };
-					const sb = window.scrollBy;
-					window.scrollBy = function (...a) { rec('window.scrollBy', typeof a[0] === 'object' ? (a[0] && a[0].top) : a[1]); return sb.apply(this, a); };
-					const d = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
-					Object.defineProperty(Element.prototype, 'scrollTop', { configurable: true, enumerable: d.enumerable,
-						get() { return d.get.call(this); },
-						set(v) { rec('scrollTop=' + (this.id || this.className || this.tagName), v); return d.set.call(this, v); } });
-					const es = Element.prototype.scrollTo;
-					if (es) Element.prototype.scrollTo = function (...a) { rec('el.scrollTo=' + (this.id || this.className || this.tagName), typeof a[0] === 'object' ? (a[0] && a[0].top) : a[1]); return es.apply(this, a); };
-				});
-				/* the Safari path, forced: `fsEngineAnchor=off` makes fs-fit believe the platform has
-				 * no anchoring of its own, and the stylesheet turns the engine's off for real, so the
-				 * two agree about which of them is responsible */
-				if (noEngineAnchor)
-					await ctx.addInitScript(() => {
-						try { localStorage.setItem('fsEngineAnchor', 'off'); } catch (e) { /* no storage */ }
-						document.addEventListener('DOMContentLoaded', () => {
-							const s = document.createElement('style');
-							s.textContent = 'html, body, #maincontent, .fs-main, #view, #view * { overflow-anchor: none !important; }';
-							document.head.appendChild(s);
-						});
-					});
-				const page = await ctx.newPage();
-				const where = `${engine} ${stand.id} @${w} ${layout.padEnd(4)} ${density.padEnd(7)} ${noEngineAnchor ? 'engine-anchoring OFF' : 'engine-anchoring on '} ${PAGE.replace('/admin/status/', '')}`;
-				await login(page, stand.base);
-				try {
-					await page.evaluate(async ([l, d]) => {
-						const prefs = await window.L.require('fs-prefs');
-						prefs.applyLayout(l);
-						prefs.applyDensity(d);
-					}, [ layout, density ]);
-					await openPage(page, stand.base + PAGE);
-				}
-				catch (e) {
-					/* NOT a finding: a page that never opened says nothing about where the reader
-					 * ended up. Kept apart and counted — see UNOPENED_TOLERANCE. */
-					unopened.push(`${where}: ${first(e)}`);
-					await ctx.close();
-					continue;
-				}
-				await page.waitForTimeout(3000);
-
-				let held, swap, quiet, tick, repeat;
-				try {
-					/* TICK FIRST, and on the page exactly as it loaded — HOLD's pad, SWAP's two
-					 * removeChild/appendChild cycles and QUIET's two dozen scripted flicks all perturb
-					 * whatever the engine had picked as its own anchor node, and TICK measures whether
-					 * a REAL tick misbehaves on ITS OWN, not after three probes have already leaned on
-					 * the page. Measured: run after them, on this same page, TICK read 0px on a cell
-					 * ../tmp/task-overview12/tick-probe.mjs (a fresh navigation) was reporting 21px
-					 * peak-to-peak on at the time — the same fix, the same page, only its position in
-					 * the sequence differed. Only against the REAL engine: with `noEngineAnchor` the
-					 * stylesheet above already turns anchoring off for the whole page, which is
-					 * precisely what TICK exists to watch for misbehaving — running it there would
-					 * measure the theme's own correction against nothing, the question HOLD/SWAP
-					 * already answer with a synthetic pad. */
-					tick = noEngineAnchor
-						? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
-						: await page.evaluate(TICK, TICK_COUNT);
-					held = await page.evaluate(HOLD, GROWTH);
-					swap = await page.evaluate(SWAP, [ GROWTH, TOLERANCE, LATE_MS, SWAP_WINDOW ]);
-					/* only against the REAL engine — same reasoning as TICK above: with `noEngineAnchor`
-					 * the fallback already runs every refill, so `_engineTrusted` has nothing to say. */
-					repeat = noEngineAnchor
-						? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
-						: await page.evaluate(REPEAT, [ GROWTH, TOLERANCE, REPEAT_TIMES ]);
-					quiet = await page.evaluate(QUIET, GROWTH);
-				}
-				/* A cell that threw proved nothing, and dropping it without a word is how a sweep comes
-				 * back green having measured a fraction of what it was asked to. That is not a theory:
-				 * `fs-fit.restAt()` was stripped out of the package, every measurement threw, and both
-				 * of these catches took the whole run down to "0 run(s)" and exit 0. */
-				catch (e) {
-					findings.push(`${where}: the measurement threw — ${first(e)}`);
-					await ctx.close();
-					continue;
-				}
-
-				/* A cell that grew `body` by the full pad without the DOCUMENT growing has proven
-				 * nothing: `.fs-ovl`'s grid sizes a row off its taller column, so a shorter column
-				 * (`div#fs-ovl-panel-0`, 291px, on owrtsnap@900 and owrt2410@1200) can absorb 120px
-				 * and leave the scroller untouched — `swap.moved` then reads 0 for the same reason a
-				 * correctly-anchored page would, and the two are indistinguishable without this
-				 * check. Folded into `swap.skip` rather than a separate branch so it is excluded from
-				 * the pass line below the same way "nothing to collapse" already is — a skip, not a
-				 * silent pass: it says the growth never reached what it was measuring. */
-				if (!swap.skip && typeof swap.grewDoc === 'number' && swap.grewDoc < GROWTH - TOLERANCE
-						&& swap.grewDoc < GROWTH / 2)
-					swap.skip = `the ${GROWTH}px pad only grew the document ${swap.grewDoc}px `
-						+ `(${swap.bodyDesc}, ${swap.bodyH}px) — the growth never reached the scroller`;
-				/* the same `.fs-ovl` grid guard as SWAP's, above — REPEAT walks the same candidates */
-				if (!repeat.skip && typeof repeat.grewDoc === 'number' && repeat.grewDoc < GROWTH - TOLERANCE
-						&& repeat.grewDoc < GROWTH / 2)
-					repeat.skip = `the ${GROWTH}px pad only grew the document ${repeat.grewDoc}px `
-						+ `(${repeat.bodyDesc}, ${repeat.bodyH}px) — the growth never reached the scroller`;
-
-				if (held.skip || quiet.skip) {
-					process.stdout.write(`  ${where}: ${held.skip || quiet.skip}\n`);
-					await ctx.close();
-					continue;
-				}
-				runs++;
-				const geom = (h) => `before.top=${h && h.before ? h.before.top : '-'} after.top=${h && h.after ? h.after.top : '-'}`;
-				if (held.moved === null)
-					findings.push(`${where}: the reader's element was replaced mid-measurement, so nothing was proven`);
-				else if (Math.abs(held.moved) > TOLERANCE) {
-					/* ONE FLAKE IN ~216 CELLS MUST NOT FAIL A RUN ON ITS OWN. A -505px HOLD finding on
-					 * firefox owrt2512 @1440 top compact was chased for a full round and never
-					 * reproduced locally: before.top read 503 every run, so after.top≈0 was the mark
-					 * landing at the viewport top — a different event from a failed correction — and
-					 * nothing here printed the geometry that would have said so at the time. Both
-					 * readings are printed now, and a second measurement is taken before either one
-					 * becomes a finding. */
-					const held2 = await page.evaluate(HOLD, GROWTH);
-					if (held2.moved !== null && Math.abs(held2.moved) > TOLERANCE)
-						found(`${where}: ${GROWTH}px grew above the reader and the page moved ${held.moved}px `
-							+ `under them (${geom(held)}); re-measured: ${held2.moved}px (${geom(held2)})`
-							+ ((held.writes && held.writes.length) ? ` — writes: ${JSON.stringify(held.writes)}` : ''));
-					else
-						process.stdout.write(`  ${where}: HOLD read ${held.moved}px once (${geom(held)}) but `
-							+ `${held2.moved}px on re-measure (${geom(held2)}) — one flake, not a finding\n`);
-				}
-				if (swap.skip)
-					process.stdout.write(`  ${where}: the swap measured nothing (${swap.skip})\n`);
-				else if (swap.moved === null)
-					found(`${where}: the reader's element did not survive the swap, so nothing was proven`);
-				else if (Math.abs(swap.moved) > TOLERANCE)
-					/* `correctedAt` is null here BY CONSTRUCTION: swap() only sets it once the drift has
-					 * fallen back under tolerance, so a moved this large at the end of the window means
-					 * it never did — NEVER CORRECTED, not corrected late. `writes` — HOLD's finding
-					 * already appends it, this one did not, which is why three CI runs of the same finding
-					 * could not say whether the theme ever attempted a correction: an empty array here means
-					 * it never wrote, a non-empty one means it wrote somewhere the mark did not see. */
-					found(`${where}: a section was refilled the way a poll refills one and the page never `
-						+ `came back — still ${swap.moved}px off after ${SWAP_WINDOW}ms `
-						+ `(the engine clamped ${swap.clamped}px of offset away)`
-						+ ` — writes: ${JSON.stringify(swap.writes || [])}`);
-				else if (swap.correctedAt !== null && swap.correctedAt > LATE_MS)
-					found(`${where}: a section was refilled the way a poll refills one and the correction `
-						+ `landed ${swap.correctedAt}ms after the refill (over the ${LATE_MS}ms late `
-						+ `threshold — visible to the reader as a jump)`
-						+ ((swap.writes && swap.writes.length) ? ` — writes: ${JSON.stringify(swap.writes)}` : ''));
-				/* The floor is judged on the CLAMP, not on the movement, and only where the theme owns the job:
-				 * with the correction switched off nobody compensates the pad the probe grows, so the
-				 * reader moves by exactly that and should. What must not happen is the engine taking an
-				 * offset away. Where the engine anchors for itself the same subtraction measures its
-				 * compensation rather than a clamp — 629px of it, and the reader still level — so it is
-				 * printed rather than judged. */
-				if (noEngineAnchor && swap.floorClamped !== null && swap.floorClamped !== undefined && swap.floorClamped > TOLERANCE)
-					found(`${where}: with the correction switched off the engine clamped `
-						+ `${swap.floorClamped}px away — the content column's floor is not holding the document up`);
-				if (quiet.unexplained)
-					found(`${where}: the offset moved on its own ${quiet.unexplained} time(s) mid-flick (worst ${quiet.biggest}px) `
-						+ '— a correction landing inside a scroll is itself a jump');
-				/* THE PARKED READER, ACROSS REAL TICKS — see the note on TICK. Nothing here inserted the
-				 * growth: a page that ticks at all and still moves is the engine's own anchoring (or its
-				 * absence of one), the fault HOLD/SWAP's synthetic pad and QUIET's motion cannot reach. */
-				if (tick.skip)
-					process.stdout.write(`  ${where}: TICK measured nothing (${tick.skip})\n`);
-				else if (Math.abs(tick.moved) > TOLERANCE)
-					found(`${where}: the reader drifted ${tick.moved}px across real poll ticks `
-						+ `(${tick.mutations} mutation(s) observed) while parked and nobody scrolling`);
-				/* SEVERAL REFILLS ON ONE PAGE — see the note on REPEAT. Two things are watched apart,
-				 * because they are two different faults: the reader actually moving (a correction ran
-				 * where it should not have, or none ran where one should have) is a finding regardless
-				 * of the trust flag; the flag going false while the reader never moved at all is a
-				 * SEPARATE finding — the engine was doing the job the whole time, and the switch took
-				 * the correction away from it anyway (task missrule). */
-				if (repeat.skip)
-					process.stdout.write(`  ${where}: REPEAT measured nothing (${repeat.skip})\n`);
-				else {
-					const jumped = repeat.refills.find((r) => r.moved === null || Math.abs(r.moved) > TOLERANCE);
-					if (jumped)
-						found(`${where}: refill ${jumped.i + 1}/${REPEAT_TIMES} on the same section left the `
-							+ `reader ${jumped.moved === null ? 'without a surviving reference' : jumped.moved + 'px off'} `
-							+ `(engineTrusted ${jumped.engineTrusted}, corrected ${jumped.correctedAt === null ? 'never' : jumped.correctedAt + 'ms'})`
-							+ (jumped.writes && jumped.writes.length ? ` — writes: ${JSON.stringify(jumped.writes)}` : ''));
-					else if (repeat.trustedBefore === true && repeat.trustedAfter === false)
-						found(`${where}: _engineTrusted went false after ${REPEAT_TIMES} refills the reader `
-							+ `never moved for — the engine was anchoring correctly the whole time `
-							+ `(misses: ${JSON.stringify(repeat.refills.map((r) => r.engineTrusted))})`);
-				}
-				/* signed for readability: a positive offset is the scroller compensating for growth
-				 * above the reader, which is what tells "the engine declined to anchor" (0px here)
-				 * apart from "the mark misreported" (moved itself would be the tell, not this term) */
-				const signed = (v) => (v === null || v === undefined ? '-' : (v >= 0 ? '+' : '') + v);
-				process.stdout.write(`  ${where}  reader moved ${held.moved}px (${geom(held)}, `
-					+ `scroll ${held.scrollDelta >= 0 ? '+' : ''}${held.scrollDelta}, ${held.scroller})`
-					+ `  swap moved ${swap.skip ? '-' : swap.moved + 'px'} `
-					+ `[offset ${swap.skip ? '-' : signed(swap.offsetDelta)}]`
-					+ `  corrected ${swap.skip ? '-' : (swap.correctedAt === null ? 'never' : swap.correctedAt + 'ms')}`
-					+ `  floor alone: clamped ${swap.skip || swap.floorClamped === null ? '-' : swap.floorClamped + 'px'}`
-					+ `, reader ${swap.skip || swap.floorMoved === null ? '-' : swap.floorMoved + 'px'} `
-					+ `[offset ${swap.skip || swap.floorOffsetDelta === null ? '-' : signed(swap.floorOffsetDelta)}]`
-					+ `  mid-flick surprises ${quiet.unexplained}`
-					+ (quiet.stalls ? `  (${quiet.stalls} step(s) too slow to still be a flick, not counted)` : '')
-					+ `  tick drift ${tick.skip ? '-' : tick.moved + 'px/' + tick.mutations + 'mut'}`
-					+ `  ${REPEAT_TIMES}x repeat ${repeat.skip ? '-' : repeat.refills.map((r) => (r.moved === null ? '?' : r.moved) + 'px').join('/')} `
-					+ `trusted ${repeat.skip ? '-' : `${repeat.trustedBefore}->${repeat.trustedAfter}`}` + '\n');
-				await ctx.close();
+				await runCell(browser, engine, stand.id, base, sessions[wi], cell);
 			}
-		}
+		}));
 	}));
 	await browser.close();
-}
+}));
 
 if (unopened.length) {
 	console.error(`\nscroll-anchor: ${unopened.length} cell(s) never opened — the browser or the stand,`
