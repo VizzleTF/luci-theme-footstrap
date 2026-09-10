@@ -236,7 +236,25 @@ function holdFloor(records) {
 		if (hs[i] > 0) { box.style.minHeight = hs[i] + 'px'; box.setAttribute('data-fs-floor', ''); }
 		else box.removeAttribute('data-fs-floor');
 	});
-	if (scrollTop() < at && page.scrollHeight >= tall) writeOffset(sc, at);
+	/* AND WHERE IT IS A REAL SHRINK, SAY SO — task wk1440. The other side of the same test: the
+	 * offset came down and the scroller stayed shorter, so the box really did give height up and
+	 * the drop is the browser's clamp into it. `applyAnchor()` is the one thing that can put back
+	 * the part of the shrink the clamp did NOT take, and it refuses while `scrolling()` — which the
+	 * clamp's own scroll event has just made true. Measured (webkit/owrtsnapb @1440 side compact,
+	 * /admin/status/overview, `../tmp/task-wk1440/`, the engine's own anchoring ablated away with
+	 * `overflow-anchor: none` so the theme is the only corrector): a 120px pad removed above the
+	 * reader took the scroller 2793 -> 2673px while the offset clamped 1889 -> 1829 — 60px short of
+	 * the 1769 the reader needed, because a clamp only ever gives back what the document lost at its
+	 * BOTTOM. One frame later `applyAnchor()` read `scrolling() true, 400ms left` and returned with
+	 * a correct -60px correction in hand; the terminal sweep's `rememberRest()` then adopted 1829 as
+	 * the reference, and every refill after it measured 0px drift against ground that was already
+	 * 60px wrong — `3x repeat 0px/-60px/-60px`, the gate's "left the reader -60px off ... corrected
+	 * never". Recorded as a PIXEL, not as a flag or a timestamp, and read back the way
+	 * `sawOwnWrite()` reads its own: it stands only while the offset has not left it, so a reader
+	 * who really does move clears it by moving. */
+	const landed = scrollTop();
+	if (landed >= at) return;
+	if (page.scrollHeight >= tall) writeOffset(sc, at); else _clampedTo = landed;
 }
 
 /* ---- is the page moving right now? asked of the position, never of the events ----
@@ -301,6 +319,22 @@ function sawOwnWrite(y) {
 	if (Math.abs(y - _ownWrite) < 1) return false;
 	_ownWrite = null;
 	return true;
+}
+/* Where the browser's own clamp last put the offset down, set by `holdFloor()`'s real-shrink branch
+ * and by nothing else — see the comment there for the measurement. NOT a second `_ownWrite`: this
+ * marker does not touch `scrolling()`, which keeps answering "the page is moving, whoever moves it"
+ * for the whole theme (task resid measured what happens when a clamp stops opening that window —
+ * `sampleMotion()`'s terminal sweep stops running behind it). It answers ONE narrower question, for
+ * `applyAnchor()` alone: is the motion that is blocking this correction the clamp the correction is
+ * FOR? */
+let _clampedTo = null;
+function sawClamp() {
+	/* the identical `scrollTop() !== seen` shape `lateDrift()` asks its own offset — the pixel was
+	 * read out of `scrollTop()` in the first place, so equality is the whole test, and `null` is
+	 * never equal to a number */
+	if (scrollTop() === _clampedTo) return true;
+	_clampedTo = null;
+	return false;
 }
 /* The one place either correction may write the scroll position, so `_ownWrite` cannot go stale by a
  * write skipping it. Reads the offset back rather than trusting the argument: a write near either
@@ -1117,8 +1151,19 @@ function applyAnchor(ref) {
 	if (!ref) return;
 	/* not into a moving page: the correction is scheduled from the mutation and applied a frame
 	 * later, and a reader who starts scrolling in between would be put back onto a page they have
-	 * already left */
-	if (scrolling()) return;
+	 * already left.
+	 *
+	 * UNLESS THE MOTION IS THE CLAMP THIS CORRECTION EXISTS FOR — task wk1440, the same trap
+	 * `settleDeferredFloor()`'s own third attempt already fell into once ("gating on `scrolling()`
+	 * refuses on the very motion it is trying to observe") and `lateDrift()` was built to avoid.
+	 * A shrink above the reader clamps the offset down inside `holdFloor()`'s own synchronous pass,
+	 * that clamp dispatches a `scroll` event of its own, and one frame later this guard reads it as
+	 * a reader who started moving: measured on the cell this task closes, `apply-enter scrolling
+	 * true, moving 400ms, at 1829` with a -60px correction already computed and never written.
+	 * `sawClamp()` is the pixel `holdFloor()` watched the clamp land on, and it stands only while
+	 * the offset has not left it — a reader who really is scrolling has moved off it by definition,
+	 * so this reopens the guard for exactly one case and no other. */
+	if (scrolling() && !sawClamp()) return;
 	/* through scroller(), not a second probe: two copies of the same question can answer
 	 * differently within one frame */
 	const sc = scroller();
