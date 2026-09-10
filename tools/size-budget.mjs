@@ -322,7 +322,19 @@ const LIMITS = {
 	 * the tab/fold/depends observer, the deferred-floor sampler) still gets the unscoped sweep, so
 	 * none of the four correction mechanisms this file also carries lost any coverage. The limit goes
 	 * to 95,300, 93 B of head-room. */
-	resourcesJs: 95_300,
+	/* 95,341 B on 2026-09-10, up 134 B against the note above (the change itself is +106 B minified
+	 * against HEAD): `holdFloor()` (`fs-fit.js`) gives the reader back the offset its OWN clear pass
+	 * took — task resid. The clear that makes the floors honest leaves the
+	 * document a pixel short for the length of the measure pass, the browser clamps the offset into
+	 * it, the floors come back and the offset does not; `lateDrift()` reads that one pixel as "the
+	 * reader is moving" and discards the whole 60px correction the same tick owed. Measured live
+	 * (chromium/owrt2512b @390 top normal, `/admin/network/dhcp`): 38 sweeps, 8 of them lost a pixel
+	 * this way, and the cell went `3x repeat 0px/-47px/-47px` → `0px/0px/0px`, floor-only ablation
+	 * `clamped -59px, reader -47px` → `clamped 0px, reader 1px`. The narrow form is what these bytes
+	 * buy: restoring unconditionally is 70 B cheaper and green on the same cell, but it makes every
+	 * genuine floor-shrink clamp this file's own write and closes the motion window `sampleMotion()`
+	 * runs behind. The limit goes to 95,400, 59 B of head-room. */
+	resourcesJs: 95_400,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -559,7 +571,12 @@ const LIMITS = {
 	/* 60,320 B on 2026-09-10, up 70 B: the same per-box skip in `holdFloor()` as `resourcesJs`'s own
 	 * note on this commit — `fs-fit.js` is cold, so every reader pays it once. The limit goes to
 	 * 60,400, 80 B of head-room. */
-	coldJs: 60_400,
+	/* 60,454 B on 2026-09-10, up 134 B against the note above: the same `holdFloor()` restore as
+	 * `resourcesJs`'s own note on this commit — `fs-fit.js` is cold, so every reader pays it once,
+	 * and the whole of the change is on this path. What it buys them is the 47-64px `REPEAT`
+	 * residual gone from every stand and engine the default sweep crosses. The limit goes to
+	 * 60,550, 96 B of head-room. */
+	coldJs: 60_550,
 };
 
 function bytes(path) {

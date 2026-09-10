@@ -195,12 +195,48 @@ function holdFloor(records) {
 	}
 	if (!dirty.length) return;
 
+	/* THE SWEEP MAY NOT COST THE READER THE CLAMP IT EXISTS TO PREVENT — task resid. Clearing every
+	 * floor before the measure pass is what makes the answers honest (above), and for the length of
+	 * that pass the document stands without them. Measured live (chromium/owrt2512b @390 top normal,
+	 * /admin/network/dhcp, `../tmp/task-resid/dbg-before.json`): 38 sweeps, 33 of them took the
+	 * document DOWN between the clear and the write-back, and on 13 the offset went with it. Eight of
+	 * those 13 are this fault — the unscoped, every-box sweep, document 4730px to 4729px and straight
+	 * back to 4730px, offset 3886 to 3885 and NOT back. Nothing in this function is asynchronous and
+	 * `scrolling()` at the top already refused a reader who is moving, so an offset that is LOWER
+	 * after the write-back than before the clear was lowered by this pass and by nothing else — 0
+	 * sweeps of the 38 moved it the other way.
+	 *
+	 * One pixel, and it is not the pixel that matters: `lateDrift()` reads the offset twice,
+	 * SCROLL_IDLE apart, and treats any difference as "the reader has moved since" (its own comment
+	 * below). That 1px discarded the whole 60px correction the same tick's shrink was owed
+	 * (`late-refuse why: moving, seen 3886, now 3885`), and the unforced `rememberRest()` a
+	 * millisecond later adopted the wrong offset as the reference the NEXT refill measures against:
+	 * 59px off, carried forward, which is the 47-64px `REPEAT` reports on the second or third of
+	 * three back-to-back refills of one section (`tools/scroll-anchor.mjs`, docs/anchoring.md).
+	 *
+	 * ONLY WHERE THE SCROLLER IS AS TALL AGAIN AS IT WAS, which is what separates this pass's own
+	 * transient dip from a floor that came down because the CONTENT really shrank — the eight sweeps
+	 * above against the other five, on the same run, that lost 3958 to 3886 with the document
+	 * staying 120px shorter for good. That second clamp is real, it belongs to the shrink, and
+	 * `lateDrift()`'s `floorShrink` path already corrects for it; touching it here was measured too
+	 * — restoring unconditionally and letting the browser re-clamp the write is green on this cell
+	 * as well, but it also makes every genuine shrink's clamp this file's OWN write
+	 * (`sawOwnWrite()`), so the motion window that clamp used to open stops opening and
+	 * `sampleMotion()`'s terminal sweep stops running with it. The narrow form holds the cell on its
+	 * own, so the wider one does not ship.
+	 *
+	 * `writeOffset()` rather than a bare assignment: the restore is a scroll write like the two
+	 * corrections, and the motion sampler must read it as this file's own rather than as the reader
+	 * arriving. */
+	const sc = scroller(), page = sc || document.documentElement;
+	const at = scrollTop(), tall = page.scrollHeight;
 	dirty.forEach((box) => { box.style.minHeight = ''; });
 	dirty.forEach((box) => hs.push(box.offsetHeight));
 	dirty.forEach((box, i) => {
 		if (hs[i] > 0) { box.style.minHeight = hs[i] + 'px'; box.setAttribute('data-fs-floor', ''); }
 		else box.removeAttribute('data-fs-floor');
 	});
+	if (scrollTop() < at && page.scrollHeight >= tall) writeOffset(sc, at);
 }
 
 /* ---- is the page moving right now? asked of the position, never of the events ----
