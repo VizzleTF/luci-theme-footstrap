@@ -32,6 +32,18 @@
  *             anchoring included — must not move the offset either. `held` closes inside 800ms and
  *             `quiet` discards a still 400ms; a correction landing between those windows (WebKit's
  *             own, measured 421ms) passed both and is what this row exists to catch.
+ *   repeat    `swapped` again, `REPEAT_TIMES` (3) times running on the same section — the shape
+ *             every case above is structurally blind to: each closes inside one refill, and
+ *             `_engineTrusted` (fs-fit.js) only ever moves on the SECOND miss, so a switch that
+ *             flips wrongly — an engine still anchoring correctly loses the theme's trust in it two
+ *             ticks later — is invisible to anything that never performs a second one (task
+ *             missrule). Both the reader's position after every refill and the trust flag itself
+ *             are read; the flag going false while the reader never moved is its own finding,
+ *             separate from the reader actually moving. It measures on the SAME section SWAP just
+ *             measured — `window.__fsRepeatSection`, not a second search — because a second search
+ *             run after SWAP's own two refills can land on a worse candidate than the one SWAP
+ *             already proved reaches the scroller (274/274 cells measured nothing before this was
+ *             fixed; SWAP's own coverage in the same run is the comparison).
  *
  * The growth in `held`/`swapped`/`quiet` is inserted rather than waited for: a real tick depends on
  * what the router's radios are doing, and a gate that only fails when a station happens to join is
@@ -143,6 +155,12 @@ const LATE_MS = 200;
  * lateDrift()'s measured 419-420ms with real margin for a loaded runner; short enough that a cell
  * that truly never corrects does not sit idle. */
 const SWAP_WINDOW = 900;
+/* How many refills REPEAT performs on the SAME section, back to back — see the note on REPEAT
+ * below. `LATE_MISS_LIMIT` (fs-fit.js) is 2: one is headroom for a one-off, a second is the count.
+ * Two refills only ever REACHES the limit on the second one; a third is what proves the flag it
+ * trips STAYS tripped (or, on a correctly-anchoring engine, never trips at all) rather than
+ * resetting itself on the very next tick — task missrule. */
+const REPEAT_TIMES = 3;
 
 /* Park the reader and wait for the THEME to notice, rather than for a stopwatch.
  *
@@ -394,6 +412,11 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		if (!body || el.offsetHeight > body.offsetHeight) body = el;
 	}
 	if (!body || body.offsetHeight < 200) return { skip: 'nothing above the reader big enough to collapse' };
+	/* Stashed for REPEAT as soon as `body` is settled, before the mark search below can still fail
+	 * — see the note beside the full stash a few lines down. `mark: null` here so REPEAT can tell
+	 * "SWAP found no candidate at all" apart from "SWAP found one but nothing survived under the
+	 * reader", rather than reading the second as the first. */
+	window.__fsRepeatSection = { body, mark: null };
 	/* Named for the guard below: `body` living inside `.fs-ovl` (System/Memory/Storage's own grid,
 	 * fs-overview.js) can grow by the full pad and move the DOCUMENT by nothing — the grid's row
 	 * tracks size off the taller column, so a shorter column growing 120px never reaches the
@@ -447,6 +470,16 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 	}
 	if (!mark) return { skip: 'nothing under the reader that survives the swap' };
 	const before = { pos: pos(), top: Math.round(mark.getBoundingClientRect().top) };
+
+	/* `mark` filled in on the same stash — REPEAT reads this rather than re-searching, which runs
+	 * next in the same page. Measured live: an independent search, run 700ms after this one, picked
+	 * `table.table.cbi-section-table` (1145px, a legitimate-looking candidate) on a cell where THIS
+	 * search had already found a sibling that reached the scroller; the growth landed on the wrong
+	 * element and `grewDoc` read 0 on every one of 274 cells swept. Nothing here mutates between the
+	 * two searches on purpose — it is SWAP's own two `swap()` passes below, each a `dom.content()`-
+	 * shaped refill, that wake `holdFloor()` in between and let it hand a second search a different
+	 * answer. */
+	window.__fsRepeatSection.mark = mark;
 
 	/* the two halves of dom.content(), with the layout the engine performs in between made explicit
 	 * — WebKit gets there on its own, and a gate must not depend on when */
@@ -522,6 +555,152 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		scroller: sc ? 'maincontent' : 'window' };
 
 	} finally { /* the poll stays stopped — see the note on QUIET, which starts it again */ }
+};
+
+/* Runs in the page: SEVERAL of dom.content()'s empty-then-refill cycles on the SAME section, back
+ * to back, on a page where the engine's own anchoring is left alone throughout.
+ *
+ * Why this is not SWAP again: SWAP performs ONE refill and closes inside 900ms, so `LATE_MISS_LIMIT`
+ * (2, fs-fit.js) — the count that decides whether the theme keeps trusting an engine that anchors
+ * imprecisely — is structurally unreachable from it. A switch that only flips after the SECOND miss
+ * is invisible to a case that never performs one (task missrule): 48 green sub-runs proving a fix
+ * to the miss-counting formula were all first-miss runs, and the regression the fix itself could
+ * introduce — the switch flipping on an engine that is doing the job correctly, two ticks (10s)
+ * later — had no case that could see it trip at all.
+ *
+ * `fs-fit.engineTrusted()` is read rather than inferred from timing, for the same reason `restAt()`
+ * already is: "is it scrolling" and a correction's own latency both answer the wrong question, and a
+ * flat guess here already cost a false report once (see the note on `parkAt` above).
+ *
+ * IT DOES NOT PICK ITS OWN SECTION. `window.__fsRepeatSection` — set by SWAP, which runs first in
+ * every cell — is read instead of running the same search again: a second search, after SWAP's own
+ * two refills have woken `holdFloor()`, can land on a different and sometimes worse candidate than
+ * the one just proven to reach the scroller. Measured before this was fixed: 274 of 274 cells in a
+ * full three-engine sweep reported either "nothing above the reader big enough to collapse" or a
+ * growth that never reached the document, on a page where SWAP — the identical selector, the
+ * identical park — had just measured something. See the note beside `window.__fsRepeatSection`
+ * above for the one concrete example chased down. */
+const REPEAT = async ([ growth, tol, times ]) => {
+	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+	const view = document.getElementById('view');
+	if (!view) return { skip: 'no view' };
+	const mc = document.getElementById('maincontent');
+	const flow = mc ? getComputedStyle(mc).overflowY : '';
+	const sc = (flow === 'auto' || flow === 'scroll') ? mc : null;
+	const pos = () => (sc ? sc.scrollTop : window.scrollY);
+	const room = (sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - window.innerHeight);
+	if (room < 600) return { skip: 'page too short to scroll' };
+
+	/* only against the REAL engine — see the note on TICK below for why `noEngineAnchor` skips this
+	 * case entirely rather than reaching it with the fallback forced on */
+	const poll = (window.L && window.L.Poll) || null;
+	const polling = !!(poll && typeof poll.active === 'function' && poll.active());
+	if (polling) poll.stop();
+	try {
+
+	/* THE SAME SECTION SWAP ALREADY PICKED, not a second search. SWAP's own two `dom.content()`-
+	 * shaped passes (corrected + floor-only) wake `holdFloor()` in between, and a fresh search run
+	 * afterwards can land on a different — and sometimes worse — candidate than the one SWAP just
+	 * proved reaches the scroller: measured live, an independent search here picked
+	 * `table.table.cbi-section-table` (1145px, itself a plausible-looking candidate) on a cell where
+	 * SWAP's own search had found a sibling that DID reach the scroller, and every one of 274 swept
+	 * cells reported "nothing above the reader big enough to collapse" or the growth landing on an
+	 * element that never moved the document — SWAP measured 91 of those same 171 cells in the same
+	 * run. Re-parking (below) is still needed — SWAP's own `wait(700)` settling window may have left
+	 * the reader a pixel or two off `before.top` — but WHICH element is measured is SWAP's call, read
+	 * off `window.__fsRepeatSection` rather than re-decided. */
+	const picked = window.__fsRepeatSection;
+	let body = picked && picked.body && picked.body.isConnected ? picked.body : null;
+	if (!body || body.offsetHeight < 200) return { skip: 'nothing above the reader big enough to collapse' };
+	let mark = picked && picked.mark && picked.mark.isConnected ? picked.mark : null;
+	if (!mark) return { skip: 'nothing under the reader that survives the swap' };
+	const bodyDesc = body.tagName.toLowerCase() + (body.id ? '#' + body.id : '')
+		+ (body.className ? '.' + String(body.className).trim().replace(/\s+/g, '.') : '');
+	const bodyH0 = body.offsetHeight;
+	const docH = () => (sc ? sc.scrollHeight : document.documentElement.scrollHeight);
+
+	/* park/wait: the same shape as SWAP above, because the fault this measures is downstream of the
+	 * SAME candidate section — duplicated rather than shared, matching every other case in this
+	 * file, since each has to run standalone inside `page.evaluate()`. */
+	const at = room - 60;
+	const parkAt = async (y) => {
+		const target = sc || window;
+		const landed = new Promise((res) => {
+			let done = false;
+			const on = () => { if (!done) { done = true; target.removeEventListener('scroll', on); res(); } };
+			target.addEventListener('scroll', on, { passive: true });
+			setTimeout(() => { if (!done) { done = true; target.removeEventListener('scroll', on); res(); } }, 2500);
+		});
+		if (sc) sc.scrollTop = y; else window.scrollTo(0, y);
+		await landed;
+		const fit = await window.L.require('fs-fit').then((m) => m, () => null);
+		if (fit && typeof fit.restAt !== 'function')
+			throw new Error('fs-fit is loaded but exports no restAt(): the sweep cannot tell when '
+				+ 'the theme has taken its reference, and a flat wait is not a substitute');
+		if (fit) {
+			for (let i = 0; i < 160; i++) {
+				if (fit.restAt() === (sc ? sc.scrollTop : window.scrollY) && !fit.scrolling()) break;
+				await wait(25);
+			}
+		}
+		await wait(600);
+	};
+	await parkAt(at);
+	const before = { pos: pos(), top: Math.round(mark.getBoundingClientRect().top) };
+
+	const fit = await window.L.require('fs-fit').then((m) => m, () => null);
+	/* Absent on a checkout that stripped it, same guard as `restAt` — a case that silently measured
+	 * nothing here would read as "trust never left true", which is not the same claim. */
+	if (fit && typeof fit.engineTrusted !== 'function')
+		throw new Error('fs-fit is loaded but exports no engineTrusted(): this case cannot tell '
+			+ 'whether the switch tripped, and a missing export is not the same as "it did not"');
+	const trusted = () => (fit ? fit.engineTrusted() : null);
+	const trustedBefore = trusted();
+
+	/* Grown by `body`'s OWN mutation, in dom.content()'s shape — empty, then refill, one tick at a
+	 * time. The pad is removed and the floor allowed to settle between ticks (SWAP's own comment on
+	 * why: the next pass reads a floor already standing, not one still clearing). */
+	const startDocH = docH();
+	const refills = [];
+	/* Read WHILE the first pad is still standing — see SWAP's own `grewDoc`, taken before ITS pad
+	 * comes off. This used to be `docH() - startDocH` computed after the loop, by which point every
+	 * refill's pad had already been removed and the document was back at its start height on
+	 * purpose: net zero on every cell, `.fs-ovl` grid or not, and indistinguishable from the growth
+	 * genuinely never reaching the scroller. Measured live on the 39 cells SWAP itself measured
+	 * something on in the same run: every one still read `grewDoc` 0 under the old placement. */
+	let grewDoc = null;
+	for (let i = 0; i < times; i++) {
+		const kept = Array.prototype.slice.call(body.childNodes);
+		for (const n of kept) body.removeChild(n);
+		for (const n of kept) body.appendChild(n);
+		const pad = document.createElement('div');
+		pad.style.height = growth + 'px';
+		pad.dataset.fsProbe = '1';
+		body.appendChild(pad);
+		const t0 = performance.now();
+		const w0 = (window.__fsW || []).length;
+		let correctedAt = null, lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
+		await new Promise((done) => {
+			const frame = () => {
+				lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
+				if (correctedAt === null && lastTop !== null && Math.abs(lastTop - before.top) <= tol)
+					correctedAt = Math.round(performance.now() - t0);
+				if (performance.now() - t0 < 900) requestAnimationFrame(frame); else done();
+			};
+			requestAnimationFrame(frame);
+		});
+		const writes = (window.__fsW || []).slice(w0);
+		if (i === 0) grewDoc = docH() - startDocH;
+		pad.remove();
+		refills.push({ i, moved: lastTop === null ? null : lastTop - before.top, correctedAt, writes,
+			engineTrusted: trusted() });
+		await wait(700);
+	}
+	return { before, bodyDesc, bodyH: bodyH0, grewDoc,
+		trustedBefore, trustedAfter: trusted(), refills,
+		scroller: sc ? 'maincontent' : 'window' };
+
+	} finally { /* the poll stays stopped, matching HOLD/SWAP — nothing here restarts it */ }
 };
 
 /* Runs in the page: a scripted flick up and down while ticks land, reporting any offset change the
@@ -830,7 +1009,7 @@ for (const engine of ENGINES) {
 				}
 				await page.waitForTimeout(3000);
 
-				let held, swap, quiet, tick;
+				let held, swap, quiet, tick, repeat;
 				try {
 					/* TICK FIRST, and on the page exactly as it loaded — HOLD's pad, SWAP's two
 					 * removeChild/appendChild cycles and QUIET's two dozen scripted flicks all perturb
@@ -849,6 +1028,11 @@ for (const engine of ENGINES) {
 						: await page.evaluate(TICK, TICK_COUNT);
 					held = await page.evaluate(HOLD, GROWTH);
 					swap = await page.evaluate(SWAP, [ GROWTH, TOLERANCE, LATE_MS, SWAP_WINDOW ]);
+					/* only against the REAL engine — same reasoning as TICK above: with `noEngineAnchor`
+					 * the fallback already runs every refill, so `_engineTrusted` has nothing to say. */
+					repeat = noEngineAnchor
+						? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
+						: await page.evaluate(REPEAT, [ GROWTH, TOLERANCE, REPEAT_TIMES ]);
 					quiet = await page.evaluate(QUIET, GROWTH);
 				}
 				/* A cell that threw proved nothing, and dropping it without a word is how a sweep comes
@@ -873,6 +1057,11 @@ for (const engine of ENGINES) {
 						&& swap.grewDoc < GROWTH / 2)
 					swap.skip = `the ${GROWTH}px pad only grew the document ${swap.grewDoc}px `
 						+ `(${swap.bodyDesc}, ${swap.bodyH}px) — the growth never reached the scroller`;
+				/* the same `.fs-ovl` grid guard as SWAP's, above — REPEAT walks the same candidates */
+				if (!repeat.skip && typeof repeat.grewDoc === 'number' && repeat.grewDoc < GROWTH - TOLERANCE
+						&& repeat.grewDoc < GROWTH / 2)
+					repeat.skip = `the ${GROWTH}px pad only grew the document ${repeat.grewDoc}px `
+						+ `(${repeat.bodyDesc}, ${repeat.bodyH}px) — the growth never reached the scroller`;
 
 				if (held.skip || quiet.skip) {
 					process.stdout.write(`  ${where}: ${held.skip || quiet.skip}\n`);
@@ -940,6 +1129,26 @@ for (const engine of ENGINES) {
 				else if (Math.abs(tick.moved) > TOLERANCE)
 					found(`${where}: the reader drifted ${tick.moved}px across real poll ticks `
 						+ `(${tick.mutations} mutation(s) observed) while parked and nobody scrolling`);
+				/* SEVERAL REFILLS ON ONE PAGE — see the note on REPEAT. Two things are watched apart,
+				 * because they are two different faults: the reader actually moving (a correction ran
+				 * where it should not have, or none ran where one should have) is a finding regardless
+				 * of the trust flag; the flag going false while the reader never moved at all is a
+				 * SEPARATE finding — the engine was doing the job the whole time, and the switch took
+				 * the correction away from it anyway (task missrule). */
+				if (repeat.skip)
+					process.stdout.write(`  ${where}: REPEAT measured nothing (${repeat.skip})\n`);
+				else {
+					const jumped = repeat.refills.find((r) => r.moved === null || Math.abs(r.moved) > TOLERANCE);
+					if (jumped)
+						found(`${where}: refill ${jumped.i + 1}/${REPEAT_TIMES} on the same section left the `
+							+ `reader ${jumped.moved === null ? 'without a surviving reference' : jumped.moved + 'px off'} `
+							+ `(engineTrusted ${jumped.engineTrusted}, corrected ${jumped.correctedAt === null ? 'never' : jumped.correctedAt + 'ms'})`
+							+ (jumped.writes && jumped.writes.length ? ` — writes: ${JSON.stringify(jumped.writes)}` : ''));
+					else if (repeat.trustedBefore === true && repeat.trustedAfter === false)
+						found(`${where}: _engineTrusted went false after ${REPEAT_TIMES} refills the reader `
+							+ `never moved for — the engine was anchoring correctly the whole time `
+							+ `(misses: ${JSON.stringify(repeat.refills.map((r) => r.engineTrusted))})`);
+				}
 				/* signed for readability: a positive offset is the scroller compensating for growth
 				 * above the reader, which is what tells "the engine declined to anchor" (0px here)
 				 * apart from "the mark misreported" (moved itself would be the tell, not this term) */
@@ -954,7 +1163,9 @@ for (const engine of ENGINES) {
 					+ `[offset ${swap.skip || swap.floorOffsetDelta === null ? '-' : signed(swap.floorOffsetDelta)}]`
 					+ `  mid-flick surprises ${quiet.unexplained}`
 					+ (quiet.stalls ? `  (${quiet.stalls} step(s) too slow to still be a flick, not counted)` : '')
-					+ `  tick drift ${tick.skip ? '-' : tick.moved + 'px/' + tick.mutations + 'mut'}` + '\n');
+					+ `  tick drift ${tick.skip ? '-' : tick.moved + 'px/' + tick.mutations + 'mut'}`
+					+ `  ${REPEAT_TIMES}x repeat ${repeat.skip ? '-' : repeat.refills.map((r) => (r.moved === null ? '?' : r.moved) + 'px').join('/')} `
+					+ `trusted ${repeat.skip ? '-' : `${repeat.trustedBefore}->${repeat.trustedAfter}`}` + '\n');
 				await ctx.close();
 			}
 		}

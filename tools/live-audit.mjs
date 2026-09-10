@@ -29,9 +29,35 @@
  *   node tools/live-audit.mjs [--only owrt2512,owrt2410] [--widths 320,390,768,1440]
  *                             [--pages /admin/status] [--pages-all] [--all] [--arrive 768]
  *                             [--update] [--prune] [--engine chromium|firefox|webkit] [--lang ru]
+ *                             [--settle 460]
  *
  * Needs a running owlab router (docs/development.md). `--update` rewrites the baseline: read the
  * diff before you do that — it is the whole value of the file.
+ *
+ * `--settle` (task livegate): the resize loop below used to sample EVERYTHING 220ms after each
+ * `setViewportSize`, which is 180ms INSIDE `fs-fit.js`'s own `SCROLL_IDLE` (400ms) — the window the
+ * theme deliberately defers every layout-reading pass behind while it judges the page to still be
+ * moving, and which a fast back-to-back sweep across WIDTHS keeps re-arming on every step. Sampling
+ * `doc-scroll`/`overflow`/`clipped`/`target`/the table and floor checks there reads the state the
+ * theme is holding off on and reports it as a layout break — measured directly as CI's
+ * `geometry|fs-content` finding on `/admin/status/vnstat2/config`, whose offset was always exactly
+ * the gap between two adjacent WIDTHS entries, never a real number.
+ *
+ * TWO DIFFERENT FIXES FOR TWO DIFFERENT PROMISES, not one. `1cd2af1` fixed `fs-chrome.js`'s
+ * `contentWidth()` so it re-reads the window's width on every call regardless of the defer window —
+ * GEOMETRY's own promise is "the model matches reality NO MATTER WHEN you ask" (fs-select reads it
+ * mid-scroll too), so GEOMETRY stays sampled IMMEDIATELY, before `SETTLE_MS`, same as before —
+ * `docs/development.md` says outright not to "fix" a recurrence of this shape by sampling later
+ * instead, and reproduced directly (task livegate, `1cd2af1` reverted in a scratch copy): sampled at
+ * 220ms it reads the stale model (`off=-70` at 320->390 through `off=-936` at 1440, matching the
+ * vnstat2 shape exactly), sampled ONLY past `SCROLL_IDLE` it reads clean — the SAME bug, hidden,
+ * because by then the deferred pass has simply had time to run and paper over a model that is still
+ * broken. So GEOMETRY is sampled BOTH ways (see below) and stays exactly as exposed to this class of
+ * regression as it always was. Every OTHER check's promise is "the page IS laid out correctly", which
+ * needs the deferred pass to have actually RUN — those depend on `SETTLE_MS`, past `SCROLL_IDLE`, not
+ * on a self-correcting read, and moving only them fixes the 220ms false report without reintroducing
+ * the one `1cd2af1` closed. 460ms clears the 400ms floor with the same margin `SCROLL_IDLE`'s own
+ * comment gives it.
  *
  * `--lang` (task 0162): the checks that read TEXT LENGTH — `overflow`, `clipped`, `doc-scroll` — are
  * pinned to whatever language the router happens to answer in, and the default is English (Playwright's
@@ -111,6 +137,13 @@ const ARRIVE = Number(arg('arrive', '768'));
 if (!Number.isFinite(ARRIVE) || ARRIVE < 0) {
 	/* a typo may not turn a check off in silence — that is how a gate stops holding anything */
 	console.error(`live-audit: --arrive wants a width in px (or 0 to skip it), got "${arg('arrive', '')}"`);
+	process.exit(1);
+}
+/* See the file header. Past fs-fit.js's SCROLL_IDLE (400ms), not "a frame or two" — sampling inside
+ * that window reads the theme's own deferred state, not a break. */
+const SETTLE_MS = Number(arg('settle', '460'));
+if (!Number.isFinite(SETTLE_MS) || SETTLE_MS < 0) {
+	console.error(`live-audit: --settle wants a wait in ms, got "${arg('settle', '')}"`);
 	process.exit(1);
 }
 
@@ -288,7 +321,7 @@ const baseline = (() => {
 const list = requireStands(stands(arg('only', ''), { all: ALL_STANDS }), 'live-audit');
 const browser = await pw[ENGINE].launch();
 const seen = {}, fresh = [];
-let checked = 0;
+let checked = 0, armed = 0;
 
 /* THE ROUTERS RUN AT THE SAME TIME. Nothing here is a timing measurement — every finding is a
  * geometry or a name read out of a settled page — so two containers answering at once cannot change
@@ -369,6 +402,11 @@ await Promise.all(list.map(async (stand) => {
 			/* a page the router refuses (an app in the menu whose ACL says no) is not a layout finding */
 			if (!(await page.evaluate(() => !!document.getElementById('view')))) continue;
 			checked++; here++;
+			/* whether the theme actually ran on this page — a stand rebuilt without `owlab sync`
+			 * (docs/development.md) serves every page LuCI-bare, `data-fs-fit` never appears, and
+			 * ungated-table/unanswered-table/dead-floor (all three gated on it) check nothing on any
+			 * page for the whole run without a single line saying so */
+			if (await page.evaluate(() => document.documentElement.hasAttribute('data-fs-fit'))) armed++;
 
 			/* what the RESIZE pass saw at the arrival width, so the arrival pass can report only what is
 			 * new about arriving. See the arrival block below. */
@@ -383,8 +421,24 @@ await Promise.all(list.map(async (stand) => {
 
 			for (const w of WIDTHS) {
 				await page.setViewportSize({ width: w, height: 900 });
-				/* the fitters run on a resize observer and settle within a frame or two */
-				await page.waitForTimeout(220);
+				/* GEOMETRY sampled IMMEDIATELY, deliberately inside the window the theme may still be
+				 * deferring behind — its promise is "the model matches reality NO MATTER WHEN you ask",
+				 * because fs-select reads it mid-scroll too (fs-chrome.js's own contentWidth()). Waiting
+				 * here would let a future regression of the exact 1cd2af1 shape — contentWidth()
+				 * answering for the previous width — hide behind the deferred fitter's own, unrelated
+				 * correctness once SETTLE_MS has passed: reproduced directly (task livegate, 1cd2af1
+				 * reverted in a scratch copy) — sampled at 220ms it reads the stale model, sampled once
+				 * more past SCROLL_IDLE it reads clean, same bug, because by then the deferred pass has
+				 * simply had time to run and paper over it. docs/development.md says the same in the
+				 * other direction: do not "fix" a recurrence of this shape by sampling later instead.
+				 * Sampled again after the settle wait below, so a model that is ALSO wrong once the page
+				 * has stopped moving is caught too — same signature either way, one entry. */
+				try { for (const f of await page.evaluate(GEOMETRY)) record(w, f); } catch (e) { /* see there */ }
+				/* Everything else here — doc-scroll, overflow, clipped, target, the table and floor
+				 * checks — depends on the deferred pass having actually RUN, unlike GEOMETRY above, so
+				 * it is sampled past SCROLL_IDLE (see SETTLE_MS in the file header) rather than inside
+				 * the window the theme is deliberately still deferring in. */
+				await page.waitForTimeout(SETTLE_MS);
 				let found = [];
 				try { found = await page.evaluate(CHECK); } catch (e) { continue; }
 				for (const f of found) record(w, f);
@@ -424,6 +478,24 @@ await Promise.all(list.map(async (stand) => {
 	}
 }));
 await browser.close();
+
+/* Zero of either is not a clean sweep. `checked === 0` is every router unauthenticated or every
+ * page in the menu lacking #view — the shape `login()` never checks for (lib/stands.mjs). `armed
+ * === 0` with `checked > 0` is pages rendering LuCI-bare: a stand rebuilt with `owlab up --rebuild`
+ * carries no theme until `owlab sync` (docs/development.md), every check gated on data-fs-fit
+ * (ungated-table, unanswered-table, dead-floor) then checks nothing for the whole run, and nothing
+ * before this printed that it had not. */
+if (checked === 0) {
+	console.error('\nlive-audit: 0 page render(s) across ' + list.length + ' router(s) — every router '
+		+ 'was unauthenticated, or every page in its menu lacked #view. Nothing was measured.\n');
+	process.exit(1);
+}
+if (armed === 0) {
+	console.error(`\nlive-audit: ${checked} page(s) rendered but data-fs-fit never appeared on any of `
+		+ 'them — the theme is not installed on the stand(s) measured (owlab sync after a rebuild, '
+		+ 'docs/development.md). ungated-table, unanswered-table and dead-floor were not checked.\n');
+	process.exit(1);
+}
 
 /* A run narrowed by --pages or --widths visited only part of the baseline, so it may neither rewrite
  * it nor report the rest as fixed. */
