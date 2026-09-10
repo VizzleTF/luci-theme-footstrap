@@ -700,7 +700,97 @@ happens on the maintainer's explicit word for one change, never by reflex, and `
 5. Rollback, if anything above fails or a page is wrong:
    `ssh <host> 'uci set luci.main.mediaurlbase=/luci-static/bootstrap; uci commit luci; rm -f /tmp/luci-indexcache*'`.
 
+## Running everything CI runs, locally: `tools/ci-local.sh`
+
+`.github/workflows/build.yml` is six jobs; nothing local ran the four beyond `check`/`lint`
+(`build`, `verify`, `live`, `anchors`) until this script, so a red job there used to be the first
+time anything here measured that half at all. `tools/ci-local.sh` runs the same commands, in the
+same order, selectable per job or per slice:
+
+```sh
+tools/ci-local.sh --list                      # the job/slice map and what this cannot reproduce
+tools/ci-local.sh check lint build            # the three jobs that never touch a router
+tools/ci-local.sh verify                      # owlab test, both formats — safe with stands up
+tools/ci-local.sh --mode push --force live    # all three live slices, THIS project's own stands
+tools/ci-local.sh all --dry-run               # print every command either mode would run
+```
+
+`--mode pr|push` reproduces the exact split `build.yml` makes for `live`/`anchors`
+(`ROUTERS=owrt2512`, `FULL=""` on a pull request; all three routers and `--full` on a push) —
+`check`/`lint`/`build`/`verify` do not vary by mode. `verify` runs `owlab test`, which
+synthesizes its own ephemeral router in a scratch directory and never touches the named stands,
+so it is safe to run even while another session has `owrt2512`/`owrt2410`/`owrtsnap` to itself.
+`live` and `anchors` are the opposite — they boot and install onto those SAME named stands — so
+the script refuses to run them for real without `--force`, a deliberate echo of "Two live-audit
+sweeps against the same stand fight over its language" below: this default exists because that
+failure mode is measured, not hypothetical. `--dry-run` prints every command any job/slice would
+run without touching a tool or a router, and works with no prerequisite on `PATH` at all.
+
+**Every run — `--list` included — ends by naming what it did NOT reproduce and why**: the signed
+`release`/`pages` jobs (no local copy of either secret key), the artifact upload/download between
+`build` and everything downstream of it (substituted by one shared `dist/` on disk), job-level
+`timeout-minutes` (unenforced locally), and the apt-get fallback branches inside `check`'s
+gettext block and `ci-playwright.sh` (only exercised when the tool is actually missing, which it
+was not on this host). A step this script cannot cover is printed as `SKIP` with a reason, never
+folded into a passing count.
+
+**This has to run from WSL, never from Git Bash on Windows** — the same host split
+`docs/development.md` documents below for every other npm-run gate — invoked the way that
+section's own recipe does, PATH set by hand inside the call. Node does not need installing under
+WSL's own nvm the way that recipe assumes, either: this session found `npm`/`node` already staged
+under the Windows install (`node_modules/.bin/*` carries an extensionless sh wrapper beside the
+`.cmd`/`.ps1` ones), and that copy runs from WSL exactly as well as a native one once its `PATH`
+is set — no `EFTYPE`/loader-hook workaround needed, because a REAL Linux `node` executing
+`build-css.sh` through `execFileSync` is not the Windows-side failure that trap is about. `owlab`
+and `owfeed` (`~/go/bin`, both already on this host at the CI-pinned versions, 0.6.1 and 0.5.1)
+are ordinary Linux ELF binaries and need no such bridging at all. What genuinely needs installing
+fresh is `node` itself if WSL has none of its own — this session used NodeSource's `setup_22.x`
+to match `build.yml`'s pinned `node-version: '22'` exactly, a one-time `apt-get` cost, not a
+per-run one.
+
+**A variable ASSIGNED inside an inline `wsl.exe -- bash -c '…'` string reads back empty or
+truncated, independent of and in addition to the `$?` trap already on this page.** Measured this
+session, the same inline call every time: `x=$(echo hello); echo "$x"` printed nothing; so did
+the far simpler `x=hello; echo "$x"`, with no command substitution involved at all; a function
+DEFINED inline (`f(){ …; }; f`) failed to resolve. The exact same lines, saved to a file and run
+as `wsl.exe -- bash /path/to/script.sh`, read back correctly every time — command substitution,
+`$?`, and everything else this script depends on, all confirmed with a dedicated probe before
+writing a line of `tools/ci-local.sh` around it. Treat this as one mechanism with the `$?` trap
+below rather than two: neither survives an inline `bash -c` string, both survive a file, and
+"write the script to a file and call `wsl.exe -- bash <path>.sh` instead of inlining it" (already
+this page's advice for the `$R`/`$T` collapse) is the same fix for both.
+
 ## The stand's own traps
+
+- **`owlab up` on a taken port fails ONE container and returns non-zero for the whole command.**
+  Adding three stands on 2026-09-09, `owrt2512b` could not bind ssh 2235 — something else on this
+  machine already listened there — so `up` printed `Bind for 0.0.0.0:2235 failed: port is already
+  allocated` and exited 1, while the other two had started fine. The following `owlab sync` then
+  synced those two and reported a failure for the third. Read the per-router lines, not the exit
+  status: a partial success looks like a total failure and the reverse is equally possible. Check
+  what is actually listening with `ss -ltn | grep :22` before choosing a port, and note that
+  2222 and, on this host, 2235/2240/2241 are taken by things owlab does not own.
+
+- **A stand rebuilt with `owlab up --rebuild` carries NO theme until `owlab sync`.** The gates do
+  not say so: every cell prints `page.evaluate: NetworkError: HTTP error 404 while loading class
+  file "/luci-static/resources/fs-prefs.js"` and the run **exits 0**. A sweep that measured nothing
+  is indistinguishable from a clean one unless you read the lines. Always `owlab sync` after a
+  rebuild, and treat a 404 in a cell as "the stand is empty", not as a finding.
+
+- **Never pipe a long run into `tail`.** The output buffers until the command ends, so a hang looks
+  exactly like progress. `live-audit` over a full sweep did this on 2026-09-09: the process sat
+  alive and idle for 73 minutes with no output, where CI takes about 90 seconds a stand. Write to a
+  file and read the file as it grows, and give any local `live-audit` both `--pages` and a
+  `timeout`.
+
+- **A variable assigned INSIDE an inline `wsl.exe -- bash -c '...'` string reads back empty.** This
+  is separate from the `$?` trap below and bites the same way: the script looks like it ran and
+  produced nothing. Write the script to a file and call `wsl.exe -- bash <path>.sh`.
+
+- **`${PIPESTATUS[0]}` is as unreliable as `$?` in that shell.** On 2026-09-09 a piped
+  `npm run check` reported `CHECK_EXIT=` and read as success while it had actually failed on the
+  size budget; the failure was only caught by reading the gate's printed text. Judge every gate by
+  what it printed, never by a status.
 
 Every one of these cost a measurement that read as a regression in the theme. They are written down
 because each was hit more than once.

@@ -215,3 +215,28 @@ routers:
     # up, and why every gate that claimed the snapshot line was measuring two routers instead of
     # three. docs/development.md, "The stand's own traps".
     ports: { http: 8022, ssh: 2228 }
+
+  # ---- second instances of the three OpenWrt lines, for parallel measurement ----
+  #
+  # Not more coverage — the SAME three lines a second time. Added 2026-09-09, when a day of
+  # concurrent anchor work kept colliding on five stands: one agent held owrt2512/owrt2410/owrtsnap
+  # for a full three-engine sweep, a second was told to use the ImmortalWrt boxes because nothing
+  # else was free, and a measurement about the theme was very nearly made on the wrong distro. The
+  # maintainer's rule is that a behaviour claim needs 24.10, 25.12 and snapshot; imm* answers a
+  # question about the brand instead. So the answer to contention is more OpenWrt, never a
+  # substitute.
+  #
+  # Same releases and the same third-party fixtures as their originals, so a finding on `-b`
+  # carries exactly as much weight as one on the original. Ports continue the block rather than
+  # interleaving: 803x/223x, clear of 2222 for the reason owrtsnap's comment gives.
+  - id: owrt2512b
+    release: "25.12.4"
+    ports: { http: 8045, ssh: 2245 }
+    extra_packages: *third_party_apps
+  - id: owrt2410b
+    release: "24.10.8"
+    ports: { http: 8034, ssh: 2234 }
+    extra_packages: *third_party_apps
+  - id: owrtsnapb
+    release: "snapshot"
+    ports: { http: 8032, ssh: 2232 }
