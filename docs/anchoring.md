@@ -521,6 +521,38 @@ was a measured failure first:
   something exercised it. Cost: 82 B minified over `tools/size-budget.mjs`'s `coldJs` limit (45 B of
   head-room before this fix), the array and the filter both irreducible without dropping coverage —
   reported rather than raised, per the budget's own rule.
+- **And a box nothing touched must not be re-cleared at all — task floorchurn.** Every one of the six
+  points above assumes the clear-and-remeasure pass is the cost of correctness; it is also, on its
+  own, a cost worth not paying twice. Instrumented across 25s of real polling on the Overview, three
+  routers whose poll delivers System/Memory/Storage as separate `MutationObserver` batches (`owrt2512`,
+  `owrtsnap`, `imm2512`): 25 `holdFloor()` calls (5 per tick) times up to 29 candidate boxes is 725
+  clears and 625 writes, and 610 of those 625 write back the value already standing — only 15 boxes
+  ever actually change (`../tmp/task-floorsuppress/`). A box no mutation touched cannot have a
+  different true content height from the one this function measured it at last time — the only other
+  thing that changes what a box's content needs is a WIDTH change, which is a different codepath
+  entirely (`onResize()` → `schedule()` → `run()` with no records, still an unscoped sweep). So
+  `holdFloor()` now takes the mutation observer's own `records` and narrows the clear/measure/write
+  step to the boxes at least one record's `target` actually touched, either direction (a box may be
+  the target itself, contain it, or — a fresh child just inserted into it — be contained BY it);
+  every other caller (the resize re-fit, `_moFlag`, `_moTabs`, the deferred-floor sampler) passes
+  none and still gets the full, unscoped sweep, so none of the six points above lost any coverage —
+  `r.target` (above, `grew`/`floorShrink`) is never excluded, since it already carries `data-fs-floor`
+  and is by construction one of the mutation's own targets. Measured live against the real fix,
+  same page, same 25s window: 725/625 down to 70/70 on the three routers above (a ~90% cut, `changed`
+  unmoved at 15 — nothing missed), and 80/75 down to 75/75 on `owrt2410`/`imm2410`, whose Overview
+  batches the same tick into a single callback rather than five, leaving little for a per-call skip
+  to find — not a regression, the unscoped-equivalent case this design already had to be safe under.
+  This is a COST fix, not a correctness one: the same probe that measured the churn found it does not
+  suppress the engine's own anchoring on any engine, and forcing every box "unchanged" by reading its
+  height WHILE ITS OLD FLOOR IS STILL APPLIED — `min-height` masks a real shrink the same way it masks
+  everything under the floor — was tried and rejected for exactly the danger this file exists to
+  guard against: `tools/floor-contract.mjs` gained a case that shrinks a floored box by half its
+  children (not empty — `EMPTY_TALLEST`/`AFTER` above already cover that) and reads the floor back
+  against what the box actually stands at; the masked check fails it outright (a real live cell:
+  `owrt2410`/`imm2410` overview, a table cut from 15 to 8 rows, floor stuck at 639px against a 339px
+  box, +300px of blank the theme would never take back), the mutation-scoped fix passes it (339px
+  against 339px, 0px), and `floor-contract`'s existing ACCURACY/RELEASE/switch/fold/depends cases are
+  unmoved on the full default sweep (175 floors, worst −1px, 0 findings).
 
 ## What the reader was looking at: `anchorRef()` and the memo
 

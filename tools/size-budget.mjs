@@ -311,7 +311,18 @@ const LIMITS = {
 	 * (`../tmp/task-wkrefill/run-gate.sh`, real `tools/scroll-anchor.mjs`, three read `3x repeat
 	 * 0px/0px/0px`, the fourth 0px/0px/0px too with a separate, pre-existing trust-flip left for its
 	 * own investigation). The limit goes to 95,100, 75 B of head-room. */
-	resourcesJs: 95_100,
+	/* 95,207 B on 2026-09-10, up 182 B: `holdFloor()` (`fs-fit.js`) stops re-clearing and rewriting
+	 * every candidate box on every call — task floorchurn. Measured live on the Overview, 25s of real
+	 * polling: 725 clears + 625 writes down to 70 + 70 on the three routers whose poll delivers
+	 * System/Memory/Storage as separate `MutationObserver` batches (owrt2512, owrtsnap, imm2512),
+	 * each one still a real `min-height` invalidation the engine reacts to (css-scroll-anchoring-1
+	 * §2.2.2) whether or not the value put back is the one already standing. `records`, passed only
+	 * by the childList observer's own callback, narrows the clear/measure/write step to the boxes at
+	 * least one delivered record actually touched; every other caller (the coalesced resize re-fit,
+	 * the tab/fold/depends observer, the deferred-floor sampler) still gets the unscoped sweep, so
+	 * none of the four correction mechanisms this file also carries lost any coverage. The limit goes
+	 * to 95,300, 93 B of head-room. */
+	resourcesJs: 95_300,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -545,7 +556,10 @@ const LIMITS = {
 	 * every reader pays it once; proven on all four remaining cells through the real gate, not just
 	 * this repo's own probe. The limit goes to 60,250, 112 B of head-room — the eighth and, per that
 	 * gate run, last raise for this defect. */
-	coldJs: 60_250,
+	/* 60,320 B on 2026-09-10, up 70 B: the same per-box skip in `holdFloor()` as `resourcesJs`'s own
+	 * note on this commit — `fs-fit.js` is cold, so every reader pays it once. The limit goes to
+	 * 60,400, 80 B of head-room. */
+	coldJs: 60_400,
 };
 
 function bytes(path) {

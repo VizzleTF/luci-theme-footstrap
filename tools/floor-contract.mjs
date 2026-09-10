@@ -147,6 +147,41 @@ const TAB_AFTER = () => {
 	};
 };
 
+/* Shrinks the tallest floored box by ABOUT HALF ITS CHILDREN — a real childList mutation, the same
+ * shape a poll's `dom.content()` makes, but a genuine PARTIAL shrink rather than RELEASE's full
+ * empty below. This is the shape a per-box skip in `holdFloor()` (task floorchurn) has to get
+ * right: a skip that reads a box's height WHILE ITS OLD FLOOR IS STILL APPLIED cannot see a shrink
+ * at all — `min-height` forces `offsetHeight` up to the floor no matter what is actually left
+ * inside, so "this box already reads its own floor" is trivially true after every ordinary shrink,
+ * not only a coincidental one. Needs at least 2 children so removing some leaves the box non-empty
+ * — RELEASE below already covers the fully-emptied case. */
+const SHRINK_HALF = () => {
+	const el = [ ...document.querySelectorAll('#view [style*="min-height"]') ]
+		.sort((a, b) => parseFloat(b.style.minHeight) - parseFloat(a.style.minHeight))
+		.find((e) => e.children.length >= 2);
+	if (!el) return null;
+	window.__fsShrinkBox = el;
+	const n = Math.max(1, Math.floor(el.children.length / 2));
+	for (let i = 0; i < n; i++) el.removeChild(el.lastElementChild);
+	return { cls: (el.className || el.tagName).split(' ')[0], floorBefore: el.style.minHeight,
+	         removed: n, doc: document.documentElement.scrollHeight };
+};
+
+/* What the box's floor reads once the mutation observer has had a turn, against what it is
+ * actually standing at with no floor under it — the same clear/measure/put-back AFTER below uses,
+ * so a passing floor and a passing bare box are told apart by the SAME yardstick RELEASE holds
+ * them to. */
+const SHRINK_AFTER = () => {
+	const el = window.__fsShrinkBox;
+	if (!el || !document.getElementById('view').contains(el)) return { inDoc: false };
+	const was = el.style.minHeight;
+	el.style.minHeight = '';
+	const bare = Math.round(el.getBoundingClientRect().height);
+	el.style.minHeight = was;
+	return { inDoc: true, floorAfter: el.style.minHeight, bare,
+	         doc: document.documentElement.scrollHeight };
+};
+
 /* Empty the tallest floored box the way a tick does, and DO NOT refill it: a container that is not
  * coming back must not keep holding the page open. Returns what to look at afterwards. */
 const EMPTY_TALLEST = () => {
@@ -192,7 +227,7 @@ const RELEASE_WAIT = Number(arg('wait', '0')) || 13000;
 const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'floor-contract');
 const browser = await chromium.launch();
 const findings = [];
-let boxes = 0, worst = 0, released = 0, switches = 0, folds = 0, depends = 0;
+let boxes = 0, worst = 0, released = 0, switches = 0, folds = 0, depends = 0, shrinks = 0;
 
 for (const stand of list) {
 	const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -234,6 +269,34 @@ for (const stand of list) {
 
 		process.stdout.write(`  ${where}  ${r.floors.length} floor(s), worst ${
 			r.floors.reduce((a, f) => Math.abs(f.delta) > Math.abs(a) ? f.delta : a, 0)}px\n`);
+
+		/* …and a genuine PARTIAL shrink (task floorchurn) — before the switch and the release, both
+		 * of which mutate #view themselves and would otherwise be read as this test's own effect. */
+		const shrinkBefore = await page.evaluate(SHRINK_HALF);
+		if (shrinkBefore) {
+			/* the mutation observer's own callback runs as a microtask off the removeChild() calls
+			 * above; 600ms is the same margin TAB_SWITCH gives its own read below, comfortably past
+			 * a callback that has no network or timer of its own to wait on */
+			await page.waitForTimeout(600);
+			const shrinkAfter = await page.evaluate(SHRINK_AFTER);
+			if (!shrinkAfter.inDoc) {
+				process.stdout.write(`  ${where}  shrink probe: the poll replaced ${shrinkBefore.cls} `
+					+ `before the read, nothing to check\n`);
+			} else {
+				shrinks++;
+				const floorAfter = Math.round(parseFloat(shrinkAfter.floorAfter) || 0);
+				const gap = floorAfter - shrinkAfter.bare;
+				if (Math.abs(gap) > SLACK)
+					findings.push(`${where}: ${shrinkBefore.cls} lost ${shrinkBefore.removed} child(ren) `
+						+ `(floor was ${shrinkBefore.floorBefore}) and still wears ${shrinkAfter.floorAfter} `
+						+ `where it now measures ${shrinkAfter.bare}px (+${gap}px) — a shrink the floor `
+						+ `never came down for, document ${shrinkBefore.doc} -> ${shrinkAfter.doc}`);
+				else
+					process.stdout.write(`  ${where}  shrink probe: ${shrinkBefore.cls} lost `
+						+ `${shrinkBefore.removed} child(ren), floor ${shrinkBefore.floorBefore} -> `
+						+ `${shrinkAfter.floorAfter} over ${shrinkAfter.bare}px of box\n`);
+			}
+		}
 
 		/* …and the switch, on a page that has a tab strip. Before the release test, which empties
 		 * a box: the floors this reads are the ones a settled page wrote. */
@@ -286,4 +349,4 @@ if (findings.length) {
 }
 console.log(`floor-contract: ${boxes} floor(s) over ${list.length} router(s), worst ${worst}px against the box, `
 	+ `${released} released after emptying, ${switches} released on a tab switch, ${folds} fold(s) `
-	+ `closed, ${depends} depends() row(s) switched off.`);
+	+ `closed, ${depends} depends() row(s) switched off, ${shrinks} partial shrink(s) checked.`);

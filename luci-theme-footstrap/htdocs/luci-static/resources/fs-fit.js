@@ -68,14 +68,18 @@ function fittersEnabled() {
 /* One path for everything that may run now: the mutation observer, the coalesced re-fit and a pass
  * put off during a scroll all come through here, so the order — work, then the floor, then the
  * reference — is stated once. The correction is not this function's: observeContent() takes its
- * reference before calling here and applies the offset afterwards. */
-function run() {
+ * reference before calling here and applies the offset afterwards.
+ *
+ * `records`, passed ONLY by the childList observer's own callback (below), is what lets
+ * `holdFloor()` skip a box nothing touched (task floorchurn) — every other caller leaves it
+ * undefined and gets the unscoped, every-box sweep, unchanged. */
+function run(records) {
 	if (!fittersEnabled()) return;
 	runAll(_fitters, 'fitter');
 	/* make the document whole again before anything lays it out, then take the position the next
 	 * mutation is measured against — unless a correction is already on its way, which would make
 	 * this reference the drifted one */
-	holdFloor();
+	holdFloor(records);
 	if (!_anchorPending) rememberRest();
 }
 
@@ -141,8 +145,32 @@ const FLOORED = '[data-fs-floor]';
  *
  * The climb is the ONE part of the 0.14.4 floor kept: this pass still clears and re-measures, so a
  * box that cannot hold anything up measures 0 with its floor off and gets none — which is why the
- * collapsed tab pane of issue #41 cannot come back with it. */
-function holdFloor() {
+ * collapsed tab pane of issue #41 cannot come back with it.
+ *
+ * NOT EVERY BOX EVERY TIME — task floorchurn. Instrumented across 25s of real polling, three
+ * engines, two stands: 25 calls (5 per tick) times 29 candidate boxes is 725 clears and 625 writes,
+ * of which 610 put back the number already standing — only 15 boxes actually changed
+ * (`../tmp/task-floorsuppress/`). A box nobody has mutated cannot have a different height from the
+ * one this function measured it at last time: nothing else changes what `offsetHeight` answers here
+ * except a DOM mutation inside it (caught below) or a WIDTH change (a different codepath entirely —
+ * `onResize()` -> `schedule()` -> `run()` with no `records`, which still sweeps every box, since a
+ * reflow from a width change is invisible to a childList observer). So `records` — passed only by
+ * observeContent()'s own MutationObserver callback, `undefined` everywhere else in this file —
+ * narrows the clear/measure/write step to the boxes at least one record's `target` actually touched,
+ * either direction (`target` may be the box itself, a descendant the mutation changed, or an
+ * ANCESTOR of a box that just appeared as a fresh child of it — a plain `box.contains(target)` alone
+ * misses that last shape, since a box cannot contain the parent it was just inserted into).
+ *
+ * The climb itself — which boxes exist, and whether each one currently wears `data-fs-floor` — is
+ * still computed in full every call: cheap (`querySelectorAll` plus `getComputedStyle`, no forced
+ * layout) and it is what lets an untouched box be correctly recognised as untouched. What is skipped
+ * is only the clear-and-remeasure, the part that forces a layout per box. A box this call finds
+ * "not dirty" is left exactly as it was — for the ONE call that matters for correctness, the one
+ * `observeContent()`'s own callback reads `r.target`'s floor back from immediately after to compute
+ * `grew`/`floorShrink` (task blindref, task wkrefill), `r.target` already carries `data-fs-floor`
+ * and IS one of the mutation's own targets, so it is never excluded — this cannot silently swallow
+ * the shrink those mechanisms depend on seeing. */
+function holdFloor(records) {
 	if (scrolling()) return;
 	const host = document.getElementById('view');
 	if (!host) return;			/* the login page has no view */
@@ -158,9 +186,18 @@ function holdFloor() {
 		boxes.push(box);
 	});
 	host.querySelectorAll(FLOORED).forEach((box) => { if (boxes.indexOf(box) === -1) boxes.push(box); });
-	boxes.forEach((box) => { box.style.minHeight = ''; });
-	boxes.forEach((box) => hs.push(box.offsetHeight));
-	boxes.forEach((box, i) => {
+
+	let dirty = boxes;
+	if (records && records.length) {
+		const targets = [];
+		for (const r of records) if (r.target && targets.indexOf(r.target) === -1) targets.push(r.target);
+		dirty = boxes.filter((box) => targets.some((t) => box.contains(t) || t.contains(box)));
+	}
+	if (!dirty.length) return;
+
+	dirty.forEach((box) => { box.style.minHeight = ''; });
+	dirty.forEach((box) => hs.push(box.offsetHeight));
+	dirty.forEach((box, i) => {
 		if (hs[i] > 0) { box.style.minHeight = hs[i] + 'px'; box.setAttribute('data-fs-floor', ''); }
 		else box.removeAttribute('data-fs-floor');
 	});
@@ -1151,7 +1188,7 @@ function observeContent() {
 		 * any tick's `holdFloor()` actually runs, for the identical reason. */
 		const wasScrolling = scrolling();
 		if (r && before && wasScrolling) _deferredFloor = r.target;
-		run();
+		run(records);
 		if (!wasScrolling) _deferredFloor = null;
 		const floorShrink = (r && before) ? Math.max(0, before - (parseFloat(r.target.style.minHeight) || 0)) : 0;
 		if (trustEngine) lateDrift(settled, grew, floorShrink);
@@ -1173,7 +1210,13 @@ function observeContent() {
 	 * {childList, subtree} registration above wherever body IS the content host. Merging them the
 	 * other way is worse — `subtree: true` plus an attribute filter wakes `run()` on every class
 	 * change in the document, and the poll rewrites row classes on every tick. */
-	_moFlag = new MutationObserver(run);
+	/* wrapped, not passed bare: `run(records)` above means a MutationObserver callback handed to it
+	 * directly would forward ITS OWN records as the dirty scope, and this observer's targets are
+	 * `document.body`'s class attribute — never a box `holdFloor()` tracks — which would read as
+	 * "nothing here is dirty" and skip the very sweep this observer exists to force (a dialog just
+	 * became visible, or a poll rewrote a row's class). Call with none, and `holdFloor()` sweeps
+	 * every box, as it always has for this trigger. */
+	_moFlag = new MutationObserver(() => run());
 	_moFlag.observe(document.body, { attributes: true, attributeFilter: [ 'class' ] });
 
 	/* A TAB SWITCH — OR A DISCLOSURE CLOSING, OR A depends() ROW HIDING — MUTATES NO NODE. ui.tabs
