@@ -797,6 +797,17 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   is separate from the `$?` trap below and bites the same way: the script looks like it ran and
   produced nothing. Write the script to a file and call `wsl.exe -- bash <path>.sh`.
 
+- **`tools/bg.sh` started from inside a `wsl.exe -e bash -c …` call dies with that call, and reads
+  as a run that finished instantly.** The log file is created and stays empty, `.status` never
+  appears, and `tools/bg-wait.sh` reports a dead pid within a second or two — indistinguishable, from
+  the caller's side, from a gate that started and exited 0. The detach is real inside WSL; what does
+  not survive is the WSL session itself, which the interop call tears down the moment its own command
+  returns, taking the whole process group with it. Tell the two apart by the log: a run that genuinely
+  finished has output and a `.status` file, one that was killed with its session has a zero-byte log
+  and no `.status` at all. From a Windows host, start a long gate as a **background Bash-tool
+  command** (`wsl.exe -e bash -c 'cd … && npm run check'`, run in the background) and wait on that
+  instead — `tools/bg.sh` is for a session that outlives the command, which an interop call is not.
+
 - **`${PIPESTATUS[0]}` is as unreliable as `$?` in that shell.** On 2026-09-09 a piped
   `npm run check` reported `CHECK_EXIT=` and read as success while it had actually failed on the
   size budget; the failure was only caught by reading the gate's printed text. Judge every gate by
