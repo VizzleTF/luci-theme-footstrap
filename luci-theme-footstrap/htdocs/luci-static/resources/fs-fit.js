@@ -192,6 +192,51 @@ function deferMeasurement() { _deferred = true; }
 let _movingUntil = 0;
 let _lastOffset = null;
 let _sampling = false;
+/* THE THEME'S OWN CORRECTION WRITE IS A SCROLL EVENT TOO, and this sampler cannot otherwise tell it
+ * from the reader's: `lateDrift()` and `applyAnchor()` write `scrollTop` directly, the browser
+ * dispatches `scroll` for that the same as for a finger, and `noteMotion()` below used to treat
+ * either as SCROLL_IDLE (400ms) of fresh motion — which then blocks `holdFloor()`, `rememberRest()`
+ * and `applyAnchor()` itself for that whole window, since all three refuse while `scrolling()`. On
+ * REPEAT's own back-to-back refills of one section a correction's write routinely landed inside the
+ * 700ms gap the next refill starts in: measured live (`../tmp/task-refill2/probe.mjs`,
+ * owrt2512b/chromium/Overview), a correction's write at t=6530 opened a motion window to t=6930, the
+ * next refill's mutation arrived at t=6811 — INSIDE it — and both `holdFloor()` and `rememberRest()`
+ * were silently refused for that refill: the floor never picked up the new content's real height and
+ * `_rest` kept describing the position from before it, so the correction two ticks later measured a
+ * fabricated 59px drift against that stale reference and wrote a real one, the exact 47-60px "never
+ * corrected" shape the gate reports. Two such self-inflicted writes are two misses by `lateDrift()`'s
+ * own count, which is what tripped `_engineTrusted` false in the same run though the engine had
+ * anchored correctly throughout. The write's own resulting offset is remembered here and consumed by
+ * `sawOwnWrite()` below, held (not consumed on the first look) until the offset actually leaves that
+ * pixel, so both watchers agree; a reader who scrolls to a different pixel in the meantime is
+ * unaffected. */
+let _ownWrite = null;
+/* -> true if `y` is new motion the sampler must count; false if it still reads as this file's own
+ * last write settling. NOT single-shot — task refill2: `noteMotion()` (the `scroll` event) and
+ * `sampleMotion()`'s own frame loop both ask this of the SAME settling write when the sampler was
+ * already running before the write (an earlier, genuine motion still winding down), and a version
+ * that cleared `_ownWrite` on the first of the two to ask left the second — whichever it was — with
+ * nothing to recognise, reading the already-explained pixel as fresh motion and re-extending
+ * `_movingUntil` right back over the write's own settle. Measured live
+ * (`../tmp/task-refill2/probe.mjs`, owrt2512b/webkit/Overview @390 top, 3/3 reps): `scrolling()` never
+ * came back false at all between refills, `holdFloor()`/`rememberRest()` refused every one of them,
+ * and the reader drifted 59px on the second and third with no correction ever landing — the same
+ * shape a stale `_rest` produces, from a different cause. The marker now clears only once the offset
+ * moves to something ELSE, so however many places ask, the answer for THIS pixel stays consistent. */
+function sawOwnWrite(y) {
+	if (_ownWrite === null) return true;
+	if (Math.abs(y - _ownWrite) < 1) return false;
+	_ownWrite = null;
+	return true;
+}
+/* The one place either correction may write the scroll position, so `_ownWrite` cannot go stale by a
+ * write skipping it. Reads the offset back rather than trusting the argument: a write near either
+ * end of the document is clamped by the browser, and the pixel that actually lands is the one the
+ * next `scroll` event will report. */
+function writeOffset(sc, value) {
+	if (sc) sc.scrollTop = value; else window.scrollTo(0, value);
+	_ownWrite = sc ? sc.scrollTop : window.scrollY;
+}
 
 /* Which element scrolls, asked once per width rather than once per frame.
  *
@@ -234,14 +279,34 @@ function scrolling() { return Date.now() < _movingUntil; }
 function sampleMotion() {
 	const y = scrollTop();
 	if (_lastOffset === null || y !== _lastOffset) {
+		const own = !sawOwnWrite(y);
 		_lastOffset = y;
-		_movingUntil = Date.now() + SCROLL_IDLE;
+		if (!own) _movingUntil = Date.now() + SCROLL_IDLE;
 	}
 	if (scrolling()) { requestAnimationFrame(sampleMotion); return; }
 	_sampling = false;
+	/* THE BOX, NOT THE REFERENCE — second attempt, also measured live and also wrong: a check
+	 * against `_rest.el`'s own rect never sees this fault, because `_rest` is exactly what gets
+	 * RE-ESTABLISHED, at whatever the offset currently is, by the very next successful
+	 * `rememberRest()` — which may already have run, on a FRESH reference picked at the fold of an
+	 * already-wrong position, before this ever gets to check anything. A reference cannot catch a
+	 * fault in the ground it is itself read off. See `settleDeferredFloor()` for what holds instead:
+	 * the OFFSET's own response to the ONE write below, measured directly, the same way
+	 * `lateDrift()`'s `compensated` already checks the offset against `grow` — just for a shrink
+	 * `holdFloor()` is about to (or, silently, already did) apply rather than one a mutation just
+	 * grew. Both taken before `holdFloor()` runs it down: a box already settled through the ordinary
+	 * mutation path in the meantime shows no shrink here, and costs one `parseFloat` to learn that. */
+	const target = _deferredFloor;
+	_deferredFloor = null;
+	const floorBefore = (target && target.isConnected) ? (parseFloat(target.style.minHeight) || 0) : 0;
+	const offsetBefore = scrollTop();
 	/* the reader has stopped, so the floor and the reference both belong to where the page now
 	 * stands */
 	holdFloor();
+	if (target && target.isConnected) {
+		const shrink = floorBefore - (parseFloat(target.style.minHeight) || 0);
+		if (shrink > 1) settleDeferredFloor(offsetBefore, shrink);
+	}
 	rememberRest();
 	/* the page has held still for SCROLL_IDLE: whatever was put off may run now */
 	if (_deferred) {
@@ -258,6 +323,7 @@ function sampleMotion() {
 }
 
 function noteMotion() {
+	if (!sawOwnWrite(scrollTop())) return;
 	_movingUntil = Date.now() + SCROLL_IDLE;
 	if (_sampling) return;
 	_sampling = true;
@@ -406,15 +472,71 @@ const ENGINE_ANCHORS = (() => {
  * of the platform. `lateDrift()` below already computes the residual after every refill the theme
  * did not itself correct, so the evidence is left to accumulate rather than guessed at up front:
  * two residuals it actually had to write back — task latenet's four-way ablation measured that
- * write landing 419-420ms after the refill — and the observer stops trusting this engine with the
- * REST of the session, moving to the anchorFor()/scheduleAnchor() path instead, measured 7-36ms on
- * the same refill. One residual is left as headroom for a single one-off rather than tripping on
- * the first. Never a browser name, only a count: an engine that keeps the reference itself never
- * reaches the write this counts — Chromium and Firefox measure 0 residuals today — so the switch
- * cannot trip for them. `docs/anchoring.md`, "Who is responsible", carries the numbers. */
+ * write landing 419-420ms after the refill — and the observer stops trusting this engine, moving to
+ * the anchorFor()/scheduleAnchor() path instead, measured 7-36ms on the same refill, UNTIL
+ * TRUST_RECOVERY_LIMIT below says otherwise — not for the rest of the session unconditionally: a
+ * fork with no way back paid the full 7-36ms path forever after two ticks a loaded runner or a
+ * momentary layout hiccup could produce just as easily as a standing fault. One residual is left as
+ * headroom for a single one-off rather than tripping on the first. Never a browser name, only a
+ * count: an engine that keeps the reference itself never reaches the write this counts — Chromium
+ * and Firefox measure 0 residuals today — so the switch cannot trip for them.
+ * `docs/anchoring.md`, "Who is responsible", carries the numbers. */
 const LATE_MISS_LIMIT = 2;
 let _lateMisses = 0;
 let _engineTrusted = ENGINE_ANCHORS;
+/* How much of the growth witness's own rounding a correctly-anchoring engine may leave unaccounted
+ * for before that gap reads as the engine declining rather than as the witness rounding — task
+ * missrule. Measured on a 32-36 row DHCP lease table at 390 wide, the one shape in the tree that
+ * rounds this large: 8px (compact), 12px (normal/large, webkit), 12.25px (large, firefox) — three
+ * points clustered tight against a 120px growth pad (`GROWTH`, tools/scroll-anchor.mjs), none of
+ * them a residual, all of them the engine having already done the whole correction
+ * (docs/anchoring.md, "The witness is not safe to write on its own"). 16 leaves 3.75px (30%) over
+ * the largest of the three — the same margin-over-the-worst-measured-cluster shape the gate's own
+ * `LATE_MS` uses — while staying far under half the pad (60px), so a genuine partial failure that
+ * leaves the reader in the middle of it is never read as rounding. */
+const LATE_ROUND_TOLERANCE = 16;
+
+/* Trust that was never allowed back — task trust. Once `_engineTrusted` went false the fork above
+ * stayed on the `anchorFor()`/`scheduleAnchor()` path for the rest of the session even where the
+ * two misses that tripped it were the engine having a bad ten seconds, not a standing fault.
+ *
+ * TWO SHAPES TRIED HERE WERE WRONG, BOTH MEASURED — worth keeping the failures, not only the fix,
+ * since a maintainer three lines below reasoning "just read the same drift `lateDrift()` reads" or
+ * "just compare the offset to the growth" is about to reproduce one of them.
+ *
+ * First shape: `applyAnchor()` already reads `ref.el`'s own rect against the remembered top before
+ * deciding whether to write — the same measurement `lateDrift()` uses to call a miss on the trusted
+ * path — so a hit was counted there whenever that drift read under a pixel. Live against a real,
+ * correctly-anchoring engine (`../tmp/task-trust/probe.mjs`, chromium/owrt2410, the Overview's own
+ * poll-sized section) that branch never ran at all: `anchorFor()`'s OWN offset read forces the
+ * layout the engine's scroll-anchoring resolves against, so by the time it asks "did the reader
+ * move", the engine has ALREADY moved the offset to absorb the growth — and `anchorFor()`, built for
+ * an engine that does none of that, reads any offset change that is not a downward clamp as the
+ * READER having scrolled and returns null. `scheduleAnchor()` then never runs, so `applyAnchor()`
+ * never sees the one tick that would prove the engine right — 0 hits recorded across 5 genuinely
+ * successful refills, measured directly (a debug build exporting `_lateHits` read 0 throughout).
+ *
+ * Second shape: read the offset itself instead, in the SAME microtask `grew` (below) is already
+ * read in, before `run()` can overwrite `_restAt` — `compensated = scrollTop() - _restAt` against
+ * `grew`, the identical comparison `lateDrift()` makes on the trusted path (`seen - ref.at`), just
+ * without a rAF plus `SCROLL_IDLE` to wait out. This one DOES see the engine work, but it is not
+ * strict enough: measured against a genuinely PARTIAL correction (an offset that moved by about the
+ * right amount overall), `compensated` matched `grew` within `LATE_ROUND_TOLERANCE` while the
+ * gate's own independent mark still sat 48px off, uncorrected — the container growing by roughly the
+ * right amount is not the same fact as the READER'S OWN reference holding, and task blindref already
+ * proved a container-based witness can agree with a bad tick.
+ *
+ * What holds: `_rest.el` itself, read directly rather than through `anchorFor()` — the identical
+ * reference and the identical comparison `lateDrift()` trusts on the OTHER path, just made here,
+ * before `run()`, instead of a rAF plus `SCROLL_IDLE` later, since the compensation is already done
+ * by the time anything in this callback reads geometry. A false negative here only delays recovery;
+ * this shape has no cheaper approximation that does not risk a false positive instead. Proven the
+ * same way as the two failures: the identical 5-refill run holds `_rest.el`'s drift under a pixel on
+ * every one, `_engineTrusted` returns `true` on the second, and the reader's own mark never moved
+ * (`moved: 0` throughout, both phases) — recovery costs no visible correction of its own, because
+ * there is nothing left for one to do. */
+const TRUST_RECOVERY_LIMIT = 2;
+let _lateHits = 0;
 
 /* What the reader was looking at, captured while the page was still. `anchorRef()` runs from the
  * mutation observer, i.e. after the DOM changed: right for the FITTERS, which have not run yet, and
@@ -426,6 +548,22 @@ let _rest = null;
  * both scrollers on a client navigation and replays them on a Back, and neither is a clamp to
  * undo. */
 let _restAt = null, _restPage = null;
+/* The floored box a mutation found `holdFloor()` refused for (`scrolling()` was true) — its own
+ * shrink or grow still happens eventually, once `holdFloor()` finally does run, and until now that
+ * later call was `sampleMotion()`'s own bare `holdFloor(); rememberRest();`, wired to neither
+ * `lateDrift()` nor `scheduleAnchor()` — task wkrefill. Stashed by the mutation callback below,
+ * cleared the moment any tick's `holdFloor()` stops being refused, consumed once by
+ * `sampleMotion()`/`settleDeferredFloor()` (the write, and why it checks the OFFSET rather than a
+ * reference element, are there). Measured live (`../tmp/task-wkrefill/run-probe2.mjs`,
+ * webkit/owrt2512b @390 top, normal): a growth-then-shrink refill landing entirely inside one
+ * motion window left `_restAt` 59px higher than it started — `mark`'s own PAGE position never
+ * changed (7441.15625px throughout) while its viewport position read 440 against a `before` of 499
+ * — because the shrink's `min-height` write (a real scroll-anchor invalidation, `holdFloor()`'s own
+ * citation) landed inside `sampleMotion()`'s unwired call, the engine gave back only 61px of the
+ * 120px it owed, and the 59px gap was adopted as truth by the very next `rememberRest()`,
+ * uncounted and uncorrected — the exact shape task refill2's `compensated` check already catches on
+ * the GROWTH side, missing here only because nothing measured the SHRINK side at all. */
+let _deferredFloor = null;
 function pageStamp() {
 	return (document.body && document.body.getAttribute('data-page')) || '';
 }
@@ -435,8 +573,19 @@ function forgetRest() {
 	_restAt = null;
 	_restPage = null;
 }
-function rememberRest() {
-	if (scrolling()) return;
+/* `force`: skip the `scrolling()` guard — for the one caller that just wrote the scroll offset
+ * itself and needs the reference to match THAT write, not whatever unrelated motion happens to have
+ * `_movingUntil` still in the future at that instant. `lateDrift()`'s own correction and the
+ * engine's real compensation for the SAME underlying mutation both settle around the same
+ * SCROLL_IDLE window, so the two routinely overlap by a few milliseconds — measured live
+ * (`../tmp/task-refill2/probe.mjs`, owrt2512b/chromium/Overview): an ordinary, unforced
+ * `rememberRest()` right after the write was refused on `scrolling()` still reading true from the
+ * engine's own, unrelated scroll event 1ms earlier, leaving `_rest` stale for the NEXT refill and
+ * reproducing the same fabricated drift this call exists to prevent. Safe here specifically because
+ * the write just performed is a single, deliberate one this file made, not a multi-step animation to
+ * read mid-flight — by the time this call happens, that write has already landed. */
+function rememberRest(force) {
+	if (scrolling() && !force) return;
 	/* A page at the top has nothing to be put back to, so it does not pay for a reference: at
 	 * offset 0 there is nothing to lose, and anchorRef()'s hit test plus rect costs 0.2ms typical,
 	 * 6ms on a poll-dirtied WebKit layout. The offset is still remembered — one read, and
@@ -608,7 +757,7 @@ function anchorEnabled() {
  * scrolls, not across a navigation, never more than a viewport. */
 let _lateFrame = 0;
 
-function lateDrift(ref, grow) {
+function lateDrift(ref, grow, floorShrink) {
 	/* the reference from BEFORE this tick, captured by the caller: one taken after the mutation
 	 * describes the page as the mutation left it, so its drift is zero by construction */
 	if (_lateFrame || !ref) return;
@@ -658,30 +807,186 @@ function lateDrift(ref, grow) {
 			 * side, task blindref). `grow` — the mutation record's OWN target measured by the caller
 			 * (observeContent()) against the height `data-fs-floor` pinned it at before this tick —
 			 * cannot make that mistake: it IS what the refilled container actually grew by, not a
-			 * guess at what moved, and it is 0 where nothing did, so a false witness only ever REFUSES
-			 * here, never writes. Cross-checked against the offset actually moved since the reference
-			 * was taken (`seen`, not a fresh read — the guard above already proved it has not
-			 * changed): an engine that anchored moves it by (about) the growth, one that declined
-			 * leaves it where it was. */
+			 * guess at what moved.
+			 *
+			 * IT IS NOT A SAFE NUMBER TO WRITE ON ITS OWN, though — task detector, reverting the claim
+			 * this comment used to make. `compensated` is what the OFFSET already did since the
+			 * reference was taken; where it is exactly zero the engine never touched the offset at
+			 * all, the same blindness `drift` above just had, and `grow` is the only witness that saw
+			 * it — writing the whole growth back is correct and IS a miss: the engine did nothing.
+			 * Where `compensated` is NOT zero the engine already moved the offset roughly by its own
+			 * anchoring, and a SMALL gap between the two is not a residual to correct — it is this
+			 * witness's own rounding on a many-row table re-laid at a narrow width: a 32-36 row DHCP
+			 * lease table clamped by exactly 8px (compact), 12px (normal/large, webkit) or 12.25px
+			 * (large, firefox) while `compensated` already matched `grow` to within that same amount,
+			 * on BOTH engines, at every density and every layout tested (task detector, 21 CI
+			 * findings, /admin/network/dhcp @390 — the overshoot equalled the clamp the gate itself
+			 * reported in every one). Writing that gap is a second correction on top of one the engine
+			 * already made; instrumented locally against the failing cell, withholding the write reads
+			 * `swap moved 0px` on all 21 with no write logged, engine alone.
+			 *
+			 * BUT a gap that small is not the only shape this branch used to see, and task detector's
+			 * own `>= 1` counted every one of them as a miss regardless of size — so on the SAME table,
+			 * two ticks (10s) later, `_engineTrusted` went false while the engine was still anchoring
+			 * perfectly (task missrule, `../tmp/task-anchor-audit/inventory.md` §2.2): the fast path
+			 * then ran ALONGSIDE a live engine, the exact "two corrections throw the page the other
+			 * way" `ENGINE_ANCHORS` above warns about. A miss must mean the engine did not do the job,
+			 * not that this witness rounded — so only a gap ABOVE `LATE_ROUND_TOLERANCE` counts as one;
+			 * within it, the engine did the job and lateDrift() returns having written nothing, same as
+			 * the direct `drift < 1` case two lines below. Below the tolerance is not "no drift to
+			 * report" — WITHIN it, this file already knows the engine is right, which `drift` alone
+			 * (still whatever `anchorRef()`'s possibly-blind reference read) does not. Re-measured live
+			 * against a real engine that never anchors this section at all (task missrule,
+			 * ../tmp/task-missrule/probe.mjs, webkit and chromium, a table swapped three times running):
+			 * `compensated` stays exactly 0 every tick, so this branch is never reached for that case —
+			 * it counts the ordinary way, below, and `_engineTrusted` still goes false on the second
+			 * one, switch working as built. */
 			if (Math.abs(drift) < 1 && grow > 1) {
-				const g = grow - (seen - ref.at);
-				if (Math.abs(g) >= 1) drift = g;
+				const compensated = seen - ref.at;
+				if (Math.abs(compensated) < 1) drift = grow - compensated;
+				else if (Math.abs(grow - compensated) > LATE_ROUND_TOLERANCE) {
+					/* fresh distrust starts the recovery count at 0 too — a streak from a PREVIOUS
+					 * spell of distrust proves nothing about this one */
+					if (++_lateMisses >= LATE_MISS_LIMIT) { _engineTrusted = false; _lateHits = 0; }
+					return;
+				}
+				/* else: within table-row rounding — drift is still whatever it was (< 1 per the guard
+				 * above), so the plain `drift < 1` return two lines down is what fires, unwritten and
+				 * uncounted: the engine did the job. */
 			}
 			if (Math.abs(drift) < 1) return;			/* the engine put it back */
 			if (Math.abs(drift) > (window.innerHeight || 800)) return;
 			const sc = scroller();
 			const at = sc ? sc.scrollTop : window.scrollY;
-			if (sc) sc.scrollTop = at + drift; else window.scrollTo(0, at + drift);
-			/* The write moves the page by exactly the drift measured, which puts the reference back
-			 * at the top it was remembered at, so `_rest.top` still holds and the next tick
-			 * measures zero. Only `_restAt` changes, and the write may have been clamped short, so
-			 * it is re-read rather than assumed; `rememberRest()` cannot do it, since the write
-			 * starts the motion sampler and that function returns early while the page moves. */
-			_restAt = scrollTop();
+			writeOffset(sc, at + drift);
+			/* A FRESH, FORCED rememberRest(), not just `_restAt = scrollTop()` — task refill2. The
+			 * write moves the page by exactly the drift measured, so `_rest.top` still holds FOR THIS
+			 * TICK's own `el`, but `_rest` itself was taken by run() at the top of THIS callback,
+			 * before the mutation had a settled height and before the engine had done any of its own
+			 * compensating scroll for it — a snapshot mid-transition, not the page as it will stay.
+			 * Left standing, the NEXT refill's own correction reads its drift against that stale,
+			 * mid-transition top instead of the one this write just settled, and computes a fabricated
+			 * number: on REPEAT's own back-to-back refills of one section this was the 59px "never
+			 * corrected" drift itself, not merely late bookkeeping. `force` (`rememberRest()`'s own
+			 * comment) because the engine's real, unrelated compensation for the SAME underlying
+			 * mutation routinely settles inside the same SCROLL_IDLE window as this write and leaves
+			 * `scrolling()` reading true by a handful of milliseconds — an unforced call here reproduced
+			 * the identical fabricated drift on the very next refill (measured,
+			 * `../tmp/task-refill2/probe.mjs`, owrt2512b/chromium/Overview: `moved 0, 0, -59` without
+			 * `force`, `moved 0, 0, 0` with it, both `trusted true` throughout). */
+			rememberRest(true);
+			/* A DROP IN THIS SAME BOX'S OWN FLOOR IS NOT EVIDENCE ABOUT THE ENGINE — task refill2. Every
+			 * `run()` clears and rewrites `r.target`'s `min-height`, and a WRITE to that property is a
+			 * scroll-anchor invalidation in its own right (`holdFloor()`'s own citation), independent of
+			 * how reliably this engine otherwise keeps a reference: a floored box whose content really
+			 * did shrink pays this cost on every engine, every time, structurally — counting it toward
+			 * `_lateMisses` measures the theme's own floor bookkeeping, not the engine, and two ordinary
+			 * shrinks ten seconds apart used to be enough to distrust an engine that had anchored every
+			 * real growth on the same section at 0px throughout (measured, `../tmp/task-refill2/
+			 * probe.mjs`, owrt2512b/chromium/Overview: `trustedBefore true, trustedAfter false`, reader
+			 * never moved). The correction still runs — P1/P2 do not care why the engine left a
+			 * residual — only the bookkeeping is skipped. */
+			if (floorShrink > 1) return;
+			/* A DIRECT DRIFT INSIDE THE SAME TOLERANCE THE BLIND BRANCH ALREADY USES IS THE SAME
+			 * ROUNDING, NOT A SECOND FAULT — task refill2. The blind branch above only ever sees this
+			 * table's row-rounding when the engine's own compensation left `drift` under 1px; on the
+			 * SAME table's GROWTH refill this measured a direct `drift` of exactly 1px against a 132px
+			 * growth (`../tmp/task-refill2/probe.mjs`, owrt2512b/chromium, `/admin/network/dhcp @390`
+			 * side and top) — one pixel over the `< 1` line above, so neither guard caught it, and a
+			 * write this small still counted as a miss. `REPEAT`'s own three-refill window turns that
+			 * into two: one from this 1px growth-side rounding, a second from the very next one, and
+			 * `_engineTrusted` tripped false on an engine anchoring within a pixel every time. Read
+			 * against the SAME LATE_ROUND_TOLERANCE the blind branch already measured this exact page
+			 * and width against (8-12.25px) rather than a new number for what is the same table. */
+			if (Math.abs(drift) <= LATE_ROUND_TOLERANCE) return;
 			/* This engine did not keep the reference across a container refill, once more on this
 			 * page — see LATE_MISS_LIMIT above for what happens once that has been measured twice. */
-			if (++_lateMisses >= LATE_MISS_LIMIT) _engineTrusted = false;
+			if (++_lateMisses >= LATE_MISS_LIMIT) { _engineTrusted = false; _lateHits = 0; }
 		}, SCROLL_IDLE);
+	});
+}
+
+/* ---- a floor `holdFloor()` could not clear at mutation time, cleared later with nobody watching ----
+ *
+ * `_deferredFloor`'s own comment has the fault; this is the fix, and it needs a THIRD frame slot,
+ * not either of the two `lateDrift()`/`scheduleAnchor()` already own. Measured live, first attempt:
+ * routing the same information through `lateDrift(ref, 0, floorShrink)` from `sampleMotion()`
+ * collided with the regular mutation's OWN pending call for the SAME tick — `seen` there is
+ * captured one rAF after the ORIGINAL (refused) mutation, well before `sampleMotion()` ever gets to
+ * clear the floor, so by the time this one tried to arm, `_lateFrame` was still occupied, and by
+ * the time the ORIGINAL one's own timeout fired, `holdFloor()`'s belated write had already moved
+ * the offset on its own — read by that timeout as `scrollTop() !== seen`, "the reader is still
+ * moving", and refused too. Two correct guards, aimed at two different questions, defeating each
+ * other on the one tick both fire for.
+ *
+ * NOT A REFERENCE ELEMENT'S OWN DRIFT — second attempt, also measured live and also wrong, and the
+ * one worth explaining because it looks safer than it is. Checking `_rest.el`'s (or `ref.sec`'s)
+ * rect the way `lateDrift()` does cannot see this fault BY CONSTRUCTION: `_rest` is exactly what
+ * gets RE-ESTABLISHED, at whatever the offset happens to be, by the very next successful
+ * `rememberRest()` — which runs a fresh `anchorRef()` hit test at the CURRENT fold, wherever that
+ * now falls. Once one has run on an already-59px-wrong offset, the reference it picks (measured
+ * live: an `H3` a NEW hit test landed on, in a position the fold only reaches because the offset is
+ * already wrong) shows zero drift for ever after — it was established AT the wrong position, not
+ * moved away from a right one. A witness cannot catch a fault in the ground it is itself read off.
+ *
+ * WHAT HOLDS: the OFFSET's own response to the ONE write below, measured directly against how much
+ * the box actually shrank — the same `compensated` vs `grow` comparison `lateDrift()`'s blind branch
+ * already makes for a GROWTH, just made here for a SHRINK `holdFloor()` is about to apply (or,
+ * silently, already did) rather than one a mutation just grew. Neither snapshot depends on `_rest`
+ * staying pure, so neither can be corrupted by the fault this exists to catch. */
+/* NOT GATED ON `scrolling()` — third attempt, also measured live and also wrong, and the one
+ * `lateDrift()`'s own comment already warned this file about once: "an anchoring engine moves the
+ * offset ITSELF … so an offset that merely differs is the engine working, and refusing on that
+ * leaves the engine's own residual uncorrected." `holdFloor()`'s belated write is exactly such a
+ * change — a real `min-height` clear the engine reacts to by moving the offset — and that reaction
+ * dispatches its own `scroll` events, which is what this correction exists to read. Gating on
+ * `scrolling()` therefore refuses on the very motion it is trying to observe: measured live,
+ * `scrolling()` still read true one whole rAF after `holdFloor()` ran, on every one of three cells,
+ * because the reaction itself kept re-arming `_movingUntil`. `lateDrift()` does not make this
+ * mistake either — it checks `scrollTop() !== seen` (STILL, not "not moving"), two reads apart, the
+ * same check used here: two rAFs, not `SCROLL_IDLE` (400ms) — `REPEAT`'s own back-to-back refills
+ * leave under a second between this write's inputs being known and the NEXT refill's mutation
+ * landing, and a 400ms wait routinely lands its own check after that next refill has already
+ * restarted the motion sampler, checking a `now` the reader has already moved past. */
+let _floorLateFrame = 0;
+function settleDeferredFloor(offsetBefore, shrink) {
+	if (_floorLateFrame) return;
+	_floorLateFrame = requestAnimationFrame(() => {
+		const seen = scrollTop();
+		_floorLateFrame = requestAnimationFrame(() => {
+			_floorLateFrame = 0;
+			if (!anchorEnabled() || Date.now() < _userUntil) return;
+			if (_restPage !== pageStamp()) return;
+			if (scrollTop() !== seen) return;		/* still settling, or the reader has moved */
+			/* A box that shrinks above the reader must lower the offset by the same amount for them
+			 * to stay put — `wanted` is that target, not an estimate: `shrink` is what the box
+			 * actually gave up, read fresh by the caller against its own pre-write height, the
+			 * identical measurement `grow` already is for the growth side. */
+			const wanted = offsetBefore - shrink;
+			const gap = wanted - seen;
+			if (Math.abs(gap) <= LATE_ROUND_TOLERANCE) return;		/* the engine already gave it back */
+			if (Math.abs(gap) > (window.innerHeight || 800)) return;
+			const sc = scroller();
+			const at = sc ? sc.scrollTop : window.scrollY;
+			writeOffset(sc, at + gap);
+			/* `_rest` ADJUSTED IN PLACE, NOT `rememberRest(true)` — fourth attempt, also measured
+			 * live and also wrong: this write's own `scroll` event can still be in flight when this
+			 * line runs, and `rememberRest(true)` calls `anchorRef()` regardless of `force` —
+			 * `anchorRef()` has its OWN, unconditional `if (scrolling()) return null;` guard, so a
+			 * write landing inside that window leaves `_rest` NULL rather than merely stale. Measured
+			 * live (`../tmp/task-wkrefill/run-probe.mjs --cellonly owrt2410b@top`): the very next
+			 * mutation's `lateDrift()` then refused with "no ref", `_rest` was re-established fresh
+			 * off whatever the fold happened to be two ticks later, and the reader ended up 120px off
+			 * in the OTHER direction — worse than doing nothing. `_rest.el` itself did not move; only
+			 * the offset it was measured against did, by exactly `gap`, so its remembered screen
+			 * position shifts by the same amount and nothing needs re-reading off the page. */
+			if (_rest) { _rest.top -= gap; if (_rest.sec) _rest.secTop -= gap; _rest.at = scrollTop(); }
+			_restAt = scrollTop();
+			/* NOT COUNTED TOWARD `_lateMisses` — same rule as `lateDrift()`'s own `floorShrink > 1`
+			 * skip: this write answers for the theme's own bookkeeping catching up late, not for
+			 * anything the engine declined to do, so it says nothing about whether the engine can be
+			 * trusted on an ordinary tick. */
+		});
 	});
 }
 
@@ -694,10 +999,14 @@ function scheduleAnchor(ref) {
 		_anchorFrame = 0;
 		const pending = _anchorPending;
 		_anchorPending = null;
-		applyAnchor(pending);
+		const wrote = applyAnchor(pending);
 		/* after the correction, never before: the reference must describe the page as the reader now
-		 * sees it, or the next tick pays the same drift twice */
-		rememberRest();
+		 * sees it, or the next tick pays the same drift twice. Forced only where a write just
+		 * happened — task refill2's `force` on `rememberRest()` is for resyncing after THIS file's
+		 * own write, not for skipping the guard when `applyAnchor()` did nothing (refused because the
+		 * page was moving, at the top, or the reference was gone): forcing unconditionally would read
+		 * a reference off a page mid-flick on exactly the refusal this guard exists for. */
+		rememberRest(wrote);
 	});
 }
 function applyAnchor(ref) {
@@ -719,22 +1028,28 @@ function applyAnchor(ref) {
 	 * one case to sit out. */
 	if (ref.by != null) {
 		if (ref.by < 1) return;
-		if (sc) sc.scrollTop = at + ref.by;
-		else window.scrollTo(0, at + ref.by);
-		return;
+		writeOffset(sc, at + ref.by);
+		return true;
 	}
 	if (at <= 0) return;
 	if (!ref.el.isConnected) return;
 	const drift = ref.el.getBoundingClientRect().top - ref.top;
-	if (Math.abs(drift) < 1) return;
+	if (Math.abs(drift) < 1) return;			/* nothing needed correcting here */
+	/* A definite write is a definite miss — task trust: any recovery streak counted so far said
+	 * nothing about THIS tick, and this tick just proved the engine did not do the job on its own.
+	 * (Recovery evidence itself is gathered earlier, in the mutation callback — see TRUST_RECOVERY
+	 * _LIMIT above: this path never sees the tick that proves the engine right, because a reference
+	 * the engine has already put back is exactly what makes anchorFor() return null instead of
+	 * reaching here — measured live, `../tmp/task-trust/probe.mjs`.) */
+	_lateHits = 0;
 	/* A correction is a scroll the reader did not ask for, so an absurd one is a bug: a view that
 	 * replaced its whole subtree can move a reference by thousands of pixels. One viewport and 200px
 	 * is the most a single tick can honestly account for — where `innerHeight` is unreadable those
 	 * 200px are the whole ceiling — plus whatever the engine is on record for having clamped away
 	 * (`slack`, see anchorFor()). */
 	if (Math.abs(drift) > (window.innerHeight || 0) + 200 + (ref.slack || 0)) return;
-	if (sc) sc.scrollTop = at + drift;
-	else window.scrollTo(0, at + drift);
+	writeOffset(sc, at + drift);
+	return true;
 }
 
 /* Rule 2's mutation side. Deliberately not filtered by node type: a filter is a second place to
@@ -777,20 +1092,69 @@ function observeContent() {
 		 * the box holdFloor() pinned at its last settled height, so its height against that pin, taken
 		 * NOW — the mutation already happened, so this is its final height; nothing here waits on the
 		 * engine, which only ever moves the SCROLL POSITION, never an element's own size — is the
-		 * growth lateDrift() needs, in pixels rather than a live reference to carry forward. Only
-		 * worth finding where the engine is trusted to correct on its own — scheduleAnchor() below
-		 * reads its own reference geometrically. */
-		let grew = 0;
-		if (trustEngine) {
-			const r = records.find((m) => m.type === 'childList' && m.target.hasAttribute('data-fs-floor'));
-			/* a box freshly wearing its FIRST floor has no "before" to measure against — parseFloat
-			 * of an unset `min-height` is NaN, `|| 0` reads as "no growth" rather than false growth
-			 * the size of the whole box */
-			const before = r && (parseFloat(r.target.style.minHeight) || 0);
-			if (before) grew = r.target.offsetHeight - before;
+		 * growth lateDrift() needs, in pixels rather than a live reference to carry forward.
+		 *
+		 * FOUND EVERY TICK, TRUSTED OR NOT — task trust. Gating this to the trusted branch was fine
+		 * while distrust was permanent, since nothing downstream of it would ever read the number
+		 * again; recovering trust needs to tell a tick that tested the engine from one that tested
+		 * nothing on the distrusted path too, in the recovery check right below, so the read can no
+		 * longer be skipped there. One extra `records.find` and an `offsetHeight` per distrusted
+		 * tick — the one path that used to pay nothing here at all. */
+		const r = records.find((m) => m.type === 'childList' && m.target.hasAttribute('data-fs-floor'));
+		/* a box freshly wearing its FIRST floor has no "before" to measure against — parseFloat
+		 * of an unset `min-height` is NaN, `|| 0` reads as "no growth" rather than false growth
+		 * the size of the whole box */
+		const before = r && (parseFloat(r.target.style.minHeight) || 0);
+		const grew = before ? r.target.offsetHeight - before : 0;
+		/* RECOVERY EVIDENCE, task trust — read here and nowhere else; see TRUST_RECOVERY_LIMIT's own
+		 * comment for why `applyAnchor()` cannot see it. THE SAME REFERENCE `lateDrift()` trusts on
+		 * the other path (`_rest.el`'s own rect against the top it was remembered at), read before
+		 * `run()` can overwrite it, instead of a rAF plus `SCROLL_IDLE` later — the compensation is
+		 * already done by the time anything here reads geometry (`anchorFor()`'s own read, just
+		 * above, forces the layout the engine resolves it in).
+		 *
+		 * NOT `compensated` vs `grew` (the OFFSET against the CONTAINER'S height, `lateDrift()`'s own
+		 * comparison for the case its element-based drift is blind) — measured live and wrong here:
+		 * `../tmp/task-trust/probe.mjs` against a genuinely partial correction (an offset that moved
+		 * ROUGHLY the growth pad's own size) read `compensated≈grew` and recovered trust while the
+		 * probe's own independent mark still sat 48px off, uncorrected. The container growing by
+		 * about the right amount is not the same fact as THIS reference holding, and recovery needs
+		 * the stricter of the two: a false negative here only delays recovery, a false positive
+		 * un-distrusts an engine that is still getting it wrong. */
+		if (!trustEngine && grew > 1 && _rest && _rest.el.isConnected && Date.now() >= _userUntil
+				&& !scrolling() && _restPage === pageStamp()
+				&& Math.abs(_rest.el.getBoundingClientRect().top - _rest.top) < 1
+				&& ++_lateHits >= TRUST_RECOVERY_LIMIT) {
+			_engineTrusted = true;
+			_lateMisses = _lateHits = 0;
 		}
+		/* THE SAME BOX'S FLOOR, BEFORE AND AFTER THIS run() — task refill2. `holdFloor()` inside
+		 * run() clears and rewrites `r.target`'s own `min-height` every tick, which is a scroll-
+		 * anchor-invalidating style write on its own account (css-scroll-anchoring-1 §2.2.2,
+		 * `holdFloor()`'s own comment) — so a floored box whose CONTENT genuinely shrinks (a poll's
+		 * data losing rows, or in this callback the mutation record ITSELF being a removal) drops the
+		 * engine's own anchoring for that write no matter how reliable the engine otherwise is. That
+		 * residual reads to `lateDrift()` exactly like an engine that declined a real refill — the
+		 * `grow` witness above is already 0 for it (`before` still equals the box's own pre-shrink
+		 * offsetHeight at the point `grew` was read, min-height not yet cleared) — and every one of
+		 * them used to count as a miss: measured live (`../tmp/task-refill2/probe.mjs`,
+		 * owrt2512b/chromium/Overview, `REPEAT_TIMES` back-to-back refills of one section), two such
+		 * shrinks ten seconds apart tripped `_engineTrusted` false on an engine that had anchored
+		 * every real growth on the same section at 0px throughout. Read AFTER run(), which is what
+		 * actually clears and rewrites it for this tick. */
+		/* STASHED BEFORE run(), against the identical `scrolling()` its own `holdFloor()` call is
+		 * about to check: a floored box `holdFloor()` is refused for right now still shrinks or grows
+		 * eventually — see `_deferredFloor`'s own comment for where and why nothing used to notice.
+		 * THE BOX ITSELF, not a height or a reference: `settleDeferredFloor()` re-reads the height
+		 * fresh at consumption time, so an intervening successful sweep of the SAME box (this tick's
+		 * own `run()`, or another mutation's) leaves nothing stale behind — cleared below the moment
+		 * any tick's `holdFloor()` actually runs, for the identical reason. */
+		const wasScrolling = scrolling();
+		if (r && before && wasScrolling) _deferredFloor = r.target;
 		run();
-		if (trustEngine) lateDrift(settled, grew);
+		if (!wasScrolling) _deferredFloor = null;
+		const floorShrink = (r && before) ? Math.max(0, before - (parseFloat(r.target.style.minHeight) || 0)) : 0;
+		if (trustEngine) lateDrift(settled, grew, floorShrink);
 		else scheduleAnchor(ref);
 	});
 	const hosts = [ document.getElementById('view') || document.body, document.getElementById('modal_overlay') ]
@@ -880,6 +1244,15 @@ return baseclass.extend({
 	 * word about the missing method, because the call sits in a try/catch written for "no theme
 	 * here at all". */
 	restAt: () => _restAt,
+
+	/* -> whether this session still lets the engine's own scroll anchoring correct a refill, or has
+	 * moved to the anchorFor()/scheduleAnchor() fallback instead (LATE_MISS_LIMIT above) — until
+	 * TRUST_RECOVERY_LIMIT measured refills in a row put it back (task trust). Unmarked for the same
+	 * reason `restAt` is: a browser sweep against the INSTALLED package needs it, and a probe marker
+	 * is what packaging strips. Task missrule — SWAP closes after one refill, so nothing before this
+	 * could see the flag go false on the SECOND one; this is what a several-refill case reads instead
+	 * of inferring it from timing. */
+	engineTrusted: () => _engineTrusted,
 
 	/* "the offset is mine now, forget what you remembered": called by fs-router when it resets both
 	 * scrollers for an incoming page. The router resets synchronously and stamps `body[data-page]`

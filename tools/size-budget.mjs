@@ -271,7 +271,47 @@ const LIMITS = {
 	 * What it bought is four WCAG failures closed — 2.1.1 and 4.1.2 on 14 elements per Overview,
 	 * 1.3.1 on every table the theme restyles, 4.1.2 on every meter. The limit goes to 94,000, 239 B
 	 * of head-room. */
-	resourcesJs: 94_000,
+	/* 94,093 B on 2026-09-10, up 93 B for the night's reader-facing repairs: Back restoring the
+	 * reader's place (`fs-router.js` — the cancellation that watched both scrollers at once killed a
+	 * restore the other axis had nothing to do with, and the stale reference from the page being left
+	 * was never cleared on a Back at all: a reader 1577px down landed at 0 and stayed there on a
+	 * phone, while the same Back at 1440 restored correctly), and the trust in the engine's own
+	 * anchoring becoming recoverable rather than lost for the session on two unlucky ticks
+	 * (`fs-fit.js`). Both are on flash for every page; neither is on the cold path in the same
+	 * proportion, which is why this budget moves and the one below moves differently. The limit goes
+	 * to 94,150, 57 B of head-room. */
+	/* 94,429 B on 2026-09-10, up 279 B: Back now actually restores the reader on a real router. The
+	 * live gate measured them dropped from 2475, 2684, 4747 and 5110 px to 0 on the Overview ->
+	 * package-manager route, on two stands and both widths. Three separate causes, all in
+	 * `restoreScroll()`: a cancellation that watched BOTH scrollers, so a scroll on the axis the
+	 * restore did not target killed it; `fit.forgetRest()` gated on a forward navigation, so a Back
+	 * left the previous page's reference standing; and - the one that survived the first two fixes -
+	 * the browser's own traversal restore landing BEFORE `commitStage()`, on a document still ~900px
+	 * tall, so the engine clamped it back to 0 and that clamp read as the reader taking over. A
+	 * scroll landing exactly at the scroller's own current ceiling, while that ceiling is below the
+	 * target, is the engine settling: a reader cannot scroll past a height that does not exist yet.
+	 * The limit goes to 94,500, 71 B of head-room. */
+	/* 94,712 B on 2026-09-10, up 212 B: the last of the repeated-refill defect, on WebKit only,
+	 * @390, normal density — `_deferredFloor` (`fs-fit.js`). A floor `holdFloor()` refuses to clear
+	 * while the reader is scrolling still shrinks or grows once `sampleMotion()` next calls it
+	 * unwired to any correction, and the residual that leaves was being adopted as the new resting
+	 * position with nothing counting it a miss or writing it back — measured live
+	 * (`../tmp/task-wkrefill/run-probe2.mjs`, webkit/owrt2512b @390 top normal): `mark`'s own PAGE
+	 * position never moved across a refill while its VIEWPORT position drifted 59px, because the
+	 * shrink that caused it ran inside `sampleMotion()`'s bare `holdFloor(); rememberRest();`. The
+	 * limit goes to 94,750, 38 B of head-room. */
+	/* 95,025 B on 2026-09-10, up 275 B: the fix above went through three measured-live shapes before
+	 * this one held — routing the deferred correction through `lateDrift()`'s own frame slot
+	 * collided with the regular mutation's pending call for the same tick; checking `_rest.el`'s own
+	 * drift could not see the fault because `_rest` is exactly what gets re-established, at the
+	 * already-wrong offset, by the next successful `rememberRest()`; gating the check on
+	 * `scrolling()` refused on the very native reaction it exists to observe. What holds —
+	 * `settleDeferredFloor()`, its own frame slot, the offset-delta comparison, `_rest` adjusted in
+	 * place rather than re-hit-testing — is the fourth shape, proven on all four cells
+	 * (`../tmp/task-wkrefill/run-gate.sh`, real `tools/scroll-anchor.mjs`, three read `3x repeat
+	 * 0px/0px/0px`, the fourth 0px/0px/0px too with a separate, pre-existing trust-flip left for its
+	 * own investigation). The limit goes to 95,100, 75 B of head-room. */
+	resourcesJs: 95_100,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -419,7 +459,93 @@ const LIMITS = {
 	 * against the offset. The limit goes to 58,900, 42 B of head-room — the fourth raise today, and
 	 * every one of them bought a mechanism replacing a narrower patch. What the cold path is
 	 * carrying is worth an audit of its own before the next one. */
-	coldJs: 58_900,
+	/* 58,908 B on 2026-09-09, up 8 B for the witness that counts instead of writing (task detector):
+	 * the growth witness added hours earlier wrote `grow - compensated` back whenever the geometric
+	 * drift read blind, and on /admin/network/dhcp at 390 that was wrong in a way no reasoning
+	 * caught — the engine already moves the offset by the whole pad, while `grow` (the floor box's
+	 * own offsetHeight delta) reads 8-12.25px MORE than it, which is table-row rounding across a
+	 * 32-36 row lease table at that width, not an uncorrected residual. Writing it landed a second
+	 * correction on top of the engine's: 21 CI findings across all three engines, every one
+	 * overshooting by exactly the clamp the gate itself reported. The witness now writes only where
+	 * the engine never touched the offset at all — the genuine blind case — and where it did, the
+	 * residual counts as a miss and `LATE_MISS_LIMIT` hands the job to `anchorFor()`/
+	 * `scheduleAnchor()`, which reads the offset back rather than a container's raw height and does
+	 * not share the failure. Re-verified through the real gate: 48 sub-runs over the 21 failing
+	 * cells and 27 more axis variants, 0 findings. Three minimised variants measured at 10/26/8 B;
+	 * this is the 8. The limit goes to 58,950, 42 B of head-room — the fifth raise today, every one
+	 * of them a mechanism replacing a narrower patch, and what the cold path carries is now overdue
+	 * an audit of its own. */
+	/* 58,928 B on 2026-09-09, up 20 B — NOT a raise: the same day's fix above stopped a genuine
+	 * blind-engine miss but started counting the rounding it was measured against (8-12.25px) as one
+	 * too, so two ticks on /admin/network/dhcp flipped `_engineTrusted` false on an engine that was
+	 * still anchoring correctly (task missrule) — the exact "two corrections throw the page the
+	 * other way" `ENGINE_ANCHORS` warns about. `LATE_ROUND_TOLERANCE` (fs-fit.js) widens the ONE
+	 * comparison that used to be a bare `1` to a named, measured constant, plus one accessor
+	 * (`engineTrusted`) the gate's own several-refill case reads instead of inferring the flag from
+	 * timing — measured minimum: inlining the literal `1` into the constant's own declaration site
+	 * cost the same 20 B, so there was no cheaper shape to chase. 58,928 still clears the existing
+	 * 58,950 limit — 22 B of head-room left, not 42, and the limit stays put rather than banking
+	 * slack a mechanism that shipped the SAME day did not earn. */
+	/* 59,111 B on 2026-09-10, up 183 B — task trust: `_engineTrusted` used to have no way back once
+	 * `LATE_MISS_LIMIT` tripped it, so two ticks the engine merely had a bad ten seconds on cost the
+	 * REST of the session on the 420ms-slower path even after it started keeping the reference again.
+	 * `TRUST_RECOVERY_LIMIT`/`_lateHits` (fs-fit.js) let the mutation callback count
+	 * `TRUST_RECOVERY_LIMIT` (2, symmetric with `LATE_MISS_LIMIT`) consecutive refills `_rest.el` held
+	 * on its own — the SAME rect-vs-remembered-top measurement `lateDrift()` already trusts to call a
+	 * miss, read here instead of a rAF plus `SCROLL_IDLE` later, since the engine's own compensation is
+	 * already visible by the time anything in this callback reads geometry.
+	 *
+	 * Two CHEAPER shapes were tried first and both were WRONG, not merely pricier — this raise is the
+	 * cost of the one that measured true, not the cheapest one that compiled. Reading `applyAnchor()`'s
+	 * own drift (nearly free — it already computes it) never sees a correctly-anchoring engine at all:
+	 * `anchorFor()`'s own offset read forces the layout the engine's compensation resolves in, so by
+	 * the time it asks "did the reader move" the answer is already yes, and it returns null before
+	 * `applyAnchor()` ever runs — 0 hits recorded across 5 genuinely successful refills, measured
+	 * directly. Comparing the OFFSET to the growth instead (`compensated` vs `grew`, `lateDrift()`'s own
+	 * comparison for its blind-witness case) does see the engine work, cheaper still, and is still
+	 * wrong: measured against a genuinely PARTIAL correction, `compensated` matched `grew` within
+	 * `LATE_ROUND_TOLERANCE` while the gate's own independent mark sat 48px off, uncorrected — a
+	 * container growing by roughly the right amount is not the same fact as THIS reference holding.
+	 * `_rest.el`'s own rect, read directly, is the only one of the three that never returned a false
+	 * hit; the extra bytes are the guards `lateDrift()` already carries for the identical reason
+	 * (`_userUntil`, `scrolling()`, `_restPage`) plus `_rest.el.isConnected`, none of them optional once
+	 * the cheaper shapes had measured false positives instead of merely a worse constant.
+	 *
+	 * Proof: `../tmp/task-trust/probe.mjs`, real Playwright + real `fs-fit.js` (route-intercepted)
+	 * against `owrt2410`/chromium — forced two genuine misses on `/admin/network/dhcp`'s Static Leases
+	 * table (`trustedBefore→false`, reader unmoved through 3 further refills), 3000ms of real,
+	 * unscripted polling on the Overview afterwards with trust still correctly false, then two genuine
+	 * hits from the SAME section (`moved: 0, 0, 0`, `trustedAfter: true`) — the reader's own position
+	 * never moved in either phase. Re-checked on webkit and firefox on the same stand: neither ever
+	 * recovers falsely (a real, pre-existing drift on this router's webkit build, and session churn on
+	 * firefox, both left `_rest.el` unable to prove a clean hold — a false NEGATIVE, the safe side of
+	 * this asymmetry, not a false positive). `fit-quiet` (0px peak-to-peak) and `scroll-anchor`'s `tick`
+	 * case are unaffected: this touches only the already-distrusted branch, which neither gate's
+	 * default axis reaches. */
+	/* 59,206 B on 2026-09-10, up 95 B on the cold path for the same night's repairs the flash
+	 * budget above records - Back restoring the reader's place, and trust in the engine's own
+	 * anchoring becoming recoverable instead of lost for a whole session on two unlucky ticks. Both
+	 * files are cold, so a reader pays this on the first page they open. The limit goes to 59,300,
+	 * 94 B of head-room. That is the sixth raise in two days - 58,100 to 59,300 - and every one
+	 * bought a mechanism replacing a narrower patch, which is the right trade and also the reason
+	 * the cold path is now overdue an audit of what it actually carries. */
+	/* 59,542 B on 2026-09-10, up 242 B for the same Back repair the flash budget above records, plus
+	 * the repeated-refill work in `fs-fit.js` (a reader held through the first refill of a section
+	 * and drifted 47-60px on the second or third, with no correction at all - invisible until the
+	 * gate learned to refill twice). Both files are cold. The limit goes to 59,600, 58 B of
+	 * head-room. */
+	/* 59,825 B on 2026-09-10, up 225 B for `_deferredFloor` (`fs-fit.js`) — the last four cells of the
+	 * repeated-refill defect, WebKit-only, closed by wiring `sampleMotion()`'s own floor sweep through
+	 * the same `lateDrift()`/`scheduleAnchor()` a poll tick gets, instead of leaving a refused
+	 * `holdFloor()` to clear later with nothing watching. Cold, so every reader pays it once. The
+	 * limit goes to 59,900, 75 B of head-room — the seventh raise in three days for this one defect,
+	 * and the last of it: 35 of 39 cells closed the first pass, the remaining 4 this one. */
+	/* 60,138 B on 2026-09-10, up 238 B: `settleDeferredFloor()`'s fourth, working shape — see
+	 * `resourcesJs`'s own note on the same commit for why the first three did not hold. Cold, so
+	 * every reader pays it once; proven on all four remaining cells through the real gate, not just
+	 * this repo's own probe. The limit goes to 60,250, 112 B of head-room — the eighth and, per that
+	 * gate run, last raise for this defect. */
+	coldJs: 60_250,
 };
 
 function bytes(path) {
