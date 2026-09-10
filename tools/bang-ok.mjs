@@ -16,12 +16,19 @@ const errors = [];
 
 /* ---- audit.py: the BANG_OK set literal, plus its base glob -------------------------------- */
 const auditSrc = read('tools/audit.py');
-const auditBlock = auditSrc.match(/BANG_OK\s*=\s*\(\{([\s\S]*?)\}/);   /* up to the first `}` (the explicit set) */
+/* Up to and including the base glob that unions into BANG_OK — NOT just the first `}` (the
+ * explicit set alone), and the base-glob check below runs against this captured block, never
+ * against auditSrc as a whole: `sources()` a little further down the same file calls
+ * `(STYLES / "base").glob("*.css")` too, for an unrelated reason (it lists every source file, not
+ * the allowlist), and testing the regex against the whole file let a BANG_OK missing its OWN union
+ * still read "agrees" off that unrelated call. Deleting the real line changed nothing this gate
+ * printed. */
+const auditBlock = auditSrc.match(/BANG_OK\s*=\s*\(([\s\S]*?\.glob\("\*\.css"\)\})\s*\)/);
 if (!auditBlock) errors.push('tools/audit.py: BANG_OK set literal not found — this gate is broken, not the allowlist');
 const auditNames = new Set(
 	auditBlock ? [...auditBlock[1].matchAll(/"([\w.-]+\.css)"/g)].map((m) => m[1]) : []
 );
-const auditHasBaseGlob = /\(STYLES \/ "base"\)\.glob\("\*\.css"\)/.test(auditSrc);
+const auditHasBaseGlob = auditBlock ? /\(STYLES \/ "base"\)\.glob\("\*\.css"\)/.test(auditBlock[1]) : false;
 if (!auditHasBaseGlob)
 	errors.push('tools/audit.py: BANG_OK no longer unions styles/base via glob("*.css") — base would lose its !important exemption');
 

@@ -315,6 +315,16 @@ def main():
     strict = "--strict" in sys.argv   # CI gate: exit non-zero if anything is reported
     findings = 0
     css = sources()
+    # Every section below is a report() over `css`: an empty list makes every one of the seven print
+    # "none" and the script exit 0 whether or not --strict was given, since nothing UNBALANCED,
+    # SHADOWED or HARDCODED was found in zero files either. Measured: with styles/ emptied, a plain
+    # run printed seven clean sections and `--strict` exited 0 — this is the count nothing else in
+    # main() ever took, and it fails regardless of --strict because a report over no input is not a
+    # finding of "clean", it is no audit at all (currently 40 stylesheets, in build-css.sh's order).
+    if not css:
+        sys.exit(f"audit.py: no stylesheets found under {STYLES} — the source tree is missing, not "
+                  "clean")
+    print(f"{len(css)} stylesheet(s) audited, in build-css.sh's concatenation order.")
     s = "\n".join(p.read_text(encoding="utf-8") for p in css)
 
     # CSS only, deliberately. Counting the JS too does not work: raw counting punished dense

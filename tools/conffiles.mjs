@@ -54,8 +54,20 @@ const owfeedDeclared = y
 	: [];
 
 if (!shipped.length) {
-	console.log('conffiles: the package ships no /etc/config/* — nothing to declare.');
-	process.exit(0);
+	// The sentence is honest — CONFIG_DIR really is empty or missing — but exit 0 read as a pass,
+	// and a pass here is indistinguishable from "correctly protected" to anything watching the CI
+	// job go green. It never legitimately means that for this package: root/etc/config/footstrap
+	// is a permanent, load-bearing stub (Appearance "Save as default" writes into it at runtime;
+	// see the header above), so an empty CONFIG_DIR is root/etc/config/ having been deleted or
+	// renamed, not a variant of the theme that ships none. Failing closed means the day this
+	// theme genuinely drops its last conffile, that has to be a conscious edit to THIS script
+	// (loosen this check and say why), not a status nobody chose.
+	console.error('conffiles: FAILED\n');
+	console.error(`  the package ships no /etc/config/* — expected at least one (root/etc/config/footstrap,`);
+	console.error(`  the "Save as default" stub); either it was deleted or ${CONFIG_DIR} moved`);
+	console.error('\nIf the theme has genuinely stopped shipping a conffile, this check needs updating');
+	console.error('on purpose — it does not default to that reading a missing directory.');
+	process.exit(1);
 }
 
 if (!y) {

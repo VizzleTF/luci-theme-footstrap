@@ -158,8 +158,11 @@ if (enIds.join() !== ruIds.join()) {
 }
 
 const vcount = en.versions.length;
-console.log(`changelog: ${vcount} version(s), mirror in lockstep, sections canonical`);
 
+// Printed only once the checks above are known to hold: this line used to run before the
+// `fails.length` check below and announced "mirror in lockstep, sections canonical" on its way to
+// exit 1, so a failing run's own first line of output contradicted its own exit code — a CI reader
+// skimming the top of the log read a pass.
 if (fails.length) {
 	console.error('\nchangelog: FAILED\n');
 	for (const f of fails) console.error(`  ${f}`);
@@ -167,4 +170,5 @@ if (fails.length) {
 	process.exit(1);
 }
 
+console.log(`changelog: ${vcount} version(s), mirror in lockstep, sections canonical`);
 console.log('changelog: the release notes will generate cleanly.');
