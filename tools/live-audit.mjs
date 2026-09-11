@@ -79,7 +79,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import * as pw from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
-import { classify, representatives, reportReduction, PINNED } from './lib/page-shapes.mjs';
+import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINE = resolve(HERE, 'baselines/live-audit.json');
@@ -321,7 +321,25 @@ const baseline = (() => {
 const list = requireStands(stands(arg('only', ''), { all: ALL_STANDS }), 'live-audit');
 const browser = await pw[ENGINE].launch();
 const seen = {}, fresh = [];
+/* pages that froze while their shape was being read — their own kind of finding, and fatal on
+ * their own: reportFrozen() below (lib/page-shapes.mjs) */
+const frozen = [];
 let checked = 0, armed = 0;
+
+/* SAY WHERE THE SWEEP IS, ON EVERY PAGE AND WITH THE CLOCK.
+ *
+ * This gate printed nothing between its first page load and the per-router total at the end, which
+ * is the whole of a router's sweep. A slice cancelled inside that window says nothing about where
+ * it was — task liveslice: `/admin/system/filemanager` pinned the browser's main thread under
+ * `13e9864` and `page.evaluate()` has no deadline of its own, so this gate and `spa-parity` both sat
+ * at the 45-minute cap for a day of runs with an empty log each time.
+ *
+ * A line per page, newline-terminated so a runner flushes it as it happens, carrying seconds since
+ * the gate started: what each page costs is then readable off the log, and a run that dies names
+ * the page it died on. */
+const T0 = Date.now();
+const at = () => `${String(Math.round((Date.now() - T0) / 1000)).padStart(4)}s`;
+const say = (line) => process.stdout.write(`${at()}  ${line}\n`);
 
 /* THE ROUTERS RUN AT THE SAME TIME. Nothing here is a timing measurement — every finding is a
  * geometry or a name read out of a settled page — so two containers answering at once cannot change
@@ -386,13 +404,16 @@ await Promise.all(list.map(async (stand) => {
 		if (!ALL_PAGES && !ONLY_PAGES) {
 			/* one load per page to read its shape, then one representative per shape — plus every path
 			 * the baseline names and every pinned page, which may never be sampled away */
-			const shapes = await classify(page, stand.base, paths);
+			say(`${key}: reading the shape of ${paths.length} page(s)`);
+			const shapes = await classify(page, stand.base, paths, { frozen, id: key });
 			const { picked, dropped } = representatives(shapes, [ ...known.map((sig) => sig.split('|')[0]), ...PINNED ]);
 			reportReduction(stand.id, picked, dropped, shapes);
 			paths = picked;
 		}
 
+		let n = 0;
 		for (const path of paths) {
+			say(`${key} ${++n}/${paths.length} ${path}`);
 			await page.setViewportSize({ width: 1440, height: 900 });
 			errs.length = 0;
 			try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
@@ -470,7 +491,7 @@ await Promise.all(list.map(async (stand) => {
 			}
 		}
 		await ctx.close();
-		process.stdout.write(`${key}: ${seen[key].size} finding(s) over ${here} page(s)\n`);
+		say(`${key}: ${seen[key].size} finding(s) over ${here} page(s)`);
 	} finally {
 		/* Never leave a router parked off `auto` — the next unflagged run must not silently inherit
 		 * this one's language, which is the exact shape of the incident this flag exists to close. */
@@ -478,6 +499,15 @@ await Promise.all(list.map(async (stand) => {
 	}
 }));
 await browser.close();
+
+/* A page that froze is measured by nobody, and it is never a baseline entry: a signature can be
+ * blessed, a stopped main thread cannot. First of the three, because it names the actual cause —
+ * enough of them and `checked === 0` below would blame the login instead — and before --update,
+ * because a run that lost pages to a freeze may not rewrite the baseline from what it did see. */
+if (reportFrozen(frozen)) {
+	console.error('live-audit: those pages were not audited at any width. Fix the freeze first.\n');
+	process.exit(1);
+}
 
 /* Zero of either is not a clean sweep. `checked === 0` is every router unauthenticated or every
  * page in the menu lacking #view — the shape `login()` never checks for (lib/stands.mjs). `armed

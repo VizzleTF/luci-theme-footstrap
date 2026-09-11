@@ -64,8 +64,9 @@ jobs/slices (repeatable; "all" is every one of them, in build.yml's own order):
   live:parity           job `live`, slice `parity`  — spa-parity
   live:audit            job `live`, slice `audit`   — live-audit
   live:motion           job `live`, slice `motion`  — upstream-contract, scroll-jank, table-tick,
-                         floor-contract, fit-quiet, scroll-anchor, install-check.sh
-  anchors               job `anchors`, both engines below
+                         floor-contract, fit-quiet, install-check.sh
+  anchors               job `anchors`, all three engines below
+  anchors:chromium      job `anchors`, engine chromium
   anchors:firefox       job `anchors`, engine firefox
   anchors:webkit        job `anchors`, engine webkit
   all                   every job above
@@ -105,7 +106,7 @@ while [ $# -gt 0 ]; do
 		usage
 		exit 0
 		;;
-	check | lint | build | verify | live | live:parity | live:audit | live:motion | anchors | anchors:firefox | anchors:webkit | all)
+	check | lint | build | verify | live | live:parity | live:audit | live:motion | anchors | anchors:chromium | anchors:firefox | anchors:webkit | all)
 		JOBS="$JOBS $1"
 		shift
 		;;
@@ -416,7 +417,8 @@ job_live() {
 	slice=$1
 	compute_routers
 	O=$(printf '%s' "$ROUTERS" | tr ' ' ,)
-	echo "== live:$slice (mode=$MODE, routers=$ROUTERS, full=${FULL:-<none>}) =="
+	# no `full=` here any more: `--full` belongs to scroll-anchor, and that sweep is `anchors:*`
+	echo "== live:$slice (mode=$MODE, routers=$ROUTERS) =="
 	if [ "$DRY" = 1 ]; then
 		step "ci-playwright" echo "sh tools/ci-playwright.sh"
 		step "owlab-boot" echo "owlab up $ROUTERS; owlab install <router> <package>  # per router, apk or ipk"
@@ -429,7 +431,7 @@ job_live() {
 			step "live:motion:table-tick" echo "node tools/table-tick.mjs --only $O"
 			step "live:motion:floor-contract" echo "node tools/floor-contract.mjs --only $O"
 			step "live:motion:fit-quiet" echo "node tools/fit-quiet.mjs --only $O"
-			step "live:motion:scroll-anchor" echo "node tools/scroll-anchor.mjs --only $O $FULL"
+			# chromium's scroll-anchor sweep is `anchors:chromium` now, not a step of this slice
 			step "live:motion:install-check" echo "sh tools/install-check.sh $ROUTERS"
 			;;
 		esac
@@ -455,11 +457,8 @@ job_live() {
 		step "live:motion:table-tick" node tools/table-tick.mjs --only "$O"
 		step "live:motion:floor-contract" node tools/floor-contract.mjs --only "$O"
 		step "live:motion:fit-quiet" node tools/fit-quiet.mjs --only "$O"
-		if [ -n "$FULL" ]; then
-			step "live:motion:scroll-anchor" node tools/scroll-anchor.mjs --only "$O" --full
-		else
-			step "live:motion:scroll-anchor" node tools/scroll-anchor.mjs --only "$O"
-		fi
+		# chromium's scroll-anchor sweep left this slice for `anchors:chromium` (build.yml, task
+		# liveslice): same cells, its own runner, and this slice back under half its budget.
 		# shellcheck disable=SC2086 # $ROUTERS is a deliberate word list, install-check.sh's own argv
 		step "live:motion:install-check" sh tools/install-check.sh $ROUTERS
 		;;
@@ -473,7 +472,11 @@ job_anchors() {
 	O=$(printf '%s' "$ROUTERS" | tr ' ' ,)
 	echo "== anchors:$engine (mode=$MODE, routers=$ROUTERS, full=${FULL:-<none>}) =="
 	if [ "$DRY" = 1 ]; then
-		step "playwright-install-$engine" echo "npx playwright install --with-deps $engine"
+		step "ci-playwright" echo "sh tools/ci-playwright.sh"
+		# chromium is what ci-playwright.sh above fetches and proves launches, so this leg does not
+		# ask apt for it again — build.yml's own step carries `if: matrix.engine != 'chromium'`
+		[ "$engine" = chromium ] ||
+			step "playwright-install-$engine" echo "npx playwright install --with-deps $engine"
 		step "owlab-boot" echo "owlab up $ROUTERS; owlab install <router> <package>"
 		step "anchors:$engine" echo "node tools/scroll-anchor.mjs --engines $engine --only $O $FULL"
 		return
@@ -483,7 +486,11 @@ job_anchors() {
 		skip "anchors:$engine" "dist/ has no built packages — run 'tools/ci-local.sh build' first"
 		return
 	fi
-	step "playwright-install-$engine" npx playwright install --with-deps "$engine"
+	step "ci-playwright" sh tools/ci-playwright.sh
+	# see the dry-run branch: chromium is already there, and `--with-deps` is an apt run
+	if [ "$engine" != chromium ]; then
+		step "playwright-install-$engine" npx playwright install --with-deps "$engine"
+	fi
 	echo "  booting $ROUTERS and installing this build …"
 	if ! boot_and_install; then
 		skip "anchors:$engine" "owlab up/install failed — see $RUNDIR/owlab-up-install.log"
@@ -524,7 +531,8 @@ live:parity                live (slice parity)                  spa-parity
 live:audit                 live (slice audit)                   live-audit
 live:motion                live (slice motion)                  upstream-contract, scroll-jank,
                                                                  table-tick, floor-contract, fit-quiet,
-                                                                 scroll-anchor, install-check.sh
+                                                                 install-check.sh
+anchors:chromium            anchors (engine chromium)            scroll-anchor --engines chromium
 anchors:firefox             anchors (engine firefox)             scroll-anchor --engines firefox
 anchors:webkit              anchors (engine webkit)              scroll-anchor --engines webkit
 all                         every job above                      in build.yml's own dependency order
@@ -610,6 +618,7 @@ expand_jobs() {
 			echo live:parity
 			echo live:audit
 			echo live:motion
+			echo anchors:chromium
 			echo anchors:firefox
 			echo anchors:webkit
 			;;
@@ -619,6 +628,7 @@ expand_jobs() {
 			echo live:motion
 			;;
 		anchors)
+			echo anchors:chromium
 			echo anchors:firefox
 			echo anchors:webkit
 			;;
@@ -636,6 +646,7 @@ for j in $(expand_jobs); do
 	live:parity) job_live parity ;;
 	live:audit) job_live audit ;;
 	live:motion) job_live motion ;;
+	anchors:chromium) job_anchors chromium ;;
 	anchors:firefox) job_anchors firefox ;;
 	anchors:webkit) job_anchors webkit ;;
 	esac

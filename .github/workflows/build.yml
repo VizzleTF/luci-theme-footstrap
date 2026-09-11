@@ -264,14 +264,27 @@ jobs:
   # navigation that painted less than a full load (upstream review). None can fail a static gate.
   #
   # owlab boots the same containers a developer runs locally, so the gate and the local command are
-  # the same command. Two routers on a push, one on a pull request: the second release line doubles
-  # the wall clock and has never been the one to catch something first.
+  # the same command. Three routers on a push, one on a pull request: the other release lines double
+  # the wall clock and have never been the one to catch something first.
   live:
-    # THREE SLICES, because this job was the release's critical path once `anchors` stopped being it:
-    # 1545s, of which the gates are 1370 and the three heaviest are 448 (spa-parity), 427
-    # (live-audit) and 495 (the rest together). Split that way each slice boots its own routers —
-    # 157s it does not share — and the job's wall clock is its longest slice rather than their sum.
-    # fail-fast is off: a parity failure says nothing about whether the reader stays put.
+    # THREE SLICES, because this job was the release's critical path once `anchors` stopped being it.
+    # Each slice boots its own routers — 157s it does not share — so the job's wall clock is its
+    # longest slice rather than their sum, and fail-fast is off: a parity failure says nothing about
+    # whether the reader stays put.
+    #
+    # Re-measured on the last run where every slice finished (7ff9e56, push, three routers): the
+    # gates are 485s (spa-parity), 450s (live-audit) and 754s (everything `motion` still runs), on
+    # top of 157s of checkout/npm/playwright/boot each slice pays for itself. `motion` used to carry
+    # a fourth number — chromium's own scroll-anchor sweep, 1434s once `--full` crossed the density
+    # axis (e48434c) — which alone put the slice at 39 of its 45 minutes. That sweep is now a shard
+    # of `anchors`, where the one-job-per-engine rule already lives and the cap is 75 minutes; the
+    # cells did not change, only which runner draws them.
+    #
+    # These numbers only hold while a page still answers. A page that pins the browser's main thread
+    # costs a slice its whole budget rather than a page's worth of seconds, because `page.evaluate()`
+    # has no deadline of its own — task liveslice, `/admin/system/filemanager` under `13e9864`, both
+    # measuring slices cancelled at 45 minutes for a day. A slice that runs long is read by looking
+    # at WHICH page each gate last named, not by raising this cap.
     strategy:
       fail-fast: false
       matrix:
@@ -358,13 +371,13 @@ jobs:
               # to measure whether the menu fits a row, and is a row shorter while it asks. Reported
               # from an iPhone, where no engine anchoring puts the reader back.
               node tools/fit-quiet.mjs --only "$O"
-              # Chromium here; the other two engines have a job of their own (`anchors`). Density
-              # was never crossed on this leg before task latenet — normal only, on every push and
-              # every pull request alike — so chromium's own DENSITIES axis (compact, large) went
-              # unmeasured here. `--full` on a push/tag only, the same split `anchors` already
-              # makes for its own axes, below.
-              if [ "${{ github.event_name }}" = "pull_request" ]; then FULL=""; else FULL="--full"; fi
-              node tools/scroll-anchor.mjs --only "$O" $FULL
+              # Chromium's own scroll-anchor sweep is NOT here any more: it is a shard of `anchors`
+              # below, beside firefox and webkit. It sat here while it was the cheap engine — 145s
+              # against the other two's 52 minutes — and stopped being one when `--full` started
+              # crossing chromium's DENSITIES axis too (e48434c): 34 runs became 184 and 145s became
+              # 1434s, which is 65% of everything this slice does and put it at 39 of its 45 minutes.
+              # Moving it changes no cell and costs the pipeline nothing, because `anchors` already
+              # runs one job per engine and its other two shards are longer than this one.
               # LAST, because it installs the PUBLISHED release over the build everything above
               # measured — and that is the claim: what a user runs is install.sh against the feed,
               # not `apk add` against a local file. Three field reports (#16, #28, #30) were this
@@ -378,7 +391,7 @@ jobs:
       - if: always()
         run: owlab down || true
 
-  # THE OTHER TWO ENGINES, on a clock of their own.
+  # EVERY ENGINE'S ANCHOR SWEEP, on a clock of its own.
   #
   # This was one more step inside `live` and it did not fit: three engines across two routers, two
   # page shapes, two widths, both layouts and all three densities is ~290 measurements, and the job
@@ -392,12 +405,17 @@ jobs:
   anchors:
     # ONE JOB PER ENGINE, and it is the release's critical path that pays for it: this gate ran
     # 52 minutes against live's 17 on the same three routers, so the whole pipeline was as slow as
-    # its slowest job. firefox and webkit share nothing — separate browsers, separate runs of the
-    # same sweep — so splitting them halves the wall clock and measures exactly as much.
+    # its slowest job. The three engines share nothing — separate browsers, separate runs of the
+    # same sweep — so a job each measures exactly as much at a third of the wall clock.
+    #
+    # Chromium joined them in task liveslice. It had stayed in `live`'s `motion` slice as the cheap
+    # engine (145s), and `--full` crossing its DENSITIES axis (e48434c) took it to 1434s — 65% of
+    # that slice, which was then at 39 of its 45 minutes. Here it is the SHORTEST of the three and
+    # the job's wall clock does not move.
     strategy:
       fail-fast: false
       matrix:
-        engine: [ firefox, webkit ]
+        engine: [ chromium, firefox, webkit ]
     name: The reader stays put (${{ matrix.engine }})
     timeout-minutes: 75
     needs: build
@@ -410,9 +428,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: sh tools/ci-playwright.sh
-      # only the engine this shard drives: installing both cost ~1 minute of every run for a
-      # browser it never launches
-      - run: npx playwright install --with-deps ${{ matrix.engine }}
+      # Only the engine this shard drives: installing all three cost ~1 minute of every run for
+      # browsers it never launches. Skipped for chromium, which the step above has already fetched
+      # off the CDN and proved launches — `--with-deps` goes through apt, and apt is the half that
+      # stalls (see ci-retry.sh); the other two genuinely need gtk-4/gstreamer from it.
+      - if: matrix.engine != 'chromium'
+        run: npx playwright install --with-deps ${{ matrix.engine }}
       - uses: actions/download-artifact@v8
         with:
           name: owfeed-packages

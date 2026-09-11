@@ -21,7 +21,7 @@
  * Needs a running owlab router (docs/development.md). */
 import { chromium } from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
-import { classify, representatives, reportReduction, PINNED } from './lib/page-shapes.mjs';
+import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
 import { read } from './lib/root.mjs';
 
 const arg = (name, dflt) => {
@@ -285,7 +285,25 @@ async function backRestoreCheck(page, stand, findings, widthLabel) {
 const list = requireStands(stands(arg('only', ''), { all: ALL_STANDS }), 'spa-parity');
 const browser = await chromium.launch();
 const findings = [];
+/* pages that froze while their shape was being read — their own kind of finding, reported by
+ * reportFrozen() below (lib/page-shapes.mjs) */
+const frozen = [];
 let compared = 0;
+
+/* SAY WHERE THE SWEEP IS, ON EVERY PAGE AND WITH THE CLOCK.
+ *
+ * This gate used to print one `.` per page — no newline, so a CI runner buffers the whole run into a
+ * single line that is only flushed at the end — and nothing at all until the first router had
+ * finished classifying. A slice cancelled before that (task liveslice: `/admin/system/filemanager`
+ * pinned the browser's main thread under `13e9864`, and `page.evaluate()` has no deadline of its
+ * own, so both measuring slices sat at the 45-minute cap) left a log with not one word in it about
+ * which page it was on, for a whole day of runs.
+ *
+ * A line per page, newline-terminated, with seconds since the gate started: the wall clock is then
+ * readable straight off the log, and a run that dies names the page it died on. */
+const T0 = Date.now();
+const at = () => `${String(Math.round((Date.now() - T0) / 1000)).padStart(4)}s`;
+const say = (line) => process.stdout.write(`${at()}  ${line}\n`);
 
 /* the routers run at the same time: every comparison here is content against content on one router,
  * so nothing another container does can reach it (see the same note in live-audit.mjs) */
@@ -296,11 +314,13 @@ await Promise.all(list.map(async (stand) => {
 	const errs = [];
 	page.on('pageerror', (e) => errs.push(String(e).replace(/\s+/g, ' ').slice(0, 120)));
 	await login(page, stand.base);
+	say(`${stand.id}: logged in, staging + Back at 1440px`);
 
 	await stagingWindowCheck(page, stand, findings);
 	await backRestoreCheck(page, stand, findings);
 
 	/* the narrow pass: its own context, since theme/90-responsive.css's rules never match at 1440px */
+	say(`${stand.id}: staging + Back at ${NARROW_WIDTH}px`);
 	const narrowCtx = await browser.newContext({ viewport: { width: NARROW_WIDTH, height: 900 } });
 	await sealToRouter(narrowCtx, stand.base);
 	const narrowPage = await narrowCtx.newPage();
@@ -312,13 +332,16 @@ await Promise.all(list.map(async (stand) => {
 	let paths = (await menuPaths(page)).filter((p) => !DESTRUCTIVE.test(p) && p !== ORIGIN);
 	if (ONLY_PAGES) paths = paths.filter((p) => p.startsWith(ONLY_PAGES));
 	if (!ALL_PAGES && !ONLY_PAGES) {
-		const shapes = await classify(page, stand.base, paths);
+		say(`${stand.id}: reading the shape of ${paths.length} page(s)`);
+		const shapes = await classify(page, stand.base, paths, { frozen, id: stand.id });
 		const { picked, dropped } = representatives(shapes, PINNED);
 		reportReduction(stand.id, picked, dropped, shapes);
 		paths = picked;
 	}
 
+	let n = 0;
 	for (const path of paths) {
+		say(`${stand.id} ${++n}/${paths.length} ${path}`);
 
 		try { await page.goto(stand.base + ORIGIN, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
 		catch (e) { continue; }
@@ -373,12 +396,23 @@ await Promise.all(list.map(async (stand) => {
 		}
 		for (const e of spaErrs.filter((e) => !fullErrs.includes(e)).slice(0, 2))
 			add('console', e);
-		process.stdout.write(findings.some((f) => f.path === path && f.stand === stand.id) ? 'X' : '.');
+		/* the page's own line is already out (above, before it was opened); mark it only when this
+		 * page is where a difference landed, so a long log still shows the interesting rows */
+		if (findings.some((f) => f.path === path && f.stand === stand.id))
+			say(`${stand.id}    ^ a click and a load DISAGREE here`);
 	}
 	await ctx.close();
-	process.stdout.write(`\n${stand.id}: ${compared} page(s) compared\n`);
+	say(`${stand.id}: ${compared} page(s) compared`);
 }));
 await browser.close();
+
+/* Before the differences, because a page that stopped answering was not compared at all: reporting
+ * "a click and a load agree on every one" over a walk that lost pages to a frozen thread is the
+ * silence this gate is here to stop. */
+if (reportFrozen(frozen)) {
+	console.error('spa-parity: a page that will not answer cannot be compared. Fix the freeze first.\n');
+	process.exit(1);
+}
 
 if (findings.length) {
 	console.error(`\nspa-parity: ${findings.length} difference(s) between a click and a load:\n`);

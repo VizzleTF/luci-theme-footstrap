@@ -787,10 +787,13 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   is indistinguishable from a clean one unless you read the lines. Always `owlab sync` after a
   rebuild, and treat a 404 in a cell as "the stand is empty", not as a finding.
 
-- **Never pipe a long run into `tail`.** The output buffers until the command ends, so a hang looks
-  exactly like progress. `live-audit` over a full sweep did this on 2026-09-09: the process sat
-  alive and idle for 73 minutes with no output, where CI takes about 90 seconds a stand. Write to a
-  file and read the file as it grows, and give any local `live-audit` both `--pages` and a
+- **Never pipe a long run into `tail`, `sort` or a bare `grep`.** The output buffers until the
+  command ends, so a hang looks exactly like progress. `live-audit` over a full sweep did this on
+  2026-09-09: the process sat alive and idle for 73 minutes with no output, where CI takes about 90
+  seconds a stand. `grep` is the one that catches you by accident — filtering a `wsl.exe` call's
+  noise through `| grep -v …` buffers in 4KB blocks, so a gate that was printing a line a second
+  looked mute for minutes (2026-09-10). Write to a file and read the file as it grows (`grep
+  --line-buffered` if it must be a pipe), and give any local `live-audit` both `--pages` and a
   `timeout`.
 
 - **A variable assigned INSIDE an inline `wsl.exe -- bash -c '...'` string reads back empty.** This
@@ -809,6 +812,52 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   its session has a header-only log, no `.status` and no `.pid`. From a Windows host, start a long gate as a **background Bash-tool
   command** (`wsl.exe -e bash -c 'cd … && npm run check'`, run in the background) and wait on that
   instead — `tools/bg.sh` is for a session that outlives the command, which an interop call is not.
+
+- **`scroll-anchor --full` with all three engines at once over three stands kills the chromium
+  process about two minutes in; one engine at a time completes.** It reads as a regression in the
+  sweep — chromium's leg dies mid-run while webkit and firefox finish — and it is the browser's
+  zygote going down under the load of three engine sets against three routers on one host, not
+  anything the theme did. Tell the two apart by re-running the same axis with a single
+  `--engines chromium`: a real finding reproduces there, this does not. Measured 2026-09-11 on the
+  three twins (`owrt2512b`, `owrt2410b`, `owrtsnapb`), 184 runs per engine green when run one at a
+  time. CI does not meet it — `anchors` is one job per engine, on a runner each.
+
+- **A page that pins the browser's main thread stops a gate DEAD, and no gate has a deadline for
+  it.** `page.evaluate()` is the one Playwright call with no timeout at all: it waits for the page's
+  own thread, and a page stuck in a loop never gives it back. Measured 2026-09-10 (task liveslice):
+  `/admin/system/filemanager` under `fs-fit.js` at `13e9864` left the renderer at ~105% CPU for as
+  long as it was allowed, so `classify()` (`tools/lib/page-shapes.mjs`, which both `spa-parity` and
+  `live-audit` walk the whole menu with) never returned, and both CI slices were cancelled at their
+  45-minute cap on every run for a day — with an empty log, because neither gate said which page it
+  was on. Both gates now print a line per page with the clock on it; a run that stops has the answer
+  as its last line.
+  **Tell a frozen page apart from a slow one in about a minute:**
+  ```sh
+  # 1. is it the theme? serve the stock package on that stand and load the same page
+  owlab exec owrt2512b -- 'uci set luci.main.mediaurlbase=/luci-static/bootstrap && uci commit luci'
+  owlab exec owrt2512b -- 'rm -f /tmp/luci-indexcache*'      # …and back to /luci-static/footstrap after
+  # 2. is it THIS commit? swap one file in, no worktree and no sync — the stands may be somebody
+  #    else's right now, and `owlab sync` pushes whatever the working tree currently holds
+  git show <sha>:luci-theme-footstrap/htdocs/luci-static/resources/fs-fit.js > ../tmp/fs-fit.<sha>.js
+  docker cp ../tmp/fs-fit.<sha>.js owlab-luci-theme-footstrap-owrt2512b:/www/luci-static/resources/fs-fit.js
+  docker exec owlab-luci-theme-footstrap-owrt2512b chmod 644 /www/luci-static/resources/fs-fit.js
+  ```
+  `chmod` is not optional: a `docker cp` lands the file 0600-ish and uhttpd answers **403**, which
+  reaches the page as `NetworkError: HTTP error 403 while loading class file` — the module then does
+  not run at all and the page looks *fixed*. A green result with 403s in it has measured nothing.
+
+- **`live-audit` on a `-b` twin calls every finding NEW.** The baseline is keyed by stand id
+  (`tools/baselines/live-audit.json`: `owrt2410`, `owrt2410@ru`, …), and `owrt2410b` is not one of
+  those keys, so a sweep there starts from an empty known set — 30 fresh signatures over the
+  `/admin/network` subtree alone, none of them a regression. The twins are for the gates that carry
+  no baseline (`scroll-anchor`, `spa-parity`); measure `live-audit` on the base stand, or read its
+  twin run as a list rather than a verdict.
+
+- **`pkill -f <pattern>` kills the shell you typed it in.** `-f` matches the full command line, and
+  the wrapper `bash -lc "pkill -f probe-one …; node probe-one.mjs …"` contains the pattern, so the
+  whole chain dies before the command after the `;` runs — and it looks exactly like a run that
+  produced no output. Bracket the first character (`pkill -f "[p]robe-one"`), or kill from a separate
+  call.
 
 - **`${PIPESTATUS[0]}` is as unreliable as `$?` in that shell.** On 2026-09-09 a piped
   `npm run check` reported `CHECK_EXIT=` and read as success while it had actually failed on the
