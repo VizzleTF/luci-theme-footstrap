@@ -334,7 +334,21 @@ const LIMITS = {
 	 * buy: restoring unconditionally is 70 B cheaper and green on the same cell, but it makes every
 	 * genuine floor-shrink clamp this file's own write and closes the motion window `sampleMotion()`
 	 * runs behind. The limit goes to 95,400, 59 B of head-room. */
-	resourcesJs: 95_400,
+	/* 95,488 B on 2026-09-11, up 147 B against the note above, in three pieces: 53 B already shipped
+	 * (`sawClamp()`, 71295ce, measured inside the old limit), 18 B for the fractional floor and 76 B
+	 * for the same-value attribute filter. The 18 B are one expression — `holdFloor()` writes the
+	 * floor from `getBoundingClientRect().height` instead of `offsetHeight`, which is an INTEGER,
+	 * rounded to nearest, so every floor stood up to half a pixel taller than the content measured
+	 * for it (421.875 written back as 422, 1685.656 as 1686). Twenty-two such boxes made the document
+	 * 2px taller with the floors than without, the next clear gave those 2px back, and a reader parked
+	 * at the end had their offset clamped into the gap — a scroll position change, which invalidates
+	 * the engine's own anchor (css-scroll-anchoring-1 §2.1.1). Measured on `owrt2410b`/webkit
+	 * `@390 top normal`: 6 of 12 refills anchored, 12 of 12 with the floor written fractionally. The
+	 * 76 B are `attributeOldValue: true` and the comparison it enables: without it a same-value
+	 * `classList.add()` — which still queues a mutation record — fed `_moTabs` its own fitters'
+	 * writes, 926 callbacks a second on `/admin/system/filemanager`, main thread pinned. The limit
+	 * goes to 95,560, 72 B of head-room. */
+	resourcesJs: 95_560,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -576,7 +590,13 @@ const LIMITS = {
 	 * and the whole of the change is on this path. What it buys them is the 47-64px `REPEAT`
 	 * residual gone from every stand and engine the default sweep crosses. The limit goes to
 	 * 60,550, 96 B of head-room. */
-	coldJs: 60_550,
+	/* 60,601 B on 2026-09-11, up 147 B against the note above: the same three pieces as
+	 * `resourcesJs`'s own note on this commit — `fs-fit.js` is cold, so every reader pays all of it
+	 * once, and the whole of both changes is on this path. What it buys them is the last two anchoring
+	 * findings closed on every stand and engine the full sweep crosses (736 runs, `mid-flick
+	 * surprises 0`), and a tab that no longer stops responding on a page with a table. The limit goes
+	 * to 60,680, 79 B of head-room. */
+	coldJs: 60_680,
 };
 
 function bytes(path) {
