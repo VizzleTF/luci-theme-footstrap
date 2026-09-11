@@ -1228,6 +1228,11 @@ function applyAnchor(ref) {
  * constructor, and luci-base instantiates a class once, at the first require. */
 function observeContent() {
 	if (_mo) return;
+	/* read before the observer closes over it: the swap test below compares node identity, and the
+	 * `#view` bound here is the one the router keeps between navigations (liveView(), fs-router.js) */
+	const hosts = [ document.getElementById('view') || document.body, document.getElementById('modal_overlay') ]
+		.filter(Boolean);
+	const viewHost = hosts[0];
 	_mo = new MutationObserver((records) => {
 		/* The theme corrects only where the engine will not. Where it anchors, growth above the
 		 * reader is the engine's job and the floor covers the collapse, so there is nothing left for
@@ -1319,11 +1324,32 @@ function observeContent() {
 		run(records);
 		if (!wasScrolling) _deferredFloor = null;
 		const floorShrink = (r && before) ? Math.max(0, before - (parseFloat(r.target.style.minHeight) || 0)) : 0;
+		/* `#view` ITSELF EMPTIED AND REFILLED IS A PAGE SWAP, NOT A REFILL — task latecommit,
+		 * docs/anchoring.md "The commit is not a refill". The router commits a client navigation
+		 * with `dom.content()` on the live `#view` (commitStage(), fs-router.js) and the browser
+		 * delivers it as two batches: `run()`'s own `rememberRest()` fires between them and adopts
+		 * a reference measured mid-swap, which `lateDrift()` reads 431px out 420ms later and writes
+		 * back over a correct `restoreScroll()` (2723 -> 2292.21875, owrt2410b/chromium, Back to
+		 * /admin/status/overview). `lateDrift()`'s own `_restPage` guard cannot see it: every stamp
+		 * in the document already names the incoming page by the time the commit is observable, so
+		 * carrying the same stamp on the reference instead is the same number twice.
+		 *
+		 * BOTH HALVES OF `dom.content()`, not merely a record naming `#view`: a plain insertion
+		 * there is an ordinary growth that must still be corrected, and matching on the target
+		 * alone left scroll-anchor's HOLD case 120px uncorrected on all three twins @1440 side
+		 * normal with the engine ablated off. One pass and no `type` test, unlike the
+		 * `records.find()` above: this observer registers `childList` only, and a record of any
+		 * other type carries two empty node lists anyway. */
+		let gone = 0, came = 0;
+		for (const m of records)
+			if (m.target === viewHost) { gone += m.removedNodes.length; came += m.addedNodes.length; }
+		if (gone && came) {
+			forgetRest();
+			return;
+		}
 		if (trustEngine) lateDrift(settled, grew, floorShrink);
 		else scheduleAnchor(ref);
 	});
-	const hosts = [ document.getElementById('view') || document.body, document.getElementById('modal_overlay') ]
-		.filter(Boolean);
 	for (const host of hosts) {
 		_mo.observe(host, { childList: true, subtree: true });
 		watch(host);

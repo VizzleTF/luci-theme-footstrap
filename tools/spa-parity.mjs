@@ -220,7 +220,34 @@ async function stagingWindowCheck(page, stand, findings, cases = STAGING_CASES, 
 const BACK_CASES = [
 	{ from: ORIGIN, to: '/admin/system/package-manager' },
 ];
-const BACK_SETTLE_MS = 3000;
+/* ---- the traversal is held open too, for the same reason the staging cases are ----
+ *
+ * A Back that commits while the incoming page is still 61-66 nodes deep clamps the browser's own
+ * traversal restore to 0, `restoreScroll()` then writes from zero and nothing corrects it
+ * afterwards: the case ends 2683 -> 2683 and proves only that the router's own half works. The
+ * fault that reached CI (run 34565660484, owrt2410 2680 -> 2249) needs the OTHER shape — the
+ * incoming page already whole at the swap — which a loaded runner produces by itself and a local
+ * stand produces roughly 1 run in 15. Holding the incoming view's ubus calls open across the
+ * traversal produces it every time: 3 of 3 red on owrt2410b before the fs-fit.js fix, 3 of 3 green
+ * after (`../tmp/task-back431/slow.mjs`, the same 700ms).
+ *
+ * The settle is then the swap's own end plus fs-fit.js's late-correction window rather than a flat
+ * wait: the correction that moved the reader landed 419ms after the commit, and a commit that a
+ * held-open RPC has pushed to 3.1s past `goBack()` is already outside the 3s this used to wait —
+ * so the gate read the offset BEFORE the write it exists to catch. SCROLL_IDLE is read out of
+ * fs-fit.js, not copied here, for the same reason the narrow breakpoint is read out of the CSS. */
+const BACK_RPC_ROUTE = '**/ubus**';
+const BACK_RPC_DELAY_MS = 700;
+const FIT_JS_PATH = 'luci-theme-footstrap/htdocs/luci-static/resources/fs-fit.js';
+function lateWindow() {
+	const m = read(FIT_JS_PATH).match(/const SCROLL_IDLE = (\d+);/);
+	if (!m)
+		throw new Error(`spa-parity: no SCROLL_IDLE in ${FIT_JS_PATH} to size the Back settle off of`);
+	/* the correction is one rAF plus SCROLL_IDLE after the last commit batch; doubled is the slack
+	 * a busy stand needs, stated once rather than as a number of its own */
+	return Number(m[1]) * 2;
+}
+const BACK_SETTLE_MS = lateWindow();
 /* rounding plus the odd late layout pass, not a tolerance for the bug itself: task-back's own
  * measurement was a reader dropped to 0 from ~3274px, orders of magnitude past this */
 const BACK_TOLERANCE_PX = 40;
@@ -272,10 +299,31 @@ async function backRestoreCheck(page, stand, findings, widthLabel) {
 		}, c.to);
 		await page.waitForTimeout(1400);
 
+		/* held only across the traversal itself — slowing the outgoing page would move the very
+		 * timing under test */
+		await page.route(BACK_RPC_ROUTE, async (route) => {
+			await new Promise((r) => setTimeout(r, BACK_RPC_DELAY_MS));
+			try { await route.continue(); } catch (e) {}
+		});
 		await page.goBack();
+		/* the swap's own start and end, not a clock: `.fs-staging` is the marker the staging cases
+		 * above already read, and the window this route holds open is what makes it observable */
+		let staged = false;
+		try {
+			await page.waitForFunction(() => document.querySelectorAll('.fs-staging').length > 0,
+				null, { timeout: 15000 });
+			staged = true;
+			await page.waitForFunction(() => document.querySelectorAll('.fs-staging').length === 0,
+				null, { timeout: 20000 });
+		}
+		catch (e) { /* reported below — a case that saw no swap measured nothing */ }
+		await page.unroute(BACK_RPC_ROUTE);
 		await page.waitForTimeout(BACK_SETTLE_MS);
 		const restored = await readScrollOffset(page, useDoc);
 
+		if (!staged)
+			add('the held-open ubus route never caught a staging window on the traversal — this case '
+				+ 'measured nothing');
 		if (Math.abs(restored - parked) > BACK_TOLERANCE_PX)
 			add(`parked at ${parked}px, Back restored ${restored}px — the reader was dropped `
 				+ `${parked - restored}px from where they were`);

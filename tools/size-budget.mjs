@@ -348,7 +348,18 @@ const LIMITS = {
 	 * `classList.add()` — which still queues a mutation record — fed `_moTabs` its own fitters'
 	 * writes, 926 callbacks a second on `/admin/system/filemanager`, main thread pinned. The limit
 	 * goes to 95,560, 72 B of head-room. */
-	resourcesJs: 95_560,
+	/* 95,604 B on 2026-09-11, up 116 B: `lateDrift()` no longer writes across an SPA commit. The
+	 * commit reaches `observeContent()`'s observer in TWO batches; `run()` -> `rememberRest()` fires
+	 * between them and takes its reference in the middle of the swap, and the second batch hands that
+	 * half-swapped reference to `lateDrift()`, which 420 ms later writes the swap's own settling back
+	 * as if it were drift. Measured on `owrt2410b`/chromium with the incoming page's ubus held 700 ms
+	 * across the traversal: Back parked at 2723px was corrected to 2292.21875px, 3 of 3 runs, and now
+	 * reads 2723px with `writeOffset()` not called at all, 3 of 3. The page-stamp guard already in
+	 * `lateDrift()` cannot see this — `navigate()` and `commitStage()` move every stamp before the
+	 * commit is observable, so the stamp reads the same at capture and at write
+	 * (`admin-status-overview` in every run), which is why putting the stamp on the reference itself
+	 * was measured and dropped. The limit goes to 95,680, 76 B of head-room. */
+	resourcesJs: 95_680,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -596,7 +607,12 @@ const LIMITS = {
 	 * findings closed on every stand and engine the full sweep crosses (736 runs, `mid-flick
 	 * surprises 0`), and a tab that no longer stops responding on a page with a table. The limit goes
 	 * to 60,680, 79 B of head-room. */
-	coldJs: 60_680,
+	/* 60,717 B on 2026-09-11, up 116 B: the same SPA-commit refusal as `resourcesJs`'s own note on
+	 * this commit — `fs-fit.js` is cold, so every reader pays it once. What it buys them is Back not
+	 * dropping them 431px down a page that never moved, which `tools/spa-parity.mjs` now reproduces
+	 * deterministically instead of about one run in fifteen. The limit goes to 60,800, 83 B of
+	 * head-room. */
+	coldJs: 60_800,
 };
 
 function bytes(path) {

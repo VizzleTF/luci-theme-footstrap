@@ -822,6 +822,18 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   three twins (`owrt2512b`, `owrt2410b`, `owrtsnapb`), 184 runs per engine green when run one at a
   time. CI does not meet it — `anchors` is one job per engine, on a runner each.
 
+- **"no owlab router is running, so nothing was checked" while all eight are up means the gate
+  could not find `owlab`, not that the stands are down.** `owlab` is a Go binary in `~/go/bin`, put
+  on `PATH` by the login profile — and a login shell started as `wsl.exe -e bash -lc` from a Windows
+  host can die part-way through that profile on something unrelated (measured 2026-09-11: a stale
+  `deno/env` path from another project, printed as a bare `No such file or directory` with no
+  mention of owlab), leaving `PATH` half-built. Every live gate then reports the same sentence on
+  every stand at once. Tell the two apart with `owlab status`: if it lists routers as `running`, the
+  stands are fine and the shell is not. Run live gates as `wsl.exe -e bash -c` with
+  `export PATH=$HOME/go/bin:$PATH` set explicitly, which skips the profile entirely. **Six gates
+  saying "nothing was checked" is the hardening working** — before `21a8502` and `916d4d5` those
+  same runs would have exited 0 and read as six passes.
+
 - **A page that pins the browser's main thread stops a gate DEAD, and no gate has a deadline for
   it.** `page.evaluate()` is the one Playwright call with no timeout at all: it waits for the page's
   own thread, and a page stuck in a loop never gives it back. Measured 2026-09-10 (task liveslice):

@@ -1182,6 +1182,75 @@ that point on, and a mutation the outgoing page's own poller makes during the st
 `clearViewIntervals()` runs, later in the same chain) must not be read against a reference that
 belongs to a page about to go away, whether or not the scroll write that follows has happened yet.
 
+### The commit is not a refill (task latecommit)
+
+`fit.forgetRest()` at the click is not enough, because the commit that arrives three seconds later
+reaches this file as an ordinary content mutation and re-establishes a reference of its own.
+
+**Measured** (`../tmp/task-back431/slow.mjs`, chromium/`owrt2410b` at 1440x900 in the stand's own
+default layout, where the document is the scroller, with the incoming page's ubus held open 700 ms
+across the traversal so the shape is deterministic): parked at 2723px on `/admin/status/overview`, into `/admin/system/package-manager`,
+Back. `commitStage()` hands `restoreScroll()` `{win:2723,main:0}`, the first tick reads a ceiling of
+3152 and writes 2723, `pending=false` — the router's half is right. 419 ms later `lateDrift()`
+writes `2292.21875` over it, and the reader is 431px short on a page where nothing that carries
+layout moved: a census of the first 400 nodes of `#view` at commit+60 ms and again 2.5 s later
+differs in 11 entries, all zero-height `IMG`/`BR` inside fixed position whose document coordinate is
+the offset itself.
+
+**The mechanism** (`../tmp/task-latecommit/probe3.mjs` — the observer's own records,
+`rememberRest()` and `lateDrift()` logged in place): the browser delivers the swap as TWO batches.
+The first is 21 `childList` records on `#view` itself, taken while the document is still 3152px
+tall; `run()`'s own `rememberRest()` fires at the end of it and hit-tests the fold mid-swap,
+adopting a `DIV` at top -480.97. 9 ms later the second batch arrives with the document settled at
+2723, and ITS `settled` is that mid-swap reference. 420 ms later the same element reads -911.75 with
+the offset unchanged at 2723: the 431px is the swap's own collapse, measured as drift and written
+back.
+
+**The page stamp cannot see it, in any form.** `_restPage` and `pageStamp()` both read
+`admin-status-overview` at the capture AND at the write in every instrumented run — `navigate()`
+restamps `body[data-page]` seconds before the commit and `commitStage()` restamps `#view` and
+`.fs-content` before `dom.content()` — so `lateDrift()`'s existing `_restPage !== pageStamp()` guard
+is not comparing the wrong thing; there is nothing left in the document for it to compare. Carrying
+the stamp on the reference at capture time and checking it at the write is the same number twice.
+
+**What holds.** A batch that both removes and adds children of the live `#view` is `dom.content()`'s
+own shape on the one node only `commitStage()` calls it on. On such a batch the observer callback
+calls `forgetRest()` and returns without a correction: the memo is void, the next tick has no
+reference and `run()` re-takes one on a settled page. 3 of 3 red before, 3 of 3 green after with no
+`writeOffset()` logged at all (2723 -> 2723, ceiling 2723).
+
+**Testing the target alone does not hold, and this is the measurement that says so.** The first
+version asked only whether any `childList` record named `#view`. `tools/scroll-anchor.mjs`'s HOLD
+case grows the page by inserting a pad as `#view`'s own first child, so it matched too, and the
+theme stopped correcting for it: `120px grew above the reader and the page moved 120px under them`
+on all three twins at @1440 side normal, chromium, with the engine's anchoring ablated off. Both
+halves of `dom.content()` is what separates a swap from an ordinary insertion there; the same cell
+reads 16 runs clean with the narrowed test.
+
+**Not the fix, measured** (both from the session that traced this, `docs/spa-router.md` "Scroll"):
+`fit.forgetRest()` called by the router at the commit leaves the 431px in place, because the
+reference `lateDrift()` works from is handed to it by the mutation callback, not read from `_rest`
+at call time. Holding `restoreScroll()` open for its whole 5 s budget reads 2723 (2 of 2) but only
+undoes the correction a frame after it lands — the reader still sees the jump — and it overrules the
+`scroll`-based cancellation three earlier fixes stand on.
+
+**The gate.** `spa-parity`'s `back-scroll` case reproduced this about 1 run in 15 and measured
+nothing on the other 14, for two separate reasons, both closed. It committed before the incoming
+page was whole, so the browser's traversal restore clamped to 0, `restoreScroll()` wrote from zero
+and no correction followed (2683 -> 2683 on `owrt2512b`, 2473 -> 2473 on `owrtsnapb`); and its flat
+3 s settle expired before a commit that a held-open RPC pushes to 3.1 s past `goBack()` — so it read
+the offset before the write it exists to catch. It now holds the incoming page's ubus open 700 ms
+across the traversal, waits on `.fs-staging` appearing and going away rather than on a clock, then
+waits `SCROLL_IDLE * 2` read out of `fs-fit.js`. Red on the HEAD behaviour, deterministically:
+`parked at 2723px, Back restored 2292px — the reader was dropped 431px from where they were`.
+
+**Cost: +116 B minified** (`fs-fit.js` 8455 -> 8571 B), and it does not fit: `tools/size-budget.mjs`
+reads 60717 B of cold JS against its 60680 B budget (37 B over) and 95604 B of shipped JS against
+95560 B (44 B over) — both green on HEAD. The two `records.some()` calls this started as cost 155 B;
+the single pass that replaced them saves 39 of those and is where the shrinking ran out. The budget's
+own rule is that the number is raised by the maintainer with the note saying what it bought, and this
+task's file list did not include that file, so `npm run check` is red on those two lines until it is.
+
 ## Is each one still needed
 
 One mechanism disabled at a time, on the agent's own stand so nothing else moves, over the axes that
