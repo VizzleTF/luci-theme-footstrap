@@ -879,17 +879,28 @@ function anchorEnabled() {
  * reports zero and this does nothing. Same guards as the main correction — not while the reader
  * scrolls, not across a navigation, never more than a viewport. */
 let _lateFrame = 0;
+/* WHY THE LAST LATE CORRECTION DID OR DID NOT WRITE — an unmarked export for the sweep, the same
+ * shape and the same reason as `restAt()` and `engineTrusted()` beside it. `lateDrift()` has eight
+ * ways to return without writing, and from outside they are one symptom: `writes: []`. Three CI
+ * runs were spent guessing between them — whether the theme tried and missed, had no reference to
+ * try from, or read the engine as having already done the job — and each guess cost a push. One
+ * short string, set at every exit, ends that: the finding names the line instead of the silence. */
+let _lateWhy = null;
+function why(w) { _lateWhy = w; }
 
 function lateDrift(ref, grow, floorShrink) {
 	/* the reference from BEFORE this tick, captured by the caller: one taken after the mutation
 	 * describes the page as the mutation left it, so its drift is zero by construction */
-	if (_lateFrame || !ref) return;
+	if (_lateFrame) return why('busy');
+	if (!ref) return why('no-reference');
+	why('armed');
 	_lateFrame = requestAnimationFrame(() => {
 		const seen = scrollTop();
 		const settle = () => {
 			_lateFrame = 0;
-			if (!anchorEnabled() || Date.now() < _userUntil) return;
-			if (_restPage !== pageStamp()) return;
+			if (!anchorEnabled()) return why('anchoring-off');
+			if (Date.now() < _userUntil) return why('reader-intent');
+			if (_restPage !== pageStamp()) return why('page-changed');
 			/* THE OFFSET, NOT THE EVENT STREAM. `scrolling()` cannot answer this one: the engine's
 			 * own compensation moves the offset and starts the motion sampler, so gating on it
 			 * skips every tick this exists for — and in WebKit a programmatic scroll's event
@@ -913,12 +924,12 @@ function lateDrift(ref, grow, floorShrink) {
 			 * against 600px of growth — so an offset that merely differs is the engine working, and
 			 * refusing on that leaves the engine's own residual (58px) uncorrected. What must not be
 			 * touched is a page still in motion, which is asked directly instead. */
-			if (scrollTop() !== seen) return;
+			if (scrollTop() !== seen) return why('offset-moved');
 			/* the tick usually replaces the element this was taken on, so without the section
 			 * fallback the correction does nothing on the tick it exists for */
 			let el = ref.el, was = ref.top;
 			if (!el || !el.isConnected) {
-				if (!ref.sec || !ref.sec.isConnected || ref.secTop == null) return;
+				if (!ref.sec || !ref.sec.isConnected || ref.secTop == null) return why('reference-gone');
 				el = ref.sec; was = ref.secTop;
 			}
 			let drift = el.getBoundingClientRect().top - was;
@@ -984,7 +995,7 @@ function lateDrift(ref, grow, floorShrink) {
 					 * REPEAT's own mark never moved (misses [true,true,false]) — e0b6db4's fault on the
 					 * other side of the same comparison. */
 					rememberRest(true);
-					return;
+					return why('engine-partly-' + Math.round(compensated) + '-of-' + Math.round(grow));
 				}
 				/* else: within table-row rounding — drift is still whatever it was (< 1 per the guard
 				 * above), so the plain `drift < 1` return two lines down is what fires, unwritten and
@@ -1007,12 +1018,13 @@ function lateDrift(ref, grow, floorShrink) {
 				 * second of three back-to-back refills, unchanged — chromium/firefox/webkit alike,
 				 * `_engineTrusted` true throughout. */
 				if (grow > 1 || floorShrink > 1) rememberRest(true);
-				return;						/* the engine put it back */
+				return why('no-drift-grow-' + Math.round(grow));	/* the engine put it back */
 			}
-			if (Math.abs(drift) > (window.innerHeight || 800)) return;
+			if (Math.abs(drift) > (window.innerHeight || 800)) return why('drift-too-big');
 			const sc = scroller();
 			const at = sc ? sc.scrollTop : window.scrollY;
 			writeOffset(sc, at + drift);
+			why('wrote-' + Math.round(drift));
 			/* A FRESH, FORCED rememberRest(), not just `_restAt = scrollTop()` — task refill2. The
 			 * write moves the page by exactly the drift measured, so `_rest.top` still holds FOR THIS
 			 * TICK's own `el`, but `_rest` itself was taken by run() at the top of THIS callback,
@@ -1514,6 +1526,8 @@ return baseclass.extend({
 	/* "is the reader scrolling" and "I could not measure, wake me when they stop": a pass that reads
 	 * layout asks the first and calls the second, one that only writes does neither */
 	scrolling,
+	/* unmarked, for tools/scroll-anchor.mjs — see `_lateWhy` */
+	lateWhy: () => _lateWhy,
 	deferMeasurement,
 
 	/* -> the offset this file last took a reference at, or null before it has taken one.

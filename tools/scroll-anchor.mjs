@@ -459,6 +459,7 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 	 * correction that ran and missed. Read here, immediately before the refill. */
 	const fitMod = await window.L.require('fs-fit').then((m) => m, () => null);
 	const themeStill = fitMod ? !fitMod.scrolling() : null;
+	const lateWhy = () => (fitMod && typeof fitMod.lateWhy === 'function' ? fitMod.lateWhy() : 'n/a');
 	const bodyH0 = body.offsetHeight;
 	const docH = () => (sc ? sc.scrollHeight : document.documentElement.scrollHeight);
 
@@ -547,6 +548,9 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		});
 		const after = { pos: pos(), top: lastTop };
 		const writes = (window.__fsW || []).slice(w0);
+		/* WHICH LINE DECIDED — see `_lateWhy` in fs-fit.js. Read after the window, so it holds the
+		 * decision this refill produced rather than the previous cell's. */
+		const why = lateWhy();
 		/* The offset the swap actually asked the scroller to move by — separate from `clamped`
 		 * (what the engine took OUT of a document momentarily empty) and from `moved` (what the
 		 * reader's mark shows). A cell that reports `clamped 0px` because the engine declined to
@@ -560,7 +564,7 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		pad.remove();
 		await wait(700);		/* let the floor come back down before the next pass measures */
 		return { empty, after, moved: after.top === null ? null : after.top - before.top,
-			clamped: before.pos - empty.pos, offsetDelta, grewDoc, correctedAt, writes };
+			clamped: before.pos - empty.pos, offsetDelta, grewDoc, correctedAt, writes, why };
 	};
 
 	const corrected = await swap();
@@ -582,7 +586,7 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		correctedAt: corrected.correctedAt,
 		late: corrected.correctedAt !== null && corrected.correctedAt > lateMs,
 		writes: corrected.writes,
-		bodyDesc, bodyH: bodyH0, witness, themeStill,
+		bodyDesc, bodyH: bodyH0, witness, themeStill, why: corrected.why,
 		floorMoved: floorOnly.skip ? null : floorOnly.moved,
 		floorClamped: floorOnly.skip ? null : floorOnly.clamped,
 		floorOffsetDelta: floorOnly.skip ? null : floorOnly.offsetDelta,
@@ -1186,13 +1190,13 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 		found(`${where}: a section was refilled the way a poll refills one and the page never `
 			+ `came back — still ${swap.moved}px off after ${SWAP_WINDOW}ms `
 			+ `(the engine clamped ${swap.clamped}px of offset away)`
-			+ `, growth witness: ${swap.witness}, theme still at refill: ${swap.themeStill}`
+			+ `, growth witness: ${swap.witness}, theme still at refill: ${swap.themeStill}, theme said: ${swap.why}`
 			+ ` — writes: ${JSON.stringify(swap.writes || [])}`);
 	else if (swap.correctedAt !== null && swap.correctedAt > LATE_MS)
 		found(`${where}: a section was refilled the way a poll refills one and the correction `
 			+ `landed ${swap.correctedAt}ms after the refill (over the ${LATE_MS}ms late `
 			+ `threshold — visible to the reader as a jump)`
-			+ `, growth witness: ${swap.witness}, theme still at refill: ${swap.themeStill}`
+			+ `, growth witness: ${swap.witness}, theme still at refill: ${swap.themeStill}, theme said: ${swap.why}`
 			+ ((swap.writes && swap.writes.length) ? ` — writes: ${JSON.stringify(swap.writes)}` : ''));
 	/* The floor is judged on the CLAMP, not on the movement, and only where the theme owns the job:
 	 * with the correction switched off nobody compensates the pad the probe grows, so the

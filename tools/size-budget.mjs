@@ -367,7 +367,13 @@ const LIMITS = {
 	 * of three on `webkit owrtsnap @1440 side compact overview` against a local run of the same cell
 	 * that passed every time because the fold happened to land below the growing block. The limit
 	 * goes to 95,760, 66 B of head-room. */
-	resourcesJs: 95_760,
+	/* 96,014 B on 2026-09-12, up 254 B: `lateDrift()` names the exit it took (`_lateWhy`, exported as
+	 * `lateWhy()` for the sweep, the same unmarked shape as `restAt()` and `engineTrusted()`). It has
+	 * eight ways to return without writing and from outside they are one symptom — `writes: []` — and
+	 * six CI runs were spent guessing between them, each guess a push. These bytes buy the difference
+	 * between "the theme decided not to write" and "the theme never got to decide", printed in the
+	 * finding itself. The limit goes to 96,100, 86 B of head-room. */
+	resourcesJs: 96_100,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -623,7 +629,9 @@ const LIMITS = {
 	/* 60,807 B on 2026-09-12, up 7 B: the same witness climb as `resourcesJs`'s own note on this
 	 * commit — `fs-fit.js` is cold, so every reader pays it once. The limit goes to 60,880, 73 B of
 	 * head-room. */
-	coldJs: 60_880,
+	/* 61,127 B on 2026-09-12, up 247 B: the same exit naming as `resourcesJs`'s own note on this
+	 * commit — `fs-fit.js` is cold. The limit goes to 61,210, 83 B of head-room. */
+	coldJs: 61_210,
 };
 
 function bytes(path) {
