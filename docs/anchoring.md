@@ -1502,3 +1502,26 @@ have reported a shrink the size of the whole box.
 `tools/scroll-anchor.mjs` now prints `growth witness: none | self | div#id@<pinned>` on the
 never-came-back and corrected-late findings, so the next report of this shape says which of the two
 witnesses was blind instead of leaving it to be inferred.
+
+## The later batch must NOT win — task twohalves, measured and reverted
+
+`dom.content()` refills in two batches, empty then fill, and the observer delivers both.
+`lateDrift()` arms on the first and drops the second (`if (_lateFrame) return`), which aims the
+correction at the half-second in which the section does not exist. CI measured what that costs on
+`webkit owrtsnap @1440 side compact overview`: `theme said: wrote--834` — the theme wrote minus 834
+pixels for a refill that grew the page by 120, then had nothing left for the real one, which reads
+from outside as `writes: []` inside the measuring window with the damage done just before it.
+
+**The obvious fix is wrong and the measurement says so.** Cancelling the pending call and re-arming
+with the later batch — one `cancelAnimationFrame`/`clearTimeout` and a re-arm — turned the sweep
+from clean into **12 findings on the ordinary path**: `engine-anchoring on`, Overview, the reader
+drifted 46px, 88px and 138px across real poll ticks at every density and both layouts, on
+`owrt2512` and `owrtsnap` alike. A real tick delivers around twenty mutation records, not two, so
+every arm is superseded by the next and the correction never fires at all. Reverted; the same
+command reads 276 runs and no findings again, which is how the 12 were shown to be the fix's own.
+
+Whatever closes the `-834` has to leave the twenty-record case alone. The distinguishing mark of
+the batch that must not be armed on is not "there is a later one" — that cannot be known when the
+decision is made — but that the batch is a REMOVAL: the section loses children and gains none, and
+the box it hangs from does not grow. That is checkable at arming time and does not exist on a
+poll tick's ordinary records.

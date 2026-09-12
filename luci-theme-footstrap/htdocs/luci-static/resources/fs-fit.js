@@ -1418,14 +1418,30 @@ function observeContent() {
 		 * normal with the engine ablated off. One pass and no `type` test, unlike the
 		 * `records.find()` above: this observer registers `childList` only, and a record of any
 		 * other type carries two empty node lists anyway. */
-		let gone = 0, came = 0;
-		for (const m of records)
+		let gone = 0, came = 0, took = 0, gave = 0;
+		for (const m of records) {
 			if (m.target === viewHost) { gone += m.removedNodes.length; came += m.addedNodes.length; }
+			if (m.type === 'childList') { took += m.removedNodes.length; gave += m.addedNodes.length; }
+		}
 		if (gone && came) {
 			forgetRest();
 			return;
 		}
-		if (trustEngine) lateDrift(settled, grew, floorShrink);
+		/* NOT ON A BATCH THAT ONLY TOOK NODES AWAY — task twohalves. `dom.content()` is empty-then-fill,
+		 * and where the two halves reach this observer as two batches, arming on the first aims the
+		 * correction at a page that is about to stop existing: CI measured `wrote--834` for a refill
+		 * that grew the page by 120, the reader thrown by the transient and nothing left for the real
+		 * half. Superseding the armed call with the later batch was measured instead and is WORSE —
+		 * a real tick delivers around twenty records, each one cancelling the last, and the sweep went
+		 * from clean to 12 findings of ordinary drift (docs/anchoring.md, "The later batch must NOT
+		 * win"). This is the discriminator that survives both: a batch that removed nodes, added none
+		 * and left the floored box no taller is a removal, and a removal is not a page to correct
+		 * against. A synchronous `dom.content()` — every real poll tick — delivers its removals and
+		 * its additions in ONE batch and is untouched. */
+		if (trustEngine) {
+			if (took && !gave && grew <= 0) why('emptying');
+			else lateDrift(settled, grew, floorShrink);
+		}
 		else scheduleAnchor(ref);
 	});
 	for (const host of hosts) {

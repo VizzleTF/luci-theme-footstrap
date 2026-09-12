@@ -373,7 +373,14 @@ const LIMITS = {
 	 * six CI runs were spent guessing between them, each guess a push. These bytes buy the difference
 	 * between "the theme decided not to write" and "the theme never got to decide", printed in the
 	 * finding itself. The limit goes to 96,100, 86 B of head-room. */
-	resourcesJs: 96_100,
+	/* 96,121 B on 2026-09-12, up 21 B: `lateDrift()` is not armed on a batch that removed nodes,
+	 * added none and left the floored box no taller — task twohalves. Where `dom.content()`'s two
+	 * halves reach the observer separately, arming on the first wrote `-834px` for a refill that grew
+	 * the page by 120. Superseding the armed call with the later batch was measured first and is
+	 * worse: a real tick carries ~20 records, each cancelling the last, 12 findings of ordinary drift.
+	 * A synchronous `dom.content()` delivers both halves in one batch and is untouched. The limit goes
+	 * to 96,200, 79 B of head-room. */
+	resourcesJs: 96_200,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -631,7 +638,9 @@ const LIMITS = {
 	 * head-room. */
 	/* 61,127 B on 2026-09-12, up 247 B: the same exit naming as `resourcesJs`'s own note on this
 	 * commit — `fs-fit.js` is cold. The limit goes to 61,210, 83 B of head-room. */
-	coldJs: 61_210,
+	/* 61,234 B on 2026-09-12, up 24 B: the same removal guard as `resourcesJs`'s own note on this
+	 * commit. The limit goes to 61,310, 76 B of head-room. */
+	coldJs: 61_310,
 };
 
 function bytes(path) {

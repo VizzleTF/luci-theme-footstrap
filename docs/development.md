@@ -848,6 +848,16 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   `corrected late` within ~50 ms of the threshold; a real one reproduces on a quiet machine. Run the
   sweep on its own, and `spa-parity`/`check` after it.
 
+- **Two `tools/ci-local.sh` runs against the same stands invent findings, and `--force` does not
+  make it safe — it only silences the refusal that was protecting you.** Measured 2026-09-12: a
+  second `anchors:webkit` started 37 s after the first, both with `--force`, and the pair reported
+  **12 findings** — `the reader drifted 46/88/138px across real poll ticks` at every density and
+  both layouts, on two stands. Run alone, the same commit and the same command read 276 runs and no
+  findings. The script's default refusal names this exact failure; passing `--force` is a promise
+  that nothing else is using the stands, and the way to keep it is `ps -eo cmd | grep -E
+  '[s]croll-anchor|[c]i-local'` returning nothing before you start. A finding that appears on twelve
+  cells at once, evenly across an axis, is this and not the theme.
+
 - **"no owlab router is running, so nothing was checked" while all eight are up means the gate
   could not find `owlab`, not that the stands are down.** `owlab` is a Go binary in `~/go/bin`, put
   on `PATH` by the login profile — and a login shell started as `wsl.exe -e bash -lc` from a Windows
