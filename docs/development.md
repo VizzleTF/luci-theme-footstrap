@@ -838,6 +838,16 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   of this week's findings need the window as wide as it is. Full `--full` across three engines:
   ~75 min serial, **1860 s (31 min) at nine shards**, 828 runs.
 
+- **Nine shards is the ceiling; running the sweep ALONGSIDE `spa-parity` and `npm run check`
+  manufactures late findings that are not there.** Measured 2026-09-12: nine sweep shards plus three
+  `spa-parity` runs plus a full `check`, thirteen processes at once, produced two
+  `corrected late` findings — `webkit owrt2410d` at 228 ms and `webkit owrt2512d` at 247 ms, both
+  `@1440 side normal engine DECLINES overview`, both just over the gate's own 200 ms `LATE_MS`. The
+  identical three webkit shards on an otherwise idle machine, same commit and same stands, read 276
+  runs and no findings. Tell the two apart by re-running the engine alone before believing a
+  `corrected late` within ~50 ms of the threshold; a real one reproduces on a quiet machine. Run the
+  sweep on its own, and `spa-parity`/`check` after it.
+
 - **"no owlab router is running, so nothing was checked" while all eight are up means the gate
   could not find `owlab`, not that the stands are down.** `owlab` is a Go binary in `~/go/bin`, put
   on `PATH` by the login profile — and a login shell started as `wsl.exe -e bash -lc` from a Windows

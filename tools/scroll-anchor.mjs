@@ -441,6 +441,16 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 	 * the correction working. */
 	const bodyDesc = body.tagName.toLowerCase() + (body.id ? '#' + body.id : '')
 		+ (body.className ? '.' + String(body.className).trim().replace(/\s+/g, '.') : '');
+	/* WHAT THE THEME'S GROWTH WITNESS CAN SEE FROM HERE — task blindgrow. `observeContent()` measures
+	 * a refill against the `min-height` on the floored box, so a refill with no floored box in its
+	 * ancestry has no witness at all and a `lateDrift()` whose element-based drift is also blind
+	 * writes nothing. That reads in a report exactly like a correction that ran and failed, which is
+	 * three CI runs of guesswork; printed here so a "never came back" finding says which of the two
+	 * it was. Read BEFORE the swap, while the floor of the settled page is still standing. */
+	const floorBox = body.closest && body.closest('[data-fs-floor]');
+	const witness = !floorBox ? 'none'
+		: (floorBox === body ? 'self' : floorBox.tagName.toLowerCase() + (floorBox.id ? '#' + floorBox.id : ''))
+			+ '@' + Math.round(parseFloat(floorBox.style.minHeight) || 0);
 	const bodyH0 = body.offsetHeight;
 	const docH = () => (sc ? sc.scrollHeight : document.documentElement.scrollHeight);
 
@@ -564,7 +574,7 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		correctedAt: corrected.correctedAt,
 		late: corrected.correctedAt !== null && corrected.correctedAt > lateMs,
 		writes: corrected.writes,
-		bodyDesc, bodyH: bodyH0,
+		bodyDesc, bodyH: bodyH0, witness,
 		floorMoved: floorOnly.skip ? null : floorOnly.moved,
 		floorClamped: floorOnly.skip ? null : floorOnly.clamped,
 		floorOffsetDelta: floorOnly.skip ? null : floorOnly.offsetDelta,
@@ -632,6 +642,16 @@ const REPEAT = async ([ growth, tol, times ]) => {
 	if (!mark) return { skip: 'nothing under the reader that survives the swap' };
 	const bodyDesc = body.tagName.toLowerCase() + (body.id ? '#' + body.id : '')
 		+ (body.className ? '.' + String(body.className).trim().replace(/\s+/g, '.') : '');
+	/* WHAT THE THEME'S GROWTH WITNESS CAN SEE FROM HERE — task blindgrow. `observeContent()` measures
+	 * a refill against the `min-height` on the floored box, so a refill with no floored box in its
+	 * ancestry has no witness at all and a `lateDrift()` whose element-based drift is also blind
+	 * writes nothing. That reads in a report exactly like a correction that ran and failed, which is
+	 * three CI runs of guesswork; printed here so a "never came back" finding says which of the two
+	 * it was. Read BEFORE the swap, while the floor of the settled page is still standing. */
+	const floorBox = body.closest && body.closest('[data-fs-floor]');
+	const witness = !floorBox ? 'none'
+		: (floorBox === body ? 'self' : floorBox.tagName.toLowerCase() + (floorBox.id ? '#' + floorBox.id : ''))
+			+ '@' + Math.round(parseFloat(floorBox.style.minHeight) || 0);
 	const bodyH0 = body.offsetHeight;
 	const docH = () => (sc ? sc.scrollHeight : document.documentElement.scrollHeight);
 
@@ -1158,11 +1178,13 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 		found(`${where}: a section was refilled the way a poll refills one and the page never `
 			+ `came back — still ${swap.moved}px off after ${SWAP_WINDOW}ms `
 			+ `(the engine clamped ${swap.clamped}px of offset away)`
+			+ `, growth witness: ${swap.witness}`
 			+ ` — writes: ${JSON.stringify(swap.writes || [])}`);
 	else if (swap.correctedAt !== null && swap.correctedAt > LATE_MS)
 		found(`${where}: a section was refilled the way a poll refills one and the correction `
 			+ `landed ${swap.correctedAt}ms after the refill (over the ${LATE_MS}ms late `
 			+ `threshold — visible to the reader as a jump)`
+			+ `, growth witness: ${swap.witness}`
 			+ ((swap.writes && swap.writes.length) ? ` — writes: ${JSON.stringify(swap.writes)}` : ''));
 	/* The floor is judged on the CLAMP, not on the movement, and only where the theme owns the job:
 	 * with the correction switched off nobody compensates the pad the probe grows, so the
