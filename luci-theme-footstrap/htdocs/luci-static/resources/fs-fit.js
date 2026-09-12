@@ -1030,7 +1030,7 @@ function lateDrift(ref, grow, floorShrink) {
 			 * `force`, `moved 0, 0, 0` with it, both `trusted true` throughout). */
 			rememberRest(true);
 			/* A DROP IN THIS SAME BOX'S OWN FLOOR IS NOT EVIDENCE ABOUT THE ENGINE — task refill2. Every
-			 * `run()` clears and rewrites `r.target`'s `min-height`, and a WRITE to that property is a
+			 * `run()` clears and rewrites the floored box's `min-height`, and a WRITE to that property is a
 			 * scroll-anchor invalidation in its own right (`holdFloor()`'s own citation), independent of
 			 * how reliably this engine otherwise keeps a reference: a floored box whose content really
 			 * did shrink pays this cost on every engine, every time, structurally — counting it toward
@@ -1313,12 +1313,35 @@ function observeContent() {
 		 * nothing on the distrusted path too, in the recovery check right below, so the read can no
 		 * longer be skipped there. One extra `records.find` and an `offsetHeight` per distrusted
 		 * tick — the one path that used to pay nothing here at all. */
-		const r = records.find((m) => m.type === 'childList' && m.target.hasAttribute('data-fs-floor'));
+		/* THE FLOORED BOX THE RECORD SITS IN, not only a record whose target IS one — task blindgrow.
+		 * `dom.content()` empties and refills the node it is handed, and that node is often a level
+		 * or two INSIDE the box `holdFloor()` pinned: measured live on Overview (webkit/owrtsnapb,
+		 * `../tmp/floorprobe.mjs`), of twelve nodes a poll refills on that page one sits inside a
+		 * floored box without wearing the mark itself. For those the old `m.target.hasAttribute`
+		 * matched nothing, `grew` read 0, and a `lateDrift()` whose element-based `drift` was ALSO
+		 * blind — `anchorRef()` having hit-tested something the growth never reached — concluded
+		 * there was nothing to correct and wrote nothing at all. That is the `writes: []`,
+		 * `corrected never` shape CI reported on `webkit owrtsnap @1440 side compact overview` in
+		 * three runs of three while every local run of the same cell passed: locally the fold
+		 * happened to land BELOW the growing block, so `drift` carried the correction on its own and
+		 * the missing `grew` never showed.
+		 *
+		 * `closest()` and not a parent walk: it stops at the first floored ancestor, which is the box
+		 * whose `min-height` holds the pre-tick height this measures against, and it costs one call
+		 * on the handful of records a tick delivers. Strictly wider than what it replaces — a target
+		 * that already wore the mark is its own `closest()` — so no tick that used to find a witness
+		 * can stop finding one. */
+		let r = null, box = null;
+		for (const m of records) {
+			if (m.type !== 'childList' || !m.target.closest) continue;
+			const b = m.target.closest(FLOORED);
+			if (b) { r = m; box = b; break; }
+		}
 		/* a box freshly wearing its FIRST floor has no "before" to measure against — parseFloat
 		 * of an unset `min-height` is NaN, `|| 0` reads as "no growth" rather than false growth
 		 * the size of the whole box */
-		const before = r && (parseFloat(r.target.style.minHeight) || 0);
-		const grew = before ? r.target.offsetHeight - before : 0;
+		const before = box && (parseFloat(box.style.minHeight) || 0);
+		const grew = before ? box.offsetHeight - before : 0;
 		/* RECOVERY EVIDENCE, task trust — read here and nowhere else; see TRUST_RECOVERY_LIMIT's own
 		 * comment for why `applyAnchor()` cannot see it. THE SAME REFERENCE `lateDrift()` trusts on
 		 * the other path (`_rest.el`'s own rect against the top it was remembered at), read before
@@ -1342,7 +1365,7 @@ function observeContent() {
 			_lateMisses = _lateHits = 0;
 		}
 		/* THE SAME BOX'S FLOOR, BEFORE AND AFTER THIS run() — task refill2. `holdFloor()` inside
-		 * run() clears and rewrites `r.target`'s own `min-height` every tick, which is a scroll-
+		 * run() clears and rewrites `box`'s own `min-height` every tick, which is a scroll-
 		 * anchor-invalidating style write on its own account (css-scroll-anchoring-1 §2.2.2,
 		 * `holdFloor()`'s own comment) — so a floored box whose CONTENT genuinely shrinks (a poll's
 		 * data losing rows, or in this callback the mutation record ITSELF being a removal) drops the
@@ -1363,10 +1386,10 @@ function observeContent() {
 		 * own `run()`, or another mutation's) leaves nothing stale behind — cleared below the moment
 		 * any tick's `holdFloor()` actually runs, for the identical reason. */
 		const wasScrolling = scrolling();
-		if (r && before && wasScrolling) _deferredFloor = r.target;
+		if (r && before && wasScrolling) _deferredFloor = box;
 		run(records);
 		if (!wasScrolling) _deferredFloor = null;
-		const floorShrink = (r && before) ? Math.max(0, before - (parseFloat(r.target.style.minHeight) || 0)) : 0;
+		const floorShrink = (r && before) ? Math.max(0, before - (parseFloat(box.style.minHeight) || 0)) : 0;
 		/* `#view` ITSELF EMPTIED AND REFILLED IS A PAGE SWAP, NOT A REFILL — task latecommit,
 		 * docs/anchoring.md "The commit is not a refill". The router commits a client navigation
 		 * with `dom.content()` on the live `#view` (commitStage(), fs-router.js) and the browser

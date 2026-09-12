@@ -1470,3 +1470,35 @@ a mechanism of this theme is measurable**, which is worth knowing before `--only
 core three. Both belong to the layer 0.14.7.1 removed: a correction that repairs another correction
 is what the reports were about, and neither fault they answer has been reported since.
 
+
+## A witness that cannot see the box it is measuring — task blindgrow
+
+`observeContent()` hands `lateDrift()` a growth in pixels: the refilled container's height now,
+against the `min-height` `holdFloor()` pinned it at before the tick. It found that container by
+matching a mutation record whose **target itself** wore `data-fs-floor` — and `dom.content()`
+refills the node it is handed, which is regularly a level or two inside the pinned box. Measured on
+Overview (`webkit`/`owrtsnapb`, `../tmp/floorprobe.mjs`): of twelve nodes a poll refills there, one
+sits inside a floored box without the mark and two have no floored ancestor at all.
+
+For those the witness returned nothing and `grew` read 0. On its own that is survivable — the
+element-based `drift` normally carries the correction. The failure needs both witnesses blind at
+once, which is exactly what a fold landing ABOVE the growing block produces: `drift` reads 0 because
+the reference never moved, `grew` reads 0 because the record's target was not the pinned box, and
+`lateDrift()` concludes there is nothing to correct and writes nothing.
+
+**That is why this file's own cell list read green here and red in CI for three runs.** On these
+stands the fold lands below the growing block and `drift` alone is enough; CI's pages are shorter
+and it lands above. Seven differences between the two were measured and ruled out first — host load
+(`load average` 16.7 of 20), core count (`taskset -c 0-3`), one process against three stands, the
+minified package installed the way CI installs it, a stand recreated from scratch, the WebKit build
+(`webkit-2336` both sides), and all of them together on the full axis: 276 runs, no findings, every
+time.
+
+`closest(FLOORED)` is strictly wider than the match it replaces, so no tick that used to find a
+witness can stop finding one. Two reads downstream move to the box with it — `_deferredFloor` and
+`floorShrink` both took `r.target.style.minHeight`, unset on an inner node, and left behind would
+have reported a shrink the size of the whole box.
+
+`tools/scroll-anchor.mjs` now prints `growth witness: none | self | div#id@<pinned>` on the
+never-came-back and corrected-late findings, so the next report of this shape says which of the two
+witnesses was blind instead of leaving it to be inferred.
