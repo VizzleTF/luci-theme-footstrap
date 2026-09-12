@@ -886,12 +886,7 @@ function lateDrift(ref, grow, floorShrink) {
 	if (_lateFrame || !ref) return;
 	_lateFrame = requestAnimationFrame(() => {
 		const seen = scrollTop();
-		/* STILL FOR SCROLL_IDLE, the interval this file already calls a page nobody is scrolling.
-		 * A frame is not long enough to tell a flick from a still page: a flick moves the offset in
-		 * steps of tens of milliseconds and two rAFs (~16 ms) fall inside one step, so the offset
-		 * reads the same twice while the page is plainly moving. 120 ms was still short enough to
-		 * let one 160px correction through on a loaded runner. */
-		_lateFrame = window.setTimeout(() => {
+		const settle = () => {
 			_lateFrame = 0;
 			if (!anchorEnabled() || Date.now() < _userUntil) return;
 			if (_restPage !== pageStamp()) return;
@@ -903,6 +898,11 @@ function lateDrift(ref, grow, floorShrink) {
 			 * with the reference on a still page, so an offset anywhere else means the reader has
 			 * moved since, and whatever this would put back they have already scrolled past. A
 			 * correction landing inside a flick is itself a jump (161px, webkit/Overview).
+			 *
+			 * The wait-length fork at the bottom of this function does consult `scrolling()`, and
+			 * it is not this rule loosened: it decides HOW LONG to wait, never WHETHER to write. A
+			 * tick the engine did move the offset for takes the long road and still arrives here,
+			 * where this same check is what answers.
 			 *
 			 * `ref.at` and not `_restAt`: run() re-remembers between the mutation and this frame,
 			 * and where the sampler has not started yet — WebKit again — that re-take records the
@@ -1056,7 +1056,50 @@ function lateDrift(ref, grow, floorShrink) {
 			/* This engine did not keep the reference across a container refill, once more on this
 			 * page — see LATE_MISS_LIMIT above for what happens once that has been measured twice. */
 			if (++_lateMisses >= LATE_MISS_LIMIT) { _engineTrusted = false; _lateHits = 0; }
-		}, SCROLL_IDLE);
+		};
+		/* HOW LONG TO WAIT IS A QUESTION ABOUT THE READER, NOT A CONSTANT — task late419.
+		 *
+		 * STILL FOR SCROLL_IDLE is the answer where the page is, or might be, in motion: a frame is
+		 * not long enough to tell a flick from a still page by the offset alone, because a flick
+		 * moves it in steps of tens of milliseconds and two rAFs (~16ms) fall inside one step, so
+		 * the offset reads the same twice while the page is plainly moving. 120ms was still short
+		 * enough to let one 160px correction through on a loaded runner. That is unchanged, and it
+		 * is what every branch below still runs on.
+		 *
+		 * But a page the theme ALREADY KNOWS is still does not need to be asked again. `scrolling()`
+		 * is this file's own answer to "has anything moved the offset in the last SCROLL_IDLE",
+		 * sampled from the POSITION every frame rather than from the event stream, so it sees
+		 * momentum and rubber-banding that dispatch nothing (its own comment) — and `_userUntil` is
+		 * the reader's hand on the page: a `touchstart`, `wheel`, `mousedown` or `keydown` arrives
+		 * BEFORE the offset it is about to move, so a flick about to begin has already said so.
+		 * Where both answer "nobody is driving and nothing has moved", the only thing that can have
+		 * touched the offset since the reference was taken is the engine, whose own correction
+		 * window is measured at 7-36ms — not 400 — so the wait is the next frame and the same
+		 * `scrollTop() !== seen` check decides, exactly as it does on the long path. Two rAFs in
+		 * total, one apart: `settleDeferredFloor()`'s own shape, and for its stated reason — the
+		 * offset read twice a frame apart is the check, and the wait is only there to space the
+		 * two reads. A third frame was measured and is not bought: it costs 11-16ms of the
+		 * headroom under the gate's own `LATE_MS` and changes no reading — webkit 67/71/72ms
+		 * against 51/54/61ms on the same three stands, everything else identical.
+		 *
+		 * NEITHER GUARD ALONE WOULD DO, and that is the whole reason this is a pair. `_userUntil` is
+		 * a 400ms timer off the last EVENT, and iOS momentum carries the page long after the finger
+		 * has gone — the same fault `scrolling()` exists because of. And `scrolling()` alone would
+		 * write into the moment a finger is down on a page that has not moved yet. A synthetic flick
+		 * makes the first half concrete: `tools/scroll-anchor.mjs`'s QUIET drives its 24 steps by
+		 * assigning `scrollTop`, so it carries no intent event at all, and an intent-only gate would
+		 * take the short path straight through the middle of it.
+		 *
+		 * Measured (`tools/scroll-anchor.mjs`, the `engine DECLINES` cell this task added — the
+		 * engine ablated off while the theme still trusts it, which is the state CI caught 2 runs in
+		 * 3 and no local run ever): 404-422ms before, 8-61ms after, on nine cells — three engines
+		 * against three stands, `@1440 side compact overview`, the cell CI reported. The other two
+		 * cells of the same axis are untouched, which is the point: the engine-anchoring-on cell
+		 * corrects at 4-19ms (the engine's own work, which never reaches this path) and the
+		 * engine-OFF cell at 6-44ms (`applyAnchor()`, a different function). `mid-flick surprises`
+		 * reads 0 on all 27. */
+		if (!scrolling() && Date.now() >= _userUntil) _lateFrame = requestAnimationFrame(settle);
+		else _lateFrame = window.setTimeout(settle, SCROLL_IDLE);
 	});
 }
 

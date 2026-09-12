@@ -81,7 +81,9 @@ every refill the theme did not correct itself; each one it actually has to write
 single one-off, since a page that corrects at all some of the time is not the same fault as one that
 never does; a second is the count, not a guess), `_engineTrusted` goes false and every later refill
 on that page takes the `anchorFor()` → `scheduleAnchor()` path instead — the one `applyAnchor()`
-measures at 7-36ms rather than `lateDrift()`'s 419-420ms. The comment at the increment site claims
+measures at 7-36ms rather than `lateDrift()`'s 419-420ms. (Task late419 has since taken that second
+number to 8-61ms for a page that was already still when the refill landed; what still separates the
+two paths is that this one waits out a reader who IS moving.) The comment at the increment site claims
 only what is measured: "this engine did not keep the reference across a container refill, N times on
 this page" — never a browser name, because the count is what is asked, not the identity. Chromium and
 Firefox measure 0 residuals on the pages this sweep covers, so `_lateMisses` never advances for them
@@ -108,6 +110,69 @@ combination is big enough to collapse (`nothing above the reader big enough to c
 skip the `.fs-ovl` grid case uses). Widening what `SWAP` can measure — a smaller minimum collapse
 size, or picking a body nearer the fold instead of the tallest one entirely above it — is a change to
 what the case tests, not a flag on top of it, and is out of scope here.
+
+## How long to wait is a question about the reader — task late419
+
+`lateDrift()` waited `SCROLL_IDLE` (400ms) after its own first frame before it would write, whatever
+the page had been doing, so a refill the engine declined to anchor was corrected 419ms after it
+happened. The reader ends up in the right place; they see a jump getting there, which is what the
+sweep's `LATE_MS` threshold (200ms) exists to call out.
+
+**It survived three CI runs of one commit — green, red, red, the same cell each time.** `webkit
+owrtsnap @1440 side compact, engine-anchoring on, overview`: `the correction landed 419ms after the
+refill … writes: [{"t":29054,"how":"scrollTop=maincontent","val":1014}]`. One write, at the offset
+the reader needed, 419ms late. A full local sweep — 552 runs, three engines, three twins — found it
+zero times, because on an unloaded machine WebKit anchors that refill every time and `lateDrift()`
+is never the corrector. The green run was the engine working, not the theme.
+
+**The gate could only see it by accident, so it was given a way to see it on purpose.** The
+`noEngineAnchor` axis had two states and neither can reach the one that failed: with the engine on
+the engine does the work, and with `fsEngineAnchor=off` the theme KNOWS it is alone and takes
+`applyAnchor()` (7-36ms) instead. The state CI caught is the third — the engine declining while the
+theme still trusts it — and it is one `addInitScript` away: the same `overflow-anchor: none`
+stylesheet without the `localStorage` half. `tools/scroll-anchor.mjs` now runs that as a third cell
+per group, printed `engine DECLINES`, skipping TICK and REPEAT exactly as the `OFF` cell does (REPEAT
+for the opposite reason: there `_engineTrusted` going false is the switch working, so its "the flag
+tripped while the reader never moved" finding would fire on correct behaviour). **Red on HEAD,
+deterministically: 9 cells of 9 — chromium 409/419/420ms, firefox 404/415/417ms, webkit
+421/421/422ms**, three engines against `owrt2512b`/`owrt2410b`/`owrtsnapb`, on a machine under no load
+at all.
+
+**The cause, once it was reproducible on demand.** 419-421ms is the timer itself: one rAF plus
+`SCROLL_IDLE`. That wait is there because a frame cannot tell a flick from a still page by the offset
+alone — a flick moves it in steps of tens of milliseconds, two rAFs fall inside one step, and 120ms
+was measured letting a 160px correction through on a loaded runner. But the page in this cell was
+provably still before the refill and nothing but the refill happened during it, and this file already
+knows that: `scrolling()` is its own answer to "has anything moved the offset in the last
+`SCROLL_IDLE`", sampled from the POSITION every frame, and `_userUntil` is the reader's hand on the
+page — `touchstart`, `wheel`, `mousedown` and `keydown` all arrive BEFORE the offset they are about
+to move. Where both say nobody is driving and nothing has moved, the only thing that can have touched
+the offset since the reference was taken is the engine, and the engine's own correction window is
+7-36ms, not 400. So the wait forks: the next frame where the page was already still, the full
+`SCROLL_IDLE` where it was not. The `scrollTop() !== seen` check that decides whether to write is
+unchanged and runs on both paths — the fork decides HOW LONG to wait, never WHETHER to write.
+
+**Measured: 404-422ms → 8-61ms**, the same nine cells and the same command. The other two states of
+the axis do not move, which is the point — `engine-anchoring on` corrects at 4-19ms (the engine's own
+work, which never reaches this path) and `engine-anchoring OFF` at 6-44ms (`applyAnchor()`, a
+different function) — and `mid-flick surprises` reads 0 on all 27.
+
+**Two negative results worth keeping.**
+
+*Neither guard would do alone, and the direction this task started from was the intent check on its
+own.* `_userUntil` is a 400ms timer off the last EVENT, and iOS momentum carries the page long after
+the finger has gone — the fault `scrolling()` was built for in the first place. It is also not
+hypothetical in the gate: `QUIET` drives its 24 flick steps by assigning `scrollTop`, so it carries
+no intent event at all, and an intent-only fork would take the short path straight through the middle
+of the one case whose subject is a correction landing inside a scroll. The other direction is
+narrower but real: `scrolling()` alone would write in the moment a finger is down on a page that has
+not moved yet.
+
+*A third frame buys nothing and costs headroom.* `settleDeferredFloor()`'s shape is two rAFs, one
+apart — the offset read twice a frame apart IS the check, and the wait only spaces the two reads.
+Written with an extra frame first, webkit read 67/71/72ms against 51/54/61ms with two, everything
+else identical; the extra frame is 11-16ms of the margin under `LATE_MS` for no change in any
+reading.
 
 ## A witness that cannot be blind: the growth itself (task blindref)
 
@@ -1119,7 +1184,7 @@ not a clamp to undo.
 | | runs when | what it does |
 |---|---|---|
 | `applyAnchor()` via `scheduleAnchor()` | the engine does NOT anchor | the whole correction, one rAF after the mutation, against `anchorFor()`'s reference |
-| `lateDrift()` | the engine anchors | only what the engine left behind, a frame plus `SCROLL_IDLE` later, against the memo from before the tick |
+| `lateDrift()` | the engine anchors | only what the engine left behind, against the memo from before the tick — the next frame where the page was already still, a frame plus `SCROLL_IDLE` where it was not (task late419) |
 
 Each ends in one write and reads nothing back. A third correction around the deferred pass
 (`settleDrift()`), and a shared writer that re-read where the element had landed after a clamped
@@ -1279,6 +1344,7 @@ from a theme fault.
 | `lateDrift()` | 120px on Overview and on Processes, both scrollers, with the engine anchoring | yes — the engine's residual is not small |
 | `ENGINE_ANCHORS` | forcing "no engine anchors" on an engine that does: 120px on Processes | yes — the detection picks the path, and running both corrections is what throws the page the other way |
 | `_engineTrusted` (task latenet) | an engine that anchors but declines to on a given refill left uncaught by `ENGINE_ANCHORS` (a load-time check) leaves every later correction on `lateDrift()`'s 419-420ms path instead of `applyAnchor()`'s 7-36ms one | yes, once `LATE_MISS_LIMIT` (2) residuals have been measured on the page — not needed, and never trips, where the engine keeps the reference itself (0 residuals measured on chromium/firefox) |
+| `lateDrift()` waiting only the next frame where the page was already still (task late419) | every refill a trusted engine declines is corrected 419ms after it happened instead of 8-61ms — the reader lands right and sees a jump getting there, which `SWAP`'s `LATE_MS` reports: 9 findings of 9 `engine DECLINES` cells, three engines, three twins | yes, and the ablation IS the third cell of the axis above — nothing else in this sweep can put the theme on `lateDrift()` as the only corrector on demand |
 | the guards on a page in motion (`scrollTop() !== seen`, `_userUntil`) | 6 findings per scroller, on BOTH engines and all three pages: the offset moved on its own mid-flick, worst 185-520px | yes, and it is the only mechanism here that fails on Chromium-class engines too |
 | `anchorRef()` refusing to run while scrolling | nothing measurable | **not measurable here** — it is a cost guard, not a correctness one: every rect read there is a forced layout and this runs on every content mutation |
 | `anchorRef()` refusing `#view` as the reference | nothing on the current pages | **not measurable here.** The hit test is retried across the viewport, so it now finds real content where it used to land in a grid gap; the refusal is what keeps a future layout from silently anchoring on the host, whose own top never moves (drift 0 for ever, half the matrix silently unmeasured when it did) |

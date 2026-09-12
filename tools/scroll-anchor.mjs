@@ -153,14 +153,23 @@ const TICK_COUNT = 3;
  * SWAP simply never seeing one at all. Measured (task latenet's four-way SWAP ablation): the
  * theme's own fallback (`applyAnchor` via `scheduleAnchor`) lands 7-36ms after a refill; an engine
  * that anchors but did not keep the reference through THIS refill is caught by the theme's
- * `lateDrift()` (fs-fit.js) at 419-420ms, one rAF plus `SCROLL_IDLE` later. 200ms sits roughly
- * midway between those two clusters, with well over 150ms of headroom on either side, so ordinary
- * jitter on a loaded runner cannot cross it either way — and it is what a maintainer reading a
- * report would call the difference between "instant" and "a jump". */
+ * `lateDrift()` (fs-fit.js), which used to answer one rAF plus `SCROLL_IDLE` later — 404-422ms,
+ * measured on the `engine DECLINES` cell below across three engines and three stands. 200ms sat
+ * roughly midway between those two clusters with well over 150ms of headroom either side, so
+ * ordinary jitter on a loaded runner could not cross it, and it is what a maintainer reading a
+ * report would call the difference between "instant" and "a jump".
+ *
+ * Task late419 moved `lateDrift()` itself rather than this number: where the page was already
+ * still when the refill landed it now waits the next frame instead, and the same cells read
+ * 8-61ms. The threshold is unchanged and still separates the two shapes — what it now separates
+ * is "the theme corrected on the next frame" from "the theme waited out a reader who was moving",
+ * which is the only case left above it. */
 const LATE_MS = 200;
 /* How long SWAP watches a refill before it may call a correction "never came". Long enough to hold
- * lateDrift()'s measured 419-420ms with real margin for a loaded runner; short enough that a cell
- * that truly never corrects does not sit idle. */
+ * lateDrift()'s slow path (404-422ms, the reader in motion) with real margin for a loaded runner;
+ * short enough that a cell that truly never corrects does not sit idle. NOT shortened to match
+ * task late419's faster path: the window has to outlast the SLOWEST correction the theme can
+ * legitimately make, or "late" and "never" become the same reading again. */
 const SWAP_WINDOW = 900;
 /* How many refills REPEAT performs on the SAME section, back to back — see the note on REPEAT
  * below. `LATE_MISS_LIMIT` (fs-fit.js) is 2: one is headroom for a one-off, a second is the count.
@@ -982,7 +991,7 @@ async function captureSession(browser, base) {
  * happened to draw reads identically to one the base container drew (see `pairStands()`). Pulled out
  * of the sweep below so a worker can run its own slice of the cell list without duplicating what
  * used to be the loop body. */
-async function runCell(browser, engine, reportId, base, sessionState, { PAGE, width: w, layout, density, noEngineAnchor }) {
+async function runCell(browser, engine, reportId, base, sessionState, { PAGE, width: w, layout, density, noEngineAnchor, declines }) {
 	const ctx = await browser.newContext({ viewport: { width: w, height: 844 }, storageState: sessionState });
 	await sealToRouter(ctx, base);
 	/* HOLD and SWAP's own record of every scroll write made during their measurement
@@ -1006,18 +1015,31 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	});
 	/* the Safari path, forced: `fsEngineAnchor=off` makes fs-fit believe the platform has
 	 * no anchoring of its own, and the stylesheet turns the engine's off for real, so the
-	 * two agree about which of them is responsible */
-	if (noEngineAnchor)
-		await ctx.addInitScript(() => {
-			try { localStorage.setItem('fsEngineAnchor', 'off'); } catch (e) { /* no storage */ }
+	 * two agree about which of them is responsible.
+	 *
+	 * `declines` IS THE SAME STYLESHEET WITHOUT THE localStorage HALF — task late419, and it
+	 * is the third state of this axis rather than a flag on top of it. An engine that HAS
+	 * `overflow-anchor` and declines to use it on a given refill is not a hypothesis: CI
+	 * reported it on `webkit owrtsnap @1440 side compact overview` twice in three runs of one
+	 * commit and never once locally, because on an unloaded machine the same engine anchors
+	 * every time. The two cells above cannot reach that state by construction — one has the
+	 * engine working, the other has the theme knowing it is off — so the path the theme takes
+	 * when it TRUSTS an engine that did nothing (`lateDrift()`, fs-fit.js) was measured only
+	 * by whatever a loaded runner happened to produce. Ablating the engine alone puts the
+	 * theme in exactly that state on every engine and every run, which is what turns a 2-in-3
+	 * CI coin toss into a cell that either passes or does not. */
+	if (noEngineAnchor || declines)
+		await ctx.addInitScript((tellTheTheme) => {
+			if (tellTheTheme) try { localStorage.setItem('fsEngineAnchor', 'off'); } catch (e) { /* no storage */ }
 			document.addEventListener('DOMContentLoaded', () => {
 				const s = document.createElement('style');
 				s.textContent = 'html, body, #maincontent, .fs-main, #view, #view * { overflow-anchor: none !important; }';
 				document.head.appendChild(s);
 			});
-		});
+		}, !!noEngineAnchor);
 	const page = await ctx.newPage();
-	const where = `${engine} ${reportId} @${w} ${layout.padEnd(4)} ${density.padEnd(7)} ${noEngineAnchor ? 'engine-anchoring OFF' : 'engine-anchoring on '} ${PAGE.replace('/admin/status/', '')}`;
+	const mode = noEngineAnchor ? 'engine-anchoring OFF' : (declines ? 'engine DECLINES     ' : 'engine-anchoring on ');
+	const where = `${engine} ${reportId} @${w} ${layout.padEnd(4)} ${density.padEnd(7)} ${mode} ${PAGE.replace('/admin/status/', '')}`;
 	await login(page, base);
 	try {
 		await page.evaluate(async ([l, d]) => {
@@ -1050,14 +1072,20 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 		 * precisely what TICK exists to watch for misbehaving — running it there would
 		 * measure the theme's own correction against nothing, the question HOLD/SWAP
 		 * already answer with a synthetic pad. */
-		tick = noEngineAnchor
+		tick = (noEngineAnchor || declines)
 			? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
 			: await page.evaluate(TICK, TICK_COUNT);
 		held = await page.evaluate(HOLD, GROWTH);
 		swap = await page.evaluate(SWAP, [ GROWTH, TOLERANCE, LATE_MS, SWAP_WINDOW ]);
 		/* only against the REAL engine — same reasoning as TICK above: with `noEngineAnchor`
-		 * the fallback already runs every refill, so `_engineTrusted` has nothing to say. */
-		repeat = noEngineAnchor
+		 * the fallback already runs every refill, so `_engineTrusted` has nothing to say.
+		 * AND NOT ON THE `declines` CELL EITHER, for the opposite reason: there the flag going
+		 * false is the switch working exactly as built — the engine really is doing nothing —
+		 * so REPEAT's "the flag tripped while the reader never moved" finding would fire on
+		 * correct behaviour. SWAP above performs one trusted refill per page load, which is
+		 * the one measurement this cell is for; a second would be taken on an already-
+		 * distrusted theme and measure `applyAnchor()`, which the OFF cell already covers. */
+		repeat = (noEngineAnchor || declines)
 			? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
 			: await page.evaluate(REPEAT, [ GROWTH, TOLERANCE, REPEAT_TIMES ]);
 		quiet = await page.evaluate(QUIET, GROWTH);
@@ -1222,7 +1250,14 @@ await Promise.all(ENGINES.map(async (engine) => {
 		for (const PAGE of PAGES)
 			for (const { width, layout } of SCROLLERS)
 				for (const density of DENSITIES)
-					groups.push([ false, true ].map((noEngineAnchor) => ({ PAGE, width, layout, density, noEngineAnchor })));
+					/* Three states, not two — see the note beside the init script in runCell():
+					 * the engine working, the engine off with the theme knowing, and the engine
+					 * off with the theme still trusting it. The third costs what the second does
+					 * (TICK and REPEAT skip it), and it is the only one that exercises
+					 * `lateDrift()` as the page's ONLY corrector without waiting for a loaded
+					 * runner to arrange it. */
+					groups.push([ { noEngineAnchor: false }, { noEngineAnchor: true }, { declines: true } ]
+						.map((mode) => ({ PAGE, width, layout, density, ...mode })));
 		const twin = PAIRS.get(stand.id);
 		const workers = twin ? [ stand.base, twin.base ] : [ stand.base ];
 		/* Split evenly across the pair rather than handing the twin a copy of the same list — every
