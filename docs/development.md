@@ -820,7 +820,23 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   anything the theme did. Tell the two apart by re-running the same axis with a single
   `--engines chromium`: a real finding reproduces there, this does not. Measured 2026-09-11 on the
   three twins (`owrt2512b`, `owrt2410b`, `owrtsnapb`), 184 runs per engine green when run one at a
-  time. CI does not meet it — `anchors` is one job per engine, on a runner each.
+  time. CI does not meet it — `anchors` is one job per engine, on a runner each. **The way to have
+  all three at once locally is one PROCESS per engine**, not one process driving three: measured
+  2026-09-12, nine shards (engine x stand, own browser and own router each) ran to completion with
+  no zygote loss at all.
+
+- **The sweep is wait-bound, not CPU-bound, and sharding it further than the tool already does buys
+  almost nothing.** Measured 2026-09-12 on a 20-core, 15 GB host: three engine processes over three
+  stands each read 22 cells/min; nine shards, one per engine and stand, read 26 — 18% for three
+  times the processes, because `tools/scroll-anchor.mjs` (0fa9c2b) ALREADY runs its stands
+  concurrently inside one process, so an external split mostly moves that same concurrency outside.
+  What the same run says about the machine is the useful part: `load average 1.49` of 20, 5 GB of
+  15 in use, every stand container at 0.03-0.14% CPU. A cell costs ~20 s and nearly all of it is
+  fixed waiting — SWAP's 900 ms window, three REPEAT refills, QUIET's 24 flick steps, `SCROLL_IDLE`
+  on each check — so the lever is more cells in flight (memory is the only ceiling), never a faster
+  machine. **Do not shorten those waits to speed the sweep up**: each is a measured number, and half
+  of this week's findings need the window as wide as it is. Full `--full` across three engines:
+  ~75 min serial, **1860 s (31 min) at nine shards**, 828 runs.
 
 - **"no owlab router is running, so nothing was checked" while all eight are up means the gate
   could not find `owlab`, not that the stands are down.** `owlab` is a Go binary in `~/go/bin`, put

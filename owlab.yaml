@@ -240,3 +240,39 @@ routers:
   - id: owrtsnapb
     release: "snapshot"
     ports: { http: 8032, ssh: 2232 }
+
+  # ---- third and fourth instances, one set per browser engine ----
+  #
+  # Added 2026-09-12. `-b` answered contention between two people; this answers contention inside
+  # ONE sweep. `tools/scroll-anchor.mjs --full` is 276 runs per engine, and running the three
+  # engines in one process against one set of stands takes chromium's zygote down about two minutes
+  # in (docs/development.md, "The stand's own traps") — so the sweep was being run one engine at a
+  # time, ~25 min each, three quarters of a 20-core machine idle throughout. Three sets means three
+  # separate node processes, each with its own engine AND its own routers: no shared browser server
+  # to lose, and no two contexts hitting one uhttpd.
+  #
+  # Same releases and the same third-party fixtures as their originals, so a finding on `-c` or
+  # `-d` carries exactly as much weight as one on the original. Ports continue the block: 804x/224x
+  # and 805x/225x for `-c`, 8055/8065 and 225x/226x for `-d`, all clear of 2222.
+  - id: owrt2512c
+    release: "25.12.4"
+    ports: { http: 8055, ssh: 2255 }
+    extra_packages: *third_party_apps
+  - id: owrt2410c
+    release: "24.10.8"
+    ports: { http: 8044, ssh: 2244 }
+    extra_packages: *third_party_apps
+  - id: owrtsnapc
+    release: "snapshot"
+    ports: { http: 8042, ssh: 2242 }
+  - id: owrt2512d
+    release: "25.12.4"
+    ports: { http: 8065, ssh: 2265 }
+    extra_packages: *third_party_apps
+  - id: owrt2410d
+    release: "24.10.8"
+    ports: { http: 8054, ssh: 2254 }
+    extra_packages: *third_party_apps
+  - id: owrtsnapd
+    release: "snapshot"
+    ports: { http: 8052, ssh: 2252 }
