@@ -451,6 +451,14 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 	const witness = !floorBox ? 'none'
 		: (floorBox === body ? 'self' : floorBox.tagName.toLowerCase() + (floorBox.id ? '#' + floorBox.id : ''))
 			+ '@' + Math.round(parseFloat(floorBox.style.minHeight) || 0);
+	/* AND WHETHER THE THEME HAS A REFERENCE AT ALL — the other half of "why was nothing written".
+	 * `anchorRef()` returns null outright while `scrolling()` is true, and `rememberRest()` then
+	 * clears `_rest` while still setting `_restAt`, so the wait above (`restAt() === scrollTop`) is
+	 * satisfied by a theme that has no reference. `lateDrift()`'s first line is `if (_lateFrame ||
+	 * !ref) return`, so that reads as `writes: []` — indistinguishable, in a report, from a
+	 * correction that ran and missed. Read here, immediately before the refill. */
+	const fitMod = await window.L.require('fs-fit').then((m) => m, () => null);
+	const themeStill = fitMod ? !fitMod.scrolling() : null;
 	const bodyH0 = body.offsetHeight;
 	const docH = () => (sc ? sc.scrollHeight : document.documentElement.scrollHeight);
 
@@ -574,7 +582,7 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		correctedAt: corrected.correctedAt,
 		late: corrected.correctedAt !== null && corrected.correctedAt > lateMs,
 		writes: corrected.writes,
-		bodyDesc, bodyH: bodyH0, witness,
+		bodyDesc, bodyH: bodyH0, witness, themeStill,
 		floorMoved: floorOnly.skip ? null : floorOnly.moved,
 		floorClamped: floorOnly.skip ? null : floorOnly.clamped,
 		floorOffsetDelta: floorOnly.skip ? null : floorOnly.offsetDelta,
@@ -1178,13 +1186,13 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 		found(`${where}: a section was refilled the way a poll refills one and the page never `
 			+ `came back — still ${swap.moved}px off after ${SWAP_WINDOW}ms `
 			+ `(the engine clamped ${swap.clamped}px of offset away)`
-			+ `, growth witness: ${swap.witness}`
+			+ `, growth witness: ${swap.witness}, theme still at refill: ${swap.themeStill}`
 			+ ` — writes: ${JSON.stringify(swap.writes || [])}`);
 	else if (swap.correctedAt !== null && swap.correctedAt > LATE_MS)
 		found(`${where}: a section was refilled the way a poll refills one and the correction `
 			+ `landed ${swap.correctedAt}ms after the refill (over the ${LATE_MS}ms late `
 			+ `threshold — visible to the reader as a jump)`
-			+ `, growth witness: ${swap.witness}`
+			+ `, growth witness: ${swap.witness}, theme still at refill: ${swap.themeStill}`
 			+ ((swap.writes && swap.writes.length) ? ` — writes: ${JSON.stringify(swap.writes)}` : ''));
 	/* The floor is judged on the CLAMP, not on the movement, and only where the theme owns the job:
 	 * with the correction switched off nobody compensates the pad the probe grows, so the
