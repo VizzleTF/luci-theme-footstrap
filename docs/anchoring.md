@@ -1532,3 +1532,82 @@ real shrink `floorShrink` exists to carry into `lateDrift()`. CI: `refill 2/3 le
 off, corrected never`, chromium and firefox, `/admin/network/dhcp @390`, both stands — checked
 locally on webkit only before the push. The guard now also requires `floorShrink <= 1`: the empty
 half of a refill is held by its floor and shrinks nothing, a real shrink does not.
+
+## Growth below the reader — task below
+
+`closest(FLOORED)` (task blindgrow, above) made the growth witness see refills one level inside a
+floored box. Nothing asked where that box was. For a box that grows BELOW the reader, the reader's
+reference correctly does not move — and `lateDrift()`'s blind-witness branch reads "the reference
+did not move, the offset did not compensate, the box grew" as a blind witness and writes the whole
+growth, throwing the reader up the page.
+
+Measured with a deterministic probe (`../tmp/p1-below.mjs`: park at 30 % of the room, grow a floored
+box entirely below the viewport by 120 px from one level inside it, wrap `scrollTo` and the
+`scrollTop` setter with a call stack), firefox and chromium × engine on / DECLINES / OFF ×
+`/admin/network/dhcp` and Overview:
+
+| fs-fit.js | cells that moved the reader |
+|---|---|
+| 21c0417, before `closest()` | 0 of 12 |
+| 0f298ef … 98375e0 | 8 of 12 — offset +120, reader −120, on and DECLINES; stack `settle()` → `writeOffset()` |
+| the positional guard | 0 of 12, no theme write at all |
+
+The guard counts growth only from a box whose top is above the reader's reference top: a box that
+begins at or below the reference cannot move it. The rect is read beside the `offsetHeight` just
+taken, on the same layout.
+
+The sweep could not see it: HOLD grows content at the top of `#view`, SWAP and REPEAT refill a body
+entirely above the viewport — 828 runs, all growth above the reader. `tools/scroll-anchor.mjs` gains
+BELOW, red on the regression in 4 of 4 engine-on cells (`below -120px`) and green on the guard in 12
+of 12.
+
+## A correction waiting for a frame the page does not produce — task stall
+
+On the still path `lateDrift()` took one frame after the mutation and asked for a second one to
+settle in. Right after a refill a page can produce no frame for hundreds of milliseconds, and the
+sweep's `longest frame gap` equalled the wait to the millisecond:
+
+- firefox, `/admin/network/dhcp @390 top compact`, engine DECLINES — `frame +21, wait-frame +21,
+  settle +261`, gap 240 ms ending at +261;
+- webkit, `Overview @1440 side normal`, engine DECLINES — `frame +18, wait-frame +18, settle +181`,
+  gap 163 ms ending at +181.
+
+The correction itself was right (+120) and nothing cancelled it; it was late only by the frame it
+waited for, and the frame the reader saw in between was the uncorrected one. The callback it waited
+from IS a frame, and `seen` is read at its top — reading `scrollTop` forces the layout the engine's
+own adjustment is applied in, so `compensated` still sees what the engine did. It now settles there
+(`why('now')`); the still condition remains the motion sampler's over `SCROLL_IDLE`, and a page that
+is moving, or has a reader's hand on it, still takes the 400 ms road.
+
+Full axis on this change with the sweep's frame read below, three engines in parallel on three stand
+sets (2156 s): chromium 276 runs, webkit 276, firefox 273 — no findings on any. Firefox's three
+missing cells are `/admin/network/dhcp` reading `page too short to scroll` that run: the lease table's
+height varies between runs, and at firefox's metrics it fell under the sweep's 600 px of room.
+
+## The sweep read a frame before the theme's own — task painted
+
+The same report shape then came from CI on HEAD, without the stall above: firefox `owrt2512 @390 top
+normal`, engine DECLINES, `/admin/network/dhcp`, `the correction landed 2702ms after the refill` —
+with `late trail: [armed+18 frame+19 wait-frame+19 settle+21 wrote-120+21]` and `longest frame gap:
+2681ms ending at +2702ms`. The theme wrote at +21 ms. The sweep's frame loop is requested right after
+the refill, before the theme's rAF (armed from the mutation record a microtask later), so its read at
+the top of each callback saw the page BEFORE the theme's correction in that same frame and credited
+the correction to the next frame — 16 ms of slack on a healthy runner, the whole stall on a starved
+one. Nothing a reader could see was late.
+
+SWAP and REPEAT now read the mark from a ResizeObserver re-observing the root every frame: its
+notifications are delivered in the same rendering update after every rAF callback and before paint,
+and `observe()` always delivers one — no DOM write, no size change. The read is credited to its
+frame's own timestamp; a frame the observer skipped is read at the top of the next one and credited
+to that later frame, so a miss can only make a correction look later. The cell line prints `painted
+N/M`; the final frame is read directly, so a full read is `N-1/N`.
+
+Red before accepted: an fs-fit.js forced onto the 400 ms road read 13 late findings of 13 on each of
+chromium, firefox and webkit (`corrected 409-425ms` against `settle+403…418`); the stall build on the
+same cells read 51 runs, no findings, `corrected 3-18ms`, `painted 55/56` throughout.
+
+Kept as a negative result: one `refill 2/3 on the same section left the reader -60px off (engineTrusted
+true, corrected never)` on chromium `owrtsnapb @390 side large` during a full axis on the stall build.
+The same cell, 216 REPEAT runs on the stall build and 216 on HEAD without it: no finding either way —
+not attributable to the stall change and not reproduced. REPEAT's finding now carries the same late
+and anchor trails as SWAP's, so the next one names its exit.

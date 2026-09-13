@@ -1134,7 +1134,17 @@ function lateDrift(ref, grow, floorShrink) {
 		 * corrects at 4-19ms (the engine's own work, which never reaches this path) and the
 		 * engine-OFF cell at 6-44ms (`applyAnchor()`, a different function). `mid-flick surprises`
 		 * reads 0 on all 27. */
-		if (!scrolling() && Date.now() >= _userUntil) { why('wait-frame'); _lateFrame = requestAnimationFrame(settle); }
+		/* THE FRAME IT ALREADY HAS — task stall. Where the page is already still this used to ask for one more
+		 * frame and settle there, and that frame is not guaranteed to come soon: right after a refill the page
+		 * can produce no frame at all for hundreds of milliseconds. Measured with the sweep's longest-frame-gap
+		 * print, the gap equalling the wait to the millisecond: firefox, /admin/network/dhcp @390 top compact,
+		 * engine DECLINES — `wait-frame +21, settle +261`, gap 240 ms ending at +261; webkit, Overview @1440 side
+		 * normal — `wait-frame +18, settle +181`, gap 163 ms ending at +181; and once no frame came inside the
+		 * sweep's 900 ms window at all (`wait-frame +5` and nothing after), so the reader read as never put back.
+		 * This callback IS a frame, and `seen` was read at its top — reading `scrollTop` forces the layout the
+		 * engine's own adjustment is applied in, so `compensated` still sees what the engine did. The still
+		 * condition is the motion sampler's, over SCROLL_IDLE, not a second read one frame later. */
+		if (!scrolling() && Date.now() >= _userUntil) { why('now'); settle(); }
 		else { why(scrolling() ? 'wait-idle-moving' : 'wait-idle-intent'); _lateFrame = window.setTimeout(settle, SCROLL_IDLE); }
 	});
 }
