@@ -199,6 +199,85 @@ const REPEAT_TIMES = 3;
  * owrt2512 and owrt2410 both, and on no other engine — WebKit is slow enough here to lose that race
  * repeatably. The growth is synthetic in either case, so a real tick underneath adds nothing but the
  * chance of measuring nothing. */
+/* BELOW — content arriving UNDER the reader must not move them. Every other case grows content above the
+ * reader: HOLD inserts at the top of #view, SWAP and REPEAT refill a body entirely above the viewport. So a
+ * theme that scrolls the reader for growth below them passed all of them — measured, 0f298ef: a 120 px refill
+ * inside a floored box below the viewport moved the offset +120 and the reader -120 on firefox and chromium,
+ * /admin/network/dhcp and Overview, engine anchoring on, the stack naming settle() in lateDrift() writing the
+ * whole growth as a blind-witness correction. The pad goes INSIDE the floored box, a child deep, because that
+ * is the shape a LuCI refill has and the shape that change mis-read. */
+const BELOW = async (growth) => {
+	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+	const view = document.getElementById('view');
+	if (!view || !view.firstElementChild) return { skip: 'nothing to grow' };
+	const mc = document.getElementById('maincontent');
+	const flow = mc ? getComputedStyle(mc).overflowY : '';
+	const sc = (flow === 'auto' || flow === 'scroll') ? mc : null;
+	const pos = () => (sc ? sc.scrollTop : window.scrollY);
+	const vh = sc ? sc.clientHeight : window.innerHeight;
+
+	const room = (sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - window.innerHeight);
+	if (room < 600) return { skip: 'page too short to scroll' };
+	const poll = (window.L && window.L.Poll) || null;
+	if (poll && typeof poll.active === 'function' && poll.active()) poll.stop();
+
+	const at = Math.round(room * 0.25);
+	const target = sc || window;
+	const landed = new Promise((res) => {
+		let done = false;
+		const on = () => { if (!done) { done = true; target.removeEventListener('scroll', on); res(); } };
+		target.addEventListener('scroll', on, { passive: true });
+		setTimeout(() => { if (!done) { done = true; target.removeEventListener('scroll', on); res(); } }, 2500);
+	});
+	if (sc) sc.scrollTop = at; else window.scrollTo(0, at);
+	await landed;
+	const fit = await window.L.require('fs-fit').then((m) => m, () => null);
+	if (fit && typeof fit.restAt === 'function')
+		for (let i = 0; i < 160; i++) { if (fit.restAt() === pos() && !fit.scrolling()) break; await wait(25); }
+	await wait(600);
+
+	/* a floored box entirely below the viewport, the kind a poll refills */
+	const scTop = sc ? sc.getBoundingClientRect().top : 0;
+	const box = Array.from(view.querySelectorAll('[data-fs-floor]'))
+		.find((b) => b.getBoundingClientRect().top - scTop > vh + 40 && b.offsetHeight > 60);
+	if (!box) return { skip: 'no floored box below the reader' };
+
+	const markAt = (y, x) => {
+		for (const el of document.elementsFromPoint(x, y)) {
+			if (el === view || !view.contains(el) || box.contains(el)) continue;
+			let stuck = false;
+			for (let a = el; a && a !== view; a = a.parentElement)
+				if (getComputedStyle(a).position === 'sticky') { stuck = true; break; }
+			if (!stuck) return el;
+		}
+		return null;
+	};
+	const h = window.innerHeight || 800;
+	const vw = window.innerWidth || 800;
+	let mark = null;
+	for (const fy of [ 0.5, 0.4, 0.6, 0.3 ]) {
+		for (const fx of [ 0.5, 0.25, 0.75 ]) {
+			mark = markAt(Math.round(h * fy), Math.round(vw * fx));
+			if (mark) break;
+		}
+		if (mark) break;
+	}
+	if (!mark) return { skip: 'no content under the reader' };
+	const before = { pos: pos(), top: Math.round(mark.getBoundingClientRect().top) };
+
+	const w0 = (window.__fsW || []).length;
+	const pad = document.createElement('div');
+	pad.style.height = growth + 'px';
+	(box.firstElementChild || box).appendChild(pad);
+	await wait(1200);
+
+	const after = { pos: pos(), top: mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null };
+	const writes = (window.__fsW || []).slice(w0);
+	pad.remove();
+	return { before, after, moved: after.top === null ? null : after.top - before.top,
+		scrollDelta: after.pos - before.pos, boxDesc: box.id || box.className || box.tagName, writes };
+};
+
 const HOLD = async (growth) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
@@ -538,8 +617,15 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		const t0 = performance.now();
 		const w0 = (window.__fsW || []).length;
 		let correctedAt = null, lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
+		/* LONGEST FRAME GAP — task gap. The interval between two of this loop's frames (the first measured
+		 * from t0), and when it ended. `performance.now()` only: no layout read, so the measurement cannot
+		 * stall the frames it is measuring. */
+		let prevFrame = t0, gapMax = 0, gapAt = 0;
 		await new Promise((done) => {
 			const frame = () => {
+				const nowF = performance.now();
+				if (nowF - prevFrame > gapMax) { gapMax = nowF - prevFrame; gapAt = nowF - t0; }
+				prevFrame = nowF;
 				lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
 				if (correctedAt === null && lastTop !== null && Math.abs(lastTop - before.top) <= tol)
 					correctedAt = Math.round(performance.now() - t0);
@@ -572,7 +658,7 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		pad.remove();
 		await wait(700);		/* let the floor come back down before the next pass measures */
 		return { empty, after, moved: after.top === null ? null : after.top - before.top,
-			clamped: before.pos - empty.pos, offsetDelta, grewDoc, correctedAt, writes, why, awhy, trail, atrail };
+			clamped: before.pos - empty.pos, offsetDelta, grewDoc, correctedAt, writes, why, awhy, trail, atrail, gapMax: Math.round(gapMax), gapAt: Math.round(gapAt) };
 	};
 
 	const corrected = await swap();
@@ -594,7 +680,7 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		correctedAt: corrected.correctedAt,
 		late: corrected.correctedAt !== null && corrected.correctedAt > lateMs,
 		writes: corrected.writes,
-		bodyDesc, bodyH: bodyH0, witness, themeStill, why: corrected.why, awhy: corrected.awhy, trail: corrected.trail, atrail: corrected.atrail,
+		bodyDesc, bodyH: bodyH0, witness, themeStill, why: corrected.why, awhy: corrected.awhy, trail: corrected.trail, atrail: corrected.atrail, gapMax: corrected.gapMax, gapAt: corrected.gapAt,
 		floorMoved: floorOnly.skip ? null : floorOnly.moved,
 		floorClamped: floorOnly.skip ? null : floorOnly.clamped,
 		floorOffsetDelta: floorOnly.skip ? null : floorOnly.offsetDelta,
@@ -1098,7 +1184,7 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	}
 	await page.waitForTimeout(3000);
 
-	let held, swap, quiet, tick, repeat;
+	let held, swap, quiet, tick, repeat, below;
 	try {
 		/* TICK FIRST, and on the page exactly as it loaded — HOLD's pad, SWAP's two
 		 * removeChild/appendChild cycles and QUIET's two dozen scripted flicks all perturb
@@ -1128,6 +1214,7 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 		repeat = (noEngineAnchor || declines)
 			? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
 			: await page.evaluate(REPEAT, [ GROWTH, TOLERANCE, REPEAT_TIMES ]);
+		below = await page.evaluate(BELOW, GROWTH);
 		quiet = await page.evaluate(QUIET, GROWTH);
 	}
 	/* A cell that threw proved nothing, and dropping it without a word is how a sweep comes
@@ -1184,6 +1271,10 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 			process.stdout.write(`  ${where}: HOLD read ${held.moved}px once (${geom(held)}) but `
 				+ `${held2.moved}px on re-measure (${geom(held2)}) — one flake, not a finding\n`);
 	}
+	if (below && !below.skip && below.moved !== null && Math.abs(below.moved) > TOLERANCE)
+		found(`${where}: ${GROWTH}px grew BELOW the reader and the page moved ${below.moved}px under them `
+			+ `(offset ${below.scrollDelta >= 0 ? '+' : ''}${below.scrollDelta}, ${below.boxDesc}) — content arriving under the reader must not move them`
+			+ ((below.writes && below.writes.length) ? ` — writes: ${JSON.stringify(below.writes)}` : ''));
 	if (swap.skip)
 		process.stdout.write(`  ${where}: the swap measured nothing (${swap.skip})\n`);
 	else if (swap.moved === null)
@@ -1198,13 +1289,13 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 		found(`${where}: a section was refilled the way a poll refills one and the page never `
 			+ `came back — still ${swap.moved}px off after ${SWAP_WINDOW}ms `
 			+ `(the engine clamped ${swap.clamped}px of offset away)`
-			+ `, growth witness: ${swap.witness}, theme still at refill: ${swap.themeStill}, theme said: ${swap.why}, anchor said: ${swap.awhy}, late trail: [${swap.trail}], anchor trail: [${swap.atrail}]`
+			+ `, growth witness: ${swap.witness}, theme still at refill: ${swap.themeStill}, theme said: ${swap.why}, anchor said: ${swap.awhy}, late trail: [${swap.trail}], anchor trail: [${swap.atrail}], longest frame gap: ${swap.gapMax}ms ending at +${swap.gapAt}ms`
 			+ ` — writes: ${JSON.stringify(swap.writes || [])}`);
 	else if (swap.correctedAt !== null && swap.correctedAt > LATE_MS)
 		found(`${where}: a section was refilled the way a poll refills one and the correction `
 			+ `landed ${swap.correctedAt}ms after the refill (over the ${LATE_MS}ms late `
 			+ `threshold — visible to the reader as a jump)`
-			+ `, growth witness: ${swap.witness}, theme still at refill: ${swap.themeStill}, theme said: ${swap.why}, anchor said: ${swap.awhy}, late trail: [${swap.trail}], anchor trail: [${swap.atrail}]`
+			+ `, growth witness: ${swap.witness}, theme still at refill: ${swap.themeStill}, theme said: ${swap.why}, anchor said: ${swap.awhy}, late trail: [${swap.trail}], anchor trail: [${swap.atrail}], longest frame gap: ${swap.gapMax}ms ending at +${swap.gapAt}ms`
 			+ ((swap.writes && swap.writes.length) ? ` — writes: ${JSON.stringify(swap.writes)}` : ''));
 	/* The floor is judged on the CLAMP, not on the movement, and only where the theme owns the job:
 	 * with the correction switched off nobody compensates the pad the probe grows, so the
@@ -1252,6 +1343,7 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	const signed = (v) => (v === null || v === undefined ? '-' : (v >= 0 ? '+' : '') + v);
 	process.stdout.write(`  ${where}  reader moved ${held.moved}px (${geom(held)}, `
 		+ `scroll ${held.scrollDelta >= 0 ? '+' : ''}${held.scrollDelta}, ${held.scroller})`
+		+ `  below ${below && !below.skip && below.moved !== null ? below.moved + 'px' : '-'}`
 		+ `  swap moved ${swap.skip ? '-' : swap.moved + 'px'} `
 		+ `[offset ${swap.skip ? '-' : signed(swap.offsetDelta)}]`
 		+ `  corrected ${swap.skip ? '-' : (swap.correctedAt === null ? 'never' : swap.correctedAt + 'ms')}`
