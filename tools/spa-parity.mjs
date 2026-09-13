@@ -152,59 +152,106 @@ const NARROW_STAGING_CASES = [
 	  owned: '#view .controls > div:not(.pager)', prop: 'display', want: 'block' },
 ];
 
+/* HOW MANY TIMES A CASE IS TRIED WHEN THE OUTGOING PAGE'S OWN CONTENT MOVED INSIDE THE WINDOW — task attrib.
+ * On CI the Overview was regularly still rendering when the click came, 1400 ms after its load: `the outgoing
+ * page's document height moved during the staging window` read `2959 -> 3540px`, `2750 -> 3331px` and once
+ * `900 -> 4011px` — its own sections arriving, not a page-scoped rule letting go. Waiting for the page to
+ * settle does not answer it: a wait on height and mutations read a page standing on its loading spinner as
+ * settled (../tmp/p7-settle.mjs, ubus +600 ms, 4 of 4 grew), and a wait that also asked for no request in
+ * flight never settled on CI within 20 s (three runs of three, every stand). What tells the two apart is
+ * WHAT moved: the defect this case exists for changes an attribute and every rule under it, and adds or
+ * removes no node in the outgoing page (0 content mutations on every such finding, fs-router with the live
+ * page renamed at the click); a page still loading does. A height change WITH content mutations says
+ * nothing either way, so the case is tried again, and only a run of STAGING_ATTEMPTS of those is reported —
+ * as a case that measured nothing. The rule check (`owned`) is independent of content and is a finding on
+ * any attempt. */
+const STAGING_ATTEMPTS = 3;
+
 async function stagingWindowCheck(page, stand, findings, cases = STAGING_CASES, widthLabel) {
 	for (const c of cases) {
-		let before, mid;
-		try {
-			await page.goto(stand.base + c.from, { waitUntil: 'domcontentloaded', timeout: 20000 });
-		}
-		catch (e) { continue; }
-		await page.waitForTimeout(1400);
-		before = await page.evaluate((c) => {
-			const el = c.owned ? document.querySelector(c.owned) : null;
-			return { docH: document.documentElement.scrollHeight,
-			         prop: el ? getComputedStyle(el)[c.prop] : null };
-		}, c);
-
-		/* held open only for the click below, not for the goto()/settle above: slowing the
-		 * outgoing page's own load would tell us nothing about the staging window */
-		await page.route(STAGING_ROUTE, async (route) => {
-			await new Promise((r) => setTimeout(r, STAGING_DELAY_MS));
-			/* the prefetch fetch() and require()'s own XHR can both name the same URL, and a route
-			 * already settled by the other rejects a second continue() — nothing this probe reads
-			 * depends on which of the two wins */
-			try { await route.continue(); } catch (e) {}
-		});
-		await page.evaluate((to) => {
-			const href = '/cgi-bin/luci' + to;
-			let a = [ ...document.querySelectorAll('a[href]') ].find((x) => x.getAttribute('href') === href);
-			if (!a) { a = document.createElement('a'); a.href = href; a.textContent = 'probe'; document.getElementById('view').append(a); }
-			a.click();
-		}, c.to);
-		/* mid-flight: well inside the held-open fetch, well before commitStage can run */
-		await page.waitForTimeout(500);
-		mid = await page.evaluate((c) => {
-			const el = c.owned ? document.querySelector(c.owned) : null;
-			return { docH: document.documentElement.scrollHeight,
-			         prop: el ? getComputedStyle(el)[c.prop] : null,
-			         staged: document.querySelectorAll('.fs-staging').length };
-		}, c);
-		await page.unroute(STAGING_ROUTE);
-		/* let the held-open navigation actually finish before the next case reuses this page */
-		await page.waitForTimeout(STAGING_DELAY_MS + 1000);
-
 		const add = (detail) => findings.push({ stand: stand.id,
 			path: c.from + ' -> ' + c.to + (widthLabel ? ` @${widthLabel}px` : ''), kind: 'staging', detail });
-		if (mid.staged === 0) {
-			add('the fake-slow route never caught a staging window — this case measured nothing');
-			continue;
+		const busy = [];
+		for (let attempt = 1; attempt <= STAGING_ATTEMPTS; attempt++) {
+			const r = await stagingAttempt(page, stand, c);
+			if (!r) break;
+			if (r.mid.staged === 0) { add('the fake-slow route never caught a staging window — this case measured nothing'); break; }
+			if (c.owned && r.mid.prop !== c.want) {
+				add(`${c.owned} read ${JSON.stringify(r.mid.prop)} mid-flight, wanted ${JSON.stringify(c.want)} — `
+					+ 'the outgoing page\'s own rule stopped matching');
+				break;
+			}
+			if (r.mid.docH === r.before.docH) break;
+			if (r.mid.mutations === 0) {
+				add(`the outgoing page's document height moved during the staging window: ${r.before.docH} -> ${r.mid.docH}px`
+					+ ' (no node of the outgoing page was added or removed inside the window)');
+				break;
+			}
+			busy.push(`${r.before.docH} -> ${r.mid.docH}px with ${r.mid.mutations} content mutation(s)`);
+			if (attempt === STAGING_ATTEMPTS)
+				add(`the outgoing page's own content kept arriving inside the staging window on all ${STAGING_ATTEMPTS} `
+					+ `attempts (${busy.join('; ')}) — this case measured nothing`);
 		}
-		if (mid.docH !== before.docH)
-			add(`the outgoing page's document height moved during the staging window: ${before.docH} -> ${mid.docH}px`);
-		if (c.owned && mid.prop !== c.want)
-			add(`${c.owned} read ${JSON.stringify(mid.prop)} mid-flight, wanted ${JSON.stringify(c.want)} — `
-				+ 'the outgoing page\'s own rule stopped matching');
 	}
+}
+
+/* One pass of a staging case: full-load the outgoing page, sample, click with the incoming view held open,
+ * sample mid-flight. `mutations` counts nodes added to or removed from the outgoing page (the stage excluded)
+ * between the two samples — see STAGING_ATTEMPTS. */
+async function stagingAttempt(page, stand, c) {
+	let before, mid;
+	try {
+		await page.goto(stand.base + c.from, { waitUntil: 'domcontentloaded', timeout: 20000 });
+	}
+	catch (e) { return null; }
+	await page.waitForTimeout(1400);
+	before = await page.evaluate((c) => {
+		const el = c.owned ? document.querySelector(c.owned) : null;
+		window.__fsStagingMut = 0;
+		const host = document.querySelector('.fs-content') || document.body;
+		const inStage = (n) => !!(n && ((n.classList && n.classList.contains('fs-staging'))
+			|| (n.closest && n.closest('.fs-staging'))));
+		window.__fsStagingMo = new MutationObserver((recs) => {
+			for (const m of recs) {
+				if (inStage(m.target)) continue;
+				const nodes = [ ...m.addedNodes, ...m.removedNodes ].filter((n) => !inStage(n));
+				if (nodes.length) window.__fsStagingMut++;
+			}
+		});
+		window.__fsStagingMo.observe(host, { childList: true, subtree: true });
+		return { docH: document.documentElement.scrollHeight,
+		         prop: el ? getComputedStyle(el)[c.prop] : null };
+	}, c);
+
+	/* held open only for the click below, not for the goto()/settle above: slowing the
+	 * outgoing page's own load would tell us nothing about the staging window */
+	await page.route(STAGING_ROUTE, async (route) => {
+		await new Promise((r) => setTimeout(r, STAGING_DELAY_MS));
+		/* the prefetch fetch() and require()'s own XHR can both name the same URL, and a route
+		 * already settled by the other rejects a second continue() — nothing this probe reads
+		 * depends on which of the two wins */
+		try { await route.continue(); } catch (e) {}
+	});
+	await page.evaluate((to) => {
+		const href = '/cgi-bin/luci' + to;
+		let a = [ ...document.querySelectorAll('a[href]') ].find((x) => x.getAttribute('href') === href);
+		if (!a) { a = document.createElement('a'); a.href = href; a.textContent = 'probe'; document.getElementById('view').append(a); }
+		a.click();
+	}, c.to);
+	/* mid-flight: well inside the held-open fetch, well before commitStage can run */
+	await page.waitForTimeout(500);
+	mid = await page.evaluate((c) => {
+		const el = c.owned ? document.querySelector(c.owned) : null;
+		if (window.__fsStagingMo) window.__fsStagingMo.disconnect();
+		return { docH: document.documentElement.scrollHeight,
+		         prop: el ? getComputedStyle(el)[c.prop] : null,
+		         staged: document.querySelectorAll('.fs-staging').length,
+		         mutations: window.__fsStagingMut || 0 };
+	}, c);
+	await page.unroute(STAGING_ROUTE);
+	/* let the held-open navigation actually finish before the next case reuses this page */
+	await page.waitForTimeout(STAGING_DELAY_MS + 1000);
+	return { before, mid };
 }
 
 /* ---- browser Back must restore the reader's own scroll offset ----
