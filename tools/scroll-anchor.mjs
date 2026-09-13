@@ -940,6 +940,11 @@ const QUIET = async (growth) => {
 	const reach = Math.max(40, Math.min(160, Math.floor((hi - lo) / 12)));
 
 	let unexplained = 0, biggest = 0, expected = 0, stalls = 0;
+	/* WHO MOVED IT — the first surprise's step, the theme's own scroll writes and its decision trails, so
+	 * a "moved on its own" finding says whether the theme wrote or the engine adjusted. A CI report
+	 * (firefox owrt2410 @390 top large, engine on, dhcp, 562px) arrived without any of it. */
+	let surprise = null;
+	const fitQ = await window.L.require('fs-fit').then((m) => m, () => null);
 	let last = Math.round((lo + hi) / 2);
 	if (sc) sc.scrollTop = last; else window.scrollTo(0, last);
 	await wait(700);
@@ -948,6 +953,9 @@ const QUIET = async (growth) => {
 	let movedAt = Date.now();
 	for (let i = 0; i < 24; i++) {
 		const step = (i % 12 < 6) ? reach : -reach;
+		const stepT0 = performance.now();
+		const w0 = (window.__fsW || []).length;
+		const docH0 = sc ? sc.scrollHeight : document.documentElement.scrollHeight;
 		expected = Math.max(lo, Math.min(hi, last + step));
 		if (sc) sc.scrollTop = expected; else window.scrollTo(0, expected);
 		/* a growth lands mid-flick, which is when the theme must NOT correct */
@@ -976,12 +984,26 @@ const QUIET = async (growth) => {
 		const off = Math.abs(now - expected);
 		if (off > growth + 4) {
 			if (gap >= 400 || idle >= 400) stalls++;
-			else { unexplained++; biggest = Math.max(biggest, off); }
+			else {
+				unexplained++; biggest = Math.max(biggest, off);
+				if (!surprise) {
+					const rel = (tr) => (tr || []).map((e) => {
+						const k = e.lastIndexOf('@');
+						return e.slice(0, k) + '+' + Math.round(Number(e.slice(k + 1)) - stepT0);
+					}).filter((e) => Number(e.slice(e.lastIndexOf('+') + 1)) > -2000).join(' ');
+					surprise = { step: i, padded: i % 6 === 3, expected, now, gap,
+						docDelta: (sc ? sc.scrollHeight : document.documentElement.scrollHeight) - docH0,
+						writes: (window.__fsW || []).slice(w0),
+						trail: fitQ && typeof fitQ.lateTrail === 'function' ? rel(fitQ.lateTrail()) : 'n/a',
+						atrail: fitQ && typeof fitQ.anchorTrail === 'function' ? rel(fitQ.anchorTrail()) : 'n/a',
+						trusted: fitQ && typeof fitQ.engineTrusted === 'function' ? fitQ.engineTrusted() : null };
+				}
+			}
 		}
 		last = now;
 	}
 	view.querySelectorAll('[data-fs-probe]').forEach((el) => el.remove());
-	return { unexplained, biggest, stalls };
+	return { unexplained, biggest, stalls, surprise };
 };
 
 /* Runs in the page: park the reader, LEAVE THE POLL RUNNING, and watch the offset across several
@@ -1367,7 +1389,11 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 			+ `${swap.floorClamped}px away — the content column's floor is not holding the document up`);
 	if (quiet.unexplained)
 		found(`${where}: the offset moved on its own ${quiet.unexplained} time(s) mid-flick (worst ${quiet.biggest}px) `
-			+ '— a correction landing inside a scroll is itself a jump');
+			+ '— a correction landing inside a scroll is itself a jump'
+			+ (quiet.surprise ? `, first at step ${quiet.surprise.step}${quiet.surprise.padded ? ' (pad inserted)' : ''}: `
+				+ `asked ${quiet.surprise.expected}, read ${quiet.surprise.now} after ${quiet.surprise.gap}ms, document ${quiet.surprise.docDelta >= 0 ? '+' : ''}${quiet.surprise.docDelta}px, `
+				+ `engineTrusted ${quiet.surprise.trusted}, late trail: [${quiet.surprise.trail}], anchor trail: [${quiet.surprise.atrail}], `
+				+ `theme writes: ${JSON.stringify(quiet.surprise.writes)}` : ''));
 	/* THE PARKED READER, ACROSS REAL TICKS — see the note on TICK. Nothing here inserted the
 	 * growth: a page that ticks at all and still moves is the engine's own anchoring (or its
 	 * absence of one), the fault HOLD/SWAP's synthetic pad and QUIET's motion cannot reach. */
