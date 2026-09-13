@@ -1271,7 +1271,17 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	 * `fs-fit.restAt()` was stripped out of the package, every measurement threw, and both
 	 * of these catches took the whole run down to "0 run(s)" and exit 0. */
 	catch (e) {
-		findings.push(`${where}: the measurement threw — ${first(e)}`);
+		/* A PAGE THAT IS NO LONGER A LUCI PAGE MEASURED NOTHING EITHER — task noluci. The throw above stays
+		 * a finding where LuCI is still there to answer: a stripped `restAt()` throws with `window.L` in
+		 * place. But CI also threw `page.evaluate: TypeError: undefined is not an object (evaluating
+		 * 'window.L.require')` — webkit owrt2410 @1440 side normal, engine DECLINES, Overview — in the same
+		 * run as `page.goto: WebKit encountered an internal error` on the same stand: the document the
+		 * cell opened was gone, which is the unopened case arriving late. Asked of the page itself, and a
+		 * page that cannot even answer (crashed, closed) counts as gone. Still counted against
+		 * UNOPENED_TOLERANCE, so a stand that keeps losing its pages fails the sweep as before. */
+		const luci = await page.evaluate(() => !!(window.L && typeof window.L.require === 'function')).catch(() => false);
+		if (luci) findings.push(`${where}: the measurement threw — ${first(e)}`);
+		else unopened.push(`${where}: the page stopped being a LuCI page mid-measurement (${page.isClosed() ? 'closed' : page.url()}) — ${first(e)}`);
 		await ctx.close();
 		return;
 	}
