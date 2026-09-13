@@ -113,6 +113,46 @@ const timerProbe = async (page) => {
  * slow route that probe uses. */
 const STAGING_ROUTE = '**/luci-static/resources/view/**';
 const STAGING_DELAY_MS = 1200;
+/* how long the outgoing page must stand still before a staging case samples it, and how long to wait for
+ * that — see task settle in stagingWindowCheck() */
+const SETTLE_QUIET_MS = 1000;
+const SETTLE_CAP_MS = 20000;
+
+/* XHR/fetch in flight on a page, counted from the moment this is called — attach it before the goto */
+function trackRequests(page) {
+	let n = 0;
+	const kind = (r) => r.resourceType() === 'xhr' || r.resourceType() === 'fetch';
+	const on = (r) => { if (kind(r)) n++; };
+	const off = (r) => { if (kind(r)) n = Math.max(0, n - 1); };
+	page.on('request', on);
+	page.on('requestfinished', off);
+	page.on('requestfailed', off);
+	return { count: () => n,
+		stop: () => { page.off('request', on); page.off('requestfinished', off); page.off('requestfailed', off); } };
+}
+
+/* The outgoing page is done when, for SETTLE_QUIET_MS running, nothing is in flight, no LuCI loading
+ * spinner stands in `#view`, the document height holds and the content does not mutate. Returns the ms it
+ * took, or null past SETTLE_CAP_MS. See task settle in stagingWindowCheck(). */
+async function settleOutgoing(page, requests) {
+	await page.evaluate(() => {
+		window.__fsSettleMut = 0;
+		const host = document.querySelector('.fs-content') || document.body;
+		new MutationObserver(() => { window.__fsSettleMut++; })
+			.observe(host, { childList: true, subtree: true, characterData: true });
+	});
+	const t0 = Date.now();
+	let quietSince = t0, h = null, m = null;
+	while (Date.now() - t0 < SETTLE_CAP_MS) {
+		await page.waitForTimeout(100);
+		const s = await page.evaluate(() => ({ h: document.documentElement.scrollHeight, m: window.__fsSettleMut,
+			spin: !!document.querySelector('#view .spinning') }));
+		if (requests.count() > 0 || s.spin || s.h !== h || s.m !== m) quietSince = Date.now();
+		h = s.h; m = s.m;
+		if (Date.now() - quietSince >= SETTLE_QUIET_MS) return Date.now() - t0;
+	}
+	return null;
+}
 const STAGING_CASES = [
 	/* the Overview's own stray `<h2 name="content">` (view.ut) is hidden by
 	 * `.fs-content[data-page="admin-status-overview"] h2[name="content"]`
@@ -155,13 +195,44 @@ const NARROW_STAGING_CASES = [
 async function stagingWindowCheck(page, stand, findings, cases = STAGING_CASES, widthLabel) {
 	for (const c of cases) {
 		let before, mid;
+		const requests = trackRequests(page);
 		try {
 			await page.goto(stand.base + c.from, { waitUntil: 'domcontentloaded', timeout: 20000 });
 		}
-		catch (e) { continue; }
-		await page.waitForTimeout(1400);
+		catch (e) { requests.stop(); continue; }
+		/* THE OUTGOING PAGE HAS TO BE FINISHED BEFORE ITS HEIGHT MEANS ANYTHING — task settle. This was a flat
+		 * 1400 ms, and on CI the Overview was still rendering when the click came: `2959 -> 3540px` on owrt2512
+		 * and `2750 -> 3331px` on owrtsnap (+581 both, three runs), `900 -> 4011px` once on owrt2410 — its own
+		 * sections arriving inside the window, not a page-scoped rule letting go. Measured without any click
+		 * (../tmp/p5-ovlgrow.mjs, ../tmp/p6-ovlrpc.mjs): CPU throttled 8x leaves the Overview complete at
+		 * 1400 ms (3583px, 15 of 15 loads); every ubus response held back 800 or 1500 ms leaves it at 900px
+		 * there, 10 of 10, and 3583px later. So wait for the page itself: document height unchanged and no
+		 * content mutation for SETTLE_QUIET_MS running, capped at SETTLE_CAP_MS — a page that never settles
+		 * measured nothing and says so. */
+		/* STILL IS NOT THE SAME AS DONE. A first version of this wait asked only for the height and the content
+		 * to stand still for a second, and with the click (../tmp/p7-settle.mjs, ubus held back 600 ms) the
+		 * Overview stood on its 900px loading spinner for longer than that while waiting on the network, read
+		 * as settled at 1.7-1.8 s, and grew to 3002px inside the window in 4 of 4 loads. So the page is also
+		 * asked whether anything is still coming: no XHR/fetch in flight (counted from before the goto above)
+		 * and no LuCI loading spinner in `#view`. */
+		const settled = await settleOutgoing(page, requests);
+		requests.stop();
+		if (settled === null) {
+			findings.push({ stand: stand.id, path: c.from + ' -> ' + c.to + (widthLabel ? ` @${widthLabel}px` : ''),
+				kind: 'staging', detail: `the outgoing page never settled within ${SETTLE_CAP_MS}ms — this case measured nothing` });
+			continue;
+		}
 		before = await page.evaluate((c) => {
 			const el = c.owned ? document.querySelector(c.owned) : null;
+			/* content arriving in the outgoing page from here on is counted, so a height finding says whether
+			 * the page's own content moved under it */
+			window.__fsStagingMut = 0;
+			const host = document.querySelector('.fs-content') || document.body;
+			window.__fsStagingMo = new MutationObserver((recs) => {
+				for (const r of recs) if (!(r.target.closest && r.target.closest('.fs-staging'))
+					&& !Array.from(r.addedNodes).some((n) => n.classList && n.classList.contains('fs-staging'))) window.__fsStagingMut++;
+			});
+			window.__fsStagingMo.observe(host, { childList: true, subtree: true });
 			return { docH: document.documentElement.scrollHeight,
 			         prop: el ? getComputedStyle(el)[c.prop] : null };
 		}, c);
@@ -185,9 +256,11 @@ async function stagingWindowCheck(page, stand, findings, cases = STAGING_CASES, 
 		await page.waitForTimeout(500);
 		mid = await page.evaluate((c) => {
 			const el = c.owned ? document.querySelector(c.owned) : null;
+			if (window.__fsStagingMo) window.__fsStagingMo.disconnect();
 			return { docH: document.documentElement.scrollHeight,
 			         prop: el ? getComputedStyle(el)[c.prop] : null,
-			         staged: document.querySelectorAll('.fs-staging').length };
+			         staged: document.querySelectorAll('.fs-staging').length,
+			         mutations: window.__fsStagingMut || 0 };
 		}, c);
 		await page.unroute(STAGING_ROUTE);
 		/* let the held-open navigation actually finish before the next case reuses this page */
@@ -200,7 +273,8 @@ async function stagingWindowCheck(page, stand, findings, cases = STAGING_CASES, 
 			continue;
 		}
 		if (mid.docH !== before.docH)
-			add(`the outgoing page's document height moved during the staging window: ${before.docH} -> ${mid.docH}px`);
+			add(`the outgoing page's document height moved during the staging window: ${before.docH} -> ${mid.docH}px`
+				+ ` (settled ${settled}ms before the click; ${mid.mutations} content mutation(s) outside the stage inside the window)`);
 		if (c.owned && mid.prop !== c.want)
 			add(`${c.owned} read ${JSON.stringify(mid.prop)} mid-flight, wanted ${JSON.stringify(c.want)} — `
 				+ 'the outgoing page\'s own rule stopped matching');
