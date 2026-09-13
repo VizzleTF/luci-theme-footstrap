@@ -859,7 +859,12 @@ let _anchorPending = null;
  * path and not `lateDrift()`, and `applyAnchor()` has five ways to return without a write that all
  * read as "late" from outside. Named here so that finding says which. */
 let _anchorWhy = null;
-function awhy(w) { _anchorWhy = w; }
+const _anchorTrail = [];
+function awhy(w) {
+	_anchorWhy = w;
+	_anchorTrail.push(w + '@' + Math.round(performance.now()));
+	if (_anchorTrail.length > 8) _anchorTrail.shift();
+}
 let _anchorFrame = 0;
 /* dev switch: `localStorage.fsAnchor = 'off'` stops the theme writing the scroll offset at all,
  * which is the one thing here that can move a page nobody is touching */
@@ -893,7 +898,17 @@ let _lateFrame = 0;
  * try from, or read the engine as having already done the job — and each guess cost a push. One
  * short string, set at every exit, ends that: the finding names the line instead of the silence. */
 let _lateWhy = null;
-function why(w) { _lateWhy = w; }
+/* THE LAST EIGHT, WITH THE CLOCK — task trail. One last word is ambiguous: a correction whose `settle`
+ * has not run yet and one that ran, exited, and was re-armed by a later mutation both read `armed` at
+ * the end of the sweep's window. Seen on firefox, /admin/network/dhcp @390 top large, engine on:
+ * `theme said: armed` with the correction landing at 1744 ms. `performance.now()`, the clock the sweep
+ * measures the refill on, so the gate can print each entry relative to it. */
+const _lateTrail = [];
+function why(w) {
+	_lateWhy = w;
+	_lateTrail.push(w + '@' + Math.round(performance.now()));
+	if (_lateTrail.length > 8) _lateTrail.shift();
+}
 
 function lateDrift(ref, grow, floorShrink) {
 	/* the reference from BEFORE this tick, captured by the caller: one taken after the mutation
@@ -1562,7 +1577,9 @@ return baseclass.extend({
 	scrolling,
 	/* unmarked, for tools/scroll-anchor.mjs — see `_lateWhy` */
 	lateWhy: () => _lateWhy,
+	lateTrail: () => _lateTrail.slice(),
 	anchorWhy: () => _anchorWhy,
+	anchorTrail: () => _anchorTrail.slice(),
 	deferMeasurement,
 
 	/* -> the offset this file last took a reference at, or null before it has taken one.

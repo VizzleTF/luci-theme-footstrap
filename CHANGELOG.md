@@ -82,6 +82,8 @@
 
 - **The engine-OFF correction now names the exit it took, the same way the late one does.** `applyAnchor()` and `scheduleAnchor()` record why they did or did not write — `no-reference`, `anchoring-off`, `pending-kept-first`, `refused-moving`, `at-top`, `reference-gone`, `no-drift`, `drift-too-big`, `wrote-<n>` — exported as `anchorWhy()` for the sweep and printed as `anchor said:` beside `theme said:`. The engine-OFF cell of `/admin/network/dhcp @390 top compact` corrected 1034 ms and 1885 ms after the refill on firefox with `theme said: null`: the correction came through this path, not `lateDrift()`, and nothing in the report could say which of its silent returns had held it.
 
+- **A correction's last word now comes with the eight decisions before it, and when each was taken.** `lateTrail()` and `anchorTrail()` keep the last eight exits of each correction path stamped with `performance.now()`, and the sweep prints them relative to the refill as `late trail:` and `anchor trail:`. One last word was not enough: on firefox, `/admin/network/dhcp @390 top large`, engine on, the finding read `theme said: armed` at the end of the 900 ms window while the correction landed at 1744 ms — and `armed` as the last word means either that the settle had not run yet or that it ran, exited, and a later mutation armed it again, two faults with different fixes.
+
 ## [0.14.12] — 2026-09-07
 
 ### Added
