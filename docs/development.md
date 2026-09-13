@@ -1613,6 +1613,27 @@ scrolling=true` at 220 ms, `off=0` once resampled past 620 ms. Fixed in `fs-chro
 fitter's cache (`docs/chrome.md`, "`data-narrow`: ..."); do not "fix" a live recurrence of this shape
 by making the gate sample later instead — that would hide the same staleness from a real reader.
 
+**`TaskStop` on a background command kills its outer shell, not a `sh script.sh` it started.** A
+stopped chain kept waiting as its own process and would have raced its replacement to the same
+commit. After stopping one, check `ps -ef | grep scratchpad` on the Windows side and `pgrep -af '^sh
+/mnt/c/.*scratchpad/'` in WSL; kill the child by its exact command, and give a replacement a guard
+that refuses to start while the old one lives.
+
+**A process search inside `sh -c '…'` finds the shell running it.** `pgrep -f "npm run check"`, `ps |
+grep build-css` and `pgrep -f "sh tools/ci-local"` all matched their own `sh -c`, whose command line
+contains the pattern: two launchers waited forever and a CSS-build check reported a build that did not
+exist. Anchor the pattern (`^node tools/`, `^npm run check`) and run the check from a script file, or
+wait on a file's final line instead.
+
+**Git Bash rewrites `/mnt/c/...` arguments passed to `wsl.exe` into `C:/Program Files/Git/mnt/c/...`**,
+and the script "does not exist". `export MSYS_NO_PATHCONV=1` before `wsl.exe -e sh /mnt/c/...`.
+
+**A timing finding from `scroll-anchor` with a `longest frame gap` near its `landed Nms` is the page
+not producing frames, not the theme deciding late.** Read the late trail beside it: the theme's
+`wrote-…+T` is when the correction happened. A `T` far below `landed` with a gap that ends at `landed`
+was the runner (task painted, `docs/anchoring.md`); a `settle` that itself sits at the end of the gap
+was the theme waiting for that frame (task stall).
+
 ## The test matrix
 
 - **Pages**: Status/Overview (tables, ifacebox), Network/Interfaces (zonebadge, modals),

@@ -621,15 +621,39 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		 * from t0), and when it ended. `performance.now()` only: no layout read, so the measurement cannot
 		 * stall the frames it is measuring. */
 		let prevFrame = t0, gapMax = 0, gapAt = 0;
+		/* WHAT A FRAME PAINTED, NOT WHAT IT STARTED FROM — task painted. This loop's rAF is queued before
+		 * the theme's own (it is requested right after the refill, the theme's from the mutation record a
+		 * microtask later), so a read at the top of the callback sees the page BEFORE the theme's correction
+		 * in that same frame, and credits the correction to the NEXT frame. With frames 16ms apart that was a
+		 * frame of slack; on a stalled runner it was the whole stall. Measured in CI, firefox owrt2512 @390
+		 * top normal, engine DECLINES, /admin/network/dhcp: the late trail read `settle+21 wrote-120+21` and
+		 * the finding read 2702ms, the longest frame gap 2681ms ending at +2702. A ResizeObserver's
+		 * notifications are delivered in the same rendering update AFTER every rAF callback and before paint
+		 * (HTML "update the rendering"), and `observe()` always delivers one first notification — so
+		 * re-observing the root each frame reads the page as that frame paints it, with no DOM write and no
+		 * size change. Credited to the frame's own timestamp. `painted` counts how many frames were read
+		 * that way; a frame the observer did not deliver for is read at the top of the next one and credited
+		 * to THAT frame, which can only make a correction look later, never earlier. */
+		let pending = null, painted = 0, frames = 0;
+		const read = (at) => {
+			lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
+			if (correctedAt === null && lastTop !== null && Math.abs(lastTop - before.top) <= tol)
+				correctedAt = Math.round(at - t0);
+		};
+		const ro = new ResizeObserver(() => { if (pending !== null) { pending = null; painted++; read(prevFrame); } });
 		await new Promise((done) => {
 			const frame = () => {
 				const nowF = performance.now();
+				if (pending !== null) { pending = null; read(nowF); }
 				if (nowF - prevFrame > gapMax) { gapMax = nowF - prevFrame; gapAt = nowF - t0; }
 				prevFrame = nowF;
-				lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
-				if (correctedAt === null && lastTop !== null && Math.abs(lastTop - before.top) <= tol)
-					correctedAt = Math.round(performance.now() - t0);
-				if (performance.now() - t0 < winMs) requestAnimationFrame(frame); else done();
+				frames++;
+				if (nowF - t0 < winMs) {
+					pending = nowF;
+					ro.unobserve(document.documentElement);
+					ro.observe(document.documentElement);
+					requestAnimationFrame(frame);
+				} else { ro.disconnect(); read(nowF); done(); }
 			};
 			requestAnimationFrame(frame);
 		});
@@ -658,7 +682,7 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		pad.remove();
 		await wait(700);		/* let the floor come back down before the next pass measures */
 		return { empty, after, moved: after.top === null ? null : after.top - before.top,
-			clamped: before.pos - empty.pos, offsetDelta, grewDoc, correctedAt, writes, why, awhy, trail, atrail, gapMax: Math.round(gapMax), gapAt: Math.round(gapAt) };
+			clamped: before.pos - empty.pos, offsetDelta, grewDoc, correctedAt, writes, why, awhy, trail, atrail, gapMax: Math.round(gapMax), gapAt: Math.round(gapAt), painted, frames };
 	};
 
 	const corrected = await swap();
@@ -680,7 +704,7 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		correctedAt: corrected.correctedAt,
 		late: corrected.correctedAt !== null && corrected.correctedAt > lateMs,
 		writes: corrected.writes,
-		bodyDesc, bodyH: bodyH0, witness, themeStill, why: corrected.why, awhy: corrected.awhy, trail: corrected.trail, atrail: corrected.atrail, gapMax: corrected.gapMax, gapAt: corrected.gapAt,
+		bodyDesc, bodyH: bodyH0, witness, themeStill, why: corrected.why, awhy: corrected.awhy, trail: corrected.trail, atrail: corrected.atrail, gapMax: corrected.gapMax, gapAt: corrected.gapAt, painted: corrected.painted, frames: corrected.frames,
 		floorMoved: floorOnly.skip ? null : floorOnly.moved,
 		floorClamped: floorOnly.skip ? null : floorOnly.clamped,
 		floorOffsetDelta: floorOnly.skip ? null : floorOnly.offsetDelta,
@@ -821,24 +845,49 @@ const REPEAT = async ([ growth, tol, times ]) => {
 		body.appendChild(pad);
 		const t0 = performance.now();
 		const w0 = (window.__fsW || []).length;
+		/* the same diagnostics SWAP prints — a REPEAT finding used to say only "corrected never" */
+		const themeStill = fit ? !fit.scrolling() : null;
 		let correctedAt = null, lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
+		let prevFrame = t0, gapMax = 0, gapAt = 0;
+		/* read as the frame paints it — see SWAP's note, task painted */
+		let pending = null;
+		const read = (at) => {
+			lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
+			if (correctedAt === null && lastTop !== null && Math.abs(lastTop - before.top) <= tol)
+				correctedAt = Math.round(at - t0);
+		};
+		const ro = new ResizeObserver(() => { if (pending !== null) { pending = null; read(prevFrame); } });
 		await new Promise((done) => {
 			const frame = () => {
-				lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
-				if (correctedAt === null && lastTop !== null && Math.abs(lastTop - before.top) <= tol)
-					correctedAt = Math.round(performance.now() - t0);
-				if (performance.now() - t0 < 900) requestAnimationFrame(frame); else done();
+				const now = performance.now();
+				if (pending !== null) { pending = null; read(now); }
+				if (now - prevFrame > gapMax) { gapMax = Math.round(now - prevFrame); gapAt = Math.round(now - t0); }
+				prevFrame = now;
+				if (now - t0 < 900) {
+					pending = now;
+					ro.unobserve(document.documentElement);
+					ro.observe(document.documentElement);
+					requestAnimationFrame(frame);
+				} else { ro.disconnect(); read(now); done(); }
 			};
 			requestAnimationFrame(frame);
 		});
 		const writes = (window.__fsW || []).slice(w0);
+		const rel = (tr) => (tr || []).map((e) => {
+			const k = e.lastIndexOf('@');
+			return e.slice(0, k) + '+' + Math.round(Number(e.slice(k + 1)) - t0);
+		}).join(' ');
+		const why = fit && typeof fit.lateWhy === 'function' ? fit.lateWhy() : 'n/a';
+		const awhy = fit && typeof fit.anchorWhy === 'function' ? fit.anchorWhy() : 'n/a';
+		const trail = fit && typeof fit.lateTrail === 'function' ? rel(fit.lateTrail()) : 'n/a';
+		const atrail = fit && typeof fit.anchorTrail === 'function' ? rel(fit.anchorTrail()) : 'n/a';
 		if (i === 0) grewDoc = docH() - startDocH;
 		pad.remove();
 		refills.push({ i, moved: lastTop === null ? null : lastTop - before.top, correctedAt, writes,
-			engineTrusted: trusted() });
+			engineTrusted: trusted(), themeStill, why, awhy, trail, atrail, gapMax, gapAt });
 		await wait(700);
 	}
-	return { before, bodyDesc, bodyH: bodyH0, grewDoc,
+	return { before, bodyDesc, bodyH: bodyH0, grewDoc, witness,
 		trustedBefore, trustedAfter: trusted(), refills,
 		scroller: sc ? 'maincontent' : 'window' };
 
@@ -1331,6 +1380,7 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 			found(`${where}: refill ${jumped.i + 1}/${REPEAT_TIMES} on the same section left the `
 				+ `reader ${jumped.moved === null ? 'without a surviving reference' : jumped.moved + 'px off'} `
 				+ `(engineTrusted ${jumped.engineTrusted}, corrected ${jumped.correctedAt === null ? 'never' : jumped.correctedAt + 'ms'})`
+				+ `, growth witness: ${repeat.witness}, theme still at refill: ${jumped.themeStill}, theme said: ${jumped.why}, anchor said: ${jumped.awhy}, late trail: [${jumped.trail}], anchor trail: [${jumped.atrail}], longest frame gap: ${jumped.gapMax}ms ending at +${jumped.gapAt}ms`
 				+ (jumped.writes && jumped.writes.length ? ` — writes: ${JSON.stringify(jumped.writes)}` : ''));
 		else if (repeat.trustedBefore === true && repeat.trustedAfter === false)
 			found(`${where}: _engineTrusted went false after ${REPEAT_TIMES} refills the reader `
@@ -1346,7 +1396,7 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 		+ `  below ${below && !below.skip && below.moved !== null ? below.moved + 'px' : '-'}`
 		+ `  swap moved ${swap.skip ? '-' : swap.moved + 'px'} `
 		+ `[offset ${swap.skip ? '-' : signed(swap.offsetDelta)}]`
-		+ `  corrected ${swap.skip ? '-' : (swap.correctedAt === null ? 'never' : swap.correctedAt + 'ms')}`
+		+ `  corrected ${swap.skip ? '-' : (swap.correctedAt === null ? 'never' : swap.correctedAt + 'ms')}${swap.skip ? '' : ` painted ${swap.painted}/${swap.frames}`}`
 		+ `  floor alone: clamped ${swap.skip || swap.floorClamped === null ? '-' : swap.floorClamped + 'px'}`
 		+ `, reader ${swap.skip || swap.floorMoved === null ? '-' : swap.floorMoved + 'px'} `
 		+ `[offset ${swap.skip || swap.floorOffsetDelta === null ? '-' : signed(swap.floorOffsetDelta)}]`
