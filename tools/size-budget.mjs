@@ -380,7 +380,8 @@ const LIMITS = {
 	 * worse: a real tick carries ~20 records, each cancelling the last, 12 findings of ordinary drift.
 	 * A synchronous `dom.content()` delivers both halves in one batch and is untouched. The limit goes
 	 * to 96,200, 79 B of head-room. */
-	resourcesJs: 96_200,
+	/* 96,386 B on 2026-09-13: `applyAnchor()` and `scheduleAnchor()` name the exit they took (`_anchorWhy`, exported as `anchorWhy()` for the sweep, the twin of `lateWhy()`): the engine-OFF cell of /admin/network/dhcp @390 top compact corrected at 1034 ms and 1885 ms on firefox with `theme said: null`, and the five silent returns on this path all read as late from outside. The limit goes to 96,460. */
+	resourcesJs: 96_460,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -640,7 +641,8 @@ const LIMITS = {
 	 * commit — `fs-fit.js` is cold. The limit goes to 61,210, 83 B of head-room. */
 	/* 61,234 B on 2026-09-12, up 24 B: the same removal guard as `resourcesJs`'s own note on this
 	 * commit. The limit goes to 61,310, 76 B of head-room. */
-	coldJs: 61_310,
+	/* 61,499 B on 2026-09-13: the same exit naming as `resourcesJs`'s own note on this commit. The limit goes to 61,570. */
+	coldJs: 61_570,
 };
 
 function bytes(path) {

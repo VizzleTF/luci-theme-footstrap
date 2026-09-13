@@ -853,6 +853,13 @@ function anchorRef() {
 }
 
 let _anchorPending = null;
+/* WHY THE LAST ENGINE-OFF CORRECTION DID OR DID NOT WRITE — the `applyAnchor()` twin of `_lateWhy`,
+ * exported as `anchorWhy()` for the sweep. The engine-OFF cell of `/admin/network/dhcp @390 top
+ * compact` corrected at 1034 ms and 1885 ms on firefox with `theme said: null`, i.e. through this
+ * path and not `lateDrift()`, and `applyAnchor()` has five ways to return without a write that all
+ * read as "late" from outside. Named here so that finding says which. */
+let _anchorWhy = null;
+function awhy(w) { _anchorWhy = w; }
 let _anchorFrame = 0;
 /* dev switch: `localStorage.fsAnchor = 'off'` stops the theme writing the scroll offset at all,
  * which is the one thing here that can move a page nobody is touching */
@@ -1200,8 +1207,9 @@ function settleDeferredFloor(offsetBefore, shrink) {
 }
 
 function scheduleAnchor(ref) {
-	if (!ref || !anchorEnabled()) return;
-	if (_anchorPending) return;
+	if (!ref) return awhy('no-reference');
+	if (!anchorEnabled()) return awhy('anchoring-off');
+	if (_anchorPending) return awhy('pending-kept-first');
 	_anchorPending = ref;
 	if (_anchorFrame) return;
 	_anchorFrame = requestAnimationFrame(() => {
@@ -1234,7 +1242,7 @@ function applyAnchor(ref) {
 	 * `sawClamp()` is the pixel `holdFloor()` watched the clamp land on, and it stands only while
 	 * the offset has not left it — a reader who really is scrolling has moved off it by definition,
 	 * so this reopens the guard for exactly one case and no other. */
-	if (scrolling() && !sawClamp()) return;
+	if (scrolling() && !sawClamp()) return awhy('refused-moving');
 	/* through scroller(), not a second probe: two copies of the same question can answer
 	 * differently within one frame */
 	const sc = scroller();
@@ -1247,14 +1255,15 @@ function applyAnchor(ref) {
 	 * collapse clamps the offset to zero, which is the worst version of this fault rather than the
 	 * one case to sit out. */
 	if (ref.by != null) {
-		if (ref.by < 1) return;
+		if (ref.by < 1) return awhy('by-under-1');
 		writeOffset(sc, at + ref.by);
+		awhy('wrote-by-' + Math.round(ref.by));
 		return true;
 	}
-	if (at <= 0) return;
-	if (!ref.el.isConnected) return;
+	if (at <= 0) return awhy('at-top');
+	if (!ref.el.isConnected) return awhy('reference-gone');
 	const drift = ref.el.getBoundingClientRect().top - ref.top;
-	if (Math.abs(drift) < 1) return;			/* nothing needed correcting here */
+	if (Math.abs(drift) < 1) return awhy('no-drift');			/* nothing needed correcting here */
 	/* A definite write is a definite miss — task trust: any recovery streak counted so far said
 	 * nothing about THIS tick, and this tick just proved the engine did not do the job on its own.
 	 * (Recovery evidence itself is gathered earlier, in the mutation callback — see TRUST_RECOVERY
@@ -1267,8 +1276,9 @@ function applyAnchor(ref) {
 	 * is the most a single tick can honestly account for — where `innerHeight` is unreadable those
 	 * 200px are the whole ceiling — plus whatever the engine is on record for having clamped away
 	 * (`slack`, see anchorFor()). */
-	if (Math.abs(drift) > (window.innerHeight || 0) + 200 + (ref.slack || 0)) return;
+	if (Math.abs(drift) > (window.innerHeight || 0) + 200 + (ref.slack || 0)) return awhy('drift-too-big');
 	writeOffset(sc, at + drift);
+	awhy('wrote-' + Math.round(drift));
 	return true;
 }
 
@@ -1552,6 +1562,7 @@ return baseclass.extend({
 	scrolling,
 	/* unmarked, for tools/scroll-anchor.mjs — see `_lateWhy` */
 	lateWhy: () => _lateWhy,
+	anchorWhy: () => _anchorWhy,
 	deferMeasurement,
 
 	/* -> the offset this file last took a reference at, or null before it has taken one.
