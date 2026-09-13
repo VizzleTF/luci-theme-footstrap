@@ -854,8 +854,11 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   **12 findings** — `the reader drifted 46/88/138px across real poll ticks` at every density and
   both layouts, on two stands. Run alone, the same commit and the same command read 276 runs and no
   findings. The script's default refusal names this exact failure; passing `--force` is a promise
-  that nothing else is using the stands, and the way to keep it is `ps -eo cmd | grep -E
-  '[s]croll-anchor|[c]i-local'` returning nothing before you start. A finding that appears on twelve
+  that nothing else is using the stands, and the way to keep it is `pgrep -f '^node tools/(scroll-anchor|spa-parity|live-audit)'`
+  and `pgrep -f '^sh tools/ci-local'` both finding nothing before you start — anchored with `^`
+  and run from a script FILE: the unanchored `ps -eo cmd | grep '[s]croll-anchor'` this entry first
+  recommended matches the command line of an inline `bash -c '…'` that contains it, reports busy
+  every time, and aborted two A/B runs on 2026-09-13 with nothing else on the stands. A finding that appears on twelve
   cells at once, evenly across an axis, is this and not the theme.
 
 - **"no owlab router is running, so nothing was checked" while all eight are up means the gate

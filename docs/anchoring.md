@@ -1525,3 +1525,10 @@ the batch that must not be armed on is not "there is a later one" — that canno
 decision is made — but that the batch is a REMOVAL: the section loses children and gains none, and
 the box it hangs from does not grow. That is checkable at arming time and does not exist on a
 poll tick's ordinary records.
+
+**The discriminator as first shipped was too wide — cbcfd5d.** "Removed nodes, added none, the box
+no taller" also describes REPEAT's pad removal between two refills, and that removal is exactly the
+real shrink `floorShrink` exists to carry into `lateDrift()`. CI: `refill 2/3 left the reader -60px
+off, corrected never`, chromium and firefox, `/admin/network/dhcp @390`, both stands — checked
+locally on webkit only before the push. The guard now also requires `floorShrink <= 1`: the empty
+half of a refill is held by its floor and shrinks nothing, a real shrink does not.

@@ -1437,9 +1437,17 @@ function observeContent() {
 		 * win"). This is the discriminator that survives both: a batch that removed nodes, added none
 		 * and left the floored box no taller is a removal, and a removal is not a page to correct
 		 * against. A synchronous `dom.content()` — every real poll tick — delivers its removals and
-		 * its additions in ONE batch and is untouched. */
+		 * its additions in ONE batch and is untouched.
+		 *
+		 * AND ONLY WHERE THE FLOORED BOX DID NOT SHRINK. The first cut skipped every pure removal and
+		 * that took out the correction REPEAT's pad removal between refills needs: the pad goes, the
+		 * floor comes down with it, and `floorShrink` is carried into `lateDrift()` exactly so the clamp
+		 * that follows gets put back. CI on cbcfd5d: `refill 2/3 left the reader -60px off, corrected
+		 * never` on chromium and firefox, /admin/network/dhcp @390, both stands. The transient this
+		 * guard is for is the empty half of a refill, where the floor HOLDS the box — so floorShrink
+		 * is 0 there and non-zero on a real shrink. */
 		if (trustEngine) {
-			if (took && !gave && grew <= 0) why('emptying');
+			if (took && !gave && grew <= 0 && floorShrink <= 1) why('emptying');
 			else lateDrift(settled, grew, floorShrink);
 		}
 		else scheduleAnchor(ref);
