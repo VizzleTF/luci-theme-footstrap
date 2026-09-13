@@ -382,7 +382,8 @@ const LIMITS = {
 	 * to 96,200, 79 B of head-room. */
 	/* 96,386 B on 2026-09-13: `applyAnchor()` and `scheduleAnchor()` name the exit they took (`_anchorWhy`, exported as `anchorWhy()` for the sweep, the twin of `lateWhy()`): the engine-OFF cell of /admin/network/dhcp @390 top compact corrected at 1034 ms and 1885 ms on firefox with `theme said: null`, and the five silent returns on this path all read as late from outside. The limit goes to 96,460. */
 	/* 96,600 B on 2026-09-13: both correction paths keep the last eight decisions with the time they were taken (`lateTrail()`, `anchorTrail()`, printed relative to the refill): a single last word read `theme said: armed` at the end of the window on firefox /admin/network/dhcp @390 top large, engine on, with the correction landing at 1744 ms, and cannot tell a settle that never ran from one that ran and was re-armed. The limit goes to 96,680. */
-	resourcesJs: 96_680,
+	/* 96,802 B on 2026-09-13: the growth witness in observeContent() ignores a floored box that starts at or below the reader's reference — 0f298ef made refills one level inside a box count as growth, and growth BELOW the reader then moved them: a 120 px refill under the viewport moved the reader -120 px on firefox and chromium, engine anchoring on — plus four trail markers in lateDrift() (frame, wait-frame, wait-idle-*, settle) that located the frame stall behind the late corrections. The limit goes to 96,880. */
+	resourcesJs: 96_880,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -644,7 +645,8 @@ const LIMITS = {
 	 * commit. The limit goes to 61,310, 76 B of head-room. */
 	/* 61,499 B on 2026-09-13: the same exit naming as `resourcesJs`'s own note on this commit. The limit goes to 61,570. */
 	/* 61,713 B on 2026-09-13: the same decision trail as `resourcesJs`'s own note on this commit. The limit goes to 61,790. */
-	coldJs: 61_790,
+	/* 61,915 B on 2026-09-13: the same growth-witness guard and trail markers as `resourcesJs`'s own note on this commit. The limit goes to 61,990. */
+	coldJs: 61_990,
 };
 
 function bytes(path) {

@@ -917,9 +917,11 @@ function lateDrift(ref, grow, floorShrink) {
 	if (!ref) return why('no-reference');
 	why('armed');
 	_lateFrame = requestAnimationFrame(() => {
+		why('frame');
 		const seen = scrollTop();
 		const settle = () => {
 			_lateFrame = 0;
+			why('settle');
 			if (!anchorEnabled()) return why('anchoring-off');
 			if (Date.now() < _userUntil) return why('reader-intent');
 			if (_restPage !== pageStamp()) return why('page-changed');
@@ -1132,8 +1134,8 @@ function lateDrift(ref, grow, floorShrink) {
 		 * corrects at 4-19ms (the engine's own work, which never reaches this path) and the
 		 * engine-OFF cell at 6-44ms (`applyAnchor()`, a different function). `mid-flick surprises`
 		 * reads 0 on all 27. */
-		if (!scrolling() && Date.now() >= _userUntil) _lateFrame = requestAnimationFrame(settle);
-		else _lateFrame = window.setTimeout(settle, SCROLL_IDLE);
+		if (!scrolling() && Date.now() >= _userUntil) { why('wait-frame'); _lateFrame = requestAnimationFrame(settle); }
+		else { why(scrolling() ? 'wait-idle-moving' : 'wait-idle-intent'); _lateFrame = window.setTimeout(settle, SCROLL_IDLE); }
 	});
 }
 
@@ -1378,7 +1380,20 @@ function observeContent() {
 		 * of an unset `min-height` is NaN, `|| 0` reads as "no growth" rather than false growth
 		 * the size of the whole box */
 		const before = box && (parseFloat(box.style.minHeight) || 0);
-		const grew = before ? box.offsetHeight - before : 0;
+		let grew = before ? box.offsetHeight - before : 0;
+		/* ONLY GROWTH ABOVE WHAT THE READER IS LOOKING AT — task below. A floored box that grew BELOW the
+		 * reader's reference cannot move that reference, so the reference correctly reads no drift — and
+		 * `lateDrift()`'s blind-witness branch took exactly that as "the witness is blind" and wrote the
+		 * whole growth: the reader was thrown by content arriving under them. Measured deterministically
+		 * (../tmp/p1-below.mjs): a 120 px refill inside a floored box below the viewport moved the offset
+		 * +120 and the reader -120 on firefox and chromium, /admin/network/dhcp and Overview, with the
+		 * engine's own anchoring ON — an ordinary browser — and in the DECLINES state; the stack named
+		 * settle() in lateDrift(). The sweep could never see it: SWAP only grows bodies entirely above the
+		 * viewport. A box whose top is at or below the reference's top is not above it; one that contains
+		 * the reference, or sits above it, is. The box's rect is read beside the offsetHeight just taken,
+		 * on the same layout. */
+		if (grew > 1 && settled && settled.el && settled.el.isConnected
+				&& box.getBoundingClientRect().top >= settled.el.getBoundingClientRect().top) grew = 0;
 		/* RECOVERY EVIDENCE, task trust — read here and nowhere else; see TRUST_RECOVERY_LIMIT's own
 		 * comment for why `applyAnchor()` cannot see it. THE SAME REFERENCE `lateDrift()` trusts on
 		 * the other path (`_rest.el`'s own rect against the top it was remembered at), read before
