@@ -268,6 +268,152 @@ export function parseLsLines(out) {
 	return out.split('\n').map((s) => s.trim()).filter(Boolean);
 }
 
+/* Every overlay key `applyOverlay` would refuse to run over `rpc` — all of them, not just the first
+ * one it throws on. capture.mjs runs this at the end of a capture, so a key a slow stand never sent
+ * fails there, naming the key, rather than three steps later in build. */
+export function missingOverlayKeys(rpc, overlay) {
+	return Object.keys(overlay || {}).filter((key) => !(key in (rpc || {})));
+}
+
+/* The "is this page still doing something" half of `waitForQuiet`: `start(id, gen)` on every
+ * same-origin request (tagged with the generation current when it fired), `finish(id)` on
+ * `requestfinished`/`requestfailed`. `quiet(ms, gen)` counts only entries tagged `gen`: Playwright
+ * never finishes a request a page abandoned on navigation, so an older generation's entry would
+ * hold the window open forever; `prune(gen)` drops them after `teardown()`. The clock runs from the
+ * last `start` OR `finish`, so a reply slower than `ms` keeps the page busy until it lands. */
+export function createActivityTracker(now = Date.now) {
+	const pending = new Map(); /* id -> generation it was started in */
+	let lastActivityAt = now();
+	return {
+		start(id, generation = 0) { pending.set(id, generation); lastActivityAt = now(); },
+		finish(id) { pending.delete(id); lastActivityAt = now(); },
+		prune(generation) {
+			for (const [ id, gen ] of pending) if (gen !== generation) pending.delete(id);
+		},
+		pendingCount(generation = 0) {
+			let n = 0;
+			for (const gen of pending.values()) if (gen === generation) n++;
+			return n;
+		},
+		pendingEntries(generation = 0) {
+			return [ ...pending.entries() ].filter(([ , gen ]) => gen === generation).map(([ id ]) => id);
+		},
+		quiet(quietMs, generation = 0) {
+			return this.pendingCount(generation) === 0 && now() - lastActivityAt >= quietMs;
+		},
+	};
+}
+
+/* One in-flight request, rendered for a page-timeout error: `METHOD /path`, with the ubus
+ * `object.method` name(s) the POST body carries appended in brackets when the body IS a ubus call
+ * (`splitBatch`'s own key, args dropped — the STILL-PENDING call site is what a stuck page needs
+ * named, not what it asked with). Falls back to `METHOD /path` alone for a GET, a POST whose body
+ * isn't JSON, or an entry that isn't `method:'call'` (ubus's own boot `list` probe). */
+export function describePendingRequest(method, url, postData) {
+	let path;
+	try { path = new URL(url).pathname; } catch (e) { path = url; }
+	let calls = [];
+	if (method === 'POST' && postData) {
+		try {
+			calls = splitBatch(postData)
+				.filter(({ entry }) => entry && entry.method === 'call')
+				.map(({ key }) => key.slice(0, key.indexOf('(')));
+		} catch (e) { /* not JSON, or not a batch — no suffix */ }
+	}
+	return calls.length ? `${method} ${path} [${calls.join(', ')}]` : `${method} ${path}`;
+}
+
+/* `requests` (`[{method,url,postData}, ...]` — capture.mjs's shape for a Playwright `Request` once
+ * its three relevant fields are read off it) rendered by `describePendingRequest` above, joined and
+ * capped at `limit`: a page stuck with dozens in flight needs one readable line, not dozens. */
+export function describePendingRequests(requests, limit = 10) {
+	const shown = requests.slice(0, limit).map(({ method, url, postData }) => describePendingRequest(method, url, postData));
+	const extra = requests.length > limit ? `, +${requests.length - limit} more` : '';
+	return shown.join(', ') + extra;
+}
+
+/* A monotonic "which page load is this from" counter for a Playwright `page` reused across
+ * `capture.mjs`'s whole run: `bump()` starts a new generation (called right before each
+ * navigation), `tag(id)` records the generation `id` (a Request object) was SEEN in, `isCurrent(id)`
+ * says whether that still matches the latest `bump()`. A response tagged with an older generation
+ * arrived after its own page was already navigated away from — CDP has already discarded the
+ * resource by then (`response.body()`: "No resource with given identifier found", or "navigated
+ * away from") — which is exactly what the `luci-mod-dashboard` page `login()` lands on produces: its
+ * own lazy includes (`view/dashboard/include/10_router.js`, owlab.yaml:86) are still loading when
+ * the capture loop's first `goto` fires. Plain `Map`, not `WeakMap`: capture.mjs runs once per
+ * process and exits, and a plain map is what makes a fake string id a unit test. */
+export function createGenerationGate() {
+	let generation = 0;
+	const tagged = new Map();
+	return {
+		bump() { generation += 1; return generation; },
+		current() { return generation; },
+		tag(id) { tagged.set(id, generation); },
+		isCurrent(id) { return tagged.get(id) === generation; },
+	};
+}
+
+/* Polls `isQuiet()` until it returns true, or throws once the whole wait has run longer than
+ * `timeoutMs` — `describe()`, when given, is appended to that error so it can name what is still
+ * outstanding (`createActivityTracker`'s `pendingCount()`). A fixed post-load sleep is not enough:
+ * the lazy `luci-mod-status` includes behind the overlaid ubus calls (10_system.js, 60_wifi.js)
+ * fire ~0.5-0.6 s after `load` locally and later on a fresh CI container — a 300 ms settle dropped
+ * 8 of 9 overlay keys. A page whose poll (`L.Poll`) never truly stops still returns
+ * here at the first gap between ticks wider than `quietMs`; `timeoutMs` is the hard cap for the page
+ * where that gap never opens. `now`/`sleep` are injected so a fake clock drives this in a unit test
+ * without a real timer running down; `pollMs` only bounds how coarse the reading is, never a floor
+ * on the wait. */
+export async function waitForQuiet({
+	isQuiet, quietMs, timeoutMs,
+	now = Date.now, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), pollMs, describe,
+}) {
+	const step = pollMs ?? Math.max(1, Math.min(50, quietMs));
+	const start = now();
+	for (;;) {
+		if (isQuiet()) return now() - start;
+		if (now() - start >= timeoutMs) {
+			const extra = describe ? ` (${describe()})` : '';
+			throw new Error(`no ${quietMs}ms quiet window reached within ${timeoutMs}ms${extra}`);
+		}
+		await sleep(step);
+	}
+}
+
+/* Awaits every `[label, promise]` pair in `reads` with `Promise.allSettled` so one response body
+ * that failed to read never gets lost behind the ones that succeeded (capture.mjs's `response`
+ * listener never awaits its own async work — Playwright does not await an event handler either —
+ * so nothing upstream would otherwise notice a rejected read), then throws ONE error naming every
+ * failed label. A body capture.mjs believed it recorded but silently didn't is worse than a loud
+ * failure at the point it is about to trust the pile of reads it just drained.
+ *
+ * Bounded by `timeoutMs` (default 15s): a read that neither resolves nor rejects used to hang this
+ * forever — a tester run on owrt2512b measured one body read stuck ~148s and the whole capture past
+ * the 5-minute kill — so a still-pending read past the bound is now its own loud failure, naming
+ * every label still outstanding rather than the ones that already settled. */
+export async function drainReads(reads, phase, timeoutMs = 15000) {
+	const remaining = new Map(reads.map(([ label ], i) => [ i, label ]));
+	const wrapped = reads.map(([ , p ], i) => p.then(
+		(value) => { remaining.delete(i); return { status: 'fulfilled', value }; },
+		(reason) => { remaining.delete(i); return { status: 'rejected', reason }; },
+	));
+	const timedOut = Symbol('drainReads timeout');
+	let timer;
+	const guard = new Promise((resolve) => { timer = setTimeout(() => resolve(timedOut), timeoutMs); });
+	const result = await Promise.race([ Promise.all(wrapped), guard ]);
+	clearTimeout(timer);
+	if (result === timedOut) {
+		throw new Error(`playground/capture: ${phase}: drain timed out after ${timeoutMs}ms, still pending: `
+			+ `${[ ...remaining.values() ].join(', ')}`);
+	}
+	const failed = result
+		.map((r, i) => ({ r, label: reads[i][0] }))
+		.filter(({ r }) => r.status === 'rejected');
+	if (failed.length) {
+		const detail = failed.map(({ r, label }) => `${label}: ${r.reason?.message || r.reason}`).join('; ');
+		throw new Error(`playground/capture: ${phase}: ${failed.length} response read failure(s) — ${detail}`);
+	}
+}
+
 /* Recursively lays `patch` over `base`: a nested object merges key by key, an array or a scalar
  * replaces its counterpart outright (there is no sane element-wise merge for a station list). The
  * wireless overlay needs this: `luci-rpc.getWirelessDevices({}).radio0` is a whole config+interfaces

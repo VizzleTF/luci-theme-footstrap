@@ -14,7 +14,7 @@ dispatch.
 ```
 check ─┐          ┌─→ verify ─────┐
        ├─→ build ─┼─→ live ───────┼─→ release ─→ playground-asset ─→ pages   (release and after: tags only)
-lint ──┘          └─→ playground ─┘
+lint ──┘          └─→ playground ─┴─→ pages-manual                           (workflow_dispatch, publish-pages=true)
 ```
 
 | Job | What it is |
@@ -27,7 +27,8 @@ lint ──┘          └─→ playground ─┘
 | `playground` | records a real router's pages into a static, replayable site and proves it offline |
 | `release` | signs, generates the notes, attaches the assets |
 | `playground-asset` | uploads `playground.tar.gz` to the tag's release, once one exists |
-| `pages` | refreshes the GitHub Pages portal and the release mirror |
+| `pages` | refreshes the GitHub Pages portal and the release mirror, from the latest release |
+| `pages-manual` | same refresh, off a manual dispatch, from THIS run's own playground instead of a release — see `pages`, below |
 
 `permissions: contents: read` at workflow level; only `release` and `playground-asset` declare
 write, both gated to a `v*` tag. It used to be workflow-wide, which handed it to every
@@ -430,6 +431,27 @@ mirror above it: a repository with no playground-carrying release yet (or a `wor
 on a branch, `docs/development.md`) publishes the rest of the portal and says so in the log rather
 than failing the build. `_site/playground.html` is kept as a redirect to `playground/` for the links
 the README and `devkit.src.html` already carry.
+
+**A maintainer can publish Pages from a single run's own recording, without a tag:**
+
+```sh
+gh workflow run build.yml --ref <ref> -f publish-pages=true
+```
+
+This runs `build.yml`'s `pages-manual` job (`needs: playground`, off by default), which calls
+`pages.yml` with `playground-source: artifact` — everything above is unchanged except the playground
+fetch, which reads the `playground` artifact this same run uploaded instead of
+`releases/latest/download/playground.tar.gz`, and FAILS CLOSED on a miss rather than publishing the
+rest of the portal. Two things to know before using it:
+
+- **The `github-pages` environment accepts only `main` or a `v*` tag as a deployment branch**
+  (repo Settings -> Environments -> github-pages; checked 2026-09-14 with
+  `gh api repos/…/environments/github-pages/deployment-branch-policies`:
+  `custom_branch_policies` = `[main, v*]`). `--ref` naming anything else reaches `deploy` — `build`
+  and the artifact fetch already ran — and is refused there.
+- **The next push to `main` under the paths `pages.yml` watches overwrites a manual publish.** That
+  run fires from `pages.yml`'s own push trigger, `playground-source` defaults back to `release`
+  there, and Pages goes back to mirroring the latest tag.
 
 ## Installation and the trust chain
 

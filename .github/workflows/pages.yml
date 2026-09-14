@@ -20,8 +20,18 @@ on:
   workflow_dispatch:
   # Called by build.yml's release job once the release is published, which is what refreshes the
   # release-metadata mirror below. It cannot be `on: release`: an event raised by GITHUB_TOKEN does
-  # not trigger another workflow.
+  # not trigger another workflow. Also called by build.yml's `pages-manual` job, a manual publish
+  # from a single run rather than a tag.
   workflow_call:
+    inputs:
+      # 'release' (default): mirror releases/latest/download/playground.tar.gz, same as a direct
+      # workflow_dispatch or push trigger of this file — `inputs` is populated only for
+      # workflow_call, so those two read it empty and the `!= 'artifact'` checks below still pick
+      # the release path. 'artifact': build.yml's `pages-manual` job asking for THIS run's own
+      # `playground` artifact instead of the newest tag's.
+      playground-source:
+        type: string
+        default: release
 
 permissions:
   contents: read
@@ -110,6 +120,7 @@ jobs:
       # no release-attached playground.tar.gz yet (or one still mid-upload the run before its own
       # `pages` call) publishes the rest of the portal rather than failing the whole build.
       - name: Fetch the latest playground
+        if: inputs.playground-source != 'artifact'
         run: |
           set -eu
           if ! curl -fsSL --retry 2 -o /tmp/playground.tar.gz \
@@ -120,6 +131,25 @@ jobs:
           mkdir -p _site/playground
           tar -xzf /tmp/playground.tar.gz -C _site/playground
           echo "playground: $(wc -c < /tmp/playground.tar.gz) bytes"
+
+      # A MANUAL PUBLISH (build.yml's `pages-manual`), and it FAILS CLOSED, unlike the fetch above:
+      # that step exists to preview THIS run's own recording, so falling back to the release's (or
+      # to none) on a miss would publish a preview that previewed nothing and say it succeeded.
+      # `download-artifact` reads the artifact `playground` uploaded earlier in this same run — see
+      # build.yml's `pages-manual` for why no `actions: read` is needed for that.
+      - name: Fetch this run's own playground
+        if: inputs.playground-source == 'artifact'
+        uses: actions/download-artifact@v8
+        with:
+          name: playground
+          path: ${{ runner.temp }}/pg-artifact
+      - name: Unpack this run's own playground
+        if: inputs.playground-source == 'artifact'
+        run: |
+          set -eu
+          mkdir -p _site/playground
+          tar -xzf "$RUNNER_TEMP/pg-artifact/playground.tar.gz" -C _site/playground
+          echo "playground (this run): $(wc -c < "$RUNNER_TEMP/pg-artifact/playground.tar.gz") bytes"
       # Old links (README, devkit.src.html) pointed at playground.html directly; keep them working.
       - run: |
           printf '%s' '<!doctype html><meta http-equiv="refresh" content="0; url=playground/"><a href="playground/">Continue</a>' \
@@ -130,6 +160,10 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # `github-pages` accepts only `main` or a `v*` tag as a deployment branch (repo Settings ->
+    # Environments -> github-pages; `gh api repos/…/environments/github-pages/deployment-branch-
+    # policies`, checked 2026-09-14: custom_branch_policies [main, v*]) — a `pages-manual` dispatch
+    # from any other ref reaches this job but is refused HERE, after `build` already spent its time.
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

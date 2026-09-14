@@ -9,6 +9,8 @@ import {
 	rewriteBase, rewriteEnv, scrubTokens, scrubHost, rewriteHostname, rewriteHostnameInData,
 	rewriteLiteral, stripBase, jsonForScript, applyOverlay, pruneMenu, parseLsLines, TOKEN_STUB,
 	scrubDataDeep, findSecrets, guardNoSecrets, resolveUnderRoot, isSafeReturn,
+	missingOverlayKeys, waitForQuiet, drainReads, createActivityTracker, createGenerationGate,
+	describePendingRequest, describePendingRequests,
 } from '../tools/playground/lib.mjs';
 
 test('stableStringify sorts object keys but keeps array order', () => {
@@ -286,4 +288,252 @@ test('resolveUnderRoot keeps an ordinary request inside root, rejects a traversa
 	assert.equal(resolveUnderRoot(root, '/../../etc/passwd'), null);
 	assert.equal(resolveUnderRoot(root, '/foo/../../etc/passwd'), null);
 	assert.equal(resolveUnderRoot(root, '/foo\0bar'), null);
+});
+
+test('missingOverlayKeys: every overlay key not present in rpc, none when rpc has them all', () => {
+	const overlay = { 'system.board({})': {}, 'system.info({})': {} };
+	assert.deepEqual(missingOverlayKeys({}, overlay), [ 'system.board({})', 'system.info({})' ]);
+	assert.deepEqual(missingOverlayKeys({ 'system.board({})': {} }, overlay), [ 'system.info({})' ]);
+	assert.deepEqual(missingOverlayKeys({ 'system.board({})': {}, 'system.info({})': {} }, overlay), []);
+	assert.deepEqual(missingOverlayKeys({}, {}), []);
+});
+
+test('createActivityTracker: quiet only once the set is empty AND quietMs has passed since the last start/finish', () => {
+	let t = 0;
+	const now = () => t;
+	const tracker = createActivityTracker(now);
+	assert.equal(tracker.quiet(0), true, 'nothing ever started, 0ms is always long enough');
+	tracker.start('a');
+	assert.equal(tracker.pendingCount(), 1);
+	assert.equal(tracker.quiet(0), false, 'still pending');
+	t = 50;
+	tracker.finish('a');
+	assert.equal(tracker.pendingCount(), 0);
+	assert.equal(tracker.quiet(100), false, 'idle, but not for 100ms yet');
+	t = 150;
+	assert.equal(tracker.quiet(100), true);
+});
+
+test('createActivityTracker: a slow finish re-opens the clock at FINISH, not at its own start', () => {
+	let t = 0;
+	const now = () => t;
+	const tracker = createActivityTracker(now);
+	tracker.start('slow-ubus-post');
+	t = 800; /* a reply slower than a 750ms quiet window would allow if clocked at issue time */
+	tracker.finish('slow-ubus-post');
+	assert.equal(tracker.quiet(750), false, 'the clock just reset at finish(), 0ms elapsed since');
+	t = 800 + 750;
+	assert.equal(tracker.quiet(750), true);
+});
+
+test('createActivityTracker: a second start after the first finishes keeps the window open until IT finishes too', () => {
+	let t = 0;
+	const now = () => t;
+	const tracker = createActivityTracker(now);
+	tracker.start('a'); t = 10; tracker.finish('a');
+	t = 20; tracker.start('b'); /* a lazy include firing after the first request already settled */
+	assert.equal(tracker.quiet(5), false);
+	t = 30; tracker.finish('b');
+	assert.equal(tracker.quiet(5), false, 'only 0ms idle since b finished');
+	t = 36;
+	assert.equal(tracker.quiet(5), true);
+});
+
+test('createActivityTracker: a stale request from an earlier generation never blocks quiet() for the current one', () => {
+	let t = 0;
+	const now = () => t;
+	const tracker = createActivityTracker(now);
+	tracker.start('gen0-abandoned', 0); /* Playwright drops requestfinished/requestfailed for a
+		request its own page abandoned on navigation — this one never calls finish() */
+	t = 10;
+	tracker.start('gen1-doc', 1);
+	t = 20;
+	tracker.finish('gen1-doc');
+	assert.equal(tracker.quiet(50, 1), false, 'not idle for 50ms yet');
+	t = 70;
+	assert.equal(tracker.quiet(50, 1), true, 'gen1 is quiet even though the gen0 request never finished');
+	assert.equal(tracker.pendingCount(0), 1, 'the abandoned gen0 request is still tracked until pruned');
+});
+
+test('createActivityTracker: prune(gen) drops every entry not tagged that generation', () => {
+	const tracker = createActivityTracker(() => 0);
+	tracker.start('gen0-a', 0);
+	tracker.start('gen0-b', 0);
+	tracker.start('gen1-c', 1);
+	tracker.prune(1);
+	assert.equal(tracker.pendingCount(0), 0);
+	assert.equal(tracker.pendingCount(1), 1);
+	assert.deepEqual(tracker.pendingEntries(1), [ 'gen1-c' ]);
+});
+
+test('describePendingRequest: method + path, no suffix for a plain GET', () => {
+	assert.equal(
+		describePendingRequest('GET', 'http://192.168.1.1/luci-static/resources/luci.js', null),
+		'GET /luci-static/resources/luci.js',
+	);
+});
+
+test('describePendingRequest: appends the ubus object.method a POST body calls', () => {
+	const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'call', params: [ 'sid', 'system', 'board', {} ] });
+	assert.equal(describePendingRequest('POST', 'http://192.168.1.1/ubus/', body), 'POST /ubus/ [system.board]');
+});
+
+test('describePendingRequest: a batched POST names every call in the batch', () => {
+	const body = JSON.stringify([
+		{ jsonrpc: '2.0', id: 1, method: 'call', params: [ 'sid', 'system', 'board', {} ] },
+		{ jsonrpc: '2.0', id: 2, method: 'call', params: [ 'sid', 'uci', 'get', { config: 'system' } ] },
+	]);
+	assert.equal(describePendingRequest('POST', 'http://192.168.1.1/ubus/', body), 'POST /ubus/ [system.board, uci.get]');
+});
+
+test('describePendingRequest: a POST body that is not a ubus call gets no suffix', () => {
+	assert.equal(describePendingRequest('POST', 'http://192.168.1.1/cgi-bin/luci/', 'not json'), 'POST /cgi-bin/luci/');
+	assert.equal(
+		describePendingRequest('POST', 'http://192.168.1.1/cgi-bin/luci/', JSON.stringify({ method: 'list' })),
+		'POST /cgi-bin/luci/',
+	);
+});
+
+test('describePendingRequests: joins up to the limit and counts the rest', () => {
+	const reqs = Array.from({ length: 12 }, (_, i) => ({ method: 'GET', url: `http://h/luci-static/${i}.js`, postData: null }));
+	const out = describePendingRequests(reqs, 10);
+	assert.equal(out, `${Array.from({ length: 10 }, (_, i) => `GET /luci-static/${i}.js`).join(', ')}, +2 more`);
+});
+
+test('waitForQuiet: the timeout message names the still-pending requests (method + path, ubus call)', async () => {
+	let t = 0;
+	const now = () => t;
+	const tracker = createActivityTracker(now);
+	const stuck = {
+		method: 'POST', url: 'http://192.168.1.1/ubus/',
+		postData: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'call', params: [ 'sid', 'system', 'board', {} ] }),
+	};
+	tracker.start(stuck, 1); /* current generation is 1: a page-2 request never settling must not be
+		blamed on page 1's own, already-pruned, generation-0 entries */
+	const sleep = async (ms) => { t += ms; };
+	await assert.rejects(
+		() => waitForQuiet({
+			isQuiet: () => tracker.quiet(50, 1),
+			quietMs: 50, timeoutMs: 100, now, sleep, pollMs: 50,
+			describe: () => {
+				const pending = tracker.pendingEntries(1);
+				return `${pending.length} request(s) still in flight: ${describePendingRequests(pending)}`;
+			},
+		}),
+		/1 request\(s\) still in flight: POST \/ubus\/ \[system\.board\]/,
+	);
+});
+
+test('createGenerationGate: a response tagged before the latest bump() reads as stale, one tagged after as current', () => {
+	const gate = createGenerationGate();
+	gate.tag('login-landing-req'); /* generation 0, before any bump — e.g. login()'s own navigation */
+	assert.equal(gate.isCurrent('login-landing-req'), true, 'still generation 0, nothing has bumped yet');
+	gate.bump(); /* the capture loop's first page */
+	assert.equal(gate.isCurrent('login-landing-req'), false, 'a later generation is now current');
+	gate.tag('page1-req');
+	assert.equal(gate.isCurrent('page1-req'), true);
+	gate.bump(); /* the second page */
+	assert.equal(gate.isCurrent('page1-req'), false);
+	assert.equal(gate.isCurrent('page1-req'), false, 'reading it again does not change the answer');
+});
+
+test('createGenerationGate: an id that was never tagged is never current', () => {
+	const gate = createGenerationGate();
+	assert.equal(gate.isCurrent('never-tagged'), false);
+	gate.bump();
+	assert.equal(gate.isCurrent('never-tagged'), false);
+});
+
+test('waitForQuiet resolves once isQuiet() starts returning true', async () => {
+	let t = 0;
+	let quiet = false;
+	const now = () => t;
+	const sleep = async (ms) => { t += ms; if (t >= 200) quiet = true; };
+	const idleFor = await waitForQuiet({
+		isQuiet: () => quiet, quietMs: 200, timeoutMs: 5000, now, sleep, pollMs: 50,
+	});
+	assert.ok(idleFor >= 150, `expected idleFor >= 150, got ${idleFor}`);
+});
+
+test('waitForQuiet throws naming the deadline when isQuiet() never turns true', async () => {
+	let t = 0;
+	const now = () => t;
+	const sleep = async (ms) => { t += ms; };
+	await assert.rejects(
+		() => waitForQuiet({ isQuiet: () => false, quietMs: 200, timeoutMs: 1000, now, sleep, pollMs: 100 }),
+		/no 200ms quiet window reached within 1000ms$/,
+	);
+});
+
+test('waitForQuiet appends describe() to the timeout error when given', async () => {
+	let t = 0;
+	const now = () => t;
+	const sleep = async (ms) => { t += ms; };
+	await assert.rejects(
+		() => waitForQuiet({
+			isQuiet: () => false, quietMs: 200, timeoutMs: 1000, now, sleep, pollMs: 100,
+			describe: () => '2 request(s) still in flight',
+		}),
+		/no 200ms quiet window reached within 1000ms \(2 request\(s\) still in flight\)/,
+	);
+});
+
+test('waitForQuiet + createActivityTracker together: quiet only once every in-flight request has finished and settled for quietMs', async () => {
+	let t = 0;
+	const now = () => t;
+	const tracker = createActivityTracker(now);
+	tracker.start('doc');
+	const sleep = async (ms) => {
+		t += ms;
+		if (t === 50) { tracker.finish('doc'); tracker.start('lazy-include'); } /* a late-firing request */
+		if (t === 100) tracker.finish('lazy-include');
+	};
+	const idleFor = await waitForQuiet({
+		isQuiet: () => tracker.quiet(50), quietMs: 50, timeoutMs: 5000, now, sleep, pollMs: 25,
+	});
+	assert.ok(idleFor >= 100, `expected idleFor >= 100 (idle only starts once "lazy-include" finishes at t=100), got ${idleFor}`);
+});
+
+test('drainReads resolves quietly when every read succeeded', async () => {
+	await assert.doesNotReject(() => drainReads([
+		[ 'a', Promise.resolve('ok') ],
+		[ 'b', Promise.resolve('ok') ],
+	], 'phase'));
+});
+
+test('drainReads throws ONE error naming every failed label, not just the first', async () => {
+	await assert.rejects(
+		() => drainReads([
+			[ 'good', Promise.resolve('ok') ],
+			[ 'ubus POST /ubus/', Promise.reject(new Error('closed')) ],
+			[ 'GET /luci-static/x.js', Promise.reject(new Error('navigated')) ],
+		], 'page "admin/status/overview"'),
+		(err) => {
+			assert.match(err.message, /page "admin\/status\/overview"/);
+			assert.match(err.message, /2 response read failure/);
+			assert.match(err.message, /ubus POST \/ubus\/: closed/);
+			assert.match(err.message, /GET \/luci-static\/x\.js: navigated/);
+			assert.doesNotMatch(err.message, /good/);
+			return true;
+		},
+	);
+});
+
+test('drainReads: a read that never settles fails loudly at its bound, naming only what is still pending', async () => {
+	let releaseHung;
+	const hung = new Promise((resolve) => { releaseHung = resolve; });
+	await assert.rejects(
+		() => drainReads([
+			[ 'GET /luci-static/x.js', Promise.resolve('ok') ],
+			[ 'ubus POST /ubus/', hung ],
+		], 'page "admin/status/overview"', 30),
+		(err) => {
+			assert.match(err.message, /page "admin\/status\/overview"/);
+			assert.match(err.message, /drain timed out after 30ms/);
+			assert.match(err.message, /ubus POST \/ubus\//);
+			assert.doesNotMatch(err.message, /GET \/luci-static\/x\.js/);
+			return true;
+		},
+	);
+	releaseHung('ok'); /* let the dangling promise settle so it cannot leak into a later test */
 });
