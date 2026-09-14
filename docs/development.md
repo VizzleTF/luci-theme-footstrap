@@ -1271,6 +1271,19 @@ so `sh -c '…'` fails with `--config: stat n=0; for t in …` and `ucode -T -c 
 `--config: stat -o`. stdin is not forwarded either. Put the script in the staged tree, sync it, and
 run it by path: `owlab exec <stand> -- sh /www/_probe.sh`.
 
+**`owlab exec` never attaches stdin, so a pipe into it "succeeds" and writes nothing.** `printf
+'hello-stdin\n' | owlab exec owrt2512 -- cat` prints nothing and exits 0 — `docker exec` is run
+without `-i` (owfeed/owlab#21). Tell it apart from a real empty file with `printf 'x\n' | docker
+exec -i owlab-luci-theme-footstrap-owrt2512 cat`, which prints `x`; the container is named
+`owlab-<project>-<router>`. Push with `docker cp <file>
+owlab-luci-theme-footstrap-<router>:<path>` instead, and clear `/tmp/luci-indexcache*` and
+`/tmp/luci-modulecache` afterward if the file is a LuCI resource. Measured 2026-09-14, owlab 0.6.1.
+
+**`owlab exec <stand> -- sh -c '…'` fails with `owlab: --config: stat …: no such file or directory`**:
+owlab still parses its own flags after `--`, so `-c` is read as `--config` (owfeed/owlab#24); a
+flag owlab does not define, like `ls -l`, passes through. Pass the command as one string:
+`owlab exec <stand> -- "sh -c '…'"`. Measured 2026-09-14, owlab 0.6.1.
+
 **`owlab test` fights the stands that are already up.** It synthesises its own router on host port
 2222, and with stands running the bind fails — after it has already removed one of the existing
 containers. Either take the stands down first, or assert the five `verify` things by hand on a
