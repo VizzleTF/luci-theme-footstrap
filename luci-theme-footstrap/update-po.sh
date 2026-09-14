@@ -87,8 +87,10 @@ if [ "$CHECK" = 1 ]; then
 	fi
 
 	rc=0
+	n=0
 	for po in po/*/*.po; do
 		[ -e "$po" ] || continue
+		n=$((n + 1))
 		# an empty msgstr means the string renders in English for that language
 		missing="$(msgfmt --statistics -o /dev/null "$po" 2>&1 | grep -o '[0-9]* untranslated' || true)"
 		if [ -n "$missing" ]; then
@@ -97,7 +99,15 @@ if [ "$CHECK" = 1 ]; then
 		fi
 		msgfmt --check -o /dev/null "$po" || rc=1
 	done
-	[ "$rc" = 0 ] && echo "i18n: .pot current, every string translated"
+	# A tree with no po/*/*.po at all walks zero catalogues, sets rc=0 (nothing in the loop ever ran
+	# to set it otherwise) and printed "every string translated" — true of the empty set the same way
+	# it is true of vacuously anything, and indistinguishable in the output from a real, fully
+	# translated build. n=0 is the one case the loop cannot tell apart from success on its own.
+	[ "$n" -gt 0 ] || {
+		echo "update-po: no po/*/*.po found — nothing was checked, not everything is translated" >&2
+		exit 1
+	}
+	[ "$rc" = 0 ] && echo "i18n: .pot current, every string translated ($n catalogue(s))"
 	exit "$rc"
 fi
 

@@ -118,6 +118,21 @@ console.log(`\n${findings.length} duplicated declaration bodies across differing
 	+ `(>= ${MIN_DECLS} decls); ~${wasted} redundant declarations. `
 	+ `${unpinned.length ? `${unpinned.length} UNPINNED.` : 'all pinned.'}`);
 
+/* "0 duplicated bodies, all pinned" is what a broken build prints too: buildCss() returning a
+ * near-empty sheet leaves `rules` near-empty, `findings` empty, `unpinned` empty, and this gate
+ * has no budget on FINDINGS by design (see the header) — but it never had a floor on how much CSS
+ * it actually walked, either, so a build that produced almost nothing read as "nothing is
+ * duplicated" rather than as "nothing was checked". MEASURED is the current count of qualifying
+ * (>= MIN_DECLS decls) rules (434); the floor sits far under it. */
+const MEASURED_RULES = 434;
+const RULES_FLOOR = 100;
+if (rules.length < RULES_FLOOR) {
+	console.error(`\nFAIL: only ${rules.length} rule(s) with >= ${MIN_DECLS} declarations were found `
+		+ `in the built sheet (last real run: ${MEASURED_RULES}) — the build produced far less CSS `
+		+ `than the theme ships. This is not a clean sweep; it is a sweep over almost nothing.`);
+	process.exit(1);
+}
+
 if (unpinned.length) {
 	console.error(`\nFAIL: ${unpinned.length} duplicated declaration body/bodies are not pinned.`);
 	console.error('Fold them into one rule. If the guards genuinely cannot be merged in CSS (a');

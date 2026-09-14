@@ -138,6 +138,19 @@ for (const name of names) {
 
 if (!names.length) console.log('  (no @mirror groups found)');
 
+/* Since @mirror markers are comments, deleting every one of them (or a source tree that failed to
+ * be read) disarms this whole gate AND re-permits the duplicates css-dup.mjs forbids — the two are
+ * mutually load-bearing, and neither notices the other going quiet. "0 groups" used to read exactly
+ * like "every mirror still agrees": both print a clean summary line and exit 0. MEASURED is the
+ * current count (10); the floor sits under it so removing one mirror is never blocked here, but a
+ * SEARCH tree gutted to nothing is not the same event as a clean sweep. */
+const MEASURED_GROUPS = 10;
+const GROUPS_FLOOR = 5;
+if (names.length < GROUPS_FLOOR)
+	errors.push(`only ${names.length} @mirror group(s) found across SEARCH (last real run: `
+		+ `${MEASURED_GROUPS}) — either most of the forced-duplication tags were deleted, or SEARCH `
+		+ `read far fewer files than it should have. Either way this is not a clean sweep.`);
+
 if (errors.length) {
 	console.error('\nFAIL: @mirror');
 	for (const e of errors) console.error('  ' + e);

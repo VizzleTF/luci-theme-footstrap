@@ -126,8 +126,15 @@ if [ -n "$VER" ]; then
 		exit 1
 	}
 else
-	VER=0.0.0
-	echo "stage: no tag and no FOOTSTRAP_VERSION — staging as $VER" >&2
+	# A checkout with no tags (a shallow clone, or the tree copied out from under .git) used to stamp
+	# 0.0.0-r1 here and carry on: a silent placeholder version that a build or an install could not
+	# tell apart from a real 0.0.0 release. CI always sets FOOTSTRAP_VERSION and a normal dev checkout
+	# carries tags (this tree currently resolves v0.14.12), so reaching here means the version input
+	# itself is missing, not that 0.0.0 is what was meant — refuse, the same as a missing dist/ or an
+	# empty catalogue set elsewhere in this pass.
+	echo "stage: no tag and no FOOTSTRAP_VERSION — refusing to stamp a placeholder version" >&2
+	echo "       fetch tags (git fetch --tags) or set FOOTSTRAP_VERSION=<version>" >&2
+	exit 1
 fi
 
 # PKG_RELEASE is 1 in the Makefile and the -r1 suffix is part of every asset name, so it

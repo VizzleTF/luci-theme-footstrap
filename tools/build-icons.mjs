@@ -62,9 +62,53 @@ const MARK = 0.6;	/* the mark's share of the canvas: the maskable safe zone is 0
  * .apk, 3.6% of it.
  *
  * Nothing in luci-base could stand in for it: it ships functional glyphs and no logo. */
-const ICONS = [
-	{ name: 'app-icon-192.png', size: 192 },
-];
+
+/* The icon name lives in three places — manifest.json's icons[], head.ut's apple-touch-icon href,
+ * and (formerly) a literal right here — and this gate read only its own: `ICONS = []` printed "ok"
+ * with nothing checked, and a name added to the manifest but never to this array stayed silently
+ * unverified. Derived from manifest.json now, so the set this gate walks can never itself go quietly
+ * empty or drift from what a browser actually reads; the apple-touch-icon link is asserted to name
+ * one of the same files rather than read on its own, since iOS never opens the manifest at all. */
+function deriveIcons() {
+	let manifest;
+	try {
+		manifest = JSON.parse(readFileSync(join(MEDIA, 'manifest.json'), 'utf8'));
+	} catch (e) {
+		console.error(`build-icons: manifest.json unreadable — ${e.message}`);
+		process.exit(1);
+	}
+	const list = (manifest.icons || []).map((i) => {
+		const name = String(i.src || '').split('/').pop();
+		const m = /^(\d+)x(\d+)$/.exec(i.sizes || '');
+		if (!name || !m || m[1] !== m[2]) {
+			console.error(`build-icons: manifest.json icon ${JSON.stringify(i)} has no name or no square "sizes"`);
+			process.exit(1);
+		}
+		return { name, size: Number(m[1]) };
+	});
+	if (!list.length) {
+		console.error('build-icons: manifest.json\'s icons[] is empty — nothing for this gate to check');
+		process.exit(1);
+	}
+
+	const headUtPath = join(ROOT, 'luci-theme-footstrap/ucode/template/themes/footstrap/partials/head.ut');
+	const headUt = readFileSync(headUtPath, 'utf8');
+	const tag = headUt.match(/<link\b[^>]*rel="apple-touch-icon"[^>]*>/);
+	const href = tag && tag[0].match(/href="\{\{ media \}\}\/([^"]+)"/);
+	if (!href) {
+		console.error(`build-icons: ${headUtPath} carries no apple-touch-icon link this gate can read`);
+		process.exit(1);
+	}
+	if (!list.some((i) => i.name === href[1])) {
+		console.error(`build-icons: head.ut's apple-touch-icon names ${href[1]}, which manifest.json's `
+			+ `icons[] does not carry (${list.map((i) => i.name).join(', ')})`);
+		process.exit(1);
+	}
+
+	return list;
+}
+
+const ICONS = deriveIcons();
 
 const logo = readFileSync(join(MEDIA, 'logo.svg'), 'utf8');
 const page = (size) => `<!doctype html><meta charset="utf-8"><style>

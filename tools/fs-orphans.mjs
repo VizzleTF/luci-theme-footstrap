@@ -162,3 +162,18 @@ if (orphanCss.length) {
 	console.error(`\nFAIL: ${orphanCss.length} fs-* selector(s) styled but emitted by nothing.`);
 	process.exit(1);
 }
+
+/* A gate that walks a tree it never checked exists reads "0 orphans" the same as a real pass:
+ * point this at an empty styles/ (or one that failed to build/checkout) and `styled` is empty,
+ * `orphanCss` is trivially empty too, and the FORWARD check above has nothing to say — exit 0,
+ * "STYLED BUT NEVER EMITTED: none". MEASURED is the current count (83); the floor sits well below
+ * it so an ordinary edit never trips it, but zero, or a styles/ tree gutted down to a handful of
+ * files, cannot pass as if it were clean. */
+const MEASURED_STYLED = 83;
+const STYLED_FLOOR = 40;
+if (styled.size < STYLED_FLOOR) {
+	console.error(`\nFAIL: measured only ${styled.size} fs-* selector(s) in styles/ (last real run: `
+		+ `${MEASURED_STYLED}) — styles/ is missing, empty, or far short of the theme's own sheet. `
+		+ `This is not a clean run; it is a run that found nothing to check.`);
+	process.exit(1);
+}
