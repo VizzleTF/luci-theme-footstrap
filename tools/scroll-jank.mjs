@@ -130,7 +130,7 @@ const ARM = () => {
 
 /* SEQUENTIAL AND ON THE DEFAULT PAIR: frame pacing is what this gate measures, so a second router
  * rendering on the same machine is noise in the signal — unlike the structural gates, which now run
- * their routers at once. `--all` takes the four. */
+ * their routers at once. `--all` takes every running OpenWrt router. */
 const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'scroll-jank');
 const findings = [];
 let runs = 0;

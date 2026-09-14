@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+### Changed
+
+- **The playground is recorded from a real stand on every release, and runs the theme's own `fs-*.js` against a real router's ubus answers instead of a hand-written imitation of them, with a login page that accepts anything.** `tools/playground/{capture,build,verify}.mjs` replace the 475 KB hand-maintained `docs/playground.src.html`, which had gone 28 releases stale (last touched at v0.12.0, before the Appearance rebuild it still shows) because nothing forced it to track the theme it was meant to demonstrate. CI's new `playground` job captures `owrt2512` on every tag, pull request and manual dispatch and proves the recording offline in a real Chromium; `pages.yml` now fetches the tag's built site from the release instead of assembling one from a committed source file. The site opens on the router's own login form (`root`/empty, prefilled) and takes any credentials — there is no server left on a static site to check them against — with `.fs-logout` sending the reader back to it and a direct link to an admin page remembering itself across the round trip. `build.yml`'s `workflow_dispatch` gained `publish-pages`, so a maintainer can deploy Pages straight from a single run's own recording (`pages-manual`, `playground-source: artifact`) rather than waiting on a tag; the next Pages deploy — a tag, or a push to `main` touching `pages.yml`'s paths — refreshes the site from the latest release and overwrites it. The overlay stands one fictional ARM router (CPU, 512 MiB, no swap, low load, four 1 GbE ports) in for whatever machine records it, so a GitHub runner's 64-core EPYC never reaches the page.
+
+### Removed
+
+- **`docs/playground.src.html`, the hand-maintained playground source.** Superseded by a recording of a real router — see Changed, and `tools/playground/`.
+
+## [0.14.13] — 2026-09-14
+
 ### Added
 
 - **The anchoring decisions have unit tests.** `tests/fit-state.test.mjs` drives fs-fit with numbers instead of a page: which exit a correction takes, when the engine loses and regains trust, the theme's own scroll write, a removal-only batch, a `#view` swap, floor scoping, the attribute filter. 9 tests, no shipped bytes.
@@ -10,17 +20,14 @@
 
 ### Changed
 
+- **ImmortalWrt is no longer a gate target.** `tools/lib/stands.mjs` measures OpenWrt routers only: a running `imm*` stand is ignored, `--only imm2512` is refused. Same luci-base, different app set; on this release's wide run its two legs produced 1685 `noname` findings of their own apps and nothing to read.
+
 - **Comments are written for a reader with no session history.** `docs/conventions.md`, "Comments": the invariant, the measured number, one pointer; attempts, task names, `../tmp` paths and CI run ids go to `docs/`. `fs-fit.js` goes from 85 % to 39 % comment bytes with its token stream identical.
 - **The size ceiling is pinned once per release.** `node tools/size-budget.mjs --pin` in `/release`; between releases it is not raised. The week before this release raised it 17 times, each with a paragraph.
 - **Page-scoped CSS keys off `#view[data-page]` and `.fs-content[data-page]`, not `body`.** The outgoing page keeps its rules for the whole staging window: 33 Overview rules used to drop for 1.4 s and grow the document 211 px. Selectors use `:where(#view)` to stay under the specificity ceiling.
 - **The anchor sweep runs engines and stands in parallel and says what it saw.** `tools/scroll-anchor.mjs`: 390 s to 216 s on the same cells; new `tick`, `declines`, `below` and `repeat` cases; every finding names the exit the correction took and when; `--quick` says out loud what it skipped.
 - **CI.** Chromium's sweep is a shard of `anchors` beside firefox and webkit (the `motion` slice sat at 39 of its 45 minutes); `owrtsnap` gates `live` and `anchors` again on owlab 0.6.1; a push reports whether the published feed was measured or skipped; `developer`/`tester` turn caps 200/140.
-- **`docs/development.md` records the week's stand traps.** npm and long gates on a Windows checkout, `bg-wait` waiting out its cap, a detach that dies with its WSL call, two `ci-local.sh` runs colliding on one stand, `owlab exec` dropping stdin with exit 0 (owfeed/owlab#21) and reading `sh -c` after `--` as its own `--config` (owfeed/owlab#24).
-- **The playground is recorded from a real stand on every release, and runs the theme's own `fs-*.js` against a real router's ubus answers instead of a hand-written imitation of them, with a login page that accepts anything.** `tools/playground/{capture,build,verify}.mjs` replace the 475 KB hand-maintained `docs/playground.src.html`, which had gone 28 releases stale (last touched at v0.12.0, before the Appearance rebuild it still shows) because nothing forced it to track the theme it was meant to demonstrate. CI's new `playground` job captures `owrt2512` on every tag, pull request and manual dispatch and proves the recording offline in a real Chromium; `pages.yml` now fetches the tag's built site from the release instead of assembling one from a committed source file. The site opens on the router's own login form (`root`/empty, prefilled) and takes any credentials — there is no server left on a static site to check them against — with `.fs-logout` sending the reader back to it and a direct link to an admin page remembering itself across the round trip. `build.yml`'s `workflow_dispatch` gained `publish-pages`, so a maintainer can deploy Pages straight from a single run's own recording (`pages-manual`, `playground-source: artifact`) rather than waiting on a tag; the next Pages deploy — a tag, or a push to `main` touching `pages.yml`'s paths — refreshes the site from the latest release and overwrites it. The overlay stands one fictional ARM router (CPU, 512 MiB, no swap, low load, four 1 GbE ports) in for whatever machine records it, so a GitHub runner's 64-core EPYC never reaches the page.
-
-### Removed
-
-- **`docs/playground.src.html`, the hand-maintained playground source.** Superseded by a recording of a real router — see Changed, and `tools/playground/`.
+- **`docs/development.md` records the week's stand traps.** npm and long gates on a Windows checkout, `bg-wait` waiting out its cap, a detach that dies with its WSL call, two `ci-local.sh` runs colliding on one stand, `owlab exec` dropping stdin with exit 0 (owfeed/owlab#21) and reading `sh -c` after `--` as its own `--config` (owfeed/owlab#24), `owlab test` 0.6.1 removing the stands that were running.
 
 ### Fixed
 
@@ -4555,6 +4562,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.14.13]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.12...v0.14.13
 [0.14.12]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.11...v0.14.12
 [0.14.11]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.10...v0.14.11
 [0.14.10]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.14.9...v0.14.10
