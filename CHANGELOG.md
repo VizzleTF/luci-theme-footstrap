@@ -31,6 +31,8 @@
 - **The theme stops rewriting floors that did not change.** 725 clears and 625 writes per 25 s of polling become 70 and 70; the floor sweep touches only the boxes a mutation reached.
 - **The live job's `motion` slice runs in 13 minutes instead of 39**, and `parity`/`audit` finish again: a page that pins the main thread is reported by name instead of costing the slice its whole budget.
 
+- **A foreign app's own `hidden lg:flex` no longer stays `display: none` once its sheet is re-hosted into `@layer theme`.** `fs-sheets.js`'s `rehostIntoThemeLayer()` moves an app's unlayered sheet into the theme's own layer, where it competes on specificity instead of losing to it by layer order alone; measured on owrt2512 with luci-app-splify2 26.9, `theme/60-inputs.css`'s `.hidden.hidden` at (0,2,0) outranked Tailwind's `.lg\:flex` at (0,1,0), leaving `<aside class="hidden lg:flex …">` (Rail.tsx) at `display: none` at both 1440 and 1920px. `.hidden.hidden` is now `.hidden.hidden:not([class*=":"])` — (0,3,0), still clear of `input[type="submit"]` at (0,1,1) from issue #12 — excluding any class list carrying a Tailwind/UnoCSS responsive variant, since LuCI itself never emits a class containing `:`.
+
 ## [0.14.12] — 2026-09-07
 
 ### Added

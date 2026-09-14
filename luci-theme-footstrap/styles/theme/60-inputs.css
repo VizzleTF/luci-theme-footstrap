@@ -796,8 +796,17 @@
 	 * attribute selector counts as a class, so `input[type="submit"]` at (0,1,1) beats a bare
 	 * `.hidden` at (0,1,0) and a stray "Save" button floats above the page title (issue #12).
 	 * Doubling the class states the invariant once at (0,2,0) instead of chasing elements. An
-	 * `!important` would do it too, and would invert the layer order for every future override. */
-	.hidden.hidden { display: none; }
+	 * `!important` would do it too, and would invert the layer order for every future override.
+	 * `fs-sheets.js` (rehostIntoThemeLayer) re-hosts a foreign app's own sheet into `@layer theme`,
+	 * where it now competes on specificity instead of losing to an unlayered rule by layer order
+	 * alone: measured on owrt2512 with luci-app-splify2 26.9, `<aside class="hidden lg:flex …">`
+	 * (Rail.tsx) stayed `display: none` at 1440/1920px because `.hidden.hidden` at (0,3,0) — see
+	 * below — outranked `.lg\:flex` at (0,1,0). `:not([class*=":"])` excludes any class list that
+	 * carries a Tailwind/UnoCSS responsive variant (the colon in `lg:flex`, `md:block`, `sm:inline`)
+	 * from the invariant above; LuCI itself never emits a class containing `:`, so nothing stock
+	 * is affected. Specificity moves to (0,3,0) — `:not()` counts its argument's attribute
+	 * selector, (0,1,0) — still clear of `input[type="submit"]` at (0,1,1) (issue #12, unchanged). */
+	.hidden.hidden:not([class*=":"]) { display: none; }
 	/* RangeSlider (UIRangeSlider) — the one LuCI widget base leaves to native browser rendering.
 	 * Token-driven track/thumb.
 	 * The INPUT box is the WCAG 2.2 SC 2.5.8 target (24px min): it used to be the 6px track
