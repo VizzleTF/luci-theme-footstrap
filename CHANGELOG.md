@@ -2,6 +2,7 @@
 
 ### Fixed
 
+- **`install.sh` survives a dead dependency feed and refuses a dead own feed.** It also counts one opkg failure line per feed, not two, so 4 dead feeds of 8 no longer read as none.
 - **Seventeen gates that passed on nothing now fail.** Packaging and shell checks, `update-po.sh` with no catalogue, a feed assertion that never ran, anchoring cells that were never measured, a mark on a sticky element, a swap whose growth never reached the document, a page that stops being LuCI mid-measurement, the staging check on a page still loading.
 
 ## [0.14.12] — 2026-09-07
