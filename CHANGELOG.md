@@ -6,6 +6,7 @@
 - **`docs/anchoring-log.md` holds every anchoring finding with its measurement.** `docs/anchoring.md` is the reference alone: the mechanisms, their invariants, the ablation table.
 - **`tools/ci-local.sh` runs build.yml's jobs locally, in the same order.** `--list` says what a green run here does not prove; the router legs need `--force`.
 - **Six more stands.** `-b`/`-c`/`-d` twins of the three OpenWrt lines, so a full anchor sweep runs as nine shards: 75 minutes to 31.
+- **Probes for foreign CSS frameworks inside an app view.** `.claude/tooling/fwprobe.mjs` compares Tailwind 3/4, DaisyUI 5 and Bootstrap 5 fixtures under footstrap and bootstrap and names the rule that won each declaration; `fwprobe-chrome.mjs` checks the chrome beside them, `splify2.mjs` the splify2 rail. First run: 23, 48, 86 and 22 app declarations lost to the theme.
 
 ### Changed
 
@@ -14,7 +15,7 @@
 - **Page-scoped CSS keys off `#view[data-page]` and `.fs-content[data-page]`, not `body`.** The outgoing page keeps its rules for the whole staging window: 33 Overview rules used to drop for 1.4 s and grow the document 211 px. Selectors use `:where(#view)` to stay under the specificity ceiling.
 - **The anchor sweep runs engines and stands in parallel and says what it saw.** `tools/scroll-anchor.mjs`: 390 s to 216 s on the same cells; new `tick`, `declines`, `below` and `repeat` cases; every finding names the exit the correction took and when; `--quick` says out loud what it skipped.
 - **CI.** Chromium's sweep is a shard of `anchors` beside firefox and webkit (the `motion` slice sat at 39 of its 45 minutes); `owrtsnap` gates `live` and `anchors` again on owlab 0.6.1; a push reports whether the published feed was measured or skipped; `developer`/`tester` turn caps 200/140.
-- **`docs/development.md` records the week's stand traps.** npm and long gates on a Windows checkout, `bg-wait` waiting out its cap, a detach that dies with its WSL call, two `ci-local.sh` runs colliding on one stand.
+- **`docs/development.md` records the week's stand traps.** npm and long gates on a Windows checkout, `bg-wait` waiting out its cap, a detach that dies with its WSL call, two `ci-local.sh` runs colliding on one stand, `owlab exec` dropping stdin with exit 0 (owfeed/owlab#21) and reading `sh -c` after `--` as its own `--config` (owfeed/owlab#24).
 
 ### Fixed
 
@@ -25,6 +26,7 @@
 - **Four chrome faults.** A tap on a tab no longer defers the chrome fit for 400 ms; content hidden in place gives its floor back (258 px of empty ground under an unticked `depends()` row, now 0); a page with `[data-field]` cells no longer pins the main thread (926 observer callbacks a second on the file manager); `contentWidth()` no longer answers up to 256 px stale for 220-400 ms after a resize.
 - **`install.sh` survives a dead dependency feed and refuses a dead own feed.** It also counts one opkg failure line per feed, not two, so 4 dead feeds of 8 no longer read as none.
 - **Seventeen gates that passed on nothing now fail.** Packaging and shell checks, `update-po.sh` with no catalogue, a feed assertion that never ran, anchoring cells that were never measured, a mark on a sticky element, a swap whose growth never reached the document, a page that stops being LuCI mid-measurement, the staging check on a page still loading.
+- **A foreign app's `hidden lg:flex` shows again on wide screens.** An invasive sheet re-hosted into `@layer theme` competes with the theme on specificity, and `.hidden.hidden` (0,2,0) beat Tailwind's `.lg\:flex` (0,1,0): luci-app-splify2's section rail was `display: none` at 1440 and 1920 px, now `flex`, 236 px. The rule skips class lists containing `:`, which LuCI never emits; `input[type=submit].hidden` from #12 stays hidden.
 
 ### Performance
 
