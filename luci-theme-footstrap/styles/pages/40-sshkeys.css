@@ -6,8 +6,13 @@
 	 *
 	 * Scoped to this page on purpose: a general "card any bare #view > div" was tried and reverted —
 	 * it also wrapped whole tabbed views (Startup). Other bare-view pages get their own entry
-	 * here. */
-	body[data-page="admin-system-admin-sshkeys"] #view > div {
+	 * here.
+	 *
+	 * `:where(#view)`, not bare `#view`: zeroes the id's specificity while still matching the exact
+	 * same element, so `> div` still means "child of #view" — 20-overview.css, top of
+	 * `@layer page`, has the full reasoning, including why a wider `:where(#view, .fs-content)`
+	 * was rejected precisely because of this `>` combinator. */
+	:where(#view)[data-page="admin-system-admin-sshkeys"] > div {
 		background: var(--fs-panel);
 		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
@@ -17,7 +22,7 @@
 	/* An authorized_keys entry is a ~400-char base64 blob: the one dynlist that must not
 	 * take theme/60-inputs.css's 440px cap. Must live in `page` — in `base` it was dead,
 	 * since a layer beats specificity and theme's plain `.cbi-dynlist` capped it anyway. */
-	body[data-page="admin-system-admin-sshkeys"] .cbi-dynlist {
+	:where(#view)[data-page="admin-system-admin-sshkeys"] .cbi-dynlist {
 		max-width: none;
 	}
 }

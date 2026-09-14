@@ -130,9 +130,12 @@
 	}
 
 	/* Density steps for a crowded strip: fs-chrome.js (fitTabStrips) MEASURES whether the tabs
-	 * wrap to a second row and, if so, adds .fs-dense1 then .fs-dense2. Padding is trimmed
-	 * hard first (9/14 -> 5/9 -> 3/7), the font only at the d2 floor (13 -> 12) and the gap
-	 * only there (4 -> 3), so a pill never gets tighter than its label; past the floor the
+	 * wrap to a second row and escalates .fs-dense1 -> .fs-dense2, mutually exclusive (dense1 is
+	 * removed the moment dense2 is added, so a pill is never trimmed by both at once). Both steps
+	 * give the pill the SAME padding (--fs-space-1 --fs-space-2) and, where the rule sets it at
+	 * all, the SAME font-size (--fs-type) — dense1 does not touch font-size, dense2 restates it;
+	 * neither actually shrinks it further, since --fs-type is already the strip's own base size.
+	 * Only the strip's own `gap` is touched by a dense rule, and only at d2; past that floor the
 	 * strip may wrap. The id in the first selector matches the #tabmenu rule's specificity. */
 	#tabmenu ul.tabs.fs-dense1 > li > a,
 	.tabs.fs-dense1 > li > a,

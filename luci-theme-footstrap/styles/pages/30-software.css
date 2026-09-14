@@ -1,8 +1,13 @@
 @layer page {
 	/* Software disk-space bar -> the overview Memory/Storage meter: label + value on one
 	 * line, bar below (the value is the .cbi-progressbar title, lifted out by ::after).
-	 * Scoped by body[data-page], NOT by :has(#disk-space-label) — 24.10 ships no such id. */
-	body[data-page="admin-system-package-manager"] #view .controls > div:first-child { position: relative; display: block; flex: 1 1 100%; width: 100%; margin: 0 0 var(--fs-space-1-5); }
+	 * Scoped by #view[data-page], NOT by :has(#disk-space-label) — 24.10 ships no such id.
+	 * #view, not body: the attribute lives on the view itself so the outgoing page keeps its
+	 * own rules for the whole staging window (fs-router.js, commitStage).
+	 * `:where(#view)`, not bare `#view`: zeroes the id's specificity without changing which
+	 * element matches — 20-overview.css, top of `@layer page`, has the full reasoning and the
+	 * measured numbers (tools/css-metrics.mjs's ceiling). */
+	:where(#view)[data-page="admin-system-package-manager"] .controls > div:first-child { position: relative; display: block; flex: 1 1 100%; width: 100%; margin: 0 0 var(--fs-space-1-5); }
 
 	/* The package list's row SHAPE. #packages is a DATA table (`<table class="table" id="packages">`,
 	 * no .cbi-section-table class; fs-select.js tags it .fs-dt off its .tr.cbi-section-table-titles
@@ -95,7 +100,7 @@
 	 * only `:has()` accepts one — `:where()` takes a plain complex-selector list, so wrapping it
 	 * there makes the whole rule invalid and the browser drops it, which stylelint and css-metrics
 	 * both parse happily. */
-	body[data-page="admin-system-package-manager"] #view label:has(+ .cbi-progressbar) {
+	:where(#view)[data-page="admin-system-package-manager"] label:has(+ .cbi-progressbar) {
 		display: block; margin: 0; font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-dim);
 	}
 }

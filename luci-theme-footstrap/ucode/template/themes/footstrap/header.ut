@@ -88,11 +88,15 @@
 
 	{#
 		data-page carries the DISPATCH path (ctx.path), not request_path: on a firstchild route
-		/admin/status renders the overview while request_path is only ['admin','status'], so every
-		`body[data-page='admin-status-overview']` rule would silently not apply. The SPA router
-		stamps the resolved leaf path, so both ways of arriving agree.
+		/admin/status renders the overview while request_path is only ['admin','status'], so a
+		`[data-page='admin-status-overview']` rule would silently not apply. The SPA router stamps the
+		resolved leaf path, so both ways of arriving agree. Stamped on <body> for the JS modules that
+		read the route there, and again on .fs-content below for the page-scoped CSS that keys off it
+		(styles/pages/): fs-router's seed() copies it there too, but only once the modules have loaded,
+		and the Overview's stray <h2 name="content"> was painted for 65-138 ms before that.
 	#}
-	<body class="lang_{{ dispatcher.lang }}" data-page="{{ entityencode(join('-', length(ctx.path) ? ctx.path : ctx.request_path), true) }}">
+	{% const fs_page = entityencode(join('-', length(ctx.path) ? ctx.path : ctx.request_path), true) %}
+	<body class="lang_{{ dispatcher.lang }}" data-page="{{ fs_page }}">
 		{#
 			The wallpaper pattern's paint surface: 15-wallpaper.css masks this element so an
 			uploaded SVG takes the theme's ink. A mask applies to an element's whole rendering,
@@ -175,6 +179,6 @@
 				   full load, which announces itself. #}
 				<div id="fs-nav-status" class="fs-sr" data-fs-chrome role="status" aria-live="polite"></div>
 
-				<div class="fs-content">
+				<div class="fs-content" data-page="{{ fs_page }}">
 					{% include('themes/footstrap/partials/notices', { boardinfo, empty_password }) %}
 		{% endif %}

@@ -2,21 +2,31 @@
 
 ### Added
 
+- **The anchoring decisions have unit tests.** `tests/fit-state.test.mjs` drives fs-fit with numbers instead of a page: which exit a correction takes, when the engine loses and regains trust, the theme's own scroll write, a removal-only batch, a `#view` swap, floor scoping, the attribute filter. 9 tests, no shipped bytes.
+- **`docs/anchoring-log.md` holds every anchoring finding with its measurement.** `docs/anchoring.md` is the reference alone: the mechanisms, their invariants, the ablation table.
 - **`tools/ci-local.sh` runs build.yml's jobs locally, in the same order.** `--list` says what a green run here does not prove; the router legs need `--force`.
 - **Six more stands.** `-b`/`-c`/`-d` twins of the three OpenWrt lines, so a full anchor sweep runs as nine shards: 75 minutes to 31.
 
 ### Changed
 
+- **Page-scoped CSS keys off `#view[data-page]` and `.fs-content[data-page]`, not `body`.** The outgoing page keeps its rules for the whole staging window: 33 Overview rules used to drop for 1.4 s and grow the document 211 px. Selectors use `:where(#view)` to stay under the specificity ceiling.
+- **The anchor sweep runs engines and stands in parallel and says what it saw.** `tools/scroll-anchor.mjs`: 390 s to 216 s on the same cells; new `tick`, `declines`, `below` and `repeat` cases; every finding names the exit the correction took and when; `--quick` says out loud what it skipped.
 - **CI.** Chromium's sweep is a shard of `anchors` beside firefox and webkit (the `motion` slice sat at 39 of its 45 minutes); `owrtsnap` gates `live` and `anchors` again on owlab 0.6.1; a push reports whether the published feed was measured or skipped; `developer`/`tester` turn caps 200/140.
 - **`docs/development.md` records the week's stand traps.** npm and long gates on a Windows checkout, `bg-wait` waiting out its cap, a detach that dies with its WSL call, two `ci-local.sh` runs colliding on one stand.
 
 ### Fixed
 
+- **The reader stays put across poll refills, on every engine, both scrollers, all three densities.** The theme corrected only where the engine anchored nothing. It now also corrects a refill a trusted engine declined (8-61 ms instead of 419), distrusts an engine after two misses and trusts it again after two hits, reads its own scroll write as settling rather than as the reader, measures growth by the refilled box rather than by a witness that can be blind, ignores growth below the reader, gives back the pixel its own floor sweep clamped, and writes floors at the measured height — a half-pixel rounding made the document 2 px taller and invalidated the engine's anchor. Drifts closed: 47-64 px on repeated refills, 60 px on a shrink above the reader on WebKit, 120 px on a refill one level inside a floored box, 431 px on Back.
+- **The Overview no longer creeps once per poll tick.** The bar changed height inside its own measurement pass, 230 to 123 px; `fitChrome()` pins `min-height` and `height` for the whole decision. 0 px peak-to-peak on every engine. A WebKit-only suppression built on the wrong diagnosis never shipped.
+- **Back returns the reader to where they were, on a phone as well as a desktop.** The restore is cancelled only by a scroll on the axis it carries, and the engine's clamp on a page still growing no longer reads as the reader.
+- **The Overview's stray "Status" heading no longer flashes for the first 65-138 ms of a full load.** `header.ut` stamps `.fs-content` with the page, not only `body`; hidden without JavaScript too.
+- **Four chrome faults.** A tap on a tab no longer defers the chrome fit for 400 ms; content hidden in place gives its floor back (258 px of empty ground under an unticked `depends()` row, now 0); a page with `[data-field]` cells no longer pins the main thread (926 observer callbacks a second on the file manager); `contentWidth()` no longer answers up to 256 px stale for 220-400 ms after a resize.
 - **`install.sh` survives a dead dependency feed and refuses a dead own feed.** It also counts one opkg failure line per feed, not two, so 4 dead feeds of 8 no longer read as none.
 - **Seventeen gates that passed on nothing now fail.** Packaging and shell checks, `update-po.sh` with no catalogue, a feed assertion that never ran, anchoring cells that were never measured, a mark on a sticky element, a swap whose growth never reached the document, a page that stops being LuCI mid-measurement, the staging check on a page still loading.
 
 ### Performance
 
+- **The theme stops rewriting floors that did not change.** 725 clears and 625 writes per 25 s of polling become 70 and 70; the floor sweep touches only the boxes a mutation reached.
 - **The live job's `motion` slice runs in 13 minutes instead of 39**, and `parity`/`audit` finish again: a page that pins the main thread is reported by name instead of costing the slice its whole budget.
 
 ## [0.14.12] — 2026-09-07

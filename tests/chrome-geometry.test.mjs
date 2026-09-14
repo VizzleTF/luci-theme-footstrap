@@ -16,7 +16,7 @@
  * tools/live-audit.mjs compares contentWidth() against the live `.fs-content` box. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadModule, installBrowserGlobals } from './lib/luci-module.mjs';
+import { loadModule, fakeDocument, installBrowserGlobals } from './lib/luci-module.mjs';
 
 installBrowserGlobals();
 
@@ -111,4 +111,21 @@ test('the fold threshold is the same arithmetic fitShell folds on', () => {
 	const floor = G.sidebarW + G.contentPad + G.contentMin;
 	assert.equal(width({ outerW: floor }), G.contentMin);
 	assert.equal(width({ outerW: floor - 1 }) < G.contentMin, true);
+});
+
+/* contentWidth() answers off the width fitChrome() last measured, and fitChrome() stands aside for
+ * the whole SCROLL_IDLE window when a resize lands mid-flick — so the one read it makes itself is the
+ * window's width, compared against the cached one. Measured before this: 568px reported for a 390px
+ * viewport for up to 220ms after the rotate, and fs-select judged a table to have room it did not. */
+test('contentWidth() notices a window that changed width with no fitter having run', () => {
+	const root = { clientWidth: 1280, getAttribute: () => null, hasAttribute: () => false, setAttribute() {},
+		dataset: {}, classList: { add() {}, remove() {}, contains: () => false } };
+	const doc = fakeDocument({ documentElement: root, body: { appendChild() {}, getAttribute: () => null },
+		querySelector: () => ({}),
+		createElement: () => ({ style: { setProperty() {} }, setAttribute() {} }) });
+	const c = loadModule('fs-chrome', { document: doc,
+		stubs: { 'fs-prefs': { isTopLayout: () => false, currentRail: () => false } } });
+	assert.equal(c.contentWidth(), 1280 - G.sidebarW - G.contentPad);
+	root.clientWidth = 800;
+	assert.equal(c.contentWidth(), 800 - G.sidebarW - G.contentPad, 'the rotate is seen on the next call');
 });

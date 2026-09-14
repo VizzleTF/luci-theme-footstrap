@@ -113,24 +113,100 @@ async function writeCache(base, shapes) {
 	} catch (e) { /* a cache that cannot be written is a slow run, not a failed one */ }
 }
 
-export async function classify(page, base, paths, { settle = 1200, timeout = 20000 } = {}) {
+/* HOW LONG A PAGE MAY TAKE TO ANSWER THE PROBE.
+ *
+ * `page.evaluate()` has no timeout of its own, at all: Playwright hands the expression to the
+ * renderer and waits for the renderer, so a page whose main thread has stopped turning is not slow
+ * — it is silent, forever. Measured (task liveslice): `/admin/system/filemanager` pinned the
+ * renderer at ~105% CPU, `classify()` never came back, and the `parity` and `audit` slices of the
+ * `live` job were cancelled by their own `timeout-minutes: 45` four runs in a row without printing
+ * one line about which page they were on.
+ *
+ * The probe is a handful of querySelectorAll calls over a page that has ALREADY settled for
+ * `settle` ms: 4-5 ms measured on a healthy build (`fs-fit.js@76b3c7a`; a whole page costs 1.3 s,
+ * and 1.2 s of that is the settle), against not returning at all on the frozen one (`@13e9864`,
+ * still alive after 12 minutes). 10 s is ~2000x the healthy cost — nothing that is merely slow gets
+ * up there — and it keeps the worst case affordable: the widest menu measured is 96 paths
+ * (owrt2512b, third-party fixtures installed), so even every one of them freezing costs the walk
+ * 16 minutes rather than the whole 45-minute slice. */
+export const PROBE_DEADLINE_MS = 10000;
+
+const FROZEN = Symbol('probe deadline');
+
+/* Playwright's timeouts do not cover evaluate(); this is that timeout. The loser of the race is
+ * left pending on purpose — `Promise.race` keeps it handled, and the page it belongs to is closed
+ * immediately after. */
+function withDeadline(promise, ms) {
+	let timer;
+	return Promise.race([
+		promise.finally(() => clearTimeout(timer)),
+		new Promise((_, reject) => { timer = setTimeout(() => reject(FROZEN), ms); })
+	]);
+}
+
+/* `frozen` collects the pages that loaded and then stopped answering — see reportFrozen(). `id` is
+ * what the finding calls this router; `base` is a URL with a port owlab picked, so a gate that has
+ * a stand id should pass it. */
+export async function classify(page, base, paths, { settle = 1200, timeout = 20000, frozen = [], id = base } = {}) {
 	const shapes = new Map();
 	const cached = await readCache(base);
 	const fresh = new Map();
-	for (const path of paths) {
-		if (cached.has(path)) { shapes.set(path, cached.get(path)); continue; }
-		try { await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout }); }
-		catch (e) { continue; }			/* a page that will not load is measured by nobody */
-		await page.waitForTimeout(settle);
-		try {
-			const shape = await page.evaluate(SHAPE_PROBE);
-			shapes.set(path, shape);
-			fresh.set(path, shape);
+	/* THE SHAPE WALK GETS ITS OWN PAGE, so that a page which freezes can be thrown away.
+	 *
+	 * Measured: once the renderer's main thread stops, that page never comes back — every later
+	 * goto() on it burns its full 20 s timeout and every evaluate() throws `Execution context was
+	 * destroyed` at once, so one frozen page silently costs the whole rest of the menu. Closing it
+	 * and opening another in the SAME context costs 0.5 s and the walk goes on; the session cookie
+	 * and the gate's route seal live on the context, not on the page, so the new one is logged in.
+	 *
+	 * The caller's page is deliberately not the one navigated here: it carries the console listeners
+	 * and the login that the gate's own sweep needs, and must not be the thing that gets discarded. */
+	const ctx = page.context();
+	let probe = await ctx.newPage();
+	try {
+		for (const path of paths) {
+			if (cached.has(path)) { shapes.set(path, cached.get(path)); continue; }
+			try { await probe.goto(base + path, { waitUntil: 'domcontentloaded', timeout }); }
+			catch (e) { continue; }			/* a page that will not load is measured by nobody */
+			await probe.waitForTimeout(settle);
+			try {
+				const shape = await withDeadline(probe.evaluate(SHAPE_PROBE), PROBE_DEADLINE_MS);
+				shapes.set(path, shape);
+				fresh.set(path, shape);
+			}
+			catch (e) {
+				if (e !== FROZEN) continue;	/* context died under us: leave it out rather than guess */
+				/* Printed as it happens, not held to the end: this is the one finding whose whole
+				 * point is that the log used to say nothing while the run was still going. */
+				frozen.push(`${id}  ${path}`);
+				process.stdout.write(`  FINDING ${id} ${path} loaded and then stopped answering — `
+					+ `no reply to the shape probe in ${PROBE_DEADLINE_MS / 1000}s, where a page that `
+					+ 'is alive answers in ~5ms\n');
+				await probe.close().catch(() => {});
+				probe = await ctx.newPage();
+			}
 		}
-		catch (e) { /* context died under us: leave it out rather than guess */ }
 	}
+	finally { await probe.close().catch(() => {}); }
 	if (fresh.size) await writeCache(base, fresh);
 	return shapes;
+}
+
+/* The frozen pages of a run, as the gate's own closing report. Returns how many there were, so the
+ * caller can make its exit status say so.
+ *
+ * This is NOT the same thing as a page that would not open — that one is the runner or the stand,
+ * and this walk already passes over it in silence. A page that answered its own load and then went
+ * quiet has a pinned main thread, which is the theme's own defect (task liveslice: `fs-fit.js`
+ * between `76b3c7a` and `13e9864`) and is measured by nobody after it. */
+export function reportFrozen(frozen) {
+	if (!frozen.length) return 0;
+	process.stderr.write(`\n${frozen.length} page(s) never answered the shape probe:\n`);
+	for (const f of frozen) process.stderr.write(`  ${f}\n`);
+	process.stderr.write('\nThe page loaded, so this is not the runner: its main thread stopped'
+		+ ' turning. Open the page\nwith a profiler attached, or bisect the theme against it — and'
+		+ ' note that every gate walking\nthis menu measured nothing on it.\n');
+	return frozen.length;
 }
 
 /* One line per shape, so the run says what it stood in for rather than quietly not measuring it. */

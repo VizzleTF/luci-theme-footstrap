@@ -21,7 +21,8 @@
  * Needs a running owlab router (docs/development.md). */
 import { chromium } from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
-import { classify, representatives, reportReduction, PINNED } from './lib/page-shapes.mjs';
+import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
+import { read } from './lib/root.mjs';
 
 const arg = (name, dflt) => {
 	const i = process.argv.indexOf('--' + name);
@@ -96,10 +97,308 @@ const timerProbe = async (page) => {
 	catch (e) { return null; }
 };
 
+/* ---- the staging window itself, not just what arrives after it ----
+ *
+ * Every check below samples AFTER commitStage, which is exactly how 1407 ms of the OUTGOING page
+ * standing unstyled went unmeasured (task navstamp): `body[data-page]` used to flip to the
+ * incoming name at the click, and every page-scoped rule for the page still on screen stopped
+ * matching for the whole require — 33 rules in styles/pages/20-overview.css, +211px of document,
+ * the reader moved 140px. fs-router.js now keys that CSS off `#view[data-page]`/
+ * `.fs-content[data-page]` instead, spared until commitStage the same way fs-sheets spares a
+ * page's stylesheets (fs-router.js, docs/spa-router.md "The staging window").
+ *
+ * Sampled here mid-flight, with the incoming view's own module fetch held open long enough to
+ * have a window to sample in: a stand's own staging window is ~210 ms against 1.2 s on real
+ * hardware (../tmp/task-navflash/navflash.mjs), too short to catch this without the same fake
+ * slow route that probe uses. */
+const STAGING_ROUTE = '**/luci-static/resources/view/**';
+const STAGING_DELAY_MS = 1200;
+const STAGING_CASES = [
+	/* the Overview's own stray `<h2 name="content">` (view.ut) is hidden by
+	 * `.fs-content[data-page="admin-status-overview"] h2[name="content"]`
+	 * (styles/pages/20-overview.css) — present only right after a full load, before the first SPA
+	 * nav sweeps it, which is exactly the ORIGIN every case below full-loads to first. */
+	{ from: '/admin/status/overview', to: '/admin/system/package-manager',
+	  owned: '#maincontent h2[name="content"]', prop: 'display', want: 'none' },
+	/* package-manager's own page CSS (styles/pages/30-software.css) has no single always-present
+	 * element as reliable as the Overview's heading, so only the height half is checked here — the
+	 * half the card asks to prove on this page by name. */
+	{ from: '/admin/system/package-manager', to: '/admin/status/overview' },
+];
+
+/* ---- the narrow-viewport pass ----
+ *
+ * theme/90-responsive.css still scopes ~11 package-manager rules through
+ * `body[data-page="admin-system-package-manager"]`, inside `@media (max-width: …px)` — the same
+ * scope bug STAGING_CASES above was written for, one layer over, and invisible to every case
+ * above because they all run at the 1440px context (see below): that query never matches there.
+ * The width is read out of the file, not hard-coded, so an edit to the breakpoint cannot make
+ * this pass silently stop testing anything. */
+const NARROW_CSS_PATH = 'luci-theme-footstrap/styles/theme/90-responsive.css';
+function narrowBreakpoint() {
+	const m = read(NARROW_CSS_PATH).match(/@media\s*\(max-width:\s*(\d+)px\)/);
+	if (!m)
+		throw new Error(`spa-parity: no @media (max-width) in ${NARROW_CSS_PATH} to size the narrow-viewport pass off of`);
+	return Number(m[1]);
+}
+const NARROW_WIDTH = narrowBreakpoint();
+const NARROW_STAGING_CASES = [
+	/* `body[data-page="admin-system-package-manager"] #view .controls > div:not(.pager) { display:
+	 * block !important }` stacks each labelled control. Leaving the page, mid-flight the outgoing
+	 * `#view`/`.fs-content` still carry the OUTGOING name (commitStage), but `body`'s is already the
+	 * incoming route's (navigate(), fs-router.js) — an unfixed body-scoped rule here stops matching
+	 * and the row reverts to its unstacked flex layout while the reader is still looking at it. */
+	{ from: '/admin/system/package-manager', to: '/admin/status/overview',
+	  owned: '#view .controls > div:not(.pager)', prop: 'display', want: 'block' },
+];
+
+/* HOW MANY TIMES A CASE IS TRIED WHEN THE OUTGOING PAGE'S OWN CONTENT MOVED INSIDE THE WINDOW — task attrib.
+ * On CI the Overview was regularly still rendering when the click came, 1400 ms after its load: `the outgoing
+ * page's document height moved during the staging window` read `2959 -> 3540px`, `2750 -> 3331px` and once
+ * `900 -> 4011px` — its own sections arriving, not a page-scoped rule letting go. Waiting for the page to
+ * settle does not answer it: a wait on height and mutations read a page standing on its loading spinner as
+ * settled (../tmp/p7-settle.mjs, ubus +600 ms, 4 of 4 grew), and a wait that also asked for no request in
+ * flight never settled on CI within 20 s (three runs of three, every stand). What tells the two apart is
+ * WHAT moved: the defect this case exists for changes an attribute and every rule under it, and adds or
+ * removes no node in the outgoing page (0 content mutations on every such finding, fs-router with the live
+ * page renamed at the click); a page still loading does. A height change WITH content mutations says
+ * nothing either way, so the case is tried again, and only a run of STAGING_ATTEMPTS of those is reported —
+ * as a case that measured nothing. The rule check (`owned`) is independent of content and is a finding on
+ * any attempt. */
+const STAGING_ATTEMPTS = 3;
+
+async function stagingWindowCheck(page, stand, findings, cases = STAGING_CASES, widthLabel) {
+	for (const c of cases) {
+		const add = (detail) => findings.push({ stand: stand.id,
+			path: c.from + ' -> ' + c.to + (widthLabel ? ` @${widthLabel}px` : ''), kind: 'staging', detail });
+		const busy = [];
+		for (let attempt = 1; attempt <= STAGING_ATTEMPTS; attempt++) {
+			const r = await stagingAttempt(page, stand, c);
+			if (!r) break;
+			if (r.mid.staged === 0) { add('the fake-slow route never caught a staging window — this case measured nothing'); break; }
+			if (c.owned && r.mid.prop !== c.want) {
+				add(`${c.owned} read ${JSON.stringify(r.mid.prop)} mid-flight, wanted ${JSON.stringify(c.want)} — `
+					+ 'the outgoing page\'s own rule stopped matching');
+				break;
+			}
+			if (r.mid.docH === r.before.docH) break;
+			if (r.mid.mutations === 0) {
+				add(`the outgoing page's document height moved during the staging window: ${r.before.docH} -> ${r.mid.docH}px`
+					+ ' (no node of the outgoing page was added or removed inside the window)');
+				break;
+			}
+			busy.push(`${r.before.docH} -> ${r.mid.docH}px with ${r.mid.mutations} content mutation(s)`);
+			if (attempt === STAGING_ATTEMPTS)
+				add(`the outgoing page's own content kept arriving inside the staging window on all ${STAGING_ATTEMPTS} `
+					+ `attempts (${busy.join('; ')}) — this case measured nothing`);
+		}
+	}
+}
+
+/* One pass of a staging case: full-load the outgoing page, sample, click with the incoming view held open,
+ * sample mid-flight. `mutations` counts nodes added to or removed from the outgoing page (the stage excluded)
+ * between the two samples — see STAGING_ATTEMPTS. */
+async function stagingAttempt(page, stand, c) {
+	let before, mid;
+	try {
+		await page.goto(stand.base + c.from, { waitUntil: 'domcontentloaded', timeout: 20000 });
+	}
+	catch (e) { return null; }
+	await page.waitForTimeout(1400);
+	before = await page.evaluate((c) => {
+		const el = c.owned ? document.querySelector(c.owned) : null;
+		window.__fsStagingMut = 0;
+		const host = document.querySelector('.fs-content') || document.body;
+		const inStage = (n) => !!(n && ((n.classList && n.classList.contains('fs-staging'))
+			|| (n.closest && n.closest('.fs-staging'))));
+		window.__fsStagingMo = new MutationObserver((recs) => {
+			for (const m of recs) {
+				if (inStage(m.target)) continue;
+				const nodes = [ ...m.addedNodes, ...m.removedNodes ].filter((n) => !inStage(n));
+				if (nodes.length) window.__fsStagingMut++;
+			}
+		});
+		window.__fsStagingMo.observe(host, { childList: true, subtree: true });
+		return { docH: document.documentElement.scrollHeight,
+		         prop: el ? getComputedStyle(el)[c.prop] : null };
+	}, c);
+
+	/* held open only for the click below, not for the goto()/settle above: slowing the
+	 * outgoing page's own load would tell us nothing about the staging window */
+	await page.route(STAGING_ROUTE, async (route) => {
+		await new Promise((r) => setTimeout(r, STAGING_DELAY_MS));
+		/* the prefetch fetch() and require()'s own XHR can both name the same URL, and a route
+		 * already settled by the other rejects a second continue() — nothing this probe reads
+		 * depends on which of the two wins */
+		try { await route.continue(); } catch (e) {}
+	});
+	await page.evaluate((to) => {
+		const href = '/cgi-bin/luci' + to;
+		let a = [ ...document.querySelectorAll('a[href]') ].find((x) => x.getAttribute('href') === href);
+		if (!a) { a = document.createElement('a'); a.href = href; a.textContent = 'probe'; document.getElementById('view').append(a); }
+		a.click();
+	}, c.to);
+	/* mid-flight: well inside the held-open fetch, well before commitStage can run */
+	await page.waitForTimeout(500);
+	mid = await page.evaluate((c) => {
+		const el = c.owned ? document.querySelector(c.owned) : null;
+		if (window.__fsStagingMo) window.__fsStagingMo.disconnect();
+		return { docH: document.documentElement.scrollHeight,
+		         prop: el ? getComputedStyle(el)[c.prop] : null,
+		         staged: document.querySelectorAll('.fs-staging').length,
+		         mutations: window.__fsStagingMut || 0 };
+	}, c);
+	await page.unroute(STAGING_ROUTE);
+	/* let the held-open navigation actually finish before the next case reuses this page */
+	await page.waitForTimeout(STAGING_DELAY_MS + 1000);
+	return { before, mid };
+}
+
+/* ---- browser Back must restore the reader's own scroll offset ----
+ *
+ * Nothing above drives HISTORY at all: stagingWindowCheck proves the swap itself, but a reader who
+ * scrolls down, opens another page and presses Back is a full round trip through fs-router.js's
+ * `_scrollMem`/`restoreScroll()` that no case here exercised — task-back's card was opened against
+ * exactly this gap. Scroll down on `from`, click into `to`, go Back, and read whichever element
+ * `saveScroll()`/`restoreScroll()` would have used AT THIS WIDTH: `#maincontent` where its own
+ * `overflow-y` computes to `auto`/`scroll` (the sidebar layout), the document otherwise (the top
+ * layout) — docs/spa-router.md, "Scroll". Run at both the 1440px context every case above uses and
+ * the narrow one, since the two layouts genuinely scroll different elements. */
+const BACK_CASES = [
+	{ from: ORIGIN, to: '/admin/system/package-manager' },
+];
+/* ---- the traversal is held open too, for the same reason the staging cases are ----
+ *
+ * A Back that commits while the incoming page is still 61-66 nodes deep clamps the browser's own
+ * traversal restore to 0, `restoreScroll()` then writes from zero and nothing corrects it
+ * afterwards: the case ends 2683 -> 2683 and proves only that the router's own half works. The
+ * fault that reached CI (run 34565660484, owrt2410 2680 -> 2249) needs the OTHER shape — the
+ * incoming page already whole at the swap — which a loaded runner produces by itself and a local
+ * stand produces roughly 1 run in 15. Holding the incoming view's ubus calls open across the
+ * traversal produces it every time: 3 of 3 red on owrt2410b before the fs-fit.js fix, 3 of 3 green
+ * after (`../tmp/task-back431/slow.mjs`, the same 700ms).
+ *
+ * The settle is then the swap's own end plus fs-fit.js's late-correction window rather than a flat
+ * wait: the correction that moved the reader landed 419ms after the commit, and a commit that a
+ * held-open RPC has pushed to 3.1s past `goBack()` is already outside the 3s this used to wait —
+ * so the gate read the offset BEFORE the write it exists to catch. SCROLL_IDLE is read out of
+ * fs-fit.js, not copied here, for the same reason the narrow breakpoint is read out of the CSS. */
+const BACK_RPC_ROUTE = '**/ubus**';
+const BACK_RPC_DELAY_MS = 700;
+const FIT_JS_PATH = 'luci-theme-footstrap/htdocs/luci-static/resources/fs-fit.js';
+function lateWindow() {
+	const m = read(FIT_JS_PATH).match(/const SCROLL_IDLE = (\d+);/);
+	if (!m)
+		throw new Error(`spa-parity: no SCROLL_IDLE in ${FIT_JS_PATH} to size the Back settle off of`);
+	/* the correction is one rAF plus SCROLL_IDLE after the last commit batch; doubled is the slack
+	 * a busy stand needs, stated once rather than as a number of its own */
+	return Number(m[1]) * 2;
+}
+const BACK_SETTLE_MS = lateWindow();
+/* rounding plus the odd late layout pass, not a tolerance for the bug itself: task-back's own
+ * measurement was a reader dropped to 0 from ~3274px, orders of magnitude past this */
+const BACK_TOLERANCE_PX = 40;
+
+function readScrollOffset(page, useDoc) {
+	return page.evaluate((doc) => {
+		const sc = document.getElementById('maincontent');
+		return doc ? Math.round(window.scrollY) : (sc ? sc.scrollTop : 0);
+	}, useDoc);
+}
+function writeScrollOffset(page, useDoc, v) {
+	return page.evaluate(({ doc, v }) => {
+		const sc = document.getElementById('maincontent');
+		if (doc) window.scrollTo(0, v);
+		else if (sc) sc.scrollTop = v;
+	}, { doc: useDoc, v });
+}
+
+async function backRestoreCheck(page, stand, findings, widthLabel) {
+	for (const c of BACK_CASES) {
+		const label = `${c.from} -> ${c.to}` + (widthLabel ? ` @${widthLabel}px (Back)` : ' (Back)');
+		const add = (detail) => findings.push({ stand: stand.id, path: label, kind: 'back-scroll', detail });
+
+		try { await page.goto(stand.base + c.from, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
+		catch (e) { continue; }
+		await page.waitForTimeout(1400);
+
+		/* which scroller THIS width uses, read the same way fs-fit.js's own scroller() does — never
+		 * assumed from the layout name, which a CSS edit could move independently of this gate */
+		const useDoc = await page.evaluate(() => {
+			const sc = document.getElementById('maincontent');
+			const flow = sc ? getComputedStyle(sc).overflowY : '';
+			return !(flow === 'auto' || flow === 'scroll');
+		});
+
+		await writeScrollOffset(page, useDoc, 100000);	/* as far as this page allows */
+		const parked = await readScrollOffset(page, useDoc);
+		if (parked < 80) {
+			add(`${c.from} has no room to scroll at this width (parked at ${parked}px) — this case `
+				+ 'proves nothing here');
+			continue;
+		}
+
+		await page.evaluate((to) => {
+			const href = '/cgi-bin/luci' + to;
+			let a = [ ...document.querySelectorAll('a[href]') ].find((x) => x.getAttribute('href') === href);
+			if (!a) { a = document.createElement('a'); a.href = href; a.textContent = 'probe'; document.getElementById('view').append(a); }
+			a.click();
+		}, c.to);
+		await page.waitForTimeout(1400);
+
+		/* held only across the traversal itself — slowing the outgoing page would move the very
+		 * timing under test */
+		await page.route(BACK_RPC_ROUTE, async (route) => {
+			await new Promise((r) => setTimeout(r, BACK_RPC_DELAY_MS));
+			try { await route.continue(); } catch (e) {}
+		});
+		await page.goBack();
+		/* the swap's own start and end, not a clock: `.fs-staging` is the marker the staging cases
+		 * above already read, and the window this route holds open is what makes it observable */
+		let staged = false;
+		try {
+			await page.waitForFunction(() => document.querySelectorAll('.fs-staging').length > 0,
+				null, { timeout: 15000 });
+			staged = true;
+			await page.waitForFunction(() => document.querySelectorAll('.fs-staging').length === 0,
+				null, { timeout: 20000 });
+		}
+		catch (e) { /* reported below — a case that saw no swap measured nothing */ }
+		await page.unroute(BACK_RPC_ROUTE);
+		await page.waitForTimeout(BACK_SETTLE_MS);
+		const restored = await readScrollOffset(page, useDoc);
+
+		if (!staged)
+			add('the held-open ubus route never caught a staging window on the traversal — this case '
+				+ 'measured nothing');
+		if (Math.abs(restored - parked) > BACK_TOLERANCE_PX)
+			add(`parked at ${parked}px, Back restored ${restored}px — the reader was dropped `
+				+ `${parked - restored}px from where they were`);
+	}
+}
+
 const list = requireStands(stands(arg('only', ''), { all: ALL_STANDS }), 'spa-parity');
 const browser = await chromium.launch();
 const findings = [];
+/* pages that froze while their shape was being read — their own kind of finding, reported by
+ * reportFrozen() below (lib/page-shapes.mjs) */
+const frozen = [];
 let compared = 0;
+
+/* SAY WHERE THE SWEEP IS, ON EVERY PAGE AND WITH THE CLOCK.
+ *
+ * This gate used to print one `.` per page — no newline, so a CI runner buffers the whole run into a
+ * single line that is only flushed at the end — and nothing at all until the first router had
+ * finished classifying. A slice cancelled before that (task liveslice: `/admin/system/filemanager`
+ * pinned the browser's main thread under `13e9864`, and `page.evaluate()` has no deadline of its
+ * own, so both measuring slices sat at the 45-minute cap) left a log with not one word in it about
+ * which page it was on, for a whole day of runs.
+ *
+ * A line per page, newline-terminated, with seconds since the gate started: the wall clock is then
+ * readable straight off the log, and a run that dies names the page it died on. */
+const T0 = Date.now();
+const at = () => `${String(Math.round((Date.now() - T0) / 1000)).padStart(4)}s`;
+const say = (line) => process.stdout.write(`${at()}  ${line}\n`);
 
 /* the routers run at the same time: every comparison here is content against content on one router,
  * so nothing another container does can reach it (see the same note in live-audit.mjs) */
@@ -110,17 +409,34 @@ await Promise.all(list.map(async (stand) => {
 	const errs = [];
 	page.on('pageerror', (e) => errs.push(String(e).replace(/\s+/g, ' ').slice(0, 120)));
 	await login(page, stand.base);
+	say(`${stand.id}: logged in, staging + Back at 1440px`);
+
+	await stagingWindowCheck(page, stand, findings);
+	await backRestoreCheck(page, stand, findings);
+
+	/* the narrow pass: its own context, since theme/90-responsive.css's rules never match at 1440px */
+	say(`${stand.id}: staging + Back at ${NARROW_WIDTH}px`);
+	const narrowCtx = await browser.newContext({ viewport: { width: NARROW_WIDTH, height: 900 } });
+	await sealToRouter(narrowCtx, stand.base);
+	const narrowPage = await narrowCtx.newPage();
+	await login(narrowPage, stand.base);
+	await stagingWindowCheck(narrowPage, stand, findings, NARROW_STAGING_CASES, NARROW_WIDTH);
+	await backRestoreCheck(narrowPage, stand, findings, NARROW_WIDTH);
+	await narrowCtx.close();
 
 	let paths = (await menuPaths(page)).filter((p) => !DESTRUCTIVE.test(p) && p !== ORIGIN);
 	if (ONLY_PAGES) paths = paths.filter((p) => p.startsWith(ONLY_PAGES));
 	if (!ALL_PAGES && !ONLY_PAGES) {
-		const shapes = await classify(page, stand.base, paths);
+		say(`${stand.id}: reading the shape of ${paths.length} page(s)`);
+		const shapes = await classify(page, stand.base, paths, { frozen, id: stand.id });
 		const { picked, dropped } = representatives(shapes, PINNED);
 		reportReduction(stand.id, picked, dropped, shapes);
 		paths = picked;
 	}
 
+	let n = 0;
 	for (const path of paths) {
+		say(`${stand.id} ${++n}/${paths.length} ${path}`);
 
 		try { await page.goto(stand.base + ORIGIN, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
 		catch (e) { continue; }
@@ -175,12 +491,23 @@ await Promise.all(list.map(async (stand) => {
 		}
 		for (const e of spaErrs.filter((e) => !fullErrs.includes(e)).slice(0, 2))
 			add('console', e);
-		process.stdout.write(findings.some((f) => f.path === path && f.stand === stand.id) ? 'X' : '.');
+		/* the page's own line is already out (above, before it was opened); mark it only when this
+		 * page is where a difference landed, so a long log still shows the interesting rows */
+		if (findings.some((f) => f.path === path && f.stand === stand.id))
+			say(`${stand.id}    ^ a click and a load DISAGREE here`);
 	}
 	await ctx.close();
-	process.stdout.write(`\n${stand.id}: ${compared} page(s) compared\n`);
+	say(`${stand.id}: ${compared} page(s) compared`);
 }));
 await browser.close();
+
+/* Before the differences, because a page that stopped answering was not compared at all: reporting
+ * "a click and a load agree on every one" over a walk that lost pages to a frozen thread is the
+ * silence this gate is here to stop. */
+if (reportFrozen(frozen)) {
+	console.error('spa-parity: a page that will not answer cannot be compared. Fix the freeze first.\n');
+	process.exit(1);
+}
 
 if (findings.length) {
 	console.error(`\nspa-parity: ${findings.length} difference(s) between a click and a load:\n`);
