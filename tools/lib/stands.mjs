@@ -12,26 +12,17 @@
  * that starts and stops containers by itself is a gate nobody runs locally. */
 import { execFileSync } from 'node:child_process';
 
-/* The routers a gate runs on by default: the three OpenWrt lines the theme actually supports.
+/* The routers a gate runs on by default: the three OpenWrt lines the theme supports. What changes
+ * what the theme is measured against is the package manager (apk on 25.12+, opkg on 24.10) and the
+ * luci-base the router carries; the snapshot box tracks luci-base's master, so an upstream change
+ * fails here before it reaches a user. `--all` widens to every running OpenWrt router (the -b/-c/-d
+ * twins); a gate that takes `--only` must honour `--all` too.
  *
- * owlab can boot five — two distributions across two releases, plus a snapshot box. What can change
- * what this theme is measured against is the PACKAGE MANAGER (apk on 25.12+, opkg on 24.10) and the
- * luci-base the router carries; the snapshot box is the third because it tracks luci-base's master,
- * so an upstream change that will land in the next release fails here first rather than in a user's
- * report. That is the set every gate must cover.
- *
- * ImmortalWrt is NOT in the default set. It is the same luci-base with a different brand and app
- * set, it has never been the leg that caught something first, and it doubles a wall clock that is
- * already the reason people skip running the gates. It is measured when asked for — `--all`, or
- * `--only imm2512,…` — and a red immortalwrt leg is worth reading, not worth blocking a release on.
- *
- * A gate that takes `--only` must also honour `--all`: upstream-contract read the first and ignored
- * the second, so it silently measured a subset of what the release runbook had asked for. */
+ * ImmortalWrt is not a gate target at all, since 0.14.13: same luci-base, different brand and app
+ * set, never the leg that caught something first, and its two legs produced 1685 `noname` findings
+ * of their own app set on the 0.14.13 release run with nothing to read in them. A running `imm*`
+ * router is ignored, and `--only imm2512` is refused by name rather than measured. */
 export const CORE = [ 'owrt2512', 'owrt2410', 'owrtsnap' ];
-
-/* The set `--all` adds on top of CORE, kept apart so a caller can say "and the optional ones" and a
- * report can say which half a finding came from. */
-export const OPTIONAL = [ 'imm2512', 'imm2410' ];
 
 /* Every RUNNING owlab router, newest release first, or an empty array when owlab is absent — the
  * caller decides whether that is a failure (a gate) or a reason to skip (a local convenience).
@@ -48,8 +39,14 @@ export function stands(only, { all = false } = {}) {
 	let parsed;
 	try { parsed = JSON.parse(out); } catch (e) { return []; }
 	const wanted = (only || '').split(',').map((s) => s.trim()).filter(Boolean);
+	const foreign = (parsed.routers || []).filter((r) => r.distro !== 'openwrt' && wanted.includes(r.id));
+	if (foreign.length) {
+		console.error(`${foreign.map((r) => r.id).join(', ')}: not a gate target — the gates measure OpenWrt `
+			+ 'routers only (tools/lib/stands.mjs).');
+		process.exit(2);
+	}
 	const running = (parsed.routers || [])
-		.filter((r) => r.state === 'running' && r.http_port)
+		.filter((r) => r.state === 'running' && r.http_port && r.distro === 'openwrt')
 		.map((r) => ({
 			id: r.id,
 			base: `http://localhost:${r.http_port}/cgi-bin/luci`,

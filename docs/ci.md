@@ -309,8 +309,8 @@ longer come before the other two slices, which are on runners of their own.
 **Three routers on a push, one on a pull request.** The push set is the OpenWrt lines the theme
 supports — 25.12/apk, 24.10/opkg and the snapshot box, which tracks luci-base's master and so fails
 on an upstream change before a user reports it. ImmortalWrt is not in it: same luci-base, different
-brand and app set, never the leg that caught something first. Run it locally with `--all` when a
-finding smells distribution-specific. What each gate holds, and how
+brand and app set, never the leg that caught something first, and no gate measures it locally
+either (`tools/lib/stands.mjs`). What each gate holds, and how
 to run it by hand, is in [conventions.md](conventions.md) and [development.md](development.md).
 
 **The snapshot box carries no third-party extras (`owlab.yaml`, `owrtsnap`).** openclash and

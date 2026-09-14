@@ -98,17 +98,12 @@ echoes ends `… && npm run anchor --all --pages-all`, and `live-audit` logged
 `node tools/live-audit.mjs` with no arguments. Each gate is therefore called by hand:
 
 ```sh
-node tools/live-audit.mjs  --all --pages-all   # every router owlab boots, every page
+node tools/live-audit.mjs  --all --pages-all   # every OpenWrt router owlab boots, every page
 node tools/spa-parity.mjs  --all --pages-all
 node tools/table-tick.mjs  --all
 node tools/scroll-anchor.mjs --all
 node tools/upstream-contract.mjs --all         # what the theme assumes of luci-base, asked on each
 ```
-
-The two ImmortalWrt legs are not in any baseline — the wide run reports 2125 signatures there, 60 of
-them read, all `noname` on luci-base's own `input.cbi-section-create-name` (`form.js`, built with no
-label, placeholder or `aria-label`). They are worth reading and do not block a tag:
-`tools/lib/stands.mjs` says why.
 
 **And the package on both formats, before the tag.** `npm run live` measures a *synced* tree; a
 release is *installed*, and that is a different claim — two `owlab test` invocations, one per
@@ -138,9 +133,9 @@ and the contract entry that guarded it are gone with the fallback they guarded.
 
 Day to day those gates measure three routers and one page per shape, which is what makes them cheap
 enough to run before a push (`docs/development.md`). A release is the one moment where the axes they
-trade away are worth paying for: ImmortalWrt is a different app set on the same luci-base, and a page
-that shares a shape with another is only *probably* the same to this theme. Read the reduction lines
-either way — they name every page that was stood in for.
+trade away are worth paying for: a page that shares a shape with another is only *probably* the same
+to this theme. Read the reduction lines either way — they name every page that was stood in for.
+ImmortalWrt is not measured by any gate (`tools/lib/stands.mjs`).
 
 | Issue | Page | What to look at |
 |---|---|---|

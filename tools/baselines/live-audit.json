@@ -199,7 +199,8 @@
 		"/admin/system/filemanager|568|noname|input.select-checkbox",
 		"/admin/system/filemanager|568|overflow|div#file-list-container",
 		"/admin/system/filemanager|768|noname|input#select-all-checkbox",
-		"/admin/system/filemanager|768|noname|input.select-checkbox"
+		"/admin/system/filemanager|768|noname|input.select-checkbox",
+		"/admin/system/filemanager|768|target|a"
 	],
 	"owrt2410": [
 		"/admin/dashboard|320|overflow|div.radio-info",

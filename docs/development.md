@@ -34,8 +34,8 @@ boxes.
 |---|---|---|---|---|
 | `owrt2512` | OpenWrt | 25.12.4 | apk | http://localhost:8025 |
 | `owrt2410` | OpenWrt | 24.10.8 | opkg | http://localhost:8024 |
-| `imm2512` | ImmortalWrt | 25.12.1 | apk | http://localhost:8026 |
-| `imm2410` | ImmortalWrt | 24.10.6 | opkg | http://localhost:8027 |
+| `imm2512` | ImmortalWrt | 25.12.1 | apk | http://localhost:8026 — not a gate target |
+| `imm2410` | ImmortalWrt | 24.10.6 | opkg | http://localhost:8027 — not a gate target |
 
 ```sh
 owlab up                 # build and start all four
@@ -341,7 +341,7 @@ owlab up                       # the containers these gates measure
 owlab sync                     # your working tree onto them
 npm run live                   # upstream-contract, spa-parity, live-audit, scroll-jank, table-tick, scroll-anchor
                                #   two routers (the OpenWrt pair), one page per SHAPE
-npm run live -- --all --pages-all   # the four routers and every page: before a tag
+npm run live -- --all --pages-all   # every running OpenWrt router and every page: before a tag
 ```
 
 Each is also a command of its own, and each takes `--only <router ids>`:
@@ -369,10 +369,11 @@ means:
   it, and a narrowed run may not rewrite the baseline. `--pages-all` measures them all.
 - **Three routers by default** (`lib/stands.mjs`, `CORE`): 25.12/apk, 24.10/opkg and the snapshot
   box. The first two are the package managers; the third tracks luci-base master, which is where an
-  upstream change shows up before it reaches a release. `--all` adds the two ImmortalWrt stands
-  (`OPTIONAL`) — worth reading, not worth blocking on. A gate that takes `--only` must honour
-  `--all` too: `upstream-contract` read one and ignored the other, and silently measured a subset of
-  what the release runbook asked for.
+  upstream change shows up before it reaches a release. `--all` widens to every running OpenWrt
+  router (the twins). ImmortalWrt is not a gate target: a running `imm*` router is ignored and
+  `--only imm2512` is refused. A gate that takes `--only` must honour `--all` too:
+  `upstream-contract` read one and ignored the other, and silently measured a subset of what the
+  release runbook asked for.
 
 The structural gates run their routers CONCURRENTLY — nothing they measure is a timing — while
 `scroll-jank` stays sequential, because frame pacing is its subject.
@@ -771,6 +772,16 @@ below rather than two: neither survives an inline `bash -c` string, both survive
 this page's advice for the `$R`/`$T` collapse) is the same fix for both.
 
 ## The stand's own traps
+
+- **`owlab test` (0.6.1) removes the project's RUNNING stands, not only the throwaway router it
+  booted.** Measured 2026-09-14: `owrt2512` and `owrt2410` were up, `owlab test --release 25.12.4
+  --install …` ran, and its own log carried `Container owlab-luci-theme-footstrap-owrt2512 Removing`
+  / `Removed` before the `openwrt-25.12.4` router it built — a compose `down` of the whole project.
+  A concurrent `owlab up owrtsnap imm2512 imm2410` exited 1 with its images built and no container
+  left. `docs/ci.md` and `tools/ci-local.sh --list` say `verify` is "safe with stands up"; on 0.6.1
+  it is not. Tell the two apart with `docker ps --format '{{.Names}}' | grep owlab-luci-theme-footstrap`
+  before and after: 0 after is this. Run `owlab test` BEFORE `owlab up`, or `owlab up` again after
+  it; an issue against owfeed/owlab is drafted in `../tmp/task-release-0.14.13/owlab-issue.md`.
 
 - **`owlab up` on a taken port fails ONE container and returns non-zero for the whole command.**
   Adding three stands on 2026-09-09, `owrt2512b` could not bind ssh 2235 — something else on this
