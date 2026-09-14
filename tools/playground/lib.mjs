@@ -382,36 +382,32 @@ export async function waitForQuiet({
 /* Awaits every `[label, promise]` pair in `reads` with `Promise.allSettled` so one response body
  * that failed to read never gets lost behind the ones that succeeded (capture.mjs's `response`
  * listener never awaits its own async work — Playwright does not await an event handler either —
- * so nothing upstream would otherwise notice a rejected read), then throws ONE error naming every
- * failed label. A body capture.mjs believed it recorded but silently didn't is worse than a loud
- * failure at the point it is about to trust the pile of reads it just drained.
+ * so nothing upstream would otherwise notice a rejected read). Returns `{settled, abandoned}`
+ * rather than throwing: whether an abandoned or rejected read is fatal depends on what it was
+ * reading (an ubus poll tick capture.mjs can afford to lose vs. a document or static asset the
+ * build ships), and only the caller knows which — `capture.mjs`'s `drain()` is the policy.
  *
- * Bounded by `timeoutMs` (default 15s): a read that neither resolves nor rejects used to hang this
- * forever — a tester run on owrt2512b measured one body read stuck ~148s and the whole capture past
- * the 5-minute kill — so a still-pending read past the bound is now its own loud failure, naming
- * every label still outstanding rather than the ones that already settled. */
-export async function drainReads(reads, phase, timeoutMs = 15000) {
+ * Bounded by `timeoutMs` (default 15s): a read that neither resolves nor rejects — a tester run on
+ * owrt2512b measured one body read stuck ~148s, past capture's 5-minute kill — is named in
+ * `abandoned` rather than left to hang this forever; `settled` still carries every read that landed
+ * before the bound, fulfilled or rejected. */
+export async function drainReads(reads, timeoutMs = 15000) {
 	const remaining = new Map(reads.map(([ label ], i) => [ i, label ]));
+	const results = new Array(reads.length);
 	const wrapped = reads.map(([ , p ], i) => p.then(
-		(value) => { remaining.delete(i); return { status: 'fulfilled', value }; },
-		(reason) => { remaining.delete(i); return { status: 'rejected', reason }; },
+		(value) => { remaining.delete(i); results[i] = { status: 'fulfilled', value }; },
+		(reason) => { remaining.delete(i); results[i] = { status: 'rejected', reason }; },
 	));
 	const timedOut = Symbol('drainReads timeout');
 	let timer;
 	const guard = new Promise((resolve) => { timer = setTimeout(() => resolve(timedOut), timeoutMs); });
-	const result = await Promise.race([ Promise.all(wrapped), guard ]);
+	const raced = await Promise.race([ Promise.all(wrapped), guard ]);
 	clearTimeout(timer);
-	if (result === timedOut) {
-		throw new Error(`playground/capture: ${phase}: drain timed out after ${timeoutMs}ms, still pending: `
-			+ `${[ ...remaining.values() ].join(', ')}`);
-	}
-	const failed = result
-		.map((r, i) => ({ r, label: reads[i][0] }))
-		.filter(({ r }) => r.status === 'rejected');
-	if (failed.length) {
-		const detail = failed.map(({ r, label }) => `${label}: ${r.reason?.message || r.reason}`).join('; ');
-		throw new Error(`playground/capture: ${phase}: ${failed.length} response read failure(s) — ${detail}`);
-	}
+	const abandoned = raced === timedOut ? [ ...remaining.values() ] : [];
+	const settled = reads
+		.map(([ label ], i) => (results[i] ? { label, ...results[i] } : null))
+		.filter(Boolean);
+	return { settled, abandoned };
 }
 
 /* Recursively lays `patch` over `base`: a nested object merges key by key, an array or a scalar

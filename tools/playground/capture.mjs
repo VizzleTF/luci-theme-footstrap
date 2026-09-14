@@ -20,7 +20,7 @@ import { execFileSync } from 'node:child_process';
 import { stands, login, menuPaths, sealToRouter, requireStands } from '../lib/stands.mjs';
 import {
 	splitBatch, parseLsLines, waitForQuiet, drainReads, missingOverlayKeys,
-	createActivityTracker, createGenerationGate, describePendingRequests,
+	createActivityTracker, createGenerationGate, describePendingRequest, describePendingRequests,
 } from './lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -52,7 +52,10 @@ const SETTLE_MS = 1400;
 const QUIET_MS = 750;
 const QUIET_TIMEOUT_MS = 30000;
 /* A response body read can neither resolve nor reject (one stalled ~148 s on a stand); `drain()`
- * fails loudly at this bound instead of hanging capture — `drainReads`, lib.mjs. */
+ * stops waiting at this bound instead of hanging capture — `drainReads`, lib.mjs. An ubus read still
+ * outstanding past it is a dropped poll tick, not a capture failure: `missingOverlayKeys` at the end
+ * of the run is the actual proof the overlay's keys got captured, and a page whose `L.Poll` never
+ * truly stalls asks the same call again on its next tick. */
 const DRAIN_TIMEOUT_MS = 15000;
 
 const pages = JSON.parse(readFileSync(PAGES_FILE, 'utf8'));
@@ -118,18 +121,38 @@ async function main() {
 	 * or `browser.close()` runs used to fail silently ("Response body is not available for a
 	 * response that was navigated", "Target page … closed") and just drop whatever it was reading.
 	 * `track` files the promise here instead of awaiting it inline; `drain` below is called at every
-	 * point capture.mjs is about to navigate or close, and turns a still-rejected read into a loud
-	 * failure instead of a gap in the recording. */
+	 * point capture.mjs is about to navigate or close, and decides what an abandoned or a rejected
+	 * read is worth recording as. */
 	let pending = [];
 	function track(label, promise) {
 		promise.catch(() => {}); /* drain() below decides what a rejection means; this only stops
 			node's unhandled-rejection warning from firing before drain gets to look at it */
 		pending.push([ label, promise ]);
 	}
+	/* `drainReads` (lib.mjs) never throws by itself; the policy lives here because only capture.mjs
+	 * knows what a read WAS. An ubus POST's label always starts "POST " (`describePendingRequest`,
+	 * used at both call sites below — a GET, static or the document, never does), so a lost or a
+	 * failed ubus read is dropped rather than fatal: `missingOverlayKeys` at the end of the run is
+	 * the actual correctness gate for what the overlay needs. A document or static-asset read still
+	 * throws — nothing else re-fetches it if this read was the only place it gets recorded. */
+	const UBUS_LABEL_RE = /^POST /;
 	async function drain(phase) {
 		const batch = pending;
 		pending = [];
-		await drainReads(batch, phase, DRAIN_TIMEOUT_MS);
+		const { settled, abandoned } = await drainReads(batch, DRAIN_TIMEOUT_MS);
+		for (const label of abandoned)
+			console.warn(`playground/capture: ${phase}: abandoned after ${DRAIN_TIMEOUT_MS}ms, dropped — ${label}`);
+		const fatal = [];
+		for (const { label, status, reason } of settled) {
+			if (status !== 'rejected') continue;
+			const detail = `${label}: ${reason?.message || reason}`;
+			if (UBUS_LABEL_RE.test(label))
+				console.warn(`playground/capture: ${phase}: read failed, dropped — ${detail}`);
+			else
+				fatal.push(detail);
+		}
+		if (fatal.length)
+			throw new Error(`playground/capture: ${phase}: ${fatal.length} response read failure(s) — ${fatal.join('; ')}`);
 	}
 
 	async function recordStatic(response) {
@@ -154,7 +177,8 @@ async function main() {
 	const loginContext = await browser.newContext();
 	await sealToRouter(loginContext, stand.base);
 	const loginPage = await loginContext.newPage();
-	loginPage.on('response', (response) => track(`login GET ${response.url()}`, recordStatic(response)));
+	loginPage.on('response', (response) =>
+		track(`login ${describePendingRequest('GET', response.url(), null)}`, recordStatic(response)));
 	const [ loginResponse ] = await Promise.all([
 		loginPage.waitForResponse((r) => r.request().resourceType() === 'document', { timeout: 30000 }),
 		loginPage.goto(stand.base, { waitUntil: 'load' }),
@@ -211,15 +235,19 @@ async function main() {
 		 * below) over a byte range capture.mjs no longer needs and the page no longer has. */
 		if (!gate.isCurrent(request)) return;
 		if (request.method() !== 'GET' && request.method() !== 'POST') return;
-		if (request.method() === 'GET') { track(`GET ${response.url()}`, recordStatic(response)); return; }
+		if (request.method() === 'GET') {
+			track(describePendingRequest('GET', response.url(), null), recordStatic(response));
+			return;
+		}
 		if (!ubuspath) return;
 
 		let url;
 		try { url = new URL(response.url()); } catch (e) { return; }
 		if (url.pathname !== ubuspath) return;
 
-		track(`ubus POST ${response.url()}`, (async () => {
-			const reqEntries = splitBatch(request.postData() || '{}');
+		const postData = request.postData();
+		track(describePendingRequest('POST', response.url(), postData), (async () => {
+			const reqEntries = splitBatch(postData || '{}');
 			let text;
 			try { text = await response.text(); }
 			catch (e) { throw new Error(`could not read ubus response body: ${e.message}`); }

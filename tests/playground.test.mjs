@@ -494,46 +494,38 @@ test('waitForQuiet + createActivityTracker together: quiet only once every in-fl
 	assert.ok(idleFor >= 100, `expected idleFor >= 100 (idle only starts once "lazy-include" finishes at t=100), got ${idleFor}`);
 });
 
-test('drainReads resolves quietly when every read succeeded', async () => {
-	await assert.doesNotReject(() => drainReads([
+test('drainReads: every read succeeded — settled carries both, nothing abandoned', async () => {
+	const result = await drainReads([
 		[ 'a', Promise.resolve('ok') ],
 		[ 'b', Promise.resolve('ok') ],
-	], 'phase'));
+	]);
+	assert.deepEqual(result.abandoned, []);
+	assert.deepEqual(result.settled.map((s) => [ s.label, s.status ]), [ [ 'a', 'fulfilled' ], [ 'b', 'fulfilled' ] ]);
 });
 
-test('drainReads throws ONE error naming every failed label, not just the first', async () => {
-	await assert.rejects(
-		() => drainReads([
-			[ 'good', Promise.resolve('ok') ],
-			[ 'ubus POST /ubus/', Promise.reject(new Error('closed')) ],
-			[ 'GET /luci-static/x.js', Promise.reject(new Error('navigated')) ],
-		], 'page "admin/status/overview"'),
-		(err) => {
-			assert.match(err.message, /page "admin\/status\/overview"/);
-			assert.match(err.message, /2 response read failure/);
-			assert.match(err.message, /ubus POST \/ubus\/: closed/);
-			assert.match(err.message, /GET \/luci-static\/x\.js: navigated/);
-			assert.doesNotMatch(err.message, /good/);
-			return true;
-		},
-	);
+test('drainReads: never throws — a rejected read comes back in settled, not as an exception', async () => {
+	const result = await drainReads([
+		[ 'good', Promise.resolve('ok') ],
+		[ 'ubus POST /ubus/', Promise.reject(new Error('closed')) ],
+		[ 'GET /luci-static/x.js', Promise.reject(new Error('navigated')) ],
+	]);
+	assert.deepEqual(result.abandoned, []);
+	const byLabel = Object.fromEntries(result.settled.map((s) => [ s.label, s ]));
+	assert.equal(byLabel.good.status, 'fulfilled');
+	assert.equal(byLabel['ubus POST /ubus/'].status, 'rejected');
+	assert.equal(byLabel['ubus POST /ubus/'].reason.message, 'closed');
+	assert.equal(byLabel['GET /luci-static/x.js'].status, 'rejected');
+	assert.equal(byLabel['GET /luci-static/x.js'].reason.message, 'navigated');
 });
 
-test('drainReads: a read that never settles fails loudly at its bound, naming only what is still pending', async () => {
+test('drainReads: a read that never settles is named in `abandoned`, never thrown', async () => {
 	let releaseHung;
 	const hung = new Promise((resolve) => { releaseHung = resolve; });
-	await assert.rejects(
-		() => drainReads([
-			[ 'GET /luci-static/x.js', Promise.resolve('ok') ],
-			[ 'ubus POST /ubus/', hung ],
-		], 'page "admin/status/overview"', 30),
-		(err) => {
-			assert.match(err.message, /page "admin\/status\/overview"/);
-			assert.match(err.message, /drain timed out after 30ms/);
-			assert.match(err.message, /ubus POST \/ubus\//);
-			assert.doesNotMatch(err.message, /GET \/luci-static\/x\.js/);
-			return true;
-		},
-	);
+	const result = await drainReads([
+		[ 'GET /luci-static/x.js', Promise.resolve('ok') ],
+		[ 'ubus POST /ubus/', hung ],
+	], 30);
+	assert.deepEqual(result.abandoned, [ 'ubus POST /ubus/' ]);
+	assert.deepEqual(result.settled.map((s) => s.label), [ 'GET /luci-static/x.js' ]);
 	releaseHung('ok'); /* let the dangling promise settle so it cannot leak into a later test */
 });
