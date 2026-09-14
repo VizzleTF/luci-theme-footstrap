@@ -9,6 +9,8 @@
 
 ### Changed
 
+- **Comments are written for a reader with no session history.** `docs/conventions.md`, "Comments": the invariant, the measured number, one pointer; attempts, task names, `../tmp` paths and CI run ids go to `docs/`. `fs-fit.js` goes from 85 % to 39 % comment bytes with its token stream identical.
+- **The size ceiling is pinned once per release.** `node tools/size-budget.mjs --pin` in `/release`; between releases it is not raised. The week before this release raised it 17 times, each with a paragraph.
 - **Page-scoped CSS keys off `#view[data-page]` and `.fs-content[data-page]`, not `body`.** The outgoing page keeps its rules for the whole staging window: 33 Overview rules used to drop for 1.4 s and grow the document 211 px. Selectors use `:where(#view)` to stay under the specificity ceiling.
 - **The anchor sweep runs engines and stands in parallel and says what it saw.** `tools/scroll-anchor.mjs`: 390 s to 216 s on the same cells; new `tick`, `declines`, `below` and `repeat` cases; every finding names the exit the correction took and when; `--quick` says out loud what it skipped.
 - **CI.** Chromium's sweep is a shard of `anchors` beside firefox and webkit (the `motion` slice sat at 39 of its 45 minutes); `owrtsnap` gates `live` and `anchors` again on owlab 0.6.1; a push reports whether the published feed was measured or skipped; `developer`/`tester` turn caps 200/140.

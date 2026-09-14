@@ -34,6 +34,7 @@ repository, and loads none of this file. `.claude/hooks/session-start.sh` says s
 | tokens, palettes, type, the Appearance axes | `docs/design-system.md` |
 | sidebar / bar / rail, the menu renderer, the fit | `docs/chrome.md` |
 | the reader's place through a poll tick — floor, reference, the three corrections | `docs/anchoring.md` |
+| every anchoring finding, its numbers and the attempts that were reverted | `docs/anchoring-log.md` |
 | client navigation | `docs/spa-router.md` |
 | foreign `luci-app-*`, the fence | `docs/third-party-apps.md` |
 | Makefile, uci-defaults, postinst/postrm, ACL | `docs/package.md` |
@@ -60,6 +61,7 @@ npm run smoke                              # T1: modules come up in a real DOM (
 npm run computed-diff                      # T1: worktree vs HEAD, computed styles (~4 s)
 tools/bg.sh <cmd>                          # T2: detach, log into ../tmp/ (refuses ssh, dev-sync, push)
 tools/bg-wait.sh <run-id>                  # the waiter; stops on status, a dead pid, or the 2 h cap
+tools/ci-local.sh --list                   # T2: build.yml's jobs, locally, in the same order; --force for the router legs
 node tools/build-icons.mjs                 # re-raster the app icons after a logo.svg change
 owlab up | owlab sync --watch | owlab open owrt2512
 ./tools/stage.sh && owfeed build           # both formats into dist/
@@ -121,11 +123,15 @@ unprompted when it arrives. "I started it" is not a status. `docs/development.md
 
 ## Comments
 
-Every rule, with the example behind it: `docs/conventions.md`, "Comments". Read it before a comment
-pass. Two of them break something silently and are repeated here for that reason alone:
+The reader is a model with the file open and no session history. One comment is the invariant, the
+number behind it and one pointer, in that order. Attempts and their order, task names, `../tmp`
+paths and CI run ids go to `docs/<area>.md`, never into shipped code. Limits: inline 1-2 lines, a
+block 8, a header 15, under 40 % of a file's bytes. Full rule with the example behind each line:
+`docs/conventions.md`, "Comments". Two of them break something silently:
 
 - **Some comments are code** — `@mirror`/`@endmirror`, `/* fs:probe */`, the eslint `'require …'`
-  pragmas, the Makefile's buildroot marker. Reword one and a gate or the build breaks.
+  pragmas, the Makefile's buildroot marker, the literal `dataset.fsFit` write. Reword one and a gate
+  or the build breaks.
 - **A `#` line inside a quoted `ssh "$R" "…"` string is part of the string**: `sh -n` after editing.
 
 ## Crew

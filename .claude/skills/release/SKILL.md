@@ -60,6 +60,9 @@ exactly one. Simulate it against the shape of the coming release — the loop is
 
 ## 4. The runbook
 
+0. `node tools/size-budget.mjs --pin` — re-pins the size ceiling to this build plus 2 %. This is
+   the ONLY time the numbers in `tools/size-budget.mjs` change; between releases a change that
+   crosses them removes something instead. Goes into the same commit as the rename below.
 1. Rename `[Unreleased]` to `## [x.y.z] — YYYY-MM-DD` in **both** `CHANGELOG.md` and
    `CHANGELOG_ru.md`, and add the `compare/` link at the bottom of each. Canonical section order,
    every bullet with a bold lead.

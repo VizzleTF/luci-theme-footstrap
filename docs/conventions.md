@@ -215,58 +215,78 @@ pattern that reliably removes anonymous handlers.
 
 ## Comments
 
-The rules every comment in this tree follows, whatever the language. `CLAUDE.md` carries the short
-form; this is the one with the examples.
+The reader is a model with this file open and no session history. It needs, per line it is about
+to change: what must stay true, why, and where the proof is. Everything else costs it context and
+gives nothing back. `CLAUDE.md` carries the short form; this is the full rule, with the example
+behind each line.
 
-**Minimally sufficient: the shortest text that still carries the reason.** An inline comment is one
-line, two if the reason needs a number; a block is justified only when it covers several rules at
-once; a module header is a short paragraph, not a page. Anything longer belongs in `docs/`, pointed
-at from the code in one line. Cut every word that removing does not lose a fact.
+### What a comment carries
 
-**A comment says why, not what.** One that restates the line it sits on is deleted, not reworded.
-What a reader cannot recover from the code is the reason: the constraint, the alternative that
-failed, the number that was measured.
+| part | example | required |
+|---|---|---|
+| the invariant | `min-height` AND `height` are pinned to the same value for the whole pass | always |
+| the reason, as a number | the bar walked 230 -> 123 px inside one pass, 107 px of growth | when one was measured |
+| one pointer | `docs/anchoring.md`, "The corrections"; openwrt/luci#8981; issue #41 | when the proof is longer than a line |
 
-**Carry the measurement, not the adjective.** "overflows" is unfalsifiable; "19-109px of overflow,
-once per poll tick, on Firewall/DHCP/Wireless" tells the next reader whether the rule still earns
-its place and how to re-run the check. Same for widths, timings, counts, and the viewport and
-density they were taken at.
+One of each, in that order, in one sentence where it fits. A comment with no invariant is
+deleted, not reworded: restating the line it sits on is what it did.
 
-**A negative result stays, in one line.** "tried X, it did Y" is the cheapest way to stop the next
-session re-trying it (`display: none` on top of a zeroed tab pane buys nothing: scrollHeight 1039
-either way). The narrative around it does not stay — how it was first written, what was renamed,
-which attempt came in which order. Current state, present tense.
+### What a comment does not carry
 
-**A number or a name in a comment is part of the contract.** 15 comments once said the poll
-re-renders "once a second" while `pollinterval` ships at 5 s — a claim that read as measured and
-was not. The comment changes in the same edit as the code, or git preserves the lie forever.
+| cut | goes to | why |
+|---|---|---|
+| attempts and their order ("first shape … second shape …") | `docs/<area>.md`, one paragraph per attempt | the code is the survivor; the losers are history |
+| a task or session name (`task refill2`) | nothing — cite the docs heading instead | names nothing the reader can open |
+| a `../tmp/…` path | `docs/<area>.md` restates the finding | the file is not in the repository; the pointer is dead the next day |
+| a CI run id | the changelog entry, once | the run expires; the number it produced does not |
+| the same fact the docs already hold | one line and the pointer | two copies drift |
+| CAPS for emphasis, a rhetorical question, a warning to a future maintainer | plain prose | an LLM weights capitals as shouting, not as priority |
 
-**References are the part that cannot be rebuilt**: issue numbers (#19, openwrt/luci#8981), spec
-text quoted verbatim (WCAG SC 1.4.10's exception, HTML-AAM), upstream commits, file paths. A
-compression pass may cut the sentence around them; it may not cut them.
+### Size
 
-**Some comments are code**: `@mirror name/tag` / `@endmirror` (`npm run mirror`), `/* fs:probe */`
-(`strip-probes.sh`), the eslint `'require …'` pragmas, and the Makefile's buildroot signature line
-that scan.mk greps for, which must stay last with nothing between it and the text it announces
-(`npm run marker`). Reword one and a gate or the build breaks — silently, in the Makefile's case.
+| comment | limit |
+|---|---|
+| inline, on or above a statement | 1 line; 2 when the reason is a number |
+| above a function or a rule block | 8 lines |
+| module or file header | 15 lines: purpose, invariants, what the file does not own |
+| comment share of a shipped file | under 40 % of the bytes |
 
-**Formal English, no theatre** — no exclamation, no shouting a fix, no addressing the reader. A
-module header states purpose and invariants; an inline comment explains the rule it sits above and
-nothing else. Never stack a second comment on the first: edit the one that is there.
+Over the limit means the text is an explanation, and an explanation is a `docs/` section pointed at
+from one line. `fs-fit.js` at 85 % comment bytes is the measurement this table comes from: the
+rules it documents are sound, and no reader finds them.
 
-**Comments cost no router bytes.** `strip-templates.sh`, `strip-shell.sh` and `build-css.sh` remove
-every one at package time and git keeps every word, so never trade a "why" away for bytes. A stale
-comment is worse than none.
+### Rules that hold regardless of size
 
-**A comment inside a quoted command string is part of the string** — the `#` lines inside
-`ssh "$R" "…"` in `dev-sync.sh` keep their escaped backticks and `$`. Run `sh -n` after any such
-edit.
+- **A number or a name is part of the contract.** 15 comments once said the poll re-renders
+  "once a second" while `pollinterval` ships at 5 s. The comment changes in the edit that changes
+  the code, or git preserves the lie.
+- **A negative result stays, in one line, present tense.** `display: none` on a zeroed tab pane
+  buys nothing: scrollHeight 1039 either way. Not how it was found, not which attempt it was.
+- **References survive every compression pass**: issue numbers, spec text quoted verbatim, upstream
+  commits, file paths inside the repository.
+- **Some comments are code**: `@mirror name/tag` / `@endmirror` (`npm run mirror`), `/* fs:probe */`
+  (`strip-probes.sh`), the eslint `'require …'` pragmas, the Makefile's buildroot signature line
+  (`npm run marker`), the literal `dataset.fsFit` write (`tools/table-contract.mjs`). Reword one
+  and a gate or the build breaks, silently in the Makefile's case.
+- **Edit the comment that is there.** Never stack a second one on the first.
+- **Formal English.** No exclamation, no addressing the reader.
+- **A `#` line inside a quoted `ssh "$R" "…"` string is part of the string.** `sh -n` after the
+  edit.
 
-**After a bulk comment pass, prove the code did not move**: a token-stream compare against HEAD for
-every JS file, a comment-stripped and whitespace-normalised diff for CSS, `.ut`, shell and yaml.
-That is what caught a deleted Makefile marker and a lost shell escape; no gate would have. The
-full-tree compare is T2 — `tools/bg.sh`, and the pass is not finished until its output has been
-read and reported.
+### Where the narrative goes
+
+The measurement that justifies a rule is written once, in `docs/<area>.md`, under a heading the
+code can cite: what was seen, what it was, the command that tells the two apart. `docs/anchoring.md`
+(the reference) and `docs/anchoring-log.md` (the findings) are those files for `fs-fit.js`. A docs section may be as long as the finding needs; the comment
+citing it may not.
+
+### After a bulk comment pass
+
+Prove the code did not move: a token-stream compare against HEAD for every JS file, a
+comment-stripped and whitespace-normalised diff for CSS, `.ut`, shell and yaml. That is what caught
+a deleted Makefile marker and a lost shell escape. The full-tree compare is T2 (`tools/bg.sh`); the
+pass is finished when its output has been read.
+
 
 ## Templates and translation
 
@@ -379,7 +399,7 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `a11y` | axe-core WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap,2020,forum} × {untinted,60°,260°} |
 | `placeholder-ink` | a hint may not read as a value the reader typed: every `placeholder` attribute and every `li[placeholder]` row on `docs/gallery.html`, across all eight palette/mode combinations, must have travelled ≥40% of the way from the field's own ink to its fill in light and ≥30% in dark (oklab lightness), and still measure 3:1 on that fill — SC 1.4.11, not AA's 4.5, which is the decision the token records: a dark palette has 6.45:1 of ink to spend against light's 14.84:1, and a hint that clears AA has not moved far enough to stop reading as a value. Every combination runs again under `prefers-contrast: more`, where the query hands the AA ink back and the thresholds swap (≥15%, 4.5:1). `a11y` is excluded from `li[placeholder]` for the same decision — axe measures that row as text and skips the attribute carrying the same ink. axe-core skips `::placeholder` entirely and the old ink was legal by every threshold the theme had — 11.12:1 on footstrap light, against the value's 14.84:1. It also caught a colour rule that had never applied: `li[placeholder]` (0,2,2) lost to the menu row's own `color` (0,3,2) |
 | `test` | the unit suite (`node --test`, no browser): the shipped module is evaluated inside the same wrapper luci.js uses, and its pure logic is driven directly. For the cases a stand **cannot** produce — a luci-base with a surface missing, an alias loop in a foreign `menu.d`, a `firstchild` tie — not as a second opinion on what the stands already cover |
-| `size` | ratchet on what the router SENDS: `cascade.css` after `build-css.sh` + the token mangle, and the shipped JS after terser — the package build's own asset half, reproduced. uhttpd serves `/www` uncompressed, so these are wire bytes |
+| `size` | ceiling on what the router SENDS, pinned once per release by `/release` (`--pin`, measured + 2 %) and never raised between releases: `cascade.css` after `build-css.sh` + the token mangle, and the shipped JS after terser — the package build's own asset half, reproduced. uhttpd serves `/www` uncompressed, so these are wire bytes |
 | `icons` | the committed app-icon rasters still match `logo.svg` (per channel, with a tolerance) and still hold the maskable invariants — they are generated by `tools/build-icons.mjs` and cannot be rebuilt on the buildbot |
 
 ## The live gates, and why a file cannot answer for a page
