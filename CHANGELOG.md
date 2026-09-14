@@ -1,9 +1,23 @@
 ## [Unreleased]
 
+### Added
+
+- **`tools/ci-local.sh` runs build.yml's jobs locally, in the same order.** `--list` says what a green run here does not prove; the router legs need `--force`.
+- **Six more stands.** `-b`/`-c`/`-d` twins of the three OpenWrt lines, so a full anchor sweep runs as nine shards: 75 minutes to 31.
+
+### Changed
+
+- **CI.** Chromium's sweep is a shard of `anchors` beside firefox and webkit (the `motion` slice sat at 39 of its 45 minutes); `owrtsnap` gates `live` and `anchors` again on owlab 0.6.1; a push reports whether the published feed was measured or skipped; `developer`/`tester` turn caps 200/140.
+- **`docs/development.md` records the week's stand traps.** npm and long gates on a Windows checkout, `bg-wait` waiting out its cap, a detach that dies with its WSL call, two `ci-local.sh` runs colliding on one stand.
+
 ### Fixed
 
 - **`install.sh` survives a dead dependency feed and refuses a dead own feed.** It also counts one opkg failure line per feed, not two, so 4 dead feeds of 8 no longer read as none.
 - **Seventeen gates that passed on nothing now fail.** Packaging and shell checks, `update-po.sh` with no catalogue, a feed assertion that never ran, anchoring cells that were never measured, a mark on a sticky element, a swap whose growth never reached the document, a page that stops being LuCI mid-measurement, the staging check on a page still loading.
+
+### Performance
+
+- **The live job's `motion` slice runs in 13 minutes instead of 39**, and `parity`/`audit` finish again: a page that pins the main thread is reported by name instead of costing the slice its whole budget.
 
 ## [0.14.12] — 2026-09-07
 

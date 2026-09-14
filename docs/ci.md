@@ -12,10 +12,9 @@ What the Makefile and the install scripts do: [package.md](package.md). The rele
 dispatch.
 
 ```
-check ─┐          ┌─→ verify ─────┐
-       ├─→ build ─┤               ├─→ release ─→ pages     (release and after: tags only)
-lint ──┘          └─→ live ───────┘
-                   └╌╌→ live-snapshot     (informative only — release does not `need` it)
+check ─┐          ┌─→ verify ─┐
+       ├─→ build ─┤           ├─→ release ─→ pages     (release and after: tags only)
+lint ──┘          └─→ live ───┘
 ```
 
 | Job | What it is |
@@ -24,9 +23,7 @@ lint ──┘          └─→ live ───────┘
 | `lint` | the npm gates: eslint, stylelint, axe-core, the ratchets |
 | `build` | both package formats, via owfeed |
 | `verify` | installs this very build on real 25.12 and 24.10 userlands and renders its pages |
-| `live` | opens every page of the menu on `owrt2512`/`owrt2410` and measures it — layout, navigation parity, and the assumptions this theme makes about luci-base |
-| `live-snapshot` | the same gates, once, against `owrtsnap` alone — informative, `continue-on-error`, not in `release`'s `needs` (below) |
-| `anchors` | the reader-stays-put sweep on the other two engines, `owrt2512`/`owrt2410` only — same reasoning as `live` |
+| `live` | opens every page of the menu on those userlands and measures it — layout, navigation parity, and the assumptions this theme makes about luci-base |
 | `release` | signs, generates the notes, attaches the assets |
 | `pages` | refreshes the GitHub Pages portal and the release mirror |
 
@@ -204,6 +201,13 @@ and asserts the published feed serves a working theme.
 
 That the build "produced an ipk" proves nothing about the ipk; this job is what does.
 
+**When the feed does not answer, the assertion is skipped and says so.** `tools/feed-key.sh` still
+reports `reachable=false` rather than failing — the claim is about a channel this repository does not
+own — but the run now ends with "Report whether the published feed was measured", which writes
+*measured and passed*, *measured and failed* or *NOT MEASURED* into the run's annotations and job
+summary. A green `verify` no longer looks the same whether the feed was tested or never asked;
+`tools/ci-local.sh verify` prints the same sentence from the same script.
+
 **Five assertions per leg**, and the fifth is the template gate:
 
 ```
@@ -236,14 +240,40 @@ The job boots the same owlab containers a developer runs locally (`owfeed/owlab/
 on PATH; the binary is checked against its build attestation), installs the artifact `build` just
 produced, and runs the live gates.
 
-**It is three jobs, not one.** Once `anchors` moved out, this was the release's critical path at
-1545s — 1370s of gates, of which spa-parity is 448, live-audit 427 and everything else 495 together.
-Those are the three slices (`parity`, `audit`, `motion`), each booting its own routers for 157s it
-does not share, so the wall clock is the longest slice and not the sum. `fail-fast` is off: a parity
-failure says nothing about whether the reader stays put. Where two gates share a slice they also
-share the page shapes they read, through `FS_SHAPES` — classifying is one load and a 1200ms settle
-per page of the menu, and both gates used to do it back to back (measured: live-audit 421s alone,
-303s after spa-parity had already read the same router).
+**It is three jobs, not one.** Once `anchors` moved out, this was the release's critical path, so it
+became three slices (`parity`, `audit`, `motion`), each booting its own routers for 157s it does not
+share — the wall clock is the longest slice and not the sum. `fail-fast` is off: a parity failure
+says nothing about whether the reader stays put. Where two gates share a slice they also share the
+page shapes they read, through `FS_SHAPES` — classifying is one load and a 1200ms settle per page of
+the menu, and both gates used to do it back to back (measured: live-audit 421s alone, 303s after
+spa-parity had already read the same router). **Splitting them onto separate runners gave that
+saving back**: `FS_SHAPES` points inside each runner's own temp, so `parity` and `audit` each walk
+the whole menu now — ~90s a router, and the price of the split.
+
+Measured on the last run where every slice finished (`7ff9e56`, push, three routers): the gates are
+**485s** (spa-parity), **450s** (live-audit) and **754s** (`motion`'s six). `motion` carried a
+seventh until task liveslice — chromium's own scroll-anchor sweep, which grew from 145s to **1434s**
+when `--full` started crossing its density axis (`e48434c`) and put the slice at 39 of its 45
+minutes. That sweep is a shard of `anchors` now, beside firefox and webkit, where the cap is 75
+minutes and the one-job-per-engine rule already lives; the cells are the same cells.
+
+**A number here only holds while every page still answers.** `page.evaluate()` has no deadline in
+Playwright, so a page that pins the browser's main thread does not cost a page's worth of seconds —
+it costs the slice its whole budget. That is what happened for a day: `/admin/system/filemanager`
+under `13e9864` (`fs-fit.js`), `parity` and `audit` both cancelled at 45 minutes on every run, with
+nothing in either log. Both gates now print a line per page with the clock on it, so the next one
+names the page instead. **Read which page a slice last named; never raise the cap.**
+
+Printing a line is only half of it: a slice that names the page and is then killed at 45 minutes
+still measured nothing about the pages behind it. Each shape probe in `classify()`
+(`tools/lib/page-shapes.mjs`) is capped at `PROBE_DEADLINE_MS` (10s) — about 2000x the 4-5ms a live
+page answers in, and wide enough that even a menu where every path froze costs 16 minutes rather
+than the whole slice (96 paths, the widest measured, `owrt2512b` with the third-party fixtures). A
+page that loaded and then stopped answering is printed as a FINDING naming the router and the path,
+the walk continues on a fresh tab — a frozen page stays poisoned, every later `goto` on it burning
+its own 20s, while `close()` + `newPage()` costs 0.5s and the login lives on the context — and
+`parity` and `audit` exit non-zero. A page that never LOADED still says nothing, on purpose: that is
+the runner or the stand, not the theme, and the two must not read alike.
 
 Cheapest-first still holds inside `motion`, which opens with upstream-contract at 7s; it can no
 longer come before the other two slices, which are on runners of their own.
@@ -263,38 +293,36 @@ longer come before the other two slices, which are on runners of their own.
 5. `tools/table-tick.mjs` — the poll tick performed deliberately, with the layout forced inside the
    window fs-select answers in: a replaced data table may not be laid out before it has an answer.
 6. `tools/scroll-anchor.mjs` — content grows above the reader and the page must not move under them,
-   with and without the engine's own scroll anchoring. It runs in its OWN job, one shard per engine
-   (`anchors`), not here: at 52 minutes against this job's 17 it was the whole release's critical
-   path, and firefox and webkit share nothing, so the two halves run at once. Its sweep is narrow on
-   a pull request and `--full` on a push — the axes it drops were measured not to change its answer,
-   and a push is where being wrong about that must still be caught.
+   with and without the engine's own scroll anchoring. It runs in its OWN job, **one shard per
+   engine — chromium, firefox and webkit** (`anchors`), not here: at 52 minutes against this job's 17
+   it was the whole release's critical path, and the three engines share nothing, so the shards run
+   at once. Chromium stayed in `motion` while it was the cheap engine at 145s and left when `--full`
+   took it to 1434s (task liveslice); it is now the shortest of the three shards and costs the
+   pipeline no wall clock at all. Its sweep is narrow on a pull request and `--full` on a push — the
+   axes it drops were measured not to change its answer, and a push is where being wrong about that
+   must still be caught.
 7. `tools/install-check.sh` — `install.sh` twice on each router, fresh and over its own result. It
    goes last in its slice because it replaces the build under test with the published release; #16,
    #28 and #30 were all this script, and all on the second run. That replacement is also why it may
    not share a router with a gate still measuring the build — which a slice of its own guarantees.
 
-**Two routers on a push, one on a pull request — both pinned releases.** `owrt2512`/`owrt2410` are
-the OpenWrt lines the theme supports, and their feeds are fixed once that release ships. ImmortalWrt
-is not in it: same luci-base, different brand and app set, never the leg that caught something
-first. Run it locally with `--all` when a finding smells distribution-specific. What each gate
-holds, and how to run it by hand, is in [conventions.md](conventions.md) and
-[development.md](development.md).
+**Three routers on a push, one on a pull request.** The push set is the OpenWrt lines the theme
+supports — 25.12/apk, 24.10/opkg and the snapshot box, which tracks luci-base's master and so fails
+on an upstream change before a user reports it. ImmortalWrt is not in it: same luci-base, different
+brand and app set, never the leg that caught something first. Run it locally with `--all` when a
+finding smells distribution-specific. What each gate holds, and how
+to run it by hand, is in [conventions.md](conventions.md) and [development.md](development.md).
 
-**The snapshot box is a job of its own, `live-snapshot`, and it does not gate a release.**
-`owrtsnap` tracks luci-base's master, which is the whole reason for running against it: it can fail
-on an upstream change before a user reports it, still-runs, still-reports, still shows failed in the
-run for a maintainer to read. What it must not do is hold a release hostage to somebody else's
-infrastructure: OpenWrt rebuilds the snapshot feed continuously and names the kmods index after the
-kernel hash, so `apk update` can 404 on an image that has not changed at all — measured on runs
-`34036001267` and `34095751675`, both green on `owrt2512`/`owrt2410` and red on `owrtsnap` alone, on
-the same commit, before owlab's own per-package loop (already tolerant of a package missing from a
-feed) gets a turn. A retry does not help there — a 404 is not a stall, which is what
-`tools/ci-retry.sh` is for. `live-snapshot` runs the same gates `live` runs, once, sequentially,
-against `owrtsnap` alone, carries `continue-on-error: true`, and is deliberately absent from
-`release`'s `needs` below — a genuine finding still turns the job red, it just does not stop a tag
-from publishing. `anchors` (the cross-engine reader-stays-put sweep, below) never carried `owrtsnap`
-at all going forward: its chromium-only slice of that coverage now lives inside `live-snapshot`, and
-the other two engines were never the leg that caught an upstream-luci-base change first.
+**The snapshot box carries no third-party extras (`owlab.yaml`, `owrtsnap`).** openclash and
+ssclash pull `kmod-tun`, which resolves through a kmods index keyed to the box's exact kernel git
+hash, and the box's baked kernel is never the one `downloads.openwrt.org/snapshots` is currently
+publishing kmods for — permanent drift, not a stale image. Measured 2026-09-07: `apk add` 404s the
+kmods `packages.adb` for the running `6.18.33` hash and both apps fail; justclash (no kernel module)
+installs cleanly on the same box, which is why it was never in the failure list. `owlab`'s own
+`extra_packages` merge is additive only (`defaults:` plus what a router adds, no subtraction), so
+the three apps are declared once, on `owrt2512`, and aliased onto the other release routers instead
+of living in `defaults:` — `owrtsnap` gets none. The snapshot leg still runs every other gate; only
+these three apps are untested there.
 
 ## `release` — signing and publication
 
@@ -311,10 +339,7 @@ release:
 ```
 
 **This is the only job that holds a key**, and `needs: [build, verify, live]` is what stops a tag
-publishing a package no router has installed. `live-snapshot` is deliberately not in that list: it
-runs against `owrtsnap`, whose feed is somebody else's infrastructure on somebody else's rebuild
-schedule, and a release must not wait on that (above, and the comment beside `release` in the
-workflow itself).
+publishing a package no router has installed.
 
 `tools/stage-release.sh` is our half — the `pre-release` hook. It writes the release notes where the
 workflow reads them and puts the one non-package asset into `dist/`, before the manifest is written,

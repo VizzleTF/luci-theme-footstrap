@@ -398,6 +398,16 @@ The structural gates run their routers CONCURRENTLY — nothing they measure is 
   for Linux). A new engine needs its own baseline, created by one `--update` run. `--lang ru` (task
   0162, below) runs the same sweep against a Russian router, keyed `<stand>@ru` — the two suffixes
   compose (`owrt2512@ru@firefox`).
+- **`scroll-anchor`** (task sweepspeed) runs its requested engines concurrently rather than one after
+  another, and — when an `-b` twin of a stand is up (`owlab.yaml`'s matched pairs, `owrt2512`/
+  `owrt2512b` and the like) — splits that stand's own cell list across the two containers instead of
+  walking it with one. Neither changes which cells run: every combination the axes define still runs
+  exactly once, findings from either container print under the base stand's id. `--no-pair` turns the
+  splitting off (for measuring the pairing itself, or a run that wants the twin left idle); `--only
+  owrt2512,owrt2512b` measures both explicitly instead of pairing them. `--quick` is the fast local
+  loop — one stand, the Overview page alone, the default axes — and prints what it left out on every
+  run; it is not a substitute for a full `npm run anchor` or CI's own `--full` sweep, and is never set
+  by CI.
 
 ### `live-audit`'s baseline is not a clean sheet, and neither entry nor language may be assumed
 
@@ -700,7 +710,210 @@ happens on the maintainer's explicit word for one change, never by reflex, and `
 5. Rollback, if anything above fails or a page is wrong:
    `ssh <host> 'uci set luci.main.mediaurlbase=/luci-static/bootstrap; uci commit luci; rm -f /tmp/luci-indexcache*'`.
 
+## Running everything CI runs, locally: `tools/ci-local.sh`
+
+`.github/workflows/build.yml` is six jobs; nothing local ran the four beyond `check`/`lint`
+(`build`, `verify`, `live`, `anchors`) until this script, so a red job there used to be the first
+time anything here measured that half at all. `tools/ci-local.sh` runs the same commands, in the
+same order, selectable per job or per slice:
+
+```sh
+tools/ci-local.sh --list                      # the job/slice map and what this cannot reproduce
+tools/ci-local.sh check lint build            # the three jobs that never touch a router
+tools/ci-local.sh verify                      # owlab test, both formats — safe with stands up
+tools/ci-local.sh --mode push --force live    # all three live slices, THIS project's own stands
+tools/ci-local.sh all --dry-run               # print every command either mode would run
+```
+
+`--mode pr|push` reproduces the exact split `build.yml` makes for `live`/`anchors`
+(`ROUTERS=owrt2512`, `FULL=""` on a pull request; all three routers and `--full` on a push) —
+`check`/`lint`/`build`/`verify` do not vary by mode. `verify` runs `owlab test`, which
+synthesizes its own ephemeral router in a scratch directory and never touches the named stands,
+so it is safe to run even while another session has `owrt2512`/`owrt2410`/`owrtsnap` to itself.
+`live` and `anchors` are the opposite — they boot and install onto those SAME named stands — so
+the script refuses to run them for real without `--force`, a deliberate echo of "Two live-audit
+sweeps against the same stand fight over its language" below: this default exists because that
+failure mode is measured, not hypothetical. `--dry-run` prints every command any job/slice would
+run without touching a tool or a router, and works with no prerequisite on `PATH` at all.
+
+**Every run — `--list` included — ends by naming what it did NOT reproduce and why**: the signed
+`release`/`pages` jobs (no local copy of either secret key), the artifact upload/download between
+`build` and everything downstream of it (substituted by one shared `dist/` on disk), job-level
+`timeout-minutes` (unenforced locally), and the apt-get fallback branches inside `check`'s
+gettext block and `ci-playwright.sh` (only exercised when the tool is actually missing, which it
+was not on this host). A step this script cannot cover is printed as `SKIP` with a reason, never
+folded into a passing count.
+
+**This has to run from WSL, never from Git Bash on Windows** — the same host split
+`docs/development.md` documents below for every other npm-run gate — invoked the way that
+section's own recipe does, PATH set by hand inside the call. Node does not need installing under
+WSL's own nvm the way that recipe assumes, either: this session found `npm`/`node` already staged
+under the Windows install (`node_modules/.bin/*` carries an extensionless sh wrapper beside the
+`.cmd`/`.ps1` ones), and that copy runs from WSL exactly as well as a native one once its `PATH`
+is set — no `EFTYPE`/loader-hook workaround needed, because a REAL Linux `node` executing
+`build-css.sh` through `execFileSync` is not the Windows-side failure that trap is about. `owlab`
+and `owfeed` (`~/go/bin`, both already on this host at the CI-pinned versions, 0.6.1 and 0.5.1)
+are ordinary Linux ELF binaries and need no such bridging at all. What genuinely needs installing
+fresh is `node` itself if WSL has none of its own — this session used NodeSource's `setup_22.x`
+to match `build.yml`'s pinned `node-version: '22'` exactly, a one-time `apt-get` cost, not a
+per-run one.
+
+**A variable ASSIGNED inside an inline `wsl.exe -- bash -c '…'` string reads back empty or
+truncated, independent of and in addition to the `$?` trap already on this page.** Measured this
+session, the same inline call every time: `x=$(echo hello); echo "$x"` printed nothing; so did
+the far simpler `x=hello; echo "$x"`, with no command substitution involved at all; a function
+DEFINED inline (`f(){ …; }; f`) failed to resolve. The exact same lines, saved to a file and run
+as `wsl.exe -- bash /path/to/script.sh`, read back correctly every time — command substitution,
+`$?`, and everything else this script depends on, all confirmed with a dedicated probe before
+writing a line of `tools/ci-local.sh` around it. Treat this as one mechanism with the `$?` trap
+below rather than two: neither survives an inline `bash -c` string, both survive a file, and
+"write the script to a file and call `wsl.exe -- bash <path>.sh` instead of inlining it" (already
+this page's advice for the `$R`/`$T` collapse) is the same fix for both.
+
 ## The stand's own traps
+
+- **`owlab up` on a taken port fails ONE container and returns non-zero for the whole command.**
+  Adding three stands on 2026-09-09, `owrt2512b` could not bind ssh 2235 — something else on this
+  machine already listened there — so `up` printed `Bind for 0.0.0.0:2235 failed: port is already
+  allocated` and exited 1, while the other two had started fine. The following `owlab sync` then
+  synced those two and reported a failure for the third. Read the per-router lines, not the exit
+  status: a partial success looks like a total failure and the reverse is equally possible. Check
+  what is actually listening with `ss -ltn | grep :22` before choosing a port, and note that
+  2222 and, on this host, 2235/2240/2241 are taken by things owlab does not own.
+
+- **A stand rebuilt with `owlab up --rebuild` carries NO theme until `owlab sync`.** The gates do
+  not say so: every cell prints `page.evaluate: NetworkError: HTTP error 404 while loading class
+  file "/luci-static/resources/fs-prefs.js"` and the run **exits 0**. A sweep that measured nothing
+  is indistinguishable from a clean one unless you read the lines. Always `owlab sync` after a
+  rebuild, and treat a 404 in a cell as "the stand is empty", not as a finding.
+
+- **Never pipe a long run into `tail`, `sort` or a bare `grep`.** The output buffers until the
+  command ends, so a hang looks exactly like progress. `live-audit` over a full sweep did this on
+  2026-09-09: the process sat alive and idle for 73 minutes with no output, where CI takes about 90
+  seconds a stand. `grep` is the one that catches you by accident — filtering a `wsl.exe` call's
+  noise through `| grep -v …` buffers in 4KB blocks, so a gate that was printing a line a second
+  looked mute for minutes (2026-09-10). Write to a file and read the file as it grows (`grep
+  --line-buffered` if it must be a pipe), and give any local `live-audit` both `--pages` and a
+  `timeout`.
+
+- **A variable assigned INSIDE an inline `wsl.exe -- bash -c '...'` string reads back empty.** This
+  is separate from the `$?` trap below and bites the same way: the script looks like it ran and
+  produced nothing. Write the script to a file and call `wsl.exe -- bash <path>.sh`.
+
+- **`tools/bg.sh` started from inside a `wsl.exe -e bash -c …` call dies with that call, and reads
+  as a run that finished instantly — and `tools/bg-wait.sh` then waits out its full two-hour cap
+  on it.** The log file is created with `bg.sh`'s own header (~280 B) and never grows, and `.status`
+  never appears. Neither does `.pid`: the inner shell is killed before it gets that far, so
+  `bg-wait.sh` has no pid to test and cannot see the death at all — measured 2026-09-10, it returned
+  `WAIT-RC=2, exit: timeout (no status after 7200s)` on a run that had died at second zero. The detach
+  is real inside WSL; what does not survive is the WSL session itself, which the interop call tears
+  down the moment its own command returns, taking the whole process group with it. Tell the two apart
+  by the files: a run that genuinely finished has output in its log and a `.status`; one killed with
+  its session has a header-only log, no `.status` and no `.pid`. From a Windows host, start a long gate as a **background Bash-tool
+  command** (`wsl.exe -e bash -c 'cd … && npm run check'`, run in the background) and wait on that
+  instead — `tools/bg.sh` is for a session that outlives the command, which an interop call is not.
+
+- **`scroll-anchor --full` with all three engines at once over three stands kills the chromium
+  process about two minutes in; one engine at a time completes.** It reads as a regression in the
+  sweep — chromium's leg dies mid-run while webkit and firefox finish — and it is the browser's
+  zygote going down under the load of three engine sets against three routers on one host, not
+  anything the theme did. Tell the two apart by re-running the same axis with a single
+  `--engines chromium`: a real finding reproduces there, this does not. Measured 2026-09-11 on the
+  three twins (`owrt2512b`, `owrt2410b`, `owrtsnapb`), 184 runs per engine green when run one at a
+  time. CI does not meet it — `anchors` is one job per engine, on a runner each. **The way to have
+  all three at once locally is one PROCESS per engine**, not one process driving three: measured
+  2026-09-12, nine shards (engine x stand, own browser and own router each) ran to completion with
+  no zygote loss at all.
+
+- **The sweep is wait-bound, not CPU-bound, and sharding it further than the tool already does buys
+  almost nothing.** Measured 2026-09-12 on a 20-core, 15 GB host: three engine processes over three
+  stands each read 22 cells/min; nine shards, one per engine and stand, read 26 — 18% for three
+  times the processes, because `tools/scroll-anchor.mjs` (0fa9c2b) ALREADY runs its stands
+  concurrently inside one process, so an external split mostly moves that same concurrency outside.
+  What the same run says about the machine is the useful part: `load average 1.49` of 20, 5 GB of
+  15 in use, every stand container at 0.03-0.14% CPU. A cell costs ~20 s and nearly all of it is
+  fixed waiting — SWAP's 900 ms window, three REPEAT refills, QUIET's 24 flick steps, `SCROLL_IDLE`
+  on each check — so the lever is more cells in flight (memory is the only ceiling), never a faster
+  machine. **Do not shorten those waits to speed the sweep up**: each is a measured number, and half
+  of this week's findings need the window as wide as it is. Full `--full` across three engines:
+  ~75 min serial, **1860 s (31 min) at nine shards**, 828 runs.
+
+- **Nine shards is the ceiling; running the sweep ALONGSIDE `spa-parity` and `npm run check`
+  manufactures late findings that are not there.** Measured 2026-09-12: nine sweep shards plus three
+  `spa-parity` runs plus a full `check`, thirteen processes at once, produced two
+  `corrected late` findings — `webkit owrt2410d` at 228 ms and `webkit owrt2512d` at 247 ms, both
+  `@1440 side normal engine DECLINES overview`, both just over the gate's own 200 ms `LATE_MS`. The
+  identical three webkit shards on an otherwise idle machine, same commit and same stands, read 276
+  runs and no findings. Tell the two apart by re-running the engine alone before believing a
+  `corrected late` within ~50 ms of the threshold; a real one reproduces on a quiet machine. Run the
+  sweep on its own, and `spa-parity`/`check` after it.
+
+- **Two `tools/ci-local.sh` runs against the same stands invent findings, and `--force` does not
+  make it safe — it only silences the refusal that was protecting you.** Measured 2026-09-12: a
+  second `anchors:webkit` started 37 s after the first, both with `--force`, and the pair reported
+  **12 findings** — `the reader drifted 46/88/138px across real poll ticks` at every density and
+  both layouts, on two stands. Run alone, the same commit and the same command read 276 runs and no
+  findings. The script's default refusal names this exact failure; passing `--force` is a promise
+  that nothing else is using the stands, and the way to keep it is `pgrep -f '^node tools/(scroll-anchor|spa-parity|live-audit)'`
+  and `pgrep -f '^sh tools/ci-local'` both finding nothing before you start — anchored with `^`
+  and run from a script FILE: the unanchored `ps -eo cmd | grep '[s]croll-anchor'` this entry first
+  recommended matches the command line of an inline `bash -c '…'` that contains it, reports busy
+  every time, and aborted two A/B runs on 2026-09-13 with nothing else on the stands. A finding that appears on twelve
+  cells at once, evenly across an axis, is this and not the theme.
+
+- **"no owlab router is running, so nothing was checked" while all eight are up means the gate
+  could not find `owlab`, not that the stands are down.** `owlab` is a Go binary in `~/go/bin`, put
+  on `PATH` by the login profile — and a login shell started as `wsl.exe -e bash -lc` from a Windows
+  host can die part-way through that profile on something unrelated (measured 2026-09-11: a stale
+  `deno/env` path from another project, printed as a bare `No such file or directory` with no
+  mention of owlab), leaving `PATH` half-built. Every live gate then reports the same sentence on
+  every stand at once. Tell the two apart with `owlab status`: if it lists routers as `running`, the
+  stands are fine and the shell is not. Run live gates as `wsl.exe -e bash -c` with
+  `export PATH=$HOME/go/bin:$PATH` set explicitly, which skips the profile entirely. **Six gates
+  saying "nothing was checked" is the hardening working** — before `21a8502` and `916d4d5` those
+  same runs would have exited 0 and read as six passes.
+
+- **A page that pins the browser's main thread stops a gate DEAD, and no gate has a deadline for
+  it.** `page.evaluate()` is the one Playwright call with no timeout at all: it waits for the page's
+  own thread, and a page stuck in a loop never gives it back. Measured 2026-09-10 (task liveslice):
+  `/admin/system/filemanager` under `fs-fit.js` at `13e9864` left the renderer at ~105% CPU for as
+  long as it was allowed, so `classify()` (`tools/lib/page-shapes.mjs`, which both `spa-parity` and
+  `live-audit` walk the whole menu with) never returned, and both CI slices were cancelled at their
+  45-minute cap on every run for a day — with an empty log, because neither gate said which page it
+  was on. Both gates now print a line per page with the clock on it; a run that stops has the answer
+  as its last line.
+  **Tell a frozen page apart from a slow one in about a minute:**
+  ```sh
+  # 1. is it the theme? serve the stock package on that stand and load the same page
+  owlab exec owrt2512b -- 'uci set luci.main.mediaurlbase=/luci-static/bootstrap && uci commit luci'
+  owlab exec owrt2512b -- 'rm -f /tmp/luci-indexcache*'      # …and back to /luci-static/footstrap after
+  # 2. is it THIS commit? swap one file in, no worktree and no sync — the stands may be somebody
+  #    else's right now, and `owlab sync` pushes whatever the working tree currently holds
+  git show <sha>:luci-theme-footstrap/htdocs/luci-static/resources/fs-fit.js > ../tmp/fs-fit.<sha>.js
+  docker cp ../tmp/fs-fit.<sha>.js owlab-luci-theme-footstrap-owrt2512b:/www/luci-static/resources/fs-fit.js
+  docker exec owlab-luci-theme-footstrap-owrt2512b chmod 644 /www/luci-static/resources/fs-fit.js
+  ```
+  `chmod` is not optional: a `docker cp` lands the file 0600-ish and uhttpd answers **403**, which
+  reaches the page as `NetworkError: HTTP error 403 while loading class file` — the module then does
+  not run at all and the page looks *fixed*. A green result with 403s in it has measured nothing.
+
+- **`live-audit` on a `-b` twin calls every finding NEW.** The baseline is keyed by stand id
+  (`tools/baselines/live-audit.json`: `owrt2410`, `owrt2410@ru`, …), and `owrt2410b` is not one of
+  those keys, so a sweep there starts from an empty known set — 30 fresh signatures over the
+  `/admin/network` subtree alone, none of them a regression. The twins are for the gates that carry
+  no baseline (`scroll-anchor`, `spa-parity`); measure `live-audit` on the base stand, or read its
+  twin run as a list rather than a verdict.
+
+- **`pkill -f <pattern>` kills the shell you typed it in.** `-f` matches the full command line, and
+  the wrapper `bash -lc "pkill -f probe-one …; node probe-one.mjs …"` contains the pattern, so the
+  whole chain dies before the command after the `;` runs — and it looks exactly like a run that
+  produced no output. Bracket the first character (`pkill -f "[p]robe-one"`), or kill from a separate
+  call.
+
+- **`${PIPESTATUS[0]}` is as unreliable as `$?` in that shell.** On 2026-09-09 a piped
+  `npm run check` reported `CHECK_EXIT=` and read as success while it had actually failed on the
+  size budget; the failure was only caught by reading the gate's printed text. Judge every gate by
+  what it printed, never by a status.
 
 Every one of these cost a measurement that read as a regression in the theme. They are written down
 because each was hit more than once.
@@ -780,6 +993,46 @@ Two traps sit in the calling convention itself, each cost a retry:
   `tools/bg-wait.sh`. Tell the two apart by the log: a `tools/bg.sh` run started this way stops dead
   at its header line with no `.status` file ever appearing, no matter how long `bg-wait.sh` is left
   polling it.
+
+**`owlab.yaml`'s `extra_packages` under `defaults:` reaches every router, including the snapshot
+box, and a package that box cannot resolve fails `owlab up` for the whole lab — not just the
+missing package.** `defaults.extra_packages` merges additively onto whatever a router adds
+(`internal/config/config.go` in owlab, no subtraction syntax), so there is no way to opt a router
+OUT of a list declared in `defaults:`; the only lever is to not put it there. Reproduced 2026-09-07,
+`owlab up --rebuild owrtsnap`: openclash and ssclash need `kmod-tun`, which resolves through a kmods
+index keyed to the box's exact kernel git hash, and `downloads.openwrt.org/snapshots` was not
+currently publishing kmods for the box's baked `6.18.33` hash — `apk add` 404s that index and both
+apps fail to resolve, permanently, until the box's kernel and the live kmods feed happen to agree
+again. justclash carries no kernel module and installed cleanly on the same box, which is why it was
+never in the failure list — same feed, different dependency shape, not a fluke. `owlab up`'s
+non-zero exit here is correct by design (`reportMissingExtras`, owfeed/owlab#18's sibling): it is
+the config asking every router for packages one of them cannot ever have. Fix is in `owlab.yaml`
+itself — declare the three apps once on a release router and alias the list onto the others, leaving
+`owrtsnap` with none, rather than routing them through `defaults:`.
+
+**An ordinary `packages:` entry can go missing on `owrtsnap` too, and it is not the kmod-tun
+mechanism above even though the symptom looks the same — and the entry that goes missing is not
+fixed, so do not name one here as if it were.** Task 0177: a `scroll-anchor` finding on
+`owrtsnap @1440 side compact` traced to the Overview page rendering 12 `.cbi-section` there against
+`owrt2512`'s 13 — `luci-app-https-dns-proxy` absent that day. `apk info -R` shows neither it nor its
+`https-dns-proxy` binary needs a kernel module (`ca-bundle libc libcares libcurl4 libev jsonfilter
+resolveip` only), which rules out the kmods-index gap; `/var/log/apk.log` from that boot instead
+named the KMOD-needing packages failing (`luci-app-mwan3`, `-sqm`, `-nlbwmon`, `-openvpn`,
+`luci-proto-wireguard`/`-openconnect` — the same `ERROR: unable to select packages` the kmods gap
+produces) while `luci-app-https-dns-proxy` installed clean in that same run. By task 0178,
+`https-dns-proxy` installed clean on every stand and `luci-app-mwan3` was the one missing instead
+(no `90_mwan3.js`; the same `unable to select packages` line in `apk.log`, this time for `mwan3`,
+`nlbwmon`, `openvpn` and `sqm` together). Two different names in two sessions IS the finding:
+`feeds/luci` and `feeds/packages` build the snapshot index independently, and a `luci-app-*`/binary
+pair that agrees on version when both are fresh can briefly disagree while one side has moved and
+the other has not mirrored yet — the same class of drift as the kmods index, on an ordinary package
+rather than a kernel module, and not reproducible on demand for that reason. Not fixed by a version
+pin: `owlab.yaml`'s `packages:` list carries no version syntax, and pinning one would go stale as
+the snapshot feed prunes old builds (a release branch keeps them for the branch's life; snapshot
+does not). Check what is missing TODAY rather than trust a name in this paragraph: `apk info -e
+<pkg>` for a `+luci-app-*` in `owlab.yaml`, or `grep 'unable to select' /var/log/apk.log`, on
+`owrtsnap` — before treating a snapshot-only section-count or DOM-count difference as a theme
+finding.
 
 **`mangle-tokens.sh` fails on a `C:\...`-shaped path with `mv: cannot stat ...tmp.NNN`, and the gate
 that surfaces it never mentions the script by name.** Like `build-css.sh`, it needs a POSIX path;
@@ -1234,6 +1487,152 @@ not whatever is sitting in `dist/`:
 ```sh
 git archive <tag> | tar -x -C /clean/checkout && (cd /clean/checkout && ./tools/stage.sh)
 ```
+
+**A dead feed no longer reds `owrtsnap`'s boot — owlab 0.6.1 made the refresh partial instead of
+fatal, closing the trap this note used to teach around.** Through owlab 0.5.3, stage-3 opened
+`apk update`/`opkg update` under a bare `set -eu`, so one unreachable feed took the whole install
+down before owlab's own per-package loop — already tolerant of a package missing from a feed — got a
+turn; the snapshot rootfs pins its kmods index to a kernel hash the feed's retention window keeps only
+a handful of, so an image a few weeks old 404s on that one sub-index on every run with no code change
+involved (owfeed/owlab#18, closed within the hour; `live`/`anchors` had carried a containment for it,
+`live-snapshot`, `continue-on-error` and absent from `release`'s `needs`, task 0172/0173). `owlab`
+0.6.1's `internal/pkgmgr.UpdateShell` now continues the refresh once at least one feed has answered
+and only aborts when none has — reproduced locally (`owlab up owrtsnap`, `owlab install owrtsnap
+dist/noarch/luci-theme-footstrap-*.apk`, task 0173) against a freshly downloaded `owlab 0.6.1`
+binary, not the WSL install's drifted dev build: the identical 404 still prints
+(`ERROR: wget: exited with error 8` / `unexpected end of file` on
+`kmods/6.18.33-1-70e27cfe28d8cb55760256504e7c02fe/packages.adb`), but the router boots and the
+package installs anyway, and the log now names the gap rather than staying silent about it —
+`owlab: apk update: partial refresh, 7 feed(s) read, 10206 packages available; the feed above did
+not answer and its packages will be missing`. `owrtsnap` is back in `live`/`anchors` and
+`live-snapshot` is gone; what is worth knowing going forward is the shape of that line in a log, not
+how to survive its absence.
+
+**`install.sh` carried the identical trap one layer down, and "packages available > 0" turned out
+not to be the signal that separates a partial refresh from a total one.** Task 0175, run 34112646188:
+`install-check` red on `owrtsnap` at `apk update`, same dead kmods sub-index as above, but this time
+inside the installer's own `set -e`, which had no per-package loop after it to absorb the exit —
+every install on that stand died before the theme was ever fetched. The obvious fix (treat apk's
+own "N unavailable, M stale; K distinct packages available" line as fine whenever K > 0) is wrong:
+with every feed unreachable, apk still printed `8 unavailable, 0 stale; 136 distinct packages
+available` and exited non-zero — those 136 are rows already in the **installed** database, not
+anything the refresh just read, so K is nonzero on a total failure too. What actually separates the
+two is the `N unavailable` count against how many feeds were **configured** to begin with (counted
+from `/etc/apk/repositories` + `/etc/apk/repositories.d/*.list`): `N < configured` means at least one
+feed answered, `N == configured` means none did. opkg prints no such summary line and is affected
+identically (exit 1 with one bad feed of eight on 24.10.8, exit 7 with the network cut), so the same
+comparison is drawn there by counting `Failed to download` lines against the configured
+`distfeeds.conf`/`customfeeds.conf` entries instead. Neither manager's own exit code decides this in
+either implementation — `install.sh`'s `feed_refresh()`.
+
+**That tolerance turned out to be too even-handed: a security review (task 0176) found it let this
+project's OWN feed, `repo.owfeed.org`, be the one silently skipped.** `repo.owfeed.org` is a distinct
+host from every stock OpenWrt feed, so an on-path/DNS attacker can blackhole it alone while the rest
+answer — `_bad < _total`, the old code returned 0, and the script went on to install whatever
+owfeed-packages index apk/opkg already had cached from a prior run while printing "[+] Installed …".
+Reproduced live rather than argued: on `owrt2512` (9 configured feeds) with a `127.0.0.1
+repo.owfeed.org` `/etc/hosts` entry and the 8 stock feeds left open, `apk update` itself reported the
+router's cached copy as merely `stale` (`0 unavailable, 1 stale; 11286 distinct packages available`,
+exit 1) — a shape the OLD counter never even tolerated (`_bad` reads 0, not 1, so the pre-fix code
+already fell through to the generic failure here) but a fresh-index router would read as `unavailable`
+and the old code WOULD tolerate. `feed_refresh()` now checks, before the tolerance, whether `$FEED_HOST`
+— the literal string this same script writes into the repository line a few lines below, not
+`$FEED_NAME` or any label an admin could rename — appears in a failure line (apk: `ERROR:`/`WARNING:`;
+opkg: `Failed to download`, both of which print the full failing URL in real router output, confirmed
+on both managers below). If it does, the refresh fails closed with a message naming this project's own
+feed specifically, regardless of how many other feeds answered. Verified on live stands, all four
+shapes: `owrtsnap`'s real dead kmods sub-index (unrelated host) still tolerates and installs, unchanged
+from the paragraph above; `owrt2512` (apk) and `owrt2410` (opkg) with `repo.owfeed.org` blocked and
+every stock feed open now fail closed with `` `apk/opkg update` could not reach https://repo.owfeed.org
+— this project's own feed`` and install nothing, where the old code's tolerance would have gone on to
+`apk add`/`opkg install` against a stale cache; both routers with every feed healthy install clean, no
+warning; `owrt2512` fully disconnected from its docker network still fails the way it always did,
+naming the unreachable host and refusing rather than claiming success.
+
+**A verification trap worth naming for the next session: opkg's OWN counting is looser than apk's, in
+the other direction.** Blocking `downloads.openwrt.org` (the host behind all 7 of `owrt2410`'s stock
+feeds, `/etc/opkg/distfeeds.conf`) while `repo.owfeed.org` stayed open made `feed_refresh()`'s pre-fix
+`_bad` counter read 14 against 8 configured — opkg logs each unreachable feed on TWO lines that both
+match the substring `Failed to download` (`*** Failed to download the package list from <url>` and
+` * opkg_download: Failed to download <url>, wget returned N.`), so `grep -c 'Failed to download'`
+double-counts every failure. `_bad >= _total` therefore reads as "none answered" even when most did,
+and the refresh fails closed rather than tolerating — safe (it never installs from a worse index than
+it would otherwise refuse), but it makes opkg's tolerance narrower than the comment above claims and
+narrower than apk's, which reads its own reported `N unavailable` count rather than grepping its log.
+Not this task's fix (`install.sh`'s boundary here is the own-feed decision alone, not the general
+counting shape) — flagged for whoever next touches `feed_refresh()`'s opkg branch.
+
+**Installing npm packages from WSL instead of from Windows leaves every gate looking broken, when
+only the install is.** An install run from WSL writes `node_modules/.bin/` as POSIX symlinks
+(`eslint@ -> ../eslint/bin/eslint.js`), which Windows cannot execute — every `npm run <gate>` from
+Git Bash then dies with `'eslint' is not recognized as an internal or external command`, and the git
+`pre-push` hook fails the same way, reading exactly like a red gate rather than a bad install.
+Installed from Windows instead, npm writes three wrappers per package (`eslint`, `eslint.cmd`,
+`eslint.ps1`), and the extensionless one is a sh script WSL can run too — one install serves both
+sides. The install itself has to be invoked as `node "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js"
+ci --ignore-scripts` from Git Bash: `cmd.exe /c npm ci` from Git Bash silently does nothing (MSYS
+rewrites `/c` into a path before `cmd.exe` ever sees it), and PowerShell refuses `npm` outright (next
+trap). `--ignore-scripts` is deliberate — the browsers the gates need live in WSL, and a second
+Windows-side copy is a few hundred MB nobody runs. Verified this session: `npm run lint` passes from
+both Git Bash and WSL off one Windows-side install.
+
+**A fresh Windows-side `npm ci` needs `chmod +x node_modules/.bin/*` from WSL before WSL can run any
+of it, and the fix does not survive the next install.** `/mnt/c` on this machine mounts
+`metadata,umask=0077,fmask=0177` (`/etc/wsl.conf`), so every file npm just wrote from Windows arrives
+world-unexecutable — the sh wrappers the trap above depends on are present and correct, but
+`npm run lint` inside WSL still dies, this time with `sh: 1: eslint: Permission denied`. Because
+`metadata` is on, one `chmod` sticks across reboots — but not across a fresh `npm ci`, which writes
+new files under the mount's default mode again. Diagnose with `ls -l node_modules/.bin/eslint` (mode
+`0600` is the trap) and `mount | grep " /mnt/c "` (confirms the `fmask`).
+
+**PowerShell is not a fallback for the symlink trap above — `npm` does not run there at all on this
+machine.** `npm.ps1 cannot be loaded because running scripts is disabled on this system` is
+PowerShell's own execution policy refusing the wrapper script outright, unrelated to the WSL symlink
+issue and not fixed by installing from the "right" side. Git Bash and `cmd` (called directly, not
+through `cmd.exe /c` from Git Bash) are unaffected.
+
+**`${PIPESTATUS[0]}` reads back empty in this WSL bash, the same way `$?` is already unreliable here
+— and it fails silently, not loudly.** A piped `npm run check | tee log.txt; echo
+"CHECK_EXIT=${PIPESTATUS[0]}"` printed `CHECK_EXIT=` — empty, not a number — and the empty string
+read as "not the literal failure text" to whatever was watching it, while the run had actually
+failed on the size budget. The gate's own printed output was the only place the failure showed.
+Judge a WSL gate by what it printed, never by a captured status of any kind — `$?`, `PIPESTATUS`, or
+otherwise.
+
+**A `geometry|fs-content` finding whose offset equals the gap between two adjacent entries in the
+gate's own `WIDTHS` is a staleness race, not a layout break — re-sample at 620 ms before believing
+it.** `live-audit` samples `contentWidth()` at 220 ms after each `setViewportSize`; `fitChrome()`
+steps aside for the whole `SCROLL_IDLE` window (400 ms, `fs-fit.js`) whenever `fit.scrolling()`
+answers yes, and a resize starts that window too, so a sample taken inside it reads the PREVIOUS
+width, not the one the gate just set. Task staleouter: `owrt2410 /admin/status/vnstat2/config | 568
+| geometry | fs-content (-178)` — `-178` is exactly `568 - 390`, the gap between those two widths in
+`live-audit`'s own list, and the same shape held at every step (`-70` at 320→390, `-256` at
+1024→1440). Confirmed with `probe2.mjs`/`probe3.mjs` (`../tmp/task-vnstat/`): `model=358 real=536
+scrolling=true` at 220 ms, `off=0` once resampled past 620 ms. Fixed in `fs-chrome.js`'s
+`contentWidth()`, which now re-reads the window's width on every call rather than trusting the last
+fitter's cache (`docs/chrome.md`, "`data-narrow`: ..."); do not "fix" a live recurrence of this shape
+by making the gate sample later instead — that would hide the same staleness from a real reader.
+
+**`TaskStop` on a background command kills its outer shell, not a `sh script.sh` it started.** A
+stopped chain kept waiting as its own process and would have raced its replacement to the same
+commit. After stopping one, check `ps -ef | grep scratchpad` on the Windows side and `pgrep -af '^sh
+/mnt/c/.*scratchpad/'` in WSL; kill the child by its exact command, and give a replacement a guard
+that refuses to start while the old one lives.
+
+**A process search inside `sh -c '…'` finds the shell running it.** `pgrep -f "npm run check"`, `ps |
+grep build-css` and `pgrep -f "sh tools/ci-local"` all matched their own `sh -c`, whose command line
+contains the pattern: two launchers waited forever and a CSS-build check reported a build that did not
+exist. Anchor the pattern (`^node tools/`, `^npm run check`) and run the check from a script file, or
+wait on a file's final line instead.
+
+**Git Bash rewrites `/mnt/c/...` arguments passed to `wsl.exe` into `C:/Program Files/Git/mnt/c/...`**,
+and the script "does not exist". `export MSYS_NO_PATHCONV=1` before `wsl.exe -e sh /mnt/c/...`.
+
+**A timing finding from `scroll-anchor` with a `longest frame gap` near its `landed Nms` is the page
+not producing frames, not the theme deciding late.** Read the late trail beside it: the theme's
+`wrote-…+T` is when the correction happened. A `T` far below `landed` with a gap that ends at `landed`
+was the runner (task painted, `docs/anchoring.md`); a `settle` that itself sits at the end of the gap
+was the theme waiting for that frame (task stall).
 
 ## The test matrix
 

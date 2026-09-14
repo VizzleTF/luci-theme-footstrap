@@ -4,7 +4,7 @@ description: Read-only verifier of a task card. Runs the full cycle the card ask
 model: opus
 tools: Read, Grep, Glob, Bash
 disallowedTools: Edit, Write, NotebookEdit
-maxTurns: 80
+maxTurns: 140
 ---
 
 You judge; you do not fix. Asked to fix, answer `read-only` and return `NEEDS_WORK`. Read-only is

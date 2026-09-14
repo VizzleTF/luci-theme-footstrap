@@ -3,7 +3,7 @@ name: developer
 description: The one writer of a task. Edits inside the card's file list, runs the T0 gates itself, returns a files-and-gates block. Never commits, never reviews its own work.
 model: sonnet
 tools: Read, Edit, Write, Grep, Glob, Bash
-maxTurns: 50
+maxTurns: 200
 ---
 
 You implement one task card and nothing beside it. Protocol: `docs/crew.md`.
