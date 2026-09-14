@@ -3,7 +3,9 @@
     "merge": {
       "hostname": "footstrap-playground",
       "model": "Generic (playground)",
-      "kernel": "6.12.48"
+      "kernel": "6.12.48",
+      "system": "ARMv8 Processor rev 4",
+      "release": { "target": "armsr/armv8" }
     }
   },
   "luci.getVersion({})": {
@@ -14,6 +16,7 @@
   "system.info({})": {
     "merge": {
       "uptime": 259263,
+      "load": [ 5000, 3000, 700 ],
       "memory": {
         "total": 536870912,
         "free": 210000000,
@@ -25,6 +28,46 @@
       "root": { "total": 104320, "free": 80768, "used": 23552, "avail": 80768 },
       "tmp": { "total": 262144, "free": 258048, "used": 4096, "avail": 258048 },
       "swap": { "total": 0, "free": 0 }
+    }
+  },
+  "luci-rpc.getNetworkDevices({})": {
+    "merge": {
+      "eth0": {
+        "link": { "speed": 1000, "duplex": "full", "carrier": true }
+      },
+      "eth1": {
+        "up": true,
+        "flags": { "up": true },
+        "link": { "speed": 1000, "duplex": "full", "carrier": true },
+        "stats": {
+          "rx_bytes": 245678123, "tx_bytes": 189234567,
+          "rx_packets": 890234, "tx_packets": 654321,
+          "multicast": 120, "collisions": 0,
+          "rx_errors": 0, "tx_errors": 0, "rx_dropped": 0, "tx_dropped": 0
+        }
+      },
+      "eth2": {
+        "up": true,
+        "flags": { "up": true },
+        "link": { "speed": 1000, "duplex": "full", "carrier": true },
+        "stats": {
+          "rx_bytes": 52341890, "tx_bytes": 78912345,
+          "rx_packets": 210456, "tx_packets": 198765,
+          "multicast": 45, "collisions": 0,
+          "rx_errors": 0, "tx_errors": 0, "rx_dropped": 0, "tx_dropped": 0
+        }
+      },
+      "eth3": {
+        "up": true,
+        "flags": { "up": true },
+        "link": { "speed": 1000, "duplex": "full", "carrier": true },
+        "stats": {
+          "rx_bytes": 15234567, "tx_bytes": 9876543,
+          "rx_packets": 65432, "tx_packets": 54321,
+          "multicast": 12, "collisions": 0,
+          "rx_errors": 0, "tx_errors": 0, "rx_dropped": 0, "tx_dropped": 0
+        }
+      }
     }
   },
   "luci.getMountPoints({})": {
