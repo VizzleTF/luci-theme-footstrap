@@ -1,0 +1,134 @@
+{
+  "system.board({})": {
+    "merge": {
+      "hostname": "footstrap-playground",
+      "model": "Generic (playground)",
+      "kernel": "6.12.48",
+      "system": "ARMv8 Processor rev 4",
+      "release": { "target": "armsr/armv8" }
+    }
+  },
+  "luci.getVersion({})": {
+    "merge": {
+      "branch": "openwrt-25.12 branch"
+    }
+  },
+  "system.info({})": {
+    "merge": {
+      "uptime": 259263,
+      "load": [ 5000, 3000, 700 ],
+      "memory": {
+        "total": 536870912,
+        "free": 210000000,
+        "shared": 524288,
+        "buffered": 8000000,
+        "cached": 60000000,
+        "available": 278000000
+      },
+      "root": { "total": 104320, "free": 80768, "used": 23552, "avail": 80768 },
+      "tmp": { "total": 262144, "free": 258048, "used": 4096, "avail": 258048 },
+      "swap": { "total": 0, "free": 0 }
+    }
+  },
+  "luci-rpc.getNetworkDevices({})": {
+    "merge": {
+      "eth0": {
+        "link": { "speed": 1000, "duplex": "full", "carrier": true }
+      },
+      "eth1": {
+        "up": true,
+        "flags": { "up": true },
+        "link": { "speed": 1000, "duplex": "full", "carrier": true },
+        "stats": {
+          "rx_bytes": 245678123, "tx_bytes": 189234567,
+          "rx_packets": 890234, "tx_packets": 654321,
+          "multicast": 120, "collisions": 0,
+          "rx_errors": 0, "tx_errors": 0, "rx_dropped": 0, "tx_dropped": 0
+        }
+      },
+      "eth2": {
+        "up": true,
+        "flags": { "up": true },
+        "link": { "speed": 1000, "duplex": "full", "carrier": true },
+        "stats": {
+          "rx_bytes": 52341890, "tx_bytes": 78912345,
+          "rx_packets": 210456, "tx_packets": 198765,
+          "multicast": 45, "collisions": 0,
+          "rx_errors": 0, "tx_errors": 0, "rx_dropped": 0, "tx_dropped": 0
+        }
+      },
+      "eth3": {
+        "up": true,
+        "flags": { "up": true },
+        "link": { "speed": 1000, "duplex": "full", "carrier": true },
+        "stats": {
+          "rx_bytes": 15234567, "tx_bytes": 9876543,
+          "rx_packets": 65432, "tx_packets": 54321,
+          "multicast": 12, "collisions": 0,
+          "rx_errors": 0, "tx_errors": 0, "rx_dropped": 0, "tx_dropped": 0
+        }
+      }
+    }
+  },
+  "luci.getMountPoints({})": {
+    "merge": { "result": [] }
+  },
+  "luci-rpc.getWirelessDevices({})": {
+    "merge": {
+      "radio0": { "up": true, "pending": false, "retry_setup_failed": false },
+      "radio1": { "up": true, "pending": false, "retry_setup_failed": false }
+    }
+  },
+  "iwinfo.assoclist({\"device\":\"radio0.network1\"})": {
+    "replace": {
+      "results": [
+        {
+          "mac": "02:00:5E:00:53:01",
+          "signal": -54,
+          "signal_avg": -56,
+          "noise": -95,
+          "inactive": 120,
+          "connected_time": 3600,
+          "thr": 65000,
+          "authorized": true,
+          "authenticated": true,
+          "preamble": "long",
+          "wme": true,
+          "mfp": false,
+          "tdls": false,
+          "rx": { "rate": 866700, "mcs": 9, "40mhz": true, "short_gi": true },
+          "tx": { "rate": 866700, "mcs": 9, "40mhz": true, "short_gi": true }
+        }
+      ]
+    }
+  },
+  "iwinfo.assoclist({\"device\":\"radio0.network2\"})": {
+    "replace": { "results": [] }
+  },
+  "iwinfo.assoclist({\"device\":\"radio1.network1\"})": {
+    "replace": {
+      "results": [
+        {
+          "mac": "02:00:5E:00:53:02",
+          "signal": -48,
+          "signal_avg": -50,
+          "noise": -92,
+          "inactive": 40,
+          "connected_time": 7200,
+          "thr": 433300,
+          "authorized": true,
+          "authenticated": true,
+          "preamble": "long",
+          "wme": true,
+          "mfp": true,
+          "tdls": false,
+          "rx": { "rate": 1200000, "mcs": 9, "80mhz": true, "short_gi": true },
+          "tx": { "rate": 1200000, "mcs": 9, "80mhz": true, "short_gi": true }
+        }
+      ]
+    }
+  },
+  "iwinfo.assoclist({\"device\":\"radio1.network2\"})": {
+    "replace": { "results": [] }
+  }
+}

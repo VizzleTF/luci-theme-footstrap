@@ -1,6 +1,8 @@
 # Publishes the developer portal to GitHub Pages. devkit.html is generated (like cascade.css), so it
-# is built here, never committed. The gallery is published too — it needs a real cascade.css and the
-# wallpaper assets next to it, so those are copied in.
+# is built here, never committed. The gallery is published too — it needs a real cascade.css next to
+# it, so that is built in. The playground is not built here at all: it is recorded from a real router
+# by build.yml's `playground` job and fetched below from the latest release, the same way the release
+# mirror is.
 #
 # One-time setup by a maintainer: repo Settings -> Pages -> Source = "GitHub Actions".
 name: pages
@@ -10,7 +12,6 @@ on:
     branches: [main]
     paths:
       - 'docs/devkit.src.html'
-      - 'docs/playground.src.html'
       - 'docs/gallery.html'
       - 'luci-theme-footstrap/styles/**'
       - 'tools/devkit-build.mjs'
@@ -19,8 +20,18 @@ on:
   workflow_dispatch:
   # Called by build.yml's release job once the release is published, which is what refreshes the
   # release-metadata mirror below. It cannot be `on: release`: an event raised by GITHUB_TOKEN does
-  # not trigger another workflow.
+  # not trigger another workflow. Also called by build.yml's `pages-manual` job, a manual publish
+  # from a single run rather than a tag.
   workflow_call:
+    inputs:
+      # 'release' (default): mirror releases/latest/download/playground.tar.gz, same as a direct
+      # workflow_dispatch or push trigger of this file — `inputs` is populated only for
+      # workflow_call, so those two read it empty and the `!= 'artifact'` checks below still pick
+      # the release path. 'artifact': build.yml's `pages-manual` job asking for THIS run's own
+      # `playground` artifact instead of the newest tag's.
+      playground-source:
+        type: string
+        default: release
 
 permissions:
   contents: read
@@ -53,18 +64,12 @@ jobs:
           mkdir -p _site
           cp docs/devkit.html _site/index.html          # portal is the Pages root
           cp docs/devkit.html _site/devkit.html
-          cp docs/playground.html _site/playground.html
           cp docs/gallery.html _site/gallery.html
           luci-theme-footstrap/build-css.sh _site/cascade.css   # gallery loads this by <link>
           # No fonts to copy: the theme carries none. The stylesheet names Manrope and JetBrains
           # Mono first and the system stack after, so the portal renders in whatever the visitor
           # has — the same thing a router does.
           cp "$MEDIA"/logo.svg _site/
-          # The two sample patterns the playground links. They are not in the package — the
-          # Wallpaper axis takes an SVG the admin uploads — so the portal serves them from the
-          # repository copy. This glob has broken twice on a move; `set -e` plus a glob that matches
-          # nothing is a failed build, which is the loud outcome and the right one.
-          cp wallpapers/svg/*.svg _site/
       # A FULL MIRROR OF THE LATEST RELEASE — the manifest, its signature AND THE PACKAGES, on a
       # different host from github.com, so a block or an outage covering one need not cover the
       # other.
@@ -109,12 +114,56 @@ jobs:
             echo "mirrored: $f ($(wc -c < "_site/$f") bytes)"
           done
           echo "mirror of $tag complete."
+
+      # The playground is recorded from a real router by build.yml's `playground` job, not built
+      # here — Pages has no owlab stand. Same fail-open shape as the mirror step above: a repo with
+      # no release-attached playground.tar.gz yet (or one still mid-upload the run before its own
+      # `pages` call) publishes the rest of the portal rather than failing the whole build.
+      - name: Fetch the latest playground
+        if: inputs.playground-source != 'artifact'
+        run: |
+          set -eu
+          if ! curl -fsSL --retry 2 -o /tmp/playground.tar.gz \
+                 "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/playground.tar.gz"; then
+            echo "the latest release publishes no playground — playground skipped"
+            exit 0
+          fi
+          mkdir -p _site/playground
+          tar -xzf /tmp/playground.tar.gz -C _site/playground
+          echo "playground: $(wc -c < /tmp/playground.tar.gz) bytes"
+
+      # A MANUAL PUBLISH (build.yml's `pages-manual`), and it FAILS CLOSED, unlike the fetch above:
+      # that step exists to preview THIS run's own recording, so falling back to the release's (or
+      # to none) on a miss would publish a preview that previewed nothing and say it succeeded.
+      # `download-artifact` reads the artifact `playground` uploaded earlier in this same run — see
+      # build.yml's `pages-manual` for why no `actions: read` is needed for that.
+      - name: Fetch this run's own playground
+        if: inputs.playground-source == 'artifact'
+        uses: actions/download-artifact@v8
+        with:
+          name: playground
+          path: ${{ runner.temp }}/pg-artifact
+      - name: Unpack this run's own playground
+        if: inputs.playground-source == 'artifact'
+        run: |
+          set -eu
+          mkdir -p _site/playground
+          tar -xzf "$RUNNER_TEMP/pg-artifact/playground.tar.gz" -C _site/playground
+          echo "playground (this run): $(wc -c < "$RUNNER_TEMP/pg-artifact/playground.tar.gz") bytes"
+      # Old links (README, devkit.src.html) pointed at playground.html directly; keep them working.
+      - run: |
+          printf '%s' '<!doctype html><meta http-equiv="refresh" content="0; url=playground/"><a href="playground/">Continue</a>' \
+            > _site/playground.html
       - uses: actions/upload-pages-artifact@v5
         with: { path: _site }
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # `github-pages` accepts only `main` or a `v*` tag as a deployment branch (repo Settings ->
+    # Environments -> github-pages; `gh api repos/…/environments/github-pages/deployment-branch-
+    # policies`, checked 2026-09-14: custom_branch_policies [main, v*]) — a `pages-manual` dispatch
+    # from any other ref reaches this job but is refused HERE, after `build` already spent its time.
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

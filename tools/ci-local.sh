@@ -69,6 +69,7 @@ jobs/slices (repeatable; "all" is every one of them, in build.yml's own order):
   anchors:chromium      job `anchors`, engine chromium
   anchors:firefox       job `anchors`, engine firefox
   anchors:webkit        job `anchors`, engine webkit
+  playground             job `playground` — owlab up/install owrt2512, then capture -> build -> verify
   all                   every job above
 
 flags:
@@ -106,7 +107,7 @@ while [ $# -gt 0 ]; do
 		usage
 		exit 0
 		;;
-	check | lint | build | verify | live | live:parity | live:audit | live:motion | anchors | anchors:chromium | anchors:firefox | anchors:webkit | all)
+	check | lint | build | verify | playground | live | live:parity | live:audit | live:motion | anchors | anchors:chromium | anchors:firefox | anchors:webkit | all)
 		JOBS="$JOBS $1"
 		shift
 		;;
@@ -377,6 +378,40 @@ job_verify() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# job `playground` — .github/workflows/build.yml, job `playground`. Boots/installs onto THIS
+# PROJECT'S OWN named stand (owrt2512), so it shares require_stand_ack/boot_and_install with
+# `live`/`anchors` below rather than repeating their --force gate.
+# ---------------------------------------------------------------------------------------------
+job_playground() {
+	ROUTERS=owrt2512
+	echo "== playground (capture -> build -> verify, router=$ROUTERS) =="
+	if [ "$DRY" = 1 ]; then
+		step "ci-playwright" echo "sh tools/ci-playwright.sh"
+		step "owlab-boot" echo "owlab up $ROUTERS; owlab install $ROUTERS dist/noarch/luci-theme-footstrap-*.apk"
+		step "playground-capture" echo "node tools/playground/capture.mjs --recording \$PG/recording"
+		step "playground-build" echo "node tools/playground/build.mjs --recording \$PG/recording --out \$PG/out --base /luci-theme-footstrap/playground"
+		step "playground-verify" echo "node tools/playground/verify.mjs --out \$PG/out --base /luci-theme-footstrap/playground --budget-kb 600"
+		return
+	fi
+	require_stand_ack "playground" || return
+	if [ ! -d dist/noarch ]; then
+		skip "playground" "dist/noarch has no built package — run 'tools/ci-local.sh build' first"
+		return
+	fi
+	step "ci-playwright" sh tools/ci-playwright.sh
+	echo "  booting $ROUTERS and installing this build …"
+	if ! boot_and_install; then
+		skip "playground" "owlab up/install failed — see $RUNDIR/owlab-up-install.log"
+		return
+	fi
+	PG="$RUNDIR/playground"
+	step "playground-capture" node tools/playground/capture.mjs --recording "$PG/recording"
+	step "playground-build" node tools/playground/build.mjs --recording "$PG/recording" --out "$PG/out" --base /luci-theme-footstrap/playground
+	step "playground-verify" node tools/playground/verify.mjs --out "$PG/out" --base /luci-theme-footstrap/playground --budget-kb 600
+	owlab down >>"$RUNDIR/owlab-down.log" 2>&1
+}
+
+# ---------------------------------------------------------------------------------------------
 # job `live` and job `anchors` — both boot and install onto THIS PROJECT'S OWN named stands
 # (owlab.yaml: owrt2512, owrt2410, owrtsnap), never an ephemeral one. Refused without --force.
 # ---------------------------------------------------------------------------------------------
@@ -535,6 +570,8 @@ live:motion                live (slice motion)                  upstream-contrac
 anchors:chromium            anchors (engine chromium)            scroll-anchor --engines chromium
 anchors:firefox             anchors (engine firefox)             scroll-anchor --engines firefox
 anchors:webkit              anchors (engine webkit)              scroll-anchor --engines webkit
+playground                 playground                           owlab up/install owrt2512, then
+                                                                 capture.mjs -> build.mjs -> verify.mjs
 all                         every job above                      in build.yml's own dependency order
 EOF
 }
@@ -621,6 +658,7 @@ expand_jobs() {
 			echo anchors:chromium
 			echo anchors:firefox
 			echo anchors:webkit
+			echo playground
 			;;
 		live)
 			echo live:parity
@@ -643,6 +681,7 @@ for j in $(expand_jobs); do
 	lint) job_lint ;;
 	build) job_build ;;
 	verify) job_verify ;;
+	playground) job_playground ;;
 	live:parity) job_live parity ;;
 	live:audit) job_live audit ;;
 	live:motion) job_live motion ;;

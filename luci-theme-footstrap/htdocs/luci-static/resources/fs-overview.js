@@ -126,8 +126,8 @@ function wireDisclosure(sec) {
 
 /* A `.cbi-section` LuCI still renders when a stock include has nothing to show this tick: title
  * "-", the poll pill its only content, 72px tall on the live Overview — seventh there (a fixture is
- * not proof of position: docs/playground.html puts it first). Real and cosmetic, so it is
- * suppressed rather than left as a rung in the tab order with nothing behind its own name. */
+ * not proof of position). Real and cosmetic, so it is suppressed rather than left as a rung in the
+ * tab order with nothing behind its own name. */
 function hideEmptyCard(sec) {
 	if (sectionTitle(sec) === '-') sec.classList.add('fs-ovl-empty');
 }

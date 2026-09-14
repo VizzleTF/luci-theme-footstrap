@@ -1,0 +1,10 @@
+[
+  "admin/status/overview",
+  "admin/system/footstrap",
+  "admin/network/network",
+  "admin/network/wireless",
+  "admin/network/firewall/zones",
+  "admin/system/system",
+  "admin/status/processes",
+  "admin/network/sqm"
+]

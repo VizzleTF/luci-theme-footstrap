@@ -1,7 +1,7 @@
 # LUCI-THEME-FOOTSTRAP
 
 **English** · [Русский](README_ru.md) ·
-**[Playground — try the whole thing with no router](https://vizzletf.github.io/luci-theme-footstrap/playground.html)**
+**[Playground — try the whole thing with no router](https://vizzletf.github.io/luci-theme-footstrap/playground/)**
 
 [![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap.json)](https://owfeed.org/install/)
 [![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap-releases.json)](https://owfeed.org/install/)

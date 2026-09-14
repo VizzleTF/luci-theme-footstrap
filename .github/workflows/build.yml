@@ -13,6 +13,17 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      # Off by default: the ordinary path is a v* tag through the `pages` job below, and this
+      # exists to preview a run's OWN recording before one exists. The github-pages environment
+      # accepts only `main` or a `v*` tag as a deployment branch (checked via `gh api
+      # repos/…/environments/github-pages`, 2026-09-14: custom_branch_policies [main, v*]), so a
+      # dispatch on any other ref reaches `pages-manual` but `deploy` inside it still refuses.
+      publish-pages:
+        description: >-
+          Deploy GitHub Pages with THIS run's own playground instead of the latest release's.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -471,12 +482,70 @@ jobs:
       - if: always()
         run: owlab down || true
 
+  # Builds a real router's `fs-*.js` and `luci.js` into a static site (capture → build → verify) and
+  # proves it in a real Chromium — never the theme's OWN JS against fixtures, since capture.mjs talks
+  # to nothing but the router. Runs on a pull request too, not only a tag: the earliest point a
+  # regression against a real ubus answer can be caught is before a tag exists to publish from.
+  # `--base` matches the path `pages.yml` serves it under, `/<repo>/playground`, so a link the built
+  # HTML carries resolves the same way here and there.
+  playground:
+    name: Record and verify the playground
+    timeout-minutes: 20
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      # The browser off Playwright's CDN, then a launch to prove it works; apt only if that
+      # fails. `--with-deps` went through apt unconditionally, and apt is the half that stalls.
+      - run: sh tools/ci-playwright.sh
+      - uses: actions/download-artifact@v8
+        with:
+          name: owfeed-packages
+          path: dist/
+      - uses: owfeed/owlab/setup@v0.6.1
+        with:
+          version: v0.6.1
+      - run: owlab up owrt2512
+      - run: owlab install owrt2512 dist/noarch/luci-theme-footstrap-*.apk
+
+      # Under $RUNNER_TEMP, the same reason FS_SHAPES lives there in the `live` job: it cannot
+      # outlive the install it describes, and it keeps the recording out of the checkout.
+      - name: Record, build and verify
+        run: |
+          set -eu
+          PG="$RUNNER_TEMP/playground"
+          node tools/playground/capture.mjs --recording "$PG/recording"
+          node tools/playground/build.mjs --recording "$PG/recording" --out "$PG/out" \
+            --base "/${GITHUB_REPOSITORY#*/}/playground"
+          # 600 KB: the tar.gz measured 479 KB on owrt2512 with all 29 icons, ~25% headroom.
+          node tools/playground/verify.mjs --out "$PG/out" --base "/${GITHUB_REPOSITORY#*/}/playground" \
+            --budget-kb 600
+
+      - if: always()
+        run: owlab down || true
+
+      # Only the built tarball, not recording/: its raw server documents carry pre-scrub session
+      # tokens and the stand's hostname, and this artifact is downloadable on a public repo.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: playground
+          path: ${{ runner.temp }}/playground/playground.tar.gz
+          if-no-files-found: error
+
   # The only job that holds a key, and its `needs` is what keeps a tag from publishing a package no
   # router has installed. `lint` is named here rather than inherited through `build`, which stopped
-  # waiting for it: the gate has to hold a release, not the packing step.
+  # waiting for it: the gate has to hold a release, not the packing step. `playground` joined the
+  # list for the same reason as the others: a recording that fails to build or verify is a real fault
+  # in the theme's own `fs-*.js` against a real router, caught by capture.mjs talking to nothing else.
   release:
     name: Sign and publish
-    needs: [build, verify, live, anchors, lint]
+    needs: [build, verify, live, anchors, lint, playground]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
@@ -501,13 +570,59 @@ jobs:
       notes-file: release-notes.md
       verify-with: release.pub
 
+  # A separate job, not a `package.yml` input: `dist/*` rides the manifest `release` signs, and
+  # playground.tar.gz is a demo site, never router payload — owfeed's own pipeline has no input for
+  # a foreign artifact anyway, and putting it in `dist/` would sign it as if it were one. Needs both
+  # `release` (the tag it attaches to) and `playground` (this run's own recording).
+  playground-asset:
+    name: Attach the playground to the release
+    needs: [release, playground]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: playground
+          path: pg/
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" pg/playground.tar.gz --clobber --repo "$GITHUB_REPOSITORY"
+
   # Refresh the Pages mirror of the release metadata. Called rather than triggered: `on: release`
-  # never fires for a release created with GITHUB_TOKEN.
+  # never fires for a release created with GITHUB_TOKEN. Waits on `playground-asset`, not `release`
+  # directly, so the mirror step pages.yml runs next (releases/latest/download/playground.tar.gz)
+  # never races the upload that puts it there.
   pages:
     name: Refresh the Pages mirror
-    needs: release
+    needs: playground-asset
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+  # Lets a maintainer see a run's OWN recording on Pages before a tag exists to publish
+  # `playground-asset` from — `publish-pages` defaults to false, so the tag path above is
+  # unchanged. `uses: ./…` runs a local reusable workflow's jobs as jobs of THIS SAME run, so
+  # `playground-source: artifact` can fetch the `playground` artifact `playground` just uploaded
+  # here — no `actions: read` needed beyond the permissions below: `download-artifact` reads a
+  # same-run artifact through the runner's own token, not a `permissions:` scope, which is why the
+  # `build`/`verify`/`live`/`anchors`/`playground` jobs above never declare it either despite each
+  # downloading `owfeed-packages`.
+  #
+  # A LATER PAGES DEPLOY OVERWRITES THIS: pages.yml's own push trigger (a push to `main` touching its
+  # `paths:`) or the tag `pages` job both run with `playground-source` at its `release` default and
+  # refresh the site from the latest RELEASE. This job previews a recording; it does not pin one.
+  pages-manual:
+    name: Publish Pages from this run
+    needs: playground
+    if: github.event_name == 'workflow_dispatch' && inputs.publish-pages
+    uses: ./.github/workflows/pages.yml
+    with:
+      playground-source: artifact
     permissions:
       contents: read
       pages: write

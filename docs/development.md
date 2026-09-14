@@ -711,6 +711,35 @@ happens on the maintainer's explicit word for one change, never by reflex, and `
 5. Rollback, if anything above fails or a page is wrong:
    `ssh <host> 'uci set luci.main.mediaurlbase=/luci-static/bootstrap; uci commit luci; rm -f /tmp/luci-indexcache*'`.
 
+### The playground: recording and replaying a real router
+
+`tools/playground/{capture,build,verify}.mjs` turn an owlab stand into a static, offline site —
+CI's own `playground` job, [ci.md](ci.md). Each step needs the one before it (`capture` needs a
+booted, installed router; `build` and `verify` need `capture`'s output) and the whole chain is a
+router-driving Playwright run, so it is T2: detach it with `tools/bg.sh` and pair it with
+`tools/bg-wait.sh` in the same turn rather than waiting on it in the foreground.
+
+```sh
+owlab up owrt2512 && owlab install owrt2512 'dist/noarch/luci-theme-footstrap-*.apk'
+tools/bg.sh sh -c '
+  npm run playground:capture &&
+  npm run playground:build -- --base /luci-theme-footstrap/playground &&
+  npm run playground:verify -- --base /luci-theme-footstrap/playground
+'
+tools/bg-wait.sh <run-id>
+```
+
+Each script also takes its own flags directly (`--recording DIR`, `--out DIR`, `--base /path`,
+`--budget-kb N` on `verify`) — `--help` on any of the three prints the exact list. Output lands
+under `../tmp/playground/` by default (`recording/`, `out/`, `playground.tar.gz`), never inside the
+checkout. Open `../tmp/playground/out/cgi-bin/luci/admin/status/overview/index.html` in a browser
+under any static server rooted at `--base` to look at what was built without re-running `verify`.
+
+The site opens on a login page (`BASE/cgi-bin/luci/`, prefilled `root`/empty like a real router)
+that accepts any credentials — a static site has no server left to check them against — and
+`.fs-logout` returns to it; `build.mjs` refuses an old `--recording` made before `capture.mjs`
+saved the login form, naming the fix (re-capture) rather than shipping a playground with no gate.
+
 ## Running everything CI runs, locally: `tools/ci-local.sh`
 
 `.github/workflows/build.yml` is six jobs; nothing local ran the four beyond `check`/`lint`
@@ -1206,22 +1235,6 @@ error, with cells that skip in one run and measure in the next — the routers g
 under the probe. A finding is only a finding when the same cell repeats it: `--only <one stand>`
 plus three passes, which is now a minute with `--width`/`--layout`. The ones that survived that test
 were real; the ones that did not never reproduced alone.
-
-**`docs/playground.html` draws Port status as STOCK, and that is the build's doing, not the theme's.**
-The whole port reskin in `styles/pages/20-overview.css` is scoped to
-`.ifacebox:has(img[src*="/port_"])`, and `tools/devkit-build.mjs` inlines every asset as a `data:`
-URI on its way into the page — so the icon's `src` no longer contains `/port_`, not one of those
-rules matches, and the tiles render as luci-mod-status shipped them: icon visible, name centred, zone
-bar unplaced. Reading that as "the reskin regressed" is the trap; the tiles are correct on a router
-and under `owlab`. Tell the two apart without leaving the browser — 0 on the playground, one per
-port on a real page:
-
-```js
-document.querySelectorAll('#view .ifacebox:has(img[src*="/port_"])').length
-```
-
-Everything else on that page — System, Memory, Storage, Network, DHCP, Wireless — is faithful, so the
-playground stays the cheap way to judge a card's typography. Only the port tiles are off.
 
 **`RPC call to uci/get failed: Access denied` on arrival is LuCI's, not the theme's.** It is thrown
 once, BEFORE the login form is submitted: `luci.js` asks for `uci get luci` with the all-zero session
