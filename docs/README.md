@@ -49,8 +49,8 @@ and a style checker: <https://vizzletf.github.io/luci-theme-footstrap/>.
 |---|---|
 | `gallery.html` | every widget LuCI can emit, with the real class names — what the a11y gate runs against |
 | `devkit.src.html` | source of the developer portal |
-| `playground.src.html` | source of the playground: two real router pages, Status and System → Footstrap, with the axes live |
-| `devkit.html`, `playground.html` | built from the two sources above by the `pages` job. Generated, gitignored, never committed |
+| `devkit.html` | built from `devkit.src.html`, `gallery.html` and `02-tokens.css` by the `pages` job. Generated, gitignored, never committed |
+| the playground | not a page here at all — recorded from a real router by `tools/playground/*` and CI's `playground` job, published as a release asset and fetched into Pages by `pages.yml`. [ci.md](ci.md) |
 | `design/`, `screenshots/`, `img/` | reference mock-ups and README assets |
 
 ## Conventions of these pages

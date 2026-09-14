@@ -12,9 +12,9 @@ What the Makefile and the install scripts do: [package.md](package.md). The rele
 dispatch.
 
 ```
-check ─┐          ┌─→ verify ─┐
-       ├─→ build ─┤           ├─→ release ─→ pages     (release and after: tags only)
-lint ──┘          └─→ live ───┘
+check ─┐          ┌─→ verify ─────┐
+       ├─→ build ─┼─→ live ───────┼─→ release ─→ playground-asset ─→ pages   (release and after: tags only)
+lint ──┘          └─→ playground ─┘
 ```
 
 | Job | What it is |
@@ -24,12 +24,15 @@ lint ──┘          └─→ live ───┘
 | `build` | both package formats, via owfeed |
 | `verify` | installs this very build on real 25.12 and 24.10 userlands and renders its pages |
 | `live` | opens every page of the menu on those userlands and measures it — layout, navigation parity, and the assumptions this theme makes about luci-base |
+| `playground` | records a real router's pages into a static, replayable site and proves it offline |
 | `release` | signs, generates the notes, attaches the assets |
+| `playground-asset` | uploads `playground.tar.gz` to the tag's release, once one exists |
 | `pages` | refreshes the GitHub Pages portal and the release mirror |
 
-`permissions: contents: read` at workflow level; only `release` declares write. It used to be
-workflow-wide, which handed it to every `pull_request` run — including `npm ci` in lint, and
-therefore to the lifecycle scripts of every dev dependency.
+`permissions: contents: read` at workflow level; only `release` and `playground-asset` declare
+write, both gated to a `v*` tag. It used to be workflow-wide, which handed it to every
+`pull_request` run — including `npm ci` in lint, and therefore to the lifecycle scripts of every
+dev dependency.
 
 **Every job has a `timeout-minutes`, and every network install runs under `tools/ci-retry.sh`.**
 The default job timeout is six hours, and the two things these jobs fetch from somebody else's
@@ -324,22 +327,48 @@ the three apps are declared once, on `owrt2512`, and aliased onto the other rele
 of living in `defaults:` — `owrtsnap` gets none. The snapshot leg still runs every other gate; only
 these three apps are untested there.
 
+## `playground` — a real router, recorded and replayed
+
+Turns `admin/status/overview` and seven other pages of an owlab stand into a static site any browser
+can open with no router behind it, and proves that site offline. Three scripts, `tools/playground/`:
+
+1. `capture.mjs` — boots nothing itself, talks to the `owrt2512` this job already installed the
+   build on: logs in, fetches every page in `pages.json`, and records the server's own document, the
+   `/luci-static/**` assets those pages fetched, every distinct ubus call and the ACL-filtered menu.
+2. `build.mjs` — offline, deterministic: rewrites the recorded paths under `--base`, scrubs tokens
+   and the stand's hostname, splices in `replay.js` (patches `XMLHttpRequest`/`fetch` to answer from
+   the recording instead of a router), and tars the result.
+3. `verify.mjs` — opens the built site in a real Chromium and fails it on a page error, a replay
+   miss, a 404, or an empty `#view`; also proves the one client navigation this theme has and that an
+   Appearance change survives a reload.
+
+Runs on a tag, a pull request and `workflow_dispatch` — not only on release, because a regression in
+`fs-*.js` against a real ubus answer is a real fault and the cheapest place to catch it is before a
+tag exists to publish from. It replaces the 475 KB hand-written snapshot that used to live here,
+which imitated `fs-*.js` inline and had already gone 13 releases stale (`CHANGELOG.md`): this build
+runs the theme's own JS, so it cannot drift from it the same way.
+
+Local run: `tools/ci-local.sh playground` (needs `--force`, same stand-safety rule as `live`); by
+hand, `docs/development.md`.
+
 ## `release` — signing and publication
 
 Tags only, and **it is a call into owfeed's own reusable workflow** rather than steps of ours:
 
 ```yaml
 release:
-  needs: [build, verify, live]
+  needs: [build, verify, live, anchors, lint, playground]
   if: startsWith(github.ref, 'refs/tags/v')
-  uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.0
+  uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.1
   secrets:    { sign-key: …OWFEED_AUTHOR_KEY, usign-key: …FOOTSTRAP_USIGN_KEY }
-  with:       { owfeed-version: v0.5.0, pre-release: sh tools/stage-release.sh,
-                sign-also: install.sh, notes-file: <runner temp>/notes.md, verify-with: release.pub }
+  with:       { owfeed-version: v0.5.1, pre-release: sh tools/stage-release.sh,
+                sign-also: install.sh, notes-file: release-notes.md, verify-with: release.pub }
 ```
 
-**This is the only job that holds a key**, and `needs: [build, verify, live]` is what stops a tag
-publishing a package no router has installed.
+**This is the only job that holds a key**, and this `needs` list is what stops a tag publishing a
+package no router has installed, no page has behaved on, or no recording has proven runs the real
+JS — `playground` is in it for the same reason as `live` and `anchors`: a fault it catches is the
+theme's, not a docs nit, and it does not ship with one unfound.
 
 `tools/stage-release.sh` is our half — the `pre-release` hook. It writes the release notes where the
 workflow reads them and puts the one non-package asset into `dist/`, before the manifest is written,
@@ -371,19 +400,36 @@ and a copy already on somebody's router cannot be fixed remotely — a field ins
 would make it fetch a URL that 404s. The workflow checks that order on every release rather than
 relying on it.
 
+## `playground-asset` — attaching the built playground to the release
+
+Tags only, `needs: [release, playground]`. `dist/*` rides the manifest `release` signs, and
+`playground.tar.gz` is a demo site rather than router payload — owfeed's `package.yml` has no input
+for a foreign artifact, and putting one there would sign it as if it were one — so this is a plain
+`gh release upload` against the tag `release` just published, in a job of its own with
+`permissions: contents: write` and nothing else. `pages` waits on this job, not on `release` directly,
+so its own fetch of `playground.tar.gz` (below) never races the upload that puts it there.
+
 ## `pages`
 
 Publishes the developer portal to GitHub Pages: `docs/devkit.html` (generated by
-`tools/devkit-build.mjs`, never committed), `docs/playground.html` and `docs/gallery.html`, with a
-freshly built `cascade.css` and the font/wallpaper assets beside them. It also carries a **full
-mirror of the latest release** — the manifest, its signature, the installer **and the packages** — on a
-different host from github.com, so an outage or a block covering one need not cover the other. It is
-called by `release` rather than triggered by `on: release`, because an event raised by
-`GITHUB_TOKEN` does not trigger another workflow.
+`tools/devkit-build.mjs`, never committed) and `docs/gallery.html`, with a freshly built
+`cascade.css` and `logo.svg` beside them. It also carries a **full mirror of the
+latest release** — the manifest, its signature, the installer **and the packages** — on a different
+host from github.com, so an outage or a block covering one need not cover the other. It is called by
+`release` (by way of `playground-asset`) rather than triggered by `on: release`, because an event
+raised by `GITHUB_TOKEN` does not trigger another workflow.
 
 The devkit assembles itself from files that already exist — the real stylesheet, the export tier
 parsed out of `02-tokens.css`, the widget markup from `gallery.html` — so nothing is hand-copied and
 nothing can drift.
+
+**The playground is not built here at all.** It is not source that lives in this repository; it is
+fetched, already built, from `releases/latest/download/playground.tar.gz` — the same
+`playground-asset` upload above — and unpacked into `_site/playground/`. Fails OPEN like the release
+mirror above it: a repository with no playground-carrying release yet (or a `workflow_dispatch` run
+on a branch, `docs/development.md`) publishes the rest of the portal and says so in the log rather
+than failing the build. `_site/playground.html` is kept as a redirect to `playground/` for the links
+the README and `devkit.src.html` already carry.
 
 ## Installation and the trust chain
 

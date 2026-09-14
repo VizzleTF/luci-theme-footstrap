@@ -10,11 +10,11 @@
  *   - the component catalogue <- docs/gallery.html (the single source of real widget markup)
  *   - the chrome and prose   <- docs/devkit.src.html
  *
- * It writes a second page from the same inlined stylesheet: docs/playground.html, from
- * docs/playground.src.html.
- *
  * The DOM->E() conversion and click-to-copy happen in the BROWSER off the rendered preview node,
- * so the code a dev copies always matches what they see. */
+ * so the code a dev copies always matches what they see.
+ *
+ * The playground is not part of this build: it is recorded from a real router by
+ * `tools/playground/*` and CI's `playground` job, not assembled from a committed source file. */
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { buildCss } from './lib/css.mjs';
@@ -25,8 +25,6 @@ const SRC = join(ROOT, 'docs/devkit.src.html');
 const GALLERY = join(ROOT, 'docs/gallery.html');
 const TOKENS = join(ROOT, 'luci-theme-footstrap/styles/02-tokens.css');
 const OUT = join(ROOT, 'docs/devkit.html');
-const PG_SRC = join(ROOT, 'docs/playground.src.html');
-const PG_OUT = join(ROOT, 'docs/playground.html');
 
 /* The export tier is the whole contract an app is allowed to read. Its NAMES are parsed from the
  * token file (tools/lib/tokens.mjs — shared with export-tier.mjs, which MEASURES the same set);
@@ -90,8 +88,3 @@ const out = src
 
 await writeFile(OUT, out);
 console.log(`devkit.html: ${tiers.length} token families, ${components.length} components, ${(out.length / 1024 | 0)} KB`);
-
-/* the playground shares the same inlined stylesheet — the theme's real chrome + Appearance controls */
-const pg = (await readFile(PG_SRC, 'utf8')).replace('/*__CASCADE__*/', () => css);
-await writeFile(PG_OUT, pg);
-console.log(`playground.html: ${(pg.length / 1024 | 0)} KB`);
