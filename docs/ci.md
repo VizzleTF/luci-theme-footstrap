@@ -478,11 +478,39 @@ seen. LuCI's package manager reads exactly three apk paths — `repositories`,
 `repositories.d/distfeeds.list`, `repositories.d/customfeeds.list` — in its rpcd ACL *and* hardcoded
 in `package-manager.js`, so a feed anywhere else is absent from "Configure APK" and cannot be edited
 or removed there. An installer from before this wrote `repositories.d/owfeed-packages.list`, which
-is why the apk branch deletes that file after appending — the same repository configured twice, once
-where the admin can see it and once where they cannot, is worse than either. Neither customfeeds
-file needs a `keep.d` entry: both are conffiles of their manager (`apk-mbedtls`, `opkg`), sysupgrade
-backs up every conffile whose checksum has moved, and `build_list_of_backup_overlay_files` was
-already dropping the duplicate entry the script used to add.
+is why the apk branch deletes that file after writing its own line — the same repository configured
+twice, once where the admin can see it and once where they cannot, is worse than either. Neither
+customfeeds file needs a `keep.d` entry: both are conffiles of their manager (`apk-mbedtls`, `opkg`),
+sysupgrade backs up every conffile whose checksum has moved, and `build_list_of_backup_overlay_files`
+was already dropping the duplicate entry the script used to add.
+
+**The line is MOVED to be the first non-comment line, never merely appended or left wherever it
+already was** — measured on real apk: its customfeeds reader stops at the first line it cannot
+parse, so an admin's own unrelated line (or a stale one from an older run) sitting above where the
+correct line used to land could cut the feed off with no error at all, and a router this project's
+own OLDER installer had already configured has exactly that shape (the line appended, after
+whatever else was there) — so "is the line present" has to become "is it first", checked and
+repaired on every run, not only when the line is missing outright; the closing message distinguishes
+the three outcomes ("Adding"/"Feed added" when the line was missing, "Moving … to the top" when it
+only had to be repositioned, "already configured" when nothing changed). Every other ACTIVE line
+naming the feed's host (case-insensitive) or, on opkg, its src name, is commented out and reported
+rather than left to shadow the correct one; a line for any other host is untouched.
+
+Both this and the stale-line cleanup write the result atomically and never `mv` a fresh file over the
+customfeeds path directly: they resolve it with `readlink -f`, `cp -p` its mode and owner onto a temp
+file in the SAME directory (so the rename stays on one filesystem), write the new content into that
+copy, and only then `mv -f` it over the resolved target. A customfeeds file that is itself a symlink
+keeps being one — the rename replaces what it points at, never the link — and a write that fails
+partway (a full overlay, OOM, a `cp`/`cat`/`mv` a hostile PATH entry shadows) leaves the original
+byte-identical, because nothing is truncated until the copy is complete and the rename is what
+actually takes effect. **The failure itself is checked, not inferred**: `disable_other_lines`'s
+"disabled:" lines wait until the write actually lands before printing, and `ensure_first` reports
+its outcome through a real exit status the caller tests with `if`, never through `$(…)`, whose own
+exit code `set -e` cannot see — a failure to write the feeds file now exits 1 with one error naming
+the file, leaving it unchanged and no temporary files behind, instead of printing "Adding the
+feed…"/"disabled: …" over a write that silently never happened (measured on both package managers
+with `cp`, `mv`, and — on opkg — `cat` shimmed to fail; on apk a failing `cat` is intercepted
+earlier, at reading `/etc/apk/arch`, and reported there instead).
 
 **A snapshot router is served the newest release branch.** The feed publishes one branch per
 OpenWrt minor and has no snapshot channel — owfeed-packages lists exactly two release lines and they

@@ -865,6 +865,39 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   2026-09-12, nine shards (engine x stand, own browser and own router each) ran to completion with
   no zygote loss at all.
 
+- **A twin restarting mid-run reads as `install.sh` failing the network, not as the stand.** Testing
+  the install-feed card's fixes on `owrt2410b`/`owrt2512b`, a run reported `StartedAt`
+  12:39:45…12:43:42 — several restarts inside four minutes, none of them anything this session did —
+  and for about 10 s after each one `ip route` inside the container had no default route at all
+  (`wget`/`apk`/`opkg` answered "Operation not permitted", not a DNS failure or a 404): the
+  container's network namespace was still being reattached to `br-lan`. A network call from
+  `install.sh` that lands in that ~10 s window fails exactly like a real feed outage would —
+  `feed_refresh`'s own tolerance logic cannot tell the two apart, because from inside the container
+  there IS no route, full stop. Tell a restart apart from an installer or feed defect with
+  `docker inspect -f '{{.State.StartedAt}}' <container>` against the time the failure was logged (a
+  `StartedAt` within seconds of the failure is the restart, not the script) and `ip route` right
+  after (no `default via …` line yet, or an `owlab status` showing the router still coming up) — a
+  genuine feed problem leaves the route intact and fails on DNS/TLS/timeout instead. Cause not
+  identified from inside this session (no `owlab up`/`owlab sync` was run against these two stands
+  here); re-running the same scenario a few minutes later, once `StartedAt` had settled, reproduced
+  cleanly with no restarts.
+
+- **A `cp`/`cat`/`mv` PATH-shim in a failure-injection harness silently injects nothing when the
+  harness runs under this dev box's own busybox in WSL, while the identical shim works inside a
+  real router container.** Testing the install-feed card's `atomic_write()` failure paths, a harness
+  that put a fake, always-failing `cp` first on `$PATH` and called the extracted shell functions
+  directly kept reporting success — the write went through, unshimmed, no matter how the temp
+  directory or `export PATH=` order was arranged. The cause: this busybox's `ash` resolves `cp`,
+  `cat` and `mv` as its own applets via a standalone-shell shortcut that bypasses `$PATH` lookup
+  entirely for names it already provides, so a shim script at another path on `$PATH` is never
+  reached — confirmed with `busybox --list | grep -wE 'cp|cat|mv'` (all three listed) against the
+  same shim placed and `chmod +x`'d correctly, invoked by its literal path (`/tmp/shim/cp`, which
+  *did* run) versus by bare name (`cp`, which did not). Inside an owlab router container the same
+  shim, same harness, intercepted correctly on the first try — `docker exec <container> sh
+  harness.sh`, not `busybox ash harness.sh` on the dev box. Tell the two apart before trusting a
+  "shimmed and it still passed" result: run the harness through `docker exec`/`owlab` on a stand, or
+  check `busybox --list` in the exact shell the harness runs under for the command being shimmed.
+
 - **The sweep is wait-bound, not CPU-bound, and sharding it further than the tool already does buys
   almost nothing.** Measured 2026-09-12 on a 20-core, 15 GB host: three engine processes over three
   stands each read 22 cells/min; nine shards, one per engine and stand, read 26 — 18% for three
