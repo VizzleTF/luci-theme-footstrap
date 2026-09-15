@@ -344,7 +344,7 @@ Before rendering the new view:
 
   ```js
   L.Poll.queue.length = 0;   // the outgoing view's pollers
-  L.Poll.stop();             // drop its tick
+  L.Poll.stop();             // drop its tick, dispatch `poll-stop` — see below
   L.Poll.start();            // on an EMPTY queue: tick = 0, no timer armed
   ```
 
@@ -362,11 +362,44 @@ Before rendering the new view:
   `stop()` + `start()` on an empty queue gives exactly what a fresh document has. This is not a
   workaround — it is literally upstream's sequence: on a full load `initDOM()` calls `Poll.start()`
   on an empty queue before the view renders.
-- The "Refreshing"/"Paused" indicator used to outlive its own polling: LuCI shows it on `poll-start`,
-  switches it on `poll-stop` and never hides it again, while our `stop()` dispatches `poll-stop`
-  on every navigation — so moving from a polling page to a non-polling one left "Paused" about
-  polling that did not exist. Our own `poll-stop` listener (registered at module eval, therefore
-  after LuCI's, therefore running second) hides the pill when the queue is empty.
+- **The "Refreshing"/"Paused" pill's own teardown is a `poll-stop` listener whose hide is deferred
+  past the synchronous dispatch, one microtask.** LuCI shows the pill on `poll-start`, switches it to
+  "Paused" on `poll-stop` and never hides it again, while `L.Poll.stop()` dispatches `poll-stop` on
+  every navigation — so moving from a polling page to a non-polling one left "Paused" about a poll
+  that did not exist. Two different callers reach `stop()` with an empty queue: this router's own
+  navigate() teardown above, and a VIEW emptying its own queue with no navigation at all
+  (`L.Poll.remove()` — `luci-mod-status`'s Realtime Graphs on unload, `luci-app-banip`'s log
+  template), which dispatches the identical event. A version of this fix that called the hide only
+  from navigate()'s teardown covered the first and silently missed the second — reproduced live,
+  owrt2410b and owrt2512b, add-then-remove on Statistics with no navigation at all:
+  `{"active":false,"q":0,"pill":{"text":"Paused","clickable":true}}`, unchanged by a click.
+
+  A single `poll-stop` LISTENER covers both callers, since both dispatch through the same `stop()` —
+  but running the hide INSIDE that listener is exactly the original bug: `stop()` dispatches
+  synchronously to every listener registered at that moment, and luci.js registers its own
+  (`showIndicator('poll-status', 'Paused', null, 'inactive')`, always with `handler: null`) from
+  `setupDOM()`, reached through an async chain (`DOMContentLoaded` + `ui`/`rpc`/`form` +
+  `probeRPCBaseURL`), while this module registers at eval, from the inline
+  `L.require('menu-footstrap')` in `partials/footer.ut` — network/cache timing decides which
+  finishes loading, and therefore registers, last. Reversed, on owrt2410/24.10.8 Chromium the pill
+  read "Odświeżanie" ("Refreshing") after one SPA navigation but had no `data-clickable`/click
+  handler at all, and stayed that way for the rest of the document: this listener ran first and
+  removed the span, luci.js's `poll-stop` listener then re-created it for "Paused" with
+  `handler: null`, `ui.showIndicator()` binds a click handler only when it first builds the element,
+  and the next `poll-start` found the span already there and only updated its text.
+
+  The fix keeps the listener but moves the actual hide (`hidePollIndicatorIfEmpty()`) into a
+  `queueMicrotask()` callback instead of running it inline: a microtask runs only once the whole
+  synchronous turn that dispatched the event has unwound — every `poll-stop` listener already fired,
+  in whichever order — so the check always reads the state stock's listener actually left, never
+  races it, and reads `L.Poll.queue.length` at that later moment rather than at dispatch time, so a
+  queue the SAME navigation's incoming page has already refilled by then is left alone: the incoming
+  page's own `require()`/render() is real async work, always later than a microtask queued during the
+  synchronous `stop()` call that preceded it. It still declines on a non-empty queue, which is what a
+  manual pause (the pill's own click handler) or a `Poll.remove()` down to one remaining poller both
+  leave behind. `tests/poll-status.test.mjs` drives both callers — a navigation's queue flush and a
+  bare `Poll.remove()` to empty — in both listener orders, plus a direct check that the hide does not
+  fire inside the synchronous dispatch at all.
 - **uci's config cache is dropped** (`flushUciCache()`). `uci.load()` does not answer "is this
   config present?" — it answers "which of these packages did THIS call fetch", skipping every
   package already in `state.values`. Four shipped views read the return value as an existence check

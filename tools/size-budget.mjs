@@ -113,7 +113,16 @@ const LIMITS = {
 	 * anywhere near it, not merely ugly: that is what buys the raise here rather than a further
 	 * trim. The limit goes to 127,500, 400 B of head-room (127,100 B measured; a later
 		 * commit moved the sheet 99 B past the 127,001 B this note was written against). */
-	cascadeCss: 127_500,
+	/* 127,593 B on 2026-09-15, up 127 B for two forum #141 fixes that left a control or a table
+	 * frame broken in a foreign app, not merely ugly: a `.cbi-checkbox` whose app hides its
+	 * `label[for]` (luci-app-modemdata) now stays visible because the switch is painted on the
+	 * input (`theme/60-inputs.css`, already trimmed from 146 B over to 34 B under by scoping the
+	 * bare-checkbox rules with a zero-specificity `:not(:where())` instead of undoing them); and
+	 * a framed table keeps its top corners with a `thead`-shaped header and no longer steps its
+	 * row separators under an app's `position: relative; top` cell offset
+	 * (`theme/30-tables.css`, luci-mod-dashboard). The limit goes to 128,000 on the
+	 * maintainer's word, 407 B of head-room. */
+	cascadeCss: 128_000,
 	/* The FLASH cost of the shipped modules, terser with top-level mangling: every module ships,
 	 * whether or not a given page loads it. 86,737 B on 2026-08-27.
 	 *

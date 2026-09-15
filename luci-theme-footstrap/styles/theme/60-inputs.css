@@ -138,11 +138,19 @@
 	/* A raw checkbox inside a button-styled label sat flush against its text: base zeroes the
 	 * checkbox margin (30-forms.css) and only a literal space separated the ✓ from the words
 	 * (issue #5.1 — attendedsysupgrade's "Keep settings" confirm: label.btn > input[type=checkbox]
-	 * + text). Restore a gap. The toggle-switch .cbi-checkbox below is unaffected — its input is
-	 * opacity:0, so this margin moves nothing there. */
+	 * + text). Restore a gap. The toggle-switch .cbi-checkbox below is unaffected — its own
+	 * margin: 0 outranks this rule by specificity ((0,2,1) vs this rule's (0,2,1) on a DIFFERENT
+	 * ancestor class, so the two never both match one element: `.cbi-checkbox` is never `.btn`). */
 	.btn > input[type="checkbox"], .btn > input[type="radio"] { margin-inline-end: .5em; }
 
-	/* checkbox -> toggle switch
+	/* checkbox -> toggle switch, drawn on the INPUT itself.
+	 *
+	 * Was drawn on label[for] with the real input hidden (position:absolute; opacity:0; width/
+	 * height:0) — forum.openwrt.org/t/251930 post #141: luci-app-modemdata (and any third-party CSS
+	 * built the way bootstrap expects, styling the native input) injects an unlayered
+	 * `label[for] { display: none }` flagged important, scoped to its own markup, which left
+	 * NOTHING visible, since the input it left alone was the invisible one. Drawing on the input
+	 * means an app that hides label[for] hides an already-empty placeholder, not the switch.
 	 *
 	 * The pill, the knob and the knob's travel are all on --fs-density-box. As bare literals they
 	 * make LuCI's most common control the only one in the theme that ignores the Density axis, while
@@ -154,25 +162,19 @@
 	 *
 	 * flex-shrink: 0 below (task 0145): `.cbi-checkbox` is the flex row, and a caption after the
 	 * pill — `label.cbi-checkbox > input + label[for] + TEXT`, package-manager.js's and banip's real
-	 * markup, not the caption-less div the gallery had — makes the pill a SECOND, shrinkable flex
-	 * item. Unshrunk it stays exactly --sw-w; measured shrunk on the live Install dialog on both
-	 * stands, RU/Normal/390px gave a used width of 30.17px against 40 declared and a knob 6.83px past
-	 * the pill's right edge, EN/Large/360px 36.22 against 46 declared and a 6.47px overhang —
-	 * flex-shrink: 0 alone took both to -3.00px and -3.31px (the knob safely inside the pill, not
-	 * flush with it), so a second guard (e.g. min-width: var(--sw-w), redundant with a non-shrinking
-	 * flex-basis) was not needed and does not ship.
+	 * markup — makes the input (now the real, sized flex item; label[for] no longer is one, below) a
+	 * SECOND, shrinkable flex item. Unshrunk it stays exactly --sw-w; measured shrunk on the live
+	 * Install dialog on both stands when this box was still label[for]'s (task 0145): RU/Normal/390px
+	 * gave a used width of 30.17px against 40 declared and a knob 6.83px past the pill's right edge,
+	 * EN/Large/360px 36.22 against 46 declared and a 6.47px overhang — flex-shrink: 0 alone took both
+	 * to -3.00px and -3.31px (the knob safely inside the pill, not flush with it). The flex row and
+	 * its sibling caption are unchanged by which element carries the pill, so the guard carries over.
 	 *
-	 * Scoped to `.cbi-checkbox > label[for]`, not a bare `.cbi-checkbox > label`: ui.js's
-	 * Checkbox.render() appends a SECOND label when `tooltip` is set (form.Flag.tooltip — e.g.
-	 * luci-app-firewall's zones.js on `masq`), `label.cbi-tooltip-container` holding the hint icon,
-	 * and the bare selector painted it as a second switch too — measured on the gallery's tooltip
-	 * fixture, both labels 40x22 at rgb(55,62,71), flush against each other with no gap. `[for]` is
-	 * the discriminator rather than `input[type="checkbox"] + label`: Checkbox.render() always
-	 * builds the switch label as `E('label', { 'for': id })` and the tooltip label with no `for` at
-	 * all, so the attribute alone tells the two apart, at a fifth of the bytes — the sibling
-	 * combinator repeated across five rules (this one, its ::before/::after, and the two
-	 * forced-colors rules in 95-a11y-media.css) put cascade.css 186 B over its budget; rescoping
-	 * dropped it back under. */
+	 * label[for] stays in the DOM (ui.js and every third-party app that builds this markup emit it)
+	 * but draws and occupies nothing: `[for]` still discriminates it from the SECOND label
+	 * Checkbox.render() appends when `tooltip` is set (form.Flag.tooltip — e.g. luci-app-firewall's
+	 * zones.js on `masq`), `label.cbi-tooltip-container` holding the hint icon, which must keep
+	 * rendering. */
 	/* `overflow-wrap: anywhere`: the caption after the pill is a plain text flex item, which already
 	 * wraps at spaces on its own — this is only for the one WORD that does not fit even at the row's
 	 * own full width. Measured on this exact caption (see the pill's own comment below): pseudo-loc
@@ -181,31 +183,45 @@
 	 * is not implausible (the theme already ships an untranslated one), so the row should absorb it
 	 * by breaking the word, not by escaping its column. */
 	.cbi-checkbox { display: inline-flex; align-items: center; gap: var(--fs-space-2); overflow-wrap: anywhere; }
-	.cbi-checkbox > input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
-	.cbi-checkbox > label[for] {
+	/* label[for] takes over the input's old trick (position:absolute, zero box, opacity:0): out of
+	 * flow and out of the flex item count, so `.cbi-checkbox`'s `gap` still opens on only the SAME
+	 * two neighbours it always did — see the tooltip-container note below. */
+	.cbi-checkbox > label[for] { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+	.cbi-checkbox > input[type="checkbox"] {
 		--sw-w: calc(40px * var(--fs-density-box));
 		--sw-h: calc(22px * var(--fs-density-box));
 		--sw-knob: calc(16px * var(--fs-density-box));
 		--sw-pad: calc(2px * var(--fs-density-box));
+		/* `appearance: none` and this compound's other unstated properties (color, the invalid
+		 * --bd-color/--fg-color custom props) still come from the bare `input[type="checkbox"]`
+		 * rule further down, written for a third-party app's raw markup: harmless to share, since
+		 * this input never reads --bd-color/--fg-color. The parts of that rule that WOULD paint
+		 * over this switch (the drawn box, the mark, the focus ring) are scoped with
+		 * `:not(:where(.cbi-checkbox > input))` at their own selector instead of being undone here —
+		 * cheaper than restating every property this rule already states for the opposite reason,
+		 * and it is one property, not eight, that both rules would otherwise fight over. */
 		display: inline-block; position: relative; margin: 0; flex-shrink: 0;
 		width: var(--sw-w); height: var(--sw-h); border-radius: var(--fs-radius-pill);
 		background: var(--fs-track); border: var(--fs-hairline);
 		cursor: pointer; transition: background var(--fs-dur), border-color var(--fs-dur); vertical-align: middle;
 	}
-	/* The input is opacity:0 at 0x0, so this label IS the whole hit box of LuCI's most common
-	 * control — and at 22px tall it sits under the 24px floor of WCAG 2.5.8. The floor is about the
-	 * CLICKABLE area, not the drawing: an invisible overlay stretches the target to 44x30 without
-	 * fattening the pill (a visual 44x24 was tried and looked bloated). position:absolute, so it
-	 * adds nothing to layout; the knob keeps ::after.
+	/* The invisible overlay stretching the hit target to 44x30 (WCAG 2.5.8: the pill is 22px tall,
+	 * under the 24px floor) — moved here from label[for] unchanged. position:absolute, so it adds
+	 * nothing to layout; the knob keeps ::after.
+	 *
+	 * `content`/`position` come from the raw checkbox's own shared `::before, ::after { position:
+	 * absolute; content: "" }` rule further down — left UNSCOPED and reused here rather than
+	 * restated, since both pseudo-elements need exactly those two values anyway. The two rules
+	 * that would otherwise paint a drawn box and a mark ON this pseudo (their own selectors,
+	 * further down) are scoped with `:not(:where(.cbi-checkbox > input))` instead, so nothing is left to
+	 * override here.
 	 *
 	 * The inset stays literal while the pill above scales: this is an accessibility floor, and a
 	 * floor that shrinks with a density setting is not one. At Compact the target is still 38x26.7,
 	 * over the minimum. */
-	.cbi-checkbox > label[for]::before {
-		content: ""; position: absolute; inset: -4px -2px;
-	}
-	.cbi-checkbox > label[for]::after {
-		content: ""; position: absolute; top: var(--sw-pad); inset-inline-start: var(--sw-pad);
+	.cbi-checkbox > input[type="checkbox"]::before { inset: -4px -2px; }
+	.cbi-checkbox > input[type="checkbox"]::after {
+		top: var(--sw-pad); inset-inline-start: var(--sw-pad);
 		width: var(--sw-knob); height: var(--sw-knob); border-radius: 50%;
 		background: var(--fs-dim);
 		/* transform, not `left`: `left` is a layout property, so the knob re-laid out the row on
@@ -213,47 +229,58 @@
 		transform: translateX(0);
 		transition: transform var(--fs-dur-move), background var(--fs-dur);
 	}
-	/* The tooltip-container label (above) is now unstyled by the switch rules, so it falls back to
-	 * the browser's plain inline label plus base's `cursor: help` — the icon glyph, no pill. It still
+	/* The tooltip-container label (above) is unstyled by the switch rules and falls back to the
+	 * browser's plain inline label plus base's `cursor: help` — the icon glyph, no pill. It still
 	 * needs a gap from the switch, and `.cbi-checkbox`'s own `gap` above gives it one instead of a
-	 * margin declared here: the checkbox input inside that flex row is `position: absolute`, so it is
-	 * never a flex item, and `gap` only ever opens BETWEEN flex items — an ordinary `.cbi-checkbox`
-	 * with just the switch label has one flex item and gets no gap at all (measured: cb1's box is
-	 * still 40px wide, unchanged), while the tooltip fixture's two labels get exactly one. --fs-space-2
-	 * (8px), same number the removed margin used — the gap the theme already uses beside an inline
-	 * checkbox glyph (`.btn > input[type="checkbox"]` above) — measured on the gallery fixture: top
-	 * edges 0.5px apart (the icon glyph's own line box, not this gap) and left-to-right edge 8px,
-	 * both unchanged from before this rescope. */
-	.cbi-checkbox > input[type="checkbox"]:checked + label { background: var(--fs-accent); border-color: transparent; }
+	 * margin declared here: label[for] inside that flex row is `position: absolute` (above), so it
+	 * is never a flex item, and `gap` only ever opens BETWEEN flex items — an ordinary `.cbi-checkbox`
+	 * with just the switch input has one flex item (the input itself) and gets no gap at all, while
+	 * the tooltip fixture's input+tooltip-label pair gets exactly one. --fs-space-2 (8px), same
+	 * number the removed margin used — the gap the theme already uses beside an inline checkbox
+	 * glyph (`.btn > input[type="checkbox"]` above). The flex-item COUNT and the gap token are the
+	 * same as before this rule moved from label[for] to the input; only which element is the
+	 * absolute one swapped. */
+	.cbi-checkbox > input[type="checkbox"]:checked { background: var(--fs-accent); border-color: transparent; }
 	/* The travel is derived rather than hand-written, so it cannot drift out of step with the three
 	 * sizes above. The `- 2px` is the pill's two 1px BORDERS and is the whole subtlety: --sw-w is a
 	 * border-box width, while an absolutely-positioned ::after is placed against the PADDING box, so
 	 * the knob has 2px less room and deriving without that term lands it off-centre — the travel
 	 * comes out 20px where symmetry wants 18. The border does not scale with density, so the term
 	 * stays literal. */
-	.cbi-checkbox > input[type="checkbox"]:checked + label::after {
+	.cbi-checkbox > input[type="checkbox"]:checked::after {
 		transform: translateX(calc(var(--sw-w) - var(--sw-knob) - var(--sw-pad) * 2 - 2px));
 		background: var(--fs-on-accent);
 	}
-	/* The real checkbox is opacity:0 at 0x0 above, so base's `input:focus::before` glow paints on a
-	 * 0x0 box. The <label> IS the switch, so the ring goes there, or the most common control in LuCI
-	 * shows nothing under keyboard focus.
+	/* The bare fallback ring further down (`input:focus`, for every untyped/unlisted input, and its
+	 * `input[type="checkbox"]:focus::before` twin) is scoped with `:not(:where(.cbi-checkbox > input))` at
+	 * its own selector, so a plain click on this real, visible input rings nothing — as it never
+	 * did before this input was the drawn element, since only :focus-visible below is meant to. */
+	/* The <input> IS the switch now, so the ring goes there directly, or the most common control in
+	 * LuCI shows nothing under keyboard focus.
 	 *
 	 * -solo, because on the CHECKED switch — half the switches on any page — neither other channel
 	 * exists: the rule above fills the track with --fs-accent and sets `border-color: transparent`,
 	 * so the border flip is accent on accent (measured: fill rgb(86,157,245) against a border of the
 	 * same accent at .97 alpha) and the tinted ring is accent at .15 alpha. */
-	.cbi-checkbox > input[type="checkbox"]:focus-visible + label {
+	.cbi-checkbox > input[type="checkbox"]:focus-visible {
 		border-color: var(--fs-accent);
 		box-shadow: var(--fs-focus-ring-solo);
 	}
-	.cbi-checkbox > input[type="checkbox"]:disabled + label { opacity: var(--fs-disabled-opacity); cursor: not-allowed; }
+	.cbi-checkbox > input[type="checkbox"]:disabled { opacity: var(--fs-disabled-opacity); cursor: not-allowed; }
 
 	/* Raw checkbox/radio — the drawing, absorbed from base whole: it undoes the generic `input` box
 	 * below, and left in base every one of those overrides would lose to that rule by layer. The box
 	 * is 16px on the grid and the tick or dot is inset FROM it rather than restating its own number,
 	 * so resizing the box cannot leave the mark off-centre. LuCI's own forms wrap checkboxes in the
-	 * .cbi-checkbox toggle above; the raw drawing is what a third-party app's bare markup gets. */
+	 * .cbi-checkbox toggle above; the raw drawing is what a third-party app's bare markup gets.
+	 *
+	 * `.cbi-checkbox > input` matches the switch's own input too: this base rule stays unscoped for
+	 * it, since the switch's own rules above want its `appearance: none` and read neither
+	 * --bd-color nor --fg-color. But the drawn box, the mark and the focus ring below DO paint over
+	 * the switch once its input is a real, visible element rather than 0x0 — each of those three
+	 * selectors carries `:not(:where(.cbi-checkbox > input))` for that reason alone; undoing them instead,
+	 * property by property, on the switch's own rules costs more than the one exclusion clause
+	 * each needs. */
 	input[type="checkbox"],
 	input[type="radio"] {
 		--bd-color: var(--fs-border);
@@ -307,7 +334,7 @@
 		position: absolute;
 		content: "";
 	}
-	input[type="checkbox"]::before,
+	input[type="checkbox"]:not(:where(.cbi-checkbox > input))::before,
 	input[type="radio"]::before {
 		/* centred in the 24px target, and direction-agnostic: `inset: 0; margin: auto` on a box with
 		 * a fixed size is the one centring that needs no translate and therefore behaves the same in
@@ -333,7 +360,7 @@
 	 * of ringing a clicked box. Both states (plain and invalid) are declared once, further
 	 * down this file, in the selector lists every other same-body ring joins — see the two
 	 * `--fs-focus-ring`/`--fs-focus-ring-invalid` rules below the text-input group. */
-	input[type="checkbox"]::after,
+	input[type="checkbox"]:not(:where(.cbi-checkbox > input))::after,
 	input[type="radio"]::after {
 		/* the mark is inset from the DRAWING, and the drawing is centred in the target, so the mark
 		 * centres the same way rather than measuring from the target's own edge */
@@ -342,7 +369,7 @@
 		width: calc(var(--box) - var(--mark-inset) * 2);
 		height: calc(var(--box) - var(--mark-inset) * 2);
 	}
-	input[type="checkbox"]:checked::after,
+	input[type="checkbox"]:not(:where(.cbi-checkbox > input)):checked::after,
 	input[type="radio"]:checked::after {
 		/* OURS. Drawn as a STROKE, which is this theme's icon language (see --spinner-icon in
 		 * base/95-luci.css and --fs-icon-refresh in 02-tokens.css: fill:none, round caps, a 24 grid).
@@ -626,15 +653,16 @@
 	textarea:hover { border-color: var(--fs-dim); }
 
 	/* bare `input:focus` absorbed from base's generic glow onto the same ring: it is the fallback
-	 * for the types the list does not name and for a typeless <input>; on checkbox/radio it lands
-	 * on the invisible element box UNDER the drawn ::before ring above — coincident boxes, one
-	 * visible ring, as the old glow behaved. `select:focus` and the keyboard-removable dynlist
-	 * chip (ui.js gives it a tabindex) join here rather than repeating the same three
-	 * declarations under their own selector: one shared body instead of three, 149 B off
-	 * cascade.css. */
+	 * for the types the list does not name and for a typeless <input>; on a bare checkbox/radio it
+	 * lands on the drawn box UNDER the ::before ring below — coincident boxes, one visible ring, as
+	 * the old glow behaved. `:not(:where(.cbi-checkbox > input))` excludes the toggle switch, whose input is
+	 * a real, visible element with its own :focus-visible-only ring (above) — a plain click on it
+	 * must ring nothing. `select:focus` and the keyboard-removable dynlist chip (ui.js gives it a
+	 * tabindex) join here rather than repeating the same three declarations under their own
+	 * selector: one shared body instead of three, 149 B off cascade.css. */
 	.cbi-input-text:focus, .cbi-input-password:focus, .cbi-input-textarea:focus,
 	.cbi-section-create-name:focus,
-	input:focus,
+	input:focus:not(:where(.cbi-checkbox > input)),
 	input[type="text"]:focus, input[type="password"]:focus, input[type="number"]:focus,
 	input[type="email"]:focus, input[type="url"]:focus, input[type="search"]:focus,
 	input[type="tel"]:focus, input[type="date"]:focus, input[type="time"]:focus,
@@ -651,8 +679,9 @@
 	 * off cascade.css. `:is()` around the `:has()` compound keeps the list forgiving: unwrapped, a
 	 * `:has()` compound sharing a selector list with plain ones fails the WHOLE rule below the
 	 * floor (Firefox < 121; docs/css.md "Two shapes fail it"), instead of just losing that one
-	 * selector. */
-	input[type="checkbox"]:focus::before, input[type="radio"]:focus::before,
+	 * selector. `:not(:where(.cbi-checkbox > input))` on the checkbox part for the same reason as the plain
+	 * ring above: the toggle switch's own :focus-visible rule is the only one allowed to ring it. */
+	input[type="checkbox"]:not(:where(.cbi-checkbox > input)):focus::before, input[type="radio"]:focus::before,
 	.cbi-select.focus,
 	.cbi-dynlist > .add-item:focus-within,
 	.control-group:is(:has(> .cbi-input-password)):focus-within {
