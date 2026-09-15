@@ -256,6 +256,25 @@ uci commit network</pre>
 					<div class="cbi-checkbox"><input id="cb-tt-off" type="checkbox"><label for="cb-tt-off"></label><label class="cbi-tooltip-container">⚠️<div class="cbi-tooltip">Limited masquerading enabled</div></label></div>
 				</div>
 			</div>
+			<!-- task cbi-checkbox: forum.openwrt.org/t/251930 post #141 — luci-app-modemdata injects an
+			     unlayered `label[for]{display:none!important}` scoped to its own markup, expecting the
+			     switch to live on the native input (as it does under bootstrap). Reproduced verbatim,
+			     scoped to this fixture only, to prove the switch stays visible from the INPUT alone. -->
+			<style>
+				.fs-fixture-hidden-label label[for] { display: none !important; }
+			</style>
+			<div class="cbi-value fs-fixture-hidden-label">
+				<label class="cbi-value-title" for="cb-hl-on">Checkbox, label[for] hidden (checked)</label>
+				<div class="cbi-value-field">
+					<label class="cbi-checkbox"><input id="cb-hl-on" type="checkbox" checked><label for="cb-hl-on"></label> Hide data</label>
+				</div>
+			</div>
+			<div class="cbi-value fs-fixture-hidden-label">
+				<label class="cbi-value-title" for="cb-hl-off">Checkbox, label[for] hidden (unchecked)</label>
+				<div class="cbi-value-field">
+					<label class="cbi-checkbox"><input id="cb-hl-off" type="checkbox"><label for="cb-hl-off"></label> Hide data</label>
+				</div>
+			</div>
 			<div class="cbi-value">
 				<label class="cbi-value-title">Radio</label>
 				<div class="cbi-value-field">
@@ -815,6 +834,42 @@ option two</textarea></div>
 		</table>
 	</div>
 
+	<!-- Two more header shapes fs-select.js's adoptMarkup() produces from a real <thead> — neither
+	     is `.tr.table-titles`, which is what the frame's corner-rounding rule (30-tables.css) used
+	     to key on alone, so the top corners stayed square under either shape (forum post #141). -->
+	<div class="cbi-section g-overwide" tabindex="0" role="group" aria-label="Framed table, thead with bare th, no tr (scrolls)">
+		<h3>Header row: &lt;thead&gt; with &lt;th&gt; directly inside, no &lt;tr&gt; (issue #141)</h3>
+		<!-- include/20_lan.js (DHCP table) builds its header with E(), which appends the <th>s
+		     straight to the <thead> — the parser's implied <tr> never happens, so the header cells
+		     are the thead's own direct children. -->
+		<table class="table fs-dt" id="table_head_bare_thead">
+			<thead class="thead">
+				<th class="th">Host</th><th class="th">IPv4 address</th><th class="th">MAC</th>
+			</thead>
+			<tr class="tr cbi-rowstyle-1">
+				<td class="td" data-title="Host">router</td><td class="td" data-title="IPv4 address">10.0.0.1</td>
+				<td class="td" data-title="MAC">AA:BB:CC:DD:EE:FF</td>
+			</tr>
+		</table>
+	</div>
+	<div class="cbi-section g-overwide" tabindex="0" role="group" aria-label="Framed table, thead wrapping a real tr (scrolls)">
+		<h3>Header row: &lt;thead&gt; wrapping a real &lt;tr&gt;, no .table-titles (issue #141)</h3>
+		<!-- include/30_wifi.js (Wi-Fi table) nests a real <tr> inside <thead>; adoptMarkup() marks
+		     the <thead> itself `.thead` but never adds `.tr`/`.table-titles` to the row nested
+		     inside it, so a selector keyed on `.tr.table-titles` alone misses this shape too. -->
+		<table class="table fs-dt" id="table_head_thead_tr">
+			<thead class="thead">
+				<tr class="dashboard-bg">
+					<th class="th">SSID</th><th class="th">Channel</th><th class="th">Signal</th>
+				</tr>
+			</thead>
+			<tr class="tr cbi-rowstyle-1">
+				<td class="td" data-title="SSID">HomeNet</td><td class="td" data-title="Channel">36</td>
+				<td class="td" data-title="Signal">-52 dBm</td>
+			</tr>
+		</table>
+	</div>
+
 	<h2>The shapes that broke it — one fixture per report</h2>
 	<!-- These are not decoration: each is the exact value that produced a bug, kept so the contract
 	     gate (tools/table-contract.mjs) has something to squeeze. A theme with no floor starves the
@@ -1073,6 +1128,34 @@ option two</textarea></div>
 				<button class="cbi-button cbi-button-neutral">Cancel</button>
 				<button class="cbi-button cbi-button-action important">Continue</button>
 			</div>
+		</div>
+		<!-- Reproduces luci-mod-dashboard's `.Dashboard … .devices-info .tr .td:nth-child(3) {
+		     position:relative; top:-3px }` (issue #141, post #141): fs-sheets.js re-hosts an app's
+		     <style> into `@layer theme`, so the app rule below meets 30-tables.css's `:is(#view,
+		     #modal_overlay) .fs-dt .td { top: auto; bottom: auto }` in the SAME layer, and it is
+		     specificity that decides — the mock selector carries the 7 classes the report measured,
+		     none of them an id, so footstrap's rule (one id, two classes) wins with no
+		     `!important`. Placed under `#modal_overlay` because that counter-rule, unlike the
+		     corner-rounding one above, has no bare `table.fs-dt` fallback: every real table already
+		     sits under `#view` or `#modal_overlay` (docs/css.md, "the card contract"), so the id is
+		     load-bearing, not decorative, and a fixture outside both roots would not exercise it. -->
+		<style>
+			@layer theme {
+				.g-mock-a.g-mock-b.g-mock-c.g-mock-d.g-mock-e .td:nth-child(2) { position: relative; top: -3px; }
+			}
+		</style>
+		<div class="modal g-mock-a g-mock-b g-mock-c g-mock-d g-mock-e" style="margin:1em 0 0">
+			<h4>Row separator vs. an app's offset cell</h4>
+			<table class="table fs-dt" id="table_head_offset_td">
+				<tr class="tr table-titles">
+					<th class="th">Client</th><th class="th">RSSI</th><th class="th">Uptime</th>
+				</tr>
+				<tr class="tr cbi-rowstyle-1">
+					<td class="td" data-title="Client">iPhone</td>
+					<td class="td" data-title="RSSI">-52 dBm</td>
+					<td class="td" data-title="Uptime">2h 14m</td>
+				</tr>
+			</table>
 		</div>
 	</div>
 </div>

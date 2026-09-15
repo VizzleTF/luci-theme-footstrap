@@ -116,17 +116,18 @@
 			padding-inline-start: calc(var(--fs-space-3) - 3px);
 		}
 		/* the toggle switch is a bare rounded box in forced colors — give the knob and
-		 * the track an edge so on/off is distinguishable at all. Scoped via `label[for]`, matching
-		 * 60-inputs.css: a bare `.cbi-checkbox > label` also reaches ui.Checkbox's `tooltip` label
-		 * (the hint-icon one, unstyled otherwise, and built with no `for` attribute), which would
-		 * grow the same border a switch does not own. */
-		.cbi-checkbox > label[for] { border: 1px solid ButtonBorder; }
-		.cbi-checkbox > input[type="checkbox"]:checked + label {
+		 * the track an edge so on/off is distinguishable at all. Scoped via `input[type="checkbox"]`,
+		 * matching 60-inputs.css, which now draws the switch there: an `<input>` selector cannot
+		 * reach ui.Checkbox's `tooltip` label (the hint-icon one, unstyled otherwise, built with no
+		 * `for` attribute) by construction, so the old `[for]` discriminator is no longer needed to
+		 * keep that label from growing a border it does not own. */
+		.cbi-checkbox > input[type="checkbox"] { border: 1px solid ButtonBorder; }
+		.cbi-checkbox > input[type="checkbox"]:checked {
 			background: Highlight;
 			forced-color-adjust: none;
 		}
-		.cbi-checkbox > label[for]::after { background: ButtonBorder; }
-		.cbi-checkbox > input[type="checkbox"]:checked + label::after { background: HighlightText; }
+		.cbi-checkbox > input[type="checkbox"]::after { background: ButtonBorder; }
+		.cbi-checkbox > input[type="checkbox"]:checked::after { background: HighlightText; }
 		/* icon-only buttons (rail toggle, search/appearance, logout) lose their hover fill */
 		.fs-railtoggle, .fs-themerow { border-color: ButtonBorder; }
 		/* the focus ring is a box-shadow everywhere in this theme, and box-shadow is

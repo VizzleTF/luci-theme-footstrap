@@ -21,6 +21,24 @@ set -e
 FEED_HOST="https://repo.owfeed.org"
 FEED_NAME="owfeed-packages"
 FEED_KEY_OPKG="9040356b214084da"
+# The bare host, with every `.` ESCAPED before it goes anywhere near `grep -E`: unescaped, `.` means
+# "any character" and `repoXowfeedXorg` satisfied it (security review, task 0176-f). Not a URL
+# parser (no IPv6, no percent-encoding) — three patterns, each anchored to where a repository URL
+# actually starts rather than matched as a substring anywhere on the line (the other 0176-f finding:
+# our host inside an unrelated URL's query string, `?u=https://repo.owfeed.org/`, used to count).
+# Case-insensitive (`grep -Eqi`); a trailing CR is stripped by the caller before any of these run.
+FEED_HOST_BARE="${FEED_HOST#*://}"
+FEED_HOST_ESC=$(printf '%s' "$FEED_HOST_BARE" | sed 's/\./\\./g')
+# customfeeds.list: optionally an apk `@tag`, then the URL itself — `repo.owfeed.org.evil.example`
+# and `repo.owfeed.org@evil.example` both fail the `(:[0-9]+)?(/|$)` anchor right after the host.
+APK_HOST_RE='^[[:space:]]*(@[^[:space:]]+[[:space:]]+)?https?://([^/@[:space:]]*@)?'"$FEED_HOST_ESC"'(:[0-9]+)?(/|$)'
+# customfeeds.conf: `src` or `src/gz`, the name field, then the URL — matches only in the URL field,
+# never against the name (the name rule is separate, in disable_other_lines below).
+OPKG_HOST_RE='^[[:space:]]*src(/gz)?[[:space:]]+[^[:space:]]+[[:space:]]+https?://([^/@[:space:]]*@)?'"$FEED_HOST_ESC"'(:[0-9]+)?(/|$)'
+# feed_refresh's own failure lines: the URL must start at a word boundary (line start, a space, or a
+# quote/paren the two managers wrap it in), not merely appear mid-string — the same query-string
+# trick would otherwise still work one line down, inside `apk update`'s own diagnostic text.
+FEED_REFRESH_RE="(^|[[:space:]'\"(])https?://([^/@[:space:]]*@)?$FEED_HOST_ESC(:[0-9]+)?/"
 PKG="luci-theme-footstrap"
 REPO="VizzleTF/luci-theme-footstrap"
 # `releases/latest/download/…` and never api.github.com: the API is rate-limited per source IP
@@ -119,11 +137,10 @@ opkg_feed_count() {
 # the others answer, and the old `_bad < _total` tolerance let the run continue and report success
 # on a stale index). Both managers print the FULL URL of a repository they could not reach in
 # their own failure lines (apk: `ERROR:`/`WARNING:` naming the index URL; opkg: `Failed to
-# download <url>`), so grepping those lines for `$FEED_HOST` — the exact string this same script
-# wrote into the repository entry a few lines below, not `$FEED_NAME` or any other label an admin
-# could have edited — cannot drift from the line that was actually written. Checked before the
-# tolerance below, so our own feed failing fails closed regardless of how many other feeds
-# answered.
+# download <url>`), so grepping those lines against `$FEED_REFRESH_RE` above — anchored to a real
+# URL, not a substring `$FEED_HOST` could also satisfy inside an unrelated line (security review,
+# task 0176-e/f) — decides whether the failure was actually ours. Checked before the tolerance
+# below, so our own feed failing fails closed regardless of how many other feeds answered.
 feed_refresh() {	# apk | opkg
 	_pmlog="/tmp/fs-install-pm.$$"
 	if "$1" update >"$_pmlog" 2>&1; then rm -f "$_pmlog"; return 0; fi
@@ -136,7 +153,7 @@ feed_refresh() {	# apk | opkg
 		_total=$(opkg_feed_count)
 		_failpat='Failed to download'
 	fi
-	if grep -E "$_failpat" "$_pmlog" 2>/dev/null | grep -qF "$FEED_HOST"; then
+	if grep -E "$_failpat" "$_pmlog" 2>/dev/null | grep -Eqi "$FEED_REFRESH_RE"; then
 		err "\`$1 update\` could not reach $FEED_HOST — this project's own feed. Without it there is"
 		err "nothing new to install, so this is not tolerated even though other feeds answered:"
 		grep -E "$_failpat" "$_pmlog" | sed 's/^/    /' >&2
@@ -181,35 +198,35 @@ is_foreign_luci_build() {	# <version>
 	[ -n "$_maj" ] && [ "$_maj" -ge 26 ]
 }
 
-# …and whether the feed has caught up. A release lands on GitHub first and reaches owfeed-packages
-# afterwards, through a pull request against that repository — usually minutes, sometimes a day. In
-# between, a user who installs gets the previous version with nothing to tell them why. So compare
-# and say it in one line.
+# What the CONFIGURED repository actually offers right now — asked of the package manager, never
+# inferred from "the installed version did not move" (forum.openwrt.org/t/251930#160: a router whose
+# feed line apk never read was told "already current", and neither had asked the feed anything).
 #
-# `releases/latest/download/manifest.txt`, not api.github.com, for the rate-limit and jsonfilter
-# reasons above. Read here for a MESSAGE only — nothing is installed from it and no decision depends
-# on it, so an unreachable GitHub is silence rather than a failure, and no signature is claimed.
-feed_lag_note() {	# <installed version>
-	[ -n "$1" ] || return 0
-	_vtmp="/tmp/fs-ver.$$"
-	mkdir -p "$_vtmp" || return 0
-	if fetch "$RELEASE_BASE/manifest.txt" "$_vtmp/manifest.txt"; then
-		# `<pkg>-<version>.apk` but `<pkg>_<version>_<arch>.ipk`, so the trailing `_<arch>` comes off
-		# after the extension does — without it the ipk leg reported "0.13.0-r1_all is out", which is
-		# not a version and never compares equal to what the router has.
-		_rel=$(awk -v p="$PKG" -v f="$PM_FMT" '$1=="pkg" && $2==p && $3==f { print $4 }' "$_vtmp/manifest.txt" \
-			| sed -n "s/^$PKG[-_]\(.*\)\.$PM_FMT$/\1/p" | sed "s/_[a-z0-9]*$//")
-		# Newest-wins with the tools a router has: `sort -V` where busybox provides it. Being
-		# unable to compare is a reason to say NOTHING — never to claim the router is behind.
-		if [ -n "$_rel" ] && [ "$_rel" != "$1" ] &&
-		   [ "$(printf '%s\n%s\n' "$1" "$_rel" | sort -V 2>/dev/null | tail -1)" = "$_rel" ]; then
-			printf '\n'
-			info "Release $_rel is out; this router has $1."
-			info "The feed follows a release through a pull request against owfeed-packages, so it"
-			info "usually catches up within a day — \`$PM upgrade\` will pick it up then."
-		fi
+# apk: `apk policy` lists, per version, every SOURCE that carries it — `lib/apk/db/installed` for
+# whatever is on disk, a repository URL for each configured repo that also has that version. Only a
+# version whose source is EXACTLY our own line counts; one sourced only from the installed db is
+# installed, not offered. No feed-lag guess is layered on top of this (R4): the three outcomes below
+# are the whole answer.
+#
+# opkg has no per-version-per-source report, so this reads the feed's own downloaded index instead —
+# the file `feed_refresh` just populated, named for $FEED_NAME by opkg itself (`lists_dir` in
+# opkg.conf, default `/var/opkg-lists`, gzipped because INDEX=Packages.gz). `opkg list`/`opkg info`
+# both also answer for the INSTALLED package once its repository line is gone entirely.
+feed_offer() {	# <pkg>
+	if [ "$PM" = apk ]; then
+		apk policy "$1" 2>/dev/null | awk -v line="$APK_LINE" '
+			/^  [^ ]/ { if (ver != "" && has) print ver; ver = $0
+				sub(/^  /, "", ver); sub(/:$/, "", ver); has = 0; next }
+			{ src = $0; sub(/^[ \t]+/, "", src); if (src == line) has = 1 }
+			END { if (ver != "" && has) print ver }
+		' | sort -V | tail -1
+	else
+		_lists=$(sed -n 's/^lists_dir[[:space:]]\{1,\}ext[[:space:]]\{1,\}//p' /etc/opkg.conf 2>/dev/null | tail -1)
+		zcat "${_lists:-/var/opkg-lists}/$FEED_NAME" 2>/dev/null | awk -v p="$1" '
+			/^Package: / { pk = $2 }
+			/^Version: / { if (pk == p) print $2 }
+		' | sort -V | tail -1
 	fi
-	rm -rf "$_vtmp" 2>/dev/null || true
 }
 
 # --- the release, for a router the feed cannot serve ------------------------------------------
@@ -507,6 +524,192 @@ if [ -z "$BRANCH" ]; then
 	exit 0
 fi
 
+# Writes <new-content-file> into <path> atomically, without `mv`-ing anything over <path> itself and
+# without ever truncating it before the replacement is ready. `cat new > path` truncates the moment
+# the redirect opens — a write that dies partway (OOM, a full overlay) can leave customfeeds empty
+# (security review, task 0176-h); a bare `mv new path` replaces a symlinked customfeeds file with a
+# plain one, target untouched, mode reset (0176-g). This resolves the real path with `readlink -f`
+# (present on both busybox builds this repo targets), copies ITS mode and owner onto a temp file IN
+# THE SAME DIRECTORY with `cp -p` — so the rename below stays on one filesystem — writes the new
+# content into THAT copy, and only then `mv -f`s it over the real file: one atomic rename, and a
+# failure at any point before it leaves the original exactly as it was, temp file removed.
+atomic_write() {	# <path> <new-content-file>
+	_aw_real=$(readlink -f "$1" 2>/dev/null)
+	[ -n "$_aw_real" ] || _aw_real="$1"
+	_aw_tmp="$_aw_real.fstmp.$$"
+	if [ -f "$_aw_real" ]; then
+		cp -p "$_aw_real" "$_aw_tmp" || { rm -f "$_aw_tmp"; return 1; }
+	else
+		# `printf ''`, never the `:` special builtin: a redirection error on a SPECIAL builtin exits
+		# the (non-interactive) shell outright, before this `||` — or any caller's own `|| { … }` —
+		# ever runs (security review, task 0176-k). `printf` is an ordinary utility, so its own
+		# redirection failure is just this command failing, exactly what `||` is here to catch.
+		printf '' > "$_aw_tmp" || return 1
+	fi
+	if ! cat "$2" > "$_aw_tmp"; then
+		rm -f "$_aw_tmp"
+		return 1
+	fi
+	# Checked explicitly, never a bare last statement: under `set -e` a bare failing command IS the
+	# function's own failure and skips straight past every caller-side cleanup that follows the call
+	# (security review, task 0176-i) — the one shape that actually matters here, since `$_aw_tmp` is
+	# this function's own responsibility and every caller above only ever sees a 0/1 result.
+	if ! mv -f "$_aw_tmp" "$_aw_real"; then
+		rm -f "$_aw_tmp"
+		return 1
+	fi
+}
+
+# R3: every ACTIVE line — other than the exact one install.sh writes — whose URL host is ours, or
+# (opkg) whose src NAME is ours, is commented out (never deleted) and reported, one line each. A
+# line for any other host is never touched, whatever else it says: no `@tag` exception, no
+# port/userinfo parsing — $APK_HOST_RE/$OPKG_HOST_RE above are boundary checks, not a URL parser.
+#
+# Why any of them matter, measured end to end (security review, task 0176-e, `m5a-apk.sh`): apk's
+# own repository-file reader silently stops at the first line it cannot tokenise, so an admin's own
+# unrelated malformed line, or a leftover line for another branch/arch, sitting ABOVE where the
+# correct line would otherwise land, can cut the feed off with no error at all — the forum defect,
+# self-inflicted. Disabling every other line naming us removes the only kind of line that could ever
+# shadow the correct one; R2 below then places the correct line first regardless, so nothing else in
+# the file — an admin's own unrelated entry, comments, blank lines — can still precede it.
+disable_other_lines() {	# <file> <exact-line> <mode: apk | opkg> -> 0 written (or nothing to do), 1 write failed
+	_dol_f="$1"; _dol_want="$2"; _dol_mode="$3"
+	[ -f "$_dol_f" ] || return 0
+	_dol_tmp="$_dol_f.newcontent.$$"
+	_dol_msgs="$_dol_f.msgs.$$"
+	_dol_changed=0
+	# `printf ''`, never the `:` special builtin: on a redirection error `:` exits the shell outright
+	# on the spot — measured, a temp path pre-created as a directory killed the whole script with no
+	# "[-] Could not …" line and no `exit 1` this function ever got to run (security review, task
+	# 0176-k). `printf` is ordinary, so its own redirection failure is checked normally below.
+	if ! printf '' > "$_dol_tmp"; then
+		return 1
+	fi
+	if ! printf '' > "$_dol_msgs"; then
+		rm -f "$_dol_tmp"
+		return 1
+	fi
+	while IFS= read -r _dol_l || [ -n "$_dol_l" ]; do
+		case "$_dol_l" in
+			\#*) printf '%s\n' "$_dol_l" >> "$_dol_tmp"; continue ;;
+		esac
+		if [ "$_dol_l" = "$_dol_want" ]; then
+			printf '%s\n' "$_dol_l" >> "$_dol_tmp"
+			continue
+		fi
+		if [ "$_dol_mode" = apk ]; then _dol_re="$APK_HOST_RE"; else _dol_re="$OPKG_HOST_RE"; fi
+		_dol_hit=0
+		if printf '%s\n' "${_dol_l%$(printf '\r')}" | grep -Eqi "$_dol_re"; then
+			_dol_hit=1
+		fi
+		if [ "$_dol_mode" = opkg ]; then
+			set -f; set -- $_dol_l; set +f
+			if [ "$2" = "$FEED_NAME" ]; then
+				_dol_hit=1
+			fi
+		fi
+		if [ "$_dol_hit" = 1 ]; then
+			# DEFERRED, not printed here: a line reads "disabled" only once the write below actually
+			# lands — printing it first and then failing the write told a user a change had happened
+			# when the file was untouched (security review, task 0176-i).
+			printf '  another active line for our feed, disabled: %s\n' "$_dol_l" >> "$_dol_msgs"
+			printf '#%s\n' "$_dol_l" >> "$_dol_tmp"
+			_dol_changed=1
+		else
+			printf '%s\n' "$_dol_l" >> "$_dol_tmp"
+		fi
+	done < "$_dol_f"
+	if [ "$_dol_changed" = 0 ]; then
+		rm -f "$_dol_tmp" "$_dol_msgs"
+		return 0
+	fi
+	# `if atomic_write …` — not a bare statement — so a failure is OURS to handle: every temp this
+	# call created is removed either way, and the caller learns about it through the return status,
+	# never through `$(…)`, which `set -e` cannot see through (task 0176-i, `m9b.sh`).
+	if atomic_write "$_dol_f" "$_dol_tmp"; then
+		while IFS= read -r _dol_m; do info "$_dol_m"; done < "$_dol_msgs"
+		rm -f "$_dol_tmp" "$_dol_msgs"
+		return 0
+	fi
+	rm -f "$_dol_tmp" "$_dol_msgs"
+	return 1
+}
+
+# R2: places $2 as the FIRST NON-COMMENT line, moving it there even when it was already present
+# SOMEWHERE ELSE in the file — origin/main's own installer only ever appended, so a router already
+# running that shape has the correct line sitting after whatever else was there, including an
+# unparsable admin line: "is the exact line present" alone stayed true forever while apk never
+# reached it (tester finding, `m6a-apk.sh` #6: "junk" then the exact line, 0.14.12 stays 0.14.12
+# across repeated runs, "already configured" every time). Every occurrence is dropped and exactly
+# one is reinserted, so this is also how repeated runs stay idempotent. The leading run of comment
+# and blank lines — the stock "add your custom feeds here" header — stays first; everything else,
+# in its original order, follows the reinserted line.
+# Sets $FEED_PLACEMENT to "added" | "moved" | "unchanged" and RETURNS 0/1 — never `echo`ed for the
+# caller to capture with `$(…)`: a command substitution's own exit status is invisible to `set -e`
+# in the assignment/case that reads it, so a write that failed INSIDE the substitution still read as
+# success one level up (security review, task 0176-i, `m9b.sh`: "added"/"Feed added" printed, file
+# on disk untouched). A plain variable plus a real return status is checked with `if ! ensure_first`,
+# which — being an if-condition — is exactly where `set -e` is SUPPOSED to step aside so the caller
+# can decide what a failure means, instead of the shell silently doing it for nobody.
+ensure_first() {	# <file> <exact-line> -> sets $FEED_PLACEMENT; returns 0/1
+	_ef_f="$1"; _ef_want="$2"
+	_ef_tmp="$_ef_f.newcontent.$$"
+	_ef_hdr="$_ef_f.hdr.$$"
+	_ef_body="$_ef_f.body.$$"
+	# `printf ''`, never the `:` special builtin — same reason as disable_other_lines above: `:`'s
+	# own redirection failure exits the shell before this function's `return 1` ever runs.
+	if ! printf '' > "$_ef_hdr"; then
+		return 1
+	fi
+	if ! printf '' > "$_ef_body"; then
+		rm -f "$_ef_hdr"
+		return 1
+	fi
+	_ef_in_header=1
+	_ef_found=0
+	if [ -f "$_ef_f" ]; then
+		while IFS= read -r _ef_l || [ -n "$_ef_l" ]; do
+			if [ "$_ef_l" = "$_ef_want" ]; then
+				_ef_found=1
+				_ef_in_header=0
+				continue
+			fi
+			if [ "$_ef_in_header" = 1 ]; then
+				case "$_ef_l" in
+					\#*|'') printf '%s\n' "$_ef_l" >> "$_ef_hdr"; continue ;;
+				esac
+				_ef_in_header=0
+			fi
+			printf '%s\n' "$_ef_l" >> "$_ef_body"
+		done < "$_ef_f"
+	fi
+	# Checked, not a bare redirect: a failed open (disk full, EROFS) is this function's OWN failure
+	# under `set -e` and would otherwise skip straight past the cleanup on the next line, leaking
+	# both scratch files (security review, task 0176-j). `&&`-joined, not `;`-joined: a group
+	# command's exit status is its LAST member's, so a `;`-joined group would have silently ignored
+	# the first `cat` failing while the second one still succeeded (security review, task 0176-l).
+	if ! { cat "$_ef_hdr" && printf '%s\n' "$_ef_want" && cat "$_ef_body"; } > "$_ef_tmp"; then
+		rm -f "$_ef_hdr" "$_ef_body" "$_ef_tmp"
+		return 1
+	fi
+	rm -f "$_ef_hdr" "$_ef_body"
+	if [ -f "$_ef_f" ] && command -v cmp >/dev/null 2>&1 && cmp -s "$_ef_tmp" "$_ef_f" 2>/dev/null; then
+		rm -f "$_ef_tmp"
+		FEED_PLACEMENT=unchanged
+		return 0
+	fi
+	if atomic_write "$_ef_f" "$_ef_tmp"; then
+		rm -f "$_ef_tmp"
+		# "added": the line was missing outright. "moved": it was ALREADY somewhere in the file (an
+		# origin/main-configured router only ever appends) and this run repositioned it — a fact the
+		# closing "Adding the feed…"/"Feed added" wording would otherwise get wrong for that router.
+		if [ "$_ef_found" = 1 ]; then FEED_PLACEMENT=moved; else FEED_PLACEMENT=added; fi
+		return 0
+	fi
+	rm -f "$_ef_tmp"
+	return 1
+}
+
 # --- feed -----------------------------------------------------------------
 # keep.d is not bookkeeping: sysupgrade wipes the key unless something claims it, and the theme
 # would come back unupgradable. The repository line itself needs no entry — both managers'
@@ -522,22 +725,38 @@ if [ "$PM" = apk ]; then
 	# It is also the file OpenWrt ships for this ("add your custom package feeds here")
 	# and the apk counterpart of the opkg branch's customfeeds.conf below.
 	APK_LIST=/etc/apk/repositories.d/customfeeds.list
-	if ! grep -q "$FEED_HOST" "$APK_LIST" 2>/dev/null; then
-		info "Adding the $FEED_NAME feed..."
-		apk add --quiet ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
-		mkdir -p /etc/apk/keys /etc/apk/repositories.d /lib/upgrade/keep.d
-		printf '%s/releases/%s/%s/packages.adb\n' "$FEED_HOST" "$BRANCH" "$ARCH" \
-			>> "$APK_LIST"
-		printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
-		# Installers before this one wrote their own file, which apk still reads: left
-		# in place it is the same repository configured twice, in one file the admin
-		# can see and one they cannot. Removed by name and only after the line above
-		# landed, so the feed is never briefly absent.
-		rm -f /etc/apk/repositories.d/owfeed-packages.list
-		ok "Feed added: $FEED_HOST/releases/$BRANCH/$ARCH"
-	else
-		info "The $FEED_NAME feed is already configured."
+	APK_LINE=$(printf '%s/releases/%s/%s/packages.adb' "$FEED_HOST" "$BRANCH" "$ARCH")
+	mkdir -p /etc/apk/keys /etc/apk/repositories.d /lib/upgrade/keep.d
+	# R1: exact, not a substring — a commented, tagged or other-branch/arch line satisfied the old
+	# `grep -q "$FEED_HOST"` while apk read none of them (forum.openwrt.org/t/251930#160). R2: placed
+	# FIRST, and MOVED there even when already present somewhere else — see ensure_first() above.
+	disable_other_lines "$APK_LIST" "$APK_LINE" apk || {
+		err "Could not update $APK_LIST — the router's own feed lines are unchanged."
+		exit 1
+	}
+	if ! ensure_first "$APK_LIST" "$APK_LINE"; then
+		err "Could not write $APK_LIST — the router's own feed lines are unchanged."
+		exit 1
 	fi
+	case "$FEED_PLACEMENT" in
+		added)
+			info "Adding the $FEED_NAME feed..."
+			apk add --quiet ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
+			printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
+			# Installers before this one wrote their own file, which apk still reads: left
+			# in place it is the same repository configured twice, in one file the admin
+			# can see and one they cannot. Removed by name and only after the line above
+			# landed, so the feed is never briefly absent.
+			rm -f /etc/apk/repositories.d/owfeed-packages.list
+			ok "Feed added: $FEED_HOST/releases/$BRANCH/$ARCH"
+			;;
+		moved)
+			info "Moving the $FEED_NAME feed line to the top of $APK_LIST so apk reads it first."
+			;;
+		*)
+			info "The $FEED_NAME feed is already configured."
+			;;
+	esac
 	# The KEY is fetched on every run, not only when the feed line is written. It used to sit inside
 	# the branch above, which meant a rotation could never be repaired by the documented one-liner:
 	# the feed was "already configured", the key was never re-fetched, and `apk update` failed
@@ -576,17 +795,31 @@ if [ "$PM" = apk ]; then
 	info "Installing $PKG..."
 	pm_quiet apk add --upgrade "$PKG<26" || exit 1
 else
-	if ! grep -q "$FEED_NAME" /etc/opkg/customfeeds.conf 2>/dev/null; then
-		info "Adding the $FEED_NAME feed..."
-		opkg update >/dev/null 2>&1 || true
-		opkg install ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
-		mkdir -p /etc/opkg/keys /lib/upgrade/keep.d
-		printf 'src/gz %s %s/releases/%s/%s\n' "$FEED_NAME" "$FEED_HOST" "$BRANCH" "$ARCH" \
-			>> /etc/opkg/customfeeds.conf
-		ok "Feed added: $FEED_HOST/releases/$BRANCH/$ARCH"
-	else
-		info "The $FEED_NAME feed is already configured."
+	OPKG_LIST=/etc/opkg/customfeeds.conf
+	OPKG_LINE=$(printf 'src/gz %s %s/releases/%s/%s' "$FEED_NAME" "$FEED_HOST" "$BRANCH" "$ARCH")
+	mkdir -p /etc/opkg/keys /lib/upgrade/keep.d
+	disable_other_lines "$OPKG_LIST" "$OPKG_LINE" opkg || {
+		err "Could not update $OPKG_LIST — the router's own feed lines are unchanged."
+		exit 1
+	}
+	if ! ensure_first "$OPKG_LIST" "$OPKG_LINE"; then
+		err "Could not write $OPKG_LIST — the router's own feed lines are unchanged."
+		exit 1
 	fi
+	case "$FEED_PLACEMENT" in
+		added)
+			info "Adding the $FEED_NAME feed..."
+			opkg update >/dev/null 2>&1 || true
+			opkg install ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
+			ok "Feed added: $FEED_HOST/releases/$BRANCH/$ARCH"
+			;;
+		moved)
+			info "Moving the $FEED_NAME feed line to the top of $OPKG_LIST so opkg reads it first."
+			;;
+		*)
+			info "The $FEED_NAME feed is already configured."
+			;;
+	esac
 	# Same as the apk leg: the key on every run, so a rotation is repairable by re-running. Here the
 	# key ID is part of the PATH, so a rotation changes the filename too — the old one is left alone
 	# rather than removed, since opkg reads the whole directory and a stale key verifies nothing.
@@ -640,7 +873,30 @@ elif [ "$_before" != "$_have" ]; then
 		ok "Upgraded $PKG $_before -> $_have — \`$PM upgrade\` will keep it current."
 	fi
 else
-	ok "Already current: $PKG $_have — the feed carries nothing newer."
+	# "Nothing changed" is not "nothing newer" (R4): `apk add`/`opkg install` on an already-satisfied
+	# package exits 0 whether or not the feed carries something newer (issues #16/#28/#30, and
+	# forum.openwrt.org/t/251930#160, where this line ran without the feed ever having been read).
+	# Ask feed_offer, which asks the repository directly, instead of guessing from the version alone.
+	_offer=$(feed_offer "$PKG")
+	if [ -z "$_offer" ]; then
+		err "$PKG $_have is installed, but $PM names no $FEED_NAME version at all — this router is"
+		if [ "$PM" = apk ]; then
+			err "not reading the feed; check $APK_LIST and \`apk policy $PKG\`."
+		else
+			err "not reading the feed; check $OPKG_LIST and \`opkg list $PKG\`."
+		fi
+	elif [ "$_offer" != "$_have" ] &&
+	     [ "$(printf '%s\n%s\n' "$_have" "$_offer" | sort -V 2>/dev/null | tail -1)" = "$_offer" ]; then
+		warn "$PKG stays at $_have even though the $FEED_NAME feed offers $_offer — that is $PM's own"
+		warn "decision (a pin, a hold, a constraint), not a feed that has not caught up:"
+		if [ "$PM" = apk ]; then
+			apk policy "$PKG" 2>/dev/null | sed 's/^/    /' >&2
+		else
+			opkg list "$PKG" 2>/dev/null | sed 's/^/    /' >&2
+		fi
+	else
+		ok "Already current: $PKG $_have — the $FEED_NAME feed carries nothing newer."
+	fi
 fi
 # A blank line between WHAT HAPPENED and WHAT TO DO NEXT: the outcome is the one line a user
 # came for, and with the next-steps block butted straight against it the two read as one
@@ -649,4 +905,3 @@ printf '\n'
 info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
 info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
 info "of System -> System. Then hard-reload the page (Ctrl+F5)."
-feed_lag_note "$_have"

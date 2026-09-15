@@ -258,13 +258,21 @@
 	}
 	/* The frame is overflow:visible, so nothing clips the square corner cells to its radius and
 	 * they poked past it. Round the four OUTER cells — the frame's corners, not a per-row pill.
-	 * `#view .table[id]` is listed because the frame rule draws the border there too. */
-	.cbi-section .table[id] .tr.table-titles .th:first-child,
-	#view .table[id] .tr.table-titles .th:first-child,
-	table.fs-dt .tr.table-titles .th:first-child { border-top-left-radius: var(--fs-radius-lg); }
-	.cbi-section .table[id] .tr.table-titles .th:last-child,
-	#view .table[id] .tr.table-titles .th:last-child,
-	table.fs-dt .tr.table-titles .th:last-child { border-top-right-radius: var(--fs-radius-lg); }
+	 * `#view .table[id]` is listed because the frame rule draws the border there too.
+	 *
+	 * `:is(.tr.table-titles, .thead)` because a header is any of the shapes fs-select.js adopts:
+	 * `.tr.table-titles` is the bare-th-row markup, `.thead` covers a real `<thead>` whether it
+	 * holds its `<th>`s directly (E()-built, no `<tr>`) or through one — adoptMarkup() never adds
+	 * `.tr` to that inner row, so a class-only selector has to reach the `.th` by descent, not by
+	 * child. Without `.thead` the header kept its square top corners under any real `<thead>`: the
+	 * DHCP and Wi-Fi dashboard tables measured a first/last `.th` radius of 0 against the frame's
+	 * 12px. */
+	.cbi-section .table[id] :is(.tr.table-titles, .thead) .th:first-child,
+	#view .table[id] :is(.tr.table-titles, .thead) .th:first-child,
+	table.fs-dt :is(.tr.table-titles, .thead) .th:first-child { border-top-left-radius: var(--fs-radius-lg); }
+	.cbi-section .table[id] :is(.tr.table-titles, .thead) .th:last-child,
+	#view .table[id] :is(.tr.table-titles, .thead) .th:last-child,
+	table.fs-dt :is(.tr.table-titles, .thead) .th:last-child { border-top-right-radius: var(--fs-radius-lg); }
 	.cbi-section .table[id] .tr:last-child .td:first-child,
 	#view .table[id] .tr:last-child .td:first-child,
 	table.fs-dt .tr:last-child .td:first-child { border-bottom-left-radius: var(--fs-radius-lg); }
@@ -473,6 +481,19 @@
 	.table .tr.cbi-section-table-titles::before { border-bottom: var(--fs-hairline); }
 	.table .tr:not(.table-titles):not(.cbi-section-table-titles):not(:last-child) > .td,
 	.table .tr.cbi-section-table-row:not(:last-child)::before { border-bottom: var(--fs-hairline); }
+	/* Because the separator above is a per-CELL border, an app that nudges one cell with
+	 * `position: relative; top: …` (luci-mod-dashboard's `.devices-info .td:nth-child(3)`) drags
+	 * that cell's border-bottom out of line with its row neighbours — a step, not a slanted line,
+	 * since each cell paints its own hairline. Bootstrap never shows this because its rows are
+	 * `border-collapse: collapse`, with no per-cell border to displace. The app's rule lands in the
+	 * same fenced `theme` layer (fs-sheets.js), so an ID root outranks its 7 classes on specificity
+	 * alone and needs no `!important`; `top` AND `bottom`, not just `top: 0`, so this also cancels
+	 * a `bottom` offset and leaves `position: relative` itself untouched for any
+	 * absolutely-positioned descendant. `top`/`bottom`, not the `inset-block` shorthand: the sheet
+	 * has never used a logical inset property before and `css-floor` has no support decision for
+	 * one, where the physical pair is already on the floor. Measured: offset .td top -3px -> 0, its
+	 * border-bottom back level with its neighbours'. */
+	:is(#view, #modal_overlay) .fs-dt .td { top: auto; bottom: auto; }
 	/* descendant combinator (not >) so a real <table>'s browser-inserted <tbody> is covered
 	 * too — one rule themes every data table, div- or table-based. */
 	.table .tr.table-titles, .table .tr.cbi-section-table-titles {
