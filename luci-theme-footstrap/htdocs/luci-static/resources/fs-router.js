@@ -138,6 +138,16 @@ function clearViewIntervals() {
 	/* Map, not Set: the key is the timer id and the value is what it takes to re-arm it */
 	_viewIntervals.forEach((spec, id) => { if (id !== keep) window.clearInterval(id); });
 }
+/* The "Refreshing"/"Paused" pill must not outlive the poll it reports on — see the `poll-stop`
+ * listener below, which is the only caller in the shipped file. Exported (fs:probe) too, because
+ * navigate()'s own async chain (require(), staging into a real `.fs-content`) needs more DOM than
+ * tests/lib's fakes give it; this is the one check that actually matters for the ordering bug and is
+ * exercised directly, without the listener's deferral, by tests/poll-status.test.mjs. */
+function hidePollIndicatorIfEmpty() {
+	if (!(L.Poll && L.Poll.queue && L.Poll.queue.length === 0)) return;
+	try { ui.hideIndicator('poll-status'); }
+	catch (e) { console.error('footstrap: hideIndicator threw on the poll-status teardown', e); }
+}
 /* one line per document: this runs on every navigation, and a router that cannot read L.Poll
  * cannot read it on the next click either */
 let _pollWarned = false;
@@ -1095,6 +1105,11 @@ function navigate(pathname, push, kbd) {
 		if (L.Poll && L.Poll.queue) {
 			L.Poll.queue.length = 0;
 			L.Poll.stop();
+			/* The "Refreshing"/"Paused" pill's own teardown rides this `stop()`'s `poll-stop` event —
+			 * see the listener below, not a call here. A page can also empty the queue on its own, with
+			 * no navigation at all (`L.Poll.remove()`, e.g. `luci-mod-status`'s graphs.js on unload,
+			 * `luci-app-banip`'s log view), and `stop()` dispatches the same event for that call too;
+			 * a call placed only here would miss it, exactly the finding this once shipped without. */
 			L.Poll.start();
 		}
 		/* kill the outgoing view's plain setInterval pollers too, as a full load would; L.Poll's own
@@ -1401,24 +1416,42 @@ function wireRouter() {
 	});
 }
 
-/* ---- the poll indicator must not outlive the poll ----
+/* ---- the poll-status pill must not outlive the poll it reports on ----
  *
- * LuCI shows the "Refreshing" pill on `poll-start`, flips it to "Paused" on `poll-stop` and never
- * hides it again (core calls ui.hideIndicator() only for `uci-changes`). That is invisible on a full
- * load, since Poll.start() dispatches `poll-start` only for a non-empty queue — but this router
- * flushes the queue and calls stop() on every navigation, so walking from a polled page to an
- * unpolled one leaves a "Paused" pill reporting on a poll that does not exist. The pill exists iff
- * there is something to poll. Registered at module eval, i.e. after luci.js's own listener, so this
- * runs second. */
+ * LuCI shows the pill on `poll-start`, flips it to "Paused" on `poll-stop`, and never hides it
+ * again. Two different callers empty the queue and reach `L.Poll.stop()`: this router's own
+ * navigate() teardown, and a VIEW emptying its own queue mid-page with no navigation at all
+ * (`L.Poll.remove()` — `luci-mod-status`'s Realtime Graphs on unload, `luci-app-banip`'s log
+ * template) — both dispatch the same `poll-stop`, so one listener here covers both, where a call
+ * placed only in navigate()'s teardown covered the first and silently missed the second: reproduced
+ * live, owrt2410b and owrt2512b, add-then-remove on Statistics — `{"active":false,"q":0,"pill":
+ * {"text":"Paused","clickable":true}}`, unchanged by a click, because nothing had ever asked to hide
+ * a pill for a poll that a `remove()` rather than a navigation had ended.
+ *
+ * The HIDE itself is deferred past the synchronous dispatch, one microtask, rather than run inline
+ * in this listener: `stop()` dispatches `poll-stop` synchronously to every listener registered at
+ * that moment, including luci.js's own (`showIndicator('poll-status', 'Paused', null, 'inactive')` —
+ * "Paused" is always shown with `handler: null`), and which of the two ran first here used to decide
+ * everything — luci.js registers its listener from `setupDOM()`, after an async chain
+ * (DOMContentLoaded + ui/rpc/form + probeRPCBaseURL), this module at eval, from the inline
+ * `L.require('menu-footstrap')` in `partials/footer.ut`, so network/cache timing picked the order.
+ * Run with this listener first, its hide removed the span before luci.js re-created it for "Paused"
+ * with no handler, and the next `poll-start` found that span already there and only changed its
+ * text — clickless for the rest of the document. A microtask runs only once the whole synchronous
+ * turn that dispatched the event has unwound, i.e. after every `poll-stop` listener already fired
+ * regardless of which ran first, so the check sees the state stock's listener actually left rather
+ * than racing it. It still reads `L.Poll.queue.length` at that later moment, not at dispatch time, so
+ * a queue the SAME navigation's incoming page has already refilled by then is left alone — the
+ * incoming page's own `require()`/render() is real async work (network, RPCs), always later than a
+ * microtask queued during the synchronous `stop()` call that preceded it. `tests/poll-status.test.mjs`
+ * drives both paths (a navigation's queue flush and a bare `Poll.remove()` to empty) in both listener
+ * orders. docs/spa-router.md, "Teardown". */
 document.addEventListener('poll-stop', () => {
-	if (L.Poll && L.Poll.queue && L.Poll.queue.length === 0) {
-		try { ui.hideIndicator('poll-status'); }
-		catch (e) { console.error('footstrap: hideIndicator threw on poll-stop', e); }
-	}
+	queueMicrotask(hidePollIndicatorIfEmpty);
 });
 
-/* At module eval, like the listener above: the session can die during the first view's own data
- * calls, before anything has called wire(), and an interceptor registered later never sees it. */
+/* At module eval: the session can die during the first view's own data calls, before anything has
+ * called wire(), and an interceptor registered later never sees it. */
 watchSession();
 
 /* Pause LuCI's 1 s poll loop while the tab is hidden: LuCI has no visibilitychange handler, so an
@@ -1470,6 +1503,10 @@ return baseclass.extend({
 	 * navigate() is the real caller of the first and `_expired` gates the second. */
 	clearViewIntervals,	/* fs:probe */
 	sessionExpired,	/* fs:probe */
+	/* tests/poll-status.test.mjs: the deferred `poll-stop` listener's own check, called directly so a
+	 * test need not also fake a microtask tick to see it fire (see the comment at its definition and
+	 * at the listener above) */
+	hidePollIndicatorIfEmpty,	/* fs:probe */
 	/* fs-search warms its recents and the arrow-key-highlighted result, neither of which the
 	 * pointer/focus triggers above can see. The edge points search -> router, because the router
 	 * must keep no dependency on the palette. */
