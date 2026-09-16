@@ -62,6 +62,13 @@ Every role returns at most 25 lines: paths, not contents; no diff, no code, no s
 attempt. The shape is in each role's file. The lead quotes the block and never opens the log it
 summarises; the role that produced a log is the role that read it.
 
+A role works in caveman full throughout, the mode the lead runs in — a subagent inherits no session
+hook, so each role carries the rule in its own "Voice" section. It covers every line the role emits,
+not the block alone: a question back to the lead, a `BLOCKED` line, a note on a gate that did not
+run. Commands, flags, paths, numbers, quoted errors and every negation stay exact; the compression
+is the prose around them, and it never grows the output. What a role writes to disk — code,
+comments, a changelog line, a handoff — is normal English prose, as everywhere else here.
+
 ## The loop
 
 1. **Size the task.** A diff the lead can describe in one sentence, it makes itself. More than one

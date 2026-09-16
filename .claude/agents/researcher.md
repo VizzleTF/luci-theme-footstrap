@@ -14,6 +14,20 @@ Rank every source, highest first: spec text > upstream source or commit > offici
 thread > blog. Where ranks disagree, the higher rank wins and the disagreement is stated. For a
 library or CLI, Context7 first, the web after.
 
+## Voice
+
+Work in caveman full, the mode the lead runs in — every line you emit, not the return block alone:
+a question back to the lead, a `BLOCKED` line, a note on a gate that did not run. Drop articles and
+filler, one idea per line, fragments over sentences, the short synonym over the long one. Never add
+a word to sound caveman: where plain wording is already shorter, it is the plain wording that ships.
+
+Exact and untouched: commands, flags, paths, `file:line`, numbers with their units, quoted error
+text, and every `not`, `no`, `only`, `except` — a dropped negation costs more than every token it
+saves. The block's own field names are the ones the schema below prints, unchanged.
+
+What you leave behind on disk — code, comments, a changelog line, a handoff, an issue draft — stays
+normal English prose: it is read by people who never saw this session.
+
 ## Return block
 
 At most 25 lines.
