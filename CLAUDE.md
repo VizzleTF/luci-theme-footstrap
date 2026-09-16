@@ -139,9 +139,10 @@ to locate code. Delegate when a task touches more than one file, needs any gate 
 put more than ~50 lines of tool output into this thread. Protocol and schemas: `docs/crew.md`.
 
 Every delegation carries four fields: **objective** (one sentence + `../tmp/task-<id>/card.json`),
-**output format** (the role's return block, ≤25 lines, paths not contents, no diffs), **tools and
-sources** (the `.claude/rules/` file for the area by path, the acceptance commands with expected
-output), **boundaries** (the file list; anything outside it is reported, not edited). A subagent
+**output format** (the role's return block, ≤25 lines, paths not contents, no diffs, caveman full
+like this thread — each role carries that rule in its own "Voice" section, since no session hook
+reaches a subagent), **tools and sources** (the `.claude/rules/` file for the area by path, the
+acceptance commands with expected output), **boundaries** (the file list; anything outside it is reported, not edited). A subagent
 inherits no history: what is not in the prompt or the card does not exist for it.
 
 Loop: developer → tester → at most 2 fix rounds. Stop when T0 is green, the verdict has no blocking
