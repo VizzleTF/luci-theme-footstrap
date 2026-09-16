@@ -1023,6 +1023,12 @@ on a clean `HEAD` — a host fault fails there too, identically.
   needs a POSIX path.
 - `python3` resolves to the Microsoft Store stub and fails with "Python was not found"; the working
   interpreter on this host is named `python` — matters for `python3 tools/audit.py --strict`.
+- `npm test` fails one case of 154 on Windows and none in WSL: `resolveUnderRoot`
+  (`tests/playground.test.mjs`, code in `tools/playground/lib.mjs`, added by `cfdc7d8`) asserts
+  `/out/cgi-bin/luci/...` and gets `C:\out\cgi-bin\luci\...`, because `path.resolve` is
+  `path.win32.resolve` there. The test states the contract CI runs under, so a red case here is the
+  host disagreeing with it, not the tree: re-run the suite as
+  `wsl.exe -e bash -c 'cd /mnt/c/... && npm test'` before reading it as a defect — 154 pass there.
 
 **None of the above means the live half is out of reach — it runs fine, just not from the Windows
 side of this checkout.** `owlab` is already installed in WSL (`~/go/bin/owlab`), its containers are
