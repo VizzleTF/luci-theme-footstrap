@@ -267,12 +267,67 @@ const result = await page.evaluate(({ mods, axes }) => {
 	return notes;
 }, { mods: sources, axes: COLOR_AXES });
 
+/* ---- the body-litter recorder (header.ut) actually wraps document.body, on a real DOM ----
+ *
+ * The recorder is server-rendered markup, so nothing else here loads it — docs/gallery.html has no
+ * chrome of its own. Its text is pulled out of header.ut, the same way tools/lib/ut-scripts.mjs
+ * pulls a template's inline scripts for eslint, and run verbatim against THIS page's own
+ * document.body: proof that the wrap it installs actually intercepts the calls fs-router.js's
+ * bodyLittered() depends on (issue #56), not only that the source parses. Run after the module
+ * checks above, not before: fs-chrome.js's and fs-appearance.js's own body-parented probes must not
+ * be caught by a wrap installed for this check alone. */
+const headerUt = readFileSync(
+	join(ROOT, 'luci-theme-footstrap/ucode/template/themes/footstrap/header.ut'), 'utf8');
+const bodyTag = headerUt.indexOf('<body');
+const recorderMatch = bodyTag >= 0 && headerUt.slice(bodyTag).match(/<script>([\s\S]*?)<\/script>/);
+
+const recorderNotes = recorderMatch ? await page.evaluate((src) => {
+	const notes = [];
+	const check = (cond, m) => notes.push({ ok: !!cond, m: 'body-litter recorder: ' + m });
+
+	try { new Function(src)(); }
+	catch (e) {
+		check(false, 'threw on a real document.body — ' + (e && e.message ? e.message : e));
+		return notes;
+	}
+
+	const probe = document.createElement('div');
+	document.body.appendChild(probe);
+	check((window.__fsBodyAdds || []).includes(probe), 'appendChild is recorded');
+	document.body.removeChild(probe);
+
+	/* a fragment dissolves on insertion: its children become direct children of <body>, which is
+	 * the shape the classifier reads — not the fragment itself, which is never a child of anything */
+	const frag = document.createDocumentFragment();
+	const fromFrag = document.createElement('span');
+	frag.appendChild(fromFrag);
+	document.body.append(frag);
+	check((window.__fsBodyAdds || []).includes(fromFrag), 'append(fragment) is recorded');
+	document.body.removeChild(fromFrag);
+
+	document.body.insertAdjacentHTML('beforeend', '<div id="fs-smoke-iah-probe"></div>');
+	const iah = document.getElementById('fs-smoke-iah-probe');
+	check(!!iah && (window.__fsBodyAdds || []).includes(iah), 'insertAdjacentHTML(beforeend) is recorded');
+	if (iah) iah.remove();
+
+	/* the wrap is on the <body> INSTANCE only — an append onto some other element must not be seen */
+	const other = document.createElement('div');
+	const child = document.createElement('span');
+	other.appendChild(child);
+	check(!(window.__fsBodyAdds || []).includes(child), 'a non-body appendChild is not recorded');
+
+	return notes;
+}, recorderMatch[1]) : [ { ok: false, m: 'body-litter recorder: header.ut\'s <body> no longer opens '
+	+ 'with a plain, non-interpolated <script>…</script> — the recorder moved, was deleted, or '
+	+ 'gained a ucode interpolation this extractor does not handle' } ];
+
 await browser.close();
 close();
 
 /* the static half runs before the browser and is reported with the rest: collected and then
  * dropped, it proved nothing — removing an export from fs-axes.js left this gate green. */
 result.unshift(...staticChecks);
+result.push(...recorderNotes);
 
 let failed = 0;
 for (const n of result) {

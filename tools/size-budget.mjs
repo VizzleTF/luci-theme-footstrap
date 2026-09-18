@@ -383,7 +383,17 @@ const LIMITS = {
 	/* 96,386 B on 2026-09-13: `applyAnchor()` and `scheduleAnchor()` name the exit they took (`_anchorWhy`, exported as `anchorWhy()` for the sweep, the twin of `lateWhy()`): the engine-OFF cell of /admin/network/dhcp @390 top compact corrected at 1034 ms and 1885 ms on firefox with `theme said: null`, and the five silent returns on this path all read as late from outside. The limit goes to 96,460. */
 	/* 96,600 B on 2026-09-13: both correction paths keep the last eight decisions with the time they were taken (`lateTrail()`, `anchorTrail()`, printed relative to the refill): a single last word read `theme said: armed` at the end of the window on firefox /admin/network/dhcp @390 top large, engine on, with the correction landing at 1744 ms, and cannot tell a settle that never ran from one that ran and was re-armed. The limit goes to 96,680. */
 	/* 96,802 B on 2026-09-13: the growth witness in observeContent() ignores a floored box that starts at or below the reader's reference — 0f298ef made refills one level inside a box count as growth, and growth BELOW the reader then moved them: a 120 px refill under the viewport moved the reader -120 px on firefox and chromium, engine anchoring on — plus four trail markers in lateDrift() (frame, wait-frame, wait-idle-*, settle) that located the frame stall behind the late corrections. The limit goes to 96,880. */
-	resourcesJs: 96_880,
+	/* 97,473 B on 2026-09-18: fs-router.js's body-litter classifier (strayBodyNode()/bodyLittered(),
+	 * issue #56) — a document that leaves nodes as direct children of <body> (luci-app-bandix's own
+	 * tooltip/modal nodes) now declines the SPA nav the same way an invasive foreign sheet already
+	 * does, instead of leaving them behind unstyled and duplicated on a return visit. The classifier
+	 * itself and its hook in navigate() are almost all of the rise; reading the chrome mark through
+	 * `dataset.fsChrome` rather than `hasAttribute('data-fs-chrome')` — needed because the literal
+	 * quoted attribute name is what `tools/chrome-fence.mjs`'s own ratchet counts as a new chrome
+	 * root being built — is only about 10 B of it. fs-router.js is on the cold path (required by
+	 * every page), so the whole rise lands on both budgets. The limit goes to 97,560, 87 B of
+	 * head-room. */
+	resourcesJs: 97_560,
 	/* …and this is what a cold page DOWNLOADS, which is the number that matters on a link the router
 	 * is also routing packets over: the set walked from the footer's two entry points
 	 * (tools/lib/page-modules.mjs, coldModules()). 73,918 B on 2026-08-27.
@@ -646,7 +656,11 @@ const LIMITS = {
 	/* 61,499 B on 2026-09-13: the same exit naming as `resourcesJs`'s own note on this commit. The limit goes to 61,570. */
 	/* 61,713 B on 2026-09-13: the same decision trail as `resourcesJs`'s own note on this commit. The limit goes to 61,790. */
 	/* 61,915 B on 2026-09-13: the same growth-witness guard and trail markers as `resourcesJs`'s own note on this commit. The limit goes to 61,990. */
-	coldJs: 61_990,
+	/* 62,561 B on 2026-09-18: the same body-litter classifier as `resourcesJs`'s own note on this
+	 * commit describes — almost all of it the classifier and its hook, about 10 B of it the
+	 * `dataset.fsChrome` read — `fs-router.js` is cold, so every reader pays it once, whether or
+	 * not bandix is installed. The limit goes to 62,650, 89 B of head-room. */
+	coldJs: 62_650,
 };
 
 function bytes(path) {

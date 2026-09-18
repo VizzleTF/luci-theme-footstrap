@@ -74,8 +74,13 @@
 	   than being named in this tree. The chrome requires each name and knows nothing else about it,
 	   so the edge points inwards exactly as fs-router.onNavigate does.
 
-	   Whitelisted to the shape of a LuCI module name before it is printed into a <script>: writing
-	   that file needs root, but a value that reaches an inline script is checked anyway. */
+	   Whitelisted to the shape of a LuCI module name before it is printed into an inline script:
+	   writing that file needs root, but a value that reaches an inline script is checked anyway.
+	   (Deliberately not spelled out with the element's own angle-bracket notation:
+	   tools/lib/ut-scripts.mjs's extractor matches that text as plain text, with no notion of a
+	   ucode comment, so writing it here would pair with the recorder's own closing tag below and
+	   read the whole ucode block between the two as one non-data script, which eslint's DATA-ONLY
+	   rule then rejects.) */
 	let fs_plugins = fsd.plugin ?? [];
 	if (type(fs_plugins) != 'array')
 		fs_plugins = [ fs_plugins ];
@@ -93,6 +98,57 @@
 		stamps the resolved leaf path, so both ways of arriving agree.
 	#}
 	<body class="lang_{{ dispatcher.lang }}" data-page="{{ entityencode(join('-', length(ctx.path) ? ctx.path : ctx.request_path), true) }}">
+		<script>
+			/* Records every node a script parks directly on <body> (issue #56): luci-app-bandix's
+			 * render() appends 7 tooltip/modal nodes unconditionally, on every visit, never
+			 * checking whether they already exist — an SPA nav away left them behind unstyled
+			 * (fs-sheets darkens the page's own <style> on the swap) and a SPA return duplicated
+			 * every id. fs-router.js's strayBodyNode()/bodyLittered() read window.__fsBodyAdds to
+			 * decide whether the document is still fit to navigate away from — Rule 2
+			 * (docs/third-party-apps.md), extended from CSS to the DOM.
+			 *
+			 * First byte of <body>, before a single chrome element or the dispatched page's own
+			 * <div id="view"> + L.require('ui').then(instantiateView) (view.ut, luci-base) —
+			 * nothing able to touch <body> has run yet.
+			 *
+			 * The wrap is an OWN property of the <body> INSTANCE, never Node.prototype: a browser
+			 * extension's content script runs in an isolated JS world that shares the DOM nodes
+			 * but not the page's own property shadows, so an extension injecting into <body> is
+			 * correctly never recorded.
+			 *
+			 * Gap: Element.before()/after()/replaceWith() on a body child are not recorded — only
+			 * <body>'s own methods are wrapped, and none of bandix's 7 appends go through those. */
+			(() => {
+				const body = document.body;
+				if (!body || body.__fsBodyHooked) return;
+				body.__fsBodyHooked = true;
+				const adds = window.__fsBodyAdds || (window.__fsBodyAdds = []);
+				const names = [ 'appendChild', 'insertBefore', 'replaceChild', 'append', 'prepend',
+					'insertAdjacentElement', 'insertAdjacentHTML' ];
+				names.forEach((name) => {
+					const orig = body[name];
+					if (typeof orig !== 'function') return;
+					try {
+						Object.defineProperty(body, name, {
+							configurable: true,
+							writable: true,
+							value() {
+								const before = Array.prototype.slice.call(this.children);
+								const ret = orig.apply(this, arguments);
+								const after = this.children;
+								for (let i = 0; i < after.length; i++) {
+									if (before.indexOf(after[i]) === -1) adds.push(after[i]);
+								}
+								return ret;
+							}
+						});
+					}
+					/* a host that refuses to redefine this one name leaves it unwrapped; the rest
+					 * still are */
+					catch (e) {}
+				});
+			})();
+		</script>
 		{#
 			The wallpaper pattern's paint surface: 15-wallpaper.css masks this element so an
 			uploaded SVG takes the theme's ink. A mask applies to an element's whole rendering,

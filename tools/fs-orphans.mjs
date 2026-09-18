@@ -139,6 +139,8 @@ const JUSTIFIED_UNSTYLED = {
 	'fs-ap-fold-': 'an id PREFIX built in JS (`fs-ap-fold-` + n) so each folded group\'s button can point aria-controls at its panel; the button and panel are styled by .fs-ap-fold / .fs-ap-body',
 	'fs-search-opt-': 'an id PREFIX built in JS (`fs-search-opt-` + i) so the combobox can point aria-activedescendant at a row; the rows themselves are styled by .fs-search-opt',
 	'fs-ovl-panel-': 'an id PREFIX built in JS (`fs-ovl-panel-` + n) so a disclosure header can point aria-controls at its panel; the panel itself rides on the card\'s own styling, unclassed',
+	'fs-appearance-probe': 'a JS hook (fs-appearance.js, issue #56): fs-router.js\'s strayBodyNode() reads the id to tell this hidden colour-reading probe apart from body litter; it is painted entirely by its own inline !important declarations, on purpose (issue #19), never by a stylesheet',
+	'fs-chrome-geom-probe': 'a JS hook (fs-chrome.js, issue #56): same reason as fs-appearance-probe above, for the hidden geometry-reading probe; also painted only by its own inline !important declarations',
 };
 
 const orphanCss = [...styled.keys()].filter(c => !emitted.has(c)).sort();

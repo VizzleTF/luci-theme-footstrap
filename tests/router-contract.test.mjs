@@ -23,8 +23,14 @@ function router({ L, window, document, ui } = {}) {
 			 * wildcard page — i.e. the one that goes on to wire the listeners */
 			'fs-menutree': { currentNode: () => null, segsFromPath: () => null, resolveSegs: () => null,
 				viewClassFor: () => null, tree: () => null },
-			'fs-chrome': { syncActive() {}, renderTabMenu() {} },
-			'fs-sheets': { watchViewSheets() {}, pageIsPoisoned: () => false }
+			/* renderChrome is the only chrome.* call navigate() makes (fs-router.js); syncActive
+			 * and renderTabMenu named neither a current nor an exported fs-chrome.js surface and
+			 * were never reached by anything in this file */
+			'fs-chrome': { renderChrome() {} },
+			/* documentPoisoned is what navigate() actually calls; pageIsPoisoned was the stale
+			 * name — a future navigate() test stubbing the old one would have exercised
+			 * `sheets.documentPoisoned()` as undefined instead of the fixture's intended answer */
+			'fs-sheets': { watchViewSheets() {}, documentPoisoned: () => false }
 		}
 	});
 }

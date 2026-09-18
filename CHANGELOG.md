@@ -10,6 +10,22 @@
 
 ### Fixed
 
+- **Leaving `luci-app-bandix` (or any view that parks its own nodes on `<body>` and never removes
+  them) is now a full load instead of a broken SPA swap.** `render()` calls
+  `document.body.appendChild()` unconditionally for 7 tooltip/modal nodes; an SPA navigation away used
+  to leave every one of them behind — unstyled once the outgoing page's `<style>` is darkened, sitting
+  under the footer — and a SPA return to bandix duplicated every id on top of what was still there
+  (issue #56, reproduced on `owrt2512` and `owrt2410`). `fs-router.js`'s `navigate()` now asks
+  `bodyLittered()` right beside `documentPoisoned()`: a recorder inline script, the first byte of
+  `<body>` in `header.ut`, wraps `document.body`'s own append methods as INSTANCE properties (never
+  `Node.prototype`, so a browser extension's isolated-world content script is never recorded), and
+  `strayBodyNode()` tells such a node apart from the theme's own chrome (`[data-fs-chrome]`, an `fs-*`
+  id/class) and from what stock LuCI parks in `<body>` itself (`ui.js`'s `#modal_overlay`,
+  `.cbi-tooltip`, and its hidden `<a download>`). Nothing is ever removed — the same reasoning Rule 1
+  already gives for a view's CSS — the document is only ever declined for a fresh one.
+  `luci-app-podkop`'s own toast container reaches the same verdict for the same reason
+  (docs/third-party-apps.md).
+
 - **`lateDrift()` refreshes its baseline on the exits where it decides not to write.** It only did so after a write, so on the two "the engine already got it right" exits the reference stayed where `run()`'s own synchronous call had put it — read in the same microtask as the mutation, before the engine's compensation had settled, which on WebKit is gradual. A stale baseline then masks a real residual on the next tick or invents one that was never there; both shapes stayed open on nine cells (`/admin/network/dhcp @390 top` on all three engines, and one trust flip on an Overview where the reader never moved) until the floor rounding below was found and closed the last of them;  `docs/anchoring.md` now carries the mechanism, the two fixes attempted for it and the numbers each produced — deferring the bare `rememberRest()` calls closed the isolated case and opened a worse one at sweep scale (the engine corrected in 22 ms and something then moved the page the full 120 px away again), so it was reverted rather than shipped.
 
 - **Nine packaging and shell gates stopped passing on nothing.** A second audit pass injected 30 defects into 16 gates and found six that report success on an empty input: `tools/audit.py` printed "none" for all seven sections with the entire stylesheet deleted; `tools/check-shell.sh` read "18 shell script(s) parse" with the whole package directory moved away, down from 27, and exited 0; `update-po.sh --check` called zero catalogues "every string translated"; `tools/build-icons.mjs --check` printed "ok" for an empty icon list. Worse, `tools/check-packages.sh` tested the `.apk` leg **by filename only** — three zero-byte packages passed, so nothing in CI ever opened the artefact 25.12 routers install — and `tools/bang-ok.mjs`, which exists to prove two allowlists agree, matched its own guard against an unrelated line, so deleting the real allowlist still printed "agrees". `check-shell.sh` also parsed with the host's shell, waving through a bashism in `install.sh`, the one file that runs on the router; it now parses router-side scripts with busybox ash. `stage.sh` refuses a release with no tag and no version instead of stamping `0.0.0-r1` as a warning, and `changelog.mjs` no longer announces "mirror in lockstep" on its way to exit 1.
