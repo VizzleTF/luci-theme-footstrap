@@ -37,8 +37,7 @@ project:
     # database, which a sync never touches — so the browser keeps the modules it has and the page
     # runs a mixture of old and new. Both paths, because which one exists depends on the release
     # (docs/development.md, "Caches while iterating").
-    for db in /lib/apk/db/installed /usr/lib/opkg/status; do [ -f "$db" ] && touch "$db"; done
-    rm -rf /www/luci-static/footstrap-top /usr/share/ucode/luci/template/themes/footstrap-top
+    for db in /lib/apk/db/installed /usr/lib/opkg/status; do if [ -f "$db" ]; then touch "$db"; fi; done
 
 defaults:
   fidelity: basic
@@ -242,7 +241,7 @@ routers:
     release: "snapshot"
     ports: { http: 8032, ssh: 2232 }
 
-  # ---- third and fourth instances, one set per browser engine ----
+  # ---- fourth instance, one more set for a browser engine ----
   #
   # Added 2026-09-12. `-b` answered contention between two people; this answers contention inside
   # ONE sweep. `tools/scroll-anchor.mjs --full` is 276 runs per engine, and running the three
@@ -252,21 +251,9 @@ routers:
   # separate node processes, each with its own engine AND its own routers: no shared browser server
   # to lose, and no two contexts hitting one uhttpd.
   #
-  # Same releases and the same third-party fixtures as their originals, so a finding on `-c` or
-  # `-d` carries exactly as much weight as one on the original. Ports: `-c` is `-b` plus 10
-  # (8055/8044/8042, ssh 2255/2244/2242), `-d` is `-c` plus 10 (8065/8054/8052, ssh 2265/2254/2252),
-  # all clear of 2222.
-  - id: owrt2512c
-    release: "25.12.4"
-    ports: { http: 8055, ssh: 2255 }
-    extra_packages: *third_party_apps
-  - id: owrt2410c
-    release: "24.10.8"
-    ports: { http: 8044, ssh: 2244 }
-    extra_packages: *third_party_apps
-  - id: owrtsnapc
-    release: "snapshot"
-    ports: { http: 8042, ssh: 2242 }
+  # Same releases and the same third-party fixtures as their originals, so a finding on `-d` carries
+  # exactly as much weight as one on the original. Ports: `-d` is `-b` plus 20
+  # (8065/8054/8052, ssh 2265/2254/2252), clear of 2222.
   - id: owrt2512d
     release: "25.12.4"
     ports: { http: 8065, ssh: 2265 }

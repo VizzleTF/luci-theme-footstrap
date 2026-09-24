@@ -1,4 +1,4 @@
-/* Pre-minify the theme's shipped JS with terser, in place, before the SDK build.
+/* Pre-minify the theme's shipped JS with terser, in place, for the owfeed release build.
  *
  * terser rather than jsmin: jsmin strips comments and whitespace only, while identifiers are wire
  * bytes and uhttpd serves /www with no compression — measured on this tree, jsmin ~57 KB against
@@ -9,11 +9,13 @@
  * It runs from tools/stage.sh over the STAGED payload, never over the checkout: it rewrites every
  * file it is handed in place.
  *
- * The Makefile keeps the other half of the contract: FOOTSTRAP_PREMIN=1 makes it set
- * LUCI_MINIFY_JS:=0, because jsmin MUST NOT run over terser output — terser legitimately emits
- * `return/^v/.test(s)` shapes, the exact one-character-lookback trap (openwrt/luci#8299) that eats
- * the rest of the file and exits 0. A build without this step minifies the untouched source with
- * jsmin as before; wrap-regex and tools/jsmin-verify.mjs guard that path.
+ * No knob keeps jsmin off terser output anymore: the two minifiers now sit on disjoint paths
+ * instead. owfeed (this file, via tools/stage.sh) never runs luci.mk, so jsmin never touches its
+ * output; an SDK/buildbot build never calls this file, so it always jsmins the untouched source
+ * under luci.mk's own default (LUCI_MINIFY_JS?=1) — double-minifying the same bytes is not wired
+ * up on either path. jsmin's own trap survives regardless: `return/^v/.test(s)`, the
+ * one-character-lookback bug (openwrt/luci#8299) that eats the rest of a file and exits 0 — still
+ * guarded by wrap-regex and tools/jsmin-verify.mjs on the SDK path.
  *
  * THE SEAM NAMES ARE RESERVED, AND THE LIST IS DERIVED. Terser never RENAMES a free variable like
  * `L`, but it will happily CREATE one: handed the file on its own, it takes the top level for

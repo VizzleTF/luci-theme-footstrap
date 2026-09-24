@@ -10,11 +10,9 @@
 	/* #syslog: absorbed into pages/70-syslog.css — in base it LOST to the theme layer's generic
 	 * form-field box (a layer beats specificity), so the log rendered as a 210px column. */
 
-	/* `:not(.placeholder)`: a hover cue promises a row you can act on, and the empty-table row is
-	 * not one. The theme's row hover already spares it (theme/30-tables.css, issue #5.2), but this
-	 * rule paints the CELL, and a placeholder row carrying no `.cbi-section-table-row` class
-	 * escapes that guard — measured on UPnP (issue #15).
-	 * Fixed here rather than repainted later, so there is one hover contract. */
+	/* :not(.placeholder): the empty-table row gets no hover cue (theme/30-tables.css spares it),
+	 * but this rule paints the CELL and a placeholder row carrying no `.cbi-section-table-row`
+	 * class escapes that guard — measured on UPnP (issue #15). */
 	.cbi-section-table .tr:not(.placeholder):hover .td,
 	.cbi-section-table .tr:not(.placeholder):hover .th,
 	.cbi-section-table .tr:not(.placeholder):hover::before {
@@ -29,32 +27,9 @@
 		font-weight: var(--fs-weight-bold);
 	}
 
-	/* The GridSection name column, where the two releases' markup genuinely differs and one
-	 * stylesheet serves both: 25.12's form.js renders the name as a real `th` plus
-	 * `td.cbi-section-table-titles` and keeps `data-title` on the row only for the drag handle,
-	 * while 24.10 renders no cell at all and expects `::before` to generate the column from
-	 * `data-title`. Upstream ships a different cascade.css per branch (25.12's says
-	 * `content: none`, 24.10's `content: attr(data-title) " "`), so taking 25.12's copy verbatim
-	 * deletes the Name column on every 24.10 router (issue #9).
-	 *
-	 * Each row type therefore asks the MARKUP, never the release:
-	 *   header — carries `data-title` on 24.10 only; 25.12 appends a real `th` instead.
-	 *   row    — BOTH set `data-title`, so the discriminator is the name cell 25.12 adds.
-	 *   descr  — has neither, so it follows the header that already proved the branch. It needs the
-	 *            empty spacer (`data-title` is absent, so the content is just " ") or its column
-	 *            labels sit one cell left of the values they describe. A descr row with no header
-	 *            row above it (every column carrying a description but no title) therefore keeps no
-	 *            spacer — no shipped page renders that, so it is untested rather than handled.
-	 * Never key on the VALUE: the header's data-title is _('Name'), i.e. translated.
-	 *
-	 * This rule states only that the column EXISTS — its padding, type and separator are the cell
-	 * rules' job in theme/30-tables.css, next to the real cells it has to line up with. (Upstream
-	 * declares the border-top here; ours would draw the stray line above the header that issue #7
-	 * removed from every other cell.) */
-	/* SPLIT OFF THE :has() HALF, and the split is the point: an engine that cannot parse `:has()`
-	 * throws away the WHOLE rule, siblings included — so a Firefox older than 121 lost the two
-	 * plain selectors above with it, and stacked tables came up with no card labels at all. Same
-	 * declarations, two rules, and the half that needs nothing new survives on its own. */
+	/* GridSection name column, discriminated by markup not release: docs/css.md "base/95-luci.css:
+	 * the GridSection name column, read from the markup, not the release" (issue #9). Column
+	 * geometry lives in theme/30-tables.css, next to the real cells it lines up with. */
 	.cbi-section-table-titles.named[data-title]::before,
 	.cbi-section-table-titles.named[data-title] ~ .cbi-section-table-descr.named::before {
 		content: attr(data-title) " ";
@@ -79,7 +54,7 @@
 		border: none;
 	}
 
-	/* cell-filling field widths (+ the numeric-cell refinement): theme/30-tables.css —
+	/* cell-filling field widths (+ numeric-cell refinement): theme/30-tables.css —
 	 * absorbed with the generic field box, which would out-layer them here */
 
 	.table.cbi-section-table .td.cbi-section-table-cell {
@@ -100,9 +75,7 @@
 	.td.cbi-section-actions > :not(.cbi-dropdown) > *,
 	.td.cbi-section-actions > * > form > * {
 		flex: 1 1 4em;
-		/* at 1px apart, adjacent row actions sat inside each other's 24px target circle
-		 * (WCAG 2.2 SC 2.5.8) — see the min-height in theme/55-buttons.css */
-		margin: 0 var(--fs-space-1);
+		margin: 0 var(--fs-space-1); /* WCAG 2.2 SC 2.5.8: 1px apart, targets sat inside each other */
 	}
 
 	.td.cbi-section-actions > * > form {
@@ -124,9 +97,8 @@
 	th[data-sort-direction="asc"]::after { content: "\a0\25b2"; }
 	th[data-sort-direction="desc"]::after { content: "\a0\25bc"; }
 
-	/* The help sentence, indented to clear the ? glyph its ::before hangs in the margin. The
-	 * indent and the glyph's own `left` are ONE relationship — both said 1.25em, stated twice — so
-	 * they now derive from a single local. */
+	/* Indent and the ::before glyph's own `left` are ONE relationship (both 1.25em, stated twice
+	 * before) — now one local. */
 	.cbi-value-description {
 		--help-indent: 1.25em;
 
@@ -135,10 +107,8 @@
 	}
 
 	.cbi-value-description:not(:empty)::before {
-		/* OURS, and drawn as a STROKE like every other glyph this theme owns (--spinner-icon below,
-		 * --fs-icon-refresh in 02-tokens.css: fill:none, round caps, a 24 grid). It replaces a solid
-		 * filled path copied verbatim from luci-theme-bootstrap: a drawn path is authored expression
-		 * in a way `padding: 8px` is not, which made it the sharpest item in that inheritance. */
+		/* OURS, drawn as a stroke like --spinner-icon below and --fs-icon-refresh in 02-tokens.css
+		 * (fill:none, round caps, 24 grid) — not the solid filled path luci-theme-bootstrap used. */
 		--help-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9.4'/><path d='M8.9 9.4a3.2 3.2 0 1 1 3.9 3.6v1.4'/><path d='M12.8 17.6h-.02'/></svg>");
 
 		position: absolute;
@@ -155,7 +125,7 @@
 		-webkit-mask-size: cover;
 	}
 
-	/* tint (and the 6%-not-12% reasoning): theme/30-tables.css — absorbed */
+	/* tint (6%-not-12% reasoning): theme/30-tables.css — absorbed */
 	.cbi-section-error {
 		border: 1px solid var(--fs-danger);
 		border-radius: var(--fs-radius);
@@ -166,8 +136,7 @@
 	.cbi-section-error ul { margin: 0 0 0 var(--fs-space-5); }
 
 	.cbi-section-error ul li {
-		/* colour: theme/35-alerts.css — absorbed */
-		font-weight: var(--fs-weight-bold);
+		font-weight: var(--fs-weight-bold); /* colour: theme/35-alerts.css — absorbed */
 	}
 
 	.ifacebox {
@@ -175,47 +144,29 @@
 		margin: 0 var(--fs-space-3);
 		text-align: center;
 		white-space: nowrap;
-		/* surface: theme/45-misc.css (flat) — absorbed */
 		border-radius: var(--fs-radius-sm);
 		display: inline-flex;
 		flex-direction: column;
-		/* a plate of single-line labels, not prose */
-		line-height: var(--fs-leading-tight);
+		line-height: var(--fs-leading-tight); /* a plate of single-line labels, not prose */
 		min-width: 100px;
 	}
 
 	.ifacebox .ifacebox-head {
 		border-bottom: var(--fs-hairline);
-		/* the head sits INSIDE the box's 1px border, so its own radius is the box's less that
-		 * border — restating a smaller literal is how the two drifted apart before. */
+		/* inside the box's 1px border, so radius = the box's less that border */
 		border-radius: calc(var(--fs-radius-sm) - 1px) calc(var(--fs-radius-sm) - 1px) 0 0;
 		padding: var(--fs-space-0-5);
-		/* surface + ink: theme/45-misc.css — absorbed */
 	}
 
-	/* The !important fights luci-mod-network's inline zone-colour `style=`: a raw zone colour is too
-	 * bright on a dark panel, so it is re-mixed at .4/.3.
-	 *
-	 * No fallback on --zone-color-rgb, and that is load-bearing: LuCI sets that var inline only
-	 * where there IS a zone colour, so elsewhere the declaration is invalid at computed-value time
-	 * and, being !important, resolves to `unset` and wipes the plain inline background — which is
-	 * the desired outcome. A fallback grey makes the rule apply there and tints five interface
-	 * boxes that correctly show the panel behind them (measured, computed-style diff). */
+	/* !important fights luci-mod-network's inline zone-colour style=: docs/css.md "base/95-luci.css:
+	 * the dark-mode zone tint, and why it has no grey fallback". */
 	[data-darkmode="true"] .zonebadge[style],
 	[data-darkmode="true"] .ifacebox-head[style] {
 		background: linear-gradient(rgba(var(--zone-color-rgb), .4), rgba(var(--zone-color-rgb), .3)) !important;
 	}
 
-	/* `.ifacebox` above is `white-space: nowrap` — right for a plate of one-word head labels, wrong
-	 * for the body's own stat/address lines once they are long enough to need a break: measured
-	 * three times under three different scopes before this rule (Network overview's
-	 * `#cbi-network-interface`, the upstream plates' `.network-status-table`, and — pseudo-loc,
-	 * gallery's plain Port-tile fixture with no `port_*.svg` icon — a 320px/Large stat line "1000
-	 * Mbit/s / 1.2 GiB / 8.3 GiB" already 33px past a 118px box in PLAIN ENGLISH, no translation
-	 * involved) — the base rule owns it once instead of a fourth scoped copy the next real page
-	 * would need again. `overflow-wrap: anywhere`, not `break-word`: only `anywhere` lowers the
-	 * box's own min-content, letting the flex item actually shrink to the tile (65-dropdown.css's
-	 * own reasoning for the same two properties). */
+	/* generalised once: docs/css.md "base/95-luci.css: the overflow-wrap fix generalised once, not
+	 * restated per page". */
 	.ifacebox .ifacebox-body {
 		padding: var(--fs-space-1);
 		white-space: normal;
@@ -232,11 +183,9 @@
 		flex-direction: row;
 		border: var(--fs-hairline);
 		padding: var(--fs-space-0-5);
-		/* surface: theme/45-misc.css (flat) — absorbed */
 		color: var(--fs-text);
 		border-radius: var(--fs-radius-sm);
 		cursor: default;
-		/* a badge is one line of label — the tight step, like .ifacebox above */
 		line-height: var(--fs-leading-tight);
 	}
 
@@ -247,7 +196,6 @@
 	}
 
 	.ifacebadge-active {
-		/* border-color: theme/45-misc.css (accent) — absorbed */
 		font-weight: var(--fs-weight-bold);
 	}
 
@@ -266,17 +214,10 @@
 		flex-direction: column;
 		height: 100%;
 		text-align: start;
-		/* the wrap fix (an uncompressed IPv6 is ~380px of unbreakable text, measured 45px over the
-		 * card at 390px before it shipped) now lives on `.ifacebox .ifacebox-body` above, generalised
-		 * to every plate rather than restated per scope — this rule keeps only what is unique to the
-		 * upstream layout: full-height flex column, address-block start alignment. */
 	}
 
-	/* The head got the port tiles' `nowrap` (short one-word labels: "wan", "lan2") but sits in the
-	 * SAME shrinking flex item as the body above, and RU's "IPv4 Upstream" caption is a sentence,
-	 * not a word: "Подключение IPv4 (внешняя сеть)" measured 301px in a 288px column at 320px/
-	 * Density Large, 41.3px past #view, with the .cbi-section clipped by 42px and no scroller — EN
-	 * at the same width and density: 0. Same two declarations as the body, same reasoning. */
+	/* same fix as .ifacebox-head above, same doc section (RU caption "Подключение IPv4
+	 * (внешняя сеть)" measured 41.3px past #view at 320px/Large, 0px in English). */
 	.network-status-table .ifacebox-head {
 		white-space: normal;
 		overflow-wrap: anywhere;
@@ -304,11 +245,14 @@
 
 	.ifacebadge.large,
 	.network-status-table .ifacebox-body .ifacebadge {
-		display: flex;
 		flex: 1;
 		padding: var(--fs-space-1);
 		min-width: 220px;
 		margin: var(--fs-space-1);
+	}
+
+	.network-status-table .ifacebox-body .ifacebadge {
+		display: flex;
 	}
 
 	.ifacebadge.large {
@@ -346,16 +290,14 @@
 	}
 
 	.zonebadge-empty {
-		/* width/style only — colour + ink: theme/45-misc.css */
-		border: 1px dashed var(--fs-border);
+		border: 1px dashed var(--fs-border); /* width/style only — colour + ink: theme/45-misc.css */
 		font-style: italic;
 		font-size: smaller;
 	}
 
-	/* color: theme/60-inputs.css — absorbed. */
 	div.cbi-value var,
 	.td.cbi-value-field var {
-		font-style: italic;
+		font-style: italic; /* colour: theme/60-inputs.css — absorbed */
 	}
 
 	div.cbi-value var[data-tooltip],
@@ -379,31 +321,25 @@
 	}
 
 	#modal_overlay > .modal.login > button.important {
-		/* no !important needed: the ID makes this (1,3,1), which no button rule can reach */
-		/* Coverage vocabulary, not a live control: nothing in luci-base gives a modal the `login`
-		 * class (ui.showModal takes classes and no call site passes one), and this theme's own
-		 * login is a server-rendered form, not a modal. It is inherited from luci-theme-bootstrap,
-		 * which carries the same selector, so an app that emits it gets a themed result — a step up
-		 * the scale, where it was a bare 120% of whatever the button happened to be. */
+		/* Coverage vocabulary, not a live control: no luci-base call site passes ui.showModal a
+		 * `login` class, and this theme's own login is a server-rendered form. Inherited from
+		 * luci-theme-bootstrap so a foreign app emitting it still gets a themed result. */
 		font-size: var(--fs-type-lg);
 		margin-top: var(--fs-space-2);
 		width: 100%;
 	}
 
-	/* a list of changed settings, one per line: prose leading, not a hand 170%. */
 	.uci-change-list {
-		line-height: var(--fs-leading);
+		line-height: var(--fs-leading); /* prose leading for a list of changed settings, not a hand 170% */
 		white-space: pre;
 	}
 
-	/* one changed-setting row. It carried `line-height: 15px` — a hand number under a 13px face;
-	 * a row of single-line code takes the tight step like every other plate here. */
 	.uci-dialog div > del,
 	.uci-dialog div > ins,
 	.uci-dialog div > var {
 		margin-bottom: var(--fs-space-0-5);
 		border: var(--fs-hairline);
-		line-height: var(--fs-leading-tight);
+		line-height: var(--fs-leading-tight); /* one row of single-line code takes the tight step */
 		overflow: hidden;
 		text-overflow: ellipsis;
 		padding: var(--fs-space-0-5);
@@ -489,25 +425,10 @@
 		margin: 15vh auto;
 	}
 
-	/* Rotate in CSS, NEVER with a SMIL <animateTransform> inside the data-URI: that runs in
-	 * the SVG's own document, which the page's `prefers-reduced-motion` cannot reach — the
-	 * one spinner a motion-sensitive user could not turn off. theme/95-a11y-media.css now
-	 * stops it like everything else. (The circle under the arc is rotationally symmetric,
-	 * so spinning the whole box looks identical.) */
-	/* ---- the glyph sits in the flow, which is the fix for a whole bug class ----
-	 *
-	 * Absolutely positioned, the host has to be told to leave room for it — a `padding-left` that
-	 * must out-rank whatever else pads that element. That race cannot be won: every padding rule
-	 * aimed at a button is a candidate and the loser is silent, the glyph simply drawing on top of
-	 * the label. Twice reported from the field, each time by a more specific rule than the last:
-	 * issue #15 (`.td .cbi-button`, 0,2,0) and issue #22, whose
-	 * `.cbi-section .table[id] .td .cbi-button` is 0,5,0 — there the ladder had padding-left at
-	 * 10px against the 32px the glyph needs.
-	 *
-	 * In the flow the glyph reserves its own space, so no host needs a padding and there is nothing
-	 * to out-rank. `flex: 0 0 auto` because the buttons are `inline-flex` and a flex item with a
-	 * mask is squeezable; `vertical-align: middle` for the non-flex hosts. The centring is the
-	 * host's own align-items or baseline alignment. */
+	/* Rotate in CSS, never a SMIL <animateTransform> inside the data-URI: that runs in the SVG's
+	 * own document, out of reach of the page's `prefers-reduced-motion`. In-flow glyph, not
+	 * absolutely positioned: docs/css.md "base/95-luci.css: the spinner glyph sits in the flow, on
+	 * purpose" (issues #15, #22). */
 	.spinning::before {
 		--spinner-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' stroke='%23000' stroke-width='3' fill='none'><circle cx='10' cy='10' r='8' stroke-opacity='.5'/><path d='M10 2c4 0 8 4 8 8'/></svg>");
 
@@ -515,22 +436,20 @@
 		flex: 0 0 auto;
 		vertical-align: middle;
 		margin-inline-end: var(--fs-space-1);
-		width: var(--fs-spin-size);
-		height: var(--fs-spin-size);
+		width: var(--fs-space-5); /* one reader, so the size lives here rather than behind a token */
+		height: var(--fs-space-5);
 		content: " ";
 		background: var(--on-color, #000);
 		mask: var(--spinner-icon) center/cover no-repeat;
 		-webkit-mask: var(--spinner-icon) center/cover no-repeat;
-		/* The two deliberate exceptions to the motion scale (02-tokens.css), both because this
-		 * is a LOOP, not a state change: 1s is a spinner period, not one of the four durations;
-		 * and `linear` is the one justified curve — `ease` would slow at each turn's seam, so an
-		 * infinite rotation visibly stutters once a second instead of spinning. */
+		/* two deliberate exceptions to the motion scale (02-tokens.css): a LOOP, not a state change
+		 * — 1s is a spinner period not one of the four durations, and `linear` avoids the stutter
+		 * `ease` gives an infinite rotation at each turn's seam. */
 		animation: fs-spin 1s linear infinite;
 	}
 
-	/* One user in this theme (`.spinning::before` above) — the rail's poll glyph is
-	 * deliberately STATIC (theme/20-shell.css; the spin was what broke that click).
-	 * Unscoped anyway: keyframe names resolve document-wide, so a luci-app-* may ride it. */
+	/* One user (.spinning::before above) — the rail's poll glyph is deliberately STATIC
+	 * (theme/20-shell.css). Unscoped: keyframe names resolve document-wide, a luci-app-* may ride it. */
 	@keyframes fs-spin { to { transform: rotate(360deg); } }
 
 	[data-darkmode="true"] .spinning::before {
@@ -552,16 +471,12 @@
 		transition: opacity var(--fs-dur-fade);
 	}
 
+	/* min(210px, 100%) floor: docs/css.md "base/95-luci.css: the file browser's floor, and the row
+	 * that is not text". */
 	.cbi-filebrowser {
-		/* `min(210px, 100%)`, not a bare 210: the floor keeps the file list readable, and a floor
-		 * wider than the field it sits in is not a floor but an overflow — measured at a 300px
-		 * viewport, the panel held 210px inside a 203px field and its whole upload row (the input,
-		 * Upload file, Cancel) stood 7px outside the card. Same shape as the dynlist's floor one file
-		 * over, and the same fix. Nothing moves at any width where the field is wider than 210. */
 		min-width: min(210px, 100%);
 		max-width: 100%;
-		/* width/style only; radius: theme/60-inputs.css — absorbed */
-		border: var(--fs-hairline);
+		border: var(--fs-hairline); /* width/style only; radius: theme/60-inputs.css — absorbed */
 		display: flex;
 		flex-direction: column;
 		opacity: 0;
@@ -569,8 +484,8 @@
 		overflow: hidden;
 	}
 
-	/* padding: theme/60-inputs.css — absorbed. The zero side padding here was what let a 36px
-	 * themed button touch this element's own clip box and lose its corners to it. */
+	/* padding: theme/60-inputs.css — absorbed. Zero side padding here let a 36px themed button
+	 * touch this element's own clip box and lose its corners. */
 	.cbi-filebrowser > * {
 		max-width: 100%;
 		overflow: hidden;
@@ -584,16 +499,9 @@
 		margin-inline-end: .25em;
 	}
 
-	/* `.cbi-filebrowser > *` above gives every row `nowrap` + ellipsis on the assumption that a row
-	 * is ONE LINE OF TEXT — true for the path and each listing row, false for `.right`: its content
-	 * is the upload strip (its own flex row) plus the Create/Cancel buttons, none of it text that an
-	 * ellipsis can stand in for. `nowrap`, inherited by `.upload` and its Browse button, was blocking
-	 * the wrap that button already had (`flex-wrap: wrap`, theme/60-inputs.css) from ever firing, and
-	 * `overflow: hidden` had no ellipsis to show for a clipped BUTTON — pseudo-loc measured Cancel's
-	 * label rendered 76px past this box with no "…" drawn, the severe case the gate's own docs call
-	 * "text the reader cannot reach", not the accepted dropdown/tab shape. `normal` restores the
-	 * ordinary wrap a button row gets everywhere else in the theme; `visible` undoes a clip a
-	 * text-only rule has no business applying to a row of controls. */
+	/* .right is not one line of text (upload strip + Create/Cancel), so it opts out of the
+	 * nowrap+ellipsis assumption above: docs/css.md "base/95-luci.css: the file browser's floor,
+	 * and the row that is not text". */
 	.cbi-filebrowser > .right {
 		white-space: normal;
 		overflow: visible;
@@ -608,9 +516,8 @@
 		flex-direction: row;
 	}
 
-	/* row hover surface, and the row's whole flex sizing: theme/60-inputs.css — absorbed. The
-	 * proportional split that lived here (name `flex: 10` / actions `flex: 3`) fitted base's ~20px
-	 * buttons and not the theme's 36px ones, which is how a file row came to clip its own Delete. */
+	/* row hover surface + flex sizing: theme/60-inputs.css — absorbed (this file's old
+	 * name:10/actions:3 split fitted base's ~20px buttons, not the theme's 36px ones). */
 	.cbi-filebrowser > ul > li > div:first-child {
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -659,15 +566,10 @@
 		100% { opacity: 0; }
 	}
 
-	/* The `fade-in` keyframes above stay although nothing here rides them: it is an upstream
-	 * animation NAME a luci-app-* may ride (coverage contract, docs/conventions.md). The theme's own
-	 * rule on the `.fade-in` CLASS is gone on purpose — luci-mod-status re-marks with it on every
-	 * poll tick, so anything hung there replays on every tick across the whole column.
-	 *
-	 * `fs-fade` is the theme's own and is one-shot: the rail flyout and the search overlay each
-	 * play it once, when the surface opens, which is why its 4px rise is right there and wrong on
-	 * a class the poll rewrites. Both keyframes live here because every keyframes in this theme
-	 * does, and an unresolvable animation-name is simply dropped, silently. */
+	/* `fade-in` stays although nothing here rides it: an upstream animation NAME a luci-app-* may
+	 * ride (coverage contract, docs/conventions.md). The theme's own `.fade-in` CLASS rule is gone
+	 * on purpose — luci-mod-status re-marks it on every poll tick, replaying anything hung there.
+	 * `fs-fade` is one-shot instead, played once by the rail flyout and the search overlay. */
 	@keyframes fs-fade {
 		from { opacity: 0; transform: translateY(4px); }
 		to { opacity: 1; transform: none; }
@@ -698,24 +600,15 @@
 		word-break: normal;
 	}
 
-	/* Statistics renders its graphs as PNGs on a white ground, so dark mode inverts them. 180deg is
-	 * arithmetic rather than taste: invert() maps every hue to h+180, so rotating 180 back restores
-	 * the original hue while keeping the inverted lightness. Read back off collectd's own cpu
-	 * series, at 150deg System (h=0) came back at h=301 and User (h=240) at h=180 — 59 and 60
-	 * degrees out, i.e. the blue plot was drawn cyan. At 180deg all three primaries are exact.
-	 *
-	 * It is not exact for every colour and cannot be: CSS hue-rotate is a linear matrix
-	 * approximation, so a non-primary survives only approximately (amber lands 13deg out). Do not
-	 * tune the angle — moving off 180 trades an exact red/green/blue for a marginally better
-	 * amber. */
+	/* PNGs on a white ground, inverted for dark mode: docs/css.md "base/95-luci.css: Statistics
+	 * graphs and Realtime SVGs are art drawn for a white ground" — 180deg is exact for the three
+	 * primaries, not tuned further. */
 	[data-darkmode="true"] [data-page="admin-statistics-graphs"] [data-plugin] img {
 		filter: invert(100%) hue-rotate(180deg);
 	}
 
-	/* Realtime graphs (Status → Load/Traffic) inject resources/svg/*.svg into a div with
-	 * an inline style. The <svg> root carries none itself, so the background needs no flag.
-	 * Its grid <line>s do — `style="stroke:black"` in the .svg — and a black hairline is
-	 * invisible on a dark panel; only an author !important beats an inline declaration. */
+	/* Realtime SVGs carry inline style= for a black ground; only an author !important beats it:
+	 * same doc section. */
 	#view div[style] > svg {
 		background-color: var(--fs-panel);
 	}
@@ -724,20 +617,8 @@
 		stroke: var(--fs-text) !important;
 	}
 
-	/* …and the axis labels beside them: every <text> in the .svg carries an inline fill of the
-	 * file's own light grey plus a black halo, drawn for the black background the file assumes
-	 * rather than for the panel this theme paints. On a light palette that grey lands on white at
-	 * 1.16:1, legible only as the shadow around it, against 17.9:1 for --fs-text, and 14.7:1 on the
-	 * dark panel, where it is the halo that has to go instead. Both come from an inline
-	 * declaration, so both need the flag.
-	 *
-	 * The weight is not decoration: the SVG hardcodes a 9pt label, the smallest type this theme
-	 * renders, and at the regular weight also the thinnest.
-	 *
-	 * A CHILD combinator, and the difference is a page: Channel Analysis derives a colour per BSSID
-	 * and paints both the curve and its SSID label with it, and those labels are built inside a
-	 * <g>, while the grey axis labels are direct children of the <svg>. A descendant selector
-	 * recolours both and leaves the curves as they were; `> text[style]` reaches only the axis. */
+	/* child combinator, not descendant: reaches only the axis labels, not Channel Analysis's
+	 * per-BSSID curve labels nested inside a <g> — same doc section. */
 	#view div[style] > svg > text[style] {
 		fill: var(--fs-text) !important;
 		text-shadow: none !important;

@@ -38,7 +38,7 @@ export function pageModules() {
  * is fetched only when something else asks for it. The prologue shape is the one
  * `tools/minify-js.mjs` parses, and the same constraint applies — the scan stops at the first
  * string literal that is neither `'use strict'` nor a `'require …'`. */
-const FOOTER = resolve(RESOURCES, '../../../ucode/template/themes/footstrap/partials/footer.ut');
+const FOOTER = resolve(RESOURCES, '../../../ucode/template/themes/footstrap/footer.ut');
 
 export function entryModules() {
 	const src = readFileSync(FOOTER, 'utf8');

@@ -17,14 +17,15 @@
  *
  * Needs a running owlab router (docs/development.md); run it against SNAPSHOT too, which is where
  * luci-base's master lands first. */
+import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
-const VERBOSE = process.argv.includes('--verbose');
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf('--' + name);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
+const { values: FLAGS } = parseArgs({ options: {
+	verbose: { type: 'boolean' }, only: { type: 'string' }, all: { type: 'boolean' },
+} });
+const VERBOSE = FLAGS.verbose ?? false;
+const arg = (name, dflt) => FLAGS[name] ?? dflt;
 
 /* Every probe returns `true`, or a STRING saying what it found instead — the string is what a
  * developer reads six months from now, so it names the value, not the expectation. */
@@ -299,7 +300,7 @@ const CONTRACT = [
 
 /* `--all`, like every other live gate: without it this one once measured a subset of what the
  * release matrix (docs/releasing.md) asked for and said "2 router(s)" in a report nobody compared. */
-const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }),
+const list = requireStands(stands(arg('only', ''), { all: FLAGS.all ?? false }),
 	'upstream-contract');
 const browser = await chromium.launch();
 let failed = 0;

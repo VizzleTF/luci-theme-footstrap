@@ -38,13 +38,15 @@
  *   node tools/table-tick.mjs [--only owrt2512] [--widths 390,768] [--pages /admin/status/overview]
  *
  * Needs a running owlab router (docs/development.md). */
+import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf('--' + name);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
+const { values: FLAGS } = parseArgs({ options: {
+	widths: { type: 'string' }, pages: { type: 'string' }, slack: { type: 'string' },
+	only: { type: 'string' }, all: { type: 'boolean' },
+} });
+const arg = (name, dflt) => FLAGS[name] ?? dflt;
 /* 390 is where the difference between an unanswered table and its card stack is largest; 768 is the
  * width the arrival fault was reported at. */
 const WIDTHS = arg('widths', '390,768').split(',').map(Number);
@@ -96,7 +98,7 @@ const SETTLED = () => new Promise((resolve) => {
 	}));
 });
 
-const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'table-tick');
+const list = requireStands(stands(arg('only', ''), { all: FLAGS.all ?? false }), 'table-tick');
 const browser = await chromium.launch();
 const findings = [];
 let ticks = 0, attempts = 0;

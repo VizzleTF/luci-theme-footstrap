@@ -40,7 +40,7 @@ luci-theme-footstrap/
 │   └── usr/share/rpcd/acl.d/luci-theme-footstrap.json
 └── ucode/template/themes/footstrap/    → /usr/share/ucode/luci/template/…
     ├── header.ut  footer.ut  sysauth.ut
-    └── partials/{head,brand,logout,notices,notice,search,icon,footer}.ut
+    └── partials/{head,brand,logout,notices,notice,search,icon}.ut
 ```
 
 `luci.mk` installs by directory presence — no install recipes needed:
@@ -85,7 +85,6 @@ PKG_NAME:=luci-theme-footstrap
 LUCI_NAME:=luci-theme-footstrap   # pin: luci.mk keys the Build/Prepare hook name on LUCI_NAME,
                                   # which defaults to the checkout directory — the CSS build
                                   # would silently not run in a renamed checkout
-FOOTSTRAP_VERSION?=               # CI injects it from the tag; locally the version is git-derived
 LUCI_TITLE:=Footstrap Theme
 LUCI_DEPENDS:=+luci-base          # the WHOLE dependency list
 LUCI_PKGARCH:=all                 # noarch: one build for every target
@@ -96,8 +95,12 @@ include $(TOPDIR)/feeds/luci/luci.mk   # ABSOLUTE, not ../../luci.mk: CI rsyncs 
                                        # package/, not into the feed
 ```
 
-**Do not set `PKG_VERSION`.** `luci.mk` derives it from git; CI injects `FOOTSTRAP_VERSION` from
-the tag, because an SDK build has no `.git` to derive from.
+**Do not set `PKG_VERSION`.** `luci.mk` derives it from git via `PKG_SRC_VERSION`, and nothing in
+this Makefile overrides it. The release is built by owfeed (`tools/stage.sh`), never through the
+SDK, so a Makefile-side version override has nothing left to set it: CI's SDK-build release leg
+set `FOOTSTRAP_VERSION` until it was retired for owfeed (e574d6d), and the `FOOTSTRAP_VERSION?=`
+knob outlived that leg with no remaining setter — `git grep FOOTSTRAP_VERSION` across `.github/`,
+`tools/` and `owfeed.yml` found none, and the knob was dropped.
 
 ### Minification: CSS off, JS on two paths
 
@@ -106,13 +109,15 @@ Two different tools; confusing them is expensive.
 - **`LUCI_MINIFY_CSS:=0` is mandatory.** luci.mk's CSS minifier is **csstidy**, old enough to
   mangle `:has()`, `color-mix()` and nested `calc()`: the package installs and the layout falls
   apart. `build-css.sh` minifies instead — a string-aware awk pass of its own.
-- **`LUCI_MINIFY_JS` has two paths.** A release CI build pre-minifies with **terser**
-  (`tools/minify-js.mjs`, which can mangle identifiers — jsmin cannot) and sets
-  `FOOTSTRAP_PREMIN=1`, which turns `LUCI_MINIFY_JS` to `0`; jsmin on top of terser output would
-  reopen the `return /re/` trap on forms terser legitimately emits. A build **without** node (SDK
-  user, buildbot) keeps the default `1`, and jsmin minifies the untouched source. Both paths
-  matter: comments are ~60% of the JS source, and uhttpd serves `/www` **uncompressed**, so those
-  are bytes on the wire and in flash.
+- **The two JS paths are two separate pipelines, not a knob.** The release is built by owfeed
+  (`tools/stage.sh`), which pre-minifies with **terser** (`tools/minify-js.mjs`, which can mangle
+  identifiers — jsmin cannot) and never touches `luci.mk`, so jsmin never runs over terser's
+  output. An SDK or buildbot build never calls `tools/stage.sh`, so it keeps `luci.mk`'s own
+  default (`LUCI_MINIFY_JS?=1`) and jsmins the untouched source. Nothing sets `LUCI_MINIFY_JS` in
+  the Makefile any more — until 0.14.x it did, gated on a `FOOTSTRAP_PREMIN` variable that only
+  CI's SDK-build release leg set, and nothing set after that leg was retired in v0.11.7. Both
+  paths matter: comments are ~60% of the JS source, and uhttpd serves `/www` **uncompressed**, so
+  those are bytes on the wire and in flash.
 
   The source therefore has to stay jsmin-safe — see the regex rule in
   [conventions.md](conventions.md).
@@ -217,6 +222,131 @@ through the same verified chain, and pins it to the tag the INSTALLED theme came
 of its own version. `tools/check-packages.sh`
 asserts one theme package per format, one catalogue per language package, and none in the theme.
 
+## install.sh: fetch, verify, install
+
+`install.sh` is the standalone `wget -qO- … | sh` installer, run as root on a box whose only
+guaranteed shell is busybox ash. Two paths, chosen by whether the feed can be read:
+
+- **Feed path** (the normal case): writes one repository line, so `apk upgrade`/`opkg upgrade`
+  carries the theme forward on every later run.
+- **Release path**: the feed cannot be read for this router (an architecture owfeed does not
+  publish, or the router cannot reach it at all) — no feed line is ever written for a feed that
+  failed, and the closing message says `$PM upgrade` will **not** carry the theme forward. A 23.05
+  router always takes this path, pinned to `v0.14.2` (`FROZEN_2305_TAG`): that release is the last
+  one that runs there — `ui.RangeSlider` needs 24.10 — and openwrt/luci declined to carry
+  compatibility code for a release it no longer builds
+  ([#8978](https://github.com/openwrt/luci/issues/8978)).
+
+Both paths end in the same `finish()` (cache clear, rpcd reload, the version-report line, the
+"Select Footstrap" hint); `report_version()` inside it is the only place the two paths' wording
+still forks, because the release path has no repository to ask "is something newer available".
+
+### The trust chain
+
+TLS (verified, never `-k`), then an ed25519 **usign** signature over `manifest.txt`, then the
+manifest's own sha256 over the artifact — in that order, and it fails **closed**: a missing usign
+binary, a missing `.sig`, or a digest that does not match refuses the install rather than
+downgrading it. `apk add --allow-untrusted` only waives the `.apk`'s own APK-level signature; the
+usign signature over the manifest is what this path actually trusts, and it is checked first.
+
+The artifact is picked from the signed manifest by an exact `pkg <name> <format>` match, never by
+guessing a filename — resolving the theme by name and taking the first match once installed a
+translation catalogue instead of the theme, because GitHub returns release assets sorted by name
+and `luci-i18n-…` sorts before `luci-theme-…` (issue #6). `RELEASE_BASE` points at
+`releases/latest/download`, never `api.github.com`: the API is rate-limited per source IP
+(60/hour, shared by everyone behind one CGNAT — issue #17), and would need JSON parsing on a box
+that may have no `jsonfilter`.
+
+### `feed_refresh`: a dead feed of ours, not just *a* dead feed
+
+`apk update`/`opkg update` both exit non-zero the instant **any** configured feed is unreachable,
+even when the rest answered — this project's own CI snapshot stand hit it against a stale kmods
+sub-index it kept past the feed's retention window (CI run 34112646188). A bare `|| exit 1` there
+took the whole install down before the theme was ever fetched, so the tolerance has to tell "some
+other feed is down" from "ours is down" without trusting either manager's own exit code: with
+*every* feed unreachable, apk still prints a "packages available" count sourced from the
+**installed** database, not from anything just read (owfeed/owlab#18), and opkg prints no summary
+line at all. So the tolerance counts each manager's own per-feed failure lines against how many
+feeds were **configured** (apk: the `N unavailable,` count; opkg: one `*** Failed to download the
+package list` line per dead feed — measured on 24.10.8, one dead feed of eight gives two
+diagnostic lines and exit 1, four of eight gives eight lines and exit 4). Whatever the count, our
+own feed failing is never tolerated: `repo.owfeed.org` is a distinct host from the stock feeds, so
+an on-path/DNS attacker can blackhole it alone while the rest answer, and an earlier
+`bad < total` tolerance let that read as success on a stale index (security review, task 0176).
+
+### The feed-list rewrite: R1–R4
+
+`disable_other_lines()` and `ensure_first()` keep `customfeeds.list`/`customfeeds.conf` in the
+shape the package manager will actually read, atomically (`atomic_write()`). Four invariants, each
+earned by a real report:
+
+| Rule | Invariant | What broke without it |
+|---|---|---|
+| R1 | The written line is matched **exactly**, never as a substring | `grep -q "$FEED_HOST"` matched a commented, tagged or other-branch/arch line while apk read none of them (forum.openwrt.org/t/251930#160) |
+| R2 | The correct line is placed **first**, and **moved** there even if already present elsewhere | An installer that only ever appended left the line stuck behind an admin's own unparsable line forever — apk's repository reader stops at the first line it cannot tokenise, so "is the line present" stayed true while apk never reached it (tester finding, `m6a-apk.sh` #6) |
+| R3 | Every **other** active line naming us is commented out (never deleted) and reported | One leftover or malformed line sitting above the correct one can shadow the whole feed with no error at all (security review, task 0176-e, `m5a-apk.sh`) |
+| R4 | "Nothing changed" is asked of the package manager (`feed_offer()`), never inferred from "the version did not move" | `apk add`/`opkg install` on an already-satisfied package exits 0 whether or not the feed carries something newer — issues #16, #28, #30, and a router whose feed line apk never read being told "already current" (forum.openwrt.org/t/251930#160) |
+
+The opkg leg matches on the host (`OPKG_HOST_RE`) **or** on the `src`/`src/gz` NAME field being
+ours (`OPKG_NAME_RE`) regardless of host — the two checks differ in case-sensitivity on purpose:
+the host check is case-insensitive (as `grep -Eqi` always was here), the name field is an exact,
+case-sensitive match. Getting that reversed matters in practice: busybox awk has no `IGNORECASE`,
+so the host check is done by lowercasing both sides, and the regex text itself has to reach awk
+through `ENVIRON` rather than `-v` — awk's own `-v var=value` runs escape processing over `value`
+first, which silently turns `\.` back into a bare `.` (measured: the exact hole `FEED_HOST_ESC`
+exists to close, "any character" instead of a literal dot). `ENVIRON` reads the environment string
+verbatim, so the escaped dot survives into the regex that reaches the router.
+
+A line whose NAME field is ours but carries a trailing CR (`src/gz owfeed-packages\r`, no URL) is
+now disabled too — HEAD's shell word-split left the `\r` glued to the field, so it never matched
+`$FEED_NAME` and the line stayed active, which is what opkg's own "Duplicate src declaration"
+against a legitimate second `owfeed-packages` line was diagnosing. The CR-stripped regex match
+closes that gap; this is a fix, not a regression.
+
+`atomic_write()` no longer runs at all when the key fetch itself fails (round-2 fix, below), so
+`keep.d/owfeed-packages` is left unwritten rather than naming a key that was never fetched — also
+correct, and the reverse of HEAD, which wrote it unconditionally before the fetch was even tried.
+
+### Atomic writes
+
+`atomic_write()` resolves the real path, copies its mode/owner onto a temp file in the same
+directory, writes the new content into that copy, then `mv -f`s it over the original — one atomic
+rename, so a failure at any point before it leaves the file exactly as it was. Six shapes were
+found and fixed together in one security review (task 0176):
+
+| Shape | Task | The fix |
+|---|---|---|
+| A bare `mv` over a symlinked customfeeds file replaces it with a plain one, target and mode lost | 0176-g | Resolve the real path first, then rename onto *that* |
+| `cat new > path` truncates the moment the redirect opens; a write that dies partway (OOM, a full overlay) leaves the file empty | 0176-h | Write into a temp file, `mv -f` only once it is complete |
+| A `$(…)` command substitution's own exit status is invisible to `set -e` in the assignment that reads it — a write that failed *inside* it still read as success one level up | 0176-i | Return status is checked with `if ! fn`, never captured with `$(…)` |
+| A failed redirect (disk full, EROFS) mid-function leaks scratch files | 0176-j | Every early return removes every temp file it created |
+| The `:` special builtin's own redirection failure exits the whole non-interactive shell before any `||` cleanup runs | 0176-k | Every truncate uses `printf ''`, never `:` |
+| A `;`-joined group command reports only its last member's exit status, silently swallowing an earlier failure | 0176-l | `&&`-joined, not `;`-joined |
+
+### The `<26` apk version constraint
+
+The theme is now also carried by the official [openwrt/luci](https://github.com/openwrt/luci)
+feed, where `luci.mk` stamps a version from git's commit date instead of this project's own
+numbering (`luci-theme-footstrap-26.246.70755~4fd72fd`, measured on 25.12.4/apk-tools 3.0.5, next
+to owfeed's own `0.14.10-r1`). That stamp only grows with the calendar, so a bare
+`apk add --upgrade "$PKG"` resolves to the highest version across *every* configured repository —
+the other publisher's build, not an upgrade to this one (field report: "Upgraded …
+-> 26.246.70755~4fd72fd"). `apk version -t` confirms `26.246.70755~4fd72fd` and `27.1.1~abc` both
+compare `>` against `26`, while `0.14.10-r1`, `1.0.0-r1` and `25.99.99-r1` all compare `<` — so
+`<26` excludes every LuCI-stamped build for good while leaving this project's own numbering
+(majors 1–25) room to grow into, and the same constraint also **repairs** a router that already
+took the foreign build (measured: "Downgrading luci-theme-footstrap (26.246.70755~4fd72fd ->
+0.14.10-r1)"). Do not tighten it to `<1` — that would reject this project's own future majors too.
+opkg has no version-constraint syntax and no equivalent collision today (the official 24.10 feed
+carries no `luci-theme-footstrap` at all); if that changes, the fallback is already written —
+`install_from_release`, the same verified path a router with no matching feed branch already
+takes.
+
+`apk add` alone never upgrades — a package already in `world` and satisfied exits 0 unchanged,
+prints its usual OK line, and changes nothing (issues #16, #28, #30; reproduced on a 25.12 stand
+carrying 0.12.5 with 0.12.7 in the feed). `--upgrade` is what asks for the newest the feed carries,
+and it also installs on a router that has none yet, so one line covers both paths.
+
 ## uci-defaults: registration
 
 `root/etc/uci-defaults/30_luci-theme-footstrap` is the **single source of truth** for
@@ -229,9 +359,11 @@ registration (`dev-sync.sh` runs the same file; nothing else registers the theme
   live in `/etc/footstrap`, because uhttpd serves `/www` only and `/etc` is what a sysupgrade
   keeps. The pattern keeps its `.svg` name — uhttpd types a response by extension.
 
-**It runs TWICE per install, not once.** Our `postinst` calls it, and OpenWrt's stock
-`default_postinst` separately runs and then deletes every `/etc/uci-defaults/*` in the package.
-The script is idempotent, so this is harmless.
+**It runs ONCE, from the package manager's own `default_postinst`, before our `postinst`
+content ever sees it.** `postinst` used to call it again as a belt-and-braces re-run — dropped
+after measuring on owrt2512b (apk) and owrt2410b (opkg), fresh install and upgrade: in all four,
+`/etc/uci-defaults/30_luci-theme-footstrap` was already gone by the time our own content ran, and
+the theme was already registered. The re-run guard never fired.
 
 **Fresh install vs upgrade is decided by the registration itself.** `mediaurlbase` is written only
 in the run that first added `luci.themes.Footstrap`; on an upgrade the entry is already there, so
@@ -250,8 +382,9 @@ start from the assumption that a user of the official package started there.
 
 ## postinst / postrm
 
-`postinst` re-runs uci-defaults and clears the LuCI caches. It does **NOT** `rpcd reload` — nor
-does `postrm`, nor `dev-sync.sh` — and the reason is its own section below.
+`postinst` clears the LuCI caches; uci-defaults registration is the package manager's own
+`default_postinst`, not ours (see above). It does **NOT** `rpcd reload` — nor does `postrm`, nor
+`dev-sync.sh` — and the reason is its own section below.
 
 `postrm` does three things, and exits early on an upgrade (`case "$1" in *upgrade*`) because opkg
 runs the OLD package's postrm mid-upgrade — reverting `mediaurlbase` there is what once flipped
@@ -460,7 +593,7 @@ deliberate PR against `po/templates/`. `npm run fork-drift` lists every shipped 
 disagree about and names those two separately; it is a report rather than a gate, because an
 unproposed change is a legitimate difference.
 
-**That tree gets the built stylesheet; this one keeps the layers.** Here, `styles/` is thirty-nine
+**That tree gets the built stylesheet; this one keeps the layers.** Here, `styles/` is thirty-eight
 files in four cascade layers whose *order* is the design, and `cascade.css` is a build artefact
 this repository does not even track. There, the other four themes each commit one `cascade.css`
 and have no build step at all — a theme arriving with its own build system asks a reviewer to

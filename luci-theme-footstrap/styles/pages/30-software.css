@@ -1,105 +1,33 @@
 @layer page {
-	/* Software disk-space bar -> the overview Memory/Storage meter: label + value on one
-	 * line, bar below (the value is the .cbi-progressbar title, lifted out by ::after).
-	 * Scoped by #view[data-page], NOT by :has(#disk-space-label) — 24.10 ships no such id.
-	 * #view, not body: the attribute lives on the view itself so the outgoing page keeps its
-	 * own rules for the whole staging window (fs-router.js, commitStage).
-	 * `:where(#view)`, not bare `#view`: zeroes the id's specificity without changing which
-	 * element matches — 20-overview.css, top of `@layer page`, has the full reasoning and the
-	 * measured numbers (tools/css-metrics.mjs's ceiling). */
+	/* Package list and disk-space bar. :where(#view): docs/css.md ":where(#view), not bare
+	 * #view". Full rationale for every rule below: docs/css.md "Software: the disk-space bar and
+	 * the carded package row". */
 	:where(#view)[data-page="admin-system-package-manager"] .controls > div:first-child { position: relative; display: block; flex: 1 1 100%; width: 100%; margin: 0 0 var(--fs-space-1-5); }
 
-	/* The package list's row SHAPE. #packages is a DATA table (`<table class="table" id="packages">`,
-	 * no .cbi-section-table class; fs-select.js tags it .fs-dt off its .tr.cbi-section-table-titles
-	 * header), so it takes the shared card from
-	 * theme/30-tables.css when measured too narrow; this only changes how a row READS, a package
-	 * being a name plus a few short facts, so label-left / value-right on one line beats the
-	 * half-width pairs a config row wants.
-	 *
-	 * No @container guard, and do not re-add one: overflow is the trigger, and fs-select.js
-	 * measures it. */
-	/* ---- the package NAME is an identifier: do not let the column collapse under it ----
-	 *
-	 * base/40-tables.css gives every data cell `overflow-wrap: anywhere` (theme/30-tables.css
-	 * narrows it to `break-word` for as long as a data table is a table), and `anywhere` — unlike
-	 * `break-word` — also lowers the column's min-content to a single character. Version and Size
-	 * are `nowrap` and cannot shrink, so auto table layout takes the whole shortfall out of column
-	 * 1: measured with the filter on "app", the name column came out 81-101px — narrower than
-	 * Size (88px) — and 6 of the first 8 names rendered broken mid-word, a hyphen making it worse
-	 * by offering a legal break point.
-	 *
-	 * nowrap here does not mean "never wrap": it makes the overflow HONEST, which is what
-	 * fs-select.js's measurement needs — where the row genuinely does not fit, the table cards. It
-	 * is the same trap idTower() works around in fs-select.js: `anywhere` hides the overflow by
-	 * shredding a cell, so nothing is left for fit.overflows() to read. Verified 560-1440px: 0
-	 * broken names, no table overflow, and the card threshold unchanged. */
 	#packages:not(.fs-stacked) .tr > .td:first-child { white-space: nowrap; }
 
-	/* `:not(...)` on the header rows, and it is load-bearing: this selector carries an ID, so it
-	 * is (1,1,0) in the PAGE layer — it beat theme/30-tables.css's
-	 * `.table.fs-stacked .tr.cbi-section-table-titles { display: none }` and put the column
-	 * header back on screen in card mode, where every cell already prints its own label. */
+	/* the id beats theme/30-tables.css's header-hiding rule in card mode — load-bearing. */
 	#packages.fs-stacked .tr:not(.cbi-section-table-titles):not(.cbi-section-table-descr) {
 		display: block; padding: var(--fs-space-3) var(--fs-space-4);
 	}
-	/* ---- the value is not one flex item, and space-between tears it apart ----
-	 *
-	 * A card row is label-left / value-right, which `justify-content: space-between` spreads over
-	 * the ::before and the cell's content. But flex makes every ELEMENT its own item, and the
-	 * filter on this page wraps each match in `<ins>`, so a matched name is two items and
-	 * space-between pushes them to opposite edges — the package name read as `luc` … 85px …
-	 * `i-app-acl`.
-	 *
-	 * So do not distribute the free space BETWEEN the items — hand it all to the label, and
-	 * everything else packs flush right in DOM order, however many elements the value is. */
 	#packages.fs-stacked .td {
 		display: flex; align-items: baseline; justify-content: flex-end;
 		gap: 0; padding: var(--fs-space-1) 0; border: 0; text-align: end;
-		/* `min-width: 0` and `width: auto` are not restated: theme/30-tables.css sets both on
-		 * `.table.fs-stacked .td`, which this table is one of, and switching them off here moved
-		 * nothing across 500 matching cells. `text-align: end` above IS this file's own — it
-		 * overrides that rule's `start`. */
 		flex: none;
 	}
-	/* An auto inline-end margin is what replaces space-between: it eats the whole free line, so the
-	 * value packs flush against the far edge as one unbroken run. The inline-end padding keeps a gutter when the row is
-	 * full and the auto margin collapses to nothing (the `gap` used to do that, but a gap applies
-	 * between EVERY pair of items — including the two halves of a highlighted name). */
 	#packages.fs-stacked .td[data-title]::before {
 		content: attr(data-title); flex: 0 0 auto; text-align: start; margin-bottom: 0;
 		margin-inline-end: auto; padding-inline-end: var(--fs-space-3-5);
 		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking);
 		color: var(--fs-eyebrow-color); white-space: nowrap;
 	}
-	/* Column 4 = Description. NOT `[data-title="Description"]`, which is a translated string and
-	 * `tools/css-i18n.mjs` fails the build on one. It used not to match even in English: LuCI builds
-	 * these cells from the heading's `innerText` (ui.js, `data-title`), which is RENDERED text, and
-	 * `.th` was uppercased here — so the attribute said "DESCRIPTION" and the literal matched ZERO
-	 * elements on every router (measured). The uppercase is gone (theme/30-tables.css, issue #39) and
-	 * the attribute now carries the app's own case; the column index is still the right anchor.
-	 * Columns: 1 Package name | 2 Version | 3 Size | 4 Description | 5 actions. */
-	/* `overflow-wrap` dropped: base/40-tables.css breaks every cell now and this copy moved nothing
-	 * against 100 matching cells. `word-break` has now gone the same way for a different reason: its
-	 * neutraliser in theme/30-tables.css stopped excusing carded tables, so this sat under a flag and
-	 * could not be read. Nothing renders differently — `break-word` is `word-break: normal` plus
-	 * `overflow-wrap: anywhere` and the theme already gives every stacked cell the second half;
-	 * measured at 390px, this cell is 322 x 103 px on either side of the change. */
+	/* column 4 = Description, matched by index — a `[data-title]` value is a translated string. */
 	#packages.fs-stacked .td:nth-child(4) { display: block; text-align: start; }
 	#packages.fs-stacked .td:nth-child(4)::before { display: block; margin-bottom: var(--fs-space-1); }
 	#packages.fs-stacked .td.cbi-section-actions { justify-content: flex-end; margin-top: var(--fs-space-1-5); }
 	#packages.fs-stacked .td.cbi-section-actions::before,
 	#packages.fs-stacked .td:not([data-title])::before { content: none; }
-	/* The "Disk space:" caption, keyed on WHAT IT SITS BESIDE rather than on `#disk-space-label`:
-	 * that id is 25.12+ only (25.12 emits `E('label',{'id':'disk-space-label'}, …)`, 24.10's
-	 * package-manager.js a bare `E('label',{}, …)`), so an id rule is dead on 24.10 and the caption
-	 * keeps base's 250px-wide label. The disk section is the only `label` immediately followed by a
-	 * `.cbi-progressbar`, which is the discriminator theme/90-responsive.css already uses for the
-	 * same element.
-	 *
-	 * Not `:has(:where(+ .cbi-progressbar))`: a leading combinator makes it a RELATIVE selector, and
-	 * only `:has()` accepts one — `:where()` takes a plain complex-selector list, so wrapping it
-	 * there makes the whole rule invalid and the browser drops it, which stylelint and css-metrics
-	 * both parse happily. */
+
 	:where(#view)[data-page="admin-system-package-manager"] label:has(+ .cbi-progressbar) {
 		display: block; margin: 0; font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-dim);
 	}

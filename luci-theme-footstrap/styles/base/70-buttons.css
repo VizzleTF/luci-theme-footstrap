@@ -1,9 +1,7 @@
 @layer base {
-	/* `.btn` and `.cbi-button` are interchangeable in LuCI markup; a row action carries both plus a
-	 * `-<variant>` class. The paint — box, fill, radius — is theme/55-buttons.css's, along with the
-	 * `.item::after` member, whose plate now lives with the dynlist in theme/60-inputs.css. What is
-	 * left here is --on-color, which is not paint: base/95-luci.css masks the spinner glyph with
-	 * it, so it must track the variant. */
+	/* .btn/.cbi-button are interchangeable in LuCI markup. Paint (box, fill, radius) is
+	 * theme/55-buttons.css's; --on-color stays here because base/95-luci.css masks the spinner
+	 * glyph with it, so it must track the variant regardless of layer. */
 	.btn,
 	.cbi-button {
 		--on-color: var(--fs-text);
@@ -13,7 +11,7 @@
 		white-space: pre;
 	}
 
-	/* border-color: theme/60-inputs.css — absorbed. The ink stays: theme paints no colour here. */
+	/* border-color: theme/60-inputs.css — absorbed. */
 	.cbi-input-invalid,
 	.cbi-input-invalid.cbi-dropdown:not(.btn):not(.cbi-button),
 	.cbi-input-invalid.cbi-dropdown:not([open]) > ul > li,
@@ -21,12 +19,7 @@
 		color: var(--fs-danger);
 	}
 
-	/* `--on-color` only. A `border-color` here would be dead: theme/55-buttons.css sets `border` on
-	 * `.cbi-button, .btn`, and a later layer beats this one whatever the specificity, so the
-	 * variant wears the theme's colour either way — proven, not reasoned: stripping the ones that
-	 * used to sit here changes no computed style over docs/gallery.html, which renders every one of
-	 * these variants. `--on-color` stays because it is not paint — base/95-luci.css masks the
-	 * spinner glyph with it. */
+	/* --on-color only: docs/css.md "Buttons: --on-color survives the absorption into theme". */
 	.cbi-button-positive,
 	.cbi-button-fieldadd,
 	.cbi-button-add,
@@ -49,46 +42,31 @@
 		--on-color: var(--fs-danger);
 	}
 
+	/* Not a clearfix — flex container, nothing floats: docs/css.md "Buttons: the flex clearfix,
+	 * and why float is dead on .cbi-page-actions". */
 	.cbi-page-actions::after {
 		display: table;
 		content: "";
 		clear: both;
 	}
 
-	.cbi-page-actions > * {
-		vertical-align: middle;
-	}
-
-	/* No `float` here: theme/55-buttons.css makes `.cbi-page-actions` a flex container, and float
-	 * does not apply to a flex item, so one would compute to `none` and move nothing while reading
-	 * like a physical side the logical-property sweep had missed. No context revives it — print
-	 * hides the whole container (theme/97-print.css). Verified in a live document in both writing
-	 * directions: the button sits 569px from the reading edge with the float and 569px without. */
 	.cbi-page-actions > :not([method="post"]):not(.cbi-button-apply):not(.cbi-button-negative):not(.cbi-button-save):not(.cbi-button-reset) {
 		margin-inline-end: var(--fs-space-1);
 	}
 
-	/* fills and borders: theme/55-buttons.css — absorbed. --on-color stays (the spinner mask). */
+	/* fills/borders absorbed (theme/55-buttons.css); Save/Apply's --on-color is re-set there too
+	 * regardless of layer, so no base copy is needed for that pair. */
 	.btn.primary,
 	.cbi-button-action.important,
-	.cbi-page-actions .cbi-button-apply,
 	.cbi-section-actions .cbi-button-edit {
 		--on-color: var(--fs-on-accent);
 	}
 
-	.cbi-button-positive.important,
-	.cbi-page-actions .cbi-button-save {
+	.cbi-button-positive.important {
 		--on-color: var(--fs-on-good);
 	}
 
 	.cbi-button-negative.important {
 		--on-color: var(--fs-on-danger);
-		/* fill + border: theme/55-buttons.css — absorbed */
-	}
-
-	.cbi-page-actions .cbi-button-apply + .cbi-button-save,
-	.cbi-page-actions .cbi-button-negative + .cbi-button-save {
-		--on-color: var(--fs-good);
-		/* fill + border: theme/55-buttons.css — absorbed */
 	}
 }

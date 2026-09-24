@@ -1,28 +1,21 @@
 @layer theme {
-	/* ==================================================================
-	 * The page-search palette. Markup is built by fs-search.js and parented to <body>:
-	 * the vertical .fs-sidebar is `overflow: auto`, which would clip a child of the trigger,
-	 * and the overlay has to cover the whole viewport anyway.
-	 * ================================================================== */
+	/* page-search palette. fs-search.js parents it to <body>: .fs-sidebar is overflow:auto, which
+	 * would clip a child of the trigger, and the overlay covers the whole viewport anyway. */
 
-	/* The scrim. --fs-scrim is the theme's one colour literal (plain black at .7) on purpose:
-	 * it is the absence of light behind a dialog, not a tint of any palette token. */
+	/* --fs-scrim is the theme's one colour literal (plain black at .7) on purpose: absence of light behind a dialog, not a tint of any palette token */
 	.fs-search-ov {
 		position: fixed; inset: 0; z-index: var(--fs-z-popover);
-		/* `display` here is what the `hidden` attribute has to beat — base/10-reset.css does that for
-		 * every element now, so this file no longer restates it for the overlay alone. */
+		/* what the `hidden` attribute has to beat — base/10-reset.css covers every element now */
 		display: flex; justify-content: center;
-		/* not centred vertically: the box grows DOWNWARD as results come in, and a centred one
-		 * would slide the input out from under the user's eyes on every keystroke */
+		/* not centred vertically: the box grows DOWNWARD as results come in, centred would slide the input out from under the user's eyes on every keystroke */
 		align-items: flex-start;
 		padding: max(8vh, var(--fs-space-6)) var(--fs-space-4) var(--fs-space-4);
 		background: var(--fs-scrim);
 		animation: fs-fade var(--fs-dur-fade);
 	}
 
-	/* The dialog itself. It is a SCROLL CONTAINER, and that is not decoration: without a cap the
-	 * box grows past a short viewport (a phone in landscape is ~380px tall) and the rows at the
-	 * bottom become unreachable — a `position: fixed` popup cannot be scrolled by the page. */
+	/* a SCROLL CONTAINER, not decoration: uncapped the box grows past a short viewport (phone
+	 * landscape ~380px), and a position:fixed popup cannot be scrolled by the page */
 	.fs-search-box {
 		display: flex; flex-direction: column; min-height: 0;
 		width: 100%; max-width: 560px; max-height: min(70dvh, 560px);
@@ -39,14 +32,10 @@
 	}
 	.fs-search-ico { display: inline-flex; color: var(--fs-faint); }
 	.fs-search-ico .fs-ico { width: 18px; height: 18px; }
-	/* The input carries no frame of its own — the ROW is the field and the box around it is the
-	 * dialog. Two classes (0,2,0) on purpose: the generic field box in 60-inputs.css is
-	 * `input[type="text"], …` (0,1,1) and outranks a single class in the same layer whatever the
-	 * source order — measured, it painted this input with the page-field border, the panel2 fill,
-	 * 8px/11px of padding and a focus ring inside the dialog's own frame.
-	 *
-	 * 16px rather than the theme's body size, deliberately: a font-size below 16px makes iOS Safari
-	 * zoom the page when the field takes focus, and this one takes focus as the palette opens. */
+	/* the ROW is the field, the input carries no frame of its own — two classes (0,2,0) needed to
+	 * outrank 60-inputs.css's generic field box (0,1,1) in the same layer regardless of source
+	 * order. 16px, not the theme's body size: below 16px iOS Safari zooms the page on focus, and
+	 * this field focuses as the palette opens. */
 	.fs-search-row .fs-search-input {
 		flex: 1 1 auto; min-width: 0;
 		margin: 0; padding: 0; border: 0; min-height: 0; background: transparent;
@@ -54,9 +43,7 @@
 		font-family: inherit; font-size: var(--fs-type-lg); font-weight: var(--fs-weight); line-height: 1.4;
 	}
 	.fs-search-row .fs-search-input:focus { outline: none; box-shadow: none; }
-	/* one placeholder ink for the whole theme (03-palettes.css) — this row is not measured by
-	 * `placeholder-ink`, the gallery having no search dialog, and must not drift from the fields
-	 * that are */
+	/* one placeholder ink for the whole theme (03-palettes.css); not measured by placeholder-ink (no gallery fixture), must not drift from the fields that are */
 	.fs-search-row .fs-search-input::placeholder { color: var(--fs-placeholder); font-weight: var(--fs-weight); }
 
 	.fs-search-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--fs-space-1-5); }
@@ -66,12 +53,9 @@
 		padding: var(--fs-space-2) var(--fs-space-2-5); border-radius: var(--fs-radius);
 		color: var(--fs-text); text-decoration: none; cursor: pointer;
 	}
-	/* One highlight for both pointer and keyboard: `.active` is set by fs-search.js for the
-	 * aria-activedescendant row AND on pointermove, so the mouse and the arrow keys can never
-	 * disagree about which row Enter would open. */
+	/* one highlight for pointer AND keyboard: .active is set on both aria-activedescendant and pointermove, so mouse and arrow keys can never disagree which row Enter opens */
 	.fs-search-opt.active { background: var(--fs-accent-soft); color: var(--fs-accent); }
 	.fs-search-opt-title { flex: 0 1 auto; font-weight: var(--fs-weight-bold); font-size: var(--fs-type); }
-	/* the breadcrumb: which section owns the page — the whole point of searching for it */
 	.fs-search-opt-path {
 		flex: 1 1 auto; min-width: 0;
 		color: var(--fs-faint); font-size: var(--fs-type); text-align: end;
@@ -79,7 +63,6 @@
 	}
 	.fs-search-opt.active .fs-search-opt-path { color: inherit; }
 
-	/* "Recently visited" — the caption over the rows */
 	.fs-search-note {
 		flex: 0 0 auto;
 		padding: var(--fs-space-2-5) var(--fs-space-3-5) var(--fs-space-0-5);
@@ -87,9 +70,8 @@
 		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase;
 	}
 
-	/* …and the box's EMPTY STATE when there are no rows at all ("No pages found"), which reads as
-	 * a sentence, not as an eyebrow label. :has() rather than a sibling combinator: the note sits
-	 * ABOVE the list it describes, so `+` cannot reach back to it. */
+	/* empty state ("No pages found") reads as a sentence, not an eyebrow label. :has(), not a
+	 * sibling combinator: the note sits ABOVE the list it describes, `+` cannot reach back to it. */
 	.fs-search-box:has(.fs-search-list:empty) .fs-search-note {
 		padding: var(--fs-space-6) var(--fs-space-3-5) var(--fs-space-7);
 		text-align: center; text-transform: none; letter-spacing: 0;

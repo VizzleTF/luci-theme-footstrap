@@ -85,13 +85,14 @@ const staticChecks = [];
 }
 
 /* The five colour axes built by colorAxis() in fs-axes.js. Each one is `--fs-<x>-h` then
- * `data-<x>="hue"`, and the property must be written first. */
+ * `data-<x>="hue"`, and the property must be written first. `axis` names the key fs-axes.js
+ * exports the `{current, apply}` object under. */
 const COLOR_AXES = [
-	{ apply: 'applyTint', attr: 'data-tint', prop: '--fs-tint-h' },
-	{ apply: 'applyAccent', attr: 'data-accent', prop: '--fs-accent-h' },
-	{ apply: 'applyGood', attr: 'data-good', prop: '--fs-good-h' },
-	{ apply: 'applyWarn', attr: 'data-warn', prop: '--fs-warn-h' },
-	{ apply: 'applyDanger', attr: 'data-danger', prop: '--fs-danger-h' },
+	{ axis: 'tint', attr: 'data-tint', prop: '--fs-tint-h' },
+	{ axis: 'accent', attr: 'data-accent', prop: '--fs-accent-h' },
+	{ axis: 'good', attr: 'data-good', prop: '--fs-good-h' },
+	{ axis: 'warn', attr: 'data-warn', prop: '--fs-warn-h' },
+	{ axis: 'danger', attr: 'data-danger', prop: '--fs-danger-h' },
 ];
 
 const { base, close } = await serveGallery(buildCss());
@@ -215,7 +216,8 @@ const result = await page.evaluate(({ mods, axes }) => {
 
 	const root = document.documentElement;
 	for (const ax of axes) {
-		if (typeof axesMod[ax.apply] !== 'function') { fail(`fs-axes.${ax.apply} is missing; the axis list in tools/smoke.mjs is stale`); continue; }
+		const axisObj = axesMod[ax.axis];
+		if (!axisObj || typeof axisObj.apply !== 'function') { fail(`fs-axes.${ax.axis} is missing or has no .apply(); the axis list in tools/smoke.mjs is stale`); continue; }
 
 		/* Start from off, so the apply under measurement writes both halves rather than one. */
 		root.removeAttribute(ax.attr);
@@ -233,36 +235,36 @@ const result = await page.evaluate(({ mods, axes }) => {
 		root.style.setProperty = (n, v, p) => { if (n === ax.prop) seen.push('prop'); return realSetProp(n, v, p); };
 
 		let threw = null;
-		try { axesMod[ax.apply](200); } catch (e) { threw = e; }
+		try { axisObj.apply(200); } catch (e) { threw = e; }
 
 		delete root.setAttribute;
 		delete root.style.setProperty;
-		if (threw) { fail(`fs-axes.${ax.apply}(200) threw — ${threw.message || threw}`); continue; }
+		if (threw) { fail(`fs-axes.${ax.axis}.apply(200) threw — ${threw.message || threw}`); continue; }
 
 		const first = seen.indexOf('prop');
 		const firstAttr = seen.indexOf('attr');
 		if (first < 0 || firstAttr < 0) {
-			fail(`${ax.apply}: expected both ${ax.prop} and ${ax.attr} to be written, saw [${seen.join(', ') || 'nothing'}]`);
+			fail(`${ax.axis}: expected both ${ax.prop} and ${ax.attr} to be written, saw [${seen.join(', ') || 'nothing'}]`);
 		} else if (first > firstAttr) {
-			fail(`${ax.apply}: wrote ${ax.attr} BEFORE ${ax.prop}. A reload paints one frame in the previous hue.`);
+			fail(`${ax.axis}: wrote ${ax.attr} BEFORE ${ax.prop}. A reload paints one frame in the previous hue.`);
 		} else {
-			pass(`${ax.apply}: ${ax.prop} then ${ax.attr}`);
+			pass(`${ax.axis}: ${ax.prop} then ${ax.attr}`);
 		}
 
-		if (root.getAttribute(ax.attr) !== 'hue') fail(`${ax.apply}: ${ax.attr} is '${root.getAttribute(ax.attr)}', expected 'hue'`);
-		if (root.style.getPropertyValue(ax.prop).trim() !== '200') fail(`${ax.apply}: ${ax.prop} is '${root.style.getPropertyValue(ax.prop)}', expected '200'`);
+		if (root.getAttribute(ax.attr) !== 'hue') fail(`${ax.axis}: ${ax.attr} is '${root.getAttribute(ax.attr)}', expected 'hue'`);
+		if (root.style.getPropertyValue(ax.prop).trim() !== '200') fail(`${ax.axis}: ${ax.prop} is '${root.style.getPropertyValue(ax.prop)}', expected '200'`);
 	}
 
 	/* The axes must reach the CASCADE, not only the DOM: a custom property set on :root that no rule
 	 * reads changes nothing on the page, and every assertion above would still pass. Measured from
 	 * OFF to a hue, in that order, because 0 means off rather than red. */
-	axesMod.applyTint(0);
+	axesMod.tint.apply(0);
 	const off = getComputedStyle(document.body).backgroundColor;
-	axesMod.applyTint(200);
+	axesMod.tint.apply(200);
 	const on = getComputedStyle(document.body).backgroundColor;
-	if (off === on) fail(`applyTint(200) changed no computed value on body (${off}); the tint tokens are not reaching the cascade`);
-	else pass(`applyTint reaches the cascade: body background ${off} -> ${on}`);
-	axesMod.applyTint(0);
+	if (off === on) fail(`tint.apply(200) changed no computed value on body (${off}); the tint tokens are not reaching the cascade`);
+	else pass(`tint.apply reaches the cascade: body background ${off} -> ${on}`);
+	axesMod.tint.apply(0);
 
 	return notes;
 }, { mods: sources, axes: COLOR_AXES });

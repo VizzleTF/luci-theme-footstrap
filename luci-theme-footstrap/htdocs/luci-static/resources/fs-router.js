@@ -43,9 +43,9 @@ const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = 
 	 * keyed by that first id and the entry carries `live`, the id armed right now (null while
 	 * paused), so a view holding its handle can still stop its own poller after a trip through a
 	 * hidden tab. The arguments are kept because a `setInterval` id carries none of them back. */
-	window.setInterval = function (fn, ms) {
+	window.setInterval = function (fn, ms, ...rest) {
 		const id = _si.apply(window, arguments);
-		_viewIntervals.set(id, { fn, ms, rest: Array.prototype.slice.call(arguments, 2), live: id });
+		_viewIntervals.set(id, { fn, ms, rest, live: id });
 		return id;
 	};
 	window.clearInterval = function (id) {
@@ -479,7 +479,7 @@ function restoreScroll(pos, gen) {
 		stop();
 	};
 	/* the keys that scroll, and only those: typing in a field must not cancel anything */
-	const SCROLL_KEYS = new Set([ 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' ', 'Spacebar' ]);
+	const SCROLL_KEYS = new Set([ 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' ' ]);
 	const onKey = (ev) => { if (SCROLL_KEYS.has(ev.key)) stop(); };
 	const opts = { passive: true, capture: true };
 	function off() {
@@ -1434,7 +1434,7 @@ function wireRouter() {
  * "Paused" is always shown with `handler: null`), and which of the two ran first here used to decide
  * everything — luci.js registers its listener from `setupDOM()`, after an async chain
  * (DOMContentLoaded + ui/rpc/form + probeRPCBaseURL), this module at eval, from the inline
- * `L.require('menu-footstrap')` in `partials/footer.ut`, so network/cache timing picked the order.
+ * `L.require('menu-footstrap')` in `footer.ut`, so network/cache timing picked the order.
  * Run with this listener first, its hide removed the span before luci.js re-created it for "Paused"
  * with no handler, and the next `poll-start` found that span already there and only changed its
  * text — clickless for the rest of the document. A microtask runs only once the whole synchronous

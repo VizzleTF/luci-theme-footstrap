@@ -490,7 +490,7 @@ function assetAxis(o) {
 				.catch((e) => _rollbackUpload(o.path, e))
 				.then(() => {
 					/* switch this browser onto it: the ordinary axis path, localStorage only */
-					axes.applyWallpaper(o.wallpaper);
+					axes.wallpaper.apply(o.wallpaper);
 					o.apply(tok);
 					return tok;
 				});
@@ -510,7 +510,7 @@ function assetAxis(o) {
  * back a raster, so the parsed-document check above stands in for it. */
 const PATTERN = assetAxis({
 	path: PAT_PATH, filename: 'pattern.svg', field: 'pattern', wallpaper: 'pattern',
-	apply: (tok) => axes.applyPattern(tok),
+	apply: (tok) => axes.pattern.apply(tok),
 	prepare: (file) => {
 		if (!file) return Promise.reject(new Error(MSG_PICK_SVG));
 		const isSvg = (/(^image\/svg\+xml$)/i).test(file.type || '') || (/\.svg$/i).test(file.name || '');
@@ -535,7 +535,7 @@ const PATTERN = assetAxis({
  * grant for BG_PATH. */
 const LOGIN_BG = assetAxis({
 	path: BG_PATH, filename: 'login-bg', field: 'login_bg', wallpaper: 'file',
-	apply: (tok) => axes.applyLoginBg(tok),
+	apply: (tok) => axes.loginBg.apply(tok),
 	prepare: (file) => {
 		if (!file || !(/^image\//).test(file.type || ''))
 			return Promise.reject(new Error(_('Please choose an image file.', 'footstrap')));

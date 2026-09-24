@@ -33,13 +33,15 @@
  *   node tools/floor-contract.mjs [--only owrt2512] [--all] [--pages /admin/network/network,…]
  *
  * Needs a running owlab router (docs/development.md). */
+import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf('--' + name);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
+const { values: FLAGS } = parseArgs({ options: {
+	pages: { type: 'string' }, slack: { type: 'string' }, settle: { type: 'string' },
+	wait: { type: 'string' }, only: { type: 'string' }, all: { type: 'boolean' },
+} });
+const arg = (name, dflt) => FLAGS[name] ?? dflt;
 
 /* Pages that carry the shapes a floor is written on: a tabbed map of tables (Interfaces), a
  * status page of tables a poll rewrites (Overview), a form page whose sections end in prose — the
@@ -285,7 +287,7 @@ const CHURN_WINDOW = 1000;
  * release cannot be seen sooner than that. Two of them plus a second of slack. */
 const RELEASE_WAIT = Number(arg('wait', '0')) || 13000;
 
-const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'floor-contract');
+const list = requireStands(stands(arg('only', ''), { all: FLAGS.all ?? false }), 'floor-contract');
 const browser = await chromium.launch();
 const findings = [];
 let boxes = 0, worst = 0, released = 0, switches = 0, folds = 0, depends = 0, shrinks = 0, live = 0;

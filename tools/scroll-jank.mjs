@@ -29,13 +29,15 @@
  *                              [--pages /admin/status/overview,…] [--widths 768,1440]
  *
  * Needs a running owlab router (docs/development.md). */
+import { parseArgs } from 'node:util';
 import * as pw from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf('--' + name);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
+const { values: FLAGS } = parseArgs({ options: {
+	engines: { type: 'string' }, pages: { type: 'string' }, widths: { type: 'string' },
+	only: { type: 'string' }, all: { type: 'boolean' },
+} });
+const arg = (name, dflt) => FLAGS[name] ?? dflt;
 const ENGINES = arg('engines', 'chromium').split(',').map((s) => s.trim()).filter(Boolean);
 /* Overview is the one that polls hardest and rebuilds whole tables; Processes is the widest data
  * table the stock menu has, i.e. the one carrying a remedy at the widths below. */
@@ -131,7 +133,7 @@ const ARM = () => {
 /* SEQUENTIAL AND ON THE DEFAULT PAIR: frame pacing is what this gate measures, so a second router
  * rendering on the same machine is noise in the signal — unlike the structural gates, which now run
  * their routers at once. `--all` takes every running OpenWrt router. */
-const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'scroll-jank');
+const list = requireStands(stands(arg('only', ''), { all: FLAGS.all ?? false }), 'scroll-jank');
 const findings = [];
 let runs = 0;
 

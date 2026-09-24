@@ -1,17 +1,6 @@
 @layer page {
-	/* SSH-Keys renders its whole view as a single bare <div> in #view with no .cbi-section wrapper, so
-	 * its text sits frameless over the wallpaper while every other page gets an opaque card. There
-	 * is no section markup to hook, so that lone wrapper is given the same card (the values are
-	 * theme/30-tables.css's `.cbi-section`).
-	 *
-	 * Scoped to this page on purpose: a general "card any bare #view > div" was tried and reverted —
-	 * it also wrapped whole tabbed views (Startup). Other bare-view pages get their own entry
-	 * here.
-	 *
-	 * `:where(#view)`, not bare `#view`: zeroes the id's specificity while still matching the exact
-	 * same element, so `> div` still means "child of #view" — 20-overview.css, top of
-	 * `@layer page`, has the full reasoning, including why a wider `:where(#view, .fs-content)`
-	 * was rejected precisely because of this `>` combinator. */
+	/* :where(#view): docs/css.md ":where(#view), not bare #view". Rest: docs/css.md "SSH-keys: the
+	 * card wrapper and the wide dynlist". */
 	:where(#view)[data-page="admin-system-admin-sshkeys"] > div {
 		background: var(--fs-panel);
 		border: var(--fs-hairline);
@@ -19,9 +8,6 @@
 		padding: var(--fs-space-4);
 	}
 
-	/* An authorized_keys entry is a ~400-char base64 blob: the one dynlist that must not
-	 * take theme/60-inputs.css's 440px cap. Must live in `page` — in `base` it was dead,
-	 * since a layer beats specificity and theme's plain `.cbi-dynlist` capped it anyway. */
 	:where(#view)[data-page="admin-system-admin-sshkeys"] .cbi-dynlist {
 		max-width: none;
 	}

@@ -57,30 +57,34 @@
  * ones that were measured not to (see SCROLLERS and DENSITIES) and is what CI runs on a push.
  *
  * Needs a running owlab router (docs/development.md). */
+import { parseArgs } from 'node:util';
 import * as pw from 'playwright';
 import { stands, login, requireStands, sealToRouter, pairStands } from './lib/stands.mjs';
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf('--' + name);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
+const { values: FLAGS } = parseArgs({ options: {
+	engines: { type: 'string' }, full: { type: 'boolean' }, bail: { type: 'boolean' },
+	quick: { type: 'boolean' }, page: { type: 'string' }, width: { type: 'string' },
+	layout: { type: 'string' }, density: { type: 'string' }, only: { type: 'string' },
+	all: { type: 'boolean' }, 'no-pair': { type: 'boolean' },
+} });
+const arg = (name, dflt) => FLAGS[name] ?? dflt;
 const ENGINES = arg('engines', 'chromium').split(',').map((s) => s.trim()).filter(Boolean);
 /* `--full` restores the axes this sweep used to cross in full: every width against every layout,
  * and all three densities. Measured on 132 cells, they multiply the sweep without dividing its
  * answers — see SCROLLERS and DENSITIES. CI crosses them on a push and a tag, where an hour is
  * affordable and a narrowing that turns out to be wrong is caught before a release. */
-const FULL = process.argv.includes('--full');
+const FULL = FLAGS.full ?? false;
 /* Stop at the first finding. A full sweep is 144 cells and tens of minutes, so an answer that only
  * arrives at the end is one nobody can iterate against — a fix attempt cost a whole sweep to learn
  * it had failed in the third cell. CI never passes this: how WIDE a fault is is half of what the
  * sweep says. */
-const BAIL = process.argv.includes('--bail');
+const BAIL = FLAGS.bail ?? false;
 /* A local iteration loop, not the sweep CI runs: the first stand only, the Overview page alone, the
  * default width/layout/density axes (task sweepspeed). Says what it left out on every run, loudly,
  * so a clean `--quick` is never mistaken for a clean sweep — the same reason a page that never
  * opened is reported apart from a pass rather than folded into one. `--only`/`--page` still override
  * when given explicitly; CI never sets this flag. */
-const QUICK = process.argv.includes('--quick');
+const QUICK = FLAGS.quick ?? false;
 
 /* Three shapes, because the shape decides what the theme can anchor ON, and each of these breaks
  * differently:
@@ -1109,7 +1113,7 @@ const TICK = async (ticks) => {
 		scroller: sc ? 'maincontent' : 'window' };
 };
 
-let list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'scroll-anchor');
+let list = requireStands(stands(arg('only', ''), { all: FLAGS.all ?? false }), 'scroll-anchor');
 /* `--quick`'s stand narrowing: the first stand `stands()` handed back, unless `--only` already said
  * which ones — an explicit `--only` is the caller overriding the default, and `--quick` narrowing it
  * again on top would make the flag's own effect depend on argument order. */
@@ -1117,7 +1121,7 @@ if (QUICK && !arg('only', '')) list = list.slice(0, 1);
 /* Each `-b` twin owlab boots beside a release line (task sweepspeed) is a second container for the
  * SAME measurement, not a fourth release line — see the note on `pairStands()`. `--no-pair` is the
  * escape hatch for debugging the pairing itself, or for a run that wants the twin left idle. */
-const PAIRS = process.argv.includes('--no-pair') ? new Map() : pairStands(list);
+const PAIRS = (FLAGS['no-pair'] ?? false) ? new Map() : pairStands(list);
 /* Printed as it is found, not held until the end: the first finding is the whole answer for someone
  * iterating on a fix, and the list below is what says how many cells and which axes. */
 const findings = [];

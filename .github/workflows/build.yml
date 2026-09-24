@@ -34,20 +34,30 @@ permissions:
 # runner — 18s, 1m24s, 1m14s, 1m28s, and the live job, which is the only long one — so a stall goes
 # red in minutes and a re-run is one click.
 jobs:
+  # Both this job and `lint` run their gates through `npm run check:fast`/`check:mid`/`check:slow`
+  # (`package.json`) rather than one step per tool: a tool added to a tier here runs in CI on its
+  # next push with no second edit in this file.
   check:
     name: Static checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - run: sh tools/check-shell.sh
-      - run: sh tools/scan-marker.sh
-      - run: sh tools/check-acl.sh
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+
+      # No npm script wraps this: it brace-balances its own output and refuses a suspiciously short
+      # file, proven here on the concatenation alone. Nothing downstream reads this copy.
       - run: luci-theme-footstrap/build-css.sh /tmp/cascade.css
-      - run: python3 tools/audit.py --strict
-      # gettext for update-po; the ucode gate needs only docker. Asked for only when the image does
-      # not already carry it, and under tools/ci-retry.sh: apt does not fail when its mirror is
-      # unwell, it stalls, and a stalled step is nothing's problem until the job timeout.
+
+      # gettext for update-po.sh (check:fast's `i18n` item, last in that tier so everything else in
+      # `check` still runs where this is missing); the ucode gate needs only docker. Asked for only
+      # when the image does not already carry it, and under tools/ci-retry.sh: apt does not fail
+      # when its mirror is unwell, it stalls, and a stalled step is nothing's problem until the job
+      # timeout.
       - run: |
           if command -v msgfmt >/dev/null && command -v msgmerge >/dev/null && command -v xgettext >/dev/null; then
             echo 'gettext already on this image'
@@ -55,10 +65,15 @@ jobs:
             sh tools/ci-retry.sh 300 sudo -n apt-get update
             sh tools/ci-retry.sh 300 sudo -n apt-get install -y gettext
           fi
-      - run: luci-theme-footstrap/update-po.sh --check
 
-  # npm-based gates, and they live here and nowhere else: the OpenWrt buildbot has no node, luci.mk
-  # never needs one, and nothing in package.json is shipped.
+      # eslint, stylelint, the unit suite, shell/marker/acl, audit.py, conffiles, i18n-packages, the
+      # CSS structural gates (css-orphans, mirror, axes, page-modules, chrome-fence), changelog,
+      # update-po.sh --check. `build` needs only this job, so a check:fast failure — a broken .pot
+      # included — still blocks packaging.
+      - run: npm run check:fast
+
+  # npm-based gates, and they live in `check` and `lint` only: the OpenWrt buildbot has no node,
+  # luci.mk never needs one, and nothing in package.json is shipped.
   lint:
     name: Lint + accessibility
     runs-on: ubuntu-latest
@@ -71,59 +86,20 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # Through package.json, not a second copy of the globs: a glob restated here goes on linting
-      # the old path after package.json moves.
-      - run: npm run lint:js
-      - run: npm run lint:css
-
-      # The unit suite: pure logic, no browser, ~100 ms. Before the browser install because it is
-      # the fastest thing here and the first to fail on a broken module.
-      - run: npm test
-
       # The browser off Playwright's CDN, then a launch to prove it works; apt only if that
       # fails. `--with-deps` went through apt unconditionally, and apt is the half that stalls.
       - run: sh tools/ci-playwright.sh
-      - run: node tools/a11y-gallery.mjs
 
-      # What the router actually sends, weighed on the real artefact: build-css plus the token mangle
-      # for the sheet, terser over a copy of the resources for the JS. And the app icons, which are
-      # committed rasters — this proves they still match logo.svg.
-      - run: node tools/size-budget.mjs --show
-      - run: node tools/build-icons.mjs --check
-      - run: node tools/export-tier.mjs
-      - run: node tools/css-metrics.mjs
-      # The browser floor, derived from the built sheet rather than asserted in a doc: it fails
-      # when docs/css.md and the stylesheet disagree, when a `:has()` compound shares a selector
-      # list with one that has none (the list is not forgiving, so the whole rule dies), and when
-      # a CSS feature nobody has classified appears.
-      - run: node tools/css-floor.mjs
-      - run: node tools/fs-orphans.mjs
-      - run: node tools/css-dup.mjs
-      - run: node tools/css-i18n.mjs
-      - run: node tools/mirror.mjs
-      - run: node tools/axes.mjs
-      - run: node tools/chrome-fence.mjs
+      # css-metrics, css-floor, css-dup, size-budget (the artefact ratchets) — no gettext needed.
+      - run: npm run check:mid
 
-      # Two derived contracts that were in `npm run check` and in no workflow. Both fail the same way
-      # if nobody runs them: the stylesheet's "an unanswered table takes no room" rule stops naming a
-      # root fs-select scans, or the page-module map names a page that no longer exists — and the
-      # page then renders with something missing and says nothing about it.
-      - run: node tools/table-contract.mjs
-      - run: node tools/page-modules.mjs
+      # table-contract, export-tier, build-icons --check, a11y-gallery, placeholder-ink, smoke,
+      # pseudo-loc — everything that wants a real headless Chromium, off the browser this job
+      # already proved launches above.
+      - run: npm run check:slow
 
-      # These three were enforced only when a human remembered to run the whole suite locally. Each
-      # guards a failure nothing observable reports: a conffile the package manager replaces on
-      # somebody else's upgrade, an `!important` that drifted out of the allowlist, a changelog
-      # bullet with no bold lead, which release-notes.sh drops from the release page in silence.
-      - run: node tools/conffiles.mjs
-      # po/, tools/stage.sh and owfeed.yml each repeat the language list, and a language
-      # missing from the last one stages into a directory nothing packages: the build stays
-      # green and that translation simply does not ship.
-      - run: node tools/i18n-packages.mjs
-      - run: node tools/bang-ok.mjs
-      - run: node tools/changelog.mjs
-
-      # jsmin-verify finds the shipped JS itself; JSMIN names the binary to test.
+      # jsmin-verify finds the shipped JS itself; JSMIN names the binary to test. No npm script:
+      # the binary under test is built fresh from luci-base/src/jsmin.c at a pinned commit.
       - run: echo "JSMIN=$(sh tools/build-jsmin.sh)" >> "$GITHUB_ENV"
       - run: node tools/jsmin-verify.mjs
 

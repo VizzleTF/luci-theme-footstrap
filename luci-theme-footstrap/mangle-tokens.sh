@@ -57,7 +57,9 @@ set -- $RESERVE_DIRS
 
 RES="$CSS.reserved.$$"
 MAP="$CSS.map.$$"
-trap 'rm -f "$RES" "$MAP" "$MAP.ord" "$CSS.tmp.$$"' EXIT
+UNSORTED="$CSS.unsorted.$$"
+SORTED="$CSS.sorted.$$"
+trap 'rm -f "$RES" "$MAP" "$MAP.ord" "$UNSORTED" "$SORTED" "$CSS.tmp.$$"' EXIT
 
 if [ -n "$REWRITE" ]; then
 	# nothing is reserved: every name is renamed here and in the far side together
@@ -72,7 +74,14 @@ else
 	[ -s "$RES" ] || { echo "mangle-tokens: reserved set came out EMPTY — refusing (a seam name would be renamed and the theme would break silently)" >&2; exit 1; }
 fi
 
-awk -v RESFILE="$RES" -v MAPFILE="$MAP" '
+# ---- pass 1: count every manglable --fs- name, string-aware, write unsorted ----
+#
+# RESFILE/UNSORTFILE travel through ENVIRON, not `-v` (and not a bare `var=value` operand, which
+# awk treats the same way): both run the value through awk's OWN escape-sequence processing before
+# use, so a path holding a literal `\t` or `\n` (a `$CSS` an OpenWrt buildbot handed us, not ours to
+# assume ASCII-clean) is silently rewritten into a tab or newline and no longer names the file that
+# is actually there. ENVIRON reads the environment string verbatim.
+RESFILE="$RES" UNSORTFILE="$UNSORTED" awk '
 	function isname(c) { return (c ~ /[A-Za-z0-9_-]/) }
 	# read the identifier starting at i (which points at the first "-" of "--")
 	function ident(s, i,   j, n) {
@@ -81,15 +90,13 @@ awk -v RESFILE="$RES" -v MAPFILE="$MAP" '
 		return substr(s, i, j - i)
 	}
 	BEGIN {
+		RESFILE = ENVIRON["RESFILE"]; UNSORTFILE = ENVIRON["UNSORTFILE"]
 		while ((getline line < RESFILE) > 0) reserved[line] = 1
 		q = ""
 	}
 	{ css = css $0 "\n" }
 	END {
-		n = length(css)
-
-		# ---- pass 1: count every manglable name, string-aware ----
-		i = 1
+		n = length(css); i = 1
 		while (i <= n) {
 			c = substr(css, i, 1)
 			if (q != "") { if (c == "\\") { i += 2; continue } ; if (c == q) q = ""; i++; continue }
@@ -101,20 +108,48 @@ awk -v RESFILE="$RES" -v MAPFILE="$MAP" '
 			}
 			i++
 		}
+		for (x = 1; x <= ncnt; x++) print cnt[order[x]], order[x] > UNSORTFILE
+	}
+' "$CSS"
 
-		# ---- short-name alphabet, hottest name gets the shortest ----
+# sort(1) runs here, in the SHELL, never as a string awk pipes to: building that string by
+# concatenating a path in ("sort ... > \"" PATH "\"") lets a `"` in the path break out of the
+# quoting. "$SORTED" is a normal shell expansion instead, safe whatever bytes CSS holds.
+sort -k1,1nr -k2,2 "$UNSORTED" > "$SORTED" || { echo "mangle-tokens: sort failed" >&2; exit 1; }
+
+# sort must neither drop nor duplicate a line; a bad exit status is not the only way it can lie.
+ncnt=$(wc -l < "$UNSORTED" | tr -d ' ')
+nsorted=$(wc -l < "$SORTED" | tr -d ' ')
+[ "$ncnt" = "$nsorted" ] || {
+	echo "mangle-tokens: sort produced $nsorted line(s) from $ncnt — refusing" >&2
+	exit 1
+}
+
+# ---- pass 2: short-name alphabet from the sorted order (hottest name shortest), then rewrite ----
+# SORTFILE/MAPFILE/OUTFILE via ENVIRON too — see the note above pass 1.
+SORTFILE="$SORTED" MAPFILE="$MAP" OUTFILE="$CSS.tmp.$$" awk '
+	function isname(c) { return (c ~ /[A-Za-z0-9_-]/) }
+	function ident(s, i,   j, n) {
+		n = length(s); j = i
+		while (j <= n && isname(substr(s, j, 1))) j++
+		return substr(s, i, j - i)
+	}
+	BEGIN {
+		SORTFILE = ENVIRON["SORTFILE"]; MAPFILE = ENVIRON["MAPFILE"]; OUTFILE = ENVIRON["OUTFILE"]
+		x = 0
+		while ((getline sline < SORTFILE) > 0) { split(sline, sf, " "); order[++x] = sf[2]; cnt[sf[2]] = sf[1] }
+		ncnt = x
+
 		A = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		nsh = 0
 		for (a = 1; a <= 52; a++) short[++nsh] = "--" substr(A, a, 1)
 		for (a = 1; a <= 52; a++) for (b = 1; b <= 52; b++) short[++nsh] = "--" substr(A, a, 1) substr(A, b, 1)
-
-		# selection sort by count (asort() is not portable to busybox/mawk)
-		for (x = 1; x <= ncnt; x++) {
-			best = x
-			for (y = x + 1; y <= ncnt; y++) if (cnt[order[y]] > cnt[order[best]]) best = y
-			t = order[x]; order[x] = order[best]; order[best] = t
-		}
 		if (ncnt > nsh) { print "mangle-tokens: more names than short forms" > "/dev/stderr"; exit 1 }
+		q = ""
+	}
+	{ css = css $0 "\n" }
+	END {
+		n = length(css)
 		for (x = 1; x <= ncnt; x++) {
 			map[order[x]] = short[x]
 			# a mangled name must not already exist in the sheet
@@ -124,7 +159,6 @@ awk -v RESFILE="$RES" -v MAPFILE="$MAP" '
 			print order[x] " -> " short[x] " x" cnt[order[x]] > MAPFILE
 		}
 
-		# ---- pass 2: rewrite ----
 		q = ""; i = 1; out = ""
 		while (i <= n) {
 			c = substr(css, i, 1)
@@ -141,7 +175,7 @@ awk -v RESFILE="$RES" -v MAPFILE="$MAP" '
 		printf "%s", out > OUTFILE
 		print ncnt " names mangled, " (length(css) - length(out)) " bytes saved" > "/dev/stderr"
 	}
-' OUTFILE="$CSS.tmp.$$" "$CSS"
+' "$CSS"
 
 before=$(wc -c < "$CSS")
 mv "$CSS.tmp.$$" "$CSS"

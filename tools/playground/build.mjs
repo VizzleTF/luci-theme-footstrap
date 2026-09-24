@@ -27,6 +27,7 @@ import {
 import { dirname, join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { parseArgs } from 'node:util';
 import {
 	rewriteBase, rewriteEnv, scrubTokens, scrubHost, rewriteHostname, rewriteHostnameInData,
 	rewriteLiteral, applyOverlay, pruneMenu, jsonForScript, scrubDataDeep, guardNoSecrets,
@@ -35,12 +36,13 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf(`--${name}`);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
+const { values: FLAGS } = parseArgs({ options: {
+	help: { type: 'boolean' }, recording: { type: 'string' }, out: { type: 'string' },
+	base: { type: 'string' },
+} });
+const arg = (name, dflt) => FLAGS[name] ?? dflt;
 
-if (process.argv.includes('--help')) {
+if (FLAGS.help) {
 	console.log('Usage: node tools/playground/build.mjs [--recording DIR] [--out DIR] [--base /path]');
 	process.exit(0);
 }
@@ -150,7 +152,7 @@ function main() {
 	const hostnameTo = rpc['system.board({})']?.result?.[1]?.hostname;
 	const rpcInjected = rewriteHostnameInData(rpc, hostnameFrom, hostnameTo);
 
-	/* footer.ut's `version.luciname` (partials/footer.ut:20) is the same `getVersion().branch`
+	/* footer.ut's `version.luciname` (footer.ut:20) is the same `getVersion().branch`
 	 * string baked server-side instead of fetched — same pair, same reason as the hostname swap
 	 * above, just against the overlay's `luci.getVersion({})` entry instead of `system.board({})`. */
 	const luciFrom = rpcRecorded['luci.getVersion({})']?.result?.[1]?.branch;

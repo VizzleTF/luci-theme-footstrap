@@ -14,7 +14,7 @@
  * One `poll-stop` LISTENER covers both callers, since `stop()` dispatches the same event either
  * way — but a listener racing luci.js's own (`showIndicator('poll-status', 'Paused', null,
  * 'inactive')`, registered from `setupDOM()` after an async chain, against this module's own eval,
- * from the inline `L.require('menu-footstrap')` in partials/footer.ut) is exactly the original bug:
+ * from the inline `L.require('menu-footstrap')` in footer.ut) is exactly the original bug:
  * network/cache timing decided which one ran first, and a hide that ran BEFORE luci.js's own
  * "Paused" show left a fresh, handler-less span for the next `poll-start` to reuse forever. The fix
  * defers the actual hide by one microtask: `stop()` dispatches synchronously to every listener

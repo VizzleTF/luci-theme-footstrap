@@ -7,6 +7,7 @@
 'require fs-router as router';
 'require fs-prefs as prefs';
 'require fs-sheets as sheets';
+'require fs-widgets as widgets';
 
 /* Page modules: `fs-overview` (Status -> Overview) adds to a stock page rather than owning a
  * route, so it is required only there. A `require` pragma would make it a hard dependency —
@@ -144,8 +145,8 @@ function wireSearch() {
  * header.ut prints `window.__fsPlugins` from `footstrap.settings.plugin`, a list a package writes
  * from its own uci-defaults; each entry is a LuCI module name, already whitelisted there. The
  * chrome requires each one after everything below is wired — a plugin registers itself through the
- * seams the theme exports (`fs-router.onNavigate`, `fs-search.addSource`) and the theme names
- * nobody. A plugin that throws costs only itself.
+ * seams the theme exports (`fs-router.onNavigate`, the `window.__fsSearchSources` global array) and
+ * the theme names nobody. A plugin that throws costs only itself.
  *
  * No plugin, no cost: an empty list is the shipped state and this loop does nothing. */
 function loadPlugins() {
@@ -190,17 +191,6 @@ const FS_METER_INVERTED_DANGER = 100 - FS_METER_DANGER;
  * construction, so the fill-based default has to stay the FALLBACK, not a shrinking allow-list. */
 const FS_METER_INVERTED = new Set([ _('Total Available'), _('Swap free') ]);
 const FS_METER_NEUTRAL = new Set([ _('Buffered'), _('Cached') ]);
-
-/* Write an attribute only when the value actually changes, so a poll tick that reads the same
- * numbers back touches no DOM and fires no attribute-mutation observer. `value === null` removes
- * the attribute instead of writing the string "null". */
-function fsSyncAttr(el, name, value) {
-	if (value === null) {
-		if (el.hasAttribute(name)) el.removeAttribute(name);
-	} else if (el.getAttribute(name) !== value) {
-		el.setAttribute(name, value);
-	}
-}
 
 /* The meter's name, if the markup already states one — never invented. A `.cbi-value` row's own
  * label (the RSSI/RSRP gallery shape) or a key/value table row's first cell (Memory, Storage, CPU
@@ -256,14 +246,14 @@ function annotateMeter(pg) {
 	const pc = parseMeterPercent(title);
 	if (pc == null) return;
 	const level = pc < 0 ? 0 : (pc > 100 ? 100 : pc);
-	fsSyncAttr(pg, 'role', 'progressbar');
-	fsSyncAttr(pg, 'aria-valuemin', '0');
-	fsSyncAttr(pg, 'aria-valuemax', '100');
-	fsSyncAttr(pg, 'aria-valuenow', String(level));
-	fsSyncAttr(pg, 'aria-valuetext', title);
+	widgets.syncAttr(pg, 'role', 'progressbar');
+	widgets.syncAttr(pg, 'aria-valuemin', '0');
+	widgets.syncAttr(pg, 'aria-valuemax', '100');
+	widgets.syncAttr(pg, 'aria-valuenow', String(level));
+	widgets.syncAttr(pg, 'aria-valuetext', title);
 	const label = findProgressbarLabel(pg);
 	const name = label ? label.textContent.trim() : '';
-	fsSyncAttr(pg, 'aria-label', label ? name : null);
+	widgets.syncAttr(pg, 'aria-label', label ? name : null);
 	/* Polarity: an unrecognised bar (a third-party app's own meter included — see the Sets above)
 	 * keeps the plain fill-based rule, on purpose. A wrong red is worse than a missing colour, but a
 	 * MISSING colour on the common case — a used-based fill, which is what an app most often draws —
@@ -278,12 +268,12 @@ function annotateMeter(pg) {
 	} else {
 		dataLevel = level >= FS_METER_DANGER ? 'danger' : (level >= FS_METER_WARN ? 'warn' : null);
 	}
-	fsSyncAttr(pg, 'data-fs-level', dataLevel);
+	widgets.syncAttr(pg, 'data-fs-level', dataLevel);
 }
 
 /* Every `.cbi-progressbar[title]` under `root` — the markup itself, not who last drew it. Called
  * from fs-overview.js's own poll-tick observer (see there for why this file does not run a second
- * one); `fsSyncAttr` above makes a re-run over an unchanged bar a no-op read. */
+ * one); `widgets.syncAttr` above makes a re-run over an unchanged bar a no-op read. */
 function annotateMeters(root) {
 	(root || document).querySelectorAll('.cbi-progressbar[title]').forEach(annotateMeter);
 }

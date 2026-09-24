@@ -1,17 +1,7 @@
 @layer theme {
-	/* prefers-reduced-motion — a medical accommodation: vestibular disorders make sliding, fading and
-	 * spinning UI genuinely nauseating. Honoured globally rather than per component; every
-	 * transition and keyframe in this theme is decoration and none carries information.
-	 *
-	 * The !important here is the documented exception, and not the same kind as the ones that fight
-	 * an inline `style=`: a cascade layer cannot help, since styles/base sets transitions too and
-	 * !important INVERTS the layer order, so only an important declaration reaches all of them at
-	 * once. This is the canonical form as published by the WCAG working group. DO NOT COPY THE FLAG
-	 * OUT OF THIS BLOCK.
-	 *
-	 * .01ms rather than 0s: a zero duration means `transitionend`/`animationend` never fire, and JS
-	 * that waits for one (LuCI's modal teardown does) would hang. `scroll-behavior` is on the list
-	 * because smooth scrolling is motion too, and a jump is what this user asked for. */
+	/* honoured globally, every transition here is decoration. !important is the one sanctioned
+	 * exception, a layer cannot reach base's own transitions — DO NOT COPY THE FLAG OUT OF THIS
+	 * BLOCK. .01ms not 0s: a zero duration never fires transitionend, LuCI's teardown waits for one. */
 	@media (prefers-reduced-motion: reduce) {
 		*, *::before, *::after {
 			animation-duration: .01ms !important;
@@ -21,42 +11,15 @@
 		}
 	}
 
-	/* prefers-reduced-transparency — the user asked the OS for opaque surfaces. Every surface in the
-	 * theme is opaque already: no blur, an opaque bar, opaque pop surfaces. The one thing left is the
-	 * wash over an uploaded photo. */
+	/* every surface is already opaque except the wallpaper's wash */
 	@media (prefers-reduced-transparency: reduce) {
 		:root {
-			/* the uploaded background is a translucent wash over a photo — exactly the effect this
-			 * user asked the OS to drop. Make the scrim opaque so the canvas is flat, not a photo
-			 * ghosting through (16-login-bg.css lays it over the image as one background layer). */
+			/* flattens the photo wash to opaque (16-login-bg.css) */
 			--fs-photo-scrim: var(--fs-bg);
 		}
 	}
 
-	/* prefers-contrast — the user asked the OS for MORE contrast but, unlike forced-colors, left the
-	 * palette to us. Same mechanism as reduced-transparency: re-state the tokens and every rule that
-	 * reads them follows. What moves and why:
-	 *   - the hairlines: --fs-border is the most-read line in the theme and sits at ~20% of the
-	 *     text's contrast, so it is pulled toward --fs-text. The role hairlines (-line/-line-hi, a
-	 *     40/55% tint of their role) go to the FULL role colour — a tint exists to be quiet, which
-	 *     is the opposite of what this user asked for.
-	 *   - secondary text: --fs-dim toward --fs-text, and --fs-faint most of the way there too
-	 *     (10-11px eyebrow labels are where AA erodes first). Not all the way ONTO --fs-dim: the two
-	 *     are the export tier's --text-color-medium and -low, so collapsing them republishes one
-	 *     colour twice to every app reading the gradation. 82% is a window tools/export-tier.mjs
-	 *     measures rather than takes on trust: below 80 the fainter ink drops under AA on footstrap
-	 *     dark's --fs-panel2 (4.51:1 at 80), above 82 the high-to-low ramp falls under the 0.10
-	 *     spread the tier promises (0.098 at 84); 82 clears both, at 4.68:1 and 0.110.
-	 *   - --fs-placeholder, in BOTH modes. It is the one token the theme ships deliberately under AA
-	 *     (3.99-4.48:1 light, 3.43-6.05:1 dark): a hint has to move far enough not to read as a
-	 *     typed value, and a dark palette has only 6.45:1 of ink to spend. A reader who asked the OS
-	 *     for more contrast has said which of the two they want, so the mixes go back to the
-	 *     AA-clearing 62% and 80% — 4.98:1 and 4.61:1, at 37% and 20% of the ink-to-field range
-	 *     instead of 44% and 34%. Only --fs-placeholder-mix moves: the mix itself is spelt once, in
-	 *     03-palettes.css. `placeholder-ink` measures this pass as well.
-	 *   - the focus ring: --fs-focus-ring is a tint of the accent (--fs-accent-soft, 10% light and
-	 *     15% dark), so at "more contrast" it carries the accent at 60% instead. Its sibling
-	 *     --fs-focus-ring-solo is already the solid accent and needs no restatement here. */
+	/* re-states the tokens so every rule reading them follows — docs/css.md "A11y: prefers-contrast token shifts, and the numbers behind them" has why each number */
 	@media (prefers-contrast: more) {
 		:root {
 			--fs-border: color-mix(in srgb, var(--fs-text) 45%, var(--fs-bg));
@@ -65,34 +28,18 @@
 			--fs-focus-ring: 0 0 0 3px color-mix(in srgb, var(--fs-accent) 60%, transparent);
 			--fs-accent-line: var(--fs-accent);	--fs-accent-line-hi: var(--fs-accent);
 			--fs-good-line: var(--fs-good);		--fs-good-line-hi: var(--fs-good);
-			--fs-warn-line: var(--fs-warn);		--fs-warn-line-hi: var(--fs-warn);
 			--fs-danger-line: var(--fs-danger);	--fs-danger-line-hi: var(--fs-danger);
-			/* the placeholder is the one token shipped under AA (see the note above); this reader
-			 * asked for contrast, so both modes buy the AA ink back, at the percentages that clear
-			 * it. Light here, dark in the block below — per mode exactly as in 03-palettes.css. */
+			/* the one token shipped under AA at rest; both modes buy the ink back here */
 			--fs-placeholder-mix: 62%;
 		}
 		:root[data-darkmode="true"] { --fs-placeholder-mix: 80%; }
 	}
 
-	/* forced-colors (Windows High Contrast) — the OS replaces every colour the theme picked, and
-	 * background-color on most elements is forced to the system canvas, so any state carried by
-	 * BACKGROUND alone vanishes: the active tab pill, the checked toggle and the selected dropdown
-	 * row all look exactly like their inactive siblings, which is a correctness bug rather than a
-	 * cosmetic one. Re-state those states with a border or outline, which forced-colors keeps, in
-	 * system colour keywords so they follow the user's scheme. */
+	/* forced-colors: background-color is forced to the system canvas, so state carried by
+	 * BACKGROUND alone vanishes (active tab, checked toggle, selected row) — re-stated with a
+	 * border/outline in system keywords, which forced-colors keeps — docs/css.md "A11y:
+	 * forced-colors state repairs". */
 	@media (forced-colors: active) {
-		/* Active tab, selected dropdown row, checked toggle: outline the state.
-		 *
-		 * `.ifacebox-head.active` and Apply join the list rather than getting a rule of their own,
-		 * being the same KIND of state — carried by a background, with no word to fall back on — and
-		 * the same repair. "This port is up" was indistinguishable from a dead port, and Save & Apply
-		 * did not read as a BUTTON at all: it is a .cbi-dropdown wrapper, so with its fill forced to
-		 * Canvas only the label inside the <li> kept a highlight.
-		 *
-		 * Not extended to the alert and .label variants: encoding severity in border-style is not a
-		 * scale anyone can learn, and the honest repair is a word or an icon in the markup, which is
-		 * ui.js's. */
 		#tabmenu ul.tabs > li.active > a,
 		ul.cbi-tabmenu.mode > li.cbi-tab > a,
 		.tabs > li.active > a,
@@ -106,21 +53,12 @@
 			background: Highlight;
 			forced-color-adjust: none;	/* keep the fill: it IS the state */
 		}
-		/* Which page am I on: the menu's active item carries its state in exactly the two things forced
-		 * colors drops, a 10%-alpha accent background and the box-shadow rail. Measured with the query
-		 * emulated, all twelve #topmenu links reported the same weight, shadow, border and colour, so
-		 * the current page was not marked at all. `aria-current="page"` is on the link, so this was a
-		 * sighted-user loss only. The rail comes back as a real border, which forced colors keeps. */
+		/* active #topmenu state was only a 10%-accent background + box-shadow rail, both dropped */
 		#topmenu li.active > a {
 			border-inline-start: 3px solid Highlight;
 			padding-inline-start: calc(var(--fs-space-3) - 3px);
 		}
-		/* the toggle switch is a bare rounded box in forced colors — give the knob and
-		 * the track an edge so on/off is distinguishable at all. Scoped via `input[type="checkbox"]`,
-		 * matching 60-inputs.css, which now draws the switch there: an `<input>` selector cannot
-		 * reach ui.Checkbox's `tooltip` label (the hint-icon one, unstyled otherwise, built with no
-		 * `for` attribute) by construction, so the old `[for]` discriminator is no longer needed to
-		 * keep that label from growing a border it does not own. */
+		/* input[type=checkbox] (60-inputs.css draws the switch there) cannot reach ui.Checkbox's tooltip label */
 		.cbi-checkbox > input[type="checkbox"] { border: 1px solid ButtonBorder; }
 		.cbi-checkbox > input[type="checkbox"]:checked {
 			background: Highlight;
@@ -130,8 +68,7 @@
 		.cbi-checkbox > input[type="checkbox"]:checked::after { background: HighlightText; }
 		/* icon-only buttons (rail toggle, search/appearance, logout) lose their hover fill */
 		.fs-railtoggle, .fs-themerow { border-color: ButtonBorder; }
-		/* the focus ring is a box-shadow everywhere in this theme, and box-shadow is
-		 * dropped entirely in forced-colors — so keyboard focus would be invisible */
+		/* box-shadow is dropped entirely in forced-colors */
 		:focus-visible { outline: 2px solid Highlight; outline-offset: 1px; }
 	}
 }

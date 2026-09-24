@@ -19,14 +19,14 @@
 
 function readChoices(sel) {
 	const choices = {};
-	Array.prototype.forEach.call(sel.options, (o) => { choices[o.value] = o.textContent; });
+	for (const o of sel.options) choices[o.value] = o.textContent;
 	return choices;
 }
 
 /* cheap identity of the option list, to detect a script rebuilding it
  * (select.replaceChildren, dependency-driven re-population, …) */
 function choicesKey(sel) {
-	return Array.prototype.map.call(sel.options, (o) => o.value + '\u0000' + o.textContent).join('\u0001');
+	return Array.from(sel.options, (o) => o.value + '\u0000' + o.textContent).join('\u0001');
 }
 
 /* Undo enhance(): drop the widget, unhide the select and cut every listener enhance() installed.
@@ -36,8 +36,7 @@ function choicesKey(sel) {
  * anonymous listener. */
 function teardown(sel) {
 	if (sel._fsAbort) sel._fsAbort.abort();
-	if (sel._fsNode && sel._fsNode.parentNode)
-		sel._fsNode.parentNode.removeChild(sel._fsNode);
+	sel._fsNode?.remove();
 	delete sel.dataset.fsSelect;
 	sel._fsDd = sel._fsNode = sel._fsKey = sel._fsAbort = null;
 	sel.removeAttribute('aria-hidden');
@@ -132,7 +131,7 @@ function enhance(sel) {
 	sel._fsAbort = ac;
 
 	/* after the select: it must stay frameEl.firstChild for ui.Select to read its value on save */
-	sel.parentNode.insertBefore(node, sel.nextSibling);
+	sel.after(node);
 
 	/* stops our own dd->sel dispatch from echoing back through the sel->dd listener */
 	let syncing = false;
@@ -356,10 +355,10 @@ const TABLE_ROLE_TAGS = [
 	[ 'tfoot', 'rowgroup' ],
 ];
 
-/* idempotent, the same idiom as menu-footstrap-common.js's fsSyncAttr: a node that already carries
- * the right role is a no-op read, so a poll tick re-rendering the same table on every tick touches
- * no DOM and wakes no attribute observer. Not imported for one line — this file has none of that
- * module's other exports to justify the dependency. */
+/* idempotent, the same idiom as fs-widgets.js's syncAttr: a node that already carries the right
+ * role is a no-op read, so a poll tick re-rendering the same table on every tick touches no DOM
+ * and wakes no attribute observer. Not imported for one line — this file has no other reason to
+ * require fs-widgets. */
 function setRole(el, role) {
 	if (el.getAttribute('role') !== role) el.setAttribute('role', role);
 }

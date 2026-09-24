@@ -77,6 +77,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { parseArgs } from 'node:util';
 import * as pw from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
 import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
@@ -84,15 +85,18 @@ import { classify, representatives, reportReduction, reportFrozen, PINNED } from
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINE = resolve(HERE, 'baselines/live-audit.json');
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf('--' + name);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
-const UPDATE = process.argv.includes('--update');
+const { values: FLAGS } = parseArgs({ options: {
+	update: { type: 'boolean' }, prune: { type: 'boolean' }, engine: { type: 'string' },
+	lang: { type: 'string' }, widths: { type: 'string' }, pages: { type: 'string' },
+	'pages-all': { type: 'boolean' }, all: { type: 'boolean' }, arrive: { type: 'string' },
+	settle: { type: 'string' }, only: { type: 'string' },
+} });
+const arg = (name, dflt) => FLAGS[name] ?? dflt;
+const UPDATE = FLAGS.update ?? false;
 /* with --update: replace each measured router's set instead of unioning into it. Removes findings
  * that belong to apps this machine simply does not install, so it is the flag you reach for after
  * reading the "no longer reproduce" list, not the one you run by habit. */
-const PRUNE = process.argv.includes('--prune');
+const PRUNE = FLAGS.prune ?? false;
 const ENGINE = arg('engine', 'chromium');
 /* the language the router is measured in — see the file header. `en` is the default and maps to
  * `auto`, which is what every existing baseline entry was collected against. */
@@ -119,9 +123,9 @@ const WIDTHS = arg('widths', '320,390,568,768,1024,1440').split(',').map(Number)
 const ONLY_PAGES = arg('pages', '');
 /* Measure one page per SHAPE instead of every leaf of the menu — see lib/page-shapes.mjs for what a
  * shape is and for the three sets that are never sampled away. `--pages-all` takes them all. */
-const ALL_PAGES = process.argv.includes('--pages-all');
+const ALL_PAGES = FLAGS['pages-all'] ?? false;
 /* the four routers rather than the OpenWrt pair (lib/stands.mjs) */
-const ALL_STANDS = process.argv.includes('--all');
+const ALL_STANDS = FLAGS.all ?? false;
 /* Entering a page at a width is not the same as RESIZING into it. A sweep that loads each page once
  * and then walks the widths takes every measurement after the first on a page that has already been
  * laid out, fitted and corrected — and the fitters re-run on the resize, which is exactly the event

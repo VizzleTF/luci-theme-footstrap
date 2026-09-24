@@ -1,6 +1,5 @@
 @layer base {
-	/* the modal overlay ui.js shows for config diffs, uploads and login, plus the colour variants
-	 * shared by .btn / .alert-message / .cbi-tooltip */
+	/* the modal overlay ui.js shows for config diffs, uploads and login */
 	#modal_overlay {
 		position: fixed;
 		top: 0;
@@ -15,26 +14,18 @@
 
 	.modal {
 		width: 90%;
-		/* clear of the sticky bar, and centred */
-		margin: var(--fs-space-6) auto;
+		margin: var(--fs-space-6) auto; /* clear of the sticky bar, and centred */
 		min-height: var(--fs-control-h);
 		max-width: 600px;
-		/* a modal is a CARD — the large radius, like every other panel */
-		border-radius: var(--fs-radius-lg);
+		border-radius: var(--fs-radius-lg); /* a modal is a card — the large radius, like every panel */
 		background: var(--fs-panel);
 		border: var(--fs-hairline);
-		/* box-shadow: theme/70-modal.css — absorbed; the old one was a shadow in the colour of the
-		 * page, and the theme gives every .modal --fs-shadow-pop instead */
-		/* the card's own gutter on every side; the button row's spacing is its own business */
 		padding: var(--fs-card-pad);
 		min-width: 270px;
 	}
 
-	/* .modal > * (normal leading, the .5em rhythm, max-width): theme/70-modal.css — absorbed
-	 * with the heading ramp, which would out-layer the leading here */
-
-	/* .modal > pre/textarea (pre-wrap, fill the dialog): theme/70-modal.css — absorbed with
-	 * the generic field box (its 210px would out-layer the width here) */
+	/* .modal > * / pre / textarea: theme/70-modal.css — absorbed with the heading ramp and the
+	 * generic field box, both of which would out-layer a restatement here. */
 
 	.modal > .button-row {
 		display: flex;
@@ -52,10 +43,7 @@
 
 	body.modal-overlay-active {
 		overflow: hidden;
-		/* svh: `100vh` counts the mobile URL bar as if it were not there and crops the modal, while
-		 * `dvh` re-lays the dialog out on every frame of the bar's slide. The small viewport height
-		 * is the one that is both correct and still. */
-		height: 100svh;
+		height: 100svh; /* not vh (crops under URL bar) or dvh (re-lays out each frame it slides) */
 	}
 
 	body.modal-overlay-active #modal_overlay {
@@ -64,18 +52,11 @@
 		visibility: visible;
 	}
 
-	/* the cross inside a button or alert: `line-height: 1` centres the glyph in its own box, where a
-	 * fixed leading stops matching the moment the type scale moves */
 	.btn .close, .alert-message .close {
 		font-family: var(--fs-font-sans);
 		line-height: 1;
 	}
 
-	/* The whole colour-word block is absorbed — do not re-add any of it. `.btn.<word>` lives in
-	 * theme/55-buttons.css, `.alert-message.<word>` and `.cbi-tooltip.<word>` in
-	 * theme/35-alerts.css. The alert variants were already dead: theme paints plain
-	 * `.alert-message`, and a later layer beats this one whatever the specificity. The tooltip
-	 * variants were not — they were alive and un-themed, which is why the note that used to sit
-	 * here said the theme did not claim them; the gallery renders all four now, and that is what
-	 * turned the claim into a measurement. */
+	/* Colour-word block absorbed, do not re-add: .btn.<word> theme/55-buttons.css,
+	 * .alert-message/.cbi-tooltip.<word> theme/35-alerts.css. */
 }

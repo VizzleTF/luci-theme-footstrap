@@ -19,17 +19,19 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { dirname, join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { resolveUnderRoot } from './lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf(`--${name}`);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
+const { values: FLAGS } = parseArgs({ options: {
+	help: { type: 'boolean' }, out: { type: 'string' }, base: { type: 'string' },
+	'budget-kb': { type: 'string' },
+} });
+const arg = (name, dflt) => FLAGS[name] ?? dflt;
 
-if (process.argv.includes('--help')) {
+if (FLAGS.help) {
 	console.log('Usage: node tools/playground/verify.mjs [--out DIR] [--base /path] [--budget-kb N]');
 	process.exit(0);
 }

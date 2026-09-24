@@ -24,36 +24,44 @@ import { execFileSync } from 'node:child_process';
  * router is ignored, and `--only imm2512` is refused by name rather than measured. */
 export const CORE = [ 'owrt2512', 'owrt2410', 'owrtsnap' ];
 
+/* `stands()` and `pairStands()` both used to shell out to `owlab status -json` and `JSON.parse` its
+ * answer themselves. One place now: an empty array on any failure (owlab absent, bad JSON) — the
+ * caller decides whether that's a gate failure or a reason to skip. */
+function owlabRouters() {
+	let out;
+	try {
+		out = execFileSync('owlab', [ 'status', '-json' ], { encoding: 'utf8', stdio: [ 'ignore', 'pipe', 'ignore' ] });
+	} catch (e) { return []; }
+	try { return JSON.parse(out).routers || []; } catch (e) { return []; }
+}
+
+/* The shape every gate reads a router through — `stands()`'s CORE/`--all` filtering and
+ * `pairStands()`'s twin lookup both produced this same object by hand. */
+const toStand = (r) => ({
+	id: r.id,
+	base: `http://localhost:${r.http_port}/cgi-bin/luci`,
+	release: r.release,
+	distro: r.distro,
+	pkg: r.package_manager,
+});
+
 /* Every RUNNING owlab router, newest release first, or an empty array when owlab is absent — the
  * caller decides whether that is a failure (a gate) or a reason to skip (a local convenience).
  * With no `only` and no `all`, the CORE pair above; if none of it is running, everything that is,
  * with a line saying so — a gate that silently measured a different set than it claims is worse
  * than a slow one. */
 export function stands(only, { all = false } = {}) {
-	let out;
-	try {
-		out = execFileSync('owlab', [ 'status', '-json' ], { encoding: 'utf8', stdio: [ 'ignore', 'pipe', 'ignore' ] });
-	} catch (e) {
-		return [];
-	}
-	let parsed;
-	try { parsed = JSON.parse(out); } catch (e) { return []; }
+	const routers = owlabRouters();
 	const wanted = (only || '').split(',').map((s) => s.trim()).filter(Boolean);
-	const foreign = (parsed.routers || []).filter((r) => r.distro !== 'openwrt' && wanted.includes(r.id));
+	const foreign = routers.filter((r) => r.distro !== 'openwrt' && wanted.includes(r.id));
 	if (foreign.length) {
 		console.error(`${foreign.map((r) => r.id).join(', ')}: not a gate target — the gates measure OpenWrt `
 			+ 'routers only (tools/lib/stands.mjs).');
 		process.exit(2);
 	}
-	const running = (parsed.routers || [])
+	const running = routers
 		.filter((r) => r.state === 'running' && r.http_port && r.distro === 'openwrt')
-		.map((r) => ({
-			id: r.id,
-			base: `http://localhost:${r.http_port}/cgi-bin/luci`,
-			release: r.release,
-			distro: r.distro,
-			pkg: r.package_manager,
-		}));
+		.map(toStand);
 	if (wanted.length) return running.filter((r) => wanted.includes(r.id));
 	if (all) return running;
 	const core = running.filter((r) => CORE.includes(r.id));
@@ -162,13 +170,7 @@ export const DESTRUCTIVE = /\/(logout|reboot|flash|backup|shutdown)(\/|$)/;
  * keyed by the BASE stand's id; empty when owlab has no `-b` set running, so a caller with the old
  * three-stand lab degrades to exactly today's behaviour. */
 export function pairStands(list) {
-	let out;
-	try {
-		out = execFileSync('owlab', [ 'status', '-json' ], { encoding: 'utf8', stdio: [ 'ignore', 'pipe', 'ignore' ] });
-	} catch (e) { return new Map(); }
-	let parsed;
-	try { parsed = JSON.parse(out); } catch (e) { return new Map(); }
-	const running = (parsed.routers || []).filter((r) => r.state === 'running' && r.http_port);
+	const running = owlabRouters().filter((r) => r.state === 'running' && r.http_port);
 	const byId = new Map(running.map((r) => [ r.id, r ]));
 	const explicit = new Set(list.map((s) => s.id));
 	const pairs = new Map();
@@ -176,8 +178,7 @@ export function pairStands(list) {
 		const twinId = s.id + 'b';
 		if (explicit.has(twinId)) continue;
 		const t = byId.get(twinId);
-		if (t) pairs.set(s.id, { id: t.id, base: `http://localhost:${t.http_port}/cgi-bin/luci`,
-			release: t.release, distro: t.distro, pkg: t.package_manager });
+		if (t) pairs.set(s.id, toStand(t));
 	}
 	return pairs;
 }

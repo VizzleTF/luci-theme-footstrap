@@ -970,12 +970,32 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   reaches the page as `NetworkError: HTTP error 403 while loading class file` — the module then does
   not run at all and the page looks *fixed*. A green result with 403s in it has measured nothing.
 
-- **`live-audit` on a `-b` twin calls every finding NEW.** The baseline is keyed by stand id
-  (`tools/baselines/live-audit.json`: `owrt2410`, `owrt2410@ru`, …), and `owrt2410b` is not one of
-  those keys, so a sweep there starts from an empty known set — 30 fresh signatures over the
-  `/admin/network` subtree alone, none of them a regression. The twins are for the gates that carry
-  no baseline (`scroll-anchor`, `spa-parity`); measure `live-audit` on the base stand, or read its
-  twin run as a list rather than a verdict.
+- **`live-audit` on a `-b` twin calls every finding NEW, and a full sweep makes that total, not
+  partial.** The baseline is keyed by stand id (`tools/baselines/live-audit.json`: `owrt2410`,
+  `owrt2410@ru`, …), and `owrt2410b`/`owrt2512b` are not among those keys, so a sweep there starts
+  from an empty known set: 30 fresh signatures over just the `/admin/network` subtree the first
+  time this was measured, **776** and **771** over a full default sweep on `owrt2512b` and
+  `owrt2410b` respectively — every page, not a regression on any of them. The twins are for the
+  gates that carry no baseline (`scroll-anchor`, `spa-parity`); `live-audit` still needs the
+  primary's own baseline. Tell a genuine regression apart from the key-lookup trap without trusting
+  the exit code:
+  ```sh
+  node tools/live-audit.mjs --only owrt2410b > /tmp/b-run.log 2>&1
+  grep '^  owrt2410b' /tmp/b-run.log | awk '{print $2}' | sort -u > /tmp/b-sigs.txt
+  jq -r '.owrt2410[]' tools/baselines/live-audit.json | sort -u > /tmp/primary-sigs.txt
+  comm -23 /tmp/b-sigs.txt /tmp/primary-sigs.txt
+  ```
+  Empty output is the trap **only up to the 60 findings the log actually printed**
+  (`tools/live-audit.mjs:579`, `fresh.slice(0, 60)` — beyond that it prints "… and N more" and stops
+  naming them), so `grep '^  owrt2410b'` never sees a finding past the 60th and an empty `comm`
+  proves the claim only for those. Check the "N NEW finding(s)" count in the log first: under 60,
+  every signature the `-b` run called NEW is already in `owrt2410`'s own baseline, just filed under a
+  key nothing reads there, and an empty `comm` output confirms it. Over 60, narrow with the existing
+  `--pages` flag (`node tools/live-audit.mjs --only owrt2410b --pages <path>,…`) into batches that
+  each stay under 60 and run the same `comm` check on each — there is no flag that dumps the full
+  list at once. Anything `comm` still prints is not in the primary baseline either and wants a real
+  look. The workaround is to run and judge `live-audit` against the primary stand id and use the twin
+  only for the gates above that carry no baseline.
 
 - **`pkill -f <pattern>` kills the shell you typed it in.** `-f` matches the full command line, and
   the wrapper `bash -lc "pkill -f probe-one …; node probe-one.mjs …"` contains the pattern, so the
@@ -1709,6 +1729,20 @@ not producing frames, not the theme deciding late.** Read the late trail beside 
 `wrote-…+T` is when the correction happened. A `T` far below `landed` with a gap that ends at `landed`
 was the runner (task painted, `docs/anchoring.md`); a `settle` that itself sits at the end of the gap
 was the theme waiting for that frame (task stall).
+
+**Without `--no-pair`, `scroll-anchor` folds the `owrt*b` twin into the base stand for free
+concurrency — and it is whatever code that twin happens to be running, not necessarily this
+session's build.** `pairStands()` (`tools/lib/stands.mjs:164`) auto-pairs a running `-b` twin
+(`owrt2512b`, `owrt2410b`, …) with its base the moment both containers are up and the caller did
+not name the twin explicitly (`--only owrt2512,owrt2512b` opts out by naming it; `--no-pair` opts
+out entirely) — a concurrent session's build, a stale sync, or a twin nobody ever synced at all
+then measures under the base stand's own name. The symptom is two-sided: a real fix reads as a
+false FINDING (the twin's half of the sweep never had it), and a page the twin's build does not
+carry answers 404 and logs as "never opened", not as a defect. Tell the two apart by the file both
+builds actually ship, not by the finding: `owlab exec owrt2512 -- md5sum
+/www/luci-static/resources/fs-fit.js` against `owlab exec owrt2512b -- md5sum
+/www/luci-static/resources/fs-fit.js` — a mismatch is the twin carrying different code, not a
+result to act on; `owlab sync` the twin or re-run with `--no-pair`.
 
 ## The test matrix
 

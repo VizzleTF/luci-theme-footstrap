@@ -3,6 +3,7 @@
 'require dom';
 'require network';
 'require fs-fit as fit';
+'require fs-widgets as widgets';
 'require menu-footstrap-common as common';
 
 /* Overview layout only: renders nothing of its own, it re-arranges the STOCK System / Memory /
@@ -50,22 +51,10 @@ function sectionTitle(sec) {
  * topbar poll pill plus one Hide/Show toggle per card — and every one is a bare <span>: no
  * tabindex, no role, no aria-expanded. Tab never reaches one and a screen reader announces a run
  * of text with no name, role or state. WCAG 2.1.1 Keyboard (A), 4.1.2 Name, Role, Value (A).
- * docs/findings.md, "A card cannot be collapsed from the keyboard".
  *
  * index.js's own pill keeps doing the actual show/hide — untouched, so mouse behaviour for anyone
  * clicking it does not change. The header becomes a second, W3C-APG way to reach the SAME handler,
  * not a competing one. */
-
-/* Idempotent attribute write, so a poll tick that finds nothing changed touches no DOM and fires
- * no mutation record. Same shape as `fsSyncAttr` in menu-footstrap-common.js — restated rather than
- * imported, since that file does not export it. */
-function syncAttr(el, name, value) {
-	if (value === null) {
-		if (el.hasAttribute(name)) el.removeAttribute(name);
-	} else if (el.getAttribute(name) !== value) {
-		el.setAttribute(name, value);
-	}
-}
 
 /* index.js's own attribute: "inactive" is expanded (the pill reads "Hide"), "active" is collapsed
  * (it reads "Show") — the chevron mirror in pages/20-overview.css reads the same attribute the
@@ -96,14 +85,14 @@ function wireDisclosure(sec) {
 	const panel = panelFor(h);
 	if (panel && !panel.id) panel.id = 'fs-ovl-panel-' + (_panelSeq++);
 
-	syncAttr(h, 'role', 'button');
-	syncAttr(h, 'tabindex', '0');
-	syncAttr(h, 'aria-controls', panel ? panel.id : null);
-	syncAttr(h, 'aria-expanded', pillExpanded(label) ? 'true' : 'false');
+	widgets.syncAttr(h, 'role', 'button');
+	widgets.syncAttr(h, 'tabindex', '0');
+	widgets.syncAttr(h, 'aria-controls', panel ? panel.id : null);
+	widgets.syncAttr(h, 'aria-expanded', pillExpanded(label) ? 'true' : 'false');
 	/* the header now carries the pill's name, role and state; a screen reader user tabbing past it
 	 * to a second, unlabelled clickable span would hear an unexplained duplicate control — same
 	 * reasoning as the aria-hidden on svgIcon()'s output, fs-widgets.js:12 */
-	syncAttr(label, 'aria-hidden', 'true');
+	widgets.syncAttr(label, 'aria-hidden', 'true');
 
 	if (h.dataset.fsWired) return;
 	h.dataset.fsWired = '1';
@@ -112,16 +101,12 @@ function wireDisclosure(sec) {
 		/* a click landing on the pill itself already ran index.js's own handler; forwarding here
 		 * too would toggle the card twice */
 		if (ev.target.closest?.('[data-indicator="poll-status"]') !== label) label.click();
-		syncAttr(h, 'aria-expanded', pillExpanded(label) ? 'true' : 'false');
+		widgets.syncAttr(h, 'aria-expanded', pillExpanded(label) ? 'true' : 'false');
 	});
 	/* the pill is an <a>-less <span>, so neither key is native here — contrast
-	 * fs-widgets.js's wireSpaceKey, written for an <a role="button">, which gets Enter for free
-	 * and needs only Space added */
-	h.addEventListener('keydown', (ev) => {
-		if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
-		ev.preventDefault();
-		label.click();
-	});
+	 * menu-footstrap.js's wireSpaceKey, written for an <a role="button">, which gets Enter for
+	 * free and needs only Space added */
+	widgets.wireActivate(h, () => label.click());
 }
 
 /* A `.cbi-section` LuCI still renders when a stock include has nothing to show this tick: title

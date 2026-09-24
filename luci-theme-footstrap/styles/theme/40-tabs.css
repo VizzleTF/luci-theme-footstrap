@@ -1,12 +1,7 @@
 @layer theme {
-	/* ---- tab strips: one component, four entry points ----
-	 * LuCI emits a strip under four selectors with no markup difference worth honouring:
-	 *   #tabmenu ul.tabs      page tabs, rendered into the server shell
-	 *   ul.cbi-tabmenu.mode   mode switcher (Available / Installed / Updates)
-	 *   .tabs                 view tabs (Routing -> IPv4 / IPv6)
-	 *   .cbi-tabmenu          CBI form tabs (System -> General / Logging / …)
-	 * They agree on everything except the active marker: `.active` for `ul.tabs`, `.cbi-tab` for
-	 * every `.cbi-tabmenu` flavour. All four render as pills in a card. */
+	/* one component, four LuCI selectors, no markup difference worth honouring: #tabmenu ul.tabs
+	 * (page tabs), ul.cbi-tabmenu.mode (mode switcher), .tabs (view tabs), .cbi-tabmenu (CBI form
+	 * tabs). Active marker: .active on ul.tabs, .cbi-tab on every .cbi-tabmenu flavour. */
 	#tabmenu { margin-bottom: 0; }
 
 	/* the card */
@@ -23,14 +18,12 @@
 		background: var(--fs-panel);
 		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
-		/* kills a folder-tab baseline gradient (the 1px x 29px background image the strip
-		 * conventionally carries) by zeroing its size rather than restating it — base's copy is
-		 * absorbed, but any gradient a view or third-party app sets is sized away too */
+		/* zeroes the folder-tab baseline gradient (1px x 29px) instead of restating it, so a
+		 * third-party gradient the strip carries is sized away too */
 		background-size: 0 0;
 	}
 
-	/* a strip nested inside a .cbi-section card -> soft inset row, no frame (a card inside a
-	 * card reads as a bug) */
+	/* a strip nested in .cbi-section -> soft inset row, no frame (a card inside a card reads as a bug) */
 	.cbi-section .tabs,
 	.cbi-section .cbi-tabmenu:not(.mode):not(.map) {
 		background: var(--fs-panel2);
@@ -49,22 +42,16 @@
 		color: var(--fs-dim);
 	}
 
-	/* the theme's own page tabs and the mode switcher never carry a sentence-length label, so
-	 * `none` is right for them — `ul.cbi-tabmenu.mode > li` below wins specificity over the plain
-	 * `.cbi-tabmenu > li` rule that follows, so the mode pills stay `none` regardless of order. */
+	/* page tabs and the mode switcher never carry a sentence-length label; ul.cbi-tabmenu.mode > li
+	 * wins specificity over .cbi-tabmenu > li below, so mode pills stay none regardless of order */
 	#tabmenu ul.tabs > li,
 	ul.cbi-tabmenu.mode > li,
 	.tabs > li {
 		max-width: none;
 	}
 
-	/* the PLAIN CBI form tabs (ui.js, not the mode switcher): adblock's Overview page names one
-	 * "Настройки межсетевого экрана", measured 293px in a 264px column at 320px/Large — 28.6px past
-	 * it, section clipped by 30px; EN measured 0. The `a` already carries `white-space: nowrap;
-	 * overflow: hidden; text-overflow: ellipsis` (base/50-chrome.css) — it never engaged because the
-	 * li's `max-width: none` left its automatic minimum size at the label's full content width, so
-	 * flexbox never shrank it. `100%` is smaller than that content width once the column is, which
-	 * is exactly the case that broke; everywhere the tab already fits, this is a no-op. */
+	/* CBI form tabs only, not the mode switcher: a long label overflowed its column by 28.6px at
+	 * 320px/Large, EN measured 0 — docs/chrome.md "Tab strips" has the measurement */
 	.cbi-tabmenu > li {
 		max-width: 100%;
 	}
@@ -109,18 +96,9 @@
 		font-weight: var(--fs-weight-bold);
 	}
 
-	/* ---- keyboard focus: a ring that survives the ACTIVE pill ----
-	 *
-	 * base/50-chrome.css drew it as `outline: 2px solid var(--fs-accent)` inset by -2px, which is
-	 * invisible on exactly the tab most likely to be focused, the active pill's own background being
-	 * that same accent (measured on the router: both rgb(86,157,245)).
-	 *
-	 * One rule for both states, on --fs-focus-ring-solo: a tab flips nothing else on focus, so the
-	 * ring IS the indicator, and the tinted --fs-focus-ring measures 1.15-1.29:1 against the strip —
-	 * the first version of this fix took that tint for the inactive pill and swapped one invisible
-	 * indicator for another.
-	 * -solo's 2px surface gap is also what lets one value serve the active pill. box-shadow, not
-	 * outline, because the strip clips and a shadow is not clipped by the scroll container. */
+	/* one ring for both states, on --fs-focus-ring-solo: base's outline is invisible on the active
+	 * pill, whose background is the same accent — docs/chrome.md "Tab strips" has the contrast
+	 * numbers. box-shadow, not outline, because the strip clips and a shadow is not */
 	#tabmenu ul.tabs > li > a:focus-visible,
 	ul.cbi-tabmenu.mode > li > a:focus-visible,
 	.tabs > li > a:focus-visible,
@@ -129,14 +107,8 @@
 		box-shadow: var(--fs-focus-ring-solo);
 	}
 
-	/* Density steps for a crowded strip: fs-chrome.js (fitTabStrips) MEASURES whether the tabs
-	 * wrap to a second row and escalates .fs-dense1 -> .fs-dense2, mutually exclusive (dense1 is
-	 * removed the moment dense2 is added, so a pill is never trimmed by both at once). Both steps
-	 * give the pill the SAME padding (--fs-space-1 --fs-space-2) and, where the rule sets it at
-	 * all, the SAME font-size (--fs-type) — dense1 does not touch font-size, dense2 restates it;
-	 * neither actually shrinks it further, since --fs-type is already the strip's own base size.
-	 * Only the strip's own `gap` is touched by a dense rule, and only at d2; past that floor the
-	 * strip may wrap. The id in the first selector matches the #tabmenu rule's specificity. */
+	/* dense1 -> dense2 (fitTabStrips, fs-chrome.js) escalate mutually exclusively on wrap; both
+	 * give the pill the same padding, dense2 alone also tightens the strip's own gap */
 	#tabmenu ul.tabs.fs-dense1 > li > a,
 	.tabs.fs-dense1 > li > a,
 	.cbi-tabmenu.fs-dense1 > li > a { padding: var(--fs-space-1) var(--fs-space-2); }

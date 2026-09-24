@@ -1,8 +1,6 @@
 @layer theme {
-	/* One thin meter for every .cbi-progressbar (overview Memory/Storage/Network, Software
-	 * disk space, package manager …): slim rounded track, accent fill, and the LuCI title
-	 * value floated just above the bar's right edge (mono/dim) instead of stuffed inside a fat
-	 * pill. No per-page overrides. */
+	/* One thin meter for every .cbi-progressbar: track + accent fill, title value floated above
+	 * the right edge instead of stuffed inside a fat pill. */
 	.cbi-progressbar {
 		position: relative;
 		height: 10px;
@@ -19,10 +17,8 @@
 		border-radius: var(--fs-radius-pill);
 		transition: width var(--fs-dur-fill);
 	}
-	/* Colour carries the reading too, not length alone: `data-fs-level` is set from JS
-	 * (menu-footstrap-common.js, FS_METER_WARN/FS_METER_DANGER — 80/92%, a decision, not a
-	 * measurement) on every poll tick. Solid tokens, matching the accent fill above — no
-	 * color-mix, so no static twin is owed to 04-nocolormix.css. */
+	/* Colour carries the reading too: data-fs-level set from JS (80/92% thresholds) every poll
+	 * tick. Solid tokens, no color-mix, nothing owed to 04-nocolormix.css. */
 	.cbi-progressbar[data-fs-level="warn"] > div {
 		background: var(--fs-warn);
 	}
@@ -31,34 +27,15 @@
 	}
 	.cbi-progressbar::after {
 		content: attr(title);
-		/* the gap is a scale step, not a literal 4: every other gap in the theme scales with the
-		 * density axis and this one sat outside it. Identical at the default density. */
 		position: absolute; inset-inline: auto 0; bottom: calc(100% + var(--fs-space-1)); top: auto;
 		font-family: var(--fs-font-mono); font-size: var(--fs-type-xs); font-weight: var(--fs-weight-normal);
 		color: var(--fs-dim); white-space: nowrap; text-shadow: none;
 	}
 
-	/* The value sits BESIDE the bar wherever the bar already shares its line with a name.
-	 *
-	 * The default above puts it over the bar's far edge, which assumes the Overview's shape: the
-	 * meter owns a full-width line and its name sits on the line above, so the value lands at the
-	 * far end of that name's line and the two read as one row. Two shapes are not that, and CSS
-	 * cannot ask whether a row carries its own label, so each is named:
-	 *
-	 *   `.cbi-value-field > .cbi-progressbar`  the meter IS the field of a CBI form row, where the
-	 *     value otherwise lands against the row divider rather than beside its own bar
-	 *   `.table:has(.tr.table-titles) .td …`   a meter COLUMN in a multi-column data table, where
-	 *     the floated value lands on the row divider too
-	 *
-	 * Both want the same geometry and differ in one number, so the geometry is written once and
-	 * `--fs-meter-value` is the knob: a form row holds `-140.0 dBm`, half again as wide as a table
-	 * cell's `100% (1.2 GiB)`. The Overview and the package manager keep the value above the bar,
-	 * their meters being neither shape. */
-	/* ONE RULE PER SHAPE, not one selector list for both, and the split is not cosmetic: the table
-	 * half needs `:has()`, and an engine that cannot parse a selector discards the WHOLE rule —
-	 * siblings included. Grouped, the form row (which needs nothing new) lost its placement on such
-	 * an engine along with the cell that was unreachable there anyway. The declarations they share
-	 * are @mirror-pinned instead, so the two copies cannot drift. */
+	/* Value moves BESIDE the bar where the row has no name above it: a CBI form row and a table
+	 * meter column, sharing one geometry via --fs-meter-value. ONE RULE PER SHAPE, not a shared
+	 * selector list — the table half needs :has(), and a non-parsing engine drops the WHOLE
+	 * rule, form row included. @mirror pins the shared declarations. */
 	.cbi-value-field > .cbi-progressbar {
 		/* @mirror meter/beside */
 		margin-inline-end: var(--fs-meter-value);
@@ -76,8 +53,7 @@
 		margin-inline-end: var(--fs-meter-value);
 		/* @endmirror */
 		--fs-meter-value: var(--fs-space-10);
-		/* narrower than this it stops reading as a meter at all; the column gives up the rest. */
-		min-width: 60px;
+		min-width: 60px; /* narrower and it stops reading as a meter; the column gives up the rest */
 	}
 	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar::after {
 		/* @mirror meter/beside-value */
@@ -86,21 +62,9 @@
 		/* @endmirror */
 	}
 
-	/* …and back above the bar once that column becomes a card.
-	 *
-	 * The rule above puts the value beside the bar because a table column shares its row with other
-	 * columns. A carded row is not that: `.fs-stacked` gives each cell half the card, so "beside"
-	 * is outside the cell and the value runs across the neighbouring column and over the label
-	 * above it (reported twice from a phone, at every density).
-	 *
-	 * So the card puts it back over the bar's far edge and buys it a line: the bar takes a top
-	 * margin of one --fs-type-xs line, so the value sits between the label and the bar instead of
-	 * on either. 6-9px of overlap before, none after.
-	 *
-	 * The selector carries `:has(.tr.table-titles)` for specificity alone — that is what the
-	 * beside-rule above matches on, and `:has()` counts its argument, which makes it (0,6,0), so a
-	 * plainer selector here loses (measured: `margin-inline-end` still 40px). The title row is
-	 * still in the DOM when the table is carded; the card only hides it. */
+	/* Carded: "beside" ran the value over the neighbouring column's label (`.fs-stacked` halves
+	 * the row). Back over the bar with a one-line top margin (was 6-9px overlap).
+	 * `:has(.tr.table-titles)` stays for SPECIFICITY, matching the beside-rule's (0,6,0). */
 	.cbi-section .table.fs-stacked:has(.tr.table-titles) .td .cbi-progressbar {
 		margin-inline-end: 0;
 		margin-block-start: calc(var(--fs-type-xs) * var(--fs-leading));

@@ -17,7 +17,7 @@
  *   node tools/css-metrics.mjs [--show]      (--show also prints rule/selector/declaration counts)
  */
 import { readFileSync } from 'node:fs';
-import { analyze } from '@projectwallace/css-analyzer';
+import * as csstree from 'css-tree';
 import { buildCss } from './lib/css.mjs';
 
 const LIMITS = {
@@ -48,8 +48,9 @@ const LIMITS = {
 	 *
 	 * Count these by PARSING, not by grepping: `grep -o '!important'` over styles/ answers far more,
 	 * most of it the word inside the comments that justify the flags. What is ratcheted is important
-	 * declarations in the BUILT sheet — css-tree is already a devDependency:
-	 *   csstree.walk(ast, { visit: 'Declaration', enter: (n) => { if (n.important) count++; } }) */
+	 * declarations in the BUILT sheet — css-tree is already a devDependency, so this walks it
+	 * directly rather than carrying a second CSS parser for three numbers the one already in the
+	 * tree can answer. */
 	importants: 33,
 	/* The widest selector the theme needs; see the layer rules in docs/conventions.md.
 	 *
@@ -62,18 +63,90 @@ const LIMITS = {
 	emptyRules: 0,
 };
 
-const result = analyze(readFileSync(buildCss(), 'utf8'));
-
-const importants = result.declarations.importants.total;
-const spec = result.selectors.specificity.max;			/* [a, b, c] */
-const empty = result.rules.empty.total;
+const ast = csstree.parse(readFileSync(buildCss(), 'utf8'), { positions: false });
 
 const cmp = (a, b) => (a[0] - b[0]) || (a[1] - b[1]) || (a[2] - b[2]);
 
+/* CSS Selectors 4 specificity: :where() contributes nothing, :not()/:is()/:has()/:matches() take
+ * the MAX of their argument list (recursively — an argument can nest another one), a legacy
+ * single-colon pseudo-ELEMENT (:before/:after/:first-line/:first-letter) counts as one even though
+ * css-tree parses it as a PseudoClassSelector, and every other pseudo-class is the flat b+1. */
+function specOfSelector(selector) {
+	let a = 0, b = 0, c = 0;
+	selector.children.forEach((node) => {
+		switch (node.type) {
+			case 'IdSelector': a++; break;
+			case 'ClassSelector':
+			case 'AttributeSelector': b++; break;
+			case 'PseudoClassSelector': {
+				const name = node.name.toLowerCase();
+				if (name === 'where') break;
+				if (name === 'not' || name === 'is' || name === 'has' || name === 'matches') {
+					const list = node.children && node.children.first;
+					if (list && list.type === 'SelectorList') {
+						const best = maxSpec(list);
+						a += best[0]; b += best[1]; c += best[2];
+					}
+					break;
+				}
+				if (name === 'before' || name === 'after' || name === 'first-letter' || name === 'first-line') { c++; break; }
+				b++;
+				break;
+			}
+			case 'PseudoElementSelector': c++; break;
+			case 'TypeSelector': if (node.name !== '*') c++; break;
+			default: break;
+		}
+	});
+	return [a, b, c];
+}
+function maxSpec(selectorList) {
+	let best = [0, 0, 0];
+	selectorList.children.forEach((sel) => {
+		const s = specOfSelector(sel);
+		if (cmp(s, best) > 0) best = s;
+	});
+	return best;
+}
+
+/* A percentage or `from`/`to` inside @keyframes is not a selector and carries no specificity —
+ * excluded from rules/selectors/specificity the same way the old analyzer excluded them, but NOT
+ * from importants: an !important inside a keyframe still counts there, same as upstream. */
+const isKeyframes = (name) => /^(-\w+-)?keyframes$/i.test(name);
+
+let totalRules = 0, empty = 0, importants = 0, spec = [0, 0, 0];
+let selectorsTotal = 0, declarationsTotal = 0;
+const uniqueSelectors = new Set(), uniqueDeclarations = new Set();
+let keyframeDepth = 0;
+
+csstree.walk(ast, {
+	enter(node) {
+		if (node.type === 'Atrule' && isKeyframes(node.name)) { keyframeDepth++; return; }
+		if (node.type === 'Rule' && !keyframeDepth) {
+			totalRules++;
+			if (node.block.children.isEmpty) empty++;
+			node.prelude.children.forEach((sel) => {
+				selectorsTotal++;
+				uniqueSelectors.add(csstree.generate(sel));
+				const s = specOfSelector(sel);
+				if (cmp(s, spec) > 0) spec = s;
+			});
+		}
+		if (node.type === 'Declaration') {
+			declarationsTotal++;
+			uniqueDeclarations.add(csstree.generate(node));
+			if (node.important) importants++;
+		}
+	},
+	leave(node) {
+		if (node.type === 'Atrule' && isKeyframes(node.name)) keyframeDepth--;
+	},
+});
+
 if (process.argv.includes('--show')) {
-	console.log(`rules            ${result.rules.total}`);
-	console.log(`selectors        ${result.selectors.total} (${result.selectors.totalUnique} unique)`);
-	console.log(`declarations     ${result.declarations.total} (${result.declarations.totalUnique} unique)`);
+	console.log(`rules            ${totalRules}`);
+	console.log(`selectors        ${selectorsTotal} (${uniqueSelectors.size} unique)`);
+	console.log(`declarations     ${declarationsTotal} (${uniqueDeclarations.size} unique)`);
 }
 
 const fails = [];

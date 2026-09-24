@@ -562,5 +562,6 @@ for (const [kind, rows] of byKind) {
 	if (!VERBOSE && rows.length > shown.length) console.error(`  … and ${rows.length - shown.length} more (--verbose)`);
 }
 console.error(`\npseudo-loc: ${findings.length} overflow finding(s) — an element, the width, the density and the ` +
-	'measured overflow are above. Read docs/development.md, "pseudo-loc", for what each kind means and what to do.');
+	'measured overflow are above. Read docs/development.md, "The three cheap browser gates: smoke, ' +
+	'computed-diff and pseudo-loc", for what each kind means and what to do.');
 process.exit(1);

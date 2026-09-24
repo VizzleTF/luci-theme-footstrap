@@ -65,23 +65,34 @@ function holdFloor(records) {
 	if (scrolling()) return;
 	const host = document.getElementById('view');
 	if (!host) return;			/* the login page has no view */
-	const boxes = [], hs = [];
+	/* boxes stays an array — order feeds the parallel `hs` below and dirty's own .filter() — with a
+	 * Set alongside it purely for the O(1) "already have this one" check .indexOf() was doing in
+	 * O(n). */
+	const boxes = [], boxSeen = new Set(), hs = [];
 	host.querySelectorAll(SHRINKS).forEach((el) => {
 		let box = el, cs = window.getComputedStyle(el);
 		while (box && box !== host && cs.display.startsWith('table')) {
 			box = box.parentElement;
 			if (box) cs = window.getComputedStyle(box);
 		}
-		if (!box || box === host || boxes.indexOf(box) !== -1) return;
+		if (!box || box === host || boxSeen.has(box)) return;
+		boxSeen.add(box);
 		boxes.push(box);
 	});
-	host.querySelectorAll(FLOORED).forEach((box) => { if (boxes.indexOf(box) === -1) boxes.push(box); });
+	host.querySelectorAll(FLOORED).forEach((box) => {
+		if (boxSeen.has(box)) return;
+		boxSeen.add(box);
+		boxes.push(box);
+	});
 
 	let dirty = boxes;
 	if (records && records.length) {
-		const targets = [];
-		for (const r of records) if (r.target && targets.indexOf(r.target) === -1) targets.push(r.target);
-		dirty = boxes.filter((box) => targets.some((t) => box.contains(t) || t.contains(box)));
+		const targets = new Set();
+		for (const r of records) if (r.target) targets.add(r.target);
+		dirty = boxes.filter((box) => {
+			for (const t of targets) if (box.contains(t) || t.contains(box)) return true;
+			return false;
+		});
 	}
 	if (!dirty.length) return;
 
@@ -363,14 +374,28 @@ function anchorRef() {
 		sec: keep, secTop: keep ? keep.getBoundingClientRect().top : 0 };
 }
 
-let _anchorPending = null;
-let _anchorWhy = null;
-const _anchorTrail = [];
-function awhy(w) {
-	_anchorWhy = w;
-	_anchorTrail.push(w + '@' + Math.round(performance.now()));
-	if (_anchorTrail.length > 8) _anchorTrail.shift();
+/* Two independent diagnostic trails — one per correction path (the frame-coalesced anchor below,
+ * the late drift correction further down) — same shape twice: the last reason recorded, and the
+ * last 8 with a timestamp, for tools/scroll-anchor.mjs to read back after a probe run. One factory,
+ * so the cap and the timestamp format cannot drift between the two. */
+const TRAIL_MAX = 8;
+function makeTrail() {
+	let last = null;
+	const entries = [];
+	return {
+		record(w) {
+			last = w;
+			entries.push(w + '@' + Math.round(performance.now()));
+			if (entries.length > TRAIL_MAX) entries.shift();
+		},
+		last: () => last,
+		entries: () => entries
+	};
 }
+
+let _anchorPending = null;
+const _anchor = makeTrail();
+function awhy(w) { _anchor.record(w); }
 let _anchorFrame = 0;
 function anchorEnabled() {
 	try { return localStorage.getItem('fsAnchor') !== 'off'; }
@@ -380,14 +405,8 @@ function anchorEnabled() {
  * It keeps a reference still; it does not promise that a section can vanish and come back. An
  * older WebKit moved 180px for 120px of growth, so the element is asked where it is now. */
 let _lateFrame = 0;
-/* why the last late correction did or did not write — eight exits, one symptom from outside */
-let _lateWhy = null;
-const _lateTrail = [];
-function why(w) {
-	_lateWhy = w;
-	_lateTrail.push(w + '@' + Math.round(performance.now()));
-	if (_lateTrail.length > 8) _lateTrail.shift();
-}
+const _late = makeTrail();
+function why(w) { _late.record(w); }
 
 function lateDrift(ref, grow, floorShrink) {
 	if (_lateFrame) return why('busy');
@@ -607,11 +626,11 @@ return baseclass.extend({
 	},
 
 	scrolling,
-	/* unmarked, for tools/scroll-anchor.mjs — see `_lateWhy` */
-	lateWhy: () => _lateWhy,
-	lateTrail: () => _lateTrail.slice(),
-	anchorWhy: () => _anchorWhy,
-	anchorTrail: () => _anchorTrail.slice(),
+	/* unmarked, for tools/scroll-anchor.mjs — see `makeTrail()` above */
+	lateWhy: () => _late.last(),
+	lateTrail: () => _late.entries().slice(),
+	anchorWhy: () => _anchor.last(),
+	anchorTrail: () => _anchor.entries().slice(),
 	deferMeasurement,
 
 	/* -> the offset this file last took a reference at, so a probe does not measure the guard instead

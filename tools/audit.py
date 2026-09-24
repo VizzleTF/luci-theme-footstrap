@@ -6,12 +6,19 @@ Checks, in print order; the "why" of each sits on the function that implements i
   1. balance()            bracket balance, a smoke test for a truncated file. CSS only, see main().
   2. audit_vars()         var() reads of a property nobody defines: the declaration is dropped
                           silently, so a shadow or a colour just vanishes.
-  3. (in main)            !important outside BANG_OK.
-  4. audit_shadowed()     one property set twice on one selector in one layer.
-  5. audit_export_reads() reads of the outward `--*-color-*` tier from inside the theme.
-  6. audit_base_dead()    base declarations a later layer repaints: the removable ones, and the
+  3. audit_shadowed()     one property set twice on one selector in one layer.
+  4. audit_export_reads() reads of the outward `--*-color-*` tier from inside the theme.
+  5. audit_base_dead()    base declarations a later layer repaints: the removable ones, and the
                           absorption backlog that must NOT be deleted.
-  7. base_hardcoded()     colour literals in styles/base — a literal cannot follow a palette.
+  6. base_hardcoded()     colour literals in styles/base — a literal cannot follow a palette.
+
+A stray `!important` outside the allowlist used to be checked here too (a BANG_OK set literal);
+folded into stylelint once measured redundant: `declaration-no-important` plus
+`.stylelintrc.json`'s override reject the same flag on the same files. balance() stays: a custom
+property's VALUE is opaque to postcss (the grammar is "any token sequence" until `var()` reads it),
+so an extra `)` inside one — `--fs-zz: 1px);` — never becomes a CssSyntaxError there; only counting
+brackets over the raw text catches it (proven by planting one — `npx stylelint` passes, this does
+not).
 
 No dependencies, any python3; --strict turns the report into a CI gate. A static audit cannot see
 the cascade: for "did this change a computed style?" measure it in a browser — the method, and why
@@ -22,30 +29,6 @@ import re, sys, pathlib
 ROOT = pathlib.Path(__file__).resolve().parents[1] / "luci-theme-footstrap"
 STYLES = ROOT / "styles"
 BASE = STYLES / "base"
-# The only files allowed an !important, each for a reason no cascade layer covers. The same list
-# lives in .stylelintrc.json (the declaration-no-important:null override); tools/bang-ok.mjs holds
-# the two copies to each other, since Python and a JSON config cannot share an import.
-# 90-responsive/20-overview outrank an inline style= written by ui.js or luci-mod-status's
-# 29_ports.js; 45-misc outranks the inline style='width:100%' the realtime graphs write on the box
-# they draw into (sized from #view, so the card's gutter clips it unless the box is widened back);
-# styles/base carries widget-internal layout (.cbi-dropdown) and the .left/.right/.center forcing
-# utilities; 95-a11y-media needs it because the flag INVERTS the layer order — the only way one rule
-# can stop animations declared in base as well as in theme.
-# 30-tables carries ONE flag, `word-break: normal` on a data table's cells while it is still a
-# table: luci-mod-status's processes.js:39 writes `style="word-break: break-word"` on its Command
-# span — the deprecated alias for `overflow-wrap: anywhere`, which erases that column's min-content
-# from an INLINE declaration. Measured at 720px: the column sat at 126px against a 353px token, and
-# forcing the column's own overflow-wrap changed nothing, because the floor was erased one level
-# down. With the flag the same table asks for 963px in 688px of room, which the fitter needs.
-BANG_OK = ({"90-responsive.css", "20-overview.css", "95-a11y-media.css", "45-misc.css",
-            "30-tables.css",
-            # 65-dropdown carries one flag, `min-width: 0` on `.hide-close`: it fights a
-            # RichListValue's own inline `min-width: 25vw` (issue #15), and only an author
-            # !important outranks an inline style. The three `ul` margin flags this note used to
-            # describe are gone — their stated adversary, an inline `margin` from ui.js, exists on
-            # neither release.
-            "65-dropdown.css"}
-           | {p.name for p in (STYLES / "base").glob("*.css")})
 
 # var()s legitimately not defined inside styles/. --zone-color-rgb is written inline on a zone badge
 # by luci-mod-network — the only --*-rgb that may exist (the theme's own RGB and HSL bridges were
@@ -315,23 +298,19 @@ def main():
     strict = "--strict" in sys.argv   # CI gate: exit non-zero if anything is reported
     findings = 0
     css = sources()
-    # Every section below is a report() over `css`: an empty list makes every one of the seven print
+    # Every section below is a report() over `css`: an empty list makes every one of the six print
     # "none" and the script exit 0 whether or not --strict was given, since nothing UNBALANCED,
-    # SHADOWED or HARDCODED was found in zero files either. Measured: with styles/ emptied, a plain
-    # run printed seven clean sections and `--strict` exited 0 — this is the count nothing else in
-    # main() ever took, and it fails regardless of --strict because a report over no input is not a
-    # finding of "clean", it is no audit at all (currently 40 stylesheets, in build-css.sh's order).
+    # UNDEFINED, SHADOWED or HARDCODED was found in zero files either. Measured: with styles/
+    # emptied, a plain run printed six clean sections and `--strict` exited 0 — this is the count
+    # nothing else in main() ever took, and it fails regardless of --strict because a report over no
+    # input is not a finding of "clean", it is no audit at all (currently 40 stylesheets, in
+    # build-css.sh's order).
     if not css:
         sys.exit(f"audit.py: no stylesheets found under {STYLES} — the source tree is missing, not "
                   "clean")
     print(f"{len(css)} stylesheet(s) audited, in build-css.sh's concatenation order.")
     s = "\n".join(p.read_text(encoding="utf-8") for p in css)
 
-    # CSS only, deliberately. Counting the JS too does not work: raw counting punished dense
-    # comments, and a hand-rolled strip was worse — it read the `//` inside `.replace(/\//g, '.')`
-    # as a line comment and ate the rest of the line, the exact jsmin bug class it was meant to
-    # find. eslint parses the JS for real and tools/jsmin-verify.mjs proves the minified output is
-    # token-identical; those are the authorities.
     findings += report("balance (CSS)",
         [f"BAD {p.relative_to(ROOT)}: {', '.join(b)}" for p in css if (b := balance(p))],
         "ok (all balanced)")
@@ -339,15 +318,6 @@ def main():
     miss = audit_vars(s)
     findings += report("css vars used but not defined",
         [f"{m}  (x{s.count('var(' + m)})" for m in miss])
-
-    stray = [(p.name, i, l.strip()[:70])
-             for p in css if p.name not in BANG_OK
-             for i, l in enumerate(p.read_text(encoding="utf-8").split("\n"), 1)
-             # a flag that terminates a declaration; prose in a comment does not
-             if re.search(r"!important\s*[;}]", l)]
-    findings += report("!important outside the files allowed to carry it",
-        [f"{name}:{ln}  {txt}" for name, ln, txt in stray], "none",
-        "-> move the rule to a later layer, or merge it with its twin")
 
     sh = audit_shadowed(css)
     findings += report("declarations shadowed within a layer (theme/page)",

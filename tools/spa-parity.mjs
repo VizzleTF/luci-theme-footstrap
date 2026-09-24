@@ -19,19 +19,22 @@
  *   node tools/spa-parity.mjs [--only owrt2512,owrt2410] [--pages /admin/network] [--pages-all]
  *
  * Needs a running owlab router (docs/development.md). */
+import { parseArgs } from 'node:util';
+import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
 import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
 import { read } from './lib/root.mjs';
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf('--' + name);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
+const { values: FLAGS } = parseArgs({ options: {
+	pages: { type: 'string' }, 'pages-all': { type: 'boolean' }, all: { type: 'boolean' },
+	only: { type: 'string' },
+} });
+const arg = (name, dflt) => FLAGS[name] ?? dflt;
 const ONLY_PAGES = arg('pages', '');
 /* one page per SHAPE rather than every leaf — lib/page-shapes.mjs; `--pages-all` takes them all */
-const ALL_PAGES = process.argv.includes('--pages-all');
-const ALL_STANDS = process.argv.includes('--all');
+const ALL_PAGES = FLAGS['pages-all'] ?? false;
+const ALL_STANDS = FLAGS.all ?? false;
 /* Every navigation starts here, so each page is reached as a real click from another page rather
  * than from whatever the previous iteration left behind. */
 const ORIGIN = '/admin/status/overview';
@@ -226,7 +229,7 @@ async function stagingAttempt(page, stand, c) {
 	/* held open only for the click below, not for the goto()/settle above: slowing the
 	 * outgoing page's own load would tell us nothing about the staging window */
 	await page.route(STAGING_ROUTE, async (route) => {
-		await new Promise((r) => setTimeout(r, STAGING_DELAY_MS));
+		await delay(STAGING_DELAY_MS);
 		/* the prefetch fetch() and require()'s own XHR can both name the same URL, and a route
 		 * already settled by the other rejects a second continue() — nothing this probe reads
 		 * depends on which of the two wins */
@@ -349,7 +352,7 @@ async function backRestoreCheck(page, stand, findings, widthLabel) {
 		/* held only across the traversal itself — slowing the outgoing page would move the very
 		 * timing under test */
 		await page.route(BACK_RPC_ROUTE, async (route) => {
-			await new Promise((r) => setTimeout(r, BACK_RPC_DELAY_MS));
+			await delay(BACK_RPC_DELAY_MS);
 			try { await route.continue(); } catch (e) {}
 		});
 		await page.goBack();

@@ -53,9 +53,56 @@ function flyoutMode() {
 	       document.documentElement.hasAttribute('data-narrow');
 }
 
-/* The trigger — a bare <a>. widgets.setOpen keeps `.open` and aria-expanded in step. */
+/* The trigger — a bare <a>. setOpen() below keeps `.open` and aria-expanded in step. */
 const TRIGGER = ':scope > a';
 const OPEN_LI = '#topmenu > li.open';
+
+/* ---- disclosure primitives ----
+ * A section header is a W3C-APG disclosure control: an <a role="button"> owning a panel it shows
+ * and hides. The one consumer of all three is this file, so they live here rather than behind a
+ * `linkSel`/`opts` parameter in fs-widgets.js — TRIGGER above is the only trigger selector either
+ * ever sees. */
+
+/* Every open and close goes through here so `.open` and aria-expanded cannot disagree: `.open`
+ * alone tells a sighted user everything and a screen-reader user nothing. */
+function setOpen(li, on) {
+	li.classList.toggle('open', on);
+	li.querySelector(TRIGGER)?.setAttribute('aria-expanded', on ? 'true' : 'false');
+}
+
+/* An <a role="button"> is given Enter by the browser but not Space, and a disclosure control has
+ * to answer both — contrast fs-widgets.js's wireActivate(), written for an element with neither. */
+function wireSpaceKey(link) {
+	link.addEventListener('keydown', (ev) => {
+		if (ev.key !== ' ') return;
+		ev.preventDefault();
+		link.click();
+	});
+}
+
+/* A click outside closes; WCAG 2.2 SC 1.4.13 also requires a hover/focus panel to be dismissible
+ * from the keyboard, with focus handed back to the trigger. `when` restricts both to flyout mode,
+ * where `.open` means "popup panel" — an unfolded accordion must not close on an outside click. */
+function wireDismiss(opts) {
+	const active = () => (opts.when ? opts.when() : true);
+
+	document.addEventListener('click', (ev) => {
+		/* `closest?.`: a document-level listener sees any dispatched click, including one whose
+		 * target is not an Element and has no closest(). The throw would kill this listener for
+		 * the rest of the session. */
+		if (active() && !ev.target.closest?.(opts.inside))
+			opts.close();
+	});
+
+	document.addEventListener('keydown', (ev) => {
+		if (ev.key !== 'Escape' || !active()) return;
+		const open = document.querySelector(opts.open);
+		if (!open) return;
+		const trigger = open.querySelector(opts.trigger);
+		opts.close();
+		trigger?.focus();
+	});
+}
 
 /* ---- dropdown edge-clamp (the bar, at every width) ----
  * A bar panel hangs off its own item (li position:relative, ul left:0 — theme/20-shell.css), so an
@@ -95,10 +142,6 @@ function clampDropdown(li) {
  * the next hover/tap recompute */
 function clearClamps() {
 	document.querySelectorAll('#topmenu ul').forEach((m) => { m.style.left = ''; });
-}
-
-function setOpen(li, on) {
-	widgets.setOpen(li, on, TRIGGER);
 }
 
 function closeFlyouts(except) {
@@ -239,7 +282,7 @@ function renderMainMenu(tree, url, level) {
 				saveOpenSections();
 			});
 
-			widgets.wireSpaceKey(link);
+			wireSpaceKey(link);
 
 			/* hybrid devices: once a real mouse enters, drop the tap-opened panel so hover is
 			 * authoritative and two panels never stack. Guarded on pointerType, since a touch
@@ -266,7 +309,7 @@ return baseclass.extend({
 
 		/* click-outside and Escape close an open flyout, gated on flyoutMode(): outside it
 		 * `.open` means unfolded accordion, which must not fold on a click elsewhere */
-		widgets.wireDismiss({
+		wireDismiss({
 			when: flyoutMode,
 			inside: '#topmenu > li.has-sub',
 			open: OPEN_LI,

@@ -166,7 +166,7 @@
 			   Precedence for every axis: localStorage ?? router default (window.__fsSD) ?? built-in.
 			   Dark mode: a saved preference, else the router default, else the OS. */
 			(() => {
-				const root = document.querySelector(':root'),
+				const root = document.documentElement,
 				      sd = (window.__fsSD || {}).darkmode;
 				let saved = null;
 				try { saved = localStorage.getItem('fs-darkmode'); } catch (e) {}
@@ -210,7 +210,7 @@
 				   applier's lsGet means. The outer try is the last resort for everything else. */
 				const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 				try {
-					const root = document.querySelector(':root'),
+					const root = document.documentElement,
 					      sd = window.__fsSD || {};
 					let p = lsGet('fs-palette');
 					/* A stray or retired palette name needs no migration here: it fails the list
@@ -351,7 +351,7 @@
 			(() => {
 				try {
 					if (localStorage.getItem('fs-rail') === 'true')
-						document.querySelector(':root').setAttribute('data-rail', 'true');
+						document.documentElement.setAttribute('data-rail', 'true');
 				} catch (e) {}
 			})();
 
@@ -362,7 +362,7 @@
 				try {
 					const saved = localStorage.getItem('fs-layout');
 					if (saved === 'top' || saved === 'sidebar')
-						document.querySelector(':root').setAttribute('data-layout', saved);
+						document.documentElement.setAttribute('data-layout', saved);
 				} catch (e) {}
 			})();
 		</script>

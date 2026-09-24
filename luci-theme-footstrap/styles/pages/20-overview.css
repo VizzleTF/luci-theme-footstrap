@@ -1,24 +1,10 @@
 @layer page {
-	/* Every !important here fights an inline `style=` — nothing else can, an inline declaration
-	 * outranking every author rule in every layer. luci-mod-status's 29_ports.js writes the ports
-	 * grid, its tiles and their inner rows with inline declarations: `display`,
-	 * `grid-template-columns` and `margin-bottom` on the grid, `margin`/`min-width`/`max-width` on
-	 * the tile, `display` on the heads, `text-align`/`font-size` on the traffic cell. Each flag is
-	 * matched against the property that inline style really sets; one fighting only another
-	 * footstrap rule would be redundant, `page` being the last layer. No cascade layer can replace
-	 * the flags that remain — keep them. */
+	/* Every !important here fights an inline style= from luci-mod-status's 29_ports.js — page is
+	 * the last layer, so a flag fighting only another footstrap rule is not kept. docs/css.md
+	 * "Overview: the port-tile reskin". */
 
-	/* The `.cbi-title .label` pill: theme/35-alerts.css (one owner — a copy here had
-	 * drifted). Only the overview-specific chevron toggle stays.
-	 * index.js emits a span with a raw "Hide"/"Show" text node + data-style (expanded =
-	 * inactive, collapsed = active); data-indicator='poll-status' is unique to these
-	 * toggles. font-size:0 hides the word, ::after borders draw the chevron.
-	 *
-	 * The card HEADER is the disclosure control now (fs-overview.js wireDisclosure()); this pill is
-	 * marked aria-hidden there and stays only as its glyph, so the border and fill that made it read
-	 * as its own 26px button are dropped — 16px, matching the rail toggle's own chevron glyph
-	 * (theme/20-shell.css `.fs-railtoggle .fs-ico`), and --fs-faint rather than the pill's --fs-dim,
-	 * a step quieter since it is decoration rather than a target now. */
+	/* decoration only, glyph aria-hidden — docs/css.md "Overview: the disclosure pill, the grid,
+	 * and the duplicate heading" */
 	.cbi-title .label[data-indicator="poll-status"] {
 		font-size: 0;
 		width: 16px;
@@ -31,10 +17,7 @@
 		border: 0;
 		color: var(--fs-faint);
 	}
-	/* The glyph itself is the Appearance fold's, to the byte — one chevron for "this opens", drawn
-	 * in two page files because the two hosts are a stock element keyed by attribute and one of
-	 * ours keyed by class, which no single selector list in one layer can carry. Pinned instead:
-	 * tools/mirror.mjs fails the build if the copies drift (styles/pages/80-appearance.css). */
+	/* pinned @mirror chevron/*, byte-identical to the Appearance fold's copy */
 	.cbi-title .label[data-indicator="poll-status"]::after {
 		/* @mirror chevron/closed */
 		content: "";
@@ -55,22 +38,8 @@
 		/* @endmirror */
 	}
 
-	/* The header itself (fs-overview.js wireDisclosure() stamps role="button"): a hand cursor for a
-	 * pointer user, a focus ring for a keyboard one — the same ring every other interactive control
-	 * in this theme draws (theme/35-alerts.css `.cbi-title .label:focus-visible`, the pill's own
-	 * former ring, now the header's).
-	 *
-	 * Two selectors, not one: fs-overview.js's headerEl() reads `.cbi-title h3, :scope > h3` because
-	 * the wrapper itself differs by release — 25.12 renders `.cbi-title > h3`, 24.10 a bare `<h3>`
-	 * straight inside `.cbi-section`, no `.cbi-title` at all. `[role="button"]` is the anchor either
-	 * way, so a heading wireDisclosure() left untouched — one with nothing to collapse — is never
-	 * matched. Measured on a 24.10 FORM: without the second arm the attributes and the keyboard
-	 * worked but `cursor` stayed `auto`, `box-shadow` `none`, and focus drew only the UA outline.
-	 * On a live 24.10 the arm does not fire at all today, and that is not a fault in it: OpenWrt
-	 * 24.10.8 renders no hide/show control on an Overview card, so wireDisclosure() stamps nothing
-	 * there and 0 of the page 14 `<h3>`s carry the role (measured on owlab owrt2410). The arm
-	 * guards a SHAPE of markup, not a release — it is what keeps the styling with the behaviour on
-	 * whichever release grows the control next. */
+	/* two selectors: wrapper differs by release (25.12 .cbi-title>h3, 24.10 bare h3); matches 0 of
+	 * 14 h3 on live 24.10.8 — not dead there, that release has no hide/show control */
 	:is(.cbi-title h3, .cbi-section > h3)[role="button"] {
 		cursor: pointer;
 		border-radius: var(--fs-radius-sm);
@@ -80,44 +49,21 @@
 		box-shadow: var(--fs-focus-ring);
 	}
 
-	/* Every page-scoped selector below anchors on `:where(#view)[data-page="…"]`, not a bare
-	 * `#view[data-page="…"]`: an id contributes (1,0,0), and this file's deepest chain (the
-	 * progressbar row's `.td:first-child` selector, further down) already carries the rest past
-	 * tools/css-metrics.mjs's ratchet on its own — `#view` on top of it measured [1,9,0], over the
-	 * ceiling of [1,7,0]. `:where(#view)` matches the exact same single element (an id is a valid
-	 * :where() argument) but contributes ZERO specificity, so nothing about which element matches
-	 * changes — including the `> div` case in 40-sshkeys.css, where a wider `:where(#view,
-	 * .fs-content)` was tried and rejected: `.fs-content` is #view's ANCESTOR, so its own `> div`
-	 * arm would have matched #view itself (a `<div>`, per fs-router.js's stageView()) rather than
-	 * #view's children — a different element, not the same one at lower specificity. Measured after:
-	 * [1,7,0], the ceiling now held by an unrelated selector elsewhere in the sheet. */
+	/* every page-scoped selector below anchors on :where(#view)[data-page="…"], not bare #view —
+	 * docs/css.md ":where(#view), not bare #view". */
 
-	/* An empty `.cbi-section` LuCI still renders when a stock include has nothing to show: title
-	 * "-", the poll pill its only content, 72px tall on the live Overview (seventh there — a
-	 * fixture is not proof of position, docs/findings.md "An empty card with `-` as its title").
-	 * Real and cosmetic, so fs-overview.js's hideEmptyCard() marks it and this drops it. */
+	/* hideEmptyCard() marks a stock include with nothing to show; drop it */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section.fs-ovl-empty { display: none; }
 
-	/* Stock overview layout: fs-overview.js wraps the stock System / Memory / Storage
-	 * sections in .fs-ovl; this is the grid only — System left across both rows, Memory +
-	 * Storage right. Stock styling and data untouched. */
-	/* the chrome already shows the page title, so the stock <h2> is a duplicate */
-	/* the chrome already shows the page title, so the stock <h2> is a duplicate.
-	 * Scoped through .fs-content, not #view: the heading is a SIBLING of #view (a
-	 * dispatcher template emits it before the div), so it needs the OUTGOING page's
-	 * identity for the whole staging window, spared until commitStage the same way
-	 * fs-sheets spares a page's stylesheets — fs-router.js. */
+	/* stock <h2> duplicate of the chrome's title; via .fs-content not #view — docs/css.md above */
 	.fs-content[data-page="admin-status-overview"] h2[name="content"] { display: none; }
 	.fs-ovl {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: var(--fs-space-4);
-		/* no align-items: the default stretch is what levels the two columns' bottom edges */
 		margin-bottom: var(--fs-card-gap);	/* match stock .cbi-section spacing below the grid */
 	}
-	/* min-width:0 so a grid item shrinks to its TRACK, not to its content's min-width
-	 * (auto): a long System value (model/firmware) blew the single-column track past a
-	 * ~344px phone and clipped. */
+	/* min-width:0 so an item shrinks to its TRACK, not its content's min-width — docs/css.md above */
 	.fs-ovl > .fs-ovl-sys,
 	.fs-ovl > .fs-ovl-mem,
 	.fs-ovl > .fs-ovl-sto { margin: 0; min-width: 0; }
@@ -131,245 +77,98 @@
 		.fs-ovl > .fs-ovl-sto { grid-column: 1; grid-row: auto; }
 	}
 
-	/* Stock Port status (29_ports.js) reskin — pure CSS over the stock .ifacebox markup: icon-in-a-box
-	 * tiles become left-aligned cards (name + link dot, speed, TX/RX).
-	 *
-	 * Every rule is scoped to `.ifacebox:has(img[src*="/port_"])` because Network and Wireless reuse
-	 * the same .ifacebox classes and only Port tiles carry a port_*.svg icon. Do not unscope. Link
-	 * state is the icon src; child order: 1 name-head, 2 body (icon+speed), 3 zone bar, 4 body
-	 * (traffic). */
-	/* The tracks pack the row instead of leaving air beside it, and every card is the same width.
-	 *
-	 * `repeat(auto-fit, minmax(126px, 200px))` reads as "shrink toward 126 when there are many
-	 * ports", and a grid does not work that way: `auto-fit` picks the track COUNT from the definite
-	 * MAX of the track function, so the count is always `floor(width / 200)` and the floor is
-	 * reached only when the column itself is narrower than that. An 11-port switch in a 1190px
-	 * column then gets 5 tracks of 200px in three rows with 150px of air beside every one.
-	 *
-	 * `minmax(92px, 1fr)` asks it the other way round: with an indefinite max the count comes from
-	 * the 92px min, so the row takes as many tiles as fit and `1fr` shares the remainder equally. */
+	/* Port status reskin. Scoped to :has(img[src*="/port_"]) — do not unscope, Network/Wireless
+	 * reuse the same .ifacebox classes. Child order: 1 name-head, 2 speed, 3 zone bar, 4 traffic. */
 	:where(#view)[data-page="admin-status-overview"] div:has(> .ifacebox img[src*="/port_"]) {
-		/* 8px, not 10: at the floor below, the gap is what decides whether an 11-port switch takes one
-		 * row or ten-plus-one. A 1190px column fits 11 cards of 101px with 8px between them and 10
-		 * of 110px with 10px — the two px come off the gutter rather than off the card, because the
-		 * card's own floor is a measurement (see below) and the gap is not. No inline gap to fight,
-		 * so no flag. */
+		/* 8px not 10: an 11-port switch in a 1190px column fits 11 cards only at 8px gap */
 		gap: var(--fs-space-2);
-		/* The floor is the traffic figure, and it is written as one: `▲ 1024.0 PiB` is the widest
-		 * string luci.js's `%1024.1mB` can produce, and the figures are `nowrap`, so a card too narrow
-		 * for one pushes it past its own padding instead of wrapping it. Measured rather than guessed:
-		 * stepping a card 1px at a time until the figure fits
-		 * on one line and the card stops overflowing gives 94px at Normal, 80 at Compact and 109 at
-		 * Large, so the text scales with the density axis and the gutter is already a token — each
-		 * setting gets its own answer (100 / 84 / 111) instead of one number that is wrong on two of
-		 * them. Held by a sweep of every width from 320 to 1900 in 10px steps at all three densities
-		 * with 24 cards of maximal content: 0 overflowing, 0 figures wrapped, narrowest card 93px. */
 		--fs-port-min: calc(76px * var(--fs-density-type) + var(--fs-space-3) * 2);
 		grid-template-columns: repeat(auto-fit, minmax(var(--fs-port-min), 1fr)) !important;
 		margin-bottom: 0 !important;
 	}
-	/* Flex-wrap, not a grid with a threshold, and that is the fix for issue #7's shifted layout.
-	 *
-	 * As `display: grid; grid-template-columns: 1fr auto`, "do those two still fit side by side?"
-	 * was answered by a @container threshold — a proxy for a question about the CONTENT, calibrated
-	 * on English: `no link` is ~45px and `нет соединения` ~100px, while the traffic figures are
-	 * `nowrap` by design, so on a Russian router a down port that had carried traffic needed ~193px
-	 * inside a 178px content box, and a grid does not wrap — the figures overflowed under the next
-	 * card. With the counters at zero the same card fitted.
-	 *
-	 * Flexbox asks the real question for free: the two cells sit on one row while they fit and the
-	 * traffic drops to its own row when they do not. */
+	/* flex-wrap, not a grid+@container threshold (issue #7) — docs/css.md above */
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) {
 		margin: 0 !important;
 		min-width: 0 !important;
-		/* The cap half of the pair that sizes the tile (the 126px min is on the wrapper's tracks —
-		 * see the note there): 200px is where a 2-port device stops growing, so two ports do not
-		 * become two half-page cards. It carries a flag because stock writes `max-width:100px`
-		 * inline and the ImmortalWrt fork writes its own. */
+		/* caps a 2-port device growing into two half-page cards; fights stock's inline max-width */
 		max-width: 200px !important;
-		/* …and `width` too, which stock never writes but a fork does: ImmortalWrt 25.12 carries
-		 * `style="margin:.25em;width:100px"` instead of stock's min/max pair, so releasing only the
-		 * two stock properties leaves the fork's fixed width in charge and the tile draws itself
-		 * 100px wide inside a 200px track. Naming all three costs nothing on stock. */
+		/* ImmortalWrt 25.12 sets inline margin/width instead of stock's min/max pair */
 		width: auto !important;
-		/* …and that is only half of it: the same fork writes `align-items:center;justify-items:center` on
-		 * the grid CONTAINER, so a tile's `justify-self` resolves to `center` — and a centred item
-		 * with `width: auto` is sized fit-content rather than stretched to its track, so releasing
-		 * the fork's width leaves the tile as narrow as its content and the rows spill to the right.
-		 * Stating the self-alignment needs no flag: the fork's declarations are `*-items` on the
-		 * PARENT, which only supply a value when the item says `auto`, and a direct `*-self` wins on
-		 * the cascade proper. */
+		/* same fork centres the grid CONTAINER; *-self wins over parent *-items, no flag needed */
 		justify-self: stretch;
 		align-self: stretch;
 		text-align: start;
 		background: var(--fs-panel2);
 		border: var(--fs-hairline);
 		border-radius: var(--fs-radius-lg);
-		/* the horizontal half is what --fs-port-min budgets for (the wrapper rule above), so it stays
-		 * --fs-space-3; the vertical half is one step tighter, because a port card is four short
-		 * lines and every px of leading between them shows. */
 		padding: var(--fs-space-1-5) var(--fs-space-3);
-		/* No `container-type` here, and its absence is the fix for a page that jumped every five seconds.
-		 * The card carried `container-type: inline-size` for two @container queries that were deleted
-		 * when the flex wrap below replaced their pixel threshold, and the containment was left
-		 * behind with nothing asking it anything.
-		 *
-		 * It was not free: the poll rewrites these cards once a tick, and a freshly built
-		 * size-contained box is laid out before the containment resolves, so everything below it
-		 * moved by the same amount on every tick. Bisected on the reporter's router down to this one
-		 * declaration.
-		 *
-		 * If a future rule needs a container query here, name the container on a wrapper the poll does
-		 * NOT replace, never on the card itself. */
+		/* no container-type: broke poll-replaced cards before containment resolved (bisected) */
 		display: flex;
-		/* `flex-direction: row` is NOT redundant: base/95-luci.css paints every .ifacebox
-		 * `display: inline-flex; flex-direction: column`, and the grid this rule used to declare
-		 * made that direction moot. Switching to flex woke it up — the name, the speed and the
-		 * figures stacked into a column, `flex-basis: 100%` became a HEIGHT, and flex-grow grew the
-		 * wrong axis. Cost an hour; state the axis. */
+		/* NOT redundant: base/95-luci.css sets .ifacebox inline-flex column */
 		flex-direction: row;
 		flex-wrap: wrap;
-		/* row-gap 0: every row inside the card carries its own spacing (the zone bar's margins, the
-		 * name's line box), and a gap on top of that is what made a five-line card 19px taller than
-		 * its content. */
+		/* row-gap 0: every row carries its own spacing already (zone bar margins, name line box) */
 		column-gap: var(--fs-space-2); row-gap: 0;
 		align-items: baseline;
 	}
-	/* drop the stock icon */
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) img { display: none; }
-	/* base/95-luci.css draws a border-bottom on EVERY .ifacebox-head; the port card carries
-	 * two heads (the name, child 1, and the zone-colour line, child 3), so that is two grey
-	 * dividers stacked around the colour line. Drop them — the colour line is the only
-	 * divider this card wants. Page layer beats base, no !important needed. */
+	/* two stock border-bottoms stack around the colour line; drop both */
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) .ifacebox-head { border-bottom: 0; border-radius: 0; }
-	/* Zone-colour bar (child 3): WAN red, LAN green — the stock Port-status indicator that
-	 * distinguishes the Internet port from the LAN ports (issue #13). Its inner .zonebadge segments
-	 * already carry firewall.getZoneColorStyle() inline and a `.cbi-tooltip` naming the zone, so
-	 * this only PLACES it: a full-width colour line on its own row between the name and the
-	 * speed/traffic bodies, where it reads as the card's divider. `order` puts it there — without it
-	 * the bodies fall in source order and the bar splits speed from traffic. No `overflow` or
-	 * `border-radius`: both clip the absolutely-positioned tooltip. */
+	/* zone-colour bar (WAN red/LAN green, issue #13); order places it between name and traffic.
+	 * No overflow/border-radius: both clip the absolutely-positioned .cbi-tooltip */
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:nth-child(3) {
 		order: 1;
 		flex: 0 0 100%;
 		width: 100%;
 		margin: var(--fs-space-0-5) 0 var(--fs-space-1);
 	}
-	/* The name row, with no status dot: the speed line and the zone bar already report the carrier,
-	 * and a `-webkit-box` lays its children out as lines, so a dot could not stay in the flow — it
-	 * would join the name's text and be clipped with the second line. */
+	/* no status dot: speed + zone bar report carrier, -webkit-box lays children as lines */
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
-		/* Its own row, and `width` rather than `flex-basis: 100%`: the two agree now that the card's
-		 * size containment is gone (see above), and this form says what it means without depending on
-		 * the card's sizing staying definite. */
 		flex: 0 0 auto;
 		width: 100%;
-		/* Two lines of name, never three, and never a name that decides how wide every card is.
-		 *
-		 * As a flex row with the name on one `nowrap` line, the LONGEST interface name becomes the
-		 * minimum width of every tile on the page. Wrapping alone is not the answer either: a name
-		 * with no space and no hyphen to break at gets three ragged lines from `overflow-wrap:
-		 * anywhere` and the row grows to fit them.
-		 *
-		 * So: a `-webkit-box` clamped to two lines, the one shape that both wraps AND puts an
-		 * ellipsis where it stops (`text-overflow` alone only ever truncates a single line).
-		 * `line-clamp` is written beside the prefixed pair for the engines that have taken the
-		 * unprefixed property; the prefixed spelling is the one that works everywhere today and is in
-		 * the spec's own compat section.
-		 *
-		 * No second line is reserved: `min-height: 2lh` was tried and cost 19px of empty air in every
-		 * card whose name does not wrap (a 5-port device stood 126px against 107px), while the grid
-		 * levels the row either way. The explicit `line-height` stays — it is what makes a wrapped
-		 * name's two lines the theme's rhythm rather than the font's own default. */
-		/* ONE LINE, cut with an ellipsis. base/95-luci.css already says `white-space: nowrap`; what
-		 * this adds is the pair that makes the overflow READABLE instead of clipped — and `min-width`,
-		 * because a nowrap box's automatic minimum size is its whole text, which would put the longest
-		 * interface name back in charge of how wide every card is. */
+		/* clamped to 2 lines never 3: unclamped nowrap name sets every tile's min width */
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		line-height: var(--fs-leading);
 		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-text);
 	}
-	/* no link (*_down.svg): dim name, to match the dim speed and the faded zone bar */
+	/* no link (*_down.svg): dim to match the dim speed and faded zone bar */
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child { color: var(--fs-dim); }
-	/* speed: green when linked, dim when not */
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
 		order: 2;								/* below the zone-colour line (child 3, order 1) */
 		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-good); text-align: start;
-		/* `flex-grow: 1` means "I take the slack", which pushes the traffic to the right edge while
-		 * the two share a row. `margin-left: auto` on the traffic is wrong: Chrome counts it when
-		 * breaking lines, so the figures take a row of their own even on a card they fit.
-		 *
-		 * The text WRAPS, and the automatic minimum size is what keeps the wrap tidy. This field used
-		 * to be `nowrap`, which holds for the speeds themselves (`1GbE`, `10 GbE`) and breaks on the
-		 * no-link label — one short word in English, three in most other languages. `нет соединения`
-		 * measured 127px in a card that gives it 127 and was CLIPPED, not ellipsised: the reader saw
-		 * `нет соедине`. A label that cannot be read is worse than a card one line taller.
-		 *
-		 * NO `min-width: 0` with it. That would let the flex line squeeze this box to 77px — the
-		 * width left beside the port image, which shares this box — and the label then broke mid-word
-		 * (`соедине` / `ния`). Left at `auto` the box keeps its min-content, which for wrapping text
-		 * is the longest WORD, so the label breaks between words and the short speeds, having nothing
-		 * to wrap at, do not move at all. `overflow-wrap` is the last resort for a language whose
-		 * single word is wider than the card. */
+		/* margin-left:auto forces its own row in Chrome's line-break count; flex-grow instead */
 		flex: 1 1 auto; white-space: normal; overflow-wrap: break-word;
 	}
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) br { display: none; }
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-body:nth-child(2) { color: var(--fs-dim); }
-	/* traffic: tx over rx, as stock's <br> leaves them — CSS cannot reorder br-separated
-	 * text runs. The size flag fights the inline `font-size:80%`. */
+	/* traffic: tx over rx, as stock's <br> leaves them — CSS cannot reorder br-separated text.
+	 * Size flag fights the inline font-size:80%. */
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) {
 		order: 2;								/* shares the speed's row, below the zone line */
 		text-align: end;
-		/* Grows but never shrinks. Growing is what anchors the figures to the card's right edge on either
-		 * row, since `text-align: right` then has a box that reaches that edge; `margin-left: auto`
-		 * would do the same on a shared row but Chrome counts it when breaking lines.
-		 * `flex-shrink: 0` keeps the nowrap figures from being squeezed into an overflow.
-		 *
-		 * `flex-basis: 100%` is what makes the figures take a row of their OWN always, not only on a
-		 * card too narrow to share one: decided per card by the content, a port with zero counters
-		 * keeps speed and traffic side by side while the port beside it pushes them apart — two
-		 * cards of the same width reading as two different layouts. */
+		/* grows to anchor text-align:end, never shrinks (nowrap figures) */
 		flex: 1 0 100%;
 	}
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container {
 		font-family: var(--fs-font-mono);
-		/* 10px at Normal, a step below the theme's --fs-type-xs (11px), and it BUYS WIDTH: this figure
-		 * is the widest thing a port card must fit whole, so its size sets the card's floor — one pixel
-		 * here is 12px off every card, measured: the floor goes 106 → 94 at Normal, 92 → 80 at Compact
-		 * and 119 → 109 at Large. It stays on the density axis and off the type LADDER, which has no
-		 * rung here, because a figure read as a pair of numbers beside a label tolerates a step body
-		 * text would not. */
-		/* The token, not a literal: --fs-type-2xs is one step below the ladder's smallest and exists
-		 * for these figures (02-tokens.css says why, and rounds it where round() exists). The flag
-		 * fights 29_ports.js's inline `font-size:80%`. */
+		/* widest thing a card must fit whole, sets the card's floor; fights inline font-size:80% */
 		font-size: var(--fs-type-2xs) !important;
 		color: var(--fs-dim);
-		/* the tight leading, not the body one: these are two lines of figures read as a block, and
-		 * --fs-leading (1.5) spent 5px of card height on the space between them. */
 		line-height: var(--fs-leading-tight);
 		white-space: nowrap;
-		/* Fights the element's own inline `text-align:left` (29_ports.js) so the up and down lines align
-		 * on their right edge and the units form a column. Scoped to a @container threshold it was
-		 * the pixel proxy the flex wrap above replaces: the cell now reaches the card's right edge
-		 * on whichever row it lands, so the alignment is one answer with no width to switch at. */
+		/* fights the element's own inline text-align:left */
 		text-align: end !important;
 	}
 
-	/* Meter rows — any stock .table row carrying a .cbi-progressbar (Memory, Storage, CPU
-	 * load, Network connections, …): label + value on one line, bar below. Keyed off the
-	 * progressbar (:has), not per-section, so it covers every such row — including a
-	 * third-party one. The bar itself is theme/25-progressbar.css. */
+	/* meter rows — any stock .table row with a .cbi-progressbar. docs/css.md above. */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)):has(.cbi-progressbar) { display: block; }
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		gap: var(--fs-space-1) var(--fs-space-2-5);
-		/* Halved from 8/10. A progressbar row is a LABEL over a 10px bar — the row is already
-		 * two lines tall, so the outer padding was doing the work of a gap twice over and Memory
-		 * and Storage read as mostly empty space. The bottom stays the larger of the two: the bar
-		 * sits on that edge, and equal padding reads as the bar hanging low in its row. */
+		/* halved from 8/10: the outer padding duplicated the gap. Bottom stays larger for the bar. */
 		padding: var(--fs-space-1) 0 var(--fs-space-1-5);
 		border: 0;
 		position: relative;
@@ -377,42 +176,24 @@
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar):last-child { padding-bottom: var(--fs-space-0-5); }
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td {
 		display: block;
-		/* beats base's `.td[width="33%"]` with no flag: the includes set a width
-		 * ATTRIBUTE, not an inline style, so a later layer wins. */
+		/* beats base's .td[width="33%"] with no flag: that sets a width ATTRIBUTE, a later layer wins */
 		width: auto;
 		padding: 0;
 		border: 0;
 	}
-	/* label. Undoes the key/value `white-space: nowrap` on a first column: a mount point
-	 * ("192.168.3.26:/volume1/… (/mnt/hdd_isync)") is one unbreakable line, so the row's
-	 * min-content width blew past the card and Memory/Storage stopped shrinking on a phone.
-	 * padding-inline-end = the gutter for the value, which is pinned over the bar's far edge
-	 * (::after, out of flow — nothing else reserves space for it). */
+	/* label — undoes key/value nowrap: a mount point is one unbreakable line past the card.
+	 * padding-inline-end is the gutter for the out-of-flow value (::after over the bar's edge). */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
 		grid-column: 1; grid-row: 1;
 		align-self: center;
 		min-width: 0;
 		white-space: normal;
-		/* overflow-wrap dropped — base/40-tables.css breaks every cell; the copy that stood here
-		 * moved nothing against 267 matching cells. */
 		padding-inline-end: min(230px, 50%);
-		/* colour and weight are the shared label rule at the end of this file; the size is here
-		 * because it is this row's geometry, not its typography */
 		font-size: var(--fs-type);
 	}
 
-	/* On a narrow card the value takes its own line — a reserve cannot be made to fit there.
-	 *
-	 * The value is out of flow (the bar's ::after, pinned over its far edge), so the only thing
-	 * keeping it off the label is that padding, and the two are sized by different things: the
-	 * padding is a fraction of the CARD, the value is however wide LuCI's formatter made it.
-	 * `16.66 GiB / 16.66 GiB (100%)` measures 218px against 190px of reserve on a 380px phone card,
-	 * so the figure printed straight through the end of the label.
-	 *
-	 * Below the threshold the label keeps the whole line and the bar drops by one --fs-type-xs line,
-	 * which is the band the value then sits in. `fs-view` rather than a container of its own: adding
-	 * `container-type` to the card would size-contain a box the port tiles deliberately keep
-	 * uncontained (see the note by `padding` above). */
+	/* narrow card: the value takes its own line, the reserve above cannot fit it — docs/css.md
+	 * above has the 218px/190px measurement. */
 	@container fs-view (max-width: 560px) {
 		:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
 			padding-inline-end: 0;
@@ -421,90 +202,53 @@
 			margin-block-start: calc(var(--fs-type-xs) * var(--fs-leading));
 		}
 	}
-	/* bar cell — spans full width on row 2 */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:nth-child(2) {
 		grid-column: 1 / -1; grid-row: 2;
 	}
 
-	/* Drop the per-row dividers theme/30-tables.css adds (.cbi-section .table .td) —
-	 * cleaner card. No !important: that rule is `theme`, this file is `page`, so the later
-	 * layer already wins.
-	 *
-	 * Keyed on the table's SHAPE rather than on the three cards the grid happens to name: a
-	 * key/value table is one with no header row, which is the same test the meter rows above
-	 * already use. Naming `.fs-ovl-mem/-sto` left System ruled at 1px per row — nine dividers down
-	 * a card whose two columns are a name and its value, where the alignment already says which is
-	 * which — and gave a third-party include of the same shape nothing at all. A DATA table
-	 * (`.tr.table-titles` present: DHCP leases, the wifi station list) keeps its dividers: there
-	 * the row is one record among many and the rule is what separates the records. */
+	/* per-row dividers dropped, keyed on table SHAPE (no header row) not on the three named cards —
+	 * docs/css.md above. A DATA table (.tr.table-titles present) keeps its dividers. */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .td,
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .th,
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr { border-bottom: 0; }
-	/* Its own rule, not a fourth line in the list above: `.cbi-value` carries no `:has()`, and a
-	 * selector list is not forgiving — below the browser floor the whole list would be discarded,
-	 * dividers and all (npm run css-floor, .claude/rules/css.md). */
+	/* own rule, not a 4th line above: .cbi-value carries no :has(), and a selector list is not
+	 * forgiving below the browser floor (npm run css-floor) */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .cbi-value { border-bottom: 0; }
 
-	/* The name in a key/value row is the QUIET half — the figure beside it is what the card is
-	 * read for. It came out at --fs-weight (600) in --fs-text, i.e. heavier and brighter than the
-	 * value it introduces, which is the ranking inverted: four bold lines down a Memory card
-	 * competing with the four numbers they label. --fs-dim at normal weight is what the System
-	 * table's first column already resolved to, so the meter cards now read as the same family.
-	 * Data tables are excluded by the same header-row test as the dividers above: there the first
-	 * column is a record's name, not a caption. */
+	/* key/value name is the QUIET half: --fs-dim at normal weight, matching what the System table's
+	 * first column already resolved to. Data tables excluded by the same header-row test above. */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .td:first-child {
 		font-weight: var(--fs-weight-normal);
 		color: var(--fs-dim);
 	}
 
-	/* ---- the active interface box ----
-	 *
-	 * theme/45-misc.css fills `.ifacebox-head.active` with --fs-accent and inks it --fs-on-accent.
-	 * On a form that is one small badge; on the Overview it is a full-bleed bar of saturated colour
-	 * across the card — three of them at once here (IPv4 Upstream, radio0, radio1), each louder
-	 * than the data underneath and than the page's own controls. The state it encodes is "this
-	 * interface is up", which is a STATUS, so it is said in the status colour and in the text
-	 * rather than in a fill: --fs-good on the same --fs-panel2 every other head carries.
-	 *
-	 * Scoped to this page deliberately: the same head on Network -> Interfaces sits among many
-	 * boxes where the fill is doing real work telling them apart. */
+	/* .active fill (theme/45-misc.css) makes three saturated bars at once here; "Up" said in
+	 * colour+text on --fs-panel2 instead. Network -> Interfaces keeps the fill (tells boxes apart
+	 * there), so this is scoped to Overview only. */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .ifacebox .ifacebox-head.active {
 		background: var(--fs-panel2);
 		color: var(--fs-good);
 		font-weight: var(--fs-weight);
 	}
 
-	/* `L.itemlist` wraps every caption in <strong>, which theme/30-tables.css leaves at 700 — so
-	 * inside an interface box the captions (Protocol, Address, Gateway, DNS) are the boldest text
-	 * on the card and the addresses they introduce are not. Same inversion as the key/value rule
-	 * above, same answer; the value keeps --fs-text and needs no rule of its own. */
+	/* L.itemlist wraps every caption in <strong> at 700 weight — the boldest text on the card,
+	 * inverted like the key/value rule above; the value keeps --fs-text with no rule of its own */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .ifacebox-body strong {
 		font-weight: var(--fs-weight-normal);
 		color: var(--fs-dim);
 	}
 
-	/* The meter's own figure, promoted to match the label it now outranks.
-	 *
-	 * theme/25-progressbar.css prints `attr(title)` above the bar at --fs-type-xs in --fs-dim,
-	 * which was the right pairing while the label beside it was 600 in --fs-text. With the label
-	 * moved down (above), a dim 11px figure left the row with nothing at full strength: on Memory
-	 * that is four bars whose only readable text is the caption. The number is what the card is
-	 * for, so it takes the body size and the body ink; the bar and the placement are untouched.
-	 *
-	 * Overview only. The same meter on Software and in the package manager sits in a form row
-	 * where the value is beside its own field label, not carrying the row on its own. */
+	/* progressbar's attr(title) was --fs-type-xs/--fs-dim beside a now-demoted label; give Memory's
+	 * bars something at full strength. Overview only — on Software the value sits beside its own
+	 * field label. */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .cbi-progressbar::after {
 		font-size: var(--fs-type);
 		color: var(--fs-text);
 	}
 
-	/* Row height in the Overview's DATA tables (DHCP leases, the wifi station list).
-	 *
-	 * theme/30-tables.css pads a data cell for a page that IS a table, where the row is the unit of
-	 * work and the padding is its hit target. On the Overview the same table is a card's contents,
-	 * read at a glance and never clicked except on its buttons, and eight leases at that height are
-	 * most of a screen: the DHCP card measures 740px against a System card of 440. One step down
-	 * the space ladder, so it follows the density axis like everything else, and only here. */
+	/* row height in DATA tables (DHCP leases, station list): theme/30-tables.css pads for a page
+	 * that IS a table, here it's a card read at a glance — 8 leases measured 740px against a 440px
+	 * System card. One step down the space ladder, only here. */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:has(.tr.table-titles) .td,
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:has(.tr.table-titles) .th {
 		padding-block: var(--fs-space-1-5);

@@ -44,13 +44,15 @@ function lsGetArr(k) {
 }
 
 /* the router-wide defaults the server stamped (head.ut), read at runtime so current*() reports the
- * effective default when this browser has no localStorage */
-function sd(k) { try { return (window.__fsSD || {})[k]; } catch (e) { return undefined; } }
+ * effective default when this browser has no localStorage. No try/catch: unlike localStorage,
+ * reading or writing a plain object property cannot throw, and window.__fsSD is always one (head.ut
+ * stamps it as an object literal). */
+function sd(k) { return (window.__fsSD || {})[k]; }
 
 /* …and the write back: an applier that persists to the router must update the blob the server
  * stamped, or current*() keeps reporting the old router default until the next full load and
  * matchesSavedDefault() lies about whether anything is left to save */
-function setSD(field, val) { try { (window.__fsSD = window.__fsSD || {})[field] = val; } catch (e) {} }
+function setSD(field, val) { (window.__fsSD = window.__fsSD || {})[field] = val; }
 
 /* ---- every axis owns its ROUTER DEFAULT, and nothing else may restate it ----
  * `def()` is the sd() branch of current() alone: the effective value with no localStorage. Exposed
@@ -169,18 +171,11 @@ function paintThemeColor() {
 }
 
 function watchThemeColor() {
-	let queued = false;
-	const paint = () => {
-		queued = false;
-		paintThemeColor();
-	};
-	const schedule = () => {
-		if (queued) return;
-		queued = true;
-		window.requestAnimationFrame(paint);
-	};
 	paintThemeColor();
-	new MutationObserver(schedule).observe(document.documentElement,
+	/* fit.frame() is the same next-frame coalescer every geometry fitter schedules through: the
+	 * tint and strength sliders write on every input event, and getComputedStyle forces style
+	 * resolution, so a dozen mutations in one frame must still repaint the meta tag once. */
+	new MutationObserver(fit.frame(paintThemeColor)).observe(document.documentElement,
 		{ attributes: true, attributeFilter: [ 'style', 'class', 'data-darkmode', 'data-palette', 'data-wallpaper' ] });
 }
 

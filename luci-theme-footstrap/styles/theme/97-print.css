@@ -1,18 +1,8 @@
 @layer theme {
-	/* ---- print ----
-	 * A LuCI page ends up on paper or in a PDF as documentation, and without this block it prints
-	 * the dark chrome, the sticky bar and — in the sidebar layout — ONE page, the shell being
-	 * height:100svh with overflow:hidden there.
-	 *
-	 * No `!important`: tools/audit.py allows the flag only in its listed files, and nothing here
-	 * fights an inline style. Where a rule must beat a same-layer
-	 * chrome rule it wins on SPECIFICITY — a repeated class at (0,4,0), one step over the layout
-	 * guards' (0,3,1) — never on this file sorting after 20-shell.css. */
+	/* without this a page prints the dark chrome and only ONE page (shell is 100svh,
+	 * overflow:hidden). No !important: a chrome rule is beaten on SPECIFICITY, (0,4,0) over (0,3,1). */
 	@media print {
-		/* Ink-friendly surfaces whatever palette/mode is active: this block sits in the
-		 * theme layer, so it outranks every tokens-layer palette block without naming
-		 * data-darkmode or the palettes. Every rule reads the tokens, so one re-statement
-		 * re-paints the whole page. */
+		/* theme layer outranks every tokens-layer palette block without naming data-darkmode */
 		:root {
 			--fs-bg: #fff; --fs-panel: #fff; --fs-panel2: #f4f4f4;
 			--fs-text: #000; --fs-dim: #333; --fs-faint: #555;
@@ -20,24 +10,21 @@
 			--fs-shadow-pop: none;
 			--fs-bar-bg: #fff;
 		}
-		/* Navigation, the search overlay and the action buttons cannot be used on paper. The
-		 * Appearance popover was on this list; it is a PAGE now, and a page prints — an admin
-		 * printing System -> Appearance wants what is on it. */
+		/* nav/search/actions unusable on paper; Appearance is a PAGE now, stays and prints */
 		.fs-sidebar.fs-sidebar.fs-sidebar.fs-sidebar,
 		.fs-skip.fs-skip,
 		.fs-search-ov.fs-search-ov,
 		.cbi-page-actions.cbi-page-actions,
 		.cbi-tabmenu.cbi-tabmenu,
 		footer { display: none; }
-		/* Undo the sidebar layout's scroll frame — the ONE-page bug above. */
+		/* undoes the sidebar layout's scroll frame, the ONE-page bug above */
 		.fs-shell.fs-shell.fs-shell.fs-shell { height: auto; overflow: visible; }
 		.fs-main.fs-main.fs-main.fs-main { height: auto; overflow: visible; }
 		.fs-content.fs-content { max-width: none; padding: 0; }
-		/* same element as 15-wallpaper.css, later in the layer — the pattern stays off the paper */
+		/* same element as 15-wallpaper.css, later in the layer */
 		.fs-pattern.fs-pattern { display: none; }
-		/* and the uploaded photo — ink, not decoration, on paper (16-login-bg.css) */
+		/* the uploaded photo — ink, not decoration, on paper (16-login-bg.css) */
 		:root[data-wallpaper="file"] :is(.fs-shell, body:not(:has(.fs-shell))) { background-image: none; }
-		/* keep a card in one piece where the page allows it */
 		.cbi-section { break-inside: avoid; }
 	}
 }

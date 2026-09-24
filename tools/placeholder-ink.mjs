@@ -39,7 +39,7 @@
  * documents).
  */
 import { chromium } from 'playwright';
-import { serveGallery, applyAppearance, matrix } from './lib/gallery.mjs';
+import { serveGallery, applyAppearance, matrix, luminance, contrast } from './lib/gallery.mjs';
 import { buildCss } from './lib/css.mjs';
 
 /* One row per pass: the contrast floor on the field's fill, and how far the hint must have moved as
@@ -55,14 +55,6 @@ const PASS = {
 
 const { base, close } = await serveGallery(buildCss());
 
-const luminance = ([r, g, b]) => {
-	const f = (u) => (u /= 255) <= 0.03928 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4;
-	return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-};
-const contrast = (a, b) => {
-	const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-	return (hi + 0.05) / (lo + 0.05);
-};
 /* oklab's L, and only L: the token is a lightness step, and a hue difference between two greys is
  * not what tells a reader "this is not your value". */
 const okL = ([r, g, b]) => {

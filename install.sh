@@ -1,61 +1,42 @@
 #!/bin/sh
-# luci-theme-footstrap installer for OpenWrt 24.10 (opkg) and 25.12+ (apk). A 23.05 router is served
-# the pinned final release instead — see FROZEN_2305_TAG. The feed carries the two branches the
-# package FORMAT splits on and nothing else.
+# luci-theme-footstrap installer, OpenWrt 24.10 (opkg) / 25.12+ (apk); 23.05 gets the pinned final
+# release. docs/package.md, "install.sh". Re-running upgrades the theme. Licensed Apache-2.0.
 #
 #   wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
 #
-# The same script is attached to every release and served from the release CDN, which has no
-# per-address budget — the address raw.githubusercontent.com rate-limits is the one a user behind
-# CGNAT shares with everyone else (issue #17). That copy is signed, so it can be verified before it
-# is run as root:
+# Rate-limited per source IP, shared behind one CGNAT (issue #17) — this signed copy instead,
+# verified before running as root:
 #
 #   wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
-#
-# It adds the owfeed-packages feed and installs the theme from it, so `apk upgrade` / `opkg upgrade`
-# carries the theme forward afterwards; the feed index is verified by the package manager against
-# the key pinned below. Running it again upgrades the theme. Licensed Apache-2.0.
 
 set -e
 
 FEED_HOST="https://repo.owfeed.org"
 FEED_NAME="owfeed-packages"
 FEED_KEY_OPKG="9040356b214084da"
-# The bare host, with every `.` ESCAPED before it goes anywhere near `grep -E`: unescaped, `.` means
-# "any character" and `repoXowfeedXorg` satisfied it (security review, task 0176-f). Not a URL
-# parser (no IPv6, no percent-encoding) — three patterns, each anchored to where a repository URL
-# actually starts rather than matched as a substring anywhere on the line (the other 0176-f finding:
-# our host inside an unrelated URL's query string, `?u=https://repo.owfeed.org/`, used to count).
-# Case-insensitive (`grep -Eqi`); a trailing CR is stripped by the caller before any of these run.
+# Anchored to where a URL/line starts, never a substring match — an unescaped `.` means "any
+# character". Case-insensitive except OPKG_NAME_RE, an exact field. docs/package.md, "install.sh".
 FEED_HOST_BARE="${FEED_HOST#*://}"
 FEED_HOST_ESC=$(printf '%s' "$FEED_HOST_BARE" | sed 's/\./\\./g')
-# customfeeds.list: optionally an apk `@tag`, then the URL itself — `repo.owfeed.org.evil.example`
-# and `repo.owfeed.org@evil.example` both fail the `(:[0-9]+)?(/|$)` anchor right after the host.
+# customfeeds.list: optionally an apk `@tag`, then the URL itself.
 APK_HOST_RE='^[[:space:]]*(@[^[:space:]]+[[:space:]]+)?https?://([^/@[:space:]]*@)?'"$FEED_HOST_ESC"'(:[0-9]+)?(/|$)'
-# customfeeds.conf: `src` or `src/gz`, the name field, then the URL — matches only in the URL field,
-# never against the name (the name rule is separate, in disable_other_lines below).
+# customfeeds.conf: `src` or `src/gz`, the name field, then the URL — matches only in the URL field.
 OPKG_HOST_RE='^[[:space:]]*src(/gz)?[[:space:]]+[^[:space:]]+[[:space:]]+https?://([^/@[:space:]]*@)?'"$FEED_HOST_ESC"'(:[0-9]+)?(/|$)'
-# feed_refresh's own failure lines: the URL must start at a word boundary (line start, a space, or a
-# quote/paren the two managers wrap it in), not merely appear mid-string — the same query-string
-# trick would otherwise still work one line down, inside `apk update`'s own diagnostic text.
+# The opkg NAME field alone, regardless of host: any `src`/`src/gz` line whose second field is ours.
+OPKG_NAME_RE='^[[:space:]]*[^[:space:]]+[[:space:]]+'"$FEED_NAME"'([[:space:]]|$)'
+# feed_refresh's own failure lines: the URL must start at a word boundary, not merely mid-string.
 FEED_REFRESH_RE="(^|[[:space:]'\"(])https?://([^/@[:space:]]*@)?$FEED_HOST_ESC(:[0-9]+)?/"
 PKG="luci-theme-footstrap"
 REPO="VizzleTF/luci-theme-footstrap"
-# `releases/latest/download/…` and never api.github.com: the API is rate-limited per source IP
-# (60/hour, shared by everyone behind one NAT) and needs JSON parsing on a box that may have no
-# jsonfilter.
-# These redirect to the newest tag's assets and are the URLs the release page links.
+# `releases/latest/download/…`, never api.github.com: that API is rate-limited per source IP
+# (60/hour, shared behind one NAT) and needs JSON parsing on a box that may have no jsonfilter.
 RELEASE_BASE="https://github.com/$REPO/releases/latest/download"
-# The last release that runs on 23.05, pinned by tag rather than by "latest": that release is EOL
-# upstream, openwrt/luci declined to carry the one piece of compatibility it needed (#8978), and the
-# theme dropped it rather than keep a widget nobody else wants. A 23.05 router is not refused — it
-# gets that version, verified exactly like any other artifact, and is told it is the end of the
-# line.
+# The last release that runs on 23.05 (EOL; openwrt/luci declined further compat work, #8978),
+# pinned by tag rather than "latest" so a 23.05 router is told it is the end of the line.
 FROZEN_2305_TAG="v0.14.2"
 FROZEN_2305_BASE="https://github.com/$REPO/releases/download/$FROZEN_2305_TAG"
-# The RELEASE key, pinned in the script that uses it: a key fetched beside the file it verifies
-# proves nothing. usign's key id travels inside the signature, so a rotation is a visible failure
-# here rather than a silent acceptance.
+# Pinned here, not fetched beside the file it verifies — that would prove nothing. usign's key id
+# travels inside the signature, so a rotation is a visible failure, never a silent acceptance.
 RELEASE_PUBKEY='untrusted comment: luci-theme-footstrap release key
 RWQYxjhl4rz41tNZc3dXmnRplRO1ydN1q8as++iPUjZc6SRUCb952L/T'
 
@@ -64,15 +45,9 @@ ok()   { printf '[+] %s\n' "$1"; }
 err()  { printf '[-] %s\n' "$1" >&2; }
 warn() { printf '[!] %s\n' "$1" >&2; }
 
-# Every downloader on the box, in turn, until one SUCCEEDS — not the first one that EXISTS.
-#
-# `uclient-fetch` needs libustream-mbedtls (or -openssl) to speak https at all, and a router with
-# the binary and without the library is ordinary. Choosing by existence therefore turns "this ONE
-# tool cannot do TLS here" into "the feed has no branch for this router".
-#
-# Certificates are always verified: this runs as root from `wget | sh`, and a failed verification is
-# the MITM case rather than a reason to retry insecurely. Falling through to the next tool is not a
-# downgrade — each one verifies, and none is ever asked to skip the check.
+# Every downloader on the box, tried until one SUCCEEDS — not the first one that EXISTS: a router
+# can have uclient-fetch without libustream, so choosing by existence alone breaks TLS. Certs are
+# always verified; falling through to the next tool is not a downgrade, each one verifies too.
 fetch() {	# <url> <outfile>
 	command -v uclient-fetch >/dev/null 2>&1 && uclient-fetch -T 30 -qO "$2" "$1" && return 0
 	command -v wget >/dev/null 2>&1 && wget -q -T 30 -O "$2" "$1" && return 0
@@ -80,14 +55,8 @@ fetch() {	# <url> <outfile>
 	return 1
 }
 
-# The package manager's chatter is not the user's business — until it fails.
-#
-# `apk update` prints every repository the router has, and `apk add` prints its progress. Running
-# this from `wget | sh` is a one-command gesture, and burying the one sentence that matters — which
-# version ended up on the router — under a dump of somebody else's feed URLs defeats it.
-#
-# So: capture, and speak only on failure, where the same output is the only diagnosis available.
-# Never `>/dev/null`: a silent failure here is a router left half-installed with a green message.
+# apk/opkg print every repository and all their own progress, burying the one line that matters:
+# capture, and speak only on failure (never `>/dev/null` — a silent failure here is a half-install).
 pm_quiet() {	# <command...>
 	_pmlog="/tmp/fs-install-pm.$$"
 	if "$@" >"$_pmlog" 2>&1; then rm -f "$_pmlog"; return 0; fi
@@ -97,9 +66,8 @@ pm_quiet() {	# <command...>
 	return 1
 }
 
-# How many repository lines each manager was asked to read, right before feed_refresh() below
-# needs it to tell "one feed missing" from "none answered". Comments and blank lines excluded so
-# the count matches what the manager itself attempts.
+# How many repository lines each manager was asked to read, for feed_refresh() below to tell "one
+# feed missing" from "none answered" — comments/blanks excluded, matching what the manager reads.
 apk_repo_count() {
 	{ cat /etc/apk/repositories 2>/dev/null; cat /etc/apk/repositories.d/*.list 2>/dev/null; } \
 		| sed 's/#.*//' | grep -c '[^[:space:]]' || true
@@ -110,37 +78,10 @@ opkg_feed_count() {
 		| grep -c '^[[:space:]]*src' || true
 }
 
-# `apk update` / `opkg update` return non-zero the instant ANY configured feed is unreachable, even
-# when the rest answered fine — this project's own snapshot stand hits it on every run: an
-# `openwrt/rootfs:x86_64-master` image unrebuilt since May 2026 pins a kmods sub-index the feed's
-# rolling retention window has already dropped (CI run 34112646188). Under a bare `|| exit 1` that
-# took the whole install down before the theme was ever fetched.
-#
-# "packages available > 0" is NOT the signal that tells partial refresh from total failure: with
-# every feed unreachable, apk still prints "8 unavailable, 0 stale; 136 distinct packages available"
-# and exits non-zero — those 136 are the INSTALLED database, not anything the refresh just read
-# (owfeed/owlab#18's own measurement, on the same shape of failure). What separates the two is the
-# "N unavailable" count against how many feeds were CONFIGURED: N < configured means at least one
-# feed answered and the rest of the index is usable; N == configured means none did. opkg prints no
-# such summary line, so the same distinction is drawn by counting its `*** Failed to download the
-# package list from <url>` lines — exactly one per feed it could not read — against the configured
-# feed count. Not the wider "Failed to download": opkg prints TWO lines per dead feed (that one plus
-# `opkg_download: Failed to download <url>, wget returned N`; measured on 24.10.8, 1 dead feed of 8
-# gives 2 lines and exit 1, 4 of 11 give 8 lines and exit 4), so the wider count reads 4 dead of 8
-# as "none answered". Neither manager's own exit code decides this.
-#
-# Tolerating "some feed unreachable" must not tolerate OUR OWN feed being the one — without it
-# there is no fresh package to install, so continuing means either installing nothing (a router
-# with no cached index) or silently keeping whatever owfeed-packages index apk/opkg already had
-# from a prior run while printing "[+] Installed …" (security review, task 0176: `repo.owfeed.org`
-# is a distinct host from the stock feeds, so an on-path/DNS attacker can blackhole it alone while
-# the others answer, and the old `_bad < _total` tolerance let the run continue and report success
-# on a stale index). Both managers print the FULL URL of a repository they could not reach in
-# their own failure lines (apk: `ERROR:`/`WARNING:` naming the index URL; opkg: `Failed to
-# download <url>`), so grepping those lines against `$FEED_REFRESH_RE` above — anchored to a real
-# URL, not a substring `$FEED_HOST` could also satisfy inside an unrelated line (security review,
-# task 0176-e/f) — decides whether the failure was actually ours. Checked before the tolerance
-# below, so our own feed failing fails closed regardless of how many other feeds answered.
+# apk/opkg both exit non-zero the instant ANY feed fails, even when the rest answered, and neither
+# tells "ours failed" from "some other one did" — so this counts each manager's own per-feed
+# failure lines against how many were CONFIGURED. Ours failing is never tolerated either way.
+# docs/package.md, "install.sh".
 feed_refresh() {	# apk | opkg
 	_pmlog="/tmp/fs-install-pm.$$"
 	if "$1" update >"$_pmlog" 2>&1; then rm -f "$_pmlog"; return 0; fi
@@ -175,11 +116,8 @@ feed_refresh() {	# apk | opkg
 }
 
 # --- what is on the router, and whether anything newer exists ---------------------------------
-#
-# Say the version. "Installed from the … feed" is equally true of a router that kept the version it
-# already had — `apk add` does not upgrade — so a stale install and a fresh one print the same line.
-# The number is the one thing that tells them apart, and the only other place a user can read it is
-# the Footstrap tab in LuCI.
+# Say the version: "Installed from the feed" is equally true of a router that kept what it had
+# (`apk add` does not upgrade) — the number is what tells the two apart.
 installed_version() {
 	if [ "$PM" = "apk" ]; then
 		apk list -I 2>/dev/null | sed -n "s/^$PKG-\([0-9][^ ]*\) .*/\1/p" | head -1
@@ -188,30 +126,18 @@ installed_version() {
 	fi
 }
 
-# Whether a version STRING came from the official openwrt/luci feed rather than this project's own:
-# luci.mk stamps a LuCI-carried build from git's commit date (`26.246.70755~4fd72fd`, measured on
-# 25.12.4/apk-tools 3.0.5), and that leading number only grows with the calendar — see the `<26`
-# apk constraint below. Used only to word the closing message honestly; the constraint is what
-# actually keeps apk off that build.
+# Whether a version came from the official openwrt/luci feed rather than this project's own:
+# luci.mk stamps a build from git's commit date, which only grows with the calendar — see the
+# `<26` apk constraint below, which is what actually keeps apk off that build.
 is_foreign_luci_build() {	# <version>
 	_maj=$(printf '%s' "$1" | sed -n 's/^\([0-9]\{1,\}\)\..*/\1/p')
 	[ -n "$_maj" ] && [ "$_maj" -ge 26 ]
 }
 
-# What the CONFIGURED repository actually offers right now — asked of the package manager, never
-# inferred from "the installed version did not move" (forum.openwrt.org/t/251930#160: a router whose
-# feed line apk never read was told "already current", and neither had asked the feed anything).
-#
-# apk: `apk policy` lists, per version, every SOURCE that carries it — `lib/apk/db/installed` for
-# whatever is on disk, a repository URL for each configured repo that also has that version. Only a
-# version whose source is EXACTLY our own line counts; one sourced only from the installed db is
-# installed, not offered. No feed-lag guess is layered on top of this (R4): the three outcomes below
-# are the whole answer.
-#
-# opkg has no per-version-per-source report, so this reads the feed's own downloaded index instead —
-# the file `feed_refresh` just populated, named for $FEED_NAME by opkg itself (`lists_dir` in
-# opkg.conf, default `/var/opkg-lists`, gzipped because INDEX=Packages.gz). `opkg list`/`opkg info`
-# both also answer for the INSTALLED package once its repository line is gone entirely.
+# What the CONFIGURED repository offers right NOW, asked of the package manager rather than
+# inferred from "the installed version did not move" (R4; docs/package.md, "install.sh").
+# apk: `apk policy` lists every SOURCE per version — only our own repository line counts. opkg has
+# no per-source report, so this reads the feed's own downloaded index instead.
 feed_offer() {	# <pkg>
 	if [ "$PM" = apk ]; then
 		apk policy "$1" 2>/dev/null | awk -v line="$APK_LINE" '
@@ -229,27 +155,81 @@ feed_offer() {	# <pkg>
 	fi
 }
 
-# --- the release, for a router the feed cannot serve ------------------------------------------
-#
-# The feed is still the install path: it is what makes `apk upgrade` / `opkg upgrade` carry the
-# theme forward, and everything below is only reached when the feed cannot be read at all — an
-# architecture owfeed does not publish, a host this router cannot resolve or reach, a network that
-# intercepts it.
-#
-# Picked from the SIGNED MANIFEST, never by guessing an asset's name: resolving the theme by name
-# and taking `head -1` is what installed a catalogue instead of the theme (issue #6). `manifest.txt`
-# names exactly one file per format with its size and digest, and it is signed, so the name comes
-# from the same statement the signature covers.
-#
-# The chain fails CLOSED and in this order: verified TLS, then usign against the key pinned above,
-# then the manifest's own sha256 over the artifact. A missing usign, a missing signature or a digest
-# that does not match is a refusal, never a downgrade. `apk`'s --allow-untrusted only says the .apk
-# carries no APK signature of its own; the usign signature over the manifest is what this path
-# trusts, and it is checked before the file is handed over.
-# <package name>, defaulting to the theme: the language catalogues are named in the same signed
-# manifest and are fetched through the same chain. <base> defaults to the newest release and is
-# given explicitly when a specific tag is wanted — see install_language(), which pins the catalogue
-# to the version of the theme the router actually ended up with.
+# --- closing report, shared by both the feed path and the release path ------------------------
+# <mode> feed also asks feed_offer for "unchanged but newer available" (R4); release has no
+# repository to ask. Wording matches each path's prior behaviour; do not merge further.
+report_version() {	# <mode: feed | release>
+	_have=$(installed_version)
+	if [ "$1" = feed ]; then
+		if [ -z "$_have" ]; then
+			ok "Installed from the $FEED_NAME feed — \`$PM upgrade\` will keep it current."
+		elif [ -z "$_before" ]; then
+			ok "Installed $PKG $_have — from the $FEED_NAME feed, \`$PM upgrade\` will keep it current."
+		elif [ "$_before" != "$_have" ]; then
+			if is_foreign_luci_build "$_before"; then
+				ok "Moved $PKG back onto the $FEED_NAME feed's build: $_before -> $_have"
+			else
+				ok "Upgraded $PKG $_before -> $_have — \`$PM upgrade\` will keep it current."
+			fi
+		else
+			_offer=$(feed_offer "$PKG")
+			if [ -z "$_offer" ]; then
+				err "$PKG $_have is installed, but $PM names no $FEED_NAME version at all — this router is"
+				if [ "$PM" = apk ]; then
+					err "not reading the feed; check $APK_LIST and \`apk policy $PKG\`."
+				else
+					err "not reading the feed; check $OPKG_LIST and \`opkg list $PKG\`."
+				fi
+			elif [ "$_offer" != "$_have" ] &&
+			     [ "$(printf '%s\n%s\n' "$_have" "$_offer" | sort -V 2>/dev/null | tail -1)" = "$_offer" ]; then
+				warn "$PKG stays at $_have even though the $FEED_NAME feed offers $_offer — that is $PM's own"
+				warn "decision (a pin, a hold, a constraint), not a feed that has not caught up:"
+				if [ "$PM" = apk ]; then
+					apk policy "$PKG" 2>/dev/null | sed 's/^/    /' >&2
+				else
+					opkg list "$PKG" 2>/dev/null | sed 's/^/    /' >&2
+				fi
+			else
+				ok "Already current: $PKG $_have — the $FEED_NAME feed carries nothing newer."
+			fi
+		fi
+	else
+		if [ -n "$_have" ] && [ -n "$_before" ] && [ "$_before" != "$_have" ]; then
+			if is_foreign_luci_build "$_before"; then
+				ok "Moved $PKG back onto this project's build: $_before -> $_have"
+			else
+				ok "Upgraded $PKG $_before -> $_have"
+			fi
+		elif [ -n "$_have" ]; then
+			ok "Installed $PKG $_have"
+		fi
+		ok "Installed from the release. Re-run this script to update, or fix the feed and run it again"
+		ok "to switch to \`$PM upgrade\`."
+	fi
+}
+
+# Both caches, as postinst does: a stale /tmp/luci-modulecache bites exactly here, on a package that
+# replaces the theme's JS. reload, never restart — restart logs out every LuCI session (see
+# docs/package.md's rpcd section for why install.sh's own reload is safe where a plugin's is not).
+finish() {	# <mode: feed | release>
+	rm -f /tmp/luci-indexcache* 2>/dev/null || true
+	rm -rf /tmp/luci-modulecache 2>/dev/null || true
+	if [ -x /etc/init.d/rpcd ]; then /etc/init.d/rpcd reload >/dev/null 2>&1 || true; fi
+	printf '\n'
+	report_version "$1"
+	# A blank line between WHAT HAPPENED and WHAT TO DO NEXT: the outcome is the one line a user
+	# came for, and with the next-steps block butted straight against it the two read as one
+	# paragraph.
+	printf '\n'
+	info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
+	info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
+	info "of System -> System. Then hard-reload the page (Ctrl+F5)."
+}
+
+# Reached only when the feed cannot be read at all. Picked from the SIGNED MANIFEST, never a bare
+# name lookup (issue #6). Fails CLOSED: verified TLS, usign against the pinned key, then the
+# manifest's own sha256 — `apk`'s --allow-untrusted only waives the .apk's OWN signature, not this
+# chain. docs/package.md, "install.sh". <base> defaults to the newest release, see install_language().
 install_from_release() {
 	_want="${1:-$PKG}"
 	_base="${2:-$RELEASE_BASE}"
@@ -300,33 +280,16 @@ install_from_release() {
 }
 
 # --- the catalogue for the language this router is set to ---------------------------------------
-#
-# The translations used to ride inside the theme, so every router carried both of them and nobody
-# had to ask for one. They are `luci-i18n-footstrap-<lang>` now, which takes 4,821 B off the theme
-# for the majority reading English — and would silently un-translate a Russian router on the upgrade
-# that introduces the split, since the theme's own catalogue leaves with the old package.
-#
-# So: read the language LuCI is actually set to and fetch that one, best effort. A missing package
-# is not a failure — most languages have no catalogue, and `en` never does. Nothing here runs when
-# the router is on the default (unset, or `auto`, which means "follow the browser" and names no
-# single catalogue to install).
-#
-# NOT IN THE FEED IS NOT THE END OF THE PATH. A release reaches owfeed-packages through a pull
-# request against that repository, so a package that is NEW — which these two were, in 0.14.4 — is
-# absent from the feed for as long as that takes, and every Russian router upgrading in that window
-# would be told its language is unavailable while the signed asset for it sits in the release.
-# So the release is the fallback, through the same verified chain the theme itself takes when the
-# feed cannot serve the router at all, and `$PM upgrade` picks the package up from the feed once it
-# lands there.
+# Reads `luci.main.lang` and fetches `luci-i18n-footstrap-<lang>`, best effort — no package can read
+# that uci value, so installing the theme alone never pulls it in. docs/package.md, "The catalogue".
 install_language() {
 	_lang=$(uci -q get luci.main.lang 2>/dev/null || true)
 	case "$_lang" in
 		''|auto|en) return 0 ;;
 	esac
 	_lpkg="luci-i18n-footstrap-$_lang"
-	# ASKED FOR FIRST, then installed. Most languages have no catalogue, and letting the install
-	# fail instead prints fifteen lines of the package manager's own diagnosis (pm_quiet's failure
-	# tail) in front of a message that says nothing is wrong.
+	# Asked for first, then installed — most have no catalogue, and letting the install fail instead
+	# prints the package manager's own diagnosis in front of a message saying nothing is wrong.
 	_in_feed=no
 	if [ "$1" = feed ]; then
 		if [ "$PM" = apk ]; then
@@ -339,9 +302,8 @@ install_language() {
 	if [ "$_in_feed" = yes ]; then
 		info "Fetching the $_lang translation ($_lpkg)..."
 		if [ "$PM" = apk ]; then
-			# Same collision as the theme package itself (see the `<26` comment above the theme's
-			# `apk add`, near the feed install below): `$_lpkg` exists in both feeds too, and the
-			# official one's LuCI-stamped version always outranks this project's.
+			# Same collision as the theme's own `apk add` below: `$_lpkg` exists in both feeds, and
+			# the official one's LuCI-stamped version always outranks this project's.
 			pm_quiet apk add --upgrade "$_lpkg<26" || {
 				warn "Could not install $_lpkg — the theme stays in English."; return 0; }
 		else
@@ -349,10 +311,8 @@ install_language() {
 				warn "Could not install $_lpkg — the theme stays in English."; return 0; }
 		fi
 	else
-		# The catalogue is pinned to the TAG THE INSTALLED THEME CAME FROM, not to `latest`: the
-		# feed trails the release by up to a day, so a router that just took 0.14.3 from the feed
-		# would otherwise get 0.14.4's catalogue — and a catalogue knows only the strings of its own
-		# version, rendering the rest in English with nothing reporting it.
+		# Pinned to the tag the INSTALLED theme came from, not `latest`: the feed trails the release
+		# by up to a day, and a catalogue only knows the strings of its own version.
 		_lbase="$RELEASE_BASE"
 		if [ "$1" = feed ]; then
 			info "The feed carries no $_lpkg yet; taking it from the signed release."
@@ -382,8 +342,7 @@ else err "Neither apk nor opkg found."; exit 1; fi
 ok "Package manager: $PM"
 
 # What is on the router BEFORE anything is installed — the closing line reads "installed",
-# "upgraded" or "already current" off the difference, which is the distinction a user was left to
-# make by hand while the manager's own output scrolled past.
+# "upgraded" or "already current" off the difference.
 _before=$(installed_version)
 
 # Read before the branch rather than beside the feed entry, because a router that names
@@ -396,33 +355,13 @@ else
 fi
 
 # --- version --------------------------------------------------------------
-# The feed publishes per OpenWrt minor, so the branch comes from the router. SNAPSHOT
-# and anything unparseable name none, and are served the newest branch of their own
-# package format instead — see FALLBACK_BRANCHES_* below for why that is sound here.
-FALLBACK_BRANCHES_APK="25.12"
-FALLBACK_BRANCHES_OPKG="24.10"
+# One fallback branch per package FORMAT (apk 25.12, ipk 24.10) — sound only because the package is
+# noarch with `+luci-base` its whole dependency list. docs/package.md, "install.sh".
+FALLBACK_BRANCH_APK="25.12"
+FALLBACK_BRANCH_OPKG="24.10"
 
-# The feed has no snapshot channel, and not by omission: the two lines owfeed-packages serves ARE
-# the package-format split (apk from 25.12, ipk on 24.10), not a build of the theme per release. A
-# snapshot has no branch of its own, so it gets the newest one its package manager can read.
-#
-# What makes that sound for THIS package and not in general: it is noarch and `+luci-base` is its
-# whole dependency list, so nothing in it was compiled against the branch it is fetched from. A
-# package carrying a binary, or a versioned dependency, must not take this path.
-#
-# Newest first, and each candidate is probed rather than assumed: a branch listed here before it is
-# published — or one that does not carry this router's architecture — falls through to the next
-# instead of writing a repository entry that 404s on every update. The probe's bytes are discarded;
-# existence is all it asks, and the index it found is still verified by the package manager against
-# the pinned key.
-newest_feed_branch() {	# <candidates> -> the first branch that answers
-	for _branch in $1; do
-		if fetch "$FEED_HOST/releases/$_branch/$ARCH/$INDEX" /dev/null 2>/dev/null; then
-			printf '%s' "$_branch"
-			return 0
-		fi
-	done
-	return 1
+feed_branch_exists() {	# <branch> -> 0 if the feed answers for $ARCH; bytes discarded, existence only
+	fetch "$FEED_HOST/releases/$1/$ARCH/$INDEX" /dev/null 2>/dev/null
 }
 
 BRANCH=$(printf '%s' "${DISTRIB_RELEASE:-}" | cut -d. -f1,2)
@@ -433,13 +372,10 @@ case "$BRANCH" in
 		err "footstrap requires OpenWrt 23.05 or newer (detected $DISTRIB_RELEASE)."
 		exit 1
 	fi
-	# 23.05 GETS THE LAST VERSION THAT RUNS ON IT, not a refusal and not the current one. The theme
-	# supported that release for one widget's sake — `ui.RangeSlider` arrived in 24.10, and its
-	# absence took the whole Appearance tab down — and that support is over: 23.05 is EOL, and
-	# openwrt/luci, where this theme now lives, declined to carry compatibility code for releases it
-	# no longer builds (#8978). Everything up to and including 0.14.2 runs there, so that is what a
-	# 23.05 router installs: pinned by tag, verified by the same signature and digest as any other
-	# artifact, and said out loud so nobody waits for an upgrade that will not come.
+	# 23.05 gets the LAST version that runs on it, not a refusal: `ui.RangeSlider` (24.10) took the
+	# whole Appearance tab down without it, and 23.05 is EOL — openwrt/luci declined to carry
+	# compatibility code for a release it no longer builds (#8978). Pinned by tag, verified like any
+	# other artifact, said out loud so nobody waits for an upgrade that will not come.
 	if [ "$MAJ" -eq 23 ]; then
 		info "OpenWrt $DISTRIB_RELEASE: installing footstrap ${FROZEN_2305_TAG#v} — the LAST version for 23.05."
 		info "23.05 is end-of-life and the theme no longer develops for it; later versions need 24.10 or newer."
@@ -451,45 +387,39 @@ case "$BRANCH" in
 		ok "footstrap ${FROZEN_2305_TAG#v} installed. This is the final release for OpenWrt 23.05."
 		exit 0
 	fi
-	# PROBED, exactly like the fallback path below, and for the reason that path states: a router
-	# on a branch the feed does not publish yet — every 26.x router on the day it ships — otherwise
-	# had a 404 URL written into its repository list, and then `apk update` failed under `set -e`
-	# BEFORE the theme was ever installed. A re-run did not rescue it either: the dead line contains
-	# $FEED_HOST, so the next run took the "already configured" path and died at the same place,
-	# leaving every later `apk update` on that router failing too. Fall back to the newest branch the
-	# feed does answer for — sound here for the same reason the fallback path is: noarch package,
-	# +luci-base its whole dependency list, nothing compiled against the branch it comes from.
-	if ! fetch "$FEED_HOST/releases/$BRANCH/$ARCH/$INDEX" /dev/null 2>/dev/null; then
+	# Probed, not assumed: a branch the feed does not publish yet would otherwise get a repository
+	# entry that 404s under `set -e`, and a re-run would die at the same place. Falls back to the
+	# branch the feed does answer for — sound for the reason above (noarch, +luci-base only).
+	if ! feed_branch_exists "$BRANCH"; then
 		info "The feed does not carry $BRANCH for $ARCH yet; asking it for the newest branch..."
-		if [ "$PM" = apk ]; then CANDIDATES="$FALLBACK_BRANCHES_APK"; else CANDIDATES="$FALLBACK_BRANCHES_OPKG"; fi
-		BRANCH=$(newest_feed_branch "$CANDIDATES") || BRANCH=""
-		if [ -n "$BRANCH" ]; then
+		if [ "$PM" = apk ]; then FALLBACK="$FALLBACK_BRANCH_APK"; else FALLBACK="$FALLBACK_BRANCH_OPKG"; fi
+		if feed_branch_exists "$FALLBACK"; then
+			BRANCH="$FALLBACK"
 			ok "Using the $BRANCH branch — the theme is noarch and needs only luci-base."
+		else
+			BRANCH=""
 		fi
 	fi
 	;;
 *)
 	info "'${DISTRIB_RELEASE:-unknown}' names no feed branch; asking the feed for the newest one..."
-	if [ "$PM" = apk ]; then CANDIDATES="$FALLBACK_BRANCHES_APK"; else CANDIDATES="$FALLBACK_BRANCHES_OPKG"; fi
-	BRANCH=$(newest_feed_branch "$CANDIDATES") || BRANCH=""
-	if [ -n "$BRANCH" ]; then
+	if [ "$PM" = apk ]; then FALLBACK="$FALLBACK_BRANCH_APK"; else FALLBACK="$FALLBACK_BRANCH_OPKG"; fi
+	if feed_branch_exists "$FALLBACK"; then
+		BRANCH="$FALLBACK"
 		ok "No branch of its own, so the $BRANCH branch it is — the theme is noarch and needs only luci-base."
+	else
+		BRANCH=""
 	fi
 	;;
 esac
 
 # --- no feed for this router: the release, verified ------------------------------------------
-# Reached only when every candidate index failed to download. That is one of two things and the
-# script cannot tell them apart from here, so it says both: either owfeed publishes nothing this
-# router can read, or this router could not reach owfeed — a resolver that does not answer, a clock
-# too far off for TLS, a network that intercepts the host. Naming the URL is what lets the admin
-# decide which, in one command.
-#
-# Either way the theme is INSTALLED, from the signed release, and the run ends there: no feed line
-# is written for a feed that could not be read.
+# One of two things, and the script cannot tell them apart, so it says both: owfeed publishes
+# nothing this router can read, or this router could not reach owfeed — naming the URL lets the
+# admin decide which. Either way: installed from the signed release, no feed line written.
 if [ -z "$BRANCH" ]; then
 	err "Could not read the $PM feed index for $ARCH from $FEED_HOST (router reports '${DISTRIB_RELEASE:-unknown}')."
-	for _b in $CANDIDATES; do err "  tried $FEED_HOST/releases/$_b/$ARCH/$INDEX"; done
+	err "  tried $FEED_HOST/releases/$FALLBACK/$ARCH/$INDEX"
 	err "If that opens in a browser, the router could not fetch it — check DNS, the clock, and TLS"
 	err "(uclient-fetch needs libustream-mbedtls; wget-ssl or curl are used instead when present)."
 	info "Installing from the signed release instead; \`$PM upgrade\` will NOT carry the theme forward."
@@ -499,40 +429,13 @@ if [ -z "$BRANCH" ]; then
 		exit 1
 	}
 	install_language release
-	rm -f /tmp/luci-indexcache* 2>/dev/null || true
-	rm -rf /tmp/luci-modulecache 2>/dev/null || true
-	if [ -x /etc/init.d/rpcd ]; then /etc/init.d/rpcd reload >/dev/null 2>&1 || true; fi
-	printf '\n'
-	_have=$(installed_version)
-	if [ -n "$_have" ] && [ -n "$_before" ] && [ "$_before" != "$_have" ]; then
-		if is_foreign_luci_build "$_before"; then
-			# Not an upgrade: $_before was the official openwrt/luci feed's build, numbered higher
-			# but predating this release — see is_foreign_luci_build() above.
-			ok "Moved $PKG back onto this project's build: $_before -> $_have"
-		else
-			ok "Upgraded $PKG $_before -> $_have"
-		fi
-	elif [ -n "$_have" ]; then
-		ok "Installed $PKG $_have"
-	fi
-	ok "Installed from the release. Re-run this script to update, or fix the feed and run it again"
-	ok "to switch to \`$PM upgrade\`."
-	printf '\n'			# the same break between the outcome and the next steps as the feed path
-	info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
-	info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
-	info "of System -> System. Then hard-reload the page (Ctrl+F5)."
+	finish release
 	exit 0
 fi
 
-# Writes <new-content-file> into <path> atomically, without `mv`-ing anything over <path> itself and
-# without ever truncating it before the replacement is ready. `cat new > path` truncates the moment
-# the redirect opens — a write that dies partway (OOM, a full overlay) can leave customfeeds empty
-# (security review, task 0176-h); a bare `mv new path` replaces a symlinked customfeeds file with a
-# plain one, target untouched, mode reset (0176-g). This resolves the real path with `readlink -f`
-# (present on both busybox builds this repo targets), copies ITS mode and owner onto a temp file IN
-# THE SAME DIRECTORY with `cp -p` — so the rename below stays on one filesystem — writes the new
-# content into THAT copy, and only then `mv -f`s it over the real file: one atomic rename, and a
-# failure at any point before it leaves the original exactly as it was, temp file removed.
+# Atomic: resolves the real path, copies its mode/owner onto a temp file in the SAME directory,
+# writes into that copy, then `mv -f`s it over the original — one rename; a failure before it
+# leaves the original untouched (never a truncate-on-open, never a bare `mv`). docs/package.md, "install.sh".
 atomic_write() {	# <path> <new-content-file>
 	_aw_real=$(readlink -f "$1" 2>/dev/null)
 	[ -n "$_aw_real" ] || _aw_real="$1"
@@ -540,92 +443,69 @@ atomic_write() {	# <path> <new-content-file>
 	if [ -f "$_aw_real" ]; then
 		cp -p "$_aw_real" "$_aw_tmp" || { rm -f "$_aw_tmp"; return 1; }
 	else
-		# `printf ''`, never the `:` special builtin: a redirection error on a SPECIAL builtin exits
-		# the (non-interactive) shell outright, before this `||` — or any caller's own `|| { … }` —
-		# ever runs (security review, task 0176-k). `printf` is an ordinary utility, so its own
-		# redirection failure is just this command failing, exactly what `||` is here to catch.
+		# `printf ''`, never `:` — its own redirection error exits the shell before `||` runs here.
 		printf '' > "$_aw_tmp" || return 1
 	fi
 	if ! cat "$2" > "$_aw_tmp"; then
 		rm -f "$_aw_tmp"
 		return 1
 	fi
-	# Checked explicitly, never a bare last statement: under `set -e` a bare failing command IS the
-	# function's own failure and skips straight past every caller-side cleanup that follows the call
-	# (security review, task 0176-i) — the one shape that actually matters here, since `$_aw_tmp` is
-	# this function's own responsibility and every caller above only ever sees a 0/1 result.
+	# Checked, not a bare last statement: under `set -e` a bare failure IS the function's own
+	# failure and skips every caller-side cleanup after the call.
 	if ! mv -f "$_aw_tmp" "$_aw_real"; then
 		rm -f "$_aw_tmp"
 		return 1
 	fi
 }
 
-# R3: every ACTIVE line — other than the exact one install.sh writes — whose URL host is ours, or
-# (opkg) whose src NAME is ours, is commented out (never deleted) and reported, one line each. A
-# line for any other host is never touched, whatever else it says: no `@tag` exception, no
-# port/userinfo parsing — $APK_HOST_RE/$OPKG_HOST_RE above are boundary checks, not a URL parser.
-#
-# Why any of them matter, measured end to end (security review, task 0176-e, `m5a-apk.sh`): apk's
-# own repository-file reader silently stops at the first line it cannot tokenise, so an admin's own
-# unrelated malformed line, or a leftover line for another branch/arch, sitting ABOVE where the
-# correct line would otherwise land, can cut the feed off with no error at all — the forum defect,
-# self-inflicted. Disabling every other line naming us removes the only kind of line that could ever
-# shadow the correct one; R2 below then places the correct line first regardless, so nothing else in
-# the file — an admin's own unrelated entry, comments, blank lines — can still precede it.
+# R3: every ACTIVE line naming us, other than the exact one install.sh writes, is commented out
+# (never deleted) and reported — apk's own reader silently stops at the first line it cannot
+# tokenise, so one such line above the correct one can cut the feed off with no error at all.
+# docs/package.md, "install.sh", for R1-R4 and why $APK_HOST_RE/$OPKG_HOST_RE/$OPKG_NAME_RE exist.
 disable_other_lines() {	# <file> <exact-line> <mode: apk | opkg> -> 0 written (or nothing to do), 1 write failed
 	_dol_f="$1"; _dol_want="$2"; _dol_mode="$3"
 	[ -f "$_dol_f" ] || return 0
+	if [ "$_dol_mode" = apk ]; then _dol_hostre="$APK_HOST_RE"; else _dol_hostre="$OPKG_HOST_RE"; fi
+	# Case-insensitive like the original `grep -Eqi`; busybox awk has no IGNORECASE, so both sides
+	# are lowercased. The opkg NAME field stays an exact, case-sensitive match.
+	_dol_hostre_lc=$(printf '%s' "$_dol_hostre" | tr 'A-Z' 'a-z')
 	_dol_tmp="$_dol_f.newcontent.$$"
 	_dol_msgs="$_dol_f.msgs.$$"
-	_dol_changed=0
-	# `printf ''`, never the `:` special builtin: on a redirection error `:` exits the shell outright
-	# on the spot — measured, a temp path pre-created as a directory killed the whole script with no
-	# "[-] Could not …" line and no `exit 1` this function ever got to run (security review, task
-	# 0176-k). `printf` is ordinary, so its own redirection failure is checked normally below.
-	if ! printf '' > "$_dol_tmp"; then
-		return 1
-	fi
+	# `printf ''`, never `:` — its own redirection error exits the shell before `return 1` runs.
 	if ! printf '' > "$_dol_msgs"; then
-		rm -f "$_dol_tmp"
 		return 1
 	fi
-	while IFS= read -r _dol_l || [ -n "$_dol_l" ]; do
-		case "$_dol_l" in
-			\#*) printf '%s\n' "$_dol_l" >> "$_dol_tmp"; continue ;;
-		esac
-		if [ "$_dol_l" = "$_dol_want" ]; then
-			printf '%s\n' "$_dol_l" >> "$_dol_tmp"
-			continue
-		fi
-		if [ "$_dol_mode" = apk ]; then _dol_re="$APK_HOST_RE"; else _dol_re="$OPKG_HOST_RE"; fi
-		_dol_hit=0
-		if printf '%s\n' "${_dol_l%$(printf '\r')}" | grep -Eqi "$_dol_re"; then
-			_dol_hit=1
-		fi
-		if [ "$_dol_mode" = opkg ]; then
-			set -f; set -- $_dol_l; set +f
-			if [ "$2" = "$FEED_NAME" ]; then
-				_dol_hit=1
-			fi
-		fi
-		if [ "$_dol_hit" = 1 ]; then
-			# DEFERRED, not printed here: a line reads "disabled" only once the write below actually
-			# lands — printing it first and then failing the write told a user a change had happened
-			# when the file was untouched (security review, task 0176-i).
-			printf '  another active line for our feed, disabled: %s\n' "$_dol_l" >> "$_dol_msgs"
-			printf '#%s\n' "$_dol_l" >> "$_dol_tmp"
-			_dol_changed=1
-		else
-			printf '%s\n' "$_dol_l" >> "$_dol_tmp"
-		fi
-	done < "$_dol_f"
-	if [ "$_dol_changed" = 0 ]; then
+	# The exact line passes through untouched even with a trailing CR (checked against the RAW
+	# line); everything else is tested CR-stripped. hostre/namere travel through ENVIRON, not `-v`,
+	# whose own escape processing mangles `\.` — docs/package.md, "install.sh".
+	if ! DOL_HOSTRE="$_dol_hostre_lc" DOL_NAMERE="$OPKG_NAME_RE" \
+		awk -v want="$_dol_want" -v mode="$_dol_mode" -v msgs="$_dol_msgs" '
+		BEGIN { hostre = ENVIRON["DOL_HOSTRE"]; namere = ENVIRON["DOL_NAMERE"] }
+		$0 == want || /^#/ { print; next }
+		{
+			line = $0
+			sub(/\r$/, "", line)
+			hit = (tolower(line) ~ hostre) || (mode == "opkg" && line ~ namere)
+			if (hit) {
+				print "  another active line for our feed, disabled: " $0 >> msgs
+				print "#" $0
+				next
+			}
+			print
+		}
+	' "$_dol_f" > "$_dol_tmp"; then
+		rm -f "$_dol_tmp" "$_dol_msgs"
+		return 1
+	fi
+	# Nothing disabled (msgs empty) -> no write, so an untouched file never triggers a sysupgrade
+	# conffile backup for no reason.
+	if [ ! -s "$_dol_msgs" ]; then
 		rm -f "$_dol_tmp" "$_dol_msgs"
 		return 0
 	fi
-	# `if atomic_write …` — not a bare statement — so a failure is OURS to handle: every temp this
-	# call created is removed either way, and the caller learns about it through the return status,
-	# never through `$(…)`, which `set -e` cannot see through (task 0176-i, `m9b.sh`).
+	# `if atomic_write …`, not a bare statement — a failure is ours to handle, and the caller learns
+	# through the return status, never `$(…)`, which `set -e` cannot see through. Messages print
+	# only once the write lands, never before — a failed write must not claim a change happened.
 	if atomic_write "$_dol_f" "$_dol_tmp"; then
 		while IFS= read -r _dol_m; do info "$_dol_m"; done < "$_dol_msgs"
 		rm -f "$_dol_tmp" "$_dol_msgs"
@@ -635,64 +515,32 @@ disable_other_lines() {	# <file> <exact-line> <mode: apk | opkg> -> 0 written (o
 	return 1
 }
 
-# R2: places $2 as the FIRST NON-COMMENT line, moving it there even when it was already present
-# SOMEWHERE ELSE in the file — origin/main's own installer only ever appended, so a router already
-# running that shape has the correct line sitting after whatever else was there, including an
-# unparsable admin line: "is the exact line present" alone stayed true forever while apk never
-# reached it (tester finding, `m6a-apk.sh` #6: "junk" then the exact line, 0.14.12 stays 0.14.12
-# across repeated runs, "already configured" every time). Every occurrence is dropped and exactly
-# one is reinserted, so this is also how repeated runs stay idempotent. The leading run of comment
-# and blank lines — the stock "add your custom feeds here" header — stays first; everything else,
-# in its original order, follows the reinserted line.
-# Sets $FEED_PLACEMENT to "added" | "moved" | "unchanged" and RETURNS 0/1 — never `echo`ed for the
-# caller to capture with `$(…)`: a command substitution's own exit status is invisible to `set -e`
-# in the assignment/case that reads it, so a write that failed INSIDE the substitution still read as
-# success one level up (security review, task 0176-i, `m9b.sh`: "added"/"Feed added" printed, file
-# on disk untouched). A plain variable plus a real return status is checked with `if ! ensure_first`,
-# which — being an if-condition — is exactly where `set -e` is SUPPOSED to step aside so the caller
-# can decide what a failure means, instead of the shell silently doing it for nobody.
+# R2: places $2 as the FIRST non-comment line, MOVING it there even if already present elsewhere.
+# Every occurrence is dropped and exactly one reinserted, which is also what keeps a repeated run
+# idempotent. Sets $FEED_PLACEMENT and RETURNS 0/1, never `echo`ed for `$(…)` — `set -e` cannot see
+# through that assignment. docs/package.md, "install.sh".
 ensure_first() {	# <file> <exact-line> -> sets $FEED_PLACEMENT; returns 0/1
 	_ef_f="$1"; _ef_want="$2"
 	_ef_tmp="$_ef_f.newcontent.$$"
-	_ef_hdr="$_ef_f.hdr.$$"
-	_ef_body="$_ef_f.body.$$"
-	# `printf ''`, never the `:` special builtin — same reason as disable_other_lines above: `:`'s
-	# own redirection failure exits the shell before this function's `return 1` ever runs.
-	if ! printf '' > "$_ef_hdr"; then
+	if [ -f "$_ef_f" ] && grep -qxF "$_ef_want" "$_ef_f" 2>/dev/null; then
+		_ef_found=1
+	else
+		_ef_found=0
+	fi
+	if [ -f "$_ef_f" ]; then _ef_src="$_ef_f"; else _ef_src=/dev/null; fi
+	# header = the leading run of comment/blank lines, kept first and unmoved; every other line,
+	# minus every occurrence of $want, follows it in original order; $want is reinserted right after.
+	if ! awk -v want="$_ef_want" '
+		BEGIN { inhdr = 1 }
+		inhdr && (/^#/ || $0 == "") { hdr = hdr $0 "\n"; next }
+		{ inhdr = 0 }
+		$0 == want { next }
+		{ body = body $0 "\n" }
+		END { printf "%s%s\n%s", hdr, want, body }
+	' "$_ef_src" > "$_ef_tmp"; then
+		rm -f "$_ef_tmp"
 		return 1
 	fi
-	if ! printf '' > "$_ef_body"; then
-		rm -f "$_ef_hdr"
-		return 1
-	fi
-	_ef_in_header=1
-	_ef_found=0
-	if [ -f "$_ef_f" ]; then
-		while IFS= read -r _ef_l || [ -n "$_ef_l" ]; do
-			if [ "$_ef_l" = "$_ef_want" ]; then
-				_ef_found=1
-				_ef_in_header=0
-				continue
-			fi
-			if [ "$_ef_in_header" = 1 ]; then
-				case "$_ef_l" in
-					\#*|'') printf '%s\n' "$_ef_l" >> "$_ef_hdr"; continue ;;
-				esac
-				_ef_in_header=0
-			fi
-			printf '%s\n' "$_ef_l" >> "$_ef_body"
-		done < "$_ef_f"
-	fi
-	# Checked, not a bare redirect: a failed open (disk full, EROFS) is this function's OWN failure
-	# under `set -e` and would otherwise skip straight past the cleanup on the next line, leaking
-	# both scratch files (security review, task 0176-j). `&&`-joined, not `;`-joined: a group
-	# command's exit status is its LAST member's, so a `;`-joined group would have silently ignored
-	# the first `cat` failing while the second one still succeeded (security review, task 0176-l).
-	if ! { cat "$_ef_hdr" && printf '%s\n' "$_ef_want" && cat "$_ef_body"; } > "$_ef_tmp"; then
-		rm -f "$_ef_hdr" "$_ef_body" "$_ef_tmp"
-		return 1
-	fi
-	rm -f "$_ef_hdr" "$_ef_body"
 	if [ -f "$_ef_f" ] && command -v cmp >/dev/null 2>&1 && cmp -s "$_ef_tmp" "$_ef_f" 2>/dev/null; then
 		rm -f "$_ef_tmp"
 		FEED_PLACEMENT=unchanged
@@ -700,9 +548,8 @@ ensure_first() {	# <file> <exact-line> -> sets $FEED_PLACEMENT; returns 0/1
 	fi
 	if atomic_write "$_ef_f" "$_ef_tmp"; then
 		rm -f "$_ef_tmp"
-		# "added": the line was missing outright. "moved": it was ALREADY somewhere in the file (an
-		# origin/main-configured router only ever appends) and this run repositioned it — a fact the
-		# closing "Adding the feed…"/"Feed added" wording would otherwise get wrong for that router.
+		# "added": the line was missing outright. "moved": it was already somewhere in the file and
+		# this run repositioned it — a fact the closing "Adding…"/"Feed added" wording would get wrong.
 		if [ "$_ef_found" = 1 ]; then FEED_PLACEMENT=moved; else FEED_PLACEMENT=added; fi
 		return 0
 	fi
@@ -712,135 +559,96 @@ ensure_first() {	# <file> <exact-line> -> sets $FEED_PLACEMENT; returns 0/1
 
 # --- feed -----------------------------------------------------------------
 # keep.d is not bookkeeping: sysupgrade wipes the key unless something claims it, and the theme
-# would come back unupgradable. The repository line itself needs no entry — both managers'
-# customfeeds files are conffiles of the manager (`apk-mbedtls` and `opkg`), and sysupgrade backs
-# up every conffile whose checksum has moved. It listed them anyway until this was measured, and
-# `build_list_of_backup_overlay_files` was already dropping the duplicate.
-if [ "$PM" = apk ]; then
-	# customfeeds.list rather than a file of our own under repositories.d/. apk reads
-	# every *.list in that directory, so both work for installing — but LuCI's package
-	# manager reads exactly three paths (`repositories`, `distfeeds.list`,
-	# `customfeeds.list`, in its rpcd ACL and hardcoded in its view), so a feed in any
-	# other file is invisible in "Configure APK" and cannot be edited or removed there.
-	# It is also the file OpenWrt ships for this ("add your custom package feeds here")
-	# and the apk counterpart of the opkg branch's customfeeds.conf below.
-	APK_LIST=/etc/apk/repositories.d/customfeeds.list
-	APK_LINE=$(printf '%s/releases/%s/%s/packages.adb' "$FEED_HOST" "$BRANCH" "$ARCH")
-	mkdir -p /etc/apk/keys /etc/apk/repositories.d /lib/upgrade/keep.d
-	# R1: exact, not a substring — a commented, tagged or other-branch/arch line satisfied the old
-	# `grep -q "$FEED_HOST"` while apk read none of them (forum.openwrt.org/t/251930#160). R2: placed
-	# FIRST, and MOVED there even when already present somewhere else — see ensure_first() above.
-	disable_other_lines "$APK_LIST" "$APK_LINE" apk || {
-		err "Could not update $APK_LIST — the router's own feed lines are unchanged."
-		exit 1
+# comes back unupgradable. The repository line itself needs no entry — customfeeds is a conffile of
+# the manager (`apk-mbedtls`/`opkg`), and sysupgrade backs up every conffile whose checksum moved.
+
+# Both package managers' setup is the same four steps with a different file/line shape — disable
+# every other line naming us (R3), then put ours first (R2). docs/package.md, "install.sh".
+feed_setup() {
+	if [ "$PM" = apk ]; then
+		_fs_list="$APK_LIST"; _fs_line="$APK_LINE"
+	else
+		_fs_list="$OPKG_LIST"; _fs_line="$OPKG_LINE"
+	fi
+	disable_other_lines "$_fs_list" "$_fs_line" "$PM" || {
+		err "Could not update $_fs_list — the router's own feed lines are unchanged."
+		return 1
 	}
-	if ! ensure_first "$APK_LIST" "$APK_LINE"; then
-		err "Could not write $APK_LIST — the router's own feed lines are unchanged."
-		exit 1
+	if ! ensure_first "$_fs_list" "$_fs_line"; then
+		err "Could not write $_fs_list — the router's own feed lines are unchanged."
+		return 1
 	fi
 	case "$FEED_PLACEMENT" in
 		added)
 			info "Adding the $FEED_NAME feed..."
-			apk add --quiet ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
-			printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
-			# Installers before this one wrote their own file, which apk still reads: left
-			# in place it is the same repository configured twice, in one file the admin
-			# can see and one they cannot. Removed by name and only after the line above
-			# landed, so the feed is never briefly absent.
-			rm -f /etc/apk/repositories.d/owfeed-packages.list
+			if [ "$PM" = apk ]; then
+				apk add --quiet ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
+				# A pre-feed_setup installer wrote its own repositories.d file, which apk still
+				# reads — the same repository configured twice, once visible to the admin and once
+				# not. Removed only after the line above lands, so the feed is never briefly absent.
+				rm -f /etc/apk/repositories.d/owfeed-packages.list
+			else
+				opkg update >/dev/null 2>&1 || true
+				opkg install ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
+			fi
 			ok "Feed added: $FEED_HOST/releases/$BRANCH/$ARCH"
 			;;
 		moved)
-			info "Moving the $FEED_NAME feed line to the top of $APK_LIST so apk reads it first."
+			info "Moving the $FEED_NAME feed line to the top of $_fs_list so $PM reads it first."
 			;;
 		*)
 			info "The $FEED_NAME feed is already configured."
 			;;
 	esac
-	# The KEY is fetched on every run, not only when the feed line is written. It used to sit inside
-	# the branch above, which meant a rotation could never be repaired by the documented one-liner:
-	# the feed was "already configured", the key was never re-fetched, and `apk update` failed
-	# verification from then on with the header promising that re-running upgrades the theme. It is
-	# one small file, the fetch is verified TLS, and writing it again is idempotent.
-	mkdir -p /etc/apk/keys /lib/upgrade/keep.d
-	fetch "$FEED_HOST/owfeed-packages.pem" /etc/apk/keys/owfeed-packages.pem
-	printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
-	info "Updating the package index..."
-	feed_refresh apk || exit 1
-	# `apk add` ALONE DOES NOT UPGRADE, and the comment that used to sit here said it did. apk 3
-	# reads `add` as "make sure this is present": a package already in `world` and already satisfied
-	# stays at the version it is at, the command prints its usual OK line and exits 0. Reproduced on
-	# a 25.12 stand carrying 0.12.5 with 0.12.7 in the feed — the run ended with
-	# "[+] Installed from the owfeed-packages feed" and `apk list -I` still said 0.12.5. That is the
-	# shape of issues #16, #28 and #30: the installer reports success and changes nothing, and the
-	# only way a user sees it is by reading the version in the Footstrap tab.
-	# `--upgrade` (`-u`) is what asks for the newest the feed carries; it installs on a router that
-	# does not have the theme yet, so this one line covers both paths, exactly as the opkg leg below
-	# already did with its explicit `opkg upgrade`.
-	#
-	# `<26`: apk resolves a bare name to the HIGHEST version across every configured repository, not
-	# the one just added above — and this theme is now ALSO carried by the official openwrt/luci feed,
-	# where luci.mk stamps the version from git's commit date instead of this project's own numbering
-	# (measured on 25.12.4/apk-tools 3.0.5: `luci-theme-footstrap-26.246.70755~4fd72fd`, from
-	# `feeds/luci/…`, next to owfeed's own `0.14.10-r1`). That stamp only grows with the calendar, so a
-	# bare `apk add --upgrade "$PKG"` moves the router to the OTHER publisher's code — one that
-	# predates this release, not an upgrade to it (field report: "Upgraded … -> 26.246.70755~4fd72fd").
-	# `apk version -t` confirms `26.246.70755~4fd72fd` and `27.1.1~abc` both compare `>` against `26`,
-	# while `0.14.10-r1`, `1.0.0-r1` and `25.99.99-r1` all compare `<` — so `<26` excludes every
-	# LuCI-stamped build for good and still leaves this project's own numbering majors 1-25 to grow
-	# into. DO NOT "tidy" this to `<1` — it would start rejecting this project's own future releases.
-	# `--upgrade` with the constraint also REPAIRS a router that already took the official build: it
-	# downgrades back to ours (measured: "Downgrading luci-theme-footstrap (26.246.70755~4fd72fd ->
-	# 0.14.10-r1)"), which is why `--upgrade` stays rather than becoming a plain `add`.
-	info "Installing $PKG..."
-	pm_quiet apk add --upgrade "$PKG<26" || exit 1
+}
+
+if [ "$PM" = apk ]; then
+	# customfeeds.list, not a file under repositories.d/ of our own: LuCI's package manager reads
+	# exactly three paths there, so a feed anywhere else is invisible to "Configure APK".
+	APK_LIST=/etc/apk/repositories.d/customfeeds.list
+	APK_LINE=$(printf '%s/releases/%s/%s/packages.adb' "$FEED_HOST" "$BRANCH" "$ARCH")
+	mkdir -p /etc/apk/keys /etc/apk/repositories.d /lib/upgrade/keep.d
 else
 	OPKG_LIST=/etc/opkg/customfeeds.conf
 	OPKG_LINE=$(printf 'src/gz %s %s/releases/%s/%s' "$FEED_NAME" "$FEED_HOST" "$BRANCH" "$ARCH")
 	mkdir -p /etc/opkg/keys /lib/upgrade/keep.d
-	disable_other_lines "$OPKG_LIST" "$OPKG_LINE" opkg || {
-		err "Could not update $OPKG_LIST — the router's own feed lines are unchanged."
+fi
+feed_setup || exit 1
+
+# Fetched every run, not only when the feed line changes — a key rotation is then repaired by
+# re-running. opkg's key ID is part of the path, so the old one is left in place, not removed.
+# A failed fetch is loud and fatal here, not left to a silent `set -e` exit behind an unrelated
+# "Feed added" — see docs/package.md, "install.sh".
+if [ "$PM" = apk ]; then
+	mkdir -p /etc/apk/keys /lib/upgrade/keep.d
+	fetch "$FEED_HOST/owfeed-packages.pem" /etc/apk/keys/owfeed-packages.pem || {
+		err "Could not fetch the verification key from $FEED_HOST/owfeed-packages.pem."
 		exit 1
 	}
-	if ! ensure_first "$OPKG_LIST" "$OPKG_LINE"; then
-		err "Could not write $OPKG_LIST — the router's own feed lines are unchanged."
-		exit 1
-	fi
-	case "$FEED_PLACEMENT" in
-		added)
-			info "Adding the $FEED_NAME feed..."
-			opkg update >/dev/null 2>&1 || true
-			opkg install ca-bundle libustream-mbedtls >/dev/null 2>&1 || true
-			ok "Feed added: $FEED_HOST/releases/$BRANCH/$ARCH"
-			;;
-		moved)
-			info "Moving the $FEED_NAME feed line to the top of $OPKG_LIST so opkg reads it first."
-			;;
-		*)
-			info "The $FEED_NAME feed is already configured."
-			;;
-	esac
-	# Same as the apk leg: the key on every run, so a rotation is repairable by re-running. Here the
-	# key ID is part of the PATH, so a rotation changes the filename too — the old one is left alone
-	# rather than removed, since opkg reads the whole directory and a stale key verifies nothing.
+	printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
+else
 	mkdir -p /etc/opkg/keys /lib/upgrade/keep.d
-	fetch "$FEED_HOST/$FEED_KEY_OPKG" "/etc/opkg/keys/$FEED_KEY_OPKG"
+	fetch "$FEED_HOST/$FEED_KEY_OPKG" "/etc/opkg/keys/$FEED_KEY_OPKG" || {
+		err "Could not fetch the verification key from $FEED_HOST/$FEED_KEY_OPKG."
+		exit 1
+	}
 	printf '%s\n' "/etc/opkg/keys/$FEED_KEY_OPKG" > /lib/upgrade/keep.d/owfeed-packages
-	info "Updating the package index..."
-	feed_refresh opkg || exit 1
-	# `opkg install` on an installed package is a no-op even when the feed has a newer
-	# version — it reports "already installed" and exits 0 — so a second run has to ask
-	# for the upgrade explicitly. Up to date is not an error for `opkg upgrade`.
-	#
-	# No `<26` here: opkg has no `world` file and no version-constraint syntax on `install`/
-	# `upgrade`, so there is no opkg equivalent of the apk leg's fix above. Left as plain
-	# `opkg upgrade "$PKG"` because the collision it would guard against does not exist today —
-	# the official 24.10 feed carries no luci-theme-footstrap at all yet (checked on owrt2410:
-	# `opkg info luci-theme-footstrap` names only this project's own `0.14.9-r1`). If that ever
-	# changes, there is no constraint to add here; the fallback is already written — bypass feed
-	# resolution entirely and install the signed release artifact directly
-	# (`install_from_release`), the same path a router with no matching feed branch already takes.
-	info "Installing $PKG..."
+fi
+info "Updating the package index..."
+feed_refresh "$PM" || exit 1
+
+info "Installing $PKG..."
+if [ "$PM" = apk ]; then
+	# `apk add` alone never upgrades — a package already in `world` and satisfied exits 0 unchanged
+	# (issues #16, #28, #30). `--upgrade` asks for the newest the feed carries and covers a fresh
+	# install too. `<26` excludes every LuCI-stamped official-feed build (only grows with the
+	# calendar) while leaving this project's own numbering room to grow — DO NOT tighten to `<1`.
+	# docs/package.md, "install.sh".
+	pm_quiet apk add --upgrade "$PKG<26" || exit 1
+else
+	# `opkg install` on an installed package is a no-op even with a newer feed version — exit 0,
+	# "already installed" — so a second run must ask for the upgrade explicitly. No `<26`
+	# equivalent: opkg has no version-constraint syntax; docs/package.md, "install.sh", for why.
 	if opkg list-installed | grep -q "^$PKG "; then
 		pm_quiet opkg upgrade "$PKG" || exit 1
 	else
@@ -849,59 +657,4 @@ else
 fi
 
 install_language feed
-
-# Both caches, as postinst does: a stale /tmp/luci-modulecache bites exactly here, on a
-# package that replaces the theme's JS. reload, never restart — restart logs out every
-# LuCI session.
-rm -f /tmp/luci-indexcache* 2>/dev/null || true
-rm -rf /tmp/luci-modulecache 2>/dev/null || true
-if [ -x /etc/init.d/rpcd ]; then /etc/init.d/rpcd reload >/dev/null 2>&1 || true; fi
-
-printf '\n'
-_have=$(installed_version)
-if [ -z "$_have" ]; then
-	ok "Installed from the $FEED_NAME feed — \`$PM upgrade\` will keep it current."
-elif [ -z "$_before" ]; then
-	ok "Installed $PKG $_have — from the $FEED_NAME feed, \`$PM upgrade\` will keep it current."
-elif [ "$_before" != "$_have" ]; then
-	if is_foreign_luci_build "$_before"; then
-		# Not an upgrade: $_before was the official openwrt/luci feed's build — a higher, unrelated
-		# version number from a different publisher, not a newer release of this project. The `<26`
-		# constraint on the apk install above is what just moved the router back onto owfeed's build.
-		ok "Moved $PKG back onto the $FEED_NAME feed's build: $_before -> $_have"
-	else
-		ok "Upgraded $PKG $_before -> $_have — \`$PM upgrade\` will keep it current."
-	fi
-else
-	# "Nothing changed" is not "nothing newer" (R4): `apk add`/`opkg install` on an already-satisfied
-	# package exits 0 whether or not the feed carries something newer (issues #16/#28/#30, and
-	# forum.openwrt.org/t/251930#160, where this line ran without the feed ever having been read).
-	# Ask feed_offer, which asks the repository directly, instead of guessing from the version alone.
-	_offer=$(feed_offer "$PKG")
-	if [ -z "$_offer" ]; then
-		err "$PKG $_have is installed, but $PM names no $FEED_NAME version at all — this router is"
-		if [ "$PM" = apk ]; then
-			err "not reading the feed; check $APK_LIST and \`apk policy $PKG\`."
-		else
-			err "not reading the feed; check $OPKG_LIST and \`opkg list $PKG\`."
-		fi
-	elif [ "$_offer" != "$_have" ] &&
-	     [ "$(printf '%s\n%s\n' "$_have" "$_offer" | sort -V 2>/dev/null | tail -1)" = "$_offer" ]; then
-		warn "$PKG stays at $_have even though the $FEED_NAME feed offers $_offer — that is $PM's own"
-		warn "decision (a pin, a hold, a constraint), not a feed that has not caught up:"
-		if [ "$PM" = apk ]; then
-			apk policy "$PKG" 2>/dev/null | sed 's/^/    /' >&2
-		else
-			opkg list "$PKG" 2>/dev/null | sed 's/^/    /' >&2
-		fi
-	else
-		ok "Already current: $PKG $_have — the $FEED_NAME feed carries nothing newer."
-	fi
-fi
-# A blank line between WHAT HAPPENED and WHAT TO DO NEXT: the outcome is the one line a user
-# came for, and with the next-steps block butted straight against it the two read as one
-# paragraph.
-printf '\n'
-info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
-info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
-info "of System -> System. Then hard-reload the page (Ctrl+F5)."
+finish feed

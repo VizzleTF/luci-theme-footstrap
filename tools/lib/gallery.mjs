@@ -74,6 +74,17 @@ export async function applyAppearance(page, { mode = 'light', palette = 'footstr
 	await page.waitForTimeout(150);
 }
 
+/* WCAG 2.x relative luminance and contrast ratio — export-tier.mjs and placeholder-ink.mjs each
+ * carried an identical copy of both. */
+export const luminance = ([r, g, b]) => {
+	const f = (u) => (u /= 255) <= 0.03928 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4;
+	return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+};
+export const contrast = (a, b) => {
+	const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+	return (hi + 0.05) / (lo + 0.05);
+};
+
 /* The palette x mode grid both gates sweep. The TINT list is a PARAMETER, not shared: axe takes
  * the two extremes, export-tier walks the wheel at 60°. That difference is deliberate and argued
  * in each caller; the scaffolding around it is not. */

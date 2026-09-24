@@ -4,6 +4,7 @@
 'require fs-fit as fit';
 'require fs-prefs as prefs';
 'require fs-menutree as tree';
+'require fs-widgets as widgets';
 
 /* The chrome around the content: the mode menu, the section tabs, the rail toggle and the
  * measurements deciding how much room each gets. The main menu is injected by menu-footstrap.js as
@@ -150,17 +151,16 @@ function shellGeometry() {
 	/* the gutter is re-asked even on a memo hit: it moves with the width, not the density */
 	if (_geom && _geomDensity === key) return _geom;
 	_geomDensity = key;
-	const px = (name, dflt) => resolveLen(name, dflt);
 	const g = {
-		contentMin: px('--fs-content-min', GEOM_DFLT.contentMin),
-		sidebarW:   px('--fs-sidebar-w', GEOM_DFLT.sidebarW),
-		railW:      px('--fs-rail-w', GEOM_DFLT.railW),
+		contentMin: resolveLen('--fs-content-min', GEOM_DFLT.contentMin),
+		sidebarW:   resolveLen('--fs-sidebar-w', GEOM_DFLT.sidebarW),
+		railW:      resolveLen('--fs-rail-w', GEOM_DFLT.railW),
 		/* the token is one side's padding; the column loses it twice. It is only the fallback —
 		 * measureShell() overwrites this with the gutter the column actually got, which nothing
 		 * has measured before the first fitter (and the login page has no `.fs-content`). */
-		contentPad: px('--fs-content-pad', GEOM_DFLT.contentPad / 2) * 2,
+		contentPad: resolveLen('--fs-content-pad', GEOM_DFLT.contentPad / 2) * 2,
 		/* where the column stops growing, i.e. where surplus becomes margin — see columnWidth() */
-		contentMax: px('--fs-content-max', GEOM_DFLT.contentMax)
+		contentMax: resolveLen('--fs-content-max', GEOM_DFLT.contentMax)
 	};
 	/* Plausibility, at the cost of one comparison: the rail is the sidebar collapsed, so
 	 * 0 < railW < sidebarW holds by construction. Both known failures destroy it — a hijacked probe
@@ -494,33 +494,18 @@ function wireRail() {
  * stays in the label for screen readers, and in `title` for the pointer. */
 const IND_DOT = '•';
 
-/* Idempotent attribute write, so a poll tick that finds nothing changed touches no DOM — same
- * shape as `fsSyncAttr` in menu-footstrap-common.js, restated rather than imported (that file does
- * not export it). */
-function syncIndAttr(el, name, value) {
-	if (value === null) {
-		if (el.hasAttribute(name)) el.removeAttribute(name);
-	} else if (el.getAttribute(name) !== value) {
-		el.setAttribute(name, value);
-	}
-}
-
 /* A CLICKABLE `[data-indicator]` (the poll pill, "Unsaved Changes: N", …) ships as a bare
  * span: no role, name or tabindex, so Tab skips it and a screen reader
  * announces a run of text with no name, role or state (WCAG 2.1.1, 4.1.2). ui.showIndicator's own
  * click handler already lives on this exact element — this only adds the second, W3C-APG way to
  * reach it; it does not add a competing one. The name is the pill's own prose ("Refreshing"),
- * never invented. Enter/Space call el.click() because a <span>, unlike an <a>, gets neither key
- * for free (contrast fs-widgets.js's wireSpaceKey, written for an <a role="button">); calling
- * click() cannot double-fire the mouse handler, since a keydown is not a click. */
+ * never invented. widgets.wireActivate() calls el.click() because a <span>, unlike an <a>, gets
+ * neither Enter nor Space for free; calling click() cannot double-fire the mouse handler, since a
+ * keydown is not a click. */
 function wireIndicatorKeyboard(el) {
 	if (el.dataset.fsWired) return;
 	el.dataset.fsWired = '1';
-	el.addEventListener('keydown', (ev) => {
-		if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
-		ev.preventDefault();
-		el.click();
-	});
+	widgets.wireActivate(el, () => el.click());
 }
 
 function wireIndicatorCounts() {
@@ -541,9 +526,9 @@ function wireIndicatorCounts() {
 			 * replaces. The ring and the pointer cursor in theme/20-shell.css are scoped to
 			 * `[data-clickable]` for the same reason; the two must not disagree. */
 			if (el.hasAttribute('data-clickable')) {
-				syncIndAttr(el, 'role', 'button');
-				syncIndAttr(el, 'tabindex', '0');
-				syncIndAttr(el, 'aria-label', txt.trim() || null);
+				widgets.syncAttr(el, 'role', 'button');
+				widgets.syncAttr(el, 'tabindex', '0');
+				widgets.syncAttr(el, 'aria-label', txt.trim() || null);
 				wireIndicatorKeyboard(el);
 			}
 		});

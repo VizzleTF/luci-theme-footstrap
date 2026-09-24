@@ -301,8 +301,7 @@ function documentCarries(path) {
  * original is deliberately not one. */
 function documentPoisoned() {
 	const names = themeNames();
-	return Array.prototype.some.call(
-		document.querySelectorAll(VIEW_SHEETS),
+	return Array.from(document.querySelectorAll(VIEW_SHEETS)).some(
 		(el) => outlivesPage(el)
 			&& (!names || (invasiveSheet(el, names) && !_owner.has(el) && !_silenced.has(el))));
 }
@@ -417,7 +416,7 @@ function fenceImported(styleEl, names, until) {
 
 /* what a sheet IS, as text: the rules that are applying, not the markup that may have produced
  * them. Serialised only to compare, never re-parsed. */
-const serializeRules = (rules) => Array.prototype.map.call(rules, (r) => r.cssText).join('\n');
+const serializeRules = (rules) => Array.from(rules, (r) => r.cssText).join('\n');
 
 /* ---- a <style>'s textContent is NOT its sheet ----
  *

@@ -1,8 +1,8 @@
 @layer base {
 	/* Element reset (Meyer, trimmed to what a LuCI view can emit). */
 
-	/* scroll-margin-top: an anchor jump must clear the sticky bar or it lands underneath it
-	 * (WCAG 2.2 SC 2.4.11). The token, never a literal — the bar is 46px. */
+	/* scroll-margin-top: anchor jump must clear the sticky bar (WCAG 2.2 SC 2.4.11), token not a
+	 * literal — bar is 46px. */
 	*, *::before, *::after {
 		scroll-margin-top: var(--fs-bar-h);
 		margin: 0;
@@ -22,16 +22,8 @@
 		border-spacing: 0;
 	}
 
-	/* `hidden` is how a VIEW says an element is not there, and the only way available to code that
-	 * ships no stylesheet. The UA gives it `display: none` at the weakest possible strength, so any
-	 * `display` a theme sets on a class beats it and the element paints anyway: measured here on
-	 * `.tr` (table-row), `.td` (table-cell), `ul.nav > li` (block), `.cbi-page-actions` (flex) and
-	 * `.ifacebox` (inline-flex).
-	 *
-	 * The flag is the point, not a workaround for a layer mistake: this must outrank every display
-	 * in tokens/base/theme/page at once, including the id-specific ones in the page layer, and it
-	 * has to keep doing so for rules not written yet. `until-found` is excluded
-	 * because there `display: none` would break the find-in-page reveal the value exists for. */
+	/* Outranks every layer's `display`, id rules included: docs/css.md "Reset: [hidden] must
+	 * outrank every layer, not patch one mistake". */
 	[hidden]:not([hidden="until-found"]) { display: none !important; }
 
 	html {
@@ -39,9 +31,7 @@
 		height: 100%;
 	}
 
-	/* :focus-visible, not :focus — the ring is for the keyboard, and the UA heuristic keeps it off a
-	 * mouse click. A 1px dotted outline is near-invisible on a dark panel, and it was the only focus
-	 * indicator generic links had. */
+	/* :focus-visible: UA heuristic keeps the ring off a mouse click. */
 	a:focus-visible {
 		outline: 2px solid var(--fs-accent);
 		outline-offset: 2px;
@@ -62,7 +52,7 @@
 		bottom: -.25em;
 	}
 
-	/* font-size: theme/60-inputs.css (the control-typography rule + `option`) — absorbed */
+	/* font-size: theme/60-inputs.css (control-typography rule + option) — absorbed */
 	button,
 	input,
 	select,
@@ -85,9 +75,7 @@
 	/* disabled-opacity fade: 30-forms.css, same elements + pointer-events/cursor */
 
 	input[type="search"] {
-		appearance: textfield;
-		/* no box-sizing: content-box — it contradicts the universal border-box above, and the
-		 * theme sizes fields by padding, so a search box comes out ~22px too wide */
+		appearance: textfield; /* not content-box: contradicts border-box above, ~22px too wide */
 	}
 
 	input[type="search"]::-webkit-search-decoration {
@@ -100,14 +88,8 @@
 		font-family: var(--fs-font-mono);
 	}
 
-	/* LuCI's .control-group is bootstrap's JOINED input-group: the trailing button pulled back over
-	 * the input so their borders coincided, with its left corners squared to match. This theme does
-	 * not join controls — every button takes the full token radius from a later layer, so the
-	 * squared corners never apply while the pull-back still does and the button's rounded corner
-	 * sits on the input's (issue #7). Separate controls with a real gap instead.
-	 *
-	 * The password reveal is the one group that IS joined, and theme/60-inputs.css builds that seam
-	 * itself (one border around the group, `gap: 0`). */
+	/* Unjoined (issue #7): bootstrap's joins square the trailing button's corner; this theme's
+	 * buttons keep full radius. Password reveal stays joined (theme/60-inputs.css). */
 	.control-group {
 		display: inline-flex;
 		gap: var(--fs-space-2);

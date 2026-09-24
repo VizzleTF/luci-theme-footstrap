@@ -115,22 +115,14 @@ function index() {
  *
  * `window.__fsSearchGen` is how a source says its data grew — a harvester fills in over a session
  * — and the stamp below is what rebuilds the pool when it does. */
-const _sources = [];
 let _pool = null, _stamp = -1;
 
 function globalSources() {
 	return Array.isArray(window.__fsSearchSources) ? window.__fsSearchSources : [];
 }
 
-function addSource(fn) {
-	_sources.push(fn);
-	_pool = null;
-}
-function refresh() {
-	_pool = null;
-}
 function pool() {
-	const all = _sources.concat(globalSources());
+	const all = globalSources();
 	const stamp = all.length + (window.__fsSearchGen || 0);
 	if (_pool && stamp === _stamp) return _pool;
 	_stamp = stamp;
@@ -421,7 +413,5 @@ function openPalette() {
 }
 
 return baseclass.extend({
-	open: openPalette,
-	/* the seam an optional package registers through; see addSource() */
-	addSource, refresh
+	open: openPalette
 });

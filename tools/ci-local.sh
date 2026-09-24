@@ -56,8 +56,8 @@ usage() {
 usage: tools/ci-local.sh [--mode pr|push] [--dry-run] [--force] [--list] <job|slice>...
 
 jobs/slices (repeatable; "all" is every one of them, in build.yml's own order):
-  check                 job `check`   — the static, non-npm gates
-  lint                  job `lint`    — the npm gates, including jsmin-verify
+  check                 job `check`   — `npm run check:fast` (needs node_modules), plus build-css.sh
+  lint                  job `lint`    — `npm run check:mid`/`check:slow`, plus jsmin-verify
   build                 job `build`   — tools/stage.sh + owfeed plan|check|build + check-packages.sh
   verify                job `verify`  — owlab test, 25.12/apk and 24.10/opkg, the workflow's own 5 assertions
   live                  job `live`, all three slices below
@@ -79,9 +79,9 @@ flags:
                    makes for `live` and `anchors`. Has no effect on check/lint/build/verify.
   --force          required before `live`/`anchors` actually boot/install onto THIS project's own
                    named stands (owlab.yaml). Withheld by default: those legs are not safe to run
-                   while another session has the same stands — docs/development.md, "Two
-                   live-audit sweeps against the same stand fight over its language" is that
-                   exact failure mode, not a hypothetical one.
+                   while another session has the same stands — docs/development.md, "The stand's
+                   own traps" ("Two live-audit sweeps against the same stand fight over its
+                   language") is that exact failure mode, not a hypothetical one.
   --dry-run        print the commands each requested job/slice would run and exit; touches
                    nothing, needs no tool on PATH.
   --list           print the job/slice -> workflow-job map and the reproducibility gaps, then
@@ -165,23 +165,25 @@ skip() {
 }
 
 # ---------------------------------------------------------------------------------------------
-# job `check` — .github/workflows/build.yml, job `check`
+# job `check` — .github/workflows/build.yml, job `check`. Runs the SAME `npm run check:fast`
+# build.yml calls, so the gate list lives in package.json only — a tool added to check:fast is
+# exercised by this leg with no second edit here.
 # ---------------------------------------------------------------------------------------------
 job_check() {
-	echo "== check (static, non-npm gates) =="
-	step "check-shell" sh tools/check-shell.sh
-	step "scan-marker" sh tools/scan-marker.sh
-	step "check-acl" sh tools/check-acl.sh
+	echo "== check (npm run check:fast) =="
+	if [ ! -d node_modules ]; then
+		skip "check" "node_modules/ is missing — run 'npm ci' yourself first (not run by this script: it never writes outside tools/ and ../tmp/). docs/development.md's Windows-install trap applies if you install it from Windows and run gates from WSL: chmod +x node_modules/.bin/* first."
+		return
+	fi
 	step "build-css" luci-theme-footstrap/build-css.sh "$RUNDIR/cascade.check.css"
-	step "audit-strict" "$PY" tools/audit.py --strict
 	if command -v msgfmt >/dev/null 2>&1 && command -v msgmerge >/dev/null 2>&1 && command -v xgettext >/dev/null 2>&1; then
 		: # already on PATH — the workflow's own apt-get fallback is not exercised, see --list
 	else
-		skip "gettext" "msgfmt/msgmerge/xgettext missing — install gettext (apt-get install gettext) and re-run"
-		printf 'update-po-check\tSKIP\tgettext missing\n' >>"$RESULTS"
-		return
+		echo "  note: msgfmt/msgmerge/xgettext missing — check:fast's last item (update-po.sh --check)"
+		echo "  will fail below; everything else in the tier still runs before it does"
+		echo "  (install gettext to clear this note)."
 	fi
-	step "update-po-check" luci-theme-footstrap/update-po.sh --check
+	step "check-fast" npm run check:fast
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -217,33 +219,14 @@ jsmin_step() {
 }
 
 job_lint() {
-	echo "== lint (npm gates) =="
+	echo "== lint (npm run check:mid + check:slow, plus jsmin-verify) =="
 	if [ ! -d node_modules ]; then
 		skip "lint" "node_modules/ is missing — run 'npm ci' yourself first (not run by this script: it never writes outside tools/ and ../tmp/). docs/development.md's Windows-install trap applies if you install it from Windows and run gates from WSL: chmod +x node_modules/.bin/* first."
 		return
 	fi
-	step "lint-js" npm run lint:js
-	step "lint-css" npm run lint:css
-	step "unit-tests" npm test
 	step "ci-playwright" sh tools/ci-playwright.sh
-	step "a11y-gallery" node tools/a11y-gallery.mjs
-	step "size-budget" node tools/size-budget.mjs --show
-	step "build-icons-check" node tools/build-icons.mjs --check
-	step "export-tier" node tools/export-tier.mjs
-	step "css-metrics" node tools/css-metrics.mjs
-	step "css-floor" node tools/css-floor.mjs
-	step "fs-orphans" node tools/fs-orphans.mjs
-	step "css-dup" node tools/css-dup.mjs
-	step "css-i18n" node tools/css-i18n.mjs
-	step "mirror" node tools/mirror.mjs
-	step "axes" node tools/axes.mjs
-	step "chrome-fence" node tools/chrome-fence.mjs
-	step "table-contract" node tools/table-contract.mjs
-	step "page-modules" node tools/page-modules.mjs
-	step "conffiles" node tools/conffiles.mjs
-	step "i18n-packages" node tools/i18n-packages.mjs
-	step "bang-ok" node tools/bang-ok.mjs
-	step "changelog" node tools/changelog.mjs
+	step "check-mid" npm run check:mid
+	step "check-slow" npm run check:slow
 	jsmin_step
 }
 
@@ -442,8 +425,9 @@ require_stand_ack() {
 	if [ "$FORCE" = 1 ]; then return 0; fi
 	echo "  refusing: $leg boots/installs onto THIS project's own stands ($ROUTERS, owlab.yaml)."
 	echo "  Pass --force once you have confirmed nothing else is using them right now —"
-	echo "  docs/development.md, 'Two live-audit sweeps against the same stand fight over its"
-	echo "  language' is the exact failure this default avoids, not a hypothetical one."
+	echo "  docs/development.md, 'The stand's own traps' ('Two live-audit sweeps against the same"
+	echo "  stand fight over its language') is the exact failure this default avoids, not a"
+	echo "  hypothetical one."
 	printf '%s\tSKIP\trefused without --force\n' "$leg" >>"$RESULTS"
 	return 1
 }
@@ -546,17 +530,22 @@ print_matrix() {
 	cat <<'EOF'
 job/slice given here   ->  workflow job (build.yml)         ->  what it runs
 ------------------------------------------------------------------------------------------------
-check                      check                                check-shell, scan-marker, check-acl,
-                                                                 build-css, audit.py --strict, [gettext],
-                                                                 update-po.sh --check
-lint                       lint                                 lint:js, lint:css, unit tests,
-                                                                 ci-playwright, a11y-gallery, size-budget,
-                                                                 build-icons --check, export-tier,
-                                                                 css-metrics, css-floor, fs-orphans,
-                                                                 css-dup, css-i18n, mirror, axes,
-                                                                 chrome-fence, table-contract,
-                                                                 page-modules, conffiles, i18n-packages,
-                                                                 bang-ok, changelog, build-jsmin+jsmin-verify
+check                      check                                build-css, [gettext],
+                                                                 `npm run check:fast`
+                                                                 (lint:js, lint:css, shell, marker,
+                                                                 audit.py --strict, conffiles, acl,
+                                                                 i18n-packages, makefile-contract,
+                                                                 unit tests, css-orphans, mirror,
+                                                                 axes, page-modules, chrome-fence,
+                                                                 changelog, update-po.sh --check —
+                                                                 package.json is the list)
+lint                       lint                                 ci-playwright,
+                                                                 `npm run check:mid` (css-metrics,
+                                                                 css-floor, css-dup, size-budget),
+                                                                 `npm run check:slow` (table-contract,
+                                                                 export-tier, build-icons --check,
+                                                                 a11y-gallery, placeholder-ink, smoke,
+                                                                 pseudo-loc), build-jsmin+jsmin-verify
 build                      build                                stage.sh, owfeed plan|check|build,
                                                                  check-packages.sh
 verify                     verify                               owlab test x2 (25.12/apk, 24.10/opkg),

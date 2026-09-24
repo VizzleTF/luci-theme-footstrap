@@ -28,13 +28,15 @@
  *   node tools/fit-quiet.mjs [--only owrt2512] [--all] [--engine chromium|webkit]
  *
  * Needs a running owlab router (docs/development.md). */
+import { parseArgs } from 'node:util';
 import { chromium, webkit } from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf('--' + name);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
+const { values: FLAGS } = parseArgs({ options: {
+	engine: { type: 'string' }, widths: { type: 'string' }, slack: { type: 'string' },
+	only: { type: 'string' }, all: { type: 'boolean' },
+} });
+const arg = (name, dflt) => FLAGS[name] ?? dflt;
 const ENGINE = arg('engine', 'chromium');
 /* Both sides of the decision: 390px is where the menu takes its own row and the bar walks taller
  * before it settles, 767px is where it does not and the walk is mostly a dip. Only widths that
@@ -74,7 +76,7 @@ const WATCH = () => {
 	Element.prototype.getClientRects = function () { const v = gcr.apply(this, arguments); sample(); return v; };
 };
 
-const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'fit-quiet');
+const list = requireStands(stands(arg('only', ''), { all: FLAGS.all ?? false }), 'fit-quiet');
 const browser = await (ENGINE === 'webkit' ? webkit : chromium).launch();
 const findings = [];
 let runs = 0, attempts = 0, worst = 0;

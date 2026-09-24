@@ -10,6 +10,7 @@
  * treats any such literal as a secret rather than tracking each field by name, because a token can
  * appear anywhere the server chose to print it, not only inside `new LuCI({...})`. */
 import { resolve, relative, isAbsolute } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 /* JSON with object keys sorted, so two calls that differ only in argument ORDER produce the SAME
  * recording key. Arrays keep their order: `['a','b']` and `['b','a']` are different ubus calls. */
@@ -365,7 +366,7 @@ export function createGenerationGate() {
  * on the wait. */
 export async function waitForQuiet({
 	isQuiet, quietMs, timeoutMs,
-	now = Date.now, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), pollMs, describe,
+	now = Date.now, sleep = delay, pollMs, describe,
 }) {
 	const step = pollMs ?? Math.max(1, Math.min(50, quietMs));
 	const start = now();

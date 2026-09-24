@@ -429,8 +429,8 @@ for (const attr of ['data-theme', 'data-bs-theme'])
 /* The SET LITERAL, not the file. Asking whether `'fs-…'` appears anywhere in fs-orphans.mjs passes
  * on a key quoted in one of that file's prose comments or in its unrelated JUSTIFIED_UNSTYLED map —
  * i.e. the gate could report the contract as held while IGNORE_EXACT did not contain the key at all,
- * which is exactly the phantom dead selector it exists to prevent. Parsed the way bang-ok.mjs parses
- * its own allowlist: the text between `IGNORE_EXACT = new Set([` and the closing `])`. */
+ * which is exactly the phantom dead selector it exists to prevent. Parses the SET LITERAL text
+ * between `IGNORE_EXACT = new Set([` and the closing `])`, nothing else in the file. */
 const ignoreBlock = ORPHANS.match(/IGNORE_EXACT\s*=\s*new Set\(\[([\s\S]*?)\]\)/);
 if (!ignoreBlock)
 	errors.push('tools/fs-orphans.mjs no longer declares IGNORE_EXACT as `new Set([…])` — this check '

@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { serveGallery, applyAppearance, matrix } from './lib/gallery.mjs';
+import { serveGallery, applyAppearance, matrix, luminance, contrast } from './lib/gallery.mjs';
 import { buildCss } from './lib/css.mjs';
 import { parseExportTier } from './lib/tokens.mjs';
 
@@ -72,14 +72,6 @@ const levelsOf = (family) => TIER.find((t) => t.family === family).levels.map((l
 /* serve + Appearance-axis stamping: shared with a11y-gallery.mjs (tools/lib/gallery.mjs) */
 const { base, close } = await serveGallery(buildCss());
 
-const luminance = ([r, g, b]) => {
-	const f = (u) => (u /= 255) <= 0.03928 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4;
-	return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-};
-const contrast = (a, b) => {
-	const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-	return (hi + 0.05) / (lo + 0.05);
-};
 const spread = (a, b) => Math.max(...a.map((x, i) => Math.abs(x - b[i]))) / 255;
 
 const NAMES = [

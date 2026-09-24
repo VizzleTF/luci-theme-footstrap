@@ -17,6 +17,7 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { parseArgs } from 'node:util';
 import { stands, login, menuPaths, sealToRouter, requireStands } from '../lib/stands.mjs';
 import {
 	splitBatch, parseLsLines, waitForQuiet, drainReads, missingOverlayKeys,
@@ -26,12 +27,13 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf(`--${name}`);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
+const { values: FLAGS } = parseArgs({ options: {
+	help: { type: 'boolean' }, stand: { type: 'string' }, recording: { type: 'string' },
+	pages: { type: 'string' },
+} });
+const arg = (name, dflt) => FLAGS[name] ?? dflt;
 
-if (process.argv.includes('--help')) {
+if (FLAGS.help) {
 	console.log('Usage: node tools/playground/capture.mjs [--stand owrt2512] [--recording DIR] [--pages FILE]');
 	process.exit(0);
 }
