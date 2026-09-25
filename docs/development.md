@@ -1787,6 +1787,43 @@ result to act on; `owlab sync` the twin or re-run with `--no-pair`.
   script itself (`owlab exec owrt2512 -- sh /etc/uci-defaults/30_luci-theme-footstrap`), which is
   idempotent and safe to re-run on a stand `post_sync:` already registered.
 
+**A worktree created on Windows cannot be read by WSL's own `git`, because the worktree's `.git` file
+holds `gitdir: C:/Users/...` — a Windows-style path no POSIX tool under `/mnt/c` resolves through
+`/mnt/c` on its own.** `tools/computed-diff.mjs` failed with `fatal: not a git repository:
+/mnt/c/.../worktrees/<name>/C:/Users/IVAN/.../.git/worktrees/<name>` — the WSL-side path with the
+Windows-side one git tried to resolve relative to it appended on the end — and the
+`git archive | tar -x` pipe behind it failed with `tar: This does not look like a tar archive` on
+whatever `git archive` wrote instead of a tarball. Tell it apart from a real repository problem:
+`cat .git` from WSL — a `gitdir:` line starting `C:/` (or carrying a backslash) is the whole story, a
+POSIX path is not this trap. Run a `git`-reading gate that shells out to `git archive`/`git diff`/
+`git show` (`computed-diff`, `fork-drift`) from the SAME OS whose git created the worktree.
+
+**Two Playwright runs against two different stands at once can turn one visit into
+`net::ERR_CONNECTION_RESET`.** Seen once: a pair run in parallel against `owrt2512`/`owrt2410` reset
+a connection on port 8024, `owrt2410`'s own published port; the identical pair run sequentially, one
+stand at a time, was clean. One occurrence is not enough to name a cause — tell it apart from a real
+navigation fault the same way either way: re-run the same script alone against the same stand before
+reading a connection reset as a theme finding.
+
+**`luci-app-bandix` is not in the OpenWrt/ImmortalWrt feeds; install it from timsaya's own GitHub
+releases, matched to the stand's arch and libc.** On `owrt2410` the first `opkg install` failed on
+`zoneinfo-core` with `Checksum or size mismatch` — a stale package index, not a bad download —
+cleared by a plain `opkg update` first. The backend cannot start inside an owlab container at all —
+`owlab exec <stand> -- '/etc/init.d/bandix restart; logread | grep -i ebpf'` logs
+`Failed to load eBPF program: map error: failed to create map`, eBPF needing kernel capabilities a
+container does not have (owlab stands are containers, not VMs — `fidelity: vm` above is the closer
+analogy, at a cost) — right next to the LuCI view still rendering and reaching the router over ubus
+regardless, which is enough to reproduce a DOM/CSS bug like issue #56's; anything that needs
+bandix's own RPC data answering for real needs `fidelity: vm` or hardware instead.
+
+**A full load's `<body>` children are not in a stable order across runs.** `ui.js`'s `UI.__init__()`
+sometimes appends `#modal_overlay`/`.cbi-tooltip` before the parser reaches `footer.ut`'s own
+`<script>` tags, and sometimes after — which one wins depends on when its own fetch resolves, not on
+anything this theme controls. A census of `document.body.children` compared in ORDER between two
+runs of the identical page reads the ones where the race went the other way as a regression. Compare
+as a MULTISET instead: `Array.from(document.body.children).map(el => el.tagName + '#' + el.id + '.' +
+el.className).sort()`, duplicates counted, never a plain sequence diff.
+
 ## The test matrix
 
 - **Pages**: Status/Overview (tables, ifacebox), Network/Interfaces (zonebadge, modals),

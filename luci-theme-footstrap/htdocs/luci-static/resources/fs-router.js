@@ -338,6 +338,66 @@ function discard(el) {
 	}
 }
 
+/* ---- a page that leaves nodes as direct children of <body> hands the next page over by full load,
+ * the same way an invasive foreign sheet does (docs/third-party-apps.md, Rule 2 extended from CSS to
+ * the DOM — issue #56) ----
+ *
+ * luci-app-bandix's render() appends 7 tooltip/modal nodes to document.body on every visit,
+ * unconditionally (reproduced on owrt2512 and owrt2410) — nothing here sweeps them; the reasoning is
+ * docs/spa-router.md, "Foreign view DOM". The recorder is header.ut's first <body> <script>, filling
+ * window.__fsBodyAdds; this file only reads it. */
+
+/* -> true if `el` is a node the theme must treat as stray body litter: not the theme's own chrome,
+ * not something stock LuCI parks there itself, not a node type that can never paint. Exported and
+ * pure (no DOM writes, no window.__fsBodyAdds read) so tests/body-litter.test.mjs can drive it
+ * without a router or a recorder. */
+function strayBodyNode(el) {
+	if (!el || el.nodeType !== 1) return false;
+	/* never rendered on their own, wherever a script parks them */
+	switch (el.nodeName) {
+		case 'SCRIPT': case 'STYLE': case 'LINK': case 'TEMPLATE': case 'NOSCRIPT': case 'META':
+			return false;
+	}
+	/* zone 1, ours (docs/third-party-apps.md): the chrome mark, or an fs-* id/class. All of these
+	 * parent straight to <body> and must never be read as litter: this file's own #fs-nav-progress,
+	 * fs-search.js's #fs-search-ov (which also carries the mark), and the geometry/colour probes
+	 * fs-chrome.js and fs-appearance.js each park on <body> once and never remove — an fs-* id is
+	 * what tells them from bandix's own unmarked nodes below. */
+	/* read through `dataset`, not a literal `hasAttribute()` call: `tools/chrome-fence.mjs` counts
+	 * every single-quoted occurrence of the chrome mark's own name (as a JS string) across this
+	 * whole tree as a JS-BUILT chrome root (EXPECT_JS_ROOTS) — right for fs-search.js's palette,
+	 * which mounts one, and a false positive here, which only READS the mark on somebody else's
+	 * node and builds nothing. camelCase avoids the exact spelling the gate scans for. */
+	if (el.dataset && el.dataset.fsChrome !== undefined) return false;
+	if (el.id && el.id.indexOf('fs-') === 0) return false;
+	for (const c of el.classList) if (c.indexOf('fs-') === 0) return false;
+	/* stock LuCI's own ui.js parents these to <body> at its own __init__ and keeps them for the life
+	 * of the document: #modal_overlay (showModal's host) and the shared .cbi-tooltip */
+	if (el.id === 'modal_overlay') return false;
+	if (el.classList.contains('cbi-tooltip')) return false;
+	/* ui.js's handleDownload() appends a hidden `<a download>`, clicks it once and revokes its object
+	 * URL, but never removes the element itself. Every app that downloads the same way (wireguard,
+	 * filemanager, snmpd, banip/adblock's feed export) calls a.remove() of its own accord and is
+	 * pruned by bodyLittered() below before ever reaching this function. */
+	if (el.nodeName === 'A' && el.hasAttribute('download') && el.style.display === 'none') return false;
+	return true;
+}
+
+/* -> true iff the document holds a stray body node right now. A recording only ever grows — the
+ * recorder cannot know a node was later removed or moved inside #view — so this is also the one
+ * place that prunes it: an entry whose element is no longer a direct child of <body> is dropped for
+ * good, or the list would grow for the life of the document and re-judge nodes nobody can reach. */
+function bodyLittered() {
+	const adds = window.__fsBodyAdds;
+	if (!adds || !adds.length) return false;
+	let littered = false;
+	for (let i = adds.length - 1; i >= 0; i--) {
+		if (!document.body || adds[i].parentNode !== document.body) { adds.splice(i, 1); continue; }
+		if (strayBodyNode(adds[i])) littered = true;
+	}
+	return littered;
+}
+
 let _wired = false;
 /* the pathname whose view is currently rendered; popstate compares against it to tell a real
  * navigation from a fragment change */
@@ -886,6 +946,10 @@ function navigate(pathname, push, kbd) {
 	/* the view on screen injected CSS that can repaint any page: this document is spent, and the
 	 * only exit leaving both pages correct is a real navigation (fs-sheets.js) */
 	if (sheets.documentPoisoned()) return false;
+
+	/* …and a page that left its own nodes as direct children of <body> is spent the same way — Rule 2
+	 * extended to the DOM, issue #56. See strayBodyNode()/bodyLittered() above. */
+	if (bodyLittered()) return false;
 
 	/* …and a document whose session has died is spent the same way: the only page it can render
 	 * correctly is the login form, and only a real navigation gets there (watchSession) */
@@ -1495,5 +1559,13 @@ return baseclass.extend({
 	/* fs-search warms its recents and the arrow-key-highlighted result, neither of which the
 	 * pointer/focus triggers above can see. The edge points search -> router, because the router
 	 * must keep no dependency on the palette. */
-	prefetchSegs
+	prefetchSegs,
+	/* out-of-package, like the three probe exports above (contractBreaks, clearViewIntervals,
+	 * sessionExpired) — prefetchSegs just above is not one of them, it is a real in-package export
+	 * fs-search.js calls. tests/body-litter.test.mjs drives the classifier and the counter directly,
+	 * and navigate() itself to prove the early return actually reaches them rather than just sitting
+	 * beside it unused */
+	strayBodyNode,	/* fs:probe */
+	bodyLittered,	/* fs:probe */
+	navigate,	/* fs:probe */
 });

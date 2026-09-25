@@ -95,6 +95,9 @@ unmodified stand the two folds agree, and only the constructed case separates th
    - `segsFromPath` strips `L.env.scriptname` into path segments;
    - `documentPoisoned()` — has an invasive foreign stylesheet poisoned the document? If so,
      `return false`;
+   - `bodyLittered()` — has a script left one of its own nodes as a direct child of `<body>` and
+     never taken it back? Same verdict, for the same reason: `return false` (docs/third-party-apps.md,
+     Rule 2 extended to the DOM, issue #56; "Foreign view DOM" below);
    - `nodeForSegs` walks the menu tree; `viewClassFor` gives the view class name, or `null` if the
      node is not SPA-able;
    - **no class → `return false`** → the handler does not `preventDefault` → the browser loads the
@@ -556,6 +559,47 @@ Two things decide the owner, and both exist because **a require in flight cannot
   `textContent` (which is how the sheet is wrapped in `@layer theme`) throws the old
   `CSSStyleSheet` away and builds a fresh, enabled one — so switching off before the wrap switched
   it back on within the same call.
+
+## Foreign view DOM: recorded, not swept
+
+A node a script parks directly on `<body>` survives an SPA transition exactly like a `<style>` does.
+For a sheet imported at module eval (ACE, HexEditor) that append runs once, because `L.require`
+caches the module, and removing it would leave a later visit unable to put it back — Rule 1's
+reasoning, unchanged. `luci-app-bandix`'s `render()` appends 7 tooltip/modal nodes to
+`document.body` UNCONDITIONALLY, on every visit — it never checks whether they already exist and
+never removes the previous copies (issue #56, reproduced on `owrt2512` and `owrt2410`), which is WHY
+a SPA return to bandix used to duplicate every id on top of what was still there. `luci-app-podkop`'s
+own toast container (docs/third-party-apps.md) leaks the same way for one node.
+
+A recorder inline script — the first byte of `<body>` in `header.ut`, before this template renders a
+single chrome element and long before the dispatched page's own `<div id="view">` +
+`L.require('ui').then(instantiateView)` (`view.ut`, luci-base) or `footer.ut`'s two `L.require(...)`
+calls — wraps `document.body`'s own `appendChild`/`insertBefore`/`replaceChild`/`append`/`prepend`/
+`insertAdjacentElement`/`insertAdjacentHTML` as OWN properties of the `<body>` element, never
+`Node.prototype`. That is also the whole safety argument for why a browser extension's own content
+script is unaffected: an isolated-world script shares the DOM nodes with the page but not the page's
+own property shadows, so the wrap set here is invisible to it, and an extension injecting into
+`<body>` is correctly never recorded — being no business of this theme's.
+
+**Gap:** only `<body>`'s own methods are wrapped, so `Element.before()`/`after()`/`replaceWith()`
+called on a body child go unrecorded — none of bandix's 7 appends take that path today, but a future
+one that did would be invisible to `strayBodyNode()`/`bodyLittered()`.
+
+`fs-router.js`'s `strayBodyNode(el)` reads that recording and judges each entry: not the theme's own
+chrome (`[data-fs-chrome]`, an `fs-*` id or class — `#fs-nav-progress` above and `fs-search.js`'s
+`#fs-search-ov`), not a node type that never renders (`SCRIPT`/`STYLE`/`LINK`/`TEMPLATE`/`NOSCRIPT`/
+`META`), and not something stock LuCI parks there itself: `ui.js`'s `#modal_overlay` and
+`.cbi-tooltip` from its own `__init__`, and the hidden `<a download>` its `handleDownload()` leaves in
+place after revoking the object URL — an app that downloads the same way and calls `a.remove()` itself
+(filemanager, wireguard, snmpd, …) is pruned from the recording before ever reaching the classifier,
+the node being gone from `<body>` by the time anything asks. `bodyLittered()` is the count:
+`navigate()` asks it right after `documentPoisoned()`, in the same place and for the same verdict — a
+full load, which starts the next page with an empty `<body>`.
+
+Nothing here is ever swept, for the reason "Foreign view CSS" above already gives, whichever shape a
+given app's append turns out to have: a node an app's own code still expects to find is a one-way
+break to take away, and nothing here can tell a module-eval append from a per-render one like
+bandix's without running the app's own logic.
 
 ## Module prefetch
 

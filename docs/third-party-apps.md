@@ -112,9 +112,14 @@ How that lands on the router's actual apps:
 |---|---|
 | ACE/ssclash (`.ace_*`) | filemanager (`.cbi-button-save:not(…)`) |
 | podkop (`#cbi-podkop-*`) | stock openvpn (`h4 { white-space: nowrap }`) |
-| bandix tables, hex editor (`.hexview`) | bandix (`.error { … }` — a global class) |
+| bandix tables, hex editor (`.hexview`) | bandix (`.error { … }` — a global class; its own un-removed `<body>` nodes hit the DOM extension below independently, issue #56) |
 | the overview CPU include | wrtbwmon (`div > label + select { min-width }`) |
 | temp-status: its `:root { --app-* }` | temp-status: its own `svg text { fill }` |
+
+A node parked directly on `document.body` and never removed spends the document the same way,
+independently of any of the above: podkop's own toast container (`z-index: 9999`, "Everything else
+that breaks, or could" above) means leaving podkop is now a full load too, even though its CSS still
+earns it the "SPA preserved" cell in this table. See "Rule 2, extended to the DOM" below.
 
 Implementation: `fs-sheets.js` → `themeNames()`, `inertDeclarations()`, `invasiveSheet()`,
 `documentPoisoned()`. It covers both `<style>` and `<link rel=stylesheet>`; `[data-fs-shell]` and
@@ -123,6 +128,50 @@ everything inside `#view` are excluded. Full detail: [spa-router.md](spa-router.
 `fs-sheets.js` also re-declares the layer order as a new `<style>`, first child of `<head>`,
 because a foreign sheet landing ahead of `cascade.css` inverts the cascade layers — see
 [css.md](css.md).
+
+### Rule 2, extended to the DOM: a document holding a stray body node hands the next page over too
+
+A document can also be poisoned by a NODE instead of a sheet. A script that calls
+`document.body.appendChild()` (or `insertBefore`/`replaceChild`/`append`/`prepend`/
+`insertAdjacentElement`/`insertAdjacentHTML`) parks an element where no page but the one that put it
+there can find it. `luci-app-bandix`'s `render()` does exactly this, unconditionally and on EVERY
+visit, for 7 tooltip/modal nodes (`#schedule-rules-tooltip`, `#lan-traffic-tooltip`, four
+`.bandix-modal-overlay`s, `#whitelist-modal`; `bandix-view/index.js:2371/2378`) — it never checks
+whether they already exist and never removes the previous copies (issue #56, reproduced on
+`owrt2512` and `owrt2410`): an SPA nav to another page used to leave every one of them sitting in
+`<body>` — unstyled once `scopeToCurrentPage()` darkens bandix's own `<style>` on the swap, painted
+under the footer — and a SPA return to bandix duplicated every id, a fresh `render()` appending a
+second copy over what was still there.
+
+Nothing is deleted here either, for the reason Rule 1 already gives, whichever shape an app's append
+turns out to have: some apps really do append once, at module eval, the same way ACE and HexEditor
+inject their CSS once — and a sweep cannot tell those apart from bandix's own per-visit shape without
+running every foreign script's logic itself. A node an app's code still expects to find is the same
+one-way break Rule 1 describes for a sheet imported once. So the theme reads the same signal it
+already reads for CSS — is the document still fit to be swapped out from under the reader — and
+answers the same way: decline the SPA navigation, let the browser reload, and the reload starts the
+next page with an empty `<body>`.
+
+`fs-router.js`'s `strayBodyNode()`/`bodyLittered()` hold the DOM half. A recorder inline script, the
+first byte of `header.ut`'s `<body>` — before this template renders a single chrome element, and long
+before the dispatched page's own `<div id="view">` + `L.require('ui').then(instantiateView)`
+(`view.ut`, luci-base) or `footer.ut`'s two `L.require(...)` calls — wraps `document.body`'s own
+append methods as OWN properties of the `<body>` INSTANCE, never `Node.prototype`. That is also the
+whole safety argument for why a browser extension's own content script is unaffected: an
+isolated-world script shares the DOM nodes with the page but not the page's own property shadows, so
+the wrap set here is invisible to it, and an extension injecting into `<body>` is correctly never
+recorded.
+
+A recorded node counts as stray unless it is the theme's own chrome (`[data-fs-chrome]`, an `fs-*` id
+or class — `#fs-nav-progress`, `fs-search.js`'s `#fs-search-ov`, and the geometry/colour probes
+`fs-chrome.js`/`fs-appearance.js` each park on `<body>` once and never remove), a node type that never
+renders (`SCRIPT`/`STYLE`/`LINK`/`TEMPLATE`/`NOSCRIPT`/`META`), or something stock LuCI parks in
+`<body>` itself and keeps for the document's life: `ui.js`'s `#modal_overlay` and `.cbi-tooltip` from
+its own `__init__`, and the hidden `<a download>` its `handleDownload()` leaves in place after
+revoking the object URL. An app that downloads the same way and calls `a.remove()` itself
+(filemanager, wireguard, snmpd, …) never reaches the classifier at all — the node is gone from
+`<body>` by the time anything asks, and `bodyLittered()` prunes it from the recording rather than
+re-judging it on every navigation.
 
 ### Rule 3. The only safe deletion is a byte-identical duplicate
 
