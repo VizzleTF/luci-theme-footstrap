@@ -54,6 +54,23 @@ const ANCHOR_TOLERANCE = 2;
  * mid-scroll shifts the page and is neither ours nor avoidable. */
 const SHIFT_TOLERANCE = 0.02;
 
+/* Has the view actually rendered, or is ARM about to record a blank shell? fs-overview.js keeps
+ * every section hidden until network.flushCache()'s five RPCs answer (fs-overview.js:301-303); on
+ * a router that just booted one answers late and a fixed wait used to expire first, arming on
+ * scrollable 0 with no tables — the page then finished painting mid-scroll and read as a 4044px
+ * jump (docs/development.md, "The stand's own traps"). Scroller detection copied from ARM's own
+ * (below) so both ask the page the same way fs-fit.js does. */
+const PAINTED = () => {
+	const mc = document.getElementById('maincontent');
+	const flow = mc ? getComputedStyle(mc).overflowY : '';
+	const scroller = (flow === 'auto' || flow === 'scroll') ? mc : null;
+	const scrollable = scroller ? scroller.scrollHeight - scroller.clientHeight
+		: document.documentElement.scrollHeight - window.innerHeight;
+	const rendered = [ ...document.querySelectorAll('#view .cbi-section, #view .table') ]
+		.some((el) => el.offsetParent !== null);
+	return rendered && scrollable > 0;
+};
+
 /* Installed in the page. Records into `window.__fsScroll` until told to stop. */
 const ARM = () => {
 	const st = { remedy: [], settle: [], replaced: 0, anchor: 0, anchorSettle: 0,
@@ -175,7 +192,15 @@ for (const engine of ENGINES) {
 				for (const path of PAGES) {
 					try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
 					catch (e) { continue; }
-					await page.waitForTimeout(2600);		/* let the arrival settle: that is another gate's subject */
+					const where = `${engine} ${stand.id} @${w} ${layout} ${path}`;
+					/* wait for the real thing instead of a fixed clock: bounded at 20s, well past the
+					 * ~17s worst case measured booting a single PR stand (tools/ci-boot.sh) */
+					try { await page.waitForFunction(PAINTED, { timeout: 20000 }); }
+					catch (e) {
+						findings.push(`${where}: page not painted, run proves nothing`);
+						continue;
+					}
+					await page.waitForTimeout(400);		/* let the arrival settle: that is another gate's subject */
 					try { await page.evaluate(ARM); } catch (e) { continue; }
 
 					/* A REAL WHEEL, not scrollTo: the motion sampler listens on wheel/scroll/touch, and
@@ -209,7 +234,6 @@ for (const engine of ENGINES) {
 					catch (e) { continue; }
 
 					runs++;
-					const where = `${engine} ${stand.id} @${w} ${layout} ${path}`;
 					/* a run where nothing moved proves nothing: say so rather than pass it */
 					if (r.scrollable > 120 && r.moved < 100)
 						findings.push(`${where}: nothing scrolled (${r.moved} of ${r.scrollable} px available) — the run proves nothing`);

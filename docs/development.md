@@ -833,6 +833,18 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
 
 ## The stand's own traps
 
+- **`moved 1980/0 anchor 4044px` on `chromium owrt2512 @768 side /admin/status/overview` reads as
+  the theme jumping under the reader; it was `scroll-jank.mjs` arming before Overview painted.**
+  4 of 16 PR runs, 0 of ~80 push runs — PR boots only `owrt2512` (`tools/ci-boot.sh`), so this cell
+  starts ~15-17s after container start, ~20s sooner than a push run's later stands.
+  `fs-overview.js` keeps every section hidden until `network.flushCache()`'s five RPCs answer; on a
+  freshly booted router one answered late enough that the gate's old fixed 2600ms wait expired
+  first, arming on `scrollable 0` with no tables rendered — the page then finished painting
+  mid-scroll and read as a jump. Tell it apart from a real jank finding by the `scrollable` figure
+  in `moved X/Y`: `0` (or anything the "nothing scrolled" guard's `> 120` floor misses) means the
+  page had not painted, not that something moved it. Fixed by waiting for the paint
+  (`page.waitForFunction`, tools/scroll-jank.mjs) instead of a clock.
+
 - **`owlab test` (0.6.1) removes the project's RUNNING stands, not only the throwaway router it
   booted.** Measured 2026-09-14: `owrt2512` and `owrt2410` were up, `owlab test --release 25.12.4
   --install …` ran, and its own log carried `Container owlab-luci-theme-footstrap-owrt2512 Removing`
