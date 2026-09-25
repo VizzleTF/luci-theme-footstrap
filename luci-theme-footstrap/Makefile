@@ -110,8 +110,10 @@ endef
 define Package/luci-theme-footstrap/postinst
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
-	# default_postinst runs uci-defaults before this body ever starts — docs/package.md
-	# "uci-defaults: registration". Only the cache drop is ours to do.
+	# uci-defaults registers the theme; drop the LuCI caches so it is seen without a reboot.
+	# default_postinst also runs it; the second pass is idempotent.
+	[ -f /etc/uci-defaults/30_luci-theme-footstrap ] && \
+		sh /etc/uci-defaults/30_luci-theme-footstrap >/dev/null 2>&1 || true
 	rm -f /tmp/luci-indexcache* /tmp/luci-modulecache/* >/dev/null 2>&1 || true
 	# See the note above the define: no reload. Instead, end a session only when re-authenticating
 	# would actually hand it the theme's scope: it must be denied uci/footstrap/write right now
