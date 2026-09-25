@@ -843,7 +843,17 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   mid-scroll and read as a jump. Tell it apart from a real jank finding by the `scrollable` figure
   in `moved X/Y`: `0` (or anything the "nothing scrolled" guard's `> 120` floor misses) means the
   page had not painted, not that something moved it. Fixed by waiting for the paint
-  (`page.waitForFunction`, tools/scroll-jank.mjs) instead of a clock.
+  (`page.waitForFunction`, tools/scroll-jank.mjs) instead of a clock, now `waitForPaint()` in
+  `lib/stands.mjs` so a second gate can share it.
+
+- **`back-scroll: /admin/status/overview has no room to scroll at this width (parked at 0px)` on
+  `owrt2512` (CI run 36184976382, job `parity`) is the same trap in `spa-parity.mjs`'s Back case,
+  not a genuinely short page.** `backRestoreCheck()` did `page.goto(from)` then a fixed
+  `page.waitForTimeout(1400)` before parking the scroll; the same late `network.flushCache()` RPC
+  above left Overview empty at 1400ms, so `parked` read 0 and the `parked < 80` guard — meant for a
+  page that truly has no room to scroll — misdiagnosed it. Fixed the same way: `waitForPaint()`
+  before parking, and a timeout there is its own `"page not painted, run proves nothing"` finding
+  rather than falling through to the short-page guard.
 
 - **`owlab test` (0.6.1) removes the project's RUNNING stands, not only the throwaway router it
   booted.** Measured 2026-09-14: `owrt2512` and `owrt2410` were up, `owlab test --release 25.12.4

@@ -31,7 +31,7 @@
  * Needs a running owlab router (docs/development.md). */
 import { parseArgs } from 'node:util';
 import * as pw from 'playwright';
-import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter, waitForPaint } from './lib/stands.mjs';
 
 const { values: FLAGS } = parseArgs({ options: {
 	engines: { type: 'string', default: 'chromium' },
@@ -54,22 +54,8 @@ const ANCHOR_TOLERANCE = 2;
  * mid-scroll shifts the page and is neither ours nor avoidable. */
 const SHIFT_TOLERANCE = 0.02;
 
-/* Has the view actually rendered, or is ARM about to record a blank shell? fs-overview.js keeps
- * every section hidden until network.flushCache()'s five RPCs answer (fs-overview.js:301-303); on
- * a router that just booted one answers late and a fixed wait used to expire first, arming on
- * scrollable 0 with no tables — the page then finished painting mid-scroll and read as a 4044px
- * jump (docs/development.md, "The stand's own traps"). Scroller detection copied from ARM's own
- * (below) so both ask the page the same way fs-fit.js does. */
-const PAINTED = () => {
-	const mc = document.getElementById('maincontent');
-	const flow = mc ? getComputedStyle(mc).overflowY : '';
-	const scroller = (flow === 'auto' || flow === 'scroll') ? mc : null;
-	const scrollable = scroller ? scroller.scrollHeight - scroller.clientHeight
-		: document.documentElement.scrollHeight - window.innerHeight;
-	const rendered = [ ...document.querySelectorAll('#view .cbi-section, #view .table') ]
-		.some((el) => el.offsetParent !== null);
-	return rendered && scrollable > 0;
-};
+/* PAINTED and waitForPaint() are shared with spa-parity.mjs's Back case — both start on this same
+ * Overview and hit this same late RPC — lib/stands.mjs. */
 
 /* Installed in the page. Records into `window.__fsScroll` until told to stop. */
 const ARM = () => {
@@ -195,8 +181,7 @@ for (const engine of ENGINES) {
 					const where = `${engine} ${stand.id} @${w} ${layout} ${path}`;
 					/* wait for the real thing instead of a fixed clock: bounded at 20s, well past the
 					 * ~17s worst case measured booting a single PR stand (tools/ci-boot.sh) */
-					try { await page.waitForFunction(PAINTED, { timeout: 20000 }); }
-					catch (e) {
+					if (!await waitForPaint(page, 20000)) {
 						findings.push(`${where}: page not painted, run proves nothing`);
 						continue;
 					}
