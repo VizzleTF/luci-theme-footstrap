@@ -178,7 +178,10 @@ eslint **all exited 0**.
    can no longer match a chrome element. That is what beats a third party's `!important`: there
    is nothing left to outrank.
 3. **`theme/10-chrome.css` — the pin.** It closes the one way in a fence cannot: inheritance
-   from `html`/`body`, where no match is needed at all.
+   from `html`/`body`, where no match is needed at all. Measured against a hostile flagged rule
+   on `html`: font-style reached 166 of 169 menu elements, word-spacing/text-align 157,
+   letter-spacing/text-transform 156, cursor 46 — 0 with the pin, because it restates exactly the
+   inherited properties the chrome does not already declare itself.
 
 The gate **derives the mark from the markup** and never restates it: rename it in `header.ut` and
 the gate re-derives it, then fails on the two copies still saying the old name. The failure it

@@ -29,7 +29,8 @@ import { join } from 'node:path';
 import * as csstree from 'css-tree';
 import { chromium } from 'playwright';
 import { serveGallery } from './lib/gallery.mjs';
-import { buildCss, ROOT } from './lib/css.mjs';
+import { buildCss } from './lib/css.mjs';
+import { ROOT } from './lib/root.mjs';
 
 const VERBOSE = process.argv.includes('--verbose');
 const cssPath = buildCss();

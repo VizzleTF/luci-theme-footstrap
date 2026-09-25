@@ -23,9 +23,11 @@ found=0
 # spaces are data. Only `>   <` is collapsed to `><`.
 for f in $(find "$DIR" -type f -name '*.svg' | sort); do
 	tmp="$f.tmp$$"
+	# portable slurp: RS tricks are not POSIX — docs/development.md, "Building a package locally".
 	awk '
-		BEGIN { RS = "\0" }
-		{
+		{ buf = buf $0 "\n" }
+		END {
+			$0 = buf
 			# comments first: they may span lines and may contain angle brackets
 			while (match($0, /<!--([^-]|-[^-]|--[^>])*-->/)) {
 				$0 = substr($0, 1, RSTART - 1) substr($0, RSTART + RLENGTH)
@@ -41,6 +43,13 @@ for f in $(find "$DIR" -type f -name '*.svg' | sort); do
 		echo "strip-assets: $f came out implausibly small — refusing" >&2
 		exit 1
 	fi
+	# a silent no-op on some other awk must never ship either: the comment is the one byte
+	# sequence stripping exists to remove, so its survival is the cheapest proof of a no-op.
+	if grep -q '<!--' "$tmp"; then
+		rm -f "$tmp"
+		echo "strip-assets: $f still has an XML comment after stripping — refusing" >&2
+		exit 1
+	fi
 	mv "$tmp" "$f"
 	found=$((found + 1))
 done
@@ -53,15 +62,16 @@ for f in $(find "$DIR" -type f -name '*.json' ! -path '*/rpcd/acl.d/*' | sort); 
 	# nobody and only Save-as-default and the upload would break, on someone else's router. Those
 	# files are also never fetched over the wire. Not worth the risk for ~200 B.
 	awk '
-		BEGIN { RS = "\0"; q = 0 }
-		{
+		{ buf = buf $0 "\n" }
+		END {
+			q = 0
 			out = ""
-			n = length($0)
+			n = length(buf)
 			for (i = 1; i <= n; i++) {
-				c = substr($0, i, 1)
+				c = substr(buf, i, 1)
 				if (q) {
 					out = out c
-					if (c == "\\") { out = out substr($0, i + 1, 1); i++; continue }
+					if (c == "\\") { out = out substr(buf, i + 1, 1); i++; continue }
 					if (c == "\"") q = 0
 					continue
 				}
@@ -75,6 +85,12 @@ for f in $(find "$DIR" -type f -name '*.json' ! -path '*/rpcd/acl.d/*' | sort); 
 	if [ ! -s "$tmp" ]; then
 		rm -f "$tmp"
 		echo "strip-assets: $f came out empty — refusing" >&2
+		exit 1
+	fi
+	# a silent no-op must never ship: a surviving newline means stripping did not happen.
+	if [ "$(wc -l < "$tmp")" -gt 0 ]; then
+		rm -f "$tmp"
+		echo "strip-assets: $f still has a newline after stripping — refusing" >&2
 		exit 1
 	fi
 	mv "$tmp" "$f"

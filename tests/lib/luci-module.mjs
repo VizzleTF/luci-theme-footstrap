@@ -20,11 +20,8 @@
  * module makes at eval. Anything that needs a real box on a real page belongs on a stand
  * (docs/development.md). */
 import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const RESOURCES = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources');
+import { join } from 'node:path';
+import { RESOURCES } from '../../tools/lib/page-modules.mjs';
 
 /* The leading run of string-literal statements. Scanned line-wise rather than parsed: the prologue
  * is by definition the head of the file, one directive per line in this tree (eslint keeps it so),
@@ -154,6 +151,30 @@ export function installBrowserGlobals() {
 		globalThis.getComputedStyle = () => ({ getPropertyValue: () => '', overflowY: 'visible' });
 }
 
+/* An unstubbed dependency defaults to `{}` (below) UNLESS it is a theme module this harness can
+ * load for real without inventing anything: a shipped `<dep>.js` whose OWN pragma dependencies are
+ * every one either `baseclass` or already present in the CALLER's `stubs`. fs-widgets is the shape
+ * this exists for — `require baseclass` only, three small pure exports (svgIcon, syncAttr,
+ * wireActivate) that hand-faking would just restate as a second copy in this file — but the rule
+ * is general: any module that grows a `require` pragma on one of these needs no test of its own
+ * updated for it. Not extended past one level: a theme module whose OWN unmet dependency is a
+ * SECOND theme module is not walked recursively, so it still falls through to `{}` below, same as
+ * `fs-fit`/`fs-router`/`fs-chrome` do today — those reach for a live DOM or a timer this harness
+ * does not have, and guessing which ones are "safe" two levels down is exactly the per-name special
+ * case this rule replaces. */
+/* No cross-call cache: fs-widgets is stateless (three pure functions) and could safely be a
+ * singleton, but this rule is general and a module like fs-menutree carries mutable state of its
+ * own (`setTree()`) — caching it here would leak that state between unrelated tests loaded later
+ * in the same process. A fresh real instance per unstubbed reference costs one more `readFileSync`
+ * and `new Function`, not a measured slowdown against the suite's ~0.7 s total. */
+function loadableForReal(dep, stubs) {
+	let src;
+	try { src = readFileSync(join(RESOURCES, dep + '.js'), 'utf8'); }
+	catch (e) { return false; }	/* not a theme module — a stock luci-base class (`ui`, `rpc`, …) */
+	return pragmas(src).map(aliasFor).filter(Boolean)
+		.every((d) => d.dep === 'baseclass' || Object.prototype.hasOwnProperty.call(stubs, d.dep));
+}
+
 /* Evaluate `<name>.js` from the shipped resource directory and return what it exports.
  *
  * `stubs` is keyed by the pragma's dependency name (`ui`, `rpc`, `fs-menutree`), not by the alias —
@@ -176,6 +197,7 @@ export function loadModule(name, { L, window, document, stubs = {} } = {}) {
 		/* baseclass is the one dependency every module has and none of them can do without: LuCI's
 		 * is a class whose extend() returns the prototype, and the tests read that object. */
 		if (d.dep === 'baseclass') return { extend: (o) => o };
+		if (loadableForReal(d.dep, stubs)) return loadModule(d.dep, { L, window, document, stubs });
 		return {};
 	});
 

@@ -15,7 +15,10 @@ on:
       - 'docs/gallery.html'
       - 'luci-theme-footstrap/styles/**'
       - 'tools/devkit-build.mjs'
-      - 'tools/lib/gallery.mjs'
+      - 'tools/lib/css.mjs'
+      - 'tools/lib/tokens.mjs'
+      - 'tools/lib/root.mjs'
+      - 'luci-theme-footstrap/build-css.sh'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
   # Called by build.yml's release job once the release is published, which is what refreshes the

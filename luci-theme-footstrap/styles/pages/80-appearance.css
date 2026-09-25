@@ -1,29 +1,13 @@
 @layer page {
-	/* The Appearance controls, appended to System -> System by fs-appearance.js.
-	 *
-	 * This was a popover on <body>, capped to the viewport because eighteen axes plus an upload
-	 * panel do not fit a floating card on a phone in landscape. As part of a page none of that
-	 * applies: the sections are ordinary .cbi-section cards, the width is the content column's and
-	 * the scroll is the document's — so the placement, the max-height clamp, the fade-in and the
-	 * [hidden] pair a floating card needed are all gone.
-	 *
-	 * What is left in the theme's own namespace — the `.fs-ap-*` folds, sections, previews and
-	 * version line below — lives in the page layer rather than the theme layer, because this is
-	 * the only page that draws it: an axis control is not chrome. */
+	/* Appearance controls, appended to System -> System by fs-appearance.js. Was a viewport-capped
+	 * popover; now ordinary .cbi-section cards in the page layer (an axis control is not chrome).
+	 * docs/css.md "Appearance: from popover to page, and what stayed CSS". */
 
 	.fs-ap { display: flex; flex-direction: column; gap: var(--fs-space-5); }
-	/* The page note (fs-appearance.js). Only the outer margins: `.alert-message p` carries
-	 * --fs-space-1 top and bottom, which at the box's own edges adds to the panel's padding and
-	 * makes a two-sentence note look loose against every other alert on the theme. */
 	.fs-ap-note p:first-child { margin-top: 0; }
 	.fs-ap-note p:last-child { margin-bottom: 0; }
-	/* Grouping headings INSIDE the tab pane, not cards: the pane is already inside the stock
-	 * .cbi-section card, and a second border around each group is a box in a box. A hairline above
-	 * each group does the same job — except for the first, which sits under the tab strip. */
-	/* the heading row. On a plain group it holds the title; on a FOLDED one the whole row is the
-	 * disclosure button (fs-appearance.js) — full width, so the target is the heading rather than a
-	 * chevron nobody can hit on a phone. */
-	/* the heading row spans the section on its own now that the rows stack */
+	/* heading row: on a folded group the WHOLE row is the disclosure button, full width so the
+	 * target is the heading, not a chevron nobody can hit on a phone */
 	button.fs-ap-fold {
 		display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-3);
 		inline-size: 100%; padding: 0; margin: 0;
@@ -31,14 +15,8 @@
 	}
 	button.fs-ap-fold:hover h4 { color: var(--fs-accent); }
 	button.fs-ap-fold:focus-visible { outline: none; box-shadow: var(--fs-focus-ring-solo); border-radius: var(--fs-radius-sm); }
-	/* The chevron: the same box with a two-border ::after that the overview's card toggles use
-	 * (styles/pages/20-overview.css) — one
-	 * chevron for "this panel opens", drawn here and there rather than an SVG in one place and
-	 * borders in the other, with the glyph pinned as @mirror chevron/* so the copies cannot drift.
-	 *
-	 * It turns on the SAME attribute that tells a screen reader the state, so the two cannot
-	 * disagree. Rotated with `transform` rather than the individual `rotate` property, because that
-	 * is what the overview's copy does and the pair must look identical mid-animation. */
+	/* pinned @mirror chevron/*: same glyph as the overview card toggle (two hosts, one keyed by
+	 * attribute, one by class — no single selector list reaches both). docs/css.md above. */
 	.fs-ap-chev {
 		flex: 0 0 auto; inline-size: 26px; block-size: 26px;
 		display: inline-flex; align-items: center; justify-content: center;
@@ -64,64 +42,27 @@
 		/* @endmirror */
 	}
 	button.fs-ap-fold:hover .fs-ap-chev { color: var(--fs-accent); }
-	/* Stock `.cbi-value` rows stack one per line and carry their own hairline, so a folded group needs
-	 * no layout of its own — it lays its rows out exactly like an unfolded section by doing nothing. */
-	/* `hidden` is what keeps a closed group out of the tab order and the a11y tree, and
-	 * base/10-reset.css is what makes the attribute win over a class's `display` — for every
-	 * element, not just this one, so there is nothing to restate here. */
-	/* the second heading inside the Colours fold — Surfaces shares the fold, not the heading. It
-	 * wears the SAME .fs-ap-head h4 as every other section title now; a third heading style on one
-	 * page (h4, folded h4, uppercase eyebrow h5) was a third of the raggedness. Only the space
-	 * above it is its own. */
 	.fs-ap-sub { margin-top: var(--fs-space-4); }
 	.fs-ap-head h4 {
 		margin: 0;
 		font-size: var(--fs-type); font-weight: var(--fs-weight-bold); color: var(--fs-text);
 	}
 	.fs-ap-section + .fs-ap-section { padding-top: var(--fs-space-4); border-top: var(--fs-hairline); }
-	/* The rows are stock `.cbi-value` and this page states no layout for them at all: caption column,
-	 * field column and the hairline between rows come from base/30-forms.css and theme/60-inputs.css,
-	 * the rules every other LuCI form is drawn by. What stood here was a responsive two-column grid
-	 * of stacked cards with an uppercase eyebrow above each control: it fitted a floating popover,
-	 * and beside General Settings / Language and Style it made the theme's own tab the one page in
-	 * LuCI that did not look like LuCI. Deleting that grid is the change — do not restate a layout
-	 * for these rows. */
-	/* The accordion switch is meaningless in the top layout — its sections are hover dropdowns,
-	 * already exclusive. Hidden HERE, not by a branch in the JS: the page is built once, so a branch
-	 * froze the control to whatever layout it loaded in and the live toggle could never change it. */
+	/* rows are stock .cbi-value with no layout of their own — base/30-forms.css and
+	 * theme/60-inputs.css already draw every other LuCI form this way. docs/css.md above. */
 	:root[data-layout="top"] .fs-ap-submenus { display: none; }
 
-	/* Save-as-default / Reset row: two equal buttons, no status text — the Save button's own
-	 * label/disabled state is the status. They take their look from .btn / .cbi-button-action
-	 * (base + theme/55-buttons.css); a disabled .cbi-button-action already greys via base. */
-	/* Buttons take the width of their own label, which is what every button on every other LuCI page
-	 * does — they were `flex: 1 1 9em` and stretched to fill the field, so three of them made one
-	 * long bar and "Choose SVG"/"Remove" each ran half the card. `wrap` keeps a narrow card honest:
-	 * an item that cannot fit moves to the next line instead of hanging past the edge, which on a
-	 * flex row is silent. */
 	.fs-ap-actrow { display: flex; flex-wrap: wrap; gap: var(--fs-space-2); }
-	/* Save and the two resets differ by one word and sit in one row, which is the shape a
-	 * destructive click lands on by accident. The gap says they are two groups; both resets also
-	 * ask for a second click. Zero-width, so it costs no height when the row wraps on a phone. */
 	.fs-ap-actgap { flex: 0 0 var(--fs-space-4); }
 	.fs-ap-actrow .btn { font-size: var(--fs-type); padding: var(--fs-space-2) var(--fs-space-2-5); cursor: pointer; }
 	.fs-ap-actrow .btn:disabled { cursor: default; }
-	/* the primed Reset (second click confirms) reads as the destructive action it is */
+	/* primed Reset (2nd click confirms) reads as the destructive action it is */
 	.fs-ap-armed { color: var(--fs-on-danger); background: var(--fs-danger); border-color: transparent; }
-	/* Save's only visible failure line (a rejected save rpc — usually a stale session) — shown in
-	 * place of the absent status text, hidden until a save actually fails. */
 	.fs-ap-err { margin-top: var(--fs-space-2); font-size: var(--fs-type-xs); line-height: 1.35; color: var(--fs-danger); }
 
-	/* ---- the colour axes ----
-	 * One row is a swatch, a hex field and the button back to the palette's own colour. */
-	/* the same ceiling every other stretching control in a form row takes (02-tokens.css), so the
-	 * swatch + hex + Palette button end where the selects and the sliders end */
 	.fs-colorctl { display: flex; flex-direction: column; gap: var(--fs-space-1-5); max-width: var(--fs-field-max); }
 	.fs-color-row { display: flex; align-items: center; gap: var(--fs-space-2); }
-	/* The native colour swatch. type="color" is drawn by the browser and cannot be restyled beyond
-	 * its box, so the box is what is styled: the inner well is stripped to the frame's edge on both
-	 * engines (WebKit nests two elements, Firefox one) or it paints a white margin inside our
-	 * border. Fixed 34px square so it lines up with the field beside it at every density. */
+	/* native swatch strips the browser's own inset well to the frame's edge (both engines) */
 	input[type="color"].fs-color-swatch {
 		flex: 0 0 auto; inline-size: 34px; block-size: 34px; padding: 0; cursor: pointer;
 		background: none; border: var(--fs-hairline); border-radius: var(--fs-radius-sm);
@@ -129,8 +70,6 @@
 	input[type="color"].fs-color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
 	input[type="color"].fs-color-swatch::-webkit-color-swatch { border: 0; border-radius: calc(var(--fs-radius-sm) - 1px); }
 	input[type="color"].fs-color-swatch::-moz-color-swatch { border: 0; border-radius: calc(var(--fs-radius-sm) - 1px); }
-	/* the hex field is a VALUE, so it is mono and tabular like every other value in the theme —
-	 * and #0969da is exactly the kind of string a proportional face makes hard to read back */
 	input[type="text"].fs-color-hex {
 		flex: 1 1 auto; min-inline-size: 0;
 		font-family: var(--fs-font-mono); font-size: var(--fs-type-xs); font-variant-numeric: tabular-nums;
@@ -139,86 +78,40 @@
 	.fs-color-clear { flex: 0 0 auto; font-size: var(--fs-type-xs); padding: var(--fs-space-1-5) var(--fs-space-2); cursor: pointer; }
 	.fs-color-clear:disabled { cursor: default; }
 
-	/* What the chosen colour COSTS, measured live against the surface it is read on (fs-widgets'
-	 * contrastRatio). It is a readout, not a validation: the theme derives readable ink over a fill
-	 * but never silently corrects a colour the admin asked for, so this says the number and grades
-	 * it. Three grades, three colours — and the failing one is --fs-danger, which the admin may have
-	 * just recoloured, which is exactly the honest outcome. */
-	/* It is LuCI's own help-text line now — `.cbi-value-description`, styled in base/95-luci.css,
-	 * which is where a sentence under a field belongs on every other page. What stays here is the
-	 * only thing stock has no opinion about: the GRADE's colour, and the tabular figures that keep
-	 * the ratio from jittering as it updates. */
+	/* live contrast readout, not a validation — docs/css.md above */
 	.fs-color-contrast { font-variant-numeric: tabular-nums; }
 	.fs-contrast-aa { color: var(--fs-good); }
 	.fs-contrast-aa-large { color: var(--fs-warn); }
 	.fs-contrast-low { color: var(--fs-danger); }
 
-	/* THE PRESET CHIPS' rules were here — a wrapping row of pills, each painted in the accent it
-	 * would set, with ink derived from that colour's own lightness. The control is gone from
-	 * fs-appearance.js: it was the one thing on the page that looked like nothing else in LuCI, it
-	 * started at the card's edge instead of at the field column, and everything it did the Accent
-	 * row does with any colour rather than eight. */
-
-	/* The uploaded image's preview and the two buttons under it, both in an ordinary
-	 * `.cbi-value-field`. The preview is a thumbnail, not a banner: capped to the same field ceiling
-	 * as every other stretching control and to a fixed height, so the row keeps one shape whatever
-	 * the image's aspect is — full width makes an SVG tile look like a letterboxed photograph. */
 	.fs-ap-bgprev {
 		display: block; width: 100%; max-width: var(--fs-field-max); height: 84px; object-fit: cover;
 		border: var(--fs-hairline); border-radius: var(--fs-radius);
-		/* the preview follows the buttons in the field, so the gap belongs ABOVE it */
 		margin-top: var(--fs-space-2);
 	}
 	.fs-ap-bgrow { display: flex; flex-wrap: wrap; gap: var(--fs-space-2); }
 	.fs-ap-bgrow .btn { font-size: var(--fs-type); padding: var(--fs-space-2) var(--fs-space-2-5); cursor: pointer; }
 	.fs-ap-bgrow .btn:disabled { cursor: default; }
-	/* The JS hides a row that does not apply to the chosen wallpaper, the empty preview and a
-	 * not-yet-uploaded Remove with `el.hidden`; base/10-reset.css makes that attribute beat the
-	 * `display` a class sets, so none of it needs restating here any more. */
-	/* Under the File wallpaper only the photo Dim is relevant — the router-identity Tint colours the
-	 * canvas the photo covers, so hide the Tint hue AND its strength there (fs-ap-tint marks both). */
+	/* File wallpaper: only Dim applies, Tint colours the canvas a photo already covers */
 	:root[data-wallpaper="file"] .fs-ap-tint { display: none; }
-	/* and the strength is a multiplier on a chroma WE choose, so it only means anything in hue mode:
-	 * with the tint off there is nothing to scale, and on a hex canvas the colour is the one the
-	 * admin entered. (0,3,0) out-ranks the stock row's own display. Not named after Density: that is
-	 * the UI-density select four rows above, and one name for two rows is how the label itself went
-	 * wrong. */
+	/* strength is a multiplier on a chroma we choose, meaningless off hue mode */
 	:root:not([data-tint="hue"]) .fs-ap-tintstr { display: none; }
 
-	/* the version line at the foot of the page */
 	.fs-ap-footer {
 		display: flex; flex-direction: column; gap: var(--fs-space-2);
 		margin-top: var(--fs-space-0-5); padding-top: var(--fs-space-2-5); border-top: var(--fs-hairline);
 	}
 	.fs-ap-verrow { display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-2-5); }
-	/* links to the project repo — reads as muted text until hovered */
 	.fs-ap-version { position: relative; font-size: var(--fs-type-xs); color: var(--fs-dim); font-variant-numeric: tabular-nums; text-decoration: none; }
 	.fs-ap-version:hover { color: var(--fs-accent); text-decoration: underline; }
-	/* the link's own box was 84x17 (owrt2512/390x844, Appearance tab), under the 24px floor of
-	 * WCAG 2.2 SC 2.5.8 on height. Same fix as `.cbi-checkbox > label[for]::before` in
-	 * theme/60-inputs.css: an invisible, absolutely-positioned overlay grows the hit box to
-	 * 88x25 without moving the text or growing `.fs-ap-verrow`, since the overlay is out of flow. */
+	/* invisible overlay grows an 84x17 link past the WCAG 2.2 SC 2.5.8 24px floor, to 88x25,
+	 * without moving the text (out of flow, same fix as .cbi-checkbox in theme/60-inputs.css) */
 	.fs-ap-version::before { content: ""; position: absolute; inset: -4px -2px; }
 
-	/* The line that names the missing catalogue package. Same weight as the version beside it —
-	 * it is a fact about this router, not a warning: nothing is broken, one package is absent.
-	 * Wraps, because the package name is 24 characters and the column is narrow at 390px. */
 	.fs-ap-i18n {
 		flex-wrap: wrap;
 		font-size: var(--fs-type-xs);
 		color: var(--fs-dim);
 	}
-	/* the chip is base/20-typography.css's `code`; only the size follows the line it sits in, which
-	 * is a step smaller than body text */
 	.fs-ap-i18n code { font-size: inherit; }
-
-	/* No rules here for a segmented control or a range slider of our own: the page draws its enums
-	 * with `ui.Select` and its numbers with `ui.RangeSlider`, which this theme already styles for
-	 * every other LuCI form. Two copies of a slider, one of them ours, was the thing to delete. */
-
-	/* No rules here for a hue slider either: the control is gone from fs-widgets' colorControl, two
-	 * controls for one value reading as two settings, and the half that could not reach a grey was
-	 * the slider. The axis still stores a hue and 03-palettes.css still rotates by one, so a saved
-	 * value goes on painting — but CSS for a control nobody renders is dead CSS in our own
-	 * namespace, which `npm run css-orphans` exists to keep out. */
 }

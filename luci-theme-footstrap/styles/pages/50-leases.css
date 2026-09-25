@@ -1,63 +1,10 @@
 @layer page {
-	/* DHCP leases. The .leases/.leases6 tables (JS-tagged .fs-dt) carry 7-8 mono columns, and the
-	 * theme's general rule lets any data cell break to fit, which splits an IPv4 or a MAC over two
-	 * lines. So: every cell on ONE line, and only the long opaque columns (DUID, the IPv6 list, the
-	 * hostname) may wrap.
-	 *
-	 * Do not re-add a card-stack copy here at a container threshold of its own: the nowrap IS this
-	 * table's ~736px floor, and a floor is what makes a table OVERFLOW when the room runs out —
-	 * fs-select.js measures that and sets .fs-stacked, so the threshold is discovered and the card
-	 * lives once, in theme/30-tables.css. `:not(.fs-stacked)` is the whole guard: once carded, the
-	 * cells must wrap again.
-	 *
-	 * `.lases` is not a typo here — it is upstream's spelling for the IPv4 table on 24.10
-	 * (`class="table lases"`), corrected to `leases` on 25.12+. Dropping it made this whole file
-	 * dead on 24.10: measured there with the theme active, every one of the five cells computed
-	 * `white-space: normal` — issue #7's exact symptom. Both spellings are matched here. */
+	/* DHCP leases nowrap by default; `.lases` is upstream's 24.10 spelling (issue #7), do not drop.
+	 * docs/css.md "Leases: nowrap counted from the end". */
 	#view table.fs-dt:is(.leases, .lases, .leases6):not(.fs-stacked) .td { white-space: nowrap; }
-	/* ---- never match a `data-title` VALUE: it is a translated, render-dependent string ----
-	 *
-	 * LuCI fills `data-title` from the column HEADING, so on a localised router the value is the
-	 * translation and an English literal in a selector never matches — the rule is dead in ~40
-	 * languages while looking alive here, which is how issue #7 survived.
-	 *
-	 * Worse, for tables whose rows LuCI builds from the heading's `innerText` the value is what the
-	 * heading RENDERS, so any transform the theme puts on `.th` rewrites the string the theme's own
-	 * CSS matches on. That is not hypothetical: `.th` carried `text-transform: uppercase` until
-	 * issue #39, and every such rule matched nothing on any router in any language.
-	 *
-	 * Anchor on the COLUMN instead: `tools/css-i18n.mjs` fails the build on any `[data-title="…"]`
-	 * value match, so this cannot come back. */
 
-	/* The long opaque columns, which may wrap. overflow-wrap:anywhere (not word-break) takes the
-	 * natural breaks first — the hyphens in a hostname — and only splits mid-token when nothing else
-	 * fits.
-	 *
-	 * ---- count from the END, never from the start ----
-	 *
-	 * The leading column is optional on 25.12+: `40_dhcp.js` opens both tables with an Interface
-	 * column only where the router serves DHCP through odhcpd, so every `:nth-child()` shifts by one
-	 * on exactly those routers and is invisible on the others. The TRAILING columns are identical
-	 * either way, so `:nth-last-child()` cannot shift.
-	 *
-	 *   25.12+  .leases   [Interface] Hostname IPv4 MAC DUID IAID Remaining Static
-	 *                                    -7     -6  -5   -4   -3      -2      -1
-	 *           .leases6  [Interface] Hostname IPv6 DUID IAID Remaining Static
-	 *                                    -6     -5   -4   -3     -2      -1
-	 *   24.10   .lases     Hostname IPv4 MAC Remaining Static     (no DUID/IAID column at all)
-	 *                        -5      -4  -3     -2      -1
-	 *           .leases6   Host IPv6 DUID Remaining Static
-	 *                       -5   -4   -3     -2      -1
-	 *
-	 * so the hostname, the IPv6 list and DUID may wrap, while IPv4/MAC/IAID and the two short
-	 * trailing columns keep the nowrap above. BOTH tables are split on column COUNT, never on the
-	 * release and never on the class name: a one-character upstream fix to `lases` would otherwise
-	 * hand the 24.10 table the 25.12 column plan and silently un-fix issue #7. base/95-luci.css
-	 * states that as the rule for release-conditioned styling.
-	 *
-	 * The count test is wrapped in `:where()` so it costs NOTHING: `:has()` otherwise takes its
-	 * argument's specificity, and `.tr.table-titles > :nth-child(6)` alone pushed the selector to
-	 * [1,8,1], past the sheet's [1,7,0] ceiling. */
+	/* opaque columns re-permitted to wrap; counted from the END, split on column COUNT — docs/css.md
+	 * above has both matrices and why :where() costs nothing. */
 	#view table.fs-dt:is(.leases, .lases):has(:where(.tr.table-titles > :nth-child(6))):not(.fs-stacked)
 		.td:is(:nth-last-child(7), :nth-last-child(4)),
 	#view table.fs-dt.leases6:has(:where(.tr.table-titles > :nth-child(6))):not(.fs-stacked)
@@ -66,10 +13,6 @@
 		.td:nth-last-child(5),
 	#view table.fs-dt.leases6:not(:has(:where(.tr.table-titles > :nth-child(6)))):not(.fs-stacked)
 		.td:is(:nth-last-child(5), :nth-last-child(4), :nth-last-child(3)) {
-		/* `white-space` is the whole rule now: it is what re-permits wrapping for these columns
-		 * against the nowrap above — and the nowrap is also what keeps IPv4/MAC unbroken, so the
-		 * column plan does not rest on overflow-wrap at all. The break itself is base's default for
-		 * every cell (base/40-tables.css); the copy that stood here moved nothing against 164 cells. */
 		white-space: normal;
 	}
 }

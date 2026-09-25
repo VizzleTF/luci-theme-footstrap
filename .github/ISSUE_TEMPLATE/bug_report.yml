@@ -47,7 +47,7 @@ body:
     id: theme-version
     attributes:
       label: Версия темы / Theme version
-      description: Показана в поповере Appearance. / Shown in the Appearance popover.
+      description: Показана на странице Appearance (/admin/system/footstrap). / Shown on the Appearance page (/admin/system/footstrap).
       placeholder: "0.9.1"
     validations:
       required: true
@@ -101,14 +101,16 @@ body:
     id: appearance
     attributes:
       label: Раскладка, палитра, режим / Layout, palette, mode
-      description: Всё это переключается в поповере Appearance. Отметьте, на чём видно баг. / All of these live in the Appearance popover. Tick whatever the bug shows on.
+      description: Всё это переключается на странице Appearance (/admin/system/footstrap). Отметьте, на чём видно баг. / All of these live on the Appearance page (/admin/system/footstrap). Tick whatever the bug shows on.
       multiple: true
       options:
         - "Раскладка / Layout: боковое меню / sidebar"
         - "Раскладка / Layout: верхнее меню / top"
         - "Палитра / Palette: Footstrap"
         - "Палитра / Palette: Hi-Contrast"
-        - "Палитра / Palette: Rvht (коты / cats)"
+        - "Палитра / Palette: Bootstrap"
+        - "Палитра / Palette: OpenWrt 2020"
+        - "Палитра / Palette: Forum"
         - "Режим / Mode: тёмный / dark"
         - "Режим / Mode: светлый / light"
 

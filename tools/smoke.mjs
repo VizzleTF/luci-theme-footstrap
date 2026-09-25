@@ -27,22 +27,65 @@
  * `npm run check` opens a page. This is the cheapest honest fix — build the DOM `wire()` watches
  * for, call it, and assert the tab actually mounted — so it lives beside the module-eval checks
  * above rather than as a gate of its own; `docs/gallery.html` supplies the served page, the same
- * way it already does for the axis-order watch. A weaker, browser-free companion runs first:
- * `tools/lib/export-contract.mjs` checks every `axes.*`/`prefs.*` name fs-appearance.js (and
- * fs-assets.js) reaches for against what fs-axes.js/fs-prefs.js actually export, which is the exact
- * shape of this bug, caught in milliseconds even where Playwright cannot run at all.
+ * way it already does for the axis-order watch. A weaker, browser-free companion runs first: the
+ * export-contract check below (`missingExports`) checks every `axes.*`/`prefs.*` name
+ * fs-appearance.js (and fs-assets.js) reaches for against what fs-axes.js/fs-prefs.js actually
+ * export, which is the exact shape of this bug, caught in milliseconds even where Playwright cannot
+ * run at all.
  *
  *   node tools/smoke.mjs
  */
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { serveGallery, ROOT } from './lib/gallery.mjs';
+import { serveGallery } from './lib/gallery.mjs';
 import { buildCss } from './lib/css.mjs';
 import { pragmas, aliasFor } from '../tests/lib/luci-module.mjs';
-import { missingExports } from './lib/export-contract.mjs';
+import { RESOURCES } from './lib/page-modules.mjs';
 
-const RESOURCES = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources');
+/* ---- export-contract: does every `alias.name(` one module reaches for exist on what the other
+ * exports? Folded in here because this is its only caller. Deliberately narrow, and safe to be
+ * narrow: a MISS (an export built dynamically, e.g. `exported[key] = fn`) makes the check see fewer
+ * exports than there are, which can only produce a false failure — never a false pass — and every
+ * module this is pointed at lists its exports as a literal, comma-separated identifier list. */
+function stripComments(src) {
+	return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+}
+
+/* The identifiers inside the module's own `return baseclass.extend({ … });` — the LAST such call
+ * in the file, which is where every one of these modules places it. Both shapes the theme uses are
+ * covered: a bare identifier (`currentTint, applyTint`) exports the name itself, and a `key: value`
+ * pair (not used today, but cheap to hold) exports the key. */
+function exportedKeys(src) {
+	const clean = stripComments(src);
+	const m = clean.match(/return\s+baseclass\.extend\(\{([\s\S]*)\}\)\s*;?\s*$/);
+	if (!m) return null;
+	const body = m[1];
+	const keys = new Set();
+	for (const km of body.matchAll(/([A-Za-z_$][A-Za-z0-9_$]*)/g)) keys.add(km[1]);
+	return keys;
+}
+
+/* Every `alias.name` reference in `src` — a call (`axes.currentContentWidth()`) or a bare
+ * reference handed to another function (`bump(axes.applyContentWidth)`), because the second shape
+ * fails the same way one call later: `bump()` invokes whatever it was given, undefined included. */
+function referencedNames(src, alias) {
+	const clean = stripComments(src);
+	const re = new RegExp(`\\b${alias}\\.([A-Za-z_$][A-Za-z0-9_$]*)`, 'g');
+	const names = new Set();
+	for (const m of clean.matchAll(re)) names.add(m[1]);
+	return names;
+}
+
+/* Every name `callerSrc` reaches for on `alias` must be a key `calleeSrc` exports. Returns `null`
+ * (not an empty array) when the callee's export shape was not recognised, so a caller can tell
+ * "nothing missing" from "could not check" and never turns the second into a silent pass. */
+function missingExports(callerSrc, alias, calleeSrc) {
+	const exported = exportedKeys(calleeSrc);
+	if (!exported) return null;
+	const referenced = referencedNames(callerSrc, alias);
+	return [...referenced].filter((n) => !exported.has(n)).sort();
+}
 
 /* Dependency order, not alphabetical: each module is evaluated once and handed to the next as its
  * pragma argument, the way luci.js's require cache does it. fs-router and fs-chrome are the two
@@ -85,13 +128,14 @@ const staticChecks = [];
 }
 
 /* The five colour axes built by colorAxis() in fs-axes.js. Each one is `--fs-<x>-h` then
- * `data-<x>="hue"`, and the property must be written first. */
+ * `data-<x>="hue"`, and the property must be written first. `axis` names the key fs-axes.js
+ * exports the `{current, apply}` object under. */
 const COLOR_AXES = [
-	{ apply: 'applyTint', attr: 'data-tint', prop: '--fs-tint-h' },
-	{ apply: 'applyAccent', attr: 'data-accent', prop: '--fs-accent-h' },
-	{ apply: 'applyGood', attr: 'data-good', prop: '--fs-good-h' },
-	{ apply: 'applyWarn', attr: 'data-warn', prop: '--fs-warn-h' },
-	{ apply: 'applyDanger', attr: 'data-danger', prop: '--fs-danger-h' },
+	{ axis: 'tint', attr: 'data-tint', prop: '--fs-tint-h' },
+	{ axis: 'accent', attr: 'data-accent', prop: '--fs-accent-h' },
+	{ axis: 'good', attr: 'data-good', prop: '--fs-good-h' },
+	{ axis: 'warn', attr: 'data-warn', prop: '--fs-warn-h' },
+	{ axis: 'danger', attr: 'data-danger', prop: '--fs-danger-h' },
 ];
 
 const { base, close } = await serveGallery(buildCss());
@@ -215,7 +259,8 @@ const result = await page.evaluate(({ mods, axes }) => {
 
 	const root = document.documentElement;
 	for (const ax of axes) {
-		if (typeof axesMod[ax.apply] !== 'function') { fail(`fs-axes.${ax.apply} is missing; the axis list in tools/smoke.mjs is stale`); continue; }
+		const axisObj = axesMod[ax.axis];
+		if (!axisObj || typeof axisObj.apply !== 'function') { fail(`fs-axes.${ax.axis} is missing or has no .apply(); the axis list in tools/smoke.mjs is stale`); continue; }
 
 		/* Start from off, so the apply under measurement writes both halves rather than one. */
 		root.removeAttribute(ax.attr);
@@ -233,36 +278,36 @@ const result = await page.evaluate(({ mods, axes }) => {
 		root.style.setProperty = (n, v, p) => { if (n === ax.prop) seen.push('prop'); return realSetProp(n, v, p); };
 
 		let threw = null;
-		try { axesMod[ax.apply](200); } catch (e) { threw = e; }
+		try { axisObj.apply(200); } catch (e) { threw = e; }
 
 		delete root.setAttribute;
 		delete root.style.setProperty;
-		if (threw) { fail(`fs-axes.${ax.apply}(200) threw — ${threw.message || threw}`); continue; }
+		if (threw) { fail(`fs-axes.${ax.axis}.apply(200) threw — ${threw.message || threw}`); continue; }
 
 		const first = seen.indexOf('prop');
 		const firstAttr = seen.indexOf('attr');
 		if (first < 0 || firstAttr < 0) {
-			fail(`${ax.apply}: expected both ${ax.prop} and ${ax.attr} to be written, saw [${seen.join(', ') || 'nothing'}]`);
+			fail(`${ax.axis}: expected both ${ax.prop} and ${ax.attr} to be written, saw [${seen.join(', ') || 'nothing'}]`);
 		} else if (first > firstAttr) {
-			fail(`${ax.apply}: wrote ${ax.attr} BEFORE ${ax.prop}. A reload paints one frame in the previous hue.`);
+			fail(`${ax.axis}: wrote ${ax.attr} BEFORE ${ax.prop}. A reload paints one frame in the previous hue.`);
 		} else {
-			pass(`${ax.apply}: ${ax.prop} then ${ax.attr}`);
+			pass(`${ax.axis}: ${ax.prop} then ${ax.attr}`);
 		}
 
-		if (root.getAttribute(ax.attr) !== 'hue') fail(`${ax.apply}: ${ax.attr} is '${root.getAttribute(ax.attr)}', expected 'hue'`);
-		if (root.style.getPropertyValue(ax.prop).trim() !== '200') fail(`${ax.apply}: ${ax.prop} is '${root.style.getPropertyValue(ax.prop)}', expected '200'`);
+		if (root.getAttribute(ax.attr) !== 'hue') fail(`${ax.axis}: ${ax.attr} is '${root.getAttribute(ax.attr)}', expected 'hue'`);
+		if (root.style.getPropertyValue(ax.prop).trim() !== '200') fail(`${ax.axis}: ${ax.prop} is '${root.style.getPropertyValue(ax.prop)}', expected '200'`);
 	}
 
 	/* The axes must reach the CASCADE, not only the DOM: a custom property set on :root that no rule
 	 * reads changes nothing on the page, and every assertion above would still pass. Measured from
 	 * OFF to a hue, in that order, because 0 means off rather than red. */
-	axesMod.applyTint(0);
+	axesMod.tint.apply(0);
 	const off = getComputedStyle(document.body).backgroundColor;
-	axesMod.applyTint(200);
+	axesMod.tint.apply(200);
 	const on = getComputedStyle(document.body).backgroundColor;
-	if (off === on) fail(`applyTint(200) changed no computed value on body (${off}); the tint tokens are not reaching the cascade`);
-	else pass(`applyTint reaches the cascade: body background ${off} -> ${on}`);
-	axesMod.applyTint(0);
+	if (off === on) fail(`tint.apply(200) changed no computed value on body (${off}); the tint tokens are not reaching the cascade`);
+	else pass(`tint.apply reaches the cascade: body background ${off} -> ${on}`);
+	axesMod.tint.apply(0);
 
 	return notes;
 }, { mods: sources, axes: COLOR_AXES });

@@ -27,7 +27,7 @@
  * a pixel of their threshold.
  *
  *   node tools/live-audit.mjs [--only owrt2512,owrt2410] [--widths 320,390,768,1440]
- *                             [--pages /admin/status] [--pages-all] [--all] [--arrive 768]
+ *                             [--pages /admin/status] [--pages-all] [--all]
  *                             [--update] [--prune] [--engine chromium|firefox|webkit] [--lang ru]
  *                             [--settle 460]
  *
@@ -77,6 +77,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { parseArgs } from 'node:util';
 import * as pw from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
 import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
@@ -84,19 +85,25 @@ import { classify, representatives, reportReduction, reportFrozen, PINNED } from
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINE = resolve(HERE, 'baselines/live-audit.json');
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf('--' + name);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
-const UPDATE = process.argv.includes('--update');
+const { values: FLAGS } = parseArgs({ options: {
+	update: { type: 'boolean', default: false }, prune: { type: 'boolean', default: false },
+	engine: { type: 'string', default: 'chromium' }, lang: { type: 'string', default: 'en' },
+	/* `widths` has no parseArgs `default:` on purpose — `fullSweep` below tells "not passed" from
+	 * "passed the default value" by checking FLAGS.widths for undefined, which a parseArgs default
+	 * would erase. */
+	widths: { type: 'string' }, pages: { type: 'string', default: '' },
+	'pages-all': { type: 'boolean', default: false }, all: { type: 'boolean', default: false },
+	settle: { type: 'string', default: '460' }, only: { type: 'string', default: '' },
+} });
+const UPDATE = FLAGS.update;
 /* with --update: replace each measured router's set instead of unioning into it. Removes findings
  * that belong to apps this machine simply does not install, so it is the flag you reach for after
  * reading the "no longer reproduce" list, not the one you run by habit. */
-const PRUNE = process.argv.includes('--prune');
-const ENGINE = arg('engine', 'chromium');
+const PRUNE = FLAGS.prune;
+const ENGINE = FLAGS.engine;
 /* the language the router is measured in — see the file header. `en` is the default and maps to
  * `auto`, which is what every existing baseline entry was collected against. */
-const LANG = arg('lang', 'en');
+const LANG = FLAGS.lang;
 if (!/^[a-z]{2,3}(-[a-zA-Z0-9]+)?$/.test(LANG)) {
 	console.error(`live-audit: --lang wants a language code (or "en"), got "${LANG}"`);
 	process.exit(1);
@@ -115,13 +122,13 @@ const setRouterLang = (id, code) => {
 /* 320 is the narrowest width WCAG 1.4.10 requires content to reflow to; 390 is the modal phone;
  * 568 is where the theme's own card decision sits; 768 and 1024 bracket the sidebar's fit; 1440 is
  * the desktop the reports come from. */
-const WIDTHS = arg('widths', '320,390,568,768,1024,1440').split(',').map(Number);
-const ONLY_PAGES = arg('pages', '');
+const WIDTHS = (FLAGS.widths ?? '320,390,568,768,1024,1440').split(',').map(Number);
+const ONLY_PAGES = FLAGS.pages;
 /* Measure one page per SHAPE instead of every leaf of the menu — see lib/page-shapes.mjs for what a
  * shape is and for the three sets that are never sampled away. `--pages-all` takes them all. */
-const ALL_PAGES = process.argv.includes('--pages-all');
+const ALL_PAGES = FLAGS['pages-all'];
 /* the four routers rather than the OpenWrt pair (lib/stands.mjs) */
-const ALL_STANDS = process.argv.includes('--all');
+const ALL_STANDS = FLAGS.all;
 /* Entering a page at a width is not the same as RESIZING into it. A sweep that loads each page once
  * and then walks the widths takes every measurement after the first on a page that has already been
  * laid out, fitted and corrected — and the fitters re-run on the resize, which is exactly the event
@@ -133,17 +140,12 @@ const ALL_STANDS = process.argv.includes('--all');
  * width, so any width whose layout needs a remedy will do, and 768 is where the sidebar has just
  * folded and a data table still has to break a column to fit. Its findings are signed `<width>a`
  * so an arrival-only fault cannot hide behind the identical resize signature. */
-const ARRIVE = Number(arg('arrive', '768'));
-if (!Number.isFinite(ARRIVE) || ARRIVE < 0) {
-	/* a typo may not turn a check off in silence — that is how a gate stops holding anything */
-	console.error(`live-audit: --arrive wants a width in px (or 0 to skip it), got "${arg('arrive', '')}"`);
-	process.exit(1);
-}
+const ARRIVE = 768;
 /* See the file header. Past fs-fit.js's SCROLL_IDLE (400ms), not "a frame or two" — sampling inside
  * that window reads the theme's own deferred state, not a break. */
-const SETTLE_MS = Number(arg('settle', '460'));
+const SETTLE_MS = Number(FLAGS.settle);
 if (!Number.isFinite(SETTLE_MS) || SETTLE_MS < 0) {
-	console.error(`live-audit: --settle wants a wait in ms, got "${arg('settle', '')}"`);
+	console.error(`live-audit: --settle wants a wait in ms, got "${FLAGS.settle}"`);
 	process.exit(1);
 }
 
@@ -318,7 +320,7 @@ const baseline = (() => {
 	catch (e) { return {}; }
 })();
 
-const list = requireStands(stands(arg('only', ''), { all: ALL_STANDS }), 'live-audit');
+const list = requireStands(stands(FLAGS.only, { all: ALL_STANDS }), 'live-audit');
 const browser = await pw[ENGINE].launch();
 const seen = {}, fresh = [];
 /* pages that froze while their shape was being read — their own kind of finding, and fatal on
@@ -531,7 +533,7 @@ if (armed === 0) {
  * it nor report the rest as fixed. */
 /* …and a run that measured one page per shape is narrowed like any other: it cannot tell a finding
  * that stopped happening from a page it did not open. */
-const fullSweep = !ONLY_PAGES && arg('widths', null) === null && arg('arrive', null) === null && ALL_PAGES;
+const fullSweep = !ONLY_PAGES && FLAGS.widths === undefined && ALL_PAGES;
 
 if (UPDATE) {
 	if (!fullSweep) {

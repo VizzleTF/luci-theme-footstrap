@@ -29,20 +29,23 @@
  *                              [--pages /admin/status/overview,…] [--widths 768,1440]
  *
  * Needs a running owlab router (docs/development.md). */
+import { parseArgs } from 'node:util';
 import * as pw from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf('--' + name);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
-const ENGINES = arg('engines', 'chromium').split(',').map((s) => s.trim()).filter(Boolean);
+const { values: FLAGS } = parseArgs({ options: {
+	engines: { type: 'string', default: 'chromium' },
+	pages: { type: 'string', default: '/admin/status/overview,/admin/status/processes' },
+	widths: { type: 'string', default: '768,1440' },
+	only: { type: 'string', default: '' }, all: { type: 'boolean', default: false },
+} });
+const ENGINES = FLAGS.engines.split(',').map((s) => s.trim()).filter(Boolean);
 /* Overview is the one that polls hardest and rebuilds whole tables; Processes is the widest data
  * table the stock menu has, i.e. the one carrying a remedy at the widths below. */
-const PAGES = arg('pages', '/admin/status/overview,/admin/status/processes').split(',');
+const PAGES = FLAGS.pages.split(',');
 /* 768 is where the sidebar has just folded and a table still needs a remedy; 1440 is the desktop,
  * where the sidebar layout scrolls `.fs-main` rather than the document. */
-const WIDTHS = arg('widths', '768,1440').split(',').map(Number);
+const WIDTHS = FLAGS.widths.split(',').map(Number);
 const LAYOUTS = [ 'side', 'top' ];
 
 /* how far the anchor may drift, in CSS px: a fractional rect edge is not a jump */
@@ -131,7 +134,7 @@ const ARM = () => {
 /* SEQUENTIAL AND ON THE DEFAULT PAIR: frame pacing is what this gate measures, so a second router
  * rendering on the same machine is noise in the signal — unlike the structural gates, which now run
  * their routers at once. `--all` takes every running OpenWrt router. */
-const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'scroll-jank');
+const list = requireStands(stands(FLAGS.only, { all: FLAGS.all }), 'scroll-jank');
 const findings = [];
 let runs = 0;
 

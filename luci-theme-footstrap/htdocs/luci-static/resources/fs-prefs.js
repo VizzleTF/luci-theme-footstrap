@@ -1,6 +1,5 @@
 'use strict';
 'require baseclass';
-'require rpc';
 'require fs-fit as fit';
 
 /* The Appearance axes this file owns; the controls that present them are fs-appearance.js. The
@@ -44,13 +43,15 @@ function lsGetArr(k) {
 }
 
 /* the router-wide defaults the server stamped (head.ut), read at runtime so current*() reports the
- * effective default when this browser has no localStorage */
-function sd(k) { try { return (window.__fsSD || {})[k]; } catch (e) { return undefined; } }
+ * effective default when this browser has no localStorage. No try/catch: unlike localStorage,
+ * reading or writing a plain object property cannot throw, and window.__fsSD is always one (head.ut
+ * stamps it as an object literal). */
+function sd(k) { return (window.__fsSD || {})[k]; }
 
 /* …and the write back: an applier that persists to the router must update the blob the server
  * stamped, or current*() keeps reporting the old router default until the next full load and
  * matchesSavedDefault() lies about whether anything is left to save */
-function setSD(field, val) { try { (window.__fsSD = window.__fsSD || {})[field] = val; } catch (e) {} }
+function setSD(field, val) { (window.__fsSD = window.__fsSD || {})[field] = val; }
 
 /* ---- every axis owns its ROUTER DEFAULT, and nothing else may restate it ----
  * `def()` is the sd() branch of current() alone: the effective value with no localStorage. Exposed
@@ -65,7 +66,6 @@ function currentMode() {
 	const s = lsGet('fs-darkmode');
 	if (s === 'true') return 'dark';
 	if (s === 'false') return 'light';
-	if (s === 'auto') return 'auto';
 	if (s === null) return modeDefault();
 	return 'auto';
 }
@@ -169,18 +169,11 @@ function paintThemeColor() {
 }
 
 function watchThemeColor() {
-	let queued = false;
-	const paint = () => {
-		queued = false;
-		paintThemeColor();
-	};
-	const schedule = () => {
-		if (queued) return;
-		queued = true;
-		window.requestAnimationFrame(paint);
-	};
 	paintThemeColor();
-	new MutationObserver(schedule).observe(document.documentElement,
+	/* fit.frame() is the same next-frame coalescer every geometry fitter schedules through: the
+	 * tint and strength sliders write on every input event, and getComputedStyle forces style
+	 * resolution, so a dozen mutations in one frame must still repaint the meta tag once. */
+	new MutationObserver(fit.frame(paintThemeColor)).observe(document.documentElement,
 		{ attributes: true, attributeFilter: [ 'style', 'class', 'data-darkmode', 'data-palette', 'data-wallpaper' ] });
 }
 
@@ -192,28 +185,6 @@ _mqDark.addEventListener('change', () => {
 		stampDark(root, intendedDark());
 	}
 });
-/* Corner radius: the card radius (0–20px) as an inline --fs-radius-base on :root, from which
- * 02-tokens derives every other radius. head.ut pre-paints it and tools/axes.mjs holds JS/CSS/head
- * to this one number, hence the named const. */
-
-/* ---- the four axis shapes, each written once ----
- *
- * Sixteen axes are four shapes, so the shape lives in a factory and each instance is one line:
- * enumAxis (pattern ink), colorAxis (tint, accent, good, warn, danger), surfaceAxis (cards,
- * controls, bar, borders), propAxis (rounding, tint strength, photo dim, pattern size, pattern
- * strength, content width). Same contract throughout: `current()` is localStorage ?? def(), `def()` is the router
- * default alone, `apply()` stores the choice explicitly. None use `this` — every export is a
- * detached method reference, so a `this` here would throw on the first call.
- *
- * Each factory takes its localStorage key as the first argument, and tools/axes.mjs matches the
- * call by its literal args: an axis built by a factory has no lsGet('fs-…') call site for the gate
- * to find.
- *
- * The remaining axes stay separate, each with a quirk a shared table would need an option for:
- * `mode` stores a value it does not apply and owns an MQL listener, `layout` reads the attribute,
- * `wallpaper` and `density` are three-valued, `palette` outgrew the two-value shape when the third
- * one landed, `autoCollapse` has no :root attribute. */
-
 /* An axis whose values are a list, with one of them stamped as nothing.
  *
  * `values` are the names that become `attr="<name>"`; `dflt` is the one that leaves :root bare, and
@@ -235,7 +206,6 @@ function listAxis(key, attr, values, dflt, after) {
 		current() {
 			const s = lsGet(key);
 			if (ok(s)) return s;
-			if (s === dflt) return dflt;
 			if (s === null) return def();
 			return dflt;	/* a stray value reads as the built-in default */
 		},
@@ -258,22 +228,6 @@ function enumAxis(key, attr, on, off) {
 	return listAxis(key, attr, [ on ], off);
 }
 
-/* A colour axis — Tint, Accent and the three status colours are one axis pointed at five tokens:
- * same validation, same "0 is off", same ordering rule (set the custom property BEFORE the
- * attribute, or a fresh load paints one frame in the previous colour).
- *
- * A value is one of three things, and the attribute says which (03-palettes.css matches on it):
- *
- *   0            off — no attribute, the palette as it shipped
- *   1–360        a HUE: CSS rotates the palette's own colour through oklch(from … l c H), so
- *                lightness, chroma and every contrast margin stay the palette's
- *   '#rrggbb'    a COLOUR, stamped inline on :root as the live token; the ink over it is derived
- *                from its lightness in CSS
- *
- * Both live in one localStorage key rather than a colour key beside a hue key: two keys would need
- * a third to say which is in effect, and that third is the one a pre-paint script forgets.
- * `hueProp` carries the degrees, `colorProp` the live token a hex value overwrites; each mode
- * clears the other's property, so the two can never both be half-applied. */
 const DENSITIES = [ 'compact', 'large' ];	/* the two non-default values; 'normal' = bare :root */
 const DENSITY = listAxis('fs-density', 'data-density', DENSITIES, 'normal', () => fit.schedule());
 const currentDensity = DENSITY.current, applyDensity = DENSITY.apply,
@@ -283,11 +237,6 @@ const currentDensity = DENSITY.current, applyDensity = DENSITY.apply,
  * Density it sets no attribute, so nothing here or in fs-chrome.js needs to read one, and
  * currentContentWidth()/applyContentWidth() have no caller outside the Appearance tab — the one
  * thing that kept Density's shape in this cold-path file. */
-/* Background-tint axis: the canvas the cards float on (--fs-bg), so a whole install reads as one
- * colour and a tab or a screenshot says which router it belongs to. Cards, chrome and the status
- * colours keep the palette's values — the cue colours the paper, not the UI. On a hue it is mixed
- * in CSS (03-palettes.css explains why that stays contrast-safe at every angle); on a hex it IS the
- * canvas. 0 is off rather than red, a hue wheel wrapping, so one end of the range is free. */
 function currentLayout() {
 	return document.documentElement.getAttribute('data-layout') === 'top' ? 'top' : 'sidebar';
 }
@@ -341,23 +290,6 @@ function applyRail(on) {
 function currentRail() {
 	return document.documentElement.getAttribute('data-rail') === 'true';
 }
-
-/* ---- Save to router: write the current effective axes to /etc/config/footstrap ----
- * The scoped rpcd ACL (config 'footstrap' only) lets the admin's session set and commit those
- * options; rpcd validates the config/section/option names, so no value reaches a shell. The server
- * reads them back on the next load and head.ut's sanitiser clamps each before it becomes
- * window.__fsSD.
- *
- * snapshotAxes() reads the effective values, which already fold in this browser's localStorage, so
- * Save captures what the user sees. It does not touch localStorage: this browser keeps overriding,
- * and the saved default is for other devices. resetToSaved() drops this browser back onto it. */
-/* Every saved axis's localStorage key: what Save-as-default clears and what a reset walks.
- *
- * Tried as one table of [key, field, def] with the resolved defaults derived from it: correct,
- * and 188 B larger after minification — three lists of short literals compress better than
- * twenty-one rows of data, because a function name is mangled and a row is not. The copies are
- * held together by tools/axes.mjs instead, which reads snapshotAxes()'s body and holds every
- * field against header.ut's FS_AXES. */
 
 return baseclass.extend({
 	/* the storage wrappers and the router-default reader: fs-axes.js is built on these */

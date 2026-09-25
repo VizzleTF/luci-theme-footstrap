@@ -1,143 +1,66 @@
 @layer theme {
-	/* The realtime graphs size their drawing from #view, not from the box they draw into:
-	 * `width = document.querySelector('#view').offsetWidth - 2`, in every realtime view and in the
-	 * luci-app-*-status copies of them. That assumption holds only in a theme whose .cbi-section has
-	 * no gutter; ours is a card, 16px of padding plus a 1px border, so the canvas comes out 34px
-	 * narrower than the drawing — and the views draw NEWEST-first from the right, so the freshest
-	 * samples are the ones falling off the edge. It reads as a phone bug only because the loss is
-	 * absolute: 34px of a 1124px desktop plot is 3%, of a 322px phone plot 10%.
-	 *
-	 * So bleed the graph box back out to the card's border edge, making the canvas exactly
-	 * `#view - 2` again. The bleed is padding plus border, derived from --fs-card-pad rather than
-	 * restated, or narrowing the gutter would silently re-clip every graph.
-	 *
-	 * The `!important` fights the inline `width: 100%` the view writes on the box: nothing in a
-	 * cascade layer can outrank an inline declaration. */
+	/* realtime graphs size their canvas from #view, clipping 34px off the newest samples — docs/css.md "Misc: the realtime graph bleed" */
 	#view .cbi-section > div[style]:has(> svg) {
 		width: auto !important;
 		margin-inline: calc(-1 * (var(--fs-card-pad) + 1px));
 	}
 
-	/* …and the same box's frame, which the same inline style paints BLACK: every realtime view writes
-	 * `border:1px solid #000;background:#fff` on it. Black is a colour no palette of this theme
-	 * contains, so on a dark surface the graph reads as a framed cut-out, and the frame lands
-	 * exactly on the card's own border edge because of the bleed above (issue #32).
-	 *
-	 * Wider than the bleed rule on purpose: channel_analysis.js hangs off a bare [data-tab] div and
-	 * must not be bled, but its border is just as black, so this asks only "an inline-styled box
-	 * wrapping an <svg>".
-	 *
-	 * Only the COLOUR moves. The 1px stays, being the graph's own edge, and `background: #fff` is
-	 * left alone: the <svg> is sized to the box's content edge, so the white never paints. Only an
-	 * author `!important` outranks an inline declaration, and `border-color` alone is enough — the
-	 * width and style already agree with what the theme would ask for. */
+	/* same box's frame, painted BLACK inline — only colour moves; wider than the bleed above, channel_analysis.js's box must not be bled but is just as black */
 	#view div[style]:has(> svg) {
 		border-color: var(--fs-border) !important;
 	}
 
-	/* WCAG 2.2 SC 1.4.1 (Use of Color, A): inside a block of text a link may not be identified
-	 * by COLOUR ALONE — it needs a non-colour cue or 3:1 against the surrounding text, and
-	 * --fs-accent on --fs-text measures 1.4:1 in dark mode. So: underline links in prose.
-	 * Scoped to prose deliberately — nav links, buttons, pills and table cells are identified
-	 * by position and shape, and underlining them would be noise. */
+	/* WCAG 1.4.1: --fs-accent on --fs-text measures 1.4:1 in dark, needs a non-colour cue in
+	 * prose. Nav links/buttons/pills are identified by position and shape instead. */
 	p a, dd a,
 	.cbi-value-description a,
 	.alert-message a:not(.btn):not(.cbi-button) {
 		text-decoration: underline;
 	}
 
-	/* A <strong>/<b> is a LABEL, and a label is UI text, so it takes the UI face even on a monospaced
-	 * surface. LuCI builds every status readout as `<strong>MAC:</strong> ac:1f:6b:…`: the strong
-	 * names the datum, the text after it IS the datum. The theme puts mono on those surfaces, the
-	 * strong inherits it, and <strong> also means weight 700 — so the label asks for a bold mono
-	 * face that exists for no other reason: 227 elements across seven pages, and 20 KB of a
-	 * 600-weight mono face fetched to draw the word "MAC:".
-	 *
-	 * It must SET the face, not merely be excluded from the mono rule: an excluded element still
-	 * INHERITS its parent's. Excluding it was the first attempt and changed nothing.
-	 *
-	 * pre/code/#syslog/textarea are exempt: there a <strong> is part of the monospaced CONTENT. */
+	/* a LABEL must SET sans, not merely be excluded — excluded still inherits mono (227 elements/
+	 * 20 KB of bold mono for nothing); exempt in pre/code/#syslog/textarea, monospaced CONTENT */
 	:is(strong, b):not(pre *, code *, #syslog *, textarea *) {
 		font-family: var(--fs-font-sans);
 	}
 
-	/* Same argument, two holdouts. `.ifacebadge` is a BADGE — chrome, not a value — sitting in a mono
-	 * cell, and `.ifacebadge-active` makes it bold; sans keeps the active/inactive weight cue (WCAG
-	 * 1.4.1, that distinction not being carried by colour) with faces the page already has.
-	 * `<code>`/`<pre>` hold a LITERAL, which does not inherit its container's emphasis.
-	 *
-	 * The second selector is not redundant: the mono rule in theme/60-inputs.css is (0,1,0), a TIE
-	 * with a bare `.ifacebadge`, and a tie is settled by source order, which 60-inputs would win.
-	 * Win on specificity instead, at (0,2,0). */
+	/* `.ifacebadge` is a BADGE (chrome, not a value) in a mono cell; wins on specificity (0,2,0)
+	 * over theme/60-inputs.css's (0,1,0) mono rule, not source order */
 	.ifacebadge,
 	.cbi-value-field .ifacebadge { font-family: var(--fs-font-sans); }
 	code, pre { font-weight: var(--fs-weight-normal); }
 
-	/* ---- the poll's `fade-in` is not animated at all, and that is the whole rule ----
-	 *
-	 * `fade-in` is upstream's class and luci-mod-status re-marks with it on EVERY poll tick — each
-	 * section, and the wrapper holding all of them — so anything this theme hangs on that class
-	 * replays on every tick across the entire content column.
-	 *
-	 * A fade plus a 4px slide moved the page under the reader; the fade alone still pulsed the whole
-	 * column on every tick, reported from an iPhone as shaking that happens WITHOUT SCROLLING AT
-	 * ALL, which is what named it — a poll tick is the only thing that happens on a still page.
-	 *
-	 * So the theme animates nothing on it. The class stays in the markup, being upstream's, and the
-	 * `fade-in` keyframes in base/95-luci.css stay for the coverage reason stated there. */
+	/* upstream's fade-in re-marks on EVERY poll tick, animating it pulsed a still page — docs/css.md "Misc: fade-in animates nothing" */
 	.cbi-title-ref { color: var(--fs-accent); }
 	.close { color: var(--fs-text); text-shadow: none; opacity: .6; }
 	.close:hover { opacity: 1; }
 	.ifacebox { background: var(--fs-panel); border-color: var(--fs-border); }
 	.ifacebox .ifacebox-head { background: var(--fs-panel2); color: var(--fs-text); }
-	/* The active-interface highlight lives in THIS layer, next to the head it overrides: the
-	 * same rule in base was dead — a layer beats specificity, and the plain `.ifacebox-head`
-	 * above repainted `.active` along with the rest. */
+	/* lives in THIS layer, next to the head it overrides: the same rule in base was dead, a layer beats specificity */
 	.ifacebox .ifacebox-head.active { background: var(--fs-accent); color: var(--fs-on-accent); }
 	.ifacebadge { background: var(--fs-panel2); border-color: var(--fs-border); }
 	.ifacebadge-active { border-color: var(--fs-accent); }
 	.zonebadge-empty { border-color: var(--fs-border); color: var(--fs-dim); }
 
-	/* The @container PLUMBING for the responsive tables — only WHICH boxes are query containers, under
-	 * what names. The card rules are not here: a CBI section table cards under `@container
-	 * fs-content (max-width: 992px)` (theme/65-dropdown.css — 992, not the row's own 960px floor,
-	 * because the query reads THIS element, one level above the `.cbi-section` that spends
-	 * `--fs-card-pad` before the table ever sees the width), and a data table cards by MEASUREMENT
-	 * (.fs-stacked, fs-select.js) at any width.
-	 *
-	 * Query the CONTENT width, not the viewport: the sidebar eats width, so a viewport breakpoint
-	 * stacks too late or too early depending on layout.
-	 *
-	 * Named, deliberately — an unnamed @container binds to the nearest ancestor that happens to have
-	 * a container-type, so giving container-type to any new component would silently re-target every
-	 * unnamed query underneath it:
-	 *   fs-view    the overview's grid (pages/20-overview.css, @container 800)
-	 *   fs-content "whatever content column I am in", carried by .cbi-map, #view and .modal (below),
-	 *              so a query resolves to the nearest of the three. */
+	/* @container PLUMBING only, card rules live with the tables. Named: an unnamed query binds to the nearest container-type ancestor, silently re-targeted by a new one */
 	.cbi-map { container-type: inline-size; container-name: fs-content; }
 	#view { container-type: inline-size; container-name: fs-view fs-content; }
 
-	/* A modal is not inside #view — ui.js appends #modal_overlay to <body> — so every @container query
-	 * above resolves to nothing in there and no table stacks: on a phone the Edit-interface dialog
-	 * rendered its form at desktop widths and cut the inputs off. Carry both names so a dialog
-	 * stacks exactly like the page, a third-party app's modal included. */
-	.modal { container-type: inline-size; container-name: fs-view fs-content; }
+	/* ui.js appends #modal_overlay outside #view, so the names above must repeat here or no dialog query resolves.
+	 * box-shadow merged in from theme/70-modal.css: base's elevation = --fs-bg's hex in footstrap
+	 * light, a glow not a shadow; others take --fs-shadow-pop */
+	.modal { container-type: inline-size; container-name: fs-view fs-content; box-shadow: var(--fs-shadow-pop); }
 
-	/* pager (« prev · text · next ») — generic, not page-scoped: any .pager gets an inline
-	 * centred row with compact square buttons. */
+	/* pager (« prev · text · next ») — generic, not page-scoped */
 	.pager.center { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center; gap: var(--fs-space-2-5); padding: var(--fs-space-3-5) 0; }
 	.pager .text { flex: 0 0 auto; font-size: var(--fs-type); color: var(--fs-dim); }
 
-	/* The heading ramp, absorbed from base wholesale (docs/css.md). Stock LuCI hands h2 to a page title
-	 * and h3/legend to a section title, and the heading-card rule below plus theme/30-tables.css
-	 * repaint exactly those two, so most of the ramp is only ever rendered by a third-party
-	 * luci-app-* — styled anyway, coverage being a contract. Every step is a scale token and the
-	 * ramp is monotonic. `legend` is deliberately not in the group: theme/30-tables.css owns it, and
-	 * a member here would fight that at equal specificity, i.e. on source order. */
+	/* absorbed from base; stock LuCI only renders h2/h3, the rest is third-party coverage.
+	 * `legend` excluded: theme/30-tables.css owns it. */
 	h1, h2, h3, h4, h5, h6 {
 		font-weight: var(--fs-weight-bold);
 		color: var(--fs-text);
-		/* 1.5 is prose leading; a heading is a label and looks slack at it. */
+		/* 1.5 is prose leading; a heading is a label and looks slack at it */
 		line-height: var(--fs-leading-tight);
 	}
 	h1 { margin-bottom: var(--fs-space-4); font-size: var(--fs-type-2xl); }
@@ -147,9 +70,8 @@
 	h5 { font-size: var(--fs-type); }
 	h6 { font-size: var(--fs-type-xs); color: var(--fs-dim); text-transform: uppercase; }
 
-	/* Heading card (h2 + .cbi-map-descr): everything sitting directly on the page background
-	 * gets a .cbi-section card's frame, so a page reads as a stack of panels instead of loose
-	 * text floating over the (possibly patterned) background. */
+	/* heading card: h2 + .cbi-map-descr get a .cbi-section card's frame, so the page reads as a
+	 * stack of panels rather than loose text over the background */
 	.cbi-map > h2,
 	#view > h2 {
 		background: var(--fs-panel);
@@ -161,8 +83,7 @@
 		font-weight: var(--fs-weight-bold);
 		color: var(--fs-text);
 	}
-	/* a heading followed by a description: split the card across the two siblings (no wrapper
-	 * element exists to hold both) */
+	/* split the card across the two siblings — no wrapper element exists to hold both */
 	.cbi-map > h2:has(+ .cbi-map-descr),
 	#view > h2:has(+ .cbi-map-descr) {
 		border-bottom: 0;
@@ -184,43 +105,18 @@
 		line-height: var(--fs-leading);
 	}
 
-	/* An action-button row (a `.right` wrapper holding Add/Save) sitting directly under a field
-	 * had no gap above it — the apk "Repo Public Keys -> Add key" paste box, and every other
-	 * paste-a-value-then-submit layout, pinned its button to the textarea. Scoped to a `.right`
-	 * immediately following a form control, so it never touches right-aligned text or cells. */
+	/* .right holding Add/Save directly under a field had no gap: pinned the button to the textarea */
 	#view :is(textarea, input[type="text"], input[type="password"], .cbi-dropdown) + .right {
 		margin-top: var(--fs-space-2-5);
 	}
 
-	/* A button row belonging to the PAGE TITLE rather than to any section. Nothing gives it a bottom
-	 * margin, so it sits flush against the first .cbi-section below and reads as part of that card
-	 * instead of as a page-level action; the same 16px every .cbi-section uses.
-	 *
-	 * And a top margin for the same reason at the other edge, the row sitting directly under the
-	 * page heading with nothing between them. Half the bottom gap, because a heading and its own
-	 * action belong together. */
+	/* button row belonging to the PAGE TITLE, not a section — same 16px as .cbi-section, half above */
 	.cbi-title-buttons { margin-block: var(--fs-space-2) var(--fs-card-gap); }
 
-	/* The per-section Delete button (`.cbi-section-remove`, what luci-base renders for every NAMED
-	 * section: SQM's queues, the firewall's zones, any app that lets you add and drop instances) sat
-	 * flush against whatever follows it — usually that section's own tab bar. Reported upstream on
-	 * SQM, but nothing here is about SQM: it is one class luci-base gives every such section, and
-	 * the gap belongs to the pattern rather than to the page. */
+	/* Delete button luci-base renders for every NAMED section sat flush against what follows — one class, not one app */
 	.cbi-section-remove { margin-bottom: var(--fs-space-2); }
 
-	/* A top-level block in a map that is not a section still keeps the page's rhythm.
-	 *
-	 * A view may return a bare widget where a section is expected — `s.render = () => new
-	 * ui.Textarea(...).render()` hands the map a plain `<div>` with no `.cbi-section` — so nothing
-	 * gives that block the gap every section carries and the next section starts against it. Stock
-	 * bootstrap measures the same 0px, but there a section is a stretch of page and here it is a
-	 * CARD, so the missing gap reads as two cards fused.
-	 *
-	 * Written against what a map CONTAINS rather than against one app: the exclusions are the
-	 * children luci-base itself puts there and which own their spacing already — the map heading and
-	 * its description, the action bar, a tabbed map's tab bar and pane, and sections.
-	 *
-	 * `:not(:empty)` because a map can hold a placeholder that renders nothing. */
+	/* a view may hand the map a bare widget with no `.cbi-section`; exclusions are the children luci-base already spaces itself */
 	.cbi-map > *:not(.cbi-section):not(.cbi-map-descr):not(.cbi-page-actions):not(h2):not(legend):not(.cbi-tabmenu):not(.cbi-map-tabbed):not(:empty) {
 		margin-bottom: var(--fs-card-gap);
 	}

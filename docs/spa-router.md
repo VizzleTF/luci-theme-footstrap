@@ -380,7 +380,7 @@ Before rendering the new view:
   (`showIndicator('poll-status', 'Paused', null, 'inactive')`, always with `handler: null`) from
   `setupDOM()`, reached through an async chain (`DOMContentLoaded` + `ui`/`rpc`/`form` +
   `probeRPCBaseURL`), while this module registers at eval, from the inline
-  `L.require('menu-footstrap')` in `partials/footer.ut` — network/cache timing decides which
+  `L.require('menu-footstrap')` in `footer.ut` — network/cache timing decides which
   finishes loading, and therefore registers, last. Reversed, on owrt2410/24.10.8 Chromium the pill
   read "Odświeżanie" ("Refreshing") after one SPA navigation but had no `data-clickable`/click
   handler at all, and stayed that way for the rest of the document: this listener ran first and
@@ -457,8 +457,7 @@ Before rendering the new view:
 - Running the registered navigation callbacks — **and the router names none of them**. The seam is
   inverted: `fs-router.js` exports `onNavigate(fn)` and a module registers itself, so an optional
   module that is not installed is not a `DependencyError` that takes out the chrome. The search
-  palette uses it today (recent pages, close on navigate); it was written for the retired self-update
-  poll cancel.
+  palette uses it (recent pages, close on navigate).
 - `ui.hideModal()`.
 
 ### `renderChrome()`

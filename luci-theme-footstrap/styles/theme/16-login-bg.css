@@ -1,30 +1,14 @@
 @layer theme {
-	/* The uploaded photo, the Wallpaper axis's `file` value. The bytes are router-side and shared,
-	 * and the served file is referenced by CSS `url()`, never inlined (uhttpd has no gzip). A photo
-	 * carries no bakeable opacity, so a scrim is mandatory for legibility: --fs-photo-scrim, a wash
-	 * derived from --fs-bg so it follows palette, mode and tint (03-palettes.css), painted as the
-	 * TOP background layer over the photo on the SAME element. That keeps it between image and
-	 * content with no ::before
-	 * and no z-index, and no backdrop-filter — a blur on a full-viewport surface is the most
-	 * expensive paint there is on a phone GPU, the scrim already carries the readability, and
-	 * reduced transparency turns the scrim opaque anyway (95-a11y-media.css).
-	 *
-	 * One-element rule, like the pattern: .fs-shell where there is chrome, the bare <body> on the
-	 * login page. Content blocks paint their own opaque --fs-panel and float above the scrim, so it
-	 * only has to carry the little text sitting directly on the canvas. --fs-login-bg-url is `none`
-	 * until a photo is uploaded. */
+	/* The `file` wallpaper: scrim + photo on one element — design-system.md,
+	 * "Wallpaper rendering: why the canvas moves to :root". */
 	:root[data-wallpaper="file"] :is(.fs-shell, body:not(:has(.fs-shell))) {
 		background-image: linear-gradient(var(--fs-photo-scrim), var(--fs-photo-scrim)), var(--fs-login-bg-url);
 		background-position: center;
 		background-size: cover;
 		background-repeat: no-repeat;
-		/* fixed, so the photo is one calm backdrop the page scrolls under, not a strip that slides
-		 * with every table. */
-		background-attachment: fixed;
+		background-attachment: fixed; /* one calm backdrop the page scrolls under, not a sliding strip */
 	}
-	/* .fs-main's opaque --fs-bg would cover the shell's single background layer — make it transparent
-	 * so the photo+scrim shows through the whole content area (15-wallpaper.css does the same for
-	 * the pattern). */
+	/* transparent: an opaque --fs-bg here would cover the shell's one background layer. */
 	:root[data-wallpaper="file"] .fs-main { background-color: transparent; }
 	:root[data-wallpaper="file"] footer.fs-footer { background: transparent; }
 }

@@ -19,8 +19,8 @@ lint ──┘          └─→ playground ─┴─→ pages-manual          
 
 | Job | What it is |
 |---|---|
-| `check` | static gates that need no node |
-| `lint` | the npm gates: eslint, stylelint, axe-core, the ratchets |
+| `check` | `npm run check:fast` — eslint, stylelint, the unit suite, shell/marker/acl, audit.py, and the rest of the fast tier |
+| `lint` | `npm run check:mid` + `check:slow` — the artefact ratchets, axe-core, and everything else that wants a browser |
 | `build` | both package formats, via owfeed |
 | `verify` | installs this very build on real 25.12 and 24.10 userlands and renders its pages |
 | `live` | opens every page of the menu on those userlands and measures it — layout, navigation parity, and the assumptions this theme makes about luci-base |
@@ -50,50 +50,64 @@ Chromium from Playwright's CDN and then LAUNCHES it — the claim the gates actu
 apt for the system libraries only if that launch fails. `--with-deps` went through apt every time,
 and apt is the half that stalls.
 
-## `check` — gates without node
+## `check` and `lint` — one gate list, package.json's
 
-Needs only `sh`, `awk`, `python3` and `perl`. Seconds to run, and it cannot break the OpenWrt
-buildbot, where node does not exist and never will.
+Both jobs run `npm run check:fast`/`check:mid`/`check:slow` (`package.json`) rather than one step
+per tool — that list used to be restated by hand in `build.yml`, and a tool added to a tier and
+forgotten here ran locally and never in CI: `makefile-contract`, `placeholder-ink`, `smoke` and
+`pseudo-loc` were exactly that, wired into `package.json`'s tiers and into no job. Locally it is the
+same command either way, `npm run check`; `tools/ci-local.sh check lint` runs the two jobs' own
+tiers, in their own order. The full table of what each gate holds is in
+[conventions.md](conventions.md).
 
-1. **`sh -n`** over `luci-theme-footstrap/*.sh`, `install.sh` and `tools/*.sh` — the scripts that
-   never reach a router. `tools/` is in the glob because `release-notes.sh` runs only in the
-   `release` job, so a syntax error there used to surface at the most expensive possible moment.
-   The *payload* scripts are parsed elsewhere: `owfeed doctor` (OWF213) parses everything under
-   `files:` in the `build` job, which covers `/etc/uci-defaults/*` once `tools/stage.sh` has staged
-   it.
-2. **The scan marker.** `include/scan.mk` finds packages by grepping for `call BuildPackage`, which
-   this Makefile only reaches through `luci.mk`'s include — so the literal in its trailing comment
-   is what makes the SDK see the package at all. It has been deleted as boilerplate once.
-3. **The ACL is valid JSON, and grants something.** rpcd skips an unreadable file in `acl.d` and
-   says nothing: a stray comma means the grant is issued to nobody, and nothing else notices. A
+`check` (job, `npm run check:fast`) needs `node_modules` now, for eslint and stylelint; the five
+gates that used to be node-free steps here are `check:fast` items too, unchanged in what they hold
+(`i18n` moved in from `check:mid` — below):
+
+1. **`shell`** (`sh -n` over `luci-theme-footstrap/*.sh`, `install.sh` and `tools/*.sh`) — the
+   scripts that never reach a router. `tools/` is in the glob because `release-notes.sh` runs only
+   in the `release` job, so a syntax error there used to surface at the most expensive possible
+   moment. The *payload* scripts are parsed elsewhere: `owfeed doctor` (OWF213) parses everything
+   under `files:` in the `build` job, which covers `/etc/uci-defaults/*` once `tools/stage.sh` has
+   staged it.
+2. **`marker`.** `include/scan.mk` finds packages by grepping for `call BuildPackage`, which this
+   Makefile only reaches through `luci.mk`'s include — so the literal in its trailing comment is
+   what makes the SDK see the package at all. It has been deleted as boilerplate once.
+3. **`acl`.** The ACL is valid JSON, and grants something: rpcd skips an unreadable file in `acl.d`
+   and says nothing, a stray comma means the grant is issued to nobody, and nothing else notices. A
    document that parses but is a list, or an entry with neither `read` nor `write`, is the same
    silent outcome by another route, so `tools/check-acl.sh` checks the shape too.
-4. **`build-css.sh`** into a temp file — the script brace-balances its own output and refuses to
-   write a suspiciously short file. That is a broken-build floor (80 KB), a correctness gate,
-   not a size budget. There is no upper CSS budget any more.
-5. **`audit.py --strict`** — undefined `var()`, shadowed declarations, export-tier reads from
-   `styles/`, dead base declarations, stray `!important`, colour literals.
-6. **i18n**: `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty. A string
-   in `_()` with no translation renders in English silently — which is how the whole Footstrap
-   tab stayed English on a Russian LuCI.
+4. **`audit`** (`audit.py --strict`) — bracket balance (a truncated-file smoke test; CSS only, and
+   the one check here stylelint cannot take over — a custom property's VALUE is opaque to postcss,
+   so an extra `)` inside one never becomes a `CssSyntaxError` there), undefined `var()`, shadowed
+   declarations, export-tier reads from `styles/`, dead base declarations, colour literals. A stray
+   `!important` used to be checked here too (`BANG_OK`); folded into stylelint once measured
+   redundant — see "The gates, and what each one holds" in conventions.md. `build-css.sh`'s own
+   correctness check (brace-balancing its output, refusing to write a suspiciously short file — a
+   broken-build floor of 80 KB, not a size budget) runs wherever a gate builds the sheet, which every
+   `check:mid` CSS gate (`css-metrics`, `css-floor`, `css-dup`) does in the `lint` job — a standalone
+   step here that built the sheet a second time and read nothing back was dropped once measured
+   redundant against that.
+5. **`i18n`**, last in `check:fast` so everything above still runs where gettext is missing —
+   `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty (a string in `_()`
+   with no translation renders in English silently, which is how the whole Footstrap tab stayed
+   English on a Russian LuCI). It stayed in `check:fast` (not `check:mid`) on purpose: `build` needs
+   only the `check` job, and a broken `.pot` blocking packaging is the guarantee `i18n` exists for.
 
 **Template compilation is not here** — it runs in `verify`, on the router, with the real `ucode`.
 It used to clone the interpreter at a pinned commit and build it with cmake, with the router runtime
 stubbed out through `-L`; the container has both for free and stubs nothing.
 
-## `lint` — the npm gates
-
-They live in CI only: the buildbot has no node and does not need it. Nothing in `package.json`
-ships. Locally it is all one command, `npm run check`; the full table of what each gate holds is in
-[conventions.md](conventions.md). The ones worth naming here:
+The npm gates live in CI only: the buildbot has no node and does not need it, and nothing in
+`package.json` ships. The ones worth naming here:
 
 | Step | What it catches |
 |---|---|
 | `eslint` | including `wrap-regex`, which forbids `return /re/…`, the form jsmin breaks on |
-| `stylelint` | correctness and project invariants only — not a formatter |
+| `stylelint` | correctness and project invariants only — not a formatter; also holds the `!important` allowlist (`declaration-no-important` + the file override) and the data-title i18n check (`selector-disallowed-list`) |
 | `a11y-gallery.mjs` | axe-core, WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap,2020,forum} × {untinted,60°,260°} — **30 combinations** |
 | `export-tier.mjs` | the `--*-color-*` contract with foreign apps — axe cannot see it, their widgets are not in the gallery. 70 palette × mode × tint combinations, then the ten untinted ones again with `prefers-contrast: more` emulated, since that query re-states the ink tokens and so publishes a second tier |
-| `css-metrics.mjs` | ratchet: `!important` ≤ 27, max specificity, empty rules |
+| `css-metrics.mjs` | ratchet: `!important` count (`LIMITS.importants`), max specificity, empty rules |
 | `css-floor.mjs` | the browser floor derived from the built sheet against the one stated in `docs/css.md`, plus the two shapes that break below it: a `:has()` compound sharing a selector list with one that has none, and a CSS feature nobody has classified |
 | `fs-orphans.mjs` | dead `fs-*` selectors (safe only inside our namespace) |
 | `css-dup.mjs` | identical declaration bodies under different guards — no linter calls this an error |
@@ -103,11 +117,10 @@ ships. Locally it is all one command, `npm run check`; the full table of what ea
 | `table-contract.mjs` | the break points, and the rule that hides an unanswered data table still names every root `fs-select` scans, guarded on `:root[data-fs-fit]` — the selector half of what `table-tick.mjs` then proves on a page |
 | `chrome-fence.mjs` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `conffiles.mjs` | every shipped `/etc/config/*` is declared a conffile — else the manager replaces it on upgrade |
-| `bang-ok.mjs` | the `!important` allowlist in `audit.py` and `.stylelintrc.json` still say the same thing |
 | `changelog.mjs` | the changelog contract: sections, order, RU mirror, bold leads |
 | `jsmin-verify.mjs` | the **only** check that catches jsmin's silent corruption (exit 0) |
 | `npm test` | the unit suite — no browser, ~100 ms, and first in the job for that reason. It holds the branches a stand cannot enter: a luci-base missing a surface the router calls, an alias loop or a `firstchild` tie in a menu tree nobody ships |
-| `size-budget.mjs` | ratchet on the **artefact**: `build-css.sh` + the token mangle for the sheet, terser over a copy of `htdocs/luci-static/resources` for the JS. `--show` prints the per-module table into the log, so a jump is attributable without re-running anything |
+| `size-budget.mjs` | ratchet on the **artefact**: `build-css.sh` + the token mangle for the sheet, terser over a copy of `htdocs/luci-static/resources` for the JS. `--show` prints the per-module table into the log; `check:mid`'s `size` script runs it plain, so a jump wants a local `node tools/size-budget.mjs --show` to attribute it |
 | `build-icons.mjs --check` | the committed app-icon rasters still match `logo.svg` — per channel with a tolerance, plus the maskable invariants (declared size, no alpha, nothing outside the safe zone, a mark in the middle). Not byte equality: that tested the renderer, and a Chromium bump reddened it on a commit that never touched the logo |
 
 **About `jsmin-verify`:** jsmin corrupts a file silently and exits 0. The source shape it breaks on,
@@ -247,12 +260,13 @@ produced, and runs the live gates.
 **It is three jobs, not one.** Once `anchors` moved out, this was the release's critical path, so it
 became three slices (`parity`, `audit`, `motion`), each booting its own routers for 157s it does not
 share — the wall clock is the longest slice and not the sum. `fail-fast` is off: a parity failure
-says nothing about whether the reader stays put. Where two gates share a slice they also share the
-page shapes they read, through `FS_SHAPES` — classifying is one load and a 1200ms settle per page of
-the menu, and both gates used to do it back to back (measured: live-audit 421s alone, 303s after
-spa-parity had already read the same router). **Splitting them onto separate runners gave that
-saving back**: `FS_SHAPES` points inside each runner's own temp, so `parity` and `audit` each walk
-the whole menu now — ~90s a router, and the price of the split.
+says nothing about whether the reader stays put. `parity` and `audit` used to run in one job and
+share the page shapes they read through an `FS_SHAPES`-named cache — classifying is one load and a
+1200ms settle per page of the menu, and both gates did it back to back (measured: live-audit 421s
+alone, 303s after spa-parity had already read the same router). **Splitting them onto separate
+runners gave that saving back**: each is now its own matrix job, with no second gate in the same
+process to hand the answer to, so the cache was dropped (`tools/lib/page-shapes.mjs`) and `parity`
+and `audit` each walk the whole menu on their own — ~90s a router, the price of the split.
 
 Measured on the last run where every slice finished (`7ff9e56`, push, three routers): the gates are
 **485s** (spa-parity), **450s** (live-audit) and **754s** (`motion`'s six). `motion` carried a
@@ -376,9 +390,8 @@ workflow reads them and puts the one non-package asset into `dist/`, before the 
 because whatever is in `dist/` is signed with everything else:
 
 - **the notes**, from `tools/release-notes.sh` — the tag's changelog section, one bold lead per
-  bullet, grouped by category. They fill the release page and are **not** an asset: the only reader
-  that ever fetched `notes.md` from a release was the self-update package, which is retired and its
-  repository archived;
+  bullet, grouped by category. They fill the release page and are **not** an asset: nothing on a
+  router reads `notes.md`;
 - **the installer**, because `raw.githubusercontent.com` is rate-limited for unauthenticated callers
   — so the user whose address has run out of budget (CGNAT, a shared exit) fails to download the
   installer meant to rescue them (issue #17) — and because a signed copy is the only one that can be
@@ -575,10 +588,10 @@ a resolver that does not answer, a network that intercepts the host — is insta
 instead of being sent away with a URL, and told plainly that `apk upgrade` will not carry the theme
 forward until the feed works.
 
-That path picks the artifact **from the signed manifest**, never by guessing an asset's name: issue
-#6 was a self-update script, shipped at the time and retired since, that resolved the theme by
-name and took `head -1`, which on a release
-carrying per-language packages installed a catalogue. `manifest.txt` names exactly one file per
+That path picks the artifact **from the signed manifest**, never by guessing an asset's name: GitHub
+sorts assets by name, and `luci-i18n-…` sorts ahead of `luci-theme-…`, so a release carrying
+per-language packages needs the manifest to say which asset is the theme, not a guessed name
+(issue #6). `manifest.txt` names exactly one file per
 format with its size and digest, and the chain fails closed in this order — verified TLS, then
 `usign -V` against the release key pinned in the script (the same key as `release.pub`), then the
 manifest's own sha256 over the downloaded artifact. A missing `usign`, a signature that does not

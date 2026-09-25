@@ -4,8 +4,6 @@ What the theme's values are and why they are those values. How the stylesheet is
 cascade is kept disciplined: [css.md](css.md). What the chrome does with them:
 [chrome.md](chrome.md).
 
-Reference mock-ups: `docs/design/`.
-
 **There is one system.** One renderer (`menu-footstrap.js`), one template directory, one
 `cascade.css`, one entry in `luci.themes`. Layout (sidebar or top bar) is a client setting,
 `:root[data-layout]`, always with an explicit value.
@@ -56,13 +54,26 @@ Third-party apps get the other side of this contract in
 `high`/`medium`/`low` must be **three different colours**: a consumer asks for a gradation and gets
 whatever we declared. All three were once aliases of one token — and `luci-app-podkop` drew its
 "no data" latency in `--primary-color-low`, i.e. the same bright accent as a live value. **A flat
-colour passes every contrast threshold there is**, so nothing failed; it failed at the user.
+colour passes every contrast threshold there is**, so nothing failed; it failed at the user. Not a
+rare ask: stock `firewall.js` and `status/cpu.js` read the ramp too, and one app alone reads eleven
+of these names. Direction follows bootstrap's, which every app was calibrated against — `high` is
+the most pronounced value of the role, except `--background-color-*`, an ELEVATION axis instead
+(`high` = raised); the mixing mechanism differs per family and is measured in each block below.
 
-The axis of the ramp is **chroma at constant lightness** (`color-mix(in oklch, …, var(--fs-dim))`).
+The axis of the ramp is **chroma at constant lightness** (`color-mix(in oklch, …, var(--fs-dim))`),
+which drains saturation while leaving luminance in place, keeping every level printable as text.
 Both obvious alternatives were measured and rejected: fading `low` toward the surface spends
 contrast the palette does not have (in dark mode every accent on `--fs-panel2` already sits at
-4.56:1, i.e. +0.06 over AA), and pulling `high` toward `--fs-text` collapses the ramp in dark mode
-where `--fs-text` is nearly white.
+4.56:1, i.e. +0.06 over AA; an 8% fade took one level to 4.18:1), and pulling `high` toward
+`--fs-text` collapses the ramp in dark mode where `--fs-text` is nearly white (the strong end comes
+back 0.055 from the weak end — flat). Bootstrap's own ramp walks lightness instead, which is why it
+reads inverted in dark mode and lands at 3.6:1 — this theme keeps its direction and drops its
+mechanism.
+
+`--text-color-low` is `--fs-faint`, the theme's own third ink, and deliberately not a duplicate of
+`-medium`: making the two the same token flattens the export (`spread(high, low)` falls to 0.082 in
+the default palette, under the 0.10 the ramp promises) and hands an app asking for a gradation one
+colour twice.
 
 The binding constraint: apps read a level as `color:` about as often as `background:`, so every
 level must pass AA as text on `--fs-bg`/`--fs-panel`/`--fs-panel2` and carry a readable
@@ -74,14 +85,66 @@ which is what a hairline is for.
 
 ## Palettes
 
-Five, all in `styles/03-palettes.css`, one self-contained block per (palette × mode):
-**footstrap** (GitHub Primer colours, the default, filling a bare `:root`), **hicontrast**
-(`data-palette="hicontrast"`), **bootstrap** (`data-palette="bootstrap"`, the stock LuCI theme's
-surfaces and greys — its semantic colours and its light ink are raised where they miss AA, which
-that block documents in place), **2020** (`data-palette="2020"`, the OpenWrt 2020 theme's
-colourway) and **forum** (`data-palette="forum"`, the OpenWrt forum's Discourse colourway). Light
-mode is the bare `:root`; dark is `:root[data-darkmode="true"]`. The file also carries the
-instructions for adding a palette.
+Five, all in `styles/03-palettes.css`, one block per (palette × mode): **footstrap** (GitHub Primer
+colours, the default, filling a bare `:root`), **hicontrast** (`data-palette="hicontrast"`),
+**bootstrap** (`data-palette="bootstrap"`, the stock LuCI theme's surfaces and greys), **2020**
+(`data-palette="2020"`, the OpenWrt 2020 theme's colourway) and **forum**
+(`data-palette="forum"`, the OpenWrt forum's Discourse colourway). Light mode is the bare `:root`;
+dark is `:root[data-darkmode="true"]`. Each DARK block is fully self-contained; a LIGHT block is
+not — see below.
+
+### Adding a palette
+
+`--fs-panel-base` and the four inks (`--fs-on-accent`, `--fs-on-good`, `--fs-on-warn`,
+`--fs-on-danger`) are `#fff` in every LIGHT palette today, so the default block (`:root,
+:root[data-palette="footstrap"]`) is their only definition — a new light block inherits them unset
+and sets only what differs from it. If a new palette needs a light ink other than `#fff` for AA
+(the way every DARK block does), declare that one property in its own block; nothing forces the
+five to stay shared, they just happen to agree so far.
+
+Copy the two hicontrast blocks (light and dark), set every colour the light block does NOT inherit
+from the default block above — five go through a `-base` pair so the tint/accent/colour axes can
+recolour them, since a palette never declares `--fs-good` etc. directly — and the dark block's own
+four inks, then register the name in four places, each failing differently and quietly if skipped:
+the PALETTE axis in `fs-prefs.js`, the `_sd_pal` whitelist and pre-paint switch in
+`partials/head.ut`, the label map in `fs-appearance.js`, and `matrix()` in `tools/lib/gallery.mjs`
+(absent there, `export-tier.mjs`, `a11y-gallery.mjs` and `placeholder-ink.mjs` never measure the
+new palette, and it ships ungated).
+
+### Surfaces carry no transparency axis
+
+`--fs-panel`, `--fs-panel2` and `--fs-border` are solid colours per palette, on purpose: thinning a
+surface thins the TEXT sitting on it out from under it, and the contrast tooling cannot even report
+the result — a ratio against a semi-transparent backdrop is a ratio against whatever pixel sits
+behind it. The wallpaper axis is the honest way to have a picture show through.
+
+**bootstrap** carries the surfaces, greys and semantic colours of the stock theme, so an admin who
+wants that look keeps it and still gets the chrome, the client navigation and the axes. Bootstrap
+computes everything from HSL axes; evaluated, those are `--background-color` high/medium/low
+`#fff`/`#f9f9f9`/`#f5f5f5` (dark `#222`/`#282828`/`#2c2c2c`), `--text-color` high/medium
+`#404040`/`#808080` (dark `#bfbfbf`/`#7f7f7f`), `--border-color` high/medium `#ccc`/`#ddd`
+(dark `#555`/`#444`). The canvas and the card are both `--background-color-high`: bootstrap is flat
+and lets the border carry the structure; panel2 is its `--background-color-low`, the surface it
+stripes tables and hovers rows with. Where this palette deviates: bootstrap's own semantic colours
+do not clear AA on bootstrap's own surfaces (on `--fs-panel2`, success 2.73:1, warn 1.61:1, error
+3.65:1, primary 4.22:1; in dark, error 3.44:1 and success 4.44:1), and every palette here is held
+to 4.5:1 on all three because the export tier is what other people's apps print text in — so each
+is taken from the step of bootstrap's own ramp that clears it where one exists, and otherwise keeps
+hue and saturation while the value moves until it clears 4.95:1 (warn is the only large move: no
+yellow readable as text on white is still that yellow). The ink follows the same logic: bootstrap's
+own `#404040` body and `#6a6a6a` muted tier measure 10.4:1 and 5.4:1 on white, and the muted one
+carries every field title, so it is matched to the default palette's light ramp ratio for ratio
+(15.7 / 11.7 / 10.0) in neutral greys — the hue is copied, not the readability. Bootstrap's dark
+header gradient is not carried: the chrome reads `--fs-panel`, so a palette cannot give the bar its
+own colour without a chrome token pair, which is a change to the chrome, not a colourway. Its dark
+neutral tiers are this palette's own construction — bootstrap's dark has no third ink, so AA
+decides where the fainter one sits: `--fs-faint` follows the export tier's `-low`, which on a
+tinted `--fs-panel2` clears 4.5:1 first at `#9a9a9a` (`#969696` measures 4.46:1, under the floor a
+name apps print text in), and `--fs-dim` steps up from it by the twelve channel steps the
+hicontrast dark ramp uses. Its own dark `--background-color-low` (`#2c2c2c`) also sits 0.016 from
+`--fs-panel`, under the 0.02 the ramp check wants (its light pair is 0.039 apart, so the same check
+catches this in the theme this palette is named after) — `--fs-panel2-base` moved to `#303030`
+(0.031) to clear it.
 
 **forum** is sampled straight off forum.openwrt.org's own `getComputedStyle`, one read per colour
 scheme rather than a guess: light ink `#222`/page `#fff`/accent `#0088cc`, dark ink `#ddd`/page
@@ -90,9 +153,12 @@ six clears 4.5:1 as text on the surface Discourse pairs it with — its own cont
 filled pill or an icon, not for the export tier every app prints text in — so each is walked the
 way 2020's cyan was, hue and saturation held while lightness moves until AA clears (worst case
 1.07:1 on white, for the yellow search-highlight that has no footstrap analogue and fills `--fs-warn`
-instead, being the only status colour Discourse's scheme leaves spare). The forum's header bar
-(`rgb(0, 43, 73)`) is not carried into either mode: its own dark scheme already has a canvas
-colour, `#222`, unlike 2020's theme which had none to sample.
+instead, being the only status colour Discourse's scheme leaves spare). The forum's CANVAS never
+takes the header bar's navy (`rgb(0, 43, 73)`): its own dark scheme already has a canvas colour,
+`#222`, unlike 2020's theme which had none to sample. The navy is carried into exactly one place —
+`--fs-bar-bg` in the forum's dark block, since that IS the chrome's own surface on forum.openwrt.org
+(measured live: `#ddd` ink at 10.7:1 on it, dimmed ink at 5.8:1) — the one palette that overrides
+the shared `--fs-bar-bg: var(--fs-panel)` from `02-tokens.css`.
 
 **2020** is the CI cyan `#00B5E2` on the navy `#002B49`, which is one scheme and no dark mode in
 the theme it comes from. Here it is a pair, and the split is the interesting part: 2020's own
@@ -152,36 +218,78 @@ fill 12% here and 18% there — four forces where the design knows two.
 | `-line` | 40% | a hairline border |
 | `-line-hi` | 55% | the same hairline on hover |
 
-The role × step matrix is **filled completely on purpose**, whether or not anything reads a cell
-today: a hole is exactly where the drift started (`--fs-accent-soft` existed, `good`/`warn`/
-`danger` had no sibling, and every rule invented its own percentage). `--fs-accent-soft` is the one
-member still in `03-palettes.css`, because its strength is the only one that depends on mode
-(10% light / 15% dark).
+The role × step matrix is **filled completely for the three roles a control can take** —
+accent/good/danger — whether or not anything reads a cell today: a hole is exactly where the drift
+started (`--fs-accent-soft` existed, the other two roles had no sibling, and every rule invented
+its own percentage). `warn` is the one role kept to a single cell, `-fill`: LuCI emits no warning
+BUTTON, so `-soft`/`-line`/`-line-hi` had zero `var()` readers across `styles/`, `htdocs/`, `ucode/`,
+`docs/gallery.html` and `tools/`, and were dropped when checked. `--fs-accent-soft` is the one
+member of the four kept out of this file, because its strength is the only one that depends on mode
+(10% light / 15% dark; hicontrast dark 14%) — light is shared in `03-palettes.css`'s `:root`, dark
+varies per palette.
 
-Other derived values: `--fs-glass` (a frosted popup surface, panel at 96%) and `--fs-blur` (one
-blur radius for every frosted surface); `--fs-emboss` / `--fs-text-emboss` (a raised 1px edge);
-`--fs-hover-lift` (the one hover hint that cannot be a colour, since it brightens whatever fill the
-role set — and its **direction depends on mode**: light darkens, dark lightens);
-`--fs-focus-ring` and `--fs-focus-ring-invalid` (which takes `-fill`, not `-soft`: a red ring has
-to read as alarm).
+Two focus rings, and which one a control takes is the contract: **`--fs-focus-ring`** is a `-soft`
+tint halo (1.15-1.29:1 on its own surface, below WCAG 1.4.11's 3:1) and is legitimate only paired
+with a second channel — every field taking it also flips `border-color` to `--fs-accent`
+(4.57-7.04:1 across palette × mode × surface), so the border is the indicator and the tint is the
+halo. **`--fs-focus-ring-solo`** is for a control where the ring is the WHOLE indicator and nothing
+else changes on focus — sidebar links, chrome icon buttons, section tabs, both range sliders — and
+its 2px of surface is what lets it read against a *filled* control (5.19-7.04:1 on panel,
+4.61-7.55:1 on canvas), where an accent ring would otherwise sit on an accent box.
+**`--fs-focus-ring-invalid`** takes `-fill` (18%), not `-soft`: a red ring must read as an alarm
+rather than a hover tint, and it is paired with a red border.
 
-**The bar's blur stays, and that is a decision rather than an oversight.** `--fs-bar-bg` at 88% was
-chosen for the blur: content has to show through the strip, and without the blur it shows
-through sharply and reads as dirt under the text. One backdrop layer on one strip is what any
-native mobile navbar does — unlike `theme/15-wallpaper.css`, which removed the blur from every
-form button, where it was dozens of layers rather than one. It could not be measured either way:
-a main-thread rAF loop cannot see compositor work, and a headless browser does not rasterise at
-all, so the remaining step is a run on a real phone. Meanwhile there is a proper opt-out —
-`@media (prefers-reduced-transparency: reduce)` in `theme/95-a11y-media.css` switches
-`--fs-bar-bg`/`--fs-glass` to the opaque `--fs-panel` and kills `--fs-blur`. That is both an
-accommodation and a measured line of retreat, and it leaves the choice with the device's owner.
+`--fs-hover-lift` is the one hover cue that cannot be a colour, since it brightens whatever fill
+the role set, and its **direction depends on mode**: light darkens to `.90` (brightening instead
+drops white-on-`--fs-accent` from 5.19:1 to 4.08:1 at a visible 1.15 — an AA failure caused by
+hovering), dark brightens to `1.15`, since its fill is light and its ink dark.
 
-**`--fs-bar-bg` (88%) is deliberately NOT merged with `--fs-glass` (96%)**: the bar is a thin strip
-the page scrolls under, and content showing through is the point; a dropdown carries a menu and has
-to stay readable. **`--fs-scrim` is the theme's one colour literal and stays one**: black at .7 is
-the absence of light behind a dialog, not a shade of any token.
+**`--fs-bar-bg` is opaque, not translucent, and stopped being a decision the moment it was
+measured.** A `backdrop-filter` blur under it was tested on the page most favourable to it — a
+pattern wallpaper at full strength, the bar sitting over scrolled content — and removing the blur
+moved **0.04%** of pixels: what the translucency bought was the page showing through the chrome,
+which reads as a glitch rather than as glass. Every `backdrop-filter`, prefixed or not, is gone
+from the sheet ([css.md](css.md) "Vendor prefixes still in the sheet"), so
+`prefers-reduced-transparency` (`theme/95-a11y-media.css`) now has nothing left to opt out of — the
+theme is opaque already, and its handler only flattens the one thing that still varies: the wash
+over an uploaded photo. **`--fs-scrim` is the theme's one colour literal and stays one**: black at
+.7 is the absence of light behind a dialog, not a shade of any token.
 
 ## Scales
+
+**Type** — five steps in `02-tokens.css`, roughly ×1.25 apart: `--fs-type-2xs` 10px, `-xs` 11px
+(eyebrows, badges, tooltips), `-type` 13px (body, tables, fields — the base), `-lg` 16px (section
+titles), `-xl` 20px (page titles), `-2xl` 26px (`h1`, third-party only). 13px is deliberate: a
+router UI is dense tables of addresses and counters. Leading is a unitless `1.5` rather than a hard
+`18px`, so it re-resolves against each element's own size instead of being inherited as a fixed
+line box that clips a smaller heading; that gives a fractional line box (13 × 1.5 = 19.5px) on an
+otherwise whole-px scale, so a BOX must never be sized `--fs-type * --fs-leading` directly — take
+the nearer `--fs-space` step. `--fs-type-2xs` exists for one caller, the Port status card's traffic
+figures: at `-xs` the card floor is 106px, at 10px it is 94px, which is what turns ten cards plus a
+lonely eleventh into one row of eleven.
+
+Declared twice, unrounded in `:root` and rounded in `@supports (width: round(1px, 1px))`, because
+`round()` (Chromium 125 / Firefox 118 / Safari 15.4) is younger than the sheet's own floor and a
+custom property holds any token stream — an engine without it parses the ladder fine and fails at
+*substitution*, computing every `var(--fs-type)` reader to `unset`. Measured by serving a sheet with
+`round(` renamed: 5881 of 5912 elements on Overview changed, body type went 13px → 16px, and 5880
+`font-size` plus 5733 `line-height` declarations were lost. Declared unrounded first, such an engine
+keeps the whole ladder and only pays a fractional pixel at the two non-default densities.
+`--fs-control-h` is rounded the same way, up to the 4px control ladder.
+
+**Weight** — three values, `--fs-weight-normal` 400 (no face of its own; resolves onto the 600
+face, which is why body text is semibold by design), `--fs-weight` 600 (the UI default) and
+`--fs-weight-bold` 700. `700`/`bold` and `400`/`normal` were both in use as the same weight before
+these were named.
+
+**The eyebrow** — `--fs-eyebrow-tracking` (.06em), `--fs-eyebrow-weight` (700) and
+`--fs-eyebrow-color` (`--fs-faint`) name one microlabel idiom drawn a dozen places: table column
+headers, stacked-card `data-title` labels, Appearance group labels, rail flyout titles, login field
+titles. It had drifted into four spellings (tracking .04/.05/.06em, weight 600 vs 700, ink `--fs-dim`
+vs `--fs-faint`) before being named — the same unnamed-level drift the derived ladder above stops,
+in typography. Size is deliberately not part of it: 10px and 11px are two real tiers and collapsing
+them resizes half the tables. `h6` (a heading) and `.fs-navlabel` (the menu's section separator,
+wider-tracked because it separates rather than captions) look like eyebrows and are not.
 
 **Radius** — one user-facing base (Footstrap page → Rounding, **0–20 px**), from which three semantic
 radii are derived proportionally: cards/panels/modals/popovers, controls (inputs, buttons,
@@ -204,9 +312,26 @@ four curves, none of them chosen.
 CSS default (`ease`) — one curve, nothing to keep in sync, and fewer bytes than naming it. A rule
 that needs a different curve should justify it in a comment, because it is making a design decision.
 
-**Spacing** — a half-step scale in `02-tokens.css`: `--fs-space-0-5`, `-1`, `-1-5`, `-2`, `-2-5`,
-`-3`, `-3-5`, `-4`, `-5`, `-6`, `-7`, `-8`, `-10` (the number is the step, `-1` = 4 px at normal
-density).
+**Spacing** — independent of the type scale on purpose: the 18px/9px pair used before this grid was
+upstream bootstrap's line-height and half of it, so every gutter in the theme was a function of
+Twitter's leading, and changing the font size silently re-spaced every widget. A 4px grid in
+`02-tokens.css`: `--fs-space-1` through `-7` at 4px apart (the number is
+the step, `-1` = 4px at normal density), then a sparse top of `-8` (32px) and `-10` (40px) with two
+or three callers each (the sidebar accordion indent, the search palette's bottom padding, a login
+card's bottom margin) — named so no padding in the theme is an unexplained number, not because a
+fourth caller is expected. The half-steps `-0-5` (2px), `-1-5` (6px), `-2-5` (10px) and `-3-5`
+(14px) are named rather than rounded away: a chip's inset, a nav item's row padding and a card's
+inner gutter genuinely land on 6/10/14, and were the single largest group of magic numbers left in
+the tree (6px ×26, 10px ×32, 14px ×13, 2px ×13) before they were. Above 16px the grid stays 4px —
+nothing needs finer.
+
+**Control heights** — three steps following Density, `--fs-ctl-h-sm` (30px), `--fs-ctl-h` (38px,
+the default) and `--fs-ctl-h-lg` (44px): a minimum height that stops a chrome control (a button, not
+a field) collapsing onto its content. Distinct from `--fs-control-h`, a *field's* height derived
+rather than measured by hand: the text box (`--fs-type` × `--fs-leading` = 19.5px) plus the vertical
+inset every such field carries (2 × `--fs-space-1`) plus both 1px borders = 29.5, rounded up to 32
+at normal density — arithmetic over one particular leading, so re-scaling the type never leaves a
+field the wrong height for its own text.
 
 **Density** multiplies the type scale, the spacing scale and the shell geometry, through three
 tokens the Density axis sets: `--fs-density-type`, `--fs-density-space` and `--fs-density-box`.
@@ -224,6 +349,22 @@ the measurement quietly subtracting the old width. Reading them through `getComp
 what makes the measurement follow Density for free.
 
 Shadows are `--fs-shadow` (per mode) and `--fs-shadow-pop` (floating surfaces).
+
+### Two glyphs drawn as tokens, not fetched
+
+**`--fs-icon-refresh`** (the poll pill's refresh glyph, one copy shared by the rail and the bar's
+compact cluster) is OURS and redrawn to stay so: it started from Lucide's `refresh-cw` (ISC) —
+`M21 3v5h-5` was byte-identical — which is a second licence obligation the theme never declared.
+Redrawn as two open arcs with solid triangular heads, a different construction rather than a nudge
+of the same one (Lucide caps a continuous stroke with an L-shaped hook; chevrons were tried and
+dissolve at the 18px this renders at). Static on purpose — a spinner makes an idle poll look busy
+and moves the click target that pauses it.
+
+**`--fs-select-chevron`** replaced an inline SVG data-URI repeated once per palette and once per
+mode (ten copies, ~2.4 KB of the shipped sheet), because a URI cannot read `var()` and needed the
+stroke colour written into the string. Two gradient bands cost one declaration and take
+`--fs-dim` at paint time, so a new palette gets a correct chevron for free; the round line cap the
+SVG had is not visible at 12px (compared side by side before the swap).
 
 ## The appearance axes
 
@@ -262,12 +403,31 @@ its three axes, File), then **Defaults**:
 | **Pattern strength** | 0–100%, default 20 | `fs-pattern-strength` | `--fs-pattern-strength` |
 | **Pattern colours** | theme / original | `fs-pattern-ink` | `data-pattern-ink=original` |
 | **Rounding** | 0–20 px, default 12 | `fs-radius` | `--fs-radius-base` |
+| **Content width** | 1280–3840 px, default 1280 | `fs-content-width` | `--fs-content-max` |
 | **Submenus** | keep open / auto-collapse | `fs-menu-autocollapse` | — (no attribute) |
+
+**Content width** (issue #44, a slider replacing a three-step picker) is a real px length written
+straight onto `--fs-content-max`, the same shape Rounding uses. Neither end of the range is derived
+from this file: 1280 is the value the theme has always drawn, so the slider's left end *is* today's
+look and the axis can never go narrower than its own default — unlike every other numeric axis,
+none of which has a floor that is also the default. `--fs-content-min` (500px) is the width this
+axis has to stay clear of; with 1280 as the floor that is now a property of the range, 780px below
+the nearest point the slider reaches. 3840 stands in for "uncapped": no CSS viewport width in
+ordinary use reaches it, even a physical 4K panel reporting a scaled CSS width well under it. The
+step is 128px (2,560px of travel at 20 stops, matching Rounding/Photo dim/Pattern strength's stop
+count rather than Pattern scale's near-pixel drag) — a stop here should move a table's column
+count, not shave a pixel off a margin, and 128 is the largest round number that divides the range
+into that few stops.
 
 
 **Photo dim** is the scrim over a `file` wallpaper, and the three **Pattern** axes are the same
 arrangement for the tiled SVG: both images' *bytes* are router-side — a file cannot live in
-`localStorage` — but how a given browser draws them is an ordinary axis.
+`localStorage` — but how a given browser draws them is an ordinary axis. `--fs-login-bg-url` and
+`--fs-pattern-url` are `none` in `03-palettes.css`'s bare `:root` (the same default the hues carry)
+so the stylesheet stands on its own with no image selected; `head.ut` and `fs-prefs.js` stamp the
+real `url()` inline once one is. `--fs-photo-scrim` is mixed from `--fs-bg-base`, not the tinted
+`--fs-bg`: the tint colours the canvas and must never leak onto an uploaded photo, so the scrim
+stays neutral whatever hue is set.
 
 **Pattern colours** is the one axis whose off state is the interesting one. On `theme` (the bare
 `:root`) the SVG is painted through a CSS `mask`, so the file supplies alpha and the theme supplies
@@ -275,6 +435,27 @@ arrangement for the tiled SVG: both images' *bytes* are router-side — a file c
 the mask is dropped for a plain tiled `background-image`, because a mask flattens artwork that
 carries its own palette to a single colour. Neither the file nor the two numbers are the axis that
 decides whether anything paints — that is `fs-wallpaper`.
+
+### Wallpaper rendering: why the canvas moves to `:root`
+
+A dedicated `.fs-pattern` element, not a `background-image`, because recolouring a rasterised
+image needs `mask-image` — the SVG supplies alpha, the element supplies colour — and a mask
+applies to the whole element including children, so it can never sit on `.fs-shell` or `<body>`
+directly. `.fs-pattern` is emitted as `<body>`'s first child (`header.ut`, `sysauth.ut`, which has
+no `.fs-shell`) with no other job.
+
+`z-index: -1` needs a transparent `body`: inside the root stacking context, paint order is html's
+background, then negative-z children, then every block background, so an opaque `--fs-bg` on
+`body` buries a negative-z layer instead of sitting above it. The canvas therefore moves to
+`:root`, and `body`, `.fs-main` and the footer all go transparent so the layer shows through. Both
+wallpapers pin `background-attachment: fixed` so the layer is one calm backdrop the page scrolls
+under rather than a strip riding along with a table underneath it.
+
+The uploaded photo (`file`) instead paints on one element only (`.fs-shell`, or bare `body`
+pre-login): `--fs-photo-scrim` as a second `background-image` layer over the photo on the SAME
+element, no `::before` and no `backdrop-filter` — a blur over a full-viewport surface is the most
+expensive paint a phone GPU does, and the scrim already carries the legibility;
+`prefers-reduced-transparency` turns the scrim opaque instead (`95-a11y-media.css`).
 
 Three more `fs-` keys are not axes: `fs-rail` (the sidebar collapsed to an icon rail,
 toggled in the chrome), `fs-menu-open` (the remembered set of open accordion sections) and
@@ -340,11 +521,13 @@ mode stays in storage and in the stylesheet so a value saved before the change g
 
 **The ink over a hex fill is derived, in CSS.** `--fs-on-accent` and the three status inks become
 `oklch(from <fill> clamp(0, (l - .62) * -100, 1) 0 0)` — black above the sRGB crossover, white
-below, chroma zeroed. The rule is written `[data-accent="hex"][data-accent]`: the palette's dark
-block is also (0,2,0) and later in the file, so the single-attribute form lost **in dark mode only**
-and left a grey accent carrying near-black ink at 1.9:1. Surfaces get no derived ink — what reads on
-them is `--fs-text`, a palette token these axes must not move — so the page reports the contrast
-each choice lands at instead.
+below, chroma zeroed. The rule is written `[data-accent="hex"][data-accent][data-accent]`, (0,4,0)
+by the triple attribute, so it outranks a *named* palette's dark block
+(`[data-palette=…][data-darkmode="true"]`, (0,3,0)) regardless of source order — a single repeat
+only matched that block's specificity and left a grey accent carrying near-black ink at 1.9:1 in
+every named palette's dark mode. Surfaces get no derived ink — what reads on them is `--fs-text`, a
+palette token these axes must not move — so the page reports the contrast each choice lands at
+instead.
 
 ### Tint and Accent
 
@@ -367,6 +550,22 @@ attribute).
   bites while a hue is set, and it is hidden and moot under a `file` wallpaper, where the tint
   resets to neutral because the photo covers the canvas. Do not confuse it with Photo dim,
   which darkens that photo rather than colouring the canvas.
+
+  `--fs-tint-c` (the chroma the hue is applied at) is a floor plus two `cos()` terms rather than a
+  flat number, because no palette's canvas is neutral — every one is a blue-grey (oklch hue
+  248–264°) — and the cue is read *against* that cast: a boost at 258° (the canvas's own hue;
+  without it blue and violet do nothing) and a damp at 55° (red-through-yellow, which the eye
+  picks up first, so at a shared floor the warm half would shout while the cold half whispers —
+  dark mode only, since on a near-white canvas warm is the quietest hue there is). Light mode runs
+  a higher floor: near-white has almost no chroma of its own, so the tint is the only colour
+  there, and it clips at the top of the wheel — on bootstrap's `#fff`, 180° and 258° land 1/255
+  apart, the price of copying a stock theme's surfaces. Lightness is copied through unmixed, so
+  contrast barely moves: a mixed-in tint dragged one export level from 4.61:1 to 4.40:1, where the
+  rotated version does not. `tools/export-tier.mjs` runs the AA matrix over six hues × both modes ×
+  every palette and `tools/a11y-gallery.mjs` runs axe-core over the tinted gallery at two extreme
+  hues; change `--fs-tint-c` and re-run both. The shipped chroma is deliberately tiny — an identity
+  cue, not a colourway — since a large flat field is where the eye is most sensitive to a cast;
+  loud belongs in a palette, where the cards and chrome can move too.
 - **Accent** (`data-accent`, `--fs-accent-h`) is the same idea applied to the interface colour:
   the rotation moves every accented control, because they all read `--fs-accent` or a `color-mix()`
   from it. `oklch(from … l c H)` preserves the palette's lightness and chroma and changes only the

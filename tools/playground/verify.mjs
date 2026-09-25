@@ -19,24 +19,29 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { dirname, join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { resolveUnderRoot } from './lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf(`--${name}`);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
+const { values: FLAGS } = parseArgs({ options: {
+	help: { type: 'boolean', default: false },
+	out: { type: 'string', default: join(ROOT, '..', 'tmp/playground/out') },
+	base: { type: 'string', default: '/luci-theme-footstrap/playground' },
+	/* no `default:` — `undefined` is what "no budget passed" means below, and 'string' can't
+	 * default to null. */
+	'budget-kb': { type: 'string' },
+} });
 
-if (process.argv.includes('--help')) {
+if (FLAGS.help) {
 	console.log('Usage: node tools/playground/verify.mjs [--out DIR] [--base /path] [--budget-kb N]');
 	process.exit(0);
 }
 
-const OUT = arg('out', join(ROOT, '..', 'tmp/playground/out'));
-const BASE = arg('base', '/luci-theme-footstrap/playground');
-const BUDGET_KB = arg('budget-kb', null);
+const OUT = FLAGS.out;
+const BASE = FLAGS.base;
+const BUDGET_KB = FLAGS['budget-kb'];
 const SETTLE_MS = 1400;
 
 const TYPES = {

@@ -1,34 +1,7 @@
 @layer theme {
-	/* ---- the chrome's floor: pin what a foreign rule can reach by INHERITANCE ----
-	 *
-	 * fs-sheets.js fences the chrome out of a third-party selector, so nothing foreign MATCHES a
-	 * chrome element. Inheritance is the way in a fence cannot close: a rule on `html` or `body` is
-	 * an ancestor, and excluding it is meaningless. Measured against a hostile flagged rule on
-	 * `html`: font-style reached 166 of the menu's 169 elements, word-spacing and text-align 157,
-	 * letter-spacing and text-transform 156, cursor 46 — while font-family, color, font-size,
-	 * line-height and font-weight reached none,
-	 * because the chrome already states those. The fix is to state the rest too.
-	 *
-	 * Inheritance is not a cascade competitor: it supplies a value only when no declaration matches
-	 * the element, so any declaration of ours — unflagged, at zero specificity — beats an inherited
-	 * `!important`. Hence no `!important` here.
-	 *
-	 * It keys off `[data-fs-chrome]`, the mark a chrome root carries in the markup (header.ut), not
-	 * off `.fs-sidebar`: the chrome is not one element, and a pin naming the menu leaves the skip
-	 * link and the search overlay inheriting straight from `html`. The fence (fs-sheets.js) reads
-	 * the same mark, so the two halves of zone 1's defence cannot cover different sets of elements,
-	 * and `npm run chrome-fence` derives the mark from the markup and holds both to it.
-	 *
-	 * It goes on the ROOT alone, and says so in the SELECTOR (`:not([data-fs-chrome] *)`) rather
-	 * than trusting whoever adds the next marker to have read this: the markers live in a template
-	 * with conditional blocks, so "is this one inside that one" is not a question a text scanner can
-	 * answer, and CSS can. Pinning descendants too is worse than useless — a direct declaration
-	 * beats an inherited one even when the inherited one is ours, so `.fs-label` loses the `nowrap`
-	 * it inherits and `text-align` is forced from `start` to `left` on 302 elements, which alone
-	 * breaks every RTL language LuCI ships. Hence `text-align: start`, never `left`.
-	 *
-	 * `:where()` keeps it at 0,0,0 so every existing chrome rule outranks it: the pin is a floor,
-	 * never a ceiling. Only inherited properties belong here. */
+	/* Pins inherited-only props on [data-fs-chrome], closing what the fence cannot: inheritance
+	 * from html/body. ROOT-only selector and text-align: start (never left) are load-bearing —
+	 * third-party-apps.md, "Rule 7. The chrome is fenced off, in three places that must agree". */
 	:where([data-fs-chrome]:not([data-fs-chrome] *)) {
 		font-style: normal;
 		font-variant: normal;
@@ -40,11 +13,8 @@
 		cursor: auto;
 	}
 
-	/* Shared chrome — brand, logo, wordmark, logout, indicators. Same in both layouts;
-	 * only their PLACEMENT differs. Written twice once (here and under `.fs-topnav`) and
-	 * the copies had drifted: 32 vs 30px logo, 11 vs 10px brand gap, 10 vs 8px indicator
-	 * gap. The top-bar values won. A layout file may set placement on these (flex, order,
-	 * the rail collapse) — never their look. */
+	/* Brand/logo/wordmark/logout/indicators: one look for every layout — a layout file sets only
+	 * PLACEMENT (flex, order, rail collapse), never look. */
 
 	.fs-brand {
 		display: flex; align-items: center; gap: var(--fs-space-2-5);
@@ -53,29 +23,17 @@
 
 	.fs-logo {
 		width: var(--fs-btn-size); height: var(--fs-btn-size); border-radius: var(--fs-radius);
-		/* No accent fill — a bordered box, same look as the square buttons in the right
-		 * cluster (.fs-logout, .fs-themerow: 1px var(--fs-border)). The glyph is the OpenWrt
-		 * favicon mark (brand.ut), baked-colour, so color/currentColor is unused here. */
-		border: var(--fs-hairline);
+		border: var(--fs-hairline); /* glyph is baked-colour (brand.ut), no currentColor use */
 		display: flex; align-items: center; justify-content: center;
 		flex: 0 0 auto;
 	}
 	.fs-logo svg { width: 20px; height: 20px; }
-	/* The OpenWrt ring flips with the theme mode like the SVG favicon does under
-	 * prefers-color-scheme — dark ring on the light UI, light ring on dark. The cyan arcs
-	 * stay baked (read on both). */
-	.fs-logo-ring { fill: #002b49; }
+	.fs-logo-ring { fill: #002b49; } /* flips with mode like the favicon SVG; cyan arcs stay baked */
 	:root[data-darkmode="true"] .fs-logo-ring { fill: #e6f4fb; }
 
-	/* 700, not 800: the theme ships no faces, so 800 is whatever the reader's Manrope or system
-	 * stack has — 700 for most of them, synthesised for the rest. It already resolved to 700 back
-	 * when the 18 KB face was bundled and dropped for drawing six elements. Say so. */
 	.fs-wordmark { font-size: var(--fs-type-lg); font-weight: var(--fs-weight-bold); letter-spacing: -.01em; }
 
-	/* Skip link — the first tab stop: a keyboard/SR user jumps the whole menu instead of
-	 * tabbing through every section on every page. Off-screen until focused, never
-	 * display:none / visibility:hidden — that removes it from the tab order, which is the
-	 * one thing it exists for. Sits above everything, incl. an open popover. */
+	/* First tab stop — never display:none/visibility:hidden, that drops it from the tab order. */
 	.fs-skip {
 		position: fixed; top: 8px; inset-inline-start: 8px; z-index: var(--fs-z-dropdown);
 		padding: var(--fs-space-2-5) var(--fs-space-4); border-radius: var(--fs-radius);
@@ -83,10 +41,8 @@
 		font-weight: var(--fs-weight-bold); font-size: var(--fs-type); text-decoration: none;
 		box-shadow: var(--fs-shadow-pop);
 	}
-	/* Clipped, not translated off-screen: --fs-shadow-pop is offset 12px / blur 34px, so a
-	 * box parked at -68px still bled ~16px of DROP SHADOW into the viewport and smudged the
-	 * top-left corner of every page. clip-path clips the shadow too. Never display:none /
-	 * visibility:hidden — see above. */
+	/* clip-path, not a -68px translate: the translate still bled ~16px of drop shadow into the
+	 * viewport (--fs-shadow-pop is offset 12px/blur 34px); clip-path clips the shadow too. */
 	.fs-skip:not(:focus) {
 		clip-path: inset(50%);
 		width: 1px; height: 1px;
@@ -95,11 +51,7 @@
 	.fs-skip:focus {
 		outline: 2px solid var(--fs-panel); outline-offset: 2px;
 	}
-	/* Visually hidden but PRESENT in the a11y tree — for the document <h1> and the live
-	 * region. hidden/display:none/visibility:hidden take the element out of the a11y tree
-	 * too: the h1 would fix no heading outline and the live region would never announce.
-	 * Clipping leaves a node readable to assistive tech while occupying no space.
-	 * nowrap: a long title clipped into a 1px column is read out line by line by some SRs. */
+	/* Clipped, not display:none/visibility:hidden — both take the <h1> out of the a11y tree too. */
 	.fs-sr {
 		position: absolute;
 		clip-path: inset(50%);
@@ -108,9 +60,7 @@
 		overflow: hidden; white-space: nowrap;
 	}
 
-	/* the skip link's target <main> carries tabindex="-1" so the browser actually MOVES
-	 * focus there (Safari/Chrome refuse on a non-focusable target: they scroll but leave
-	 * focus in the menu) — but it must not then ring the whole page. */
+	/* tabindex="-1" on <main> makes Safari/Chrome move focus here rather than just scroll to it. */
 	#maincontent:focus { outline: none; }
 
 	.fs-logout { display: flex; align-items: center; color: var(--fs-dim); }
@@ -118,42 +68,24 @@
 
 	.fs-indicators { display: flex; align-items: center; gap: var(--fs-space-2); }
 
-	/* The 34px square icon button (.fs-themerow / .fs-logout collapsed) is NOT declared
-	 * here: it only exists where the chrome is a bar or a rail, and those blocks
-	 * (20-shell.css, 50-toplayout.css) already give it its border, surface and size — an
-	 * unconditional copy here was a second definition they had to re-state anyway. */
+	/* 34px square icon button: not declared here, only where the chrome is a bar or a rail
+	 * (20-shell.css, 50-toplayout.css). */
 
-	/* Density steps for the main menu once it is a horizontal row —
-	 * fs-chrome.js (fitTabStrips) adds .fs-dense1/2 when the row would wrap (and strips them
-	 * in the vertical sidebar, so no media guard is needed). Padding is trimmed hard
-	 * first, the font only at the d2 floor. */
+	/* fitTabStrips (fs-chrome.js) adds .fs-dense1/2 when the horizontal menu row would wrap, and
+	 * strips them in the vertical sidebar — no media guard needed. */
 	.fs-sidebar ul.nav.fs-dense1 > li > a { padding: var(--fs-space-1) var(--fs-space-2); }
 	.fs-sidebar ul.nav.fs-dense2 > li > a { padding: var(--fs-space-1) var(--fs-space-1-5); font-size: var(--fs-type); }
 
-	/* Menu primitives, once for both layouts (both render the menu as `ul.nav > li > a`):
-	 * the 19px line-height, `display: block` on the items and the `position: relative`
-	 * every submenu popup anchors to — all three used to be inherited from a navbar rule
-	 * set the theme no longer carries. */
+	/* One markup (`ul.nav > li > a`) for both layouts, so these three run once. */
 	ul.nav { position: relative; margin: 0; list-style: none; }
 	ul.nav > li { display: block; }
 	ul.nav a { line-height: 19px; text-decoration: none; }
 
-	/* `.dropdown-menu` is emitted by nobody here — not by this theme, whose menu is a plain nested
-	 * `ul`, and not by luci-base. It stays styled under the coverage contract: it is theme
-	 * vocabulary (stock luci-theme-bootstrap carries 14 rules for it), so a third-party luci-app-*
-	 * is entitled to emit it and expect a themed result. Each item anchors its own nested popup,
-	 * hence position: relative.
-	 *
-	 * This comment used to claim ui.js emits it for the split Save & Apply button. It does not —
-	 * that button is a `.cbi-dropdown`, a different widget. */
+	/* No emitter here, stays styled under the coverage contract — conventions.md, "Coverage is a
+	 * contract". */
 	.dropdown-menu li { display: block; position: relative; }
-	/* wins over `ul.nav a` above: the popup sets its own denser rhythm */
-	ul.nav .dropdown-menu a, .dropdown-menu a { line-height: 18px; }
+	ul.nav .dropdown-menu a, .dropdown-menu a { line-height: 18px; } /* denser than ul.nav a above */
 
-	/* Menu hover / active — one look, every layout. One markup (`ul.nav > li > a` + a
-	 * nested `ul`) serves the main list, the submenu (accordion / bar dropdown / rail
-	 * flyout), the mode menu and the Appearance row, so there are no per-layout copies to
-	 * keep in step. */
 	.fs-sidebar ul.nav > li > a:hover,
 	.fs-sidebar ul.nav ul a:hover,
 	.fs-themerow:hover {
@@ -165,27 +97,12 @@
 	.fs-modemenu li.active a {
 		background: var(--fs-accent-soft); color: var(--fs-accent);
 	}
-	/* ---- the fill marks the PAGE, and a category is not a page ----
-	 *
-	 * `li.active` is set on the SECTION containing the current page as well as on the page's own
-	 * row, so `li.active > a` hands the same accent plate to both — two identical plates, one above
-	 * the other, on System -> System (issue #37): measured before this rule, the open category and
-	 * the current leaf carried the same fill, the same ink and the same 13px/600, differing in 2px
-	 * of padding.
-	 *
-	 * The markup already says which is which: menu-footstrap.js puts `aria-current="page"` on the
-	 * LEAF alone, a section header being a disclosure control rather than a link to where you are.
-	 * So the plate stays with the page and the ancestor keeps the accent INK, while an ancestor
-	 * that is also the page is matched by `a.active` above and keeps the plate.
-	 *
-	 * Unscoped, like the rule above it: the accordion, the bar's dropdown and the rail's flyout are
-	 * one markup. */
+	/* Plate on the PAGE only; the open ANCESTOR keeps the ink alone — issue #37 (two identical
+	 * plates stacked on System -> System otherwise). chrome.md, "menu-footstrap.js". */
 	.fs-sidebar ul.nav > li.active > a:not(.active) { color: var(--fs-accent); }
 
-	/* Keyboard focus for the chrome controls, which otherwise have only the UA default.
-	 * --fs-focus-ring-solo, not --fs-focus-ring: none of these flips a border on focus, so the ring
-	 * is the entire indicator, and the tinted ring measures 1.15-1.29:1 against the sidebar — i.e.
-	 * tabbing the whole menu shows nothing at 3:1 (the two-ring contract in 02-tokens.css). */
+	/* --fs-focus-ring-solo: none of these flips a border on focus, so the ring alone must clear
+	 * 3:1 — the tinted ring reads only 1.15-1.29:1 (two-ring contract, 02-tokens.css). */
 	.fs-railtoggle:focus-visible,
 	.fs-themerow:focus-visible,
 	.fs-logout:focus-visible,
@@ -194,11 +111,8 @@
 		box-shadow: var(--fs-focus-ring-solo);
 	}
 
-	/* The page-wide accent signals no widget rule covers, all following the palette:
-	 *   ::selection      the UA default (opaque blue) ignores palette and dark mode
-	 *   caret-color      inherits from :root into every field, in one declaration
-	 *   accent-color     the theme's own checkboxes are appearance:none drawings and never see it,
-	 *                    but a third-party app's native checkbox/radio/progress does */
+	/* accent-color reaches a foreign app's native checkbox/radio/progress — the theme's own are
+	 * appearance:none and never see it. */
 	::selection { background: var(--fs-accent); color: var(--fs-on-accent); }
 	:root { caret-color: var(--fs-accent); accent-color: var(--fs-accent); }
 }

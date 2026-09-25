@@ -34,7 +34,7 @@ owlab doctor
 
 **A change that alters behaviour is not finished until it has run on a real OpenWrt userland**, on
 **both** package managers — 25.12/apk and 24.10/opkg. Not "it should work", not "the gates are
-green": run it. `owlab up` gives you four disposable routers from `owlab.yaml`, and
+green": run it. `owlab up` gives you the disposable routers `owlab.yaml` defines, and
 `owlab test` is the local form of the same assertions CI's `verify` job makes. How:
 [development.md](development.md).
 
@@ -91,9 +91,9 @@ cascade — `theme/90-responsive` and `pages/20-overview` outrank a `style=` wri
 and `ui.js`, `theme/45-misc` widens the box the realtime graphs size inline and repaints its inline
 black border, `theme/65-dropdown` frees `.hide-close` from a RichListValue's inline `min-width:25vw`,
 and `styles/base` keeps the six
-`.left`/`.right`/… forcing utilities plus two inline-style fighters. `audit.py` keeps that list
-(`BANG_OK`), `.stylelintrc.json` states the reason for each file, `npm run bang-ok` holds the two in
-step, and `css-metrics` caps the total at **27**.
+`.left`/`.right`/… forcing utilities plus two inline-style fighters. `.stylelintrc.json` states the
+reason for each file and is the only copy of the list — `declaration-no-important` rejects a flag
+outside it — and `css-metrics` ratchets the total against `LIMITS.importants` in tools/css-metrics.mjs — the live count, not a number copied here.
 
 **Win on specificity, never on source order.** Two rules with the same specificity where the
 later one is load-bearing is the same failure as 220 `!important`, only quieter. Cap:
@@ -328,19 +328,15 @@ package needs.
 
 **One asset per package per format in a release.** Nothing on a router picks an asset any more —
 the installer takes the feed — but a reader that does gets one candidate, not a guess: GitHub
-returns assets **sorted by name**, and in v0.8.4 a `luci-i18n-…` package sorted ahead of
-`luci-theme-…`, so the self-update script shipped at the time installed a 6 KB catalogue instead of
-the theme,
-reported success, and offered the same update forever (issue #6). Code already on somebody's router
-cannot be fixed remotely; only the release can. CI fails unless each package resolves to exactly
-one asset under its name-anchored regex.
+returns assets **sorted by name**, and a `luci-i18n-…` package sorting ahead of `luci-theme-…` once
+picked the wrong asset silently (issue #6). Code already on somebody's router cannot be fixed
+remotely; only the release can. CI fails unless each package resolves to exactly one asset under its
+name-anchored regex.
 
 **The translation catalogue lives in `po/`.** That is the directory `LUCI_LANGUAGES` globs, so
 luci.mk bakes a `luci-i18n-footstrap-<lang>` package per language exactly as it does for every
 luci-app — and it is the only directory Weblate, which CONTRIBUTING names as the way to translate
-LuCI, can see. It was `i18n/` while a fielded self-update script resolved the theme by name and took
-`head -1` (issue #6); that script is retired and owfeed builds the release as one artifact per
-format regardless, so the rename no longer bought anything.
+LuCI, can see.
 
 **No runtime dependency beyond `+luci-base`.** `curl` is not in OpenWrt's default set (the base
 image ships `uclient-fetch`); fall back, do not depend. `jsonfilter`, `sha256sum` and `usign` are
@@ -373,15 +369,14 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 
 | Gate | Holds |
 |---|---|
-| `lint` | eslint over `htdocs/` and `ucode/`, stylelint over `styles/` — correctness only, not formatting |
-| `audit` | `audit.py --strict`: undefined `var()`, shadowed declarations, export-tier reads, dead base declarations, stray `!important`, colour literals |
-| `css-metrics` | ratchet: `!important` ≤ 27, max specificity `[1,7,0]`, 0 empty rules |
+| `lint` | eslint over `htdocs/` and `ucode/`, stylelint over `styles/` — correctness only, not formatting; stylelint also holds the `!important` allowlist (`declaration-no-important` + the file override) and the data-title i18n check (`selector-disallowed-list`) |
+| `audit` | `audit.py --strict`: bracket balance (a truncated-file smoke test), undefined `var()`, shadowed declarations, export-tier reads, dead base declarations, colour literals. A stray `!important` used to be checked here too (`BANG_OK`) — folded into stylelint once measured redundant: `declaration-no-important` rejects the same flag on the same files. Bracket balance stays: a custom property's VALUE is opaque to postcss, so an extra `)` inside one never becomes a `CssSyntaxError` under `lint:css` |
+| `css-metrics` | ratchet: `!important` count (`LIMITS.importants` in tools/css-metrics.mjs), max specificity `[1,7,0]`, 0 empty rules |
 | `css-orphans` | dead `fs-*` selectors — it **gates** the forward direction (styled, emitted by nothing) and **reports** the reverse, where an unstyled class is often legitimate (a JS hook, an element riding on inherited styles). A new name in the reverse list wants a look or a line in `JUSTIFIED_UNSTYLED`; it does not fail the build |
 | `acl` | every shipped `acl.d/*.json` parses **and** grants something — rpcd skips an unreadable file silently |
 | `css-dup` | identical declaration bodies under different guards |
 | `tables` | the table contract: where a cell may break (one allowlist, no viewport queries), the floor holds when a data table is squeezed, a carded cell prints its caption, and no `.cbi-dropdown` sits inside a scroll container |
 | `mirror` | `@mirror`-pinned copies still byte-identical |
-| `bang-ok` | every `!important` sits in an allowlisted file |
 | `axes` | the pre-paint in `head.ut` agrees with the live appearance appliers, and `header.ut` reads every saved option back |
 | `scroll-anchor` (live) | grows something above the reader and asserts the page does not move under them — twice, once with the engine's own scroll anchoring suppressed (the Safari path, forced on any engine with `localStorage.fsEngineAnchor='off'`) and once without, so a fallback that also runs where the engine already corrects is caught as well. Plus a scripted flick up and down: the theme may not correct WHILE the reader moves. Three page shapes (section bodies, a polled table's rows, a bare table under `#view`) across the two scrollers a layout and a width can produce; `--full` adds the axes measured not to change the answer, which is what CI crosses on a push |
 | `table-tick` (live) | performs a poll tick on purpose — rows out, rows back in, marks stripped, then a forced layout — and fails if the replaced table was laid out before anything answered for it. The intermediate lasts a microtask, so no sampler can see it: with the stylesheet's gate removed this reports 613px on Обзор@390 and 817px on Processes, and nothing with it in place |
@@ -390,14 +385,13 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `page-modules` | the `data-page` → module map in `menu-footstrap-common.js` names the same page each mapped module tests for itself, every mapped module exports the `wire()` the loader calls, and no `'require'` pragma is left for one anywhere — one pragma puts the file back on every page and takes the saving with it |
 | `chrome-fence` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `export-tier` | the `--*-color-*` contract: each level readable as text on three surfaces, each `--on-*` readable on its fill, and the ramp is not flat — measured with and without `prefers-contrast: more`, which re-states the inks |
-| `css-i18n` | translatable strings emitted from CSS |
 | `conffiles` | every shipped `/etc/config/*` is declared a conffile — `/etc/config/footstrap` is written at runtime by Save-as-default, and an undeclared one is replaced on upgrade |
 | `changelog` | section set, order, dates, compare links, RU mirror parity, bold leads |
 | `i18n` | `.pot` current, no empty `msgstr` |
 | `shell` | every shell script in the source tree parses (`sh -n`) — including `release-notes.sh`, which otherwise fails inside the release job |
 | `marker` | the `call BuildPackage` literal `include/scan.mk` greps for, without which the SDK does not see the package at all |
 | `a11y` | axe-core WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap,2020,forum} × {untinted,60°,260°} |
-| `placeholder-ink` | a hint may not read as a value the reader typed: every `placeholder` attribute and every `li[placeholder]` row on `docs/gallery.html`, across all eight palette/mode combinations, must have travelled ≥40% of the way from the field's own ink to its fill in light and ≥30% in dark (oklab lightness), and still measure 3:1 on that fill — SC 1.4.11, not AA's 4.5, which is the decision the token records: a dark palette has 6.45:1 of ink to spend against light's 14.84:1, and a hint that clears AA has not moved far enough to stop reading as a value. Every combination runs again under `prefers-contrast: more`, where the query hands the AA ink back and the thresholds swap (≥15%, 4.5:1). `a11y` is excluded from `li[placeholder]` for the same decision — axe measures that row as text and skips the attribute carrying the same ink. axe-core skips `::placeholder` entirely and the old ink was legal by every threshold the theme had — 11.12:1 on footstrap light, against the value's 14.84:1. It also caught a colour rule that had never applied: `li[placeholder]` (0,2,2) lost to the menu row's own `color` (0,3,2) |
+| `placeholder-ink` | a hint may not read as a value the reader typed: every `placeholder` attribute and every `li[placeholder]` row on `docs/gallery.html`, across all ten palette/mode combinations (5 palettes × 2 modes), must have travelled ≥40% of the way from the field's own ink to its fill in light and ≥30% in dark (oklab lightness), and still measure 3:1 on that fill — SC 1.4.11, not AA's 4.5, which is the decision the token records: a dark palette has 6.45:1 of ink to spend against light's 14.84:1, and a hint that clears AA has not moved far enough to stop reading as a value. Every combination runs again under `prefers-contrast: more`, where the query hands the AA ink back and the thresholds swap (≥15%, 4.5:1). `a11y` is excluded from `li[placeholder]` for the same decision — axe measures that row as text and skips the attribute carrying the same ink. axe-core skips `::placeholder` entirely and the old ink was legal by every threshold the theme had — 11.12:1 on footstrap light, against the value's 14.84:1. It also caught a colour rule that had never applied: `li[placeholder]` (0,2,2) lost to the menu row's own `color` (0,3,2) |
 | `test` | the unit suite (`node --test`, no browser): the shipped module is evaluated inside the same wrapper luci.js uses, and its pure logic is driven directly. For the cases a stand **cannot** produce — a luci-base with a surface missing, an alias loop in a foreign `menu.d`, a `firstchild` tie — not as a second opinion on what the stands already cover |
 | `size` | ceiling on what the router SENDS, pinned once per release by `/release` (`--pin`, measured + 2 %) and never raised between releases: `cascade.css` after `build-css.sh` + the token mangle, and the shipped JS after terser — the package build's own asset half, reproduced. uhttpd serves `/www` uncompressed, so these are wire bytes |
 | `icons` | the committed app-icon rasters still match `logo.svg` (per channel, with a tolerance) and still hold the maskable invariants — they are generated by `tools/build-icons.mjs` and cannot be rebuilt on the buildbot |

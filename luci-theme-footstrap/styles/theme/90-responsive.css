@@ -1,31 +1,6 @@
 @layer theme {
-	/* Phone overflow safety net (<=767px). .fs-main uses overflow-x: clip, so anything wider than the
-	 * viewport is silently CUT on the right rather than scrolled to. A device sweep found the
-	 * offenders below; each fix lets the control or table shrink or wrap. Tablets were already
-	 * clean. */
-	/* A pair of buttons an app packs into one `inline-flex` must be allowed to wrap its labels.
-	 *
-	 * `white-space: pre` on a button is stock — luci-theme-bootstrap sets it too — and it holds
-	 * while the label is short. Ours are wider than stock at the same job: measured on
-	 * ssclash's split button at 320, `Сохранить и перезагрузить конфигурацию` is 295px against
-	 * stock's 245, because this theme's face is wider than the system stack even at a smaller
-	 * size (13px vs 14px), and the 14px side padding adds 12 of the 50. The app's wrapper is
-	 * `inline-flex`, so it takes the buttons' max-content — 324px inside a 288px column — and
-	 * overflows by 36. Stock fits only because its buttons are narrower.
-	 *
-	 * Narrowing the buttons would be re-typesetting the theme to suit one app. Letting the label
-	 * wrap costs nothing where it already fits — a short label has no wrap point — and turns the
-	 * one case that does not into two lines. Scoped to the width where it happens: at 390 the
-	 * same page is clean.
-	 *
-	 * `min-width: 0` with it, or the automatic minimum keeps the button at its longest word and
-	 * the flex line cannot shrink it at all.
-	 *
-	 * `word-break: normal` is the third half of it. base/10-reset.css gives every button
-	 * `break-all` — carried over from the fork, and inert while the label cannot wrap at all. The
-	 * moment it can, `break-all` takes precedence over word boundaries and the label breaks mid-word
-	 * (`Сохранить и перезагрузить ко` / `нфиг`). `overflow-wrap: break-word` keeps the escape hatch
-	 * for a single word wider than the button, which is what `break-all` was there for. */
+	/* phone overflow safety net (<=767px): .fs-main is overflow-x: clip, cutting anything wider silently; tablets were clean */
+	/* split-button labels wrap under 360px — docs/css.md "Responsive: a split button's label must wrap under 360px" */
 	@container fs-view (max-width: 360px) {
 		#view .cbi-button, #view .btn,
 		#view input[type="button"], #view input[type="submit"], #view input[type="reset"] {
@@ -37,48 +12,21 @@
 	}
 
 	@media (max-width: 767px) {
-		/* The foreign-<table> scroll fallback used to live here, guarded by this query. It does not
-		 * any more: whether a table fits is a property of its CONTENT and its COLUMN, never of the
-		 * viewport — the same argument the fit engine is built on — and a 400px-wide panel on a
-		 * 1600px desktop needs it exactly as much as a phone does. It is unguarded now, in
-		 * theme/30-tables.css, next to the card stack it is the fallback FOR. */
+		/* foreign-<table> fallback unguarded now in theme/30-tables.css: fit is content/column, never viewport */
 
-		/* Must stay INSIDE this @media, for specificity within one layer: the 400px cap lives in
-		 * theme/65-dropdown.css on `.cbi-dropdown:not(.btn):not(.cbi-button)` — (0,3,0) against this
-		 * rule's (0,1,0) — so unscoped this would lose to it everywhere and cap nothing. Inside the
-		 * phone tier it is what the narrow width needs: a dropdown must never exceed its field. */
+		/* must stay INSIDE this @media: theme/65-dropdown.css's cap is (0,3,0) vs this (0,1,0) */
 		.cbi-dropdown { min-width: 0; max-width: 100%; }
 
-		/* Software page: stack each labelled control. base gives its labels a min-width: 250px that
-		 * overflows a ~360px screen, and `.controls` is a flex ROW, so its columns cram side by side
-		 * and overlap. Scoped by data-page, not by an id: on 24.10 the "Disk space:" label ships with
-		 * no id, so a `:has()` scope silently misses the whole page there. !important because
-		 * package-manager.js injects an unlayered inline style block, which outranks every layer.
-		 * Scoped by `#view[data-page]`, not `body[data-page]`: the attribute lives on the view
-		 * itself so the outgoing page keeps its own rules for the whole staging window (fs-router.js,
-		 * commitStage) — the same bug and the same fix as styles/pages/30-software.css, discovered
-		 * here separately because this narrow-viewport tier is invisible to a gate run at desktop
-		 * width (tools/spa-parity.mjs's narrow-viewport pass).
-		 * `:where(#view)`, not bare `#view`: zeroes the id's specificity while matching the exact
-		 * same element — 20-overview.css, top of `@layer page`, has the full reasoning and the
-		 * measured numbers. */
+		/* base's 250px label overflows ~360px; !important beats package-manager.js's inline style */
 		:where(#view)[data-page="admin-system-package-manager"] .controls { display: block !important; }
-		/* `:not(.pager)` — the page reuses `.controls` for the « / "Displaying 1-100 of 7677" / »
-		 * pager, and its .pager is a <div> too. Blocking it stacked those three onto three lines
-		 * (reported). Only the LABELLED control groups want stacking; the pager is a row. */
+		/* :not(.pager): blocking it stacked « / text / » onto three lines */
 		:where(#view)[data-page="admin-system-package-manager"] .controls > div:not(.pager) { display: block !important; min-width: 0; margin-bottom: var(--fs-space-2); }
-		/* …and the pager itself: a centred row that stays one. `.text` is the only part that may
-		 * give way, so the two buttons keep their size instead of being squeezed. */
 		:where(#view)[data-page="admin-system-package-manager"] .controls > .pager {
 			display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: var(--fs-space-2);
 		}
 		:where(#view)[data-page="admin-system-package-manager"] .controls > .pager > .btn { flex: 0 0 auto; }
 		:where(#view)[data-page="admin-system-package-manager"] .controls > .pager > .text { flex: 0 1 auto; min-width: 0; }
-		/* the bar's ::after value ("63% used …") normally floats above the bar, but the "Disk
-		 * space:" label already sits there — on a phone the long value text overlapped label +
-		 * bar. Drop it BELOW. The bar is a fixed 10px box, so a static ::after cannot push the
-		 * next control: reserve space with margin-bottom and place the value absolutely in it.
-		 * The disk section is the only `label` immediately followed by a `.cbi-progressbar`. */
+		/* disk gauge value moved BELOW the bar — docs/css.md "Responsive: the disk gauge value moves below the bar" */
 		:where(#view)[data-page="admin-system-package-manager"] label + .cbi-progressbar {
 			width: 100%; margin-bottom: 3em;
 		}
@@ -86,113 +34,56 @@
 			top: calc(100% + 5px); inset-inline: 0 auto; bottom: auto;
 			text-align: start; white-space: normal; max-width: 100%;
 		}
-		/* `> div > label` — the group's TITLE label ("Filter:", "Actions:", "Display LuCI
-		 * translation packages:"), not every label on the page. Written as plain `.controls label`
-		 * it also blocked the three radio labels nested a level deeper, and `filtered / all / none`
-		 * came out one per line. They are a set of three short choices: they belong on one row. */
+		/* `> div > label`: only the TITLE label, a bare `.controls label` also caught nested radio labels */
 		:where(#view)[data-page="admin-system-package-manager"] .controls > div > label { display: block; min-width: 0; white-space: normal; margin-bottom: var(--fs-space-1); }
-		/* …and the row they sit in. Stock separates them with &nbsp; text nodes, which is enough to
-		 * keep them apart but not to keep them from splitting mid-choice — a flex row with a real
-		 * gap wraps between labels instead of inside one. */
+		/* radio row: stock's &nbsp; text nodes don't stop a mid-choice split, a real gap does */
 		:where(#view)[data-page="admin-system-package-manager"] .controls > div > div:has(> label > input[type="radio"]) {
 			display: flex; flex-wrap: wrap; align-items: center; gap: var(--fs-space-1) var(--fs-space-5);
 		}
 		:where(#view)[data-page="admin-system-package-manager"] .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: var(--fs-space-2); }
 		:where(#view)[data-page="admin-system-package-manager"] .controls .control-group input { flex: 1 1 140px; min-width: 0; max-width: 100%; }
 
-		/* The Diagnostics stack is not here: a page name and a viewport are neither of the facts that
-		 * matter. Any app can put a field, a select and a button in one header-less
-		 * `<div class="table">`, and what decides whether that row fits is the ROOM — at 320px the
-		 * row needs 338px, and inside a narrow panel at 900px of viewport it needs the same.
-		 * fs-select.js writes `.fs-rowstack` on any such table that overflows, at any width, and
-		 * theme/30-tables.css carries the declarations. */
+		/* Diagnostics stack not here: fs-select.js writes .fs-rowstack at any width, theme/30-tables.css carries it */
 
-		/* No `table.fs-dt { display: block; width: 100% }` here — it sat here to stop a data table
-		 * that still fitted as a table from exceeding its column, and its absence is what makes the
-		 * measured design work at phone widths at all: `display: block` on a <table> DISCARDS the
-		 * table formatting
-		 * context, so the rows are wrapped in an anonymous table sized to the block and the table can
-		 * never be wider than its parent — which means it can never overflow, which means
-		 * `fit.overflows()` can never see anything below 767px. Measured on Processes at 720px with
-		 * such a rule in place: the Command column sat at 126px against a widest token of 353px, and
-		 * forcing that column's `overflow-wrap` three different ways produced the same 126px and the
-		 * same "the table fits" every time. */
+		/* no `table.fs-dt { display: block }`: discards the table context — docs/css.md "Responsive: no `display: block` on `table.fs-dt`" */
 
-		/* generic caps: an input/select must never exceed its field, and long key/value strings
-		 * in the Overview cards must break. */
+		/* generic caps: a field never exceeds its column */
 		.cbi-value-field input, .cbi-value-field select, .cbi-value-field .cbi-dropdown { max-width: 100%; }
-		/* …and once the label is on its own line the control takes the line it was given — a
-		 * field sized to its content left half the row empty and made the form read as a ragged
-		 * column (stock does the same on a phone). checkbox/radio/file keep their intrinsic size:
-		 * a full-width checkbox is a hit target the size of the screen. */
+		/* content-sized leaves half the row empty; checkbox/radio/file keep intrinsic size */
 		.cbi-value-field select,
 		.cbi-value-field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 		.cbi-value-field .cbi-dropdown:not(.btn):not(.cbi-button),
 		.cbi-value-field .cbi-dynlist,
 		.cbi-value-field .cbi-select { width: 100%; }
-		/* min-width only: breaking a long value is base/40-tables.css's default for every cell now,
-		 * and this copy moved nothing when switched off against 126 matching cells. `min-width: 0` is
-		 * NOT redundant — switching that off moved 12 — so it stays. */
+		/* min-width: 0 only, base/40-tables.css already breaks a long value */
 		#view .fs-ovl .table .td, #view .fs-ovl .table .th { min-width: 0; }
 
-		/* Stack each field: label on its own line, control and description full-width below. Side by side
-		 * on the desktop squeezes the field — and any .cbi-value-description inside it — into a
-		 * ~120px column on a phone, so one sentence of help wraps to 8 lines. The row already
-		 * flex-wraps; these two full-width children are what stack it.
-		 *
-		 * Not scoped to #view, and that is the point: ui.js appends a modal to <body>, so an
-		 * `#view .cbi-value` rule leaves every DIALOG in the desktop layout and on a phone the
-		 * Edit-interface form pushes its inputs past the dialog's right edge. */
-		/* `start` undoes base's `text-align: end` (the label hugs its field when the two share a
-		 * row); stacked, it goes back to the reading edge. Logical for the same reason base's is. */
+		/* side-by-side squeezes a field to ~120px; not #view-scoped, ui.js appends modals to <body> */
 		.cbi-value > .cbi-value-title { flex: 1 1 100%; text-align: start; padding-top: 0; }
 		.cbi-value > .cbi-value-field { flex: 1 1 100%; min-width: 0; }
 
-		/* The stock phone contract every luci-app-* is written against. These classes are emitted by
-		 * LuCI's own JS and by third-party apps that copied them, and they are styled nowhere but
-		 * bootstrap's mobile.css — so a theme that ignores them renders a phone layout its own app JS
-		 * believes it has already handled. */
-		/* A column the emitting JS asks to DROP on a phone: the wireless Associated Stations table marks
-		 * its MAC column .hide-xs, and stock LuCI shows Network/Host/Signal/Rate and no MAC.
-		 *
-		 * The `.table .td.hide-xs` half is not redundant: the stacking rules select the cell as
-		 * `table.fs-dt .td` (0,2,1) and `.cbi-section-table .td` (0,2,0), both outranking a bare
-		 * `.hide-xs` (0,1,0), so the cell keeps their
-		 * `display: block` and stays visible. Stock LuCI wins this with !important; one class more
-		 * wins it without one. */
+		/* stock phone contract; `.td.hide-xs` not redundant, stacking rules (0,2,1)/(0,2,0) outrank a bare `.hide-xs` (0,1,0) */
 		.hide-sm, .hide-xs,
 		.table .td.hide-sm, .table .td.hide-xs,
 		.table .th.hide-sm, .table .th.hide-xs { display: none; }
-		/* The `.col-N` weights used to live here, inside the phone tier. They are UNGUARDED now,
-		 * in theme/30-tables.css: `flex` is inert on anything that is not a flex item, and a `.td`
-		 * becomes one exactly when its table cards — so one copy covers the phone tier, the
-		 * measured stack at any width and the config table's @container, with no second copy to
-		 * keep in step. See the block there. */
+		/* .col-N weights UNGUARDED now, theme/30-tables.css: flex is inert on a non-flex item */
 
-		/* iOS Safari zooms the page in when a focused control's text is under 16px and never zooms
-		 * back out — the theme's 13px inputs did that on every form. Stock LuCI needs !important
-		 * for it; here the theme layer is enough. */
+		/* iOS Safari zooms in when focused text is under 16px and never zooms back out */
 		input, textarea, select, .cbi-dropdown > ul > li { font-size: var(--fs-type-lg); }
 	}
 
-	/* Dropdown list: anchored to its widget, never full-bleed.
-	 *
-	 * ui.js has a touch branch (`'ontouchstart' in window`) that stretches the open list across the
-	 * viewport with INLINE offsets — `ul.style.left = ${-rect.left}px`, `ul.style.right =
-	 * ${rect.right - vpWidth}px` — which assume the list's containing block is the
-	 * viewport. It is not: .cbi-dropdown is position: relative, so a negative `left` drags the list
-	 * off to the side and clips the labels. An author !important is the only thing that outranks an
-	 * inline declaration, so pin it back under the widget. Harmless on desktop, where ui.js sets
-	 * only top/bottom/max-height.
-	 *
-	 * Only left/right carry the flag — those are the two properties ui.js writes inline. The widths
-	 * never appear in an inline style (ui.js only CLEARS `ul.style.width`, on close), so they win
-	 * from this layer on their own. */
+	/* anchored to its widget: ui.js's touch branch assumes the viewport as containing block; !important beats the inline style */
 	.cbi-dropdown[open] > ul.dropdown {
 		inset-inline-start: 0 !important;
 		inset-inline-end: auto !important;
 		min-width: 100%;
+		/* desktop only: min(92vw,420px) ignores trigger's left offset, grew past viewport under 767px (113 findings, task audit-09) */
 		width: max-content;
 		max-width: min(92vw, 420px);
+	}
+
+	@media (max-width: 767px) {
+		/* phone tier, after the rule above (later wins): trigger already capped to field width, `auto` keeps the popup on-screen */
+		.cbi-dropdown[open] > ul.dropdown { width: auto; }
 	}
 }

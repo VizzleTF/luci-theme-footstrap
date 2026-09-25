@@ -5,9 +5,9 @@
 #   owlab open owrt2512 open LuCI in a browser
 #   owlab doctor        what this machine supports
 #
-# Four routers rather than one, because the three axes that change how this theme renders are the
+# Multiple routers, not one, because the three axes that change how this theme renders are the
 # package manager (apk on 25.12, opkg on 24.10), the LuCI feed (upstream vs a fork's patched one)
-# and the release. Only all four boxes cover every pairing.
+# and the release — the `routers:` list below is the count of record, not a number restated here.
 
 version: 1
 
@@ -37,8 +37,7 @@ project:
     # database, which a sync never touches — so the browser keeps the modules it has and the page
     # runs a mixture of old and new. Both paths, because which one exists depends on the release
     # (docs/development.md, "Caches while iterating").
-    for db in /lib/apk/db/installed /usr/lib/opkg/status; do [ -f "$db" ] && touch "$db"; done
-    rm -rf /www/luci-static/footstrap-top /usr/share/ucode/luci/template/themes/footstrap-top
+    for db in /lib/apk/db/installed /usr/lib/opkg/status; do if [ -f "$db" ]; then touch "$db"; fi; done
 
 defaults:
   fidelity: basic
@@ -139,11 +138,11 @@ routers:
     # Unsigned dev fixtures: pinned to exact releases and installed without signature verification.
     # Nothing here ships.
     #
-    # Anchored here and aliased onto the other three RELEASE routers, not `defaults:` — owlab's
+    # Anchored here and aliased onto the other RELEASE routers, not `defaults:` — owlab's
     # `extra_packages` merge is additive only (append(default, router), no subtraction syntax,
     # internal/config/config.go), so a router-scoped list has to start from a router, not from a
-    # default every router inherits. `owrtsnap` below carries no alias: these three are pinned
-    # builds against release branches (openclash/ssclash need kmod-tun, which resolves through a
+    # default every router inherits. `owrtsnap` below carries no alias: the aliased routers are
+    # pinned builds against release branches (openclash/ssclash need kmod-tun, which resolves through a
     # kmods index keyed to the box's exact kernel git hash) and the snapshot box's baked kernel is
     # never the one downloads.openwrt.org/snapshots is currently publishing kmods for — confirmed
     # 2026-09-07: `apk add` 404s the kmods packages.adb for the running 6.18.33 hash and both apps
@@ -171,17 +170,10 @@ routers:
     ports: { http: 8024, ssh: 2224 }
     extra_packages: *third_party_apps
 
-  - id: imm2512
-    distro: immortalwrt
-    release: "25.12.1"
-    ports: { http: 8026, ssh: 2226 }
-    extra_packages: *third_party_apps
-
-  - id: imm2410
-    distro: immortalwrt
-    release: "24.10.6"
-    ports: { http: 8027, ssh: 2227 }
-    extra_packages: *third_party_apps
+  # ImmortalWrt (imm2512/imm2410) is not a default-boot stand: not a gate target
+  # (tools/lib/stands.mjs), and no behaviour claim needs it (see the "second instances" comment below).
+  # docs/development.md, "ImmortalWrt stands (on demand)" carries the two blocks verbatim and the
+  # command to bring them up when a question is actually about the brand.
 
   # A SNAPSHOT box, because the installer has a path only it takes: `SNAPSHOT` parses to no feed
   # branch, so the script asks the feed for the newest one its package manager can read, and
@@ -242,7 +234,7 @@ routers:
     release: "snapshot"
     ports: { http: 8032, ssh: 2232 }
 
-  # ---- third and fourth instances, one set per browser engine ----
+  # ---- fourth instance, one more set for a browser engine ----
   #
   # Added 2026-09-12. `-b` answered contention between two people; this answers contention inside
   # ONE sweep. `tools/scroll-anchor.mjs --full` is 276 runs per engine, and running the three
@@ -252,21 +244,9 @@ routers:
   # separate node processes, each with its own engine AND its own routers: no shared browser server
   # to lose, and no two contexts hitting one uhttpd.
   #
-  # Same releases and the same third-party fixtures as their originals, so a finding on `-c` or
-  # `-d` carries exactly as much weight as one on the original. Ports: `-c` is `-b` plus 10
-  # (8055/8044/8042, ssh 2255/2244/2242), `-d` is `-c` plus 10 (8065/8054/8052, ssh 2265/2254/2252),
-  # all clear of 2222.
-  - id: owrt2512c
-    release: "25.12.4"
-    ports: { http: 8055, ssh: 2255 }
-    extra_packages: *third_party_apps
-  - id: owrt2410c
-    release: "24.10.8"
-    ports: { http: 8044, ssh: 2244 }
-    extra_packages: *third_party_apps
-  - id: owrtsnapc
-    release: "snapshot"
-    ports: { http: 8042, ssh: 2242 }
+  # Same releases and the same third-party fixtures as their originals, so a finding on `-d` carries
+  # exactly as much weight as one on the original. Ports: `-d` is `-b` plus 20
+  # (8065/8054/8052, ssh 2265/2254/2252), clear of 2222.
   - id: owrt2512d
     release: "25.12.4"
     ports: { http: 8065, ssh: 2265 }

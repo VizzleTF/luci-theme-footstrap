@@ -73,37 +73,28 @@ function probeColor(expr) {
  * the space it was authored in, so `oklch(0.54 0.19 300)` would parse as three numbers in the
  * wrong units and produce a colour nobody chose — measured: #010078, graded "Too faint to read",
  * in the hex field, the swatch and the contrast readout alike. Painting one pixel makes the engine
- * convert instead (tools/export-tier.mjs uses the same method). The string parse remains only as
- * the fallback for an engine with no 2D context, where only the legacy `rgb()`/`color(srgb …)`
- * forms can appear. */
+ * convert instead (tools/export-tier.mjs uses the same method). Canvas 2D is universal on every
+ * engine 24.10 ships against, so there is no second path. */
 let _cx = null;
 function rasterCtx() {
-	if (_cx !== null) return _cx;
-	try {
+	if (!_cx) {
 		const cv = document.createElement('canvas');
 		cv.width = cv.height = 1;
-		_cx = cv.getContext('2d', { willReadFrequently: true }) || false;
-	} catch (e) { _cx = false; }
+		_cx = cv.getContext('2d', { willReadFrequently: true });
+	}
 	return _cx;
 }
 function parseColor(s) {
-	const str = String(s || '');
 	const cx = rasterCtx();
-	if (cx) {
-		/* fillStyle keeps the last value it could parse, so a colour this engine rejects would
-		 * report the previous one as a fresh reading — the trap probeColor() clears for */
-		cx.fillStyle = '#000';
-		cx.fillStyle = str;
-		cx.clearRect(0, 0, 1, 1);
-		cx.fillRect(0, 0, 1, 1);
-		const d = cx.getImageData(0, 0, 1, 1).data;
-		if (d[3] === 255) return [ d[0], d[1], d[2] ];
-		/* translucent: composite over nothing is meaningless for a readout, so fall through */
-	}
-	const nums = str.match(/[\d.]+/g);
-	if (!nums || nums.length < 3) return null;
-	const unit = (/^color\(/i).test(str) ? 255 : 1;
-	return nums.slice(0, 3).map((n) => Math.max(0, Math.min(255, parseFloat(n) * unit)));
+	/* fillStyle keeps the last value it could parse, so a colour this engine rejects would
+	 * report the previous one as a fresh reading — the trap probeColor() clears for */
+	cx.fillStyle = '#000';
+	cx.fillStyle = String(s || '');
+	cx.clearRect(0, 0, 1, 1);
+	cx.fillRect(0, 0, 1, 1);
+	const d = cx.getImageData(0, 0, 1, 1).data;
+	/* translucent: composite over nothing is meaningless for a readout */
+	return d[3] === 255 ? [ d[0], d[1], d[2] ] : null;
 }
 
 /* WCAG 2.x relative luminance and contrast ratio, on sRGB. Used only to report: the theme states
@@ -141,8 +132,8 @@ function toHex(s) {
  * `opts.probe` is the live token the effective colour is read back from, so the field shows the
  * palette's colour while the axis is off without a copy of the palette in JS. `opts.contrast` is
  * the pair whose ratio is reported under the row. */
-function colorControl(current, onPick, label, opts) {
-	const o = opts || {};
+function colorControl(onPick, label, opts) {
+	const o = opts;
 
 	/* type=color leaves the picker to the browser: accessible without reimplementing a colour
 	 * wheel, and native on a phone. The text field beside it takes a pasted hex and is the
@@ -154,10 +145,6 @@ function colorControl(current, onPick, label, opts) {
 	});
 	const clear = E('button', { 'class': 'btn fs-color-clear', 'type': 'button' }, [ _('Palette', 'footstrap') ]);
 	const ratio = o.contrast ? E('div', { 'class': 'cbi-value-description fs-color-contrast' }) : null;
-
-	/* what the axis holds right now: the page can change it behind this control (a preset, Reset
-	 * to default), so a private copy would go stale. `current` is only the build-time value. */
-	const currentOf = o.read || (() => current);
 
 	/* Repaint everything that mirrors the axis. Called after every edit, and through the returned
 	 * refresh() after a preset, palette switch or dark-mode flip — each changes what the palette's
@@ -207,7 +194,9 @@ function colorControl(current, onPick, label, opts) {
 	const commit = () => {
 		const v = field.value.trim().toLowerCase();
 		if ((/^#[0-9a-f]{6}$/).test(v)) pick(v);
-		else reflect(currentOf());
+		/* re-read rather than a cached copy: the page can change what the axis holds behind this
+		 * control (a preset, Reset to default), which a snapshot taken at build time would miss */
+		else reflect(o.read());
 	};
 	field.addEventListener('blur', commit);
 	field.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); commit(); } });
@@ -218,7 +207,7 @@ function colorControl(current, onPick, label, opts) {
 	].concat(ratio ? [ ratio ] : []));
 	/* the caller decides when this runs: probeColor() needs the document, and this control is not
 	 * in it yet */
-	wrap.fsRefresh = () => reflect(currentOf());
+	wrap.fsRefresh = () => reflect(o.read());
 	return wrap;
 }
 
@@ -309,14 +298,15 @@ function build() {
 		return node;
 	};
 
-	/* one colour axis: `probe` is the live token the control reads the effective colour back from,
-	 * `contrast` the pair it reports */
-	const colourGroup = (label, axis, probe, contrast, opts) => group(label, (lbl) => {
-		const ctl = colorControl(axis.current(), bump(axis.apply), lbl, {
+	/* one colour axis: `axis` is the `{current, apply}` object fs-axes.js exports it as; `probe` is
+	 * the live token the control reads the effective colour back from, `contrast` the pair it
+	 * reports */
+	const colourGroup = (label, axis, probe, contrast, opts = {}) => group(label, (lbl) => {
+		const ctl = colorControl(bump(axis.apply), lbl, {
 			probe: probe,
 			read: axis.current,
 			contrast: contrast,
-			cls: (opts && opts.cls) || ''
+			cls: opts.cls
 		});
 		colourCtls.push(ctl);
 		return ctl;
@@ -344,7 +334,7 @@ function build() {
 			dark:  _('Dark', 'footstrap')
 		}, bump(repaint(prefs.applyMode)), label)),
 
-		group(_('Palette', 'footstrap'), (label) => selectCtl(axes.currentPalette(), {
+		group(_('Palette', 'footstrap'), (label) => selectCtl(axes.palette.current(), {
 			footstrap:  'Footstrap',
 			hicontrast: 'Hi-Contrast',
 			/* names the OTHER package, luci-theme-bootstrap, whose colours this palette is —
@@ -355,7 +345,7 @@ function build() {
 			/* names the OpenWrt forum (forum.openwrt.org), whose Discourse colourway this is —
 			 * a proper noun like the three above it, not the English common noun "forum" */
 			forum:      'Forum'
-		}, bump(repaint(axes.applyPalette)), label)),
+		}, bump(repaint(axes.palette.apply)), label)),
 
 		group(_('Density', 'footstrap'), (label) => selectCtl(prefs.currentDensity(), {
 			compact: _('Compact', 'footstrap'),
@@ -370,11 +360,11 @@ function build() {
 		 * --fs-content-min (500px, what the sidebar-to-bar fold is measured against) out of reach
 		 * by construction rather than by a rule someone has to remember. */
 		group(_('Content width', 'footstrap'),
-			(label) => sliderCtl(axes.currentContentWidth(), 1280, 3840,
-				bump(axes.applyContentWidth), label, { step: 40, live: false })),
+			(label) => sliderCtl(axes.contentWidth.current(), 1280, 3840,
+				bump(axes.contentWidth.apply), label, { step: 40, live: false })),
 
 		group(_('Rounding', 'footstrap'),
-			(label) => sliderCtl(axes.currentRadius(), 0, 20, bump(axes.applyRadius), label)),
+			(label) => sliderCtl(axes.radius.current(), 0, 20, bump(axes.radius.apply), label)),
 
 		/* The top layout has no accordion, so this switch is meaningless there: always built,
 		 * hidden by CSS (:root[data-layout="top"] .fs-ap-submenus). Do not wrap it in an
@@ -392,9 +382,7 @@ function build() {
 	const colours = [
 		/* the caption says what the axis is for: "Tint" alone reads as decoration, and nobody
 		 * would look for the router-identity cue under it */
-		colourGroup(_('Tint (router identification)', 'footstrap'), {
-			current: axes.currentTint, apply: axes.applyTint
-		}, 'var(--fs-bg)', {
+		colourGroup(_('Tint (router identification)', 'footstrap'), axes.tint, 'var(--fs-bg)', {
 			/* the canvas is the one axis with no derived ink: its text is --fs-text, a palette
 			 * token this axis must not move, so the ratio is reported instead of corrected */
 			fg: 'var(--fs-text)', bg: 'var(--fs-bg)', label: _('on the canvas', 'footstrap')
@@ -406,7 +394,7 @@ function build() {
 		 * Not called "Density": that is the select above, and this string is both the caption and
 		 * the aria-label, so a screen reader would announce two rows under one name. */
 		group(_('Tint strength', 'footstrap'),
-			(label) => sliderCtl(axes.currentTintStrength(), 0, 200, bump(repaint(axes.applyTintStrength)), label, {
+			(label) => sliderCtl(axes.tintStrength.current(), 0, 200, bump(repaint(axes.tintStrength.apply)), label, {
 				step: 5
 			}), { cls: 'fs-ap-tint fs-ap-tintstr' }),
 
@@ -419,12 +407,12 @@ function build() {
 		 * eight times between here and the surfaces below, they cost their repeated literals in
 		 * full — a string is not mangled — so the rows are data and the row is stated once. */
 		...[
-			[ _('Accent', 'footstrap'),  axes.currentAccent, axes.applyAccent, 'var(--fs-accent)' ],
-			[ _('Good', 'footstrap'),    axes.currentGood,   axes.applyGood,   'var(--fs-good)' ],
-			[ _('Warning', 'footstrap'), axes.currentWarn,   axes.applyWarn,   'var(--fs-warn)' ],
-			[ _('Danger', 'footstrap'),  axes.currentDanger, axes.applyDanger, 'var(--fs-danger)' ]
-		].map(([ label, current, apply, ink ]) =>
-			colourGroup(label, { current, apply }, ink, { fg: ink, bg: CARD_BG, label: ON_CARD }))
+			[ _('Accent', 'footstrap'),  axes.accent, 'var(--fs-accent)' ],
+			[ _('Good', 'footstrap'),    axes.good,   'var(--fs-good)' ],
+			[ _('Warning', 'footstrap'), axes.warn,   'var(--fs-warn)' ],
+			[ _('Danger', 'footstrap'),  axes.danger, 'var(--fs-danger)' ]
+		].map(([ label, axis, ink ]) =>
+			colourGroup(label, axis, ink, { fg: ink, bg: CARD_BG, label: ON_CARD }))
 	];
 
 	/* ---- the surfaces: the sheet the UI is drawn on ----
@@ -439,12 +427,12 @@ function build() {
 		/* Same rows, one column wider: a surface reports the ink read ON it, which is --fs-text
 		 * for the three that carry body text and the hairline itself for the border. */
 		...[
-			[ _('Cards', 'footstrap'),           axes.currentCard,    axes.applyCard,    CARD_BG,             INK,                  CARD_BG,             ON_CARD ],
-			[ _('Controls', 'footstrap'),        axes.currentControl, axes.applyControl, 'var(--fs-panel2)',  INK,                  'var(--fs-panel2)',  _('on a control', 'footstrap') ],
-			[ _('Sidebar and bar', 'footstrap'), axes.currentBar,     axes.applyBar,     'var(--fs-bar-bg)',  INK,                  'var(--fs-bar-bg)',  _('in the sidebar', 'footstrap') ],
-			[ _('Borders', 'footstrap'),         axes.currentLine,    axes.applyLine,    'var(--fs-border)',  'var(--fs-border)',   CARD_BG,             ON_CARD, 'shape' ]
-		].map(([ label, current, apply, probe, fg, bg, where, kind ]) =>
-			colourGroup(label, { current, apply }, probe, { fg, bg, label: where, kind }))
+			[ _('Cards', 'footstrap'),           axes.card,    CARD_BG,             INK,                  CARD_BG,             ON_CARD ],
+			[ _('Controls', 'footstrap'),        axes.control, 'var(--fs-panel2)',  INK,                  'var(--fs-panel2)',  _('on a control', 'footstrap') ],
+			[ _('Sidebar and bar', 'footstrap'), axes.bar,     'var(--fs-bar-bg)',  INK,                  'var(--fs-bar-bg)',  _('in the sidebar', 'footstrap') ],
+			[ _('Borders', 'footstrap'),         axes.line,    'var(--fs-border)',  'var(--fs-border)',   CARD_BG,             ON_CARD, 'shape' ]
+		].map(([ label, axis, probe, fg, bg, where, kind ]) =>
+			colourGroup(label, axis, probe, { fg, bg, label: where, kind }))
 	];
 
 	/* ---- section 3: the wallpaper and the rows each value brings ----
@@ -493,30 +481,30 @@ function build() {
 			group(_('Pattern', 'footstrap'),
 				() => E('div', { 'class': 'fs-ap-bgrow' }, [ patChoose, patRemove ]),
 				{ extra: [ patInput, patPreview, patErr ] }),
-			group(scaleLabel, (lbl) => sliderCtl(axes.currentPatternSize(), 40, 1600,
-				bump(axes.applyPatternSize), lbl, { step: 20 })),
-			group(strengthLabel, (lbl) => sliderCtl(axes.currentPatternStrength(), 0, 100,
-				bump(axes.applyPatternStrength), lbl, { step: 5 })),
-			group(inkLabel, (lbl) => selectCtl(axes.currentPatternInk(), {
+			group(scaleLabel, (lbl) => sliderCtl(axes.patternSize.current(), 40, 1600,
+				bump(axes.patternSize.apply), lbl, { step: 20 })),
+			group(strengthLabel, (lbl) => sliderCtl(axes.patternStrength.current(), 0, 100,
+				bump(axes.patternStrength.apply), lbl, { step: 5 })),
+			group(inkLabel, (lbl) => selectCtl(axes.patternInk.current(), {
 				theme:    _('Theme', 'footstrap'),
 				original: _('As in file', 'footstrap')
-			}, bump(axes.applyPatternInk), lbl))
+			}, bump(axes.patternInk.apply), lbl))
 		];
 		/* …and the rows the FILE photo brings. */
 		const fileRows = [
 			group(_('File', 'footstrap'),
 				() => E('div', { 'class': 'fs-ap-bgrow' }, [ chooseBtn, removeBtn ]),
 				{ extra: [ fileInput, preview, err ] }),
-			group(dimLabel, (lbl) => sliderCtl(axes.currentPhotoDim(), 0, 100,
-				bump(axes.applyPhotoDim), lbl, { step: 5 }))
+			group(dimLabel, (lbl) => sliderCtl(axes.photoDim.current(), 0, 100,
+				bump(axes.photoDim.apply), lbl, { step: 5 }))
 		];
 
 		function reflect(tok) {
-			if (tok) { preview.src = axes.loginBgUrl(tok); preview.hidden = false; removeBtn.hidden = false; }
+			if (tok) { preview.src = axes.loginBg.url(tok); preview.hidden = false; removeBtn.hidden = false; }
 			else { preview.removeAttribute('src'); preview.hidden = true; removeBtn.hidden = true; }
 		}
 		function reflectPattern(tok) {
-			if (tok) { patPreview.src = axes.patternUrl(tok); patPreview.hidden = false; patRemove.hidden = false; }
+			if (tok) { patPreview.src = axes.pattern.url(tok); patPreview.hidden = false; patRemove.hidden = false; }
 			else { patPreview.removeAttribute('src'); patPreview.hidden = true; patRemove.hidden = true; }
 		}
 		/* `hidden` on the row, which 80-appearance.css restates at a specificity beating
@@ -527,11 +515,11 @@ function build() {
 			patRows.forEach((r) => { r.hidden = (v !== 'pattern'); });
 			fileRows.forEach((r) => { r.hidden = (v !== 'file'); });
 		}
-		reflect(axes.currentLoginBg());
-		reflectPattern(axes.currentPattern());
-		togglePanel(axes.currentWallpaper());
+		reflect(axes.loginBg.current());
+		reflectPattern(axes.pattern.current());
+		togglePanel(axes.wallpaper.current());
 
-		const setWallpaper = (v) => { axes.applyWallpaper(v); refreshSave(); togglePanel(v); refreshColours(); };
+		const setWallpaper = (v) => { axes.wallpaper.apply(v); refreshSave(); togglePanel(v); refreshColours(); };
 
 		/* Both uploads present the same three controls and the same four states — pick, upload,
 		 * report, remove — so the wiring is stated once. What differs is `after`: the pattern also
@@ -579,7 +567,7 @@ function build() {
 
 		let seg;
 		const wallRow = group(_('Wallpaper', 'footstrap'), (label) => {
-			seg = selectCtl(axes.currentWallpaper(), {
+			seg = selectCtl(axes.wallpaper.current(), {
 				off:     _('Off', 'footstrap'),
 				pattern: _('Pattern', 'footstrap'),
 				file:    _('File', 'footstrap')

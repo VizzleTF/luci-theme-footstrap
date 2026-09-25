@@ -1,8 +1,6 @@
 @layer base {
-	/* small widgets a view or a third-party luci-app-* can drop anywhere: tooltip, progress bar,
-	 * zone badge, button states, close cross, alert box, .label pill */
-	/* .cbi-title-ref colour: theme/45-misc.css — absorbed. The arrow stays: content,
-	 * not paint. */
+	/* small widgets any luci-app-* can drop anywhere: tooltip, progress bar, zone badge, close
+	 * cross, alert box, .label pill. Arrow: content, not paint — colour is theme/45-misc.css. */
 	.cbi-title-ref::after {
 		content: "➙";
 	}
@@ -14,19 +12,13 @@
 	.cbi-tooltip {
 		position: absolute;
 		z-index: var(--fs-z-tooltip);
-		/* logical: `left: -10000px` in an RTL document parks the tooltip past the INLINE-END edge,
-		 * which is scrollable overflow — every page grew a 10000px horizontal scrollbar in ar/fa/he
-		 * (measured). Past the inline-start edge is unreachable in both directions. */
+		/* docs/css.md "Widgets: the tooltip parks past the unreachable edge, and the close cross
+		 * needs the same mirror" — a physical `left` grows a 10000px RTL scrollbar. */
 		inset-inline-start: -10000px;
-		/* box-shadow: theme/35-alerts.css — absorbed */
 		border-radius: var(--fs-radius-sm);
 		background: var(--fs-panel);
-		/* `pre`, not `pre-wrap`, NEVER wraps — task 0162: live-audit measured a firewall rule-jump
-		 * tooltip (`nftables/iptables`, "Chain POSTROUTING, Rule #1") 65-72px past the column at
-		 * 320px, spaces and all, because `pre` disables wrapping outright regardless of where a space
-		 * sits. `pre-wrap` keeps every literal run of whitespace this rule was carried for — the same
-		 * reason `35-alerts.css`'s validation tooltip and a multi-line firewall hint still read
-		 * correctly — while letting the browser wrap at one of them once the line is too long. */
+		/* pre-wrap, never pre: docs/css.md "Typography and widgets: an opaque token needs
+		 * overflow-wrap: anywhere, a tooltip needs pre-wrap". */
 		white-space: pre-wrap;
 		padding: var(--fs-space-0-5) var(--fs-space-1);
 		opacity: 0;
@@ -51,7 +43,6 @@
 		margin: -1.6em 0 0 -5px;
 		border-radius: var(--fs-radius-sm);
 		pointer-events: none;
-		/* box-shadow: theme/35-alerts.css states one elevation for every .cbi-tooltip */
 	}
 
 	.zonebadge .cbi-tooltip > * {
@@ -82,28 +73,16 @@
 		flex-direction: column;
 	}
 
-	/* pressed-state shadow (.btn.active/:active): theme/55-buttons.css — absorbed */
 	.btn.disabled,
 	.btn[disabled] {
 		cursor: default;
 		opacity: var(--fs-disabled-opacity);
 	}
 
-	/* `.btn.large` / `.btn.small`: theme/55-buttons.css, in full — absorbed. */
-
-	/* close cross — colour, shadow, opacities: theme/70-modal.css — absorbed. Left:
-	 * geometry. */
-	/* `line-height: 1` centres the glyph in its own box; it was 13.5px under a 20px face, and a
-	 * hand-nudged length only lands for one font size */
-	/* Physical, and mirrored by hand below — the same shape as `::-webkit-resizer`
-	 * (theme/60-inputs.css) and the two chevrons (theme/20-shell.css). `float` takes no logical
-	 * keyword this theme can rely on: `inline-end` is newer than
-	 * the `oklch(from …)` and `:has()` this sheet already requires only in Chromium, and a browser
-	 * that does not know the keyword drops the declaration and leaves the cross floating
-	 * nowhere. Measured in a live document at 1400px: the cross sat 549px from the reading edge in
-	 * LTR and 41px in RTL, i.e. it jumped from the end of the heading to its start — in front of
-	 * the title, where a dismissal control is not. It appears in every modal and in every
-	 * `.alert-message`, so this is the RTL bug with the widest reach. */
+	/* .btn.large/.btn.small, close cross colour/shadow/opacities: theme/55-buttons.css and
+	 * theme/70-modal.css — absorbed. Left here: geometry only. */
+	/* Physical, hand-mirrored: docs/css.md "Widgets: the tooltip parks past the unreachable edge,
+	 * and the close cross needs the same mirror" — appears in every modal and .alert-message. */
 	.close {
 		float: right;
 		font-size: var(--fs-type-xl);
@@ -127,14 +106,11 @@
 		margin-top: 1px;
 	}
 
-	/* colour, margin and the content reset: theme/35-alerts.css — absorbed with the heading ramp */
-
 	.alert-message button {
 		margin: var(--fs-space-1) 0;
 	}
 
-	/* `.label` pill and variants: theme/35-alerts.css — absorbed, as is the indicator pill
-	 * (showIndicator() only ever emits into #indicators, which theme/20-shell.css paints). */
+	/* .label pill and the indicator pill: theme/35-alerts.css / theme/20-shell.css — absorbed. */
 	header [data-indicator] {
 		white-space: nowrap;
 		text-shadow: none;

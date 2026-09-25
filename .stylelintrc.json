@@ -12,7 +12,9 @@
     "docs/conventions.md — no stray !important, and no colour literal outside the palettes.",
     "",
     "audit.py stays: it checks things stylelint cannot see (var() defined-vs-used",
-    "across files, declarations shadowed within a cascade layer).",
+    "across files, declarations shadowed within a cascade layer). declaration-no-important",
+    "+ the override below and selector-disallowed-list below hold the !important allowlist",
+    "and the data-title i18n check, each the ONLY copy of its rule. docs/ci.md has why.",
     "",
     "TWO formatting rules are the deliberate exception, and they are @stylistic/* because",
     "stylelint 16 removed every stylistic rule from core. The objection above is to the",
@@ -94,7 +96,14 @@
 
     "no-descending-specificity": null,
 
-    "declaration-no-important": true
+    "declaration-no-important": true,
+
+    "selector-disallowed-list": [
+      "/\\[\\s*data-title\\s*[~^$*|]?=\\s*(\"[^\"]+\"|'[^']+'|[^\\]\\s\"']+)/",
+      {
+        "message": "a CSS rule may not key off a data-title VALUE - LuCI fills it from the translated column heading (issue #7), so it matches nothing outside English and dies silently. Anchor on the column instead (`.td:nth-child(N)`). `[data-title]` presence alone, or an empty `[data-title=\"\"]`, is fine."
+      }
+    ]
   },
   "overrides": [
     {
@@ -121,8 +130,7 @@
         "against that same unlayered sheet's `flex: 2 2 10%`, two because a meter cell needs the",
         "whole line where a label/value pair needs half.",
         "This list is the contract. Adding a file to it needs a reason in the file.",
-        "The same list lives in tools/audit.py (BANG_OK); tools/bang-ok.mjs (npm run bang-ok)",
-        "fails if the two drift, so a file added here but not there (or vice versa) is caught."
+        "It is the ONLY copy — docs/ci.md has why."
       ],
       "files": [
         "luci-theme-footstrap/styles/base/*.css",

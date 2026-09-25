@@ -96,11 +96,11 @@ orchestrators use. Sources, ranked: the research artifact of 2026-09-03.
 
 ## Permissions
 
-| Change in `.claude/settings.json` | Why |
+| `.claude/settings.json` permission | Why |
 |---|---|
-| `owlab up/down/sync/test/exec/status`: `ask` → `allow` | disposable containers; a loop that prompts at every sync is not a loop |
-| `dev-sync.sh`, `ssh`: → `ask` | the hardware router is the one thing a wrong run breaks for a person |
-| `gh pr comment/review`, `gh issue comment`, MCP review calls: deny removed | publishing is a rule in `CLAUDE.md`, given per action, not a matcher |
+| `owlab up/down/sync/test/exec/status`: `allow` | disposable containers; a loop that prompts at every sync is not a loop |
+| `dev-sync.sh`, `ssh`: `ask` | the hardware router is the one thing a wrong run breaks for a person |
+| `gh pr comment/review`, `gh issue comment`, MCP review calls: no matcher in `permissions` | publishing is a rule in `CLAUDE.md`, given per action, not a matcher |
 | `Read/Write/Edit(../tmp/**)`: `allow` | the scratch directory, cards and handoffs |
 | `additionalDirectories: ["../tmp"]` | `../tmp` is outside the project root, and the three rules above do not apply until the directory is registered |
 | `git stash/clean/restore/reset --hard/checkout -- `, `git add -A|--all|.`: `ask` | the loop owns the index between rounds; these are the verbs that discard a round's work or widen it past the card, and `/upstream-pr` needs them, so they prompt rather than deny |
@@ -133,12 +133,10 @@ prints it: 136,544 characters of tool result plus 11 images (1.96 MB of payload)
 largest session, and 417,073 characters, 20 images and 484 Bash calls against 5 delegations in the
 largest of `luci-app-footstrap-files`.
 
-Two testers were run side by side on trial card 1 (2026-09-03), `tester` on Opus and `tester-b` on
-Sonnet, same prompt and same diff. Opus returned three findings to Sonnet's one: it also caught
-that the new changelog entry pointed at files still untracked, and it ran `computed-diff --control`
-without being asked, which is what turned 2468 differences from a number into a causal one. Sonnet
-cost 36k tokens against 47k and finished in half the time, and found nothing the other missed.
-Opus stays; `tester-b` is deleted.
+Trial card 1 (2026-09-03) measured `tester` on Opus against the same prompt and diff run on Sonnet:
+three findings to one, including a changelog entry pointing at still-untracked files and an
+unprompted `computed-diff --control` that turned 2468 differences from a number into a causal one —
+why `tester` runs on Opus.
 
 The loop itself was exercised on a second card the same day: round 0 carried a planted `wrap-regex`
 defect, the tester returned NEEDS_WORK with two blocking findings, and the developer closed them in

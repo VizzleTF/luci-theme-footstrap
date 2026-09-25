@@ -153,23 +153,30 @@
  *   node tools/pseudo-loc.mjs --verbose        # print every finding, not just the first 8 per kind
  */
 import { chromium } from 'playwright';
+import { parseArgs } from 'node:util';
 import { serveGallery } from './lib/gallery.mjs';
 import { buildCss } from './lib/css.mjs';
 
-const ARGV = process.argv.slice(2);
-const opt = (name, dflt) => { const i = ARGV.indexOf(`--${name}`); return i < 0 ? dflt : ARGV[i + 1]; };
-const VERBOSE = ARGV.includes('--verbose');
+const { values: ARGS } = parseArgs({
+	options: {
+		widths: { type: 'string', default: '320,390' },
+		densities: { type: 'string', default: 'normal,compact,large' },
+		eps: { type: 'string', default: '2' },
+		verbose: { type: 'boolean', default: false },
+	},
+});
+const VERBOSE = ARGS.verbose;
 
 /* 320 is the narrowest reflow WCAG 1.4.10 requires; 390 is the modal phone point every other
  * gallery gate reaches for on a phone-width claim (computed-diff.mjs, live-audit.mjs). */
-const WIDTHS = opt('widths', '320,390').split(',').map(Number);
+const WIDTHS = ARGS.widths.split(',').map(Number);
 /* null = bare :root (normal). Density=Large is the axis that exposed the ENGLISH half of task
  * 0145's bug on its own (a 360px screen); skipping it here would leave that gap open again. */
-const DENSITIES = opt('densities', 'normal,compact,large').split(',').map((d) => (d === 'normal' ? null : d));
+const DENSITIES = ARGS.densities.split(',').map((d) => (d === 'normal' ? null : d));
 /* the intact tree's own noise floor, measured above: 2px of border/padding rounding on the one
  * element this gate is proven against. A real project may need to raise this once measured; lower
  * it only after checking the intact tree still passes at the new value. */
-const EPS = Number(opt('eps', '2'));
+const EPS = Number(ARGS.eps);
 
 /* Accepted, already-documented exceptions — see the file header for the case each one is. A
  * selector added here needs the same one-line justification an a11y-gallery.mjs `.exclude()`
@@ -562,5 +569,6 @@ for (const [kind, rows] of byKind) {
 	if (!VERBOSE && rows.length > shown.length) console.error(`  … and ${rows.length - shown.length} more (--verbose)`);
 }
 console.error(`\npseudo-loc: ${findings.length} overflow finding(s) — an element, the width, the density and the ` +
-	'measured overflow are above. Read docs/development.md, "pseudo-loc", for what each kind means and what to do.');
+	'measured overflow are above. Read docs/development.md, "The three cheap browser gates: smoke, ' +
+	'computed-diff and pseudo-loc", for what each kind means and what to do.');
 process.exit(1);

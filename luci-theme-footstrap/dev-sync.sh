@@ -98,10 +98,7 @@ for _f in "$D"/root/etc/config/*; do
 	scp -q "$_f" "$R":"/tmp/.fs-conf-$_b"
 	ssh "$R" "[ -f /etc/config/$_b ] || { mv /tmp/.fs-conf-$_b /etc/config/$_b; echo '  installed /etc/config/$_b (was absent)'; }; rm -f /tmp/.fs-conf-$_b"
 done
-# There is no self-update backend to deploy any more: the theme upgrades through the package feed
-# the installer adds, which is what a package manager is for.
-#
-# No rpcd reload here either — same race as the Makefile's postinst note (Package/luci-theme-
+# No rpcd reload here — same race as the Makefile's postinst note (Package/luci-theme-
 # footstrap/postinst): this copies files onto a router where the theme registers no rpcd object,
 # rpcd re-reads acl.d/*.json at LOGIN (not only on reload), and a developer's root session already
 # carries read='*' write='*', so the theme's ACL group is irrelevant to it regardless.

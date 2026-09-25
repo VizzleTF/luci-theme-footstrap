@@ -1,24 +1,6 @@
 @layer theme {
-	/* Wallpaper axis, value `pattern`: an SVG the admin uploads, tiled behind the content and
-	 * recoloured by the theme, so the same file reads correctly in light and dark and under any
-	 * palette without being edited.
-	 *
-	 * A dedicated element rather than a `background-image`, because recolouring a rasterised image
-	 * takes `mask-image` — the SVG supplies the alpha, the element the colour — and a mask applies
-	 * to the element's whole rendering, children included, so it can never go on .fs-shell or
-	 * <body>. Hence .fs-pattern, emitted as the first child of <body> by header.ut and sysauth.ut
-	 * (the login page has no .fs-shell), whose only job is to be masked.
-	 *
-	 * z-index: -1 with a transparent body, because inside the root stacking context the paint order
-	 * is html's background, then negative-z children, then every block background: the layer sits
-	 * above the canvas and below the content, but body's own opaque --fs-bg would bury it. The
-	 * canvas therefore moves up to :root for this axis and body goes transparent; .fs-main and the
-	 * footer paint their own --fs-bg and follow for the same reason. The sidebar is deliberately
-	 * not excluded —
-	 * the bar is translucent and the pattern showing behind it is what makes the page read as one
-	 * sheet.
-	 *
-	 * Cards sit on opaque --fs-panel, so the pattern shows through the gaps only. */
+	/* .fs-pattern: the masked wallpaper element. Why a dedicated element, why z-index: -1 needs a
+	 * transparent body — design-system.md, "Wallpaper rendering: why the canvas moves to :root". */
 	.fs-pattern { display: none; }
 
 	:root[data-wallpaper="pattern"] { background-color: var(--fs-bg); }
@@ -26,10 +8,8 @@
 	:root[data-wallpaper="pattern"] .fs-main { background-color: transparent; }
 	:root[data-wallpaper="pattern"] footer.fs-footer { background: transparent; }
 
-	/* `fixed`, so the pattern is one calm backdrop the page scrolls under rather than a strip that
-	 * slides with every table — the same argument the File photo's background-attachment makes.
-	 * --fs-pattern-url is `none` until something is uploaded (head.ut / fs-prefs.js), so the axis
-	 * selected with no file is a bare canvas rather than a broken tile. */
+	/* --fs-pattern-url is `none` until an upload exists (head.ut/fs-prefs.js) — the axis picked
+	 * with no file is a bare canvas, not a broken tile. */
 	:root[data-wallpaper="pattern"] .fs-pattern {
 		display: block;
 		position: fixed;
@@ -38,10 +18,8 @@
 		pointer-events: none;
 		opacity: var(--fs-pattern-strength);
 	}
-	/* THEME INK (the default). The file's own colours are discarded and only its alpha is used, so
-	 * an opaque background inside the SVG would mask as a solid sheet — which is exactly why the
-	 * admin can switch to the file's own colours below. Line art on transparency is the shape this
-	 * mode is for. */
+	/* Theme ink (default): file's own colours discarded, only alpha used through the mask —
+	 * design-system.md, "Pattern colours". */
 	:root[data-wallpaper="pattern"]:not([data-pattern-ink="original"]) .fs-pattern {
 		background-color: var(--fs-text);
 		-webkit-mask-image: var(--fs-pattern-url);
@@ -51,15 +29,13 @@
 		-webkit-mask-size: var(--fs-pattern-size) auto;
 		mask-size: var(--fs-pattern-size) auto;
 	}
-	/* THE FILE'S OWN COLOURS: an ordinary tiled background, no mask. For artwork that carries its
-	 * own palette and would be flattened to one colour by the mask. */
+	/* original: the file's own palette, plain tiled background, no mask. */
 	:root[data-wallpaper="pattern"][data-pattern-ink="original"] .fs-pattern {
 		background-image: var(--fs-pattern-url);
 		background-repeat: repeat;
 		background-size: var(--fs-pattern-size) auto;
 	}
 
-	/* No wash layer behind #view: the pattern shows through the gaps between the cards at
-	 * full strength. Every block that carries text paints an opaque --fs-panel of its own,
-	 * so nothing has to be dimmed globally. */
+	/* No wash layer behind #view: cards paint their own opaque --fs-panel, so nothing needs
+	 * dimming globally. */
 }

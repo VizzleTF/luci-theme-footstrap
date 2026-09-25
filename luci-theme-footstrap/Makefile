@@ -12,14 +12,9 @@ PKG_NAME:=luci-theme-footstrap
 # the CSS build. Pin it.
 LUCI_NAME:=luci-theme-footstrap
 
-# Version is git-derived; never hardcode PKG_VERSION. CI injects FOOTSTRAP_VERSION from the
-# tag (an SDK build has no .git, so it cannot derive one).
-FOOTSTRAP_VERSION?=
-ifneq ($(FOOTSTRAP_VERSION),)
-PKG_VERSION:=$(FOOTSTRAP_VERSION)
-PKG_RELEASE:=1
-endif
-
+# Version is git-derived; never hardcode PKG_VERSION. luci.mk falls back to PKG_SRC_VERSION,
+# which it always defines, when nothing here sets it — see docs/package.md for why no override
+# lives here.
 LUCI_TITLE:=Footstrap Theme
 # +luci-base is the WHOLE list, and keeping it that way is the constraint. Nothing this package ships
 # fetches anything at run time, so there is no second name to justify — and the rule that got it here
@@ -37,27 +32,12 @@ LUCI_URL:=https://github.com/VizzleTF/luci-theme-footstrap
 # color-mix() and nested calc() and break the layout. build-css.sh minifies instead.
 LUCI_MINIFY_CSS:=0
 #
-# JS: two minify paths, chosen by who is building.
-#
-# CI (the released packages) pre-minifies with terser BEFORE the SDK build — tools/minify-js.mjs
-# mangles top-level identifiers too, which jsmin cannot: ~41 KB against jsmin's ~57 KB, −27% — and
-# signals it with FOOTSTRAP_PREMIN=1.
-# jsmin must then stay away from the already-minified output: terser legitimately emits
-# `return/^v/.test(s)`, the exact one-character-lookback trap below, so LUCI_MINIFY_JS goes to 0.
-#
-# Everyone else (an SDK user, the buildbot — no node) builds the untouched source and keeps
-# luci.mk's default jsmin: ~105 KB of this tree's JS is comments, and uhttpd serves /www with NO
-# compression, so those are wire and flash bytes either way.
-#
-# The catch on the jsmin path, and why the gates exist: jsmin decides regex-or-division from a
-# one-character lookback, and `n` (of `return`) and `>` (of `=>`) are not on its allow-list, so
-# `return /re/` makes it eat the rest of the file AND EXIT 0 (openwrt/luci#8299). eslint's
-# `wrap-regex` bans the shape in the source; tools/jsmin-verify.mjs proves jsmin's output is
-# token-identical to it.
-FOOTSTRAP_PREMIN?=
-ifneq ($(FOOTSTRAP_PREMIN),)
-LUCI_MINIFY_JS:=0
-endif
+# JS: the released package is built by owfeed (tools/stage.sh), never by this Makefile through
+# the SDK — so LUCI_MINIFY_JS keeps luci.mk's default jsmin here. jsmin decides regex-or-division
+# from a one-character lookback, and `n` (of `return`) and `>` (of `=>`) are not on its
+# allow-list, so `return /re/` makes it eat the rest of the file AND EXIT 0 (openwrt/luci#8299).
+# eslint's `wrap-regex` bans the shape in the source; tools/jsmin-verify.mjs proves jsmin's output
+# is token-identical to it.
 
 # Apache-2.0, and not a free choice: styles/base began as a fork of luci-theme-bootstrap's
 # cascade.css, the ucode templates derive from LuCI's own, and a few JS helpers are verbatim copies.
@@ -131,9 +111,7 @@ define Package/luci-theme-footstrap/postinst
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
 	# uci-defaults registers the theme; drop the LuCI caches so it is seen without a reboot.
-	# Calling it ourselves is belt-and-braces: OpenWrt's default_postinst also runs (then
-	# deletes) every /etc/uci-defaults/* we ship, so it executes twice per install. It is
-	# idempotent: the second pass finds the theme already registered and changes nothing.
+	# default_postinst also runs it; the second pass is idempotent.
 	[ -f /etc/uci-defaults/30_luci-theme-footstrap ] && \
 		sh /etc/uci-defaults/30_luci-theme-footstrap >/dev/null 2>&1 || true
 	rm -f /tmp/luci-indexcache* /tmp/luci-modulecache/* >/dev/null 2>&1 || true
@@ -221,12 +199,8 @@ endef
 #    falls back to PKG_SRC_VERSION, which luci.mk always defines, so only an un-built source
 #    checkout keeps the literal '0.0.0-dev'.
 #
-# The catalogue is luci.mk's business and nothing here compiles it. `po/` is the directory
-# LUCI_LANGUAGES globs, so luci.mk emits one `luci-i18n-footstrap-<lang>` package per language, the
-# way it does for every luci-app — which is what a package in the luci tree has to look like, and
-# what Weblate can see. It was `i18n/` while a fielded self-update script mis-picked a multi-asset
-# release with `head -1` (issue #6); that script is retired and owfeed builds one theme artifact
-# per format regardless.
+# The catalogue is luci.mk's business and nothing here compiles it: `po/` is the directory
+# LUCI_LANGUAGES globs, so luci.mk emits one `luci-i18n-footstrap-<lang>` package per language.
 define Build/Prepare/luci-theme-footstrap
 	# luci.mk's Build/Prepare copies only src/ luasrc/ htdocs/ root/ ucode/ into
 	# $(PKG_BUILD_DIR), and PKG_LICENSE_FILES resolves against THAT — so the Apache text has to

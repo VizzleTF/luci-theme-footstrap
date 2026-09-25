@@ -28,19 +28,20 @@
  *   node tools/fit-quiet.mjs [--only owrt2512] [--all] [--engine chromium|webkit]
  *
  * Needs a running owlab router (docs/development.md). */
+import { parseArgs } from 'node:util';
 import { chromium, webkit } from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
-const arg = (name, dflt) => {
-	const i = process.argv.indexOf('--' + name);
-	return i === -1 ? dflt : process.argv[i + 1];
-};
-const ENGINE = arg('engine', 'chromium');
+const { values: FLAGS } = parseArgs({ options: {
+	engine: { type: 'string', default: 'chromium' }, widths: { type: 'string', default: '390,480,767' },
+	only: { type: 'string', default: '' }, all: { type: 'boolean', default: false },
+} });
+const ENGINE = FLAGS.engine;
 /* Both sides of the decision: 390px is where the menu takes its own row and the bar walks taller
  * before it settles, 767px is where it does not and the walk is mostly a dip. Only widths that
  * drive the escalation move the bar at all, and both are needed to see either direction. */
-const WIDTHS = (arg('widths', '390,480,767')).split(',').map(Number);
-const SLACK = Number(arg('slack', '2'));
+const WIDTHS = FLAGS.widths.split(',').map(Number);
+const SLACK = 2;
 
 /* Every forced layout `fitChrome()`'s own decision performs — `stripFitsOneRow()`'s `offsetTop` and
  * `getClientRects()` reads (fs-chrome.js) — is a moment an engine with no scroll anchoring could
@@ -74,7 +75,7 @@ const WATCH = () => {
 	Element.prototype.getClientRects = function () { const v = gcr.apply(this, arguments); sample(); return v; };
 };
 
-const list = requireStands(stands(arg('only', ''), { all: process.argv.includes('--all') }), 'fit-quiet');
+const list = requireStands(stands(FLAGS.only, { all: FLAGS.all }), 'fit-quiet');
 const browser = await (ENGINE === 'webkit' ? webkit : chromium).launch();
 const findings = [];
 let runs = 0, attempts = 0, worst = 0;

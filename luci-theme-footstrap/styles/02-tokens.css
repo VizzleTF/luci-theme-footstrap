@@ -1,84 +1,28 @@
 @layer tokens {
-	/* Design tokens, in two tiers, and the split is load-bearing:
-	 *
-	 *   PRIVATE  --fs-*       every rule in this theme reads only these
-	 *   EXPORT   --*-color-*  LuCI's conventional names, defined FROM the private tier and read
-	 *                         by nobody here — they exist so a third-party luci-app-* keeps
-	 *                         working and keeps following the palette and dark mode
-	 *
-	 * :root is a shared scope and every luci-app-* drops CSS into the same document, unlayered,
-	 * which outranks every cascade layer. An app declaring --accent or the conventional
-	 * --text-color-high, which base itself once read 158 times, repaints the theme: 312 of 336
-	 * gallery elements with a hostile :root before the split, 0 after. The bridge is outward-only,
-	 * and tools/audit.py fails on any read of an export name inside styles/.
-	 *
-	 * docs/design-system.md. Light = :root; dark = :root[data-darkmode="true"]. */
+	/* PRIVATE --fs-* only; the EXPORT --*-color-* tier is derived elsewhere and unread here.
+	 * docs/design-system.md "Two tiers, and the split is load-bearing". */
 	:root {
-		/* Palette colours are in 03-palettes.css, one swappable block per colourway x mode;
-		 * everything here is palette-independent or var()-derived. The inks (--fs-on-accent and
-		 * friends) live in those blocks too, beside the fills they must be legible against: a
-		 * dark palette has light fills and needs a dark ink, and one global `#fff` failed WCAG AA
-		 * on seven of the eight dark-palette fills (down to 1.69:1). */
-		/* pop surfaces (menus, dropdown lists, the select picker): one value rather than a
-		 * literal per site */
-		--fs-shadow-pop: 0 12px 34px rgba(0,0,0,.30);
-		/* ---- two focus rings, and which one a control takes is the contract ----
-		 * -soft is a TINT (10-15% of the accent), measuring 1.15-1.29:1 on the surface it lands
-		 * on: a glow, not an indicator, where WCAG 1.4.11 wants 3:1. It is legitimate only beside
-		 * a second channel — every field taking it also flips border-color to --fs-accent, which
-		 * measures 4.57-7.04:1 across palette x mode x surface, so the border is the indicator and
-		 * the tint is the halo.
-		 *
-		 * -solo is for a control where the ring is the WHOLE indicator and nothing else changes on
-		 * focus: the sidebar menu links and chrome icon buttons, the section tabs, both range
-		 * sliders. Its 2px of surface is what lets it read against a FILLED control, where an
-		 * accent ring would otherwise sit on an accent box; solid accent then measures 5.19-7.04
-		 * on panel and 4.61-7.55 on the canvas.
-		 *
-		 * The invalid twin takes -fill (18%), not -soft: a red ring must read as an alarm rather
-		 * than a hover tint, and it is paired with a red border. */
+		/* palette colours live in 03-palettes.css */
+		--fs-shadow-pop: 0 12px 34px rgba(0,0,0,.30);	/* pop surfaces: menus, dropdown lists, the select picker */
+		/* which of the three a control takes: docs/design-system.md "The derived ladder" */
 		--fs-focus-ring: 0 0 0 3px var(--fs-accent-soft);
 		--fs-focus-ring-solo: 0 0 0 2px var(--fs-panel), 0 0 0 5px var(--fs-accent);
 		--fs-focus-ring-invalid: 0 0 0 3px var(--fs-danger-fill);
-		/* The chosen-row rail: a chosen row says so with an opaque surface and an inset bar, never
-		 * with a tint of the accent under accent text (4.21:1 in dark — theme/65-dropdown.css).
-		 * Named because it is written in three places that cannot be one rule: the open dropdown's
-		 * row, a native `select option:checked`, and the ring the focused row wears on top. The
-		 * first two are pinned to each other by tools/mirror.mjs. */
+		/* opaque, not a tint (4.21:1 in dark); pinned by tools/mirror.mjs
+		 * (`selected-row/paint`), docs/css.md "@mirror" */
 		--fs-row-rail: inset 2px 0 0 var(--fs-accent);
 
-		/* The hairline: every separator in this theme is the same one-pixel line in the same
-		 * border colour, so it is stated once rather than in 69 longhand declarations that would
-		 * each have to change for a 2px high-contrast line or a softer colour. The shorthand is
-		 * the token, so `border`, `border-top` and friends all take it. */
+		/* every separator is this one line, stated once rather than in 69 longhand declarations */
 		--fs-hairline: 1px solid var(--fs-border);
-		/* a field reacting to focus: the ring arrives and the edge changes colour together, and a
-		 * transition list that drifts apart shows the border moving before the ring */
+		/* ring and border-colour transition together, or the ring arrives before the edge does */
 		--fs-field-transition: border-color var(--fs-dur), box-shadow var(--fs-dur);
 
-		/* the theme's one colour literal, deliberately: black at .7 is the absence of light behind
-		 * a dialog, not a tint of any token — a palette-tinted scrim over a dark page dims
-		 * nothing. A token, so the rules stay literal-free. */
+		/* the theme's one colour literal on purpose. docs/design-system.md "The derived ladder". */
 		--fs-scrim: rgba(0, 0, 0, .7);
 
-		/* ---- role tint ladder (derived) ----
-		 * A tint OF a role, mixed FROM it, so it follows the palette with nothing hand-maintained.
-		 * Unnamed, these levels drift: the same outline border was 40% in a table and 45% in the
-		 * action bar, the same hover fill 12% in one file and 18% in another.
-		 *
-		 *   -soft     12%  a quiet FILL      — outline-button :hover
-		 *   -fill     18%  a stronger FILL   — callout/diff surface, the invalid ring
-		 *   -line     40%  a HAIRLINE        — outline-button border, diff border
-		 *   -line-hi  55%  that hairline on :hover
-		 *
-		 * The role x step matrix is complete on purpose, read or not: a gap is how the drift
-		 * starts, since a rule wanting a level that does not exist invents a percentage.
-		 * --fs-accent-soft is the one member not here — its strength differs per MODE (10% light,
-		 * 15% dark; hicontrast dark 14%). LIGHT is identical across every palette and lives as one
-		 * declaration in 03-palettes.css's shared :root instead; DARK still varies by palette (one
-		 * differs by a digit) and stays declared per palette block. */
+		/* Role tint ladder, derived so it follows the palette. docs/design-system.md "The derived
+		 * ladder". */
 		--fs-good-soft: color-mix(in srgb, var(--fs-good) 12%, transparent);
-		--fs-warn-soft: color-mix(in srgb, var(--fs-warn) 12%, transparent);
 		--fs-danger-soft: color-mix(in srgb, var(--fs-danger) 12%, transparent);
 
 		--fs-accent-fill: color-mix(in srgb, var(--fs-accent) 18%, transparent);
@@ -88,208 +32,79 @@
 
 		--fs-accent-line: color-mix(in srgb, var(--fs-accent) 40%, transparent);
 		--fs-good-line: color-mix(in srgb, var(--fs-good) 40%, transparent);
-		--fs-warn-line: color-mix(in srgb, var(--fs-warn) 40%, transparent);
 		--fs-danger-line: color-mix(in srgb, var(--fs-danger) 40%, transparent);
 
 		--fs-accent-line-hi: color-mix(in srgb, var(--fs-accent) 55%, transparent);
 		--fs-good-line-hi: color-mix(in srgb, var(--fs-good) 55%, transparent);
-		--fs-warn-line-hi: color-mix(in srgb, var(--fs-warn) 55%, transparent);
 		--fs-danger-line-hi: color-mix(in srgb, var(--fs-danger) 55%, transparent);
-		/* The warn row has no reader today and is kept on purpose: LuCI emits no warning BUTTON,
-		 * so only -fill is consumed. The row is what makes the next component reach for a token
-		 * instead of mixing its own percentage. A grep finding no `var(--fs-warn-line)` is
-		 * expected. */
 
-		/* The circular-arrows refresh glyph, as a mask so its colour follows the palette
-		 * (--fs-good active, --fs-dim paused). One copy: the poll pill collapses to it both in the
-		 * rail and in the bar's compact cluster. A static glyph on purpose — a spinner makes an
-		 * idle poll look busy and moves the click target that pauses it.
-		 *
-		 * OURS, and redrawn to keep it so. It was derived from Lucide's `refresh-cw` (ISC) —
-		 * `M21 3v5h-5` was byte-identical — which is a second outside licence obligation this theme
-		 * never declared. Redrawn as two OPEN arcs with solid triangular heads: a different
-		 * construction, not a nudge of the same one (Lucide caps a continuous stroke with an
-		 * L-shaped hook). Solid heads rather than chevrons because chevrons dissolve at the 18px
-		 * this renders at. */
+		/* ours, redrawn to stay so — not Lucide's. docs/design-system.md "Two glyphs drawn as
+		 * tokens, not fetched". */
 		--fs-icon-refresh: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4.4 9.6A8.5 8.5 0 0 1 18.6 7.6'/%3E%3Cpath d='M19.6 14.4A8.5 8.5 0 0 1 5.4 16.4'/%3E%3Cpath fill='%23000' stroke='none' d='M21.6 10.6 15.4 8.4 20.4 4.2Z'/%3E%3Cpath fill='%23000' stroke='none' d='M2.4 13.4 8.6 15.6 3.6 19.8Z'/%3E%3C/svg%3E");
-		/* …and the size it is drawn at, which css-dup cannot police for a glyph inlined once and
-		 * sized at two call sites. The two sites legitimately differ in technique — the rail masks
-		 * the element and drops the border, the bar keeps the bordered square — but not in size. */
+		/* css-dup cannot police a glyph inlined once, sized at two call sites — keep in step by hand */
 		--fs-icon-refresh-sz: calc(18px * var(--fs-density-type));
 
-		/* Hover cue for a solid control — the one cue that cannot be a colour, the fill it shifts
-		 * being whatever the role token says. Per mode, and the DIRECTION FLIPS: `filter`
-		 * recolours the text too, and a light-mode solid button is a saturated fill with white
-		 * ink, which cannot get brighter — brightening drops white on --fs-accent from 5.19:1 to
-		 * 4.59:1 at 1.08 and to 4.08:1 at a visible 1.15, an AA failure caused by hovering. So
-		 * light darkens (.90 lands at 4.94:1, still clear of the 4.5 floor) and dark, whose fill
-		 * is light and ink dark, brightens (1.15). */
+		/* direction flips by mode: light darkens, dark brightens (`filter` recolours the ink too) */
 		--fs-hover-lift: brightness(.90);
 
-		/* ---- motion: four durations, because the UI does four things ----
-		 * There is deliberately no easing token: every transition and animation omits the timing
-		 * function and takes the CSS default (ease), which is one curve, nothing to keep in sync
-		 * and fewer bytes than naming it. A rule needing another curve is making a design decision
-		 * and must justify it in a comment.
-		 *
-		 * The scale governs `animation` too, not only `transition`: one gesture ridden at three
-		 * durations is drift css-dup cannot see, the declaration bodies differing.
-		 * 95-a11y-media.css kills all of this under prefers-reduced-motion. */
+		/* four durations, no easing token. docs/design-system.md "Scales" ("Motion") */
 		--fs-dur: .15s;		/* a state change: colour, border, shadow, background, filter */
 		--fs-dur-move: .2s;	/* something that moves or unfolds: transform, max-height */
 		--fs-dur-fade: .25s;	/* a transient thing fading in or out: spinner, notification */
 		--fs-dur-fill: .4s;	/* a progress bar growing to its value */
 		--fs-content-max: 1280px;	/* content column cap */
-		/* content column side padding, read by .fs-content, the top bar's centering calc and the
-		 * notification width calc, so the three cannot drift */
+		/* also read by the bar's centering calc and the notification-width calc */
 		--fs-content-pad: calc(28px * var(--fs-density-space));
-		/* The shell's geometry: tokens, not literals, because the JS reads them back — the CSS
-		 * lays the sidebar out and fs-chrome.js's fitShell() subtracts that cut from the viewport
-		 * to decide whether what is left is readable. With copies in JS, narrowing the rail here
-		 * leaves the measurement subtracting the old width. */
+		/* tokens, not literals — fs-chrome.js's fitShell() reads them back. docs/design-system.md
+		 * "Scales" ("Shell geometry"). */
 		--fs-sidebar-w: calc(224px * var(--fs-density-box));		/* the expanded vertical sidebar's column */
 		--fs-rail-w: calc(68px * var(--fs-density-box));		/* ...and the same sidebar collapsed to its icon rail */
 		--fs-content-min: 500px;	/* below this a content column stops being readable */
-		/* the bar's surface: the top-nav bar and the sidebar's phone bar are one component in two
-		 * markups, so one token keeps the two identical. OPAQUE on purpose. It was 88% of the panel
-		 * under a 12px backdrop blur, and the pair was measured on the page most favourable to it —
-		 * a pattern wallpaper at full strength, the bar sitting over scrolled content: dropping the
-		 * blur moved 0.04% of the pixels, and what the translucency actually bought was the page
-		 * showing through the chrome, which reads as a glitch rather than as glass. */
+		/* opaque on purpose. docs/design-system.md "The derived ladder". */
 		--fs-bar-bg: var(--fs-panel);
-		/* height of that bar, and the scroll-margin every anchor target needs to clear it
-		 * (base/10-reset.css): if the two drift, an in-page jump lands under the bar */
-		/* The chrome's own controls — the square buttons (search, appearance, log out) and the poll
-		 * pill — ride the bar rather than cutting panel-coloured holes in it: the bar is one surface,
-		 * and a control on it is carried by its hairline, not by a second fill. `transparent`, so the
-		 * control shows the bar itself rather than a second surface stacked on it.
-		 *
-		 * The backdrop a control lands on is therefore --fs-bar-bg, which is --fs-panel: the same
-		 * construction `.label`'s comment in theme/35-alerts.css leans on, so a coloured variant keeps
-		 * its >=4.5:1 by the palette's guarantee rather than by measurement. A palette that wants the
-		 * old panel2 hole sets this back to var(--fs-panel2). */
-		--fs-bar-ctl-bg: transparent;
-		/* The select's chevron, drawn rather than fetched. It used to be an inline SVG data-URI, and
-		 * a URI cannot read var() — the stroke colour had to be written INTO the string, so the
-		 * declaration was repeated once per palette and once per mode: ten copies of one glyph, ~2.4 KB
-		 * of the shipped sheet, and ten chances for a palette to be recoloured while its chevron was
-		 * not. Two gradient bands cost one declaration and take their colour from the palette's own
-		 * --fs-dim at paint time, so a new palette gets a correct chevron for free. The 45% / 55% stops
-		 * are the band's thickness; the two layers are positioned by the rules that use this, since
-		 * only they know the field's inset. What is given up is the round line cap the SVG had, which
-		 * at 12px is not visible — compared side by side before the swap. */
+		/* base/10-reset.css's scroll-margin must equal this or an in-page jump lands under the bar */
+		/* drawn, not fetched. docs/design-system.md "Two glyphs drawn as tokens, not fetched". */
 		--fs-select-chevron:
 			linear-gradient(-45deg, transparent 45%, var(--fs-dim) 45% 55%, transparent 55%),
 			linear-gradient(45deg, transparent 45%, var(--fs-dim) 45% 55%, transparent 55%);
 		--fs-bar-h: calc(46px * var(--fs-density-box));
-		/* the square icon button in the bar and rail: the logo box, the .fs-themerow controls,
-		 * Log out and the collapsed poll pill are one size, so the right cluster reads as a row
-		 * of equal squares */
+		/* logo box, .fs-themerow controls, Log out and the poll pill share this size */
 		--fs-btn-size: calc(34px * var(--fs-density-box));
 
-		/* Corner-radius scale: one user-tunable base (Appearance -> Rounding, 0-20px, pre-painted
-		 * on :root by partials/head.ut) with three semantic radii scaling from it proportionally,
-		 * so every surface rounds in step and pills stay round. At base 12: card 12, control 10,
-		 * chip 8. Every border-radius in theme/ and pages/ reads one of these; the only bare px
-		 * left are 0, 50% and three that are not a card's corner at all. */
+		/* one base (Appearance -> Rounding); three radii scale from it */
 		--fs-radius-base: 12px;
 		--fs-radius-lg: var(--fs-radius-base);				/* cards, panels, modals, table frame, popovers */
 		--fs-radius: calc(var(--fs-radius-base) * 5 / 6);	/* controls: inputs, buttons, dropdowns, tabs (10 @12) */
 		--fs-radius-sm: calc(var(--fs-radius-base) * 2 / 3);	/* chips, code, small insets, rail toggle (8 @12) */
 		--fs-radius-pill: 999px;					/* pills, toggles, badges — always round */
 
-		/* A card's inner gutter (.cbi-section). A token because it is read back to UNDO it:
-		 * theme/45-misc.css bleeds the realtime graphs out to the card's border edge by this
-		 * padding plus the 1px border, so a literal in both places would re-clip every graph when
-		 * the gutter narrows. */
+		/* .cbi-section's own gutter; theme/45-misc.css reads it back to undo it (bleed to the card edge) */
 		--fs-card-pad: calc(16px * var(--fs-density-space));
-		/* the vertical rhythm between cards (.cbi-section, tab groups, alerts, action bars):
-		 * an unnamed level drifts, so it is stated once */
+		/* vertical rhythm between cards: .cbi-section, tab groups, alerts, action bars */
 		--fs-card-gap: calc(16px * var(--fs-density-space));
 
 		--fs-font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 		--fs-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-		/* ---- type scale ----
-		 *
-		 * 13px is the base deliberately: a router UI is dense tables of addresses and counters, and
-		 * the size was chosen for that. The rhythm around it is a unitless 1.5 rather than a hard
-		 * 18px — `line-height: 18px` is inherited as 18px into a 20px heading and clips it, while
-		 * 1.5 is re-resolved against each element's own size.
-		 *
-		 * Every step is a whole px; the line box 1.5 computes is not (13 -> 19.5), which is what
-		 * unitless leading gives on an odd size. What must stay whole is a BOX: never size an
-		 * element `--fs-type * --fs-leading` — take the nearer --fs-space step.
-		 *
-		 * Five steps, and the count is the point: a scale with 1px gaps builds no hierarchy, it
-		 * just makes two rules look unrelated in a grep. Ratio is roughly 1.25 per step, and
-		 * anything needing a size off this list is making a design decision and should say so. */
-		/* ---- density: one axis, three multipliers ----
-		 *
-		 * Compact / Normal / Large is a client preference stamped as :root[data-density]; absent
-		 * means Normal, so the default costs no attribute and no override.
-		 *
-		 * Three multipliers, because one knob gets all three kinds of size wrong:
-		 *
-		 *   --fs-density-type   TEXT, moving least (.9 / 1.15). Compact is a request for less air,
-		 *                       not for smaller writing; .9 puts the base at 12px, which is the
-		 *                       floor.
-		 *   --fs-density-space  pure AIR — padding, margin, gap — which is what buys the room, so
-		 *                       it moves most (.65 at Compact). It does not grow at Large, where
-		 *                       inflating the air just reads as zoom.
-		 *   --fs-density-box    boxes that must HOLD text or an icon: the sidebar, the rail, the
-		 *                       bar height, the icon buttons, the control-height floors. They
-		 *                       cannot follow the air — the type gives up only a tenth, so a
-		 *                       sidebar cut by 35% no longer fits the labels it exists to show.
-		 *
-		 * This is only expressible because every size in the theme reads one of these tokens: a
-		 * size written outside the ladders silently stops responding to the axis.
-		 *
-		 * Type is rounded to whole pixels, a fractional font size rendering soft; space is not,
-		 * since a sub-pixel padding is invisible and rounding it would collide steps together. */
+		/* five steps, ~1.25 apart */
+		/* three multipliers, one knob each for text/air/boxes */
 		--fs-density-type: 1;
 		--fs-density-space: 1;
 		--fs-density-box: 1;
 
-		/* ---- control heights: three steps, following the density ----
-		 * A minimum height stops a button collapsing onto its text, so it is part of how dense the
-		 * UI feels: left literal, Compact shrinks the writing while the buttons stay put.
-		 * Not --fs-control-h below, which is a FIELD's height derived from the text it must hold;
-		 * these are the floors a chrome control gets when its content is not text. */
+		/* chrome-control floors, not a field's height (--fs-control-h below) */
 		--fs-ctl-h-sm: calc(30px * var(--fs-density-box));	/* dense/small: .btn.small, table-row buttons */
 		--fs-ctl-h: calc(38px * var(--fs-density-box));	/* the default control */
 		--fs-ctl-h-lg: calc(44px * var(--fs-density-box));	/* prominent: .btn.large, the login submit */
 
-		/* Unrounded here, rounded in the @supports below, and the split is the difference between
-		 * a soft failure and no page: `round()` is the youngest thing this theme depends on
-		 * (Chromium 125, Firefox 118, Safari 15.4), and a custom property holds any token stream,
-		 * so an engine without it parses these fine and fails at SUBSTITUTION — `var(--fs-type)`
-		 * is then invalid at computed-value time and computes to `unset`, taking every font-size,
-		 * line-height and field min-height with it. Measured by serving a sheet with `round(`
-		 * renamed: 5881 of 5912 elements on Overview change, body type goes 13px -> 16px, and 5880
-		 * font-size and 5733 line-height declarations are lost. Declared this way, such an engine
-		 * keeps the whole ladder and pays a fractional pixel at the two non-default densities. */
-		/* One step BELOW the ladder's smallest, and it exists for one measured reason: the Port
-		 * status card's traffic figures. They are the widest thing a card must fit whole, so their
-		 * size is what sets how narrow a card may be — at --fs-type-xs the floor is 106px, at 10px
-		 * it is 94px, which is what turns ten cards plus a lonely eleventh into one row of eleven.
-		 * A figure read as a pair of numbers beside a label tolerates the step that body text would
-		 * not. Declared here rather than as a literal in the page rule so the density axis stays in
-		 * one place. */
+		/* rounded in @supports below (round() is younger than the floor) */
 		--fs-type-2xs: calc(10px * var(--fs-density-type));
 		--fs-type-xs: calc(11px * var(--fs-density-type));	/* eyebrow, badges, tooltips, dense metadata */
 		--fs-type: calc(13px * var(--fs-density-type));		/* body, tables, fields, menu items — the base */
 		--fs-type-lg: calc(16px * var(--fs-density-type));	/* section titles (h3/legend), alert headings */
 		--fs-type-xl: calc(20px * var(--fs-density-type));	/* page titles */
 		--fs-type-2xl: calc(26px * var(--fs-density-type));	/* h1 — only a third-party app emits a bare one */
-		/* ---- WEIGHT: there are only ever three, and they had six spellings ----------
-		 * The theme ships no font at all — the stacks name Manrope and JetBrains Mono first and
-		 * fall through to the system faces — so these are not a ramp to pick from: they are the
-		 * two weights a reader is likely to actually have, plus the "un-bold this"
-		 * value. `700` and `bold` were both in use and are the same weight; so are `400` and
-		 * `normal`, and 400 has no face at all (it resolves onto the 600 one — that is why body
-		 * text is semibold by design, and why adding a 400 face would silently restyle every page).
-		 * Naming them leaves one spelling each. */
+		/* one spelling per weight — `700`/`bold` and `400`/`normal` were both in use. */
 		--fs-weight-normal: 400;	/* "not bold" — no face of its own; resolves onto the 600 */
 		--fs-weight: 600;	/* the UI default: body, labels, controls */
 		--fs-weight-bold: 700;	/* titles, table headers, the eyebrow */
@@ -297,45 +112,12 @@
 		--fs-leading: 1.5;	/* unitless ON PURPOSE — see above (13 -> 19.5px) */
 		--fs-leading-tight: 1.2;	/* headings and single-line plates, where 1.5 looks loose */
 
-		/* ---- THE EYEBROW — one microlabel idiom, named once -------------------------
-		 *
-		 * Uppercase + tracked + bold + muted is ONE thing this theme draws in a dozen places: table
-		 * column headers, the stacked-card `data-title` labels, the Appearance group labels, the rail
-		 * flyout titles, the login field titles, the search-result section note. It had drifted into
-		 * four spellings of that one idiom — letter-spacing .04/.05/.06em, weight 600 vs 700, colour
-		 * --fs-dim vs --fs-faint — the same unnamed-level drift the role x step matrix above exists to
-		 * stop, only in typography. An eyebrow is a LABEL, so it takes the quietest ink and the widest
-		 * tracking of the set; the alert table's 600 was the odd one out and read lighter than every
-		 * other header on the page.
-		 *
-		 * SIZE is deliberately NOT here: 10px (a card/chrome label) and 11px (a table header, i.e.
-		 * --fs-type-xs) are two real tiers, and collapsing them would resize half the tables.
-		 *
-		 * Two things that look like eyebrows are NOT and must stay out: `h6` is a HEADING (it takes the
-		 * type scale and the heading ink), and `.fs-navlabel` is the menu's section separator, whose
-		 * .1em is deliberately wider than any label — it separates, it does not caption. */
+		/* one microlabel idiom, named once */
 		--fs-eyebrow-tracking: .06em;
 		--fs-eyebrow-weight: 700;
 		--fs-eyebrow-color: var(--fs-faint);
 
-		/* ---- SPACE SCALE — a 4px grid ----------------------------------------------
-		 *
-		 * Same story: the 18px/9px pair base used was upstream's line-height and half of it, so
-		 * every gutter in the theme was a function of Twitter's leading. A 4px grid is independent
-		 * of the type scale, which is the point — changing the font size must not silently
-		 * re-space every widget. `--fs-card-pad` (16px) and `--fs-content-pad` (28px) are already
-		 * on this grid and stay named for their role; these are the generic steps.
-		 *
-		 * Do NOT add a step because one rule wants 10px. An unnamed level is how the radius tints
-		 * drifted into four strengths for two decisions (see the ladder above): pick the nearer
-		 * step, or argue in a comment for why this rule is genuinely different. */
-		/* The grid is 4px, but the theme genuinely works at 2px between the low steps: a chip's
-		 * inset, a nav item's row padding and a card's inner gutter all landed on 6/10/14 and no
-		 * amount of rounding makes them 4/8/12 without visibly changing the control. So the half
-		 * steps are NAMED rather than pretended away — they were the single largest group of
-		 * magic numbers left in the tree (6px x26, 10px x32, 14px x13, 2px x13). Above 16px the
-		 * grid stays 4px: nothing needs finer, and every value that had drifted between the steps
-		 * up there (22, 26, 42) was snapped onto one. */
+		/* pick the nearer step; do not add one for a single rule */
 		--fs-space-0-5: calc(2px * var(--fs-density-space));
 		--fs-space-1: calc(4px * var(--fs-density-space));
 		--fs-space-1-5: calc(6px * var(--fs-density-space));
@@ -347,49 +129,17 @@
 		--fs-space-5: calc(20px * var(--fs-density-space));
 		--fs-space-6: calc(24px * var(--fs-density-space));
 		--fs-space-7: calc(28px * var(--fs-density-space));
-		/* The top of the ladder is sparse on purpose — these three are gutters and insets, not
-		 * rhythm, and each has two or three users: the sidebar accordion's indent and the search
-		 * palette's bottom padding (-7), the room a field leaves for its own chevron (-8), the login
-		 * card's bottom margin and the gauge's two right gutters (-10). They are named so that no
-		 * padding in this theme is an unexplained number, not because a fourth caller is expected. */
+		/* sparse on purpose above -7 — gutters and insets, not rhythm */
 		--fs-space-8: calc(32px * var(--fs-density-space));
 		--fs-space-10: calc(40px * var(--fs-density-space));
 
-		/* the spinner glyph's box (base/95-luci.css `.spinning::before`, width and height): one
-		 * number, one name, read in one place */
-		--fs-spin-size: var(--fs-space-5);
-
-
-		/* One control height for every single-line field — input, select, .cbi-select,
-		 * .cbi-dropdown and the checkbox/radio row beside them. Derived rather than measured by
-		 * hand: the text box (--fs-type x --fs-leading = 19.5px) plus the vertical inset those
-		 * fields carry (2 x --fs-space-1) plus both 1px borders = 29.5 -> ceil 32 at the default
-		 * density. A literal here is arithmetic over one particular leading, so
-		 * re-scaling the type silently leaves every control the wrong height for its own text. */
+		/* every single-line field's height, derived not measured */
 		--fs-control-h: calc(var(--fs-type) * var(--fs-leading) + var(--fs-space-1) * 2 + 2px);
 
-		/* How wide an elastic control gets in a form row. A `.cbi-value-field` is `flex: 1`, so
-		 * anything asking for 100% takes the whole card, and a form whose controls each end at a
-		 * different x reads as broken. Fixed-width controls keep their own 210px; this is the
-		 * ceiling for the ones that stretch. It is a COLUMN width, like the label column beside
-		 * it, so it is deliberately not on the 4px step scale. */
+		/* ceiling for an elastic `.cbi-value-field` (flex: 1) — a COLUMN width, off the 4px scale */
 		--fs-field-max: 440px;
 
-		/* ---- stacking scale ----
-		 * Every z-index in the theme comes from here. Bare numbers across seven files record
-		 * nothing about what should sit above what, which is how a popover came to paint over an
-		 * open modal; as an ordered list that is obvious.
-		 *
-		 * Bottom to top:
-		 *   raise     in-flow child that must clear its siblings (zonebadge tooltip)
-		 *   sticky    the sticky bars: top-nav, sidebar phone bar
-		 *   flyout    nav panels: rail flyouts, top-nav dropdowns, rail tooltips
-		 *   header    base's sticky <header> (above content, below any popup)
-		 *   popover   the Appearance popover — ABOVE the chrome, BELOW a modal
-		 *   overlay   #modal_overlay: a modal is modal, it covers the chrome
-		 *   tooltip   .cbi-tooltip — must read over modal content
-		 *   dropdown  an OPEN .cbi-dropdown list — over everything, including inside a modal
-		 * ------------------------------------------------------------------------ */
+		/* every z-index comes from here */
 		--fs-z-raise: 2;
 		--fs-z-sticky: 50;
 		--fs-z-flyout: 70;
@@ -399,59 +149,24 @@
 		--fs-z-tooltip: 1000;
 		--fs-z-dropdown: 1100;
 
-		/* ---- export tier: outbound only ----
-		 * Nothing in styles/ may read these (tools/audit.py fails the build if it does). They
-		 * exist so a third-party luci-app-* addressing them still gets our palette and dark mode,
-		 * and so an app overwriting one restyles only its own widgets.
-		 *
-		 * high/medium/low is a PROMINENCE scale, not decoration: apps do ask for the gradation —
-		 * one paints its "no data" latency with --primary-color-low, another reads eleven of these
-		 * names, and stock firewall.js and status/cpu.js read them too — so three aliases of one
-		 * token hand back a flat colour.
-		 *
-		 * Direction is bootstrap's, which every app was calibrated against: `high` is the most
-		 * pronounced value of the role, except --background-color-*, which is an ELEVATION axis
-		 * (high = raised). The mechanism differs per family, by measurement — see each block.
-		 *
-		 * Binding constraint: apps read a level as `color:` about as often as as `background:`, so
-		 * every level must clear WCAG AA as text on --fs-bg/--fs-panel/--fs-panel2 and carry a
-		 * legible --on-*-color as a fill. */
+		/* outbound only (audit.py --strict fails a styles/ read of one). docs/design-system.md
+		 * "The export tier is a RAMP" */
 		--background-color-high: var(--fs-panel);
 		--background-color-medium: color-mix(in srgb, var(--fs-panel) 55%, var(--fs-panel2));
 		--background-color-low: var(--fs-panel2);
 
-		/* -low is --fs-faint, the theme's own third ink, and not a duplicate of -medium: making the
-		 * two the same token flattens the export (`spread(high, low)` falls to 0.082 in the
-		 * default palette, under the 0.10 the ramp promises) and hands an app asking for a
-		 * gradation one colour twice. Legibility is measured rather than assumed — every level is
-		 * held to AA as text on all three surfaces and as a fill under its --on-* ink, in both
-		 * modes, across the whole palette x tint matrix. */
 		--text-color-highest: var(--fs-text);
 		--text-color-high: var(--fs-text);
 		--text-color-medium: var(--fs-dim);
 		--text-color-low: var(--fs-faint);
 
-		/* borders carry no text, so -low may fade toward the surface: a hairline is supposed to
+		/* borders carry no text, so -low may fade toward the surface — a hairline is meant to
 		 * disappear into it */
 		--border-color-high: color-mix(in srgb, var(--fs-border) 60%, var(--fs-text));
 		--border-color-medium: var(--fs-border);
 		--border-color-low: color-mix(in srgb, var(--fs-border) 55%, var(--fs-panel));
 
-		/* Accent ramps: the axis is CHROMA at constant lightness — `high` is the pure palette
-		 * colour and each step mixes it toward --fs-dim in oklch, which interpolates lightness
-		 * linearly and so drains saturation while leaving luminance put, keeping every level
-		 * printable as text. Both alternatives were measured and rejected:
-		 *
-		 *   fading `low` toward the surface spends contrast we do not have — in dark every accent
-		 *   already sits at 4.56-4.59:1, and an 8% fade took one level to 4.18:1;
-		 *
-		 *   pushing `high` toward --fs-text collapses the ramp in dark, where --fs-text is
-		 *   near-white: the strong end comes back 0.055 from the weak end, i.e. flat.
-		 *
-		 * Bootstrap's own ramp walks lightness, which is why it reads inverted in dark mode and
-		 * lands at 3.6:1. Keep its direction, drop its mechanism. Every step is mixed FROM the
-		 * token it grades, so there is no hand-kept second copy of a colour, and
-		 * tools/export-tier.mjs proves the whole tier across palette x mode. */
+		/* tools/export-tier.mjs proves the whole tier across palette x mode */
 		--primary-color-high: var(--fs-accent);
 		--primary-color-medium: color-mix(in oklch, var(--fs-accent) 78%, var(--fs-dim));
 		--primary-color-low: color-mix(in oklch, var(--fs-accent) 45%, var(--fs-dim));
@@ -476,16 +191,7 @@
 		color-scheme: light;
 	}
 
-	/* ---- the rounded half of the type ladder, for engines that can round ----
-	 *
-	 * A fractional font size renders soft, so every size is meant to land on a whole pixel — but a
-	 * token using `round()` on an engine without it is not a fallback, it is a deleted token that
-	 * takes every rule reading it (see the ladder above). So the ladder is declared plainly there
-	 * and rounded here, where the at-rule can be asked first. --fs-control-h is derived from
-	 * --fs-type and rounds UP to the 4px control ladder for the same reason.
-	 *
-	 * `@supports (width: round(1px, 1px))` rather than a `calc()` probe: the function has to be
-	 * tested where a length is expected. */
+	/* round(…) tested where a length is expected, not by a calc() probe */
 	@supports (width: round(1px, 1px)) {
 		:root {
 			--fs-type-2xs: calc(round(10px * var(--fs-density-type), 1px));
@@ -498,72 +204,30 @@
 		}
 	}
 
-	/* ---- the density axis ----
-	 *
-	 * Normal is a bare :root, so the default path costs no attribute and no override.
-	 *
-	 * These multiply the LADDERS, not the rules: a size on a ladder follows the axis for free and
-	 * one that is not silently ignores it. */
+	/* bare :root is Normal; these multiply the LADDERS, not the rules */
 	:root[data-density="compact"] {
-		/* type moves least (.9 against .65 for the air): padding is where the room is, so leaning
-		 * on the text would cost legibility to save very little. At .9 the base is 12px and the
-		 * eyebrow 10px, which is the floor. */
 		--fs-density-type: .9;
 		--fs-density-box: .85;
 		--fs-density-space: .65;
 	}
 	:root[data-density="large"] {
-		/* Large is about the TEXT, so the air does not grow with it: only the type and the boxes
-		 * that hold it get bigger. Inflating the spacing too pushes content off the screen and
-		 * makes the setting read as zoom, which is the browser's job. */
 		--fs-density-type: 1.15;
 		--fs-density-box: 1.15;
-		--fs-density-space: 1;
+		/* --fs-density-space stays at the bare :root default of 1 here — large density widens type
+		 * and controls, not the space/gutter scale. */
 	}
 
-	/* ---- the content-width axis ----
-	 *
-	 * No :root[data-content-width] blocks here (issue #44 moved this from a three-step picker to a
-	 * slider): the value is a real px length written straight onto --fs-content-max as an inline
-	 * style by fs-axes.js's propAxis, the same shape Rounding uses, and read back exactly as before
-	 * by `.fs-content`, the modal width calc and the top layout's centring padding
-	 * (theme/20-shell.css, theme/50-toplayout.css) — deliberately including the modal, which follows
-	 * the column on purpose rather than keeping its own separate cap the reader would have to
-	 * reconcile against.
-	 *
-	 * The range is 1280-3840, and neither end is derived from this file: 1280 (--fs-content-max
-	 * above) is the value the theme has always drawn, so the slider's left end IS today's look and
-	 * the axis can never go narrower than the default — a difference from every other numeric axis,
-	 * none of which has a floor that also has to be the default. --fs-content-min (500px) was the
-	 * rule this axis had to stay clear of; with 1280 as the floor it is now a property of the range
-	 * instead, 780px below the nearest point the slider can reach. 3840 stands in for "uncapped": no
-	 * CSS viewport width in ordinary use reaches it, since even a physical 4K panel reports a scaled
-	 * CSS width well under it — and `columnWidth()`'s `Math.min(state.outerW - cut, g.contentMax)`
-	 * needs a real px length either way, `none`/`100%` failing both the `calc()` in
-	 * 50-toplayout.css and `px()`'s getComputedStyle probe in fs-chrome.js.
-	 *
-	 * Step 128px: 2,560px of travel at 20 stops, matching Rounding/Photo dim/Pattern strength's stop
-	 * count rather than Pattern scale's near-pixel drag — a stop here should move a table's column
-	 * count, not shave a pixel off a margin, and 128 is the largest round number that divides the
-	 * range into stops that few. */
+	/* No :root[data-content-width] block: fs-axes.js's propAxis writes --fs-content-max inline
+	 * instead. docs/design-system.md "The appearance axes" ("Content width"). */
 
 	:root[data-darkmode="true"] {
-		/* palette colours are in 03-palettes.css; only mode-level, palette-independent
-		 * tokens live here */
+		/* palette colours are in 03-palettes.css; only mode-level tokens live here */
 		--fs-disabled-opacity: .45;
-		/* the hover cue flips direction here (see --fs-hover-lift): a dark-mode solid button is a
-		 * light fill with dark ink, so brightening moves it away from both the page and its own
-		 * ink */
+		/* dark fill is light, so brightening (not darkening) moves it away from page AND ink */
 		--fs-hover-lift: brightness(1.15);
 		color-scheme: dark;
 	}
 
-	/* No component bridge in any notation (--*-hsl triples, --*-rgb read as `rgba(var(--x), .3)`):
-	 * a hand-kept second copy of a colour goes stale in silence when a palette is recoloured, and
-	 * a missing triple makes the declaration invalid at computed-value time, so the tint vanishes
-	 * with no error tools/audit.py can catch — the var IS defined, only elsewhere. A tint of X is
-	 * mixed FROM X, and a component copy must not be reintroduced in any notation:
-	 *   rgba(var(--error-color-high-rgb), .3) -> color-mix(in srgb, var(--fs-danger) 30%, transparent)
-	 * The one surviving --*-rgb is --zone-color-rgb, which is not ours: luci-mod-network writes it
-	 * inline on a zone badge (base/95-luci.css). */
+	/* no component bridge (--*-hsl, --*-rgb): docs/conventions.md "Writing CSS" ("No colour
+	 * literals"). The one surviving --*-rgb is luci-mod-network's own (base/95-luci.css), not ours. */
 }

@@ -43,9 +43,9 @@ const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = 
 	 * keyed by that first id and the entry carries `live`, the id armed right now (null while
 	 * paused), so a view holding its handle can still stop its own poller after a trip through a
 	 * hidden tab. The arguments are kept because a `setInterval` id carries none of them back. */
-	window.setInterval = function (fn, ms) {
+	window.setInterval = function (fn, ms, ...rest) {
 		const id = _si.apply(window, arguments);
-		_viewIntervals.set(id, { fn, ms, rest: Array.prototype.slice.call(arguments, 2), live: id });
+		_viewIntervals.set(id, { fn, ms, rest, live: id });
 		return id;
 	};
 	window.clearInterval = function (id) {
@@ -102,28 +102,19 @@ const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = 
  *
  * `L.Poll.timer` is that id, and it is private state: `add`/`remove`/`start`/`stop`/`active` are the
  * documented surface, and the whole `L.Poll` alias is already deprecated (`'require poll'` replaces
- * it, but no supported release ships poll.js yet). Read blind, a renamed field would make LuCI's
- * tick look like a view's — cleared on the next navigation, every poll on every later page silently
- * dead. So a missing field is a reason to do nothing, once, loudly.
- *
- * Asked through the documented half first: `active()` says whether the tick is running, and `timer`
- * is deleted by `stop()`, so an absent field is the ordinary "nothing to protect" case. The anomaly
- * worth reporting is the pair disagreeing — a tick running while the id it runs on has no name we
- * know.
- *
- * The alias itself is guarded for the same reason: the sweep runs inside the staged render, and a
- * TypeError there would leave every click showing the previous page's content under the new page's
- * title. */
+ * it, but no supported release ships poll.js yet). `active()` below is called unguarded: this
+ * caller runs from the visibilitychange listener at module eval (:69-81), before CONTRACT_FNS ever
+ * checks anything, so what backs it is the floor, not the boot contract — `L.Poll.active` is
+ * unconditional in every 24.10+ luci.js. Read blind, a renamed `timer` field would make LuCI's tick
+ * look like a view's — cleared on the next navigation, every poll on every later page silently
+ * dead. So a missing field is a reason to do nothing, once, loudly: `active()` says whether the
+ * tick is running, and `timer` is deleted by `stop()`, so an absent field is the ordinary "nothing
+ * to protect" case. The anomaly worth reporting is the pair disagreeing — a tick running while the
+ * id it runs on has no name we know. */
 /* -> the tick's id; null when LuCI is not polling; false when the two cannot be told apart, which
  * every caller reads as "leave every interval alone" */
 function pollTickId() {
-	if (!L.Poll) {
-		warnPollUnreadable('footstrap: L.Poll is gone from this luci-base, so LuCI\'s own tick cannot be '
-			+ 'told apart from a view\'s timers — leaving view intervals alone. fs-router.js needs '
-			+ 'updating for this luci-base.');
-		return false;
-	}
-	const running = (typeof L.Poll.active === 'function') ? L.Poll.active() : (L.Poll.timer != null);
+	const running = L.Poll.active();
 	if (running && L.Poll.timer == null) {
 		warnPollUnreadable('footstrap: LuCI is polling but L.Poll.timer is not readable — leaving view '
 			+ 'intervals alone rather than risking its tick. fs-router.js needs updating for this '
@@ -338,11 +329,9 @@ function watchSession() {
  * which also takes it out of the live tree. Public API only; no reaching into `dom.registry`. */
 function discard(el) {
 	try {
-		const dom = window.L ? window.L.dom : null;
-		if (!dom || typeof dom.content !== 'function') { el.remove(); return; }
 		const bin = document.createElement('div');
 		bin.appendChild(el);
-		dom.content(bin, null);
+		window.L.dom.content(bin, null);
 	}
 	catch (e) {
 		el.remove();
@@ -479,7 +468,7 @@ function restoreScroll(pos, gen) {
 		stop();
 	};
 	/* the keys that scroll, and only those: typing in a field must not cancel anything */
-	const SCROLL_KEYS = new Set([ 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' ', 'Spacebar' ]);
+	const SCROLL_KEYS = new Set([ 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' ' ]);
 	const onKey = (ev) => { if (SCROLL_KEYS.has(ev.key)) stop(); };
 	const opts = { passive: true, capture: true };
 	function off() {
@@ -784,11 +773,7 @@ function commitStage(stage, contentHost) {
 		if (contentHost) contentHost.setAttribute('data-page', page);
 	}
 	const nodes = Array.from(stage.view.childNodes);
-	const dom = window.L ? window.L.dom : null;
-	if (live && dom && typeof dom.content === 'function')
-		dom.content(live, nodes);
-	else if (live)
-		live.replaceChildren(...nodes);
+	window.L.dom.content(live, nodes);
 	dropStage(stage);
 }
 
@@ -1434,7 +1419,7 @@ function wireRouter() {
  * "Paused" is always shown with `handler: null`), and which of the two ran first here used to decide
  * everything — luci.js registers its listener from `setupDOM()`, after an async chain
  * (DOMContentLoaded + ui/rpc/form + probeRPCBaseURL), this module at eval, from the inline
- * `L.require('menu-footstrap')` in `partials/footer.ut`, so network/cache timing picked the order.
+ * `L.require('menu-footstrap')` in `footer.ut`, so network/cache timing picked the order.
  * Run with this listener first, its hide removed the span before luci.js re-created it for "Paused"
  * with no handler, and the next `poll-start` found that span already there and only changed its
  * text — clickless for the rest of the document. A microtask runs only once the whole synchronous

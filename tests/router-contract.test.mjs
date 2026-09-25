@@ -13,7 +13,6 @@ function router({ L, window, document, ui } = {}) {
 	const win = window || fakeWindow();
 	const doc = document || fakeDocument();
 	const luci = L || fakeL();
-	win.L = luci;
 	return loadModule('fs-router', {
 		L: luci, window: win, document: doc,
 		stubs: {

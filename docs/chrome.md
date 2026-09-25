@@ -149,6 +149,123 @@ with the pin, 8px and 33px without it. The symptom itself does not reproduce hea
 one synchronous task and both engines restore the offset once the bar is back, measured at half the
 page and at its bottom — which is why the gate watches the cause.
 
+## The bar: fit steps, scroll model, a rail that must match its guard
+
+**The bar is written once, unguarded — never under a viewport OR an attribute selector.** CSS
+cannot OR a media query with `:root[data-layout="top"]` in one selector, so writing the bar under
+both guards means writing it twice (55 of ~75 declarations identical, free to drift). Inverted,
+each of the three chrome states — bar, vertical sidebar, vertical rail — is stated exactly once,
+and the vertical sidebar wins on **specificity** (`0,4,0` against the bar's `0,1,0`), never on
+source order.
+
+**`.fs-shell`'s floor height is `svh`, never `dvh`.** `dvh` tracks the viewport as browser UI comes
+and goes, and on iOS the URL bar slides continuously while the reader scrolls, so a shell keyed on
+it re-lays-out on every frame of that animation — the shaking reported from an iPhone. `svh` is the
+small-viewport height, fixed while the UI moves, and correct for a floor: the shell must be at
+least one screenful tall with the bar shown, and is free to grow taller once the bar hides. The
+rule generalises: a height that must not move under the reader uses `svh`; `dvh` is for something
+meant to grow as the UI retracts.
+
+**Right cluster: two fit steps, both measured by `fitCluster()` (fs-chrome.js), neither gated on
+layout.** The top layout is a bar at every width and the sidebar layout becomes one on a phone, so
+a `data-layout="top"` guard misses the common case — a phone in the default sidebar layout, whose
+bar would otherwise show full pills with Log out wrapped alone onto a second row. Step 1
+(`.fs-ind-compact`) drops the indicator pills' prose for icon squares, freeing ~200px, often
+enough to keep the menu on the brand's row. Step 2 (`.fs-bar-actrow`) moves the whole cluster to
+its own row when the pills alone are not enough.
+
+**Hostname handling is two rules for two different failures.** `overflow-wrap: anywhere` lets a
+long, dot-free hostname's flex min-content shrink so it cannot push the menu out of the bar
+(`nowrap` + ellipsis used to truncate the one string that identifies the router). `-webkit-line-clamp:
+3` bounds the other axis a width cap alone does not reach: at 1280px, 8 characters give the
+ordinary 46px bar, 63 (the kernel's nodename limit) give 73px, and an unbounded name gave a
+4273px-tall bar. Three lines outlasts every real hostname and still reads as a bar.
+
+**A static sidebar, never `position: sticky` (issue #7).** The desktop sidebar layout pins
+`.fs-shell` to the viewport and scrolls `.fs-main` inside itself, so the sidebar only needs to stay
+put — and `sticky` is the wrong tool for that: it is a composited GPU layer, and with the
+`overflow: visible` the rail's flyouts need to escape sideways, every hover repaint left a 1px seam
+of the flyout at the layer's edge until a full repaint cleared it. `static` makes no stacking
+context at all, so the flyouts resolve `--fs-z-flyout` in the root one instead, with nothing to
+leave stale.
+
+**`contain: paint` on `.fs-main` is the fix for issue #12, a Firefox-only leak.** `.fs-shell` is
+`height: 100svh; overflow: hidden` and `.fs-main` is its own `overflow: auto` scroller, so Chrome
+never grows the document past the viewport — but Firefox propagates an out-of-flow descendant's
+scrollable overflow past both overflow ancestors up to the initial containing block anyway,
+painting a second, whole-page scrollbar beside `.fs-main`'s own: measured on the Overview, where
+the `.fs-ovl` grid makes the column ~2800px tall, `html.scrollHeight` read 1058 against a 900px
+viewport (900 once contained), and the extra 158px dragged the fixed sidebar off-screen even
+though `overflow: hidden` hid the second scrollbar itself. Paint containment makes `.fs-main` the
+containing block for that descendant and clips it; LuCI's modals are `position: fixed` on
+`<body>`, not inside `.fs-main`, so the new containing block does not re-base them, and Chrome
+takes no path through this rule at all.
+
+**The rail's guard must be the vertical sidebar's, exactly** — same media floor, same
+`:not([data-narrow])`. It once read `min-width: 768px` against the vertical block's 521px, and
+between the two widths the vertical rules applied without the rail ones: the sidebar sprang back
+to its full 224px as the window shrank — it *expanded* — while the JS measurement was already
+subtracting the rail's 68px. The rail is a MODE of the vertical sidebar and can never be visible
+under conditions the vertical sidebar itself is not.
+
+**A flyout's heading reuses the bar's hover-bridge pseudo-element, and reset every geometry
+property doing it (issue #22).** `li.has-sub > ul::before` is the bar's invisible 10px hover
+bridge above the popup; in the rail the same selector carries the flyout's title instead, and
+leaving `position`, `inset` and `height` in force rendered the heading as a 10px-tall absolute box
+above the flyout, clipped in half by the panel's own overflow. The rail brings its own bridge as
+`li.has-sub::after` instead.
+
+**A collapsed-rail indicator badges its count instead of wrapping its prose (issue #14).** "Unsaved
+Changes: N" wants 86px in a 68px rail: unclamped, the pill wraps onto three lines and hangs 34px
+past the rail's edge over the content. `fs-chrome.js` lifts the count into `data-fs-badge` (a text
+node is unreachable by a selector) and the CSS paints a square showing the badge alone, `font-size:
+0` hiding the prose without removing it from the DOM (still read by a screen reader, still in
+`title` for the pointer).
+
+**A bar dropdown anchors to its own `<li>`, not to the bar (issue #19).** `position: static` plus a
+panel pinned at `left: 16px` anchored to the bar's edge instead of its trigger — measured at
+760px, the item at x=253 and the panel at x=32, nothing bridging the diagonal between them, so the
+CSS hover closed before a pointer reached the panel. `clampDropdown` (`menu-footstrap.js`) now
+nudges an item near the edge back inside the viewport in every bar state.
+
+**A footer link pair needs 26px, not the type scale's own leading, between their centres (WCAG 2.2
+SC 2.5.8).** The footer is one sentence carrying two links; where it wraps, they land on
+consecutive lines, and with the inherited leading that put 16px between their centres — inside the
+24px envelope the criterion sets around a target smaller than 24×24, which an inline link always
+is. `line-height: max(26px, calc(var(--fs-type) * 2))` is a floor, not a fixed number, because a
+bare `26px` would be the one leading in the file that ignores the Density axis while a bare
+multiplier falls back under 24px at Compact (11.7px × 2 = 23.4) — exactly where the wrap is most
+likely. Found by `tools/live-audit.mjs` on CI's runner and not on the stands, because the wrap
+width depends on text metrics the two environments render slightly differently.
+
+## Tab strips
+
+**One component, four LuCI selectors deduplicated in `theme/40-tabs.css`.** `#tabmenu ul.tabs`
+(page tabs), `ul.cbi-tabmenu.mode` (mode switcher), `.tabs` (view tabs) and `.cbi-tabmenu` (CBI
+form tabs) share every rule except the active marker (`.active` vs `.cbi-tab`).
+
+**`.cbi-tabmenu > li` alone gets `max-width: 100%`, not `none`** (page tabs and the mode switcher
+keep `none`, since neither ever carries a sentence-length label). adblock's Overview page names one
+tab "Настройки межсетевого экрана" — measured 293px in a 264px column at 320px/Large, 28.6px past
+it, the section clipped by 30px; EN measured 0px overflow. The `a` already carries `white-space:
+nowrap; overflow: hidden; text-overflow: ellipsis` (`base/50-chrome.css`); it never engaged because
+the `li`'s `max-width: none` left its automatic minimum size at the label's full content width, so
+flexbox never shrank it. `100%` is smaller than that content width only once the column already is
+— a no-op everywhere the tab already fits.
+
+**Keyboard focus on a tab pill uses one ring for both states, `--fs-focus-ring-solo`.**
+`base/50-chrome.css`'s ordinary `outline: 2px solid var(--fs-accent)` is invisible on the active
+pill, whose background is the same accent (measured on the router: both `rgb(86,157,245)`). A tab
+flips nothing else on focus, so the ring alone is the indicator; the tinted `--fs-focus-ring`
+measured 1.15-1.29:1 against the strip in the version that tried it for the inactive pill only, below
+the ring's usual contrast floor. `box-shadow`, not `outline`, because the strip clips overflow and a
+shadow is not clipped by the scroll container.
+
+**Density steps (`fs-dense1` → `fs-dense2`) come from `fitTabStrips()` (`fs-chrome.js`) measuring
+whether the strip wraps to a second row**, mutually exclusive so a pill is never trimmed by both
+classes at once. Both steps give the pill the same padding; only `fs-dense2` also tightens the
+strip's own `gap`, the last knob before the strip is allowed to wrap.
+
 ## `header.ut`
 
 - Shared parts live in `partials/` (`head`, `brand`, `logout`, `notices`, `notice`, `search`,
@@ -171,7 +288,7 @@ page and at its bottom — which is why the gate watches the cause.
 - Must be preserved: `http.prepare_content`, `cbi.js`, the translations script, `node.css`, `css`,
   `blank_page`, `noscript`, and the no-root-password / initramfs warnings.
 
-`partials/footer.ut` emits `<footer class="fs-footer" role="contentinfo">` — the role is explicit
+`footer.ut` emits `<footer class="fs-footer" role="contentinfo">` — the role is explicit
 because `<footer>` only gets `contentinfo` implicitly when its nearest ancestor is `<body>`, and
 this one sits inside `<main>`. It hard-loads `L.require('menu-footstrap')` and then
 `L.require('fs-select')`; the `menu_module` parameter that used to pick a renderer went away with
@@ -200,6 +317,11 @@ moved here.
   Deliberately not `role="menu"` — APG explicitly says site navigation should not take menubar
   semantics. `aria-current="page"` goes on the leaf only; a section header is a button, not a link
   to the current page.
+- **The active PLATE (fill) follows the page; an open ANCESTOR keeps only the accent INK.**
+  `li.active` is set on both the current leaf and the section containing it, so a shared rule
+  handing both the same fill drew two identical plates stacked on System → System (issue #37).
+  `theme/10-chrome.css` matches the plate on `a.active` and the ink on
+  `li.active > a:not(.active)`, so an ancestor that is not itself the page never gets the fill.
 - **`.open` has two meanings**: in the expanded sidebar it is an accordion (several sections at
   once, the set remembered in `localStorage` `fs-menu-open`); in the rail, in the bar, or on a
   narrow screen it is an exclusive flyout. `flyoutMode()` decides, and it reads **exactly what the
@@ -248,14 +370,11 @@ at all until you are already there — "Port Forwards" is a tab of Network → F
 - **It does not call the router.** Every result is a real `<a href>`, so a click bubbles to the
   router's own document-level handler and takes the SPA path (or falls back to a full load when the
   node is not SPA-able) with no second copy of that decision. Enter synthesises the same click.
-- **Recently visited rows are kept in `localStorage` `fs-recent`, one key each.** A page's key is
-  its menu path; a row from a companion source carries its own `key`, because what it points at has
-  no dispatcher node — the sections source keys one `admin/system/system#Footstrap`, the page plus
-  the section's own heading. Only the key is stored: the title is resolved through the pool on
-  every render, so it follows the UI language and a row nothing produces any more is dropped
-  instead of shown dead. `menu-footstrap-common` owns the writer (`remember()`, exported for a
-  source that has to record its own row) and `warmRecent()` prefetches the page half of each key —
-  see [spa-router.md](spa-router.md).
+- **Recently visited rows are kept in `localStorage` `fs-recent`, one menu path each.** Only the
+  path is stored: the title is resolved through the index on every render, so it follows the UI
+  language and a page an ACL change hides is dropped instead of shown dead. `menu-footstrap-common`
+  owns the writer (`remember()`) and `warmRecent()` prefetches each path — see
+  [spa-router.md](spa-router.md).
 
 **Trap it was built around: do not index through `ui.menu.getChildren()`.** On an alias node it
 returns a copy whose `children` are the alias *target's*. That is right for drawing a menu and

@@ -10,16 +10,7 @@
  *   Copyright 2011 Twitter, Inc
  */
 
-/* Layer order, declared here and nowhere else. A later layer beats an earlier one regardless of
- * specificity, so a theme rule never needs !important to outrank base; one that needs it to beat
- * another footstrap rule belongs in a later layer. Unlayered rules beat every layer, and that slot
- * is deliberately empty.
- *
- *   tokens  design tokens + the outbound bridge to LuCI's --*-color-* names  styles/0*
- *   base    widget defaults every LuCI view assumes exist               styles/base/*
- *   theme   footstrap components and layouts                           styles/theme/*
- *   page    per-page corrections                                       styles/pages/*
- *
- * build-css.sh concatenates those four directories into cascade.css, which is generated and
- * gitignored — never edit it. */
+/* Layer order, declared here and nowhere else. Directory-to-layer map, concatenation order and
+ * the hijack risk from a foreign sheet naming a layer first: docs/css.md "One directory per
+ * cascade layer" and "Layer order is fixed by the FIRST mention of a name". */
 @layer tokens, base, theme, page;

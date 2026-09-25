@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
 	stableStringify, ubusKey, requestKey, splitBatch,
-	rewriteBase, rewriteEnv, scrubTokens, scrubHost, rewriteHostname, rewriteHostnameInData,
+	rewriteBase, rewriteEnv, scrubTokens, scrubHost, rewriteHostnameInData,
 	rewriteLiteral, stripBase, jsonForScript, applyOverlay, pruneMenu, parseLsLines, TOKEN_STUB,
 	scrubDataDeep, findSecrets, guardNoSecrets, resolveUnderRoot, isSafeReturn,
 	missingOverlayKeys, waitForQuiet, drainReads, createActivityTracker, createGenerationGate,
@@ -107,14 +107,6 @@ test('rewriteLiteral swaps every occurrence, deletes on an empty `to`, no-ops on
 	assert.equal(rewriteLiteral(html, '', 'x'), html);
 	assert.equal(rewriteLiteral(html, 'No password set!', undefined), html);
 	assert.equal(rewriteLiteral(html, 'No password set!', 'No password set!'), html);
-});
-
-test('rewriteHostname swaps every literal occurrence, no-ops on an empty or unchanged pair', () => {
-	const html = `<title>owrt2512 | Overview</title><h1>owrt2512</h1>`;
-	assert.equal(rewriteHostname(html, 'owrt2512', 'footstrap-playground'),
-		`<title>footstrap-playground | Overview</title><h1>footstrap-playground</h1>`);
-	assert.equal(rewriteHostname(html, '', 'x'), html);
-	assert.equal(rewriteHostname(html, 'owrt2512', 'owrt2512'), html);
 });
 
 test('rewriteHostnameInData swaps every occurrence recursively, no-ops on an empty or unchanged pair', () => {

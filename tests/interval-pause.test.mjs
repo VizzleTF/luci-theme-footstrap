@@ -36,7 +36,6 @@ function boot(extra = {}) {
 	const window = extra.window || timerWindow();
 	const document = extra.document || fakeDocument();
 	const L = extra.L || fakeL();
-	window.L = L;
 	const mod = loadModule('fs-router', { window, document, L, stubs: extra.stubs });
 	return { window, document, L, mod };
 }
@@ -96,15 +95,6 @@ test('LuCI\'s own 1 s tick is not paused with the view timers', () => {
 	visibility(document, true);
 	assert.equal(window.live.has(tick), true, 'L.Poll owns this one and wireVisibility stops it');
 	assert.equal(window.live.has(mine), false);
-});
-
-test('a luci-base whose tick cannot be told apart pauses NOTHING', () => {
-	const L = fakeL({ Poll: undefined });
-	const { window, document } = boot({ L });
-	const id = window.setInterval(() => {}, 3000);
-	visibility(document, true);
-	assert.equal(window.live.has(id), true,
-		'a wasted RPC in a background tab beats re-arming LuCI\'s tick behind its back');
 });
 
 test('a timer started while the tab is hidden is left alone', () => {

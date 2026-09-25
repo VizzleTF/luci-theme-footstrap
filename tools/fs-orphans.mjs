@@ -51,8 +51,7 @@ const IGNORE_EXACT = new Set([
  * that happens to share a name with one of them is still seen. */
 const NOT_A_CLASS_BEFORE = /(?:--|data-)$/;
 /* A THIRD position: a module FILENAME. A source line naming `fs-router.js` or `fs-prefs.js` — a
- * comment cross-reference, or a server-side path test the way head.ut once probed for the retired
- * updater — is a path, not markup. Keyed on the `.js` that follows the token, so a class is still
+ * comment cross-reference or a server-side path test — is a path, not markup. Keyed on the `.js` that follows the token, so a class is still
  * seen even if a module is named after it — the same position-not-name rule as the pragmas above. */
 const NOT_A_CLASS_AFTER = /^\.js\b/;
 

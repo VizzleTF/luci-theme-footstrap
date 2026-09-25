@@ -15,7 +15,7 @@ const INTERPOLATED = /\{\{|\{%/;
  * branches, loops, declares or calls back — belongs in a pure block that IS linted. */
 const LOGIC = /\b(?:if|else|for|while|do|switch|try|catch|function|return|=>)\b|=>/;
 
-export function extractScripts(text) {
+function extractScripts(text) {
 	const out = [];
 	for (const m of text.matchAll(SCRIPT)) {
 		const body = m[1];
@@ -31,7 +31,7 @@ export function extractScripts(text) {
 
 /* An interpolated block is exempt from the lint, so it has to earn the exemption: one statement,
  * no control flow. `window.__fsSD={…};` passes; a branch on a server value does not. */
-export function assertDataOnly(block, filename) {
+function assertDataOnly(block, filename) {
 	const src = block.body.trim();
 	if (LOGIC.test(src))
 		throw new Error(
