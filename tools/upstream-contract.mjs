@@ -22,10 +22,10 @@ import { chromium } from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
 const { values: FLAGS } = parseArgs({ options: {
-	verbose: { type: 'boolean' }, only: { type: 'string' }, all: { type: 'boolean' },
+	verbose: { type: 'boolean', default: false }, only: { type: 'string', default: '' },
+	all: { type: 'boolean', default: false },
 } });
-const VERBOSE = FLAGS.verbose ?? false;
-const arg = (name, dflt) => FLAGS[name] ?? dflt;
+const VERBOSE = FLAGS.verbose;
 
 /* Every probe returns `true`, or a STRING saying what it found instead — the string is what a
  * developer reads six months from now, so it names the value, not the expectation. */
@@ -300,7 +300,7 @@ const CONTRACT = [
 
 /* `--all`, like every other live gate: without it this one once measured a subset of what the
  * release matrix (docs/releasing.md) asked for and said "2 router(s)" in a report nobody compared. */
-const list = requireStands(stands(arg('only', ''), { all: FLAGS.all ?? false }),
+const list = requireStands(stands(FLAGS.only, { all: FLAGS.all }),
 	'upstream-contract');
 const browser = await chromium.launch();
 let failed = 0;

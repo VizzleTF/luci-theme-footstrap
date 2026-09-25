@@ -12,7 +12,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-export { ROOT } from './root.mjs';
 import { ROOT } from './root.mjs';
 
 /* -> absolute path of a freshly built cascade.css. `dev` keeps comments: css-dup matches @mirror

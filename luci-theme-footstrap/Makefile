@@ -197,12 +197,8 @@ endef
 #    falls back to PKG_SRC_VERSION, which luci.mk always defines, so only an un-built source
 #    checkout keeps the literal '0.0.0-dev'.
 #
-# The catalogue is luci.mk's business and nothing here compiles it. `po/` is the directory
-# LUCI_LANGUAGES globs, so luci.mk emits one `luci-i18n-footstrap-<lang>` package per language, the
-# way it does for every luci-app — which is what a package in the luci tree has to look like, and
-# what Weblate can see. It was `i18n/` while a fielded self-update script mis-picked a multi-asset
-# release with `head -1` (issue #6); that script is retired and owfeed builds one theme artifact
-# per format regardless.
+# The catalogue is luci.mk's business and nothing here compiles it: `po/` is the directory
+# LUCI_LANGUAGES globs, so luci.mk emits one `luci-i18n-footstrap-<lang>` package per language.
 define Build/Prepare/luci-theme-footstrap
 	# luci.mk's Build/Prepare copies only src/ luasrc/ htdocs/ root/ ucode/ into
 	# $(PKG_BUILD_DIR), and PKG_LICENSE_FILES resolves against THAT — so the Apache text has to

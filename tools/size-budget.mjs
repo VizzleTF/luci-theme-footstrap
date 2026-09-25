@@ -16,7 +16,8 @@ import { cpSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildCss, ROOT } from './lib/css.mjs';
+import { buildCss } from './lib/css.mjs';
+import { ROOT } from './lib/root.mjs';
 import { coldModules } from './lib/page-modules.mjs';
 
 const SHOW = process.argv.includes('--show');

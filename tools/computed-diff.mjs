@@ -30,17 +30,24 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { serveGallery, applyAppearance, matrix, ROOT } from './lib/gallery.mjs';
+import { parseArgs } from 'node:util';
+import { serveGallery, applyAppearance, matrix } from './lib/gallery.mjs';
 import { buildCss } from './lib/css.mjs';
+import { ROOT } from './lib/root.mjs';
 
-const ARGV = process.argv.slice(2);
-const flag = (n) => ARGV.includes(n);
-const opt = (n, d) => { const i = ARGV.indexOf(n); return i < 0 ? d : ARGV[i + 1]; };
+const { values: ARGS } = parseArgs({
+	options: {
+		control: { type: 'boolean', default: false },
+		full: { type: 'boolean', default: false },
+		against: { type: 'string', default: 'HEAD' },
+		max: { type: 'string' },
+	},
+});
 
-const CONTROL = flag('--control');
-const REF = opt('--against', 'HEAD');
-const MAX = opt('--max', null);
-const POINTS = flag('--full')
+const CONTROL = ARGS.control;
+const REF = ARGS.against;
+const MAX = ARGS.max ?? null;
+const POINTS = ARGS.full
 	? matrix([null])
 	: [{ palette: 'footstrap', mode: 'light', tint: null }, { palette: 'footstrap', mode: 'dark', tint: null }];
 

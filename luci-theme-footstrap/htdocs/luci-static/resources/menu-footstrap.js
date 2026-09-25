@@ -80,30 +80,6 @@ function wireSpaceKey(link) {
 	});
 }
 
-/* A click outside closes; WCAG 2.2 SC 1.4.13 also requires a hover/focus panel to be dismissible
- * from the keyboard, with focus handed back to the trigger. `when` restricts both to flyout mode,
- * where `.open` means "popup panel" — an unfolded accordion must not close on an outside click. */
-function wireDismiss(opts) {
-	const active = () => (opts.when ? opts.when() : true);
-
-	document.addEventListener('click', (ev) => {
-		/* `closest?.`: a document-level listener sees any dispatched click, including one whose
-		 * target is not an Element and has no closest(). The throw would kill this listener for
-		 * the rest of the session. */
-		if (active() && !ev.target.closest?.(opts.inside))
-			opts.close();
-	});
-
-	document.addEventListener('keydown', (ev) => {
-		if (ev.key !== 'Escape' || !active()) return;
-		const open = document.querySelector(opts.open);
-		if (!open) return;
-		const trigger = open.querySelector(opts.trigger);
-		opts.close();
-		trigger?.focus();
-	});
-}
-
 /* ---- dropdown edge-clamp (the bar, at every width) ----
  * A bar panel hangs off its own item (li position:relative, ul left:0 — theme/20-shell.css), so an
  * item near the right edge would push its panel past the viewport. The rail flies panels out
@@ -182,7 +158,8 @@ function renderMainMenu(tree, url, level) {
 	const ul = level ? E('ul', {}) : document.querySelector('#topmenu');
 	const children = ui.menu.getChildren(tree);
 
-	if (!ul || children.length === 0 || level > 1)
+	/* #topmenu is emitted whenever this module loads (header.ut, !blank_page) */
+	if (children.length === 0 || level > 1)
 		return E([]);
 
 	/* dispatchpath = [mode, section, subsection, …]; sections sit at
@@ -308,13 +285,23 @@ return baseclass.extend({
 		common.init(renderMainMenu);
 
 		/* click-outside and Escape close an open flyout, gated on flyoutMode(): outside it
-		 * `.open` means unfolded accordion, which must not fold on a click elsewhere */
-		wireDismiss({
-			when: flyoutMode,
-			inside: '#topmenu > li.has-sub',
-			open: OPEN_LI,
-			trigger: TRIGGER,
-			close: () => closeFlyouts()
+		 * `.open` means unfolded accordion, which must not fold on a click elsewhere. WCAG 2.2
+		 * SC 1.4.13 also requires a hover/focus panel to be dismissible from the keyboard, with
+		 * focus handed back to the trigger. */
+		document.addEventListener('click', (ev) => {
+			/* `closest?.`: a document-level listener sees any dispatched click, including one
+			 * whose target is not an Element and has no closest(). The throw would kill this
+			 * listener for the rest of the session. */
+			if (flyoutMode() && !ev.target.closest?.('#topmenu > li.has-sub'))
+				closeFlyouts();
+		});
+		document.addEventListener('keydown', (ev) => {
+			if (ev.key !== 'Escape' || !flyoutMode()) return;
+			const open = document.querySelector(OPEN_LI);
+			if (!open) return;
+			const trigger = open.querySelector(TRIGGER);
+			closeFlyouts();
+			trigger?.focus();
 		});
 
 		/* Entering flyout mode folds everything, or a section left open as an accordion

@@ -5,9 +5,9 @@
 #   owlab open owrt2512 open LuCI in a browser
 #   owlab doctor        what this machine supports
 #
-# Four routers rather than one, because the three axes that change how this theme renders are the
+# Multiple routers, not one, because the three axes that change how this theme renders are the
 # package manager (apk on 25.12, opkg on 24.10), the LuCI feed (upstream vs a fork's patched one)
-# and the release. Only all four boxes cover every pairing.
+# and the release — the `routers:` list below is the count of record, not a number restated here.
 
 version: 1
 
@@ -138,11 +138,11 @@ routers:
     # Unsigned dev fixtures: pinned to exact releases and installed without signature verification.
     # Nothing here ships.
     #
-    # Anchored here and aliased onto the other three RELEASE routers, not `defaults:` — owlab's
+    # Anchored here and aliased onto the other RELEASE routers, not `defaults:` — owlab's
     # `extra_packages` merge is additive only (append(default, router), no subtraction syntax,
     # internal/config/config.go), so a router-scoped list has to start from a router, not from a
-    # default every router inherits. `owrtsnap` below carries no alias: these three are pinned
-    # builds against release branches (openclash/ssclash need kmod-tun, which resolves through a
+    # default every router inherits. `owrtsnap` below carries no alias: the aliased routers are
+    # pinned builds against release branches (openclash/ssclash need kmod-tun, which resolves through a
     # kmods index keyed to the box's exact kernel git hash) and the snapshot box's baked kernel is
     # never the one downloads.openwrt.org/snapshots is currently publishing kmods for — confirmed
     # 2026-09-07: `apk add` 404s the kmods packages.adb for the running 6.18.33 hash and both apps
@@ -170,17 +170,10 @@ routers:
     ports: { http: 8024, ssh: 2224 }
     extra_packages: *third_party_apps
 
-  - id: imm2512
-    distro: immortalwrt
-    release: "25.12.1"
-    ports: { http: 8026, ssh: 2226 }
-    extra_packages: *third_party_apps
-
-  - id: imm2410
-    distro: immortalwrt
-    release: "24.10.6"
-    ports: { http: 8027, ssh: 2227 }
-    extra_packages: *third_party_apps
+  # ImmortalWrt (imm2512/imm2410) is not a default-boot stand: not a gate target
+  # (tools/lib/stands.mjs), and no behaviour claim needs it (see the "second instances" comment below).
+  # docs/development.md, "ImmortalWrt stands (on demand)" carries the two blocks verbatim and the
+  # command to bring them up when a question is actually about the brand.
 
   # A SNAPSHOT box, because the installer has a path only it takes: `SNAPSHOT` parses to no feed
   # branch, so the script asks the feed for the newest one its package manager can read, and

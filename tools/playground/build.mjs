@@ -29,27 +29,29 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import {
-	rewriteBase, rewriteEnv, scrubTokens, scrubHost, rewriteHostname, rewriteHostnameInData,
+	rewriteBase, rewriteEnv, scrubTokens, scrubHost, rewriteHostnameInData,
 	rewriteLiteral, applyOverlay, pruneMenu, jsonForScript, scrubDataDeep, guardNoSecrets,
+	stableStringify, ubusKey, stripBase, isSafeReturn,
 } from './lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 
 const { values: FLAGS } = parseArgs({ options: {
-	help: { type: 'boolean' }, recording: { type: 'string' }, out: { type: 'string' },
-	base: { type: 'string' },
+	help: { type: 'boolean', default: false },
+	recording: { type: 'string', default: join(ROOT, '..', 'tmp/playground/recording') },
+	out: { type: 'string', default: join(ROOT, '..', 'tmp/playground/out') },
+	base: { type: 'string', default: '/luci-theme-footstrap/playground' },
 } });
-const arg = (name, dflt) => FLAGS[name] ?? dflt;
 
 if (FLAGS.help) {
 	console.log('Usage: node tools/playground/build.mjs [--recording DIR] [--out DIR] [--base /path]');
 	process.exit(0);
 }
 
-const RECORDING = arg('recording', join(ROOT, '..', 'tmp/playground/recording'));
-const OUT = arg('out', join(ROOT, '..', 'tmp/playground/out'));
-const BASE = arg('base', '/luci-theme-footstrap/playground');
+const RECORDING = FLAGS.recording;
+const OUT = FLAGS.out;
+const BASE = FLAGS.base;
 
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
 
@@ -83,7 +85,14 @@ function filesUnder(dir) {
  * fallback target when there is no (or no SAFE — `lib.mjs`'s `isSafeReturn`) return path waiting
  * in `sessionStorage`. */
 function buildInject(rpc, menu, replaySrc, base, { page, overviewUrl }) {
-	const data = `window.__pgRPC=${jsonForScript(rpc)};window.__pgMenu=${jsonForScript(menu)};`
+	/* replay.js is a classic script (no module graph) and used to hand-copy `stableStringify`/
+	 * `ubusKey`/`stripBase`/`isSafeReturn` from lib.mjs rather than import them. Inlining each
+	 * function's own SOURCE here — both scripts run in the page's one global scope, so a
+	 * `function name(){…}` declared in this tag is callable from the next one — means replay.js
+	 * calls the same code lib.mjs exports instead of a copy that can drift from it. */
+	const shared = [ stableStringify, ubusKey, stripBase, isSafeReturn ]
+		.map((fn) => fn.toString()).join(';');
+	const data = `${shared};window.__pgRPC=${jsonForScript(rpc)};window.__pgMenu=${jsonForScript(menu)};`
 		+ `window.__pgBase=${jsonForScript(base)};window.__pgPage=${jsonForScript(page)};`
 		+ `window.__pgOverview=${jsonForScript(overviewUrl)};`;
 	return `<script>${data}</script><script src="${replaySrc}"></script>`;
@@ -91,8 +100,8 @@ function buildInject(rpc, menu, replaySrc, base, { page, overviewUrl }) {
 
 /* notices.ut's `empty_password` block (header.ut:26 — `getspnam('root').pwdp === ''`), baked
  * verbatim on every page owlab's containers all hit (root carries no password there). No ubus
- * overlay entry reaches it, so it is deleted by literal match, the same way `rewriteHostname`
- * corrects a different baked value; a router-like recording that already has a password set simply
+ * overlay entry reaches it, so it is deleted by literal match, the same way the recorded
+ * hostname below is corrected; a router-like recording that already has a password set simply
  * never contains this text, so the swap is a harmless no-op then. */
 const PASSWORD_NOTICE = '<div class="alert-message warning">\n\t<h2>No password set!</h2>\n\t'
 	+ '<p>There is no password set on this router. Please configure a root password to protect the '
@@ -116,7 +125,7 @@ function buildPage(rawHtml, { base, meta, inject, hostnameFrom, hostnameTo, luci
 	html = rewriteEnv(html, base);
 	html = scrubTokens(html);
 	html = scrubHost(html, meta.host);
-	html = rewriteHostname(html, hostnameFrom, hostnameTo);
+	html = rewriteLiteral(html, hostnameFrom, hostnameTo);
 	html = html.replace(/(<script[^>]*\bsrc="[^"]*\/luci\.js[^"]*"[^>]*><\/script>)/, `${inject}$1`);
 	html = html.replace(/(<body[^>]*>)/, `$1${banner(meta)}`);
 	return html;

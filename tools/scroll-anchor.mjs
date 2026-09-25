@@ -62,29 +62,29 @@ import * as pw from 'playwright';
 import { stands, login, requireStands, sealToRouter, pairStands } from './lib/stands.mjs';
 
 const { values: FLAGS } = parseArgs({ options: {
-	engines: { type: 'string' }, full: { type: 'boolean' }, bail: { type: 'boolean' },
-	quick: { type: 'boolean' }, page: { type: 'string' }, width: { type: 'string' },
-	layout: { type: 'string' }, density: { type: 'string' }, only: { type: 'string' },
-	all: { type: 'boolean' }, 'no-pair': { type: 'boolean' },
+	engines: { type: 'string', default: 'chromium' }, full: { type: 'boolean', default: false },
+	bail: { type: 'boolean', default: false }, quick: { type: 'boolean', default: false },
+	page: { type: 'string' }, width: { type: 'string', default: '' }, layout: { type: 'string', default: '' },
+	only: { type: 'string', default: '' }, all: { type: 'boolean', default: false },
+	'no-pair': { type: 'boolean', default: false },
 } });
-const arg = (name, dflt) => FLAGS[name] ?? dflt;
-const ENGINES = arg('engines', 'chromium').split(',').map((s) => s.trim()).filter(Boolean);
+const ENGINES = FLAGS.engines.split(',').map((s) => s.trim()).filter(Boolean);
 /* `--full` restores the axes this sweep used to cross in full: every width against every layout,
  * and all three densities. Measured on 132 cells, they multiply the sweep without dividing its
  * answers — see SCROLLERS and DENSITIES. CI crosses them on a push and a tag, where an hour is
  * affordable and a narrowing that turns out to be wrong is caught before a release. */
-const FULL = FLAGS.full ?? false;
+const FULL = FLAGS.full;
 /* Stop at the first finding. A full sweep is 144 cells and tens of minutes, so an answer that only
  * arrives at the end is one nobody can iterate against — a fix attempt cost a whole sweep to learn
  * it had failed in the third cell. CI never passes this: how WIDE a fault is is half of what the
  * sweep says. */
-const BAIL = FLAGS.bail ?? false;
+const BAIL = FLAGS.bail;
 /* A local iteration loop, not the sweep CI runs: the first stand only, the Overview page alone, the
  * default width/layout/density axes (task sweepspeed). Says what it left out on every run, loudly,
  * so a clean `--quick` is never mistaken for a clean sweep — the same reason a page that never
  * opened is reported apart from a pass rather than folded into one. `--only`/`--page` still override
  * when given explicitly; CI never sets this flag. */
-const QUICK = FLAGS.quick ?? false;
+const QUICK = FLAGS.quick;
 
 /* Three shapes, because the shape decides what the theme can anchor ON, and each of these breaks
  * differently:
@@ -112,8 +112,9 @@ const QUICK = FLAGS.quick ?? false;
  *                120px pad while the block itself measured the same height before and after
  *                (`grewOnItsOwn` 0), the same way swapping `.fs-ovl` deletes three sections no poll
  *                touches. What produced the other 132px was not established. */
-const PAGES = arg('page', QUICK ? '/admin/status/overview'
-	: '/admin/status/overview,/admin/network/dhcp,/admin/status/processes')
+/* No parseArgs `default:` here: it depends on QUICK, which parseArgs cannot express. */
+const PAGES = (FLAGS.page ?? (QUICK ? '/admin/status/overview'
+	: '/admin/status/overview,/admin/network/dhcp,/admin/status/processes'))
 	.split(',').map((p) => p.trim()).filter(Boolean);
 
 /* WIDTH AND LAYOUT ARE ONE AXIS FOR HOLD/SWAP/QUIET, and it has two values, not four: what those
@@ -136,7 +137,7 @@ const SCROLLERS = (() => {
 	/* `--width 390 --layout top` narrows the sweep to the cell a finding names, which is what turns
 	 * a fix attempt from a sweep into a minute. Neither is set in CI, where the axes above are the
 	 * contract. */
-	const w = arg('width', ''), l = arg('layout', '');
+	const w = FLAGS.width, l = FLAGS.layout;
 	return all.filter((c) => (!w || String(c.width) === w) && (!l || c.layout === l));
 })();
 
@@ -144,9 +145,8 @@ const SCROLLERS = (() => {
  * height and the fold falls elsewhere — but it does not move the ANSWER: across all 72 Overview
  * cells of a full sweep, normal, compact and large reported the same two outcomes and nothing else
  * (`anchor on` clamped 0-1px with the reader still; `anchor off` clamped 59-60px with the reader
- * moved 60-61px). Three densities measured one thing three times. `--density a,b` widens it. */
-const DENSITIES = arg('density', FULL ? 'normal,compact,large' : 'normal')
-	.split(',').map((d) => d.trim()).filter(Boolean);
+ * moved 60-61px). Three densities measured one thing three times, so the axis is FULL alone. */
+const DENSITIES = FULL ? [ 'normal', 'compact', 'large' ] : [ 'normal' ];
 const GROWTH = 120;
 /* a rect edge lands on a fraction; two pixels is not a jump */
 const TOLERANCE = 2;
@@ -1113,15 +1113,15 @@ const TICK = async (ticks) => {
 		scroller: sc ? 'maincontent' : 'window' };
 };
 
-let list = requireStands(stands(arg('only', ''), { all: FLAGS.all ?? false }), 'scroll-anchor');
+let list = requireStands(stands(FLAGS.only, { all: FLAGS.all }), 'scroll-anchor');
 /* `--quick`'s stand narrowing: the first stand `stands()` handed back, unless `--only` already said
  * which ones — an explicit `--only` is the caller overriding the default, and `--quick` narrowing it
  * again on top would make the flag's own effect depend on argument order. */
-if (QUICK && !arg('only', '')) list = list.slice(0, 1);
+if (QUICK && !FLAGS.only) list = list.slice(0, 1);
 /* Each `-b` twin owlab boots beside a release line (task sweepspeed) is a second container for the
  * SAME measurement, not a fourth release line — see the note on `pairStands()`. `--no-pair` is the
  * escape hatch for debugging the pairing itself, or for a run that wants the twin left idle. */
-const PAIRS = (FLAGS['no-pair'] ?? false) ? new Map() : pairStands(list);
+const PAIRS = FLAGS['no-pair'] ? new Map() : pairStands(list);
 /* Printed as it is found, not held until the end: the first finding is the whole answer for someone
  * iterating on a fix, and the list below is what says how many cells and which axes. */
 const findings = [];

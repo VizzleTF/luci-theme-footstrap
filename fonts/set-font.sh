@@ -53,9 +53,9 @@ Usage: set-font.sh [--sans NAME [--sans-file SRC] …] [--mono NAME [--mono-file
                        flattens every heading. Pass '100 900' for a variable font.
                                                        (default: 400, or "400 600" with a bold file)
 
-  --mono NAME          the same four options for the monospace face
-  --mono-file SRC
-  --mono-bold-file SRC   (the theme assigns <strong> the sans face: there is no bold mono by design)
+  --mono NAME          the monospace family. Same fallback rule as --sans.
+  --mono-file SRC      a .woff2 URL or local path — this router will serve it (the theme assigns
+                       <strong> the sans face, so there is no bold-mono option to match)
   --mono-weight W
 
   --max BYTES          per-file size cap                        (default: 524288)
@@ -71,7 +71,7 @@ EOF
 # --- arguments ------------------------------------------------------------
 WHAT=""
 SANS=""; SANS_FILE=""; SANS_BOLD=""; SANS_WEIGHT=""
-MONO=""; MONO_FILE=""; MONO_BOLD=""; MONO_WEIGHT=""
+MONO=""; MONO_FILE=""; MONO_WEIGHT=""
 while [ $# -gt 0 ]; do
 	case "$1" in
 		-h|--help) usage; exit 0 ;;
@@ -81,7 +81,6 @@ while [ $# -gt 0 ]; do
 		--sans-weight) [ $# -ge 2 ] || die "--sans-weight needs a weight."; SANS_WEIGHT="$2"; shift 2 ;;
 		--mono) [ $# -ge 2 ] || die "--mono needs a family name."; MONO="$2"; shift 2 ;;
 		--mono-file) [ $# -ge 2 ] || die "--mono-file needs a URL or a path."; MONO_FILE="$2"; shift 2 ;;
-		--mono-bold-file) [ $# -ge 2 ] || die "--mono-bold-file needs a URL or a path."; MONO_BOLD="$2"; shift 2 ;;
 		--mono-weight) [ $# -ge 2 ] || die "--mono-weight needs a weight."; MONO_WEIGHT="$2"; shift 2 ;;
 		--max) [ $# -ge 2 ] || die "--max needs a number."; FONT_MAX="$2"; shift 2 ;;
 		-*) die "Unknown option '$1'. Try --help." ;;
@@ -94,7 +93,7 @@ done
 # whole usage text.
 [ -z "$SANS_FILE$SANS_BOLD$SANS_WEIGHT" ] || [ -n "$SANS" ] ||
 	die "A sans file needs --sans NAME too: the @font-face has to be named something."
-[ -z "$MONO_FILE$MONO_BOLD$MONO_WEIGHT" ] || [ -n "$MONO" ] ||
+[ -z "$MONO_FILE$MONO_WEIGHT" ] || [ -n "$MONO" ] ||
 	die "A mono file needs --mono NAME too: the @font-face has to be named something."
 if [ -z "$WHAT" ] && [ -z "$SANS" ] && [ -z "$MONO" ]; then usage; exit 1; fi
 
@@ -124,11 +123,12 @@ case "$FONT_MAX" in ''|*[!0-9]*) die "--max takes a number of bytes." ;; esac
 # synthesises 600 and 700 and the page reads as designed. A real variable font has the weights, so
 # say so: --sans-weight '100 900'.
 #
-# With a bold file there are two real faces, and the split has to land on 600 rather than on 700
-# for the same reason: body text asks for 600, and whichever face claims it is the one the page is
-# set in. Regular takes 400-600, bold takes 700.
+# With a sans bold file there are two real faces, and the split has to land on 600 rather than on
+# 700 for the same reason: body text asks for 600, and whichever face claims it is the one the page
+# is set in. Regular takes 400-600, bold takes 700. Mono has no bold file to split against — the
+# theme assigns <strong> the sans face, so mono is always the one static weight.
 [ -n "$SANS_WEIGHT" ] || { [ -n "$SANS_BOLD" ] && SANS_WEIGHT='400 600' || SANS_WEIGHT=400; }
-[ -n "$MONO_WEIGHT" ] || { [ -n "$MONO_BOLD" ] && MONO_WEIGHT='400 600' || MONO_WEIGHT=400; }
+[ -n "$MONO_WEIGHT" ] || MONO_WEIGHT=400
 
 # --- the router -----------------------------------------------------------
 [ "$(id -u)" = 0 ] || die "Run this as root, on the router."
@@ -206,34 +206,11 @@ stage() {	# <slot> <src> -> writes $TMPD/<slot>.font and $TMPD/<slot>.fmt
 	esac
 }
 
-# slot|src, newline separated so a path with a space survives. A slot is staged only when its side
-# was named on the command line.
-SLOTS=""
-add_slot() {	# <slot> <src>
-	[ -n "$2" ] || return 0
-	SLOTS="$SLOTS
-$1|$2"
-}
-if [ -n "$SANS" ]; then
-	add_slot sans "$SANS_FILE"
-	add_slot sans-bold "$SANS_BOLD"
-fi
-if [ -n "$MONO" ]; then
-	add_slot mono "$MONO_FILE"
-	add_slot mono-bold "$MONO_BOLD"
-fi
-
-OLDIFS="$IFS"
-IFS='
-'
-for line in $SLOTS; do
-	[ -n "$line" ] || continue
-	IFS="$OLDIFS"
-	stage "${line%%|*}" "${line#*|}"
-	IFS='
-'
-done
-IFS="$OLDIFS"
+# A slot is staged only when its file was named — a bare --sans/--mono needs none. The validation
+# above already ties a file to its family name, so checking the file var alone is enough here.
+[ -n "$SANS_FILE" ] && stage sans "$SANS_FILE"
+[ -n "$SANS_BOLD" ] && stage sans-bold "$SANS_BOLD"
+[ -n "$MONO_FILE" ] && stage mono "$MONO_FILE"
 
 # --- room for it ----------------------------------------------------------
 # A full overlay does not fail loudly: `uci commit` writes a truncated config and reports nothing,
@@ -284,7 +261,6 @@ install_face() {	# <slot> <role> <weight>
 install_face sans      sans "$SANS_WEIGHT"
 install_face sans-bold sans 700
 install_face mono      mono "$MONO_WEIGHT"
-install_face mono-bold mono 700
 
 # --- the settings ---------------------------------------------------------
 # A value with a comma is a complete stack and is written as typed; a bare family name gets the

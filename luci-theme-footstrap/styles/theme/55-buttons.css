@@ -153,7 +153,7 @@
 		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 	}
 	.td .cbi-button, .cbi-section-actions .cbi-button, .cbi-section-table .cbi-button {
-		background: transparent; background-image: none;
+		background: transparent;
 		border: var(--fs-hairline); color: var(--fs-dim);
 	}
 	.td .cbi-button:hover { border-color: var(--fs-dim); color: var(--fs-text); }
@@ -192,7 +192,6 @@
 	.cbi-page-actions .cbi-button-apply,
 	.cbi-page-actions .cbi-dropdown .cbi-button-apply {
 		background: var(--fs-accent);
-		background-image: none;
 		border: 1px solid transparent;
 		color: var(--fs-on-accent);
 		--on-color: var(--fs-on-accent);
@@ -206,7 +205,6 @@
 	.cbi-page-actions .cbi-button-apply + .cbi-button-save,
 	.cbi-page-actions .cbi-button-negative + .cbi-button-save {
 		background: var(--fs-accent-soft);
-		background-image: none;
 		border: 1px solid var(--fs-accent-line);
 		color: var(--fs-text);
 		--on-color: var(--fs-on-accent);

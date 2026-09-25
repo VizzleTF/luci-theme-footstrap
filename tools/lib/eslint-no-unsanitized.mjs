@@ -39,7 +39,7 @@ function calleeName(node) {
 	return null;
 }
 
-export function makeRule() {
+function makeRule() {
 	return {
 		meta: {
 			type: 'problem',

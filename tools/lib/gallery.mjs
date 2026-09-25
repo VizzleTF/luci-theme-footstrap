@@ -13,7 +13,6 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 
-export { ROOT } from './root.mjs';
 import { ROOT } from './root.mjs';
 
 /* buildCss lives in lib/css.mjs — it is not a gallery concern, and devkit-build.mjs was importing

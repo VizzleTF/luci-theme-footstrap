@@ -6,11 +6,10 @@
  * is a list that will disagree in one.
  */
 import { readFileSync, existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { ROOT } from './root.mjs';
 
-export const RESOURCES = resolve(dirname(fileURLToPath(import.meta.url)),
-	'../../luci-theme-footstrap/htdocs/luci-static/resources');
+export const RESOURCES = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources');
 export const LOADER = 'menu-footstrap-common.js';
 
 /* -> Map(data-page -> module name). Throws rather than returning an empty map: every caller reads
@@ -38,7 +37,7 @@ export function pageModules() {
  * is fetched only when something else asks for it. The prologue shape is the one
  * `tools/minify-js.mjs` parses, and the same constraint applies — the scan stops at the first
  * string literal that is neither `'use strict'` nor a `'require …'`. */
-const FOOTER = resolve(RESOURCES, '../../../ucode/template/themes/footstrap/footer.ut');
+const FOOTER = join(ROOT, 'luci-theme-footstrap/ucode/template/themes/footstrap/footer.ut');
 
 export function entryModules() {
 	const src = readFileSync(FOOTER, 'utf8');

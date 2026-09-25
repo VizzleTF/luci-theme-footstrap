@@ -9,11 +9,8 @@
 # A missing translation cannot fail loudly — an uncompiled _() falls through to its English msgid
 # and nothing reports it — so --check is a gate rather than a suggestion.
 #
-# The directory is `po/`, which is what LUCI_LANGUAGES globs and what Weblate translates. Naming it
-# `i18n/` stops luci.mk emitting a per-language package, which mattered while a self-updater
-# resolved the theme by name and took head -1 (issue #6); that updater is retired and owfeed builds
-# one artifact per format either way, so the rename only cost the catalogue its visibility to the
-# translation platform.
+# The directory is `po/`, which is what LUCI_LANGUAGES globs and what Weblate translates
+# (docs/package.md, "The catalogue lives in po/" — do not rename it).
 #
 # Nothing here runs on the buildbot — luci.mk calls po2lmo itself. This needs perl and gettext,
 # which the OpenWrt build does not.
@@ -42,11 +39,9 @@ done
 # Prefer a scanner from a local LuCI checkout ($LUCI_SRC) so the gate is not hostage to the
 # network; fall back to fetching it. jsmin.c is pinned the same way in CI.
 #
-# ONE trap, covering every temp and every exit. It used to be installed inside the fetch branch
-# only — so the LUCI_SRC branch had none at all — and the three mktemps below were cleaned by hand
-# at each success path. With `set -eu`, any failure in between (perl choking on a template, i.e.
-# exactly the stale-.pot session this script exists for) leaked them. `fetched` is what the trap
-# removes, so the LUCI_SRC path never deletes the user's own checkout.
+# ONE trap, covering every temp and every exit path, including LUCI_SRC's (docs/package.md,
+# "The catalogue lives in po/"). `fetched` is what it removes, so the LUCI_SRC path never deletes
+# the user's own checkout.
 fetched=''; fresh=''; old_ids=''; new_ids=''
 # shellcheck disable=SC2064  # expand nothing now: the names are assigned as the script proceeds
 trap 'rm -f "$fetched" "$fresh" "$old_ids" "$new_ids"' EXIT INT TERM

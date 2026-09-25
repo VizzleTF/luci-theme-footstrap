@@ -165,19 +165,11 @@ luci tree, and the only one [Weblate](https://hosted.weblate.org/engage/openwrt/
 which `CONTRIBUTING.md` names as *the* way to translate LuCI. Nothing in this package's own
 `Build/Prepare` touches the catalogue.
 
-It was `i18n/` from v0.8.5 to v0.12.x, which is what stopped the language packages being
-generated. The reason was issue #6: the self-update script people had installed **at the time** picked
-its asset with `grep -E '\.apk$' | head -1`, GitHub returns assets **sorted by name**, and
-`luci-i18n-…` sorts before `luci-theme-…` — so the Update button installed a 6 KB catalogue
-instead of the theme, reported success, and offered the same update forever. A script already on
-somebody's router cannot be fixed remotely, so the *release* was fixed instead.
-
-That script is retired, and the release is built by owfeed. From 0.14.4 the owfeed build emits the
-same set luci.mk would: **`luci-theme-footstrap`, plus one `luci-i18n-footstrap-<lang>` per
-language**, with the catalogue at `footstrap.<lang>.lmo` and a `uci-defaults` line registering the
-language in LuCI's own menu. `tools/stage.sh` builds the per-language staging trees, `owfeed.yml`
-declares one package each, and `tools/i18n-packages.mjs` fails the build when those three lists
-disagree.
+The release is built by owfeed, not luci.mk. From 0.14.4 the owfeed build emits the same set
+luci.mk would: **`luci-theme-footstrap`, plus one `luci-i18n-footstrap-<lang>` per language**, with
+the catalogue at `footstrap.<lang>.lmo` and a `uci-defaults` line registering the language in
+LuCI's own menu. `tools/stage.sh` builds the per-language staging trees, `owfeed.yml` declares one
+package each, and `tools/i18n-packages.mjs` fails the build when those three lists disagree.
 
 Between v0.12.x and 0.14.3 the catalogues rode **inside** the theme under the basename
 `footstrap-theme.<lang>.lmo`. That cost every router 10,992 B of flash and 4,821 B of the `.apk`,
@@ -188,6 +180,11 @@ ordinary upgrade of the same package instead. Measured on both stands: upgrading
 old `footstrap-theme.*.lmo` away with it, and installing `luci-i18n-footstrap-ru` puts
 `footstrap.ru.lmo` down in its place, with `luci.languages.ru` registered and the chrome rendering
 in Russian.
+
+`update-po.sh`'s single `trap … EXIT INT TERM` covers every mktemp the script creates, including the
+ones on the `LUCI_SRC` (no-fetch) path — it used to be installed only inside the fetch branch, so a
+`set -eu` failure between mktemps on the `LUCI_SRC` path (perl choking on a template, the exact
+stale-`.pot` case the script exists to catch) leaked them.
 
 **A package manager cannot read `uci luci.main.lang`, so the catalogue has to install itself.**
 `depends` points from the catalogue to the theme, which means installing or upgrading the THEME
@@ -535,8 +532,8 @@ a router-wide default and a login background:
 
 Those two `file.exec` grants are the only ones the theme ships, and each is one fixed
 argument-complete command.
-There is no grant for self-update, because there is no self-update: the theme upgrades through the
-package feed the installer adds.
+There is no grant for an in-app update mechanism: the theme upgrades through the package feed the
+installer adds.
 
 rpcd **skips an unreadable file in `acl.d` and says nothing**, so a stray comma means the grant
 is issued to nobody and nothing else notices. `npm run acl` (`tools/check-acl.sh`, also a step in

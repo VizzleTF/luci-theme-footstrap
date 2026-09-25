@@ -25,7 +25,6 @@ function boot() {
 	const rpcFns = [], reqFns = [];
 	const L = fakeL({ Request: { addInterceptor(fn) { reqFns.push(fn); }, get: () => Promise.resolve({}) } });
 	const window = fakeWindow();
-	window.L = L;
 	const mod = loadModule('fs-router', {
 		window, document: fakeDocument(), L,
 		stubs: { rpc: { addInterceptor(fn) { rpcFns.push(fn); } } }

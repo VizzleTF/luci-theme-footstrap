@@ -22,8 +22,6 @@
 /* section title -> grid role. _() with no msgctxt on purpose: these must resolve to exactly what
  * luci-mod-status resolves to, or the titles stop matching. Built once, not per poll tick. */
 const ROLES = { [_('System')]: 'sys', [_('Memory')]: 'mem', [_('Storage')]: 'sto' };
-/* the data-page value four call sites compare against; a string literal is not mangled, so a
- * repeat is paid in full on flash every time (measured: 24 B x4 -> 37 B, 59 B saved) */
 
 function headerEl(sec) {
 	/* two title markups, one per release: 25.12 wraps the heading (`.cbi-title > h3`), 24.10 emits
@@ -201,15 +199,13 @@ function arrange() {
 	_wrapEl = wrap;
 }
 
-/* Stock sections render async and repaint every poll, so watch #view and re-run arrange(),
- * coalesced and one observer per #view node. The SPA router may replace #view between visits, so
- * re-attach when the observed node is no longer the current one — a singleton bound to the first
- * #view would watch a detached tree and the grid would never apply again. */
-let _observer = null, _observedRoot = null, _routeObserver = null;
+/* Stock sections render async and repaint every poll, so watch #maincontent and re-run arrange(),
+ * coalesced. #maincontent (unlike #view) outlives every SPA swap, so one observer, attached once,
+ * is never stale and never needs to be re-attached. */
+let _observer = null, _routeObserver = null;
 function stopWatch() {
 	if (_observer) _observer.disconnect();
 	_observer = null;
-	_observedRoot = null;
 	_wrapEl = null;	/* the grid belongs to the #view we are leaving */
 }
 function watch() {
@@ -219,16 +215,12 @@ function watch() {
 	 * first — so the observer bound here read `isConnected: false` after one round trip and the
 	 * grid stopped being re-arranged on every poll tick, silently, until the next full load. The
 	 * shell's column outlives every swap. Same fault, same fix as fs-appearance.js. */
-	const root = document.getElementById('maincontent') || view;
-	if (_observer && _observedRoot !== root)
-		stopWatch();
+	const root = document.getElementById('maincontent');
 	arrange();
-	/* a chrome module is alive on every page, so without the route check an observer would attach
-	 * to #view on, say, the firewall page and re-run arrange() for every table mutation */
-	if (_observer || !view ||
-	    (document.body.getAttribute('data-page') || '') !== 'admin-status-overview')
+	/* the caller (onOverview(), via wire()'s data-page observer) already confirmed the overview
+	 * route before reaching here; !view alone covers the mid-navigation race above */
+	if (_observer || !view)
 		return;
-	_observedRoot = root;
 	/* one arrange() per frame, however many mutations a poll tick delivers (fit.frame — the
 	 * theme's shared coalescer, fs-fit.js) */
 	_observer = new MutationObserver(fit.frame(arrange));

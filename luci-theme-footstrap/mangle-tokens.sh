@@ -117,14 +117,6 @@ RESFILE="$RES" UNSORTFILE="$UNSORTED" awk '
 # quoting. "$SORTED" is a normal shell expansion instead, safe whatever bytes CSS holds.
 sort -k1,1nr -k2,2 "$UNSORTED" > "$SORTED" || { echo "mangle-tokens: sort failed" >&2; exit 1; }
 
-# sort must neither drop nor duplicate a line; a bad exit status is not the only way it can lie.
-ncnt=$(wc -l < "$UNSORTED" | tr -d ' ')
-nsorted=$(wc -l < "$SORTED" | tr -d ' ')
-[ "$ncnt" = "$nsorted" ] || {
-	echo "mangle-tokens: sort produced $nsorted line(s) from $ncnt — refusing" >&2
-	exit 1
-}
-
 # ---- pass 2: short-name alphabet from the sorted order (hottest name shortest), then rewrite ----
 # SORTFILE/MAPFILE/OUTFILE via ENVIRON too — see the note above pass 1.
 SORTFILE="$SORTED" MAPFILE="$MAP" OUTFILE="$CSS.tmp.$$" awk '
@@ -200,7 +192,6 @@ if [ -n "$REWRITE" ]; then
 	awk '{ print $1, $3 }' "$MAP" | awk '{ print length($1), $0 }' | sort -rn | cut -d" " -f2- > "$MAP.ord"
 	touched=0
 	for d in $REWRITE_DIRS; do
-		[ -d "$d" ] || { echo "mangle-tokens: --rewrite target $d is not a directory" >&2; exit 1; }
 		for f in $(find "$d" -type f \( -name '*.js' -o -name '*.ut' \)); do
 			awk -v MAPF="$MAP.ord" '
 				BEGIN { while ((getline l < MAPF) > 0) { split(l, a, " "); from[++k] = a[1]; to[k] = a[2] } }

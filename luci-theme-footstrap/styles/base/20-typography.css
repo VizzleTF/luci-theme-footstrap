@@ -142,13 +142,11 @@
 	/* border-radius: the shared `code, pre` rule above already sets it — a second copy of the
 	 * same value here restates, not overrides. */
 	pre {
-		--border-color: color-mix(in srgb, var(--fs-border) 15%, transparent);
-
 		background-color: var(--fs-panel2);
 		display: block;
 		padding: var(--fs-space-2);
 		margin: 0 0 var(--fs-space-4);
-		border: 1px solid var(--border-color);
+		border: 1px solid color-mix(in srgb, var(--fs-border) 15%, transparent);
 		white-space: pre-wrap;
 		overflow-wrap: break-word;
 	}

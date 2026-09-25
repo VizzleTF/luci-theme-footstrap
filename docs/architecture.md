@@ -214,3 +214,38 @@ that is a view module in a separate `luci-app-*`.
 
 The single exception is `fs-overview.js`: a layout-only, additive include that moves stock overview
 sections (System left, Memory/Storage right) and draws no content of its own.
+
+## The SVG sanitizer's residual, verified-safe findings
+
+`fs-assets.js`'s `_sanitizeSvg` — the wallpaper PATTERN upload only (`PATTERN.prepare`, fs-assets.js:475);
+the login-background upload is a photo, downscaled by `_downscale`, never parsed as XML — walks the
+parsed DOM once and strips script-capable elements, event-handler attributes, `javascript:` URLs,
+`xml:base` and any `style` `url(`. A 2026-09 security review found three residual gaps that stay open
+on purpose, because each is closed by something outside this file rather than by the walk itself —
+record kept here since the code comment limit (`docs/conventions.md`, "Comments") is 1-2 lines.
+
+- **A `<!DOCTYPE svg SYSTEM "…">` prologue** is a document-level construct the walk never visits
+  (`doc.doctype` is left as parsed) and survives `XMLSerializer` byte for byte. Costs nothing today:
+  no shipping engine resolves an external DTD for any document, `image/svg+xml` included, and a
+  direct open of the file is answered by the CGI's `Content-Security-Policy: default-src 'none';
+  sandbox`. Starts mattering the day some consumer resolves an external DTD, or the file is served
+  without that header.
+- **`href="javas&#9;cript:alert(1)"`** (a literal TAB via XML attribute-value normalisation, which
+  does not fold numeric character references the way HTML does) reaches the walk as a DOM string
+  `/^javascript:/i` does not match, and round-trips through `XMLSerializer` unchanged. It still
+  resolves to `javascript:` in a real browser (WHATWG URL strips TAB/LF/CR from the scheme before
+  comparing it) but never resolves as a URL here: this bundle only ever leaves the router as a
+  `mask-image`/`background-image`/`<img>` source, none of which reads `href` as navigable, and a
+  direct open carries the same CSP as above.
+- **A presentation attribute** (`fill`, `stroke`, `filter`, `clip-path`, `mask`, `cursor` — SVG 1.1
+  §11, §15) that carries a `url(` is a plain attribute value to this walk, not a CSS declaration, so
+  `<rect fill="url(//evil.example/x.svg#g)"/>` passes untouched — only `_sanitizeStyleValue`'s
+  `style`-attribute path is checked. The only reach is a second fetch (no script, no navigation),
+  and the bundle is never rendered with its own resource-loading context. Starts mattering the day a
+  presentation `url()` gets a fetch path this parser-only pass does not already block, or the tile
+  stops being image-only.
+
+None is closed within `_sanitizeSvg` because closing it means guessing at a grammar (every control
+character a URL parser discards, every presentation attribute the SVG spec lets carry a `url()`)
+the file exists to avoid — the walk judges elements and attributes it owns, not a second document
+model. `xml:base` (an actual finding, not residual) IS closed, at the same call site.

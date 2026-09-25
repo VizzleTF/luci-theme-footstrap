@@ -1,10 +1,8 @@
 #!/bin/sh
 # Build usign from the commit luci-upstream.pin names, and print the path to the binary.
 #
-# Two CI jobs need it for opposite reasons — the build job VERIFIES OpenWrt's sha256sums.sig before
-# trusting the SDK, the release job SIGNS each package with our own key — so a recipe living in one
-# of them would grow a copy in the other, and a second `git checkout <pin>` is exactly the shape
-# that ends up on two different commits with nothing to say so.
+# One caller: build-apk.sh, the SDK build kept for the path without owfeed (not run in CI) — it
+# verifies OpenWrt's sha256sums.sig with this binary before trusting the downloaded SDK.
 #
 # It needs neither cmake nor libubox: the six sources plus the bundled base64.c compile with plain
 # cc. Usage: U="$(tools/build-usign.sh "$RUNNER_TEMP/usign")"

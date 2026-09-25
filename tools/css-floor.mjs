@@ -44,11 +44,6 @@ const FEATURES = {
 	'prop:text-wrap':      { kind: 'soft', chrome: 117, firefox: 137, safari: 17.5 },
 	'prop:scrollbar-width':{ kind: 'soft', chrome: 121, firefox: 64,  safari: 18.2 },
 	'prop:overflow-anchor':{ kind: 'soft', chrome: 56,  firefox: 66,  safari: 99 },
-	/* view transitions: the swap animates where they exist and is instant where they do not
-	 * (fs-router.js only starts one when the API answers). Baseline 2025-10-14. */
-	'pseudoel:view-transition':     { kind: 'soft', chrome: 111, firefox: 144, safari: 18 },
-	'pseudoel:view-transition-old': { kind: 'soft', chrome: 111, firefox: 144, safari: 18 },
-	'pseudoel:view-transition-new': { kind: 'soft', chrome: 111, firefox: 144, safari: 18 },
 
 	/* HARD: no fallback exists and the page is wrong without them. */
 	'atrule:layer':        { kind: 'hard', chrome: 99,  firefox: 97,  safari: 15.4 },
@@ -58,7 +53,6 @@ const FEATURES = {
 	'unit:svh':            { kind: 'hard', chrome: 108, firefox: 101, safari: 15.4 },
 	'unit:dvh':            { kind: 'hard', chrome: 108, firefox: 101, safari: 15.4 },
 	'prop:accent-color':   { kind: 'hard', chrome: 93,  firefox: 92,  safari: 15.4 },
-	'prop:aspect-ratio':   { kind: 'hard', chrome: 88,  firefox: 89,  safari: 15 },
 	'prop:inset-inline':   { kind: 'hard', chrome: 87,  firefox: 63,  safari: 14.1 },
 	'prop:padding-block':  { kind: 'hard', chrome: 87,  firefox: 66,  safari: 14.1 },
 	'prop:color-scheme':   { kind: 'hard', chrome: 81,  firefox: 96,  safari: 13 },
@@ -163,7 +157,7 @@ const baseline = new Set(JSON.parse(readFileSync(BASELINE, 'utf8')).known);
 const unknown = [ ...seen ].filter((k) => !baseline.has(k) && !ALL[k]).sort();
 
 if (process.argv.includes('--update')) {
-	const known = [ ...new Set([ ...baseline, ...seen ]) ].sort();
+	const known = [ ...seen ].sort();
 	writeFileSync(BASELINE, JSON.stringify({
 		comment: 'Every CSS feature the built sheet uses. A new entry means a new browser-support '
 			+ 'decision: classify it in tools/css-floor.mjs (hard/soft) before adding it here.',

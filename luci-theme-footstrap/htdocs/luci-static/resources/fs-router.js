@@ -102,28 +102,19 @@ const _viewIntervals = (window.__fsViewIntervals || (window.__fsViewIntervals = 
  *
  * `L.Poll.timer` is that id, and it is private state: `add`/`remove`/`start`/`stop`/`active` are the
  * documented surface, and the whole `L.Poll` alias is already deprecated (`'require poll'` replaces
- * it, but no supported release ships poll.js yet). Read blind, a renamed field would make LuCI's
- * tick look like a view's — cleared on the next navigation, every poll on every later page silently
- * dead. So a missing field is a reason to do nothing, once, loudly.
- *
- * Asked through the documented half first: `active()` says whether the tick is running, and `timer`
- * is deleted by `stop()`, so an absent field is the ordinary "nothing to protect" case. The anomaly
- * worth reporting is the pair disagreeing — a tick running while the id it runs on has no name we
- * know.
- *
- * The alias itself is guarded for the same reason: the sweep runs inside the staged render, and a
- * TypeError there would leave every click showing the previous page's content under the new page's
- * title. */
+ * it, but no supported release ships poll.js yet). `active()` below is called unguarded: this
+ * caller runs from the visibilitychange listener at module eval (:69-81), before CONTRACT_FNS ever
+ * checks anything, so what backs it is the floor, not the boot contract — `L.Poll.active` is
+ * unconditional in every 24.10+ luci.js. Read blind, a renamed `timer` field would make LuCI's tick
+ * look like a view's — cleared on the next navigation, every poll on every later page silently
+ * dead. So a missing field is a reason to do nothing, once, loudly: `active()` says whether the
+ * tick is running, and `timer` is deleted by `stop()`, so an absent field is the ordinary "nothing
+ * to protect" case. The anomaly worth reporting is the pair disagreeing — a tick running while the
+ * id it runs on has no name we know. */
 /* -> the tick's id; null when LuCI is not polling; false when the two cannot be told apart, which
  * every caller reads as "leave every interval alone" */
 function pollTickId() {
-	if (!L.Poll) {
-		warnPollUnreadable('footstrap: L.Poll is gone from this luci-base, so LuCI\'s own tick cannot be '
-			+ 'told apart from a view\'s timers — leaving view intervals alone. fs-router.js needs '
-			+ 'updating for this luci-base.');
-		return false;
-	}
-	const running = (typeof L.Poll.active === 'function') ? L.Poll.active() : (L.Poll.timer != null);
+	const running = L.Poll.active();
 	if (running && L.Poll.timer == null) {
 		warnPollUnreadable('footstrap: LuCI is polling but L.Poll.timer is not readable — leaving view '
 			+ 'intervals alone rather than risking its tick. fs-router.js needs updating for this '
@@ -338,11 +329,9 @@ function watchSession() {
  * which also takes it out of the live tree. Public API only; no reaching into `dom.registry`. */
 function discard(el) {
 	try {
-		const dom = window.L ? window.L.dom : null;
-		if (!dom || typeof dom.content !== 'function') { el.remove(); return; }
 		const bin = document.createElement('div');
 		bin.appendChild(el);
-		dom.content(bin, null);
+		window.L.dom.content(bin, null);
 	}
 	catch (e) {
 		el.remove();
@@ -784,11 +773,7 @@ function commitStage(stage, contentHost) {
 		if (contentHost) contentHost.setAttribute('data-page', page);
 	}
 	const nodes = Array.from(stage.view.childNodes);
-	const dom = window.L ? window.L.dom : null;
-	if (live && dom && typeof dom.content === 'function')
-		dom.content(live, nodes);
-	else if (live)
-		live.replaceChildren(...nodes);
+	window.L.dom.content(live, nodes);
 	dropStage(stage);
 }
 

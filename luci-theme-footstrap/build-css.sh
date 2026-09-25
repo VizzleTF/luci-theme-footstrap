@@ -53,13 +53,13 @@ emit_layer() {
 		if head -1 "$f" | grep -q '^@layer '; then
 			head -1 "$f" | grep -q "^@layer $layer {\$" || {
 				echo "build-css: $f is in a $layer directory but does not open with '@layer $layer {'" >&2
-				rm -f "$body"; exit 1; }
+				exit 1; }
 			# the file's own wrapper: its first line, and its last line, which is that wrapper's `}`
 			sed '1d;$d' "$f" >> "$body"
 		elif [ -s "$body" ]; then
 			echo "build-css: $f has no @layer wrapper but follows one that does — it would be" >&2
 			echo "build-css: swallowed into the $layer block instead of staying above it." >&2
-			rm -f "$body"; exit 1
+			exit 1
 		else
 			cat "$f"
 		fi
@@ -69,6 +69,7 @@ emit_layer() {
 		cat "$body"
 		printf '}\n'
 	fi
+	# not covered by the EXIT trap: the success path runs `trap - EXIT` first
 	rm -f "$body"
 }
 

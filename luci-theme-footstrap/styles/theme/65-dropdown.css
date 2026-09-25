@@ -4,7 +4,7 @@
 	.dropdown-menu { background-color: var(--fs-panel); border-color: var(--fs-border); }
 	.dropdown-menu a { color: var(--fs-text); text-shadow: none; }
 	.dropdown-menu a:hover,
-	.dropdown-menu a:focus-visible { background: var(--fs-panel2); background-image: none; color: var(--fs-accent); }
+	.dropdown-menu a:focus-visible { background: var(--fs-panel2); color: var(--fs-accent); }
 
 	/* the outer div IS the button, class = ui.js's SELECTED mode; unguarded this erased that
 	 * variant's fill while its ink survived — measured page-on-page at 1.06-1.13:1. */
@@ -15,7 +15,6 @@
 	.cbi-page-actions .cbi-dropdown.cbi-button-apply,
 	.cbi-page-actions .cbi-dropdown > .cbi-button {
 		background: var(--fs-accent);
-		background-image: none;
 		border: 0;
 		color: var(--fs-on-accent);
 	}

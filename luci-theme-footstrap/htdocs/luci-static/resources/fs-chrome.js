@@ -19,11 +19,8 @@ function setRenderMain(fn) {
 
 /* section tabs -> #tabmenu (horizontal) */
 function renderTabMenu(node, url, level) {
+	/* #tabmenu is emitted whenever this module loads (notices.ut, !blank_page) */
 	const container = document.querySelector('#tabmenu');
-	/* a template without the container must not reject: an unhandled rejection here kills the
-	 * whole ui.menu.load() chain, i.e. every menu */
-	if (!container)
-		return E([]);
 	const ul = E('ul', { 'class': 'tabs' });
 	const children = ui.menu.getChildren(node);
 	let activeNode = null;
@@ -40,15 +37,13 @@ function renderTabMenu(node, url, level) {
 	});
 
 	if (ul.children.length === 0)
-		return E([]);
+		return;
 
 	container.appendChild(ul);
 	container.style.display = '';
 
 	if (activeNode)
 		renderTabMenu(activeNode, url + '/' + activeNode.name, (level || 0) + 1);
-
-	return ul;
 }
 
 /* ---- tab-strip auto-fit ----
@@ -401,6 +396,7 @@ function clusterFitsBrandRow(bar, menu) {
 
 /* modes -> #modemenu; drives the injected renderMainMenu for the active mode */
 function renderModeMenu(node, renderMainMenu) {
+	/* #modemenu is emitted whenever this module loads (header.ut, !blank_page) */
 	const ul = document.querySelector('#modemenu');
 	const children = ui.menu.getChildren(node);
 
@@ -409,18 +405,14 @@ function renderModeMenu(node, renderMainMenu) {
 			? child.name === L.env.requestpath[0]
 			: index === 0;
 
-		/* the main menu must render even where a template has no #modemenu */
-		if (ul)
-			ul.appendChild(E('li', { 'class': isActive ? 'active' : '' }, [
-				E('a', { 'href': L.url(child.name) }, [ _(child.title) ])
-			]));
+		ul.appendChild(E('li', { 'class': isActive ? 'active' : '' }, [
+			E('a', { 'href': L.url(child.name) }, [ _(child.title) ])
+		]));
 
 		if (isActive)
 			renderMainMenu(child, child.name);
 	});
 
-	if (!ul)
-		return;
 	if (children.length <= 1)
 		ul.classList.add('single');
 	if (ul.children.length > 1)
@@ -431,13 +423,15 @@ function renderModeMenu(node, renderMainMenu) {
  * every SPA nav. Containers are cleared first so a re-render does not stack duplicates. */
 function renderChrome() {
 	const root = tree.tree();
+	/* #modemenu/#topmenu/#tabmenu are emitted whenever this module loads (header.ut/notices.ut,
+	 * !blank_page) */
 	const modemenu = document.querySelector('#modemenu');
 	const topmenu  = document.querySelector('#topmenu');
 	const tabmenu  = document.querySelector('#tabmenu');
 
-	if (modemenu) { modemenu.innerHTML = ''; modemenu.style.display = 'none'; modemenu.classList.remove('single'); }
-	if (topmenu)  topmenu.innerHTML = '';
-	if (tabmenu)  { tabmenu.innerHTML = ''; tabmenu.style.display = 'none'; }
+	modemenu.innerHTML = ''; modemenu.style.display = 'none'; modemenu.classList.remove('single');
+	topmenu.innerHTML = '';
+	tabmenu.innerHTML = ''; tabmenu.style.display = 'none';
 
 	renderModeMenu(root, _renderMain);
 
@@ -461,8 +455,8 @@ function renderChrome() {
  * <html data-rail> (head.ut re-applies it before paint) and in localStorage; everything else is
  * CSS keyed off that attribute. */
 function wireRail() {
+	/* #fs-rail-toggle is emitted whenever this module loads (header.ut, !blank_page) */
 	const btn = document.getElementById('fs-rail-toggle');
-	if (!btn) return;
 
 	function sync() {
 		const on = prefs.currentRail();
@@ -509,8 +503,8 @@ function wireIndicatorKeyboard(el) {
 }
 
 function wireIndicatorCounts() {
+	/* #indicators is emitted whenever this module loads (header.ut, !blank_page) */
 	const box = document.getElementById('indicators');
-	if (!box) return;
 
 	function stamp() {
 		box.querySelectorAll('[data-indicator]').forEach((el) => {

@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
-import { ROOT } from './lib/css.mjs';
+import { ROOT } from './lib/root.mjs';
 
 const MEDIA = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/footstrap');
 const CHECK = process.argv.includes('--check');

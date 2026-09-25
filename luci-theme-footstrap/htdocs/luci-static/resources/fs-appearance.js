@@ -73,37 +73,28 @@ function probeColor(expr) {
  * the space it was authored in, so `oklch(0.54 0.19 300)` would parse as three numbers in the
  * wrong units and produce a colour nobody chose — measured: #010078, graded "Too faint to read",
  * in the hex field, the swatch and the contrast readout alike. Painting one pixel makes the engine
- * convert instead (tools/export-tier.mjs uses the same method). The string parse remains only as
- * the fallback for an engine with no 2D context, where only the legacy `rgb()`/`color(srgb …)`
- * forms can appear. */
+ * convert instead (tools/export-tier.mjs uses the same method). Canvas 2D is universal on every
+ * engine 24.10 ships against, so there is no second path. */
 let _cx = null;
 function rasterCtx() {
-	if (_cx !== null) return _cx;
-	try {
+	if (!_cx) {
 		const cv = document.createElement('canvas');
 		cv.width = cv.height = 1;
-		_cx = cv.getContext('2d', { willReadFrequently: true }) || false;
-	} catch (e) { _cx = false; }
+		_cx = cv.getContext('2d', { willReadFrequently: true });
+	}
 	return _cx;
 }
 function parseColor(s) {
-	const str = String(s || '');
 	const cx = rasterCtx();
-	if (cx) {
-		/* fillStyle keeps the last value it could parse, so a colour this engine rejects would
-		 * report the previous one as a fresh reading — the trap probeColor() clears for */
-		cx.fillStyle = '#000';
-		cx.fillStyle = str;
-		cx.clearRect(0, 0, 1, 1);
-		cx.fillRect(0, 0, 1, 1);
-		const d = cx.getImageData(0, 0, 1, 1).data;
-		if (d[3] === 255) return [ d[0], d[1], d[2] ];
-		/* translucent: composite over nothing is meaningless for a readout, so fall through */
-	}
-	const nums = str.match(/[\d.]+/g);
-	if (!nums || nums.length < 3) return null;
-	const unit = (/^color\(/i).test(str) ? 255 : 1;
-	return nums.slice(0, 3).map((n) => Math.max(0, Math.min(255, parseFloat(n) * unit)));
+	/* fillStyle keeps the last value it could parse, so a colour this engine rejects would
+	 * report the previous one as a fresh reading — the trap probeColor() clears for */
+	cx.fillStyle = '#000';
+	cx.fillStyle = String(s || '');
+	cx.clearRect(0, 0, 1, 1);
+	cx.fillRect(0, 0, 1, 1);
+	const d = cx.getImageData(0, 0, 1, 1).data;
+	/* translucent: composite over nothing is meaningless for a readout */
+	return d[3] === 255 ? [ d[0], d[1], d[2] ] : null;
 }
 
 /* WCAG 2.x relative luminance and contrast ratio, on sRGB. Used only to report: the theme states
@@ -141,8 +132,8 @@ function toHex(s) {
  * `opts.probe` is the live token the effective colour is read back from, so the field shows the
  * palette's colour while the axis is off without a copy of the palette in JS. `opts.contrast` is
  * the pair whose ratio is reported under the row. */
-function colorControl(current, onPick, label, opts) {
-	const o = opts || {};
+function colorControl(onPick, label, opts) {
+	const o = opts;
 
 	/* type=color leaves the picker to the browser: accessible without reimplementing a colour
 	 * wheel, and native on a phone. The text field beside it takes a pasted hex and is the
@@ -154,10 +145,6 @@ function colorControl(current, onPick, label, opts) {
 	});
 	const clear = E('button', { 'class': 'btn fs-color-clear', 'type': 'button' }, [ _('Palette', 'footstrap') ]);
 	const ratio = o.contrast ? E('div', { 'class': 'cbi-value-description fs-color-contrast' }) : null;
-
-	/* what the axis holds right now: the page can change it behind this control (a preset, Reset
-	 * to default), so a private copy would go stale. `current` is only the build-time value. */
-	const currentOf = o.read || (() => current);
 
 	/* Repaint everything that mirrors the axis. Called after every edit, and through the returned
 	 * refresh() after a preset, palette switch or dark-mode flip — each changes what the palette's
@@ -207,7 +194,9 @@ function colorControl(current, onPick, label, opts) {
 	const commit = () => {
 		const v = field.value.trim().toLowerCase();
 		if ((/^#[0-9a-f]{6}$/).test(v)) pick(v);
-		else reflect(currentOf());
+		/* re-read rather than a cached copy: the page can change what the axis holds behind this
+		 * control (a preset, Reset to default), which a snapshot taken at build time would miss */
+		else reflect(o.read());
 	};
 	field.addEventListener('blur', commit);
 	field.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); commit(); } });
@@ -218,7 +207,7 @@ function colorControl(current, onPick, label, opts) {
 	].concat(ratio ? [ ratio ] : []));
 	/* the caller decides when this runs: probeColor() needs the document, and this control is not
 	 * in it yet */
-	wrap.fsRefresh = () => reflect(currentOf());
+	wrap.fsRefresh = () => reflect(o.read());
 	return wrap;
 }
 
@@ -312,12 +301,12 @@ function build() {
 	/* one colour axis: `axis` is the `{current, apply}` object fs-axes.js exports it as; `probe` is
 	 * the live token the control reads the effective colour back from, `contrast` the pair it
 	 * reports */
-	const colourGroup = (label, axis, probe, contrast, opts) => group(label, (lbl) => {
-		const ctl = colorControl(axis.current(), bump(axis.apply), lbl, {
+	const colourGroup = (label, axis, probe, contrast, opts = {}) => group(label, (lbl) => {
+		const ctl = colorControl(bump(axis.apply), lbl, {
 			probe: probe,
 			read: axis.current,
 			contrast: contrast,
-			cls: (opts && opts.cls) || ''
+			cls: opts.cls
 		});
 		colourCtls.push(ctl);
 		return ctl;

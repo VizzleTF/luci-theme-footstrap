@@ -52,7 +52,7 @@ Colours go in `styles/03-palettes.css`, scales and tokens in `styles/02-tokens.c
 
 ## Working on a router
 
-The normal dev stand is four containers driven by `owlab` from `../owlab.yaml` — see
+The normal dev stand is the disposable routers `../owlab.yaml` defines, driven by `owlab` — see
 [`../docs/development.md`](../docs/development.md). `dev-sync.sh` targets a **hardware** router over
 ssh:
 

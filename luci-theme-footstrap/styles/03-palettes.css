@@ -57,11 +57,12 @@
 	:root[data-warn="hue"]   { --fs-warn:   oklch(from var(--fs-warn-base)   l c var(--fs-warn-h)); }
 	:root[data-danger="hue"] { --fs-danger: oklch(from var(--fs-danger-base) l c var(--fs-danger-h)); }
 
-	/* repeated attribute: wins (0,3,0) over the dark block's own (0,2,0), else lost in dark mode only */
-	:root[data-accent="hex"][data-accent] { --fs-on-accent: oklch(from var(--fs-accent) clamp(0, (l - .62) * -100, 1) 0 0); }
-	:root[data-good="hex"][data-good]     { --fs-on-good:   oklch(from var(--fs-good)   clamp(0, (l - .62) * -100, 1) 0 0); }
-	:root[data-warn="hex"][data-warn]     { --fs-on-warn:   oklch(from var(--fs-warn)   clamp(0, (l - .62) * -100, 1) 0 0); }
-	:root[data-danger="hex"][data-danger] { --fs-on-danger: oklch(from var(--fs-danger) clamp(0, (l - .62) * -100, 1) 0 0); }
+	/* hex ink must outrank a NAMED palette's dark block ([data-palette=…][data-darkmode="true"],
+	 * (0,3,0)); triple attribute makes it (0,4,0) */
+	:root[data-accent="hex"][data-accent][data-accent] { --fs-on-accent: oklch(from var(--fs-accent) clamp(0, (l - .62) * -100, 1) 0 0); }
+	:root[data-good="hex"][data-good][data-good]       { --fs-on-good:   oklch(from var(--fs-good)   clamp(0, (l - .62) * -100, 1) 0 0); }
+	:root[data-warn="hex"][data-warn][data-warn]       { --fs-on-warn:   oklch(from var(--fs-warn)   clamp(0, (l - .62) * -100, 1) 0 0); }
+	:root[data-danger="hex"][data-danger][data-danger] { --fs-on-danger: oklch(from var(--fs-danger) clamp(0, (l - .62) * -100, 1) 0 0); }
 
 	/* ---- footstrap — GitHub Primer (DEFAULT, also fills bare :root) ---- */
 	/* never matches (both appliers REMOVE it for the default) — kept so :root need not duplicate
@@ -83,7 +84,10 @@
 		--fs-good-base: #197c36;
 		--fs-warn-base: #946300;
 		--fs-danger-base: #cf222e;
-		/* ink ON the fills above — white clears AA on all four: 5.19/5.28/5.19/5.36 */
+		/* ink ON the fills above — white clears AA on all four: 5.19/5.28/5.19/5.36. --fs-panel-base
+		 * and these four inks are the same #fff in every light palette below, so THIS is their
+		 * only definition — hicontrast/bootstrap/2020/forum's light blocks inherit them, unset.
+		 * docs/design-system.md "Adding a palette". */
 		--fs-on-accent: #fff;
 		--fs-on-good: #fff;
 		--fs-on-warn: #fff;
@@ -115,9 +119,8 @@
 
 	/* ---- hicontrast — deeper, more saturated (opt-in); docs/design-system.md "Palettes" ---- */
 	:root[data-palette="hicontrast"] {
-		/* LIGHT — accents DARKER than the default's on purpose: 5.22/5.35/5.93/5.80 vs its 5.08 */
+		/* LIGHT — accents DARKER than the default's on purpose: 5.22/5.35/5.93/5.80 vs its 5.08. */
 		--fs-bg-base: #eef1f6;
-		--fs-panel-base: #fff;
 		--fs-panel2-base: #f6f8fb;
 		--fs-border-base: #e4e9f1;
 		--fs-text: #101725;
@@ -128,11 +131,6 @@
 		--fs-good-base: #0f7a52;
 		--fs-warn-base: #8a5a00;
 		--fs-danger-base: #c02b2b;
-		/* white on the fills above: 5.22/5.35/5.93/5.80 */
-		--fs-on-accent: #fff;
-		--fs-on-good: #fff;
-		--fs-on-warn: #fff;
-		--fs-on-danger: #fff;
 	}
 	:root[data-palette="hicontrast"][data-darkmode="true"] {
 		/* DARK */
@@ -160,9 +158,8 @@
 	/* ---- bootstrap — luci-theme-bootstrap's own colours (opt-in). docs/design-system.md
 	 * "Palettes" ("bootstrap"). ---- */
 	:root[data-palette="bootstrap"] {
-		/* LIGHT */
+		/* LIGHT — white ink on the fills below clears AA on all four: 5.81/5.54/5.40/5.70. */
 		--fs-bg-base: #fff;
-		--fs-panel-base: #fff;
 		--fs-panel2-base: #f5f5f5;
 		--fs-border-base: #ccc;
 		--fs-text: #232323;
@@ -174,11 +171,6 @@
 		--fs-good-base: #007936;   /* --success-color-low */
 		--fs-warn-base: #826706;   /* #efbd0b darkened; 1.61:1 as text is not a rounding error */
 		--fs-danger-base: #d00000; /* --error-color-low */
-		/* ink ON the fills above — white clears AA on all four: 5.81/5.54/5.40/5.70 */
-		--fs-on-accent: #fff;
-		--fs-on-good: #fff;
-		--fs-on-warn: #fff;
-		--fs-on-danger: #fff;
 	}
 	:root[data-palette="bootstrap"][data-darkmode="true"] {
 		/* DARK */
@@ -207,9 +199,8 @@
 	/* ---- 2020 — the OpenWrt 2020 theme's colourway (opt-in), split into a pair.
 	 * docs/design-system.md "Palettes" ("2020"). ---- */
 	:root[data-palette="2020"] {
-		/* LIGHT — white content, the CI cyan darkened until it can be read on it */
+		/* LIGHT — white content, the CI cyan darkened until it can be read on it. */
 		--fs-bg-base: #fff;
-		--fs-panel-base: #fff;
 		--fs-panel2-base: #eef4f8;
 		--fs-border-base: #c3d2dd;
 		/* navy-tinted neutrals rather than grey: the ink belongs to the same scheme as the accent */
@@ -222,11 +213,6 @@
 		--fs-good-base: #276e2a;   /* #5CB85C darkened; 2.28:1 as text is not a rounding error */
 		--fs-warn-base: #8a5a00;   /* #C80, same move */
 		--fs-danger-base: #c1121f; /* #C11 is 5.25:1 already — the one that stays where it was */
-		/* ink ON the fills above — white clears AA on all four */
-		--fs-on-accent: #fff;
-		--fs-on-good: #fff;
-		--fs-on-warn: #fff;
-		--fs-on-danger: #fff;
 	}
 	:root[data-palette="2020"][data-darkmode="true"] {
 		/* DARK — 2020's own scheme: the navy is the canvas and the cyan is nearly untouched */
@@ -253,9 +239,9 @@
 	/* ---- forum — sampled from forum.openwrt.org's own getComputedStyle (opt-in).
 	 * docs/design-system.md "Palettes" ("forum"). ---- */
 	:root[data-palette="forum"] {
-		/* LIGHT — the forum's own page, exactly: white canvas, near-black ink */
+		/* LIGHT — the forum's own page, exactly: white canvas, near-black ink. white on the
+		 * fills below: 5.19/5.14/5.17/5.17. */
 		--fs-bg-base: #fff;
-		--fs-panel-base: #fff;
 		--fs-panel2-base: #f0f0f0;
 		--fs-border-base: #ddd;
 		--fs-text: #222;
@@ -268,11 +254,6 @@
 		--fs-good-base: #008000;
 		--fs-warn-base: #717100;
 		--fs-danger-base: #c63c1b;
-		/* white on the fills above: 5.19/5.14/5.17/5.17 */
-		--fs-on-accent: #fff;
-		--fs-on-good: #fff;
-		--fs-on-warn: #fff;
-		--fs-on-danger: #fff;
 	}
 	:root[data-palette="forum"][data-darkmode="true"] {
 		/* DARK — the forum's own dark scheme: #222 canvas, #ddd ink, both exactly as sampled */

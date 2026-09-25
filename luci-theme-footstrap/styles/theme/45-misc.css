@@ -46,8 +46,10 @@
 	.cbi-map { container-type: inline-size; container-name: fs-content; }
 	#view { container-type: inline-size; container-name: fs-view fs-content; }
 
-	/* ui.js appends #modal_overlay outside #view, so the names above must repeat here or no dialog query resolves */
-	.modal { container-type: inline-size; container-name: fs-view fs-content; }
+	/* ui.js appends #modal_overlay outside #view, so the names above must repeat here or no dialog query resolves.
+	 * box-shadow merged in from theme/70-modal.css: base's elevation = --fs-bg's hex in footstrap
+	 * light, a glow not a shadow; others take --fs-shadow-pop */
+	.modal { container-type: inline-size; container-name: fs-view fs-content; box-shadow: var(--fs-shadow-pop); }
 
 	/* pager (« prev · text · next ») — generic, not page-scoped */
 	.pager.center { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center; gap: var(--fs-space-2-5); padding: var(--fs-space-3-5) 0; }

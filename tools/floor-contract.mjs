@@ -38,10 +38,11 @@ import { chromium } from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
 const { values: FLAGS } = parseArgs({ options: {
-	pages: { type: 'string' }, slack: { type: 'string' }, settle: { type: 'string' },
-	wait: { type: 'string' }, only: { type: 'string' }, all: { type: 'boolean' },
+	pages: { type: 'string', default: '/admin/network/network,/admin/status/overview,/admin/network/dhcp,'
+		+ '/admin/system/footstrap,/admin/system/system,/admin/system/filemanager' },
+	settle: { type: 'string', default: '10000' },
+	only: { type: 'string', default: '' }, all: { type: 'boolean', default: false },
 } });
-const arg = (name, dflt) => FLAGS[name] ?? dflt;
 
 /* Pages that carry the shapes a floor is written on: a tabbed map of tables (Interfaces), a
  * status page of tables a poll rewrites (Overview), a form page whose sections end in prose — the
@@ -55,8 +56,7 @@ const arg = (name, dflt) => FLAGS[name] ?? dflt;
  * app whose table header cells carry `data-field`, which is the shape that turned the sweep's own
  * class writes back into its own wake-up (fs-fit.js's `_moTabs`, task freeze). It is absent from
  * the CORE routers, where it costs one 404 and nothing else. */
-const PAGES = arg('pages', '/admin/network/network,/admin/status/overview,/admin/network/dhcp,'
-	+ '/admin/system/footstrap,/admin/system/system,/admin/system/filemanager').split(',');
+const PAGES = FLAGS.pages.split(',');
 
 /* Opens then closes the one `.fs-ap-fold` disclosure Footstrap's Appearance panel carries — the
  * OPEN half mutates nodes (refreshColours()) and is not the fault; the CLOSE half writes `hidden`
@@ -103,7 +103,7 @@ const DEPENDS_TRIGGER = async (page) => {
  * to, so it may sit a pixel or two off what the box measures: a collapsed bottom margin on the last
  * child is not in the span, and both numbers are rounded. 4px is that slack and nothing more —
  * the faults this gate exists for were 41 and 98. */
-const SLACK = Number(arg('slack', '4'));
+const SLACK = 4;
 
 /* What the 0.14.3 shape wrote, asked of every box wearing one of ours: take the floor off, read the
  * box, put it back. Expensive — a forced layout per box — which is why the theme does not do this
@@ -242,7 +242,7 @@ const AFTER = () => {
  * is a finding rather than a page quietly skipped. A deadline is the only way to ask it; it is a
  * detector, not a remedy, and it is generous — the reads it guards are a `querySelectorAll` and
  * some arithmetic on a page that has already had 7s to settle. */
-const SETTLE_DEADLINE = Number(arg('settle', '10000'));
+const SETTLE_DEADLINE = Number(FLAGS.settle);
 
 /* The loser of the race is a promise nobody will ever settle, so its rejection when the tab is
  * finally closed has to be swallowed here or it surfaces as an unhandled rejection and takes the
@@ -285,9 +285,9 @@ const CHURN_WINDOW = 1000;
 
 /* One poll interval is what the theme waits before deciding a container is not refilling, so the
  * release cannot be seen sooner than that. Two of them plus a second of slack. */
-const RELEASE_WAIT = Number(arg('wait', '0')) || 13000;
+const RELEASE_WAIT = 13000;
 
-const list = requireStands(stands(arg('only', ''), { all: FLAGS.all ?? false }), 'floor-contract');
+const list = requireStands(stands(FLAGS.only, { all: FLAGS.all }), 'floor-contract');
 const browser = await chromium.launch();
 const findings = [];
 let boxes = 0, worst = 0, released = 0, switches = 0, folds = 0, depends = 0, shrinks = 0, live = 0;

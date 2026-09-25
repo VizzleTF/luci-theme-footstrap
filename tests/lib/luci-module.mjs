@@ -20,11 +20,8 @@
  * module makes at eval. Anything that needs a real box on a real page belongs on a stand
  * (docs/development.md). */
 import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const RESOURCES = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources');
+import { join } from 'node:path';
+import { RESOURCES } from '../../tools/lib/page-modules.mjs';
 
 /* The leading run of string-literal statements. Scanned line-wise rather than parsed: the prologue
  * is by definition the head of the file, one directive per line in this tree (eslint keeps it so),

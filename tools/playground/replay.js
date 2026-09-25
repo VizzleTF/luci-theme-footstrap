@@ -7,10 +7,11 @@
  * Static files (`/luci-static/**`) are never touched — the page server answers those directly, the
  * same way a router's uhttpd would.
  *
- * `requestKey`/`ubusKey` below MUST derive the same string `tools/playground/lib.mjs` does for the
- * same call: this file cannot `import` it (a classic script has no module graph), so the shape is
- * duplicated rather than shared. A key that drifts here answers nothing and the call becomes a
- * miss.
+ * `stableStringify`/`ubusKey`/`stripBase`/`isSafeReturn` are lib.mjs's own functions, not copies:
+ * build.mjs inlines their source into the `<script>` tag ahead of this one (`buildInject`), and a
+ * classic script shares the page's one global scope, so they are already defined by the time this
+ * runs. Only `requestKey` below is replay-specific — lib.mjs's own version has no BASE to strip. A
+ * key that drifts here answers nothing and the call becomes a miss.
  *
  * A miss never breaks the page: `window.__pgMiss` records it (verify.mjs asserts it stays empty)
  * and the call gets a JSON-RPC error EXCEPT `session.access`, which fs-router.js's SPA guard reads
@@ -33,16 +34,6 @@
 	const OVERVIEW = window.__pgOverview || `${BASE}/cgi-bin/luci/`;
 	const LOGIN_URL = `${BASE}/cgi-bin/luci/`;
 
-	/* lib.mjs's `isSafeReturn`, duplicated for the reason this file's header states: a classic
-	 * script has no module graph. */
-	function isSafeReturn(path) {
-		if (typeof path !== 'string') return false;
-		const prefix = `${BASE}/cgi-bin/luci/admin/`;
-		if (!path.startsWith(prefix)) return false;
-		if (path.includes('//') || path.includes('..') || path.includes('\\')) return false;
-		return true;
-	}
-
 	/* Every page but the login form is gated on a sessionStorage flag: no flag sends the reader to
 	 * the login page, remembering where they were headed in `fs-pg-return` so the submit handler
 	 * below can send them back. Runs first and returns out of the whole file when it fires — the
@@ -64,37 +55,15 @@
 				event.preventDefault();
 				window.sessionStorage.setItem('fs-pg-auth', '1');
 				const stored = window.sessionStorage.getItem('fs-pg-return');
-				location.replace(isSafeReturn(stored) ? stored : OVERVIEW);
+				location.replace(isSafeReturn(stored, BASE) ? stored : OVERVIEW);
 			});
 		});
 	}
 
-	function stableStringify(value) {
-		if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-		if (value && typeof value === 'object') {
-			const keys = Object.keys(value).sort();
-			return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`;
-		}
-		return JSON.stringify(value);
-	}
 	/* `env.resource` carries BASE at replay time (build.mjs's `rewriteEnv`), so a path-like arg a
 	 * page builds from it (`L.fspath`, luci.js:2798) does too — the recording was keyed before that
-	 * rewrite, so this strips BASE back out before the key is computed. lib.mjs's `stripBase`,
-	 * duplicated here for the reason stated in the file header. */
-	function stripBase(value, base) {
-		if (!base) return value;
-		if (typeof value === 'string') return value.split(base).join('');
-		if (Array.isArray(value)) return value.map((v) => stripBase(v, base));
-		if (value && typeof value === 'object') {
-			const out = {};
-			for (const k of Object.keys(value)) out[k] = stripBase(value[k], base);
-			return out;
-		}
-		return value;
-	}
-	function ubusKey(object, method, args) {
-		return `${object}.${method}(${stableStringify(args || {})})`;
-	}
+	 * rewrite, so this strips BASE back out before the key is computed with lib.mjs's own
+	 * `stripBase`/`ubusKey` (inlined ahead of this tag, see the file header). */
 	function requestKey(entry) {
 		if (entry && entry.method === 'call' && Array.isArray(entry.params)) {
 			const object = entry.params[1], method = entry.params[2], args = entry.params[3];

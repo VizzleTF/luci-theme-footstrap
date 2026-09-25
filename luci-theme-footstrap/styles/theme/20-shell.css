@@ -146,7 +146,7 @@
 		 * them instead of pushing one cluster to the bar's far edge */
 		width: var(--fs-btn-size); height: var(--fs-btn-size); padding: 0;
 		border: var(--fs-hairline); border-radius: var(--fs-radius);
-		background: var(--fs-bar-ctl-bg); color: var(--fs-dim);
+		background: transparent; color: var(--fs-dim);
 		font: inherit; font-weight: var(--fs-weight); font-size: var(--fs-type); line-height: 1.1;
 		text-align: start; cursor: pointer;
 		transition: background var(--fs-dur), border-color var(--fs-dur), color var(--fs-dur);
@@ -199,7 +199,7 @@
 		flex: 0 0 auto; order: 2; justify-content: center;
 		width: var(--fs-btn-size); height: var(--fs-btn-size); padding: 0;
 		border: var(--fs-hairline); border-radius: var(--fs-radius);
-		background: var(--fs-bar-ctl-bg);
+		background: transparent;
 	}
 	/* on a square button the BORDER carries the state — the fill and the ink come from the
 	 * shared hover/active groups in 10-chrome.css */
@@ -534,12 +534,6 @@
 	footer a { color: var(--fs-dim); }
 	footer a:hover { color: var(--fs-accent); }
 
-	/* the phone bar is the base above; only the content gutter is width-driven */
-	@media (max-width: 767px) {
-		.fs-content { padding: var(--fs-space-4); }
-	}
-
-
 	/* Notifications — ui.addNotification prepends .alert-message as the first child of
 	 * #maincontent (.fs-main). Order it above the content and give it card spacing. */
 	.fs-main > .alert-message {
@@ -550,16 +544,16 @@
 	.fs-main > .fs-content { order: 2; }
 	.fs-main > .fs-footer { order: 3; }
 
+	/* phone tier: content gutter, alert-message width and wrap — merged, none override each
+	 * other (distinct selectors), must stay after the base rules above they narrow */
 	@media (max-width: 767px) {
+		.fs-content { padding: var(--fs-space-4); }
 		/* width: auto, not the base width above: that calc subtracts the DESKTOP gutter while
 		 * .fs-content's own gutter is narrower here — auto plus the side margins tracks the
 		 * content column exactly at any width in this tier. */
 		.fs-main > .alert-message { margin: var(--fs-space-3) var(--fs-space-4) 0; width: auto; }
-	}
-
-	/* Phone: a top-level alert's action buttons were nowrap, so Dismiss was shoved past the
-	 * panel and clipped by .fs-main's overflow-x: clip. Scoped to .fs-main for #view's too. */
-	@media (max-width: 767px) {
+		/* a top-level alert's action buttons were nowrap, so Dismiss was shoved past the panel
+		 * and clipped by .fs-main's overflow-x: clip. Scoped to .fs-main for #view's too. */
 		.fs-main .alert-message { flex-wrap: wrap; }
 		.fs-main .alert-message > * { min-width: 0; margin-inline-start: 0; }
 		/* the action row is a nested flex that stayed nowrap and clipped its first label */
@@ -581,7 +575,7 @@
 		font-weight: var(--fs-weight); font-size: var(--fs-type);
 		/* the bar's control surface — ui.js emits a bare `<span data-indicator=…>` with NO
 		 * class, so a `.label`-keyed rule matches nothing */
-		background: var(--fs-bar-ctl-bg); background-image: none;
+		background: transparent;
 		border: var(--fs-hairline);
 		color: var(--fs-dim);
 		border-radius: var(--fs-radius); padding: 0 var(--fs-space-3); box-shadow: none;

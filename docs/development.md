@@ -23,22 +23,23 @@ owlab doctor                  # what this machine can do (Docker, arch, emulatio
 
 Docker is the only other requirement. Everything else comes out of `owlab.yaml`.
 
-## The dev stand: four containers
+## The dev stand
 
-Brought up by [owlab](https://github.com/owfeed/owlab) from `owlab.yaml` in the repo root. There are
-**four** routers because the differences that bite are runtime ones and one box will not show them:
-three axes — package manager, LuCI feed (upstream vs fork), release — covered pairwise by four
-boxes.
+Brought up by [owlab](https://github.com/owfeed/owlab) from `owlab.yaml` in the repo root, which is
+the current count and list of routers — read it rather than a number here. The two that matter for
+an ordinary change are the package-manager pair:
 
 | id | distro | release | manager | LuCI |
 |---|---|---|---|---|
 | `owrt2512` | OpenWrt | 25.12.4 | apk | http://localhost:8025 |
 | `owrt2410` | OpenWrt | 24.10.8 | opkg | http://localhost:8024 |
-| `imm2512` | ImmortalWrt | 25.12.1 | apk | http://localhost:8026 — not a gate target |
-| `imm2410` | ImmortalWrt | 24.10.6 | opkg | http://localhost:8027 — not a gate target |
+
+`owlab.yaml` also carries `owrtsnap` (tracks luci-base's master), parallel-measurement twins of the
+three OpenWrt lines (`-b`, `-d`), and — on demand only, not booted by default — two ImmortalWrt
+stands: [ImmortalWrt stands (on demand)](#immortalwrt-stands-on-demand).
 
 ```sh
-owlab up                 # build and start all four
+owlab up                 # build and start every router owlab.yaml defines
 owlab sync --watch       # rebuild the CSS and push on every edit
 owlab open owrt2512      # open LuCI in a browser
 ```
@@ -58,6 +59,36 @@ netifd, ubus, rpcd, uhttpd) from its own rootfs tarball, not a home-made imitati
   `ip rule … blackhole`: LuCI answers while all outbound traffic hangs with no error.
 - A hardware router is still reachable as `ssh router`, and `luci-theme-footstrap/dev-sync.sh`
   pushes to it — for when the question is genuinely about hardware.
+
+### ImmortalWrt stands (on demand)
+
+`imm2512`/`imm2410` are not a default-boot stand and carry no opt-in flag or profile in owlab's own
+config schema (`owlab up --help`) — the only way to
+boot them is to give owlab a `routers:` entry to read. They are not a gate target either
+(`tools/lib/stands.mjs`'s `CORE`) and answer a question about the ImmortalWrt brand, never a
+behaviour claim (`owlab.yaml`, the "second instances" comment). Bring one up only when that question is
+the one being asked: paste both blocks back under `routers:` in `owlab.yaml` (they resolve
+`*third_party_apps` from the anchor already defined on `owrt2512` there), then
+
+```sh
+owlab up imm2512 imm2410
+```
+
+and once done, `owlab down imm2512 imm2410` first, then remove the pasted blocks (owlab names a router only by an id it can read in `owlab.yaml`).
+
+```yaml
+  - id: imm2512
+    distro: immortalwrt
+    release: "25.12.1"
+    ports: { http: 8026, ssh: 2226 }
+    extra_packages: *third_party_apps
+
+  - id: imm2410
+    distro: immortalwrt
+    release: "24.10.6"
+    ports: { http: 8027, ssh: 2227 }
+    extra_packages: *third_party_apps
+```
 
 ## Pushing a change
 
@@ -617,16 +648,16 @@ occasions `pseudo-loc` already earns its keep on.
 
 Ad-hoc Playwright probes against a running stand, kept for reuse and not gates: nothing there is in
 `package.json`, nothing ships, nothing runs in `check`. `lib.mjs` is the shared half — `PORTS`
-(stand → host port), `login`, `PAGES` (the ACL-filtered menu tree as a page list), `SNAP` (one chrome
-snapshot: sidebar width, menu items, sheet counts, poll queue) and `navAndCheck` (SPA-vs-full-load
-through a sentinel). Every probe takes the stand as its first argument and writes to `../tmp/`:
+(stand → host port), `login` and `SNAP` (one chrome snapshot: sidebar width, menu items, sheet
+counts, poll queue). Every probe takes the stand as its first argument and writes to `../tmp/`:
 
 ```sh
 node .claude/tooling/<probe>.mjs owrt2512 [arg]
 ```
 
-The ones worth knowing by name — `parity.mjs`, `overflow.mjs`, `resize.mjs`, `adversary.mjs`,
-`traffic.mjs` — say what they measure at the top of each file. `preview-venv/` beside them is a
+The ones worth knowing by name — `resize.mjs`, `adversary.mjs`, `traffic.mjs`, `soak.mjs` — say
+what they measure at the top of each file; `tools/spa-parity.mjs` and `tools/live-audit.mjs` are the
+gated equivalents of the retired `parity.mjs`/`overflow.mjs` probes. `preview-venv/` beside them is a
 gitignored Python venv holding a second Playwright for `docs/screenshots/capture.py`.
 
 ## Proving it on a router: `owlab test`
@@ -1313,7 +1344,7 @@ after  login: none
 axe reports no violations, and neither has looked at the change. Green on such an edit means "not
 measured", not "no effect" — take the reading off the playground or a stand, and compute any contrast
 the rule introduces by hand. Measured this way for the Overview card restyle: `--fs-good` on
-`--fs-panel2` is 4.59:1 at its worst (footstrap/dark) across all four palettes, both modes.
+`--fs-panel2` is 4.59:1 at its worst (footstrap/dark) across all five palettes, both modes.
 
 **`owlab sync` does not ship what a router gets.** It copies `htdocs/` and `ucode/` straight from the
 checkout and builds `cascade.css` with `--dev`: no minifier, no pre-paint minifier, no template
@@ -1414,7 +1445,7 @@ not render it at all.
 of them shells out to `owlab status -json` (`tools/lib/stands.mjs`) and treats a failed spawn as
 an empty router list, so a shell that cannot see `owlab` — `go install` puts it in `~/go/bin`,
 which a login shell exports and `tools/bg.sh` does not — reports exit 2 and measures nothing,
-with four containers up. The two apart: `docker ps` lists the stands while `owlab status -json`
+with the stands up. The two apart: `docker ps` lists the stands while `owlab status -json`
 fails. Export the path into the detached command itself:
 `tools/bg.sh sh -c 'export PATH=$HOME/go/bin:$PATH; node tools/live-audit.mjs'`.
 
@@ -1744,6 +1775,18 @@ builds actually ship, not by the finding: `owlab exec owrt2512 -- md5sum
 /www/luci-static/resources/fs-fit.js` — a mismatch is the twin carrying different code, not a
 result to act on; `owlab sync` the twin or re-run with `--no-pair`.
 
+- **A stand has no `/etc/footstrap`, so an Appearance upload (pattern or login background) fails
+  "No such file or directory."** `sync` deliberately never runs `root/etc/uci-defaults/…` (above:
+  that is router state, not package content) and its own `post_sync:` step only reproduces the
+  THEME REGISTRATION half of that script — it never runs the `mkdir -p /etc/footstrap` a real
+  install/upgrade gets from the uci-defaults script itself, the directory the two upload symlinks
+  and the pattern/login-background files live under. `fs-assets.js`'s upload handler then gets an
+  `ENOENT` from the router for a directory the package always ships ready on a real install. Tell
+  the two apart with `owlab exec owrt2512 -- ls -d /etc/footstrap`: missing is this, not a defect in
+  the upload code. Fix with `owlab exec owrt2512 -- mkdir -p /etc/footstrap`, or run the uci-defaults
+  script itself (`owlab exec owrt2512 -- sh /etc/uci-defaults/30_luci-theme-footstrap`), which is
+  idempotent and safe to re-run on a stand `post_sync:` already registered.
+
 ## The test matrix
 
 - **Pages**: Status/Overview (tables, ifacebox), Network/Interfaces (zonebadge, modals),
@@ -1780,3 +1823,16 @@ you build a package. Without that step, the first person to see it is a user.
 
 On Apple Silicon this runs under emulation — every `openwrt/sdk` tag is `linux/amd64`. owlab warns
 before it starts.
+
+**`./tools/stage.sh` on macOS, and under busybox awk 1.38, used to print `strip-assets: 2 file(s)`
+and ship `logo.svg` unstripped — 1338 B with its `<!-- -->` comment still in it, instead of the real
+593 B.** `strip-assets.sh` slurped each file with `awk 'BEGIN { RS = "\0" } …'`, relying on a gawk-
+and mawk-only extension that treats a NUL `RS` as "whole file, one record". Neither macOS's bundled
+awk (one true awk, 20200816) nor busybox awk 1.38 has that case: both fall back to
+`strlen(RS) == 0`, i.e. paragraph mode, and split `logo.svg` on its one blank line, so the
+comment-stripping regex only ever saw half the file — CI only ever passed because its runner's
+`/usr/bin/awk` is gawk. Tell the two apart with
+`stat -f %z dist/root/www/luci-static/footstrap/logo.svg` (593 correct, anything else is the bug) or
+`grep -c '<!--'` on the same file (0 correct). Fixed now: the script accumulates lines in the main
+`awk` block and processes the buffer in `END`, no `RS` tricks, and refuses to ship if a comment or a
+newline survives the strip on any awk.

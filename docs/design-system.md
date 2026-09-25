@@ -85,22 +85,31 @@ which is what a hairline is for.
 
 ## Palettes
 
-Five, all in `styles/03-palettes.css`, one self-contained block per (palette × mode):
-**footstrap** (GitHub Primer colours, the default, filling a bare `:root`), **hicontrast**
-(`data-palette="hicontrast"`), **bootstrap** (`data-palette="bootstrap"`, the stock LuCI theme's
-surfaces and greys), **2020** (`data-palette="2020"`, the OpenWrt 2020 theme's colourway) and
-**forum** (`data-palette="forum"`, the OpenWrt forum's Discourse colourway). Light mode is the bare
-`:root`; dark is `:root[data-darkmode="true"]`.
+Five, all in `styles/03-palettes.css`, one block per (palette × mode): **footstrap** (GitHub Primer
+colours, the default, filling a bare `:root`), **hicontrast** (`data-palette="hicontrast"`),
+**bootstrap** (`data-palette="bootstrap"`, the stock LuCI theme's surfaces and greys), **2020**
+(`data-palette="2020"`, the OpenWrt 2020 theme's colourway) and **forum**
+(`data-palette="forum"`, the OpenWrt forum's Discourse colourway). Light mode is the bare `:root`;
+dark is `:root[data-darkmode="true"]`. Each DARK block is fully self-contained; a LIGHT block is
+not — see below.
 
 ### Adding a palette
 
-Copy the two hicontrast blocks (light and dark), set every colour — five go through a `-base` pair
-so the tint/accent/colour axes can recolour them, since a palette never declares `--fs-good` etc.
-directly — and the four inks, then register the name in four places, each failing differently and
-quietly if skipped: the PALETTE axis in `fs-prefs.js`, the `_sd_pal` whitelist and pre-paint switch
-in `partials/head.ut`, the label map in `fs-appearance.js`, and `matrix()` in
-`tools/lib/gallery.mjs` (absent there, `export-tier.mjs`, `a11y-gallery.mjs` and
-`placeholder-ink.mjs` never measure the new palette, and it ships ungated).
+`--fs-panel-base` and the four inks (`--fs-on-accent`, `--fs-on-good`, `--fs-on-warn`,
+`--fs-on-danger`) are `#fff` in every LIGHT palette today, so the default block (`:root,
+:root[data-palette="footstrap"]`) is their only definition — a new light block inherits them unset
+and sets only what differs from it. If a new palette needs a light ink other than `#fff` for AA
+(the way every DARK block does), declare that one property in its own block; nothing forces the
+five to stay shared, they just happen to agree so far.
+
+Copy the two hicontrast blocks (light and dark), set every colour the light block does NOT inherit
+from the default block above — five go through a `-base` pair so the tint/accent/colour axes can
+recolour them, since a palette never declares `--fs-good` etc. directly — and the dark block's own
+four inks, then register the name in four places, each failing differently and quietly if skipped:
+the PALETTE axis in `fs-prefs.js`, the `_sd_pal` whitelist and pre-paint switch in
+`partials/head.ut`, the label map in `fs-appearance.js`, and `matrix()` in `tools/lib/gallery.mjs`
+(absent there, `export-tier.mjs`, `a11y-gallery.mjs` and `placeholder-ink.mjs` never measure the
+new palette, and it ships ungated).
 
 ### Surfaces carry no transparency axis
 
@@ -512,11 +521,13 @@ mode stays in storage and in the stylesheet so a value saved before the change g
 
 **The ink over a hex fill is derived, in CSS.** `--fs-on-accent` and the three status inks become
 `oklch(from <fill> clamp(0, (l - .62) * -100, 1) 0 0)` — black above the sRGB crossover, white
-below, chroma zeroed. The rule is written `[data-accent="hex"][data-accent]`: the palette's dark
-block is also (0,2,0) and later in the file, so the single-attribute form lost **in dark mode only**
-and left a grey accent carrying near-black ink at 1.9:1. Surfaces get no derived ink — what reads on
-them is `--fs-text`, a palette token these axes must not move — so the page reports the contrast
-each choice lands at instead.
+below, chroma zeroed. The rule is written `[data-accent="hex"][data-accent][data-accent]`, (0,4,0)
+by the triple attribute, so it outranks a *named* palette's dark block
+(`[data-palette=…][data-darkmode="true"]`, (0,3,0)) regardless of source order — a single repeat
+only matched that block's specificity and left a grey accent carrying near-black ink at 1.9:1 in
+every named palette's dark mode. Surfaces get no derived ink — what reads on them is `--fs-text`, a
+palette token these axes must not move — so the page reports the contrast each choice lands at
+instead.
 
 ### Tint and Accent
 

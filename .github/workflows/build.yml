@@ -49,10 +49,6 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # No npm script wraps this: it brace-balances its own output and refuses a suspiciously short
-      # file, proven here on the concatenation alone. Nothing downstream reads this copy.
-      - run: luci-theme-footstrap/build-css.sh /tmp/cascade.css
-
       # gettext for update-po.sh (check:fast's `i18n` item, last in that tier so everything else in
       # `check` still runs where this is missing); the ucode gate needs only docker. Asked for only
       # when the image does not already carry it, and under tools/ci-retry.sh: apt does not fail
@@ -301,27 +297,7 @@ jobs:
       - name: Boot the routers and install this build
         run: |
           set -eu
-          # NOT `. "$GITHUB_ENV"` — that file is a KEY=VALUE list, not a script, so a value with a
-          # space in it ("owrt2512 owrt2410") runs its second word as a command.
-          # The three OpenWrt lines the theme supports: both package managers plus the snapshot
-          # box, which tracks luci-base master and so fails on an upstream change before a user
-          # reports it. ImmortalWrt is deliberately absent — same luci-base, different brand,
-          # never the leg that caught something first; run it locally with --all when curious.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410 owrtsnap"; fi
-          echo "ROUTERS=$ROUTERS" >> "$GITHUB_ENV"
-          # Where a gate leaves the page shapes it read, so a second one in the same slice does not
-          # walk the whole menu again — one load and a 1200ms settle per page. Set here rather than
-          # in the job's `env`, where $RUNNER_TEMP is not available: the `runner` context exists
-          # inside a step. Under the runner's temp, so it cannot outlive the install it describes
-          # (tools/lib/page-shapes.mjs).
-          echo "FS_SHAPES=$RUNNER_TEMP/page-shapes" >> "$GITHUB_ENV"
-          owlab up $ROUTERS
-          for r in $ROUTERS; do
-            case "$r" in
-              *2512|*snap) owlab install "$r" dist/noarch/luci-theme-footstrap-*.apk ;;
-              *)           owlab install "$r" dist/all/luci-theme-footstrap_*.ipk ;;
-            esac
-          done
+          sh tools/ci-boot.sh
 
       # Each gate measures one representative per PAGE SHAPE by default (tools/lib/page-shapes.mjs)
       # and names the pages it stood in for; a release takes the whole menu on all four routers
@@ -429,20 +405,7 @@ jobs:
         with:
           version: v0.6.1
       - name: Boot the routers and install this build
-        run: |
-          # The three OpenWrt lines the theme supports: both package managers plus the snapshot
-          # box, which tracks luci-base master and so fails on an upstream change before a user
-          # reports it. ImmortalWrt is deliberately absent — same luci-base, different brand,
-          # never the leg that caught something first; run it locally with --all when curious.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410 owrtsnap"; fi
-          echo "ROUTERS=$ROUTERS" >> "$GITHUB_ENV"
-          owlab up $ROUTERS
-          for r in $ROUTERS; do
-            case "$r" in
-              *2512|*snap) owlab install "$r" dist/noarch/luci-theme-footstrap-*.apk ;;
-              *)           owlab install "$r" dist/all/luci-theme-footstrap_*.ipk ;;
-            esac
-          done
+        run: sh tools/ci-boot.sh
       # A pull request crosses the axes that were measured to change this gate's answer — three
       # width/layout cells (1440 side and 390 side, plus 390 top for the one WebKit-only tick
       # misfire that measures 0px at 390 side and 41px at 390 top, task wkanchor), both anchoring
@@ -490,8 +453,8 @@ jobs:
       - run: owlab up owrt2512
       - run: owlab install owrt2512 dist/noarch/luci-theme-footstrap-*.apk
 
-      # Under $RUNNER_TEMP, the same reason FS_SHAPES lives there in the `live` job: it cannot
-      # outlive the install it describes, and it keeps the recording out of the checkout.
+      # Under $RUNNER_TEMP: the recording cannot outlive the install it describes, and this keeps
+      # it out of the checkout.
       - name: Record, build and verify
         run: |
           set -eu

@@ -23,8 +23,8 @@ description: Module composition, the jsmin traps, and what fs-fit owns.
   `tools/stage.sh` sed it by path; moving it makes every release report "(dev)".
 - **The theme never checks for its own updates and never reaches a third-party host at run time.**
   Upgrades are the package manager's job (the installer adds the feed). `fs-router` exports
-  `onNavigate(fn)` so an optional module can register itself without the router naming anyone —
-  keep that seam inverted, but do not re-add an updater behind it.
+  `onNavigate(fn)` so a module registers itself without the router naming anyone — keep that
+  seam inverted.
 
 ## What to run after an edit here
 

@@ -535,13 +535,12 @@ function ownerKey() {
 	return (_ownerHint !== null) ? _ownerHint : currentKey();
 }
 
+/* L.env.dispatchpath (ctx.path) is stamped by luci-base's own header.ut before any theme script
+ * runs, on every page including blank_page — verified on openwrt-24.10, no location.pathname
+ * fallback needed. */
 function currentKey() {
 	if (_curKey !== null) return _curKey;
-	const dp = L.env && L.env.dispatchpath;
-	if (dp && dp.length) return appKey(dp);
-	/* no env to read (a document that never got the bootstrap): the URL is all there is */
-	const p = location.pathname.replace(/^.*\/cgi-bin\/luci\/?/, '').replace(/\/+$/, '');
-	return appKey(p ? p.split('/') : []);
+	return appKey(L.env.dispatchpath);
 }
 
 /* Both halves, for the reason silence() gives: el.disabled is the element's flag, el.sheet.disabled

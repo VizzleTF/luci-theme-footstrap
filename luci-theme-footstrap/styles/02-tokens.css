@@ -63,8 +63,6 @@
 		/* opaque on purpose. docs/design-system.md "The derived ladder". */
 		--fs-bar-bg: var(--fs-panel);
 		/* base/10-reset.css's scroll-margin must equal this or an in-page jump lands under the bar */
-		/* transparent so a control shows the bar via its hairline; old fill was --fs-panel2 */
-		--fs-bar-ctl-bg: transparent;
 		/* drawn, not fetched. docs/design-system.md "Two glyphs drawn as tokens, not fetched". */
 		--fs-select-chevron:
 			linear-gradient(-45deg, transparent 45%, var(--fs-dim) 45% 55%, transparent 55%),
@@ -215,7 +213,8 @@
 	:root[data-density="large"] {
 		--fs-density-type: 1.15;
 		--fs-density-box: 1.15;
-		--fs-density-space: 1;
+		/* --fs-density-space stays at the bare :root default of 1 here — large density widens type
+		 * and controls, not the space/gutter scale. */
 	}
 
 	/* No :root[data-content-width] block: fs-axes.js's propAxis writes --fs-content-max inline

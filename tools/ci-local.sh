@@ -56,7 +56,7 @@ usage() {
 usage: tools/ci-local.sh [--mode pr|push] [--dry-run] [--force] [--list] <job|slice>...
 
 jobs/slices (repeatable; "all" is every one of them, in build.yml's own order):
-  check                 job `check`   — `npm run check:fast` (needs node_modules), plus build-css.sh
+  check                 job `check`   — `npm run check:fast` (needs node_modules)
   lint                  job `lint`    — `npm run check:mid`/`check:slow`, plus jsmin-verify
   build                 job `build`   — tools/stage.sh + owfeed plan|check|build + check-packages.sh
   verify                job `verify`  — owlab test, 25.12/apk and 24.10/opkg, the workflow's own 5 assertions
@@ -175,7 +175,6 @@ job_check() {
 		skip "check" "node_modules/ is missing — run 'npm ci' yourself first (not run by this script: it never writes outside tools/ and ../tmp/). docs/development.md's Windows-install trap applies if you install it from Windows and run gates from WSL: chmod +x node_modules/.bin/* first."
 		return
 	fi
-	step "build-css" luci-theme-footstrap/build-css.sh "$RUNDIR/cascade.check.css"
 	if command -v msgfmt >/dev/null 2>&1 && command -v msgmerge >/dev/null 2>&1 && command -v xgettext >/dev/null 2>&1; then
 		: # already on PATH — the workflow's own apt-get fallback is not exercised, see --list
 	else
@@ -530,7 +529,7 @@ print_matrix() {
 	cat <<'EOF'
 job/slice given here   ->  workflow job (build.yml)         ->  what it runs
 ------------------------------------------------------------------------------------------------
-check                      check                                build-css, [gettext],
+check                      check                                [gettext],
                                                                  `npm run check:fast`
                                                                  (lint:js, lint:css, shell, marker,
                                                                  audit.py --strict, conffiles, acl,

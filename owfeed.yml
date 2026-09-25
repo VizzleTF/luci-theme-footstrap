@@ -35,9 +35,7 @@ feed:
 
 # Both lines, from one staged tree. 25.12+ is apk, 24.10 is opkg, and the difference is not only the
 # container: opkg calls an architecture-independent package `all` where apk requires `noarch` and
-# rejects `all`. owfeed emits each under the name its manager understands, which keeps
-# `luci-theme-footstrap_<v>_all.ipk` byte-for-byte the asset name a fielded self-update script
-# matches on.
+# rejects `all`. owfeed emits each under the name its manager understands.
 releases:
   - line: "25.12"
     default: true
@@ -115,12 +113,9 @@ packages:
 # and every router paid it — including the ones reading English, which is most of them. Split out,
 # a Russian router installs luci-i18n-footstrap-ru and nobody else carries a byte.
 #
-# The reason they were bundled is in git and half of it has expired: "several assets in one release
-# made the fielded self-update script install the 6 KB catalogue instead of the theme (issue #6)" —
-# that script is retired, and the Makefile says so. What remains is that two packages can drift, an
-# `_()` the older catalogue lacks rendering in English with nothing reporting it. That is the same
-# trade every luci-app-* in the tree makes, and `update-po.sh --check` already fails a build whose
-# catalogues are behind the source.
+# Splitting them means two packages can drift: an `_()` the older catalogue lacks renders in
+# English with nothing reporting it. That is the same trade every luci-app-* in the tree makes, and
+# `update-po.sh --check` already fails a build whose catalogues are behind the source.
 #
 # NAMES AND PATHS ARE luci.mk's, not ours: `luci-i18n-$(LUCI_BASENAME)-<lang>` with LUCI_BASENAME
 # `footstrap`, and the catalogue basename `footstrap`, so `po2lmo` in an SDK build and owfeed here

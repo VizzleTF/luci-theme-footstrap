@@ -43,15 +43,15 @@ import { chromium } from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 
 const { values: FLAGS } = parseArgs({ options: {
-	widths: { type: 'string' }, pages: { type: 'string' }, slack: { type: 'string' },
-	only: { type: 'string' }, all: { type: 'boolean' },
+	widths: { type: 'string', default: '390,768' },
+	pages: { type: 'string', default: '/admin/status/overview,/admin/status/processes' },
+	only: { type: 'string', default: '' }, all: { type: 'boolean', default: false },
 } });
-const arg = (name, dflt) => FLAGS[name] ?? dflt;
 /* 390 is where the difference between an unanswered table and its card stack is largest; 768 is the
  * width the arrival fault was reported at. */
-const WIDTHS = arg('widths', '390,768').split(',').map(Number);
-const PAGES = arg('pages', '/admin/status/overview,/admin/status/processes').split(',');
-const SLACK = Number(arg('slack', '4'));
+const WIDTHS = FLAGS.widths.split(',').map(Number);
+const PAGES = FLAGS.pages.split(',');
+const SLACK = 4;
 
 /* Runs INSIDE the page: performs the tick and answers with what the reader's own page did DURING it. */
 const TICK = () => {
@@ -98,7 +98,7 @@ const SETTLED = () => new Promise((resolve) => {
 	}));
 });
 
-const list = requireStands(stands(arg('only', ''), { all: FLAGS.all ?? false }), 'table-tick');
+const list = requireStands(stands(FLAGS.only, { all: FLAGS.all }), 'table-tick');
 const browser = await chromium.launch();
 const findings = [];
 let ticks = 0, attempts = 0;

@@ -468,9 +468,11 @@ const LOGIN_BG = tokenAsset('login_bg', '/luci-static/footstrap/bg', '--fs-login
  * lookups before this), and a flat name is one more thing every consumer of THIS FILE has to keep
  * spelled the same way fs-axes.js does — 18 axis names doubled to 36 lookups, now 18. `pattern`
  * and `loginBg` are not axes (no AXIS_KEYS entry, no router-default `def()`) but the same
- * `tokenAsset()` shape, so they export the same way. `tokenOk`, `snapshotAxes`,
- * `matchesSavedDefault`, `saveAsDefault`, `resetToSaved` and `resetToBuiltin` stay flat: none of
- * them is a `{current, apply}` pair.
+ * `tokenAsset()` shape, so they export the same way. `tokenOk`, `matchesSavedDefault`,
+ * `saveAsDefault`, `resetToSaved` and `resetToBuiltin` stay flat: none of them is a
+ * `{current, apply}` pair. `snapshotAxes` stays module-private: fs-appearance.js, its only would-be
+ * caller, builds the Appearance form from the per-axis exports above, not from the router-default
+ * snapshot matchesSavedDefault()/saveAsDefault() read internally.
  *
  * No flat `currentX`/`applyX` fallback kept: grepped `../luci-app-footstrap-*` (the sibling
  * checkouts) and this repo's docs for either spelling — nothing outside fs-appearance.js and
@@ -499,5 +501,5 @@ return baseclass.extend({
 
 	tokenOk,
 
-	snapshotAxes, matchesSavedDefault, saveAsDefault, resetToSaved, resetToBuiltin
+	matchesSavedDefault, saveAsDefault, resetToSaved, resetToBuiltin
 });

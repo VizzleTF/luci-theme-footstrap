@@ -139,9 +139,9 @@ export function resolveUnderRoot(rootDir, rel) {
 
 /* Whole-string literal swap, no-op on an empty `from`, an unset `to` (`null`/`undefined` — an empty
  * STRING is a legitimate target, deleting the literal outright) or a pair that already agrees.
- * `rewriteHostname` below is one caller; build.mjs's `buildPage` is the other, for text baked into
- * a page at capture time that no ubus overlay entry reaches (footer.ut's `version.luciname`, the
- * password notice). */
+ * build.mjs's `buildPage` is the caller, for text baked into a page at capture time that no ubus
+ * overlay entry reaches (footer.ut's `version.luciname`, the password notice, the recorded
+ * hostname baked in by header.ut's server-side `ubus.call('system','board')`). */
 export function rewriteLiteral(html, from, to) {
 	if (!from || to == null || from === to) return html;
 	return html.split(from).join(to);
@@ -151,23 +151,15 @@ export function rewriteLiteral(html, from, to) {
  * to: an admin page this playground can actually serve, under `base`, with no traversal. This is
  * a UI nicety on a static site, not an access check — `replay.js` accepts any form submission — so
  * the failure mode it closes is a stray return path landing the reader somewhere odd, not a
- * redirect a real login could be tricked into. Duplicated verbatim in `replay.js` (a classic
- * script, no module graph), the same way `stripBase` is. */
+ * redirect a real login could be tricked into. build.mjs inlines this function's own source into
+ * the built page (a classic script, no module graph) so `replay.js` calls the same code rather than
+ * a copy that can drift from it. */
 export function isSafeReturn(path, base) {
 	if (typeof path !== 'string') return false;
 	const prefix = `${base}/cgi-bin/luci/admin/`;
 	if (!path.startsWith(prefix)) return false;
 	if (path.includes('//') || path.includes('..') || path.includes('\\')) return false;
 	return true;
-}
-
-/* Baked into the document at capture time by header.ut's server-side `ubus.call('system','board')`
- * (the `<title>`, `.fs-title-main`, the brand partial — head.ut:149, header.ut:173) and never
- * re-fetched client-side on a settled page, so the overlay's `system.board({}).hostname` patch
- * alone never reaches these bytes. Replaces every literal occurrence of the RECORDED hostname with
- * the overlay's one, text-wide. */
-export function rewriteHostname(html, from, to) {
-	return rewriteLiteral(html, from, to);
 }
 
 /* The same swap, run over the DATA `build.mjs` inlines as `window.__pgRPC` instead of the document

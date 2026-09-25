@@ -82,10 +82,12 @@ gates that used to be node-free steps here are `check:fast` items too, unchanged
    so an extra `)` inside one never becomes a `CssSyntaxError` there), undefined `var()`, shadowed
    declarations, export-tier reads from `styles/`, dead base declarations, colour literals. A stray
    `!important` used to be checked here too (`BANG_OK`); folded into stylelint once measured
-   redundant — see "The gates, and what each one holds" in conventions.md. `build-css.sh` runs as a
-   CI-only step beside it (no npm script wraps that one): into a temp file, brace-balancing its own
-   output and refusing to write a suspiciously short file — a broken-build floor (80 KB), a
-   correctness gate, not a size budget. There is no upper CSS budget any more.
+   redundant — see "The gates, and what each one holds" in conventions.md. `build-css.sh`'s own
+   correctness check (brace-balancing its output, refusing to write a suspiciously short file — a
+   broken-build floor of 80 KB, not a size budget) runs wherever a gate builds the sheet, which every
+   `check:mid` CSS gate (`css-metrics`, `css-floor`, `css-dup`) does in the `lint` job — a standalone
+   step here that built the sheet a second time and read nothing back was dropped once measured
+   redundant against that.
 5. **`i18n`**, last in `check:fast` so everything above still runs where gettext is missing —
    `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty (a string in `_()`
    with no translation renders in English silently, which is how the whole Footstrap tab stayed
@@ -258,12 +260,13 @@ produced, and runs the live gates.
 **It is three jobs, not one.** Once `anchors` moved out, this was the release's critical path, so it
 became three slices (`parity`, `audit`, `motion`), each booting its own routers for 157s it does not
 share — the wall clock is the longest slice and not the sum. `fail-fast` is off: a parity failure
-says nothing about whether the reader stays put. Where two gates share a slice they also share the
-page shapes they read, through `FS_SHAPES` — classifying is one load and a 1200ms settle per page of
-the menu, and both gates used to do it back to back (measured: live-audit 421s alone, 303s after
-spa-parity had already read the same router). **Splitting them onto separate runners gave that
-saving back**: `FS_SHAPES` points inside each runner's own temp, so `parity` and `audit` each walk
-the whole menu now — ~90s a router, and the price of the split.
+says nothing about whether the reader stays put. `parity` and `audit` used to run in one job and
+share the page shapes they read through an `FS_SHAPES`-named cache — classifying is one load and a
+1200ms settle per page of the menu, and both gates did it back to back (measured: live-audit 421s
+alone, 303s after spa-parity had already read the same router). **Splitting them onto separate
+runners gave that saving back**: each is now its own matrix job, with no second gate in the same
+process to hand the answer to, so the cache was dropped (`tools/lib/page-shapes.mjs`) and `parity`
+and `audit` each walk the whole menu on their own — ~90s a router, the price of the split.
 
 Measured on the last run where every slice finished (`7ff9e56`, push, three routers): the gates are
 **485s** (spa-parity), **450s** (live-audit) and **754s** (`motion`'s six). `motion` carried a
@@ -387,9 +390,8 @@ workflow reads them and puts the one non-package asset into `dist/`, before the 
 because whatever is in `dist/` is signed with everything else:
 
 - **the notes**, from `tools/release-notes.sh` — the tag's changelog section, one bold lead per
-  bullet, grouped by category. They fill the release page and are **not** an asset: the only reader
-  that ever fetched `notes.md` from a release was the self-update package, which is retired and its
-  repository archived;
+  bullet, grouped by category. They fill the release page and are **not** an asset: nothing on a
+  router reads `notes.md`;
 - **the installer**, because `raw.githubusercontent.com` is rate-limited for unauthenticated callers
   — so the user whose address has run out of budget (CGNAT, a shared exit) fails to download the
   installer meant to rescue them (issue #17) — and because a signed copy is the only one that can be
@@ -586,10 +588,10 @@ a resolver that does not answer, a network that intercepts the host — is insta
 instead of being sent away with a URL, and told plainly that `apk upgrade` will not carry the theme
 forward until the feed works.
 
-That path picks the artifact **from the signed manifest**, never by guessing an asset's name: issue
-#6 was a self-update script, shipped at the time and retired since, that resolved the theme by
-name and took `head -1`, which on a release
-carrying per-language packages installed a catalogue. `manifest.txt` names exactly one file per
+That path picks the artifact **from the signed manifest**, never by guessing an asset's name: GitHub
+sorts assets by name, and `luci-i18n-…` sorts ahead of `luci-theme-…`, so a release carrying
+per-language packages needs the manifest to say which asset is the theme, not a guessed name
+(issue #6). `manifest.txt` names exactly one file per
 format with its size and digest, and the chain fails closed in this order — verified TLS, then
 `usign -V` against the release key pinned in the script (the same key as `release.pub`), then the
 manifest's own sha256 over the downloaded artifact. A missing `usign`, a signature that does not

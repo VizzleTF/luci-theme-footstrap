@@ -362,18 +362,3 @@ ratio held. Full data was overwritten by the run above; this table is the record
 | **TOTAL (sum of medians)** | **10518 ms** | **11680 ms** | **4638 ms** | **2.27×** |
 | **median per-page speedup** | | | | **3.43×** |
 | **pages navigated in place** | 0 | 0 | **38 / 38** | |
-
-### Dev containers (footstrap 0.10.0, 2026-07-24)
-
-Both dev containers (`owlab.yaml`), x86 under WSL, so absolute numbers are not
-comparable with router hardware. Two themes only: proton2025 is not installed there. Three runs,
-median. Data in `bench/results-container-2512.json` and `bench/results-container-2410.json`.
-
-| container | release / package manager | pages | footstrap vs bootstrap (sum of medians) | median per page | in place |
-|---|---|--:|--:|--:|--:|
-| `router2512` | 25.12 / apk | 36 | **2.33×** (7458 → 3196 ms) | **3.04×** | 34/36 |
-| `router2410` | 24.10 / opkg | 35 | **2.16×** (6753 → 3130 ms) | **2.40×** | 34/35 |
-
-The page set differs from the hardware run: container fixtures produce different menu entries,
-and `status/realtime/temperature` is skipped because there are no sensors. The ratios line up
-with the hardware baseline anyway.

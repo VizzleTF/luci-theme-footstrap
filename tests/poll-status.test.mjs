@@ -114,7 +114,6 @@ function boot(order) {
 	const ui = realishUi();
 	const poll = realishPoll(doc);
 	L.Poll = poll;
-	win.L = L;
 
 	if (order === 'stock-first') wireStockIndicator(doc, ui, poll);
 	const mod = loadModule('fs-router', { window: win, document: doc, L, stubs: { ui } });

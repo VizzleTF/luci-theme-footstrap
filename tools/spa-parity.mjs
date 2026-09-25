@@ -27,14 +27,13 @@ import { classify, representatives, reportReduction, reportFrozen, PINNED } from
 import { read } from './lib/root.mjs';
 
 const { values: FLAGS } = parseArgs({ options: {
-	pages: { type: 'string' }, 'pages-all': { type: 'boolean' }, all: { type: 'boolean' },
-	only: { type: 'string' },
+	pages: { type: 'string', default: '' }, 'pages-all': { type: 'boolean', default: false },
+	all: { type: 'boolean', default: false }, only: { type: 'string', default: '' },
 } });
-const arg = (name, dflt) => FLAGS[name] ?? dflt;
-const ONLY_PAGES = arg('pages', '');
+const ONLY_PAGES = FLAGS.pages;
 /* one page per SHAPE rather than every leaf — lib/page-shapes.mjs; `--pages-all` takes them all */
-const ALL_PAGES = FLAGS['pages-all'] ?? false;
-const ALL_STANDS = FLAGS.all ?? false;
+const ALL_PAGES = FLAGS['pages-all'];
+const ALL_STANDS = FLAGS.all;
 /* Every navigation starts here, so each page is reached as a real click from another page rather
  * than from whatever the previous iteration left behind. */
 const ORIGIN = '/admin/status/overview';
@@ -380,7 +379,7 @@ async function backRestoreCheck(page, stand, findings, widthLabel) {
 	}
 }
 
-const list = requireStands(stands(arg('only', ''), { all: ALL_STANDS }), 'spa-parity');
+const list = requireStands(stands(FLAGS.only, { all: ALL_STANDS }), 'spa-parity');
 const browser = await chromium.launch();
 const findings = [];
 /* pages that froze while their shape was being read — their own kind of finding, reported by

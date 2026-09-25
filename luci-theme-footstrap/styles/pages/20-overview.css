@@ -82,8 +82,7 @@
 	:where(#view)[data-page="admin-status-overview"] div:has(> .ifacebox img[src*="/port_"]) {
 		/* 8px not 10: an 11-port switch in a 1190px column fits 11 cards only at 8px gap */
 		gap: var(--fs-space-2);
-		--fs-port-min: calc(76px * var(--fs-density-type) + var(--fs-space-3) * 2);
-		grid-template-columns: repeat(auto-fit, minmax(var(--fs-port-min), 1fr)) !important;
+		grid-template-columns: repeat(auto-fit, minmax(calc(76px * var(--fs-density-type) + var(--fs-space-3) * 2), 1fr)) !important;
 		margin-bottom: 0 !important;
 	}
 	/* flex-wrap, not a grid+@container threshold (issue #7) — docs/css.md above */

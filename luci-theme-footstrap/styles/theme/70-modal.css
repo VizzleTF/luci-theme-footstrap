@@ -1,7 +1,4 @@
 @layer theme {
-	/* base's elevation = --fs-bg's hex in footstrap light, a glow not a shadow; others take --fs-shadow-pop */
-	.modal { box-shadow: var(--fs-shadow-pop); }
-
 	/* diff tints come from base's ladder alone */
 
 	/* beats the heading ramp's tight leading in-layer for a dialog's h4 (45-misc.css) */

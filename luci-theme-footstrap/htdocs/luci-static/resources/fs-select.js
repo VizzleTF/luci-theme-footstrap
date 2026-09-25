@@ -5,6 +5,7 @@
 'require fs-fit as fit';
 /* for the content column's width without a layout read — see the mid-scroll branch in fitTables */
 'require fs-chrome as chrome';
+'require fs-widgets as widgets';
 
 /* Theme plain LuCI <select> fields (ui.Select, widget:'select') by rendering a styled
  * cbi-dropdown beside them — a native <select> popup cannot be CSS-styled.
@@ -183,11 +184,12 @@ function enhance(sel) {
  * is the same fact the CSS uses. The flag flips AFTER the content is written, so this is asked per
  * PASS rather than fixed at load, and fs-fit.js watches that class. */
 const ROOTS = [ '#view', '#modal_overlay' ];
-const inRoots = (sel, roots) => roots.map((r) => `${r} ${sel}`).join(', ');
 const liveRoots = () => (document.body.classList.contains('modal-overlay-active') ? ROOTS : ROOTS.slice(0, 1));
+/* every call passes liveRoots(); folded in here rather than threaded as a parameter */
+const inRoots = (sel) => liveRoots().map((r) => `${r} ${sel}`).join(', ');
 
-const foreignTables = () => inRoots('.table:not(.cbi-section-table)', liveRoots()) + ', ' +
-	inRoots('table:not(.table):not(.cbi-section-table)', liveRoots());
+const foreignTables = () => inRoots('.table:not(.cbi-section-table)') + ', ' +
+	inRoots('table:not(.table):not(.cbi-section-table)');
 
 /* The fourth header markup, and the one only a foreign table produces: `<table><tr><th>…`, with no
  * `<thead>` for the parser to imply and none of LuCI's class names.
@@ -340,6 +342,9 @@ function labelCells(t, head) {
  * a class query alone reaches the whole subtree. `.thead`/`.tbody`/`.tfoot` are the same for a
  * div-based table; a REAL `<thead>`/`<tbody>`/`<tfoot>` this file never classes (20_lan.js's and
  * 30_wifi.js's `<tfoot>`, theme/30-tables.css:570/634) is reached by tag name instead. */
+/* tools/table-contract.mjs reads these two names and shapes by regex, so a `display` rule on any of
+ * these classes/tags is checked against a matching role — keep both names, and each entry a
+ * `'.class'` or `'tag'` string literal, even though roleTables() below now reads them as one list. */
 const TABLE_ROLE_CLASSES = [
 	[ '.table', 'table' ],
 	[ '.thead', 'rowgroup' ],
@@ -355,23 +360,12 @@ const TABLE_ROLE_TAGS = [
 	[ 'tfoot', 'rowgroup' ],
 ];
 
-/* idempotent, the same idiom as fs-widgets.js's syncAttr: a node that already carries the right
- * role is a no-op read, so a poll tick re-rendering the same table on every tick touches no DOM
- * and wakes no attribute observer. Not imported for one line — this file has no other reason to
- * require fs-widgets. */
-function setRole(el, role) {
-	if (el.getAttribute('role') !== role) el.setAttribute('role', role);
-}
-
 /* A hidden row/cell (`.tr.cbi-section-table-descr`, `.td.hide-xs`/`.hide-sm` under `.fs-stacked`/
  * `.fs-drop-xs`) drops out of the accessibility tree on `display: none` alone — the role written
  * here changes nothing about that, since a role is inert on a box the engine never generates. */
 function roleTables() {
-	TABLE_ROLE_CLASSES.forEach(([ sel, role ]) => {
-		document.querySelectorAll(inRoots(sel, liveRoots())).forEach((el) => setRole(el, role));
-	});
-	TABLE_ROLE_TAGS.forEach(([ sel, role ]) => {
-		document.querySelectorAll(inRoots(sel, liveRoots())).forEach((el) => setRole(el, role));
+	[ ...TABLE_ROLE_CLASSES, ...TABLE_ROLE_TAGS ].forEach(([ sel, role ]) => {
+		document.querySelectorAll(inRoots(sel)).forEach((el) => widgets.syncAttr(el, 'role', role));
 	});
 }
 
@@ -387,7 +381,7 @@ function roleTables() {
  * NOT be measured: its rows hold widgets, and a widget bakes in the width of the layout it was laid
  * out in, so un-collapsing it to read it changes what is read — the firewall zone table then
  * reported needing 1747px against a real 1190px and overflowed its section by 557px. */
-const stackables = () => inRoots('.table.fs-dt', liveRoots());
+const stackables = () => inRoots('.table.fs-dt');
 
 /* "Too cramped to be a table any more" — a design judgement, and the only threshold the fit
  * decision takes on trust rather than measuring. A four-column table of short values still fits at
@@ -526,7 +520,7 @@ function fitTables() {
 	/* mid-scroll, only the tables with no answer yet: one that has an answer needs nothing, one
 	 * that does not is held out of the layout by the stylesheet and cannot wait. Neither branch
 	 * reads layout while `scrolling()` is true. */
-	const sel = fit.scrolling() ? inRoots('.table.fs-dt:not(.fs-fitted)', liveRoots()) : stackables();
+	const sel = fit.scrolling() ? inRoots('.table.fs-dt:not(.fs-fitted)') : stackables();
 	document.querySelectorAll(sel).forEach((t) => {
 		/* While the reader scrolls this pass only WRITES: every layout read here forces a
 		 * synchronous layout, and a poll tick can land mid-flick, so on a phone with ten tables that
@@ -693,7 +687,7 @@ function fitTables() {
  * Ping button was simply unreachable past `.fs-main`'s clip. The shape is not that page's, and the
  * width that matters is the room rather than the viewport, so this measures instead of naming a
  * page. */
-const scrollables = () => inRoots('.table:not(.fs-dt):not(.cbi-section-table)', liveRoots());
+const scrollables = () => inRoots('.table:not(.fs-dt):not(.cbi-section-table)');
 const HOLDS_CONTROLS = '.cbi-dropdown, .cbi-dynlist, .cbi-tooltip-container, .cbi-progressbar, select, input, textarea, [data-tooltip]';
 
 /* ---- making a scroll box reachable, and handing the markup back as it was found ----
@@ -794,7 +788,7 @@ function fitScrollables() {
 function unpinActionColumn() {
 	/* a layout read here lands mid-flick once per poll tick — see fitTables() */
 	if (fit.scrolling()) { fit.deferMeasurement(); return; }
-	for (const t of document.querySelectorAll(inRoots('.table.cbi-section-table', liveRoots()))) {
+	for (const t of document.querySelectorAll(inRoots('.table.cbi-section-table'))) {
 		if (!t.querySelector('.cbi-section-actions')) continue;
 		/* Claim upstream's resize hook, which under SPA navigation is a leak:
 		 * stabilizeActionColumnWidth attaches a `resize` listener once per TABLE ELEMENT, guarded by
@@ -863,7 +857,10 @@ const TYPEAHEAD_RESET_MS = 1000;
 let _taBuf = '', _taTimer = null, _taLast = null;
 
 function typeaheadItems(sb) {
-	const ul = sb.querySelector('ul.dropdown') || sb.querySelector('ul');
+	/* sb is always `.cbi-dropdown[open]` here, and stock ui.js sets that attribute and adds
+	 * `ul.dropdown` in the same openDropdown() call (openwrt/luci ui.js), so the two never
+	 * disagree — verified on openwrt-24.10. */
+	const ul = sb.querySelector('ul.dropdown');
 	if (!ul) return [];
 	return [...ul.children].filter((li) =>
 		li.tagName === 'LI' &&
@@ -922,10 +919,7 @@ function wireTypeahead() {
 		/* the widget's own highlighter: adds .focus, scrolls the item into view and focuses it,
 		 * so Enter (ui.Dropdown's handler) commits exactly what is highlighted */
 		const inst = dom.findClassInstance(sb);
-		if (inst && typeof inst.setFocus === 'function')
-			inst.setFocus(sb, hit, true);
-		else
-			hit.focus();
+		if (inst) inst.setFocus(sb, hit, true);
 
 		ev.preventDefault();
 		ev.stopPropagation();

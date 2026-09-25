@@ -26,19 +26,22 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 
 const { values: FLAGS } = parseArgs({ options: {
-	help: { type: 'boolean' }, out: { type: 'string' }, base: { type: 'string' },
+	help: { type: 'boolean', default: false },
+	out: { type: 'string', default: join(ROOT, '..', 'tmp/playground/out') },
+	base: { type: 'string', default: '/luci-theme-footstrap/playground' },
+	/* no `default:` — `undefined` is what "no budget passed" means below, and 'string' can't
+	 * default to null. */
 	'budget-kb': { type: 'string' },
 } });
-const arg = (name, dflt) => FLAGS[name] ?? dflt;
 
 if (FLAGS.help) {
 	console.log('Usage: node tools/playground/verify.mjs [--out DIR] [--base /path] [--budget-kb N]');
 	process.exit(0);
 }
 
-const OUT = arg('out', join(ROOT, '..', 'tmp/playground/out'));
-const BASE = arg('base', '/luci-theme-footstrap/playground');
-const BUDGET_KB = arg('budget-kb', null);
+const OUT = FLAGS.out;
+const BASE = FLAGS.base;
+const BUDGET_KB = FLAGS['budget-kb'];
 const SETTLE_MS = 1400;
 
 const TYPES = {

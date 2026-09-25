@@ -10,7 +10,7 @@
  *
  * Never run by a gate: needs a booted, installed owlab router (T2, docs/development.md).
  *
- *   node tools/playground/capture.mjs [--stand owrt2512] [--recording DIR] [--pages FILE]
+ *   node tools/playground/capture.mjs [--recording DIR] [--pages FILE]
  */
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
@@ -28,19 +28,20 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 
 const { values: FLAGS } = parseArgs({ options: {
-	help: { type: 'boolean' }, stand: { type: 'string' }, recording: { type: 'string' },
-	pages: { type: 'string' },
+	help: { type: 'boolean', default: false },
+	recording: { type: 'string', default: join(ROOT, '..', 'tmp/playground/recording') },
+	pages: { type: 'string', default: join(HERE, 'pages.json') },
 } });
-const arg = (name, dflt) => FLAGS[name] ?? dflt;
 
 if (FLAGS.help) {
-	console.log('Usage: node tools/playground/capture.mjs [--stand owrt2512] [--recording DIR] [--pages FILE]');
+	console.log('Usage: node tools/playground/capture.mjs [--recording DIR] [--pages FILE]');
 	process.exit(0);
 }
 
-const STAND_ID = arg('stand', 'owrt2512');
-const OUT = arg('recording', join(ROOT, '..', 'tmp/playground/recording'));
-const PAGES_FILE = arg('pages', join(HERE, 'pages.json'));
+/* The stand this records from. Edit to capture a different one. */
+const STAND_ID = 'owrt2512';
+const OUT = FLAGS.recording;
+const PAGES_FILE = FLAGS.pages;
 /* A FLOOR, not the wait itself: gives a page the same load+settle window the live gates give a full
  * navigation (spa-parity.mjs) before the adaptive wait below starts reading ubus traffic — without
  * it, a page whose lazy includes haven't even started executing yet reads as "already quiet". The

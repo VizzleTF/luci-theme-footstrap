@@ -27,22 +27,65 @@
  * `npm run check` opens a page. This is the cheapest honest fix — build the DOM `wire()` watches
  * for, call it, and assert the tab actually mounted — so it lives beside the module-eval checks
  * above rather than as a gate of its own; `docs/gallery.html` supplies the served page, the same
- * way it already does for the axis-order watch. A weaker, browser-free companion runs first:
- * `tools/lib/export-contract.mjs` checks every `axes.*`/`prefs.*` name fs-appearance.js (and
- * fs-assets.js) reaches for against what fs-axes.js/fs-prefs.js actually export, which is the exact
- * shape of this bug, caught in milliseconds even where Playwright cannot run at all.
+ * way it already does for the axis-order watch. A weaker, browser-free companion runs first: the
+ * export-contract check below (`missingExports`) checks every `axes.*`/`prefs.*` name
+ * fs-appearance.js (and fs-assets.js) reaches for against what fs-axes.js/fs-prefs.js actually
+ * export, which is the exact shape of this bug, caught in milliseconds even where Playwright cannot
+ * run at all.
  *
  *   node tools/smoke.mjs
  */
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { serveGallery, ROOT } from './lib/gallery.mjs';
+import { serveGallery } from './lib/gallery.mjs';
 import { buildCss } from './lib/css.mjs';
 import { pragmas, aliasFor } from '../tests/lib/luci-module.mjs';
-import { missingExports } from './lib/export-contract.mjs';
+import { RESOURCES } from './lib/page-modules.mjs';
 
-const RESOURCES = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources');
+/* ---- export-contract: does every `alias.name(` one module reaches for exist on what the other
+ * exports? Folded in here because this is its only caller. Deliberately narrow, and safe to be
+ * narrow: a MISS (an export built dynamically, e.g. `exported[key] = fn`) makes the check see fewer
+ * exports than there are, which can only produce a false failure — never a false pass — and every
+ * module this is pointed at lists its exports as a literal, comma-separated identifier list. */
+function stripComments(src) {
+	return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+}
+
+/* The identifiers inside the module's own `return baseclass.extend({ … });` — the LAST such call
+ * in the file, which is where every one of these modules places it. Both shapes the theme uses are
+ * covered: a bare identifier (`currentTint, applyTint`) exports the name itself, and a `key: value`
+ * pair (not used today, but cheap to hold) exports the key. */
+function exportedKeys(src) {
+	const clean = stripComments(src);
+	const m = clean.match(/return\s+baseclass\.extend\(\{([\s\S]*)\}\)\s*;?\s*$/);
+	if (!m) return null;
+	const body = m[1];
+	const keys = new Set();
+	for (const km of body.matchAll(/([A-Za-z_$][A-Za-z0-9_$]*)/g)) keys.add(km[1]);
+	return keys;
+}
+
+/* Every `alias.name` reference in `src` — a call (`axes.currentContentWidth()`) or a bare
+ * reference handed to another function (`bump(axes.applyContentWidth)`), because the second shape
+ * fails the same way one call later: `bump()` invokes whatever it was given, undefined included. */
+function referencedNames(src, alias) {
+	const clean = stripComments(src);
+	const re = new RegExp(`\\b${alias}\\.([A-Za-z_$][A-Za-z0-9_$]*)`, 'g');
+	const names = new Set();
+	for (const m of clean.matchAll(re)) names.add(m[1]);
+	return names;
+}
+
+/* Every name `callerSrc` reaches for on `alias` must be a key `calleeSrc` exports. Returns `null`
+ * (not an empty array) when the callee's export shape was not recognised, so a caller can tell
+ * "nothing missing" from "could not check" and never turns the second into a silent pass. */
+function missingExports(callerSrc, alias, calleeSrc) {
+	const exported = exportedKeys(calleeSrc);
+	if (!exported) return null;
+	const referenced = referencedNames(callerSrc, alias);
+	return [...referenced].filter((n) => !exported.has(n)).sort();
+}
 
 /* Dependency order, not alphabetical: each module is evaluated once and handed to the next as its
  * pragma argument, the way luci.js's require cache does it. fs-router and fs-chrome are the two
