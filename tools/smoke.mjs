@@ -325,7 +325,7 @@ const result = await page.evaluate(({ mods, axes }) => {
 const headerUt = readFileSync(
 	join(ROOT, 'luci-theme-footstrap/ucode/template/themes/footstrap/header.ut'), 'utf8');
 const bodyTag = headerUt.indexOf('<body');
-const recorderMatch = bodyTag >= 0 && headerUt.slice(bodyTag).match(/<script>([\s\S]*?)<\/script>/);
+const recorderMatch = bodyTag >= 0 && headerUt.slice(bodyTag).match(/<script>([\s\S]*?)<\/script[^>]*>/i);
 
 const recorderNotes = recorderMatch ? await page.evaluate((src) => {
 	const notes = [];
