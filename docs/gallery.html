@@ -689,6 +689,25 @@ option two</textarea></div>
 		value sits above the bar's right edge, pairing with whatever names the bar on the line above;
 		in a <code>.cbi-value</code> row it sits after the bar, on the row's own line, and the values
 		line up in a column because the reserve is fixed rather than shrink-wrapped.</p>
+	<!-- Key/value .table off the overview page — luci-mod-status's 20_memory.js markup, reused
+	     verbatim by luci-mod-dashboard's Resources tab (forum thread 253559 post 54): td width="33%"
+	     ATTRIBUTE (stock markup, not style=) label | td bar, no header row, so it never matches
+	     admin-status-overview's meter-row selector and takes the bare .cbi-progressbar default. This
+	     is the shape that spilled the value across the row divider above it before the default
+	     reserved a line for it. -->
+	<div class="cbi-section">
+		<div class="table">
+			<div class="tr"><div class="td" width="33%">Memory</div>
+				<div class="td"><div class="cbi-progressbar" title="303.37 MiB / 484.11 MiB (62%)"><div style="width:62%"></div></div></div></div>
+			<div class="tr"><div class="td" width="33%">Swap</div>
+				<div class="td"><div class="cbi-progressbar" title="3.46 MiB / 242.05 MiB (1%)"><div style="width:1%"></div></div></div></div>
+			<div class="tr"><div class="td" width="33%">Root</div>
+				<div class="td"><div class="cbi-progressbar" title="464.75 MiB / 484.11 MiB (96%)"><div style="width:96%"></div></div></div></div>
+		</div>
+	</div>
+	<p class="g-note">What to look at: no row prints its value across the divider above it — the bar
+		reserves its own line by default here, since this shape carries no <code>data-page</code>
+		context to opt it out.</p>
 </div>
 
 <div class="g-sec">

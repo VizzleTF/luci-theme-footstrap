@@ -31,4 +31,9 @@
 	:where(#view)[data-page="admin-system-package-manager"] label:has(+ .cbi-progressbar) {
 		display: block; margin: 0; font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-dim);
 	}
+	/* value rides the "Disk space:" label's line at both widths — one unconditional opt-out of
+	 * the bare-meter reserve; theme/90-responsive.css's phone rule only adds margin-bottom. */
+	:where(#view)[data-page="admin-system-package-manager"] label + .cbi-progressbar {
+		margin-block-start: 0;
+	}
 }

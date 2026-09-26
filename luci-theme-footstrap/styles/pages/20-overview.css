@@ -191,6 +191,12 @@
 		font-size: var(--fs-type);
 	}
 
+	/* value rides the label's own line at desktop (::after floats over the row's top edge) —
+	 * opt out of the bare-meter default reserve. <=560px below restores it (own line, no room). */
+	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .cbi-progressbar {
+		margin-block-start: 0;
+	}
+
 	/* narrow card: the value takes its own line, the reserve above cannot fit it — docs/css.md
 	 * above has the 218px/190px measurement. */
 	@container fs-view (max-width: 560px) {
