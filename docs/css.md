@@ -750,6 +750,29 @@ along with the axis; only a direct child reaches the axis alone.
 reduced-motion, and print. Each section below is the finding a comment in that file points at —
 the code carries the invariant and the number, this carries the story behind it.
 
+### Meter: the value's line is reserved in flow by default, not floated on faith
+
+`.cbi-progressbar`'s value is an absolutely-positioned `::after` (`content: attr(title)`), floated
+above the bar's top edge so a thin track never grows into a fat pill. Through 0.14 the bar carried
+`margin: 0` — no space held for that floated line — which works only where a context already
+happens to leave room above the bar. Off `admin-status-overview`, a key/value `.table` row (label
+33% | bar, no header row — `luci-mod-status`'s `20_memory.js` markup, reused verbatim by
+`luci-mod-dashboard`'s Resources tab, forum thread 253559 post 54) gets no such context rule, so the
+value spilled 5-6px above its row and printed across the divider belonging to the row above.
+
+The fix follows upstream `luci-theme-bootstrap`'s model: reserve one line in flow
+(`margin-block-start: calc(var(--fs-type-xs) * var(--fs-leading))`, the SAME expression
+`.fs-stacked` and the overview `<=560px` rule already used) as the bar's DEFAULT, so the floated
+label always has a band to sit inside regardless of what wraps it. Only the contexts that
+deliberately place the value BESIDE the bar (`.cbi-value-field`, a data table's meter column — both
+pinned in `@mirror meter/beside`) or on a neighbour's line (overview's meter rows at desktop, the
+package-manager disk bar at both desktop and phone) opt out with `margin-block-start: 0`. Where an
+existing rule already styled that bar it carries the declaration (`@mirror meter/beside`); overview
+and package-manager had none — no prior rule targeted the bar on either page — so each got a new
+page-layer rule for the same selector, opt-out only, no other declaration. Everything else — the
+gallery's bare meters, a third-party app's key/value table, the old dashboard's 30_wifi assoclist
+(never reached by the `admin-status-overview`-scoped meter-row selector above — wrong page) — takes the new default and reserves its own line.
+
 ### Inputs: the toggle switch, drawn on the input, not the label
 
 Through 0.14 the switch was drawn on `label[for]` with the real `<input>` hidden

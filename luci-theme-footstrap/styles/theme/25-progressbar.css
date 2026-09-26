@@ -1,6 +1,10 @@
 @layer theme {
 	/* One thin meter for every .cbi-progressbar: track + accent fill, title value floated above
-	 * the right edge instead of stuffed inside a fat pill. */
+	 * the right edge instead of stuffed inside a fat pill. Default reserves that value's own line
+	 * in flow (bootstrap's margin:1.4em model) — an abspos value with zero reserve spilled 5-6px
+	 * UP across the divider of the row above, off the overview page (key/value .table, no header
+	 * row). Contexts that put the value BESIDE the bar or on a neighbour's line opt out with
+	 * margin-block-start: 0. */
 	.cbi-progressbar {
 		position: relative;
 		height: 10px;
@@ -10,6 +14,7 @@
 		overflow: visible;
 		min-width: 120px;
 		margin: 0;
+		margin-block-start: calc(var(--fs-type-xs) * var(--fs-leading));
 	}
 	.cbi-progressbar > div {
 		height: 100%;
@@ -39,6 +44,7 @@
 	.cbi-value-field > .cbi-progressbar {
 		/* @mirror meter/beside */
 		margin-inline-end: var(--fs-meter-value);
+		margin-block-start: 0;
 		/* @endmirror */
 		--fs-meter-value: calc(var(--fs-space-10) * 2);
 	}
@@ -51,6 +57,7 @@
 	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar {
 		/* @mirror meter/beside */
 		margin-inline-end: var(--fs-meter-value);
+		margin-block-start: 0;
 		/* @endmirror */
 		--fs-meter-value: var(--fs-space-10);
 		min-width: 60px; /* narrower and it stops reading as a meter; the column gives up the rest */
