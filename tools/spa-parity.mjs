@@ -22,7 +22,7 @@
 import { parseArgs } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
-import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
+import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter, waitForPaint } from './lib/stands.mjs';
 import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
 import { read } from './lib/root.mjs';
 
@@ -322,7 +322,15 @@ async function backRestoreCheck(page, stand, findings, widthLabel) {
 
 		try { await page.goto(stand.base + c.from, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
 		catch (e) { continue; }
-		await page.waitForTimeout(1400);
+		/* the fixed 1400ms this used to wait raced the same late RPC scroll-jank.mjs hit in 7e08d1e:
+		 * Overview's sections stay hidden until network.flushCache() answers, and on a router that
+		 * just booted one answers past 1400ms — parked read 0 and this case misdiagnosed it as "no
+		 * room to scroll". waitForPaint() is the same bounded wait, from lib/stands.mjs. */
+		if (!await waitForPaint(page, 20000)) {
+			add(`${c.from} page not painted, run proves nothing`);
+			continue;
+		}
+		await page.waitForTimeout(400);	/* let the arrival settle, same margin scroll-jank.mjs uses */
 
 		/* which scroller THIS width uses, read the same way fs-fit.js's own scroller() does — never
 		 * assumed from the layout name, which a CSS edit could move independently of this gate */

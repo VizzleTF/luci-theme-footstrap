@@ -24,6 +24,31 @@ import { execFileSync } from 'node:child_process';
  * router is ignored, and `--only imm2512` is refused by name rather than measured. */
 export const CORE = [ 'owrt2512', 'owrt2410', 'owrtsnap' ];
 
+/* Has the view actually rendered, or is a live gate about to measure a blank shell? fs-overview.js
+ * keeps every section hidden until network.flushCache()'s five RPCs answer (fs-overview.js
+ * ~:301-303); on a router that just booted, one answers late enough that a fixed wait expires
+ * first. scroll-jank.mjs armed on `scrollable 0` with no tables and read the page finishing its
+ * own paint mid-scroll as a 4044px jump (docs/development.md, "The stand's own traps") — 4 of 16 PR
+ * runs. Scroller detection matches fs-fit.js's own scroller() so every gate asks the page the same
+ * way. Runs INSIDE the page via page.evaluate/waitForFunction. */
+export const PAINTED = () => {
+	const mc = document.getElementById('maincontent');
+	const flow = mc ? getComputedStyle(mc).overflowY : '';
+	const scroller = (flow === 'auto' || flow === 'scroll') ? mc : null;
+	const scrollable = scroller ? scroller.scrollHeight - scroller.clientHeight
+		: document.documentElement.scrollHeight - window.innerHeight;
+	const rendered = [ ...document.querySelectorAll('#view .cbi-section, #view .table') ]
+		.some((el) => el.offsetParent !== null);
+	return rendered && scrollable > 0;
+};
+
+/* Bounded wait for PAINTED, true/false rather than a throw: a page still unpainted at the deadline
+ * is its own finding ("page not painted, run proves nothing"), not a script failure. */
+export async function waitForPaint(page, timeout = 20000) {
+	try { await page.waitForFunction(PAINTED, { timeout }); return true; }
+	catch (e) { return false; }
+}
+
 /* `stands()` and `pairStands()` both used to shell out to `owlab status -json` and `JSON.parse` its
  * answer themselves. One place now: an empty array on any failure (owlab absent, bad JSON) — the
  * caller decides whether that's a gate failure or a reason to skip. */

@@ -833,6 +833,28 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
 
 ## The stand's own traps
 
+- **`moved 1980/0 anchor 4044px` on `chromium owrt2512 @768 side /admin/status/overview` reads as
+  the theme jumping under the reader; it was `scroll-jank.mjs` arming before Overview painted.**
+  4 of 16 PR runs, 0 of ~80 push runs — PR boots only `owrt2512` (`tools/ci-boot.sh`), so this cell
+  starts ~15-17s after container start, ~20s sooner than a push run's later stands.
+  `fs-overview.js` keeps every section hidden until `network.flushCache()`'s five RPCs answer; on a
+  freshly booted router one answered late enough that the gate's old fixed 2600ms wait expired
+  first, arming on `scrollable 0` with no tables rendered — the page then finished painting
+  mid-scroll and read as a jump. Tell it apart from a real jank finding by the `scrollable` figure
+  in `moved X/Y`: `0` (or anything the "nothing scrolled" guard's `> 120` floor misses) means the
+  page had not painted, not that something moved it. Fixed by waiting for the paint
+  (`page.waitForFunction`, tools/scroll-jank.mjs) instead of a clock, now `waitForPaint()` in
+  `lib/stands.mjs` so a second gate can share it.
+
+- **`back-scroll: /admin/status/overview has no room to scroll at this width (parked at 0px)` on
+  `owrt2512` (CI run 36184976382, job `parity`) is the same trap in `spa-parity.mjs`'s Back case,
+  not a genuinely short page.** `backRestoreCheck()` did `page.goto(from)` then a fixed
+  `page.waitForTimeout(1400)` before parking the scroll; the same late `network.flushCache()` RPC
+  above left Overview empty at 1400ms, so `parked` read 0 and the `parked < 80` guard — meant for a
+  page that truly has no room to scroll — misdiagnosed it. Fixed the same way: `waitForPaint()`
+  before parking, and a timeout there is its own `"page not painted, run proves nothing"` finding
+  rather than falling through to the short-page guard.
+
 - **`owlab test` (0.6.1) removes the project's RUNNING stands, not only the throwaway router it
   booted.** Measured 2026-09-14: `owrt2512` and `owrt2410` were up, `owlab test --release 25.12.4
   --install …` ran, and its own log carried `Container owlab-luci-theme-footstrap-owrt2512 Removing`
@@ -1786,6 +1808,43 @@ result to act on; `owlab sync` the twin or re-run with `--no-pair`.
   the upload code. Fix with `owlab exec owrt2512 -- mkdir -p /etc/footstrap`, or run the uci-defaults
   script itself (`owlab exec owrt2512 -- sh /etc/uci-defaults/30_luci-theme-footstrap`), which is
   idempotent and safe to re-run on a stand `post_sync:` already registered.
+
+**A worktree created on Windows cannot be read by WSL's own `git`, because the worktree's `.git` file
+holds `gitdir: C:/Users/...` — a Windows-style path no POSIX tool under `/mnt/c` resolves through
+`/mnt/c` on its own.** `tools/computed-diff.mjs` failed with `fatal: not a git repository:
+/mnt/c/.../worktrees/<name>/C:/Users/IVAN/.../.git/worktrees/<name>` — the WSL-side path with the
+Windows-side one git tried to resolve relative to it appended on the end — and the
+`git archive | tar -x` pipe behind it failed with `tar: This does not look like a tar archive` on
+whatever `git archive` wrote instead of a tarball. Tell it apart from a real repository problem:
+`cat .git` from WSL — a `gitdir:` line starting `C:/` (or carrying a backslash) is the whole story, a
+POSIX path is not this trap. Run a `git`-reading gate that shells out to `git archive`/`git diff`/
+`git show` (`computed-diff`, `fork-drift`) from the SAME OS whose git created the worktree.
+
+**Two Playwright runs against two different stands at once can turn one visit into
+`net::ERR_CONNECTION_RESET`.** Seen once: a pair run in parallel against `owrt2512`/`owrt2410` reset
+a connection on port 8024, `owrt2410`'s own published port; the identical pair run sequentially, one
+stand at a time, was clean. One occurrence is not enough to name a cause — tell it apart from a real
+navigation fault the same way either way: re-run the same script alone against the same stand before
+reading a connection reset as a theme finding.
+
+**`luci-app-bandix` is not in the OpenWrt/ImmortalWrt feeds; install it from timsaya's own GitHub
+releases, matched to the stand's arch and libc.** On `owrt2410` the first `opkg install` failed on
+`zoneinfo-core` with `Checksum or size mismatch` — a stale package index, not a bad download —
+cleared by a plain `opkg update` first. The backend cannot start inside an owlab container at all —
+`owlab exec <stand> -- '/etc/init.d/bandix restart; logread | grep -i ebpf'` logs
+`Failed to load eBPF program: map error: failed to create map`, eBPF needing kernel capabilities a
+container does not have (owlab stands are containers, not VMs — `fidelity: vm` above is the closer
+analogy, at a cost) — right next to the LuCI view still rendering and reaching the router over ubus
+regardless, which is enough to reproduce a DOM/CSS bug like issue #56's; anything that needs
+bandix's own RPC data answering for real needs `fidelity: vm` or hardware instead.
+
+**A full load's `<body>` children are not in a stable order across runs.** `ui.js`'s `UI.__init__()`
+sometimes appends `#modal_overlay`/`.cbi-tooltip` before the parser reaches `footer.ut`'s own
+`<script>` tags, and sometimes after — which one wins depends on when its own fetch resolves, not on
+anything this theme controls. A census of `document.body.children` compared in ORDER between two
+runs of the identical page reads the ones where the race went the other way as a regression. Compare
+as a MULTISET instead: `Array.from(document.body.children).map(el => el.tagName + '#' + el.id + '.' +
+el.className).sort()`, duplicates counted, never a plain sequence diff.
 
 ## The test matrix
 

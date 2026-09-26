@@ -31,7 +31,7 @@
  * Needs a running owlab router (docs/development.md). */
 import { parseArgs } from 'node:util';
 import * as pw from 'playwright';
-import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter, waitForPaint } from './lib/stands.mjs';
 
 const { values: FLAGS } = parseArgs({ options: {
 	engines: { type: 'string', default: 'chromium' },
@@ -53,6 +53,9 @@ const ANCHOR_TOLERANCE = 2;
 /* Chromium's own layout-shift score for the scroll window. Not zero: an image or a font landing
  * mid-scroll shifts the page and is neither ours nor avoidable. */
 const SHIFT_TOLERANCE = 0.02;
+
+/* PAINTED and waitForPaint() are shared with spa-parity.mjs's Back case — both start on this same
+ * Overview and hit this same late RPC — lib/stands.mjs. */
 
 /* Installed in the page. Records into `window.__fsScroll` until told to stop. */
 const ARM = () => {
@@ -175,7 +178,14 @@ for (const engine of ENGINES) {
 				for (const path of PAGES) {
 					try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
 					catch (e) { continue; }
-					await page.waitForTimeout(2600);		/* let the arrival settle: that is another gate's subject */
+					const where = `${engine} ${stand.id} @${w} ${layout} ${path}`;
+					/* wait for the real thing instead of a fixed clock: bounded at 20s, well past the
+					 * ~17s worst case measured booting a single PR stand (tools/ci-boot.sh) */
+					if (!await waitForPaint(page, 20000)) {
+						findings.push(`${where}: page not painted, run proves nothing`);
+						continue;
+					}
+					await page.waitForTimeout(400);		/* let the arrival settle: that is another gate's subject */
 					try { await page.evaluate(ARM); } catch (e) { continue; }
 
 					/* A REAL WHEEL, not scrollTo: the motion sampler listens on wheel/scroll/touch, and
@@ -209,7 +219,6 @@ for (const engine of ENGINES) {
 					catch (e) { continue; }
 
 					runs++;
-					const where = `${engine} ${stand.id} @${w} ${layout} ${path}`;
 					/* a run where nothing moved proves nothing: say so rather than pass it */
 					if (r.scrollable > 120 && r.moved < 100)
 						findings.push(`${where}: nothing scrolled (${r.moved} of ${r.scrollable} px available) — the run proves nothing`);
