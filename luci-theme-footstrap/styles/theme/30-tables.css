@@ -151,34 +151,36 @@
 	}
 
 	/* --- KEY/VALUE: "no id" is not enough — GridSection also renders no-id .cbi-section-table,
-	 * excluded along with .fs-dt and the legend's inline table-layout. */
-	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:first-child {
+	 * excluded along with .fs-dt and the legend's inline table-layout. Shape, not a class, says
+	 * data table: any .th or a 3rd .td rules a table out — a real key/value row is exactly 2 .td
+	 * and no .th. docs/css.md, "The key/value discriminator". */
+	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.th)):not(:has(.td:nth-child(3))):not([style*="table-layout"]) .td:first-child {
 		color: var(--fs-dim); font-weight: var(--fs-weight); width: 40%; white-space: nowrap;
 	}
-	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:last-child:not(:first-child) {
+	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.th)):not(:has(.td:nth-child(3))):not([style*="table-layout"]) .td:last-child:not(:first-child) {
 		font-family: var(--fs-font-mono); color: var(--fs-text); text-align: end;
 	}
 	/* below ~560px the 40%/nowrap column starves the value — stacked below (560, not the config
 	 * table's 960px). :first-child:first-child doubles the pseudo-class ON PURPOSE, to outrank. */
 	@container fs-content (max-width: 560px) {
 		/* the row's own .td/.th padding above spent a FULL padding per half; moved to the ROW */
-		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .tr {
+		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.th)):not(:has(.td:nth-child(3))):not([style*="table-layout"]) .tr {
 			display: block;
 			padding: var(--fs-space-1) 0 var(--fs-space-1-5);
 			border: 0;
 			border-bottom: var(--fs-hairline);
 		}
-		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .tr:last-child {
+		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.th)):not(:has(.td:nth-child(3))):not([style*="table-layout"]) .tr:last-child {
 			border-bottom: 0;
 		}
-		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:first-child:first-child {
+		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.th)):not(:has(.td:nth-child(3))):not([style*="table-layout"]) .td:first-child:first-child {
 			display: block; width: auto; white-space: normal;
 			padding: 0; border: 0;
 			font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight);
 			letter-spacing: var(--fs-eyebrow-tracking); color: var(--fs-eyebrow-color);
 			text-transform: uppercase;
 		}
-		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:last-child:last-child:not(:first-child) {
+		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.th)):not(:has(.td:nth-child(3))):not([style*="table-layout"]) .td:last-child:last-child:not(:first-child) {
 			display: block; width: auto; text-align: start;
 			padding: 0; border: 0;
 		}

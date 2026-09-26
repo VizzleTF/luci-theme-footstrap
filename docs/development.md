@@ -893,6 +893,39 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   is separate from the `$?` trap below and bites the same way: the script looks like it ran and
   produced nothing. Write the script to a file and call `wsl.exe -- bash <path>.sh`.
 
+- **Building a test table through the HTML parser (`innerHTML`/a template literal) inserts a
+  `<tbody>` the app never wrote; `E()`/`appendChild` do not.** Task 0058's sweep harness built
+  `<table class="table">…</table>` from a string, and with `.table{display:block}` (base) plus an
+  un-carded parser `<tbody>` (an anonymous table-row-group box, `display: table-row-group` by
+  default, no rule targets it), the harness measured a ~137px shrink-to-fit box and reported text
+  overlaps that never happen on a real page — LuCI's own row builders (`ui.js:3818`,
+  `form.js:2807`) append rows straight onto the `<table>` element, no `<tbody>`. Tell the two apart:
+  strip the parser's tbody and re-measure (`document.querySelectorAll('tbody').forEach(tb =>
+  tb.replaceWith(...tb.children))`); if the finding survives, it is real, if it does not, the
+  harness built a shape LuCI never emits.
+
+- **A CSS-only probe (cascade.css loaded, no theme JS) reads a header table as key/value, because
+  `.fs-dt` is written by `fs-select.js` at runtime, not by the stylesheet.** `fs-select.js`'s
+  `tagDataTables()` (`fs-select.js:191`, `:220`, `:225`) tags any `#view` OR `.modal` table carrying
+  a header — a plain `<thead>`, a real `<tr>` inside one, or a bare-`<th>` first row — with `.fs-dt`,
+  and the key/value rule in `30-tables.css` excludes `.fs-dt`; a harness that never loads that script
+  never sees the class, so a table `fs-select.js` would have tagged reads as key/value and can
+  report a stacking/styling bug that does not exist live — this bit a table inside `.modal` too,
+  since `foreignTables()` reaches both roots. Tell the two apart: check
+  `document.querySelectorAll('.fs-dt').length` in the harness, or load `fs-select.js` before
+  measuring.
+
+- **OrbStack's VM freezes when the dev Mac's lid closes for sleep, and every stand looks reachable
+  while it is dead.** `docker ps` hangs, a stand's ssh/http port accepts the TCP connection and
+  returns 0 bytes (`curl` exit 28, timeout), and the OrbStack app itself still reports the VM
+  "Running". Cause: `vmgr` pauses the VM on system sleep and only resumes it on a full wake, which a
+  closed lid never delivers — clamshell sleep is `DarkWake`, not `FullWake`. Tell the two apart:
+  `grep 'msg=\(sleep\|wake\)' ~/.orbstack/log/vmgr.log | tail -1` shows `sleep` while the ports are
+  live but empty. Recovery: `caffeinate -u -t 2` (declares user activity, which promotes DarkWake to
+  FullWake and gets `vmgr` to log a wake). Prevention on this machine: a LaunchDaemon holding
+  `caffeinate -s` (`PreventSystemSleep`, AC power only). Neither `docker` nor `owlab` is on the agent
+  shell's `PATH`: use `/usr/local/bin/docker` and `~/go/bin/owlab`.
+
 - **`tools/bg.sh` started from inside a `wsl.exe -e bash -c …` call dies with that call, and reads
   as a run that finished instantly — and `tools/bg-wait.sh` then waits out its full two-hour cap
   on it.** The log file is created with `bg.sh`'s own header (~280 B) and never grows, and `.status`

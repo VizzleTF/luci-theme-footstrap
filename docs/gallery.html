@@ -708,6 +708,32 @@ option two</textarea></div>
 	<p class="g-note">What to look at: no row prints its value across the divider above it — the bar
 		reserves its own line by default here, since this shape carries no <code>data-page</code>
 		context to opt it out.</p>
+	<!-- The shape the key/value rule (30-tables.css) must NOT match: a no-id, no-.cbi-section-table
+	     multi-column table — luci-mod-dashboard's 20_lan.js "Devices" list, <thead><th> header, 3
+	     data columns. The old discriminator only ruled out .tr.table-titles, so this
+	     one — a real <thead> with no such class — stacked into a mislabelled single-value column
+	     below 560px. The .th cells (any header shape) now rule it out. -->
+	<div class="cbi-section">
+		<table class="table assoclist devices-info">
+			<thead class="thead dashboard-bg">
+				<tr>
+					<th class="th nowrap">Hostname</th>
+					<th class="th">IP Address</th>
+					<th class="th">MAC</th>
+				</tr>
+			</thead>
+			<tr class="tr cbi-rowstyle-1">
+				<td class="td device-info"><p><span>host-1.lan</span></p></td>
+				<td class="td device-info"><p><span>192.168.1.101</span></p></td>
+				<td class="td device-info"><p><span>AA:BB:CC:DD:EE:01</span></p></td>
+			</tr>
+			<tr class="tr cbi-rowstyle-2">
+				<td class="td device-info"><p><span>host-2.lan</span></p></td>
+				<td class="td device-info"><p><span>192.168.1.102</span></p></td>
+				<td class="td device-info"><p><span>AA:BB:CC:DD:EE:02</span></p></td>
+			</tr>
+		</table>
+	</div>
 </div>
 
 <div class="g-sec">
