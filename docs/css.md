@@ -118,7 +118,7 @@ page is plainer:
 | `color-mix()` | 111 / 113 / 16.2 | the 33 mixed tokens fall back to `styles/04-nocolormix.css` |
 | `@container` | 105 / 110 / 16.0 | five width adaptations inside `fs-view` / `fs-content` |
 | `text-wrap: pretty`, `scrollbar-width` | — | typographic polish |
-| `overflow: clip` value | 90 / 94 / 16.0 | `.fs-main`'s `overflow-x: clip` and `.fs-staging`'s `overflow: clip` drop, and the browser's own cross-axis correction (CSS Overflow 3) takes over: a sideways scrollbar on the desktop sidebar's `.fs-main` (its sibling axis is already `overflow-y: auto`) or, in the top/narrow layouts and on `.fs-staging`, whole-page horizontal scroll — exactly how stock LuCI (no `clip` at all) already renders. `.fs-staging` also stays `visibility: hidden` regardless, since nothing inside a staged view sets `visibility: visible` on itself, so nothing is exposed. Measured with `overflow-x`/`overflow` forced to `initial` in a live Chromium, task 0151 |
+| `overflow: clip` value | 90 / 94 / 16.0 | `.fs-main`'s `overflow-x: clip` and `.fs-staging`'s `overflow: clip` drop, and the browser's own cross-axis correction (CSS Overflow 3) takes over: a sideways scrollbar on the desktop sidebar's `.fs-main` (its sibling axis is already `overflow-y: auto`) or, in the top/narrow layouts and on `.fs-staging`, whole-page horizontal scroll — exactly how stock LuCI (no `clip` at all) already renders. `.fs-staging` also stays `visibility: hidden` regardless, since nothing inside a staged view sets `visibility: visible` on itself, so nothing is exposed. Measured with `overflow-x`/`overflow` forced to `initial` in a live Chromium |
 
 Two rules follow, and the gate holds both.
 
@@ -483,18 +483,38 @@ nowrap name sets the minimum width of every tile on the page. `min-height: 2lh` 
 reserve the second line and cost 19px of empty air on every name that does not wrap (measured: a
 5-port device stood 126px against 107px) — the grid already levels the row.
 
-Meter rows (any stock `.table` row carrying a `.cbi-progressbar` — Memory, Storage, CPU load,
-connections, …) are matched by `:has(.cbi-progressbar)`, not per section, so a third-party include
-of the same shape gets the layout too: label + value on one line, the bar on the next. The value's
-own reserve (`padding-inline-end: min(230px, 50%)`) cannot survive a narrow card —
+Meter rows (a key/value-shaped `.table` row carrying a `.cbi-progressbar` — Memory, Storage, CPU
+load, connections, …) are matched by `:not(:has(.th)):not(:has(.td:nth-child(3))):has(.cbi-progressbar)`,
+not per section, so any OTHER key/value-shaped include under `admin-status-overview`'s same
+`:where(#view)[data-page]` scope gets the layout too: label + value on one line, the bar on the
+next. A data-shaped row — a header cell anywhere, or a 3rd `.td` — is excluded and keeps its own
+row layout regardless of section. This is an overview-page rule, not a global one — a same-shape
+`.table` off this page (dashboard's Resources tab, any third-party app) gets none of it, just the
+base `.cbi-progressbar` default below. The value's own reserve
+(`padding-inline-end: min(230px, 50%)`) cannot survive a narrow card —
 `16.66 GiB / 16.66 GiB (100%)` measures 218px against a 190px reserve on a 380px phone card — so
 below 560px the label takes the whole line and the bar drops to its own line instead.
 
-Row dividers and the key/value weight are dropped only where the table has no header row
-(`:not(:has(.tr.table-titles))`) — the same test the meter rows use — because a *data* table (one
-record among many) keeps its dividers, but naming the three cards (`.fs-ovl-mem`/`-sto`) instead
-would have left System ruled at 1px per row and given a third-party include of the same shape
-nothing.
+Row dividers and the key/value weight are dropped only where the table's SHAPE is a real key/value
+pair — no header cell anywhere (`:not(:has(.th))`) and no row with a 3rd column
+(`:not(:has(.td:nth-child(3)))`) — because a *data* table (one record among many) keeps its
+dividers, but naming the three cards (`.fs-ovl-mem`/`-sto`) instead would have left System ruled at
+1px per row and given a third-party include of the same shape nothing. The discriminator used to be
+`:not(:has(.tr.table-titles))`, which catches only ONE header shape: `L.ui.Table`'s JS-captioned
+constructor writes that class (`ui.js:3808-3820`), while `initFromMarkup` (`ui.js:3956-3984`) binds
+a stock `<thead>`/`.th` markup table and writes no class at all. Measured live on `owrt2512`/apk and
+`owrt2410`/opkg (1280 and 380px, HEAD vs worktree): `fs-select.js`'s `tagDataTables()`
+(`fs-select.js:191`, `:220`, `:225`) already tags any `#view` or `.modal` table with a header — a
+plain `<thead>` included, dashboard's `20_lan.js`/`30_wifi.js` and luci-app-acl's modal table all
+among them — as `.fs-dt`, and this rule already excludes `.fs-dt`; those read identical at HEAD and
+worktree, no pre-fix bug. What the shape test actually closes: a table with NO header row at all
+and a 3rd `.td` (luci-mod-dsl's `stats.js`, the gallery's log fixture) — a shape `.fs-dt` never
+reaches either, `tagDataTables()` needing a header — now correctly excludes and scrolls instead of
+stacking. And because the shape test runs in CSS alone, a header table no longer flashes key/value
+styling for the first frame before `fs-select.js` runs and adds `.fs-dt` — the class-based test
+could only exclude it once that script had run. Every header shape LuCI writes puts its cell class
+on `.th` (`ui.js:3832`, `form.js:2908-2914`), so `:not(:has(.th))` alone already covers
+`.tr.table-titles` too — no separate guard needed for it.
 
 ### Software: the disk-space bar and the carded package row
 
@@ -614,6 +634,31 @@ table this layer reaches (config tables, key/value includes, meter rows) because
 measured and none can card on demand — containment is the only outcome available. The full per-tier
 table and the two bugs (#32, #36) that shaped it: "The floor, and why exactly one tier has one",
 below.
+
+### Tables: the key/value discriminator is the table's shape, not a class
+
+`theme/30-tables.css`'s desktop label/value styling and its ≤560px stacking (`:155-185`) match a
+`.cbi-section .table` only when it has no `.th` anywhere and no row with a 3rd `.td` — a real
+key/value row is exactly 2 cells, neither a header. The discriminator used to be
+`:not(:has(.tr.table-titles))`, which caught only `L.ui.Table`'s JS-captioned header
+(`ui.js:3808-3820`); `initFromMarkup` (`ui.js:3956-3984`) binds a stock `<thead>`/`.th` markup table
+with no such class. Measured live on `owrt2512`/apk and `owrt2410`/opkg (1280 and 380px, HEAD vs
+worktree): `fs-select.js`'s `tagDataTables()` already tags any `#view` or `.modal` header table it
+reaches — a plain `<thead>` included — with `.fs-dt`, which this rule already excluded; dashboard's
+`20_lan.js`/`30_wifi.js` and luci-app-acl's modal table read identical at HEAD and worktree, no
+pre-fix bug. `attendedsysupgrade`'s `11_upgrades.js` table renders via `ui.addTimeLimitedNotification`
+into `#maincontent`, outside any `.cbi-section`, so no rule on this page ever reached it either way.
+What the shape test actually fixes: a table with no header row at all and a 3rd `.td`
+(luci-mod-dsl's `stats.js`, the gallery's log fixture) — a shape `.fs-dt` never reaches — now
+scrolls instead of stacking; and, running in CSS alone, a header table no longer flashes key/value
+styling for the first frame before `fs-select.js` runs and adds `.fs-dt`. Every header LuCI writes
+puts its cell class on `.th` (`ui.js:3832`, `form.js:2908-2914`), so `:not(:has(.th))` already
+covers `.tr.table-titles` too. The overview page's own divider/weight and meter-row rules
+(`pages/20-overview.css`) repeat the same test for one consistent discriminator, not because a live
+table on this page was found misclassified; its DATA-table row-height rule runs the complement of
+it (`:is(:has(.th), :has(.td:nth-child(3)))`) so a stock header table under this page's
+`.cbi-section` scope gets the data-table padding, not the key/value one. "Overview: the port-tile
+reskin", above.
 
 ### Tables: the empty-table placeholder must not pin to the table's bottom
 
@@ -771,7 +816,9 @@ existing rule already styled that bar it carries the declaration (`@mirror meter
 and package-manager had none — no prior rule targeted the bar on either page — so each got a new
 page-layer rule for the same selector, opt-out only, no other declaration. Everything else — the
 gallery's bare meters, a third-party app's key/value table, the old dashboard's 30_wifi assoclist
-(never reached by the `admin-status-overview`-scoped meter-row selector above — wrong page) — takes the new default and reserves its own line.
+(never reached by the `admin-status-overview`-scoped meter-row selector above — wrong page — and,
+since that selector now tests SHAPE, its `<thead>`/`.th` header would fail the key/value test on its
+own even if it were) — takes the new default and reserves its own line.
 
 ### Inputs: the toggle switch, drawn on the input, not the label
 
@@ -784,7 +831,7 @@ input instead means an app that hides `label[for]` hides an already-empty placeh
 switch; `label[for]` stays in the DOM (`ui.js` and third-party apps emit it) but is now the
 out-of-flow element.
 
-`flex-shrink: 0` (task 0145) exists because a caption after the pill —
+`flex-shrink: 0` exists because a caption after the pill —
 `label.cbi-checkbox > input + label[for] + TEXT`, package-manager.js's and banip's real markup —
 makes the input a second, shrinkable flex item. Unshrunk it stays exactly `--sw-w`; measured shrunk
 on the live Install dialog on both stands before the fix: RU/Normal/390px gave a used width of
@@ -868,7 +915,7 @@ then claimed 1747px where it needs 1190px).
 
 992, not 960: the query reads `.cbi-map` (`theme/45-misc.css`), one level above the `.cbi-section`
 that actually holds the table, and never subtracted what that level spends — `--fs-card-pad` on both
-sides, 32px at the density every page but Compact ships. Measured live (task 0163): firewall/zones'
+sides, 32px at the density every page but Compact ships. Measured live: firewall/zones'
 `.cbi-map` sat at 968px, 936px once the section's own padding was out, and its six Russian headers
 needed 1017px — 968 cleared the un-adjusted 960px check and the table never carded, clipping the
 header row 49-65px with no scroller anywhere near it (English's shorter headers happened to fit the
@@ -933,7 +980,7 @@ still short) — and that is the right place for it to give, not a sibling butto
 
 ### Buttons: `flex-basis: auto`, not the definite basis base gave every row action
 
-`.td .cbi-button, .td .btn` was dropped (task 0151): the action cells this rule was filed against
+`.td .cbi-button, .td .btn` was dropped: the action cells this rule was filed against
 (`form.TableSection`'s `.td.cbi-section-table-cell.cbi-section-actions`) are already reached by
 `.cbi-section-actions .cbi-button`/`.btn` — `.cbi-section-actions` sits on the `.td` itself, so the
 descendant selector matches with no `.td` needed. What the bare `.td` reached and those two do not
