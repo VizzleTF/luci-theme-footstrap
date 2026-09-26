@@ -123,7 +123,7 @@ jobs:
       # produces the released bytes.
       - run: npm ci --ignore-scripts
 
-      - uses: owfeed/owfeed/setup@v0.5.1
+      - uses: owfeed/owfeed/setup@v0.5.4
         with:
           version: v0.5.1
 
@@ -169,7 +169,7 @@ jobs:
 
       # ONE RELEASE PER STEP: 25.12 is apk and 24.10 is opkg, and neither installs the other's file.
       - name: Install this build on 25.12 and render its pages
-        uses: owfeed/owlab/action@v0.6.1
+        uses: owfeed/owlab/action@v0.6.5
         with:
           version: v0.6.1
           releases: "25.12.4"
@@ -186,7 +186,7 @@ jobs:
             exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 
       - name: Install this build on 24.10 and render its pages
-        uses: owfeed/owlab/action@v0.6.1
+        uses: owfeed/owlab/action@v0.6.5
         with:
           version: v0.6.1
           releases: "24.10.8"
@@ -216,7 +216,7 @@ jobs:
         name: Assert the feed serves a working theme
         if: github.event_name != 'pull_request' && steps.feed-key.outputs.reachable == 'true'
         continue-on-error: true
-        uses: owfeed/owlab/action@v0.6.1
+        uses: owfeed/owlab/action@v0.6.5
         with:
           version: v0.6.1
           releases: "25.12.4"
@@ -290,7 +290,7 @@ jobs:
         with:
           name: owfeed-packages
           path: dist/
-      - uses: owfeed/owlab/setup@v0.6.1
+      - uses: owfeed/owlab/setup@v0.6.5
         with:
           version: v0.6.1
 
@@ -401,7 +401,7 @@ jobs:
         with:
           name: owfeed-packages
           path: dist/
-      - uses: owfeed/owlab/setup@v0.6.1
+      - uses: owfeed/owlab/setup@v0.6.5
         with:
           version: v0.6.1
       - name: Boot the routers and install this build
@@ -447,7 +447,7 @@ jobs:
         with:
           name: owfeed-packages
           path: dist/
-      - uses: owfeed/owlab/setup@v0.6.1
+      - uses: owfeed/owlab/setup@v0.6.5
         with:
           version: v0.6.1
       - run: owlab up owrt2512
@@ -488,7 +488,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.1
+    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.4
     secrets:
       # The repository already has this key, and owfeed-packages pins its public half.
       sign-key: ${{ secrets.OWFEED_AUTHOR_KEY }}
