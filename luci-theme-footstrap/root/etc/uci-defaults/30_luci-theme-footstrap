@@ -30,15 +30,20 @@ fi
 # The pattern is deliberately NOT symlinked into /www: an SVG is a document, and served as one
 # through a plain same-origin URL it runs as a script with the admin's session (OpenWrt forum
 # thread 251930). It is instead read by cgi-bin/luci-theme-footstrap-pattern, which answers with
-# CSP 'none' + sandbox and nosniff — headers uhttpd cannot attach to a static file. The login
-# background stays a plain symlink: fs-assets.js re-encodes every upload to a JPEG on a canvas
-# first, so there is no script grammar left in the bytes for a direct hit to run.
+# CSP 'none' + sandbox and nosniff — headers uhttpd cannot attach to a static file. It needs its
+# .svg name to paint at all, so octet-stream is not open to it.
+#
+# The login background stays a plain symlink, and NOT because of what the browser did to the
+# bytes: the ACL authorises the cgi-upload POST whatever wrote it, so fs-assets.js's canvas
+# re-encode is compression and EXIF removal, not a boundary (it says so itself). What keeps a
+# direct open inert is the extension-less name — uhttpd types the response by extension and
+# answers application/octet-stream, which a browser downloads instead of running as a document.
 mkdir -p /etc/footstrap
 if [ -d /www/luci-static/footstrap ]; then
 	ln -sf /etc/footstrap/login-bg /www/luci-static/footstrap/bg
 	ln -sfn /etc/footstrap/fonts /www/luci-static/footstrap/fonts
 fi
-# Clean up a pre-0.15 install's stale pattern symlink — see the header comment above for why this
+# Clean up a pre-0.14.11 install's stale pattern symlink — see the header comment above for why this
 # is the one migration this script makes. `-L` only: never remove a real file some other install
 # step could have left at that path.
 [ -L /www/luci-static/footstrap/pattern.svg ] && rm -f /www/luci-static/footstrap/pattern.svg

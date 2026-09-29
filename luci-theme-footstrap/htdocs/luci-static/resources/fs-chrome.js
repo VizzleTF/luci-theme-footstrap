@@ -282,8 +282,8 @@ function fitChrome() {
 	 * 123px on owrt2512 at 767px — 107px of growth a floor never sees, on top of the shrink it does
 	 * — each step landing between two of the poll's own separate section refreshes, so the browser
 	 * paints in between and the reader is moved by exactly as much, on Chromium and Firefox as well
-	 * as Safari (`tools/fit-quiet.mjs`, `../tmp/task-toplayout/pass-probe.mjs`). `min-height` alone
-	 * was measured to `accc451`'s WebKit-only diagnosis instead — WebKit's own scroll anchoring
+	 * as Safari (`tools/fit-quiet.mjs`, plus a probe that pauses the layout mid-pass). `min-height`
+	 * alone was measured to `accc451`'s WebKit-only diagnosis instead — WebKit's own scroll anchoring
 	 * looked like the whole story only because it is the one engine with no anchoring at all to hide
 	 * this walk behind; Chromium and Firefox absorb it the same way they absorb any other layout
 	 * change, which is not the same as not producing it.
@@ -585,8 +585,8 @@ return baseclass.extend({
 		 * resize is exactly what starts that window (fs-fit.js's resize observer feeds the same
 		 * motion sampler `scrolling()` reads). A caller landing in that window, most of all
 		 * fs-select's, got the width the PREVIOUS viewport had: at 568px settling to 390px, model
-		 * stayed 568 for up to 220ms of the 400 (measured: −178px, exactly 568−390;
-		 * ../tmp/task-vnstat/probe2.mjs, probe3.mjs; live-audit's `geometry|fs-content` finding on
+		 * stayed 568 for up to 220ms of the 400 (measured: −178px, exactly 568−390, against a probe
+		 * resizing the window mid-settle, and live-audit's `geometry|fs-content` finding on
 		 * owrt2410, CI run 34364446910).
 		 *
 		 * So the window's own width is compared fresh on every call, not only when `_shellOuter`

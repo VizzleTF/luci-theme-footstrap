@@ -485,10 +485,10 @@ function restoreScroll(pos, gen) {
 	 * anywhere in the document, while THIS one is still waiting for its content to grow tall enough —
 	 * used to read as "the reader scrolled" and cancel the whole restore, killing the axis that WAS
 	 * legitimately pending over one that was never being restored at all. Reproduced without a real
-	 * router (`../tmp/task-back/repro2.mjs`): a bare `window.scrollTo(0, 111)` from an unrelated
-	 * script while the sidebar layout's `#maincontent` restore was still pending left the reader at 0
-	 * for the rest of the 5 s window instead of the parked 3000; scoping the check to the axis `pos`
-	 * carries fixes it, samples unchanged (3000).
+	 * router: a bare `window.scrollTo(0, 111)` from an unrelated script while the sidebar layout's
+	 * `#maincontent` restore was still pending left the reader at 0 for the rest of the 5 s window
+	 * instead of the parked 3000; scoping the check to the axis `pos` carries fixes it, samples
+	 * unchanged (3000).
 	 *
 	 * A SAME-axis false alarm survives that fix: the browser's OWN traversal restore lands on the
 	 * scroller BEFORE this handler swaps `#view` (see the comment above the function), and the swap
@@ -1235,9 +1235,9 @@ function navigate(pathname, push, kbd) {
 				 * than at the click, where it used to sit — means the reader keeps reading the
 				 * OUTGOING page from wherever they were for the whole staging window instead of
 				 * being thrown to its top the moment they click. Measured with the require held open
-				 * (1.2 s, ../tmp/task-navflash/navflash-slow.mjs): `y` used to hit 0 within 12 ms of
-				 * the click and stay there through the swap; moved here it stays at the reader's own
-				 * offset for the whole window and reaches 0 in the same frame the new page appears.
+				 * (1.2 s): `y` used to hit 0 within 12 ms of the click and stay there through the
+				 * swap; moved here it stays at the reader's own offset for the whole window and
+				 * reaches 0 in the same frame the new page appears.
 				 * docs/anchoring.md, "The scroll reset". */
 				if (push) {
 					window.scrollTo(0, 0);

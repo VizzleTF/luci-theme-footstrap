@@ -1055,6 +1055,10 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   `chmod` is not optional: a `docker cp` lands the file 0600-ish and uhttpd answers **403**, which
   reaches the page as `NetworkError: HTTP error 403 while loading class file` — the module then does
   not run at all and the page looks *fixed*. A green result with 403s in it has measured nothing.
+  Copied from a WSL `/mnt/c` path the file also arrives owned by uid 1000, and the same 403 survives
+  the `chmod` until `chown 0:0` runs too (charts PR stand run, 2026-09-13). From Git Bash the
+  `/mnt/c/...` source path is rewritten before `docker cp` sees it, so nothing is copied (exit 9) and
+  the stand keeps serving the old file; prefix the command with `MSYS_NO_PATHCONV=1`.
 
 - **`live-audit` on a `-b` twin calls every finding NEW, and a full sweep makes that total, not
   partial.** The baseline is keyed by stand id (`tools/baselines/live-audit.json`: `owrt2410`,

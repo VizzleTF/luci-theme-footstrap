@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Fixed
+
+- **The login-background comment in `uci-defaults/30_luci-theme-footstrap` names what actually keeps a direct open inert: the extension-less name uhttpd serves as `application/octet-stream`, not `fs-assets.js`'s canvas re-encode.** The ACL authorises the cgi-upload POST whatever wrote it, so the re-encode is compression and EXIF removal, not a boundary; the stale-symlink cleanup is dated pre-0.14.11, the release the pattern's cgi handler first shipped in. Two stand traps join `docs/development.md`: a file `docker cp`'d from `/mnt/c` keeps uid 1000 and still answers 403 after `chmod` (`chown 0:0`), and Git Bash rewrites the path so `docker cp` exits 9 (`MSYS_NO_PATHCONV=1`). `fs-chrome.js` and `fs-router.js` drop four `../tmp/task-*` paths from comments.
+
 ## [0.14.14] — 2026-10-02
 
 ### Changed
