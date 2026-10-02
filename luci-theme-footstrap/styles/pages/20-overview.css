@@ -42,6 +42,8 @@
 	 * 14 h3 on live 24.10.8 — not dead there, that release has no hide/show control */
 	:is(.cbi-title h3, .cbi-section > h3)[role="button"] {
 		cursor: pointer;
+		-webkit-user-select: none;	/* every shipped Safari/iOS reads only the prefixed form */
+		user-select: none;			/* rapid header clicks read as a double-click and select the card */
 		border-radius: var(--fs-radius-sm);
 	}
 	:is(.cbi-title h3, .cbi-section > h3)[role="button"]:focus-visible {

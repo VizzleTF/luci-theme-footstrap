@@ -159,6 +159,7 @@ checked.
 |---|---|---|
 | `-webkit-mask-image` / `-webkit-mask-size` / `-webkit-mask-repeat` / `-webkit-mask` | 450 B | **required** — unprefixed masking ships only from Chrome 120; the floor is 108 |
 | `-webkit-backdrop-filter` | 214 B | **removed 2026-09-05** — with it the property itself: the theme carries no `backdrop-filter` any more (see the changelog for the measurement) |
+| `-webkit-user-select` (`pages/20-overview.css`, disclosure header) | 26 B | **required** — MDN BCD 8.1.4: unprefixed `user-select` is "preview" only in Safari and iOS Safari, `-webkit-` since 3; drops once Safari ships it unprefixed above the floor |
 | `-webkit-line-clamp` + `-webkit-box-orient` | 49 B | **required** — no standard line-clamp equivalent at the floor |
 | `::-webkit-scrollbar-thumb` | 56 B | **required** — no standard scrollbar-styling equivalent at the floor |
 | `-webkit-appearance` | 96 B, 4 occurrences | **removed 2026-09-05** — unprefixed `appearance` ships from Chrome 84 / Firefox 80 / Safari 15.4 (MDN BCD; caniuse gives Chrome 83), all at or above the floor |
