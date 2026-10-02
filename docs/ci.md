@@ -438,11 +438,14 @@ parsed out of `02-tokens.css`, the widget markup from `gallery.html` — so noth
 nothing can drift.
 
 **The playground is not built here at all.** It is not source that lives in this repository; it is
-fetched, already built, from `releases/latest/download/playground.tar.gz` — the same
-`playground-asset` upload above — and unpacked into `_site/playground/`. Fails OPEN like the release
-mirror above it: a repository with no playground-carrying release yet (or a `workflow_dispatch` run
-on a branch, `docs/development.md`) publishes the rest of the portal and says so in the log rather
-than failing the build. `_site/playground.html` is kept as a redirect to `playground/` for the links
+fetched, already built, and unpacked into `_site/playground/`. Fast path: `releases/latest/download/playground.tar.gz`
+(the `playground-asset` upload above). On a miss — the latest tag was cut before the recording moved
+to CI, or between `release` and `playground-asset` — the newest non-draft release carrying the asset
+is found with `gh api` and used, and the log names its tag. Fails OPEN only when no release carries
+it (or a `workflow_dispatch` run on a branch, `docs/development.md`): `::warning::` and the rest of
+the portal publishes without the playground. A failing `gh api` or download fails the step, on
+purpose: the previous Pages deploy stays up rather than being replaced by one without the playground.
+`_site/playground.html` is kept as a redirect to `playground/` for the links
 the README and `devkit.src.html` already carry.
 
 **A maintainer can publish Pages from a single run's own recording, without a tag:**

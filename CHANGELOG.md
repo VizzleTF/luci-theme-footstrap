@@ -49,6 +49,8 @@
 
 ### Fixed
 
+- **The published playground came back: a push to `main` no longer redeploys Pages without it.** It 404'd from 2026-09-15 because `pages.yml` read only `releases/latest`, and v0.14.13 (cut before the playground moved to CI) carries no `playground.tar.gz`, so each deploy silently dropped it. The step now falls back to the newest non-draft release that has the asset, prints which tag it used, and raises a `::warning::` annotation when none does.
+
 - **A `div.cbi-dropdown` popup no longer overflows the viewport on a phone, and a zone badge inside one wraps instead of pushing the popup wider; desktop width is unchanged.** `npm run pseudo-loc` found the overflow at 320/390px: 4 findings on Linux (16-40px over), 2 on macOS (55px over) — a long, pseudo-localised label the popup could not shrink or wrap around. Fixed in CSS the way a real long translation needs it, not by loosening the gate's thresholds or skip list.
 
 - **`install.sh` fails loudly, naming the key URL, when a verification-key fetch fails instead of relying on `set -e` to exit behind an unrelated success message, and a duplicate feed line ending in CRLF is now matched and disabled like any other duplicate instead of silently surviving the trailing `\r`.** The lookalike-host guard (`repo.owfeed.org.evil.example`, `?u=https://repo.owfeed.org/`) is unchanged.

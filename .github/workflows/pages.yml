@@ -119,17 +119,28 @@ jobs:
           echo "mirror of $tag complete."
 
       # The playground is recorded from a real router by build.yml's `playground` job, not built
-      # here — Pages has no owlab stand. Same fail-open shape as the mirror step above: a repo with
-      # no release-attached playground.tar.gz yet (or one still mid-upload the run before its own
-      # `pages` call) publishes the rest of the portal rather than failing the whole build.
+      # here — Pages has no owlab stand. It comes from releases/latest, else from the newest
+      # non-draft release carrying the asset: the latest tag can lack it (cut before the recording
+      # moved to CI, or between `release` and `playground-asset`), and a push to main must not
+      # redeploy Pages without it. Open on "no release carries it" (`::warning::`, Pages ships
+      # without); closed on a gh api or download error, so the previous deploy stays live.
       - name: Fetch the latest playground
         if: inputs.playground-source != 'artifact'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          if ! curl -fsSL --retry 2 -o /tmp/playground.tar.gz \
-                 "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/playground.tar.gz"; then
-            echo "the latest release publishes no playground — playground skipped"
-            exit 0
+          url="https://github.com/$GITHUB_REPOSITORY/releases/latest/download/playground.tar.gz"
+          if ! curl -fsSL --retry 2 -o /tmp/playground.tar.gz "$url"; then
+            tag=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq \
+              '[.[] | select(.draft | not) | select(any(.assets[]; .name == "playground.tar.gz"))][0].tag_name // empty')
+            if [ -z "$tag" ]; then
+              echo "::warning::no release carries playground.tar.gz — Pages published WITHOUT the playground"
+              exit 0
+            fi
+            curl -fsSL --retry 2 -o /tmp/playground.tar.gz \
+              "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/playground.tar.gz"
+            echo "playground from $tag (releases/latest has none)"
           fi
           mkdir -p _site/playground
           tar -xzf /tmp/playground.tar.gz -C _site/playground
