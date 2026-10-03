@@ -270,24 +270,23 @@ Only after everything above has passed:
    plainly whether the cause is this diff, an infrastructure condition, or an upstream feed. Only
    then check the release carries the expected assets (plus a `.sig` for each): the theme resolving
    to exactly one asset per format, the manifest, the installer, the notes.
-8. **Publish the feed, and do not trust the bot to finish it.** The theme is installed from
-   owfeed-packages, so a release nobody can `apk upgrade` into is half a release. The hourly job
-   there opens the version-bump pull request and says it "will merge itself once the checks pass".
-   Measured on 0.14.10, it does neither on its own, and both halves are mechanical:
-   - its pull request is authored by `app/github-actions`, and that repository's
-     `fork-pr-contributor-approval` policy holds the `pull_request` check run in `action_required`
-     until a person approves it. The job dispatches its own run of the same workflow, which goes
-     green, but the automerge waits on the held one. **Approve it** (`gh api -X POST
-     repos/owfeed/owfeed-packages/actions/runs/<id>/approve`), or the PR sits open with a green
-     check beside it.
-   - after the merge, `Publish` does not start: it triggers on a push to `main`, and a push made
-     with `GITHUB_TOKEN` does not trigger workflows. **Dispatch it by hand**
-     (`gh workflow run publish.yml --repo owfeed/owfeed-packages`).
+8. **Publish the feed, and do not wait on the schedule.** The theme is installed from
+   owfeed-packages, so a release nobody can `apk upgrade` into is half a release. There `update.yml`
+   runs `land` → `check` → `publish` on a cron GitHub thins to one run every 2-5 h. `check` pushes
+   `update/luci-theme-footstrap-<VERSION>` and runs the checks on it; a *later* run's `land`
+   fast-forwards `main` onto it once they are green, and the same run's `publish` dispatches
+   `publish.yml`. No pull request is opened, so nothing needs approving. On 0.14.14 the branch was
+   green 21 minutes after the release and no further scheduled run came for 5.5 h, the feed still
+   serving 0.14.13. So once `gh run list --repo owfeed/owfeed-packages --branch
+   update/luci-theme-footstrap-<VERSION>` shows the branch's `Check` green, dispatch it yourself:
+   `gh workflow run update.yml --repo owfeed/owfeed-packages`, then `gh run watch <id> --repo
+   owfeed/owfeed-packages` on that run and on the `publish.yml` run it starts (~1 min to land,
+   ~3 min to publish).
 
-   Then read the **served** index rather than the workflow log — `apk adbdump` on
-   `releases/25.12/<arch>/packages.adb`, `Packages.gz` on `releases/24.10/<arch>/` — and confirm the
-   new version is there. Tracked as [owfeed-packages#53](https://github.com/owfeed/owfeed-packages/issues/53);
-   when that is fixed, this step goes back to being one sentence.
+   Then read the **served** index rather than the workflow log: `Packages.gz` on
+   `https://repo.owfeed.org/releases/24.10/<arch>/` (`Version:` after `Package: luci-theme-footstrap`),
+   `apk adbdump` on `releases/25.12/<arch>/packages.adb` from a router or stand (the file is
+   compressed, `strings` finds nothing). Confirm the new version is there.
 
 A fresh empty `## [Unreleased]` comes back on top with the next substantive commit.
 

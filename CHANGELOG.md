@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Changed
+
+- **Release step 8 describes the feed flow owfeed-packages runs now: wait for the `update/luci-theme-footstrap-<VERSION>` branch's checks, then dispatch `update.yml` by hand instead of waiting on the schedule.** The bot opens no pull request any more, so the "approve the held run" and "dispatch `publish.yml`" bullets are gone, with the note on owfeed-packages#53, closed. The cron is thinned to one run every 2-5 h: on 0.14.14 the branch was green 21 minutes after the release, no later scheduled run came for 5.5 h and the feed kept serving 0.14.13; a manual dispatch landed it in about 1 minute and published in about 3. The served-index check names both indexes: `Packages.gz` for 24.10, `apk adbdump` of `packages.adb` for 25.12.
+
 ### Fixed
 
 - **The login-background comment in `uci-defaults/30_luci-theme-footstrap` names what actually keeps a direct open inert: the extension-less name uhttpd serves as `application/octet-stream`, not `fs-assets.js`'s canvas re-encode.** The ACL authorises the cgi-upload POST whatever wrote it, so the re-encode is compression and EXIF removal, not a boundary; the stale-symlink cleanup is dated pre-0.14.11, the release the pattern's cgi handler first shipped in. Two stand traps join `docs/development.md`: a file `docker cp`'d from `/mnt/c` keeps uid 1000 and still answers 403 after `chmod` (`chown 0:0`), and Git Bash rewrites the path so `docker cp` exits 9 (`MSYS_NO_PATHCONV=1`). `fs-chrome.js` and `fs-router.js` drop four `../tmp/task-*` paths from comments.
