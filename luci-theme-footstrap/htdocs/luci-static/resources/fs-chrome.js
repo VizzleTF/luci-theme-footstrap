@@ -231,7 +231,7 @@ function columnWidth(g, state) {
 	/* The column stops growing: `.fs-content` is `max-width: var(--fs-content-max); margin: 0
 	 * auto`, so past ~1500px the surplus becomes margin, and without the cap this answers ~2280 on
 	 * a 2560px window for a column that is 1224 wide. No caller can reach that today (both ask a
-	 * lower bound), but this is the exported answer to "how wide is the content column". */
+	 * lower bound), but this is the answer to "how wide is the content column". */
 	const room = Math.min(state.outerW - cut, g.contentMax);
 	return Math.max(0, room - g.contentPad);
 }

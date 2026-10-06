@@ -11,7 +11,8 @@
 # need and the router gets a module surface that is only what the theme calls. Same trade as
 # strip-templates.sh and strip-shell.sh.
 #
-# Only a line that ends with the marker, and the line must be a complete export entry — anything
+# A comment block directly above a dropped entry goes with it: it describes an export that is no
+# longer there. Only a line that ends with the marker, and the line must be a complete export entry — anything
 # else is left in place and reported, a half-removed object literal being a module that does not
 # parse and a theme that does not load.
 set -e
@@ -32,16 +33,27 @@ while IFS= read -r f; do
 	files=$((files + 1))
 	CUR="$f.tmp$$"
 	awk '
+		# a comment block directly above a probe entry describes that export, so it is held back and
+		# goes with it; above anything else it is released untouched
+		function flush() { if (nb) printf "%s", buf; buf = ""; nb = 0 }
+		incom { buf = buf $0 "\n"; nb++; if ($0 ~ /\*\//) { incom = 0 } ; next }
+		/^[ \t]*\/\*/ && !/\/\* fs:probe \*\/$/ {
+			flush()
+			buf = $0 "\n"; nb = 1
+			if ($0 !~ /\*\//) incom = 1
+			else if ($0 !~ /\*\/[ \t]*$/) flush()
+			next
+		}
 		/\/\* fs:probe \*\/$/ {
 			line = $0
 			sub(/[ \t]*\/\* fs:probe \*\/$/, "", line)
 			# a complete entry, in either form the modules use: `name,` or `name: expression,`
 			if (line ~ /^[ \t]*[A-Za-z_$][A-Za-z0-9_$]*[ \t]*,[ \t]*$/ ||
-			    line ~ /^[ \t]*[A-Za-z_$][A-Za-z0-9_$]*[ \t]*:.*,[ \t]*$/) { dropped++; next }
+			    line ~ /^[ \t]*[A-Za-z_$][A-Za-z0-9_$]*[ \t]*:.*,[ \t]*$/) { dropped++; buf = ""; nb = 0; next }
 			print "strip-probes: not a whole export entry, left in place: " line | "cat 1>&2"
 		}
-		{ print }
-		END { printf "%d", dropped > "/dev/stderr" }
+		{ flush(); print }
+		END { flush(); printf "%d", dropped > "/dev/stderr" }
 	' "$f" 2> "$CUR.n" > "$CUR"
 	n=$(cat "$CUR.n"); rm -f "$CUR.n"
 	found=$((found + ${n:-0}))

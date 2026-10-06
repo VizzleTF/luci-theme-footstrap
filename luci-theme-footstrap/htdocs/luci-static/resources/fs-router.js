@@ -130,10 +130,7 @@ function clearViewIntervals() {
 	_viewIntervals.forEach((spec, id) => { if (id !== keep) window.clearInterval(id); });
 }
 /* The "Refreshing"/"Paused" pill must not outlive the poll it reports on — see the `poll-stop`
- * listener below, which is the only caller in the shipped file. Exported (fs:probe) too, because
- * navigate()'s own async chain (require(), staging into a real `.fs-content`) needs more DOM than
- * tests/lib's fakes give it; this is the one check that actually matters for the ordering bug and is
- * exercised directly, without the listener's deferral, by tests/poll-status.test.mjs. */
+ * listener below, which is the only caller in the shipped file. */
 function hidePollIndicatorIfEmpty() {
 	if (!(L.Poll && L.Poll.queue && L.Poll.queue.length === 0)) return;
 	try { ui.hideIndicator('poll-status'); }
@@ -348,9 +345,8 @@ function discard(el) {
  * window.__fsBodyAdds; this file only reads it. */
 
 /* -> true if `el` is a node the theme must treat as stray body litter: not the theme's own chrome,
- * not something stock LuCI parks there itself, not a node type that can never paint. Exported and
- * pure (no DOM writes, no window.__fsBodyAdds read) so tests/body-litter.test.mjs can drive it
- * without a router or a recorder. */
+ * not something stock LuCI parks there itself, not a node type that can never paint. Pure: no DOM
+ * writes, no window.__fsBodyAdds read. */
 function strayBodyNode(el) {
 	if (!el || el.nodeType !== 1) return false;
 	/* never rendered on their own, wherever a script parks them */
@@ -1553,8 +1549,8 @@ return baseclass.extend({
 	clearViewIntervals,	/* fs:probe */
 	sessionExpired,	/* fs:probe */
 	/* tests/poll-status.test.mjs: the deferred `poll-stop` listener's own check, called directly so a
-	 * test need not also fake a microtask tick to see it fire (see the comment at its definition and
-	 * at the listener above) */
+	 * test need not also fake a microtask tick to see it fire, and because navigate()'s async chain
+	 * needs more DOM than tests/lib's fakes give it */
 	hidePollIndicatorIfEmpty,	/* fs:probe */
 	/* fs-search warms its recents and the arrow-key-highlighted result, neither of which the
 	 * pointer/focus triggers above can see. The edge points search -> router, because the router

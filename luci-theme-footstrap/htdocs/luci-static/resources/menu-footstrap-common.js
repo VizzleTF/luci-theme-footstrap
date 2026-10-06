@@ -199,8 +199,7 @@ function findProgressbarLabel(pg) {
  * cannot pick a wrong number out of a title carrying several. An empty title or one with no
  * percentage in any of the three shapes yields null, on purpose — nothing to annotate. `%d` is the
  * unclamped percentage, so the result can still read past 100 or under 0 and is clamped by the
- * caller, the same way `window.progressbar` clamps its own `level`, below. Exported for
- * tests/meter.test.mjs, which is the only caller that needs the parse on its own. */
+ * caller, the same way `window.progressbar` clamps its own `level`, below. */
 function parseMeterPercent(title) {
 	if (title == null) return null;
 	const m = (/\((-?\d+)%\)\s*$/).exec(title) || (/(-?\d+)%\s*$/).exec(title) || (/^(-?\d+)%/).exec(title);
