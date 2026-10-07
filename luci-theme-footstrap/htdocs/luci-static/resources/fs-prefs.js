@@ -6,8 +6,8 @@
  * axis list is AXIS_KEYS, which is exactly the fields of snapshotAxes() — what Save-as-default
  * writes.
  * All client-side, instant and persisted in localStorage, with head.ut's inline script re-applying
- * them before paint so a reload never flashes the wrong one; tools/axes.mjs derives the contract
- * from this file and holds the two copies to it.
+ * them before paint so a reload never flashes the wrong one; the contract is derived
+ * from this file and both copies are held to it.
  *
  * ---- three layers, and the browser always wins ----
  * Every axis resolves as localStorage ?? router-default ?? built-in. The router default is
@@ -79,14 +79,13 @@ function currentMode() {
  *
  * `data-darkmode` is the name the theme's own CSS keys off. The other two are outbound
  * compatibility, like the `--*-color-*` export tier: nothing in `styles/` may read them, and
- * tools/axes.mjs fails the build if it does. */
+ * a check fails if one does. */
 /* the attribute name reused below by the writer, the guard's reader and both MutationObserver
  * filters (measured: 15 B x4 -> 28 B, 32 B saved) */
 function stampDark(root, dark) {
-	/* the literal stays spelled out HERE: tools/axes.mjs reads the attribute names out of
-	 * this function's SOURCE, so a hoisted const reads as no attribute at all and the gate
-	 * reports the pre-paint and the live applier as drifted. The 45 B a const would save are
-	 * not worth teaching a gate to resolve them. */
+	/* the literal stays spelled out HERE: the attribute names are read out of this
+	 * function's SOURCE, so a hoisted const reads as no attribute at all and the pre-paint and the
+	 * live applier look drifted. The 45 B a const would save are not worth resolving them. */
 	root.setAttribute('data-darkmode', dark ? 'true' : 'false');
 	root.setAttribute('data-theme', dark ? 'dark' : 'light');
 	root.setAttribute('data-bs-theme', dark ? 'dark' : 'light');
@@ -222,7 +221,7 @@ function listAxis(key, attr, values, dflt, after) {
 }
 
 /* A two-value axis: `on` is stamped as the attribute's value, `off` is a bare :root. The list shape
- * with a list of one — kept as its own name because tools/axes.mjs matches the call, and because
+ * with a list of one — kept as its own name because the call is matched by name, and because
  * "two-valued" is what most of these axes are. */
 function enumAxis(key, attr, on, off) {
 	return listAxis(key, attr, [ on ], off);
@@ -233,9 +232,9 @@ const DENSITY = listAxis('fs-density', 'data-density', DENSITIES, 'normal', () =
 const currentDensity = DENSITY.current, applyDensity = DENSITY.apply,
 	densityDefault = DENSITY.def;
 
-/* Content width lives entirely in fs-axes.js now (a propAxis like Rounding, issue #44): unlike
+/* Content width lives entirely in fs-axes.js (a propAxis like Rounding): unlike
  * Density it sets no attribute, so nothing here or in fs-chrome.js needs to read one, and
- * currentContentWidth()/applyContentWidth() have no caller outside the Appearance tab — the one
+ * contentWidth.current()/apply() have no caller outside the Appearance tab — the one
  * thing that kept Density's shape in this cold-path file. */
 function currentLayout() {
 	return document.documentElement.getAttribute('data-layout') === 'top' ? 'top' : 'sidebar';

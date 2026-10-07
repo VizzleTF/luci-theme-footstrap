@@ -312,7 +312,7 @@ function documentPoisoned() {
  * already applying. Every footstrap rule lives in a @layer and an unlayered normal declaration
  * beats a layered one at any specificity, so a third-party `* { margin: 0; padding: 0 }` owns the
  * chrome outright — on a layer-less theme the same `*` (0,0,0) loses to any class selector. The
- * layers are what hand it the win (issue #8).
+ * layers are what hand it the win.
  *
  * So put the sheet back on specificity footing by re-hosting it into the EXISTING `theme` layer;
  * only same-layer arbitrates by specificity. Measured on the real cascade:

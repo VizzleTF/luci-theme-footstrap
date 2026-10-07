@@ -103,14 +103,14 @@ let _probe = null;
  * it carries no chrome mark and the fence deliberately does not spare it. Every declaration is
  * therefore !important, which a style-attribute wins outright: an app carrying
  * `div { min-width: 500px !important }` otherwise wins every read and the sidebar folds into a bar
- * on a 1857px desktop (issue #19) — the cut becomes 500 + 500 + 1000 = 2000 CSS px, which is why it
+ * on a 1857px desktop — the cut becomes 500 + 500 + 1000 = 2000 CSS px, which is why it
  * was reported as a zoom bug: Chrome at 90% gives 2063 CSS px and passes, 100% gives 1857 and
  * fails. box-sizing is stated for the same reason — getComputedStyle().width is
  * the content box, so a foreign `border-box` plus padding would shave the reading. */
 function resolveLen(token, dflt) {
 	if (!_probe) {
 		_probe = document.createElement('div');
-		/* the id is fs-router.js's strayBodyNode() (issue #56) reading an fs-* id as "ours", which is
+		/* the id is fs-router.js's strayBodyNode() reading an fs-* id as "ours", which is
 		 * a different question from the chrome mark above: this stays unmarked (no data-fs-chrome,
 		 * so the fence still does not spare it from a hostile !important) but still needs SOME fs-*
 		 * name, or an element appended once and never removed would read as body litter and force
@@ -165,7 +165,7 @@ function shellGeometry() {
 	};
 	/* Plausibility, at the cost of one comparison: the rail is the sidebar collapsed, so
 	 * 0 < railW < sidebarW holds by construction. Both known failures destroy it — a hijacked probe
-	 * reports one foreign width for all four (issue #19), a renamed or absent token reports 0 for
+	 * reports one foreign width for all four, a renamed or absent token reports 0 for
 	 * all four (an abs-positioned empty div shrinks to 0, which is finite, so the per-read fallback
 	 * never fires). Only the relation between the numbers gives either away. */
 	const sane = (g.railW > 0 && g.railW < g.sidebarW && g.contentMin > 0);
@@ -279,11 +279,11 @@ function fitChrome() {
 	 * currently needs — not only shorter. A `min-height` floor alone stops the shrink but not the
 	 * grow: with the classes off and `fs-dense1`/`fs-dense2` stripped by `fitTabStrips()`, this pass
 	 * measured the bar walking 230 -> 202 -> 164 -> 144 -> 123 -> 131 -> 123px against a settled
-	 * 123px on owrt2512 at 767px — 107px of growth a floor never sees, on top of the shrink it does
+	 * 123px at 767px — 107px of growth a floor never sees, on top of the shrink it does
 	 * — each step landing between two of the poll's own separate section refreshes, so the browser
 	 * paints in between and the reader is moved by exactly as much, on Chromium and Firefox as well
-	 * as Safari (`tools/fit-quiet.mjs`, plus a probe that pauses the layout mid-pass). `min-height`
-	 * alone was measured to `accc451`'s WebKit-only diagnosis instead — WebKit's own scroll anchoring
+	 * as Safari (measured with a probe that pauses the layout mid-pass). `min-height`
+	 * alone was measured against an earlier WebKit-only diagnosis instead — WebKit's own scroll anchoring
 	 * looked like the whole story only because it is the one engine with no anchoring at all to hide
 	 * this walk behind; Chromium and Firefox absorb it the same way they absorb any other layout
 	 * change, which is not the same as not producing it.
@@ -484,7 +484,7 @@ function wireRail() {
 }
 
 /* An indicator pill carries its meaning as prose ("Unsaved Changes: 2") and the collapsed rail is
- * 68px wide, so the pill wraps onto three lines and hangs past the rail's edge (issue #14). CSS
+ * 68px wide, so the pill wraps onto three lines and hangs past the rail's edge. CSS
  * squares the pill there and draws this attribute instead of the label — a text node cannot be
  * reached by a selector, so the badge is lifted into an attribute here.
  *
@@ -586,8 +586,7 @@ return baseclass.extend({
 		 * motion sampler `scrolling()` reads). A caller landing in that window, most of all
 		 * fs-select's, got the width the PREVIOUS viewport had: at 568px settling to 390px, model
 		 * stayed 568 for up to 220ms of the 400 (measured: −178px, exactly 568−390, against a probe
-		 * resizing the window mid-settle, and live-audit's `geometry|fs-content` finding on
-		 * owrt2410, CI run 34364446910).
+		 * resizing the window mid-settle, and a live geometry audit on 24.10).
 		 *
 		 * So the window's own width is compared fresh on every call, not only when `_shellOuter`
 		 * is still zero. `clientWidth` is the one read the old "no layout read" promise here was

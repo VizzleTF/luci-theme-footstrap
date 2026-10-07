@@ -45,7 +45,7 @@ function sectionTitle(sec) {
 
 /* ---- keyboard disclosure: the card header becomes the toggle, the pill becomes its glyph ----
  *
- * Live on owrt2512 (25.12.4), Status -> Overview carries 14 `[data-clickable]` elements — the
+ * On 25.12, Status -> Overview carries 14 `[data-clickable]` elements — the
  * topbar poll pill plus one Hide/Show toggle per card — and every one is a bare <span>: no
  * tabindex, no role, no aria-expanded. Tab never reaches one and a screen reader announces a run
  * of text with no name, role or state. WCAG 2.1.1 Keyboard (A), 4.1.2 Name, Role, Value (A).
@@ -89,7 +89,7 @@ function wireDisclosure(sec) {
 	widgets.syncAttr(h, 'aria-expanded', pillExpanded(label) ? 'true' : 'false');
 	/* the header now carries the pill's name, role and state; a screen reader user tabbing past it
 	 * to a second, unlabelled clickable span would hear an unexplained duplicate control — same
-	 * reasoning as the aria-hidden on svgIcon()'s output, fs-widgets.js:12 */
+	 * reasoning as the aria-hidden on svgIcon()'s output, fs-widgets.js */
 	widgets.syncAttr(label, 'aria-hidden', 'true');
 
 	if (h.dataset.fsWired) return;
@@ -148,8 +148,8 @@ function arrange() {
 	/* an SPA nav can leave the observer wired while another page renders into #view: detach as soon
 	 * as the route stops being the overview. body[data-page] carries the DISPATCH path from both
 	 * the server template and the router, so /admin/status (firstchild -> overview) matches. */
-	if ((document.body.getAttribute('data-page') || '') !== /* spelled out, not hoisted: tools/page-modules.mjs reads this value out of the module's
-	 * SOURCE to check it against the map in menu-footstrap-common.js */
+	if ((document.body.getAttribute('data-page') || '') !== /* spelled out, not hoisted: this value is read out of the module's
+	 * SOURCE and checked against the map in menu-footstrap-common.js */
 	'admin-status-overview') {
 		stopWatch();
 		return;

@@ -16,14 +16,13 @@
  * What stayed behind in `fs-prefs`, and why:
  *   - the localStorage wrappers and `sd()`, which everything here calls through `prefs.`
  *   - dark mode, because `guardDarkStamp` defends against a third-party app on every page and
- *     `tools/chrome-fence.mjs` holds `stampDark()` to that file by path
+ *     `stampDark()` is checked against that file by path
  *   - layout, density, rail and auto-collapse, because the chrome and the menu apply them live —
- *     and because `tools/scroll-anchor.mjs` and `tools/scroll-jank.mjs` stamp layout and density
- *     through `L.require('fs-prefs')` to sweep their matrix
+ *     and because external probes stamp layout and density through `L.require('fs-prefs')`
  *
  * The pre-paint in head.ut has already stamped every axis before the first frame, so nothing here
- * is needed to PAINT a page correctly — only to change one from the form. tools/axes.mjs reads the
- * whole resources directory rather than a path, precisely so an axis may live in a second file. */
+ * is needed to PAINT a page correctly — only to change one from the form. The axis list is read
+ * from the whole resources directory rather than one path, so an axis may live in a second file. */
 
 const FS_RADIUS_DEFAULT = 12;
 
@@ -117,7 +116,7 @@ function propAxis(key, sdKey, prop, min, max, dfl, fmt, after) {
  * it and the first touch of any other control takes it away.
  *
  * Legacy names ('rvht'/'roman'/'github') are migrated by head.ut before paint, so they never reach
- * currentPalette() on a loaded page; the stray fallthrough covers them anyway. */
+ * PALETTE.current() on a loaded page; the stray fallthrough covers them anyway. */
 
 const PALETTES = [ 'hicontrast', 'bootstrap', '2020', 'forum' ];	/* the non-default values; 'footstrap' = bare :root */
 const PALETTE = prefs.listAxis('fs-palette', 'data-palette', PALETTES, 'footstrap');
@@ -204,7 +203,7 @@ const DANGER = colorAxis('fs-danger', 'data-danger', '--fs-danger-h', '--fs-dang
 /* Rounding: the propAxis instance (default const and rationale up top), --fs-radius-base in px. */
 const RADIUS = propAxis('fs-radius', 'rounding', '--fs-radius-base', 0, 20, FS_RADIUS_DEFAULT, (v) => (v + 'px'));
 
-/* Content width (issue #44): how far the reader lets the column grow past --fs-content-max's own
+/* Content width: how far the reader lets the column grow past --fs-content-max's own
  * 1280px. A propAxis like Rounding, pointed at that one token — the range comment lives in
  * 02-tokens.css, next to the token it bounds, and is not restated here.
  *
@@ -462,21 +461,9 @@ const PATTERN = tokenAsset('pattern', '/cgi-bin/luci-theme-footstrap-pattern', '
  * run. */
 const LOGIN_BG = tokenAsset('login_bg', '/luci-static/footstrap/bg', '--fs-login-bg-url');
 
-/* Every axis exported as the OBJECT itself — `{ current, apply, def? }` — not a flat
- * currentX()/applyX() pair per axis: a caller wanting both already had to carry them as a pair
- * (fs-appearance.js's colourGroup() takes `{ current, apply }`, built ad hoc from two separate
- * lookups before this), and a flat name is one more thing every consumer of THIS FILE has to keep
- * spelled the same way fs-axes.js does — 18 axis names doubled to 36 lookups, now 18. `pattern`
- * and `loginBg` are not axes (no AXIS_KEYS entry, no router-default `def()`) but the same
- * `tokenAsset()` shape, so they export the same way. `tokenOk`, `matchesSavedDefault`,
- * `saveAsDefault`, `resetToSaved` and `resetToBuiltin` stay flat: none of them is a
- * `{current, apply}` pair. `snapshotAxes` stays module-private: fs-appearance.js, its only would-be
- * caller, builds the Appearance form from the per-axis exports above, not from the router-default
- * snapshot matchesSavedDefault()/saveAsDefault() read internally.
- *
- * No flat `currentX`/`applyX` fallback kept: grepped `../luci-app-footstrap-*` (the sibling
- * checkouts) and this repo's docs for either spelling — nothing outside fs-appearance.js and
- * fs-assets.js, both updated alongside this file, ever called one. */
+/* Every axis is exported as the object itself — `{ current, apply, def? }` — not a flat
+ * currentX()/applyX() pair. `pattern` and `loginBg` have the same tokenAsset() shape and export the
+ * same way; the router-default helpers (tokenOk, matchesSavedDefault, ...) stay flat. */
 return baseclass.extend({
 	palette: PALETTE,
 	wallpaper: WALLPAPER,

@@ -8,7 +8,7 @@
  i18n, and the rule the other templates point at. A msgid is a GLOBAL name: LuCI serves one merged
  catalogue — load_catalog() loads every *.<lang>.lmo and a lookup returns the first archive holding
  the hash — so readdir order decides who owns a string, and the Appearance layout toggle rendered
- "Максимум" on a Russian router because another catalogue translates `Top` as "maximum" (issue #6).
+ "Максимум" on a Russian router because another catalogue translates `Top` as "maximum".
  Anything left bare is a name anyone may take, and contexting cannot be selective.
 
  So every Appearance label carries the `footstrap` msgctxt, while the chrome's own strings — Skip
@@ -35,7 +35,7 @@
 	/* Every option saveAsDefault() writes, listed once and read back in a loop. A hand-written
 	 * literal with one line per axis drops an axis silently: Save to router reports success, the
 	 * file on disk is correct, and "Reset to router" lands on the BUILT-IN look because the value
-	 * the server hands the client was never there. tools/axes.mjs checks this list against
+	 * the server hands the client was never there. This list is checked against
 	 * snapshotAxes().
 	 *
 	 * '' rather than a raw undefined when unset, so head.ut's `!= ''` guards fire: int(undefined)
@@ -86,14 +86,11 @@
 	{% const fs_page = entityencode(join('-', length(ctx.path) ? ctx.path : ctx.request_path), true) %}
 	<body class="lang_{{ dispatcher.lang }}" data-page="{{ fs_page }}">
 		<script>
-			/* Records every node a script parks directly on <body> (issue #56): luci-app-bandix's
-			 * render() appends 7 tooltip/modal nodes unconditionally on every visit, never
-			 * checking whether they already exist. fs-router.js's strayBodyNode()/bodyLittered()
-			 * read window.__fsBodyAdds to decide whether the document is still fit to navigate
-			 * away from — Rule 2 (docs/third-party-apps.md), extended from CSS to the DOM. First
-			 * byte of <body>, before any chrome element or the dispatched page's own <div id="view">.
-			 * Own property of this <body> instance, never Node.prototype, and its gap:
-			 * docs/spa-router.md, "Foreign view DOM". */
+			/* Records every node a script parks directly on <body>: a page that does so makes the next
+			 * navigation a full load, because the document is spent. fs-router.js's
+			 * strayBodyNode()/bodyLittered() read window.__fsBodyAdds. First byte of <body>, before
+			 * any chrome element or the dispatched page's own <div id="view">. Own property of this
+			 * <body> instance, never Node.prototype. */
 			(() => {
 				const body = document.body;
 				if (!body || body.__fsBodyHooked) return;

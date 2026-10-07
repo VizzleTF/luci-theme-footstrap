@@ -7,8 +7,8 @@
 'require menu-footstrap-common as common';
 
 /* The theme's one menu renderer: a vertical #topmenu that the CSS also turns into the top bar and
- * the rail flyouts — same markup, no second renderer. Disclosure primitives come from fs-widgets,
- * the auto-collapse preference from fs-prefs; the rest of the chrome is bootstrapped by
+ * the rail flyouts — same markup, no second renderer. The disclosure primitives live in this file,
+ * the auto-collapse preference comes from fs-prefs; the rest of the chrome is bootstrapped by
  * menu-footstrap-common, which this file composes with by injecting renderMainMenu into
  * common.init — a callback, not an override, since a required LuCI module is a singleton and
  * cannot be subclassed. Spec: docs/chrome.md */
@@ -89,7 +89,7 @@ const EDGE_GAP = 8;
 /* Is this panel a bar dropdown (anchored under its item) rather than a rail flyout (anchored
  * beside it)? Same input as the stylesheet: `data-narrow` turns the sidebar into a bar and also
  * disables the rail (its rules are scoped `:not([data-narrow])`), so a narrow window is a bar even
- * with the rail on. Gating on isTopLayout() alone leaves such a panel unclamped (issue #19). */
+ * with the rail on. Gating on isTopLayout() alone leaves such a panel unclamped. */
 function barDropdown() {
 	return prefs.isTopLayout() || document.documentElement.hasAttribute('data-narrow');
 }

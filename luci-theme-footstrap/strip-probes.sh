@@ -35,7 +35,7 @@ while IFS= read -r f; do
 	awk '
 		# a comment block directly above a probe entry describes that export, so it is held back and
 		# goes with it; above anything else it is released untouched
-		function flush() { if (nb) printf "%s", buf; buf = ""; nb = 0 }
+		function flush() { if (nb) { printf "%s", buf; lastblank = 0 } buf = ""; nb = 0 }
 		incom { buf = buf $0 "\n"; nb++; if ($0 ~ /\*\//) { incom = 0 } ; next }
 		/^[ \t]*\/\*/ && !/\/\* fs:probe \*\/$/ {
 			flush()
@@ -49,10 +49,12 @@ while IFS= read -r f; do
 			sub(/[ \t]*\/\* fs:probe \*\/$/, "", line)
 			# a complete entry, in either form the modules use: `name,` or `name: expression,`
 			if (line ~ /^[ \t]*[A-Za-z_$][A-Za-z0-9_$]*[ \t]*,[ \t]*$/ ||
-			    line ~ /^[ \t]*[A-Za-z_$][A-Za-z0-9_$]*[ \t]*:.*,[ \t]*$/) { dropped++; buf = ""; nb = 0; next }
+			    line ~ /^[ \t]*[A-Za-z_$][A-Za-z0-9_$]*[ \t]*:.*,[ \t]*$/) { dropped++; buf = ""; nb = 0; skipblank = lastblank; next }
 			print "strip-probes: not a whole export entry, left in place: " line | "cat 1>&2"
 		}
-		{ flush(); print }
+		# a drop between two blank lines would leave a run the source did not have
+		skipblank && /^[ \t]*$/ { skipblank = 0; next }
+		{ flush(); skipblank = 0; lastblank = ($0 ~ /^[ \t]*$/); print }
 		END { flush(); printf "%d", dropped > "/dev/stderr" }
 	' "$f" 2> "$CUR.n" > "$CUR"
 	n=$(cat "$CUR.n"); rm -f "$CUR.n"

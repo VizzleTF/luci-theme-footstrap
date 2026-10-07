@@ -332,8 +332,8 @@ function labelCells(t, head) {
  * Rather than pair each of those twenty-odd rules with a role write timed to its own trigger — a
  * race with every one of them — the role is written UNCONDITIONALLY, matching what a plain
  * `<table>` already carries implicitly. That costs nothing while the table IS a table and survives
- * the moment any of those rules land. tools/table-contract.mjs holds the pairing: a future
- * `display` rule on one of these classes with no role to match is what it is written to catch.
+ * the moment any of those rules land. A `display` rule on one of these classes with no role to
+ * match is a defect.
  *
  * The whole chain, every pass — a `role="cell"` with nothing above it saying `row`, or a `row` with
  * nothing above IT saying `table`/`rowgroup`, reads worse than no roles at all. One flat query per
@@ -342,9 +342,9 @@ function labelCells(t, head) {
  * a class query alone reaches the whole subtree. `.thead`/`.tbody`/`.tfoot` are the same for a
  * div-based table; a REAL `<thead>`/`<tbody>`/`<tfoot>` this file never classes (20_lan.js's and
  * 30_wifi.js's `<tfoot>`, theme/30-tables.css:570/634) is reached by tag name instead. */
-/* tools/table-contract.mjs reads these two names and shapes by regex, so a `display` rule on any of
- * these classes/tags is checked against a matching role — keep both names, and each entry a
- * `'.class'` or `'tag'` string literal, even though roleTables() below now reads them as one list. */
+/* These two names and shapes are read by regex, so a `display` rule on any of these classes/tags
+ * is checked against a matching role — keep both names, and each entry a `'.class'` or `'tag'`
+ * string literal, even though roleTables() below reads them as one list. */
 const TABLE_ROLE_CLASSES = [
 	[ '.table', 'table' ],
 	[ '.thead', 'rowgroup' ],
@@ -434,7 +434,7 @@ function markBreakColumn(t, rows, col) {
 }
 
 /* Rung 3. The widest column that can be shredded: never the first, which is the row's identity
- * (issue #36 is that column being starved), and never a `nowrap`/`pre` one, where `overflow-wrap`
+ * (that column being starved is a known fault), and never a `nowrap`/`pre` one, where `overflow-wrap`
  * is inert so the mark would buy a layout and no width.
  *
  * With honest floors nothing is starved, so an overflowing table has every column at its own

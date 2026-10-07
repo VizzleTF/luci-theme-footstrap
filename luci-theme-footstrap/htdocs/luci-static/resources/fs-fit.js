@@ -1,6 +1,5 @@
 'use strict';
 'require baseclass';
-'require ui';
 
 /* fs-fit — the theme's one "does it still fit?" engine and the one place the reader's scroll
  * position is corrected. Add fit logic here, never a second observer: no CSS query can ask what the
@@ -15,9 +14,9 @@
  * without it left every data table invisible. docs/anchoring-log.md, "The arm belongs to the disarm". */
 function armGate() {
 	if (!fittersEnabled()) return;
-	/* WRITTEN AS THE LITERAL `dataset.fsFit`, never through a helper: tools/table-contract.mjs
-	 * reads this file for exactly that spelling to prove the gate rule is still armed, and an
-	 * indirection hides the write from it. The behaviour survives being factored out; the
+	/* WRITTEN AS THE LITERAL `dataset.fsFit`, never through a helper: the theme's own
+	 * repository checks this file for exactly that spelling to prove the gate rule is still armed,
+	 * and an indirection hides the write from it. The behaviour survives being factored out; the
 	 * contract does not. */
 	try { document.documentElement.dataset.fsFit = '1'; }
 	catch (e) { /* no document, no flag to write */ }
@@ -60,14 +59,13 @@ const FLOORED = '[data-fs-floor]';
 
 /* One floor per container, cleared and re-measured in one batched pass: not while the reader
  * scrolls, and not on a table box — `min-height` is undefined there (CSS 2.1 §10.7) and a 313px
- * floor still collapsed to 30px on WebKit. The clear is what keeps the answer honest (issue #41). */
+ * floor still collapsed to 30px on WebKit. The clear is what keeps the answer honest. */
 function holdFloor(records) {
 	if (scrolling()) return;
 	const host = document.getElementById('view');
 	if (!host) return;			/* the login page has no view */
 	/* boxes stays an array — order feeds the parallel `hs` below and dirty's own .filter() — with a
-	 * Set alongside it purely for the O(1) "already have this one" check .indexOf() was doing in
-	 * O(n). */
+	 * Set alongside it for the O(1) "already have this one" check. */
 	const boxes = [], boxSeen = new Set(), hs = [];
 	host.querySelectorAll(SHRINKS).forEach((el) => {
 		let box = el, cs = window.getComputedStyle(el);
@@ -376,8 +374,9 @@ function anchorRef() {
 
 /* Two independent diagnostic trails — one per correction path (the frame-coalesced anchor below,
  * the late drift correction further down) — same shape twice: the last reason recorded, and the
- * last 8 with a timestamp, for tools/scroll-anchor.mjs to read back after a probe run. One factory,
- * so the cap and the timestamp format cannot drift between the two. */
+ * last 8 with a timestamp. They are read back only by the theme repository's
+ * development build; the package exports none of it. One factory, so the cap and the timestamp
+ * format cannot drift between the two. */
 const TRAIL_MAX = 8;
 function makeTrail() {
 	let last = null;
@@ -626,11 +625,11 @@ return baseclass.extend({
 	},
 
 	scrolling,
-	/* unmarked, for tools/scroll-anchor.mjs — see `makeTrail()` above */
-	lateWhy: () => _late.last(),
-	lateTrail: () => _late.entries().slice(),
-	anchorWhy: () => _anchor.last(),
-	anchorTrail: () => _anchor.entries().slice(),
+	/* probe-only: the two trails of `makeTrail()` above */
+	lateWhy: () => _late.last(),	/* fs:probe */
+	lateTrail: () => _late.entries().slice(),	/* fs:probe */
+	anchorWhy: () => _anchor.last(),	/* fs:probe */
+	anchorTrail: () => _anchor.entries().slice(),	/* fs:probe */
 	deferMeasurement,
 
 	/* -> the offset this file last took a reference at, so a probe does not measure the guard instead

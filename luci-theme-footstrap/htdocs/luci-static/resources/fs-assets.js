@@ -213,7 +213,7 @@ function _sanitizeSvg(text) {
 	 * one, and without the PI the embedded stylesheet is never applied. */
 
 	/* An external-DTD DOCTYPE prologue is left unvisited on purpose: no engine resolves an external DTD, and
-	 * the CGI answers a direct open with CSP `default-src 'none'; sandbox`. docs/architecture.md. */
+	 * the CGI answers a direct open with CSP `default-src 'none'; sandbox`. */
 	for (const n of [ ...doc.childNodes ])
 		if (n.nodeType === Node.PROCESSING_INSTRUCTION_NODE) { n.remove(); elements++; }
 
@@ -273,7 +273,7 @@ function _sanitizeSvg(text) {
 			if (n === 'xml:base') { el.removeAttribute(a.name); refs++; continue; }
 			/* A presentation attribute's `url(` (`fill`, `stroke`, `filter`, …) is only checked below
 			 * for `style`, not here: the bundle is only an image source, so the
-			 * worst reach is a second fetch with no script and no navigation. docs/architecture.md. */
+			 * worst reach is a second fetch with no script and no navigation. */
 			if (n === 'style') {
 				const cleaned = _sanitizeStyleValue(v);
 				if (cleaned.removed) {
@@ -303,7 +303,7 @@ function _sanitizeSvg(text) {
  * The other axes are per-browser with a router default; this one has no browser layer. An admin
  * uploads an image once, it becomes the router-wide background for every device and shows
  * pre-login, so it is absent from AXIS_KEYS, snapshotAxes() and matchesSavedDefault() — it must not
- * move the Save button — and needs no factory, so tools/axes.mjs never sees it.
+ * move the Save button — and needs no factory, so axis-contract checks never see it.
  *
  * The image is a served file, uhttpd having no gzip to make inlining it in every <head> viable;
  * only its cache-bust token lives in uci -> window.__fsSD -> the url() head.ut stamps. The path is

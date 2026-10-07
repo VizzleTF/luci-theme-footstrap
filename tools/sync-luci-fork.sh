@@ -72,8 +72,42 @@ done
 # weight there. The functions stay — only the export line goes (strip-probes.sh).
 sh "$SRC/strip-probes.sh" "$OUT/htdocs/luci-static/resources"
 
+# Modes come from the theme repo's INDEX, never the worktree: core.fileMode=false here means a file
+# can lose +x on disk with git none the wiser, and rsync -a would carry that loss into the PR.
+find "$OUT" -type f -exec chmod 644 {} +
+git -C "$ROOT" ls-files -s -- luci-theme-footstrap | while read -r mode _ _ path; do
+	if [ "$mode" = 100755 ] && [ -f "$DEST/themes/$path" ]; then chmod 755 "$DEST/themes/$path"; fi
+done
+
+# Verify, loudly: a mode that differs from the index, or a stripped JS with more double-blank runs
+# than its source (a removed probe block must not leave a run the source never had).
+bad=0
+git -C "$ROOT" ls-files -s -- luci-theme-footstrap | while read -r mode _ _ path; do
+	f="$DEST/themes/$path"
+	[ -f "$f" ] || continue
+	want=644; [ "$mode" = 100755 ] && want=755
+	[ "$(stat -c %a "$f")" = "$want" ] || { echo "sync: mode $(stat -c %a "$f") != index $want: $path" >&2; exit 1; }
+done || bad=1
+dbl() { awk '/^[ \t]*$/ { if (++b == 2) n++; next } { b = 0 } END { print n + 0 }' "$1"; }
+for f in "$OUT"/htdocs/luci-static/resources/*.js; do
+	src="$SRC/${f#"$OUT"/}"
+	[ -f "$src" ] || continue
+	[ "$(dbl "$f")" -le "$(dbl "$src")" ] || { echo "sync: blank-line run not in source: ${f#"$OUT"/}" >&2; bad=1; }
+done
+[ "$bad" = 0 ] || exit 1
+
 # the artefact the far side commits, generated from the layers on this side
 sh "$SRC/build-css.sh" "$OUT/htdocs/luci-static/footstrap/cascade.css"
+
+# A shipped file must not point at anything that exists only in THIS repository: the tmp tree, a
+# test or tool, a stand, a theme-repo issue number or commit. Every synced file is scanned, the built
+# cascade.css included; docs/*.md pointers are older and accepted upstream, so they are counted,
+# not failed.
+refs=$(grep -rEnI \
+	'\.\./tmp/|tests/[a-z0-9_/-]+\.(m?js|test)|tools/[a-z0-9_/-]+\.(mjs|sh)|\bowrt(2410|2512|snap)[a-z]?\b|issue #[0-9]+|commit [0-9a-f]{7,}|`[0-9a-f]{7,12}`' \
+	"$OUT" --exclude-dir=po || true)
+[ -z "$refs" ] || { echo "sync: reference to something outside the luci tree:" >&2
+	echo "$refs" | sed "s|^$OUT/||" | cut -c1-160 >&2; exit 1; }
 
 echo "synced -> $OUT"
 echo "  cascade.css: $(wc -c < "$OUT/htdocs/luci-static/footstrap/cascade.css") bytes (generated, unmangled)"
@@ -86,4 +120,6 @@ echo "  Makefile:    hand-maintained there, $mk_diff differing line(s) — posti
 if [ -d "$OUT/po" ]; then
 	echo "  po/:         left as it is ($(find "$OUT/po" -name '*.po' | wc -l | tr -d ' ') catalogue(s)) — Weblate owns them upstream"
 fi
+doc_refs=$(grep -rEo --include='*.js' --include='*.ut' 'docs/[a-z-]+\.md' "$OUT/htdocs" "$OUT/ucode" | wc -l | tr -d ' ')
+echo "  docs/*.md:   $doc_refs pointer(s) in shipped JS/templates — accepted upstream, not checked"
 echo "  drift:       node tools/fork-drift.mjs $DEST"

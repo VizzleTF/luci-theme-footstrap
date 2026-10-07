@@ -52,11 +52,11 @@ function probeColor(expr) {
 		 * element computing `color` in every engine. It has no text and no size, so it paints
 		 * nothing.
 		 *
-		 * Every declaration is !important (issue #19): this is an unmarked element in a document
+		 * Every declaration is !important: this is an unmarked element in a document
 		 * shared with `luci-app-*`, and an app's unlayered `span { color: … !important }` outranks
 		 * a layer and a plain inline style alike. A probe that loses its own colour reports the
 		 * app's, which then becomes the admin's saved axis on the next confirm. */
-		/* the id is this probe's escape from fs-router.js's strayBodyNode() (issue #56): it is
+		/* the id is this probe's escape from fs-router.js's strayBodyNode(): it is
 		 * appended once and never removed, so without an fs-* id it would read as body litter and
 		 * force every navigation away from this page into a full load. */
 		_probe = E('span', { 'id': 'fs-appearance-probe', 'aria-hidden': 'true' });
@@ -76,7 +76,7 @@ function probeColor(expr) {
  * the space it was authored in, so `oklch(0.54 0.19 300)` would parse as three numbers in the
  * wrong units and produce a colour nobody chose — measured: #010078, graded "Too faint to read",
  * in the hex field, the swatch and the contrast readout alike. Painting one pixel makes the engine
- * convert instead (tools/export-tier.mjs uses the same method). Canvas 2D is universal on every
+ * convert instead (the export tier is checked the same way). Canvas 2D is universal on every
  * engine 24.10 ships against, so there is no second path. */
 let _cx = null;
 function rasterCtx() {
@@ -170,8 +170,8 @@ function colorControl(onPick, label, opts) {
 		 * hairline is graded on the second (`kind: 'shape'`) and warns rather than fails — a faint
 		 * border is a legitimate choice.
 		 *
-		 * Class names are written out whole: tools/fs-orphans.mjs sweeps dead CSS by matching
-		 * fs-* tokens in the source, and a concatenated name is invisible to it. */
+		 * Class names are written out whole: dead CSS is found by matching fs-* tokens in the
+		 * source, and a concatenated name is invisible to that match. */
 		const where = o.contrast.label;
 		const grade = (o.contrast.kind === 'shape')
 			? ((r >= 3)
@@ -319,7 +319,7 @@ function build() {
 	 * one merged catalogue — load_catalog() loads every *.<lang>.lmo and a lookup returns the first
 	 * archive holding the hash — so a bare msgid is a global name any luci-app may take, and
 	 * readdir order picks the winner: the layout toggle rendered "Максимум" on a Russian router
-	 * because another catalogue translates "Top" as "maximum" (issue #6). Contexting cannot be
+	 * because another catalogue translates "Top" as "maximum". Contexting cannot be
 	 * selective. The chrome, the login/notice sentences and the System/Memory/Storage headings are
 	 * deliberately bare — inheriting luci-base's translation covers the ~40 languages this theme
 	 * has no catalogue for. */
@@ -356,7 +356,7 @@ function build() {
 			large:   _('Large', 'footstrap')
 		}, bump(prefs.applyDensity), label)),
 
-		/* issue #44: the content column's own cap, separate from Density (which moves type and
+		/* the content column's own cap, separate from Density (which moves type and
 		 * air, not the column's ceiling). The slider STARTS at the 1280px the theme has always
 		 * shipped and only ever widens — there is no reason to offer a column narrower than the
 		 * one every page was designed against, and keeping 1280 as the left end also keeps
@@ -720,7 +720,7 @@ function build() {
 	 * ships them, and nothing in a package manager can read `uci luci.main.lang` to fetch the right
 	 * one: apk learns it from `install-if` against `luci-i18n-base-<lang>` (owfeed.yml), opkg has no
 	 * conditional form of that at all, and a router upgraded from 0.14.3 through the feed simply
-	 * loses the catalogue that used to ride inside the theme (issue #41). `install.sh` covers its
+	 * loses the catalogue that used to ride inside the theme. `install.sh` covers its
 	 * own path; this covers the one nobody ran a script on.
 	 *
 	 * ASKED OF THE PAGE, not of the package list: the theme has no ubus call of its own and must not
@@ -828,7 +828,7 @@ function build() {
 	]);
 
 	/* The first fill, deferred one microtask so the tree above is finished. It does not wait for
-	 * the form to be in the document: every readout resolves inside fs-widgets against a hidden
+	 * the form to be in the document: every readout resolves against a hidden
 	 * probe attached to <body>, so a detached form still reads the live palette. */
 	Promise.resolve().then(refreshColours);
 	return page;
