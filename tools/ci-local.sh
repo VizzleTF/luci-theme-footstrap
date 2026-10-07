@@ -9,23 +9,6 @@
 #   tools/ci-local.sh --mode push --force live   # all three live slices, this project's own stands
 #   tools/ci-local.sh all --dry-run              # print every command either mode would run
 #
-# MUST run from WSL, never from Git Bash on Windows — docs/development.md, "The stand's own
-# traps" ("npm, python3 and any *.sh gate cannot run from the Windows side of this checkout at
-# all"). Invoke it the way that section's own recipe does, PATH set by hand inside the call:
-#
-#   MSYS_NO_PATHCONV=1 wsl.exe -- bash -c '\
-#     PATH=$HOME/go/bin:/usr/local/bin:/usr/bin:/bin; export PATH; \
-#     cd /mnt/c/Users/<you>/Documents/home/openwrt/luci-theme-footstrap; \
-#     sh tools/ci-local.sh check lint build'
-#
-# …or, better: write that one call into a FILE and run `wsl.exe -- bash <file>.sh` instead of
-# inlining it — a second, independent trap from the one already on that page: a variable
-# ASSIGNED inside an inline `wsl.exe -- bash -c '...'` string reads back empty or truncated even
-# past the point where `$?` alone was the concern (measured this session: `x=$(echo hello);
-# echo "$x"` printed nothing, `x=hello; echo "$x"` printed nothing, over the exact same inline
-# call that a real script FILE runs correctly every time). This script relies on shell variables
-# throughout, so it is written to be RUN as a file for exactly that reason.
-#
 # What this does NOT try to be: a sandbox, a timeout enforcer, or a replacement for the real
 # workflow. `--list` (also printed at the end of every run) says out loud what a green run here
 # does not prove, on purpose — a step skipped for a missing tool or a busy router is reported as
@@ -131,10 +114,8 @@ esac
 # small helpers
 # ---------------------------------------------------------------------------------------------
 
-# Never reads $? — docs/development.md, "The stand's own traps": "$? is unreliable in this WSL
-# bash" and the corruption measured directly above for a captured variable is the same family.
-# Every verdict here comes from a direct `if COMMAND; then … else … fi`, which was verified this
-# session to report correctly even where reading `$?` afterwards did not.
+# Every verdict here comes from a direct `if COMMAND; then … else … fi`, never from `$?` read after
+# the fact: a status captured later is one `echo` away from being someone else's.
 step() {
 	name=$1
 	shift
@@ -145,7 +126,7 @@ step() {
 		return 0
 	fi
 	printf '  -> %-38s ... ' "$name"
-	if "$@" >"$log" 2>&1; then
+	if "$@" >"$log" 2>&1 9>&- 8>&- 7>&-; then
 		echo "PASS"
 		printf '%s\tPASS\t%s\n' "$name" "$log" >>"$RESULTS"
 		return 0
@@ -172,7 +153,7 @@ skip() {
 job_check() {
 	echo "== check (npm run check:fast) =="
 	if [ ! -d node_modules ]; then
-		skip "check" "node_modules/ is missing — run 'npm ci' yourself first (not run by this script: it never writes outside tools/ and ../tmp/). docs/development.md's Windows-install trap applies if you install it from Windows and run gates from WSL: chmod +x node_modules/.bin/* first."
+		skip "check" "node_modules/ is missing — run 'npm ci' yourself first (not run by this script: it never writes outside tools/ and ../tmp/)."
 		return
 	fi
 	if command -v msgfmt >/dev/null 2>&1 && command -v msgmerge >/dev/null 2>&1 && command -v xgettext >/dev/null 2>&1; then
@@ -220,7 +201,7 @@ jsmin_step() {
 job_lint() {
 	echo "== lint (npm run check:mid + check:slow, plus jsmin-verify) =="
 	if [ ! -d node_modules ]; then
-		skip "lint" "node_modules/ is missing — run 'npm ci' yourself first (not run by this script: it never writes outside tools/ and ../tmp/). docs/development.md's Windows-install trap applies if you install it from Windows and run gates from WSL: chmod +x node_modules/.bin/* first."
+		skip "lint" "node_modules/ is missing — run 'npm ci' yourself first (not run by this script: it never writes outside tools/ and ../tmp/)."
 		return
 	fi
 	step "ci-playwright" sh tools/ci-playwright.sh
@@ -283,7 +264,7 @@ verify_one() {
 			--assert 'http 200 /cgi-bin/luci/admin/status/overview' \
 			--assert 'http 200 /cgi-bin/luci/admin/system/system' \
 			--assert "exec for f in $UT/*.ut; do ucode -T -c -o /dev/null \"\$f\" || exit 1; done"
-	) >"$log" 2>&1; then
+	) >"$log" 2>&1 9>&- 8>&- 7>&-; then
 		echo "PASS"
 		printf '%s\tPASS\t%s\n' "$name" "$log" >>"$RESULTS"
 	else
@@ -328,7 +309,7 @@ verify_feed() {
 			--install luci-theme-footstrap \
 			--assert 'package luci-theme-footstrap' \
 			--assert 'http 200 /cgi-bin/luci/admin/status/overview'
-	) >>"$log" 2>&1; then
+	) >>"$log" 2>&1 9>&- 8>&- 7>&-; then
 		outcome=success
 		echo "PASS"
 		printf '%s\tPASS\t%s\n' "$name" "$log" >>"$RESULTS"
@@ -390,7 +371,7 @@ job_playground() {
 	step "playground-capture" node tools/playground/capture.mjs --recording "$PG/recording"
 	step "playground-build" node tools/playground/build.mjs --recording "$PG/recording" --out "$PG/out" --base /luci-theme-footstrap/playground
 	step "playground-verify" node tools/playground/verify.mjs --out "$PG/out" --base /luci-theme-footstrap/playground --budget-kb 600
-	owlab down >>"$RUNDIR/owlab-down.log" 2>&1
+	owlab down >>"$RUNDIR/owlab-down.log" 2>&1 9>&- 8>&- 7>&-
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -409,24 +390,61 @@ compute_routers() {
 
 boot_and_install() {
 	log="$RUNDIR/owlab-up-install.log"
-	if ! owlab up $ROUTERS >"$log" 2>&1; then return 1; fi
+	if ! owlab up $ROUTERS >"$log" 2>&1 9>&- 8>&- 7>&-; then return 1; fi
 	for r in $ROUTERS; do
 		case "$r" in
-		*2512 | *snap) owlab install "$r" dist/noarch/luci-theme-footstrap-*.apk >>"$log" 2>&1 || return 1 ;;
-		*) owlab install "$r" dist/all/luci-theme-footstrap_*.ipk >>"$log" 2>&1 || return 1 ;;
+		*2512 | *snap) owlab install "$r" dist/noarch/luci-theme-footstrap-*.apk >>"$log" 2>&1 9>&- 8>&- 7>&- || return 1 ;;
+		*) owlab install "$r" dist/all/luci-theme-footstrap_*.ipk >>"$log" 2>&1 9>&- 8>&- 7>&- || return 1 ;;
 		esac
 	done
 	return 0
 }
 
+# A second run on the same stands invents findings (12 of them, docs/development.md, "The stand's
+# own traps"), so the stands are an flock per router on ../tmp/stands-<router>.lock — the same
+# files tools/lib/stands.mjs locks — held on fds 9, 8, 7 until this script exits. Routers go in
+# sorted order so two overlapping sets cannot deadlock. STANDS_LOCK_HELD (ids) and STANDS_LOCK_PID
+# tell the gates started below that this script holds those stands; stands.mjs believes the pair
+# only after checking the pid is alive, the lock file names it and the flock is really taken, so a
+# stale value in a later shell locks normally. A child that can outlive the script (owlab's
+# daemons) is launched with `9>&- 8>&- 7>&-`: an inherited fd would keep the lock after exit.
+# An inherited STANDS_LOCK_HELD is dropped here, not trusted. `--force` skips the refusal, not
+# the lock.
+LOCKFD=9
+STANDS_LOCK_HELD=
+unset STANDS_LOCK_PID
+lock_stands() {
+	if ! command -v flock >/dev/null 2>&1; then
+		echo "  flock (util-linux) is missing — the stands cannot be locked, so nothing runs on them."
+		return 1
+	fi
+	for r in $(printf '%s\n' $ROUTERS | sort); do
+		case " $STANDS_LOCK_HELD " in *" $r "*) continue ;; esac
+		f="$TMPROOT/stands-$r.lock"
+		eval "exec $LOCKFD>>\"\$f\""
+		if ! flock -n "$LOCKFD"; then
+			echo "  stand $r is in use ($(cat "$f" 2>/dev/null || echo 'holder unknown')); waiting for $f"
+			flock "$LOCKFD"
+		fi
+		printf 'ci-local pid %s\n' "$$" >"$f"
+		STANDS_LOCK_HELD="${STANDS_LOCK_HELD:+$STANDS_LOCK_HELD }$r"
+		LOCKFD=$((LOCKFD - 1))
+	done
+	STANDS_LOCK_PID=$$
+	export STANDS_LOCK_HELD STANDS_LOCK_PID
+}
+
 require_stand_ack() {
 	leg=$1
-	if [ "$FORCE" = 1 ]; then return 0; fi
+	if [ "$FORCE" = 1 ]; then
+		if lock_stands; then return 0; fi
+		printf '%s\tSKIP\tno flock\n' "$leg" >>"$RESULTS"
+		return 1
+	fi
 	echo "  refusing: $leg boots/installs onto THIS project's own stands ($ROUTERS, owlab.yaml)."
-	echo "  Pass --force once you have confirmed nothing else is using them right now —"
-	echo "  docs/development.md, 'The stand's own traps' ('Two live-audit sweeps against the same"
-	echo "  stand fight over its language') is the exact failure this default avoids, not a"
-	echo "  hypothetical one."
+	echo "  Pass --force to go ahead: it boots and rebuilds them, which any other session using them"
+	echo "  loses. Concurrent runs of the gates themselves queue on the stand lock either way —"
+	echo "  docs/development.md, 'The stand's own traps'."
 	printf '%s\tSKIP\trefused without --force\n' "$leg" >>"$RESULTS"
 	return 1
 }
@@ -481,7 +499,7 @@ job_live() {
 		step "live:motion:install-check" sh tools/install-check.sh $ROUTERS
 		;;
 	esac
-	owlab down >>"$RUNDIR/owlab-down.log" 2>&1
+	owlab down >>"$RUNDIR/owlab-down.log" 2>&1 9>&- 8>&- 7>&-
 }
 
 job_anchors() {
@@ -519,7 +537,7 @@ job_anchors() {
 	else
 		step "anchors:$engine" node tools/scroll-anchor.mjs --engines "$engine" --only "$O"
 	fi
-	owlab down >>"$RUNDIR/owlab-down.log" 2>&1
+	owlab down >>"$RUNDIR/owlab-down.log" 2>&1 9>&- 8>&- 7>&-
 }
 
 # ---------------------------------------------------------------------------------------------

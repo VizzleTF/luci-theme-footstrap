@@ -181,6 +181,13 @@ old `footstrap-theme.*.lmo` away with it, and installing `luci-i18n-footstrap-ru
 `footstrap.ru.lmo` down in its place, with `luci.languages.ru` registered and the chrome rendering
 in Russian.
 
+**Upstream, the strings are translated in luci-base, not in `footstrap.po`.** openwrt/luci's
+`build/mkbasepot.sh` scans `themes/` along with the modules, so every footstrap `msgctxt` string
+lands in `modules/luci-base/po/templates/base.pot` and is translated in each language's `base.po`
+(79 `msgctxt "footstrap"` entries on `origin/master` of `luci-fork`, in the pot and in `ru/base.po`
+alike). An empty `msgstr` in the theme's own `footstrap.po` is therefore harmless there. Check:
+`git -C <luci> show origin/master:modules/luci-base/po/ru/base.po | grep -c 'msgctxt "footstrap"'`.
+
 `update-po.sh`'s single `trap … EXIT INT TERM` covers every mktemp the script creates, including the
 ones on the `LUCI_SRC` (no-fetch) path — it used to be installed only inside the fetch branch, so a
 `set -eu` failure between mktemps on the `LUCI_SRC` path (perl choking on a template, the exact

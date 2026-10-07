@@ -10,7 +10,8 @@
  * The routers are owlab's — `owlab status -json` names each one and the port it answers on, so
  * nothing here hard-codes a port or a container name. Nothing here boots anything either: a gate
  * that starts and stops containers by itself is a gate nobody runs locally. */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { closeSync, mkdirSync, openSync, readFileSync, unlinkSync } from 'node:fs';
 
 /* The routers a gate runs on by default: the three OpenWrt lines the theme supports. What changes
  * what the theme is measured against is the package manager (apk on 25.12+, opkg on 24.10) and the
@@ -208,11 +209,82 @@ export function pairStands(list) {
 	return pairs;
 }
 
+/* Two runs on one stand invent findings: a second sweep 37 s behind the first read 12 "the reader
+ * drifted" cells that a lone run never shows (docs/development.md, "The stand's own traps"). A
+ * promise not to overlap did not hold, so use of a stand is an flock on ../tmp/stands-<id>.lock,
+ * taken per stand in sorted order (no deadlock between overlapping sets) and held until this
+ * process dies. The holder is a child `flock` kept alive by its stdin pipe, so the kernel frees the
+ * lock on any exit, SIGKILL included. `STANDS_LOCK_HELD` (space-separated ids) with
+ * `STANDS_LOCK_PID` is how tools/ci-local.sh hands down the stands it already holds; a stale pair
+ * left in a later shell must not skip the lock, so `heldBy()` believes it only when that pid is
+ * alive, the lock file names it and the flock is really taken. `--force` has no say here.
+ *
+ * `flock` is probed synchronously first: the wait loop below blocks the event loop, so the spawn's
+ * async 'error' event never fired when it was missing and the loop spun forever (timeout 5 → 124).
+ * The wait is bounded, 30 min by default, `STANDS_LOCK_TIMEOUT_MS` overrides; on expiry it names the
+ * holder instead of hanging. */
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/* True only when `env` names a live ci-local that holds `file` for stand `id`. Exported for the
+ * unit test; `flock -n` exits 1 only on contention, so any other failure reads as "not held". */
+export function heldBy(id, file, env = process.env) {
+	const pid = Number(env.STANDS_LOCK_PID);
+	if (!Number.isInteger(pid) || pid < 1) return false;
+	if (!(env.STANDS_LOCK_HELD || '').split(' ').includes(id)) return false;
+	try { process.kill(pid, 0); } catch (e) { if (e.code !== 'EPERM') return false; }
+	try { if (readFileSync(file, 'utf8').trim() !== `ci-local pid ${pid}`) return false; } catch { return false; }
+	return spawnSync('flock', [ '-n', file, 'true' ], { stdio: 'ignore' }).status === 1;
+}
+
+function lockStands(ids, name) {
+	const dir = new URL('../../../tmp/', import.meta.url).pathname;
+	mkdirSync(dir, { recursive: true });
+	if (spawnSync('flock', [ '--version' ], { stdio: 'ignore' }).error) {
+		console.error(`${name}: cannot run flock; util-linux is required`);
+		process.exit(2);
+	}
+	const limit = Number(process.env.STANDS_LOCK_TIMEOUT_MS) || 30 * 60 * 1000;
+	for (const id of [ ...ids ].sort()) {
+		const file = `${dir}stands-${id}.lock`;
+		if (heldBy(id, file)) continue;
+		const ack = `${file}.${process.pid}.ack`;
+		const fd = openSync(ack, 'w');
+		const child = spawn('flock', [ '-x', file, 'sh', '-c', 'echo "$1" >"$2"; echo ok; cat >/dev/null',
+			'sh', `${name} pid ${process.pid}`, file ], { stdio: [ 'pipe', fd, 'inherit' ] });
+		child.unref();
+		child.stdin.unref();
+		closeSync(fd);
+		const t0 = Date.now();
+		let said = false;
+		while (!readFileSync(ack, 'utf8').includes('ok')) {
+			let by = '';
+			if (Date.now() - t0 > 500) {
+				try { by = readFileSync(file, 'utf8').trim(); } catch { /* lock file not written yet */ }
+			}
+			if (Date.now() - t0 > limit) {
+				child.kill();
+				try { unlinkSync(ack); } catch { /* already gone */ }
+				console.error(`${name}: stand ${id} still held by ${by || 'an unknown holder'} after ${Math.round(limit / 1000)} s; gave up on ${file}`);
+				process.exit(2);
+			}
+			if (!said && Date.now() - t0 > 500) {
+				console.error(`${name}: stand ${id} is in use (${by || 'holder unknown'}); waiting for ${file}`);
+				said = true;
+			}
+			sleep(100);
+		}
+		unlinkSync(ack);
+	}
+}
+
 /* No stand, no verdict — and a gate that quietly reports success on zero routers is worse than one
  * that fails, because it looks the same as a clean run in a log. */
 export function requireStands(list, name) {
-	if (list.length) return list;
-	console.error(`${name}: no owlab router is running, so nothing was checked.`);
-	console.error('Start one with `owlab up` (see docs/development.md) and run this again.');
-	process.exit(2);
+	if (!list.length) {
+		console.error(`${name}: no owlab router is running, so nothing was checked.`);
+		console.error('Start one with `owlab up` (see docs/development.md) and run this again.');
+		process.exit(2);
+	}
+	lockStands(list.map((s) => s.id), name);
+	return list;
 }

@@ -7,6 +7,7 @@ description: Module composition, the jsmin traps, and what fs-fit owns.
 
 # JS
 
+- **A comment in a shipped file carries its reason inline.** No `issue #N`, no `tools/`, `tests/` or `docs/` pointer as the only carrier: those do not exist in openwrt/luci. `docs/conventions.md`, "Comments".
 - One concern per module; `L.require` makes a singleton and throws `DependencyError` on a cycle, so
   a module can never `extend` another — compose by calling.
 - **All "does it fit" logic lives in `fs-fit.js`.** Measure uncollapsed, re-fit synchronously on a

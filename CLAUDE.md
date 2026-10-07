@@ -99,9 +99,13 @@ unprompted when it arrives. "I started it" is not a status. `docs/development.md
 - **Done is "has run on a real userland on both package managers"** — 25.12/apk and 24.10/opkg —
   held by CI's `verify` job and by the maintainer. Say which of the two a run actually covered; a
   stubbed harness proves a module initialises, nothing more.
-- **CI's `lint`, `build`, `verify`, `live` and `anchors` are not reproduced locally**; read them
-  with `gh run view`. On a PR `live` and `anchors` boot owrt2512 only, so the 24.10 half of a
-  behaviour claim comes from a push, a tag, or a detached local run.
+- **CI's `lint`, `build`, `verify`, `live` and `anchors` are not reproduced locally by reflex**;
+  read them with `gh run view`. On a PR `live` and `anchors` boot owrt2512 only, so the 24.10 half
+  of a behaviour claim comes from a push, a tag, or a detached local run.
+- **A red CI job is reproduced first** with `tools/ci-local.sh --force <job>`, before any
+  hypothesis; a push is never the experiment. Check `gh run list --branch main -L1` is not red
+  before any push. "Flaky" and "fixed" are a measured rate (`tools/rate.sh`), not one green run.
+  CI waits go through `tools/bg.sh` + `tools/bg-wait.sh`, never a sleep loop.
 - **A finding about the stands goes in `docs/development.md`, "The stand's own traps", in the same
   session** — what it looked like, what it was, and the command that tells the two apart.
 - **A fault in the tooling itself gets an issue in the tool's own repository** — `owlab`
@@ -136,11 +140,12 @@ block 8, a header 15, under 40 % of a file's bytes. Full rule with the example b
 
 ## Crew
 
-The main thread is the lead. It reads no screenshots, runs no gate, edits nothing beyond a
-one-sentence diff, and uses Bash for `git status`, `git diff --stat` and `git log` only. The work
-goes to a role in `.claude/agents/`: `developer` (writes inside the card's file list, runs T0),
+The main thread is the lead. It reads no screenshots, runs no gate, and uses Bash for `git status`,
+`git diff --stat` and `git log` only. It edits `docs/**` and config (`.claude/**`, `CLAUDE.md`,
+settings) itself; code (`luci-theme-footstrap/**`, `tools/**`, `tests/**`, `styles/**`) goes to a
+role in `.claude/agents/`: `developer` (writes inside the card's file list, runs T0),
 `tester` (the full cycle, read-only, PASS/NEEDS_WORK with evidence), `security` (`security-review`
-on the task diff), `researcher` (sourced answers, ranked), and `caveman:cavecrew-investigator`
+on the task diff), `upstream-reviewer` (the luci branch diff against upstream's bot checklist, before the first push), `researcher` (sourced answers, ranked), and `caveman:cavecrew-investigator`
 to locate code. Delegate when a task touches more than one file, needs any gate beyond T0, or would
 put more than ~50 lines of tool output into this thread. Protocol and schemas: `docs/crew.md`.
 
@@ -160,7 +165,12 @@ human and is never auto-fixed. The Opus `/security-review` before a release or P
 
 Always through the human: `git commit`, `git push`, a hardware router (`dev-sync.sh` is `ask`),
 lowering a tier, waiving a gate, a security finding, a stall. The lead quotes the verdict block, not
-the log; a log is read by the role that produced it.
+the log; a log is read by the role that produced it. Card sizing, rounds and `maxTurns`:
+`docs/crew.md`.
+
+**Fix policy: best practice only, no crutches.** Fix the root cause in the shared place with the
+established best practice; a small fix is fine only when it is that practice. A known defect is
+never deferred without asking.
 
 ## Commits
 
@@ -168,7 +178,10 @@ the log; a log is read by the role that produced it.
 that action, each time.** Finished work, green gates, a verified fix or an answered review is not
 authorization. This holds for BOTH remotes — `origin`, and the openwrt/luci fork behind a PR, where
 amend + `push --force-with-lease` is a push like any other. Leave the tree dirty and say what would
-go in; wait to be told. No co-author / "Generated with" / AI attribution trailers.
+go in; wait to be told. "Do it", "finish", "continue" and "autopilot" are not commit or push words;
+a history rewrite (rebase, amend) is its own ask. New work branches from `origin/main`, never the
+local `main`. No script contains `git commit` or `git push`. No co-author / "Generated with" / AI
+attribution trailers. `.claude/hooks/git-guard.sh` holds the guard.
 
 **Nothing is published without an explicit instruction, each time**: no PR comment, no review, no
 issue comment, no reply on an upstream thread. A review finding is answered in the DIFF and by

@@ -10,14 +10,27 @@ A subagent spends tens of thousands of tokens and returns one to two thousand.
 
 ## Roles
 
-| Role | Model | Writes | Sees | Returns |
-|---|---|---|---|---|
-| lead (main thread) | Opus | one-sentence diffs only | the card, the return blocks | decisions |
-| `developer` | Sonnet | inside `card.files` | the card, its rules file, a handoff if any | files + gates block |
-| `tester` | Opus | nothing | the diff and the card | verdict block |
-| `security` | Sonnet | nothing | the diff | findings block |
-| `researcher` | Sonnet | nothing | the question | answer + ranked sources |
-| `caveman:cavecrew-investigator` | Haiku | nothing | a "where is X" question | `file:line` table |
+| Role | Model | `maxTurns` | Writes | Sees | Returns |
+|---|---|---|---|---|---|
+| lead (main thread) | Opus | n/a | `docs/**` and config (`.claude/**`, `CLAUDE.md`, settings); never code | the card, the return blocks | decisions |
+| `developer` | Sonnet | 60 | inside `card.files` | the card, its rules file, a handoff if any | files + gates block |
+| `tester` | Opus | 100 | nothing | the diff and the card | verdict block |
+| `security` | Sonnet | 25 | nothing | the diff | findings block |
+| `upstream-reviewer` | Opus | 30 | nothing (Bash held read-only by a hook) | the luci branch diff against `origin/master` | findings block |
+| `researcher` | Sonnet | 20 | nothing | the question | answer + ranked sources |
+| `caveman:cavecrew-investigator` | Haiku | n/a | nothing | a "where is X" question | `file:line` table |
+
+`maxTurns` is the budget one card needs, not a ceiling to raise when a card runs out. `developer`
+60: a card is one mechanism, and the handoff is written 15 turns before the limit (turn 45), which
+leaves the next developer a clean state; 200 only hid cards that were too big. `tester` 100: it
+starts a detached run with `tools/bg.sh` and reads the waiter's result, it never polls, so its
+turns are the runbook's steps and not wall-clock. `security` and `researcher` are one pass over a
+diff or a question. A role that runs out is a card to split, not a number to raise. Code is the
+`developer`'s because the lead's own edits skip T0 and the tester's diff; docs and config are the
+lead's because no gate reads them but `npm run check:fast`.
+
+The lead relays each role's return block to the maintainer in Russian: the block's fields and every
+command, path and number stay as printed, the prose around them is translated.
 
 One `developer` at a time, sequentially: two writers on one card produce two designs for one
 problem, which is the failure every published account of parallel coding agents reports.
@@ -56,6 +69,14 @@ rewrite JSON less readily than Markdown, and a file outlives a compaction of the
 | `hardware` | `false` until the maintainer says otherwise for this card |
 | `history` | one entry per tester round: `{ "round", "verdict", "blocking": [ids], "diff_hash" }` |
 
+Sizing a card:
+
+- One card, one mechanism; the acceptance fits in 5 lines. A card that needs more is two cards.
+- A `SendMessage` to a resumed agent is a round, and counts toward `max_rounds` 2.
+- Upstream and release work splits in two: (a) base and history, verified by the `tester`; (b) the
+  cut and the messages. A release card is regenerated from `git diff vX..HEAD --stat` before each
+  matrix run, never reused from the last one.
+
 ## Return blocks
 
 Every role returns at most 25 lines: paths, not contents; no diff, no code, no story of the
@@ -71,8 +92,8 @@ comments, a changelog line, a handoff — is normal English prose, as everywhere
 
 ## The loop
 
-1. **Size the task.** A diff the lead can describe in one sentence, it makes itself. More than one
-   file, any gate beyond T0, or more than ~50 lines of tool output: the crew.
+1. **Size the task.** Docs and config the lead edits itself. Code goes to the crew, as does any
+   task needing a gate beyond T0 or more than ~50 lines of tool output.
 2. **`developer`, round 0.** Implements, runs T0, stages what it touched with `git add`, returns.
 3. **`tester`.** Reads `git diff HEAD`, runs what the card asks, returns a verdict. Only
    `blocking: true` findings start a round; the rest go into `history` for the maintainer.

@@ -805,31 +805,17 @@ gettext block and `ci-playwright.sh` (only exercised when the tool is actually m
 was not on this host). A step this script cannot cover is printed as `SKIP` with a reason, never
 folded into a passing count.
 
-**This has to run from WSL, never from Git Bash on Windows** — the same host split
-`docs/development.md` documents below for every other npm-run gate — invoked the way that
-section's own recipe does, PATH set by hand inside the call. Node does not need installing under
-WSL's own nvm the way that recipe assumes, either: this session found `npm`/`node` already staged
-under the Windows install (`node_modules/.bin/*` carries an extensionless sh wrapper beside the
-`.cmd`/`.ps1` ones), and that copy runs from WSL exactly as well as a native one once its `PATH`
-is set — no `EFTYPE`/loader-hook workaround needed, because a REAL Linux `node` executing
-`build-css.sh` through `execFileSync` is not the Windows-side failure that trap is about. `owlab`
-and `owfeed` (`~/go/bin`, both already on this host at the CI-pinned versions, 0.6.1 and 0.5.1)
-are ordinary Linux ELF binaries and need no such bridging at all. What genuinely needs installing
-fresh is `node` itself if WSL has none of its own — this session used NodeSource's `setup_22.x`
-to match `build.yml`'s pinned `node-version: '22'` exactly, a one-time `apt-get` cost, not a
-per-run one.
+### Calling a flaky finding fixed: `tools/rate.sh`
 
-**A variable ASSIGNED inside an inline `wsl.exe -- bash -c '…'` string reads back empty or
-truncated, independent of and in addition to the `$?` trap already on this page.** Measured this
-session, the same inline call every time: `x=$(echo hello); echo "$x"` printed nothing; so did
-the far simpler `x=hello; echo "$x"`, with no command substitution involved at all; a function
-DEFINED inline (`f(){ …; }; f`) failed to resolve. The exact same lines, saved to a file and run
-as `wsl.exe -- bash /path/to/script.sh`, read back correctly every time — command substitution,
-`$?`, and everything else this script depends on, all confirmed with a dedicated probe before
-writing a line of `tools/ci-local.sh` around it. Treat this as one mechanism with the `$?` trap
-below rather than two: neither survives an inline `bash -c` string, both survive a file, and
-"write the script to a file and call `wsl.exe -- bash <path>.sh` instead of inlining it" (already
-this page's advice for the `$R`/`$T` collapse) is the same fix for both.
+`tools/rate.sh <N> <cmd...>` runs the command N times, prints `K/N failed` and exits non-zero if
+any run failed. A flaky CI finding is called fixed only with a measured rate: the old build red
+at some K/N, the new one `0/N` with the same N and the same command. One green run proves
+nothing, and neither does a rate measured while another run holds the stands (see the lock in
+"The stand's own traps").
+
+```sh
+tools/rate.sh 10 node tools/scroll-jank.mjs --only owrt2512
+```
 
 ## The stand's own traps
 
@@ -883,15 +869,11 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
 - **Never pipe a long run into `tail`, `sort` or a bare `grep`.** The output buffers until the
   command ends, so a hang looks exactly like progress. `live-audit` over a full sweep did this on
   2026-09-09: the process sat alive and idle for 73 minutes with no output, where CI takes about 90
-  seconds a stand. `grep` is the one that catches you by accident — filtering a `wsl.exe` call's
+  seconds a stand. `grep` is the one that catches you by accident — filtering a gate's
   noise through `| grep -v …` buffers in 4KB blocks, so a gate that was printing a line a second
   looked mute for minutes (2026-09-10). Write to a file and read the file as it grows (`grep
   --line-buffered` if it must be a pipe), and give any local `live-audit` both `--pages` and a
   `timeout`.
-
-- **A variable assigned INSIDE an inline `wsl.exe -- bash -c '...'` string reads back empty.** This
-  is separate from the `$?` trap below and bites the same way: the script looks like it ran and
-  produced nothing. Write the script to a file and call `wsl.exe -- bash <path>.sh`.
 
 - **Building a test table through the HTML parser (`innerHTML`/a template literal) inserts a
   `<tbody>` the app never wrote; `E()`/`appendChild` do not.** Task 0058's sweep harness built
@@ -926,19 +908,6 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   `caffeinate -s` (`PreventSystemSleep`, AC power only). Neither `docker` nor `owlab` is on the agent
   shell's `PATH`: use `/usr/local/bin/docker` and `~/go/bin/owlab`.
 
-- **`tools/bg.sh` started from inside a `wsl.exe -e bash -c …` call dies with that call, and reads
-  as a run that finished instantly — and `tools/bg-wait.sh` then waits out its full two-hour cap
-  on it.** The log file is created with `bg.sh`'s own header (~280 B) and never grows, and `.status`
-  never appears. Neither does `.pid`: the inner shell is killed before it gets that far, so
-  `bg-wait.sh` has no pid to test and cannot see the death at all — measured 2026-09-10, it returned
-  `WAIT-RC=2, exit: timeout (no status after 7200s)` on a run that had died at second zero. The detach
-  is real inside WSL; what does not survive is the WSL session itself, which the interop call tears
-  down the moment its own command returns, taking the whole process group with it. Tell the two apart
-  by the files: a run that genuinely finished has output in its log and a `.status`; one killed with
-  its session has a header-only log, no `.status` and no `.pid`. From a Windows host, start a long gate as a **background Bash-tool
-  command** (`wsl.exe -e bash -c 'cd … && npm run check'`, run in the background) and wait on that
-  instead — `tools/bg.sh` is for a session that outlives the command, which an interop call is not.
-
 - **`scroll-anchor --full` with all three engines at once over three stands kills the chromium
   process about two minutes in; one engine at a time completes.** It reads as a regression in the
   sweep — chromium's leg dies mid-run while webkit and firefox finish — and it is the browser's
@@ -969,7 +938,7 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   cleanly with no restarts.
 
 - **A `cp`/`cat`/`mv` PATH-shim in a failure-injection harness silently injects nothing when the
-  harness runs under this dev box's own busybox in WSL, while the identical shim works inside a
+  harness runs under this dev box's own busybox, while the identical shim works inside a
   real router container.** Testing the install-feed card's `atomic_write()` failure paths, a harness
   that put a fake, always-failing `cp` first on `$PATH` and called the extracted shell functions
   directly kept reporting success — the write went through, unshimmed, no matter how the temp
@@ -1012,23 +981,24 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   second `anchors:webkit` started 37 s after the first, both with `--force`, and the pair reported
   **12 findings** — `the reader drifted 46/88/138px across real poll ticks` at every density and
   both layouts, on two stands. Run alone, the same commit and the same command read 276 runs and no
-  findings. The script's default refusal names this exact failure; passing `--force` is a promise
-  that nothing else is using the stands, and the way to keep it is `pgrep -f '^node tools/(scroll-anchor|spa-parity|live-audit)'`
-  and `pgrep -f '^sh tools/ci-local'` both finding nothing before you start — anchored with `^`
-  and run from a script FILE: the unanchored `ps -eo cmd | grep '[s]croll-anchor'` this entry first
-  recommended matches the command line of an inline `bash -c '…'` that contains it, reports busy
-  every time, and aborted two A/B runs on 2026-09-13 with nothing else on the stands. A finding that appears on twelve
+  findings. The script's default refusal names this exact failure. **Stand use is now serialized
+  by a lock, not by a promise**: `requireStands()` (`tools/lib/stands.mjs`) and `tools/ci-local.sh`
+  both take `flock` on `../tmp/stands-<set>.lock` (`<set>` is the sorted stand names joined by `-`)
+  and hold it for the whole run; a second run on the same set waits, and says who holds it.
+  `--force` skips the refusal, never the lock. The lock dies with its holder, so a killed run
+  frees it; no `pgrep` recipe is needed (the one this entry used to carry matched its own
+  `sh -c`, twice). A finding that appears on twelve
   cells at once, evenly across an axis, is this and not the theme.
 
 - **"no owlab router is running, so nothing was checked" while all eight are up means the gate
   could not find `owlab`, not that the stands are down.** `owlab` is a Go binary in `~/go/bin`, put
-  on `PATH` by the login profile — and a login shell started as `wsl.exe -e bash -lc` from a Windows
-  host can die part-way through that profile on something unrelated (measured 2026-09-11: a stale
-  `deno/env` path from another project, printed as a bare `No such file or directory` with no
-  mention of owlab), leaving `PATH` half-built. Every live gate then reports the same sentence on
-  every stand at once. Tell the two apart with `owlab status`: if it lists routers as `running`, the
-  stands are fine and the shell is not. Run live gates as `wsl.exe -e bash -c` with
-  `export PATH=$HOME/go/bin:$PATH` set explicitly, which skips the profile entirely. **Six gates
+  on `PATH` by the login profile — and a login shell that dies part-way through that profile on
+  something unrelated (measured 2026-09-11: a stale `deno/env` path from another project, printed
+  as a bare `No such file or directory` with no mention of owlab) leaves `PATH` half-built. Every
+  live gate then reports the same sentence on every stand at once. Tell the two apart with
+  `owlab status`: if it lists routers as `running`, the stands are fine and the shell is not. Run
+  live gates with `export PATH=$HOME/go/bin:$PATH` set explicitly, which skips the profile entirely.
+  **Six gates
   saying "nothing was checked" is the hardening working** — before `21a8502` and `916d4d5` those
   same runs would have exited 0 and read as six passes.
 
@@ -1055,10 +1025,8 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   `chmod` is not optional: a `docker cp` lands the file 0600-ish and uhttpd answers **403**, which
   reaches the page as `NetworkError: HTTP error 403 while loading class file` — the module then does
   not run at all and the page looks *fixed*. A green result with 403s in it has measured nothing.
-  Copied from a WSL `/mnt/c` path the file also arrives owned by uid 1000, and the same 403 survives
-  the `chmod` until `chown 0:0` runs too (charts PR stand run, 2026-09-13). From Git Bash the
-  `/mnt/c/...` source path is rewritten before `docker cp` sees it, so nothing is copied (exit 9) and
-  the stand keeps serving the old file; prefix the command with `MSYS_NO_PATHCONV=1`.
+  A file copied from a path owned by uid 1000 also arrives so, and the same 403 survives the
+  `chmod` until `chown 0:0` runs too (charts PR stand run, 2026-09-13).
 
 - **`live-audit` on a `-b` twin calls every finding NEW, and a full sweep makes that total, not
   partial.** The baseline is keyed by stand id (`tools/baselines/live-audit.json`: `owrt2410`,
@@ -1093,7 +1061,7 @@ this page's advice for the `$R`/`$T` collapse) is the same fix for both.
   produced no output. Bracket the first character (`pkill -f "[p]robe-one"`), or kill from a separate
   call.
 
-- **`${PIPESTATUS[0]}` is as unreliable as `$?` in that shell.** On 2026-09-09 a piped
+- **A piped gate's status can come back empty.** On 2026-09-09 a piped
   `npm run check` reported `CHECK_EXIT=` and read as success while it had actually failed on the
   size budget; the failure was only caught by reading the gate's printed text. Judge every gate by
   what it printed, never by a status.
@@ -1114,74 +1082,6 @@ every one Russian dashboard text (`span.associations`, `span.encryption`) under 
 key — because the stray process's own `--lang ru` write landed mid-sweep. `ps aux | grep live-audit`
 before trusting a "NEW finding" that names text in the wrong language; a live-audit run is exclusive
 use of whatever stand it names, the same as `--prune`'s own exclusive claim on the baseline file.
-
-**On a Windows checkout, most npm-run gates fail before they measure anything, and the failure is
-the host, not the theme.** Tell one apart from the other by re-running the SAME gate the SAME way
-on a clean `HEAD` — a host fault fails there too, identically.
-
-- `npm run lint:js`, `npm run lint:css` and other npm-script entry points fail outright: the
-  packages under `node_modules/.bin` have no `.cmd` shim on this host. Call the binary directly
-  instead of through npm: `node node_modules/eslint/bin/eslint.js <path>`,
-  `node node_modules/stylelint/bin/stylelint.mjs "<glob>"`.
-- Any gate that builds the sheet (`css-metrics`, `css-floor`, `table-contract`, `smoke`,
-  `computed-diff`, `a11y`, `export-tier`) fails with `EFTYPE`: `tools/lib/css.mjs` runs
-  `build-css.sh` through `execFileSync`, and Windows cannot execute a shell script directly.
-  The workaround this session used is a `NODE_OPTIONS=--import` loader hook that intercepts the
-  build call and re-issues it through `sh`, run from a copy of the tree in `../tmp/` so the checkout
-  is never written to.
-- `tools/computed-diff.mjs` additionally hands `tar -C` a `C:\…` path, which `tar` refuses — it
-  needs a POSIX path.
-- `python3` resolves to the Microsoft Store stub and fails with "Python was not found"; the working
-  interpreter on this host is named `python` — matters for `python3 tools/audit.py --strict`.
-- `npm test` fails one case of 154 on Windows and none in WSL: `resolveUnderRoot`
-  (`tests/playground.test.mjs`, code in `tools/playground/lib.mjs`, added by `cfdc7d8`) asserts
-  `/out/cgi-bin/luci/...` and gets `C:\out\cgi-bin\luci\...`, because `path.resolve` is
-  `path.win32.resolve` there. The test states the contract CI runs under, so a red case here is the
-  host disagreeing with it, not the tree: re-run the suite as
-  `wsl.exe -e bash -c 'cd /mnt/c/... && npm test'` before reading it as a defect — 154 pass there.
-
-**None of the above means the live half is out of reach — it runs fine, just not from the Windows
-side of this checkout.** `owlab` is already installed in WSL (`~/go/bin/owlab`), its containers are
-already up, and the full `npm run live` gate passes there against the very same tree, mounted at
-`/mnt/c/...`. The recipe this session used for every WSL call:
-
-```sh
-MSYS_NO_PATHCONV=1 wsl.exe -- bash -c 'PATH=$HOME/go/bin:$HOME/.nvm/versions/node/v24.12.0/bin:/usr/local/bin:/usr/bin:/bin; export PATH; cd /mnt/c/Users/IVAN/Documents/home/openwrt/luci-theme-footstrap; <command>'
-```
-
-- `MSYS_NO_PATHCONV=1` is load-bearing: without it Git Bash rewrites the POSIX `/mnt/c/...` argument
-  into a Windows-shaped path before `wsl.exe` ever sees it, and the `cd` fails with "No such file or
-  directory" on a line that reads correctly.
-- The `PATH=` has to be assigned by hand and kept short: the inherited Windows PATH carries spaces
-  and parentheses (`Program Files`, `NVIDIA Corporation (x86)`), and `export PATH=<that>` inside
-  `bash -c '...'` fails with `syntax error near unexpected token '('`.
-- Node in WSL lives under nvm (`~/.nvm/versions/node/v24.12.0/bin`), which is not on PATH by
-  default: leave it out and a live `node` on Windows still reads as `node: command not found`
-  inside the WSL shell.
-- The same recipe also clears the static gates that need a built sheet: `node tools/size-budget.mjs`
-  run this way needs no loader-hook workaround at all, because `build-css.sh` executes normally
-  under WSL's own `sh`.
-
-Two traps sit in the calling convention itself, each cost a retry:
-
-- shell variables inside `wsl.exe -- bash -c '...'` collapse to empty before `bash` ever starts —
-  `$R`, `$T`, `$?` in the single-quoted string belong to Git Bash, not to WSL — so `> $T/gate-$n.log`
-  turns into `> /gate--.log` and `cd $R/luci-theme-footstrap` into `cd /luci-theme-footstrap`. Write
-  the script to a file and call `wsl.exe -- bash <path>.sh` instead of inlining it.
-- **detaching through `tools/bg.sh` inside a one-shot `wsl.exe` call does not survive**: WSL tears
-  the session down together with the process it was running, and the log is left with only its
-  header — no `.status`, no `.pid`. It works only when the WSL session behind the run stays alive
-  for the whole duration, not merely for the `wsl.exe` invocation that started it — which a session
-  driven from Git Bash on Windows never gives it: every `wsl.exe` call from there is its own
-  subprocess that returns and tears down, so the `setsid`-detached child dies with it the moment the
-  call completes, before a T2 gate (`owlab`, docker, anything living in WSL) has had time to finish.
-  Four T2 runs were lost to exactly this before the tester stopped routing them through `tools/bg.sh`
-  from Git Bash and used the harness's own background runner instead — the Bash tool's
-  `run_in_background: true`, which keeps the process (and the WSL session under it) alive for as
-  long as the harness itself runs, paired with the Monitor/notification mechanism rather than
-  `tools/bg-wait.sh`. Tell the two apart by the log: a `tools/bg.sh` run started this way stops dead
-  at its header line with no `.status` file ever appearing, no matter how long `bg-wait.sh` is left
-  polling it.
 
 **`owlab.yaml`'s `extra_packages` under `defaults:` reaches every router, including the snapshot
 box, and a package that box cannot resolve fails `owlab up` for the whole lab — not just the
@@ -1639,24 +1539,12 @@ the element it is asked about — a collapsed link can read `display: flex` and 
 rect. Filter on the box, not the property: `link.getClientRects().length` is `0` for every element
 inside a `display: none` ancestor regardless of what its own `display` says.
 
-**`$?` is unreliable in this WSL bash** — `false; echo $?` prints `0`. What sits between the two
-commands was not isolated this session; the workaround is not diagnosing it. Read each tool's own
-printed verdict instead — PASS/FAIL text, a finding count, `bg-wait.sh`'s own `exit: N` line — never
-the shell's exit code after the fact. This is the worst trap on this page because it fails
-*silently*: a chain that trusts `$?` reports a red gate as green with nothing in the log to say so.
-
 **On System → System, `button.cbi-button-apply` selects "Скопир. из браузера" (Copy from browser),
 not the Apply-changes control.** The page renders more than one element carrying that class, and the
 Apply control itself is a `.cbi-dropdown` widget, not a `<button>`: the selector that actually reaches
 it is `.cbi-page-actions .cbi-dropdown.cbi-button-apply li[data-value="0"]`. A repro battery keyed on
 the bare class name clicked the wrong element on every run and reported NOT REPRODUCED for a fault
 that was real.
-
-**`npm`, `python3` and any `*.sh` gate cannot run from the Windows side of this checkout at all** —
-not merely degraded the way the `.cmd`-shim and `EFTYPE` notes above describe. `npm run smoke` dies
-with `EFTYPE: spawnSync … build-css.sh`, and `sh tools/check-acl.sh` resolves `python3` mid-script to
-the Microsoft Store alias. Run these under WSL, with node put on `PATH` by hand — a non-login
-`bash -c` never sources nvm's shim on its own:
 
 ```sh
 export PATH="$HOME/.nvm/versions/node/v24.12.0/bin:$PATH"
@@ -1685,7 +1573,7 @@ involved (owfeed/owlab#18, closed within the hour; `live`/`anchors` had carried 
 0.6.1's `internal/pkgmgr.UpdateShell` now continues the refresh once at least one feed has answered
 and only aborts when none has — reproduced locally (`owlab up owrtsnap`, `owlab install owrtsnap
 dist/noarch/luci-theme-footstrap-*.apk`, task 0173) against a freshly downloaded `owlab 0.6.1`
-binary, not the WSL install's drifted dev build: the identical 404 still prints
+binary, not the host install's drifted dev build: the identical 404 still prints
 (`ERROR: wget: exited with error 8` / `unexpected end of file` on
 `kmods/6.18.33-1-70e27cfe28d8cb55760256504e7c02fe/packages.adb`), but the router boots and the
 package installs anyway, and the log now names the gap rather than staying silent about it —
@@ -1748,43 +1636,6 @@ narrower than apk's, which reads its own reported `N unavailable` count rather t
 Not this task's fix (`install.sh`'s boundary here is the own-feed decision alone, not the general
 counting shape) — flagged for whoever next touches `feed_refresh()`'s opkg branch.
 
-**Installing npm packages from WSL instead of from Windows leaves every gate looking broken, when
-only the install is.** An install run from WSL writes `node_modules/.bin/` as POSIX symlinks
-(`eslint@ -> ../eslint/bin/eslint.js`), which Windows cannot execute — every `npm run <gate>` from
-Git Bash then dies with `'eslint' is not recognized as an internal or external command`, and the git
-`pre-push` hook fails the same way, reading exactly like a red gate rather than a bad install.
-Installed from Windows instead, npm writes three wrappers per package (`eslint`, `eslint.cmd`,
-`eslint.ps1`), and the extensionless one is a sh script WSL can run too — one install serves both
-sides. The install itself has to be invoked as `node "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js"
-ci --ignore-scripts` from Git Bash: `cmd.exe /c npm ci` from Git Bash silently does nothing (MSYS
-rewrites `/c` into a path before `cmd.exe` ever sees it), and PowerShell refuses `npm` outright (next
-trap). `--ignore-scripts` is deliberate — the browsers the gates need live in WSL, and a second
-Windows-side copy is a few hundred MB nobody runs. Verified this session: `npm run lint` passes from
-both Git Bash and WSL off one Windows-side install.
-
-**A fresh Windows-side `npm ci` needs `chmod +x node_modules/.bin/*` from WSL before WSL can run any
-of it, and the fix does not survive the next install.** `/mnt/c` on this machine mounts
-`metadata,umask=0077,fmask=0177` (`/etc/wsl.conf`), so every file npm just wrote from Windows arrives
-world-unexecutable — the sh wrappers the trap above depends on are present and correct, but
-`npm run lint` inside WSL still dies, this time with `sh: 1: eslint: Permission denied`. Because
-`metadata` is on, one `chmod` sticks across reboots — but not across a fresh `npm ci`, which writes
-new files under the mount's default mode again. Diagnose with `ls -l node_modules/.bin/eslint` (mode
-`0600` is the trap) and `mount | grep " /mnt/c "` (confirms the `fmask`).
-
-**PowerShell is not a fallback for the symlink trap above — `npm` does not run there at all on this
-machine.** `npm.ps1 cannot be loaded because running scripts is disabled on this system` is
-PowerShell's own execution policy refusing the wrapper script outright, unrelated to the WSL symlink
-issue and not fixed by installing from the "right" side. Git Bash and `cmd` (called directly, not
-through `cmd.exe /c` from Git Bash) are unaffected.
-
-**`${PIPESTATUS[0]}` reads back empty in this WSL bash, the same way `$?` is already unreliable here
-— and it fails silently, not loudly.** A piped `npm run check | tee log.txt; echo
-"CHECK_EXIT=${PIPESTATUS[0]}"` printed `CHECK_EXIT=` — empty, not a number — and the empty string
-read as "not the literal failure text" to whatever was watching it, while the run had actually
-failed on the size budget. The gate's own printed output was the only place the failure showed.
-Judge a WSL gate by what it printed, never by a captured status of any kind — `$?`, `PIPESTATUS`, or
-otherwise.
-
 **A `geometry|fs-content` finding whose offset equals the gap between two adjacent entries in the
 gate's own `WIDTHS` is a staleness race, not a layout break — re-sample at 620 ms before believing
 it.** `live-audit` samples `contentWidth()` at 220 ms after each `setViewportSize`; `fitChrome()`
@@ -1801,8 +1652,7 @@ by making the gate sample later instead — that would hide the same staleness f
 
 **`TaskStop` on a background command kills its outer shell, not a `sh script.sh` it started.** A
 stopped chain kept waiting as its own process and would have raced its replacement to the same
-commit. After stopping one, check `ps -ef | grep scratchpad` on the Windows side and `pgrep -af '^sh
-/mnt/c/.*scratchpad/'` in WSL; kill the child by its exact command, and give a replacement a guard
+commit. After stopping one, check `pgrep -af '^sh .*scratchpad/'`; kill the child by its exact command, and give a replacement a guard
 that refuses to start while the old one lives.
 
 **A process search inside `sh -c '…'` finds the shell running it.** `pgrep -f "npm run check"`, `ps |
@@ -1810,9 +1660,6 @@ grep build-css` and `pgrep -f "sh tools/ci-local"` all matched their own `sh -c`
 contains the pattern: two launchers waited forever and a CSS-build check reported a build that did not
 exist. Anchor the pattern (`^node tools/`, `^npm run check`) and run the check from a script file, or
 wait on a file's final line instead.
-
-**Git Bash rewrites `/mnt/c/...` arguments passed to `wsl.exe` into `C:/Program Files/Git/mnt/c/...`**,
-and the script "does not exist". `export MSYS_NO_PATHCONV=1` before `wsl.exe -e sh /mnt/c/...`.
 
 **A timing finding from `scroll-anchor` with a `longest frame gap` near its `landed Nms` is the page
 not producing frames, not the theme deciding late.** Read the late trail beside it: the theme's
@@ -1846,17 +1693,6 @@ result to act on; `owlab sync` the twin or re-run with `--no-pair`.
   script itself (`owlab exec owrt2512 -- sh /etc/uci-defaults/30_luci-theme-footstrap`), which is
   idempotent and safe to re-run on a stand `post_sync:` already registered.
 
-**A worktree created on Windows cannot be read by WSL's own `git`, because the worktree's `.git` file
-holds `gitdir: C:/Users/...` — a Windows-style path no POSIX tool under `/mnt/c` resolves through
-`/mnt/c` on its own.** `tools/computed-diff.mjs` failed with `fatal: not a git repository:
-/mnt/c/.../worktrees/<name>/C:/Users/IVAN/.../.git/worktrees/<name>` — the WSL-side path with the
-Windows-side one git tried to resolve relative to it appended on the end — and the
-`git archive | tar -x` pipe behind it failed with `tar: This does not look like a tar archive` on
-whatever `git archive` wrote instead of a tarball. Tell it apart from a real repository problem:
-`cat .git` from WSL — a `gitdir:` line starting `C:/` (or carrying a backslash) is the whole story, a
-POSIX path is not this trap. Run a `git`-reading gate that shells out to `git archive`/`git diff`/
-`git show` (`computed-diff`, `fork-drift`) from the SAME OS whose git created the worktree.
-
 **Two Playwright runs against two different stands at once can turn one visit into
 `net::ERR_CONNECTION_RESET`.** Seen once: a pair run in parallel against `owrt2512`/`owrt2410` reset
 a connection on port 8024, `owrt2410`'s own published port; the identical pair run sequentially, one
@@ -1882,6 +1718,23 @@ anything this theme controls. A census of `document.body.children` compared in O
 runs of the identical page reads the ones where the race went the other way as a regression. Compare
 as a MULTISET instead: `Array.from(document.body.children).map(el => el.tagName + '#' + el.id + '.' +
 el.className).sort()`, duplicates counted, never a plain sequence diff.
+
+- **Exec bits lost in a host move are invisible while `core.fileMode=false`.** `git status` stays
+  clean, and a gate then dies with `Permission denied` on a `tools/*.sh` or `node_modules/.bin/*`
+  that is no longer executable. Compare the index with the disk: `git ls-files -s | grep -c '^100755'`
+  against `find . -path ./node_modules -prune -o -type f -perm -u+x -print`, or per file
+  `git ls-files -s tools/stage.sh` (`100755`) against `test -x tools/stage.sh`. Restore with
+  `chmod +x` and `git update-index --chmod=+x` only where the index says `100644` by mistake.
+
+- **Never run `git worktree prune` while a session worktree is live.** It deletes the metadata of
+  any worktree whose directory it cannot see at that moment (an unmounted path, a moved checkout),
+  and the session's next `git` call there fails `fatal: not a git repository`. Protect a live one
+  with `git worktree lock --reason "session" <path>`; `git worktree unlock` when it is done.
+
+- **`ucode` is not on the host; it lives in a stand.** `ucode -T -c -o /dev/null <file>.ut` from the
+  host reads `command not found`. Run it where LuCI runs: `docker cp <file>.ut
+  owlab-luci-theme-footstrap-owrt2512:/tmp/` then `docker exec owlab-luci-theme-footstrap-owrt2512
+  ucode -T -c -o /dev/null /tmp/<file>.ut`. If `ucode` is installed locally, the plain form works.
 
 ## The test matrix
 

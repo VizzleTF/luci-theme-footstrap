@@ -86,6 +86,7 @@ const PROPS = [
 	'align-items', 'justify-content', 'gap',
 	'grid-template-columns', 'grid-auto-flow',
 	'transform', 'transition-property', 'content',
+	'user-select', '-webkit-user-select', 'pointer-events', 'cursor', 'touch-action',
 ];
 
 /* Build the reference stylesheet from a git ref. `git archive` gives exactly the two things

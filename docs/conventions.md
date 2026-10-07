@@ -226,9 +226,9 @@ behind each line.
 |---|---|---|
 | the invariant | `min-height` AND `height` are pinned to the same value for the whole pass | always |
 | the reason, as a number | the bar walked 230 -> 123 px inside one pass, 107 px of growth | when one was measured |
-| one pointer | `docs/anchoring.md`, "The corrections"; openwrt/luci#8981; issue #41 | when the proof is longer than a line |
+| one pointer | `docs/anchoring.md`, "The corrections"; openwrt/luci#8981 | when the proof is longer than a line |
 
-One of each, in that order, in one sentence where it fits. A comment with no invariant is
+One of each, in that order, in one sentence where it fits. **A file under `luci-theme-footstrap/htdocs`, `ucode` or `root` ships to openwrt/luci, where `docs/`, `tools/`, `tests/` and this repo's `issue #N` do not exist: it carries none of them as a pointer, the reason stays inline, and a `docs/` pointer is never the only carrier** (`sync-luci-fork.sh` fails on `issue #N`; the upstream bot flags `docs/` pointers as dangling). A pointer to `docs/` is for `tools/`, `tests/`, `styles/` and the docs themselves. An upstream `openwrt/luci#N` is fine. A comment with no invariant is
 deleted, not reworded: restating the line it sits on is what it did.
 
 ### What a comment does not carry

@@ -11,6 +11,8 @@
   },
   "permissions": {
     "deny": [
+      "Bash(git push --no-verify:*)",
+      "Bash(git commit --no-verify:*)",
       "Edit(**/cascade.css)",
       "Edit(tmp/**)",
       "Edit(**/docs/screenshots/**)"
@@ -21,6 +23,8 @@
     "ask": [
       "Bash(git commit:*)",
       "Bash(git push:*)",
+      "Bash(git rebase:*)",
+      "Bash(git commit --amend:*)",
       "Bash(npm run live:*)",
       "Bash(luci-theme-footstrap/dev-sync.sh:*)",
       "Bash(./luci-theme-footstrap/dev-sync.sh:*)",
@@ -81,8 +85,12 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(git commit *)",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/precommit-gate.sh",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/git-guard.sh\"",
+            "statusMessage": "Checking git authorization"
+          },
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/precommit-gate.sh\"",
             "statusMessage": "Checking the changelog contract"
           }
         ]
@@ -93,7 +101,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start.sh"
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start.sh\""
           }
         ]
       }

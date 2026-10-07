@@ -1,26 +1,30 @@
 # Мониторинг и ответ на ревью
 
 Правило `CLAUDE.md`: **сессия не пишет комментарии в апстрим-PR**. Замечание закрывается правкой
-в диффе и пометкой треда resolved. Если что-то надо сказать человеку — текст готовится в чате,
-отправляет его пользователь.
+в диффе и пометкой треда resolved. Если что-то надо сказать человеку — текст готовится в чате
+и отдаётся мейнтейнеру, отправляет его он.
 
 ## Мониторинг
 
-Один persistent-монитор на PR: комментарии, инлайны, новые ревью, смена состояния. Опрос раз в
-минуту; id уже виденных ревью — в файле, иначе каждый цикл повторяет одно и то же.
+Один наблюдатель на PR — `tools/pr-watch.sh`, в фоне (`run_in_background` или `tools/bg.sh`):
 
 ```sh
-gh api "repos/openwrt/luci/issues/<N>/comments?since=$last" --jq '.[] | "comment by \(.user.login): \(.body[0:400])"'
-gh api "repos/openwrt/luci/pulls/<N>/comments?since=$last"  --jq '.[] | "inline by \(.user.login) on \(.path):\(.line): \(.body[0:400])"'
-gh api "repos/openwrt/luci/pulls/<N>/reviews"               --jq '.[] | "\(.id)|review by \(.user.login) [\(.state)]: \(.body[0:300])"'
-gh pr view <N> --repo openwrt/luci --json state --jq .state   # MERGED / CLOSED — можно снимать монитор
+tools/bg.sh tools/pr-watch.sh <N> --seen ../tmp/pr-<N>.seen
 ```
+
+Он опрашивает `gh api` раз в минуту, дедуплицирует события по id в seen-файле, ключует CI по SHA
+головы (force-push обнуляет), собирает пачку и завершается, когда пришло ревью (человека или бота),
+комментарий или сменилось состояние PR (`MERGED`/`CLOSED`). Падение отдельной проверки CI его не
+будит: результат CI приходит строкой в следующей пачке. После завершения прочитать пачку и запустить
+наблюдателя снова. `git push` в рецептах идёт в фоне — один раз он занял больше 120 с.
 
 ## Два вида ревью
 
 ### Бот (`openwrt-ai`) — разбираем сами
 
-Не ждём пользователя. По каждому замечанию:
+Не ждём пользователя. **Замечания только к комментариям применяются дословно**: текст предложения
+бота идёт в диф как есть. Любое отклонение от него показывается мейнтейнеру в форме «бот
+предлагает X / я предлагаю Y» с цитатой предложения. По каждому замечанию:
 
 1. **Проверить измерением, право ли оно.** Бот ошибается заметно чаще человека: он жаловался, что
    `text-overflow: ellipsis` ничего не делает, хотя `white-space: nowrap` приходит из base; он же
@@ -58,9 +62,7 @@ gh api graphql -f query='mutation($id: ID!) { resolveReviewThread(input:{threadI
 CI после пуша:
 
 ```sh
-SHA=$(cd /tmp/luci-pr && git rev-parse HEAD)
-until [ "$(gh api repos/openwrt/luci/commits/$SHA/check-runs --jq '[.check_runs[]|select(.status!="completed")]|length')" = "0" ]; do sleep 20; done
-gh api repos/openwrt/luci/commits/$SHA/check-runs --jq '.check_runs[] | "\(.name): \(.conclusion)"'
+gh api repos/openwrt/luci/commits/$(git -C ../tmp/luci-pr rev-parse HEAD)/check-runs --jq '.check_runs[] | "\(.name): \(.status) \(.conclusion)"'
 ```
 
 ## Заготовки ответов

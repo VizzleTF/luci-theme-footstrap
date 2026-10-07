@@ -249,9 +249,7 @@ Only after everything above has passed:
 4. Tag `vx.y.z` on this commit. **Never tag first** — the tag must point at a commit that
    already contains its own entry, or the release describes a version whose changelog does not yet
    exist.
-5. **Before pushing, read the recent runs on `main`**: `gh run list --limit 6` — on the maintainer's
-   Windows machine `gh` is not on `PATH` in Git Bash or WSL, and must be called by its full path,
-   `"/c/Program Files/GitHub CLI/gh.exe" run list --limit 6`. A run already red before your push
+5. **Before pushing, read the recent runs on `main`**: `gh run list --limit 6`. A run already red before your push
    stays red after it, and `release` does not fire until whatever it currently gates on is green —
    so a tag pushed onto a broken pipeline cannot publish. A pre-existing failure is not something to
    push past: it is either an infrastructure condition to be fixed first, or a real regression that

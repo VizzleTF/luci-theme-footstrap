@@ -43,4 +43,6 @@ touching any `_()`. A msgid is a **global** name shared with every app — Appea
 `footstrap` msgctxt; the chrome, the login/notice sentences and the System/Memory/Storage titles
 deliberately do not.
 
+- **A comment in a shipped file carries its reason inline.** No `issue #N`, no `tools/`, `tests/` or `docs/` pointer as the only carrier: those do not exist in openwrt/luci. `docs/conventions.md`, "Comments".
+
 Deeper: `docs/chrome.md`, `docs/third-party-apps.md`, `docs/spa-router.md`.

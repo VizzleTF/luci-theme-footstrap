@@ -6,23 +6,31 @@
 # instead. The two exemptions are exactly the ones CLAUDE.md already names: CLAUDE.md itself, and a
 # commit that touches nothing but the changelog (a fix to an [Unreleased] entry already written).
 #
-# settings.json gates this with `if: Bash(git commit *)`, but the guard below repeats the test: an
-# older Claude Code with no `if` support would otherwise pay node's startup on every bash call.
+# No `if:` in settings.json: it only matches a line that STARTS with `git commit`. The detection is
+# git-guard.sh's `--kinds`, so `cd a && git commit` and a script that commits reach this too.
 set -eu
 
-# Without jq the hook cannot read the command at all. Say so and stand aside: a hook that exits
-# non-zero here blocks nothing anyway, it only prints a shell error before every bash call.
+ask() { # $1 why; no quotes in it, jq may be the thing that is missing
+	printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"precommit-gate: %s, so the changelog contract cannot be checked: confirm this command."}}\n' "$1"
+	exit 0
+}
+
+IN=$(cat) || exit 0
+# Without jq the command cannot be read: ask when the raw input mentions a commit or a script.
 if ! command -v jq >/dev/null 2>&1; then
-	echo "precommit-gate: jq not found, the changelog contract is NOT being enforced" >&2
+	case ${IN#*\"command\"} in *commit*|*sh*) ask "jq not found" ;; esac
 	exit 0
 fi
-
-IN=$(cat)
-CMD=$(printf '%s' "$IN" | jq -r '.tool_input.command // ""')
+CMD=$(printf '%s' "$IN" | jq -r '.tool_input.command // ""') || ask "jq could not parse the input"
 
 # Fast path. Anything that is not a commit leaves without touching git or node.
 case "$CMD" in
-	*'git commit'*) ;;
+	*commit*|*sh*|*/*) ;;
+	*) exit 0 ;;
+esac
+KINDS=$(printf '%s' "$IN" | sh "$(dirname -- "$0")/git-guard.sh" --kinds) || ask "git-guard.sh could not inspect the line"
+case " $KINDS " in
+	*' commit '*) ;;
 	*) exit 0 ;;
 esac
 
@@ -32,7 +40,7 @@ esac
 HOOK_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd -P)
 
 CWD=$(printf '%s' "$IN" | jq -r '.cwd // ""')
-[ -n "$CWD" ] && cd "$CWD"
+[ -z "$CWD" ] || cd "$CWD" 2>/dev/null || exit 0
 
 # The contract belongs to THIS repository, and a session commits in others: owfeed-packages, and
 # the openwrt/luci fork behind an upstream PR. Neither tree has a CHANGELOG.md, so the hook denied
