@@ -499,6 +499,9 @@ function navigate(pathname, push, kbd) {
 
 	if (bodyLittered()) return false;
 
+	/* an extension's lodash/underscore replaced window._: LuCI's own `_('x').format()` then throws on every view; a full load restores it */
+	if (typeof _ !== 'function' || typeof _('') !== 'string') return false;
+
 	if (_expired) return false;
 
 	/* `segs` is what the user clicked, `rsegs` the leaf it resolves to (they differ for an

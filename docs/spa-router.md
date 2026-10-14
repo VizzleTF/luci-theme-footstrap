@@ -98,6 +98,9 @@ unmodified stand the two folds agree, and only the constructed case separates th
    - `bodyLittered()` — has a script left one of its own nodes as a direct child of `<body>` and
      never taken it back? Same verdict, for the same reason: `return false` (docs/third-party-apps.md,
      Rule 2 extended to the DOM, issue #56; "Foreign view DOM" below);
+   - `typeof _('') !== 'string'` — did an extension's lodash/underscore replace `window._`? LuCI's
+     `_('x').format()` then throws on every view (openwrt/luci#7817, #8342); a full load restores
+     it, so `return false`;
    - `nodeForSegs` walks the menu tree; `viewClassFor` gives the view class name, or `null` if the
      node is not SPA-able;
    - **no class → `return false`** → the handler does not `preventDefault` → the browser loads the
