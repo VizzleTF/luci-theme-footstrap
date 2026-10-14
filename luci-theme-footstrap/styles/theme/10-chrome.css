@@ -23,7 +23,7 @@
 
 	.fs-logo {
 		width: var(--fs-btn-size); height: var(--fs-btn-size); border-radius: var(--fs-radius);
-		border: var(--fs-hairline); /* glyph is baked-colour (brand.ut), no currentColor use */
+		border: var(--fs-hairline); /* glyph is baked-colour (header.ut), no currentColor use */
 		display: flex; align-items: center; justify-content: center;
 		flex: 0 0 auto;
 	}
@@ -43,7 +43,7 @@
 	}
 	/* clip-path, not a -68px translate: the translate still bled ~16px of drop shadow into the
 	 * viewport (--fs-shadow-pop is offset 12px/blur 34px); clip-path clips the shadow too. */
-	.fs-skip:not(:focus) {
+	.fs-skip:not(:focus), .fs-sr {
 		clip-path: inset(50%);
 		width: 1px; height: 1px;
 		padding: 0; overflow: hidden; white-space: nowrap;
@@ -52,29 +52,18 @@
 		outline: 2px solid var(--fs-panel); outline-offset: 2px;
 	}
 	/* Clipped, not display:none/visibility:hidden — both take the <h1> out of the a11y tree too. */
-	.fs-sr {
-		position: absolute;
-		clip-path: inset(50%);
-		width: 1px; height: 1px;
-		margin: -1px; padding: 0;
-		overflow: hidden; white-space: nowrap;
-	}
+	.fs-sr { position: absolute; margin: -1px; }
 
 	/* tabindex="-1" on <main> makes Safari/Chrome move focus here rather than just scroll to it. */
 	#maincontent:focus { outline: none; }
 
-	.fs-logout { display: flex; align-items: center; color: var(--fs-dim); }
+	/* box and base colour: 20-shell.css (shared with .fs-themerow) */
 	.fs-logout:hover { color: var(--fs-danger); }
-
-	.fs-indicators { display: flex; align-items: center; gap: var(--fs-space-2); }
-
-	/* 34px square icon button: not declared here, only where the chrome is a bar or a rail
-	 * (20-shell.css, 50-toplayout.css). */
 
 	/* fitTabStrips (fs-chrome.js) adds .fs-dense1/2 when the horizontal menu row would wrap, and
 	 * strips them in the vertical sidebar — no media guard needed. */
 	.fs-sidebar ul.nav.fs-dense1 > li > a { padding: var(--fs-space-1) var(--fs-space-2); }
-	.fs-sidebar ul.nav.fs-dense2 > li > a { padding: var(--fs-space-1) var(--fs-space-1-5); font-size: var(--fs-type); }
+	.fs-sidebar ul.nav.fs-dense2 > li > a { padding: var(--fs-space-1) var(--fs-space-1-5); }
 
 	/* One markup (`ul.nav > li > a`) for both layouts, so these three run once. */
 	ul.nav { position: relative; margin: 0; list-style: none; }
@@ -98,7 +87,7 @@
 		background: var(--fs-accent-soft); color: var(--fs-accent);
 	}
 	/* Plate on the PAGE only; the open ANCESTOR keeps the ink alone — issue #37 (two identical
-	 * plates stacked on System -> System otherwise). chrome.md, "menu-footstrap.js". */
+	 * plates stacked on System -> System otherwise). chrome.md, "fs-chrome.js". */
 	.fs-sidebar ul.nav > li.active > a:not(.active) { color: var(--fs-accent); }
 
 	/* --fs-focus-ring-solo: none of these flips a border on focus, so the ring alone must clear

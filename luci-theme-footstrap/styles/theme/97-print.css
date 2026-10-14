@@ -1,6 +1,7 @@
 @layer theme {
 	/* without this a page prints the dark chrome and only ONE page (shell is 100svh,
-	 * overflow:hidden). No !important: a chrome rule is beaten on SPECIFICITY, (0,4,0) over (0,3,1). */
+	 * overflow:hidden). No !important: each arm is at least one class over the
+	 * strongest chrome rule it meets. */
 	@media print {
 		/* theme layer outranks every tokens-layer palette block without naming data-darkmode */
 		:root {
@@ -18,11 +19,11 @@
 		.cbi-tabmenu.cbi-tabmenu,
 		footer { display: none; }
 		/* undoes the sidebar layout's scroll frame, the ONE-page bug above */
-		.fs-shell.fs-shell.fs-shell.fs-shell { height: auto; overflow: visible; }
-		.fs-main.fs-main.fs-main.fs-main { height: auto; overflow: visible; }
-		.fs-content.fs-content { max-width: none; padding: 0; }
-		/* same element as 15-wallpaper.css, later in the layer */
-		.fs-pattern.fs-pattern { display: none; }
+		.fs-shell.fs-shell.fs-shell.fs-shell.fs-shell,
+		.fs-main.fs-main.fs-main.fs-main.fs-main { height: auto; overflow: visible; }
+		.fs-content.fs-content.fs-content.fs-content { max-width: none; padding: 0; }
+		/* (0,4,0) over 15-wallpaper.css's :root[data-wallpaper="pattern"] .fs-pattern (0,3,0) */
+		.fs-pattern.fs-pattern.fs-pattern.fs-pattern { display: none; }
 		/* the uploaded photo — ink, not decoration, on paper (16-login-bg.css) */
 		:root[data-wallpaper="file"] :is(.fs-shell, body:not(:has(.fs-shell))) { background-image: none; }
 		.cbi-section { break-inside: avoid; }

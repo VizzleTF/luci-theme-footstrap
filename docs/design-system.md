@@ -4,7 +4,7 @@ What the theme's values are and why they are those values. How the stylesheet is
 cascade is kept disciplined: [css.md](css.md). What the chrome does with them:
 [chrome.md](chrome.md).
 
-**There is one system.** One renderer (`menu-footstrap.js`), one template directory, one
+**There is one system.** One renderer (`fs-chrome.js`), one template directory, one
 `cascade.css`, one entry in `luci.themes`. Layout (sidebar or top bar) is a client setting,
 `:root[data-layout]`, always with an explicit value.
 
@@ -37,7 +37,7 @@ Reading export names from `base` was the wider hole still: `--text-color-high` i
 | after | **0** |
 
 The exception is a local variable declared inside the very rule that reads it (`--bd-color`,
-`--fg-color`, `--on-color`, `--focus-color`): a foreign `:root` cannot intercept those.
+`--fg-color`): a foreign `:root` cannot intercept those.
 
 ```css
 /* NO — reading an export name; the gate fails */
@@ -96,8 +96,8 @@ not — see below.
 ### Adding a palette
 
 `--fs-panel-base` and the four inks (`--fs-on-accent`, `--fs-on-good`, `--fs-on-warn`,
-`--fs-on-danger`) are `#fff` in every LIGHT palette today, so the default block (`:root,
-:root[data-palette="footstrap"]`) is their only definition — a new light block inherits them unset
+`--fs-on-danger`) are `#fff` in every LIGHT palette today, so the default block (bare
+`:root`) is their only definition — a new light block inherits them unset
 and sets only what differs from it. If a new palette needs a light ink other than `#fff` for AA
 (the way every DARK block does), declare that one property in its own block; nothing forces the
 five to stay shared, they just happen to agree so far.
@@ -105,11 +105,11 @@ five to stay shared, they just happen to agree so far.
 Copy the two hicontrast blocks (light and dark), set every colour the light block does NOT inherit
 from the default block above — five go through a `-base` pair so the tint/accent/colour axes can
 recolour them, since a palette never declares `--fs-good` etc. directly — and the dark block's own
-four inks, then register the name in four places, each failing differently and quietly if skipped:
-the PALETTE axis in `fs-prefs.js`, the `_sd_pal` whitelist and pre-paint switch in
-`partials/head.ut`, the label map in `fs-appearance.js`, and `matrix()` in `tools/lib/gallery.mjs`
-(absent there, `export-tier.mjs`, `a11y-gallery.mjs` and `placeholder-ink.mjs` never measure the
-new palette, and it ships ungated).
+four inks, then register the name in three places, each failing differently and quietly if skipped:
+the PALETTE axis in `fs-axes.js`, the `_sd_pal` whitelist and pre-paint switch in
+`partials/head.ut`, and the label map in `fs-appearance.js`. `matrix()` in `tools/lib/gallery.mjs`
+reads the palette list from the `:root[data-palette]` blocks, so the gates measure the new palette
+without being told.
 
 ### Surfaces carry no transparency axis
 
@@ -204,6 +204,10 @@ again under the query. It is the only gate that can: axe-core does not measure `
 all, and it is excluded from the `li[placeholder]` row that carries the same ink, since a rule
 reaching half a decision would fail it.
 
+The floors are a fraction of the ink-to-field range, not a flat lightness step, because that range
+is per palette: footstrap light has 0.724 of oklab lightness between ink and field and its dark
+half 0.464, which is also why the two floors differ (40 % light, 30 % dark).
+
 ## The derived ladder: four steps, and the matrix is deliberately full
 
 A tint of a role is mixed from that role, so it follows the palette and cannot go stale. What
@@ -277,8 +281,18 @@ custom property holds any token stream — an engine without it parses the ladde
 keeps the whole ladder and only pays a fractional pixel at the two non-default densities.
 `--fs-control-h` is rounded the same way, up to the 4px control ladder.
 
-**Weight** — three values, `--fs-weight-normal` 400 (no face of its own; resolves onto the 600
-face, which is why body text is semibold by design), `--fs-weight` 600 (the UI default) and
+**Field text** — `--fs-type-floor` is `max(16px, --fs-type-lg)`: iOS Safari zooms the page when a
+field under 16px takes focus and never zooms back, and `--fs-type-lg` alone is 14.4px at Compact.
+`--fs-type-field` (inputs, textareas, selects, dropdown rows) and `--fs-type-field-xs` (the table
+filter and the Appearance hex field, 11px on desktop) are the sizes typed text is set in: the body
+or dense size on desktop, and under `@media (max-width: 767px)` both become the floor, set once in
+`02-tokens.css`. Before this the floor was written as three spellings of one expression and a
+seven-selector list in `theme/90-responsive.css`, repeated only to out-specify the rules it
+overrode. The palette search field reads `--fs-type-floor` directly: it focuses as it opens, at any
+width.
+
+**Weight** — three values, `--fs-weight-normal` 400 ("not bold"; the face is whatever the installed
+family has, see "Sans: Manrope where present" below), `--fs-weight` 600 (the UI default) and
 `--fs-weight-bold` 700. `700`/`bold` and `400`/`normal` were both in use as the same weight before
 these were named.
 
@@ -341,12 +355,13 @@ at Large, so the two ends are deliberately not mirror images. Every type, spacin
 is a `calc()` over one of them — which is why the numbers below are quoted **at normal density**.
 
 **Shell geometry** — `--fs-sidebar-w` (224 px), `--fs-rail-w` (68 px), `--fs-content-min` (500 px),
-plus `--fs-content-max` (1280 px), `--fs-content-pad` (28 px) and `--fs-bar-h` (46 px) — **tokens
-rather than literals because the JS reads them**: `fitShell()` uses `getComputedStyle` to subtract
+`--fs-content-max` (1280 px) and `--fs-bar-h` (46 px) — **tokens rather than literals because the
+JS reads them**: `fitShell()` uses `getComputedStyle` to subtract
 the sidebar's slice from the viewport and decide whether the remaining column is readable. The JS
 used to keep its own copies against bare literals in the CSS, so narrowing the rail in styles left
 the measurement quietly subtracting the old width. Reading them through `getComputedStyle` is also
-what makes the measurement follow Density for free.
+what makes the measurement follow Density for free. `--fs-content-pad` (28 px) is a token too,
+but no JS reads it any more.
 
 Shadows are `--fs-shadow` (per mode) and `--fs-shadow-pop` (floating surfaces).
 
@@ -381,10 +396,11 @@ dispatcher node of its own. It can — the entry belongs to the package, not to 
 theme, so it is present for exactly as long as the package is installed, regardless of which theme
 is selected — and `docs/architecture.md` has the boundary that replaced the old belief.
 
-The values live in `fs-prefs.js`. Grouped the way the page groups them — **Interface** (Layout,
-Theme, Palette, Density, Rounding, Submenus), then the **Colours** fold (Tint and its strength, the
-four colour axes, the four surface axes), then the **Background** fold (Wallpaper, Dim, Pattern and
-its three axes, File), then **Defaults**:
+The values live in `fs-axes.js` (`fs-prefs.js` for dark mode, layout, auto-collapse and rail).
+Grouped the way the page groups them — **Interface** (Layout, Theme, Palette, Density, Rounding,
+Submenus), then the **Colours** fold (Tint and its strength, the four colour axes, the four surface
+axes), then the **Background** fold (Wallpaper, Dim, Pattern and its three axes, File), then
+**Defaults**:
 
 | Axis | Values | `localStorage` | `:root` |
 |---|---|---|---|
@@ -424,7 +440,7 @@ into that few stops.
 arrangement for the tiled SVG: both images' *bytes* are router-side — a file cannot live in
 `localStorage` — but how a given browser draws them is an ordinary axis. `--fs-login-bg-url` and
 `--fs-pattern-url` are `none` in `03-palettes.css`'s bare `:root` (the same default the hues carry)
-so the stylesheet stands on its own with no image selected; `head.ut` and `fs-prefs.js` stamp the
+so the stylesheet stands on its own with no image selected; `head.ut` and `fs-axes.js` stamp the
 real `url()` inline once one is. `--fs-photo-scrim` is mixed from `--fs-bg-base`, not the tinted
 `--fs-bg`: the tint colours the canvas and must never leak onto an uploaded photo, so the scrim
 stays neutral whatever hue is set.
@@ -498,13 +514,14 @@ now.
 declared a conffile** — see [package.md](package.md).
 
 **Every axis is implemented twice** — inline in `partials/head.ut` before first paint, where
-`require` is impossible because the module loader does not exist yet, and live in `fs-prefs.js`.
-The two cannot be merged byte for byte, so `tools/axes.mjs` derives the contract **from the JS** and
-checks the template against it: keys, `:root` attributes, custom properties, the 1–360 ranges, the
-rounding default — and the load-bearing ordering rule, **custom property first, attribute second**.
-Reversed, a reload paints exactly one frame in the previous hue. The gate exists for that one line:
-it would be fixed in the live applier and forgotten in the template, and the only symptom is a single
-wrong frame nobody reports.
+`require` is impossible because the module loader does not exist yet, and live in `fs-axes.js`
+(`fs-prefs.js` for dark mode, layout, auto-collapse and rail). The two cannot be merged byte for
+byte, so `tools/axes.mjs` derives the contract **from the JS** and checks the template against it:
+keys, `:root` attributes, custom properties, the 1–360 ranges, every slider's limits and default
+(JS, pre-paint, `_sd_range`, CSS token) — and the load-bearing ordering rule, **custom property
+first, attribute second**. Reversed, a reload paints exactly one frame in the previous hue. The gate
+exists for that one line: it would be fixed in the live applier and forgotten in the template, and
+the only symptom is a single wrong frame nobody reports.
 
 ### The colour axes, and why the slider went
 
@@ -512,20 +529,19 @@ Nine axes take a colour: Tint (the canvas), Accent, the three status colours Goo
 Warning / Danger, and the four surfaces Cards / Controls / Sidebar / Borders. Each holds one
 of three things — off, a hue 1–360°, or a `#rrggbb` — and `data-<axis>` carries `hue` or `hex` to
 say which. The surfaces are the exception and hold only a colour: they set an inline custom property
-and no attribute at all (`surfaceAxis` in `fs-prefs.js`), because there is nothing for a rule to
+and no attribute at all (`surfaceAxis` in `fs-axes.js`), because there is nothing for a rule to
 match.
 
 **The UI offers only the hex field.** The hue slider was here and is gone: rotating a hue keeps the
 palette's chroma, so no angle of it reaches a grey — which is the one thing #20 asked for. The hue
 mode stays in storage and in the stylesheet so a value saved before the change goes on painting.
 
-**The ink over a hex fill is derived, in CSS.** `--fs-on-accent` and the three status inks become
-`oklch(from <fill> clamp(0, (l - .62) * -100, 1) 0 0)` — black above the sRGB crossover, white
-below, chroma zeroed. The rule is written `[data-accent="hex"][data-accent][data-accent]`, (0,4,0)
-by the triple attribute, so it outranks a *named* palette's dark block
-(`[data-palette=…][data-darkmode="true"]`, (0,3,0)) regardless of source order — a single repeat
-only matched that block's specificity and left a grey accent carrying near-black ink at 1.9:1 in
-every named palette's dark mode. Surfaces get no derived ink — what reads on them is `--fs-text`, a
+**The ink over a hex fill is derived, in JS.** `--fs-on-accent` and the three status inks are
+written inline as black or white by `inkFor()` (`fs-axes.js`; the `head.ut` pre-paint holds a copy,
+and `npm run axes` keeps the two equal) — black above the sRGB crossover (OKLab L .62), white
+below. An inline custom property outranks every stylesheet rule, so a *named* palette's dark block
+(`[data-palette=…][data-darkmode="true"]`) cannot leave a grey accent carrying near-black ink
+(1.9:1 once did), and no engine needs relative colour for it. Surfaces get no derived ink — what reads on them is `--fs-text`, a
 palette token these axes must not move — so the page reports the contrast each choice lands at
 instead.
 
@@ -687,7 +703,7 @@ a variable font.
 | **Percent badge** | `font: 11/700; padding: 2px 7px`; colour + `-soft` fill by status | inline status in `.cbi-progressbar`, zonebadge |
 | **Status pill** | `--fs-radius-pill`; `--fs-panel2` fill, `--fs-border`; active text `--fs-good` | `#indicators [data-indicator]` |
 | **Menu item** | `--fs-radius`; active `--fs-accent-soft` on `--fs-accent`; inactive `--fs-dim` | `#topmenu li a`, sidebar nav |
-| **Logo** | 30px square, `--fs-radius`, gradient `--fs-accent` → `--fs-accent-lt`, wifi SVG on `currentColor`, wordmark 16/700 | `.fs-brand`/`.fs-logo` in `partials/brand.ut` |
+| **Logo** | `--fs-btn-size` square, `--fs-radius`, hairline border, 20px SVG with the ring `#002b49` (`#e6f4fb` under `data-darkmode`) and cyan arcs baked in, wordmark `--fs-type-lg`/700 | `.fs-brand`/`.fs-logo` in `header.ut` |
 | **Table row** | flex, space-between, 1px `--fs-border` bottom; label dim, value mono | `.cbi-value`, `.table .tr` |
 
 Rings, sparklines and port tiles from the mock-up are content, drawn by view JS — not something
@@ -695,7 +711,7 @@ a theme can produce. See the boundary in [architecture.md](architecture.md).
 
 ### Meter polarity
 
-`annotateMeter()` (`menu-footstrap-common.js`) colours a `.cbi-progressbar` from its fill
+`annotateMeter()` (`fs-overview.js`, the Overview module only) colours a `.cbi-progressbar` from its fill
 percentage — 80%/92% warn/danger, `docs/conventions.md` — but a fill is not always "how much is
 used". Forum #134 (2026-09-06) caught Status -> Overview's memory row 0, "Total Available" /
 «Свободно», turning yellow at 91% full: a HIGH reading there is healthy, not a warning. Row 4,
@@ -710,8 +726,8 @@ which comes back untranslated wherever it is tried — the trap this rule exists
 into a second time):
 
 1. **Inverted** ("Total Available", "Swap free"): the warn/danger split fires on a LOW reading —
-   `100 - FS_METER_WARN` / `100 - FS_METER_DANGER`, not a second pair of numbers, because an
-   inverted bar asks the identical health question ("how much headroom is left") from the other
+   the inverted bar reads `100 - level` against the same `FS_METER_WARN`/`FS_METER_DANGER`, not a
+   second pair of numbers, because an inverted bar asks the identical health question ("how much headroom is left") from the other
    end of the same fill.
 2. **Neutral** ("Buffered", "Cached"): no colour, ever. A full page cache is the kernel doing its
    job, not a resource running out — colouring it "danger" would say something false.

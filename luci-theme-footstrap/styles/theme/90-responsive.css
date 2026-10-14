@@ -4,27 +4,32 @@
 	@container fs-view (max-width: 360px) {
 		#view .cbi-button, #view .btn,
 		#view input[type="button"], #view input[type="submit"], #view input[type="reset"] {
+			/* @mirror btn-wrap/anywhere */
 			white-space: normal;
 			min-width: 0;
-			word-break: normal;
-			overflow-wrap: break-word;
+			overflow-wrap: anywhere;
+			/* @endmirror */
 		}
 	}
 
 	@media (max-width: 767px) {
 		/* foreign-<table> fallback unguarded now in theme/30-tables.css: fit is content/column, never viewport */
 
-		/* must stay INSIDE this @media: theme/65-dropdown.css's cap is (0,3,0) vs this (0,1,0) */
+		/* button dropdowns: no floor, capped to the column */
 		.cbi-dropdown { min-width: 0; max-width: 100%; }
+		/* form dropdowns: 65-dropdown.css's (0,3,0) 210px/400px floor outranks the rule above, a @media adds no
+		 * specificity; the doubled class lifts this one to (0,4,0), min() so a 320px modal field is not overflowed */
+		.cbi-dropdown.cbi-dropdown:not(.btn):not(.cbi-button) { min-width: min(210px, 100%); max-width: 100%; }
+		/* phone tier over 65-dropdown.css's `width: max-content` (0,3,1): the doubled class makes this (0,4,1); trigger already capped to field width, `auto` keeps the popup on-screen */
+		.cbi-dropdown[open] > ul.dropdown.dropdown { width: auto; }
 
-		/* base's 250px label overflows ~360px; !important beats package-manager.js's inline style */
+		/* package-manager.js injects an unlayered `.controls > * > label { min-width: 250px }` (overflows ~360px) and `.controls { display: flex }`; !important beats that sheet, and the two pager rows' inline display:none until the first display() */
 		:where(#view)[data-page="admin-system-package-manager"] .controls { display: block !important; }
 		/* :not(.pager): blocking it stacked « / text / » onto three lines */
 		:where(#view)[data-page="admin-system-package-manager"] .controls > div:not(.pager) { display: block !important; min-width: 0; margin-bottom: var(--fs-space-2); }
 		:where(#view)[data-page="admin-system-package-manager"] .controls > .pager {
 			display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: var(--fs-space-2);
 		}
-		:where(#view)[data-page="admin-system-package-manager"] .controls > .pager > .btn { flex: 0 0 auto; }
 		:where(#view)[data-page="admin-system-package-manager"] .controls > .pager > .text { flex: 0 1 auto; min-width: 0; }
 		/* disk gauge value moved BELOW the bar — docs/css.md "Responsive: the disk gauge value moves below the bar" */
 		:where(#view)[data-page="admin-system-package-manager"] label + .cbi-progressbar {
@@ -48,7 +53,7 @@
 		/* no `table.fs-dt { display: block }`: discards the table context — docs/css.md "Responsive: no `display: block` on `table.fs-dt`" */
 
 		/* generic caps: a field never exceeds its column */
-		.cbi-value-field input, .cbi-value-field select, .cbi-value-field .cbi-dropdown { max-width: 100%; }
+		.cbi-value-field input, .cbi-value-field select { max-width: 100%; }
 		/* content-sized leaves half the row empty; checkbox/radio/file keep intrinsic size */
 		.cbi-value-field select,
 		.cbi-value-field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
@@ -68,22 +73,6 @@
 		.table .th.hide-sm, .table .th.hide-xs { display: none; }
 		/* .col-N weights UNGUARDED now, theme/30-tables.css: flex is inert on a non-flex item */
 
-		/* iOS Safari zooms in when focused text is under 16px and never zooms back out */
-		input, textarea, select, .cbi-dropdown > ul > li { font-size: var(--fs-type-lg); }
-	}
-
-	/* anchored to its widget: ui.js's touch branch assumes the viewport as containing block; !important beats the inline style */
-	.cbi-dropdown[open] > ul.dropdown {
-		inset-inline-start: 0 !important;
-		inset-inline-end: auto !important;
-		min-width: 100%;
-		/* desktop only: min(92vw,420px) ignores trigger's left offset, grew past viewport under 767px (113 findings, task audit-09) */
-		width: max-content;
-		max-width: min(92vw, 420px);
-	}
-
-	@media (max-width: 767px) {
-		/* phone tier, after the rule above (later wins): trigger already capped to field width, `auto` keeps the popup on-screen */
-		.cbi-dropdown[open] > ul.dropdown { width: auto; }
+		/* no field-size rule here: the 16px iOS floor is the --fs-type-field token, set under this query in 02-tokens.css */
 	}
 }

@@ -1,8 +1,10 @@
 @layer tokens {
-	/* Static twin for each of the 33 color-mix() tokens, below Chrome 111 / Firefox 113 / Safari
-	 * 16.2. Last in the tokens layer, to outrank 02-tokens.css and 03-palettes.css. A fallback
-	 * declaration cannot do this job — a custom property fails at the point of USE, not of
-	 * definition. Degradation rules: docs/css.md "The browser floor". */
+	/* Static twin for each of the 26 color-mix() tokens (28 declarations: the two focus rings read
+	 * them), below Chrome 111 / Firefox 113 / Safari 16.2. Last in the tokens layer, to outrank
+	 * 02-tokens.css and 03-palettes.css. A fallback declaration cannot do this job — a custom
+	 * property fails at the point of USE, not of definition. A re-declaration of a twinned token
+	 * outside :root (dark blocks, theme layer) outranks it: re-state the percentage, or wrap the
+	 * block in the same @supports. Degradation rules: docs/css.md "The browser floor". */
 	@supports not (color: color-mix(in srgb, red 50%, transparent)) {
 		:root {
 			--fs-accent-soft: transparent;

@@ -54,7 +54,6 @@
 
 	.btn .close, .alert-message .close {
 		font-family: var(--fs-font-sans);
-		line-height: 1;
 	}
 
 	/* Colour-word block absorbed, do not re-add: .btn.<word> theme/55-buttons.css,

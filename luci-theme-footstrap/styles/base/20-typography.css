@@ -15,8 +15,6 @@
 	a {
 		color: var(--fs-accent);
 		text-decoration: none;
-		line-height: inherit;
-		font-weight: inherit;
 	}
 
 	a:hover {
@@ -64,7 +62,8 @@
 	}
 
 	ul, ol {
-		margin: 0 0 var(--fs-space-4) var(--fs-space-6);
+		margin-block: 0 var(--fs-space-4);
+		margin-inline: var(--fs-space-6) 0;
 	}
 
 	ul ul,
@@ -100,19 +99,11 @@
 
 	hr {
 		margin: var(--fs-space-5) 0;
-		border: 0;
 		border-bottom: var(--fs-hairline);
 	}
 
 	strong {
-		font-style: inherit;
 		font-weight: var(--fs-weight-bold);
-	}
-
-	em {
-		font-style: italic;
-		font-weight: inherit;
-		line-height: inherit;
 	}
 
 	small { font-size: var(--fs-type) }

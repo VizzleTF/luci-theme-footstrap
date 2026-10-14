@@ -49,7 +49,8 @@
 	/* clears the button's own side inset so the label starts on its text, unflagged (0,3,1) over the rule above's (0,1,1) */
 	.cbi-dropdown.btn > ul:not(.dropdown),
 	.cbi-dropdown.cbi-button > ul:not(.dropdown) {
-		margin: 0 0 0 var(--fs-space-3);
+		margin-block: 0;
+		margin-inline: var(--fs-space-3) 0;
 	}
 	.cbi-dropdown.btn.spinning > ul:not(.dropdown),
 	.cbi-dropdown.cbi-button.spinning > ul:not(.dropdown) {
@@ -76,6 +77,7 @@
 	}
 	.cbi-dropdown > ul > li {
 		display: none;
+		font-size: var(--fs-type-field);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -108,22 +110,20 @@
 		margin-inline-end: .25em;
 	}
 	.cbi-dropdown > ul > li > form > input[type="checkbox"] {
-		margin: 0 var(--fs-space-1) 0 0;
+		margin-block: 0;
+		margin-inline: 0 var(--fs-space-1);
 	}
 
 	/* ---- the display state machine, on specificity (docs/css.md has the per-selector table) ---- */
+	/* a closed optional dropdown with an empty value renders EMPTY unflagged too: the placeholder
+	 * hider out-specifies the generic shower. :not([open]) keeps this out of the open list. */
 	.cbi-dropdown > ul > li[display],
 	.cbi-dropdown[open] > ul.preview,
 	.cbi-dropdown[open] > ul.dropdown > li,
 	.cbi-dropdown[multiple] > ul > li > label,
 	.cbi-dropdown[multiple][open] > ul.dropdown > li,
 	.cbi-dropdown[multiple][more] > .more,
-	.cbi-dropdown[multiple][empty] > .more {
-		flex-grow: 1;
-		display: flex;
-	}
-	/* a closed optional dropdown with an empty value renders EMPTY unflagged too: the placeholder
-	 * hider out-specifies the generic shower. :not([open]) keeps this out of the open list. */
+	.cbi-dropdown[multiple][empty] > .more,
 	.cbi-dropdown:not([open]):not(.btn):not(.cbi-button) > ul > li[placeholder][display] {
 		flex-grow: 1;
 		display: flex;
@@ -152,21 +152,17 @@
 		border-radius: var(--fs-radius);
 		color: var(--fs-text);
 		min-height: var(--fs-ctl-h);
-		/* fixed height is load-bearing next to min-height: without it a closed dropdown grows to
-		 * its tallest child (Save & Apply's 40px button, measured 38 -> 42px on the gallery) */
-		height: var(--fs-control-h);
+		/* fixed height: without it a closed dropdown grows to its tallest child (Save & Apply's
+		 * 40px button, measured 38 -> 42px on the gallery); --fs-ctl-h, since the min-height floor always won */
+		height: var(--fs-ctl-h);
 		font-size: var(--fs-type);
 		transition: var(--fs-field-transition);
 		/* absorbed from base/30-forms.css; NOT the dynlist's numbers (240/440) — one value vs a column of them */
 		min-width: 210px;
 		max-width: 400px;
 		width: auto;
-		/* base carried `!important` here to beat its OWN generic form-field rule at higher
-		 * specificity (0,3,0 vs 0,1,0); a later LAYER beats it for free */
-		display: inline-flex;
-		padding: 0;
 	}
-	.cbi-dropdown.btn, .cbi-dropdown.cbi-button { display: inline-flex; padding: 0; }
+	.cbi-dropdown.btn, .cbi-dropdown.cbi-button { padding: 0; }
 	.cbi-dropdown:not(.btn):not(.cbi-button):hover { border-color: var(--fs-dim); }
 	.cbi-dropdown:focus, .cbi-dropdown[open] {
 		border-color: var(--fs-accent);
@@ -233,10 +229,17 @@
 		box-shadow: var(--fs-shadow-pop);
 		padding: var(--fs-space-1-5);
 		margin-top: var(--fs-space-1-5);
+		/* anchored to its widget: ui.js's touch branch assumes the viewport as containing block; !important beats the inline style */
+		inset-inline-start: 0 !important;
+		inset-inline-end: auto !important;
+		min-width: 100%;
+		/* desktop only: min(92vw,420px) ignores trigger's left offset, grew past viewport under 767px (113 findings) */
+		width: max-content;
+		max-width: min(92vw, 420px);
 	}
 	.cbi-dropdown[open] > ul.dropdown > li {
-		border-radius: var(--fs-radius-sm); padding: var(--fs-space-2) var(--fs-space-3);
-		border-inline-start: 0; color: var(--fs-text);
+		border-radius: var(--fs-radius-sm);
+		border-inline-start: 0;
 		position: relative;
 		/* an OPEN row wraps; only the closed preview ellipsizes — the menu is capped at
 		 * min(92vw, 420px), so a verbose option would otherwise decide the width of every menu */
@@ -247,7 +250,7 @@
 	/* The row's own wrap above never reaches a `.zonebadge` (base/95-luci.css): `white-space: nowrap`
 	 * there, right for a one-line pill in a table cell, wrong here where a multi-homed interface
 	 * (RichListValue) nests two `.ifacebadge` chips in one badge with no space between them — an
-	 * unbreakable 254-258px at 320px (`R` past the 320px viewport, task audit-09), overflowing
+	 * unbreakable 254-258px at 320px (`R` past the 320px viewport), overflowing
 	 * regardless of the popup's own width. Scoped to the open list only: every other `.zonebadge`
 	 * keeps `nowrap`. */
 	.cbi-dropdown[open] > ul.dropdown > li .zonebadge {
@@ -268,7 +271,6 @@
 	}
 	/* theme's ring, not the UA's outline:auto; inset, since the menu clips overflow, rail rides
 	 * INSIDE it so a focused+selected row keeps both */
-	.cbi-dropdown[open] > ul.dropdown > li[selected]:focus-visible,
 	.cbi-dropdown[open] > ul.dropdown > li:focus-visible {
 		outline: none;
 		box-shadow: var(--fs-row-rail), inset 0 0 0 2px var(--fs-accent-soft);
@@ -303,12 +305,14 @@
 	 * "Dropdown: 992px, not 960" has the padding subtraction and the regression it fixed. */
 	@container fs-content (max-width: 992px) {
 		.table.cbi-section-table,
+		.table.cbi-section-table .thead,
 		.table.cbi-section-table .tbody,
 		.table.cbi-section-table .td { display: block; width: auto; }
-		/* hide the header in BOTH markups (form.js's .thead, the Lua CBI's bare
-		 * tr.cbi-section-table-titles) — a card repeats every label, the header is a duplicate */
-		.table.cbi-section-table .thead,
-		.table.cbi-section-table .tr.cbi-section-table-titles,
+		/* a card repeats every label, so the header goes in BOTH markups (form.js's .thead children,
+		 * the Lua CBI's bare titles/descr rows) — except the opt-in Table Filters row (25.12 tags it
+		 * -titles too): no card repeats it, and hidden its 4 gallery controls rendered 0x0 */
+		.table.cbi-section-table .thead > :not(.cbi-section-table-filter),
+		.table.cbi-section-table .tr.cbi-section-table-titles:not(.cbi-section-table-filter),
 		.table.cbi-section-table .tr.cbi-section-table-descr { display: none; }
 		/* stretch (not flex-start) keeps a pair's cells the same height when one wraps */
 		.table.cbi-section-table .tr {
@@ -328,6 +332,12 @@
 			/* overflow-wrap: anywhere for opaque tokens (a real IPv6 GUA has no break point) — one
 			 * ran 156px past a 360px viewport before this */
 			overflow-wrap: anywhere; white-space: normal;
+		}
+		/* the filter cells are .th, so the .td rule above never reaches them: one field per card
+		 * line, and no row divider (.cbi-section .table .th's border-bottom) between fields */
+		.table.cbi-section-table .tr.cbi-section-table-filter > .th {
+			flex: 1 1 100%; min-width: 0; border: 0;
+			padding-block: var(--fs-space-1-5); padding-inline: 0 var(--fs-space-2-5);
 		}
 		/* a cell that only READS a value is short, two fit a line; a real widget keeps full width (a dropdown at half a phone's width is unusable) */
 		.table.cbi-section-table .td[data-widget="CBI.DummyValue"],
@@ -360,9 +370,6 @@
 			flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: var(--fs-space-2);
 			/* @endmirror */
 		}
-		.table.cbi-section-table .td .cbi-dropdown,
-		.table.cbi-section-table .td select,
-		.table.cbi-section-table .td input[type="text"] { width: 100%; min-width: 0; }
 		.table.cbi-section-table .td .zone-forwards { width: 100%; }
 	}
 

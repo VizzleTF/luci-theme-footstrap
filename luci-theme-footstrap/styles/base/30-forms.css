@@ -5,16 +5,15 @@
 		padding-top: var(--fs-space-2);
 	}
 
-	/* size: theme/30-tables.css (legend) — absorbed */
+	/* size + ink: theme/30-tables.css (legend) — absorbed */
 	fieldset legend {
 		display: block;
 		line-height: 1;
-		color: var(--fs-text);
 		padding-top: var(--fs-space-5);
 	}
 
 	/* Stays in BASE: docs/css.md "Forms: control typography stays in base, on purpose". select is
-	 * excluded — face/size/leading live in theme/60-inputs.css. */
+	 * excluded, and an input's size is theme/60-inputs.css's --fs-type-field. */
 	label,
 	input,
 	button {
@@ -27,7 +26,6 @@
 	.cbi-value {
 		display: flex;
 		flex-wrap: wrap;
-		margin-bottom: var(--fs-space-4);
 		align-items: baseline;
 	}
 
@@ -55,7 +53,6 @@
 	label > input[type="checkbox"],
 	label > input[type="radio"] {
 		vertical-align: text-top;
-		margin: 0;
 	}
 
 	label[for] {
@@ -73,8 +70,8 @@
 
 	/* item paint: theme/60-inputs.css — absorbed. Left: drag-and-drop machinery (UIDynamicList). */
 	.cbi-dynlist > .item {
-		margin-bottom: var(--fs-space-1);
-		padding: var(--fs-space-1) 2em var(--fs-space-1) var(--fs-space-2);
+		padding-block: var(--fs-space-1);
+		padding-inline: var(--fs-space-2) 2em;
 		position: relative;
 		pointer-events: auto;
 		overflow: hidden;
@@ -95,10 +92,7 @@
 		pointer-events: auto;
 	}
 
-	.cbi-dynlist > .item.drag-over {
-		border-top: 1px solid var(--fs-text);
-	}
-
+	/* drop indicator (.drag-over): theme/60-inputs.css — a base rule lost to the theme border shorthands by layer */
 	.cbi-dynlist > .item.dragging {
 		opacity: .5;
 	}
@@ -109,14 +103,6 @@
 
 	.cbi-dynlist > .add-item {
 		display: flex;
-	}
-
-	.cbi-dynlist > .add-item > .cbi-input-text.drag-over {
-		border-top: 1px solid var(--fs-text);
-	}
-
-	.cbi-dynlist > .add-item > .cbi-button-add.drag-over {
-		border-top: 1px solid var(--fs-text);
 	}
 
 	.cbi-dynlist > .add-item > input,
@@ -156,11 +142,7 @@
 	button[disabled],
 	select[disabled],
 	textarea[disabled],
-	.cbi-dropdown[disabled]:not(.btn):not(.cbi-button),
-	input[type="checkbox"][disabled]::before,
-	input[type="checkbox"][disabled]::after,
-	input[type="radio"][disabled]::before,
-	input[type="radio"][disabled]::after {
+	.cbi-dropdown[disabled]:not(.btn):not(.cbi-button) {
 		opacity: var(--fs-disabled-opacity);
 		pointer-events: none;
 		cursor: default;
@@ -170,7 +152,8 @@
 
 	.cbi-optionals,
 	.cbi-section-create {
-		padding: 0 0 var(--fs-space-3) var(--fs-space-3);
+		padding-block: 0 var(--fs-space-3);
+		padding-inline: var(--fs-space-3) 0;
 	}
 
 	.cbi-section-create {

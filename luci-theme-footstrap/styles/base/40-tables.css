@@ -27,7 +27,7 @@
 	 * the tier, not the file". First column is a label too; exempt once carded (.fs-stacked .td,
 	 * theme/30-tables.css). */
 	.table .td { overflow-wrap: anywhere; }
-	.table .th { overflow-wrap: break-word; }
+	.table .th,
 	.table .tr > .td:first-child { overflow-wrap: break-word; }
 
 	.table .tr:first-child .th {

@@ -24,7 +24,7 @@
 	/* column 4 = Description, matched by index — a `[data-title]` value is a translated string. */
 	#packages.fs-stacked .td:nth-child(4) { display: block; text-align: start; }
 	#packages.fs-stacked .td:nth-child(4)::before { display: block; margin-bottom: var(--fs-space-1); }
-	#packages.fs-stacked .td.cbi-section-actions { justify-content: flex-end; margin-top: var(--fs-space-1-5); }
+	#packages.fs-stacked .td.cbi-section-actions { margin-top: var(--fs-space-1-5); }
 	#packages.fs-stacked .td.cbi-section-actions::before,
 	#packages.fs-stacked .td:not([data-title])::before { content: none; }
 

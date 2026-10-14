@@ -1,12 +1,11 @@
 @layer theme {
-	/* one component, four LuCI selectors, no markup difference worth honouring: #tabmenu ul.tabs
-	 * (page tabs), ul.cbi-tabmenu.mode (mode switcher), .tabs (view tabs), .cbi-tabmenu (CBI form
-	 * tabs). Active marker: .active on ul.tabs, .cbi-tab on every .cbi-tabmenu flavour. */
+	/* one component, three LuCI selectors, no markup difference worth honouring: #tabmenu ul.tabs
+	 * (page tabs), .tabs (view tabs), .cbi-tabmenu (CBI form tabs, the mode switcher included).
+	 * Active marker: .active on ul.tabs, .cbi-tab on every .cbi-tabmenu flavour. */
 	#tabmenu { margin-bottom: 0; }
 
 	/* the card */
 	#tabmenu ul.tabs,
-	ul.cbi-tabmenu.mode,
 	.tabs,
 	.cbi-tabmenu {
 		display: flex;
@@ -32,7 +31,6 @@
 	}
 
 	#tabmenu ul.tabs > li,
-	ul.cbi-tabmenu.mode > li,
 	.tabs > li,
 	.cbi-tabmenu > li {
 		height: auto;
@@ -57,7 +55,6 @@
 	}
 
 	#tabmenu ul.tabs > li > a,
-	ul.cbi-tabmenu.mode > li > a,
 	.tabs > li > a,
 	.cbi-tabmenu > li > a {
 		display: block;
@@ -73,7 +70,6 @@
 	}
 
 	#tabmenu ul.tabs > li > a:hover,
-	ul.cbi-tabmenu.mode > li > a:hover,
 	.tabs > li > a:hover,
 	.cbi-tabmenu > li > a:hover {
 		background: var(--fs-accent-soft);
@@ -82,13 +78,11 @@
 
 	/* active pill */
 	#tabmenu ul.tabs > li.active,
-	ul.cbi-tabmenu.mode > li.cbi-tab,
 	.tabs > li.active,
 	.cbi-tabmenu > li.cbi-tab {
 		color: var(--fs-on-accent);
 	}
 	#tabmenu ul.tabs > li.active > a,
-	ul.cbi-tabmenu.mode > li.cbi-tab > a,
 	.tabs > li.active > a,
 	.cbi-tabmenu > li.cbi-tab > a {
 		background: var(--fs-accent);
@@ -100,25 +94,17 @@
 	 * pill, whose background is the same accent — docs/chrome.md "Tab strips" has the contrast
 	 * numbers. box-shadow, not outline, because the strip clips and a shadow is not */
 	#tabmenu ul.tabs > li > a:focus-visible,
-	ul.cbi-tabmenu.mode > li > a:focus-visible,
 	.tabs > li > a:focus-visible,
 	.cbi-tabmenu > li > a:focus-visible {
 		outline: none;
 		box-shadow: var(--fs-focus-ring-solo);
 	}
 
-	/* dense1 -> dense2 (fitTabStrips, fs-chrome.js) escalate mutually exclusively on wrap; both
-	 * give the pill the same padding, dense2 alone also tightens the strip's own gap */
-	#tabmenu ul.tabs.fs-dense1 > li > a,
-	.tabs.fs-dense1 > li > a,
-	.cbi-tabmenu.fs-dense1 > li > a { padding: var(--fs-space-1) var(--fs-space-2); }
-
-	#tabmenu ul.tabs.fs-dense2,
-	.tabs.fs-dense2,
-	.cbi-tabmenu.fs-dense2 { gap: var(--fs-space-1); }
-	#tabmenu ul.tabs.fs-dense2 > li > a,
-	.tabs.fs-dense2 > li > a,
-	.cbi-tabmenu.fs-dense2 > li > a { padding: var(--fs-space-1) var(--fs-space-2); font-size: var(--fs-type); }
+	/* fitTabStrips (fs-chrome.js) escalates dense1 -> dense2 on wrap; for tabs both are the same
+	 * pill padding (gap and font-size already equal the base), so one list serves both */
+	#tabmenu ul.tabs:is(.fs-dense1, .fs-dense2) > li > a,
+	.tabs:is(.fs-dense1, .fs-dense2) > li > a,
+	.cbi-tabmenu:is(.fs-dense1, .fs-dense2) > li > a { padding: var(--fs-space-1) var(--fs-space-2); }
 
 	/* map-level tabs keep the body font size instead of base's 16.5px/bold */
 	.cbi-tabmenu.map > li { font-size: var(--fs-type); font-weight: var(--fs-weight); }

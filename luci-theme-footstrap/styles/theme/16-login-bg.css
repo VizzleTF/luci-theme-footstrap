@@ -8,7 +8,4 @@
 		background-repeat: no-repeat;
 		background-attachment: fixed; /* one calm backdrop the page scrolls under, not a sliding strip */
 	}
-	/* transparent: an opaque --fs-bg here would cover the shell's one background layer. */
-	:root[data-wallpaper="file"] .fs-main { background-color: transparent; }
-	:root[data-wallpaper="file"] footer.fs-footer { background: transparent; }
 }

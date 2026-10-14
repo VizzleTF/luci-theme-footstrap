@@ -3,10 +3,11 @@
 	 * Markup: ucode/template/themes/footstrap/header.ut · spec: docs/chrome.md */
 
 	body {
-		padding: 0;
 		background-color: var(--fs-bg);
 		font-family: var(--fs-font-sans);
 	}
+	/* One stroke for every chrome icon (header.ut, svgIcon()): 5 attributes per <svg> were 300 B of each admin page */
+	.fs-ico, .fs-chevron { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 	/* placement only — the look lives in 10-chrome.css */
 	.fs-brand { flex: 1 1 auto; min-width: 0; }
 	/* Hostname handling, two rules for two failures — chrome.md, "Hostname handling". */
@@ -25,13 +26,9 @@
 		transition: background var(--fs-dur), border-color var(--fs-dur), color var(--fs-dur);
 	}
 	.fs-railtoggle:hover { color: var(--fs-text); background: var(--fs-panel2); border-color: var(--fs-border); }
-	.fs-railtoggle .fs-ico { width: 16px; height: 16px; transition: transform var(--fs-dur-move); }
-	.fs-sidebar ul.nav,
-	.fs-sidebar #modemenu {
-		list-style: none;
-		margin: 0; padding: 0;
-		display: flex;
-	}
+	.fs-railtoggle .fs-ico { width: 16px; height: 16px; transition: rotate var(--fs-dur-move); }
+	/* base `ul` gives a 24px inline-start margin and a disc; padding is already 0 (reset) */
+	.fs-modemenu { list-style: none; margin: 0; }
 	.fs-sidebar ul.nav > li > a .fs-label { flex: 1 1 auto; }
 	/* collapse chevron for sections with children */
 	.fs-chevron {
@@ -43,16 +40,13 @@
 	 * so the RTL mirror below sets `scale` without either rule restating the other's value. */
 	.fs-sidebar ul.nav > li.open > a .fs-chevron { rotate: 90deg; }
 	/* The two chevrons are DIRECTION, not decoration, so with the document flipped (head.ut
-	 * stamps dir) they must be mirrored explicitly — logical properties do that for everything
-	 * else in the chrome, but a glyph needs the transform. */
+	 * stamps dir) they must be mirrored explicitly — logical properties flip the box sides
+	 * (margin, padding, inset, radius), but a glyph needs the transform. */
 	:root[dir="rtl"] .fs-chevron,
 	:root[dir="rtl"] .fs-railtoggle .fs-ico { scale: -1 1; }
 	.fs-sidebar ul.nav > li.has-sub > a { cursor: pointer; }
-	.fs-sidebar ul.nav ul {
-		list-style: none;
-	}
-	/* .fs-logout's display/align/colour are shared chrome (10-chrome.css) — do not restate
-	 * them; only its LAYOUT (square button vs full-width row) belongs to a layout block. */
+	/* .fs-logout shares the .fs-themerow button rule below (display, colour, box); only its
+	 * LAYOUT (square button vs full-width row) differs per layout block. */
 
 
 	/* The bar is the default chrome and the only copy of it, unguarded — chrome.md, "The bar:
@@ -79,11 +73,15 @@
 	/* the bar has no section caption, no column to collapse, and its height follows its
 	 * content — so the flex filler has nothing to fill */
 	.fs-navlabel, .fs-spacer, .fs-railtoggle, .fs-modemenu { display: none; }
+	/* the mode strip opts in at 2+ modes; empty (before renderModeMenu in fs-chrome.js runs: no gap, no brand
+	 * shift) or `.single` stays hidden by the line above. */
+	.fs-modemenu:not(:empty):not(.single) { display: flex; }
 
 	/* the menu on its own full-width row beneath the brand. The DESKTOP bar lifts it back
 	 * onto the brand's row whenever it fits — MEASURED, not a breakpoint
 	 * (fs-chrome.js fitChrome adds .fs-bar-stack when it does NOT fit). */
 	.fs-sidebar ul.nav {
+		display: flex;
 		order: 3; flex: 1 1 100%;
 		flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--fs-space-0-5);
 	}
@@ -101,10 +99,9 @@
 	.fs-sidebar ul.nav > li > a .fs-chevron { display: none; }
 
 	/* popup card under its own item, sized to content and capped to the viewport; clampDropdown
-	 * (menu-footstrap.js) nudges one back inside near the right edge, every bar state. */
-	.fs-sidebar ul.nav ul,
-	.fs-sidebar ul.nav > li.open > ul {
-		display: none;
+	 * (fs-chrome.js) nudges one back inside near the inline-end edge, every bar state. */
+	.fs-sidebar ul.nav ul {
+		display: none; list-style: none;
 		position: absolute; inset-inline: 0 auto; top: calc(100% + 8px); z-index: var(--fs-z-flyout);
 		width: max-content; min-width: 200px; max-width: calc(100vw - 32px);
 		margin: 0; padding: var(--fs-space-2);
@@ -124,29 +121,32 @@
 		.fs-sidebar ul.nav > li.has-sub:hover > ul { display: block; }
 	}
 	.fs-sidebar ul.nav > li.has-sub.open > ul { display: block; }
-	/* a submenu link is the same link in every layout — only its PADDING differs (denser
-	 * inside a popup than in the accordion), which is all the vertical override restates. */
+	/* a submenu link is the same link in every layout, the accordion included. */
 	.fs-sidebar ul.nav ul a {
 		display: block; padding: var(--fs-space-2) var(--fs-space-3); border-radius: var(--fs-radius-sm);
 		color: var(--fs-dim); font-size: var(--fs-type); font-weight: var(--fs-weight);
 	}
 
-	/* right cluster: the poll pill, then Appearance and Log out as square icon buttons.
+	/* right cluster: the poll pill, then Search and Log out as square icon buttons.
 	 * LuCI's #indicators (poll "Refreshing", unsaved changes) collapses when empty, so it
 	 * only shows when there is something to report. */
 	.fs-sidebar #indicators {
-		display: flex; flex-wrap: wrap; gap: var(--fs-space-1-5);
+		display: flex; flex-wrap: wrap; align-items: center; gap: var(--fs-space-1-5);
 		order: 2; margin-inline-start: auto; padding: 0;
 	}
 
-	.fs-themerow {
+	/* the square icon button both far-edge controls are; .fs-themerow adds only what a <button> needs */
+	.fs-themerow, .fs-logout {
 		display: flex; align-items: center; justify-content: center;
-		flex: 0 0 auto; order: 2; margin-inline-start: auto;
-		/* see the :not(:empty) rule below — two auto margins would SPLIT the free space between
-		 * them instead of pushing one cluster to the bar's far edge */
+		flex: 0 0 auto; order: 2;
 		width: var(--fs-btn-size); height: var(--fs-btn-size); padding: 0;
 		border: var(--fs-hairline); border-radius: var(--fs-radius);
 		background: transparent; color: var(--fs-dim);
+	}
+	.fs-themerow {
+		margin-inline-start: auto;
+		/* see the :not(:empty) rule below — two auto margins would SPLIT the free space between
+		 * them instead of pushing one cluster to the bar's far edge */
 		font: inherit; font-weight: var(--fs-weight); font-size: var(--fs-type); line-height: 1.1;
 		text-align: start; cursor: pointer;
 		transition: background var(--fs-dur), border-color var(--fs-dur), color var(--fs-dur);
@@ -192,15 +192,6 @@
 	 * SPLITS the free space between the two and the pill drifts away from the buttons.
 	 * .fs-themerow keeps its own auto for when the pill is empty and collapsed. */
 	.fs-sidebar #indicators:not(:empty) ~ .fs-themerow { margin-inline-start: 0; }
-	/* …and there are TWO .fs-themerow buttons now (Search, then Appearance), so the same split
-	 * would happen between THEM whenever the pill is collapsed: the second one stands down too. */
-	.fs-themerow ~ .fs-themerow { margin-inline-start: 0; }
-	.fs-logout {
-		flex: 0 0 auto; order: 2; justify-content: center;
-		width: var(--fs-btn-size); height: var(--fs-btn-size); padding: 0;
-		border: var(--fs-hairline); border-radius: var(--fs-radius);
-		background: transparent;
-	}
 	/* on a square button the BORDER carries the state — the fill and the ink come from the
 	 * shared hover/active groups in 10-chrome.css */
 	.fs-themerow:hover,
@@ -245,7 +236,7 @@
 		 * or the brand is capped twice, at the wrong value */
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-brandrow {
 			display: flex; align-items: center; gap: var(--fs-space-1-5);
-			flex: 0 0 auto; order: 0; min-width: auto; max-width: none; padding: 0 var(--fs-space-1) var(--fs-space-5) var(--fs-space-2);
+			flex: 0 0 auto; order: 0; min-width: auto; max-width: none; padding-block: 0 var(--fs-space-5); padding-inline: var(--fs-space-2) var(--fs-space-1);
 		}
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-navlabel {
 			display: block;
@@ -256,10 +247,9 @@
 		}
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-spacer { display: block; flex: 1 1 auto; min-height: 12px; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-railtoggle { display: inline-flex; }
-		/* :not(:empty):not(.single) in the SHOW rule, not a separate hide pair: the bar's base
-		 * rule (top of this file) already hides .fs-modemenu, so an empty/single-mode strip
-		 * simply never opts in. */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-modemenu:not(:empty):not(.single) { display: flex; margin-top: var(--fs-space-1); }
+		/* spacing only: whether the strip shows is the bar's :not(:empty):not(.single) rule above,
+		 * and the rail's hide below outranks it (0,5,0 vs 0,3,0). */
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-modemenu { margin-top: var(--fs-space-1); }
 
 		/* vertical main nav */
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav,
@@ -267,17 +257,15 @@
 			order: 0; flex: 0 1 auto;
 			flex-direction: column; flex-wrap: nowrap; align-items: normal; gap: var(--fs-space-0-5);
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li,
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub { position: relative; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li { position: relative; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a {
-			display: flex; align-items: center; gap: var(--fs-space-3);
+			gap: var(--fs-space-3);
 			padding: var(--fs-space-2-5) var(--fs-space-3);
-			/* Bold is the root level's own signal (--fs-weight-normal has no face of its own, so
-			 * lightening children reads as hierarchy instead); only the accordion needs it. */
-			font-size: var(--fs-type); font-weight: var(--fs-weight-bold); white-space: normal;
+			/* Bold is the root level's own signal (lightening children reads as hierarchy instead); only the accordion needs it. */
+			font-weight: var(--fs-weight-bold); white-space: normal;
 			line-height: 1.1;
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a .fs-ico { display: block; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a .fs-ico,
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a .fs-chevron { display: block; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav .fs-ico,
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow .fs-ico,
@@ -292,7 +280,7 @@
 			position: static; top: auto; inset-inline: auto; z-index: auto;
 			width: auto; min-width: 0; max-width: none;
 			flex-direction: column; gap: var(--fs-space-0-5);
-			margin: 0 0 0 var(--fs-space-7); padding: 0;
+			margin-block: 0; margin-inline: var(--fs-space-7) 0; padding: 0;
 			background: none;
 			border: 0; border-radius: 0; box-shadow: none;
 			overflow: hidden;
@@ -305,56 +293,44 @@
 		 * guard needed — the rail's own rule below restates these at higher specificity. */
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.open > ul {
 			display: flex;
-			margin: var(--fs-space-1) 0 var(--fs-space-3) var(--fs-space-7);
+			margin-block: var(--fs-space-1) var(--fs-space-3);
+			margin-inline: var(--fs-space-7) 0;
 			padding-inline-start: var(--fs-space-1);
 			border-inline-start: var(--fs-hairline);
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav ul a { padding: var(--fs-space-2) var(--fs-space-3); }
 
-		/* the Appearance trigger and Log out are full-width text rows down here */
+		/* Search and Log out are full-width text rows down here */
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow,
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout {
 			order: 0; margin-inline-start: 0;
 			width: 100%; height: auto;
 			justify-content: normal;
 			gap: var(--fs-space-3); padding: var(--fs-space-2-5) var(--fs-space-3);
-			border: 0; border-radius: var(--fs-radius);
-			background: transparent;
+			border: 0;
+			/* no background here: at (0,4,0) it would out-rank the (0,2,0) hover and open plates in 10-chrome.css */
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow { text-align: start; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout { font-weight: var(--fs-weight); font-size: var(--fs-type); }
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout:hover { background: var(--fs-panel2); border-color: transparent; }
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow:hover,
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow[aria-expanded="true"] { border-color: transparent; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout:hover { background: var(--fs-panel2); }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow .fs-label,
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout .fs-label { display: block; flex: 1 1 auto; }
 
-		/* the poll pill sits in the sidebar footer, above Appearance */
+		/* the poll pill sits in the sidebar footer, above Search */
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar #indicators {
 			order: 0; margin-inline-start: 0;
-			flex-wrap: wrap; gap: var(--fs-space-1-5);
 			padding: 0 var(--fs-space-1-5) var(--fs-space-1);
 		}
 		/* In the column the indicator is one of a stack of ROWS, not a row of buttons —
-		 * Appearance and Log out below it run the sidebar's full width, so a pill at its own
+		 * Search and Log out below it run the sidebar's full width, so a pill at its own
 		 * content width read as a stray chip. */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar #indicators .label,
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar #indicators [data-indicator] {
 			flex: 1 1 100%;
 			justify-content: center;
 		}
-	}
 
-
-	/* The Appearance controls used to live here (a popover on <body>). They are a PAGE now
-	 * (System -> Appearance): styles/pages/80-appearance.css. */
-
-	/* Collapsed sidebar (icon rail): <html data-rail="true">, persisted in localStorage and
-	 * re-applied before paint by head.ut. Labels collapse and a section's submenu becomes a
-	 * flyout anchored right of its icon. The guard below must equal the vertical sidebar's
-	 * exactly — chrome.md, "The rail's guard must be the vertical sidebar's, exactly". */
-	@media (min-width: 521px) {
+		/* Collapsed sidebar (icon rail): <html data-rail="true">, persisted in localStorage and
+		 * re-applied before paint by head.ut. Labels collapse and a section's submenu becomes a
+		 * flyout anchored at its icon's inline-end. Same block as the vertical sidebar, so the two guards
+		 * cannot drift — chrome.md, "The rail's guard must be the vertical sidebar's, exactly". */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar {
 			width: var(--fs-rail-w); padding: var(--fs-space-5) var(--fs-space-2-5);
 			/* the default `overflow-y: auto` computes overflow-x to `auto` as well,
@@ -400,11 +376,11 @@
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li:not(.has-sub) > a:hover::after { opacity: 1; }
 
 		/* the flyout: opened by hover on a mouse, or by .open which the menu JS toggles on tap
-		 * (exclusively — menu-footstrap.js flyoutMode). Hover gated on a real pointer: mobile
+		 * (exclusively — fs-chrome.js flyoutMode). Hover gated on a real pointer: mobile
 		 * browsers leave :hover stuck on the tapped element, which would block tap-to-close. */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub > ul {
 			display: none;
-			position: absolute; inset-inline-start: 100%; top: -8px; margin: 0; margin-inline-start: var(--fs-space-2-5);
+			position: absolute; inset-inline-start: 100%; top: -8px; margin-block: 0; margin-inline: var(--fs-space-2-5) 0;
 			min-width: 196px; padding: var(--fs-space-2); z-index: var(--fs-z-flyout);
 			background: var(--fs-panel); border: var(--fs-hairline); border-radius: var(--fs-radius-lg);
 			box-shadow: var(--fs-shadow-pop);
@@ -452,13 +428,13 @@
 
 		/* Badges its count instead of wrapping its prose (issue #14) — chrome.md, "A
 		 * collapsed-rail indicator badges its count". One rule per box: two would need an extra
-		 * attribute + :not() past the css-metrics specificity ratchet. `.fs-sidebar` is
+		 * attribute + :not() past stylelint's selector-max-specificity (1,7,0). `.fs-sidebar` is
 		 * deliberately absent: #indicators is an id. */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] #indicators [data-indicator]:not([data-indicator="poll-status"]) {
 			/* min-width, not width: the count is unbounded (a big config can queue three digits)
 			 * and a fixed box would clip it. */
 			font-size: 0; min-width: var(--fs-ctl-h-sm); max-width: 100%; height: var(--fs-ctl-h-sm);
-			box-sizing: border-box; padding: 0 var(--fs-space-1); overflow: hidden;
+			padding: 0 var(--fs-space-1); overflow: hidden;
 			display: inline-flex; align-items: center; justify-content: center;
 		}
 		/* .fs-ind-compact above paints the same badge (mirror-pinned) but cannot SHARE this
@@ -480,7 +456,6 @@
 		overflow-x: clip;
 	}
 	.fs-sidebar #indicators:empty { display: none; }
-	.fs-indicators { flex-wrap: wrap; }
 	.fs-content { padding: var(--fs-space-5) var(--fs-content-pad); flex: 1 1 auto; width: 100%; max-width: var(--fs-content-max); margin: 0 auto; }
 
 	/* fs-router.js builds the incoming page in a second #view here, then moves its children into
@@ -492,7 +467,7 @@
 	/* Slow-navigation hairline, shown once a nav outlives 150ms (fs-router.js). Fixed, and a
 	 * child of <body>, not .fs-main (a column flex container shrinks its 2px to zero) or
 	 * .fs-shell (contain: paint would re-base and clip a fixed descendant). transform/opacity
-	 * only, both composited, so drawing this never costs the render it reports on. */
+	 * only, both composited; the one style flush is on activation out of 'done', no layout. */
 	#fs-nav-progress {
 		position: fixed; inset-inline: 0; top: 0;
 		height: 2px;
@@ -508,7 +483,6 @@
 		transition: transform 2s cubic-bezier(.1, .7, .1, 1), opacity 120ms linear;
 	}
 	#fs-nav-progress[data-state="done"] {
-		opacity: 0;
 		transform: scaleX(1);
 		transition: transform 120ms ease-out, opacity 300ms linear 100ms;
 	}
@@ -561,11 +535,12 @@
 		.fs-main .alert-message .btn,
 		.fs-main .alert-message button { white-space: normal; max-width: 100%; }
 	}
+	/* anywhere, not break-word: an inline-flex button keeps its min-content under break-word (a 496px word
+	 * overflowed a 320px button). Outside the @media: table-contract refuses overflow-wrap in a width query */
+	.fs-main .alert-message .btn,
+	.fs-main .alert-message button { overflow-wrap: anywhere; }
 
 	/* poll-status ("Refreshing") — subtle, not a loud accent chip */
-	.fs-indicators .label,
-	.fs-indicators [data-indicator],
-	#indicators .label,
 	#indicators [data-indicator] {
 		/* wears the row's own --fs-btn-size and --fs-radius, not a pill, or it reads as a
 		 * different kind of object beside Search and Log out */
@@ -573,23 +548,19 @@
 		min-height: var(--fs-btn-size);
 		text-transform: none;
 		font-weight: var(--fs-weight); font-size: var(--fs-type);
-		/* the bar's control surface — ui.js emits a bare `<span data-indicator=…>` with NO
-		 * class, so a `.label`-keyed rule matches nothing */
+		/* the bar's control surface; ui.js emits a bare `<span data-indicator=…>`, no class to key on */
 		background: transparent;
 		border: var(--fs-hairline);
 		color: var(--fs-dim);
 		border-radius: var(--fs-radius); padding: 0 var(--fs-space-3); box-shadow: none;
 	}
-	.fs-indicators [data-indicator][data-style="active"],
 	#indicators [data-indicator][data-style="active"] { color: var(--fs-good); }
 	/* nothing else gives a clickable indicator a pointer cursor — base's rule carries geometry
 	 * only, and this theme emits no <header> at all — so "Refreshing" showed a text caret. */
-	.fs-indicators [data-indicator][data-clickable],
 	#indicators [data-indicator][data-clickable] { cursor: pointer; }
 	/* fs-chrome.js promotes a clickable indicator to role="button" with Enter and Space, so it
 	 * takes the control ring the buttons beside it take (55-buttons.css). :focus-visible, not
 	 * :focus: a pointer press on the pill should not draw a ring. */
-	.fs-indicators [data-indicator][data-clickable]:focus-visible,
 	#indicators [data-indicator][data-clickable]:focus-visible {
 		outline: none;
 		border-color: var(--fs-accent);

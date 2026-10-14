@@ -11,9 +11,9 @@
     scp docs/gallery.html router:/www/luci-static/footstrap/
     open http://<router>/luci-static/footstrap/gallery.html
 
-  Toggle dark/light with the button; ?palette=rvht picks the wallpaper palette.
+  The buttons toggle dark/light and the default/hicontrast palette.
 -->
-<html lang="en" data-darkmode="true" data-palette="footstrap">
+<html lang="en" data-darkmode="true">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -52,12 +52,12 @@
 </style>
 </head>
 <body class="lang_en">
-<div class="g-wrap">
+<div class="g-wrap" id="view">
 
 <div class="g-bar">
 	<h1>footstrap — component gallery</h1>
 	<button class="cbi-button" onclick="var r=document.documentElement;r.setAttribute('data-darkmode',r.getAttribute('data-darkmode')==='true'?'false':'true')">Toggle dark</button>
-	<button class="cbi-button" onclick="var r=document.documentElement;r.setAttribute('data-palette',r.getAttribute('data-palette')==='rvht'?'footstrap':'rvht')">Toggle palette</button>
+	<button class="cbi-button" onclick="var r=document.documentElement;r.getAttribute('data-palette')==='hicontrast'?r.removeAttribute('data-palette'):r.setAttribute('data-palette','hicontrast')">Toggle palette</button>
 </div>
 
 <div class="g-sec">
@@ -104,6 +104,16 @@ uci commit network</pre>
 		<button class="cbi-button cbi-button-down">down</button>
 		<button class="cbi-button" disabled>disabled</button>
 		<button class="cbi-button spinning">spinning</button>
+	</div>
+	<!-- ui.createHandlerFn adds `spinning` to the clicked button: modal Save (form.js) and FileBrowser
+	     Delete (ui.js). Label and glyph keep the button's own ink. -->
+	<div class="g-row">
+		<button class="cbi-button cbi-button-positive spinning">positive</button>
+		<button class="cbi-button cbi-button-positive important spinning">positive important</button>
+		<button class="cbi-button cbi-button-action important spinning">action important</button>
+		<button class="btn cbi-button-negative spinning">Delete</button>
+		<button class="cbi-button cbi-button-negative important spinning">negative important</button>
+		<button class="cbi-button cbi-button-reset spinning">reset</button>
 	</div>
 	<div class="g-row">
 		<a class="btn" href="#">.btn</a>
@@ -176,6 +186,11 @@ uci commit network</pre>
 		</div>
 		<button class="cbi-button cbi-button-save">Save</button>
 		<button class="cbi-button cbi-button-reset">Reset</button>
+	</div>
+	<!-- Save and Save & Apply WHILE SAVING: luci.js addFooter wraps both in createHandlerFn -->
+	<div class="cbi-page-actions">
+		<button class="cbi-button cbi-button-apply spinning">Save &amp; Apply</button>
+		<button class="cbi-button cbi-button-save spinning">Save</button>
 	</div>
 </div>
 
@@ -280,6 +295,35 @@ uci commit network</pre>
 				<div class="cbi-value-field">
 					<label><input type="radio" name="r" checked> yes</label>
 					<label><input type="radio" name="r"> no</label>
+				</div>
+			</div>
+			<!-- Disabled states, which no fixture drew: theme/60-inputs.css dims the switch input alone
+			     (`.cbi-checkbox > input[type=checkbox]:disabled`, opacity + not-allowed). The toggle is
+			     ui.Checkbox's markup with `disabled` on the input (ui.js Checkbox.render()); the raw
+			     checkbox and radio are the plain inputs a form can disable. -->
+			<div class="cbi-value">
+				<label class="cbi-value-title" for="cb-dis-on">Checkbox (toggle), disabled, checked</label>
+				<div class="cbi-value-field">
+					<div class="cbi-checkbox"><input id="cb-dis-on" type="checkbox" checked disabled><label for="cb-dis-on"></label></div>
+				</div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title" for="cb-dis-off">Checkbox (toggle), disabled, unchecked</label>
+				<div class="cbi-value-field">
+					<div class="cbi-checkbox"><input id="cb-dis-off" type="checkbox" disabled><label for="cb-dis-off"></label></div>
+				</div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Raw checkbox, disabled</label>
+				<div class="cbi-value-field">
+					<label><input type="checkbox" checked disabled> yes</label>
+				</div>
+			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Radio, disabled</label>
+				<div class="cbi-value-field">
+					<label><input type="radio" name="r-dis" checked disabled> yes</label>
+					<label><input type="radio" name="r-dis" disabled> no</label>
 				</div>
 			</div>
 			<div class="cbi-value">
@@ -394,6 +438,8 @@ option two</textarea></div>
 	<div class="g-row">
 		<div class="cbi-dropdown" tabindex="0"><ul><li class="focus" display="0">Selected value</li></ul><span class="open">▾</span></div>
 		<div class="cbi-dropdown btn cbi-button cbi-button-action" tabindex="0"><ul><li>Button dropdown</li></ul><span class="open">▾</span></div>
+		<!-- an enhanced select the validator rejected: the hidden <select> carries the class, the widget is its next sibling -->
+		<select class="cbi-input-invalid" data-fs-select="1" hidden><option>rejected</option></select><div class="cbi-dropdown" tabindex="0"><ul><li class="focus" display="0">Rejected value</li></ul><span class="open">▾</span></div>
 		<!-- The Save & Apply split control WHILE APPLYING: a .cbi-dropdown that is also a spinning
 		     button. Its padding has to out-rank the dropdown box's own `padding: 0` — the one case
 		     the spinner's !important used to exist for, and the one nothing rendered. -->
@@ -562,6 +608,26 @@ option two</textarea></div>
 		     shrink that far. EN has no fixture this long because EN never broke. -->
 		<li class="cbi-tab"><a href="#">Настройки межсетевого экрана</a></li>
 	</ul>
+	<!-- fitTabStrips (fs-chrome.js) escalates a wrapping strip to .fs-dense1, then .fs-dense2;
+	     theme/40-tabs.css gives both the same tighter pill padding on ul.tabs, #tabmenu ul.tabs
+	     and ul.cbi-tabmenu. The classes are set by hand here, since the fitter needs a real
+	     overflow to fire. -->
+	<ul class="tabs fs-dense1">
+		<li class="tabmenu-item-general active"><a href="#" aria-current="page">General Settings</a></li>
+		<li class="tabmenu-item-advanced"><a href="#">Advanced</a></li>
+	</ul>
+	<ul class="tabs fs-dense2">
+		<li class="tabmenu-item-general active"><a href="#" aria-current="page">General Settings</a></li>
+		<li class="tabmenu-item-advanced"><a href="#">Advanced</a></li>
+	</ul>
+	<ul class="cbi-tabmenu fs-dense1">
+		<li class="cbi-tab"><a href="#">Mode A</a></li>
+		<li class="cbi-tab-disabled"><a href="#">Mode B</a></li>
+	</ul>
+	<ul class="cbi-tabmenu fs-dense2">
+		<li class="cbi-tab"><a href="#">Mode A</a></li>
+		<li class="cbi-tab-disabled"><a href="#">Mode B</a></li>
+	</ul>
 </div>
 
 <div class="g-sec">
@@ -577,6 +643,9 @@ option two</textarea></div>
 		<h4>With a heading and actions</h4>
 		<p>Some explanatory body text.</p>
 		<div><button class="cbi-button">Stop showing</button> <button class="cbi-button">Dismiss</button></div>
+		<!-- ui.changes' apply/rollback modal is itself an .alert-message, and its buttons are variants:
+		     a paint on `.alert-message .btn` once turned 'Apply unchecked' the same grey as 'Cancel' -->
+		<div><button class="cbi-button cbi-button-action important">Revert changes</button> <button class="cbi-button cbi-button-negative important">Apply unchecked</button></div>
 	</div>
 	<!-- The rest of what base styles inside an alert: h5, a list, and a <pre>. Only h4 and <p> were
 	     here, so the audit's absorption backlog for `.alert-message li/ul/pre/h5` could not be
@@ -656,14 +725,14 @@ option two</textarea></div>
 	<div class="cbi-progressbar" title="303.37 MiB / 484.11 MiB (62%)"><div style="width:62%"></div></div>
 	<div class="cbi-progressbar" title="3.46 MiB / 242.05 MiB (1%)"><div style="width:1%"></div></div>
 	<div class="cbi-progressbar" title="97%"><div style="width:97%"></div></div>
-	<!-- The three below are what window.progressbar() itself writes (menu-footstrap-common.js), not
+	<!-- The three below are what the Overview pass (annotateMeter, fs-overview.js) writes, not
 	     hand-authored markup like the three above: role, aria-value* and — the reason these exist at
 	     all — data-fs-level, which is the ONLY thing 25-progressbar.css's warn/danger rules match.
 	     Nothing above carried that attribute, so computed-diff, a11y and export-tier never rendered
 	     those two rules at all; a clean run proved nothing about them. None of the three carries
-	     aria-label: none sits in a .cbi-value row or a table cell, so the function finds no label and
+	     aria-label: none sits in a .cbi-value row or a table cell, so the pass finds no label and
 	     writes no attribute at all — the accessible name then falls back to `title`, the same reading
-	     the visible `::after` shows (menu-footstrap-common.js, findProgressbarLabel). -->
+	     the visible `::after` shows (fs-overview.js, findProgressbarLabel). -->
 	<div class="cbi-progressbar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
 		aria-valuenow="42" aria-valuetext="203.37 MiB / 484.11 MiB (42%)"
 		title="203.37 MiB / 484.11 MiB (42%)"><div style="width:42%"></div></div>
@@ -1015,6 +1084,17 @@ option two</textarea></div>
 </div>
 
 <div class="g-sec">
+	<h2>Button label wider than a 340px column</h2>
+	<p class="g-note">The @container fs-view (max-width: 360px) button rule in theme/90-responsive.css
+	   needs `#view` as an ancestor and a container that narrow; `.g-wrap` is the first and not the
+	   second, so this fixture carries the narrow container.
+	   The single unbroken word is wider than the column, so only `overflow-wrap: anywhere` lets it break.</p>
+	<div style="max-width: 340px; container-type: inline-size; container-name: fs-view">
+		<button class="cbi-button cbi-button-action">Supercalifragilisticexpialidocious_configuration_reloadandrestartservice</button>
+	</div>
+</div>
+
+<div class="g-sec">
 	<h2>CBI section table — firewall zones, port forwards</h2>
 	<div class="cbi-section cbi-tblsection">
 		<h3>Zones</h3>
@@ -1039,6 +1119,16 @@ option two</textarea></div>
 				<td class="td cbi-section-table-cell nowrap cbi-section-actions">
 					<button class="cbi-button drag-handle center">☰</button>
 					<button class="btn cbi-button cbi-button-edit">Edit</button>
+					<button class="btn cbi-button cbi-button-remove">Delete</button>
+				</td>
+			</tr>
+			<!-- GridSection Edit while its modal opens: form.js wraps it in createHandlerFn -->
+			<tr class="tr cbi-section-table-row cbi-rowstyle-1">
+				<td class="td cbi-value-field cbi-section-table-cell">dmz</td>
+				<td class="td cbi-value-field cbi-section-table-cell">drop</td>
+				<td class="td cbi-section-table-cell nowrap cbi-section-actions">
+					<button class="cbi-button drag-handle center">☰</button>
+					<button class="btn cbi-button cbi-button-edit spinning">Edit</button>
 					<button class="btn cbi-button cbi-button-remove">Delete</button>
 				</td>
 			</tr>
@@ -1082,6 +1172,76 @@ option two</textarea></div>
 	</div>
 </div>
 
+<div class="g-sec">
+	<h2>CBI section table — Table Filters row survives the card (both markups)</h2>
+	<p class="g-note">Opt-in (System &rarr; Language and Style &rarr; Table Filters, `luci.main.tablefilters`):
+	   form.js puts a filter row of `.th` cells with inputs into the same `<thead>` as the titles. The
+	   card hides the header because it repeats every label, but nothing repeats these inputs, so the
+	   row has to stay and take one field per line. 24.10 tags the row `cbi-section-table-filter`
+	   alone; 25.12 also tags it `cbi-section-table-titles`, the class the hider matches. `.cbi-map`
+	   pinned to 600px, under the 992px card boundary (theme/65-dropdown.css).</p>
+	<div class="cbi-map" style="max-width: 600px">
+		<div class="cbi-section cbi-tblsection">
+			<h3>Zones, 24.10 markup</h3>
+			<table class="table cbi-section-table">
+				<thead class="thead cbi-section-thead">
+					<tr class="tr cbi-section-table-titles named">
+						<th class="th cbi-section-table-cell">Name</th>
+						<th class="th cbi-section-table-cell">Input</th>
+						<th class="th cbi-section-table-cell">Masquerading</th>
+						<th class="th cbi-section-table-cell cbi-section-actions">&nbsp;</th>
+					</tr>
+					<tr class="tr cbi-section-table-filter named">
+						<th class="th cbi-section-table-cell"><input type="text" class="cbi-input cbi-section-filter" placeholder="Filter"></th>
+						<th class="th cbi-section-table-cell"><input type="text" class="cbi-input cbi-section-filter" placeholder="Filter Input"></th>
+						<th class="th cbi-section-table-cell"><input type="text" class="cbi-input cbi-section-filter" placeholder="0/1" maxlength="1" style="width: 30px;"></th>
+						<th class="th cbi-section-table-cell cbi-section-actions"><button class="btn cbi-button cbi-button-neutral" type="button" title="Reset filters">Reset</button></th>
+					</tr>
+				</thead>
+				<tbody class="tbody cbi-section-tbody">
+					<tr class="tr cbi-section-table-row cbi-rowstyle-1">
+						<td class="td cbi-value-field cbi-section-table-cell" data-title="Name">lan</td>
+						<td class="td cbi-value-field cbi-section-table-cell" data-title="Input">accept</td>
+						<td class="td cbi-value-field cbi-section-table-cell" data-title="Masquerading">no</td>
+						<td class="td cbi-section-table-cell nowrap cbi-section-actions">
+							<button class="btn cbi-button cbi-button-edit">Edit</button>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<div class="cbi-section cbi-tblsection">
+			<h3>Zones, 25.12 markup</h3>
+			<table class="table cbi-section-table">
+				<thead class="thead cbi-section-thead">
+					<tr class="tr cbi-section-table-titles named">
+						<th class="th cbi-section-table-cell">Name</th>
+						<th class="th cbi-section-table-cell">Input</th>
+						<th class="th cbi-section-table-cell">Masquerading</th>
+						<th class="th cbi-section-table-cell cbi-section-actions">&nbsp;</th>
+					</tr>
+					<tr class="tr cbi-section-table-filter cbi-section-table-titles named">
+						<th class="th cbi-section-table-cell"><input type="text" class="cbi-input cbi-section-filter" placeholder="Filter"></th>
+						<th class="th cbi-section-table-cell"><input type="text" class="cbi-input cbi-section-filter" placeholder="Filter Input"></th>
+						<th class="th cbi-section-table-cell"><input type="text" class="cbi-input cbi-section-filter" placeholder="0/1" maxlength="1" style="width: 30px;"></th>
+						<th class="th cbi-section-table-cell cbi-section-actions"><button class="btn cbi-button cbi-button-neutral" type="button" title="Reset filters">Reset</button></th>
+					</tr>
+				</thead>
+				<tbody class="tbody cbi-section-tbody">
+					<tr class="tr cbi-section-table-row cbi-rowstyle-1">
+						<td class="td cbi-value-field cbi-section-table-cell" data-title="Name">lan</td>
+						<td class="td cbi-value-field cbi-section-table-cell" data-title="Input">accept</td>
+						<td class="td cbi-value-field cbi-section-table-cell" data-title="Masquerading">no</td>
+						<td class="td cbi-section-table-cell nowrap cbi-section-actions">
+							<button class="btn cbi-button cbi-button-edit">Edit</button>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+</div>
+
 <!-- task 0147 (second RU sweep), finding 3: base/95-luci.css sizes each row-action button
      `flex: 1 1 4em` inside `.td.cbi-section-actions`, a plain <table>/.td markup (Startup, not
      form.js's .cbi-section-table above) with no per-row carding. A definite flex-basis caps the
@@ -1117,16 +1277,34 @@ option two</textarea></div>
 </div>
 
 <div class="g-sec">
+	<h2>Dense fields — the table filter and the Appearance hex (--fs-type-field-xs)</h2>
+	<!-- Both sit at the xs size on desktop and take the 16px iOS floor under 767px; the hex is the only
+	     .fs-color-hex here, so without it computed-diff cannot see that reader of --fs-type-field-xs
+	     (the table filter also appears in the tables above). -->
+	<table class="table cbi-section-table">
+		<tr class="tr cbi-section-table-titles cbi-section-table-filter">
+			<th class="th cbi-section-table-cell"><input type="text" class="cbi-input cbi-section-filter" placeholder="Filter" aria-label="Filter"></th>
+		</tr>
+	</table>
+	<div class="fs-colorctl">
+		<div class="fs-color-row">
+			<input type="color" class="fs-color-swatch" value="#0969da" aria-label="Colour">
+			<input type="text" class="fs-color-hex" value="#0969da" aria-label="Hex">
+		</div>
+	</div>
+</div>
+
+<div class="g-sec">
 	<h2>The chrome bar (#indicators, .fs-themerow, .fs-logout)</h2>
 	<!-- The bar's own controls, in the shape the chrome really emits: the buttons come from
-	     ucode/template/themes/footstrap/partials/search.ut and logout.ut, and #indicators is the
-	     empty div header.ut leaves for LuCI (`<div id="indicators" class="fs-indicators">`), which
+	     ucode/template/themes/footstrap/header.ut, and #indicators is the
+	     empty div header.ut leaves for LuCI (`<div id="indicators">`), which
 	     ui.js fills with a BARE `<span data-indicator=…>` — no class, which is exactly why a theme
 	     rule written against `.label` painted nothing and no gate noticed. Nothing here needs the
 	     chrome JS: fs-chrome.js only adds .fs-ind-compact/.fs-bar-actrow by measurement, and their
 	     absence is the ordinary wide-bar case this fixture stands for. -->
 	<div class="fs-sidebar" style="position:static">
-		<div class="fs-indicators" id="indicators">
+		<div id="indicators">
 			<span data-indicator="poll-status" data-style="active">Refreshing</span>
 			<span data-indicator="uci-changes" data-clickable="true">Unsaved: 3</span>
 		</div>
@@ -1139,8 +1317,84 @@ option two</textarea></div>
 			<span class="fs-label">Log out</span>
 		</a>
 	</div>
+	<!-- the same bar once fitCluster has added .fs-ind-compact: the poll pill is a bare masked glyph, active
+	     (green) and paused (grey). It is the specimen forced-colors measures, since the mask is a
+	     background fill there. #indicators repeats the id above: the theme keys on it, and nothing here targets it. -->
+	<div class="fs-sidebar fs-ind-compact" style="position:static">
+		<div id="indicators">
+			<span data-indicator="poll-status" data-style="active">Refreshing</span>
+			<span data-indicator="poll-status" data-style="inactive">Paused</span>
+		</div>
+	</div>
 </div>
 
+<div class="g-sec">
+	<h2>Overview card header — disclosure control (pages/20-overview.css)</h2>
+	<!-- fs-overview.js wireDisclosure() promotes the card heading to role="button", with the
+	     keyboard-only pieces (tabindex, aria-expanded, aria-controls) plus a hand cursor and a
+	     focus ring from the theme (pages/20-overview.css). The wrapper differs by release
+	     (fs-overview.js headerEl()): 25.12 wraps the heading in `.cbi-title`, 24.10 leaves a bare
+	     `<h3>` as the section's own first child, and the theme rule has to reach both — this is
+	     the specimen that measures it, computed-diff otherwise reading 0 for this file. Appended
+	     after Modal; nothing above is touched or reordered. -->
+	<div class="cbi-section">
+		<div class="cbi-title">
+			<h3 role="button" tabindex="0" aria-controls="g-ovl-panel-1" aria-expanded="true">System
+				<span class="label" data-indicator="poll-status" data-style="inactive" aria-hidden="true">Hide</span>
+			</h3>
+		</div>
+		<div id="g-ovl-panel-1">
+			<div class="table">
+				<div class="tr"><div class="td">Hostname</div><div class="td">OpenWrt</div></div>
+				<div class="tr"><div class="td">Model</div><div class="td">Generic</div></div>
+			</div>
+		</div>
+	</div>
+	<div class="cbi-section">
+		<h3 role="button" tabindex="0" aria-expanded="false">Memory
+			<span class="label" data-indicator="poll-status" data-style="active" aria-hidden="true">Show</span>
+		</h3>
+	</div>
+</div>
+
+<div class="g-sec">
+	<h2>Appearance — fold, action row, background row (pages/80-appearance.css)</h2>
+	<!-- view/footstrap/appearance.js (fs-appearance.js): foldable() puts a button.fs-ap-fold with an
+	     empty .fs-ap-chev inside the section's h2, `group()` rows are stock .cbi-value, the Saved
+	     look row is .fs-ap-actrow (Save, a .fs-ap-actgap spacer, two resets; twoClick() adds
+	     .fs-ap-armed to the primed one), and Pattern/File are .fs-ap-bgrow of .btn. -->
+	<div class="fs-ap">
+		<div class="fs-ap-section">
+			<div class="fs-ap-head"><h2><button type="button" class="fs-ap-fold" aria-expanded="false" aria-controls="g-ap-fold-1">Colours<span class="fs-ap-chev" aria-hidden="true"></span></button></h2></div>
+			<div id="g-ap-fold-1" hidden></div>
+		</div>
+		<div class="fs-ap-section">
+			<div class="fs-ap-head"><h2><button type="button" class="fs-ap-fold" aria-expanded="true" aria-controls="g-ap-fold-2">Background<span class="fs-ap-chev" aria-hidden="true"></span></button></h2></div>
+			<div id="g-ap-fold-2">
+				<div class="cbi-value">
+					<label class="cbi-value-title">Pattern</label>
+					<div class="cbi-value-field">
+						<div class="fs-ap-bgrow"><button class="btn cbi-button" type="button">Choose…</button><button class="btn cbi-button-remove" type="button">Remove</button></div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="fs-ap-section">
+			<div class="fs-ap-head"><h2>Saved look</h2></div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Saved look</label>
+				<div class="cbi-value-field">
+					<div class="fs-ap-actrow"><button class="btn cbi-button cbi-button-save" type="button">Save to router</button><span class="fs-ap-actgap" aria-hidden="true"></span><button class="btn cbi-button" type="button">Reset to router</button><button class="btn cbi-button fs-ap-armed" type="button">Confirm reset</button></div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+</div>
+
+<!-- #modal_overlay is appended outside #view by ui.js, so the dialog fixtures sit outside the #view wrapper too: under it, `:is(#view, #modal_overlay)` rules would match with no #modal_overlay at all. -->
+<div class="g-wrap" style="padding-top:0">
 <div class="g-sec">
 	<h2>Modal</h2>
 	<!-- `opacity`/`visibility`, not just `position`/`display`: base/60-modal.css hides the overlay
@@ -1204,36 +1458,6 @@ option two</textarea></div>
 		</div>
 	</div>
 </div>
-
-<div class="g-sec">
-	<h2>Overview card header — disclosure control (pages/20-overview.css)</h2>
-	<!-- fs-overview.js wireDisclosure() promotes the card heading to role="button", with the
-	     keyboard-only pieces (tabindex, aria-expanded, aria-controls) plus a hand cursor and a
-	     focus ring from the theme (pages/20-overview.css). The wrapper differs by release
-	     (fs-overview.js headerEl()): 25.12 wraps the heading in `.cbi-title`, 24.10 leaves a bare
-	     `<h3>` as the section's own first child, and the theme rule has to reach both — this is
-	     the specimen that measures it, computed-diff otherwise reading 0 for this file. Appended
-	     after Modal; nothing above is touched or reordered. -->
-	<div class="cbi-section">
-		<div class="cbi-title">
-			<h3 role="button" tabindex="0" aria-controls="g-ovl-panel-1" aria-expanded="true">System
-				<span class="label" data-indicator="poll-status" data-style="inactive" aria-hidden="true">Hide</span>
-			</h3>
-		</div>
-		<div id="g-ovl-panel-1">
-			<div class="table">
-				<div class="tr"><div class="td">Hostname</div><div class="td">OpenWrt</div></div>
-				<div class="tr"><div class="td">Model</div><div class="td">Generic</div></div>
-			</div>
-		</div>
-	</div>
-	<div class="cbi-section">
-		<h3 role="button" tabindex="0" aria-expanded="false">Memory
-			<span class="label" data-indicator="poll-status" data-style="active" aria-hidden="true">Show</span>
-		</h3>
-	</div>
-</div>
-
 </div>
 </body>
 </html>
