@@ -7,11 +7,13 @@
 # within a directory. A later layer beats an earlier one whatever the specificity, so nothing needs
 # !important to override base.
 #
-# Minified unless --dev: ~468 KB of source to ~136 KB. uhttpd serves CSS with NO gzip, so every byte
-# is a wire byte. Comments and whitespace go; a selector or a declaration is never rewritten, which
-# is why LuCI's csstidy stays off (it mangles :has() and color-mix()). Needs only cat and awk, so an
-# OpenWrt buildbot can run it.
-set -e
+# Minified unless --dev: uhttpd serves CSS with no gzip, so every byte is a wire byte. Comments and
+# whitespace go, and five spellings shrink (docs/css.md, "The build"): [a="b"] -> [a=b], the space
+# before !important, ::before -> :before, the spaces beside * and / in a declaration, and a flex
+# triple with a keyword form (1 1 auto -> auto). Nothing else in a selector or declaration is
+# rewritten, which is why csstidy stays off (it mangles :has() and color-mix()). Needs only cat and
+# awk, so an OpenWrt buildbot can run it.
+set -eu
 
 D="$(cd "$(dirname "$0")" && pwd)"
 OUT=""
@@ -19,8 +21,7 @@ DEV=0
 for a in "$@"; do
 	case "$a" in
 		--dev) DEV=1 ;;
-		# An unknown option used to fall through to `OUT="$a"`: a typo like `--devv`
-		# wrote the stylesheet to a file named "--devv".
+		# Else a typo like `--devv` becomes the output file name.
 		-*) echo "build-css: unknown option: $a" >&2; exit 1 ;;
 		*) OUT="$a" ;;
 	esac
@@ -32,19 +33,15 @@ for d in styles styles/base styles/theme styles/pages; do
 done
 
 TMP="$OUT.tmp.$$"
-# $TMP.min too: an awk failure used to leave it behind next to the real output.
+# $TMP.min too: an awk failure leaves it behind.
 trap 'rm -f "$TMP" "$TMP.min" "$TMP.layer"' EXIT
+trap 'exit 130' INT TERM
 mkdir -p "$(dirname "$OUT")"
 
-# One `@layer X{` per LAYER, not one per FILE. Every source file carries its own wrapper so it can
-# be read and edited alone; concatenated, that is 37 copies of the same six-to-eleven bytes, 542 of
-# them.
-#
-# The wrapper now comes from the DIRECTORY, so a file filed under the wrong layer would be silently
-# re-layered instead of just being wrong — hence the check that each file opens with the layer its
-# directory means. A file with no wrapper at all (00-header.css: the banner and the layer-order
-# statement) is copied through, and must come before the wrapped ones or it would land inside the
-# block.
+# One `@layer X{` per LAYER, not per FILE: 37 file wrappers are 542 bytes. The wrapper comes from
+# the DIRECTORY, so each file must open with the layer its directory means or it is silently
+# re-layered. A file with no wrapper (00-header.css: banner and layer-order statement) is copied
+# through and must come before the wrapped ones, or it lands inside the block.
 emit_layer() {
 	layer="$1"; shift
 	body="$TMP.layer"
@@ -54,8 +51,32 @@ emit_layer() {
 			head -1 "$f" | grep -q "^@layer $layer {\$" || {
 				echo "build-css: $f is in a $layer directory but does not open with '@layer $layer {'" >&2
 				exit 1; }
-			# the file's own wrapper: its first line, and its last line, which is that wrapper's `}`
-			sed '1d;$d' "$f" >> "$body"
+			# the file's own wrapper: its first line, and the bare `}` where brace depth returns to 0.
+			# Anything but blank or comment after that `}` is refused: the source leaves it unlayered
+			# and the build would move it into the block, a silent cascade change.
+			awk -v F="$f" 'NR == FNR {
+					if (end) {
+						l = $0
+						if (inc) { if (sub(/^.*\*\//, "", l)) inc = 0; else next }
+						gsub(/\/\*.*\*\//, "", l)
+						if (match(l, /\/\*/)) { inc = 1; l = substr(l, 1, RSTART - 1) }
+						if (!bad && l ~ /[^ \t\r]/) bad = NR
+						next
+					}
+					# depth, string- and comment-aware: a `{` in a multi-line comment or in content:"{"
+					# is not a block (the same walk as brace_count below)
+					l = $0; n = length(l)
+					for (i = 1; i <= n; i++) {
+						ch = substr(l, i, 1)
+						if (inc) { if (ch == "*" && substr(l, i + 1, 1) == "/") { inc = 0; i++ } continue }
+						if (q != "") { if (ch == "\\") i++; else if (ch == q) q = ""; continue }
+						if (ch == "\"" || ch == "'"'"'") { q = ch; continue }
+						if (ch == "/" && substr(l, i + 1, 1) == "*") { inc = 1; i++; continue }
+						if (ch == "{") d++; else if (ch == "}") d--
+					}
+					if (NR > 1 && d == 0) end = NR; next }
+				END { if (bad) { printf "build-css: %s:%d: a rule after the @layer wrapper would be moved into the layer; put it inside\n", F, bad > "/dev/stderr"; exit 1 } }
+				FNR > 1 && FNR != end' "$f" "$f" >> "$body"
 		elif [ -s "$body" ]; then
 			echo "build-css: $f has no @layer wrapper but follows one that does — it would be" >&2
 			echo "build-css: swallowed into the $layer block instead of staying above it." >&2
@@ -82,13 +103,23 @@ emit_layer() {
 } > "$TMP"
 
 # Comments, and — unless told not to — the whitespace CSS ignores anyway, in one string-aware
-# pass rather than two chained ones. squeeze=0 (the pre-compression rule count below, and every
-# `--dev` build) strips comments and trims each line; squeeze=1 also does the ~9.5 KB whitespace
-# pass. Why a scan has to be string-aware, what the whitespace pass leaves alone and why, and the
-# sed bug this replaced: docs/css.md, "The build".
+# pass rather than two chained ones. squeeze=0 (the pre-compression rule count below; a
+# `--dev` build skips the pass and keeps the raw sheet) strips comments and trims each line;
+# squeeze=1 also does the ~9.5 KB whitespace pass. Why a scan has to be string-aware, what the
+# whitespace pass leaves alone and why, and the sed bug this replaced: docs/css.md, "The build".
 squeeze() {
 	awk -v SQUEEZE="$2" '
-		BEGIN { q = ""; inc = 0; banner = 0; lastc = ""; buf = ""; lastreal = "" }
+		# The exact flex triples that have a shorter keyword form (shorthand initial values: grow 1
+		# shrink 1 basis auto). Bare 0 is left alone, since `flex:0` means grow 0.
+		function flexv(v,   imp) {
+			if (v ~ /!important$/) { imp = "!important"; v = substr(v, 1, length(v) - 10) }
+			if (v == "0 0 auto") v = "none"
+			else if (v == "1 1 auto") v = "auto"
+			else if (v == "0 1 auto") v = "0 auto"
+			else if (v ~ /^1 1 ([0-9]+\.?[0-9]*|\.[0-9]+)(%|[A-Za-z]+)$/) v = substr(v, 5)
+			return v imp
+		}
+		BEGIN { q = ""; inc = 0; banner = 0; lastc = ""; buf = ""; lastreal = ""; d = 0; st = 0; fl = 0 }
 		{
 			line = $0
 			# a banner already open on an earlier line: nothing on a pure continuation line can
@@ -120,7 +151,20 @@ squeeze() {
 					lastreal = ""
 					i++; continue
 				}
-				if (c == "\"" || c == "'"'"'") { q = c; out = out c; lastreal = ""; i++; continue }
+				if (c == "\"" || c == "'"'"'") {
+					# [attr="ident"] -> [attr=ident]: the same selector, 2 bytes less, 394 sites. Only a
+					# whole ident closed on this line right before `]`; "--" stays quoted, since
+					# mangle-tokens.sh reads an unquoted --fs- as a name to rename.
+					if (SQUEEZE) {
+						j = index(substr(line, i + 1), c)
+						v = substr(line, i + 1, j - 1)
+						if (j && substr(line, i + j + 1, 1) == "]" && out ~ /\[[-A-Za-z0-9_]+[~|^$*]?=$/ &&
+						    v ~ /^-?[A-Za-z_][-A-Za-z0-9_]*$/ && !index(v, "--")) {
+							out = out v; lastreal = ""; i += j + 1; continue
+						}
+					}
+					q = c; out = out c; lastreal = ""; i++; continue
+				}
 				if (c == "/" && substr(line, i + 1, 1) == "*") {
 					if (substr(line, i + 2, 1) == "!") {
 						# a genuine banner open: reached only with q=="" and inc==0 AT THIS
@@ -144,31 +188,52 @@ squeeze() {
 						# previous output line — hence lastc, not just `out`.
 						prev = (length(out) ? substr(out, length(out), 1) : lastc)
 						nxt  = (i <= n ? substr(line, i, 1) : "")
-						# drop it entirely next to a delimiter; otherwise it may be a combinator
-						#
-						# `>` is a delimiter too, and the only one that is itself a combinator: a
-						# space either side of it is decoration. Safe because a `>` outside a
-						# string can only be the child combinator — the sheet has no media range
-						# syntax (`@media (width > 600px)`) — and a `>` inside a string never
-						# reaches here, the scanner having copied it verbatim above. `~` and `+`
-						# are deliberately NOT joined: `[attr~=v]` and `calc(100% - 10px)` make
-						# them ambiguous without tracking bracket depth.
+						# Drop the space next to a delimiter; otherwise it may be a combinator. `>` joins:
+						# outside a string it is the child combinator or a range `>`
+						# (`@container (width > 560px)`), both valid unspaced. `~` and `+` do not:
+						# `[attr~=v]` and `calc(100% - 10px)` are ambiguous without bracket depth.
+						# `!` joins too: `red!important` is the same declaration (35 sites).
 						if (prev == "" || prev == "{" || prev == "}" || prev == ";" || prev == "," || prev == ":" || prev == ">")
 							continue
-						if (nxt == "{" || nxt == "}" || nxt == ";" || nxt == "," || nxt == "" || nxt == ">")
+						if (nxt == "{" || nxt == "}" || nxt == ";" || nxt == "," || nxt == "" || nxt == ">" || nxt == "!")
+							continue
+						# Inside a declaration only + and - need their spaces: calc(1px * 2) -> calc(1px*2),
+						# 16 / 9 -> 16/9. Not before a comment opener, and `/*` or `*/` is never joined.
+						if (bk[d] == "D" && (prev == "*" || prev == "/" || nxt == "*" || (nxt == "/" && substr(line, i + 1, 1) != "*")) &&
+						    (prev nxt) != "/*" && (prev nxt) != "*/")
 							continue
 						out = out " "; lastreal = " "
 						continue
 					}
-					# THE LAST `;` OF A BLOCK IS REDUNDANT — dropped as the `}` is emitted, i.e.
-					# INSIDE the string-aware scanner. It used to be a `| sed "s/;}/}/g"` bolted
-					# onto the awk output, and sed cannot see strings: `content: ";}"` came out as
-					# `content: "}"`, and a data-URI containing `;}` was corrupted the same way
-					# (both reproduced). Nothing in the tree holds that byte pair today — which is
-					# how such a bug waits for whoever adds the first one.
-					#
-					# The `;` may already sit in the previous line output, so text is held in
-					# `buf` until the rule closes: a `;` already printed cannot be taken back.
+					# ::before/::after -> :before/:after, the CSS2 form every engine still parses and
+					# serialises as `::`; the first colon of 93 pseudo-elements. Not `::before-x`.
+					if (c == ":" && substr(line, i + 1, 1) == ":") {
+						w = (substr(line, i + 2, 6) == "before") ? 6 : (substr(line, i + 2, 5) == "after") ? 5 : 0
+						if (w && substr(line, i + 2 + w, 1) !~ /[-A-Za-z0-9_]/) { i++; continue }
+					}
+					# bk[d] is the kind of the open block: G holds rules (@layer @media @supports @container
+					# @keyframes), D holds declarations (a style rule, @font-face, a keyframe step). st: a
+					# statement has started, pk: its kind. The value rewrites cannot tell a nested rule from a
+					# declaration, so a rule inside a D block fails the build.
+					if (c == "{") {
+						if (bk[d] == "D") { printf "build-css: a rule nested in a declaration block (docs/css.md, \"The build\")\n" > "/dev/stderr"; exit 1 }
+						bk[++d] = (st ? pk : "D"); st = 0
+					} else if (c == "}") { d--; st = 0 }
+					else if (c == ";") st = 0
+					else if (!st) {
+						st = 1
+						pk = (substr(line, i, 24) ~ /^@(layer|media|supports|container|scope|starting-style|[-a-z]*keyframes)/) ? "G" : "D"
+					}
+					# flex: vs is the offset of the value in buf out; it is rewritten when the declaration ends
+					if (c == ":" && bk[d] == "D" && out ~ /flex$/ && (buf out) ~ /(^|[{;])flex$/) { fl = 1; vs = length(buf) + length(out) + 1 }
+					if (fl && (c == ";" || c == "}")) {
+						fl = 0; ft = buf out; fv = substr(ft, vs + 1); fw = flexv(fv)
+						if (fw != fv) { buf = ""; out = substr(ft, 1, vs) fw }
+					}
+					# The last `;` of a block is dropped here, inside the string-aware scanner: a sed
+					# `s/;}/}/` cannot see strings and turns `content: ";}"` into `content: "}"`.
+					# The `;` may already sit in the previous output line, so text is held in `buf`
+					# until the rule closes.
 					if (c == "}") {
 						if (length(out) && substr(out, length(out), 1) == ";")
 							out = substr(out, 1, length(out) - 1)
@@ -246,18 +311,9 @@ if [ "$DEV" -eq 0 ]; then
 	squeeze "$TMP" 1 > "$TMP.min"
 	mv "$TMP.min" "$TMP"
 
-	# AND AGAIN, on what actually ships: the check above only saw the squeeze's INPUT, yet
-	# the squeeze is the pass most able to corrupt the sheet — it tracks strings, joins lines
-	# and deletes the `;` before a `}`. An unchanged rule count is what says it did not.
-	#
-	# That equality — not brace balance on its own — is also why the 80 KB FS_CSS_FLOOR size
-	# guard once here is gone. Balance alone misses a cut right after any of the four
-	# `@layer NAME { … }` wrappers closes: everything up to that point is still a matched set, so
-	# a truncated write — a full disk, a compression that ate the tail — that stops exactly there
-	# reads as a valid, complete-looking file. Fed the real sheet, a cut right after the base
-	# layer's own close counts a balanced 283 rules against the file's true 1057. What catches
-	# that is the COUNT: RULES_BEFORE is measured from the untruncated concatenation before this
-	# pass runs, so a write that stops early can only ever come up short against it.
+	# Recount on what ships: the squeeze is the pass most able to corrupt the sheet. The rule COUNT,
+	# not brace balance, catches a truncated write: a cut right after the base layer closes is still
+	# balanced against the true rule count, and RULES_BEFORE comes from the untruncated sheet.
 	RULES_AFTER=$(brace_count "$TMP") || exit 1
 	if [ "$RULES_BEFORE" != "$RULES_AFTER" ]; then
 		echo "build-css: the squeeze changed the rule count ($RULES_BEFORE -> $RULES_AFTER)." >&2

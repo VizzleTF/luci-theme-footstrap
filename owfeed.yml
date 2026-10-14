@@ -74,6 +74,8 @@ packages:
     # that PKG_RELEASE:=1 puts on every asset name.
     version-from: file:./dist/VERSION
     files: ./dist/root
+    # Zopfli deflate: the figures and the .apk caveat are in docs/ci.md, "Zopfli packages".
+    compression: zopfli
 
     description: "A modern, fast LuCI theme."
     # +luci-base is the WHOLE list, and it is the Makefile's LUCI_DEPENDS verbatim. Nothing may pull
@@ -99,10 +101,8 @@ packages:
     # cannot disagree about what happens at install time. owfeed adds the default_postinst /
     # default_prerm wrapper around them, exactly as package-pack.mk does.
     #
-    # For the 24.10 leg: owfeed's ipk container emits postinst and prerm only, so post-deinstall
-    # reaches apk but not opkg today. On 24.10 that loses the removal cleanup (unregistering the
-    # theme, putting mediaurlbase back) — a real removal only, never an upgrade, which the script's
-    # own `case "$1" in *upgrade*` guard already exits on.
+    # owfeed packs post-deinstall as the ipk's postrm too; the script's own `*upgrade*` guard
+    # keeps opkg's mid-upgrade call from unregistering the theme.
     scripts:
       post-install: ./dist/scripts/post-install
       post-deinstall: ./dist/scripts/post-deinstall
@@ -132,6 +132,7 @@ packages:
     arch: noarch
     version-from: file:./dist/VERSION
     files: ./dist/i18n-ru
+    compression: zopfli
     description: "Footstrap theme - Russian translation"
     depends: [luci-theme-footstrap]
     license: Apache-2.0
@@ -158,6 +159,7 @@ packages:
     arch: noarch
     version-from: file:./dist/VERSION
     files: ./dist/i18n-es
+    compression: zopfli
     description: "Footstrap theme - Spanish translation"
     depends: [luci-theme-footstrap]
     license: Apache-2.0

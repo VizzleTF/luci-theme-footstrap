@@ -1,31 +1,21 @@
-/* Pre-minify the theme's shipped JS with terser, in place, for the owfeed release build.
+/* Pre-minify the theme's shipped JS with uglify-js, in place, for the owfeed release build.
  *
- * terser rather than jsmin: jsmin strips comments and whitespace only, while identifiers are wire
- * bytes and uhttpd serves /www with no compression — measured on this tree, jsmin ~57 KB against
- * terser's ~41 KB. Top-level mangling is safe BECAUSE a LuCI resource file is evaluated inside a
- * function wrapper: its top level is function scope, and everything crossing a module seam goes
- * through undeclared globals (`L`, `E`, `_`, the pragma aliases), which terser never renames.
+ * uglify-js rather than jsmin, which strips comments and whitespace only and mangles nothing; it also
+ * beat terser 5.51.2 by 2,687 B (docs/ci.md, "The steps", step 2). Top-level mangling is safe
+ * because a LuCI resource file is evaluated inside a function wrapper and everything crossing a module seam goes through
+ * undeclared globals (`L`, `E`, `_`, the pragma aliases), which uglify-js never renames. Runs from
+ * tools/stage.sh over the STAGED payload, never the checkout. The two minifiers sit on disjoint
+ * paths: owfeed never runs luci.mk, and an SDK build never calls this file, so jsmin sees the
+ * untouched source (jsmin's one-character-lookback trap, openwrt/luci#8299, stays guarded by
+ * tools/jsmin-verify.mjs).
  *
- * It runs from tools/stage.sh over the STAGED payload, never over the checkout: it rewrites every
- * file it is handed in place.
- *
- * No knob keeps jsmin off terser output anymore: the two minifiers now sit on disjoint paths
- * instead. owfeed (this file, via tools/stage.sh) never runs luci.mk, so jsmin never touches its
- * output; an SDK/buildbot build never calls this file, so it always jsmins the untouched source
- * under luci.mk's own default (LUCI_MINIFY_JS?=1) — double-minifying the same bytes is not wired
- * up on either path. jsmin's own trap survives regardless: `return/^v/.test(s)`, the
- * one-character-lookback bug (openwrt/luci#8299) that eats the rest of a file and exits 0 — still
- * guarded by wrap-regex and tools/jsmin-verify.mjs on the SDK path.
- *
- * THE SEAM NAMES ARE RESERVED, AND THE LIST IS DERIVED. Terser never RENAMES a free variable like
- * `L`, but it will happily CREATE one: handed the file on its own, it takes the top level for
- * global scope and `L` for a name nobody declared, i.e. one it may give to a mangled variable. So
- * the free variables of the SOURCE are reserved, computed per file rather than listed — a new seam
- * name cannot be forgotten because nothing here names them. */
+ * THE SEAM NAMES ARE RESERVED, AND THE LIST IS DERIVED. uglify-js never renames a free variable
+ * like `L` but will CREATE one: handed the file alone it takes `L` for a name nobody declared and
+ * may give it to a mangled variable. So the free variables of the SOURCE are reserved, per file. */
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import * as acorn from 'acorn';
-import { minify } from 'terser';
+import { minify } from 'uglify-js';
 
 const ACORN = { ecmaVersion: 2022, allowReturnOutsideFunction: true };
 const VERSION_DECL = /const FS_VERSION\s*=\s*'[^']*'/;
@@ -81,7 +71,7 @@ function boundNames(ast) {
 }
 
 /* Names the file USES but never binds — its seam with the LuCI wrapper and with the browser.
- * These are exactly the names terser must not hand to one of its own variables. */
+ * These are exactly the names uglify-js must not hand to one of its own variables. */
 function freeNames(src) {
 	const ast = acorn.parse(src, ACORN);
 	const bound = boundNames(ast);
@@ -101,8 +91,8 @@ function freeNames(src) {
 /* The wrapper's parameters, which are bound whether the file mentions them or not — the half a
  * "free variables of the source" answer gets wrong. luci.js evaluates a resource file as
  * `function(window, document, L, <one arg per require pragma>) { … }`, so those names are already
- * declared in the scope terser minifies into: a file that never reads `L` outside a comment is not
- * free of it by any AST measure, and terser handing `L` to a top-level `const` is a redeclaration
+ * declared in the scope uglify-js minifies into: a file that never reads `L` outside a comment is not
+ * free of it by any AST measure, and uglify-js handing `L` to a top-level `const` is a redeclaration
  * of the parameter and a SyntaxError before a line of it runs.
  *
  * The alias is derived exactly the way luci.js derives it, so this list cannot drift. */
@@ -138,17 +128,33 @@ for (const f of files) {
 	const name = basename(f);
 	const src = readFileSync(f, 'utf8');
 	const isVersion = (name === 'fs-version.js');
+	const trails = (name === 'fs-fit.js');
 	/* the two halves of "names this scope already has": what the file reads without binding, and
 	 * what the LuCI wrapper binds for it whether it reads them or not */
 	const free = new Set([ ...freeNames(src), ...wrapperParams(src) ]);
-	const res = await minify(src, {
+	const res = minify(src, {
+		/* a LuCI resource is a function body, not a module; webkit and v8 switch on uglify-js's
+		 * workarounds for Safari and Chrome engine bugs, which a router's admin browser can be */
+		module: false, webkit: true, v8: true, toplevel: true,
 		parse: { bare_returns: true },
-		/* directives:false = do NOT remove them — the pragmas ARE directives */
-		compress: { directives: false, toplevel: true, passes: 3 },
-		mangle: { toplevel: true, reserved: [ ...free, ...(isVersion ? [ 'FS_VERSION' ] : []) ] },
+		/* directives:false = do NOT remove them — the pragmas ARE directives. keep_fargs keeps
+		 * every function's arity. fs-version.js: evaluate would fold the literal into its readers
+		 * (the guard below); the bytes it costs are in docs/ci.md, step 2. */
+		compress: {
+			directives: false, passes: 3, keep_fargs: true,
+			...(isVersion ? { evaluate: false } : {}),
+			/* fs-fit.js's two diagnostic trails are read only by `fs:probe` exports, stripped before this runs,
+			 * so their writes are dead in the package (docs/anchoring.md, "What the gate itself cannot answer") */
+			pure_funcs: trails ? [ 'makeTrail', '_late.record', '_anchor.record', 'Math.round' ] : []
+		},
+		/* uglify renames every variable BEFORE it compresses, so pure_funcs would match `a.record` and
+		 * drop nothing: the three trail names are reserved, which costs 15 B less than `rename:false` */
+		mangle: { reserved: [ ...free, ...(isVersion ? [ 'FS_VERSION' ] : []),
+			...(trails ? [ 'makeTrail', '_late', '_anchor' ] : []) ] },
 		/* quote_style 1 = single quotes, so the version sed's '[^']*' still matches */
-		format: isVersion ? { quote_style: 1 } : {}
+		output: isVersion ? { quote_style: 1 } : {}
 	});
+	if (res.error) throw res.error;
 	const min = res.code;
 	try {
 		acorn.parse(min, ACORN);
@@ -165,13 +171,17 @@ for (const f of files) {
 		if (isVersion && !VERSION_DECL.test(min))
 			throw new Error('the FS_VERSION declaration did not survive — the version sed would miss');
 		/* …and that the declaration is still REFERENCED. `compress.toplevel` is free to inline a
-		 * const that is only read: the declaration would survive for the Makefile's sed to stamp,
+		 * const that is only read: the declaration would survive for stage.sh's sed to stamp,
 		 * every reader would carry the pre-stamp literal, and every release would report
 		 * "Footstrap (dev)" with no gate saying otherwise. Three occurrences today — one
 		 * declaration, two reads in label(). */
 		if (isVersion && (min.match(/FS_VERSION/g) || []).length < 2)
 			throw new Error('FS_VERSION was inlined — the declaration survives for the sed to stamp, '
 				+ 'but nothing reads it any more, so a stamped release would still say "(dev)"');
+		/* a rename of makeTrail/_late/_anchor would silently bring the trails back; their
+		 * reason strings are the tell, and nothing else in fs-fit.js carries them */
+		if (trails && /reader-intent|no-reference/.test(min))
+			throw new Error('the diagnostic trails survived — pure_funcs no longer matches makeTrail/_late/_anchor');
 		/* a floor, not a budget: an empty/truncated write must not ship (build-css.sh's rule) */
 		if (!min || min.length < 100 || min.length >= src.length)
 			throw new Error(`implausible output size ${min && min.length} (source ${src.length})`);

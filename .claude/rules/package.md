@@ -11,7 +11,7 @@ description: Packaging invariants that fail silently on somebody else's router.
 # Package
 
 Every rule here shares one shape: nothing fails at build time, and the damage lands on a router that
-is not yours, weeks later. Four of them are now held by `npm run makefile-contract`
+is not yours, weeks later. Five of them are now held by `npm run makefile-contract`
 (`tools/makefile-contract.mjs`) and the rest by the gates named beside them.
 
 - **`+luci-base` is the whole dependency list and keeping it that way is a constraint.** `curl` is
@@ -25,12 +25,18 @@ is not yours, weeks later. Four of them are now held by `npm run makefile-contra
 - Anything under `root/etc/config/` MUST be in the `conffiles` define (`npm run conffiles`) — else
   the manager replaces it on upgrade and the theme's own Update wipes the admin's saved defaults,
   reporting success.
-- `postinst`/`postrm` use **`rpcd reload`, never `restart`** — restart logs out every LuCI session.
+- `postinst`/`postrm` run **no `rpcd reload` and no `restart`** — `restart` logs out every LuCI
+  session and `reload` is a SIGHUP re-exec that can drop a plugin file mid-write, and the package
+  registers nothing for rpcd to re-read
+  (`npm run makefile-contract`).
 - A malformed `acl.d/*.json` is skipped by rpcd **silently**, so the grant goes to nobody and only
   Save-as-default and the background upload break, on someone else's router (`npm run acl`).
 - `root/etc/uci-defaults/30_luci-theme-footstrap` is the single source of registration; fresh
-  install vs upgrade is the marker file `/usr/share/luci-theme-footstrap/.installed`, and **an
-  upgrade must never change the active theme** (`$PKG_UPGRADE` is dead — apk never exports it).
+  install vs upgrade is told apart by whether the `themes.Footstrap` entry already exists (the
+  `.installed` marker is gone), and **an upgrade must never change the active theme**. apk exports
+  no `$PKG_UPGRADE`, so that test carries the decision alone; dev-sync.sh sets it by hand.
+- `PKG_LICENSE_FILES:=LICENSE` needs the `$(CP) $(CURDIR)/LICENSE` line in `Build/Prepare`: luci.mk
+  fills the build dir with `src/ luasrc/ htdocs/ root/ ucode/` only (`npm run makefile-contract`).
 - Do not set `PKG_VERSION` (git-derived). `LUCI_MINIFY_CSS:=0` — csstidy mangles `:has()` and
   `color-mix()`.
 - The Makefile's buildroot signature line is what `include/scan.mk` greps for to see the package at

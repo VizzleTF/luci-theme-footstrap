@@ -6,45 +6,39 @@
 #   ./update-po.sh --check    change nothing; fail if the .pot is stale or a string is
 #                             untranslated. The CI gate.
 #
-# A missing translation cannot fail loudly — an uncompiled _() falls through to its English msgid
-# and nothing reports it — so --check is a gate rather than a suggestion.
-#
-# The directory is `po/`, which is what LUCI_LANGUAGES globs and what Weblate translates
-# (docs/package.md, "The catalogue lives in po/" — do not rename it).
-#
-# Nothing here runs on the buildbot — luci.mk calls po2lmo itself. This needs perl and gettext,
-# which the OpenWrt build does not.
-#
-# The scanner is LuCI's OWN build/i18n-scan.pl rather than a grep: it lexes a .ut, rewriting the
-# template into JS before xgettext, and covers the rpcd acl.d/*.json title. A grep would miss the
-# ACL string and choke on any apostrophe.
+# An untranslated _() falls through to its English msgid and nothing reports it, so --check is a gate.
+# `po/` is what LUCI_LANGUAGES globs and Weblate translates (docs/package.md): do not rename it.
+# Not run on the buildbot (luci.mk calls po2lmo); needs perl and gettext.
+# The scanner is LuCI's own build/i18n-scan.pl, not a grep: it lexes .ut into JS before xgettext and
+# covers the acl.d/*.json title, which a grep would miss.
 set -eu
 
 cd "$(dirname "$0")"
 
-# Pinned to a commit and checksummed: a perl script fetched over the network and then EXECUTED, and
-# the gate deciding whether the catalogue is complete. Off a moving branch, the gate is whatever
-# upstream pushed last. luci-upstream.pin is the single source of the commit and both checksums.
+# Pinned by commit and sha256 in luci-upstream.pin: a fetched perl script is EXECUTED, and off a
+# moving branch the completeness gate would be whatever upstream pushed last.
 . ./luci-upstream.pin
 SCANNER_URL="https://raw.githubusercontent.com/openwrt/luci/${LUCI_PIN}/build/i18n-scan.pl"
 SCANNER_SHA256="$I18N_SCAN_SHA256"
 POT='po/templates/footstrap.pot'
 CHECK=0
-[ "${1:-}" = '--check' ] && CHECK=1
+case "${1:-}" in
+	'') ;;
+	--check) CHECK=1 ;;
+	# Else a typo like `--chek` rewrites the catalogues instead of checking them.
+	*) echo "update-po: unknown option: $1" >&2; exit 1 ;;
+esac
 
 for tool in perl xgettext msgmerge msgfmt; do
 	command -v "$tool" >/dev/null || { echo "update-po: $tool not found (install perl + gettext)" >&2; exit 1; }
 done
 
-# Prefer a scanner from a local LuCI checkout ($LUCI_SRC) so the gate is not hostage to the
-# network; fall back to fetching it. jsmin.c is pinned the same way in CI.
-#
-# ONE trap, covering every temp and every exit path, including LUCI_SRC's (docs/package.md,
-# "The catalogue lives in po/"). `fetched` is what it removes, so the LUCI_SRC path never deletes
-# the user's own checkout.
+# Prefer a scanner from a local LuCI checkout ($LUCI_SRC), else fetch it. One trap covers every
+# temp and exit path; it removes `fetched` only, never the user's own checkout.
 fetched=''; fresh=''; old_ids=''; new_ids=''
 # shellcheck disable=SC2064  # expand nothing now: the names are assigned as the script proceeds
-trap 'rm -f "$fetched" "$fresh" "$old_ids" "$new_ids"' EXIT INT TERM
+trap 'rm -f "$fetched" "$fresh" "$old_ids" "$new_ids"' EXIT
+trap 'exit 130' INT TERM
 
 scanner=''
 if [ -n "${LUCI_SRC:-}" ] && [ -f "$LUCI_SRC/build/i18n-scan.pl" ]; then
@@ -68,10 +62,8 @@ fresh="$(mktemp)"
 perl "$scanner" htdocs ucode root > "$fresh"
 
 if [ "$CHECK" = 1 ]; then
-	# Compare msgid AND msgctxt (line-number comments churn on every edit and say nothing).
-	# The CONTEXT is part of the key — po2lmo hashes "ctxt\1msgid" — so a .pot carrying the
-	# same msgids with the context dropped describes a different catalogue, which comparing
-	# msgid alone waved through.
+	# msgid AND msgctxt: po2lmo hashes "ctxt\1msgid", so a .pot with the context dropped is a
+	# different catalogue. Line-number comments churn on every edit and are ignored.
 	old_ids="$(mktemp)"; new_ids="$(mktemp)"
 	grep '^msgid\|^msgctxt' "$POT" | sort > "$old_ids"
 	grep '^msgid\|^msgctxt' "$fresh" | sort > "$new_ids"
@@ -94,10 +86,7 @@ if [ "$CHECK" = 1 ]; then
 		fi
 		msgfmt --check -o /dev/null "$po" || rc=1
 	done
-	# A tree with no po/*/*.po at all walks zero catalogues, sets rc=0 (nothing in the loop ever ran
-	# to set it otherwise) and printed "every string translated" — true of the empty set the same way
-	# it is true of vacuously anything, and indistinguishable in the output from a real, fully
-	# translated build. n=0 is the one case the loop cannot tell apart from success on its own.
+	# zero catalogues leaves rc=0 and would print "every string translated", vacuously true
 	[ "$n" -gt 0 ] || {
 		echo "update-po: no po/*/*.po found — nothing was checked, not everything is translated" >&2
 		exit 1

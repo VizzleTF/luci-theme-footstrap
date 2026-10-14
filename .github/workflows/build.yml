@@ -123,9 +123,9 @@ jobs:
       # produces the released bytes.
       - run: npm ci --ignore-scripts
 
-      - uses: owfeed/owfeed/setup@v0.5.4
-        with:
-          version: v0.5.1
+      # No `version:` on any owfeed or owlab step in this file: the `uses:` ref is the pin Dependabot
+      # moves, and an unset version installs that ref (owfeed >= 0.5.3, owlab >= 0.6.4). docs/ci.md.
+      - uses: owfeed/owfeed/setup@v0.5.5
 
       # The commit's timestamp, not the job's: a package's identity is a hash over its payload and
       # mkpkg records mtimes, so re-running a release over the same commit must produce the same
@@ -171,7 +171,6 @@ jobs:
       - name: Install this build on 25.12 and render its pages
         uses: owfeed/owlab/action@v0.6.5
         with:
-          version: v0.6.1
           releases: "25.12.4"
           install: dist/noarch/luci-theme-footstrap-*.apk
           # `exec ucode -T -c` is LuCI's own trycompile, run against the templates as INSTALLED
@@ -183,12 +182,11 @@ jobs:
             file /www/luci-static/footstrap/cascade.css
             http 200 /cgi-bin/luci/admin/status/overview
             http 200 /cgi-bin/luci/admin/system/system
-            exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
+            exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut /usr/share/ucode/luci/template/themes/footstrap/partials/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 
       - name: Install this build on 24.10 and render its pages
         uses: owfeed/owlab/action@v0.6.5
         with:
-          version: v0.6.1
           releases: "24.10.8"
           install: dist/all/luci-theme-footstrap_*.ipk
           # The same compile as the 25.12 leg, and not redundant: the templates are identical but
@@ -198,7 +196,7 @@ jobs:
             file /www/luci-static/footstrap/cascade.css
             http 200 /cgi-bin/luci/admin/status/overview
             http 200 /cgi-bin/luci/admin/system/system
-            exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
+            exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut /usr/share/ucode/luci/template/themes/footstrap/partials/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 
       # And the published channel, by NAME, out of the signed index — a different claim: that the
       # index parses, the URL does not redirect somewhere apk will not follow, and the key on the
@@ -218,7 +216,6 @@ jobs:
         continue-on-error: true
         uses: owfeed/owlab/action@v0.6.5
         with:
-          version: v0.6.1
           releases: "25.12.4"
           feed: https://repo.owfeed.org/releases/25.12/x86_64/packages.adb
           feed-key: ${{ runner.temp }}/owfeed-packages.pem
@@ -291,8 +288,6 @@ jobs:
           name: owfeed-packages
           path: dist/
       - uses: owfeed/owlab/setup@v0.6.5
-        with:
-          version: v0.6.1
 
       - name: Boot the routers and install this build
         run: |
@@ -309,7 +304,7 @@ jobs:
       - name: The gates of this slice
         run: |
           set -eu
-          O="$(echo $ROUTERS | tr ' ' ,)"
+          O="$(echo "$ROUTERS" | tr ' ' ,)"
           case "${{ matrix.slice }}" in
             parity)
               node tools/spa-parity.mjs --only "$O"
@@ -347,7 +342,7 @@ jobs:
               # script and nothing else, all on the re-install-over-an-existing-copy path, which a
               # fresh install cannot exercise. It replaces the build, so it may not share a router
               # with a slice still measuring one — which is exactly what a slice of its own buys.
-              sh tools/install-check.sh $ROUTERS
+              sh tools/install-check.sh "$ROUTERS"
               ;;
           esac
 
@@ -402,8 +397,6 @@ jobs:
           name: owfeed-packages
           path: dist/
       - uses: owfeed/owlab/setup@v0.6.5
-        with:
-          version: v0.6.1
       - name: Boot the routers and install this build
         run: sh tools/ci-boot.sh
       # A pull request crosses the axes that were measured to change this gate's answer — three
@@ -417,7 +410,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then FULL=""; else FULL="--full"; fi
           node tools/scroll-anchor.mjs --engines ${{ matrix.engine }} \
-            --only "$(echo $ROUTERS | tr ' ' ,)" $FULL
+            --only "$(echo "$ROUTERS" | tr ' ' ,)" $FULL
       - if: always()
         run: owlab down || true
 
@@ -448,8 +441,6 @@ jobs:
           name: owfeed-packages
           path: dist/
       - uses: owfeed/owlab/setup@v0.6.5
-        with:
-          version: v0.6.1
       - run: owlab up owrt2512
       - run: owlab install owrt2512 dist/noarch/luci-theme-footstrap-*.apk
 
@@ -488,13 +479,12 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.4
+    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.5
     secrets:
       # The repository already has this key, and owfeed-packages pins its public half.
       sign-key: ${{ secrets.OWFEED_AUTHOR_KEY }}
       usign-key: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
     with:
-      owfeed-version: v0.5.1
       # Writes dist/install.sh and release-notes.md. The installer is an asset because
       # raw.githubusercontent is rate-limited for the very user who most needs it (issue #17) and
       # because a signed copy is the only one checkable before it runs as root; the notes fill the
