@@ -1,38 +1,25 @@
 #!/usr/bin/env node
-/* The table contract, held to the sheet and to the render.
+/* The table contract, held to the sheet and to the render. Which tier a table gets is decided by
+ * measurement (fs-select.js's ladder); this gate holds what that measurement rests on:
  *
- * Every table in this theme reaches one of a few outcomes, decided by measurement (fs-select.js's
- * ladder) rather than by a breakpoint. What a gate CAN hold is the three things that measurement
- * rests on, each of which has been broken by a change that looked local:
- *
- *   1. where the break values live. `overflow-wrap: anywhere` lowers a cell's min-content to one
- *      character (css-text-3 §5.4), which is right for a tier with nowhere to put an overflow and
- *      catastrophic for the tier that is measured — the browser then answers "it fits" while a
- *      column is starved.
- *   2. what the render does. docs/gallery.html carries a fixture per tier, including the shapes
- *      that only ever appeared in bug reports (a 130-character token, an 8 000-character value, a
- *      MAC, a hyphenated identifier).
+ *   1. where the break values live: `overflow-wrap: anywhere` lowers min-content to one character
+ *      (css-text-3 §5.4), which starves a column in the tier that is measured.
+ *   2. what the render does: docs/gallery.html carries a fixture per tier, bug-report shapes included.
  *   3. the gate that keeps an unanswered table out of the layout.
- *   4. that a `display` rule on `.table`/`.thead`/`.tbody`/`.tfoot`/`.tr`/`.th`/`.td` (or a real
- *      `<thead>`/`<tbody>`/`<tfoot>` this file never classes) has a matching role in fs-select.js's
- *      TABLE_ROLE_CLASSES/TABLE_ROLE_TAGS — the pairing that survives the moment any of those
- *      twenty-odd rules strip the browser's own implicit table/row/cell role (WCAG 1.3.1).
+ *   4. a `display` rule on a table part has a matching role in fs-select.js's TABLE_ROLE_* (WCAG 1.3.1).
  *
- * WHAT IT CANNOT ASSERT, so a green run is not read as coverage: the gallery ships CSS only — no
- * LuCI JS — so which class the ladder picks, the pathological-column pick, the poll, the dialog
- * flag and `roomFor` under the real chrome belong to the live gates (tools/table-tick.mjs,
- * tools/live-audit.mjs).
- *
- * Usage: node tools/table-contract.mjs [--verbose] */
+ * Cannot assert: the gallery has no LuCI JS, so the ladder's pick, the pathological-column pick, the
+ * poll and `roomFor` belong to tools/table-tick.mjs and tools/live-audit.mjs. Usage: [--verbose] */
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import * as csstree from 'css-tree';
 import { chromium } from 'playwright';
-import { serveGallery } from './lib/gallery.mjs';
+import { serveGallery, assertRendered } from './lib/gallery.mjs';
 import { buildCss } from './lib/css.mjs';
-import { ROOT } from './lib/root.mjs';
+import { read } from './lib/root.mjs';
+import { parseFlags } from './lib/util.mjs';
 
-const VERBOSE = process.argv.includes('--verbose');
+const FLAGS = parseFlags('table-contract', { verbose: { type: 'boolean', default: false } });
+const VERBOSE = FLAGS.verbose;
 const cssPath = buildCss();
 const css = readFileSync(cssPath, 'utf8');
 const fails = [];
@@ -114,35 +101,13 @@ csstree.walk(ast, {
 
 /* ---- 1b. a `display` override must not cost a table its own roles (WCAG 1.3.1) ----
  *
- * fs-select.js writes `table`/`rowgroup`/`row`/`columnheader`/`cell` UNCONDITIONALLY onto
- * `.table`/`.thead`/`.tbody`/`.tfoot`/`.tr`/`.th`/`.td` (and the three bare tags for a real
- * `<thead>`/`<tbody>`/`<tfoot>` it never classes) rather than pairing a role write to each
- * `display` rule across theme/*.css and pages/*.css — a race with every one of them, since a media
- * query's or a container's live state is not something JS can read at the point a role would need
- * writing. That map can only ever SHRINK by an edit to fs-select.js itself, which the block below
- * catches from the source. It cannot catch the two ways a NEW `styles/**` rule slips past it, so
- * both are checked here too, from the CSS side:
- *
- *   A. an unqualified rule — one `display` change on `.table`/`.tr`/`.td`/… with nothing in its own
- *      selector (a state class, `:not()`/`:has()`, an attribute, an id) restricting it to one rung
- *      of the ladder — touches every such element on the page at once, the "fifth place to decide"
- *      item 1 above already refuses for `overflow-wrap`. Every rule this file ships either carries
- *      a ladder class (`.fs-stacked`, `.fs-dt`, `.cbi-section-table`, `.fs-rowstack`, `.fs-xscroll`,
- *      `hide-xs`/`hide-sm`) or the four-way `:not()` fence around the key/value tables
- *      (theme/30-tables.css ~300) that stands in for one; a rule with neither is new and unproven,
- *      whichever specific class it names.
- *   B. a class fs-select.js was never told about, standing in for `.tr`/`.td` rather than beside
- *      them — nothing in TABLE_ROLE_CLASSES can shrink to catch a name it never held. Undetectable
- *      in general (a `display: flex` row is ordinary CSS everywhere outside a table), so this is
- *      scoped to where a false alarm has not been found: inside a `.cbi-section` — every rule that
- *      touches a real table lives there — and named like a table part (`row`/`cell`/`col`/`head`/
- *      `body`/`foot`/`table`/`grid` as a whole hyphenated word, not a substring — `.fs-kv-row`
- *      catches it, `.fs-ovl-empty`/`.ifacebox-head` do not). A false NEGATIVE stays possible (a
- *      table part named some other way, or one built outside a `.cbi-section`); a false positive
- *      breaking Appearance's `.fs-color-row`/`.fs-ap-actrow`/`.fs-ap-bgrow`/`.fs-ap-verrow` or
- *      75-search.css's `.fs-search-row` — none of them a `.cbi-section` descendant — is the risk
- *      that kept this from being a plain name-contains-"row" scan. */
-const selJs = readFileSync(join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources/fs-select.js'), 'utf8');
+ * fs-select.js writes the table roles unconditionally onto `.table`/`.thead`/`.tbody`/`.tfoot`/`.tr`/
+ * `.th`/`.td` and the bare tags (JS cannot read a media or container query's state). The map shrinks only by an edit to fs-select.js, caught below. Two ways a NEW rule slips past it are
+ * checked from the CSS side (docs/css.md, "Tables: roles survive a `display` override"):
+ *   A. an unqualified `display` rule, with no ladder class and no `:not()` fence, touches every table.
+ *   B. an unknown class standing in for `.tr`/`.td` inside a `.cbi-section`, named like a table part.
+ */
+const selJs = read('luci-theme-footstrap/htdocs/luci-static/resources/fs-select.js');
 const roleClassesDecl = /const TABLE_ROLE_CLASSES = \[([\s\S]*?)\n\];/.exec(selJs);
 const roleTagsDecl = /const TABLE_ROLE_TAGS = \[([\s\S]*?)\n\];/.exec(selJs);
 if (!roleClassesDecl || !roleTagsDecl) {
@@ -254,23 +219,18 @@ if (!roleClassesDecl || !roleTagsDecl) {
 /* ---------------------------------------------------------------- 2. the render */
 /* ---- 3. the gate that keeps a freshly polled table out of the layout ----
  *
- * A poll tick REPLACES a data table, and a fresh one carries no marks: for the moment between
- * landing and being stamped it is laid out as a full-width table, at 390px several screens taller
- * than the card stack it is about to become. If anything forces layout in that moment, the engine
- * re-anchors on the intermediate and throws the reader.
- *
- * theme/30-tables.css answers it by holding an unanswered table out of the flow, and the rule has to
- * name the roots a table can land in. fs-select scans `ROOTS`; the stylesheet lists them again, so
- * the two are derived and compared here — a root added to the JS without the CSS is a table nothing
- * protects, and the symptom is a page that jumps on a router with an app that renders tables
- * somewhere new. */
+ * A fresh table carries no marks until stamped, so it lays out full-width, several screens taller
+ * than the card stack it becomes (390px), and a forced layout re-anchors the reader. theme/30-tables.css
+ * holds it out of the flow and must name every root fs-select's `ROOTS` scans; both lists are
+ * derived and compared here.
+ */
 /* selJs: read once, above, for the role-map check */
 const rootsDecl = /const ROOTS = \[([^\]]*)\]/.exec(selJs);
 if (!rootsDecl) fails.push('fs-select.js no longer declares ROOTS, so the gate rule cannot be checked against it');
 else {
 	const roots = [ ...rootsDecl[1].matchAll(/'([^']+)'/g) ].map((m) => m[1]);
 	/* what fs-fit arms the rule with, read from the JS rather than assumed */
-	const armed = /dataset\.fsFit\s*=/.test(readFileSync(join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources/fs-fit.js'), 'utf8'));
+	const armed = /dataset\.fsFit\s*=/.test(read('luci-theme-footstrap/htdocs/luci-static/resources/fs-fit.js'));
 	if (!armed) fails.push('fs-fit.js no longer writes the data-fs-fit attribute the gate rule is guarded on');
 
 	const gateSelectors = [];
@@ -301,6 +261,7 @@ const { base, close } = await serveGallery(cssPath);
 const browser = await chromium.launch();
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
 await page.goto(base, { waitUntil: 'load' });
+await assertRendered(page);
 await page.evaluate(() => document.fonts.ready);
 
 /* 2a. the computed values, tier by tier — the sheet half proved they exist, this proves they LAND */
@@ -318,7 +279,7 @@ for (const [ k, v ] of Object.entries(want))
 	if (computed[k] && computed[k] !== v)
 		fails.push(`${k} computes \`overflow-wrap: ${computed[k]}\`, contract says \`${v}\``);
 	else if (!computed[k])
-		notes.push(`${k}: no fixture in docs/gallery.html to measure`);
+		fails.push(`${k}: no fixture in docs/gallery.html to measure — nothing measured`);
 
 /* 2b. THE FLOOR, as a relation and never as a pixel: squeeze a data-table fixture and assert its
  * used width stops shrinking at the width of the widest token it must show. Ratio-based, so it
@@ -348,7 +309,8 @@ const floor = await page.evaluate(() => {
 	}
 	return { widths, widest: Math.round(widest) };
 });
-if (floor) {
+if (!floor) fails.push('no `.table.fs-dt` in docs/gallery.html — the floor was not measured');
+else {
 	const min = Math.min(...floor.widths);
 	if (min + 2 < floor.widest)
 		fails.push(`the data table shrank to ${min}px against a widest token of ${floor.widest}px — the floor is gone, the fitter is blind`);
@@ -372,7 +334,8 @@ const card = await page.evaluate(() => {
 	t.classList.remove('fs-stacked');
 	return out;
 });
-if (card) {
+if (!card) fails.push('no `.table.fs-dt` in docs/gallery.html — the card was not measured');
+else {
 	if (!card.rowIsFlex) fails.push('a carded row is not a flex row — the card layout is gone');
 	if (!card.headerHidden) fails.push('a carded table still shows its header row');
 	if (!card.labelled) fails.push('a carded cell prints no `data-title` label — the card says nothing about which column a value came from');

@@ -1,69 +1,57 @@
-/* Prove a CSS change by diffing computed styles, on the gallery instead of a router.
+/* Prove a CSS change by diffing computed styles, on the gallery instead of a router (docs/css.md):
+ * load it once per side, snapshot getComputedStyle over every element and its ::before/::after, diff
+ * the two, so any difference was caused by the CSS. Both sides are the SHIPPED sheet (build-css.sh,
+ * then mangle-tokens.sh: lib/css.mjs `shipped`), each in its own document, because two sheets can map
+ * the private tokens differently and a gallery renamed for one reads the wrong tokens under the other.
  *
- * The method is docs/css.md's: one DOM, one data set, two stylesheets — load the page, snapshot
- * getComputedStyle over every element, swap the <link>, snapshot again. Any difference was caused
- * by the CSS, because nothing else moved.
- *
- * What is new here is the SURFACE. On a live router the same sheet twice moves 0.5-1.3% of pixels
- * (uptime, DHCP leases, signal) and a real regression weighs 0.19% — the noise buries the signal,
- * which is why screenshots do not work and why a live computed diff still needs a control pass to
- * learn each page's floor. docs/gallery.html has no clock, no poll and no data: `--control` runs the
- * SAME stylesheet on both sides and must report exactly 0 differences. That 0 is the threshold, and
- * it is measured rather than chosen — run `--control` whenever the gallery gains a widget.
- *
- * This does not replace the live run. The gallery has every widget and none of the pages: no menu,
- * no chrome, no third-party sheet. It catches the regression that is IN the stylesheet; owlab
- * catches the one that is in the page.
- *
- * Two viewports run, not one (task 0145): every other gallery gate — this one included, until now —
- * takes Playwright's 1280 default (`a11y`, `export-tier`) or sets it explicitly (line below), so a
- * declared width that only drifts once a flex row is narrower than its own content never shows up.
- * cb1's own bug was exactly that shape: 0 diffs at 1280 with the fix reverted, a `width` diff at 390.
- * A container query answered by 1280 alone was answered by nothing; VIEWPORTS below is the fix.
+ * A live router moves 0.5-1.3% of pixels on the same sheet twice; docs/gallery.html has no clock,
+ * poll or data, so `--control` (the SAME stylesheet on both sides) must report exactly 0, the
+ * measured threshold. It does not replace the live run: no page, no header.ut chrome, no
+ * third-party sheet (docs/development.md, "The three cheap browser gates").
  *
  *   node tools/computed-diff.mjs                 # worktree vs HEAD, light + dark, both viewports
  *   node tools/computed-diff.mjs --control       # the same sheet twice: the threshold, must be 0
  *   node tools/computed-diff.mjs --against v0.15.0 --full --max 0
  */
 import { chromium } from 'playwright';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { parseArgs } from 'node:util';
-import { serveGallery, applyAppearance, matrix } from './lib/gallery.mjs';
+import { serveGallery, applyAppearance, matrix, settle, GALLERY_FLOOR, blankGallery } from './lib/gallery.mjs';
 import { buildCss } from './lib/css.mjs';
-import { ROOT } from './lib/root.mjs';
+import { parseFlags } from './lib/util.mjs';
 
-const { values: ARGS } = parseArgs({
-	options: {
-		control: { type: 'boolean', default: false },
-		full: { type: 'boolean', default: false },
-		against: { type: 'string', default: 'HEAD' },
-		max: { type: 'string' },
-	},
+const FLAGS = parseFlags('computed-diff', {
+	control: { type: 'boolean', default: false },
+	full: { type: 'boolean', default: false },
+	against: { type: 'string', default: 'HEAD' },
+	max: { type: 'string' },
 });
 
-const CONTROL = ARGS.control;
-const REF = ARGS.against;
-const MAX = ARGS.max ?? null;
-const POINTS = ARGS.full
+const CONTROL = FLAGS.control;
+const REF = FLAGS.against;
+const MAX = FLAGS.max ?? null;
+if (MAX !== null && !/^\d+$/.test(MAX)) { console.error(`computed-diff: --max wants a non-negative integer, got "${MAX}"`); process.exit(2); }
+const POINTS = FLAGS.full
 	? matrix([null])
 	: [{ palette: 'footstrap', mode: 'light', tint: null }, { palette: 'footstrap', mode: 'dark', tint: null }];
 
-/* Two viewports, not one. 1280 is every page's design width (docs/development.md); 390x844 is the
- * phone point task 0145's own bug was measured against (styles/theme/60-inputs.css) and the one this
- * repo already reaches for on a phone-width claim (owrt2512/390x844 elsewhere in that file). The gap
- * this closes: a caption turns the switch pill into a SECOND, shrinkable flex item only once the row
- * is narrower than the pill + caption's combined natural width, which never happens at 1280 — so a
- * declared `width` sitting at exactly `--sw-w` on both sides of a diff there proves nothing, the flex
- * shrink that broke it never engaged. Measured with the flex-shrink:0 fix reverted in a scratch copy:
- * cb1's used width holds at 40.00px on both sides at 1280 (0 diffs, the bug invisible), and at 390 it
- * splits 40.00px (worktree) vs 26.80px (reverted HEAD) — a 13.20px `width` difference the 1280 pass
- * cannot see at any density. */
+/* 1280 is every page's design width; 390x844 is the phone point. With the flex-shrink:0 fix
+ * reverted, the switch pill (styles/theme/60-inputs.css) stays 40.00px at 1280 (0 diffs) and splits
+ * 40.00px vs 26.80px at 390, a difference the 1280 pass cannot see. */
 const VIEWPORTS = [
 	{ width: 1280, height: 900, label: '1280' },
 	{ width: 390, height: 844, label: '390' },
+];
+
+/* Two more passes beside the plain ones, each a state the plain passes never enter: `fc` emulates
+ * forced-colors: active at 1280, where the 95-a11y-media.css repairs live (a repair whose selector
+ * stopped reaching its element changes nothing in the other passes); `rtl` sets dir=rtl lang=ar at
+ * 390, where a physical margin-left / padding-left that should be logical computes differently, and
+ * a background-position (no logical keyword) that was not mirrored by hand stays put.
+ * Each has the first appearance point only — forced colors overrides the palette, and a direction
+ * flip does not depend on it. */
+const PASSES = [
+	...VIEWPORTS.map((vp) => ({ vp, kind: '', all: true })),
+	{ vp: VIEWPORTS[0], kind: 'fc', all: false },
+	{ vp: VIEWPORTS[1], kind: 'rtl', all: false },
 ];
 
 /* The properties read on every element. This list IS the contract: a property missing from it is a
@@ -73,113 +61,77 @@ const VIEWPORTS = [
 const PROPS = [
 	'display', 'position', 'visibility', 'opacity', 'z-index', 'float', 'clear',
 	'width', 'height', 'max-width', 'max-height', 'min-width', 'min-height',
+	'top', 'right', 'bottom', 'left',
 	'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
 	'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
 	'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
 	'border-top-style', 'border-top-color', 'border-bottom-color', 'border-radius',
 	'box-shadow', 'outline-width', 'outline-color', 'outline-offset',
-	'color', 'background-color', 'background-image',
+	'color', 'background-color', 'background-image', 'background-position',
 	'font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing',
 	'text-align', 'text-transform', 'text-decoration-line', 'white-space', 'overflow-wrap',
 	'overflow-x', 'overflow-y',
 	'flex-direction', 'flex-wrap', 'flex-grow', 'flex-shrink', 'flex-basis',
 	'align-items', 'justify-content', 'gap',
 	'grid-template-columns', 'grid-auto-flow',
-	'transform', 'transition-property', 'content',
+	'transform', 'transition-property', 'content', 'vertical-align', 'mask-image', '-webkit-mask-image',
 	'user-select', '-webkit-user-select', 'pointer-events', 'cursor', 'touch-action',
 ];
 
-/* Build the reference stylesheet from a git ref. `git archive` gives exactly the two things
- * build-css.sh needs — itself and styles/ beside it — and it reads neither the index nor the
- * worktree, so an uncommitted edit cannot leak into the BEFORE side. */
-function buildCssAt(ref) {
-	const dir = mkdtempSync(join(process.env.RUNNER_TEMP || tmpdir(), 'fs-css-ref-'));
-	const pkg = 'luci-theme-footstrap';
-	execFileSync('sh', ['-c',
-		`git archive ${JSON.stringify(ref)} ${pkg}/build-css.sh ${pkg}/styles | tar -x -C ${JSON.stringify(dir)}`],
-	{ cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
-	const out = join(dir, 'cascade.css');
-	execFileSync(join(dir, pkg, 'build-css.sh'), [out], { stdio: 'inherit' });
-	return out;
-}
-
-/* Wait for the sheet AND for font matching. A snapshot taken before matching settles measures
- * fallback metrics: every width on the page shifts a pixel or two, and 291 false differences on the
- * firewall page is what that looked like the first time. Neither sheet ships a face now, but a
- * machine with Manrope installed still resolves one. */
-async function settle(page) {
-	await page.evaluate(() => document.fonts.ready);
-	/* And for every running animation. Measured: with fonts alone, a clean tree still reported one
-	 * difference against its own HEAD — `span.cbi-tooltip opacity 0.00245647 -> 0`, a fade caught
-	 * mid-flight by one snapshot and finished by the other. Waiting on the animations rather than
-	 * disabling them keeps `transition-property` honest, which is itself one of the measured
-	 * properties. The 2 s cap is for an infinite animation, which never resolves. */
-	await page.evaluate(() => Promise.race([
-		Promise.allSettled(document.getAnimations().map((a) => a.finished)),
-		new Promise((r) => setTimeout(r, 2000)),
-	]));
-	await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-}
-
-async function swapSheet(page, href) {
-	await page.evaluate((h) => new Promise((resolve, reject) => {
-		const link = document.querySelector('link[rel="stylesheet"]');
-		if (!link) { reject(new Error('the gallery has no <link rel=stylesheet> to swap')); return; }
-		link.addEventListener('load', resolve, { once: true });
-		link.addEventListener('error', () => reject(new Error('the swapped stylesheet failed to load')), { once: true });
-		link.href = h;
-	}), href);
-	await settle(page);
-}
-
-const snapshot = (props) => {
+/* One document's readings: a row of PROPS per element, and a row per ::before/::after that
+ * generates content (the glyphs, chevrons, switch knobs and poll mask live there). */
+const snapshot = ({ props, pseudos }) => {
+	/* The 13 `.spinning` buttons turn their ::before forever (fs-spin); two loads catch it at two
+	 * angles, 13 phantom `transform` differences per pass. Frozen at frame 0 on both sides. */
+	for (const an of document.getAnimations()) {
+		if (an.effect.getComputedTiming().iterations === Infinity) { an.pause(); an.currentTime = 0; }
+	}
 	const els = document.querySelectorAll('*');
-	const out = new Array(els.length);
-	for (let i = 0; i < els.length; i++) {
-		const cs = getComputedStyle(els[i]);
-		const row = new Array(props.length);
-		for (let p = 0; p < props.length; p++) row[p] = cs.getPropertyValue(props[p]);
-		out[i] = row;
-	}
-	/* A readable name for each element, computed once so the diff pass carries no DOM work. */
-	const names = new Array(els.length);
-	for (let i = 0; i < els.length; i++) {
-		const e = els[i];
+	const read = (cs) => props.map((p) => cs.getPropertyValue(p));
+	const rows = [], names = [], pseudo = {};
+	els.forEach((e, i) => {
+		rows.push(read(getComputedStyle(e)));
 		const cls = (e.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).join('.');
-		names[i] = e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (cls ? '.' + cls : '');
-	}
-	window.__fsSnap = { out, names };
-	return els.length;
+		names.push(e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (cls ? '.' + cls : ''));
+		for (const pe of pseudos) {
+			const cs = getComputedStyle(e, pe);
+			if (cs.content !== 'none' && cs.content !== 'normal') pseudo[i + pe] = read(cs);
+		}
+	});
+	return { rows, names, pseudo };
 };
 
-const compare = ({ props, cap }) => {
-	const before = window.__fsSnap;
-	const els = document.querySelectorAll('*');
-	const diffs = [];
-	if (els.length !== before.out.length) {
-		return { structural: `element count changed: ${before.out.length} -> ${els.length}`, diffs };
+/* A pseudo-element a side does not generate has no row: against one that does it is one `content`
+ * difference (the rule appeared or vanished), not a row of properties compared with nothing. */
+const diffSnapshots = (A, B, cap) => {
+	if (A.rows.length !== B.rows.length) {
+		return { structural: `element count changed: ${A.rows.length} -> ${B.rows.length}`, diffs: [] };
 	}
-	for (let i = 0; i < els.length && diffs.length < cap; i++) {
-		const cs = getComputedStyle(els[i]);
-		for (let p = 0; p < props.length; p++) {
-			const now = cs.getPropertyValue(props[p]);
-			if (now !== before.out[i][p]) {
-				diffs.push({ el: before.names[i], i, prop: props[p], from: before.out[i][p], to: now });
-				if (diffs.length >= cap) break;
-			}
+	const diffs = [];
+	const add = (el, prop, from, to) => { if (diffs.length < cap) diffs.push({ el, prop, from, to }); };
+	for (let i = 0; i < A.rows.length; i++) {
+		for (let p = 0; p < PROPS.length; p++) {
+			if (A.rows[i][p] !== B.rows[i][p]) add(A.names[i], PROPS[p], A.rows[i][p], B.rows[i][p]);
 		}
+	}
+	const content = PROPS.indexOf('content');
+	for (const key of new Set([...Object.keys(A.pseudo), ...Object.keys(B.pseudo)])) {
+		const [ , i, pe ] = key.match(/^(\d+)(::.*)$/);
+		const [ a, b ] = [ A.pseudo[key], B.pseudo[key] ];
+		if (!a || !b) { add(A.names[i] + pe, 'content', a ? a[content] : 'none', b ? b[content] : 'none'); continue; }
+		for (let p = 0; p < PROPS.length; p++) if (a[p] !== b[p]) add(A.names[i] + pe, PROPS[p], a[p], b[p]);
 	}
 	return { structural: null, diffs };
 };
 
 const CAP = 4000;
+const PSEUDOS = ['::before', '::after'];
 
-const cssNow = buildCss();
-const cssRef = CONTROL ? cssNow : buildCssAt(REF);
+const cssNow = buildCss({ shipped: true });
+const cssRef = CONTROL ? cssNow : buildCss({ ref: REF, shipped: true });
 
 const a = await serveGallery(cssRef);
 const b = await serveGallery(cssNow);
-const originB = new URL(b.base).origin;
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: VIEWPORTS[0] });
@@ -187,37 +139,31 @@ const page = await browser.newPage({ viewport: VIEWPORTS[0] });
 let total = 0;
 const report = [];
 
-for (const vp of VIEWPORTS) {
+for (const { vp, kind, all } of PASSES) {
 	await page.setViewportSize({ width: vp.width, height: vp.height });
+	/* Before goto: the media feature must hold for the first style recalc, not arrive after it. */
+	await page.emulateMedia({ forcedColors: kind === 'fc' ? 'active' : 'none' });
 
-	for (const point of POINTS) {
-		await page.goto(a.base, { waitUntil: 'load' });
-		await applyAppearance(page, point);
-		await settle(page);
-
-		/* Swap A onto itself before the FIRST snapshot, so both snapshots are taken in the same state.
-		 * Measured: without this, a control pass (the same stylesheet on both sides) reported 28
-		 * differences in light and 0 in dark — every one of them a colour re-serialised across the swap,
-		 * `oklab(0.539907 -0.0412925 -0.186042 / 0.4)` becoming
-		 * `color(srgb 0.0352941 0.411765 0.854902 / 0.4)` on border-top-color, border-bottom-color and
-		 * box-shadow. The values are the same colour; only the serialisation of a computed colour
-		 * differs between a sheet parsed with the document and one attached afterwards. Symmetry costs
-		 * one extra load and takes the floor to 0, which is what makes a non-zero diff readable as
-		 * causal rather than as a number to compare against a remembered baseline. */
-		await swapSheet(page, `${new URL(a.base).origin}/cascade.css`);
-		const n = await page.evaluate(snapshot, PROPS);
-
-		await swapSheet(page, `${originB}/cascade.css`);
-		/* The swap does not touch :root, so the axes stamped before it are still in force. Re-stamping
-		 * here would be the bug this gate exists to catch, dressed as a fixture. */
-		const { structural, diffs } = await page.evaluate(compare, { props: PROPS, cap: CAP });
+	for (const point of all ? POINTS : POINTS.slice(0, 1)) {
+		const take = async (url) => {
+			await page.goto(url, { waitUntil: 'load' });
+			if (kind === 'rtl') await page.evaluate(() => { document.documentElement.dir = 'rtl'; document.documentElement.lang = 'ar'; });
+			await applyAppearance(page, point);
+			await settle(page);
+			return page.evaluate(snapshot, { props: PROPS, pseudos: PSEUDOS });
+		};
+		const snapA = await take(a.base);
+		const snapB = await take(b.base);
+		const n = snapA.rows.length;
+		const np = Object.keys(snapA.pseudo).length;
+		const { structural, diffs } = diffSnapshots(snapA, snapB, CAP);
 
 		/* The viewport is part of the label, not just the point: a `width` diff that only exists at
-		 * 390 and not at 1280 is unreadable as "width: … -> …" alone once two viewports run — task
-		 * 0145's own fixture is exactly a diff that is silent at 1280 and loud at 390. */
-		const label = `${vp.label}/${point.palette}/${point.mode}${point.tint ? `/tint${point.tint}` : ''}`;
-		if (structural) { report.push({ label, structural, diffs: [], n }); total += 1; continue; }
-		report.push({ label, structural: null, diffs, n });
+		 * 390 and not at 1280 is unreadable as "width: … -> …" alone once two viewports run: a diff
+		 * can be silent at 1280 and loud at 390. */
+		const label = `${vp.label}${kind ? `/${kind}` : ''}/${point.palette}/${point.mode}${point.tint ? `/tint${point.tint}` : ''}`;
+		if (structural) { report.push({ label, structural, diffs: [], n, np }); total += 1; continue; }
+		report.push({ label, structural: null, diffs, n, np });
 		total += diffs.length;
 	}
 }
@@ -227,7 +173,7 @@ a.close();
 b.close();
 
 const side = CONTROL ? 'the SAME stylesheet on both sides' : `worktree vs ${REF}`;
-console.log(`computed-diff: ${side}, ${report[0]?.n ?? 0} elements x ${PROPS.length} properties, ${POINTS.length} appearance point(s) x ${VIEWPORTS.length} viewport(s) (${VIEWPORTS.map((v) => v.label).join(', ')})`);
+console.log(`computed-diff: ${side}, ${report[0]?.n ?? 0} elements + ${report[0]?.np ?? 0} pseudo-elements x ${PROPS.length} properties, ${report.length} pass(es): ${report.map((r) => r.label).join(', ')}`);
 
 for (const r of report) {
 	if (r.structural) { console.log(`  ${r.label}: ${r.structural}`); continue; }
@@ -245,24 +191,17 @@ for (const r of report) {
 	}
 }
 
-/* Below this line a real diff count is a JUDGEMENT CALL (`--max` makes it one; plain output is a
- * report a human reads) — but "the page never rendered" is not a judgement call, it is a broken
- * harness, and it used to read exactly like a clean pass: a blank gallery snapshots 0 elements on
- * both sides, `els.length === before.out.length` (0 === 0) skips the structural check, the diff
- * loop never runs, and "0 difference(s) total" prints — indistinguishable from the real thing this
- * gate is trusted to prove. Both checks below run UNCONDITIONALLY, independent of --control/--max,
- * because a run that measured nothing is not a report either — it is nothing to report.
- *
- * MEASURED is the current per-point count (853 elements on docs/gallery.html, task-gate-audit);
- * the floor sits far under it so a widget added or removed never trips it, and only a gallery that
- * failed to render — 0, or a handful of elements from a bare error page — does. */
-const MEASURED_ELEMENTS = 853;
-const ELEMENTS_FLOOR = 200;
-const empty = report.filter((r) => (r.n ?? 0) < ELEMENTS_FLOOR);
+/* A gallery that failed to render snapshots 0 elements on both sides and would print "0 difference(s)".
+ * Both checks below run regardless of --control/--max; floor in lib/gallery.mjs. */
+const empty = report.filter((r) => (r.n ?? 0) < GALLERY_FLOOR);
 if (empty.length) {
-	console.error(`\nFAIL: measured only ${empty[0].n} element(s) at ${empty[0].label} (last real run: `
-		+ `~${MEASURED_ELEMENTS}) — the gallery did not render. This is not "0 differences"; it is `
-		+ `nothing measured, on ${empty.length}/${report.length} point(s).`);
+	console.error(`\nFAIL: ${blankGallery(empty[0].n ?? 0, ` at ${empty[0].label}`)} On ${empty.length}/${report.length} point(s).`);
+	process.exit(1);
+}
+/* Same for the pseudo-element half: a gallery with generated content on none would read nothing. */
+const noPseudo = report.filter((r) => !r.np);
+if (noPseudo.length) {
+	console.error(`\nFAIL: no ::before/::after with generated content measured at ${noPseudo[0].label} (and ${noPseudo.length - 1} more); the pseudo-element half read nothing.`);
 	process.exit(1);
 }
 const structural = report.filter((r) => r.structural);

@@ -21,9 +21,9 @@ import { dirname, join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { resolveUnderRoot } from './lib.mjs';
+import { ROOT } from '../lib/root.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(HERE, '..', '..');
 
 const { values: FLAGS } = parseArgs({ options: {
 	help: { type: 'boolean', default: false },
@@ -62,16 +62,12 @@ function serveOut(outDir, base) {
 		catch (e) { res.writeHead(400).end(); return; }
 		if (pathname !== normBase && !pathname.startsWith(`${normBase}/`)) { res.writeHead(404).end(); return; }
 		const rel = pathname.slice(normBase.length) || '/';
-		/* `resolveUnderRoot` (lib.mjs) is what actually decides the request stays inside `outDir` —
-		 * a plain `join()` followed by a `startsWith()` on the unnormalised STRING let a decoded
-		 * `{base}/../../etc/passwd` out, since `../` only collapses once something normalises the
-		 * path, which the string compare never did. */
+		/* `resolveUnderRoot` (lib.mjs) keeps the request inside `outDir`: a string `startsWith()`
+		 * let a decoded `{base}/../../etc/passwd` out, as `../` collapses only on normalising. */
 		const file = resolveUnderRoot(outDir, rel.endsWith('/') ? `${rel}index.html` : rel);
 		if (!file) { res.writeHead(403).end(); return; }
-		/* `file` for a directory URL with no trailing slash IS `existsSync` (it names the directory
-		 * itself), so the redirect must key on `isDirectory()`, not on absence — the inverted check
-		 * fell through to the 404 branch below for every one of build.mjs's `cgi-bin/luci/<page>/`
-		 * directories. */
+		/* A directory URL without a trailing slash exists, so the redirect keys on `isDirectory()`,
+		 * not on absence; the inverse 404'd every `cgi-bin/luci/<page>/`. */
 		if (!rel.endsWith('/') && existsSync(file) && statSync(file).isDirectory()) {
 			const indexFile = resolveUnderRoot(outDir, `${rel}/index.html`);
 			if (indexFile && existsSync(indexFile)) {
@@ -114,8 +110,8 @@ async function checkPage(context, serverBase, p, fail) {
 }
 
 /* A section's own `<ul>` is `display: none` until its trigger — the `<a role="button"
- * aria-controls>` menu-footstrap.js:212-218 wires beside it — adds `.open` to their shared `<li>`
- * (menu-footstrap.js:220-235, `li.has-sub.open > ul { display: … }`, 20-shell.css:174/406/528). A
+ * aria-controls>` fs-chrome.js wires beside it — adds `.open` to their shared `<li>`
+ * (fs-chrome.js, `li.has-sub.open > ul { display: … }`, 20-shell.css). A
  * user reaches a nested item by opening every ancestor section first; clicking the link directly
  * hit Playwright's own visibility wait and timed out. Climbs outward from `el`, clicking each
  * `[aria-controls]` trigger in turn — capped at 5, deeper than any real menu.d tree nests. */
@@ -159,23 +155,15 @@ async function checkSpaNav(context, serverBase, fail) {
 	await page.close();
 }
 
-/* fs-appearance.js's `selectCtl` sets `aria-label` on `ui.Select#render()`'s return value, which is
- * the WRAPPING `<div>` (ui.js:807 `frameEl`), not the `<select>` it appends — `aria-label` sits one
- * level above the element it should describe. What the caption actually is sits in the `group()`
- * row's own `label.cbi-value-title` text (fs-appearance.js:264), so that is what a lookup has to
- * key on instead. */
+/* fs-appearance.js's `selectCtl` puts `aria-label` on the inner `<select>` (a stock widget's
+ * wrapper div cannot carry a name), so the Palette control is found by that label. */
 async function checkPalette(context, serverBase, fail) {
 	const page = await context.newPage();
 	await page.goto(`${serverBase}/cgi-bin/luci/admin/system/footstrap`, { waitUntil: 'load' });
 	await page.waitForTimeout(SETTLE_MS);
 
-	const handle = await page.evaluateHandle(() => {
-		const row = Array.from(document.querySelectorAll('.cbi-value')).find((r) => {
-			const title = r.querySelector('.cbi-value-title');
-			return title && title.textContent.trim() === 'Palette';
-		});
-		return row ? row.querySelector('select') : null;
-	});
+	const handle = await page.evaluateHandle(
+		() => document.querySelector('select[aria-label="Palette"]'));
 	const select = handle.asElement();
 	if (!select) { fail('palette: no Palette control on the Appearance page'); await page.close(); return; }
 
@@ -183,12 +171,13 @@ async function checkPalette(context, serverBase, fail) {
 	for (const want of [ 'footstrap', 'hicontrast', 'bootstrap', '2020', 'forum' ])
 		if (!options.includes(want)) fail(`palette: option "${want}" missing from the Palette select`);
 
-	/* fs-select.js hides this native `<select>` (`display: none`, fs-select.js:110) behind a
+	/* fs-select.js hides this native `<select>` (`display: none` in enhance()) behind a
 	 * visible `cbi-dropdown` it builds beside it, so `selectOption` — which waits on the element's
 	 * OWN visibility — times out. `ui.Select.bind()` wires `widget-change` off THIS element's own
 	 * `change` event (ui.js:882-883), not off fs-select's widget, and fs-select's own picked-option
-	 * handler ends by setting `.value` and dispatching that same event on it (fs-select.js:145-146)
-	 * — so driving it directly is the same signal a real click on the visible widget produces. */
+	 * handler ends by setting `.value` and dispatching that same event on it (the
+	 * `cbi-dropdown-change` listener in enhance()) — so driving it directly is the same signal a
+	 * real click on the visible widget produces. */
 	await select.evaluate((el, v) => {
 		el.value = v;
 		el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -293,16 +282,12 @@ async function main() {
 	const server = await serveOut(OUT, BASE);
 	const browser = await chromium.launch();
 	const context = await browser.newContext();
-	/* Every check below but `checkLoginFlow` measures a PAGE, not the login gate — without this,
-	 * every one of them would land on the login form instead (replay.js's guard fires on a fresh
-	 * `sessionStorage`, which every new page in a fresh context starts with). */
+	/* Every check but `checkLoginFlow` measures a page: without this each lands on the login form
+	 * (replay.js's guard fires on a fresh `sessionStorage`). */
 	await context.addInitScript(() => window.sessionStorage.setItem('fs-pg-auth', '1'));
 
-	/* One check throwing (a `goto` timeout, a closed page) used to unwind straight past
-	 * `browser.close()` into the outer catch, which prints the one exception and exits — dropping
-	 * every failure `fail()` had already collected from checks that ran and finished before it.
-	 * Each check runs to completion or has its own throw folded into `failures` instead, so a run
-	 * always reports everything it saw, not just the first thing that broke. */
+	/* A throwing check is folded into `failures`, so a run reports everything it saw and
+	 * `browser.close()` still runs. */
 	const guard = async (label, run) => {
 		try { await run(); }
 		catch (e) { fail(`${label}: threw — ${(e && e.stack) || e}`); }

@@ -1,18 +1,15 @@
 /* devkit-build.mjs — assemble the self-contained luci-app developer portal.
  *
- * docs/devkit.html is GENERATED (like cascade.css) and gitignored. It is the page an external
- * luci-app-* author opens to see what to copy, which token to read and what not to do, without a
- * router and without this repo. Every part comes from a file that already exists here, so nothing
- * is hand-copied and nothing can drift:
+ * docs/devkit.html is GENERATED (like cascade.css) and gitignored: the page an external luci-app-*
+ * author opens to see what to copy and what not to do, with no router. Every part comes from a
+ * file that exists here, so nothing is hand-copied and nothing drifts:
  *
  *   - the stylesheet         <- build-css.sh (the real cascade.css, inlined)
  *   - the export tier        <- styles/02-tokens.css (parsed — the one contract apps may read)
  *   - the component catalogue <- docs/gallery.html (the single source of real widget markup)
  *   - the chrome and prose   <- docs/devkit.src.html
  *
- * The DOM->E() conversion and click-to-copy happen in the BROWSER off the rendered preview node,
- * so the code a dev copies always matches what they see.
- *
+ * The DOM->E() conversion and click-to-copy run in the BROWSER off the rendered preview node.
  * The playground is not part of this build: it is recorded from a real router by
  * `tools/playground/*` and CI's `playground` job, not assembled from a committed source file. */
 import { readFile, writeFile } from 'node:fs/promises';
@@ -53,31 +50,11 @@ function parseComponents(html) {
 	}).filter((c) => c.title && c.markup);
 }
 
-/* The page must be ONE file (opened off GitHub Pages with no sibling assets), so every url() the
- * stylesheet references is inlined as a data: URI. The assets live under
- * htdocs/luci-static/footstrap/, the same paths the router serves. (There are no fonts among them
- * any more — the theme carries none — but the inliner is generic and stays that way.) */
-const MEDIA = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/footstrap');
-const MIME = { '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png' };
-async function inlineAssets(cssText) {
-	const refs = [...new Set([...cssText.matchAll(/url\(([^)]+)\)/g)].map((m) => m[1].replace(/["']/g, '').trim()))]
-		.filter((u) => !u.startsWith('data:') && !u.startsWith('http'));
-	for (const ref of refs) {
-		try {
-			const buf = await readFile(join(MEDIA, ref));
-			const ext = ref.slice(ref.lastIndexOf('.'));
-			const uri = `data:${MIME[ext] || 'application/octet-stream'};base64,${buf.toString('base64')}`;
-			cssText = cssText.split(`url(${ref})`).join(`url(${uri})`)
-				.split(`url("${ref}")`).join(`url("${uri}")`).split(`url('${ref}')`).join(`url('${uri}')`);
-		} catch { /* an asset the devkit does not need; leave the url() as-is */ }
-	}
-	return cssText;
-}
-
 const [src, galleryHtml, tokensCss] = await Promise.all([
 	readFile(SRC, 'utf8'), readFile(GALLERY, 'utf8'), readFile(TOKENS, 'utf8'),
 ]);
-const css = await inlineAssets(await readFile(buildCss(), 'utf8'));
+const css = await readFile(buildCss(), 'utf8');
+if (/url\((?!\s*["']?data:)/.test(css)) throw new Error('cascade.css references a file; devkit.html must be one file');
 const tiers = parseExportTier(tokensCss);
 const components = parseComponents(galleryHtml);
 

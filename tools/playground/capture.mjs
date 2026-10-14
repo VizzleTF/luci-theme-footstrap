@@ -13,7 +13,7 @@
  *   node tools/playground/capture.mjs [--recording DIR] [--pages FILE]
  */
 import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
@@ -23,9 +23,10 @@ import {
 	splitBatch, parseLsLines, waitForQuiet, drainReads, missingOverlayKeys,
 	createActivityTracker, createGenerationGate, describePendingRequest, describePendingRequests,
 } from './lib.mjs';
+import { ROOT } from '../lib/root.mjs';
+import { writeFile } from '../lib/util.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(HERE, '..', '..');
 
 const { values: FLAGS } = parseArgs({ options: {
 	help: { type: 'boolean', default: false },
@@ -42,11 +43,8 @@ if (FLAGS.help) {
 const STAND_ID = 'owrt2512';
 const OUT = FLAGS.recording;
 const PAGES_FILE = FLAGS.pages;
-/* A FLOOR, not the wait itself: gives a page the same load+settle window the live gates give a full
- * navigation (spa-parity.mjs) before the adaptive wait below starts reading ubus traffic — without
- * it, a page whose lazy includes haven't even started executing yet reads as "already quiet". The
- * actual per-page wait is `waitForQuiet` below; see its doc comment for why a fixed settle alone
- * (this constant, formerly the whole wait) dropped overlay keys on a slow CI container. */
+/* A floor, not the wait: the load+settle window of spa-parity.mjs before `waitForQuiet` reads ubus
+ * traffic, else a page whose lazy includes have not started reads as already quiet. */
 const SETTLE_MS = 1400;
 /* No same-origin request in flight for this long is "this page is done making the calls it's going
  * to make" — `waitForQuiet`/`createActivityTracker` below. Hard cap per page so a page that never
@@ -97,11 +95,6 @@ function listStaticDir(standId, dir) {
 	}
 }
 
-function writeFile(path, body) {
-	mkdirSync(dirname(path), { recursive: true });
-	writeFileSync(path, body);
-}
-
 async function main() {
 	const [ stand ] = requireStands(stands(STAND_ID), 'playground/capture');
 	const origin = new URL(stand.base).origin;
@@ -119,13 +112,10 @@ async function main() {
 	const rpc = {};
 	const staticSeen = new Set();
 
-	/* `page.on('response', …)` never has its handler's promise awaited by anyone — Playwright fires
-	 * it and moves on — so a slow `response.body()`/`.text()` still in flight when the next `goto`
-	 * or `browser.close()` runs used to fail silently ("Response body is not available for a
-	 * response that was navigated", "Target page … closed") and just drop whatever it was reading.
-	 * `track` files the promise here instead of awaiting it inline; `drain` below is called at every
-	 * point capture.mjs is about to navigate or close, and decides what an abandoned or a rejected
-	 * read is worth recording as. */
+	/* Playwright never awaits a `page.on('response')` handler, so a body read still in flight at the
+	 * next `goto` or `browser.close()` failed silently and dropped its data. `track` files the
+	 * promise here; `drain` runs before every navigation or close and decides what a rejected read
+	 * is worth. */
 	let pending = [];
 	function track(label, promise) {
 		promise.catch(() => {}); /* drain() below decides what a rejection means; this only stops

@@ -1,7 +1,7 @@
 /* Pure functions the playground pipeline runs on both sides of the router: capture.mjs uses
- * `requestKey`/`stableStringify` to file a response away, replay.js uses the SAME key shape
- * (duplicated there — a classic script, no ESM) to find it again, and build.mjs uses everything
- * else to turn a recording into a servable tree. Nothing here touches a filesystem or a browser,
+ * `requestKey`/`stableStringify` to file a response away, replay.js finds it again with the SAME
+ * function (build.mjs inlines its source into pg-data.js, replay.js being a classic script), and
+ * build.mjs uses everything else to turn a recording into a servable tree. Nothing here touches a filesystem or a browser,
  * which is what makes it testable without either. `resolveUnderRoot` is the one exception that
  * imports `node:path`, still pure in the sense that matters here: no `fs` call, no network.
  *
@@ -35,10 +35,10 @@ export function ubusKey(object, method, args) {
  * `rpc.js`'s `call()` always sends `{jsonrpc,id,method:'call',params:[sid,object,method,args]}`;
  * the one exception is `probeRPCBaseURL()`'s boot probe, `{id:'init',method:'list',params:undefined}`
  * (luci.js), which carries no object/method pair of its own and gets the fixed key `list()`. */
-export function requestKey(entry) {
+export function requestKey(entry, base) {
 	if (entry && entry.method === 'call' && Array.isArray(entry.params)) {
 		const [, object, method, args] = entry.params;
-		return ubusKey(object, method, args);
+		return ubusKey(object, method, stripBase(args, base));
 	}
 	return `${(entry && entry.method) || ''}()`;
 }
@@ -52,6 +52,20 @@ export function splitBatch(bodyText) {
 	return entries.map((entry) => ({ entry, key: requestKey(entry) }));
 }
 
+/* `f` applied to every string in a JSON-shaped value, recursing into arrays and objects (and into
+ * object KEYS when `keys` is set). Self-contained and recursive by name: build.mjs inlines its
+ * source into pg-data.js, where `stripBase` calls it. */
+export function mapStrings(v, f, keys) {
+	if (typeof v === 'string') return f(v);
+	if (Array.isArray(v)) return v.map((x) => mapStrings(x, f, keys));
+	if (v && typeof v === 'object') {
+		const out = {};
+		for (const k of Object.keys(v)) out[keys ? f(k) : k] = mapStrings(v[k], f, keys);
+		return out;
+	}
+	return v;
+}
+
 /* `"/cgi-bin/…` and `"/luci-static/…` (or `'…`), wherever a quote sits directly against the
  * prefix, get `base` spliced in front. Deliberately does NOT match the escaped `\/cgi-bin\/` form
  * `new LuCI({...})` is serialised with (`replace(json, '/', '\\/')`, header.ut) — a backslash, not
@@ -61,11 +75,9 @@ export function rewriteBase(html, base) {
 	return html.replace(PREFIX_RE, (_m, q, p) => `${q}${base}${p}`);
 }
 
-/* The 32-hex secrets a LuCI page ever prints literally: `sessionid`, `token`, `rollback_token`
- * (`new LuCI({...})`, header.ut) and the rollback confirm call's own token (luci-base footer.ut,
- * only emitted while a change is pending). One fixed stub for all of them — the replay shim never
- * checks a session, so what the stub SAYS does not matter, only that a recording never ships a
- * real one. */
+/* The 32-hex secrets a page prints literally: `sessionid`, `token`, `rollback_token` (header.ut)
+ * and the rollback confirm token (luci-base footer.ut). One stub for all: replay never checks a
+ * session, only that no real one ships. */
 export const TOKEN_STUB = '0'.repeat(32);
 const TOKEN_RE = /\b[0-9a-f]{32}\b/g;
 export function scrubTokens(text) {
@@ -81,20 +93,13 @@ export function scrubHost(text, host) {
 }
 
 /* `scrubTokens`/`scrubHost` above only ever ran over the HTML DOCUMENT (build.mjs's `buildPage`);
- * `buildInject` inlines the recorded ubus answers and menu tree as `window.__pgRPC`/`__pgMenu`
+ * build.mjs writes the recorded ubus answers and menu tree into pg-data.js as `window.__pgRPC`/`__pgMenu`
  * verbatim, so a 32-hex session token or the stand's `host:port` sitting inside that JSON — not
  * baked into the page text, only into the DATA — shipped to the built site unscrubbed. Recurses
  * into object KEYS as well as values: `network.getHostHints({})` keys its answer by MAC, not a
  * shape either scrub touches, but a key is still a string the recording chose, same as a value. */
 export function scrubDataDeep(value, host) {
-	if (typeof value === 'string') return scrubHost(scrubTokens(value), host);
-	if (Array.isArray(value)) return value.map((v) => scrubDataDeep(v, host));
-	if (value && typeof value === 'object') {
-		const out = {};
-		for (const k of Object.keys(value)) out[scrubDataDeep(k, host)] = scrubDataDeep(value[k], host);
-		return out;
-	}
-	return value;
+	return mapStrings(value, (s) => scrubHost(scrubTokens(s), host), true);
 }
 
 /* The fail-closed guard build.mjs runs over every text file it WROTE, not over a value on its way
@@ -109,10 +114,8 @@ export function findSecrets(text, host) {
 	return reasons;
 }
 
-/* Kept pure (no `fs`) so a planted token is a unit test, not a build run: `files` is
- * `[[relPath, text], ...]`, shaped by build.mjs from every text file it wrote under `--out`.
- * Throws naming the first offender rather than collecting all of them — one is already a
- * ship-stopper, and the message is what a CI log needs to point at the file. */
+/* Pure (no `fs`) so a planted token is a unit test: `files` is `[[relPath, text], ...]` from
+ * build.mjs. Throws on the first offender; one is already a ship-stopper. */
 export function guardNoSecrets(files, host) {
 	for (const [ rel, text ] of files) {
 		const reasons = findSecrets(text, host);
@@ -165,17 +168,9 @@ export function isSafeReturn(path, base) {
 /* The same swap, run over the DATA `build.mjs` inlines as `window.__pgRPC` instead of the document
  * text: `system.board({}).hostname` is one field, but `uci.get`'s own `system` config, hosthints
  * and a `system.info`-style ps snapshot all echo the stand's hostname back too, so the built page
- * still names the real stand under an overlay that changed it. Recurses the way `stripBase` does. */
+ * still names the real stand under an overlay that changed it. */
 export function rewriteHostnameInData(value, from, to) {
-	if (!from || !to || from === to) return value;
-	if (typeof value === 'string') return value.split(from).join(to);
-	if (Array.isArray(value)) return value.map((v) => rewriteHostnameInData(v, from, to));
-	if (value && typeof value === 'object') {
-		const out = {};
-		for (const k of Object.keys(value)) out[k] = rewriteHostnameInData(value[k], from, to);
-		return out;
-	}
-	return value;
+	return !from || !to || from === to ? value : mapStrings(value, (s) => s.split(from).join(to));
 }
 
 /* `env.resource`/`env.documentroot` feed `L.fspath()` (luci.js:2798), which some boot probes
@@ -184,15 +179,7 @@ export function rewriteHostnameInData(value, from, to) {
  * made before the rewrite — this strips every occurrence of BASE back out of a string (recursing
  * into arrays/objects) so a replay lookup's key matches the one the recording was keyed under. */
 export function stripBase(value, base) {
-	if (!base) return value;
-	if (typeof value === 'string') return value.split(base).join('');
-	if (Array.isArray(value)) return value.map((v) => stripBase(v, base));
-	if (value && typeof value === 'object') {
-		const out = {};
-		for (const k of Object.keys(value)) out[k] = stripBase(value[k], base);
-		return out;
-	}
-	return value;
+	return base ? mapStrings(value, (s) => s.split(base).join('')) : value;
 }
 
 /* `<` is the only byte a JSON literal can carry that means something inside an inline `<script>`
@@ -325,16 +312,12 @@ export function describePendingRequests(requests, limit = 10) {
 	return shown.join(', ') + extra;
 }
 
-/* A monotonic "which page load is this from" counter for a Playwright `page` reused across
- * `capture.mjs`'s whole run: `bump()` starts a new generation (called right before each
- * navigation), `tag(id)` records the generation `id` (a Request object) was SEEN in, `isCurrent(id)`
- * says whether that still matches the latest `bump()`. A response tagged with an older generation
- * arrived after its own page was already navigated away from — CDP has already discarded the
- * resource by then (`response.body()`: "No resource with given identifier found", or "navigated
- * away from") — which is exactly what the `luci-mod-dashboard` page `login()` lands on produces: its
- * own lazy includes (`view/dashboard/include/10_router.js`, owlab.yaml:86) are still loading when
- * the capture loop's first `goto` fires. Plain `Map`, not `WeakMap`: capture.mjs runs once per
- * process and exits, and a plain map is what makes a fake string id a unit test. */
+/* A "which page load is this from" counter for a `page` reused across capture.mjs's run: `bump()`
+ * starts a generation before each navigation, `tag(id)` records the generation a Request was SEEN
+ * in, `isCurrent(id)` says whether it still matches. A response from an older generation arrived
+ * after its page was navigated away from, so CDP has discarded its body ("No resource with given
+ * identifier found"); the dashboard `login()` lands on does this (docs/development.md, "The
+ * playground"). A plain `Map`, not `WeakMap`, so a fake string id is a unit test. */
 export function createGenerationGate() {
 	let generation = 0;
 	const tagged = new Map();
@@ -346,16 +329,11 @@ export function createGenerationGate() {
 	};
 }
 
-/* Polls `isQuiet()` until it returns true, or throws once the whole wait has run longer than
- * `timeoutMs` — `describe()`, when given, is appended to that error so it can name what is still
- * outstanding (`createActivityTracker`'s `pendingCount()`). A fixed post-load sleep is not enough:
- * the lazy `luci-mod-status` includes behind the overlaid ubus calls (10_system.js, 60_wifi.js)
- * fire ~0.5-0.6 s after `load` locally and later on a fresh CI container — a 300 ms settle dropped
- * 8 of 9 overlay keys. A page whose poll (`L.Poll`) never truly stops still returns
- * here at the first gap between ticks wider than `quietMs`; `timeoutMs` is the hard cap for the page
- * where that gap never opens. `now`/`sleep` are injected so a fake clock drives this in a unit test
- * without a real timer running down; `pollMs` only bounds how coarse the reading is, never a floor
- * on the wait. */
+/* Polls `isQuiet()` until it returns true, or throws once the wait passes `timeoutMs`, naming what
+ * is outstanding through `describe()`. A fixed post-load sleep is not enough (a 300 ms settle
+ * dropped 8 of 9 overlay keys: docs/development.md, "The playground"). A page whose `L.Poll` never
+ * stops still returns at the first gap wider than `quietMs`; `timeoutMs` caps the page where none
+ * opens. `now`/`sleep` are injected for a fake clock; `pollMs` bounds the reading, never the wait. */
 export async function waitForQuiet({
 	isQuiet, quietMs, timeoutMs,
 	now = Date.now, sleep = delay, pollMs, describe,
@@ -372,18 +350,11 @@ export async function waitForQuiet({
 	}
 }
 
-/* Awaits every `[label, promise]` pair in `reads` with `Promise.allSettled` so one response body
- * that failed to read never gets lost behind the ones that succeeded (capture.mjs's `response`
- * listener never awaits its own async work — Playwright does not await an event handler either —
- * so nothing upstream would otherwise notice a rejected read). Returns `{settled, abandoned}`
- * rather than throwing: whether an abandoned or rejected read is fatal depends on what it was
- * reading (an ubus poll tick capture.mjs can afford to lose vs. a document or static asset the
- * build ships), and only the caller knows which — `capture.mjs`'s `drain()` is the policy.
- *
- * Bounded by `timeoutMs` (default 15s): a read that neither resolves nor rejects — a tester run on
- * owrt2512b measured one body read stuck ~148s, past capture's 5-minute kill — is named in
- * `abandoned` rather than left to hang this forever; `settled` still carries every read that landed
- * before the bound, fulfilled or rejected. */
+/* Awaits every `[label, promise]` pair in `reads` with `allSettled`, so one failed body read is not
+ * lost behind the ones that landed (the `response` listener never awaits its own work). Returns
+ * `{settled, abandoned}` rather than throwing: whether a lost read is fatal depends on what it read,
+ * and only capture.mjs's `drain()` knows. Bounded by `timeoutMs` (15 s): a read that never settles
+ * (one stuck ~148 s on a stand, past capture's 5-minute kill) is named in `abandoned`. */
 export async function drainReads(reads, timeoutMs = 15000) {
 	const remaining = new Map(reads.map(([ label ], i) => [ i, label ]));
 	const results = new Array(reads.length);

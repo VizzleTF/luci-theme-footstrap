@@ -4,6 +4,12 @@
  * captured document, and the overlay/menu edits it makes on top of the recorded JSON. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { ROOT } from '../tools/lib/root.mjs';
 import {
 	stableStringify, ubusKey, requestKey, splitBatch,
 	rewriteBase, rewriteEnv, scrubTokens, scrubHost, rewriteHostnameInData,
@@ -520,4 +526,40 @@ test('drainReads: a read that never settles is named in `abandoned`, never throw
 	assert.deepEqual(result.abandoned, [ 'ubus POST /ubus/' ]);
 	assert.deepEqual(result.settled.map((s) => s.label), [ 'GET /luci-static/x.js' ]);
 	releaseHung('ok'); /* let the dangling promise settle so it cannot leak into a later test */
+});
+
+test('build.mjs ships pg-data.js once, and its inlined lib functions answer a BASE-prefixed lookup in a bare global scope', () => {
+	const dir = mkdtempSync(join(tmpdir(), 'fs-pg-'));
+	try {
+		const rec = join(dir, 'rec'), out = join(dir, 'out'), base = '/pg';
+		mkdirSync(join(rec, 'docs'), { recursive: true });
+		const page = '<html><head><script src="/luci-static/resources/luci.js"></script></head><body></body></html>';
+		writeFileSync(join(rec, 'docs', 'login.html'), page);
+		writeFileSync(join(rec, 'docs', 'x.html'), page);
+		const rpc = {};
+		for (const k of [ 'system.board({})', 'luci.getVersion({})', 'system.info({})' ]) rpc[k] = { result: [ 0, {} ] };
+		for (const k of Object.keys(JSON.parse(readFileSync(join(ROOT, 'tools/playground/overlay.json'), 'utf8'))))
+			rpc[k] ??= { result: [ 0, {} ] };
+		rpc['file.list({"path":"/www/x"})'] = { result: [ 0, { ok: 1 } ] };
+		writeFileSync(join(rec, 'rpc.json'), JSON.stringify(rpc));
+		writeFileSync(join(rec, 'menu.json'), JSON.stringify({ children: { x: {} } }));
+		writeFileSync(join(rec, 'meta.json'), JSON.stringify({ host: 'stand:1', pages: [ 'x' ] }));
+		const r = spawnSync(process.execPath, [ join(ROOT, 'tools/playground/build.mjs'),
+			'--recording', rec, '--out', out, '--base', base ], { encoding: 'utf8' });
+		assert.equal(r.status, 0, r.stderr);
+
+		const html = readFileSync(join(out, 'cgi-bin/luci/x/index.html'), 'utf8');
+		assert.ok(html.includes(`<script src="${base}/pg-data.js"></script><script src="${base}/replay.js"></script>`));
+		assert.ok(!html.includes('__pgRPC'), 'the data blob is no longer inlined per page');
+
+		const win = {};
+		const ctx = vm.createContext({ window: win });
+		vm.runInContext(readFileSync(join(out, 'pg-data.js'), 'utf8'), ctx);
+		const entry = { method: 'call', params: [ 'sid', 'file', 'list', { path: `/www${base}/x` } ] };
+		const key = vm.runInContext('requestKey', ctx)(entry, win.__pgBase);
+		assert.equal(key, 'file.list({"path":"/www/x"})');
+		assert.ok(key in win.__pgRPC);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 });
