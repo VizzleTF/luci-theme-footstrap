@@ -1,48 +1,26 @@
-/* Early detector: do the shipped modules come up in a REAL browser, does the Appearance PAGE
- * actually render, and do the Appearance axes stamp in the documented order?
+/* Early detector: do the shipped modules come up in a REAL browser, and do the Appearance axes
+ * stamp in the documented order? Not a userland run (`owlab test`): the gallery has no luci-base,
+ * session, menu or rpc, so every dependency is a stub. `npm test` cannot see a module that throws
+ * on its first box measure: its window and document RECORD calls (tests/lib/luci-module.mjs).
  *
- * This is NOT a substitute for a userland run and does not earn a release the right to skip owlab.
- * The gallery has no luci-base, no session, no menu, no rpc and no router — every dependency here
- * is a stub, so what this proves is that a module EVALUATES against a real DOM, a real CSSOM and
- * real layout, and that the axes it applies land on :root in the right order. Behaviour on a page
- * is still `owlab test` and `npm run live` (docs/development.md).
+ * Order check: every colour axis sets its custom property BEFORE the attribute that switches the
+ * rotation on, else a reload paints one frame in the previous hue (`tools/axes.mjs` reads source).
+ * Export contract (`missingExports`): every `axes.*`/`prefs.*` name fs-appearance.js, fs-assets.js
+ * and fs-axes.js reach for exists on fs-axes.js/fs-prefs.js (docs/development.md, "smoke").
  *
- * What it adds over `npm test`: the unit suite runs against tests/lib/luci-module.mjs, whose window
- * and document RECORD calls rather than answer them — there is no layout there, so a module that
- * throws the first time it measures a box passes the unit suite and fails on a router. Here the box
- * is real.
- *
- * The order check is the one that earns its own gate. Every colour axis sets its custom property
- * BEFORE the attribute that switches the rotation on; reversed, a reload paints one frame in the
- * previous hue. `tools/axes.mjs` holds the pre-paint in head.ut to the live appliers by reading the
- * source; this watches the two writes actually happen in that order on a live :root.
- *
- * ---- the Appearance render check, and why it lives HERE ----
- *
- * fs-appearance.js called `axes.currentContentWidth()` while fs-axes.js exported no such name; the
- * call returned undefined, `build()` threw inside the one try/catch mount() wraps it in, and the
- * whole "Footstrap" section vanished from System with a single console line nobody was watching.
- * Every gate stayed green: `npm run smoke` EVALUATED fs-appearance.js (a factory call that only
- * defines functions and returns `{ wire }`) but never rendered its form, and nothing else in
- * `npm run check` opens a page. This is the cheapest honest fix — build the DOM `wire()` watches
- * for, call it, and assert the tab actually mounted — so it lives beside the module-eval checks
- * above rather than as a gate of its own; `docs/gallery.html` supplies the served page, the same
- * way it already does for the axis-order watch. A weaker, browser-free companion runs first: the
- * export-contract check below (`missingExports`) checks every `axes.*`/`prefs.*` name
- * fs-appearance.js (and fs-assets.js) reaches for against what fs-axes.js/fs-prefs.js actually
- * export, which is the exact shape of this bug, caught in milliseconds even where Playwright cannot
- * run at all.
- *
+ * `--staged` runs what a router gets: the minified, token-mangled modules and header.ut that
+ * `tools/stage.sh` leaves in dist/ ($DIST); the static half stays on the source tree.
  *   node tools/smoke.mjs
+ *   sh tools/stage.sh && node tools/smoke.mjs --staged
  */
 import { chromium } from 'playwright';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { serveGallery } from './lib/gallery.mjs';
-import { buildCss } from './lib/css.mjs';
+import { buildCss, seamOf } from './lib/css.mjs';
 import { pragmas, aliasFor } from '../tests/lib/luci-module.mjs';
-import { RESOURCES } from './lib/page-modules.mjs';
-import { ROOT } from './lib/root.mjs';
+import { ROOT, RESOURCES } from './lib/root.mjs';
+import { parseFlags } from './lib/util.mjs';
 
 /* ---- export-contract: does every `alias.name(` one module reaches for exist on what the other
  * exports? Folded in here because this is its only caller. Deliberately narrow, and safe to be
@@ -53,17 +31,25 @@ function stripComments(src) {
 	return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
 }
 
-/* The identifiers inside the module's own `return baseclass.extend({ … });` — the LAST such call
- * in the file, which is where every one of these modules places it. Both shapes the theme uses are
- * covered: a bare identifier (`currentTint, applyTint`) exports the name itself, and a `key: value`
- * pair (not used today, but cheap to hold) exports the key. */
+/* The KEYS of the module's own `return baseclass.extend({ … });` — the LAST such call in the file,
+ * which is where every one of these modules places it. A shorthand (`currentTint, applyTint`)
+ * exports the name itself; in `key: value` only the key counts, so a value identifier is never
+ * mistaken for an export. Entries are split on commas at depth 0 (a value may hold a call or literal). */
 function exportedKeys(src) {
 	const clean = stripComments(src);
 	const m = clean.match(/return\s+baseclass\.extend\(\{([\s\S]*)\}\)\s*;?\s*$/);
 	if (!m) return null;
 	const body = m[1];
 	const keys = new Set();
-	for (const km of body.matchAll(/([A-Za-z_$][A-Za-z0-9_$]*)/g)) keys.add(km[1]);
+	let depth = 0, start = 0;
+	const take = (end) => { const k = body.slice(start, end).match(/^\s*(?:async\s+)?([A-Za-z_$][A-Za-z0-9_$]*)/); if (k) keys.add(k[1]); };
+	for (let i = 0; i < body.length; i++) {
+		const c = body[i];
+		if ('([{'.includes(c)) depth++;
+		else if (')]}'.includes(c)) depth--;
+		else if (c === ',' && !depth) { take(i); start = i + 1; }
+	}
+	take(body.length);
 	return keys;
 }
 
@@ -90,20 +76,34 @@ function missingExports(callerSrc, alias, calleeSrc) {
 
 /* Dependency order, not alphabetical: each module is evaluated once and handed to the next as its
  * pragma argument, the way luci.js's require cache does it. fs-router and fs-chrome are the two
- * that measure a box at eval, and fs-appearance is the one that only RENDERS its box once `wire()`
- * finds the stock System page — which is exactly why it, fs-version and fs-assets (its two other
- * dependencies) are here and not only in the unit suite. */
+ * that measure a box at eval. */
 const MODULES = ['fs-fit', 'fs-prefs', 'fs-axes', 'fs-version', 'fs-assets', 'fs-select', 'fs-chrome', 'fs-router', 'fs-appearance'];
 
+const FLAGS = parseFlags('smoke', { staged: { type: 'boolean', default: false } });
+const STAGED = FLAGS.staged;
+const DIST = process.env.DIST || join(ROOT, 'dist');
+const SHIPPED = join(DIST, 'root/www/luci-static');
+const MODS = STAGED ? join(SHIPPED, 'resources') : RESOURCES;
+if (STAGED && !existsSync(join(MODS, 'fs-fit.js'))) {
+	console.error(`smoke --staged: no staged tree under ${DIST}; run sh tools/stage.sh first`);
+	process.exit(2);
+}
+
+/* The minifier writes the prologue as one line of directives, in whichever quote it picked for the
+ * file (fs-version.js keeps single quotes), which pragmas() - a line-wise reader of the source tree - does not see. */
+const stagedPragmas = (src) => [ ...(/^(?:(["'])[^"'\n]*\1;)+/.exec(src)?.[0] ?? '').matchAll(/(["'])([^"']*)\1;/g) ]
+	.map((m) => m[2]).filter((p) => p !== 'use strict');
+
+/* `src` is the readable source, which the static half reads; `run` is what the browser evaluates. */
 const sources = MODULES.map((name) => {
 	const src = readFileSync(join(RESOURCES, name + '.js'), 'utf8');
-	return { name, src, deps: pragmas(src).map(aliasFor).filter(Boolean) };
+	const run = STAGED ? readFileSync(join(MODS, name + '.js'), 'utf8') : src;
+	return { name, src, run, deps: (STAGED ? stagedPragmas(run) : pragmas(src)).map(aliasFor).filter(Boolean) };
 });
 
 /* ---- the static half: every `axes.` / `prefs.` reference held against what is exported ----
  * Runs before the browser even launches, and fails the build on its own if it finds anything —
- * the render check below would fail too, but this says WHICH name is missing rather than "the tab
- * never mounted". */
+ * which says WHICH name is missing. */
 const staticChecks = [];
 {
 	const appearanceSrc = sources.find((s) => s.name === 'fs-appearance').src;
@@ -114,6 +114,7 @@ const staticChecks = [];
 		['fs-appearance', appearanceSrc, 'axes', 'fs-axes', axesSrc],
 		['fs-appearance', appearanceSrc, 'prefs', 'fs-prefs', prefsSrc],
 		['fs-assets', assetsSrc, 'axes', 'fs-axes', axesSrc],
+		['fs-axes', axesSrc, 'prefs', 'fs-prefs', prefsSrc],
 	]) {
 		const missing = missingExports(callerSrc, alias, calleeSrc);
 		if (missing === null) {
@@ -139,13 +140,22 @@ const COLOR_AXES = [
 	{ axis: 'danger', attr: 'data-danger', prop: '--fs-danger-h' },
 ];
 
-const { base, close } = await serveGallery(buildCss());
+/* The staged JS writes the mangled names, so it meets the sheet mangled the same way; a stage left
+ * from an older tree would agree on nothing and fail on the first axis. */
+const css = buildCss({ shipped: STAGED });
+const seam = (n) => seamOf(css)?.names.get(n) ?? n;
+if (STAGED) {
+	const fresh = readFileSync(join(SHIPPED, 'footstrap/cascade.css'), 'utf8') === readFileSync(css, 'utf8');
+	staticChecks.push({ ok: fresh, m: fresh ? 'staged: cascade.css is the sheet a fresh build ships'
+		: 'staged: cascade.css differs from a fresh shipped build; re-run sh tools/stage.sh (not --dev)' });
+}
+const { base, close } = await serveGallery(css);
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 
 /* A module that logs an error instead of throwing still "loaded", and the theme's own history is
- * exactly that shape: the Appearance tab is built in ONE try/catch, so a missing ui.RangeSlider cost
- * the whole panel and a single console line (openwrt/luci#8978).
+ * exactly that shape: the Appearance tab is built in ONE try/catch, so one missing name cost the
+ * whole panel and a single console line.
  *
  * Network 404s are the fixture, not the theme: serveGallery holds two files, so the favicon the
  * browser asks for on its own and any asset a background-image names are absent by construction.
@@ -185,38 +195,8 @@ const result = await page.evaluate(({ mods, axes }) => {
 		hasSystemFeature: () => false,
 	};
 	window.L = L;
-	/* A real `E(tag, attrs, children)`, not the bare `createElement` the module-eval checks got by
-	 * with: none of THEM call it before the render check below does, but fs-appearance.js's build()
-	 * calls it ~120 times to construct the whole Appearance form the moment it mounts, and a stub
-	 * that drops attrs/children would build a page of empty, class-less, label-less nodes — which
-	 * would pass "did it throw" while failing to prove any of the groups this check counts exist. */
-	window.E = window.E || ((tag, attrs, children) => {
-		const el = (typeof tag === 'string') ? document.createElement(tag) : document.createElement('div');
-		if (attrs) for (const k in attrs) {
-			const v = attrs[k];
-			if (v === null || v === undefined || v === false) continue;
-			if (k === 'class') el.className = String(v);
-			else el.setAttribute(k, String(v));
-		}
-		const append = (c) => {
-			if (c === null || c === undefined || c === '') return;
-			if (Array.isArray(c)) { c.forEach(append); return; }
-			el.appendChild((c instanceof Node) ? c : document.createTextNode(String(c)));
-		};
-		if (children !== undefined) append(children);
-		return el;
-	});
-	/* `_(msgid, ctx)` with no catalogue returns msgid unchanged (luci.js); the theme then calls
-	 * `.format(...)` on some of those strings (the contrast readouts), so the polyfill luci.js
-	 * installs on String.prototype has to exist here too or build() throws reaching for it — a
-	 * throw the render check exists to catch, not to manufacture out of a missing stub. */
+	/* `_(msgid, ctx)` with no catalogue returns msgid unchanged (luci.js); fs-assets.js calls it at eval. */
 	window._ = window._ || ((s) => s);
-	if (!String.prototype.format) {
-		Object.defineProperty(String.prototype, 'format', { value: function (...args) {
-			let i = 0;
-			return this.replace(/%s/g, () => (i < args.length ? args[i++] : '%s'));
-		} });
-	}
 
 	const registry = {
 		baseclass: { extend: (o) => o },
@@ -224,20 +204,8 @@ const result = await page.evaluate(({ mods, axes }) => {
 		ui: {
 			instantiateView: () => Promise.resolve({}), hideModal() {}, hideIndicator() {},
 			showIndicator() {}, addNotification() {}, menu: { load: () => Promise.resolve({}) },
-			tabs: { switchTab() {} },
-			/* Minimal stand-ins for the two stock widgets the Appearance form builds every row
-			 * from (`new ui.Select(...)`, `new ui.RangeSlider(...)`): a real DOM node from
-			 * `.render()` and the value back from `.getValue()`, nothing else. Neither is
-			 * exercised for behaviour here — `fs-appearance.js` wiring `widget-change` to a real
-			 * router value is `owlab test`'s question, not this file's. */
-			Select: function Select(value) { this._v = value; this._el = document.createElement('select'); },
-			RangeSlider: function RangeSlider(value) { this._v = value; this._el = document.createElement('input'); this._el.type = 'range'; },
 		},
-		dom: { ...L.dom, callClassMethod() {} },
-		poll: L.Poll,
-		request: L.Request,
-		uci: { get: () => null, load: () => Promise.resolve() },
-		fs: { read: () => Promise.resolve(''), exec: () => Promise.resolve({ code: 0 }) },
+		dom: L.dom,
 	};
 
 	for (const { name, src, deps } of mods) {
@@ -311,19 +279,16 @@ const result = await page.evaluate(({ mods, axes }) => {
 	axesMod.tint.apply(0);
 
 	return notes;
-}, { mods: sources, axes: COLOR_AXES });
+}, { mods: sources.map(({ name, run, deps }) => ({ name, src: run, deps })), axes: COLOR_AXES.map((a) => ({ ...a, prop: seam(a.prop) })) });
 
 /* ---- the body-litter recorder (header.ut) actually wraps document.body, on a real DOM ----
  *
- * The recorder is server-rendered markup, so nothing else here loads it — docs/gallery.html has no
- * chrome of its own. Its text is pulled out of header.ut, the same way tools/lib/ut-scripts.mjs
- * pulls a template's inline scripts for eslint, and run verbatim against THIS page's own
- * document.body: proof that the wrap it installs actually intercepts the calls fs-router.js's
- * bodyLittered() depends on (issue #56), not only that the source parses. Run after the module
- * checks above, not before: fs-chrome.js's and fs-appearance.js's own body-parented probes must not
- * be caught by a wrap installed for this check alone. */
-const headerUt = readFileSync(
-	join(ROOT, 'luci-theme-footstrap/ucode/template/themes/footstrap/header.ut'), 'utf8');
+ * Server-rendered markup that docs/gallery.html lacks, so its text is pulled out of header.ut
+ * (as tools/lib/ut-scripts.mjs does for eslint) and run verbatim against THIS page's document.body:
+ * the wrap must intercept the calls fs-router.js's bodyLittered() depends on (issue #56), not only
+ * parse. It runs after the module checks: their own body-parented probes must not be caught by it. */
+const headerUt = readFileSync(STAGED ? join(DIST, 'root/usr/share/ucode/luci/template/themes/footstrap/header.ut')
+	: join(ROOT, 'luci-theme-footstrap/ucode/template/themes/footstrap/header.ut'), 'utf8');
 const bodyTag = headerUt.indexOf('<body');
 const recorderMatch = bodyTag >= 0 && headerUt.slice(bodyTag).match(/<script>([\s\S]*?)<\/script[^>]*>/i);
 
@@ -367,13 +332,72 @@ const recorderNotes = recorderMatch ? await page.evaluate((src) => {
 	+ 'with a plain, non-interpolated <script>…</script> — the recorder moved, was deleted, or '
 	+ 'gained a ucode interpolation this extractor does not handle' } ];
 
+/* ---- fs-sheets fences an @import's rules on a real CSSOM ----
+ *
+ * fenceRules() follows CSSImportRule.styleSheet; a fake rule list cannot model that, a real
+ * stylesheet can. The import is a data: URL so the gallery server needs to serve nothing. */
+const sheetsSrc = readFileSync(join(MODS, 'fs-sheets.js'), 'utf8');
+const sheetsNotes = await page.evaluate(async ([ src, staged ]) => {
+	const notes = [];
+	const check = (cond, m) => notes.push({ ok: !!cond, m: 'fs-sheets: ' + m });
+	const mod = new Function('window', 'document', 'L', 'baseclass', src)(window, document, window.L, { extend: (o) => o });
+	const el = document.createElement('style');
+	el.textContent = '@import url("data:text/css,p%7Bcolor%3Ared%7D") layer(theme);';
+	document.head.appendChild(el);
+	/* bounded: a load that already fired, or never comes, would hang the gate; 3 s is far over a data: URL */
+	const loaded = await Promise.race([
+		new Promise((res) => { if (el.sheet && el.sheet.cssRules[0].styleSheet) res(true); else el.addEventListener('load', () => res(true), { once: true }); }),
+		new Promise((res) => setTimeout(() => res(false), 3000)),
+	]);
+	if (!loaded) { check(false, 'the @import never loaded within 3 s'); el.remove(); return notes; }
+	try {
+		if (staged) check(mod.fenceRules === undefined, 'fenceRules is a probe export and is not in the shipped tree');
+		else {
+			mod.fenceRules(el.sheet.cssRules, new Set());
+			const inner = el.sheet.cssRules[0].styleSheet.cssRules[0];
+			check(inner && inner.selectorText.includes(':where(:not([data-fs-chrome]'), "an @import's rule is fenced (" + (inner && inner.selectorText) + ')');
+		}
+	} catch (e) { check(false, 'fenceRules threw — ' + e.message); }
+	el.remove();
+
+	/* a link the app marks alternate/disabled and enables later has no node added, so only the
+	 * observer's attribute records can fence it */
+	const stub = { env: { dispatchpath: [ 'admin', 'x', 'y' ] } };
+	new Function('window', 'document', 'L', 'baseclass', src)(window, document, stub, { extend: (o) => o }).watchViewSheets();
+	const tick = () => new Promise((res) => setTimeout(res, 300));
+	for (const [ label, arm, fire ] of [
+		[ 'rel=alternate → stylesheet', (l) => { l.rel = 'alternate stylesheet'; }, (l) => { l.rel = 'stylesheet'; } ],
+		[ 'disabled attribute removed', (l) => { l.rel = 'stylesheet'; l.setAttribute('disabled', ''); }, (l) => { l.removeAttribute('disabled'); } ],
+	]) {
+		const href = 'data:text/css,*%7Bmargin%3A0%7D/*' + label.length + '*/';
+		const l = document.createElement('link');
+		arm(l);
+		l.href = href;
+		document.head.appendChild(l);
+		await tick();
+		const shims = () => [ ...document.querySelectorAll('style[data-fs-layered]') ].filter((s) => s.textContent.includes(href)).length;
+		check(shims() === 0, label + ': not re-hosted while marked');
+		let childList = 0;
+		const watch = new MutationObserver((ms) => { for (const m of ms) if (m.type === 'childList') childList++; });
+		watch.observe(document.head, { childList: true });
+		fire(l);
+		await tick();
+		watch.disconnect();
+		check(shims() === 1, label + ': gains one @import shim (' + shims() + ')');
+		check(childList === 1, label + ': one node added, no feedback loop (' + childList + ' childList records)');
+		document.querySelectorAll('style[data-fs-layered]').forEach((x) => { if (x.textContent.includes(href)) x.remove(); });
+		l.remove();
+	}
+	return notes;
+}, [ sheetsSrc, STAGED ]);
+
 await browser.close();
 close();
 
 /* the static half runs before the browser and is reported with the rest: collected and then
  * dropped, it proved nothing — removing an export from fs-axes.js left this gate green. */
 result.unshift(...staticChecks);
-result.push(...recorderNotes);
+result.push(...recorderNotes, ...sheetsNotes);
 
 let failed = 0;
 for (const n of result) {

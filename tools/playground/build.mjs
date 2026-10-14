@@ -1,28 +1,18 @@
 #!/usr/bin/env node
-/* Turns a `capture.mjs` recording into a static site under `--base`, servable by any web server
- * (verify.mjs uses its own). Pure and deterministic — no router, no browser, same recording always
- * produces the same tree — so this is safe to run and re-run offline against a recording that was
- * made once, on a tag.
- *
- * Per page: the recorded document, path/env rewritten (`lib.mjs`) so links and the `new LuCI({...})`
- * boot object resolve under `--base`, tokens/host/hostname scrubbed (the last swapped to whatever
- * `overlay.json` gave `system.board`, since that is baked into the page as plain text), a recording
- * banner, and `replay.js` (plus the recording's data, inlined so it is there before `luci.js`'s
- * first XHR) spliced in right before the `luci.js` tag. `overlay.json` corrects a few ubus answers
- * a container cannot give honestly; `menu.json` is pruned to the recorded pages so the built site
- * links nowhere it cannot answer.
- *
- * `docs/login.html` (`capture.mjs`) goes through the SAME `buildPage()` and lands at
- * `BASE/cgi-bin/luci/` — `build_url()`'s own answer, which is where LuCI already sends the reader
- * after a logout. `BASE/cgi-bin/luci/admin/logout/index.html` is synthesised, not recorded: the
- * router has nothing to answer that GET honestly in a static site, so it is a page of our own that
- * clears the playground's login flag and sends the reader back there. Root `--base/index.html`
- * redirects to the login, not straight to Overview — a fresh session has not "logged in" yet.
+/* Turns a `capture.mjs` recording into a static site under `--base`. Pure and deterministic: no
+ * router, no browser, the same recording always gives the same tree. Per page: the recorded
+ * document with path/env rewritten (`lib.mjs`) so links and the `new LuCI({...})` boot object
+ * resolve under `--base`, tokens/host scrubbed (hostname swapped to `overlay.json`'s
+ * `system.board`), a recording banner, and `pg-data.js` + `replay.js` spliced in before the
+ * `luci.js` tag. `overlay.json` corrects ubus answers a container cannot give honestly;
+ * `menu.json` is pruned to the recorded pages. `docs/login.html` goes through the same
+ * `buildPage()` to `BASE/cgi-bin/luci/`; `admin/logout/index.html` is synthesised, clearing the
+ * playground's login flag. Root `--base/index.html` redirects to the login.
  *
  *   node tools/playground/build.mjs [--recording DIR] [--out DIR] [--base /path]
  */
 import {
-	mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, copyFileSync, statSync,
+	mkdirSync, readFileSync, readdirSync, existsSync, copyFileSync, statSync,
 } from 'node:fs';
 import { dirname, join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,11 +21,12 @@ import { parseArgs } from 'node:util';
 import {
 	rewriteBase, rewriteEnv, scrubTokens, scrubHost, rewriteHostnameInData,
 	rewriteLiteral, applyOverlay, pruneMenu, jsonForScript, scrubDataDeep, guardNoSecrets,
-	stableStringify, ubusKey, stripBase, isSafeReturn,
+	stableStringify, ubusKey, stripBase, isSafeReturn, requestKey, mapStrings,
 } from './lib.mjs';
+import { ROOT } from '../lib/root.mjs';
+import { writeFile } from '../lib/util.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(HERE, '..', '..');
 
 const { values: FLAGS } = parseArgs({ options: {
 	help: { type: 'boolean', default: false },
@@ -55,11 +46,6 @@ const BASE = FLAGS.base;
 
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
 
-function writeFile(path, body) {
-	mkdirSync(dirname(path), { recursive: true });
-	writeFileSync(path, body);
-}
-
 /* Every regular file under `dir`, as paths relative to it — `readdirSync(recursive)` also yields
  * the directories themselves, and a directory can't be `copyFileSync`d. */
 function filesUnder(dir) {
@@ -70,35 +56,29 @@ function filesUnder(dir) {
 		.map((f) => f.slice(dir.length + 1));
 }
 
-/* One recording answers every page: the ubus keys and the menu it needs do not depend on which
- * page is asking, so the same inlined blob is correct for all of them. Inlined rather than fetched
- * by replay.js itself — a `fetch()` there would race the FIRST intercepted XHR, which can fire
- * within the same tick `luci.js` starts evaluating. `jsonForScript` keeps a `</script` or `<!--`
- * inside a recorded value from truncating this element. `__pgBase` lets replay.js undo `rewriteEnv`
- * on a path-like ubus arg before it looks the call up (lib.mjs's `stripBase`). `rpc`/`menu` arrive
- * already run through `scrubDataDeep` (main()) — `buildPage`'s `scrubTokens`/`scrubHost` only ever
- * touch the HTML document, never this inlined JSON, which is a separate byte stream a token or the
- * stand's host could still be sitting in.
- *
- * `page` is replay.js's only way to tell the login document from every other one: it runs before
- * the DOM exists, so it cannot sniff for `form.fs-login`. `overviewUrl` is the login handler's
- * fallback target when there is no (or no SAFE — `lib.mjs`'s `isSafeReturn`) return path waiting
- * in `sessionStorage`. */
-function buildInject(rpc, menu, replaySrc, base, { page, overviewUrl }) {
-	/* replay.js is a classic script (no module graph) and used to hand-copy `stableStringify`/
-	 * `ubusKey`/`stripBase`/`isSafeReturn` from lib.mjs rather than import them. Inlining each
-	 * function's own SOURCE here — both scripts run in the page's one global scope, so a
-	 * `function name(){…}` declared in this tag is callable from the next one — means replay.js
-	 * calls the same code lib.mjs exports instead of a copy that can drift from it. */
-	const shared = [ stableStringify, ubusKey, stripBase, isSafeReturn ]
+/* One `pg-data.js` serves every page (inlined per page it was ~40 % of the tarball), as a sync
+ * `<script src>` because a fetch in replay.js would race the first intercepted XHR. `jsonForScript`
+ * stops a `</script` or `<!--` in a value truncating it; `__pgBase` lets replay.js undo `rewriteEnv`.
+ * `rpc`/`menu` arrive through `scrubDataDeep` (main()): `scrubTokens`/`scrubHost` only touch the HTML.
+ * lib.mjs functions are written in as source so replay.js shares one global scope with them;
+ * `mapStrings` is there because `stripBase` calls it. */
+function buildData(rpc, menu, base, overviewUrl) {
+	const shared = [ stableStringify, ubusKey, mapStrings, stripBase, requestKey, isSafeReturn ]
 		.map((fn) => fn.toString()).join(';');
-	const data = `${shared};window.__pgRPC=${jsonForScript(rpc)};window.__pgMenu=${jsonForScript(menu)};`
-		+ `window.__pgBase=${jsonForScript(base)};window.__pgPage=${jsonForScript(page)};`
-		+ `window.__pgOverview=${jsonForScript(overviewUrl)};`;
-	return `<script>${data}</script><script src="${replaySrc}"></script>`;
+	return `${shared};window.__pgRPC=${jsonForScript(rpc)};window.__pgMenu=${jsonForScript(menu)};`
+		+ `window.__pgBase=${jsonForScript(base)};window.__pgOverview=${jsonForScript(overviewUrl)};`;
 }
 
-/* notices.ut's `empty_password` block (header.ut:26 — `getspnam('root').pwdp === ''`), baked
+/* `page` is replay.js's only way to tell the login document from every other one: it runs before
+ * the DOM exists, so it cannot sniff for `form.fs-login`. Only the login page sets it, inline;
+ * `overviewUrl` (in pg-data.js) is the login handler's fallback target when there is no (or no
+ * SAFE — `lib.mjs`'s `isSafeReturn`) return path waiting in `sessionStorage`. */
+function buildInject(dataSrc, replaySrc, { page }) {
+	const pageTag = page === 'login' ? `<script>window.__pgPage=${jsonForScript(page)}</script>` : '';
+	return `<script src="${dataSrc}"></script>${pageTag}<script src="${replaySrc}"></script>`;
+}
+
+/* header.ut's inline notices block `empty_password` (`getspnam('root').pwdp === ''`), baked
  * verbatim on every page owlab's containers all hit (root carries no password there). No ubus
  * overlay entry reaches it, so it is deleted by literal match, the same way the recorded
  * hostname below is corrected; a router-like recording that already has a password set simply
@@ -155,13 +135,13 @@ function main() {
 	/* Baked into every recorded document as plain text at capture time (head.ut's `<title>`,
 	 * header.ut's `.fs-title-main`) — the overlay's `system.board({})` patch only reaches the
 	 * client-side ubus replay, never these bytes, so the swap is done here instead. Computed before
-	 * `buildInject` so the SAME pair also corrects the ubus data that patch reaches (uci's own
+	 * `buildData` so the SAME pair also corrects the ubus data that patch reaches (uci's own
 	 * `system` config, hosthints, ps — `rewriteHostnameInData`, lib.mjs). */
 	const hostnameFrom = rpcRecorded['system.board({})']?.result?.[1]?.hostname;
 	const hostnameTo = rpc['system.board({})']?.result?.[1]?.hostname;
 	const rpcInjected = rewriteHostnameInData(rpc, hostnameFrom, hostnameTo);
 
-	/* footer.ut's `version.luciname` (footer.ut:20) is the same `getVersion().branch`
+	/* footer.ut's `version.luciname` is the same `getVersion().branch`
 	 * string baked server-side instead of fetched — same pair, same reason as the hostname swap
 	 * above, just against the overlay's `luci.getVersion({})` entry instead of `system.board({})`. */
 	const luciFrom = rpcRecorded['luci.getVersion({})']?.result?.[1]?.branch;
@@ -176,7 +156,8 @@ function main() {
 	const replaySrc = `${BASE}/replay.js`;
 	const rpcScrubbed = scrubDataDeep(rpcInjected, meta.host);
 	const menuScrubbed = scrubDataDeep(menu, meta.host);
-	const inject = buildInject(rpcScrubbed, menuScrubbed, replaySrc, BASE, { page: 'view', overviewUrl });
+	writeFile(join(OUT, 'pg-data.js'), buildData(rpcScrubbed, menuScrubbed, BASE, overviewUrl));
+	const inject = buildInject(`${BASE}/pg-data.js`, replaySrc, { page: 'view' });
 
 	for (const p of pages) {
 		const raw = readFileSync(join(RECORDING, 'docs', `${p}.html`), 'utf8');
@@ -191,13 +172,13 @@ function main() {
 	}
 
 	const loginRaw = readFileSync(loginPath, 'utf8');
-	const loginInject = buildInject(rpcScrubbed, menuScrubbed, replaySrc, BASE, { page: 'login', overviewUrl });
+	const loginInject = buildInject(`${BASE}/pg-data.js`, replaySrc, { page: 'login' });
 	const loginHtml = buildPage(loginRaw, { base: BASE, meta, inject: loginInject, hostnameFrom, hostnameTo, luciFrom, luciTo });
 	writeFile(join(OUT, 'cgi-bin/luci/index.html'), loginHtml);
 
 	/* Synthesised, not recorded: a static site has nothing of its own to answer this GET with, only
 	 * a page that undoes what the login submit handler in replay.js did. `a.fs-logout`'s own href
-	 * (partials/logout.ut, `build_url('admin/logout')`) already resolves here once `rewriteBase`
+	 * (header.ut, `build_url('admin/logout')`) already resolves here once `rewriteBase`
 	 * has run on every OTHER page, so no page needs to name this URL specially to reach it. */
 	writeFile(join(OUT, 'cgi-bin/luci/admin/logout/index.html'),
 		'<!doctype html><title>Logging out…</title>'
@@ -213,7 +194,7 @@ function main() {
 		+ `<p>This page was not part of the playground recording. <a href="${BASE}/">Back to the playground</a>.</p>`);
 
 	/* Fail-closed, over the bytes actually WRITTEN rather than the values passed to `buildPage`/
-	 * `buildInject` — the one check downstream of every scrub call site at once, so a future call
+	 * `buildData` — the one check downstream of every scrub call site at once, so a future call
 	 * site that forgets to scrub fails the build instead of shipping to GitHub Pages. `.woff2`/
 	 * `.png`/… are skipped: recorded static assets, never where a token or the stand's host sits. */
 	const TEXT_EXT = new Set([ '.html', '.js', '.json' ]);

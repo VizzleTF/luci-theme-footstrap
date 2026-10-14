@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { serveGallery, applyAppearance, matrix, luminance, contrast } from './lib/gallery.mjs';
+import { serveGallery, applyAppearance, matrix, installRgba, contrast } from './lib/gallery.mjs';
 import { buildCss } from './lib/css.mjs';
 import { parseExportTier } from './lib/tokens.mjs';
 
@@ -69,7 +69,7 @@ if (setup.length) {
 const INKS = Object.fromEntries(TIER.filter((t) => t.ink).map((t) => [t.family, `--${t.ink}`]));
 const levelsOf = (family) => TIER.find((t) => t.family === family).levels.map((l) => `--${l}`);
 
-/* serve + Appearance-axis stamping: shared with a11y-gallery.mjs (tools/lib/gallery.mjs) */
+/* serve + Appearance-axis stamping: shared by eight tools (tools/lib/gallery.mjs) */
 const { base, close } = await serveGallery(buildCss());
 
 const spread = (a, b) => Math.max(...a.map((x, i) => Math.abs(x - b[i]))) / 255;
@@ -91,6 +91,7 @@ const MATRIX = matrix(TINTS);
 const browser = await chromium.launch();
 const page = await browser.newPage();
 await page.goto(base, { waitUntil: 'load' });
+await installRgba(page);
 
 const failures = [];
 let checks = 0;
@@ -104,28 +105,22 @@ let checks = 0;
 async function runCombo({ palette, mode, tint }, suffix) {
 	await applyAppearance(page, { mode, palette, tint });
 
-	/* Resolve each custom property by RASTERISING it, never by parsing the computed string:
-	 * a color-mix() computes to whatever space it was written in, and `oklch(L C H)` has three
-	 * numbers that parse perfectly well — silently and wrongly — as an rgb() triple. That
-	 * misread once scored a light token as near-black. */
-	const v = await page.evaluate((names) => {
+	/* Resolve each custom property by RASTERISING it (installRgba), never by parsing the computed
+	 * string: `oklch(L C H)` has three numbers that parse perfectly well — silently and wrongly — as
+	 * an rgb() triple. That misread once scored a light token as near-black. The same evaluate reads
+	 * <body>'s background for the dark-mode sniff below. */
+	const { v, bodyBg } = await page.evaluate((names) => {
 		const probe = document.createElement('div');
 		document.body.appendChild(probe);
-		const cv = document.createElement('canvas');
-		cv.width = cv.height = 1;
-		const cx = cv.getContext('2d', { willReadFrequently: true });
 		const out = {};
 		for (const n of names) {
 			probe.style.color = '';
 			probe.style.color = `var(${n})`;
-			cx.clearRect(0, 0, 1, 1);
-			cx.fillStyle = getComputedStyle(probe).color;
-			cx.fillRect(0, 0, 1, 1);
-			const d = cx.getImageData(0, 0, 1, 1).data;
-			out[n] = [d[0], d[1], d[2]];
+			out[n] = window.__fsRgba(getComputedStyle(probe).color).slice(0, 3);
 		}
 		probe.remove();
-		return out;
+		const raw = getComputedStyle(document.body).backgroundColor;
+		return { v: out, bodyBg: { raw, rgba: window.__fsRgba(raw) } };
 	}, NAMES);
 
 	const where = `${palette}/${mode}${tint === null ? '' : `/tint ${tint}°`}${suffix}`;
@@ -160,31 +155,15 @@ async function runCombo({ palette, mode, tint }, suffix) {
 
 	/* ---- dark mode must be sniffable, and <body> is what everyone sniffs ----
 	 *
-	 * An app with dark styles must decide whether the page is dark, and there is no standard to ask.
-	 * The one method needing no cooperation from the theme — hence everybody's fallback — is the
-	 * LUMINANCE of getComputedStyle(document.body).backgroundColor: luci-app-ssclash
-	 * (0.299/0.587/0.114), OpenClash (isDarkBackground, 0.2126/0.7152/0.0722, which then stamps
-	 * `data-darkmode` on OUR :root from it), passwall's four node-widgets (YIQ).
-	 *
-	 * So `body` must carry an OPAQUE background on the correct side of the midpoint in every
-	 * palette x mode. Paint the page on :root leaving `body` transparent, or fade it with an alpha,
-	 * and the readback is `rgba(0, 0, 0, 0)`, which those sniffers read as LIGHT — the canvas
-	 * rasterises the alpha as the white page showing through, so a faded dark body reads light. */
-	const bodyBg = await page.evaluate(() => {
-		const cv = document.createElement('canvas');
-		cv.width = cv.height = 1;
-		const cx = cv.getContext('2d', { willReadFrequently: true });
-		const bg = getComputedStyle(document.body).backgroundColor;
-		cx.clearRect(0, 0, 1, 1);
-		cx.fillStyle = bg;
-		cx.fillRect(0, 0, 1, 1);
-		const d = cx.getImageData(0, 0, 1, 1).data;
-		return { raw: bg, rgb: [d[0], d[1], d[2]], alpha: d[3] };
-	});
+	 * There is no standard to ask, so apps read the LUMINANCE of getComputedStyle(document.body)
+	 * .backgroundColor: ssclash (0.299/0.587/0.114), OpenClash (0.2126/0.7152/0.0722, then stamps
+	 * `data-darkmode` on OUR :root), passwall's node-widgets (YIQ). So `body` needs an OPAQUE
+	 * background on the right side of the midpoint in every palette x mode: transparent or faded,
+	 * the readback is `rgba(0, 0, 0, 0)` or the white page showing through, and reads LIGHT. */
 	checks++;
 	/* what those sniffers compute, in the notation they compute it in */
-	const luma = (0.299 * bodyBg.rgb[0] + 0.587 * bodyBg.rgb[1] + 0.114 * bodyBg.rgb[2]) / 255;
-	if (bodyBg.alpha !== 255)
+	const luma = (0.299 * bodyBg.rgba[0] + 0.587 * bodyBg.rgba[1] + 0.114 * bodyBg.rgba[2]) / 255;
+	if (bodyBg.rgba[3] !== 255)
 		failures.push(`${where}: body background is ${bodyBg.raw} — not opaque. Every third-party dark-mode `
 			+ `sniffer reads its luminance, and a transparent body reads back as LIGHT.`);
 	else if ((mode === 'dark') !== (luma < 0.5))

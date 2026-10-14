@@ -1,27 +1,15 @@
 /* The playground's runtime half: answers every ubus/menu/upload call the built page makes, from
- * the data build.mjs inlined ahead of this tag (`window.__pgRPC`, `window.__pgMenu`) — nothing
+ * the data pg-data.js defines ahead of this tag (`window.__pgRPC`, `window.__pgMenu`) — nothing
  * here reaches a network. A CLASSIC script, not a module, and injected BEFORE luci.js on purpose:
  * XMLHttpRequest and fetch must already be patched when luci.js's own boot sequence makes its
  * first request, not after.
  *
- * Static files (`/luci-static/**`) are never touched — the page server answers those directly, the
- * same way a router's uhttpd would.
- *
- * `stableStringify`/`ubusKey`/`stripBase`/`isSafeReturn` are lib.mjs's own functions, not copies:
- * build.mjs inlines their source into the `<script>` tag ahead of this one (`buildInject`), and a
- * classic script shares the page's one global scope, so they are already defined by the time this
- * runs. Only `requestKey` below is replay-specific — lib.mjs's own version has no BASE to strip. A
- * key that drifts here answers nothing and the call becomes a miss.
- *
- * A miss never breaks the page: `window.__pgMiss` records it (verify.mjs asserts it stays empty)
- * and the call gets a JSON-RPC error EXCEPT `session.access`, which fs-router.js's SPA guard reads
- * as "log in again" the moment it sees one fail — so an unrecorded permission check answers
- * `true` instead of failing loudly.
- *
- * The login gate below IMITATES being logged out; it does not enforce it. Every byte of this site
- * shipped to the reader's own browser, so there is no server left to refuse anything — the form
- * on `window.__pgPage === 'login'` accepts any username and password, on purpose, the same way the
- * rest of this file fakes a router with none installed. */
+ * `/luci-static/**` is never touched. `requestKey`/`ubusKey`/`stripBase`/`isSafeReturn` are
+ * lib.mjs's own functions, written into pg-data.js by build.mjs (one global scope), not copies; a
+ * drifted key answers nothing. A miss lands in `window.__pgMiss` (verify.mjs asserts it empty) and
+ * gets a JSON-RPC error, except `session.access`, which fs-router.js reads as "log in again", so
+ * it answers `true`. The login gate imitates being logged out and does not enforce it: the site
+ * is static, so the form on `window.__pgPage === 'login'` accepts any credentials, on purpose. */
 (function () {
 	'use strict';
 
@@ -60,18 +48,6 @@
 		});
 	}
 
-	/* `env.resource` carries BASE at replay time (build.mjs's `rewriteEnv`), so a path-like arg a
-	 * page builds from it (`L.fspath`, luci.js:2798) does too — the recording was keyed before that
-	 * rewrite, so this strips BASE back out before the key is computed with lib.mjs's own
-	 * `stripBase`/`ubusKey` (inlined ahead of this tag, see the file header). */
-	function requestKey(entry) {
-		if (entry && entry.method === 'call' && Array.isArray(entry.params)) {
-			const object = entry.params[1], method = entry.params[2], args = entry.params[3];
-			return ubusKey(object, method, stripBase(args, BASE));
-		}
-		return `${(entry && entry.method) || ''}()`;
-	}
-
 	/* uci writes the theme's "Save to router"/"Save & Apply" issue (fs-axes.js, ui.js's own apply
 	 * flow) never had a chance to run on the stand at capture time, so no recording can answer
 	 * them; faking success here is what keeps those buttons from erroring out in the playground. */
@@ -82,7 +58,7 @@
 	]);
 
 	function answerEntry(entry) {
-		const key = requestKey(entry);
+		const key = requestKey(entry, BASE);
 		const recorded = RPC[key];
 		if (recorded) return { ...recorded, id: entry.id, jsonrpc: '2.0' };
 
@@ -155,6 +131,7 @@
 		const text = kind === 'ubus' ? answerUbus(body)
 			: kind === 'menu' ? JSON.stringify(MENU) : answerUpload();
 		const blobUrl = URL.createObjectURL(new Blob([ text ], { type: 'application/json' }));
+		this.addEventListener('loadend', () => URL.revokeObjectURL(blobUrl), { once: true });
 		realOpen.call(this, 'GET', blobUrl, true);
 		return realSend.call(this);
 	};
