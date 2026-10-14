@@ -12,26 +12,23 @@
  * that starts and stops containers by itself is a gate nobody runs locally. */
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { closeSync, mkdirSync, openSync, readFileSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { ROOT } from './root.mjs';
 
-/* The routers a gate runs on by default: the three OpenWrt lines the theme supports. What changes
- * what the theme is measured against is the package manager (apk on 25.12+, opkg on 24.10) and the
- * luci-base the router carries; the snapshot box tracks luci-base's master, so an upstream change
- * fails here before it reaches a user. `--all` widens to every running OpenWrt router (the -b/-c/-d
- * twins); a gate that takes `--only` must honour `--all` too.
- *
- * ImmortalWrt is not a gate target at all, since 0.14.13: same luci-base, different brand and app
- * set, never the leg that caught something first, and its two legs produced 1685 `noname` findings
- * of their own app set on the 0.14.13 release run with nothing to read in them. A running `imm*`
- * router is ignored, and `--only imm2512` is refused by name rather than measured. */
+/* The routers a gate runs on by default: the three OpenWrt lines the theme supports (apk on 25.12+,
+ * opkg on 24.10, and the snapshot box, which tracks luci-base's master). `--all` widens to every
+ * running OpenWrt router (the twins); a gate that takes `--only` must honour `--all` too.
+ * ImmortalWrt is not a gate target: a running `imm*` router is ignored and `--only imm2512` is
+ * refused (its two legs gave 1685 unreadable `noname` findings of their own app set at 0.14.13). */
 export const CORE = [ 'owrt2512', 'owrt2410', 'owrtsnap' ];
 
 /* Has the view actually rendered, or is a live gate about to measure a blank shell? fs-overview.js
- * keeps every section hidden until network.flushCache()'s five RPCs answer (fs-overview.js
- * ~:301-303); on a router that just booted, one answers late enough that a fixed wait expires
- * first. scroll-jank.mjs armed on `scrollable 0` with no tables and read the page finishing its
- * own paint mid-scroll as a 4044px jump (docs/development.md, "The stand's own traps") — 4 of 16 PR
- * runs. Scroller detection matches fs-fit.js's own scroller() so every gate asks the page the same
- * way. Runs INSIDE the page via page.evaluate/waitForFunction. */
+ * keeps every section hidden until network.flushCache()'s five RPCs answer; on a router that just
+ * booted, one answers late enough that a fixed wait expires first. scroll-jank.mjs armed on
+ * `scrollable 0` with no tables and read the page finishing its own paint mid-scroll as a
+ * 4044px jump (docs/development.md, "The stand's own traps") — 4 of 16 PR runs. Scroller
+ * detection matches fs-fit.js's own scroller() so every gate asks the page the same way.
+ * Runs INSIDE the page via page.evaluate/waitForFunction. */
 export const PAINTED = () => {
 	const mc = document.getElementById('maincontent');
 	const flow = mc ? getComputedStyle(mc).overflowY : '';
@@ -45,7 +42,7 @@ export const PAINTED = () => {
 
 /* Bounded wait for PAINTED, true/false rather than a throw: a page still unpainted at the deadline
  * is its own finding ("page not painted, run proves nothing"), not a script failure. */
-export async function waitForPaint(page, timeout = 20000) {
+export async function waitForPaint(page, timeout) {
 	try { await page.waitForFunction(PAINTED, { timeout }); return true; }
 	catch (e) { return false; }
 }
@@ -73,7 +70,7 @@ const toStand = (r) => ({
 
 /* Every RUNNING owlab router, newest release first, or an empty array when owlab is absent — the
  * caller decides whether that is a failure (a gate) or a reason to skip (a local convenience).
- * With no `only` and no `all`, the CORE pair above; if none of it is running, everything that is,
+ * With no `only` and no `all`, the CORE set above; if none of it is running, everything that is,
  * with a line saying so — a gate that silently measured a different set than it claims is worse
  * than a slow one. */
 export function stands(only, { all = false } = {}) {
@@ -88,7 +85,16 @@ export function stands(only, { all = false } = {}) {
 	const running = routers
 		.filter((r) => r.state === 'running' && r.http_port && r.distro === 'openwrt')
 		.map(toStand);
-	if (wanted.length) return running.filter((r) => wanted.includes(r.id));
+	if (wanted.length) {
+		/* --only names a stand that is not running: measuring the rest would pass a gate on fewer routers than asked */
+		const missing = wanted.filter((id) => !running.some((r) => r.id === id));
+		if (missing.length) {
+			console.error(`${missing.join(', ')}: not running — --only asked for it, and a gate does not `
+				+ 'measure fewer routers than it was asked to (owlab up).');
+			process.exit(2);
+		}
+		return running.filter((r) => wanted.includes(r.id));
+	}
 	if (all) return running;
 	const core = running.filter((r) => CORE.includes(r.id));
 	if (core.length) return core;
@@ -98,31 +104,15 @@ export function stands(only, { all = false } = {}) {
 	return running;
 }
 
-/* Cut the browser off from everything except the router under test.
- *
- * A live gate measures what THIS theme renders. Anything a page fetches from the open internet is
- * somebody else's code reaching somebody else's host, and it can only add noise: `luci-app-ssclash`
- * asks GitHub for the latest mihomo release on two of its pages, and on a CI runner — whose egress
- * IP is shared and rate-limited — that answers 403. Nine console findings across three routers, on
- * a release that had nothing to do with any of them, none of it reproducible off the runner.
- *
- * Blocking is better than filtering the message afterwards, and better than dropping the app from
- * the stands: the app stays (its lazily-inserted Ace stylesheets are the one adversary that can
- * invert the cascade layer order — owlab.yaml), the request simply never leaves. The gates stop
- * depending on the network, on a rate limit, and on how fast github.com answers today.
- *
- * `abort`, not a fake 200: an invented response is a lie the page then renders. The abort still
- * writes `net::ERR_FAILED` to the console, which live-audit's own network-noise filter drops.
- *
- * The router's own origin passes, and so do data:/blob: — a stylesheet or an icon the page builds
- * for itself is not a fetch. */
+/* Cut the browser off from everything except the router under test: a fetch to the open internet
+ * is somebody else's code and only adds noise (docs/development.md, "The live gates"). The app
+ * stays on the stands (its Ace stylesheets can invert the cascade layer order, owlab.yaml); the
+ * request never leaves. `abort`, not a fake 200, which the page would render. The router's origin
+ * and data:/blob: pass. */
 export async function sealToRouter(ctx, base) {
 	const host = new URL(base).host;
-	/* The predicate form, never a catch-all glob: a glob route hands EVERY request to a JS callback,
-	 * including the hundreds the router itself serves, and each round trip through the client costs
-	 * time and disables the browser's own handling. A predicate is evaluated by Playwright, so a request to
-	 * the router is never intercepted at all — only the handful going elsewhere reach the handler.
-	 * The glob version pushed CI's live job from 17 minutes past its 45-minute limit. */
+	/* A predicate, never a catch-all glob: a glob sends every request, the router's own included,
+	 * through a JS callback (17 minutes past CI's 45-minute limit; docs/development.md). */
 	await ctx.route(
 		(url) => url.host !== host && url.protocol !== 'data:' && url.protocol !== 'blob:',
 		(route) => route.abort());
@@ -142,27 +132,16 @@ export async function login(page, base) {
 	}
 }
 
-/* Every LEAF of the router's own menu tree, as LuCI itself resolves it — not a list of paths kept
- * in the repo, which would go stale the moment an app is installed or a release moves a page.
- *
- * `L.ui.menu.load()` returns the tree ALREADY rooted at `admin`, so the walk starts with an empty
- * path: seeding it with the root's name produces `/admin/admin/...` and a sweep of 404s that looks
- * like a clean run. */
+/* Every leaf of the router's own menu tree, as LuCI resolves it, not a list kept in the repo that
+ * goes stale when an app is installed. `L.ui.menu.load()` returns the tree rooted at `admin`, so
+ * the walk starts with an empty path (docs/development.md, "The live gates"). */
 export async function menuPaths(page, opts = {}) {
-	/* `L.ui` is only there once ui.js has been required by something on the page, and how soon that
-	 * happens differs between release lines — reading it straight after the login redirect crashed
-	 * the 24.10 leg with "Cannot read properties of undefined (reading 'menu')" while 25.12 was fine.
-	 * Wait for the runtime, then ask for the module by name rather than hoping somebody else did. */
+	/* `L.ui` exists only once something required ui.js, which differs by release line (24.10
+	 * crashed with "Cannot read properties of undefined (reading 'menu')"): wait, then require it. */
 	await page.waitForFunction(() => window.L && typeof window.L.require === 'function', null, { timeout: 20000 });
-	/* Only the leaves that are PAGES. A dispatcher tree carries far more than the menu shows: on a
-	 * router with openclash and justclash installed, 105 of its 169 leaves are `call` nodes — RPC
-	 * endpoints an app registers for its own JS — plus `function` nodes and the untitled plumbing.
-	 * None renders a page, so a gate that measured layout on one measured an empty `#view` and spent
-	 * two thirds of its wall clock proving that.
-	 *
-	 * `view` and `template` are the two that paint (plus `cbi` on an old enough app), and a node the
-	 * menu does not title is not a page a user can reach. `{ all: true }` returns the raw walk, for a
-	 * caller that wants the dispatcher rather than the interface. */
+	/* Only leaves that render and are titled (`view`, `template`, `cbi`): 105 of 169 leaves with
+	 * openclash and justclash are `call` RPC endpoints, which paint nothing. `{ all: true }` returns
+	 * the raw dispatcher walk. */
 	return page.evaluate(async (all) => {
 		const ui = await L.require('ui');
 		const tree = await ui.menu.load();
@@ -187,15 +166,13 @@ export async function menuPaths(page, opts = {}) {
  * translated and the paths are not. */
 export const DESTRUCTIVE = /\/(logout|reboot|flash|backup|shutdown)(\/|$)/;
 
-/* The literal clone owlab boots beside `owrt2512`, `owrt2410` and `owrtsnap` (`owlab.yaml`, task
- * sweepspeed) — same distro, release and package manager, its own container answering its own
- * ubus — for exactly this: a sweep can treat the pair as one logical stand with twice the
- * concurrency, without changing which release lines it covers. Auto-paired only when the caller did
- * not already name the twin explicitly: `--only owrt2512,owrt2512b` means "measure both,
- * separately", and this must not silently halve that into "measure the union once." Returns a Map
- * keyed by the BASE stand's id; empty when owlab has no `-b` set running, so a caller with the old
- * three-stand lab degrades to exactly today's behaviour. */
-export function pairStands(list) {
+/* The literal clone owlab boots beside `owrt2512`, `owrt2410` and `owrtsnap` (`owlab.yaml`): same
+ * distro, release and package manager, its own ubus, so a sweep treats the pair as one stand with
+ * twice the concurrency. Auto-paired only when the caller did not name the twin:
+ * `--only owrt2512,owrt2512b` means "measure both, separately". Returns a Map keyed by the BASE
+ * stand's id; a twin another process holds is left out (try-lock, never a wait); empty when owlab
+ * has no `-b` set running, so a three-stand lab degrades to exactly today's behaviour. */
+export function pairStands(list, name) {
 	const running = owlabRouters().filter((r) => r.state === 'running' && r.http_port);
 	const byId = new Map(running.map((r) => [ r.id, r ]));
 	const explicit = new Set(list.map((s) => s.id));
@@ -204,25 +181,22 @@ export function pairStands(list) {
 		const twinId = s.id + 'b';
 		if (explicit.has(twinId)) continue;
 		const t = byId.get(twinId);
-		if (t) pairs.set(s.id, toStand(t));
+		if (!t) continue;
+		if (take(twinId, name, false)) { pairs.set(s.id, toStand(t)); continue; }
+		let by = '';
+		try { by = readFileSync(`${lockDir}stands-${twinId}.lock`, 'utf8').trim(); } catch { /* not written */ }
+		console.error(`${name}: twin ${twinId} is in use (${by || 'holder unknown'}); measuring ${s.id} alone`);
 	}
 	return pairs;
 }
 
 /* Two runs on one stand invent findings: a second sweep 37 s behind the first read 12 "the reader
- * drifted" cells that a lone run never shows (docs/development.md, "The stand's own traps"). A
- * promise not to overlap did not hold, so use of a stand is an flock on ../tmp/stands-<id>.lock,
- * taken per stand in sorted order (no deadlock between overlapping sets) and held until this
- * process dies. The holder is a child `flock` kept alive by its stdin pipe, so the kernel frees the
- * lock on any exit, SIGKILL included. `STANDS_LOCK_HELD` (space-separated ids) with
- * `STANDS_LOCK_PID` is how tools/ci-local.sh hands down the stands it already holds; a stale pair
- * left in a later shell must not skip the lock, so `heldBy()` believes it only when that pid is
- * alive, the lock file names it and the flock is really taken. `--force` has no say here.
- *
- * `flock` is probed synchronously first: the wait loop below blocks the event loop, so the spawn's
- * async 'error' event never fired when it was missing and the loop spun forever (timeout 5 → 124).
- * The wait is bounded, 30 min by default, `STANDS_LOCK_TIMEOUT_MS` overrides; on expiry it names the
- * holder instead of hanging. */
+ * drifted" cells a lone run never shows. Use of a stand is therefore an flock on
+ * ../tmp/stands-<id>.lock, one per stand in sorted order, held until this process dies (a child
+ * `flock` kept alive by its stdin pipe, so SIGKILL frees it). `flock` is probed synchronously
+ * first, and the wait is bounded, 30 min by default (`STANDS_LOCK_TIMEOUT_MS`).
+ * tools/ci-local.sh hands its locks down through `STANDS_LOCK_HELD`/`STANDS_LOCK_PID`, checked by
+ * `heldBy()`. docs/development.md, "The stand's own traps". */
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /* True only when `env` names a live ci-local that holds `file` for stand `id`. Exported for the
@@ -236,44 +210,60 @@ export function heldBy(id, file, env = process.env) {
 	return spawnSync('flock', [ '-n', file, 'true' ], { stdio: 'ignore' }).status === 1;
 }
 
+const lockDir = join(ROOT, '..', 'tmp') + '/';
+
+/* Take one stand's lock and hold it until this process dies. `wait` blocks (bounded, see above); a
+ * try-lock (wait=false) answers `busy` instead and returns false, so the optional twin never stalls
+ * a run. The child writes `ok` once it holds the flock, or `busy` when `flock -n` lost. */
+function take(id, name, wait) {
+	const file = `${lockDir}stands-${id}.lock`;
+	if (heldBy(id, file)) return true;
+	const limit = Number(process.env.STANDS_LOCK_TIMEOUT_MS) || 30 * 60 * 1000;
+	const ack = `${file}.${process.pid}.ack`;
+	const fd = openSync(ack, 'w');
+	const child = spawn('sh', [ '-c', 'flock ' + (wait ? `-w ${Math.ceil(limit / 1000)} ` : '-n ') + '-x "$2" sh -c \'echo "$1" >"$2"; echo ok; cat >/dev/null\' sh "$1" "$2" || echo busy',
+		'sh', `${name} pid ${process.pid}`, file ], { stdio: [ 'pipe', fd, 'inherit' ] });
+	child.unref();
+	child.stdin.unref();
+	closeSync(fd);
+	const t0 = Date.now();
+	let said = false;
+	for (;;) {
+		const got = readFileSync(ack, 'utf8');
+		if (got.includes('ok') || got.includes('busy')) break;
+		let by = '';
+		if (Date.now() - t0 > 500) {
+			try { by = readFileSync(file, 'utf8').trim(); } catch { /* lock file not written yet */ }
+		}
+		if (!said && Date.now() - t0 > 500) {
+			console.error(`${name}: stand ${id} is in use (${by || 'holder unknown'}); waiting for ${file}`);
+			said = true;
+		}
+		sleep(100);
+	}
+	const held = readFileSync(ack, 'utf8').includes('ok');
+	unlinkSync(ack);
+	/* flock -w gives up by itself, so no waiting flock outlives this process to write a dead pid. */
+	if (wait && !held && Date.now() - t0 >= limit - 1000) {
+		let by = '';
+		try { by = readFileSync(file, 'utf8').trim(); } catch { /* lock file not written yet */ }
+		console.error(`${name}: stand ${id} still held by ${by || 'an unknown holder'} after ${Math.round(limit / 1000)} s; gave up on ${file}`);
+		process.exit(2);
+	}
+	return held;
+}
+
 function lockStands(ids, name) {
-	const dir = new URL('../../../tmp/', import.meta.url).pathname;
-	mkdirSync(dir, { recursive: true });
+	mkdirSync(lockDir, { recursive: true });
 	if (spawnSync('flock', [ '--version' ], { stdio: 'ignore' }).error) {
 		console.error(`${name}: cannot run flock; util-linux is required`);
 		process.exit(2);
 	}
-	const limit = Number(process.env.STANDS_LOCK_TIMEOUT_MS) || 30 * 60 * 1000;
 	for (const id of [ ...ids ].sort()) {
-		const file = `${dir}stands-${id}.lock`;
-		if (heldBy(id, file)) continue;
-		const ack = `${file}.${process.pid}.ack`;
-		const fd = openSync(ack, 'w');
-		const child = spawn('flock', [ '-x', file, 'sh', '-c', 'echo "$1" >"$2"; echo ok; cat >/dev/null',
-			'sh', `${name} pid ${process.pid}`, file ], { stdio: [ 'pipe', fd, 'inherit' ] });
-		child.unref();
-		child.stdin.unref();
-		closeSync(fd);
-		const t0 = Date.now();
-		let said = false;
-		while (!readFileSync(ack, 'utf8').includes('ok')) {
-			let by = '';
-			if (Date.now() - t0 > 500) {
-				try { by = readFileSync(file, 'utf8').trim(); } catch { /* lock file not written yet */ }
-			}
-			if (Date.now() - t0 > limit) {
-				child.kill();
-				try { unlinkSync(ack); } catch { /* already gone */ }
-				console.error(`${name}: stand ${id} still held by ${by || 'an unknown holder'} after ${Math.round(limit / 1000)} s; gave up on ${file}`);
-				process.exit(2);
-			}
-			if (!said && Date.now() - t0 > 500) {
-				console.error(`${name}: stand ${id} is in use (${by || 'holder unknown'}); waiting for ${file}`);
-				said = true;
-			}
-			sleep(100);
-		}
-		unlinkSync(ack);
+		/* wait mode never answers `busy` for contention, so a false here is flock itself failing. */
+		if (take(id, name, true)) continue;
+		console.error(`${name}: could not take the lock for stand ${id} (flock failed on ${lockDir}); not running unlocked`);
+		process.exit(2);
 	}
 }
 

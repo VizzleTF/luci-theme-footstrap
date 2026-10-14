@@ -1,15 +1,12 @@
 /* `innerHTML` and its two relatives, held by a rule instead of by review.
  *
- * The theme parses HTML from a string in four places and every one is safe today: three are `= ''`
- * clears and the fourth concatenates an icon builder with literals. Nothing checked that. The whole
- * chrome is built from `E()` and `document.createElement`, so a fifth site written the ordinary way
- * — `link.innerHTML = someLabel` — would be a script sink on a page fed by menu.d entries that any
- * package may ship, and it would read exactly like the four that are fine.
+ * Every HTML-from-string site in the theme is safe today: the `= ''` clears, and one that
+ * concatenates an icon builder with literals. The chrome is built from `E()` and
+ * `document.createElement`, so a new site written the ordinary way (`link.innerHTML = someLabel`)
+ * would be a script sink fed by menu.d entries any package may ship, and would read like the safe ones.
  *
- * eslint-plugin-no-unsanitized is the off-the-shelf answer and is not taken: it is a dependency in
- * a repository whose devDependencies are the argument for having a build at all, and its escape
- * hatch is a comment pragma rather than a named builder. This rule takes the same shape as the
- * codebase's other invariants — a small allowlist, stated once.
+ * eslint-plugin-no-unsanitized is not taken: a dependency, and its escape hatch is a comment pragma
+ * rather than a named builder. This rule is a small allowlist, stated once.
  *
  * SAFE is a string expression whose every leaf is a literal, a call to one of the two icon builders,
  * or a const bound to one of those. Anything else — a bare identifier, a property read, a template
@@ -17,18 +14,14 @@
  * added to BUILDERS with the reason it cannot carry attacker text.
  */
 
-/* Two kinds of builder, and the difference is what happens to the argument.
- *
- * MARKUP takes markup and wraps it — svgIcon('<circle …/>') returns an <svg> around exactly what it
- * was handed — so its arguments are checked like any other operand.
- *
- * LOOKUP takes a NAME and returns markup the theme wrote: iconSvg()/iconFor() map a menu node's
- * name onto one of a closed set of paths, with a `|| ICONS._default` fallback, and never
- * interpolate the name into the result. Their arguments are unchecked on purpose — the name comes
- * from a menu.d entry any package may ship, and being unable to reach the output is the property
- * that makes the call safe. A builder added here must have that property. */
+/* MARKUP builders take markup and wrap it (svgIcon('<circle …/>') returns an <svg> around exactly
+ * that), so their arguments are checked like any other operand. LOOKUP builders take a NAME and
+ * return markup the theme wrote (iconSvg maps a menu node's name onto a closed set, `||
+ * ICONS._default`, never interpolating it), so their arguments are unchecked on purpose: the name
+ * comes from a menu.d entry any package may ship, and being unable to reach the output is what makes
+ * the call safe. A builder added here must have that property. */
 const MARKUP_BUILDERS = new Set([ 'svgIcon' ]);
-const LOOKUP_BUILDERS = new Set([ 'iconSvg', 'iconFor' ]);
+const LOOKUP_BUILDERS = new Set([ 'iconSvg' ]);
 
 const SINK_PROPS = new Set([ 'innerHTML', 'outerHTML' ]);
 
@@ -53,7 +46,7 @@ function makeRule() {
 			},
 		},
 		create(context) {
-			const src = context.sourceCode ?? context.getSourceCode();
+			const src = context.sourceCode;
 
 			/* `seen` breaks the cycle a self-referential const would otherwise spin in */
 			function safe(node, seen = new Set()) {
@@ -72,7 +65,7 @@ function makeRule() {
 					return safe(node.left, seen) && safe(node.right, seen);
 				case 'CallExpression': {
 					const fn = calleeName(node.callee);
-					if (LOOKUP_BUILDERS.has(fn)) return true;
+					if (node.callee.type === 'Identifier' && LOOKUP_BUILDERS.has(fn)) return true;
 					return MARKUP_BUILDERS.has(fn) && node.arguments.every((a) => safe(a, seen));
 				}
 				case 'Identifier': {

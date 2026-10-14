@@ -34,6 +34,7 @@
     "spa-parity": "node tools/spa-parity.mjs",
     "upstream": "node tools/upstream-contract.mjs",
     "page-modules": "node tools/page-modules.mjs",
+    "comment-share": "node tools/comment-share.mjs",
     "fork-drift": "node tools/fork-drift.mjs",
     "scroll": "node tools/scroll-jank.mjs",
     "table-tick": "node tools/table-tick.mjs",
@@ -48,7 +49,7 @@
     "playground:capture": "node tools/playground/capture.mjs",
     "playground:build": "node tools/playground/build.mjs",
     "playground:verify": "node tools/playground/verify.mjs",
-    "check:fast": "npm run lint && npm run shell && npm run marker && npm run audit && npm run conffiles && npm run acl && npm run i18n-packages && npm run makefile-contract && npm run test && npm run css-orphans && npm run mirror && npm run axes && npm run page-modules && npm run chrome-fence && npm run changelog && npm run i18n",
+    "check:fast": "npm run lint && npm run shell && npm run marker && npm run audit && npm run conffiles && npm run acl && npm run i18n-packages && npm run makefile-contract && npm run test && npm run css-orphans && npm run mirror && npm run axes && npm run page-modules && npm run comment-share && npm run chrome-fence && npm run changelog && npm run i18n",
     "check:mid": "npm run css-metrics && npm run css-floor && npm run css-dup && npm run size",
     "check:slow": "npm run tables && npm run export-tier && npm run icons && npm run a11y && npm run placeholder && npm run smoke && npm run pseudo-loc",
     "makefile-contract": "node tools/makefile-contract.mjs"
@@ -58,12 +59,14 @@
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@stylistic/stylelint-plugin": "^5.3.0",
+    "acorn": "8.17.0",
     "css-tree": "^3.2.1",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
+    "mdn-data": "2.27.1",
     "playwright": "^1.63.0",
     "stylelint": "^17.15.0",
-    "terser": "^5.51.2"
+    "uglify-js": "3.19.3"
   },
   "overrides": {
     "fast-uri": "^3.1.6"

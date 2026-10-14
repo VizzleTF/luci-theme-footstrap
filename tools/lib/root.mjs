@@ -1,18 +1,18 @@
 /* The repo root, and the reads every gate does through it: `read`, `filesIn`, `readAll`. One copy.
  *
- * `join(dirname(fileURLToPath(import.meta.url)), '..')` written out per tool is three levels of
- * truth about where the repo is, all free to drift the moment a tool moves between `tools/` and
- * `tools/lib/` — at which point the boilerplate resolves one directory off and every read fails
- * with ENOENT pointing at a path nobody wrote.
- *
- * Two callers stay on their own walk on purpose: mirror.mjs takes a MIXED list of files and
- * directories, and minify-js.mjs takes roots outside the repo (it runs over the staged payload). */
+ * A per-tool `join(dirname(fileURLToPath(import.meta.url)), '..')` drifts the moment a tool moves
+ * between `tools/` and `tools/lib/` and every read fails with ENOENT on a path nobody wrote.
+ * mirror.mjs (a MIXED list of files and directories) and minify-js.mjs (roots outside the repo)
+ * keep their own walk on purpose. */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /* lib/ is one level below tools/, which is one below the repo root. */
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/* the theme's served resources dir, absolute */
+export const RESOURCES = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources');
 
 /* read a repo-relative path as text */
 export const read = (p) => readFileSync(join(ROOT, p), 'utf8');

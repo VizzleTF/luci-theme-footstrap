@@ -43,7 +43,7 @@ case ${SEEN##*/} in ''|-*|*[!A-Za-z0-9._-]*) bad "--seen needs a plain file name
 [ "$(CDPATH='' cd -- "$(dirname -- "$SEEN")" 2>/dev/null && pwd -P)" = "$TMPDIR_OK" ] || bad "--seen must live in $TMPDIR_OK"
 [ ! -L "$SEEN" ] || bad "--seen must not be a symlink"
 touch "$SEEN"
-OUT=$(mktemp); trap 'rm -f "$OUT"' EXIT
+OUT=$(mktemp) CI=$(mktemp); trap 'rm -f "$OUT" "$CI"' EXIT
 
 SAN='def san: gsub("[\\x00-\\x1f\\x7f-\\x9f\\x{200b}-\\x{200f}\\x{2028}-\\x{202e}\\x{2060}-\\x{2064}\\x{2066}-\\x{2069}\\x{180e}\\x{feff}\\x{fe00}-\\x{fe0f}\\x{e0000}-\\x{e007f}|]"; " ");'
 me=$(gh api user --jq .login)   # the session's own comments are not news
@@ -70,12 +70,11 @@ ci() {
 	sha=$(gh pr view "$N" --repo "$REPO" --json headRefOid --jq .headRefOid)
 	json=$(gh api "repos/$REPO/commits/$sha/check-runs" --jq "$SAN"'([.check_runs[]|select(.status!="completed")]|length), ([.check_runs[]|select(.status=="completed")|"\(.name | san): \(.conclusion | san)"]|join("; "))')
 	pending=$(echo "$json" | sed -n 1p)
-	[ "$pending" = 0 ] || return 0
+	[ "$pending" = 0 ] && [ -n "$(echo "$json" | sed -n 2p)" ] || return 0   # no check-run yet is not "CI passed"
 	grep -qxF "ci-$sha" "$SEEN" && return 0
 	echo "ci-$sha" >> "$SEEN"
 	echo "CI on $(echo "$sha" | cut -c1-9): $(echo "$json" | sed -n 2p)" >> "$CI"
 }
-CI=$(mktemp); trap 'rm -f "$OUT" "$CI"' EXIT
 
 state0=$(gh pr view "$N" --repo "$REPO" --json state --jq .state)
 elapsed=0

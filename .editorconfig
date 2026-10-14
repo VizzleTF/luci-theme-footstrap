@@ -1,9 +1,9 @@
 # Indentation and line endings, for editors that read this before eslint/stylelint can say anything.
 # The gates own everything else: `npm run lint` is the authority on JS and CSS style.
 #
-# Tabs are the tree's indent, including the shell that ends up in the package: strip-shell.sh and
-# strip-templates.sh rewrite those files line by line, and a mixed indent shows up as a diff nobody
-# meant to make.
+# Tabs are the tree's indent, including the shell that ends up in the package:
+# strip-build.sh (shell and templates modes) rewrites those files line by line, and a mixed indent
+# shows up as a diff nobody meant to make.
 
 root = true
 

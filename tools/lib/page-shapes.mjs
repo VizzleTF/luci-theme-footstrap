@@ -35,7 +35,7 @@ const SHAPE_PROBE = function () {
 	if (has('svg')) flags.push('svg');
 	if (has('iframe')) flags.push('iframe');
 	if (has('.cbi-progressbar')) flags.push('progressbar');
-	if (has('.fs-card, .fs-ovl-sys, .fs-ovl-mem')) flags.push('cards');
+	if (has('.fs-ovl-sys, .fs-ovl-mem')) flags.push('cards');
 	if (has('.cbi-page-actions')) flags.push('actions');
 	if (count('*') > 1500) flags.push('heavy');
 	return flags.join('+') || 'bare';
@@ -50,12 +50,10 @@ export const PINNED = [
 	'/admin/network/dhcp',				/* leases: the table that cards, plus its own form */
 	'/admin/network/wireless',			/* assoclist: the widest table the stock menu has */
 	'/admin/network/diagnostics',		/* #11's shredded column and the sub-24px button row */
-	'/admin/system/system',				/* the Appearance panel hangs off this one */
-	'/admin/system/flash',				/* file inputs and the modal-heavy path */
-	'/admin/status/iptables'			/* long pre-formatted output, the nested-scroll case of #12 */
+	'/admin/system/system'				/* the Appearance panel hangs off this one */
 ];
 
-/* -> { picked: [path], dropped: Map(path -> representative), shapes: Map(path -> shape) }
+/* -> { picked: [path], dropped: Map(path -> representative) }
  *
  * `keep` is the set that may not be sampled away (the baseline's paths, and PINNED). Order is the
  * menu's, so the choice of representative is deterministic rather than whichever page answered
@@ -69,29 +67,17 @@ export function representatives(shapes, keep = []) {
 		if (!seen.has(shape)) { seen.set(shape, path); picked.push(path); continue; }
 		dropped.set(path, seen.get(shape));
 	}
-	return { picked, dropped, shapes };
+	return { picked, dropped };
 }
 
 /* Visit each page once and read its shape. One load, one settle — a fifth of what the measuring
  * pass costs, which is what makes the reduction worth doing at all. Not cached: each CI slice
  * calls this at most once per stand (docs/ci.md, "It is three jobs, not one"). */
 
-/* HOW LONG A PAGE MAY TAKE TO ANSWER THE PROBE.
- *
- * `page.evaluate()` has no timeout of its own, at all: Playwright hands the expression to the
- * renderer and waits for the renderer, so a page whose main thread has stopped turning is not slow
- * — it is silent, forever. Measured (task liveslice): `/admin/system/filemanager` pinned the
- * renderer at ~105% CPU, `classify()` never came back, and the `parity` and `audit` slices of the
- * `live` job were cancelled by their own `timeout-minutes: 45` four runs in a row without printing
- * one line about which page they were on.
- *
- * The probe is a handful of querySelectorAll calls over a page that has ALREADY settled for
- * `settle` ms: 4-5 ms measured on a healthy build (`fs-fit.js@76b3c7a`; a whole page costs 1.3 s,
- * and 1.2 s of that is the settle), against not returning at all on the frozen one (`@13e9864`,
- * still alive after 12 minutes). 10 s is ~2000x the healthy cost — nothing that is merely slow gets
- * up there — and it keeps the worst case affordable: the widest menu measured is 96 paths
- * (owrt2512b, third-party fixtures installed), so even every one of them freezing costs the walk
- * 16 minutes rather than the whole 45-minute slice. */
+/* How long a page may take to answer the probe. `page.evaluate()` has no timeout, so a pinned main
+ * thread is silent forever (docs/development.md, "A page that pins the browser's main thread").
+ * The probe costs 4-5 ms on a healthy page; 10 s is ~2000x that, and the widest menu (96 paths on
+ * owrt2512b) freezing on every page costs 16 minutes, not the whole 45-minute slice. */
 const PROBE_DEADLINE_MS = 10000;
 
 const FROZEN = Symbol('probe deadline');
@@ -99,7 +85,7 @@ const FROZEN = Symbol('probe deadline');
 /* Playwright's timeouts do not cover evaluate(); this is that timeout. The loser of the race is
  * left pending on purpose — `Promise.race` keeps it handled, and the page it belongs to is closed
  * immediately after. */
-function withDeadline(promise, ms) {
+export function withDeadline(promise, ms) {
 	let timer;
 	return Promise.race([
 		promise.finally(() => clearTimeout(timer)),
@@ -110,18 +96,13 @@ function withDeadline(promise, ms) {
 /* `frozen` collects the pages that loaded and then stopped answering — see reportFrozen(). `id` is
  * what the finding calls this router; `base` is a URL with a port owlab picked, so a gate that has
  * a stand id should pass it. */
-export async function classify(page, base, paths, { settle = 1200, timeout = 20000, frozen = [], id = base } = {}) {
+export async function classify(page, base, paths, { frozen = [], id = base } = {}) {
+	const settle = 1200, timeout = 20000;
 	const shapes = new Map();
-	/* THE SHAPE WALK GETS ITS OWN PAGE, so that a page which freezes can be thrown away.
-	 *
-	 * Measured: once the renderer's main thread stops, that page never comes back — every later
-	 * goto() on it burns its full 20 s timeout and every evaluate() throws `Execution context was
-	 * destroyed` at once, so one frozen page silently costs the whole rest of the menu. Closing it
-	 * and opening another in the SAME context costs 0.5 s and the walk goes on; the session cookie
-	 * and the gate's route seal live on the context, not on the page, so the new one is logged in.
-	 *
-	 * The caller's page is deliberately not the one navigated here: it carries the console listeners
-	 * and the login that the gate's own sweep needs, and must not be the thing that gets discarded. */
+	/* The walk gets its own page so a frozen one can be thrown away: once the renderer stops, every
+	 * later goto() burns its 20 s timeout and evaluate() throws `Execution context was destroyed`.
+	 * A new page in the SAME context costs 0.5 s and keeps the login and the route seal; the
+	 * caller's page carries the console listeners and must not be the one discarded. */
 	const ctx = page.context();
 	let probe = await ctx.newPage();
 	try {
@@ -155,8 +136,8 @@ export async function classify(page, base, paths, { settle = 1200, timeout = 200
  *
  * This is NOT the same thing as a page that would not open — that one is the runner or the stand,
  * and this walk already passes over it in silence. A page that answered its own load and then went
- * quiet has a pinned main thread, which is the theme's own defect (task liveslice: `fs-fit.js`
- * between `76b3c7a` and `13e9864`) and is measured by nobody after it. */
+ * quiet has a pinned main thread, which is the theme's own defect, measured by nobody after
+ * it (docs/development.md, "A page that pins the browser's main thread"). */
 export function reportFrozen(frozen) {
 	if (!frozen.length) return 0;
 	process.stderr.write(`\n${frozen.length} page(s) never answered the shape probe:\n`);
