@@ -1155,6 +1155,7 @@ The frame, corner and placeholder rules in `theme/30-tables.css` select `.table.
 #67) matched none of them, kept the generic `.table { overflow: hidden }`, became the sticky header's
 scroll container, and its `.th` sat one bar-height (46px) over the first body row at scroll 0 in layout
 top (webkit, chromium). `fs-select.js` puts `table` on every `.fs-dt`, so real tables lose nothing.
+The cell padding (`.td, .th`) keys on `.table.fs-dt` too: on `table.fs-dt` the bare div specimen kept 8px where a real table has 10px. The `table.fs-dt` selectors left in `pages/50-leases.css` are leases-only real tables.
 `overflow: clip` on the generic rule is not the fix: it clips popups. `table-contract.mjs` check 2e holds it.
 
 ### Responsive: the disk gauge value moves below the bar
