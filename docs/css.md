@@ -1163,7 +1163,7 @@ immediately followed by a `.cbi-progressbar`.
 ### A11y: prefers-contrast token shifts, and the numbers behind them
 
 `prefers-contrast: more` asks for MORE contrast but, unlike `forced-colors`, leaves the palette to
-the theme. Same mechanism as `prefers-reduced-transparency`: re-state the tokens and every rule that
+the theme. Same mechanism as any token shift: re-state the tokens and every rule that
 reads them follows.
 
 - **the hairlines**: `--fs-border` is the most-read line in the theme and sits at ~20% of the
