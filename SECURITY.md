@@ -29,9 +29,9 @@ dispatcher node and depends on `luci-base` alone. The parts worth your attention
 - **The login page.** `ucode/template/themes/footstrap/sysauth.ut` renders *before* a session
   exists, so it is the one unauthenticated surface. The form is server-rendered on purpose.
 - **The rpcd ACL**, `root/usr/share/rpcd/acl.d/luci-theme-footstrap.json`. It grants uci
-  read/write on the `footstrap` config, `cgi-io` upload, and `file` write/remove/exec on two fixed
-  paths. The two `exec` grants are whole command lines (`/bin/chmod 644 /etc/footstrap/…`), never an
-  interpreter — `npm run acl` fails the build if that changes.
+  read/write on the `footstrap` config, `cgi-io` upload, and `file` write/remove on two fixed
+  paths. No `exec` grant: `cgi-io` sets the uploaded file's mode itself (`filemode`) —
+  `npm run acl` fails the build if an interpreter grant appears.
 - **The uploads.** Appearance accepts a login background and a pattern tile. Both are inspected in
   the browser (an SVG is parsed, a photo is redrawn on a canvas, which also drops EXIF) and land
   under `/etc/footstrap`, reached from `/www` through a symlink.
