@@ -2,20 +2,19 @@
 /* The page-module contract: a module that belongs to one page must be loaded on that page and on no
  * other, and the two halves of that sentence live in two files.
  *
- * `fs-appearance` and `fs-overview` add to a stock page rather than owning a route (a theme may not
- * register a dispatcher node), so each watches `body[data-page]` and acts on one value. Required
- * from the chrome's directive prologue they would be a hard dependency, fetched and evaluated on
- * every admin page — 15.3 KB after terser for panels that page does not have — so
+ * `fs-overview` adds to a stock page rather than owning a route (a theme may not register a
+ * dispatcher node), so it watches `body[data-page]` and acts on one value. Required from the
+ * chrome's directive prologue it would be fetched and evaluated on every admin page, so
  * menu-footstrap-common carries a MAP from `data-page` to module name instead.
  *
- * That map repeats a page name each module also carries, which is what this gate holds together —
- * along with the rule that no `'require <module>'` pragma may survive anywhere, because one pragma
- * anywhere in the graph puts the file back on every page and takes the saving with it. Same shape as
- * tools/axes.mjs: two implementations of one fact, held together by a derivation rather than by a
- * comment asking the next person to remember. */
+ * The map repeats a page name the module also carries; this gate holds the two together, plus the
+ * rule that no `'require <module>'` pragma survives anywhere, since one puts the file back on every
+ * page. Same shape as tools/axes.mjs: two implementations of one fact, held by a derivation.
+ */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { pageModules, RESOURCES as RES, LOADER } from './lib/page-modules.mjs';
+import { pageModules, LOADER } from './lib/page-modules.mjs';
+import { RESOURCES as RES } from './lib/root.mjs';
 
 const src = (name) => readFileSync(join(RES, name), 'utf8');
 const fail = [];
@@ -31,7 +30,7 @@ for (const [ page, name ] of map) {
 	catch (e) { fail.push(`${name}: mapped from ${page} but ${name}.js does not exist`); continue; }
 
 	/* every `data-page` value the module compares itself against, however it spells the comparison:
-	 * a PAGE constant, or the literal inline (fs-overview does both) */
+	 * a PAGE constant, or the literal inline */
 	const pages = new Set();
 	for (const m of text.matchAll(/const PAGE\s*=\s*'([a-z0-9-]+)'/g)) pages.add(m[1]);
 	for (const m of text.matchAll(/getAttribute\('data-page'\)[^;]{0,40}?[!=]==\s*'([a-z0-9-]+)'/g)) pages.add(m[1]);

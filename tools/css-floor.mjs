@@ -1,38 +1,28 @@
 #!/usr/bin/env node
 /* The browser floor, derived from the stylesheet instead of asserted in a doc nobody re-checks.
  *
- * Two failures this catches, both of which shipped silently before it existed:
+ * Catches two silent failures: a selector list that mixes a `:has()` part with one that has none
+ * (the list is not forgiving, so Firefox 115 lost `display: flex` on every stacked card; inside
+ * `:is()`/`:where()` it is forgiving), and a feature with no decision about what happens below its
+ * floor (every at-rule, pseudo, function and property is checked against
+ * tools/baselines/css-features.json; an unknown one fails until classified).
  *
- * 1. A SELECTOR LIST that mixes a `:has()` part with a part that has none. A selector list is not
- *    forgiving, so one unsupported compound invalidates the WHOLE rule — `.table.fs-stacked .tr,
- *    .table.fs-stacked tfoot:not(:has(> .tr))` took `display: flex` off every stacked card in
- *    Firefox before 121, which is a broken mobile table rather than a missing refinement. Inside
- *    `:is()`/`:where()` the list IS forgiving, so that shape is allowed and is the fix.
- *
- * 2. A FEATURE arriving without anyone deciding what happens below its floor. Every at-rule,
- *    pseudo, value function and property in the built sheet is checked against
- *    tools/baselines/css-features.json; an unknown one fails and has to be classified.
- *
- * HARD vs SOFT is the whole judgement. HARD means a browser without it renders something broken or
- * unreadable, so its versions set the floor the theme claims. SOFT means the rule simply does not
- * apply and the page is plainer — those never raise the floor. `color-mix()` is SOFT only because
- * styles/04-nocolormix.css gives all 36 tokens static twins; delete that file and it is HARD.
- *
- * Classification is by PROPERTY, which misses a VALUE with its own support story — `overflow` is
- * ancient but `overflow: clip` (task 0151) is Safari 16, and the property-only check said nothing
- * while the sheet sailed a version past its own declared floor. VALUES below is the same table for
- * that narrower case: only checked for the exact property/value pairs listed, because most values
- * share their property's support and a blanket value scan would be noise no one reads.
- *
- * The claimed floor lives in docs/css.md between the two `css-floor` markers and is compared
- * against the computed one, so the doc cannot drift from the sheet.
+ * HARD means a browser without it renders something broken, so its versions set the floor. SOFT means
+ * the rule just does not apply and never raises it; `color-mix()` is SOFT only because
+ * styles/04-nocolormix.css gives all 26 tokens static twins (28 declarations).
+ * A `value:prop=val` key covers a value whose support differs from its property's.
+ * The claimed floor lives in docs/css.md between the `css-floor` markers and is compared with the
+ * computed one; docs/css.md, "The browser floor", has the reasoning.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import * as csstree from 'css-tree';
+import { join } from 'node:path';
 import { buildCss } from './lib/css.mjs';
+import { ROOT } from './lib/root.mjs';
+import { parseFlags } from './lib/util.mjs';
 
-const BASELINE = new URL('./baselines/css-features.json', import.meta.url);
-const DOC = new URL('../docs/css.md', import.meta.url);
+const BASELINE = join(ROOT, 'tools/baselines/css-features.json');
+const DOC = join(ROOT, 'docs/css.md');
 const ENGINES = [ 'chrome', 'firefox', 'safari' ];
 
 /* Only features whose support is younger than the floor need an entry; everything older is carried
@@ -44,6 +34,12 @@ const FEATURES = {
 	'prop:text-wrap':      { kind: 'soft', chrome: 117, firefox: 137, safari: 17.5 },
 	'prop:scrollbar-width':{ kind: 'soft', chrome: 121, firefox: 64,  safari: 18.2 },
 	'prop:overflow-anchor':{ kind: 'soft', chrome: 56,  firefox: 66,  safari: 99 },
+	/* The visible oklch( nodes are the two @supports probes over the 9 relative-colour rules in
+	 * 03-palettes.css (css-tree reads their custom-property values as Raw). Below them hue and ink stay the palette's. */
+	'fn:oklch':            { kind: 'soft', chrome: 122, firefox: 128, safari: 18 },
+	/* `overflow` is ancient, `clip` is Safari 16; a browser that drops it falls back to stock LuCI's
+	 * rendering and `.fs-staging` stays `visibility: hidden` (docs/css.md, "The browser floor"). */
+	'value:overflow=clip': { kind: 'soft', chrome: 90, firefox: 94, safari: 16 },
 
 	/* HARD: no fallback exists and the page is wrong without them. */
 	'atrule:layer':        { kind: 'hard', chrome: 99,  firefox: 97,  safari: 15.4 },
@@ -56,67 +52,20 @@ const FEATURES = {
 	'prop:inset-inline':   { kind: 'hard', chrome: 87,  firefox: 63,  safari: 14.1 },
 	'prop:padding-block':  { kind: 'hard', chrome: 87,  firefox: 66,  safari: 14.1 },
 	'prop:color-scheme':   { kind: 'hard', chrome: 81,  firefox: 96,  safari: 13 },
+	/* logical corner radii mirror a table's four outer corners in RTL; all below the floor */
+	'prop:border-start-start-radius': { kind: 'hard', chrome: 89, firefox: 66, safari: 15 },
+	'prop:border-start-end-radius':   { kind: 'hard', chrome: 89, firefox: 66, safari: 15 },
+	'prop:border-end-start-radius':   { kind: 'hard', chrome: 89, firefox: 66, safari: 15 },
+	'prop:border-end-end-radius':     { kind: 'hard', chrome: 89, firefox: 66, safari: 15 },
 };
 
-/* `overflow: clip` (and the `overflow-x`/`overflow-y` longhands) support Safari 16 while `overflow`
- * itself is ancient — measured (task 0151, node measure-clip-scratch.mjs, since deleted) on both
- * declared sites, `.fs-main`'s `overflow-x: clip` and `.fs-staging`'s `overflow: clip`: a browser
- * that drops the unrecognised value leaves the longhand at its initial `visible`, which the CSS
- * Overflow spec's cross-axis rule then corrects to `auto` wherever the other axis is already
- * non-visible (the desktop sidebar's `.fs-main`, `overflow-y: auto`) and leaves genuinely `visible`
- * where it is not (the top/narrow layouts, and `.fs-staging`'s own two-axis shorthand) — a sideways
- * scrollbar in the first case, whole-page horizontal scroll in the second, neither of which is a
- * broken page: it is exactly how stock LuCI (no `clip` at all) already renders. `.fs-staging` stays
- * `visibility: hidden` regardless of which value its `overflow` resolves to — nothing inside the
- * staged view sets `visibility: visible` on itself, only `body.modal-overlay-active #modal_overlay`
- * does that, and that element lives outside `.fs-staging` — so the uncontained overflow never
- * paints. SOFT on both counts. */
-const VALUES = {
-	'value:overflow=clip': {
-		kind: 'soft', chrome: 90, firefox: 94, safari: 16,
-		props: [ 'overflow', 'overflow-x', 'overflow-y' ], value: 'clip',
-	},
-};
-const VALUE_PROPS = new Map();
-for (const [ key, v ] of Object.entries(VALUES))
-	for (const p of v.props) {
-		if (!VALUE_PROPS.has(p)) VALUE_PROPS.set(p, []);
-		VALUE_PROPS.get(p).push(key);
-	}
-const ALL = { ...FEATURES, ...VALUES };
+const FLAGS = parseFlags('css-floor', { update: { type: 'boolean', default: false } });
 
 const css = readFileSync(buildCss(), 'utf8');
 const ast = csstree.parse(css, { parseValue: true });
 
 const seen = new Set();
 const hazards = [];
-
-/* `:has()` under an `:is()`/`:where()` ancestor is safe — those lists forgive an unsupported
- * compound and drop only it. Anywhere else, the list is all-or-nothing. */
-function hasOutsideForgiving(selectorAst) {
-	let found = false;
-	csstree.walk(selectorAst, {
-		enter(node, item, list) {
-			if (node.type !== 'PseudoClassSelector' || node.name !== 'has') return;
-			found = true;
-		},
-	});
-	if (!found) return false;
-	/* strip every :is()/:where() subtree, then look again */
-	const clone = csstree.parse(csstree.generate(selectorAst), { context: 'selector' });
-	let stillThere = false;
-	const drop = (node) => {
-		if (node.type !== 'PseudoClassSelector') return false;
-		return node.name === 'is' || node.name === 'where';
-	};
-	csstree.walk(clone, {
-		enter(node, item, list) {
-			if (list && drop(node)) list.remove(item);
-		},
-	});
-	csstree.walk(clone, { enter(node) { if (node.type === 'PseudoClassSelector' && node.name === 'has') stillThere = true; } });
-	return stillThere;
-}
 
 csstree.walk(ast, {
 	enter(node) {
@@ -128,18 +77,29 @@ csstree.walk(ast, {
 		if (node.type === 'Declaration' && !node.property.startsWith('--')) {
 			const prop = node.property.replace(/^-\w+-/, '').toLowerCase();
 			seen.add(`prop:${prop}`);
-			const keys = VALUE_PROPS.get(prop);
-			if (keys)
-				csstree.walk(node.value, {
-					enter(vn) {
-						if (vn.type !== 'Identifier') return;
-						const name = vn.name.toLowerCase();
-						for (const key of keys) if (VALUES[key].value === name) seen.add(key);
-					},
-				});
+			if (/^overflow(-[xy])?$/.test(prop)
+				&& csstree.find(node.value, (n) => n.type === 'Identifier' && n.name.toLowerCase() === 'clip'))
+				seen.add('value:overflow=clip');
 		}
 	},
 });
+
+/* `:has()` under an `:is()`/`:where()` ancestor is safe — those lists forgive an unsupported
+ * compound and drop only it. Anywhere else, the list is all-or-nothing. */
+function hasOutsideForgiving(selector) {
+	let depth = 0, hit = false;
+	csstree.walk(selector, {
+		enter(node) {
+			if (node.type !== 'PseudoClassSelector') return;
+			if (node.name === 'is' || node.name === 'where') depth++;
+			else if (node.name === 'has' && !depth) hit = true;
+		},
+		leave(node) {
+			if (node.type === 'PseudoClassSelector' && (node.name === 'is' || node.name === 'where')) depth--;
+		},
+	});
+	return hit;
+}
 
 csstree.walk(ast, {
 	visit: 'Rule',
@@ -147,16 +107,16 @@ csstree.walk(ast, {
 		if (rule.prelude.type !== 'SelectorList') return;
 		const parts = rule.prelude.children.toArray();
 		if (parts.length < 2) return;
-		const risky = parts.filter((p) => hasOutsideForgiving(p));
+		const risky = parts.filter(hasOutsideForgiving);
 		if (risky.length && risky.length !== parts.length)
 			hazards.push(csstree.generate(rule.prelude).slice(0, 160));
 	},
 });
 
 const baseline = new Set(JSON.parse(readFileSync(BASELINE, 'utf8')).known);
-const unknown = [ ...seen ].filter((k) => !baseline.has(k) && !ALL[k]).sort();
+const unknown = [ ...seen ].filter((k) => !baseline.has(k) && !FEATURES[k]).sort();
 
-if (process.argv.includes('--update')) {
+if (FLAGS.update) {
 	const known = [ ...seen ].sort();
 	writeFileSync(BASELINE, JSON.stringify({
 		comment: 'Every CSS feature the built sheet uses. A new entry means a new browser-support '
@@ -169,7 +129,7 @@ if (process.argv.includes('--update')) {
 
 const floor = {};
 for (const e of ENGINES) floor[e] = 0;
-for (const [ key, f ] of Object.entries(ALL)) {
+for (const [ key, f ] of Object.entries(FEATURES)) {
 	if (f.kind !== 'hard' || !seen.has(key)) continue;
 	for (const e of ENGINES) if (f[e] > floor[e]) floor[e] = f[e];
 }
@@ -192,7 +152,7 @@ if (!block) {
 }
 
 console.log(`computed hard floor: ${ENGINES.map((e) => `${e} ${floor[e]}`).join(', ')}`);
-const soft = Object.entries(ALL).filter(([ k, f ]) => f.kind === 'soft' && seen.has(k));
+const soft = Object.entries(FEATURES).filter(([ k, f ]) => f.kind === 'soft' && seen.has(k));
 console.log(`progressive (no floor raised): ${soft.map(([ k ]) => k).join(', ') || 'none'}`);
 
 let bad = false;

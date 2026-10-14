@@ -1,24 +1,18 @@
 #!/usr/bin/env node
 /* One package per language, and the three places that have to agree about which languages exist.
  *
- * `po/<lang>/` is the source of truth — Weblate writes there and `update-po.sh` keeps it current.
- * Two other files repeat that list, and neither fails loudly on its own:
+ * `po/<lang>/` is the source of truth (Weblate writes there). Two other files repeat the list, and
+ * neither fails loudly on its own:
  *
- *   tools/stage.sh   builds dist/po-<lang>/ and dist/i18n-<lang>/, and carries the label LuCI's
- *                    language menu shows. A language missing here is simply never staged.
- *   owfeed.yml       declares luci-i18n-footstrap-<lang>. A language missing here stages into a
- *                    directory nothing packages — the build stays green and the translation is
- *                    gone, which is exactly the failure that made bundling the catalogues look
- *                    like the safer choice.
+ *   tools/stage.sh   builds dist/po-<lang>/ and dist/i18n-<lang>/ and carries the label LuCI's
+ *                    language menu shows; a language missing here is never staged.
+ *   owfeed.yml       declares luci-i18n-footstrap-<lang>; a language missing here stages into a
+ *                    directory nothing packages, the build stays green and the translation is gone.
  *
- * The names are luci.mk's and are checked as such: `luci-i18n-$(LUCI_BASENAME)-<lang>` with
- * LUCI_BASENAME `footstrap`, catalogue basename `footstrap`. An SDK build and an owfeed build must
- * put the same file in the same package, or a router upgrading between the two fights itself over
- * who owns /usr/lib/lua/luci/i18n/footstrap.<lang>.lmo.
- *
- * The labels are compared against luci.mk itself when a luci checkout sits beside this one — that
- * is where they come from, and a hand-typed one drifts. With no checkout the comparison is skipped
- * and said so; everything else still runs.
+ * Names are luci.mk's: `luci-i18n-$(LUCI_BASENAME)-<lang>`, LUCI_BASENAME `footstrap`. An SDK build
+ * and an owfeed build must put the same file in the same package, or an upgrading router fights over
+ * /usr/lib/lua/luci/i18n/footstrap.<lang>.lmo. Labels are compared against luci.mk when a luci
+ * checkout sits beside this one, and skipped (said so) otherwise.
  */
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';

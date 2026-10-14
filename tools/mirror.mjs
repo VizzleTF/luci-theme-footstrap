@@ -1,17 +1,13 @@
 #!/usr/bin/env node
 /* @mirror — turn duplication you cannot delete into duplication that cannot ROT.
  *
- * Some duplication is forced rather than chosen: CSS cannot share a declaration block across two
- * mutually exclusive guards — the stacked table's card layout is needed under a CLASS (.fs-stacked,
- * the measured data table) AND under a CONTAINER QUERY (the config table, which cannot be measured;
- * see fs-select.js). A script fetched with `curl | sh` and running BEFORE the package exists cannot
- * source a library shipping inside that package, yet has to do exactly what it does.
+ * Some duplication is forced: CSS cannot share a declaration block across two mutually exclusive
+ * guards (the stacked table's card layout is needed under a CLASS, .fs-stacked, AND under a
+ * CONTAINER QUERY, the config table; see fs-select.js).
  *
- * The trap: a structural duplicate detector (tools/css-dup.mjs) matches bodies that are IDENTICAL,
- * so it goes QUIET the moment two copies diverge — exactly when it should shout. Not hypothetical:
- * the fetch helper existed twice and had ALREADY drifted three ways (different backend order, one
- * with no timeout on its first-choice tool, one missing the https redirect pin) and nothing said a
- * word. So: tag every copy, assert they stay byte-identical. */
+ * A structural duplicate detector (tools/css-dup.mjs) matches only IDENTICAL bodies, so it goes
+ * quiet the moment two copies diverge. So: tag every copy, assert they stay byte-identical.
+ */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
@@ -20,9 +16,7 @@ import { ROOT } from './lib/root.mjs';
 /* Whole FILES pinned byte-identical — the same argument one level up. The Apache-2.0 text must
  * exist twice and neither copy can go:
  *   LICENSE                        the repo root, the only place GitHub looks
- *   luci-theme-footstrap/LICENSE   the PACKAGE: PKG_LICENSE_FILES resolves against
- *                                  $(PKG_BUILD_DIR), into which only the package source dirs are
- *                                  copied, so the root file is unreachable from $(CURDIR).
+ *   luci-theme-footstrap/LICENSE   the PACKAGE copy: it is what sync-luci-fork sends to openwrt/luci
  * A licence text cannot carry an @mirror comment without ceasing to be the licence text. */
 const SAME_FILE = [
 	['LICENSE', 'luci-theme-footstrap/LICENSE'],
@@ -38,7 +32,7 @@ const SEARCH = [
 ];
 const EXT = /\.(css|js|sh|ut)$|(^|\/)(Makefile|30_luci-theme-footstrap)$/;
 
-/* SEARCH mixes directories with single files (Makefile, install.sh), so one isDirectory() stays. */
+/* SEARCH mixes directories with single files (Makefile), so one isDirectory() stays. */
 const files = SEARCH.flatMap((s) => {
 	const p = join(ROOT, s);
 	return statSync(p).isDirectory()
@@ -99,20 +93,17 @@ for (const [a, b] of SAME_FILE) {
 		console.log(`  ok   @same-file ${a} == ${b}   (${ta.length} bytes)`);
 }
 
-let bad = 0;
 const names = [...groups.keys()].sort();
 for (const name of names) {
 	const copies = groups.get(name);
 	if (copies.length < 2) {
 		errors.push(`@mirror ${name}: only ONE copy (${copies[0].file}:${copies[0].line}). ` +
 			`A mirror of one enforces nothing — delete the tag, or restore the copy it was pinning.`);
-		bad++;
 		continue;
 	}
 	const first = copies[0];
 	const drifted = copies.filter(c => c.body !== first.body);
 	if (drifted.length) {
-		bad++;
 		errors.push(`@mirror ${name}: the copies have DRIFTED apart.`);
 		for (const c of copies)
 			errors.push(`    ${c.file}:${c.line}${c.body === first.body ? '' : '   <-- differs'}`);
@@ -138,9 +129,9 @@ if (!names.length) console.log('  (no @mirror groups found)');
  * be read) disarms this whole gate AND re-permits the duplicates css-dup.mjs forbids — the two are
  * mutually load-bearing, and neither notices the other going quiet. "0 groups" used to read exactly
  * like "every mirror still agrees": both print a clean summary line and exit 0. MEASURED is the
- * current count (10); the floor sits under it so removing one mirror is never blocked here, but a
+ * current count (9); the floor sits under it so removing one mirror is never blocked here, but a
  * SEARCH tree gutted to nothing is not the same event as a clean sweep. */
-const MEASURED_GROUPS = 10;
+const MEASURED_GROUPS = 9;
 const GROUPS_FLOOR = 5;
 if (names.length < GROUPS_FLOOR)
 	errors.push(`only ${names.length} @mirror group(s) found across SEARCH (last real run: `

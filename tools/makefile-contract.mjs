@@ -1,19 +1,18 @@
-/* Four Makefile invariants that each fail SILENTLY, on somebody else's router, weeks later.
+/* Five Makefile invariants that each fail SILENTLY, on somebody else's router, weeks later.
  *
  * Every one of them was already written down and held by nothing: the file is small enough that a
  * reviewer trusts it, and none of these produces a build error — a wrong DEPENDS installs and then
  * fails on a router without that package, a hardcoded PKG_VERSION ships a release that reports the
- * wrong version, csstidy silently mangles :has() and color-mix(), and `rpcd restart` logs out every
- * LuCI session on the box at install time.
+ * wrong version, csstidy silently mangles :has() and color-mix(), a live `rpcd reload` or
+ * `restart` re-execs rpcd and drops its sessions on the box at install time, and a
+ * PKG_LICENSE_FILES whose file the SDK path no longer copies declares a licence that is not there.
  *
- * `tools/scan-marker.sh` holds the fifth (the buildbot signature comment) and is not repeated here.
+ * `tools/scan-marker.sh` holds the sixth (the buildbot signature comment) and is not repeated here.
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { ROOT } from './lib/root.mjs';
+import { read } from './lib/root.mjs';
 
 const PATH = 'luci-theme-footstrap/Makefile';
-const src = readFileSync(join(ROOT, PATH), 'utf8');
+const src = read(PATH);
 const lines = src.split('\n');
 const fails = [];
 
@@ -44,11 +43,23 @@ if (!(/^\s*LUCI_MINIFY_CSS\s*:?=\s*0\s*$/m).test(src)) {
 	fails.push(`${PATH}: LUCI_MINIFY_CSS:=0 is missing. luci.mk's csstidy pass mangles :has() and color-mix().`);
 }
 
-/* 4. reload, never restart: rpcd holds sessions in memory, so a restart logs out every LuCI user on
- *    the router at the moment they install an upgrade. */
+/* 4. no live `rpcd reload` or `restart`: reload is a re-exec that drops every LuCI session as
+ *    surely as restart (the Makefile's postinst note has the measurement). Comment lines are the
+ *    note itself and are skipped. */
 for (const [i, l] of lines.entries()) {
-	if ((/rpcd\s+restart|restart\s*>.*rpcd/).test(l) || (/\/etc\/init\.d\/rpcd\s+restart/).test(l)) {
-		fails.push(`${PATH}:${i + 1}: 'rpcd restart' logs out every LuCI session. Use 'rpcd reload'.`);
+	if (!(/^\s*#/).test(l) && (/\b(?:reload|restart)\b.*\brpcd\b|\brpcd\b.*\b(?:reload|restart)\b/).test(l)) {
+		fails.push(`${PATH}:${i + 1}: a live 'rpcd reload|restart' drops every LuCI session. Tell the user to log in again instead.`);
+	}
+}
+
+/* 5. PKG_LICENSE_FILES resolves against $(PKG_BUILD_DIR), which luci.mk fills with only src/ luasrc/
+ *    htdocs/ root/ ucode/. Build/Prepare has to copy each file it names there, or the SDK path
+ *    declares a licence text that is not in the tree. */
+const licence = lines.find((l) => (/^\s*PKG_LICENSE_FILES\s*:?=/).test(l));
+for (const f of licence ? licence.split('=')[1].trim().split(/\s+/) : []) {
+	const copy = `$(CP) $(CURDIR)/${f} $(PKG_BUILD_DIR)/`;
+	if (!lines.some((l) => l.trim() === copy)) {
+		fails.push(`${PATH}:${at(/^\s*PKG_LICENSE_FILES/)}: PKG_LICENSE_FILES names '${f}' but Build/Prepare does not run '${copy}'.`);
 	}
 }
 
@@ -57,4 +68,4 @@ if (fails.length) {
 	console.error(`\nmakefile-contract: ${fails.length} violation(s).`);
 	process.exit(1);
 }
-console.log(`makefile-contract: 4 invariants hold (${PATH}).`);
+console.log(`makefile-contract: 5 invariants hold (${PATH}).`);

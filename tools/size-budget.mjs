@@ -3,31 +3,34 @@
  * probe-stripped the way the package ships them. Every byte is flash read and CPU on a device that
  * is also routing packets.
  *
- * The ceiling is pinned ONCE PER RELEASE, by `/release` (`--pin`: measured plus 2 %, rounded up to
+ * The ceiling is pinned at a release, by `/release` (`--pin`: measured plus 2 %, rounded up to
  * 10 B). Between releases it is not raised: a change that crosses it pays for itself by removing
- * something, or the maintainer raises it by hand. The week before 0.14.13 raised it 17 times, each
- * with a paragraph here; the paragraphs are the changelog's job (docs/conventions.md, "Comments").
+ * something, or the maintainer raises it by hand. A re-pin DOWN is allowed between releases when a
+ * refactor shrinks the build, so the slack does not hide growth. The reason for each raise is the
+ * changelog's job, not a paragraph here (docs/conventions.md, "Comments").
  *
  *   node tools/size-budget.mjs          # the gate: exit 1 over the ceiling
  *   node tools/size-budget.mjs --show   # every file with its size
- *   node tools/size-budget.mjs --pin    # rewrite LIMITS below from the current build (release only)
+ *   node tools/size-budget.mjs --pin    # rewrite LIMITS below from the current build (at a release; down between releases)
  */
-import { cpSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildCss } from './lib/css.mjs';
-import { ROOT } from './lib/root.mjs';
+import { buildCss, scratchDir } from './lib/css.mjs';
+import { ROOT, RESOURCES } from './lib/root.mjs';
 import { coldModules } from './lib/page-modules.mjs';
+import { parseFlags } from './lib/util.mjs';
 
-const SHOW = process.argv.includes('--show');
-const PIN = process.argv.includes('--pin');
+const FLAGS = parseFlags('size-budget', { show: { type: 'boolean', default: false }, pin: { type: 'boolean', default: false } });
+const SHOW = FLAGS.show;
+const PIN = FLAGS.pin;
 
-/* pinned by `--pin`; the numbers are the only thing in this block that changes */
+/* Pinned by `--pin` to 2 % over the build; a cut that leaves 8-11 % slack is re-pinned,
+ * since slack that wide stops the ratchet catching growth. */
 const LIMITS = {
-	cascadeCss: 130_000,
-	resourcesJs: 95_690,
-	coldJs: 62_280,
+	cascadeCss: 118_060,
+	resourcesJs: 88_430,
+	coldJs: 54_820,
 };
 
 function bytes(path) {
@@ -36,26 +39,25 @@ function bytes(path) {
 
 function shippedCss() {
 	const out = buildCss();
-	execFileSync(join(ROOT, 'luci-theme-footstrap/mangle-tokens.sh'), [
-		out,
-		join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources'),
-		join(ROOT, 'luci-theme-footstrap/ucode')
-	], { stdio: SHOW ? 'inherit' : 'ignore' });
-	return { path: out, size: bytes(out) };
+	/* the script rewrites the JS and templates it is given in place, so it gets copies */
+	const dir = scratchDir('fs-css-');
+	const pkg = join(ROOT, 'luci-theme-footstrap');
+	cpSync(RESOURCES, join(dir, 'resources'), { recursive: true });
+	cpSync(join(pkg, 'ucode'), join(dir, 'ucode'), { recursive: true });
+	execFileSync(join(pkg, 'mangle-tokens.sh'), [ out, join(dir, 'resources'), join(dir, 'ucode') ],
+		{ stdio: SHOW ? 'inherit' : 'ignore' });
+	return { path: out, size: bytes(out), res: join(dir, 'resources') };
 }
 
-function shippedJs() {
-	const dir = mkdtempSync(join(process.env.RUNNER_TEMP || tmpdir(), 'fs-js-'));
-	const res = join(dir, 'resources');
-	cpSync(join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources'), res, { recursive: true });
-	execFileSync(join(ROOT, 'luci-theme-footstrap/strip-probes.sh'), [ res ],
+/* stage.sh runs mangle, then probes, then uglify: start from the mangled copy shippedCss made */
+function shippedJs(res) {
+	execFileSync(join(ROOT, 'luci-theme-footstrap/strip-build.sh'), [ 'probes', res ],
 		{ stdio: SHOW ? 'inherit' : 'ignore' });
 	execFileSync(process.execPath, [ join(ROOT, 'tools/minify-js.mjs'), res ],
 		{ stdio: SHOW ? 'inherit' : 'ignore' });
 	const cold = new Set([ ...coldModules() ].map((n) => n + '.js'));
-	const lazy = new Set(readdirSync(res).filter((f) => f.endsWith('.js') && !cold.has(f)));
-	const files = readdirSync(res).filter((f) => f.endsWith('.js'))
-		.map((f) => ({ name: f, size: bytes(join(res, f)), lazy: lazy.has(f) }))
+	const files = readdirSync(res, { recursive: true, encoding: 'utf8' }).filter((f) => f.endsWith('.js'))
+		.map((f) => ({ name: f, size: bytes(join(res, f)), lazy: !cold.has(f) }))
 		.sort((a, b) => b.size - a.size);
 	return {
 		files,
@@ -65,7 +67,7 @@ function shippedJs() {
 }
 
 const css = shippedCss();
-const js = shippedJs();
+const js = shippedJs(css.res);
 
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 
@@ -100,8 +102,8 @@ if (js.size > LIMITS.resourcesJs)
 if (over.length) {
 	console.error('\nsize-budget: the router would send more than the budget allows\n');
 	for (const line of over) console.error('  ' + line);
-	console.error('\nThe ceiling is pinned once per release (`--pin`, /release); between releases a change'
-		+ '\nthat crosses it removes something, or the maintainer raises the number by hand.\n');
+	console.error('\nThe ceiling is pinned at a release (`--pin`, /release); between releases a change'
+		+ '\nthat crosses it removes something, or the maintainer raises the number by hand (a re-pin down is allowed).\n');
 	process.exit(1);
 }
 

@@ -77,7 +77,7 @@ docker exec <контейнер-стенда> sh -c 'for f in $(find /usr/share/
 ```sh
 owlab sync owrt2512 owrt2410
 node tools/scroll-anchor.mjs --engines chromium,firefox,webkit   # если трогали fs-fit
-npm run live -- --all                                            # общий обход
+npm run live                                                     # общий обход; широкий — docs/releasing.md, Step 4
 ```
 
 CSS доказывается computed-style или пиксельным диффом против прогона того же листа, не скриншотом:

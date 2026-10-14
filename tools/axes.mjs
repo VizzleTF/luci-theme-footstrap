@@ -1,96 +1,47 @@
 #!/usr/bin/env node
-/* Every Appearance axis — twenty-five localStorage keys across five axis shapes — is implemented
- * TWICE, and nothing else holds the copies together:
+/* Every Appearance axis (twenty-five localStorage keys, five axis shapes) is implemented TWICE, and
+ * nothing else holds the copies together:
  *
  *   1. `partials/head.ut` — inline <script>s that read localStorage and stamp :root BEFORE THE
  *      FIRST PAINT, or the page flashes the wrong theme on every reload. They cannot `require` a
  *      LuCI module: the loader does not exist yet.
- *   2. `fs-prefs.js` — the live appliers behind the Appearance tab.
+ *   2. `fs-axes.js` — the five axis factories behind the Appearance tab; `fs-prefs.js` wires them.
  *
- * Forced duplication, like the @mirror cases, but these two can never be byte-identical, so
- * mirror.mjs cannot hold them. What CAN be held is the CONTRACT: key names, :root attributes,
- * custom properties, valid ranges — and the load-bearing rule:
- *
- *      set the custom property BEFORE the attribute that switches the mixes on,
- *      or a fresh load paints one frame with the previous hue.
- *
- * The JS side is the WHOLE resources tree concatenated, deliberately: it used to name one file,
- * and an axis moved (or added) elsewhere would have left the gate quietly checking nothing. */
+ * The two can never be byte-identical, so mirror.mjs cannot hold them; this holds the CONTRACT: key
+ * names, :root attributes, custom properties, valid ranges, every slider's limits and default, and the load-bearing rule: set the custom
+ * property BEFORE the attribute that switches the mixes on, or a fresh load paints one frame with
+ * the previous hue. The JS side is the WHOLE resources tree, so a moved axis is still found. */
 import { read, readAll } from './lib/root.mjs';
+import { keysIn, storageKeys, colorAxesIn, enumAxesIn, listAxesIn, propAxesIn, surfaceAxesIn } from './lib/axes.mjs';
 
-/* every module the theme ships — the axes live across fs-prefs.js and menu-footstrap.js */
+/* every module the theme ships — the axes live in fs-axes.js and fs-prefs.js */
 const JS = readAll('luci-theme-footstrap/htdocs/luci-static/resources', '.js');
 const HEAD = read('luci-theme-footstrap/ucode/template/themes/footstrap/partials/head.ut');
-/* the SERVER side of the axes: header.ut is what reads /etc/config/footstrap back for head.ut */
-const HEADER = read('luci-theme-footstrap/ucode/template/themes/footstrap/header.ut');
 const TOKENS = read('luci-theme-footstrap/styles/02-tokens.css');
 const STYLES = readAll('luci-theme-footstrap/styles', '.css');
-const ORPHANS = read('tools/fs-orphans.mjs');
-/* The third implementation of the axes, and the one nothing held: lib/gallery.mjs stamps them onto
- * :root so a11y-gallery.mjs and export-tier.mjs can sweep the matrix. Renaming `--fs-tint-h` there
- * left every gate at exit 0 while export-tier reported 28 combinations and silently measured an
- * UNTINTED page in 21 of them — 7 distinct results presented as 28. */
+/* The third implementation of the axes: lib/gallery.mjs stamps them onto :root so a11y-gallery.mjs
+ * and export-tier.mjs can sweep the matrix. A rename of `--fs-tint-h` there left export-tier
+ * measuring an UNTINTED page in 21 of its 28 combinations (7 distinct results). */
 const GALLERY = read('tools/lib/gallery.mjs');
 
 const errors = [];
 const ok = [];
 
-/* "did MY section pass?", not "has nothing failed yet". Three sections below used to gate their
- * success line on the GLOBAL error list being empty, so one unrelated failure earlier in the run
- * deleted their line from the report — and an operator reading a failure could not tell whether
- * those checks had passed or never run. */
+/* "did MY section pass?", not "has nothing failed yet": a global-empty test lets one unrelated failure
+ * delete a later section's success line, and the operator cannot tell passed from never ran. */
 const errorMark = () => errors.length;
 const cleanSince = (m) => errors.length === m;
 
 /* ---- 1. every localStorage key the theme uses, taken from the JS -------------------- */
-const keysIn = (src) => {
-	const out = new Set();
-	for (const m of src.matchAll(/(?:lsGet|lsSet|lsDel)\(\s*'(fs-[a-z-]+)'/g)) out.add(m[1]);
-	/* `lsGet(…)` counts as a read. Both files wrap storage in a helper of that name — fs-prefs.js
-	 * because every read must survive a browser that refuses storage, head.ut's pre-paint for the
-	 * same reason — and a pattern that only knew the bare `localStorage.getItem(` spelling saw 4 of
-	 * head.ut's 15 keys the moment that block started guarding itself, while still reporting OK. */
-	for (const m of src.matchAll(/(?:localStorage\.(?:getItem|setItem|removeItem)|lsGet)\(\s*'(fs-[a-z-]+)'/g)) out.add(m[1]);
-	/* the accordion's remembered set keeps its key in a constant, not at the call site */
-	for (const m of src.matchAll(/^const\s+\w*KEY\w*\s*=\s*'(fs-[a-z-]+)'/gm)) out.add(m[1]);
-	return out;
-};
-/* ...plus the axes built by a FACTORY, which pass their key in as an argument — colorAxis(key,
- * attr, hueProp, colorProp) and enumAxis(key, attr, on, off). Those have no lsGet('fs-…') call site
- * at all (the factory body reads a variable), so the scan above misses them entirely and every check
- * below would go quiet on exactly the axes it is meant to hold. Match each factory call by its
- * literal args. */
-const colorAxes = [...JS.matchAll(/colorAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)]
-	.map(([, key, attr, hueProp, colorProp]) => ({ key, attr, hueProp, colorProp }));
-const enumAxes = [...JS.matchAll(/enumAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)]
-	.map(([, key, attr, on, off]) => ({ key, attr, on, off }));
-/* listAxis(key, attr, VALUES, 'dflt', …) — the same shape with more than one stamped value, so the
- * third argument is the name of an array rather than a literal and the values are read from THAT
- * declaration. Same blind spot as the others: the lsGet(key) is inside the factory, so keysIn()
- * cannot see the key and the call is what has to be matched. */
-const listAxes = [...JS.matchAll(/listAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*([A-Z_]+)\s*,\s*'([^']+)'/g)]
-	.map(([, key, attr, listName, dflt]) => {
-		const decl = JS.match(new RegExp(`const ${listName} = \\[([^\\]]*)\\]`));
-		const values = decl ? [...decl[1].matchAll(/'([^']+)'/g)].map((m) => m[1]) : [];
-		return { key, attr, listName, dflt, values };
-	});
-/* propAxis(key, sdKey, prop, …) — an inline-property slider (rounding, tint strength). Same reason
- * as above: its lsGet(key) sits in the factory body, so keysIn() cannot see the key. Match the call. */
-const propAxes = [...JS.matchAll(/propAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'/g)]
-	.map(([, key, sdKey, prop]) => ({ key, sdKey, prop }));
-/* surfaceAxis(key, sdKey, prop) — a surface repaint (cards, controls, bar, borders). Same blind
- * spot again, and section 2e needs its sdKey. */
-const surfaceAxes = [...JS.matchAll(/surfaceAxis\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)]
-	.map(([, key, sdKey, prop]) => ({ key, sdKey, prop }));
-
-const jsKeys = new Set([...keysIn(JS), ...colorAxes.map(a => a.key), ...enumAxes.map(a => a.key),
-	...listAxes.map(a => a.key),
-	...propAxes.map(a => a.key), ...surfaceAxes.map(a => a.key)]);
-/* head.ut pre-paints the five colour axes through ONE local helper, so their keys are arguments
- * there too and keysIn() cannot see them either — the same blind spot, on the other side. Matched
+const colorAxes = colorAxesIn(JS), enumAxes = enumAxesIn(JS), listAxes = listAxesIn(JS),
+	propAxes = propAxesIn(JS), surfaceAxes = surfaceAxesIn(JS);
+if (listAxes.length !== 3) errors.push(`found ${listAxes.length} listAxis() calls, expected 3 — did the factory's signature change?`);
+if (surfaceAxes.length !== 4) errors.push(`found ${surfaceAxes.length} surfaceAxis() calls, expected 4 — did the factory's signature change?`);
+const jsKeys = storageKeys(JS);
+/* head.ut pre-paints the five colour axes through ONE helper, so its keys are arguments too; matched
  * by the call, and the four literals are what section 2 holds against the JS. */
-const headColorCalls = [...HEAD.matchAll(/colour\(\s*'([^']+)'\s*,[^,]*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)]
-	.map(([, key, attr, hueProp, colorProp]) => ({ key, attr, hueProp, colorProp }));
+const headColorCalls = [...HEAD.matchAll(/colour\(\s*'([^']+)'\s*,[^,]*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)'\s*)?\)/g)]
+	.map(([, key, attr, hueProp, colorProp, inkProp]) => ({ key, attr, hueProp, colorProp, inkProp }));
 const headKeys = new Set([...keysIn(HEAD), ...headColorCalls.map(a => a.key)]);
 
 if (!jsKeys.size) errors.push('found no fs-* localStorage keys in the theme JS — this tool is broken, not the theme');
@@ -103,19 +54,22 @@ for (const k of headKeys)
 
 /* ---- 2. the colour axes: key, attribute, both custom properties, order, range ----
  *
- * A colour axis holds off | a hue 1-360 | a '#rrggbb', and the attribute's VALUE says which of the
- * last two is in effect. Both sides build all five from one helper, so the contract that can drift
- * is the ARGUMENT LIST: a renamed property or a mistyped attribute on one side and the pre-paint
- * silently stops matching the stylesheet, whose only symptom is one wrong frame on reload.
- *
- * The property-before-attribute ordering is therefore checked once, inside the helper, rather than
- * per axis. */
+ * A colour axis holds off | a hue 1-360 | a '#rrggbb'; the attribute's VALUE says which. Both sides
+ * build all five from one helper, so what can drift is its ARGUMENT LIST (a renamed property or
+ * attribute makes the pre-paint stop matching the stylesheet: one wrong frame on reload). The
+ * property-before-attribute order is checked once, inside the helper. */
 if (!colorAxes.length) errors.push('no colorAxis() calls found in the theme JS — did the axis helper get renamed?');
-if (!headColorCalls.length) errors.push('head.ut no longer pre-paints any colour axis through colour(key, sd, attr, hueProp, colorProp)');
+if (!headColorCalls.length) errors.push('head.ut no longer pre-paints any colour axis through colour(key, sd, attr, hueProp, colorProp, inkProp)');
 
 /* the helper's body, where the ordering rule lives */
 const headColourFn = (HEAD.match(/const colour = \([\s\S]*?\n\t{5}\};/) || [''])[0];
-for (const [mode, prop] of [ [ 'hex', 'colorProp' ], [ 'hue', 'hueProp' ] ]) {
+/* the hex branch ends where the hue branch's parseInt starts; each ink call is looked for in its own branch only */
+const hueAt = headColourFn.indexOf('parseInt(');
+const branchOf = { hex: headColourFn.slice(0, hueAt), hue: headColourFn.slice(hueAt) };
+for (const [mode, prop, ink] of [ [ 'hex', 'colorProp', 'setProperty(inkProp' ], [ 'hue', 'hueProp', 'removeProperty(inkProp' ] ]) {
+	if (!branchOf[mode].includes(ink))
+		errors.push(`head.ut's colour() never calls ${ink}, in the ${mode} branch — the pre-paint would leave the `
+			+ `ink of a ${mode} fill unset or stale for the first frame`);
 	const iProp = headColourFn.indexOf(`setProperty(${prop}`);
 	const iAttr = headColourFn.indexOf(`setAttribute(attr, '${mode}')`);
 	if (iProp < 0 || iAttr < 0) {
@@ -128,18 +82,38 @@ for (const [mode, prop] of [ [ 'hex', 'colorProp' ], [ 'hue', 'hueProp' ] ]) {
 			+ `first, or a fresh load paints one frame in the previous colour.`);
 	else ok.push(`colour pre-paint ${mode}: property before attribute`);
 }
+/* The ink is computed in JS where the hex is applied, in two copies that cannot share code. Text
+ * comparison would pass a changed constant on one side, so take both function bodies and RUN them
+ * over a spread of fills, including both sides of the .62 threshold. */
+const inkFn = (src, re, param) => {
+	const m = src.match(re);
+	try { return m ? new Function(param, m[1]) : null; } catch { return null; }
+};
+const jsInk = inkFn(JS, /function inkFor\(hex\)\s*\{([\s\S]*?)\n\}/, 'hex');
+const headInk = inkFn(HEAD, /const inkFor = \(hx\) => \{([\s\S]*?)\n\t{5}\};/, 'hx');
+if (!jsInk || !headInk) errors.push('inkFor() is not readable in fs-axes.js and head.ut — the hex-ink gate cannot compare the two copies');
+else {
+	const inkMark = errorMark();
+	const palette = [...STYLES.matchAll(/--fs-(?:accent|good|warn|danger)-base:\s*(#[0-9a-f]{6})/gi)].map((m) => m[1]);
+	const grey = Array.from({ length: 16 }, (_, i) => '#' + (i * 17).toString(16).padStart(2, '0').repeat(3));
+	for (const hex of ['#ffcc00', '#0033aa', '#808080', ...palette, ...grey]) {
+		const a = jsInk(hex), b = headInk(hex);
+		if (a !== b) errors.push(`hex ink for ${hex}: fs-axes.js gives ${a}, head.ut gives ${b} — the pre-paint and the live applier disagree`);
+	}
+	if (cleanSince(inkMark)) ok.push('hex ink: fs-axes.js inkFor() and head.ut inkFor() agree over the sample');
+}
 /* the valid hue range, as the JS validates it (1..360) */
 if (!(/>=\s*1\s*&&[\s\S]{0,40}?<=\s*360/).test(headColourFn))
 	errors.push('head.ut\'s colour() does not validate a stored hue as 1..360 the way normColor() does '
 		+ '(an out-of-range value would be pre-painted and then rejected by the page)');
 
-for (const { key, attr, hueProp, colorProp } of colorAxes) {
+for (const { key, attr, hueProp, colorProp, inkProp } of colorAxes) {
 	const where = `colour axis '${key}'`;
 	const head = headColorCalls.find((c) => c.key === key);
 	if (!head) { errors.push(`${where}: head.ut never pre-paints it — it will flash on reload`); continue; }
-	if (head.attr !== attr || head.hueProp !== hueProp || head.colorProp !== colorProp) {
-		errors.push(`${where}: head.ut pre-paints it as (${head.attr}, ${head.hueProp}, ${head.colorProp}) `
-			+ `but the JS applies it as (${attr}, ${hueProp}, ${colorProp}) — one of the two is painting `
+	if (head.attr !== attr || head.hueProp !== hueProp || head.colorProp !== colorProp || head.inkProp !== inkProp) {
+		errors.push(`${where}: head.ut pre-paints it as (${head.attr}, ${head.hueProp}, ${head.colorProp}, ${head.inkProp}) `
+			+ `but the JS applies it as (${attr}, ${hueProp}, ${colorProp}, ${inkProp}) — one of the two is painting `
 			+ `a token the stylesheet does not read`);
 		continue;
 	}
@@ -185,21 +159,15 @@ for (const { key, attr, on } of enumAxes) {
 	ok.push(`enum axis ${key.padEnd(10)} -> ${attr}='${on}'   (key, attr and both directions agree)`);
 }
 
-/* The list-shaped axes, held the same way — and they need their own loop rather than 2c's blanket
- * check below, because the moment their attribute becomes factory-stamped 2c skips it. Written
- * without one and the gate went QUIET on all three: `data-density` renamed on either side alone was
- * reported by nothing, which is the exact failure this whole file exists to prevent.
- *
- * head.ut pre-paints these as a chain of literal comparisons rather than a list, so the check is
- * that every value the JS will stamp appears there as a stamp, and that the removal is there too. */
+/* The list-shaped axes, held the same way, in their own loop: once their attribute is factory-stamped
+ * 2c skips it, and `data-density` renamed on one side alone went unreported. head.ut pre-paints them
+ * as a chain of literal comparisons, so every value the JS stamps must appear there as a stamp. */
 for (const { key, attr, values, listName } of listAxes) {
 	const where = `list axis '${key}'`;
 	if (!values.length) { errors.push(`${where}: ${listName} is not a list of string literals this gate can read`); continue; }
 	if (!headKeys.has(key)) { errors.push(`${where}: head.ut never reads localStorage '${key}' — it will flash on reload`); continue; }
-	/* Looked for in the LINES THAT STAMP, not anywhere in the file: every one of these values also
-	 * appears in head.ut's own sanitiser whitelist a hundred lines up, so a file-wide search reports
-	 * a value the pre-paint has stopped stamping as present. Measured by deleting `'large'` from the
-	 * stamp and watching the gate stay green. */
+	/* Looked for in the LINES THAT STAMP, not file-wide: every value also sits in head.ut's sanitiser
+	 * whitelist. Deleting `'large'` from the stamp left a file-wide search green. */
 	const stampLines = HEAD.split('\n')
 		.map((l, i, all) => (l.includes(`setAttribute('${attr}'`) ? all.slice(Math.max(0, i - 2), i + 1).join('\n') : ''))
 		.join('\n');
@@ -227,37 +195,21 @@ for (const [, attr, prop] of GALLERY.matchAll(/hue\(\w+, '([^']+)', '([^']+)'\)/
 
 /* ---- 2c. every other :root attribute an applier stamps ----
  *
- * The checks above cover the two FACTORY shapes only. An axis that keeps its own applier stamps a
- * `data-*` attribute nothing holds to head.ut: rename it on one side and the pre-paint silently
- * stops matching, with one wrong frame on reload as the only symptom.
- *
- * Derived, not listed: take the attributes the JS appliers stamp and require head.ut to stamp each.
- *
- * It deliberately does not require the matching removeAttribute — `data-rail` is correct code that
- * does not have one. */
+ * The checks above cover the two FACTORY shapes. An axis with its own applier stamps a `data-*`
+ * attribute nothing holds to head.ut. Derived, not listed: every attribute the JS appliers stamp
+ * must be stamped by head.ut. The matching removeAttribute is not required (`data-rail` has none). */
 const OUTBOUND = new Set(['data-theme', 'data-bs-theme', 'data-darkmode']);	/* checked in 3b */
 const factoryAttrs = new Set([...colorAxes.map(a => a.attr), ...enumAxes.map(a => a.attr),
 	...listAxes.map(a => a.attr)]);
-/* Both spellings of the receiver, because an applier picked the other one and vanished from this
- * check: applyLayout() writes `document.documentElement.setAttribute('data-layout', …)` while every
- * other applier holds it in a local `root`, and a pattern anchored on `root.` therefore derived a
- * list with the layout axis silently missing — the one shape this section exists to catch. */
-/* `[a-z-]+` used to stop at the first character outside that class — silently, with no error and
- * no changed exit code. Renaming `data-rail` to `data-raiL` (one uppercase letter) made the WHOLE
- * match fail (nothing between 'data-' and the closing quote can satisfy both the class and the
- * literal quote that follows it), so the attribute dropped out of `jsSets` and this section's loop
- * had nothing to say about it — the exact "check disappears" shape this section exists to catch.
- * `\w` covers upper-case, digits and underscore, so a rename lands IN the derived set instead of
- * falling out of it, and the loop below can still compare it against head.ut. */
+/* Both spellings of the receiver: applyLayout() writes `document.documentElement.setAttribute('data-layout', …)`
+ * while the others use a local `root`. `\w`, not `[a-z-]+`: `data-raiL` must land IN the derived set
+ * instead of making the whole match fail and dropping out of it. */
 const jsSets = new Set(
 	[...JS.matchAll(/(?:^|[^\w.])(?:root|document\.documentElement)\.setAttribute\('(data-[\w-]+)'/g)]
 		.map((m) => m[1]));
 
-/* A derived list with no expected size is the same hole one level up: a regex that stopped
- * matching ANY call (not just one attribute) would empty `jsSets` and the loop below would report
- * nothing — zero findings, indistinguishable from "every axis agrees". Measured today:
- * data-layout and data-rail are the two bespoke appliers this section holds; the floor sits at
- * that count, not at 0. */
+/* A derived list needs an expected size: a regex that matched no call at all would report zero
+ * findings, the same as "every axis agrees". data-layout and data-rail are the two bespoke appliers. */
 const MIN_2C_ATTRS = 2;
 if (jsSets.size < MIN_2C_ATTRS)
 	errors.push(`only ${jsSets.size} axis attribute(s) matched by the (root|document.documentElement)`
@@ -277,61 +229,50 @@ for (const attr of jsSets) {
 
 /* ---- 2d. the server read: every option Save-as-default writes must be read back ----
  *
- * saveAsDefault() uci-sets the fields snapshotAxes() returns; header.ut reads
- * /etc/config/footstrap back into `fs_defaults`, head.ut sanitises that into window.__fsSD, and
- * fs-prefs.js's def() reads it from there. An axis missing from the SERVER read is written to disk
- * correctly and never comes back: Save reports success, the file is right, and "Reset to saved"
- * drops the browser to the BUILT-IN default.
- *
- * It has happened twice — `density`, then all seven colour and surface axes at once — and neither
- * time did anything fail. */
-/* The uci options header.ut reads back that are NOT axes: they have no browser layer, no Appearance
- * control and therefore no business in snapshotAxes() — Save as default must never write them.
- * login_bg and pattern are the two uploaded images' cache-bust tokens, written by the upload path
- * itself; font_sans, font_mono and fonts are the router's webfont setting, written by
- * fonts/set-font.sh or by hand. All five still travel to the client through FS_AXES. */
+ * saveAsDefault() uci-sets the AXES table's keys; header.ut hands /etc/config/footstrap's section to
+ * head.ut as `fs_defaults`, which becomes window.__fsSD, which fs-prefs.js's def() reads. An axis
+ * missing from that read is saved correctly and never comes back: "Reset to saved" falls to the
+ * built-in default. It happened for `density`, then for all seven colour and surface axes at once. */
+/* The uci options header.ut reads back that are NOT axes, so Save as default must never write them:
+ * login_bg and pattern are the uploaded images' cache-bust tokens, font_sans, font_mono and fonts
+ * the router's webfont setting (fonts/set-font.sh). */
 const SERVER_ONLY = new Set(['login_bg', 'pattern', 'font_sans', 'font_mono', 'fonts']);
 
 const serverReadMark = errorMark();
-const snapBody = (JS.match(/function snapshotAxes\(\)\s*\{([\s\S]*?)\n\}/) || [, ''])[1];
-const snapFields = [...snapBody.matchAll(/^\s*([a-z_]+):/gm)].map((m) => m[1]);
-const headerAxes = (HEADER.match(/const FS_AXES = \[([\s\S]*?)\]/) || [, ''])[1];
-const headerFields = [...headerAxes.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+/* The AXES table's top-level keys, found by stripping the nested { ... } rows until none is left. */
+let axesBody = (JS.match(/const AXES = \{([\s\S]*?)\n\};/) || [, ''])[1];
+for (let prev; prev !== axesBody;) { prev = axesBody; axesBody = axesBody.replace(/\{[^{}]*\}/g, ''); }
+const snapFields = [...axesBody.matchAll(/\b([a-z_]+)\s*:/g)].map((m) => m[1]);
+/* head.ut is what consumes the section, so its fs_defaults.<key> reads are the options the server uses */
+const headerFields = [...new Set([...HEAD.matchAll(/\bfs_defaults\.([a-z_]+)/g)].map((m) => m[1]))];
 
-if (!snapFields.length) errors.push('no snapshotAxes() found in the theme JS — did Save-as-default get renamed?');
-else if (!headerFields.length) errors.push('header.ut no longer declares `const FS_AXES = [...]` — the gate cannot tell which uci options the server reads back');
+if (!snapFields.length) errors.push('no `const AXES = {...}` table found in the theme JS — did Save-as-default get renamed?');
+else if (!headerFields.length) errors.push('head.ut no longer reads `fs_defaults.<key>` — the gate cannot tell which uci options the server reads back');
 else {
 	for (const f of snapFields)
 		if (!headerFields.includes(f))
-			errors.push(`uci option '${f}': saveAsDefault() writes it, but header.ut's FS_AXES does not read `
+			errors.push(`uci option '${f}': saveAsDefault() writes it, but head.ut's fs_defaults does not read `
 				+ `it back — the router default for this axis reaches no browser, so "Reset to saved" `
 				+ `falls through to the built-in and Save-as-default looks like it did nothing`);
 	for (const f of headerFields)
 		if (!SERVER_ONLY.has(f) && !snapFields.includes(f))
-			errors.push(`uci option '${f}': header.ut reads it back, but snapshotAxes() never writes it — `
+			errors.push(`uci option '${f}': head.ut reads it back, but snapshotAxes() never writes it — `
 				+ `either a leftover from a removed axis, or the axis is missing from Save-as-default`);
 	if (cleanSince(serverReadMark))
-		ok.push(`server read: all ${snapFields.length} saved option(s) are read back by header.ut`);
+		ok.push(`server read: all ${snapFields.length} saved option(s) are read back by head.ut`);
 }
 
 /* ---- 2e. the field name: every sd() lookup must name a field head.ut actually emits ----
  *
- * The factories reach the router default through window.__fsSD and get the field name two ways:
- * enumAxis and colorAxis DERIVE it from the localStorage key (key minus 'fs-', hyphens folded to
- * underscores), while propAxis and surfaceAxis are HANDED it, one of them being a rename rather
- * than a spelling. Nothing else checks either against the template.
- *
- * `fs-pattern-ink` is what that cost: a bare slice(3) asks for 'pattern-ink' where head.ut emits
- * `pattern_ink`, so sd() answers undefined forever and the axis reports the built-in default
- * however the router is configured. Every symptom is silent, which is how it survived a review
- * round (openwrt/luci#8903) and every other gate in this file. */
+ * enumAxis and colorAxis DERIVE the field from the localStorage key (minus 'fs-', hyphens to
+ * underscores); propAxis and surfaceAxis are HANDED it. `fs-pattern-ink` with a bare slice(3) asked
+ * for 'pattern-ink' where head.ut emits `pattern_ink`: sd() answered undefined forever
+ * (openwrt/luci#8903). */
 const sdMark = errorMark();
 const sdLine = (HEAD.match(/window\.__fsSD\s*=\s*\{[^\n]*/) || [''])[0];
 const sdFields = [...sdLine.matchAll(/[{,]\s*([a-z_]+)\s*:/g)].map((m) => m[1]);
-/* THE DERIVING FACTORIES' FORMULA IS TAKEN FROM THE SOURCE AND RUN, never restated here. Written
- * the obvious way — repeat the fold in this file and compare — the gate holds head.ut against
- * ITSELF and stays green while fs-prefs.js says something else entirely: measured by breaking the
- * fold back to a bare slice(3), which such a version passed. */
+/* The deriving factories' formula is taken from the source and run, never restated: a restated fold
+ * holds head.ut against itself (a bare slice(3) in fs-prefs.js passed). */
 const sdFormula = (factory) => {
 	const body = JS.match(new RegExp(`function ${factory}\\([^)]*\\)\\s*\\{[\\s\\S]*?\\n\\}`));
 	const expr = body && body[0].match(/const\s+sdKey\s*=\s*([^;]+);/);
@@ -372,18 +313,30 @@ else {
 		ok.push(`sd() fields: ${sdReaders.length} factory axes + ${new Set(sdLiterals).size} direct reads all name a field head.ut emits`);
 }
 
-/* ---- 3. the rounding default: JS, template and CSS token must be the same number ----- */
-const jsRadius = JS.match(/const\s+FS_RADIUS_DEFAULT\s*=\s*(\d+)/);
-const cssRadius = TOKENS.match(/--fs-radius-base:\s*(\d+)px/);
-const headRadius = HEAD.match(/r\s*!==?\s*(\d+)/);
-if (!jsRadius) errors.push('FS_RADIUS_DEFAULT not found in the theme JS (fs-prefs.js)');
-else if (!cssRadius) errors.push('--fs-radius-base not found in styles/02-tokens.css');
-else if (!headRadius) errors.push('head.ut no longer skips the default rounding (the `r !== <default>` test is gone)');
-else if (!(jsRadius[1] === cssRadius[1] && cssRadius[1] === headRadius[1]))
-	errors.push(`the rounding DEFAULT disagrees across the three places that state it: `
-		+ `JS FS_RADIUS_DEFAULT=${jsRadius[1]}, CSS --fs-radius-base=${cssRadius[1]}px, head.ut r!==${headRadius[1]}. `
-		+ `head.ut cannot read the CSS token (it runs before the stylesheet), so this is the only thing checking it.`);
-else ok.push(`rounding default ${jsRadius[1]}px agrees in the JS, the CSS token and head.ut`);
+/* ---- 3. every propAxis slider: min, max and default in the JS, head.ut (pre-paint and _sd_range) and the CSS token ----
+ *
+ * head.ut runs before the stylesheet and the module loader, so it states each limit again as a literal;
+ * a copy that drifts silently reverts a stored value on every page but Appearance. A copy this gate
+ * cannot find is an error, never a skip. */
+if (propAxes.length !== 6) errors.push(`found ${propAxes.length} propAxis() calls with literal limits, expected 6 — did the factory's signature change?`);
+const cssNum = (s) => s.trim().replace(/^0(?=\.)/, '');
+for (const { key, sdKey, prop, min, max, dfl, fmt } of propAxes) {
+	const where = `slider '${key}'`;
+	const mark = errorMark();
+	const pre = new RegExp(`>=\\s*${min}\\s*&&\\s*\\w+\\s*<=\\s*${max}\\s*&&\\s*\\w+\\s*!==?\\s*${dfl}\\)\\s*root\\.style\\.setProperty\\('${prop}'`);
+	if (!pre.test(HEAD))
+		errors.push(`${where}: head.ut's pre-paint does not test ${min}..${max} and !== ${dfl} before stamping ${prop} — `
+			+ `the JS says min ${min}, max ${max}, default ${dfl}`);
+	if (!new RegExp(`_sd_range\\(fs_defaults\\.${sdKey},\\s*${min},\\s*${max}\\)`).test(HEAD))
+		errors.push(`${where}: head.ut has no _sd_range(fs_defaults.${sdKey}, ${min}, ${max}) — the server clamps a saved default to other limits than the JS`);
+	const token = STYLES.match(new RegExp(`${prop}:\\s*([^;]+);`));
+	const want = String(new Function('v', `return ${fmt.replace(/^\(v\) => /, '')};`)(dfl));
+	if (!token) errors.push(`${where}: ${prop} is declared nowhere in styles/`);
+	else if (cssNum(token[1]) !== cssNum(want))
+		errors.push(`${where}: CSS ${prop} is ${token[1].trim()} but the JS default ${dfl} formats to ${want} — `
+			+ `head.ut skips the default, so the stylesheet's value is what the page shows`);
+	if (cleanSince(mark)) ok.push(`slider ${key.padEnd(20)} min ${min}, max ${max}, default ${dfl} agree in the JS, head.ut (pre-paint, _sd_range) and ${prop}`);
+}
 
 /* ---- 3b. the dark-mode attributes: the same SET, same values, in both places ----
  *
@@ -425,31 +378,9 @@ for (const attr of ['data-theme', 'data-bs-theme'])
 		errors.push(`styles/ keys a rule off [${attr}] — that name is OUTBOUND compatibility for third-party `
 			+ `apps, not a theme input. The theme's own dark rules read [data-darkmode].`);
 
-/* ---- 4. css-orphans must know every key, or a new axis breaks that gate -------------- */
-/* The SET LITERAL, not the file. Asking whether `'fs-…'` appears anywhere in fs-orphans.mjs passes
- * on a key quoted in one of that file's prose comments or in its unrelated JUSTIFIED_UNSTYLED map —
- * i.e. the gate could report the contract as held while IGNORE_EXACT did not contain the key at all,
- * which is exactly the phantom dead selector it exists to prevent. Parses the SET LITERAL text
- * between `IGNORE_EXACT = new Set([` and the closing `])`, nothing else in the file. */
-const ignoreBlock = ORPHANS.match(/IGNORE_EXACT\s*=\s*new Set\(\[([\s\S]*?)\]\)/);
-if (!ignoreBlock)
-	errors.push('tools/fs-orphans.mjs no longer declares IGNORE_EXACT as `new Set([…])` — this check '
-		+ 'reads that literal, and a shape it cannot parse would silently pass every key');
-const ignoreNames = new Set(
-	[...(ignoreBlock ? ignoreBlock[1] : '')
-		/* comments stripped first: that literal is half prose, and a key QUOTED in the reason for
-		 * some other key would otherwise read as a member — the same false pass one level down. */
-		.replace(/\/\*[\s\S]*?\*\//g, ' ')
-		.matchAll(/'([\w-]+)'/g)].map((m) => m[1]));
-
-for (const k of jsKeys)
-	if (!ignoreNames.has(k))
-		errors.push(`tools/fs-orphans.mjs does not list '${k}' in IGNORE_EXACT — it looks like an fs-* CSS `
-			+ `class to that tool's regex, so adding this axis makes css-orphans report a phantom dead selector`);
-
 /* ---- report --------------------------------------------------------------------------- */
 for (const line of ok) console.log('  ok   ' + line);
-console.log(`  ok   ${jsKeys.size} localStorage keys, all known to css-orphans`);
+console.log(`  ok   ${jsKeys.size} localStorage keys`);
 
 if (errors.length) {
 	console.error('\nFAIL: the Appearance axes have drifted between their two implementations.');
