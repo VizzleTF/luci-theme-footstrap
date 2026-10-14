@@ -2,51 +2,27 @@
 /* The poll tick, performed on purpose: does a freshly replaced data table ever throw the reader
  * before anything has answered for it?
  *
- * luci-base's poll does not append a row, it REPLACES the table, and the replacement carries none of
- * the marks fs-select stamps. For the moment between landing and being stamped the table is a
- * full-width table — at 390px several screens taller than the card stack it is about to become — and
- * if anything forces layout in that moment the engine re-anchors on the intermediate and throws the
- * reader (612px out and back, twice per tick, on a live router at iPhone width — 2e83050).
+ * luci-base's poll REPLACES the table and the replacement carries none of fs-select's marks, so
+ * until it is stamped it is a full-width table, several screens taller than the card stack it
+ * becomes at 390px; a forced layout in that moment makes the engine re-anchor on it. That lasts a
+ * microtask and no per-frame sampler sees it, so this file forces layout inside it, as an app
+ * reading a width after rendering does. `.fs-footer` follows all content on both layouts, so its
+ * document position is the reader's place: `before` has the old table in the DOM, `during` is read
+ * in the task of the replacement, `after` once fs-select has settled. `during` above both is the fault.
+ * Asserting the CSS rule's own selector read the fix, not the reader: docs/anchoring-log.md.
  *
- * WHY A DELIBERATE TICK RATHER THAN WATCHING A REAL ONE. The intermediate lasts a microtask:
- * fs-select answers in a MutationObserver callback, before paint, so a per-frame sampler never sees
- * it — measured, with the rule removed, as 0 frames out of 108 while the page grew by 269px. The
- * only way to observe the state is to force layout inside that window, which is exactly what an app
- * reading a width right after rendering does, and what this reproduces.
- *
- * WHAT THIS USED TO MEASURE, AND WHY THAT WAS THE WRONG SIDE OF THE FIX. Before this file asserted
- * `.table.fs-dt:not(.fs-fitted)` had zero height — the exact selector `theme/30-tables.css` uses to
- * hide an unanswered table (`display: none`), and nothing else. That is the CSS rule restated, not
- * the reader's position: a fix that held the page still by some other means (an out-of-flow
- * placement, say) would have read as a failure here for carrying real height while never moving
- * anyone, and a regression that still threw the reader while `fs-select` had already stamped
- * `fs-fitted` on the box would have read as a clean pass, because the selector excludes it by
- * construction.
- *
- * WHAT IT MEASURES NOW. `.fs-footer` sits after every page's content in document order, on both
- * layouts, so its own document position (viewport top + scroll offset) is the sum of everything the
- * poll could have grown above the reader — the target table itself, whatever class it carries, or
- * anything else the tick touches. `before` is the footer's place with the OLD, already-answered
- * table still in the DOM; `during` is read synchronously, in the SAME task, right after the
- * replacement — before fs-select's microtask gets to answer for it; `after` is read once a
- * microtask turn and a frame have run, i.e. once fs-select (or whatever replaces it) has settled.
- * A table that is held out of the flow while unanswered — the theme's own choice — makes `during`
- * SMALLER than `before`/`after`, which is the accepted trade-off this file does not gate on; a table
- * that is laid out full-width before anything has answered makes `during` LARGER than either
- * settled position, which is the 612px this file exists to catch, on any mechanism that produces it.
- *
- *   node tools/table-tick.mjs [--only owrt2512] [--widths 390,768] [--pages /admin/status/overview]
+ *   node tools/table-tick.mjs [--only owrt2512] [--all] [--widths 390,768] [--pages /admin/status/overview]
  *
  * Needs a running owlab router (docs/development.md). */
-import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
+import { parseFlags } from './lib/util.mjs';
 
-const { values: FLAGS } = parseArgs({ options: {
+const FLAGS = parseFlags('table-tick', {
 	widths: { type: 'string', default: '390,768' },
 	pages: { type: 'string', default: '/admin/status/overview,/admin/status/processes' },
 	only: { type: 'string', default: '' }, all: { type: 'boolean', default: false },
-} });
+});
 /* 390 is where the difference between an unanswered table and its card stack is largest; 768 is the
  * width the arrival fault was reported at. */
 const WIDTHS = FLAGS.widths.split(',').map(Number);
@@ -71,7 +47,7 @@ const TICK = () => {
 
 	/* The reader's own place: the footer, which sits after everything a page can show, so growth
 	 * anywhere above it — the table this tick targets, or anything else — moves it. */
-	const anchor = document.querySelector('.fs-footer') || document.scrollingElement || document.body;
+	const anchor = document.querySelector('.fs-footer');
 	const place = () => Math.round(anchor.getBoundingClientRect().top + window.scrollY);
 	const before = place();
 
@@ -84,7 +60,7 @@ const TICK = () => {
 	 * microtask) gets to answer. */
 	const during = place();
 
-	return { armed, ungated, before, during, tables: all.length, view: true };
+	return { armed, ungated, before, during, tables: all.length };
 };
 
 /* A second call, once a microtask turn and a frame have had time to run — fs-select's own answer,
@@ -93,7 +69,7 @@ const TICK = () => {
  * folding the two into one async function would let the await itself yield before `during` is read. */
 const SETTLED = () => new Promise((resolve) => {
 	requestAnimationFrame(() => requestAnimationFrame(() => {
-		const anchor = document.querySelector('.fs-footer') || document.scrollingElement || document.body;
+		const anchor = document.querySelector('.fs-footer');
 		resolve(Math.round(anchor.getBoundingClientRect().top + window.scrollY));
 	}));
 });

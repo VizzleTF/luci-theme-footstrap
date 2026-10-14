@@ -220,7 +220,7 @@ half of this file is responsible.
 | switch | effect |
 |---|---|
 | `localStorage.fsFit = 'off'` | no fitter runs, and no floor is written |
-| `localStorage.fsAnchor = 'off'` | the theme writes the scroll offset nowhere |
+| `localStorage.fsAnchor = 'off'` | no correction is written; the floor sweep still puts back the clamp its own clear pass took |
 | `localStorage.fsEngineAnchor = 'off'` | any engine takes the non-anchoring path — how the sweep reaches it, and how a Safari-only report is reproduced on a machine with no Safari |
 
 ## Navigation is a different question
@@ -324,6 +324,11 @@ it. Each exit sets one short string with `performance.now()` beside it, the cloc
 the refill on, and the last eight are kept: a correction whose settle has not run yet and one that
 ran and was re-armed both read `armed` at the end of the window otherwise (anchoring-log.md, "The
 last eight exits, with the clock").
+
+The release build carries neither the exports nor the writes behind them: `strip-build.sh probes`
+removes the readers and `tools/minify-js.mjs` marks `makeTrail` and both `record` calls pure for
+`fs-fit.js`, which takes the 28 `why()`/`awhy()` calls out of the package (8987 -> 8175 B). The
+same tool fails the build if `reader-intent` or `no-reference` is still in the output.
 
 Nothing else can answer "has a reference been taken yet": `scrolling()` says no both before the
 motion sampler starts and after it finishes, **1.5 s apart in WebKit**, and a flat wait instead made

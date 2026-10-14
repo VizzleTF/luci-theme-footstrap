@@ -1,35 +1,28 @@
 #!/usr/bin/env node
 /* The navigation gate: a page opened by a click must be the same page a full load gives.
  *
- * The theme replaces LuCI's full-page navigation with a client router (docs/spa-router.md), and that
- * is one long list of things a fresh document does for free: an empty uci cache, an empty poll
- * queue, no stray intervals, no leftover notifications, a re-stamped body[data-page], a view
- * constructed rather than a cached singleton reused. Every one of those has been wrong at least
- * once.
+ * The client router (docs/spa-router.md) must redo what a fresh document does for free: an empty uci
+ * cache and poll queue, no stray intervals or notifications, a re-stamped body[data-page], a view
+ * constructed rather than reused. This gate opens every page BOTH ways and compares what the user
+ * ends up with: how much the view painted, which config packages are in uci's cache (a state bug
+ * with no visible symptom: `uci.state.values` is `{}` after a click), how many wifi devices
+ * network.js answers with, and whether the click path threw where a full load did not.
+ * No baseline: a difference between the two ways is always a bug.
  *
- * So this gate does not check the router's mechanics: it opens every page BOTH ways and compares
- * what the user ends up with — how much the view painted, which config packages are in uci's cache
- * (the axis that catches a state bug with no visible symptom: a page can render the same characters
- * either way while `uci.state.values` is `{}` after a click), how many wifi devices network.js
- * answers with, and whether the click path threw where a full load did not.
- *
- * There is no baseline: a difference between the two ways of opening the same page is always a bug,
- * and if a page is legitimately different it does not belong in the menu.
- *
- *   node tools/spa-parity.mjs [--only owrt2512,owrt2410] [--pages /admin/network] [--pages-all]
+ *   node tools/spa-parity.mjs [--only owrt2512,owrt2410] [--all] [--pages /admin/network] [--pages-all]
  *
  * Needs a running owlab router (docs/development.md). */
-import { parseArgs } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter, waitForPaint } from './lib/stands.mjs';
 import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
 import { read } from './lib/root.mjs';
+import { parseFlags, makeSay } from './lib/util.mjs';
 
-const { values: FLAGS } = parseArgs({ options: {
+const FLAGS = parseFlags('spa-parity', {
 	pages: { type: 'string', default: '' }, 'pages-all': { type: 'boolean', default: false },
 	all: { type: 'boolean', default: false }, only: { type: 'string', default: '' },
-} });
+});
 const ONLY_PAGES = FLAGS.pages;
 /* one page per SHAPE rather than every leaf — lib/page-shapes.mjs; `--pages-all` takes them all */
 const ALL_PAGES = FLAGS['pages-all'];
@@ -37,6 +30,16 @@ const ALL_STANDS = FLAGS.all;
 /* Every navigation starts here, so each page is reached as a real click from another page rather
  * than from whatever the previous iteration left behind. */
 const ORIGIN = '/admin/status/overview';
+/* CLICK a link, because that is the only thing the router hooks — driving navigate() directly would
+ * test a function nobody calls that way. A page with no such link in its menu gets a probe anchor. */
+const clickTo = (page, to) => page.evaluate((to) => {
+	const href = '/cgi-bin/luci' + to;
+	let a = [ ...document.querySelectorAll('a[href]') ].find((x) => x.getAttribute('href') === href);
+	if (!a) { a = document.createElement('a'); a.href = href; a.textContent = 'probe'; document.getElementById('view').append(a); }
+	a.click();
+}, to);
+/* the origin itself is clicked to from here, so `--pages /admin/status/overview` has a click to compare */
+const ORIGIN_ALT = '/admin/system/package-manager';
 
 const measure = async (page) => {
 	try {
@@ -44,6 +47,8 @@ const measure = async (page) => {
 			const v = document.getElementById('view');
 			const text = (v ? v.textContent : '').replace(/\s+/g, ' ').trim();
 			const out = {
+				/* an untitled node must fall back to the hostname in the heading on a click as on a load */
+				heading: ((document.querySelector('.fs-title-main') || {}).textContent || '').trim(), docTitle: document.title,
 				chars: text.length, nodes: v ? v.querySelectorAll('*').length : 0, uci: '', wifi: -1,
 				/* The staged render puts a second `#view` in the document on purpose — LuCI's own chain
 				 * resolves `#view` at paint time and must find the stage — but it is transient BY
@@ -64,18 +69,10 @@ const measure = async (page) => {
 	}
 };
 
-/* What a trip through a background tab leaves behind.
- *
- * fs-router pauses a view's own `setInterval` while the tab is hidden and re-arms it on the way
- * back, the one piece of the router's state a navigation does not reset — and it was wrong in both
- * directions at once: the re-armed timer came back under a fresh id, so the view could no longer
- * stop its own poller, and while paused it sat outside the registry a navigation sweeps, so a tab
- * hidden across a click brought the previous page's timers back.
- *
- * Both are invisible on a page that is merely looked at, and both are cheap to ask here, where a
- * navigation has just happened. `document.hidden` is read-only and is overridden the way the
- * browser's own tooling does — the page is thrown away by the full load that follows, so the
- * override never outlives this probe. */
+/* What a trip through a background tab leaves behind: fs-router pauses a view's `setInterval` while
+ * hidden and re-arms it on return. A re-armed timer under a fresh id cannot be stopped by its view,
+ * and a paused one sat outside the registry a navigation sweeps, so the previous page's timers came
+ * back. `document.hidden` is overridden as browser tooling does; the full load that follows discards it. */
 const timerProbe = async (page) => {
 	try {
 		return await page.evaluate(async () => {
@@ -89,7 +86,7 @@ const timerProbe = async (page) => {
 			const before = reg.size;
 			hide(true);
 			await settle();
-			/* L.Poll's own tick is deliberately left running — wireVisibility() owns that one */
+			/* the hide handler stops L.Poll before it pauses the view timers, so its tick is not armed either */
 			const armedHidden = [ ...reg.values() ].filter((s) => s && s.live != null).length;
 			hide(false);
 			await settle();
@@ -101,18 +98,10 @@ const timerProbe = async (page) => {
 
 /* ---- the staging window itself, not just what arrives after it ----
  *
- * Every check below samples AFTER commitStage, which is exactly how 1407 ms of the OUTGOING page
- * standing unstyled went unmeasured (task navstamp): `body[data-page]` used to flip to the
- * incoming name at the click, and every page-scoped rule for the page still on screen stopped
- * matching for the whole require — 33 rules in styles/pages/20-overview.css, +211px of document,
- * the reader moved 140px. fs-router.js now keys that CSS off `#view[data-page]`/
- * `.fs-content[data-page]` instead, spared until commitStage the same way fs-sheets spares a
- * page's stylesheets (fs-router.js, docs/spa-router.md "The staging window").
- *
- * Sampled here mid-flight, with the incoming view's own module fetch held open long enough to
- * have a window to sample in: a stand's own staging window is ~210 ms against 1.2 s on real
- * hardware (../tmp/task-navflash/navflash.mjs), too short to catch this without the same fake
- * slow route that probe uses. */
+ * The outgoing page keeps its page-scoped CSS until commitStage: when `body[data-page]` flipped at
+ * the click, 33 rules of 20-overview.css stopped matching for 1407 ms, +211px of document, reader
+ * moved 140px (docs/spa-router.md, "The staging window"). Sampled mid-flight with the incoming
+ * view's module fetch held open (a stand's window is ~210 ms, too short; development.md, "The live gates"). */
 const STAGING_ROUTE = '**/luci-static/resources/view/**';
 const STAGING_DELAY_MS = 1200;
 const STAGING_CASES = [
@@ -130,12 +119,11 @@ const STAGING_CASES = [
 
 /* ---- the narrow-viewport pass ----
  *
- * theme/90-responsive.css still scopes ~11 package-manager rules through
- * `body[data-page="admin-system-package-manager"]`, inside `@media (max-width: …px)` — the same
- * scope bug STAGING_CASES above was written for, one layer over, and invisible to every case
- * above because they all run at the 1440px context (see below): that query never matches there.
- * The width is read out of the file, not hard-coded, so an edit to the breakpoint cannot make
- * this pass silently stop testing anything. */
+ * theme/90-responsive.css scopes its package-manager rules through
+ * `:where(#view)[data-page="admin-system-package-manager"]`, inside `@media (max-width: …px)`; that
+ * query never matches at the 1440px context the cases above run in, so this pass is a regression
+ * guard for the scope. The width is read out of the file, not hard-coded, so an edit to the
+ * breakpoint cannot make this pass silently stop testing anything. */
 const NARROW_CSS_PATH = 'luci-theme-footstrap/styles/theme/90-responsive.css';
 function narrowBreakpoint() {
 	const m = read(NARROW_CSS_PATH).match(/@media\s*\(max-width:\s*(\d+)px\)/);
@@ -154,19 +142,9 @@ const NARROW_STAGING_CASES = [
 	  owned: '#view .controls > div:not(.pager)', prop: 'display', want: 'block' },
 ];
 
-/* HOW MANY TIMES A CASE IS TRIED WHEN THE OUTGOING PAGE'S OWN CONTENT MOVED INSIDE THE WINDOW — task attrib.
- * On CI the Overview was regularly still rendering when the click came, 1400 ms after its load: `the outgoing
- * page's document height moved during the staging window` read `2959 -> 3540px`, `2750 -> 3331px` and once
- * `900 -> 4011px` — its own sections arriving, not a page-scoped rule letting go. Waiting for the page to
- * settle does not answer it: a wait on height and mutations read a page standing on its loading spinner as
- * settled (../tmp/p7-settle.mjs, ubus +600 ms, 4 of 4 grew), and a wait that also asked for no request in
- * flight never settled on CI within 20 s (three runs of three, every stand). What tells the two apart is
- * WHAT moved: the defect this case exists for changes an attribute and every rule under it, and adds or
- * removes no node in the outgoing page (0 content mutations on every such finding, fs-router with the live
- * page renamed at the click); a page still loading does. A height change WITH content mutations says
- * nothing either way, so the case is tried again, and only a run of STAGING_ATTEMPTS of those is reported —
- * as a case that measured nothing. The rule check (`owned`) is independent of content and is a finding on
- * any attempt. */
+/* Attempts per case while the outgoing page's own content moved (a height change WITH content
+ * mutations proves nothing, so it is retried; the `owned` rule check is a finding on any attempt).
+ * Overview still rendered at the click on CI, 2959 -> 3540px: development.md, "The live gates". */
 const STAGING_ATTEMPTS = 3;
 
 async function stagingWindowCheck(page, stand, findings, cases = STAGING_CASES, widthLabel) {
@@ -177,6 +155,7 @@ async function stagingWindowCheck(page, stand, findings, cases = STAGING_CASES, 
 		for (let attempt = 1; attempt <= STAGING_ATTEMPTS; attempt++) {
 			const r = await stagingAttempt(page, stand, c);
 			if (!r) break;
+			if (r.unpainted) { add(`${c.from} page not painted, run proves nothing`); break; }
 			if (r.mid.staged === 0) { add('the fake-slow route never caught a staging window — this case measured nothing'); break; }
 			if (c.owned && r.mid.prop !== c.want) {
 				add(`${c.owned} read ${JSON.stringify(r.mid.prop)} mid-flight, wanted ${JSON.stringify(c.want)} — `
@@ -206,7 +185,10 @@ async function stagingAttempt(page, stand, c) {
 		await page.goto(stand.base + c.from, { waitUntil: 'domcontentloaded', timeout: 20000 });
 	}
 	catch (e) { return null; }
-	await page.waitForTimeout(1400);
+	/* the router queues a click behind the outgoing page's first render, so a fixed wait on a freshly
+	 * booted 24.10 (Overview paints at 3.1-6.4 s) clicked into no staging window at all */
+	if (!await waitForPaint(page, 20000)) return { unpainted: true };
+	await page.waitForTimeout(400);	/* let the arrival settle, same margin as backRestoreCheck */
 	before = await page.evaluate((c) => {
 		const el = c.owned ? document.querySelector(c.owned) : null;
 		window.__fsStagingMut = 0;
@@ -234,12 +216,7 @@ async function stagingAttempt(page, stand, c) {
 		 * depends on which of the two wins */
 		try { await route.continue(); } catch (e) {}
 	});
-	await page.evaluate((to) => {
-		const href = '/cgi-bin/luci' + to;
-		let a = [ ...document.querySelectorAll('a[href]') ].find((x) => x.getAttribute('href') === href);
-		if (!a) { a = document.createElement('a'); a.href = href; a.textContent = 'probe'; document.getElementById('view').append(a); }
-		a.click();
-	}, c.to);
+	await clickTo(page, c.to);
 	/* mid-flight: well inside the held-open fetch, well before commitStage can run */
 	await page.waitForTimeout(500);
 	mid = await page.evaluate((c) => {
@@ -258,33 +235,19 @@ async function stagingAttempt(page, stand, c) {
 
 /* ---- browser Back must restore the reader's own scroll offset ----
  *
- * Nothing above drives HISTORY at all: stagingWindowCheck proves the swap itself, but a reader who
- * scrolls down, opens another page and presses Back is a full round trip through fs-router.js's
- * `_scrollMem`/`restoreScroll()` that no case here exercised — task-back's card was opened against
- * exactly this gap. Scroll down on `from`, click into `to`, go Back, and read whichever element
- * `saveScroll()`/`restoreScroll()` would have used AT THIS WIDTH: `#maincontent` where its own
- * `overflow-y` computes to `auto`/`scroll` (the sidebar layout), the document otherwise (the top
- * layout) — docs/spa-router.md, "Scroll". Run at both the 1440px context every case above uses and
- * the narrow one, since the two layouts genuinely scroll different elements. */
+ * Scroll down on `from`, click into `to`, go Back, and read the element `saveScroll()`/
+ * `restoreScroll()` use at this width: `#maincontent` where its `overflow-y` computes to
+ * `auto`/`scroll` (sidebar layout), the document otherwise (docs/spa-router.md, "Scroll"). Run at
+ * 1440 and at the narrow width, since the two layouts scroll different elements. */
 const BACK_CASES = [
 	{ from: ORIGIN, to: '/admin/system/package-manager' },
 ];
 /* ---- the traversal is held open too, for the same reason the staging cases are ----
  *
- * A Back that commits while the incoming page is still 61-66 nodes deep clamps the browser's own
- * traversal restore to 0, `restoreScroll()` then writes from zero and nothing corrects it
- * afterwards: the case ends 2683 -> 2683 and proves only that the router's own half works. The
- * fault that reached CI (run 34565660484, owrt2410 2680 -> 2249) needs the OTHER shape — the
- * incoming page already whole at the swap — which a loaded runner produces by itself and a local
- * stand produces roughly 1 run in 15. Holding the incoming view's ubus calls open across the
- * traversal produces it every time: 3 of 3 red on owrt2410b before the fs-fit.js fix, 3 of 3 green
- * after (`../tmp/task-back431/slow.mjs`, the same 700ms).
- *
- * The settle is then the swap's own end plus fs-fit.js's late-correction window rather than a flat
- * wait: the correction that moved the reader landed 419ms after the commit, and a commit that a
- * held-open RPC has pushed to 3.1s past `goBack()` is already outside the 3s this used to wait —
- * so the gate read the offset BEFORE the write it exists to catch. SCROLL_IDLE is read out of
- * fs-fit.js, not copied here, for the same reason the narrow breakpoint is read out of the CSS. */
+ * Holding the incoming view's ubus calls open 700 ms makes the page whole at the swap every time
+ * (owrt2410 2680 -> 2249 once in 15 runs otherwise); the settle is the swap's end plus fs-fit.js's
+ * late-correction window, 419 ms after the commit, not a flat 3 s. SCROLL_IDLE is read out of
+ * fs-fit.js, like the narrow breakpoint out of the CSS (development.md, "The live gates"). */
 const BACK_RPC_ROUTE = '**/ubus**';
 const BACK_RPC_DELAY_MS = 700;
 const FIT_JS_PATH = 'luci-theme-footstrap/htdocs/luci-static/resources/fs-fit.js';
@@ -297,8 +260,7 @@ function lateWindow() {
 	return Number(m[1]) * 2;
 }
 const BACK_SETTLE_MS = lateWindow();
-/* rounding plus the odd late layout pass, not a tolerance for the bug itself: task-back's own
- * measurement was a reader dropped to 0 from ~3274px, orders of magnitude past this */
+/* rounding plus the odd late layout pass; the bug dropped a reader to 0 from ~3274px, far past this */
 const BACK_TOLERANCE_PX = 40;
 
 function readScrollOffset(page, useDoc) {
@@ -348,12 +310,7 @@ async function backRestoreCheck(page, stand, findings, widthLabel) {
 			continue;
 		}
 
-		await page.evaluate((to) => {
-			const href = '/cgi-bin/luci' + to;
-			let a = [ ...document.querySelectorAll('a[href]') ].find((x) => x.getAttribute('href') === href);
-			if (!a) { a = document.createElement('a'); a.href = href; a.textContent = 'probe'; document.getElementById('view').append(a); }
-			a.click();
-		}, c.to);
+		await clickTo(page, c.to);
 		await page.waitForTimeout(1400);
 
 		/* held only across the traversal itself — slowing the outgoing page would move the very
@@ -395,24 +352,12 @@ const findings = [];
 const frozen = [];
 let compared = 0;
 
-/* SAY WHERE THE SWEEP IS, ON EVERY PAGE AND WITH THE CLOCK.
- *
- * This gate used to print one `.` per page — no newline, so a CI runner buffers the whole run into a
- * single line that is only flushed at the end — and nothing at all until the first router had
- * finished classifying. A slice cancelled before that (task liveslice: `/admin/system/filemanager`
- * pinned the browser's main thread under `13e9864`, and `page.evaluate()` has no deadline of its
- * own, so both measuring slices sat at the 45-minute cap) left a log with not one word in it about
- * which page it was on, for a whole day of runs.
- *
- * A line per page, newline-terminated, with seconds since the gate started: the wall clock is then
- * readable straight off the log, and a run that dies names the page it died on. */
-const T0 = Date.now();
-const at = () => `${String(Math.round((Date.now() - T0) / 1000)).padStart(4)}s`;
-const say = (line) => process.stdout.write(`${at()}  ${line}\n`);
+const say = makeSay();
 
 /* the routers run at the same time: every comparison here is content against content on one router,
  * so nothing another container does can reach it (see the same note in live-audit.mjs) */
 await Promise.all(list.map(async (stand) => {
+	let here = 0;
 	const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 	await sealToRouter(ctx, stand.base);
 	const page = await ctx.newPage();
@@ -434,8 +379,11 @@ await Promise.all(list.map(async (stand) => {
 	await backRestoreCheck(narrowPage, stand, findings, NARROW_WIDTH);
 	await narrowCtx.close();
 
-	let paths = (await menuPaths(page)).filter((p) => !DESTRUCTIVE.test(p) && p !== ORIGIN);
+	/* a named page may be an untitled node (status/nftables) that the menu walk hides: take the raw tree then */
+	let paths = (await menuPaths(page, { all: !!ONLY_PAGES })).filter((p) => !DESTRUCTIVE.test(p) && (ONLY_PAGES || p !== ORIGIN));
 	if (ONLY_PAGES) paths = paths.filter((p) => p.startsWith(ONLY_PAGES));
+	if (ONLY_PAGES && !paths.length)
+		findings.push({ stand: stand.id, path: ONLY_PAGES, kind: 'selection', detail: '--pages matched no page on this router' });
 	if (!ALL_PAGES && !ONLY_PAGES) {
 		say(`${stand.id}: reading the shape of ${paths.length} page(s)`);
 		const shapes = await classify(page, stand.base, paths, { frozen, id: stand.id });
@@ -448,18 +396,17 @@ await Promise.all(list.map(async (stand) => {
 	for (const path of paths) {
 		say(`${stand.id} ${++n}/${paths.length} ${path}`);
 
-		try { await page.goto(stand.base + ORIGIN, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
+		const from = path === ORIGIN ? ORIGIN_ALT : ORIGIN;
+		try { await page.goto(stand.base + from, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
 		catch (e) { continue; }
-		await page.waitForTimeout(1400);
+		/* same as stagingAttempt: a click before the origin's first render is queued behind it */
+		if (!await waitForPaint(page, 20000)) {
+			findings.push({ stand: stand.id, path, kind: 'paint', detail: `${from} page not painted, run proves nothing` });
+			continue;
+		}
+		await page.waitForTimeout(400);
 		errs.length = 0;
-		/* CLICK a link, because that is the only thing the router hooks — driving navigate()
-		 * directly would test a function nobody calls that way. */
-		await page.evaluate((t) => {
-			const href = '/cgi-bin/luci' + t;
-			let a = [ ...document.querySelectorAll('a[href]') ].find((x) => x.getAttribute('href') === href);
-			if (!a) { a = document.createElement('a'); a.href = href; a.textContent = 'probe'; document.getElementById('view').append(a); }
-			a.click();
-		}, path);
+		await clickTo(page, path);
 		await page.waitForTimeout(2600);
 		const spa = await measure(page);
 		const timers = await timerProbe(page);
@@ -474,9 +421,14 @@ await Promise.all(list.map(async (stand) => {
 		if (!spa || !full) continue;
 		/* a page that answers with nothing either way is not installed on this router */
 		if (full.chars === 0 && full.nodes === 0) continue;
+		here++;
 		compared++;
 
 		const add = (kind, detail) => findings.push({ stand: stand.id, path, kind, detail });
+		if (spa.heading !== full.heading)
+			add('heading', `page heading ${JSON.stringify(spa.heading)} on a click, ${JSON.stringify(full.heading)} on a load`);
+		if (spa.docTitle !== full.docTitle)
+			add('heading', `document.title ${JSON.stringify(spa.docTitle)} on a click, ${JSON.stringify(full.docTitle)} on a load`);
 		if (full.chars > 40 && full.chars - spa.chars > Math.max(30, full.chars * 0.15))
 			add('content', `${spa.chars} characters on a click, ${full.chars} on a load`);
 		if (full.nodes - spa.nodes > Math.max(5, full.nodes * 0.15))
@@ -493,7 +445,7 @@ await Promise.all(list.map(async (stand) => {
 		if (timers) {
 			if (timers.armedHidden > 1)
 				add('timers', `${timers.armedHidden} interval(s) still armed in a hidden tab — only `
-					+ 'LuCI\'s own 1 s tick may be, and wireVisibility() stops that one');
+					+ 'the hide handler stops LuCI\'s own 1 s tick first, so at most one is tolerated');
 			if (timers.after !== timers.before)
 				add('timers', `the registry held ${timers.before} interval(s) before a hide/show and `
 					+ `${timers.after} after — a timer was lost, duplicated, or re-armed under an id `
@@ -507,7 +459,7 @@ await Promise.all(list.map(async (stand) => {
 			say(`${stand.id}    ^ a click and a load DISAGREE here`);
 	}
 	await ctx.close();
-	say(`${stand.id}: ${compared} page(s) compared`);
+	say(`${stand.id}: ${here} page(s) compared`);
 }));
 await browser.close();
 
@@ -524,6 +476,11 @@ if (findings.length) {
 	for (const f of findings) console.error(`  ${f.stand}  ${f.path}\n     ${f.kind}: ${f.detail}`);
 	console.error('\nA page reached by a click has to be the page a full load gives. docs/spa-router.md');
 	console.error('lists what a fresh document does for free and what fs-router has to do by hand.');
+	process.exit(1);
+}
+if (!compared) {
+	console.error(`\nspa-parity: 0 of ${list.length} router(s) compared a page — every router either failed to load or answered no page. `
+		+ 'This is not a clean sweep; it is nothing measured.\n');
 	process.exit(1);
 }
 console.log(`spa-parity: ${compared} page(s), a click and a load agree on every one.`);

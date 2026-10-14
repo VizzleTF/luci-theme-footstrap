@@ -1,44 +1,27 @@
 #!/usr/bin/env node
 /* The scroll gate: nothing may re-decide, blink or jump under a reader who is scrolling.
  *
- * fs-fit.js is built around one promise — a pass that reads layout does not run while the page is
- * moving; it defers, and measures when the reader stops. Every table remedy rides that promise:
- * cards, dropped columns, a shredded column. Break it and the reader sees what this theme is most
- * often reported for.
+ * fs-fit.js defers every layout-reading pass while the page moves and measures when the reader
+ * stops. That promise exists only DURING a scroll, so this gate drives a real wheel and reports
+ * four columns: `remedy` (a decided table changing mid-scroll; the contract is zero), `anchor`
+ * (an element's document position moving), `shift` (layout-shift entries; Chromium only, the
+ * others report -1) and `replaced` (tables the poll re-rendered in the window). The columns and
+ * why every engine runs: docs/development.md, "The live gates", `scroll-jank`.
  *
- * None of that is visible in a file, and none of it in a screenshot either: the page is correct
- * before the scroll and correct after it. It only exists DURING, so this gate scrolls, with a real
- * wheel, and watches:
- *
- *   remedy    a table that already had a decision changing it while the page moves. The contract is
- *             zero. A table the poll brings in mid-scroll is NOT this — it is answered from the slot
- *             its predecessor left, which is the deferral working, and it is counted separately.
- *   anchor    an element's document position (`rect.top + scrollTop`) moving. That number changes
- *             only if something above it grew or shrank, which is exactly "the page jumped".
- *   shift     the engine's own layout-shift entries (Chromium; the others report -1).
- *   replaced  how many tables the poll re-rendered inside the scroll window. A run where none did
- *             has not tested the interesting case, which is why the wheel runs long enough to meet
- *             one — measured on the stand: Overview replaces 12 tables in a 6.6 s scroll.
- *
- * EVERY ENGINE THE PROJECT SUPPORTS, because the three differ in precisely the mechanisms this
- * depends on: scroll anchoring is Chromium's alone, WebKit keeps firing `scroll` through its
- * momentum long after the wheel stops, and Firefox delivers a ResizeObserver callback on a
- * different tick. Chromium alone is the default because it is the one CI always has.
- *
- *   node tools/scroll-jank.mjs [--only owrt2512] [--engines chromium,firefox,webkit]
+ *   node tools/scroll-jank.mjs [--only owrt2512] [--all] [--engines chromium,firefox,webkit]
  *                              [--pages /admin/status/overview,…] [--widths 768,1440]
  *
  * Needs a running owlab router (docs/development.md). */
-import { parseArgs } from 'node:util';
 import * as pw from 'playwright';
 import { stands, login, requireStands, sealToRouter, waitForPaint } from './lib/stands.mjs';
+import { parseFlags } from './lib/util.mjs';
 
-const { values: FLAGS } = parseArgs({ options: {
+const FLAGS = parseFlags('scroll-jank', {
 	engines: { type: 'string', default: 'chromium' },
 	pages: { type: 'string', default: '/admin/status/overview,/admin/status/processes' },
 	widths: { type: 'string', default: '768,1440' },
 	only: { type: 'string', default: '' }, all: { type: 'boolean', default: false },
-} });
+});
 const ENGINES = FLAGS.engines.split(',').map((s) => s.trim()).filter(Boolean);
 /* Overview is the one that polls hardest and rebuilds whole tables; Processes is the widest data
  * table the stock menu has, i.e. the one carrying a remedy at the widths below. */
@@ -64,10 +47,31 @@ const ARM = () => {
 	window.__fsScroll = st;
 
 	const REMEDY = [ 'fs-stacked', 'fs-drop-xs' ];
-	const marks = (el) => REMEDY.filter((c) => el.classList.contains(c)).join(',') +
-		'|' + (el._fsBreakCol === undefined ? -1 : el._fsBreakCol);
+	/* the break column is read off the cells, not the table's `_fsBreakCol` expando: the expando
+	 * survives a row swap, so rows a poll swapped in unmarked left the signature unchanged */
+	const marks = (el) => REMEDY.filter((c) => el.classList.contains(c)).join(',') + '|' +
+		[ ...el.querySelectorAll('.tr:not(.table-titles)') ].map((r) =>
+			[ ...r.children ].findIndex((c) => c.classList.contains('fs-td-break'))).join('');
 	const before = new Map();
 	document.querySelectorAll('#view .table').forEach((t) => before.set(t, marks(t)));
+	/* A poll tick on a marked table, performed on purpose: ui.Table.update keeps the <table> and swaps
+	 * in fresh body rows with no break mark (the title row is left out: fs-select marks it on a
+	 * re-walk but not on the first fit). No stock page both polls rows and carries a mark, so waiting
+	 * for a real tick proves nothing; the mark has to be back by the next frame. */
+	st.tick = () => {
+		let n = 0;
+		document.querySelectorAll('#view .table').forEach((t) => {
+			if (!t.querySelector('.fs-td-break')) return;
+			t.querySelectorAll('.tr:not(.table-titles)').forEach((r) => {
+				const c = r.cloneNode(true);
+				c.querySelectorAll('.fs-td-break').forEach((x) => x.classList.remove('fs-td-break'));
+				r.replaceWith(c);
+			});
+			n++;
+		});
+		st.ticked += n;
+	};
+	st.ticked = 0;
 
 	const watch = () => {
 		document.querySelectorAll('#view .table').forEach((t) => {
@@ -100,18 +104,14 @@ const ARM = () => {
 	const place = () => (anchor ? Math.round(anchor.getBoundingClientRect().top + top()) : 0);
 	const place0 = place();
 
-	if (window.PerformanceObserver) {
-		try {
-			new PerformanceObserver((l) => {
-				for (const e of l.getEntries()) {
-					if (e.hadRecentInput) continue;
-					if (st.phase === 'motion') st.shift += e.value; else st.shiftSettle += e.value;
-				}
-			}).observe({ type: 'layout-shift', buffered: false });
-			st.shiftSeen = true;
+	/* Chromium alone reports layout-shift; elsewhere the column stays -1 */
+	st.shiftSeen = !!window.PerformanceObserver?.supportedEntryTypes?.includes('layout-shift');
+	if (st.shiftSeen) new PerformanceObserver((l) => {
+		for (const e of l.getEntries()) {
+			if (e.hadRecentInput) continue;
+			if (st.phase === 'motion') st.shift += e.value; else st.shiftSettle += e.value;
 		}
-		catch (e) { st.shiftSeen = false; }		/* not Chromium: reported as -1 */
-	}
+	}).observe({ type: 'layout-shift', buffered: false });
 
 	st.minTop = st.maxTop = top();
 	st.scrollable = Math.max(0, scroller ? scroller.scrollHeight - scroller.clientHeight
@@ -144,7 +144,7 @@ let runs = 0;
 for (const engine of ENGINES) {
 	if (!pw[engine]) {
 		console.error(`scroll-jank: no such engine "${engine}"`);
-		process.exit(1);
+		process.exit(2);
 	}
 	let browser;
 	try { browser = await pw[engine].launch(); }
@@ -194,6 +194,7 @@ for (const engine of ENGINES) {
 					await page.mouse.move(Math.round(w / 2), 400);
 					for (let i = 0; i < 44; i++) {
 						await page.mouse.wheel(0, (i % 22 < 11) ? 180 : -180);
+						if (i === 14 || i === 30) await page.evaluate(() => window.__fsScroll.tick());
 						await page.waitForTimeout(150);
 					}
 
@@ -212,7 +213,7 @@ for (const engine of ENGINES) {
 								anchor: st.anchor, anchorSettle: st.anchorSettle,
 								shift: st.shiftSeen ? +st.shift.toFixed(4) : -1,
 								shiftSettle: st.shiftSeen ? +st.shiftSettle.toFixed(4) : -1,
-								long: st.long, frames: st.frames, moved: st.maxTop - st.minTop,
+								long: st.long, frames: st.frames, ticked: st.ticked, moved: st.maxTop - st.minTop,
 								scrollable: st.scrollable, scroller: st.scroller, layout: st.layout };
 						});
 					}
@@ -230,7 +231,7 @@ for (const engine of ENGINES) {
 						findings.push(`${where}: layout-shift ${r.shift} during the scroll`);
 
 					process.stdout.write(`  ${where}\n     moved ${r.moved}/${r.scrollable}  anchor ${r.anchor}px  `
-						+ `remedy ${r.remedy.length}  polled-in ${r.replaced}  shift ${r.shift}  long ${r.long}/${r.frames}  `
+						+ `remedy ${r.remedy.length}  polled-in ${r.replaced}  ticked ${r.ticked}  shift ${r.shift}  long ${r.long}/${r.frames}  `
 						+ `[${r.layout} scrolls ${r.scroller}]  settle: remedy ${r.settle.length} anchor ${r.anchorSettle} shift ${r.shiftSettle}\n`);
 				}
 			}
@@ -245,6 +246,12 @@ if (findings.length) {
 	for (const f of findings) console.error('  ' + f);
 	console.error('\nfs-fit.js defers every layout read while the page is moving and takes it when the');
 	console.error('reader stops (docs/chrome.md). A finding here means a pass got through that.\n');
+	process.exit(1);
+}
+if (!runs) {
+	console.error(`\nscroll-jank: 0 of ${ENGINES.length * list.length} engine/router cell(s) produced a scroll — the theme JS is absent `
+		+ '(fs-prefs not requirable, e.g. owlab up --rebuild without sync) or every run failed. This is not a clean sweep; '
+		+ 'it is nothing measured.\n');
 	process.exit(1);
 }
 console.log(`\nscroll-jank: ${runs} scroll(s) across ${ENGINES.join(', ')}, nothing re-decided or jumped mid-scroll.`);

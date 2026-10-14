@@ -1664,3 +1664,112 @@ page went back to 0 from 591 on every run**.
 A residual check two frames later was carried for that engine and is gone with the floor moving from
 the column to the containers: the collapse it answered no longer happens, and its own correction
 landed inside a flick (**161px**, webkit/Overview, `tools/scroll-anchor.mjs`).
+
+## The gates watch the reader's place, not the mechanism
+
+`tools/table-tick.mjs` asserted that `.table.fs-dt:not(.fs-fitted)` had zero height, which is the
+selector `theme/30-tables.css` uses to hide an unanswered table and nothing else. That restates the
+CSS rule: a fix that held the page still some other way read as a failure, and a regression that
+still threw the reader after `fs-select` had stamped `fs-fitted` read as a pass, because the
+selector excludes it by construction. It now reads `.fs-footer`'s document position (viewport top
+plus scroll offset), which sums everything above it. The intermediate lasts a microtask, so a
+per-frame sampler never sees it: with the rule removed, **0 frames of 108** showed it while the
+page grew by **269px**, against **612px** out and back, twice per tick, on a live router at iPhone
+width (2e83050). A table held out of the flow makes `during` smaller than `before`/`after`; that
+is the accepted trade-off and the gate does not fail on it.
+
+`tools/fit-quiet.mjs` first read `.fs-sidebar`'s own height, but that box is the pin `fitChrome()`
+installs for the same pass (`bar.style.minHeight`/`height`, fs-chrome.js), so the gate read back
+the fix's own artefact. Moving the same **107px** of growth into a sibling of the bar (the menu row
+inside it, or `.fs-main`'s top offset) read **0px** peak-to-peak while the reader still moved
+(reader audit, 2026-09-10). It now reads `#maincontent`'s document position at `offsetTop` and
+`getClientRects()`, the only forced layouts inside the pass. On owrt2512 at 767px the bar walked
+230 -> 202 -> 164 -> 144 -> 123 -> 131 -> 123px against a settled 123px: **41px** of dip and
+**107px** of growth in one pass, and the reader followed it 1:1 on all three engines (49a1ff5).
+The hook sits on those two reads because most of the walk comes from `fitTabStrips()` toggling
+`fs-dense1`/`fs-dense2` on the menu, which writes nothing to the bar's own attributes.
+
+### Gate details moved out of `tools/scroll-anchor.mjs`
+
+- **Page shapes.** `/admin/status/processes` is a table directly under `#view`: it does not poll
+  and its one block is taller than the page scrolls (**6397px** against **6108px**), so it proves
+  the climb, never the swap. The climb used to land on the host and give up, so nothing held the
+  reader on any engine while a one-shape gate passed. `wireless` was dropped (**812px** of scroll
+  at 390 and **0** at 1440). `connections` was dropped: its length follows conntrack (**958px**
+  then **400px** on the same cell), and emptying its section `div` moved the reader **252px**
+  against a **120px** pad with the block unchanged (`grewOnItsOwn` 0); the other 132px was not
+  established.
+- **Layout axis.** `tick` keeps `top` in the default sweep: on owrt2512/Overview one real tick with
+  the reader parked is **0px** peak-to-peak at 390 side and **41px** at 390 top, same page and
+  engine. HOLD/SWAP/QUIET reduce width x layout to two scrollers.
+- **One density.** Across all 72 Overview cells of a full sweep normal, compact and large gave the
+  same two outcomes: anchor on clamped 0-1px with the reader still, anchor off clamped 59-60px
+  with the reader moved 60-61px.
+- **`LATE_MS` 200 and `SWAP_WINDOW` 900.** The theme's own fallback lands **7-36ms** after a
+  refill; `lateDrift()` used to answer **404-422ms** later across three engines and three stands.
+  200 sat midway with over 150ms either side. `lateDrift()` now waits the next frame when the page
+  was already still, and the same cells read **8-61ms**; the threshold stays, and the window stays
+  past the slowest legitimate correction so "late" and "never" do not read alike.
+- **REPEAT.** `LATE_MISS_LIMIT` is 2, so SWAP's single refill cannot reach it: **48** green
+  sub-runs of a miss-counting fix were all first-miss runs. A search run after SWAP's own two
+  refills picked a worse candidate (`table.table.cbi-section-table`, 1145px) and **274 of 274**
+  cells measured nothing, so REPEAT reuses `window.__fsRepeatSection`. SWAP measured 91 of the
+  same 171 cells in that run.
+- **TICK.** WebKit's own anchoring moved the offset **+21px** on a tick where nothing above the
+  reader changed height; `lateDrift()` wrote it back **421/421/408ms** later, past HOLD/SWAP's
+  800ms window and QUIET's 400ms-still discard. Counting MutationObserver batches was tried first
+  and exited after about 2s of page time (one Overview tick is three batches), reading **0px** on
+  3/3 tries. TICK runs first on the page as loaded: after the other probes it read 0px on a cell
+  that read 21px on a fresh navigation. The budget is time, off `L.env.pollinterval`.
+- **The poll is started in QUIET only.** `Poll.start()` calls `step()` synchronously, so a case
+  that hands the poll back fires a real tick into the next one: HOLD returning it put a live tick
+  under SWAP's floor measurement (`the content column's floor is not holding the document up`,
+  120px, webkit/owrt2410 @390 top compact), green at v0.14.2 and green again once reverted.
+  Starting it two statements late put the first tick inside the flick (`worst 145.5px`, firefox/
+  owrt2410 @390 top compact).
+- **The mark.** `#view` and `position: sticky` boxes are not marks: a host's top does not move
+  when something grows inside it (on 25.12's Overview every point down the middle answered
+  `#view`, so eight runs measured nothing), and a stuck `th.th` read `rect.top` 0 on every growth
+  from 0 to 120px (owrtsnap). `.cbi-section-descr` is static text no poll replaces (121px reported
+  on firefox and webkit, DHCP at 1440 top bar), and `.fs-ovl` holds three sections no poll replaces.
+- **Writes log.** `window.__fsW` wraps `scrollTo`/`scrollBy`, the `scrollTop` setter and
+  `Element.scrollTo`, read back only for a finding: a **-505px** HOLD reading (firefox owrt2512
+  @1440 top compact) was the mark reaching the viewport top (`before.top` 503), not a failed
+  correction.
+- **Growth witness.** `observeContent()` measures a refill against the floored box's `min-height`;
+  with none in the ancestry the witness is blind and `lateDrift()` writes nothing, which reads like
+  a failed correction. The finding prints the witness (`none`, `self`, or the box and its floor).
+- **Frame gap and painted frames.** The gate records the longest gap between its own frames
+  (`performance.now()` only, no layout read). A rAF queued before the theme's own reads the page
+  before that frame's correction and credits it to the next frame, which on a stalled runner was
+  the whole stall: firefox owrt2512 @390 top normal, DHCP, read `settle+21 wrote-120+21` against a
+  finding of **2702ms** with a **2681ms** gap. A ResizeObserver delivers after every rAF and
+  before paint, so re-observing the root each frame reads the page as it paints.
+- **`declines`.** An engine that has `overflow-anchor` and declines it on one refill showed in CI on
+  `webkit owrtsnap @1440 side compact overview` twice in three runs of one commit and never
+  locally; ablating the engine alone puts the theme in that state on every run.
+- **A page that is no longer a LuCI page.** A stripped `restAt()` throws with `window.L` in place
+  and stays a finding. CI also threw `undefined is not an object (evaluating 'window.L.require')`
+  on webkit owrt2410 @1440 side normal beside `page.goto: WebKit encountered an internal error`:
+  the document was gone, the unopened case arriving late. Such a cell goes to `unopened`, under
+  `UNOPENED_TOLERANCE`.
+- **Concurrency.** The gate was **52** minutes of the release's critical path against live's
+  **17** (docs/ci.md). Stands and engines now run at once; one worker per cell split the cheap
+  anchor-off cells from the expensive anchor-on ones (**16** done against **4** at the same moment),
+  so workers take whole groups.
+
+### Gate details moved out of `tools/floor-contract.mjs`
+
+- **The settle deadline.** The sweep's observer watches four attributes over all of `#view`; a
+  same-value `classList.add()` still queues a record and, on an element with `data-field`, wakes
+  the observer again: `/admin/system/filemanager` ran **926** sweeps a second and the renderer
+  never came back (`_moTabs`). Every `page.evaluate()` then timed out and the gate read that as "no
+  floor standing". Each read now has a deadline (`--settle`, 10000ms), and a page that misses it is
+  a finding and gets a fresh tab. The class-write count over one second is logged beside the floors.
+- **History of the faults.** The 0.14.4 shape marked each floor with an attribute and was reverted
+  with that release's anchoring. 0.14.3 cleared every floor on every tick and measured
+  `offsetHeight`: correct, at **1550** style writes per 25s of polling, each one a suppression of
+  scroll anchoring. `.cbi-section-descr` on /admin/network/dhcp measured **115px** against the
+  **156px** it stands at (the span was taken to the last element, and that box ends in text); a
+  section emptied of its table kept **1299px** (#41); the pane the reader left kept **2432px** on
+  System -> Startup (#75). `min-height` beats the `height: 0` of an inactive pane.

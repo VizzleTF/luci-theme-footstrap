@@ -1,38 +1,60 @@
 #!/bin/sh
 # The installer gate: install.sh, run twice, on a real router.
 #
-# Three field reports were the installer and nothing else (#16, #28, #30), all in the half no gate
-# reached: `sh -n` proves the script parses, and `owlab test` installs the BUILT package with the
-# package manager directly, which is not what a user runs. What a user runs is this script, against
-# the published feed, on a router that may already have the theme.
+# Three field reports were the installer alone (#16, #28, #30): `sh -n` proves it parses and
+# `owlab test` installs the BUILT package directly, not what a user runs. So: copy install.sh onto
+# a stand, run it, then run it AGAIN over its own result, the upgrade path. After each run the
+# package must be present, `luci.main.mediaurlbase` must point at this theme and its files must be
+# on disk. It installs the PUBLISHED release and leaves it in place; `owlab sync` restores the tree.
 #
-# So: copy install.sh onto a stand, run it, then run it AGAIN over its own result — the upgrade
-# path, which is what all three reports were about and cannot be exercised by a fresh install. After
-# each run the package must be present, `luci.main.mediaurlbase` must point at this theme, and the
-# theme's own files must be on disk.
-#
-# It installs the PUBLISHED release rather than this working tree, that being the path users take,
-# and leaves the stand with that release installed — `owlab sync` puts the working tree back.
-#
-#   sh tools/install-check.sh [router-id ...]        (default: every running router)
+#   sh tools/install-check.sh [router-id ...]        (default: every running OpenWrt router)
 #
 # Needs owlab and a stand with network access.
 set -eu
 cd "$(dirname "$0")/.."
 
-command -v owlab >/dev/null || { echo "install-check: owlab is not on PATH (docs/development.md)"; exit 2; }
+command -v owlab >/dev/null || {
+	echo "install-check: owlab is not on PATH (docs/development.md)"; exit 2
+}
 
 routers="${*:-}"
 if [ -z "$routers" ]; then
-	routers=$(owlab status -json | sed -n 's/.*"id": "\([^"]*\)".*/\1/p' | tr '\n' ' ')
+	routers=$(node --input-type=module -e "
+		import { stands } from './tools/lib/stands.mjs';
+		console.log(stands('', { all: true }).map((s) => s.id).join(' '))")
 fi
-[ -n "$routers" ] || { echo "install-check: no owlab router is running, so nothing was checked."; exit 2; }
+[ -n "$routers" ] || {
+	echo "install-check: no owlab router is running, so nothing was checked."; exit 2
+}
+
+# heldBy() alone decides whether ci-local.sh's STANDS_LOCK_HELD/STANDS_LOCK_PID is believed: pid
+# alive, lock file names it, flock really taken. A stale pair left in a later shell locks normally.
+held() {
+	node --input-type=module -e "
+		import { heldBy } from './tools/lib/stands.mjs';
+		process.exit(heldBy(process.argv[1], process.argv[2]) ? 0 : 1)" "$@"
+}
 
 project=$(owlab status -json | sed -n 's/.*"project": "\([^"]*\)".*/\1/p' | head -1)
 fail=0
+tmp=../tmp
+mkdir -p "$tmp"
 
 for r in $routers; do
 	c="owlab-${project}-${r}"
+	# Installing on a stand another gate is measuring invents findings: take
+	# ../tmp/stands-<id>.lock the way tools/lib/stands.mjs does (30 min wait, STANDS_LOCK_TIMEOUT_MS), unless ci-local.sh
+	# already holds it for this run.
+	if ! held "$r" "$tmp/stands-$r.lock"; then
+		exec 9>>"$tmp/stands-$r.lock"
+		command -v flock >/dev/null 2>&1 || { echo "install-check: flock (util-linux) is missing; the stands cannot be locked"; exit 2; }
+		lim=$(( ${STANDS_LOCK_TIMEOUT_MS:-1800000} / 1000 ))
+		if ! flock -n 9; then
+			echo "install-check: stand $r is in use ($(cat "$tmp/stands-$r.lock" 2>/dev/null || echo 'holder unknown')); waiting"
+			flock -w "$lim" 9 || { echo "install-check: stand $r still held after ${lim}s by ($(cat "$tmp/stands-$r.lock" 2>/dev/null || echo 'holder unknown')); gave up"; exit 2; }
+		fi
+		echo "install-check pid $$" >"$tmp/stands-$r.lock"
+	fi
 	printf '%s: ' "$r"
 	docker cp install.sh "$c:/tmp/fs-install.sh" >/dev/null
 
@@ -41,46 +63,37 @@ for r in $routers; do
 	# which would go stale the moment a release lands.
 	pass=1
 	for run in 1 2; do
-		if ! docker exec "$c" sh /tmp/fs-install.sh >"/tmp/install-check-$r-$run.log" 2>&1; then
-			echo; echo "  run $run exited non-zero:"; tail -12 "/tmp/install-check-$r-$run.log" | sed 's/^/    /'
+		if ! docker exec "$c" sh /tmp/fs-install.sh >"$tmp/install-check-$r-$run.log" 2>&1; then
+			echo; echo "  run $run exited non-zero:"
+			tail -12 "$tmp/install-check-$r-$run.log" | sed 's/^/    /'
 			pass=0; break
 		fi
 		# installed, registered, and the files it registers are actually there
-		if ! docker exec "$c" sh -c '(apk info -e luci-theme-footstrap 2>/dev/null | grep -q . ) || (opkg list-installed 2>/dev/null | grep -q "^luci-theme-footstrap ")'; then
-			echo; echo "  run $run: the package manager does not report the theme as installed"; pass=0; break
+		if ! docker exec "$c" sh -c '
+			(apk info -e luci-theme-footstrap 2>/dev/null | grep -q . ) ||
+			(opkg list-installed 2>/dev/null | grep -q "^luci-theme-footstrap ")'; then
+			echo; echo "  run $run: the package manager does not report the theme as installed"
+			pass=0; break
 		fi
-		if ! docker exec "$c" sh -c 'uci get luci.main.mediaurlbase 2>/dev/null | grep -q "footstrap$"'; then
-			echo; echo "  run $run: luci.main.mediaurlbase does not point at the theme"; pass=0; break
+		if ! docker exec "$c" sh -c \
+			'uci get luci.main.mediaurlbase 2>/dev/null | grep -q "footstrap$"'; then
+			echo; echo "  run $run: luci.main.mediaurlbase does not point at the theme"
+			pass=0; break
 		fi
 		if ! docker exec "$c" sh -c 'test -s /www/luci-static/footstrap/cascade.css'; then
 			echo; echo "  run $run: cascade.css is missing or empty"; pass=0; break
 		fi
-		# AND THE VERSION IS NOT OLDER THAN THE FEED'S. This is the assertion the gate was missing
-		# when it was written, and the field bug walked straight through the hole: `apk add` on a
-		# package already in `world` leaves the old version in place, prints its usual OK line and
-		# exits 0, so "installed, registered, cascade.css present" was all true while the router
-		# still ran the previous release.
-		#
-		# NOT equality, and the difference is this job's normal state: in CI the router already
-		# carries the build under test, which the feed has not published yet — a release run has
-		# 0.12.8 installed while the feed serves 0.12.7, and demanding equality failed the opkg leg
-		# on a correct install (the apk leg passed only because `apk list` includes the installed
-		# version among the candidates). What the installer must never do is leave the router BEHIND
-		# the feed; being ahead of it is what a pre-release router looks like.
-		# The `want` expression inside filters the apk candidates down to THIS feed's. Since the
-		# theme was accepted into the official openwrt/luci feed, `apk list` answers with two builds
-		# of one name: ours, and one luci.mk stamps from git's commit date (26.246.70755~4fd72fd).
-		# That stamp only grows with the calendar, so a plain `sort -V | tail -1` always picks the
-		# foreign build and calls a correctly installed router "behind" - which is what failed this
-		# gate on owrt2512 and owrtsnap, while owrt2410 passed because its 24.10 feed carries no
-		# theme at all. The greps are the SAME rule install.sh pins with (`<26`, see
-		# is_foreign_luci_build() there): a leading number of 26 or more is not this feed's version.
-		# The comment lives HERE, not inside the payload: everything between the quotes below is a
-		# STRING, and a `#` line in it would be shipped to the container as code.
+		# The version must not be older than the feed's: `apk add` over a package in `world` keeps the old
+		# version and exits 0. Not equality: CI's router carries the build under test, ahead of the feed
+		# (docs/development.md, "The live gates", `install-check`). The `want` filter drops a leading
+		# number of 26 or more, the rule install.sh pins with in is_foreign_luci_build(). The comment
+		# lives HERE: a `#` line inside the quoted payload below would be shipped to the container.
 		if ! docker exec "$c" sh -c '
 			if command -v apk >/dev/null 2>&1; then
 				have=$(apk list -I 2>/dev/null | sed -n "s/^luci-theme-footstrap-\([^ ]*\) .*/\1/p" | head -1)
-				want=$(apk list luci-theme-footstrap 2>/dev/null | sed -n "s/^luci-theme-footstrap-\([^ ]*\) .*/\1/p" | grep -v "^2[6-9]\." | grep -v "^[3-9][0-9]\." | sort -V | tail -1)
+				want=$(apk list luci-theme-footstrap 2>/dev/null |
+					sed -n "s/^luci-theme-footstrap-\([^ ]*\) .*/\1/p" |
+					grep -v "^2[6-9]\." | grep -v "^[3-9][0-9]\." | sort -V | tail -1)
 			else
 				have=$(opkg list-installed luci-theme-footstrap 2>/dev/null | awk "{print \$3}")
 				want=$(opkg list luci-theme-footstrap 2>/dev/null | awk "{print \$3}" | sort -V | tail -1)
@@ -92,12 +105,15 @@ for r in $routers; do
 			newest=$(printf "%s\n%s\n" "$have" "$want" | sort -V | tail -1)
 			[ "$newest" = "$have" ]'; then
 			echo; echo "  run $run: the router is left BEHIND the version the feed serves"
-			docker exec "$c" sh -c 'apk list -I 2>/dev/null | grep footstrap || opkg list-installed 2>/dev/null | grep footstrap' | sed 's/^/    installed: /'
+			docker exec "$c" sh -c 'apk list -I 2>/dev/null | grep footstrap ||
+				opkg list-installed 2>/dev/null | grep footstrap' | sed 's/^/    installed: /'
 			pass=0; break
 		fi
 	done
 
-	if [ "$pass" = 1 ]; then echo "fresh install and re-install over it both leave the newest version, working"
+	if [ "$pass" = 1 ]; then
+		echo "fresh install and re-install over it both leave the newest version, working"
+		rm -f "$tmp/install-check-$r-"*.log
 	else fail=1; fi
 done
 
@@ -105,4 +121,4 @@ done
 owlab sync >/dev/null 2>&1 || true
 
 [ "$fail" = 0 ] || { echo "install-check: the installer failed on at least one router."; exit 1; }
-echo "install-check: install.sh is good on $(echo "$routers" | wc -w | tr -d ' ') router(s)."
+echo "install-check: install.sh is good on: $routers"
