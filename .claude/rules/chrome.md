@@ -23,9 +23,10 @@ description: The one renderer, the three ownership zones, and the fence that kee
   sheet makes the next navigation a full load instead; only a byte-identical duplicate may be
   dropped.
 - Every Appearance axis is implemented twice (pre-paint in `partials/head.ut`, live in
-  `fs-prefs.js`) and **the custom property is set BEFORE the attribute** — reversed, a reload paints
-  one frame in the previous hue. `npm run axes` derives the contract from the JS; `npm run smoke`
-  watches the two writes actually happen in that order on a live `:root`.
+  `fs-axes.js`; `fs-prefs.js` for dark mode, layout, auto-collapse and rail) and **the custom
+  property is set BEFORE the attribute** — reversed, a reload paints one frame in the previous hue.
+  `npm run axes` derives the contract from the JS; `npm run smoke` watches the two writes actually
+  happen in that order on a live `:root`.
 
 ## Templates
 
@@ -43,6 +44,7 @@ touching any `_()`. A msgid is a **global** name shared with every app — Appea
 `footstrap` msgctxt; the chrome, the login/notice sentences and the System/Memory/Storage titles
 deliberately do not.
 
-- **A comment in a shipped file carries its reason inline.** No `issue #N`, no `tools/`, `tests/` or `docs/` pointer as the only carrier: those do not exist in openwrt/luci. `docs/conventions.md`, "Comments".
+- **A comment in a shipped file carries its reason inline.** No `issue #N`, no `tools/` or `tests/` pointer as the only carrier: those do not exist in openwrt/luci, and a `docs/` pointer is never the only carrier either. `docs/conventions.md`, "Comments".
+- **Run `npm run comment-share` for any comment edit in an `fs-*.js` or `menu-footstrap*.js`** — every shipped JS file stays under 40 % comment bytes.
 
 Deeper: `docs/chrome.md`, `docs/third-party-apps.md`, `docs/spa-router.md`.

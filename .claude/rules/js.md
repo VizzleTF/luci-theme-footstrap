@@ -7,11 +7,13 @@ description: Module composition, the jsmin traps, and what fs-fit owns.
 
 # JS
 
-- **A comment in a shipped file carries its reason inline.** No `issue #N`, no `tools/`, `tests/` or `docs/` pointer as the only carrier: those do not exist in openwrt/luci. `docs/conventions.md`, "Comments".
+- **A comment in a shipped file carries its reason inline.** No `issue #N`, no `tools/` or `tests/` pointer as the only carrier: those do not exist in openwrt/luci, and a `docs/` pointer is never the only carrier either. `docs/conventions.md`, "Comments".
 - One concern per module; `L.require` makes a singleton and throws `DependencyError` on a cycle, so
   a module can never `extend` another — compose by calling.
-- **All "does it fit" logic lives in `fs-fit.js`.** Measure uncollapsed, re-fit synchronously on a
-  mutation, coalesce on resize. `data-narrow` — not a viewport media query — is the single source of
+- **The fit engine lives in `fs-fit.js`; a module registers its decision with `fit.add()`** and
+  never runs its own observer (`fitTables` in fs-select). The one exception is the `#indicators`
+  observer in fs-chrome, which calls `fitChrome()` because fs-fit watches `#view`, not the chrome. Measure
+  uncollapsed, re-fit synchronously on a mutation, coalesce on resize. `data-narrow` — not a viewport media query — is the single source of
   "the sidebar became a bar", and the widths are read from the CSS tokens with `getComputedStyle`,
   never copied into JS.
 - **Never put a regex literal straight after `return` or `=>`** — jsmin eats the rest of the file
@@ -31,11 +33,11 @@ description: Module composition, the jsmin traps, and what fs-fit owns.
 
 `npm run lint:js` is the T0 gate. Then the one that covers what you touched: `axes` for `fs-prefs`
 or `fs-axes`, `chrome-fence` for `fs-sheets`/`fs-prefs`, `page-modules` for the page→module map,
-`css-orphans` if a `fs-*` class name moved, `floor` (T2, live) for anything in `holdFloor()` or
+`css-orphans` if a `fs-*` class name moved, `comment-share` for any comment edit in a shipped JS file (under 40 % comment bytes), `floor` (T2, live) for anything in `holdFloor()` or
 `naturalHeight()` — it is the only gate that reads a floor's height back and empties a box to see
 the floor come off.
 
-`npm run smoke` (T1, ~1.4 s) runs the modules against a real DOM on the gallery with every
+`npm run smoke` (T1, ~2.1 s) runs the modules against a real DOM on the gallery with every
 dependency stubbed; `npm test` covers only the branches a stand cannot enter. Neither answers for
 a page: behaviour is `owlab test` and the live gates (T2), and a green smoke never earns a release
-the right to skip them. `docs/development.md` "The two cheap browser gates".
+the right to skip them. `docs/development.md` "The three cheap browser gates".
