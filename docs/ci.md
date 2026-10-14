@@ -90,7 +90,7 @@ gates that used to be node-free steps here are `check:fast` items too, unchanged
    redundant against that.
 5. **`i18n`**, last in `check:fast` so everything above still runs where gettext is missing —
    `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty (a string in `_()`
-   with no translation renders in English silently, which is how the whole Footstrap tab stayed
+   with no translation renders in English silently, which is how the whole System → Footstrap page stayed
    English on a Russian LuCI). It stayed in `check:fast` (not `check:mid`) on purpose: `build` needs
    only the `check` job, and a broken `.pot` blocking packaging is the guarantee `i18n` exists for.
 
@@ -107,20 +107,21 @@ The npm gates live in CI only: the buildbot has no node and does not need it, an
 | `stylelint` | correctness and project invariants only — not a formatter; also holds the `!important` allowlist (`declaration-no-important` + the file override) and the data-title i18n check (`selector-disallowed-list`) |
 | `a11y-gallery.mjs` | axe-core, WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap,2020,forum} × {untinted,60°,260°} — **30 combinations** |
 | `export-tier.mjs` | the `--*-color-*` contract with foreign apps — axe cannot see it, their widgets are not in the gallery. 70 palette × mode × tint combinations, then the ten untinted ones again with `prefers-contrast: more` emulated, since that query re-states the ink tokens and so publishes a second tier |
-| `css-metrics.mjs` | ratchet: `!important` count (`LIMITS.importants`), max specificity, empty rules |
+| `css-metrics.mjs` | ratchet: `!important` count (`LIMITS.importants`), empty rules (max specificity is stylelint's) |
 | `css-floor.mjs` | the browser floor derived from the built sheet against the one stated in `docs/css.md`, plus the two shapes that break below it: a `:has()` compound sharing a selector list with one that has none, and a CSS feature nobody has classified |
 | `fs-orphans.mjs` | dead `fs-*` selectors (safe only inside our namespace) |
 | `css-dup.mjs` | identical declaration bodies under different guards — no linter calls this an error |
-| `mirror.mjs` | `@mirror`-pinned copies still byte-identical (CSS **and** shell) |
+| `mirror.mjs` | `@mirror`-pinned copies still byte-identical (CSS) |
 | `axes.mjs` | the pre-paint in `head.ut` agrees with the live appearance appliers |
 | `page-modules.mjs` | the page → module map agrees with the modules, and neither is `require`d at eval |
+| `comment-share.mjs` | every shipped JS file is under 40 % comment bytes (`docs/conventions.md`, "Size") |
 | `table-contract.mjs` | the break points, and the rule that hides an unanswered data table still names every root `fs-select` scans, guarded on `:root[data-fs-fit]` — the selector half of what `table-tick.mjs` then proves on a page |
 | `chrome-fence.mjs` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `conffiles.mjs` | every shipped `/etc/config/*` is declared a conffile — else the manager replaces it on upgrade |
 | `changelog.mjs` | the changelog contract: sections, order, RU mirror, bold leads |
 | `jsmin-verify.mjs` | the **only** check that catches jsmin's silent corruption (exit 0) |
 | `npm test` | the unit suite — no browser, ~100 ms, and first in the job for that reason. It holds the branches a stand cannot enter: a luci-base missing a surface the router calls, an alias loop or a `firstchild` tie in a menu tree nobody ships |
-| `size-budget.mjs` | ratchet on the **artefact**: `build-css.sh` + the token mangle for the sheet, terser over a copy of `htdocs/luci-static/resources` for the JS. `--show` prints the per-module table into the log; `check:mid`'s `size` script runs it plain, so a jump wants a local `node tools/size-budget.mjs --show` to attribute it |
+| `size-budget.mjs` | ratchet on the **artefact**: `build-css.sh` + the token mangle (over temp copies of `resources/` and `ucode/`, which it rewrites) for the sheet, uglify-js over a copy of `htdocs/luci-static/resources` for the JS. `--show` prints the per-module table into the log; `check:mid`'s `size` script runs it plain, so a jump wants a local `node tools/size-budget.mjs --show` to attribute it |
 | `build-icons.mjs --check` | the committed app-icon rasters still match `logo.svg` — per channel with a tolerance, plus the maskable invariants (declared size, no alpha, nothing outside the safe zone, a mark in the middle). Not byte equality: that tested the renderer, and a Chromium bump reddened it on a commit that never touched the logo |
 
 **About `jsmin-verify`:** jsmin corrupts a file silently and exits 0. The source shape it breaks on,
@@ -130,12 +131,12 @@ same jsmin from `luci-base/src/jsmin.c` at the pinned commit and compares the to
 output against the source (acorn). The list of shipped JS is not written by hand — it is
 `find htdocs -name '*.js'`, because luci.mk copies `htdocs/` wholesale, so that *is* the shipped set.
 
-Both gates stay mandatory **for the source**, even though the release build minifies with terser
+Both gates stay mandatory **for the source**, even though the release build minifies with uglify-js
 instead: a build without node still hands the untouched source to jsmin.
 
 **About `size-budget`:** the numeric budgets were dropped once, and the reason they are back is what
 they measure now. The old ones were counted on the SOURCE, which is not what anyone downloads — the
-sheet is concatenated and token-mangled and the JS goes through terser, all of it inside the package
+sheet is concatenated and token-mangled and the JS goes through uglify-js, all of it inside the package
 build, so a developer's edit-and-check loop never sees the artefact at all. That is the shape a
 number drifts in: one feature at a time, each too small to argue with, none of them measured. This
 gate reproduces the package build's asset half and weighs the result. uhttpd serves `/www` with no
@@ -170,14 +171,35 @@ tarball and keeps it on the same chain this workflow used to spell out: an ed255
 `sha256sums`, the branch key pinned from a *different* host (`github.com/openwrt/keyring`), and the
 sha256 read only out of an already-authenticated file.
 
-**owfeed itself is installed by its own action** — `owfeed/owfeed/setup`, pinned by commit — which
-downloads the binary and **verifies it against GitHub's build attestation before it reaches PATH**.
-That is why it is preferred to `go install …@<sha>`, which compiles the tool in every job and trusts
-whatever the module proxy returns. A `SHA256SUMS` next to a release is not a check either — the same
+**owfeed itself is installed by its own action** — `owfeed/owfeed/setup`, pinned by its `uses:` tag
+alone — which downloads the binary and **verifies it against GitHub's build attestation before it
+reaches PATH**. That is why it is preferred to `go install …@<sha>`, which compiles the tool in
+every job and trusts whatever the module proxy returns. A `SHA256SUMS` next to a release is not a check either — the same
 host serves both the binary and the sum (the same argument this project makes about GitHub's asset
 digest). An attestation is signed by GitHub's identity, sits in a public transparency log, and the
 action pins the workflow that was allowed to issue it. Verified locally on a release binary:
 genuine → exit 0; one byte appended → exit 1; against a foreign repository → exit 1.
+
+**No `version:` input anywhere in `build.yml`** (owfeed `setup`, owlab `setup` and `action`, and
+`package.yml`'s `owfeed-version`). Dependabot moves the `uses:` ref and never an input, so a
+`version: v0.5.1` beside `setup@v0.5.4` ran 0.5.1 under a ref that read 0.5.4; since owfeed 0.5.3 and
+owlab 0.6.4 an unset version installs the release the ref names. `~/go/bin/owfeed` and `owlab` follow
+the same refs (0.5.5, 0.6.5), taken from the GitHub release after `gh attestation verify -R
+owfeed/<tool>` and the release's `SHA256SUMS`, so `tools/stage.sh && owfeed build` writes CI's bytes.
+
+**Zopfli packages.** `owfeed.yml` sets `compression: zopfli` on all three packages (owfeed 0.5.5).
+Measured on this tree with `SOURCE_DATE_EPOCH` fixed, as [package.md](package.md) "Measuring a size
+change" describes: 24.10 `.ipk` 69065 → 65298 B from owfeed 0.5.5's best-level default alone, then
+→ 62091 B with zopfli (`luci-i18n-footstrap-ru` 4375 → 3993, `-es` 3923 → 3608); the build
+goes from 0.05 s to ~2.7 s, and two builds are byte-identical. The `.apk` leaves `owfeed build` at
+its old size (65707 B) and shrinks inside `owfeed sign`, after `adbsign`: signed 65812-65818 →
+62968-63053 B over ten signings each, since the ECDSA signature is random. `release` runs `owfeed
+sign` through `package.yml` with `sign-key` set and `owfeed.yml` has no `signing.sign-packages:
+false`, so the released `.apk` gets the re-deflate. By owfeed's docs a feed that adds its own
+signature on top re-compresses the file and the saving is gone (not measured here), so the `.apk`
+saving is certain for the release asset and not for the owfeed-packages copy. Without
+`SOURCE_DATE_EPOCH` the `.apk` bytes follow the clock (two builds 2.7 s apart differed), which is
+why CI sets it from the commit.
 
 The steps:
 
@@ -186,11 +208,37 @@ The steps:
    identity is a hash over its payload, so without a fixed epoch byte-identical content rebuilds
    into a package that *claims* to be new.
 2. **`./tools/stage.sh`** — the half owfeed deliberately does not do ("packages a directory; does
-   not build one"). It is `Build/Prepare` from the Makefile, step for step: build `cascade.css`,
-   mangle the private `--fs-*` names, minify the JS with terser, strip comments out of the templates
-   and the shell, stamp `FS_VERSION`. It also extracts postinst/postrm — by awk over the
-   Makefile's `define`s, not as a second copy: a script that runs on somebody else's router months
-   later is the worst possible place for two copies to diverge.
+   not build one"). It is `Build/Prepare` from the Makefile in one script, with uglify-js where
+   luci.mk ran jsmin: build `cascade.css`, mangle the private `--fs-*` names, drop the
+   `/* fs:probe */` exports, minify the JS with uglify-js, strip the comments and indentation out of
+   the templates and the comments out of the shell, strip `logo.svg` and `manifest.json`, stamp
+   `FS_VERSION`. Three things on top of `Build/Prepare`, which the SDK path does not need or does
+   itself: `minify-prepaint` over the inline pre-paint script in `head.ut`; the postinst/postrm
+   extraction, by awk over the Makefile's `define`s, not as a second copy (a script that runs on
+   somebody else's router months later is the worst possible place for two copies to diverge); and
+   the `chmod` below.
+   It ends with `chmod -R u=rwX,go=rX` over `dist/`: owfeed copies modes from disk, so the 5 files
+   (0600) and 4 directories (0700) a local worktree can hold shipped as `-rw-------` and
+   `drwx------ ./www/`, and uhttpd answers 403 on a file that is not world-readable. A CI
+   checkout has none of them, which is why only a local build showed it;
+   `tests/stage-modes.test.mjs` holds it.
+   Measured on this tree: uglify-js 3.19.3 (pinned exact, the one minifier for the modules,
+   `fs-version.js` and the pre-paint blocks) leaves the staged JS at 86,295 B where terser 5.51.2
+   left 88,982 B: -2,687 B raw, -260 B gz9, 1,968 B of it on every cold admin page (identifiers are
+   wire bytes and uhttpd serves `/www` uncompressed); the .ipk is 71 B and the .apk 136 B smaller
+   (zopfli, `SOURCE_DATE_EPOCH` fixed). `fs-version.js` runs with `evaluate:false`:
+   at uglify's defaults `FS_VERSION` is folded into its readers (229 B, no declaration left for
+   the version sed) and `minify-js` refuses the file; set, it is 258 B with the declaration
+   intact. `varify:false` beside it changed nothing (the same 258 B, byte for byte, with and
+   without), so it is not set. `fs-fit.js` reserves `makeTrail`, `_late` and `_anchor` from the mangle,
+   since uglify renames before it compresses and `pure_funcs` would otherwise match `a.record` and
+   drop nothing. `minify-prepaint`, run after `strip-build.sh templates` as in `stage.sh`, takes the
+   five inline blocks without ucode interpolation from 6424 to 4511 B (terser left 4632 B), 1913 B
+   off every page load and off the login page, which fetches no module: 105 B less HTML per admin
+   page and 119 B less on the login page than terser gave. Blocks with `{{`, `{%` or `{#`
+   (`head.ut`'s `window.__fsSD` data object, 23 substitutions) are left as they are, and it runs
+   over the build tree only: `axes.mjs` and `chrome-fence.mjs` read `head.ut` as text with regexes
+   pinned to its literal shape.
 3. **`owfeed build`** — deliberately without `--frozen-lock`. That flag re-derives `owfeed.lock`
    from `downloads.openwrt.org` and fails if it moved, which is right for a repository that
    **publishes a feed**, where the covered architecture set is part of the contract with
@@ -232,7 +280,7 @@ package luci-theme-footstrap
 file /www/luci-static/footstrap/cascade.css
 http 200 /cgi-bin/luci/admin/status/overview
 http 200 /cgi-bin/luci/admin/system/system
-exec for f in …/themes/footstrap/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
+exec for f in …/themes/footstrap/*.ut …/themes/footstrap/partials/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 ```
 
 `ucode -T -c` is LuCI's own trycompile, and it runs here against the installed templates with
@@ -374,9 +422,9 @@ Tags only, and **it is a call into owfeed's own reusable workflow** rather than 
 release:
   needs: [build, verify, live, anchors, lint, playground]
   if: startsWith(github.ref, 'refs/tags/v')
-  uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.1
+  uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.5
   secrets:    { sign-key: …OWFEED_AUTHOR_KEY, usign-key: …FOOTSTRAP_USIGN_KEY }
-  with:       { owfeed-version: v0.5.1, pre-release: sh tools/stage-release.sh,
+  with:       { pre-release: sh tools/stage-release.sh,
                 sign-also: install.sh, notes-file: release-notes.md, verify-with: release.pub }
 ```
 

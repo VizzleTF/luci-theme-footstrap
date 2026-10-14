@@ -11,9 +11,8 @@ How the packages are actually built and published: [ci.md](ci.md).
 luci-theme-footstrap/
 ├── Makefile
 ├── build-css.sh          styles/ → cascade.css (cat + awk, no node)
-├── mangle-tokens.sh      shorten the private --fs-* names in a BUILT sheet
-├── strip-templates.sh    drop the comments from .ut (template and whole-line code)
-├── strip-shell.sh        drop whole-line # from root/**.sh
+├── mangle-tokens.sh      shorten the private --fs-* names in a BUILT sheet, then join it to one line
+├── strip-build.sh        build-tree-only bytes out, one mode each: templates, probes, shell, assets
 ├── build-apk.sh          SDK build, kept so the theme stays buildable without owfeed
 ├── dev-sync.sh           deploy to a HARDWARE router over ssh (containers use owlab)
 ├── update-po.sh          regenerate/verify the translation catalogue
@@ -30,17 +29,21 @@ luci-theme-footstrap/
 │   │                     the apple-touch-icon LINK, which points at the same file)
 │   │                     (the raster is COMMITTED and made by tools/build-icons.mjs — the
 │   │                      buildbot has no browser; `npm run icons` proves it matches logo.svg)
-│   │                     (pattern.svg and fonts/ are NOT here: they are symlinks uci-defaults
-│   │                      makes to /etc/footstrap/, which the admin uploads or installs)
-│   └── resources/        menu-footstrap.js, menu-footstrap-common.js, fs-*.js
+│   │                     (bg and fonts/ are NOT here: they are symlinks uci-defaults
+│   │                      makes to /etc/footstrap/, which the admin uploads or installs;
+│   │                      the pattern is served by the cgi-bin script, not linked)
+│   └── resources/        menu-footstrap.js (footer entry), menu-footstrap-common.js, fs-*.js,
+│                         view/footstrap/appearance.js (System → Footstrap)
 ├── root/                 → /
 │   ├── etc/uci-defaults/30_luci-theme-footstrap
 │   ├── etc/config/footstrap                      empty stub, written at runtime
+│   ├── usr/share/luci/menu.d/luci-theme-footstrap.json   the Appearance menu entry
+│   ├── www/cgi-bin/luci-theme-footstrap-pattern  serves the pattern
 │   ├── lib/upgrade/keep.d/luci-theme-footstrap   what sysupgrade carries across a flash
 │   └── usr/share/rpcd/acl.d/luci-theme-footstrap.json
 └── ucode/template/themes/footstrap/    → /usr/share/ucode/luci/template/…
     ├── header.ut  footer.ut  sysauth.ut
-    └── partials/{head,brand,logout,notices,notice,search,icon}.ut
+    └── partials/{head,notice}.ut
 ```
 
 `luci.mk` installs by directory presence — no install recipes needed:
@@ -52,7 +55,8 @@ luci-theme-footstrap/
 | `root/*` | `/` |
 | `root/etc/uci-defaults/*` | picked up as `LUCI_DEFAULTS` |
 
-Only `src/ luasrc/ htdocs/ root/ ucode/ po/` are copied verbatim. `styles/` is not in that list,
+Only `src/ luasrc/ htdocs/ root/ ucode/` are copied verbatim (`po/` is read by luci.mk's own
+catalogue rules, not copied). `styles/` is not in that list,
 which is why `cascade.css` is generated in `Build/Prepare` straight into the build tree and is
 absent from git.
 
@@ -61,7 +65,7 @@ absent from git.
 
 **The web manifest is a static file, and that is a constraint, not a shortcut.** A theme may not
 register a dispatcher node — it would outlive the theme that registered it — so there is nothing that
-could render the manifest per request. Two values are fixed by that: `start_url`/`scope` are
+could render the manifest per request. Two values are fixed by that: `start_url` is
 `/cgi-bin/luci/`, uhttpd's own default, and `background_color`/`theme_color` are the DEFAULT palette's
 page colour, since the manifest is read once at install time and cannot follow a live Appearance
 change (it paints the splash and the installed window's chrome, never the page). Chrome's install
@@ -69,14 +73,17 @@ prompt needs a secure context, so over plain HTTP what this buys is iOS's Add to
 reads the `apple-touch-icon` link rather than the manifest — plus the icon itself. Regenerate it with
 `node tools/build-icons.mjs` whenever `logo.svg` changes; `npm run icons` fails if you forget.
 
-The committed file is **quantised to a 32-colour palette**, which is 4.6 KB where the browser's own
-RGBA screenshot is 15.7 KB: the picture is a flat background, one ink colour and the ramp between
-them, so a palette is the right encoding and the worst channel moves by 18 of 255 on 0.2% of the
-pixels. That step is the one thing in this repo that wants **ImageMagick**, and only when
-regenerating — `npm run icons` compares PIXELS in the browser it already runs, so a different
-ImageMagick version is not a failure and a redrawn logo still is. Nothing in luci-base could stand in
-for the icon, which is worth stating: it ships functional glyphs (interfaces, signal bars, ports) and
-no logo or raster of any kind, and every theme carries its own.
+The committed file is **quantised to a 32-colour palette**: the picture is a flat background, one
+ink colour and the ramp between them, so a palette is the right encoding and the worst channel moves
+by 18 of 255 on 0.2% of the pixels. That step wants **ImageMagick**, and the repack after it wants
+**oxipng** (`-o 6`, zopfli 255, `--strip safe`: 1,613 B from ImageMagick's default zlib, 1,481 from
+its best, 1,341 from oxipng, identical IHDR, PLTE and inflated IDAT). Both are needed only when
+regenerating, and generating exits 1 without either: `npm run icons` compares PIXELS in the browser
+it already runs, so a machine without oxipng would commit the larger file and nothing would go red.
+A different ImageMagick version is not a failure and a redrawn logo still is. `logo_48.png` (320 B
+to 291 B) is not generated: it was repacked once with the same oxipng command. Nothing in luci-base
+could stand in for the icon, which is worth stating: it ships functional glyphs (interfaces, signal
+bars, ports) and no logo or raster of any kind, and every theme carries its own.
 
 ## Makefile: what differs from a template theme
 
@@ -91,8 +98,8 @@ LUCI_PKGARCH:=all                 # noarch: one build for every target
 LUCI_MAINTAINER / LUCI_URL        # otherwise the package claims "OpenWrt LuCI community"
 LUCI_MINIFY_CSS:=0                # see below
 PKG_LICENSE:=Apache-2.0           # the theme, and nothing else: it carries no webfonts
-include $(TOPDIR)/feeds/luci/luci.mk   # ABSOLUTE, not ../../luci.mk: CI rsyncs the package into
-                                       # package/, not into the feed
+include $(TOPDIR)/feeds/luci/luci.mk   # ABSOLUTE, not ../../luci.mk: that relative path
+                                       # resolves only inside the luci feed
 ```
 
 **Do not set `PKG_VERSION`.** `luci.mk` derives it from git via `PKG_SRC_VERSION`, and nothing in
@@ -110,38 +117,59 @@ Two different tools; confusing them is expensive.
   mangle `:has()`, `color-mix()` and nested `calc()`: the package installs and the layout falls
   apart. `build-css.sh` minifies instead — a string-aware awk pass of its own.
 - **The two JS paths are two separate pipelines, not a knob.** The release is built by owfeed
-  (`tools/stage.sh`), which pre-minifies with **terser** (`tools/minify-js.mjs`, which can mangle
-  identifiers — jsmin cannot) and never touches `luci.mk`, so jsmin never runs over terser's
+  (`tools/stage.sh`), which pre-minifies with **uglify-js** (`tools/minify-js.mjs`, which can mangle
+  identifiers — jsmin cannot) and never touches `luci.mk`, so jsmin never runs over uglify-js's
   output. An SDK or buildbot build never calls `tools/stage.sh`, so it keeps `luci.mk`'s own
   default (`LUCI_MINIFY_JS?=1`) and jsmins the untouched source. Nothing sets `LUCI_MINIFY_JS` in
   the Makefile any more — until 0.14.x it did, gated on a `FOOTSTRAP_PREMIN` variable that only
   CI's SDK-build release leg set, and nothing set after that leg was retired in v0.11.7. Both
-  paths matter: comments are ~60% of the JS source, and uhttpd serves `/www` **uncompressed**, so
-  those are bytes on the wire and in flash.
+  paths matter: comments are just under 40 % of the JS source (comment-share holds each file under
+  it), and uhttpd serves `/www` **uncompressed**, so those are bytes on the wire and in flash.
 
   The source therefore has to stay jsmin-safe — see the regex rule in
   [conventions.md](conventions.md).
 
-### `Build/Prepare` — six steps, in this order
+### `Build/Prepare` — eight steps, in this order
 
 The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sources into
 `PKG_BUILD_DIR`, and edits the **copy**:
 
 1. **Copy `LICENSE`** into `PKG_BUILD_DIR` — `PKG_LICENSE_FILES` resolves against *that*, and
-   luci.mk does not copy the package root.
+   luci.mk does not copy the package root. The copy is metadata only, luci.mk never installs it;
+   `npm run makefile-contract` fails when a file named in `PKG_LICENSE_FILES` has no copy line,
+   which is how a drop as dead code went unseen once.
 2. **`build-css.sh`** → `cascade.css` in the build tree. `cat`/`awk` only, so it runs on the
    OpenWrt buildbot with no host toolchain.
-3. **`mangle-tokens.sh`** — shorten the private `--fs-*` names, 16% of the sheet.
-   **Before** step 4 on purpose: the reserved set is derived by reading the JS and the templates,
-   so it must see them whole — and step 4 is what strips the template comments. It reads them from the **source** tree, never from
-   `PKG_BUILD_DIR` — in CI the build tree's JS has already been through terser, its comments are
-   gone, and five names that only appear in a comment would stop being reserved. That made the
-   shipped sheet depend on *who* built it.
-4. **`strip-templates.sh`** — the comments out of the `.ut` files: `{# … #}` template comments, and
+3. **`mangle-tokens.sh`** — shorten the private `--fs-*` names, 14% of the sheet.
+   Takes the sheet and the build copies of `resources/` and `ucode/`: every name is renamed in the
+   sheet and, with the same map, in the JS and templates, in place (it refuses a directory under its
+   own source tree). **Before** steps 4 and 5 on purpose, which strip the comments it reads.
+   Last, it joins the sheet onto one line: 1009 of its 1021 newlines follow a rule's `}` and are
+   dead bytes on every cold page (on an earlier sheet: 118,389 → 117,366 B; gzip -9 22,922 → 22,823 B; .ipk −58 B,
+   .apk −102 B). `build-css.sh` alone keeps one rule per line, the form the upstream copy and a
+   diff read. A `/*!` banner keeps its lines: it is an Apache-2.0 notice, not formatting.
+   Renaming the 36 names that cross the seam too, rather than reserving them (8,574 B of the sheet,
+   `--fs-accent` alone 1,452 B), takes 4.5 KB more off the wire; it is safe only while every far-side
+   `--fs-` is a whole string literal.
+4. **`strip-build.sh templates`** — the comments and the indentation out of the `.ut` files: `{# … #}` template comments, and
    `/* … */` code comments **that own their lines**, wherever they sit (ucode inside `{% … %}`,
-   JavaScript inside an inline `<script>`, CSS inside an inline `<style>`). 63 KB of templates
-   become 21 KB, which is **−7.4 KB of the compressed package** — it went from 72.4 KB to 65.2 KB —
-   and −7 KB on every page the router serves, since uhttpd serves `/www` uncompressed.
+   JavaScript inside an inline `<script>`, CSS inside an inline `<style>`). 47 KB of templates
+   become 20 KB, which is **−11.1 KB of the compressed package** (`tar | gzip -9` of the five files:
+   18.1 KB to 7.0 KB) and −7 KB on every page the router serves, since uhttpd serves `/www`
+   uncompressed.
+
+   The last pass takes the indentation: a line loses its leading blanks unless the line above ends
+   in `%}` (ucode eats that newline, so the blanks are the first bytes of the output there), a line
+   left empty is dropped, and line 1 stays whole. Every whitespace run keeps its newline, so HTML,
+   ucode code and inline JS/CSS read the same: −1.6 KB of the templates, −307 B on every admin page
+   and −124 B on the login page. It refuses the build on an odd backtick count (a template literal
+   spanning lines), a trailing backslash (a continued string), a quote left open at a line end
+   inside a `{% %}` or `{{ }}` block (a multi-line string: `ucode -T -c` accepts one and its next
+   line is data; 0 of the 5 templates have one), `<pre>` and `<textarea>`, the five places a
+   leading blank is data; `tests/strip-build.test.mjs` holds each refusal. The scan tells a regex
+   literal from a division by the token before the `/`: an opening character, an operator or one of
+   `return`, `case`, `in`, `delete`, `else` starts a regex (`ucode -T -c` reads those five that way
+   and `typeof`, `void`, `throw`, `new`, `do` as names), so `return /"/` is not a string.
 
    The rule is what makes this safe, and it is not "remove `/* … */`": a comment is removed only
    when `/*` is the first non-blank thing on its line and `*/` the last on its (possibly later)
@@ -153,10 +181,18 @@ The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sour
    Verified on a live router, not only by reading: the pages the stripped templates serve are
    byte-identical to the ones the source templates serve, once the comments are removed from both
    (the only remaining difference is the session id).
-5. **`strip-shell.sh`** — whole-line `#` out of the shell under `root/`.
-6. **Stamp `FS_VERSION`** into `fs-version.js` with `sed`. The path is part of the contract —
+5. **`strip-build.sh probes`** — the `/* fs:probe */` export lines out of the resources JS: a few
+   module-private functions are exported only so a gate in this repository can call them. The
+   functions stay; the export line goes.
+6. **`strip-build.sh shell`** — whole-line `#` out of the shell under `root/`. A heredoc, and a
+   `#` line inside a quoted string (`ssh "$R" "…"` is one: that line is data), refuse the build
+   naming `file:line`; `tests/strip-build.test.mjs` holds both.
+7. **`strip-build.sh assets`** — the comment out of `logo.svg` and the indentation out of
+   `manifest.json`, two files every browser fetches uncompressed.
+8. **Stamp `FS_VERSION`** into `fs-version.js` with `sed`. The path is part of the contract —
    `dev-sync.sh` and `tools/stage.sh` run the same substitution, so moving the constant means
-   fixing three places.
+   fixing three places. `tools/stage.sh` refuses a `FOOTSTRAP_VERSION` or tag outside
+   `[0-9A-Za-z._-]` before it wipes `dist/`, the pattern `dev-sync.sh` holds the same stamp to.
 ### The catalogue lives in `po/`, and luci.mk owns it
 
 `LUCI_LANGUAGES` in luci.mk is `$(wildcard po/*)`, so a `po/` directory makes it bake a
@@ -170,6 +206,19 @@ luci.mk would: **`luci-theme-footstrap`, plus one `luci-i18n-footstrap-<lang>` p
 the catalogue at `footstrap.<lang>.lmo` and a `uci-defaults` line registering the language in
 LuCI's own menu. `tools/stage.sh` builds the per-language staging trees, `owfeed.yml` declares one
 package each, and `tools/i18n-packages.mjs` fails the build when those three lists disagree.
+
+**Measuring a size change.** Package figures are what the release ships, so they are taken the way
+CI builds: owfeed at the version `build.yml` pins (0.5.5) with `owfeed.yml`'s `compression:
+zopfli`, one fixed `SOURCE_DATE_EPOCH` and `FOOTSTRAP_VERSION` for both sides (a free epoch moved
+a package by up to 33 B on identical input), modes normalised by `tools/stage.sh`, and each side
+staged and built twice: the two runs must hash identically before a number is written. A change is
+its commit against its parent, each built in a scratch `git worktree` outside the checkout. The
+`.ipk` and `.apk` figures are the `owfeed build` output; `owfeed sign` re-deflates the `.apk` and
+adds a random ECDSA signature that moves the signed file by up to 85 B between signings, so the
+signed file is never compared byte for byte. Tens of bytes of gzip can show as 1 B in a zopfli
+`.ipk`, so a package figure is measured, not predicted from the gzip one. gzip sizes always come
+from stdin (`gzip -9 < file | wc -c`): `gzip -9 file` stores the file name and adds 12 B for
+`cascade.css`. A ratio compares two figures of one epoch, or it is dropped.
 
 Between v0.12.x and 0.14.3 the catalogues rode **inside** the theme under the basename
 `footstrap-theme.<lang>.lmo`. That cost every router 10,992 B of flash and 4,821 B of the `.apk`,
@@ -209,7 +258,7 @@ covers all of it:
 `install-if` needs at least two entries with one pinned by `=` (apk-package(5)); `{version}` is
 expanded by owfeed to the version being built, so a release does not hand-edit the pin.
 
-Where none of the three fired, the Appearance tab says so: it asks `_('Layout', 'footstrap')` — a
+Where none of the three fired, System → Footstrap says so: it asks `_('Layout', 'footstrap')` — a
 string every catalogue carries — and, when the answer comes back untranslated on a non-English
 router, names the package. That check is why `Appearance` is the wrong string to test: it is
 obsolete in the catalogues (`#~ msgid`) and reported "not translated" on a router whose Russian
@@ -357,11 +406,13 @@ and it also installs on a router that has none yet, so one line covers both path
 registration (`dev-sync.sh` runs the same file; nothing else registers the theme).
 
 - Registers **one** entry: `luci.themes.Footstrap=/luci-static/footstrap`. Layout, palette, mode
-  and rounding are **client** switches on the Footstrap tab.
+  and rounding are **client** switches on the System → Footstrap page.
 - The key in `themes.<Name>` is CamelCase without hyphens — a uci option-name limitation.
-- Links the three admin uploads into `/www`: `bg`, `pattern.svg` and the `fonts/` directory all
-  live in `/etc/footstrap`, because uhttpd serves `/www` only and `/etc` is what a sysupgrade
-  keeps. The pattern keeps its `.svg` name — uhttpd types a response by extension.
+- Links two of the three admin uploads into `/www`: `bg` and the `fonts/` directory live in
+  `/etc/footstrap`, because uhttpd serves `/www` only and `/etc` is what a sysupgrade keeps.
+  The pattern is not linked: an SVG opened through a same-origin URL runs as a script with the
+  admin's session, so `cgi-bin/luci-theme-footstrap-pattern` serves it under CSP `none` + sandbox +
+  `nosniff`; uci-defaults removes a pre-0.14.11 install's stale `pattern.svg` link.
 
 **It runs ONCE, from the package manager's own `default_postinst`, before our `postinst`
 content ever sees it.** `postinst` used to call it again as a belt-and-braces re-run — dropped
@@ -372,8 +423,9 @@ the theme was already registered. The re-run guard never fired.
 **Fresh install vs upgrade is decided by the registration itself.** `mediaurlbase` is written only
 in the run that first added `luci.themes.Footstrap`; on an upgrade the entry is already there, so
 nothing moves a router off the theme it is on. `[ "$PKG_UPGRADE" != 1 ]` is checked beside it, as
-the other themes in the tree do, but carries nothing on its own: apk never exports the variable and
-neither does our postinst.
+the other themes in the tree do, but carries nothing on a package install: apk never exports the
+variable and neither does our postinst. `dev-sync.sh` sets it by hand, so a dev router keeps its
+theme.
 
 **It migrates nothing from older footstraps, on purpose.** A router is expected to `sysupgrade`
 rather than upgrade single packages, so leftovers go with the image; what remains worth cleaning is
@@ -400,6 +452,11 @@ every updating 24.10 user back to bootstrap:
   UI to a half-removed bootstrap, which is the white page this branch was written for);
 - removes `/etc/footstrap` — the admin's uploads, kept out of the package so an upgrade preserves
   them, and a real removal is the one time they should go.
+
+Measured on owrt2410 (opkg, `opkg -V2`): upgrading a 0.14.13-r1 repack to 0.14.14-r1 runs the old
+`prerm`, the NEW `preinst`, then the old `postrm` (`pkg_run_script: Running script …postrm`), and `themes.Footstrap` and
+`mediaurlbase=/luci-static/footstrap` are unchanged afterwards; `opkg remove` runs the same script
+and leaves `mediaurlbase=/luci-static/bootstrap`, no `themes.Footstrap` and no `/etc/footstrap`.
 
 ## Why postinst/postrm never call `rpcd reload`
 
@@ -444,40 +501,27 @@ on a **restricted** (non-`*`) rpcd login — its in-memory ACL set predates the 
 a fresh login re-reads `acl.d`. `postinst` closes that gap without touching rpcd at all, ending a
 session only when re-authenticating would actually hand it the theme's scope: it must be **denied**
 `uci`/`footstrap`/`write` right now, **and** its own username's `rpcd.@login[]` entry must list the
-theme's ACL group in its `read` or `write` list — otherwise the login was never given the group at
-all (a second admin account, a monitoring script's login), a fresh login would deny it exactly the
-same, and ending the session would cost that session for nothing:
+theme's ACL group where a fresh login grants more: in `write` while `uci`/`footstrap`/`write` is
+denied, or in `read` alone while `read` is denied too (the case that hides the Footstrap menu item).
+Otherwise the login was never given the group at all (a second admin account, a monitoring script's
+login), or is read-only and already holds the read scope; a fresh login would grant it nothing, and
+ending the session would cost that session for nothing:
 
-```sh
-for s in $(ubus call session list 2>/dev/null | grep -o '"ubus_rpc_session": "[a-f0-9]*"' | cut -d'"' -f4); do
-	case "$s" in *[!0]*) ;; *) continue ;; esac
-	ubus call session access "{\"ubus_rpc_session\":\"$s\",\"scope\":\"uci\",\"object\":\"footstrap\",\"function\":\"write\"}" 2>/dev/null | grep -q true && continue
-	u=$(ubus call session get "{\"ubus_rpc_session\":\"$s\"}" 2>/dev/null | grep -o '"username": *"[^"]*"' | cut -d'"' -f4)
-	[ -n "$u" ] || continue
-	# Enumerated from `uci show`, not a `uci -q get` index count: the latter stops at the FIRST
-	# login section with no username option and never sees any section past it. `while read`, not
-	# `for`, because a username may contain a space and word-splitting would skip that section; the
-	# subshell's answer is echoed out and captured instead of set in a variable.
-	grant=$(uci show rpcd 2>/dev/null | grep -F .username= | while read -r kv; do
-		sect=${kv%%.username=*}
-		un=${kv#*.username=}
-		un=${un#\'}
-		un=${un%\'}
-		[ "$un" = "$u" ] || continue
-		for grp in $(uci -q get "$sect.read") $(uci -q get "$sect.write"); do
-			[ "$grp" = luci-theme-footstrap ] && { echo 1; break 2; }
-		done
-	done)
-	[ -n "$grant" ] || continue
-	ubus call session destroy "{\"ubus_rpc_session\":\"$s\"}" >/dev/null 2>&1 || true
-done
-```
+The loop is the `postinst` define in the `Makefile` (`Package/luci-theme-footstrap/postinst`),
+not a copy here. The `uci show rpcd` listing is enumerated rather than counted by index, because a
+`uci -q get` index count stops at the FIRST login section with no `username` option and never sees
+any section past it; it reads with `while read`, because a username may contain a space and
+word-splitting would skip that section; and the subshell's answer is echoed out and captured. A
+read-only login hands a fresh session nothing beyond the read scope, so such a session is kept
+when it already holds `read`.
 
-Guarded on the `session` ubus object existing at all, and the `case` line skips the all-zero
+The loop is guarded on the `session` ubus object existing at all (`set -f` sits beside it, so the
+unquoted `uci -q get` lists split and never glob), and the `case` line skips the all-zero
 session id — the unauthenticated default, never denied anything by an ACL, so this sweep is not
 its business. Verified verbatim on the stand: a blanket-root session survived, a stale restricted
 session (whose login lists the group) was destroyed, the unauthenticated all-zero session was left
-untouched, and a fresh login answered `true`. The one visible price is the narrowest one available:
+untouched, and a fresh login answered `true`. On owrt2512 the old sweep ended 5 of 6 stale
+restricted sessions, the new one 4 of 6; the read-only session holding the read scope is kept. The one visible price is the narrowest one available:
 an admin on a restricted account whose login already lists the theme's group, installing the theme
 from LuCI's own Software page, logs themselves out and must log back in once — every root session,
 every session that already has the scope, and every denied session whose login was never given the
@@ -528,17 +572,14 @@ not a browser going through rpcd. Nothing in the UI writes those three options.
 
 ## ACL
 
-`root/usr/share/rpcd/acl.d/luci-theme-footstrap.json` grants what the Footstrap tab needs to persist
+`root/usr/share/rpcd/acl.d/luci-theme-footstrap.json` grants what the System → Footstrap page needs to persist
 a router-wide default and a login background:
 
 - `uci` `set`/`commit`, scoped to the `footstrap` config — "Save as default";
 - `cgi-io upload` plus `file` `write`/`remove` on `/etc/footstrap/login-bg` and
   `/etc/footstrap/pattern.svg` — the wallpaper photo and the tiled pattern;
-- `file exec` on two literal commands, `/bin/chmod 644 /etc/footstrap/login-bg` and the same for
-  `/etc/footstrap/pattern.svg` — an upload that is not world-readable is one uhttpd answers with 403.
-
-Those two `file.exec` grants are the only ones the theme ships, and each is one fixed
-argument-complete command.
+There is no `file exec` grant: the upload form carries `filemode=644` and `cgi-io` chmods the file
+itself, after the ACL-checked write (an upload left 0600 is one uhttpd answers with 403).
 There is no grant for an in-app update mechanism: the theme upgrades through the package feed the
 installer adds.
 
@@ -609,14 +650,15 @@ committed on that one, and `styles/` plus the four shell scripts do not travel.
 and `luci-base`'s own JS 28–29, i.e. ordinary source with indentation. So the copy keeps its
 `--fs-*` names unmangled, its templates and shell keep their comments, and the JS goes over
 untouched for `luci.mk` to run **jsmin** across at package time — which is what every other
-package in that tree gets. The release path here does more (terser, `mangle-tokens.sh`, comment
+package in that tree gets. The release path here does more (uglify-js, `mangle-tokens.sh`, comment
 stripping) and the packages differ by about 14% because of it: 76 321 bytes against 66 825.
 
 The one place the copy still stands out is the sheet itself, at 128 bytes per line against the
 stock 17–20, and the arithmetic is why it stays: unminified it is **467 615 bytes**, eight times
 the largest stock theme, because this repository keeps the *why* beside each rule and in source
-form those comments are 70% of the file. The choice there is not "like everyone else" versus
-"minified" — it is 136 kB of minified sheet against 468 kB of prose.
+form those comments are most of the file. The choice there is not "like everyone else" versus
+"minified" — it is the minified sheet against several times its size in prose, over a link
+uhttpd does not compress.
 
 Two more things the copy changes, both in the Makefile, which is the one file maintained by hand
 on the far side and never overwritten by the sync:

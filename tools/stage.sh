@@ -2,29 +2,19 @@
 # Stage the theme's rootfs for owfeed — the half of the build owfeed deliberately does not do.
 #
 #   ./tools/stage.sh              # dist/root + dist/VERSION + dist/scripts
+#   ./tools/stage.sh --dev        # the same with the CSS unminified and no mangle or strip
 #   FOOTSTRAP_VERSION=0.12.0 ./tools/stage.sh
 #
-# `owfeed build` packages a DIRECTORY; it does not build one. Everything the OpenWrt SDK used to do
-# on the way in — concatenate the stylesheet, mangle the private custom properties, strip the
-# comments out of the templates and the shell, stamp the version — has to happen before it. The one
-# step it does NOT do is the translation catalogue: owfeed compiles the .po files itself,
-# byte-identical to po2lmo, and requiring po2lmo would put a C build of luci-base in front of anyone
-# packaging this theme.
-#
-# The order is the Makefile's, step for step (see Build/Prepare there):
-#
-#   1. copy       luci.mk's install mapping: htdocs -> /www, ucode -> /usr/share/ucode/luci, root -> /
-#   2. build-css  cascade.css is generated from styles/ and is not in the tree
-#   3. mangle     the private --fs-* names, reading the reserved set from the SOURCE
-#   4. minify     terser over the staged JS
-#   5. strip      {# … #} out of the templates, whole-line # out of the shell
-#   6. stamp      FS_VERSION, after the minify — minify-js.mjs keeps that declaration verbatim
-#                 precisely so this sed still matches
-#
-# The lifecycle scripts are EXTRACTED from the Makefile rather than kept as files beside it: they
-# exist there already, they are what an SDK build installs, and two copies of a postrm that only
-# runs on somebody else's router months later is the worst duplication in this repo to let rot. `$$`
-# is make's escaping for a literal `$`, so it is undone here.
+# `owfeed build` packages a DIRECTORY; it does not build one, and it compiles the .po files itself
+# (byte-identical to po2lmo). Everything else the SDK did happens here, in the order below: 1 copy
+# (luci.mk's install mapping), 2 build-css, 3 mangle the private --fs-* names, 4 `strip-build.sh
+# probes` then uglify-js, 5 strip templates, minify the pre-paint scripts inside them, strip shell
+# and assets, 6 stamp FS_VERSION after the minify (minify-js.mjs keeps that declaration verbatim so
+# the sed still matches). Those are the Makefile's Build/Prepare steps plus two minifiers (uglify-js
+# over resources, minify-prepaint over head.ut); probes and templates touch disjoint trees, so
+# their order is free.
+# The lifecycle scripts are EXTRACTED from the Makefile, not kept as a second copy; `$$` is make's
+# escaping for a literal `$`, undone here.
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -32,20 +22,29 @@ SRC="$ROOT/luci-theme-footstrap"
 DIST="${DIST:-$ROOT/dist}"
 STAGE="$DIST/root"
 DEV=0
-[ "${1:-}" = "--dev" ] && DEV=1
+case "${1:-}" in
+	'') ;;
+	--dev) DEV=1 ;;
+	# Else a typo like `--devv` stages a minified build the caller meant to read.
+	*) echo "stage: unknown option: $1" >&2; exit 1 ;;
+esac
+
+# FOOTSTRAP_VERSION is what CI injects from the tag; a working tree falls back to its newest tag.
+# It goes into sed and fs-version.js, so it is checked where it enters, before dist/ is wiped, with
+# the pattern dev-sync.sh holds the same stamp to: no quote, `#`, `&` or newline gets through.
+VER="${FOOTSTRAP_VERSION:-$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)}"
+if [ -n "$VER" ] && ! expr "$VER" : '[0-9A-Za-z._-]*$' >/dev/null 2>&1; then
+	echo "stage: refusing version '$VER' — only [0-9A-Za-z._-] may reach sed and fs-version.js" >&2
+	exit 1
+fi
 
 rm -rf "$DIST"
 mkdir -p "$STAGE/www" "$STAGE/usr/share/ucode/luci" "$DIST/scripts"
 
-# 1. luci.mk's mapping. `cp -a` rather than `cp -r`, so anything under htdocs that IS a symlink
-#    stays one. Nothing there is today: the background, the pattern and the fonts directory are
-#    aliases uci-defaults makes at runtime under /www, /www being repopulated from firmware on a
-#    sysupgrade.
-#
-#    root/ is staged BESIDE the payload and merged at the end: it is the only part strip-shell.sh is
-#    pointed at, and the Makefile hands that script a directory holding nothing but shell and one
-#    JSON. Merged first, the script would be handed /www and /usr/share/ucode as well, which it
-#    exits non-zero on.
+# 1. luci.mk's mapping. `cp -a`, so a symlink under htdocs stays one (none is today: the
+#    background, the pattern and the fonts are aliases uci-defaults makes at runtime).
+#    root/ is staged BESIDE the payload and merged after the strip, so `strip-build.sh shell` is
+#    pointed at root/ alone, as the Makefile points it at $(PKG_BUILD_DIR)/root.
 ROOTPART="$DIST/.root"
 cp -a "$SRC/htdocs/." "$STAGE/www/"
 cp -a "$SRC/ucode/."  "$STAGE/usr/share/ucode/luci/"
@@ -63,60 +62,44 @@ if [ "$DEV" = 1 ]; then
 else
 	"$SRC/build-css.sh" "$CSS"
 
-	# 3. The private --fs-* tier, renamed to one- and two-letter names — in the sheet AND on the
-	#    far side of the seam, the staged JS and templates, with the same map. The 36 names that
-	#    cross the seam used to be reserved and cost 8,574 B of the sheet on their own
-	#    (`--fs-accent` 1,452 B); renaming both sides together takes 4.5 KB more off the wire.
-	#
-	#    Safe only because every `--fs-` reference in the JS and the templates is a WHOLE string
-	#    literal — `setProperty('--fs-accent', …)`, never `'--fs-' + role`. Checked across all 89
-	#    sites. If one is ever composed, the sheet renames and the JS keeps asking for a name that
-	#    no longer exists, silently, which is why mangle-tokens.sh says so at its --rewrite flag.
-	#
-	#    The staged copies are rewritten, never $SRC: this runs before terser, so the staged JS
-	#    still has its comments and a name mentioned only in one is renamed there too, harmlessly.
-	"$SRC/mangle-tokens.sh" "$CSS" "$SRC/htdocs/luci-static/resources" "$SRC/ucode" \
-		--rewrite "$STAGE/www/luci-static/resources" "$STAGE/usr/share/ucode/luci"
+	# 3. The private --fs-* tier, renamed to one- and two-letter names in the sheet AND in the staged
+	#    JS and templates, with the same map. Safe only because every `--fs-` reference there is a
+	#    WHOLE string literal (docs/package.md); a composed one would ask for a name that no longer
+	#    exists. The staged copies are rewritten, never $SRC.
+	"$SRC/mangle-tokens.sh" "$CSS" "$STAGE/www/luci-static/resources" "$STAGE/usr/share/ucode/luci"
 
-	# 4. The gate-only exports, BEFORE terser — the marker is a comment, and terser takes every
-	#    comment with it. See strip-probes.sh for what a probe is and why a router does not need it.
-	"$SRC/strip-probes.sh" "$STAGE/www/luci-static/resources"
+	# 4. The gate-only exports, BEFORE uglify-js — the marker is a comment, and uglify-js takes every
+	#    comment with it. See strip-build.sh for what a probe is and why a router does not need it.
+	"$SRC/strip-build.sh" probes "$STAGE/www/luci-static/resources"
 
-	#    …then terser. On the SDK path this was optional (luci.mk's jsmin was the fallback for a
+	#    …then uglify-js. On the SDK path this was optional (luci.mk's jsmin was the fallback for a
 	#    buildbot with no node); there is no jsmin here, so it is the only minifier and a
 	#    missing node is a failed build rather than a bigger package.
 	node "$ROOT/tools/minify-js.mjs" "$STAGE/www/luci-static/resources"
 
-	# 5. Comments out of the templates and out of the shell.
-	"$SRC/strip-templates.sh" "$STAGE/usr/share/ucode/luci"
+	# 5. Comments out of the templates, the pre-paint scripts, the shell and the assets.
+	"$SRC/strip-build.sh" templates "$STAGE/usr/share/ucode/luci"
 
-	#    …then the pre-paint scripts inside those templates, which strip-templates.sh deliberately
-	#    leaves alone (it removes comments and nothing else). These are the most expensive bytes in
+	#    …then the pre-paint scripts inside those templates, which the templates strip deliberately
+	#    leaves alone (it removes comments and indentation, nothing else). These are the most expensive bytes in
 	#    the package: they sit in the HTML document itself, so every page load pays them before a
 	#    single module is fetched — the login page included, which fetches no modules at all.
 	node "$ROOT/tools/minify-prepaint.mjs" "$STAGE/usr/share/ucode/luci"
 
-	"$SRC/strip-shell.sh" "$ROOTPART"
+	"$SRC/strip-build.sh" shell "$ROOTPART"
 
 	#    …and the two static assets nothing else touches: the SVG favicon's comment and the
 	#    manifest's indentation. Both are fetched by a browser, and uhttpd sends them uncompressed
 	#    like everything else.
-	"$SRC/strip-assets.sh" "$STAGE/www/luci-static/footstrap"
-
-	#    …and the app icon's compressed stream, which build-icons.mjs leaves as Chromium's encoder
-	#    wrote it: the same pixels re-deflated are 581 B smaller, and it is a manifest icon a
-	#    browser fetches over the same uncompressed channel.
-	node "$ROOT/tools/repack-png.mjs" "$STAGE/www/luci-static/footstrap"
+	"$SRC/strip-build.sh" assets "$STAGE/www/luci-static/footstrap"
 fi
 
 # root/ joins the payload once it has been stripped — see the note at step 1.
 cp -a "$ROOTPART/." "$STAGE/"
 rm -rf "$ROOTPART"
 
-# 6. The version the Appearance page shows. FOOTSTRAP_VERSION is what CI injects from the
-#    tag; a working tree falls back to its newest tag, and a checkout with no tags at all
-#    keeps fs-version.js's own '0.0.0-dev'.
-VER="${FOOTSTRAP_VERSION:-$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)}"
+# 6. The version the Appearance page shows: $VER from the top of this script, stamped into
+#    fs-version.js. A checkout with no tags at all is refused below.
 if [ -n "$VER" ]; then
 	sed "s#const FS_VERSION *= *'[^']*'#const FS_VERSION = '$VER'#" \
 		"$STAGE/www/luci-static/resources/fs-version.js" > "$STAGE/.fs-version.js"
@@ -126,14 +109,9 @@ if [ -n "$VER" ]; then
 		exit 1
 	}
 else
-	# A checkout with no tags (a shallow clone, or the tree copied out from under .git) used to stamp
-	# 0.0.0-r1 here and carry on: a silent placeholder version that a build or an install could not
-	# tell apart from a real 0.0.0 release. CI always sets FOOTSTRAP_VERSION and a normal dev checkout
-	# carries tags (this tree currently resolves v0.14.12), so reaching here means the version input
-	# itself is missing, not that 0.0.0 is what was meant — refuse, the same as a missing dist/ or an
-	# empty catalogue set elsewhere in this pass.
+	# No tag and no FOOTSTRAP_VERSION: the input is missing, not "0.0.0", so refuse rather than stamp a placeholder.
 	echo "stage: no tag and no FOOTSTRAP_VERSION — refusing to stamp a placeholder version" >&2
-	echo "       fetch tags (git fetch --tags) or set FOOTSTRAP_VERSION=<version>" >&2
+	echo "stage: fetch tags (git fetch --tags) or set FOOTSTRAP_VERSION=<version>" >&2
 	exit 1
 fi
 
@@ -152,7 +130,7 @@ extract() {			# <define-suffix> <outfile>
 	' "$SRC/Makefile" | sed 's/\$\$/$/g' > "$2"
 	[ -s "$2" ] || {
 		echo "stage: no Package/luci-theme-footstrap/$1 block in the Makefile — refusing to" >&2
-		echo "       build a package whose install-time half is silently missing" >&2
+		echo "stage: build a package whose install-time half is silently missing" >&2
 		exit 1
 	}
 }
@@ -162,23 +140,12 @@ chmod +x "$DIST/scripts/"*
 
 # ---- one package per language, the way luci.mk emits them ----
 #
-# The catalogues used to ship INSIDE the theme: 10,992 B on flash and 4,821 B of the .apk, paid by
-# every router including the ones reading English. Split out, a Russian router installs
-# luci-i18n-footstrap-ru and nobody else carries it.
-#
 # owfeed's `i18n.from` compiles every language under one directory into one package, so each
-# language gets its own staging directory holding only its own .po — that is all these two loops
-# build. The package NAMES are luci.mk's (`luci-i18n-$(LUCI_BASENAME)-<lang>`, and LUCI_BASENAME is
-# `footstrap`), and so is the catalogue basename, so an SDK build and this one produce the same
-# package for the same router.
-#
-# The uci-defaults line is luci.mk's too: without it the language never appears in LuCI's own
-# language menu, and the catalogue loads only for someone who set the language by hand.
-# The label is LuCI's own, copied from luci.mk's LUCI_LANG.<code> table rather than invented: it is
-# what the language menu shows, and every luci-i18n-* package on the router writes the same string
-# for the same code. A language with no entry here stops the build — registering the bare code would
-# put "ru" in a menu that reads "Русский (Russian)" everywhere else.
-# tools/i18n-packages.mjs holds this table, po/ and owfeed.yml to each other.
+# language gets its own staging directory holding only its own .po. Package names and the
+# catalogue basename are luci.mk's (`luci-i18n-footstrap-<lang>`), and so is the uci-defaults line
+# that puts the language in LuCI's menu. The label is copied from luci.mk's LUCI_LANG.<code>
+# table; a language with no entry stops the build. tools/i18n-packages.mjs holds this table, po/
+# and owfeed.yml to each other.
 lang_name() {			# <code> -> the label LuCI shows
 	case "$1" in
 		es) echo 'Español (Spanish)' ;;
@@ -202,5 +169,10 @@ for po in "$SRC"/po/*/; do
 		"$(echo "$lang" | tr - _)" "$label" \
 		> "$DIST/i18n-$lang/etc/uci-defaults/luci-i18n-footstrap-$lang"
 done
+
+# uhttpd answers 403 on a file that is not world-readable, and owfeed copies modes from disk: a
+# worktree can hold 0600/0700 (5 files, 4 directories; a CI checkout is 0644). build-apk.sh and
+# dev-sync.sh normalise the same way. X keeps the execute bit of what has one.
+chmod -R u=rwX,go=rX "$DIST"
 
 echo "staged $DIST/root at $(cat "$DIST/VERSION")"

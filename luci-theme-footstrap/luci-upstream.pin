@@ -1,79 +1,31 @@
-# THE SINGLE SOURCE of the openwrt/luci commit this project borrows two BUILD TOOLS from, and
-# of their checksums. Sourced as shell (`. luci-upstream.pin`) by update-po.sh and by CI.
-#
-# Both are downloaded over the network and then EXECUTED as gates:
-#   - jsmin.c       compiled; decides whether our shipped JS is safe (its regex-vs-division
-#                   lookback can silently eat a file — see docs/conventions.md)
+# Single source of the openwrt/luci commit whose two build tools we download and run as gates, and
+# of their checksums. Sourced as shell (`. luci-upstream.pin`) by update-po.sh and CI.
+#   - jsmin.c       compiled; its regex-vs-division lookback can silently eat a shipped JS file
 #   - i18n-scan.pl  run by perl; decides whether the translation catalogue is complete
-# Off a moving `master`, the gate would be whatever upstream pushed last.
-#
-# The commit used to be written out twice — in .github/workflows/build.yml and in update-po.sh
-# — each with a comment saying "bump them together" and nothing enforcing it, so bumping one
-# left half the toolchain on an older tree, silently.
-#
+# Off a moving `master` the gate would be whatever upstream pushed last.
 # To bump: change LUCI_PIN, re-fetch both files at the new commit, update their sha256s.
 LUCI_PIN=5cf20c5741dc34eea0faaf7324ef3751b05fa1f3
 JSMIN_SHA256=0568b14873f27f339cf66a9c43603d0bc8ca501ff62522ea924c6e8daf1be215
 I18N_SCAN_SHA256=a1823d1fdd942f31a105e1e53b401e146bc10527f231e016930b1a5123ef21d3
 
-# THERE IS NO UCODE PIN, AND THAT IS DELIBERATE — do not add one back.
-#
-# The theme's .ut templates still have to be compile-checked: they are copied to the router
-# verbatim and never parsed at build time, so a stray brace in header.ut builds green, releases,
-# and then every user's LuCI silently falls back to another theme (docs/architecture.md).
-#
-# That check used to live here — clone ucode at a pinned commit, build it with cmake, run
-# `ucode -T -c` with the router runtime stubbed out through `-L`. It is now the fifth assertion
-# of the `verify` job (docs/ci.md), which runs the router's OWN interpreter against the INSTALLED
-# templates, on both release lines. Nothing to pin, nothing to build, nothing stubbed — and it
-# checks the interpreter each branch actually ships rather than one commit for both.
+# No ucode pin, deliberately: the `verify` job runs the router's own interpreter over the installed
+# templates on both release lines (docs/ci.md), so nothing is pinned, built or stubbed here.
 
-# usign — OpenWrt's ed25519 signer. CI builds it to SIGN each release package; the router
-# verifies with the /usr/bin/usign it already has (base-files depends on usign, so it is on
-# every OpenWrt image — the signature costs the theme no new runtime dependency).
-#
-# This is the commit the router's own binary is built from (`usign-2025.10.03~c4c72b1b`), so the
-# signer in CI and the verifier in the field are the same code. It needs neither cmake nor
-# libubox: `cc *.c` over the six sources plus the bundled base64.c is the whole build.
-#
-# CI builds it TWICE for two different jobs (verify the SDK, sign the release), through
-# tools/build-usign.sh so the two cannot drift onto different commits.
+# usign, OpenWrt's ed25519 signer: owfeed signs each release package with it, and build-apk.sh
+# builds this copy (via tools/build-usign.sh, not run in CI) to check the SDK it downloads. This is
+# the commit the router's own /usr/bin/usign is built from (`usign-2025.10.03~c4c72b1b`), so signer
+# and field verifier are the same code; `cc *.c` over six sources plus base64.c is the whole build.
 USIGN_PIN=c4c72b1b07945ee192361dc751291a7c98d6adcd
 
-# OpenWrt's own usign RELEASE key, and the keyring commit it comes from — what CI checks the SDK
-# with. The SDK is the least verified input in this repo and the only one that ends up inside the
-# package users install: jsmin.c and i18n-scan.pl are LINTERS pinned by commit and sha256, while the
-# toolchain that compiles the released artifact arrived on nothing but TLS.
-#
-# The sha256 next to the tarball cannot fix that, and the reason is this project's own argument
-# against GitHub's asset digest (docs/conventions.md): `sha256sums` is served by the SAME host, from the SAME
-# directory, unsigned — whoever can replace openwrt-sdk-*.tar.zst can replace the checksum beside it,
-# and the check then verifies the attacker's SDK. It is worth keeping for a truncated download; it is
-# not a verification, and the comment in build.yml used to say it was.
-#
-# What makes it one is `sha256sums.sig`, an ed25519 signature over that file — verified with a key
-# this repo pins from a DIFFERENT host (github.com/openwrt/keyring, the mirror of the keyring
-# openwrt/openwrt itself ships), so downloads.openwrt.org cannot vouch for itself. Proven end to end
-# with the router's own usign: signature OK, one byte flipped in sha256sums -> "verification failed".
-#
-# Note the mirror does not carry the git.openwrt.org commit openwrt/openwrt pins, so this is the
-# mirror's own. To bump: change the commit and re-fetch every key it serves, then update their
-# sha256s — the sha256 is what actually holds the content, exactly as for jsmin.c.
-#
-# The two branches do NOT share a key: 24.10 has a release key of its own while 25.12 is signed by
-# the unattended-build key. Pinning one for both was wrong in the only way it could be — the 24.10
-# leg refused to build, which is the gate doing its job on its author.
-#
-# Both live here now. They used to sit in .github/workflows/build.yml's matrix, beside the channel
-# they are a property of; that matrix went away with the SDK build (the release is built by owfeed,
-# which fetches and verifies its own host apk). build-apk.sh — the local SDK build, the one path
-# that still needs them — read them out of that file, so leaving them there would have left a
-# convenience script parsing a matrix that no longer exists.
-#
-# The key id IS the file name in the keyring, and it is the keynum usign embeds in the signature. If
-# a build ever comes back "verification failed", read that keynum first (the script prints it):
-# OpenWrt rotating a branch's key looks exactly like an attack. The sha256 is what actually holds
-# the content — the id only says which file to fetch.
+# OpenWrt's usign RELEASE keys and the keyring commit they come from; build-apk.sh checks the SDK
+# with them. The SDK is the only input that ends up inside the installed package, and the
+# `sha256sums` beside the tarball is no verification: same host, same directory, unsigned
+# (docs/conventions.md). `sha256sums.sig` is, verified with a key pinned from a different host
+# (github.com/openwrt/keyring): the router's usign says "signature OK", and one flipped byte gives
+# "verification failed". 24.10 and 25.12 do not share a key (a release key vs the unattended-build
+# key). The key id is the keyring file name and the keynum usign embeds in the signature; on
+# "verification failed" read that keynum first, since a key rotation looks exactly like an attack.
+# The sha256 holds the content.
 OPENWRT_KEYRING_PIN=fbae29d730f81c892f52e0ff00fe867444aeeae6
 OPENWRT_SDK_KEY_2512=b5043e70f9a75cde
 OPENWRT_SDK_KEY_2512_SHA256=d7ac10f9ed1b38033855f3d27c9327d558444fca804c685b17d9dcfb0648228f

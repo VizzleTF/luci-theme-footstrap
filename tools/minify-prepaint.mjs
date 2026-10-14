@@ -1,30 +1,17 @@
 #!/usr/bin/env node
-/* Minify the inline <script> blocks inside the shipped templates.
+/* Minify the inline <script> blocks inside the shipped templates: the largest bytes nothing shrank
+ * (strip-build.sh only removes comments and indentation), in the HTML document before any module
+ * is fetched. Measured in stage order, 6424 -> 4511 B (docs/ci.md).
  *
- * These are the largest bytes in the package that nothing was shrinking. `strip-templates.sh`
- * removes comments and says so — "it does not minify: no joining of lines, no touching of anything
- * that is not a comment from column one" — so the pre-paint went to the wire with full indentation
- * and full identifiers. And it is the most expensive place to pay: it is in the HTML document
- * itself, before a single module is fetched, on every page AND on the login page, which downloads
- * no modules at all. Measured over the shipped templates: 10,625 B of script in, 2,176 B saved.
- *
- * ONLY blocks with no ucode interpolation are touched. `partials/head.ut`'s first block is the
- * `window.__fsSD = {…}` data object, 23 `{{ … }}` substitutions that are ucode expressions and not
- * JavaScript at all — terser would parse `{{ _sd_lay }}` as a block statement and rewrite it into
- * something ucode never emits. A block containing `{{`, `{%` or `{#` is left exactly as it is.
- *
- * Over a BUILD TREE, never the checkout — same rule as minify-js.mjs, and for a sharper reason
- * here: tools/axes.mjs and tools/chrome-fence.mjs both read `head.ut` as TEXT and match it with
- * regexes pinned to its literal shape (`/function set\(dark\)\s*\{([\s\S]*?)\n\t{4}\}/`). Minify
- * the source and those gates stop being able to read the file they exist to hold.
- *
- * CI-only, like the JS minifier: an SDK build has no node and keeps the source, which is the trade
- * already accepted for the shipped modules.
+ * ONLY blocks with no ucode interpolation are touched: a block containing `{{`, `{%` or `{#` (the
+ * `window.__fsSD` data object in partials/head.ut) is not JavaScript and is left exactly as it is.
+ * Over a BUILD TREE, never the checkout: tools/axes.mjs and tools/chrome-fence.mjs match head.ut as
+ * TEXT with regexes pinned to its literal shape. CI-only, like the JS minifier.
  *
  * Usage: node tools/minify-prepaint.mjs <ucode-dir> */
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { minify } from 'terser';
+import { minify } from 'uglify-js';
 
 /* not lib/root.mjs's filesIn(): that one resolves against the repo, and this runs over a build tree
  * whose path is given absolutely */
@@ -57,15 +44,13 @@ for (const file of templates(dir)) {
 	while ((m = re.exec(src)) !== null) {
 		const [ whole, open, body, close ] = m;
 		if (!body.trim() || UCODE.test(body)) continue;
-		const min = await minify(body, {
-			/* the pre-paint runs before anything else on the page and owns no module scope, so it
-			 * is a script, not a module; `toplevel` would rename the IIFEs' own bindings safely but
-			 * buys little here and is one more way to differ from what the gates read */
-			ecma: 2020,
-			compress: { passes: 2 },
-			mangle: true,
-			format: { comments: false },
-		}).catch((e) => { throw new Error(`${file}: ${e.message}`); });
+		/* the pre-paint runs before anything else on the page and owns no module scope, so it
+		 * is a script, not a module; `toplevel` would rename the IIFEs' own bindings safely but
+		 * buys little here and is one more way to differ from what the gates read.
+		 * passes 2, not minify-js.mjs's 3: the blocks are short and a third pass saves 2 B of 4767; webkit/v8
+		 * are the engine-bug workarounds explained there */
+		const min = minify(body, { module: false, webkit: true, v8: true, compress: { passes: 2 }, mangle: true });
+		if (min.error) throw new Error(`${file}: ${min.error.message}`);
 		if (!min.code) continue;
 		out.push(src.slice(last, m.index), open, min.code, close);
 		last = m.index + whole.length;

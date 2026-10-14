@@ -47,7 +47,7 @@ npm run check
 | forum 82-83 | the `placeholder` attribute and the unset dropdown row were drawn in the body inks, so an option's DEFAULT read as a value the reader had typed | `placeholder-ink` (a hint is ≥40% light / ≥30% dark of the ink-to-field range away from the value, and still 3:1, with every combination re-run under `prefers-contrast: more`) |
 | #6 | localisation ships as separate `luci-i18n-*` packages, and assets sorted by name can be picked instead of the theme | `i18n` (catalogue current and complete); `tools/check-packages.sh` asserts exactly one theme package per format, but runs in CI's build job rather than inside `check` |
 | #9, #11 | config-table row labels and a data-table column vanished or were squeezed | `css-dup` + `mirror` (`@mirror table-card/*`) |
-| all | a rule lost its `!important` or started depending on source order | `css-metrics`, `audit --strict`, `css-orphans` |
+| all | a rule lost its `!important` or started depending on source order | `css-metrics`, stylelint `selector-max-specificity`, `audit --strict`, `css-orphans` |
 | — | the template pre-paint drifted from the live appearance appliers | `axes` |
 | — | `[Unreleased]` without a bold lead, or the RU mirror out of sync → an empty release note | `changelog` |
 
@@ -91,17 +91,21 @@ wherever you are unsure — it is the reference for LuCI behaviour.
 
 **A release runs the WIDE version of the automatic live gates first:**
 
-**and `npm run live -- …` cannot carry those flags**: `live` is six `npm run` calls joined by `&&`,
-and npm appends the arguments after the LAST of them, so `--all --pages-all` reached `anchor` alone
-and every gate before it ran its default set. Measured on 2026-09-01: the composed line the shell
-echoes ends `… && npm run anchor --all --pages-all`, and `live-audit` logged
-`node tools/live-audit.mjs` with no arguments. Each gate is therefore called by hand:
+**`npm run live -- …` cannot carry those flags**: `live` chains eight `npm run` calls with `&&`,
+and npm takes the forwarded flags as its own config, so no gate receives them, `anchor` included.
+Measured on 2026-09-01: the composed line the shell echoes ends `… && npm run anchor --all
+--pages-all`, and `live-audit` logged `node tools/live-audit.mjs` with no arguments. Each gate is
+called by hand, `--all` on every one and `--pages-all` only on the two that parse it (`parseArgs`
+is strict, so any other gate exits on an unknown flag):
 
 ```sh
 node tools/live-audit.mjs  --all --pages-all   # every OpenWrt router owlab boots, every page
 node tools/spa-parity.mjs  --all --pages-all
 node tools/table-tick.mjs  --all
 node tools/scroll-anchor.mjs --all
+node tools/scroll-jank.mjs --all
+node tools/floor-contract.mjs --all
+node tools/fit-quiet.mjs --all
 node tools/upstream-contract.mjs --all         # what the theme assumes of luci-base, asked on each
 ```
 
@@ -124,7 +128,7 @@ opened is not a green gate, and the tier a check sits in never changes what the 
 
 **23.05 used to have a line of its own here, and no longer does.** It was the oldest release the
 theme claimed and the only one whose `luci-base` was missing a widget the theme uses:
-`ui.RangeSlider` arrived in 24.10, and its absence took the ENTIRE Appearance tab down — the panel
+`ui.RangeSlider` arrived in 24.10, and its absence took the ENTIRE System → Footstrap page down — the panel
 is built inside one try/catch, so the miss cost a console line and an empty tab, reported from the
 field by a user on 23.05.5 rather than by a gate. Support for that release ended at 0.14.2: it is
 EOL, and openwrt/luci declined to carry the compatibility code in the tree the theme now lives in
@@ -145,7 +149,7 @@ ImmortalWrt is not measured by any gate (`tools/lib/stands.mjs`).
 | #9 | `admin/network/firewall/forwards`, `/snats` (GridSection) | config-table row labels visible (`.fs-stacked` cards / `@container 960`) |
 | #10 | `admin/network/dhcp` (a page with hidden tabs) | no empty scroll below the content |
 | #41, #75 | `admin/network/network`, `admin/system/startup` (a page with a tab strip) | switch tabs: the pane the reader LEFT keeps no `min-height`, and the tab they opened starts where the page starts. `floor-contract` asks it automatically — it clicks the strip and reads the inactive panes — because the fault is invisible on a page that is only loaded and, on a page that does not poll, never goes away by itself |
-| the iPhone report | `admin/status/overview` on a narrow window, scrolled off the top | the page does not creep upward once per poll tick. `fit-quiet` asks the cause automatically — the bar may not be shorter than it settled at while it measures itself — because the symptom needs an engine with no scroll anchoring and does not reproduce headless |
+| the iPhone report | `admin/status/overview` on a narrow window, scrolled off the top | the page does not creep upward once per poll tick. `fit-quiet` asks the cause automatically — `#maincontent` may not move in either direction while the chrome measures itself — because the symptom needs an engine with no scroll anchoring and does not reproduce headless |
 | #11 | `admin/status/overview` (client list) | the "Network" column is not crushed, rows are not over-wide |
 | #17 | the release assets, not a page | `manifest.txt` **and** `manifest.txt.sig` are present; `latest/download/manifest.txt` serves that file; `usign -V` passes with `release.pub`; `awk '$1=="pkg"'` yields one line per format; no install or update path touches `api.github.com`. **The manifest is now load-bearing for installs**, not only for readers: a router the feed cannot serve is installed from it (`install.sh` -> `install_from_release`), so a manifest that does not verify is an install that refuses |
 
