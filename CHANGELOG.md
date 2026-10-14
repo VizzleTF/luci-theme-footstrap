@@ -83,6 +83,7 @@
 - **A `_` typed in a text field is no longer cut off in Chrome/Edge on Linux.** Fields set `line-height: normal`, which in DejaVu Sans Mono (underscore bottom -483 = hhea descent) put the line-box clip exactly on the underscore; they now use the 1.5 body leading (19.5 px at Normal). Field height is unchanged.
 - **A browser extension that replaces the global `_` no longer breaks every page after the first.** `navigate()` now takes a full load when `_('')` is not a string (a lodash/underscore `_` returns an object, so LuCI's `_(…).format` threw `is not a function` on each following view); a full load restores LuCI's `_`.
 - **Installing on OpenWrt 24.10.0-24.10.2 is refused with a clear message, and Appearance there shows a notice instead of "ui.RangeSlider is not a constructor".** `ui.RangeSlider` reached openwrt-24.10 by backport in 24.10.3, so the floor is now 24.10.3; run sysupgrade.
+- **A div-based `.table.fs-dt` outside `.cbi-section` (luci-app-roamd) gets the same cell padding as a real table.** Its `.th` sat at 8px where every other data table has 10px, because the padding rule still keyed on `table.fs-dt`.
 
 ### Security
 

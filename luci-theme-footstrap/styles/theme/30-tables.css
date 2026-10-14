@@ -77,7 +77,7 @@
 	 * known only by the tag (Status -> Routing) lost to key/value's default. */
 	.cbi-section .table:is([id], .fs-dt) .td,
 	.cbi-section .table:is([id], .fs-dt) .th,
-	table.fs-dt .td, table.fs-dt .th { padding: var(--fs-space-2-5) var(--fs-space-3); }
+	.table.fs-dt .td, .table.fs-dt .th { padding: var(--fs-space-2-5) var(--fs-space-3); }
 	.cbi-section .table:is([id], .fs-dt) .td { font-family: var(--fs-font-mono); font-size: var(--fs-type); color: var(--fs-text); }
 
 	/* the min-content FLOOR belongs here: break-word (unlike base's -anywhere) does not lower
