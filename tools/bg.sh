@@ -6,7 +6,7 @@
 # Logs go to ../tmp/ beside the checkout, resolved from this script rather than from $PWD, so a run
 # started from a subdirectory still lands in the one scratch directory CLAUDE.md sanctions.
 #
-#   tools/bg.sh npm run live -- --all
+#   tools/bg.sh node tools/live-audit.mjs --all
 #   tail -n 40 ../tmp/<run-id>.log
 set -eu
 

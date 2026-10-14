@@ -1,13 +1,16 @@
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { ROOT } from '../tools/lib/root.mjs';
 
-const HOOK = new URL('../.claude/hooks/git-guard.sh', import.meta.url).pathname;
-const PRECOMMIT = new URL('../.claude/hooks/precommit-gate.sh', import.meta.url).pathname;
+const HOOK = join(ROOT, '.claude/hooks/git-guard.sh');
+const PRECOMMIT = join(ROOT, '.claude/hooks/precommit-gate.sh');
 const dir = mkdtempSync(join(tmpdir(), 'git-guard-'));
+const bins = [];
+after(() => { for (const d of [ dir, ...bins ]) rmSync(d, { recursive: true, force: true }); });
 writeFileSync(join(dir, 'pipe.sh'), 'set -e\ngit commit -m x\n');
 writeFileSync(join(dir, 'outer.sh'), 'sh pipe.sh\n');
 writeFileSync(join(dir, 'clean.sh'), 'git status\n');
@@ -25,6 +28,7 @@ writeFileSync(join(dir, 'n2', 'ee', 'p.sh'), 'git push\n');
 // being simulated.
 function binWithout(...skip) {
 	const bin = mkdtempSync(join(tmpdir(), 'git-guard-bin-'));
+	bins.push(bin);
 	for (const tool of [ 'jq', 'awk', 'tr', 'cat', 'head', 'grep', 'dirname', 'git', 'node', 'sort', 'sed', 'sh' ]) {
 		if (skip.includes(tool)) continue;
 		for (const d of process.env.PATH.split(':')) {

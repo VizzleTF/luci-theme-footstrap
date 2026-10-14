@@ -263,7 +263,7 @@ verify_one() {
 			--assert 'file /www/luci-static/footstrap/cascade.css' \
 			--assert 'http 200 /cgi-bin/luci/admin/status/overview' \
 			--assert 'http 200 /cgi-bin/luci/admin/system/system' \
-			--assert "exec for f in $UT/*.ut; do ucode -T -c -o /dev/null \"\$f\" || exit 1; done"
+			--assert "exec for f in $UT/*.ut $UT/partials/*.ut; do ucode -T -c -o /dev/null \"\$f\" || exit 1; done"
 	) >"$log" 2>&1 9>&- 8>&- 7>&-; then
 		echo "PASS"
 		printf '%s\tPASS\t%s\n' "$name" "$log" >>"$RESULTS"
@@ -424,7 +424,11 @@ lock_stands() {
 		eval "exec $LOCKFD>>\"\$f\""
 		if ! flock -n "$LOCKFD"; then
 			echo "  stand $r is in use ($(cat "$f" 2>/dev/null || echo 'holder unknown')); waiting for $f"
-			flock "$LOCKFD"
+			lim=$(( ${STANDS_LOCK_TIMEOUT_MS:-1800000} / 1000 ))
+			flock -w "$lim" "$LOCKFD" || {
+				echo "  stand $r still held after ${lim}s by ($(cat "$f" 2>/dev/null || echo 'holder unknown')); gave up"
+				return 1
+			}
 		fi
 		printf 'ci-local pid %s\n' "$$" >"$f"
 		STANDS_LOCK_HELD="${STANDS_LOCK_HELD:+$STANDS_LOCK_HELD }$r"
@@ -438,7 +442,7 @@ require_stand_ack() {
 	leg=$1
 	if [ "$FORCE" = 1 ]; then
 		if lock_stands; then return 0; fi
-		printf '%s\tSKIP\tno flock\n' "$leg" >>"$RESULTS"
+		printf '%s\tSKIP\tstands not locked\n' "$leg" >>"$RESULTS"
 		return 1
 	fi
 	echo "  refusing: $leg boots/installs onto THIS project's own stands ($ROUTERS, owlab.yaml)."
@@ -553,7 +557,7 @@ check                      check                                [gettext],
                                                                  audit.py --strict, conffiles, acl,
                                                                  i18n-packages, makefile-contract,
                                                                  unit tests, css-orphans, mirror,
-                                                                 axes, page-modules, chrome-fence,
+                                                                 axes, page-modules, comment-share, chrome-fence,
                                                                  changelog, update-po.sh --check —
                                                                  package.json is the list)
 lint                       lint                                 ci-playwright,

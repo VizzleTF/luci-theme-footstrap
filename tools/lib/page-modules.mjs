@@ -1,15 +1,13 @@
 /* The page-module map, read from the one file that declares it.
  *
  * `menu-footstrap-common.js` maps a `body[data-page]` value to the module for that page and loads it
- * there. Two tools need the list — the gate that proves map and modules agree, and the size budget,
- * which must not count a page module in what a cold page downloads — and a list parsed in two places
- * is a list that will disagree in one.
+ * there. Only tools/page-modules.mjs reads this list (map against modules); the size budget uses
+ * coldModules() below.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT } from './root.mjs';
+import { ROOT, RESOURCES } from './root.mjs';
 
-export const RESOURCES = join(ROOT, 'luci-theme-footstrap/htdocs/luci-static/resources');
 export const LOADER = 'menu-footstrap-common.js';
 
 /* -> Map(data-page -> module name). Throws rather than returning an empty map: every caller reads
@@ -24,36 +22,25 @@ export function pageModules() {
 	return map;
 }
 
-/* Which modules a page downloads before it can show anything, DERIVED rather than listed.
- *
- * The page-module map answers a narrower question than the size budget needs: it names the two
- * modules the loader fetches per page, but a module reached only from one of THOSE is just as
- * absent from a cold visit, and the budget was counting it. `fs-version.js` is the standing
- * example — 281 B required by `fs-appearance` alone, downloaded on no cold page, and paid for on
- * every one of them in the number the gate printed.
- *
- * So: start at the two `L.require(…)` calls the footer emits and walk the directive prologues.
- * `luci.js` resolves a prologue when the module is FETCHED, so everything the walk does not reach
- * is fetched only when something else asks for it. The prologue shape is the one
- * `tools/minify-js.mjs` parses, and the same constraint applies — the scan stops at the first
- * string literal that is neither `'use strict'` nor a `'require …'`. */
+/* Which modules a page downloads before it can show anything, DERIVED rather than listed: start at
+ * the two `L.require(…)` calls the footer emits and walk the directive prologues, which `luci.js`
+ * resolves when a module is FETCHED. A module reached only from a page module is absent from a cold
+ * visit too (`fs-version.js`, 281 B, required by `fs-appearance` alone, is not counted in the budget).
+ * The prologue ends at the first string literal that is neither `'use strict'` nor a `'require …'`,
+ * the shape tools/minify-js.mjs parses. */
 const FOOTER = join(ROOT, 'luci-theme-footstrap/ucode/template/themes/footstrap/footer.ut');
 
-export function entryModules() {
+function entryModules() {
 	const src = readFileSync(FOOTER, 'utf8');
 	const names = [ ...src.matchAll(/L\.require\('([a-z0-9-]+)'\)/g) ].map((m) => m[1]);
 	if (!names.length) throw new Error(`no L.require() entry point in ${FOOTER}`);
 	return names;
 }
 
-function ours(name) {
-	return existsSync(join(RESOURCES, name + '.js'));
-}
-
 function requiresOf(name) {
 	let src;
 	try { src = readFileSync(join(RESOURCES, name + '.js'), 'utf8'); }
-	catch (e) { return []; }			/* a stock luci-base class, not one of ours */
+	catch (e) { return null; }		/* a stock luci-base class, not one of ours */
 	const out = [];
 	for (const line of src.split('\n')) {
 		const m = /^\s*'(?:use strict|require\s+(\S+?)(?:\s+as\s+\S+)?)'\s*;?\s*$/.exec(line);
@@ -73,9 +60,11 @@ export function coldModules() {
 	const queue = entryModules();
 	while (queue.length) {
 		const name = queue.shift();
-		if (seen.has(name) || !ours(name)) continue;
+		if (seen.has(name)) continue;
+		const deps = requiresOf(name);
+		if (!deps) continue;
 		seen.add(name);
-		for (const dep of requiresOf(name)) queue.push(dep);
+		queue.push(...deps);
 	}
 	return seen;
 }

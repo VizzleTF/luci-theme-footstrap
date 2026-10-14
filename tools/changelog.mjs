@@ -2,21 +2,20 @@
 /* The changelog contract (docs/releasing.md), held by a machine, because it drifts silently and the
  * release page is generated from it.
  *
- * The bug this exists for, found by hand while cutting 0.9.2: `[Unreleased]` had accumulated a
- * DUPLICATE `### Changed` (and `Fixed` sat before `Removed`) across several commits, each of which
- * looked fine on its own, and `tools/release-notes.sh` prints a header the first time it meets each
- * `###` — so the release page would have carried two "Changed" groups. Nothing failed, the notes
- * being generated at tag time, by which point the tag is pushed and the page published.
+ * `[Unreleased]` once accumulated a DUPLICATE `### Changed` (and `Fixed` before `Removed`) across
+ * several commits, each fine on its own; `tools/release-notes.sh` prints a header at each `###`, so
+ * the release page would have carried two "Changed" groups. The notes are generated at tag time,
+ * when the tag is already pushed.
  *
- * A gate rather than a review, because every fault here is invisible in the diff that causes it.
- * The prose is deliberately NOT checked: what makes an entry worth reading is beyond a scanner,
- * so this holds the mechanical half — the half that breaks the generator. */
-import { readFileSync, writeFileSync } from 'node:fs';
+ * The prose is deliberately NOT checked: this holds the mechanical half, the half that breaks the
+ * generator.
+ */
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { ROOT } from './lib/root.mjs';
+import { ROOT, read } from './lib/root.mjs';
 
 /* Keep a Changelog's order, `Performance` appended (docs/releasing.md). The RU mirror's names are the same
  * list in the same order — that is what lets the two files be compared by INDEX rather than by
@@ -26,14 +25,18 @@ const CANON = {
 	'CHANGELOG_ru.md': ['Добавлено', 'Изменено', 'Устарело', 'Удалено', 'Исправлено', 'Безопасность', 'Производительность'],
 };
 
+/* The line index where the section starting before `i` ends: the next heading or the link list. */
+const sectionEnd = (lines, i) => {
+	while (i < lines.length && !/^## \[|^\[[^\]]+\]:\s*\S/.test(lines[i])) i++;
+	return i;
+};
+
 /* A released section's raw text: its heading down to the next heading or the link list. */
 export function sectionText(text, id) {
 	const lines = text.split('\n');
 	const a = lines.findIndex(l => l.startsWith(`## [${id}]`));
 	if (a < 0) return null;
-	let b = a + 1;
-	while (b < lines.length && !/^## \[|^\[[^\]]+\]:\s*\S/.test(lines[b])) b++;
-	return lines.slice(a, b).join('\n').trimEnd();
+	return lines.slice(a, sectionEnd(lines, a + 1)).join('\n').trimEnd();
 }
 
 /* Insert `bullet` as the last bullet of `### section` under [Unreleased], creating the section in
@@ -43,8 +46,7 @@ export function insertBullet(text, canon, section, bullet) {
 	const lines = text.split('\n');
 	const u = lines.findIndex(l => l.startsWith('## [Unreleased]'));
 	if (u < 0) throw new Error('no [Unreleased] heading');
-	let end = u + 1;
-	while (end < lines.length && !/^## \[|^\[[^\]]+\]:\s*\S/.test(lines[end])) end++;
+	const end = sectionEnd(lines, u + 1);
 	const heads = [];
 	for (let i = u + 1; i < end; i++) {
 		const m = lines[i].match(/^### (.+)$/);
@@ -72,15 +74,12 @@ export function insertBullet(text, canon, section, bullet) {
  * strays (until the next tag), and 0.7-0.14 carry 24 legitimate post-tag edits a gate must not
  * rewrite. A tag absent locally, or from before the file, is skipped. */
 export function sealedDrift(file, text, tagged) {
-	const out = [];
 	const newest = [...text.matchAll(/^## \[([^\]]+)\]/gm)].map(m => m[1]).find(id => id !== 'Unreleased');
-	for (const id of newest ? [newest] : []) {
-		const old = tagged(`v${id}`, file);
-		if (old == null) continue;
-		const was = sectionText(old, id), now = sectionText(text, id);
-		if (was !== null && was !== now) out.push(id);
-	}
-	return out;
+	if (!newest) return [];
+	const old = tagged(`v${newest}`, file);
+	if (old == null) return [];
+	const was = sectionText(old, newest);
+	return was !== null && was !== sectionText(text, newest) ? [newest] : [];
 }
 
 const git = (...a) => execFileSync('git', ['-C', ROOT, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
@@ -94,14 +93,18 @@ function addPair(argv) {
 	const pair = { 'CHANGELOG.md': flag('--en'), 'CHANGELOG_ru.md': flag('--ru') };
 	if (!Number.isInteger(idx) || idx < 0 || idx > 6 || !Object.values(pair).every(b => b.startsWith('- **')))
 		throw new Error('usage: changelog.mjs add <0-6> --en "- **lead.** …" --ru "- **lead.** …"');
-	for (const [file, bullet] of Object.entries(pair)) {
+	/* All four texts first: a failure on the RU file must not leave EN written alone. */
+	const plan = Object.entries(pair).map(([file, bullet]) => {
 		const canon = CANON[file], sec = canon[idx];
-		const work = readFileSync(join(ROOT, file), 'utf8');
+		const work = read(file);
 		let staged;
 		try { staged = git('show', `:${file}`); } catch { staged = work; }
-		writeFileSync(join(ROOT, file), insertBullet(work, canon, sec, bullet));
+		return { file, sec, work: insertBullet(work, canon, sec, bullet), index: insertBullet(staged, canon, sec, bullet) };
+	});
+	for (const { file, sec, work, index } of plan) {
+		writeFileSync(join(ROOT, file), work);
 		const oid = execFileSync('git', ['-C', ROOT, 'hash-object', '-w', '--stdin'],
-			{ input: insertBullet(staged, canon, sec, bullet), encoding: 'utf8' }).trim();
+			{ input: index, encoding: 'utf8' }).trim();
 		git('update-index', '--cacheinfo', `100644,${oid},${file}`);
 		console.log(`changelog: ${file} <- ### ${sec}`);
 	}
@@ -115,8 +118,8 @@ function gate() {
 
 	/* Parse into versions -> sections -> bullets. A bullet is a top-level `- ` at column 0; the
 	 * rationale that follows it is indented, so it never counts as one. */
-	function parse(file) {
-		const lines = readFileSync(join(ROOT, file), 'utf8').split('\n');
+	function parse(text) {
+		const lines = text.split('\n');
 		const versions = [];
 		const links = new Map();
 		let ver = null, sec = null;
@@ -142,20 +145,20 @@ function gate() {
 		return { versions, links };
 	}
 
+	const tagged = (tag, f) => { try { return git('show', `${tag}:${f}`); } catch { return null; } };
+	const parsed = {};
 	for (const [file, canon] of Object.entries(CANON)) {
-		const { versions, links } = parse(file);
-		const tagged = (tag, f) => { try { return git('show', `${tag}:${f}`); } catch { return null; } };
-		for (const id of sealedDrift(file, readFileSync(join(ROOT, file), 'utf8'), tagged))
+		const text = read(file);
+		const { versions, links } = parsed[file] = parse(text);
+		for (const id of sealedDrift(file, text, tagged))
 			fail(file, 1, `[${id}] differs from its section at tag v${id} — a released section is sealed ` +
 				`(a rebase or cherry-pick moved an entry into it?); \`git diff v${id} -- ${file}\``);
 
 		if (!versions.length) { fail(file, 1, 'no `## [version]` headings at all'); continue; }
-		if (versions[0].id !== 'Unreleased' && !versions.some(v => v.id === 'Unreleased')) {
-			/* not a fault: a freshly cut release has no [Unreleased] until the next commit */
-		} else if (versions[0].id !== 'Unreleased' && versions.some(v => v.id === 'Unreleased')) {
-			fail(file, versions.find(v => v.id === 'Unreleased').line,
-				'[Unreleased] is not the first heading — the file is newest-first');
-		}
+		/* absent is not a fault: a freshly cut release has no [Unreleased] until the next commit */
+		const unrel = versions.find(v => v.id === 'Unreleased');
+		if (unrel && unrel !== versions[0])
+			fail(file, unrel.line, '[Unreleased] is not the first heading — the file is newest-first');
 
 		for (const v of versions) {
 			/* a released version carries its date; [Unreleased] must not pretend to have one */
@@ -212,7 +215,7 @@ function gate() {
 	/* THE MIRROR: same facts, only the prose language differs (docs/releasing.md). A mirror that lags is worse
 	 * than none — the reader cannot tell which copy is stale — and nothing renders differently when it
 	 * does, so only a comparison finds it. Sections are matched by CANONICAL INDEX, never by name. */
-	const en = parse('CHANGELOG.md'), ru = parse('CHANGELOG_ru.md');
+	const en = parsed['CHANGELOG.md'], ru = parsed['CHANGELOG_ru.md'];
 	const enIds = en.versions.map(v => v.id), ruIds = ru.versions.map(v => v.id);
 
 	if (enIds.join() !== ruIds.join()) {
@@ -249,10 +252,7 @@ function gate() {
 
 	const vcount = en.versions.length;
 
-	// Printed only once the checks above are known to hold: this line used to run before the
-	// `fails.length` check below and announced "mirror in lockstep, sections canonical" on its way to
-	// exit 1, so a failing run's own first line of output contradicted its own exit code — a CI reader
-	// skimming the top of the log read a pass.
+	// Printed only after the checks hold: a failing run must not open with a line claiming a pass.
 	if (fails.length) {
 		console.error('\nchangelog: FAILED\n');
 		for (const f of fails) console.error(`  ${f}`);

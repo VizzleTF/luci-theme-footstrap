@@ -4,9 +4,10 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { ROOT } from '../tools/lib/root.mjs';
 
-const SCRIPT = new URL('../tools/pr-watch.sh', import.meta.url).pathname;
-const TMP = new URL('../../tmp/', import.meta.url).pathname;
+const SCRIPT = join(ROOT, 'tools/pr-watch.sh');
+const TMP = join(ROOT, '..', 'tmp') + '/';
 const dir = mkdtempSync(join(tmpdir(), 'pr-watch-'));
 const seen = join(TMP, `pr-watch-test-${process.pid}.seen`);
 after(() => { rmSync(dir, { recursive: true, force: true }); rmSync(seen, { force: true }); });
@@ -67,4 +68,11 @@ test('invisible characters (tags, BOM, joiners, variation selectors) are strippe
 	assert.equal(r.status, 0, r.stderr);
 	assert.doesNotMatch(r.stdout, /[\u{e0000}-\u{e007f}\ufeff\u2060-\u2064\u180e\ufe00-\ufe0f]/u);
 	assert.match(r.stdout, /hid +den/);
+});
+
+test('a head with no check-run yet is not reported as CI', () => {
+	rmSync(seen, { force: true });
+	const r = run([ '1', '--batch', '0', '--interval', '1', '--max', '5', '--seen', seen ]);
+	assert.equal(r.status, 0, r.stderr);
+	assert.doesNotMatch(r.stdout, /CI on/);
 });

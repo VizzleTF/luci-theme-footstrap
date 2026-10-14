@@ -1,27 +1,16 @@
 /* Load one shipped `fs-*.js` the way luci.js loads it, so a unit test can call its exports.
  *
- * A LuCI resource file is NOT an ES module and cannot be `import`ed: it has no exports, it ends in a
- * bare `return`, and its dependencies arrive as PARAMETERS named by the `'require x as y'` pragmas
- * in its directive prologue. luci.js evaluates it as the body of
- *
- *     function (window, document, L, <one param per pragma>) { … }
- *
- * with `E` and `_` reached through `window`. This reproduces that call, which is the only honest way
- * to test the file that ships — a rewritten copy in ESM syntax would be a second source of truth,
- * and the interesting bugs live in the seam this wrapper IS (see tools/minify-js.mjs, where the same
- * derivation stops terser handing `L` to one of its own variables).
- *
- * The alias is derived the way luci.js derives it: the `as` name, else the dependency with every
- * non-word character replaced. A dependency with no stub is handed an empty object rather than
- * `undefined`, so a module that only reaches into an unrelated dependency at call time still loads.
- *
- * What this is NOT: a browser. There is no layout, no CSS and no event dispatch — `window` and
- * `document` here record what a module ASKS FOR (listeners, timers) and answer the few reads a
- * module makes at eval. Anything that needs a real box on a real page belongs on a stand
- * (docs/development.md). */
+ * A LuCI resource file is NOT an ES module: no exports, it ends in a bare `return`, and its
+ * dependencies arrive as PARAMETERS named by the `'require x as y'` pragmas in its directive
+ * prologue. luci.js evaluates it as `function (window, document, L, <one param per pragma>) { … }`
+ * with `E` and `_` reached through `window`; this reproduces that call (a rewritten ESM copy would
+ * be a second source of truth; tools/minify-js.mjs derives the same aliases). The alias is the `as`
+ * name, else the dependency with every non-word character replaced; a dependency with no stub gets
+ * an empty object. Not a browser: no layout, CSS or event dispatch, `window` and `document` record
+ * what a module ASKS FOR — anything needing a real box belongs on a stand (docs/development.md). */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { RESOURCES } from '../../tools/lib/page-modules.mjs';
+import { RESOURCES } from '../../tools/lib/root.mjs';
 
 /* The leading run of string-literal statements. Scanned line-wise rather than parsed: the prologue
  * is by definition the head of the file, one directive per line in this tree (eslint keeps it so),
@@ -151,17 +140,10 @@ export function installBrowserGlobals() {
 		globalThis.getComputedStyle = () => ({ getPropertyValue: () => '', overflowY: 'visible' });
 }
 
-/* An unstubbed dependency defaults to `{}` (below) UNLESS it is a theme module this harness can
- * load for real without inventing anything: a shipped `<dep>.js` whose OWN pragma dependencies are
- * every one either `baseclass` or already present in the CALLER's `stubs`. fs-widgets is the shape
- * this exists for — `require baseclass` only, three small pure exports (svgIcon, syncAttr,
- * wireActivate) that hand-faking would just restate as a second copy in this file — but the rule
- * is general: any module that grows a `require` pragma on one of these needs no test of its own
- * updated for it. Not extended past one level: a theme module whose OWN unmet dependency is a
- * SECOND theme module is not walked recursively, so it still falls through to `{}` below, same as
- * `fs-fit`/`fs-router`/`fs-chrome` do today — those reach for a live DOM or a timer this harness
- * does not have, and guessing which ones are "safe" two levels down is exactly the per-name special
- * case this rule replaces. */
+/* An unstubbed dependency defaults to `{}` UNLESS it is a shipped theme `<dep>.js` whose OWN
+ * pragma dependencies are all `baseclass` or already in the CALLER's `stubs` (fs-widgets: three
+ * pure exports that faking would restate as a second copy). One level only: a module with an unmet
+ * theme dependency stays `{}`, as fs-fit/fs-router/fs-chrome do — they need a live DOM or a timer. */
 /* No cross-call cache: fs-widgets is stateless (three pure functions) and could safely be a
  * singleton, but this rule is general and a module like fs-menutree carries mutable state of its
  * own (`setTree()`) — caching it here would leak that state between unrelated tests loaded later

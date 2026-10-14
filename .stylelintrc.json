@@ -39,7 +39,12 @@
     "thing that can catch a value which is invalid at computed-value time and therefore",
     "vanishes in SILENCE — the exact failure mode this project tore the --*-rgb component",
     "bridges out for. custom-property-no-missing-var-function catches `color: --fs-accent`",
-    "(a bare custom-property name where var() was meant), which parses and does nothing."
+    "(a bare custom-property name where var() was meant), which parses and does nothing.",
+    "",
+    "selector-max-specificity is the widest selector the theme needs (docs/conventions.md). Raised",
+    "6 -> 7 when the vertical sidebar's guard gained :not([data-narrow]): the cut depends on the",
+    "content column's width, so it is an attribute, not a media query, and every vertical and rail",
+    "rule carries one more."
   ],
   "plugins": ["@stylistic/stylelint-plugin"],
   "rules": {
@@ -95,6 +100,7 @@
     "syntax-string-no-invalid": true,
 
     "no-descending-specificity": null,
+    "selector-max-specificity": "1,7,0",
 
     "declaration-no-important": true,
 
@@ -109,17 +115,19 @@
     {
       "//": [
         "The only files allowed an !important, and each for a documented reason.",
-        "theme/90-responsive + pages/20-overview outrank an inline style= attribute",
-        "written by 29_ports.js / ui.js — no cascade layer can do that, only an author",
+        "theme/90-responsive (package-manager.js) + pages/20-overview (29_ports.js) outrank",
+        "an inline style= attribute — no cascade layer can do that, only an author",
         "!important can. theme/45-misc is the same case: the realtime graphs write",
         "style='width:100%' on the box they draw into, and the theme has to widen it or",
         "the drawing (sized from #view) is clipped by the card's gutter. theme/65-dropdown",
-        "carries the widget's ul-margin flag (ui.js writes margin inline on an open list),",
+        "carries the open list's inset-inline flags (ui.js writes left/right inline) and",
+        "frees .hide-close from RichListValue's inline min-width:25vw,",
         "moved in with the machinery absorbed from base/80-dropdown.css. styles/base",
         "keeps the .left/.right/.center forcing utilities and the two inline-style fighters",
         "in 95-luci. theme/95-a11y-media is the reduced-motion block: !important INVERTS",
         "the layer order, so it is the only way one rule can stop animations declared in",
-        "base as well as in theme.",
+        "base as well as in theme. It also carries the forced-colors focus outline, for the",
+        "same reason: 15 themed rules set outline: none at up to (0,4,1) or in the page layer.",
         "theme/30-tables carries THREE flags, one per adversary a layer cannot reach.",
         "`word-break: normal` fights two of them: luci-mod-status's processes.js writes",
         "style='word-break: break-word' on its Command span, the deprecated alias for",
