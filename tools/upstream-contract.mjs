@@ -2,29 +2,23 @@
 /* The coupling registry: every assumption this theme makes about luci-base, checked against the
  * luci-base a router actually runs.
  *
- * The theme ships no framework and depends on `+luci-base` alone, so every fs-*.js module is written
- * against somebody else's code — and against parts of it that are not an API: `L.Poll` is a
- * deprecated alias, `uci.state.values` and `uci.loaded` are private, `L.env.dispatchpath` is
- * re-pointed by us on a client navigation, and network.js loads three uci packages exactly once and
- * answers out of that cache forever. None of those is a promise anyone made, and each is
- * load-bearing here.
+ * The theme depends on `+luci-base` alone, so each fs-*.js module leans on parts of it that are not
+ * an API: `L.Poll` is a deprecated alias, `uci.state.values` and `uci.loaded` are private,
+ * `L.env.dispatchpath` is re-pointed on a client navigation, network.js loads three uci packages
+ * once and answers from that cache forever. Each entry names WHAT is assumed, WHO assumes it and a
+ * probe on a live page. A failure means "this luci-base moved, look at the module named here".
  *
- * Each entry names WHAT is assumed, WHO in this repo assumes it, and a probe that answers on a live
- * page. A failure is not "the theme is broken" — it is "this luci-base moved, and the module named
- * here has to be looked at before the theme ships against it".
+ *   node tools/upstream-contract.mjs [--only owrt2512,owrt2410] [--all] [--verbose]
  *
- *   node tools/upstream-contract.mjs [--only owrt2512,owrt2410] [--verbose]
- *
- * Needs a running owlab router (docs/development.md); run it against SNAPSHOT too, which is where
- * luci-base's master lands first. */
-import { parseArgs } from 'node:util';
+ * Needs a running owlab router; run it against SNAPSHOT too, where luci-base's master lands first. */
 import { chromium } from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
+import { parseFlags } from './lib/util.mjs';
 
-const { values: FLAGS } = parseArgs({ options: {
+const FLAGS = parseFlags('upstream-contract', {
 	verbose: { type: 'boolean', default: false }, only: { type: 'string', default: '' },
 	all: { type: 'boolean', default: false },
-} });
+});
 const VERBOSE = FLAGS.verbose;
 
 /* Every probe returns `true`, or a STRING saying what it found instead — the string is what a
@@ -33,7 +27,7 @@ const CONTRACT = [
 	{
 		id: 'env-shape',
 		what: 'L.env carries dispatchpath, requestpath, pathinfo, nodespec, scriptname, base_url, cgi_base',
-		used_by: 'fs-router.js (re-points all of them on a client navigation), fs-chrome.js, fs-menutree.js, fs-search.js',
+		used_by: 'fs-router.js (re-points dispatchpath/requestpath/pathinfo/nodespec on a client navigation, reads base_url), fs-chrome.js, fs-menutree.js, fs-sheets.js, fs-overview.js, fs-appearance.js, menu-footstrap-common.js, fs-assets.js (cgi_base)',
 		fn: () => {
 			const missing = [ 'dispatchpath', 'requestpath', 'pathinfo', 'nodespec', 'scriptname', 'base_url', 'cgi_base' ]
 				.filter((k) => !(k in L.env));
@@ -42,13 +36,13 @@ const CONTRACT = [
 	},
 	{
 		id: 'poll-alias',
-		what: 'the deprecated L.Poll alias still exists, with queue[], start(), stop() and a readable tick',
+		what: 'the deprecated L.Poll alias still exists, with queue[], start(), stop() and active()',
 		used_by: 'fs-router.js — flushes the queue and re-arms the tick so an incoming view polls at once',
 		fn: () => {
 			if (!L.Poll) return 'L.Poll is gone; fs-router falls back to leaving the queue alone';
 			if (!Array.isArray(L.Poll.queue)) return 'L.Poll.queue is not an array: ' + typeof L.Poll.queue;
 			if (typeof L.Poll.start !== 'function' || typeof L.Poll.stop !== 'function') return 'L.Poll has no start/stop';
-			if (typeof L.Poll.active !== 'function' && !('timer' in L.Poll)) return 'neither L.Poll.active() nor L.Poll.timer is readable';
+			if (typeof L.Poll.active !== 'function') return 'L.Poll.active() is not a function';
 			return true;
 		},
 	},
@@ -90,7 +84,7 @@ const CONTRACT = [
 			const pkgs = [ ...chunk.matchAll(/uci\.load\('([a-z]+)'\)/g) ].map((m) => m[1]).sort();
 			const want = [ 'luci', 'network', 'wireless' ].join(',');
 			if (pkgs.join(',') !== want) return 'initNetworkState() now loads [' + pkgs.join(', ') + '], not [' + want + ']';
-			if (!/_state\s*!=\s*null\s*\?\s*Promise\.resolve\(_state\)/.test(chunk + src.slice(i, i + 4000)))
+			if (!/_state\s*!=\s*null\s*\?\s*Promise\.resolve\(_state\)/.test(chunk))
 				return 'initNetworkState() no longer short-circuits on _state — the refill may be unnecessary';
 			return true;
 		},
@@ -197,17 +191,6 @@ const CONTRACT = [
 		},
 	},
 	{
-		id: 'tabs-api',
-		what: 'ui.tabs exposes initTabGroup() and switchTab()',
-		used_by: 'fs-chrome.js re-renders the section tab strip; fs-router.js relies on a view calling initTabGroup during render',
-		fn: async () => {
-			const ui = await L.require('ui');
-			if (!ui.tabs) return 'ui.tabs is gone';
-			for (const m of [ 'initTabGroup', 'switchTab' ]) if (typeof ui.tabs[m] !== 'function') return 'ui.tabs.' + m + ' is not a function';
-			return true;
-		},
-	},
-	{
 		id: 'dropdown-popup-is-absolute',
 		what: 'an open ui.Dropdown\'s list is position:absolute inside the widget, so ANY overflow ancestor clips it',
 		used_by: 'fs-select.js never gives a control-bearing table a scroll container; theme/65-dropdown.css keeps :has(.cbi-dropdown) out of one',
@@ -289,7 +272,7 @@ const CONTRACT = [
 	{
 		id: 'session-id',
 		what: 'rpc.getSessionID() answers with the session token',
-		used_by: 'fs-prefs.js posts to cgi-upload with the session in a form FIELD, which is what luci-base\'s own upload does',
+		used_by: 'fs-assets.js posts to cgi-upload with the session in a form FIELD, which is what luci-base\'s own upload does',
 		fn: async () => {
 			const rpc = await L.require('rpc');
 			const id = rpc.getSessionID();

@@ -1,73 +1,30 @@
 #!/usr/bin/env node
 /* The reader's place, on an engine that will not keep it.
  *
- * A poll tick changes the height of things above the reader and the page below moves. Chromium,
- * Firefox and — since WebKit 26 — Safari all hide that with scroll anchoring of their own
- * (docs/anchoring.md, `ENGINE_ANCHORS`); an older WebKit and every iPhone before it had none, and a
- * current one can still get the COLLAPSE case wrong (task wkanchor, and the `tick` row below).
+ * A poll tick changes the height of things above the reader and the page below moves. The engines
+ * hide that with scroll anchoring of their own (docs/anchoring.md, `ENGINE_ANCHORS`) except an
+ * older WebKit, and a current one can still get the collapse case wrong; fs-fit.js covers it.
+ * Cells: held (growth, correction forced on), floor (correction off), swapped (a body emptied and
+ * refilled), not twice (engine alone), quiet (no correction mid-flick), tick (a REAL tick, reader
+ * parked), repeat (three refills; the trust flag). Growth is inserted, not waited for, except in
+ * tick. Why each exists, with numbers: docs/anchoring-log.md, "Gate details moved out of
+ * `tools/scroll-anchor.mjs`".
  *
- * The theme does that job where nobody else does (fs-fit.js, ENGINE_ANCHORS). This gate holds every
- * half of that sentence, since each can break silently:
- *
- *   held      with the engine's anchoring suppressed AND the theme's fallback forced on, a growth
- *             above the fold must move the reader by no more than a pixel or two.
- *   floor     the same refill with the correction switched off (`fsAnchor = 'off'`): the content
- *             column holds its height between ticks, so the document never gets short enough to be
- *             clamped. It can only be measured with the other half silent.
- *   swapped   a section refilled the way `dom.content()` refills one — emptied, then filled again —
- *             must leave the reader where they were too, and PROMPTLY: sampled every frame for
- *             `SWAP_WINDOW` (900ms, well past lateDrift()'s measured 419-420ms), a drift that never
- *             falls back under tolerance is one finding ("never came back") and one that does but
- *             past `LATE_MS` (200ms — task latenet's four-way ablation put the theme's own fallback
- *             at 7-36ms and an engine's late residual at 419-420ms, and this sits between the two
- *             with margin either side) is another ("corrected late") — a single fixed-delay read
- *             cannot tell those apart, and used to fold them into the same `moved 0px`. The moment in
- *             between the empty and the refill has no height, and `held` cannot see that: a growth
- *             only ever inserted never collapses anything.
- *   not twice with the engine's anchoring left alone, the same growth must move the reader just as
- *             little — a fallback that also ran there would throw the page the other way.
- *   quiet     while the reader is SCROLLING the theme must not correct at all: a correction landing
- *             inside a flick is itself a jump.
- *   tick      while the reader is PARKED and nothing is inserted, a REAL poll tick — the engine's own
- *             anchoring included — must not move the offset either. `held` closes inside 800ms and
- *             `quiet` discards a still 400ms; a correction landing between those windows (WebKit's
- *             own, measured 421ms) passed both and is what this row exists to catch.
- *   repeat    `swapped` again, `REPEAT_TIMES` (3) times running on the same section — the shape
- *             every case above is structurally blind to: each closes inside one refill, and
- *             `_engineTrusted` (fs-fit.js) only ever moves on the SECOND miss, so a switch that
- *             flips wrongly — an engine still anchoring correctly loses the theme's trust in it two
- *             ticks later — is invisible to anything that never performs a second one (task
- *             missrule). Both the reader's position after every refill and the trust flag itself
- *             are read; the flag going false while the reader never moved is its own finding,
- *             separate from the reader actually moving. It measures on the SAME section SWAP just
- *             measured — `window.__fsRepeatSection`, not a second search — because a second search
- *             run after SWAP's own two refills can land on a worse candidate than the one SWAP
- *             already proved reaches the scroller (274/274 cells measured nothing before this was
- *             fixed; SWAP's own coverage in the same run is the comparison).
- *
- * The growth in `held`/`swapped`/`quiet` is inserted rather than waited for: a real tick depends on
- * what the router's radios are doing, and a gate that only fails when a station happens to join is
- * not a gate. `tick` is the one case that measures a real one anyway, for the fault only a real tick
- * can show.
- *
- *   node tools/scroll-anchor.mjs [--only owrt2512] [--engines chromium,firefox] [--full]
- *   … [--width 390] [--layout top] [--bail]   one cell, stopping at the first finding
- *
- * The default sweep crosses the axes that were measured to change its answer; `--full` adds the
- * ones that were measured not to (see SCROLLERS and DENSITIES) and is what CI runs on a push.
- *
+ *   node tools/scroll-anchor.mjs [--only owrt2512] [--all] [--engines chromium,firefox] [--full|--bail]
+ *   … [--width 390] [--layout top]   one cell
+ *   … [--quick] [--page <name>] [--no-pair]
  * Needs a running owlab router (docs/development.md). */
-import { parseArgs } from 'node:util';
 import * as pw from 'playwright';
 import { stands, login, requireStands, sealToRouter, pairStands } from './lib/stands.mjs';
+import { parseFlags } from './lib/util.mjs';
 
-const { values: FLAGS } = parseArgs({ options: {
+const FLAGS = parseFlags('scroll-anchor', {
 	engines: { type: 'string', default: 'chromium' }, full: { type: 'boolean', default: false },
 	bail: { type: 'boolean', default: false }, quick: { type: 'boolean', default: false },
 	page: { type: 'string' }, width: { type: 'string', default: '' }, layout: { type: 'string', default: '' },
 	only: { type: 'string', default: '' }, all: { type: 'boolean', default: false },
 	'no-pair': { type: 'boolean', default: false },
-} });
+});
 const ENGINES = FLAGS.engines.split(',').map((s) => s.trim()).filter(Boolean);
 /* `--full` restores the axes this sweep used to cross in full: every width against every layout,
  * and all three densities. Measured on 132 cells, they multiply the sweep without dividing its
@@ -80,56 +37,28 @@ const FULL = FLAGS.full;
  * sweep says. */
 const BAIL = FLAGS.bail;
 /* A local iteration loop, not the sweep CI runs: the first stand only, the Overview page alone, the
- * default width/layout/density axes (task sweepspeed). Says what it left out on every run, loudly,
+ * default width/layout/density axes. Says what it left out on every run, loudly,
  * so a clean `--quick` is never mistaken for a clean sweep — the same reason a page that never
  * opened is reported apart from a pass rather than folded into one. `--only`/`--page` still override
  * when given explicitly; CI never sets this flag. */
 const QUICK = FLAGS.quick;
 
-/* Three shapes, because the shape decides what the theme can anchor ON, and each of these breaks
- * differently:
- *
- *   overview     sections whose BODIES a poll refills (`.cbi-section > div`, every 5 s). The only
- *                page here where a refilled block is ever entirely above the reader, so the
- *                `swapped` scenario is measured here and nowhere else.
- *   dhcp         a table under a section whose ROWS a poll replaces — what `L.ui.Table` does, and
- *                the shape a third-party app is most likely to emit. The leases are stable (32 and
- *                36 rows on the stands), which is what makes it a repeatable cell.
- *   processes    one table, a direct child of `#view`. The climb out of it used to land on the host
- *                and give up, so nothing held the reader at all, on every engine, while a gate that
- *                only opened the first shape passed throughout. It does not poll and its single
- *                block is taller than the page scrolls (6397px against 6108px on owrt2512), so it
- *                proves the CLIMB and never the swap.
- *
- * `--page a,b` overrides. Two pages were measured and NOT taken, which is the cheaper half of this
- * list to lose:
- *
- *   wireless     812px of scroll at 390px wide and 0 at 1440, so every cell of it skipped.
- *   connections  the realtime page. Its length follows the conntrack table, so the same cell
- *                reported 958px of scroll in one run and 400px in the next — a cell that is not
- *                repeatable is not a gate. And the block this sweep swaps there is not the block
- *                its poll replaces: emptying the section `div` moved the reader 252px against a
- *                120px pad while the block itself measured the same height before and after
- *                (`grewOnItsOwn` 0), the same way swapping `.fs-ovl` deletes three sections no poll
- *                touches. What produced the other 132px was not established. */
+/* Three page shapes, because the shape decides what the theme can anchor ON: overview (section
+ * bodies a poll refills; the only page where a refilled block sits entirely above the reader, so
+ * `swapped` is measured here alone), dhcp (a polled table's ROWS, the shape a third-party app most
+ * likely emits) and processes (one table directly under `#view`: it proves the climb, never the
+ * swap). wireless and connections were measured and dropped as not repeatable; the numbers are in
+ * docs/anchoring-log.md. `--page a,b` overrides. */
 /* No parseArgs `default:` here: it depends on QUICK, which parseArgs cannot express. */
 const PAGES = (FLAGS.page ?? (QUICK ? '/admin/status/overview'
 	: '/admin/status/overview,/admin/network/dhcp,/admin/status/processes'))
 	.split(',').map((p) => p.trim()).filter(Boolean);
 
-/* WIDTH AND LAYOUT ARE ONE AXIS FOR HOLD/SWAP/QUIET, and it has two values, not four: what those
- * three measure is which element the correction has to scroll, and only one of the four
- * combinations scrolls anything but the window:
- *
- *   1440 side → #maincontent      1440 top → window      390 side → window      390 top → window
- *
- * `tick` (task wkanchor) does not fit that reduction: at 390 wide both `side` and `top` collapse the
- * sidebar into the same bar chrome and scroll the same window, but `data-layout` itself is still
- * either value underneath that collapse, and something in what THAT leaves in the DOM is what
- * decides whether WebKit's own scroll anchoring misfires — measured on owrt2512/Overview, one real
- * tick with the reader parked: 0px peak-to-peak at 390 side, 41px at 390 top, same page, same tick,
- * same engine. So `top` stays in the default axis for that one case rather than only under `--full`
- * — a PR that reintroduces this fault would otherwise only be caught on a push or a tag. */
+/* WIDTH AND LAYOUT ARE ONE AXIS FOR HOLD/SWAP/QUIET, with two values: they measure which element
+ * the correction scrolls, and only 1440 side scrolls anything but the window. `tick` does not fit
+ * the reduction: 390 side and 390 top scroll the same window yet WebKit's own anchoring misfires
+ * on one only (0px against 41px peak-to-peak on one real tick, owrt2512/Overview), so `top` stays
+ * in the default axis for that case rather than only under `--full`. */
 const SCROLLERS = (() => {
 	const all = FULL
 		? [ 1440, 390 ].flatMap((width) => [ 'side', 'top' ].map((layout) => ({ width, layout })))
@@ -153,63 +82,35 @@ const TOLERANCE = 2;
 /* how many REAL poll ticks TICK insists on before it will trust a 0px reading — see the note on
  * TICK below for why fewer would pass a fault this gate exists to catch */
 const TICK_COUNT = 3;
-/* How late a correction may land before the drift it leaves is itself a finding — separate from
- * SWAP simply never seeing one at all. Measured (task latenet's four-way SWAP ablation): the
- * theme's own fallback (`applyAnchor` via `scheduleAnchor`) lands 7-36ms after a refill; an engine
- * that anchors but did not keep the reference through THIS refill is caught by the theme's
- * `lateDrift()` (fs-fit.js), which used to answer one rAF plus `SCROLL_IDLE` later — 404-422ms,
- * measured on the `engine DECLINES` cell below across three engines and three stands. 200ms sat
- * roughly midway between those two clusters with well over 150ms of headroom either side, so
- * ordinary jitter on a loaded runner could not cross it, and it is what a maintainer reading a
- * report would call the difference between "instant" and "a jump".
- *
- * Task late419 moved `lateDrift()` itself rather than this number: where the page was already
- * still when the refill landed it now waits the next frame instead, and the same cells read
- * 8-61ms. The threshold is unchanged and still separates the two shapes — what it now separates
- * is "the theme corrected on the next frame" from "the theme waited out a reader who was moving",
- * which is the only case left above it. */
+/* How late a correction may land before the drift is itself a finding, apart from SWAP never
+ * seeing one. The theme's own fallback lands 7-36ms after a refill; `lateDrift()` (fs-fit.js)
+ * answers on the next frame when the page was already still (8-61ms) and waits out a moving reader
+ * otherwise (404-422ms). 200ms sits between with over 150ms of headroom either side. */
 const LATE_MS = 200;
-/* How long SWAP watches a refill before it may call a correction "never came". Long enough to hold
- * lateDrift()'s slow path (404-422ms, the reader in motion) with real margin for a loaded runner;
- * short enough that a cell that truly never corrects does not sit idle. NOT shortened to match
- * task late419's faster path: the window has to outlast the SLOWEST correction the theme can
- * legitimately make, or "late" and "never" become the same reading again. */
+/* How long SWAP watches a refill before a correction "never came": past `lateDrift()`'s slow path
+ * (404-422ms, the reader in motion) with margin for a loaded runner. Not shortened to match the
+ * faster path: it must outlast the SLOWEST legitimate correction, or "late" and "never" read alike. */
 const SWAP_WINDOW = 900;
-/* How many refills REPEAT performs on the SAME section, back to back — see the note on REPEAT
- * below. `LATE_MISS_LIMIT` (fs-fit.js) is 2: one is headroom for a one-off, a second is the count.
- * Two refills only ever REACHES the limit on the second one; a third is what proves the flag it
- * trips STAYS tripped (or, on a correctly-anchoring engine, never trips at all) rather than
- * resetting itself on the very next tick — task missrule. */
+/* How many refills REPEAT performs on the SAME section (see its note). `LATE_MISS_LIMIT`
+ * (fs-fit.js) is 2: the second refill reaches the limit, the third proves the flag it trips stays
+ * tripped (or, on an engine anchoring correctly, never trips) rather than resetting on the next tick. */
 const REPEAT_TIMES = 3;
 
-/* Park the reader and wait for the THEME to notice, rather than for a stopwatch.
- *
- * A probe scrolls the page and then has to let the theme settle: fs-fit treats the reader as moving
- * until SCROLL_IDLE (400 ms) of stillness and only then remembers where the page stands — the
- * reference every correction is measured against. A flat wait is a race WebKit loses: a programmatic
- * `scrollTop` write there does not fire `scroll` on the next frame, it arrives up to 1.2 seconds
- * later, so the sampler had not begun settling when the probe grew the page (measured: three
- * findings on WebKit, none on the other two engines, with the theme identical).
- *
- * So the wait is on the EVENT and then on the idle window, both bounded. */
+/* Park the reader and wait for the THEME to notice, not for a stopwatch: fs-fit treats the reader
+ * as moving until SCROLL_IDLE (400 ms) of stillness and only then takes the reference every
+ * correction is measured against. A flat wait is a race WebKit loses — a programmatic `scrollTop`
+ * write there fires `scroll` up to 1.2 s late — so the wait is on the EVENT, then on the idle
+ * window, both bounded. */
 
-/* Runs in the page: park the reader, grow something above them, report what they saw.
- *
- * The router's poll is held here too, though this case only INSERTS. It used to run underneath, on
- * the reasoning that a pad the probe adds survives a tick landing beside it — and the pad does. The
- * REFERENCE does not: a tick calls `dom.content()` on the section the reader happens to be over, and
- * the element this probe measured the page by is gone before the second read. Measured on the tag
- * build: `the reader's element was replaced mid-measurement` on webkit/Overview at 1440 side, on
- * owrt2512 and owrt2410 both, and on no other engine — WebKit is slow enough here to lose that race
- * repeatably. The growth is synthetic in either case, so a real tick underneath adds nothing but the
- * chance of measuring nothing. */
-/* BELOW — content arriving UNDER the reader must not move them. Every other case grows content above the
- * reader: HOLD inserts at the top of #view, SWAP and REPEAT refill a body entirely above the viewport. So a
- * theme that scrolls the reader for growth below them passed all of them — measured, 0f298ef: a 120 px refill
- * inside a floored box below the viewport moved the offset +120 and the reader -120 on firefox and chromium,
- * /admin/network/dhcp and Overview, engine anchoring on, the stack naming settle() in lateDrift() writing the
- * whole growth as a blind-witness correction. The pad goes INSIDE the floored box, a child deep, because that
- * is the shape a LuCI refill has and the shape that change mis-read. */
+/* Runs in the page: park the reader, grow something above them, report what they saw. The poll is
+ * held here too: a tick refills the section the reader is over, and the element this probe
+ * measures by is gone before the second read (`the reader's element was replaced
+ * mid-measurement`, webkit/Overview at 1440 side). The growth is synthetic either way. */
+/* BELOW — content arriving UNDER the reader must not move them. Every other case grows content
+ * above the reader, so a theme that scrolls the reader for growth below passed them all (0f298ef:
+ * a 120 px refill in a floored box below the viewport moved the offset +120 and the reader -120 on
+ * firefox and chromium, engine anchoring on). The pad goes INSIDE the floored box, a child deep,
+ * the shape a LuCI refill has. */
 const BELOW = async (growth) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
@@ -301,7 +202,7 @@ const HOLD = async (growth) => {
 	const poll = (window.L && window.L.Poll) || null;
 	const polling = !!(poll && typeof poll.active === 'function' && poll.active());
 	if (polling) poll.stop();
-	try {
+	/* the poll stays stopped — see the note on QUIET, which starts it again */
 	const at = Math.min(Math.round(room / 2), 1600);
 	/* park the reader and wait for the ENGINE to say the scroll happened — see the note above */
 	const parkAt = async (y) => {
@@ -344,22 +245,11 @@ const HOLD = async (growth) => {
 	};
 	await parkAt(at);
 
-	/* The host is not a mark, and taking it as one makes this gate report a jump that is its own:
-	 * `#view` is a `.cbi-section` gap wide enough to hit at 390px, its own top does not move when the
-	 * pad grows INSIDE it, and a correctly compensated page then reads as -120px. Measured: on
-	 * 25.12's Overview every point down the middle answered `#view`, so all eight runs on that
-	 * release reported "no content under the reader" and measured nothing.
-	 *
-	 * So the whole STACK at the point is read rather than the topmost element — the section a grid
-	 * gap belongs to is right underneath it — and two more rows are tried before giving up, a gap
-	 * being a gap only at the y it was measured at. */
-	/* STICKY EXCLUDED FOR THE SAME REASON AS #view: a `position: sticky` element's rect.top is
-	 * pinned to its stuck offset for as long as it stays stuck, so `after.top - before.top` stops
-	 * being a faithful proxy for the reader's place the moment the stick state does — or does not —
-	 * change across the measurement. Confirmed live: a sticky mark on a synthetic page reported
-	 * moved=0 on every growth from 0 to 120px while a plain sibling at the same point moved with the
-	 * page, so the check would silently pass however badly the theme failed there. The walk climbs
-	 * to `view` because a plain child of a stuck header inherits the same pinned top. */
+	/* The host is not a mark: `#view` is a `.cbi-section` gap wide enough to hit at 390px and its own
+	 * top does not move when the pad grows INSIDE it, so a compensated page reads -120px. The whole
+	 * STACK at the point is read, plus two more rows (a gap is a gap only at its y). `position:
+	 * sticky` is excluded the same way: its rect.top stays pinned while stuck, so it stops tracking
+	 * the reader. The walk climbs to `view` because a child of a stuck header inherits the pin. */
 	const markAt = (y, x) => {
 		for (const el of document.elementsFromPoint(x, y)) {
 			if (el === view || !view.contains(el)) continue;
@@ -387,13 +277,10 @@ const HOLD = async (growth) => {
 	if (!mark) return { skip: 'no content under the reader' };
 	const before = { pos: pos(), top: Math.round(mark.getBoundingClientRect().top) };
 
-	/* Sliced from HERE, not from navigation — the writes `parkAt()` already made to reach this
-	 * offset are not this measurement's business. `window.__fsW` is an init-script wrapper around
-	 * `scrollTo`/`scrollBy`, the `scrollTop` setter and `Element.scrollTo`
-	 * (../tmp/task-holdreg/hold-probe.mjs), read back only when a finding needs it: a -505px HOLD
-	 * reading on firefox/owrt2512 @1440 top compact was chased a full round before before.top/
-	 * after.top were printed at all — before.top read 503 on every local run, so after.top≈0 was
-	 * the mark landing at the viewport top, a different event from a failed correction. */
+	/* Sliced from HERE, not from navigation: the writes `parkAt()` made to reach this offset are not
+	 * this measurement's business. `window.__fsW` wraps `scrollTo`/`scrollBy`, the `scrollTop` setter
+	 * and `Element.scrollTo`, and is read back only for a finding: it tells a mark that reached the
+	 * viewport top (-505px, firefox owrt2512 @1440 top compact) from a failed correction. */
 	const w0 = (window.__fsW || []).length;
 	const pad = document.createElement('div');
 	pad.style.height = growth + 'px';
@@ -406,7 +293,6 @@ const HOLD = async (growth) => {
 	return { before, after, moved: after.top === null ? null : after.top - before.top,
 		scrollDelta: after.pos - before.pos, scroller: sc ? 'maincontent' : 'window', writes };
 
-	} finally { /* the poll stays stopped — see the note on QUIET, which starts it again */ }
 };
 
 /* Runs in the page: a poll tick the way LuCI actually performs one — `dom.content()` empties the
@@ -416,7 +302,7 @@ const HOLD = async (growth) => {
  * the theme keeps stays valid. A real tick passes through a moment where the section has no height
  * at all, and a document that short is one the engine clamps the offset into; the section fills
  * again, nobody puts the offset back, and the reader is somewhere else. */
-const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
+const SWAP = async ([ growth, tol, winMs ]) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
 	if (!view) return { skip: 'no view' };
@@ -436,7 +322,7 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 	const poll = (window.L && window.L.Poll) || null;
 	const polling = !!(poll && typeof poll.active === 'function' && poll.active());
 	if (polling) poll.stop();
-	try {
+	/* the poll stays stopped — see the note on QUIET, which starts it again */
 
 	/* as far down as the page goes: what the reader loses to a clamp is what is left below them */
 	const at = room - 60;
@@ -481,30 +367,17 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 	};
 	await parkAt(at);
 
-	/* The tallest section body that is ENTIRELY ABOVE the viewport, and both halves matter. Tall,
-	 * because the clamp only bites when what the swap takes away is more than the room left below the
-	 * reader. Above, because "the reader must not move" is only true of a change above them: a
-	 * section that straddles the fold is one the theme anchors INSIDE, and content growing below that
-	 * anchor is supposed to move. */
-	/* What a poll actually replaces, not one page's idea of it. Looking for `.cbi-section > div` alone
-	 * is the Overview's shape, so the gate measures this fault there and nowhere else: Processes,
-	 * Routes and the realtime pages are a TABLE inside the section, and `L.ui.Table` refreshes by
-	 * replacing its rows — the same collapse with a different parent — so every one of those runs
-	 * reported "no section body big enough to collapse" and passed on the engine where the fault is
-	 * real. */
+	/* The tallest section body ENTIRELY ABOVE the viewport: tall, because the clamp only bites when
+	 * the swap takes away more than the room below the reader; above, because a section straddling
+	 * the fold is one the theme anchors inside, where growth below the anchor is meant to move. It is
+	 * what a poll replaces, not one page's idea of it: tables refresh by replacing their rows, the
+	 * same collapse with a different parent, so `.cbi-section > div` alone measured Overview only. */
 	let body = null;
-	/* What a poll replaces, and nothing wider. `:scope > div` also matches `.fs-ovl`, the theme's own
-	 * wrapper around System/Memory/Storage, so the probe deletes three whole sections at once, which
-	 * no poll does — the stock one refreshes a section's BODY in place. The theme's reference lives
-	 * inside that grid, so removing all of it takes the reference and its fallback together and the
-	 * gate reports a jump the theme could not have prevented. A section body, a table, a table's
-	 * body: those are the three things `dom.content()` is called on.
-	 *
-	 * `.cbi-section-descr` is excluded for the same reason and was the same mistake one level down:
-	 * it is a section's DESCRIPTION, appended once when the section renders (luci-base form.js) and
-	 * never replaced by a tick. On DHCP at 1440 wide with the top bar it is the tallest `div` under a
-	 * section that sits above the reader, so the probe emptied it and reported 121px of movement on
-	 * firefox and webkit — a collapse of static text that no poll performs. */
+	/* What a poll replaces, and nothing wider. `:scope > div` also matches `.fs-ovl`, which would
+	 * delete three whole sections at once and take the theme's reference with them; the stock poll
+	 * refreshes a section's BODY, a table, a table's body (`dom.content()`). `.cbi-section-descr` is
+	 * excluded too: static text appended once, never replaced by a tick (121px of movement reported
+	 * on firefox and webkit, DHCP at 1440 with the top bar). */
 	for (const el of view.querySelectorAll('.cbi-section > div:not(.cbi-section-descr), .table > .tbody, .table')) {
 		if (el.getBoundingClientRect().bottom > 0) continue;		/* must be entirely above the reader */
 		if (el.contains(view) || el === view) continue;
@@ -524,12 +397,10 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 	 * the correction working. */
 	const bodyDesc = body.tagName.toLowerCase() + (body.id ? '#' + body.id : '')
 		+ (body.className ? '.' + String(body.className).trim().replace(/\s+/g, '.') : '');
-	/* WHAT THE THEME'S GROWTH WITNESS CAN SEE FROM HERE — task blindgrow. `observeContent()` measures
-	 * a refill against the `min-height` on the floored box, so a refill with no floored box in its
-	 * ancestry has no witness at all and a `lateDrift()` whose element-based drift is also blind
-	 * writes nothing. That reads in a report exactly like a correction that ran and failed, which is
-	 * three CI runs of guesswork; printed here so a "never came back" finding says which of the two
-	 * it was. Read BEFORE the swap, while the floor of the settled page is still standing. */
+	/* What the theme's growth witness can see from here: `observeContent()` measures a refill against
+	 * the floored box's `min-height`, so with no floored box in the ancestry the witness is blind
+	 * and `lateDrift()` writes nothing, which reads like a correction that ran and failed. Printed so
+	 * a "never came back" finding says which. Read BEFORE the swap, while the settled floor stands. */
 	const floorBox = body.closest && body.closest('[data-fs-floor]');
 	const witness = !floorBox ? 'none'
 		: (floorBox === body ? 'self' : floorBox.tagName.toLowerCase() + (floorBox.id ? '#' + floorBox.id : ''))
@@ -547,22 +418,11 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 	const bodyH0 = body.offsetHeight;
 	const docH = () => (sc ? sc.scrollHeight : document.documentElement.scrollHeight);
 
-	/* the whole STACK at the point, not just the topmost element: in a grid gap the top of the
-	 * stack is `#view` itself — a host is not a mark, its own top does not move when something
-	 * grows INSIDE it — and the section that gap belongs to is right underneath it. Measured: on
-	 * 25.12's Overview every point down the middle answered `#view`, so all eight runs on that
-	 * release reported "no content under the reader" and measured nothing. */
-	/* STICKY EXCLUDED FOR THE SAME REASON AS #view AND `.cbi-section-descr`: a `position: sticky`
-	 * element's rect.top is pinned to its stuck offset for as long as it stays stuck, so
-	 * `after.top - before.top` stops being a faithful proxy for the reader's place the moment the
-	 * stick state does — or does not — change across the measurement. Found live on owrtsnap: the
-	 * mark landed on `th.th`, the sidebar's own sticky table header (theme/30-tables.css), where
-	 * owrt2512 gave `td.td` for the same page and point. It did not fire in the runs that found it
-	 * (`headerWasPinned=true, tableTop=-166`, moved 0 throughout) — but a synthetic sticky header
-	 * reproduces the failure directly: rect.top read 0 on every growth from 0 to 120px while a plain
-	 * sibling at the same point moved with the page, so a mark landing there would pass however
-	 * badly the theme failed. The walk climbs to `view` because a plain child of a stuck header
-	 * inherits the same pinned top. */
+	/* The host is not a mark (see HOLD): the whole STACK at the point is read, since in a grid gap
+	 * the top of the stack is `#view` itself. `position: sticky` is excluded too: its rect.top stays
+	 * pinned while stuck (a stuck `th.th` on owrtsnap read 0 on every growth from 0 to 120px), so
+	 * it stops tracking the reader. The walk climbs to `view` because a child of a stuck header
+	 * inherits the pin. */
 	const markAt = (y, x) => {
 		for (const el of document.elementsFromPoint(x, y)) {
 			if (el === view || !view.contains(el) || body.contains(el)) continue;
@@ -621,23 +481,15 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 		const t0 = performance.now();
 		const w0 = (window.__fsW || []).length;
 		let correctedAt = null, lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
-		/* LONGEST FRAME GAP — task gap. The interval between two of this loop's frames (the first measured
-		 * from t0), and when it ended. `performance.now()` only: no layout read, so the measurement cannot
-		 * stall the frames it is measuring. */
+		/* Longest gap between two of this loop's frames (the first from t0), and when it ended.
+		 * `performance.now()` only, so the measurement cannot stall the frames it is measuring. */
 		let prevFrame = t0, gapMax = 0, gapAt = 0;
-		/* WHAT A FRAME PAINTED, NOT WHAT IT STARTED FROM — task painted. This loop's rAF is queued before
-		 * the theme's own (it is requested right after the refill, the theme's from the mutation record a
-		 * microtask later), so a read at the top of the callback sees the page BEFORE the theme's correction
-		 * in that same frame, and credits the correction to the NEXT frame. With frames 16ms apart that was a
-		 * frame of slack; on a stalled runner it was the whole stall. Measured in CI, firefox owrt2512 @390
-		 * top normal, engine DECLINES, /admin/network/dhcp: the late trail read `settle+21 wrote-120+21` and
-		 * the finding read 2702ms, the longest frame gap 2681ms ending at +2702. A ResizeObserver's
-		 * notifications are delivered in the same rendering update AFTER every rAF callback and before paint
-		 * (HTML "update the rendering"), and `observe()` always delivers one first notification — so
-		 * re-observing the root each frame reads the page as that frame paints it, with no DOM write and no
-		 * size change. Credited to the frame's own timestamp. `painted` counts how many frames were read
-		 * that way; a frame the observer did not deliver for is read at the top of the next one and credited
-		 * to THAT frame, which can only make a correction look later, never earlier. */
+		/* A frame is read as it PAINTED, not as it started: this loop's rAF is queued before the
+		 * theme's own, so a read at the top of the callback sees the page before that frame's
+		 * correction and credits it to the next frame (a whole stall on a stalled runner: a 2702ms
+		 * finding for a 2681ms gap, firefox owrt2512 @390 top). Re-observing the root each frame gets a
+		 * ResizeObserver notification after every rAF and before paint. `painted` counts the frames
+		 * read that way; a missed one is read at the next top and can only look later. */
 		let pending = null, painted = 0, frames = 0;
 		const read = (at) => {
 			lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
@@ -694,8 +546,9 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 	/* THE SAME SWAP WITH THE CORRECTION SWITCHED OFF, which is what isolates the other half. The
 	 * content column keeps a floor between ticks (fs-fit.js, holdFloor), so a section emptying inside
 	 * it takes nothing off the document and there is nothing for the engine to clamp into. With
-	 * `fsAnchor = 'off'` the theme writes no offset at all, so anything that still moves the reader
-	 * here is the floor failing rather than the correction covering for it. */
+	 * `fsAnchor = 'off'` no correction is written (the floor sweep still puts back the clamp its own
+	 * clear pass took), so anything that still moves the reader here is the floor failing rather
+	 * than the correction covering for it. */
 	let floorOnly = { skip: 'no storage' };
 	try {
 		localStorage.setItem('fsAnchor', 'off');
@@ -703,43 +556,25 @@ const SWAP = async ([ growth, tol, lateMs, winMs ]) => {
 	} catch (e) { /* no storage, no second pass */ }
 	finally { try { localStorage.removeItem('fsAnchor'); } catch (e) { /* … */ } }
 
-	return { before, empty: corrected.empty, after: corrected.after, moved: corrected.moved,
+	return { empty: corrected.empty, moved: corrected.moved,
 		clamped: corrected.clamped, offsetDelta: corrected.offsetDelta, grewDoc: corrected.grewDoc,
 		correctedAt: corrected.correctedAt,
-		late: corrected.correctedAt !== null && corrected.correctedAt > lateMs,
 		writes: corrected.writes,
 		bodyDesc, bodyH: bodyH0, witness, themeStill, why: corrected.why, awhy: corrected.awhy, trail: corrected.trail, atrail: corrected.atrail, gapMax: corrected.gapMax, gapAt: corrected.gapAt, painted: corrected.painted, frames: corrected.frames,
 		floorMoved: floorOnly.skip ? null : floorOnly.moved,
 		floorClamped: floorOnly.skip ? null : floorOnly.clamped,
-		floorOffsetDelta: floorOnly.skip ? null : floorOnly.offsetDelta,
-		scroller: sc ? 'maincontent' : 'window' };
+		floorOffsetDelta: floorOnly.skip ? null : floorOnly.offsetDelta };
 
-	} finally { /* the poll stays stopped — see the note on QUIET, which starts it again */ }
 };
 
 /* Runs in the page: SEVERAL of dom.content()'s empty-then-refill cycles on the SAME section, back
- * to back, on a page where the engine's own anchoring is left alone throughout.
+ * to back, with the engine's own anchoring left alone.
  *
- * Why this is not SWAP again: SWAP performs ONE refill and closes inside 900ms, so `LATE_MISS_LIMIT`
- * (2, fs-fit.js) — the count that decides whether the theme keeps trusting an engine that anchors
- * imprecisely — is structurally unreachable from it. A switch that only flips after the SECOND miss
- * is invisible to a case that never performs one (task missrule): 48 green sub-runs proving a fix
- * to the miss-counting formula were all first-miss runs, and the regression the fix itself could
- * introduce — the switch flipping on an engine that is doing the job correctly, two ticks (10s)
- * later — had no case that could see it trip at all.
- *
- * `fs-fit.engineTrusted()` is read rather than inferred from timing, for the same reason `restAt()`
- * already is: "is it scrolling" and a correction's own latency both answer the wrong question, and a
- * flat guess here already cost a false report once (see the note on `parkAt` above).
- *
- * IT DOES NOT PICK ITS OWN SECTION. `window.__fsRepeatSection` — set by SWAP, which runs first in
- * every cell — is read instead of running the same search again: a second search, after SWAP's own
- * two refills have woken `holdFloor()`, can land on a different and sometimes worse candidate than
- * the one just proven to reach the scroller. Measured before this was fixed: 274 of 274 cells in a
- * full three-engine sweep reported either "nothing above the reader big enough to collapse" or a
- * growth that never reached the document, on a page where SWAP — the identical selector, the
- * identical park — had just measured something. See the note beside `window.__fsRepeatSection`
- * above for the one concrete example chased down. */
+ * Not SWAP again: SWAP closes inside one refill, so `LATE_MISS_LIMIT` (2, fs-fit.js) is
+ * unreachable from it, and a switch that flips only on the SECOND miss — including one that flips
+ * on an engine doing the job — had no case that could see it. `fs-fit.engineTrusted()` is read,
+ * not inferred from timing. The section is SWAP's own, `window.__fsRepeatSection`: a second search
+ * after SWAP's refills picks a worse candidate (docs/anchoring-log.md). */
 const REPEAT = async ([ growth, tol, times ]) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
@@ -756,19 +591,11 @@ const REPEAT = async ([ growth, tol, times ]) => {
 	const poll = (window.L && window.L.Poll) || null;
 	const polling = !!(poll && typeof poll.active === 'function' && poll.active());
 	if (polling) poll.stop();
-	try {
+	/* the poll stays stopped, matching HOLD/SWAP — nothing here restarts it */
 
-	/* THE SAME SECTION SWAP ALREADY PICKED, not a second search. SWAP's own two `dom.content()`-
-	 * shaped passes (corrected + floor-only) wake `holdFloor()` in between, and a fresh search run
-	 * afterwards can land on a different — and sometimes worse — candidate than the one SWAP just
-	 * proved reaches the scroller: measured live, an independent search here picked
-	 * `table.table.cbi-section-table` (1145px, itself a plausible-looking candidate) on a cell where
-	 * SWAP's own search had found a sibling that DID reach the scroller, and every one of 274 swept
-	 * cells reported "nothing above the reader big enough to collapse" or the growth landing on an
-	 * element that never moved the document — SWAP measured 91 of those same 171 cells in the same
-	 * run. Re-parking (below) is still needed — SWAP's own `wait(700)` settling window may have left
-	 * the reader a pixel or two off `before.top` — but WHICH element is measured is SWAP's call, read
-	 * off `window.__fsRepeatSection` rather than re-decided. */
+	/* The same section SWAP picked, not a second search (see the note on REPEAT). Re-parking below is
+	 * still needed — SWAP's settling window may leave the reader a pixel or two off `before.top` —
+	 * but WHICH element is measured is SWAP's call, read off `window.__fsRepeatSection`. */
 	const picked = window.__fsRepeatSection;
 	let body = picked && picked.body && picked.body.isConnected ? picked.body : null;
 	if (!body || body.offsetHeight < 200) return { skip: 'nothing above the reader big enough to collapse' };
@@ -776,12 +603,9 @@ const REPEAT = async ([ growth, tol, times ]) => {
 	if (!mark) return { skip: 'nothing under the reader that survives the swap' };
 	const bodyDesc = body.tagName.toLowerCase() + (body.id ? '#' + body.id : '')
 		+ (body.className ? '.' + String(body.className).trim().replace(/\s+/g, '.') : '');
-	/* WHAT THE THEME'S GROWTH WITNESS CAN SEE FROM HERE — task blindgrow. `observeContent()` measures
-	 * a refill against the `min-height` on the floored box, so a refill with no floored box in its
-	 * ancestry has no witness at all and a `lateDrift()` whose element-based drift is also blind
-	 * writes nothing. That reads in a report exactly like a correction that ran and failed, which is
-	 * three CI runs of guesswork; printed here so a "never came back" finding says which of the two
-	 * it was. Read BEFORE the swap, while the floor of the settled page is still standing. */
+	/* The growth witness, as in SWAP: with no floored box in the ancestry `observeContent()` is blind
+	 * and `lateDrift()` writes nothing, which reads like a correction that ran and failed. Printed
+	 * so a "never came back" finding says which. Read BEFORE the swap. */
 	const floorBox = body.closest && body.closest('[data-fs-floor]');
 	const witness = !floorBox ? 'none'
 		: (floorBox === body ? 'self' : floorBox.tagName.toLowerCase() + (floorBox.id ? '#' + floorBox.id : ''))
@@ -853,7 +677,7 @@ const REPEAT = async ([ growth, tol, times ]) => {
 		const themeStill = fit ? !fit.scrolling() : null;
 		let correctedAt = null, lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
 		let prevFrame = t0, gapMax = 0, gapAt = 0;
-		/* read as the frame paints it — see SWAP's note, task painted */
+		/* read as the frame paints it — see SWAP's note */
 		let pending = null;
 		const read = (at) => {
 			lastTop = mark.isConnected ? Math.round(mark.getBoundingClientRect().top) : null;
@@ -891,23 +715,17 @@ const REPEAT = async ([ growth, tol, times ]) => {
 			engineTrusted: trusted(), themeStill, why, awhy, trail, atrail, gapMax, gapAt });
 		await wait(700);
 	}
-	return { before, bodyDesc, bodyH: bodyH0, grewDoc, witness,
-		trustedBefore, trustedAfter: trusted(), refills,
-		scroller: sc ? 'maincontent' : 'window' };
+	return { bodyDesc, bodyH: bodyH0, grewDoc, witness,
+		trustedBefore, trustedAfter: trusted(), refills };
 
-	} finally { /* the poll stays stopped, matching HOLD/SWAP — nothing here restarts it */ }
 };
 
 /* Runs in the page: a scripted flick up and down while ticks land, reporting any offset change the
  * wheel did not ask for. */
-/* THE POLL IS STARTED HERE AND NOWHERE ELSE, and the two cases before this leave it stopped rather
- * than handing it back. `Poll.start()` calls `step()` SYNCHRONOUSLY (luci-base, luci.js), so a case
- * that restores the poll on its way out fires a real tick into the case that runs next: measured in
- * CI, HOLD returning the poll put a live tick under SWAP's floor measurement and the sweep reported
- * `the content column's floor is not holding the document up`, 120px, on webkit/owrt2410 @390 top
- * compact — a cell that is green at v0.14.2, green before that change and green again when it was
- * reverted, on a theme those three builds share. This case WANTS ticks landing mid-flick, so it is
- * the one that starts them. */
+/* The poll is started HERE and nowhere else: `Poll.start()` calls `step()` synchronously (luci.js),
+ * so a case that hands the poll back fires a real tick into the next one (HOLD returning it put a
+ * live tick under SWAP's floor measurement, 120px, webkit/owrt2410 @390 top compact). This case
+ * WANTS ticks landing mid-flick. */
 const QUIET = async (growth) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
@@ -918,16 +736,13 @@ const QUIET = async (growth) => {
 	const room = (sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - window.innerHeight);
 	if (room < 600) return { skip: 'page too short to scroll' };
 
-	/* A FLICK THAT NEVER REACHES AN EDGE. Assigning a scrollTop that is already the current one
-	 * fires no scroll event, so a run of steps clamped at 0 or at the bottom is a page standing
-	 * still — 400 ms of that and the theme is right to put the pending growth back, which is the
-	 * theme's contract and not a jump. So the travel is kept inside the page: a margin at each end,
-	 * and a step small enough that six of them fit between the two. */
-	/* The ticks this case measures against — see the note above. Started BEFORE the park and given
-	 * a tick's worth of time, because `Poll.start()` performs one synchronously: started later, that
-	 * first tick lands inside the flick this case is timing, and the sweep reports the jump it came
-	 * to look for. Measured in CI: `the offset moved on its own mid-flick (worst 145.5px)` on
-	 * firefox/owrt2410 @390 top compact, from starting the poll two statements further down. */
+	/* A flick that never reaches an edge: assigning the current scrollTop fires no scroll event, so
+	 * steps clamped at 0 or the bottom are a page standing still, and 400 ms of that is the theme
+	 * rightly putting the pending growth back. Travel stays inside the page: a margin at each end,
+	 * steps small enough that six fit between. */
+	/* The ticks this case measures against start BEFORE the park, with a tick's worth of time:
+	 * `Poll.start()` performs one synchronously, and later it lands inside the flick (worst 145.5px,
+	 * firefox/owrt2410 @390 top compact). */
 	const poll = (window.L && window.L.Poll) || null;
 	if (poll && typeof poll.active === 'function' && !poll.active()) {
 		poll.start();
@@ -1011,18 +826,11 @@ const QUIET = async (growth) => {
 };
 
 /* Runs in the page: park the reader, LEAVE THE POLL RUNNING, and watch the offset across several
- * REAL ticks — no synthetic pad, nothing inserted by the probe at all.
- *
- * HOLD and SWAP stop the poll (see the note on QUIET) and both close their case inside 800ms; QUIET
- * starts the poll but its subject is a reader in MOTION, and it discards any step where the offset
- * held still for 400ms. None of the three ever watches a PARKED reader across a tick the poll fires
- * on its own — which is exactly the shape of task wkanchor's fault: WebKit's own scroll anchoring
- * moved the offset +21px on a tick where nothing above the reader changed height by even a pixel
- * (no `scrollTo`, no `scrollTop` setter recorded — the probe in ../tmp/task-overview12/tick-probe.mjs
- * is what caught that), and lateDrift() (fs-fit.js) wrote it back one rAF + SCROLL_IDLE later,
- * measured 421/421/408ms after the tick. Both HOLD/SWAP's 800ms window and QUIET's 400ms-still
- * discard read that pair as "the reader stayed put" — the correction landing inside their own
- * tolerance, not outside it — which is why this gate held green through it. */
+ * REAL ticks — nothing inserted by the probe. HOLD and SWAP stop the poll and close inside 800ms;
+ * QUIET discards any step where the offset held still for 400ms. None watches a PARKED reader
+ * across a tick the poll fires itself, which is where WebKit's own anchoring moved the offset
+ * +21px with nothing above the reader changing and `lateDrift()` wrote it back 408-421ms later,
+ * inside both of their tolerances. */
 const TICK = async (ticks) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
@@ -1043,13 +851,10 @@ const TICK = async (ticks) => {
 		return { skip: 'this page registers no poll — nothing to tick' };
 	if (typeof poll.active === 'function' && !poll.active()) poll.start();
 
-	/* NOT room/2 — HOLD and SWAP only need SOME room below the reader, but this case's fault is
-	 * where the reader rests relative to the FOLD, not to the document's total length: on a page
-	 * `room` puts room/2 thousands of pixels past where anything was misbehaving, and a run parked
-	 * there measured 0px on 3/3 tries while ../tmp/task-overview12/tick-probe.mjs kept finding 21px
-	 * peak-to-peak at the same page's default park, ~0.6 viewport heights down — the same fraction
-	 * `anchorRef()` (fs-fit.js) already uses to find the fold, because a reader who just opened a
-	 * page rests roughly one screen down into it, not in its middle. */
+	/* NOT room/2: this case's fault is where the reader rests relative to the FOLD, not to the
+	 * document's length, and a run parked thousands of pixels past it measured 0px on 3/3 tries where
+	 * the default park read 21px. ~0.6 viewport heights down is the fraction `anchorRef()` (fs-fit.js)
+	 * uses for the fold: a reader who just opened a page rests about one screen in. */
 	const at = Math.min(Math.round((window.innerHeight || 800) * 0.6), room);
 	/* park the reader and wait for the ENGINE to say the scroll happened — see the note on HOLD */
 	const parkAt = async (y) => {
@@ -1076,15 +881,9 @@ const TICK = async (ticks) => {
 	};
 	await parkAt(at);
 
-	/* NOT counted by MutationObserver batch — tried first, and wrong: one real tick on the Overview
-	 * refills System, Memory and Storage as three separate `dom.content()` calls, each its own
-	 * microtask-batched callback, so 3 "mutations" landed inside a SINGLE real tick and the case
-	 * exited after 500ms of quiet having watched about two seconds of page time — long before the
-	 * three real, 5-SECOND-APART ticks this case exists to cross. That version measured 0px on 3/3
-	 * tries on the exact cell ../tmp/task-overview12/tick-probe.mjs was, at the time, reporting 21px
-	 * peak-to-peak on. So the budget is TIME, off the page's own `L.env.pollinterval` — what
-	 * `Poll.add()` itself defaults an interval to when a caller gives none (luci-base) — rather than
-	 * off how many mutation callbacks happened to fire. */
+	/* The budget is TIME, off the page's own `L.env.pollinterval` (what `Poll.add()` defaults to), not
+	 * mutation callbacks: one Overview tick is three microtask-batched callbacks, so counting them
+	 * exited after about 2s of page time, before the real ticks 5 s apart, and read 0px. */
 	const interval = (window.L && window.L.env && Number(window.L.env.pollinterval)) || 5;
 	let mutations = 0;
 	const mo = new MutationObserver(() => { mutations++; });
@@ -1109,19 +908,19 @@ const TICK = async (ticks) => {
 		return { skip: `no tick landed in ${Math.round(performance.now() - start)}ms — the poll did not run` };
 
 	const mn = Math.min(...samples), mx = Math.max(...samples);
-	return { moved: Math.round((mx - mn) * 10) / 10, mutations, samples: samples.length,
-		scroller: sc ? 'maincontent' : 'window' };
+	return { moved: Math.round((mx - mn) * 10) / 10, mutations };
 };
 
-let list = requireStands(stands(FLAGS.only, { all: FLAGS.all }), 'scroll-anchor');
+let list = stands(FLAGS.only, { all: FLAGS.all });
 /* `--quick`'s stand narrowing: the first stand `stands()` handed back, unless `--only` already said
  * which ones — an explicit `--only` is the caller overriding the default, and `--quick` narrowing it
  * again on top would make the flag's own effect depend on argument order. */
 if (QUICK && !FLAGS.only) list = list.slice(0, 1);
-/* Each `-b` twin owlab boots beside a release line (task sweepspeed) is a second container for the
- * SAME measurement, not a fourth release line — see the note on `pairStands()`. `--no-pair` is the
+requireStands(list, 'scroll-anchor');
+/* Each `-b` twin owlab boots beside a release line is a second container for the SAME
+ * measurement, not a fourth release line — see the note on `pairStands()`. `--no-pair` is the
  * escape hatch for debugging the pairing itself, or for a run that wants the twin left idle. */
-const PAIRS = FLAGS['no-pair'] ? new Map() : pairStands(list);
+const PAIRS = FLAGS['no-pair'] ? new Map() : pairStands(list, 'scroll-anchor');
 /* Printed as it is found, not held until the end: the first finding is the whole answer for someone
  * iterating on a fix, and the list below is what says how many cells and which axes. */
 const findings = [];
@@ -1194,11 +993,9 @@ async function captureSession(browser, base) {
 async function runCell(browser, engine, reportId, base, sessionState, { PAGE, width: w, layout, density, noEngineAnchor, declines }) {
 	const ctx = await browser.newContext({ viewport: { width: w, height: 844 }, storageState: sessionState });
 	await sealToRouter(ctx, base);
-	/* HOLD and SWAP's own record of every scroll write made during their measurement
-	 * window — read back only when a finding needs it, which is what told a real failed
-	 * correction apart from a mark that legitimately reached the top of the viewport (a
-	 * -505px HOLD reading, firefox owrt2512 @1440 top compact, chased a full round before
-	 * that distinction was made). Borrowed from ../tmp/task-holdreg/hold-probe.mjs. */
+	/* HOLD and SWAP's own record of every scroll write in their measurement window, read back only
+	 * when a finding needs it: it tells a mark that legitimately reached the viewport top (-505px,
+	 * firefox owrt2512 @1440 top compact) from a failed correction. */
 	await ctx.addInitScript(() => {
 		window.__fsW = [];
 		const rec = (how, val) => { try { window.__fsW.push({ t: Math.round(performance.now()), how, val: Math.round(val) }); } catch (e) { /* … */ } };
@@ -1213,21 +1010,12 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 		const es = Element.prototype.scrollTo;
 		if (es) Element.prototype.scrollTo = function (...a) { rec('el.scrollTo=' + (this.id || this.className || this.tagName), typeof a[0] === 'object' ? (a[0] && a[0].top) : a[1]); return es.apply(this, a); };
 	});
-	/* the Safari path, forced: `fsEngineAnchor=off` makes fs-fit believe the platform has
-	 * no anchoring of its own, and the stylesheet turns the engine's off for real, so the
-	 * two agree about which of them is responsible.
-	 *
-	 * `declines` IS THE SAME STYLESHEET WITHOUT THE localStorage HALF — task late419, and it
-	 * is the third state of this axis rather than a flag on top of it. An engine that HAS
-	 * `overflow-anchor` and declines to use it on a given refill is not a hypothesis: CI
-	 * reported it on `webkit owrtsnap @1440 side compact overview` twice in three runs of one
-	 * commit and never once locally, because on an unloaded machine the same engine anchors
-	 * every time. The two cells above cannot reach that state by construction — one has the
-	 * engine working, the other has the theme knowing it is off — so the path the theme takes
-	 * when it TRUSTS an engine that did nothing (`lateDrift()`, fs-fit.js) was measured only
-	 * by whatever a loaded runner happened to produce. Ablating the engine alone puts the
-	 * theme in exactly that state on every engine and every run, which is what turns a 2-in-3
-	 * CI coin toss into a cell that either passes or does not. */
+	/* the Safari path, forced: `fsEngineAnchor=off` makes fs-fit believe the platform has no
+	 * anchoring of its own, and the stylesheet turns the engine's off for real, so the two agree
+	 * about which is responsible. `declines` is the same stylesheet WITHOUT the localStorage half:
+	 * the engine has `overflow-anchor` and declines it on a refill, so the theme TRUSTS an engine
+	 * that did nothing (`lateDrift()`, fs-fit.js). CI hit that state on a loaded runner in two of
+	 * three runs and a quiet machine never did; ablating the engine alone makes it deterministic. */
 	if (noEngineAnchor || declines)
 		await ctx.addInitScript((tellTheTheme) => {
 			if (tellTheTheme) try { localStorage.setItem('fsEngineAnchor', 'off'); } catch (e) { /* no storage */ }
@@ -1245,7 +1033,7 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 		await page.evaluate(async ([l, d]) => {
 			const prefs = await window.L.require('fs-prefs');
 			prefs.applyLayout(l);
-			prefs.applyDensity(d);
+			(await window.L.require('fs-axes')).density.apply(d);
 		}, [ layout, density ]);
 		await openPage(page, base + PAGE);
 	}
@@ -1260,23 +1048,15 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 
 	let held, swap, quiet, tick, repeat, below;
 	try {
-		/* TICK FIRST, and on the page exactly as it loaded — HOLD's pad, SWAP's two
-		 * removeChild/appendChild cycles and QUIET's two dozen scripted flicks all perturb
-		 * whatever the engine had picked as its own anchor node, and TICK measures whether
-		 * a REAL tick misbehaves on ITS OWN, not after three probes have already leaned on
-		 * the page. Measured: run after them, on this same page, TICK read 0px on a cell
-		 * ../tmp/task-overview12/tick-probe.mjs (a fresh navigation) was reporting 21px
-		 * peak-to-peak on at the time — the same fix, the same page, only its position in
-		 * the sequence differed. Only against the REAL engine: with `noEngineAnchor` the
-		 * stylesheet above already turns anchoring off for the whole page, which is
-		 * precisely what TICK exists to watch for misbehaving — running it there would
-		 * measure the theme's own correction against nothing, the question HOLD/SWAP
-		 * already answer with a synthetic pad. */
+		/* TICK FIRST, on the page exactly as it loaded: HOLD's pad, SWAP's cycles and QUIET's flicks
+		 * perturb whatever the engine picked as its anchor node, and after them TICK read 0px on a
+		 * cell a fresh navigation read 21px on. Only against the REAL engine: with `noEngineAnchor`
+		 * the stylesheet already turns anchoring off, which is what TICK watches for misbehaving. */
 		tick = (noEngineAnchor || declines)
 			? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
 			: await page.evaluate(TICK, TICK_COUNT);
 		held = await page.evaluate(HOLD, GROWTH);
-		swap = await page.evaluate(SWAP, [ GROWTH, TOLERANCE, LATE_MS, SWAP_WINDOW ]);
+		swap = await page.evaluate(SWAP, [ GROWTH, TOLERANCE, SWAP_WINDOW ]);
 		/* only against the REAL engine — same reasoning as TICK above: with `noEngineAnchor`
 		 * the fallback already runs every refill, so `_engineTrusted` has nothing to say.
 		 * AND NOT ON THE `declines` CELL EITHER, for the opposite reason: there the flag going
@@ -1296,14 +1076,10 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	 * `fs-fit.restAt()` was stripped out of the package, every measurement threw, and both
 	 * of these catches took the whole run down to "0 run(s)" and exit 0. */
 	catch (e) {
-		/* A PAGE THAT IS NO LONGER A LUCI PAGE MEASURED NOTHING EITHER — task noluci. The throw above stays
-		 * a finding where LuCI is still there to answer: a stripped `restAt()` throws with `window.L` in
-		 * place. But CI also threw `page.evaluate: TypeError: undefined is not an object (evaluating
-		 * 'window.L.require')` — webkit owrt2410 @1440 side normal, engine DECLINES, Overview — in the same
-		 * run as `page.goto: WebKit encountered an internal error` on the same stand: the document the
-		 * cell opened was gone, which is the unopened case arriving late. Asked of the page itself, and a
-		 * page that cannot even answer (crashed, closed) counts as gone. Still counted against
-		 * UNOPENED_TOLERANCE, so a stand that keeps losing its pages fails the sweep as before. */
+		/* A page that is no longer a LuCI page measured nothing either. The throw above stays a finding
+		 * where LuCI still answers (a stripped `restAt()` throws with `window.L` in place); a page that
+		 * cannot answer, or answers without `L.require`, is the unopened case arriving late, still
+		 * counted against UNOPENED_TOLERANCE (docs/anchoring-log.md). */
 		const luci = await page.evaluate(() => !!(window.L && typeof window.L.require === 'function')).catch(() => false);
 		if (luci) findings.push(`${where}: the measurement threw — ${first(e)}`);
 		else unopened.push(`${where}: the page stopped being a LuCI page mid-measurement (${page.isClosed() ? 'closed' : page.url()}) — ${first(e)}`);
@@ -1319,13 +1095,11 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	 * check. Folded into `swap.skip` rather than a separate branch so it is excluded from
 	 * the pass line below the same way "nothing to collapse" already is — a skip, not a
 	 * silent pass: it says the growth never reached what it was measuring. */
-	if (!swap.skip && typeof swap.grewDoc === 'number' && swap.grewDoc < GROWTH - TOLERANCE
-			&& swap.grewDoc < GROWTH / 2)
+	if (!swap.skip && swap.grewDoc < GROWTH / 2)
 		swap.skip = `the ${GROWTH}px pad only grew the document ${swap.grewDoc}px `
 			+ `(${swap.bodyDesc}, ${swap.bodyH}px) — the growth never reached the scroller`;
 	/* the same `.fs-ovl` grid guard as SWAP's, above — REPEAT walks the same candidates */
-	if (!repeat.skip && typeof repeat.grewDoc === 'number' && repeat.grewDoc < GROWTH - TOLERANCE
-			&& repeat.grewDoc < GROWTH / 2)
+	if (!repeat.skip && repeat.grewDoc < GROWTH / 2)
 		repeat.skip = `the ${GROWTH}px pad only grew the document ${repeat.grewDoc}px `
 			+ `(${repeat.bodyDesc}, ${repeat.bodyH}px) — the growth never reached the scroller`;
 
@@ -1405,12 +1179,10 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	else if (Math.abs(tick.moved) > TOLERANCE)
 		found(`${where}: the reader drifted ${tick.moved}px across real poll ticks `
 			+ `(${tick.mutations} mutation(s) observed) while parked and nobody scrolling`);
-	/* SEVERAL REFILLS ON ONE PAGE — see the note on REPEAT. Two things are watched apart,
-	 * because they are two different faults: the reader actually moving (a correction ran
-	 * where it should not have, or none ran where one should have) is a finding regardless
-	 * of the trust flag; the flag going false while the reader never moved at all is a
-	 * SEPARATE finding — the engine was doing the job the whole time, and the switch took
-	 * the correction away from it anyway (task missrule). */
+	/* Several refills on one page (see REPEAT). Two faults, reported apart: the reader moving (a
+	 * correction ran where it should not, or none where it should) is a finding regardless of the
+	 * trust flag; the flag going false while the reader never moved is its own — the engine was
+	 * doing the job and the switch took the correction away from it. */
 	if (repeat.skip)
 		process.stdout.write(`  ${where}: REPEAT measured nothing (${repeat.skip})\n`);
 	else {
@@ -1447,28 +1219,19 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	await ctx.close();
 }
 
-/* THE STANDS RUN AT THE SAME TIME, the way live-audit and spa-parity already do, and so — since
- * task sweepspeed — do the ENGINES: nothing measured here is a frame rate, every wait is on an EVENT
- * (the scroll landing, `fit.restAt()` reporting a reference at this offset) with a bounded fallback,
- * so several routers and several browsers answering at once cannot move an answer — unlike
- * scroll-jank, whose subject IS frame pacing and which therefore stays serial.
- *
- * This gate was once the whole release's critical path at 52 minutes against live's 17 (docs/ci.md);
- * CI's own fix was to shard firefox and webkit onto separate runners, which a single local process
- * cannot do — what this can do instead is stop paying for them one after another IN that process.
- * Each engine gets its own browser, and the three (or however many `--engines` named) now launch and
- * run concurrently rather than in the `for` loop's own sequence. */
+/* THE STANDS AND ENGINES RUN AT THE SAME TIME, as live-audit and spa-parity do: nothing measured
+ * here is a frame rate, every wait is on an EVENT with a bounded fallback, so concurrent routers
+ * and browsers cannot move an answer — unlike scroll-jank, whose subject IS frame pacing and which
+ * stays serial. Each engine gets its own browser, launched and run concurrently (the gate was 52
+ * minutes of the release's critical path against live's 17; docs/ci.md). */
 await Promise.all(ENGINES.map(async (engine) => {
-	if (!pw[engine]) { console.error(`scroll-anchor: no such engine "${engine}"`); process.exit(1); }
+	if (!pw[engine]) { console.error(`scroll-anchor: no such engine "${engine}"`); process.exit(2); }
 	const browser = await pw[engine].launch();
 	await Promise.all(list.map(async (stand) => {
-		/* One flat list of GROUPS per stand — a group is both `noEngineAnchor` states of the same
-		 * page/scroller/density, kept together rather than split by raw cell index. TICK and REPEAT
-		 * only run with the engine's own anchoring live (~26s of real poll ticks between them), so a
-		 * plain `i % workers.length` over individual cells hands one worker every expensive cell and
-		 * the other every cheap one — measured live, task sweepspeed: 16 anchor-OFF cells done against
-		 * 4 anchor-ON ones at the same wall-clock point, the split defeating its own purpose. Splitting
-		 * whole groups keeps every worker's share an even mix of both. */
+		/* One flat list of GROUPS per stand — both `noEngineAnchor` states of the same page/scroller/
+		 * density. TICK and REPEAT only run with the engine's anchoring live (~26s of real ticks), so
+		 * splitting individual cells by index gave one worker every expensive cell (16 anchor-OFF cells
+		 * done against 4 anchor-ON at the same moment); whole groups keep every share even. */
 		const groups = [];
 		for (const PAGE of PAGES)
 			for (const { width, layout } of SCROLLERS)
@@ -1524,7 +1287,8 @@ if (unopened.length && unopened.length > Math.max(3, (runs + unopened.length) * 
 }
 /* A sweep that measured nothing has not shown that the reader stays put, so it may not say so. */
 if (!runs) {
-	console.error('\nscroll-anchor: 0 run(s) — every cell was skipped, so nothing was measured.\n');
+	console.error(`\nscroll-anchor: 0 of ${ENGINES.length * list.length} engine/router cell(s) produced a run — every cell was skipped. `
+		+ 'This is not a clean sweep; it is nothing measured.\n');
 	process.exit(1);
 }
 console.log(`scroll-anchor: ${runs} run(s), the reader stayed put with and without the engine's own anchoring.`);

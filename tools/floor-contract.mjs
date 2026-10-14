@@ -1,61 +1,38 @@
 #!/usr/bin/env node
-/* The poll floor, asked the three questions no other gate asks: is it the RIGHT height, does it
- * ever come off, and does it come off IN TIME?
+/* The poll floor, asked what no other gate asks: is it the right height, does it come off, and
+ * does it come off in time?
  *
  * `holdFloor()` in fs-fit.js pins `min-height` on the containers a poll empties, so the document
- * cannot get shorter under the reader while `dom.content()` refills them (docs/anchoring.md). Both
- * ways of getting that wrong ship as the same symptom — blank page — and neither is visible in a
- * file or on a page that is merely loaded:
+ * cannot shrink under the reader while `dom.content()` refills them (docs/anchoring.md). A floor
+ * too short, never taken off, or taken off late ships as a blank page, and none shows on a page
+ * that is only loaded. Floors are found by their inline `min-height`, whatever the
+ * `data-fs-floor` mark says, because a box emptied of children leaves the sweep's selector. Asked:
+ * accuracy (floor vs bare `offsetHeight`, 4px), shrink, fold, depends, tab switch (the pane the
+ * reader left keeps none), release (the tallest floor, emptied) and liveness (the page answers).
+ * Faults, with numbers: docs/anchoring-log.md, "Gate details moved out of `tools/floor-contract.mjs`".
  *
- *   TOO SHORT and the floor does not hold: `.cbi-section-descr` on /admin/network/dhcp measured
- *   115px against the 156px it stands at, because the span was taken to the last ELEMENT and that
- *   box ends in text. 41px the document may shrink during the tick the floor exists for.
- *
- *   TOO TALL, or never taken off, and the floor IS the blank page: a section emptied of its table
- *   kept 1299px of `min-height` for the life of the page, and the reader's tab started that far
- *   down (issue #41). A box qualifies for a floor through its CHILDREN, so emptying it takes it out
- *   of the sweep's selector, so a floor is found here by the inline `min-height` it IS. The 0.14.4
- *   shape marked each one with an attribute and was reverted with the rest of that release's
- *   anchoring; this gate outlived it.
- *
- * Both were shipped, four releases apart, and 0.14.3 had neither: it cleared every floor on every
- * tick and measured `offsetHeight` — correct, at 1550 style writes per 25 s of polling, each one a
- * scroll-anchoring suppression. This gate is what lets the cheaper shape stay: it holds it to the
- * old one's answer.
- *
- *   TOO LATE and it is the same blank page for as long as it stands. A tab switch writes
- *   `data-tab-active` and moves no node, so the sweep that takes the floor off has nothing to wake
- *   it: the pane the reader left kept 2432px of `min-height` on System -> Startup, and the tab they
- *   opened started below it — for one poll interval on a page that polls, and for the life of a
- *   page that does not (#75, forum posts 68 and 73). `min-height` beats the `height: 0` an inactive
- *   pane is collapsed with, which is why refusing to WRITE a floor there was never enough.
- *
- *   node tools/floor-contract.mjs [--only owrt2512] [--all] [--pages /admin/network/network,…]
+ *   node tools/floor-contract.mjs [--only owrt2512] [--all] [--pages /admin/network/network,…] [--settle ms]
  *
  * Needs a running owlab router (docs/development.md). */
-import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
+import { withDeadline } from './lib/page-shapes.mjs';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
+import { parseFlags } from './lib/util.mjs';
 
-const { values: FLAGS } = parseArgs({ options: {
+const FLAGS = parseFlags('floor-contract', {
 	pages: { type: 'string', default: '/admin/network/network,/admin/status/overview,/admin/network/dhcp,'
 		+ '/admin/system/footstrap,/admin/system/system,/admin/system/filemanager' },
 	settle: { type: 'string', default: '10000' },
 	only: { type: 'string', default: '' }, all: { type: 'boolean', default: false },
-} });
+});
 
 /* Pages that carry the shapes a floor is written on: a tabbed map of tables (Interfaces), a
- * status page of tables a poll rewrites (Overview), a form page whose sections end in prose — the
- * shape that caught the short measurement — plus the two that carry content hidden IN PLACE
- * (FOLD_TRIGGER/DEPENDS_TRIGGER below): Footstrap's own Appearance disclosure, and a stock form
- * whose `depends()` hides a row with no node moving at all (System -> System, Time
- * Synchronization). Neither trigger fires on a page that does not offer it, so adding both here
- * costs nothing on the other three.
- *
- * …and one page for LIVENESS below rather than for a floor: /admin/system/filemanager, a foreign
- * app whose table header cells carry `data-field`, which is the shape that turned the sweep's own
- * class writes back into its own wake-up (fs-fit.js's `_moTabs`, task freeze). It is absent from
- * the CORE routers, where it costs one 404 and nothing else. */
+ * status page a poll rewrites (Overview), a form page whose sections end in prose (DHCP), and the
+ * two that hide content IN PLACE (FOLD_TRIGGER/DEPENDS_TRIGGER): Footstrap's Appearance
+ * disclosure and System -> System, Time Synchronization. A trigger a page does not offer does not
+ * fire. /admin/system/filemanager is here for LIVENESS: a foreign app whose header cells carry
+ * `data-field`, the shape that fed the sweep's class writes back into its own wake-up
+ * (`_moTabs`). It is absent from the CORE routers, where it costs one 404. */
 const PAGES = FLAGS.pages.split(',');
 
 /* Opens then closes the one `.fs-ap-fold` disclosure Footstrap's Appearance panel carries — the
@@ -118,7 +95,7 @@ const ACCURACY = () => {
 		el.style.minHeight = keep;
 		out.push({ cls: (el.className || el.tagName).split(' ')[0], floor, bare, delta: floor - bare });
 	}
-	return { floors: out, unmarked: [] };
+	return { floors: out };
 };
 
 /* Switch to the next tab and read what the pane the reader LEFT is still wearing.
@@ -156,7 +133,7 @@ const TAB_AFTER = () => {
 
 /* Shrinks the tallest floored box by ABOUT HALF ITS CHILDREN — a real childList mutation, the same
  * shape a poll's `dom.content()` makes, but a genuine PARTIAL shrink rather than RELEASE's full
- * empty below. This is the shape a per-box skip in `holdFloor()` (task floorchurn) has to get
+ * empty below. This is the shape a per-box skip in `holdFloor()` has to get
  * right: a skip that reads a box's height WHILE ITS OLD FLOOR IS STILL APPLIED cannot see a shrink
  * at all — `min-height` forces `offsetHeight` up to the floor no matter what is actually left
  * inside, so "this box already reads its own floor" is trivially true after every ordinary shrink,
@@ -227,34 +204,18 @@ const AFTER = () => {
 	         h: Math.round(el.getBoundingClientRect().height), doc: document.documentElement.scrollHeight };
 };
 
-/* THE SWEEP HAS TO STOP — task freeze, and the case every other question on this page depends on.
- *
- * The floor is written from a MutationObserver callback, and the observer that catches content
- * hidden IN PLACE watches four ATTRIBUTES over the whole of `#view`. The sweep it wakes re-applies
- * the fitters' own classes on every pass by design, a same-value `classList.add()` still queues a
- * record, and where the element carries `data-field` that record wakes the observer again: on
- * /admin/system/filemanager the loop ran 926 sweeps a second and the renderer never came back
- * (fs-fit.js's `_moTabs`, docs/anchoring.md).
- *
- * Nothing below can be measured on a page whose main thread is spinning — every `page.evaluate()`
- * here simply times out, and this gate USED to read that as "no floor standing" and walk on. So the
- * first question asked of every page is whether it still answers at all, and a page that does not
- * is a finding rather than a page quietly skipped. A deadline is the only way to ask it; it is a
- * detector, not a remedy, and it is generous — the reads it guards are a `querySelectorAll` and
- * some arithmetic on a page that has already had 7s to settle. */
+/* The first question asked of every page is whether it still answers. The sweep's observer can
+ * loop on a page whose elements carry `data-field` (926 sweeps a second on filemanager,
+ * `_moTabs`), and every `page.evaluate()` then times out; a page that misses the deadline is a
+ * finding, not a page skipped. A detector, not a remedy, and generous: the reads it guards are a
+ * `querySelectorAll` and arithmetic on a page that has had 7s to settle. */
 const SETTLE_DEADLINE = Number(FLAGS.settle);
+if (!(SETTLE_DEADLINE > 0)) {
+	console.error(`floor-contract: --settle wants milliseconds, got "${FLAGS.settle}"`);
+	process.exit(2);
+}
 
-/* The loser of the race is a promise nobody will ever settle, so its rejection when the tab is
- * finally closed has to be swallowed here or it surfaces as an unhandled rejection and takes the
- * whole run down instead of the one page. */
-const deadline = (p) => {
-	p.catch(() => {});
-	let t;
-	return Promise.race([
-		p.finally(() => clearTimeout(t)),
-		new Promise((_, rej) => { t = setTimeout(() => rej(new Error('deadline')), SETTLE_DEADLINE); }),
-	]);
-};
+const deadline = (p) => withDeadline(p, SETTLE_DEADLINE);
 
 /* …and, once it does answer, how hard it is still working. Not a finding on its own — a threshold
  * separating "busy" from "looping" cannot be shown red, because a page that loops never answers the
@@ -283,9 +244,9 @@ const CHURN_READ = () => {
  * the poll interval, so an idle page usually reports zero and a looping one cannot hide. */
 const CHURN_WINDOW = 1000;
 
-/* One poll interval is what the theme waits before deciding a container is not refilling, so the
- * release cannot be seen sooner than that. Two of them plus a second of slack. */
-const RELEASE_WAIT = 13000;
+/* holdFloor() runs in the observer callback, so a release lands within a microtask or 400ms after
+ * motion stops; 600ms is past that with no network or timer of its own to wait on. */
+const SWEEP_WAIT = 600;
 
 const list = requireStands(stands(FLAGS.only, { all: FLAGS.all }), 'floor-contract');
 const browser = await chromium.launch();
@@ -355,20 +316,16 @@ for (const stand of list) {
 					+ `${f.bare}px (${f.delta > 0 ? '+' : ''}${f.delta}px) — ${f.delta > 0
 						? 'that difference IS blank page' : 'the document may shrink by that much mid-tick'}`);
 		}
-		if (r.unmarked.length)
-			process.stdout.write(`  ${where}: ${r.unmarked.length} unmarked inline min-height (${r.unmarked.join(', ')})\n`);
 
 		process.stdout.write(`  ${where}  ${r.floors.length} floor(s), worst ${
 			r.floors.reduce((a, f) => Math.abs(f.delta) > Math.abs(a) ? f.delta : a, 0)}px\n`);
 
-		/* …and a genuine PARTIAL shrink (task floorchurn) — before the switch and the release, both
+		/* …and a genuine PARTIAL shrink — before the switch and the release, both
 		 * of which mutate #view themselves and would otherwise be read as this test's own effect. */
 		const shrinkBefore = await page.evaluate(SHRINK_HALF);
 		if (shrinkBefore) {
-			/* the mutation observer's own callback runs as a microtask off the removeChild() calls
-			 * above; 600ms is the same margin TAB_SWITCH gives its own read below, comfortably past
-			 * a callback that has no network or timer of its own to wait on */
-			await page.waitForTimeout(600);
+			/* the observer's callback runs as a microtask off the removeChild() calls above (SWEEP_WAIT) */
+			await page.waitForTimeout(SWEEP_WAIT);
 			const shrinkAfter = await page.evaluate(SHRINK_AFTER);
 			if (!shrinkAfter.inDoc) {
 				process.stdout.write(`  ${where}  shrink probe: the poll replaced ${shrinkBefore.cls} `
@@ -393,7 +350,7 @@ for (const stand of list) {
 		 * a box: the floors this reads are the ones a settled page wrote. */
 		const tabBefore = await page.evaluate(TAB_SWITCH);
 		if (tabBefore) {
-			await page.waitForTimeout(600);
+			await page.waitForTimeout(SWEEP_WAIT);
 			const tabAfter = await page.evaluate(TAB_AFTER);
 			if (tabAfter.stale.length)
 				findings.push(`${where}: switching from "${tabBefore.from}" to "${tabAfter.to}" left `
@@ -409,7 +366,7 @@ for (const stand of list) {
 		/* …and the release, on the tallest floor this page carries */
 		const before = await page.evaluate(EMPTY_TALLEST);
 		if (!before) continue;
-		await page.waitForTimeout(RELEASE_WAIT);
+		await page.waitForTimeout(SWEEP_WAIT);
 		const after = await page.evaluate(AFTER);
 		if (!after.inDoc || !after.empty) {
 			process.stdout.write(`  ${where}  emptied ${before.cls}: the poll `
@@ -420,7 +377,7 @@ for (const stand of list) {
 		const held = after.min ? Math.round(parseFloat(after.min) - after.bare) : 0;
 		if (held > SLACK)
 			findings.push(`${where}: ${before.cls} emptied and left empty still wears ${after.min} `
-				+ `after ${Math.round(RELEASE_WAIT / 1000)}s — ${held}px more than the empty box `
+				+ `after ${SWEEP_WAIT}ms — ${held}px more than the empty box `
 				+ `stands at (${after.bare}px), which is that much page holding nothing, `
 				+ `document ${before.doc} -> ${after.doc}`);
 		process.stdout.write(`  ${where}  emptied ${before.cls}: ${before.min} -> `
@@ -437,6 +394,12 @@ if (findings.length) {
 	console.error('\nThe floor is written by holdFloor() in fs-fit.js and explained in docs/anchoring.md.');
 	console.error('Too short and it does not hold; too tall, or never taken off, and it IS the blank page.');
 	console.error('A page that does not answer holds no measurable floor at all: the sweep is feeding itself.\n');
+	process.exit(1);
+}
+if (!boxes) {
+	console.error(`\nfloor-contract: 0 of ${list.length} router(s) produced a floor, ${live} page(s) answering — `
+		+ 'the theme wrote no floor on any page (not logged in, theme not active, or every page failed to '
+		+ 'load). This is not a clean sweep; it is nothing measured.\n');
 	process.exit(1);
 }
 console.log(`floor-contract: ${boxes} floor(s) over ${list.length} router(s), worst ${worst}px against the box, `

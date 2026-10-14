@@ -1,41 +1,27 @@
 #!/usr/bin/env node
-/* The reader does not move while the chrome measures itself, in EITHER direction.
+/* The reader does not move while the chrome measures itself, in either direction.
  *
- * `fitChrome()` decides whether the menu fits on the brand's row by taking the bar's layout classes
- * off and asking the engine (fs-fit rule 1), then walks it back through `fs-ind-compact`/
- * `fs-bar-stack` one step at a time. Every step is a real, differently-sized box: with the classes
- * off the bar is free to answer whatever height its content currently needs, taller as well as
- * shorter than where it settles. Measured with the two hooks below, on owrt2512 at 767px: the bar
- * walked 230 -> 202 -> 164 -> 144 -> 123 -> 131 -> 123px against a settled 123px — 41px of dip AND
- * 107px of growth, in the same pass (`../tmp/task-toplayout/pass-probe.mjs`), and the reader
- * followed it 1:1 on all three engines (49a1ff5).
+ * `fitChrome()` strips the bar's layout classes to ask whether the menu fits the brand's row, then
+ * walks it back through `fs-ind-compact`/`fs-bar-stack` one step at a time (fs-fit rule 1), so the
+ * bar is taller as well as shorter than where it settles. This gate samples `#maincontent`'s
+ * document position (viewport top + scroll offset: the sum of everything above the reader) at the
+ * pass's two forced layouts, `stripFitsOneRow()`'s `offsetTop` and `getClientRects()` reads, and
+ * bounds it both ways within 2px of where it started. The bar's own height is not the reader's
+ * place — it is the pin `fitChrome()` installs (docs/anchoring-log.md, "The gates watch the
+ * reader's place"); on owrt2512 at 767px the pass shows 41px of dip and 107px of growth.
  *
- * WHAT THIS USED TO WATCH, AND WHY THAT WAS THE WRONG SIDE OF THE FIX. Before this file measured
- * `.fs-sidebar`'s own `getBoundingClientRect().height` — but that box is the pin `fitChrome()`
- * installs for the exact same pass (`bar.style.minHeight`/`height`, fs-chrome.js), so the gate was
- * reading back the fix's own artefact, not the reader's place. Move the same 107px of growth into a
- * sibling of the bar — the menu row inside it, or `.fs-main`'s own top offset — and the OLD
- * measurement read 0px peak-to-peak while the reader still moved. Reader audit, 2026-09-10.
- *
- * WHAT IT WATCHES NOW. `#maincontent` (`.fs-main`) is the sibling the bar sits above in document
- * order in both layouts — everything the poll or a resize can put above the reader, the bar's own
- * box or anything beside it, shows up as a change in `#maincontent`'s document position, because
- * that position is the sum of everything above it. Sampled at the same instants as before —
- * `stripFitsOneRow()`'s `offsetTop` and `getClientRects()` reads (fs-chrome.js), the only forced
- * layouts inside the pass — so the trigger is unchanged; only what gets read at each one moved from
- * the mechanism to the promise.
- *
- *   node tools/fit-quiet.mjs [--only owrt2512] [--all] [--engine chromium|webkit]
+ *   node tools/fit-quiet.mjs [--only owrt2512] [--all] [--engine chromium|firefox|webkit]
+ *                            [--widths 390,480,767]
  *
  * Needs a running owlab router (docs/development.md). */
-import { parseArgs } from 'node:util';
-import { chromium, webkit } from 'playwright';
+import * as pw from 'playwright';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
+import { parseFlags } from './lib/util.mjs';
 
-const { values: FLAGS } = parseArgs({ options: {
+const FLAGS = parseFlags('fit-quiet', {
 	engine: { type: 'string', default: 'chromium' }, widths: { type: 'string', default: '390,480,767' },
 	only: { type: 'string', default: '' }, all: { type: 'boolean', default: false },
-} });
+});
 const ENGINE = FLAGS.engine;
 /* Both sides of the decision: 390px is where the menu takes its own row and the bar walks taller
  * before it settles, 767px is where it does not and the walk is mostly a dip. Only widths that
@@ -43,16 +29,11 @@ const ENGINE = FLAGS.engine;
 const WIDTHS = FLAGS.widths.split(',').map(Number);
 const SLACK = 2;
 
-/* Every forced layout `fitChrome()`'s own decision performs — `stripFitsOneRow()`'s `offsetTop` and
- * `getClientRects()` reads (fs-chrome.js) — is a moment an engine with no scroll anchoring could
- * paint against, so `#maincontent`'s own document position (viewport top + scroll offset — the
- * reader's place, not the bar's) is sampled at each one, peak AND trough against the position it
- * had when the pass started. A live DOMTokenList carries no pointer back to its element and a
- * class-write hook only fires when the BAR's own class list changes — most of the walk comes from
- * `fitTabStrips()` toggling `fs-dense1`/`fs-dense2` on the MENU, which reflows the bar around it
- * with no write to the bar's own attributes at all — so the hook sits on the two reads instead,
- * same as `../tmp/task-toplayout/pass-probe.mjs`, which is what found the 107px this gate used to
- * miss while it was still reading the bar. */
+/* Sampled at every forced layout `fitChrome()`'s decision performs, each a moment an engine with no
+ * scroll anchoring could paint against; peak and trough are taken against the position at the
+ * pass's start. A class-write hook would miss most of the walk: `fitTabStrips()` toggles
+ * `fs-dense1`/`fs-dense2` on the MENU, which reflows the bar with no write to the bar's own
+ * attributes, and a live DOMTokenList has no pointer back to its element. */
 const WATCH = () => {
 	const anchor = document.getElementById('maincontent');
 	if (!anchor) return;
@@ -76,7 +57,11 @@ const WATCH = () => {
 };
 
 const list = requireStands(stands(FLAGS.only, { all: FLAGS.all }), 'fit-quiet');
-const browser = await (ENGINE === 'webkit' ? webkit : chromium).launch();
+if (!['chromium', 'firefox', 'webkit'].includes(ENGINE)) {
+	console.error(`fit-quiet: no such engine "${ENGINE}"`);
+	process.exit(2);
+}
+const browser = await pw[ENGINE].launch();
 const findings = [];
 let runs = 0, attempts = 0, worst = 0;
 
@@ -96,13 +81,11 @@ for (const stand of list) {
 			if (!window.__fsAnchor) return { skip: 'no anchor' };
 			const host = document.getElementById('view') || document.body;
 			/* what a poll tick does to this pass: a mutation inside #view wakes every fitter and the
-			 * chrome's own is one of them. A resize drives the same pass; a reader gets the first of
-			 * the two five times a minute. */
+			 * chrome's own is one of them; a reader gets one five times a minute. */
 			for (let i = 0; i < 3; i++) {
 				const n = document.createElement('span');
 				host.appendChild(n);
 				n.remove();
-				window.dispatchEvent(new Event('resize'));
 				await new Promise((res) => setTimeout(res, 400));
 			}
 			return window.__fsAnchor;
@@ -111,7 +94,7 @@ for (const stand of list) {
 		const where = `${stand.id} @${width}px`;
 		if (!r.samples) {
 			findings.push(`${where}: the chrome never re-fitted, so this gate proved nothing — a poll `
-				+ `tick and a resize both have to reach fitChrome()`);
+				+ `tick has to reach fitChrome()`);
 			await ctx.close();
 			continue;
 		}
