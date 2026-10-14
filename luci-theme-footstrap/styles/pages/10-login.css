@@ -13,11 +13,11 @@
 		/* the token, not a literal 45%-black 60px halo: that ignored the palette. */
 		padding: var(--fs-space-6); box-shadow: var(--fs-shadow-pop);
 	}
-	/* router hostname, not the eyebrow tokens: those force uppercase and a hostname is a name
-	 * (case is the only thing telling two similar ones apart). docs/css.md above. */
+	/* router hostname as the card title, at the 20px page-title step; not the eyebrow tokens: those
+	 * force uppercase and a hostname is a name (case tells two similar ones apart). docs/css.md above. */
 	.fs-login-host {
 		margin: 0 0 var(--fs-space-6); text-align: center;
-		font-size: var(--fs-type-lg); font-weight: var(--fs-weight-bold); color: var(--fs-dim);
+		font-size: var(--fs-type-xl); font-weight: var(--fs-weight-bold); letter-spacing: -.01em;
 		overflow-wrap: anywhere;
 	}
 	.fs-login .cbi-map,
@@ -25,12 +25,6 @@
 	.fs-login .cbi-section-node {
 		background: none; border: 0; padding: 0; margin: 0; box-shadow: none;
 	}
-	/* h1, not h2: no title bar on this page to carry the document's h1, so sysauth.ut emits it here
-	 * and the ramp's own h1 size wraps at 400px — reset to h2's size. docs/css.md above. */
-	.fs-login .cbi-map > h1 {
-		font-size: var(--fs-type-xl); font-weight: var(--fs-weight-bold); letter-spacing: -.01em; margin: 0 0 var(--fs-space-1-5);
-	}
-	.fs-login .cbi-map-descr { color: var(--fs-dim); font-size: var(--fs-type); margin: 0 0 var(--fs-space-5); }
 	.fs-login .cbi-value {
 		display: block; border: 0; padding: 0 0 var(--fs-space-4); margin: 0;
 	}

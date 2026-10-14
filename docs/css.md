@@ -363,7 +363,7 @@ exists, every RPC answers "Access denied", and `render()` never runs.
 `.fs-login` is a direct flex item of `<body>` (`base/20-typography.css` makes body a flex column
 so the footer can `margin-top: auto`), and on the cross axis an `auto` side margin overrides
 stretch and sizes the item to fit-content. `max-width: 400px` capped nothing under that rule — the
-card collapsed to its min-content (~131px) and the description wrapped one word per line;
+card collapsed to its min-content (~131px) and the text wrapped one word per line;
 `width: min(400px, calc(100% - 32px))` is what actually caps it.
 
 The router hostname above the form (`.fs-login-host`) does not reuse the eyebrow tokens despite
@@ -372,10 +372,10 @@ sharing their position: those carry `text-transform: uppercase`, and a hostname 
 apart on a router farm. `overflow-wrap: anywhere` is there because the card is a definite 400px
 and a hostname is one unbreakable token up to 63 characters long.
 
-`.cbi-map > h1`, not `h2`: this page has no title bar to carry the document's one `<h1>`, so
-`sysauth.ut` emits the heading at that level, and the ramp's own h1 size (26px,
-`theme/45-misc.css`) wraps `Authorization Required` onto two lines inside a 400px card — reset
-here to the h2 size, which was always the right size, only the wrong level.
+The `<h1>Authorization Required</h1>` is `.fs-sr` (clipped, still in the a11y tree) and the
+description line is gone: the hostname is the card's title at `--fs-type-xl` (20px, the size the h1
+had), and both removed texts repeated what the Username/Password labels already say. The ramp's own
+h1 size (26px, `theme/45-misc.css`) is not reached, so the login page carries no h1 sizing rule.
 
 `.cbi-page-actions` is a column, not the stock block: some auth plugins add a second action
 (Reset), and the full-width buttons carry `margin: 0`, so a block layout glues them together with

@@ -11,7 +11,7 @@ msgctxt "footstrap"
 msgid "As in file"
 msgstr ""
 
-#: ucode/template/themes/footstrap/sysauth.ut:68
+#: ucode/template/themes/footstrap/sysauth.ut:69
 msgid "Authorization Required"
 msgstr ""
 
@@ -201,7 +201,7 @@ msgctxt "footstrap"
 msgid "Interface"
 msgstr ""
 
-#: ucode/template/themes/footstrap/sysauth.ut:52
+#: ucode/template/themes/footstrap/sysauth.ut:53
 msgid "Invalid username and/or password! Please try again."
 msgstr ""
 
@@ -230,7 +230,7 @@ msgctxt "footstrap"
 msgid "Light"
 msgstr ""
 
-#: ucode/template/themes/footstrap/sysauth.ut:131
+#: ucode/template/themes/footstrap/sysauth.ut:129
 msgid "Log in"
 msgstr ""
 
@@ -288,7 +288,7 @@ msgctxt "footstrap"
 msgid "Palette"
 msgstr ""
 
-#: ucode/template/themes/footstrap/sysauth.ut:80
+#: ucode/template/themes/footstrap/sysauth.ut:78
 msgid "Password"
 msgstr ""
 
@@ -306,10 +306,6 @@ msgstr ""
 #: htdocs/luci-static/resources/fs-assets.js:278
 msgctxt "footstrap"
 msgid "Please choose an image file."
-msgstr ""
-
-#: ucode/template/themes/footstrap/sysauth.ut:70
-msgid "Please enter your username and password."
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-search.js:220
@@ -542,7 +538,7 @@ msgctxt "footstrap"
 msgid "Uploading…"
 msgstr ""
 
-#: ucode/template/themes/footstrap/sysauth.ut:74
+#: ucode/template/themes/footstrap/sysauth.ut:72
 msgid "Username"
 msgstr ""
 

@@ -84,6 +84,7 @@
 - **A browser extension that replaces the global `_` no longer breaks every page after the first.** `navigate()` now takes a full load when `_('')` is not a string (a lodash/underscore `_` returns an object, so LuCI's `_(…).format` threw `is not a function` on each following view); a full load restores LuCI's `_`.
 - **Installing on OpenWrt 24.10.0-24.10.2 is refused with a clear message, and Appearance there shows a notice instead of "ui.RangeSlider is not a constructor".** `ui.RangeSlider` reached openwrt-24.10 by backport in 24.10.3, so the floor is now 24.10.3; run sysupgrade.
 - **A div-based `.table.fs-dt` outside `.cbi-section` (luci-app-roamd) gets the same cell padding as a real table.** Its `.th` sat at 8px where every other data table has 10px, because the padding rule still keyed on `table.fs-dt`.
+- **The login card now leads with the router name instead of "Authorization Required".** The hostname is the title at 20px (was 16px, dimmed), the heading stays in the page for screen readers but is clipped, and the "Please enter your username and password." line that repeated the field labels is gone.
 
 ### Security
 
