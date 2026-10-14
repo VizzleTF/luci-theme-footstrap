@@ -9,13 +9,13 @@ Internal name: `footstrap`. Media path: `/luci-static/footstrap`.
 
 `luci.themes` carries **exactly one** entry, `Footstrap` → `/luci-static/footstrap`. Layout (top bar
 by default, or the side menu), mode, palette, density, wallpaper, rounding and every colour — accent,
-the three status colours, the four surfaces — are **client** axes on the Footstrap tab of
-System → System: `localStorage` plus attributes and inline properties on `:root`, and nothing is
-written to the router until "Save as default" is pressed.
-There are no per-layout or per-mode themes; every legacy name (`FootstrapSidebar`, `FootstrapOnTop`,
-`…-dark`/`…-light`) is deleted by `root/etc/uci-defaults/30_luci-theme-footstrap`.
+the three status colours, the four surfaces — are **client** axes on the System → Footstrap page:
+`localStorage` plus attributes and inline properties on `:root`, and nothing is written to the
+router until "Save as default" is pressed. There are no per-layout or per-mode themes; every legacy
+name (`FootstrapSidebar`, `FootstrapOnTop`, `…-dark`/`…-light`) is deleted by
+`root/etc/uci-defaults/30_luci-theme-footstrap`.
 
-There is one menu renderer too, `menu-footstrap.js`. The top bar is its own markup, morphed by CSS
+There is one menu renderer too, `renderMainMenu` in `fs-chrome.js`. The top bar is its own markup, morphed by CSS
 through `:root[data-layout]`. No second template, no second renderer, no `footstrap-top` symlink.
 
 **The theme's boundary:** it supplies the chrome and the design language; page content is drawn by
@@ -29,14 +29,14 @@ Makefile                          luci.mk; LUCI_MINIFY_CSS:=0; Build/Prepare (CS
                                   version, po2lmo)
 styles/                           CSS SOURCE: layers tokens / base / theme / pages
 build-css.sh                      styles/ → htdocs/luci-static/footstrap/cascade.css
-mangle-tokens.sh                  shorten the private --fs-* names in a built sheet
-strip-templates.sh strip-shell.sh drop comments from .ut and from root/**.sh
+mangle-tokens.sh                  shorten the private --fs-* names in a built sheet, then join it to one line
+strip-build.sh                    build-tree strip, one mode each: templates, shell, probes, assets
 po/                               translation catalogue (Weblate translates this)
 ucode/template/themes/footstrap/  header.ut, footer.ut, sysauth.ut, partials/
 htdocs/luci-static/footstrap/     cascade.css (generated), logo.svg — no webfonts, and no
                                   wallpaper: the Pattern is one the admin uploads, and a font
                                   is one the admin installs (repo: fonts/set-font.sh)
-htdocs/luci-static/resources/     menu-footstrap.js (renderer), menu-footstrap-common.js,
+htdocs/luci-static/resources/     menu-footstrap.js (footer entry), menu-footstrap-common.js,
                                   fs-{fit,menutree,prefs,widgets,chrome,router,sheets,search,
                                   select,appearance,version,overview}.js
 root/etc/uci-defaults/            registration and legacy-name migration
