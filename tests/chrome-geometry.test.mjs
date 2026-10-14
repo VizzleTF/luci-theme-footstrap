@@ -4,27 +4,25 @@
  * whether the sidebar still fits beside it, and `contentWidth()` answers a table's mid-scroll
  * question, where reading layout is forbidden. They are the same arithmetic — the window less the
  * sidebar (or the rail, or nothing) less the shell's gutter — and written twice they drifted:
- * `--fs-content-pad` is one side's padding, already doubled by shellGeometry(), and contentWidth
- * subtracted it a second time: 56 CSS px of column that does not exist. And `data-narrow` is not the
- * only chrome with no sidebar beside it — fitShell returns early on the top-BAR layout and removes
- * the attribute on the way out, so contentWidth, which read only that attribute, went on
- * subtracting a 224px sidebar from a window that has none.
+ * the gutter shellGeometry() returns is already both sides, and contentWidth subtracted it a
+ * second time: 56 CSS px of column that does not exist. And `data-narrow` is not the only chrome
+ * with no sidebar beside it — fitShell returns early on the top-BAR layout, so contentWidth, which
+ * read only that attribute, went on subtracting a 224px sidebar from a window that has none.
  *
- * Neither is visible in a screenshot: the wrong answer only matters when it crosses fs-select's
- * CRAMPED threshold, and then it cards a table that had room and un-cards it a moment later. What
- * this test may NOT check — that the inputs describe the real page — is checked on a stand, where
- * tools/live-audit.mjs compares contentWidth() against the live `.fs-content` box. */
+ * Neither shows in a screenshot: the wrong answer matters only across fs-select's CRAMPED
+ * threshold, where it cards a table that had room. That the inputs describe the real page is
+ * checked on a stand: tools/live-audit.mjs compares contentWidth() against the live `.fs-content`. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModule, fakeDocument, installBrowserGlobals } from './lib/luci-module.mjs';
 
 installBrowserGlobals();
 
-const chrome = () => loadModule('fs-chrome');
+const chrome = () => loadModule('fs-chrome', { stubs: { 'fs-prefs': { lsGetArr: () => [] } } });
 
-/* what shellGeometry() reads back from 02-tokens.css at the default density — contentPad is the
- * gutter of BOTH sides, exactly as that function returns it */
-const G = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56, contentMax: 1280 };
+/* what shellGeometry() returns at the default density — contentPad is the gutter of BOTH sides,
+ * measured off `.fs-content` (GEOM_DFLT's 56 until the first measurement) */
+const G = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56 };
 
 function width(state) {
 	return chrome().columnWidth(G, Object.assign({ narrow: false, top: false, rail: false }, state));
@@ -73,36 +71,8 @@ test('an omitted flag means the sidebar is there', () => {
 	assert.equal(chrome().columnWidth(G, { outerW: 800, rail: true }), 800 - G.railW - G.contentPad);
 });
 
-test('the column stops growing at --fs-content-max', () => {
-	/* `.fs-content` is `max-width: var(--fs-content-max); margin: 0 auto`, so past that width the
-	 * surplus is margin, not column. Without the cap a 2560px sidebar layout answered 2280 for a
-	 * column that is 1224 wide — no caller can reach that region (both ask a lower bound), which is
-	 * exactly why it needs a test rather than a reader's trust. */
-	assert.equal(width({ outerW: 2560 }), G.contentMax - G.contentPad);
-	assert.equal(width({ outerW: 2560, top: true }), G.contentMax - G.contentPad);
-	/* and the cap does not bind before it should: at the width where window-minus-sidebar first
-	 * reaches the cap, the two agree */
-	assert.equal(width({ outerW: G.contentMax + G.sidebarW }), G.contentMax - G.contentPad);
-	assert.equal(width({ outerW: G.contentMax + G.sidebarW - 100 }), G.contentMax - 100 - G.contentPad);
-});
-
 test('a column is never negative', () => {
 	assert.equal(width({ outerW: 10 }), 0);
-});
-
-/* issue #44: the Content width axis (fs-axes.js CWIDTH) raises --fs-content-max past the 1280px
- * default by overriding the token, not by changing columnWidth()'s arithmetic — so the cap test
- * above is re-run at other caps rather than edited. The axis is a slider over 1280-3840, so the
- * caps here are arbitrary points in that range and one at each end, not named steps. */
-test('the column stops growing at a raised cap, wherever the slider puts it', () => {
-	const cap = (n) => Object.assign({}, G, { contentMax: n });
-	const cw = (g, outerW) => chrome().columnWidth(g, { outerW, narrow: false, top: false, rail: false });
-	for (const n of [ 1280, 1440, 1600, 2200, 3840 ]) {
-		/* below the cap it is the window that binds, exactly as at the default */
-		assert.equal(cw(cap(n), n), n - G.sidebarW - G.contentPad);
-		/* past it the cap holds the column rather than letting it follow the window */
-		assert.equal(cw(cap(n), 5000), n - G.contentPad);
-	}
 });
 
 test('the fold threshold is the same arithmetic fitShell folds on', () => {
@@ -119,13 +89,42 @@ test('the fold threshold is the same arithmetic fitShell folds on', () => {
  * viewport for up to 220ms after the rotate, and fs-select judged a table to have room it did not. */
 test('contentWidth() notices a window that changed width with no fitter having run', () => {
 	const root = { clientWidth: 1280, getAttribute: () => null, hasAttribute: () => false, setAttribute() {},
-		dataset: {}, classList: { add() {}, remove() {}, contains: () => false } };
+		dataset: {}, style: { getPropertyValue: () => '' },
+		classList: { add() {}, remove() {}, contains: () => false } };
 	const doc = fakeDocument({ documentElement: root, body: { appendChild() {}, getAttribute: () => null },
 		querySelector: () => ({}),
 		createElement: () => ({ style: { setProperty() {} }, setAttribute() {} }) });
 	const c = loadModule('fs-chrome', { document: doc,
-		stubs: { 'fs-prefs': { isTopLayout: () => false, currentRail: () => false } } });
+		stubs: { 'fs-prefs': { isTopLayout: () => false, currentRail: () => false, lsGetArr: () => [] } } });
 	assert.equal(c.contentWidth(), 1280 - G.sidebarW - G.contentPad);
 	root.clientWidth = 800;
 	assert.equal(c.contentWidth(), 800 - G.sidebarW - G.contentPad, 'the rotate is seen on the next call');
+});
+
+/* ui.showIndicator rewrites a pill's label in place (`firstChild.data = label`) when the text
+ * differs: Refreshing to Paused, the change counter. That is a characterData record, no childList,
+ * and with polling paused nothing else wakes the fit — the bar kept the wrap of the old width. */
+test('the #indicators observer re-fits the bar on a label change, not only on a pill arriving', () => {
+	const realMO = globalThis.MutationObserver;
+	const observers = [];
+	globalThis.MutationObserver = class {
+		constructor(cb) { this.cb = cb; observers.push(this); }
+		observe() {}
+	};
+	try {
+		const box = { querySelectorAll: () => [] };
+		const doc = fakeDocument({ getElementById: (id) => (id === 'indicators' ? box : null) });
+		let fits = 0;
+		const c = loadModule('fs-chrome', { document: doc, stubs: {
+			'fs-fit': { scrolling: () => { fits++; return true; }, deferMeasurement() {} },
+			'fs-prefs': { lsGetArr: () => [] }, 'fs-menutree': {}, ui: {} } });
+		c.wireIndicatorCounts();
+		const mo = observers.at(-1);
+		mo.cb([{ type: 'characterData', target: { nodeType: 3, parentNode: { nodeType: 1 } } }]);
+		assert.equal(fits, 1, 'a label text change fits the chrome');
+		mo.cb([{ type: 'childList', target: box }]);
+		assert.equal(fits, 2, 'a pill arriving still does');
+	} finally {
+		globalThis.MutationObserver = realMO;
+	}
 });

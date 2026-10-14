@@ -5,9 +5,9 @@
  * page can answer it: `scrolling()` says "no" both before the motion sampler starts and after it
  * finishes, 1.5 seconds apart in WebKit. So the module exports `restAt()` and the gate waits on it.
  *
- * A rename or a drop here fails nothing: the gate's `try` swallows it, falls back to a flat wait and
- * goes green while measuring the wrong moment — which is exactly how a 60px-per-tick drift on Safari
- * stayed invisible for a release. This test is what makes that a red gate instead. */
+ * A missing restAt() makes HOLD/SWAP/REPEAT/TICK throw and the cell becomes a finding (BELOW alone still
+ * falls back to a flat wait). A rename that drops it must fail here first: a 60px-per-tick drift on
+ * Safari stayed invisible for a release while the gate measured the wrong moment. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModule, installBrowserGlobals } from './lib/luci-module.mjs';

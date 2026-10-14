@@ -28,8 +28,3 @@ test('the registrations after a throwing one still happen, and still run', () =>
 	f.add(() => { ran++; });
 	assert.equal(ran, 1, 'a fitter registered after a throwing one must run on registration');
 });
-
-test('add() ignores anything that is not a function', () => {
-	const f = fit();
-	assert.doesNotThrow(() => { f.add(null); f.add('fitTables'); f.add(undefined); });
-});

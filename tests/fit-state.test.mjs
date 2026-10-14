@@ -11,15 +11,11 @@ import { loadModule, fakeWindow, fakeDocument, installBrowserGlobals } from './l
 
 /* ---- a page fs-fit can run its state machine against, with no layout engine behind it ----
  *
- * fs-fit decides everything from a handful of reads — `scrollTop()`, a box's `min-height` against
- * its measured height, a reference element's `top` — and writes back through `scrollTo`. Here every
- * one of those reads is a number the test sets, so a scenario is "the box grew 120px, the reference
- * did not move, the offset did not move" stated directly, and the assertion is which exit the
- * correction took (`lateWhy()`, `anchorWhy()`) and where the offset ended up.
- *
- * What it does NOT do: dispatch events or produce frames. `requestAnimationFrame` is a macrotask,
- * the MutationObserver never fires on its own — a test hands the observer its records. Anything that
- * depends on real layout is tools/scroll-anchor.mjs's, on a stand. */
+ * fs-fit decides from a few reads (`scrollTop()`, a box's `min-height` against its height, a
+ * reference element's `top`) and writes back through `scrollTo`. Each read is a number the test
+ * sets; the assertion is which exit the correction took (`lateWhy()`, `anchorWhy()`) and the
+ * final offset. No events and no frames: a test hands the MutationObserver its records, and real
+ * layout is tools/scroll-anchor.mjs's, on a stand. */
 const observers = [];
 globalThis.MutationObserver = class {
 	constructor(cb) { this.cb = cb; observers.push(this); }
@@ -107,7 +103,8 @@ function page({ scrollY = 1000, docHeight = 5000, boxes = [], refTop = 300, engi
 			getAttribute: () => null, hasAttribute: () => false, setAttribute() {},
 			classList: { add() {}, remove() {}, contains: () => false } },
 		getElementById: (id) => (id === 'view' ? host : null),
-		elementFromPoint: () => ref
+		elementFromPoint: () => ref,
+		elementsFromPoint: () => [ ref ]
 	});
 
 	const before = observers.length;

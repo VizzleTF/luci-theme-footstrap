@@ -1,6 +1,6 @@
 # The chrome: sidebar, rail, bar
 
-The spec for what `header.ut` and `menu-footstrap.js` draw. Tokens and palettes:
+The spec for what `header.ut` and `fs-chrome.js` draw. Tokens and palettes:
 [design-system.md](design-system.md). The stylesheet build: [css.md](css.md). Client navigation:
 [spa-router.md](spa-router.md).
 
@@ -16,10 +16,11 @@ bar are the same markup and the same renderer; CSS morphs them by `:root[data-la
   by merely not being `top` — which is what `:not([data-layout="top"])` would do, and why that
   guard must not be written. It also keeps the chrome correct with JS disabled.
 - Switching layout re-renders nothing: the DOM serves both, CSS changes the chrome, and a
-  `MutationObserver` on `data-layout` in `menu-footstrap.js` folds the accordion into dropdowns
+  `MutationObserver` on `data-layout` in `fs-chrome.js` folds the accordion into dropdowns
   and back.
-- **The router may carry a default**: `luci.main.footstrap_layout=top` makes the bar the layout a
-  browser starts on, `head.ut` stamps it, and the reader's own choice overrides it forever. A
+- **The router may carry a default**: `uci set footstrap.settings.layout=sidebar|top` (or Save to
+  router) names the layout a browser starts on, `head.ut` whitelists and stamps it, and the
+  reader's own choice overrides it forever. A
   shell script cannot write `localStorage`, which is why the server side of the axis exists at
   all. Layout is the axis this pattern started with; every axis now records its choice
   explicitly, for the same reason — see the three layers in [design-system.md](design-system.md).
@@ -51,8 +52,8 @@ The widths are quoted at normal density: `--fs-sidebar-w` and `--fs-rail-w` are 
 `--fs-density-box`, which the Density axis sets, so Compact and Large move them — and `fitShell()`
 follows for free because it reads the computed token rather than a copy.
 
-There is no separate topbar inside `main`: the page title is a visually hidden `<h1>` inside
-`<div class="fs-title fs-sr">`, and `#indicators` (the "Refreshing" poll pill, unsaved changes)
+There is no separate topbar inside `main`: the page title is a visually hidden `<h1>`
+(`.fs-title-main.fs-sr`), and `#indicators` (the "Refreshing" poll pill, unsaved changes)
 lives in the sidebar. The `◂` button (`#fs-rail-toggle`) collapses the sidebar to a 68 px icon rail
 with flyouts.
 
@@ -68,9 +69,9 @@ happen at all for a screen reader.
 | LuCI container | In bootstrap | In footstrap |
 |---|---|---|
 | `#topmenu` | horizontal top-level menu | `ul.nav` in `.fs-sidebar`: vertical list / bar / rail flyouts — **one markup** |
-| `#modemenu` | admin/status breadcrumb switch | `.fs-modemenu` in the sidebar; empty or single mode → `display:none` |
-| `#tabmenu` | tabs under the header | stays in main, above `#view` (emitted by `partials/notices.ut`) |
-| `#indicators` | header's right corner | `.fs-indicators` in the sidebar under the brand; empty → hidden |
+| `#modemenu` | admin/status breadcrumb switch | `.fs-modemenu` in the chrome (sidebar, bar, top layout; hidden in the collapsed rail); shown only at two or more modes: `theme/20-shell.css` hides it, and `.fs-modemenu:not(:empty):not(.single)` alone shows it |
+| `#tabmenu` | tabs under the header | stays in main, above `#view` (emitted by `header.ut`) |
+| `#indicators` | header's right corner | `.fs-sidebar #indicators` under the brand; empty → hidden |
 | `#view` | content | content (main column) |
 
 The set of top-level sections comes from the menu tree and depends on the installed packages —
@@ -85,20 +86,20 @@ full sidebar.
 
 `fitShell()` (`fs-chrome.js`) subtracts the slice from the root's `clientWidth` and compares the
 remainder with `--fs-content-min`; it **reads the widths from the CSS tokens** (`--fs-sidebar-w`,
-`--fs-rail-w`, `--fs-content-min`, `--fs-content-pad`) through `getComputedStyle` rather than
+`--fs-rail-w`, `--fs-content-min`) through `getComputedStyle` rather than
 keeping copies — otherwise narrowing the rail in the styles would leave the measurement subtracting
 the old number, and no gate would notice. The result is `data-narrow` on `:root`, read by both the
 CSS and `flyoutMode()` in the JS.
 
 **The subtraction itself is `columnWidth()`, and there is exactly one of it.** Two callers need the
 width of the content column — `fitShell()`, deciding whether the sidebar still fits beside it, and
-`contentWidth()`, which answers `fitTables()` mid-scroll where reading layout is forbidden — and
-while the arithmetic was written twice it drifted twice: `--fs-content-pad` is ONE side's gutter and
-`shellGeometry()` already doubles it, so one copy subtracted it twice, and the top-BAR layout has no
+`contentWidth()`, which answers `fitTables()` mid-scroll where reading layout per table is forbidden — and
+while the arithmetic was written twice it drifted twice: the gutter in `shellGeometry()` is already BOTH
+sides, so one copy subtracted it twice, and the top-BAR layout has no
 sidebar to subtract although it carries no `data-narrow` either (`fitShell()` removes it on the way
 out). Both errors are invisible in a screenshot and both are worth enough to push a table across
 `fitTables()`'s cramped threshold. The gutter it subtracts is MEASURED off `.fs-content` rather than read from
-`--fs-content-pad`: the same sheet re-paddings that element to 16px a side below 767px while the
+the `--fs-content-pad` token (no longer read at all): the same sheet re-paddings that element to 16px a side below 767px while the
 token stays 28, and a media query has no `data-*` to key on — nor may its breakpoint be copied into
 the JS. So the model asks the element what it actually got.
 
@@ -106,6 +107,10 @@ The arithmetic is unit-tested per combination (`tests/chrome-geometry.test.mjs`)
 still describe the real page is checked on a stand, where `live-audit` compares `contentWidth()`
 against the live `.fs-content` box. That check is what caught the gutter, on every page at 320, 390
 and 568.
+
+The model answers below the column's `max-width` and has no cap of its own: both callers ask a lower bound
+(500, 568), and the width slider's floor (1280) keeps a capped column at >= 1216px, above both, so a cap
+would change no decision. `live-audit` skips a column held at its `max-width` instead of comparing it exactly.
 
 **`contentWidth()`'s width is compared fresh on every call, not just cached from the last fitter.**
 `_shellOuter` (the window width `columnWidth()` subtracts from) is written only by `measureShell()`,
@@ -118,13 +123,13 @@ by design — got the PREVIOUS viewport's width: a resize from 568 to 390 still 
 adjacent widths). `contentWidth()` now compares `document.documentElement.clientWidth` against
 `_shellOuter` on every call and re-runs `measureShell()` when they differ, rather than only when
 `_shellOuter` was still unset. That comparison is the one layout read the function's "no layout
-read" promise was already conditional on (the bootstrap branch made the same call); doing it on
-every call costs nothing when nothing moved, since nothing invalidated layout between one read and
-the next.
+read" promise was already conditional on (the bootstrap branch made the same call). The read forces
+layout when it is dirty on classic-scrollbar engines (overlay-scrollbar phones skip the flush), so
+`fitTables()` takes it once per mid-scroll pass, lazily, not once per unanswered table.
 
 The measurement, the observer and the coalescing live in `fs-fit.js`, the theme's one "does it
-still fit?" engine (also used by `fitTables` in `fs-select.js`). **Add fit logic there; do not grow
-a second observer.**
+still fit?" engine (also used by `fitTables` in `fs-select.js`). **A new fit decision registers with
+`fit.add()`; do not grow a second observer.**
 
 The one literal is `@media (min-width: 521px)` around the vertical override in `20-shell.css`: the
 floor below which no slice leaves a readable 500 px, and simultaneously the safety net with JS
@@ -143,9 +148,9 @@ pass. Chromium and Firefox put the reader back afterwards; Safari implements no 
 any platform, and an iPhone reported the Overview creeping upward once per poll tick, bisected there
 to this pass. So `fitChrome()` writes `min-height` at the settled height before it strips the
 classes and takes it off after — the measurement is unchanged, and the box the page is laid out
-against does not move. `tools/fit-quiet.mjs` (`npm run quiet`, in `live`) hands the bar a
-`classList` of its own and reads the height back at the instant the classes come off: 0px of dip
-with the pin, 8px and 33px without it. The symptom itself does not reproduce headless — the pass is
+against does not move. `tools/fit-quiet.mjs` (`npm run quiet`, in `live`) hooks the two forced
+layouts of the pass (`offsetTop`, `getClientRects()`) and bounds `#maincontent`'s document position
+both ways within 2px of where it started: 0px of dip with the pin, 8px and 33px without it. The symptom itself does not reproduce headless — the pass is
 one synchronous task and both engines restore the offset once the bar is back, measured at half the
 page and at its bottom — which is why the gate watches the cause.
 
@@ -225,7 +230,7 @@ node is unreachable by a selector) and the CSS paints a square showing the badge
 **A bar dropdown anchors to its own `<li>`, not to the bar (issue #19).** `position: static` plus a
 panel pinned at `left: 16px` anchored to the bar's edge instead of its trigger — measured at
 760px, the item at x=253 and the panel at x=32, nothing bridging the diagonal between them, so the
-CSS hover closed before a pointer reached the panel. `clampDropdown` (`menu-footstrap.js`) now
+CSS hover closed before a pointer reached the panel. `clampDropdown` (`fs-chrome.js`) now
 nudges an item near the edge back inside the viewport in every bar state.
 
 **A footer link pair needs 26px, not the type scale's own leading, between their centres (WCAG 2.2
@@ -240,9 +245,10 @@ width depends on text metrics the two environments render slightly differently.
 
 ## Tab strips
 
-**One component, four LuCI selectors deduplicated in `theme/40-tabs.css`.** `#tabmenu ul.tabs`
-(page tabs), `ul.cbi-tabmenu.mode` (mode switcher), `.tabs` (view tabs) and `.cbi-tabmenu` (CBI
-form tabs) share every rule except the active marker (`.active` vs `.cbi-tab`).
+**One component, three LuCI selectors deduplicated in `theme/40-tabs.css`.** `#tabmenu ul.tabs`
+(page tabs), `.tabs` (view tabs) and `.cbi-tabmenu` (CBI form tabs, and the mode switcher
+`ul.cbi-tabmenu.mode` through it) share every rule (the mode switcher keeps only its own
+`max-width: none`) except the active marker (`.active` vs `.cbi-tab`).
 
 **`.cbi-tabmenu > li` alone gets `max-width: 100%`, not `none`** (page tabs and the mode switcher
 keep `none`, since neither ever carries a sentence-length label). adblock's Overview page names one
@@ -263,13 +269,19 @@ shadow is not clipped by the scroll container.
 
 **Density steps (`fs-dense1` → `fs-dense2`) come from `fitTabStrips()` (`fs-chrome.js`) measuring
 whether the strip wraps to a second row**, mutually exclusive so a pill is never trimmed by both
-classes at once. Both steps give the pill the same padding; only `fs-dense2` also tightens the
-strip's own `gap`, the last knob before the strip is allowed to wrap.
+classes at once. Both steps give the pill the same padding (the strip's `gap` and font-size
+already equal the base), so for tabs `fs-dense2` changes nothing past `fs-dense1`.
 
 ## `header.ut`
 
-- Shared parts live in `partials/` (`head`, `brand`, `logout`, `notices`, `notice`, `search`,
-  `icon`, `footer`). There is no second template directory.
+- Shared parts live in `partials/` (`head`, `notice`); the brand, search, log-out and icon
+  markup is inline in `header.ut`. There is no second template directory.
+- **A chrome icon is a bare `<svg class="fs-ico" aria-hidden="true" viewBox="0 0 24 24">`**: its
+  fill, stroke, 1.9 width and round caps are the one `.fs-ico, .fs-chevron` rule in
+  `theme/20-shell.css`, not five attributes per element (100 B each, 300 B of every admin page).
+  `header.ut` writes its three inline and `svgIcon()` (`fs-widgets.js`) emits the same markup for
+  the menu and the search palette; a class outside the rule draws a filled black glyph, which
+  `tests/icon-stroke.test.mjs` holds.
 - `<body>` → a `.fs-shell` flex wrapper. Before it, the skip link `.fs-skip`
   ("Skip to content" → `#maincontent`), the first tab stop on the page.
 - **Sidebar** — `<nav class="fs-sidebar" aria-label="Menu">`, deliberately `<nav>`: `<aside>` gives
@@ -283,8 +295,8 @@ strip's own `gap`, the last knob before the strip is allowed to wrap.
     button used to sit between them; the axes are their own menu entry now
     (`/admin/system/footstrap`, previously a tab stapled onto System → System), so the chrome
     carries one control fewer — see [design-system.md](design-system.md).
-- **Main** — `<main class="fs-main" id="maincontent" tabindex="-1">`: `.fs-title.fs-sr` with the
-  `<h1>`, `#fs-nav-status`, and `.fs-content` (warnings, `#tabmenu`, `#view`, footer).
+- **Main** — `<main class="fs-main" id="maincontent" tabindex="-1">`: the
+  `.fs-title-main.fs-sr` `<h1>`, `#fs-nav-status`, and `.fs-content` (warnings, `#tabmenu`, `#view`, footer).
 - Must be preserved: `http.prepare_content`, `cbi.js`, the translations script, `node.css`, `css`,
   `blank_page`, `noscript`, and the no-root-password / initramfs warnings.
 
@@ -294,24 +306,24 @@ this one sits inside `<main>`. It hard-loads `L.require('menu-footstrap')` and t
 `L.require('fs-select')`; the `menu_module` parameter that used to pick a renderer went away with
 the second renderer.
 
-## `menu-footstrap.js` — the ONLY renderer
+## `fs-chrome.js` — the ONLY renderer
 
 There is no `menu-footstrap-top.js`. **A second layout was never a second design**: the sidebar
 renderer already produced markup its own CSS turns into a horizontal bar on a phone, and it already
 had a flyout mode where a section behaves exactly like a top-menu dropdown. The top layout is
 that mode at desktop width. The one piece of unique logic the deleted file carried, `clampDropdown`,
-moved here.
+moved to `fs-chrome.js`.
 
 - `renderMainMenu` fills `#topmenu`: an item is
   `<li><a><icon><span class="fs-label">title</span><chevron></a></li>`, active by
   `L.env.dispatchpath`. Icons are mapped by section name with a regex fallback and a generic SVG,
   inlined as strings in the JS (`E()` cannot build SVG — see [conventions.md](conventions.md)).
-  Everything shared — tabs, modes, the rail, the SPA router, chrome
-  measurement — lives in the `fs-*.js` modules that `menu-footstrap-common.js` wires together. Only
-  `renderMainMenu` is layout-specific, and it is passed into `common.init()`: composition, not
-  inheritance, because LuCI makes a singleton of every baseclass.
+  `renderMainMenu` sits in `fs-chrome.js` beside `renderModeMenu` and
+  `renderTabMenu`; `menu-footstrap-common.js` calls `chrome.wireMenu()` and `chrome.start()`, so
+  the renderer is no injected parameter. The rest — tabs, modes, the rail, the SPA router, chrome
+  measurement — lives in the other `fs-*.js` modules.
 - The top-level `admin/logout` node is dropped from the tree — the chrome draws its own Log out
-  (`partials/logout.ut`), otherwise it appears twice.
+  (`header.ut`), otherwise it appears twice.
 - **A section with children is a W3C APG disclosure pattern**, not a link: `role="button"`,
   `aria-expanded`, `aria-controls`, Enter/Space, and Escape closes the flyout and returns focus.
   Deliberately not `role="menu"` — APG explicitly says site navigation should not take menubar
@@ -329,13 +341,26 @@ moved here.
   the accordion (`restoreAccordion()`) — a plain `closeFlyouts()` was not enough, because it
   stripped `.open` from everything while the markup is not rebuilt on a rail toggle, so "Keep open"
   stopped meaning anything.
-- `clampDropdown` pushes a dropdown back into the viewport at the right edge. Whenever the chrome is
+- `clampDropdown` pushes a dropdown back into the viewport at its inline-end edge (right in LTR, left in RTL, through `inset-inline-start`). Whenever the chrome is
   a BAR (`barDropdown()` — the top layout at any width, or a `data-narrow` sidebar), because that is
   when a panel hangs off its own `<li>`; the rail is excluded, where a flyout is anchored sideways
   instead. It keeps one scheduled `rAF` **per `<li>`** so it can cancel an
   unfinished measurement when the pointer has moved on; the shared `fit.frame()` coalescer cannot
   express that, and this is a documented exception.
 - Hover opening is pure CSS.
+
+- **The width probe's `!important` declarations.** An app carrying `div { min-width: 500px
+  !important }` won every read and folded the sidebar into a bar on a 1857px desktop: the cut became
+  500 + 500 + 1000 = 2000 CSS px, reported as a zoom bug (Chrome at 90 % gives 2063 CSS px and
+  passes, 100 % gives 1857 and fails). `box-sizing` is stated for the same reason, as
+  `getComputedStyle().width` is the content box.
+- **The indicator observer shares `stamp()`'s callback.** On WebKit at 390px a second indicator
+  pushed the page down 91px for 708 ms, until `fs-ind-compact` landed at 771 ms; sharing the
+  callback lands the decision in the microtask before paint.
+- **`contentWidth()` compares the window width fresh on every call.** A resize that moves the offset
+  opens the `SCROLL_IDLE` window (400 ms) itself, and a caller landing in it got the previous
+  viewport's width: 568px settling to 390px stayed 568 for up to 220 ms (-178px = 568 - 390, live
+  geometry audit on 24.10).
 
 ## Dark mode and outward compatibility
 
@@ -373,7 +398,9 @@ at all until you are already there — "Port Forwards" is a tab of Network → F
 - **Recently visited rows are kept in `localStorage` `fs-recent`, one menu path each.** Only the
   path is stored: the title is resolved through the index on every render, so it follows the UI
   language and a page an ACL change hides is dropped instead of shown dead. `menu-footstrap-common`
-  owns the writer (`remember()`) and `warmRecent()` prefetches each path — see
+  owns the writer (`remember()`) and `warmRecent()` prefetches each path; the key, the cap of 8 and
+  the reader (`recentPaths()`) live once in `fs-prefs`, and common alone binds the button,
+  Ctrl/Cmd+K and `/`, calling `fs-search`'s `open`/`toggle` — see
   [spa-router.md](spa-router.md).
 
 **Trap it was built around: do not index through `ui.menu.getChildren()`.** On an alias node it
@@ -594,8 +621,37 @@ be styled with CSS. The native `<select>` remains the form field and must stay
 It also owns `fitTables()`, which folds data tables into cards. Why config tables are handled
 differently, and why that difference is not an unfinished job: [css.md](css.md).
 
+### The measurements behind `fs-select.js`
+
+The file keeps each rule and its reason; the numbers that set them live here.
+
+- **Roots.** `ui.showModal` parks its dialog on `#modal_overlay`, a sibling of `#view`; before the
+  overlay was a root, a table in the wireless-scan dialog stood 56px past the dialog's edge at 390px.
+- **Bare tables.** A `<div class="table">` or a table with no LuCI class is tagged too, because a
+  third-party app may emit one. A census over all 196 menu pages of the dev stand found zero — the
+  rule exists for the apps that are not there.
+- **An honest floor.** `overflow-wrap: break-word` keeps a column's min-content real. Rebuilding the
+  floor in JS is UAX #14 by hand and wrong both ways: `WPA2-PSK/CCMP` measured 144px against a real
+  93px, so tables carded that had room.
+- **`CRAMPED` is trusted, not measured.** Giving cells a min-width so "cramped" produces an
+  overflow was tried: it carded the firewall zone table at 1420px, and the card still overflowed by
+  39px.
+- **The answer lives on the slot.** The measurement strips a table's marks and lays out a full-width
+  table for the pass. The poll replaces the table every tick, so at iPhone width that threw the
+  reader 612px out and back, twice per tick; compensating afterwards was tried four ways and each was
+  wrong somewhere. Keying the answer on the section frame (table id, or position) removes the pass.
+- **A zero measurement is not an answer.** The first pass reads `scrollWidth: 0` behind the
+  `.fs-fitted` gate; caching "fits" left a 777px table clipped inside a 712px column at 768px.
+- **Controls stack.** Network → Diagnostics is three controls in one header-less row needing 338px
+  in 320px; the Ping button was unreachable past `.fs-main`'s clip.
+- **Dropping upstream's width pin.** A pin measured while the config table is carded is the card's
+  width: firewall/zones pinned 634px and scrolled sideways by 256px, against 192px on a fresh load.
+- **Claiming the resize hook.** `stabilizeActionColumnWidth` adds a `resize` listener per table
+  element and never removes it; under the SPA router that grew from 1 to 31 listeners over 120
+  navigations, ~11.8 KB per navigation with no plateau.
+
 ## Translation
 
-Every label on the Footstrap tab carries the `footstrap` `msgctxt`; the chrome (Menu, Logout,
+Every label on System → Footstrap carries the `footstrap` `msgctxt`; the chrome (Menu, Logout,
 Skip to content) and the login/warning strings deliberately do not. The reasoning — `msgid` is a
 global name shared with every app on the router — is in [conventions.md](conventions.md).
