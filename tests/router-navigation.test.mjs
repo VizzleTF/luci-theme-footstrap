@@ -250,3 +250,14 @@ test('a navigation refused for want of .fs-content leaves the one in flight alon
 	await flush();
 	assert.notEqual(outgoing.parentNode, t.main, 'B still commits: the refusal did not supersede it');
 });
+
+test('navigate() takes the full load when a foreign script replaced the global _', () => {
+	const t = boot();
+	t.r.seed();
+	const luci = globalThis._;
+	globalThis._ = () => ({});
+	try {
+		assert.equal(t.r.navigate(PATH('admin', 'status', 'B'), true), false, 'a lodash _ is not LuCI\'s');
+	} finally { globalThis._ = luci; }
+	assert.ok(t.r.navigate(PATH('admin', 'status', 'B'), true), 'LuCI\'s _ keeps the client navigation');
+});
