@@ -177,6 +177,9 @@ re-judging it on every navigation.
 
 `dedupeViewSheets()`. The rules do not disappear (the first copy stays), and a library's "have I
 imported this?" check still finds its sheet. Without it, podkop accumulates one `<style>` per visit.
+A copy is a duplicate only of one with the SAME owner (the page it arrived for): another app's copy
+is disabled on this page, so dropping this page's live copy for it left 0 of 2 copies painting.
+Unowned copies still collapse.
 
 ### Rule 4. Dark mode is announced in three dialects
 
@@ -279,7 +282,7 @@ is the same payload marked `[data-fs-shell]` so the module skips it: **63 elemen
 for the nested variant), which is what makes the twenty-one zeroes a working fence rather than a
 broken measurement. Gecko (Firefox 153) rewrites all of them identically on a synthetic page.
 
-Two things that fell out of it and are worth knowing:
+Three things that fell out of it and are worth knowing:
 
 - **A nested rule under a pinned parent is fenced too, redundantly.** `#app-x .thing { &:hover { … } }`
   comes back as `&:hover:where(:not([data-fs-chrome], …))` — `&:hover` names nothing the theme does
@@ -293,6 +296,16 @@ Two things that fell out of it and are worth knowing:
   That is the flash the module's own comment already describes for server-rendered `<link>`s, it
   affects only the page you are on, and it is not fixable from a module that has to be fetched. Any
   future probe must wait for the theme's JS, or it measures the gap and calls it a fence failure.
+- **`@import` is followed.** `fenceRules()` descends into `CSSImportRule.styleSheet`, so
+  `* { padding: 0 !important }` imported by an app's `<style>` is fenced like its own rules. A
+  re-hosted `<link>`'s import is fenced on the shim's `load` event (readable then in Chromium,
+  Firefox and WebKit), not on a frame deadline; an import still loading when a `<style>` is
+  re-hosted stays unfenced on its own page in all three engines and is switched off on others. The
+  shim appends the link's `media` after `layer(theme)`. A `rel=alternate` or `disabled` link is
+  skipped but watched: its `rel`/`disabled` change re-runs the passes, because enabling adds no node
+  (an attribute observer sees a child only if it is the target; `subtree` on `<body>` would fire on
+  every button LuCI's poll disables). Firefox keeps one shim per href on a re-added link, measured
+  1/1 against Chromium.
 
 The same gate holds the dark-mode guard to `stampDark`: that guard exists because third parties
 write the attributes this theme publishes (`luci-app-openclash` does it in seven templates). Add a

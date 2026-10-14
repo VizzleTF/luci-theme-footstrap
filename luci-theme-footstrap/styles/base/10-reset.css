@@ -1,8 +1,8 @@
 @layer base {
 	/* Element reset (Meyer, trimmed to what a LuCI view can emit). */
 
-	/* scroll-margin-top: anchor jump must clear the sticky bar (WCAG 2.2 SC 2.4.11), token not a
-	 * literal — bar is 46px. */
+	/* scroll-margin-top: anchor jump must clear the sticky bar (WCAG 2.2 SC 2.4.11). Its designed
+	 * height, 46px, is the floor everywhere; the rule below raises it where the bar is measured. */
 	*, *::before, *::after {
 		scroll-margin-top: var(--fs-bar-h);
 		margin: 0;
@@ -11,9 +11,15 @@
 		box-sizing: border-box;
 	}
 
+	/* The document-scrolled bar outgrows 46px when the brand wraps or a row is added; the measured
+	 * height (fs-chrome.js publishBarHeight) replaces it there. .fs-main only: overlays and the
+	 * sidebar before fitShell keep 46px. */
+	:where(:root[data-layout="top"] .fs-main, :root[data-narrow] .fs-main) * {
+		scroll-margin-top: var(--fs-bar-live, var(--fs-bar-h));
+	}
+
 	abbr[title], acronym[title] {
 		border-bottom: 1px dotted;
-		font-weight: inherit;
 		cursor: help;
 	}
 
@@ -27,7 +33,6 @@
 	[hidden]:not([hidden="until-found"]) { display: none !important; }
 
 	html {
-		font-size: 100%;
 		height: 100%;
 	}
 
@@ -52,14 +57,11 @@
 		bottom: -.25em;
 	}
 
-	/* font-size: theme/60-inputs.css (control-typography rule + option) — absorbed */
+	/* font-size: button/label in base/30-forms.css; input/select/option/textarea in theme/60-inputs.css — absorbed */
 	button,
 	input,
 	select,
-	option,
-	textarea {
-		margin: 0;
-		box-sizing: border-box;
+	option {
 		vertical-align: baseline;
 	}
 
@@ -69,7 +71,6 @@
 	input[type="submit"] {
 		cursor: pointer;
 		appearance: button;
-		word-break: break-all;
 	}
 
 	/* disabled-opacity fade: 30-forms.css, same elements + pointer-events/cursor */

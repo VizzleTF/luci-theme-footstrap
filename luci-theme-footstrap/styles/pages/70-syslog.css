@@ -25,7 +25,7 @@
 		}
 	}
 
-	/* width beats base's 210px input/textarea by layer order alone (25.12), docs/css.md above */
+	/* width beats theme/60-inputs.css's 210px textarea by layer order alone */
 	#syslog {
 		width: 100%;
 		min-height: 500px;

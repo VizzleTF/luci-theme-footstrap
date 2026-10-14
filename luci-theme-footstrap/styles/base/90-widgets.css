@@ -28,7 +28,6 @@
 	.cbi-tooltip-container:hover .cbi-tooltip:not(:empty) {
 		inset-inline-start: auto;
 		opacity: 1;
-		transition: opacity var(--fs-dur-fade);
 	}
 
 	/* .cbi-progressbar paint: theme/25-progressbar.css — absorbed. The fill's starting
@@ -40,8 +39,8 @@
 	.zonebadge .cbi-tooltip {
 		padding: 1px;
 		background: inherit;
-		margin: -1.6em 0 0 -5px;
-		border-radius: var(--fs-radius-sm);
+		margin-block: -1.6em 0;
+		margin-inline: -5px 0;
 		pointer-events: none;
 	}
 
@@ -114,6 +113,6 @@
 	header [data-indicator] {
 		white-space: nowrap;
 		text-shadow: none;
-		margin: var(--fs-space-1) 0 var(--fs-space-1) var(--fs-space-1);
+		margin-block: var(--fs-space-1); margin-inline: var(--fs-space-1) 0;
 	}
 }

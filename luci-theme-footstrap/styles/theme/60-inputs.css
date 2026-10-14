@@ -13,8 +13,8 @@
 	.cbi-value:not(:has(.cbi-value-description)):has(> .cbi-value-field > .cbi-checkbox, > .cbi-value-field > div > .cbi-radio) {
 		align-items: center;
 	}
-	/* absorbed from base; ONLY the transition — typography stays in base (theme/45-misc.css). border-COLOR not the shorthand, which also animates width */
-	input, button {
+	/* ONLY the transition here, shared by every field box below (`textarea` included); typography stays in base/30-forms.css. border-COLOR not the shorthand, which also animates width */
+	input, button, textarea {
 		transition: var(--fs-field-transition);
 	}
 
@@ -30,7 +30,7 @@
 	.cbi-value-field *:where(:not(.btn, .cbi-button, .cbi-value-description)) { font-family: var(--fs-font-mono); }
 	.cbi-value-description { font-family: var(--fs-font-sans); text-wrap: pretty; }
 
-	/* not base's fixed 210px: mono + padded --fs-space-3, 210px clipped a URL mid-domain (issue #5); elastic, capped to the dynlist's ceiling */
+	/* not the generic input's fixed 210px (above): mono + padded --fs-space-3, 210px clipped a URL mid-domain (issue #5); elastic, capped to the dynlist's ceiling */
 	.cbi-value-field input[type="text"],
 	.cbi-value-field input[type="url"],
 	.cbi-value-field input[type="search"] { width: 100%; max-width: var(--fs-field-max); }
@@ -45,7 +45,7 @@
 	.td > input[type="password"],
 	.td > select,
 	.td > .cbi-dropdown:not(.btn):not(.cbi-button),
-	.cbi-dynlist > .add-item > .cbi-dropdown { width: 100%; }
+	.cbi-dynlist > .add-item > .cbi-dropdown,
 	.cbi-section-create > * > input { width: 100%; }
 
 	/* --- live components that bypassed the theme --- */
@@ -73,8 +73,9 @@
 
 	/* Form widgets — toggles, file input. Applies to every CBI form. */
 
-	/* base zeroes checkbox margin; inside a .btn label only a literal space separated ✓ from text
-	 * (issue #5.1). toggle switch below unaffected, its own margin:0 wins on a different ancestor */
+	/* the shared checkbox rule below gives the input a -4px margin (16px box in a 24px hit area, Normal
+	 * density), so inside a .btn label the mark sat flush against the text; .5em restores the gap.
+	 * The toggle switch is unaffected: its own margin:0 wins on a different ancestor */
 	.btn > input[type="checkbox"], .btn > input[type="radio"] { margin-inline-end: .5em; }
 
 	/* checkbox -> toggle switch, drawn on the INPUT — docs/css.md "Inputs: the toggle switch,
@@ -89,12 +90,13 @@
 		--sw-h: calc(22px * var(--fs-density-box));
 		--sw-knob: calc(16px * var(--fs-density-box));
 		--sw-pad: calc(2px * var(--fs-density-box));
+		--sw-travel: calc(var(--sw-w) - var(--sw-knob) - var(--sw-pad) * 2 - 2px);
 		/* appearance/--bd-color/--fg-color come from the shared input[type=checkbox] rule below;
-		 * flex-shrink: 0 keeps the pill at its width beside a caption (task 0145 has the numbers) */
+		 * flex-shrink: 0 keeps the pill at its width beside a caption (docs/css.md "Inputs: the toggle switch, drawn on the input, not the label") */
 		display: inline-block; position: relative; margin: 0; flex-shrink: 0;
 		width: var(--sw-w); height: var(--sw-h); border-radius: var(--fs-radius-pill);
 		background: var(--fs-track); border: var(--fs-hairline);
-		cursor: pointer; transition: background var(--fs-dur), border-color var(--fs-dur); vertical-align: middle;
+		cursor: pointer; transition: background var(--fs-dur), border-color var(--fs-dur);
 	}
 	/* hit-target overlay to 44x30 (WCAG 2.5.8 floor 24px, pill is 22px); inset stays literal, not
 	 * density-scaled — a floor that shrinks with Density is not one */
@@ -110,15 +112,17 @@
 	.cbi-checkbox > input[type="checkbox"]:checked { background: var(--fs-accent); border-color: transparent; }
 	/* derived so it cannot drift from the sizes above; -2px is the pill's two 1px borders (the knob sits against the padding box, so it has 2px less room — travel is 18px not 20) */
 	.cbi-checkbox > input[type="checkbox"]:checked::after {
-		transform: translateX(calc(var(--sw-w) - var(--sw-knob) - var(--sw-pad) * 2 - 2px));
+		transform: translateX(var(--sw-travel));
 		background: var(--fs-on-accent);
 	}
+	/* the knob starts at the inline-start edge, so RTL travels the other way (translateX is physical) */
+	:root[dir="rtl"] .cbi-checkbox > input[type="checkbox"]:checked::after { transform: translateX(calc(var(--sw-travel) * -1)); }
 	/* the input IS the switch, ring goes here; -solo: checked switch already spends its border channel on accent, only the tinted shadow shows */
 	.cbi-checkbox > input[type="checkbox"]:focus-visible {
 		border-color: var(--fs-accent);
 		box-shadow: var(--fs-focus-ring-solo);
 	}
-	.cbi-checkbox > input[type="checkbox"]:disabled { opacity: var(--fs-disabled-opacity); cursor: not-allowed; }
+	.cbi-checkbox > input[type="checkbox"]:disabled { cursor: not-allowed; } /* opacity comes from base/30-forms.css input[disabled] */
 
 	/* raw checkbox/radio, absorbed from base: undoes the generic input box below. 16px box on the
 	 * grid, mark inset FROM it. `.cbi-checkbox > input` also matches the switch's own input
@@ -205,6 +209,7 @@
 		padding: var(--fs-space-1) var(--fs-space-2);
 		background: var(--fs-panel);
 		color: var(--fs-text);
+		font-size: var(--fs-type-field);
 		border: var(--fs-hairline);
 		border-radius: var(--fs-radius);
 	}
@@ -220,25 +225,30 @@
 		width: auto;
 	}
 
-	/* native <select> chevron + theme; the data-URI lives in 03-palettes.css per palette/mode block since a URI cannot read var() */
-	select, select.cbi-input-select, .cbi-value-field select {
+	/* native <select> chevron + theme; the chevron is --fs-select-chevron (two gradient bands), the RTL rule below mirrors its position */
+	select, select.cbi-input-select, .cbi-value-field select, .cbi-select:not(select) {
 		/* unprefixed only, floor clears it everywhere — docs/css.md "The browser floor" */
 		appearance: none;
 		background-color: var(--fs-panel2);
 		background-image: var(--fs-select-chevron);
-		/* right inset is the scale step, not a literal 12 — the .cbi-select shell below repeats the same one spelling */
+		/* right inset is the scale step, not a literal 12; the .cbi-select shell shares this rule */
 		background-repeat: no-repeat; background-size: 6px 6px;
 		background-position: right calc(var(--fs-space-3) - 1px) center, right calc(var(--fs-space-3) + 5px) center;
-		padding: var(--fs-space-2) var(--fs-space-8) var(--fs-space-2) var(--fs-space-3);
+		padding-block: var(--fs-space-2); padding-inline: var(--fs-space-3) var(--fs-space-8);
 		border: var(--fs-hairline); border-radius: var(--fs-radius);
-		color: var(--fs-text); font-family: var(--fs-font-sans); font-size: var(--fs-type);
+		color: var(--fs-text); font-family: var(--fs-font-sans); font-size: var(--fs-type-field);
 		line-height: 1.3; min-height: var(--fs-ctl-h); cursor: pointer;
 		width: 210px;
 		display: inline-block;
 		transition: var(--fs-field-transition);
 	}
+	/* background-position has no logical keyword, so it is mirrored by hand; the two bands swap offsets
+	 * to keep the chevron's left-leaning half on the left. The padding above is logical and follows. */
+	:root[dir="rtl"] :is(select, .cbi-select:not(select)) {
+		background-position: left calc(var(--fs-space-3) + 5px) center, left calc(var(--fs-space-3) - 1px) center;
+	}
 	/* height:inherit so the multiple/listbox variant does not take the closed control's one-line height */
-	select[multiple] { background-color: var(--fs-panel2); color: var(--fs-text); height: inherit; }
+	select[multiple] { height: inherit; }
 	option { font-size: 100%; line-height: 2em; }
 	select option { background: var(--fs-panel); color: var(--fs-text); }
 
@@ -269,25 +279,15 @@
 		}
 	}
 
-	/* .cbi-select — legacy luci-compat shell around a native <select>, matching the themed select
-	 * property for property. :not(select): the class also appears on a bare <select>, which cannot draw the ::before chevron */
+	/* .cbi-select — legacy luci-compat shell around a native <select>; it takes the themed select rule above and
+	 * keeps only its box. :not(select): the class also appears on a bare <select>, which cannot draw the ::before chevron */
 	.cbi-select:not(select) {
-		display: inline-block;
-		width: 210px;
 		/* height not min-height: the child's height:100% falls back to content height against an auto-height parent (measured collapse 30px -> 15px in a 38px shell) */
 		height: var(--fs-ctl-h);
-		color: var(--fs-text);
-		font-size: var(--fs-type);
-		border: var(--fs-hairline);
-		border-radius: var(--fs-radius);
 		padding: 0;
 		position: relative;
-		background-color: var(--fs-panel2);
-		background-image: var(--fs-select-chevron);
-		background-repeat: no-repeat;
-		background-size: 6px 6px;
-		background-position: right calc(var(--fs-space-3) - 1px) center, right calc(var(--fs-space-3) + 5px) center;
-		transition: var(--fs-field-transition);
+		/* the shell draws no text; the shared rule's field size belongs to its select child */
+		font-size: var(--fs-type);
 	}
 	/* base/30-forms.css only dims the old ▾ plate; with the plate gone the disabled state had no visual, so the shell carries it now */
 	.cbi-select[disabled]:not(select) {
@@ -305,15 +305,17 @@
 		height: 100%;
 		min-height: 0;
 		width: 100%;
-		padding: 0 var(--fs-space-8) 0 var(--fs-space-3);
-		font-size: var(--fs-type);
+		padding-block: 0; padding-inline: var(--fs-space-3) var(--fs-space-8);
+		font-size: var(--fs-type-field);
 		line-height: normal;
 		cursor: pointer;
 	}
 
-	.spinning, .cbi-value em, em.spinning { color: var(--fs-dim); }
+	/* :where() keeps this at 0,1,0: a bare :not() would be 0,2,0 and beat `.alert-message p` (0,1,1).
+	 * A button keeps its own label ink while it spins; dim on a solid fill measured 1.00-2.24:1. */
+	.spinning:where(:not(.btn, .cbi-button)), .cbi-value em, em.spinning { color: var(--fs-dim); }
 
-	/* type list must be EXHAUSTIVE: an omission falls back to BASE's stock field beside a themed one, not to "unstyled" */
+	/* type list must be EXHAUSTIVE: an omission falls back to the generic `input` box above, beside a themed one, not to "unstyled" */
 	.cbi-input-text, .cbi-input-password, .cbi-input-textarea,
 	.cbi-section-create-name, .cbi-value-field input.create-item-input,
 	input[type="text"], input[type="password"], input[type="number"],
@@ -329,10 +331,9 @@
 		padding: var(--fs-space-2) var(--fs-space-3);
 		min-height: var(--fs-ctl-h);
 		box-shadow: none;
-		transition: var(--fs-field-transition);
 	}
 	/* max-width:100% beside the fixed 210px: a textarea's intrinsic width comes from `cols` (default 20), which put two textareas 19px outside their card at 300px before this */
-	textarea { min-height: 84px; line-height: var(--fs-leading); width: 210px; max-width: 100%; font-size: var(--fs-type); }
+	textarea { min-height: 84px; line-height: var(--fs-leading); width: 210px; max-width: 100%; font-size: var(--fs-type-field); }
 	/* a square native scrollbar is not clipped by a rounded corner; self-rounded thumb + transparent track fixes it. no scrollbar-width/-color: either switches Chromium to the square standard bar */
 	textarea::-webkit-scrollbar { width: 16px; height: 16px; }
 	textarea::-webkit-scrollbar-track { background: transparent; margin: var(--fs-space-4) 0 var(--fs-space-2-5); }
@@ -385,19 +386,22 @@
 		box-shadow: var(--fs-focus-ring);
 	}
 
-	/* .cbi-value-error input (Lua-CBI) must live HERE: base's red border-color is a longhand and
-	 * this rule's border shorthand wipes it by layer regardless of specificity */
+	/* .cbi-value-error input (Lua-CBI) must live here: base's red border-color is a longhand and
+	 * this rule's border shorthand wipes it by layer regardless of specificity.
+	 * The same rejected value shown by a ui.Dropdown: base carried the widget and its closed <li>, theme only the input half.
+	 * The enhanced select's validator fails on the hidden <select>, so its widget (the next sibling) is matched through it;
+	 * (0,5,1) beats 65-dropdown's border shorthand (0,3,0), its hover (0,4,0) and its focus ring (0,2,0); the closed <li> takes the border only, the ring sits on the widget */
 	input[type="checkbox"].cbi-input-invalid:focus::before,
 	input[type="radio"].cbi-input-invalid:focus::before,
 	.cbi-select.cbi-input-invalid.focus,
 	.cbi-input-invalid, input.cbi-input-invalid, textarea.cbi-input-invalid,
 	.cbi-value-error input, .cbi-value-error textarea,
-	.cbi-input-invalid:focus {
+	.cbi-input-invalid:focus,
+	.cbi-input-invalid.cbi-dropdown:not(.btn):not(.cbi-button),
+	select.cbi-input-invalid[data-fs-select="1"] + .cbi-dropdown:not(.btn):not(.cbi-button) {
 		border-color: var(--fs-danger);
 		box-shadow: var(--fs-focus-ring-invalid);
 	}
-	/* same rejected value shown by a ui.Dropdown: base carried the widget and its closed <li>, theme only the input half */
-	.cbi-input-invalid.cbi-dropdown:not(.btn):not(.cbi-button),
 	.cbi-input-invalid.cbi-dropdown:not([open]) > ul > li { border-color: var(--fs-danger); }
 
 	/* doubled [readonly] states intent at (0,2,1): at (0,1,1) it only tied the typed input rules above and silently lost */
@@ -440,7 +444,10 @@
 		display: inline-flex;
 		padding: 0 var(--fs-space-2);
 		color: var(--fs-danger);
-		border-radius: 0 var(--fs-radius-sm) var(--fs-radius-sm) 0;
+		/* logical: base pins the × with inset-inline-end, so in RTL the rounded corners must follow it */
+		border-radius: 0;
+		border-start-end-radius: var(--fs-radius-sm);
+		border-end-end-radius: var(--fs-radius-sm);
 	}
 	.cbi-dynlist > .add-item {
 		align-items: stretch;
@@ -454,6 +461,12 @@
 		flex: 1 1 auto; min-width: 0; width: auto;
 		border: 0; background: transparent;
 		box-shadow: none; min-height: var(--fs-ctl-h-sm); border-radius: 0;
+	}
+	/* UIDynamicList drop indicator (ui.js puts .drag-over on the dragenter target): (0,4,0) out-ranks the border
+	 * shorthands above and in 55-buttons; [draggable] (ui.js sets it on every .item) lifts the item past .item:focus (0,3,0) */
+	.cbi-dynlist > .item[draggable].drag-over,
+	.cbi-dynlist > .add-item > :is(.cbi-input-text, .cbi-button-add).drag-over {
+		border-top: 1px solid var(--fs-text);
 	}
 
 	/* input + button as ONE seamless group; gap:0 is load-bearing — base gives every .control-group a gap, this is the one whose members must touch */
@@ -472,8 +485,9 @@
 	}
 	.cbi-section-create, .cbi-section-create.cbi-tblsection-create { margin-top: var(--fs-space-3); }
 
-	/* `.hidden.hidden` outranks every component rule without !important (which would invert layer
-	 * order later) and covers the Enter-key submit legacy Lua pages carry (issue #12).
+	/* `.hidden.hidden` beats component rules up to (0,3,0) that come earlier in source, without
+	 * !important (which would invert layer order); it also covers the Enter-key submit legacy Lua
+	 * pages carry (issue #12). The @container table rules and fs-stacked actions outrank it.
 	 * :not([class*=":"]) excludes a Tailwind/UnoCSS class fs-sheets.js re-hosts into this layer —
 	 * docs/css.md "Inputs: `.hidden.hidden`, and the Tailwind/UnoCSS exception". */
 	.hidden.hidden:not([class*=":"]) { display: none; }

@@ -1,6 +1,4 @@
 @layer theme {
-	/* diff tints come from base's ladder alone */
-
 	/* beats the heading ramp's tight leading in-layer for a dialog's h4 (45-misc.css) */
 	.modal > * {
 		line-height: normal;
@@ -21,9 +19,15 @@
 	.modal:has(.cbi-map) { max-width: min(1100px, 94vw); }
 
 	/* no HORIZONTAL scroll ever (measured 634px scroll vs 530px room) — docs/css.md "Modal: no horizontal scroll, ever" */
-	#modal_overlay .modal label.btn { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+	#modal_overlay .modal label.btn {
+		/* @mirror btn-wrap/anywhere */
+		white-space: normal;
+		min-width: 0;
+		overflow-wrap: anywhere;
+		/* @endmirror */
+	}
 	#modal_overlay .modal li { overflow-wrap: anywhere; }
-	/* a literal 4px sat outside the Rounding axis */
+	/* tints come from base's ladder alone (base/95-luci.css); radii sit on the Rounding axis */
 	#modal_overlay .uci-dialog div > ins,
 	#modal_overlay .uci-dialog div > del,
 	#modal_overlay .uci-dialog div > var,

@@ -44,9 +44,9 @@ description: The cascade layers, the token tiers, and how a CSS change is proved
 
 ## Proving the change
 
-`npm run computed-diff` (T1, ~4 s) is the cheap half; `--control` runs the same sheet on both sides
-and must report 0. The gallery has every widget and none of the pages, so a clean diff is an early
-result, not a release: the live half is `npm run live` and `owlab test` (T2), where the same sheet
-twice moves 0.5-1.3% of pixels and a real regression weighs 0.19% — never screenshots. Method and
-the two corrections the gate needed: `docs/css.md` "Proving a CSS change", `docs/development.md`
-"The two cheap browser gates".
+`npm run computed-diff` (T1, ~8.7 s) is the cheap half; `--control` runs the same sheet on both
+sides and must report 0. The gallery has every widget and none of the pages, so a clean diff is an
+early result, not a release: the live half is `npm run live` and `owlab test` (T2), where the same
+sheet twice moves 0.5-1.3% of pixels and a real regression weighs 0.19% — never screenshots.
+Method and the two corrections the gate needed: `docs/css.md` "Proving a CSS change",
+`docs/development.md` "The three cheap browser gates".

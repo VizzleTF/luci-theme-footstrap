@@ -3,8 +3,12 @@
 	 * fitChrome measures instead — docs/css.md "Toplayout: measured, not media-queried". */
 	:root[data-layout="top"] .fs-sidebar {
 		/* min-height not height: a long hostname wraps the capped brand onto a second line (20-shell.css) */
-		min-height: var(--fs-bar-h); height: auto;
+		min-height: var(--fs-bar-h);
 		gap: var(--fs-space-3);
+	}
+	/* the stacked bar (.fs-bar-stack, set by fitChrome in fs-chrome.js, not a media query) IS the
+	 * base bar, so the delta below skips it instead of restating the base values */
+	:root[data-layout="top"] .fs-sidebar:not(.fs-bar-stack) {
 		/* nowrap or flexbox wraps the BAR itself instead of the menu's own pills — the signal fitChrome measures */
 		flex-wrap: nowrap;
 		/* aligns the bar to .fs-content so the brand/menu line up with the headings below */
@@ -12,37 +16,17 @@
 	}
 
 	/* flex:1 opens the gap pushing the right cluster to the column's edge */
-	:root[data-layout="top"] .fs-sidebar ul.nav {
+	:root[data-layout="top"] .fs-sidebar:not(.fs-bar-stack) ul.nav {
 		order: 2; flex: 1 1 auto; margin-inline-start: var(--fs-space-2);
 	}
-	:root[data-layout="top"] .fs-sidebar #indicators,
-	:root[data-layout="top"] .fs-themerow,
-	:root[data-layout="top"] .fs-logout { order: 3; margin-inline-start: 0; }
+	:root[data-layout="top"] .fs-sidebar:not(.fs-bar-stack) #indicators,
+	:root[data-layout="top"] .fs-sidebar:not(.fs-bar-stack) .fs-themerow,
+	:root[data-layout="top"] .fs-sidebar:not(.fs-bar-stack) .fs-logout { order: 3; margin-inline-start: 0; }
 
 	/* dropdown anchor/bridge/clamp live unguarded in 20-shell.css, not here (issue #19) */
 
-	/* :not(:empty):not(.single), not a hide pair: 20-shell.css already hides the mode strip */
-	:root[data-layout="top"] .fs-modemenu:not(:empty):not(.single) {
-		display: flex; order: 4; flex: 1 1 100%; margin: 0; gap: var(--fs-space-1);
-	}
+	/* placement only: the strip's own show/hide (empty, single) lives in 20-shell.css */
+	:root[data-layout="top"] .fs-modemenu { order: 4; flex: 1 1 100%; gap: var(--fs-space-1); }
 
 	:root[data-layout="top"] .fs-content { padding-top: var(--fs-space-6); }
-
-	/* .fs-bar-stack: set by fitChrome (fs-chrome.js), not a media query — same reasoning as the header above */
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack {
-		flex-wrap: wrap; height: auto; padding: var(--fs-space-2-5) var(--fs-space-4);
-	}
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack ul.nav {
-		order: 3; flex: 1 1 100%; margin-inline-start: 0;
-	}
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack #indicators,
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow,
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-logout { order: 2; }
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack #indicators,
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow { margin-inline-start: auto; }
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack #indicators:not(:empty) ~ .fs-themerow { margin-inline-start: 0; }
-	/* only the FIRST far-edge item keeps the auto margin, restated here — base guard is out-specified (0,4,0 vs 0,2,0) */
-	:root[data-layout="top"] .fs-sidebar.fs-bar-stack .fs-themerow ~ .fs-themerow { margin-inline-start: 0; }
-
-	/* .fs-ind-compact/.fs-bar-actrow live with the bar in 20-shell.css too — only the top delta lives here */
 }

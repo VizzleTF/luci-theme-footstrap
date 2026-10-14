@@ -1,49 +1,28 @@
 @layer page {
-	/* Appearance controls, appended to System -> System by fs-appearance.js. Was a viewport-capped
-	 * popover; now ordinary .cbi-section cards in the page layer (an axis control is not chrome).
-	 * docs/css.md "Appearance: from popover to page, and what stayed CSS". */
+	/* The axis controls are page content, not chrome (fs-appearance.js): docs/css.md "Appearance: from popover to page, and what stayed CSS". */
 
 	.fs-ap { display: flex; flex-direction: column; gap: var(--fs-space-5); }
 	.fs-ap-note p:first-child { margin-top: 0; }
 	.fs-ap-note p:last-child { margin-bottom: 0; }
-	/* heading row: on a folded group the WHOLE row is the disclosure button, full width so the
-	 * target is the heading, not a chevron nobody can hit on a phone */
+	/* heading row: on a folded group the WHOLE row is the disclosure button inside the h2, full
+	 * width so the target is the heading, not a chevron nobody can hit on a phone. `font: inherit`
+	 * hands the button the heading's size, weight and leading, which a button resets to the UA's. */
 	button.fs-ap-fold {
 		display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-3);
 		inline-size: 100%; padding: 0; margin: 0;
-		background: none; border: 0; cursor: pointer; text-align: start; color: inherit;
+		background: none; border: 0; cursor: pointer; text-align: start; color: inherit; font: inherit;
 	}
-	button.fs-ap-fold:hover h4 { color: var(--fs-accent); }
+	button.fs-ap-fold:hover { color: var(--fs-accent); }
 	button.fs-ap-fold:focus-visible { outline: none; box-shadow: var(--fs-focus-ring-solo); border-radius: var(--fs-radius-sm); }
-	/* pinned @mirror chevron/*: same glyph as the overview card toggle (two hosts, one keyed by
-	 * attribute, one by class — no single selector list reaches both). docs/css.md above. */
+	/* the chevron glyph itself is in theme/45-misc.css, shared with the overview card toggle */
 	.fs-ap-chev {
 		flex: 0 0 auto; inline-size: 26px; block-size: 26px;
 		display: inline-flex; align-items: center; justify-content: center;
 		color: var(--fs-dim); border-radius: var(--fs-radius-sm);
 	}
-	.fs-ap-chev::after {
-		/* @mirror chevron/closed */
-		content: "";
-		width: 7px;
-		height: 7px;
-		border-right: 2px solid currentColor;
-		border-bottom: 2px solid currentColor;
-		border-radius: 1px;
-		transform: rotate(45deg);			/* closed: chevron down */
-		margin-top: -2px;					/* optical centring of the down chevron */
-		transition: transform var(--fs-dur-move);
-		/* @endmirror */
-	}
-	button.fs-ap-fold[aria-expanded="true"] .fs-ap-chev::after {
-		/* @mirror chevron/open */
-		transform: rotate(-135deg);			/* open: chevron up */
-		margin-top: var(--fs-space-0-5);
-		/* @endmirror */
-	}
 	button.fs-ap-fold:hover .fs-ap-chev { color: var(--fs-accent); }
 	.fs-ap-sub { margin-top: var(--fs-space-4); }
-	.fs-ap-head h4 {
+	.fs-ap-head :is(h2, h3) {
 		margin: 0;
 		font-size: var(--fs-type); font-weight: var(--fs-weight-bold); color: var(--fs-text);
 	}
@@ -52,10 +31,9 @@
 	 * theme/60-inputs.css already draw every other LuCI form this way. docs/css.md above. */
 	:root[data-layout="top"] .fs-ap-submenus { display: none; }
 
-	.fs-ap-actrow { display: flex; flex-wrap: wrap; gap: var(--fs-space-2); }
+	.fs-ap-actrow, .fs-ap-bgrow { display: flex; flex-wrap: wrap; gap: var(--fs-space-2); }
 	.fs-ap-actgap { flex: 0 0 var(--fs-space-4); }
-	.fs-ap-actrow .btn { font-size: var(--fs-type); padding: var(--fs-space-2) var(--fs-space-2-5); cursor: pointer; }
-	.fs-ap-actrow .btn:disabled { cursor: default; }
+	.fs-ap-actrow .btn, .fs-ap-bgrow .btn { padding: var(--fs-space-2) var(--fs-space-2-5); }
 	/* primed Reset (2nd click confirms) reads as the destructive action it is */
 	.fs-ap-armed { color: var(--fs-on-danger); background: var(--fs-danger); border-color: transparent; }
 	.fs-ap-err { margin-top: var(--fs-space-2); font-size: var(--fs-type-xs); line-height: 1.35; color: var(--fs-danger); }
@@ -72,11 +50,10 @@
 	input[type="color"].fs-color-swatch::-moz-color-swatch { border: 0; border-radius: calc(var(--fs-radius-sm) - 1px); }
 	input[type="text"].fs-color-hex {
 		flex: 1 1 auto; min-inline-size: 0;
-		font-family: var(--fs-font-mono); font-size: var(--fs-type-xs); font-variant-numeric: tabular-nums;
+		font-family: var(--fs-font-mono); font-size: var(--fs-type-field-xs); font-variant-numeric: tabular-nums;
 		text-transform: lowercase;
 	}
-	.fs-color-clear { flex: 0 0 auto; font-size: var(--fs-type-xs); padding: var(--fs-space-1-5) var(--fs-space-2); cursor: pointer; }
-	.fs-color-clear:disabled { cursor: default; }
+	.fs-color-clear { flex: 0 0 auto; font-size: var(--fs-type-xs); padding: var(--fs-space-1-5) var(--fs-space-2); }
 
 	/* live contrast readout, not a validation — docs/css.md above */
 	.fs-color-contrast { font-variant-numeric: tabular-nums; }
@@ -89,12 +66,8 @@
 		border: var(--fs-hairline); border-radius: var(--fs-radius);
 		margin-top: var(--fs-space-2);
 	}
-	.fs-ap-bgrow { display: flex; flex-wrap: wrap; gap: var(--fs-space-2); }
-	.fs-ap-bgrow .btn { font-size: var(--fs-type); padding: var(--fs-space-2) var(--fs-space-2-5); cursor: pointer; }
-	.fs-ap-bgrow .btn:disabled { cursor: default; }
-	/* File wallpaper: only Dim applies, Tint colours the canvas a photo already covers */
-	:root[data-wallpaper="file"] .fs-ap-tint { display: none; }
-	/* strength is a multiplier on a chroma we choose, meaningless off hue mode */
+	/* File wallpaper: only Dim applies, Tint colours the canvas a photo already covers; strength is a multiplier on a chroma we choose, meaningless off hue mode */
+	:root[data-wallpaper="file"] .fs-ap-tint,
 	:root:not([data-tint="hue"]) .fs-ap-tintstr { display: none; }
 
 	.fs-ap-footer {

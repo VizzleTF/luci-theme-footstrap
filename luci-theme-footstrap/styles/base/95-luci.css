@@ -2,10 +2,8 @@
 	/* Widgets with no generic equivalent: CBI section tables, interface/zone badges,
 	 * the uci change dialog, spinners, the file browser, and a few rules luci-mod-*
 	 * depends on. */
-	/* .hidden: theme/60-inputs.css (with the .cbi-* variants LuCI emits) */
+	/* .hidden: theme/60-inputs.css */
 	form.inline { display: inline; margin-bottom: 0; }
-
-	#modemenu li:last-child span.divider { display: none }
 
 	/* #syslog: absorbed into pages/70-syslog.css — in base it LOST to the theme layer's generic
 	 * form-field box (a layer beats specificity), so the log rendered as a 210px column. */
@@ -31,12 +29,8 @@
 	 * the GridSection name column, read from the markup, not the release" (issue #9). Column
 	 * geometry lives in theme/30-tables.css, next to the real cells it lines up with. */
 	.cbi-section-table-titles.named[data-title]::before,
-	.cbi-section-table-titles.named[data-title] ~ .cbi-section-table-descr.named::before {
-		content: attr(data-title) " ";
-		display: table-cell;
-		vertical-align: middle;
-	}
-	.cbi-section-table-row[data-title]:not(:has(> .cbi-section-table-titles))::before {
+	.cbi-section-table-titles.named[data-title] ~ .cbi-section-table-descr.named::before,
+	.cbi-section-table-row[data-title]:is(:not(:has(> .cbi-section-table-titles)))::before {
 		content: attr(data-title) " ";
 		display: table-cell;
 		vertical-align: middle;
@@ -83,10 +77,6 @@
 		margin: 0;
 	}
 
-	.table.valign-middle .td {
-		vertical-align: middle;
-	}
-
 	.cbi-rowstyle-2,
 	.tr.table-titles,
 	.tr.cbi-section-table-titles {
@@ -97,12 +87,13 @@
 	th[data-sort-direction="asc"]::after { content: "\a0\25b2"; }
 	th[data-sort-direction="desc"]::after { content: "\a0\25bc"; }
 
-	/* Indent and the ::before glyph's own `left` are ONE relationship (both 1.25em, stated twice
-	 * before) — now one local. */
+	/* Indent and the ::before glyph's `inset-inline-start` are one relationship (both 1.25em),
+	 * held in one local. */
 	.cbi-value-description {
 		--help-indent: 1.25em;
 
-		margin: var(--fs-space-1) 0 0 var(--help-indent);
+		margin-block: var(--fs-space-1) 0;
+		margin-inline: var(--help-indent) 0;
 		position: relative;
 	}
 
@@ -133,7 +124,7 @@
 		margin-bottom: var(--fs-space-4);
 	}
 
-	.cbi-section-error ul { margin: 0 0 0 var(--fs-space-5); }
+	.cbi-section-error ul { margin-block: 0; margin-inline: var(--fs-space-5) 0; }
 
 	.cbi-section-error ul li {
 		font-weight: var(--fs-weight-bold); /* colour: theme/35-alerts.css — absorbed */
@@ -180,7 +171,6 @@
 
 	.ifacebadge {
 		display: inline-block;
-		flex-direction: row;
 		border: var(--fs-hairline);
 		padding: var(--fs-space-0-5);
 		color: var(--fs-text);
@@ -439,7 +429,7 @@
 		width: var(--fs-space-5); /* one reader, so the size lives here rather than behind a token */
 		height: var(--fs-space-5);
 		content: " ";
-		background: var(--on-color, #000);
+		background: var(--fs-text); /* palette ink, not CanvasText: a foreign `:root{color-scheme}` flips that against the theme */
 		mask: var(--spinner-icon) center/cover no-repeat;
 		-webkit-mask: var(--spinner-icon) center/cover no-repeat;
 		/* two deliberate exceptions to the motion scale (02-tokens.css): a LOOP, not a state change
@@ -448,13 +438,15 @@
 		animation: fs-spin 1s linear infinite;
 	}
 
+	/* A button's glyph is its label ink, so it cannot match the fill under it (white on Save's pale
+	 * tint measures 1.22:1). A bare `.spinning` keeps the page ink above. */
+	:is(.btn, .cbi-button).spinning::before {
+		background: currentColor;
+	}
+
 	/* One user (.spinning::before above) — the rail's poll glyph is deliberately STATIC
 	 * (theme/20-shell.css). Unscoped: keyframe names resolve document-wide, a luci-app-* may ride it. */
 	@keyframes fs-spin { to { transform: rotate(360deg); } }
-
-	[data-darkmode="true"] .spinning::before {
-		background: var(--on-color, #fff);
-	}
 
 	[data-tab-title] {
 		height: 0;
@@ -513,7 +505,6 @@
 
 	.cbi-filebrowser > ul > li {
 		display: flex;
-		flex-direction: row;
 	}
 
 	/* row hover surface + flex sizing: theme/60-inputs.css — absorbed (this file's old
@@ -533,7 +524,6 @@
 
 	.cbi-filebrowser .upload {
 		display: flex;
-		flex-direction: row;
 		flex-wrap: wrap;
 		margin: 0 -.125em .25em -.125em;
 		padding: 0 0 .125em 0;
@@ -569,7 +559,8 @@
 	/* `fade-in` stays although nothing here rides it: an upstream animation NAME a luci-app-* may
 	 * ride (coverage contract, docs/conventions.md). The theme's own `.fade-in` CLASS rule is gone
 	 * on purpose — luci-mod-status re-marks it on every poll tick, replaying anything hung there.
-	 * `fs-fade` is one-shot instead, played once by the rail flyout and the search overlay. */
+	 * `fs-fade` is one-shot instead, played once by the rail flyout and the search overlay.
+	 * docs/css.md "Misc: fade-in animates nothing, on purpose". */
 	@keyframes fs-fade {
 		from { opacity: 0; transform: translateY(4px); }
 		to { opacity: 1; transform: none; }
@@ -594,10 +585,6 @@
 	.assoclist .td:nth-of-type(3),
 	.assoclist .td:nth-of-type(5) {
 		width: 25%;
-	}
-
-	.assoclist .td:nth-of-type(6) button {
-		word-break: normal;
 	}
 
 	/* PNGs on a white ground, inverted for dark mode: docs/css.md "base/95-luci.css: Statistics
@@ -625,6 +612,6 @@
 		font-weight: var(--fs-weight-bold);
 	}
 
-	/* Overview Hide/Show toggle pills: theme/35-alerts.css (.cbi-title .label) +
-	 * pages/20-overview.css (chevron variant) — absorbed. */
+	/* Overview Hide/Show toggle pills: theme/35-alerts.css (.cbi-title .label), the chevron in
+	 * theme/45-misc.css, the 16px pill in pages/20-overview.css — absorbed. */
 }

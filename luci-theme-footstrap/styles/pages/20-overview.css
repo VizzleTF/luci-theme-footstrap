@@ -17,26 +17,6 @@
 		border: 0;
 		color: var(--fs-faint);
 	}
-	/* pinned @mirror chevron/*, byte-identical to the Appearance fold's copy */
-	.cbi-title .label[data-indicator="poll-status"]::after {
-		/* @mirror chevron/closed */
-		content: "";
-		width: 7px;
-		height: 7px;
-		border-right: 2px solid currentColor;
-		border-bottom: 2px solid currentColor;
-		border-radius: 1px;
-		transform: rotate(45deg);			/* closed: chevron down */
-		margin-top: -2px;					/* optical centring of the down chevron */
-		transition: transform var(--fs-dur-move);
-		/* @endmirror */
-	}
-	.cbi-title .label[data-indicator="poll-status"][data-style="inactive"]::after {
-		/* @mirror chevron/open */
-		transform: rotate(-135deg);			/* open: chevron up */
-		margin-top: var(--fs-space-0-5);
-		/* @endmirror */
-	}
 
 	/* two selectors: wrapper differs by release (25.12 .cbi-title>h3, 24.10 bare h3); matches 0 of
 	 * 14 h3 on live 24.10.8 — not dead there, that release has no hide/show control */
@@ -54,10 +34,8 @@
 	/* every page-scoped selector below anchors on :where(#view)[data-page="…"], not bare #view —
 	 * docs/css.md ":where(#view), not bare #view". */
 
-	/* hideEmptyCard() marks a stock include with nothing to show; drop it */
-	:where(#view)[data-page="admin-status-overview"] .cbi-section.fs-ovl-empty { display: none; }
-
-	/* stock <h2> duplicate of the chrome's title; via .fs-content not #view — docs/css.md above */
+	/* drops what hideEmptyCard() marked (a stock include with nothing to show) and the stock <h2> duplicate of the chrome's title, the latter via .fs-content not #view */
+	:where(#view)[data-page="admin-status-overview"] .cbi-section.fs-ovl-empty,
 	.fs-content[data-page="admin-status-overview"] h2[name="content"] { display: none; }
 	.fs-ovl {
 		display: grid;
@@ -132,7 +110,7 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		line-height: var(--fs-leading);
-		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-text);
+		font-size: var(--fs-type); color: var(--fs-text);
 	}
 	/* no link (*_down.svg): dim to match the dim speed and faded zone bar */
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]):has(img[src*="_down.svg"]) > .ifacebox-head:first-child { color: var(--fs-dim); }
@@ -162,6 +140,8 @@
 		/* fights the element's own inline text-align:left */
 		text-align: end !important;
 	}
+	/* 25.12+ PoE line: inline color:#000 is 1.65:1 on the dark tile (#2d333b); beats it, needs the flag */
+	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) > .cbi-tooltip-container > span[style*="color:#000"] { color: var(--fs-text) !important; }
 
 	/* meter rows — a key/value-shaped .table row with a .cbi-progressbar (same shape test as
 	 * :218 below and 30-tables.css's key/value rule); a data table's own bar stays untouched.
@@ -222,7 +202,7 @@
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.th)):not(:has(.td:nth-child(3))) .td,
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.th)):not(:has(.td:nth-child(3))) .th,
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.th)):not(:has(.td:nth-child(3))) .tr { border-bottom: 0; }
-	/* own rule, not a 4th line above: .cbi-value carries no :has(), and a selector list is not
+	/* own rule, chosen instead of :is(): .cbi-value carries no :has(), and a selector list is not
 	 * forgiving below the browser floor (npm run css-floor) */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .cbi-value { border-bottom: 0; }
 

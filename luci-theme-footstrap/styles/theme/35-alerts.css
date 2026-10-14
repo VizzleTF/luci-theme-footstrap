@@ -74,11 +74,11 @@
 	/* --fs-text, not --fs-eyebrow-color: the muted ink does not survive the status tint
 	 * (3.35-3.36:1 against AA's 4.5). */
 	.alert-message .table .th,
-	/* title-row (0,4,0) outranks the plain rule above (0,3,0) regardless of source order */
+	/* title-row arms (0,5,0) outrank 30-tables.css's `.table .tr.table-titles .th` (0,4,0) */
 	.alert-message .table .tr.table-titles .th,
 	.alert-message .table .tr.cbi-section-table-titles .th { color: var(--fs-text); font-weight: var(--fs-eyebrow-weight); font-size: var(--fs-type-xs); letter-spacing: var(--fs-eyebrow-tracking); }
 	/* column gap --fs-space-3 like every other cell; row density --fs-space-2, a dense readout */
-	.alert-message .table .th, .alert-message .table .td { padding: var(--fs-space-2) var(--fs-space-3) var(--fs-space-2) 0; background: transparent; border-color: color-mix(in srgb, var(--fs-border) 60%, transparent); }
+	.alert-message .table .th, .alert-message .table .td { padding-block: var(--fs-space-2); padding-inline: 0 var(--fs-space-3); background: transparent; border-color: color-mix(in srgb, var(--fs-border) 60%, transparent); }
 	.alert-message .table .td { color: var(--fs-text); }
 
 	/* validation tooltip: fill stays SOLID, unlike .label below — floats over arbitrary content,
@@ -98,7 +98,7 @@
 		font-size: var(--fs-type-xs); font-weight: var(--fs-weight); line-height: 1.4;
 		background: var(--fs-panel2); border: var(--fs-hairline);
 		color: var(--fs-dim); text-shadow: none; text-transform: none;
-		white-space: nowrap; margin: .125em 0 .125em .4em; /* carried over from the absorbed base rule */
+		white-space: nowrap; margin-block: .125em; margin-inline: .4em 0; /* carried over from the absorbed base rule */
 	}
 	/* no background: a translucent tint under same-colour text eats contrast (3.4-4.4:1);
 	 * inherited opaque --fs-panel2 guarantees >=4.5. */
@@ -109,14 +109,12 @@
 	a.label:link, a.label:visited { color: var(--fs-dim); }
 	a.label:hover { text-decoration: none; color: var(--fs-text); }
 
-	/* section-title toggles are .label pills, clickable — SINGLE owner (pages/20-overview.css
-	 * used to restate this, unscoped, drifted) */
+	/* section-title toggles are .label pills, clickable — SINGLE owner */
 	.cbi-title .label {
-		font-size: var(--fs-type-xs); font-weight: var(--fs-weight);
-		padding: var(--fs-space-1) var(--fs-space-3); border-radius: var(--fs-radius-pill);
-		background: var(--fs-panel2); border: var(--fs-hairline);
-		color: var(--fs-dim); cursor: pointer; line-height: 1.4;
-		text-transform: none; letter-spacing: 0;
+		padding: var(--fs-space-1) var(--fs-space-3);
+		border: var(--fs-hairline);
+		color: var(--fs-dim); cursor: pointer;
+		letter-spacing: 0;
 		margin: 0; min-width: 0; box-shadow: none;
 	}
 	.cbi-title .label:hover { color: var(--fs-text); border-color: var(--fs-dim); opacity: 1; }

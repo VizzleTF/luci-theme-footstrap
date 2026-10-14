@@ -40,7 +40,7 @@
 
 		/* ours, redrawn to stay so — not Lucide's. docs/design-system.md "Two glyphs drawn as
 		 * tokens, not fetched". */
-		--fs-icon-refresh: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4.4 9.6A8.5 8.5 0 0 1 18.6 7.6'/%3E%3Cpath d='M19.6 14.4A8.5 8.5 0 0 1 5.4 16.4'/%3E%3Cpath fill='%23000' stroke='none' d='M21.6 10.6 15.4 8.4 20.4 4.2Z'/%3E%3Cpath fill='%23000' stroke='none' d='M2.4 13.4 8.6 15.6 3.6 19.8Z'/%3E%3C/svg%3E");
+		--fs-icon-refresh: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'><path d='M4.4 9.6A8.5 8.5 0 0 1 18.6 7.6'/><path d='M19.6 14.4A8.5 8.5 0 0 1 5.4 16.4'/><path fill='%23000' stroke='none' d='M21.6 10.6 15.4 8.4 20.4 4.2Z'/><path fill='%23000' stroke='none' d='M2.4 13.4 8.6 15.6 3.6 19.8Z'/></svg>");
 		/* css-dup cannot police a glyph inlined once, sized at two call sites — keep in step by hand */
 		--fs-icon-refresh-sz: calc(18px * var(--fs-density-type));
 
@@ -62,11 +62,11 @@
 		--fs-content-min: 500px;	/* below this a content column stops being readable */
 		/* opaque on purpose. docs/design-system.md "The derived ladder". */
 		--fs-bar-bg: var(--fs-panel);
-		/* base/10-reset.css's scroll-margin must equal this or an in-page jump lands under the bar */
 		/* drawn, not fetched. docs/design-system.md "Two glyphs drawn as tokens, not fetched". */
 		--fs-select-chevron:
 			linear-gradient(-45deg, transparent 45%, var(--fs-dim) 45% 55%, transparent 55%),
 			linear-gradient(45deg, transparent 45%, var(--fs-dim) 45% 55%, transparent 55%);
+		/* the bar's designed height; fs-chrome.js publishes the measured one as --fs-bar-live */
 		--fs-bar-h: calc(46px * var(--fs-density-box));
 		/* logo box, .fs-themerow controls, Log out and the poll pill share this size */
 		--fs-btn-size: calc(34px * var(--fs-density-box));
@@ -86,7 +86,6 @@
 		--fs-font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 		--fs-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-		/* five steps, ~1.25 apart */
 		/* three multipliers, one knob each for text/air/boxes */
 		--fs-density-type: 1;
 		--fs-density-space: 1;
@@ -103,13 +102,19 @@
 		--fs-type: calc(13px * var(--fs-density-type));		/* body, tables, fields, menu items — the base */
 		--fs-type-lg: calc(16px * var(--fs-density-type));	/* section titles (h3/legend), alert headings */
 		--fs-type-xl: calc(20px * var(--fs-density-type));	/* page titles */
-		--fs-type-2xl: calc(26px * var(--fs-density-type));	/* h1 — only a third-party app emits a bare one */
+		--fs-type-2xl: calc(26px * var(--fs-density-type));	/* h1: error500 and third-party apps; login sizes its own, the chrome title is .fs-sr */
+		/* iOS Safari zooms the page when a field under 16px takes focus and never zooms back; max() holds
+		 * the floor at Compact, where --fs-type-lg is 14.4px. -field/-field-xs are the size typed text is
+		 * set in: the body (or dense) size on desktop, the floor under 767px (@media below). */
+		--fs-type-floor: max(16px, var(--fs-type-lg));
+		--fs-type-field: var(--fs-type);
+		--fs-type-field-xs: var(--fs-type-xs);	/* the table filter and the colour hex */
 		/* one spelling per weight — `700`/`bold` and `400`/`normal` were both in use. */
-		--fs-weight-normal: 400;	/* "not bold" — no face of its own; resolves onto the 600 */
+		--fs-weight-normal: 400;	/* "not bold" */
 		--fs-weight: 600;	/* the UI default: body, labels, controls */
 		--fs-weight-bold: 700;	/* titles, table headers, the eyebrow */
 
-		--fs-leading: 1.5;	/* unitless ON PURPOSE — see above (13 -> 19.5px) */
+		--fs-leading: 1.5;	/* unitless on purpose: it scales with the element's own font-size (13 -> 19.5px) */
 		--fs-leading-tight: 1.2;	/* headings and single-line plates, where 1.5 looks loose */
 
 		/* one microlabel idiom, named once */
@@ -202,6 +207,10 @@
 			--fs-type-2xl: calc(round(26px * var(--fs-density-type), 1px));
 			--fs-control-h: calc(round(up, calc(var(--fs-type) * var(--fs-leading) + var(--fs-space-1) * 2 + 2px), 4px));
 		}
+	}
+
+	@media (max-width: 767px) {
+		:root { --fs-type-field: var(--fs-type-floor); --fs-type-field-xs: var(--fs-type-floor); }
 	}
 
 	/* bare :root is Normal; these multiply the LADDERS, not the rules */

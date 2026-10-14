@@ -5,9 +5,9 @@
 		display: inline-flex; flex-wrap: wrap; gap: var(--fs-space-2); align-items: center; justify-content: flex-end;
 	}
 
-	/* native input types listed on purpose: LuCI always uses <button class="cbi-button">, but a
-	 * third-party app may emit a bare <input type="submit"> and base only gives those width/
-	 * height: auto — coverage is a contract (docs/gallery.html) */
+	/* native input types listed on purpose: LuCI also emits <input type=submit|reset|button>
+	 * (sysauth, luci-compat cbi/*.htm), mostly with .cbi-button; luci-app-splash emits bare ones.
+	 * Base only gives those width/height: auto — coverage is a contract (docs/gallery.html) */
 	.cbi-button, .btn,
 	input[type="button"], input[type="submit"], input[type="reset"] {
 		display: inline-flex; align-items: center; justify-content: center;
@@ -54,8 +54,10 @@
 		box-shadow: inset 0 2px 4px color-mix(in srgb, var(--fs-border) 40%, transparent);
 	}
 
-	/* three fills, not six: `.cbi-button-*` (LuCI's own views) and `.btn.<colour-word>` (third-party
-	 * apps) painted together in one rule, or a recolour lands on one half and not the other */
+	/* three fills, each shared by `.cbi-button-*` (LuCI's own views) and `.btn.<colour-word>` (third-party
+	 * apps), or a recolour lands on one half and not the other.
+	 * The `.important` twins are needed: at 0,2,0 they beat the neutral `input[type=button]` paint (0,1,1)
+	 * for dockerman's `<input type=button class="cbi-button-action important">`. */
 	.cbi-button-positive, .btn.success {
 		background: var(--fs-good); border-color: transparent; color: var(--fs-on-good);
 	}
@@ -66,26 +68,31 @@
 	.btn.danger, .btn.error {
 		background: var(--fs-danger); border-color: transparent; color: var(--fs-on-danger);
 	}
-	/* must stay AHEAD of the page-action Save rule below, or its border-color:transparent erases Save's outline on hover at equal specificity */
-	.cbi-button-positive:hover, .cbi-button-action:hover, .cbi-button-apply:hover,
-	.cbi-button-save:hover, .cbi-button-negative:hover,
-	.btn.success:hover, .btn.info:hover, .btn.danger:hover, .btn.error:hover {
+	/* the lift is for the fills above plus the page-action Save & Apply: brightness deepens a solid
+	 * fill and washes out an outline or a tint, so neutral Apply/Save keep their hairline.
+	 * `.td .cbi-button-apply` is the one outline that does lift. */
+	.cbi-button-positive:hover, .btn.success:hover,
+	.cbi-button-action:hover, .btn.primary:hover, .btn.info:hover,
+	.cbi-button-negative:hover, .cbi-button-remove:hover, .btn.danger:hover, .btn.error:hover,
+	.cbi-page-actions .cbi-button-apply:hover, .td .cbi-button-apply:hover {
 		filter: var(--fs-hover-lift); border-color: transparent;
 	}
 	.cbi-button-reset, .cbi-button-link { background: transparent; border-color: var(--fs-border); color: var(--fs-dim); }
 
-	/* .btn owns size words in full now: the plain rule above re-sets padding/radius in a later
+	/* .btn owns size words in full now: the plain rule above re-sets padding in a later
 	 * layer, so a size word carrying only font-size (base's old copy) got default padding */
-	.btn.large { font-size: var(--fs-type-lg); min-height: var(--fs-ctl-h-lg); padding: var(--fs-space-2) var(--fs-space-4); border-radius: var(--fs-radius); }
+	.btn.large { font-size: var(--fs-type-lg); min-height: var(--fs-ctl-h-lg); padding: var(--fs-space-2) var(--fs-space-4); }
 	.btn.small { font-size: var(--fs-type-xs); min-height: var(--fs-ctl-h-sm); padding: var(--fs-space-1) var(--fs-space-2-5); border-radius: var(--fs-radius-sm); }
 
 	.cbi-section .table[id] .td .btn,
 	.cbi-section .table[id] .td .cbi-button { padding: var(--fs-space-1) var(--fs-space-2-5); font-size: var(--fs-type); }
+	/* size only: ui.changes puts .alert-message on the apply/rollback modal itself, so a paint here
+	 * (0,2,0, after the fills) turned 'Apply unchecked' into the same panel2 grey as 'Cancel' */
 	.alert-message .btn, .alert-message .cbi-button {
-		border-radius: var(--fs-radius); padding: var(--fs-space-2) var(--fs-space-3); font-weight: var(--fs-weight);
-		background: var(--fs-panel2); border: var(--fs-hairline); color: var(--fs-text);
+		border-radius: var(--fs-radius); padding: var(--fs-space-2) var(--fs-space-3);
 	}
-	.alert-message .btn:hover { border-color: var(--fs-accent); color: var(--fs-accent); }
+	.alert-message .btn:not(.cbi-button-positive, .cbi-button-action, .cbi-button-negative, .cbi-button-remove,
+		.primary, .info, .success, .danger, .error):hover { border-color: var(--fs-accent); color: var(--fs-accent); }
 
 	/* Save/Apply footer: base renders a tall half-empty plate with bottom-only radius, made a compact rounded bar */
 	.cbi-page-actions {
@@ -112,7 +119,6 @@
 		padding: 0 var(--fs-space-5);
 		border-radius: var(--fs-radius);
 		font-weight: var(--fs-weight);
-		display: inline-flex; align-items: center; justify-content: center;
 		vertical-align: middle;
 	}
 	/* Reset takes Save's same ladder step (-soft/-fill) off the DANGER role, since it discards
@@ -148,7 +154,7 @@
 		/* flex-basis: auto, not a definite basis: with one, the automatic minimum resolves to 0 in
 		 * every row and flex-grow divides by count instead of by need — docs/css.md "Buttons:
 		 * `flex-basis: auto`, not the definite basis base gave every row action" has the
-		 * regression this fixed (task 0151) and the measured widths before/after. */
+		 * regression this fixed and the measured widths before/after. */
 		flex-basis: auto;
 		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 	}
@@ -188,32 +194,28 @@
 		border-color: var(--fs-danger-line-hi);
 	}
 
-	/* Save & Apply is THE primary action, Save demoted so only one reads primary; --on-color drives the spinner mask in styles/base */
+	/* Save & Apply is THE primary action, Save demoted so only one reads primary */
 	.cbi-page-actions .cbi-button-apply,
 	.cbi-page-actions .cbi-dropdown .cbi-button-apply {
 		background: var(--fs-accent);
 		border: 1px solid transparent;
 		color: var(--fs-on-accent);
-		--on-color: var(--fs-on-accent);
 		text-shadow: none;
 	}
 	/* a TINT at rest, not a bare outline, or Save reads disabled beside the solid Save & Apply;
 	 * -soft/-fill off the role ladder. Label --fs-text, not --fs-accent: accent on accent-soft
-	 * measures 4.25:1, an AA failure (docs/design-system.md). filter:none cancels the shared
-	 * hover-lift, which washes out a translucent tint instead of deepening it. */
+	 * measures 4.25:1, an AA failure (docs/design-system.md). */
 	.cbi-page-actions .cbi-button-save,
 	.cbi-page-actions .cbi-button-apply + .cbi-button-save,
 	.cbi-page-actions .cbi-button-negative + .cbi-button-save {
 		background: var(--fs-accent-soft);
 		border: 1px solid var(--fs-accent-line);
 		color: var(--fs-text);
-		--on-color: var(--fs-on-accent);
 		text-shadow: none;
 	}
 	.cbi-page-actions .cbi-button-save:hover {
 		background: var(--fs-accent-fill);
 		border-color: var(--fs-accent-line-hi);
-		filter: none;
 	}
 
 	/* buttons that are part of a compound field widget */
@@ -239,9 +241,7 @@
 	 * no scale) and opted out of the Density axis; square because the glyph is an arrow, not a label */
 	.pager .btn.prev, .pager .btn.next {
 		flex: 0 0 auto; width: var(--fs-ctl-h); min-width: var(--fs-ctl-h); height: var(--fs-ctl-h); padding: 0;
-		border-radius: var(--fs-radius); border: var(--fs-hairline);
-		background: var(--fs-panel2); color: var(--fs-text);
-		display: inline-flex; align-items: center; justify-content: center;
+		border: var(--fs-hairline);
 	}
 	.pager .btn.prev:hover, .pager .btn.next:hover { border-color: var(--fs-accent); color: var(--fs-accent); }
 }

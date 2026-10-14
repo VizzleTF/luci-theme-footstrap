@@ -4,9 +4,11 @@
 	.fs-pattern { display: none; }
 
 	:root[data-wallpaper="pattern"] { background-color: var(--fs-bg); }
+	/* transparent for both wallpapers: an opaque --fs-bg here would cover the shell's one background layer
+	 * (the photo on the file wallpaper, the .fs-pattern element on the pattern one). */
 	:root[data-wallpaper="pattern"] body,
-	:root[data-wallpaper="pattern"] .fs-main { background-color: transparent; }
-	:root[data-wallpaper="pattern"] footer.fs-footer { background: transparent; }
+	:root:is([data-wallpaper="pattern"], [data-wallpaper="file"]) .fs-main { background-color: transparent; }
+	:root:is([data-wallpaper="pattern"], [data-wallpaper="file"]) footer.fs-footer { background: transparent; }
 
 	/* --fs-pattern-url is `none` until an upload exists (head.ut/fs-prefs.js) — the axis picked
 	 * with no file is a bare canvas, not a broken tile. */

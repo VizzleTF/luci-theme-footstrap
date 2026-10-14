@@ -34,17 +34,17 @@
 	.fs-search-ico .fs-ico { width: 18px; height: 18px; }
 	/* the ROW is the field, the input carries no frame of its own — two classes (0,2,0) needed to
 	 * outrank 60-inputs.css's generic field box (0,1,1) in the same layer regardless of source
-	 * order. 16px, not the theme's body size: below 16px iOS Safari zooms the page on focus, and
-	 * this field focuses as the palette opens. */
+	 * order. --fs-type-floor at every width, not the body size: below 16px iOS Safari zooms the page
+	 * on focus, and this field focuses as the palette opens. */
 	.fs-search-row .fs-search-input {
 		flex: 1 1 auto; min-width: 0;
 		margin: 0; padding: 0; border: 0; min-height: 0; background: transparent;
 		color: var(--fs-text);
-		font-family: inherit; font-size: var(--fs-type-lg); font-weight: var(--fs-weight); line-height: 1.4;
+		font-family: inherit; font-size: var(--fs-type-floor); font-weight: var(--fs-weight); line-height: 1.4;
 	}
 	.fs-search-row .fs-search-input:focus { outline: none; box-shadow: none; }
-	/* one placeholder ink for the whole theme (03-palettes.css); not measured by placeholder-ink (no gallery fixture), must not drift from the fields that are */
-	.fs-search-row .fs-search-input::placeholder { color: var(--fs-placeholder); font-weight: var(--fs-weight); }
+	/* ink comes from base ::placeholder (one for the whole theme); only the weight is restated */
+	.fs-search-row .fs-search-input::placeholder { font-weight: var(--fs-weight); }
 
 	.fs-search-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--fs-space-1-5); }
 

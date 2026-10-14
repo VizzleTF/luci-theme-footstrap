@@ -66,9 +66,9 @@
 	.tabs .menu-dropdown, .tabs .dropdown-menu {
 		top: 100%;
 		border-width: 1px;
-		/* square top-left only: the panel hangs off the tab above it and the two share that
+		/* square start-start only: the panel hangs off the tab above it and the two share that
 		 * corner */
-		border-radius: 0 var(--fs-radius) var(--fs-radius) var(--fs-radius);
+		border-radius: var(--fs-radius); border-start-start-radius: 0;
 	}
 
 	/* the caret beside a tab's label, centred on the text box rather than nudged down it */

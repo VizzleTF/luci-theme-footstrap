@@ -1,7 +1,7 @@
 @layer theme {
-	/* honoured globally, every transition here is decoration. !important is the one sanctioned
-	 * exception, a layer cannot reach base's own transitions — DO NOT COPY THE FLAG OUT OF THIS
-	 * BLOCK. .01ms not 0s: a zero duration never fires transitionend, LuCI's teardown waits for one. */
+	/* honoured globally, every transition here is decoration. This file is the one place for flags against the theme's own rules,
+	 * and there are two: this block (a layer cannot reach base's own transitions) and the forced-colors focus outline below
+	 * (.stylelintrc.json holds the allowlist). .01ms not 0s: a zero duration never fires transitionend, LuCI's teardown waits for one. */
 	@media (prefers-reduced-motion: reduce) {
 		*, *::before, *::after {
 			animation-duration: .01ms !important;
@@ -21,11 +21,17 @@
 
 	/* re-states the tokens so every rule reading them follows — docs/css.md "A11y: prefers-contrast token shifts, and the numbers behind them" has why each number */
 	@media (prefers-contrast: more) {
+		/* theme layer outranks the tokens-layer twins (04-nocolormix.css): without color-mix an unguarded
+		 * re-set leaves --fs-hairline, the focus ring and the placeholder ink invalid at use */
+		@supports (color: color-mix(in srgb, red 50%, transparent)) {
+			:root {
+				--fs-border: color-mix(in srgb, var(--fs-text) 45%, var(--fs-bg));
+				--fs-dim: color-mix(in srgb, var(--fs-text) 85%, var(--fs-bg));
+				--fs-faint: color-mix(in srgb, var(--fs-text) 82%, var(--fs-bg));
+				--fs-focus-ring: 0 0 0 3px color-mix(in srgb, var(--fs-accent) 60%, transparent);
+			}
+		}
 		:root {
-			--fs-border: color-mix(in srgb, var(--fs-text) 45%, var(--fs-bg));
-			--fs-dim: color-mix(in srgb, var(--fs-text) 85%, var(--fs-bg));
-			--fs-faint: color-mix(in srgb, var(--fs-text) 82%, var(--fs-bg));
-			--fs-focus-ring: 0 0 0 3px color-mix(in srgb, var(--fs-accent) 60%, transparent);
 			--fs-accent-line: var(--fs-accent);	--fs-accent-line-hi: var(--fs-accent);
 			--fs-good-line: var(--fs-good);		--fs-good-line-hi: var(--fs-good);
 			--fs-danger-line: var(--fs-danger);	--fs-danger-line-hi: var(--fs-danger);
@@ -36,15 +42,14 @@
 	}
 
 	/* forced-colors: background-color is forced to the system canvas, so state carried by
-	 * BACKGROUND alone vanishes (active tab, checked toggle, selected row) — re-stated with a
+	 * BACKGROUND alone vanishes (active tab, checked toggle, open-list selected row) — re-stated with a
 	 * border/outline in system keywords, which forced-colors keeps — docs/css.md "A11y:
 	 * forced-colors state repairs". */
 	@media (forced-colors: active) {
 		#tabmenu ul.tabs > li.active > a,
-		ul.cbi-tabmenu.mode > li.cbi-tab > a,
 		.tabs > li.active > a,
 		.cbi-tabmenu > li.cbi-tab > a,
-		.cbi-dropdown > ul > li[selected],
+		.cbi-dropdown[open] > ul.dropdown > li[selected],
 		.ifacebox .ifacebox-head.active,
 		.cbi-page-actions .cbi-button-apply {
 			outline: 2px solid Highlight;
@@ -66,9 +71,33 @@
 		}
 		.cbi-checkbox > input[type="checkbox"]::after { background: ButtonBorder; }
 		.cbi-checkbox > input[type="checkbox"]:checked::after { background: HighlightText; }
-		/* icon-only buttons (rail toggle, search/appearance, logout) lose their hover fill */
+		/* a glyph drawn as a background fill cut out by mask is Canvas on Canvas here: the poll glyph keeps 0 of the
+		 * 103 ink pixels its box shows at rest, and a checked checkbox or radio is pixel-identical to an unchecked
+		 * one. A system colour with the fill un-forced brings it back; ButtonText polling and GrayText paused
+		 * keep the green/grey state — docs/css.md "A11y: forced-colors state repairs". Selectors repeat the
+		 * glyph rules' own (20-shell, 60-inputs, base/95-luci) with one class or attribute doubled, one step above the original; the two rail selectors already sit at the stylelint ceiling (1,7,0) and still win by file order. */
+		.fs-sidebar.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]::before,
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"],
+		input[type="checkbox"][type="checkbox"]:not(:where(.cbi-checkbox > input)):checked::after,
+		input[type="radio"][type="radio"]:checked::after,
+		:is(.btn, .cbi-button).spinning::before {
+			background: ButtonText;
+			forced-color-adjust: none;
+		}
+		.fs-sidebar.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]:not([data-style="active"])::before,
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"]:not([data-style="active"]) {
+			background: GrayText;
+		}
+		.cbi-value-description:not(:empty)::before,
+		.spinning::before {
+			background: CanvasText;
+			forced-color-adjust: none;
+		}
+		/* icon-only buttons (rail toggle, search) lose their hover fill */
 		.fs-railtoggle, .fs-themerow { border-color: ButtonBorder; }
-		/* box-shadow is dropped entirely in forced-colors */
-		:focus-visible { outline: 2px solid Highlight; outline-offset: 1px; }
+		/* box-shadow is dropped entirely in forced-colors, and themed rules set outline: none above (0,1,0)
+		 * or in the page layer, so only !important reaches them. #maincontent keeps its deliberate none:
+		 * the router and the skip link focus <main>. */
+		:focus-visible:not(#maincontent) { outline: 2px solid Highlight !important; outline-offset: 1px; }
 	}
 }

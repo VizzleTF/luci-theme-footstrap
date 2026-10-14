@@ -8,9 +8,11 @@
 		--fs-bg: var(--fs-bg-base);
 		/* derived from -base so the accent-hue axis has one copy to rotate */
 		--fs-accent: var(--fs-accent-base);
-		/* tint OF --fs-accent, mixed FROM it so it never goes stale. LIGHT only; each dark block
-		 * below overrides its own. */
-		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 10%, transparent);
+		/* tint OF --fs-accent, mixed FROM it so it never goes stale. The formula lives on :root only;
+		 * dark blocks re-state the percentage, since a (0,2,0) re-declaration would outrank the
+		 * (0,1,0) twin in 04-nocolormix.css and leave the token invalid without color-mix. */
+		--fs-accent-soft-mix: 10%;
+		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) var(--fs-accent-soft-mix), transparent);
 		/* surfaces + status: raw per palette, derived form is read everywhere else */
 		--fs-panel: var(--fs-panel-base);
 		--fs-panel2: var(--fs-panel2-base);
@@ -42,34 +44,7 @@
 		--fs-pattern-strength: .2;
 		/* floor + two cos() terms, not flat chroma. docs/design-system.md "Tint and Accent". */
 		--fs-tint-c: calc((.016 + .012 * max(0, cos((var(--fs-tint-h) - 258) * 1deg))) * var(--fs-tint-strength));
-	}
-	:root[data-darkmode="true"] {
-		--fs-tint-c: calc((.011 + .016 * max(0, cos((var(--fs-tint-h) - 258) * 1deg))
-			- .004 * max(0, cos((var(--fs-tint-h) - 55) * 1deg))) * var(--fs-tint-strength));
-		/* per-mode, not per-palette — see the placeholder-mix note above */
-		--fs-placeholder-mix: 64%;
-	}
-	:root[data-tint="hue"] { --fs-bg: oklch(from var(--fs-bg-base) l var(--fs-tint-c) var(--fs-tint-h)); }
-
-	/* hue mode rotates via oklch(from…); hex mode is stamped inline and re-derives the ink below */
-	:root[data-accent="hue"] { --fs-accent: oklch(from var(--fs-accent-base) l c var(--fs-accent-h)); }
-	:root[data-good="hue"]   { --fs-good:   oklch(from var(--fs-good-base)   l c var(--fs-good-h)); }
-	:root[data-warn="hue"]   { --fs-warn:   oklch(from var(--fs-warn-base)   l c var(--fs-warn-h)); }
-	:root[data-danger="hue"] { --fs-danger: oklch(from var(--fs-danger-base) l c var(--fs-danger-h)); }
-
-	/* hex ink must outrank a NAMED palette's dark block ([data-palette=…][data-darkmode="true"],
-	 * (0,3,0)); triple attribute makes it (0,4,0) */
-	:root[data-accent="hex"][data-accent][data-accent] { --fs-on-accent: oklch(from var(--fs-accent) clamp(0, (l - .62) * -100, 1) 0 0); }
-	:root[data-good="hex"][data-good][data-good]       { --fs-on-good:   oklch(from var(--fs-good)   clamp(0, (l - .62) * -100, 1) 0 0); }
-	:root[data-warn="hex"][data-warn][data-warn]       { --fs-on-warn:   oklch(from var(--fs-warn)   clamp(0, (l - .62) * -100, 1) 0 0); }
-	:root[data-danger="hex"][data-danger][data-danger] { --fs-on-danger: oklch(from var(--fs-danger) clamp(0, (l - .62) * -100, 1) 0 0); }
-
-	/* ---- footstrap — GitHub Primer (DEFAULT, also fills bare :root) ---- */
-	/* never matches (both appliers REMOVE it for the default) — kept so :root need not duplicate
-	 * the derive rule above */
-	:root,
-	:root[data-palette="footstrap"] {
-		/* LIGHT */
+		/* ---- footstrap — GitHub Primer (DEFAULT), LIGHT ---- */
 		--fs-bg-base: #f6f8fa;
 		--fs-panel-base: #fff;
 		--fs-panel2-base: #f6f8fa;
@@ -93,8 +68,13 @@
 		--fs-on-warn: #fff;
 		--fs-on-danger: #fff;
 	}
-	:root[data-darkmode="true"],
-	:root[data-palette="footstrap"][data-darkmode="true"] {
+	:root[data-darkmode="true"] {
+		--fs-tint-c: calc((.011 + .016 * max(0, cos((var(--fs-tint-h) - 258) * 1deg))
+			- .004 * max(0, cos((var(--fs-tint-h) - 55) * 1deg))) * var(--fs-tint-strength));
+		/* per-mode, not per-palette — see the placeholder-mix note above */
+		--fs-placeholder-mix: 64%;
+		/* hicontrast dark re-states 14% */
+		--fs-accent-soft-mix: 15%;
 		/* DARK (dimmed) */
 		--fs-bg-base: #1c2128;
 		--fs-panel-base: #22272e;
@@ -104,7 +84,6 @@
 		--fs-dim: #8f9cab;
 		--fs-faint: #959ca5;
 		--fs-accent-base: #569df5;
-		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
 		--fs-track: #373e47;
 		--fs-good-base: #5aad5d;
 		--fs-warn-base: #c79128;
@@ -115,6 +94,18 @@
 		--fs-on-good: #10151c;
 		--fs-on-warn: #10151c;
 		--fs-on-danger: #10151c;
+	}
+	/* relative colour is above the browser floor; below it the token is invalid at computed-value
+	 * time and fills paint transparent, so the palette stays. Versions: docs/css.md "The browser floor". */
+	@supports (color: oklch(from red l c 40)) {
+		:root[data-tint="hue"] { --fs-bg: oklch(from var(--fs-bg-base) l var(--fs-tint-c) var(--fs-tint-h)); }
+
+		/* hue mode rotates via oklch(from…); hex mode, and its ink, is stamped inline by the
+		 * appliers (inkFor() in fs-axes.js) */
+		:root[data-accent="hue"] { --fs-accent: oklch(from var(--fs-accent-base) l c var(--fs-accent-h)); }
+		:root[data-good="hue"]   { --fs-good:   oklch(from var(--fs-good-base)   l c var(--fs-good-h)); }
+		:root[data-warn="hue"]   { --fs-warn:   oklch(from var(--fs-warn-base)   l c var(--fs-warn-h)); }
+		:root[data-danger="hue"] { --fs-danger: oklch(from var(--fs-danger-base) l c var(--fs-danger-h)); }
 	}
 
 	/* ---- hicontrast — deeper, more saturated (opt-in); docs/design-system.md "Palettes" ---- */
@@ -142,7 +133,7 @@
 		--fs-dim: #9ba6b8;
 		--fs-faint: #8f9aad;
 		--fs-accent-base: #3ba7ff;
-		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 14%, transparent);
+		--fs-accent-soft-mix: 14%;
 		--fs-track: #1b2230;
 		--fs-good-base: #43e0a0;
 		--fs-warn-base: #ffb454;
@@ -184,7 +175,6 @@
 		--fs-dim: #a6a6a6;
 		--fs-faint: #9a9a9a;
 		--fs-accent-base: #53a4c2;
-		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
 		--fs-track: #333;
 		--fs-good-base: #1aaf7b;
 		--fs-warn-base: #aa9968;
@@ -225,7 +215,6 @@
 		--fs-faint: #9dbccd;
 		/* the CI cyan, one step up so it clears AA on the lightest of the three surfaces too */
 		--fs-accent-base: #35c6ea;
-		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
 		--fs-track: #123c56;
 		--fs-good-base: #74cc74;   /* #5CB85C lifted for the same reason */
 		--fs-warn-base: #eab346;
@@ -266,7 +255,6 @@
 		--fs-faint: #969696;
 		/* sampled #0f82af 3.66:1/3.12:1 on bg/panel2, under 4.5:1; held the hue to 5.86:1/5.00:1 */
 		--fs-accent-base: #13a8e3;
-		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) 15%, transparent);
 		--fs-track: #333;
 		--fs-good-base: #1fb65a;
 		--fs-warn-base: #c99259;

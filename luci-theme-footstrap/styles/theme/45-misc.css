@@ -18,19 +18,15 @@
 		text-decoration: underline;
 	}
 
-	/* a LABEL must SET sans, not merely be excluded — excluded still inherits mono (227 elements/
-	 * 20 KB of bold mono for nothing); exempt in pre/code/#syslog/textarea, monospaced CONTENT */
-	:is(strong, b):not(pre *, code *, #syslog *, textarea *) {
-		font-family: var(--fs-font-sans);
-	}
-
-	/* `.ifacebadge` is a BADGE (chrome, not a value) in a mono cell; wins on specificity (0,2,0)
+	/* a label must set sans, not merely be excluded — excluded still inherits mono (227 elements/
+	 * 20 KB of bold mono for nothing); exempt in pre/code/#syslog/textarea, monospaced content.
+	 * `.ifacebadge` is a badge (chrome, not a value) in a mono cell; wins on specificity (0,2,0)
 	 * over theme/60-inputs.css's (0,1,0) mono rule, not source order */
+	:is(strong, b):not(pre *, code *, #syslog *, textarea *),
 	.ifacebadge,
 	.cbi-value-field .ifacebadge { font-family: var(--fs-font-sans); }
 	code, pre { font-weight: var(--fs-weight-normal); }
 
-	/* upstream's fade-in re-marks on EVERY poll tick, animating it pulsed a still page — docs/css.md "Misc: fade-in animates nothing" */
 	.cbi-title-ref { color: var(--fs-accent); }
 	.close { color: var(--fs-text); text-shadow: none; opacity: .6; }
 	.close:hover { opacity: 1; }
@@ -52,7 +48,7 @@
 	.modal { container-type: inline-size; container-name: fs-view fs-content; box-shadow: var(--fs-shadow-pop); }
 
 	/* pager (« prev · text · next ») — generic, not page-scoped */
-	.pager.center { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center; gap: var(--fs-space-2-5); padding: var(--fs-space-3-5) 0; }
+	.pager.center { display: flex; align-items: center; justify-content: center; gap: var(--fs-space-2-5); padding: var(--fs-space-3-5) 0; }
 	.pager .text { flex: 0 0 auto; font-size: var(--fs-type); color: var(--fs-dim); }
 
 	/* absorbed from base; stock LuCI only renders h2/h3, the rest is third-party coverage.
@@ -66,8 +62,7 @@
 	h1 { margin-bottom: var(--fs-space-4); font-size: var(--fs-type-2xl); }
 	h2 { font-size: var(--fs-type-xl); }
 	h3 { font-size: var(--fs-type-lg); }
-	h4 { font-size: var(--fs-type); }
-	h5 { font-size: var(--fs-type); }
+	h4, h5 { font-size: var(--fs-type); }
 	h6 { font-size: var(--fs-type-xs); color: var(--fs-dim); text-transform: uppercase; }
 
 	/* heading card: h2 + .cbi-map-descr get a .cbi-section card's frame, so the page reads as a
@@ -79,9 +74,6 @@
 		border-radius: var(--fs-radius-lg);
 		margin: 0 0 var(--fs-card-gap);
 		padding: var(--fs-space-4);
-		font-size: var(--fs-type-xl);
-		font-weight: var(--fs-weight-bold);
-		color: var(--fs-text);
 	}
 	/* split the card across the two siblings — no wrapper element exists to hold both */
 	.cbi-map > h2:has(+ .cbi-map-descr),
@@ -119,5 +111,26 @@
 	/* a view may hand the map a bare widget with no `.cbi-section`; exclusions are the children luci-base already spaces itself */
 	.cbi-map > *:not(.cbi-section):not(.cbi-map-descr):not(.cbi-page-actions):not(h2):not(legend):not(.cbi-tabmenu):not(.cbi-map-tabbed):not(:empty) {
 		margin-bottom: var(--fs-card-gap);
+	}
+
+	/* the disclosure chevron, one rule for both hosts: the overview card toggle (a stock element, keyed by
+	 * attribute) and the Appearance fold (ours, keyed by class), so the two cannot drift.
+	 * pages/20-overview.css sizes the pill around it. */
+	.cbi-title .label[data-indicator="poll-status"]::after,
+	.fs-ap-chev::after {
+		content: "";
+		width: 7px;
+		height: 7px;
+		border-right: 2px solid currentColor;
+		border-bottom: 2px solid currentColor;
+		border-radius: 1px;
+		transform: rotate(45deg);			/* closed: chevron down */
+		margin-top: -2px;					/* optical centring of the down chevron */
+		transition: transform var(--fs-dur-move);
+	}
+	.cbi-title .label[data-indicator="poll-status"][data-style="inactive"]::after,
+	button.fs-ap-fold[aria-expanded="true"] .fs-ap-chev::after {
+		transform: rotate(-135deg);			/* open: chevron up */
+		margin-top: var(--fs-space-0-5);
 	}
 }
