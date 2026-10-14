@@ -128,7 +128,7 @@ opened is not a green gate, and the tier a check sits in never changes what the 
 
 **23.05 used to have a line of its own here, and no longer does.** It was the oldest release the
 theme claimed and the only one whose `luci-base` was missing a widget the theme uses:
-`ui.RangeSlider` arrived in 24.10, and its absence took the ENTIRE System → Footstrap page down — the panel
+`ui.RangeSlider` arrived in 24.10.3 (backport e4c67020de; 24.10.0-24.10.2 lack it, `install.sh` refuses them), and its absence took the ENTIRE System → Footstrap page down — the panel
 is built inside one try/catch, so the miss cost a console line and an empty tab, reported from the
 field by a user on 23.05.5 rather than by a gate. Support for that release ended at 0.14.2: it is
 EOL, and openwrt/luci declined to carry the compatibility code in the tree the theme now lives in

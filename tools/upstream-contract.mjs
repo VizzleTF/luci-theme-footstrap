@@ -174,7 +174,7 @@ const CONTRACT = [
 	},
 	{
 		id: 'slider-widget-available',
-		/* `ui.RangeSlider` arrived in 24.10, which is the oldest release this theme claims. It was
+		/* `ui.RangeSlider` arrived in 24.10.3 by backport, the oldest release this theme claims. It was
 		 * once probed with a fallback built from `ui.AbstractElement`, because 23.05 has no such
 		 * widget and its absence took the WHOLE Appearance tab down — the panel is built inside one
 		 * try/catch. That release is EOL and support for it is gone, so what is left to check is that
