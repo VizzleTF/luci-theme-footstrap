@@ -102,22 +102,30 @@ unmodified stand the two folds agree, and only the constructed case separates th
      node is not SPA-able;
    - **no class → `return false`** → the handler does not `preventDefault` → the browser loads the
      page normally;
+   - **no `.fs-content` column → `return false`**, asked before the first write: `_navGen`,
+     `_curPath`, `_curSearch` and `_pendingRestore` move only once the navigation is committed, or a
+     refusal would supersede the one in flight and drop its render;
    - otherwise: teardown → update `L.env` → `body[data-page]` → `pushState` (or **`replaceState`**
      if the already-open page was clicked — a second entry would make one Back press dead) →
      `renderChrome()` → forget the anchoring reference → focus `#maincontent` and announce the new
      title in the polite live region → re-instantiate the view → **commit**: swap the staged content
-     in, THEN `scrollTo(0, 0)` — see "The staging window" for why the scroll reset moved off the
+     in, THEN reset the scrollers: both on a click; on a Back only the axis the saved position does not
+     carry (a page left at the top saves {0,0}, and `#maincontent` survives the swap holding the
+     offset of the page just left); the carried axis is restored by `restoreScroll()` — see "The staging window" for why the scroll reset moved off the
      click and `body[data-page]` no longer decides the page-scoped CSS on its own;
    - `return true` → `preventDefault`.
 
    Every committed navigation increments `_navGen`.
 3. `popstate` (back/forward): `navigate(location.pathname, push=false)`; a non-SPA-able node →
-   `location.reload()`. Two guards first: an entry with a `?query` reloads immediately, and **a
+   `location.reload()`. The fragment guard runs first: **a
    fragment change is not a navigation** — Chrome fires `popstate` for a same-document `#` jump, so
    a click on `<a href="#">` inside a view arrived here as "the user pressed Back" and the router
    re-instantiated the view, wiping the state that click had just set (issue #3:
    `luci-app-filemanager`'s tab strip is four `<a href="#">` whose handler never calls
-   `preventDefault`). If `location.pathname === _curPath`, the page owns the fragment; return.
+   `preventDefault`). If `location.pathname === _curPath` and the entry has no query or the query the document booted
+   with (`_curSearch`, forgotten by the first `navigate()`), the page owns the fragment: the entry is
+   adopted (`adoptEntry()`, so the next click saves this offset under the right id) and the handler
+   returns. Only then does an entry with a `?query` reload.
 
 Because `pushState` stores the real dispatcher URL, F5 and deep links work server-side
 unchanged.
@@ -214,6 +222,11 @@ while the page the user is reading stays untouched.
   change is not about speed; it is that the outgoing page stays readable instead of being replaced
   by a spinner, and that three repair mechanisms could be deleted.
 
+The stage has the container's width, so the Load graph is 1222px wide by a full load or by a click.
+It is hidden but laid out (`visibility: hidden; height: 0; overflow: clip`), never `display: none`:
+views size themselves from the element they render into, and a zero width would stick for the
+instance's life.
+
 ### The staging window
 
 **The rule this fix establishes: the OUTGOING page keeps its own identity — its page-scoped CSS and
@@ -238,7 +251,8 @@ with no navigation at all, flipping `body[data-page]` alone on a standing page: 
 its own `styles/pages/*` file, measured -18px the same way.
 
 **The fix gives the two pages two different anchors instead of one shared one**, the same two-phase
-shape `fs-sheets`' `scopeToCurrentPage(rsegs, leaving)` already uses for a page's own injected
+shape `fs-sheets`' `scopeToCurrentPage(segs, keep)` already uses (`keep` is `_shown`, the page that last reached
+`commitStage()`, not `L.env.dispatchpath`, which the previous `navigate()` may already have re-pointed) for a page's own injected
 stylesheets (sparing the outgoing page's own sheets until the swap, above): `#view[data-page]` for
 content the STAGE writes into — the incoming name, from the moment `stageView()` creates it, so the
 staged render still measures itself under its own rules — and `#view[data-page]` /
@@ -315,6 +329,11 @@ navigation outlives **150 ms** — below that a bar would flash on and off on ev
 reads as a glitch rather than as progress. Overlapping navigations share one bar through a counter.
 It animates `transform` and `opacity` only, so it cannot cost the render it reports on, and reduced
 motion keeps the bar and drops the animation.
+
+- A navigation that activates the bar while the previous one still fades out in `done` used to
+  write `active` straight over it, so the bar crawled backwards from full width (`scaleX` every
+  150 ms: 1, .915, .863, .842, .828, .82). The activation timer now clears `done` and flushes
+  style first, restarting from zero (0, .372, .547, .634, .687, .722); the flush is style only.
 ## The two `L` trap
 
 `L` inside a module (the factory parameter) and `window.L` (the runtime instance the dispatcher
@@ -449,7 +468,8 @@ Before rendering the new view:
   live on the element: luci.js keeps it in `dom.registry` keyed by a `data-idref` attribute, and the
   only thing that deletes an entry is `dom.content()`. `#view` is safe — the incoming view's own
   `dom.content(#view, …)` reaps the outgoing page — but the siblings a template emitted next to it
-  and the runtime notification banners are removed by the router, and `remove()` leaves their
+  and the runtime notification banners `#maincontent` held when staging began are removed by the
+  router (a banner the incoming view raises while rendering into the stage is kept), and `remove()` leaves their
   entries, and through them the elements and any class instance stored on them, reachable for the
   life of the document. `discard()` moves the element into a detached container and calls
   `dom.content(bin, null)`, which reaps the element's own entry as well as its descendants', using
@@ -460,7 +480,9 @@ Before rendering the new view:
 - Running the registered navigation callbacks — **and the router names none of them**. The seam is
   inverted: `fs-router.js` exports `onNavigate(fn)` and a module registers itself, so an optional
   module that is not installed is not a `DependencyError` that takes out the chrome. The search
-  palette uses it (recent pages, close on navigate).
+  palette uses it (recent pages, close on navigate), and so does System → Footstrap, which ends its
+  `:root` colour observer there: a page cannot tell from inside a mutation that it has gone, and
+  waiting for the next relevant stamp kept N observers and N-1 detached forms after N visits.
 - `ui.hideModal()`.
 
 ### `renderChrome()`
@@ -526,7 +548,9 @@ and `luci-app-mosdns` re-attaches three CodeMirror `<link>`s, so every SPA visit
 browser parses forever. An exact duplicate is safe to drop for the same reason sweeping was not: the
 rules do not go anywhere — the surviving copy is byte-identical, and a library's "have I imported
 this already?" check still finds its sheet. **The FIRST copy is kept**: that is the one the app holds
-a handle to. `watchViewSheets()` observes `<head>` rather than sweeping on navigation, because podkop
+a handle to. A copy is a duplicate only of one with the SAME owner (the page it arrived for):
+another app's copy is disabled on this page, so dropping this page's live copy for it left 0 of 2
+copies painting. Unowned copies still collapse. `watchViewSheets()` observes `<head>` rather than sweeping on navigation, because podkop
 injects from `render()`, which resolves after the router's `require()` callback — sweeping on
 navigation left the document carrying one permanently stale copy. The observer cannot loop: a removal
 is a mutation with no added nodes, and the handler returns when nothing was added.
@@ -661,11 +685,12 @@ cold HTTP cache and **no hover at all**: `network/routes` 289 ms against 553 col
 
 ## Background polling pause
 
-`wireVisibility()`: `visibilitychange` → a hidden tab does `L.Poll.stop()` (clearInterval, queue
-intact), showing does `L.Poll.start()` (re-arm plus an immediate `step()`). LuCI has no handler of
-its own, so status/overview in a background tab otherwise hammers ubus 24/7 (the expensive iwinfo
-`getAssocList`). Only what we paused is resumed (`wasActive`) — the user may have stopped polling by
-hand through the "Refreshing" indicator, and an unconditional `start()` would silently undo that.
+fs-router hooks `visibilitychange` at module eval: a hidden tab does `L.Poll.stop()` (clearInterval, queue
+intact) and disarms every registered view interval, showing re-arms them and does `L.Poll.start()`
+(re-arm plus an immediate `step()`). LuCI has no handler of its own, so status/overview in a
+background tab otherwise hammers ubus 24/7 (the expensive iwinfo `getAssocList`). Only what we
+paused is resumed (`wasActive`) — the user may have stopped polling by hand through the "Refreshing"
+indicator, and an unconditional `start()` would silently undo that.
 
 ## Accessibility of a route change
 
@@ -751,6 +776,11 @@ at 0 for the rest of the 5 s window instead of the parked 3000px — the write n
 `#maincontent` at all, but the single shared cancellation flag stopped that restore anyway. Scoping
 the check to the axis `pos` actually carries fixes it: `../tmp/task-back/router-before.js` (today's
 code) samples `[0,0,0,0,0,…]`; fixed, `[0,0,3000,3000,3000,…]`, top layout unaffected either way.
+
+The listener is a capture listener on `window`, so it sees every element's `scroll`, and the element
+branch used to treat any of them as `#maincontent`. A script scrolling a `textarea` or an
+`.fs-xscroll` table inside the view cancelled the restore; the branch now returns unless the target
+is `#maincontent`, which is the only element scroller the reader moves.
 
 **`fit.forgetRest()` was gated on `push`, so a Back replay never cleared it — despite the comment
 right above the call already saying "regardless".** A stale anchoring reference from the page being
@@ -871,10 +901,10 @@ both directions.
 
 - **The boot contract: a luci-base without one of the surfaces this router calls turns CLIENT
   NAVIGATION off — the theme itself keeps working, every link simply becomes a full load.**
-  `wireRouter()` looks up twelve names before it wires anything —
-  `L.require`, `L.Class`, `L.dom.content`, the five `L.env` keys a navigation re-points,
+  `wireRouter()` looks up nine surfaces before it wires anything —
+  `L.require`, `L.dom.content`, the five `L.env` keys a navigation re-points,
   `L.Poll.queue`, `L.Poll.start/stop`, `L.Request.addInterceptor`, `rpc.addInterceptor`,
-  `ui.instantiateView`, `ui.hideModal`, `ui.hideIndicator`, `ui.addNotification` — and on a miss it
+  `ui.hideModal`, `ui.hideIndicator` — and on a miss it
   logs *which* and returns. The page is then the server-dispatched MPA the theme was before the
   router existed: every link a full load, nothing else lost.
 

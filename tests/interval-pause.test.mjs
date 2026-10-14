@@ -86,15 +86,46 @@ test('a navigation while the tab is hidden does not bring the old page\'s timers
 		'a timer swept by a navigation may not be re-armed when the tab comes back');
 });
 
-test('LuCI\'s own 1 s tick is not paused with the view timers', () => {
+/* luci.js's Poll: start()/stop() arm and clear through `window` at call time, so the router's hook
+ * sees the tick like any other interval */
+function luciPoll(window) {
+	return {
+		queue: [], tick: null, timer: null,
+		active() { return this.timer != null; },
+		start() { if (this.timer != null) return; this.tick = 0; this.timer = window.setInterval(() => {}, 1000); },
+		stop() { if (this.timer == null) return; window.clearInterval(this.timer); this.timer = null; },
+		add() {}, remove() {}
+	};
+}
+
+test('LuCI\'s poll is stopped while hidden and armed exactly once after N hide/show', () => {
+	const window = timerWindow();
 	const L = fakeL();
-	const { window, document } = boot({ L });
-	const tick = window.setInterval(() => {}, 1000);
-	L.Poll.timer = tick;			/* what L.Poll.start() leaves behind, through our hook */
+	L.Poll = luciPoll(window);
+	const { document } = boot({ window, L });
+	L.Poll.start();
 	const mine = window.setInterval(() => {}, 3000);
+	for (let n = 0; n < 3; n++) {
+		visibility(document, true);
+		assert.equal(L.Poll.active(), false, 'the poll is stopped while the tab is hidden');
+		assert.equal(window.live.size, 0, 'neither its tick nor the view timer is armed');
+		visibility(document, false);
+		assert.equal(L.Poll.active(), true);
+		assert.equal(window.live.size, 2, 'one poll tick and one view timer, never a second tick');
+	}
+	L.Poll.stop();
+	assert.deepEqual([ ...window.live.values() ].map((t) => t.ms), [ 3000 ], 'stop() leaves only view timers');
+	window.clearInterval(mine);
+});
+
+test('a manual poll pause is not undone by a hide/show', () => {
+	const window = timerWindow();
+	const L = fakeL();
+	L.Poll = luciPoll(window);
+	const { document } = boot({ window, L });
 	visibility(document, true);
-	assert.equal(window.live.has(tick), true, 'L.Poll owns this one and wireVisibility stops it');
-	assert.equal(window.live.has(mine), false);
+	visibility(document, false);
+	assert.equal(L.Poll.active(), false);
 });
 
 test('a timer started while the tab is hidden is left alone', () => {

@@ -41,7 +41,6 @@ test('a complete luci-base breaks no contract entry', () => {
 test('each missing surface is named, and only that one', () => {
 	const cases = [
 		[ 'L.require', (L) => { delete L.require; } ],
-		[ 'L.Class', (L) => { delete L.Class; } ],
 		[ 'L.dom.content', (L) => { L.dom = {}; } ],
 		[ 'L.Poll.queue', (L) => { L.Poll.queue = null; } ],
 		[ 'L.Poll.start/stop', (L) => { delete L.Poll.stop; } ],
@@ -65,8 +64,8 @@ test('a missing L.env key is reported even though L.env itself is there', () => 
 
 test('a gone ui method is reported', () => {
 	const ui = fakeUi();
-	delete ui.instantiateView;
-	assert.deepEqual(router({ ui }).contractBreaks(), [ 'ui.instantiateView' ]);
+	delete ui.hideModal;
+	assert.deepEqual(router({ ui }).contractBreaks(), [ 'ui.hideModal' ]);
 });
 
 test('an L that throws on a property read counts as missing, not as an exception', () => {
