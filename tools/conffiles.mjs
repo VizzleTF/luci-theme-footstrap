@@ -1,28 +1,20 @@
 #!/usr/bin/env node
 /* Every shipped /etc/config/* must be declared a conffile, or the package manager eats it.
  *
- * `root/etc/config/footstrap` ships as an empty stub and is WRITTEN AT RUNTIME — Appearance ->
- * "Save as default" has rpcd uci-set the router-wide axes into that very file. With no `conffiles`
- * define, the package manager owns it as an ordinary file and REPLACES it on upgrade, so the
- * admin's saved defaults are wiped by the theme's own one-click Update, silently and reported as
- * success.
+ * `root/etc/config/footstrap` ships as an empty stub and is written at runtime (Appearance ->
+ * "Save as default" uci-sets the router-wide axes into it). Without a `conffiles` define the
+ * package manager replaces it on upgrade and the saved defaults vanish, reported as success.
  *
- * A gate rather than just the fix, because nothing observable fails: the wipe happens on someone
- * else's router, months later, at the moment they upgrade.
+ * A gate because nothing observable fails here: the wipe happens on someone else's router.
+ * OpenWrt honours the define for both formats (include/package-pack.mk: KEEP_$(1) -> apk
+ * .conffiles, ipk CONTROL/conffiles), so one define covers opkg and apk.
  *
- * OpenWrt honours the define for BOTH formats (include/package-pack.mk: KEEP_$(1) -> apk
- * .conffiles / .conffiles_static, ipk CONTROL/conffiles), so one define covers 24.10's opkg and
- * 25.12's apk alike.
- *
- * Deliberately a TEXT check, not a package build: the gate must run on a dev box and in the lint
- * job, neither of which has an OpenWrt SDK. */
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+ * A text check, not a package build: it must run where no OpenWrt SDK exists. */
+import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { ROOT } from './lib/root.mjs';
+import { ROOT, read } from './lib/root.mjs';
 const PKG = join(ROOT, 'luci-theme-footstrap');
-const MAKEFILE = join(PKG, 'Makefile');
-const OWFEED = join(ROOT, 'owfeed.yml');
 const CONFIG_DIR = join(PKG, 'root/etc/config');
 
 const fails = [];
@@ -34,7 +26,7 @@ const shipped = existsSync(CONFIG_DIR)
 
 /* what the Makefile DECLARES. The define body is everything between the header and `endef`;
  * blank lines and `#` comments are not paths. */
-const mk = readFileSync(MAKEFILE, 'utf8');
+const mk = read('luci-theme-footstrap/Makefile');
 const m = mk.match(/^define Package\/[^/\n]+\/conffiles\n([\s\S]*?)^endef$/m);
 const declared = m
 	? m[1].split('\n').map(s => s.trim()).filter(s => s && !s.startsWith('#')).sort()
@@ -47,7 +39,7 @@ const declared = m
  *
  * A text match, like the Makefile one above: this gate runs on a dev box and in the lint job, and
  * neither should need a YAML parser to answer a question about one list of paths. */
-const yml = readFileSync(OWFEED, 'utf8');
+const yml = read('owfeed.yml');
 const y = yml.match(/^\s*conffiles:\s*\[([^\]]*)\]/m);
 const owfeedDeclared = y
 	? [ ...y[1].matchAll(/["']([^"']+)["']/g) ].map(mm => mm[1]).sort()
@@ -70,37 +62,26 @@ if (!shipped.length) {
 	process.exit(1);
 }
 
-if (!y) {
-	fails.push(
-		`the package ships ${shipped.length} config file(s) but owfeed.yml declares no\n` +
-		`  conffiles: — the RELEASED package is the one built from it, so every one of them\n` +
-		`  is replaced on upgrade whatever the Makefile says`
-	);
-} else {
+/* one pass per source: a missing declaration, shipped but undeclared, declared but not shipped */
+function compare(source, found, list, hint = '') {
+	if (!found) {
+		fails.push(
+			`the package ships ${shipped.length} config file(s) but ${source} declares no conffiles${hint}\n` +
+			`  — every one of them is REPLACED on upgrade:\n` +
+			shipped.map(p => `    ${p}`).join('\n')
+		);
+		return;
+	}
 	for (const p of shipped)
-		if (!owfeedDeclared.includes(p))
-			fails.push(`${p} is shipped but NOT in owfeed.yml's conffiles — the released package will overwrite it on upgrade`);
-	for (const p of owfeedDeclared)
+		if (!list.includes(p))
+			fails.push(`${p} is shipped but NOT in ${source}'s conffiles — an upgrade will overwrite it`);
+	/* a stale path silently protects nothing */
+	for (const p of list)
 		if (!shipped.includes(p))
-			fails.push(`${p} is in owfeed.yml's conffiles but the package ships no such file — stale entry`);
+			fails.push(`${p} is in ${source}'s conffiles but the package ships no such file — stale entry`);
 }
-
-if (!m) {
-	fails.push(
-		`the package ships ${shipped.length} config file(s) but the Makefile has no\n` +
-		`  "define Package/<name>/conffiles" block at all — every one of them is REPLACED on upgrade:\n` +
-		shipped.map(p => `    ${p}`).join('\n')
-	);
-} else {
-	for (const p of shipped)
-		if (!declared.includes(p))
-			fails.push(`${p} is shipped but NOT declared a conffile — an upgrade will overwrite it`);
-
-	/* the reverse is a real fault too: a stale path silently protects nothing */
-	for (const p of declared)
-		if (!shipped.includes(p))
-			fails.push(`${p} is declared a conffile but the package ships no such file — stale entry`);
-}
+compare('owfeed.yml', y, owfeedDeclared, ' (the released package is built from it)');
+compare('the Makefile', m, declared);
 
 console.log(`conffiles: ${shipped.length} shipped, ${declared.length} in the Makefile, ${owfeedDeclared.length} in owfeed.yml`);
 for (const p of shipped)

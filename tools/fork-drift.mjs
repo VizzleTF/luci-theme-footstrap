@@ -15,9 +15,9 @@
  *   node tools/fork-drift.mjs [path-to-luci-checkout]      (default: ../luci-fork)
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { ROOT } from './lib/root.mjs';
+import { ROOT, read } from './lib/root.mjs';
 
 const DEST = process.argv[2] || join(ROOT, '..', 'luci-fork');
 const SRC = join(ROOT, 'luci-theme-footstrap');
@@ -28,23 +28,15 @@ if (!existsSync(join(DEST, 'luci.mk')) || !existsSync(OUT)) {
 	process.exit(0);
 }
 
-/* the sync's own exclude list, restated as the shape of an EXPECTED difference */
-const NOT_SENT = [ 'styles', 'build-css.sh', 'mangle-tokens.sh', 'strip-templates.sh',
-	'strip-shell.sh', 'strip-probes.sh', 'build-apk.sh', 'dev-sync.sh', 'update-po.sh',
-	'luci-upstream.pin', 'README.md', '.DS_Store' ];
 const HAND_HELD = [ 'Makefile', 'po' ];
+/* the sync's own --exclude list, read from it so a new exclude is not reported as DRIFT */
+const NOT_SENT = [ ...read('tools/sync-luci-fork.sh').matchAll(/--exclude '([^']+)'/g) ]
+	.map((m) => m[1]).filter((n) => !HAND_HELD.includes(n));
 /* generated on this side, committed on that one */
 const GENERATED = [ 'htdocs/luci-static/footstrap/cascade.css' ];
 
-function walk(dir, base = dir) {
-	const out = [];
-	for (const name of readdirSync(dir)) {
-		const p = join(dir, name);
-		if (statSync(p).isDirectory()) out.push(...walk(p, base));
-		else out.push(relative(base, p));
-	}
-	return out;
-}
+const walk = (dir) => readdirSync(dir, { recursive: true, encoding: 'utf8' })
+	.filter((f) => statSync(join(dir, f)).isFile()).sort();
 const owner = (rel) => {
 	const top = rel.split('/')[0];
 	if (HAND_HELD.includes(top)) return 'hand';

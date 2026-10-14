@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-/* The chrome is defended from third-party CSS in three places that must agree, and nothing else
- * holds them together: breaking the fence constant to `.fs-sidebarTYPO` leaves the menu completely
- * unprotected while `npm run check`, `jsmin-verify` and `eslint` all exit 0.
+/* The chrome is defended from third-party CSS in three places that must agree: breaking the fence
+ * constant to `.fs-sidebarTYPO` leaves the menu unprotected while every other gate exits 0.
  *
  *   1. `header.ut` — the markup. A chrome root MARKS itself with `data-fs-chrome`; the <nav> is
  *      one, and so are the skip link and the two sr-only elements, none of which is inside it.
@@ -9,13 +8,10 @@
  *      MATCH a chrome element, which is what beats a third party's `!important`.
  *   3. `theme/10-chrome.css` — the pin, which closes the way a fence cannot: inheritance.
  *
- * The mark is DERIVED FROM THE MARKUP here, never restated: rename it in header.ut and this gate
- * re-derives it, then fails on the two copies that still say the old one.
- *
- * The fence and the pin are each ONE canonical string, compared whole rather than tested for
- * tokens. That is the hole the token version had: its four independent `includes()` checks all
- * passed on `:where(:not(.fs-sidebar), .fs-sidebar *)`, the exact INVERSE of a fence — it stops
- * sparing the chrome and starts TARGETING it. */
+ * The mark is DERIVED FROM THE MARKUP, never restated. The fence and the pin are each ONE canonical
+ * string compared whole: four `includes()` checks passed on `:where(:not(.fs-sidebar), .fs-sidebar *)`,
+ * the INVERSE of a fence, which targets the chrome instead of sparing it. */
+import { createRequire } from 'node:module';
 import { read, readAll } from './lib/root.mjs';
 
 const HEADER = read('luci-theme-footstrap/ucode/template/themes/footstrap/header.ut');
@@ -24,9 +20,7 @@ const PREFS = read('luci-theme-footstrap/htdocs/luci-static/resources/fs-prefs.j
 const CHROME = read('luci-theme-footstrap/styles/theme/10-chrome.css');
 
 /* Every module the theme ships, concatenated — for the "does any JS build a chrome root" check
- * below. A GLOB, not a named file: the popover that used to build one lived in fs-appearance.js and
- * this gate read that one path, so a root moved to another module would have left the check quietly
- * looking at a file that no longer had one. */
+ * below. A glob, not a named file, so a root moved to another module is still found. */
 const JS = readAll('luci-theme-footstrap/htdocs/luci-static/resources', '.js');
 
 const errors = [];
@@ -59,12 +53,9 @@ if (!(/^data-fs-/).test(MARK)) {
 	console.error('Nobody outside this theme may emit an fs-* name — that is what makes the fence safe.');
 	process.exit(1);
 }
-/* Every root that carries it, RATCHETED rather than merely reported: this count is the whole thesis
- * that the chrome is not one element. Gating only the JS root leaves the template side unguarded —
- * deleting the mark from the skip link printed "3 root(s)" and exited 0, which is the v0.9.1 damage
- * exactly (popover flattened 12px -> 0 and `position: fixed` -> `static`, both sr-only elements
- * un-clipped onto every page; the <nav> alone held). Adding or removing a root is a deliberate act,
- * so it is a deliberate edit here. */
+/* Every root that carries it, RATCHETED: this count is the thesis that the chrome is not one element.
+ * Deleting the mark from the skip link printed "3 root(s)" and exited 0 (v0.9.1: popover flattened
+ * 12px -> 0 and `position: fixed` -> `static`, both sr-only elements un-clipped onto every page). */
 const EXPECT_ROOTS = 5;	/* + .fs-pattern, the wallpaper's paint layer: a body-level sibling of .fs-shell */
 /* …and how many the JS builds: fs-search.js's command palette, a `position: fixed` overlay parented
  * to <body> and therefore outside every template root. A page rendered inside .fs-main is zone 2,
@@ -74,7 +65,7 @@ const EXPECT_ROOTS = 5;	/* + .fs-pattern, the wallpaper's paint layer: a body-le
  * back here and account for it — either it is chrome, and the mark plus this number move together,
  * or it is not, and it belongs inside #view. */
 const EXPECT_JS_ROOTS = 1;
-const roots = [...MARKUP.matchAll(new RegExp(`<([a-z]+)\\b[^>]*\\b${MARK}\\b`, 'g'))].map((m) => m[1]);
+const roots = [...MARKUP.matchAll(new RegExp(`<([a-z][a-z0-9]*)\\b[^>]*\\b${MARK}\\b`, 'g'))].map((m) => m[1]);
 const jsRoots = [...JS.matchAll(new RegExp(`'${MARK}'`, 'g'))].length;
 ok.push(`chrome mark derived from header.ut: [${MARK}] — ${roots.length} root(s) in the template `
 	+ `(${roots.join(', ')}) + ${jsRoots} built by the theme's JS`);
@@ -109,19 +100,10 @@ if (!fenceM) {
 }
 
 /* ---- 3. the pin (theme/10-chrome.css) ------------------------------------------------- */
-/* Inherited properties, per CSS. Only these belong in the pin: it exists to break the inheritance
- * chain from html/body, and a non-inherited property cannot arrive that way. */
-const INHERITED = new Set([
-	'azimuth', 'border-collapse', 'border-spacing', 'caption-side', 'color', 'cursor', 'direction',
-	'empty-cells', 'font', 'font-family', 'font-size', 'font-style', 'font-variant', 'font-weight',
-	'font-size-adjust', 'font-stretch', 'hanging-punctuation', 'hyphens', 'letter-spacing',
-	'line-height', 'list-style', 'list-style-image', 'list-style-position', 'list-style-type',
-	'orphans', 'overflow-wrap', 'quotes', 'tab-size', 'text-align', 'text-align-last',
-	'text-indent', 'text-justify', 'text-shadow', 'text-transform', 'visibility', 'white-space',
-	'widows', 'word-break', 'word-spacing', 'word-wrap', 'writing-mode', 'text-rendering',
-	'image-rendering', 'pointer-events', 'caret-color', 'accent-color', 'color-scheme',
-	'font-feature-settings', 'font-variation-settings', 'font-kerning', 'text-decoration-color'
-]);
+/* The pin exists to break the inheritance chain from html/body, and a non-inherited property cannot
+ * arrive that way, so only properties mdn-data flags `inherited` belong in it. */
+const MDN = createRequire(import.meta.url)('mdn-data/css/properties.json');
+const inherited = (p) => MDN[p]?.inherited === true;
 
 /* Found by the MARK, not by position: the old matcher took the first `:where(.x…){…}` in the file,
  * so a second such rule added above it would have been checked in the pin's place. */
@@ -148,7 +130,7 @@ if (pins.length !== 1) {
 			+ `even when the inherited one is OURS (measured: .fs-label lost its nowrap, text-align forced `
 			+ `from start to left on 302 elements — that alone breaks every RTL language LuCI ships)`);
 	const props = [...body.matchAll(/([-a-z]+)\s*:/g)].map((m) => m[1]);
-	const notInherited = props.filter((p) => !INHERITED.has(p));
+	const notInherited = props.filter((p) => !inherited(p));
 	if (notInherited.length)
 		errors.push(`the pin declares non-inherited propert${notInherited.length > 1 ? 'ies' : 'y'} `
 			+ `${notInherited.join(', ')} — the pin exists only to break the inheritance chain, and at `
@@ -173,10 +155,9 @@ if (!stampM) {
 	const watched = [...guardM[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
 	const missing = written.filter((a) => !watched.includes(a));
 	const extra = watched.filter((a) => !written.includes(a));
-	/* Two empty lists agree with each other, and that used to PASS — "watches all 0 published
-	 * dialects". Both halves are read by regex, so either one going quiet (stampDark stamping through
-	 * a helper or a loop instead of a literal setAttribute, an emptied attributeFilter) is the failure
-	 * this gate exists to catch, not a clean bill. */
+	/* Two empty lists agree with each other, so an empty one is a failure, not a pass. Both halves
+	 * are read by regex: stampDark stamping through a helper or a loop instead of a literal
+	 * setAttribute, or an emptied attributeFilter, makes one go quiet. */
 	if (!written.length)
 		errors.push('stampDark() writes no attribute this gate can see — it matches literal '
 			+ "setAttribute('…') calls, and finding none means either the guard is gone or the stamping "

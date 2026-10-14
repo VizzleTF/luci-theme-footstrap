@@ -3,31 +3,18 @@
 #
 #   ./tools/sync-luci-fork.sh ../luci
 #
-# One decision separates the two: the luci tree gets the BUILT stylesheet, not the source that
-# generates it. Here `styles/` is the source of truth and `cascade.css` is an untracked artefact;
-# there the other themes each commit one `cascade.css` and have no build step, and a theme arriving
-# with a 500-line shell script in `Build/Prepare` asks a reviewer to audit a build system before
-# they can read a stylesheet. The cost is that the sheet has to be regenerated and re-copied
-# whenever `styles/` changes, which is what this script is.
-#
-# What is deliberately NOT done to the copy:
-#
-#   * the custom properties are not mangled — readability wins in a tree somebody has to review and
-#     patch, bytes win in a release artefact;
-#   * the templates and the shell keep their comments, stripping being a packaging step;
-#   * the JS is untouched: luci.mk runs jsmin over it at package time;
-#   * `po/` does not travel at all. Upstream's CONTRIBUTING.md is explicit that translations are
-#     made in Weblate, which writes straight into that tree, so a sync carrying our catalogues would
-#     overwrite whatever translators had done. A changed msgid is a deliberate PR of its own.
-#
-# What this script cannot do for you: the Makefile is maintained by hand on the far side, so a
-# change to OUR Makefile — postinst, postrm, conffiles — does not travel and has to be made there
-# too. It is the one file that can drift unnoticed, so the sync ends by saying whether it has.
+# The luci tree gets the BUILT stylesheet, not `styles/`: the other themes commit one `cascade.css`
+# and have no build step, so re-run this whenever `styles/` changes. Deliberately NOT done to the
+# copy: custom properties are not mangled, templates and shell keep their comments, the JS is
+# untouched (luci.mk runs jsmin at package time), and `po/` does not travel (Weblate writes into
+# that tree; a changed msgid is a PR of its own).
+# The Makefile is maintained by hand on the far side, so a change to OUR Makefile does not travel;
+# the sync ends by saying whether it has drifted.
 set -eu
 
 DEST="${1:-}"
-[ -n "$DEST" ] || { echo "usage: $0 <path-to-luci-checkout>" >&2; exit 1; }
-[ -f "$DEST/luci.mk" ] || { echo "$DEST does not look like a luci checkout (no luci.mk)" >&2; exit 1; }
+[ -n "$DEST" ] || { echo "usage: $0 <path-to-luci-checkout>" >&2; exit 2; }
+[ -f "$DEST/luci.mk" ] || { echo "$DEST does not look like a luci checkout (no luci.mk)" >&2; exit 2; }
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/luci-theme-footstrap"
@@ -44,10 +31,7 @@ rsync -a --delete \
 	--exclude 'styles' \
 	--exclude 'build-css.sh' \
 	--exclude 'mangle-tokens.sh' \
-	--exclude 'strip-templates.sh' \
-	--exclude 'strip-shell.sh' \
-	--exclude 'strip-probes.sh' \
-	--exclude 'strip-assets.sh' \
+	--exclude 'strip-build.sh' \
 	--exclude 'build-apk.sh' \
 	--exclude 'dev-sync.sh' \
 	--exclude 'update-po.sh' \
@@ -62,15 +46,15 @@ rsync -a --delete \
 # the far side. (--delete-excluded would take that too.)
 # `po` is NOT in this list on purpose: it is excluded from the send because Weblate owns it there,
 # which means the copy that is already in that tree must be left exactly where it is.
-for stale in styles build-css.sh mangle-tokens.sh strip-templates.sh strip-shell.sh \
-             strip-probes.sh strip-assets.sh build-apk.sh dev-sync.sh update-po.sh luci-upstream.pin README.md; do
+for stale in styles build-css.sh mangle-tokens.sh strip-build.sh \
+             build-apk.sh dev-sync.sh update-po.sh luci-upstream.pin README.md; do
 	rm -rf "$OUT/$stale"
 done
 
 # The gate-only exports do not travel either. They exist so a gate in THIS repository can call a
 # module-private function; upstream has no such gate, and a module surface nobody calls is dead
-# weight there. The functions stay — only the export line goes (strip-probes.sh).
-sh "$SRC/strip-probes.sh" "$OUT/htdocs/luci-static/resources"
+# weight there. The functions stay — only the export line goes (strip-build.sh probes).
+sh "$SRC/strip-build.sh" probes "$OUT/htdocs/luci-static/resources"
 
 # Modes come from the theme repo's INDEX, never the worktree: core.fileMode=false here means a file
 # can lose +x on disk with git none the wiser, and rsync -a would carry that loss into the PR.
@@ -104,10 +88,18 @@ sh "$SRC/build-css.sh" "$OUT/htdocs/luci-static/footstrap/cascade.css"
 # cascade.css included; docs/*.md pointers are older and accepted upstream, so they are counted,
 # not failed.
 refs=$(grep -rEnI \
-	'\.\./tmp/|tests/[a-z0-9_/-]+\.(m?js|test)|tools/[a-z0-9_/-]+\.(mjs|sh)|\bowrt(2410|2512|snap)[a-z]?\b|issue #[0-9]+|commit [0-9a-f]{7,}|`[0-9a-f]{7,12}`' \
+	'\.\./tmp/|tests/[a-z0-9_/-]+\.(m?js|test)|tools/[a-z0-9_/-]+\.(mjs|sh)|\bnpm run [a-z-]+|\b[a-z-]+\.mjs\b|\bowrt(2410|2512|snap)[a-z]?\b|issue #[0-9]+|commit [0-9a-f]{7,}|`[0-9a-f]{7,12}`' \
 	"$OUT" --exclude-dir=po || true)
 [ -z "$refs" ] || { echo "sync: reference to something outside the luci tree:" >&2
 	echo "$refs" | sed "s|^$OUT/||" | cut -c1-160 >&2; exit 1; }
+# The scan above is per line, so "issue" at the end of a comment line and "#22" at the start of the
+# next passes it; the issue and commit patterns (plus answers|fixes|closes) over each file with its
+# newlines folded catch the wrapped form.
+wrapped=$(grep -rlI --exclude-dir=po '' "$OUT" | while read -r f; do
+	tr '\n' ' ' < "$f" | grep -oE '(issue|answers|fixes|closes)[[:space:]*#/]+#[0-9]+|commit[[:space:]*#/]+[0-9a-f]{7,}' | sed "s|^|${f#"$OUT"/}: |"
+done || true)
+[ -z "$wrapped" ] || { echo "sync: wrapped reference to a theme-repo issue or commit:" >&2
+	echo "$wrapped" | cut -c1-160 >&2; exit 1; }
 
 echo "synced -> $OUT"
 echo "  cascade.css: $(wc -c < "$OUT/htdocs/luci-static/footstrap/cascade.css") bytes (generated, unmangled)"

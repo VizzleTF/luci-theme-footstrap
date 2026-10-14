@@ -50,12 +50,13 @@ function mirrorFor(node) {
 }
 
 /* A rule's "guard" = the chain of at-rules it sits inside (media/container/supports). Same guard
- * + same body = a plain duplicate (stylelint's job); DIFFERENT guards is what we hunt. */
+ * + same body, different selector = mergeable by hand; only DIFFERENT guards are hunted here: same-guard
+ * copies stay unchecked (MIN_DECLS noise) and stylelint does not see them either. */
 const rules = [];
 const stack = [];
 csstree.walk(ast, {
 	enter(node) {
-		if (node.type === 'Atrule' && node.prelude && ['media', 'container', 'supports', 'layer'].includes(node.name))
+		if (node.type === 'Atrule' && node.prelude && ['media', 'container', 'supports'].includes(node.name))
 			stack.push(`@${node.name} ${csstree.generate(node.prelude)}`);
 		if (node.type !== 'Rule' || node.block?.type !== 'Block') return;
 
@@ -68,7 +69,7 @@ csstree.walk(ast, {
 		if (decls.length < MIN_DECLS) return;
 
 		rules.push({
-			guard: stack.filter(g => !g.startsWith('@layer')).join(' & ') || '(none)',
+			guard: stack.join(' & ') || '(none)',
 			selector: csstree.generate(node.prelude).replace(/\s+/g, ' ').trim(),
 			line: node.loc?.start.line ?? 0,
 			key: decls.slice().sort().join('; '),
@@ -77,7 +78,7 @@ csstree.walk(ast, {
 		});
 	},
 	leave(node) {
-		if (node.type === 'Atrule' && node.prelude && ['media', 'container', 'supports', 'layer'].includes(node.name))
+		if (node.type === 'Atrule' && node.prelude && ['media', 'container', 'supports'].includes(node.name))
 			stack.pop();
 	},
 });
@@ -93,7 +94,7 @@ const findings = [];
 for (const [key, group] of byBody) {
 	if (group.length < 2) continue;
 	const guards = new Set(group.map(r => r.guard));
-	if (guards.size < 2) continue;			/* same guard = plain dup, stylelint owns it */
+	if (guards.size < 2) continue;			/* same-guard copies: not checked on purpose (MIN_DECLS noise); stylelint does not see them either */
 	findings.push({ key, n: group[0].n, group });
 }
 findings.sort((a, b) => b.n * b.group.length - a.n * a.group.length);
@@ -123,8 +124,8 @@ console.log(`\n${findings.length} duplicated declaration bodies across differing
  * has no budget on FINDINGS by design (see the header) — but it never had a floor on how much CSS
  * it actually walked, either, so a build that produced almost nothing read as "nothing is
  * duplicated" rather than as "nothing was checked". MEASURED is the current count of qualifying
- * (>= MIN_DECLS decls) rules (434); the floor sits far under it. */
-const MEASURED_RULES = 434;
+ * (>= MIN_DECLS decls) rules (413); the floor sits far under it. */
+const MEASURED_RULES = 413;
 const RULES_FLOOR = 100;
 if (rules.length < RULES_FLOOR) {
 	console.error(`\nFAIL: only ${rules.length} rule(s) with >= ${MIN_DECLS} declarations were found `
