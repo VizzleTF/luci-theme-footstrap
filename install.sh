@@ -1,5 +1,5 @@
 #!/bin/sh
-# luci-theme-footstrap installer, OpenWrt 24.10 (opkg) / 25.12+ (apk); 23.05 gets the pinned final
+# luci-theme-footstrap installer, OpenWrt 24.10.3+ (opkg) / 25.12+ (apk); 23.05 gets the pinned final
 # release. docs/package.md, "install.sh". Re-running upgrades the theme. Licensed Apache-2.0.
 #
 #   wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
@@ -372,13 +372,13 @@ case "$BRANCH" in
 		err "footstrap requires OpenWrt 23.05 or newer (detected $DISTRIB_RELEASE)."
 		exit 1
 	fi
-	# 23.05 gets the LAST version that runs on it, not a refusal: `ui.RangeSlider` (24.10) took the
+	# 23.05 gets the LAST version that runs on it, not a refusal: `ui.RangeSlider` (24.10.3) took the
 	# whole Appearance tab down without it, and 23.05 is EOL — openwrt/luci declined to carry
 	# compatibility code for a release it no longer builds (#8978). Pinned by tag, verified like any
 	# other artifact, said out loud so nobody waits for an upgrade that will not come.
 	if [ "$MAJ" -eq 23 ]; then
 		info "OpenWrt $DISTRIB_RELEASE: installing footstrap ${FROZEN_2305_TAG#v} — the LAST version for 23.05."
-		info "23.05 is end-of-life and the theme no longer develops for it; later versions need 24.10 or newer."
+		info "23.05 is end-of-life and the theme no longer develops for it; later versions need 24.10.3 or newer."
 		RELEASE_BASE="$FROZEN_2305_BASE"
 		install_from_release || {
 			err "Could not install the ${FROZEN_2305_TAG#v} release asset on $DISTRIB_RELEASE."
@@ -386,6 +386,15 @@ case "$BRANCH" in
 		}
 		ok "footstrap ${FROZEN_2305_TAG#v} installed. This is the final release for OpenWrt 23.05."
 		exit 0
+	fi
+	# 24.10.0-24.10.2 predate the `ui.RangeSlider` backport (first in 24.10.3), so the Appearance page
+	# throws there. 24.10-SNAPSHOT has no patch number: it is the branch tip and passes.
+	if [ "$BRANCH" = "24.10" ]; then
+		PATCH=$(printf '%s' "$DISTRIB_RELEASE" | sed -n 's/^24\.10\.\([0-9][0-9]*\).*/\1/p')
+		if [ -n "$PATCH" ] && [ "$PATCH" -lt 3 ]; then
+			err "footstrap requires OpenWrt 24.10.3 or newer (detected $DISTRIB_RELEASE); run sysupgrade."
+			exit 1
+		fi
 	fi
 	# Probed, not assumed: a branch the feed does not publish yet would otherwise get a repository
 	# entry that 404s under `set -e`, and a re-run would die at the same place. Falls back to the

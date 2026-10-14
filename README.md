@@ -1,6 +1,6 @@
 # luci-theme-footstrap
 
-A LuCI theme for OpenWrt 24.10 and newer. It depends only on `luci-base`, styles every LuCI page
+A LuCI theme for OpenWrt 24.10.3 and newer. It depends only on `luci-base`, styles every LuCI page
 including third-party `luci-app-*` pages, and leaves alone what an app styles itself. It works on a phone and installs to its home screen,
 and has 22 appearance settings (layout, palette, density, colours, wallpaper) that apply without a
 reload.
@@ -14,7 +14,7 @@ reload.
 
 ## Install
 
-Needs OpenWrt 24.10 or newer, and a browser from Chrome 108, Firefox 101 or Safari 15.4 on. On
+Needs OpenWrt 24.10.3 or newer (earlier 24.10 releases lack a LuCI widget the theme uses), and a browser from Chrome 108, Firefox 101 or Safari 15.4 on. On
 23.05 the installer installs 0.14.2: later versions use a LuCI widget that 23.05 lacks.
 
 Run as root on the router, over SSH:

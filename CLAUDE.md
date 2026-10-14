@@ -1,14 +1,14 @@
 # CLAUDE.md
 
-`luci-theme-footstrap` — a LuCI theme for **OpenWrt 24.10 and newer** (and ImmortalWrt). Standalone:
+`luci-theme-footstrap` — a LuCI theme for **OpenWrt 24.10.3 and newer** (and ImmortalWrt). Standalone:
 it ships no framework and depends on nothing but `luci-base`. Page content is rendered client-side
 by app view-JS, so the theme is server chrome (`ucode/template/themes/footstrap/*.ut`) + one
 generated `cascade.css` + `fs-*.js` in `htdocs/luci-static/resources/`.
 
 **Communicate in Russian.** Code, comments, commit messages and PR text stay in English.
 
-**The floor is 24.10.** 23.05 support ended at 0.14.2 (`ui.RangeSlider` is 24.10-only,
-openwrt/luci#8978); `install.sh` serves a 23.05 router that pin. `docs/releasing.md`.
+**The floor is 24.10.3.** `ui.RangeSlider` reached openwrt-24.10 only by backport in 24.10.3
+(e4c67020de), so 24.10.0-24.10.2 are refused; 23.05 support ended at 0.14.2 (openwrt/luci#8978); `install.sh` serves a 23.05 router that pin. `docs/releasing.md`.
 
 `styles/base/` is footstrap's code: **do not call it "the fork" or reintroduce the word bootstrap**
 into filenames, comments or docs. That name belongs to the *other, real* package only — the

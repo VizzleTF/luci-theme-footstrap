@@ -286,7 +286,7 @@ guaranteed shell is busybox ash. Two paths, chosen by whether the feed can be re
   publish, or the router cannot reach it at all) — no feed line is ever written for a feed that
   failed, and the closing message says `$PM upgrade` will **not** carry the theme forward. A 23.05
   router always takes this path, pinned to `v0.14.2` (`FROZEN_2305_TAG`): that release is the last
-  one that runs there — `ui.RangeSlider` needs 24.10 — and openwrt/luci declined to carry
+  one that runs there — `ui.RangeSlider` needs 24.10.3 — and openwrt/luci declined to carry
   compatibility code for a release it no longer builds
   ([#8978](https://github.com/openwrt/luci/issues/8978)).
 

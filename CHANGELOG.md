@@ -82,6 +82,7 @@
 - **The photo wallpaper no longer disappears on Edge, Vivaldi and Opera when the OS reports reduced transparency.** The `prefers-reduced-transparency` block set the photo scrim to the opaque page colour, so the shell rendered as one flat colour (Chromium 1400x800: photo gone with the query emulated, visible without). The photo is the admin's explicit choice and every card is already opaque, so the block is deleted (#66).
 - **A `_` typed in a text field is no longer cut off in Chrome/Edge on Linux.** Fields set `line-height: normal`, which in DejaVu Sans Mono (underscore bottom -483 = hhea descent) put the line-box clip exactly on the underscore; they now use the 1.5 body leading (19.5 px at Normal). Field height is unchanged.
 - **A browser extension that replaces the global `_` no longer breaks every page after the first.** `navigate()` now takes a full load when `_('')` is not a string (a lodash/underscore `_` returns an object, so LuCI's `_(…).format` threw `is not a function` on each following view); a full load restores LuCI's `_`.
+- **Installing on OpenWrt 24.10.0-24.10.2 is refused with a clear message, and Appearance there shows a notice instead of "ui.RangeSlider is not a constructor".** `ui.RangeSlider` reached openwrt-24.10 by backport in 24.10.3, so the floor is now 24.10.3; run sysupgrade.
 
 ### Security
 
