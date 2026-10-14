@@ -102,7 +102,7 @@
 		--fs-type: calc(13px * var(--fs-density-type));		/* body, tables, fields, menu items — the base */
 		--fs-type-lg: calc(16px * var(--fs-density-type));	/* section titles (h3/legend), alert headings */
 		--fs-type-xl: calc(20px * var(--fs-density-type));	/* page titles */
-		--fs-type-2xl: calc(26px * var(--fs-density-type));	/* h1: error500 and third-party apps; login sizes its own, the chrome title is .fs-sr */
+		--fs-type-2xl: calc(26px * var(--fs-density-type));	/* h1: error500 and third-party apps; the chrome title and the login h1 are .fs-sr */
 		/* iOS Safari zooms the page when a field under 16px takes focus and never zooms back; max() holds
 		 * the floor at Compact, where --fs-type-lg is 14.4px. -field/-field-xs are the size typed text is
 		 * set in: the body (or dense) size on desktop, the floor under 767px (@media below). */

@@ -21,7 +21,7 @@ msgctxt "footstrap"
 msgid "As in file"
 msgstr "Como en el archivo"
 
-#: ucode/template/themes/footstrap/sysauth.ut:68
+#: ucode/template/themes/footstrap/sysauth.ut:69
 msgid "Authorization Required"
 msgstr "Se requiere autorización"
 
@@ -220,7 +220,7 @@ msgctxt "footstrap"
 msgid "Interface"
 msgstr "Interfaz"
 
-#: ucode/template/themes/footstrap/sysauth.ut:52
+#: ucode/template/themes/footstrap/sysauth.ut:53
 msgid "Invalid username and/or password! Please try again."
 msgstr "¡Nombre de usuario y/o contraseña incorrectos! Inténtelo de nuevo."
 
@@ -249,7 +249,7 @@ msgctxt "footstrap"
 msgid "Light"
 msgstr "Claro"
 
-#: ucode/template/themes/footstrap/sysauth.ut:131
+#: ucode/template/themes/footstrap/sysauth.ut:129
 msgid "Log in"
 msgstr "Iniciar sesión"
 
@@ -310,7 +310,7 @@ msgctxt "footstrap"
 msgid "Palette"
 msgstr "Paleta"
 
-#: ucode/template/themes/footstrap/sysauth.ut:80
+#: ucode/template/themes/footstrap/sysauth.ut:78
 msgid "Password"
 msgstr "Contraseña"
 
@@ -329,10 +329,6 @@ msgstr "Elija un archivo SVG."
 msgctxt "footstrap"
 msgid "Please choose an image file."
 msgstr "Por favor, seleccione un archivo de imagen."
-
-#: ucode/template/themes/footstrap/sysauth.ut:70
-msgid "Please enter your username and password."
-msgstr "Por favor, ingrese su nombre de usuario y contraseña."
 
 #: htdocs/luci-static/resources/fs-search.js:220
 msgctxt "footstrap"
@@ -575,7 +571,7 @@ msgctxt "footstrap"
 msgid "Uploading…"
 msgstr "Cargando…"
 
-#: ucode/template/themes/footstrap/sysauth.ut:74
+#: ucode/template/themes/footstrap/sysauth.ut:72
 msgid "Username"
 msgstr "Nombre de usuario"
 
@@ -620,6 +616,9 @@ msgctxt "footstrap"
 msgid ""
 "the uploaded file could not be removed either; it is still on the router."
 msgstr "tampoco se pudo eliminar el archivo subido; sigue en el router."
+
+#~ msgid "Please enter your username and password."
+#~ msgstr "Por favor, ingrese su nombre de usuario y contraseña."
 
 #~ msgctxt "footstrap"
 #~ msgid ""
