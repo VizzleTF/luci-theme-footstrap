@@ -1143,6 +1143,15 @@ rule in place: the Command column sat at 126px against a widest token of 353px, 
 column's `overflow-wrap` three different ways produced the same 126px and the same "the table fits"
 every time.
 
+### Tables: one frame for every `.fs-dt`
+
+The frame, corner and placeholder rules in `theme/30-tables.css` select `.table.fs-dt`, not
+`table.fs-dt`. A div-based table outside `.cbi-section` and without `[id]` (luci-app-roamd, GitHub
+#67) matched none of them, kept the generic `.table { overflow: hidden }`, became the sticky header's
+scroll container, and its `.th` sat one bar-height (46px) over the first body row at scroll 0 in layout
+top (webkit, chromium). `fs-select.js` puts `table` on every `.fs-dt`, so real tables lose nothing.
+`overflow: clip` on the generic rule is not the fix: it clips popups. `table-contract.mjs` check 2e holds it.
+
 ### Responsive: the disk gauge value moves below the bar
 
 The bar's `::after` value ("63% used …") normally floats above the bar, but the System page's "Disk
