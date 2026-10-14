@@ -676,6 +676,11 @@ its face, size and leading live in `theme/60-inputs.css`. So does the *size* an 
 767px, `design-system.md` "Scales"); base has no classed rule that sets an input's size, so
 stating it in the theme's generic field box outranks nothing it should not.
 
+The same box states `line-height: var(--fs-leading)`: base's `input` inherits `normal`, and DejaVu
+Sans Mono's underscore bottom (yMin -483) equals its hhea descent, so Chrome on Linux clipped the
+`_` at the line box (forum, Ubuntu/Wayland). Derived from font metrics, not reproduced in headless
+chromium; `--fs-control-h` is a fixed `height`, so the field does not grow.
+
 ### Forms: the label column's `min-width: 0` survives the responsive layer
 
 `.cbi-value-title` sits in a flex row (`.cbi-value`) at `flex: 0 0 180px`; `theme/90-responsive.css`
