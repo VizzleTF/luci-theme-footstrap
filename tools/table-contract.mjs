@@ -360,6 +360,26 @@ const clipped = await page.evaluate(() => {
 for (const el of clipped)
 	fails.push(`a .cbi-dropdown sits inside a scroll container (${el}) — its open list will be clipped and mis-sized`);
 
+/* 2e. every .fs-dt frame, div or real table, shares one overflow: the generic `.table` rule's
+ * overflow:hidden made a bare div table the sticky header's scroll container, one bar-height off
+ * its first row (GitHub #67). */
+const frame = await page.evaluate(() => {
+	document.documentElement.setAttribute('data-layout', 'top');
+	window.scrollTo(0, 0);
+	const bad = [];
+	for (const t of document.querySelectorAll('.table.fs-dt:not(.fs-stacked)')) {
+		const o = getComputedStyle(t).overflow;
+		if (o !== 'visible') bad.push(`${t.tagName.toLowerCase()}#${t.id || '-'} overflow:${o}`);
+	}
+	const t = document.querySelector('[data-fs-bare]');
+	const th = t && t.querySelector('.tr.table-titles .th');
+	const off = th ? Math.round(th.getBoundingClientRect().top - th.parentElement.getBoundingClientRect().top) : null;
+	return { bad, off };
+});
+for (const b of frame.bad) fails.push(`a .table.fs-dt computes ${b} — it becomes the sticky header's scroll container`);
+if (frame.off === null) fails.push('no bare div `.table.fs-dt` in docs/gallery.html — the sticky frame was not measured');
+else if (frame.off !== 0) fails.push(`a bare div .table.fs-dt: the first .th sits ${frame.off}px off its .tr at scroll 0 (layout top)`);
+
 await browser.close();
 close();
 

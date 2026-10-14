@@ -119,7 +119,7 @@
 	/* contour (border-collapse:separate, or the radius is silently dropped); #view too —
 	 * Startup renders .table.fs-dt with no section */
 	.cbi-section .table[id], #view .table[id],
-	.cbi-section .table.fs-dt, .cbi-section table.fs-dt, table.fs-dt {
+	.cbi-section .table.fs-dt, .cbi-section table.fs-dt, .table.fs-dt {
 		border-collapse: separate; border-spacing: 0;
 		border: var(--fs-hairline); border-radius: var(--fs-radius-lg);
 		/* EXPLICIT: the generic .table rule below still says overflow:hidden, clipped otherwise */
@@ -130,20 +130,20 @@
 	 * kept square top corners. */
 	.cbi-section .table[id] :is(.tr.table-titles, .thead) .th:first-child,
 	#view .table[id] :is(.tr.table-titles, .thead) .th:first-child,
-	table.fs-dt :is(.tr.table-titles, .thead) .th:first-child { border-start-start-radius: var(--fs-radius-lg); }
+	.table.fs-dt :is(.tr.table-titles, .thead) .th:first-child { border-start-start-radius: var(--fs-radius-lg); }
 	.cbi-section .table[id] :is(.tr.table-titles, .thead) .th:last-child,
 	#view .table[id] :is(.tr.table-titles, .thead) .th:last-child,
-	table.fs-dt :is(.tr.table-titles, .thead) .th:last-child { border-start-end-radius: var(--fs-radius-lg); }
+	.table.fs-dt :is(.tr.table-titles, .thead) .th:last-child { border-start-end-radius: var(--fs-radius-lg); }
 	.cbi-section .table[id] .tr:last-child .td:first-child,
 	#view .table[id] .tr:last-child .td:first-child,
-	table.fs-dt .tr:last-child .td:first-child { border-end-start-radius: var(--fs-radius-lg); }
+	.table.fs-dt .tr:last-child .td:first-child { border-end-start-radius: var(--fs-radius-lg); }
 	.cbi-section .table[id] .tr:last-child .td:last-child,
 	#view .table[id] .tr:last-child .td:last-child,
-	table.fs-dt .tr:last-child .td:last-child { border-end-end-radius: var(--fs-radius-lg); }
+	.table.fs-dt .tr:last-child .td:last-child { border-end-end-radius: var(--fs-radius-lg); }
 	/* empty table: L.ui.Table adds .tr.placeholder; spanning it is base's job, framed flavour left here */
 	.cbi-section .table[id] .tr.placeholder .td,
 	#view .table[id] .tr.placeholder .td,
-	table.fs-dt .tr.placeholder .td {
+	.table.fs-dt .tr.placeholder .td {
 		padding-block: var(--fs-space-2); /* this layer's own cell padding made the plate 4px tall */
 		text-align: start;
 		color: var(--fs-dim); font-family: var(--fs-font-sans);
