@@ -135,3 +135,10 @@ test('readonly is AND down the path: one writable acl re-opens it', () => {
 	assert.equal(m.readonlyForSegs([ 'admin' ]), false,
 		'nothing on the path is acl-gated, so the dispatcher grants write');
 });
+
+test('nodeForSegs walks to a node, and a childless leaf or a miss gives null instead of throwing', () => {
+	const m = tree({ admin: { title: 'admin', satisfied: true, children: { a: view('a') } } });
+	assert.equal(m.nodeForSegs([ 'admin', 'a' ]).title, 'a');
+	assert.equal(m.nodeForSegs([ 'admin', 'a', 'x' ]), null);
+	assert.equal(m.nodeForSegs([ 'nope' ]), null);
+});

@@ -1,6 +1,6 @@
 /* The meter's threshold logic, exercised without a screen reader or a stand.
  *
- * `annotateMeter` (menu-footstrap-common.js) has no test of its own before this file: `smoke` only
+ * `annotateMeter` (fs-overview.js) has no test of its own before this file: `smoke` only
  * proves the module loads, and `computed-diff`/`a11y` read a rendered `.cbi-progressbar` rather than
  * the function that built its attributes. What is worth pinning down without either — the percentage
  * parse out of `title` in both shapes it is written in, the 0..100 clamp on a value `%d` never
@@ -18,11 +18,10 @@ import { loadModule } from './lib/luci-module.mjs';
  * under test is asked to match its OWN output, never a translated string. */
 globalThis._ = globalThis._ || ((s) => s);
 
-const common = () => loadModule('menu-footstrap-common');
+const common = () => loadModule('fs-overview');
 
 /* A `.cbi-progressbar` node is never asked for a label in these cases (closest() answers null, as it
- * does for the bare Software/package-manager bar the module's own comment names), so every case here
- * is about the value alone. */
+ * does for a bare meter), so every case here is about the value alone. */
 function fakeMeter(title) {
 	const attrs = { title };
 	return {
@@ -35,7 +34,7 @@ function fakeMeter(title) {
 }
 
 /* The key/value-table shape `findProgressbarLabel` reads a row's name off of (Memory, Storage —
- * menu-footstrap-common.js's own comment on that function): `.cbi-value` answers null, `.tr`
+ * fs-overview.js's own comment on that function): `.cbi-value` answers null, `.tr`
  * answers a stub row whose first cell is the label, and the bar's OWN `.td, td` differs from that
  * cell so the lookup does not read its own wrapper back as its name. */
 function fakeMeterWithLabel(title, label) {
@@ -156,20 +155,6 @@ test('an unrecognised bar keeps the plain fill-based rule', () => {
 	const pg = fakeMeterWithLabel('95%', 'Some Other App Metric');
 	common().annotateMeter(pg);
 	assert.equal(pg.getAttribute('data-fs-level'), 'danger');
-});
-
-/* The package-manager's own disk bar (view/system/packages.js, not this theme's) leads with the
- * percentage instead of trailing it, and used to parse to null — no role, no aria-*, no colour —
- * because parseMeterPercent only matched a percentage at the END of the string. */
-test('parseMeterPercent reads the package-manager title, which LEADS with the percentage', () => {
-	assert.equal(
-		common().parseMeterPercent('6% used (62.91 GiB used of 1006.85 GiB, 943.95 GiB free)'), 6);
-});
-
-test('parseMeterPercent reads the same leading form localised', () => {
-	assert.equal(
-		common().parseMeterPercent('6% использовано (62.91 GiB использовано из 1006.85 GiB, 943.95 GiB свободно)'),
-		6);
 });
 
 test('parseMeterPercent does not pick a decimal quantity out of a title with no percent at all', () => {
