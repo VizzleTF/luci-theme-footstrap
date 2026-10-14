@@ -2,7 +2,7 @@
 
 A LuCI theme for OpenWrt 24.10 and newer. It depends only on `luci-base`, styles every LuCI page
 including third-party `luci-app-*` pages, and leaves alone what an app styles itself. It works on a phone and installs to its home screen,
-and has 21 appearance settings (layout, palette, density, colours, wallpaper) that apply without a
+and has 22 appearance settings (layout, palette, density, colours, wallpaper) that apply without a
 reload.
 
 [Русский](README_ru.md) · [Playground: the theme in your browser, no router needed](https://vizzletf.github.io/luci-theme-footstrap/playground/)

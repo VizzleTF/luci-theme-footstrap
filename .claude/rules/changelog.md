@@ -17,7 +17,7 @@ Enforced by `.claude/hooks/precommit-gate.sh`, which denies a `git commit` whose
 substantive files and not both changelog files, and then runs `npm run changelog`. The hook is the
 defence; this page is the reason, and the prose below is the half no gate can check.
 
-- List entries with `grep -n '^- \*\*' CHANGELOG.md`, never cat/awk the `[Unreleased]` block: it has run to 81 KB.
+- List entries with `grep -n '^- \*\*' CHANGELOG.md`, never cat/awk the `[Unreleased]` block: it has run to 90 KB.
 - `npm run changelog` also fails when the newest released `## [X]` differs from `git show vX:CHANGELOG.md`
   (a rebase or cherry-pick moved an entry into it). `node tools/changelog.mjs add <0-6> --en '- **…**' --ru '- **…**'`
   puts one bullet pair into both files' `[Unreleased]` (0 = Added … 6 = Performance), in the worktree and the index only.

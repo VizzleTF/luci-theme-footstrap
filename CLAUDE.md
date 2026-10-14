@@ -57,10 +57,10 @@ measure, and how the theme is checked without a router.
 npm run check                              # T1: every gate; exit 0 before pushing
 npm run check:fast                         # T1: the static subset, no browser and no CSS build
 npm test                                   # T0: the unit suite alone (node --test, no browser)
-npm run smoke                              # T1: modules come up in a real DOM (~1.4 s)
-npm run computed-diff                      # T1: worktree vs HEAD, computed styles (~4 s)
+npm run smoke                              # T1: modules come up in a real DOM (~2.1 s)
+npm run computed-diff                      # T1: worktree vs HEAD, computed styles (~8.7 s)
 tools/bg.sh <cmd>                          # T2: detach, log into ../tmp/ (refuses ssh, dev-sync, push)
-tools/bg-wait.sh <run-id>                  # the waiter; stops on status, a dead pid, or the 2 h cap
+tools/bg-wait.sh <run-id>                  # the waiter; stops on status, a dead pid, or the 2 h cap (a full `ci-local` run takes `30 10800`)
 tools/ci-local.sh --list                   # T2: build.yml's jobs, locally, in the same order; --force for the router legs
 node tools/build-icons.mjs                 # re-raster the app icons after a logo.svg change
 owlab up | owlab sync --watch | owlab open owrt2512
@@ -85,7 +85,7 @@ just edited (the map is in each `.claude/rules/` file and in `docs/conventions.m
 `ucode -T -c -o /dev/null` over each template touched. Nothing else runs by reflex.
 
 **T1 — on an explicit request, 5 min.** `npm run check` once, when the branch is otherwise finished.
-`npm run smoke` and `npm run computed-diff` after a JS or CSS change: seconds each.
+`npm run smoke` and `npm run computed-diff` after a JS or CSS change: smoke ~2.1 s, computed-diff ~8.7 s.
 
 **T2 — never blocked on.** `owlab up|test`, the live gates, `bench/nav-benchmark.py`,
 `jsmin-verify`, the full token-stream compare. Started detached through `tools/bg.sh` and paired,

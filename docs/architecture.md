@@ -85,8 +85,8 @@ Variables a theme template gets: `theme`, `media`, `resource`, `ctx`, `dispatche
 
 ### Where footstrap differs
 
-- **One template directory**, `ucode/template/themes/footstrap/`. `header.ut` is thin; `<head>`,
-  brand, notices, logout and search live in `partials/*.ut`. Sidebar and top bar are **not a second
+- **One template directory**, `ucode/template/themes/footstrap/`. `header.ut` is thin; `<head>` and
+  the notices live in `partials/head.ut` and `partials/notice.ut`. Sidebar and top bar are **not a second
   template** — they are `:root[data-layout]` plus CSS.
 - **`data-page` is built from the dispatch path**, `join('-', length(ctx.path) ? ctx.path :
   ctx.request_path)` — the reverse of bootstrap's order. On a firstchild route (`/admin/status`
@@ -95,7 +95,7 @@ Variables a theme template gets: `theme`, `media`, `resource`, `ctx`, `dispatche
 - The first element in `<body>` is a skip link; the content container is
   `<main class="fs-main" id="maincontent" tabindex="-1">`; the menu is `<nav class="fs-sidebar">`.
   Not `<aside>` — that carries the `complementary` role, which no landmark jump reaches.
-- The document heading is `<h1 class="fs-title-main">` inside `.fs-title.fs-sr`, **clipped, not
+- The document heading is `<h1 class="fs-title-main">` carrying `.fs-sr`, **clipped, not
   `hidden`**: `hidden` is `display:none`, which drops the element out of the accessibility tree, so
   the `<h1>` effectively did not exist while the SPA router dutifully updated it.
 - `partials/head.ut` sends `cascade.css`, `node.css` and `cbi.js` with `?v={{ pkgs_update_time }}`
@@ -126,17 +126,18 @@ this theme has no catalogue for — see [conventions.md](conventions.md).
 
 ## The menu is entirely client-side
 
-The server header emits empty containers by id; client JS fills them. The footer loads the renderer
-with `L.require('menu-footstrap')`, then `L.require('fs-select')`.
+The server header emits empty containers by id; client JS fills them. The footer loads the entry
+with `L.require('menu-footstrap')` (it only calls `menu-footstrap-common`; `fs-chrome` is the
+renderer), then `L.require('fs-select')`.
 
 Menu JS lives in `htdocs/luci-static/resources/` — **not** in the theme directory — because
 `L.require()` resolves against `resourcebase`. From there it pulls its dependencies through
 `'require <module> as <name>'` pragmas:
 
 ```
-menu-footstrap        → ui, fs-fit, fs-prefs, fs-widgets, menu-footstrap-common
-menu-footstrap-common → ui, fs-fit, fs-menutree, fs-chrome, fs-router,
-                        fs-prefs, fs-sheets, fs-search
+menu-footstrap        → menu-footstrap-common
+menu-footstrap-common → ui, fs-menutree, fs-chrome, fs-router,
+                        fs-prefs, fs-sheets
 fs-select             (no requirer — the footer loads it directly)
 fs-overview           (PAGE MODULE — required by menu-footstrap-common when
                          body[data-page] says the page is theirs, see below)
@@ -144,24 +145,28 @@ fs-overview           (PAGE MODULE — required by menu-footstrap-common when
 
 The graph is acyclic and the runtime enforces it: `require()` throws `DependencyError` on a cycle.
 
-**One module is loaded by PAGE, not by pragma.** `fs-overview` reshapes Status → Overview, watches
-`body[data-page]` and does nothing anywhere else, because that page is `luci-mod-status`'s own — a
+**One module is loaded by PAGE, not by pragma.** `fs-overview` reshapes Status → Overview and
+does nothing anywhere else, because that page is `luci-mod-status`'s own — a
 theme may register a dispatcher node of its own (`fs-appearance` does, below), but that adds a
 route, it does not hand over one another package already owns. A `'require'` pragma, though, is a
 hard dependency — luci.js evaluates the module before the requirer's factory runs, on every admin
 page — so `menu-footstrap-common.js`
 carries a map from `data-page` to module name and requires the module when that page appears
-(server-stamped or router-stamped, the same attribute either way). The module is unchanged, including
-its own observer: `wire()` re-checks the page synchronously, so one that arrives after the stamp
-still starts watching. The map repeats a page name the module also tests, and `npm run page-modules`
-derives both sides and fails if they drift.
+(server-stamped or router-stamped, the same attribute either way). The loader owns the observer on
+`body[data-page]` and calls the module's `onPage()` on every stamp; `wire()` re-checks the page
+synchronously, so one that arrives after the stamp is still picked up. The map repeats a page name
+the module also tests, and `npm run page-modules` derives both sides and fails if they drift.
 
 `fs-appearance` (the Appearance controls) used to be the map's other entry, stapled onto System →
 System the same way. It now owns a route of its own, `/admin/system/footstrap`
 (`root/usr/share/luci/menu.d/luci-theme-footstrap.json`, dispatched to
 `view/footstrap/appearance.js`), which requires it by pragma like any ordinary view — an ordinary
 dependency, not a page-watching module, because a theme with a route no longer needs the
-`body[data-page]` workaround for the page it owns.
+`body[data-page]` workaround for the page it owns. What the route replaced: a MutationObserver on
+`#maincontent` watching for the stock form's tab strip, a 5 s deadline, a `body[data-page]` tracker,
+a stale-group WeakSet so the outgoing page's DOM could not false-match, and a sessionStorage flag so
+a reset's reload landed back on the tab — and a Save & Apply on a real router still lost the tab
+once, never reproduced on a stand.
 
 **There is no update checker, and nothing that loads one.** The installer adds the owfeed-packages
 feed, so `apk upgrade` / `opkg upgrade` carries the theme forward, and a settings page has no
@@ -196,7 +201,7 @@ footstrap does not, because mode, palette and layout are client axes. Details:
 /www/luci-static/footstrap/            cascade.css (generated), fonts/, logo.svg
                                        (+ pattern.svg — a symlink to /etc/footstrap, uploaded)
 /www/luci-static/resources/            menu-footstrap.js, menu-footstrap-common.js, fs-*.js
-/usr/lib/lua/luci/i18n/footstrap-theme.<lang>.lmo    catalogue, bundled INSIDE the theme package
+/usr/lib/lua/luci/i18n/footstrap.<lang>.lmo    shipped by luci-i18n-footstrap-<lang>, not the theme package
 /usr/share/rpcd/acl.d/luci-theme-footstrap.json      ACL: uci footstrap + login-bg upload
 /etc/uci-defaults/30_luci-theme-footstrap            registration
 ```
@@ -217,35 +222,54 @@ sections (System left, Memory/Storage right) and draws no content of its own.
 
 ## The SVG sanitizer's residual, verified-safe findings
 
-`fs-assets.js`'s `_sanitizeSvg` — the wallpaper PATTERN upload only (`PATTERN.prepare`, fs-assets.js:475);
+`fs-assets.js`'s `_sanitizeSvg` — the wallpaper PATTERN upload only (`PATTERN.prepare`);
 the login-background upload is a photo, downscaled by `_downscale`, never parsed as XML — walks the
-parsed DOM once and strips script-capable elements, event-handler attributes, `javascript:` URLs,
-`xml:base` and any `style` `url(`. A 2026-09 security review found three residual gaps that stay open
-on purpose, because each is closed by something outside this file rather than by the walk itself —
-record kept here since the code comment limit (`docs/conventions.md`, "Comments") is 1-2 lines.
+parsed DOM once. Elements and references are judged by what may stay; script-capable SVG elements,
+event handlers and off-document CSS are still matched by name:
+
+- **Elements:** only the SVG namespace. Every element in another namespace goes — XHTML, MathML and
+  an editor's metadata alike — and so do `<foreignObject>` and the SVG elements that can run script.
+  An animation (`animate`, `set`, `animateTransform`, `animateMotion`, `animateColor`) goes only when
+  its `attributeName` is a URL-valued attribute (`href`, `ping`, any prefix): WebKit followed
+  `<animateTransform attributeName="href">` to a same-origin `translate(…)` path on a click. Colour,
+  rotation and motion animations stay; their `values`/`from`/`to`/`by` go through the CSS rule below.
+  The XHTML half was the hole: `<h:frame src="javascript:…">` ran with the router's session cookie on
+  a direct open without CSP in all three engines; `h:img src`/`srcset`, `h:picture`, `h:meta refresh`
+  fetched or navigated off the router in all three, `h:input type=image` in Chromium and Firefox,
+  `h:table background` in Chromium. A full Inkscape export (`sodipodi:namedview`, `rdf:RDF`) therefore reports itself
+  cleaned; nothing it draws is lost.
+- **`href` / `xlink:href` / `ping`:** every URL-valued attribute is stripped the way the WHATWG URL parser strips (every TAB/LF/CR, then
+  leading spaces — XML 1.0 admits no other C0 control; not JavaScript's `trim()`, which also eats NBSP and U+FEFF and let
+  `&#160;data:…/../x` resolve as a same-origin path), then kept only as a same-document `#fragment`,
+  or as a raster `data:` URL (png, jpeg, gif, webp, avif, bmp) on an `<image>`.
+- **CSS:** an attribute with no namespace (the presentation attributes and `style`) and a `<style>`
+  element's direct text are dropped when, CSS-unescaped, they reach off-document: `url(` to anything
+  but a `#fragment`, `@import`, `expression(`, `image-set(`, `image(`, `src(`, `cross-fade(`. The image
+  functions match only as a function token, the name directly followed by `(`, so
+  `inkscape:label="image (2)"` stays; `url` and `expression` also match with whitespace before `(`.
+  Whitespace means CSS whitespace only (space, TAB, LF, CR, FF): `url(&#160;#a)` is a path to CSS, not
+  a fragment, and fetched `/%C2%A0` before.
+  A `style` attribute loses the offending declaration, any other attribute is removed. CR LF, CR and FF are folded
+  to LF before escapes are decoded (CSS Syntax §3.3), so `u\72&#13;&#10;l(` is still `url(`. A
+  `<style>` with an element child is removed whole: the CSS engine reads only the direct text, and
+  `<style>@imp<x>z</x>ort …</style>` reads as `@import` while its `textContent` does not.
+- **`xml:base`** is removed.
+
+A self-contained `<style>` stays: in image mode it cannot fetch or run anything, and stripping it lost
+the look of every pattern drawn by a design tool. One residual stays open on purpose, because it is
+closed by something outside this file rather than by the walk itself — record kept here since the
+code comment limit (`docs/conventions.md`, "Comments") is 1-2 lines.
 
 - **A `<!DOCTYPE svg SYSTEM "…">` prologue** is a document-level construct the walk never visits
   (`doc.doctype` is left as parsed) and survives `XMLSerializer` byte for byte. Costs nothing today:
   no shipping engine resolves an external DTD for any document, `image/svg+xml` included, and a
   direct open of the file is answered by the CGI's `Content-Security-Policy: default-src 'none';
   sandbox`. Starts mattering the day some consumer resolves an external DTD, or the file is served
-  without that header.
-- **`href="javas&#9;cript:alert(1)"`** (a literal TAB via XML attribute-value normalisation, which
-  does not fold numeric character references the way HTML does) reaches the walk as a DOM string
-  `/^javascript:/i` does not match, and round-trips through `XMLSerializer` unchanged. It still
-  resolves to `javascript:` in a real browser (WHATWG URL strips TAB/LF/CR from the scheme before
-  comparing it) but never resolves as a URL here: this bundle only ever leaves the router as a
-  `mask-image`/`background-image`/`<img>` source, none of which reads `href` as navigable, and a
-  direct open carries the same CSP as above.
-- **A presentation attribute** (`fill`, `stroke`, `filter`, `clip-path`, `mask`, `cursor` — SVG 1.1
-  §11, §15) that carries a `url(` is a plain attribute value to this walk, not a CSS declaration, so
-  `<rect fill="url(//evil.example/x.svg#g)"/>` passes untouched — only `_sanitizeStyleValue`'s
-  `style`-attribute path is checked. The only reach is a second fetch (no script, no navigation),
-  and the bundle is never rendered with its own resource-loading context. Starts mattering the day a
-  presentation `url()` gets a fetch path this parser-only pass does not already block, or the tile
-  stops being image-only.
+  without that header. Internal entities and `ATTLIST` defaults land in the DOM before the walk and
+  are judged like any other node; `XMLSerializer` drops the internal subset.
 
-None is closed within `_sanitizeSvg` because closing it means guessing at a grammar (every control
-character a URL parser discards, every presentation attribute the SVG spec lets carry a `url()`)
-the file exists to avoid — the walk judges elements and attributes it owns, not a second document
-model. `xml:base` (an actual finding, not residual) IS closed, at the same call site.
+The 2026-10 review measured every case above with the file opened directly and no CSP — the worst
+sink — in Chromium, Firefox and WebKit: 0 outside requests and no script after the walk. The image
+sinks (`<img>`, `mask-image`, `background-image`) made 0 requests even with the raw file; the CGI's
+CSP is the second wall, and the CGI does not validate the bytes itself (an admin's direct
+`cgi-upload` POST skips the client walk).
