@@ -11,14 +11,6 @@
 		}
 	}
 
-	/* every surface is already opaque except the wallpaper's wash */
-	@media (prefers-reduced-transparency: reduce) {
-		:root {
-			/* flattens the photo wash to opaque (16-login-bg.css) */
-			--fs-photo-scrim: var(--fs-bg);
-		}
-	}
-
 	/* re-states the tokens so every rule reading them follows — docs/css.md "A11y: prefers-contrast token shifts, and the numbers behind them" has why each number */
 	@media (prefers-contrast: more) {
 		/* theme layer outranks the tokens-layer twins (04-nocolormix.css): without color-mix an unguarded

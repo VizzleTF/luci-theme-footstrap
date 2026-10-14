@@ -254,9 +254,9 @@ pattern wallpaper at full strength, the bar sitting over scrolled content — an
 moved **0.04%** of pixels: what the translucency bought was the page showing through the chrome,
 which reads as a glitch rather than as glass. Every `backdrop-filter`, prefixed or not, is gone
 from the sheet ([css.md](css.md) "Vendor prefixes still in the sheet"), so
-`prefers-reduced-transparency` (`theme/95-a11y-media.css`) now has nothing left to opt out of — the
-theme is opaque already, and its handler only flattens the one thing that still varies: the wash
-over an uploaded photo. **`--fs-scrim` is the theme's one colour literal and stays one**: black at
+`prefers-reduced-transparency` has nothing to opt out of — the theme is opaque already. It once
+flattened the wash over an uploaded photo; that handler is gone, because it erased the admin's
+chosen photo on Edge/Vivaldi/Opera with "Transparency effects" off (#66). **`--fs-scrim` is the theme's one colour literal and stays one**: black at
 .7 is the absence of light behind a dialog, not a shade of any token.
 
 ## Scales
@@ -471,7 +471,7 @@ The uploaded photo (`file`) instead paints on one element only (`.fs-shell`, or 
 pre-login): `--fs-photo-scrim` as a second `background-image` layer over the photo on the SAME
 element, no `::before` and no `backdrop-filter` — a blur over a full-viewport surface is the most
 expensive paint a phone GPU does, and the scrim already carries the legibility;
-`prefers-reduced-transparency` turns the scrim opaque instead (`95-a11y-media.css`).
+`prefers-reduced-transparency` is not honoured here — an opaque scrim hid the photo (#66).
 
 Three more `fs-` keys are not axes: `fs-rail` (the sidebar collapsed to an icon rail,
 toggled in the chrome), `fs-menu-open` (the remembered set of open accordion sections) and
