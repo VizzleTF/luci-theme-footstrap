@@ -1159,8 +1159,11 @@ so it meets this rule in the same layer; luci-app-filemanager `#file-table`'s `.
 (0,2,1) used to win by source order and lost to (0,3,0) on owrt2512: Name and Permissions padding-left
 5 -> 12px, Type padding-right 5 -> 12px, Size header 15 -> 12px, Size cells 10 -> 12px, and the 70px
 Permissions column clipped more ("rwxr-..." -> "rwxr..."). Changing only that selector back restored
-the numbers. `table-contract.mjs` check 2f holds it with a real table and a mock app rule in the gallery.
-`fs-select.js` tags `.table, table` with `fs-dt`; the form is `table` or `div` in practice, a `.table`
+the numbers. `table-contract.mjs` check 2f holds it: the cell padding with a real table and a mock app
+rule in the gallery, and each of the eight keys (padding `.td`/`.th`, the frame, four corners, the
+placeholder) by selector in the built sheet, so a `.table.fs-dt` revert of any one fails the gate. The
+rules that were `.table.fs-dt` in v0.14.14 (the break floor, the `!important` word-break, the sticky
+header, `overflow-anchor`) keep it. `fs-select.js` tags `.table, table` with `fs-dt`; the form is `table` or `div` in practice, a `.table`
 on another tag would match neither. The frame group keeps `.cbi-section .table.fs-dt` and
 `.cbi-section table.fs-dt` at their v0.14.14 specificity. The `table.fs-dt` selectors left in
 `pages/50-leases.css` are leases-only real tables.
