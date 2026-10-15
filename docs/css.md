@@ -1162,9 +1162,10 @@ Permissions column clipped more ("rwxr-..." -> "rwxr..."). Changing only that se
 the numbers. `table-contract.mjs` check 2f holds it: the cell padding with a real table and a mock app
 rule in the gallery, and each of the eight keys (padding `.td`/`.th`, the frame, four corners, the
 placeholder) by selector in the built sheet, so a `.table.fs-dt` revert of any one fails the gate. The
-rules that were `.table.fs-dt` in v0.14.14 (the break floor, the `!important` word-break, the sticky
-header, `overflow-anchor`) keep it. `fs-select.js` tags `.table, table` with `fs-dt`; the form is `table` or `div` in practice, a `.table`
-on another tag would match neither. The frame group keeps `.cbi-section .table.fs-dt` and
+rules that were `.table.fs-dt` in v0.14.14 keep it: the break floor, the `!important` word-break, the
+sticky header, `overflow-anchor`, the fit gate (`:root[data-fs-fit] … .table.fs-dt:not(.fs-fitted)`)
+and the `.fs-stacked` card rules. `fs-select.js` tags `.table, table` with `fs-dt`; the form is
+`table` or `div` in practice, a `.table` on another tag would match neither. The frame group keeps `.cbi-section .table.fs-dt` and
 `.cbi-section table.fs-dt` at their v0.14.14 specificity. The `table.fs-dt` selectors left in
 `pages/50-leases.css` are leases-only real tables.
 
