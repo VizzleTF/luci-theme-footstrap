@@ -28,9 +28,9 @@ const PIN = FLAGS.pin;
 /* Pinned by `--pin` to 2 % over the build; a cut that leaves 8-11 % slack is re-pinned,
  * since slack that wide stops the ratchet catching growth. */
 const LIMITS = {
-	cascadeCss: 118_060,
-	resourcesJs: 88_430,
-	coldJs: 54_820,
+	cascadeCss: 118_080,
+	resourcesJs: 88_100,
+	coldJs: 54_790,
 };
 
 function bytes(path) {
