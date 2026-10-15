@@ -74,9 +74,10 @@
 	}
 
 	/* --- DATA tables ([id] or JS-tagged .fs-dt) --- `:is()` at ONE specificity: split, a table
-	 * known only by the tag (Status -> Routing) lost to key/value's default. Every fs-dt rule below
-	 * keys on `:is(table, div).fs-dt` (0,1,1): `.table.fs-dt .td` (0,3,0) beat an app's
-	 * `.table td:nth-child(1)` (0,2,1), filemanager padding-left 5 -> 12px (docs/css.md). */
+	 * known only by the tag (Status -> Routing) lost to key/value's default. The padding, frame, corner
+	 * and placeholder rules key on `:is(table, div).fs-dt` (0,1,1) as v0.14.14's `table.fs-dt`, plus
+	 * the bare div: `.table.fs-dt .td` (0,3,0) beat an app's `.table td:nth-child(1)` (0,2,1),
+	 * filemanager padding-left 5 -> 12px (docs/css.md). The rules that were `.table.fs-dt` stay so. */
 	.cbi-section .table:is([id], .fs-dt) .td,
 	.cbi-section .table:is([id], .fs-dt) .th,
 	:is(table, div).fs-dt .td, :is(table, div).fs-dt .th { padding: var(--fs-space-2-5) var(--fs-space-3); }

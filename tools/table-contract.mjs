@@ -380,8 +380,25 @@ for (const b of frame.bad) fails.push(`a .table.fs-dt computes ${b} — it becom
 if (frame.off === null) fails.push('no bare div `.table.fs-dt` in docs/gallery.html — the sticky frame was not measured');
 else if (frame.off !== 0) fails.push(`a bare div .table.fs-dt: the first .th sits ${frame.off}px off its .tr at scroll 0 (layout top)`);
 
-/* 2f. an app's own column padding on a real fs-dt table must still win: the cell rule scores (0,2,1)
- * as `table.fs-dt .td` did; at (0,3,0) filemanager's `.table td:nth-child(1)` (0,2,1) lost, 5px -> 12px. */
+/* 2f. an app's own rules meet a real fs-dt table in the SAME layer, so each rule v0.14.14 keyed on
+ * `table.fs-dt` must still score as it did: `:is(table, div).fs-dt` is (0,1,1) like `table.fs-dt` and
+ * reaches the bare div; `.table.fs-dt` is (0,2,0), a class higher, and filemanager's `.table
+ * td:nth-child(1)` (0,2,1) lost to the cell rule, 5px -> 12px. The sheet lists every key, the render
+ * measures the cell rule. The `.table.fs-dt` rules that were never `table.fs-dt` are not listed. */
+const DT_KEY = ':is(table, div).fs-dt';
+const dtKeys = new Set();
+csstree.walk(ast, {
+	visit: 'Rule',
+	enter(node) {
+		if (node.prelude.type === 'SelectorList') node.prelude.children.forEach((s) => dtKeys.add(csstree.generate(s)));
+	}
+});
+for (const tail of [ '', ' .td', ' .th',
+	' :is(.tr.table-titles, .thead) .th:first-child', ' :is(.tr.table-titles, .thead) .th:last-child',
+	' .tr:last-child .td:first-child', ' .tr:last-child .td:last-child', ' .tr.placeholder .td' ])
+	if (!dtKeys.has(csstree.generate(csstree.parse(DT_KEY + tail, { context: 'selector' }))))
+		fails.push(`no rule keys on \`${DT_KEY}${tail}\` — \`.table.fs-dt\` scores (0,2,0), a class above \`table.fs-dt\`'s (0,1,1), so an app's same-layer rule on a real table loses; a plain \`table.fs-dt\` misses the bare div table`);
+
 const appPad = await page.evaluate(() => {
 	const td = document.querySelector('[data-fs-app-pad] td:first-child');
 	return td ? getComputedStyle(td).paddingLeft : null;
