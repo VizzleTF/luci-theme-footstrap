@@ -74,10 +74,12 @@
 	}
 
 	/* --- DATA tables ([id] or JS-tagged .fs-dt) --- `:is()` at ONE specificity: split, a table
-	 * known only by the tag (Status -> Routing) lost to key/value's default. */
+	 * known only by the tag (Status -> Routing) lost to key/value's default. Every fs-dt rule below
+	 * keys on `:is(table, div).fs-dt` (0,1,1): `.table.fs-dt .td` (0,3,0) beat an app's
+	 * `.table td:nth-child(1)` (0,2,1), filemanager padding-left 5 -> 12px (docs/css.md). */
 	.cbi-section .table:is([id], .fs-dt) .td,
 	.cbi-section .table:is([id], .fs-dt) .th,
-	.table.fs-dt .td, .table.fs-dt .th { padding: var(--fs-space-2-5) var(--fs-space-3); }
+	:is(table, div).fs-dt .td, :is(table, div).fs-dt .th { padding: var(--fs-space-2-5) var(--fs-space-3); }
 	.cbi-section .table:is([id], .fs-dt) .td { font-family: var(--fs-font-mono); font-size: var(--fs-type); color: var(--fs-text); }
 
 	/* the min-content FLOOR belongs here: break-word (unlike base's -anywhere) does not lower
@@ -119,7 +121,7 @@
 	/* contour (border-collapse:separate, or the radius is silently dropped); #view too —
 	 * Startup renders .table.fs-dt with no section */
 	.cbi-section .table[id], #view .table[id],
-	.cbi-section .table.fs-dt, .cbi-section table.fs-dt, .table.fs-dt {
+	.cbi-section .table.fs-dt, .cbi-section table.fs-dt, :is(table, div).fs-dt {
 		border-collapse: separate; border-spacing: 0;
 		border: var(--fs-hairline); border-radius: var(--fs-radius-lg);
 		/* EXPLICIT: the generic .table rule below still says overflow:hidden, clipped otherwise */
@@ -130,20 +132,20 @@
 	 * kept square top corners. */
 	.cbi-section .table[id] :is(.tr.table-titles, .thead) .th:first-child,
 	#view .table[id] :is(.tr.table-titles, .thead) .th:first-child,
-	.table.fs-dt :is(.tr.table-titles, .thead) .th:first-child { border-start-start-radius: var(--fs-radius-lg); }
+	:is(table, div).fs-dt :is(.tr.table-titles, .thead) .th:first-child { border-start-start-radius: var(--fs-radius-lg); }
 	.cbi-section .table[id] :is(.tr.table-titles, .thead) .th:last-child,
 	#view .table[id] :is(.tr.table-titles, .thead) .th:last-child,
-	.table.fs-dt :is(.tr.table-titles, .thead) .th:last-child { border-start-end-radius: var(--fs-radius-lg); }
+	:is(table, div).fs-dt :is(.tr.table-titles, .thead) .th:last-child { border-start-end-radius: var(--fs-radius-lg); }
 	.cbi-section .table[id] .tr:last-child .td:first-child,
 	#view .table[id] .tr:last-child .td:first-child,
-	.table.fs-dt .tr:last-child .td:first-child { border-end-start-radius: var(--fs-radius-lg); }
+	:is(table, div).fs-dt .tr:last-child .td:first-child { border-end-start-radius: var(--fs-radius-lg); }
 	.cbi-section .table[id] .tr:last-child .td:last-child,
 	#view .table[id] .tr:last-child .td:last-child,
-	.table.fs-dt .tr:last-child .td:last-child { border-end-end-radius: var(--fs-radius-lg); }
+	:is(table, div).fs-dt .tr:last-child .td:last-child { border-end-end-radius: var(--fs-radius-lg); }
 	/* empty table: L.ui.Table adds .tr.placeholder; spanning it is base's job, framed flavour left here */
 	.cbi-section .table[id] .tr.placeholder .td,
 	#view .table[id] .tr.placeholder .td,
-	.table.fs-dt .tr.placeholder .td {
+	:is(table, div).fs-dt .tr.placeholder .td {
 		padding-block: var(--fs-space-2); /* this layer's own cell padding made the plate 4px tall */
 		text-align: start;
 		color: var(--fs-dim); font-family: var(--fs-font-sans);

@@ -1145,13 +1145,25 @@ every time.
 
 ### Tables: one frame for every `.fs-dt`
 
-The frame, corner and placeholder rules in `theme/30-tables.css` select `.table.fs-dt`, not
-`table.fs-dt`. A div-based table outside `.cbi-section` and without `[id]` (luci-app-roamd, GitHub
-#67) matched none of them, kept the generic `.table { overflow: hidden }`, became the sticky header's
-scroll container, and its `.th` sat one bar-height (46px) over the first body row at scroll 0 in layout
-top (webkit, chromium). `fs-select.js` puts `table` on every `.fs-dt`, so real tables lose nothing.
-The cell padding (`.td, .th`) keys on `.table.fs-dt` too: on `table.fs-dt` the bare div specimen kept 8px where a real table has 10px. The `table.fs-dt` selectors left in `pages/50-leases.css` are leases-only real tables.
+The frame, corner, placeholder and cell-padding rules in `theme/30-tables.css` select
+`:is(table, div).fs-dt`, not `table.fs-dt`. A div-based table outside `.cbi-section` and without `[id]`
+(luci-app-roamd, GitHub #67) matched none of them, kept the generic `.table { overflow: hidden }`,
+became the sticky header's scroll container, and its `.th` sat one bar-height (46px) over the first body
+row at scroll 0 in layout top (webkit, chromium); its cells kept 8px where a real table has 10px.
 `overflow: clip` on the generic rule is not the fix: it clips popups. `table-contract.mjs` check 2e holds it.
+
+The key is `:is(table, div).fs-dt` and not `.table.fs-dt` because of specificity: `:is()` scores its
+most specific argument, so `:is(table, div).fs-dt .td` is (0,2,1), exactly `table.fs-dt .td`, while
+`.table.fs-dt .td` is (0,3,0). An app's column padding is fenced into `@layer theme` (`fs-sheets.js`),
+so it meets this rule in the same layer; luci-app-filemanager `#file-table`'s `.table td:nth-child(1)`
+(0,2,1) used to win by source order and lost to (0,3,0) on owrt2512: Name and Permissions padding-left
+5 -> 12px, Type padding-right 5 -> 12px, Size header 15 -> 12px, Size cells 10 -> 12px, and the 70px
+Permissions column clipped more ("rwxr-..." -> "rwxr..."). Changing only that selector back restored
+the numbers. `table-contract.mjs` check 2f holds it with a real table and a mock app rule in the gallery.
+`fs-select.js` tags `.table, table` with `fs-dt`; the form is `table` or `div` in practice, a `.table`
+on another tag would match neither. The frame group keeps `.cbi-section .table.fs-dt` and
+`.cbi-section table.fs-dt` at their v0.14.14 specificity. The `table.fs-dt` selectors left in
+`pages/50-leases.css` are leases-only real tables.
 
 ### Responsive: the disk gauge value moves below the bar
 
