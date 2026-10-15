@@ -210,8 +210,6 @@
 		background: var(--fs-panel);
 		color: var(--fs-text);
 		font-size: var(--fs-type-field);
-		/* not `normal`: DejaVu Sans Mono's underscore bottom (-483) equals its hhea descent, so Chrome clipped it at the line box (forum, Ubuntu/Wayland) */
-		line-height: var(--fs-leading);
 		border: var(--fs-hairline);
 		border-radius: var(--fs-radius);
 	}
