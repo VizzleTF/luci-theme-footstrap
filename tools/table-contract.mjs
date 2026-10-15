@@ -380,6 +380,15 @@ for (const b of frame.bad) fails.push(`a .table.fs-dt computes ${b} — it becom
 if (frame.off === null) fails.push('no bare div `.table.fs-dt` in docs/gallery.html — the sticky frame was not measured');
 else if (frame.off !== 0) fails.push(`a bare div .table.fs-dt: the first .th sits ${frame.off}px off its .tr at scroll 0 (layout top)`);
 
+/* 2f. an app's own column padding on a real fs-dt table must still win: the cell rule scores (0,2,1)
+ * as `table.fs-dt .td` did; at (0,3,0) filemanager's `.table td:nth-child(1)` (0,2,1) lost, 5px -> 12px. */
+const appPad = await page.evaluate(() => {
+	const td = document.querySelector('[data-fs-app-pad] td:first-child');
+	return td ? getComputedStyle(td).paddingLeft : null;
+});
+if (appPad === null) fails.push('no `[data-fs-app-pad]` table in docs/gallery.html — an app\'s column padding was not measured');
+else if (appPad !== '5px') fails.push(`a real .fs-dt table: an app's \`td:nth-child(1) { padding-left: 5px }\` computes ${appPad} — the fs-dt cell rule scores above table.fs-dt`);
+
 await browser.close();
 close();
 

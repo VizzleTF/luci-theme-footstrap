@@ -72,6 +72,24 @@
 </div>
 
 <div class="g-sec">
+	<h2>Real table with an app's own column padding</h2>
+	<!-- luci-app-filemanager #file-table: `.table td:nth-child(1) { padding-left: 5px }` (0,2,1) is
+	     re-hosted into `@layer theme`, so it meets the fs-dt cell padding in the SAME layer and only
+	     specificity and order decide. The mock below is the same (0,2,1) and sits after the sheet;
+	     the theme's `.td` rule must not score above it. table-contract.mjs holds it. -->
+	<style>
+		@layer theme {
+			.g-app-pad td:nth-child(1) { padding-left: 5px; }
+		}
+	</style>
+	<table class="table fs-dt g-app-pad" id="g_app_pad" data-fs-app-pad="1">
+		<tr class="tr table-titles"><th class="th">Name</th><th class="th">Size</th></tr>
+		<tr class="tr"><td class="td" data-title="Name">firmware.bin</td><td class="td" data-title="Size">8.2 MB</td></tr>
+		<tr class="tr"><td class="td" data-title="Name">backup.tar.gz</td><td class="td" data-title="Size">41 KB</td></tr>
+	</table>
+</div>
+
+<div class="g-sec">
 	<h2>Typography &amp; text elements</h2>
 	<div class="cbi-section">
 		<h1>Heading 1</h1><h2>Heading 2</h2><h3>Heading 3</h3>
