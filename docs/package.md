@@ -382,7 +382,7 @@ The theme is now also carried by the official [openwrt/luci](https://github.com/
 feed, where `luci.mk` stamps a version from git's commit date instead of this project's own
 numbering (`luci-theme-footstrap-26.246.70755~4fd72fd`, measured on 25.12.4/apk-tools 3.0.5, next
 to owfeed's own `0.14.10-r1`). That stamp only grows with the calendar, so a bare
-`apk add --upgrade "$PKG"` resolves to the highest version across *every* configured repository —
+`apk add --upgrade "$PKG"` (or `apk upgrade "$PKG"`) resolves to the highest version across *every* configured repository —
 the other publisher's build, not an upgrade to this one (field report: "Upgraded …
 -> 26.246.70755~4fd72fd"). `apk version -t` confirms `26.246.70755~4fd72fd` and `27.1.1~abc` both
 compare `>` against `26`, while `0.14.10-r1`, `1.0.0-r1` and `25.99.99-r1` all compare `<` — so
@@ -397,8 +397,16 @@ takes.
 
 `apk add` alone never upgrades — a package already in `world` and satisfied exits 0 unchanged,
 prints its usual OK line, and changes nothing (issues #16, #28, #30; reproduced on a 25.12 stand
-carrying 0.12.5 with 0.12.7 in the feed). `--upgrade` is what asks for the newest the feed carries,
-and it also installs on a router that has none yet, so one line covers both paths.
+carrying 0.12.5 with 0.12.7 in the feed). So the script runs two commands: `apk add "$PKG<26"`
+installs on a fresh router and writes the constraint into `world` (the repair above is this step —
+the solver must satisfy `world`, so a foreign `26.*` build is downgraded here), then
+`apk upgrade "$PKG"` moves the theme alone to the newest build the constraint allows. Not
+`apk add --upgrade`: apk-tools' `app_add.c` sets the upgrade flag on the named package *and makes
+it inheritable* (`apk_solver_set_name_flags(name, flags, flags)`), so every dependency down from
+`luci-base` — ucode, rpcd, uhttpd, libc — is upgraded too. `app_upgrade.c` sets it with no
+inheritance (`…, 0)`) once a package is named, so a dependency moves only when the new theme
+actually requires a newer one. The catalogues take the same two steps. opkg's
+`opkg upgrade "$PKG"` already upgrades the named package alone.
 
 ## uci-defaults: registration
 

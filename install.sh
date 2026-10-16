@@ -304,7 +304,7 @@ install_language() {
 		if [ "$PM" = apk ]; then
 			# Same collision as the theme's own `apk add` below: `$_lpkg` exists in both feeds, and
 			# the official one's LuCI-stamped version always outranks this project's.
-			pm_quiet apk add --upgrade "$_lpkg<26" || {
+			{ pm_quiet apk add "$_lpkg<26" && pm_quiet apk upgrade "$_lpkg"; } || {
 				warn "Could not install $_lpkg — the theme stays in English."; return 0; }
 		else
 			pm_quiet opkg install "$_lpkg" || pm_quiet opkg upgrade "$_lpkg" || {
@@ -648,12 +648,12 @@ feed_refresh "$PM" || exit 1
 
 info "Installing $PKG..."
 if [ "$PM" = apk ]; then
-	# `apk add` alone never upgrades — a package already in `world` and satisfied exits 0 unchanged
-	# (issues #16, #28, #30). `--upgrade` asks for the newest the feed carries and covers a fresh
-	# install too. `<26` excludes every LuCI-stamped official-feed build (only grows with the
-	# calendar) while leaving this project's own numbering room to grow — DO NOT tighten to `<1`.
-	# docs/package.md, "install.sh".
-	pm_quiet apk add --upgrade "$PKG<26" || exit 1
+	# `apk add` installs and holds `world` at `<26` (excludes every LuCI-stamped official-feed build,
+	# DO NOT tighten to `<1`) but never upgrades a satisfied package (issues #16, #28, #30).
+	# `apk upgrade <name>` upgrades that name alone; `add --upgrade` would upgrade its whole
+	# dependency tree, i.e. half the router. docs/package.md, "install.sh".
+	pm_quiet apk add "$PKG<26" || exit 1
+	pm_quiet apk upgrade "$PKG" || exit 1
 else
 	# `opkg install` on an installed package is a no-op even with a newer feed version — exit 0,
 	# "already installed" — so a second run must ask for the upgrade explicitly. No `<26`

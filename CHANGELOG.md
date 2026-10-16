@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Fixed
+
+- **Re-running the installer upgrades the theme alone, not every package on the router.** On apk (25.12+) it ran `apk add --upgrade luci-theme-footstrap`, and apk-tools makes that flag inheritable: every dependency down from `luci-base` — ucode, rpcd, uhttpd, libc — was upgraded along with the theme whenever the feed had something newer. It now runs `apk add "luci-theme-footstrap<26"` (fresh install, and the `world` constraint that keeps the official-feed build out) followed by `apk upgrade luci-theme-footstrap`, which upgrades the named package only; a dependency moves only when the new theme requires it. The translation catalogues take the same two steps. The opkg leg (24.10) already upgraded the theme alone.
+
 ## [0.14.15] — 2026-10-15
 
 ### Changed
