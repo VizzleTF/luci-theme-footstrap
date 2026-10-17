@@ -974,6 +974,22 @@ option two</textarea></div>
 				<td class="td" data-title="MAC">E6:EF:BA:54:DE:32</td><td class="td" data-title="Lease time">9h 10m 51s</td>
 				<td class="td cbi-section-actions"><button class="cbi-button cbi-button-apply">Reserve IP</button></td>
 			</tr>
+			<!-- 60_wifi.js puts a ui.ComboButton straight into the td (macfilter on): the arrow must stay on the label's line -->
+			<tr class="tr cbi-rowstyle-2">
+				<td class="td" data-title="Hostname">Phone</td><td class="td" data-title="IPv4 address">10.11.12.132</td>
+				<td class="td" data-title="MAC">E6:EF:BA:54:DE:33</td><td class="td" data-title="Lease time">2h 01m 10s</td>
+				<td class="td cbi-section-actions">
+					<div class="cbi-dropdown btn cbi-button cbi-button-remove" tabindex="0" data-idref="g-combo-stacked">
+						<ul tabindex="-1">
+							<li data-value="0" selected display="0">Disconnect</li>
+							<li data-value="1">Add to Blacklist</li>
+						</ul>
+						<span class="more" tabindex="-1">···</span>
+						<span class="open" tabindex="-1">▾</span>
+						<div><input type="hidden" value="0"></div>
+					</div>
+				</td>
+			</tr>
 		</table>
 	</div>
 

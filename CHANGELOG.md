@@ -3,6 +3,7 @@
 ### Fixed
 
 - **Re-running the installer upgrades the theme alone, not every package on the router.** On apk (25.12+) it ran `apk add --upgrade luci-theme-footstrap`, and apk-tools makes that flag inheritable: every dependency down from `luci-base` — ucode, rpcd, uhttpd, libc — was upgraded along with the theme whenever the feed had something newer. It now runs `apk add "luci-theme-footstrap<26"` (fresh install, and the `world` constraint that keeps the official-feed build out) followed by `apk upgrade luci-theme-footstrap`, which upgrades the named package only; a dependency moves only when the new theme requires it. The translation catalogues take the same two steps. The opkg leg (24.10) already upgraded the theme alone.
+- **The "Disconnect" button with a dropdown in the phone layout of the wireless clients list is one line again.** Status shows a split Disconnect / "Add to Blacklist" button when the SSID has a MAC filter; in the stacked card its arrow wrapped under the label (65.6px tall instead of 40px) because the action-cell rule set `flex-wrap: wrap` on the dropdown itself. It now spans the card like the plain buttons (212px at 360px), and a long selected label ellipsizes instead of pushing the cell 127px past the card. The gallery carries the case so `computed-diff` sees it.
 
 ## [0.14.15] — 2026-10-15
 

@@ -339,9 +339,16 @@
 	}
 	/* LuCI groups buttons in ONE inner <div>, so this flex-wrap never fires and .fs-main clipped
 	 * the tail button. PINNED to the config table's copy. */
-	.table.fs-stacked .td.cbi-section-actions > * {
+	.table.fs-stacked .td.cbi-section-actions > :not(.cbi-dropdown) {
 		/* @mirror table-card/actions-inner */
 		flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: var(--fs-space-2);
+		/* @endmirror */
+	}
+	/* width: 0 — the label's nowrap min-content (288px for a Russian item at 360px) sizes the table-row-group
+	 * past the card (td right 442 vs 315); the item still grows to the line. PINNED. */
+	.table.fs-stacked .td.cbi-section-actions > .cbi-dropdown {
+		/* @mirror table-card/actions-dropdown */
+		flex: 1 1 auto; width: 0; min-width: 0;
 		/* @endmirror */
 	}
 	/* nothing in a half-width cell may force the row wider than the viewport — .fs-main clips,

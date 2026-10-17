@@ -365,9 +365,16 @@
 		.table.cbi-section-table .td.cbi-section-actions::before { content: none; }
 		/* LuCI groups the row's buttons in ONE inner div, so the td's own wrap never fires — the
 		 * div is a single flex item. PINNED to the data table's copy, same trap on Startup. */
-		.table.cbi-section-table .td.cbi-section-actions > * {
+		.table.cbi-section-table .td.cbi-section-actions > :not(.cbi-dropdown) {
 			/* @mirror table-card/actions-inner */
 			flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: var(--fs-space-2);
+			/* @endmirror */
+		}
+		/* width: 0 — the label's nowrap min-content (288px for a Russian item at 360px) sizes the table-row-group
+		 * past the card (td right 442 vs 315); the item still grows to the line. PINNED. */
+		.table.cbi-section-table .td.cbi-section-actions > .cbi-dropdown {
+			/* @mirror table-card/actions-dropdown */
+			flex: 1 1 auto; width: 0; min-width: 0;
 			/* @endmirror */
 		}
 		.table.cbi-section-table .td .zone-forwards { width: 100%; }
