@@ -25,38 +25,30 @@ issues #1–#5 and #7–#11 mandatory. **Always mandatory regardless of the diff
 section, plus issue #6 (packaging and asset selection), because #6 breaks at the release level and
 nothing fails until a router in the field pulls the update.
 
-## 2. The full pre-tag matrix
+## 2. The pre-tag matrix: CI on the release sha, read job by job
 
-All four, and every one of them read rather than merely started. The three long ones are T2: start
-them detached with `tools/bg.sh` and report the run-ids, then read the logs.
+The gates run in CI; a local re-run of them on the same sha is not part of a release (67 min,
+nine stands, no new information — `docs/releasing.md` step 2). Before the tag:
 
 | Must be green | How |
 |---|---|
-| `npm run check` | one run, exit 0. Every static gate |
-| `owlab test`, **both formats** | two invocations, one per format — never one run with two `--release` flags |
-| the wide live gates | one call per gate — `npm run live -- …` does not forward its flags, `docs/releasing.md` |
+| CI on the release code's `main` push: `check`, `lint`, `build`, `verify` (apk+ipk), `live` (incl. `audit-ru`), `anchors` (3 engines + `scroll-jank`) | `gh run view <id>`, every job read; a red one gets an owner first |
+| `npm run changelog`, `node tools/size-budget.mjs --pin` | locally |
 | `/security-review` | on the final branch diff, **before** the tag |
+| stale `live-audit` baseline | dispatch the workflow on `main` so `deep` runs; if it reports any, prune with every `live-audit-seen-deep-*` artifact, `docs/releasing.md` "The stale `live-audit` baseline" |
 
-```sh
-./tools/stage.sh && owfeed build
-owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' --assert …
-owlab test --release 24.10.8 --install 'dist/all/luci-theme-footstrap_*.ipk'   --assert …
-```
-
-`--install` is a host-side glob evaluated per router, so `dist/*/…` hands the apk box an ipk as well
-and the install fails on both (measured: `0 of 2 routers passed`). The five assertions and the exact
-flags: `docs/development.md`. `tools/jsmin-verify.mjs` is not in `check` — CI runs it.
-
-**A release is not cut until every log above has been read.** A detached run nobody opened is not a
-green gate, and the tier a check sits in never changes what the release requires.
+`deep` (`--pages-all`, per router) does not run on a push: dispatch the workflow on `main` and read
+it before the tag. `release-assets` runs only on the tag: a red one there is a fix and a new patch
+tag. **A release is not cut until every job has been read**, on `main` before the tag and on the tag
+after it.
 
 ## 3. Asset selection (issue #6), separately and always
 
 The most fragile part of every release and the only one that fails silently: the notes and the asset
 choice are evaluated at tag time, in the field, months later. The `build` job asserts exactly N
 assets per format, each resolving through its own name-anchored regex `^<name>[-_][^/]*\.EXT$` to
-exactly one. Simulate it against the shape of the coming release — the loop is in
-`docs/releasing.md` step 3.
+exactly one; `release-assets` asks the same of the published release on the tag. Until that job
+has been green on a real tag, also simulate it by hand — the loop is in `docs/releasing.md` step 3.
 
 ## 4. The runbook
 

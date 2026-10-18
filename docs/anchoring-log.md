@@ -1665,6 +1665,18 @@ A residual check two frames later was carried for that engine and is gone with t
 the column to the containers: the collapse it answered no longer happens, and its own correction
 landed inside a flick (**161px**, webkit/Overview, `tools/scroll-anchor.mjs`).
 
+## Firefox once shows the refill-2/3 shape too
+
+The `REPEAT` refill that leaves the reader ~60px off with `corrected never` was recorded for WebKit
+and Chromium only. On 2026-10-16 CI read it on Firefox for the first time: `firefox owrt2512 @390
+side large engine-anchoring on /admin/network/dhcp: refill 2/3 on the same section left the reader
+-60px off (engineTrusted true, corrected never)`, one cell red of 144, run 38942860712 on 327b8cd,
+which changed only `install.sh`. Chromium and WebKit on the same sha were green. **1 of 25** CI runs
+of the job red; locally the same cell on 61a3c24 read **0 of 5** (`reader moved 0px`, corrected in
+5-7ms): `tools/rate.sh 5 node tools/scroll-anchor.mjs --only owrt2512 --engines firefox --full
+--page /admin/network/dhcp --width 390 --layout side`. Cause not established; a second sighting
+makes it a pattern to ablate, not noise.
+
 ## The gates watch the reader's place, not the mechanism
 
 `tools/table-tick.mjs` asserted that `.table.fs-dt:not(.fs-fitted)` had zero height, which is the

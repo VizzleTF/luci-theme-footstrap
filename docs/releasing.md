@@ -32,48 +32,71 @@ git status --short | grep -E 'styles/|menu-footstrap|\.ut$|fs-sheets|fs-select|f
 and asset selection) — because #6 breaks at the release level rather than in the code, and
 nothing fails until a router in the field pulls the update.
 
-## Step 2 — the automatic gates
+## Step 2 — the automatic gates: read CI on the release sha
 
-One run closes most of the guards. It must exit 0.
+The gates run in CI, not again on this machine. The code of the release is on `main` before the
+release commit is cut, and its push run is read **job by job** (`gh run view <id>`): a local re-run
+of the same gates on the same sha measured 67 min over nine stands and added no information —
+six of them are twins of the same three images, and every local live gate was a subset of CI's
+(`scroll-anchor` locally: one engine, no `--full`; CI: three engines, `--full`).
+
+| CI job | What it holds |
+|---|---|
+| `check`, `lint` | every static gate below, `jsmin-verify`, `computed-diff` (a report on PRs, never a failure) |
+| `build` | both formats; `tools/check-packages.sh` — one theme package per format, catalogues outside it |
+| `verify` | `owlab test` on 25.12/apk and 24.10/opkg, the five assertions of [development.md](development.md#proving-it-on-a-router-owlab-test) |
+| `live` | `spa-parity`, `live-audit` (EN), `live-audit --lang ru` on 25.12 and 24.10 (`audit-ru`), `motion` (`upstream-contract`, `table-tick`, `floor-contract`, `fit-quiet`, `install-check`) |
+| `anchors` | `scroll-anchor --full` and `scroll-jank` on chromium, firefox and webkit |
+| `deep` (tag, `workflow_dispatch`) | `live-audit` and `spa-parity` with `--pages-all`, one shard per router |
+| `release-assets` (tag only) | the published release resolves to one asset per format per package name (step 3) |
+
+What stays local, beside reading CI:
 
 ```sh
-npm run check
+npm run changelog
+node tools/size-budget.mjs --pin
 ```
+
+and `/security-review` on the diff this release carries, before the tag. It is not a gate and cannot
+be — it reads a diff rather than a tree — which is why it is named here: the pass is worth the
+minute on the five things a theme can actually get wrong (the installer's signature chain, new
+shell running over a build tree, the unauthenticated login template, sinks in the browser JS, the
+packaging pipeline), and a maintainer has asked outright whether one was done.
+
+The guards inside `check`, by the issue that left them:
 
 | Issue | What went wrong | The guard inside `check` |
 |---|---|---|
 | #3, #8 | theme styles stopped applying on a foreign package's page (filemanager, OpenClash `*{padding:0!important}`) | `chrome-fence` — the fence/pin/dark-guard still match the chrome; `fs-sheets` re-hosts the foreign sheet |
 | #5 | the `low`/`medium`/`high` ramp was three aliases of one colour, so "no data" lit up like a live value | `export-tier` (three DIFFERENT colours), `audit --strict` |
 | forum 82-83 | the `placeholder` attribute and the unset dropdown row were drawn in the body inks, so an option's DEFAULT read as a value the reader had typed | `placeholder-ink` (a hint is ≥40% light / ≥30% dark of the ink-to-field range away from the value, and still 3:1, with every combination re-run under `prefers-contrast: more`) |
-| #6 | localisation ships as separate `luci-i18n-*` packages, and assets sorted by name can be picked instead of the theme | `i18n` (catalogue current and complete); `tools/check-packages.sh` asserts exactly one theme package per format, but runs in CI's build job rather than inside `check` |
+| #6 | localisation ships as separate `luci-i18n-*` packages, and assets sorted by name can be picked instead of the theme | `i18n` (catalogue current and complete); `tools/check-packages.sh` in CI's `build` |
 | #9, #11 | config-table row labels and a data-table column vanished or were squeezed | `css-dup` + `mirror` (`@mirror table-card/*`) |
+| the ComboButton report | a split button wrapped its arrow under the label in a stacked action cell; the gallery had no such widget, so no gate saw it | `gallery-coverage` — every (widget, container) pair the styles distinguish has a fixture in `docs/gallery.html` |
 | all | a rule lost its `!important` or started depending on source order | `css-metrics`, stylelint `selector-max-specificity`, `audit --strict`, `css-orphans` |
 | — | the template pre-paint drifted from the live appearance appliers | `axes` |
 | — | `[Unreleased]` without a bold lead, or the RU mirror out of sync → an empty release note | `changelog` |
 
-`tools/jsmin-verify.mjs` is not in `check` (it needs a jsmin binary built from the pin) — CI runs
-it. Locally the cause is covered by eslint's `wrap-regex`, inside `lint`.
-
-`/security-review` runs beside it, on the diff this release carries, before the tag. It is not a
-gate and cannot be — it reads a diff rather than a tree — which is why it is named here instead:
-the pass is worth the minute on the five things a theme can actually get wrong (the installer's
-signature chain, new shell running over a build tree, the unauthenticated login template, sinks in
-the browser JS, the packaging pipeline), and a maintainer has asked outright whether one was done.
+A push does not run `deep`, so before the tag dispatch the workflow on `main` (`gh workflow run
+build.yml --ref main`) and read that run too: it is the early stop for the wide gates and the
+evidence for the baseline prune below. **`release-assets` runs only on the tag**, so a red one there
+costs a fixed commit and a new patch tag.
 
 ## Step 3 — asset selection (issue #6), separately and always
 
 This is the most fragile part of every release and the only one that fails silently: the release
 notes and the asset choice are evaluated at tag time, in the field, months later.
 
-- **The CI gate** (`build` job): exactly N assets per format, each package resolving through its own
-  **name-anchored** regex `^<name>[-_][^/]*\.EXT$` to exactly one. A `.sig` ends in `.EXT.sig` and
-  does not match `\.EXT$`.
+- **The CI gates**: `build` asserts exactly N assets per format, each package resolving through its
+  own **name-anchored** regex `^<name>[-_][^/]*\.EXT$` to exactly one (a `.sig` ends in `.EXT.sig`
+  and does not match `\.EXT$`); `release-assets` asks the same of the **published** release.
 - **The reader in the field** is `install.sh`, and it never guesses: on a router the feed cannot
   serve it reads the signed `manifest.txt` and matches `$2` against the package name exactly, which
   is what makes a release carrying `luci-theme-footstrap` and two `luci-i18n-footstrap-<lang>`
-  packages safe where #6 was not. The release must still resolve to one file per format **per
-  name**, for a by-hand install and for the Pages mirror. Simulate it against the shape of the
-  coming release:
+  packages safe where #6 was not.
+
+Until `release-assets` has been green on a real tag, the by-hand simulation below stays mandatory
+(a gate replaces a manual check only once it has run):
 
 ```sh
 # on a dev router, RELJSON = the release JSON of the intended shape
@@ -86,45 +109,14 @@ done
 
 ## Step 4 — live checks for the areas the diff touched
 
-Run on both releases (25.12/apk and 24.10/opkg). Compare against stock bootstrap
-wherever you are unsure — it is the reference for LuCI behaviour.
+The wide live gates are CI's `deep` job (step 2). What remains here is the human look at the issues
+below, on both releases (25.12/apk and 24.10/opkg), for the areas the diff touched. Compare against
+stock bootstrap wherever you are unsure — it is the reference for LuCI behaviour.
 
-**A release runs the WIDE version of the automatic live gates first:**
-
-**`npm run live -- …` cannot carry those flags**: `live` chains eight `npm run` calls with `&&`,
-and npm takes the forwarded flags as its own config, so no gate receives them, `anchor` included.
-Measured on 2026-09-01: the composed line the shell echoes ends `… && npm run anchor --all
---pages-all`, and `live-audit` logged `node tools/live-audit.mjs` with no arguments. Each gate is
-called by hand, `--all` on every one and `--pages-all` only on the two that parse it (`parseArgs`
-is strict, so any other gate exits on an unknown flag):
-
-```sh
-node tools/live-audit.mjs  --all --pages-all   # every OpenWrt router owlab boots, every page
-node tools/spa-parity.mjs  --all --pages-all
-node tools/table-tick.mjs  --all
-node tools/scroll-anchor.mjs --all
-node tools/scroll-jank.mjs --all
-node tools/floor-contract.mjs --all
-node tools/fit-quiet.mjs --all
-node tools/upstream-contract.mjs --all         # what the theme assumes of luci-base, asked on each
-```
-
-**And the package on both formats, before the tag.** `npm run live` measures a *synced* tree; a
-release is *installed*, and that is a different claim — two `owlab test` invocations, one per
-format, never one run with two `--release` flags (`--install` is a host-side glob evaluated per
-router, so `dist/*/…` hands the apk box an ipk too: `0 of 2 routers passed`). The five assertions
-and the exact flags are in [development.md](development.md#proving-it-on-a-router-owlab-test); the
-fifth is the `ucode -T -c` sweep over every installed template.
-
-```sh
-./tools/stage.sh && owfeed build
-owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' --assert …
-owlab test --release 24.10.8 --install 'dist/all/luci-theme-footstrap_*.ipk'   --assert …
-```
-
-Both of these are long runs: start them detached with `tools/bg.sh` and read the logs out of
-`../tmp/`. **A release is not cut until every log above has been read** — a detached run nobody
-opened is not a green gate, and the tier a check sits in never changes what the release requires.
+**`npm run live -- …` cannot carry flags**: `live` chains eight `npm run` calls with `&&`, and npm
+takes the forwarded flags as its own config, so no gate receives them. Call a gate by hand when one
+needs re-running locally, on the core stands only (`--only owrt2512,owrt2410,owrtsnap`): the twins
+are the same images, kept for parallel measurement (`owlab.yaml`).
 
 **23.05 used to have a line of its own here, and no longer does.** It was the oldest release the
 theme claimed and the only one whose `luci-base` was missing a widget the theme uses:
@@ -134,12 +126,6 @@ field by a user on 23.05.5 rather than by a gate. Support for that release ended
 EOL, and openwrt/luci declined to carry the compatibility code in the tree the theme now lives in
 (#8978). `install.sh` pins that version for a 23.05 router and says it is the last one; the stand
 and the contract entry that guarded it are gone with the fallback they guarded.
-
-Day to day those gates measure three routers and one page per shape, which is what makes them cheap
-enough to run before a push (`docs/development.md`). A release is the one moment where the axes they
-trade away are worth paying for: a page that shares a shape with another is only *probably* the same
-to this theme. Read the reduction lines either way — they name every page that was stood in for.
-ImmortalWrt is not measured by any gate (`tools/lib/stands.mjs`).
 
 | Issue | Page | What to look at |
 |---|---|---|
@@ -158,6 +144,25 @@ served `latest/download/manifest.txt` against the built one), but a manifest fai
 on the page**: the theme looks fine while installation breaks for new users and the update badge
 breaks for existing ones — on someone else's router, weeks later. That is exactly the failure shape
 this file exists for.
+
+### The stale `live-audit` baseline
+
+A baseline entry no run reproduces is a hole in the ratchet: a regression with that signature
+passes silently. Only a full sweep (`--pages-all`) can call an entry stale, so the evidence is
+CI's `deep` job, which a push does not run. Before the tag, dispatch the workflow on `main`
+(`gh workflow run build.yml --ref main`) and read `deep`'s "N baseline entr(ies) no longer
+reproduce". If N is above zero, prune from CI's evidence and a local sweep together, never from one
+machine alone — the baseline is a union across platforms. Download every
+`live-audit-seen-deep-*` artifact of that run, all three routers, or do not prune: a shard that
+stopped on an unreached or frozen page writes none (one red only on NEW findings still writes it).
+Then, on the core stands:
+
+```sh
+node tools/live-audit.mjs --only owrt2512,owrt2410,owrtsnap --pages-all \
+  --update --prune --seen-in <every live-audit-seen-deep-*.json, comma-separated>
+```
+
+The dropped entries are printed; the baseline goes into the release commit.
 
 ## The changelog contract
 
@@ -269,9 +274,10 @@ Only after everything above has passed:
    nothing to do with the diff — infrastructure or an upstream feed, not this release's code. **The
    release is not cut until the tag's own run is read, job by job, not merely waited on**: `gh run
    view <id>` for the job list, `gh run view --job <id> --log-failed` for the failing step's log; say
-   plainly whether the cause is this diff, an infrastructure condition, or an upstream feed. Only
-   then check the release carries the expected assets (plus a `.sig` for each): the theme resolving
-   to exactly one asset per format, the manifest, the installer, the notes.
+   plainly whether the cause is this diff, an infrastructure condition, or an upstream feed. `deep`
+   and `release-assets` run here and nowhere before, so this is their first reading. Only then check
+   the release carries the expected assets (plus a `.sig` for each): the theme resolving to exactly
+   one asset per format, the manifest, the installer, the notes.
 8. **Publish the feed, and do not wait on the schedule.** The theme is installed from
    owfeed-packages, so a release nobody can `apk upgrade` into is half a release. There `update.yml`
    runs `land` → `check` → `publish` on a cron GitHub thins to one run every 2-5 h. `check` pushes
