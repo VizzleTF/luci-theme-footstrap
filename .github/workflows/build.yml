@@ -76,6 +76,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          # computed-diff below needs the merge-base's tree, and a shallow clone has no base.
+          fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -98,6 +101,25 @@ jobs:
       # the binary under test is built fresh from luci-base/src/jsmin.c at a pinned commit.
       - run: echo "JSMIN=$(sh tools/build-jsmin.sh)" >> "$GITHUB_ENV"
       - run: node tools/jsmin-verify.mjs
+
+      # The CSS change as computed styles, worktree against the PR's merge-base: REPORT ONLY. The
+      # cheap half of the proof CLAUDE.md asks for ("Prove a CSS change with a computed-style
+      # diff"), put where the reviewer reads it; a diff is the point of a CSS PR, so it never fails
+      # the job — the exit code goes into the report and the step stays green.
+      - name: Computed-style diff against the merge-base (report only)
+        if: github.event_name == 'pull_request'
+        run: |
+          base=$(git merge-base HEAD^1 HEAD^2)
+          node tools/computed-diff.mjs --against "$base" > "$RUNNER_TEMP/computed-diff.txt" 2>&1 \
+            || echo "computed-diff exit $?" >> "$RUNNER_TEMP/computed-diff.txt"
+          cat "$RUNNER_TEMP/computed-diff.txt"
+      - name: Upload the computed-style report
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: computed-diff
+          path: ${{ runner.temp }}/computed-diff.txt
+          if-no-files-found: ignore
 
   # No key anywhere in this job. `owfeed check` is build, sign, index and doctor on keys owfeed
   # generates and throws away, so a pull request exercises the pipeline that publishes rather than a
@@ -265,11 +287,20 @@ jobs:
     # has no deadline of its own — task liveslice, `/admin/system/filemanager` under `13e9864`, both
     # measuring slices cancelled at 45 minutes for a day. A slice that runs long is read by looking
     # at WHICH page each gate last named, not by raising this cap.
+    #
+    # `audit-ru` is the same live-audit in Russian (`--lang ru`, strings run ~30% longer and break
+    # layouts English never reaches), one shard per router because the baseline carries
+    # `owrt2512@ru` and `owrt2410@ru` and no `owrtsnap@ru`; it runs on a pull request too, and
+    # boots only its own router (FS_ROUTERS, tools/ci-boot.sh). Estimate 12 min: live-audit's 150s
+    # a router, doubled by the second pass over the language, on top of 157s of boot.
     strategy:
       fail-fast: false
       matrix:
         slice: [ parity, audit, motion ]
-    name: The pages behave on a real router (${{ matrix.slice }})
+        include:
+          - { slice: audit-ru, router: owrt2512 }
+          - { slice: audit-ru, router: owrt2410 }
+    name: The pages behave on a real router (${{ matrix.slice }}${{ matrix.router && format(' {0}', matrix.router) || '' }})
     timeout-minutes: 45
     needs: build
     runs-on: ubuntu-latest
@@ -290,13 +321,15 @@ jobs:
       - uses: owfeed/owlab/setup@v0.6.5
 
       - name: Boot the routers and install this build
+        env:
+          FS_ROUTERS: ${{ matrix.router }}
         run: |
           set -eu
           sh tools/ci-boot.sh
 
       # Each gate measures one representative per PAGE SHAPE by default (tools/lib/page-shapes.mjs)
-      # and names the pages it stood in for; a release takes the whole menu on all four routers
-      # instead (`--all --pages-all`, docs/releasing.md).
+      # and names the pages it stood in for; a tag takes the whole menu instead, in the `deep` job
+      # below (`--pages-all`, docs/releasing.md).
       #
       # `motion` opens with upstream-contract at 7s, so a broken assumption about luci-base is still
       # reported before anything spends minutes rendering pages against it — it cannot come before
@@ -312,12 +345,13 @@ jobs:
             audit)
               node tools/live-audit.mjs --only "$O"
               ;;
+            audit-ru)
+              node tools/live-audit.mjs --only "$ROUTERS" --lang ru
+              ;;
             motion)
               node tools/upstream-contract.mjs --only "$O"
-              # Nothing may re-decide or jump while the page moves. Chromium only here: WebKit needs
-              # system libraries (gtk-4, gstreamer) this job would install on every run, and the
-              # engine differences it covers are checked locally before a release.
-              node tools/scroll-jank.mjs --only "$O"
+              # scroll-jank is NOT here: it is a step of each `anchors` shard, one engine per runner,
+              # where the browsers are already installed (this job installs chromium only).
               # The two things a poll tick can do to a page nobody is touching: lay out a replaced
               # table before anything answered for it, and move the page under the reader.
               node tools/table-tick.mjs --only "$O"
@@ -346,6 +380,58 @@ jobs:
               ;;
           esac
 
+      - if: always()
+        run: owlab down || true
+
+  # THE WHOLE MENU, on a tag. `live` measures one representative per page shape on every push; a
+  # release takes every page (`--pages-all`, docs/releasing.md step 4), which used to be a local
+  # pre-tag run and is this job now. One shard per router, spa-parity and live-audit in turn, and
+  # `release` waits on all three. Estimate 28 min a shard (parity ~6, audit ~17 on the menu's 96
+  # paths, 157s of boot), under the 45-minute cap; read which page each gate last named if one
+  # runs long — never raise the cap (see `live`). A pull request does not run it; a manual dispatch
+  # does, which is how the stale-baseline prune reads its artifacts before a tag exists.
+  #
+  # Only a full sweep decides which baseline entries are stale (live-audit.mjs), so only this job
+  # writes `--seen-out`: whether an entry is stale is decided from these files, never from one run.
+  deep:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        router: [ owrt2512, owrt2410, owrtsnap ]
+    name: Every page of the menu (${{ matrix.router }})
+    timeout-minutes: 45
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: sh tools/ci-playwright.sh
+      - uses: actions/download-artifact@v8
+        with:
+          name: owfeed-packages
+          path: dist/
+      - uses: owfeed/owlab/setup@v0.6.5
+      - name: Boot the router and install this build
+        env:
+          FS_ROUTERS: ${{ matrix.router }}
+        run: sh tools/ci-boot.sh
+      - name: Every page, both gates
+        run: |
+          set -eu
+          node tools/spa-parity.mjs --only "${{ matrix.router }}" --pages-all
+          node tools/live-audit.mjs --only "${{ matrix.router }}" --pages-all --seen-out "$RUNNER_TEMP/seen.json"
+      - name: Upload the signatures this run reproduced
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: live-audit-seen-deep-${{ matrix.router }}
+          path: ${{ runner.temp }}/seen.json
+          if-no-files-found: warn
       - if: always()
         run: owlab down || true
 
@@ -411,6 +497,11 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then FULL=""; else FULL="--full"; fi
           node tools/scroll-anchor.mjs --engines ${{ matrix.engine }} \
             --only "$(echo "$ROUTERS" | tr ' ' ,)" $FULL
+      # Nothing may re-decide or jump while the page moves, in each engine. It lived in `live`'s
+      # `motion` on chromium only, because that job installs no other browser; here all three are
+      # present, so each engine is measured once, on the runner that already has it.
+      - name: The wheel
+        run: node tools/scroll-jank.mjs --engines ${{ matrix.engine }} --only "$(echo "$ROUTERS" | tr ' ' ,)"
       - if: always()
         run: owlab down || true
 
@@ -475,7 +566,7 @@ jobs:
   # in the theme's own `fs-*.js` against a real router, caught by capture.mjs talking to nothing else.
   release:
     name: Sign and publish
-    needs: [build, verify, live, anchors, lint, playground]
+    needs: [build, verify, live, deep, anchors, lint, playground]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
@@ -498,6 +589,37 @@ jobs:
       sign-also: install.sh
       notes-file: release-notes.md
       verify-with: release.pub
+
+  # Step 3 of docs/releasing.md as a gate: the PUBLISHED release, read back, resolves to exactly one
+  # asset per format per package name. The regex is name-anchored — a `.sig` ends in `.EXT.sig`
+  # and a loose pattern once installed a language package AS the theme (issue #6). Names are the
+  # theme plus one `luci-i18n-footstrap-<lang>` per `po/<lang>`, the set check-packages.sh asserts.
+  release-assets:
+    name: The release resolves one asset per package
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' > assets.txt
+          names="luci-theme-footstrap"
+          for d in luci-theme-footstrap/po/*/; do
+            l=$(basename "$d"); [ "$l" = templates ] || names="$names luci-i18n-footstrap-$l"
+          done
+          bad=0
+          for n in $names; do
+            for ext in apk ipk; do
+              c=$(grep -Ec "^${n}[-_][^/]*\.$ext\$" assets.txt || true)
+              echo "$n .$ext -> $c"
+              [ "$c" = 1 ] || bad=1
+            done
+          done
+          exit "$bad"
 
   # A separate job, not a `package.yml` input: `dist/*` rides the manifest `release` signs, and
   # playground.tar.gz is a demo site, never router payload — owfeed's own pipeline has no input for

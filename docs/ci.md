@@ -20,12 +20,14 @@ lint ──┘          └─→ playground ─┴─→ pages-manual          
 | Job | What it is |
 |---|---|
 | `check` | `npm run check:fast` — eslint, stylelint, the unit suite, shell/marker/acl, audit.py, and the rest of the fast tier |
-| `lint` | `npm run check:mid` + `check:slow` — the artefact ratchets, axe-core, and everything else that wants a browser |
+| `lint` | `npm run check:mid` + `check:slow` — the artefact ratchets, axe-core, and everything else that wants a browser; on a pull request also `computed-diff` against the merge-base, report only (artifact `computed-diff`) |
 | `build` | both package formats, via owfeed |
 | `verify` | installs this very build on real 25.12 and 24.10 userlands and renders its pages |
 | `live` | opens every page of the menu on those userlands and measures it — layout, navigation parity, and the assumptions this theme makes about luci-base |
+| `deep` | a tag's (and a dispatch's) job: every page of the menu, `spa-parity` and `live-audit` with `--pages-all`, one shard per router |
 | `playground` | records a real router's pages into a static, replayable site and proves it offline |
 | `release` | signs, generates the notes, attaches the assets |
+| `release-assets` | reads the published release back and asserts one asset per format per package name |
 | `playground-asset` | uploads `playground.tar.gz` to the tag's release, once one exists |
 | `pages` | refreshes the GitHub Pages portal and the release mirror, from the latest release |
 | `pages-manual` | same refresh, off a manual dispatch, from THIS run's own playground instead of a release — see `pages`, below |
@@ -117,6 +119,7 @@ The npm gates live in CI only: the buildbot has no node and does not need it, an
 | `comment-share.mjs` | every shipped JS file is under 40 % comment bytes (`docs/conventions.md`, "Size") |
 | `table-contract.mjs` | the break points, and the rule that hides an unanswered data table still names every root `fs-select` scans, guarded on `:root[data-fs-fit]` — the selector half of what `table-tick.mjs` then proves on a page |
 | `chrome-fence.mjs` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
+| `gallery-coverage.mjs` | `docs/gallery.html` still renders every widget LuCI or an app can emit (a `check:fast` gate) |
 | `conffiles.mjs` | every shipped `/etc/config/*` is declared a conffile — else the manager replaces it on upgrade |
 | `changelog.mjs` | the changelog contract: sections, order, RU mirror, bold leads |
 | `jsmin-verify.mjs` | the **only** check that catches jsmin's silent corruption (exit 0) |
@@ -341,6 +344,24 @@ its own 20s, while `close()` + `newPage()` costs 0.5s and the login lives on the
 `parity` and `audit` exit non-zero. A page that never LOADED still says nothing, on purpose: that is
 the runner or the stand, not the theme, and the two must not read alike.
 
+**`audit-ru` is a fourth slice, one shard per router** (`owrt2512`, `owrt2410`): `live-audit --lang ru`
+on every push and pull request, because Russian strings run ~30% longer and break layouts English
+never reaches. The baseline carries `owrt2512@ru` and `owrt2410@ru` and no `owrtsnap@ru`, so there is
+no snapshot shard. It boots only its own router (`FS_ROUTERS`, `tools/ci-boot.sh`). Estimate 12
+minutes, from live-audit's 150s a router and a second pass over the language.
+
+**`deep` is the release's own pass, in CI.** Everything above measures one page per shape; a tag also
+takes every page of the menu (`--pages-all` on `spa-parity` and `live-audit`, `docs/releasing.md`
+step 4), which was a local pre-tag run and is a job now: one shard per router (`owrt2512`,
+`owrt2410`, `owrtsnap`), `release` waits on all three, a pull request skips them. Estimate 28 minutes
+a shard (spa-parity ~6, live-audit ~17 over the menu's 96 paths, 157s of boot) against the 45-minute
+cap, from the per-shape numbers above scaled by page count, not measured on a tag yet: the first tag's
+timings replace this line. **Stale baseline entries are decided from CI, not from one run:** only
+a full sweep decides them (`live-audit.mjs`), so `deep`'s live-audit alone writes the signatures it
+reproduced (`--seen-out`) and uploads artifact `live-audit-seen-deep-<router>`; `audit` and
+`audit-ru` write none, they could not use it. `deep` also runs on `workflow_dispatch`, so the prune
+reads these artifacts from a dispatch on `main` before the tag.
+
 Cheapest-first still holds inside `motion`, which opens with upstream-contract at 7s; it can no
 longer come before the other two slices, which are on runners of their own.
 
@@ -355,7 +376,9 @@ longer come before the other two slices, which are on runners of their own.
    file rather than replacing a router's set: the baseline is a union across platforms, and a
    machine that does not install mwan3 must not delete mwan3's findings.
 4. `tools/scroll-jank.mjs` — a real wheel, long enough to meet a poll tick, in both layouts: nothing
-   may re-decide or jump while the page moves.
+   may re-decide or jump while the page moves. A step of each `anchors` shard, `--engines <engine>`,
+   not of `motion`: that job installs chromium only, and the engine differences are now measured in
+   CI rather than locally before a release.
 5. `tools/table-tick.mjs` — the poll tick performed deliberately, with the layout forced inside the
    window fs-select answers in: a replaced data table may not be laid out before it has an answer.
 6. `tools/scroll-anchor.mjs` — content grows above the reader and the page must not move under them,
@@ -420,7 +443,7 @@ Tags only, and **it is a call into owfeed's own reusable workflow** rather than 
 
 ```yaml
 release:
-  needs: [build, verify, live, anchors, lint, playground]
+  needs: [build, verify, live, deep, anchors, lint, playground]
   if: startsWith(github.ref, 'refs/tags/v')
   uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.5
   secrets:    { sign-key: …OWFEED_AUTHOR_KEY, usign-key: …FOOTSTRAP_USIGN_KEY }
@@ -461,6 +484,14 @@ the `pkg` line. The order of the first six fields is untouchable: `install.sh` r
 and a copy already on somebody's router cannot be fixed remotely — a field inserted before them
 would make it fetch a URL that 404s. The workflow checks that order on every release rather than
 relying on it.
+
+## `release-assets` — the published release, read back
+
+Tags only, `needs: release`. `docs/releasing.md` step 3 as a gate instead of a loop to remember: for
+the theme and each `luci-i18n-footstrap-<lang>` (one per `po/<lang>`), `gh release view --json assets`
+must show exactly one asset per format through the name-anchored regex `^<name>[-_][^/]*\.EXT$`.
+A `.sig` ends in `.EXT.sig` and does not match; a loose pattern once installed a language package
+AS the theme (issue #6).
 
 ## `playground-asset` — attaching the built playground to the release
 

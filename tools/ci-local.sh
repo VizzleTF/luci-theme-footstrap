@@ -6,7 +6,7 @@
 #   tools/ci-local.sh --list                    # the job/slice map and what cannot be reproduced
 #   tools/ci-local.sh check lint build           # the three jobs that never touch a router
 #   tools/ci-local.sh verify                     # owlab test, both formats — safe with stands up
-#   tools/ci-local.sh --mode push --force live   # all three live slices, this project's own stands
+#   tools/ci-local.sh --mode push --force live   # every live slice, this project's own stands
 #   tools/ci-local.sh all --dry-run              # print every command either mode would run
 #
 # What this does NOT try to be: a sandbox, a timeout enforcer, or a replacement for the real
@@ -43,11 +43,17 @@ jobs/slices (repeatable; "all" is every one of them, in build.yml's own order):
   lint                  job `lint`    — `npm run check:mid`/`check:slow`, plus jsmin-verify
   build                 job `build`   — tools/stage.sh + owfeed plan|check|build + check-packages.sh
   verify                job `verify`  — owlab test, 25.12/apk and 24.10/opkg, the workflow's own 5 assertions
-  live                  job `live`, all three slices below
+  live                  job `live`, every slice below (audit-ru on both of its routers)
   live:parity           job `live`, slice `parity`  — spa-parity
   live:audit            job `live`, slice `audit`   — live-audit
-  live:motion           job `live`, slice `motion`  — upstream-contract, scroll-jank, table-tick,
+  live:audit-ru:owrt2512  job `live`, slice `audit-ru` — live-audit --lang ru, one router
+  live:audit-ru:owrt2410  job `live`, slice `audit-ru` — live-audit --lang ru, one router
+  live:motion           job `live`, slice `motion`  — upstream-contract, table-tick,
                          floor-contract, fit-quiet, install-check.sh
+  deep                  job `deep`, all three routers below (a tag's job: every page of the menu)
+  deep:owrt2512         job `deep`, one router — spa-parity + live-audit, both --pages-all
+  deep:owrt2410         job `deep`, one router
+  deep:owrtsnap         job `deep`, one router
   anchors               job `anchors`, all three engines below
   anchors:chromium      job `anchors`, engine chromium
   anchors:firefox       job `anchors`, engine firefox
@@ -90,7 +96,7 @@ while [ $# -gt 0 ]; do
 		usage
 		exit 0
 		;;
-	check | lint | build | verify | playground | live | live:parity | live:audit | live:motion | anchors | anchors:chromium | anchors:firefox | anchors:webkit | all)
+	check | lint | build | verify | playground | live | live:parity | live:audit | live:audit-ru:owrt2512 | live:audit-ru:owrt2410 | live:motion | deep | deep:owrt2512 | deep:owrt2410 | deep:owrtsnap | anchors | anchors:chromium | anchors:firefox | anchors:webkit | all)
 		JOBS="$JOBS $1"
 		shift
 		;;
@@ -467,11 +473,10 @@ job_live() {
 		audit) step "live:audit" echo "node tools/live-audit.mjs --only $O" ;;
 		motion)
 			step "live:motion:upstream-contract" echo "node tools/upstream-contract.mjs --only $O"
-			step "live:motion:scroll-jank" echo "node tools/scroll-jank.mjs --only $O"
 			step "live:motion:table-tick" echo "node tools/table-tick.mjs --only $O"
 			step "live:motion:floor-contract" echo "node tools/floor-contract.mjs --only $O"
 			step "live:motion:fit-quiet" echo "node tools/fit-quiet.mjs --only $O"
-			# chromium's scroll-anchor sweep is `anchors:chromium` now, not a step of this slice
+			# scroll-jank and chromium's scroll-anchor sweep are `anchors:*` now, not steps of this slice
 			step "live:motion:install-check" echo "sh tools/install-check.sh $ROUTERS"
 			;;
 		esac
@@ -493,14 +498,58 @@ job_live() {
 	audit) step "live:audit" node tools/live-audit.mjs --only "$O" ;;
 	motion)
 		step "live:motion:upstream-contract" node tools/upstream-contract.mjs --only "$O"
-		step "live:motion:scroll-jank" node tools/scroll-jank.mjs --only "$O"
 		step "live:motion:table-tick" node tools/table-tick.mjs --only "$O"
 		step "live:motion:floor-contract" node tools/floor-contract.mjs --only "$O"
 		step "live:motion:fit-quiet" node tools/fit-quiet.mjs --only "$O"
-		# chromium's scroll-anchor sweep left this slice for `anchors:chromium` (build.yml, task
-		# liveslice): same cells, its own runner, and this slice back under half its budget.
+		# scroll-jank and chromium's scroll-anchor sweep left this slice for `anchors:*` (build.yml):
+		# same cells, a runner that has every engine, and this slice back under half its budget.
 		# shellcheck disable=SC2086 # $ROUTERS is a deliberate word list, install-check.sh's own argv
 		step "live:motion:install-check" sh tools/install-check.sh $ROUTERS
+		;;
+	esac
+	owlab down >>"$RUNDIR/owlab-down.log" 2>&1 9>&- 8>&- 7>&-
+}
+
+# The one-router shards: `live` slice audit-ru (every push and PR) and job `deep` (a tag). Same
+# boot and teardown as job_live, with ROUTERS pinned to the shard's router, as FS_ROUTERS does in CI.
+job_router_shard() {
+	kind=$1
+	router=$2
+	ROUTERS=$router
+	case "$kind" in
+	audit-ru) leg="live:audit-ru:$router" ;;
+	*) leg="$kind:$router" ;;
+	esac
+	echo "== $leg (router=$router) =="
+	if [ "$DRY" = 1 ]; then
+		step "ci-playwright" echo "sh tools/ci-playwright.sh"
+		step "owlab-boot" echo "owlab up $router; owlab install $router <package>"
+		case "$kind" in
+		audit-ru) step "$leg" echo "node tools/live-audit.mjs --only $router --lang ru" ;;
+		deep)
+			step "deep:$router:spa-parity" echo "node tools/spa-parity.mjs --only $router --pages-all"
+			step "deep:$router:live-audit" echo "node tools/live-audit.mjs --only $router --pages-all --seen-out \$RUNDIR/seen-$leg.json"
+			;;
+		esac
+		return
+	fi
+	require_stand_ack "$leg" || return
+	if [ ! -d dist/noarch ] || [ ! -d dist/all ]; then
+		skip "$leg" "dist/ has no built packages — run 'tools/ci-local.sh build' first"
+		return
+	fi
+	step "ci-playwright" sh tools/ci-playwright.sh
+	echo "  booting $router and installing this build …"
+	if ! boot_and_install; then
+		skip "$leg" "owlab up/install failed — see $RUNDIR/owlab-up-install.log"
+		return
+	fi
+	seen="$RUNDIR/seen-$(printf '%s' "$leg" | tr : -).json"
+	case "$kind" in
+	audit-ru) step "$leg" node tools/live-audit.mjs --only "$router" --lang ru ;;
+	deep)
+		step "deep:$router:spa-parity" node tools/spa-parity.mjs --only "$router" --pages-all
+		step "deep:$router:live-audit" node tools/live-audit.mjs --only "$router" --pages-all --seen-out "$seen"
 		;;
 	esac
 	owlab down >>"$RUNDIR/owlab-down.log" 2>&1 9>&- 8>&- 7>&-
@@ -519,6 +568,7 @@ job_anchors() {
 			step "playwright-install-$engine" echo "npx playwright install --with-deps $engine"
 		step "owlab-boot" echo "owlab up $ROUTERS; owlab install <router> <package>"
 		step "anchors:$engine" echo "node tools/scroll-anchor.mjs --engines $engine --only $O $FULL"
+		step "anchors:$engine:scroll-jank" echo "node tools/scroll-jank.mjs --engines $engine --only $O"
 		return
 	fi
 	require_stand_ack "anchors:$engine" || return
@@ -541,6 +591,7 @@ job_anchors() {
 	else
 		step "anchors:$engine" node tools/scroll-anchor.mjs --engines "$engine" --only "$O"
 	fi
+	step "anchors:$engine:scroll-jank" node tools/scroll-jank.mjs --engines "$engine" --only "$O"
 	owlab down >>"$RUNDIR/owlab-down.log" 2>&1 9>&- 8>&- 7>&-
 }
 
@@ -558,6 +609,7 @@ check                      check                                [gettext],
                                                                  i18n-packages, makefile-contract,
                                                                  unit tests, css-orphans, mirror,
                                                                  axes, page-modules, comment-share, chrome-fence,
+                                                                 gallery-coverage,
                                                                  changelog, update-po.sh --check —
                                                                  package.json is the list)
 lint                       lint                                 ci-playwright,
@@ -574,12 +626,18 @@ verify                     verify                               owlab test x2 (2
                                                                  --mode push adds the feed-live check
 live:parity                live (slice parity)                  spa-parity
 live:audit                 live (slice audit)                   live-audit
-live:motion                live (slice motion)                  upstream-contract, scroll-jank,
-                                                                 table-tick, floor-contract, fit-quiet,
+live:audit-ru:<router>     live (slice audit-ru, owrt2512/2410) live-audit --lang ru
+live:motion                live (slice motion)                  upstream-contract, table-tick,
+                                                                 floor-contract, fit-quiet,
                                                                  install-check.sh
-anchors:chromium            anchors (engine chromium)            scroll-anchor --engines chromium
-anchors:firefox             anchors (engine firefox)             scroll-anchor --engines firefox
-anchors:webkit              anchors (engine webkit)              scroll-anchor --engines webkit
+deep:<router>              deep (owrt2512/owrt2410/owrtsnap)    spa-parity + live-audit, --pages-all
+                                                                 (a tag's job; --seen-out)
+anchors:chromium            anchors (engine chromium)            scroll-anchor + scroll-jank
+                                                                 --engines chromium
+anchors:firefox             anchors (engine firefox)             scroll-anchor + scroll-jank
+                                                                 --engines firefox
+anchors:webkit              anchors (engine webkit)              scroll-anchor + scroll-jank
+                                                                 --engines webkit
 playground                 playground                           owlab up/install owrt2512, then
                                                                  capture.mjs -> build.mjs -> verify.mjs
 all                         every job above                      in build.yml's own dependency order
@@ -592,6 +650,10 @@ print_gaps() {
 Not reproduced by this script, and why (printed on every run, --list included):
   - `release` (sign & publish): needs secrets.OWFEED_AUTHOR_KEY and secrets.FOOTSTRAP_USIGN_KEY,
     runs only on a v* tag push. Never attempted — no local copy of either key exists.
+  - `release-assets` (the published release resolves one asset per package and format): runs after
+    `release`, so it needs the tag's published release. Never attempted.
+  - computed-diff on a pull request (job `lint`, report only): `npm run computed-diff` is the same
+    command against HEAD; the merge-base wiring is the workflow's own.
   - `pages` (Pages mirror refresh): runs only after `release`, needs pages:write/id-token:write.
     Never attempted.
   - actions/upload-artifact + download-artifact, between `build` and {verify,live,anchors}: this
@@ -664,7 +726,12 @@ expand_jobs() {
 			echo verify
 			echo live:parity
 			echo live:audit
+			echo live:audit-ru:owrt2512
+			echo live:audit-ru:owrt2410
 			echo live:motion
+			echo deep:owrt2512
+			echo deep:owrt2410
+			echo deep:owrtsnap
 			echo anchors:chromium
 			echo anchors:firefox
 			echo anchors:webkit
@@ -673,7 +740,14 @@ expand_jobs() {
 		live)
 			echo live:parity
 			echo live:audit
+			echo live:audit-ru:owrt2512
+			echo live:audit-ru:owrt2410
 			echo live:motion
+			;;
+		deep)
+			echo deep:owrt2512
+			echo deep:owrt2410
+			echo deep:owrtsnap
 			;;
 		anchors)
 			echo anchors:chromium
@@ -694,7 +768,9 @@ for j in $(expand_jobs); do
 	playground) job_playground ;;
 	live:parity) job_live parity ;;
 	live:audit) job_live audit ;;
+	live:audit-ru:*) job_router_shard audit-ru "${j#live:audit-ru:}" ;;
 	live:motion) job_live motion ;;
+	deep:*) job_router_shard deep "${j#deep:}" ;;
 	anchors:chromium) job_anchors chromium ;;
 	anchors:firefox) job_anchors firefox ;;
 	anchors:webkit) job_anchors webkit ;;

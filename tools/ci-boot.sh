@@ -16,7 +16,11 @@ set -eu
 # tracks luci-base master and so fails on an upstream change before a user reports it. ImmortalWrt
 # is deliberately absent — same luci-base, different brand, never the leg that caught something
 # first; run it locally with --all when curious.
-if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then ROUTERS="owrt2512"; else ROUTERS="owrt2512 owrt2410 owrtsnap"; fi
+# FS_ROUTERS pins one router for a shard that is about a single router (`audit-ru`, `deep`): the
+# event-driven set would boot two or three it never measures, 157s each of the shard's budget.
+if [ -n "${FS_ROUTERS:-}" ]; then ROUTERS="$FS_ROUTERS"
+elif [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then ROUTERS="owrt2512"
+else ROUTERS="owrt2512 owrt2410 owrtsnap"; fi
 echo "ROUTERS=$ROUTERS" >> "$GITHUB_ENV"
 
 owlab up $ROUTERS
