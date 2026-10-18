@@ -372,6 +372,7 @@
 		"/admin/system/filemanager|768|overflow|div#file-list-container"
 	],
 	"owrt2512@ru": [
+		"/admin/dashboard|1024|clipped|div.cbi-section",
 		"/admin/dashboard|320|overflow|div.radio-info",
 		"/admin/dashboard|320|overflow|p",
 		"/admin/dashboard|320|overflow|span",
@@ -388,6 +389,7 @@
 		"/admin/dashboard|390|overflow|span.associations",
 		"/admin/dashboard|390|overflow|span.rate",
 		"/admin/dashboard|390|overflow|span.ssid",
+		"/admin/dashboard|768|clipped|div.cbi-section",
 		"/admin/network/diagnostics|0|noname|textarea#widget.command-output",
 		"/admin/network/mwan3/interface|0|noname|input.cbi-section-create-name",
 		"/admin/network/mwan3/member|0|noname|input.cbi-section-create-name",
