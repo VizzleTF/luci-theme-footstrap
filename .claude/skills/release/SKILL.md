@@ -74,10 +74,14 @@ has been green on a real tag, also simulate it by hand — the loop is in `docs/
    step's log; say whether a red job is the diff, infrastructure, or an upstream feed. Then check
    the release carries the expected assets plus a `.sig` for each.
 8. **Publish the feed.** The theme installs from owfeed-packages, so a release nobody can
-   `apk upgrade` into is half a release. Bump `packages/luci-theme-footstrap/upstream.sh`, check the
-   sha256s in the diff against the assets you downloaded, merge, then read the **served** index
-   rather than the workflow log: `apk adbdump` on `releases/25.12/<arch>/packages.adb` and
-   `Packages.gz` on `releases/24.10/<arch>/`.
+   `apk upgrade` into is half a release. Dispatch `update.yml` there: it pushes
+   `update/luci-theme-footstrap-<VERSION>` (`VERSION`/`TAG` only — sizes and sha256s come from the
+   signed `manifest.txt`, there is no checksum table to compare) and runs `Check` on it; once green,
+   dispatch it again to land and publish (`docs/releasing.md` step 8). A `check / build` red on
+   `owfeed.lock is out of date` is a new OpenWrt point release: `owfeed lock --update` in a PR to
+   owfeed-packages, merge, dispatch again — the branch is rebuilt on the new `main` by itself. Then
+   read the **served** index rather than the workflow log: `apk adbdump` on
+   `releases/25.12/<arch>/packages.adb` and `Packages.gz` on `releases/24.10/<arch>/`.
 
 Steps 3, 4 and 6 need an explicit instruction from the maintainer, each time. `git commit` and
 `git push` are `ask` in `.claude/settings.json` for exactly this reason.

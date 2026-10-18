@@ -10,10 +10,11 @@
  *
  *   node tools/live-audit.mjs [--only owrt2512,owrt2410] [--widths 320,390,768,1440]
  *                             [--pages /admin/status] [--pages-all] [--all] [--update] [--prune]
- *                             [--seen-out f.json] [--prune --seen-in a.json,b.json]
+ *                             [--seen-out f.json] [--seen-in a.json,b.json [--update --prune]]
  *                             [--engine chromium|firefox|webkit] [--lang ru] [--settle 460]
  *
  * Needs a running owlab router. `--update` rewrites the baseline: read the diff first.
+ * `--pages-all --seen-in …` alone is a dry run: prints how many entries --prune would drop.
  * `--settle`, `--lang`: docs/development.md, "The live gates". */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,7 +22,7 @@ import { ROOT } from './lib/root.mjs';
 import { execFileSync } from 'node:child_process';
 import * as pw from 'playwright';
 import { stands, coreId, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
-import { mergeBaseline, baselineKey, openSeen, noteFinding, seenToJson, readSeenIn, prunable, isFullSweep } from './lib/baseline-merge.mjs';
+import { mergeBaseline, baselineKey, openSeen, noteFinding, seenToJson, readSeenIn, prunable, isFullSweep, staleCounts } from './lib/baseline-merge.mjs';
 import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
 import { parseFlags, makeSay } from './lib/util.mjs';
 
@@ -52,12 +53,17 @@ if (FLAGS.update && !fullSweep) {
 	process.exit(2);
 }
 /* --prune weighs a signature against this run only unless the files of other runs (CI's) vouch too. */
-if ((PRUNE || FLAGS['seen-in']) && !FLAGS.update) {
-	console.error('live-audit: --prune and --seen-in only act together with --update (a full sweep); alone they do nothing.');
+if (PRUNE && !FLAGS.update) {
+	console.error('live-audit: --prune only acts together with --update (a full sweep); alone it does nothing.');
 	process.exit(2);
 }
-if (FLAGS['seen-in'] && !PRUNE) {
-	console.error('live-audit: --seen-in only vouches for --prune; add --prune --update.');
+if (FLAGS['seen-in'] && FLAGS.update && !PRUNE) {
+	console.error('live-audit: --seen-in only vouches for --prune; add --prune, or drop --update for a dry run.');
+	process.exit(2);
+}
+/* --seen-in alone is a dry run: it reports what --prune would drop, writes nothing. */
+if (FLAGS['seen-in'] && !fullSweep) {
+	console.error('live-audit: --seen-in needs a full sweep (--pages-all, no --pages or --widths).');
 	process.exit(2);
 }
 const SEEN_IN = readSeenIn(FLAGS['seen-in'], (f) => readFileSync(f, 'utf8'));
@@ -453,6 +459,17 @@ if (armed === 0) {
 
 if (FLAGS['seen-out']) writeFileSync(FLAGS['seen-out'], JSON.stringify(seenToJson(seen), null, '\t') + '\n');
 
+/* A signature that stopped appearing is not a failure — it is a fix, and the baseline should shrink
+ * to match. Printed, never gating: a page an app no longer installs would otherwise fail the run.
+ *
+ * Only a FULL sweep may say that: a run narrowed by --pages or --widths did not visit most of the
+ * baseline, and reporting the rest as "no longer reproduces" is how a baseline gets emptied by
+ * someone debugging one page. */
+const { stale, wouldDrop } = staleCounts(baseline, seen, SEEN_IN);
+if (stale && fullSweep)
+	console.log(`${stale} baseline entr(ies) not reproduced on their own stand; ${wouldDrop} would be dropped by --update --prune`
+		+ (FLAGS['seen-in'] ? ' (seen nowhere in this run or the --seen-in files).' : ' (seen by no stand of this run; without --seen-in this counts this run only).'));
+
 if (UPDATE) {
 	/* Adding is safe, removing is a decision — and this file is a UNION ACROSS PLATFORMS, which is what
 	 * makes the difference matter: a run sees the apps THIS machine has. Rewriting a router's set
@@ -477,17 +494,6 @@ if (UPDATE) {
 	process.exit(0);
 }
 
-/* A signature that stopped appearing is not a failure — it is a fix, and the baseline should shrink
- * to match. Printed, never gating: a page an app no longer installs would otherwise fail the run.
- *
- * Only a FULL sweep may say that: a run narrowed by --pages or --widths did not visit most of the
- * baseline, and reporting the rest as "no longer reproduces" is how a baseline gets emptied by
- * someone debugging one page. */
-let stale = 0;
-for (const id of Object.keys(seen))
-	for (const sig of baseline[id] || [])
-		if (!seen[id].has(sig)) stale++;
-if (stale && fullSweep) console.log(`${stale} baseline entr(ies) no longer reproduce — re-run with --update to drop them.`);
 
 if (fresh.length) {
 	console.error(`\nlive-audit: ${fresh.length} NEW finding(s):\n`);

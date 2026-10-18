@@ -1,5 +1,9 @@
 import { coreId } from './stands.mjs';
 
+/* Every signature any stand of the run or any --seen-in file reproduced: the one rule --prune keeps by. */
+const seenAnywhere = (seen, elsewhere = {}) => new Set(
+	[ ...Object.values(seen), ...Object.values(elsewhere) ].flatMap((v) => [ ...v ]));
+
 /* Merge one live-audit run into the baseline. `seen` maps stand id → Set of signatures. With
  * `prune`, an entry is dropped only when NO stand of the run reproduced it: a stand without an
  * app's package cannot vouch for that app's entry, another stand of the run can. Without it the
@@ -7,8 +11,7 @@ import { coreId } from './stands.mjs';
  * runner has apps a dev machine lacks. Returns the next baseline and the dropped `id: sig` keys. */
 export function mergeBaseline(baseline, seen, prune, elsewhere = {}) {
 	const next = Object.assign({}, baseline), dropped = [];
-	const anywhere = new Set(Object.values(seen).flatMap((v) => [ ...v ]));
-	for (const v of Object.values(elsewhere)) for (const sig of v) anywhere.add(sig);
+	const anywhere = seenAnywhere(seen, elsewhere);
 	for (const id of Object.keys(seen)) {
 		const old = baseline[id] || [];
 		const keep = prune ? old.filter((sig) => anywhere.has(sig)) : old;
@@ -16,6 +19,17 @@ export function mergeBaseline(baseline, seen, prune, elsewhere = {}) {
 		next[id] = [ ...new Set([ ...keep, ...seen[id] ]) ].sort();
 	}
 	return { next, dropped };
+}
+
+/* `stale`: entries not reproduced on their own key. `wouldDrop`: those --prune drops, i.e. seen
+ * nowhere (mergeBaseline's rule). Only keys the run measured are judged. */
+export function staleCounts(baseline, seen, elsewhere = {}) {
+	const anywhere = seenAnywhere(seen, elsewhere);
+	let stale = 0, wouldDrop = 0;
+	for (const id of Object.keys(seen))
+		for (const sig of baseline[id] || [])
+			if (!seen[id].has(sig)) { stale++; if (!anywhere.has(sig)) wouldDrop++; }
+	return { stale, wouldDrop };
 }
 
 /* The baseline key of a stand: the core stand's id, so a twin is judged against the core's set,

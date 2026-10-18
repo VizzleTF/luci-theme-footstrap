@@ -150,19 +150,25 @@ this file exists for.
 A baseline entry no run reproduces is a hole in the ratchet: a regression with that signature
 passes silently. Only a full sweep (`--pages-all`) can call an entry stale, so the evidence is
 CI's `deep` job, which a push does not run. Before the tag, dispatch the workflow on `main`
-(`gh workflow run build.yml --ref main`) and read `deep`'s "N baseline entr(ies) no longer
-reproduce". If N is above zero, prune from CI's evidence and a local sweep together, never from one
-machine alone — the baseline is a union across platforms. Download every
-`live-audit-seen-deep-*` artifact of that run, all three routers, or do not prune: a shard that
-stopped on an unreached or frozen page writes none (one red only on NEW findings still writes it).
-Then, on the core stands:
+(`gh workflow run build.yml --ref main`) and download every `live-audit-seen-deep-*` artifact of
+that run, all three routers: a shard that stopped on an unreached or frozen page writes none (one
+red only on NEW findings still writes it).
+
+`deep`'s own "N not reproduced on their own stand" is evidence, not the decision: a shard has one
+router, so its "M would be dropped" equals N (owrtsnap 48/48, owrt2512 8/8) and says nothing.
+Mostly it is an app that stand lacks. The decision is M from a dry run on the core stands with
+every deep file (nothing is written; it exits by findings as usual):
 
 ```sh
 node tools/live-audit.mjs --only owrt2512,owrt2410,owrtsnap --pages-all \
-  --update --prune --seen-in <every live-audit-seen-deep-*.json, comma-separated>
+  --seen-in <every live-audit-seen-deep-*.json, comma-separated>
 ```
 
-The dropped entries are printed; the baseline goes into the release commit.
+It prints "N baseline entr(ies) not reproduced on their own stand; M would be dropped by --update --prune". Prune only
+when M is above zero, never from one machine alone — the baseline is a union across platforms
+(measured 2026-10-18: N=55-56 across two runs, M=0 with the three deep files, so nothing to prune). Then the same command with
+`--update --prune` added; the dropped entries are printed, and the baseline goes into the release
+commit.
 
 ## The changelog contract
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeBaseline, readSeenIn, seenToJson, prunable, isFullSweep } from '../tools/lib/baseline-merge.mjs';
+import { mergeBaseline, readSeenIn, seenToJson, prunable, isFullSweep, staleCounts } from '../tools/lib/baseline-merge.mjs';
 
 const baseline = { a: [ 'onlyA', 'onlyB', 'both', 'none' ], b: [ 'onlyB' ] };
 const seen = { a: new Set([ 'onlyA', 'both' ]), b: new Set([ 'onlyB', 'both' ]) };
@@ -45,4 +45,12 @@ test('a full sweep is --pages-all with no --pages and no --widths', () => {
 	assert.equal(isFullSweep({ pages: '', 'pages-all': false }), false);
 	assert.equal(isFullSweep({ pages: '/admin', 'pages-all': true }), false);
 	assert.equal(isFullSweep({ pages: '', 'pages-all': true, widths: '800' }), false);
+});
+
+test('staleCounts: stale on its own key counts in N; only a signature seen nowhere counts in M', () => {
+	const base = { a: [ 'onlyB', 'none', 'kept' ], b: [ 'onlyB' ] };
+	const run = { a: new Set([ 'kept' ]), b: new Set([ 'onlyB' ]) };
+	assert.deepEqual(staleCounts(base, run), { stale: 2, wouldDrop: 1 });
+	assert.deepEqual(staleCounts(base, run, { x: [ 'none' ] }), { stale: 2, wouldDrop: 0 });
+	assert.equal(staleCounts(base, run).wouldDrop, mergeBaseline(base, run, true).dropped.length);
 });
