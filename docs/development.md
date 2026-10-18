@@ -1304,6 +1304,15 @@ tools/rate.sh 10 node tools/scroll-jank.mjs --only owrt2512
   full `--all --pages-all` sweep read **412** NEW, every one on a twin, against 0 on the core stands;
   after it, 0 NEW over 675 renders on 9 routers. Output and counts still name the twin itself.
 
+- **A local stand keeps the app versions it was built with; CI boots today's feed.** A `live-audit`
+  finding red in CI and silent locally can be an app that moved: CI's first `audit-ru` run
+  (2026-10-18) found `/admin/dashboard|768|clipped|div.cbi-section` on owrt2512 with
+  `luci-mod-dashboard` 26.288.56989~75a306d, while the local stands still carried 26.251.57781~0f38c02,
+  from before upstream reworked the dashboard into KPI cards. Tell it apart: the CI job log prints
+  every installed version; compare with `owlab exec owrt2512 -- apk list -I luci-mod-dashboard`, and
+  reproduce in a throw-away container from the stand's image after `apk add -u <app>` rather than
+  upgrading a shared stand.
+
 - **A freshly started stand has no theme: the first live gate reads "N page(s) rendered but
   data-fs-fit never appeared".** `owlab up` boots the image; the theme arrives only with `owlab
   sync`. Seen on all 9 stands after `owlab test` had taken them down (2026-10-18). Tell it apart:

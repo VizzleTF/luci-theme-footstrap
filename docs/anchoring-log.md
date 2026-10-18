@@ -1674,8 +1674,11 @@ side large engine-anchoring on /admin/network/dhcp: refill 2/3 on the same secti
 which changed only `install.sh`. Chromium and WebKit on the same sha were green. **1 of 25** CI runs
 of the job red; locally the same cell on 61a3c24 read **0 of 5** (`reader moved 0px`, corrected in
 5-7ms): `tools/rate.sh 5 node tools/scroll-anchor.mjs --only owrt2512 --engines firefox --full
---page /admin/network/dhcp --width 390 --layout side`. Cause not established; a second sighting
-makes it a pattern to ablate, not noise.
+--page /admin/network/dhcp --width 390 --layout side`; the same at `rate.sh 25` on 2026-10-18 read
+**0 of 25**, every repeat `0px/0px/0px trusted true->true` — **0 of 30** locally in all. On
+owrt2410 the cell measures nothing ("nothing above the reader big enough to collapse"), so its 0 of
+10 proves nothing about this path. Cause not established; a second sighting makes it a pattern to
+ablate, not noise.
 
 ## The gates watch the reader's place, not the mechanism
 
