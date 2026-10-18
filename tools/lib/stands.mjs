@@ -22,6 +22,10 @@ import { ROOT } from './root.mjs';
  * refused (its two legs gave 1685 unreadable `noname` findings of their own app set at 0.14.13). */
 export const CORE = [ 'owrt2512', 'owrt2410', 'owrtsnap' ];
 
+/* The core stand an owlab twin (`owrt2512b`, `owrt2512d`) shares its install and baseline with;
+ * any other id maps to itself. A twin booted from the same image finds the core's findings. */
+export const coreId = (id) => CORE.find((c) => id === c || (id.startsWith(c) && /^[bd]$/.test(id.slice(c.length)))) ?? id;
+
 /* Has the view actually rendered, or is a live gate about to measure a blank shell? fs-overview.js
  * keeps every section hidden until network.flushCache()'s five RPCs answer; on a router that just
  * booted, one answers late enough that a fixed wait expires first. scroll-jank.mjs armed on

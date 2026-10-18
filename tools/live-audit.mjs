@@ -10,6 +10,7 @@
  *
  *   node tools/live-audit.mjs [--only owrt2512,owrt2410] [--widths 320,390,768,1440]
  *                             [--pages /admin/status] [--pages-all] [--all] [--update] [--prune]
+ *                             [--seen-out f.json] [--prune --seen-in a.json,b.json]
  *                             [--engine chromium|firefox|webkit] [--lang ru] [--settle 460]
  *
  * Needs a running owlab router. `--update` rewrites the baseline: read the diff first.
@@ -19,8 +20,8 @@ import { join } from 'node:path';
 import { ROOT } from './lib/root.mjs';
 import { execFileSync } from 'node:child_process';
 import * as pw from 'playwright';
-import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
-import { mergeBaseline } from './lib/baseline-merge.mjs';
+import { stands, coreId, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
+import { mergeBaseline, baselineKey, openSeen, noteFinding, seenToJson, readSeenIn, prunable, isFullSweep } from './lib/baseline-merge.mjs';
 import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
 import { parseFlags, makeSay } from './lib/util.mjs';
 
@@ -28,6 +29,7 @@ const BASELINE = join(ROOT, 'tools/baselines/live-audit.json');
 
 const FLAGS = parseFlags('live-audit', {
 	update: { type: 'boolean', default: false }, prune: { type: 'boolean', default: false },
+	'seen-out': { type: 'string', default: '' }, 'seen-in': { type: 'string', default: '' },
 	engine: { type: 'string', default: 'chromium' }, lang: { type: 'string', default: 'en' },
 	/* `widths` has no parseArgs `default:` on purpose — `fullSweep` below tells "not passed" from
 	 * "passed the default value" by checking FLAGS.widths for undefined, which a parseArgs default
@@ -41,6 +43,24 @@ const UPDATE = FLAGS.update;
  * that belong to apps this machine simply does not install, so it is the flag you reach for after
  * reading the "no longer reproduce" list, not the one you run by habit. */
 const PRUNE = FLAGS.prune;
+/* A run narrowed by --pages or --widths, or one page per shape, visited only part of the baseline:
+ * it may neither rewrite it nor report the rest as fixed. Decided from the flags, before launch. */
+const fullSweep = isFullSweep(FLAGS);
+if (FLAGS.update && !fullSweep) {
+	console.error('live-audit: --update needs a full sweep (--pages-all, no --pages or --widths) —');
+	console.error('a narrowed run would drop every signature it did not visit.');
+	process.exit(2);
+}
+/* --prune weighs a signature against this run only unless the files of other runs (CI's) vouch too. */
+if ((PRUNE || FLAGS['seen-in']) && !FLAGS.update) {
+	console.error('live-audit: --prune and --seen-in only act together with --update (a full sweep); alone they do nothing.');
+	process.exit(2);
+}
+if (FLAGS['seen-in'] && !PRUNE) {
+	console.error('live-audit: --seen-in only vouches for --prune; add --prune --update.');
+	process.exit(2);
+}
+const SEEN_IN = readSeenIn(FLAGS['seen-in'], (f) => readFileSync(f, 'utf8'));
 const ENGINE = FLAGS.engine;
 /* the language the router is measured in — see the file header. `en` is the default and maps to
  * `auto`, which is what every existing baseline entry was collected against. */
@@ -262,7 +282,7 @@ const seen = {}, fresh = [];
  * their own: reportFrozen() below (lib/page-shapes.mjs) */
 const frozen = [];
 /* pages or widths the run could not measure (goto failed, CHECK threw): never a baseline change */
-const unreached = [];
+const unreached = [], skipped = [];
 let checked = 0, armed = 0;
 
 const say = makeSay();
@@ -302,13 +322,11 @@ await Promise.all(list.map(async (stand) => {
 		 * things (the doubled scrollbar of #12 was Firefox-only), a second language finds different things
 		 * for the reason the file header gives, and mixing either pair of sets would let one run bless a
 		 * finding it never saw. Suffixes compose (`owrt2512@ru@firefox`) rather than picking one. */
-		const keySuffixes = [];
-		if (LANG !== 'en') keySuffixes.push(LANG);
-		if (ENGINE !== 'chromium') keySuffixes.push(ENGINE);
-		const key = keySuffixes.length ? `${stand.id}@${keySuffixes.join('@')}` : stand.id;
+		const key = baselineKey(stand.id, LANG, ENGINE);
 		const known = baseline[key] || [];
-		const kset = new Set(known);
-		seen[key] = new Set();
+		openSeen(seen, key);
+		/* the stand's own id for output (a twin is not its core), the core's key for the baseline */
+		const label = key.replace(coreId(stand.id), stand.id), mine = new Set();
 
 		let paths = (await menuPaths(page)).filter((p) => !DESTRUCTIVE.test(p));
 		if (ONLY_PAGES) paths = paths.filter((p) => p.startsWith(ONLY_PAGES));
@@ -316,8 +334,8 @@ await Promise.all(list.map(async (stand) => {
 		if (!ALL_PAGES && !ONLY_PAGES) {
 			/* one load per page to read its shape, then one representative per shape — plus every path
 			 * the baseline names and every pinned page, which may never be sampled away */
-			say(`${key}: reading the shape of ${paths.length} page(s)`);
-			const shapes = await classify(page, stand.base, paths, { frozen, id: key });
+			say(`${label}: reading the shape of ${paths.length} page(s)`);
+			const shapes = await classify(page, stand.base, paths, { frozen, id: label });
 			const { picked, dropped } = representatives(shapes, [ ...known.map((sig) => sig.split('|')[0]), ...PINNED ]);
 			reportReduction(stand.id, picked, dropped, shapes);
 			paths = picked;
@@ -325,15 +343,15 @@ await Promise.all(list.map(async (stand) => {
 
 		let n = 0;
 		for (const path of paths) {
-			say(`${key} ${++n}/${paths.length} ${path}`);
+			say(`${label} ${++n}/${paths.length} ${path}`);
 			await page.setViewportSize({ width: 1440, height: 900 });
 			errs.length = 0;
 			try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
-			catch (e) { unreached.push(`${key} ${path} (goto: ${e.message.split('\n')[0]})`); continue; }
+			catch (e) { unreached.push(`${label} ${path} (goto: ${e.message.split('\n')[0]})`); continue; }
 			/* a view renders behind an RPC; give it the time a user would wait before judging it */
 			await page.waitForTimeout(1800);
 			/* a page the router refuses (an app in the menu whose ACL says no) is not a layout finding */
-			if (!(await page.evaluate(() => !!document.getElementById('view')))) continue;
+			if (!(await page.evaluate(() => !!document.getElementById('view')))) { skipped.push({ key, path }); continue; }
 			checked++; here++;
 			/* whether the theme actually ran on this page — a stand rebuilt without `owlab sync`
 			 * (docs/development.md) serves every page LuCI-bare, `data-fs-fit` never appears, and
@@ -347,8 +365,8 @@ await Promise.all(list.map(async (stand) => {
 			const record = (width, f) => {
 				const sig = `${path}|${f.kind === 'noname' ? 0 : width}|${f.kind}|${f.el}`;
 				if (width === ARRIVE) atArrive.add(`${f.kind}|${f.el}`);
-				if (!seen[key].has(sig) && !kset.has(sig)) fresh.push({ stand: key, sig, by: f.by });
-				seen[key].add(sig);
+				mine.add(sig);
+				noteFinding(seen, baseline, fresh, key, sig, f.by);
 			};
 
 			for (const w of WIDTHS) {
@@ -360,7 +378,7 @@ await Promise.all(list.map(async (stand) => {
 				/* Every other check needs the deferred pass to have run, so it waits past SCROLL_IDLE. */
 				await page.waitForTimeout(SETTLE_MS);
 				let found = [];
-				try { found = await page.evaluate(CHECK); } catch (e) { unreached.push(`${key} ${path} at ${w}px (CHECK: ${e.message.split('\n')[0]})`); continue; }
+				try { found = await page.evaluate(CHECK); } catch (e) { unreached.push(`${label} ${path} at ${w}px (CHECK: ${e.message.split('\n')[0]})`); continue; }
 				for (const f of found) record(w, f);
 				try { for (const f of await page.evaluate(GEOMETRY)) record(w, f); } catch (e) { /* see there */ }
 			}
@@ -375,11 +393,11 @@ await Promise.all(list.map(async (stand) => {
 			await page.setViewportSize({ width: ARRIVE, height: 900 });
 			let arrived = true;
 			try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
-			catch (e) { arrived = false; unreached.push(`${key} ${path} at ${ARRIVE}px (arrival goto: ${e.message.split('\n')[0]})`); }
+			catch (e) { arrived = false; unreached.push(`${label} ${path} at ${ARRIVE}px (arrival goto: ${e.message.split('\n')[0]})`); }
 			if (arrived) {
 				await page.waitForTimeout(1800);
 				let found = [];
-				try { found = await page.evaluate(CHECK); } catch (e) { unreached.push(`${key} ${path} at ${ARRIVE}px (arrival CHECK: ${e.message.split('\n')[0]})`); }
+				try { found = await page.evaluate(CHECK); } catch (e) { unreached.push(`${label} ${path} at ${ARRIVE}px (arrival CHECK: ${e.message.split('\n')[0]})`); }
 				try { found = found.concat(await page.evaluate(GEOMETRY)); } catch (e) { /* see there */ }
 				for (const f of found) {
 					if (atArrive.has(`${f.kind}|${f.el}`)) continue;
@@ -389,7 +407,7 @@ await Promise.all(list.map(async (stand) => {
 			for (const e of [...new Set(errs)].slice(0, 3)) record(0, { kind: 'console', el: e });
 		}
 		await ctx.close();
-		say(`${key}: ${seen[key].size} finding(s) over ${here} page(s)`);
+		say(`${label}: ${mine.size} finding(s) over ${here} page(s)`);
 	} finally {
 		/* Never leave a router parked off `auto` — the next unflagged run must not silently inherit
 		 * this one's language, which is the exact shape of the incident this flag exists to close. */
@@ -433,24 +451,23 @@ if (armed === 0) {
 	process.exit(1);
 }
 
-/* A run narrowed by --pages or --widths visited only part of the baseline, so it may neither rewrite
- * it nor report the rest as fixed. */
-/* …and a run that measured one page per shape is narrowed like any other: it cannot tell a finding
- * that stopped happening from a page it did not open. */
-const fullSweep = !ONLY_PAGES && FLAGS.widths === undefined && ALL_PAGES;
+if (FLAGS['seen-out']) writeFileSync(FLAGS['seen-out'], JSON.stringify(seenToJson(seen), null, '\t') + '\n');
 
 if (UPDATE) {
-	if (!fullSweep) {
-		console.error('live-audit: --update needs a full sweep — a run narrowed by --pages or --widths');
-		console.error('would drop every signature it did not visit. Drop the narrowing flags.');
-		process.exit(2);
-	}
 	/* Adding is safe, removing is a decision — and this file is a UNION ACROSS PLATFORMS, which is what
 	 * makes the difference matter: a run sees the apps THIS machine has. Rewriting a router's set
 	 * from what one machine saw deletes every finding belonging to an app it does not have, and the
 	 * next CI run reports them as new — a red gate produced by a green one. So `--update` unions and
 	 * prints what did not reproduce, while `--prune` is the deliberate act of dropping those. */
-	const { next, dropped } = mergeBaseline(baseline, seen, PRUNE);
+	const blocked = PRUNE ? prunable(baseline, skipped) : [];
+	if (blocked.length) {
+		console.error('live-audit: --prune refused, these pages rendered no #view so their entries cannot be judged:');
+		for (const b of blocked) console.error(`  ${b}`);
+		process.exit(1);
+	}
+	const { next, dropped } = mergeBaseline(baseline, seen, PRUNE, SEEN_IN);
+	if (PRUNE && !FLAGS['seen-in'])
+		console.warn('live-audit: --prune without --seen-in weighs this run alone; signatures only CI reproduces may be lost.');
 	const untouched = Object.keys(baseline).filter((id) => !(id in seen));
 	writeFileSync(BASELINE, JSON.stringify(next, null, '\t') + '\n');
 	console.log(PRUNE ? 'baseline rewritten (pruned of entries no stand of this run reproduced):' : 'baseline updated (union):', BASELINE);

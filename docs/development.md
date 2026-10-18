@@ -1298,32 +1298,17 @@ tools/rate.sh 10 node tools/scroll-jank.mjs --only owrt2512
   A file copied from a path owned by uid 1000 also arrives so, and the same 403 survives the
   `chmod` until `chown 0:0` runs too (charts PR stand run, 2026-09-13).
 
-- **`live-audit` on a `-b` twin calls every finding NEW, and a full sweep makes that total, not
-  partial.** The baseline is keyed by stand id (`tools/baselines/live-audit.json`: `owrt2410`,
-  `owrt2410@ru`, …), and `owrt2410b`/`owrt2512b` are not among those keys, so a sweep there starts
-  from an empty known set: 30 fresh signatures over just the `/admin/network` subtree the first
-  time this was measured, **776** and **771** over a full default sweep on `owrt2512b` and
-  `owrt2410b` respectively — every page, not a regression on any of them. The twins are for the
-  gates that carry no baseline (`scroll-anchor`, `spa-parity`); `live-audit` still needs the
-  primary's own baseline. Tell a genuine regression apart from the key-lookup trap without trusting
-  the exit code:
-  ```sh
-  node tools/live-audit.mjs --only owrt2410b > /tmp/b-run.log 2>&1
-  grep '^  owrt2410b' /tmp/b-run.log | awk '{print $2}' | sort -u > /tmp/b-sigs.txt
-  jq -r '.owrt2410[]' tools/baselines/live-audit.json | sort -u > /tmp/primary-sigs.txt
-  comm -23 /tmp/b-sigs.txt /tmp/primary-sigs.txt
-  ```
-  Empty output is the trap **only up to the 60 findings the log actually printed**
-  (`tools/live-audit.mjs:579`, `fresh.slice(0, 60)` — beyond that it prints "… and N more" and stops
-  naming them), so `grep '^  owrt2410b'` never sees a finding past the 60th and an empty `comm`
-  proves the claim only for those. Check the "N NEW finding(s)" count in the log first: under 60,
-  every signature the `-b` run called NEW is already in `owrt2410`'s own baseline, just filed under a
-  key nothing reads there, and an empty `comm` output confirms it. Over 60, narrow with the existing
-  `--pages` flag (`node tools/live-audit.mjs --only owrt2410b --pages <path>,…`) into batches that
-  each stay under 60 and run the same `comm` check on each — there is no flag that dumps the full
-  list at once. Anything `comm` still prints is not in the primary baseline either and wants a real
-  look. The workaround is to run and judge `live-audit` against the primary stand id and use the twin
-  only for the gates above that carry no baseline.
+- **A twin (`-b`/`-d`) is judged against its core stand's `live-audit` baseline.** The baseline is
+  keyed by core id (`owrt2410`, `owrt2410@ru`, …); `coreId()` in `tools/lib/stands.mjs` maps
+  `owrt2410b`/`owrt2410d` onto `owrt2410`, so a twin's NEW is genuinely new. Before that mapping a
+  full `--all --pages-all` sweep read **412** NEW, every one on a twin, against 0 on the core stands;
+  after it, 0 NEW over 675 renders on 9 routers. Output and counts still name the twin itself.
+
+- **A freshly started stand has no theme: the first live gate reads "N page(s) rendered but
+  data-fs-fit never appeared".** `owlab up` boots the image; the theme arrives only with `owlab
+  sync`. Seen on all 9 stands after `owlab test` had taken them down (2026-10-18). Tell it apart:
+  `owlab exec <stand> -- ls /www/luci-static/footstrap` fails on an unsynced stand. Run `owlab sync`
+  on every stand after `owlab up`, before any live gate.
 
 - **`pkill -f <pattern>` kills the shell you typed it in.** `-f` matches the full command line, and
   the wrapper `bash -lc "pkill -f probe-one …; node probe-one.mjs …"` contains the pattern, so the
