@@ -374,6 +374,10 @@
 	.table.fs-stacked .td:not(.cbi-section-actions):not([class*="col-"]):not(:has(.cbi-progressbar)) {
 		flex: 1 1 50% !important;
 	}
+	/* a first cell that is one token (fs-select.js): "/dev/mtdblock6" is 110px, the half-split left
+	 * 94-106px at 360-390 and `anywhere` cut it mid-word. fit-content of one token is the token,
+	 * capped at the row, so a 64-char hash still breaks inside the card; a phrase keeps its half. */
+	.table.fs-stacked .tr > .td.fs-td-token:first-child:not(.cbi-section-actions):not([class*="col-"]) { min-width: fit-content; }
 	/* a meter takes the whole line — its own title prints over the cell's caption otherwise */
 	.table.fs-stacked .td:has(.cbi-progressbar) { flex: 1 1 100% !important; }
 

@@ -1246,6 +1246,13 @@ option two</textarea></div>
 				<td class="td" data-title="Filesystem">/dev/mtdblock6</td><td class="td" data-title="Mount Point">/overlay</td>
 				<td class="td" data-title="Available"><div class="cbi-progressbar" title="12.4 MiB / 20.0 MiB (62%)"><div style="width:62%"></div></div></td>
 			</tr>
+			<!-- fs-select.js markTokenCells: a first cell with no space and no hyphen gets fs-td-token; a hyphenated one keeps its break at the hyphen and no class -->
+			<tr class="tr cbi-rowstyle-2">
+				<td class="td fs-td-token" data-title="Filesystem">/dev/mtdblock6</td><td class="td" data-title="Mount Point">/overlay</td>
+			</tr>
+			<tr class="tr cbi-rowstyle-1">
+				<td class="td" data-title="Filesystem">esp-sensor-hall</td><td class="td" data-title="Mount Point">/mnt/data</td>
+			</tr>
 		</table>
 	</div>
 </div>
