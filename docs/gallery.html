@@ -1183,6 +1183,74 @@ option two</textarea></div>
 </div>
 
 <div class="g-sec">
+	<h2>Widgets in the containers the layout rules tell apart</h2>
+	<p class="g-note">Each block is a widget in a container that styles/ has a selector for and the rest of
+	   this page never combined them in: tools/gallery-coverage.mjs derives the pairs from the CSS and fails
+	   on one that is not here. Markup is what LuCI emits (ui.js, form.js, tools/widgets.js, view/firewall).</p>
+	<div class="cbi-section cbi-tblsection">
+		<h3>Section table: dropdown, input, tooltip and a ComboButton in the cells</h3>
+		<table class="table cbi-section-table">
+			<tr class="tr cbi-section-table-titles">
+				<th class="th cbi-section-table-cell">Name</th>
+				<th class="th cbi-section-table-cell">Protocol</th>
+				<th class="th cbi-section-table-cell">Match</th>
+				<th class="th cbi-section-table-cell cbi-section-actions">&nbsp;</th>
+			</tr>
+			<tr class="tr cbi-section-table-row cbi-rowstyle-1">
+				<td class="td cbi-value-field cbi-section-table-cell" data-title="Name" data-name="name" data-widget="Value"><div id="cbi-firewall-rule1-name"><input type="text" class="cbi-input-text" value="Allow-Ping" aria-label="Name"></div></td>
+				<td class="td cbi-value-field cbi-section-table-cell" data-title="Protocol" data-name="proto" data-widget="DynamicList">
+					<div class="cbi-dropdown" tabindex="0" data-idref="g-cell-dd"><ul><li data-value="icmp" selected display="0">ICMP</li><li data-value="tcp">TCP</li></ul><span class="open">▾</span><div><input type="hidden" value="icmp"></div></div>
+				</td>
+				<!-- form.js renderFrame(in_table) writes data-title and wraps the widget in div#cbi-<config>-<section>-<option>; it emits no <label> for a cell, so the input carries aria-label as the Filter field does below. forwards.js / rules.js: fwtool.fmt() writes the ICMP type list as a tooltip on a <var> -->
+				<td class="td cbi-value-field cbi-section-table-cell" data-title="Match" data-widget="CBI.DummyValue">Incoming <var class="cbi-tooltip-container">ICMP<span class="cbi-tooltip">ICMP with types <var>echo-request</var></span></var></td>
+				<td class="td cbi-section-table-cell nowrap cbi-section-actions">
+					<div>
+						<div class="cbi-dropdown btn cbi-button cbi-button-remove" tabindex="0" data-idref="g-combo-table">
+							<ul tabindex="-1">
+								<li data-value="0" selected display="0">Disable</li>
+								<li data-value="1">Delete</li>
+							</ul>
+							<span class="more" tabindex="-1">···</span>
+							<span class="open" tabindex="-1">▾</span>
+							<div><input type="hidden" value="0"></div>
+						</div>
+					</div>
+				</td>
+			</tr>
+		</table>
+	</div>
+	<!-- tools/widgets.js ZoneInfoDummy.renderZone: the zone's interfaces pop out of the badge itself -->
+	<p>
+		<label class="zonebadge cbi-tooltip-container" style="--zone-color-rgb:164, 209, 164; background-color:rgb(var(--zone-color-rgb))"><strong>lan</strong><div class="cbi-tooltip"><span class="ifacebadge">lan: <em>br-lan</em></span><span class="ifacebadge">{ 192.168.1.0/24 }</span></div></label>
+	</p>
+	<!-- ui.Textfield with `password: true`: the reveal button sits in a .control-group beside the input -->
+	<div class="cbi-value">
+		<label class="cbi-value-title" for="g-pass-reveal">Password with reveal</label>
+		<div class="cbi-value-field"><div class="control-group"><input id="g-pass-reveal" type="password" class="cbi-input-password" value="secret"><button class="cbi-button cbi-button-neutral" title="Reveal/hide password" aria-label="Reveal/hide password">∗</button></div></div>
+	</div>
+	<!-- ui.tabs: a tabbed section builds its strip as a child of .cbi-section -->
+	<div class="cbi-section">
+		<ul class="cbi-tabmenu">
+			<li class="cbi-tab"><a href="#">General Settings</a></li>
+			<li class="cbi-tab-disabled"><a href="#">Advanced Settings</a></li>
+		</ul>
+	</div>
+	<!-- the carded table (.fs-stacked) with a meter in a cell: system/mounts.js "Available" column -->
+	<div class="cbi-section">
+		<h3>Carded table with a meter in the cell</h3>
+		<table class="table fs-dt fs-stacked" id="status_mounts_carded">
+			<tr class="tr table-titles">
+				<th class="th">Filesystem</th><th class="th">Mount Point</th><th class="th">Available</th>
+			</tr>
+			<tr class="tr cbi-rowstyle-1">
+				<td class="td" data-title="Filesystem">/dev/mtdblock6</td><td class="td" data-title="Mount Point">/overlay</td>
+				<td class="td" data-title="Available"><div class="cbi-progressbar" title="12.4 MiB / 20.0 MiB (62%)"><div style="width:62%"></div></div></td>
+			</tr>
+		</table>
+	</div>
+</div>
+
+<div class="g-sec">
 	<h2>CBI section table — header reflow at the card boundary (RU, task 0163)</h2>
 	<p class="g-note">`.cbi-map` pinned to 968px — firewall/zones' own measured content column at
 	   1024px, live, RU. The card fires on THIS element (theme/45-misc.css), one level above

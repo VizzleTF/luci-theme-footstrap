@@ -28,6 +28,7 @@
     "chrome-fence": "node tools/chrome-fence.mjs",
     "devkit": "node tools/devkit-build.mjs",
     "changelog": "node tools/changelog.mjs",
+    "gallery-coverage": "node tools/gallery-coverage.mjs",
     "shell": "sh tools/check-shell.sh",
     "marker": "sh tools/scan-marker.sh",
     "live-audit": "node tools/live-audit.mjs",
@@ -49,7 +50,7 @@
     "playground:capture": "node tools/playground/capture.mjs",
     "playground:build": "node tools/playground/build.mjs",
     "playground:verify": "node tools/playground/verify.mjs",
-    "check:fast": "npm run lint && npm run shell && npm run marker && npm run audit && npm run conffiles && npm run acl && npm run i18n-packages && npm run makefile-contract && npm run test && npm run css-orphans && npm run mirror && npm run axes && npm run page-modules && npm run comment-share && npm run chrome-fence && npm run changelog && npm run i18n",
+    "check:fast": "npm run lint && npm run shell && npm run marker && npm run audit && npm run conffiles && npm run acl && npm run i18n-packages && npm run makefile-contract && npm run test && npm run css-orphans && npm run mirror && npm run axes && npm run page-modules && npm run comment-share && npm run chrome-fence && npm run gallery-coverage && npm run changelog && npm run i18n",
     "check:mid": "npm run css-metrics && npm run css-floor && npm run css-dup && npm run size",
     "check:slow": "npm run tables && npm run export-tier && npm run icons && npm run a11y && npm run placeholder && npm run smoke && npm run pseudo-loc",
     "makefile-contract": "node tools/makefile-contract.mjs"

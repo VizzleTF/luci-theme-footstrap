@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Added
+
+- **A gate fails when the gallery lacks a widget in a container the styles lay out differently.** `gallery-coverage` reads every (widget, container) pair the selectors in `styles/` distinguish and checks `docs/gallery.html` shows each one, so the gates that measure the gallery cannot miss a layout no fixture exercises: the split Disconnect button in a stacked action cell reached users that way. Its first run found 14 such pairs; the gallery now carries fixtures for them in upstream markup (a dropdown and a text input in a config-table cell, the tooltips in a zone badge and a field, the password field with its reveal button, a meter in a carded table, a tab menu in a section), and 6 pairs LuCI never emits are listed with the reason. In `check:fast`, 0.2 s.
+
 ### Fixed
 
 - **Re-running the installer upgrades the theme alone, not every package on the router.** On apk (25.12+) it ran `apk add --upgrade luci-theme-footstrap`, and apk-tools makes that flag inheritable: every dependency down from `luci-base` — ucode, rpcd, uhttpd, libc — was upgraded along with the theme whenever the feed had something newer. It now runs `apk add "luci-theme-footstrap<26"` (fresh install, and the `world` constraint that keeps the official-feed build out) followed by `apk upgrade luci-theme-footstrap`, which upgrades the named package only; a dependency moves only when the new theme requires it. The translation catalogues take the same two steps. The opkg leg (24.10) already upgraded the theme alone.
