@@ -179,6 +179,8 @@
 	.cbi-dropdown > ul.dropdown > li {
 		padding: var(--fs-space-2) var(--fs-space-3); color: var(--fs-text);
 		font-family: var(--fs-font-sans);
+		/* a menu row is not a button label: the open list sits inside the button and would inherit its 600 and 1.1 line (a plain dropdown's rows: 400, 1.5) */
+		font-weight: var(--fs-weight-normal); line-height: var(--fs-leading);
 		/* a grid step, not calc(--fs-type * --fs-leading) (19.5px) — a half-pixel box edge is what the scale exists to stop */
 		min-height: var(--fs-space-5);
 	}
