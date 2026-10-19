@@ -39,3 +39,6 @@ release-notes.md
 /skills-lock.json
 /.claude/tooling/preview-venv/
 /.claude/settings.local.json
+
+# EnterWorktree checkouts: a second copy of every file, so grep and eslint report each hit twice
+/.claude/worktrees/

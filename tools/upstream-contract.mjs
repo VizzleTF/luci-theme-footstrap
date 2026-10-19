@@ -9,17 +9,57 @@
  * probe on a live page. A failure means "this luci-base moved, look at the module named here".
  *
  *   node tools/upstream-contract.mjs [--only owrt2512,owrt2410] [--all] [--verbose]
+ *   node tools/upstream-contract.mjs --static-only [--root <checkout>]
  *
- * Needs a running owlab router; run it against SNAPSHOT too, where luci-base's master lands first. */
+ * The live half needs a running owlab router; run it against SNAPSHOT too, where luci-base's master
+ * lands first. The static half (`--static-only`, no router) scans what ships for session litter the
+ * upstream bot flags: a `../tmp/` path, a task id, a CI run id. It runs first in both modes. */
 import { chromium } from 'playwright';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
 import { parseFlags } from './lib/util.mjs';
 
 const FLAGS = parseFlags('upstream-contract', {
 	verbose: { type: 'boolean', default: false }, only: { type: 'string', default: '' },
 	all: { type: 'boolean', default: false },
+	'static-only': { type: 'boolean', default: false }, root: { type: 'string', default: '.' },
 });
 const VERBOSE = FLAGS.verbose;
+
+/* A shipped comment pointing at ../tmp/ or a task/run id is a dead pointer in an upstream tree;
+ * the bot caught it twice by hand (docs/conventions.md, "Comments"). */
+const LITTER = [
+	[ /\.\.\/tmp\//, 'a ../tmp/ path (the file is not in the repository)' ],
+	[ /\btask-(?=[0-9a-z]*\d)[0-9a-z]+/, 'a task id' ],
+	[ /\brun [0-9]{9,}|actions\/runs\//, 'a CI run id' ],
+];
+function litterIn(dir, out = []) {
+	for (const e of readdirSync(dir, { withFileTypes: true })) {
+		const p = join(dir, e.name);
+		if (e.isDirectory()) { if (e.name !== 'node_modules') litterIn(p, out); continue; }
+		const buf = readFileSync(p);
+		if (buf.includes(0)) continue;
+		buf.toString('utf8').split('\n').forEach((line, i) => {
+			for (const [ re, why ] of LITTER) {
+				const m = re.exec(line);
+				if (m) out.push(`${p}:${i + 1}: "${m[0]}" — ${why}`);
+			}
+		});
+	}
+	return out;
+}
+const root = resolve(FLAGS.root);
+const litter = [ 'htdocs', 'ucode', 'root', 'styles' ].flatMap((d) => {
+	try { return litterIn(join(root, 'luci-theme-footstrap', d)); }
+	catch (e) { if (e.code === 'ENOENT') return []; throw e; }
+});
+if (litter.length) {
+	console.error(litter.join('\n'));
+	console.error(`\nupstream-contract: ${litter.length} session-litter hit(s) in shipped files; reword the comment to the invariant and a docs/ pointer.`);
+	process.exit(1);
+}
+if (FLAGS['static-only']) { console.log('upstream-contract: no session litter in shipped files.'); process.exit(0); }
 
 /* Every probe returns `true`, or a STRING saying what it found instead — the string is what a
  * developer reads six months from now, so it names the value, not the expectation. */

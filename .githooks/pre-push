@@ -20,13 +20,13 @@ done
 
 if ! command -v npm >/dev/null 2>&1; then
 	echo "pre-push: npm not found, and npm run check is the gate this push needs." >&2
-	echo "Install node, or push with --no-verify and say in the PR that the gates did not run." >&2
+	echo "Install node, then push again." >&2
 	exit 1
 fi
 
 echo "pre-push: npm run check ..." >&2
 if ! npm run check; then
 	echo >&2
-	echo "pre-push: npm run check failed. Fix it, or push with --no-verify if you know why." >&2
+	echo "pre-push: npm run check failed — the failing gate is above; fix it and push again. A maintainer who must bypass knows how." >&2
 	exit 1
 fi

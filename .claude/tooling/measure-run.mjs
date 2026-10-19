@@ -3,7 +3,7 @@
  *
  *   node .claude/tooling/measure-run.mjs            # the newest transcript of this project
  *   node .claude/tooling/measure-run.mjs latest 3   # the three newest
- *   node .claude/tooling/measure-run.mjs <path.jsonl>
+ *   node .claude/tooling/measure-run.mjs <path.jsonl | session-id>
  *
  * A transcript is one JSON object per line; a tool_result is matched to its tool_use by id, so the
  * per-tool split is exact rather than guessed from the content.
@@ -15,7 +15,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
-const slug = '-' + process.cwd().replace(/^\//, '').replace(/[/.]/g, '-');
+const slug = process.cwd().replace(/[^A-Za-z0-9]/g, '-');
 const dir = join(homedir(), '.claude', 'projects', slug);
 
 function newest(n) {
@@ -62,20 +62,26 @@ function measure(file) {
   return { file, total, byTool, images, imageBytes, text, agents, results };
 }
 
-/* Every subagent this session spawned, from <session>/subagents/agent-*.jsonl beside the file. */
+/* Every subagent this session spawned: <session>/subagents/agent-*.jsonl, and the workflow ones one
+ * level down in subagents/workflows/<id>/ (1728 of them in one session, none counted by a flat read). */
+function jsonls(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? jsonls(join(dir, e.name)) : e.name.endsWith('.jsonl') ? [join(dir, e.name)] : []);
+}
+
 function delegated(file) {
   const sub = file.replace(/\.jsonl$/, '') + '/subagents';
   if (!existsSync(sub)) return { agents: 0, chars: 0 };
   let agents = 0, chars = 0;
-  for (const f of readdirSync(sub).filter((x) => x.endsWith('.jsonl'))) {
+  for (const f of jsonls(sub)) {
     agents += 1;
-    chars += measure(join(sub, f)).total;
+    chars += measure(f).total;
   }
   return { agents, chars };
 }
 
 const arg = process.argv[2] || 'latest';
-const files = arg.endsWith('.jsonl') ? [arg] : newest(Number(process.argv[3] || 1));
+const files = arg.endsWith('.jsonl') ? [arg] : /^[0-9a-f-]{36}$/.test(arg) ? [join(dir, arg + '.jsonl')] : newest(Number(process.argv[3] || 1));
 for (const f of files) {
   const m = measure(f);
   console.log(`${f}`);

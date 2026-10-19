@@ -246,6 +246,7 @@ deleted, not reworded: restating the line it sits on is what it did.
 | a task or session name (`task refill2`) | nothing — cite the docs heading instead | names nothing the reader can open |
 | a `../tmp/…` path | `docs/<area>.md` restates the finding | the file is not in the repository; the pointer is dead the next day |
 | a CI run id | the changelog entry, once | the run expires; the number it produced does not |
+| any of the three rows above, in a shipped file | `node tools/upstream-contract.mjs --static-only` fails on `../tmp/`, a task id and a run id under `luci-theme-footstrap/{htdocs,ucode,root,styles}`, with `file:line`; red on v0.14.13 (754e529) with 5 hits | the upstream bot caught the same litter three times by hand; `tools/upstream-review-facts.sh <base> <head>` prints the rest of its checklist in one read-only report |
 | the same fact the docs already hold | one line and the pointer | two copies drift |
 | CAPS for emphasis, a rhetorical question, a warning to a future maintainer | plain prose | an LLM weights capitals as shouting, not as priority |
 
@@ -383,6 +384,10 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 
 ## The gates, and what each one holds
 
+A gate's failure line names the item (cell, selector, file:line), the measured value, the threshold,
+and the write or input that caused it. A gate that only says "failed" makes the reader guess; a new
+gate is reviewed against this line.
+
 | Gate | Holds |
 |---|---|
 | `lint` | eslint over `htdocs/` and `ucode/`, stylelint over `styles/` — correctness only, not formatting; stylelint also holds the `!important` allowlist (`declaration-no-important` + the file override) and the data-title i18n check (`selector-disallowed-list`) |
@@ -409,6 +414,7 @@ why. Format, categories and the release runbook: [releasing.md](releasing.md).
 | `conffiles` | every shipped `/etc/config/*` is declared a conffile — `/etc/config/footstrap` is written at runtime by Save-as-default, and an undeclared one is replaced on upgrade |
 | `changelog` | section set, order, dates, compare links, RU mirror parity, bold leads |
 | `i18n` | `.pot` current, no empty `msgstr` |
+| `agent-refs` | every repo path, `npm run <x>` and `tools/<x>` that `CLAUDE.md`, `.claude/**/*.md` and `docs/crew.md` name in backticks exists; a hit is `file:line: target`. Skipped: `../tmp`, `<placeholder>` and glob forms. A steering file naming a deleted tool sends the next session into a dead end |
 | `shell` | every shell script in the source tree parses (`sh -n`) — including `release-notes.sh`, which otherwise fails inside the release job |
 | `marker` | the `call BuildPackage` literal `include/scan.mk` greps for, without which the SDK does not see the package at all |
 | `a11y` | axe-core WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap,2020,forum} × {untinted,60°,260°}; then under emulated `forced-colors: active`: every selector in an `@media (forced-colors)` block must reach a gallery element (`CHROME_ONLY` lists the template-chrome-only ones: `header.ut`, and the rail guard `head.ut` stamps) and keyboard focus must draw a `Highlight` outline |
