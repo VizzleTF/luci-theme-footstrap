@@ -3,8 +3,12 @@
 #
 # "NO COMMIT LANDS WITHOUT ITS CHANGELOG ENTRY … in the same commit, in BOTH files" was a rule the
 # model had to remember; a rule remembered is a rule broken eventually. This denies the commit
-# instead. The two exemptions are exactly the ones CLAUDE.md already names: CLAUDE.md itself, and a
+# instead. The two exemptions are the ones .claude/rules/changelog.md names: CLAUDE.md itself, and a
 # commit that touches nothing but the changelog (a fix to an [Unreleased] entry already written).
+#
+# One call may add the entries and commit: `node tools/changelog.mjs add … && git commit …`; `add`
+# stages both files, so the staged set is read as if it had already run (below).
+# The rules page is .claude/rules/changelog.md.
 #
 # No `if:` in settings.json: it only matches a line that STARTS with `git commit`. The detection is
 # git-guard.sh's `--kinds`, so `cd a && git commit` and a script that commits reach this too.
@@ -74,11 +78,16 @@ case "$FLAGS" in
 	*) FILES=$(git diff --cached --name-only 2>/dev/null || true) ;;
 esac
 
+# `add … && git commit` in one call: the add has not run yet, but it stages both files or the chain stops.
+case "$CMD" in
+	*'changelog.mjs add'*'&&'*commit*) FILES=$(printf '%s\nCHANGELOG.md\nCHANGELOG_ru.md\n' "$FILES") ;;
+esac
+
 # An empty set is `git commit --amend` with no staged change, or a commit that will fail on its own.
 [ -n "$FILES" ] || exit 0
 
-# Substantive = everything except the two exemptions. Documentation, CI and packaging are IN, which
-# is CLAUDE.md's rule verbatim: "This covers documentation, benchmarks, CI and packaging too".
+# Substantive = everything except the two exemptions. Documentation, CI and packaging are IN
+# (.claude/rules/changelog.md: "This covers documentation, benchmarks, CI and packaging too").
 SUBSTANTIVE=$(printf '%s\n' "$FILES" | grep -v -x -e 'CLAUDE.md' -e 'CHANGELOG.md' -e 'CHANGELOG_ru.md' || true)
 
 if [ -n "$SUBSTANTIVE" ]; then

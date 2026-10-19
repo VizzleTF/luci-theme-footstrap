@@ -33,6 +33,18 @@ test('insertBullet never touches a released section', () => {
 	assert.throws(() => insertBullet(DOC, CANON, 'Nope', '- **n.** x'), /unknown section/);
 });
 
+test('insertBullet brings back a missing [Unreleased] above the newest release', () => {
+	const bare = DOC.slice(DOC.indexOf('## [1.0.0]'));
+	const out = insertBullet(bare, CANON, 'Fixed', '- **n.** new');
+	assert.match(out, /^## \[Unreleased\]\n\n### Fixed\n\n- \*\*n\.\*\* new\n\n## \[1\.0\.0\]/);
+	assert.throws(() => insertBullet('no headings\n', CANON, 'Fixed', '- **n.** x'), /no `## \[` heading/);
+});
+
+test('insertBullet puts one blank line between an empty ### heading and its bullet', () => {
+	const out = insertBullet('## [Unreleased]\n\n### Fixed\n\n## [1.0.0] — 2026-01-01\n', CANON, 'Fixed', '- **n.** new');
+	assert.match(out, /### Fixed\n\n- \*\*n\.\*\* new\n\n## \[1\.0\.0\]/);
+});
+
 test('sealedDrift flags an entry that landed in the newest released section', () => {
 	const tagged = () => DOC;
 	assert.deepEqual(sealedDrift('f', DOC, tagged), []);

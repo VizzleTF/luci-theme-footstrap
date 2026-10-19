@@ -4,6 +4,10 @@
 
 - **`live-audit` says how many stale baseline entries a prune would actually drop, and can say it without writing.** A full sweep printed one per-stand count ("50/3/8 no longer reproduce" on the last CI `deep` run) while `--update --prune` dropped 0 of them, because a prune keeps any signature some stand still sees. It now prints both numbers, the second from the same rule the prune uses; `--seen-in` without `--update` is a dry run that folds CI's `deep` evidence into that count, and `docs/releasing.md` prunes only when it is above zero. The release skill's feed step now matches the feed: no checksum table to compare, and an `owfeed.lock` behind a new OpenWrt point release is a lock PR, not a theme fault.
 
+### Fixed
+
+- **`changelog.mjs add` recreates `## [Unreleased]` after a release, and `add && git commit` passes the commit gate in one call.** After 0.14.16 the first entry threw `no [Unreleased] heading` and took four hand-written edits, though `docs/releasing.md` promises the heading comes back with the next commit; the gate also denied the one-call form because it read the staged set before `add` ran.
+
 ## [0.14.16] — 2026-10-18
 
 ### Added

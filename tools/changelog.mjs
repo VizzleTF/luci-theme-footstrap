@@ -44,8 +44,13 @@ export function sectionText(text, id) {
 export function insertBullet(text, canon, section, bullet) {
 	if (!canon.includes(section)) throw new Error(`unknown section \`${section}\` — one of ${canon.join('/')}`);
 	const lines = text.split('\n');
-	const u = lines.findIndex(l => l.startsWith('## [Unreleased]'));
-	if (u < 0) throw new Error('no [Unreleased] heading');
+	let u = lines.findIndex(l => l.startsWith('## [Unreleased]'));
+	if (u < 0) {
+		/* A fresh release leaves none (docs/releasing.md): the next entry brings it back on top. */
+		u = lines.findIndex(l => l.startsWith('## ['));
+		if (u < 0) throw new Error('no `## [` heading to put [Unreleased] above');
+		lines.splice(u, 0, '## [Unreleased]', '');
+	}
 	const end = sectionEnd(lines, u + 1);
 	const heads = [];
 	for (let i = u + 1; i < end; i++) {
@@ -57,7 +62,8 @@ export function insertBullet(text, canon, section, bullet) {
 		const next = heads.find(x => x.at > h.at);
 		let at = next ? next.at : end;
 		while (lines[at - 1].trim() === '') at--;
-		lines.splice(at, 0, bullet);
+		/* an empty `### X` has no bullet to follow: keep one blank line under the heading */
+		lines.splice(at, 0, ...(at === h.at + 1 ? ['', bullet] : [bullet]));
 	} else {
 		const rank = canon.indexOf(section);
 		const next = heads.find(x => canon.indexOf(x.name) > rank);
