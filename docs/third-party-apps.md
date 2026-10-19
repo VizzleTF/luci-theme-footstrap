@@ -325,8 +325,8 @@ is left alone on purpose and scrolls: see [css.md](css.md#which-of-the-three-a-t
 
 **The claim is re-made on every fit pass, not once per element.** These tables are polled: the app
 replaces the rows inside the element it already has, so a claim that ran once left every batch after
-it without `.tr`/`.td` and without a caption — on a table that may by then be carding, where
-`#view .table.fs-dt.fs-stacked { overflow: hidden }` clips the fresh rows with no scrollbar. Both
+it without `.tr`/`.td` and without a caption — on a table that may by then be carding, where the
+fresh rows fall out of the card layout uncaptioned. Both
 halves are additive, and the one JUDGEMENT — "does this table speak LuCI's row vocabulary, or is it
 ours to rewrite?" — is still taken once, at claim time, and remembered on the element, so LuCI's own
 markup is never rewritten by a later pass.

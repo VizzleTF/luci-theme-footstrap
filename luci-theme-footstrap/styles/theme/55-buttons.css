@@ -156,6 +156,9 @@
 		 * `flex-basis: auto`, not the definite basis base gave every row action" has the
 		 * regression this fixed and the measured widths before/after. */
 		flex-basis: auto;
+	}
+	/* a ComboButton is a widget: its open list is a child of the box, and its label ellipsizes in its own <li> */
+	:is(.cbi-section-actions .cbi-button, .cbi-section-actions .btn, .cbi-section-table .cbi-button):not(.cbi-dropdown) {
 		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 	}
 	.td .cbi-button, .cbi-section-actions .cbi-button, .cbi-section-table .cbi-button {

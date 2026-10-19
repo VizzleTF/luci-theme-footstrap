@@ -345,10 +345,10 @@
 		/* @endmirror */
 	}
 	/* width: 0 — the label's nowrap min-content (288px for a Russian item at 360px) sizes the table-row-group
-	 * past the card (td right 442 vs 315); the item still grows to the line. PINNED. */
+	 * past the card (td right 442 vs 315); basis `content` still sizes the item to its label (it was 266px, a whole card, with `1 1 auto`). PINNED. */
 	.table.fs-stacked .td.cbi-section-actions > .cbi-dropdown {
 		/* @mirror table-card/actions-dropdown */
-		flex: 1 1 auto; width: 0; min-width: 0;
+		flex: 0 1 content; width: 0; min-width: 0;
 		/* @endmirror */
 	}
 	/* nothing in a half-width cell may force the row wider than the viewport — .fs-main clips,
@@ -363,10 +363,17 @@
 	.table.fs-stacked tfoot .td:empty,
 	.table.fs-stacked .tfoot .td:empty { display: none; }
 
-	/* --- DATA table flavour (L.ui.Table, tagged .fs-dt) --- clip to the frame's corners: zebra
-	 * paints on the .tr while the frame is overflow:visible, poking past the radius. */
-	#view .table.fs-dt.fs-stacked,
-	#modal_overlay .table.fs-dt.fs-stacked { overflow: hidden; }
+	/* --- DATA table flavour (L.ui.Table, tagged .fs-dt) --- the frame stays overflow:visible so a
+	 * ComboButton's open list can leave the card; zebra and hover paint on the .tr, so the two outer
+	 * rows carry the frame's inner radius (its radius less the 1px border) instead of a clip. */
+	.table.fs-dt.fs-stacked :is(.tr:first-child, :is(.tr.table-titles, .thead) + .tr) {
+		border-start-start-radius: calc(var(--fs-radius-lg) - 1px);
+		border-start-end-radius: calc(var(--fs-radius-lg) - 1px);
+	}
+	.table.fs-dt.fs-stacked .tr:last-child {
+		border-end-start-radius: calc(var(--fs-radius-lg) - 1px);
+		border-end-end-radius: calc(var(--fs-radius-lg) - 1px);
+	}
 	/* :not(.placeholder) — the empty-state plate is out of flow; its row only reserves height,
 	 * and padding subtracted from that left text hanging below the frame (Wireless) */
 	.table.fs-dt.fs-stacked .tr:not(.placeholder) { padding: var(--fs-space-2-5) var(--fs-space-4) var(--fs-space-3); }
