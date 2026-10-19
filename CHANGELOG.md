@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Added
+
+- **`tools/ci-watch.sh` waits for a commit's CI and prints one verdict line; `tools/ci-log.sh` prints the failed step and its decisive lines.** Finding a run, watching it and reading a red job took three to five calls each time (one wait missed its run on a wrong `createdAt` filter, `--log-failed` came back empty, raw logs carried ANSI codes); `tools/bg.sh` now also refuses detached `gh` writes, merges and reruns.
+
 ### Changed
 
 - **`live-audit` says how many stale baseline entries a prune would actually drop, and can say it without writing.** A full sweep printed one per-stand count ("50/3/8 no longer reproduce" on the last CI `deep` run) while `--update --prune` dropped 0 of them, because a prune keeps any signature some stand still sees. It now prints both numbers, the second from the same rule the prune uses; `--seen-in` without `--update` is a dry run that folds CI's `deep` evidence into that count, and `docs/releasing.md` prunes only when it is above zero. The release skill's feed step now matches the feed: no checksum table to compare, and an `owfeed.lock` behind a new OpenWrt point release is a lock PR, not a theme fault.

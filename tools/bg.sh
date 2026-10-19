@@ -30,6 +30,12 @@ fi
 SCAN=$(printf ' %s ' "$*" | tr -d '\\' | tr '\n\t"`;&|()<>'"'"'' ' ' | tr -s ' ')
 set -f                     # $SCAN is split into words, never globbed: a run may carry a literal `*`
 prev=''
+prev2=''
+api=0
+refuse() {
+	echo "refused: '$1' writes history or publishes. Detached runs never commit, push or publish: run it in the foreground thread; a tag goes through /release." >&2
+	exit 2
+}
 for word in $SCAN; do
 	# Path forms (`/usr/bin/ssh`, `./ssh`) walk past a bare-word match, so the same names are
 	# checked with a `*/name` form too; `*dev-sync.sh` already had this shape and is the model.
@@ -41,21 +47,36 @@ for word in $SCAN; do
 	esac
 	# Publishing is `git`/`gh` plus a subcommand, and a path defeats a literal `git push`
 	# substring match the same way it defeats the ssh check above; the basename of the PREVIOUS
-	# word is what a shell would actually run, so that is what is compared here.
+	# word is what a shell would actually run, so that is what is compared here. Reads (`gh run
+	# watch|view|list`, `gh pr checks|view|list|diff`) pass: a detached CI watch is the point.
 	case "${prev##*/}" in
 		git)
 			case "$word" in
-				push | commit | tag)
-					echo "refused: committing, pushing and publishing are given per action by the human (CLAUDE.md), and a detached run cannot be given anything." >&2
-					exit 2 ;;
+				push | commit | tag) refuse "git $word" ;;
 			esac ;;
 		gh)
-			case "$word" in
-				pr | release | issue)
-					echo "refused: committing, pushing and publishing are given per action by the human (CLAUDE.md), and a detached run cannot be given anything." >&2
-					exit 2 ;;
+			[ "$word" = api ] && api=1 ;;
+	esac
+	case "${prev2##*/}" in
+		gh)
+			case "$prev:$word" in
+				pr:view | pr:list | pr:checks | pr:diff | pr:status | issue:view | issue:list | release:view | release:list) ;;
+				pr:* | issue:* | release:*) refuse "gh $prev $word" ;;
+				run:rerun | run:cancel | run:delete) refuse "gh run $word" ;;
 			esac ;;
 	esac
+	# `gh api` is a GET unless a method or a body flag turns it into a write (-f/-F imply POST).
+	if [ "$api" = 1 ]; then
+		case "$prev:$word" in
+			-X:GET | --method:GET) ;;
+			-X:* | --method:*) refuse "gh api $prev $word" ;;
+		esac
+		case "$word" in
+			-f | -F | --field | --raw-field | --input | --field=* | --raw-field=* | --input=* | -XPOST | -XPUT | -XPATCH | -XDELETE | --method=POST | --method=PUT | --method=PATCH | --method=DELETE)
+				refuse "gh api $word" ;;
+		esac
+	fi
+	prev2=$prev
 	prev=$word
 done
 set +f

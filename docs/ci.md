@@ -52,6 +52,24 @@ Chromium from Playwright's CDN and then LAUNCHES it — the claim the gates actu
 apt for the system libraries only if that launch fails. `--with-deps` went through apt every time,
 and apt is the half that stalls.
 
+## Reading a run
+
+Two scripts replace the hand-built `sleep` + `gh run list` + `gh run watch` loop. Both are read-only.
+
+- `tools/ci-watch.sh (--sha SHA | --run ID) [--repo R] [--workflow W] [--max S]` waits for a commit's
+  runs to appear (up to 10 min; `--commit` is matched, not `createdAt`, which is UTC and missed a
+  run), then for all of them to complete. On red it prints `ci-log.sh` for each failed run. The last
+  line is the verdict, `ci: green|red|timeout <sha7> runs <ids> [failed: <jobs>]`; exit 0 green, 1 red,
+  2 no run, 3 still running at `--max` (default 1800 s). Run it as
+  `tools/bg.sh tools/ci-watch.sh --sha "$(git rev-parse HEAD)"` with `tools/bg-wait.sh` beside it.
+- `tools/ci-log.sh <run-id> [job-regex] [--repo R]` prints each failed job, its failed step and the
+  last decisive log lines (`##[error]`, `NEW`, `live-audit:`, `Error`), ANSI and timestamps stripped,
+  40 lines at most. `gh run view --log-failed` prints nothing while a run is still marked in progress.
+
+`tools/bg.sh` lets these and every other read through, and refuses `git push|commit|tag`, `gh pr|issue|release`
+writes, `gh run rerun|cancel|delete` and `gh api` with a method other than GET or with `-f`/`-F`/`--input`.
+`tests/ci-tools.test.mjs` pins the parsing (stub `gh` on `PATH`) and the refusal list.
+
 ## `check` and `lint` — one gate list, package.json's
 
 Both jobs run `npm run check:fast`/`check:mid`/`check:slow` (`package.json`) rather than one step
