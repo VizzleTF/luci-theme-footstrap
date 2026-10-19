@@ -22,6 +22,8 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$SHA$RUN" ] || { echo "usage: tools/ci-watch.sh (--sha SHA | --run ID) [--repo R] [--workflow W] [--max S] [--interval S]" >&2; exit 2; }
 HERE=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+# `gh run list --commit` matches the full sha only: an abbreviated one finds nothing
+[ -z "$SHA" ] || SHA=$(git rev-parse --verify -q "$SHA^{commit}" 2>/dev/null || printf %s "$SHA")
 R=''; [ -z "$REPO" ] || R="--repo $REPO"
 LABEL=${SHA:-$RUN}; LABEL=$(printf %.7s "$LABEL")
 FIND=$((MAX < 600 ? MAX : 600))   # how long a run may take to show up

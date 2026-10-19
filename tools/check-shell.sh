@@ -28,6 +28,11 @@ for f in luci-theme-footstrap/*.sh install.sh tools/*.sh wallpapers/*.sh fonts/*
 	n=$((n + 1))
 done
 
+# A script run by its path needs the exec bit in the INDEX, not on disk: a clone with
+# core.fileMode=false adds new files as 100644 and CI then answers "Permission denied" (b6a68b4).
+bad=$(git ls-files -s -- 'tools/*.sh' '.githooks/*' | awk '$1 != "100755" { print $4 }')
+[ -z "$bad" ] || { echo "not executable in git (git update-index --chmod=+x):" $bad; exit 1; }
+
 # A vanished payload must not read greener than a whole one: with the package directory moved away
 # this used to print "18 shell script(s) parse", down from a real 27 (now 29, tools/ having grown
 # since), and exit 0 — nothing compared the count against what should be there. 25 leaves room for a

@@ -13,6 +13,7 @@
 ### Fixed
 
 - **`changelog.mjs add` recreates `## [Unreleased]` after a release, and `add && git commit` passes the commit gate in one call.** After 0.14.16 the first entry threw `no [Unreleased] heading` and took four hand-written edits, though `docs/releasing.md` promises the heading comes back with the next commit; the gate also denied the one-call form because it read the staged set before `add` ran.
+- **New tool scripts are committed executable, and `check-shell` fails a script under `tools/` or `.githooks/` that is not.** A clone with `core.fileMode=false` added `ci-watch.sh`, `ci-log.sh` and `upstream-review-facts.sh` as 100644, so CI got "Permission denied" and main went red at b6a68b4; `ci-watch.sh --sha` also accepts an abbreviated sha now, which `gh run list --commit` alone never matched.
 
 ## [0.14.16] — 2026-10-18
 
