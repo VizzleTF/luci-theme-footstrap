@@ -24,6 +24,10 @@ if ! command -v npm >/dev/null 2>&1; then
 	exit 1
 fi
 
+# git exports GIT_DIR (and GIT_PREFIX, GIT_INDEX_FILE, ...) to a hook; a test's `git -C tmp init` then
+# re-inits the real repo (core.bare=true once). tests/pre-push.test.mjs holds it.
+unset $(git rev-parse --local-env-vars)
+
 echo "pre-push: npm run check ..." >&2
 if ! npm run check; then
 	echo >&2
