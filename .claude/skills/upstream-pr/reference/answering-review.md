@@ -1,54 +1,64 @@
-# Мониторинг и ответ на ревью
+# Watching and answering review
 
-Правило `CLAUDE.md`: **сессия не пишет комментарии в апстрим-PR**. Замечание закрывается правкой
-в диффе и пометкой треда resolved. Если что-то надо сказать человеку — текст готовится в чате
-и отдаётся мейнтейнеру, отправляет его он.
+A remark is closed by a change in the diff and by resolving its thread. Anything to say to a person
+is drafted in chat and posted by the maintainer (`CLAUDE.md` `## Commits`, publication).
 
-## Мониторинг
+## Watching
 
-Один наблюдатель на PR — `tools/pr-watch.sh`, в фоне (`run_in_background` или `tools/bg.sh`):
+One watcher per PR, each with its own seen-file, as a Monitor (one event batch per run):
 
-```sh
-tools/bg.sh tools/pr-watch.sh <N> --seen ../tmp/pr-<N>.seen
+```
+Monitor  command: tools/pr-watch.sh <N> --seen ../tmp/pr-<N>.seen --max 1700
+         timeout_ms: 1800000   description: "openwrt/luci #<N> review events"
 ```
 
-Он опрашивает `gh api` раз в минуту, дедуплицирует события по id в seen-файле, ключует CI по SHA
-головы (force-push обнуляет), собирает пачку и завершается, когда пришло ревью (человека или бота),
-комментарий или сменилось состояние PR (`MERGED`/`CLOSED`). Падение отдельной проверки CI его не
-будит: результат CI приходит строкой в следующей пачке. После завершения прочитать пачку и запустить
-наблюдателя снова. `git push` в рецептах идёт в фоне — один раз он занял больше 120 с.
+`pr-watch.sh` polls `gh api` once a minute, dedupes events by id in the seen-file (so a re-arm never
+replays one), keys CI by the head SHA (a force-push starts from zero), and exits once a review
+(human or bot), a comment or a state change (`MERGED`/`CLOSED`) arrives. A failing check does not
+wake it; CI arrives as a line in the next batch. Read the batch, then re-arm the Monitor, also on
+exit 3 (`--max` elapsed with nothing new). Done = the PR is `MERGED` or `CLOSED`.
 
-## Два вида ревью
+**Humans first.** Before reporting any bot event, read every review on the PR:
 
-### Бот (`openwrt-ai`) — разбираем сами
+```sh
+gh api repos/openwrt/luci/pulls/<N>/reviews --jq '.[] | "=== \(.user.login) [\(.state)]\n\(.body)"'
+```
 
-Не ждём пользователя. **Замечания только к комментариям применяются дословно**: текст предложения
-бота идёт в диф как есть. Любое отклонение от него показывается мейнтейнеру в форме «бот
-предлагает X / я предлагаю Y» с цитатой предложения. По каждому замечанию:
+A review by anyone other than `openwrt-ai` leads the report, above the bot's.
 
-1. **Проверить измерением, право ли оно.** Бот ошибается заметно чаще человека: он жаловался, что
-   `text-overflow: ellipsis` ничего не делает, хотя `white-space: nowrap` приходит из base; он же
-   нашёл настоящую регрессию в селекторе подписей графиков.
-2. Настоящую ошибку — починить сразу, в том же заходе.
-3. Ложную — не чинить, зафиксировать в ответе пользователю одной строкой, почему.
-4. Треды закрыть — **только те, что действительно исправлены или доказательно опровергнуты**.
+## Two kinds of review
 
-### Человек — уведомление и вердикт
+### The bot (`openwrt-ai`) — handled here
 
-1. Отправить пользователю уведомление, что пришло ревью от живого мейнтейнера.
-2. Прочитать целиком, не по обрезанному уведомлению.
-3. Разобрать по пунктам и дать вердикт по каждому: делаем / это ошибка ревьюера, вот почему /
-   требует решения пользователя.
-4. Правки — после его слова, если пункт спорный; очевидные — сразу.
+Handled without waiting for the maintainer. A remark on a comment is applied **verbatim**: the
+bot's suggested text goes into the diff as is; any departure is shown as "bot suggests X / I
+suggest Y" with the quote. For each remark:
 
-## Команды
+1. **Measure whether it is right.** The bot is wrong noticeably more often than a person: it claimed
+   `text-overflow: ellipsis` did nothing although `white-space: nowrap` comes from base; it also
+   found a real regression in the chart-label selector.
+2. A real defect: fix it in the same round, in the commit it belongs to, then `commit --amend` (or
+   a fixup into that commit).
+3. A false one: no change; one line in the report on why.
+4. Resolve the threads that are fixed or measurably refuted, and only those.
+
+Then show a one-line summary of the round and the exact update command from
+`mechanics.md` Step 6; push on the maintainer's word.
+
+### A person — report and verdict
+
+1. Tell the maintainer a human review arrived.
+2. Read it whole, never from the truncated notification.
+3. Give a verdict per point: we do it / the reviewer is mistaken, here is why / needs your decision.
+4. Obvious fixes go in at once; a disputed point waits for the maintainer's word.
+
+## Commands
 
 ```sh
 gh api repos/openwrt/luci/pulls/<N>/comments --jq '.[] | "=== \(.path):\(.line // .original_line)\n\(.body)"'
-gh api repos/openwrt/luci/pulls/<N>/reviews  --jq '.[] | "=== \(.user.login) [\(.state)]\n\(.body)"'
 ```
 
-Открытые треды и закрытие:
+Open threads, and resolving one:
 
 ```sh
 gh api graphql -f query='query { repository(owner:"openwrt", name:"luci") {
@@ -59,36 +69,34 @@ gh api graphql -f query='query { repository(owner:"openwrt", name:"luci") {
 gh api graphql -f query='mutation($id: ID!) { resolveReviewThread(input:{threadId:$id}) { thread { isResolved } } }' -f id="<THREAD_ID>"
 ```
 
-CI после пуша:
+CI after a push:
 
 ```sh
 gh api repos/openwrt/luci/commits/$(git -C ../tmp/luci-pr rev-parse HEAD)/check-runs --jq '.check_runs[] | "\(.name): \(.status) \(.conclusion)"'
 ```
 
-## Заготовки ответов
+## Drafts for the maintainer to post
 
-Отдаются пользователю в чат, отправляет он.
-
-**Про `'prefs' is not defined`**
+**On `'prefs' is not defined`**
 
 > That is an `eslint.config.mjs` defect: it does not read the `'require X as Y'` pragma, so every
 > aliased require reports as undefined — 24 of the 30 aliases in the tree, 59 files across 18
 > packages. The fix belongs there; I can send it as a separate PR.
 
-**Про security review**
+**On security review**
 
 > Yes — the branch diff was reviewed: the installer's signature chain, the new shell script, the
 > login template, the browser JS and the build pipeline. No findings.
 
-**Про совместимость со старьём**
+**On old-release compatibility**
 
 > Dropped — the theme targets 24.10 and newer now. A 23.05 router gets the pinned last release that
 > runs on it, verified by the same signature and digest as any other artifact.
 
-## Чего не делать
+## Stance
 
-- Не резолвить тред, который не исправлен, — даже «объяснив» его.
-- Не спорить с позицией «мы апстрим»: просят убрать совместимость или вынести правку в отдельный
-  PR — дешевле сделать. Оба раза это заняло часы и было принято.
-- Не переоткрывать PR ради переделки формы: `push --force-with-lease` в ту же ветку — норма.
-  Закрывать стоит, только если меняется сам предмет PR.
+- A thread is resolved only when fixed or refuted by measurement, never by explanation alone.
+- "We are the upstream" wins: removing compatibility or moving a change to its own PR is cheaper to
+  do than to argue (both times it took hours and was accepted).
+- Reworking the form goes into the same branch with `--force-with-lease`; a PR is closed only when
+  its subject changes.

@@ -11,18 +11,18 @@ const PRECOMMIT = join(ROOT, '.claude/hooks/precommit-gate.sh');
 const dir = mkdtempSync(join(tmpdir(), 'git-guard-'));
 const bins = [];
 after(() => { for (const d of [ dir, ...bins ]) rmSync(d, { recursive: true, force: true }); });
-writeFileSync(join(dir, 'pipe.sh'), 'set -e\ngit commit -m x\n');
+writeFileSync(join(dir, 'pipe.sh'), 'set -e\ngit tag v1\n');
 writeFileSync(join(dir, 'outer.sh'), 'sh pipe.sh\n');
 writeFileSync(join(dir, 'clean.sh'), 'git status\n');
 mkdirSync(join(dir, 'sub'));
-writeFileSync(join(dir, 'sub', 'p.sh'), 'git push\n');
+writeFileSync(join(dir, 'sub', 'p.sh'), 'git tag v1\n');
 // nested scripts: the inner path resolves against the directory the caller ran in
 mkdirSync(join(dir, 'n1', 'dd'), { recursive: true });
 writeFileSync(join(dir, 'n1', 'outer.sh'), 'sh dd/p.sh\n');
-writeFileSync(join(dir, 'n1', 'dd', 'p.sh'), 'git push\n');
+writeFileSync(join(dir, 'n1', 'dd', 'p.sh'), 'git tag v1\n');
 mkdirSync(join(dir, 'n2', 'ee'), { recursive: true });
 writeFileSync(join(dir, 'n2', 'outer.sh'), 'cd ee && sh p.sh\n');
-writeFileSync(join(dir, 'n2', 'ee', 'p.sh'), 'git push\n');
+writeFileSync(join(dir, 'n2', 'ee', 'p.sh'), 'git tag v1\n');
 
 // A PATH holding only the tools the hooks need, minus the ones named: a missing tool is the failure
 // being simulated.
@@ -47,59 +47,50 @@ const decide = (command, o) => run(command, o).permissionDecision || '';
 
 const ask = [
 	// a shell behind a wrapper, in any token position
-	'env FOO=1 sh -c "git push"',
+	'env FOO=1 sh -c "git tag v1"',
 	'/usr/bin/env bash pipe.sh',
-	'timeout 5 bash -c "git commit -m x"',
+	'timeout 5 bash -c "git tag v1"',
 	'nice -n 5 sh pipe.sh',
-	'nohup sh -c "git push" &',
-	'xargs sh -c "git push"',
-	'sudo sh -c "git push"',
+	'nohup sh -c "git tag v1" &',
+	'xargs sh -c "git tag v1"',
+	'sudo sh -c "git tag v1"',
 	'doas sh pipe.sh',
-	'command sh -c "git push"',
-	'exec bash -c "git push"',
-	"find . -exec sh -c 'git push' sh {} \\;",
+	'command sh -c "git tag v1"',
+	'exec bash -c "git tag v1"',
+	"find . -exec sh -c 'git tag v1' sh {} \\;",
 	'find . -execdir sh pipe.sh \\;',
-	'git bisect run sh -c "git push"',
+	'git bisect run sh -c "git tag v1"',
 	// here-string and redirected input are scanned as nested input
-	'bash <<< "git push"',
-	'sh <<< "git commit -m x"',
-	'cat <<< "git push" | sh',
+	'bash <<< "git tag v1"',
+	'sh <<< "git tag v1"',
+	'cat <<< "git tag v1" | sh',
 	'sh < pipe.sh',
 	'bash < ./pipe.sh',
 	`cd ${dir}/n1 && sh outer.sh`,
 	`cd ${dir}/n2 && sh outer.sh`,
-	'git pull --reb',
-	'git pull --rebase=true',
 	'git reset --h HEAD~1',
-	'git commit -m x',
-	'set -e; X=1; git commit -m x',
-	'cd a && git push',
-	'true | git push origin main',
-	'(git commit -m x)',
-	'FOO=1 git push',
-	'git -C /r -c user.name=a commit -m x',
-	'wsl.exe -e git push',
-	"git rebase --exec 'git commit --amend' HEAD~2",
-	'git commit --amend --no-edit',
+	'git tag v1',
+	'set -e; X=1; git tag v1',
+	'cd a && git tag v1',
+	'true | git tag v1',
+	'(git tag v1)',
+	'FOO=1 git tag v1',
+	'git -C /r -c user.name=a tag v1',
+	'wsl.exe -e git tag v1',
 	'git reset --hard HEAD~1',
 	'sh pipe.sh',
 	'bash ./pipe.sh',
 	'sh outer.sh',
 	'./pipe.sh',
-	'sh -c "git push"',
+	'sh -c "git tag v1"',
 	// a script path is resolved after a cd in the same line, and an unresolvable cd is unknown
 	'cd sub && sh p.sh',
 	'cd sub; ./p.sh',
 	`cd ${join(dir, 'sub')} && bash p.sh`,
 	'(cd sub && true); sh pipe.sh',
-	'echo "$(git push)"',
-	'eval "git push"',
-	'git cherry-pick abc',
-	'git am x.patch',
-	'git merge topic',
-	'git pull --rebase',
-	'git pull -r',
-	'git commit -m "a; b"',
+	'echo "$(git tag v1)"',
+	'eval "git tag v1"',
+	'git tag v1 -m "a; b"',
 ];
 const deny = [
 	'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git commit -m x',
@@ -166,6 +157,71 @@ const none = [
 for (const c of ask) test(`ask: ${c}`, () => assert.equal(decide(c), 'ask'));
 for (const c of deny) test(`deny: ${c}`, () => assert.equal(decide(c), 'deny'));
 for (const c of none) test(`silent: ${c}`, () => assert.equal(decide(c), ''));
+// Policy: commit and push are the agent's; a tag, a release, a rewrite of main and a hard reset need the maintainer's word.
+const askPolicy = [
+	'git tag -a v1 -m x', 'git tag v1', 'git tag -d v1', 'git tag -f v1 HEAD', 'git -C /r tag -s v1',
+	'git push origin v0.14.17', 'git push --follow-tags', 'git push --tags', 'git push origin --tags', 'git push --mirror',
+	'git push origin refs/tags/v1', 'git push origin :refs/tags/v1', 'git push origin HEAD:refs/tags/x', 'git push origin tag v1',
+	'git config push.followTags true', 'git update-ref refs/tags/v1 HEAD', 'git update-ref -d refs/tags/v1',
+	'gh release create v1', 'gh release edit v1', 'gh release delete v1', 'gh release upload v1 f.apk',
+	'gh api -X POST repos/VizzleTF/luci-theme-footstrap/git/refs -f ref=refs/tags/v1',
+	'gh api --method=DELETE repos/VizzleTF/luci-theme-footstrap/git/refs/tags/v1',
+	'gh api repos/VizzleTF/luci-theme-footstrap/releases -f tag_name=v1',
+	'gh workflow run release.yml', 'gh workflow run build.yml -R VizzleTF/luci-theme-footstrap',
+	'gh -R VizzleTF/luci-theme-footstrap release create v1', 'gh --repo VizzleTF/luci-theme-footstrap workflow run u.yml', 'gh -R owfeed/x api -X POST repos/VizzleTF/luci-theme-footstrap/git/refs -f a=1',
+	'git push --force origin main', 'git push -f origin master', 'git push origin +main', 'git push --force-with-lease origin main',
+	'git push origin --delete main', 	'sh -c "git tag v1"', 'git commit -m x && git tag v1',
+];
+const nonePolicy = [
+	'git commit -m x', 'git commit -am x', 'git push', 'git push origin main', 'git push -u origin claude/x',
+	'git push --force origin claude/x', 'git push --force-with-lease origin feat/y', 'git push origin +fix/z',
+	'git cherry-pick abc', 'git am x.patch', 'git merge topic', 'git pull --rebase', 'git pull -r', 'git rebase main', 'git commit --amend --no-edit',
+	'git tag', 'git tag -l', 'git tag --list "v*"', 'git tag --contains abc', 'git tag -v v1', 'git tag --points-at HEAD',
+	'git config push.followTags', 'git update-ref refs/heads/x HEAD',
+	'gh release list', 'gh release view v1', 'gh api repos/VizzleTF/luci-theme-footstrap/releases',
+	'gh api -X POST repos/owfeed/owfeed-packages/git/refs -f x=1', 'gh api repos/VizzleTF/luci-theme-footstrap/issues -f title=x',
+	'gh workflow run update.yml -R owfeed/owfeed-packages', 'gh workflow run update.yml --repo owfeed/owfeed-packages', 'gh run list',
+	// a heredoc to git or cat is data, not a command line
+	"git commit -F - <<'E'\nfix: drop --no-verify advice\nE",
+	"cat >> docs/x.md <<'E'\ngit commit --no-verify\nE",
+	"python3 - <<'E'\nprint('git push --no-verify')\nE",
+	"tee x <<-E\n\tgit tag v1\n\tE\nls",
+];
+for (const c of askPolicy) test(`policy ask: ${c}`, () => assert.equal(decide(c), 'ask'));
+for (const c of nonePolicy) test(`policy silent: ${c}`, () => assert.equal(decide(c), ''));
+test('a heredoc fed to a shell is still scanned', () => {
+	assert.equal(decide("sh <<'E'\ngit commit --no-verify\nE"), 'deny');
+	assert.equal(decide("bash <<E\ngit tag v1\nE"), 'ask');
+	assert.equal(decide("cat <<E\nhi\nE\ngit tag v1"), 'ask');
+});
+
+// History rewrite is judged on the repository the hook runs in: HEAD inside origin/main asks, own work is silent.
+test('rebase, amend and a bare force push ask only on pushed main work', () => {
+	const g = (cwd, ...a) => { const r = spawnSync('git', a, { cwd, encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); };
+	const r = join(dir, 'repo');
+	mkdirSync(r);
+	g(r, 'init', '-q', '-b', 'main');
+	g(r, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'a');
+	g(r, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+	for (const c of [ 'git rebase -i HEAD~1', 'git commit --amend --no-edit', 'git push --force-with-lease', 'git push -f origin HEAD' ]) assert.equal(decide(c, { cwd: r }), 'ask', c);
+	g(r, 'checkout', '-q', '-b', 'claude/x');
+	g(r, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'b');
+	for (const c of [ 'git rebase main', 'git commit --amend --no-edit', 'git push --force-with-lease', 'git push -f origin HEAD' ]) assert.equal(decide(c, { cwd: r }), '', c);
+});
+
+// A push is judged on the remote URL of the directory it runs in (cd or git -C): outside the theme repo asks.
+test('a push to a remote other than the theme repo asks, to the theme repo is silent', () => {
+	const g = (cwd, ...a) => { const r = spawnSync('git', a, { cwd, encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); };
+	const f = join(dir, 'pushrepo');
+	mkdirSync(f);
+	g(f, 'init', '-q');
+	g(f, 'remote', 'add', 'origin', 'git@github.com:VizzleTF/luci-theme-footstrap.git');
+	g(f, 'remote', 'add', 'fork', 'git@github.com:VizzleTF/luci.git');
+	g(f, 'remote', 'add', 'up', 'https://github.com/openwrt/luci');
+	for (const c of [ 'git push fork feat/x', 'git push up x', `git -C ${f} push fork x`, `cd ${f} && git push fork x`, 'git -C pushrepo push up x', 'cd pushrepo && git push fork x', 'git push https://github.com/openwrt/luci x' ]) assert.equal(decide(c, { cwd: c.includes(f) || c.includes('pushrepo') ? dir : f }), 'ask', c);
+	for (const c of [ 'git push', 'git push origin main', 'git -C pushrepo push origin x', 'git push nosuch x', 'cd "$X" && git push fork x' ]) assert.equal(decide(c, { cwd: c.includes('pushrepo') ? dir : f }), '', c);
+});
+
 // Fan-out: the same script reached 40 ways is scanned once; 60 distinct scripts hit the cap.
 test('80-way nested fan-out of one script is deduplicated and fast', () => {
 	const f = join(dir, 'fan');
@@ -185,24 +241,24 @@ test('more than 50 distinct scripts is silent in hook mode and script-scan-cap i
 	const r = spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input: JSON.stringify({ cwd: c, tool_input: { command: 'sh top.sh' } }), encoding: 'utf8', timeout: 20000 });
 	assert.match(r.stdout, /script-scan-cap/);
 });
-test('multi-word message with -n is not no-verify', () => assert.equal(decide("git commit -m 'a -n b'"), 'ask'));
-test('commit message containing -n is not no-verify', () => assert.equal(decide('git commit -m "fix -n"'), 'ask'));
+test('multi-word message with -n is not no-verify', () => assert.equal(decide("git commit -m 'a -n b'"), ''));
+test('commit message containing -n is not no-verify', () => assert.equal(decide('git commit -m "fix -n"'), ''));
 
 // A tripwire acts only on a positive find: an internal failure stays silent in hook mode.
 test('no jq: hook is silent', () => {
 	const env = { PATH: binWithout('jq') };
-	assert.equal(decide('git push', { env }), '');
+	assert.equal(decide('git tag v1', { env }), '');
 	assert.equal(decide('ls', { env }), '');
 });
 test('no awk: hook is silent', () => {
 	const env = { PATH: binWithout('awk') };
-	assert.equal(decide('git push', { env }), '');
+	assert.equal(decide('git tag v1', { env }), '');
 	assert.equal(decide('ls', { env }), '');
 });
-test('nonexistent cwd: plain line is silent, git line asks', () => {
+test('nonexistent cwd: plain line is silent, tag line asks', () => {
 	const cwd = join(dir, 'gone');
 	assert.equal(decide('ls', { cwd }), '');
-	assert.equal(decide('git push', { cwd }), 'ask');
+	assert.equal(decide('git tag v1', { cwd }), 'ask');
 });
 test('--kinds exits non-zero on an internal failure', () => {
 	const r = spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input: '{"tool_input":{"command":"git commit"}}', encoding: 'utf8', env: { PATH: binWithout('awk') } });

@@ -8,6 +8,7 @@
 ### Changed
 
 - **`live-audit` says how many stale baseline entries a prune would actually drop, and can say it without writing.** A full sweep printed one per-stand count ("50/3/8 no longer reproduce" on the last CI `deep` run) while `--update --prune` dropped 0 of them, because a prune keeps any signature some stand still sees. It now prints both numbers, the second from the same rule the prune uses; `--seen-in` without `--update` is a dry run that folds CI's `deep` evidence into that count, and `docs/releasing.md` prunes only when it is above zero. The release skill's feed step now matches the feed: no checksum table to compare, and an `owfeed.lock` behind a new OpenWrt point release is a lock PR, not a theme fault.
+- **The agent now commits and pushes to `main` on its own; a tag, a GitHub release and history on `main` wait for the maintainer's word.** Across 20 sessions about 45 approvals were spent on routine, green commits and pushes, while `git tag` itself was never fenced (0.14.12 was re-pointed and 0.14.15 tagged ahead of its CI without a prompt). `git-guard.sh` now asks on tag, release, fork push, force push and history rewrite of `main` and stays silent on ordinary commits and pushes; the new `/ship` and `/retro` skills, the slimmer `CLAUDE.md` and `docs/crew.md` with `docs/ai-architecture.html` describe the crew, its autonomy and its guardrails.
 
 ### Fixed
 

@@ -7,9 +7,11 @@ disallowedTools: Edit, Write, NotebookEdit
 maxTurns: 100
 ---
 
-You judge; you do not fix. Asked to fix, answer `read-only` and return `NEEDS_WORK`. Read-only is
-a rule you keep, not a fence around you: `Edit` and `Write` are absent from your tools, but `Bash`
-would let you write, stage or delete, and none of that is yours to do. You see the
+You judge; you do not fix. Asked to fix, answer `read-only` and judge the diff as it stands: the
+verdict follows the findings alone, PASS when none is blocking. Read-only is a rule you keep, not a
+fence around you: `Edit` and `Write` are absent from your tools, but `Bash` would let you write,
+stage, commit or delete. Your Bash runs gates and reads; this checkout's files, index and history
+stay exactly as the developer left them, and the lead commits. You see the
 diff and the card, never the developer's reasoning, and that is the point: a judge that watched the
 work grades the work it watched. Protocol: `docs/crew.md`; the stands: `docs/development.md`.
 
@@ -23,24 +25,28 @@ work grades the work it watched. Protocol: `docs/crew.md`; the stands: `docs/dev
 
 ## Runbook
 
-Every `tools/bg.sh` call below is paired, in the same turn, with `tools/bg-wait.sh <run-id>` started
-as a **background** command. A waiter in the foreground blocks past the 5-minute limit and is killed,
-which is the failure the pairing exists to prevent. Read every waiter's result before you return:
-one still running when you finish wakes you again afterwards and re-sends your verdict as noise.
-Any run over 5 minutes is detached this way and its result is read once, never polled.
+Waiting. A run that ends within 4.5 min: one foreground `tools/bg-wait.sh <id> 5 270` after its
+`tools/bg.sh`. Longer: start `tools/bg-wait.sh <id>` with `run_in_background`, write one line naming
+the task id, and make no further tool calls until its notification arrives. Chain sequential gates
+into one `tools/bg.sh` script. Read every waiter's result before you return: one still running when
+you finish wakes you again afterwards and re-sends your verdict as noise. Your turn ends only with
+the verdict block.
 
-For every new or changed gate or fixture, revert the fix and show the gate go red; a gate seen
-only green is unproven. A layout change runs under RU or pseudo-loc text and at a phone width.
+For every new or changed gate or fixture, show it go red without the fix: `git worktree add
+../tmp/red-<id> HEAD`, copy in only the gate and fixture files, run it there, then `git worktree
+remove ../tmp/red-<id>`. A gate seen only green is unproven. A layout change runs under RU or pseudo-loc text and at a phone width.
 
 1. Classify the diff: css-only / js / template / package-or-build (`Makefile`, `root/**`,
    `build-css.sh`, `tools/stage.sh`, `strip-*`). `scope_ok` is `git diff HEAD --name-only` being a
    subset of `card.files`.
-2. T0, foreground: `npm test`; every `acceptance[].cmd`; `ucode -T -c -o /dev/null <file>` for each
-   `.ut`; `npm run lint:js` or `npm run lint:css` by area.
+2. T0, foreground: `npm test`; every `acceptance[].cmd`; for any `.ut`, the stand check in
+   `.claude/rules/chrome.md` "Templates" (25.12's ucode only: say so under `not_run` for 24.10);
+   the T0 gate the area's rules file names.
 3. `npm run smoke`; `npm run computed-diff`. A css-only diff whose number surprises you gets
    `npm run computed-diff -- --control`, which must print 0 before the first number means anything.
-4. Stands: `docker ps --format '{{.Names}}\t{{.Ports}}'`. If `owrt2512` and `owrt2410` are not up,
-   detach: `tools/bg.sh sh -c 'export PATH=$HOME/go/bin:$PATH; owlab up'`, then the waiter.
+4. Stands: `docker ps --format '{{.Names}}\t{{.Ports}}'`. Bare `owlab up` boots every stand in
+   `owlab.yaml`; start only the ids that are down and name them in the verdict:
+   `tools/bg.sh sh -c 'export PATH=$HOME/go/bin:$PATH; owlab up owrt2512 owrt2410'`, then the waiter.
 5. `owlab sync owrt2512 && owlab sync owrt2410`. Prove the bytes arrived: `md5sum` of a touched
    resource on the host against `owlab exec owrt2410 -- md5sum /www/luci-static/resources/<file>`.
    opkg answers `up to date` to a matching version and installs nothing; the checksum is the proof.
@@ -66,6 +72,8 @@ only green is unproven. A layout change runs under RU or pseudo-loc text and at 
    the body (25.12 answers 403 with `x-luci-login-required: yes`; the code alone proves nothing). On any failure print the rollback
    line — `uci set luci.main.mediaurlbase=/luci-static/bootstrap; uci commit luci` — and stop; do
    not run it unasked.
+10. CI, when the card names a pushed sha: `tools/bg.sh tools/ci-watch.sh --sha <sha>`, then the
+    waiter; on red, `tools/ci-log.sh <run-id>` gives the failed step and its decisive lines.
 
 ## Findings
 
@@ -76,19 +84,8 @@ only green is unproven. A layout change runs under RU or pseudo-loc text and at 
 - Evidence is the command and its output, trimmed to the lines that show it. A finding without a
   command is an opinion and does not go in the block.
 
-## Voice
-
-Work in caveman full, the mode the lead runs in — every line you emit, not the return block alone:
-a question back to the lead, a `BLOCKED` line, a note on a gate that did not run. Drop articles and
-filler, one idea per line, fragments over sentences, the short synonym over the long one. Never add
-a word to sound caveman: where plain wording is already shorter, it is the plain wording that ships.
-
-Exact and untouched: commands, flags, paths, `file:line`, numbers with their units, quoted error
-text, and every `not`, `no`, `only`, `except` — a dropped negation costs more than every token it
-saves. The block's own field names are the ones the schema below prints, unchanged.
-
-What you leave behind on disk — code, comments, a changelog line, a handoff, an issue draft — stays
-normal English prose: it is read by people who never saw this session.
+Voice, shell and waiting rules arrive from `.claude/hooks/subagent-start.sh`; without them, prose is
+caveman full in Russian, and files, commands, paths and the block's field names stay exact English.
 
 ## Verdict block
 

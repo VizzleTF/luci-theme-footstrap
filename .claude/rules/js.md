@@ -31,7 +31,7 @@ description: Module composition, the jsmin traps, and what fs-fit owns.
 
 ## What to run after an edit here
 
-`npm run lint:js` is the T0 gate. Then the one that covers what you touched: `axes` for `fs-prefs`
+T0 is `npm test`, `npm run lint:js`, and the one gate that covers what you touched: `axes` for `fs-prefs`
 or `fs-axes`, `chrome-fence` for `fs-sheets`/`fs-prefs`, `page-modules` for the page→module map,
 `css-orphans` if a `fs-*` class name moved, `comment-share` for any comment edit in a shipped JS file (under 40 % comment bytes), `floor` (T2, live) for anything in `holdFloor()` or
 `naturalHeight()` — it is the only gate that reads a floor's height back and empties a box to see

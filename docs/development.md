@@ -2009,6 +2009,27 @@ el.className).sort()`, duplicates counted, never a plain sequence diff.
   owrt2512d -- pidof rpcd` still answers the PID it had before. Restore with `owlab exec owrt2512d
   -- /etc/init.d/rpcd restart`; that is the stand, not the theme.
 
+- **`zsh:1: ====X not found` from a line that only prints is the host shell, not the command.** The
+  Bash tool runs the user's `zsh`, whose `EQUALS` option expands a word that starts with `=` into
+  the path of the command named after it: `echo =====X` exits 1 with `====X not found`, and the same
+  happens to a `=` separator in an `echo`. Four sessions lost a call each to it. Tell it apart:
+  `bash -c 'echo =====X'` prints the word. Quote any word that starts with `=` (`echo '=== X'`).
+
+- **`Exit code 137` on a long gate is SIGKILL, and on this WSL host the sender is the OOM killer.**
+  A `timeout`-bounded `npm run check` in a prepush worktree died with 137, not `timeout`'s 124, while
+  stands and browsers were up (2026-10-07). Tell the two apart: `dmesg | grep -i 'killed process'`
+  names the victim when it was memory; 124 is the clock. Bring fewer stands up for the run
+  (`docker ps | grep -c owlab-`) and keep one browser gate at a time.
+
+- **A hardware test build versioned `X.Y.Z_pN` never gives way to the release.** On apk `_p` is a
+  patch level and sorts ABOVE `X.Y.Z`, so `apk upgrade` keeps the test build and the router had to be
+  downgraded by hand. Measured 2026-10-19 on the stands: `apk version -t 0.14.15_rc1 0.14.15` → `<`
+  and `0.14.15_p1` → `>`; opkg sorts both `_rc1` and `_p1` above the release and only
+  `0.14.15~rc1` below (`opkg compare-versions 0.14.15~rc1 '<<' 0.14.15`), which apk rejects
+  (`apk version -c` → invalid). So stamp an apk test build as the NEXT version's candidate
+  (`FOOTSTRAP_VERSION=0.14.16_rc1` over 0.14.15): it upgrades the router and yields to 0.14.16. An
+  opkg test build needs `opkg install --force-downgrade` back to the release.
+
 ## The test matrix
 
 - **Pages**: Status/Overview (tables, ifacebox), Network/Interfaces (zonebadge, modals),

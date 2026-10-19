@@ -44,6 +44,10 @@ description: The cascade layers, the token tiers, and how a CSS change is proved
 
 ## Proving the change
 
+T0 after an edit here: `npm run lint:css`, plus the gate behind the rule you touched — `npm run
+audit` (token tiers, `!important`), `npm run mirror` (duplicates), `npm run css-floor` (a feature
+new to the sheet).
+
 `npm run computed-diff` (T1, ~8.7 s) is the cheap half; `--control` runs the same sheet on both
 sides and must report 0. The gallery has every widget and none of the pages, so a clean diff is an
 early result, not a release: the live half is `npm run live` and `owlab test` (T2), where the same

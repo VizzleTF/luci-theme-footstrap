@@ -1,33 +1,35 @@
-# Как собрать ветку
+# Building the branch
 
-Апстрим держит только собранный `cascade.css`, а не `styles/`. Значит каждый коммит PR должен
-нести свой кусок готового листа — то есть ветка собирается **переигрыванием** состояний нашего
-дерева, а не переносом коммитов `main` как есть.
+Upstream keeps the built `cascade.css`, not `styles/`, so every PR commit carries its own slice of
+the finished sheet: the branch is built by **replaying** states of our tree, never by moving `main`'s
+commits across.
 
-## Рабочие копии
+## Working copies
 
-| Путь | Что это |
+| Path | Role |
 |---|---|
-| `.` | наш репозиторий |
-| `../tmp/fs-hist` | worktree нашего репозитория для переигрывания |
-| `../tmp/luci-pr` | клон openwrt/luci, один на все PR; `origin` — апстрим, `fork` — наш форк |
+| `.` | our repository |
+| `../tmp/fs-hist` | worktree of ours, for the replay |
+| `../tmp/luci-pr` | THE clone of openwrt/luci for every PR: `origin` upstream, `fork` ours. All branch work happens here |
+| `../tmp/luci-ref` | worktree of that clone, the reference for Step 3 |
+| `../luci-fork` | drift report only: `npm run fork-drift`'s default target (`tools/fork-drift.mjs`), synced from `main` |
 
-**Источник — последний релизный тег темы** (`git describe --tags --abbrev=0`), не `main`: в апстрим
-едет то, что выпущено.
+**The source is the latest release tag** (`git describe --tags --abbrev=0`): what goes upstream is
+what was released.
 
 ```sh
-git worktree add --detach ../tmp/fs-hist $(git describe --tags --abbrev=0)   # если worktree ещё нет
-LUCI=$(cd ../tmp/luci-pr && pwd)                  # дальше путь к клону — только через $LUCI
-git -C $LUCI config user.name "Ivan Kvashonkin"   # иначе формальности завернут
-git -C $LUCI checkout --quiet -B <ветка> origin/master   # переиспользование клона: -B, не новый clone
+git worktree add --detach ../tmp/fs-hist $(git describe --tags --abbrev=0)   # when it is missing
+LUCI=$(cd ../tmp/luci-pr && pwd)                  # the clone is $LUCI from here on
+git -C $LUCI config user.name "Ivan Kvashonkin"   # the global name bounces on formalities
+git -C $LUCI fetch origin && git -C $LUCI checkout --quiet -B <branch> origin/master
 ```
 
-## Шаг 1. Найти точку, где апстрим совпадал с нами
+## Step 1. Find where upstream matched us
 
-Сравниваются **все шиппящиеся файлы**, а не один `cascade.css`: он совпадает и при разошедшихся
-JS и шаблонах. Кандидаты — релизные теги, от новых к старым. Для каждого: синк в чистый
-`origin/master`-checkout и `git status` по теме. Git сравнивает blob-SHA, поэтому пустой вывод
-значит «каждый файл совпал»; `Makefile` и `po/` ведутся там отдельно и из сверки исключены.
+Compare **every shipped file**, not `cascade.css` alone (it matches while JS and templates differ).
+Candidates are release tags, newest first; each one is synced into a clean `origin/master` and
+`git status` is read. Git compares blob SHAs, so empty means every file matched; `Makefile` and `po/`
+are kept there separately and excluded. This is also the check of what upstream currently ships.
 
 ```sh
 for t in $(git tag --sort=-creatordate | head -10); do
@@ -35,105 +37,116 @@ for t in $(git tag --sort=-creatordate | head -10); do
   git -C ../tmp/fs-hist checkout --quiet --detach $t
   (cd ../tmp/fs-hist && ./tools/sync-luci-fork.sh $LUCI >/dev/null 2>&1)
   n=$(git -C $LUCI status --porcelain -- themes/luci-theme-footstrap ':!themes/luci-theme-footstrap/Makefile' ':!themes/luci-theme-footstrap/po' | wc -l)
-  echo "$t: $n файлов расходятся"
+  echo "$t: $n files differ"
 done
 ```
 
-Первый тег с нулём — точка. Если нуля нет, берётся тег с минимумом: его список
-(`git status --porcelain`) показывает, что апстрим поправил сам, и это переносится в нашу сторону
-до переигрывания.
+The first tag at zero is the base. With no zero, take the minimum: its `git status --porcelain` list
+is what upstream fixed on its own, and that is carried into our tree before the replay.
 
-## Шаг 2. Переиграть, пропуская ненужное
+## Step 2. Replay by the split plan
 
-Ветка строится группами: `cherry-pick -n` нескольких коммитов, затем один `commit`. Так несколько
-наших коммитов становятся одним апстримным — группируем по логике изменения, а не по тому, как
-работа шла в нашем репозитории.
+One group per upstream commit of the split plan: `cherry-pick -n` its tag commits, then one
+`commit`. Group by concern, not by how the work went in our repository.
 
 ```sh
-cd ../tmp/fs-hist && git checkout --quiet -B upstream-N <точка>   # точка из шага 1
+cd ../tmp/fs-hist && git checkout --quiet -B upstream-N <base>   # base from Step 1
 pick() { for c in "$@"; do git cherry-pick -n -x $c >/dev/null 2>&1 || {
   git diff --name-only --diff-filter=U | while read -r f; do git checkout --theirs "$f"; git add "$f"; done; }; done; }
 
-pick <коммит> <коммит> && git commit --quiet -m g1
+pick <commit> <commit> && git commit --quiet -m g1
 ```
 
-Приёмы, которые понадобились на практике:
+`pick` resolves every conflict to the picked side (`--theirs`) without a word. That is safe only
+because Step 3 compares the tip with the tag; a group built without Step 3 can carry a wrong
+resolution upstream.
 
-- **выкинуть часть коммита** — после `pick` вернуть файл на место:
+Moves that were needed in practice:
+
+- **drop part of a commit**: after `pick`, restore the file:
   `git checkout HEAD -- luci-theme-footstrap/styles/theme/45-misc.css`;
-- **перенести часть в другую группу** — взять файл из нужного коммита:
-  `git checkout <коммит> -- <файл>`;
-- **пропустить коммит целиком** — просто не включать в `pick` (так выпали 23.05-коммиты);
-- **правка комментария должна ехать с кодом, который она описывает** — иначе в серии видно, как
-  один коммит вводит текст, а следующий его исправляет.
+- **move part into another group**: take the file from that commit: `git checkout <commit> -- <file>`;
+- **skip a commit**: leave it out of `pick` (the 23.05 commits went this way);
+- **a comment fix travels with the code it describes**, or the series shows one commit adding text
+  and the next correcting it.
 
-## Шаг 3. Сверить вершину с тегом
+## Step 3. Tip == tag
 
-Перед нарезкой коммитов PR — обязательно, иначе в апстрим уедет не то, что проверено. Сверяется
-**всё дерево темы** через `diff -r`, а не список файлов: новый файл не должен выпасть из проверки.
-Эталон — синк тега в отдельную worktree клона.
+Mandatory before cutting PR commits. The **whole theme tree** is compared with `diff -r`, so a new
+file cannot drop out. The reference is the tag synced into a separate worktree of the clone.
 
 ```sh
-git -C $LUCI worktree add --detach ../tmp/luci-ref origin/master      # если ещё нет
+git -C $LUCI worktree add --detach ../tmp/luci-ref origin/master      # when it is missing
 git -C ../tmp/fs-hist checkout --quiet --detach $(git describe --tags --abbrev=0)
 (cd ../tmp/fs-hist && ./tools/sync-luci-fork.sh $(cd ../tmp/luci-ref && pwd))
-diff -r -x Makefile -x po ../tmp/luci-ref/themes/luci-theme-footstrap $LUCI/themes/luci-theme-footstrap && echo "вершина == тег"
+git -C ../tmp/fs-hist checkout --quiet upstream-N
+(cd ../tmp/fs-hist && ./tools/sync-luci-fork.sh $LUCI)
+diff -r -x Makefile -x po ../tmp/luci-ref/themes/luci-theme-footstrap $LUCI/themes/luci-theme-footstrap && echo "tip == tag"
 ```
 
-`$LUCI` стоит на вершине ветки PR. Пустой вывод — можно резать коммиты. `sync-luci-fork.sh` сам
-падает (exit 1), если режим файла не совпал с индексом нашего репо, если вырезание проб оставило
-двойную пустую строку и если в шиппящемся файле осталась ссылка за пределы дерева (`../tmp/`,
-`tools/`, `tests/`, стенды, `issue #N`, хеш коммита) — его вывод читается целиком.
+`sync-luci-fork.sh` exits 1 when a file mode differs from our index, when probe stripping leaves a
+double blank line, or when a shipped file references something outside the tree (`../tmp/`,
+`tools/`, `tests/`, stands, `issue #N`, a commit hash); read its whole output.
 
-## Шаг 4. Нарезать коммиты PR
+## Step 4. Cut the PR commits
 
-Для каждой точки: синк в клон luci, затем коммит с готовым сообщением.
+For each group: sync into the luci clone, then commit with its finished message.
 
 ```sh
-git -C $LUCI checkout --quiet -B <ветка> origin/master      # -B пересоздаёт ветку с нуля
+git -C $LUCI checkout --quiet -B <branch> origin/master      # -B rebuilds the branch from scratch
 i=1
-for p in $(git -C ../tmp/fs-hist log --format=%h --reverse <точка>..upstream-N); do
+for p in $(git -C ../tmp/fs-hist log --format=%h --reverse <base>..upstream-N); do
   git -C ../tmp/fs-hist checkout --quiet --detach $p
-  (cd ../tmp/fs-hist && ./tools/sync-luci-fork.sh $LUCI >/dev/null) || break   # ошибки гарда — в stderr
-  git -C $LUCI checkout --quiet origin/master -- themes/luci-theme-footstrap/po   # Weblate владеет каталогами
+  (cd ../tmp/fs-hist && ./tools/sync-luci-fork.sh $LUCI >/dev/null) || break   # guard errors go to stderr
+  git -C $LUCI checkout --quiet origin/master -- themes/luci-theme-footstrap/po   # Weblate owns the catalogues
   git -C $LUCI add -A themes/luci-theme-footstrap
-  git -C $LUCI diff --cached --quiet || git -C $LUCI commit --quiet -F <файл сообщения $i>
+  git -C $LUCI diff --cached --quiet || git -C $LUCI commit --quiet -F <message file $i>
   i=$((i+1))
 done
 ```
 
-`po/` возвращается на каждом шаге не случайно: наши каталоги отличаются путями в комментариях,
-и без этого они попадут в дифф.
+`po/` is restored on every step because our catalogues differ in their path comments.
 
-## Шаг 5. Проверить дифф ветки
+## Step 5. Read the branch diff
 
 ```sh
 cd $LUCI
-git log --format="%h %s" --stat origin/master..HEAD | grep -E "^[0-9a-f]{7} |files? changed"
-git diff --name-only origin/master..HEAD          # только шиппящиеся файлы, без po/ и Makefile
+git log --format="%h %s" --stat origin/master..HEAD | grep -E "^[0-9a-f]{7,} |files? changed"
+git diff --name-only origin/master..HEAD          # shipped files only; Makefile only as a mirror of ours
 git diff --check origin/master..HEAD
 git log --format="%an <%ae>" origin/master..HEAD | sort -u
 ```
 
-## Шаг 6. Публикация
+## Step 6. Publish (the maintainer's word)
 
-Только по слову мейнтейнера: PR создаёт и пушит сессия, но не раньше его «пушь» и «создавай».
+Show a one-line summary of the branch and the exact command; run it on the word, in the background
+(one push took over 120 s).
+
+A new PR:
 
 ```sh
-git push --force-with-lease --quiet fork <ветка>   # run_in_background: один раз занял больше 120 с
-gh pr create --repo openwrt/luci --base master --head VizzleTF:<ветка> \
-  --title "..." --body-file <файл>
+git -C $LUCI push --quiet fork <branch> \
+  && gh pr create --repo openwrt/luci --base master --head VizzleTF:<branch> --title "..." --body-file <file>
 ```
 
-Обновление существующего PR — тот же `push --force-with-lease` плюс, если состав изменился,
-`gh pr edit <N> --body-file`.
+An update after review or a bot round (the bot's suggestion applied verbatim, then `commit --amend`):
 
-## Грабли
+```sh
+old=$(git -C $LUCI ls-remote fork refs/heads/<branch> | cut -f1) \
+  && git -C $LUCI push --quiet --force-with-lease=<branch>:$old fork HEAD:<branch> \
+  && gh pr edit <N> --repo openwrt/luci --body-file <file>
+```
 
-- `luci.mk:` как префикс subject бот отвергает — нужен `treewide:`.
-- Автор коммита обязан быть «Имя Фамилия»; `git config user.name` в клоне по умолчанию
-  берётся глобальный (`VizzleTF`) и заворачивается.
-- `sync-luci-fork.sh` сам вырезает `/* fs:probe */`-экспорты — но только если рабочая копия,
-  из которой идёт синк, содержит свежие `tools/sync-luci-fork.sh` и `strip-build.sh`.
-- `cascade.css` в апстриме лежит **неминифицированным** и **без манглинга токенов** — это
-  осознанно: там дерево исходников, которое кто-то должен читать при ревью.
+The `&&` chain is the point: a failed push leaves the PR body as it was.
+
+## Step 7. Clean up
+
+After the merge: `git worktree remove ../tmp/fs-hist` and `git -C $LUCI worktree remove ../tmp/luci-ref`.
+
+## Traps
+
+- The author must be "First Last"; the clone inherits the global `VizzleTF` and bounces.
+- `sync-luci-fork.sh` strips `/* fs:probe */` exports only when the worktree it runs from holds
+  current `tools/sync-luci-fork.sh` and `luci-theme-footstrap/strip-build.sh`.
+- Upstream keeps `cascade.css` **unminified** and with **unmangled tokens** on purpose: it is a source
+  tree someone reviews.

@@ -1,121 +1,101 @@
-# Предполёт
+# Preflight
 
-Каждая проверка здесь стоит одного замечания, которое иначе прилетит в ревью и будет стоить
-переигрывания ветки. **Весь предполёт, включая раздел 0, идёт до ПЕРВОГО пуша**: PR #9111 бот
-разбирал два круга, и оба раза находил то, что ловится локально.
+Each check here costs one review remark that would otherwise arrive upstream and cost a branch
+replay. **All of it, section 0 included, runs before the FIRST push**: on #9111 the bot needed two
+rounds, and both times found what a local run catches. Done = every section below green.
 
-## 0. Ревью диффа ветки
+## 0. Review of the branch diff
 
-Агент `upstream-reviewer` (read-only, Opus) читает `git -C ../tmp/luci-pr diff origin/master..`:
-осиротевшие комментарии проб, удалённый API с живыми ссылками, потерянный `+x`
-(100755 → 100644), двойные пустые строки, ссылки за пределы дерева (`docs/`, `tools/`, `../tmp`,
-`#NNNN`), комментарии, ставшие ложными после вырезания, мёртвые экспорты, видимые изменения
-поведения без слова в теле коммита; плюс `git diff --check`. Вердикт `CLEAN` — условие пуша.
+The `upstream-reviewer` agent (read-only, Opus) reads `git -C ../tmp/luci-pr diff origin/master..`:
+orphaned probe comments, removed API with live references, a lost `+x` (100755 → 100644), double
+blank lines, references outside the tree (`docs/`, `tools/`, `../tmp`, `#NNNN`), comments made false
+by stripping, dead exports, visible behaviour changes with no word in the commit body; plus
+`git diff --check`. A `CLEAN` verdict is the condition for the push.
 
-`tools/sync-luci-fork.sh` уже держит часть этого: режимы файлов берутся из индекса нашего репо,
-пробы вырезаются, двойные пустые строки сверяются с исходником, ссылки `docs/*.md` в шиппящихся
-файлах считаются в сводке. Его вывод читается целиком, а не отбрасывается в `/dev/null`.
+`tools/sync-luci-fork.sh` already holds part of this (file modes from our index, probes stripped,
+double blank lines checked against the source, `docs/*.md` references counted in its summary); its
+output is read whole.
 
-## 1. Наши гейты
+## 1. Our gates
 
 ```sh
-npm run check          # должен выйти 0; включает lint, audit, size, changelog, a11y и остальные
+npm run check          # exit 0
 ```
 
-Не входят в `check` и запускаются отдельно, когда правка их касается:
-`npm run live` (нужен поднятый стенд), `npm run fork-drift`, `npm run upstream`.
+Outside `check`, run when the change touches them: `npm run fork-drift`, `npm run upstream`, and the
+live gates (section 5).
 
-## 2. Их eslint по нашим файлам
+## 2. Their eslint on our files
 
-Апстримный конфиг перечисляет глобалы вручную и **не читает** прагму `'require X as Y'`, поэтому
-он ругается на алиасы, которых нет в его списке. Это ловится локально:
+Upstream's config lists globals by hand and **does not read** the `'require X as Y'` pragma, so it
+flags aliases missing from its list. Caught locally:
 
 ```sh
-cd /tmp/lintcheck && cp <изменённые .js> .
-# конфиг с их набором глобалов, без плагинов
-<репо>/node_modules/.bin/eslint --no-config-lookup -c ./eslint.config.mjs *.js | grep "is not defined"
+mkdir -p ../tmp/lintcheck && cp <changed .js> ../tmp/lintcheck/ && cp ../tmp/luci-pr/eslint.config.mjs ../tmp/lintcheck/
+cd ../tmp/lintcheck && <repo>/node_modules/.bin/eslint --no-config-lookup -c ./eslint.config.mjs *.js | grep "is not defined"
 ```
 
-Если предупреждение относится к алиасу — это дефект их конфига (24 из 30 алиасов дерева ему
-неизвестны, задето 59 файлов в 18 пакетах), и ответ такой же. Если к настоящей опечатке — чинить.
+A warning on an alias is their config's defect (24 of the tree's 30 aliases are unknown to it, 59
+files in 18 packages) and the answer says so. A warning on a real typo is a fix.
 
-## 3. Их правила формальностей
+## 3. Their formalities
 
-`.github/formalities.json` в клоне luci — машинный гейт, он висит перед сборкой:
-
-| Правило | Значение |
-|---|---|
-| subject | ≤60 мягко, ≤80 жёстко |
-| строка тела | ≤100 символов |
-| тело | обязательно, и не должно повторять subject |
-| `Signed-off-by` | обязателен, совпадает с автором |
-| автор | имя и фамилия, не `@users.noreply.github.com` |
-| ветка | не `master`/`main` |
-| merge-коммиты, CRLF | запрещены |
-
-Проверка своими руками перед пушем:
+`.github/formalities.json` in the luci clone is the machine gate in front of the build: subject soft
+60 / hard 80, body required and not a repeat of the subject, `Signed-off-by` matching the author, a
+real full name (no `@users.noreply.github.com`), branch not `master`/`main`, no merge commits, no
+CRLF. Its body-line limit is 100; our wrap is 72, the single number for this skill.
 
 ```sh
-awk 'length > 75 {print FILENAME": "FNR": "length}' <файлы сообщений>
-head -1 <файл> | wc -c      # ≤61 с учётом перевода строки
+awk 'length > 72 {print FILENAME": "FNR": "length}' <message files>   # empty
+head -1 <file> | wc -c                                                # ≤ 61 with the newline
 ```
 
-## 4. Шаблоны компилируются
+## 4. Templates compile
 
-На хосте `ucode` нет — компиляция идёт внутри уже запущенного стенда owlab (`owlab ps` покажет
-имя и контейнер). Шаблоны темы берутся из пакета, который стоит на стенде:
+The host has no `ucode`; compile inside a running owlab stand (`owlab ps` names it), on the
+templates of the package installed there:
 
 ```sh
-docker exec <контейнер-стенда> sh -c 'for f in $(find /usr/share/ucode/luci/template/themes/footstrap -name "*.ut"); do
+docker exec <stand container> sh -c 'for f in $(find /usr/share/ucode/luci/template/themes/footstrap -name "*.ut"); do
   ucode -T -c -o /dev/null "$f" || echo "FAILS: $f"; done; echo done'
 ```
 
-## 5. Живая проверка
+## 5. Live
 
-Поведенческая правка не готова, пока не прогнана на **обоих** пакетных менеджерах:
+A behaviour change is ready once it has run on **both** package managers:
 
 ```sh
 owlab sync owrt2512 owrt2410
-node tools/scroll-anchor.mjs --engines chromium,firefox,webkit   # если трогали fs-fit
-npm run live                                                     # общий обход; широкий — docs/releasing.md, Step 4
+node tools/scroll-anchor.mjs --engines chromium,firefox,webkit   # when fs-fit changed
 ```
 
-CSS доказывается computed-style или пиксельным диффом против прогона того же листа, не скриншотом:
-живые счётчики дают 0.5–1.3% различий сами по себе.
+`npm run live` takes no flags (it chains eight `npm run` calls; `docs/releasing.md` Step 4) and is
+`ask` in settings: to re-run one gate with flags, call `node tools/<gate>.mjs` directly, core
+stands only (`--only owrt2512,owrt2410`). CSS is proven by a computed-style or pixel diff against a
+run of the same sheet: live counters alone move 0.5–1.3 %.
 
-## 6. Дрейф
+## 6. Drift
 
 ```sh
 ./tools/sync-luci-fork.sh ../luci-fork && npm run fork-drift
 ```
 
-Легитимно отличаются только `Makefile` (правится на той стороне вручную), `po/` (Weblate) и
-`cascade.css` (собирается здесь, коммитится там). Всё остальное в списке DRIFT — это либо
-неотправленная правка, либо забытый синк.
+Only `Makefile` (kept by hand there), `po/` (Weblate) and `cascade.css` (built here, committed
+there) legitimately differ. Anything else in DRIFT is an unsent change or a forgotten sync.
 
-## 7. Размер
+## 7. Size
 
-Понадобится, если спросят про вес пакета — спрашивали уже дважды.
+Asked about twice; keep the numbers at hand.
 
 ```sh
-node tools/size-budget.mjs --show      # разбивка JS по файлам, CSS, холодная страница
+node tools/size-budget.mjs --show      # JS per file, CSS, the cold page
 du -sb luci-theme-footstrap/ucode luci-theme-footstrap/htdocs/luci-static/resources
-```
-
-Доля комментариев в файле:
-
-```sh
-python3 -c "
-import re,glob
-tot=com=0
-for f in glob.glob('luci-theme-footstrap/ucode/**/*.ut', recursive=True):
-    s=open(f).read(); tot+=len(s); com+=sum(len(m) for m in re.findall(r'\{#.*?#\}', s, re.S))
-print(f'{tot/1024:.1f} KB, comments {com/1024:.1f} KB ({100*com/tot:.0f}%)')"
 ```
 
 ## 8. Security review
 
-Обязателен перед PR и перед релизом (`CLAUDE.md`), прогоняется по финальной ветке — `/security-review`.
-Мейнтейнер спрашивал прямо; в последний раз находок не было.
-Что проверять в первую очередь: цепочку подписи в `install.sh`, новые shell-скрипты, шаблон логина
-(страница неаутентифицированная), sink-и в браузерном JS, изменения конвейера сборки.
+Required before a PR (`CLAUDE.md`), on the final branch: `/security-review` reads
+`git diff origin/HEAD...` of the directory it runs in, so run it from our repository on a commit
+that carries the tag's tree over the previous synced tag — the recipe in `docs/releasing.md` Step 2.
+First look: the signature chain in `install.sh`, new shell scripts, the login template
+(unauthenticated), sinks in the browser JS, build pipeline changes.

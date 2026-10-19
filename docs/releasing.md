@@ -57,11 +57,33 @@ npm run changelog
 node tools/size-budget.mjs --pin
 ```
 
-and `/security-review` on the diff this release carries, before the tag. It is not a gate and cannot
-be — it reads a diff rather than a tree — which is why it is named here: the pass is worth the
-minute on the five things a theme can actually get wrong (the installer's signature chain, new
-shell running over a build tree, the unauthenticated login template, sinks in the browser JS, the
-packaging pipeline), and a maintainer has asked outright whether one was done.
+`node tools/size-budget.mjs --pin` runs after the last code fix: a fix landed mid-release once left
+the pins stale. The ceilings may also rise between releases, each time with a written
+justification; the pin here re-fits them to the build that ships.
+
+`~/go/bin/owfeed lock` must exit 0 at the repo root and in a fresh clone of owfeed-packages. Without
+`--update` it only compares and writes nothing (exit 9 and the drift, e.g. `25.12 point release
+25.12.5 -> 25.12.6`, when stale). A stale lock in owfeed-packages reds its `check / build` after
+the tag, which is where 0.14.15 found it.
+
+And `/security-review` on the diff this release carries, after the last code commit and before the
+tag. It is not a gate and cannot be — it reads a diff rather than a tree — which is why it is named
+here: the pass is worth the minute on the five things a theme can actually get wrong (the
+installer's signature chain, new shell running over a build tree, the unauthenticated login
+template, sinks in the browser JS, the packaging pipeline), and a maintainer has asked outright
+whether one was done. The command reviews `git diff origin/HEAD...`, which is empty on `main` once
+the release commit is pushed (0.14.15 and 0.14.16 shipped seven commits nobody reviewed), so it
+runs in a worktree on a commit whose only parent is the previous tag:
+
+```sh
+c=$(git commit-tree 'HEAD^{tree}' -p '<prev>^{commit}' -m 'security review <v>') \
+  && git worktree add --detach ../tmp/sec-<v> "$c"
+# /security-review with ../tmp/sec-<v> as the working directory; verdict -> ../tmp/release-<v>/security.md
+git worktree remove ../tmp/sec-<v>
+```
+
+Its diff then equals `git diff <prev> HEAD`, deletions included (measured on v0.14.15..v0.14.16:
+28 files, +940/-188 both ways).
 
 The guards inside `check`, by the issue that left them:
 
@@ -254,33 +276,39 @@ from the diff after the fact; a self-reference to a commit hash.
 
 ## The runbook
 
-Only after everything above has passed:
+Only after everything above has passed. `/release` walks these steps in order. It is model-invoked
+on purpose, so "делай тег" lands in this procedure rather than in a bare `git tag` (0.14.15 was
+tagged that way, with no security review and before CI on the release sha); the tag itself stays
+gated by step 4 below, the `git-guard` hook and the `ask` rule.
 
 1. Rename `[Unreleased]` to `## [x.y.z] — YYYY-MM-DD` in both `CHANGELOG.md` and
    `CHANGELOG_ru.md`, and add the `compare/` link at the bottom of each. Sections in the canonical
    order, every bullet with a `bold lead`.
 2. `npm run changelog` — green.
-3. Commit that change. Message in English, Conventional Commits, **no AI attribution**.
-4. Tag `vx.y.z` on this commit. **Never tag first** — the tag must point at a commit that
-   already contains its own entry, or the release describes a version whose changelog does not yet
-   exist.
-5. **Before pushing, read the recent runs on `main`**: `gh run list --limit 6`. A run already red before your push
+3. Commit that change as `release: x.y.z` and push it to `origin main`; this is part of a release
+   the maintainer asked for, so it needs no further word. Message in English, **no AI attribution**.
+4. **The tag is the maintainer's word, each time**: either their message named it ("tag",
+   "делай тег", "release x.y.z") or the session asks, quoting
+   `git tag -a vx.y.z -m vx.y.z && git push origin vx.y.z`, and runs exactly that in its own Bash
+   call. The tag goes on the release commit, never first — it must point at a commit that already
+   contains its own entry, or the release describes a version whose changelog does not yet exist.
+5. **Before the tag, read the release sha's run and the one before it on `main`**:
+   `gh run list --branch main -L2`. A run already red before your push
    stays red after it, and `release` does not fire until whatever it currently gates on is green —
    so a tag pushed onto a broken pipeline cannot publish. A pre-existing failure is not something to
    push past: it is either an infrastructure condition to be fixed first, or a real regression that
    has nothing to do with this release but will still hold it. `v0.14.12` was tagged onto exactly
    this: the previous commit on `main` had already failed the same way the day before, on the same
    upstream condition, and nobody looked before the tag went out.
-6. Push the commit and the tag to `origin` — the only remote (the `git.vaka.work` mirror was removed
-   on 2026-07-25).
+6. `origin` is the only remote (the `git.vaka.work` mirror was removed on 2026-07-25).
 7. CI on `v*` builds both formats, signs them, and builds the release body from the changelog, but
    `release` does not run until whatever it gates on is green, by design — deliberately, so that a
    tag cannot publish a package no router has installed. The consequence is exactly what bit
    `v0.14.12`: any one red leg holds the whole release, including a leg red for a reason that has
    nothing to do with the diff — infrastructure or an upstream feed, not this release's code. **The
-   release is not cut until the tag's own run is read, job by job, not merely waited on**: `gh run
-   view <id>` for the job list, `gh run view --job <id> --log-failed` for the failing step's log; say
-   plainly whether the cause is this diff, an infrastructure condition, or an upstream feed. `deep`
+   release is not cut until the tag's own run is read, job by job, not merely waited on**:
+   `tools/ci-watch.sh --sha <sha>` (detached through `tools/bg.sh`) for the verdict, `gh run view
+   <id>` for the job list, `tools/ci-log.sh <id>` for a failing step's decisive lines; say plainly whether the cause is this diff, an infrastructure condition, or an upstream feed. `deep`
    and `release-assets` run here and nowhere before, so this is their first reading. Only then check
    the release carries the expected assets (plus a `.sig` for each): the theme resolving to exactly
    one asset per format, the manifest, the installer, the notes.
@@ -302,7 +330,7 @@ Only after everything above has passed:
    `apk adbdump` on `releases/25.12/<arch>/packages.adb` from a router or stand (the file is
    compressed, `strings` finds nothing). Confirm the new version is there.
 
-A fresh empty `## [Unreleased]` comes back on top with the next substantive commit.
+`node tools/changelog.mjs add` recreates `## [Unreleased]` on top with the next substantive commit.
 
 ## Sources for the changelog rules
 

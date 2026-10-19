@@ -1,48 +1,72 @@
-# Working as a crew
+# The AI-development architecture
 
-The protocol for a Claude Code session on this repository: a lead thread that delegates, role
-subagents that do the work, a card that holds the state, a loop that ends. For the lead and for
-whoever edits a role in `.claude/agents/`. The short form is the "Crew" section of `CLAUDE.md`.
+How Claude Code works on this repository: one lead thread that orchestrates, role subagents that
+do the work, a card that holds the state, a loop that ends, and guardrail layers that hold whatever
+must hold every time. For the lead and for whoever edits a role, a hook, a skill or a permission.
+`CLAUDE.md` carries the always-needed rules and is the single source of the commit policy; this page
+is the reference behind it. The interactive diagram is `docs/ai-architecture.html`.
 
-Why it exists: the heaviest session on record put 484 Bash results and 20 screenshots through one
-context, against 5 delegations, and a context that carries every gate log recalls less of the rest.
-A subagent spends tens of thousands of tokens and returns one to two thousand.
+The design follows one principle: the simplest workflow that works, more machinery only where a
+measured failure asks for it. A solo frontend package has few parallel subtasks, and multi-agent
+runs cost several times the tokens, so this is one writer at a time with read-only reviewers
+beside it, not a swarm. Why delegate at all: the heaviest session on record put 484 Bash results
+and 20 screenshots through one context against 5 delegations; a subagent spends tens of thousands
+of tokens and returns one to two thousand.
+
+## Overview
+
+```mermaid
+flowchart TD
+  M([Maintainer]) -->|task, per-word approvals| L[Lead: main thread, Opus]
+  L -->|writes| C[(card.json in ../tmp/task-id)]
+  L -->|Agent, depth 1| D[developer: Sonnet, writes card.files, runs T0]
+  D -->|files + gates block| L
+  L --> T[tester: Opus, read-only, T1/T2]
+  T -->|PASS / NEEDS_WORK| L
+  L -.->|NEEDS_WORK, max 2 rounds| D
+  L --> S[security / upstream-reviewer / researcher: read-only]
+  L -->|/ship| G{git-guard + precommit-gate hooks}
+  G -->|commit + push origin| P[.githooks/pre-push: npm run check]
+  P --> CI[GitHub CI: lint, build, verify apk+opkg, live, anchors]
+  CI -->|tools/ci-watch.sh verdict| L
+  L -->|tag, release, fork push, publication| M
+  H[[SubagentStart / SessionStart / PermissionDenied hooks]] -.-> L
+  H -.-> D
+  H -.-> T
+```
 
 ## Roles
 
 | Role | Model | `maxTurns` | Writes | Sees | Returns |
 |---|---|---|---|---|---|
-| lead (main thread) | Opus | n/a | `docs/**` and config (`.claude/**`, `CLAUDE.md`, settings); never code | the card, the return blocks | decisions |
-| `developer` | Sonnet | 60 | inside `card.files` | the card, its rules file, a handoff if any | files + gates block |
+| lead (main thread) | Opus | n/a | `docs/**` and config; commits and pushes per `CLAUDE.md` "Commits" | the card, the return blocks | decisions, status |
+| `developer` | Sonnet | 60 | inside `card.files`, stages them | the card, its rules file, a handoff if any | files + gates block |
 | `tester` | Opus | 100 | nothing | the diff and the card | verdict block |
 | `security` | Sonnet | 25 | nothing | the diff | findings block |
 | `upstream-reviewer` | Opus | 30 | nothing (Bash held read-only by a hook) | the luci branch diff against `origin/master` | findings block |
 | `researcher` | Sonnet | 20 | nothing | the question | answer + ranked sources |
 | `caveman:cavecrew-investigator` | Haiku | n/a | nothing | a "where is X" question | `file:line` table |
 
-`maxTurns` is the budget one card needs, not a ceiling to raise when a card runs out. `developer`
-60: a card is one mechanism, and the handoff is written 15 turns before the limit (turn 45), which
-leaves the next developer a clean state; 200 only hid cards that were too big. `tester` 100: it
-starts a detached run with `tools/bg.sh` and reads the waiter's result, it never polls, so its
-turns are the runbook's steps and not wall-clock. `security` and `researcher` are one pass over a
-diff or a question. A role that runs out is a card to split, not a number to raise. Code is the
-`developer`'s because the lead's own edits skip T0 and the tester's diff; docs and config are the
-lead's because no gate reads them but `npm run check:fast`.
+`maxTurns` is the budget one card needs. `developer` 60: a card is one mechanism, and the handoff
+is written at turn 45, leaving the next developer a clean state. `tester` 100: it starts detached
+runs and reads the waiter's result, so its turns are runbook steps, not wall-clock. A role that
+runs out is a card to split. Code is the `developer`'s because the lead's own edits skip T0 and the
+tester's diff; docs and config are the lead's because only `npm run check:fast` reads them.
 
-The lead relays each role's return block to the maintainer in Russian: the block's fields and every
-command, path and number stay as printed, the prose around them is translated.
+One `developer` at a time: two writers on one card produce two designs for one problem. Subagents
+spawn no subagents (nesting depth 1). The tester runs on a different model from the developer and
+sees only the diff, never the developer's reasoning: a judge of the same model grades its own text
+softer. `tester`, `security`, `researcher` and `upstream-reviewer` carry `disallowedTools: Edit,
+Write, NotebookEdit`; Bash can still write, so read-only is a contract the tester's `diff_hash`
+check verifies, not a sandbox.
 
-One `developer` at a time, sequentially: two writers on one card produce two designs for one
-problem, which is the failure every published account of parallel coding agents reports.
-
-The tester runs on a different model from the developer: a judge of the same model recognises its
-own text and grades it softer. It never sees the developer's reasoning, only the diff. Set the
-lead's model with `/model opus`; the roles name theirs in frontmatter.
+The lead relays each return block to the maintainer in Russian: fields, commands, paths and numbers
+as printed, the prose around them translated.
 
 ## The card
 
 The lead writes `../tmp/task-<id>/card.json` before the first delegation. JSON, because models
-rewrite JSON less readily than Markdown, and a file outlives a compaction of the lead's context.
+rewrite JSON less readily than Markdown, and a file outlives a compaction.
 
 ```json
 {
@@ -69,72 +93,120 @@ rewrite JSON less readily than Markdown, and a file outlives a compaction of the
 | `hardware` | `false` until the maintainer says otherwise for this card |
 | `history` | one entry per tester round: `{ "round", "verdict", "blocking": [ids], "diff_hash" }` |
 
-Sizing a card:
-
 - One card, one mechanism; the acceptance fits in 5 lines. A card that needs more is two cards.
-- A `SendMessage` to a resumed agent is a round, and counts toward `max_rounds` 2.
+- A `SendMessage` to a resumed agent is a round and counts toward `max_rounds`.
 - Upstream and release work splits in two: (a) base and history, verified by the `tester`; (b) the
   cut and the messages. A release card is regenerated from `git diff vX..HEAD --stat` before each
-  matrix run, never reused from the last one.
+  matrix run.
+- A live reproduction (stand, probe, baseline, layout question) is a `tester` card on an owlab
+  stand (root, empty password).
 
 ## Return blocks
 
-Every role returns at most 25 lines: paths, not contents; no diff, no code, no story of the
-attempt. The shape is in each role's file. The lead quotes the block and never opens the log it
-summarises; the role that produced a log is the role that read it.
-
-A role works in caveman full throughout, the mode the lead runs in — a subagent inherits no session
-hook, so each role carries the rule in its own "Voice" section. It covers every line the role emits,
-not the block alone: a question back to the lead, a `BLOCKED` line, a note on a gate that did not
-run. Commands, flags, paths, numbers, quoted errors and every negation stay exact; the compression
-is the prose around them, and it never grows the output. What a role writes to disk — code,
-comments, a changelog line, a handoff — is normal English prose, as everywhere else here.
+Every role returns at most 25 lines: paths, not contents; no diff, no code, no story of the attempt.
+The shape is in each role's file. The lead quotes the block; the role that produced a log reads it.
+Voice, shell and waiting rules reach every role through `.claude/hooks/subagent-start.sh`
+(SubagentStart), one copy for all five roles. Files a role leaves on disk are normal English prose.
 
 ## The loop
 
 1. **Size the task.** Docs and config the lead edits itself. Code goes to the crew, as does any
    task needing a gate beyond T0 or more than ~50 lines of tool output.
-2. **`developer`, round 0.** Implements, runs T0, stages what it touched with `git add`, returns.
-3. **`tester`.** Reads `git diff HEAD`, runs what the card asks, returns a verdict. Only
-   `blocking: true` findings start a round; the rest go into `history` for the maintainer.
-4. **Stop** when all three hold: T0 green, no blocking finding, the last round touched no file
-   outside the previous round's set.
+2. **`developer`, round 0.** Implements, runs T0, stages what it touched by path, returns.
+3. **`tester`.** Reads `git diff HEAD`, runs what the card asks, returns a verdict. A finding is
+   blocking only for correctness or card acceptance on input a real OpenWrt install produces; the
+   rest goes to `history`.
+4. **Stop** when T0 is green, no finding is blocking, and the last round touched no file outside the
+   previous round's set.
 5. **Otherwise, one fix round.** The developer gets the blocking findings and its previous
-   `not_done`. The tester gets `git diff` (worktree against the index, which holds the previous
-   round) and the previous findings — never the full diff again. Two fix rounds at most.
-6. **Stall.** The same blocking id in two consecutive verdicts, or the same `diff_hash` twice, ends
-   the loop: the card goes to the human. A third round on a stalled finding is the ping-pong the
-   loop exists to prevent.
-7. **`security`**, once, on the final diff. Skipped for CSS-only and one-line diffs. Findings go to
-   the human and are never auto-fixed.
+   `not_done`; the tester gets `git diff` (worktree against the index, which holds the previous
+   round) and the previous findings. Two fix rounds at most.
+6. **At `max_rounds`** the **Recommended** option to the maintainer is "ship what PASSed, file the rest
+   as an issue" or "simplify the approach"; a further round is offered last.
+7. **Stall.** The same blocking id in two consecutive verdicts, or the same `diff_hash` twice, sends
+   the card to the maintainer.
+8. **`security`**, once, on the final diff; skipped for CSS-only and one-line diffs. A vulnerability
+   goes to the maintainer and is never auto-fixed; a functional LOW goes to card `history`.
+9. **Ship.** The lead commits by path and pushes through `/ship` (`CLAUDE.md` "Commits").
 
-While a card is open the index belongs to the loop: commit with `git commit`, not `git commit -a`,
-and read `git status` before staging anything else.
+While a card is open the index belongs to the loop: `git commit` with staged paths, never `-a`;
+read `git status` before staging anything else.
 
-The numbers behind the caps: gains of iterative repair sit in the first two rounds; a review
-without a new external signal makes the result worse; a stall counter of 2–3 is what production
-orchestrators use. Sources, ranked: the research artifact of 2026-09-03.
+The caps come from the evidence: iterative repair gains sit in the first two rounds, a review with
+no new external signal makes the result worse, and production orchestrators stop at a stall
+counter of 2–3.
 
-## Permissions
+## Lead conduct
 
-| `.claude/settings.json` permission | Why |
+- **Status:** at most 5 lines — done, running (task ids + ETA), waiting on the maintainer — sent
+  on a state change, with the action already started in the same message.
+- **A role returns without its block:** read `git status` and file mtimes at once and re-dispatch
+  with the remaining acceptance; a finished agent sends no later notification.
+- **A denied step** in a background or workflow agent: there an `ask` rule is a denial. The lead
+  runs the step in the foreground itself or names it to the maintainer, as the denial reads.
+- **Asking:** a question opens with one plain sentence on what the thing is. A decision that a
+  rule or memory already settles is taken and reported.
+- **Issue replies:** one line in the maintainer's style, "fixed, ships in <next patch>", with the
+  version read after `git fetch`.
+- **"Not released yet":** say what reaches users from `main` now (`install.sh`) and what waits for
+  the feed's next tag.
+- **No-agents mode:** gate output still goes to `../tmp` logs; the lead reads the tail.
+- **Sessions:** one wave, one session; state lives in `card.json` and `docs/`. Past ~150k tokens
+  the lead writes a handoff and starts a fresh session (`/clear`). A second session on the same
+  tree works in a worktree under .claude/worktrees.
+
+## Autonomy levels
+
+`CLAUDE.md` "Commits" is the authority; this table sorts it.
+
+| Level | Actions |
 |---|---|
-| `owlab up/down/sync/test/exec/status`: `allow` | disposable containers; a loop that prompts at every sync is not a loop |
-| `dev-sync.sh`, `ssh`: `ask` | the hardware router is the one thing a wrong run breaks for a person |
-| `gh pr comment/review`, `gh issue comment`, MCP review calls: no matcher in `permissions` | publishing is a rule in `CLAUDE.md`, given per action, not a matcher |
-| `Read/Write/Edit(../tmp/**)`: `allow` | the scratch directory, cards and handoffs |
-| `additionalDirectories: ["../tmp"]` | `../tmp` is outside the project root, and the three rules above do not apply until the directory is registered |
-| `git stash/clean/restore/reset --hard/checkout -- `, `git add -A|--all|.`: `ask` | the loop owns the index between rounds; these are the verbs that discard a round's work or widen it past the card, and `/upstream-pr` needs them, so they prompt rather than deny |
+| Autonomous | read, plan, edit inside the role's scope; T0–T2; `owlab` stands; commit and push to `origin` `main` and own branches under the four preconditions; rebase, amend, `--force-with-lease` on own branches; the `release:` commit inside `/release`; feed publication after a tag; `ci-watch`/`ci-log` reads |
+| Per word, each time | tag create/move/delete/push; `gh release *`; `gh workflow run` in the theme repo; force-push, rebase or amend of pushed `main`; `git reset --hard` of pushed work; openwrt/luci fork pushes and upstream PR actions; every publication (comments, reviews, replies, owlab/owfeed issues); hardware router (`dev-sync.sh`, `ssh`); lowering a tier; waiving a gate |
+| Never | `--no-verify` on commit or push; AI attribution trailers; staging the maintainer's own hunks; commit, push or tag from a detached run; a commit by a role other than the lead |
 
-`tools/bg.sh` carries its own fence: `ssh`, `scp`, `sftp`, `rsync`, `dev-sync.sh`, `git push`,
-`git commit`, `git tag` and `gh pr|release|issue` are refused there. The wrapper is allow-listed and
-the matcher reads the first word only, so without that fence `tools/bg.sh sh -c '… ssh …'` runs past
-every `ask` rule above. `tester` and `security` also carry `disallowedTools: Edit, Write,
-NotebookEdit`, which makes "read-only" a fence and not only a sentence in the prompt.
+## Guardrail layers
 
-`.claude/rules/*.md` do load inside a subagent when it reads a matching file (probed 2026-09-03,
-Haiku subagent, `styles/**`). The developer still reads its rules file by name from the card: a
-rule has to be in front of it before the first edit, not after the first Read.
+Instructions shape behaviour and are advisory; the layers below them are deterministic. Each rule
+that must hold every time has a layer that fails closed.
+
+| Layer | Where | Holds |
+|---|---|---|
+| 1. Instructions | `CLAUDE.md`, `.claude/rules/*.md` (path-scoped), `.claude/agents/*.md`, skills, auto-memory | the policy, the tiers, the roles; the auto-mode classifier reads `CLAUDE.md` too |
+| 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes); `precommit-gate.sh` (both CHANGELOG entries); `session-start.sh` (drift from `origin/main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/retro`) | the per-word list, whatever the permission mode |
+| 3. Permissions and auto mode | `.claude/settings.json` `deny`/`ask`/`allow`; `autoMode` in `~/.claude/settings.json` (the classifier reads it only from user settings); `tools/bg.sh` refuses ssh, commit, push, tag and gh writes in detached runs | prompts and denials before a command runs; prefix matching misses `git -C` forms, hence layer 2 |
+| 4. Git hooks | `.githooks/pre-push` (`npm run check`), `.githooks/commit-msg` (strips trailers) | every contributor, agent or not |
+| 5. CI | `build.yml`: lint, build, verify (25.12/apk + 24.10/opkg), live, anchors | the ground truth for "done" |
+
+## Skills
+
+| Skill | Invocation | Does | Side effects |
+|---|---|---|---|
+| `/ship` | model | T0 check, changelog entries, commit by path, push, `ci-watch` in the background | commit and push to `origin`; never a tag |
+| `/release` | model, on the maintainer's ask | pre-tag matrix, changelog rename, `release:` commit, tag, feed | asks for the tag unless the maintainer's message named it |
+| `/upstream-pr` | model | openwrt/luci branch, local checks, review answers | fork pushes and replies on the maintainer's word |
+| `/retro` | maintainer only (`disable-model-invocation`) | reads `measure-run.mjs`, `../tmp/denials.log`, repeated corrections; sorts each into keep / skill / rule / hook / delete | edits steering files after the maintainer agrees |
+
+A procedure lives in a skill, a fact in `CLAUDE.md`, a path-scoped rule in `.claude/rules/`, a
+must-always in a hook. A retro miss becomes an eval scenario for its skill before the text changes.
+
+## Memory and state
+
+- `CLAUDE.md`: under 120 lines, facts and hard limits, pointers to `docs/`.
+- Auto-memory (`~/.claude/projects/<project>/memory/`): learnings no file shows. A memory that
+  recurs twice is promoted to a rule or hook and deleted.
+- `card.json`, handoffs and `tools/bg.sh` run logs in `../tmp/`: state outside any context, so a
+  dead session resumes from files.
+
+## Workflows for fan-out
+
+A workflow script fans out independent read-only work (audits, research, per-file reviews).
+
+- Scripts live in `../tmp/workflows/<name>.wf.js`, so they survive the session.
+- At most 5 agents in flight, through a semaphore.
+- Long prompts sit in `.md` files the script reads, not in template strings.
+- Each agent writes a large result to a file and returns its path.
+- Writers stay one at a time; parallel writers need separate worktrees and separate cards.
 
 ## Measuring the crew
 
@@ -143,23 +215,24 @@ node .claude/tooling/measure-run.mjs            # newest transcript of this proj
 node .claude/tooling/measure-run.mjs latest 3
 ```
 
-The `delegated:` line is the other half of the trade: a subagent writes its own transcript under
-`<session>/subagents/`, so the lead's number alone would only ever say that the lead got lighter.
-The crew trial of 2026-09-03 reads 152k characters in the lead against 1.54M across 17 subagent
-transcripts — the work moved, it did not evaporate.
+The `delegated:` line counts the subagent transcripts under `<session>/subagents/`, so the lead's
+number never claims work that only moved. Per card: lead tool output under 15k characters, zero
+images in the lead, every gate log opened by a role, rounds ≤ 2, no stall. Baseline before the crew:
+136,544 characters and 11 images in this project's largest session; the 2026-09-03 trial put 152k
+characters in the lead against 1.54M across 17 subagents. On the same diff, `tester` on Opus found
+three issues to Sonnet's one, which is why it runs on Opus.
 
-Per card the crew must show: lead tool-output under 15k characters, zero images in the lead, every
-gate log opened by a role, rounds ≤ 2, no stall. Baseline before the crew, as the command above
-prints it: 136,544 characters of tool result plus 11 images (1.96 MB of payload) in this project's
-largest session, and 417,073 characters, 20 images and 484 Bash calls against 5 delegations in the
-largest of `luci-app-footstrap-files`.
+## Sources
 
-Trial card 1 (2026-09-03) measured `tester` on Opus against the same prompt and diff run on Sonnet:
-three findings to one, including a changelog entry pointing at still-untracked files and an
-unprompted `computed-diff --control` that turned 2468 differences from a number into a causal one —
-why `tester` runs on Opus.
-
-The loop itself was exercised on a second card the same day: round 0 carried a planted `wrap-regex`
-defect, the tester returned NEEDS_WORK with two blocking findings, and the developer closed them in
-one round by deleting the unreachable helper rather than wrapping its regex — wrapping would have
-been polish on dead code. One fix round, no stall, stop condition met.
+- Building effective agents — https://www.anthropic.com/engineering/building-effective-agents
+- Multi-agent research system — https://www.anthropic.com/engineering/multi-agent-research-system
+- Effective context engineering — https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
+- Writing tools for agents — https://www.anthropic.com/engineering/writing-tools-for-agents
+- Claude Code best practices — https://code.claude.com/docs/en/best-practices
+- Memory — https://code.claude.com/docs/en/memory
+- Subagents — https://code.claude.com/docs/en/sub-agents
+- Hooks — https://code.claude.com/docs/en/hooks-guide
+- Auto mode config — https://code.claude.com/docs/en/auto-mode-config
+- Permission modes — https://code.claude.com/docs/en/permission-modes
+- Skills — https://code.claude.com/docs/en/skills
+- Skill authoring best practices — https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices

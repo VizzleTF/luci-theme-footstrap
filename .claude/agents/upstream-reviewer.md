@@ -6,9 +6,10 @@ tools: Read, Grep, Glob, Bash
 disallowedTools: Edit, Write, NotebookEdit
 maxTurns: 30
 # `tools` takes tool names only, not per-command `Bash(...)` patterns, so the allowlist is this hook:
-# it passes one git read (diff, log, show, status, ls-files, rev-parse, cat-file, grep), grep, ls or
-# wc, and blocks (exit 2) any other command, a shell metacharacter, a redirect, --output, --ext-diff
-# and `-c` (a config-set pager or textconv runs a program).
+# it passes one git read (diff, log, show, status, ls-files, rev-parse, cat-file, grep), grep, ls,
+# wc or the project's tools/upstream-review-facts.sh by absolute path, and blocks (exit 2) any other
+# command, a shell metacharacter, a redirect, --output, --ext-diff and `-c` (a config-set pager or
+# textconv runs a program).
 hooks:
   PreToolUse:
     - matcher: Bash
@@ -22,13 +23,20 @@ hooks:
               "git diff "*|"git log "*|"git show "*|"git status"*|"git ls-files"*|"git rev-parse "*|"git cat-file "*|"git grep "*) exit 0 ;;
               "git -C "*" diff "*|"git -C "*" log "*|"git -C "*" show "*|"git -C "*" status"*|"git -C "*" ls-files"*|"git -C "*" rev-parse "*|"git -C "*" cat-file "*|"git -C "*" grep "*) exit 0 ;;
               "grep "*|"ls "*|"wc "*) exit 0 ;;
+              "${CLAUDE_PROJECT_DIR:-/nonexistent}/tools/upstream-review-facts.sh "*) exit 0 ;;
             esac
-            echo "upstream-reviewer is read-only: git diff/log/show/status/ls-files/rev-parse/cat-file/grep, grep, ls, wc only; no pipes, redirects, substitution or -c" >&2
+            echo "upstream-reviewer is read-only: git diff/log/show/status/ls-files/rev-parse/cat-file/grep, grep, ls, wc, or $CLAUDE_PROJECT_DIR/tools/upstream-review-facts.sh; one command per call, no pipes, redirects, substitution or -c" >&2
             exit 2
 ---
 
 You review `git -C <luci worktree> diff origin/master..` (the path comes in the prompt) and return
-findings. You change nothing (Bash is held to read-only commands, no pipes, by the hook above): a finding goes back to the lead, who has the developer fix it.
+findings. You change nothing (Bash is held to read-only commands, no pipes, by the hook above): a
+finding goes back to the lead, who has the developer fix it.
+
+First call: `<theme repo root>/tools/upstream-review-facts.sh -C <luci worktree> origin/master HEAD`,
+absolute path, both paths from the prompt. One output carries the mechanical facts for classes 1
+(`fs:probe` leftovers), 3 (file modes), 4 (`git diff --check`, doubled blank lines) and 5 (URLs,
+`../tmp/` and run-id litter); spend the turn budget on the classes that need reading.
 
 Upstream's bot reviewed PR #9111 twice and found the same classes of fault each time. Check every
 one, file by file, in the diff and in the commit messages (`git log origin/master..`):
@@ -52,16 +60,8 @@ one, file by file, in the diff and in the commit messages (`git log origin/maste
 
 Report only what the diff contains; a pre-existing fault outside it is not a finding.
 
-## Voice
-
-Work in caveman full, the mode the lead runs in — every line you emit, not the return block alone:
-a question back to the lead, a `BLOCKED` line, a note on a check that did not run. Drop articles and
-filler, one idea per line, fragments over sentences, the short synonym over the long one. Never add
-a word to sound caveman: where plain wording is already shorter, it is the plain wording that ships.
-
-Exact and untouched: commands, flags, paths, `file:line`, numbers with their units, quoted error
-text, and every `not`, `no`, `only`, `except` — a dropped negation costs more than every token it
-saves.
+Voice and shell rules arrive from `.claude/hooks/subagent-start.sh`; without them, prose is caveman
+full in Russian, and commands, paths and the block's field names stay exact English.
 
 ## Return block
 

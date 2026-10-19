@@ -1,19 +1,25 @@
 #!/bin/sh
-# PreToolUse/Bash: a TRIPWIRE for an accidental commit or push, not a fence. Frozen: it catches the
-# forms a session reaches for by habit and by mistake; it does not stop a determined bypass (a line
-# built at run time, an alias, a file written then run). The fence is server-side branch protection.
+# PreToolUse/Bash: a TRIPWIRE for the actions that need the maintainer's word, not a fence. Frozen: it
+# catches the forms a session reaches for by habit and by mistake; it does not stop a determined bypass
+# (a line built at run time, an alias, a file written then run). No server-side rule backs it.
 #
-# The `ask` rules in settings.json match a line that STARTS with `git commit`; this reads the whole
-# line, quote-aware, plus the local scripts and nested shells it runs (three levels deep, at most 50
-# scripts and 200 nested texts, each script once), and asks on commit, push, rebase, cherry-pick, am,
-# merge, `pull --rebase` and reset --hard anywhere in it. A shell is followed behind env, timeout,
-# nice, nohup, xargs, sudo, doas, command, exec, find -exec and `git bisect run`, and via `<<<` or
-# `< file`. Denied: --no-verify (any unique prefix), -n on commit, `-c core.hooksPath`, `git config`
-# writes of it and GIT_CONFIG_KEY_n / GIT_CONFIG_PARAMETERS naming it. `--kinds` prints the kinds
-# found, so precommit-gate.sh shares this detection.
+# Commit and push are the agent's own and stay silent. Ask: a tag (create, move, delete, push, also
+# --tags, --follow-tags, refs/tags/*, a v<digit> refspec, update-ref), `gh release` writes, `gh api`
+# writes to git/refs, git/tags or releases of the theme repo, `gh workflow run` in the theme repo (the
+# owfeed dispatch is standing-authorized), a force push or delete of main/master, rebase and
+# `commit --amend` while HEAD is already in origin/main, `reset --hard`, and a push whose remote
+# (`git remote get-url --push`, in the directory `cd` / `git -C` leaves) is not VizzleTF/luci-theme-footstrap:
+# that is how an openwrt/luci fork push shows up.
+# The whole line is read, quote-aware, plus the local scripts and nested shells it runs (three levels
+# deep, at most 50 scripts and 200 nested texts, each script once). A shell is followed behind env,
+# timeout, nice, nohup, xargs, sudo, doas, command, exec, find -exec and `git bisect run`, and via `<<<`,
+# `< file` or a heredoc body; the body of a heredoc fed to anything else (cat, git -F -, python) is data.
+# Denied: --no-verify (any unique prefix), -n on commit, `-c core.hooksPath`, `git config` writes of it
+# and GIT_CONFIG_KEY_n / GIT_CONFIG_PARAMETERS naming it. `--kinds` prints every kind found, the silent
+# ones too, so precommit-gate.sh shares this detection.
 #
 # Acts only on a positive find: a missing jq or awk, unreadable stdin, a script it cannot resolve,
-# too deep or over the cap stay silent (every `sh "$X"` used to ask); `--kinds` exits 1 instead.
+# too deep or over the cap stay silent; `--kinds` exits 1 instead.
 TAB=$(printf '\t')
 KINDS=''
 SRC=''
@@ -68,11 +74,13 @@ $R
 
 scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to BASE; ? = unknown)
 	OUT=$(printf '%s\n' "$1" | START=$3 awk '
-	function chdir(a) {
-		if (a == "" || a == "-" || a ~ /[$`~*?]/) cwd = "?"
-		else if (a ~ /^\//) cwd = a
-		else if (cwd != "?") cwd = (cwd == ".") ? a : cwd "/" a
+	function joind(b, a) {
+		if (a == "" || a == "-" || a ~ /[$`~*?]/) return "?"
+		if (a ~ /^\//) return a
+		if (b == "?") return "?"
+		return (b == ".") ? a : b "/" a
 	}
+	function chdir(a) { cwd = joind(cwd, a) }
 	function nest(s) { gsub(/\n/, ";", s); print "NEST\t" cwd "\t" s }
 	function script(p) {
 		if (cwd == "?" || p ~ /[$`~*?]/) print "KIND\tunknown-script"
@@ -89,9 +97,49 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 			if (t[k] !~ /^-/) { script(t[k]); return }
 		}
 	}
+	function recv(   i) { # does a heredoc body fed to this segment run as shell?
+		for (i = 1; i <= n; i++) if (isshell(t[i]) || t[i] ~ /(^|\/)(eval|source|xargs)$/ || t[i] == ".") return 1
+		return 0
+	}
+	# gh release writes, gh api writes to refs/tags/releases of the theme repo, gh workflow run there
+	function gh(i0,   j, k, a, v, m, hf, path, repo, lp, r0) {
+		j = i0 + 1
+		while (j <= n && t[j] ~ /^-/) {
+			# a global -R/--repo carries a value; skipping the flag alone would make the repo name the verb
+			if (t[j] ~ /^(-R|--repo)$/) { r0 = t[j + 1]; j += 2 }
+			else { if (t[j] ~ /^--repo=/) r0 = substr(t[j], 8); else if (t[j] ~ /^-R./) r0 = substr(t[j], 3); j++ }
+		}
+		v = t[j]
+		if (v == "release") { if (t[j + 1] ~ /^(create|edit|delete|delete-asset|upload)$/) print "KIND\trelease" }
+		else if (v == "workflow" && t[j + 1] == "run") {
+			repo = r0
+			for (k = j + 2; k <= n; k++) {
+				a = t[k]
+				if (a == "-R" || a == "--repo") repo = t[k + 1]
+				else if (a ~ /^--repo=/) repo = substr(a, 8)
+				else if (a ~ /^-R./) repo = substr(a, 3)
+			}
+			if (repo == "" || tolower(repo) == "vizzletf/luci-theme-footstrap") print "KIND\trelease"
+		} else if (v == "api") {
+			m = ""; hf = 0; path = ""
+			for (k = j + 1; k <= n; k++) {
+				a = t[k]
+				if (a == "-X" || a == "--method") { m = toupper(t[k + 1]); k++ }
+				else if (a ~ /^--method=/) m = toupper(substr(a, 10))
+				else if (a ~ /^-X./) m = toupper(substr(a, 3))
+				else if (a ~ /^(-f|-F|--field|--raw-field|--input)$/) { hf = 1; k++ }
+				else if (a ~ /^-[fF]./ || a ~ /^--(field|raw-field|input)=/) hf = 1
+				else if (a ~ /^(-H|--header|-q|--jq|-t|--template|--hostname|--cache|--preview|-p)$/) k++
+				else if (a !~ /^-/ && path == "") path = a
+			}
+			lp = tolower(path)
+			if ((m ~ /^(POST|PATCH|PUT|DELETE)$/ || (m == "" && hf)) && lp ~ /(git\/refs|git\/tags|releases)/ \
+				&& !(lp ~ /repos\/[^\/{]+\/[^\/]+/ && lp !~ /vizzletf\/luci-theme-footstrap/)) print "KIND\trelease"
+		}
+	}
 	function endtok() { if (have) { n++; t[n] = tok } tok = ""; have = 0 }
 	function endseg() { endtok(); if (n) proc(); n = 0; split("", sub_) }
-	function proc(   s, i, j, k, x, w, a, sb, deny, hp, rb, hard, ch, nm, ro, kk, wr) {
+	function proc(   s, i, j, k, x, w, a, sb, deny, hp, rb, hard, ch, nm, ro, kk, wr, pf, np, pos, na, tl, tg, fo, fm, fc, am, ref, tgt, gd) {
 		s = 1
 		while (s <= n && t[s] ~ /^[A-Za-z_][A-Za-z0-9_]*=/) s++
 		w = t[s]
@@ -116,26 +164,39 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 			for (i = s + 1; i <= n; i++) if (t[i] == "bisect") wr = 1
 			if (wr) for (i = s + 1; i <= n; i++) if (isshell(t[i])) { shellrun(i); break }
 		} else if (w ~ /\//) script(w)
+		for (i = 1; i <= n; i++) if (t[i] ~ /(^|\/)gh(\.exe)?$/) gh(i)
 		for (i = 1; i <= n; i++) {
 			if (t[i] !~ /(^|\/)git(\.exe)?$/) continue
-			j = i + 1; hp = 0
+			j = i + 1; hp = 0; gd = cwd
 			while (j <= n && t[j] ~ /^-/) {
 				if (tolower(t[j] " " t[j + 1]) ~ /core\.hookspath/) hp = 1
+				if (t[j] == "-C") gd = joind(gd, t[j + 1])
 				j += (t[j] ~ /^(-C|-c|--git-dir|--work-tree|--namespace|--exec-path|--config-env)$/) ? 2 : 1
 			}
 			sb = t[j]
-			if (sb !~ /^(commit|push|rebase|reset|cherry-pick|am|merge|pull|config)$/) continue
-			deny = hp; rb = 0; hard = 0; ro = 0; kk = 0
+			if (sb !~ /^(commit|push|rebase|reset|cherry-pick|am|merge|pull|config|tag|update-ref)$/) continue
+			deny = hp; rb = 0; hard = 0; ro = 0; kk = 0; pf = 0; np = 0; na = 0; tl = 0; tg = 0; fo = 0; fm = 0; fc = 0; am = 0
+			split("", pos)
 			for (k = j + 1; k <= n; k++) {
 				a = t[k]
+				na++
 				if (sb == "config") {
 					a = tolower(a)
 					if (a == "core.hookspath") kk = k
+					else if (a == "push.followtags") pf = k
 					else if (a ~ /^(--unset(-all)?|--get(-all|-regexp|-urlmatch)?|--list|-l|unset|get|list)$/) ro = 1
 					continue
 				}
 				if (a == "--") break
 				if (a ~ /^--no-v/ && index("--no-verify", a) == 1) deny = 1
+				if (a !~ /^-/) { np++; pos[np] = a }
+				if (a ~ /^(-l|--list|-v|--verify|--contains|--no-contains|--points-at|--merged|--no-merged)$/ || a ~ /^--(contains|no-contains|points-at|merged|no-merged|list)=/) tl = 1
+				if (a ~ /refs\/tags\//) tg = 1
+				if (sb == "push") {
+					if (a ~ /^--force/ || a == "--delete") fo = 1
+					if (a == "--tags" || a == "--mirror" || a ~ /^--follow-tags(=|$)/) tg = 1
+				}
+				if (sb == "commit" && length(a) >= 4 && index("--amend", a) == 1) am = 1
 				nm = a; sub(/=.*/, "", nm)
 				if (length(nm) >= 5 && index("--rebase", nm) == 1) rb = 1
 				if (length(nm) >= 3 && index("--hard", nm) == 1) hard = 1
@@ -146,12 +207,36 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 						ch = substr(a, x, 1)
 						if (ch ~ /[mFcC]/) { if (x == length(a)) k++; break }
 						if (ch == "n" && sb == "commit") deny = 1
+						if ((ch == "f" || ch == "d") && sb == "push") fo = 1
 					}
 				} else if (a ~ /^--(message|file)$/) k++
 			}
-			if (sb == "config") { if (kk && !ro && (kk < n || t[j + 1] ~ /^(set|--add|--replace-all)$/)) print "KIND\tnoverify"; continue }
+			if (sb == "config") {
+				if (kk && !ro && (kk < n || t[j + 1] ~ /^(set|--add|--replace-all)$/)) print "KIND\tnoverify"
+				if (pf && !ro && (pf < n || t[j + 1] ~ /^(set|--add|--replace-all)$/)) print "KIND\ttagpush"
+				continue
+			}
+			if (sb == "tag") { if (na && !tl) print "KIND\ttag"; continue }
+			if (sb == "update-ref") { if (tg) print "KIND\ttagpush"; continue }
 			if (deny) print "KIND\tnoverify"
-			if (sb == "reset") { if (hard) print "KIND\treset-hard" }
+			if (sb == "push") {
+				# pos[1] is the remote, the rest are refspecs; a `+` forces that one
+				for (x = 2; x <= np; x++) {
+					ref = pos[x]
+					if (ref == "tag" || ref ~ /(^|[:+])(refs\/tags\/|v[0-9])/) tg = 1
+					if (ref ~ /^\+/) fo = 1
+					tgt = ref; sub(/^\+/, "", tgt); sub(/^[^:]*:/, "", tgt); sub(/^refs\/heads\//, "", tgt)
+					if (tgt ~ /^(main|master)$/) fm = 1
+					else if (tgt == "" || tgt == "HEAD") fc = 1
+				}
+				if (np < 2) fc = 1
+				if (tg) print "KIND\ttagpush"
+				if (fo && fm) print "KIND\trewrite"
+				else if (fo && fc) print "KIND\tforcecur"
+				print "PUSH\t" gd "\t" (np ? pos[1] : "origin")
+			}
+			if (sb == "rebase" || am) print "KIND\thistcheck"
+			if (sb == "reset") { if (hard) { print "KIND\treset-hard"; print "KIND\trewrite" } }
 			else if (sb == "pull") { if (rb) print "KIND\tpull-rebase" }
 			else print "KIND\t" sb
 		}
@@ -174,6 +259,34 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				p++; continue
 			}
 			if (c == "\047" || c == "\"") { q = c; have = 1; continue }
+			if (c == "<" && substr(S, p + 1, 1) == "<" && substr(S, p + 2, 1) != "<" && substr(S, p - 1, 1) != "<") {
+				# heredoc: the body runs only when a shell reads it; otherwise it is data and is skipped
+				endtok(); hsh = recv(); strip = 0; dl = ""; p += 2
+				if (substr(S, p, 1) == "-") { strip = 1; p++ }
+				while (substr(S, p, 1) == " " || substr(S, p, 1) == "\t") p++
+				while (p <= L) {
+					ch2 = substr(S, p, 1)
+					if (ch2 ~ /[ \t\n;&|()<>]/) break
+					if (ch2 == "\047" || ch2 == "\"" || ch2 == "\\") { p++; continue }
+					dl = dl ch2; p++
+				}
+				p--
+				if (dl != "") pend = 1
+				continue
+			}
+			if (pend && c == "\n") {
+				endseg(); pend = 0; body = ""; p++
+				while (p <= L) {
+					e = index(substr(S, p), "\n"); ln = (e ? substr(S, p, e - 1) : substr(S, p))
+					p += (e ? e : length(ln) + 1)
+					chk = ln; if (strip) sub(/^\t+/, "", chk)
+					if (chk == dl) break
+					body = body ln "\n"
+				}
+				p--
+				if (hsh) nest(body)
+				continue
+			}
 			if (c == "#" && !have) { while (p < L && substr(S, p + 1, 1) != "\n") p++; continue }
 			if (c == " " || c == "\t") { endtok(); continue }
 			if (c ~ /[;&|(){}`\n]/) { endseg(); continue }
@@ -184,6 +297,20 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 	while IFS=$TAB read -r K REST; do
 		case $K in
 			KIND) KINDS="$KINDS $REST" ;;
+			PUSH)
+				# REST = dir<TAB>remote; an unresolvable dir or remote is no find
+				D=${REST%%"$TAB"*}
+				P=${REST#*"$TAB"}
+				[ "$D" = "?" ] && continue
+				case $P in
+					*/*|*:*) PU=$P ;;
+					*) PU=$(git -C "$(rp "$BASE" "$D" .)" remote get-url --push "$P" 2>/dev/null) || continue ;;
+				esac
+				case $PU in
+					'') ;;
+					*[Vv]izzle[Tt][Ff]/luci-theme-footstrap*) ;;
+					*) KINDS="$KINDS forkpush" ;;
+				esac ;;
 			NEST|SCRIPT)
 				if [ "$2" -ge 3 ]; then KINDS="$KINDS script-too-deep"; continue; fi
 				D=${REST%%"$TAB"*}
@@ -219,10 +346,16 @@ if [ "$MODE" = "--kinds" ]; then
 	exit 0
 fi
 
-# A tripwire acts only on what it saw: a script it could not follow is not a commit, so it stays quiet.
+# Only the kinds that need the maintainer's word act; commit, push and the rest stay silent. A script
+# it could not follow is not a find either. HEAD is read in the hook's own cwd (`git -C` is not
+# followed); a git failure there leaves the kind silent.
 U=''
 for k in $KINDS; do
-	case $k in unknown-script|script-too-deep|script-scan-cap) ;; *) U="$U $k" ;; esac
+	case $k in
+		noverify|tag|tagpush|release|rewrite|reset-hard|forkpush) U="$U $k" ;;
+		histcheck) git -C "$BASE" merge-base --is-ancestor HEAD origin/main >/dev/null 2>&1 && U="$U rewrite" ;;
+		forcecur) case $(git -C "$BASE" symbolic-ref --short -q HEAD 2>/dev/null) in main|master) U="$U rewrite" ;; esac ;;
+	esac
 done
 KINDS=${U# }
 [ -n "$KINDS" ] || exit 0
@@ -231,5 +364,5 @@ case " $KINDS " in
 	*' noverify '*)
 		emit deny "Hook skipping (--no-verify, -n on commit, core.hooksPath) is never allowed; fix what the hook reports instead." ;;
 	*)
-		emit ask "git $KINDS found in this command (possibly inside a script it runs): commit, push and rebase need the user's explicit word each time." ;;
+		emit ask "git/gh $KINDS found in this command (possibly inside a script it runs): a tag, a release, a push outside the theme repo or a history rewrite of main needs the maintainer's word. Run /release for a tag; for a rewrite, name the commits." ;;
 esac

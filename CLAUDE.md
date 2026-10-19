@@ -1,193 +1,120 @@
-# CLAUDE.md
+`luci-theme-footstrap` — a LuCI theme for **OpenWrt 24.10.3 and newer** (and ImmortalWrt), depending
+on nothing but `luci-base`. App view-JS renders page content client-side, so the theme is server
+chrome (`ucode/template/themes/footstrap/*.ut`) + one generated `cascade.css` + `fs-*.js` in
+`htdocs/luci-static/resources/`. The floor is 24.10.3 (`ui.RangeSlider`); 23.05 ended at 0.14.2,
+which `install.sh` pins for it (`docs/releasing.md`).
 
-`luci-theme-footstrap` — a LuCI theme for **OpenWrt 24.10.3 and newer** (and ImmortalWrt). Standalone:
-it ships no framework and depends on nothing but `luci-base`. Page content is rendered client-side
-by app view-JS, so the theme is server chrome (`ucode/template/themes/footstrap/*.ut`) + one
-generated `cascade.css` + `fs-*.js` in `htdocs/luci-static/resources/`.
+**Russian prose to the maintainer, including right after an English subagent or background result.**
+Code, comments, commit messages and PR text stay in English.
 
-**Communicate in Russian.** Code, comments, commit messages and PR text stay in English.
+`styles/base/` is footstrap's own base. The name bootstrap belongs to the *other, real* package
+only: the `/luci-static/bootstrap` fallback, the `bench/` baseline, the attribution in
+`styles/00-header.css`.
 
-**The floor is 24.10.3.** `ui.RangeSlider` reached openwrt-24.10 only by backport in 24.10.3
-(e4c67020de), so 24.10.0-24.10.2 are refused; 23.05 support ended at 0.14.2 (openwrt/luci#8978); `install.sh` serves a 23.05 router that pin. `docs/releasing.md`.
-
-`styles/base/` is footstrap's code: **do not call it "the fork" or reintroduce the word bootstrap**
-into filenames, comments or docs. That name belongs to the *other, real* package only — the
-`/luci-static/bootstrap` fallback, the `bench/` baseline, the attribution in `styles/00-header.css`.
-
-**Repo root is the workspace** (`package.json` gates, `tools/`, `docs/`, `owlab.yaml`,
-`install.sh`); the shipped package is `luci-theme-footstrap/` one level down — same name, one level
-apart, so a path is ambiguous unless it is absolute or rooted. Nothing in the root ships. **Work
-from the repo root, not from its parent**: the parent holds `luci-fork/` and `tmp/`, is not a git
-repository, and loads none of this file. `.claude/hooks/session-start.sh` says so at startup.
+**Repo root is the workspace** (`package.json`, `tools/`, `docs/`, `owlab.yaml`, `install.sh`); the
+shipped package is `luci-theme-footstrap/` one level down, so write paths rooted or absolute.
+Start sessions here: the parent (`luci-fork/`, `tmp/`) is no git repository and loads none of this
+file, its rules or its hooks. Here `.claude/hooks/session-start.sh` reports drift from `origin/main`.
+`../tmp` and .claude/worktrees are not the repo: search with `git grep`. The Bash tool runs zsh:
+quote globs and `'== X'`, test with `[ a = b ]`, put bash-only code in `bash -c`.
 
 ## Read the doc first
-
-`docs/` is the reference and every page carries the measurement behind each rule.
 
 | Touching | Read |
 |---|---|
 | what LuCI expects of a theme, where the boundary runs | `docs/architecture.md` |
 | the rule list with the gate that holds each one, the comment rules | `docs/conventions.md` |
-| dev routers, pushing a change, proving it, the probe rig, hardware | `docs/development.md` |
-| the lead thread, the roles, the card, the loop | `docs/crew.md` |
+| dev routers, proving a change, the probe rig, the stand's traps | `docs/development.md` |
+| roles, the card, the loop, autonomy, guardrails, skills | `docs/crew.md`, `docs/ai-architecture.html` |
 | `styles/`, cascade layers, `build-css.sh`, `@mirror` | `docs/css.md` |
 | tokens, palettes, type, the Appearance axes | `docs/design-system.md` |
 | sidebar / bar / rail, the menu renderer, the fit | `docs/chrome.md` |
-| the reader's place through a poll tick — floor, reference, the three corrections | `docs/anchoring.md` |
-| every anchoring finding, its numbers and the attempts that were reverted | `docs/anchoring-log.md` |
+| the reader's place through a poll tick | `docs/anchoring.md`, `docs/anchoring-log.md` |
 | client navigation | `docs/spa-router.md` |
 | foreign `luci-app-*`, the fence | `docs/third-party-apps.md` |
 | Makefile, uci-defaults, postinst/postrm, ACL | `docs/package.md` |
-| CI job graph, owfeed, packaging, the trust chain | `docs/ci.md` |
+| CI job graph, reading a run, owfeed, the trust chain | `docs/ci.md` |
 | pre-release checklist, changelog contract, runbook | `docs/releasing.md` |
-| the navigation benchmark | `docs/benchmark.md` |
 
-`docs/luci-app-styling-guide.md` (+ `_ru`) is outward-facing. `docs/gallery.html` renders every
-widget LuCI or any app can emit — it is what `a11y`, `export-tier`, `computed-diff` and `smoke`
-measure, and how the theme is checked without a router.
-
-**The rules for one area load with that area** — `.claude/rules/css.md` (`styles/**`),
-`js.md` (`htdocs/**/*.js`), `chrome.md` (`*.ut`, `fs-*.js`), `package.md` (Makefile, `root/**`,
-`po/**`), `changelog.md` (`CHANGELOG*.md`). Cutting a release is `/release`; openwrt/luci work is
-`/upstream-pr`. Read the matching file before editing there; the rules below apply everywhere.
+`docs/gallery.html` renders every widget LuCI or an app can emit; the browser gates measure it.
+Area rules load with their files from `.claude/rules/` (css, js, chrome, package, changelog).
+Skills: `/ship` (commit, push, watch CI), `/release`, `/upstream-pr` (openwrt/luci), `/retro`.
 
 ## Commands
 
 ```sh
-npm run check                              # T1: every gate; exit 0 before pushing
-npm run check:fast                         # T1: the static subset, no browser and no CSS build
-npm test                                   # T0: the unit suite alone (node --test, no browser)
-npm run smoke                              # T1: modules come up in a real DOM (~2.1 s)
-npm run computed-diff                      # T1: worktree vs HEAD, computed styles (~8.7 s)
-tools/bg.sh <cmd>                          # T2: detach, log into ../tmp/ (refuses ssh, dev-sync, push)
-tools/bg-wait.sh <run-id>                  # the waiter; stops on status, a dead pid, or the 2 h cap (a full `ci-local` run takes `30 10800`)
-tools/ci-local.sh --list                   # T2: build.yml's jobs, locally, in the same order; --force for the router legs
-node tools/build-icons.mjs                 # re-raster the app icons after a logo.svg change
+tools/bg.sh <cmd>                  # T2: detach, log into ../tmp/; refuses ssh, commit, push, tag
+tools/bg-wait.sh <run-id>          # its waiter, as a background command (full ci-local: `30 10800`)
+tools/ci-watch.sh --sha <sha>      # a commit's CI runs -> one verdict line; run via tools/bg.sh
+./tools/stage.sh && owfeed build   # the package routers get, both formats into dist/
 owlab up | owlab sync --watch | owlab open owrt2512
-./tools/stage.sh && owfeed build           # both formats into dist/
 owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' --assert …
-ucode -T -c -o /dev/null <template>.ut     # syntax-check a template the way LuCI does
-luci-theme-footstrap/dev-sync.sh <host>    # deploy to a HARDWARE router over ssh (ask)
-npm run fork-drift                         # what the two trees disagree about
+luci-theme-footstrap/dev-sync.sh <host>   # HARDWARE router over ssh: the maintainer's word each time
 ```
 
 ## Verifying
 
-Every gate sits in exactly one tier; the tier says who runs it and whether waiting on it is
-allowed. Tiering changes nothing in the release matrix (`/release`, `docs/releasing.md`), and CI
-runs every job on every pull request regardless of what a session ran.
-
-Who runs which tier: T0 is the `developer`'s, before it returns; T1 and T2 are the `tester`'s.
-The lead runs none of them.
-
-**T0 — always, foreground, 60 s.** `npm test`; the ONE `node tools/<name>.mjs` that covers the file
-just edited (the map is in each `.claude/rules/` file and in `docs/conventions.md`);
-`ucode -T -c -o /dev/null` over each template touched. Nothing else runs by reflex.
-
-**T1 — on an explicit request, 5 min.** `npm run check` once, when the branch is otherwise finished.
-`npm run smoke` and `npm run computed-diff` after a JS or CSS change: smoke ~2.1 s, computed-diff ~8.7 s.
-
-**T2 — never blocked on.** `owlab up|test`, the live gates, `bench/nav-benchmark.py`,
-`jsmin-verify`, the full token-stream compare. Started detached through `tools/bg.sh` and paired,
-in the same turn, with `tools/bg-wait.sh <run-id>` as a background command; the result is reported
-unprompted when it arrives. "I started it" is not a status. `docs/development.md`.
-
-- **No bash call runs longer than 5 minutes** (`BASH_MAX_TIMEOUT_MS` in `.claude/settings.json`).
-  One that would is T2 by definition; one that hits its timeout is never re-run with a larger one.
-- **A tier is lowered by the maintainer, never by the agent.** The gate is started detached, or
-  waived out loud.
-- **Done is "has run on a real userland on both package managers"** — 25.12/apk and 24.10/opkg —
-  held by CI's `verify` job and by the maintainer. Say which of the two a run actually covered; a
-  stubbed harness proves a module initialises, nothing more.
-- **CI's `lint`, `build`, `verify`, `live` and `anchors` are not reproduced locally by reflex**;
-  read them with `gh run view`. On a PR `live` and `anchors` boot owrt2512 only, so the 24.10 half
-  of a behaviour claim comes from a push, a tag, or a detached local run.
-- **A red CI job is reproduced first** with `tools/ci-local.sh --force <job>`, before any
-  hypothesis; a push is never the experiment. Check `gh run list --branch main -L1` is not red
-  before any push. "Flaky" and "fixed" are a measured rate (`tools/rate.sh`), not one green run.
-  CI waits go through `tools/bg.sh` + `tools/bg-wait.sh`, never a sleep loop.
-- **A finding about the stands goes in `docs/development.md`, "The stand's own traps", in the same
-  session** — what it looked like, what it was, and the command that tells the two apart.
-- **A fault in the tooling itself gets an issue in the tool's own repository** — `owlab`
-  (`owfeed.org/owlab` → github.com/owfeed/owlab) and `owfeed` (github.com/owfeed/owfeed), both with
-  issues open. The trap note says how to work around it here; the issue is how it gets fixed there,
-  and without one the next session rediscovers it from scratch. Draft it with the command, the exact
-  error text, the tool version (`owlab version`) and the host — then it is **published only on the
-  maintainer's explicit word, like every other publication**; drafting is the agent's, posting is
-  not.
-- **One fault, one mechanism — prove that one holds alone.** A spare added "to be safe" is measured
-  with the first on its own; if the probe still passes, it does not ship (openwrt/luci#8981).
-- **`/security-review` before every release and every upstream PR**, on the final branch diff.
-  Surface: the installer's signature chain, shell over a build tree, the login template, sinks in
-  the browser JS, the packaging pipeline.
-- **Prove a CSS change with a computed-style diff, not screenshots.** Cheap half:
-  `npm run computed-diff`; the live half is T2 and not finished until its numbers are read.
-- Screenshots, `tools/bg.sh` logs and any other scratch artefact go in `../tmp/`, never inside
-  the checkout.
-
-## Comments
-
-The reader is a model with the file open and no session history. One comment is the invariant, the
-number behind it and one pointer, in that order. Attempts and their order, task names, `../tmp`
-paths and CI run ids go to `docs/<area>.md`, never into shipped code. Limits: inline 1-2 lines, a
-block 8, a header 15, under 40 % of a file's bytes. Full rule with the example behind each line:
-`docs/conventions.md`, "Comments". Two of them break something silently:
-
-- **Some comments are code** — `@mirror`/`@endmirror`, `/* fs:probe */`, the eslint `'require …'`
-  pragmas, the Makefile's buildroot marker, the literal `dataset.fsFit` write. Reword one and a gate
-  or the build breaks.
-- **A `#` line inside a quoted `ssh "$R" "…"` string is part of the string**: `sh -n` after editing.
+- **T0, the developer's, always, foreground, 60 s:** `npm test`, the T0 gate the area's rules file
+  names, and for a template the stand compile in `.claude/rules/chrome.md` "Templates".
+- **T1, the tester's, on request, 5 min:** `npm run check` once on a finished branch; `npm run smoke`
+  and `npm run computed-diff` after JS or CSS. `.githooks/pre-push` is the T1 of a push, the one T1
+  the lead runs; it reads that output only on failure (tail).
+- **T2, never blocked on:** owlab, live gates, the benchmark, `jsmin-verify`: `tools/bg.sh` plus, in
+  the same turn, `tools/bg-wait.sh <run-id>` in the background; report unprompted, ETA if >15 min.
+- A Bash call stays under 5 minutes; one that would is T2, and a timeout is never retried larger.
+  Only the maintainer lowers a tier.
+- **Done = ran on a real userland on both package managers** (25.12/apk, 24.10/opkg: CI `verify`);
+  say which one a run covered. Before/after baselines use the last package published in the feed.
+- A red CI job: `tools/ci-log.sh <run-id>`, then `tools/ci-local.sh --force <job>` before any
+  hypothesis. "Flaky" and "fixed" are a rate (`tools/rate.sh`). Tool and gate fixes precede a release.
+- One fault, one mechanism: a spare added "to be safe" ships only if the probe fails without it.
+- Prove CSS with a computed-style diff; screenshots and scratch files go in `../tmp/`.
+- A stand finding goes in `docs/development.md` "The stand's own traps" the same session; an owlab
+  or owfeed fault also gets an issue draft (command, exact error, `owlab version`, host).
+- `/security-review` on the final diff before every release and every upstream PR.
+- Some comments are code (`@mirror`/`@endmirror`, `/* fs:probe */`, eslint `'require …'` pragmas,
+  the Makefile's buildroot marker, the literal `dataset.fsFit` write): keep them verbatim. A `#` line
+  in a quoted `ssh "$R" "…"` string is part of it: `sh -n` after editing. Rest: `docs/conventions.md`.
 
 ## Crew
 
-The main thread is the lead. It reads no screenshots, runs no gate, and uses Bash for `git status`,
-`git diff --stat` and `git log` only. It edits `docs/**` and config (`.claude/**`, `CLAUDE.md`,
-settings) itself; code (`luci-theme-footstrap/**`, `tools/**`, `tests/**`, `styles/**`) goes to a
-role in `.claude/agents/`: `developer` (writes inside the card's file list, runs T0),
-`tester` (the full cycle, read-only, PASS/NEEDS_WORK with evidence), `security` (`security-review`
-on the task diff), `upstream-reviewer` (the luci branch diff against upstream's bot checklist, before the first push), `researcher` (sourced answers, ranked), and `caveman:cavecrew-investigator`
-to locate code. Delegate when a task touches more than one file, needs any gate beyond T0, or would
-put more than ~50 lines of tool output into this thread. Protocol and schemas: `docs/crew.md`.
+The main thread is the lead: it orchestrates and edits `docs/**` and config. Code
+(`luci-theme-footstrap/**`, `tools/**`, `tests/**`) goes with a card to a role in `.claude/agents/`
+when it touches more than one file, needs a gate beyond T0, or brings ~50 lines of output. The
+lead's Bash is orchestration: git, `/ship`, `tools/ci-watch.sh`, `tools/ci-log.sh`,
+`node tools/changelog.mjs add`. Gate logs, stands, probes and screenshots belong to a role; a live
+reproduction is a `tester` card. Budget: under 15k characters of tool output per card. Status: at
+most 5 lines (done / running with task ids + ETA / waiting on the maintainer), on a state change.
+Delegation fields, the loop, round caps and workflows: `docs/crew.md`. Through the maintainer: a
+security vulnerability, a stall, and the per-word items under "Commits".
 
-Every delegation carries four fields: **objective** (one sentence + `../tmp/task-<id>/card.json`),
-**output format** (the role's return block, ≤25 lines, paths not contents, no diffs; the role works
-in caveman full throughout like this thread, carrying that rule in its own "Voice" section, since no
-session hook reaches a subagent), **tools and sources** (the `.claude/rules/` file for the area by
-path, the acceptance commands with expected output), **boundaries** (the file list; anything outside it is reported, not edited). A subagent
-inherits no history: what is not in the prompt or the card does not exist for it.
-
-Loop: developer → tester → at most 2 fix rounds. Stop when T0 is green, the verdict has no blocking
-finding and the last round touched no file outside the previous round's set. Round N+1 gets the
-inter-round diff, the previous findings and fresh gate output — never the full diff again. A stall
-— the same blocking finding id twice, or the same `diff_hash` twice — goes to the human, not into
-another round. `security` runs per task except CSS-only or one-line diffs; any finding goes to the
-human and is never auto-fixed. The Opus `/security-review` before a release or PR stays.
-
-Always through the human: `git commit`, `git push`, a hardware router (`dev-sync.sh` is `ask`),
-lowering a tier, waiving a gate, a security finding, a stall. The lead quotes the verdict block, not
-the log; a log is read by the role that produced it. Card sizing, rounds and `maxTurns`:
-`docs/crew.md`.
-
-**Fix policy: best practice only, no crutches.** Fix the root cause in the shared place with the
-established best practice; a small fix is fine only when it is that practice. A known defect is
-never deferred without asking.
+**Fix policy: best practice only:** the root cause, in the shared place, with the established
+practice; ask before deferring a known defect.
 
 ## Commits
 
-**Conventional Commits, message in English. Never commit OR PUSH without an explicit instruction for
-that action, each time.** Finished work, green gates, a verified fix or an answered review is not
-authorization. This holds for BOTH remotes — `origin`, and the openwrt/luci fork behind a PR, where
-amend + `push --force-with-lease` is a push like any other. Leave the tree dirty and say what would
-go in; wait to be told. "Do it", "finish", "continue" and "autopilot" are not commit or push words;
-a history rewrite (rebase, amend) is its own ask. New work branches from `origin/main`, never the
-local `main`. No script contains `git commit` or `git push`. No co-author / "Generated with" / AI
-attribution trailers. `.claude/hooks/git-guard.sh` holds the guard.
+Standing grant: the agent commits and pushes to `origin` (`main` and its own `claude/*`, `feat/*`,
+`fix/*` branches) on its own judgement, through `/ship`, when all four hold: (1) T0 is green;
+(2) both CHANGELOG entries are in the commit (`node tools/changelog.mjs add … && git commit …`;
+`.claude/hooks/precommit-gate.sh` refuses otherwise); (3) the branch is based on `origin/main`;
+(4) `gh run list --branch main -L1` is not red, or this push fixes that red. The push runs
+`.githooks/pre-push` (`npm run check`, 2–4 min): `timeout: 300000` or `run_in_background`. After
+every push, same turn: `tools/bg.sh tools/ci-watch.sh --sha <sha>` + `tools/bg-wait.sh <run-id>`
+in the background; report the verdict line unprompted.
 
-**Nothing is published without an explicit instruction, each time**: no PR comment, no review, no
-issue comment, no reply on an upstream thread. A review finding is answered in the DIFF and by
-resolving the thread (`/upstream-pr`). This is a rule, not a matcher: `permissions` in
-`.claude/settings.json` fence none of it, on purpose.
+Also the agent's: rebase, amend and `git push --force-with-lease` on its own branches; the
+`release: x.y.z` commit and push inside `/release` once the maintainer asked for that release; the
+feed publication after a tag. Stage by path only what the agent wrote; the maintainer's hunks stay
+unstaged. Roles stage, the lead commits. Detached runs never commit, push or tag. Conventional
+Commits, English, no attribution trailers. New work branches from `origin/main`.
 
-`git commit` and `git push` are `ask` in `.claude/settings.json`; trailers are stripped by
-`attribution` there and by `.githooks/commit-msg`. Every commit carries its changelog entry in both
-files — `.claude/rules/changelog.md`, enforced by `.claude/hooks/precommit-gate.sh`.
+**IMPORTANT: the maintainer names each of these, each time,** and each runs in its own Bash call:
+a tag created, moved, deleted or pushed (`git tag`, `--tags`, `--follow-tags`, `refs/tags/*`);
+`gh release create|edit|delete|upload`; `gh workflow run` in the theme repo; force-push, rebase or
+amend of anything on `main`; `git reset --hard` of pushed work. A tag word names the tag:
+"tag 0.14.17", "делай тег", "release 0.14.17".
+
+Also per word, each time: any push to the openwrt/luci fork and every upstream PR action; every
+publication (PR or issue comment, review, upstream reply, owlab/owfeed issue; the agent drafts);
+the hardware router; lowering a tier; waiving a gate. A review finding is answered in the diff and
+by resolving the thread (`/upstream-pr`).

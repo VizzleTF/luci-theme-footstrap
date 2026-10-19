@@ -2,7 +2,8 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
     "BASH_DEFAULT_TIMEOUT_MS": "120000",
-    "BASH_MAX_TIMEOUT_MS": "300000"
+    "BASH_MAX_TIMEOUT_MS": "300000",
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "1"
   },
   "attribution": {
     "commit": "",
@@ -21,10 +22,6 @@
       "../tmp"
     ],
     "ask": [
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git rebase:*)",
-      "Bash(git commit --amend:*)",
       "Bash(npm run live:*)",
       "Bash(luci-theme-footstrap/dev-sync.sh:*)",
       "Bash(./luci-theme-footstrap/dev-sync.sh:*)",
@@ -36,7 +33,27 @@
       "Bash(git checkout -- :*)",
       "Bash(git add -A:*)",
       "Bash(git add --all:*)",
-      "Bash(git add .:*)"
+      "Bash(git add .:*)",
+      "Bash(git tag:*)",
+      "Bash(git push --tags:*)",
+      "Bash(git push origin --tags:*)",
+      "Bash(git push --follow-tags:*)",
+      "Bash(git push origin --follow-tags:*)",
+      "Bash(git push origin v*)",
+      "Bash(git push origin refs/tags/*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin --force:*)",
+      "Bash(git push origin -f:*)",
+      "Bash(git push --mirror:*)",
+      "Bash(gh release:*)",
+      "Bash(gh workflow run:*)",
+      "Bash(gh api graphql:*)",
+      "Bash(gh api * -X *)",
+      "Bash(gh api * --method *)",
+      "Bash(gh api * -f *)",
+      "Bash(gh api * -F *)",
+      "Bash(gh api * --input *)"
     ],
     "allow": [
       "Bash(git status:*)",
@@ -45,7 +62,6 @@
       "Bash(git show:*)",
       "Bash(git branch:*)",
       "Bash(git add:*)",
-      "Bash(gh api:*)",
       "Bash(gh run view:*)",
       "Bash(gh pr view:*)",
       "Bash(gh pr checks:*)",
@@ -75,7 +91,23 @@
       "Bash(docker exec owlab-*)",
       "Read(../tmp/**)",
       "Write(../tmp/**)",
-      "Edit(../tmp/**)"
+      "Edit(../tmp/**)",
+      "Bash(git commit:*)",
+      "Bash(git push origin:*)",
+      "Bash(git fetch:*)",
+      "Bash(git ls-remote:*)",
+      "Bash(git rev-list:*)",
+      "Bash(git reflog:*)",
+      "Bash(git worktree list:*)",
+      "Bash(git merge-base:*)",
+      "Bash(gh api repos/*/actions/*)",
+      "Bash(gh api repos/*/pulls/*)",
+      "Bash(gh api repos/*/issues/*)",
+      "Bash(gh api repos/*/commits/*)",
+      "Bash(gh api repos/*/rulesets*)",
+      "Bash(gh run list:*)",
+      "Bash(tools/ci-watch.sh:*)",
+      "Bash(tools/ci-log.sh:*)"
     ]
   },
   "hooks": {
@@ -102,6 +134,27 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start.sh\""
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "developer|tester|security|researcher|upstream-reviewer",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/subagent-start.sh\""
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/permission-denied.sh\""
           }
         ]
       }
