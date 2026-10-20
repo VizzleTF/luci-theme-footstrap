@@ -191,7 +191,7 @@ jobs:
 
       # ONE RELEASE PER STEP: 25.12 is apk and 24.10 is opkg, and neither installs the other's file.
       - name: Install this build on 25.12 and render its pages
-        uses: owfeed/owlab/action@v0.6.5
+        uses: owfeed/owlab/action@v0.6.6
         with:
           releases: "25.12.4"
           install: dist/noarch/luci-theme-footstrap-*.apk
@@ -207,7 +207,7 @@ jobs:
             exec for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut /usr/share/ucode/luci/template/themes/footstrap/partials/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
 
       - name: Install this build on 24.10 and render its pages
-        uses: owfeed/owlab/action@v0.6.5
+        uses: owfeed/owlab/action@v0.6.6
         with:
           releases: "24.10.8"
           install: dist/all/luci-theme-footstrap_*.ipk
@@ -236,7 +236,7 @@ jobs:
         name: Assert the feed serves a working theme
         if: github.event_name != 'pull_request' && steps.feed-key.outputs.reachable == 'true'
         continue-on-error: true
-        uses: owfeed/owlab/action@v0.6.5
+        uses: owfeed/owlab/action@v0.6.6
         with:
           releases: "25.12.4"
           feed: https://repo.owfeed.org/releases/25.12/x86_64/packages.adb
@@ -318,7 +318,7 @@ jobs:
         with:
           name: owfeed-packages
           path: dist/
-      - uses: owfeed/owlab/setup@v0.6.5
+      - uses: owfeed/owlab/setup@v0.6.6
 
       - name: Boot the routers and install this build
         env:
@@ -415,7 +415,7 @@ jobs:
         with:
           name: owfeed-packages
           path: dist/
-      - uses: owfeed/owlab/setup@v0.6.5
+      - uses: owfeed/owlab/setup@v0.6.6
       - name: Boot the router and install this build
         env:
           FS_ROUTERS: ${{ matrix.router }}
@@ -482,7 +482,7 @@ jobs:
         with:
           name: owfeed-packages
           path: dist/
-      - uses: owfeed/owlab/setup@v0.6.5
+      - uses: owfeed/owlab/setup@v0.6.6
       - name: Boot the routers and install this build
         run: sh tools/ci-boot.sh
       # A pull request crosses the axes that were measured to change this gate's answer — three
@@ -531,7 +531,7 @@ jobs:
         with:
           name: owfeed-packages
           path: dist/
-      - uses: owfeed/owlab/setup@v0.6.5
+      - uses: owfeed/owlab/setup@v0.6.6
       - run: owlab up owrt2512
       - run: owlab install owrt2512 dist/noarch/luci-theme-footstrap-*.apk
 

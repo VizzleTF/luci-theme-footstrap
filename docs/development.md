@@ -24,7 +24,7 @@ owlab doctor                  # what this machine can do (Docker, arch, emulatio
 Docker is the only other requirement. Everything else comes out of `owlab.yaml`.
 
 `owfeed` and `owlab` here follow the refs in `.github/workflows/build.yml`, which are the only pin
-(0.5.5 and 0.6.5 at the time of writing; `owfeed version`, `owlab version`). A release binary from
+(0.5.5 and 0.6.6 at the time of writing; `owfeed version`, `owlab version`). A release binary from
 GitHub, checked with `gh attestation verify <file> -R owfeed/<tool>` and its `SHA256SUMS`, replaces
 the one in `~/go/bin`; `@latest` can run ahead of CI. The traps below name the owlab version they
 were measured on.
@@ -2034,6 +2034,23 @@ el.className).sort()`, duplicates counted, never a plain sequence diff.
   (`apk version -c` → invalid). So stamp an apk test build as the NEXT version's candidate
   (`FOOTSTRAP_VERSION=0.14.16_rc1` over 0.14.15): it upgrades the router and yields to 0.14.16. An
   opkg test build needs `opkg install --force-downgrade` back to the release.
+
+- **Every page on `owrtsnap` fails with `L is not defined` (or `window.L.require` undefined, or a
+  20 s `menuPaths` timeout) while `owrt2512`/`owrt2410` are clean: that stand's LuCI answers 502.**
+  The rootfs (`openwrt/rootfs:x86_64-master@sha256:2659c3a9`, 2026-10-19T02:46Z) links `ucode` to
+  `libucode.so.20230711`; the 2026-10-20 feed installs `ucode-mod-html` built for `libucode20261009`
+  (`ucv_metamethod_lookup`). Tell it apart: `curl -s -o /dev/null -w '%{http_code}'
+  <stand>/cgi-bin/luci/` prints `502`; `docker exec owlab-<project>-owrtsnap sh -c 'ldd /usr/bin/ucode;
+  apk version -l "<"'`. Fixed in owlab 0.6.6 (owfeed/owlab#42: a rolling release runs `apk upgrade`
+  before installing), which `build.yml` pins. The gates say `LuCI answered 502 … — the stand, not the theme`.
+
+- **`tools/ci-local.sh --force live:*`/`deep:*`/`anchors:*`/`playground` stays green on a feed
+  drift CI goes red on: the leg reuses the cached stand.** It runs `owlab up` without `--rebuild`,
+  so the container keeps the packages it was built with. Tell it apart: `docker exec owlab-luci-theme-footstrap-<stand> apk
+  version -l '<'` lists what the feed has moved past (`opkg list-upgradable` on 24.10). Reproduce in
+  isolation: copy `owlab.yaml` with its own `project.name` and CI's `image@digest`, then
+  `OWLAB_CONFIG=<copy> owlab up --rebuild <stand>`; the 9 real stands stay untouched. A leg now stops
+  only the stands it started (`notRunning`, `tools/lib/stands.mjs`); a bare `owlab down` stopped all 9.
 
 ## The test matrix
 
