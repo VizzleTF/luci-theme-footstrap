@@ -544,7 +544,7 @@
       "dot": "rose",
       "title": "Maintainer names it, each time",
       "items": [
-        "tag create/move/delete/push; gh release",
+        "tag create/move/delete/push; gh release; a Pages deploy",
         "force-push, rebase or amend of pushed main; reset --hard of pushed work",
         "openwrt/luci fork push, upstream PR, every publication, hardware router, lowering a tier, waiving a gate"
       ]

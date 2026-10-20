@@ -34,6 +34,7 @@
 
 - **The development toolchain no longer pulls a vulnerable `source-map-js` or `brace-expansion`, and CodeQL has nothing left to flag in `tools/` and `tests/`.** Dependabot reported `source-map-js` 1.2.1 (high, event-loop DoS) and `brace-expansion` 5.0.9 (moderate, quadratic expansion), both dev-only and outside the shipped package; the lockfile now resolves 1.2.2 and 5.0.12. `gallery-coverage.mjs` strips comments and `script`/`style` bodies until the page stops changing, a test reads its log with `readFileSync` instead of spawning `cat`, and a fixture escapes every `>`.
 - **`git-guard.sh` no longer carries a token from one command into the next, and a commit message with an odd quote inside `$(cat <<EOF …)` stays data.** `echo a create; gh release` asked as a release create because the previous segment's token leaked, and a `"` in a heredoc commit message flipped the quote state so its body was scanned as commands.
+- **A dispatch that deploys GitHub Pages still asks: `gh workflow run … -f publish-pages=true` and `gh workflow run pages.yml`.** Making the theme's CI dispatch the agent's own action had also let through the one dispatch that publishes a public site; the release readiness eval now forbids only that form.
 
 ## [0.14.16] — 2026-10-18
 

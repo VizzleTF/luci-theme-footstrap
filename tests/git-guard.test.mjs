@@ -195,6 +195,11 @@ const askPolicy = [
 	'gh release -R VizzleTF/luci-theme-footstrap create v1', 'gh release --repo VizzleTF/luci-theme-footstrap create v1', 'gh release --repo=VizzleTF/luci-theme-footstrap delete v1 -y',
 	'gh release -RVizzleTF/luci-theme-footstrap upload v1 a.tgz', "bash -c 'gh release -R VizzleTF/luci-theme-footstrap create v1'",
 	'gh -R VizzleTF/luci-theme-footstrap release create v1', 'gh -R owfeed/x api -X POST repos/VizzleTF/luci-theme-footstrap/git/refs -f a=1',
+	'gh workflow run build.yml -f publish-pages=true', 'gh workflow run build.yml --field publish-pages=true', 'gh workflow run build.yml -F publish-pages=true',
+	'gh workflow run build.yml --raw-field publish-pages=true', 'gh workflow run build.yml -f publish-pages=1', 'gh workflow run build.yml -fpublish-pages=true',
+	'gh workflow run build.yml --raw-field=publish-pages=true', 'gh workflow run pages.yml', 'gh workflow run pages', 'gh workflow run pages.yml --ref main',
+	'gh workflow run pages.yml -R VizzleTF/luci-theme-footstrap', 'gh workflow run build.yml --repo VizzleTF/luci-theme-footstrap -f publish-pages=true',
+	'gh -R VizzleTF/luci-theme-footstrap workflow run pages.yml', 'gh workflow -R VizzleTF/luci-theme-footstrap run pages.yml',
 	'git push --force origin main', 'git push -f origin master', 'git push origin +main', 'git push --force-with-lease origin main',
 	'git push origin --delete main', 	'sh -c "git tag v1"', 'git commit -m x && git tag v1',
 ];
@@ -207,6 +212,8 @@ const nonePolicy = [
 	'git -c push.followTags=false push', 'git -c push.followTags=off push', 'git -c push.followTags= push', 'git -c push.default=simple push',
 	'gh release list', 'gh release view v1', 'gh api repos/VizzleTF/luci-theme-footstrap/releases',
 	'gh api -X POST repos/owfeed/owfeed-packages/git/refs -f x=1', 'gh api repos/VizzleTF/luci-theme-footstrap/issues -f title=x',
+	'gh workflow run build.yml --ref main', 'gh -R VizzleTF/luci-theme-footstrap workflow run build.yml',
+	'gh workflow run build.yml -f publish-pages=false', 'gh workflow run pages.yml --repo owfeed/owfeed-packages', 'gh workflow run build.yml -R owfeed/x -f publish-pages=true',
 	'gh workflow run update.yml -R owfeed/owfeed-packages', 'gh workflow run update.yml --repo owfeed/owfeed-packages', 'gh run list',
 	'gh workflow -R owfeed/owfeed-packages run update.yml', 'gh workflow --repo=owfeed/owfeed-packages run update.yml', 'gh release -R VizzleTF/luci-theme-footstrap list',
 	// a heredoc to git or cat is data, not a command line

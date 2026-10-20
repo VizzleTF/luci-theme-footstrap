@@ -5,7 +5,7 @@
 #
 # Commit and push are the agent's own and stay silent. Ask: a tag (create, move, delete, push, also
 # --tags, --follow-tags or push.followTags set by `-c`, GIT_CONFIG_* or `git config`, refs/tags/*, a
-# v<digit> refspec, update-ref), `gh release` writes, `gh api`
+# v<digit> refspec, update-ref), `gh workflow run` that deploys Pages (pages.yml, or -f publish-pages=true), `gh release` writes, `gh api`
 # writes to git/refs, git/tags or releases of the theme repo, a force push or delete of main/master, rebase and
 # `commit --amend` while HEAD is already in origin/main, `reset --hard`, main or master moved or
 # deleted locally (`checkout -B`, `switch -C`, `branch -f|-D|-m`, `update-ref`), and a push whose remote
@@ -181,12 +181,29 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 		return j
 	}
 	# gh release writes, gh api writes to refs/tags/releases of the theme repo
-	function gh(i0,   j, k, a, v, m, hf, path, lp, sc) {
+	function gh(i0,   j, k, a, v, m, hf, path, lp, sc, wf) {
 		ghr = ""
 		j = ghflags(i0 + 1)
 		v = t[j]; sc = j + 1
 		# cobra takes -R/--repo after the group verb too (`gh release -R o/r create`)
 		if (v == "release") sc = ghflags(sc)
+		if (v == "workflow") {
+			sc = ghflags(sc)
+			if (t[sc] == "run") {
+				wf = ""; pg = 0
+				for (k = sc + 1; k <= n; k++) {
+					a = t[k]
+					if (a ~ /^(-r|--ref|--json)$/) k++
+					else if (a ~ /^(-[fF]|--field|--raw-field)$/) { if (tolower(t[k + 1]) ~ /^publish-pages=(true|1)$/) pg = 1; k++ }
+					else if (a ~ /^(-[fF].|--field=|--raw-field=)/) { if (tolower(a) ~ /publish-pages=(true|1)$/) pg = 1 }
+					else if (a ~ /^(-R|--repo)$/) { ghr = t[k + 1]; k++ }
+					else if (a ~ /^--repo=/) ghr = substr(a, 8)
+					else if (a ~ /^-R./) ghr = substr(a, 3)
+					else if (a !~ /^-/ && wf == "") wf = tolower(a)
+				}
+				if ((pg || wf ~ /^pages(\.ya?ml)?$/) && (ghr == "" || tolower(ghr) ~ /vizzletf\/luci-theme-footstrap/)) print "KIND\tpages"
+			}
+		}
 		if (v == "release") { if (t[sc] ~ /^(create|edit|delete|delete-asset|upload)$/) print "KIND\trelease" }
 		else if (v == "api") {
 			m = ""; hf = 0; path = ""
@@ -564,7 +581,7 @@ fi
 U=''
 for k in $KINDS; do
 	case $k in
-		noverify|tag|tagpush|release|rewrite|reset-hard|forkpush|mainmove) U="$U $k" ;;
+		noverify|tag|tagpush|release|pages|rewrite|reset-hard|forkpush|mainmove) U="$U $k" ;;
 		histcheck) git -C "$BASE" merge-base --is-ancestor HEAD origin/main >/dev/null 2>&1 && U="$U rewrite" ;;
 		forcecur) case $(git -C "$BASE" symbolic-ref --short -q HEAD 2>/dev/null) in main|master) U="$U rewrite" ;; esac ;;
 	esac
