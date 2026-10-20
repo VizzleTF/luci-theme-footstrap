@@ -1,9 +1,11 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { ROOT } from '../tools/lib/root.mjs';
 
 const WATCH = join(ROOT, 'tools/ci-watch.sh');
@@ -93,18 +95,68 @@ test('ci-watch: a run still going at --max exits 3', () => {
 	assert.match(r.stdout, /^ci: timeout 5 /);
 });
 
-// bg.sh must refuse every write form before it spawns anything; the reads must reach the spawn,
-// which a missing binary then fails harmlessly in the background (the wrapper itself exits 0).
-for (const c of [ 'git push', 'git tag v1', 'gh pr merge 3', 'gh run rerun 1', 'gh run cancel 1', 'gh api -X POST repos/o/r/git/refs', 'gh api repos/o/r/issues -f title=x', 'gh release create v1', 'gh pr comment 1' ]) {
-	test(`bg.sh refuses: ${c}`, () => {
-		const r = spawnSync('sh', [ BG, ...c.split(' ') ], { encoding: 'utf8' });
+// bg.sh is probed through --check only: it prints the verdict and runs nothing, so a refusal that
+// went missing turns a test red instead of running the command. cwd is a fresh dir outside the repo.
+const cwd = mkdtempSync(join(tmpdir(), 'ci-bg-'));
+after(() => rmSync(cwd, { recursive: true, force: true }));
+const check = (c) => spawnSync('sh', [ BG, '--check', ...c.split(' ') ], { encoding: 'utf8', cwd });
+
+const refused = [
+	// publishing and history, with and without the global options that sit before the subcommand
+	'git push', 'git tag v1', 'git commit -m x', 'git -C /r push', 'git -C /r -c user.name=a commit -m x', 'git --git-dir=/x tag v1', 'git --git-dir /x push', 'git -c alias.p=push p', 'git -calias.p=push p',
+	'git reset --hard HEAD~3', 'git update-ref refs/tags/v9 HEAD', 'git update-ref -d refs/heads/main', 'git rebase HEAD~3', 'git branch -f main HEAD~5', 'git branch -D main', 'git checkout -B main', 'git switch -C main',
+	'git send-pack x', 'git fetch origin +x:main', 'git stash', 'git clean -fd', 'git restore f', 'git merge x', 'git pull', 'git cherry-pick x', 'git am x.patch', 'git tt v1',
+	'gh pr merge 3', 'gh run rerun 1', 'gh run cancel 1', 'gh run delete 1', 'gh api -X POST repos/o/r/git/refs', 'gh api repos/o/r/issues -f title=x', 'gh release create v1', 'gh pr comment 1',
+	'gh -R o/r pr merge 1', 'gh --repo o/r issue comment 1', 'gh --repo=o/r release create v1', 'gh -Ro/r pr close 1', 'gh -R o/r api -X POST repos/o/r/issues', 'gh api --method=PATCH repos/o/r', 'gh api repos/o/r/issues --raw-field body=x',
+	'gh api repos/o/r/issues --field body=x', 'gh api -XPOST repos/o/r/issues', 'gh api graphql -f query=x', 'gh release upload v1 f', 'gh release delete v1', 'gh workflow run release.yml', 'gh -R o/r workflow run u.yml',
+	'gh secret set X', 'gh repo delete x', 'gh repo create x', 'gh label create x', 'gh alias set x y', 'gh extension install x', 'gh auth login', 'gh pr create', 'gh gist create f', 'gh ghx',
+	// a command folded into a shell string, behind a separator or a wrapper
+	'sh -c git reset --hard HEAD~3', 'sh -c true && git push', 'sh -c npm test ; gh -R o/r pr merge 1', 'env GIT_DIR=/x git push', 'xargs git tag', '/usr/bin/git -C /r push', 'command gh secret set X',
+	// the hardware router and the transfer tools
+	'ssh r', 'scp a b', '/usr/bin/rsync a b', 'tools/dev-sync.sh h',
+];
+for (const c of refused) {
+	test(`bg.sh --check refuses: ${c}`, () => {
+		const r = check(c);
 		assert.equal(r.status, 2);
-		assert.match(r.stderr, /foreground thread/);
+		assert.match(r.stdout, /^refused: .*foreground thread/);
+		assert.equal(r.stderr, '');
 	});
 }
-for (const c of [ 'gh pr checks 1', 'gh api -X GET repos/o/r' ]) {
-	test(`bg.sh lets through: ${c}`, () => {
-		const r = spawnSync('sh', [ BG, 'true', ...c.split(' ') ], { encoding: 'utf8' });
-		assert.equal(r.status, 0, r.stderr);
+const allowed = [
+	'git status', 'git -C /r log --oneline -3', 'git diff', 'git show HEAD', 'git rev-parse HEAD', 'git ls-remote origin', 'git describe --tags', 'git --version', 'git -c color.ui=never log',
+	'gh pr checks 1', 'gh pr view 1', 'gh -R o/r pr checks 1', 'gh --repo o/r run watch 1', 'gh --repo=o/r run list', 'gh run view 1 --log', 'gh run list', 'gh run download 1', 'gh release view v1', 'gh release list', 'gh issue list',
+	'gh api -X GET repos/o/r', 'gh api --method GET repos/o/r', 'gh api repos/o/r/actions/runs', 'gh api -H Accept:x repos/o/r/commits', 'gh auth status', 'gh workflow list', 'gh repo view', 'gh --version',
+	'tools/ci-watch.sh --sha x', 'sshd', 'echo git', 'cd /home/x/git && npm test', 'sh -c git status && npm test', 'node tools/live-audit.mjs --all', 'git',
+];
+for (const c of allowed) {
+	test(`bg.sh --check allows: ${c}`, () => {
+		const r = check(c);
+		assert.equal(r.status, 0, r.stdout);
+		assert.equal(r.stdout, 'allowed\n');
 	});
 }
+
+test('bg.sh --check without a command is a usage error', () => {
+	const r = spawnSync('sh', [ BG, '--check' ], { encoding: 'utf8', cwd });
+	assert.equal(r.status, 2);
+	assert.match(r.stderr, /^usage:/);
+});
+
+test('bg.sh --check runs nothing, allowed or refused', async () => {
+	const marker = join(cwd, 'ran');
+	assert.equal(check(`touch ${marker}`).stdout, 'allowed\n');
+	assert.match(check(`touch ${marker} ssh`).stdout, /^refused:/);
+	await sleep(200); // a detached run would have created the marker within a few ms
+	assert.equal(existsSync(marker), false);
+});
+
+// Static guard: a line that names bg.sh or its path constant must carry --check, so no test here can
+// reach the real run path. Comment lines and the constant's own declaration are exempt.
+const unchecked = (src) => src.split('\n').filter((l) => /\bBG\b|bg\.sh/.test(l) && !/^const BG =|^\s*\/\//.test(l) && !l.includes('--check'));
+
+test('every bg.sh spawn in this file goes through --check', () => {
+	const bad = "spawnSync('sh', [ @, 'git', 'push' ]);".replace('@', 'B' + 'G'); // assembled: the scan must not read it as a call
+	assert.equal(unchecked(bad).length, 1);
+	assert.deepEqual(unchecked(readFileSync(fileURLToPath(import.meta.url), 'utf8')), []);
+});

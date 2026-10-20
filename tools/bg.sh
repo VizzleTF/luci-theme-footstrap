@@ -8,10 +8,21 @@
 #
 #   tools/bg.sh node tools/live-audit.mjs --all
 #   tail -n 40 ../tmp/<run-id>.log
+#
+# `tools/bg.sh --check <command…>` asks the refusal question and nothing else: it prints `allowed`
+# (exit 0) or `refused: <why>` (exit 2) on stdout and never detaches or runs the command. A test or a
+# probe of the fence uses it, because a refusal that went missing would otherwise run the command
+# under test.
 set -eu
 
+CHECK=0
+if [ "${1-}" = --check ]; then
+	CHECK=1
+	shift
+fi
+
 if [ $# -eq 0 ]; then
-	echo "usage: tools/bg.sh <command> [args...]" >&2
+	echo "usage: tools/bg.sh [--check] <command> [args...]" >&2
 	exit 2
 fi
 
@@ -22,64 +33,113 @@ fi
 #
 # This is a guardrail against the wrapper laundering a command past a permission rule, not a
 # sandbox: it reads the text of the command, so it can be fooled by anything the text itself does
-# not reveal (an alias, a script that shells out, a binary named to match nothing here). What it
-# does catch is scanned as words, not substrings, so `sshd` or a path ending in `-ssh` does not
-# trip it. Backslashes are deleted (not folded to a separator) BEFORE the quoting and shell
-# operators are folded to spaces, so `s\sh` collapses to the `ssh` it will actually become when the
-# shell reassembles it, rather than scanning as two harmless words.
-SCAN=$(printf ' %s ' "$*" | tr -d '\\' | tr '\n\t"`;&|()<>'"'"'' ' ' | tr -s ' ')
-set -f                     # $SCAN is split into words, never globbed: a run may carry a literal `*`
-prev=''
-prev2=''
-api=0
+# not reveal (a script that shells out, a binary named to match nothing here). What it does catch is
+# scanned as words, not substrings, so `sshd` or a path ending in `-ssh` does not trip it. Backslashes
+# are deleted (not folded to a separator) BEFORE the quoting and shell operators are folded to spaces,
+# so `s\sh` collapses to the `ssh` it will actually become, rather than scanning as two harmless words.
+# Every `;`, `&` and `|` stays as a `;` word, so a git or gh call ends where its command ends.
+#
+# A detached run only reads. After a `git` or `gh` word the global options are skipped (git -C/-c/
+# --git-dir, gh -R/--repo, each with its value) and the subcommand must be on a short read list, so a
+# writing verb nobody thought of is refused, and so is an alias: git ignores one that shadows a
+# built-in, so a configured alias is never on the list, and `-c alias.*` is refused by name.
+
+# The callers run in decide()'s subshell, so the exit ends that subshell only.
 refuse() {
-	echo "refused: '$1' writes history or publishes. Detached runs never commit, push or publish: run it in the foreground thread; a tag goes through /release." >&2
+	printf "'%s' writes history, refs or publishes, or is not a read this wrapper knows. Detached runs only read (git status|diff|log|show…, gh run|pr|release view|list…): run it in the foreground thread; a tag goes through /release.\n" "$1"
 	exit 2
 }
-for word in $SCAN; do
-	# Path forms (`/usr/bin/ssh`, `./ssh`) walk past a bare-word match, so the same names are
-	# checked with a `*/name` form too; `*dev-sync.sh` already had this shape and is the model.
-	case "$word" in
-		ssh | scp | sftp | rsync | */ssh | */scp | */sftp | */rsync | *dev-sync.sh)
-			echo "refused: '$word' goes through the human, not through a detached wrapper." >&2
-			echo "tools/bg.sh is allow-listed, so a command run through it never reaches the 'ask' rule that guards this one. Run it in the foreground." >&2
-			exit 2 ;;
-	esac
-	# Publishing is `git`/`gh` plus a subcommand, and a path defeats a literal `git push`
-	# substring match the same way it defeats the ssh check above; the basename of the PREVIOUS
-	# word is what a shell would actually run, so that is what is compared here. Reads (`gh run
-	# watch|view|list`, `gh pr checks|view|list|diff`) pass: a detached CI watch is the point.
-	case "${prev##*/}" in
-		git)
-			case "$word" in
-				push | commit | tag) refuse "git $word" ;;
-			esac ;;
-		gh)
-			[ "$word" = api ] && api=1 ;;
-	esac
-	case "${prev2##*/}" in
-		gh)
-			case "$prev:$word" in
-				pr:view | pr:list | pr:checks | pr:diff | pr:status | issue:view | issue:list | release:view | release:list) ;;
-				pr:* | issue:* | release:*) refuse "gh $prev $word" ;;
-				run:rerun | run:cancel | run:delete) refuse "gh run $word" ;;
-			esac ;;
-	esac
-	# `gh api` is a GET unless a method or a body flag turns it into a write (-f/-F imply POST).
-	if [ "$api" = 1 ]; then
-		case "$prev:$word" in
-			-X:GET | --method:GET) ;;
-			-X:* | --method:*) refuse "gh api $prev $word" ;;
+
+# $@ the words after a `git`, up to the next `;`
+gitcheck() {
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			';') return 0 ;;
+			-c) case "${2-}" in [Aa][Ll][Ii][Aa][Ss].*) refuse "git -c ${2-}" ;; esac; shift; [ $# -eq 0 ] || shift ;;
+			-c[Aa][Ll][Ii][Aa][Ss].*) refuse "git $1" ;;
+			-C | --git-dir | --work-tree | --namespace | --config-env | --super-prefix | --attr-source) shift; [ $# -eq 0 ] || shift ;;
+			-*) shift ;;
+			*) break ;;
 		esac
+	done
+	case "${1-}" in
+		'' | ';' | status | diff | log | show | rev-parse | rev-list | describe | ls-files | ls-remote | ls-tree | cat-file | blame | shortlog | merge-base | name-rev | for-each-ref | show-ref | grep | diff-tree | cherry) ;;
+		*) refuse "git $1" ;;
+	esac
+}
+
+# $@ the words after `gh api`, up to the next `;`: a GET unless a method or a body flag turns it into a write
+apicheck() {
+	m=''
+	while [ $# -gt 0 ] && [ "$1" != ';' ]; do
+		case "$1" in
+			-X | --method) m=${2-}; if [ $# -gt 1 ]; then shift; fi ;;
+			--method=*) m=${1#*=} ;;
+			-X?*) m=${1#-X} ;;
+			-f | -F | -f?* | -F?* | --field | --raw-field | --input | --field=* | --raw-field=* | --input=*) refuse "gh api $1" ;;
+			graphql) refuse "gh api graphql" ;;
+		esac
+		shift
+	done
+	case "$m" in '' | GET | get) ;; *) refuse "gh api -X $m" ;; esac
+}
+
+# $@ the words after a `gh`, up to the next `;`
+ghcheck() {
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			';') return 0 ;;
+			-R | --repo | --hostname) shift; [ $# -eq 0 ] || shift ;;
+			-*) shift ;;
+			*) break ;;
+		esac
+	done
+	[ "${2-}" != ';' ] || set -- "$1"
+	case "${1-}:${2-}" in
+		:) ;;
+		run:view | run:watch | run:list | run:download | pr:view | pr:list | pr:checks | pr:diff | pr:status | issue:view | issue:list | issue:status | release:view | release:list | workflow:list | workflow:view | repo:view | auth:status) ;;
+		api:*) shift; apicheck "$@" ;;
+		*) refuse "gh ${1-}${2:+ $2}" ;;
+	esac
+}
+
+# Prints the reason and exits 2 on a refusal; prints nothing and returns 0 on a pass.
+decide() {
+	SCAN=$(printf ' %s ' "$*" | tr -d '\\' | tr '\n\t' '; ' | sed "s/[\"\`()<>']/ /g; s/[;&|]/ ; /g" | tr -s ' ')
+	set -f                     # $SCAN is split into words, never globbed: a run may carry a literal `*`
+	set -- $SCAN
+	while [ $# -gt 0 ]; do
+		word=$1
+		shift
+		# Path forms (`/usr/bin/ssh`, `./ssh`) walk past a bare-word match, so the same names are
+		# checked with a `*/name` form too; `*dev-sync.sh` already had this shape and is the model.
 		case "$word" in
-			-f | -F | --field | --raw-field | --input | --field=* | --raw-field=* | --input=* | -XPOST | -XPUT | -XPATCH | -XDELETE | --method=POST | --method=PUT | --method=PATCH | --method=DELETE)
-				refuse "gh api $word" ;;
+			ssh | scp | sftp | rsync | */ssh | */scp | */sftp | */rsync | *dev-sync.sh)
+				printf "'%s' goes through the human, not through a detached wrapper: tools/bg.sh is allow-listed, so a command run through it never reaches the 'ask' rule that guards this one. Run it in the foreground thread.\n" "$word"
+				exit 2 ;;
 		esac
+		# the basename is what a shell would actually run
+		case "${word##*/}" in
+			git | git.exe) gitcheck "$@" ;;
+			gh | gh.exe) ghcheck "$@" ;;
+		esac
+	done
+}
+
+# The one refusal decision, shared by --check and the real run so the two cannot drift. It runs in
+# a command substitution so `set -f` and `exit` stay in the subshell.
+if ! WHY=$(decide "$@"); then
+	if [ "$CHECK" = 1 ]; then
+		printf 'refused: %s\n' "$WHY"
+	else
+		printf 'refused: %s\n' "$WHY" >&2
 	fi
-	prev2=$prev
-	prev=$word
-done
-set +f
+	exit 2
+fi
+if [ "$CHECK" = 1 ]; then
+	echo allowed
+	exit 0
+fi
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 TMP=$(dirname -- "$ROOT")/tmp
