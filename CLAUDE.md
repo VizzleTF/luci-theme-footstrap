@@ -111,9 +111,8 @@ Every commit and push runs its hooks (git-guard refuses `--no-verify`, `-n` on c
 
 **IMPORTANT: the maintainer names each of these, each time,** and each runs in its own Bash call (a
 tag's create and its push are two): a tag created, moved, deleted or pushed (`git tag`, `--tags`,
-`--follow-tags`, `refs/tags/*`); `gh release create|edit|delete|upload`; `gh workflow run` in the
-theme repo; force-push, rebase or amend of commits already on `origin/main`; `git reset --hard` of
-pushed work. A tag word names the tag: "tag 0.14.17", "делай тег", "release 0.14.17".
+`--follow-tags`, `refs/tags/*`); `gh release create|edit|delete|upload`; force-push, rebase or amend of commits already on
+`origin/main`; `git reset --hard` of pushed work. A tag word names the tag: "tag 0.14.17", "делай тег", "release 0.14.17".
 
 Also per word, each time: any push to the openwrt/luci fork and every upstream PR action; every
 publication (PR or issue comment, review, upstream reply, owlab/owfeed issue; the agent drafts);

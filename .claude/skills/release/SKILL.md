@@ -14,13 +14,12 @@ source. The order is load-bearing: the tag points at a commit that already carri
 changelog section, and every gate reads the sha the tag will name. `<v>` is the new version,
 `<prev>` the last tag (`git describe --tags --abbrev=0`). Scratch output goes to `../tmp/release-<v>/`.
 
-1. **Readiness** (autonomous except the dispatch below; any red stops here with an owner named):
+1. **Readiness** (autonomous; any red stops here with an owner named):
    - scope the diff — `docs/releasing.md` Step 1 says which live checks it makes mandatory;
    - `gh run list --branch main -L1 --json conclusion,headSha,databaseId` → `success`, and
      `gh run view <id>` read job by job (`check`, `lint`, `build`, `verify`, `live`, `anchors`);
-   - `gh workflow run build.yml --ref main` is the maintainer's word (CLAUDE.md, git-guard asks):
-     ask with AskUserQuestion, the exact command in the option, unless their message named it;
-     then `tools/bg.sh tools/ci-watch.sh --run <id> --max 6000`
+   - `gh workflow run build.yml --ref main` (the agent's own dispatch, no question), then
+     `tools/bg.sh tools/ci-watch.sh --run <id> --max 6000`
      + `tools/bg-wait.sh <run-id>`: that run is the first reading of `deep` and `playground`, and the
      evidence for the stale-baseline prune (`docs/releasing.md` "The stale `live-audit` baseline");
    - `~/go/bin/owfeed lock` exits 0 both at the repo root and in a fresh

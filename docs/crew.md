@@ -186,8 +186,8 @@ counter of 2–3.
 
 | Level | Actions |
 |---|---|
-| Autonomous | read, plan, edit inside the role's scope; T0–T2; `owlab` stands; commit and push to `origin` `main` and own branches under the four preconditions; rebase, amend, `--force-with-lease` on own branches; the `release:` commit inside `/release`; feed publication after a tag; `ci-watch`/`ci-log` reads |
-| Per word, each time | tag create/move/delete/push; `gh release *`; `gh workflow run` in the theme repo; force-push, rebase or amend of pushed `main`; `git reset --hard` of pushed work; openwrt/luci fork pushes and upstream PR actions; every publication (comments, reviews, replies, owlab/owfeed issues); hardware router (`dev-sync.sh`, `ssh`); lowering a tier; waiving a gate |
+| Autonomous | read, plan, edit inside the role's scope; T0–T2; `owlab` stands; commit and push to `origin` `main` and own branches under the four preconditions; rebase, amend, `--force-with-lease` on own branches; the `release:` commit inside `/release`; `gh workflow run` in the theme repo; feed publication after a tag; `ci-watch`/`ci-log` reads |
+| Per word, each time | tag create/move/delete/push; `gh release *`; force-push, rebase or amend of pushed `main`; `git reset --hard` of pushed work; openwrt/luci fork pushes and upstream PR actions; every publication (comments, reviews, replies, owlab/owfeed issues); hardware router (`dev-sync.sh`, `ssh`); lowering a tier; waiving a gate |
 | Never | `--no-verify` on commit or push; AI attribution trailers; staging the maintainer's own hunks; commit, push or tag from a detached run; staging or a commit by a role other than the lead |
 
 ## Guardrail layers

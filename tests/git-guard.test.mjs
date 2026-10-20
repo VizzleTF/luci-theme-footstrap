@@ -191,11 +191,10 @@ const askPolicy = [
 	'gh api -X POST repos/VizzleTF/luci-theme-footstrap/git/refs -f ref=refs/tags/v1',
 	'gh api --method=DELETE repos/VizzleTF/luci-theme-footstrap/git/refs/tags/v1',
 	'gh api repos/VizzleTF/luci-theme-footstrap/releases -f tag_name=v1',
-	'gh workflow run release.yml', 'gh workflow run build.yml -R VizzleTF/luci-theme-footstrap',
 	// cobra takes -R/--repo after the group verb too, so the subcommand is read past it
 	'gh release -R VizzleTF/luci-theme-footstrap create v1', 'gh release --repo VizzleTF/luci-theme-footstrap create v1', 'gh release --repo=VizzleTF/luci-theme-footstrap delete v1 -y',
-	'gh release -RVizzleTF/luci-theme-footstrap upload v1 a.tgz', 'gh workflow -R VizzleTF/luci-theme-footstrap run build.yml', "bash -c 'gh release -R VizzleTF/luci-theme-footstrap create v1'",
-	'gh -R VizzleTF/luci-theme-footstrap release create v1', 'gh --repo VizzleTF/luci-theme-footstrap workflow run u.yml', 'gh -R owfeed/x api -X POST repos/VizzleTF/luci-theme-footstrap/git/refs -f a=1',
+	'gh release -RVizzleTF/luci-theme-footstrap upload v1 a.tgz', "bash -c 'gh release -R VizzleTF/luci-theme-footstrap create v1'",
+	'gh -R VizzleTF/luci-theme-footstrap release create v1', 'gh -R owfeed/x api -X POST repos/VizzleTF/luci-theme-footstrap/git/refs -f a=1',
 	'git push --force origin main', 'git push -f origin master', 'git push origin +main', 'git push --force-with-lease origin main',
 	'git push origin --delete main', 	'sh -c "git tag v1"', 'git commit -m x && git tag v1',
 ];
@@ -330,7 +329,7 @@ const hide = {
 		'git update-ref refs/heads/main HEAD', 'git update-ref -d refs/heads/main', 'git update-ref -m msg refs/heads/master HEAD~1',
 		"git -c alias.p=push p --force origin main", 'git -c alias.a=b -c alias.b=push a --tags',
 		// the wrapper that is allow-listed hides nothing from the line it carries
-		'tools/bg.sh sh -c "git reset --hard HEAD~3"', 'tools/bg.sh gh workflow run release.yml', 'tools/bg.sh git update-ref refs/tags/x HEAD', 'tools/bg.sh git branch -f main HEAD~5',
+		'tools/bg.sh sh -c "git reset --hard HEAD~3"', 'tools/bg.sh git update-ref refs/tags/x HEAD', 'tools/bg.sh git branch -f main HEAD~5',
 		// a commit message that is followed by a real tag
 		'git commit -m "$(cat <<\'EOM\'\nx\nEOM\n)" && git tag v1',
 		// a substitution that a shell, eval or xargs runs: the heredoc body inside it is the code, not data
