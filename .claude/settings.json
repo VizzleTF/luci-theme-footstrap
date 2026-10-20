@@ -93,7 +93,6 @@
       "Bash(docker ps:*)",
       "Bash(docker exec owlab-*)",
       "Read(../tmp/**)",
-      "Write(../tmp/**)",
       "Edit(../tmp/**)",
       "Bash(git commit:*)",
       "Bash(git push origin:*)",

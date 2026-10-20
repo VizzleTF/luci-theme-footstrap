@@ -28,6 +28,7 @@
 - **CI's snapshot stands work again: the live and anchors legs run owlab 0.6.6, which upgrades a rolling release's base before installing into it.** On 2026-10-20 the snapshot feed moved `ucode` to a new ABI under a rootfs that still carried the old one; installing LuCI by name upgraded half of it and every snapshot stand answered 502, turning main red on code that had been green the evening before.
 - **`agent-refs` judges a named path by what git tracks or ignores, so it gives the same verdict on a fresh CI checkout as on a working tree; `tools/ci-log.sh` prints the lines before a step's first `##[error]`.** A steering file naming `dist/` passed locally, where the build output exists, and failed CI's `check:fast` on a clean checkout, turning main red; `ci-log` then showed no cause, because the gate's own message sat right above the error line it skipped.
 - **The skill evals run green on this machine: `/retro` and `docs/crew.md` give the `claude plugin eval` command with `TMPDIR` outside `/tmp`.** The eval sandbox denies writes under `/tmp`, its own workspace there included, so both scaffolded `ship` cases failed on `git fetch` with `Read-only file system` (0.67 and 0.75); with `TMPDIR=~/.cache/claude-eval-tmp` all ten cases pass.
+- **`.claude/settings.json` no longer carries a `Write(../tmp/**)` rule that Claude Code ignores.** File permission checks match only `Edit(...)` rules, so the harness warned on every start; the existing `Edit(../tmp/**)` already covers writes there.
 
 ### Security
 
