@@ -388,6 +388,11 @@ A gate's failure line names the item (cell, selector, file:line), the measured v
 and the write or input that caused it. A gate that only says "failed" makes the reader guess; a new
 gate is reviewed against this line.
 
+A gate reads what git tracks, what git ignores by rule, or what it builds itself, so a working tree
+and CI's clean checkout get the same verdict: `agent-refs` once checked `dist/` on disk, passed the
+pre-push here and turned main red on CI (6dc27c5). A gate that needs a file the checkout lacks
+builds it first or names the step that does.
+
 | Gate | Holds |
 |---|---|
 | `lint` | eslint over `htdocs/` and `ucode/`, stylelint over `styles/` — correctness only, not formatting; stylelint also holds the `!important` allowlist (`declaration-no-important` + the file override) and the data-title i18n check (`selector-disallowed-list`) |
@@ -414,7 +419,7 @@ gate is reviewed against this line.
 | `conffiles` | every shipped `/etc/config/*` is declared a conffile — `/etc/config/footstrap` is written at runtime by Save-as-default, and an undeclared one is replaced on upgrade |
 | `changelog` | section set, order, dates, compare links, RU mirror parity, bold leads |
 | `i18n` | `.pot` current, no empty `msgstr` |
-| `agent-refs` | every repo path, `npm run <x>` and `tools/<x>` that `CLAUDE.md`, `.claude/**/*.md` and `docs/crew.md` name in backticks exists; a hit is `file:line: target`. Skipped: `../tmp`, `<placeholder>` and glob forms. A steering file naming a deleted tool sends the next session into a dead end |
+| `agent-refs` | every repo path, `npm run <x>` and `tools/<x>` that `CLAUDE.md`, `.claude/**/*.md` and `docs/crew.md` name in backticks is tracked or ignored by rule (generated output such as `dist/`); a hit is `file:line: target`. Skipped: `../tmp`, `<placeholder>` and glob forms. A steering file naming a deleted tool sends the next session into a dead end |
 | `shell` | every shell script in the source tree parses (`sh -n`) — including `release-notes.sh`, which otherwise fails inside the release job |
 | `marker` | the `call BuildPackage` literal `include/scan.mk` greps for, without which the SDK does not see the package at all |
 | `a11y` | axe-core WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap,2020,forum} × {untinted,60°,260°}; then under emulated `forced-colors: active`: every selector in an `@media (forced-colors)` block must reach a gallery element (`CHROME_ONLY` lists the template-chrome-only ones: `header.ut`, and the rail guard `head.ut` stamps) and keyboard focus must draw a `Highlight` outline |
