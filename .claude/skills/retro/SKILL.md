@@ -35,7 +35,8 @@ ago). `T=../tmp/retro-<today>`. Each step ends on its done line.
    `.claude/hooks/*.sh`, `.claude/tooling/**` and other code go to a card per `docs/crew.md`. A
    skill edited here gets its retro miss as an eval case under `.claude/skills/<name>/evals/<case>/` (format in `docs/crew.md`). Running it
    is paid and waits for the maintainer's word:
-   `claude plugin eval .claude/skills/<name> --case <case> --scaffold --allow-tools Bash --no-publish --output-dir ../tmp/evals/<name>`.
+   `mkdir -p ~/.cache/claude-eval-tmp && TMPDIR=~/.cache/claude-eval-tmp claude plugin eval .claude/skills/<name> --case <case> --scaffold --allow-tools Bash --no-publish --trust-plugin --output-dir ../tmp/evals/<name>`
+   (`TMPDIR` outside `/tmp`: the eval sandbox denies writes under `/tmp`, its own workspace included).
 
 Done = every finding in `$T/findings.md` has a fate and a target file, every accepted row is
 applied, and the rest are listed for the maintainer.

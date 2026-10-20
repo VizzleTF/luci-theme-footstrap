@@ -227,7 +227,9 @@ must-always in a hook. A retro miss becomes an eval scenario for its skill befor
 Evals live in `.claude/skills/<name>/evals/<case>/`: `prompt.md` and a `graders` directory, plus `case.yaml`
 and `scaffold.sh` when the case needs a scaffolded repo (the release and ship cases); they run
 through `claude plugin eval` as `.claude/skills/retro/SKILL.md` step 8 "Agree, then apply" gives it:
-paid model runs, so on the maintainer's word.
+paid model runs, so on the maintainer's word. The sandbox they need is `bubblewrap` and `socat`, and
+`TMPDIR` must lie outside `/tmp`: the eval sandbox denies writes under `/tmp`, which covers its own
+workspace there, so a case's `git fetch` fails with `Read-only file system`.
 
 ## Memory and state
 
