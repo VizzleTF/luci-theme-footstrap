@@ -1,6 +1,7 @@
 #!/bin/sh
 # Print why a CI run failed: failed job, failed step, then the decisive lines of its log
-# (##[error], NEW, live-audit:, Error), ANSI and timestamps stripped, 40 lines at most.
+# (##[error], NEW, live-audit:, Error, node:test `not ok` with its location and one-line error),
+# ANSI and timestamps stripped, 40 lines at most.
 # `gh run view --log-failed` prints nothing for a run that is still marked in progress and
 # `gh api .../logs` keeps the colour codes, so this reads the job log itself.
 #
@@ -8,7 +9,9 @@
 #   tools/ci-log.sh --filter <N>      # stdin -> the last N decisive lines (the pure part, unit-tested)
 set -eu
 
-DECISIVE='##\[error\]|^NEW|live-audit:|Error'
+# A TAP failure is `not ok N - name` + `location:` (indented one level per nesting); `error: |-` carries
+# its text on the next line, so only the one-line form `error: '...'` is kept (a bare `|-` is one wasted line).
+DECISIVE='##\[error\]|^NEW|live-audit:|Error|^[[:space:]]*(not ok |location: |error: [^|])'
 
 # ESC[...m and the leading ISO timestamp are noise; the CR some steps emit would hide a match's end.
 filter() { sed 's/\x1b\[[0-9;]*[A-Za-z]//g; s/\r//g; s/^[0-9T:.Z-]* //' | grep -E "$DECISIVE" | tail -n "$1" || true; }
