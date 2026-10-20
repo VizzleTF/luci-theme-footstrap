@@ -15,7 +15,7 @@
  *   … [--quick] [--page <name>] [--no-pair]
  * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
-import { stands, login, requireStands, sealToRouter, pairStands } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter, pairStands, eachStand, reportDown } from './lib/stands.mjs';
 import { parseFlags } from './lib/util.mjs';
 
 const FLAGS = parseFlags('scroll-anchor', {
@@ -932,6 +932,8 @@ const found = (line) => {
  * after a layout change, and a page that did not open measured nothing at all. Reported separately,
  * and fatal only in bulk — see UNOPENED_TOLERANCE below. */
 const unopened = [];
+/* stands that did not serve LuCI at all (lib/stands.mjs loginFault): named, and the other stands still run */
+const down = [];
 let runs = 0;
 
 if (QUICK) {
@@ -975,11 +977,11 @@ const first = (e) => String((e && e.message) || e).split('\n')[0].trim();
  * handed to every context a worker opens afterward; `login()` still runs on each of them and still
  * re-authenticates for real the moment a cookie has expired (LuCI's own session timeout) — this
  * removes the ROUND TRIP for the common case, it does not replace the check. */
-async function captureSession(browser, base) {
+async function captureSession(browser, base, id) {
 	const ctx = await browser.newContext();
 	await sealToRouter(ctx, base);
 	const page = await ctx.newPage();
-	await login(page, base);
+	await login(page, base, id);
 	const state = await ctx.storageState();
 	await ctx.close();
 	return state;
@@ -1028,8 +1030,8 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	const page = await ctx.newPage();
 	const mode = noEngineAnchor ? 'engine-anchoring OFF' : (declines ? 'engine DECLINES     ' : 'engine-anchoring on ');
 	const where = `${engine} ${reportId} @${w} ${layout.padEnd(4)} ${density.padEnd(7)} ${mode} ${PAGE.replace('/admin/status/', '')}`;
-	await login(page, base);
 	try {
+		await login(page, base, reportId);
 		await page.evaluate(async ([l, d]) => {
 			const prefs = await window.L.require('fs-prefs');
 			prefs.applyLayout(l);
@@ -1040,7 +1042,8 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	catch (e) {
 		/* NOT a finding: a page that never opened says nothing about where the reader
 		 * ended up. Kept apart and counted — see UNOPENED_TOLERANCE. */
-		unopened.push(`${where}: ${first(e)}`);
+		const why = first(e);		/* a StandDown already leads with the router, which `where` names */
+		unopened.push(`${where}: ${why.startsWith(`${reportId}: `) ? why.slice(reportId.length + 2) : why}`);
 		await ctx.close();
 		return;
 	}
@@ -1227,7 +1230,7 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 await Promise.all(ENGINES.map(async (engine) => {
 	if (!pw[engine]) { console.error(`scroll-anchor: no such engine "${engine}"`); process.exit(2); }
 	const browser = await pw[engine].launch();
-	await Promise.all(list.map(async (stand) => {
+	down.push(...await eachStand(list, async (stand) => {
 		/* One flat list of GROUPS per stand — both `noEngineAnchor` states of the same page/scroller/
 		 * density. TICK and REPEAT only run with the engine's anchoring live (~26s of real ticks), so
 		 * splitting individual cells by index gave one worker every expensive cell (16 anchor-OFF cells
@@ -1251,7 +1254,7 @@ await Promise.all(ENGINES.map(async (engine) => {
 		 * is exactly as wide as before and the wall clock for THIS stand is roughly halved. */
 		const perWorker = workers.map(() => []);
 		groups.forEach((g, i) => perWorker[i % workers.length].push(...g));
-		const sessions = await Promise.all(workers.map((base) => captureSession(browser, base)));
+		const sessions = await Promise.all(workers.map((base) => captureSession(browser, base, stand.id)));
 		await Promise.all(workers.map(async (base, wi) => {
 			for (const cell of perWorker[wi]) {
 				/* --bail: the cells after the first finding measure the same fix attempt again */
@@ -1262,6 +1265,7 @@ await Promise.all(ENGINES.map(async (engine) => {
 	}));
 	await browser.close();
 }));
+const unanswered = reportDown('scroll-anchor', down);
 
 if (unopened.length) {
 	console.error(`\nscroll-anchor: ${unopened.length} cell(s) never opened — the browser or the stand,`
@@ -1278,6 +1282,7 @@ if (findings.length) {
 	console.error('stay out of the way where it does. docs/chrome.md.\n');
 	process.exit(1);
 }
+if (unanswered) process.exit(1);
 
 /* Bulk failure to open is its own defect: the sweep did not measure what it claims to have. */
 if (unopened.length && unopened.length > Math.max(3, (runs + unopened.length) * UNOPENED_TOLERANCE)) {

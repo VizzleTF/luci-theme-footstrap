@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { ROOT } from './lib/root.mjs';
 import { execFileSync } from 'node:child_process';
 import * as pw from 'playwright';
-import { stands, coreId, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter } from './lib/stands.mjs';
+import { stands, coreId, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter, eachStand, reportDown } from './lib/stands.mjs';
 import { mergeBaseline, baselineKey, openSeen, noteFinding, seenToJson, readSeenIn, prunable, isFullSweep, staleCounts } from './lib/baseline-merge.mjs';
 import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
 import { parseFlags, makeSay } from './lib/util.mjs';
@@ -296,7 +296,7 @@ const say = makeSay();
 /* The routers run at the same time: every finding is a geometry or a name read out of a settled
  * page, so concurrent containers change no answer and halve the wall clock (scroll-jank stays
  * sequential, frame pacing being its subject). */
-await Promise.all(list.map(async (stand) => {
+const down = await eachStand(list, async (stand) => {
 	let here = 0;
 	/* Set before the sweep and restored to `auto` in the `finally` below: a router never stays parked
 	 * in a language a later, unflagged run would inherit. */
@@ -322,7 +322,7 @@ await Promise.all(list.map(async (stand) => {
 		};
 		page.on('pageerror', (e) => note(String(e)));
 		page.on('console', (m) => { if (m.type() === 'error') note(m.text()); });
-		await login(page, stand.base);
+		await login(page, stand.base, stand.id);
 
 		/* Baselines are per ENGINE and per LANGUAGE, as well as per router: a second engine finds different
 		 * things (the doubled scrollbar of #12 was Firefox-only), a second language finds different things
@@ -419,8 +419,17 @@ await Promise.all(list.map(async (stand) => {
 		 * this one's language, which is the exact shape of the incident this flag exists to close. */
 		setRouterLang(stand.id, 'en');
 	}
-}));
+});
 await browser.close();
+const unanswered = reportDown('live-audit', down);
+
+function reportFresh() {
+	console.error(`\nlive-audit: ${fresh.length} NEW finding(s):\n`);
+	for (const f of fresh.slice(0, 60)) console.error(`  ${f.stand}  ${f.sig}${f.by != null ? '  (' + f.by + ')' : ''}`);
+	if (fresh.length > 60) console.error(`  … and ${fresh.length - 60} more`);
+	console.error('\nEach line is path|width|kind|element. Fix it, or — if it belongs to the app and');
+	console.error('not to the theme — say so in the commit and re-run with --update.');
+}
 
 /* A page that froze is measured by nobody, and it is never a baseline entry: a signature can be
  * blessed, a stopped main thread cannot. First of the three, because it names the actual cause —
@@ -436,6 +445,14 @@ if (unreached.length) {
 	for (const u of unreached.slice(0, 30)) console.error(`  ${u}`);
 	if (unreached.length > 30) console.error(`  … and ${unreached.length - 30} more`);
 	console.error('\nA run that lost pages may not pass, and may not rewrite the baseline (--update/--prune).\n');
+	process.exit(1);
+}
+
+/* A router that never answered lost all its pages: same rule (no --seen-out, no --update), its empty
+ * section would read as "reproduced nothing". The routers that did answer still get their verdict. */
+if (unanswered) {
+	if (fresh.length) reportFresh();
+	else if (checked) console.log(`live-audit: ${checked} page render(s) on the router(s) that answered, no new findings.`);
 	process.exit(1);
 }
 
@@ -496,11 +513,7 @@ if (UPDATE) {
 
 
 if (fresh.length) {
-	console.error(`\nlive-audit: ${fresh.length} NEW finding(s):\n`);
-	for (const f of fresh.slice(0, 60)) console.error(`  ${f.stand}  ${f.sig}${f.by != null ? '  (' + f.by + ')' : ''}`);
-	if (fresh.length > 60) console.error(`  … and ${fresh.length - 60} more`);
-	console.error('\nEach line is path|width|kind|element. Fix it, or — if it belongs to the app and');
-	console.error('not to the theme — say so in the commit and re-run with --update.');
+	reportFresh();
 	process.exit(1);
 }
 console.log(`live-audit: ${checked} page render(s) across ${list.length} router(s), no new findings.`);

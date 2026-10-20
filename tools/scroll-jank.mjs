@@ -13,7 +13,7 @@
  *
  * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
-import { stands, login, requireStands, sealToRouter, waitForPaint } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter, waitForPaint, eachStand, reportDown } from './lib/stands.mjs';
 import { parseFlags } from './lib/util.mjs';
 
 const FLAGS = parseFlags('scroll-jank', {
@@ -139,6 +139,7 @@ const ARM = () => {
  * their routers at once. `--all` takes every running OpenWrt router. */
 const list = requireStands(stands(FLAGS.only, { all: FLAGS.all }), 'scroll-jank');
 const findings = [];
+const down = [];
 let runs = 0;
 
 for (const engine of ENGINES) {
@@ -154,12 +155,12 @@ for (const engine of ENGINES) {
 		process.exit(1);
 	}
 
-	for (const stand of list) {
+	down.push(...await eachStand(list, async (stand) => {
 		for (const w of WIDTHS) {
 			const ctx = await browser.newContext({ viewport: { width: w, height: 800 } });
 			await sealToRouter(ctx, stand.base);
 			const page = await ctx.newPage();
-			await login(page, stand.base);
+			await login(page, stand.base, stand.id);
 
 			for (const layout of LAYOUTS) {
 				/* chosen BEFORE the page under test is opened: switching it on that page schedules a
@@ -237,9 +238,10 @@ for (const engine of ENGINES) {
 			}
 			await ctx.close();
 		}
-	}
+	}, { serial: true }));
 	await browser.close();
 }
+const unanswered = reportDown('scroll-jank', down);
 
 if (findings.length) {
 	console.error(`\nscroll-jank: ${findings.length} finding(s) — something moved under the reader:\n`);
@@ -248,6 +250,7 @@ if (findings.length) {
 	console.error('reader stops (docs/chrome.md). A finding here means a pass got through that.\n');
 	process.exit(1);
 }
+if (unanswered) process.exit(1);
 if (!runs) {
 	console.error(`\nscroll-jank: 0 of ${ENGINES.length * list.length} engine/router cell(s) produced a scroll — the theme JS is absent `
 		+ '(fs-prefs not requirable, e.g. owlab up --rebuild without sync) or every run failed. This is not a clean sweep; '

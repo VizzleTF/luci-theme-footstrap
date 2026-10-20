@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
-import { stands, login, menuPaths, sealToRouter, requireStands } from '../lib/stands.mjs';
+import { stands, login, menuPaths, sealToRouter, requireStands, StandDown, unreached } from '../lib/stands.mjs';
 import {
 	splitBatch, parseLsLines, waitForQuiet, drainReads, missingOverlayKeys,
 	createActivityTracker, createGenerationGate, describePendingRequest, describePendingRequests,
@@ -174,7 +174,7 @@ async function main() {
 		track(`login ${describePendingRequest('GET', response.url(), null)}`, recordStatic(response)));
 	const [ loginResponse ] = await Promise.all([
 		loginPage.waitForResponse((r) => r.request().resourceType() === 'document', { timeout: 30000 }),
-		loginPage.goto(stand.base, { waitUntil: 'load' }),
+		loginPage.goto(stand.base, { waitUntil: 'load' }).catch((e) => { throw unreached(e, stand.id, stand.base); }),
 	]);
 	await loginPage.waitForTimeout(SETTLE_MS);
 	await drain('login page');
@@ -254,7 +254,7 @@ async function main() {
 		})());
 	});
 
-	await login(page, stand.base);
+	await login(page, stand.base, stand.id);
 
 	/* Every LEAF the router's own menu resolves to, not the list in pages.json: a page this build
 	 * asks for that the router does not offer is a stale pages.json entry, and failing loudly here
@@ -359,6 +359,7 @@ async function main() {
 }
 
 main().catch((e) => {
-	console.error(String(e && e.stack || e));
+	/* a stand that does not serve LuCI is named, not a stack: the capture is not at fault */
+	console.error(e instanceof StandDown ? e.message : String(e && e.stack || e));
 	process.exit(1);
 });

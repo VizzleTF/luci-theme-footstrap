@@ -16,7 +16,7 @@
  * Needs a running owlab router (docs/development.md). */
 import { chromium } from 'playwright';
 import { withDeadline } from './lib/page-shapes.mjs';
-import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter, eachStand, reportDown } from './lib/stands.mjs';
 import { parseFlags } from './lib/util.mjs';
 
 const FLAGS = parseFlags('floor-contract', {
@@ -253,12 +253,12 @@ const browser = await chromium.launch();
 const findings = [];
 let boxes = 0, worst = 0, released = 0, switches = 0, folds = 0, depends = 0, shrinks = 0, live = 0;
 
-for (const stand of list) {
+const down = await eachStand(list, async (stand) => {
 	const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 	await sealToRouter(ctx, stand.base);
 	/* not const: a page whose main thread has stopped turning is replaced below */
 	let page = await ctx.newPage();
-	await login(page, stand.base);
+	await login(page, stand.base, stand.id);
 
 	for (const path of PAGES) {
 		try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
@@ -286,7 +286,7 @@ for (const stand of list) {
 			 * measured through a renderer that is still spinning. Start the next one in a fresh tab. */
 			await page.close({ runBeforeUnload: false }).catch(() => {});
 			page = await ctx.newPage();
-			await login(page, stand.base);
+			await login(page, stand.base, stand.id);
 			continue;
 		}
 		if (churn)
@@ -385,8 +385,9 @@ for (const stand of list) {
 			+ `document ${before.doc} -> ${after.doc}\n`);
 	}
 	await ctx.close();
-}
+}, { serial: true });
 await browser.close();
+const unanswered = reportDown('floor-contract', down);
 
 if (findings.length) {
 	console.error(`\nfloor-contract: ${findings.length} finding(s)\n`);
@@ -396,6 +397,7 @@ if (findings.length) {
 	console.error('A page that does not answer holds no measurable floor at all: the sweep is feeding itself.\n');
 	process.exit(1);
 }
+if (unanswered) process.exit(1);
 if (!boxes) {
 	console.error(`\nfloor-contract: 0 of ${list.length} router(s) produced a floor, ${live} page(s) answering — `
 		+ 'the theme wrote no floor on any page (not logged in, theme not active, or every page failed to '

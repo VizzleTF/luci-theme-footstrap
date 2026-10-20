@@ -15,7 +15,7 @@
  *
  * Needs a running owlab router (docs/development.md). */
 import { chromium } from 'playwright';
-import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter, eachStand, reportDown } from './lib/stands.mjs';
 import { parseFlags } from './lib/util.mjs';
 
 const FLAGS = parseFlags('table-tick', {
@@ -79,12 +79,12 @@ const browser = await chromium.launch();
 const findings = [];
 let ticks = 0, attempts = 0;
 
-for (const stand of list) {
+const down = await eachStand(list, async (stand) => {
 	for (const w of WIDTHS) {
 		const ctx = await browser.newContext({ viewport: { width: w, height: 844 } });
 		await sealToRouter(ctx, stand.base);
 		const page = await ctx.newPage();
-		await login(page, stand.base);
+		await login(page, stand.base, stand.id);
 		for (const path of PAGES) {
 			attempts++;
 			try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
@@ -119,19 +119,9 @@ for (const stand of list) {
 		}
 		await ctx.close();
 	}
-}
+}, { serial: true });
 await browser.close();
-
-/* Zero ticks is not a clean sweep: three skip paths above and a goto failure all leave it at 0, and
- * that reads identically to "no table was ever laid out without an answer" unless the printed lines
- * are read. A stand with no theme, no data table on either page, or an ACL that empties both is a
- * failure to measure, not a pass. */
-if (!findings.length && ticks === 0) {
-	console.error(`\ntable-tick: 0 of ${attempts} attempt(s) produced a tick — every router/width/page `
-		+ 'either failed to load, had no #view, or had no data table with rows to replace. This is not '
-		+ 'a clean sweep; it is nothing measured.\n');
-	process.exit(1);
-}
+const unanswered = reportDown('table-tick', down);
 
 if (findings.length) {
 	console.error(`\ntable-tick: ${findings.length} finding(s)\n`);
@@ -140,4 +130,17 @@ if (findings.length) {
 	console.error('and proved selector-side by tools/table-contract.mjs. One of those three did not hold here.\n');
 	process.exit(1);
 }
+if (unanswered) process.exit(1);
+
+/* Zero ticks is not a clean sweep: three skip paths above and a goto failure all leave it at 0, and
+ * that reads identically to "no table was ever laid out without an answer" unless the printed lines
+ * are read. A stand with no theme, no data table on either page, or an ACL that empties both is a
+ * failure to measure, not a pass. */
+if (ticks === 0) {
+	console.error(`\ntable-tick: 0 of ${attempts} attempt(s) produced a tick — every router/width/page `
+		+ 'either failed to load, had no #view, or had no data table with rows to replace. This is not '
+		+ 'a clean sweep; it is nothing measured.\n');
+	process.exit(1);
+}
+
 console.log(`table-tick: ${ticks} tick(s), the reader's page never moved before a replaced table was answered for.`);

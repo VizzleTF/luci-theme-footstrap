@@ -122,11 +122,43 @@ export async function sealToRouter(ctx, base) {
 		(route) => route.abort());
 }
 
+/* A stand that cannot serve LuCI at all, as opposed to a theme that misrenders it: the gate's
+ * own verdict is "nothing was measured here", never a finding (docs/ci.md). */
+export class StandDown extends Error {}
+
+/* Null when the answer is a LuCI page — the login form, or an authenticated page that loads luci.js —
+ * else the sentence naming what the stand said instead. A snapshot stand whose ucode and
+ * ucode-mod-html disagreed on libucode answered every request 502 "Bad Gateway", and every gate
+ * reported "L is not defined" as a defect of the theme. */
+export function loginFault(status, html) {
+	if (status < 500 && /luci_password|luci\.js|new LuCI\(/.test(html)) return null;
+	const line = html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '').replace(/<[^>]*>/g, '\n')
+		.split('\n').map((l) => l.trim()).find(Boolean) || 'empty body';
+	return `LuCI answered ${status} (${line.slice(0, 120)}) — the stand, not the theme`;
+}
+
+/* What Playwright throws when nothing answers on the port, as measured against a closed port and a
+ * socket accepted then dropped: Chromium names the net error, Firefox the NS_ERROR, WebKit the
+ * socket's own words. A navigation that waits out its timeout is the same stand. */
+const NO_ANSWER = /net::ERR_(CONNECTION_|EMPTY_RESPONSE|SOCKET_NOT_CONNECTED)|NS_ERROR_(CONNECTION_REFUSED|NET_)|Could not connect|Connection (terminated|reset)/;
+
+/* The StandDown for such a navigation error, else the error itself: anything else is a bug in the
+ * gate and keeps its stack. Use as `.catch((e) => { throw unreached(e, id, base); })`. The cause
+ * rides in the sentence: a reset socket and a hung uhttpd are not a closed port, and the reader
+ * would go looking for a free one. */
+const cause = (e) => String(e.message).split('\n')[0].replace(/^\w+\.\w+: | at https?:\/\/\S+$/g, '').trim();
+export const unreached = (e, id, base) => (e && (e.name === 'TimeoutError' || NO_ANSWER.test(String(e.message))))
+	? new StandDown(`${id}: ${base} did not answer (${cause(e)}) — the stand, not the theme`) : e;
+
 /* LuCI answers an unauthenticated request with the login form, not a 403 page — so every live gate
  * has to log in before it can measure anything. owlab's routers are root with an empty password
- * (`owlab status` prints it); a hardware router is not what these gates run against. */
-export async function login(page, base) {
-	await page.goto(base, { waitUntil: 'domcontentloaded' });
+ * (`owlab status` prints it); a hardware router is not what these gates run against. `id` names the
+ * router in the error; the host stands in for it when a caller has only a base URL. */
+export async function login(page, base, id = new URL(base).host) {
+	const res = await page.goto(base, { waitUntil: 'domcontentloaded' })
+		.catch((e) => { throw unreached(e, id, base); });
+	const fault = loginFault(res ? res.status() : 0, await page.content());
+	if (fault) throw new StandDown(`${id}: ${fault}`);
 	if (await page.$('input[name="luci_password"]')) {
 		await page.fill('input[name="luci_username"]', 'root');
 		await Promise.all([
@@ -282,3 +314,38 @@ export function requireStands(list, name) {
 	lockStands(list.map((s) => s.id), name);
 	return list;
 }
+
+/* Run `fn` on every stand at once and let each finish: one router answering 502 must not discard
+ * what the others measured. `serial` runs them one after another for a gate whose subject is frame
+ * pacing, where a second router rendering is noise (scroll-jank). Returns the routers that threw as
+ * `<id>: <reason>` lines — a StandDown by its sentence, anything else with its stack, because that
+ * one is a bug in the gate. */
+export async function eachStand(list, fn, { serial = false } = {}) {
+	const run = async (stand) => {
+		try { await fn(stand); return []; }
+		catch (e) {
+			const text = e instanceof StandDown ? e.message : String((e && e.stack) || e);
+			return [ text.startsWith(`${stand.id}:`) ? text : `${stand.id}: ${text}` ];
+		}
+	};
+	if (!serial) return (await Promise.all(list.map(run))).flat();
+	const down = [];
+	for (const stand of list) down.push(...await run(stand));
+	return down;
+}
+
+/* Say which routers measured nothing, and return how many: the caller exits non-zero after it has
+ * printed the findings of the routers that did answer. A gate that runs once per engine passes the
+ * same line per engine; it is named once. */
+export function reportDown(name, down) {
+	const rows = [ ...new Set(down) ];
+	if (!rows.length) return 0;
+	console.error(`\n${name}: ${rows.length} router(s) did not complete, so nothing was measured on them:`);
+	for (const d of rows) console.error(`  ${d}`);
+	return rows.length;
+}
+
+/* The ids in `wanted` that owlab does not report running. tools/ci-local.sh stops exactly these
+ * after a leg: `owlab down` with no ids stops every stand of owlab.yaml (9 on the maintainer's box). */
+export const notRunning = (wanted, routers) =>
+	wanted.filter((id) => !routers.some((r) => r.id === id && r.state === 'running'));

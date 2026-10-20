@@ -360,6 +360,7 @@ job_playground() {
 		step "playground-capture" echo "node tools/playground/capture.mjs --recording \$PG/recording"
 		step "playground-build" echo "node tools/playground/build.mjs --recording \$PG/recording --out \$PG/out --base /luci-theme-footstrap/playground"
 		step "playground-verify" echo "node tools/playground/verify.mjs --out \$PG/out --base /luci-theme-footstrap/playground --budget-kb 600"
+		step "owlab-down" echo "owlab down <only the stands this leg started; never the whole project>"
 		return
 	fi
 	require_stand_ack "playground" || return
@@ -377,7 +378,7 @@ job_playground() {
 	step "playground-capture" node tools/playground/capture.mjs --recording "$PG/recording"
 	step "playground-build" node tools/playground/build.mjs --recording "$PG/recording" --out "$PG/out" --base /luci-theme-footstrap/playground
 	step "playground-verify" node tools/playground/verify.mjs --out "$PG/out" --base /luci-theme-footstrap/playground --budget-kb 600
-	owlab down >>"$RUNDIR/owlab-down.log" 2>&1 9>&- 8>&- 7>&-
+	stop_started
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -394,8 +395,29 @@ compute_routers() {
 	fi
 }
 
+# `owlab down` with no ids stops every stand of owlab.yaml (9 on the maintainer's box, in use by other
+# sessions), so a leg stops only what it started: $ROUTERS less what `owlab status` reports running
+# just before `owlab up`. An unreadable status stops nothing.
+STARTED=
+started_stands() {
+	owlab status -json 2>/dev/null | node --input-type=module -e '
+import { readFileSync } from "node:fs";
+import { notRunning } from "./tools/lib/stands.mjs";
+console.log(notRunning(process.argv[1].split(" "), JSON.parse(readFileSync(0, "utf8")).routers).join(" "));' "$ROUTERS"
+}
+
+stop_started() {
+	if [ -z "$STARTED" ]; then
+		echo "  every stand of this leg was already running (or owlab status was unreadable); none is stopped"
+		return 0
+	fi
+	# shellcheck disable=SC2086 # $STARTED is a deliberate word list, owlab down's own argv
+	owlab down $STARTED >>"$RUNDIR/owlab-down.log" 2>&1 9>&- 8>&- 7>&-
+}
+
 boot_and_install() {
 	log="$RUNDIR/owlab-up-install.log"
+	STARTED=$(started_stands 2>/dev/null) || STARTED=
 	if ! owlab up $ROUTERS >"$log" 2>&1 9>&- 8>&- 7>&-; then return 1; fi
 	for r in $ROUTERS; do
 		case "$r" in
@@ -480,6 +502,7 @@ job_live() {
 			step "live:motion:install-check" echo "sh tools/install-check.sh $ROUTERS"
 			;;
 		esac
+		step "owlab-down" echo "owlab down <only the stands this leg started; never the whole project>"
 		return
 	fi
 	require_stand_ack "live:$slice" || return
@@ -507,7 +530,7 @@ job_live() {
 		step "live:motion:install-check" sh tools/install-check.sh $ROUTERS
 		;;
 	esac
-	owlab down >>"$RUNDIR/owlab-down.log" 2>&1 9>&- 8>&- 7>&-
+	stop_started
 }
 
 # The one-router shards: `live` slice audit-ru (every push and PR) and job `deep` (a tag). Same
@@ -531,6 +554,7 @@ job_router_shard() {
 			step "deep:$router:live-audit" echo "node tools/live-audit.mjs --only $router --pages-all --seen-out \$RUNDIR/seen-$leg.json"
 			;;
 		esac
+		step "owlab-down" echo "owlab down <only the stands this leg started; never the whole project>"
 		return
 	fi
 	require_stand_ack "$leg" || return
@@ -552,7 +576,7 @@ job_router_shard() {
 		step "deep:$router:live-audit" node tools/live-audit.mjs --only "$router" --pages-all --seen-out "$seen"
 		;;
 	esac
-	owlab down >>"$RUNDIR/owlab-down.log" 2>&1 9>&- 8>&- 7>&-
+	stop_started
 }
 
 job_anchors() {
@@ -569,6 +593,7 @@ job_anchors() {
 		step "owlab-boot" echo "owlab up $ROUTERS; owlab install <router> <package>"
 		step "anchors:$engine" echo "node tools/scroll-anchor.mjs --engines $engine --only $O $FULL"
 		step "anchors:$engine:scroll-jank" echo "node tools/scroll-jank.mjs --engines $engine --only $O"
+		step "owlab-down" echo "owlab down <only the stands this leg started; never the whole project>"
 		return
 	fi
 	require_stand_ack "anchors:$engine" || return
@@ -592,7 +617,7 @@ job_anchors() {
 		step "anchors:$engine" node tools/scroll-anchor.mjs --engines "$engine" --only "$O"
 	fi
 	step "anchors:$engine:scroll-jank" node tools/scroll-jank.mjs --engines "$engine" --only "$O"
-	owlab down >>"$RUNDIR/owlab-down.log" 2>&1 9>&- 8>&- 7>&-
+	stop_started
 }
 
 # ---------------------------------------------------------------------------------------------

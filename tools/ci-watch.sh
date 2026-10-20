@@ -2,11 +2,13 @@
 # Wait for the CI runs of one commit and end with a one-line verdict. Run it detached:
 #   tools/bg.sh tools/ci-watch.sh --sha "$(git rev-parse HEAD)"   (+ tools/bg-wait.sh <run-id>)
 #
-#   tools/ci-watch.sh (--sha SHA | --run ID) [--repo owner/name] [--workflow NAME] [--max S] [--interval S]
+#   tools/ci-watch.sh (--sha SHA | --run ID) [--repo owner/name] [--workflow FILE|NAME] [--max S] [--interval S]
 #
 # --sha polls `gh run list --commit` until a run for it exists (a push takes a few seconds to
 # register; never filter by createdAt, which is UTC and missed a run), then until every matching
 # run is completed. On red it prints tools/ci-log.sh for each failed run. Read-only.
+# --workflow goes to gh, which takes a file name (release.yml) or a display name; matching the run's
+# workflowName here missed a file name after 608 s. --run ignores it.
 # Exit: 0 green, 1 red, 2 no run found or usage, 3 --max elapsed while still running.
 # Last line: `ci: green|red|timeout <sha7|run> runs <ids> [failed: job, job]`.
 set -eu
@@ -20,7 +22,7 @@ while [ $# -gt 0 ]; do
 	esac
 	shift 2 || { echo "ci-watch: option needs a value" >&2; exit 2; }
 done
-[ -n "$SHA$RUN" ] || { echo "usage: tools/ci-watch.sh (--sha SHA | --run ID) [--repo R] [--workflow W] [--max S] [--interval S]" >&2; exit 2; }
+[ -n "$SHA$RUN" ] || { echo "usage: tools/ci-watch.sh (--sha SHA | --run ID) [--repo R] [--workflow FILE|NAME] [--max S] [--interval S]" >&2; exit 2; }
 HERE=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 # `gh run list --commit` matches the full sha only: an abbreviated one finds nothing
 [ -z "$SHA" ] || SHA=$(git rev-parse --verify -q "$SHA^{commit}" 2>/dev/null || printf %s "$SHA")
@@ -30,15 +32,15 @@ FIND=$((MAX < 600 ? MAX : 600))   # how long a run may take to show up
 
 # one line per run: id <TAB> status <TAB> conclusion <TAB> workflow
 list() {
+	set --; [ -z "$WF" ] || set -- --workflow "$WF"   # "$@" keeps a display name with spaces whole
 	# shellcheck disable=SC2086
 	if [ -n "$RUN" ]; then gh run view "$RUN" $R --json databaseId,status,conclusion,workflowName --jq '"\(.databaseId)\t\(.status)\t\(.conclusion)\t\(.workflowName)"'
-	else gh run list $R --commit "$SHA" --limit 30 --json databaseId,status,conclusion,workflowName --jq '.[] | "\(.databaseId)\t\(.status)\t\(.conclusion)\t\(.workflowName)"'; fi
+	else gh run list $R "$@" --commit "$SHA" --limit 30 --json databaseId,status,conclusion,workflowName --jq '.[] | "\(.databaseId)\t\(.status)\t\(.conclusion)\t\(.workflowName)"'; fi
 }
-pick() { if [ -n "$WF" ]; then awk -F'\t' -v w="$WF" '$4 == w'; else cat; fi; }
 
 start=$(date +%s)
 while :; do
-	runs=$(list 2>/dev/null | pick || true)
+	runs=$(list 2>/dev/null || true)
 	now=$(($(date +%s) - start))
 	if [ -z "$runs" ]; then
 		[ "$now" -lt "$FIND" ] || { echo "ci: no run for $LABEL after ${now}s (pushed? --repo? workflow filter?)"; exit 2; }

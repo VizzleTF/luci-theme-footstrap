@@ -22,6 +22,7 @@
 - **`tools/bg.sh --check <cmd>` prints the refusal verdict and runs nothing, and the refusal tests use only it; `bg.sh` now allows a list of read-only verbs instead of refusing a list of writes.** A refusal test drove real commands through `bg.sh` and trusted it to refuse them; while `bg.sh` was being edited, `node --test` ran `git update-ref refs/tags/v9`, `git reset --hard HEAD~3` and `gh secret set X` for real in the working repo. Global options (`git -C`, `gh -R`) no longer walk past a refusal, and a static test fails any spawn of `bg.sh` without `--check`.
 - **`tools/ci-log.sh` names the failing `node:test` case, its location and its error.** On the red `check:fast` at b6a68b4 it printed only `AssertionError` and two unrelated fixture lines, so the failing test had to be dug out of the raw log by hand.
 - **`tools/ci-watch.sh` waits 100 minutes by default instead of 30.** A push run of `build.yml` takes 46-49 minutes, so a watch without `--max` ended in `ci: timeout` before the verdict.
+- **A live gate names a router whose LuCI does not answer — `<id>: LuCI answered 502 … — the stand, not the theme` — and still reports the routers that do; `tools/ci-local.sh` stops only the stands it started.** On 2026-10-20 a broken snapshot stand read as `ReferenceError: L is not defined` in every gate, and its crash aborted the healthy 25.12 and 24.10 results with it; a bare `owlab down` in `ci-local.sh` also stopped all nine local stands. `tools/ci-watch.sh --workflow` now takes a workflow file name as well as its display name.
 
 ### Security
 

@@ -17,7 +17,7 @@
 import { chromium } from 'playwright';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter, StandDown, reportDown } from './lib/stands.mjs';
 import { parseFlags } from './lib/util.mjs';
 
 const FLAGS = parseFlags('upstream-contract', {
@@ -327,12 +327,15 @@ const list = requireStands(stands(FLAGS.only, { all: FLAGS.all }),
 	'upstream-contract');
 const browser = await chromium.launch();
 let failed = 0;
+/* a router that does not serve LuCI is named and skipped; the ones after it are still read */
+const down = [];
 
 for (const stand of list) {
 	const ctx = await browser.newContext();
 	await sealToRouter(ctx, stand.base);
 	const page = await ctx.newPage();
-	await login(page, stand.base);
+	try { await login(page, stand.base, stand.id); }
+	catch (e) { if (!(e instanceof StandDown)) throw e; down.push(e.message); await ctx.close(); continue; }
 	/* a page with a #view and the full module set loaded — Status → Overview is on every router */
 	await page.goto(`${stand.base}/admin/status/overview`, { waitUntil: 'domcontentloaded' });
 	await page.waitForTimeout(1500);
@@ -352,6 +355,7 @@ for (const stand of list) {
 	await ctx.close();
 }
 await browser.close();
+const unanswered = reportDown('upstream-contract', down);
 
 if (failed) {
 	console.error(`\nupstream-contract: ${failed} assumption(s) no longer hold.`);
@@ -359,4 +363,5 @@ if (failed) {
 	console.error('before shipping against this luci-base.');
 	process.exit(1);
 }
+if (unanswered) process.exit(1);
 console.log(`\nupstream-contract: ${CONTRACT.length} assumption(s) hold on ${list.length} router(s).`);

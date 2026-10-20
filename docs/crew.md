@@ -114,6 +114,10 @@ rewrite JSON less readily than Markdown, and a file outlives a compaction.
   matrix run.
 - A live reproduction (stand, probe, baseline, layout question) is a `tester` card on an owlab
   stand (root, empty password).
+- Steering edited mid-session (`CLAUDE.md`, measured; `.claude/rules/**` likely) reaches subagents only after a
+  session restart: a subagent spawned later still reads the session-start copy (probe 2026-10-20: it
+  quoted the old `## Commits` while the file on disk carried the new one). A card that depends on
+  the new rule quotes it.
 
 ## Return blocks
 

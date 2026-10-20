@@ -56,11 +56,13 @@ and apt is the half that stalls.
 
 Two scripts replace the hand-built `sleep` + `gh run list` + `gh run watch` loop. Both are read-only.
 
-- `tools/ci-watch.sh (--sha SHA | --run ID) [--repo R] [--workflow W] [--max S]` waits for a commit's
+- `tools/ci-watch.sh (--sha SHA | --run ID) [--repo R] [--workflow FILE|NAME] [--max S]` waits for a commit's
   runs to appear (up to 10 min; `--commit` is matched, not `createdAt`, which is UTC and missed a
   run), then for all of them to complete. On red it prints `ci-log.sh` for each failed run. The last
   line is the verdict, `ci: green|red|timeout <sha7> runs <ids> [failed: <jobs>]`; exit 0 green, 1 red,
   2 no run, 3 still running at `--max` (default 6000 s; a push run of `build.yml` takes 46-49 min).
+  `--workflow` goes to `gh run list --workflow`, so `release.yml` and `release` both work (the run's
+  `workflowName` is the display name, and matching it here missed a file name after 608 s); `--run` ignores it.
   Run it as `tools/bg.sh tools/ci-watch.sh --sha "$(git rev-parse HEAD)"` with `tools/bg-wait.sh` beside it.
 - `tools/ci-log.sh <run-id> [job-regex] [--repo R]` prints each failed job, its failed step and the
   last decisive log lines (`##[error]`, `NEW`, `live-audit:`, `Error`, and each node:test `not ok`
@@ -208,7 +210,7 @@ genuine → exit 0; one byte appended → exit 1; against a foreign repository �
 `package.yml`'s `owfeed-version`). Dependabot moves the `uses:` ref and never an input, so a
 `version: v0.5.1` beside `setup@v0.5.4` ran 0.5.1 under a ref that read 0.5.4; since owfeed 0.5.3 and
 owlab 0.6.4 an unset version installs the release the ref names. `~/go/bin/owfeed` and `owlab` follow
-the same refs (0.5.5, 0.6.5), taken from the GitHub release after `gh attestation verify -R
+the same refs (0.5.5, 0.6.6), taken from the GitHub release after `gh attestation verify -R
 owfeed/<tool>` and the release's `SHA256SUMS`, so `tools/stage.sh && owfeed build` writes CI's bytes.
 
 **Zopfli packages.** `owfeed.yml` sets `compression: zopfli` on all three packages (owfeed 0.5.5).
@@ -364,6 +366,15 @@ the walk continues on a fresh tab — a frozen page stays poisoned, every later 
 its own 20s, while `close()` + `newPage()` costs 0.5s and the login lives on the context — and
 `parity` and `audit` exit non-zero. A page that never LOADED still says nothing, on purpose: that is
 the runner or the stand, not the theme, and the two must not read alike.
+
+**A router that does not serve LuCI is named, not measured; the others still report.** `login()`
+(`tools/lib/stands.mjs`) throws `<id>: LuCI answered <status> (<first body line>) — the stand, not the
+theme` on a status >= 500 or a body with neither the login form nor `luci.js`; a refused, reset or
+timed-out connection throws `<id>: <base> did not answer (<cause>) — the stand, not the theme`. All
+eight live gates let the other routers finish (`eachStand` in `spa-parity`, `live-audit`,
+`scroll-anchor`, serially in `fit-quiet`, `floor-contract`, `table-tick`, `scroll-jank`;
+`upstream-contract` skips a `StandDown` in its own loop), print `<gate>: N router(s) did not complete`
+first, then the answering routers' findings, and exit non-zero (development.md, "The stand's own traps").
 
 **`audit-ru` is a fourth slice, one shard per router** (`owrt2512`, `owrt2410`): `live-audit --lang ru`
 on every push and pull request, because Russian strings run ~30% longer and break layouts English

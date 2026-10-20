@@ -14,7 +14,7 @@
  * Needs a running owlab router (docs/development.md). */
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
-import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter, waitForPaint } from './lib/stands.mjs';
+import { stands, login, menuPaths, DESTRUCTIVE, requireStands, sealToRouter, waitForPaint, eachStand, reportDown } from './lib/stands.mjs';
 import { classify, representatives, reportReduction, reportFrozen, PINNED } from './lib/page-shapes.mjs';
 import { read } from './lib/root.mjs';
 import { parseFlags, makeSay } from './lib/util.mjs';
@@ -356,14 +356,14 @@ const say = makeSay();
 
 /* the routers run at the same time: every comparison here is content against content on one router,
  * so nothing another container does can reach it (see the same note in live-audit.mjs) */
-await Promise.all(list.map(async (stand) => {
+const down = await eachStand(list, async (stand) => {
 	let here = 0;
 	const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 	await sealToRouter(ctx, stand.base);
 	const page = await ctx.newPage();
 	const errs = [];
 	page.on('pageerror', (e) => errs.push(String(e).replace(/\s+/g, ' ').slice(0, 120)));
-	await login(page, stand.base);
+	await login(page, stand.base, stand.id);
 	say(`${stand.id}: logged in, staging + Back at 1440px`);
 
 	await stagingWindowCheck(page, stand, findings);
@@ -374,7 +374,7 @@ await Promise.all(list.map(async (stand) => {
 	const narrowCtx = await browser.newContext({ viewport: { width: NARROW_WIDTH, height: 900 } });
 	await sealToRouter(narrowCtx, stand.base);
 	const narrowPage = await narrowCtx.newPage();
-	await login(narrowPage, stand.base);
+	await login(narrowPage, stand.base, stand.id);
 	await stagingWindowCheck(narrowPage, stand, findings, NARROW_STAGING_CASES, NARROW_WIDTH);
 	await backRestoreCheck(narrowPage, stand, findings, NARROW_WIDTH);
 	await narrowCtx.close();
@@ -460,8 +460,9 @@ await Promise.all(list.map(async (stand) => {
 	}
 	await ctx.close();
 	say(`${stand.id}: ${here} page(s) compared`);
-}));
+});
 await browser.close();
+const unanswered = reportDown('spa-parity', down);
 
 /* Before the differences, because a page that stopped answering was not compared at all: reporting
  * "a click and a load agree on every one" over a walk that lost pages to a frozen thread is the
@@ -478,6 +479,8 @@ if (findings.length) {
 	console.error('lists what a fresh document does for free and what fs-router has to do by hand.');
 	process.exit(1);
 }
+/* the routers that did answer have reported their differences above; the ones that did not are listed by reportDown */
+if (unanswered) process.exit(1);
 if (!compared) {
 	console.error(`\nspa-parity: 0 of ${list.length} router(s) compared a page — every router either failed to load or answered no page. `
 		+ 'This is not a clean sweep; it is nothing measured.\n');

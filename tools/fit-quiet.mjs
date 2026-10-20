@@ -15,7 +15,7 @@
  *
  * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
-import { stands, login, requireStands, sealToRouter } from './lib/stands.mjs';
+import { stands, login, requireStands, sealToRouter, eachStand, reportDown } from './lib/stands.mjs';
 import { parseFlags } from './lib/util.mjs';
 
 const FLAGS = parseFlags('fit-quiet', {
@@ -65,14 +65,14 @@ const browser = await pw[ENGINE].launch();
 const findings = [];
 let runs = 0, attempts = 0, worst = 0;
 
-for (const stand of list) {
+const down = await eachStand(list, async (stand) => {
 	for (const width of WIDTHS) {
 		attempts++;
 		const ctx = await browser.newContext({ viewport: { width, height: 844 } });
 		await sealToRouter(ctx, stand.base);
 		await ctx.addInitScript(() => { try { localStorage.setItem('fs-layout', 'top'); } catch (e) {} });
 		const page = await ctx.newPage();
-		await login(page, stand.base);
+		await login(page, stand.base, stand.id);
 		try { await page.goto(stand.base + '/admin/status/overview', { waitUntil: 'domcontentloaded', timeout: 20000 }); }
 		catch (e) { await ctx.close(); continue; }
 		await page.waitForTimeout(4000);
@@ -113,19 +113,9 @@ for (const stand of list) {
 			+ `${r.min}-${r.max}px (${pp}px peak-to-peak)\n`);
 		await ctx.close();
 	}
-}
+}, { serial: true });
 await browser.close();
-
-/* Zero runs is not a clean sweep — it is every cell having skipped or failed to load, which reads
- * identically to a settled chrome unless the lines above are read. A stand with no theme, an
- * unauthenticated session, or a page that never reaches fitChrome() must fail the same as a real
- * finding, not print a worst-case of 0px it never measured. */
-if (!findings.length && runs === 0) {
-	console.error(`\nfit-quiet: 0 of ${attempts} cell(s) produced a measurable pass — every router/width `
-		+ 'either failed to load, had no #maincontent, or never reached fitChrome(). This is not a '
-		+ 'clean sweep; it is nothing measured.\n');
-	process.exit(1);
-}
+const unanswered = reportDown('fit-quiet', down);
 
 if (findings.length) {
 	console.error(`\nfit-quiet: ${findings.length} finding(s)\n`);
@@ -133,5 +123,18 @@ if (findings.length) {
 	console.error('\nThe pass is fitChrome() in fs-chrome.js, the reason is in docs/anchoring.md.\n');
 	process.exit(1);
 }
+if (unanswered) process.exit(1);
+
+/* Zero runs is not a clean sweep — it is every cell having skipped or failed to load, which reads
+ * identically to a settled chrome unless the lines above are read. A stand with no theme, an
+ * unauthenticated session, or a page that never reaches fitChrome() must fail the same as a real
+ * finding, not print a worst-case of 0px it never measured. */
+if (runs === 0) {
+	console.error(`\nfit-quiet: 0 of ${attempts} cell(s) produced a measurable pass — every router/width `
+		+ 'either failed to load, had no #maincontent, or never reached fitChrome(). This is not a '
+		+ 'clean sweep; it is nothing measured.\n');
+	process.exit(1);
+}
+
 console.log(`fit-quiet: ${ENGINE}, ${runs} width(s) over ${list.length} router(s), worst ${worst}px `
 	+ 'peak-to-peak — the reader held still while the chrome measured itself.');
