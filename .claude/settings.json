@@ -47,13 +47,14 @@
       "Bash(git push origin -f:*)",
       "Bash(git push --mirror:*)",
       "Bash(gh release:*)",
-      "Bash(gh workflow run:*)",
       "Bash(gh api graphql:*)",
-      "Bash(gh api * -X *)",
-      "Bash(gh api * --method *)",
-      "Bash(gh api * -f *)",
-      "Bash(gh api * -F *)",
-      "Bash(gh api * --input *)"
+      "Bash(gh api * -X*)",
+      "Bash(gh api * --method*)",
+      "Bash(gh api * -f*)",
+      "Bash(gh api * -F*)",
+      "Bash(gh api * --field*)",
+      "Bash(gh api * --raw-field*)",
+      "Bash(gh api * --input*)"
     ],
     "allow": [
       "Bash(git status:*)",
@@ -74,7 +75,6 @@
       "Bash(npm run makefile-contract:*)",
       "Bash(node tools/*)",
       "Bash(node .claude/tooling/*)",
-      "Bash(ucode -T -c *)",
       "Bash(sh -n *)",
       "Bash(md5sum:*)",
       "Bash(tools/bg.sh:*)",

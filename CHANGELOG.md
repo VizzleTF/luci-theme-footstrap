@@ -19,6 +19,10 @@
 - **An open ComboButton menu shows its items in normal weight, like a plain dropdown.** The list sits inside the button and inherited its 600 weight and 1.1 line height (13px rows at 14.3px); the shared menu-row rule now sets 400 and the 1.5 leading, so the rows match a select dropdown (400, 19.5px at 1280) and the closed label stays 600.
 - **`tools/bg.sh --check <cmd>` prints the refusal verdict and runs nothing, and the refusal tests use only it; `bg.sh` now allows a list of read-only verbs instead of refusing a list of writes.** A refusal test drove real commands through `bg.sh` and trusted it to refuse them; while `bg.sh` was being edited, `node --test` ran `git update-ref refs/tags/v9`, `git reset --hard HEAD~3` and `gh secret set X` for real in the working repo. Global options (`git -C`, `gh -R`) no longer walk past a refusal, and a static test fails any spawn of `bg.sh` without `--check`.
 
+### Security
+
+- **`git-guard.sh` asks on a tag, a release or a rewrite of `main` hidden behind an alias, an interpreter one-liner, a `--` refspec, `--git-dir`/`GIT_DIR`, a remote set in the same line, or `-c include.path`.** Each of these walked past the hook in a review of the new commit policy; `checkout -B main`, `branch -f main` and `update-ref refs/heads/main` now count as moving `main`, the changelog one-call exemption holds only for a clean `node tools/changelog.mjs add` segment, and `gh api` write flags (`--field`, `--raw-field`, `-XPOST`, `--method=POST`) ask in `.claude/settings.json`.
+
 ## [0.14.16] — 2026-10-18
 
 ### Added
