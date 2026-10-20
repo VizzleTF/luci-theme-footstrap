@@ -66,7 +66,8 @@ Two scripts replace the hand-built `sleep` + `gh run list` + `gh run watch` loop
   Run it as `tools/bg.sh tools/ci-watch.sh --sha "$(git rev-parse HEAD)"` with `tools/bg-wait.sh` beside it.
 - `tools/ci-log.sh <run-id> [job-regex] [--repo R]` prints each failed job, its failed step and the
   last decisive log lines (`##[error]`, `NEW`, `live-audit:`, `Error`, and each node:test `not ok`
-  with its `location:` and one-line `error:`), ANSI and timestamps stripped, 40 lines at most.
+  with its `location:` and one-line `error:`) plus the 8 non-empty lines before the step's first
+  `##[error]`, where a gate's own message sits; ANSI and timestamps stripped, 40 lines at most.
   `gh run view --log-failed` prints nothing while a run is still marked in progress.
 
 `tools/bg.sh` lets reads through and refuses everything else: any `git` or `gh` subcommand off its read

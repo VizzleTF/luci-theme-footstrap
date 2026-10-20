@@ -44,9 +44,9 @@ function sh(script, args, env = {}) {
 	return spawnSync('sh', [ script, ...args ], { encoding: 'utf8', env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CI_LOG: join(dir, 'job.log'), ...env } });
 }
 
-test('ci-log --filter strips ANSI and the timestamp, keeps only decisive lines', () => {
+test('ci-log --filter strips ANSI and the timestamp, keeps decisive lines and the context before ##[error]', () => {
 	const r = spawnSync('sh', [ LOG, '--filter', '40' ], { input: require_log(), encoding: 'utf8' });
-	assert.equal(r.stdout, 'live-audit: 3 findings on /cgi-bin/luci/admin\nNEW  td.cbi-value-field overflows\n##[error]Process completed with exit code 1.\n');
+	assert.equal(r.stdout, 'npm test\nok 1 - fine\nlive-audit: 3 findings on /cgi-bin/luci/admin\nNEW  td.cbi-value-field overflows\n##[error]Process completed with exit code 1.\n');
 });
 
 function require_log() { return readFileSync(join(dir, 'job.log'), 'utf8'); }
@@ -58,7 +58,7 @@ test('ci-log --filter keeps the LAST n decisive lines', () => {
 
 test('ci-log names the failed job and step, then the log lines', () => {
 	const r = sh(LOG, [ '42' ], { CI_JOBS: '7\tlint\tnpm test' });
-	assert.match(r.stdout, /^job: lint \(7\)\nstep: npm test\nlive-audit:/);
+	assert.match(r.stdout, /^job: lint \(7\)\nstep: npm test\n[\s\S]*live-audit:/);
 	assert.ok(r.stdout.split('\n').length <= 41);
 });
 

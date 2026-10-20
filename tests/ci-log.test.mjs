@@ -58,15 +58,21 @@ test('ci-log --filter names the failing node:test case and its location', () => 
 	assert.ok(out.includes("  location: '/home/runner/work/r/r/tests/ci-tools.test.mjs:77:1'"));
 });
 
-test('ci-log --filter keeps a nested failure and a one-line error, drops the rest of the TAP block', () => {
+test('ci-log --filter keeps every failure with its one-line error, then the 8 lines before ##[error]', () => {
 	assert.equal(filter(TAP), [
 		'not ok 2 - ci-watch: a red run exits 1',
 		"  location: '/home/runner/work/r/r/tests/ci-tools.test.mjs:77:1'",
 		'not ok 3 - throws',
 		"  location: '/home/runner/work/r/r/tests/ci-tools.test.mjs:90:1'",
 		"  error: 'boom'",
+		'  ...',
+		'# Subtest: parent',
+		'    # Subtest: child',
 		'    not ok 1 - child',
+		'      ---',
 		"      location: '/home/runner/work/r/r/tests/ci-tools.test.mjs:99:39'",
+		'      ...',
+		'    1..1',
 		'##[error]Process completed with exit code 1.',
 		'',
 	].join('\n'));
@@ -80,4 +86,39 @@ test('ci-log --filter keeps the LAST n lines of a long TAP failure', () => {
 	const many = Array.from({ length: 30 }, (_, i) => `not ok ${i + 1} - t${i + 1}`);
 	const out = filter(many, 5).trimEnd().split('\n');
 	assert.deepEqual(out, many.slice(-5));
+});
+
+// A step that dies on a plain console.error matches nothing above: the cause is only the line before ##[error].
+const AGENT_REFS = [
+	'> luci-theme-footstrap@0.0.0 check:fast',
+	'> node tools/agent-refs.mjs',
+	'.claude/agents/tester.md:15: dist/ — no such path',
+	'',
+	'agent-refs: 1 reference(s) to something that is not in the repository; fix the steering file or restore the target.',
+	'##[error]Process completed with exit code 1.',
+];
+
+test('ci-log --filter prints the line before ##[error] that no decisive pattern matches', () => {
+	const out = filter(AGENT_REFS).split('\n');
+	assert.ok(out.includes('.claude/agents/tester.md:15: dist/ — no such path'));
+	assert.equal(out.at(-2), '##[error]Process completed with exit code 1.');
+});
+
+test('ci-log --filter prints a line that is both decisive and context once, and skips blank lines', () => {
+	const out = filter([ 'Error: boom', '   ', '', 'step output', '##[error]Process completed with exit code 1.' ]);
+	assert.equal(out, 'Error: boom\nstep output\n##[error]Process completed with exit code 1.\n');
+});
+
+test('ci-log --filter takes the 8 lines before the FIRST ##[error], none from after it', () => {
+	const before = Array.from({ length: 12 }, (_, i) => `before ${i + 1}`);
+	const out = filter([ ...before, '##[error]first', 'after 1', '##[error]second' ]).trimEnd().split('\n');
+	assert.deepEqual(out, [ ...before.slice(-8), '##[error]first', '##[error]second' ]);
+});
+
+test('ci-log --filter keeps its n-line cap with the context counted in', () => {
+	assert.deepEqual(filter(AGENT_REFS, 3).trimEnd().split('\n'), [
+		'.claude/agents/tester.md:15: dist/ — no such path',
+		'agent-refs: 1 reference(s) to something that is not in the repository; fix the steering file or restore the target.',
+		'##[error]Process completed with exit code 1.',
+	]);
 });
