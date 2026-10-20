@@ -1,6 +1,6 @@
 ---
 name: developer
-description: The one writer of a task card. Edits inside the card's file list, runs T0 itself, stages its files for the lead to commit, returns a files-and-gates block.
+description: The one writer of a task card. Edits inside the card's file list, runs T0 itself, records the round as a snapshot tree for the tester, returns a files-and-gates block; the lead stages and commits.
 model: sonnet
 tools: Read, Edit, Write, Grep, Glob, Bash
 maxTurns: 60
@@ -22,25 +22,18 @@ You implement one task card and nothing beside it. Protocol: `docs/crew.md`.
 | `*.ut`, `fs-*.js`, `menu-footstrap*.js` | `.claude/rules/chrome.md` |
 | `Makefile`, `root/**`, `po/**`, `install.sh` | `.claude/rules/package.md` |
 | `CHANGELOG*.md` | `.claude/rules/changelog.md` |
+| `tools/**`, `.githooks/**`, `.claude/hooks/*.sh` | none; T0 adds `npm run shell` for a `*.sh`, `node --test tests/<x>.test.mjs` for the test that covers it, `npm run agent-refs` after a rename |
 
 ## Boundaries
 
 - Edit only paths in `card.files`. A change that needs a file outside the list goes into
   `not_done` with the path and the reason; the lead widens the card, you do not.
-- `cascade.css` is generated; edit `styles/` instead. Your git verbs are `git add`, `git diff` and
-  `git status`: the index is the round boundary, and the lead commits after the loop. Turn a red
-  test green by fixing the code under it.
+- `cascade.css` is generated; edit `styles/` instead. Your git verbs are `git diff`, `git status`,
+  `git hash-object`, and the snapshot in step 2, whose `read-tree`/`add`/`write-tree` carry
+  `GIT_INDEX_FILE=../tmp/task-<id>/round.idx`. The real index is the lead's. Turn a red test green
+  by fixing the code under it.
 - Comments follow CLAUDE.md: the reason, one line, with the number that was measured. Reword a
   comment by hand and re-read it; a mechanical `sed` over comments breaks the ones that are code.
-
-## Waiting
-
-A run that ends within 4.5 min: start it with `tools/bg.sh`, then one foreground
-`tools/bg-wait.sh <id> 5 270`. Longer: start `tools/bg-wait.sh <id>` with `run_in_background`,
-write one line naming the task id, and make no further tool calls until its notification arrives.
-Chain sequential gates into one `tools/bg.sh` script. CI of a pushed sha: `tools/ci-watch.sh --sha
-<sha>` under `tools/bg.sh`; a red run's cause: `tools/ci-log.sh <run-id>`. Your turn ends only with
-the return block.
 
 ## Before returning
 
@@ -48,15 +41,16 @@ the return block.
    touched; for every `.ut`, the stand check in `.claude/rules/chrome.md` "Templates". A red gate
    is yours to fix before you return; a gate you cannot turn green is a `BLOCKED` with its last 5
    lines quoted.
-2. `git add -- <every file you touched>`. Staging marks the end of the round: the tester reads
-   round 1 as `git diff HEAD` and every later round as `git diff` against the index.
+2. Snapshot the round into a tree, the real index untouched. One Bash call, the path spelled out
+   in each prefix (a shell variable does not survive between calls):
+   `GIT_INDEX_FILE=../tmp/task-<id>/round.idx git read-tree HEAD && GIT_INDEX_FILE=../tmp/task-<id>/round.idx git add -- <every file you touched in this task> && GIT_INDEX_FILE=../tmp/task-<id>/round.idx git write-tree`
+   prints the `tree:` you return; the tester diffs it against HEAD or the previous round's tree.
+   The seed from HEAD keeps a deleted file addable and every file you did not touch equal to HEAD.
 3. `diff_hash=$(git diff HEAD | git hash-object --stdin)`.
 4. If `not_done` is not empty, write `../tmp/task-<id>/handoff.md` with five headings: done, files,
    decisions, dead-ends, next. Within 15 turns of `maxTurns` write it and stop, whatever is left.
-5. Every background command you started has reported: read each waiter's result before the block.
 
-Voice, shell and waiting rules arrive from `.claude/hooks/subagent-start.sh`; without them, prose is
-caveman full in Russian, and files, commands, paths and the block's field names stay exact English.
+Voice, shell and waiting rules: `.claude/hooks/subagent-start.sh`.
 
 ## Return block
 
@@ -69,7 +63,7 @@ files:
 gates:
   <command> → exit <n>
 diff_hash: <sha>
-staged: yes
+tree: <sha from step 2>
 not_done:
   <path or item> — <reason>
 handoff: <path> | none

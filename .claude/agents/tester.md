@@ -19,26 +19,27 @@ work grades the work it watched. Protocol: `docs/crew.md`; the stands: `docs/dev
 
 - `../tmp/task-<id>/card.json`: goal, `files`, `acceptance[]` (command + expected output), `live[]`
   (gate + flags), `grade` (`task` | `release`), `hardware`, `round`.
-- Round 1 reads `git diff HEAD`. Round N+1 reads `git diff` (worktree against the index, which
-  holds the previous round) plus the previous findings the prompt carries. Never re-read the full
-  diff on a later round.
+- The diff is tree against tree, `<tree>` being the developer's `tree:` for this round (the prompt
+  carries it, and the previous one): round 1 reads `git diff HEAD <tree>`, round N+1 reads
+  `git diff <previous tree> <tree>` plus the previous findings. Never re-read the full diff on a
+  later round. The index is the lead's; a role never stages.
 
 ## Runbook
 
-Waiting. A run that ends within 4.5 min: one foreground `tools/bg-wait.sh <id> 5 270` after its
-`tools/bg.sh`. Longer: start `tools/bg-wait.sh <id>` with `run_in_background`, write one line naming
-the task id, and make no further tool calls until its notification arrives. Chain sequential gates
-into one `tools/bg.sh` script. Read every waiter's result before you return: one still running when
-you finish wakes you again afterwards and re-sends your verdict as noise. Your turn ends only with
-the verdict block.
+Guards (`.claude/hooks/git-guard.sh`, `precommit-gate.sh`, `tools/bg.sh`) are probed through
+their decision path: hook JSON on stdin (`git-guard.sh --kinds`), `tools/bg.sh --check <cmd>`. The
+verdict they print is the evidence; the guarded command stays unrun. In this checkout your git reads
+(`diff`, `log`, `show`, `status`, `rev-parse`, `ls-files`) and runs the red-proof worktree below;
+anything that writes a ref, the index or files runs in a scratch repo you `git init` under `../tmp/`.
+`gh` here is `run view`, `run list`, `tools/ci-watch.sh` and `tools/ci-log.sh`.
 
 For every new or changed gate or fixture, show it go red without the fix: `git worktree add
 ../tmp/red-<id> HEAD`, copy in only the gate and fixture files, run it there, then `git worktree
 remove ../tmp/red-<id>`. A gate seen only green is unproven. A layout change runs under RU or pseudo-loc text and at a phone width.
 
 1. Classify the diff: css-only / js / template / package-or-build (`Makefile`, `root/**`,
-   `build-css.sh`, `tools/stage.sh`, `strip-*`). `scope_ok` is `git diff HEAD --name-only` being a
-   subset of `card.files`.
+   `build-css.sh`, `tools/stage.sh`, `strip-*`). `scope_ok` is
+   `git diff --name-only HEAD <tree>` being a subset of `card.files`.
 2. T0, foreground: `npm test`; every `acceptance[].cmd`; for any `.ut`, the stand check in
    `.claude/rules/chrome.md` "Templates" (25.12's ucode only: say so under `not_run` for 24.10);
    the T0 gate the area's rules file names.
@@ -77,15 +78,16 @@ remove ../tmp/red-<id>`. A gate seen only green is unproven. A layout change run
 
 ## Findings
 
-- A finding is `blocking` when it breaks correctness, the card's acceptance, a gate, or
-  security; everything else is `blocking: false` and never triggers a round on its own.
+- `blocking` means wrong behaviour on input a real OpenWrt install produces, or a red check the
+  card owns (T0, `acceptance[]`, `live[]`). A security concern is `blocking: false` with the id
+  `security:<path>:<slug>`; the lead routes it to the maintainer. Everything else is
+  `blocking: false`, goes to card `history`, and never triggers a round on its own.
 - Ids are stable across rounds: `<gate>:<path>:<slug>`. The same id twice is what the lead
   calls a stall, so do not rename a finding you are repeating.
 - Evidence is the command and its output, trimmed to the lines that show it. A finding without a
   command is an opinion and does not go in the block.
 
-Voice, shell and waiting rules arrive from `.claude/hooks/subagent-start.sh`; without them, prose is
-caveman full in Russian, and files, commands, paths and the block's field names stay exact English.
+Voice, shell and waiting rules: `.claude/hooks/subagent-start.sh`.
 
 ## Verdict block
 
@@ -93,7 +95,7 @@ At most 25 lines. No diff, no code.
 
 ```
 VERDICT: PASS | NEEDS_WORK
-round: <n>   scope_ok: yes | no
+round: <n>   diff: HEAD..<tree> | <previous tree>..<tree>   scope_ok: yes | no
 gates:
   <name> → exit <n>   <one line of evidence>
 findings:

@@ -26,8 +26,9 @@ median commit body in openwrt/luci is three lines and says WHAT changed.
 6. **Review** — one watcher per PR; bot review handled here, human review reported first.
    → `reference/answering-review.md`
 
-**Who builds it.** A single-commit PR is built inline by the lead. A multi-concern release sync goes
-through the crew (`docs/crew.md`), one card per concern.
+**Who builds it.** The lead cuts a single-commit PR inline (steps 1, 2, 4); its preflight (step 3)
+is a `tester` card plus the `upstream-reviewer`, since the lead runs no gate or stand. A
+multi-concern release sync goes through the crew (`docs/crew.md`), one card per concern.
 
 ## How many commits
 

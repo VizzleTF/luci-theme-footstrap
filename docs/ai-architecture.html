@@ -5030,34 +5030,38 @@
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Boundaries (behind everything) -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="0" data-composition-frame-label="maintainer-only boundary" x="16" y="56" width="165" height="296" rx="8" class="c-security-group" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="0" data-composition-frame-label="maintainer names it, each time" x="10.53224906451615" y="56" width="175.9355018709677" height="324" rx="8" class="c-security-group" stroke-width="1"/>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="1" data-composition-frame-label="autonomous: commit + push origin main" x="193" y="56" width="1145" height="294" rx="12" class="c-region" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="1" data-composition-frame-label="skills that reach per-word acts" x="193.3999907" y="276" width="181.2000186" height="302" rx="12" class="c-region" stroke-width="1"/>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="2" data-composition-frame-label="guardrail layers, outermost last" x="14" y="566" width="1261" height="106" rx="12" class="c-region" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="2" data-composition-frame-label="autonomous: CLAUDE.md Commits" x="388" y="276" width="542" height="102" rx="12" class="c-region" stroke-width="1"/>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="3" data-composition-frame-label="owlab stands" x="810" y="396" width="350" height="102" rx="12" class="c-region" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="3" data-composition-frame-label="crew: never commits or pushes" x="628" y="58" width="704" height="196" rx="12" class="c-region" stroke-width="1"/>
+
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="4" data-composition-frame-label="guardrail layers 1-5, outermost last" x="14" y="586" width="1070" height="106" rx="12" class="c-region" stroke-width="1"/>
+
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="5" data-composition-frame-label="owlab stands" x="810" y="416" width="350" height="102" rx="12" class="c-region" stroke-width="1"/>
 
         <!-- Connection paths (before components for correct z-order) -->
-        <path data-edge-from="maintainer" data-edge-to="lead" data-edge-label="task" data-edge-key="0" data-composition-points="163,111;258,111" d="M 163 111 L 258 111" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="maintainer" data-edge-to="tag" data-edge-label="names it" data-edge-key="1" data-composition-points="98.5,142;98.5,270" d="M 98.5 142 L 98.5 270" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="lead" data-edge-to="developer" data-edge-label="card.json" data-edge-key="2" data-composition-points="396,111;456,111" d="M 396 111 L 456 111" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="developer" data-edge-to="tester" data-edge-label="diff" data-edge-key="3" data-composition-points="594,111;636,111" d="M 594 111 L 636 111" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="release" data-edge-to="tag" data-edge-label="asks" data-edge-key="4" data-composition-points="215,301;163,301" d="M 215 301 L 163 301" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="lead" data-edge-to="ship" data-edge-label="commit + push" data-edge-key="5" data-composition-points="327,142;327,207;465,207;465,272" d="M 327 142 L 327 199 Q 327 207 335 207 L 457 207 Q 465 207 465 215 L 465 272" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="ship" data-edge-to="githooks" data-edge-label="git push" data-edge-key="6" data-composition-points="465,330;465,460;718,460;718,590" d="M 465 330 L 465 452 Q 465 460 473 460 L 710 460 Q 718 460 718 468 L 718 590" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="rules" data-edge-to="hooks" data-edge-key="7" data-composition-points="180,621;224,621" d="M 180 621 L 224 621" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="hooks" data-edge-to="perms" data-edge-key="8" data-composition-points="387,621;430,621" d="M 387 621 L 430 621" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="perms" data-edge-to="githooks" data-edge-key="9" data-composition-points="602,621;645,621" d="M 602 621 L 645 621" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="githooks" data-edge-to="ci" data-edge-key="10" data-composition-points="791,621;834,621" d="M 791 621 L 834 621" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="ci" data-edge-to="feed" data-edge-label="tag only" data-edge-key="11" data-composition-points="1040,621;1109,621" d="M 1040 621 L 1109 621" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="ci" data-edge-to="owrt2512" data-edge-label="apk" data-edge-key="12" data-composition-points="923,590;923,534;895,534;895,478" d="M 923 590 L 923 542 Q 923 534 915 534 L 903 534 Q 895 534 895 526 L 895 478" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="ci" data-edge-to="owrt2410" data-edge-label="opkg" data-edge-key="13" data-composition-points="937,590;937,534;1075,534;1075,478" d="M 937 590 L 937 542 Q 937 534 945 534 L 1067 534 Q 1075 534 1075 526 L 1075 478" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="ci" data-edge-to="pkg" data-edge-label="build" data-edge-key="14" data-composition-points="951,590;951,534;1251.5,534;1251.5,478" d="M 951 590 L 951 542 Q 951 534 959 534 L 1243.5 534 Q 1251.5 534 1251.5 526 L 1251.5 478" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="maintainer" data-edge-to="lead" data-edge-label="task" data-edge-key="0" data-composition-points="163,111;410,111" d="M 163 111 L 410 111" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="maintainer" data-edge-to="tag" data-edge-label="names it" data-edge-key="1" data-composition-points="98.5,142;98.5,298" d="M 98.5 142 L 98.5 298" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="lead" data-edge-to="developer" data-edge-label="card.json" data-edge-key="2" data-composition-points="548,111;650,111" d="M 548 111 L 650 111" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="developer" data-edge-to="tester" data-edge-label="diff" data-edge-key="3" data-composition-points="782,111;826,111" d="M 782 111 L 826 111" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="release" data-edge-to="tag" data-edge-label="asks" data-edge-key="4" data-composition-points="215,329;163,329" d="M 215 329 L 163 329" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="lead" data-edge-to="ship" data-edge-label="commit + push" data-edge-key="5" data-composition-points="479,142;479,300" d="M 479 142 L 479 300" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="ship" data-edge-to="githooks" data-edge-label="git push" data-edge-key="6" data-composition-points="479,358;479,484;718,484;718,610" d="M 479 358 L 479 476 Q 479 484 487 484 L 710 484 Q 718 484 718 492 L 718 610" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="rules" data-edge-to="hooks" data-edge-key="7" data-composition-points="180,641;224,641" d="M 180 641 L 224 641" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="hooks" data-edge-to="perms" data-edge-key="8" data-composition-points="387,641;430,641" d="M 387 641 L 430 641" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="perms" data-edge-to="githooks" data-edge-key="9" data-composition-points="602,641;645,641" d="M 602 641 L 645 641" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="githooks" data-edge-to="ci" data-edge-key="10" data-composition-points="791,641;834,641" d="M 791 641 L 834 641" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="ci" data-edge-to="feed" data-edge-label="tag only" data-edge-key="11" data-composition-points="1064,641;1140,641" d="M 1064 641 L 1140 641" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="ci" data-edge-to="owrt2512" data-edge-label="apk" data-edge-key="12" data-composition-points="935,610;935,554;895,554;895,498" d="M 935 610 L 935 562 Q 935 554 927 554 L 903 554 Q 895 554 895 546 L 895 498" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="ci" data-edge-to="owrt2410" data-edge-label="opkg" data-edge-key="13" data-composition-points="949,610;949,554;1075,554;1075,498" d="M 949 610 L 949 562 Q 949 554 957 554 L 1067 554 Q 1075 554 1075 546 L 1075 498" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="ci" data-edge-to="pkg" data-edge-label="build" data-edge-key="14" data-composition-points="963,610;963,554;1251.5,554;1251.5,498" d="M 963 610 L 963 562 Q 963 554 971 554 L 1243.5 554 Q 1251.5 554 1251.5 546 L 1251.5 498" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
 
         <!-- Components -->
-        <g id="node-maintainer" data-node-id="maintainer" data-node-label="Maintainer" tabindex="0" role="button" aria-label="Focus Maintainer, final word, maintainer-only boundary" aria-pressed="false" data-node-kind="external" data-node-sublabel="final word" data-node-context="maintainer-only boundary">
-          <title>Maintainer · final word · maintainer-only boundary</title>
+        <g id="node-maintainer" data-node-id="maintainer" data-node-label="Maintainer" tabindex="0" role="button" aria-label="Focus Maintainer, final word, maintainer names it, each time" aria-pressed="false" data-node-kind="external" data-node-sublabel="final word" data-node-context="maintainer names it, each time">
+          <title>Maintainer · final word · maintainer names it, each time</title>
           <rect x="34" y="80" width="129" height="62" rx="6" class="c-mask"/>
           <rect x="34" y="80" width="129" height="62" rx="6" class="c-external" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(40 86) scale(0.6875)">
@@ -5068,327 +5072,373 @@
         <text data-detail="context" x="98.5" y="125" class="t-muted" font-size="9" text-anchor="middle">final word</text>
         </g>
 
-        <g id="node-tag" data-node-id="tag" data-node-label="Tag v*" tabindex="0" role="button" aria-label="Focus Tag v*, git tag, gh release, maintainer-only boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="git tag, gh release" data-node-tag="maintainer-only" data-node-context="maintainer-only boundary">
-          <title>Tag v* · git tag, gh release · maintainer-only boundary · maintainer-only</title>
-          <rect x="34" y="270" width="129" height="62" rx="6" class="c-mask"/>
-          <rect x="34" y="270" width="129" height="62" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(40 276) scale(0.6875)">
+        <g id="node-tag" data-node-id="tag" data-node-label="Tag v*" tabindex="0" role="button" aria-label="Focus Tag v*, git tag, gh release, maintainer names it, each time" aria-pressed="false" data-node-kind="security" data-node-sublabel="git tag, gh release" data-node-tag="maintainer-named" data-node-context="maintainer names it, each time">
+          <title>Tag v* · git tag, gh release · maintainer names it, each time · maintainer-named</title>
+          <rect x="34" y="298" width="129" height="62" rx="6" class="c-mask"/>
+          <rect x="34" y="298" width="129" height="62" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(40 304) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="98.5" y="299" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tag v*</text>
-        <text data-detail="context" x="98.5" y="315" class="t-muted" font-size="9" text-anchor="middle">git tag, gh release</text>
-        <text data-detail="fine" x="98.5" y="324" class="t-security" font-size="7" text-anchor="middle">maintainer-only</text>
+          <text data-node-label="" data-detail-anchor="" x="98.5" y="327" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tag v*</text>
+        <text data-detail="context" x="98.5" y="343" class="t-muted" font-size="9" text-anchor="middle">git tag, gh release</text>
+        <text data-detail="fine" x="98.5" y="352" class="t-security" font-size="7" text-anchor="middle">maintainer-named</text>
         </g>
 
-        <g id="node-lead" data-node-id="lead" data-node-label="Lead thread" tabindex="0" role="button" aria-label="Focus Lead thread, Opus, main thread, autonomous: commit + push origin main" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="Opus, main thread" data-node-context="autonomous: commit + push origin main">
-          <title>Lead thread · Opus, main thread · autonomous: commit + push origin main</title>
-          <rect x="258" y="80" width="138" height="62" rx="6" class="c-mask"/>
-          <rect x="258" y="80" width="138" height="62" rx="6" class="c-frontend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(264 86) scale(0.6875)">
+        <g id="node-gallery" data-node-id="gallery" data-node-label="docs/gallery.html" tabindex="0" role="button" aria-label="Focus docs/gallery.html, what smoke + a11y measure, Architecture component" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="what smoke + a11y measure" data-node-context="Architecture component">
+          <title>docs/gallery.html · what smoke + a11y measure · Architecture component</title>
+          <rect x="20" y="440" width="160" height="58" rx="6" class="c-mask"/>
+          <rect x="20" y="440" width="160" height="58" rx="6" class="c-frontend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(26 446) scale(0.6875)">
             <rect x="2" y="3" width="12" height="10" rx="2"/>
             <path d="M2 6.5h12"/>
             <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
             <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="327" y="109" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Lead thread</text>
-        <text data-detail="context" x="327" y="125" class="t-muted" font-size="9" text-anchor="middle">Opus, main thread</text>
+          <text data-node-label="" data-detail-anchor="" x="100" y="467" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">docs/gallery.html</text>
+        <text data-detail="context" x="100" y="483" class="t-muted" font-size="9" text-anchor="middle">what smoke + a11y measure</text>
         </g>
 
-        <g id="node-developer" data-node-id="developer" data-node-label="developer" tabindex="0" role="button" aria-label="Focus developer, Sonnet, T0, autonomous: commit + push origin main" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Sonnet, T0" data-node-context="autonomous: commit + push origin main">
-          <title>developer · Sonnet, T0 · autonomous: commit + push origin main</title>
-          <rect x="456" y="82" width="138" height="58" rx="6" class="c-mask"/>
-          <rect x="456" y="82" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(462 88) scale(0.6875)">
+        <g id="node-release" data-node-id="release" data-node-label="/release" tabindex="0" role="button" aria-label="Focus /release, asks for the tag, skills that reach per-word acts" aria-pressed="false" data-node-kind="backend" data-node-sublabel="asks for the tag" data-node-context="skills that reach per-word acts">
+          <title>/release · asks for the tag · skills that reach per-word acts</title>
+          <rect x="215" y="300" width="138" height="58" rx="6" class="c-mask"/>
+          <rect x="215" y="300" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(221 306) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="525" y="109" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">developer</text>
-        <text data-detail="context" x="525" y="125" class="t-muted" font-size="9" text-anchor="middle">Sonnet, T0</text>
+          <text data-node-label="" data-detail-anchor="" x="284" y="327" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">/release</text>
+        <text data-detail="context" x="284" y="343" class="t-muted" font-size="9" text-anchor="middle">asks for the tag</text>
         </g>
 
-        <g id="node-tester" data-node-id="tester" data-node-label="tester" tabindex="0" role="button" aria-label="Focus tester, Opus, read-only, autonomous: commit + push origin main" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Opus, read-only" data-node-context="autonomous: commit + push origin main">
-          <title>tester · Opus, read-only · autonomous: commit + push origin main</title>
-          <rect x="636" y="82" width="138" height="58" rx="6" class="c-mask"/>
-          <rect x="636" y="82" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(642 88) scale(0.6875)">
+        <g id="node-upr" data-node-id="upr" data-node-label="/upstream-pr" tabindex="0" role="button" aria-label="Focus /upstream-pr, fork push on word, skills that reach per-word acts" aria-pressed="false" data-node-kind="backend" data-node-sublabel="fork push on word" data-node-context="skills that reach per-word acts">
+          <title>/upstream-pr · fork push on word · skills that reach per-word acts</title>
+          <rect x="215" y="400" width="138" height="58" rx="6" class="c-mask"/>
+          <rect x="215" y="400" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(221 406) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="705" y="109" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">tester</text>
-        <text data-detail="context" x="705" y="125" class="t-muted" font-size="9" text-anchor="middle">Opus, read-only</text>
+          <text data-node-label="" data-detail-anchor="" x="284" y="427" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">/upstream-pr</text>
+        <text data-detail="context" x="284" y="443" class="t-muted" font-size="9" text-anchor="middle">fork push on word</text>
         </g>
 
-        <g id="node-security" data-node-id="security" data-node-label="security" tabindex="0" role="button" aria-label="Focus security, per-task diff review, autonomous: commit + push origin main" aria-pressed="false" data-node-kind="security" data-node-sublabel="per-task diff review" data-node-context="autonomous: commit + push origin main">
-          <title>security · per-task diff review · autonomous: commit + push origin main</title>
-          <rect x="817" y="82" width="138" height="58" rx="6" class="c-mask"/>
-          <rect x="817" y="82" width="138" height="58" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(823 88) scale(0.6875)">
+        <g id="node-retro" data-node-id="retro" data-node-label="/retro" tabindex="0" role="button" aria-label="Focus /retro, maintainer-run, skills that reach per-word acts" aria-pressed="false" data-node-kind="backend" data-node-sublabel="maintainer-run" data-node-context="skills that reach per-word acts">
+          <title>/retro · maintainer-run · skills that reach per-word acts</title>
+          <rect x="215" y="500" width="138" height="58" rx="6" class="c-mask"/>
+          <rect x="215" y="500" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(221 506) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="284" y="527" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">/retro</text>
+        <text data-detail="context" x="284" y="543" class="t-muted" font-size="9" text-anchor="middle">maintainer-run</text>
+        </g>
+
+        <g id="node-lead" data-node-id="lead" data-node-label="Lead thread" tabindex="0" role="button" aria-label="Focus Lead thread, Opus, main thread, Architecture component" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="Opus, main thread" data-node-context="Architecture component">
+          <title>Lead thread · Opus, main thread · Architecture component</title>
+          <rect x="410" y="80" width="138" height="62" rx="6" class="c-mask"/>
+          <rect x="410" y="80" width="138" height="62" rx="6" class="c-frontend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(416 86) scale(0.6875)">
+            <rect x="2" y="3" width="12" height="10" rx="2"/>
+            <path d="M2 6.5h12"/>
+            <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
+            <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="479" y="109" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Lead thread</text>
+        <text data-detail="context" x="479" y="125" class="t-muted" font-size="9" text-anchor="middle">Opus, main thread</text>
+        </g>
+
+        <g id="node-ship" data-node-id="ship" data-node-label="/ship" tabindex="0" role="button" aria-label="Focus /ship, commit + push origin, autonomous: CLAUDE.md Commits" aria-pressed="false" data-node-kind="backend" data-node-sublabel="commit + push origin" data-node-tag="autonomous" data-node-context="autonomous: CLAUDE.md Commits">
+          <title>/ship · commit + push origin · autonomous: CLAUDE.md Commits · autonomous</title>
+          <rect x="410" y="300" width="138" height="58" rx="6" class="c-mask"/>
+          <rect x="410" y="300" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(416 306) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="479" y="327" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">/ship</text>
+        <text data-detail="context" x="479" y="343" class="t-muted" font-size="9" text-anchor="middle">commit + push origin</text>
+        <text data-detail="fine" x="479" y="350" class="t-backend" font-size="7" text-anchor="middle">autonomous</text>
+        </g>
+
+        <g id="node-relc" data-node-id="relc" data-node-label="release: x.y.z" tabindex="0" role="button" aria-label="Focus release: x.y.z, commit + push main, autonomous: CLAUDE.md Commits" aria-pressed="false" data-node-kind="backend" data-node-sublabel="commit + push main" data-node-tag="autonomous" data-node-context="autonomous: CLAUDE.md Commits">
+          <title>release: x.y.z · commit + push main · autonomous: CLAUDE.md Commits · autonomous</title>
+          <rect x="590" y="300" width="138" height="58" rx="6" class="c-mask"/>
+          <rect x="590" y="300" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(596 306) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="659" y="327" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">release: x.y.z</text>
+        <text data-detail="context" x="659" y="343" class="t-muted" font-size="9" text-anchor="middle">commit + push main</text>
+        <text data-detail="fine" x="659" y="350" class="t-backend" font-size="7" text-anchor="middle">autonomous</text>
+        </g>
+
+        <g id="node-feedp" data-node-id="feedp" data-node-label="Feed publish" tabindex="0" role="button" aria-label="Focus Feed publish, owfeed update.yml, autonomous: CLAUDE.md Commits" aria-pressed="false" data-node-kind="backend" data-node-sublabel="owfeed update.yml" data-node-tag="autonomous" data-node-context="autonomous: CLAUDE.md Commits">
+          <title>Feed publish · owfeed update.yml · autonomous: CLAUDE.md Commits · autonomous</title>
+          <rect x="770" y="300" width="138" height="58" rx="6" class="c-mask"/>
+          <rect x="770" y="300" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(776 306) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="839" y="327" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Feed publish</text>
+        <text data-detail="context" x="839" y="343" class="t-muted" font-size="9" text-anchor="middle">owfeed update.yml</text>
+        <text data-detail="fine" x="839" y="350" class="t-backend" font-size="7" text-anchor="middle">autonomous</text>
+        </g>
+
+        <g id="node-developer" data-node-id="developer" data-node-label="developer" tabindex="0" role="button" aria-label="Focus developer, Sonnet, T0, crew: never commits or pushes" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Sonnet, T0" data-node-context="crew: never commits or pushes">
+          <title>developer · Sonnet, T0 · crew: never commits or pushes</title>
+          <rect x="650" y="82" width="132" height="58" rx="6" class="c-mask"/>
+          <rect x="650" y="82" width="132" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(656 88) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="716" y="109" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">developer</text>
+        <text data-detail="context" x="716" y="125" class="t-muted" font-size="9" text-anchor="middle">Sonnet, T0</text>
+        </g>
+
+        <g id="node-tester" data-node-id="tester" data-node-label="tester" tabindex="0" role="button" aria-label="Focus tester, Opus, read-only, crew: never commits or pushes" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Opus, read-only" data-node-context="crew: never commits or pushes">
+          <title>tester · Opus, read-only · crew: never commits or pushes</title>
+          <rect x="826" y="82" width="132" height="58" rx="6" class="c-mask"/>
+          <rect x="826" y="82" width="132" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(832 88) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="892" y="109" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">tester</text>
+        <text data-detail="context" x="892" y="125" class="t-muted" font-size="9" text-anchor="middle">Opus, read-only</text>
+        </g>
+
+        <g id="node-security" data-node-id="security" data-node-label="security" tabindex="0" role="button" aria-label="Focus security, per-task diff, crew: never commits or pushes" aria-pressed="false" data-node-kind="security" data-node-sublabel="per-task diff" data-node-context="crew: never commits or pushes">
+          <title>security · per-task diff · crew: never commits or pushes</title>
+          <rect x="1002" y="82" width="132" height="58" rx="6" class="c-mask"/>
+          <rect x="1002" y="82" width="132" height="58" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(1008 88) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="886" y="109" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">security</text>
-        <text data-detail="context" x="886" y="125" class="t-muted" font-size="9" text-anchor="middle">per-task diff review</text>
+          <text data-node-label="" data-detail-anchor="" x="1068" y="109" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">security</text>
+        <text data-detail="context" x="1068" y="125" class="t-muted" font-size="9" text-anchor="middle">per-task diff</text>
         </g>
 
-        <g id="node-upstream" data-node-id="upstream" data-node-label="upstream-reviewer" tabindex="0" role="button" aria-label="Focus upstream-reviewer, luci bot checklist, autonomous: commit + push origin main" aria-pressed="false" data-node-kind="backend" data-node-sublabel="luci bot checklist" data-node-context="autonomous: commit + push origin main">
-          <title>upstream-reviewer · luci bot checklist · autonomous: commit + push origin main</title>
-          <rect x="998" y="82" width="138" height="58" rx="6" class="c-mask"/>
-          <rect x="998" y="82" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(1004 88) scale(0.6875)">
+        <g id="node-upstream" data-node-id="upstream" data-node-label="upstream-reviewer" tabindex="0" role="button" aria-label="Focus upstream-reviewer, luci bot checklist, crew: never commits or pushes" aria-pressed="false" data-node-kind="backend" data-node-sublabel="luci bot checklist" data-node-context="crew: never commits or pushes">
+          <title>upstream-reviewer · luci bot checklist · crew: never commits or pushes</title>
+          <rect x="1178" y="82" width="132" height="58" rx="6" class="c-mask"/>
+          <rect x="1178" y="82" width="132" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(1184 88) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1067" y="109" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">upstream-reviewer</text>
-        <text data-detail="context" x="1067" y="125" class="t-muted" font-size="9" text-anchor="middle">luci bot checklist</text>
+          <text data-node-label="" data-detail-anchor="" x="1244" y="109" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">upstream-reviewer</text>
+        <text data-detail="context" x="1244" y="125" class="t-muted" font-size="9" text-anchor="middle">luci bot checklist</text>
         </g>
 
-        <g id="node-researcher" data-node-id="researcher" data-node-label="researcher" tabindex="0" role="button" aria-label="Focus researcher, ranked sources, autonomous: commit + push origin main" aria-pressed="false" data-node-kind="external" data-node-sublabel="ranked sources" data-node-context="autonomous: commit + push origin main">
-          <title>researcher · ranked sources · autonomous: commit + push origin main</title>
-          <rect x="1178" y="82" width="138" height="58" rx="6" class="c-mask"/>
-          <rect x="1178" y="82" width="138" height="58" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1184 88) scale(0.6875)">
+        <g id="node-researcher" data-node-id="researcher" data-node-label="researcher" tabindex="0" role="button" aria-label="Focus researcher, ranked sources, crew: never commits or pushes" aria-pressed="false" data-node-kind="external" data-node-sublabel="ranked sources" data-node-context="crew: never commits or pushes">
+          <title>researcher · ranked sources · crew: never commits or pushes</title>
+          <rect x="650" y="176" width="132" height="58" rx="6" class="c-mask"/>
+          <rect x="650" y="176" width="132" height="58" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(656 182) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1247" y="109" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">researcher</text>
-        <text data-detail="context" x="1247" y="125" class="t-muted" font-size="9" text-anchor="middle">ranked sources</text>
+          <text data-node-label="" data-detail-anchor="" x="716" y="203" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">researcher</text>
+        <text data-detail="context" x="716" y="219" class="t-muted" font-size="9" text-anchor="middle">ranked sources</text>
         </g>
 
-        <g id="node-ship" data-node-id="ship" data-node-label="/ship" tabindex="0" role="button" aria-label="Focus /ship, verify, commit, push, autonomous: commit + push origin main" aria-pressed="false" data-node-kind="backend" data-node-sublabel="verify, commit, push" data-node-tag="autonomous" data-node-context="autonomous: commit + push origin main">
-          <title>/ship · verify, commit, push · autonomous: commit + push origin main · autonomous</title>
-          <rect x="396" y="272" width="138" height="58" rx="6" class="c-mask"/>
-          <rect x="396" y="272" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(402 278) scale(0.6875)">
-            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+        <g id="node-investigator" data-node-id="investigator" data-node-label="caveman:cavecrew-investigator" tabindex="0" role="button" aria-label="Focus caveman:cavecrew-investigator, Haiku, file:line table, crew: never commits or pushes" aria-pressed="false" data-node-kind="external" data-node-sublabel="Haiku, file:line table" data-node-context="crew: never commits or pushes">
+          <title>caveman:cavecrew-investigator · Haiku, file:line table · crew: never commits or pushes</title>
+          <rect x="826" y="176" width="214" height="58" rx="6" class="c-mask"/>
+          <rect x="826" y="176" width="214" height="58" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(832 182) scale(0.6875)">
+            <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
+            <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="465" y="299" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">/ship</text>
-        <text data-detail="context" x="465" y="315" class="t-muted" font-size="9" text-anchor="middle">verify, commit, push</text>
-        <text data-detail="fine" x="465" y="322" class="t-backend" font-size="7" text-anchor="middle">autonomous</text>
+          <text data-node-label="" data-detail-anchor="" x="933" y="203" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">caveman:cavecrew-investigator</text>
+        <text data-detail="context" x="933" y="219" class="t-muted" font-size="9" text-anchor="middle">Haiku, file:line table</text>
         </g>
 
-        <g id="node-release" data-node-id="release" data-node-label="/release" tabindex="0" role="button" aria-label="Focus /release, matrix, changelog, autonomous: commit + push origin main" aria-pressed="false" data-node-kind="backend" data-node-sublabel="matrix, changelog" data-node-context="autonomous: commit + push origin main">
-          <title>/release · matrix, changelog · autonomous: commit + push origin main</title>
-          <rect x="215" y="272" width="138" height="58" rx="6" class="c-mask"/>
-          <rect x="215" y="272" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(221 278) scale(0.6875)">
-            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+        <g id="node-owrt2512" data-node-id="owrt2512" data-node-label="owrt2512" tabindex="0" role="button" aria-label="Focus owrt2512, 25.12 / apk, owlab stands" aria-pressed="false" data-node-kind="database" data-node-sublabel="25.12 / apk" data-node-context="owlab stands">
+          <title>owrt2512 · 25.12 / apk · owlab stands</title>
+          <rect x="826" y="440" width="138" height="58" rx="6" class="c-mask"/>
+          <rect x="826" y="440" width="138" height="58" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(832 446) scale(0.6875)">
+            <ellipse cx="8" cy="4" rx="5" ry="2"/>
+            <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="284" y="299" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">/release</text>
-        <text data-detail="context" x="284" y="315" class="t-muted" font-size="9" text-anchor="middle">matrix, changelog</text>
+          <text data-node-label="" data-detail-anchor="" x="895" y="467" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">owrt2512</text>
+        <text data-detail="context" x="895" y="483" class="t-muted" font-size="9" text-anchor="middle">25.12 / apk</text>
         </g>
 
-        <g id="node-upr" data-node-id="upr" data-node-label="/upstream-pr" tabindex="0" role="button" aria-label="Focus /upstream-pr, openwrt/luci branch, autonomous: commit + push origin main" aria-pressed="false" data-node-kind="backend" data-node-sublabel="openwrt/luci branch" data-node-context="autonomous: commit + push origin main">
-          <title>/upstream-pr · openwrt/luci branch · autonomous: commit + push origin main</title>
-          <rect x="576" y="272" width="138" height="58" rx="6" class="c-mask"/>
-          <rect x="576" y="272" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(582 278) scale(0.6875)">
-            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+        <g id="node-owrt2410" data-node-id="owrt2410" data-node-label="owrt2410" tabindex="0" role="button" aria-label="Focus owrt2410, 24.10 / opkg, owlab stands" aria-pressed="false" data-node-kind="database" data-node-sublabel="24.10 / opkg" data-node-context="owlab stands">
+          <title>owrt2410 · 24.10 / opkg · owlab stands</title>
+          <rect x="1006" y="440" width="138" height="58" rx="6" class="c-mask"/>
+          <rect x="1006" y="440" width="138" height="58" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(1012 446) scale(0.6875)">
+            <ellipse cx="8" cy="4" rx="5" ry="2"/>
+            <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="645" y="299" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">/upstream-pr</text>
-        <text data-detail="context" x="645" y="315" class="t-muted" font-size="9" text-anchor="middle">openwrt/luci branch</text>
+          <text data-node-label="" data-detail-anchor="" x="1075" y="467" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">owrt2410</text>
+        <text data-detail="context" x="1075" y="483" class="t-muted" font-size="9" text-anchor="middle">24.10 / opkg</text>
         </g>
 
-        <g id="node-retro" data-node-id="retro" data-node-label="/retro" tabindex="0" role="button" aria-label="Focus /retro, reads denials.log, autonomous: commit + push origin main" aria-pressed="false" data-node-kind="backend" data-node-sublabel="reads denials.log" data-node-context="autonomous: commit + push origin main">
-          <title>/retro · reads denials.log · autonomous: commit + push origin main</title>
-          <rect x="757" y="272" width="138" height="58" rx="6" class="c-mask"/>
-          <rect x="757" y="272" width="138" height="58" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(763 278) scale(0.6875)">
-            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+        <g id="node-pkg" data-node-id="pkg" data-node-label="package" tabindex="0" role="button" aria-label="Focus package, cascade.css, fs-*.js, Architecture component" aria-pressed="false" data-node-kind="database" data-node-sublabel="cascade.css, fs-*.js" data-node-context="Architecture component">
+          <title>package · cascade.css, fs-*.js · Architecture component</title>
+          <rect x="1187" y="440" width="129" height="58" rx="6" class="c-mask"/>
+          <rect x="1187" y="440" width="129" height="58" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(1193 446) scale(0.6875)">
+            <ellipse cx="8" cy="4" rx="5" ry="2"/>
+            <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="826" y="299" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">/retro</text>
-        <text data-detail="context" x="826" y="315" class="t-muted" font-size="9" text-anchor="middle">reads denials.log</text>
+          <text data-node-label="" data-detail-anchor="" x="1251.5" y="467" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">package</text>
+        <text data-detail="context" x="1251.5" y="483" class="t-muted" font-size="9" text-anchor="middle">cascade.css, fs-*.js</text>
         </g>
 
-        <g id="node-rules" data-node-id="rules" data-node-label="CLAUDE.md + rules" tabindex="0" role="button" aria-label="Focus CLAUDE.md + rules, advisory, guardrail layers, outermost last" aria-pressed="false" data-node-kind="security" data-node-sublabel="advisory" data-node-context="guardrail layers, outermost last">
-          <title>CLAUDE.md + rules · advisory · guardrail layers, outermost last</title>
-          <rect x="34" y="590" width="146" height="62" rx="6" class="c-mask"/>
-          <rect x="34" y="590" width="146" height="62" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(40 596) scale(0.6875)">
+        <g id="node-rules" data-node-id="rules" data-node-label="1. Instructions" tabindex="0" role="button" aria-label="Focus 1. Instructions, CLAUDE.md, rules, agents, guardrail layers 1-5, outermost last" aria-pressed="false" data-node-kind="security" data-node-sublabel="CLAUDE.md, rules, agents" data-node-context="guardrail layers 1-5, outermost last">
+          <title>1. Instructions · CLAUDE.md, rules, agents · guardrail layers 1-5, outermost last</title>
+          <rect x="34" y="610" width="146" height="62" rx="6" class="c-mask"/>
+          <rect x="34" y="610" width="146" height="62" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(40 616) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="107" y="619" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">CLAUDE.md + rules</text>
-        <text data-detail="context" x="107" y="635" class="t-muted" font-size="9" text-anchor="middle">advisory</text>
+          <text data-node-label="" data-detail-anchor="" x="107" y="639" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">1. Instructions</text>
+        <text data-detail="context" x="107" y="655" class="t-muted" font-size="9" text-anchor="middle">CLAUDE.md, rules, agents</text>
         </g>
 
-        <g id="node-hooks" data-node-id="hooks" data-node-label="Claude hooks" tabindex="0" role="button" aria-label="Focus Claude hooks, 5 hook scripts, guardrail layers, outermost last" aria-pressed="false" data-node-kind="security" data-node-sublabel="5 hook scripts" data-node-context="guardrail layers, outermost last">
-          <title>Claude hooks · 5 hook scripts · guardrail layers, outermost last</title>
-          <rect x="224" y="590" width="163" height="62" rx="6" class="c-mask"/>
-          <rect x="224" y="590" width="163" height="62" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(230 596) scale(0.6875)">
+        <g id="node-hooks" data-node-id="hooks" data-node-label="2. Hooks" tabindex="0" role="button" aria-label="Focus 2. Hooks, 5 Claude hook scripts, guardrail layers 1-5, outermost last" aria-pressed="false" data-node-kind="security" data-node-sublabel="5 Claude hook scripts" data-node-context="guardrail layers 1-5, outermost last">
+          <title>2. Hooks · 5 Claude hook scripts · guardrail layers 1-5, outermost last</title>
+          <rect x="224" y="610" width="163" height="62" rx="6" class="c-mask"/>
+          <rect x="224" y="610" width="163" height="62" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(230 616) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="305.5" y="619" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Claude hooks</text>
-        <text data-detail="context" x="305.5" y="635" class="t-muted" font-size="9" text-anchor="middle">5 hook scripts</text>
+          <text data-node-label="" data-detail-anchor="" x="305.5" y="639" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">2. Hooks</text>
+        <text data-detail="context" x="305.5" y="655" class="t-muted" font-size="9" text-anchor="middle">5 Claude hook scripts</text>
         </g>
 
-        <g id="node-perms" data-node-id="perms" data-node-label="settings permissions" tabindex="0" role="button" aria-label="Focus settings permissions, ask/deny + autoMode, guardrail layers, outermost last" aria-pressed="false" data-node-kind="security" data-node-sublabel="ask/deny + autoMode" data-node-context="guardrail layers, outermost last">
-          <title>settings permissions · ask/deny + autoMode · guardrail layers, outermost last</title>
-          <rect x="430" y="590" width="172" height="62" rx="6" class="c-mask"/>
-          <rect x="430" y="590" width="172" height="62" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(436 596) scale(0.6875)">
+        <g id="node-perms" data-node-id="perms" data-node-label="3. Permissions" tabindex="0" role="button" aria-label="Focus 3. Permissions, ask/deny, autoMode, bg.sh, guardrail layers 1-5, outermost last" aria-pressed="false" data-node-kind="security" data-node-sublabel="ask/deny, autoMode, bg.sh" data-node-context="guardrail layers 1-5, outermost last">
+          <title>3. Permissions · ask/deny, autoMode, bg.sh · guardrail layers 1-5, outermost last</title>
+          <rect x="430" y="610" width="172" height="62" rx="6" class="c-mask"/>
+          <rect x="430" y="610" width="172" height="62" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(436 616) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="516" y="619" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">settings permissions</text>
-        <text data-detail="context" x="516" y="635" class="t-muted" font-size="9" text-anchor="middle">ask/deny + autoMode</text>
+          <text data-node-label="" data-detail-anchor="" x="516" y="639" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">3. Permissions</text>
+        <text data-detail="context" x="516" y="655" class="t-muted" font-size="9" text-anchor="middle">ask/deny, autoMode, bg.sh</text>
         </g>
 
-        <g id="node-githooks" data-node-id="githooks" data-node-label=".githooks" tabindex="0" role="button" aria-label="Focus .githooks, pre-push, commit-msg, guardrail layers, outermost last" aria-pressed="false" data-node-kind="security" data-node-sublabel="pre-push, commit-msg" data-node-context="guardrail layers, outermost last">
-          <title>.githooks · pre-push, commit-msg · guardrail layers, outermost last</title>
-          <rect x="645" y="590" width="146" height="62" rx="6" class="c-mask"/>
-          <rect x="645" y="590" width="146" height="62" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(651 596) scale(0.6875)">
+        <g id="node-githooks" data-node-id="githooks" data-node-label="4. Git hooks" tabindex="0" role="button" aria-label="Focus 4. Git hooks, pre-push, commit-msg, guardrail layers 1-5, outermost last" aria-pressed="false" data-node-kind="security" data-node-sublabel="pre-push, commit-msg" data-node-context="guardrail layers 1-5, outermost last">
+          <title>4. Git hooks · pre-push, commit-msg · guardrail layers 1-5, outermost last</title>
+          <rect x="645" y="610" width="146" height="62" rx="6" class="c-mask"/>
+          <rect x="645" y="610" width="146" height="62" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(651 616) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="718" y="619" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">.githooks</text>
-        <text data-detail="context" x="718" y="635" class="t-muted" font-size="9" text-anchor="middle">pre-push, commit-msg</text>
+          <text data-node-label="" data-detail-anchor="" x="718" y="639" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">4. Git hooks</text>
+        <text data-detail="context" x="718" y="655" class="t-muted" font-size="9" text-anchor="middle">pre-push, commit-msg</text>
         </g>
 
-        <g id="node-ci" data-node-id="ci" data-node-label="CI build.yml" tabindex="0" role="button" aria-label="Focus CI build.yml, check lint build verify, guardrail layers, outermost last" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="check lint build verify" data-node-context="guardrail layers, outermost last">
-          <title>CI build.yml · check lint build verify · guardrail layers, outermost last</title>
-          <rect x="834" y="590" width="206" height="62" rx="6" class="c-mask"/>
-          <rect x="834" y="590" width="206" height="62" rx="6" class="c-cloud" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(840 596) scale(0.6875)">
+        <g id="node-ci" data-node-id="ci" data-node-label="5. CI build.yml" tabindex="0" role="button" aria-label="Focus 5. CI build.yml, check lint build verify live anchors, guardrail layers 1-5, outermost last" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="check lint build verify live anchors" data-node-context="guardrail layers 1-5, outermost last">
+          <title>5. CI build.yml · check lint build verify live anchors · guardrail layers 1-5, outermost last</title>
+          <rect x="834" y="610" width="230" height="62" rx="6" class="c-mask"/>
+          <rect x="834" y="610" width="230" height="62" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(840 616) scale(0.6875)">
             <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="937" y="619" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">CI build.yml</text>
-        <text data-detail="context" x="937" y="635" class="t-muted" font-size="9" text-anchor="middle">check lint build verify</text>
+          <text data-node-label="" data-detail-anchor="" x="949" y="639" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">5. CI build.yml</text>
+        <text data-detail="context" x="949" y="655" class="t-muted" font-size="9" text-anchor="middle">check lint build verify live anchors</text>
         </g>
 
-        <g id="node-feed" data-node-id="feed" data-node-label="owfeed" tabindex="0" role="button" aria-label="Focus owfeed, signed apk + ipk, guardrail layers, outermost last" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="signed apk + ipk" data-node-context="guardrail layers, outermost last">
-          <title>owfeed · signed apk + ipk · guardrail layers, outermost last</title>
-          <rect x="1109" y="590" width="146" height="62" rx="6" class="c-mask"/>
-          <rect x="1109" y="590" width="146" height="62" rx="6" class="c-messagebus" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(1115 596) scale(0.6875)">
+        <g id="node-feed" data-node-id="feed" data-node-label="owfeed" tabindex="0" role="button" aria-label="Focus owfeed, signed apk + ipk, Architecture component" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="signed apk + ipk" data-node-context="Architecture component">
+          <title>owfeed · signed apk + ipk · Architecture component</title>
+          <rect x="1140" y="610" width="146" height="62" rx="6" class="c-mask"/>
+          <rect x="1140" y="610" width="146" height="62" rx="6" class="c-messagebus" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(1146 616) scale(0.6875)">
             <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>
             <circle cx="5" cy="4.5" r="1" class="sigil-fill"/>
             <circle cx="10.5" cy="8" r="1" class="sigil-fill"/>
             <circle cx="7" cy="11.5" r="1" class="sigil-fill"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1182" y="619" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">owfeed</text>
-        <text data-detail="context" x="1182" y="635" class="t-muted" font-size="9" text-anchor="middle">signed apk + ipk</text>
-        </g>
-
-        <g id="node-owrt2512" data-node-id="owrt2512" data-node-label="owrt2512" tabindex="0" role="button" aria-label="Focus owrt2512, 25.12 / apk, owlab stands" aria-pressed="false" data-node-kind="database" data-node-sublabel="25.12 / apk" data-node-context="owlab stands">
-          <title>owrt2512 · 25.12 / apk · owlab stands</title>
-          <rect x="826" y="420" width="138" height="58" rx="6" class="c-mask"/>
-          <rect x="826" y="420" width="138" height="58" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(832 426) scale(0.6875)">
-            <ellipse cx="8" cy="4" rx="5" ry="2"/>
-            <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="895" y="447" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">owrt2512</text>
-        <text data-detail="context" x="895" y="463" class="t-muted" font-size="9" text-anchor="middle">25.12 / apk</text>
-        </g>
-
-        <g id="node-owrt2410" data-node-id="owrt2410" data-node-label="owrt2410" tabindex="0" role="button" aria-label="Focus owrt2410, 24.10 / opkg, owlab stands" aria-pressed="false" data-node-kind="database" data-node-sublabel="24.10 / opkg" data-node-context="owlab stands">
-          <title>owrt2410 · 24.10 / opkg · owlab stands</title>
-          <rect x="1006" y="420" width="138" height="58" rx="6" class="c-mask"/>
-          <rect x="1006" y="420" width="138" height="58" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(1012 426) scale(0.6875)">
-            <ellipse cx="8" cy="4" rx="5" ry="2"/>
-            <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="1075" y="447" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">owrt2410</text>
-        <text data-detail="context" x="1075" y="463" class="t-muted" font-size="9" text-anchor="middle">24.10 / opkg</text>
-        </g>
-
-        <g id="node-gallery" data-node-id="gallery" data-node-label="docs/gallery.html" tabindex="0" role="button" aria-label="Focus docs/gallery.html, what smoke + a11y measure, Architecture component" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="what smoke + a11y measure" data-node-context="Architecture component">
-          <title>docs/gallery.html · what smoke + a11y measure · Architecture component</title>
-          <rect x="40" y="420" width="160" height="58" rx="6" class="c-mask"/>
-          <rect x="40" y="420" width="160" height="58" rx="6" class="c-frontend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(46 426) scale(0.6875)">
-            <rect x="2" y="3" width="12" height="10" rx="2"/>
-            <path d="M2 6.5h12"/>
-            <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
-            <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="120" y="447" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">docs/gallery.html</text>
-        <text data-detail="context" x="120" y="463" class="t-muted" font-size="9" text-anchor="middle">what smoke + a11y measure</text>
-        </g>
-
-        <g id="node-pkg" data-node-id="pkg" data-node-label="package" tabindex="0" role="button" aria-label="Focus package, cascade.css, fs-*.js, Architecture component" aria-pressed="false" data-node-kind="database" data-node-sublabel="cascade.css, fs-*.js" data-node-context="Architecture component">
-          <title>package · cascade.css, fs-*.js · Architecture component</title>
-          <rect x="1187" y="420" width="129" height="58" rx="6" class="c-mask"/>
-          <rect x="1187" y="420" width="129" height="58" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(1193 426) scale(0.6875)">
-            <ellipse cx="8" cy="4" rx="5" ry="2"/>
-            <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="1251.5" y="447" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">package</text>
-        <text data-detail="context" x="1251.5" y="463" class="t-muted" font-size="9" text-anchor="middle">cascade.css, fs-*.js</text>
+          <text data-node-label="" data-detail-anchor="" x="1213" y="639" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">owfeed</text>
+        <text data-detail="context" x="1213" y="655" class="t-muted" font-size="9" text-anchor="middle">signed apk + ipk</text>
         </g>
 
         <!-- Connection labels -->
         <g data-detail="context" data-edge-from="maintainer" data-edge-to="lead" data-edge-label="task" data-edge-key="0">
-          <rect x="195.5" y="91" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="210.5" y="101" class="t-backend" font-size="8" text-anchor="middle">task</text>
+          <rect x="271.5" y="91" width="30" height="14" rx="3" class="c-mask"/>
+          <text x="286.5" y="101" class="t-backend" font-size="8" text-anchor="middle">task</text>
         </g>
         <g data-detail="context" data-edge-from="maintainer" data-edge-to="tag" data-edge-label="names it" data-edge-key="1">
-          <rect x="74.8" y="196" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="99" y="206" class="t-security" font-size="8" text-anchor="middle">names it</text>
+          <rect x="74.8" y="210" width="48.4" height="14" rx="3" class="c-mask"/>
+          <text x="99" y="220" class="t-security" font-size="8" text-anchor="middle">names it</text>
         </g>
         <g data-detail="context" data-edge-from="lead" data-edge-to="developer" data-edge-label="card.json" data-edge-key="2">
-          <rect x="399.4" y="91" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="426" y="101" class="t-backend" font-size="8" text-anchor="middle">card.json</text>
+          <rect x="572.4" y="91" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
+          <text x="599" y="101" class="t-backend" font-size="8" text-anchor="middle">card.json</text>
         </g>
         <g data-detail="context" data-edge-from="developer" data-edge-to="tester" data-edge-label="diff" data-edge-key="3">
-          <rect x="600" y="91" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="615" y="101" class="t-muted" font-size="8" text-anchor="middle">diff</text>
+          <rect x="789" y="91" width="30" height="14" rx="3" class="c-mask"/>
+          <text x="804" y="101" class="t-muted" font-size="8" text-anchor="middle">diff</text>
         </g>
         <g data-detail="context" data-edge-from="release" data-edge-to="tag" data-edge-label="asks" data-edge-key="4">
-          <rect x="174" y="281" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="189" y="291" class="t-security" font-size="8" text-anchor="middle">asks</text>
+          <rect x="174" y="309" width="30" height="14" rx="3" class="c-mask"/>
+          <text x="189" y="319" class="t-security" font-size="8" text-anchor="middle">asks</text>
         </g>
         <g data-detail="context" data-edge-from="lead" data-edge-to="ship" data-edge-label="commit + push" data-edge-key="5">
-          <rect x="359.8" y="187" width="72.4" height="14" rx="3" class="c-mask"/>
-          <text x="396" y="197" class="t-backend" font-size="8" text-anchor="middle">commit + push</text>
+          <rect x="442.8" y="211" width="72.4" height="14" rx="3" class="c-mask"/>
+          <text x="479" y="221" class="t-backend" font-size="8" text-anchor="middle">commit + push</text>
         </g>
         <g data-detail="context" data-edge-from="ship" data-edge-to="githooks" data-edge-label="git push" data-edge-key="6">
-          <rect x="567.3" y="440" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="591.5" y="450" class="t-backend" font-size="8" text-anchor="middle">git push</text>
+          <rect x="574.3" y="464" width="48.4" height="14" rx="3" class="c-mask"/>
+          <text x="598.5" y="474" class="t-backend" font-size="8" text-anchor="middle">git push</text>
         </g>
 
 
 
 
         <g data-detail="context" data-edge-from="ci" data-edge-to="feed" data-edge-label="tag only" data-edge-key="11">
-          <rect x="1050.3" y="601" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="1074.5" y="611" class="t-security" font-size="8" text-anchor="middle">tag only</text>
+          <rect x="1077.8" y="621" width="48.4" height="14" rx="3" class="c-mask"/>
+          <text x="1102" y="631" class="t-security" font-size="8" text-anchor="middle">tag only</text>
         </g>
         <g data-detail="context" data-edge-from="ci" data-edge-to="owrt2512" data-edge-label="apk" data-edge-key="12">
-          <rect x="894" y="514" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="909" y="524" class="t-muted" font-size="8" text-anchor="middle">apk</text>
+          <rect x="900" y="534" width="30" height="14" rx="3" class="c-mask"/>
+          <text x="915" y="544" class="t-muted" font-size="8" text-anchor="middle">apk</text>
         </g>
         <g data-detail="context" data-edge-from="ci" data-edge-to="owrt2410" data-edge-label="opkg" data-edge-key="13">
-          <rect x="991" y="514" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="1006" y="524" class="t-muted" font-size="8" text-anchor="middle">opkg</text>
+          <rect x="997" y="534" width="30" height="14" rx="3" class="c-mask"/>
+          <text x="1012" y="544" class="t-muted" font-size="8" text-anchor="middle">opkg</text>
         </g>
         <g data-detail="context" data-edge-from="ci" data-edge-to="pkg" data-edge-label="build" data-edge-key="14">
-          <rect x="1084.25" y="514" width="34" height="14" rx="3" class="c-mask"/>
-          <text x="1101.25" y="524" class="t-muted" font-size="8" text-anchor="middle">build</text>
+          <rect x="1090.25" y="534" width="34" height="14" rx="3" class="c-mask"/>
+          <text x="1107.25" y="544" class="t-muted" font-size="8" text-anchor="middle">build</text>
         </g>
 
         <!-- Boundary labels (foreground masks keep routes out of titles) -->
-        <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="security-group" data-composition-frame-label="maintainer-only boundary">
-          <rect data-graph-role="structural-frame-label-mask" x="20" y="60" width="139.6" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="24" y="73" class="t-security" font-size="9" font-weight="600">maintainer-only boundary</text>
+        <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="security-group" data-composition-frame-label="maintainer names it, each time">
+          <rect data-graph-role="structural-frame-label-mask" x="14.53224906451615" y="60" width="167.9355018709677" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="18.53224906451615" y="72.7741945483871" class="t-security" font-size="8.774194548387095" font-weight="600">maintainer names it, each time</text>
         </g>
 
-        <g data-graph-role="structural-frame-label" data-composition-frame-id="1" data-composition-frame-kind="region" data-composition-frame-label="autonomous: commit + push origin main">
-          <rect data-graph-role="structural-frame-label-mask" x="197" y="60" width="209.79999999999998" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="201" y="73" class="t-cloud" font-size="9" font-weight="600">autonomous: commit + push origin main</text>
+        <g data-graph-role="structural-frame-label" data-composition-frame-id="1" data-composition-frame-kind="region" data-composition-frame-label="skills that reach per-word acts">
+          <rect data-graph-role="structural-frame-label-mask" x="197.3999907" y="280" width="173.2000186" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="201.3999907" y="292.7741945483871" class="t-cloud" font-size="8.774194548387097" font-weight="600">skills that reach per-word acts</text>
         </g>
 
-        <g data-graph-role="structural-frame-label" data-composition-frame-id="2" data-composition-frame-kind="region" data-composition-frame-label="guardrail layers, outermost last">
-          <rect data-graph-role="structural-frame-label-mask" x="18" y="570" width="182.79999999999998" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="22" y="583" class="t-cloud" font-size="9" font-weight="600">guardrail layers, outermost last</text>
+        <g data-graph-role="structural-frame-label" data-composition-frame-id="2" data-composition-frame-kind="region" data-composition-frame-label="autonomous: CLAUDE.md Commits">
+          <rect data-graph-role="structural-frame-label-mask" x="392" y="280" width="166.6" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="396" y="293" class="t-cloud" font-size="9" font-weight="600">autonomous: CLAUDE.md Commits</text>
         </g>
 
-        <g data-graph-role="structural-frame-label" data-composition-frame-id="3" data-composition-frame-kind="region" data-composition-frame-label="owlab stands">
-          <rect data-graph-role="structural-frame-label-mask" x="814" y="400" width="74.8" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="818" y="413" class="t-cloud" font-size="9" font-weight="600">owlab stands</text>
+        <g data-graph-role="structural-frame-label" data-composition-frame-id="3" data-composition-frame-kind="region" data-composition-frame-label="crew: never commits or pushes">
+          <rect data-graph-role="structural-frame-label-mask" x="632" y="62" width="166.6" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="636" y="75" class="t-cloud" font-size="9" font-weight="600">crew: never commits or pushes</text>
+        </g>
+
+        <g data-graph-role="structural-frame-label" data-composition-frame-id="4" data-composition-frame-kind="region" data-composition-frame-label="guardrail layers 1-5, outermost last">
+          <rect data-graph-role="structural-frame-label-mask" x="18" y="590" width="204.4" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="22" y="603" class="t-cloud" font-size="9" font-weight="600">guardrail layers 1-5, outermost last</text>
+        </g>
+
+        <g data-graph-role="structural-frame-label" data-composition-frame-id="5" data-composition-frame-kind="region" data-composition-frame-label="owlab stands">
+          <rect data-graph-role="structural-frame-label-mask" x="814" y="420" width="74.8" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="818" y="433" class="t-cloud" font-size="9" font-weight="600">owlab stands</text>
         </g>
 
         <!-- Legend -->
@@ -5582,12 +5632,12 @@
       <div class="card">
         <div class="card-header">
           <div class="card-dot emerald"></div>
-          <h3>Agent alone</h3>
+          <h3>Autonomous</h3>
         </div>
         <ul>
-          <li>&bull; commit and push origin main when T0 is green and main CI is not red</li>
-          <li>&bull; rebase/amend/force-with-lease on its own branches</li>
-          <li>&bull; watch CI after every push with tools/ci-watch.sh</li>
+          <li>&bull; commit + push origin main and own branches via /ship: T0 green, both CHANGELOGs, on origin/main, main CI not red</li>
+          <li>&bull; rebase, amend, --force-with-lease on own branches; the release: commit once asked; feed publish after a tag</li>
+          <li>&bull; after a push: tools/ci-watch.sh (check, lint, build, verify, live, anchors; a tag adds deep); a red job: tools/ci-log.sh</li>
         </ul>
       </div>
 
@@ -5597,21 +5647,21 @@
           <h3>Maintainer names it, each time</h3>
         </div>
         <ul>
-          <li>&bull; git tag, tag push, gh release</li>
-          <li>&bull; rewriting main, openwrt/luci pushes, publication</li>
-          <li>&bull; hardware router, lowering a tier, waiving a gate</li>
+          <li>&bull; tag create/move/delete/push; gh release; gh workflow run in the theme repo</li>
+          <li>&bull; force-push, rebase or amend of main; reset --hard of pushed work</li>
+          <li>&bull; openwrt/luci fork push, upstream PR, every publication, hardware router, lowering a tier, waiving a gate</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <div class="card-dot cyan"></div>
-          <h3>Ground truth</h3>
+          <div class="card-dot amber"></div>
+          <h3>Never</h3>
         </div>
         <ul>
-          <li>&bull; build.yml jobs: check, lint, build, verify, live, anchors, deep</li>
-          <li>&bull; verify installs on 25.12/apk and 24.10/opkg</li>
-          <li>&bull; hooks: git-guard, precommit-gate, session-start, subagent-start, permission-denied</li>
+          <li>&bull; --no-verify on commit or push; attribution trailers</li>
+          <li>&bull; staging the maintainer&#39;s hunks; commit, push or tag from a detached run</li>
+          <li>&bull; a commit by a role: the lead stages by path and commits</li>
         </ul>
       </div>
     </div>

@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: stages-only-own-files
+context:
+  scaffold_script: scaffold.sh

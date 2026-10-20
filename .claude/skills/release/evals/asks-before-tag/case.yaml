@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: asks-before-tag
+context:
+  scaffold_script: scaffold.sh

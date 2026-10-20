@@ -42,3 +42,6 @@ release-notes.md
 
 # EnterWorktree checkouts: a second copy of every file, so grep and eslint report each hit twice
 /.claude/worktrees/
+
+# `claude plugin eval` run outputs; the cases beside them under evals/ are committed
+/.claude/skills/*/evals/results/

@@ -6,6 +6,9 @@ argument-hint: <x.y.z>
 
 # Cutting a release
 
+A readiness question (готов ли main, is the release ready) runs step 1 alone and reports the
+verdict with each command; steps 2-8 run only when the maintainer asked for the release.
+
 The order and the gates; each step's detail is the matching step of `docs/releasing.md`, the single
 source. The order is load-bearing: the tag points at a commit that already carries its own
 changelog section, and every gate reads the sha the tag will name. `<v>` is the new version,
@@ -23,7 +26,8 @@ changelog section, and every gate reads the sha the tag will name. `<v>` is the 
    - `~/go/bin/owfeed lock` exits 0 both at the repo root and in a fresh
      `gh repo clone owfeed/owfeed-packages ../tmp/release-<v>/feed -- --depth 1` (without
      `--update` it only reads; a stale lock there reds the feed's `check / build` after the tag);
-   - asset selection (issue #6) and the live rows for the touched areas — Steps 3 and 4.
+   - asset selection (issue #6) and the live rows for the touched areas (Steps 3 and 4): one
+     `tester` card, `live[]` = those rows, `grade: release`; Done = its PASS verdict quoted.
    Done = every item above green, each with the command that showed it.
 2. **Size pin**: `node tools/size-budget.mjs --pin`, after the last code fix, into the release commit.
 3. **Release commit** (autonomous, its own Bash call): rename `[Unreleased]` in both changelogs and
@@ -40,11 +44,14 @@ changelog section, and every gate reads the sha the tag will name. `<v>` is the 
    `git diff <prev> HEAD`. Save the verdict to `../tmp/release-<v>/security.md`, then
    `git worktree remove ../tmp/sec-<v>`. Any finding goes to the maintainer before the tag.
 5. **CI on the release sha**: `tools/bg.sh tools/ci-watch.sh --sha <sha> --max 6000` +
-   `tools/bg-wait.sh <run-id>` in the same turn; read every job, a red one through
-   `tools/ci-log.sh <run-id>` and named as diff, infrastructure or upstream feed.
+   `tools/bg-wait.sh <run-id>` in the same turn; read every job. On red, `tools/ci-log.sh <run-id>`,
+   then a `tester` card reproducing the job (`tools/ci-local.sh --force <job>`) before the cause is
+   named as diff, infrastructure or upstream feed. Done = the verdict line plus, on red, the card's
+   reproduction result.
 6. **Tag — the maintainer names it.** When their message already said so (tag, делай тег,
-   release <v>), run it; otherwise ask with AskUserQuestion, the exact command in the option:
-   `git tag -a v<v> -m v<v> && git push origin v<v>`. It runs in its own Bash call, alone.
+   release <v>), run it; otherwise ask with AskUserQuestion, both exact commands in the option:
+   `git tag -a v<v> -m v<v>`, then `git push origin v<v>`. Each runs in its own Bash call, alone,
+   the push only after the create exited 0.
 7. **The tag's run**: `tools/ci-watch.sh --sha <sha>` as in step 5, every job read (`deep`,
    `playground`, `release`, `release-assets`); the release carries every asset plus its `.sig`
    (runbook 7). A red job is a fix commit and a new patch tag, again named by the maintainer.

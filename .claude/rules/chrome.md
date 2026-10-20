@@ -30,17 +30,18 @@ description: The one renderer, the three ownership zones, and the fence that kee
 
 ## Templates
 
-Syntax-check the way LuCI does after any `.ut` edit — that is T0. `ucode` lives in the stand, not
-on the host, so sync the templates there and compile every installed one:
+Syntax-check the way LuCI does after any `.ut` edit. `ucode` lives in the stand, not on the host, so
+sync the templates there and compile every installed one:
 
 ```sh
 owlab sync owrt2512
 docker exec owlab-luci-theme-footstrap-owrt2512 sh -c 'for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut /usr/share/ucode/luci/template/themes/footstrap/partials/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done'
 ```
 
-Stand down (`docker ps` lacks it): `owlab up owrt2512` through `tools/bg.sh` and its waiter first.
-This proves 25.12's ucode only; 24.10's interpreter accepts a different set, and CI's `verify` job
-compiles on both, so report the 24.10 half as CI's.
+The compile is T0 when the stand is up. Stand down (`docker ps` lacks it): booting is T2, started
+first: `tools/bg.sh owlab up owrt2512`, then `tools/bg-wait.sh <run-id>`; the 60 s T0 bound is the
+compile, not the boot. This proves 25.12's ucode only; 24.10's interpreter accepts a different set,
+and CI's `verify` job compiles on both, so report the 24.10 half as CI's.
 
 A `_()` with no catalogue renders silently in English: run `luci-theme-footstrap/update-po.sh` after
 touching any `_()`. A msgid is a **global** name shared with every app — Appearance labels carry the

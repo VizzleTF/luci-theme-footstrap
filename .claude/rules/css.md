@@ -8,9 +8,10 @@ description: The cascade layers, the token tiers, and how a CSS change is proved
 
 # CSS
 
-- **`htdocs/luci-static/footstrap/cascade.css` is generated — never edit it.** Source is `styles/`.
-  Enforced by `permissions.deny: Edit(**/cascade.css)` in `.claude/settings.json`, which also covers
-  a shell redirection into that path; the rule is here for the reason, not as the defence.
+- **`htdocs/luci-static/footstrap/cascade.css` is generated — edit `styles/` instead.**
+  `permissions.deny: Edit(**/cascade.css)` stops the file tools only; a shell write passes it and
+  is lost anyway: the file is gitignored and `build-css.sh` rewrites it on every `owlab sync` and
+  `tools/stage.sh`, so a hand edit never reaches a router.
 - Layer order `tokens, base, theme, page`, one directory per layer, filename prefix = source order.
   A later layer beats an earlier one regardless of specificity, so a theme rule never needs
   `!important` to outrank base. A file added to a layer directory needs its own `@layer` wrapper —

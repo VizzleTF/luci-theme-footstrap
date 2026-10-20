@@ -4,6 +4,22 @@ Each check here costs one review remark that would otherwise arrive upstream and
 replay. **All of it, section 0 included, runs before the FIRST push**: on #9111 the bot needed two
 rounds, and both times found what a local run catches. Done = every section below green.
 
+**Who runs it.** The lead dispatches and quotes verdicts; it runs no gate and no stand. Sections 1,
+2, 4, 5, 6 and 7 are one `tester` card (grade `task`, `live[]` = section 5's gates); section 3 is
+the lead's (its own messages); section 0 is the `upstream-reviewer`, section 8 `/security-review`.
+
+**Where.** The PR carries the latest release tag's tree, not `main`'s (`mechanics.md`, "The source
+is the latest release tag"); once `main` moves past the tag, a check run on `main` grades code the
+PR does not hold. Sections 1, 4, 5 and 7 therefore run inside `../tmp/fs-hist`, detached at the tag:
+
+```sh
+git -C ../tmp/fs-hist checkout --quiet --detach $(git describe --tags --abbrev=0)   # from our repo root
+```
+
+`git describe` inside `fs-hist` names its own HEAD's tag, so it is evaluated from our root. Sections
+2, 3 and 6 read the luci clone and stay where they are. Section 5's `owlab sync` runs before section
+4's compile.
+
 ## 0. Review of the branch diff
 
 The `upstream-reviewer` agent (read-only, Opus) reads `git -C ../tmp/luci-pr diff origin/master..`:
@@ -52,8 +68,9 @@ head -1 <file> | wc -c                                                # ≤ 61 w
 
 ## 4. Templates compile
 
-The host has no `ucode`; compile inside a running owlab stand (`owlab ps` names it), on the
-templates of the package installed there:
+The host has no `ucode`; compile inside a running owlab stand (`owlab status` names it), on the
+templates of the package installed there. Run section 5's `owlab sync` from `../tmp/fs-hist` first,
+or the stand still holds whatever was synced last:
 
 ```sh
 docker exec <stand container> sh -c 'for f in $(find /usr/share/ucode/luci/template/themes/footstrap -name "*.ut"); do
@@ -66,7 +83,8 @@ A behaviour change is ready once it has run on **both** package managers:
 
 ```sh
 owlab sync owrt2512 owrt2410
-node tools/scroll-anchor.mjs --engines chromium,firefox,webkit   # when fs-fit changed
+tools/bg.sh node tools/scroll-anchor.mjs --engines chromium,firefox,webkit   # when fs-fit changed: T2
+tools/bg-wait.sh <run-id>                                                   # run_in_background
 ```
 
 `npm run live` takes no flags (it chains eight `npm run` calls; `docs/releasing.md` Step 4) and is

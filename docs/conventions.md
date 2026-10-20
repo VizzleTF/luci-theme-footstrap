@@ -446,7 +446,8 @@ after a client navigation while every static gate stayed green.
 `--engine firefox` and `--engine webkit` run the audit in the other two engines, keyed separately in
 the baseline: #12 was Firefox-only, and a chromium run must not bless a finding it never saw.
 
-Two more run in CI only. `tools/jsmin-verify.mjs` needs a jsmin built from the commit in
-`luci-upstream.pin`. `ucode -T -c` over every template runs inside the `verify` containers, against
-the installed theme with the router's own interpreter — which is also how you run it locally
-(`owlab exec … ucode -T -c`), so nothing here has to build one.
+`tools/jsmin-verify.mjs` runs in CI only: it needs a jsmin built from the commit in
+`luci-upstream.pin`. `ucode -T -c` over every template runs inside the `verify` containers on both
+releases, against the installed theme with the router's own interpreter, so nothing here has to
+build one. Locally it is a template's T0 on a running stand, through `docker exec`
+(`.claude/rules/chrome.md` "Templates"): `owlab exec` parses `-c` and `-o` after `--` as its own.

@@ -60,8 +60,7 @@ one, file by file, in the diff and in the commit messages (`git log origin/maste
 
 Report only what the diff contains; a pre-existing fault outside it is not a finding.
 
-Voice and shell rules arrive from `.claude/hooks/subagent-start.sh`; without them, prose is caveman
-full in Russian, and commands, paths and the block's field names stay exact English.
+Voice, shell and waiting rules: `.claude/hooks/subagent-start.sh`.
 
 ## Return block
 

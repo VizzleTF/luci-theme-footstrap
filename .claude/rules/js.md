@@ -33,11 +33,11 @@ description: Module composition, the jsmin traps, and what fs-fit owns.
 
 T0 is `npm test`, `npm run lint:js`, and the one gate that covers what you touched: `axes` for `fs-prefs`
 or `fs-axes`, `chrome-fence` for `fs-sheets`/`fs-prefs`, `page-modules` for the page→module map,
-`css-orphans` if a `fs-*` class name moved, `comment-share` for any comment edit in a shipped JS file (under 40 % comment bytes), `floor` (T2, live) for anything in `holdFloor()` or
-`naturalHeight()` — it is the only gate that reads a floor's height back and empties a box to see
-the floor come off.
+`css-orphans` if a `fs-*` class name moved, `comment-share` for any comment edit in a shipped JS file (under 40 % comment bytes).
 
 `npm run smoke` (T1, ~2.1 s) runs the modules against a real DOM on the gallery with every
-dependency stubbed; `npm test` covers only the branches a stand cannot enter. Neither answers for
-a page: behaviour is `owlab test` and the live gates (T2), and a green smoke never earns a release
-the right to skip them. `docs/development.md` "The three cheap browser gates".
+dependency stubbed; `npm test` covers only the branches a stand cannot enter. Neither answers for a
+page: behaviour is `owlab test` and the live gates (T2), and a green smoke never earns a release the
+right to skip them. Anything in `holdFloor()` or `naturalHeight()` also takes `npm run floor` (T2,
+live), the only gate that reads a floor's height back and empties a box to see it come off.
+`docs/development.md` "The three cheap browser gates".

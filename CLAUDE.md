@@ -7,16 +7,15 @@ which `install.sh` pins for it (`docs/releasing.md`).
 **Russian prose to the maintainer, including right after an English subagent or background result.**
 Code, comments, commit messages and PR text stay in English.
 
-`styles/base/` is footstrap's own base. The name bootstrap belongs to the *other, real* package
-only: the `/luci-static/bootstrap` fallback, the `bench/` baseline, the attribution in
-`styles/00-header.css`.
+`styles/base/` is footstrap's own base. The name bootstrap belongs to the *other, real* package only:
+the `/luci-static/bootstrap` fallback, the `bench/` baseline, the attribution in `styles/00-header.css`.
 
 **Repo root is the workspace** (`package.json`, `tools/`, `docs/`, `owlab.yaml`, `install.sh`); the
 shipped package is `luci-theme-footstrap/` one level down, so write paths rooted or absolute.
 Start sessions here: the parent (`luci-fork/`, `tmp/`) is no git repository and loads none of this
-file, its rules or its hooks. Here `.claude/hooks/session-start.sh` reports drift from `origin/main`.
-`../tmp` and .claude/worktrees are not the repo: search with `git grep`. The Bash tool runs zsh:
-quote globs and `'== X'`, test with `[ a = b ]`, put bash-only code in `bash -c`.
+file, its rules or its hooks. `../tmp` and .claude/worktrees are not the repo: search with
+`git grep`. The Bash tool runs zsh: quote globs and `'== X'`, test with `[ a = b ]`, put bash-only
+code in `bash -c`.
 
 ## Read the doc first
 
@@ -38,35 +37,33 @@ quote globs and `'== X'`, test with `[ a = b ]`, put bash-only code in `bash -c`
 
 `docs/gallery.html` renders every widget LuCI or an app can emit; the browser gates measure it.
 Area rules load with their files from `.claude/rules/` (css, js, chrome, package, changelog).
-Skills: `/ship` (commit, push, watch CI), `/release`, `/upstream-pr` (openwrt/luci), `/retro`.
 
 ## Commands
 
 ```sh
 tools/bg.sh <cmd>                  # T2: detach, log into ../tmp/; refuses ssh, commit, push, tag
-tools/bg-wait.sh <run-id>          # its waiter, as a background command (full ci-local: `30 10800`)
+tools/bg-wait.sh <run-id>          # its waiter (a full ci-local takes `30 10800`)
 tools/ci-watch.sh --sha <sha>      # a commit's CI runs -> one verdict line; run via tools/bg.sh
 ./tools/stage.sh && owfeed build   # the package routers get, both formats into dist/
 owlab up | owlab sync --watch | owlab open owrt2512
-owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' --assert …
 luci-theme-footstrap/dev-sync.sh <host>   # HARDWARE router over ssh: the maintainer's word each time
 ```
 
 ## Verifying
 
-- **T0, the developer's, always, foreground, 60 s:** `npm test`, the T0 gate the area's rules file
-  names, and for a template the stand compile in `.claude/rules/chrome.md` "Templates".
+- **T0, the developer's, always, foreground, 60 s:** `npm test`, the area's T0 gate, and a template's
+  compile (`.claude/rules/chrome.md` "Templates"; a down stand boots as T2 first, outside the 60 s).
 - **T1, the tester's, on request, 5 min:** `npm run check` once on a finished branch; `npm run smoke`
-  and `npm run computed-diff` after JS or CSS. `.githooks/pre-push` is the T1 of a push, the one T1
-  the lead runs; it reads that output only on failure (tail).
-- **T2, never blocked on:** owlab, live gates, the benchmark, `jsmin-verify`: `tools/bg.sh` plus, in
-  the same turn, `tools/bg-wait.sh <run-id>` in the background; report unprompted, ETA if >15 min.
+  and `npm run computed-diff` after JS or CSS. The lead runs `npm run check:fast` on its own edits
+  and `.githooks/pre-push` on a push, reading the output only on failure (tail).
+- **T2, never blocked on past one waiter:** owlab, live gates, the benchmark, `jsmin-verify`:
+  `tools/bg.sh` + its waiter, same turn: `tools/bg-wait.sh <run-id> 5 270` with `timeout: 300000`
+  in the foreground for a run under 4.5 min, else in the background; report unprompted, ETA >15 min.
 - A Bash call stays under 5 minutes; one that would is T2, and a timeout is never retried larger.
-  Only the maintainer lowers a tier.
 - **Done = ran on a real userland on both package managers** (25.12/apk, 24.10/opkg: CI `verify`);
   say which one a run covered. Before/after baselines use the last package published in the feed.
 - A red CI job: `tools/ci-log.sh <run-id>`, then `tools/ci-local.sh --force <job>` before any
-  hypothesis. "Flaky" and "fixed" are a rate (`tools/rate.sh`). Tool and gate fixes precede a release.
+  hypothesis. "Flaky" and "fixed" are a rate (`tools/rate.sh`).
 - One fault, one mechanism: a spare added "to be safe" ships only if the probe fails without it.
 - Prove CSS with a computed-style diff; screenshots and scratch files go in `../tmp/`.
 - A stand finding goes in `docs/development.md` "The stand's own traps" the same session; an owlab
@@ -78,18 +75,20 @@ luci-theme-footstrap/dev-sync.sh <host>   # HARDWARE router over ssh: the mainta
 
 ## Crew
 
-The main thread is the lead: it orchestrates and edits `docs/**` and config. Code
-(`luci-theme-footstrap/**`, `tools/**`, `tests/**`) goes with a card to a role in `.claude/agents/`
-when it touches more than one file, needs a gate beyond T0, or brings ~50 lines of output. The
-lead's Bash is orchestration: git, `/ship`, `tools/ci-watch.sh`, `tools/ci-log.sh`,
-`node tools/changelog.mjs add`. Gate logs, stands, probes and screenshots belong to a role; a live
-reproduction is a `tester` card. Budget: under 15k characters of tool output per card. Status: at
-most 5 lines (done / running with task ids + ETA / waiting on the maintainer), on a state change.
-Delegation fields, the loop, round caps and workflows: `docs/crew.md`. Through the maintainer: a
-security vulnerability, a stall, and the per-word items under "Commits".
+The main thread is the lead: it orchestrates and edits `docs/**` and config. Code of any size
+(`luci-theme-footstrap/**`, `tools/**`, `tests/**`, `install.sh`, `package.json`, `.githooks/**`,
+`.github/**`, `.claude/hooks/*.sh`, `.claude/tooling/**`) goes with a card to a role in
+`.claude/agents/`, as does a task needing a gate beyond T0 or bringing ~50 lines of output. The
+lead's Bash runs git, `npm run check:fast` and the commands a skill it runs spells out (`/ship`,
+`/release`, `/retro`, `/upstream-pr`); any other gate, stand, probe or screenshot is a role's card,
+a live reproduction a `tester` card. Budget: under 15k characters of tool output per card. Status:
+at most 5 lines (done / running with task ids + ETA / waiting on the maintainer), on a state change.
+Through the maintainer: a security vulnerability, a stall, the per-word items in "Commits".
 
-**Fix policy: best practice only:** the root cause, in the shared place, with the established
-practice; ask before deferring a known defect.
+A guard is probed through its decision path alone (`tools/bg.sh --check`, hook JSON to `--kinds`);
+real git for a test runs in a scratch repo under `../tmp/` (`docs/crew.md` "Probing a guard").
+
+**Fix policy:** root cause, shared place, established practice; ask before deferring a known defect.
 
 ## Commits
 
@@ -104,17 +103,18 @@ in the background; report the verdict line unprompted.
 
 Also the agent's: rebase, amend and `git push --force-with-lease` on its own branches; the
 `release: x.y.z` commit and push inside `/release` once the maintainer asked for that release; the
-feed publication after a tag. Stage by path only what the agent wrote; the maintainer's hunks stay
-unstaged. Roles stage, the lead commits. Detached runs never commit, push or tag. Conventional
-Commits, English, no attribution trailers. New work branches from `origin/main`.
+feed publication after a tag. The lead stages by path only what the agent wrote, and commits; the
+maintainer's hunks stay unstaged and roles never stage. Detached runs never commit, push or tag.
+Every commit and push runs its hooks (git-guard refuses `--no-verify`, `-n` on commit,
+`core.hooksPath`). Conventional Commits, English, no attribution trailers. New work branches from
+`origin/main`.
 
-**IMPORTANT: the maintainer names each of these, each time,** and each runs in its own Bash call:
-a tag created, moved, deleted or pushed (`git tag`, `--tags`, `--follow-tags`, `refs/tags/*`);
-`gh release create|edit|delete|upload`; `gh workflow run` in the theme repo; force-push, rebase or
-amend of anything on `main`; `git reset --hard` of pushed work. A tag word names the tag:
-"tag 0.14.17", "делай тег", "release 0.14.17".
+**IMPORTANT: the maintainer names each of these, each time,** and each runs in its own Bash call (a
+tag's create and its push are two): a tag created, moved, deleted or pushed (`git tag`, `--tags`,
+`--follow-tags`, `refs/tags/*`); `gh release create|edit|delete|upload`; `gh workflow run` in the
+theme repo; force-push, rebase or amend of commits already on `origin/main`; `git reset --hard` of
+pushed work. A tag word names the tag: "tag 0.14.17", "делай тег", "release 0.14.17".
 
 Also per word, each time: any push to the openwrt/luci fork and every upstream PR action; every
 publication (PR or issue comment, review, upstream reply, owlab/owfeed issue; the agent drafts);
-the hardware router; lowering a tier; waiving a gate. A review finding is answered in the diff and
-by resolving the thread (`/upstream-pr`).
+the hardware router; lowering a tier; waiving a gate.

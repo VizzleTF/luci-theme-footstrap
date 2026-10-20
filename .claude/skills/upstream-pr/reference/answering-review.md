@@ -30,7 +30,8 @@ A review by anyone other than `openwrt-ai` leads the report, above the bot's.
 
 ### The bot (`openwrt-ai`) — handled here
 
-Handled without waiting for the maintainer. A remark on a comment is applied **verbatim**: the
+The local fix is made without waiting for the maintainer; what reaches openwrt/luci (the push,
+resolving a thread) waits for their word. A remark on a comment is applied **verbatim**: the
 bot's suggested text goes into the diff as is; any departure is shown as "bot suggests X / I
 suggest Y" with the quote. For each remark:
 
@@ -40,10 +41,10 @@ suggest Y" with the quote. For each remark:
 2. A real defect: fix it in the same round, in the commit it belongs to, then `commit --amend` (or
    a fixup into that commit).
 3. A false one: no change; one line in the report on why.
-4. Resolve the threads that are fixed or measurably refuted, and only those.
 
-Then show a one-line summary of the round and the exact update command from
-`mechanics.md` Step 6; push on the maintainer's word.
+Then show a one-line summary of the round, the exact update command from `mechanics.md` Step 6
+and the threads to resolve. On the maintainer's word, push; once the push lands, resolve the
+threads that are fixed or measurably refuted, and only those (the same word covers both).
 
 ### A person — report and verdict
 
@@ -58,7 +59,7 @@ Then show a one-line summary of the round and the exact update command from
 gh api repos/openwrt/luci/pulls/<N>/comments --jq '.[] | "=== \(.path):\(.line // .original_line)\n\(.body)"'
 ```
 
-Open threads, and resolving one:
+Open threads, and resolving one (after the push, on the maintainer's word):
 
 ```sh
 gh api graphql -f query='query { repository(owner:"openwrt", name:"luci") {

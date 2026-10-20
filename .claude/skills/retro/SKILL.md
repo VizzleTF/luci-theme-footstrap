@@ -25,10 +25,17 @@ ago). `T=../tmp/retro-<today>`. Each step ends on its done line.
 6. **Fate each finding**: keep, skill, rule, hook or delete, with the target file — hooks for what
    must always happen, skills for procedures, `.claude/rules/` for area facts, `CLAUDE.md` for
    always-true facts. A finding already fixed and not recurring is `keep`.
-7. **Lint the instructions.** Run `/doctor prompt-audit`; each contradiction or dead reference is a
-   finding with a fate. `node tools/agent-refs.mjs` must exit 0.
-8. **Apply.** Lead-owned files (`docs/**`, `.claude/**`, `CLAUDE.md`, memory) are edited here; code
-   goes to a card per `docs/crew.md`. Each edited skill is re-run on its retro miss as an eval.
+7. **Lint the instructions.** `node tools/agent-refs.mjs` exits 0 (dead references). Then read
+   `CLAUDE.md`, `docs/crew.md`, `.claude/rules/*.md`, `.claude/agents/*.md` and
+   `.claude/skills/*/SKILL.md` against each other; each contradiction is a finding with a fate.
+8. **Agree, then apply.** Show the maintainer the fate table (finding, fate, target file, the change
+   in one line) and ask with AskUserQuestion which rows to apply; nothing is edited before the
+   answer. Accepted rows in lead-owned files (`docs/**`, `CLAUDE.md`,
+   `.claude/{agents,rules,skills}/**`, `.claude/settings.json`, memory) are edited here;
+   `.claude/hooks/*.sh`, `.claude/tooling/**` and other code go to a card per `docs/crew.md`. A
+   skill edited here gets its retro miss as an eval case under `.claude/skills/<name>/evals/<case>/` (format in `docs/crew.md`). Running it
+   is paid and waits for the maintainer's word:
+   `claude plugin eval .claude/skills/<name> --case <case> --scaffold --allow-tools Bash --no-publish --output-dir ../tmp/evals/<name>`.
 
-Done = every finding in `$T/findings.md` has a fate and a target file, and every lead-owned fate is
-applied or listed for the maintainer.
+Done = every finding in `$T/findings.md` has a fate and a target file, every accepted row is
+applied, and the rest are listed for the maintainer.
