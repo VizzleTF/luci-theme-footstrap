@@ -1854,6 +1854,17 @@ not answer and its packages will be missing`. `owrtsnap` is back in `live`/`anch
 `live-snapshot` is gone; what is worth knowing going forward is the shape of that line in a log, not
 how to survive its absence.
 
+**A CI `live` or `anchors` leg red at "Boot the routers and install this build" with `owlab:
+owrt2512: luci-app-openclash: GET https://github.com/vernesong/OpenClash/releases/download/…: 504
+Gateway Timeout` is GitHub's release download, not the build.** The third-party fixtures in
+`owlab.yaml`'s `extra_packages` come from their upstream release pages on every boot; owlab retries
+a 5xx, then fails `owlab up`, and the sweep step is skipped, so no gate ran. Seen 2026-10-15 on PR
+#72: firefox `anchors` alone, while chromium and webkit booted the same commit and passed. Tell it
+apart: the failed step is the boot, not the sweep (`gh api
+repos/VizzleTF/luci-theme-footstrap/actions/jobs/<job-id> -q '.steps[]|select(.conclusion=="failure").name'`),
+and the line says "the server is failing, not refusing". Once the run is complete, `gh run rerun
+<run-id> --failed`; nothing in the tree is the experiment.
+
 **`install.sh` carried the identical trap one layer down, and "packages available > 0" turned out
 not to be the signal that separates a partial refresh from a total one.** Task 0175, run 34112646188:
 `install-check` red on `owrtsnap` at `apk update`, same dead kmods sub-index as above, but this time
