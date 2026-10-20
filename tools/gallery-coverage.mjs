@@ -44,7 +44,12 @@ const VOID = new Set([ 'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input
 /* -> [{ tag, cls: Set, parent, depth }] for every element; a hand-written page, so a tag scan is
  * enough. Comments, script and style bodies are blanked first. */
 export function elementsOf(html) {
-	const src = html.replace(/<!--[\s\S]*?-->/g, '').replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '');
+	/* repeated until stable: one pass can leave a new comment or tag made of the pieces around a cut */
+	let src = html;
+	for (let prev; prev !== src;) {
+		prev = src;
+		src = src.replace(/<!--[\s\S]*?-->/g, '').replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '');
+	}
 	const out = [];
 	let top = null;
 	for (const m of src.matchAll(/<(\/?)([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>/g)) {

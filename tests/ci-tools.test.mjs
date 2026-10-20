@@ -46,7 +46,7 @@ test('ci-log --filter strips ANSI and the timestamp, keeps only decisive lines',
 	assert.equal(r.stdout, 'live-audit: 3 findings on /cgi-bin/luci/admin\nNEW  td.cbi-value-field overflows\n##[error]Process completed with exit code 1.\n');
 });
 
-function require_log() { return spawnSync('cat', [ join(dir, 'job.log') ], { encoding: 'utf8' }).stdout; }
+function require_log() { return readFileSync(join(dir, 'job.log'), 'utf8'); }
 
 test('ci-log --filter keeps the LAST n decisive lines', () => {
 	const r = spawnSync('sh', [ LOG, '--filter', '1' ], { input: require_log(), encoding: 'utf8' });

@@ -466,7 +466,7 @@ test('a CDATA <style> with a child combinator survives, and survives a serialize
 	const clean = svg('<style><![CDATA[' + css + ']]></style><path class="a"/>');
 	assert.equal(sanitize(clean).text, clean);
 	/* something else is removed, so the whole tree is serialized: the stylesheet must come back whole */
-	const result = sanitize(svg('<style>' + css.replace('>', '&gt;') + '</style><script>x</script><path class="a"/>'));
+	const result = sanitize(svg('<style>' + css.replaceAll('>', '&gt;') + '</style><script>x</script><path class="a"/>'));
 	assert.equal(result.elements, 1);
 	assert.ok(result.text.includes('<style>.a &gt; .b{fill:url(#g)}</style>'));
 });
