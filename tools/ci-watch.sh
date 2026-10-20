@@ -11,7 +11,7 @@
 # Last line: `ci: green|red|timeout <sha7|run> runs <ids> [failed: job, job]`.
 set -eu
 
-SHA='' RUN='' REPO='' WF='' MAX=1800 INTERVAL=20
+SHA='' RUN='' REPO='' WF='' MAX=6000 INTERVAL=20
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--sha) SHA=${2-} ;; --run) RUN=${2-} ;; --repo) REPO=${2-} ;; --workflow) WF=${2-} ;;

@@ -60,15 +60,18 @@ Two scripts replace the hand-built `sleep` + `gh run list` + `gh run watch` loop
   runs to appear (up to 10 min; `--commit` is matched, not `createdAt`, which is UTC and missed a
   run), then for all of them to complete. On red it prints `ci-log.sh` for each failed run. The last
   line is the verdict, `ci: green|red|timeout <sha7> runs <ids> [failed: <jobs>]`; exit 0 green, 1 red,
-  2 no run, 3 still running at `--max` (default 1800 s). Run it as
-  `tools/bg.sh tools/ci-watch.sh --sha "$(git rev-parse HEAD)"` with `tools/bg-wait.sh` beside it.
+  2 no run, 3 still running at `--max` (default 6000 s; a push run of `build.yml` takes 46-49 min).
+  Run it as `tools/bg.sh tools/ci-watch.sh --sha "$(git rev-parse HEAD)"` with `tools/bg-wait.sh` beside it.
 - `tools/ci-log.sh <run-id> [job-regex] [--repo R]` prints each failed job, its failed step and the
-  last decisive log lines (`##[error]`, `NEW`, `live-audit:`, `Error`), ANSI and timestamps stripped,
-  40 lines at most. `gh run view --log-failed` prints nothing while a run is still marked in progress.
+  last decisive log lines (`##[error]`, `NEW`, `live-audit:`, `Error`, and each node:test `not ok`
+  with its `location:` and one-line `error:`), ANSI and timestamps stripped, 40 lines at most.
+  `gh run view --log-failed` prints nothing while a run is still marked in progress.
 
-`tools/bg.sh` lets these and every other read through, and refuses `git push|commit|tag`, `gh pr|issue|release`
-writes, `gh run rerun|cancel|delete` and `gh api` with a method other than GET or with `-f`/`-F`/`--input`.
-`tests/ci-tools.test.mjs` pins the parsing (stub `gh` on `PATH`) and the refusal list.
+`tools/bg.sh` lets reads through and refuses everything else: any `git` or `gh` subcommand off its read
+list (push, commit, tag, reset, rebase, update-ref, `gh pr|issue|release` writes, `gh run rerun|cancel|delete`,
+`gh api` with a non-GET method or `-f`/`-F`/`--field`/`--raw-field`/`--input`), plus `ssh`, `scp`, `sftp`,
+`rsync` and `dev-sync.sh`. `tools/bg.sh --check <cmd>` prints that verdict and runs nothing; tests and probes
+use it. `tests/ci-tools.test.mjs` pins the parsing (stub `gh` on `PATH`) and the refusal list.
 
 ## `check` and `lint` — one gate list, package.json's
 

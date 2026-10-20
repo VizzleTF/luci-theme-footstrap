@@ -20,6 +20,7 @@
 - **An open ComboButton menu shows its items in normal weight, like a plain dropdown.** The list sits inside the button and inherited its 600 weight and 1.1 line height (13px rows at 14.3px); the shared menu-row rule now sets 400 and the 1.5 leading, so the rows match a select dropdown (400, 19.5px at 1280) and the closed label stays 600.
 - **`tools/bg.sh --check <cmd>` prints the refusal verdict and runs nothing, and the refusal tests use only it; `bg.sh` now allows a list of read-only verbs instead of refusing a list of writes.** A refusal test drove real commands through `bg.sh` and trusted it to refuse them; while `bg.sh` was being edited, `node --test` ran `git update-ref refs/tags/v9`, `git reset --hard HEAD~3` and `gh secret set X` for real in the working repo. Global options (`git -C`, `gh -R`) no longer walk past a refusal, and a static test fails any spawn of `bg.sh` without `--check`.
 - **`tools/ci-log.sh` names the failing `node:test` case, its location and its error.** On the red `check:fast` at b6a68b4 it printed only `AssertionError` and two unrelated fixture lines, so the failing test had to be dug out of the raw log by hand.
+- **`tools/ci-watch.sh` waits 100 minutes by default instead of 30.** A push run of `build.yml` takes 46-49 minutes, so a watch without `--max` ended in `ci: timeout` before the verdict.
 
 ### Security
 
