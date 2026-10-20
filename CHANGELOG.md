@@ -26,6 +26,7 @@
 - **`git-guard.sh` asks on a tag, a release or a rewrite of `main` hidden behind an alias, an interpreter one-liner, a `--` refspec, `--git-dir`/`GIT_DIR`, a remote set in the same line, or `-c include.path`.** Each of these walked past the hook in a review of the new commit policy; `checkout -B main`, `branch -f main` and `update-ref refs/heads/main` now count as moving `main`, the changelog one-call exemption holds only for a clean `node tools/changelog.mjs add` segment, and `gh api` write flags (`--field`, `--raw-field`, `-XPOST`, `--method=POST`) ask in `.claude/settings.json`.
 
 - **The development toolchain no longer pulls a vulnerable `source-map-js` or `brace-expansion`, and CodeQL has nothing left to flag in `tools/` and `tests/`.** Dependabot reported `source-map-js` 1.2.1 (high, event-loop DoS) and `brace-expansion` 5.0.9 (moderate, quadratic expansion), both dev-only and outside the shipped package; the lockfile now resolves 1.2.2 and 5.0.12. `gallery-coverage.mjs` strips comments and `script`/`style` bodies until the page stops changing, a test reads its log with `readFileSync` instead of spawning `cat`, and a fixture escapes every `>`.
+- **`git-guard.sh` no longer carries a token from one command into the next, and a commit message with an odd quote inside `$(cat <<EOF …)` stays data.** `echo a create; gh release` asked as a release create because the previous segment's token leaked, and a `"` in a heredoc commit message flipped the quote state so its body was scanned as commands.
 
 ## [0.14.16] — 2026-10-18
 

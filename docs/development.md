@@ -1623,8 +1623,9 @@ flag owlab does not define, like `ls -l`, passes through. Pass the command as on
 
 **`owlab test` fights the stands that are already up.** It synthesises its own router on host port
 2222, and with stands running the bind fails — after it has already removed one of the existing
-containers. Either take the stands down first, or assert the five `verify` things by hand on a
-running stand. If you do it by hand, log IN: an unauthenticated `curl` answers 403 and proves
+containers. The port can stay held after `owlab down` with `docker ps` empty (something outside
+docker held it once): `ss -ltn | grep ':2222 '` must print nothing before `owlab test`. Either take
+the stands down first, or assert the five `verify` things by hand on a running stand. If you do it by hand, log IN: an unauthenticated `curl` answers 403 and proves
 nothing.
 
 **`owlab up` can fail to rebuild the full five-router set, and the failure looks like the theme's
@@ -1667,7 +1668,8 @@ not render it at all.
 **A live gate that says "no owlab router is running" may be looking at the wrong PATH.** Every one
 of them shells out to `owlab status -json` (`tools/lib/stands.mjs`) and treats a failed spawn as
 an empty router list, so a shell that cannot see `owlab` — `go install` puts it in `~/go/bin`,
-which a login shell exports and `tools/bg.sh` does not — reports exit 2 and measures nothing,
+which the session PATH carries (and `tools/bg.sh` keeps) but a scrubbed environment (`env -i`,
+cron, a systemd unit) does not — reports exit 2 and measures nothing,
 with the stands up. The two apart: `docker ps` lists the stands while `owlab status -json`
 fails. Export the path into the detached command itself:
 `tools/bg.sh sh -c 'export PATH=$HOME/go/bin:$PATH; node tools/live-audit.mjs'`.
@@ -1686,8 +1688,9 @@ makes "is it done?" a question you have to keep asking, and therefore one that g
 was forgotten three times in a single session here, twice while somebody was waiting on the answer,
 each time for 15-30 minutes after the chain had already finished.
 
-Start the waiter in the same turn as the run, as a background command, so finishing wakes you
-instead of you polling it:
+Start the waiter in the same turn as the run (CLAUDE.md "Verifying", T2): in the foreground as
+`tools/bg-wait.sh <run-id> 5 270` with `timeout: 300000` for a run under 4.5 min, otherwise as a
+background command, so finishing wakes you instead of you polling it:
 
 ```sh
 tools/bg.sh sh -c '…'            # prints run-id and log path
@@ -1708,12 +1711,14 @@ A full `tools/ci-local.sh --mode push --force all` outlives the default: 2 h 14 
 2026-10-12 (anchors `--full` on three engines and three stands is ~35 min an engine), so pass
 `tools/bg-wait.sh <run-id> 30 10800`. A `timeout` there is the waiter's cap; read the `.status`.
 
-**`tools/bg.sh` refuses `ssh`, `scp`, `sftp`, `rsync`, `dev-sync.sh`, `git push`, `git commit`,
-`git tag` and `gh pr|release|issue`.** The wrapper is allow-listed in `.claude/settings.json` and
+**`tools/bg.sh` refuses `ssh`, `scp`, `sftp`, `rsync`, `dev-sync.sh` and every git or gh
+subcommand off its read list.** The wrapper is allow-listed in `.claude/settings.json` and
 the permission engine matches the first word of a command, so it cannot see an `ssh` inside
 `tools/bg.sh sh -c '…'` — the form every T2 gate uses — and the wrapper would carry that command
 straight past the `ask` rule guarding the hardware router, the one thing a wrong run breaks for a
 person. Those commands run in the foreground, where the prompt reaches the human.
+`tools/bg.sh --check <cmd>` prints `allowed` or `refused: <why>` and runs nothing; a test or probe
+of the fence uses it, never the command itself.
 
 **"It is the app's markup" is a claim, and switching the stand to bootstrap is how you check it.**
 A finding on a third-party page reads as the app's, and the reflex is to write it into the baseline.
