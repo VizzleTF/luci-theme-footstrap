@@ -28,8 +28,8 @@ You implement one task card and nothing beside it. Protocol: `docs/crew.md`.
 
 - Edit only paths in `card.files`. A change that needs a file outside the list goes into
   `not_done` with the path and the reason; the lead widens the card, you do not.
-- `cascade.css` is generated; edit `styles/` instead. Your git verbs are `git diff`, `git status`,
-  `git hash-object`, and the snapshot in step 2, whose `read-tree`/`add`/`write-tree` carry
+- `cascade.css` is generated; edit `styles/` instead. Your git verbs are `git diff`, `git status` and
+  the snapshot in step 2, whose `read-tree`/`add`/`write-tree` carry
   `GIT_INDEX_FILE=../tmp/task-<id>/round.idx`. The real index is the lead's. Turn a red test green
   by fixing the code under it.
 - Comments follow CLAUDE.md: the reason, one line, with the number that was measured. Reword a
@@ -43,14 +43,16 @@ You implement one task card and nothing beside it. Protocol: `docs/crew.md`.
    lines quoted.
 2. Snapshot the round into a tree, the real index untouched. One Bash call, the path spelled out
    in each prefix (a shell variable does not survive between calls):
-   `GIT_INDEX_FILE=../tmp/task-<id>/round.idx git read-tree HEAD && GIT_INDEX_FILE=../tmp/task-<id>/round.idx git add -- <every file you touched in this task> && GIT_INDEX_FILE=../tmp/task-<id>/round.idx git write-tree`
+   ``GIT_INDEX_FILE=../tmp/task-<id>/round.idx git read-tree HEAD && GIT_INDEX_FILE=../tmp/task-<id>/round.idx git add -- <every card.files path that `git status --porcelain --untracked-files=all -- <card.files>` lists, earlier rounds included, less any path listed in ../tmp/task-<id>/dirty-at-start> && GIT_INDEX_FILE=../tmp/task-<id>/round.idx git write-tree``
    prints the `tree:` you return; the tester diffs it against HEAD or the previous round's tree.
-   The seed from HEAD keeps a deleted file addable and every file you did not touch equal to HEAD.
-3. `diff_hash=$(git diff HEAD | git hash-object --stdin)`.
-4. If `not_done` is not empty, write `../tmp/task-<id>/handoff.md` with five headings: done, files,
+   A fix round snapshots every round's files, or the tester sees round 1 reverted to HEAD; a card
+   path listed in `dirty-at-start` holds the maintainer's hunk and is never snapshotted: name it
+   under `not_done`. The seed from HEAD keeps a deleted file addable and every file you did not
+   touch equal to HEAD.
+3. If `not_done` is not empty, write `../tmp/task-<id>/handoff.md` with five headings: done, files,
    decisions, dead-ends, next. Within 15 turns of `maxTurns` write it and stop, whatever is left.
 
-Voice, shell and waiting rules: `.claude/hooks/subagent-start.sh`.
+Voice, shell, waiting and guard-probing rules: `.claude/hooks/subagent-start.sh`.
 
 ## Return block
 
@@ -58,11 +60,11 @@ At most 25 lines. Paths, not contents. No diff, no code, no narration of the att
 
 ```
 STATUS: DONE | PARTIAL | BLOCKED
+round: <card.round>
 files:
   <path> — <why, one line>
 gates:
   <command> → exit <n>
-diff_hash: <sha>
 tree: <sha from step 2>
 not_done:
   <path or item> — <reason>

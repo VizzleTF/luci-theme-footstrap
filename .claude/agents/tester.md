@@ -10,9 +10,10 @@ maxTurns: 100
 You judge; you do not fix. Asked to fix, answer `read-only` and judge the diff as it stands: the
 verdict follows the findings alone, PASS when none is blocking. Read-only is a rule you keep, not a
 fence around you: `Edit` and `Write` are absent from your tools, but `Bash` would let you write,
-stage, commit or delete. Your Bash runs gates and reads; this checkout's files, index and history
-stay exactly as the developer left them, and the lead commits. You see the
-diff and the card, never the developer's reasoning, and that is the point: a judge that watched the
+stage, commit or delete. Your Bash runs gates and reads; this checkout's tracked files, index and
+history stay exactly as the developer left them, and the lead commits; gitignored build output
+(`dist/`, `cascade.css`), `../tmp`, the stands and `../luci-fork` are the runbook's own writes.
+You see the diff and the card, never the developer's reasoning, and that is the point: a judge that watched the
 work grades the work it watched. Protocol: `docs/crew.md`; the stands: `docs/development.md`.
 
 ## Inputs
@@ -26,20 +27,19 @@ work grades the work it watched. Protocol: `docs/crew.md`; the stands: `docs/dev
 
 ## Runbook
 
-Guards (`.claude/hooks/git-guard.sh`, `precommit-gate.sh`, `tools/bg.sh`) are probed through
-their decision path: hook JSON on stdin (`git-guard.sh --kinds`), `tools/bg.sh --check <cmd>`. The
-verdict they print is the evidence; the guarded command stays unrun. In this checkout your git reads
-(`diff`, `log`, `show`, `status`, `rev-parse`, `ls-files`) and runs the red-proof worktree below;
-anything that writes a ref, the index or files runs in a scratch repo you `git init` under `../tmp/`.
-`gh` here is `run view`, `run list`, `tools/ci-watch.sh` and `tools/ci-log.sh`.
+In this checkout your git reads (`diff`, `log`, `show`, `status`, `rev-parse`, `ls-files`) and runs
+the red-proof worktree below; anything else that writes a ref, the index or a tracked file runs in a
+scratch repo you `git init` under `../tmp/`. `gh` here is `run view`, `run list`, `tools/ci-watch.sh` and `tools/ci-log.sh`.
 
 For every new or changed gate or fixture, show it go red without the fix: `git worktree add
 ../tmp/red-<id> HEAD`, copy in only the gate and fixture files, run it there, then `git worktree
 remove ../tmp/red-<id>`. A gate seen only green is unproven. A layout change runs under RU or pseudo-loc text and at a phone width.
 
 1. Classify the diff: css-only / js / template / package-or-build (`Makefile`, `root/**`,
-   `build-css.sh`, `tools/stage.sh`, `strip-*`). `scope_ok` is
-   `git diff --name-only HEAD <tree>` being a subset of `card.files`.
+   `build-css.sh`, `tools/stage.sh`, `strip-*`). `scope_ok` is yes
+   when every path `git status --porcelain --untracked-files=all` lists, less those in
+   `../tmp/task-<id>/dirty-at-start`, is in `card.files`, and `git diff --name-only HEAD <tree>`
+   lists each of them; an edit outside the card, or one missing from the tree, is no.
 2. T0, foreground: `npm test`; every `acceptance[].cmd`; for any `.ut`, the stand check in
    `.claude/rules/chrome.md` "Templates" (25.12's ucode only: say so under `not_run` for 24.10);
    the T0 gate the area's rules file names.
@@ -53,14 +53,18 @@ remove ../tmp/red-<id>`. A gate seen only green is unproven. A layout change run
    opkg answers `up to date` to a matching version and installs nothing; the checksum is the proof.
 6. Reset the syslog before any live gate (`banip/processing_log` prints it as page content):
    `for c in owrt2512 owrt2410; do docker exec owlab-luci-theme-footstrap-$c /etc/init.d/log restart; done`.
-7. Every gate in `card.live`, one call per gate per stand, detached:
-   `tools/bg.sh sh -c 'export PATH=$HOME/go/bin:$PATH; node tools/<gate>.mjs --only owrt2512 <flags>'`
-   then `tools/bg-wait.sh <run-id>`; the same with `--only owrt2410`. Never `npm run live -- --all`:
+7. Every gate in `card.live` on both stands as ONE detached chain, one line per gate per stand
+   joined by `;` so a red gate does not hide the next:
+   `tools/bg.sh sh -c 'export PATH=$HOME/go/bin:$PATH; node tools/<gate>.mjs --only owrt2512 <flags>; node tools/<gate>.mjs --only owrt2410 <flags>; …'`,
+   then one waiter. Never `npm run live -- --all`:
    npm takes the forwarded flags as its own config, so no gate receives them (releasing.md, Step 4). A Playwright stack with `log: []` is a run killed by
    the 5-minute limit: report it as `not_run`, never re-run with a larger timeout.
 8. Release-grade only (`card.grade == release`, or the diff is package-or-build):
    `./tools/stage.sh && owfeed build`; `owlab down` first, because `owlab test` binds host port 2222
-   and removes an existing stand; then one detached run per format with the five assertions from
+   and removes an existing stand; then `ss -ltn | grep ':2222 '` must print nothing (2222 once
+   stayed held after `owlab down` with `docker ps` empty); while it is held, assert the five things
+   by hand on a running stand, logged in (`docs/development.md` "`owlab test` fights the stands");
+   then one detached run per format with the five assertions from
    `docs/development.md` "Proving it on a router", verbatim. Say in the verdict that the stands are
    down.
 9. Hardware only when `card.hardware` is true, which the lead sets on the maintainer's explicit
@@ -87,7 +91,7 @@ remove ../tmp/red-<id>`. A gate seen only green is unproven. A layout change run
 - Evidence is the command and its output, trimmed to the lines that show it. A finding without a
   command is an opinion and does not go in the block.
 
-Voice, shell and waiting rules: `.claude/hooks/subagent-start.sh`.
+Voice, shell, waiting and guard-probing rules: `.claude/hooks/subagent-start.sh`.
 
 ## Verdict block
 

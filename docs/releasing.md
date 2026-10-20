@@ -18,8 +18,8 @@ A bug with no guard comes back silently. **If you fix something that has no row 
 A regression can only come from what the diff touches.
 
 ```sh
-git status --short | awk '{print $2}' | sed 's#/.*##' | sort -u
-git status --short | grep -E 'styles/|menu-footstrap|\.ut$|fs-sheets|fs-select|fs-fit' \
+git diff --name-only "$(git describe --tags --abbrev=0)" HEAD | sed 's#/.*##' | sort -u
+git diff --name-only "$(git describe --tags --abbrev=0)" HEAD | grep -E 'styles/|menu-footstrap|\.ut$|fs-sheets|fs-select|fs-fit' \
   || echo 'no CSS / renderer / template / fence changes'
 ```
 
@@ -279,7 +279,7 @@ from the diff after the fact; a self-reference to a commit hash.
 Only after everything above has passed. `/release` walks these steps in order. It is model-invoked
 on purpose, so "делай тег" lands in this procedure rather than in a bare `git tag` (0.14.15 was
 tagged that way, with no security review and before CI on the release sha); the tag itself stays
-gated by step 4 below, the `git-guard` hook and the `ask` rule.
+gated by step 5 below, the `git-guard` hook and the `ask` rule.
 
 1. Rename `[Unreleased]` to `## [x.y.z] — YYYY-MM-DD` in both `CHANGELOG.md` and
    `CHANGELOG_ru.md`, and add the `compare/` link at the bottom of each. Sections in the canonical
@@ -287,12 +287,7 @@ gated by step 4 below, the `git-guard` hook and the `ask` rule.
 2. `npm run changelog` — green.
 3. Commit that change as `release: x.y.z` and push it to `origin main`; this is part of a release
    the maintainer asked for, so it needs no further word. Message in English, **no AI attribution**.
-4. **The tag is the maintainer's word, each time**: either their message named it ("tag",
-   "делай тег", "release x.y.z") or the session asks, quoting
-   `git tag -a vx.y.z -m vx.y.z && git push origin vx.y.z`, and runs exactly that in its own Bash
-   call. The tag goes on the release commit, never first — it must point at a commit that already
-   contains its own entry, or the release describes a version whose changelog does not yet exist.
-5. **Before the tag, read the release sha's run and the one before it on `main`**:
+4. **Before the tag, read the release sha's run and the one before it on `main`**:
    `gh run list --branch main -L2`. A run already red before your push
    stays red after it, and `release` does not fire until whatever it currently gates on is green —
    so a tag pushed onto a broken pipeline cannot publish. A pre-existing failure is not something to
@@ -300,6 +295,12 @@ gated by step 4 below, the `git-guard` hook and the `ask` rule.
    has nothing to do with this release but will still hold it. `v0.14.12` was tagged onto exactly
    this: the previous commit on `main` had already failed the same way the day before, on the same
    upstream condition, and nobody looked before the tag went out.
+5. **The tag is the maintainer's word, each time**: either their message named it ("tag",
+   "делай тег", "release x.y.z") or the session asks, quoting both commands:
+   `git tag -a vx.y.z -m vx.y.z`, then `git push origin vx.y.z`, each in its own Bash call, the
+   push only after the create exited 0. The tag goes on the release commit, never first — it must
+   point at a commit that already contains its own entry, or the release describes a version whose
+   changelog does not yet exist.
 6. `origin` is the only remote (the `git.vaka.work` mirror was removed on 2026-07-25).
 7. CI on `v*` builds both formats, signs them, and builds the release body from the changelog, but
    `release` does not run until whatever it gates on is green, by design — deliberately, so that a

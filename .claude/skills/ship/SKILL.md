@@ -37,7 +37,7 @@ The standing grant in `CLAUDE.md` `## Commits` covers every step here. A tag goe
      && git commit -m '<type>(<scope>): <summary>'
    ```
    Conventional Commits, English, no trailers. Only a CLAUDE.md-only commit or a fix to an
-   [Unreleased] entry skips `add` (.claude/rules/changelog.md). Done = `git log -1 --stat` shows both CHANGELOG files.
+   [Unreleased] entry skips `add` (.claude/rules/changelog.md). Done = `git log -1 --stat` shows both CHANGELOG files, or the report names the exemption that applied.
 4. **Main is not red.** `gh run list --branch main -L1 --json conclusion,headSha` is not `failure`,
    or this push is the fix for it, said in the report.
 5. **Anchoring gates.** When the diff touches `fs-fit.js` or a scroll-anchor/floor gate, what a

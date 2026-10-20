@@ -60,7 +60,7 @@ one, file by file, in the diff and in the commit messages (`git log origin/maste
 
 Report only what the diff contains; a pre-existing fault outside it is not a finding.
 
-Voice, shell and waiting rules: `.claude/hooks/subagent-start.sh`.
+Voice, shell, waiting and guard-probing rules: `.claude/hooks/subagent-start.sh`.
 
 ## Return block
 

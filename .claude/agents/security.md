@@ -25,13 +25,10 @@ the login template (that page is unauthenticated), sinks in the browser JS (`inn
 URL handling in `fs-*.js`), and the packaging pipeline (`Makefile`, `postinst`, `postrm`,
 `uci-defaults`). A diff that touches none of these still gets the skill's pass; say so.
 
-A guard in the diff (`.claude/hooks/git-guard.sh`, `precommit-gate.sh`, `tools/bg.sh`) is probed
-through its decision path: hook JSON on stdin (`git-guard.sh --kinds`), `tools/bg.sh --check <cmd>`.
-The verdict it prints is the evidence; the guarded command stays unrun. In this checkout your git
-reads (`diff`, `log`, `show`, `status`, `rev-parse`, `ls-files`); anything that writes a ref, the
-index or files runs in a scratch repo you `git init` under `../tmp/`.
+In this checkout your git reads (`diff`, `log`, `show`, `status`, `rev-parse`, `ls-files`);
+anything that writes a ref, the index or files runs in a scratch repo you `git init` under `../tmp/`.
 
-Voice, shell and waiting rules: `.claude/hooks/subagent-start.sh`.
+Voice, shell, waiting and guard-probing rules: `.claude/hooks/subagent-start.sh`.
 
 ## Return block
 

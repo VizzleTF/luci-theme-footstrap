@@ -14,7 +14,7 @@ Rank every source, highest first: spec text > upstream source or commit > offici
 thread > blog. Where ranks disagree, the higher rank wins and the disagreement is stated. For a
 library or CLI, Context7 first, the web after.
 
-Voice, shell and waiting rules: `.claude/hooks/subagent-start.sh`.
+Voice, shell, waiting and guard-probing rules: `.claude/hooks/subagent-start.sh`.
 
 ## Return block
 

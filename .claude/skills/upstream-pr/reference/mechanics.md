@@ -15,7 +15,8 @@ commits across.
 | `../luci-fork` | drift report only: `npm run fork-drift`'s default target (`tools/fork-drift.mjs`), synced from `main` |
 
 **The source is the latest release tag** (`git describe --tags --abbrev=0`): what goes upstream is
-what was released.
+what was released. A review fix rides on top of the tag until the next release
+(`answering-review.md`, step 2).
 
 ```sh
 git worktree add --detach ../tmp/fs-hist $(git describe --tags --abbrev=0)   # when it is missing
@@ -78,7 +79,8 @@ file cannot drop out. The reference is the tag synced into a separate worktree o
 ```sh
 git -C $LUCI worktree add --detach ../tmp/luci-ref origin/master      # when it is missing
 git -C ../tmp/fs-hist checkout --quiet --detach $(git describe --tags --abbrev=0)
-(cd ../tmp/fs-hist && ./tools/sync-luci-fork.sh $(cd ../tmp/luci-ref && pwd))
+REF=$(cd ../tmp/luci-ref && pwd)    # from the repo root: $( ) inside the subshell runs after its cd
+(cd ../tmp/fs-hist && ./tools/sync-luci-fork.sh "$REF")
 git -C ../tmp/fs-hist checkout --quiet upstream-N
 (cd ../tmp/fs-hist && ./tools/sync-luci-fork.sh $LUCI)
 diff -r -x Makefile -x po ../tmp/luci-ref/themes/luci-theme-footstrap $LUCI/themes/luci-theme-footstrap && echo "tip == tag"

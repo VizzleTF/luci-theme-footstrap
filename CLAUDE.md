@@ -86,7 +86,7 @@ at most 5 lines (done / running with task ids + ETA / waiting on the maintainer)
 Through the maintainer: a security vulnerability, a stall, the per-word items in "Commits".
 
 A guard is probed through its decision path alone (`tools/bg.sh --check`, hook JSON to `--kinds`);
-real git for a test runs in a scratch repo under `../tmp/` (`docs/crew.md` "Probing a guard").
+real git runs in a scratch repo outside this checkout (`docs/crew.md` "Probing a guard").
 
 **Fix policy:** root cause, shared place, established practice; ask before deferring a known defect.
 

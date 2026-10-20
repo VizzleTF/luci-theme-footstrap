@@ -1,7 +1,8 @@
 # Watching and answering review
 
 A remark is closed by a change in the diff and by resolving its thread. Anything to say to a person
-is drafted in chat and posted by the maintainer (`CLAUDE.md` `## Commits`, publication).
+is drafted in chat and posted only on the maintainer's word, each time (`CLAUDE.md` `## Commits`,
+publication).
 
 ## Watching
 
@@ -38,8 +39,25 @@ suggest Y" with the quote. For each remark:
 1. **Measure whether it is right.** The bot is wrong noticeably more often than a person: it claimed
    `text-overflow: ellipsis` did nothing although `white-space: nowrap` comes from base; it also
    found a real regression in the chart-label selector.
-2. A real defect: fix it in the same round, in the commit it belongs to, then `commit --amend` (or
-   a fixup into that commit).
+2. A real defect: a `developer` card fixes it on our `main` (`docs/crew.md`), so the next tag
+   carries it; the lead brings the same change into the commit it belongs to here (amend or fixup).
+   Step 3 of `mechanics.md` then runs against tag + fixes: the reference is the tag the branch was
+   built from plus every review fix so far, oldest first; the tip is the amended `../tmp/luci-pr`
+   as it stands, not re-synced from `upstream-N`:
+
+   ```sh
+   git -C ../tmp/fs-hist checkout --quiet --detach <tag>
+   git -C ../tmp/fs-hist cherry-pick <main fix sha>...
+   REF=$(cd ../tmp/luci-ref && pwd)    # from the repo root: $( ) inside the subshell runs after its cd
+   (cd ../tmp/fs-hist && ./tools/sync-luci-fork.sh "$REF") &&
+   diff -r -x Makefile -x po ../tmp/luci-ref/themes/luci-theme-footstrap ../tmp/luci-pr/themes/luci-theme-footstrap && echo "tip == tag"
+   ```
+
+   A cherry-pick conflict in `CHANGELOG*.md` takes the tag's side (`checkout --ours`, `add`,
+   `cherry-pick --continue`; the changelog does not ship). One under `luci-theme-footstrap/` means
+   the fix leans on post-tag `main`: a `developer` card ports it in `../tmp/fs-hist`
+   (card.files = the conflicted paths there, acceptance = the `diff -r` above printing
+   `tip == tag`); the lead then runs `cherry-pick --continue`.
 3. A false one: no change; one line in the report on why.
 
 Then show a one-line summary of the round, the exact update command from `mechanics.md` Step 6

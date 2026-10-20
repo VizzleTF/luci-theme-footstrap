@@ -75,7 +75,7 @@ Each one was paid for by a bounce.
 - `Makefile`: edit it on the luci side by hand (`sync-luci-fork.sh` does not carry it), mirroring
   our postinst/postrm/conffiles changes; a Makefile change that mirrors ours belongs in the PR.
   `npm run fork-drift` is a report to read, not a gate to empty.
-- Comments on the PR: `CLAUDE.md` `## Commits` (the session drafts, the maintainer posts).
+- Comments on the PR: `CLAUDE.md` `## Commits` (the session drafts; it posts only on the maintainer's word).
 
 ## Already refused — do not offer again
 

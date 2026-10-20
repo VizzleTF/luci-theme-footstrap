@@ -97,10 +97,16 @@ rewrite JSON less readily than Markdown, and a file outlives a compaction.
 | `round` | 1 for the first developer pass, +1 per fix round; the same number in the developer's and the tester's block |
 | `history` | one entry per tester round: `{ "round", "tree", "verdict", "blocking": [ids] }` |
 
-- Before its first edit or delegation the lead records what was already dirty:
-  `mkdir -p ../tmp/task-<id> && git status --porcelain > ../tmp/task-<id>/dirty-at-start`. A
-  lead-only task with no card writes the same file; `/ship` step 2 stops before staging a path
-  listed there.
+- Before its first edit or delegation the lead records what was already dirty, paths and hunks:
+  `mkdir -p ../tmp/task-<id> && git status --porcelain --untracked-files=all > ../tmp/task-<id>/dirty-at-start && git diff HEAD > ../tmp/task-<id>/dirty-at-start.diff`.
+  A lead-only task with no card writes the same files; `/ship` step 2 stops before staging a path
+  listed there. The developer snapshots a card path listed there all the same (the tree is for
+  review; the lead stages by path), and the tester leaves out every hunk `dirty-at-start.diff`
+  carries.
+- `scope_ok` (the tester's): every code path `CLAUDE.md` "Crew" lists that `git status
+  --porcelain --untracked-files=all` shows, less `dirty-at-start`, is in `card.files`; and
+  `git diff --name-only HEAD <tree>` holds each `card.files` path `git status` shows and nothing
+  outside `card.files`. Docs and config are the lead's to edit mid-task and do not count.
 - One card, one mechanism; the acceptance fits in 5 lines. A card that needs more is two cards.
 - A `SendMessage` to a resumed agent is a round and counts toward `max_rounds`.
 - Upstream and release work splits in two: (a) base and history, verified by the `tester`; (b) the
@@ -163,9 +169,11 @@ counter of 2–3.
   version read after `git fetch`.
 - **"Not released yet":** say what reaches users from `main` now (`install.sh`) and what waits for
   the feed's next tag.
-- **No-agents mode:** gate output still goes to `../tmp` logs; the lead reads the tail.
+- **No-agents mode** (the maintainer asks for it on a task, e.g. «без агентов»): the lead runs the
+  role's commands itself; gate output still goes to `../tmp` logs and the lead reads the tail.
 - **Sessions:** one wave, one session; state lives in `card.json` and `docs/`. Past ~150k tokens
-  the lead writes a handoff and starts a fresh session (`/clear`). A second session on the same
+  the lead writes a handoff and asks the maintainer to `/clear` (a CLI command only the maintainer
+  types). A second session on the same
   tree works in a worktree under .claude/worktrees.
 
 ## Autonomy levels
@@ -195,10 +203,10 @@ tag or a rewrite of `main` (a tag ruleset was rejected on 2026-10-19).
 **Probing a guard.** A hook or `tools/bg.sh` is tested through its decision path only: the hook
 JSON on stdin (`.claude/hooks/git-guard.sh --kinds`, `precommit-gate.sh`) or `tools/bg.sh --check
 <command>`, which print a verdict and run nothing. The guarded command itself never executes, in a
-test, a probe or a stub. A test that needs real git runs in a scratch repo it `git init`s under
-`../tmp/`, with its cwd there. The reason: on 2026-10-19 a refusal test ran real commands through
-a mid-edit `bg.sh` and, in this checkout, created a tag, reset away every uncommitted edit and set
-an Actions secret.
+test, a probe or a stub. Real git runs in a scratch repo `git init`ed outside this checkout, with
+its cwd there: `../tmp/` for a probe, the test's `mkdtemp(tmpdir())` dir for a test. The reason:
+on 2026-10-19 a refusal test ran real commands through a mid-edit `bg.sh` and, in this checkout,
+created a tag, reset away every uncommitted edit and set an Actions secret.
 
 ## Skills
 
@@ -212,9 +220,10 @@ an Actions secret.
 A procedure lives in a skill, a fact in `CLAUDE.md`, a path-scoped rule in `.claude/rules/`, a
 must-always in a hook. A retro miss becomes an eval scenario for its skill before the text changes.
 
-Evals live in `.claude/skills/<name>/evals/<case>/{case.yaml,prompt.md,graders/,scaffold.sh}`;
-they run through `claude plugin eval` as `.claude/skills/retro/SKILL.md` "Apply the accepted rows"
-gives it: paid model runs, so on the maintainer's word.
+Evals live in `.claude/skills/<name>/evals/<case>/`: `prompt.md` and a `graders` directory, plus `case.yaml`
+and `scaffold.sh` when the case needs a scaffolded repo (the release and ship cases); they run
+through `claude plugin eval` as `.claude/skills/retro/SKILL.md` step 8 "Agree, then apply" gives it:
+paid model runs, so on the maintainer's word.
 
 ## Memory and state
 
