@@ -53,6 +53,7 @@
 - **Dependencies arrive a week late and run no install script.** Dependabot waits 7 days before proposing a version (security updates excepted), `.npmrc` turns install scripts off for every `npm ci`, the Pages build job no longer holds the deploy token while it installs, and a new or replaced dependency needs the maintainer.
 - **The changelog has an eighth section, `Development`, for changes a theme user never sees, and the release page leaves it out.** 44 of the 46 `[Unreleased]` bullets were the agent's tooling, and `release-notes.sh` would have copied every bold lead into the GitHub release; `changelog.mjs add 7` writes there, the 44 entries moved out of Added, Changed, Fixed and Security, and `.claude/rules/changelog.md`, `docs/releasing.md` and `/ship` say which side of the line a change falls on.
 - **Every cheap file gate proves on each npm test that it still goes red.** `tests/gates-red.test.mjs` plants the defect each of 15 file gates exists for in a copy of the tree and asserts the gate fails and names it, size and importants one unit over their limit; `tests/upstream-contract.test.mjs` no longer writes into a caller's index.
+- **The parity back-scroll red of 249042a is a measured flake.** `docs/development.md` "Known flakes" records it: 1 of 59 CI parity jobs, 0 of 71 local runs under load, most likely the fixed 800 ms read of the gate while 25.12 Overview grows back.
 
 ## [0.14.16] — 2026-10-18
 
