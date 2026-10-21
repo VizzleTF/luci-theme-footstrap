@@ -228,7 +228,7 @@ the sandbox. Revisit when detached runs move off `tools/bg.sh`.
 | Layer | Where | Holds |
 |---|---|---|
 | 1. Instructions | `CLAUDE.md`, `.claude/rules/*.md` (path-scoped), `.claude/agents/*.md`, skills, auto-memory | the policy, the tiers, the roles; the auto-mode classifier reads `CLAUDE.md` too |
-| 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes, publications); `precommit-gate.sh` (both CHANGELOG entries, then a recorded tester verdict on a package or guard path, asked); `card-gate.sh` (PreToolUse `Agent`: a `developer` spawn needs its card and `dirty-at-start`, denied); `session-start.sh` (drift from `origin/main`, a red Build push run on `main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/retro`) | the per-word list, whatever the permission mode |
+| 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes, publications; a role's checkout, index and config writes in this checkout, denied); `precommit-gate.sh` (both CHANGELOG entries, then a recorded tester verdict on a package or guard path, asked); `card-gate.sh` (PreToolUse `Agent`: a `developer` spawn needs its card and `dirty-at-start`, denied); `session-start.sh` (drift from `origin/main`, a red Build push run on `main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/retro`) | the per-word list, whatever the permission mode |
 | 3. Permissions and auto mode | `.claude/settings.json` `deny`/`ask`/`allow`; `autoMode` in `~/.claude/settings.json` (the classifier reads it only from user settings); `tools/bg.sh` refuses ssh, commit, push, tag and gh writes in detached runs; the MCP servers github, kubernetes, helm and Vercel are denied in this project (never called here, and their write tools bypassed every other layer) | prompts and denials before a command runs; prefix matching misses `git -C` forms, hence layer 2 |
 | 4. Git hooks | `.githooks/pre-push` (`npm run check` on the pushed commit in a clean worktree), `.githooks/commit-msg` (strips trailers) | every contributor, agent or not |
 | 5. CI | `build.yml`: check, lint, build, verify (25.12/apk + 24.10/opkg), live, anchors on every push; deep on a tag or dispatch | the ground truth for "done" |
@@ -239,7 +239,13 @@ JSON on stdin (`.claude/hooks/git-guard.sh --kinds`, `precommit-gate.sh`, `card-
 test, a probe or a stub. Real git runs in a scratch repo `git init`ed outside this checkout, with
 its cwd there: `../tmp/` for a probe, the test's `mkdtemp(tmpdir())` dir for a test. The reason:
 on 2026-10-19 a refusal test ran real commands through a mid-edit `bg.sh` and, in this checkout,
-created a tag, reset away every uncommitted edit and set an Actions secret.
+created a tag, reset away every uncommitted edit and set an Actions secret. For a role the rule is
+held: `git-guard.sh` denies it, in this checkout, a `checkout` of paths, `switch -f`, `restore`, `clean`,
+`reset`, `stash`, `checkout-index`, `read-tree`, `add`, `rm`, `mv`, `remote` and `config` write, resolved the
+way it reads a push (`cd`, `-C`, `--git-dir`, `GIT_DIR`); the round snapshot's `GIT_INDEX_FILE=` prefix
+(an `export` or `env` counts, a bare assignment does not) and a scratch repo pass. Three
+roles ran real git here on 2026-10-21, one of them `cd $R && git checkout -q -- .` with `R` lost
+between two Bash calls (it reverted three tracked files): a role spells every path literally in each call.
 
 ## Skills
 

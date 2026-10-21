@@ -1,7 +1,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { ROOT } from '../tools/lib/root.mjs';
@@ -38,8 +38,9 @@ function binWithout(...skip) {
 	return bin;
 }
 
-function run(command, { cwd = dir, hook = HOOK, env, timeout } = {}) {
-	const r = spawnSync('/bin/sh', [ hook ], { input: JSON.stringify({ cwd, tool_input: { command } }), encoding: 'utf8', env, timeout });
+// `agent` is the hook input's agent_type: set for a subagent (a crew role or any other), absent for the lead
+function run(command, { cwd = dir, hook = HOOK, env, timeout, agent } = {}) {
+	const r = spawnSync('/bin/sh', [ hook ], { input: JSON.stringify({ cwd, ...(agent && { agent_type: agent }), tool_input: { command } }), encoding: 'utf8', env, timeout });
 	assert.equal(r.status, 0, r.stderr);
 	// every probe runs on a healthy PATH unless it simulates a missing tool, and a hook that runs on every Bash call must say nothing on stderr
 	if (!env) assert.equal(r.stderr, '', `stderr of ${command}`);
@@ -949,4 +950,144 @@ test('precommit-gate verdict: the changelog deny comes first, and another reposi
 	writeFileSync(join(other, 'luci-theme-footstrap/a.txt'), 'a\n');
 	g(other, 'add', 'luci-theme-footstrap/a.txt');
 	assert.equal(v.run('git commit -m x', other).permissionDecision, undefined);
+});
+
+// ---- a crew role in the lead's checkout: what rewrites its worktree, index or config is denied, and only there ----
+const ROLES = [ 'developer', 'tester', 'security', 'researcher', 'upstream-reviewer' ];
+const roleDeny = [
+	// a discard of paths, whatever sits before the `--`, and a cd into nowhere that stays put
+	'git checkout -q -- .', 'git checkout -- f', 'git checkout .', 'git checkout HEAD -- a b', 'git checkout -f -- .', 'git checkout -- ./luci-theme-footstrap',
+	'cd "" && git checkout -- .', 'cd -- "" && git checkout -- .', "cd '' && git restore .", 'git -c core.pager=cat checkout -- .',
+	'git restore f', 'git restore .', 'git restore --staged f', 'git restore -S f', 'git restore --source HEAD~1 f', 'git restore --worktree --staged .',
+	'git clean -fd', 'git clean -fdx', 'git clean -f',
+	'git stash', 'git stash push -m x', 'git stash -u', 'git stash pop', 'git stash apply', 'git stash drop', 'git stash clear', 'git stash save x',
+	'git reset', 'git reset --hard HEAD~1', 'git reset --soft HEAD~1', 'git reset --mixed', 'git reset HEAD f', 'git reset -q',
+	'git add f', 'git add -A', 'git add .', 'git add -- f g', 'git rm f', 'git rm --cached f', 'git mv a b',
+	'git remote add zz u', 'git remote remove zz', 'git remote rm zz', 'git remote rename a b', 'git remote set-url origin u', 'git remote set-url --add origin u', 'git remote set-head origin main',
+	'git config user.name x', 'git config --global user.name x', 'git config --local a.b c', 'git config --unset user.name', 'git config --unset-all a.b', 'git config --add a.b c', 'git config --replace-all a.b c',
+	'git config set a.b c', 'git config unset a.b', 'git config --edit', 'git config --file f a b', 'git config --type bool a.b true', 'git config --remove-section a', 'git config --rename-section a b',
+	// behind a wrapper, a nested shell or a chain; the private index does not make a worktree verb safe
+	'sh -c "git checkout -- ."', "bash -c 'git restore .'", 'true && git clean -fd', 'env FOO=1 git reset', 'timeout 5 git stash', 'tools/bg.sh git checkout -- .', 'echo x | xargs git restore',
+	'GIT_INDEX_FILE=../tmp/task-x/round.idx git checkout -- .', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git restore .', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git rm f', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git mv a b',
+	'GIT_INDEX_FILE= git add f',
+	// a bare assignment is a shell variable: git never sees it and writes the real index
+	'GIT_INDEX_FILE=../tmp/task-x/round.idx; git add -- f', 'GIT_INDEX_FILE=../tmp/task-x/round.idx; git read-tree HEAD', 'FOO=1; GIT_INDEX_FILE=x; git add f', 'foo GIT_INDEX_FILE=x git add f', 'GIT_INDEX_FILE=x && git add f',
+	// a discard that is no `-- .`: a pathspec that cannot be a ref, a tree-ish and a path, a forced or patch checkout, a lone word that is no ref
+	'git checkout ./', 'git checkout ./luci-theme-footstrap', 'git checkout :/', "git checkout ':(top)docs'", "git checkout '*'", 'git checkout .gitignore', 'git checkout HEAD f', 'git checkout HEAD~1 a b', 'git checkout f', 'git checkout nosuchbranch',
+	'git checkout -f', 'git checkout -f HEAD', 'git checkout --force HEAD', 'git checkout -fq HEAD', 'git checkout -p', 'git checkout --patch HEAD f', 'git checkout --pathspec-from-file=list',
+	'git switch --discard-changes HEAD', 'git switch -f HEAD', 'git switch --force HEAD', 'git switch -fq HEAD',
+	'git checkout-index -f -a', 'git checkout-index -a', 'git checkout-index f',
+	'git read-tree HEAD', 'git read-tree -u --reset HEAD', 'git read-tree --reset -u HEAD', 'git read-tree -m HEAD HEAD',
+	// an empty -C operand stays put like cd ""
+	'git -C "" checkout -- .', "git -C '' restore .", 'find . -name x -exec git checkout -- {} \\;', 'git -c alias.co=checkout co -- .', 'eval "git checkout -- ."', '(cd tests && git restore .)', 'sh -c \'cd "" && git checkout -- .\'',
+];
+const roleNone = [
+	// reads
+	'git status', 'git diff', 'git diff --cached', 'git log -3', 'git show HEAD', 'git ls-files', 'git rev-parse HEAD', 'git worktree list', 'git branch', 'git blame f',
+	'git remote', 'git remote -v', 'git remote get-url origin', 'git remote show origin',
+	'git stash list', 'git stash show -p', 'git stash create',
+	'git config user.name', 'git config --get user.name', 'git config --get-regexp remote', 'git config -l', 'git config --list', 'git config --global --get user.name', 'git config get user.name', 'git config list',
+	'git config --file f --get a.b', 'git config --type bool a.b', 'git config --show-origin --get a.b',
+	// a dry run writes nothing
+	'git clean -n', 'git clean -nfd', 'git clean -fdn', 'git clean --dry-run -fd', 'git add -n f', 'git add --dry-run .', 'git rm -n f', 'git mv -n a b', 'git read-tree --dry-run HEAD',
+	// the round snapshot: a private index, and the verbs that only read the real one
+	'GIT_INDEX_FILE=../tmp/task-x/round.idx git add -- f', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git add -A', 'env GIT_INDEX_FILE=../tmp/task-x/round.idx git add -- f',
+	'export GIT_INDEX_FILE=../tmp/task-x/round.idx; git add -- f', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git rm --cached f', 'export GIT_INDEX_FILE=../tmp/task-x/round.idx; git read-tree HEAD',
+	'timeout 5 env GIT_INDEX_FILE=../tmp/task-x/round.idx git add f', 'GIT_INDEX_FILE=../tmp/task-x/round.idx sudo git add f', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git read-tree -m HEAD HEAD',
+	'GIT_INDEX_FILE=../tmp/task-x/round.idx git read-tree HEAD && GIT_INDEX_FILE=../tmp/task-x/round.idx git add -- a b && GIT_INDEX_FILE=../tmp/task-x/round.idx git write-tree',
+	// not named by the rule: a branch switch, a commit, an unplaceable directory, a `--` with nothing after it, and words that are text
+	'git checkout HEAD', 'git checkout -b x', 'git checkout -b x HEAD', 'git checkout -B x HEAD', 'git checkout --detach HEAD', 'git checkout -', 'git checkout HEAD --',
+	'git switch x', 'git switch -c x', 'git switch -', 'git read-tree -n HEAD', 'git commit -m x', 'git checkout --', 'cd "$X" && git checkout -- .', 'cd nosuch && git restore .',
+	'echo git checkout -- .', 'git commit -m "git restore ."', "cat <<'E'\ngit clean -fd\nE",
+];
+const asRole = (agent) => (c, cwd = ROOT) => decide(c, { cwd, agent });
+for (const c of roleDeny) test(`role denied in the checkout: ${c}`, () => assert.equal(asRole('developer')(c), 'deny'));
+for (const c of roleNone) test(`role silent in the checkout: ${c}`, () => assert.equal(asRole('developer')(c), ''));
+for (const a of ROLES) test(`${a} is a role`, () => assert.equal(asRole(a)('git checkout -q -- .'), 'deny'));
+// the lead has no agent_type; any other agent type is not a crew role
+for (const a of [ undefined, '', 'general-purpose', 'Explore', 'Plan', 'developers' ]) {
+	test(`agent_type ${JSON.stringify(a)} is left alone`, () => {
+		for (const c of [ 'git checkout -q -- .', 'git restore --staged f', 'git clean -fd', 'git stash', 'git reset', 'git add f', 'git rm f', 'git remote add zz u', 'git config user.name x', 'cd "" && git checkout -- .',
+			'git checkout HEAD f', 'git checkout f', 'git checkout -f', 'git checkout :/', 'git switch -f HEAD', 'git checkout-index -a', 'git read-tree HEAD', 'GIT_INDEX_FILE=x; git add f', 'git -C "" restore .' ]) assert.equal(asRole(a)(c), '', c);
+	});
+}
+test('a role that also tags is denied, not asked; the lead is asked', () => {
+	assert.equal(asRole('tester')('git tag v1 && git checkout -- .'), 'deny');
+	assert.equal(asRole(undefined)('git tag v1 && git checkout -- .'), 'ask');
+	assert.equal(asRole('tester')('git tag v1'), 'ask');
+});
+test('the reason names the checkout and the way out, and --kinds lists rolegit for a role only', () => {
+	const r = run('git checkout -q -- .', { cwd: ROOT, agent: 'tester' });
+	assert.equal(r.permissionDecision, 'deny');
+	assert.ok(r.permissionDecisionReason.includes(realpathSync(ROOT)), r.permissionDecisionReason);
+	assert.match(r.permissionDecisionReason, /scratch repo/);
+	assert.match(r.permissionDecisionReason, /GIT_INDEX_FILE/);
+	assert.match(r.permissionDecisionReason, /literally/);
+	const kinds = (agent) => spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input: JSON.stringify({ cwd: ROOT, ...(agent && { agent_type: agent }), tool_input: { command: 'git checkout -- .' } }), encoding: 'utf8' }).stdout.trim();
+	assert.equal(kinds('tester'), 'rolegit');
+	assert.equal(kinds(), '');
+});
+
+// A scratch repo is nobody's: the directory the line resolves to (cd, -C, --git-dir, GIT_DIR, the hook's cwd) decides.
+test('a role aimed at a scratch repo is silent, and aimed at the checkout from a scratch repo is denied', () => {
+	const s = repo(join(dir, 'rolescratch'));
+	const t = asRole('tester');
+	for (const c of [ `git -C ${s} checkout -- .`, `cd ${s} && git restore .`, `cd ${s} && git clean -fd`, `git --git-dir=${s}/.git checkout -- .`, `GIT_DIR=${s}/.git git reset`, `cd ${s} && git add f`, `git -C ${s} remote add zz u`, `cd ${s} && git config a.b c`, `cd ${s} && git stash` ]) assert.equal(t(c), '', c);
+	// GIT_DIR and GIT_INDEX_FILE reach git only as a prefix, behind env or exported; a bare assignment is a shell variable and git acts where it stands
+	for (const c of [ `export GIT_DIR=${s}/.git; git checkout -- .`, `env GIT_DIR=${s}/.git git restore .`, `timeout 5 env GIT_DIR=${s}/.git git clean -fd` ]) assert.equal(t(c), '', c);
+	for (const c of [ `GIT_DIR=${s}/.git; git checkout -- .`, `FOO=1; GIT_DIR=${s}/.git; git reset`, `GIT_DIR=${s}/.git && git restore .` ]) assert.equal(t(c), 'deny', c);
+	assert.equal(t('git checkout -- .', s), '');
+	assert.equal(t('git checkout nosuchbranch', s), '');
+	assert.equal(t('git remote add zz u', s), '');
+	assert.equal(t('cd sub/.. && git restore .', s), '');
+	for (const c of [ `git -C ${ROOT} checkout -- .`, `cd ${ROOT} && git restore .`, `cd ${ROOT}/tests && git clean -fd`, `git -C ${ROOT}/docs reset`, `cd ${s} && cd ${ROOT} && git add f` ]) assert.equal(t(c, s), 'deny', c);
+});
+
+// The hook is the checkout it ships in: a copy of it inside a scratch repo makes that repo "this checkout", with a worktree of it beside.
+test('worktree and index verbs are denied in the checkout and free in its worktree; config and remotes are shared', () => {
+	const home = repo(join(dir, 'rolehome'));
+	mkdirSync(join(home, '.claude/hooks'), { recursive: true });
+	copyFileSync(HOOK, join(home, '.claude/hooks/git-guard.sh'));
+	g(home, 'commit', '-q', '--allow-empty', '-m', 'a');
+	const wt = join(dir, 'rolewt');
+	g(home, 'worktree', 'add', '-q', wt);
+	const hook = join(home, '.claude/hooks/git-guard.sh');
+	const d = (c, cwd, agent = 'tester') => decide(c, { cwd, hook, agent });
+	for (const c of [ 'git checkout -- .', 'git restore .', 'git clean -fd', 'git reset', 'git add f', 'git stash' ]) {
+		assert.equal(d(c, home), 'deny', c);
+		assert.equal(d(c, wt), '', `${c} in its worktree`);
+		assert.equal(d(`git -C ${home} ${c.slice(4)}`, wt), 'deny', `${c} aimed at the checkout from the worktree`);
+		assert.equal(d(`cd ${wt} && ${c}`, home), '', `${c} after a cd into the worktree`);
+		assert.equal(d(`GIT_DIR=${home}/.git ${c}`, dir), 'deny', `${c} by GIT_DIR`);
+		assert.equal(d(`git --git-dir=${home}/.git ${c.slice(4)}`, dir), 'deny', `${c} by --git-dir`);
+		assert.equal(d(c, home, 'general-purpose'), '', `${c} for another agent type`);
+	}
+	for (const c of [ 'git remote add zz u', 'git remote set-url origin u', 'git config a.b c', 'git config --unset a.b' ]) {
+		assert.equal(d(c, home), 'deny', c);
+		assert.equal(d(c, wt), 'deny', `${c} in its worktree shares the config`);
+		assert.equal(d(c, dir), '', `${c} in no repository`);
+	}
+	assert.equal(d('git status', wt), '');
+	assert.equal(d('git config --get a.b', wt), '');
+	// a lone word after checkout is a branch (a switch) or a path (a discard), told apart in the repository the line lands in
+	g(home, 'branch', 'side');
+	assert.equal(d('git checkout side', home), '');
+	assert.equal(d('git checkout nosuchbranch', home), 'deny');
+	assert.equal(d('git checkout side', home, 'general-purpose'), '');
+	assert.equal(d('git checkout nosuchbranch', home, 'general-purpose'), '');
+	assert.equal(d('git checkout nosuchbranch', wt), '');
+	assert.equal(d(`git -C ${home} checkout nosuchbranch`, wt), 'deny');
+	assert.equal(d(`git --git-dir=${home}/.git checkout side`, dir), '');
+	assert.equal(d(`git --git-dir=${home}/.git checkout nosuchbranch`, dir), 'deny');
+	assert.equal(d('git checkout side -- f', home), 'deny');
+	assert.equal(d('git checkout -b other side', home), '');
+});
+
+// `cd ""` and `git -C ""` stay put: the directory a line resolves to is the one it started in, for a push too.
+test('an empty cd or -C operand leaves the directory where it was', () => {
+	const f = repo(join(dir, 'emptycd'), { origin: THEME, fork: 'git@github.com:VizzleTF/luci.git' });
+	assert.equal(decide('cd "" && git push fork x', { cwd: f }), 'ask');
+	assert.equal(decide('git -C "" push fork x', { cwd: f }), 'ask');
+	assert.equal(decide('git -C "$X" push fork x', { cwd: f }), '');
+	assert.equal(decide('cd "$X" && git push fork x', { cwd: f }), '');
 });
