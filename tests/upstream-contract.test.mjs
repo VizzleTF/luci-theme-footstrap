@@ -2,7 +2,7 @@
  * id or a CI run id (the upstream bot flagged each by hand). Driven on fixture trees; no router. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -36,17 +36,25 @@ test('prose such as task-list is not a task id', () => {
 	assert.equal(scan({ 'htdocs/a.js': '// task-list rows\n' }).status, 0);
 });
 
+/* A scratch repo must not inherit the caller's git env: under a hook or a snapshot (GIT_INDEX_FILE) its
+ * `git add` writes the caller's index. .githooks/pre-push unsets the same list. */
+const LOCAL_ENV = spawnSync('git', [ 'rev-parse', '--local-env-vars' ], { encoding: 'utf8' }).stdout.split('\n');
+const noLocalEnv = (env) => Object.fromEntries(Object.entries(env).filter(([ k ]) => !LOCAL_ENV.includes(k)));
+
 test('upstream-review-facts.sh -C runs git on the named tree', () => {
 	const d = mkdtempSync(join(tmpdir(), 'urf-'));
+	const callerIndex = `${d}.caller-idx`;
+	const env = noLocalEnv({ ...process.env, GIT_INDEX_FILE: callerIndex });
 	try {
-		const g = (...a) => spawnSync('git', [ '-C', d, '-c', 'user.name=t', '-c', 'user.email=t@t', ...a ], { encoding: 'utf8' });
+		const g = (...a) => spawnSync('git', [ '-C', d, '-c', 'user.name=t', '-c', 'user.email=t@t', ...a ], { encoding: 'utf8', env });
 		g('init', '-q', '-b', 'master');
 		writeFileSync(join(d, 'a'), 'x\n'); g('add', 'a'); g('commit', '-qm', 'a');
 		g('checkout', '-qb', 'pr');
 		writeFileSync(join(d, 'b'), 'y\n'); g('add', 'b'); g('commit', '-qm', 'b');
-		const r = spawnSync('sh', [ 'tools/upstream-review-facts.sh', '-C', d, 'master', 'pr' ], { encoding: 'utf8' });
+		const r = spawnSync('sh', [ 'tools/upstream-review-facts.sh', '-C', d, 'master', 'pr' ], { encoding: 'utf8', env });
 		assert.equal(r.status, 0, r.stderr);
 		assert.match(r.stdout, /A b/);
 		assert.equal(spawnSync('sh', [ 'tools/upstream-review-facts.sh' ]).status, 2);
-	} finally { rmSync(d, { recursive: true, force: true }); }
+		assert.equal(existsSync(callerIndex), false, "the caller's GIT_INDEX_FILE was written by the scratch repo");
+	} finally { rmSync(d, { recursive: true, force: true }); rmSync(callerIndex, { force: true }); }
 });

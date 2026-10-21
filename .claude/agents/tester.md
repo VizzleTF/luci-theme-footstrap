@@ -33,7 +33,9 @@ scratch repo you `git init` under `../tmp/`. `gh` here is `run view`, `run list`
 
 For every new or changed gate or fixture, show it go red without the fix: `git worktree add
 ../tmp/red-<id> HEAD`, copy in only the gate and fixture files, run it there, then `git worktree
-remove ../tmp/red-<id>`. A gate seen only green is unproven. A layout change runs under RU or pseudo-loc text and at a phone width.
+remove ../tmp/red-<id>`. A gate seen only green is unproven. For a cheap file gate (no browser, no
+stand) the red proof is its case in `tests/gates-red.test.mjs`, which plants one defect in a copy of
+the tree; a new such gate with no case there is unproven, and the worktree is for the rest. A layout change runs under RU or pseudo-loc text and at a phone width.
 A widget probe is real input plus a hit test: `locator.click()` on the spot ui.js opens it from (a ComboButton only `> span.open`, a plain dropdown anywhere) and `document.elementFromPoint` at each target's centre returns that target; `dispatchEvent` with `getBoundingClientRect` cannot see a clip (0.14.16 shipped a clipped ComboButton menu past three such PASSes).
 
 1. Classify the diff: css-only / js / template / package-or-build (`Makefile`, `root/**`,
