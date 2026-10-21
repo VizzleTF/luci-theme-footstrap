@@ -19,9 +19,20 @@
 # blob: the tree that was tested is the combination, and an exec bit or a symlink is a change. Every
 # other path passes: the tester reads it after the push.
 #
+# The third half asks when the commit weakens an oracle, "waiving a gate" being the maintainer's word and
+# nothing else seeing a waiver in a diff: a line added under `tools/baselines/` (a `release: ` subject is
+# exempt), a number raised in `LIMITS` of tools/css-metrics.mjs, a net drop of `test(` calls in a
+# tests/*.test.mjs (a deleted file included), a literal added to an `ALLOW` list of a tools/*.mjs. It counts
+# what grew and names the file; a lowering, a removal and tools/size-budget.mjs (its own grant) stay silent.
+#
+# `git commit --amend` is read against HEAD^ (a root commit: the empty tree), not HEAD: the commit is its
+# parent plus the index, or plus the worktree under `-a` and paths.
+#
 # This is a tripwire for the habitual forms, not a fence against obfuscation, so what it cannot read it
 # leaves silent: a commit run by an alias or a script, an option or path behind a quote or a `$`, a
-# flag on a later line than `git commit` (a heredoc message).
+# flag on a later line than `git commit` (a heredoc message), a `cd <dir>` or `git -C <dir>` ahead of
+# `git commit <paths>` (the paths are read against the hook's own cwd), `--pathspec-from-file`, a
+# `release: ` subject in a heredoc, a `-F` file or an amend without `-m` (read as no release), a deleted `LIMITS` key.
 #
 # No `if:` in settings.json: it only matches a line that STARTS with `git commit`. The detection is
 # git-guard.sh's `--kinds`, so `cd a && git commit` and a script that commits reach this too.
@@ -100,6 +111,7 @@ case $BARE in
 	*[[:space:]]commit[[:space:]]*) ARGS=$(printf '%s\n' "${BARE#*[[:space:]]commit[[:space:]]}" | sed -e 's/[;&|<>].*//' -e 's/[[:space:]]#.*//' -e 1q) ;;
 esac
 ALLF=0
+AMEND=0
 CPATHS=''
 skip=0
 dd=0
@@ -110,7 +122,8 @@ for w in $ARGS; do
 		case $w in
 			--) dd=1; continue ;;
 			--all) ALLF=1; continue ;;
-			--message|--file|--author|--date|--fixup|--squash|--trailer|--template|--cleanup|--reuse-message|--reedit-message) skip=1; continue ;;
+			--amend) AMEND=1; continue ;;
+			--message|--file|--pathspec-from-file|--author|--date|--fixup|--squash|--trailer|--template|--cleanup|--reuse-message|--reedit-message) skip=1; continue ;;
 			--*) continue ;;
 			-?*)
 				r=${w#-}
@@ -129,16 +142,21 @@ for w in $ARGS; do
 	case $w in *[!A-Za-z0-9_./@%+=,:*?-]*) ;; *) CPATHS="$CPATHS $w" ;; esac
 done
 set +f
+# BASE: what the commit is diffed against. An amend carries its parent plus the index (the worktree under `-a`
+# and paths), so HEAD^ and not HEAD, or a combination amended in is read as the one file that was added.
+# Empty means the bare `git diff --cached`, which also reads a repository with no commit yet.
+BASE=''
+if [ "$AMEND" = 1 ]; then BASE=$(git rev-parse -q --verify 'HEAD^' 2>/dev/null) || BASE=$(git hash-object -t tree /dev/null 2>/dev/null) || BASE=''; fi
 # WTF: the files whose content the commit takes from the worktree, not from the index. --no-renames
 # lists the old name of a move too, which is a deletion the verdict half must see.
 WTF=''
 if [ "$ALLF" = 1 ]; then
-	FILES=$(git diff --no-renames --name-only -z HEAD 2>/dev/null | zl); WTF=$FILES
+	FILES=$(git diff --no-renames --name-only -z "${BASE:-HEAD}" 2>/dev/null | zl); WTF=$FILES
 else
-	FILES=$(git diff --no-renames --cached --name-only -z 2>/dev/null | zl)
+	FILES=$(git diff --no-renames --cached --name-only -z ${BASE:+"$BASE"} 2>/dev/null | zl)
 	if [ -n "$CPATHS" ]; then
 		set -f
-		WTF=$(git diff --no-renames --name-only -z HEAD -- $CPATHS 2>/dev/null | zl)
+		WTF=$(git diff --no-renames --name-only -z "${BASE:-HEAD}" -- $CPATHS 2>/dev/null | zl)
 		set +f
 		FILES=$(printf '%s\n%s\n' "$FILES" "$WTF")
 	fi
@@ -227,9 +245,102 @@ fi
 # The mechanical half — sections, order, dates, compare links, RU mirror parity, the mandatory bold
 # lead. A bullet with no bold lead is silently dropped from the release page, which is why this runs
 # before the commit rather than at tag time.
-if ! OUT=$(node tools/changelog.mjs 2>&1); then
+# from the root: the hook's cwd is the session's, and a subdirectory has no tools/changelog.mjs
+if ! OUT=$(cd "$GIT_ROOT" && node tools/changelog.mjs 2>&1); then
 	deny "node tools/changelog.mjs failed, so this commit would land a broken changelog: $OUT"
 fi
+
+# The oracle half. One stream per file: its text at BASE, a SPLIT line, its text in the commit; `mode` picks the
+# count. The text is read with comments out and string literals whole, so a `//` or a quote in a comment or a
+# string moves no count. shortcut: a reworded ALLOW reason reads as a new literal and asks; upgrade if it costs one.
+cd "$GIT_ROOT" || exit 0 # the names are root-relative
+ORACLE='^(tools/baselines/[A-Za-z0-9_./-]+|tools/[A-Za-z0-9_.-]+[.]mjs|tests/[A-Za-z0-9_.-]+[.]test[.]mjs)$'
+# shellcheck disable=SC2016
+ORACLE_AWK='
+function strip(s,   o, i, c, d, q, lit) {
+	o = ""; nl = 0
+	for (i = 1; i <= length(s); i++) {
+		c = substr(s, i, 1); d = substr(s, i, 2)
+		if (blk) { if (d == "*/") { blk = 0; i++ } continue }
+		if (d == "/*") { blk = 1; i++; continue }
+		if (d == "//") break
+		if (c == Q || c == D) {
+			q = c; lit = c
+			for (i++; i <= length(s); i++) {
+				c = substr(s, i, 1); lit = lit c
+				if (c == "\\") { i++; lit = lit substr(s, i, 1) } else if (c == q) break
+			}
+			L[++nl] = lit; o = o lit; continue
+		}
+		o = o c
+	}
+	return o
+}
+function grew(x) { if (!(x in was) && !(x in got)) { got[x] = 1; if (!ng++) first = x } }
+BEGIN { Q = "\047"; D = "\042"; side = 0 }
+$0 == "\001SPLIT" { side = 1; blk = 0; inb = 0; next }
+mode == "count" { n[side] += gsub(/(^|[^[:alnum:]_$.])test\(/, "&"); next }
+mode == "lines" {
+	s = $0; sub(/^[[:space:]]+/, "", s); sub(/[[:space:],]+$/, "", s)
+	if (s == "") next
+	if (side) grew(s); else was[s] = 1
+	next
+}
+mode == "limits" {
+	s = strip($0)
+	if (s ~ /LIMITS[[:space:]]*=[[:space:]]*\{/) { inb = 1; next }
+	if (inb && s ~ /^[]}]/) inb = 0
+	if (inb && match(s, /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*:[[:space:]]*[0-9][0-9_.]*/)) {
+		t = substr(s, RSTART, RLENGTH); k = t; v = t
+		sub(/[[:space:]]*:.*/, "", k); sub(/^[[:space:]]+/, "", k)
+		sub(/^[^:]*:[[:space:]]*/, "", v); gsub(/_/, "", v)
+		if (side) now[k] = v + 0; else lim[k] = v + 0
+	}
+	next
+}
+mode == "allow" {
+	s = strip($0); start = 0
+	if (!inb && s ~ /ALLOW[[:space:]]*=/) { inb = 1; start = 1 }
+	if (!inb) next
+	if (!start && s ~ /^[]})]/) { inb = 0; next }
+	for (j = 1; j <= nl; j++) { if (side) grew(L[j]); else was[L[j]] = 1 }
+	if (start && s ~ /;[[:space:]]*$/) inb = 0
+}
+END {
+	if (mode == "count" && n[1] + 0 < n[0] + 0) print file " lost test( calls: " n[0] + 0 " -> " n[1] + 0
+	if (mode == "lines" && ng) print file " gained " ng " line(s), first: " substr(first, 1, 70)
+	if (mode == "allow" && ng) print file " ALLOW gained " ng " literal(s), first: " substr(first, 1, 70)
+	if (mode == "limits") {
+		for (k in now) if ((k in lim) && now[k] > lim[k]) r = r (r == "" ? "" : ", ") k " " lim[k] " -> " now[k]
+		if (r != "") print file " LIMITS raised: " r
+	}
+}'
+# the file as the commit leaves it (the worktree's under `-a`, a path or a chained add, else the index's), and as BASE has it
+now_of() { if printf '%s\n' "$WTF" | grep -qxF -- "$1"; then cat -- "$1" 2>/dev/null || true; else git show ":$1" 2>/dev/null || true; fi; }
+was_of() { git show "${BASE:-HEAD}:$1" 2>/dev/null || true; }
+# the subject of the commit's first -m, `-qm` and `--message=` included: only a plain or quoted word after it is read
+release_subject() {
+	rest=$(printf '%s' "$CMD" | tr '\n' ' ' | awk '{ if (match($0, /[[:space:]]commit[[:space:]]/)) { s = substr($0, RSTART + RLENGTH); if (match(s, /(^|[[:space:]])(-[A-Za-z]*m|--message[= ])[[:space:]]*/)) print substr(s, RSTART + RLENGTH) } }') || return 1
+	case $rest in release:\ *|\"release:\ *|\'release:\ *) return 0 ;; esac
+	return 1
+}
+OQ=''
+while IFS= read -r p; do
+	[ -n "$p" ] || continue
+	case $p in
+		tools/baselines/*) release_subject && continue; mode=lines ;;
+		tests/*) mode=count ;;
+		tools/css-metrics.mjs) mode=limits ;;
+		*) now_of "$p" | grep -q 'ALLOW[[:space:]]*=' || continue; mode=allow ;;
+	esac
+	m=$({ was_of "$p"; printf '\n\001SPLIT\n'; now_of "$p"; } | awk -v mode="$mode" -v file="$p" "$ORACLE_AWK") || m=''
+	[ -z "$m" ] || OQ="$OQ$m; "
+done <<EOF
+$(printf '%s\n' "$FILES" | grep -E "$ORACLE" | sort -u || true)
+EOF
+[ -z "$OQ" ] || OQ="this commit weakens an oracle: ${OQ%; }. "
+# an oracle find is a question whichever way the verdict half ends
+quit() { [ -z "$OQ" ] || emit ask "precommit-gate: ${OQ}Waiving a gate is the maintainer's word: confirm this commit."; exit 0; }
 
 # The verdict half. A path of a class the pre-push check cannot stand in for needs a tester verdict on
 # the very content the commit carries: ONE PASS entry in some card's history[] whose tree holds every such
@@ -242,8 +353,7 @@ fi
 CLASS='^(luci-theme-footstrap/|install[.]sh$|[.]claude/hooks/|[.]claude/settings[.]json$|[.]githooks/|[.]github/workflows/)'
 ROOTS='luci-theme-footstrap install.sh .claude/hooks .claude/settings.json .githooks .github/workflows'
 CAND=$(printf '%s\n' "$FILES" | grep -E "$CLASS" | sort -u || true)
-[ -n "$CAND" ] || exit 0
-cd "$GIT_ROOT" || exit 0 # FILES are root-relative
+[ -n "$CAND" ] || quit
 
 NL='
 '
@@ -310,13 +420,13 @@ done <<EOF
 $CAND
 EOF
 ALLP=$PKGP$GRDP
-[ -n "$ALLP" ] || exit 0
+[ -n "$ALLP" ] || quit
 
 HL=''
 if [ "$DEL" = 1 ]; then
-	# a deletion is judged on the whole policed tree: HEAD's listing is what the commit changes, a tree's what it verified
+	# a deletion is judged on the whole policed tree: BASE's listing (HEAD^ under --amend) is what the commit changes, a tree's what it verified
 	# shellcheck disable=SC2086
-	HL=$(git ls-tree -r -z --full-tree HEAD -- $ROOTS 2>/dev/null | zl | awk '{ print "H\t" $0 }')
+	HL=$(git ls-tree -r -z --full-tree "${BASE:-HEAD}" -- $ROOTS 2>/dev/null | zl | awk '{ print "H\t" $0 }')
 fi
 PASSED=''
 CLEANED=''
@@ -374,7 +484,7 @@ while read -r T S; do
 done <<EOF
 $(verdict_entries | awk '!seen[$0]++')
 EOF
-[ "$COVERED" = 0 ] || exit 0
+[ "$COVERED" = 0 ] || quit
 
 # the paths some entry covers, so the question names what is missing; when every path has an entry and no entry has them all, the combination is
 BADP=$(lacks "$PKGP" "$PASSED")
@@ -383,4 +493,4 @@ MSG=''
 [ -z "$BADP" ] || MSG="no recorded PASS on the content of $(printf '%s' "$BADP" | tr '\n' ' ') (package class). "
 [ -z "$BADG" ] || MSG="${MSG}no recorded PASS with security CLEAN on the content of $(printf '%s' "$BADG" | tr '\n' ' ') (guard class). "
 [ -n "$MSG" ] || MSG="no single history entry holds $(printf '%s' "$ALLP" | tr '\n' ' ')together${GRDP:+ with security CLEAN}, and the tree a tester passed is the combination. "
-emit ask "precommit-gate: ${MSG}Run the tester card (and security for a guard path) and record its entry in the card's history[], or confirm this commit."
+emit ask "precommit-gate: ${OQ}${MSG}Run the tester card (and security for a guard path) and record its entry in the card's history[], or confirm this commit."

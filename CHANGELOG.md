@@ -8,6 +8,7 @@
 - **A developer is never spawned without its card.** A new `card-gate.sh` hook denies a `developer` spawn whose prompt names no existing task card with its `dirty-at-start` record, and prints the two commands that create the record.
 - **A crew role can no longer discard work in the real checkout.** `git-guard.sh` denies a `developer`, `tester`, `security`, `researcher` or `upstream-reviewer` call that would reset, restore, clean, stash, re-read or stage into the worktree, index or remotes of the checkout itself; a scratch repository and a private index stay open. Three such slips happened in one session.
 - **measure-run counts tokens by role.** Beside its character lines it prints the lead characters per delegation against the 15k budget, the five largest outputs the lead read, and a token table per role and model, each message counted once; a subagent output count is marked as a lower bound where its transcript lacks the final usage.
+- **A commit that weakens a check asks first.** `precommit-gate.sh` asks before a commit adds a line to `tools/baselines/`, raises a `css-metrics` limit, adds an `ALLOW` entry or drops `test(` calls from a test file; `--amend` is read against the commit it replaces, and the role rules say a red gate is fixed in the code under it.
 
 ### Changed
 

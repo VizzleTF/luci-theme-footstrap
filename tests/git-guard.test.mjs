@@ -845,6 +845,8 @@ test('precommit-gate verdict: the commit forms that take worktree content are re
 		'git commit -m x; ls luci-theme-footstrap', 'git commit -m x | cat', 'git commit -m x -- docs',
 		// a quoted path is named in the header as unread
 		`git commit -m x "${PKG}"`,
+		// the value of --pathspec-from-file is a file name, not a path the commit takes
+		`git commit -m x --pathspec-from-file ${PKG}`,
 	]) assert.equal(v.run(c).permissionDecision, undefined, c);
 });
 
@@ -950,6 +952,195 @@ test('precommit-gate verdict: the changelog deny comes first, and another reposi
 	writeFileSync(join(other, 'luci-theme-footstrap/a.txt'), 'a\n');
 	g(other, 'add', 'luci-theme-footstrap/a.txt');
 	assert.equal(v.run('git commit -m x', other).permissionDecision, undefined);
+});
+
+// ---- precommit-gate, the oracle half: a commit that weakens a baseline, a limit, a test or an allow-list asks ----
+// None of these paths is in the verdict class, so only the oracle half can speak. `was` is committed first, `now` is staged.
+function oracle(name, rel, was, now) {
+	const v = verdictRepo(name);
+	if (was !== null) { v.stage(rel, was); g(v.r, 'commit', '-q', '-m', 'add'); }
+	v.stage(rel, now);
+	return v;
+}
+const reason = (v, c = 'git commit -m x') => v.run(c).permissionDecisionReason;
+const decision = (v, c = 'git commit -m x') => v.run(c).permissionDecision;
+
+test('precommit-gate oracle: a line added under tools/baselines asks, a `release: ` subject does not', () => {
+	const B = 'tools/baselines/b.json';
+	const was = '{\n\t"a": [\n\t\t"x",\n\t\t"y"\n\t]\n}\n';
+	// "y" gains a comma and "z" is the one new line
+	const v = oracle('o1', B, was, '{\n\t"a": [\n\t\t"x",\n\t\t"y",\n\t\t"z"\n\t]\n}\n');
+	assert.equal(decision(v), 'ask');
+	assert.match(reason(v), /this commit weakens an oracle: tools\/baselines\/b\.json gained 1 line\(s\), first: "z"/);
+	for (const c of [ "git commit -m 'release: 1.2.3'", 'git commit -m "release: 1.2.3"', "git commit -qm 'release: 1.2.3'", 'git commit --message="release: 1.2.3"', "git commit --message 'release: 1.2.3'" ]) assert.equal(decision(v, c), undefined, c);
+	// the first -m is the subject, and the word has to start it
+	for (const c of [ "git commit -m 'fix: release: 1.2.3'", "git commit -m x -m 'release: 1.2.3'", "git commit -m 'prerelease: 1.2.3'", 'git commit --amend --no-edit' ]) assert.equal(decision(v, c), 'ask', c);
+	// a removal, and a baseline brought in at the same content, are not growth; a baseline file that is new is all growth
+	assert.equal(decision(oracle('o1b', B, '{\n\t"a": [\n\t\t"x",\n\t\t"y"\n\t]\n}\n', '{\n\t"a": [\n\t\t"x"\n\t]\n}\n')), undefined);
+	assert.equal(decision(oracle('o1c', B, null, was)), 'ask');
+	assert.equal(decision(oracle('o1d', B, was, was.replace('"x"', '"x"'))), undefined);
+	// -a reads the worktree: the index holds nothing new, the file on disk does
+	const w = verdictRepo('o1e');
+	w.stage(B, was);
+	g(w.r, 'commit', '-q', '-m', 'add');
+	w.touch(B, `${was}"more"\n`);
+	assert.equal(decision(w, 'git commit -am x'), 'ask');
+	assert.equal(decision(w), undefined);
+});
+
+test('precommit-gate oracle: a raised number in css-metrics LIMITS asks, a lowering and size-budget do not', () => {
+	const C = 'tools/css-metrics.mjs';
+	const css = (n, more = '') => `// importants: 99 in a comment\nconst LIMITS = {\n\t/* a raise: importants: 77 */\n\timportants: ${n},\n\temptyRules: 0,${more}\n};\nconst importants = 5;\n`;
+	const up = oracle('o2', C, css(35), css(36));
+	assert.equal(decision(up), 'ask');
+	assert.match(reason(up), /tools\/css-metrics\.mjs LIMITS raised: importants 35 -> 36/);
+	assert.equal(decision(oracle('o2b', C, css(35), css(34))), undefined);
+	assert.equal(decision(oracle('o2c', C, css(35), css(35, '\n\tnewKey: 9,'))), undefined, 'a limit that is new is a new check');
+	assert.match(reason(oracle('o2d', C, css(35), css(35).replace('emptyRules: 0', 'emptyRules: 1'))), /emptyRules 0 -> 1/);
+	assert.equal(decision(oracle('o2e', C, css(35), css(35).replace('// importants: 99', '// importants: 100'))), undefined, 'a comment is not a limit');
+	// the size budget is under a standing grant
+	const budget = (n) => `const LIMITS = {\n\tcascadeCss: ${n},\n};\n`;
+	assert.equal(decision(oracle('o2f', 'tools/size-budget.mjs', budget('118_420'), budget('120_000'))), undefined);
+	assert.equal(decision(oracle('o2g', C, budget('118_420'), budget('118_421'))), 'ask', 'an underscored number is read whole');
+});
+
+test('precommit-gate oracle: a net drop of test( calls in a tests file asks, per file', () => {
+	const T = 'tests/a.test.mjs';
+	// `latest(` and `contest(` hold the letters, not a call
+	const tf = (...names) => `import { test } from 'node:test';\n${names.map((n) => `test('${n}', () => {});`).join('\n')}\nlatest(1); contest(2);\n`;
+	const drop = oracle('o3', T, tf('a', 'b', 'c'), tf('a', 'b'));
+	assert.equal(decision(drop), 'ask');
+	assert.match(reason(drop), /tests\/a\.test\.mjs lost test\( calls: 3 -> 2/);
+	assert.equal(decision(oracle('o3b', T, tf('a', 'b'), tf('a', 'b', 'c'))), undefined);
+	assert.equal(decision(oracle('o3c', T, tf('a', 'b'), tf('x', 'y'))), undefined, 'the same count');
+	assert.equal(decision(oracle('o3d', T, null, tf('a'))), undefined, 'a new file');
+	assert.equal(decision(oracle('o3e', 'tests/helper.mjs', tf('a', 'b'), tf('a'))), undefined, 'not a *.test.mjs');
+	// a test moved to another file still asks on the file it left
+	const m = oracle('o3f', T, tf('a', 'b', 'c'), tf('a', 'b'));
+	m.stage('tests/b.test.mjs', tf('c'));
+	assert.match(reason(m), /tests\/a\.test\.mjs lost/);
+	assert.doesNotMatch(reason(m), /tests\/b\.test\.mjs/);
+	// a deleted file is every test gone
+	const del = verdictRepo('o3g');
+	del.stage(T, tf('a', 'b', 'c'));
+	g(del.r, 'commit', '-q', '-m', 'add');
+	del.remove(T);
+	assert.match(reason(del), /tests\/a\.test\.mjs lost test\( calls: 3 -> 0/);
+	// -a reads the worktree
+	const w = verdictRepo('o3h');
+	w.stage(T, tf('a', 'b'));
+	g(w.r, 'commit', '-q', '-m', 'add');
+	w.touch(T, tf('a'));
+	assert.equal(decision(w, 'git commit -am x'), 'ask');
+	assert.equal(decision(w), undefined);
+});
+
+test('precommit-gate oracle: a literal added to an ALLOW list of a tools gate asks, a removal does not', () => {
+	const G = 'tools/gate.mjs';
+	// the apostrophe is escaped in a literal, a quote and a `//` in a comment are text, and a set after the list is not the list
+	const map = (...entries) => `const SKIP = [ 'not-in-a-list' ];\n/* ALLOW = [ 'in a comment' ] */\nconst ALLOW = new Map([\n\t// 'x': skipped\n${entries.map(([ k, why ]) => `\t[ '${k}', '${why}' ], // it's here`).join('\n')}\n]);\nconst after = new Set([ 'later' ]);\n`;
+	const one = [ 'a in .b', "the reason, it\\'s long" ];
+	const two = [ 'c in .d', 'http://x/y' ];
+	const add = oracle('o4', G, map(one), map(one, two));
+	assert.equal(decision(add), 'ask');
+	assert.match(reason(add), /tools\/gate\.mjs ALLOW gained 2 literal\(s\), first: 'c in \.d'/);
+	assert.equal(decision(oracle('o4b', G, map(one, two), map(one))), undefined);
+	assert.equal(decision(oracle('o4c', G, map(one), map(one).replace("'later'", "'later', 'and more'"))), undefined, 'outside the list');
+	assert.equal(decision(oracle('o4d', G, map(one), map(one).replace("\t// 'x': skipped", "\t// 'x': skipped, 'y' /* 'z' */"))), undefined, 'inside a comment');
+	// a bare array, several entries on one line: a removal from the line is not a new entry, and a one-line list ends on its `;`
+	const arr = (...e) => `const ALLOW = [\n\t${e.map((x) => `'${x}'`).join(', ')},\n];\n`;
+	assert.equal(decision(oracle('o4e', G, arr('a', 'b'), arr('b'))), undefined);
+	assert.match(reason(oracle('o4f', G, arr('a', 'b'), arr('a', 'b', 'c'))), /ALLOW gained 1 literal\(s\), first: 'c'/);
+	const flat = (...e) => `const ALLOW = [ ${e.map((x) => `'${x}'`).join(', ')} ];\nconst other = [ 'zz' ];\n`;
+	assert.equal(decision(oracle('o4g', G, flat('a'), flat('a', 'b'))), 'ask');
+	assert.equal(decision(oracle('o4h', G, flat('a'), flat('a').replace("'zz'", "'zz', 'yy'"))), undefined);
+	// a file with no ALLOW list is never read, and the list belongs to a tools/*.mjs
+	assert.equal(decision(oracle('o4i', G, 'const X = [ "a" ];\n', 'const X = [ "a", "b" ];\n')), undefined);
+	assert.equal(decision(oracle('o4j', 'docs/gate.mjs', arr('a'), arr('a', 'b'))), undefined);
+});
+
+test('precommit-gate oracle: a find joins the verdict half question, and a clean commit stays silent', () => {
+	const v = oracle('o5', 'tools/baselines/b.json', '[\n\t"a"\n]\n', '[\n\t"a",\n\t"b"\n]\n');
+	v.stage('luci-theme-footstrap/a.txt', 'one\n');
+	const q = reason(v);
+	assert.match(q, /weakens an oracle: tools\/baselines\/b\.json/);
+	assert.match(q, /no recorded PASS on the content of luci-theme-footstrap\/a\.txt/);
+	v.card('1', pass(g(v.r, 'write-tree')));
+	assert.match(reason(v), /^precommit-gate: this commit weakens an oracle: tools\/baselines\/b\.json gained 1 line\(s\), first: "b"\. Waiving a gate is the maintainer's word/);
+	const quiet = verdictRepo('o5b');
+	for (const [ rel, text ] of [ [ 'tools/baselines/b.json', '[ "a" ]\n' ], [ 'tests/a.test.mjs', "test('a', () => {});\n" ], [ 'tools/x.mjs', 'const ALLOW = [ "a" ];\n' ], [ 'tools/css-metrics.mjs', 'const LIMITS = {\n\timportants: 1,\n};\n' ] ]) quiet.stage(rel, text);
+	g(quiet.r, 'commit', '-q', '-m', 'add');
+	quiet.stage('docs/x.md', 'x\n');
+	assert.equal(decision(quiet), undefined);
+});
+
+// ---- precommit-gate: `--amend` is read against HEAD^, and a commit from a subdirectory is read from the root ----
+test('precommit-gate: an amend is the combination of its parent and the index', () => {
+	const v = verdictRepo('am1');
+	const A = 'luci-theme-footstrap/a.txt';
+	const B = 'luci-theme-footstrap/b.txt';
+	v.stage(A, 'a0\n');
+	v.stage(B, 'b0\n');
+	g(v.r, 'commit', '-q', '-m', 'base');
+	v.touch(A, 'a1\n');
+	const aNew = v.snap(A); // A new, B old
+	v.touch(A, 'a0\n');
+	v.touch(B, 'b1\n');
+	const bNew = v.snap(B); // B new, A old
+	v.touch(A, 'a1\n');
+	const both = v.snap(A, B);
+	g(v.r, 'add', A, 'CHANGELOG.md', 'CHANGELOG_ru.md');
+	g(v.r, 'commit', '-q', '-m', 'A');
+	v.stage(B, 'b1\n'); // HEAD holds A new; the index adds B new
+	v.card('1', pass(aNew));
+	v.card('2', pass(bNew));
+	assert.equal(decision(v), undefined, 'a plain commit adds B alone, and B has a PASS');
+	const q = v.run('git commit --amend -m x');
+	assert.equal(q.permissionDecision, 'ask', 'the amended commit is A and B together, which no entry holds');
+	assert.match(q.permissionDecisionReason, /no single history entry/);
+	assert.equal(decision(v, 'git commit --no-edit --amend'), 'ask');
+	v.card('3', pass(both));
+	for (const c of [ 'git commit --amend -m x', 'git commit --amend --no-edit', 'git commit -a --amend -m x' ]) assert.equal(decision(v, c), undefined, c);
+	// a root commit has no parent: its content is the whole index, and the hooks it carries are guard paths
+	const r = gateRepo('am2');
+	assert.match(decide('git commit --amend -m x', { cwd: r, hook: join(r, '.claude/hooks/precommit-gate.sh') }), /ask/);
+	const root = run('git commit --amend -m x', { cwd: r, hook: join(r, '.claude/hooks/precommit-gate.sh') });
+	assert.match(root.permissionDecisionReason, /\.claude\/hooks\/precommit-gate\.sh/);
+});
+
+test('precommit-gate: an amend that deletes a path judges the deletion against the amend base', () => {
+	const v = verdictRepo('am3');
+	const A = 'luci-theme-footstrap/a.txt';
+	const B = 'luci-theme-footstrap/b.txt';
+	for (const f of [ A, B, 'luci-theme-footstrap/c.txt' ]) v.stage(f, `${f}0\n`);
+	g(v.r, 'commit', '-q', '-m', 'base');
+	v.stage(B, 'b1\n');
+	g(v.r, 'commit', '-q', '-m', 'b1');
+	// HEAD minus A still holds b1, which the amend rolls back to its parent's blob: that tree was never the combination
+	g(v.r, 'rm', '-q', '--cached', A);
+	const headMinusA = g(v.r, 'write-tree');
+	g(v.r, 'reset', '-q');
+	v.remove(A);
+	v.stage(B, `${B}0\n`);
+	const made = g(v.r, 'write-tree');
+	v.card('1', pass(headMinusA));
+	assert.equal(decision(v, 'git commit --amend -m x'), 'ask', 'the tree the amend does not make');
+	v.card('1', pass(made));
+	assert.equal(decision(v, 'git commit --amend -m x'), undefined, 'the tree the amend makes');
+});
+
+test('precommit-gate: a commit from a subdirectory runs the changelog check from the root', () => {
+	const v = verdictRepo('sub1');
+	v.stage('docs/x.md', 'x\n');
+	assert.equal(decision(v, 'git commit -m x') ?? '', '');
+	assert.equal(v.run('git commit -m x', join(v.r, 'docs')).permissionDecision, undefined);
+	// the contract still bites from there: a staged file with no entry is the changelog deny, not a missing module
+	const r = gateRepo('sub2');
+	mkdirSync(join(r, 'docs'));
+	const q = run('git commit -m x', { cwd: join(r, 'docs'), hook: join(r, '.claude/hooks/precommit-gate.sh') });
+	assert.equal(q.permissionDecision, 'deny');
+	assert.match(q.permissionDecisionReason, /Changelog contract/);
+	assert.doesNotMatch(q.permissionDecisionReason, /MODULE_NOT_FOUND|changelog\.mjs failed/);
 });
 
 // ---- a crew role in the lead's checkout: what rewrites its worktree, index or config is denied, and only there ----
