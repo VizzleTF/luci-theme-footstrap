@@ -15,6 +15,7 @@
 - **The agent dispatches the theme's own CI workflows (`gh workflow run`) without asking.** A dispatch only runs checks on code already on `main` (the `deep` reading before a release); it publishes nothing, so `git-guard.sh`, `CLAUDE.md` and `/release` stopped treating it like a tag.
 - **`/ship` runs `install-check` on both stands before it pushes a change to `install.sh`.** Users fetch the installer from raw `main` the moment a push lands, while T0 only parsed it; three field reports (#16, #28, #30) were the installer alone.
 - **`docs/crew.md` records the accepted risk of secrets in the agent's environment, keeps writers one at a time in the shared checkout, and states the 16-agent workflow cap; two role files drop stale references.** From the AI-development audit of 2026-10-20: one writer's `git reset --hard HEAD~3` had wiped its neighbours' work, and the workflow notes, the role roster and the memory rule had drifted from what holds.
+- **`table-contract` opens every dropdown the way a user does and checks each open item can be hit: a ComboButton through its arrow, a plain dropdown anywhere, then `elementFromPoint` at the centre of every item.** 0.14.16 shipped a ComboButton whose menu `overflow: hidden` clipped, after three tester passes that opened it with `dispatchEvent`; the old check only flagged `auto`/`scroll` ancestors. The gate now goes red on that release, on a hidden arrow and on an arrow that cannot be clicked, and is green on 32 items today.
 
 ### Fixed
 

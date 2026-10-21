@@ -95,6 +95,7 @@ The guards inside `check`, by the issue that left them:
 | #6 | localisation ships as separate `luci-i18n-*` packages, and assets sorted by name can be picked instead of the theme | `i18n` (catalogue current and complete); `tools/check-packages.sh` in CI's `build` |
 | #9, #11 | config-table row labels and a data-table column vanished or were squeezed | `css-dup` + `mirror` (`@mirror table-card/*`) |
 | the ComboButton report | a split button wrapped its arrow under the label in a stacked action cell; the gallery had no such widget, so no gate saw it | `gallery-coverage` — every (widget, container) pair the styles distinguish has a fixture in `docs/gallery.html` |
+| 0.14.16 | a ComboButton's open menu was clipped by `overflow: hidden`; three testers "opened" it with `dispatchEvent` and a rect, which cannot see a clip | `table-contract` check 2d — a real click opens every visible `.cbi-dropdown` (a ComboButton on its `> span.open` arrow, which must be visible), `elementFromPoint` at each `li`'s centre returns that `li`, and no ancestor from the dropdown up clips or scrolls |
 | all | a rule lost its `!important` or started depending on source order | `css-metrics`, stylelint `selector-max-specificity`, `audit --strict`, `css-orphans` |
 | — | the template pre-paint drifted from the live appearance appliers | `axes` |
 | — | `[Unreleased]` without a bold lead, or the RU mirror out of sync → an empty release note | `changelog` |

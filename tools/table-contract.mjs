@@ -341,24 +341,87 @@ else {
 	if (!card.labelled) fails.push('a carded cell prints no `data-title` label — the card says nothing about which column a value came from');
 }
 
-/* 2d. nothing that can hold a popup may become a scroll container: `overflow-x: auto` computes
- * `overflow-y` to auto as well, and luci-base sizes an open dropdown against the nearest scroll
- * parent. This is the assertion that keeps the scroll tier honest as it grows. */
-const clipped = await page.evaluate(() => {
-	const bad = [];
-	for (const dd of document.querySelectorAll('.cbi-dropdown')) {
-		for (let el = dd.parentElement; el && el !== document.body; el = el.parentElement) {
-			const cs = getComputedStyle(el);
-			if (/(auto|scroll)/.test(cs.overflowX + cs.overflowY)) {
-				bad.push(`${el.tagName.toLowerCase()}.${(el.className || '').toString().split(' ')[0]}`);
-				break;
+/* 2d. an open dropdown is usable the way a user meets it. Static half: nothing from the dropdown up
+ * may clip (hidden, clip) or scroll (auto, scroll; `overflow-x: auto` computes `overflow-y` to auto as
+ * well and luci-base sizes an open list against the nearest scroll parent). Render half: a real click
+ * opens every visible dropdown (a ComboButton on its arrow) and `elementFromPoint` at each li's centre
+ * must return that li; dispatchEvent + getBoundingClientRect cannot see a clip, which is how 0.14.16
+ * shipped a ComboButton menu under `overflow: hidden`. The gallery has no LuCI JS, so a stand-in
+ * mirrors openDropdown's DOM ([open], the ul as `.dropdown` under a `top`, a `.preview` clone) less
+ * `.cbi-dropdown-open` and the upward flip, which no theme rule reads. */
+await page.evaluate(() => {
+	document.addEventListener('click', (ev) => {
+		const sb = ev.target.closest('.cbi-dropdown');
+		if (!sb || sb.hasAttribute('open')) return;
+		/* UIComboButton.handleClick: a closed button runs its action unless the arrow was hit */
+		if (sb.matches('.btn, .cbi-button') && !ev.target.matches('.cbi-dropdown > span.open')) return;
+		const ul = sb.querySelector('ul');
+		const pv = ul.cloneNode(true);
+		pv.classList.add('preview');
+		sb.setAttribute('open', '');
+		ul.style.top = `${sb.offsetHeight}px`;
+		ul.style.maxHeight = `${Math.max(innerHeight - sb.getBoundingClientRect().bottom, 0)}px`;
+		ul.classList.add('dropdown');
+		sb.insertBefore(pv, ul.nextElementSibling);
+	});
+	window.__closeDropdown = (sb) => {
+		const ul = sb.querySelector('ul.dropdown');
+		sb.querySelector('ul.preview')?.remove();
+		sb.removeAttribute('open');
+		ul.classList.remove('dropdown');
+		ul.style.top = ul.style.maxHeight = '';
+	};
+	/* the gallery stages two lists open; one open at a time is what ui.js keeps, and a staged list lies over the next widget's */
+	document.querySelectorAll('.cbi-dropdown[open]').forEach((sb) => window.__closeDropdown(sb));
+});
+const dropdowns = page.locator('.cbi-dropdown');
+let hitTested = 0;
+for (let i = 0, n = await dropdowns.count(); i < n; i++) {
+	const dd = dropdowns.nth(i);
+	if (!(await dd.isVisible())) continue;
+	/* what a failure names: the position, the label and the id LuCI gave a ComboButton */
+	const name = await dd.evaluate((el, k) => `#${k} "${(el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 24)}"` +
+		(el.dataset.idref ? ` [data-idref=${el.dataset.idref}]` : ''), i);
+	const clips = await dd.evaluate((el) => {
+		const bad = [];
+		for (let a = el; a && a !== document.body; a = a.parentElement) {
+			const cs = getComputedStyle(a);
+			if (/(auto|scroll|hidden|clip)/.test(cs.overflowX + cs.overflowY))
+				bad.push(`${a.tagName.toLowerCase()}.${(a.className || '').toString().split(' ')[0]} ${cs.overflowX}/${cs.overflowY}`);
+		}
+		return bad;
+	});
+	for (const c of clips) fails.push(`dropdown ${name} sits in ${c} — its open list is clipped or mis-sized`);
+	/* near the top of the viewport, so the list has room below it */
+	await dd.evaluate((el) => scrollTo(0, scrollY + el.getBoundingClientRect().top - 100));
+	const combo = await dd.evaluate((el) => el.matches('.btn, .cbi-button'));
+	const target = combo ? dd.locator(':scope > span.open') : dd;
+	if (!(await target.isVisible())) { fails.push(`ComboButton ${name} has no visible arrow (> span.open) — nothing opens its list`); continue; }
+	try { await target.click({ timeout: 3000 }); }
+	catch (e) { fails.push(`dropdown ${name} cannot be clicked${combo ? ' on its arrow' : ''}: ${e.message.split('\n')[0]}`); continue; }
+	if (!(await dd.evaluate((el) => el.hasAttribute('open')))) { fails.push(`dropdown ${name}: a click on it did not open the list`); continue; }
+	const miss = await dd.evaluate((el) => {
+		const bad = [];
+		let tested = 0;
+		for (const li of el.querySelectorAll('ul.dropdown > li')) {
+			const r = li.getBoundingClientRect();
+			if (!r.width || !r.height) continue;
+			tested++;
+			const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+			if (!hit || !li.contains(hit)) {
+				const at = hit ? `${hit.tagName.toLowerCase()}.${(hit.className || '').toString().split(' ')[0]}` : 'nothing';
+				bad.push(`"${(li.textContent || '').trim().slice(0, 24)}" -> ${at}`);
 			}
 		}
-	}
-	return bad;
-});
-for (const el of clipped)
-	fails.push(`a .cbi-dropdown sits inside a scroll container (${el}) — its open list will be clipped and mis-sized`);
+		return { bad, tested };
+	});
+	hitTested += miss.tested;
+	for (const m of miss.bad) fails.push(`an open dropdown ${name}: the centre of li ${m}, so the user cannot reach it`);
+	await dd.evaluate((el) => window.__closeDropdown(el));
+}
+if (!hitTested) fails.push('no open dropdown li was hit-tested — nothing measured');
+else if (VERBOSE) console.log(`  dropdown  ${hitTested} li hit-tested`);
+await page.evaluate(() => scrollTo(0, 0));
 
 /* 2e. every .fs-dt frame, div or real table, shares one overflow: the generic `.table` rule's
  * overflow:hidden made a bare div table the sticky header's scroll container, one bar-height off
@@ -415,4 +478,4 @@ if (fails.length) {
 	for (const f of fails) console.error(`  - ${f}`);
 	process.exit(1);
 }
-console.log('table-contract: break values where the contract puts them, floor holds, card labelled, no popup inside a scroller.');
+console.log('table-contract: break values where the contract puts them, floor holds, card labelled, every open dropdown list reachable.');
