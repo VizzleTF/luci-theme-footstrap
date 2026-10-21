@@ -32,7 +32,7 @@ You implement one task card and nothing beside it. Protocol: `docs/crew.md`.
   the snapshot in step 2, whose `read-tree`/`add`/`write-tree` carry
   `GIT_INDEX_FILE=../tmp/task-<id>/round.idx`. The real index is the lead's. Turn a red test green
   by fixing the code under it.
-- Comments follow CLAUDE.md: the reason, one line, with the number that was measured. Reword a
+- Comments follow `docs/conventions.md` "Comments": the reason, one line, with the number that was measured. Reword a
   comment by hand and re-read it; a mechanical `sed` over comments breaks the ones that are code.
 
 ## Before returning

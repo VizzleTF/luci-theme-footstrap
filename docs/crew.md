@@ -47,7 +47,6 @@ flowchart TD
 | `security` | Sonnet | 25 | nothing | the diff | findings block |
 | `upstream-reviewer` | Opus | 30 | nothing (Bash held read-only by a hook) | the luci branch diff against `origin/master` | findings block |
 | `researcher` | Sonnet | 20 | nothing | the question | answer + ranked sources |
-| `caveman:cavecrew-investigator` | Haiku | n/a | nothing | a "where is X" question | `file:line` table |
 
 `maxTurns` is the budget one card needs. `developer` 60: a card is one mechanism, and the handoff
 is written at turn 45, leaving the next developer a clean state. `tester` 100: it starts detached
@@ -194,13 +193,16 @@ counter of 2–3.
 
 Instructions are advisory; hooks and permission rules are deterministic tripwires that fail open
 (`.claude/hooks/git-guard.sh` header); CI is the ground truth for done. Nothing server-side stops a
-tag or a rewrite of `main` (a tag ruleset was rejected on 2026-10-19).
+tag or a rewrite of `main` (a tag ruleset was rejected on 2026-10-19). Accepted risk (the
+maintainer, 2026-10-21): the shell Claude Code starts from exports the maintainer's secrets, signing
+keys included, so every Bash subprocess, npm dependency, plugin hook and MCP server inherits them;
+a `Read` deny does not cover `env`, and no layer below stops code that reads its own environment.
 
 | Layer | Where | Holds |
 |---|---|---|
 | 1. Instructions | `CLAUDE.md`, `.claude/rules/*.md` (path-scoped), `.claude/agents/*.md`, skills, auto-memory | the policy, the tiers, the roles; the auto-mode classifier reads `CLAUDE.md` too |
-| 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes); `precommit-gate.sh` (both CHANGELOG entries); `session-start.sh` (drift from `origin/main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/retro`) | the per-word list, whatever the permission mode |
-| 3. Permissions and auto mode | `.claude/settings.json` `deny`/`ask`/`allow`; `autoMode` in `~/.claude/settings.json` (the classifier reads it only from user settings); `tools/bg.sh` refuses ssh, commit, push, tag and gh writes in detached runs | prompts and denials before a command runs; prefix matching misses `git -C` forms, hence layer 2 |
+| 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes, publications); `precommit-gate.sh` (both CHANGELOG entries); `session-start.sh` (drift from `origin/main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/retro`) | the per-word list, whatever the permission mode |
+| 3. Permissions and auto mode | `.claude/settings.json` `deny`/`ask`/`allow`; `autoMode` in `~/.claude/settings.json` (the classifier reads it only from user settings); `tools/bg.sh` refuses ssh, commit, push, tag and gh writes in detached runs; the MCP servers github, kubernetes, helm and Vercel are denied in this project (never called here, and their write tools bypassed every other layer) | prompts and denials before a command runs; prefix matching misses `git -C` forms, hence layer 2 |
 | 4. Git hooks | `.githooks/pre-push` (`npm run check`), `.githooks/commit-msg` (strips trailers) | every contributor, agent or not |
 | 5. CI | `build.yml`: check, lint, build, verify (25.12/apk + 24.10/opkg), live, anchors on every push; deep on a tag or dispatch | the ground truth for "done" |
 
@@ -235,7 +237,8 @@ workspace there, so a case's `git fetch` fails with `Read-only file system`.
 
 - `CLAUDE.md`: at most 120 lines, facts and hard limits, pointers to `docs/`.
 - Auto-memory (`~/.claude/projects/<project>/memory/`): learnings no file shows. A memory that
-  recurs twice is promoted to a rule or hook and deleted.
+  recurs twice is promoted to a rule or hook and deleted; a memory keeps only the why no repo file
+  carries, or it is deleted.
 - `card.json`, handoffs and `tools/bg.sh` run logs in `../tmp/`: state outside any context, so a
   dead session resumes from files.
 
@@ -243,11 +246,18 @@ workspace there, so a case's `git fetch` fails with `Read-only file system`.
 
 A workflow script fans out independent read-only work (audits, research, per-file reviews).
 
-- Scripts live in `../tmp/workflows/<name>.wf.js`, so they survive the session.
-- At most 5 agents in flight, through a semaphore.
-- Long prompts sit in `.md` files the script reads, not in template strings.
-- Each agent writes a large result to a file and returns its path.
-- Writers stay one at a time; parallel writers need separate worktrees and separate cards.
+- The Workflow tool keeps each script under `~/.claude/projects/<project>/<session>/workflows/scripts/`;
+  one that must outlive the session is copied to `../tmp/workflows/<name>.wf.js`, and a plan or
+  decision that must survive goes to `../tmp/task-<id>/`.
+- Up to 16 agents in flight, the runtime's own cap (the maintainer lifted the 5-agent limit on
+  2026-10-20).
+- Long prompts sit in `.md` files an agent is told to read, not in template strings.
+- Each agent writes a large result to a file and returns its path. The harness may refuse a
+  subagent's write of a file it reads as a report; that result comes back as text and the lead
+  saves it (the 2026-10-20 audit's final report).
+- Writers stay one at a time in the shared checkout; parallel writers each get their own worktree
+  and card, and a general-purpose workflow agent edits no repository file. On 2026-10-19 one
+  writer's test ran `git reset --hard HEAD~3` in the shared tree and wiped its neighbours' work.
 
 ## Measuring the crew
 

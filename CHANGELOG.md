@@ -14,6 +14,7 @@
 - **`docs/conventions.md` asks every gate to read only what git tracks, what git ignores by rule, or what it builds itself.** `agent-refs` checked `dist/` on disk, passed the pre-push in a working tree and failed CI on a clean checkout; a gate whose verdict depends on leftovers in one tree is not a gate.
 - **The agent dispatches the theme's own CI workflows (`gh workflow run`) without asking.** A dispatch only runs checks on code already on `main` (the `deep` reading before a release); it publishes nothing, so `git-guard.sh`, `CLAUDE.md` and `/release` stopped treating it like a tag.
 - **`/ship` runs `install-check` on both stands before it pushes a change to `install.sh`.** Users fetch the installer from raw `main` the moment a push lands, while T0 only parsed it; three field reports (#16, #28, #30) were the installer alone.
+- **`docs/crew.md` records the accepted risk of secrets in the agent's environment, keeps writers one at a time in the shared checkout, and states the 16-agent workflow cap; two role files drop stale references.** From the AI-development audit of 2026-10-20: one writer's `git reset --hard HEAD~3` had wiped its neighbours' work, and the workflow notes, the role roster and the memory rule had drifted from what holds.
 
 ### Fixed
 

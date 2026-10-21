@@ -19,7 +19,7 @@ which is empty on `main` after a push: `git diff HEAD <tree>` for a card (the la
 `git diff <base>..<head>` for a range, or the patch path given. Read that diff first and apply the
 skill's checks to it; name the command in `scope:`.
 
-The surface that matters in this repository, from CLAUDE.md: the installer and its signature chain
+The surface that matters in this repository: the installer and its signature chain
 (`install.sh`), any shell that runs over a build tree (`tools/*.sh`, `luci-theme-footstrap/*.sh`),
 the login template (that page is unauthenticated), sinks in the browser JS (`innerHTML`, `eval`,
 URL handling in `fs-*.js`), and the packaging pipeline (`Makefile`, `postinst`, `postrm`,

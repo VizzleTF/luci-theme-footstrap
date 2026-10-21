@@ -1020,7 +1020,7 @@ failure mode is measured, not hypothetical. `--dry-run` prints every command any
 run without touching a tool or a router, and works with no prerequisite on `PATH` at all.
 
 **Every run — `--list` included — ends by naming what it did NOT reproduce and why**: the signed
-`release`/`pages` jobs (no local copy of either secret key), the artifact upload/download between
+`release`/`pages` jobs (they sign with CI secrets this script never reads), the artifact upload/download between
 `build` and everything downstream of it (substituted by one shared `dist/` on disk), job-level
 `timeout-minutes` (unenforced locally), and the apt-get fallback branches inside `check`'s
 gettext block and `ci-playwright.sh` (only exercised when the tool is actually missing, which it
