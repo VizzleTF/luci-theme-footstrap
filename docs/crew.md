@@ -332,6 +332,12 @@ images in the lead, every gate log opened by a role, rounds ≤ 2, no stall. Bas
 characters in the lead against 1.54M across 17 subagents. On the same diff, `tester` on Opus found
 three issues to Sonnet's one, which is why it runs on Opus.
 
+After the character lines it prints the lead's characters per delegation against the 15k budget,
+the lead's five largest tool outputs, and a token table per role and model, each message counted
+once by `message.id`. `cache_read` is the exact cost number (audit 69c0d4f8: workflow agents 175M,
+the lead 124M, tester 60M, developer 45M); a subagent's `output` is a lower bound, printed
+`>=N (final/msgs final)`, because its transcript keeps the final usage line for few messages.
+
 ## Sources
 
 - Building effective agents — https://www.anthropic.com/engineering/building-effective-agents

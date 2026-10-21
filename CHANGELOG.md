@@ -7,6 +7,7 @@
 - **A commit of package or guard code asks without a recorded tester verdict.** `precommit-gate.sh` asks before a commit carries `luci-theme-footstrap/**` or `install.sh` content no tester `PASS` covered, or hook, settings or workflow content without a `security` pass too; other paths ship on T0 and are verified after the push.
 - **A developer is never spawned without its card.** A new `card-gate.sh` hook denies a `developer` spawn whose prompt names no existing task card with its `dirty-at-start` record, and prints the two commands that create the record.
 - **A crew role can no longer discard work in the real checkout.** `git-guard.sh` denies a `developer`, `tester`, `security`, `researcher` or `upstream-reviewer` call that would reset, restore, clean, stash, re-read or stage into the worktree, index or remotes of the checkout itself; a scratch repository and a private index stay open. Three such slips happened in one session.
+- **measure-run counts tokens by role.** Beside its character lines it prints the lead characters per delegation against the 15k budget, the five largest outputs the lead read, and a token table per role and model, each message counted once; a subagent output count is marked as a lower bound where its transcript lacks the final usage.
 
 ### Changed
 
