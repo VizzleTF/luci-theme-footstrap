@@ -103,7 +103,13 @@ rewrite JSON less readily than Markdown, and a file outlives a compaction.
   A lead-only task with no card writes the same files; `/ship` step 2 stops before staging a path
   listed there. The developer snapshots a card path listed there all the same (the tree is for
   review; the lead stages by path), and the tester leaves out every hunk `dirty-at-start.diff`
-  carries.
+  carries. `card-gate.sh` (PreToolUse, `Agent`) holds both files: it denies a `developer` spawn
+  whose prompt names no existing `../tmp/task-<id>/card.json` with `dirty-at-start` beside it, and
+  prints the two commands that record it in the reason. It denies rather than asks because the
+  omission is the lead's own, and every other agent type passes. Measured: 16 of 50 developer
+  spawns since 2026-10-07 ran with no card (audit P1-2). A Workflow script's `agent()` is no
+  `Agent` tool call and does not pass through it; a writer there names its card in the prompt all
+  the same.
 - `scope_ok` (the tester's): every code path `CLAUDE.md` "Crew" lists that `git status
   --porcelain --untracked-files=all` shows, less `dirty-at-start`, is in `card.files`; and
   `git diff --name-only HEAD <tree>` holds each `card.files` path `git status` shows and nothing
@@ -221,13 +227,13 @@ the sandbox. Revisit when detached runs move off `tools/bg.sh`.
 | Layer | Where | Holds |
 |---|---|---|
 | 1. Instructions | `CLAUDE.md`, `.claude/rules/*.md` (path-scoped), `.claude/agents/*.md`, skills, auto-memory | the policy, the tiers, the roles; the auto-mode classifier reads `CLAUDE.md` too |
-| 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes, publications); `precommit-gate.sh` (both CHANGELOG entries, then a recorded tester verdict on a package or guard path, asked); `session-start.sh` (drift from `origin/main`, a red Build push run on `main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/retro`) | the per-word list, whatever the permission mode |
+| 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes, publications); `precommit-gate.sh` (both CHANGELOG entries, then a recorded tester verdict on a package or guard path, asked); `card-gate.sh` (PreToolUse `Agent`: a `developer` spawn needs its card and `dirty-at-start`, denied); `session-start.sh` (drift from `origin/main`, a red Build push run on `main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/retro`) | the per-word list, whatever the permission mode |
 | 3. Permissions and auto mode | `.claude/settings.json` `deny`/`ask`/`allow`; `autoMode` in `~/.claude/settings.json` (the classifier reads it only from user settings); `tools/bg.sh` refuses ssh, commit, push, tag and gh writes in detached runs; the MCP servers github, kubernetes, helm and Vercel are denied in this project (never called here, and their write tools bypassed every other layer) | prompts and denials before a command runs; prefix matching misses `git -C` forms, hence layer 2 |
 | 4. Git hooks | `.githooks/pre-push` (`npm run check` on the pushed commit in a clean worktree), `.githooks/commit-msg` (strips trailers) | every contributor, agent or not |
 | 5. CI | `build.yml`: check, lint, build, verify (25.12/apk + 24.10/opkg), live, anchors on every push; deep on a tag or dispatch | the ground truth for "done" |
 
 **Probing a guard.** A hook or `tools/bg.sh` is tested through its decision path only: the hook
-JSON on stdin (`.claude/hooks/git-guard.sh --kinds`, `precommit-gate.sh`) or `tools/bg.sh --check
+JSON on stdin (`.claude/hooks/git-guard.sh --kinds`, `precommit-gate.sh`, `card-gate.sh`) or `tools/bg.sh --check
 <command>`, which print a verdict and run nothing. The guarded command itself never executes, in a
 test, a probe or a stub. Real git runs in a scratch repo `git init`ed outside this checkout, with
 its cwd there: `../tmp/` for a probe, the test's `mkdtemp(tmpdir())` dir for a test. The reason:

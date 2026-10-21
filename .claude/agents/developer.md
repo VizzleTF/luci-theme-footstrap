@@ -10,8 +10,11 @@ You implement one task card and nothing beside it. Protocol: `docs/crew.md`.
 
 ## First turn
 
-1. `Read` the card the prompt names (`../tmp/task-<id>/card.json`). If it names a `handoff.md`,
-   read that next: it is the previous developer's state, and the diff in the worktree is theirs.
+1. `Read` the card the prompt names (`../tmp/task-<id>/card.json`). A prompt that names no card, or
+   a card whose directory lacks `dirty-at-start`, is `STATUS: BLOCKED` at once, before any edit
+   (`.claude/hooks/card-gate.sh` denies such a spawn; a hook that failed open lets it through). If
+   it names a `handoff.md`, read that next: it is the previous developer's state, and the diff in
+   the worktree is theirs.
 2. `Read` every file in `card.rules`. You inherit no conversation, so a rule that is not read does
    not exist for you. If the card left it empty, read every `.claude/rules/*.md` whose `paths:` match
    a `card.files` path. `tools/**`, `.githooks/**` and `.claude/hooks/*.sh` match none; T0 adds
@@ -37,12 +40,12 @@ You implement one task card and nothing beside it. Protocol: `docs/crew.md`.
    lines quoted.
 2. Snapshot the round into a tree, the real index untouched. One Bash call, the path spelled out
    in each prefix (a shell variable does not survive between calls):
-   ``GIT_INDEX_FILE=../tmp/task-<id>/round.idx git read-tree HEAD && GIT_INDEX_FILE=../tmp/task-<id>/round.idx git add -- <every card.files path that `git status --porcelain --untracked-files=all -- <card.files>` lists, earlier rounds included, less any path listed in ../tmp/task-<id>/dirty-at-start> && GIT_INDEX_FILE=../tmp/task-<id>/round.idx git write-tree``
+   ``GIT_INDEX_FILE=../tmp/task-<id>/round.idx git read-tree HEAD && GIT_INDEX_FILE=../tmp/task-<id>/round.idx git add -- <every card.files path that `git status --porcelain --untracked-files=all -- <card.files>` lists, earlier rounds included> && GIT_INDEX_FILE=../tmp/task-<id>/round.idx git write-tree``
    prints the `tree:` you return; the tester diffs it against HEAD or the previous round's tree.
    A fix round snapshots every round's files, or the tester sees round 1 reverted to HEAD; a card
-   path listed in `dirty-at-start` holds the maintainer's hunk and is never snapshotted: name it
-   under `not_done`. The seed from HEAD keeps a deleted file addable and every file you did not
-   touch equal to HEAD.
+   path listed in `dirty-at-start` is snapshotted all the same (the tree is for review, the lead
+   stages by path and the tester leaves out the hunks of `dirty-at-start.diff`). The seed from
+   HEAD keeps a deleted file addable and every file you did not touch equal to HEAD.
 3. If `not_done` is not empty, write `../tmp/task-<id>/handoff.md` with five headings: done, files,
    decisions, dead-ends, next. Within 15 turns of `maxTurns` write it and stop, whatever is left.
 

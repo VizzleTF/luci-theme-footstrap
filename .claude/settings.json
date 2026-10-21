@@ -147,6 +147,16 @@
             "statusMessage": "Checking the changelog contract"
           }
         ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/card-gate.sh\"",
+            "statusMessage": "Checking the developer's card"
+          }
+        ]
       }
     ],
     "SessionStart": [
