@@ -40,11 +40,15 @@ The standing grant in `CLAUDE.md` `## Commits` covers every step here. A tag goe
    [Unreleased] entry skips `add` (.claude/rules/changelog.md). Done = `git log -1 --stat` shows both CHANGELOG files, or the report names the exemption that applied.
 4. **Main is not red.** `gh run list --branch main -L1 --json conclusion,headSha` is not `failure`,
    or this push is the fix for it, said in the report.
-5. **Anchoring gates.** When the diff touches `fs-fit.js` or a scroll-anchor/floor gate, what a
-   push to `main` runs (both stands, hours) goes to a `tester` card before the push, acceptance
-   `tools/ci-local.sh --mode push --force build anchors` → every `anchors` step PASS, none SKIP.
-   The lead runs no stand and waits for the verdict block. Done = the `PASS` verdict quoted, or the
-   report says it was skipped and why.
+5. **Stand gates before the push.** What a push to `main` would prove only after the push goes to
+   a `tester` card first; the lead runs no stand and waits for the verdict block.
+   - The diff touches `fs-fit.js` or a scroll-anchor/floor gate (both stands, hours): acceptance
+     `tools/ci-local.sh --mode push --force build anchors` → every `anchors` step PASS, none SKIP.
+   - The diff touches `install.sh`: users fetch it from raw `main` the moment the push lands, and
+     T0 only parses it. Acceptance `tools/bg.sh sh tools/install-check.sh owrt2512 owrt2410` →
+     PASS on both, the verdict naming 25.12/apk and 24.10/opkg.
+
+   Done = each `PASS` verdict quoted, or the report says it was skipped and why.
 6. **Push.** `git push origin HEAD` with `timeout: 300000`: `.githooks/pre-push` runs
    `npm run check`. A red hook is a fix and a new commit, then this step again; a non-fast-forward
    rejection (origin moved meanwhile) is step 1 again.

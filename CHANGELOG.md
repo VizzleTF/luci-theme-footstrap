@@ -13,6 +13,7 @@
 - **Every role gets the guard-probing rule from the `SubagentStart` hook, a fix round snapshots all of its card's files, and `scp`, `sftp` and `rsync` ask like `ssh`.** The developer's snapshot took only the current round's files, so round 2's tester saw round 1 reverted; the probing rule lived in two agent files and not in the one that writes the tests; and a global `scp` allow let a copy to the hardware router through without a prompt.
 - **`docs/conventions.md` asks every gate to read only what git tracks, what git ignores by rule, or what it builds itself.** `agent-refs` checked `dist/` on disk, passed the pre-push in a working tree and failed CI on a clean checkout; a gate whose verdict depends on leftovers in one tree is not a gate.
 - **The agent dispatches the theme's own CI workflows (`gh workflow run`) without asking.** A dispatch only runs checks on code already on `main` (the `deep` reading before a release); it publishes nothing, so `git-guard.sh`, `CLAUDE.md` and `/release` stopped treating it like a tag.
+- **`/ship` runs `install-check` on both stands before it pushes a change to `install.sh`.** Users fetch the installer from raw `main` the moment a push lands, while T0 only parsed it; three field reports (#16, #28, #30) were the installer alone.
 
 ### Fixed
 
