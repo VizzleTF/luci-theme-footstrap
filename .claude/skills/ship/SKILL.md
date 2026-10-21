@@ -11,6 +11,13 @@ The standing grant in `CLAUDE.md` `## Commits` covers every step here. A tag goe
    exits 0. Without one (the lead's own docs or config edit), run `npm run check:fast` in the
    foreground: it holds `npm test` and `agent-refs`. Done = those gate lines, or its exit 0, quoted
    in the report.
+
+   A diff with a package path (`luci-theme-footstrap/**`, `install.sh`) or a guard path
+   (`.claude/hooks/**`, `.claude/settings.json`, `.githooks/**`, `.github/workflows/**`) also needs
+   the tester's `PASS` (and `security` `CLEAN` for a guard path) on the staged content: append
+   `{ "round", "tree", "verdict", "security"?, "blocking" }` from the block to the card's `history`
+   and quote the entry in the report. `precommit-gate.sh` asks at step 3 without it. Other paths
+   ship on T0 and the pre-push check; their tester card runs after the push, same session.
 1. **Base on `origin/main`, before anything is staged** (a staged index makes a rebase refuse).
    `git fetch origin`, then `git rev-list --left-right --count origin/main...HEAD` prints
    `<behind> <ahead>`:

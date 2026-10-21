@@ -1,5 +1,5 @@
 #!/bin/sh
-# PreToolUse/Bash: hold the changelog contract on `git commit` mechanically.
+# PreToolUse/Bash: hold the changelog contract and the recorded-verdict rule on `git commit` mechanically.
 #
 # "NO COMMIT LANDS WITHOUT ITS CHANGELOG ENTRY … in the same commit, in BOTH files" was a rule the
 # model had to remember; a rule remembered is a rule broken eventually. This denies the commit
@@ -10,6 +10,13 @@
 # files) or `git add <paths> && git commit …`. The index is read before those have run, so the files
 # they stage are read from the worktree instead (below). Any other `git add` ahead of the commit asks.
 # The rules page is .claude/rules/changelog.md.
+#
+# The second half asks (never denies) when the commit carries a path whose pre-push class needs a
+# tester verdict (docs/crew.md "The card"): the package (`luci-theme-footstrap/**`, `install.sh`) wants
+# a PASS entry in some ../tmp/task-*/card.json `history[]` whose tree holds the content the commit
+# will carry, the guards (`.claude/hooks/**`, `.claude/settings.json`, `.githooks/**`,
+# `.github/workflows/**`) want that entry to say `security: "CLEAN"` as well. Every other path
+# passes: the tester reads it after the push.
 #
 # No `if:` in settings.json: it only matches a line that STARTS with `git commit`. The detection is
 # git-guard.sh's `--kinds`, so `cd a && git commit` and a script that commits reach this too.
@@ -56,16 +63,17 @@ CWD=$(printf '%s' "$IN" | jq -r '.cwd // ""')
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || true)
 [ "$GIT_ROOT" = "$HOOK_ROOT" ] || exit 0
 
-deny() {
-	jq -n --arg r "$1" '{
+emit() { # $1 deny|ask, $2 why
+	jq -n --arg d "$1" --arg r "$2" '{
 		hookSpecificOutput: {
 			hookEventName: "PreToolUse",
-			permissionDecision: "deny",
+			permissionDecision: $d,
 			permissionDecisionReason: $r
 		}
 	}'
 	exit 0
 }
+deny() { emit deny "$1"; }
 
 # `git commit -a` stages tracked changes as it runs, so the staged index is not what the commit
 # will hold. Compare against HEAD in that case, and against the index otherwise.
@@ -78,9 +86,13 @@ deny() {
 # its recipe as `add … \<NL>  && git commit`, and a newline left in would read as a second command.
 CMD=$(printf '%s' "$CMD" | sed -e ':a' -e '/\\$/{$!N;s/\\\n//;ta' -e '}') || ask "sed could not read the command"
 FLAGS=${CMD%%[\"\']*}
+# WTF: the files whose content the commit takes from the worktree, not from the index. --no-renames
+# lists the old name of a move too, which is a deletion the verdict half must see.
+WTF=''
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.quotepath GIT_CONFIG_VALUE_0=off # a non-ASCII name is listed as itself, not quoted
 case "$FLAGS" in
-	*' -a'*|*' --all'*) FILES=$(git diff --name-only HEAD 2>/dev/null || true) ;;
-	*) FILES=$(git diff --cached --name-only 2>/dev/null || true) ;;
+	*' -a'*|*' --all'*) FILES=$(git diff --no-renames --name-only HEAD 2>/dev/null || true); WTF=$FILES ;;
+	*) FILES=$(git diff --no-renames --cached --name-only 2>/dev/null || true) ;;
 esac
 
 # `add … && git commit` in one call: the add has not run yet, but it stages its files or the chain stops.
@@ -137,8 +149,10 @@ if chained_add; then
 	if [ -n "$SPECS" ]; then
 		# tracked changes and deletions, then untracked files the ignore rules let through; the pathspecs are git's to expand
 		set -f
-		FILES=$(printf '%s\n%s\n%s\n' "$FILES" "$(git diff --name-only -- $SPECS 2>/dev/null || true)" "$(git ls-files --full-name -o --exclude-standard -- $SPECS 2>/dev/null || true)")
+		ADDED=$(printf '%s\n%s\n' "$(git diff --no-renames --name-only -- $SPECS 2>/dev/null || true)" "$(git ls-files --full-name -o --exclude-standard -- $SPECS 2>/dev/null || true)")
 		set +f
+		FILES=$(printf '%s\n%s\n' "$FILES" "$ADDED")
+		WTF=$(printf '%s\n%s\n' "$WTF" "$ADDED")
 	fi
 	FILES=$(printf '%s\n' "$FILES" | grep -v '^$' || true)
 else
@@ -167,5 +181,133 @@ fi
 if ! OUT=$(node tools/changelog.mjs 2>&1); then
 	deny "node tools/changelog.mjs failed, so this commit would land a broken changelog: $OUT"
 fi
+
+# The verdict half. A path of a class the pre-push check cannot stand in for needs a tester verdict on
+# the very content the commit carries: a PASS entry in some card's history[] whose tree holds the same
+# blob there, and for a guard path that entry says CLEAN too. A deletion is covered by a tree that
+# lacks the path and holds, in the nearest directory that survives the commit, exactly the policed files
+# the commit leaves there: a tree from before the file existed lacks it too, and says nothing about
+# the directory it lived in. It asks and never denies; whatever it cannot read leaves silent.
+CLASS='^(luci-theme-footstrap/|install[.]sh$|[.]claude/hooks/|[.]claude/settings[.]json$|[.]githooks/|[.]github/workflows/)'
+ROOTS='luci-theme-footstrap install.sh .claude/hooks .claude/settings.json .githooks .github/workflows'
+CAND=$(printf '%s\n' "$FILES" | grep -E "$CLASS" | sort -u || true)
+[ -n "$CAND" ] || exit 0
+cd "$GIT_ROOT" || exit 0 # FILES are root-relative
+
+NL='
+'
+OLDIFS=$IFS
+TAB=$(printf '\t')
+
+# "<tree> <CLEAN|->" per PASS entry, the newest card and round first. A card that is not JSON stops jq for the
+# cards behind it, so a failed run is repeated card by card; only a card that mentions "PASS" is read at all.
+verdict_entries() {
+	jq_f='try (.history | arrays | reverse | .[] | objects | select(.verdict == "PASS" and (.tree | type == "string" and test("^[0-9a-f]{40,64}$"))) | "\(.tree) \(.security // "-")")'
+	cards=$(grep -l '"PASS"' "$HOOK_ROOT"/../tmp/task-*/card.json 2>/dev/null || true)
+	[ -n "$cards" ] || return 0
+	set -f
+	IFS=$NL
+	# shellcheck disable=SC2086
+	set -- $cards
+	cards=$(ls -t -- "$@" 2>/dev/null || true)
+	[ -n "$cards" ] || { IFS=$OLDIFS; set +f; return 0; }
+	# shellcheck disable=SC2086
+	set -- $cards
+	IFS=$OLDIFS
+	set +f
+	jq -r "$jq_f" "$@" 2>/dev/null && return 0
+	for c in "$@"; do jq -r "$jq_f" "$c" 2>/dev/null || true; done
+}
+# $1 newline list, $2 newline list: the lines of the first that the second lacks
+lacks() {
+	while IFS= read -r l; do
+		[ -z "$l" ] || case "$NL$2" in *"$NL$l$NL"*) ;; *) printf '%s\n' "$l" ;; esac
+	done <<EOF
+$1
+EOF
+}
+
+NEEDS=''
+PKGP=''
+GRDP=''
+DEL=0
+while IFS= read -r p; do
+	# the content the commit will carry at p: the worktree's for what `-a` or a chained add stages, else the index's; `-` is none
+	if printf '%s\n' "$WTF" | grep -qxF -- "$p"; then
+		if [ -f "$p" ]; then b=$(git hash-object -- "$p" 2>/dev/null) || continue; else b=-; fi
+	else
+		b=$(git --literal-pathspecs ls-files -s -- "$p" 2>/dev/null | awk 'NR == 1 { print $2 }') || continue
+		[ -n "$b" ] || b=-
+	fi
+	[ "$b" != - ] || DEL=1
+	case $p in
+		luci-theme-footstrap/*|install.sh) PKGP="$PKGP$p$NL" ;;
+		*) GRDP="$GRDP$p$NL" ;;
+	esac
+	NEEDS="${NEEDS}W$TAB$b$TAB$p$NL"
+done <<EOF
+$CAND
+EOF
+
+PASSED=''
+CLEANED=''
+HL=''
+set -f
+IFS=$NL
+# shellcheck disable=SC2086
+set -- $CAND
+IFS=$OLDIFS
+set +f
+if [ "$DEL" = 1 ]; then
+	# a deletion is judged on the whole policed tree: HEAD's listing is what the commit changes, a tree's what it verified
+	# shellcheck disable=SC2086
+	set -- $ROOTS
+	HL=$(git ls-tree -r --full-tree HEAD -- "$@" 2>/dev/null | awk '{ print "H\t" $0 }' || true)
+fi
+while read -r T S; do
+	[ -n "$T" ] || continue
+	LS=$(git ls-tree -r --full-tree "$T" -- "$@" 2>/dev/null) || continue
+	# the paths of NEEDS this tree holds with that blob. One it lacks (blob `-`) counts only when the nearest
+	# directory that survives the commit holds, among the policed files, exactly what the commit leaves there.
+	# `p in h` is asked before `h[p]` is read: awk makes an element of a key it only looks at.
+	HIT=$(printf '%s\n%s\n%s\n' "$NEEDS" "$HL" "$LS" | awk -F'\t' '
+		$1 == "W" { w[$3] = $2; next }
+		$1 == "H" { split($2, a, " "); hs[$3] = a[3]; next }
+		NF == 2 { split($1, a, " "); if (a[2] == "blob") h[$2] = a[3] }
+		END {
+			for (p in hs) if (!(p in w)) c[p] = hs[p]
+			for (p in w) if (w[p] != "-") c[p] = w[p]
+			for (p in w) {
+				if (w[p] != "-") { if ((p in h) && h[p] == w[p]) print p; continue }
+				if (p in h) continue
+				d = p
+				while (1) {
+					if (!sub(/\/[^\/]*$/, "", d)) { d = ""; break }
+					pre = d "/"
+					live = 0
+					for (e in c) if (index(e, pre) == 1) { live = 1; break }
+					if (live) break
+				}
+				pre = (d == "") ? "" : d "/"
+				ok = 1
+				for (e in c) if (index(e, pre) == 1 && !((e in h) && h[e] == c[e])) ok = 0
+				for (e in h) if (index(e, pre) == 1 && !((e in c) && c[e] == h[e])) ok = 0
+				if (ok) print p
+			}
+		}')
+	PASSED="$PASSED$HIT$NL"
+	[ "$S" != CLEAN ] || CLEANED="$CLEANED$HIT$NL"
+	# newest first: stop once everything is covered, so the common silent commit does not read the whole history
+	[ -z "$(lacks "$PKGP" "$PASSED")" ] && [ -z "$(lacks "$GRDP" "$CLEANED")" ] && break
+done <<EOF
+$(verdict_entries | awk '!seen[$0]++')
+EOF
+
+BADP=$(lacks "$PKGP" "$PASSED")
+BADG=$(lacks "$GRDP" "$CLEANED")
+MSG=''
+[ -z "$BADP" ] || MSG="no recorded PASS on the content of $(printf '%s' "$BADP" | tr '\n' ' ') (package class). "
+[ -z "$BADG" ] || MSG="${MSG}no recorded PASS with security CLEAN on the content of $(printf '%s' "$BADG" | tr '\n' ' ') (guard class). "
+[ -z "$MSG" ] || emit ask "precommit-gate: ${MSG}Run the tester card (and security for a guard path) and record its entry in the card's history[], or confirm this commit."
 
 exit 0

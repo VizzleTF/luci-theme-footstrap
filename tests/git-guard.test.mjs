@@ -1,9 +1,9 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { ROOT } from '../tools/lib/root.mjs';
 
 const HOOK = join(ROOT, '.claude/hooks/git-guard.sh');
@@ -51,6 +51,7 @@ const g = (cwd, ...a) => {
 	assert.ok(!resolve(cwd).startsWith(ROOT), `scratch git must not run in the checkout: ${cwd}`);
 	const r = spawnSync('git', [ '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...a ], { cwd, encoding: 'utf8' });
 	assert.equal(r.status, 0, r.stderr);
+	return r.stdout.trim();
 };
 const THEME = 'git@github.com:VizzleTF/luci-theme-footstrap.git';
 const FORK = 'https://github.com/openwrt/luci';
@@ -578,4 +579,238 @@ test('precommit-gate: a git add chained before the commit counts its pending fil
 		'git add -A && git commit -m x', 'git add --all && git commit -m x', 'git add . && git commit -m x', 'git add b.txt CHANGELOG.md CHANGELOG_ru.md && git commit -m x',
 		'git add CHANGELOG.md CHANGELOG_ru.md && git commit -m x', 'git add *.md && git commit -m x', 'git add CHANGELOG.md && git add CHANGELOG_ru.md && git commit -m x',
 	]) assert.equal(gate(c), '', c);
+});
+
+// ---- precommit-gate, the verdict half: a package or guard path needs a recorded tester verdict on its content ----
+// The cards are read from ../tmp of the repository that holds the hook, so each scratch repo gets a parent of its own.
+function verdictRepo(name) {
+	const r = gateRepo(`${name}/repo`, false);
+	const hook = join(r, '.claude/hooks/precommit-gate.sh');
+	const log = (rel) => { for (const f of [ 'CHANGELOG.md', 'CHANGELOG_ru.md' ]) appendFileSync(join(r, f), `- ${rel}\n`); };
+	return {
+		r,
+		run: (c, cwd = r) => run(c, { cwd, hook }),
+		// the commit's content: the file in the index, with both changelog entries so only the verdict half can speak
+		stage(rel, text) {
+			mkdirSync(dirname(join(r, rel)), { recursive: true });
+			writeFileSync(join(r, rel), text);
+			log(rel);
+			g(r, 'add', rel, 'CHANGELOG.md', 'CHANGELOG_ru.md');
+		},
+		remove(rel, to) { // a deletion, or a move when `to` is given
+			if (to) g(r, 'mv', rel, to); else g(r, 'rm', '-q', rel);
+			log(rel);
+			g(r, 'add', 'CHANGELOG.md', 'CHANGELOG_ru.md');
+		},
+		// the content only the worktree holds: the changelog is modified but not staged
+		touch(rel, text) {
+			mkdirSync(dirname(join(r, rel)), { recursive: true });
+			writeFileSync(join(r, rel), text);
+			log(rel);
+		},
+		// a round's tree of whatever is in the worktree for these paths, the way the developer's private index writes it
+		snap(...paths) {
+			g(r, 'add', ...paths);
+			const t = g(r, 'write-tree');
+			g(r, 'reset', '-q');
+			return t;
+		},
+		// a card as the lead leaves it after a tester (and security) round
+		card(n, ...history) {
+			mkdirSync(join(r, '..', 'tmp', `task-${n}`), { recursive: true });
+			writeFileSync(join(r, '..', 'tmp', `task-${n}`, 'card.json'), JSON.stringify({ id: `${n}`, history }));
+		},
+	};
+}
+const pass = (tree, more = {}) => ({ round: 1, tree, verdict: 'PASS', blocking: [], ...more });
+
+test('precommit-gate verdict: a package path needs a PASS tree holding the same blob', () => {
+	const v = verdictRepo('v1');
+	const PKG = 'luci-theme-footstrap/a.txt';
+	v.stage(PKG, 'one\n');
+	const none = v.run('git commit -m x');
+	assert.equal(none.permissionDecision, 'ask', 'no card at all');
+	assert.match(none.permissionDecisionReason, /luci-theme-footstrap\/a\.txt/);
+	assert.match(none.permissionDecisionReason, /package class/);
+	const tree = g(v.r, 'write-tree');
+	v.card('1', { ...pass(tree), verdict: 'NEEDS_WORK' });
+	assert.equal(v.run('git commit -m x').permissionDecision, 'ask', 'a verdict that is not PASS');
+	v.card('1', pass(tree));
+	assert.equal(v.run('git commit -m x').permissionDecision, undefined, 'the PASS tree holds the same blob');
+	// one byte of difference is a different blob: the PASS covered the other content
+	v.stage(PKG, 'one!\n');
+	assert.match(v.run('git commit -m x').permissionDecisionReason, /luci-theme-footstrap\/a\.txt/);
+	// a card that is not JSON is skipped, and the cards behind it are still read
+	v.card('0-bad');
+	writeFileSync(join(v.r, '..', 'tmp', 'task-0-bad', 'card.json'), '{ "PASS" nope');
+	v.card('2', pass(g(v.r, 'write-tree')));
+	assert.equal(v.run('git commit -m x').permissionDecision, undefined);
+	// a history that is not a list of objects reads as no verdict
+	v.card('2', 'PASS');
+	assert.equal(v.run('git commit -m x').permissionDecision, 'ask');
+});
+
+test('precommit-gate verdict: a guard path needs CLEAN on the same entry, any other path needs nothing', () => {
+	const v = verdictRepo('v2');
+	v.stage('.githooks/pre-push', '#!/bin/sh\n');
+	const tree = g(v.r, 'write-tree');
+	v.card('1', pass(tree));
+	const q = v.run('git commit -m x');
+	assert.equal(q.permissionDecision, 'ask', 'PASS without CLEAN');
+	assert.match(q.permissionDecisionReason, /\.githooks\/pre-push/);
+	assert.match(q.permissionDecisionReason, /CLEAN/);
+	// CLEAN on a different entry is not the same entry
+	v.card('2', pass(g(v.r, 'write-tree'), { security: 'FINDINGS' }));
+	assert.equal(v.run('git commit -m x').permissionDecision, 'ask');
+	v.card('1', pass(tree, { security: 'CLEAN' }));
+	assert.equal(v.run('git commit -m x').permissionDecision, undefined);
+	for (const rel of [ '.claude/hooks/x.sh', '.claude/settings.json', '.github/workflows/x.yml' ]) {
+		v.stage(rel, 'x\n');
+		assert.equal(v.run('git commit -m x').permissionDecision, 'ask', rel);
+	}
+	// the other paths go out on T0 and the pre-push check, and the tester reads them afterwards
+	const w = verdictRepo('v3');
+	for (const rel of [ 'tools/x.mjs', 'docs/x.md', 'tests/x.mjs', '.claude/skills/x.md', '.claude/agents/x.md', 'CLAUDE.md' ]) w.stage(rel, 'x\n');
+	assert.equal(w.run('git commit -m x').permissionDecision, undefined);
+	// a mixed commit names only the path that is uncovered
+	w.stage('luci-theme-footstrap/b.txt', 'b\n');
+	w.card('1', pass(g(w.r, 'write-tree')));
+	w.stage('install.sh', '#!/bin/sh\n');
+	const mixed = w.run('git commit -m x').permissionDecisionReason;
+	assert.match(mixed, /install\.sh/);
+	assert.doesNotMatch(mixed, /b\.txt|tools\/x/);
+});
+
+test('precommit-gate verdict: a deletion is covered by a PASS tree that lacks the path', () => {
+	const v = verdictRepo('v4');
+	v.stage('luci-theme-footstrap/old.txt', 'old\n');
+	g(v.r, 'commit', '-q', '-m', 'add');
+	const held = g(v.r, 'write-tree');
+	v.remove('luci-theme-footstrap/old.txt');
+	v.card('1', pass(held));
+	assert.equal(v.run('git commit -m x').permissionDecision, 'ask', 'a tree that still holds the file');
+	v.card('1', pass(g(v.r, 'write-tree')));
+	assert.equal(v.run('git commit -m x').permissionDecision, undefined);
+	// a move is a deletion of the old name too
+	const m = verdictRepo('v5');
+	m.stage('luci-theme-footstrap/old.txt', 'old\nmore\nlines\nso\nthat\ngit\nsees\na rename\n');
+	g(m.r, 'commit', '-q', '-m', 'add');
+	const heldHere = g(m.r, 'write-tree');
+	m.remove('luci-theme-footstrap/old.txt', 'docs-old.txt');
+	m.card('1', pass(g(m.r, 'write-tree')));
+	assert.equal(m.run('git commit -m x').permissionDecision, undefined);
+	m.card('1', pass(heldHere));
+	assert.equal(m.run('git commit -m x').permissionDecision, 'ask');
+});
+
+test('precommit-gate verdict: a tree from before a file existed does not cover its deletion', () => {
+	const d = verdictRepo('v8');
+	d.stage('luci-theme-footstrap/keep.js', 'a\n');
+	g(d.r, 'commit', '-q', '-m', 'A');
+	const old = g(d.r, 'write-tree');
+	// the next commit changes the directory the file lives in, and the file sits in a directory of its own
+	d.stage('luci-theme-footstrap/keep.js', 'b\n');
+	d.stage('luci-theme-footstrap/sub/new.js', 'n\n');
+	g(d.r, 'commit', '-q', '-m', 'B');
+	d.remove('luci-theme-footstrap/sub/new.js');
+	d.card('1', pass(old));
+	const q = d.run('git commit -m x');
+	assert.equal(q.permissionDecision, 'ask', 'the old tree lacks new.js and holds another keep.js');
+	assert.match(q.permissionDecisionReason, /sub\/new\.js/);
+	d.card('1', pass(g(d.r, 'write-tree')));
+	assert.equal(d.run('git commit -m x').permissionDecision, undefined, 'a tree of this very change');
+	// when nothing else moved, the old tree is exactly what the commit leaves, so it does cover it
+	const e = verdictRepo('v9');
+	e.stage('luci-theme-footstrap/keep.js', 'a\n');
+	g(e.r, 'commit', '-q', '-m', 'A');
+	const same = g(e.r, 'write-tree');
+	e.stage('luci-theme-footstrap/new.js', 'n\n');
+	g(e.r, 'commit', '-q', '-m', 'B');
+	e.remove('luci-theme-footstrap/new.js');
+	e.card('1', pass(same));
+	assert.equal(e.run('git commit -m x').permissionDecision, undefined);
+	// a root-level file is judged on the policed files of the whole tree
+	const f = verdictRepo('v10');
+	f.stage('install.sh', '#!/bin/sh\n');
+	f.stage('luci-theme-footstrap/a.txt', 'a\n');
+	g(f.r, 'commit', '-q', '-m', 'A');
+	const before = g(f.r, 'write-tree');
+	f.stage('luci-theme-footstrap/a.txt', 'a2\n');
+	g(f.r, 'commit', '-q', '-m', 'B');
+	f.remove('install.sh');
+	f.card('1', pass(before));
+	assert.equal(f.run('git commit -m x').permissionDecision, 'ask');
+	f.card('1', pass(g(f.r, 'write-tree')));
+	assert.equal(f.run('git commit -m x').permissionDecision, undefined);
+});
+
+test('precommit-gate verdict: the cards are read newest first and the order never changes the answer', () => {
+	const v = verdictRepo('v11');
+	v.stage('luci-theme-footstrap/a.txt', 'one\n');
+	const tree = g(v.r, 'write-tree');
+	const at = (n, sec) => utimesSync(join(v.r, '..', 'tmp', `task-${n}`, 'card.json'), sec, sec);
+	v.card('match', pass(tree));
+	for (let i = 0; i < 5; i++) v.card(`other${i}`, pass('0'.repeat(40)), pass('1'.repeat(40)));
+	for (const [ old, fresh ] of [ [ 'match', 'other0' ], [ 'other0', 'match' ] ]) {
+		at(old, 1000);
+		at(fresh, 2000);
+		assert.equal(v.run('git commit -m x').permissionDecision, undefined, `${fresh} newest`);
+	}
+	// a guard path wants CLEAN from some entry, and a newer entry without it does not hide the older one that has it
+	const w = verdictRepo('v12');
+	w.stage('.githooks/pre-push', 'x\n');
+	const t = g(w.r, 'write-tree');
+	w.card('old', pass(t, { security: 'CLEAN' }));
+	w.card('new', pass(t));
+	utimesSync(join(w.r, '..', 'tmp', 'task-old', 'card.json'), 1000, 1000);
+	utimesSync(join(w.r, '..', 'tmp', 'task-new', 'card.json'), 2000, 2000);
+	assert.equal(w.run('git commit -m x').permissionDecision, undefined);
+});
+
+test('precommit-gate verdict: a one-call add, changelog add or `-a` is checked against what the commit will carry', () => {
+	const v = verdictRepo('v6');
+	const PKG = 'luci-theme-footstrap/n.txt';
+	const log = "node tools/changelog.mjs add 0 --en '- **A.** d' --ru '- **А.** б'";
+	// `git add` stages the worktree: the PASS tree is the worktree content, and one byte off asks
+	v.touch(PKG, 'new\n');
+	v.card('1', pass(v.snap(PKG)));
+	const add = `git add ${PKG} CHANGELOG.md CHANGELOG_ru.md && git commit -m x`;
+	assert.equal(v.run(add).permissionDecision, undefined);
+	assert.equal(v.run(`git add -A && git commit -m x`).permissionDecision, undefined);
+	v.touch(PKG, 'new!\n');
+	assert.match(v.run(add).permissionDecisionReason, /luci-theme-footstrap\/n\.txt/);
+	// the changelog add stages only the changelog: the package file is the index's, whatever the worktree holds
+	writeFileSync(join(v.r, PKG), 'worktree only\n');
+	const worktree = v.snap(PKG);
+	writeFileSync(join(v.r, PKG), 'index\n');
+	g(v.r, 'add', PKG);
+	const index = g(v.r, 'write-tree');
+	writeFileSync(join(v.r, PKG), 'worktree only\n');
+	v.card('1', pass(worktree));
+	assert.equal(v.run(`${log} && git commit -m x`).permissionDecision, 'ask');
+	v.card('1', pass(index));
+	assert.equal(v.run(`${log} && git commit -m x`).permissionDecision, undefined);
+	// `-a` takes tracked files from the worktree, and leaves an untracked one out
+	g(v.r, 'reset', '-q');
+	g(v.r, 'add', PKG);
+	g(v.r, 'commit', '-q', '-m', 'add');
+	v.touch(PKG, 'second\n');
+	v.touch('luci-theme-footstrap/untracked.txt', 'u\n');
+	v.card('1', pass(v.snap(PKG)));
+	assert.equal(v.run('git commit -am x').permissionDecision, undefined);
+	v.touch(PKG, 'third\n');
+	assert.equal(v.run('git commit -am x').permissionDecision, 'ask');
+});
+
+test('precommit-gate verdict: the changelog deny comes first, and another repository is left alone', () => {
+	const v = verdictRepo('v7');
+	mkdirSync(join(v.r, 'luci-theme-footstrap'));
+	writeFileSync(join(v.r, 'luci-theme-footstrap/a.txt'), 'a\n');
+	g(v.r, 'add', 'luci-theme-footstrap/a.txt');
+	assert.equal(v.run('git commit -m x').permissionDecision, 'deny');
+	const other = repo(join(dir, 'v7', 'other'));
+	mkdirSync(join(other, 'luci-theme-footstrap'));
+	writeFileSync(join(other, 'luci-theme-footstrap/a.txt'), 'a\n');
+	g(other, 'add', 'luci-theme-footstrap/a.txt');
+	assert.equal(v.run('git commit -m x', other).permissionDecision, undefined);
 });

@@ -60,7 +60,9 @@ sees only the diff, never the developer's reasoning: a judge of the same model g
 softer. `tester`, `security`, `researcher` and `upstream-reviewer` carry `disallowedTools: Edit,
 Write, NotebookEdit`; Bash can still write, so read-only is a contract, not a sandbox: after the
 tester the lead reruns `developer.md` step 2 into `../tmp/task-<id>/check.idx` over the paths
-`git diff --name-only HEAD <tree>` prints, and the tree it prints equals the round's `tree`.
+`git diff --name-only HEAD <tree>` prints, and the tree it prints equals the round's `tree`. For a
+package or guard path `precommit-gate.sh` now does that at commit time (below, "The card"); the
+lead's `check.idx` stays for every other path.
 
 The lead relays each return block to the maintainer in Russian: fields, commands, paths and numbers
 as printed, the prose around them translated.
@@ -94,7 +96,7 @@ rewrite JSON less readily than Markdown, and a file outlives a compaction.
 | `grade` | `task`, or `release` — adds `owlab test` on both formats. Any diff touching the Makefile, `root/**`, `build-css.sh`, `tools/stage.sh` or a `strip-*` script is `release` |
 | `hardware` | `false` until the maintainer says otherwise for this card |
 | `round` | 1 for the first developer pass, +1 per fix round; the same number in the developer's and the tester's block |
-| `history` | one entry per tester round: `{ "round", "tree", "verdict", "blocking": [ids] }` |
+| `history` | per tester round, the lead appends `{ "round", "tree", "verdict", "security"?, "blocking": [ids] }`, `security` being `CLEAN` when that role found no vulnerability in the tree (its LOWs go to `notes`); the commit gate reads it |
 
 - Before its first edit or delegation the lead records what was already dirty, paths and hunks:
   `mkdir -p ../tmp/task-<id> && git status --porcelain --untracked-files=all > ../tmp/task-<id>/dirty-at-start && git diff HEAD > ../tmp/task-<id>/dirty-at-start.diff`.
@@ -106,6 +108,16 @@ rewrite JSON less readily than Markdown, and a file outlives a compaction.
   --porcelain --untracked-files=all` shows, less `dirty-at-start`, is in `card.files`; and
   `git diff --name-only HEAD <tree>` holds each `card.files` path `git status` shows and nothing
   outside `card.files`. Docs and config are the lead's to edit mid-task and do not count.
+- **A verdict before the commit, for two classes.** `precommit-gate.sh` asks, never denies, when a
+  commit carries a package path (`luci-theme-footstrap/**`, `install.sh`) and no
+  `../tmp/task-*/card.json` `history[]` holds a `PASS` entry whose `tree` has the same blob at
+  that path, or a guard path (`.claude/hooks/**`, `.claude/settings.json`, `.githooks/**`,
+  `.github/workflows/**`) and that entry lacks `security: "CLEAN"`. A deletion is covered by a
+  tree that lacks the path and, in the nearest directory that survives the commit, holds exactly
+  the policed files the commit leaves there: a tree from before the file existed lacks it too. The
+  cards are read newest first, and the scan stops once every path is covered. Every other code
+  path goes out on T0 and `.githooks/pre-push` and gets its `tester` card after the push, in the
+  same session; a `NEEDS_WORK` there is a fix commit.
 - One card, one mechanism; the acceptance fits in 5 lines. A card that needs more is two cards.
 - A `SendMessage` to a resumed agent is a round and counts toward `max_rounds`.
 - Upstream and release work splits in two: (a) base and history, verified by the `tester`; (b) the
@@ -147,10 +159,10 @@ Voice, shell and waiting rules reach every role through `.claude/hooks/subagent-
 
 **The round tree.** The real index is the lead's, so a role never stages. The developer writes the
 round into a private index under `../tmp/task-<id>/` and returns its tree id (the command:
-`.claude/agents/developer.md` "Before returning", step 2); the lead records it in `history` and
-passes it to the next tester. Both sides of the tester's diff are trees: a diff against the
-worktree goes through the real index, where a file the developer created is untracked, so it drops
-this round's new file and shows last round's as deleted (scratch repo, 2026-10-19). The lead
+`.claude/agents/developer.md` "Before returning", step 2); the lead records it in `history` with the
+verdict and passes it to the next tester. Both sides of the tester's diff are trees: a diff against
+the worktree goes through the real index, where a file the developer created is untracked, so it
+drops this round's new file and shows last round's as deleted (scratch repo, 2026-10-19). The lead
 commits with staged paths, never `-a`, and reads `git status` before staging anything.
 
 The caps come from the evidence: iterative repair gains sit in the first two rounds, a review with
@@ -205,7 +217,7 @@ the sandbox. Revisit when detached runs move off `tools/bg.sh`.
 | Layer | Where | Holds |
 |---|---|---|
 | 1. Instructions | `CLAUDE.md`, `.claude/rules/*.md` (path-scoped), `.claude/agents/*.md`, skills, auto-memory | the policy, the tiers, the roles; the auto-mode classifier reads `CLAUDE.md` too |
-| 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes, publications); `precommit-gate.sh` (both CHANGELOG entries); `session-start.sh` (drift from `origin/main`, a red Build push run on `main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/retro`) | the per-word list, whatever the permission mode |
+| 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes, publications); `precommit-gate.sh` (both CHANGELOG entries, then a recorded tester verdict on a package or guard path, asked); `session-start.sh` (drift from `origin/main`, a red Build push run on `main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/retro`) | the per-word list, whatever the permission mode |
 | 3. Permissions and auto mode | `.claude/settings.json` `deny`/`ask`/`allow`; `autoMode` in `~/.claude/settings.json` (the classifier reads it only from user settings); `tools/bg.sh` refuses ssh, commit, push, tag and gh writes in detached runs; the MCP servers github, kubernetes, helm and Vercel are denied in this project (never called here, and their write tools bypassed every other layer) | prompts and denials before a command runs; prefix matching misses `git -C` forms, hence layer 2 |
 | 4. Git hooks | `.githooks/pre-push` (`npm run check` on the pushed commit in a clean worktree), `.githooks/commit-msg` (strips trailers) | every contributor, agent or not |
 | 5. CI | `build.yml`: check, lint, build, verify (25.12/apk + 24.10/opkg), live, anchors on every push; deep on a tag or dispatch | the ground truth for "done" |

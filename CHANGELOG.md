@@ -4,6 +4,7 @@
 
 - **`tools/ci-watch.sh` waits for a commit's CI and prints one verdict line; `tools/ci-log.sh` prints the failed step and its decisive lines.** Finding a run, watching it and reading a red job took three to five calls each time (one wait missed its run on a wrong `createdAt` filter, `--log-failed` came back empty, raw logs carried ANSI codes); `tools/bg.sh` now also refuses detached `gh` writes, merges and reruns.
 - **`check:fast` fails when an agent-facing file names a path, npm script or tool that does not exist (`tools/agent-refs.mjs`).** The steering files had drifted to a host `ucode`, a Windows `gh.exe` and removed scripts with nothing to notice; the same change gives the upstream reviewer a facts script that runs on the luci worktree (`-C`) and stops shipped files from naming scratch paths or run ids.
+- **A commit of package or guard code asks without a recorded tester verdict.** `precommit-gate.sh` asks before a commit carries `luci-theme-footstrap/**` or `install.sh` content no tester `PASS` covered, or hook, settings or workflow content without a `security` pass too; other paths ship on T0 and are verified after the push.
 
 ### Changed
 
