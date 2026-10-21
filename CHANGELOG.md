@@ -46,6 +46,7 @@
 - **"Main is red" reads the right run.** `/ship`, `/release` and the release runbook read only the push run of `build.yml`, so a green CodeQL or Pages run no longer hides a red build, and a new session says when that run failed.
 - **The verdict gate reads what the commit really carries.** Path names git quotes, `-a` after a quoted message or in a flag cluster, `git commit <paths>`, an exec-bit or symlink change, and a mix of two verdicts that never tested the combination now ask instead of passing silently.
 - **scroll-jank retries a stand that is slow to open a page.** Both of its page loads go through the three-attempt `openPage()` that scroll-anchor already used, now shared in `tools/lib/stands.mjs`; a single WebKit timeout on the first load had turned four CI runs red since 2026-10-20 before anything was measured.
+- **scroll-jank no longer passes over a page it never opened.** A page whose load failed all three attempts is named and counted; more than one unopened page fails the gate, as more than three cells fail scroll-anchor, both through one shared check in `tools/lib/stands.mjs`.
 
 ### Security
 

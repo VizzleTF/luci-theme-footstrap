@@ -189,6 +189,15 @@ export async function openPage(page, url) {
 	throw last;
 }
 
+/* Share of attempted cells or pages under test that may go unopened before the sweep itself is the
+ * problem: one flaky cell is the runner, a stand that stopped answering is not, and a run that
+ * measured almost nothing must not say the reader stayed put. 2% alone rounds to zero on a small
+ * sweep, so each gate names a floor, the count it tolerates whatever the share: scroll-anchor 3 of
+ * ~170 cells (1.8%), scroll-jank 1 of 8 pages on a PR stand (12.5%; a floor of 3 would let both
+ * processes@768 cells, the only ones holding the remedy contract, vanish unreported). */
+const UNOPENED_TOLERANCE = 0.02;
+export const tooManyUnopened = (unopened, attempted, floor) => unopened > Math.max(floor, attempted * UNOPENED_TOLERANCE);
+
 /* Every leaf of the router's own menu tree, as LuCI resolves it, not a list kept in the repo that
  * goes stale when an app is installed. `L.ui.menu.load()` returns the tree rooted at `admin`, so
  * the walk starts with an empty path (docs/development.md, "The live gates"). */

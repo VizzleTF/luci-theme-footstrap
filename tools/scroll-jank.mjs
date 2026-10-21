@@ -13,7 +13,7 @@
  *
  * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
-import { stands, login, openPage, requireStands, sealToRouter, waitForPaint, eachStand, reportDown } from './lib/stands.mjs';
+import { stands, login, openPage, requireStands, sealToRouter, waitForPaint, eachStand, reportDown, tooManyUnopened } from './lib/stands.mjs';
 import { parseFlags } from './lib/util.mjs';
 
 const FLAGS = parseFlags('scroll-jank', {
@@ -139,8 +139,11 @@ const ARM = () => {
  * their routers at once. `--all` takes every running OpenWrt router. */
 const list = requireStands(stands(FLAGS.only, { all: FLAGS.all }), 'scroll-jank');
 const findings = [];
+/* Pages under test openPage gave up on: not findings, nothing was measured there. Printed, and fatal
+ * only past tooManyUnopened's floor of 1 or its 2% of `attempted` (lib/stands.mjs). */
+const unopened = [];
 const down = [];
-let runs = 0;
+let runs = 0, attempted = 0;
 
 for (const engine of ENGINES) {
 	if (!pw[engine]) {
@@ -177,9 +180,10 @@ for (const engine of ENGINES) {
 				catch (e) { continue; }		/* a document without the theme's JS has nothing to test */
 
 				for (const path of PAGES) {
-					try { await openPage(page, stand.base + path); }
-					catch (e) { continue; }
 					const where = `${engine} ${stand.id} @${w} ${layout} ${path}`;
+					attempted++;
+					try { await openPage(page, stand.base + path); }
+					catch (e) { unopened.push(`${where}: ${String(e.message).split('\n')[0]}`); continue; }
 					/* wait for the real thing instead of a fixed clock: bounded at 20s, well past the
 					 * ~17s worst case measured booting a single PR stand (tools/ci-boot.sh) */
 					if (!await waitForPaint(page, 20000)) {
@@ -243,6 +247,13 @@ for (const engine of ENGINES) {
 }
 const unanswered = reportDown('scroll-jank', down);
 
+if (unopened.length) {
+	console.error(`\nscroll-jank: ${unopened.length} of ${attempted} page(s) never opened — the browser or the stand,`
+		+ ' not the theme:\n');
+	for (const u of unopened) console.error('  ' + u);
+	console.error('\nA page that did not load measured nothing about the reader.\n');
+}
+
 if (findings.length) {
 	console.error(`\nscroll-jank: ${findings.length} finding(s) — something moved under the reader:\n`);
 	for (const f of findings) console.error('  ' + f);
@@ -251,10 +262,15 @@ if (findings.length) {
 	process.exit(1);
 }
 if (unanswered) process.exit(1);
+if (tooManyUnopened(unopened.length, attempted, 1)) {
+	console.error(`scroll-jank: ${unopened.length} of ${attempted} page(s) never opened `
+		+ '— too many to call the runner. Fix the stand or the browser, then re-run.\n');
+	process.exit(1);
+}
 if (!runs) {
 	console.error(`\nscroll-jank: 0 of ${ENGINES.length * list.length} engine/router cell(s) produced a scroll — the theme JS is absent `
 		+ '(fs-prefs not requirable, e.g. owlab up --rebuild without sync) or every run failed. This is not a clean sweep; '
 		+ 'it is nothing measured.\n');
 	process.exit(1);
 }
-console.log(`\nscroll-jank: ${runs} scroll(s) across ${ENGINES.join(', ')}, nothing re-decided or jumped mid-scroll.`);
+console.log(`\nscroll-jank: ${runs} scroll(s) across ${ENGINES.join(', ')}, nothing re-decided or jumped mid-scroll (${unopened.length} unopened).`);

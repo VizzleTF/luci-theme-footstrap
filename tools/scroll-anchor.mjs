@@ -15,7 +15,7 @@
  *   … [--quick] [--page <name>] [--no-pair]
  * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
-import { stands, login, openPage, requireStands, sealToRouter, pairStands, eachStand, reportDown } from './lib/stands.mjs';
+import { stands, login, openPage, requireStands, sealToRouter, pairStands, eachStand, reportDown, tooManyUnopened } from './lib/stands.mjs';
 import { parseFlags } from './lib/util.mjs';
 
 const FLAGS = parseFlags('scroll-anchor', {
@@ -952,7 +952,7 @@ const found = (line) => {
 };
 /* Cells whose page never loaded. They are NOT findings: this gate measures where the reader ends up
  * after a layout change, and a page that did not open measured nothing at all. Reported separately,
- * and fatal only in bulk — see UNOPENED_TOLERANCE below. */
+ * and fatal only in bulk — see UNOPENED_TOLERANCE in lib/stands.mjs. */
 const unopened = [];
 /* stands that did not serve LuCI at all (lib/stands.mjs loginFault): named, and the other stands still run */
 const down = [];
@@ -966,10 +966,6 @@ if (QUICK) {
 		+ '--quick (`npm run anchor`, or CI\'s own `--full` sweep) before trusting a clean result.\n');
 }
 
-/* How many cells may go unopened before the sweep itself is the problem. One flaky cell is the
- * runner; a stand that stopped answering is not, and a run that measured almost nothing must not
- * report that the reader stayed put. 2% of a ~170-cell sweep is 3 cells. */
-const UNOPENED_TOLERANCE = 0.02;
 /* one line out of a Playwright error: the rest is a stack through the evaluate wrapper, and the
  * first line is the sentence the browser or this file actually wrote */
 const first = (e) => String((e && e.message) || e).split('\n')[0].trim();
@@ -1299,7 +1295,7 @@ if (findings.length) {
 if (unanswered) process.exit(1);
 
 /* Bulk failure to open is its own defect: the sweep did not measure what it claims to have. */
-if (unopened.length && unopened.length > Math.max(3, (runs + unopened.length) * UNOPENED_TOLERANCE)) {
+if (tooManyUnopened(unopened.length, runs + unopened.length, 3)) {
 	console.error(`scroll-anchor: ${unopened.length} of ${runs + unopened.length} cell(s) never opened `
 		+ '— too many to call the runner. Fix the stand or the browser, then re-run.\n');
 	process.exit(1);
