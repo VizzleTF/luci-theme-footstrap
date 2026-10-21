@@ -49,7 +49,10 @@ The standing grant in `CLAUDE.md` `## Commits` covers every step here. A tag goe
    reads `success`, or this push is the fix for it, said in the report. Only Build's push run
    counts: CodeQL, pages and Dependabot runs on `main` are not the reading. A `cancelled` or
    `skipped` latest run says nothing about main: the newest completed run before it (`-L2`) decides,
-   and the report names both.
+   and the report names both. A `failure` whose failing job's log (`tools/ci-log.sh <id>`) matches
+   a row of `docs/development.md` "Known flakes" gets one `gh run rerun <id> --failed` and a new
+   `tools/ci-watch.sh` wait; a second red, or no matching row, goes to the maintainer with the log
+   line, and a new signature gets a `tester` card to classify it.
 5. **Stand gates before the push.** What a push to `main` would prove only after the push goes to
    a `tester` card first; the lead runs no stand and waits for the verdict block.
    - The diff touches `fs-fit.js` or a scroll-anchor/floor gate (both stands, hours): acceptance

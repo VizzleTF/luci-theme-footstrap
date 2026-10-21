@@ -76,6 +76,20 @@ list (push, commit, tag, reset, rebase, update-ref, `gh pr|issue|release` writes
 `rsync` and `dev-sync.sh`. `tools/bg.sh --check <cmd>` prints that verdict and runs nothing; tests and probes
 use it. `tests/ci-tools.test.mjs` pins the parsing (stub `gh` on `PATH`) and the refusal list.
 
+## Rules the server holds
+
+Three rulesets on the repository (Settings → Rules); `gh api repos/{owner}/{repo}/rulesets` lists them.
+
+| Ruleset | Target | Rules | Bypass |
+|---|---|---|---|
+| 24042288 "main: CI must pass" | `main` | required status checks (11) | admin, always: a direct push to `main` needs it, so each push prints "Bypassed rule violations … 11 of 11" and the checks are read after the push (`tools/ci-watch.sh`) |
+| 25550110 "main: no force-push or deletion" | the default branch | `non_fast_forward`, `deletion` | none, admin included |
+| 25550119 "release tags: no move or deletion" | `refs/tags/v*` | `update`, `deletion` | none; creating a tag stays open for `/release` |
+
+The last two were created on 2026-10-21 on the maintainer's word (audit P1-5). With no bypass, no
+token gets past them: a force-push or rewrite of `main`, or moving or deleting a released tag, starts
+with the maintainer disabling that ruleset in the UI, then their word as before.
+
 ## `check` and `lint` — one gate list, package.json's
 
 Both jobs run `npm run check:fast`/`check:mid`/`check:slow` (`package.json`) rather than one step

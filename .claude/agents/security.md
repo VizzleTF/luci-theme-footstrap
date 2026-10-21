@@ -35,10 +35,17 @@ Voice, shell, waiting and guard-probing rules: `.claude/hooks/subagent-start.sh`
 At most 25 lines. Paths and lines, not contents.
 
 ```
-RESULT: CLEAN | FINDINGS
+RESULT: CLEAN | FINDINGS | PARTIAL
 skill: loaded | unavailable
 scope: <the diff command or patch path reviewed>
 findings:
   vuln|low  <severity>  <path>:<line>  <one sentence: what, and what an attacker gets>
 surface_touched: <list from the paragraph above, or none>
+covered: <files and line ranges read, probes run>
+not covered: <files and line ranges not reached, and why>
 ```
+
+`CLEAN` means every line of the scope was read. The turn budget is 25: by turn 20 stop probing
+and return the block, `PARTIAL` with the `not covered:` line if the diff was not read to its end;
+a block with gaps beats none, and the lead re-sends the rest as its own scope. `skill: unavailable`
+(the session's cwd is not this repository) makes the run a failed one: say so first.

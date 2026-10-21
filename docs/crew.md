@@ -214,8 +214,9 @@ counter of 2–3.
 ## Guardrail layers
 
 Instructions are advisory; hooks and permission rules are deterministic tripwires that fail open
-(`.claude/hooks/git-guard.sh` header); CI is the ground truth for done. Nothing server-side stops a
-tag or a rewrite of `main` (a tag ruleset was rejected on 2026-10-19). Accepted risk (the
+(`.claude/hooks/git-guard.sh` header); CI is the ground truth for done. The server holds `main`
+against a force-push or deletion and a `v*` tag against a move or deletion, with no bypass
+(`docs/ci.md` "Rules the server holds", 2026-10-21). Accepted risk (the
 maintainer, 2026-10-21): the shell Claude Code starts from exports the maintainer's secrets, signing
 keys included, so every Bash subprocess, npm dependency, plugin hook and MCP server inherits them;
 a `Read` deny does not cover `env`, and no layer below stops code that reads its own environment.
