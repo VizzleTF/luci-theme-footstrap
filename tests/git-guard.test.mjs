@@ -202,6 +202,23 @@ const askPolicy = [
 	'gh -R VizzleTF/luci-theme-footstrap workflow run pages.yml', 'gh workflow -R VizzleTF/luci-theme-footstrap run pages.yml',
 	'git push --force origin main', 'git push -f origin master', 'git push origin +main', 'git push --force-with-lease origin main',
 	'git push origin --delete main', 	'sh -c "git tag v1"', 'git commit -m x && git tag v1',
+	// a PR or issue comment or review is a publication on any repo, the theme's too
+	'gh pr comment 9 --repo openwrt/luci -b x', 'gh issue comment 1 -R owfeed/owfeed -b x', 'gh pr review 3 --approve', 'gh pr comment 1 -b x', 'gh issue comment 1 -R VizzleTF/luci-theme-footstrap -b x',
+	'gh pr -R openwrt/luci comment 9 -b x', 'gh -R openwrt/luci pr review 9 -c -b x', 'gh pr review 3 -R VizzleTF/luci-theme-footstrap --request-changes -b x',
+	// a write asks when it is aimed at another repo: -R, --repo, --repo=, -Rx before or after the group, or a PR or issue URL
+	'gh pr create -R openwrt/luci -t t -b b', 'gh issue create --repo VizzleTF/owlab -t t', 'gh issue create --repo=owfeed/owfeed -t t', 'gh pr create -Ropenwrt/luci -t t',
+	'gh pr -R openwrt/luci create -t t', 'gh -R openwrt/luci issue create -t t', 'gh pr edit 4 --repo openwrt/luci --title t', 'gh issue close 7 -R owfeed/owfeed', 'gh pr reopen 7 -R openwrt/luci',
+	'gh pr close https://github.com/openwrt/luci/pull/9', 'gh issue edit https://github.com/VizzleTF/owlab/issues/2 -t t', 'gh issue reopen HTTPS://GitHub.com/OpenWrt/luci/issues/2',
+	'gh pr create -R VizzleTF/luci-theme-footstrap-fork -t t', 'gh pr create -R github.com/openwrt/luci -t t', 'gh issue create -R hub.example.com/VizzleTF/luci-theme-footstrap -t t',
+	// reached through a loop, a nested shell or a chain
+	// new is gh's alias for create, revert opens a PR, a discussion is published like an issue
+	'gh pr new -R openwrt/luci -t t -b b', 'gh issue new -R owfeed/owfeed -t t', 'gh pr revert 3 -R openwrt/luci', 'gh discussion comment 1 -R openwrt/luci -b x', 'gh discussion create -R openwrt/luci -t t',
+	// GH_REPO names the target as a prefix, behind env or an export
+	'GH_REPO=openwrt/luci gh pr create -t t -b b', 'env GH_REPO=openwrt/luci gh pr edit 3 -t t', 'export GH_REPO=openwrt/luci; gh pr close 9', 'GH_REPO=openwrt/luci; export GH_REPO; gh pr new -t t',
+	'GH_REPO=VizzleTF/luci-theme-footstrap gh pr create -R openwrt/luci -t t',
+	// close and reopen post a comment on any repo when given one
+	'gh pr close 9 --comment x', 'gh issue close 9 -c x', 'gh issue reopen 9 --comment=x', 'gh pr close 9 -R VizzleTF/luci-theme-footstrap -c x', 'gh pr close 9 -cx',
+	'for i in 1; do gh issue comment $i -b x; done', "sh -c 'gh pr comment 2 -b x'", 'git -C . status && gh pr comment 1 -b x', 'echo x | xargs gh pr comment 1 -b',
 ];
 const nonePolicy = [
 	'git commit -m x', 'git commit -am x', 'git push', 'git push origin main', 'git push -u origin claude/x',
@@ -216,6 +233,19 @@ const nonePolicy = [
 	'gh workflow run build.yml -f publish-pages=false', 'gh workflow run pages.yml --repo owfeed/owfeed-packages', 'gh workflow run build.yml -R owfeed/x -f publish-pages=true',
 	'gh workflow run update.yml -R owfeed/owfeed-packages', 'gh workflow run update.yml --repo owfeed/owfeed-packages', 'gh run list',
 	'gh workflow -R owfeed/owfeed-packages run update.yml', 'gh workflow --repo=owfeed/owfeed-packages run update.yml', 'gh release -R VizzleTF/luci-theme-footstrap list',
+	// the theme's own PRs and issues are the agent's, and so is every read verb on any repo
+	'gh pr create -t t -b b', 'gh pr merge 5 --rebase', 'gh pr merge 5 --squash -R openwrt/luci', 'gh issue list -R openwrt/luci', 'gh pr checks 3', 'gh pr view 1 --repo openwrt/luci', 'gh pr list', 'gh pr status',
+	'gh pr diff 3 -R openwrt/luci', 'gh issue view 1 -R owfeed/owfeed', 'gh issue status', 'gh pr checkout 3', 'gh pr ready 3',
+	'gh pr create -R VizzleTF/luci-theme-footstrap -t t', 'gh pr create --repo vizzletf/luci-theme-footstrap -t t -b b', 'gh pr create --repo=VizzleTF/luci-theme-footstrap -t t',
+	'gh pr create -R https://github.com/VizzleTF/luci-theme-footstrap -t t', 'gh issue create -R github.com/VizzleTF/luci-theme-footstrap.git -t t', 'gh -R VizzleTF/luci-theme-footstrap pr edit 4 --title t',
+	'gh issue close 7 -R VizzleTF/luci-theme-footstrap', 'gh pr close https://github.com/VizzleTF/luci-theme-footstrap/pull/9',
+	'gh pr new -t t', 'gh pr close 9', 'gh pr close 9 -d', 'gh pr revert 3', 'gh pr new -R VizzleTF/luci-theme-footstrap -t t', 'gh discussion view 1 -R openwrt/luci', 'gh discussion list',
+	'GH_REPO=VizzleTF/luci-theme-footstrap gh pr create -t t', 'export GH_REPO=VizzleTF/luci-theme-footstrap; gh pr close 9', 'GH_REPO=openwrt/luci gh pr create -R VizzleTF/luci-theme-footstrap -t t',
+	'GH_REPO=openwrt/luci gh pr view 3', 'GH_REPO=$X gh pr create -t t', 'export GH_REPO=$X; gh pr close 9',
+	// a repository picked at run time or by gh itself is no find
+	'gh pr create -R "$R" -t t', 'gh issue create --repo {owner}/{repo} -t t', 'gh pr close 3 -R $REPO',
+	// the words in an echo, a commit message or a heredoc are text
+	'echo gh pr comment 1', 'git commit -m "docs: run gh pr comment 1 on the PR"', "cat <<'E'\ngh pr comment 1 -b x\nE",
 	// a heredoc to git or cat is data, not a command line
 	"git commit -F - <<'E'\nfix: drop --no-verify advice\nE",
 	"cat >> docs/x.md <<'E'\ngit commit --no-verify\nE",
@@ -246,6 +276,20 @@ test('a push to a remote other than the theme repo asks, to the theme repo is si
 	const f = repo(join(dir, 'pushrepo'), { origin: THEME, fork: 'git@github.com:VizzleTF/luci.git', up: FORK });
 	for (const c of [ 'git push fork feat/x', 'git push up x', `git -C ${f} push fork x`, `cd ${f} && git push fork x`, 'git -C pushrepo push up x', 'cd pushrepo && git push fork x', 'git push https://github.com/openwrt/luci x' ]) assert.equal(decide(c, { cwd: c.includes(f) || c.includes('pushrepo') ? dir : f }), 'ask', c);
 	for (const c of [ 'git push', 'git push origin main', 'git -C pushrepo push origin x', 'git push nosuch x', 'cd "$X" && git push fork x' ]) assert.equal(decide(c, { cwd: c.includes('pushrepo') ? dir : f }), '', c);
+});
+
+// With no -R and no GH_REPO, gh writes to the repository of the directory it runs in: a remote that is not the theme repo asks.
+test('a gh write with no repo named is judged on the remotes of its directory', () => {
+	const up = repo(join(dir, 'luci-pr'), { origin: FORK });
+	const mixed = repo(join(dir, 'ghmixed'), { origin: THEME, up: FORK });
+	const own = repo(join(dir, 'ghown'), { origin: THEME });
+	const bare = repo(join(dir, 'ghbare'));
+	for (const c of [ 'cd luci-pr && gh pr create --fill', 'cd luci-pr; gh pr new --fill', `cd ${up} && gh pr create --fill`, 'cd ghmixed && gh issue close 3', 'cd luci-pr && gh pr revert 3', 'cd luci-pr && sh -c "gh pr create --fill"' ]) assert.equal(decide(c), 'ask', c);
+	assert.equal(decide('gh pr create --fill', { cwd: up }), 'ask');
+	assert.equal(decide('gh pr edit 3 -t t', { cwd: mixed }), 'ask');
+	for (const c of [ 'cd ghown && gh pr create --fill', 'cd ghbare && gh pr create --fill', 'cd nosuch && gh pr create --fill', 'cd "$X" && gh pr create --fill', 'cd luci-pr && gh pr create -R VizzleTF/luci-theme-footstrap --fill', 'cd luci-pr && GH_REPO=VizzleTF/luci-theme-footstrap gh pr create --fill', 'cd luci-pr && gh pr view 3', 'cd luci-pr && gh pr merge 3' ]) assert.equal(decide(c), '', c);
+	assert.equal(decide('gh pr create --fill', { cwd: own }), '');
+	assert.equal(decide('gh pr create --fill', { cwd: bare }), '');
 });
 
 // Fan-out: the same script reached 40 ways is scanned once; 60 distinct scripts hit the cap.

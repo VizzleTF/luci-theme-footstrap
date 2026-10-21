@@ -6,7 +6,11 @@
 # Commit and push are the agent's own and stay silent. Ask: a tag (create, move, delete, push, also
 # --tags, --follow-tags or push.followTags set by `-c`, GIT_CONFIG_* or `git config`, refs/tags/*, a
 # v<digit> refspec, update-ref), `gh workflow run` that deploys Pages (pages.yml, or -f publish-pages=true), `gh release` writes, `gh api`
-# writes to git/refs, git/tags or releases of the theme repo, a force push or delete of main/master, rebase and
+# writes to git/refs, git/tags or releases of the theme repo, `gh pr|issue|discussion comment` and `gh pr review`
+# on any repo and a close or reopen that carries --comment (kind publish), `gh pr|issue|discussion
+# create|new|edit|close|reopen` and `gh pr revert` aimed at another repo: -R, --repo, a github.com PR or issue URL,
+# GH_REPO=, or with none of those a remote of the directory it runs in that is not the theme repo; a target that
+# cannot be read is no find. Also a force push or delete of main/master, rebase and
 # `commit --amend` while HEAD is already in origin/main, `reset --hard`, main or master moved or
 # deleted locally (`checkout -B`, `switch -C`, `branch -f|-D|-m`, `update-ref`), and a push whose remote
 # is not VizzleTF/luci-theme-footstrap: read with `git remote get-url --push` in the directory `cd`,
@@ -180,8 +184,9 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 		}
 		return j
 	}
-	# gh release writes, gh api writes to refs/tags/releases of the theme repo
-	function gh(i0,   j, k, a, v, m, hf, path, lp, sc, wf) {
+	function ghmine(r) { return (tolower(r) ~ /^((https?:\/\/)?github\.com\/)?vizzletf\/luci-theme-footstrap(\.git)?\/?$/) }
+	# gh release writes, gh api writes to refs/tags/releases of the theme repo, gh pr, issue and discussion publications
+	function gh(i0,   j, k, x, a, v, m, hf, path, lp, sc, wf, vb, oth, cm, envr, u) {
 		ghr = ""
 		j = ghflags(i0 + 1)
 		v = t[j]; sc = j + 1
@@ -202,6 +207,29 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 					else if (a !~ /^-/ && wf == "") wf = tolower(a)
 				}
 				if ((pg || wf ~ /^pages(\.ya?ml)?$/) && (ghr == "" || tolower(ghr) ~ /vizzletf\/luci-theme-footstrap/)) print "KIND\tpages"
+			}
+		}
+		if (v == "pr" || v == "issue" || v == "discussion") {
+			# a comment or review is a publication anywhere; a write only when aimed at another repo ($X or {repo} is no find)
+			# shortcut: a bare PR URL given as a flag value also reads as the target, so it prompts; upgrade if that nags
+			sc = ghflags(sc); vb = t[sc]; oth = 0; cm = 0
+			for (k = sc + 1; k <= n; k++) {
+				a = t[k]
+				if (a ~ /^(-R|--repo)$/) { ghr = t[k + 1]; k++ }
+				else if (a ~ /^--repo=/) ghr = substr(a, 8)
+				else if (a ~ /^-R./) ghr = substr(a, 3)
+				else if (a ~ /^(-c|--comment)$/) { cm = 1; k++ }
+				else if (a ~ /^(--comment=|-c.)/) cm = 1
+				else { u = tolower(a); if (u ~ /^https?:\/\/github\.com\/[^\/]+\/[^\/]+\/(pull|issues)\// && u !~ /^https?:\/\/github\.com\/vizzletf\/luci-theme-footstrap\//) oth = 1 }
+			}
+			# -R beats GH_REPO (a prefix of this command, or an earlier export), which beats the repository of the directory
+			for (x = 1; x < i0; x++) if (t[x] ~ /^GH_REPO=./) envr = substr(t[x], 9)
+			if (ghr == "") ghr = (envr != "") ? envr : ghenv
+			if (vb ~ /^(comment|review)$/ || (vb ~ /^(close|reopen)$/ && cm)) print "KIND\tpublish"
+			else if (vb ~ /^(create|new|edit|close|reopen|revert)$/) {
+				if (oth) print "KIND\tpublish"
+				else if (ghr != "") { if (ghr !~ /[${`]/ && !ghmine(ghr)) print "KIND\tpublish" }
+				else print "GHDIR\t" cwd "\t" (gdirenv == "" ? "-" : gdirenv)
 			}
 		}
 		if (v == "release") { if (t[sc] ~ /^(create|edit|delete|delete-asset|upload)$/) print "KIND\trelease" }
@@ -267,6 +295,7 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 					if (x ~ /^git_config_key_[0-9]+=push\.followtags$|^git_config_parameters=.*push\.followtags/) print "KIND\ttagpush"
 				}
 				if (t[i] ~ /^GIT_DIR=/ && (s > n || w == "export")) gdirenv = joind(cwd, substr(t[i], 9))
+				if (t[i] ~ /^GH_REPO=/ && (s > n || w == "export")) ghenv = substr(t[i], 9)
 			}
 		if (s > n) return
 		if (w == "cd" || w == "pushd") { chdir(t[s + 1] == "--" ? t[s + 2] : t[s + 1]); return }
@@ -534,6 +563,19 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 					   else PU=$(git --git-dir="$(rp "$BASE" . "$G")" remote get-url --push "$P" 2>/dev/null) || continue; fi ;;
 				esac
 				[ -z "$PU" ] || ismine "$PU" || KINDS="$KINDS forkpush" ;;
+			GHDIR)
+				# REST = dir, git dir: a gh write with no repo named goes to the repository of that directory; any remote that is not the theme repo is a find, no remote or an unreadable dir is not
+				D=${REST%%"$TAB"*}
+				G=${REST#*"$TAB"}
+				{ [ "$D" = "?" ] || [ "$G" = "?" ]; } && continue
+				if [ "$G" = - ]; then RU=$(git -C "$(rp "$BASE" "$D" .)" config --get-regexp '^remote\..*\.url$' 2>/dev/null) || continue
+				else RU=$(git --git-dir="$(rp "$BASE" . "$G")" config --get-regexp '^remote\..*\.url$' 2>/dev/null) || continue; fi
+				while read -r _ GU; do
+					ismine "$GU" || { KINDS="$KINDS publish"; break; }
+				done <<EOF
+$RU
+EOF
+				: ;;
 			NEST|NESTC|NESTB|SCRIPT)
 				if [ "$2" -ge 3 ]; then KINDS="$KINDS script-too-deep"; continue; fi
 				D=${REST%%"$TAB"*}
@@ -581,7 +623,7 @@ fi
 U=''
 for k in $KINDS; do
 	case $k in
-		noverify|tag|tagpush|release|pages|rewrite|reset-hard|forkpush|mainmove) U="$U $k" ;;
+		noverify|tag|tagpush|release|pages|publish|rewrite|reset-hard|forkpush|mainmove) U="$U $k" ;;
 		histcheck) git -C "$BASE" merge-base --is-ancestor HEAD origin/main >/dev/null 2>&1 && U="$U rewrite" ;;
 		forcecur) case $(git -C "$BASE" symbolic-ref --short -q HEAD 2>/dev/null) in main|master) U="$U rewrite" ;; esac ;;
 	esac
@@ -593,5 +635,5 @@ case " $KINDS " in
 	*' noverify '*)
 		emit deny "Hook skipping (--no-verify, -n on commit, core.hooksPath, an included config file) is never allowed; fix what the hook reports instead." ;;
 	*)
-		emit ask "git/gh $KINDS found in this command (possibly inside a script it runs): a tag, a release, a push outside the theme repo or a rewrite or move of main needs the maintainer's word. Run /release for a tag; for a rewrite, name the commits." ;;
+		emit ask "git/gh $KINDS found in this command (possibly inside a script it runs): a tag, a release, a push outside the theme repo, a PR or issue comment, review or write outside it, or a rewrite or move of main needs the maintainer's word. Run /release for a tag; for a rewrite, name the commits." ;;
 esac
