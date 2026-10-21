@@ -3,20 +3,35 @@
 # agent, and a gate that only the agent's rule file states is a gate the next contributor never
 # runs. Deliberate bypass: git push --no-verify.
 #
+# It runs on the commit being pushed, in a detached worktree under mktemp -d, not on the working
+# tree: an exec bit set on disk only and an untracked dist/ both passed a check of the working tree
+# and turned main red, and a maintainer's unstaged hunk is in that tree by policy.
+#
 # Enable with: git config core.hooksPath .githooks
 set -eu
 
-# A delete-only push (`git push origin :branch`) changes no tree, so there is nothing to check. The
-# stdin format is: <local ref> <local sha> <remote ref> <remote sha>, one line per ref.
-ALL_DELETES=1
+# git exports GIT_DIR (and GIT_PREFIX, GIT_INDEX_FILE, ...) to a hook; a test's `git -C tmp init` then
+# re-inits the real repo (core.bare=true once). tests/pre-push.test.mjs holds it.
+unset $(git rev-parse --local-env-vars)
+
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
+
+# The stdin format is: <local ref> <local sha> <remote ref> <remote sha>, one line per ref. A
+# delete-only push (`git push origin :branch`) changes no tree, so it leaves SHAS empty: nothing to
+# check. Refs at one commit are checked once: a branch pushed with an annotated tag (--follow-tags)
+# names the commit twice, the tag by its own object, so each sha is peeled to its commit first.
+SHAS=
 while read -r _local_ref local_sha _remote_ref _remote_sha; do
 	[ -z "${local_sha:-}" ] && continue
 	case "$local_sha" in
 		0000000000000000000000000000000000000000) ;;
-		*) ALL_DELETES=0 ;;
+		*)
+			commit=$(git rev-parse "$local_sha^{commit}")
+			case " $SHAS " in *" $commit "*) ;; *) SHAS="$SHAS $commit" ;; esac ;;
 	esac
 done
-[ "$ALL_DELETES" = 1 ] && exit 0
+if [ -z "$SHAS" ]; then exit 0; fi
 
 if ! command -v npm >/dev/null 2>&1; then
 	echo "pre-push: npm not found, and npm run check is the gate this push needs." >&2
@@ -24,13 +39,39 @@ if ! command -v npm >/dev/null 2>&1; then
 	exit 1
 fi
 
-# git exports GIT_DIR (and GIT_PREFIX, GIT_INDEX_FILE, ...) to a hook; a test's `git -C tmp init` then
-# re-inits the real repo (core.bare=true once). tests/pre-push.test.mjs holds it.
-unset $(git rev-parse --local-env-vars)
+# One level down from the temp dir, so the `../tmp` the gates resolve from their root lands in $D and
+# goes with it. Every exit path (a red check, a signal) runs this; the worktree's node_modules is a
+# symlink, so removing it never reaches the checkout's.
+D=
+cleanup() {
+	if [ -n "$D" ]; then
+		git -C "$ROOT" worktree remove --force "$D/wt" >/dev/null 2>&1 || :
+		rm -rf "$D"
+	fi
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-echo "pre-push: npm run check ..." >&2
-if ! npm run check; then
-	echo >&2
-	echo "pre-push: npm run check failed — the failing gate is above; fix it and push again. A maintainer who must bypass knows how." >&2
-	exit 1
-fi
+for sha in $SHAS; do
+	D=$(mktemp -d)
+	git worktree add --quiet --detach "$D/wt" "$sha"
+	echo "pre-push: npm run check on $sha ..." >&2
+	# Link the checkout's node_modules unless this commit changed the lockfile (or the checkout has
+	# none); then install what the lockfile says, as build.yml's check job does.
+	if ! (
+		cd "$D/wt"
+		if [ -d "$ROOT/node_modules" ] && cmp -s package-lock.json "$ROOT/package-lock.json"; then
+			ln -s "$ROOT/node_modules" node_modules
+		else
+			npm ci
+		fi && npm run check
+	); then
+		echo >&2
+		echo "pre-push: npm run check failed — the failing gate is above; fix it and push again. A maintainer who must bypass knows how." >&2
+		exit 1
+	fi
+	cleanup
+	D=
+done

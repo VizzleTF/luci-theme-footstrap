@@ -493,8 +493,9 @@ git config core.hooksPath .githooks
 
 `commit-msg` strips Co-Authored-By, `Claude-Session:` and "Generated with" trailers from whatever
 wrote them, and leaves `Signed-off-by` alone — openwrt/luci refuses a sign-off with a
-`@users.noreply.github.com` address, so that line is load-bearing. `pre-push` runs `npm run check`;
-`git push --no-verify` is the deliberate bypass and says so on the way past.
+`@users.noreply.github.com` address, so that line is load-bearing. `pre-push` runs `npm run check`
+on the pushed commit in a clean worktree; `git push --no-verify` is the deliberate bypass and says
+so on the way past.
 
 ## The live gates: `npm run live`
 

@@ -50,8 +50,9 @@ The standing grant in `CLAUDE.md` `## Commits` covers every step here. A tag goe
 
    Done = each `PASS` verdict quoted, or the report says it was skipped and why.
 6. **Push.** `git push origin HEAD` with `timeout: 300000`: `.githooks/pre-push` runs
-   `npm run check`. A red hook is a fix and a new commit, then this step again; a non-fast-forward
-   rejection (origin moved meanwhile) is step 1 again.
+   `npm run check` on the pushed commit in a clean worktree, not on the working tree. A red hook is
+   a fix and a new commit, then this step again; a non-fast-forward rejection (origin moved
+   meanwhile) is step 1 again.
 7. **Watch CI**, in the same turn as the push:
    ```sh
    tools/bg.sh tools/ci-watch.sh --sha "$(git rev-parse HEAD)" --max 6000

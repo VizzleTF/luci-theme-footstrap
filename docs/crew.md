@@ -28,7 +28,7 @@ flowchart TD
   L -.->|NEEDS_WORK, max 2 rounds| D
   L --> S[security / upstream-reviewer / researcher: read-only]
   L -->|/ship| G{git-guard + precommit-gate hooks}
-  G -->|commit + push origin| P[.githooks/pre-push: npm run check]
+  G -->|commit + push origin| P[.githooks/pre-push: npm run check on the pushed commit]
   P --> CI[GitHub CI: check, lint, build, verify apk+opkg, live, anchors]
   CI -->|tools/ci-watch.sh verdict| L
   L -->|tag, release, fork push, publication| M
@@ -207,7 +207,7 @@ the sandbox. Revisit when detached runs move off `tools/bg.sh`.
 | 1. Instructions | `CLAUDE.md`, `.claude/rules/*.md` (path-scoped), `.claude/agents/*.md`, skills, auto-memory | the policy, the tiers, the roles; the auto-mode classifier reads `CLAUDE.md` too |
 | 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes, publications); `precommit-gate.sh` (both CHANGELOG entries); `session-start.sh` (drift from `origin/main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/retro`) | the per-word list, whatever the permission mode |
 | 3. Permissions and auto mode | `.claude/settings.json` `deny`/`ask`/`allow`; `autoMode` in `~/.claude/settings.json` (the classifier reads it only from user settings); `tools/bg.sh` refuses ssh, commit, push, tag and gh writes in detached runs; the MCP servers github, kubernetes, helm and Vercel are denied in this project (never called here, and their write tools bypassed every other layer) | prompts and denials before a command runs; prefix matching misses `git -C` forms, hence layer 2 |
-| 4. Git hooks | `.githooks/pre-push` (`npm run check`), `.githooks/commit-msg` (strips trailers) | every contributor, agent or not |
+| 4. Git hooks | `.githooks/pre-push` (`npm run check` on the pushed commit in a clean worktree), `.githooks/commit-msg` (strips trailers) | every contributor, agent or not |
 | 5. CI | `build.yml`: check, lint, build, verify (25.12/apk + 24.10/opkg), live, anchors on every push; deep on a tag or dispatch | the ground truth for "done" |
 
 **Probing a guard.** A hook or `tools/bg.sh` is tested through its decision path only: the hook

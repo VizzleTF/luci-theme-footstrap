@@ -35,6 +35,7 @@
 - **The skill evals run green on this machine: `/retro` and `docs/crew.md` give the `claude plugin eval` command with `TMPDIR` outside `/tmp`.** The eval sandbox denies writes under `/tmp`, its own workspace there included, so both scaffolded `ship` cases failed on `git fetch` with `Read-only file system` (0.67 and 0.75); with `TMPDIR=~/.cache/claude-eval-tmp` each of the ten cases passed one run (`--runs 1 --ablation none`, default model and judge), not the three runs with and without the skill that the documented command makes.
 - **`.claude/settings.json` no longer carries a `Write(../tmp/**)` rule that Claude Code ignores.** File permission checks match only `Edit(...)` rules, so the harness warned on every start; the existing `Edit(../tmp/**)` already covers writes there.
 - **`scroll-anchor` QUIET no longer fails a run on a stalled frame loop alone: a mid-flick reading with a 400ms+ rAF gap beside it is measured again and reported only if it reproduces, and every finding prints its frame gap.** A docs-only commit went red on `firefox owrt2410 @1440 processes` (198px) while the same cell read 0 of 25 locally and 0 of 20 under CPU load; a 198px theme write with no stall still fails at once, and 538 cells on owrt2512 and owrt2410 read clean.
+- **The pre-push hook checks the commit being pushed.** It runs `npm run check` in a clean worktree of that commit, not in the working tree, so an exec bit set only on disk, an untracked file or an unstaged edit can no longer pass it and then fail CI.
 
 ### Security
 
