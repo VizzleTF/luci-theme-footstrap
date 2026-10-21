@@ -6,8 +6,8 @@ description: The changelog contract — sections, the bold lead, and the bilingu
 
 # The changelog
 
-**NO COMMIT LANDS WITHOUT ITS CHANGELOG ENTRY.** It goes under `## [Unreleased]`, in the **same
-commit as the code**, and in **BOTH `CHANGELOG.md` AND `CHANGELOG_ru.md`** — never one now and its
+**No commit lands without its changelog entry.** It goes under `## [Unreleased]`, in the **same
+commit as the code**, and in **both `CHANGELOG.md` and `CHANGELOG_ru.md`** — never one now and its
 mirror later. An entry written afterwards is written from the diff, and the diff is exactly what
 does not know why. This covers documentation, benchmarks, CI and packaging too, not just code: if
 the commit is worth making, it is worth one line saying what changed. The only things that skip it

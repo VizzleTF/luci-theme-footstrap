@@ -225,20 +225,6 @@
       ]
     },
     {
-      "id": "investigator",
-      "type": "external",
-      "label": "caveman:cavecrew-investigator",
-      "sublabel": "Haiku, file:line table",
-      "pos": [
-        826,
-        176
-      ],
-      "size": [
-        214,
-        58
-      ]
-    },
-    {
       "id": "owrt2512",
       "type": "database",
       "label": "owrt2512",
@@ -403,8 +389,7 @@
         "tester",
         "security",
         "upstream",
-        "researcher",
-        "investigator"
+        "researcher"
       ],
       "pad": 22
     },

@@ -58,8 +58,9 @@ node tools/size-budget.mjs --pin
 ```
 
 `node tools/size-budget.mjs --pin` runs after the last code fix: a fix landed mid-release once left
-the pins stale. The ceilings may also rise between releases, each time with a written
-justification; the pin here re-fits them to the build that ships.
+the pins stale. The ceilings may also rise between releases, each time with the reason and
+the numbers in the commit's changelog entry (the policy: the header of `tools/size-budget.mjs`); the pin here
+re-fits them to the build that ships.
 
 `~/go/bin/owfeed lock` must exit 0 at the repo root and in a fresh clone of owfeed-packages. Without
 `--update` it only compares and writes nothing (exit 9 and the drift, e.g. `25.12 point release
@@ -257,10 +258,10 @@ Changelog on all three.** Do not "correct" entries toward the other standard.
 
 ### `[Unreleased]`
 
-**Every substantive commit writes into `## [Unreleased]` in the same commit as the code.** A
-changelog written afterwards is written from the diff, and the diff is precisely what does not know
-why. Commits that change nothing for a user or a maintainer (a typo in a comment, a CI-only
-refactor) need no entry; when in doubt, write one.
+**Every commit writes into `## [Unreleased]` in the same commit as the code**, in both files.
+A changelog written afterwards is written from the diff, and the diff is precisely what does not know
+why. Documentation, benchmarks, CI and packaging commits count too; only `CLAUDE.md` and a fix to an
+entry already written skip it (`.claude/rules/changelog.md`, enforced by `precommit-gate.sh`).
 
 ### The bilingual mirror
 

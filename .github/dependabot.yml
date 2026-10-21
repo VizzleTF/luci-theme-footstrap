@@ -1,4 +1,5 @@
-# SHA pins rot without this. A pinned action is only a decision anyone made if
+# Version-tag pins rot without this (actions/* on @vN, owfeed/* on @vX.Y.Z; no
+# SHA pin is left). A pinned action is only a decision anyone made if
 # something proposes the update as a diff; otherwise it is a version nobody chose
 # that stops receiving fixes -- the failure mode of pinning without automation.
 #

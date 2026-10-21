@@ -141,13 +141,13 @@ The npm gates live in CI only: the buildbot has no node and does not need it, an
 | `axes.mjs` | the pre-paint in `head.ut` agrees with the live appearance appliers |
 | `page-modules.mjs` | the page → module map agrees with the modules, and neither is `require`d at eval |
 | `comment-share.mjs` | every shipped JS file is under 40 % comment bytes (`docs/conventions.md`, "Size") |
-| `table-contract.mjs` | the break points, and the rule that hides an unanswered data table still names every root `fs-select` scans, guarded on `:root[data-fs-fit]` — the selector half of what `table-tick.mjs` then proves on a page |
+| `table-contract.mjs` | the break points, and the rule that hides an unanswered data table still names every root `fs-select` scans, guarded on `:root[data-fs-fit]` — the selector half of what `table-tick.mjs` then proves on a page; and check 2d, a real click opens every visible `.cbi-dropdown` (a ComboButton on its `> span.open` arrow), `elementFromPoint` at each item's centre must return that item, and no ancestor may clip or scroll it — red on `a541109^`, where a ComboButton menu sat under `overflow: hidden` |
 | `chrome-fence.mjs` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
 | `gallery-coverage.mjs` | `docs/gallery.html` still renders every widget LuCI or an app can emit (a `check:fast` gate) |
 | `conffiles.mjs` | every shipped `/etc/config/*` is declared a conffile — else the manager replaces it on upgrade |
 | `changelog.mjs` | the changelog contract: sections, order, RU mirror, bold leads |
 | `jsmin-verify.mjs` | the **only** check that catches jsmin's silent corruption (exit 0) |
-| `npm test` | the unit suite — no browser, ~100 ms, and first in the job for that reason. It holds the branches a stand cannot enter: a luci-base missing a surface the router calls, an alias loop or a `firstchild` tie in a menu tree nobody ships |
+| `npm test` | the unit suite — no browser, 39.8 s on CI for 939 tests (run 39487715282, 2026-10-20), the 9th step of `check:fast`. It holds the branches a stand cannot enter: a luci-base missing a surface the router calls, an alias loop or a `firstchild` tie in a menu tree nobody ships |
 | `size-budget.mjs` | ratchet on the **artefact**: `build-css.sh` + the token mangle (over temp copies of `resources/` and `ucode/`, which it rewrites) for the sheet, uglify-js over a copy of `htdocs/luci-static/resources` for the JS. `--show` prints the per-module table into the log; `check:mid`'s `size` script runs it plain, so a jump wants a local `node tools/size-budget.mjs --show` to attribute it |
 | `build-icons.mjs --check` | the committed app-icon rasters still match `logo.svg` — per channel with a tolerance, plus the maskable invariants (declared size, no alpha, nothing outside the safe zone, a mark in the middle). Not byte equality: that tested the renderer, and a Chromium bump reddened it on a commit that never touched the logo |
 
@@ -168,8 +168,9 @@ build, so a developer's edit-and-check loop never sees the artefact at all. That
 number drifts in: one feature at a time, each too small to argue with, none of them measured. This
 gate reproduces the package build's asset half and weighs the result. uhttpd serves `/www` with no
 compression, so identity bytes are wire bytes, read off flash by a core that is also routing packets.
-Raising a limit is a decision and wants a comment saying what it bought; lowering one after a cleanup
-is how the slack stops being spendable in silence.
+Raising a limit between releases is the agent's call when a correct fix needs it, with the reason and
+the numbers in the commit's changelog entry (the header of `tools/size-budget.mjs` holds the policy); lowering one
+after a cleanup is how the slack stops being spendable in silence.
 
 Most of what the other jobs run lives in `tools/*.sh` rather than inline in the YAML —
 `check-shell.sh`, `scan-marker.sh`, `check-acl.sh`, `build-jsmin.sh`,

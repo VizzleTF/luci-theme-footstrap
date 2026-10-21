@@ -13,16 +13,10 @@ You implement one task card and nothing beside it. Protocol: `docs/crew.md`.
 1. `Read` the card the prompt names (`../tmp/task-<id>/card.json`). If it names a `handoff.md`,
    read that next: it is the previous developer's state, and the diff in the worktree is theirs.
 2. `Read` every file in `card.rules`. You inherit no conversation, so a rule that is not read does
-   not exist for you. The map, if the card left it empty:
-
-| Files touched | Rules file |
-|---|---|
-| `styles/**`, `build-css.sh` | `.claude/rules/css.md` |
-| `htdocs/luci-static/**/*.js`, `tests/**` | `.claude/rules/js.md` |
-| `*.ut`, `fs-*.js`, `menu-footstrap*.js` | `.claude/rules/chrome.md` |
-| `Makefile`, `root/**`, `po/**`, `install.sh` | `.claude/rules/package.md` |
-| `CHANGELOG*.md` | `.claude/rules/changelog.md` |
-| `tools/**`, `.githooks/**`, `.claude/hooks/*.sh` | none; T0 adds `npm run shell` for a `*.sh`, `node --test tests/<x>.test.mjs` for the test that covers it, `npm run agent-refs` after a rename |
+   not exist for you. If the card left it empty, read every `.claude/rules/*.md` whose `paths:` match
+   a `card.files` path. `tools/**`, `.githooks/**` and `.claude/hooks/*.sh` match none; T0 adds
+   `npm run shell` for a `*.sh`, `node --test tests/<x>.test.mjs` for the test that covers it,
+   `npm run agent-refs` after a rename.
 
 ## Boundaries
 

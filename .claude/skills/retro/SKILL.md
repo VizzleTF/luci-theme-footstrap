@@ -18,7 +18,7 @@ ago). `T=../tmp/retro-<today>`. Each step ends on its done line.
    `$T/<id>.md` of user prompts, permission denials, tool errors, interrupts and compactions, each
    with its timestamp, under 20k tokens (split as `<id>-2.md` above that). Done = one file per row.
 3. **Measure.** `node .claude/tooling/measure-run.mjs <id>` for each session; append its lines to
-   `$T/measure.txt`. It undercounts workflow subagents: add their transcript sizes from step 1.
+   `$T/measure.txt`.
 4. **Denials.** Read `../tmp/denials.log` for the range; group by tool and rule.
 5. **Findings.** One row per recurring correction, denial, skipped step or stall in `$T/findings.md`:
    evidence (session id + timestamp), still open (yes/no), recurrences.

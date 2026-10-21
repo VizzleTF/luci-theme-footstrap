@@ -49,6 +49,5 @@ touching any `_()`. A msgid is a **global** name shared with every app — Appea
 deliberately do not.
 
 - **A comment in a shipped file carries its reason inline.** No `issue #N`, no `tools/` or `tests/` pointer as the only carrier: those do not exist in openwrt/luci, and a `docs/` pointer is never the only carrier either. `docs/conventions.md`, "Comments".
-- **Run `npm run comment-share` for any comment edit in an `fs-*.js` or `menu-footstrap*.js`** — every shipped JS file stays under 40 % comment bytes.
 
 Deeper: `docs/chrome.md`, `docs/third-party-apps.md`, `docs/spa-router.md`.

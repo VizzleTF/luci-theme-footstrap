@@ -4,10 +4,12 @@
  * is also routing packets.
  *
  * The ceiling is pinned at a release, by `/release` (`--pin`: measured plus 2 %, rounded up to
- * 10 B). Between releases it is not raised: a change that crosses it pays for itself by removing
- * something, or the maintainer raises it by hand. A re-pin DOWN is allowed between releases when a
- * refactor shrinks the build, so the slack does not hide growth. The reason for each raise is the
- * changelog's job, not a paragraph here (docs/conventions.md, "Comments").
+ * 10 B). Between releases the agent raises it itself when a correct fix needs it (the maintainer's
+ * grant, 2026-09-09, reconfirmed 2026-10-09): measure the least the fix costs on 2-3 minimised
+ * variants, leave head-room, give the reason with the numbers in the commit's changelog entry and
+ * report the raise. The grant covers these ceilings only; lowering a tier or waiving a gate stays
+ * the maintainer's. A re-pin DOWN is allowed between releases when a refactor shrinks the build,
+ * so the slack does not hide growth.
  *
  *   node tools/size-budget.mjs          # the gate: exit 1 over the ceiling
  *   node tools/size-budget.mjs --show   # every file with its size
@@ -102,8 +104,10 @@ if (js.size > LIMITS.resourcesJs)
 if (over.length) {
 	console.error('\nsize-budget: the router would send more than the budget allows\n');
 	for (const line of over) console.error('  ' + line);
-	console.error('\nThe ceiling is pinned at a release (`--pin`, /release); between releases a change'
-		+ '\nthat crosses it removes something, or the maintainer raises the number by hand (a re-pin down is allowed).\n');
+	console.error('\nThe ceiling is pinned at a release (`--pin`, /release). Between releases the agent raises it when a correct'
+		+ '\nfix needs it: measure the least the fix costs, leave head-room,'
+		+ '\ngive the reason with the numbers in the commit\'s changelog entry, report the raise.'
+		+ '\nAnother gate, lowering a tier or waiving a gate stays the maintainer\'s (a re-pin down is allowed).\n');
 	process.exit(1);
 }
 
