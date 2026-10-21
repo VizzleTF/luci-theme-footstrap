@@ -13,10 +13,15 @@
 #
 # The second half asks (never denies) when the commit carries a path whose pre-push class needs a
 # tester verdict (docs/crew.md "The card"): the package (`luci-theme-footstrap/**`, `install.sh`) wants
-# a PASS entry in some ../tmp/task-*/card.json `history[]` whose tree holds the content the commit
-# will carry, the guards (`.claude/hooks/**`, `.claude/settings.json`, `.githooks/**`,
-# `.github/workflows/**`) want that entry to say `security: "CLEAN"` as well. Every other path
-# passes: the tester reads it after the push.
+# a PASS entry in some ../tmp/task-*/card.json `history[]`, the guards (`.claude/hooks/**`,
+# `.claude/settings.json`, `.githooks/**`, `.github/workflows/**`) want that entry to say
+# `security: "CLEAN"` as well. ONE entry must hold every such path of the commit at once, by mode and
+# blob: the tree that was tested is the combination, and an exec bit or a symlink is a change. Every
+# other path passes: the tester reads it after the push.
+#
+# This is a tripwire for the habitual forms, not a fence against obfuscation, so what it cannot read it
+# leaves silent: a commit run by an alias or a script, an option or path behind a quote or a `$`, a
+# flag on a later line than `git commit` (a heredoc message).
 #
 # No `if:` in settings.json: it only matches a line that STARTS with `git commit`. The detection is
 # git-guard.sh's `--kinds`, so `cd a && git commit` and a script that commits reach this too.
@@ -75,25 +80,69 @@ emit() { # $1 deny|ask, $2 why
 }
 deny() { emit deny "$1"; }
 
-# `git commit -a` stages tracked changes as it runs, so the staged index is not what the commit
-# will hold. Compare against HEAD in that case, and against the index otherwise.
-#
-# Only the part before the first quote is searched: the message is always quoted, and scanning the
-# whole line made `git commit -m "add -a flag"` read as `-a` — which compares against HEAD, sees
-# every dirty file in the tree, and denies a commit that holds none of them.
-#
 # A backslash-newline pair is the shell's line continuation, so it is folded out first: /ship step 3 prints
 # its recipe as `add … \<NL>  && git commit`, and a newline left in would read as a second command.
 CMD=$(printf '%s' "$CMD" | sed -e ':a' -e '/\\$/{$!N;s/\\\n//;ta' -e '}') || ask "sed could not read the command"
-FLAGS=${CMD%%[\"\']*}
+
+# Names are read NUL-separated (`-z`): git quotes a `"`, a `\`, a tab or a newline in one, and a quoted name matches
+# no class. Each NUL becomes a newline and each newline in a name `\001`, so one line is one path.
+zl() { tr '\n\000' '\001\n'; }
+
+# The index is what the commit holds, except under `-a`/`--all` (also inside a short cluster: `-qa`, `-am`) and
+# `git commit [-o|-i] [--] <paths>`: those take their files from the worktree, and WTF lists them. The words after
+# `commit` are read with the quoted text dropped, up to the first operator: a message saying "-a" once read as the
+# flag and denied a commit holding none of the dirty files. A quoted word stands as `$Q`, which is no path.
+# shortcut: `<paths>` (--only) is read as the index plus the paths, so it can ask over a staged file it leaves out
+# and never stays silent over one it takes; upgrade if that ever costs a question.
+BARE=$(printf '%s\n' "$CMD" | sed -e 's/"[^"]*"/$Q/g' -e "s/'[^']*'/\$Q/g") || ask "sed could not read the command"
+ARGS=''
+case $BARE in
+	*[[:space:]]commit[[:space:]]*) ARGS=$(printf '%s\n' "${BARE#*[[:space:]]commit[[:space:]]}" | sed -e 's/[;&|<>].*//' -e 's/[[:space:]]#.*//' -e 1q) ;;
+esac
+ALLF=0
+CPATHS=''
+skip=0
+dd=0
+set -f
+for w in $ARGS; do
+	if [ "$skip" = 1 ]; then skip=0; continue; fi # the argument of an option that takes one
+	if [ "$dd" = 0 ]; then
+		case $w in
+			--) dd=1; continue ;;
+			--all) ALLF=1; continue ;;
+			--message|--file|--author|--date|--fixup|--squash|--trailer|--template|--cleanup|--reuse-message|--reedit-message) skip=1; continue ;;
+			--*) continue ;;
+			-?*)
+				r=${w#-}
+				while [ -n "$r" ]; do
+					c=${r%"${r#?}"}
+					r=${r#?}
+					case $c in
+						a) ALLF=1 ;;
+						[mFCct]) [ -n "$r" ] || skip=1; break ;; # takes the rest of the word, or the next word
+						[Su]) break ;; # an optional argument, attached
+					esac
+				done
+				continue ;;
+		esac
+	fi
+	case $w in *[!A-Za-z0-9_./@%+=,:*?-]*) ;; *) CPATHS="$CPATHS $w" ;; esac
+done
+set +f
 # WTF: the files whose content the commit takes from the worktree, not from the index. --no-renames
 # lists the old name of a move too, which is a deletion the verdict half must see.
 WTF=''
-export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.quotepath GIT_CONFIG_VALUE_0=off # a non-ASCII name is listed as itself, not quoted
-case "$FLAGS" in
-	*' -a'*|*' --all'*) FILES=$(git diff --no-renames --name-only HEAD 2>/dev/null || true); WTF=$FILES ;;
-	*) FILES=$(git diff --no-renames --cached --name-only 2>/dev/null || true) ;;
-esac
+if [ "$ALLF" = 1 ]; then
+	FILES=$(git diff --no-renames --name-only -z HEAD 2>/dev/null | zl); WTF=$FILES
+else
+	FILES=$(git diff --no-renames --cached --name-only -z 2>/dev/null | zl)
+	if [ -n "$CPATHS" ]; then
+		set -f
+		WTF=$(git diff --no-renames --name-only -z HEAD -- $CPATHS 2>/dev/null | zl)
+		set +f
+		FILES=$(printf '%s\n%s\n' "$FILES" "$WTF")
+	fi
+fi
 
 # `add … && git commit` in one call: the add has not run yet, but it stages its files or the chain stops.
 # That holds only when every word before the commit is an add of its own, joined by `&&`: after `|| true`,
@@ -149,17 +198,17 @@ if chained_add; then
 	if [ -n "$SPECS" ]; then
 		# tracked changes and deletions, then untracked files the ignore rules let through; the pathspecs are git's to expand
 		set -f
-		ADDED=$(printf '%s\n%s\n' "$(git diff --no-renames --name-only -- $SPECS 2>/dev/null || true)" "$(git ls-files --full-name -o --exclude-standard -- $SPECS 2>/dev/null || true)")
+		ADDED=$(printf '%s\n%s\n' "$(git diff --no-renames --name-only -z -- $SPECS 2>/dev/null | zl)" "$(git ls-files -z --full-name -o --exclude-standard -- $SPECS 2>/dev/null | zl)")
 		set +f
 		FILES=$(printf '%s\n%s\n' "$FILES" "$ADDED")
 		WTF=$(printf '%s\n%s\n' "$WTF" "$ADDED")
 	fi
-	FILES=$(printf '%s\n' "$FILES" | grep -v '^$' || true)
 else
 	# a git add before the commit that is not a clean chained segment: the index says nothing about what it stages
 	case " $KINDS " in *' add '*) case ${CMD%%git commit*} in *add*) ask "a git add ahead of the commit is in a form it cannot read" ;; esac ;; esac
 fi
 
+FILES=$(printf '%s\n' "$FILES" | grep -v '^$' || true)
 # An empty set is `git commit --amend` with no staged change, or a commit that will fail on its own.
 [ -n "$FILES" ] || exit 0
 
@@ -183,10 +232,12 @@ if ! OUT=$(node tools/changelog.mjs 2>&1); then
 fi
 
 # The verdict half. A path of a class the pre-push check cannot stand in for needs a tester verdict on
-# the very content the commit carries: a PASS entry in some card's history[] whose tree holds the same
-# blob there, and for a guard path that entry says CLEAN too. A deletion is covered by a tree that
-# lacks the path and holds, in the nearest directory that survives the commit, exactly the policed files
-# the commit leaves there: a tree from before the file existed lacks it too, and says nothing about
+# the very content the commit carries: ONE PASS entry in some card's history[] whose tree holds every such
+# path of the commit with the same mode and blob (a tree with A new and B old, and another with A old and
+# B new, were never the combination the commit makes), and when a guard path is among them that entry says
+# CLEAN too. A symlink is a mode of its own, so a file turned into one is a change. A deletion is covered by a
+# tree that lacks the path and holds, in the nearest directory that survives the commit, exactly the policed
+# files the commit leaves there: a tree from before the file existed lacks it too, and says nothing about
 # the directory it lived in. It asks and never denies; whatever it cannot read leaves silent.
 CLASS='^(luci-theme-footstrap/|install[.]sh$|[.]claude/hooks/|[.]claude/settings[.]json$|[.]githooks/|[.]github/workflows/)'
 ROOTS='luci-theme-footstrap install.sh .claude/hooks .claude/settings.json .githooks .github/workflows'
@@ -231,49 +282,69 @@ NEEDS=''
 PKGP=''
 GRDP=''
 DEL=0
-while IFS= read -r p; do
-	# the content the commit will carry at p: the worktree's for what `-a` or a chained add stages, else the index's; `-` is none
-	if printf '%s\n' "$WTF" | grep -qxF -- "$p"; then
-		if [ -f "$p" ]; then b=$(git hash-object -- "$p" 2>/dev/null) || continue; else b=-; fi
+while IFS= read -r k; do
+	p=$(printf '%sx' "$k" | tr '\001' '\n'); p=${p%x} # the path as the filesystem has it
+	# the "mode blob" the commit will carry at p: the worktree's for what `-a`, a path or a chained add takes, else
+	# the index's; `-` is none. A symlink is asked before `-f`, which follows it and sees its target's bytes.
+	if printf '%s\n' "$WTF" | grep -qxF -- "$k"; then
+		if [ -L "$p" ]; then
+			b=$(printf '%s' "$(readlink -- "$p")" | git hash-object --stdin 2>/dev/null) || continue
+			b="120000 $b"
+		elif [ -f "$p" ]; then
+			b=$(git hash-object -- "$p" 2>/dev/null) || continue
+			if [ -x "$p" ]; then b="100755 $b"; else b="100644 $b"; fi
+		else
+			b=-
+		fi
 	else
-		b=$(git --literal-pathspecs ls-files -s -- "$p" 2>/dev/null | awk 'NR == 1 { print $2 }') || continue
+		b=$(git --literal-pathspecs ls-files -s -- "$p" 2>/dev/null | awk 'NR == 1 { print $1 " " $2 }') || continue
 		[ -n "$b" ] || b=-
 	fi
 	[ "$b" != - ] || DEL=1
-	case $p in
-		luci-theme-footstrap/*|install.sh) PKGP="$PKGP$p$NL" ;;
-		*) GRDP="$GRDP$p$NL" ;;
+	case $k in
+		luci-theme-footstrap/*|install.sh) PKGP="$PKGP$k$NL" ;;
+		*) GRDP="$GRDP$k$NL" ;;
 	esac
-	NEEDS="${NEEDS}W$TAB$b$TAB$p$NL"
+	NEEDS="${NEEDS}W$TAB$b$TAB$k$NL"
 done <<EOF
 $CAND
 EOF
+ALLP=$PKGP$GRDP
+[ -n "$ALLP" ] || exit 0
 
-PASSED=''
-CLEANED=''
 HL=''
-set -f
-IFS=$NL
-# shellcheck disable=SC2086
-set -- $CAND
-IFS=$OLDIFS
-set +f
 if [ "$DEL" = 1 ]; then
 	# a deletion is judged on the whole policed tree: HEAD's listing is what the commit changes, a tree's what it verified
 	# shellcheck disable=SC2086
-	set -- $ROOTS
-	HL=$(git ls-tree -r --full-tree HEAD -- "$@" 2>/dev/null | awk '{ print "H\t" $0 }' || true)
+	HL=$(git ls-tree -r -z --full-tree HEAD -- $ROOTS 2>/dev/null | zl | awk '{ print "H\t" $0 }')
 fi
+PASSED=''
+CLEANED=''
+COVERED=0
 while read -r T S; do
 	[ -n "$T" ] || continue
-	LS=$(git ls-tree -r --full-tree "$T" -- "$@" 2>/dev/null) || continue
-	# the paths of NEEDS this tree holds with that blob. One it lacks (blob `-`) counts only when the nearest
+	git cat-file -e "$T^{tree}" 2>/dev/null || continue # a tree that is gone lists as empty, and an empty listing lacks every path
+	# shellcheck disable=SC2086
+	LS=$(git ls-tree -r -z --full-tree "$T" -- $ROOTS 2>/dev/null | zl)
+	# the paths of NEEDS this tree holds with that mode and blob. One it lacks (blob `-`) counts only when the nearest
 	# directory that survives the commit holds, among the policed files, exactly what the commit leaves there.
+	# A record is `W|H|<tree line>`, a TAB, then the rest: a name may hold a TAB, so it is cut at the first one, not split.
 	# `p in h` is asked before `h[p]` is read: awk makes an element of a key it only looks at.
-	HIT=$(printf '%s\n%s\n%s\n' "$NEEDS" "$HL" "$LS" | awk -F'\t' '
-		$1 == "W" { w[$3] = $2; next }
-		$1 == "H" { split($2, a, " "); hs[$3] = a[3]; next }
-		NF == 2 { split($1, a, " "); if (a[2] == "blob") h[$2] = a[3] }
+	HIT=$(printf '%s\n%s\n%s\n' "$NEEDS" "$HL" "$LS" | awk '
+		{
+			i = index($0, "\t")
+			if (!i) next
+			head = substr($0, 1, i - 1); rest = substr($0, i + 1)
+			if (head == "W" || head == "H") {
+				j = index(rest, "\t")
+				v = substr(rest, 1, j - 1); name = substr(rest, j + 1)
+				if (head == "W") w[name] = v
+				else { split(v, a, " "); hs[name] = a[1] " " a[3] }
+				next
+			}
+			split(head, a, " ")
+			if (a[2] == "blob") h[rest] = a[1] " " a[3]
+		}
 		END {
 			for (p in hs) if (!(p in w)) c[p] = hs[p]
 			for (p in w) if (w[p] != "-") c[p] = w[p]
@@ -297,17 +368,19 @@ while read -r T S; do
 		}')
 	PASSED="$PASSED$HIT$NL"
 	[ "$S" != CLEAN ] || CLEANED="$CLEANED$HIT$NL"
-	# newest first: stop once everything is covered, so the common silent commit does not read the whole history
-	[ -z "$(lacks "$PKGP" "$PASSED")" ] && [ -z "$(lacks "$GRDP" "$CLEANED")" ] && break
+	# newest first: the first entry that holds the whole commit (and is CLEAN when a guard path is in it) ends the scan,
+	# so the common silent commit does not read the whole history
+	if [ -z "$(lacks "$ALLP" "$HIT$NL")" ] && { [ -z "$GRDP" ] || [ "$S" = CLEAN ]; }; then COVERED=1; break; fi
 done <<EOF
 $(verdict_entries | awk '!seen[$0]++')
 EOF
+[ "$COVERED" = 0 ] || exit 0
 
+# the paths some entry covers, so the question names what is missing; when every path has an entry and no entry has them all, the combination is
 BADP=$(lacks "$PKGP" "$PASSED")
 BADG=$(lacks "$GRDP" "$CLEANED")
 MSG=''
 [ -z "$BADP" ] || MSG="no recorded PASS on the content of $(printf '%s' "$BADP" | tr '\n' ' ') (package class). "
 [ -z "$BADG" ] || MSG="${MSG}no recorded PASS with security CLEAN on the content of $(printf '%s' "$BADG" | tr '\n' ' ') (guard class). "
-[ -z "$MSG" ] || emit ask "precommit-gate: ${MSG}Run the tester card (and security for a guard path) and record its entry in the card's history[], or confirm this commit."
-
-exit 0
+[ -n "$MSG" ] || MSG="no single history entry holds $(printf '%s' "$ALLP" | tr '\n' ' ')together${GRDP:+ with security CLEAN}, and the tree a tester passed is the combination. "
+emit ask "precommit-gate: ${MSG}Run the tester card (and security for a guard path) and record its entry in the card's history[], or confirm this commit."

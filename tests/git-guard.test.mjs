@@ -1,7 +1,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { ROOT } from '../tools/lib/root.mjs';
@@ -595,7 +595,7 @@ function verdictRepo(name) {
 			mkdirSync(dirname(join(r, rel)), { recursive: true });
 			writeFileSync(join(r, rel), text);
 			log(rel);
-			g(r, 'add', rel, 'CHANGELOG.md', 'CHANGELOG_ru.md');
+			g(r, '--literal-pathspecs', 'add', rel, 'CHANGELOG.md', 'CHANGELOG_ru.md'); // a name may hold a backslash or a glob
 		},
 		remove(rel, to) { // a deletion, or a move when `to` is given
 			if (to) g(r, 'mv', rel, to); else g(r, 'rm', '-q', rel);
@@ -800,6 +800,142 @@ test('precommit-gate verdict: a one-call add, changelog add or `-a` is checked a
 	assert.equal(v.run('git commit -am x').permissionDecision, undefined);
 	v.touch(PKG, 'third\n');
 	assert.equal(v.run('git commit -am x').permissionDecision, 'ask');
+});
+
+test('precommit-gate verdict: a name git quotes is read as the path it is', () => {
+	for (const [ i, name ] of [ 'a"b.js', 'a\tb.js', 'a\\b.js', 'a\nb.js', 'a[1]*b.js' ].entries()) {
+		const v = verdictRepo(`q${i}`);
+		const rel = `luci-theme-footstrap/${name}`;
+		v.stage(rel, 'one\n');
+		assert.equal(v.run('git commit -m x').permissionDecision, 'ask', `${JSON.stringify(name)} uncovered`);
+		v.card('1', pass(g(v.r, 'write-tree')));
+		assert.equal(v.run('git commit -m x').permissionDecision, undefined, `${JSON.stringify(name)} covered`);
+		v.stage(rel, 'two\n');
+		assert.equal(v.run('git commit -m x').permissionDecision, 'ask', `${JSON.stringify(name)} one byte off`);
+		assert.equal(v.run('git commit -am x').permissionDecision, 'ask', `${JSON.stringify(name)} read from the worktree`);
+	}
+	const w = verdictRepo('q-guard');
+	w.stage('.githooks/a"b', 'x\n');
+	assert.equal(w.run('git commit -m x').permissionDecision, 'ask', 'a guard path with a quoted name');
+});
+
+test('precommit-gate verdict: the commit forms that take worktree content are read from the worktree', () => {
+	const v = verdictRepo('f1');
+	const PKG = 'luci-theme-footstrap/a.txt';
+	v.stage(PKG, 'one\n');
+	g(v.r, 'commit', '-q', '-m', 'add');
+	const held = g(v.r, 'rev-parse', 'HEAD^{tree}');
+	v.touch(PKG, 'two\n'); // an edit only the worktree holds
+	const edited = v.snap(PKG);
+	g(v.r, 'add', 'CHANGELOG.md', 'CHANGELOG_ru.md'); // the index carries the changelog and no package file
+	const reads = [
+		'git commit -m x -a', 'git commit -m "x y" -a', "git commit -m 'x y' --all", 'git commit -qa -m x', 'git commit -sa -m x', 'git commit -am x', 'git commit --all -m x',
+		`git commit -m x ${PKG}`, `git commit -m "x y" ${PKG}`, `git commit -o ${PKG} -m x`, `git commit -i ${PKG} -m x`, `git commit --only -m x -- ${PKG}`, `git commit --include ${PKG} -m x`,
+		'git commit -m x luci-theme-footstrap',
+	];
+	v.card('1', pass(held));
+	for (const c of reads) assert.equal(v.run(c).permissionDecision, 'ask', c);
+	v.card('1', pass(edited));
+	for (const c of reads) assert.equal(v.run(c).permissionDecision, undefined, c);
+	// a line that only mentions the flag, or whose flag is another command's, leaves the index as the content
+	v.card('1', pass(held));
+	for (const c of [
+		'git commit -m x', 'git commit -m "add -a flag"', "git commit -m 'x' # -a", 'git commit -ma', 'git commit -m x && ls -a', 'ls -a && git commit -m x', 'git commit -m x 2>&1',
+		'git commit -m x; ls luci-theme-footstrap', 'git commit -m x | cat', 'git commit -m x -- docs',
+		// a quoted path is named in the header as unread
+		`git commit -m x "${PKG}"`,
+	]) assert.equal(v.run(c).permissionDecision, undefined, c);
+});
+
+test('precommit-gate verdict: an exec bit and a symlink are part of the content', () => {
+	const v = verdictRepo('m1');
+	const G = '.githooks/pre-push';
+	v.stage(G, '#!/bin/sh\n');
+	g(v.r, 'commit', '-q', '-m', 'add');
+	v.card('1', pass(g(v.r, 'rev-parse', 'HEAD^{tree}'), { security: 'CLEAN' }));
+	v.touch(G, '#!/bin/sh\n'); // the same bytes, and the bit
+	chmodSync(join(v.r, G), 0o755);
+	const exec = v.snap(G);
+	const staged = () => g(v.r, 'add', 'CHANGELOG.md', 'CHANGELOG_ru.md');
+	g(v.r, 'add', G);
+	staged();
+	assert.equal(v.run('git commit -m x').permissionDecision, 'ask', 'staged with the bit');
+	g(v.r, 'reset', '-q');
+	staged();
+	for (const c of [ 'git commit -am x', `git add ${G} && git commit -m x`, `git commit -m x ${G}` ]) assert.equal(v.run(c).permissionDecision, 'ask', c);
+	v.card('1', pass(exec, { security: 'CLEAN' }));
+	for (const c of [ 'git commit -am x', `git add ${G} && git commit -m x`, `git commit -m x ${G}` ]) assert.equal(v.run(c).permissionDecision, undefined, c);
+	g(v.r, 'add', G);
+	assert.equal(v.run('git commit -m x').permissionDecision, undefined, 'the tree holds the bit');
+
+	// a file replaced by a symlink holding the same bytes, and a link that was never a file
+	const w = verdictRepo('m2');
+	const L = 'luci-theme-footstrap/l.txt';
+	w.stage('luci-theme-footstrap/real.txt', 'real.txt'); // no newline: the bytes a link to it holds
+	w.stage(L, 'real.txt');
+	g(w.r, 'commit', '-q', '-m', 'add');
+	const held = g(w.r, 'rev-parse', 'HEAD^{tree}');
+	w.card('1', pass(held));
+	w.touch('luci-theme-footstrap/real.txt', 'real.txt');
+	rmSync(join(w.r, L));
+	symlinkSync('real.txt', join(w.r, L));
+	const link = w.snap(L);
+	g(w.r, 'add', L, 'CHANGELOG.md', 'CHANGELOG_ru.md');
+	assert.equal(w.run('git commit -m x').permissionDecision, 'ask', 'staged as a link');
+	g(w.r, 'reset', '-q');
+	g(w.r, 'add', 'CHANGELOG.md', 'CHANGELOG_ru.md');
+	assert.equal(w.run('git commit -am x').permissionDecision, 'ask', 'a link in the worktree');
+	w.card('1', pass(link));
+	assert.equal(w.run('git commit -am x').permissionDecision, undefined, 'the tree holds the link');
+	symlinkSync('nowhere', join(w.r, 'luci-theme-footstrap/new'));
+	assert.equal(w.run('git add luci-theme-footstrap/new CHANGELOG.md CHANGELOG_ru.md && git commit -m x').permissionDecision, 'ask', 'a new link, dangling');
+});
+
+test('precommit-gate verdict: one entry has to hold every class path of the commit together', () => {
+	const v = verdictRepo('c1');
+	const A = 'luci-theme-footstrap/a.txt';
+	const B = 'luci-theme-footstrap/b.txt';
+	v.stage(A, 'a0\n');
+	v.stage(B, 'b0\n');
+	g(v.r, 'commit', '-q', '-m', 'add');
+	v.touch(A, 'a1\n');
+	const aNew = v.snap(A);
+	v.touch(A, 'a0\n');
+	v.touch(B, 'b1\n');
+	const bNew = v.snap(B);
+	v.touch(A, 'a1\n');
+	const both = v.snap(A, B);
+	g(v.r, 'add', A, B, 'CHANGELOG.md', 'CHANGELOG_ru.md');
+	v.card('1', pass(aNew));
+	v.card('2', pass(bNew));
+	const q = v.run('git commit -m x');
+	assert.equal(q.permissionDecision, 'ask', 'each path has an entry of its own');
+	assert.match(q.permissionDecisionReason, /no single history entry/);
+	v.card('3', pass(both));
+	assert.equal(v.run('git commit -m x').permissionDecision, undefined, 'the pair is one entry');
+	// the entry that holds both may be an older one, behind newer entries that hold one each
+	v.card('3', pass('0'.repeat(40)), pass(both), pass(aNew));
+	assert.equal(v.run('git commit -m x').permissionDecision, undefined);
+
+	// a package path and a guard path: the entry holding both is the one that says CLEAN
+	const w = verdictRepo('c2');
+	const P = 'luci-theme-footstrap/p.txt';
+	const G = '.githooks/pre-push';
+	w.stage(P, 'p0\n');
+	w.stage(G, 'g0\n');
+	g(w.r, 'commit', '-q', '-m', 'add');
+	w.touch(G, 'g1\n');
+	const guardNew = w.snap(G);
+	w.touch(P, 'p1\n');
+	const pair = w.snap(P, G);
+	g(w.r, 'add', P, G, 'CHANGELOG.md', 'CHANGELOG_ru.md');
+	w.card('1', pass(guardNew, { security: 'CLEAN' }));
+	w.card('2', pass(pair));
+	const r = w.run('git commit -m x');
+	assert.equal(r.permissionDecision, 'ask', 'CLEAN on one entry, both paths on another');
+	assert.match(r.permissionDecisionReason, /CLEAN/);
+	w.card('2', pass(pair, { security: 'CLEAN' }));
+	assert.equal(w.run('git commit -m x').permissionDecision, undefined);
 });
 
 test('precommit-gate verdict: the changelog deny comes first, and another repository is left alone', () => {

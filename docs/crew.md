@@ -109,15 +109,19 @@ rewrite JSON less readily than Markdown, and a file outlives a compaction.
   `git diff --name-only HEAD <tree>` holds each `card.files` path `git status` shows and nothing
   outside `card.files`. Docs and config are the lead's to edit mid-task and do not count.
 - **A verdict before the commit, for two classes.** `precommit-gate.sh` asks, never denies, when a
-  commit carries a package path (`luci-theme-footstrap/**`, `install.sh`) and no
-  `../tmp/task-*/card.json` `history[]` holds a `PASS` entry whose `tree` has the same blob at
-  that path, or a guard path (`.claude/hooks/**`, `.claude/settings.json`, `.githooks/**`,
-  `.github/workflows/**`) and that entry lacks `security: "CLEAN"`. A deletion is covered by a
-  tree that lacks the path and, in the nearest directory that survives the commit, holds exactly
-  the policed files the commit leaves there: a tree from before the file existed lacks it too. The
-  cards are read newest first, and the scan stops once every path is covered. Every other code
-  path goes out on T0 and `.githooks/pre-push` and gets its `tester` card after the push, in the
-  same session; a `NEEDS_WORK` there is a fix commit.
+  commit carries a package path (`luci-theme-footstrap/**`, `install.sh`) or a guard path
+  (`.claude/hooks/**`, `.claude/settings.json`, `.githooks/**`, `.github/workflows/**`) and no
+  `../tmp/task-*/card.json` `history[]` holds a `PASS` entry that covers them: one entry covers the
+  commit's package and guard paths together, by mode and blob (an exec bit or a symlink is a
+  change), and says `security: "CLEAN"` when a guard path is among them. A path comes from the
+  worktree under `-a`, a `git add` in the same call or `git commit <paths>`, else from the index. A
+  deletion is covered by a tree that lacks the path and, in the nearest directory that survives the
+  commit, holds exactly the policed files the commit leaves there: a tree from before the file
+  existed lacks it too. The cards are read newest first, and the scan stops at the first entry that
+  covers the whole set. What the gate cannot read (an alias, a quoted path, a flag behind a heredoc
+  message) stays silent; the header of the hook lists them. Every other code path goes out on T0
+  and `.githooks/pre-push` and gets its `tester` card after the push, in the same session; a
+  `NEEDS_WORK` there is a fix commit.
 - One card, one mechanism; the acceptance fits in 5 lines. A card that needs more is two cards.
 - A `SendMessage` to a resumed agent is a round and counts toward `max_rounds`.
 - Upstream and release work splits in two: (a) base and history, verified by the `tester`; (b) the
