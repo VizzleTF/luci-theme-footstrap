@@ -40,15 +40,32 @@
 # developer's round snapshot (kind `rolegit`): a `checkout` of paths (after `--`, a word that starts with
 # `.` or `:` or holds a glob, two words, `-f`, `-p`, or one word that is no branch), `switch -f`, `restore`
 # (--staged too), `clean`, `stash` but list|show|create, `reset`, `checkout-index`, `read-tree`, `add`, `rm`,
-# `mv`, `remote add|remove|rm|rename|set-url|set-head|set-branches`, `config` writes. `-n`/`--dry-run`
-# passes; `add`, `rm --cached` and `read-tree` pass behind GIT_INDEX_FILE=, which counts as a prefix of
-# the command (or behind env) or an `export`, never as a bare assignment: that is a shell variable git
-# does not see, and GIT_DIR is read the same way. Measured 2026-10-21: three roles ran real git in the
-# lead's checkout, one of them `cd $R && git checkout -q -- .` with R empty, which reverted three tracked
-# files. The directory is read as for a push (cd, -C, --git-dir, GIT_DIR; an empty `cd` or `-C` operand
-# stays put); worktree and index verbs compare git dirs and remote and config verbs the common dir, so a
-# `git worktree add` of this checkout is free to work in. A scratch repo, the lead and any other
-# agent_type are untouched; a `cd "$X"` it cannot place is no find.
+# `mv`, `write-tree`, `update-index`, `apply` but --check, --stat, --numstat, --summary, `pull`, `revert`,
+# `sparse-checkout` but list, `remote add|remove|rm|rename|set-url|set-head|set-branches`, `config` writes.
+# `-n`/`--dry-run` passes on `clean`, `add`, `rm`, `mv` and `read-tree`, `--check`, `--stat`, `--numstat` and
+# `--summary` on `apply` unless `--apply` is there too. `add`, `rm --cached`, `read-tree`, `write-tree` and
+# `update-index` pass behind GIT_INDEX_FILE=, which counts as a prefix of the command (or behind env) or an
+# `export`, never as a bare assignment: that is a shell variable git does not see, and GIT_DIR and
+# GIT_WORK_TREE are read the same way. `read-tree -u` writes the worktree and is denied behind a private
+# index too. Measured 2026-10-21: three roles ran real git in the lead's checkout, one of them
+# `cd $R && git checkout -q -- .` with R empty, which reverted three tracked files; a rig then overwrote a
+# real file with `git --git-dir=<scratch>/.git checkout -- .`, deleted one with
+# `GIT_DIR=<scratch>/.git git clean -fdx` and reverted one with `GIT_INDEX_FILE=<private> git read-tree -u
+# --reset HEAD`. The directory is read as for a push (cd, -C, --git-dir, GIT_DIR; an empty `cd` or `-C`
+# operand stays put; a subshell, `$( )`, `cd -` and `popd` give back the directory the line stood in).
+# Worktree and index verbs are judged by the git dir first, then by the work tree: --git-dir or GIT_DIR with
+# no --work-tree or GIT_WORK_TREE leaves the work tree where the line stands, so in the checkout a scratch
+# git dir does not make the line free (an index-only verb included); --work-tree=<scratch> or a `cd` there
+# does. A work tree that cannot be placed (`$S`) drops that second chance only, the git dir is still judged;
+# a git dir that is not there yet (made earlier on the line) is judged by the work tree alone. Those verbs
+# compare git dirs, so a `git worktree add` of this checkout is free to work in; remote and config verbs
+# compare the common dir and are not. A scratch repo, the lead and any other agent_type are untouched; a
+# `cd "$X"` it cannot place is no find. Not read: a cd inside backticks, in a `case` arm or in a function
+# body (read as the line's own), a `case` arm `)` inside a subshell (it closes the directory frame early), an
+# `export` inside `( )` (it outlives the `)`), a relative GIT_DIR or GIT_WORK_TREE with `-C` (read against
+# the directory before the -C, git reads it after), core.worktree set by `-c` or a config file, and a bare
+# repository named by --git-dir (its work tree is the line's directory). Not named: `merge`, `rebase`,
+# `cherry-pick`, `am`, `commit`.
 #
 # Acts only on a positive find: a missing jq or awk, unreadable stdin, a script it cannot resolve,
 # too deep or over the cap stay silent; `--kinds` exits 1 instead. A repository chosen with
@@ -123,9 +140,11 @@ STX=$(printf '\001')
 scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to BASE; ? = unknown), $4 = 1 when a substitution in it is code, $5 = 1 for the body of an unquoted heredoc (its substitutions are the code)
 	OUT=$(printf '%s\n' "$1" | START=$3 HC=${4:-0} HB=${5:-0} MINE_RE=$MINE_RE ROLE=$ROLE awk '
 	BEGIN {
-		split("status diff log show add fetch branch checkout switch restore stash ls-files ls-remote rev-parse rev-list describe remote worktree blame grep clone init cat-file show-ref for-each-ref merge-base diff-tree shortlog reflog bisect cherry clean mv rm gc fsck notes submodule revert apply format-patch show-branch name-rev bundle archive help version commit push rebase reset cherry-pick am merge pull config tag update-ref checkout-index read-tree", bi0, " ")
+		split("status diff log show add fetch branch checkout switch restore stash ls-files ls-remote rev-parse rev-list describe remote worktree blame grep clone init cat-file show-ref for-each-ref merge-base diff-tree shortlog reflog bisect cherry clean mv rm gc fsck notes submodule revert apply format-patch show-branch name-rev bundle archive help version commit push rebase reset cherry-pick am merge pull config tag update-ref checkout-index read-tree write-tree update-index sparse-checkout", bi0, " ")
 		for (i in bi0) bi[bi0[i]] = 1
 		role = (ENVIRON["ROLE"] == 1)
+		# the verbs that write the worktree or index of a role and that no other kind watches
+		rolev = "^(restore|clean|stash|rm|mv|checkout-index|read-tree|write-tree|update-index|apply|revert|sparse-checkout)$"
 	}
 	# ~ and $HOME are the home directory, as the shell would make them
 	function expand(a) {
@@ -305,7 +324,7 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 		}
 		p--
 	}
-	function proc(   s, i, j, k, x, w, a, sb, deny, hp, rb, hard, ch, nm, ro, kk, wr, wrp, pf, ia, alk, rk, uk, b, np, pos, na, tl, tg, fo, fm, fc, am, ref, tgt, gd, gdir, dd, cv, lal, rep, df, mv, fr, fb, fl, rc, ai, ix, rgdir, seenenv, rw, ra, ddn, dry, cached, cwr, crd, c1, cnp, cskip, cf, cb, hasps) {
+	function proc(   s, i, j, k, x, w, a, sb, deny, hp, rb, hard, ch, nm, ro, kk, wr, wrp, pf, ia, alk, rk, uk, b, np, pos, na, tl, tg, fo, fm, fc, am, ref, tgt, gd, gdir, dd, cv, lal, rep, df, mv, fr, fb, fl, rc, ai, ix, rgdir, seenenv, rw, ra, ddn, dry, cached, cwr, crd, c1, cnp, cskip, cf, cb, hasps, rwt, ru, pv, ap) {
 		s = 1
 		while (s <= n && t[s] ~ /^[A-Za-z_][A-Za-z0-9_]*=/) s++
 		w = (s <= n) ? t[s] : ""
@@ -324,13 +343,21 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				# git sees these only when they are exported: a bare assignment is a shell variable
 				if (t[i] ~ /^GIT_INDEX_FILE=./ && w == "export") gidxenv = 1
 				if (t[i] ~ /^GIT_DIR=/ && w == "export") gdirexp = joind(cwd, substr(t[i], 9))
+				if (t[i] ~ /^GIT_WORK_TREE=/ && w == "export") gwtexp = joind(cwd, substr(t[i], 15))
 			}
 		if (s > n) return
+		# a "$( )" in the operand is code that runs before the directory changes
+		if (w ~ /^(cd|pushd|popd)$/) for (i = 1; i <= n; i++) if (sub_[i]) nest(t[i])
+		if (w == "popd") { if (dn > 0) { ocwd = cwd; cwd = dstk[dn--] }; return }
 		if (w == "cd" || w == "pushd") {
 			ai = (t[s + 1] == "--") ? s + 2 : s + 1
 			# every shell stays put on an empty operand; no operand at all is HOME
 			if (w == "cd" && ai <= n && t[ai] == "") return
-			chdir(t[ai]); return
+			if (w == "pushd") dstk[++dn] = cwd
+			pv = cwd
+			# `cd -` goes back to where the last cd or pushd left from, as popd does to a pushd; with none before it the place is unknown
+			if (w == "cd" && t[ai] == "-") cwd = ocwd; else chdir(t[ai])
+			ocwd = pv; return
 		}
 		rc = recv()
 		for (i = 1; i <= n; i++) if (sub_[i]) { if (rc) nestc(t[i]); else nest(t[i]) }
@@ -355,7 +382,7 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 		for (i = 1; i <= n; i++) {
 			if (t[i] !~ /(^|\/)git(\.exe)?$/) continue
 			j = i + 1; hp = 0; gd = cwd; gdir = gdirenv; split("", lal)
-			ix = gidxenv; rgdir = gdirexp; seenenv = 0
+			ix = gidxenv; rgdir = gdirexp; rwt = gwtexp; seenenv = 0
 			for (x = 1; x < i; x++) {
 				if (t[x] ~ /^GIT_DIR=/) gdir = joind(cwd, substr(t[x], 9))
 				# the child sees an assignment ahead of the command word or after an env
@@ -363,6 +390,7 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				if (x < s || seenenv) {
 					if (t[x] ~ /^GIT_INDEX_FILE=./) ix = 1
 					if (t[x] ~ /^GIT_DIR=/) rgdir = joind(cwd, substr(t[x], 9))
+					if (t[x] ~ /^GIT_WORK_TREE=./) rwt = joind(cwd, substr(t[x], 15))
 				}
 			}
 			while (j <= n && t[j] ~ /^-/) {
@@ -372,6 +400,8 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				if (t[j] == "-C") { if (t[j + 1] != "") gd = joind(gd, t[j + 1]) }
 				else if (t[j] == "--git-dir") { gdir = joind(gd, t[j + 1]); rgdir = gdir }
 				else if (t[j] ~ /^--git-dir=/) { gdir = joind(gd, substr(t[j], 11)); rgdir = gdir }
+				else if (t[j] == "--work-tree") rwt = joind(gd, t[j + 1])
+				else if (t[j] ~ /^--work-tree=./) rwt = joind(gd, substr(t[j], 13))
 				else if (t[j] == "-c") cv = t[j + 1]
 				else if (t[j] ~ /^-c./) cv = substr(t[j], 3)
 				if (cv != "" && cfg(cv, lal)) hp = 1
@@ -387,8 +417,8 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				else if (sb ~ /^[A-Za-z0-9][A-Za-z0-9_.-]*$/) print "ALIAS\t" cwd "\t" gd "\t" (gdir == "" ? "-" : gdir) "\t" x "\t" enc(apre(i, j)) "\t" enc(apost(j))
 				continue
 			}
-			if (sb !~ /^(commit|push|rebase|reset|cherry-pick|am|merge|pull|config|tag|update-ref|remote|branch|checkout|switch|add)$/ && !(role && sb ~ /^(restore|clean|stash|rm|mv|checkout-index|read-tree)$/)) continue
-			deny = hp; ddn = 0; dry = 0; cached = 0; cwr = 0; crd = 0; c1 = ""; cnp = 0; cskip = 0; cf = 0; cb = 0; rb = 0; hard = 0; ro = 0; kk = 0; pf = 0; ia = 0; alk = 0; rk = 0; uk = 0; np = 0; na = 0; tl = 0; tg = 0; fo = 0; fm = 0; fc = 0; am = 0; dd = 0; rep = ""; df = 0; mv = 0; fr = 0; fb = 0; fl = 0
+			if (sb !~ /^(commit|push|rebase|reset|cherry-pick|am|merge|pull|config|tag|update-ref|remote|branch|checkout|switch|add)$/ && !(role && sb ~ rolev)) continue
+			deny = hp; ddn = 0; dry = 0; cached = 0; cwr = 0; crd = 0; c1 = ""; cnp = 0; cskip = 0; cf = 0; cb = 0; rb = 0; hard = 0; ro = 0; kk = 0; pf = 0; ia = 0; alk = 0; rk = 0; uk = 0; np = 0; na = 0; tl = 0; tg = 0; fo = 0; fm = 0; fc = 0; am = 0; dd = 0; rep = ""; df = 0; mv = 0; fr = 0; fb = 0; fl = 0; ru = 0; ap = 0
 			split("", pos)
 			for (k = j + 1; k <= n; k++) {
 				a = t[k]
@@ -415,7 +445,8 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				if (dd) { np++; pos[np] = a; ddn++; continue }
 				if (a == "--") { dd = 1; continue }
 				if (a ~ /^--no-v/ && index("--no-verify", a) == 1) deny = 1
-				if (a == "--dry-run") dry = 1
+				if (a == "--dry-run" || (sb == "apply" && a ~ /^--(check|stat|numstat|summary)$/)) dry = 1
+			if (sb == "apply" && length(a) >= 4 && index("--apply", a) == 1) ap = 1
 				if (a ~ /^--(force|discard-changes|patch)$/ || a ~ /^--pathspec-from-file(=|$)/) cf = 1
 				if (a ~ /^--orphan(=|$)/) cb = 1
 				if (a == "--cached") cached = 1
@@ -441,9 +472,10 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 					# a cluster ends at the first flag that takes a value; the rest is that value
 					for (x = 2; x <= length(a); x++) {
 						ch = substr(a, x, 1)
-						if ((ch ~ /[mFcC]/ && sb !~ /^(branch|checkout|switch)$/) || (sb == "push" && ch == "o")) { if (x == length(a)) k++; break }
+						if ((ch ~ /[mFcC]/ && sb !~ /^(branch|checkout|switch|read-tree)$/) || (sb == "push" && ch == "o")) { if (x == length(a)) k++; break }
 						if (ch == "n" && sb == "commit") deny = 1
 						if (ch == "n" && sb ~ /^(add|rm|mv|clean|read-tree)$/) dry = 1
+						if (ch == "u" && sb == "read-tree") ru = 1
 						if (ch ~ /[fp]/ && sb ~ /^(checkout|switch)$/) cf = 1
 						if (ch ~ /[bB]/ && sb == "checkout") cb = 1
 						if ((ch == "f" || ch == "d") && sb == "push") fo = 1
@@ -467,7 +499,12 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				}
 				else if (sb == "switch") { if (cf) rw = "switch --discard-changes" }
 				else if (sb == "restore" || sb == "reset" || sb == "checkout-index") rw = sb
-				else if (sb == "read-tree") { if (!dry && !ix) rw = sb }
+				# -u writes the worktree, which a private index does not make private
+				else if (sb == "read-tree") { if (!dry && (!ix || ru)) rw = sb }
+				else if (sb ~ /^(write-tree|update-index)$/) { if (!ix) rw = sb }
+				else if (sb == "apply") { if (!dry || ap) rw = sb }
+				else if (sb ~ /^(pull|revert)$/) rw = sb
+				else if (sb == "sparse-checkout") { if (pos[1] != "list") rw = sb }
 				else if (sb == "clean") { if (!dry) rw = sb }
 				else if (sb == "stash") { if (pos[1] !~ /^(list|show|create)$/) rw = sb }
 				# `add` and `rm --cached` write only the index, which GIT_INDEX_FILE makes private to the round; any other rm or mv moves a file
@@ -477,9 +514,9 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 					if (c1 ~ /^(get|list)$/) crd = 1
 					if (!crd && (cwr || c1 ~ /^(set|unset|edit|rename-section|remove-section)$/ || cnp >= 2)) rw = sb
 				}
-				if (rw != "") print "ROLE\t" (sb ~ /^(remote|config)$/ ? "C" : (ra != "" ? "R" : "W")) "\t" rw "\t" gd "\t" (rgdir == "" ? "-" : rgdir) "\t" (ra == "" ? "-" : ra)
+				if (rw != "") print "ROLE\t" (sb ~ /^(remote|config)$/ ? "C" : (ra != "" ? "R" : "W")) "\t" rw "\t" gd "\t" (rgdir == "" ? "-" : rgdir) "\t" (rwt == "" ? "-" : rwt) "\t" (ra == "" ? "-" : ra)
 			}
-			if (sb ~ /^(restore|clean|stash|rm|mv|checkout-index|read-tree)$/) continue
+			if (sb ~ rolev) continue
 			if (sb == "config") {
 				if (kk && !ro && (kk < n || t[j + 1] ~ /^(set|--add|--replace-all)$/)) print "KIND\tnoverify"
 				if (ia && !ro && ia < n) print "KIND\tnoverify"
@@ -529,7 +566,7 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 	}
 	{ S = S $0 "\n" }
 	END {
-		cwd = ENVIRON["START"]
+		cwd = ENVIRON["START"]; ocwd = "?"
 		L = length(S)
 		# the body of an unquoted heredoc is read as the inside of a "…" token that follows `echo`: only its substitutions are code
 		if (ENVIRON["HB"] == 1) { hdm = 1; q = "\""; ds = 0; have = 1; n = 1; t[1] = "echo" }
@@ -607,7 +644,13 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 			else if (c == "`") { if (sd < 0) sd = 0; else if (sd == 0) { sd = -1; sc = (recv() || ENVIRON["HC"] == 1) } }
 			# a brace is the word of a group ({ cmd; }); inside a word it is the {owner}/{repo} of gh or a brace expansion
 			if ((c == "{" || c == "}") && !have && substr(S, p + 1, 1) ~ /[ \t\n;&|()<>]/) { endseg(); prev = c; continue }
-			if (c ~ /[;&|()`\n]/) { endseg(); prev = c; continue }
+			if (c ~ /[;&|()`\n]/) {
+				endseg(); prev = c
+				# a subshell, $( ) or <( ) keeps its cds to itself: the directory of the line comes back at its )
+				if (c == "(") { cdepth++; cstk[cdepth] = cwd; ostk[cdepth] = ocwd }
+				else if (c == ")" && cdepth > 0) { cwd = cstk[cdepth]; ocwd = ostk[cdepth]; cdepth-- }
+				continue
+			}
 			tok = tok c; have = 1
 		}
 		endseg()
@@ -645,21 +688,28 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				esac
 				[ -z "$PU" ] || ismine "$PU" || KINDS="$KINDS forkpush" ;;
 			ROLE)
-				# REST = class (W worktree and index, C config, R a lone checkout word that is a branch or a path), what, dir, git dir, the word: a find only when it lands in the checkout this hook ships in; an unresolvable dir or git dir is no find
+				# REST = class (W worktree and index, C config, R a lone checkout word that is a branch or a path), what, dir, git dir, work tree, the word: a find only when it lands in the checkout this hook ships in; an unresolvable dir or git dir is no find, an unresolvable work tree only drops the second chance
 				RC=${REST%%"$TAB"*}; REST=${REST#*"$TAB"}
 				RW=${REST%%"$TAB"*}; REST=${REST#*"$TAB"}
 				D=${REST%%"$TAB"*}; REST=${REST#*"$TAB"}
-				G=${REST%%"$TAB"*}; RA=${REST#*"$TAB"}
+				G=${REST%%"$TAB"*}; REST=${REST#*"$TAB"}
+				WT=${REST%%"$TAB"*}; RA=${REST#*"$TAB"}
 				{ [ "$D" = "?" ] || [ "$G" = "?" ]; } && continue
 				if [ -z "$MYGD" ]; then
 					MYTOP=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." 2>/dev/null && pwd -P) || continue
 					MYI=$(git -C "$MYTOP" rev-parse --absolute-git-dir --path-format=absolute --git-common-dir 2>/dev/null) || continue
 					MYGD=${MYI%%"$NL"*}; MYCD=${MYI#*"$NL"}
 				fi
-				RI=$(rgit rev-parse --absolute-git-dir --path-format=absolute --git-common-dir 2>/dev/null) || continue
+				# a git dir that is not there yet (made earlier on the line) leaves RI empty: the work tree is still judged, a config verb is no find
+				RI=$(rgit rev-parse --absolute-git-dir --path-format=absolute --git-common-dir 2>/dev/null) || RI=''
 				case $RC in
 					C) [ "${RI#*"$NL"}" = "$MYCD" ] || continue ;;
-					*) [ "${RI%%"$NL"*}" = "$MYGD" ] || continue ;;
+					# the git dir first; the second chance is the work tree, which with --git-dir or GIT_DIR and no --work-tree or GIT_WORK_TREE is the directory the line stands in, whatever git dir is named; one that cannot be placed gives no second chance
+					*) [ "${RI%%"$NL"*}" = "$MYGD" ] || {
+						[ "$WT" != "?" ] || false
+						if [ "$WT" = - ]; then RT=$(rp "$BASE" "$D" .); else RT=$(rp "$BASE" . "$WT"); fi
+						[ "$(git -C "$RT" rev-parse --absolute-git-dir 2>/dev/null)" = "$MYGD" ]
+					} || continue ;;
 				esac
 				# a branch is a switch, not a discard; DWIM of a remote branch counts as a path (shortcut: it is a switch too, but it moves HEAD of the lead's checkout)
 				[ "$RC" = R ] && rgit rev-parse --verify -q "$RA^{commit}" >/dev/null 2>&1 && continue

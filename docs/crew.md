@@ -256,9 +256,12 @@ its cwd there: `../tmp/` for a probe, the test's `mkdtemp(tmpdir())` dir for a t
 on 2026-10-19 a refusal test ran real commands through a mid-edit `bg.sh` and, in this checkout,
 created a tag, reset away every uncommitted edit and set an Actions secret. For a role the rule is
 held: `git-guard.sh` denies it, in this checkout, a `checkout` of paths, `switch -f`, `restore`, `clean`,
-`reset`, `stash`, `checkout-index`, `read-tree`, `add`, `rm`, `mv`, `remote` and `config` write, resolved the
-way it reads a push (`cd`, `-C`, `--git-dir`, `GIT_DIR`); the round snapshot's `GIT_INDEX_FILE=` prefix
-(an `export` or `env` counts, a bare assignment does not) and a scratch repo pass. Three
+`reset`, `stash`, `checkout-index`, `read-tree`, `write-tree`, `update-index`, `apply`, `pull`, `revert`,
+`sparse-checkout`, `add`, `rm`, `mv`, `remote` and `config` write, resolved the way it reads a push
+(`cd`, `-C`, `--git-dir`, `GIT_DIR`), with the work tree judged where it resolves (`--work-tree`,
+`GIT_WORK_TREE`, else the shell's directory, which a subshell, `cd -` or `popd` restores); the round
+snapshot's `GIT_INDEX_FILE=` prefix (an `export` or `env` counts, a bare assignment does not) and a
+scratch repo pass, `read-tree -u` never. Three
 roles ran real git here on 2026-10-21, one of them `cd $R && git checkout -q -- .` with `R` lost
 between two Bash calls (it reverted three tracked files): a role spells every path literally in each call.
 

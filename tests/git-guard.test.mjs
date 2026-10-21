@@ -107,6 +107,8 @@ const ask = [
 	`cd ${join(dir, 'sub')} && bash p.sh`,
 	'(cd sub && true); sh pipe.sh',
 	'echo "$(git tag v1)"',
+	// the substitution in the operand of cd, pushd and popd runs before the directory changes
+	'popd "$(git tag v1)"', 'cd "$(git tag v1)"', 'pushd "$(git tag v1)" && true',
 	'eval "git tag v1"',
 	'git tag v1 -m "a; b"',
 ];
@@ -1199,6 +1201,17 @@ const roleDeny = [
 	'git switch --discard-changes HEAD', 'git switch -f HEAD', 'git switch --force HEAD', 'git switch -fq HEAD',
 	'git checkout-index -f -a', 'git checkout-index -a', 'git checkout-index f',
 	'git read-tree HEAD', 'git read-tree -u --reset HEAD', 'git read-tree --reset -u HEAD', 'git read-tree -m HEAD HEAD',
+	// read-tree -u writes the worktree, which a private index does not make private (-m takes no value, so -mu and -um are the same flags)
+	'GIT_INDEX_FILE=../tmp/task-x/round.idx git read-tree -u --reset HEAD', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git read-tree -mu HEAD', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git read-tree -um HEAD',
+	'GIT_INDEX_FILE=../tmp/task-x/round.idx git read-tree -m -u HEAD', 'export GIT_INDEX_FILE=../tmp/task-x/round.idx; git read-tree -u HEAD', 'git read-tree -mu HEAD',
+	// the real index or worktree by a verb the list had not named: write-tree and update-index are free only behind a private index
+	'git write-tree', 'git write-tree --prefix=docs/', 'GIT_INDEX_FILE=x; git write-tree', 'git update-index --refresh', 'git update-index --add f', 'GIT_INDEX_FILE=x; git update-index --refresh',
+	'git apply p.diff', 'git apply --index p.diff', 'git apply --cached p.diff', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git apply p.diff',
+	'git pull', 'git pull --ff-only origin main', 'git pull --dry-run', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git pull', 'git revert HEAD', 'git revert --no-commit HEAD~2', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git revert HEAD',
+	'git sparse-checkout set docs', 'git sparse-checkout init', 'git sparse-checkout disable', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git sparse-checkout set docs', 'sh -c "git write-tree"',
+	// --apply makes the patch land whatever else is given; an unplaceable work tree does not hide the git dir the line stands in
+	'git apply --check --apply p.diff', 'git apply --stat --apply p.diff', 'git apply --apply --check p.diff', 'git apply --numstat --app p.diff',
+	'git --work-tree="$S" reset', 'GIT_WORK_TREE=$S git clean -fd', 'git --work-tree=$S checkout -- .', 'git -C docs --work-tree="$S" restore .', 'export GIT_WORK_TREE="$S"; git restore .', 'GIT_WORK_TREE="$S" git stash',
 	// an empty -C operand stays put like cd ""
 	'git -C "" checkout -- .', "git -C '' restore .", 'find . -name x -exec git checkout -- {} \\;', 'git -c alias.co=checkout co -- .', 'eval "git checkout -- ."', '(cd tests && git restore .)', 'sh -c \'cd "" && git checkout -- .\'',
 ];
@@ -1216,6 +1229,8 @@ const roleNone = [
 	'export GIT_INDEX_FILE=../tmp/task-x/round.idx; git add -- f', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git rm --cached f', 'export GIT_INDEX_FILE=../tmp/task-x/round.idx; git read-tree HEAD',
 	'timeout 5 env GIT_INDEX_FILE=../tmp/task-x/round.idx git add f', 'GIT_INDEX_FILE=../tmp/task-x/round.idx sudo git add f', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git read-tree -m HEAD HEAD',
 	'GIT_INDEX_FILE=../tmp/task-x/round.idx git read-tree HEAD && GIT_INDEX_FILE=../tmp/task-x/round.idx git add -- a b && GIT_INDEX_FILE=../tmp/task-x/round.idx git write-tree',
+	'GIT_INDEX_FILE=../tmp/task-x/round.idx git write-tree', 'export GIT_INDEX_FILE=../tmp/task-x/round.idx; git write-tree', 'env GIT_INDEX_FILE=../tmp/task-x/round.idx git write-tree', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git update-index --add f',
+	'git apply --check p.diff', 'git apply --stat p.diff', 'git apply --numstat p.diff', 'git apply --summary p.diff', 'git apply --check --index p.diff', 'git sparse-checkout list', 'git read-tree -n -u HEAD', 'git read-tree -nu HEAD', 'git read-tree --dry-run -mu HEAD',
 	// not named by the rule: a branch switch, a commit, an unplaceable directory, a `--` with nothing after it, and words that are text
 	'git checkout HEAD', 'git checkout -b x', 'git checkout -b x HEAD', 'git checkout -B x HEAD', 'git checkout --detach HEAD', 'git checkout -', 'git checkout HEAD --',
 	'git switch x', 'git switch -c x', 'git switch -', 'git read-tree -n HEAD', 'git commit -m x', 'git checkout --', 'cd "$X" && git checkout -- .', 'cd nosuch && git restore .',
@@ -1229,7 +1244,8 @@ for (const a of ROLES) test(`${a} is a role`, () => assert.equal(asRole(a)('git 
 for (const a of [ undefined, '', 'general-purpose', 'Explore', 'Plan', 'developers' ]) {
 	test(`agent_type ${JSON.stringify(a)} is left alone`, () => {
 		for (const c of [ 'git checkout -q -- .', 'git restore --staged f', 'git clean -fd', 'git stash', 'git reset', 'git add f', 'git rm f', 'git remote add zz u', 'git config user.name x', 'cd "" && git checkout -- .',
-			'git checkout HEAD f', 'git checkout f', 'git checkout -f', 'git checkout :/', 'git switch -f HEAD', 'git checkout-index -a', 'git read-tree HEAD', 'GIT_INDEX_FILE=x; git add f', 'git -C "" restore .' ]) assert.equal(asRole(a)(c), '', c);
+			'git checkout HEAD f', 'git checkout f', 'git checkout -f', 'git checkout :/', 'git switch -f HEAD', 'git checkout-index -a', 'git read-tree HEAD', 'GIT_INDEX_FILE=x; git add f', 'git -C "" restore .',
+			'git write-tree', 'git update-index --refresh', 'git apply p.diff', 'git pull', 'git revert HEAD', 'git sparse-checkout set docs', 'GIT_INDEX_FILE=x git read-tree -mu HEAD', '(cd /tmp && git status); git restore .', 'cd /tmp && git status; cd -; git restore .' ]) assert.equal(asRole(a)(c), '', c);
 	});
 }
 test('a role that also tags is denied, not asked; the lead is asked', () => {
@@ -1253,10 +1269,37 @@ test('the reason names the checkout and the way out, and --kinds lists rolegit f
 test('a role aimed at a scratch repo is silent, and aimed at the checkout from a scratch repo is denied', () => {
 	const s = repo(join(dir, 'rolescratch'));
 	const t = asRole('tester');
-	for (const c of [ `git -C ${s} checkout -- .`, `cd ${s} && git restore .`, `cd ${s} && git clean -fd`, `git --git-dir=${s}/.git checkout -- .`, `GIT_DIR=${s}/.git git reset`, `cd ${s} && git add f`, `git -C ${s} remote add zz u`, `cd ${s} && git config a.b c`, `cd ${s} && git stash` ]) assert.equal(t(c), '', c);
-	// GIT_DIR and GIT_INDEX_FILE reach git only as a prefix, behind env or exported; a bare assignment is a shell variable and git acts where it stands
-	for (const c of [ `export GIT_DIR=${s}/.git; git checkout -- .`, `env GIT_DIR=${s}/.git git restore .`, `timeout 5 env GIT_DIR=${s}/.git git clean -fd` ]) assert.equal(t(c), '', c);
-	for (const c of [ `GIT_DIR=${s}/.git; git checkout -- .`, `FOO=1; GIT_DIR=${s}/.git; git reset`, `GIT_DIR=${s}/.git && git restore .` ]) assert.equal(t(c), 'deny', c);
+	// the directory the line stands in, or the work tree it names, is the scratch repo
+	for (const c of [ `git -C ${s} checkout -- .`, `cd ${s} && git restore .`, `cd ${s} && git clean -fd`, `cd ${s} && git add f`, `git -C ${s} remote add zz u`, `cd ${s} && git config a.b c`, `cd ${s} && git stash`, `git -C ${s} --git-dir=.git checkout -- .`,
+		`git --git-dir=${s}/.git --work-tree=${s} checkout -- .`, `git --git-dir=${s}/.git --work-tree=${s} restore .`, `GIT_DIR=${s}/.git GIT_WORK_TREE=${s} git reset`, `export GIT_DIR=${s}/.git GIT_WORK_TREE=${s}; git clean -fd`, `env GIT_DIR=${s}/.git GIT_WORK_TREE=${s} git restore .`,
+		`git --git-dir=${s}/.git remote add zz u`, `GIT_DIR=${s}/.git git config a.b c` ]) assert.equal(t(c), '', c);
+	// --git-dir and GIT_DIR name the repository, not the files: with no --work-tree or GIT_WORK_TREE the work tree is the directory the line stands in, here the checkout
+	// (GIT_DIR and GIT_INDEX_FILE reach git only as a prefix, behind env or exported; a bare assignment is a shell variable and git acts where it stands)
+	for (const c of [ `git --git-dir=${s}/.git checkout -- .`, `git --git-dir ${s}/.git restore .`, `GIT_DIR=${s}/.git git reset`, `GIT_DIR=${s}/.git git clean -fdx`, `export GIT_DIR=${s}/.git; git checkout -- .`, `env GIT_DIR=${s}/.git git restore .`, `timeout 5 env GIT_DIR=${s}/.git git clean -fd`,
+		`git --git-dir=${s}/.git --work-tree=${ROOT} checkout -- .`, `GIT_DIR=${s}/.git GIT_WORK_TREE=${ROOT} git clean -fd`, `git -C ${s} --work-tree=${ROOT} restore .`, `cd ${ROOT}/docs && git --git-dir=${s}/.git restore .`, `git -C ${ROOT}/docs --git-dir=${s}/.git restore .`,
+		`GIT_DIR=${s}/.git; git checkout -- .`, `FOO=1; GIT_DIR=${s}/.git; git reset`, `GIT_DIR=${s}/.git && git restore .` ]) assert.equal(t(c), 'deny', c);
+	// the same lines from the scratch repo are free, and the lead is never asked
+	for (const c of [ `git --git-dir=${s}/.git checkout -- .`, `GIT_DIR=${s}/.git git reset`, `export GIT_DIR=${s}/.git; git checkout -- .`, `env GIT_DIR=${s}/.git git restore .` ]) {
+		assert.equal(t(c, s), '', c);
+		assert.equal(asRole(undefined)(c), '', c);
+	}
+	// an unplaceable work tree drops the work-tree chance only: the git dir named is still judged, and an unplaceable one stays no find
+	for (const c of [ `git --git-dir=${s}/.git --work-tree="$S" checkout -- .`, `GIT_DIR=${s}/.git GIT_WORK_TREE=$S git reset`, `git -C "$X" --work-tree=${s} reset` ]) assert.equal(t(c), '', c);
+	// a git dir made earlier on the line is not there when the hook reads it: the work tree is still judged, a config verb is no find
+	const nogd = `${dir}/nogitdir/.git`;
+	for (const c of [ `git init ${dir}/nogitdir && git --git-dir=${nogd} clean -fd`, `GIT_DIR=${nogd} git checkout -- .`, `git --git-dir=${nogd} --work-tree=${ROOT} restore .`, `export GIT_DIR=${nogd}; git reset` ]) assert.equal(t(c), 'deny', c);
+	for (const c of [ `git --git-dir=${nogd} --work-tree=${s} checkout -- .`, `GIT_DIR=${nogd} GIT_WORK_TREE=${s} git reset`, `git --git-dir=${nogd} config a.b c`, `GIT_DIR=${nogd} git remote add zz u` ]) assert.equal(t(c), '', c);
+	assert.equal(t(`GIT_DIR=${nogd} git checkout -- .`, s), '');
+	// a subshell, a substitution, `cd -` and popd leave the directory the line stood in: a command after them runs there
+	for (const c of [ `(cd ${s} && git status); git restore .`, `(cd ${s}; git status) && git clean -fd`, `x=$(cd ${s} && pwd); git add f`, `cd ${s} && git status; cd - && git restore .`, `cd ${s} && git status; cd - >/dev/null; git reset`,
+		`pushd ${s} >/dev/null; git status; popd; git restore .`, `pushd ${s}; popd >/dev/null; git stash`, `(cd ${s} && (cd /; true); git status); git restore .`, `cd ${s}; git status; cd ${ROOT}; cd -; git status; cd - && git restore .` ]) {
+		assert.equal(t(c), 'deny', c);
+		assert.equal(asRole(undefined)(c), '', c);
+	}
+	for (const c of [ `(cd ${s} && git restore .)`, `x=$(cd ${s} && git status); cd ${s} && git restore .`, `cd ${s} && (cd ${ROOT}; true); git restore .`, `cd ${s}; git restore .; cd -; git status`, `cd ${s} && cd ${ROOT} && cd - && git restore .`,
+		`pushd ${s} >/dev/null; git restore .`, `pushd ${s}; pushd ${ROOT}; popd; git restore .`, 'cd -; git restore .' ]) assert.equal(t(c), '', c);
+	assert.equal(t(`(cd ${ROOT} && git status); git restore .`, s), '');
+	assert.equal(t(`(cd ${ROOT} && git restore .)`, s), 'deny');
 	assert.equal(t('git checkout -- .', s), '');
 	assert.equal(t('git checkout nosuchbranch', s), '');
 	assert.equal(t('git remote add zz u', s), '');
