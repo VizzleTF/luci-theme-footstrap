@@ -15,7 +15,7 @@
  *   … [--quick] [--page <name>] [--no-pair]
  * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
-import { stands, login, requireStands, sealToRouter, pairStands, eachStand, reportDown } from './lib/stands.mjs';
+import { stands, login, openPage, requireStands, sealToRouter, pairStands, eachStand, reportDown } from './lib/stands.mjs';
 import { parseFlags } from './lib/util.mjs';
 
 const FLAGS = parseFlags('scroll-anchor', {
@@ -964,26 +964,6 @@ if (QUICK) {
 		+ 'sweep: it skips every other stand, both other page shapes (dhcp, processes), and — without '
 		+ '--full — compact/large density and every scroller but 1440 side/390 side/390 top. Run without '
 		+ '--quick (`npm run anchor`, or CI\'s own `--full` sweep) before trusting a clean result.\n');
-}
-
-/* A single `page.goto` in CI is not reliable enough to fail a release on. Two runs an hour apart on
- * the same commit died on webkit/owrt2410 with `page.goto: Timeout 20000ms exceeded` and
- * `page.goto: WebKit encountered an internal error` — two cells out of the sweep, every other cell
- * reporting `reader moved 0px`, and the same sweep green locally over 174 runs. So: three attempts
- * before a cell is written off. */
-async function openPage(page, url) {
-	let last;
-	for (let attempt = 1; attempt <= 3; attempt++) {
-		try {
-			await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-			return;
-		} catch (e) {
-			last = e;
-			/* the WebKit process may still be dying; give it a moment rather than racing it */
-			if (attempt < 3) await page.waitForTimeout(1500);
-		}
-	}
-	throw last;
 }
 
 /* How many cells may go unopened before the sweep itself is the problem. One flaky cell is the

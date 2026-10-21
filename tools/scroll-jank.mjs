@@ -13,7 +13,7 @@
  *
  * Needs a running owlab router (docs/development.md). */
 import * as pw from 'playwright';
-import { stands, login, requireStands, sealToRouter, waitForPaint, eachStand, reportDown } from './lib/stands.mjs';
+import { stands, login, openPage, requireStands, sealToRouter, waitForPaint, eachStand, reportDown } from './lib/stands.mjs';
 import { parseFlags } from './lib/util.mjs';
 
 const FLAGS = parseFlags('scroll-jank', {
@@ -166,7 +166,7 @@ for (const engine of ENGINES) {
 				/* chosen BEFORE the page under test is opened: switching it on that page schedules a
 				 * re-fit of its own, which then lands inside the window this measures and is read as
 				 * a mid-scroll re-decision that never happened */
-				await page.goto(stand.base + '/admin/status/overview', { waitUntil: 'domcontentloaded' });
+				await openPage(page, stand.base + '/admin/status/overview');
 				await page.waitForTimeout(1500);
 				try {
 					await page.evaluate(async (l) => {
@@ -177,7 +177,7 @@ for (const engine of ENGINES) {
 				catch (e) { continue; }		/* a document without the theme's JS has nothing to test */
 
 				for (const path of PAGES) {
-					try { await page.goto(stand.base + path, { waitUntil: 'domcontentloaded', timeout: 20000 }); }
+					try { await openPage(page, stand.base + path); }
 					catch (e) { continue; }
 					const where = `${engine} ${stand.id} @${w} ${layout} ${path}`;
 					/* wait for the real thing instead of a fixed clock: bounded at 20s, well past the

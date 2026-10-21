@@ -168,6 +168,27 @@ export async function login(page, base, id = new URL(base).host) {
 	}
 }
 
+/* A single `page.goto` in CI is not reliable enough to fail a release on. Two runs an hour apart on
+ * the same commit died on webkit/owrt2410 with `page.goto: Timeout 20000ms exceeded` and
+ * `page.goto: WebKit encountered an internal error` — two cells out of the sweep, every other cell
+ * reporting `reader moved 0px`, and the same sweep green locally over 174 runs. So: three attempts
+ * before a cell is written off. scroll-jank's gotos died the same way before any measurement (4
+ * CI runs since 2026-10-20), so both gates open pages through this. */
+export async function openPage(page, url) {
+	let last;
+	for (let attempt = 1; attempt <= 3; attempt++) {
+		try {
+			await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+			return;
+		} catch (e) {
+			last = e;
+			/* the WebKit process may still be dying; give it a moment rather than racing it */
+			if (attempt < 3) await page.waitForTimeout(1500);
+		}
+	}
+	throw last;
+}
+
 /* Every leaf of the router's own menu tree, as LuCI resolves it, not a list kept in the repo that
  * goes stale when an app is installed. `L.ui.menu.load()` returns the tree rooted at `admin`, so
  * the walk starts with an empty path (docs/development.md, "The live gates"). */
