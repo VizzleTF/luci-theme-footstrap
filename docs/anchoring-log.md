@@ -1760,6 +1760,21 @@ The hook sits on those two reads because most of the walk comes from `fitTabStri
   the whole stall: firefox owrt2512 @390 top normal, DHCP, read `settle+21 wrote-120+21` against a
   finding of **2702ms** with a **2681ms** gap. A ResizeObserver delivers after every rAF and
   before paint, so re-observing the root each frame reads the page as it paints.
+- **QUIET and a stalled frame loop (2026-10-21).** CI run 39558098668 on c253c28, which changed no
+  theme file, read `firefox owrt2410 @1440 side normal processes: the offset moved on its own 1
+  time(s) mid-flick (worst 198px)`, with writes `scrollTop=maincontent 631` at t=10723 (QUIET's own
+  step) and `829` at t=10724 (the theme's one write); its parent df10e33 was green on the same job
+  (39555843219, 39555840403). Locally the cell read **0 of 25**, and **0 of 20** with four CPU hogs on
+  the two cores node and firefox shared. A hypothesis, not an observation: the theme samples the
+  offset once per frame and calls the reader stopped after `SCROLL_IDLE` (**400ms**) without one, so
+  a runner that drew no frame that long could have the theme correct inside a flick, while QUIET's
+  `Date.now()` guard (a step or a still offset of 400ms) sees timers keep time. A rig that held rAF
+  and scroll events for 700ms did not make the theme write mid-flick (0 surprises in 6 of 6 cells).
+  QUIET now records the longest rAF gap per step, the open one included, and prints it in the finding
+  and the cell line; a run whose every reading had a gap of **400ms** or more beside it is measured
+  once more and reported only if it reproduces (HOLD's rule), while a reading with no gap fails at
+  once. The next such finding in CI carries its frame gap, which decides the hypothesis; the
+  `lateDrift()` fast road in fs-fit.js stays untouched until it does.
 - **`declines`.** An engine that has `overflow-anchor` and declines it on one refill showed in CI on
   `webkit owrtsnap @1440 side compact overview` twice in three runs of one commit and never
   locally; ablating the engine alone puts the theme in that state on every run.

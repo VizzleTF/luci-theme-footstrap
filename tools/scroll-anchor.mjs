@@ -91,6 +91,10 @@ const LATE_MS = 200;
  * (404-422ms, the reader in motion) with margin for a loaded runner. Not shortened to match the
  * faster path: it must outlast the SLOWEST legitimate correction, or "late" and "never" read alike. */
 const SWAP_WINDOW = 900;
+/* fs-fit.js's SCROLL_IDLE: with no frame to see the offset change for this long the theme calls the
+ * reader stopped, so QUIET reads a step slower, or a frame loop quieter, than this as a runner
+ * stall and not as a flick. */
+const SCROLL_IDLE = 400;
 /* How many refills REPEAT performs on the SAME section (see its note). `LATE_MISS_LIMIT`
  * (fs-fit.js) is 2: the second refill reaches the limit, the third proves the flag it trips stays
  * tripped (or, on an engine anchoring correctly, never trips) rather than resetting on the next tick. */
@@ -726,7 +730,7 @@ const REPEAT = async ([ growth, tol, times ]) => {
  * so a case that hands the poll back fires a real tick into the next one (HOLD returning it put a
  * live tick under SWAP's floor measurement, 120px, webkit/owrt2410 @390 top compact). This case
  * WANTS ticks landing mid-flick. */
-const QUIET = async (growth) => {
+const QUIET = async ([ growth, scrollIdle ]) => {
 	const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 	const view = document.getElementById('view');
 	const mc = document.getElementById('maincontent');
@@ -758,7 +762,7 @@ const QUIET = async (growth) => {
 	 * to be measured as a flick. */
 	const reach = Math.max(40, Math.min(160, Math.floor((hi - lo) / 12)));
 
-	let unexplained = 0, biggest = 0, expected = 0, stalls = 0;
+	let unexplained = 0, biggest = 0, expected = 0, stalls = 0, stalled = 0, gapMax = 0;
 	/* WHO MOVED IT — the first surprise's step, the theme's own scroll writes and its decision trails, so
 	 * a "moved on its own" finding says whether the theme wrote or the engine adjusted. A CI report
 	 * (firefox owrt2410 @390 top large, engine on, dhcp, 562px) arrived without any of it. */
@@ -770,6 +774,18 @@ const QUIET = async (growth) => {
 	last = pos();
 	let lastAt = Date.now();
 	let movedAt = Date.now();
+	/* Longest gap between the page's frames since the last step was read, an open one included: the
+	 * theme samples the offset in frames (`sampleMotion`, fs-fit.js), so a runner that drew none for
+	 * SCROLL_IDLE has it rightly correcting inside a "flick" the `Date.now()` steps below cannot see
+	 * stall (198px, firefox owrt2410 @1440 side normal processes, CI; 0 of 45 locally). */
+	let prevFrame = performance.now(), gapStep = 0, framing = true;
+	const frame = () => {
+		const t = performance.now();
+		gapStep = Math.max(gapStep, t - prevFrame);
+		prevFrame = t;
+		if (framing) requestAnimationFrame(frame);
+	};
+	requestAnimationFrame(frame);
 	for (let i = 0; i < 24; i++) {
 		const step = (i % 12 < 6) ? reach : -reach;
 		const stepT0 = performance.now();
@@ -786,6 +802,9 @@ const QUIET = async (growth) => {
 		}
 		await wait(70);
 		const now = pos();
+		const frameGap = Math.max(gapStep, performance.now() - prevFrame);
+		gapStep = 0;
+		gapMax = Math.max(gapMax, frameGap);
 		/* Was this step still part of a flick? The theme calls the reader "scrolling" until the offset
 		 * has held still for SCROLL_IDLE (400 ms, fs-fit.js), and a step here is 70 ms, so on a machine
 		 * that keeps up the whole loop is one motion. A loaded CI runner does not always keep up, and a
@@ -802,15 +821,17 @@ const QUIET = async (growth) => {
 		 * happen is a correction of the theme's own on top of it while the reader is moving */
 		const off = Math.abs(now - expected);
 		if (off > growth + 4) {
-			if (gap >= 400 || idle >= 400) stalls++;
+			if (gap >= scrollIdle || idle >= scrollIdle) stalls++;
 			else {
 				unexplained++; biggest = Math.max(biggest, off);
+				/* counted apart: the caller measures again when every reading had a stalled frame loop beside it */
+				if (frameGap >= scrollIdle) stalled++;
 				if (!surprise) {
 					const rel = (tr) => (tr || []).map((e) => {
 						const k = e.lastIndexOf('@');
 						return e.slice(0, k) + '+' + Math.round(Number(e.slice(k + 1)) - stepT0);
 					}).filter((e) => Number(e.slice(e.lastIndexOf('+') + 1)) > -2000).join(' ');
-					surprise = { step: i, padded: i % 6 === 3, expected, now, gap,
+					surprise = { step: i, padded: i % 6 === 3, expected, now, gap, frameGap: Math.round(frameGap),
 						docDelta: (sc ? sc.scrollHeight : document.documentElement.scrollHeight) - docH0,
 						writes: (window.__fsW || []).slice(w0),
 						trail: fitQ && typeof fitQ.lateTrail === 'function' ? rel(fitQ.lateTrail()) : 'n/a',
@@ -821,8 +842,9 @@ const QUIET = async (growth) => {
 		}
 		last = now;
 	}
+	framing = false;
 	view.querySelectorAll('[data-fs-probe]').forEach((el) => el.remove());
-	return { unexplained, biggest, stalls, surprise };
+	return { unexplained, biggest, stalls, stalled, gapMax: Math.round(gapMax), surprise };
 };
 
 /* Runs in the page: park the reader, LEAVE THE POLL RUNNING, and watch the offset across several
@@ -1049,7 +1071,7 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	}
 	await page.waitForTimeout(3000);
 
-	let held, swap, quiet, tick, repeat, below;
+	let held, swap, quiet, tick, repeat, below, quietFirst = null;
 	try {
 		/* TICK FIRST, on the page exactly as it loaded: HOLD's pad, SWAP's cycles and QUIET's flicks
 		 * perturb whatever the engine picked as its anchor node, and after them TICK read 0px on a
@@ -1072,7 +1094,15 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 			? { skip: 'engine already forced off — HOLD/SWAP cover the theme\'s own correction' }
 			: await page.evaluate(REPEAT, [ GROWTH, TOLERANCE, REPEAT_TIMES ]);
 		below = await page.evaluate(BELOW, GROWTH);
-		quiet = await page.evaluate(QUIET, GROWTH);
+		quiet = await page.evaluate(QUIET, [ GROWTH, SCROLL_IDLE ]);
+		/* Every reading had a frame gap of SCROLL_IDLE or more beside it: the theme read a reader who
+		 * had stopped, because the runner drew no frame to say otherwise. Measured once more and
+		 * reported only if it reproduces (HOLD's rule); a reading with no stall beside it fails at once.
+		 * A re-measure that cannot run (`skip`) leaves the first one standing. */
+		if (quiet.unexplained && quiet.unexplained === quiet.stalled) {
+			const again = await page.evaluate(QUIET, [ GROWTH, SCROLL_IDLE ]);
+			if (!again.skip) { quietFirst = quiet; quiet = again; }
+		}
 	}
 	/* A cell that threw proved nothing, and dropping it without a word is how a sweep comes
 	 * back green having measured a fraction of what it was asked to. That is not a theory:
@@ -1167,11 +1197,15 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 	if (noEngineAnchor && swap.floorClamped !== null && swap.floorClamped !== undefined && swap.floorClamped > TOLERANCE)
 		found(`${where}: with the correction switched off the engine clamped `
 			+ `${swap.floorClamped}px away — the content column's floor is not holding the document up`);
+	if (quietFirst && !quiet.unexplained)
+		process.stdout.write(`  ${where}: QUIET read ${quietFirst.biggest}px mid-flick once, with a ${quietFirst.surprise.frameGap}ms `
+			+ `frame gap beside it, but nothing on re-measure — a stalled runner, not a finding\n`);
 	if (quiet.unexplained)
 		found(`${where}: the offset moved on its own ${quiet.unexplained} time(s) mid-flick (worst ${quiet.biggest}px) `
 			+ '— a correction landing inside a scroll is itself a jump'
+			+ (quietFirst ? ` (re-measured: the first run read ${quietFirst.biggest}px beside a ${quietFirst.surprise.frameGap}ms frame gap)` : '')
 			+ (quiet.surprise ? `, first at step ${quiet.surprise.step}${quiet.surprise.padded ? ' (pad inserted)' : ''}: `
-				+ `asked ${quiet.surprise.expected}, read ${quiet.surprise.now} after ${quiet.surprise.gap}ms, document ${quiet.surprise.docDelta >= 0 ? '+' : ''}${quiet.surprise.docDelta}px, `
+				+ `asked ${quiet.surprise.expected}, read ${quiet.surprise.now} after ${quiet.surprise.gap}ms, longest frame gap ${quiet.surprise.frameGap}ms, document ${quiet.surprise.docDelta >= 0 ? '+' : ''}${quiet.surprise.docDelta}px, `
 				+ `engineTrusted ${quiet.surprise.trusted}, late trail: [${quiet.surprise.trail}], anchor trail: [${quiet.surprise.atrail}], `
 				+ `theme writes: ${JSON.stringify(quiet.surprise.writes)}` : ''));
 	/* THE PARKED READER, ACROSS REAL TICKS — see the note on TICK. Nothing here inserted the
@@ -1214,7 +1248,7 @@ async function runCell(browser, engine, reportId, base, sessionState, { PAGE, wi
 		+ `  floor alone: clamped ${swap.skip || swap.floorClamped === null ? '-' : swap.floorClamped + 'px'}`
 		+ `, reader ${swap.skip || swap.floorMoved === null ? '-' : swap.floorMoved + 'px'} `
 		+ `[offset ${swap.skip || swap.floorOffsetDelta === null ? '-' : signed(swap.floorOffsetDelta)}]`
-		+ `  mid-flick surprises ${quiet.unexplained}`
+		+ `  mid-flick surprises ${quiet.unexplained} (longest frame gap ${quiet.gapMax}ms)`
 		+ (quiet.stalls ? `  (${quiet.stalls} step(s) too slow to still be a flick, not counted)` : '')
 		+ `  tick drift ${tick.skip ? '-' : tick.moved + 'px/' + tick.mutations + 'mut'}`
 		+ `  ${REPEAT_TIMES}x repeat ${repeat.skip ? '-' : repeat.refills.map((r) => (r.moved === null ? '?' : r.moved) + 'px').join('/')} `
