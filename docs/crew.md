@@ -197,6 +197,10 @@ tag or a rewrite of `main` (a tag ruleset was rejected on 2026-10-19). Accepted 
 maintainer, 2026-10-21): the shell Claude Code starts from exports the maintainer's secrets, signing
 keys included, so every Bash subprocess, npm dependency, plugin hook and MCP server inherits them;
 a `Read` deny does not cover `env`, and no layer below stops code that reads its own environment.
+No OS sandbox either (the maintainer, 2026-10-21, after a measured probe): bubblewrap works on this
+WSL2 host and the egress allowlist held, but daily work needs `tools/bg.sh`, every T2 gate,
+`check:fast` and `owlab` excluded, and an excluded repo script can be edited and then run outside
+the sandbox. Revisit when detached runs move off `tools/bg.sh`.
 
 | Layer | Where | Holds |
 |---|---|---|
