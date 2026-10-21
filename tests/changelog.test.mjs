@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import { insertBullet, sealedDrift, sectionText } from '../tools/changelog.mjs';
 
-const CANON = ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security', 'Performance'];
+const CANON = ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security', 'Performance', 'Development'];
 const DOC = [
 	'## [Unreleased]', '', '### Changed', '', '- **a.** x', '', '### Fixed', '', '- **b.** y', '',
 	'## [1.0.0] — 2026-01-01', '', '### Added', '', '- **c.** z', '',
@@ -25,6 +27,22 @@ test('insertBullet creates a missing section in its canonical slot', () => {
 	assert.match(out, /## \[Unreleased\]\n\n### Added\n\n- \*\*n\.\*\* new\n\n### Changed/);
 	const sec = insertBullet(DOC, CANON, 'Security', '- **s.** sec');
 	assert.match(sec, /- \*\*b\.\*\* y\n\n### Security\n\n- \*\*s\.\*\* sec\n\n## \[1\.0\.0\]/);
+});
+
+test('insertBullet puts Development last, after Performance and everything else', () => {
+	const out = insertBullet(DOC, CANON, 'Development', '- **d.** dev');
+	assert.match(out, /- \*\*b\.\*\* y\n\n### Development\n\n- \*\*d\.\*\* dev\n\n## \[1\.0\.0\]/);
+	const perf = insertBullet(out, CANON, 'Performance', '- **p.** perf');
+	assert.match(perf, /### Performance\n\n- \*\*p\.\*\* perf\n\n### Development/);
+});
+
+test('add refuses an index past Development (7) before it writes anything', () => {
+	const bin = fileURLToPath(new URL('../tools/changelog.mjs', import.meta.url));
+	for (const i of [8, -1]) {
+		const r = spawnSync(process.execPath, [bin, 'add', String(i), '--en', '- **a.** b', '--ru', '- **a.** b'], { encoding: 'utf8' });
+		assert.equal(r.status, 1);
+		assert.match(r.stderr, /usage: changelog\.mjs add <0-7>/);
+	}
 });
 
 test('insertBullet never touches a released section', () => {

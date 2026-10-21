@@ -17,12 +17,13 @@ import { fileURLToPath } from 'node:url';
 
 import { ROOT, read } from './lib/root.mjs';
 
-/* Keep a Changelog's order, `Performance` appended (docs/releasing.md). The RU mirror's names are the same
- * list in the same order — that is what lets the two files be compared by INDEX rather than by
- * name, so only the prose language may differ. */
+/* Keep a Changelog's order, `Performance` and `Development` appended (docs/releasing.md). The RU mirror's
+ * names are the same list in the same order — that is what lets the two files be compared by INDEX rather
+ * than by name, so only the prose language may differ. `Development` (index 7) is for what a router never
+ * shows: release-notes.sh leaves it out of the release page. */
 const CANON = {
-	'CHANGELOG.md':    ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security', 'Performance'],
-	'CHANGELOG_ru.md': ['Добавлено', 'Изменено', 'Устарело', 'Удалено', 'Исправлено', 'Безопасность', 'Производительность'],
+	'CHANGELOG.md':    ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security', 'Performance', 'Development'],
+	'CHANGELOG_ru.md': ['Добавлено', 'Изменено', 'Устарело', 'Удалено', 'Исправлено', 'Безопасность', 'Производительность', 'Разработка'],
 };
 
 /* The line index where the section starting before `i` ends: the next heading or the link list. */
@@ -92,13 +93,13 @@ const git = (...a) => execFileSync('git', ['-C', ROOT, ...a], { encoding: 'utf8'
 
 /* `changelog.mjs add <idx> --en "- **…**" --ru "- **…**"`: put one bullet pair into [Unreleased] of
  * both files, in the worktree AND in the index only (never other staged or unstaged edits), so a
- * commit can be split per entry. <idx> is the section's canonical index, 0 = Added … 6 = Performance. */
+ * commit can be split per entry. <idx> is the section's canonical index, 0 = Added … 7 = Development. */
 function addPair(argv) {
 	const idx = Number(argv[0]);
 	const flag = (n) => { const i = argv.indexOf(n); return i < 0 ? '' : argv[i + 1] ?? ''; };
 	const pair = { 'CHANGELOG.md': flag('--en'), 'CHANGELOG_ru.md': flag('--ru') };
-	if (!Number.isInteger(idx) || idx < 0 || idx > 6 || !Object.values(pair).every(b => b.startsWith('- **')))
-		throw new Error('usage: changelog.mjs add <0-6> --en "- **lead.** …" --ru "- **lead.** …"');
+	if (!Number.isInteger(idx) || idx < 0 || idx >= CANON['CHANGELOG.md'].length || !Object.values(pair).every(b => b.startsWith('- **')))
+		throw new Error('usage: changelog.mjs add <0-7> --en "- **lead.** …" --ru "- **lead.** …"');
 	/* All four texts first: a failure on the RU file must not leave EN written alone. */
 	const plan = Object.entries(pair).map(([file, bullet]) => {
 		const canon = CANON[file], sec = canon[idx];

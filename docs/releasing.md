@@ -211,8 +211,8 @@ failing, because the notes are generated at tag time, when the tag is already pu
 
 - **Base: Keep a Changelog 1.1.0.** Fixed category names and order, `[Unreleased]` on top, newest
   version first, ISO 8601 dates, the file at the repository root.
-- **Extension: `Performance`** — a seventh category on top of KaC's six. A documented, legitimate
-  extension.
+- **Extensions: `Performance` and `Development`** — a seventh and an eighth category on top of KaC's
+  six. Documented, legitimate extensions; `Development` is the one the release page leaves out.
 - **Voice: effect-lead** — neither strictly past tense nor strictly imperative:
   `- **one-line effect.** then the reasoning`. A third option, but internally consistent; keep it
   everywhere.
@@ -225,13 +225,24 @@ Changelog on all three.** Do not "correct" entries toward the other standard.
 
 ### Categories, in this fixed order
 
-`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`, `Performance`.
+`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`, `Performance`, `Development`
+(`Добавлено`, `Изменено`, `Устарело`, `Удалено`, `Исправлено`, `Безопасность`, `Производительность`,
+`Разработка`).
 
 - **One section of each type per release.** Two `### Fixed` under one version is a merge artefact.
 - **The order does not follow the order the work was done in.**
 - **No empty sections.** No bullets, no heading.
-- Not all seven need to be present. A normal release is `Added`/`Changed`/`Fixed`, sometimes
+- Not all eight need to be present. A normal release is `Added`/`Changed`/`Fixed`, sometimes
   `Performance`.
+- **`Development` is for changes a theme user never sees:** the crew, hooks, gates, CI, tooling, tests
+  and agent docs. An entry is user-facing when it changes what a router running the package shows or
+  does (`luci-theme-footstrap/**`, `install.sh`, the feed, the published package) and goes under
+  `Added`/`Changed`/`Fixed`/…; everything else goes here. A fix to the trust chain a user installs
+  through (`install.sh`, the signing keys, `tools/stage-release.sh`, the `release` job, the feed) is
+  `Security` even when only CI files change. `tools/release-notes.sh` prints no
+  `Development` header and no lead from it, so the release page lists only what the reader can notice,
+  while the every-commit rule (below) still gets its entry. A version holding nothing else prints an
+  empty body. A change with both halves gets one entry in each section.
 
 ### The shape of an entry
 
@@ -241,7 +252,7 @@ Changelog on all three.** Do not "correct" entries toward the other standard.
 ```
 
 - **The bold lead IS the release note.** `tools/release-notes.sh` extracts only the bold lead of
-  each bullet and groups it by section. So: the lead is mandatory (a bullet without `**…**` silently
+  each bullet and groups it by section (`Development` excepted). So: the lead is mandatory (a bullet without `**…**` silently
   drops out of the release), and it must be a self-contained sentence, because it appears without
   the reasoning behind it.
 - **Write the effect, not the diff.** "Buttons had no focus indicator at all" beats "changed

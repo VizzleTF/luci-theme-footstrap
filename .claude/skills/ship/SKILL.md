@@ -40,9 +40,12 @@ The standing grant in `CLAUDE.md` `## Commits` covers every step here. A tag goe
 3. **Commit with both changelog entries**, one Bash call (`.claude/rules/changelog.md` for the
    section index and the entry shape):
    ```sh
-   node tools/changelog.mjs add <0-6> --en '- **Lead.** …' --ru '- **Лид.** …' \
+   node tools/changelog.mjs add <0-7> --en '- **Lead.** …' --ru '- **Лид.** …' \
      && git commit -m '<type>(<scope>): <summary>'
    ```
+   Section 7 (`Development` / `Разработка`) takes a change a theme user never sees: crew, hooks, gates,
+   CI, tooling, tests, agent docs; `release-notes.sh` leaves it out of the release page. A change to
+   `luci-theme-footstrap/**`, `install.sh` or the feed takes its user-facing section (0-6).
    Conventional Commits, English, no trailers. Only a CLAUDE.md-only commit or a fix to an
    [Unreleased] entry skips `add` (.claude/rules/changelog.md). Done = `git log -1 --stat` shows both CHANGELOG files, or the report names the exemption that applied.
 4. **Main is not red.** `gh run list --branch main --workflow build.yml --event push --status completed -L1 --json conclusion,headSha,databaseId`
