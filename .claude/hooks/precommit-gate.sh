@@ -20,10 +20,12 @@
 # other path passes: the tester reads it after the push.
 #
 # The third half asks when the commit weakens an oracle, "waiving a gate" being the maintainer's word and
-# nothing else seeing a waiver in a diff: a line added under `tools/baselines/` (a `release: ` subject is
-# exempt), a number raised in `LIMITS` of tools/css-metrics.mjs, a net drop of `test(` calls in a
-# tests/*.test.mjs (a deleted file included), a literal added to an `ALLOW` list of a tools/*.mjs. It counts
-# what grew and names the file; a lowering, a removal and tools/size-budget.mjs (its own grant) stay silent.
+# nothing else seeing a waiver in a diff: a line added under `tools/baselines/` (a `release: ` subject is exempt;
+# a line is new under its enclosing `[`/`{` opener lines, so an entry copied or moved to another key asks, as
+# tools/baselines/live-audit.json repeats 105 entries across its stand keys, and a reordering does not), a number
+# raised in `LIMITS` of tools/css-metrics.mjs, a net drop of `test(` calls in a tests/*.test.mjs (a deleted file
+# included), a literal added to an `ALLOW` list of a tools/*.mjs. It counts what grew and names the file; a lowering,
+# a removal and tools/size-budget.mjs (its own grant) stay silent.
 #
 # `git commit --amend` is read against HEAD^ (a root commit: the empty tree), not HEAD: the commit is its
 # parent plus the index, or plus the worktree under `-a` and paths.
@@ -32,7 +34,10 @@
 # leaves silent: a commit run by an alias or a script, an option or path behind a quote or a `$`, a
 # flag on a later line than `git commit` (a heredoc message), a `cd <dir>` or `git -C <dir>` ahead of
 # `git commit <paths>` (the paths are read against the hook's own cwd), `--pathspec-from-file`, a
-# `release: ` subject in a heredoc, a `-F` file or an amend without `-m` (read as no release), a deleted `LIMITS` key.
+# `release: ` subject in a heredoc, a `-F` file or an amend without `-m` (read as no release), a deleted `LIMITS` key,
+# a hex or expression `LIMITS` value, a backtick `ALLOW` entry, a baseline line that is the SOH sentinel of the oracle's
+# own stream, a `release: ` subject on a commit that is no release, a baseline entry copied between the sibling
+# objects of one array (they share a context), a baseline that is no JSON (its `[`/`{` line ends read as openers).
 #
 # No `if:` in settings.json: it only matches a line that STARTS with `git commit`. The detection is
 # git-guard.sh's `--kinds`, so `cd a && git commit` and a script that commits reach this too.
@@ -276,14 +281,18 @@ function strip(s,   o, i, c, d, q, lit) {
 	}
 	return o
 }
-function grew(x) { if (!(x in was) && !(x in got)) { got[x] = 1; if (!ng++) first = x } }
+function grew(x, t) { if (!(x in was) && !(x in got)) { got[x] = 1; if (!ng++) first = t } }
 BEGIN { Q = "\047"; D = "\042"; side = 0 }
-$0 == "\001SPLIT" { side = 1; blk = 0; inb = 0; next }
+$0 == "\001SPLIT" { side = 1; blk = 0; inb = 0; dp = 0; next }
 mode == "count" { n[side] += gsub(/(^|[^[:alnum:]_$.])test\(/, "&"); next }
 mode == "lines" {
+	# a line is new under its path of enclosing `[`/`{` opener lines: the same entry copied under another key is a new waiver
 	s = $0; sub(/^[[:space:]]+/, "", s); sub(/[[:space:],]+$/, "", s)
 	if (s == "") next
-	if (side) grew(s); else was[s] = 1
+	if (s ~ /^[]}]/ && dp > 0) dp--
+	k = cx[dp]
+	if (side) grew(k SUBSEP s, s); else was[k SUBSEP s] = 1
+	if (s ~ /[[{]$/) cx[++dp] = k SUBSEP s
 	next
 }
 mode == "limits" {
@@ -303,7 +312,7 @@ mode == "allow" {
 	if (!inb && s ~ /ALLOW[[:space:]]*=/) { inb = 1; start = 1 }
 	if (!inb) next
 	if (!start && s ~ /^[]})]/) { inb = 0; next }
-	for (j = 1; j <= nl; j++) { if (side) grew(L[j]); else was[L[j]] = 1 }
+	for (j = 1; j <= nl; j++) { if (side) grew(L[j], L[j]); else was[L[j]] = 1 }
 	if (start && s ~ /;[[:space:]]*$/) inb = 0
 }
 END {

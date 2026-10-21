@@ -47,6 +47,7 @@
 - **The verdict gate reads what the commit really carries.** Path names git quotes, `-a` after a quoted message or in a flag cluster, `git commit <paths>`, an exec-bit or symlink change, and a mix of two verdicts that never tested the combination now ask instead of passing silently.
 - **scroll-jank retries a stand that is slow to open a page.** Both of its page loads go through the three-attempt `openPage()` that scroll-anchor already used, now shared in `tools/lib/stands.mjs`; a single WebKit timeout on the first load had turned four CI runs red since 2026-10-20 before anything was measured.
 - **scroll-jank no longer passes over a page it never opened.** A page whose load failed all three attempts is named and counted; more than one unopened page fails the gate, as more than three cells fail scroll-anchor, both through one shared check in `tools/lib/stands.mjs`.
+- **A baseline entry copied to another stand key asks too.** The oracle check of `precommit-gate.sh` reads each baseline line with the key it sits under, so copying or moving an entry between stands in `tools/baselines/` asks like a new one; a reorder or a removal stays silent.
 
 ### Security
 

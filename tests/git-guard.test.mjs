@@ -988,6 +988,36 @@ test('precommit-gate oracle: a line added under tools/baselines asks, a `release
 	assert.equal(decision(w), undefined);
 });
 
+test('precommit-gate oracle: a baseline line is new under its key, so a copy or a move between keys asks', () => {
+	// the shape of tools/baselines/live-audit.json: stand keys, each a sorted list, most entries repeated across them
+	const L = 'tools/baselines/live-audit.json';
+	const shared = [ '/admin/dashboard|320|overflow|span', '/admin/services/acme/logread|0|noname|textarea#syslog' ];
+	const only = '/admin/network/diagnostics|0|noname|textarea';
+	const book = (o) => `${JSON.stringify(o, null, '\t')}\n`;
+	const base = { owrt2512: [ only, ...shared ], owrt2410: [ ...shared ], owrtsnap: [ ...shared ], 'owrt2410@ru': [ ...shared ] };
+	const was = book(base);
+	const q = (name, o) => oracle(name, L, was, book(o));
+	// a copy: the text sits in the file already, under owrt2512, and is new under owrt2410
+	const copy = q('o1f', { ...base, owrt2410: [ only, ...shared ] });
+	assert.equal(decision(copy), 'ask');
+	assert.ok(reason(copy).includes(`${L} gained 1 line(s), first: "${only}"`), reason(copy));
+	// a move: out of one key, into another
+	assert.equal(decision(q('o1g', { ...base, owrt2512: [ ...shared ], owrt2410: [ only, ...shared ] })), 'ask');
+	// a key that is new is its opener line and its entries; the closer already stands under the root
+	assert.match(reason(q('o1h', { ...base, owrtnew: [ ...shared ] })), /gained 3 line\(s\), first: "owrtnew": \[/);
+	// a reordering within a key, a removal and a file brought in unchanged are not growth
+	assert.equal(decision(q('o1i', { ...base, owrt2512: [ ...shared, only ] })), undefined);
+	assert.equal(decision(q('o1j', { ...base, owrt2512: [ only ], owrtsnap: [ shared[0] ] })), undefined);
+	assert.equal(decision(q('o1k', JSON.parse(was))), undefined);
+	// the key is the whole path of openers, so two lists under different parents are different keys
+	const nest = (a, b) => book({ x: { list: a }, y: { list: b } });
+	assert.equal(decision(oracle('o1l', L, nest([ 'p' ], [ 'p' ]), nest([ 'p', 'q' ], [ 'p' ]))), 'ask');
+	assert.equal(decision(oracle('o1m', L, nest([ 'p', 'q' ], [ 'p' ]), nest([ 'p', 'q' ], [ 'p', 'q' ]))), 'ask', 'copied between the two lists');
+	assert.equal(decision(oracle('o1n', L, nest([ 'p', 'q' ], [ 'p' ]), nest([ 'q', 'p' ], [ 'p' ]))), undefined);
+	// a `release: ` subject still carries a baseline refresh, a copy included
+	assert.equal(decision(copy, "git commit -m 'release: 1.2.3'"), undefined);
+});
+
 test('precommit-gate oracle: a raised number in css-metrics LIMITS asks, a lowering and size-budget do not', () => {
 	const C = 'tools/css-metrics.mjs';
 	const css = (n, more = '') => `// importants: 99 in a comment\nconst LIMITS = {\n\t/* a raise: importants: 77 */\n\timportants: ${n},\n\temptyRules: 0,${more}\n};\nconst importants = 5;\n`;
