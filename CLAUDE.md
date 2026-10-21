@@ -93,13 +93,13 @@ real git runs in a scratch repo outside this checkout (`docs/crew.md` "Probing a
 ## Commits
 
 Standing grant: the agent commits and pushes to `origin` (`main` and its own `claude/*`, `feat/*`,
-`fix/*` branches) on its own judgement, through `/ship`, when all four hold: (1) T0 is green;
-(2) both CHANGELOG entries are in the commit (`node tools/changelog.mjs add … && git commit …`;
-`.claude/hooks/precommit-gate.sh` refuses otherwise); (3) the branch is based on `origin/main`;
-(4) `gh run list --branch main -L1` is not red, or this push fixes that red. The push runs
-`.githooks/pre-push` (`npm run check`, 2–4 min): `timeout: 300000` or `run_in_background`. After
-every push, same turn: `tools/bg.sh tools/ci-watch.sh --sha <sha>` + `tools/bg-wait.sh <run-id>`
-in the background; report the verdict line unprompted.
+`fix/*` branches) on its own judgement, through `/ship`, when all four hold: (1) T0 is green; (2)
+both CHANGELOG entries are in the commit (`node tools/changelog.mjs add … && git commit …`;
+`.claude/hooks/precommit-gate.sh` refuses otherwise); (3) the branch is based on `origin/main`; (4)
+Build's newest completed push run on `main` is `success` (`/ship` step 4), or this push fixes it.
+The push runs `.githooks/pre-push` (`npm run check`, 2–4 min): `timeout: 300000` or
+`run_in_background`. After every push, same turn: `tools/bg.sh tools/ci-watch.sh --sha <sha>` +
+`tools/bg-wait.sh <run-id>` in the background; report the verdict line unprompted.
 
 Also the agent's: rebase, amend and `git push --force-with-lease` on its own branches; the
 `release: x.y.z` commit and push inside `/release` once the maintainer asked for that release; the

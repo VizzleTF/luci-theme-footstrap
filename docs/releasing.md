@@ -290,7 +290,9 @@ gated by step 5 below, the `git-guard` hook and the `ask` rule.
 3. Commit that change as `release: x.y.z` and push it to `origin main`; this is part of a release
    the maintainer asked for, so it needs no further word. Message in English, **no AI attribution**.
 4. **Before the tag, read the release sha's run and the one before it on `main`**:
-   `gh run list --branch main -L2`. A run already red before your push
+   `gh run list --branch main --workflow build.yml --event push -L2` (Build's push runs only: a
+   CodeQL or pages run is not the pipeline the tag waits on; no `--status completed`, so the release
+   sha's own run shows while it is still going). A run already red before your push
    stays red after it, and `release` does not fire until whatever it currently gates on is green —
    so a tag pushed onto a broken pipeline cannot publish. A pre-existing failure is not something to
    push past: it is either an infrastructure condition to be fixed first, or a real regression that

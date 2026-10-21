@@ -16,7 +16,9 @@ changelog section, and every gate reads the sha the tag will name. `<v>` is the 
 
 1. **Readiness** (autonomous; any red stops here with an owner named):
    - scope the diff — `docs/releasing.md` Step 1 says which live checks it makes mandatory;
-   - `gh run list --branch main -L1 --json conclusion,headSha,databaseId` → `success`, and
+   - `gh run list --branch main --workflow build.yml --event push --status completed -L1 --json conclusion,headSha,databaseId`
+     → `success` (a `cancelled` or `skipped` latest run says nothing: the one before it, `-L2`,
+     decides), and
      `gh run view <id>` read job by job (`check`, `lint`, `build`, `verify`, `live`, `anchors`);
    - `gh workflow run build.yml --ref main` (the agent's own dispatch, no question), then
      `tools/bg.sh tools/ci-watch.sh --run <id> --max 6000`

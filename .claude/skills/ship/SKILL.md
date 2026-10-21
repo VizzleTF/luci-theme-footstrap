@@ -38,8 +38,11 @@ The standing grant in `CLAUDE.md` `## Commits` covers every step here. A tag goe
    ```
    Conventional Commits, English, no trailers. Only a CLAUDE.md-only commit or a fix to an
    [Unreleased] entry skips `add` (.claude/rules/changelog.md). Done = `git log -1 --stat` shows both CHANGELOG files, or the report names the exemption that applied.
-4. **Main is not red.** `gh run list --branch main -L1 --json conclusion,headSha` is not `failure`,
-   or this push is the fix for it, said in the report.
+4. **Main is not red.** `gh run list --branch main --workflow build.yml --event push --status completed -L1 --json conclusion,headSha,databaseId`
+   reads `success`, or this push is the fix for it, said in the report. Only Build's push run
+   counts: CodeQL, pages and Dependabot runs on `main` are not the reading. A `cancelled` or
+   `skipped` latest run says nothing about main: the newest completed run before it (`-L2`) decides,
+   and the report names both.
 5. **Stand gates before the push.** What a push to `main` would prove only after the push goes to
    a `tester` card first; the lead runs no stand and waits for the verdict block.
    - The diff touches `fs-fit.js` or a scroll-anchor/floor gate (both stands, hours): acceptance

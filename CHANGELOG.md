@@ -36,6 +36,7 @@
 - **`.claude/settings.json` no longer carries a `Write(../tmp/**)` rule that Claude Code ignores.** File permission checks match only `Edit(...)` rules, so the harness warned on every start; the existing `Edit(../tmp/**)` already covers writes there.
 - **`scroll-anchor` QUIET no longer fails a run on a stalled frame loop alone: a mid-flick reading with a 400ms+ rAF gap beside it is measured again and reported only if it reproduces, and every finding prints its frame gap.** A docs-only commit went red on `firefox owrt2410 @1440 processes` (198px) while the same cell read 0 of 25 locally and 0 of 20 under CPU load; a 198px theme write with no stall still fails at once, and 538 cells on owrt2512 and owrt2410 read clean.
 - **The pre-push hook checks the commit being pushed.** It runs `npm run check` in a clean worktree of that commit, not in the working tree, so an exec bit set only on disk, an untracked file or an unstaged edit can no longer pass it and then fail CI.
+- **"Main is red" reads the right run.** `/ship`, `/release` and the release runbook read only the push run of `build.yml`, so a green CodeQL or Pages run no longer hides a red build, and a new session says when that run failed.
 
 ### Security
 

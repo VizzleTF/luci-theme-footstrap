@@ -5,7 +5,10 @@
 #    owlab call fail and read as a broken owlab rather than a wrong directory.
 # 2. HEAD vs origin/main after a quiet fetch: a stale or squash-merged branch is named before any
 #    commit or push lands on it. Silent when level with origin/main or when the fetch fails.
-# Speaks only on a positive find; total time is bounded by the 10 s fetch timeout.
+# 3. The latest completed push run of build.yml on main is `failure`: CLAUDE.md "Commits" (4) bars a
+#    push on a red main, and the other workflows (CodeQL, pages) must not mask it. Silent on any other
+#    conclusion, no gh, no network, no answer within its 8 s timeout, and when step 2's fetch failed.
+# Speaks only on a positive find; total time is bounded by the 10 s fetch and the 8 s gh timeouts.
 set -eu
 
 NOTES=''
@@ -27,6 +30,9 @@ elif timeout 10 git fetch -q origin 2>/dev/null && git rev-parse -q --verify ori
 	if [ "$behind" -gt 0 ] && git log --format=%s HEAD..origin/main 2>/dev/null | grep -q '^release: '; then
 		add "origin/main carries a release HEAD lacks; latest tag: $(git describe --tags --abbrev=0 origin/main 2>/dev/null || echo unknown)."
 	fi
+	red=$(timeout 8 gh run list --branch main --workflow build.yml --event push --status completed -L1 --json conclusion,headSha,databaseId 2>/dev/null \
+		| jq -r '.[0] | select(.conclusion == "failure") | "main CI red on \(.headSha[0:7]) (run \(.databaseId))"' 2>/dev/null) || red=''
+	[ -z "$red" ] || add "$red"
 fi
 
 [ -n "$NOTES" ] || exit 0
