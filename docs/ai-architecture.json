@@ -84,7 +84,7 @@
     {
       "id": "retro",
       "type": "backend",
-      "label": "/retro",
+      "label": "/crew-retro",
       "sublabel": "maintainer-run",
       "pos": [
         215,

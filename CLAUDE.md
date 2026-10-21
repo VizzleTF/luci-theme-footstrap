@@ -80,7 +80,7 @@ The main thread is the lead: it orchestrates and edits `docs/**` and config. Cod
 `.github/**`, `.claude/hooks/*.sh`, `.claude/tooling/**`) goes with a card to a role in
 `.claude/agents/`, as does a task needing a gate beyond T0 or bringing ~50 lines of output. The
 lead's Bash runs git, `npm run check:fast` and the commands a skill it runs spells out (`/ship`,
-`/release`, `/retro`, `/upstream-pr`); any other gate, stand, probe or screenshot is a role's card,
+`/release`, `/crew-retro`, `/upstream-pr`); any other gate, stand, probe or screenshot is a role's card,
 a live reproduction a `tester` card. Budget: under 15k characters of tool output per card. Status:
 at most 5 lines (done / running with task ids + ETA / waiting on the maintainer), on a state change.
 Through the maintainer: a security vulnerability, a stall, the per-word items in "Commits".

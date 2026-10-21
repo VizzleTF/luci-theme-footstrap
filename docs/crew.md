@@ -128,6 +128,10 @@ rewrite JSON less readily than Markdown, and a file outlives a compaction.
   message) stays silent; the header of the hook lists them. Every other code path goes out on T0
   and `.githooks/pre-push` and gets its `tester` card after the push, in the same session; a
   `NEEDS_WORK` there is a fix commit.
+- **A fix keeps its check.** A fix card names one check that stays in the repository, is red on
+  the parent commit and holds the promise to the reader (an existing gate extended beats a new
+  one), or says why there is none; the tester proves it red (`tester.md`). 9 of 28 product fixes
+  since 2026-09-15 left no check behind (audit P1-14).
 - One card, one mechanism; the acceptance fits in 5 lines. A card that needs more is two cards.
 - A `SendMessage` to a resumed agent is a round and counts toward `max_rounds`.
 - Upstream and release work splits in two: (a) base and history, verified by the `tester`; (b) the
@@ -196,10 +200,15 @@ counter of 2–3.
   the feed's next tag.
 - **No-agents mode** (the maintainer asks for it on a task, e.g. «без агентов»): the lead runs the
   role's commands itself; gate output still goes to `../tmp` logs and the lead reads the tail.
-- **Sessions:** one wave, one session; state lives in `card.json` and `docs/`. Past ~150k tokens
-  the lead writes a handoff and asks the maintainer to `/clear` (a CLI command only the maintainer
-  types). A second session on the same
-  tree works in a worktree under .claude/worktrees.
+- **Sessions:** one wave, one session; state lives in `card.json` (its `history`) and `docs/`, so
+  an auto-compaction inside a wave loses nothing a card does not hold. At the end of a wave the
+  lead writes a handoff and asks the maintainer to `/clear` (a CLI command only the maintainer
+  types). A fixed token threshold was the rule until 2026-10-21 and never held: five sessions
+  peaked at 304k-614k tokens (audit P1-11). A second session on the same tree works in a worktree
+  under .claude/worktrees.
+- **The lead reads summaries, not raw logs:** a transcript, a CI job log or a gate log longer
+  than a screen goes to a read-only agent that writes `../tmp/<id>.md` and returns its path and
+  verdict; `/crew-retro` fans out that way.
 
 ## Autonomy levels
 
@@ -225,10 +234,16 @@ WSL2 host and the egress allowlist held, but daily work needs `tools/bg.sh`, eve
 `check:fast` and `owlab` excluded, and an excluded repo script can be edited and then run outside
 the sandbox. Revisit when detached runs move off `tools/bg.sh`.
 
+A guard finding counts when it is a habitual or accidental form of a per-word action or of a role
+writing the checkout. A form built to dodge the hook (a line assembled at run time, a nested shell
+written for it) is left to the classifier and the `ask` rules, and goes into the hook header's
+list of what it does not stop instead of a patch: git-guard grew from 368 to 591 lines in two days
+chasing such forms, and fixed the false prompts that growth brought (audit P1-18).
+
 | Layer | Where | Holds |
 |---|---|---|
 | 1. Instructions | `CLAUDE.md`, `.claude/rules/*.md` (path-scoped), `.claude/agents/*.md`, skills, auto-memory | the policy, the tiers, the roles; the auto-mode classifier reads `CLAUDE.md` too |
-| 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes, publications; a role's checkout, index and config writes in this checkout, denied); `precommit-gate.sh` (both CHANGELOG entries, then a recorded tester verdict on a package or guard path, asked); `card-gate.sh` (PreToolUse `Agent`: a `developer` spawn needs its card and `dirty-at-start`, denied); `session-start.sh` (drift from `origin/main`, a red Build push run on `main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/retro`) | the per-word list, whatever the permission mode |
+| 2. Hooks | `.claude/hooks/git-guard.sh` (PreToolUse, full command: tags, releases, history rewrite, fork pushes, publications; a role's checkout, index and config writes in this checkout, denied); `precommit-gate.sh` (both CHANGELOG entries, then a recorded tester verdict on a package or guard path, asked); `card-gate.sh` (PreToolUse `Agent`: a `developer` spawn needs its card and `dirty-at-start`, denied); `session-start.sh` (drift from `origin/main`, a red Build push run on `main`); `.claude/hooks/subagent-start.sh` (shared role rules); `.claude/hooks/permission-denied.sh` (appends to `../tmp/denials.log` for `/crew-retro`) | the per-word list, whatever the permission mode |
 | 3. Permissions and auto mode | `.claude/settings.json` `deny`/`ask`/`allow`; `autoMode` in `~/.claude/settings.json` (the classifier reads it only from user settings); `tools/bg.sh` refuses ssh, commit, push, tag and gh writes in detached runs; the MCP servers github, kubernetes, helm and Vercel are denied in this project (never called here, and their write tools bypassed every other layer) | prompts and denials before a command runs; prefix matching misses `git -C` forms, hence layer 2 |
 | 4. Git hooks | `.githooks/pre-push` (`npm run check` on the pushed commit in a clean worktree), `.githooks/commit-msg` (strips trailers) | every contributor, agent or not |
 | 5. CI | `build.yml`: check, lint, build, verify (25.12/apk + 24.10/opkg), live, anchors on every push; deep on a tag or dispatch | the ground truth for "done" |
@@ -254,14 +269,14 @@ between two Bash calls (it reverted three tracked files): a role spells every pa
 | `/ship` | model | T0 check, changelog entries, commit by path, push, `ci-watch` in the background | commit and push to `origin`; never a tag |
 | `/release` | model, on the maintainer's ask | pre-tag matrix, changelog rename, `release:` commit, tag, feed | asks for the tag unless the maintainer's message named it |
 | `/upstream-pr` | model | openwrt/luci branch, local checks, review answers | fork pushes and replies on the maintainer's word |
-| `/retro` | maintainer only (`disable-model-invocation`) | reads `measure-run.mjs`, `../tmp/denials.log`, repeated corrections; sorts each into keep / skill / rule / hook / delete | edits the lead-owned rows the maintainer accepts in its "Agree" step; code goes to a card |
+| `/crew-retro` | maintainer only (`disable-model-invocation`) | reads `measure-run.mjs`, `../tmp/denials.log`, repeated corrections; sorts each into keep / skill / rule / hook / delete | edits the lead-owned rows the maintainer accepts in its "Agree" step; code goes to a card |
 
 A procedure lives in a skill, a fact in `CLAUDE.md`, a path-scoped rule in `.claude/rules/`, a
 must-always in a hook. A retro miss becomes an eval scenario for its skill before the text changes.
 
 Evals live in `.claude/skills/<name>/evals/<case>/`: `prompt.md` and a `graders` directory, plus `case.yaml`
 and `scaffold.sh` when the case needs a scaffolded repo (the release and ship cases); they run
-through `claude plugin eval` as `.claude/skills/retro/SKILL.md` step 8 "Agree, then apply" gives it:
+through `claude plugin eval` as `.claude/skills/crew-retro/SKILL.md` step 8 "Agree, then apply" gives it:
 paid model runs, so on the maintainer's word. The sandbox they need is `bubblewrap` and `socat`, and
 `TMPDIR` must lie outside `/tmp`: the eval sandbox denies writes under `/tmp`, which covers its own
 workspace there, so a case's `git fetch` fails with `Read-only file system`.
@@ -288,6 +303,17 @@ A workflow script fans out independent read-only work (audits, research, per-fil
 - Each agent writes a large result to a file and returns its path. The harness may refuse a
   subagent's write of a file it reads as a report; that result comes back as text and the lead
   saves it (the 2026-10-20 audit's final report).
+- A gate agent (verifier, reviewer, security) that returns nothing is `not_run`, never clean: the
+  script hands it back as `{not_run, error}`, a round is dry only when every gate agent answered,
+  and the lead's report opens with the `not_run` list. polish-2 read four silent security rounds
+  as `all_green`.
+- A workflow that edits files runs "The loop": two fix rounds at most, the same blocking id twice
+  (a `STILL:` repeat included) stops it for the maintainer, and after the last fix round a tester
+  runs or the result is marked unverified. A verifier gets the card, the diff and the changed
+  files, never the writer's reasoning (`decisions_taken`). A card split off a workflow keeps its
+  `round` and `history`.
+- A security agent's scope fits its 25 turns: an audit is cut by surface, and a `PARTIAL` or empty
+  return is re-sent as the uncovered part, never as the same scope again.
 - Writers stay one at a time in the shared checkout; parallel writers each get their own worktree
   and card, and a general-purpose workflow agent edits no repository file. On 2026-10-19 one
   writer's test ran `git reset --hard HEAD~3` in the shared tree and wiped its neighbours' work.

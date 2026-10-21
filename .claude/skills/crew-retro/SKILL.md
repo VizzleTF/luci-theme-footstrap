@@ -1,5 +1,5 @@
 ---
-name: retro
+name: crew-retro
 description: Retro of this project's Claude sessions since a date, and a revision of the agent environment from what they show.
 disable-model-invocation: true
 argument-hint: "[since-date YYYY-MM-DD]"
@@ -14,14 +14,18 @@ ago). `T=../tmp/retro-<today>`. Each step ends on its done line.
    every `<uuid>.jsonl` with mtime on or after the date, plus its `<uuid>/subagents/*.jsonl`
    (workflow agents included). Write `$T/sessions.tsv`: id, start, end, size, subagent count.
    Done = every file of the range is a row.
-2. **Extract with `jq`**, the only way a transcript reaches the context: per session, one
-   `$T/<id>.md` of user prompts, permission denials, tool errors, interrupts and compactions, each
-   with its timestamp, under 20k tokens (split as `<id>-2.md` above that). Done = one file per row.
-3. **Measure.** `node .claude/tooling/measure-run.mjs <id>` for each session; append its lines to
-   `$T/measure.txt`.
-4. **Denials.** Read `../tmp/denials.log` for the range; group by tool and rule.
-5. **Findings.** One row per recurring correction, denial, skipped step or stall in `$T/findings.md`:
-   evidence (session id + timestamp), still open (yes/no), recurrences.
+2. **Extract, measure and find, read-only agents, one per session** (a Workflow or parallel
+   `Agent` calls; the lead reads no transcript): each runs `jq` over its session (user prompts,
+   permission denials, tool errors, interrupts, compactions, each with its timestamp) and
+   `node .claude/tooling/measure-run.mjs <id>`, writes `$T/<id>.md` under 20k tokens, and returns
+   its path, its `measure-run` lines and its findings. Done = one file per row of `sessions.tsv`;
+   an agent that returned nothing is a row marked `not_run`.
+3. **Measure.** Append every agent's `measure-run` lines to `$T/measure.txt`.
+4. **Denials.** One more read-only agent reads `../tmp/denials.log` for the range and groups it by
+   tool and rule into `$T/denials.md`.
+5. **Findings.** The lead merges the agents' findings into `$T/findings.md`, one row per recurring
+   correction, denial, skipped step or stall: evidence (session id + timestamp), still open
+   (yes/no), recurrences.
 6. **Fate each finding**: keep, skill, rule, hook or delete, with the target file — hooks for what
    must always happen, skills for procedures, `.claude/rules/` for area facts, `CLAUDE.md` for
    always-true facts. A finding already fixed and not recurring is `keep`.
