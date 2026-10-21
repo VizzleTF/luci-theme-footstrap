@@ -36,10 +36,10 @@ on:
         type: string
         default: release
 
+# Only `deploy` takes pages/id-token write: `build` runs `npm ci`, and a token with those scopes
+# there would let a dependency publish to Pages. A caller's permissions cap these (build.yml).
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -174,6 +174,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     # `github-pages` accepts only `main` or a `v*` tag as a deployment branch (repo Settings ->
     # Environments -> github-pages; `gh api repos/…/environments/github-pages/deployment-branch-
     # policies`, checked 2026-09-14: custom_branch_policies [main, v*]) — a `pages-manual` dispatch

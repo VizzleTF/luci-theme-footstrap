@@ -141,9 +141,8 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      # --ignore-scripts: a dev dependency's lifecycle script has no business running in the job that
-      # produces the released bytes.
-      - run: npm ci --ignore-scripts
+      # Install scripts are off through the repo's .npmrc, for every `npm ci`, not by a flag here.
+      - run: npm ci
 
       # No `version:` on any owfeed or owlab step in this file: the `uses:` ref is the pin Dependabot
       # moves, and an unset version installs that ref (owfeed >= 0.5.3, owlab >= 0.6.4). docs/ci.md.

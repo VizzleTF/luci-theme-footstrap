@@ -115,6 +115,6 @@ tag's create and its push are two): a tag created, moved, deleted or pushed (`gi
 rebase or amend of commits already on `origin/main`; `git reset --hard` of pushed work. A tag word
 names the tag: "tag 0.14.17", "делай тег", "release 0.14.17".
 
-Also per word, each time: any push to the openwrt/luci fork and every upstream PR action; every
-publication (PR or issue comment, review, upstream reply, owlab/owfeed issue; the agent drafts);
-the hardware router; lowering a tier; waiving a gate.
+Also per word, each time: any push to the openwrt/luci fork and every upstream PR action; every publication
+(PR or issue comment, review, upstream reply, owlab/owfeed issue; the agent drafts); the hardware router;
+lowering a tier; waiving a gate; a new or replaced dependency (Dependabot's own bumps are not one).

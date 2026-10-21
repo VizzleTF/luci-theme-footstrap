@@ -37,6 +37,15 @@ write, both gated to a `v*` tag. It used to be workflow-wide, which handed it to
 `pull_request` run — including `npm ci` in lint, and therefore to the lifecycle scripts of every
 dev dependency.
 
+**Dependencies arrive a week late and run no install script.** `.github/dependabot.yml` sets
+`cooldown: default-days: 7` on both ecosystems (version updates only, never security updates), the
+repo's `.npmrc` sets `ignore-scripts=true` for every `npm ci` (CI, the pre-push hook, a developer's
+shell), and `pages.yml` gives `pages: write` and `id-token: write` to `deploy` alone, so the job
+that runs `npm ci` holds `contents: read` only. A new or replaced dependency needs the maintainer's word.
+No `min-release-age` in `.npmrc`: npm 11.20 never finishes installing a fresh version with a peer
+cycle (measured on eslint 10.13.0), and it might hold back a Dependabot security update; the
+cooldown and the maintainer's word on a new dependency carry the age.
+
 **Every job has a `timeout-minutes`, and every network install runs under `tools/ci-retry.sh`.**
 The default job timeout is six hours, and the two things these jobs fetch from somebody else's
 server — apt and the Playwright CDN — stall rather than fail: on the 0.13.2 tag one apt step and two

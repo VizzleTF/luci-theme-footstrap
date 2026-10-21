@@ -5,12 +5,17 @@
 #
 # This repository sat two owfeed releases behind for exactly that reason: a pin
 # nobody was reminded about.
+#
+# cooldown 7: a release is proposed only a week after it is published, so a compromised one has
+# time to be yanked first (two bumps used to merge 18-28 h after release). Security updates ignore it.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]
@@ -19,6 +24,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       dev:
         patterns: ["*"]
