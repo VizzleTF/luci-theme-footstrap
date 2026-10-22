@@ -188,6 +188,9 @@ const askPolicy = [
 	'git push origin v0.14.17', 'git push --follow-tags', 'git push --tags', 'git push origin --tags', 'git push --mirror',
 	'git push origin refs/tags/v1', 'git push origin :refs/tags/v1', 'git push origin HEAD:refs/tags/x', 'git push origin tag v1',
 	'git config push.followTags true', 'git update-ref refs/tags/v1 HEAD', 'git update-ref -d refs/tags/v1',
+	// an alias the env carries is resolved like one set by -c
+	'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.t GIT_CONFIG_VALUE_0=tag git t v1', 'env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.t GIT_CONFIG_VALUE_0=tag git t v1', 'export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.t GIT_CONFIG_VALUE_0=tag; git t v1',
+	`GIT_CONFIG_PARAMETERS="'alias.t'='tag'" git t v1`, 'CI=tag git --config-env=alias.t=CI t v1', 'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.p GIT_CONFIG_VALUE_0="push --tags" git p',
 	// follow-tags set as config for one call carries every annotated tag just like the flag
 	'git -c push.followTags=true push', 'git -c push.followTags push', 'git -cpush.followTags=yes push', 'git -c alias.p=push -c push.followTags=1 p',
 	'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=push.followTags GIT_CONFIG_VALUE_0=true git push',
@@ -228,6 +231,8 @@ const askPolicy = [
 const nonePolicy = [
 	'git commit -m x', 'git commit -am x', 'git push', 'git push origin main', 'git push -u origin claude/x',
 	'git push --force origin claude/x', 'git push --force-with-lease origin feat/y', 'git push origin +fix/z',
+	// an alias set where the scan cannot read it is no find for anyone but a role in the checkout
+	'git --config-env=alias.t=T t v1', 'git -c help.autocorrect=1 comit', 'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ll GIT_CONFIG_VALUE_0=log git ll',
 	'git cherry-pick abc', 'git am x.patch', 'git merge topic', 'git pull --rebase', 'git pull -r', 'git rebase main', 'git commit --amend --no-edit',
 	'git tag', 'git tag -l', 'git tag --list "v*"', 'git tag --contains abc', 'git tag -v v1', 'git tag --points-at HEAD',
 	'git config push.followTags', 'git update-ref refs/heads/x HEAD',
@@ -381,6 +386,7 @@ const hide = {
 		`perl -e 'system("git", "tag", "v1")'`, `perl -lane 'system "git tag v1"'`, `ruby -e 'system("git push --tags")'`, `php -r 'system("git tag v1");'`,
 		// a branch moved by force, main by name or by ref
 		'git checkout -B main origin/main', 'git checkout -B master', 'git checkout -fB main', 'git switch -C main', 'git switch --force-create main origin/main',
+		'git branch --forc main HEAD~1', 'git branch --del main', 'git branch --mov main old', 'git switch --force-c main origin/main',
 		'git branch -f main HEAD~1', 'git branch --force main abc', 'git branch -D main', 'git branch -M main', 'git branch -m main old', 'git branch -M x main',
 		'git update-ref refs/heads/main HEAD', 'git update-ref -d refs/heads/main', 'git update-ref -m msg refs/heads/master HEAD~1',
 		"git -c alias.p=push p --force origin main", 'git -c alias.a=b -c alias.b=push a --tags',
@@ -1199,7 +1205,7 @@ test('precommit-gate: a commit from a subdirectory runs the changelog check from
 	assert.doesNotMatch(q.permissionDecisionReason, /MODULE_NOT_FOUND|changelog\.mjs failed/);
 });
 
-// ---- a crew role in the lead's checkout: what rewrites its worktree, index or config is denied, and only there ----
+// ---- a crew role in the lead's checkout: what moves HEAD or a ref, or rewrites its worktree, index or config, is denied, and only there ----
 const ROLES = [ 'developer', 'tester', 'security', 'researcher', 'upstream-reviewer' ];
 const roleDeny = [
 	// a discard of paths, whatever sits before the `--`, and a cd into nowhere that stays put
@@ -1238,6 +1244,57 @@ const roleDeny = [
 	'git --work-tree="$S" reset', 'GIT_WORK_TREE=$S git clean -fd', 'git --work-tree=$S checkout -- .', 'git -C docs --work-tree="$S" restore .', 'export GIT_WORK_TREE="$S"; git restore .', 'GIT_WORK_TREE="$S" git stash',
 	// an empty -C operand stays put like cd ""
 	'git -C "" checkout -- .', "git -C '' restore .", 'find . -name x -exec git checkout -- {} \\;', 'git -c alias.co=checkout co -- .', 'eval "git checkout -- ."', '(cd tests && git restore .)', 'sh -c \'cd "" && git checkout -- .\'',
+	// HEAD moves and ref writes: a commit, a merge, a rebase, a pick, a patch mail, a bisect, a switch or checkout of a branch, whatever the form
+	'git commit -m x', 'git commit -am x', 'git commit --amend --no-edit', 'git commit --allow-empty -m x', 'git commit -F msg', 'git commit -m "git restore ."', 'git commit -m "x --dry-run"',
+	'git merge topic', 'git merge --abort', 'git merge --no-ff --no-commit topic', 'git rebase main', 'git rebase -i HEAD~3', 'git rebase --abort', 'git rebase --continue',
+	'git cherry-pick abc', 'git cherry-pick --abort', 'git cherry-pick -n abc', 'git am x.patch', 'git am --abort',
+	'git switch x', 'git switch -c x', 'git switch -C x', 'git switch -', 'git switch --detach HEAD', 'git switch --create x', 'git switch',
+	'git checkout HEAD', 'git checkout side', 'git checkout HEAD~1', 'git checkout -b x', 'git checkout -b x HEAD', 'git checkout -B x HEAD', 'git checkout --orphan x', 'git checkout --detach', 'git checkout --detach HEAD',
+	'git checkout -d', 'git checkout -qd HEAD', 'git checkout -', 'git checkout HEAD --', 'git checkout -t origin/x', 'git checkout --track origin/x',
+	'git bisect', 'git bisect start', 'git bisect bad', 'git bisect good HEAD~5', 'git bisect reset', 'git bisect run sh t.sh', 'git bisect skip',
+	'git update-ref refs/heads/x HEAD', 'git update-ref -d refs/heads/x', 'git update-ref HEAD HEAD~1', 'git update-ref --stdin',
+	'git branch -f x HEAD', 'git branch --force x', 'git branch -d x', 'git branch -D x', 'git branch --delete x', 'git branch -m a b', 'git branch -M a b', 'git branch --move a b', 'git branch -fd x', 'git branch -r -d origin/x',
+	'git branch -c a b', 'git branch -C a b', 'git branch --copy a b', 'git branch -u origin/x', 'git branch --set-upstream-to=origin/x', 'git branch --set-upstream-to origin/x x', 'git branch --unset-upstream', 'git branch --edit-description',
+	// a private index is no private HEAD; a wrapper, a chain, a -C inside the checkout and an alias change nothing
+	'GIT_INDEX_FILE=../tmp/task-x/round.idx git commit -m x', 'sh -c "git commit -m x"', 'true && git merge topic', 'env FOO=1 git switch x', 'tools/bg.sh git rebase main', 'git -C docs commit -m x', 'git -c user.name=a commit -m x',
+	'git -c alias.ci=commit ci -m x', 'timeout 5 git cherry-pick abc', 'echo x | xargs git branch -D', 'cd docs && git update-ref refs/heads/x HEAD',
+	// a symbolic ref written or deleted (HEAD moves with it), a reflog expired or deleted (the recovery data goes)
+	'git symbolic-ref HEAD refs/heads/x', 'git symbolic-ref -m msg HEAD refs/heads/x', 'git symbolic-ref -q HEAD refs/heads/x', 'git symbolic-ref -d HEAD', 'git symbolic-ref --delete HEAD', 'git symbolic-ref -qd HEAD',
+	'git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main', 'git symbolic-ref -d refs/remotes/origin/HEAD', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git symbolic-ref HEAD refs/heads/x', 'sh -c "git symbolic-ref HEAD refs/heads/x"',
+	'git reflog expire --all', 'git reflog expire --expire=now --all', 'git reflog expire --expire-unreachable=now refs/heads/main', 'git reflog delete HEAD@{1}', 'git reflog delete --rewrite HEAD@{2}', 'git reflog drop --all',
+	'cd docs && git reflog expire --all', 'env FOO=1 git reflog delete HEAD@{1}',
+	// git takes any unique prefix of a long option: the flags above, abbreviated (a prefix that fits two options is an error in git, so reading it as this one is only stricter)
+	'git checkout --det', 'git checkout --detac HEAD', 'git checkout --orph x', 'git checkout --orph=x', 'git checkout --forc', 'git checkout --discard', 'git checkout --pat', 'git checkout --pathspec-from=list', 'git switch --force-c x',
+	'git branch --del x', 'git branch --dele x', 'git branch --mov a b', 'git branch --cop a b', 'git branch --forc x', 'git branch --unset-up', 'git branch --edit-desc', 'git branch --set-up=origin/x', 'git branch --set-upstream-t origin/x',
+	'git symbolic-ref --del HEAD',
+	// the last of --dry-run and --no-dry-run wins, and so do --check and --no-check
+	'git commit --dry-run --no-dry-run', 'git commit --dry-run --no-dry', 'git commit --dry-run --no-dry-run -m x', 'git commit -m x --dry-run --no-dry-run', 'git add -n --no-dry-run f', 'git clean --dry-run --no-dry-run -f',
+	'git apply --check --no-check p.diff', 'git apply --stat --no-stat p.diff', 'git apply --check --no-chec p.diff',
+	// the read form of rebase and am is the flag alone: a value of an option may be spelled like it, and a patch given beside it is applied
+	'git am --directory x --show-current-patch p.patch', 'git am --directory --show-current-patch p.patch', 'git am --dir --show-current-patch p.patch', 'git am -p 1 --show-current-patch', 'git am --empty drop --show-current-patch p.patch',
+	'git am --show-current-patch p.patch', 'git rebase --exec --show-current-patch main', 'git rebase -x --show-current-patch main', 'git rebase --show-current-patch main', 'git rebase --onto --show-current-patch main',
+	// fetch -u lets a fetch into the checked-out branch through, in whichever worktree holds it
+	'git fetch -u . +side:main', 'git fetch --update-head-ok . side:main', 'git fetch --update-head origin', 'git fetch --update-h', 'git fetch -qu', 'git fetch origin -u', 'git -C docs fetch -u . +side:main',
+	// worktree add -f gives a second worktree a branch another one holds, -B resets a shared branch
+	'git worktree add -f ../tmp/x main', 'git worktree add --force ../tmp/x main', 'git worktree add --for ../tmp/x main', 'git worktree add -B main ../tmp/x', 'git worktree add -fB x ../tmp/x', 'git worktree add -b red -f ../tmp/x HEAD',
+	'git -C docs worktree add -f ../x main', 'cd docs && git worktree add --force ../x main',
+	// gc and prune with a date, a gc expiry on the line for any verb: what the reflog still names goes
+	'git gc --prune=now', 'git gc --prune', 'git gc --prune=1.hour.ago', 'git gc --pru=now', 'git gc --aggressive --prune=now', 'git prune', 'git prune --expire now', 'git prune --expire=now',
+	'git -c gc.reflogExpire=now gc', 'git -c gc.reflogExpireUnreachable=now gc', 'git -c gc.pruneExpire=now gc', 'git -c gc.refs/heads/main.reflogExpire=now gc', 'git -cgc.reflogexpire=now gc',
+	'git -c gc.reflogExpire=now fetch', 'git -c gc.auto=1 -c gc.pruneExpire=now fetch origin', 'git -c gc.pruneExpire=now status',
+	'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=gc.reflogExpire GIT_CONFIG_VALUE_0=now git gc', 'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=gc.pruneExpire GIT_CONFIG_VALUE_0=now git fetch', 'git --config-env=gc.pruneExpire=EXP gc',
+	// an alias or autocorrect the hook cannot read is no read verb: the env a line sets, --config-env, help.autocorrect with a verb git does not know
+	'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit git ci -m x', 'env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit git ci -m x',
+	'export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit; git ci -m x', 'export GIT_CONFIG_COUNT=1; export GIT_CONFIG_KEY_0=alias.ci; export GIT_CONFIG_VALUE_0="!git commit -am"; git ci x',
+	'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.co GIT_CONFIG_VALUE_0=checkout git co -- .', 'GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=x GIT_CONFIG_KEY_1=alias.ci GIT_CONFIG_VALUE_1=commit git ci -m x',
+	`GIT_CONFIG_PARAMETERS="'alias.ci'='commit'" git ci -m x`, `GIT_CONFIG_PARAMETERS="'alias.ci=commit'" git ci -m x`, `GIT_CONFIG_PARAMETERS="'user.name'='x' 'alias.ci'='commit -m y'" git ci`, `export GIT_CONFIG_PARAMETERS="'alias.ci'='commit'"; git ci -m x`,
+	'git --config-env=alias.ci=CI ci -m x', 'git --config-env alias.ci=CI ci -m x', 'CI=commit git --config-env=alias.ci=CI ci -m x', 'env CI=switch git --config-env alias.ci=CI ci x', 'git --config-env=alias.sh=SH sh',
+	'git -c help.autocorrect=immediate comit -m x', 'git -c help.autocorrect=1 comit', 'git -c help.autocorrect=prompt chekout x', 'git -chelp.autocorrect=20 comit', 'git -c help.autocorrect comit', 'git -c help.autocorrect=true switch2 x',
+	'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=help.autocorrect GIT_CONFIG_VALUE_0=1 git comit -m x', 'git --config-env=help.autocorrect=AC comit', 'export CI=commit; git --config-env=alias.ci=CI ci -m x',
+	// the verb is the line's own words: quotes and a backslash in it must not break the reason that names it
+	"git -c help.autocorrect=1 'co\"m\\mit' x", `git --config-env='alias.a"b=CI' 'a"b' x`,
+	// checkout -B and switch -C reset a branch another worktree may hold
+	'git checkout -B x', 'git switch -C x', 'git switch --force-create x',
 ];
 const roleNone = [
 	// reads
@@ -1255,21 +1312,55 @@ const roleNone = [
 	'GIT_INDEX_FILE=../tmp/task-x/round.idx git read-tree HEAD && GIT_INDEX_FILE=../tmp/task-x/round.idx git add -- a b && GIT_INDEX_FILE=../tmp/task-x/round.idx git write-tree',
 	'GIT_INDEX_FILE=../tmp/task-x/round.idx git write-tree', 'export GIT_INDEX_FILE=../tmp/task-x/round.idx; git write-tree', 'env GIT_INDEX_FILE=../tmp/task-x/round.idx git write-tree', 'GIT_INDEX_FILE=../tmp/task-x/round.idx git update-index --add f',
 	'git apply --check p.diff', 'git apply --stat p.diff', 'git apply --numstat p.diff', 'git apply --summary p.diff', 'git apply --check --index p.diff', 'git sparse-checkout list', 'git read-tree -n -u HEAD', 'git read-tree -nu HEAD', 'git read-tree --dry-run -mu HEAD',
-	// not named by the rule: a branch switch, a commit, an unplaceable directory, a `--` with nothing after it, and words that are text
-	'git checkout HEAD', 'git checkout -b x', 'git checkout -b x HEAD', 'git checkout -B x HEAD', 'git checkout --detach HEAD', 'git checkout -', 'git checkout HEAD --',
-	'git switch x', 'git switch -c x', 'git switch -', 'git read-tree -n HEAD', 'git commit -m x', 'git checkout --', 'cd "$X" && git checkout -- .', 'cd nosuch && git restore .',
-	'echo git checkout -- .', 'git commit -m "git restore ."', "cat <<'E'\ngit clean -fd\nE",
+	// a checkout with no word and no branch flag, an unplaceable directory, a `--` with nothing after it, and words that are text
+	'git read-tree -n HEAD', 'git checkout', 'git checkout -q', 'git checkout --', 'cd "$X" && git checkout -- .', 'cd nosuch && git restore .',
+	'echo git checkout -- .', 'git log --grep "git restore ."', "cat <<'E'\ngit clean -fd\nE",
+	// the reads next to the HEAD and ref writes: a dry run, a base, a cherry, a patch shown, a bisect log, a branch list or a new name, a worktree of the checkout
+	'git commit --dry-run', 'git commit --dry-run --short', 'git commit-graph verify', 'git commit-tree HEAD^{tree} -m x', 'git merge-base HEAD main', 'git merge-base --is-ancestor a b', 'git cherry -v',
+	'git am --show-current-patch', 'git bisect log', 'git bisect view', 'git bisect visualize',
+	'git branch -a', 'git branch -r', 'git branch -vv', 'git branch -l', 'git branch --list "x*"', 'git branch --show-current', 'git branch --contains abc', 'git branch --merged main', 'git branch --sort=-committerdate', 'git branch x', 'git branch x HEAD~1',
+	'git worktree add ../tmp/task-x/wt HEAD', 'git worktree add -b red ../tmp/task-x/wt HEAD', 'git worktree add --detach ../tmp/task-x/wt HEAD', 'git show-ref', 'git for-each-ref', 'git rev-list --count HEAD',
+	'git symbolic-ref HEAD', 'git symbolic-ref --short HEAD', 'git symbolic-ref -q HEAD', 'git symbolic-ref --short -q HEAD', 'git symbolic-ref --no-recurse HEAD', 'git symbolic-ref refs/remotes/origin/HEAD',
+	'git reflog', 'git reflog show', 'git reflog show --all', 'git reflog HEAD', 'git reflog -n 5', 'git reflog exists refs/heads/main',
+	// named in the header as not touched: they write no HEAD, index or work tree, and git refuses the checked-out branch
+	'git fetch origin main:other', 'git push . x:y', 'git replace a b', 'git notes add -m x',
+	// abbreviated reads are no write, the pass flag last wins, and the read form of rebase and am is the flag alone
+	'git branch --cont abc', 'git branch --merg main', 'git branch --sho', 'git branch --form=x', 'git branch --sort=x', 'git symbolic-ref --sho HEAD', 'git checkout --', 'git checkout --quiet',
+	'git commit --no-dry-run --dry-run', 'git commit --dry-run --short', 'git add --no-dry-run --dry-run f', 'git add --dry-run f', 'git apply --no-check --check p.diff', 'git apply --check --stat p.diff',
+	'git am --show-current-patch=raw',
+	// fetch with no -u, a worktree for a red proof, gc and prune left to their defaults or a dry run, a config that is no expiry
+	'git fetch', 'git fetch origin', 'git fetch --all', 'git fetch --prune', 'git fetch -p', 'git fetch -j 4 origin', 'git fetch --update-shallow origin', 'git fetch --unshallow', 'git fetch -q --tags',
+	'git worktree add ../tmp/red-x HEAD', 'git worktree add -b red ../tmp/red-x HEAD', 'git worktree add --detach ../tmp/red-x HEAD', 'git worktree add --lock ../tmp/red-x HEAD', 'git worktree remove ../tmp/red-x', 'git worktree remove -f ../tmp/red-x', 'git worktree prune', 'git worktree list',
+	'git gc', 'git gc --auto', 'git gc --aggressive', 'git gc --no-prune', 'git gc --quiet', 'git prune -n', 'git prune --dry-run', 'git -c gc.auto=0 status', 'git -c gc.autoDetach=false gc',
+	// an alias the hook reads and that names a read verb, and an autocorrect that is off or has no unknown verb to act on
+	'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ll GIT_CONFIG_VALUE_0=log git ll', 'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=x git status', `GIT_CONFIG_PARAMETERS="'alias.ll'='log'" git ll`,
+	'CI=log git --config-env=alias.ll=CI ll', 'git --config-env=user.name=NAME status', 'export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ll GIT_CONFIG_VALUE_0=status; git ll', 'git -c alias.ll=log ll',
+	'git comit -m x', 'git --config-env=alias.ci=CI status', 'git -c alias.ll=log -c help.autocorrect=1 ll',
+	'git -c help.autocorrect=never comit', 'git -c help.autocorrect=0 comit', 'git -c help.autocorrect=show comit', 'git -c help.autocorrect= comit', 'git -c help.autocorrect=false comit', 'git -c help.autocorrect=1 status', 'git -c help.autocorrect=immediate log',
+	'git lfs ls-files',
 ];
 const asRole = (agent) => (c, cwd = ROOT) => decide(c, { cwd, agent });
 for (const c of roleDeny) test(`role denied in the checkout: ${c}`, () => assert.equal(asRole('developer')(c), 'deny'));
 for (const c of roleNone) test(`role silent in the checkout: ${c}`, () => assert.equal(asRole('developer')(c), ''));
+// The role rule reads rebase --show-current-patch as a read. The histcheck kind asks on any rebase while HEAD is in origin/main, which depends on the push state of the checkout the test runs in, so the rule is asserted by its kind.
+test('rebase --show-current-patch is no role find, whatever the push state of this checkout', () => {
+	for (const c of [ 'git rebase --show-current-patch', 'git rebase --show-current-patch=diff' ]) {
+		const kinds = spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input: JSON.stringify({ cwd: ROOT, agent_type: 'developer', tool_input: { command: c } }), encoding: 'utf8', env: CLEAN }).stdout.trim().split(' ');
+		assert.ok(!kinds.includes('rolegit'), c);
+		assert.notEqual(decide(c, { cwd: ROOT, agent: 'developer' }), 'deny', c);
+	}
+});
 for (const a of ROLES) test(`${a} is a role`, () => assert.equal(asRole(a)('git checkout -q -- .'), 'deny'));
 // the lead has no agent_type; any other agent type is not a crew role
 for (const a of [ undefined, '', 'general-purpose', 'Explore', 'Plan', 'developers' ]) {
 	test(`agent_type ${JSON.stringify(a)} is left alone`, () => {
 		for (const c of [ 'git checkout -q -- .', 'git restore --staged f', 'git clean -fd', 'git stash', 'git reset', 'git add f', 'git rm f', 'git remote add zz u', 'git config user.name x', 'cd "" && git checkout -- .',
 			'git checkout HEAD f', 'git checkout f', 'git checkout -f', 'git checkout :/', 'git switch -f HEAD', 'git checkout-index -a', 'git read-tree HEAD', 'GIT_INDEX_FILE=x; git add f', 'git -C "" restore .',
-			'git write-tree', 'git update-index --refresh', 'git apply p.diff', 'git pull', 'git revert HEAD', 'git sparse-checkout set docs', 'GIT_INDEX_FILE=x git read-tree -mu HEAD', '(cd /tmp && git status); git restore .', 'cd /tmp && git status; cd -; git restore .' ]) assert.equal(asRole(a)(c), '', c);
+			'git write-tree', 'git update-index --refresh', 'git apply p.diff', 'git pull', 'git revert HEAD', 'git sparse-checkout set docs', 'GIT_INDEX_FILE=x git read-tree -mu HEAD', '(cd /tmp && git status); git restore .', 'cd /tmp && git status; cd -; git restore .',
+				'git commit -m x', 'git merge topic', 'git cherry-pick abc', 'git switch x', 'git switch -c x', 'git checkout side', 'git checkout -b x', 'git checkout --detach', 'git checkout -', 'git bisect start', 'git update-ref refs/heads/x HEAD', 'git branch -D x', 'git branch -m a b', 'git branch -u origin/x', 'git branch --edit-description',
+				'git symbolic-ref HEAD refs/heads/x', 'git symbolic-ref -d HEAD', 'git reflog expire --all', 'git reflog delete HEAD@{1}',
+				'git fetch -u . +side:main', 'git worktree add -f ../x main', 'git worktree add -B x ../x', 'git gc --prune=now', 'git prune', 'git -c gc.reflogExpire=now gc', 'git checkout -B x', 'git switch -C x', 'git commit --dry-run --no-dry-run',
+				'git -c help.autocorrect=1 comit', 'git --config-env=alias.ci=CI ci -m x', 'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=gc.pruneExpire GIT_CONFIG_VALUE_0=now git gc', 'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit git ci -m x' ]) assert.equal(asRole(a)(c), '', c);
 	});
 }
 test('a role that also tags is denied, not asked; the lead is asked', () => {
@@ -1284,9 +1375,22 @@ test('the reason names the checkout and the way out, and --kinds lists rolegit f
 	assert.match(r.permissionDecisionReason, /scratch repo/);
 	assert.match(r.permissionDecisionReason, /GIT_INDEX_FILE/);
 	assert.match(r.permissionDecisionReason, /literally/);
-	const kinds = (agent) => spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input: JSON.stringify({ cwd: ROOT, ...(agent && { agent_type: agent }), tool_input: { command: 'git checkout -- .' } }), encoding: 'utf8' }).stdout.trim();
+	assert.match(run('git commit -m x', { cwd: ROOT, agent: 'tester' }).permissionDecisionReason, /^git commit in .* HEAD, the branches/);
+	const kinds = (agent, command = 'git checkout -- .') => spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input: JSON.stringify({ cwd: ROOT, ...(agent && { agent_type: agent }), tool_input: { command } }), encoding: 'utf8', env: CLEAN }).stdout.trim();
 	assert.equal(kinds('tester'), 'rolegit');
 	assert.equal(kinds(), '');
+	// precommit-gate shares this detection: a role's commit is still listed as one
+	assert.deepEqual(kinds('tester', 'git commit -m x').split(' ').sort(), [ 'commit', 'rolegit' ]);
+	assert.equal(kinds(undefined, 'git commit -m x'), 'commit');
+});
+
+// The text every role is handed names what the rule denies: a verb the hook gained and the roles are not told is one they learn by a denial
+test('the role text in subagent-start.sh names every verb the role rule denies', () => {
+	const r = spawnSync('/bin/sh', [ join(ROOT, '.claude/hooks/subagent-start.sh') ], { encoding: 'utf8', env: CLEAN });
+	assert.equal(r.status, 0, r.stderr);
+	const text = JSON.parse(r.stdout).hookSpecificOutput.additionalContext;
+	for (const v of [ 'commit', 'merge', 'rebase', 'cherry-pick', 'am', 'switch', 'checkout', 'bisect', 'update-ref', 'symbolic-ref', 'reflog', 'branch', 'restore', 'clean', 'reset', 'stash', 'checkout-index',
+		'read-tree', 'add', 'rm', 'mv', 'write-tree', 'update-index', 'apply', 'pull', 'revert', 'sparse-checkout', 'remote', 'config', 'fetch', 'worktree', 'gc', 'prune' ]) assert.match(text, new RegExp(`(^|[ ,(])${v}([ ,)]|$)`, 'm'), v);
 });
 
 // A scratch repo is nobody's: the directory the line resolves to (cd, -C, --git-dir, GIT_DIR, the hook's cwd) decides.
@@ -1296,12 +1400,19 @@ test('a role aimed at a scratch repo is silent, and aimed at the checkout from a
 	// the directory the line stands in, or the work tree it names, is the scratch repo
 	for (const c of [ `git -C ${s} checkout -- .`, `cd ${s} && git restore .`, `cd ${s} && git clean -fd`, `cd ${s} && git add f`, `git -C ${s} remote add zz u`, `cd ${s} && git config a.b c`, `cd ${s} && git stash`, `git -C ${s} --git-dir=.git checkout -- .`,
 		`git --git-dir=${s}/.git --work-tree=${s} checkout -- .`, `git --git-dir=${s}/.git --work-tree=${s} restore .`, `GIT_DIR=${s}/.git GIT_WORK_TREE=${s} git reset`, `export GIT_DIR=${s}/.git GIT_WORK_TREE=${s}; git clean -fd`, `env GIT_DIR=${s}/.git GIT_WORK_TREE=${s} git restore .`,
-		`git --git-dir=${s}/.git remote add zz u`, `GIT_DIR=${s}/.git git config a.b c` ]) assert.equal(t(c), '', c);
+		`git --git-dir=${s}/.git remote add zz u`, `GIT_DIR=${s}/.git git config a.b c`,
+			`cd ${s} && git commit -m x`, `git -C ${s} switch x`, `cd ${s} && git merge x`, `cd ${s} && git checkout -b x`, `git -C ${s} checkout side`, `cd ${s} && git branch -D x`, `git -C ${s} update-ref refs/heads/x HEAD`, `git --git-dir=${s}/.git branch -D x`, `git --git-dir=${s}/.git update-ref refs/heads/x HEAD`,
+			`cd ${s} && git symbolic-ref HEAD refs/heads/x`, `git -C ${s} reflog expire --all`, `git --git-dir=${s}/.git reflog delete HEAD@{1}`, `git --git-dir=${s}/.git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main`,
+			`cd ${s} && git fetch -u . +side:main`, `cd ${s} && git worktree add -f ../x main`, `cd ${s} && git gc --prune=now`, `git -C ${s} checkout -B x`, `cd ${s} && git switch -C x`, `cd ${s} && git -c gc.reflogExpire=now fetch`,
+			`cd ${s} && git --config-env=alias.ci=CI ci -m x`, `cd ${s} && git -c help.autocorrect=1 comit`, `cd ${s} && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit git ci -m x` ]) assert.equal(t(c), '', c);
 	// --git-dir and GIT_DIR name the repository, not the files: with no --work-tree or GIT_WORK_TREE the work tree is the directory the line stands in, here the checkout
 	// (GIT_DIR and GIT_INDEX_FILE reach git only as a prefix, behind env or exported; a bare assignment is a shell variable and git acts where it stands)
 	for (const c of [ `git --git-dir=${s}/.git checkout -- .`, `git --git-dir ${s}/.git restore .`, `GIT_DIR=${s}/.git git reset`, `GIT_DIR=${s}/.git git clean -fdx`, `export GIT_DIR=${s}/.git; git checkout -- .`, `env GIT_DIR=${s}/.git git restore .`, `timeout 5 env GIT_DIR=${s}/.git git clean -fd`,
 		`git --git-dir=${s}/.git --work-tree=${ROOT} checkout -- .`, `GIT_DIR=${s}/.git GIT_WORK_TREE=${ROOT} git clean -fd`, `git -C ${s} --work-tree=${ROOT} restore .`, `cd ${ROOT}/docs && git --git-dir=${s}/.git restore .`, `git -C ${ROOT}/docs --git-dir=${s}/.git restore .`,
-		`GIT_DIR=${s}/.git; git checkout -- .`, `FOO=1; GIT_DIR=${s}/.git; git reset`, `GIT_DIR=${s}/.git && git restore .` ]) assert.equal(t(c), 'deny', c);
+		`GIT_DIR=${s}/.git; git checkout -- .`, `FOO=1; GIT_DIR=${s}/.git; git reset`, `GIT_DIR=${s}/.git && git restore .`,
+			`git --git-dir=${s}/.git commit -m x`, `GIT_DIR=${s}/.git git switch x`, `git --git-dir=${s}/.git checkout side`, `GIT_DIR=${s}/.git; git commit -m x`,
+			`GIT_DIR=${s}/.git; git symbolic-ref HEAD refs/heads/x`, `GIT_DIR=${s}/.git; git reflog expire --all`,
+			`GIT_DIR=${s}/.git; git fetch -u . +side:main`, `GIT_DIR=${s}/.git; git gc --prune=now`, `GIT_DIR=${s}/.git; git checkout -B x`, `GIT_DIR=${s}/.git; git worktree add -f ../x main`, `GIT_DIR=${s}/.git; git --config-env=alias.ci=CI ci` ]) assert.equal(t(c), 'deny', c);
 	// the same lines from the scratch repo are free, and the lead is never asked
 	for (const c of [ `git --git-dir=${s}/.git checkout -- .`, `GIT_DIR=${s}/.git git reset`, `export GIT_DIR=${s}/.git; git checkout -- .`, `env GIT_DIR=${s}/.git git restore .` ]) {
 		assert.equal(t(c, s), '', c);
@@ -1341,7 +1452,7 @@ test('worktree and index verbs are denied in the checkout and free in its worktr
 	g(home, 'worktree', 'add', '-q', wt);
 	const hook = join(home, '.claude/hooks/git-guard.sh');
 	const d = (c, cwd, agent = 'tester') => decide(c, { cwd, hook, agent });
-	for (const c of [ 'git checkout -- .', 'git restore .', 'git clean -fd', 'git reset', 'git add f', 'git stash' ]) {
+	for (const c of [ 'git checkout -- .', 'git restore .', 'git clean -fd', 'git reset', 'git add f', 'git stash', 'git commit -m x', 'git switch x', 'git checkout side', 'git merge x', 'git rebase x', 'git cherry-pick x', 'git am x', 'git bisect start', 'git symbolic-ref HEAD refs/heads/x', 'git symbolic-ref -d HEAD', 'git checkout -b x', 'git switch -c x', 'git am --directory x --show-current-patch p.patch', 'git commit --dry-run --no-dry-run' ]) {
 		assert.equal(d(c, home), 'deny', c);
 		assert.equal(d(c, wt), '', `${c} in its worktree`);
 		assert.equal(d(`git -C ${home} ${c.slice(4)}`, wt), 'deny', `${c} aimed at the checkout from the worktree`);
@@ -1350,25 +1461,35 @@ test('worktree and index verbs are denied in the checkout and free in its worktr
 		assert.equal(d(`git --git-dir=${home}/.git ${c.slice(4)}`, dir), 'deny', `${c} by --git-dir`);
 		assert.equal(d(c, home, 'general-purpose'), '', `${c} for another agent type`);
 	}
-	for (const c of [ 'git remote add zz u', 'git remote set-url origin u', 'git config a.b c', 'git config --unset a.b' ]) {
+	// the refs are shared: a branch or ref written from a worktree is written in the checkout
+	for (const c of [ 'git remote add zz u', 'git remote set-url origin u', 'git config a.b c', 'git config --unset a.b', 'git branch -D x', 'git branch -m a b', 'git branch -f x HEAD', 'git update-ref refs/heads/x HEAD', 'git update-ref -d refs/heads/x',
+		// HEAD is the worktree's own, any other symbolic ref and every reflog sit in the shared directory
+		'git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main', 'git symbolic-ref -d refs/remotes/origin/HEAD', 'git reflog expire --all', 'git reflog delete HEAD@{1}', 'git reflog drop --all',
+		// a branch reset by checkout -B or switch -C, a branch another worktree holds, a fetch into it, what gc and prune drop, an alias or autocorrect that hides any of them
+		'git checkout -B x', 'git switch -C x', 'git switch --force-create x', 'git fetch -u . +x:y', 'git worktree add -f ../tmp/x main', 'git worktree add -B x ../tmp/x', 'git gc --prune=now', 'git prune', 'git -c gc.reflogExpire=now gc',
+		'git branch --del x', 'git -c help.autocorrect=1 comit', 'git --config-env=alias.ci=CI ci', 'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=gc.pruneExpire GIT_CONFIG_VALUE_0=now git status' ]) {
 		assert.equal(d(c, home), 'deny', c);
 		assert.equal(d(c, wt), 'deny', `${c} in its worktree shares the config`);
 		assert.equal(d(c, dir), '', `${c} in no repository`);
 	}
 	assert.equal(d('git status', wt), '');
 	assert.equal(d('git config --get a.b', wt), '');
-	// a lone word after checkout is a branch (a switch) or a path (a discard), told apart in the repository the line lands in
+	// a lone word after checkout is a branch (a switch) or a path (a discard): either is the lead's, and free in the worktree
 	g(home, 'branch', 'side');
-	assert.equal(d('git checkout side', home), '');
+	assert.equal(d('git checkout side', home), 'deny');
 	assert.equal(d('git checkout nosuchbranch', home), 'deny');
 	assert.equal(d('git checkout side', home, 'general-purpose'), '');
 	assert.equal(d('git checkout nosuchbranch', home, 'general-purpose'), '');
 	assert.equal(d('git checkout nosuchbranch', wt), '');
 	assert.equal(d(`git -C ${home} checkout nosuchbranch`, wt), 'deny');
-	assert.equal(d(`git --git-dir=${home}/.git checkout side`, dir), '');
+	assert.equal(d(`git --git-dir=${home}/.git checkout side`, dir), 'deny');
 	assert.equal(d(`git --git-dir=${home}/.git checkout nosuchbranch`, dir), 'deny');
 	assert.equal(d('git checkout side -- f', home), 'deny');
-	assert.equal(d('git checkout -b other side', home), '');
+	assert.equal(d('git checkout -b other side', home), 'deny');
+	assert.equal(d('git checkout -b other side', wt), '');
+	assert.equal(d('git commit -m x', wt), '');
+	assert.equal(d('git commit --dry-run', home), '');
+	assert.equal(d(`git -C ${home} commit -m x`, wt), 'deny');
 });
 
 // `cd ""` and `git -C ""` stay put: the directory a line resolves to is the one it started in, for a push too.

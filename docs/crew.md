@@ -255,9 +255,13 @@ test, a probe or a stub. Real git runs in a scratch repo `git init`ed outside th
 its cwd there: `../tmp/` for a probe, the test's `mkdtemp(tmpdir())` dir for a test. The reason:
 on 2026-10-19 a refusal test ran real commands through a mid-edit `bg.sh` and, in this checkout,
 created a tag, reset away every uncommitted edit and set an Actions secret. For a role the rule is
-held: `git-guard.sh` denies it, in this checkout, a `checkout` of paths, `switch -f`, `restore`, `clean`,
+held: `git-guard.sh` denies it, in this checkout, any `checkout` and `switch`, `restore`, `clean`,
 `reset`, `stash`, `checkout-index`, `read-tree`, `write-tree`, `update-index`, `apply`, `pull`, `revert`,
-`sparse-checkout`, `add`, `rm`, `mv`, `remote` and `config` write, resolved the way it reads a push
+`sparse-checkout`, `add`, `rm`, `mv`, `commit`, `merge`, `rebase`, `cherry-pick`, `am`, `bisect`,
+`update-ref`, `symbolic-ref`, `reflog expire|delete|drop`, `fetch -u`, `worktree add -f|-B`, `gc --prune`,
+`prune`, any `gc.*Expire` setting, and `branch`, `remote` and `config` writes, under any unique prefix of a
+long option and behind an alias it can resolve (one it cannot resolve is denied too):
+whatever moves HEAD or rewrites the index, the work tree or a ref the lead works on, resolved the way it reads a push
 (`cd`, `-C`, `--git-dir`, `GIT_DIR`), with the work tree judged where it resolves (`--work-tree`,
 `GIT_WORK_TREE`, else the shell's directory, which a subshell, `cd -` or `popd` restores); the round
 snapshot's `GIT_INDEX_FILE=` prefix (an `export` or `env` counts, a bare assignment does not) and a
