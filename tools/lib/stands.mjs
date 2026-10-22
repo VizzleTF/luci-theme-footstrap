@@ -149,10 +149,20 @@ const cause = (e) => String(e.message).split('\n')[0].replace(/^\w+\.\w+: | at h
 export const unreached = (e, id, base) => (e && (e.name === 'TimeoutError' || NO_ANSWER.test(String(e.message))))
 	? new StandDown(`${id}: ${base} did not answer (${cause(e)}) — the stand, not the theme`) : e;
 
+/* Has the landing page's LuCI answered `L.require`? Runs INSIDE the page via waitForFunction, which
+ * waits out the returned promise. */
+const LANDED = () => (window.L && typeof window.L.require === 'function')
+	? window.L.require('ui').then(() => true) : false;
+
 /* LuCI answers an unauthenticated request with the login form, not a 403 page — so every live gate
  * has to log in before it can measure anything. owlab's routers are root with an empty password
  * (`owlab status` prints it); a hardware router is not what these gates run against. `id` names the
- * router in the error; the host stands in for it when a caller has only a base URL. */
+ * router in the error; the host stands in for it when a caller has only a base URL.
+ *
+ * It returns once the landing has answered `L.require`, not at its domcontentloaded: the first goto
+ * after a login from a landing still loading failed in WebKit 5 of 168 times (3.0%) against 0 of 840
+ * later ones, while scroll-anchor, which awaited `L.require` there before its first goto, lost 7 of
+ * ~7400 (0.09%). A stand whose landing never answers is bounded at openPage's 20 s and is a StandDown. */
 export async function login(page, base, id = new URL(base).host) {
 	const res = await page.goto(base, { waitUntil: 'domcontentloaded' })
 		.catch((e) => { throw unreached(e, id, base); });
@@ -165,6 +175,8 @@ export async function login(page, base, id = new URL(base).host) {
 			page.press('input[name="luci_password"]', 'Enter'),
 		]);
 	}
+	await page.waitForFunction(LANDED, null, { timeout: 20000 })
+		.catch((e) => { throw unreached(e, id, base); });
 }
 
 /* A single `page.goto` in CI is not reliable enough to fail a release on. Two runs an hour apart on
@@ -172,7 +184,8 @@ export async function login(page, base, id = new URL(base).host) {
  * `page.goto: WebKit encountered an internal error` — two cells out of the sweep, every other cell
  * reporting `reader moved 0px`, and the same sweep green locally over 174 runs. So: three attempts
  * before a cell is written off. scroll-jank's gotos died the same way before any measurement (4
- * CI runs since 2026-10-20), so both gates open pages through this. */
+ * CI runs since 2026-10-20), so both gates open pages through this. Each failed attempt prints one
+ * stderr line, because a retry that worked left no trace and CI could not say what it had done. */
 export async function openPage(page, url) {
 	let last;
 	for (let attempt = 1; attempt <= 3; attempt++) {
@@ -181,6 +194,7 @@ export async function openPage(page, url) {
 			return;
 		} catch (e) {
 			last = e;
+			console.error(`openPage: ${page.context().browser()?.browserType().name()} ${url} attempt ${attempt}/3: ${String(e.message).split('\n')[0]}`);
 			/* the WebKit process may still be dying; give it a moment rather than racing it */
 			if (attempt < 3) await page.waitForTimeout(1500);
 		}

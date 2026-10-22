@@ -40,6 +40,7 @@ const fakePage = (status, html) => {
 		fill: async () => calls.push('fill'),
 		press: async () => calls.push('press'),
 		waitForNavigation: async () => calls.push('nav'),
+		waitForFunction: async () => true,
 	};
 };
 

@@ -56,6 +56,7 @@
 - **The parity back-scroll red of 249042a is a measured flake.** `docs/development.md` "Known flakes" records it: 1 of 59 CI parity jobs, 0 of 71 local runs under load, most likely the fixed 800 ms read of the gate while 25.12 Overview grows back.
 - **The role rule of git-guard sees the work tree a command writes, not only its git dir.** A role is denied `--git-dir` or `GIT_DIR` aimed at a scratch repo while the shell stands in the checkout, `read-tree -u`, `write-tree`, `update-index`, `apply`, `pull`, `revert` and `sparse-checkout` here, and a command after a subshell, `cd -` or `popd` is judged where the shell really is.
 - **A linked worktree logs, waits and locks the stands in the same ../tmp as the main checkout.** bg.sh, bg-wait.sh, ci-local.sh, install-check.sh, pr-watch.sh and the stand locks resolve it from the git common dir through tools/lib/tmp-root, and the verdict and denial hooks carry the same rule inline; before, a worktree run used its own ../tmp, so two runs could drive one stand at once.
+- **Browser gates wait for LuCI on the landing page before their first navigation.** login() now returns only once L.require answers (20 s bound, a timeout is a stand-down), and openPage() logs each failed attempt: the WebKit internal error hit the first goto after login in 5 of 168 runs (3.0%) against 0.09% where scroll-anchor already waited.
 
 ## [0.14.16] — 2026-10-18
 
