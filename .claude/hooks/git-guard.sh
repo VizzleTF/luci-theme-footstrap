@@ -53,8 +53,9 @@
 # receive.denyCurrentBranch (git refuses a local push into the checked-out branch unless that is lifted; -c and
 # the env do not reach a local receive-pack, a --receive-pack or --exec program does) or lands in a repository
 # of this checkout (`.`, a path, a `file://` URL or a remote whose push URL is one; a relative one is read from
-# the toplevel of the work tree as git does, from the line's directory when it names --git-dir, GIT_DIR or
-# --work-tree), `worktree add`
+# the work tree root, as git does: the one --work-tree or GIT_WORK_TREE names when the line's directory is inside
+# it, else the toplevel of the directory's repository; from the line's directory when --git-dir or GIT_DIR names
+# no work tree, or the directory is outside the one named), `worktree add`
 # with -f, --force or -B (a branch another worktree holds, or a shared one reset), `gc` with --prune and
 # `prune` (what the reflog still names), any git call with a gc.*reflogExpire or gc.pruneExpire or an alias set
 # by `-c` or the env (git runs gc --auto after a fetch or a commit), `restore` (--staged too), `clean`, `stash` but
@@ -88,7 +89,8 @@
 # branch, `checkout -B`, `switch -C`, `checkout|switch --ignore-other-worktrees` (a commit after these moves
 # a branch another worktree holds) and an unreadable alias compare the common dir (the refs are shared) and are
 # not. A push is judged by the repository it names, not the one it leaves: `.`, a path or the push URL of a
-# remote, read as a path, is this checkout's when its common dir is. A scratch repo, the lead
+# remote, read as a path, is this checkout's when its common dir is (the .git file of a linked worktree and a
+# worktree's own git dir stand for the common dir they point at). A scratch repo, the lead
 # and any other agent_type are untouched; a `cd "$X"` it cannot place is no find. Not read: a cd inside
 # backticks, in a `case` arm or in a function body (read as the line's own), a `case` arm `)` inside a
 # subshell (it closes the directory frame early), an `export` inside `( )` (it outlives the `)`), a relative
@@ -103,9 +105,13 @@
 # the quotes of a double-quoted value (the shell expands it) or from a variable exported by name only
 # (`X=...; export X`);
 # `repack -ad` (it drops the packed objects no ref or reflog reaches, a dropped stash for one, with none of gc's
-# two weeks of grace); `worktree remove|prune` (a role's own red-proof worktree goes the same way); and a
+# two weeks of grace); `worktree remove|prune` (a role's own red-proof worktree goes the same way); a
 # dry-run flag eaten as the value of another verb's option (`clean -e -n`, `apply --exclude --check`, `add
-# --pathspec-from-file -n`).
+# --pathspec-from-file -n`); and the forms built to get past this scan, named and not chased: an alias key or
+# GIT_CONFIG_KEY_n spelled by a variable or by `$'...'` escapes (the scan sees no `alias.` in it), GIT_CONFIG_*
+# set by `declare -x`, `typeset -x` or `set -a` (only a prefix, `env` and `export` are read), and the lead's
+# alias chain, an alias whose `!git <alias>` text runs another one set on the same line (the second is looked
+# up in the repository config only; a role is denied for any alias set inline, so only the lead is missed).
 # Not named (they touch no HEAD, index or work tree): fetch <src>:<dst>, replace, notes. Git itself refuses a
 # fetch into the checked-out branch without -u (denied above).
 #
@@ -518,7 +524,7 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				if (t[j] == "--config-env") ce = t[j + 1]
 				else if (t[j] ~ /^--config-env=/) ce = substr(t[j], 14)
 				if ((cv != "" && cfg(cv, lal)) || (ce != "" && cenv(ce, pe, lal))) hp = 1
-				j += (t[j] ~ /^(-C|-c|--git-dir|--work-tree|--namespace|--exec-path|--config-env)$/) ? 2 : 1
+				j += (t[j] ~ /^(-C|-c|--git-dir|--work-tree|--namespace|--exec-path|--config-env|--attr-source|--shallow-file)$/) ? 2 : 1
 			}
 			sb = t[j]
 			if (sb == "") continue
@@ -867,11 +873,18 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				RI=$(rgit rev-parse --absolute-git-dir --path-format=absolute --git-common-dir 2>/dev/null) || RI=''
 				case $RC in
 					C) [ "${RI#*"$NL"}" = "$MYCD" ] || continue ;;
-					# a remote name stands for its push URL, which is a path when the remote is local; the repository named is this checkout's when its common dir is. A relative path or URL is read from the toplevel of the work tree, as git does; a line that names a git dir or work tree (--git-dir, GIT_DIR, --work-tree), or a place with no work tree, leaves the line's directory
-					T) if [ "$G" = - ] && [ "$WT" = - ]; then TOP=$(rgit rev-parse --show-toplevel 2>/dev/null) || TOP=$(rp "$BASE" "$D" .); else TOP=$(rp "$BASE" "$D" .); fi
+					# a remote name stands for its push URL, which is a path when the remote is local; the repository named is this checkout's when its common dir is. A relative path or URL is read from the work tree root when the line's directory is inside a work tree (the one --work-tree or GIT_WORK_TREE names, else the toplevel its repository has), from the line's directory otherwise (--git-dir or GIT_DIR with no work tree, a directory outside the work tree named, a place with none), as git does
+					T) TOP=$(rp "$BASE" "$D" .)
+						if [ "$WT" = - ]; then
+							if [ "$G" = - ]; then TOP=$(rgit rev-parse --show-toplevel 2>/dev/null) || TOP=$(rp "$BASE" "$D" .); fi
+						elif [ "$WT" != "?" ]; then
+							W1=$(CDPATH='' cd -- "$TOP" 2>/dev/null && pwd -P) && W2=$(CDPATH='' cd -- "$(rp "$BASE" . "$WT")" 2>/dev/null && pwd -P) && case $W1 in "${W2%/}"/*) TOP=$W2 ;; esac
+						fi
 						if PT=$(rgit remote get-url --push "$TG" 2>/dev/null) && [ -n "$PT" ]; then PT=${PT#file://}; else PT=$TG; fi
 						case $PT in /*) RT=$PT ;; *) RT=$TOP/$PT ;; esac
-						[ "$(git -C "$RT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" = "$MYCD" ] || continue ;;
+						# a gitfile (the .git of a linked worktree) is no directory for -C: git takes it as the git dir, whose common dir is the shared one
+						if [ -f "$RT" ]; then TC=$(git --git-dir="$RT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null); else TC=$(git -C "$RT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null); fi
+						[ "$TC" = "$MYCD" ] || continue ;;
 					# the git dir first; the second chance is the work tree, which with --git-dir or GIT_DIR and no --work-tree or GIT_WORK_TREE is the directory the line stands in, whatever git dir is named; one that cannot be placed gives no second chance
 					*) [ "${RI%%"$NL"*}" = "$MYGD" ] || {
 						[ "$WT" != "?" ] || false

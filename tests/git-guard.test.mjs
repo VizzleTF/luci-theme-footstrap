@@ -185,6 +185,8 @@ for (const c of none) test(`silent: ${c}`, () => assert.equal(decide(c), ''));
 // Policy: commit and push are the agent's; a tag, a release, a rewrite of main and a hard reset need the maintainer's word.
 const askPolicy = [
 	'git tag -a v1 -m x', 'git tag v1', 'git tag -d v1', 'git tag -f v1 HEAD', 'git -C /r tag -s v1',
+	// a global option that takes the next word as its value leaves the verb where it is, --attr-source and --shallow-file as --namespace and -C do
+	'git --attr-source HEAD tag v1', 'git --shallow-file f tag v1', 'git --namespace n tag v1', 'git --attr-source HEAD push --tags', 'git --shallow-file f push --tags', 'git -C /r --attr-source HEAD tag v1', 'git --attr-source HEAD -c alias.t=tag t v1', 'git --attr-source=HEAD tag v1',
 	'git push origin v0.14.17', 'git push --follow-tags', 'git push --tags', 'git push origin --tags', 'git push --mirror',
 	'git push origin refs/tags/v1', 'git push origin :refs/tags/v1', 'git push origin HEAD:refs/tags/x', 'git push origin tag v1',
 	'git config push.followTags true', 'git update-ref refs/tags/v1 HEAD', 'git update-ref -d refs/tags/v1',
@@ -251,6 +253,7 @@ const askPolicy = [
 const nonePolicy = [
 	'git commit -m x', 'git commit -am x', 'git push', 'git push origin main', 'git push -u origin claude/x',
 	'git push --force origin claude/x', 'git push --force-with-lease origin feat/y', 'git push origin +fix/z',
+	'git --attr-source HEAD status', 'git --shallow-file f log', 'git --attr-source HEAD tag -l', 'git --attr-source HEAD push origin main',
 	// an alias set where the scan cannot read it is no find for anyone but a role in the checkout
 	'git --config-env=alias.t=T t v1', 'git -c help.autocorrect=1 comit', 'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ll GIT_CONFIG_VALUE_0=log git ll',
 	// a quote inside a GIT_CONFIG_PARAMETERS value does not end it, and an entry never closed is unread
@@ -1330,8 +1333,12 @@ const roleDeny = [
 	// any alias set on the line, by any channel, is a find for a role whatever it holds or how many values it has: nothing is resolved, so a decoy hides nothing
 	"GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ll GIT_CONFIG_VALUE_0=log git ll", "git -c alias.ll=log ll", "git -c alias.ll=log status", "git -c alias.ll=log -c help.autocorrect=1 ll", "CI=log git --config-env=alias.ll=CI ll", "git --config-env=alias.ci=CI status", "GIT_CONFIG_PARAMETERS=\"'alias.ll'='log'\" git ll", "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ll GIT_CONFIG_VALUE_0=status; git ll", "GIT_CONFIG_PARAMETERS=\"'alias.ll'='!echo '\\\\''x'\\\\''; git log'\" git ll", "GIT_CONFIG_PARAMETERS=\"'alias.ll'='log'\" git status",
 	"GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit GIT_CONFIG_KEY_1=alias.ci GIT_CONFIG_VALUE_1=log git ci", "GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_1=alias.ci GIT_CONFIG_VALUE_1=log GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit git ci", "GIT_CONFIG_COUNT=11 GIT_CONFIG_KEY_9=alias.ci GIT_CONFIG_VALUE_9=commit GIT_CONFIG_KEY_10=alias.ci GIT_CONFIG_VALUE_10=log git ci", "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit GIT_CONFIG_KEY_1=alias.ci GIT_CONFIG_VALUE_1=log git ci -m x", "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_00=alias.ci GIT_CONFIG_VALUE_00=commit GIT_CONFIG_KEY_01=alias.ci GIT_CONFIG_VALUE_01=log git ci -m x", "GIT_CONFIG_PARAMETERS=\"'alias.ci'='commit'\" GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=log git ci -m x", "GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit git -c alias.ci=log ci -m x",
-	// a relative push path is read from the line's directory when the line names a git dir or work tree, from the toplevel otherwise
-	`cd docs && GIT_DIR=${ROOT}/.git git push .. x:y`, `git -C docs --git-dir=${ROOT}/.git push .. x:y`, `git -C docs --work-tree=${ROOT} push .. x:y`,
+	// a relative push path is read from the work tree root when the line stands inside a work tree (the one --work-tree or GIT_WORK_TREE names, else the toplevel), from the line's directory when --git-dir or GIT_DIR names no work tree
+	`cd docs && GIT_DIR=${ROOT}/.git git push .. x:y`, `git -C docs --git-dir=${ROOT}/.git push .. x:y`,
+	`git -C docs --work-tree=${ROOT} push .git x:y`, `cd docs && GIT_WORK_TREE=${ROOT} git push .git x:y`, `cd docs && git --git-dir=${ROOT}/.git --work-tree=${ROOT} push .git x:y`,
+	// a global option that takes the next word as its value leaves the verb where it is: --attr-source and --shallow-file as --namespace and -C do
+	'git --attr-source HEAD commit -m x', 'git --shallow-file f commit -m x', 'git --namespace n commit -m x', 'git --attr-source HEAD checkout -- .', 'git --shallow-file f restore .', 'git -c user.name=a --attr-source HEAD commit -m x', 'git --attr-source HEAD --shallow-file f reset',
+	'git --attr-source=HEAD commit -m x', 'git --attr-source HEAD push . x:y', 'git --shallow-file f branch -D x', 'git -C docs --attr-source HEAD switch x', 'sh -c "git --attr-source HEAD commit -m x"',
 	// every value of a key counts, whichever way the line spells them and whichever awk runs it
 	'GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=log GIT_CONFIG_KEY_1=alias.ci GIT_CONFIG_VALUE_1=commit git ci -m x', 'GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_1=alias.ci GIT_CONFIG_VALUE_1=commit GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=log git ci -m x',
 	'GIT_CONFIG_COUNT=11 GIT_CONFIG_KEY_9=alias.ci GIT_CONFIG_VALUE_9=log GIT_CONFIG_KEY_10=alias.ci GIT_CONFIG_VALUE_10=commit git ci -m x',
@@ -1398,6 +1405,8 @@ const roleNone = [
 	'git lfs ls-files',
 	// a dry run of a push writes nothing
 	"git push --dry-run . x:y", "git push -n . x:y", "git push --no-dry-run --dry-run . x:y", "git push --dry-run --receive-pack='git -c receive.denyCurrentBranch=ignore receive-pack' . side:main",
+	// the reads behind a global option that takes the next word as its value stay reads
+	'git --attr-source HEAD status', 'git --shallow-file f log', 'git --attr-source HEAD commit --dry-run', 'git --attr-source HEAD branch -a', 'git --namespace n diff', 'git -c user.name=a --attr-source HEAD show',
 	// a commit stays a dry run when the flag is no value of an option: it comes first, or follows an option that takes its value only attached (-S, -u)
 	'git commit -m x --dry-run', 'git commit --dry-run -m x', 'git commit --dry-run --mes x', 'git commit --dry-run --trailer "a: b"', 'git commit --author="A <a@b>" --dry-run', 'git commit -mx --dry-run', 'git commit -am x --dry-run',
 	'git commit -S --dry-run', 'git commit --gpg-sign --dry-run', 'git commit -u --dry-run', 'git commit --untracked-files --dry-run', 'git commit --dry-run -m --dry-run', 'git commit --message=--dry-run --dry-run',
@@ -1469,6 +1478,8 @@ test('the role text in subagent-start.sh names every verb the role rule denies',
 	const text = JSON.parse(r.stdout).hookSpecificOutput.additionalContext;
 	for (const v of [ 'commit', 'merge', 'rebase', 'cherry-pick', 'am', 'switch', 'checkout', 'bisect', 'update-ref', 'symbolic-ref', 'reflog', 'branch', 'restore', 'clean', 'reset', 'stash', 'checkout-index',
 		'read-tree', 'add', 'rm', 'mv', 'write-tree', 'update-index', 'apply', 'pull', 'revert', 'sparse-checkout', 'remote', 'config', 'fetch', 'worktree', 'gc', 'prune', 'push' ]) assert.match(text, new RegExp(`(^|[ ,(])${v}([ ,)]|$)`, 'm'), v);
+	// an alias set inline is denied whatever it holds, so a role is not told only an unreadable one is
+	assert.match(text, /Any alias set inline on a git line in the checkout/);
 });
 
 // A scratch repo is nobody's: the directory the line resolves to (cd, -C, --git-dir, GIT_DIR, the hook's cwd) decides.
@@ -1580,6 +1591,28 @@ test('worktree and index verbs are denied in the checkout and free in its worktr
 	const other = repo(join(dir, 'roleother'));
 	assert.ok(!kindsOf(`git push ${other} x:y`, 'tester', home, hook).includes('rolegit'), 'a push to another repository is no find');
 	assert.ok(!kindsOf('git push . x:y', 'tester', other, hook).includes('rolegit'), 'nor is a push from one to itself');
+	// --work-tree and GIT_WORK_TREE name the root git chdirs to when the line stands inside it, so a relative path is read from there; with --git-dir or GIT_DIR and no work tree it is read from the line's directory, and from it too when the line stands outside the work tree named (`.git` is a target from the root only, `..` the checkout from sub only)
+	for (const c of [ `git -C sub --work-tree=${home} push .git x:y`, `cd sub && GIT_WORK_TREE=${home} git push .git x:y`, `cd sub && git --git-dir=${home}/.git --work-tree=${home} push .git x:y`,
+		`cd sub && git --git-dir=${home}/.git push .. x:y`, `cd sub && GIT_DIR=${home}/.git git push .. x:y`, `cd sub && git --work-tree=${other} push .. x:y` ]) assert.equal(d(c, home), 'deny', c);
+	for (const c of [ `git -C sub --work-tree=${home} push .. x:y`, `cd sub && GIT_WORK_TREE=${home} git push .. x:y`, `cd sub && git --git-dir=${home}/.git --work-tree=${home} push .. x:y`,
+		`cd sub && git --git-dir=${home}/.git push .git x:y`, `cd sub && git --work-tree=${other} push .git x:y` ]) assert.ok(!kindsOf(c, 'tester', home, hook).includes('rolegit'), c);
+	// the .git of a linked worktree is a file that names a git dir, and git pushes into that: a gitfile, an absolute or a relative one (worktree.useRelativePaths, git 2.48), and a worktree's own git dir stand for the common dir they point at
+	const wtr = join(dir, 'rolewtrel');
+	g(home, '-c', 'worktree.useRelativePaths=true', 'worktree', 'add', '-q', '--detach', wtr);
+	for (const c of [ `git push ${wt}/.git x:y`, `git push ${wtr}/.git x:y`, `git push file://${wt}/.git x:y`, `git push --repo=${wt}/.git x:y`, `git push ${home}/.git/worktrees/${basename(wt)} x:y`, `cd ${wt} && git push .git x:y`, `git -C ${wt} push ${wt}/.git x:y`, `cd ${other} && git push ${wt}/.git x:y` ]) assert.equal(d(c, dir), 'deny', c);
+	for (const c of [ `git push ${other}/.git x:y`, `git push ${home}/.claude/hooks/git-guard.sh x:y`, `git push ${dir}/nosuch/.git x:y` ]) assert.ok(!kindsOf(c, 'tester', dir, hook).includes('rolegit'), c);
+	// the hook shipped in a linked worktree (where .githooks/pre-push runs the tests, `.git` a file there): its checkout is the shared one, and its own work tree and the main one are two work trees of it
+	const hookW = join(wt, '.claude/hooks/git-guard.sh');
+	mkdirSync(dirname(hookW), { recursive: true });
+	copyFileSync(HOOK, hookW);
+	const dw = (c, cwd = dir) => decide(c, { cwd, hook: hookW, agent: 'tester' });
+	for (const c of [ `git push ${wt}/.git x:y`, `git push ${wt} x:y`, `git push ${home}/.git x:y`, `git push ${home} x:y`, `git push file://${wt}/.git x:y`, `git push ${wtr}/.git x:y`, `cd ${wt} && git push .git x:y`, `cd ${wt}/.claude && git push .git x:y`, `git -C ${wt} push . x:y` ]) assert.equal(dw(c), 'deny', c);
+	assert.equal(dw('git push --repo . x:y', wt), 'deny');
+	assert.ok(!kindsOf(`git push ${other}/.git x:y`, 'tester', dir, hookW).includes('rolegit'));
+	assert.equal(dw('git restore .', wt), 'deny', 'its own work tree');
+	assert.equal(dw('git restore .', home), '', 'the main work tree is a sibling');
+	assert.equal(dw(`git -C ${wt} restore .`, home), 'deny');
+	assert.equal(dw('git branch -D x', home), 'deny', 'the refs are shared');
 	// a lone word after checkout is a branch (a switch) or a path (a discard): either is the lead's, and free in the worktree
 	g(home, 'branch', 'side');
 	assert.equal(d('git checkout side', home), 'deny');

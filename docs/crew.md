@@ -269,6 +269,9 @@ snapshot's `GIT_INDEX_FILE=` prefix (an `export` or `env` counts, a bare assignm
 scratch repo pass, `read-tree -u` never. Three
 roles ran real git here on 2026-10-21, one of them `cd $R && git checkout -q -- .` with `R` lost
 between two Bash calls (it reverted three tracked files): a role spells every path literally in each call.
+A guard's tests run where its users stand: a clone with `origin/main` holding HEAD (the checkout's
+push state) and a `git worktree add --detach` of the round (where `.githooks/pre-push` runs them, `.git`
+a file there). A plain scratch copy hid both on 2026-10-22: card 0201 went red in the checkout, 0202 in pre-push.
 
 ## Skills
 
