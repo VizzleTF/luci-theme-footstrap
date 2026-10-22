@@ -5,9 +5,9 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, sy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ROOT } from '../tools/lib/root.mjs';
+import { CLEAN } from './lib/git-env.mjs';
 
 const HOOK = join(ROOT, '.claude/hooks/session-start.sh');
-const CLEAN = Object.fromEntries(Object.entries(process.env).filter(([ k ]) => !k.startsWith('GIT_')));
 const git = (cwd, ...a) => spawnSync('git', [ '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...a ], { cwd, env: CLEAN, encoding: 'utf8' });
 const RED = /^main CI red on [0-9a-f]{7} \(run \d+\)$/m;
 

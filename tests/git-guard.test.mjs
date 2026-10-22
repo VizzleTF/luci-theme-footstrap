@@ -5,6 +5,7 @@ import { appendFileSync, chmodSync, copyFileSync, existsSync, mkdirSync, mkdtemp
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { ROOT } from '../tools/lib/root.mjs';
+import { CLEAN } from './lib/git-env.mjs';
 
 const HOOK = join(ROOT, '.claude/hooks/git-guard.sh');
 const PRECOMMIT = join(ROOT, '.claude/hooks/precommit-gate.sh');
@@ -39,18 +40,18 @@ function binWithout(...skip) {
 }
 
 // `agent` is the hook input's agent_type: set for a subagent (a crew role or any other), absent for the lead
-function run(command, { cwd = dir, hook = HOOK, env, timeout, agent } = {}) {
+function run(command, { cwd = dir, hook = HOOK, env = CLEAN, timeout, agent } = {}) {
 	const r = spawnSync('/bin/sh', [ hook ], { input: JSON.stringify({ cwd, ...(agent && { agent_type: agent }), tool_input: { command } }), encoding: 'utf8', env, timeout });
 	assert.equal(r.status, 0, r.stderr);
 	// every probe runs on a healthy PATH unless it simulates a missing tool, and a hook that runs on every Bash call must say nothing on stderr
-	if (!env) assert.equal(r.stderr, '', `stderr of ${command}`);
+	if (env === CLEAN) assert.equal(r.stderr, '', `stderr of ${command}`);
 	return r.stdout ? JSON.parse(r.stdout).hookSpecificOutput : {};
 }
 const decide = (command, o) => run(command, o).permissionDecision || '';
 // Real git only ever runs in a scratch repository under the tmp dir, never in this checkout.
 const g = (cwd, ...a) => {
 	assert.ok(!resolve(cwd).startsWith(ROOT), `scratch git must not run in the checkout: ${cwd}`);
-	const r = spawnSync('git', [ '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...a ], { cwd, encoding: 'utf8' });
+	const r = spawnSync('git', [ '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...a ], { cwd, encoding: 'utf8', env: CLEAN });
 	assert.equal(r.status, 0, r.stderr);
 	return r.stdout.trim();
 };
@@ -312,17 +313,17 @@ test('more than 50 distinct scripts is silent in hook mode and script-scan-cap i
 	for (let i = 0; i < 60; i++) { writeFileSync(join(c, `s${i}.sh`), 'true\n'); top += `sh s${i}.sh\n`; }
 	writeFileSync(join(c, 'top.sh'), top);
 	assert.equal(decide('sh top.sh', { cwd: c, timeout: 20000 }), '');
-	const r = spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input: JSON.stringify({ cwd: c, tool_input: { command: 'sh top.sh' } }), encoding: 'utf8', timeout: 20000 });
+	const r = spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input: JSON.stringify({ cwd: c, tool_input: { command: 'sh top.sh' } }), encoding: 'utf8', timeout: 20000, env: CLEAN });
 	assert.match(r.stdout, /script-scan-cap/);
 });
 // precommit-gate reads --kinds: a commit that hides behind a `<<` in a "…" token must still be seen as one
 test('--kinds still lists the commit behind a << inside a quoted token', () => {
 	const input = JSON.stringify({ cwd: dir, tool_input: { command: 'echo "$(true) <<X\n" ; git commit -m x ; echo "\nX\n"' } });
-	assert.match(spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input, encoding: 'utf8' }).stdout, /\bcommit\b/);
+	assert.match(spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input, encoding: 'utf8', env: CLEAN }).stdout, /\bcommit\b/);
 });
 test('--kinds still lists the commit behind a backtick span that holds a <<', () => {
 	const input = JSON.stringify({ cwd: dir, tool_input: { command: 'echo "`cat <<X\nfoo\n`"; git commit -m x #\nX\n`"' } });
-	assert.match(spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input, encoding: 'utf8' }).stdout, /\bcommit\b/);
+	assert.match(spawnSync('/bin/sh', [ HOOK, '--kinds' ], { input, encoding: 'utf8', env: CLEAN }).stdout, /\bcommit\b/);
 });
 test('multi-word message with -n is not no-verify', () => assert.equal(decide("git commit -m 'a -n b'"), ''));
 test('commit message containing -n is not no-verify', () => assert.equal(decide('git commit -m "fix -n"'), ''));
@@ -471,7 +472,7 @@ test('a push is judged on the repository a line redirects it to, and on a remote
 	const home = join(dir, 'home');
 	const fork = repo(join(home, 'fork'), { origin: FORK });
 	const mine = repo(join(dir, 'mine'), { origin: THEME, up: FORK });
-	const env = { ...process.env, HOME: home };
+	const env = { ...CLEAN, HOME: home };
 	const ask = [
 		`git --git-dir=${fork}/.git push origin HEAD:x`, `git --git-dir ${fork}/.git push origin HEAD:x`, `GIT_DIR=${fork}/.git git push origin HEAD:x`, `env GIT_DIR=${fork}/.git git push origin HEAD:x`,
 		`export GIT_DIR=${fork}/.git; git push origin HEAD:x`, `git -C ${home} --git-dir=fork/.git push origin HEAD:x`,
@@ -515,7 +516,7 @@ test('a push is judged on the repository a line redirects it to, and on a remote
 
 test('hook stays quiet on stderr for plain, alias, interpreter and push lines', () => {
 	for (const c of [ 'git status', 'git tag v1', `python3 -c 'print(1)'`, 'git push origin -- +main', 'git tt v1' ]) {
-		const r = spawnSync('/bin/sh', [ HOOK ], { input: JSON.stringify({ cwd: dir, tool_input: { command: c } }), encoding: 'utf8' });
+		const r = spawnSync('/bin/sh', [ HOOK ], { input: JSON.stringify({ cwd: dir, tool_input: { command: c } }), encoding: 'utf8', env: CLEAN });
 		assert.equal(r.status, 0);
 		assert.equal(r.stderr, '', c);
 	}

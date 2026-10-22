@@ -6,6 +6,7 @@ import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { cleanEnv } from './lib/git-env.mjs';
 
 function scan(files) {
 	const root = mkdtempSync(join(tmpdir(), 'uc-'));
@@ -36,15 +37,10 @@ test('prose such as task-list is not a task id', () => {
 	assert.equal(scan({ 'htdocs/a.js': '// task-list rows\n' }).status, 0);
 });
 
-/* A scratch repo must not inherit the caller's git env: under a hook or a snapshot (GIT_INDEX_FILE) its
- * `git add` writes the caller's index. .githooks/pre-push unsets the same list. */
-const LOCAL_ENV = spawnSync('git', [ 'rev-parse', '--local-env-vars' ], { encoding: 'utf8' }).stdout.split('\n');
-const noLocalEnv = (env) => Object.fromEntries(Object.entries(env).filter(([ k ]) => !LOCAL_ENV.includes(k)));
-
 test('upstream-review-facts.sh -C runs git on the named tree', () => {
 	const d = mkdtempSync(join(tmpdir(), 'urf-'));
 	const callerIndex = `${d}.caller-idx`;
-	const env = noLocalEnv({ ...process.env, GIT_INDEX_FILE: callerIndex });
+	const env = cleanEnv({ ...process.env, GIT_INDEX_FILE: callerIndex });
 	try {
 		const g = (...a) => spawnSync('git', [ '-C', d, '-c', 'user.name=t', '-c', 'user.email=t@t', ...a ], { encoding: 'utf8', env });
 		g('init', '-q', '-b', 'master');

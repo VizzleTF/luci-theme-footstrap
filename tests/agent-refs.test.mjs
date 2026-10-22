@@ -6,6 +6,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { CLEAN } from './lib/git-env.mjs';
 
 /* The fixture is a real scratch repo: `tracked` files are `git add`ed, `loose` ones are written after
  * and stay untracked, `ignore` is its .gitignore. `git: false` leaves it a bare directory. */
@@ -16,9 +17,9 @@ function run(claude, { tracked = {}, loose = {}, ignore = '', git = true } = {})
 	};
 	try {
 		put({ 'tools/real.mjs': '', 'docs/real.md': '', 'package.json': JSON.stringify({ scripts: { test: 'x' } }), 'CLAUDE.md': claude, '.gitignore': ignore, ...tracked });
-		if (git) for (const a of [ [ 'init', '-q' ], [ 'add', '-A' ] ]) spawnSync('git', a, { cwd: root });
+		if (git) for (const a of [ [ 'init', '-q' ], [ 'add', '-A' ] ]) spawnSync('git', a, { cwd: root, env: CLEAN });
 		put(loose);
-		return spawnSync(process.execPath, [ 'tools/agent-refs.mjs', '--root', root ], { encoding: 'utf8' });
+		return spawnSync(process.execPath, [ 'tools/agent-refs.mjs', '--root', root ], { encoding: 'utf8', env: CLEAN });
 	} finally { rmSync(root, { recursive: true, force: true }); }
 }
 

@@ -11,8 +11,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { ROOT } from '../tools/lib/root.mjs';
 import { tmpRoot } from '../tools/lib/tmp-root.mjs';
+import { CLEAN } from './lib/git-env.mjs';
 
-const CLEAN = Object.fromEntries(Object.entries(process.env).filter(([ k ]) => !k.startsWith('GIT_')));
 const git = (cwd, ...a) => {
 	const r = spawnSync('git', [ '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...a ], { cwd, env: CLEAN, encoding: 'utf8' });
 	assert.equal(r.status, 0, r.stderr);

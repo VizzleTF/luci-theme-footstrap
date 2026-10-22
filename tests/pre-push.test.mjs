@@ -5,10 +5,10 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSy
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { ROOT } from '../tools/lib/root.mjs';
+import { CLEAN } from './lib/git-env.mjs';
 
 const ZERO = '0'.repeat(40);
 const HOOK = join(ROOT, '.githooks/pre-push');
-const CLEAN = Object.fromEntries(Object.entries(process.env).filter(([ k ]) => !k.startsWith('GIT_')));
 const git = (cwd, ...a) => spawnSync('git', [ '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...a ], { cwd, env: CLEAN, encoding: 'utf8' });
 
 /* A scratch checkout holding one commit, then the two things a working-tree check would trip on: an

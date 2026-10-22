@@ -57,6 +57,7 @@
 - **The role rule of git-guard sees the work tree a command writes, not only its git dir.** A role is denied `--git-dir` or `GIT_DIR` aimed at a scratch repo while the shell stands in the checkout, `read-tree -u`, `write-tree`, `update-index`, `apply`, `pull`, `revert` and `sparse-checkout` here, and a command after a subshell, `cd -` or `popd` is judged where the shell really is.
 - **A linked worktree logs, waits and locks the stands in the same ../tmp as the main checkout.** bg.sh, bg-wait.sh, ci-local.sh, install-check.sh, pr-watch.sh and the stand locks resolve it from the git common dir through tools/lib/tmp-root, and the verdict and denial hooks carry the same rule inline; before, a worktree run used its own ../tmp, so two runs could drive one stand at once.
 - **Browser gates wait for LuCI on the landing page before their first navigation.** login() now returns only once L.require answers (20 s bound, a timeout is a stand-down), and openPage() logs each failed attempt: the WebKit internal error hit the first goto after login in 5 of 168 runs (3.0%) against 0.09% where scroll-anchor already waited.
+- **Tests that run git in a scratch repo no longer write the caller index.** One shared environment (tests/lib/git-env.mjs, every GIT_* name dropped) replaces five private copies and covers the two sites that had none: under an exported GIT_INDEX_FILE the agent-refs and git-guard tests wrote it (650 bytes), under GIT_DIR they put scratch commits into that repo.
 
 ## [0.14.16] — 2026-10-18
 
