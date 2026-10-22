@@ -5,9 +5,10 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { ROOT } from '../tools/lib/root.mjs';
+import { tmpRoot } from '../tools/lib/tmp-root.mjs';
 
 const id = `ict-${process.pid}`;
-const lock = join(ROOT, '..', 'tmp', `stands-${id}.lock`);
+const lock = join(tmpRoot(), `stands-${id}.lock`);
 const bin = mkdtempSync(join(tmpdir(), 'install-check-'));
 const holders = [];
 mkdirSync(dirname(lock), { recursive: true });

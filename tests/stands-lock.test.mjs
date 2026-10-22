@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROOT } from '../tools/lib/root.mjs';
 import { heldBy } from '../tools/lib/stands.mjs';
+import { tmpRoot } from '../tools/lib/tmp-root.mjs';
 
 const dir = mkdtempSync(join(tmpdir(), 'stands-lock-'));
 const file = join(dir, 'stands-x.lock');
@@ -73,7 +74,7 @@ test('a lock wait that times out ends its own flock and leaves none behind', () 
 	});
 	alive.forEach((pid) => process.kill(pid, 'SIGKILL'));
 	// a wait cut short by the timeout leaves its ack file in the lock dir
-	const lockDir = join(ROOT, '..', 'tmp');
+	const lockDir = tmpRoot();
 	for (const f of readdirSync(lockDir)) if (f.startsWith(`stands-f9-${process.pid}.`)) rmSync(join(lockDir, f));
 	assert.equal(r.status, 2, r.error ? String(r.error) : r.stderr);
 	assert.match(r.stderr, /still held by .* after 2 s; gave up/);

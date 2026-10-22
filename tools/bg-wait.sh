@@ -18,7 +18,8 @@ case "$1" in
 esac
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-TMP=$(dirname -- "$ROOT")/tmp
+. "$ROOT/tools/lib/tmp-root.sh"
+TMP=$(tmp_root "$ROOT")
 LOG="$TMP/$1.log"
 STATUS="$TMP/$1.status"
 PIDF="$TMP/$1.pid"

@@ -5,9 +5,10 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ROOT } from '../tools/lib/root.mjs';
+import { tmpRoot } from '../tools/lib/tmp-root.mjs';
 
 const SCRIPT = join(ROOT, 'tools/pr-watch.sh');
-const TMP = join(ROOT, '..', 'tmp') + '/';
+const TMP = tmpRoot() + '/';
 const dir = mkdtempSync(join(tmpdir(), 'pr-watch-'));
 const seen = join(TMP, `pr-watch-test-${process.pid}.seen`);
 after(() => { rmSync(dir, { recursive: true, force: true }); rmSync(seen, { force: true }); });

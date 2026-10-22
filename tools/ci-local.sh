@@ -18,7 +18,8 @@ set -u
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT" || exit 2
 
-TMPROOT=$(CDPATH='' cd -- "$ROOT/.." && pwd)/tmp
+. "$ROOT/tools/lib/tmp-root.sh"
+TMPROOT=$(tmp_root "$ROOT")
 STAMP=$(date +%Y%m%d-%H%M%S)
 RUNDIR="$TMPROOT/ci-local-$STAMP"
 mkdir -p "$RUNDIR"

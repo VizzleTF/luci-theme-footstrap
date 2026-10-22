@@ -1256,7 +1256,10 @@ is added only with a `tester` card's classification behind it, never to get a pu
   by a lock, not by a promise**: `requireStands()` (`tools/lib/stands.mjs`), `tools/ci-local.sh` and
   `tools/install-check.sh` all take `flock` on `../tmp/stands-<id>.lock`, one per stand taken in sorted order,
   and hold it for the whole run; a second run on the same set waits, and says who holds it.
-  `--force` skips the refusal, never the lock. The holder is a child `flock` kept alive by its
+  `--force` skips the refusal, never the lock. `../tmp` there is the main checkout's from every linked
+  worktree too (`tools/lib/tmp-root.sh` and `.mjs`, the git common dir; a copy outside git keeps its own
+  parent), so a worktree run takes the same lock and the pre-push worktree's gates write into the shared
+  `../tmp`, not into their `mktemp -d`. The holder is a child `flock` kept alive by its
   stdin pipe, so the kernel frees the lock on any exit, SIGKILL included. `flock` is probed
   synchronously first: the wait loop blocks the event loop, so the spawn's async `error` event
   never fired when `flock` was missing and the loop spun forever (`timeout 5` → 124). The wait is
@@ -2025,6 +2028,10 @@ recreate the stand, or measure on `owrtsnapb`.
   any worktree whose directory it cannot see at that moment (an unmounted path, a moved checkout),
   and the session's next `git` call there fails `fatal: not a git repository`. Protect a live one
   with `git worktree lock --reason "session" <path>`; `git worktree unlock` when it is done.
+
+- **A `claude --worktree` session installs its own `node_modules`.** `settings.json` does not symlink the
+  main checkout's through `worktree.symlinkDirectories`: `npm ci` in a worktree would delete and rewrite
+  the main one. The pre-push hook links it only when the two lockfiles match, and runs `npm ci` otherwise.
 
 - **`ucode` is not on the host; it lives in a stand.** `ucode -T -c -o /dev/null <file>.ut` from the
   host reads `command not found`. Run it where LuCI runs: `docker cp <file>.ut

@@ -12,8 +12,7 @@
  * that starts and stops containers by itself is a gate nobody runs locally. */
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { closeSync, mkdirSync, openSync, readFileSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
-import { ROOT } from './root.mjs';
+import { tmpRoot } from './tmp-root.mjs';
 
 /* The routers a gate runs on by default: the three OpenWrt lines the theme supports (apk on 25.12+,
  * opkg on 24.10, and the snapshot box, which tracks luci-base's master). `--all` widens to every
@@ -276,7 +275,7 @@ export function heldBy(id, file, env = process.env) {
 	return spawnSync('flock', [ '-n', file, 'true' ], { stdio: 'ignore' }).status === 1;
 }
 
-const lockDir = join(ROOT, '..', 'tmp') + '/';
+const lockDir = tmpRoot() + '/';
 
 /* Take one stand's lock and hold it until this process dies. `wait` blocks (bounded, see above); a
  * try-lock (wait=false) answers `busy` instead and returns false, so the optional twin never stalls

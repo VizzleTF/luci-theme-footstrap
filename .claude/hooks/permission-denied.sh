@@ -6,8 +6,15 @@
 # -u/--user user:pass, sshpass -p, openssl pass:, and the shapes hvs./hvb./hvr./s. (OpenBao),
 # gh?_ / github_pat_ and sk-. A credential in any other shape is written as is.
 # Always exits 0 and prints nothing: the denial already happened, a log failure must not add noise.
-LOG="${CLAUDE_PROJECT_DIR:-.}/../tmp/denials.log"
-mkdir -p "$(dirname "$LOG")" 2>/dev/null
+# The main checkout's ../tmp from a linked worktree too: the git common dir is that checkout's .git.
+# The rule of tools/lib/tmp-root.sh, written out here because a guard hook sources nothing from outside
+# .claude/hooks; no git, or a layout it does not know, leaves the project dir's own ../tmp.
+ROOT=${CLAUDE_PROJECT_DIR:-.}
+COMMON=$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || COMMON=
+case $COMMON in /*/.git) ROOT=${COMMON%/.git} ;; esac
+TMP=$ROOT/../tmp
+LOG="$TMP/denials.log"
+mkdir -p "$TMP" 2>/dev/null
 jq -r --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
 def redact:
 	gsub("(?<k>[A-Za-z][A-Za-z0-9+.-]*://)[^/@\\s]+@"; "\(.k)***@")

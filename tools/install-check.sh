@@ -37,7 +37,8 @@ held() {
 
 project=$(owlab status -json | sed -n 's/.*"project": "\([^"]*\)".*/\1/p' | head -1)
 fail=0
-tmp=../tmp
+. tools/lib/tmp-root.sh
+tmp=$(tmp_root "$PWD")
 mkdir -p "$tmp"
 
 for r in $routers; do

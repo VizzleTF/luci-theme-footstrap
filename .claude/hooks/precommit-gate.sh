@@ -373,7 +373,12 @@ TAB=$(printf '\t')
 # cards behind it, so a failed run is repeated card by card; only a card that mentions "PASS" is read at all.
 verdict_entries() {
 	jq_f='try (.history | arrays | reverse | .[] | objects | select(.verdict == "PASS" and (.tree | type == "string" and test("^[0-9a-f]{40,64}$"))) | "\(.tree) \(.security // "-")")'
-	cards=$(grep -l '"PASS"' "$HOOK_ROOT"/../tmp/task-*/card.json 2>/dev/null || true)
+	# The cards are the main checkout's ../tmp from a linked worktree too (the git common dir is its .git). The rule of
+	# tools/lib/tmp-root.sh, written out because this guard sources nothing from outside .claude/hooks: a file under
+	# tools/ is no guard path, so sourcing one would let an edit of it decide which cards the verdict reads.
+	common=$(git -C "$HOOK_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || common=
+	case $common in /*/.git) cardroot=${common%/.git} ;; *) cardroot=$HOOK_ROOT ;; esac
+	cards=$(grep -l '"PASS"' "$cardroot"/../tmp/task-*/card.json 2>/dev/null || true)
 	[ -n "$cards" ] || return 0
 	set -f
 	IFS=$NL

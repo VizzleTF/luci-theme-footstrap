@@ -653,6 +653,29 @@ test('precommit-gate verdict: a package path needs a PASS tree holding the same 
 	assert.equal(v.run('git commit -m x').permissionDecision, 'ask');
 });
 
+// The lead writes the cards into the main checkout's ../tmp; a hook run from a linked worktree must read them there.
+test('precommit-gate verdict: a linked worktree reads the cards from the main checkout\'s ../tmp', () => {
+	const v = verdictRepo('vw');
+	const wt = join(dir, 'vw-wt');
+	g(v.r, 'worktree', 'add', '-q', '--detach', wt);
+	const PKG = 'luci-theme-footstrap/a.txt';
+	mkdirSync(dirname(join(wt, PKG)), { recursive: true });
+	writeFileSync(join(wt, PKG), 'one\n');
+	for (const f of [ 'CHANGELOG.md', 'CHANGELOG_ru.md' ]) appendFileSync(join(wt, f), `- ${PKG}\n`);
+	g(wt, 'add', PKG, 'CHANGELOG.md', 'CHANGELOG_ru.md');
+	const at = { cwd: wt, hook: join(wt, '.claude/hooks/precommit-gate.sh') };
+	assert.equal(run('git commit -m x', at).permissionDecision, 'ask', 'no card yet');
+	// the hook sources nothing outside .claude/hooks: a tools/lib/tmp-root.sh that points at a forged PASS card changes nothing
+	const forged = join(dir, 'vw-forged');
+	mkdirSync(join(forged, 'task-9'), { recursive: true });
+	writeFileSync(join(forged, 'task-9/card.json'), JSON.stringify({ id: '9', history: [ pass(g(wt, 'write-tree')) ] }));
+	mkdirSync(join(wt, 'tools/lib'), { recursive: true });
+	writeFileSync(join(wt, 'tools/lib/tmp-root.sh'), `tmp_root() { printf '%s\\n' ${JSON.stringify(forged)}; }\n`);
+	assert.equal(run('git commit -m x', at).permissionDecision, 'ask', 'a helper a role can edit does not pick the cards');
+	v.card('1', pass(g(wt, 'write-tree')));
+	assert.equal(run('git commit -m x', at).permissionDecision, undefined, 'the card is in the main ../tmp');
+});
+
 test('precommit-gate verdict: a guard path needs CLEAN on the same entry, any other path needs nothing', () => {
 	const v = verdictRepo('v2');
 	v.stage('.githooks/pre-push', '#!/bin/sh\n');

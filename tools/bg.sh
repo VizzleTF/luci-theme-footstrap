@@ -3,8 +3,9 @@
 # it. Prints the run-id and the log path before the command has produced a byte, and exits 0 whether
 # or not the command later fails: the exit status lives in <run-id>.status, read by hand.
 #
-# Logs go to ../tmp/ beside the checkout, resolved from this script rather than from $PWD, so a run
-# started from a subdirectory still lands in the one scratch directory CLAUDE.md sanctions.
+# Logs go to ../tmp/ beside the main checkout, resolved from this script rather than from $PWD, so a
+# run started from a subdirectory or a linked worktree still lands in the one scratch directory
+# CLAUDE.md sanctions (tools/lib/tmp-root.sh).
 #
 #   tools/bg.sh node tools/live-audit.mjs --all
 #   tail -n 40 ../tmp/<run-id>.log
@@ -142,13 +143,18 @@ if [ "$CHECK" = 1 ]; then
 fi
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-TMP=$(dirname -- "$ROOT")/tmp
+. "$ROOT/tools/lib/tmp-root.sh"
+TMP=$(tmp_root "$ROOT")
 mkdir -p "$TMP"
 
 # The slug is the first two words of the command with everything but [A-Za-z0-9] folded to a dash,
 # so `npm run live` and `owlab test` are distinguishable in a directory listing without opening one.
-SLUG=$(printf '%s %s' "$1" "${2-}" | tr -c 'A-Za-z0-9' '-' | sed 's/--*/-/g; s/^-//; s/-$//')
-RUN="$(date +%Y%m%d-%H%M%S)-${SLUG:-cmd}-$$"
+# It is cut so the whole run-id stays under 61 characters: a 300-character argument made the log
+# name 'File name too long'.
+STAMP=$(date +%Y%m%d-%H%M%S)
+PIDS=$$
+SLUG=$(printf '%s %s' "$1" "${2-}" | tr -c 'A-Za-z0-9' '-' | sed 's/--*/-/g; s/^-//' | cut -c "1-$((60 - ${#STAMP} - ${#PIDS} - 2))" | sed 's/-$//')
+RUN="$STAMP-${SLUG:-cmd}-$$"
 LOG="$TMP/$RUN.log"
 STATUS="$TMP/$RUN.status"
 PIDF="$TMP/$RUN.pid"

@@ -11,6 +11,7 @@
 #
 # tools/ is in the glob because release-notes.sh is only ever run by the release job, i.e. after
 # both packages have built — a syntax error in it would be found at the one moment it costs most.
+# tools/lib/ is in it for the helpers the scripts source: `sh -n` of the sourcing script never reads them.
 #
 # `sh -n` is whatever `sh` resolves to on the box running it — bash on a developer's machine, dash
 # on the ubuntu-latest CI runner, and NEITHER is busybox ash, which is what OpenWrt's own `/bin/sh`
@@ -22,7 +23,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 n=0
-for f in luci-theme-footstrap/*.sh install.sh tools/*.sh wallpapers/*.sh fonts/*.sh; do
+for f in luci-theme-footstrap/*.sh install.sh tools/*.sh tools/lib/*.sh wallpapers/*.sh fonts/*.sh; do
 	[ -f "$f" ] || continue
 	sh -n "$f" || { echo "syntax error: $f"; exit 1; }
 	n=$((n + 1))

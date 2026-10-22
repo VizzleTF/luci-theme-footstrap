@@ -35,8 +35,11 @@ case ${REPO%%/*}/${REPO##*/} in ./*|../*|*/.|*/..) bad "--repo owner and name mu
 for v in "$INTERVAL" "$BATCH" "$MAX"; do
 	case $v in ''|*[!0-9]*) bad "--interval, --batch and --max take whole seconds, got '$v'" ;; esac
 done
-mkdir -p "$(dirname "$0")/../../tmp"
-TMPDIR_OK=$(CDPATH='' cd -- "$(dirname "$0")/../../tmp" && pwd -P)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+. "$ROOT/tools/lib/tmp-root.sh"
+TMP=$(tmp_root "$ROOT")
+mkdir -p "$TMP"
+TMPDIR_OK=$(CDPATH='' cd -- "$TMP" && pwd -P)
 [ -n "$SEEN" ] || SEEN="$TMPDIR_OK/pr-watch-${REPO%%/*}-${REPO##*/}-$N.seen"
 # the seen-file is appended to on every event, so it is confined to ../tmp, in a plain filename
 case ${SEEN##*/} in ''|-*|*[!A-Za-z0-9._-]*) bad "--seen needs a plain file name, got '$SEEN'" ;; esac
