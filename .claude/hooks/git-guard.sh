@@ -15,13 +15,19 @@
 # deleted locally (`checkout -B`, `switch -C`, `branch -f|-D|-m`, `update-ref`), and a push whose remote
 # is not VizzleTF/luci-theme-footstrap: read with `git remote get-url --push` in the directory `cd`,
 # `git -C`, `--git-dir` or GIT_DIR leaves, or taken from a remote or URL the same line sets.
-# The whole line is read, quote-aware, plus the local scripts and nested shells it runs (three levels
+# The whole line is read, quote-aware (inside a double quote a backslash escapes only $, a backtick, a double
+# quote, a backslash and a newline, as in sh), plus the local scripts and nested shells it runs (three levels
 # deep, at most 50 scripts and 200 nested texts, each script once). A shell is followed behind env,
 # timeout, nice, nohup, xargs, sudo, doas, command, exec, tools/bg.sh, find -exec and `git bisect run`,
 # and via `<<<`, `< file` or a heredoc body; the code of `python -c`, `node -e`, `perl -e`, `ruby -e` is
-# read as a line. An alias is resolved first: `-c alias.*`, GIT_CONFIG_KEY_n with GIT_CONFIG_VALUE_n or
-# GIT_CONFIG_PARAMETERS (a prefix, behind env, or exported), `--config-env` (its variable read from the same
-# prefix), one set earlier in the line, or one in the repository config. The body of a heredoc fed to anything
+# read as a line. An alias is resolved first: `-c alias.*`, every GIT_CONFIG_KEY_n with its GIT_CONFIG_VALUE_n
+# (GIT_CONFIG_COUNT is never read: it can be spelled in ways this scan cannot follow) or the quoted entries of
+# GIT_CONFIG_PARAMETERS (`'\''` is a quote in a value; anything unquoted between entries is skipped), a prefix,
+# behind env, or exported; `--config-env` (its variable read from the same prefix), one set earlier in the
+# line, or one in the repository config. Every value the line gives one name is read, in no order, so a
+# duplicate cannot hide another. For a role any alias set on the line by those channels, `alias.` anywhere in
+# GIT_CONFIG_PARAMETERS included, is a find on its own beside a git call in this checkout (kind rolegit,
+# nothing resolved). The body of a heredoc fed to anything
 # else (cat, git -F -, python) is data, except inside a `$( )` or backtick that a shell, eval or xargs runs
 # (`sh -c "$(cat <<E ...)"`) and when a shell sits behind a `|` on its line (`cat <<E | sh`): that body is the
 # code. Under an unquoted delimiter the shell also runs the `$( )` and backticks of the body, so those are
@@ -31,9 +37,10 @@
 # `)`; a `<<` that cannot be copied whole gives that count up, the next `"` ends the token. A `{` or `}` ends
 # a command only as a word of its own (`{ cmd; }`); inside a word it is gh's `{owner}/{repo}`.
 # Denied: --no-verify (any unique prefix), -n on commit, `-c core.hooksPath`, `-c include.path` (an
-# include reaches the command scope, which beats the repository's own hook path), `git config` writes
-# of either, and GIT_CONFIG_KEY_n / GIT_CONFIG_PARAMETERS naming them. `--kinds` prints every kind
-# found, the silent ones too (`commit`, `add`), so precommit-gate.sh shares this detection.
+# include reaches the command scope, which beats the repository's own hook path, and may hold any alias, so
+# for a role an unknown verb under it is a find too), `git config` writes
+# of either, and GIT_CONFIG_KEY_n / GIT_CONFIG_PARAMETERS naming them, whatever the count says. `--kinds`
+# prints every kind found, the silent ones too (`commit`, `add`), so precommit-gate.sh shares this detection.
 #
 # A crew role (hook input `agent_type`: developer, tester, security, researcher, upstream-reviewer) is
 # also denied, in the checkout this hook ships in, what moves its HEAD or a ref, or rewrites its worktree,
@@ -42,23 +49,30 @@
 # `-`, a path), -b, -B, --orphan, --detach, -d, -f or -p, `bisect` but log|view|visualize, `update-ref`,
 # `symbolic-ref` with two words or -d or --delete, `reflog expire|delete|drop`, `branch` with -f, -d, -D, -m,
 # -M, -c, -C, -u, --set-upstream-to, --unset-upstream or --edit-description (a list or a new name passes),
-# `fetch` with -u or --update-head-ok (it lets a fetch into the checked-out branch through), `worktree add`
+# `fetch` with -u or --update-head-ok (it lets a fetch into the checked-out branch through), `push` that names
+# receive.denyCurrentBranch (git refuses a local push into the checked-out branch unless that is lifted; -c and
+# the env do not reach a local receive-pack, a --receive-pack or --exec program does) or lands in a repository
+# of this checkout (`.`, a path, a `file://` URL or a remote whose push URL is one; a relative one is read from
+# the toplevel of the work tree as git does, from the line's directory when it names --git-dir, GIT_DIR or
+# --work-tree), `worktree add`
 # with -f, --force or -B (a branch another worktree holds, or a shared one reset), `gc` with --prune and
-# `prune` (what the reflog still names), any git call with a gc.*reflogExpire or gc.pruneExpire set by `-c` or
-# the env (git runs gc --auto after a fetch or a commit), `restore` (--staged too), `clean`, `stash` but
+# `prune` (what the reflog still names), any git call with a gc.*reflogExpire or gc.pruneExpire or an alias set
+# by `-c` or the env (git runs gc --auto after a fetch or a commit), `restore` (--staged too), `clean`, `stash` but
 # list|show|create, `reset`, `checkout-index`, `read-tree`, `add`, `rm`, `mv`, `write-tree`, `update-index`,
 # `apply` but --check, --stat, --numstat, --summary, `pull`, `revert`, `sparse-checkout` but list,
 # `remote add|remove|rm|rename|set-url|set-head|set-branches`, `config` writes. A long option counts under any
-# unique prefix. `-n`/`--dry-run` passes on `clean`, `add`, `rm`, `mv`, `prune` and `read-tree`, `--dry-run`
+# unique prefix. `-n`/`--dry-run` passes on `clean`, `add`, `rm`, `mv`, `prune`, `push` and `read-tree`, `--dry-run`
 # on `commit`, `--check`, `--stat`, `--numstat` and `--summary` on `apply` unless `--apply` is there too; the
-# last of --dry-run and --no-dry-run (--check and --no-check) wins. Plain `gc` and `gc --auto` pass: they drop
-# only what is older than gc.pruneExpire (2 weeks) and the 90 and 30 day reflog windows. A verb that an alias
-# or help.autocorrect set on the line leaves unread (--config-env of a variable the line does not set, an
-# unknown verb under autocorrect) is denied too. `add`, `rm --cached`, `read-tree`, `write-tree` and
-# `update-index` pass behind GIT_INDEX_FILE=, which counts as a prefix of the command (or behind env) or an
-# `export`, never as a bare assignment: that is a shell variable git does not see, and GIT_DIR and
-# GIT_WORK_TREE are read the same way. `read-tree -u` writes the worktree and is denied behind a private
-# index too. Measured 2026-10-21: three roles ran real git in the lead's checkout, one of them
+# last of --dry-run and --no-dry-run (--check and --no-check) wins. A `--dry-run` that follows -m, -F, -c, -C,
+# -t or a long option of commit that takes a value (--message, --file, --reedit-message, --reuse-message,
+# --template, --trailer, --author, --date, --cleanup, --fixup, --squash, --pathspec-from-file, any unique
+# prefix) is that value, no dry run; -S, -u and --gpg-sign take theirs only attached. Plain `gc` and
+# `gc --auto` pass: they drop only what is older than gc.pruneExpire (2 weeks) and the 90 and 30 day reflog
+# windows. An unknown verb under help.autocorrect or `-c include.path` is denied too. `add`, `rm --cached`,
+# `read-tree`, `write-tree` and `update-index` pass behind GIT_INDEX_FILE=, which counts as a prefix of the
+# command (or behind env) or an `export`, never as a bare assignment: that is a shell variable git does not
+# see, and GIT_DIR and GIT_WORK_TREE are read the same way. `read-tree -u` writes the worktree and is denied
+# behind a private index too. Measured 2026-10-21: three roles ran real git in the lead's checkout, one of them
 # `cd $R && git checkout -q -- .` with R empty, which reverted three tracked files; a rig then overwrote a
 # real file with `git --git-dir=<scratch>/.git checkout -- .`, deleted one with
 # `GIT_DIR=<scratch>/.git git clean -fdx` and reverted one with `GIT_INDEX_FILE=<private> git read-tree -u
@@ -70,17 +84,30 @@
 # does. A work tree that cannot be placed (`$S`) drops that second chance only, the git dir is still judged;
 # a git dir that is not there yet (made earlier on the line) is judged by the work tree alone. Those verbs
 # compare git dirs, so a `git worktree add` of this checkout is free to work in; remote, config, branch,
-# update-ref, reflog, fetch, worktree, gc, prune, symbolic-ref of a name but HEAD, `checkout -B`, `switch -C`
-# and an unreadable alias compare the common dir (the refs are shared) and are not. A scratch repo, the lead
+# update-ref, reflog, fetch, worktree, gc, prune, push, symbolic-ref of a name but HEAD or of HEAD pointed at a
+# branch, `checkout -B`, `switch -C`, `checkout|switch --ignore-other-worktrees` (a commit after these moves
+# a branch another worktree holds) and an unreadable alias compare the common dir (the refs are shared) and are
+# not. A push is judged by the repository it names, not the one it leaves: `.`, a path or the push URL of a
+# remote, read as a path, is this checkout's when its common dir is. A scratch repo, the lead
 # and any other agent_type are untouched; a `cd "$X"` it cannot place is no find. Not read: a cd inside
 # backticks, in a `case` arm or in a function body (read as the line's own), a `case` arm `)` inside a
 # subshell (it closes the directory frame early), an `export` inside `( )` (it outlives the `)`), a relative
 # GIT_DIR or GIT_WORK_TREE with `-C` (read against the directory before the -C, git reads it after),
 # core.worktree set by `-c` or a config file, and a bare repository named by --git-dir (its work tree is the
-# line's directory).
-# Not named (they touch no HEAD, index or work tree): fetch <src>:<dst>, push . <src>:<dst>, replace, notes. Git
-# itself refuses a fetch into the checked-out branch without -u (denied above) and a local push into it unless
-# receive.denyCurrentBranch is lifted, which -c can do and this does not read.
+# line's directory); the aliases of a config file the line points git at (GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM,
+# HOME or XDG_CONFIG_HOME set on the line); a help.autocorrect or gc expiry that a config file on disk sets;
+# GIT_CONFIG_* exported and then run behind `sh -c` or `tools/bg.sh sh -c` (a nested text sees none of the
+# line's env); a push target the line builds (`$VAR`, `~user`, a glob) or a remote it defines (`-c
+# remote.<n>.url`, `-c url.<base>.insteadOf`); for the lead's resolving only (a role is denied on any `alias.`
+# in it) GIT_CONFIG_PARAMETERS written as `$'...'`, with the `'\!'` form git uses for a `!`, with a `$` inside
+# the quotes of a double-quoted value (the shell expands it) or from a variable exported by name only
+# (`X=...; export X`);
+# `repack -ad` (it drops the packed objects no ref or reflog reaches, a dropped stash for one, with none of gc's
+# two weeks of grace); `worktree remove|prune` (a role's own red-proof worktree goes the same way); and a
+# dry-run flag eaten as the value of another verb's option (`clean -e -n`, `apply --exclude --check`, `add
+# --pathspec-from-file -n`).
+# Not named (they touch no HEAD, index or work tree): fetch <src>:<dst>, replace, notes. Git itself refuses a
+# fetch into the checked-out branch without -u (denied above).
 #
 # Acts only on a positive find: a missing jq or awk, unreadable stdin, a script it cannot resolve,
 # too deep or over the cap stay silent; `--kinds` exits 1 instead. A repository chosen with
@@ -196,45 +223,78 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 	function mine(u) { return (tolower(u) ~ ENVIRON["MINE_RE"]) }
 	# a long option as git takes it: any unique prefix. A prefix that fits two options is an error there, so reading it as this one only makes the reading stricter
 	function ab(x, l) { return (length(x) >= 3 && index(l, x) == 1) }
+	# an option that takes the next word as its value, so a flag in that word is no flag: --message and --file of any verb, the other value options of commit and push, under any unique prefix; -S and --gpg-sign take a value only when attached
+	function vopt(v, x) {
+		if (x ~ /^--(message|file)$/) return 1
+		if (v == "commit") return (ab(x, "--message") || ab(x, "--file") || ab(x, "--reedit-message") || ab(x, "--reuse-message") || ab(x, "--template") || ab(x, "--trailer") || ab(x, "--author") || ab(x, "--date") || ab(x, "--cleanup") || ab(x, "--fixup") || ab(x, "--squash") || ab(x, "--pathspec-from-file"))
+		if (v == "push") return (ab(x, "--push-option") || ab(x, "--receive-pack") || ab(x, "--exec") || ab(x, "--repo") || ab(x, "--recurse-submodules"))
+		return 0
+	}
 	# one `-c key=value` of a git call: an alias is kept, a remote or URL it sets is noted, follow-tags not switched off is a tag push; true when it is an include
 	function cfg(cv, al_,   key, val, b) {
 		key = tolower(cv); sub(/=.*/, "", key)
 		val = (index(cv, "=") ? substr(cv, index(cv, "=") + 1) : "")
 		# git reads a bare key as true and an empty value as false
 		if (key == "push.followtags" && (!index(cv, "=") || tolower(val) !~ /^(false|no|off|0)?$/)) print "KIND\ttagpush"
-		if (key ~ /^alias\./) al_[substr(key, 7)] = val
+		# every value an alias gets on the line is kept, in no order: a duplicate cannot hide another, and a role is denied for any alias set inline
+		if (key ~ /^alias\./) { b = substr(key, 7); al_[b] = (b in al_) ? al_[b] "\002" val : val; al_[" alias"] = 1 }
 		# with autocorrect on, an unknown verb runs as the nearest known one; a gc expiry shortened here empties the reflog or the object store
 		if (key == "help.autocorrect" && (!index(cv, "=") || tolower(val) !~ /^(false|no|off|0|never|show)?$/)) al_[" autocorrect"] = 1
 		if (key ~ /^gc\..*(reflogexpire|pruneexpire)/) al_[" gcexpire"] = 1
 		if (key ~ /^remote\..*\.(url|pushurl)$/ && !mine(val)) rset = 1
 		if (key ~ /^url\..*\.(push)?insteadof$/) { b = substr(key, 5); sub(/\.(push)?insteadof$/, "", b); if (!mine(b)) rset = 1 }
-		return (key ~ /^include(if\..*)?\.path$/)
+		# an included file may hold any alias
+		if (key ~ /^include(if\..*)?\.path$/) { al_[" unread *"] = 1; return 1 }
+		return 0
 	}
-	# the config an env hands to git, read like `-c`: GIT_CONFIG_KEY_n with GIT_CONFIG_VALUE_n, and the quoted key=value entries of GIT_CONFIG_PARAMETERS; an alias entry it cannot parse stays unread
-	function envcfg(pe, al_,   k, ps, e, i, r) {
-		for (k in pe) if (k ~ /^GIT_CONFIG_KEY_[0-9]+$/) r = cfg(pe[k] "=" pe["GIT_CONFIG_VALUE_" substr(k, 16)], al_) || r
-		ps = pe["GIT_CONFIG_PARAMETERS"]
-		while (match(ps, /\047[^\047=]+\047=\047[^\047]*\047|\047[^\047=]+=[^\047]*\047/)) {
-			e = substr(ps, RSTART + 1, RLENGTH - 2)
-			ps = substr(ps, 1, RSTART - 1) " " substr(ps, RSTART + RLENGTH)
-			i = index(e, "\047=\047")
-			r = cfg(i ? substr(e, 1, i - 1) "=" substr(e, i + 3) : e, al_) || r
+	# the single-quoted run at p of s (git writes a quote inside one as quote, backslash, quote, quote): its text, with sqp left after the closing quote and sqbad set when it never closes
+	function sq(s, p,   w, c, n) {
+		n = length(s); w = ""; sqbad = 0; p++
+		while (p <= n) {
+			c = substr(s, p, 1)
+			if (c == "\047") {
+				if (substr(s, p + 1, 3) != "\\\047\047") { sqp = p + 1; return w }
+				w = w "\047"; p += 4; continue
+			}
+			w = w c; p++
 		}
-		if (tolower(ps) ~ /alias\./) al_[" unread *"] = 1
+		sqbad = 1; sqp = p
+		return w
+	}
+	# the config an env hands to git, read like `-c`: every GIT_CONFIG_KEY_n with its GIT_CONFIG_VALUE_n, whatever GIT_CONFIG_COUNT says, and the quoted entries of GIT_CONFIG_PARAMETERS, each a quoted key and a quoted value joined by = or one quoted key=value, with anything unquoted between them skipped; any alias. in the text is an alias set inline
+	function envcfg(pe, al_,   k, i, v, ps, w, r, t) {
+		for (k in pe) if (k ~ /^GIT_CONFIG_KEY_[0-9]+$/) r = cfg(pe[k] "=" pe["GIT_CONFIG_VALUE_" substr(k, 16)], al_) || r
+		ps = pe["GIT_CONFIG_PARAMETERS"]; i = 1
+		while (i <= length(ps)) {
+			if (substr(ps, i, 1) != "\047") { i++; continue }
+			w = sq(ps, i); i = sqp
+			if (sqbad) break
+			if (substr(ps, i, 2) == "=\047") { v = sq(ps, i + 1); i = sqp; if (sqbad) break; w = w "=" v }
+			r = cfg(w, al_) || r
+		}
+		# the plain entries again, cut at the first quote inside a value, as an entry the quoted read may have missed: values only add, so the union hides nothing
+		t = ps
+		while (match(t, /\047[^\047=]+\047=\047[^\047]*\047|\047[^\047=]+=[^\047]*\047/)) {
+			w = substr(t, RSTART + 1, RLENGTH - 2)
+			t = substr(t, 1, RSTART - 1) " " substr(t, RSTART + RLENGTH)
+			i = index(w, "\047=\047")
+			r = cfg(i ? substr(w, 1, i - 1) "=" substr(w, i + 3) : w, al_) || r
+		}
+		if (tolower(ps) ~ /alias\./) al_[" alias"] = 1
 		return r
 	}
 	# --config-env=key=VAR: the value is what VAR holds in the env this line gives git; a VAR it cannot see leaves an alias unread and any other key set
 	function cenv(ce, pe, al_,   k, v) {
 		k = substr(ce, 1, index(ce, "=") - 1); v = substr(ce, index(ce, "=") + 1)
 		if (v in pe) return cfg(k "=" pe[v], al_)
-		if (tolower(k) ~ /^alias\./) al_[" unread " substr(tolower(k), 7)] = 1
+		if (tolower(k) ~ /^alias\./) al_[" alias"] = 1
 		else return cfg(k "=?", al_)
 		return 0
 	}
-	# a find for a role: class, what, and the directory, git dir and work tree the line lands in; what may hold words of the line, so the control characters, quotes and backslashes that would break the JSON reason go
-	function rf(cls, what, d, g, wt) {
+	# a find for a role: class, what, and the directory, git dir and work tree the line lands in, and for class T the repository a push aims at; what may hold words of the line, so the control characters, quotes and backslashes that would break the JSON reason go
+	function rf(cls, what, d, g, wt, tg) {
 		gsub(/[\001-\037\042]/, " ", what); gsub(/\\/, " ", what)
-		print "ROLE\t" cls "\t" what "\t" d "\t" (g == "" ? "-" : g) "\t" (wt == "" ? "-" : wt)
+		print "ROLE\t" cls "\t" what "\t" d "\t" (g == "" ? "-" : g) "\t" (wt == "" ? "-" : wt) "\t" (tg == "" ? "-" : tg)
 	}
 	function script(p) {
 		if (cwd == "?" || p ~ /[$`~*?]/) print "KIND\tunknown-script"
@@ -370,7 +430,7 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 		}
 		p--
 	}
-	function proc(   s, i, j, k, x, w, a, sb, deny, hp, rb, hard, ch, nm, ro, kk, wr, wrp, pf, ia, alk, rk, uk, b, np, pos, na, tl, tg, fo, fm, fc, am, ref, tgt, gd, gdir, dd, cv, lal, rep, df, mv, fr, fb, fl, rc, ai, ix, rgdir, seenenv, rw, dry, cached, cwr, crd, c1, cnp, cskip, cf, cb, rwt, ru, pv, ap, dt, wrf, sp, pe, ce, cls) {
+	function proc(   s, i, j, k, x, w, a, sb, deny, hp, rb, hard, ch, nm, ro, kk, wr, wrp, pf, ia, alk, rk, uk, b, np, pos, na, tl, tg, fo, fm, fc, am, ref, tgt, gd, gdir, dd, cv, lal, rep, df, mv, fr, fb, fl, rc, ai, ix, rgdir, seenenv, rw, dry, cached, cwr, crd, c1, cnp, cskip, cf, cb, rwt, ru, pv, ap, dt, wrf, sp, pe, ce, cls, iw, rdb, ptx, ptg, nav, av, qi) {
 		s = 1
 		while (s <= n && t[s] ~ /^[A-Za-z_][A-Za-z0-9_]*=/) s++
 		w = (s <= n) ? t[s] : ""
@@ -464,20 +524,26 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 			if (sb == "") continue
 			# for a role, a gc expiry set on the line is a find whatever the verb: git runs gc --auto after a fetch, a merge or a commit
 			if (role && (" gcexpire" in lal)) rf("C", sb " with a gc expiry set", gd, rgdir, rwt)
+			# an alias set on the line, by any channel, is a find for a role whatever it holds: no resolving
+			if (role && (" alias" in lal)) rf("C", sb " with an alias set on the line", gd, rgdir, rwt)
 			if (!(sb in bi)) {
 				# a name git does not know is an alias, set on this line, in this call or in the config on disk (git ignores one that shadows a built-in)
 				x = tolower(sb)
-				if (x in lal) nest(aliasrun(i, j, lal[x]))
+				if (x in lal) {
+					# each value the line gives the name is read
+					nav = split(lal[x], av, "\002")
+					for (qi = 1; qi <= nav; qi++) nest(aliasrun(i, j, av[qi]))
+				}
 				else if (x in al) nest(aliasrun(i, j, al[x]))
 				else {
 					# one the line sets where this scan cannot read it, or autocorrect that may turn the name into any verb, is no read verb: a role is denied
-					if (role && (((" unread " x) in lal) || ((" unread *") in lal) || ((" autocorrect") in lal))) rf("C", sb " via an alias or autocorrect", gd, rgdir, rwt)
+					if (role && (((" unread *") in lal) || ((" autocorrect") in lal))) rf("C", sb " via an alias or autocorrect", gd, rgdir, rwt)
 					if (sb ~ /^[A-Za-z0-9][A-Za-z0-9_.-]*$/) print "ALIAS\t" cwd "\t" gd "\t" (gdir == "" ? "-" : gdir) "\t" x "\t" enc(apre(i, j)) "\t" enc(apost(j))
 				}
 				continue
 			}
 			if (sb !~ /^(commit|push|rebase|reset|cherry-pick|am|merge|pull|config|tag|update-ref|remote|branch|checkout|switch|add)$/ && !(role && sb ~ rolev)) continue
-			deny = hp; dry = 0; cached = 0; cwr = 0; crd = 0; c1 = ""; cnp = 0; cskip = 0; cf = 0; cb = 0; rb = 0; hard = 0; ro = 0; kk = 0; pf = 0; ia = 0; alk = 0; rk = 0; uk = 0; np = 0; na = 0; tl = 0; tg = 0; fo = 0; fm = 0; fc = 0; am = 0; dd = 0; rep = ""; df = 0; mv = 0; fr = 0; fb = 0; fl = 0; ru = 0; ap = 0; dt = 0; wrf = 0; sp = 0
+			deny = hp; dry = 0; cached = 0; cwr = 0; crd = 0; c1 = ""; cnp = 0; cskip = 0; cf = 0; cb = 0; rb = 0; hard = 0; ro = 0; kk = 0; pf = 0; ia = 0; alk = 0; rk = 0; uk = 0; np = 0; na = 0; tl = 0; tg = 0; fo = 0; fm = 0; fc = 0; am = 0; dd = 0; rep = ""; df = 0; mv = 0; fr = 0; fb = 0; fl = 0; ru = 0; ap = 0; dt = 0; wrf = 0; sp = 0; iw = 0; rdb = 0; ptg = ""
 			split("", pos)
 			for (k = j + 1; k <= n; k++) {
 				a = t[k]
@@ -523,7 +589,7 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				if (sb == "push") {
 					if (a ~ /^--force/ || a == "--delete") fo = 1
 					if (a == "--tags" || a == "--mirror" || a ~ /^--follow-tags(=|$)/) tg = 1
-					if (a ~ /^--repo=/) rep = substr(a, 8)
+					if (a != nm && ab(nm, "--repo")) rep = substr(a, length(nm) + 2)
 				}
 				if (sb == "commit" && length(a) >= 4 && index("--amend", a) == 1) am = 1
 				if (sb == "branch") {
@@ -533,6 +599,8 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 					else if (ab(nm, "--copy") || ab(nm, "--edit-description") || ab(nm, "--unset-upstream") || ab(nm, "--set-upstream-to")) wrf = 1
 				}
 				if (sb == "switch" && ab(nm, "--force-create")) fb = 1
+				# a branch another worktree holds is refused without this, so a commit after it would move the branch of that worktree
+				if ((sb == "checkout" || sb == "switch") && ab(nm, "--ignore-other-worktrees")) iw = 1
 				if (length(nm) >= 5 && index("--rebase", nm) == 1) rb = 1
 				if (length(nm) >= 3 && index("--hard", nm) == 1) hard = 1
 				if (a == "-r") rb = 1
@@ -540,9 +608,9 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 					# a cluster ends at the first flag that takes a value; the rest is that value
 					for (x = 2; x <= length(a); x++) {
 						ch = substr(a, x, 1)
-						if ((ch ~ /[mFcC]/ && sb !~ /^(branch|checkout|switch|read-tree)$/) || (sb == "push" && ch == "o")) { if (x == length(a)) k++; break }
+						if ((ch ~ /[mFcC]/ && sb !~ /^(branch|checkout|switch|read-tree)$/) || (sb == "push" && ch == "o") || (sb == "commit" && ch == "t")) { if (x == length(a)) k++; break }
 						if (ch == "n" && sb == "commit") deny = 1
-						if (ch == "n" && sb ~ /^(add|rm|mv|clean|read-tree|prune)$/) dry = 1
+						if (ch == "n" && sb ~ /^(add|rm|mv|clean|read-tree|prune|push)$/) dry = 1
 						if (ch == "u" && sb == "read-tree") ru = 1
 						if (ch ~ /[fp]/ && sb ~ /^(checkout|switch)$/) cf = 1
 						if (ch ~ /[bB]/ && sb == "checkout") cb = 1
@@ -553,10 +621,18 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 						if (sb == "branch") { if (ch ~ /[dD]/) df = 1; if (ch ~ /[mM]/) mv = 1; if (ch == "f") fr = 1; if (ch ~ /[cCu]/) wrf = 1 }
 						if ((sb == "checkout" && ch == "B") || (sb == "switch" && ch == "C")) fb = 1
 					}
-				} else if (a ~ /^--(message|file)$/ || (sb == "push" && a ~ /^--(push-option|receive-pack|exec|repo)$/)) {
-					if (sb == "push" && a == "--repo") rep = t[k + 1]
+				} else if (a == nm && vopt(sb, nm)) {
+					if (sb == "push" && ab(nm, "--repo")) rep = t[k + 1]
 					k++
 				}
+			}
+			# a push is judged by where it lands: the repository it names (a path or the URL of a remote, read on the shell side), and a program that lifts the refusal of the checked-out branch
+			if (sb == "push") {
+				for (k = j + 1; k <= n; k++) if (tolower(t[k]) ~ /receive\.denycurrentbranch/) rdb = 1
+				ptx = (rep != "") ? rep : (np ? pos[1] : "")
+				sub(/^file:\/\//, "", ptx)
+				# the word as written, for the remote lookup; one this scan cannot place ($VAR, ~user, a glob) is no find
+				ptg = (ptx != "" && !index(ptx, ":") && joind(gd, ptx) != "?") ? expand(ptx) : ""
 			}
 			if (role) {
 				rw = ""
@@ -574,6 +650,8 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				else if (sb == "fetch" || sb == "gc") { if (wrf) rw = sb }
 				else if (sb == "worktree") { if (pos[1] == "add" && wrf) rw = "worktree add" }
 				else if (sb == "prune") { if (!dry) rw = sb }
+				# git refuses a local push into a checked-out branch unless receive.denyCurrentBranch is lifted, which -c and the env cannot do for a local receive-pack: a --receive-pack or --exec program can
+				else if (sb == "push") { if (rdb && !dry) rw = sb }
 				# -u writes the worktree, which a private index does not make private
 				else if (sb == "read-tree") { if (!dry && (!ix || ru)) rw = sb }
 				else if (sb ~ /^(write-tree|update-index)$/) { if (!ix) rw = sb }
@@ -590,8 +668,11 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 					if (!crd && (cwr || c1 ~ /^(set|unset|edit|rename-section|remove-section)$/ || cnp >= 2)) rw = sb
 				}
 				# refs, reflogs, remotes, config and the worktree list sit in the directory a linked worktree shares; checkout -B and switch -C reset a branch there
-				cls = (sb ~ /^(remote|config|branch|update-ref|reflog|fetch|worktree|gc|prune)$/ || fb || (sb == "symbolic-ref" && pos[1] != "HEAD")) ? "C" : "W"
+				# --ignore-other-worktrees and a HEAD pointed at a branch by symbolic-ref let a commit in a linked worktree move a branch another worktree holds
+				cls = (sb ~ /^(remote|config|branch|update-ref|reflog|fetch|worktree|gc|prune|push)$/ || fb || iw || (sb == "symbolic-ref" && (pos[1] != "HEAD" || np >= 2))) ? "C" : "W"
+				# a push that lands in a repository of this checkout writes its refs whatever the line says: class T, judged on the shell side by the repository it names
 				if (rw != "") rf(cls, rw, gd, rgdir, rwt)
+				else if (sb == "push" && ptg != "" && !dry) rf("T", sb, gd, rgdir, rwt, ptg)
 			}
 			if (sb ~ rolev) continue
 			if (sb == "config") {
@@ -635,7 +716,8 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				else print "PUSH\t" gd "\t" (gdir == "" ? "-" : gdir) "\t" (np ? pos[1] : "origin")
 				if (rep != "") print "PUSH\t" gd "\t-\t" rep
 			}
-			if (sb == "rebase" || am) print "KIND\thistcheck"
+			# the read form of rebase is the flag alone, as for the role rule
+			if ((sb == "rebase" && !(sp && na == 1)) || am) print "KIND\thistcheck"
 			if (sb == "reset") { if (hard) { print "KIND\treset-hard"; print "KIND\trewrite" } }
 			else if (sb == "pull") { if (rb) print "KIND\tpull-rebase" }
 			else print "KIND\t" sb
@@ -681,7 +763,11 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 					continue
 				}
 				# depth 0: in the body of an unquoted heredoc (hdm) a quote is text, and so is every word outside a substitution, so only the substitutions are kept
-				if (c == "\\") { if (!hdm || bt) tok = tok substr(S, p + 1, 1); p++; continue }
+				# inside a double quote the shell escapes only $, a backtick, a double quote, a backslash and a newline; before any other character the backslash stays
+				if (c == "\\") {
+					if (!hdm || bt) { nx = substr(S, p + 1, 1); tok = tok ((nx == "\n") ? "" : ((nx ~ /[$`"\\]/) ? nx : "\\" nx)) }
+					p++; continue
+				}
 				if (c == "\"") { if (hdm) { if (bt) tok = tok c; continue } q = ""; continue }
 				if (c == "`") { ds = 2; sub_[n + 1] = 1; if (hdm) bt = !bt }
 				# `$$` is the PID: eaten as a pair, so the `$` that opens a `$(` is never the second half of one
@@ -765,12 +851,12 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				esac
 				[ -z "$PU" ] || ismine "$PU" || KINDS="$KINDS forkpush" ;;
 			ROLE)
-				# REST = class (W HEAD, worktree and index, C config, refs and reflogs), what, dir, git dir, work tree: a find only when it lands in the checkout this hook ships in; an unresolvable dir or git dir is no find, an unresolvable work tree only drops the second chance
+				# REST = class (W HEAD, worktree and index, C config, refs and reflogs, T a push), what, dir, git dir, work tree, the repository a push names: a find only when it lands in the checkout this hook ships in; an unresolvable dir or git dir is no find, an unresolvable work tree only drops the second chance
 				RC=${REST%%"$TAB"*}; REST=${REST#*"$TAB"}
 				RW=${REST%%"$TAB"*}; REST=${REST#*"$TAB"}
 				D=${REST%%"$TAB"*}; REST=${REST#*"$TAB"}
 				G=${REST%%"$TAB"*}; REST=${REST#*"$TAB"}
-				WT=$REST
+				WT=${REST%%"$TAB"*}; TG=${REST#*"$TAB"}
 				{ [ "$D" = "?" ] || [ "$G" = "?" ]; } && continue
 				if [ -z "$MYGD" ]; then
 					MYTOP=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." 2>/dev/null && pwd -P) || continue
@@ -781,6 +867,11 @@ scan() { # $1 text, $2 depth, $3 dir the text runs in (as written, relative to B
 				RI=$(rgit rev-parse --absolute-git-dir --path-format=absolute --git-common-dir 2>/dev/null) || RI=''
 				case $RC in
 					C) [ "${RI#*"$NL"}" = "$MYCD" ] || continue ;;
+					# a remote name stands for its push URL, which is a path when the remote is local; the repository named is this checkout's when its common dir is. A relative path or URL is read from the toplevel of the work tree, as git does; a line that names a git dir or work tree (--git-dir, GIT_DIR, --work-tree), or a place with no work tree, leaves the line's directory
+					T) if [ "$G" = - ] && [ "$WT" = - ]; then TOP=$(rgit rev-parse --show-toplevel 2>/dev/null) || TOP=$(rp "$BASE" "$D" .); else TOP=$(rp "$BASE" "$D" .); fi
+						if PT=$(rgit remote get-url --push "$TG" 2>/dev/null) && [ -n "$PT" ]; then PT=${PT#file://}; else PT=$TG; fi
+						case $PT in /*) RT=$PT ;; *) RT=$TOP/$PT ;; esac
+						[ "$(git -C "$RT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" = "$MYCD" ] || continue ;;
 					# the git dir first; the second chance is the work tree, which with --git-dir or GIT_DIR and no --work-tree or GIT_WORK_TREE is the directory the line stands in, whatever git dir is named; one that cannot be placed gives no second chance
 					*) [ "${RI%%"$NL"*}" = "$MYGD" ] || {
 						[ "$WT" != "?" ] || false

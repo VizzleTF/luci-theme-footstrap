@@ -259,8 +259,9 @@ held: `git-guard.sh` denies it, in this checkout, any `checkout` and `switch`, `
 `reset`, `stash`, `checkout-index`, `read-tree`, `write-tree`, `update-index`, `apply`, `pull`, `revert`,
 `sparse-checkout`, `add`, `rm`, `mv`, `commit`, `merge`, `rebase`, `cherry-pick`, `am`, `bisect`,
 `update-ref`, `symbolic-ref`, `reflog expire|delete|drop`, `fetch -u`, `worktree add -f|-B`, `gc --prune`,
-`prune`, any `gc.*Expire` setting, and `branch`, `remote` and `config` writes, under any unique prefix of a
-long option and behind an alias it can resolve (one it cannot resolve is denied too):
+`prune`, any `gc.*Expire` setting, a `push` into this checkout (`.`, its path or a file URL of it) or one naming
+`receive.denyCurrentBranch`, `--ignore-other-worktrees`, and `branch`, `remote` and `config` writes, under any unique prefix of a
+long option, and any git line that sets an alias itself (`-c`, `--config-env`, `GIT_CONFIG_*`):
 whatever moves HEAD or rewrites the index, the work tree or a ref the lead works on, resolved the way it reads a push
 (`cd`, `-C`, `--git-dir`, `GIT_DIR`), with the work tree judged where it resolves (`--work-tree`,
 `GIT_WORK_TREE`, else the shell's directory, which a subshell, `cd -` or `popd` restores); the round
