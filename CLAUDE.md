@@ -14,19 +14,20 @@ Talk to the maintainer in Russian. Code, comments, commit messages and PR text a
 
 ## Read before touching an area
 
-`docs/README.md` indexes every page. Always: `docs/conventions.md` (the rules and the gate behind
-each) and `docs/verifying.md` (what to run after an edit). Release: `docs/releasing.md`. The
+`docs/README.md` indexes every page. Always: `docs/conventions.md` (the rules) and
+`docs/verifying.md` (how a change is proven). Release: `docs/releasing.md`. The
 openwrt/luci PR: `docs/upstream-pr.md`.
 
 ## Verifying
 
-- After every edit: `npm test` plus the area's gate from `docs/verifying.md`. Before a push:
-  `npm run check` (the pre-push hook runs it on the pushed commit).
-- Anything over ~4.5 minutes (stands, live gates, `tools/ci-local.sh`) runs detached:
-  `tools/bg.sh <cmd>`, then `tools/bg-wait.sh <run-id>`.
-- Done means it ran on both package managers: 25.12/apk and 24.10/opkg (CI's `verify`). Say which
-  one a run covered.
-- A red gate is fixed in the code under it, never by editing the gate or its baseline.
+- The one check is `tools/e2e.mjs` (`docs/verifying.md`): the package's life on a real owlab
+  router — last release, upgrade, every menu page against bootstrap, removal, fresh install. CI's
+  `e2e` job runs it on 25.12/apk and 24.10/opkg; done means both are green. Say which one a run
+  covered.
+- Locally: `owlab up <router>`, then the e2e command; anything over ~4.5 minutes runs detached
+  (`tools/bg.sh <cmd>`, then `tools/bg-wait.sh <run-id>`). If owlab cannot boot here, rely on CI
+  and say so.
+- A new check is added only for a fault actually seen on a router, never for a guessed one.
 
 ## Hard rules
 
@@ -46,4 +47,4 @@ openwrt/luci PR: `docs/upstream-pr.md`.
 There are no predefined agents. For work that splits into independent parts — a fan-out search,
 a review across dimensions, verification on both stands, a multi-file change — write a dynamic
 workflow with the Workflow tool (the maintainer opts in for this repository); for a single side
-task, one Agent call. Give each agent the relevant `docs/` page and the gate it must pass.
+task, one Agent call. Give each agent the relevant `docs/` page and what proves its part done.
