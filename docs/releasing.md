@@ -1,17 +1,17 @@
 # Releasing
 
 The mandatory pre-release checklist, the changelog contract, and the runbook. **No release goes out
-until the automatic gates are green and the live checks are done for every issue the release diff
-touches.**
+until CI's `e2e` is green on both routers and the live checks are done for every issue the release
+diff touches.**
 
 How CI builds and signs the packages: [ci.md](ci.md).
 
 ## Why there is a checklist at all
 
-Every closed bug left a guard behind — a gate or a live check that catches its return. This page
-is the register: one row per issue, the mechanism, the command, and whether it is automated.
+Every closed bug left a live check behind: what to look at, and where, to catch its return. This
+page is the register: one row per issue.
 
-A bug with no guard comes back silently. **If you fix something that has no row here, add a row.**
+A bug with no check comes back silently. **If you fix something that has no row here, add a row.**
 
 ## Step 1 — scope: what can regress in this release
 
@@ -24,43 +24,29 @@ git diff --name-only "$(git describe --tags --abbrev=0)" HEAD | grep -E 'styles/
 ```
 
 - The diff does not touch `styles/`, the renderer, the templates or the fence → the visual and
-  fence issues (#1–#5, #7–#11) cannot regress from it. Their gates being green is enough; a live run
-  is allowed but not required.
+  fence issues (#1–#5, #7–#11) cannot regress from it; a live look is allowed but not required.
 - The diff touches the matching area → the live check for those issues is mandatory.
 
-**Always mandatory regardless of the diff:** the whole automatic section, plus issue #6 (packaging
+**Always mandatory regardless of the diff:** CI's `e2e` on both routers, plus issue #6 (packaging
 and asset selection) — because #6 breaks at the release level rather than in the code, and
 nothing fails until a router in the field pulls the update.
 
-## Step 2 — the automatic gates: read CI on the release sha
+## Step 2 — read CI on the release sha
 
-The gates run in CI, not again on this machine. The code of the release is on `main` before the
-release commit is cut, and its push run is read **job by job** (`gh run view <id>`): a local re-run
-of the same gates on the same sha measured 67 min over nine stands and added no information —
-six of them are twins of the same three images, and every local live gate was a subset of CI's
-(`scroll-anchor` locally: one engine, no `--full`; CI: three engines, `--full`).
+The code of the release is on `main` before the release commit is cut, and its push run is read
+**job by job** (`gh run view <id>`):
 
 | CI job | What it holds |
 |---|---|
-| `check`, `lint` | every static gate below, `jsmin-verify`, `computed-diff` (a report on PRs, never a failure) |
-| `build` | both formats; `tools/check-packages.sh` — one theme package per format, catalogues outside it |
-| `verify` | `owlab test` on 25.12/apk and 24.10/opkg, the five assertions of [development.md](development.md#proving-it-on-a-router-owlab-test) |
-| `live` | `spa-parity`, `live-audit` (EN), `live-audit --lang ru` on 25.12 and 24.10 (`audit-ru`), `motion` (`upstream-contract`, `table-tick`, `floor-contract`, `fit-quiet`, `install-check`) |
-| `anchors` | `scroll-anchor --full` and `scroll-jank` on chromium, firefox and webkit |
-| `deep` (tag, `workflow_dispatch`) | `live-audit` and `spa-parity` with `--pages-all`, one shard per router |
-| `release-assets` (tag only) | the published release resolves to one asset per format per package name (step 3) |
+| `build` | both formats, built by `owfeed build` |
+| `e2e` | `tools/e2e.mjs` on owrt2512 (25.12/apk) and owrt2410 (24.10/opkg): install the last release, upgrade to this build, open every menu page against bootstrap, remove, fresh install ([verifying.md](verifying.md)) |
+| `playground` | the playground site built from the package |
 
 What stays local, beside reading CI:
 
 ```sh
 npm run changelog
-node tools/size-budget.mjs --pin
 ```
-
-`node tools/size-budget.mjs --pin` runs after the last code fix: a fix landed mid-release once left
-the pins stale. The ceilings may also rise between releases, each time with the reason and
-the numbers in the commit's changelog entry (the policy: the header of `tools/size-budget.mjs`); the pin here
-re-fits them to the build that ships.
 
 `~/go/bin/owfeed lock` must exit 0 at the repo root and in a fresh clone of owfeed-packages. Without
 `--update` it only compares and writes nothing (exit 9 and the drift, e.g. `25.12 point release

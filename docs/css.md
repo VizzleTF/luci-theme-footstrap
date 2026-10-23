@@ -406,8 +406,6 @@ Never match a `data-title` *value* in a selector here: LuCI fills it from the co
 an English literal never matches on a localised router (issue #7 again), and for rows LuCI builds
 from the heading's `innerText`, any transform the theme puts on `.th` rewrites the string the
 theme's own CSS would try to match (`.th` carried `text-transform: uppercase` until issue #39).
-`.stylelintrc.json`'s `selector-disallowed-list` fails the build on any `[data-title="…"]` value
-match.
 
 ### Syslog filter bar: two disjoint container queries
 
@@ -454,7 +452,7 @@ Deleted controls, and why removing them is not an oversight:
 - **The hue slider in the colour control** — two controls for one value read as two settings, and
   the slider half could never reach a grey. The axis still stores a hue and `03-palettes.css`
   still rotates by it, so a saved value keeps painting; the slider CSS itself was dead in the
-  theme's own namespace, which `npm run css-orphans` exists to catch.
+  theme's own namespace and went with it.
 - **The `data-layout="top"` accordion toggle** hides `.fs-ap-submenus` because those sections are
   hover dropdowns in that layout, already exclusive — hidden in CSS, not by a JS branch, because
   the page is built once and a branch would freeze the control to whatever layout it loaded in.
@@ -591,8 +589,7 @@ moved nothing across 500 matching cells — `text-align: end` is this file's own
 rule's `start`.
 
 Column 4 (Description) is matched by index, `:nth-child(4)`, not `[data-title="Description"]`: a
-translated string `.stylelintrc.json`'s `selector-disallowed-list` fails the build on, and it used
-not to match even in English — LuCI builds `data-title` from the column heading's rendered
+translated string never matches on a localised router, and it used not to match even in English — LuCI builds `data-title` from the column heading's rendered
 `innerText`, and `.th` was uppercased then, so the attribute said "DESCRIPTION" and the literal
 matched zero elements on every router (fixed with the uppercase, `theme/30-tables.css`, issue #39).
 Columns: 1 Package name, 2 Version, 3 Size, 4 Description, 5 actions. `overflow-wrap`/`word-break`
@@ -607,8 +604,7 @@ immediately followed by a `.cbi-progressbar`, the same discriminator `theme/90-r
 already uses. The selector is `label:has(+ .cbi-progressbar)`, not
 `:has(:where(+ .cbi-progressbar))`: a leading combinator makes the argument a RELATIVE selector,
 which only `:has()` accepts — `:where()` takes a plain complex-selector list, so wrapping it there
-makes the whole rule invalid and the browser drops it silently, past both stylelint and
-`css-metrics`.
+makes the whole rule invalid and the browser drops it silently.
 
 ### SSH-keys: the card wrapper and the wide dynlist
 
@@ -625,7 +621,7 @@ layer beats specificity and `theme`'s plain `.cbi-dynlist` capped it anyway.
 `styles/base/` restyles class names LuCI itself emits with no theme-specific hook — the Meyer
 reset, CBI form/table markup, the modal `ui.js` builds, widgets with no generic equivalent. Prefer
 `styles/theme/` for anything that is paint; a base edit is for markup this theme cannot route
-around ([verifying.md](verifying.md) "CSS").
+around.
 
 ### Reset: `[hidden]` must outrank every layer, not patch one mistake
 
