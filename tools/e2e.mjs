@@ -2,17 +2,19 @@
 /* The package's whole life on a real router, the way an admin lives it, against one running owlab
  * router that has LuCI and its apps but not this theme:
  *
- *   1. install the last published release        -> it becomes the active theme
- *   2. the admin switches to bootstrap and saves a footstrap setting
+ *   1. install the last published release        -> it is offered in Language and Style, and the
+ *                                                     active theme is left alone (README: the admin
+ *                                                     picks Footstrap there)
+ *   2. the admin picks footstrap and saves a footstrap setting
  *   3. upgrade to this build                       -> the admin's theme and setting survive
- *   4. the admin picks footstrap again, and every page of the menu is opened: by a full load at
+ *   4. every page of the menu is opened: by a full load at
  *      desktop and phone width, and by a click in the chrome. The same pages are then opened
  *      under bootstrap, and a page fails only for what footstrap adds: a JS error, a failed
  *      request or a view that never renders where bootstrap had none, or the theme's own
  *      stylesheet and chrome missing (LuCI falls back to another theme silently on a broken
  *      template).
  *   5. remove the package                          -> LuCI falls back to bootstrap and still serves
- *   6. install this build on the clean router      -> it becomes the active theme
+ *   6. install this build on the clean router      -> offered, active theme left alone
  *
  * No list of expected problems: the stock theme on the same router is the reference.
  *
@@ -96,6 +98,11 @@ const signature = (s) => String(s).split('\n')[0].replace(/\?[^\s'")]*/g, '').re
 
 function watch(page, origin) {
 	const errors = new Set();
+	const net = page.__net = { inflight: 0, last: Date.now() };
+	page.on('request', () => { net.inflight++; net.last = Date.now(); });
+	const done = () => { net.inflight = Math.max(0, net.inflight - 1); net.last = Date.now(); };
+	page.on('requestfinished', done);
+	page.on('requestfailed', done);
 	page.on('pageerror', (e) => errors.add(`pageerror: ${signature(e.message)}`));
 	page.on('console', (m) => { if (m.type() === 'error') errors.add(`console: ${signature(m.text())}`); });
 	page.on('response', (r) => {
@@ -139,6 +146,17 @@ async function menuPaths(page) {
 	return paths.filter((p) => !/\/logout$/.test(p));
 }
 
+/* An app's own requests keep arriving after its view has rendered (adblock and banip fetch their
+ * reports late), so both themes are read only once nothing has been in flight for a second, or
+ * after 15 s. Playwright's own networkidle fires once per navigation and misses the late ones. */
+async function settle(page) {
+	const net = page.__net;
+	for (let waited = 0; waited < 15000; waited += 250) {
+		if (net.inflight === 0 && Date.now() - net.last >= 1000) return;
+		await page.waitForTimeout(250);
+	}
+}
+
 const shotName = (path) => path.replace(/^\//, '').replace(/\//g, '_') || 'root';
 
 /* One full load of `path`: errors seen, whether the view rendered, whether footstrap painted it. */
@@ -148,7 +166,7 @@ async function open(page, errors, path, shotDir) {
 	try {
 		await page.goto(BASE + path, { waitUntil: 'load', timeout: 30000 });
 		rendered = await page.waitForFunction(RENDERED, null, { timeout: 20000 }).then(() => true, () => false);
-		await page.waitForTimeout(500);
+		await settle(page);
 	} catch (e) { errors.add(`navigation: ${signature(e.message)}`); }
 	const painted = await page.evaluate(FOOTSTRAP).catch(() => false);
 	if (shotDir) await page.screenshot({ path: join(shotDir, `${shotName(path)}.jpg`), type: 'jpeg', quality: 60 }).catch(() => {});
@@ -172,7 +190,7 @@ async function click(page, errors, path) {
 	try {
 		await page.waitForFunction((p) => location.pathname.replace(/\/$/, '').endsWith(p), path, { timeout: 20000 });
 		rendered = await page.waitForFunction(RENDERED, null, { timeout: 20000 }).then(() => true, () => false);
-		await page.waitForTimeout(500);
+		await settle(page);
 	} catch (e) { errors.add(`navigation: ${signature(e.message)}`); }
 	const painted = await page.evaluate(FOOTSTRAP).catch(() => false);
 	return { errors: [ ...errors ], rendered, painted };
@@ -230,6 +248,12 @@ async function crawl(browser) {
 	return { paths, pages, bootstrap: bs };
 }
 
+/* A fresh install registers the theme for Language and Style and leaves the active one alone. */
+function offered(what) {
+	check(`a fresh install of ${what} offers Footstrap`, uci('luci.themes.Footstrap') === '/luci-static/footstrap', uci('luci.themes.Footstrap'));
+	check(`a fresh install of ${what} leaves the active theme alone`, theme() === '/luci-static/bootstrap', theme());
+}
+
 /* ---- the run ---- */
 
 let crawlReport = null;
@@ -241,18 +265,17 @@ try {
 
 	const oldOut = install(opt.old);
 	check('the last release installs', installedVersion() !== '', oldOut.split('\n').slice(-1)[0]);
-	check('a fresh install of the last release makes it the active theme', theme() === '/luci-static/footstrap', theme());
+	offered('the last release');
 
-	setTheme('/luci-static/bootstrap');
+	setTheme('/luci-static/footstrap');
 	sh('uci set footstrap.e2e=marker && uci commit footstrap');
 	const before = installedVersion();
 	const upOut = install(opt.new);
 	const after = installedVersion();
 	check('this build upgrades the last release', after !== '' && after !== before, `${before} -> ${after}; ${upOut.split('\n').slice(-1)[0]}`);
-	check('the upgrade keeps the admin\'s theme', theme() === '/luci-static/bootstrap', theme());
+	check('the upgrade keeps the admin\'s theme', theme() === '/luci-static/footstrap', theme());
 	check('the upgrade keeps the admin\'s footstrap settings', uci('footstrap.e2e') === 'marker');
 
-	setTheme('/luci-static/footstrap');
 	const browser = await chromium.launch();
 	try { crawlReport = await crawl(browser); } finally { await browser.close(); }
 
@@ -264,7 +287,7 @@ try {
 	check('LuCI still serves its login form after removal', /luci_password/.test(login));
 
 	install(opt.new);
-	check('a fresh install of this build makes it the active theme', theme() === '/luci-static/footstrap', theme());
+	offered('this build');
 } catch (e) {
 	check('the run completes', false, String(e.stderr || e.message).split('\n').filter(Boolean).slice(-3).join(' | '));
 }
