@@ -641,7 +641,7 @@ layer beats specificity and `theme`'s plain `.cbi-dynlist` capped it anyway.
 `styles/base/` restyles class names LuCI itself emits with no theme-specific hook — the Meyer
 reset, CBI form/table markup, the modal `ui.js` builds, widgets with no generic equivalent. Prefer
 `styles/theme/` for anything that is paint; a base edit is for markup this theme cannot route
-around (`.claude/rules/css.md`).
+around ([verifying.md](verifying.md) "CSS").
 
 ### Reset: `[hidden]` must outrank every layer, not patch one mistake
 

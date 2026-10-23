@@ -1,4 +1,0 @@
-schema_version: "1.1"
-name: named-version-still-gated
-context:
-  scaffold_script: scaffold.sh

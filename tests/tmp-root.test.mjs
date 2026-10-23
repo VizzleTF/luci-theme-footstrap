@@ -6,7 +6,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { ROOT } from '../tools/lib/root.mjs';
@@ -18,7 +18,7 @@ const git = (cwd, ...a) => {
 	assert.equal(r.status, 0, r.stderr);
 };
 const FILES = [ 'tools/bg.sh', 'tools/bg-wait.sh', 'tools/ci-local.sh', 'tools/install-check.sh', 'tools/pr-watch.sh', 'tools/lib/tmp-root.sh', 'tools/lib/tmp-root.mjs', 'tools/lib/root.mjs',
-	'tools/lib/stands.mjs', '.claude/hooks/permission-denied.sh' ];
+	'tools/lib/stands.mjs' ];
 const put = (dir) => FILES.forEach((f) => { mkdirSync(dirname(join(dir, f)), { recursive: true }); copyFileSync(join(ROOT, f), join(dir, f)); });
 
 /* proj/main is the repo, proj/main/.claude/worktrees/in a worktree under it, elsewhere/out one outside
@@ -122,35 +122,4 @@ test('pr-watch.sh from a worktree keeps its seen-file in the shared ../tmp', () 
 	spawnSync('sh', [ join(out, 'tools/pr-watch.sh'), '1' ], { cwd: out, encoding: 'utf8', timeout: 20000, env: { ...CLEAN, PATH: `${bin}:${process.env.PATH}` } });
 	assert.ok(existsSync(join(SHARED, 'pr-watch-openwrt-luci-1.seen')), 'the seen-file is in the shared ../tmp');
 	assert.ok(!existsSync(join(d, 'elsewhere/tmp')), 'no ../tmp beside the worktree');
-});
-
-// The guard hooks source nothing from outside .claude/hooks (tools/ is no guard path, so a file there that a role can
-// edit must not decide where a hook reads or writes): each carries the rule itself. Poisoned helper: it prints, exits 2
-// and names a directory that does not exist.
-test('the denial log of a worktree session is the main tree\'s, and no tools/lib/tmp-root.sh or missing git moves it', { skip: spawnSync('jq', [ '--version' ]).error ? 'no jq' : false }, () => {
-	const hook = join(under, '.claude/hooks/permission-denied.sh');
-	const input = JSON.stringify({ session_id: 's', tool_name: 'Bash', reason: 'r', tool_input: { command: 'echo hi' } });
-	const denial = (cwd, project, env = CLEAN) => spawnSync('/bin/sh', [ hook ], { cwd, encoding: 'utf8', env: { ...env, CLAUDE_PROJECT_DIR: project }, input });
-	const log = join(SHARED, 'denials.log');
-	let r = denial(under, under);
-	assert.equal(r.status, 0, r.stderr);
-	assert.match(readFileSync(log, 'utf8'), /\tBash\tr\techo hi\n$/);
-	writeFileSync(join(under, 'tools/lib/tmp-root.sh'), 'echo poisoned >&2\ntmp_root() { echo /nonexistent; }\nexit 2\n');
-	r = denial(under, under);
-	assert.deepEqual([ r.status, r.stdout, r.stderr ], [ 0, '', '' ], 'a poisoned helper is not read');
-	assert.equal(readFileSync(log, 'utf8').split('\n').filter(Boolean).length, 2, 'the second denial is in the main ../tmp too');
-	// no git: the project dir's own ../tmp, silently
-	const bin = join(d, 'bin-nogit');
-	mkdirSync(bin, { recursive: true });
-	for (const tool of [ 'jq', 'date', 'mkdir' ]) {
-		const found = process.env.PATH.split(':').map((p) => join(p, tool)).find((p) => existsSync(p));
-		if (!existsSync(join(bin, tool))) symlinkSync(found, join(bin, tool));
-	}
-	r = denial(under, under, { PATH: bin });
-	assert.deepEqual([ r.status, r.stdout, r.stderr ], [ 0, '', '' ], 'a hook without git stays silent');
-	assert.match(readFileSync(join(main, '.claude/worktrees/tmp/denials.log'), 'utf8'), /\tBash\tr\techo hi\n$/);
-	// outside git the same
-	r = spawnSync('sh', [ join(plain, '.claude/hooks/permission-denied.sh') ], { cwd: plain, encoding: 'utf8', env: { ...CLEAN, CLAUDE_PROJECT_DIR: plain }, input });
-	assert.deepEqual([ r.status, r.stdout, r.stderr ], [ 0, '', '' ]);
-	assert.match(readFileSync(join(d, 'other/tmp/denials.log'), 'utf8'), /\tBash\tr\techo hi\n$/);
 });

@@ -272,7 +272,10 @@ Changelog on all three.** Do not "correct" entries toward the other standard.
 **Every commit writes into `## [Unreleased]` in the same commit as the code**, in both files.
 A changelog written afterwards is written from the diff, and the diff is precisely what does not know
 why. Documentation, benchmarks, CI and packaging commits count too; only `CLAUDE.md` and a fix to an
-entry already written skip it (`.claude/rules/changelog.md`, enforced by `precommit-gate.sh`).
+entry already written skip it. Write both with one call so neither half can be forgotten:
+`node tools/changelog.mjs add <0-7> --en '- **…**' --ru '- **…**' && git commit …` (0 = Added …
+7 = Development; it writes the worktree and the index and recreates the heading when a release left
+none). List existing entries with `grep -n '^- \*\*' CHANGELOG.md` rather than reading the block.
 
 ### The bilingual mirror
 
@@ -289,11 +292,26 @@ from the diff after the fact; a self-reference to a commit hash.
 
 ## The runbook
 
-Only after everything above has passed. `/release` walks these steps in order. It is model-invoked
-on purpose, so "делай тег" lands in this procedure rather than in a bare `git tag` (0.14.15 was
-tagged that way, with no security review and before CI on the release sha); the tag itself stays
-gated by step 5 below, the `git-guard` hook and the `ask` rule.
+Only after everything above has passed, in this order: the tag points at a commit that already
+carries its own changelog section, and every gate reads the sha the tag will name ("делай тег" means
+this procedure, not a bare `git tag`: 0.14.15 was tagged that way, with no security review and
+before CI on the release sha). A readiness question ("готов ли main") runs step 0 alone and reports
+each command with its verdict. `<v>` is the new version, `<prev>` the last tag; scratch output goes
+to `../tmp/release-<v>/`.
 
+0. **Readiness** — any red stops here, with its owner named:
+   - scope the diff (Step 1 above says which live checks it makes mandatory) and run those rows
+     plus asset selection (Steps 3 and 4) on both stands ([verifying.md](verifying.md));
+   - Build's newest completed push run on `main` is `success` and is read job by job (`check`,
+     `lint`, `build`, `verify`, `live`, `anchors`);
+   - `gh workflow run build.yml --ref main`, then `tools/bg.sh tools/ci-watch.sh --run <id> --max 6000`:
+     the first reading of `deep` and `playground`, and the evidence for the stale-baseline prune;
+   - `~/go/bin/owfeed lock` exits 0 at the repo root **and** in a fresh
+     `gh repo clone owfeed/owfeed-packages ../tmp/release-<v>/feed -- --depth 1` (a stale lock
+     there reds the feed's `check / build` after the tag);
+   - after the last code fix, `node tools/size-budget.mjs --pin` goes into the release commit;
+   - the security review of the whole release (Step 2's recipe), verdict saved to
+     `../tmp/release-<v>/security.md`; any finding goes to the maintainer before the tag.
 1. Rename `[Unreleased]` to `## [x.y.z] — YYYY-MM-DD` in both `CHANGELOG.md` and
    `CHANGELOG_ru.md`, and add the `compare/` link at the bottom of each. Sections in the canonical
    order, every bullet with a `bold lead`.

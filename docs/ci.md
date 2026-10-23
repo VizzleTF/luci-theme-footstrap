@@ -93,7 +93,7 @@ Three rulesets on the repository (Settings → Rules); `gh api repos/{owner}/{re
 |---|---|---|---|
 | 24042288 "main: CI must pass" | `main` | required status checks (11) | admin, always: a direct push to `main` needs it, so each push prints "Bypassed rule violations … 11 of 11" and the checks are read after the push (`tools/ci-watch.sh`) |
 | 25550110 "main: no force-push or deletion" | the default branch | `non_fast_forward`, `deletion` | none, admin included |
-| 25550119 "release tags: no move or deletion" | `refs/tags/v*` | `update`, `deletion` | none; creating a tag stays open for `/release` |
+| 25550119 "release tags: no move or deletion" | `refs/tags/v*` | `update`, `deletion` | none; creating a tag stays open for the release runbook |
 
 The last two were created on 2026-10-21 on the maintainer's word (audit P1-5). With no bypass, no
 token gets past them: a force-push or rewrite of `main`, or moving or deleting a released tag, starts

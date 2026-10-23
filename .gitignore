@@ -33,15 +33,12 @@ __pycache__/
 release-notes.md
 
 # personal Claude Code state: skills pulled by `npx skills add` (a symlink into .agents/), the
-# installer's lock, the playwright venv behind .claude/tooling/, and the per-machine settings override
+# installer's lock and the per-machine settings override; the playwright venv beside tools/probes/
 /.agents/
-/.claude/skills/minimalist-ui
+/.claude/skills/
 /skills-lock.json
-/.claude/tooling/preview-venv/
 /.claude/settings.local.json
+/tools/probes/preview-venv/
 
 # EnterWorktree checkouts: a second copy of every file, so grep and eslint report each hit twice
 /.claude/worktrees/
-
-# `claude plugin eval` run outputs; the cases beside them under evals/ are committed
-/.claude/skills/*/evals/results/

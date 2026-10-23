@@ -15,7 +15,7 @@ Usage:
                                                         [--ssh-host router] [--out DIR]
 
 Requires the project preview venv (Playwright + Chromium):
-  .claude/tooling/preview-venv/bin/python docs/screenshots/capture.py ...
+  tools/probes/preview-venv/bin/python docs/screenshots/capture.py ...
 """
 import argparse, os, subprocess, sys, time, pathlib
 from playwright.sync_api import sync_playwright

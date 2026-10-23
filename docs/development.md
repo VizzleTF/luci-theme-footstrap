@@ -860,7 +860,7 @@ Run it explicitly (`node tools/live-audit.mjs --pages-all --lang ru`, T2, detach
 and after any change to a string-heavy page or to `overflow`/`white-space`/flex-basis CSS — the same
 occasions `pseudo-loc` already earns its keep on.
 
-### The probe rig: `.claude/tooling/`
+### The probe rig: `tools/probes/`
 
 Ad-hoc Playwright probes against a running stand, kept for reuse and not gates: nothing there is in
 `package.json`, nothing ships, nothing runs in `check`. `lib.mjs` is the shared half — `PORTS`
@@ -868,7 +868,7 @@ Ad-hoc Playwright probes against a running stand, kept for reuse and not gates: 
 counts, poll queue). Every probe takes the stand as its first argument and writes to `../tmp/`:
 
 ```sh
-node .claude/tooling/<probe>.mjs owrt2512 [arg]
+node tools/probes/<probe>.mjs owrt2512 [arg]
 ```
 
 The ones worth knowing by name — `resize.mjs`, `adversary.mjs`, `traffic.mjs`, `soak.mjs` — say
@@ -1043,10 +1043,11 @@ tools/rate.sh 10 node tools/scroll-jank.mjs --only owrt2512
 ### Known flakes
 
 A red job on `main` whose log carries one of these signatures is a measured flake, not a finding
-of the commit. The agent reruns the failed jobs of that run once (`gh run rerun <id> --failed`,
-`/ship` step 4); a second red on the same run, or any signature not listed here, goes to the
-maintainer. A row past its "re-measure by" date matches nothing until a new rate is in it. A row
-is added only with a `tester` card's classification behind it, never to get a push through.
+of the commit. The agent reruns the failed jobs of that run once (`gh run rerun <id> --failed`);
+a second red on the same run, or any signature not listed here, goes to the maintainer. A row past
+its "re-measure by" date matches nothing until a new rate is in it. A row is added only with a
+reproduction and a measured rate behind it (`tools/ci-local.sh`, `tools/rate.sh`), never to get a
+push through.
 
 | Job | Signature in the log | Rate | Class, card | Seen | Re-measure by |
 |---|---|---|---|---|---|
@@ -1706,7 +1707,7 @@ makes "is it done?" a question you have to keep asking, and therefore one that g
 was forgotten three times in a single session here, twice while somebody was waiting on the answer,
 each time for 15-30 minutes after the chain had already finished.
 
-Start the waiter in the same turn as the run (CLAUDE.md "Verifying", T2): in the foreground as
+Start the waiter in the same turn as the run ([verifying.md](verifying.md) "Tiers", T2): in the foreground as
 `tools/bg-wait.sh <run-id> 5 270` with `timeout: 300000` for a run under 4.5 min, otherwise as a
 background command, so finishing wakes you instead of you polling it:
 
@@ -1730,7 +1731,7 @@ A full `tools/ci-local.sh --mode push --force all` outlives the default: 2 h 14 
 `tools/bg-wait.sh <run-id> 30 10800`. A `timeout` there is the waiter's cap; read the `.status`.
 
 **`tools/bg.sh` refuses `ssh`, `scp`, `sftp`, `rsync`, `dev-sync.sh` and every git or gh
-subcommand off its read list.** The wrapper is allow-listed in `.claude/settings.json` and
+subcommand off its read list.** An allow rule for the wrapper is the natural one to add, and
 the permission engine matches the first word of a command, so it cannot see an `ssh` inside
 `tools/bg.sh sh -c '…'` — the form every T2 gate uses — and the wrapper would carry that command
 straight past the `ask` rule guarding the hardware router, the one thing a wrong run breaks for a

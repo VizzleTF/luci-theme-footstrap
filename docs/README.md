@@ -12,7 +12,7 @@ Every page here stands on its own — start wherever your question is.
 | [architecture.md](architecture.md) | What LuCI expects from a theme, and where footstrap plugs into it |
 | [conventions.md](conventions.md) | The rules a patch must follow, and which gate holds each one |
 | [development.md](development.md) | Bring up a dev router, push a change, prove it works |
-| [crew.md](crew.md) | How a session is split between the lead thread and the role subagents |
+| [verifying.md](verifying.md) | What to run after an edit: tiers, per-area gates, the full cycle on the stands |
 
 ## How it is built
 
@@ -31,6 +31,7 @@ Every page here stands on its own — start wherever your question is.
 | [package.md](package.md) | Source tree, Makefile, uci-defaults, postinst/postrm |
 | [ci.md](ci.md) | The CI job graph, packaging, installation and the trust chain |
 | [releasing.md](releasing.md) | The pre-release checklist, the changelog contract, the runbook |
+| [upstream-pr.md](upstream-pr.md) | The theme's pull request to openwrt/luci: building, preflight, review |
 | [benchmark.md](benchmark.md) | The navigation benchmark: method and results |
 
 ## For authors of other packages

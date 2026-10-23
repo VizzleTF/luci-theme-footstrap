@@ -5,7 +5,7 @@
  *   - long words (de) and dense scripts (ja): does the sidebar/tab/cluster fit escalation cope?
  *   - a language the theme ships no catalogue for: does the chrome inherit luci-base's strings?
  *
- * Run: node .claude/tooling/lang.mjs <router> [langs] — sets uci luci.main.lang over ssh between
+ * Run: node tools/probes/lang.mjs <router> [langs] — sets uci luci.main.lang over ssh between
  * passes and puts it back at the end.
  */
 import { execFile } from 'node:child_process';

@@ -1,6 +1,6 @@
 /* Shared rig for the stand probes: log in and measure the chrome the same way everywhere so
  * results from different probes compare. */
-import { login as standsLogin } from '../../tools/lib/stands.mjs';
+import { login as standsLogin } from '../lib/stands.mjs';
 
 /* Host http ports; stands() lists only running openwrt stands, so imm* stay here. imm2512/imm2410
  * are on-demand, not in owlab.yaml by default (docs/development.md, "ImmortalWrt stands (on

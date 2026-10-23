@@ -3,7 +3,7 @@
  * probe-stripped the way the package ships them. Every byte is flash read and CPU on a device that
  * is also routing packets.
  *
- * The ceiling is pinned at a release, by `/release` (`--pin`: measured plus 2 %, rounded up to
+ * The ceiling is pinned at a release (`--pin`: measured plus 2 %, rounded up to
  * 10 B). Between releases the agent raises it itself when a correct fix needs it (the maintainer's
  * grant, 2026-09-09, reconfirmed 2026-10-09): measure the least the fix costs on 2-3 minimised
  * variants, leave head-room, give the reason with the numbers in the commit's changelog entry and

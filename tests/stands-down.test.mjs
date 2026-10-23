@@ -168,7 +168,7 @@ const sources = (dir) => readdirSync(join(ROOT, dir), { withFileTypes: true }).f
 	d.isDirectory() ? sources(join(dir, d.name)) : d.name.endsWith('.mjs') ? [ join(dir, d.name) ] : []);
 
 test('every caller of login() passes the router id and reports a stand that is down', () => {
-	const callers = sources('tools').filter((f) => f !== 'tools/lib/stands.mjs'
+	const callers = sources('tools').filter((f) => f !== 'tools/lib/stands.mjs' && !f.startsWith('tools/probes/')
 		&& /import \{[^}]*\blogin\b[^}]*\} from '[./]+\/lib\/stands\.mjs'/.test(readFileSync(join(ROOT, f), 'utf8')));
 	assert.ok(callers.length >= 9, callers.join());
 	for (const f of callers) {

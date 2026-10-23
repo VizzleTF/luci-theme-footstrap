@@ -103,7 +103,7 @@ jobs:
       - run: node tools/jsmin-verify.mjs
 
       # The CSS change as computed styles, worktree against the PR's merge-base: REPORT ONLY. The
-      # cheap half of the proof CLAUDE.md asks for ("Prove a CSS change with a computed-style
+      # cheap half of the proof docs/verifying.md asks for ("CSS is proven with a computed-style
       # diff"), put where the reviewer reads it; a diff is the point of a CSS PR, so it never fails
       # the job — the exit code goes into the report and the step stays green.
       - name: Computed-style diff against the merge-base (report only)
