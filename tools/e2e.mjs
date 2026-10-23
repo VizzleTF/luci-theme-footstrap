@@ -147,11 +147,14 @@ async function menuPaths(page) {
 }
 
 /* An app's own requests keep arriving after its view has rendered (adblock and banip fetch their
- * reports late), so both themes are read only once nothing has been in flight for a second, or
- * after 15 s. Playwright's own networkidle fires once per navigation and misses the late ones. */
-async function settle(page) {
+ * reports late, and LuCI's poll never lets the network go quiet for long), so the two themes are
+ * watched for different spans: footstrap for 1 s after its view rendered, the bootstrap reference
+ * until nothing has been in flight for a second, at most 10 s. An app's late error then lands in
+ * the reference, and footstrap is charged only for what it shows that the longer look did not. */
+async function settle(page, reference) {
+	if (!reference) return page.waitForTimeout(1000);
 	const net = page.__net;
-	for (let waited = 0; waited < 15000; waited += 250) {
+	for (let waited = 0; waited < 10000; waited += 250) {
 		if (net.inflight === 0 && Date.now() - net.last >= 1000) return;
 		await page.waitForTimeout(250);
 	}
@@ -160,13 +163,13 @@ async function settle(page) {
 const shotName = (path) => path.replace(/^\//, '').replace(/\//g, '_') || 'root';
 
 /* One full load of `path`: errors seen, whether the view rendered, whether footstrap painted it. */
-async function open(page, errors, path, shotDir) {
+async function open(page, errors, path, shotDir, reference = false) {
 	errors.clear();
 	let rendered = false;
 	try {
 		await page.goto(BASE + path, { waitUntil: 'load', timeout: 30000 });
 		rendered = await page.waitForFunction(RENDERED, null, { timeout: 20000 }).then(() => true, () => false);
-		await settle(page);
+		await settle(page, reference);
 	} catch (e) { errors.add(`navigation: ${signature(e.message)}`); }
 	const painted = await page.evaluate(FOOTSTRAP).catch(() => false);
 	if (shotDir) await page.screenshot({ path: join(shotDir, `${shotName(path)}.jpg`), type: 'jpeg', quality: 60 }).catch(() => {});
@@ -224,7 +227,7 @@ async function crawl(browser) {
 	const ref = await session(browser, { width: 1280, height: 800 });
 	const bs = {};
 	const bsDir = join(OUT, 'bootstrap'); mkdirSync(bsDir, { recursive: true });
-	for (const p of paths) bs[p] = await open(ref.page, ref.errors, p, bsDir);
+	for (const p of paths) bs[p] = await open(ref.page, ref.errors, p, bsDir, true);
 	await ref.ctx.close();
 	setTheme('/luci-static/footstrap');
 

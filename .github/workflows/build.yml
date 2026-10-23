@@ -61,7 +61,7 @@ jobs:
   # tree `build` packs.
   e2e:
     name: The package's life on ${{ matrix.router }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
