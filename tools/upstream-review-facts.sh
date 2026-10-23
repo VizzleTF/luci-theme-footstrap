@@ -1,6 +1,6 @@
 #!/bin/sh
-# One read-only report of the mechanical facts the upstream bot checks, so the reviewer reads one
-# output instead of piping a dozen git calls (the no-pipe hook cost it its turn budget).
+# One read-only report of the mechanical facts the upstream bot checks, so a reviewer reads one
+# output instead of piping a dozen git calls.
 #   tools/upstream-review-facts.sh [-C <dir>] <base> <head>
 set -eu
 D=.

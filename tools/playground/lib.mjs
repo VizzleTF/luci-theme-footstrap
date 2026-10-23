@@ -114,7 +114,7 @@ export function findSecrets(text, host) {
 	return reasons;
 }
 
-/* Pure (no `fs`) so a planted token is a unit test: `files` is `[[relPath, text], ...]` from
+/* Pure (no `fs`): `files` is `[[relPath, text], ...]` from
  * build.mjs. Throws on the first offender; one is already a ship-stopper. */
 export function guardNoSecrets(files, host) {
 	for (const [ rel, text ] of files) {
@@ -124,13 +124,13 @@ export function guardNoSecrets(files, host) {
 	}
 }
 
-/* verify.mjs's static server joined a decoded request path onto `outDir` and checked the STRING
- * with `startsWith()` — a `{base}/../../etc/passwd` pathname passes that check (the string still
+/* A static server that joins a decoded request path onto its root and checks the STRING with
+ * `startsWith()` is wrong — a `{base}/../../etc/passwd` pathname passes that check (the string still
  * starts with base) and only escapes once `join()` normalises the `../` segments, which is exactly
- * what the string compare never saw. `rel` is the request path already stripped of `--base`
- * (verify.mjs's job); returns the resolved file path if it stays inside `rootDir`, `null` if it
- * would escape it or carries a NUL byte (a filesystem call would otherwise choke on that byte, not
- * refuse it cleanly). Pure — no `fs` — so the traversal case is a unit test, not an HTTP request. */
+ * what the string compare never saw. `rel` is the request path already stripped of `--base`;
+ * returns the resolved file path if it stays inside `rootDir`, `null` if it would escape it or
+ * carries a NUL byte (a filesystem call would otherwise choke on that byte, not refuse it cleanly).
+ * Pure — no `fs`. */
 export function resolveUnderRoot(rootDir, rel) {
 	if (rel.includes('\0')) return null;
 	const root = resolve(rootDir);
@@ -317,7 +317,7 @@ export function describePendingRequests(requests, limit = 10) {
  * in, `isCurrent(id)` says whether it still matches. A response from an older generation arrived
  * after its page was navigated away from, so CDP has discarded its body ("No resource with given
  * identifier found"); the dashboard `login()` lands on does this (docs/development.md, "The
- * playground"). A plain `Map`, not `WeakMap`, so a fake string id is a unit test. */
+ * playground"). A plain `Map`, not `WeakMap`, so a string id works too. */
 export function createGenerationGate() {
 	let generation = 0;
 	const tagged = new Map();

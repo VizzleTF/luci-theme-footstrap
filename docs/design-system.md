@@ -22,8 +22,8 @@ the very per-component copy the project killed. Values live in `styles/02-tokens
   **Every rule in the theme reads this and only this.**
 - **The export tier `--*-color-*`** — the conventional LuCI names (`--primary-color-high`,
   `--text-color-*`, `--border-color-*`, `--on-*-color`), defined from the private tier and read
-  by nobody inside the theme. This is not a bridge, it is a one-way export:
-  `audit.py --strict` **fails the build** on any read of an export name from `styles/`.
+  by nobody inside the theme. This is not a bridge, it is a one-way export: **nothing in
+  `styles/` reads an export name**.
 
 Why: `:root` is a shared scope, and every `luci-app-*` puts its CSS in the same document
 **unlayered**, where it outranks any `@layer`. One app declaring `:root { --accent: … }` — or
@@ -40,7 +40,7 @@ The exception is a local variable declared inside the very rule that reads it (`
 `--fg-color`): a foreign `:root` cannot intercept those.
 
 ```css
-/* NO — reading an export name; the gate fails */
+/* NO — reading an export name */
 color: var(--text-color-medium);
 /* YES — the private tier */
 color: var(--fs-dim);
@@ -77,9 +77,9 @@ colour twice.
 
 The binding constraint: apps read a level as `color:` about as often as `background:`, so every
 level must pass AA as text on `--fs-bg`/`--fs-panel`/`--fs-panel2` and carry a readable
-`--on-*-color` as a fill. `tools/export-tier.mjs` proves all of it across
-{footstrap, hicontrast, bootstrap, 2020} × {light, dark} × a sweep of tint hues — 56 combinations
-and 4352 contrast checks today — including that the ramp is not flat, the only check that can catch flatness.
+`--on-*-color` as a fill. All of it was measured across {footstrap, hicontrast, bootstrap, 2020} ×
+{light, dark} × a sweep of tint hues — 56 combinations and 4352 contrast checks — including that
+the ramp is not flat, which no contrast threshold can catch.
 Borders are exempt from the text half: `--border-color-low` may legitimately fade into the surface,
 which is what a hairline is for.
 
@@ -107,9 +107,7 @@ from the default block above — five go through a `-base` pair so the tint/acce
 recolour them, since a palette never declares `--fs-good` etc. directly — and the dark block's own
 four inks, then register the name in three places, each failing differently and quietly if skipped:
 the PALETTE axis in `fs-axes.js`, the `_sd_pal` whitelist and pre-paint switch in
-`partials/head.ut`, and the label map in `fs-appearance.js`. `matrix()` in `tools/lib/gallery.mjs`
-reads the palette list from the `:root[data-palette]` blocks, so the gates measure the new palette
-without being told.
+`partials/head.ut`, and the label map in `fs-appearance.js`.
 
 ### Surfaces carry no transparency axis
 
@@ -142,9 +140,8 @@ decides where the fainter one sits: `--fs-faint` follows the export tier's `-low
 tinted `--fs-panel2` clears 4.5:1 first at `#9a9a9a` (`#969696` measures 4.46:1, under the floor a
 name apps print text in), and `--fs-dim` steps up from it by the twelve channel steps the
 hicontrast dark ramp uses. Its own dark `--background-color-low` (`#2c2c2c`) also sits 0.016 from
-`--fs-panel`, under the 0.02 the ramp check wants (its light pair is 0.039 apart, so the same check
-catches this in the theme this palette is named after) — `--fs-panel2-base` moved to `#303030`
-(0.031) to clear it.
+`--fs-panel`, under the 0.02 the ramp needs (its light pair is 0.039 apart) — `--fs-panel2-base`
+moved to `#303030` (0.031) to clear it.
 
 **forum** is sampled straight off forum.openwrt.org's own `getComputedStyle`, one read per colour
 scheme rather than a guess: light ink `#222`/page `#fff`/accent `#0088cc`, dark ink `#ddd`/page
@@ -198,11 +195,6 @@ reader configure the wrong thing, while a hint at 3.43:1 makes them look twice. 
 were measured first and moved 37% and 20%: the same fault, quieter. 3:1 (SC 1.4.11) is the line not
 crossed, and `prefers-contrast: more` buys the AA ink back in both modes
 (`theme/95-a11y-media.css`): that reader has said which of the two they want.
-
-`placeholder-ink` holds both ends across the eight palette/mode combinations and runs each of them
-again under the query. It is the only gate that can: axe-core does not measure `::placeholder` at
-all, and it is excluded from the `li[placeholder]` row that carries the same ink, since a rule
-reaching half a decision would fail it.
 
 The floors are a fraction of the ink-to-field range, not a flat lightness step, because that range
 is per palette: footstrap light has 0.724 of oklab lightness between ink and field and its dark
@@ -516,12 +508,12 @@ declared a conffile** — see [package.md](package.md).
 **Every axis is implemented twice** — inline in `partials/head.ut` before first paint, where
 `require` is impossible because the module loader does not exist yet, and live in `fs-axes.js`
 (`fs-prefs.js` for dark mode, layout, auto-collapse and rail). The two cannot be merged byte for
-byte, so `tools/axes.mjs` derives the contract **from the JS** and checks the template against it:
-keys, `:root` attributes, custom properties, the 1–360 ranges, every slider's limits and default
-(JS, pre-paint, `_sd_range`, CSS token) — and the load-bearing ordering rule, **custom property
-first, attribute second**. Reversed, a reload paints exactly one frame in the previous hue. The gate
-exists for that one line: it would be fixed in the live applier and forgotten in the template, and
-the only symptom is a single wrong frame nobody reports.
+byte, so the JS is the contract and the template follows it: keys, `:root` attributes, custom
+properties, the 1–360 ranges, every slider's limits and default (JS, pre-paint, `_sd_range`, CSS
+token) — and the load-bearing ordering rule, **custom property first, attribute second**. Reversed,
+a reload paints exactly one frame in the previous hue. That line is the easy one to lose: it would
+be fixed in the live applier and forgotten in the template, and the only symptom is a single wrong
+frame nobody reports.
 
 ### The colour axes, and why the slider went
 
@@ -537,8 +529,8 @@ palette's chroma, so no angle of it reaches a grey — which is the one thing #2
 mode stays in storage and in the stylesheet so a value saved before the change goes on painting.
 
 **The ink over a hex fill is derived, in JS.** `--fs-on-accent` and the three status inks are
-written inline as black or white by `inkFor()` (`fs-axes.js`; the `head.ut` pre-paint holds a copy,
-and `npm run axes` keeps the two equal) — black above the sRGB crossover (OKLab L .62), white
+written inline as black or white by `inkFor()` (`fs-axes.js`; the `head.ut` pre-paint holds a copy
+that must stay equal to it) — black above the sRGB crossover (OKLab L .62), white
 below. An inline custom property outranks every stylesheet rule, so a *named* palette's dark block
 (`[data-palette=…][data-darkmode="true"]`) cannot leave a grey accent carrying near-black ink
 (1.9:1 once did), and no engine needs relative colour for it. Surfaces get no derived ink — what reads on them is `--fs-text`, a
@@ -577,9 +569,9 @@ attribute).
   there, and it clips at the top of the wheel — on bootstrap's `#fff`, 180° and 258° land 1/255
   apart, the price of copying a stock theme's surfaces. Lightness is copied through unmixed, so
   contrast barely moves: a mixed-in tint dragged one export level from 4.61:1 to 4.40:1, where the
-  rotated version does not. `tools/export-tier.mjs` runs the AA matrix over six hues × both modes ×
-  every palette and `tools/a11y-gallery.mjs` runs axe-core over the tinted gallery at two extreme
-  hues; change `--fs-tint-c` and re-run both. The shipped chroma is deliberately tiny — an identity
+  rotated version does not. The shipped chroma was checked with the AA matrix over six hues × both
+  modes × every palette and with axe-core over the tinted gallery at two extreme hues; a change to
+  `--fs-tint-c` needs the same measurement again. The shipped chroma is deliberately tiny — an identity
   cue, not a colourway — since a large flat field is where the eye is most sensitive to a cast;
   loud belongs in a palette, where the cards and chrome can move too.
 - **Accent** (`data-accent`, `--fs-accent-h`) is the same idea applied to the interface colour:
@@ -683,7 +675,7 @@ Three things about the shape are load-bearing:
   the file exists. That is the preload lesson above, applied before it could repeat.
 
 None of the three is an **axis**: no localStorage, no Appearance control, no entry in
-`snapshotAxes()` (`tools/axes.mjs` knows them as server-only, beside the two upload tokens). A font
+`snapshotAxes()` (they are server-only, like the two upload tokens). A font
 is a property of the router, not a per-visitor preference — the one Appearance-adjacent setting with
 no browser layer at all.
 

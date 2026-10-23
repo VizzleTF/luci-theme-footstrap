@@ -17,12 +17,12 @@ page-review/
 # built packages
 dist/
 
-# lint/a11y tooling only — never shipped (see package.json).
+# build and e2e tooling only — never shipped (see package.json).
 # package-lock.json IS committed on purpose: it pins the transitive dependency
-# tree, so CI lints with exactly what was verified here.
+# tree, so CI builds and tests with exactly what was verified here.
 node_modules/
 
-# python bytecode from the audit tooling
+# python bytecode (docs/screenshots/capture.py)
 __pycache__/
 # local overrides for the dev-router containers (public key path, DNS) — machine-specific
 /docker/.env
@@ -32,13 +32,8 @@ __pycache__/
 # written by tools/stage-release.sh in the release job — the release BODY, not an asset
 release-notes.md
 
-# personal Claude Code state: skills pulled by `npx skills add` (a symlink into .agents/), the
-# installer's lock and the per-machine settings override; the playwright venv beside tools/probes/
-/.agents/
-/.claude/skills/
-/skills-lock.json
+# personal Claude Code state: the per-machine settings override
 /.claude/settings.local.json
-/tools/probes/preview-venv/
 
-# EnterWorktree checkouts: a second copy of every file, so grep and eslint report each hit twice
+# EnterWorktree checkouts: a second copy of every file, so grep reports each hit twice
 /.claude/worktrees/

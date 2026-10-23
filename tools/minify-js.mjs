@@ -6,8 +6,7 @@
  * undeclared globals (`L`, `E`, `_`, the pragma aliases), which uglify-js never renames. Runs from
  * tools/stage.sh over the STAGED payload, never the checkout. The two minifiers sit on disjoint
  * paths: owfeed never runs luci.mk, and an SDK build never calls this file, so jsmin sees the
- * untouched source (jsmin's one-character-lookback trap, openwrt/luci#8299, stays guarded by
- * tools/jsmin-verify.mjs).
+ * untouched source (jsmin's one-character-lookback trap is openwrt/luci#8299).
  *
  * THE SEAM NAMES ARE RESERVED, AND THE LIST IS DERIVED. uglify-js never renames a free variable
  * like `L` but will CREATE one: handed the file alone it takes `L` for a name nobody declared and
@@ -144,7 +143,7 @@ for (const f of files) {
 			directives: false, passes: 3, keep_fargs: true,
 			...(isVersion ? { evaluate: false } : {}),
 			/* fs-fit.js's two diagnostic trails are read only by `fs:probe` exports, stripped before this runs,
-			 * so their writes are dead in the package (docs/anchoring.md, "What the gate itself cannot answer") */
+			 * so their writes are dead in the package (docs/anchoring.md, "What the sweep itself cannot answer") */
 			pure_funcs: trails ? [ 'makeTrail', '_late.record', '_anchor.record', 'Math.round' ] : []
 		},
 		/* uglify renames every variable BEFORE it compresses, so pure_funcs would match `a.record` and
@@ -173,7 +172,7 @@ for (const f of files) {
 		/* …and that the declaration is still REFERENCED. `compress.toplevel` is free to inline a
 		 * const that is only read: the declaration would survive for stage.sh's sed to stamp,
 		 * every reader would carry the pre-stamp literal, and every release would report
-		 * "Footstrap (dev)" with no gate saying otherwise. Three occurrences today — one
+		 * "Footstrap (dev)" with nothing saying otherwise. Three occurrences today — one
 		 * declaration, two reads in label(). */
 		if (isVersion && (min.match(/FS_VERSION/g) || []).length < 2)
 			throw new Error('FS_VERSION was inlined — the declaration survives for the sed to stamp, '

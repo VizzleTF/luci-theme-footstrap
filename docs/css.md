@@ -676,16 +676,13 @@ below.
 
 ### Tables: roles survive a `display` override
 
-`tools/table-contract.mjs` check 1b. Rule A: a `display` change on a table part with nothing in its
-selector restricting it to one rung of the ladder (a state class, `:not()`/`:has()`, an attribute,
-an id) touches every such element at once; each shipped rule carries a ladder class (`.fs-stacked`,
-`.fs-dt`, `.cbi-section-table`, `.fs-rowstack`, `.fs-xscroll`, `hide-xs`/`hide-sm`) or the four-way
-`:not()` fence around the key/value tables in `theme/30-tables.css`. Rule B is scoped to a
-`.cbi-section` descendant named like a table part (`row`/`cell`/`col`/`head`/`body`/`foot`/`table`/
-`grid` as a whole hyphenated word: `.fs-kv-row` is caught, `.fs-ovl-empty` and `.ifacebox-head` are
-not). A false negative stays possible; a plain name-contains-"row" scan was rejected because it
-breaks `.fs-color-row`, `.fs-ap-actrow`, `.fs-ap-bgrow`, `.fs-ap-verrow` and `.fs-search-row`, none
-of them inside a `.cbi-section`.
+A `display` change on a table part with nothing in its selector restricting it to one rung of the
+ladder (a state class, `:not()`/`:has()`, an attribute, an id) touches every such element at once;
+each shipped rule carries a ladder class (`.fs-stacked`, `.fs-dt`, `.cbi-section-table`,
+`.fs-rowstack`, `.fs-xscroll`, `hide-xs`/`hide-sm`) or the four-way `:not()` fence around the
+key/value tables in `theme/30-tables.css`. The same holds for a `.cbi-section` descendant named like
+a table part (`row`/`cell`/`col`/`head`/`body`/`foot`/`table`/`grid` as a whole hyphenated word:
+`.fs-kv-row` is one, `.fs-ovl-empty` and `.ifacebox-head` are not).
 
 ### Tables: the key/value discriminator is the table's shape, not a class
 
@@ -808,8 +805,8 @@ the whole upload row standing 7px outside the card (same fix as the dynlist's fl
 Its child rule assumes every row is one line of text (`nowrap` + ellipsis); `.right` breaks that
 assumption — its content is the upload strip plus Create/Cancel, none of it text an ellipsis can
 stand in for. Inherited `nowrap` blocked the wrap the Browse button already had (`flex-wrap: wrap`),
-and `overflow: hidden` clipped Cancel's label 76px past the box with no "…" drawn — the gate's own
-"text the reader cannot reach" case, not the accepted dropdown/tab shape.
+and `overflow: hidden` clipped Cancel's label 76px past the box with no "…" drawn — text the reader
+cannot reach, not the accepted dropdown/tab shape.
 
 ### `base/95-luci.css`: Statistics graphs and Realtime SVGs are art drawn for a white ground
 
@@ -927,12 +924,9 @@ logical keyword — so under `[dir="rtl"]` (`theme/60-inputs.css`) the positions
 hand. The offsets must also swap between the two layers: mirrored as they were, the band that leans
 left would sit on the right and the chevron would draw as an inverted V. The padding that clears
 the chevron is `padding-inline-end`, so the text clearance follows the writing direction on its
-own. Measured with the `rtl` pass of `npm run computed-diff` (390px, `dir=rtl`) against the commit
-before the mirror: 7 selects change `padding-left` 12px → 32px and `padding-right` 32px → 12px,
-9 elements (the 7 selects and the 2 `.cbi-select` DIV shells) change `background-position`, and
-nothing else moves. `background-position` had to join the gate's property list for this: with the
-rule deleted the pass reports those 9 differences, and before the property was listed it reported
-0.
+own. Measured with a computed-style diff (390px, `dir=rtl`) against the commit before the mirror:
+7 selects change `padding-left` 12px → 32px and `padding-right` 32px → 12px, 9 elements (the 7
+selects and the 2 `.cbi-select` DIV shells) change `background-position`, and nothing else moves.
 
 ### Dropdown: the display state machine, unflagged
 
@@ -1130,7 +1124,7 @@ The frame, corner, placeholder and cell-padding rules in `theme/30-tables.css` s
 (luci-app-roamd, GitHub #67) matched none of them, kept the generic `.table { overflow: hidden }`,
 became the sticky header's scroll container, and its `.th` sat one bar-height (46px) over the first body
 row at scroll 0 in layout top (webkit, chromium); its cells kept 8px where a real table has 10px.
-`overflow: clip` on the generic rule is not the fix: it clips popups. `table-contract.mjs` check 2e holds it.
+`overflow: clip` on the generic rule is not the fix: it clips popups.
 
 The key is `:is(table, div).fs-dt` and not `.table.fs-dt` because of specificity: `:is()` scores its
 most specific argument, so `:is(table, div).fs-dt .td` is (0,2,1), exactly `table.fs-dt .td`, while
@@ -1139,10 +1133,8 @@ so it meets this rule in the same layer; luci-app-filemanager `#file-table`'s `.
 (0,2,1) used to win by source order and lost to (0,3,0) on owrt2512: Name and Permissions padding-left
 5 -> 12px, Type padding-right 5 -> 12px, Size header 15 -> 12px, Size cells 10 -> 12px, and the 70px
 Permissions column clipped more ("rwxr-..." -> "rwxr..."). Changing only that selector back restored
-the numbers. `table-contract.mjs` check 2f holds it: the cell padding with a real table and a mock app
-rule in the gallery, and each of the eight keys (padding `.td`/`.th`, the frame, four corners, the
-placeholder) by selector in the built sheet, so a `.table.fs-dt` revert of any one fails the gate. The
-rules that were `.table.fs-dt` in v0.14.14 keep it: the break floor, the `!important` word-break, the
+the numbers. Eight keys carry the `:is(table, div).fs-dt` form: padding `.td`/`.th`, the frame, four
+corners, the placeholder. The rules that were `.table.fs-dt` in v0.14.14 keep it: the break floor, the `!important` word-break, the
 sticky header, `overflow-anchor`, the fit gate (`:root[data-fs-fit] … .table.fs-dt:not(.fs-fitted)`)
 and the `.fs-stacked` card rules. `fs-select.js` tags `.table, table` with `fs-dt`; the form is
 `table` or `div` in practice, a `.table` on another tag would match neither. The frame group keeps `.cbi-section .table.fs-dt` and
@@ -1170,8 +1162,8 @@ reads them follows.
 - **secondary text**: `--fs-dim` toward `--fs-text`, and `--fs-faint` most of the way there too
   (10-11px eyebrow labels are where AA erodes first). Not all the way onto `--fs-dim`: the two are
   the export tier's `--text-color-medium` and `-low`, so collapsing them republishes one colour
-  twice to every app reading the gradation. 82% is a window `tools/export-tier.mjs` measures rather
-  than takes on trust: below 80 the fainter ink drops under AA on footstrap dark's `--fs-panel2`
+  twice to every app reading the gradation. 82% is a measured window, not one taken on trust:
+  below 80 the fainter ink drops under AA on footstrap dark's `--fs-panel2`
   (4.51:1 at 80), above 82 the high-to-low ramp falls under the 0.10 spread the tier promises (0.098
   at 84); 82 clears both, at 4.68:1 and 0.110.
 - **`--fs-placeholder`, in BOTH modes**: the one token the theme ships deliberately under AA
@@ -1179,8 +1171,7 @@ reads them follows.
   value, and a dark palette has only 6.45:1 of ink to spend. A reader who asked for more contrast has
   said which of the two they want, so the mixes go back to the AA-clearing 62% and 80% — 4.98:1 and
   4.61:1, at 37% and 20% of the ink-to-field range instead of 44% and 34%. Only
-  `--fs-placeholder-mix` moves: the mix itself is spelt once, in `03-palettes.css`. `placeholder-ink`
-  measures this pass as well.
+  `--fs-placeholder-mix` moves: the mix itself is spelt once, in `03-palettes.css`.
 - **the focus ring**: `--fs-focus-ring` is a tint of the accent (`--fs-accent-soft`, 10% light and
   15% dark), so at "more contrast" it carries the accent at 60% instead. Its sibling
   `--fs-focus-ring-solo` is already the solid accent and needs no restatement here.
@@ -1214,13 +1205,6 @@ grey carried), ButtonText for the check and the radio dot and for a button's spi
 the help icon and a bare spinner, which sit on the page like text. The wallpaper pattern
 (`15-wallpaper.css`) is the one masked fill left alone: decoration that is meant to drop out.
 
-`a11y` holds both halves: every selector in a `forced-colors` block must reach a gallery element
-(`CHROME_ONLY` in `tools/a11y-gallery.mjs` lists the five only `header.ut` and `head.ut` render — `#topmenu
-li.active > a`, `.fs-railtoggle`, `#tabmenu ul.tabs > li.active > a`, and the two collapsed-rail poll
-selectors, whose `:root[data-layout][data-rail]` guard a static gallery cannot carry), and keyboard focus
-must show a `Highlight` outline. `computed-diff`'s `1280/fc` pass reads the repairs' computed values;
-the compact poll pill has its own specimen in the gallery's chrome-bar section for that.
-
 ## The card contract: what is measured and what is not
 
 A table folds into cards by two different mechanisms, and that is not an unfinished job.
@@ -1253,7 +1237,7 @@ width, so the first pass over a table with no slot to inherit from read `scrollW
 0 overflows nothing, concluded "no remedy" — and CACHED that answer. The table then appeared at its
 natural width: on Status → Processes at 768px, 777px inside a 712px column, columns cut off by
 `.fs-main { overflow-x: clip }` with no scrollbar and nothing to say so. A second pass ~60 ms later
-usually corrected it, which is why it reached a user rather than a gate: that pass exists only if
+usually corrected it, which is why it reached a user: that pass exists only if
 something mutates `#view` again, and a page that renders once and stands still never does. So
 `fitTables()` treats a zero measurement as no answer at all — it lifts the gate, asks for one more
 frame, and writes nothing to the slot. Measured entering that page at 768: 2 of 8 arrivals on 0.13.1
@@ -1334,8 +1318,7 @@ So the break value follows the tier, and the split is the design:
 | config table, key/value include, meter rows, realtime legend | `anywhere` (`base/40-tables.css`) | none of them is measured and none can card on demand — containment is the only outcome available |
 | header row, first column | `break-word` (`base/40-tables.css`) | the labels you read the table by (issues #32, #36) |
 
-`tools/table-contract.mjs` (`npm run tables`) holds that table to the sheet, selector by selector: a
-fifth place to decide how a cell may break is a hard failure, and so is any of them appearing under a
+These four are the only places that decide how a cell may break, and none of them sits under a
 viewport query.
 
 Two of the four per-page `nowrap` rules the general contract retired were `pages/60-assoclist.css`
@@ -1405,10 +1388,10 @@ The method that does work: load the gallery with each stylesheet, snapshot `getC
 Same DOM, same data — so any difference was caused by the CSS. The sheet is the one a router gets
 (`build-css.sh`, then `mangle-tokens.sh`), each side in its own document: swapping the `<link>` on
 one document only works while both sheets map the private tokens alike. The gallery has no
-`header.ut` chrome, so a change to the sidebar, bar, rail or menu reads 0 here and is measured by
-`live-audit` and `spa-parity` on a stand. `docs/development.md`, "The three cheap browser gates".
+`header.ut` chrome, so a change to the sidebar, bar, rail or menu reads 0 here and has to be
+measured on a router.
 
-> `cssdiff.py`, the script the changelog and `audit.py` refer to by name, is the maintainer's own
+> `cssdiff.py`, the script the changelog refers to by name, is the maintainer's own
 > tooling and is not in this repository. Without it, drive the steps above with Playwright
 > yourself — the result a review asks for is the property diff, not that particular script.
 
@@ -1432,8 +1415,7 @@ padding from another; and an actions column losing its right alignment.
 
 `docs/gallery.html` renders every widget `ui.js`/`cbi.js` can emit, with the real class names, so
 you do not have to hunt the router for a page that happens to contain the control you changed. It
-is not part of the package; it is published to GitHub Pages alongside the built stylesheet, and
-the a11y gate runs axe-core against it.
+is not part of the package; it is published to GitHub Pages alongside the built stylesheet.
 
 It immediately found two holes that existed on no router page but that any third-party
 `luci-app-*` can hit: native `input[type=button|submit|reset]` (which `styles/base` gave only

@@ -63,8 +63,9 @@ Three things follow:
    `/usr/share/ucode/luci/template/themes/<name>/header.ut`.
 2. **A header that does not compile does not brick the UI.** LuCI falls back to the first working
    theme and shows a "Theme fallback" indicator carrying the error. Convenient while developing —
-   and the reason CI compiles every `.ut` with `ucode -T -c`: a stray brace would otherwise ship
-   green and quietly move every user to another theme.
+   and dangerous in a release: a stray brace quietly moves every user to another theme. The e2e
+   run on the routers fails a page whose footstrap stylesheet or chrome is missing, which is what
+   that fallback looks like.
 3. `resource` is always `/luci-static/resources`, shared with luci-base. Themes must not touch it.
 
 ## What the header must do
@@ -155,7 +156,7 @@ carries a map from `data-page` to module name and requires the module when that 
 (server-stamped or router-stamped, the same attribute either way). The loader owns the observer on
 `body[data-page]` and calls the module's `onPage()` on every stamp; `wire()` re-checks the page
 synchronously, so one that arrives after the stamp is still picked up. The map repeats a page name
-the module also tests, and `npm run page-modules` derives both sides and fails if they drift.
+the module also tests, so the two must be edited together.
 
 `fs-appearance` (the Appearance controls) used to be the map's other entry, stapled onto System →
 System the same way. It now owns a route of its own, `/admin/system/footstrap`

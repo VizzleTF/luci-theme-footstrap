@@ -1,6 +1,6 @@
 #!/bin/sh
 # Wait for a tools/bg.sh run to end, then print its exit status and the summary lines of its log.
-# This is the pairing CLAUDE.md requires for every detached run, as one command a role can start
+# This is the pairing CLAUDE.md requires for every detached run, as one command a session can start
 # with run_in_background and permissions.allow can name. Exits with the run's own status.
 #
 #   tools/bg-wait.sh <run-id> [interval-seconds] [max-seconds]
@@ -27,7 +27,7 @@ EVERY=${2:-30}
 MAX=${3:-7200}
 
 # A non-numeric interval would make `sleep` fail once per iteration; under `set -e` that ends the
-# waiter with a shell error rather than with the run's status, which reads as a failed gate.
+# waiter with a shell error rather than with the run's status, which reads as a failed run.
 case "$EVERY" in '' | *[!0-9]*) echo "bad interval: $EVERY" >&2; exit 2 ;; esac
 case "$MAX" in '' | *[!0-9]*) echo "bad max: $MAX" >&2; exit 2 ;; esac
 
@@ -74,7 +74,7 @@ done
 ST=$(cat "$STATUS")
 case "$ST" in '' | *[!0-9]*) echo "unreadable status: $ST" >&2; ST=1 ;; esac
 echo "exit: $ST"
-# The gates print their findings as `name: value` lines; everything else in the log is progress.
+# Findings are printed as `name: value` lines; everything else in the log is progress.
 grep -E '^[a-z-]+:' "$LOG" || true
 echo "--- tail"
 tail -n 20 "$LOG"

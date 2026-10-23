@@ -1,19 +1,17 @@
 #!/bin/sh
-# Detach a T2 gate (owlab, npm run live, bench, a computed-style diff) so the session never waits on
-# it. Prints the run-id and the log path before the command has produced a byte, and exits 0 whether
+# Detach a long run (owlab, tools/e2e.mjs, bench) so the session never waits on it. Prints the run-id and the log path before the command has produced a byte, and exits 0 whether
 # or not the command later fails: the exit status lives in <run-id>.status, read by hand.
 #
 # Logs go to ../tmp/ beside the main checkout, resolved from this script rather than from $PWD, so a
 # run started from a subdirectory or a linked worktree still lands in the one scratch directory
 # CLAUDE.md sanctions (tools/lib/tmp-root.sh).
 #
-#   tools/bg.sh node tools/live-audit.mjs --all
+#   tools/bg.sh node tools/e2e.mjs --router owrt2512 --old <release pkg> --new <built pkg>
 #   tail -n 40 ../tmp/<run-id>.log
 #
 # `tools/bg.sh --check <command…>` asks the refusal question and nothing else: it prints `allowed`
-# (exit 0) or `refused: <why>` (exit 2) on stdout and never detaches or runs the command. A test or a
-# probe of the fence uses it, because a refusal that went missing would otherwise run the command
-# under test.
+# (exit 0) or `refused: <why>` (exit 2) on stdout and never detaches or runs the command. Probing the
+# fence uses it, because a refusal that went missing would otherwise run the command being probed.
 set -eu
 
 CHECK=0
@@ -28,7 +26,7 @@ if [ $# -eq 0 ]; then
 fi
 
 # `Bash(tools/bg.sh:*)` is allow-listed, and the permission engine matches the first word only: it
-# cannot see an `ssh` inside `tools/bg.sh sh -c '…'`, which is the form every T2 gate uses. Without
+# cannot see an `ssh` inside `tools/bg.sh sh -c '…'`, which is the form most long runs use. Without
 # this the wrapper launders any command past the `ask` fence on the hardware router and on
 # publishing. The fence has to live here, where the whole command line is visible.
 #
@@ -148,7 +146,7 @@ TMP=$(tmp_root "$ROOT")
 mkdir -p "$TMP"
 
 # The slug is the first two words of the command with everything but [A-Za-z0-9] folded to a dash,
-# so `npm run live` and `owlab test` are distinguishable in a directory listing without opening one.
+# so `npm run e2e` and `owlab test` are distinguishable in a directory listing without opening one.
 # It is cut so the whole run-id stays under 61 characters: a 300-character argument made the log
 # name 'File name too long'.
 STAMP=$(date +%Y%m%d-%H%M%S)

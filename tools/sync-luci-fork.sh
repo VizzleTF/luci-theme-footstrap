@@ -51,9 +51,9 @@ for stale in styles build-css.sh mangle-tokens.sh strip-build.sh \
 	rm -rf "$OUT/$stale"
 done
 
-# The gate-only exports do not travel either. They exist so a gate in THIS repository can call a
-# module-private function; upstream has no such gate, and a module surface nobody calls is dead
-# weight there. The functions stay — only the export line goes (strip-build.sh probes).
+# The probe-only exports (`/* fs:probe */`) do not travel either. They expose a module-private
+# function to this repository's own tooling; upstream has none of it, and a module surface nobody
+# calls is dead weight there. The functions stay — only the export line goes (strip-build.sh probes).
 sh "$SRC/strip-build.sh" probes "$OUT/htdocs/luci-static/resources"
 
 # Modes come from the theme repo's INDEX, never the worktree: core.fileMode=false here means a file
@@ -114,4 +114,3 @@ if [ -d "$OUT/po" ]; then
 fi
 doc_refs=$(grep -rEo --include='*.js' --include='*.ut' 'docs/[a-z-]+\.md' "$OUT/htdocs" "$OUT/ucode" | wc -l | tr -d ' ')
 echo "  docs/*.md:   $doc_refs pointer(s) in shipped JS/templates — accepted upstream, not checked"
-echo "  drift:       node tools/fork-drift.mjs $DEST"

@@ -1,23 +1,22 @@
-/* The live half of the gates: one place that knows how to reach a running router, log into LuCI and
- * enumerate its pages.
+/* One place that knows how to reach a running router, log into LuCI and enumerate its pages.
  *
- * Every static gate here measures a FILE. The bugs that reached users measured a PAGE — a column
+ * A check of a FILE cannot see the bugs that reached users; they lived on a PAGE — a column
  * shredded to one character per line (#11), a submenu title clipped (#22), a doubled scrollbar in
  * Firefox (#12), a third-party app's tabs laid out wrong (#36, #33, #8), a client navigation that
  * painted less than a full load (upstream review). None can be seen in a stylesheet; all are one
  * query away on a live page.
  *
  * The routers are owlab's — `owlab status -json` names each one and the port it answers on, so
- * nothing here hard-codes a port or a container name. Nothing here boots anything either: a gate
- * that starts and stops containers by itself is a gate nobody runs locally. */
+ * nothing here hard-codes a port or a container name. Nothing here boots anything either: a tool
+ * that starts and stops containers by itself is a tool nobody runs locally. */
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { closeSync, mkdirSync, openSync, readFileSync, unlinkSync } from 'node:fs';
 import { tmpRoot } from './tmp-root.mjs';
 
-/* The routers a gate runs on by default: the three OpenWrt lines the theme supports (apk on 25.12+,
+/* The routers a caller runs on by default: the three OpenWrt lines the theme supports (apk on 25.12+,
  * opkg on 24.10, and the snapshot box, which tracks luci-base's master). `--all` widens to every
- * running OpenWrt router (the twins); a gate that takes `--only` must honour `--all` too.
- * ImmortalWrt is not a gate target: a running `imm*` router is ignored and `--only imm2512` is
+ * running OpenWrt router (the twins); a caller that takes `--only` must honour `--all` too.
+ * ImmortalWrt is not a target: a running `imm*` router is ignored and `--only imm2512` is
  * refused (its two legs gave 1685 unreadable `noname` findings of their own app set at 0.14.13). */
 export const CORE = [ 'owrt2512', 'owrt2410', 'owrtsnap' ];
 
@@ -25,12 +24,12 @@ export const CORE = [ 'owrt2512', 'owrt2410', 'owrtsnap' ];
  * any other id maps to itself. A twin booted from the same image finds the core's findings. */
 export const coreId = (id) => CORE.find((c) => id === c || (id.startsWith(c) && /^[bd]$/.test(id.slice(c.length)))) ?? id;
 
-/* Has the view actually rendered, or is a live gate about to measure a blank shell? fs-overview.js
+/* Has the view actually rendered, or is a caller about to measure a blank shell? fs-overview.js
  * keeps every section hidden until network.flushCache()'s five RPCs answer; on a router that just
- * booted, one answers late enough that a fixed wait expires first. scroll-jank.mjs armed on
- * `scrollable 0` with no tables and read the page finishing its own paint mid-scroll as a
+ * booted, one answers late enough that a fixed wait expires first. A scroll measurement once armed
+ * on `scrollable 0` with no tables and read the page finishing its own paint mid-scroll as a
  * 4044px jump (docs/development.md, "The stand's own traps") — 4 of 16 PR runs. Scroller
- * detection matches fs-fit.js's own scroller() so every gate asks the page the same way.
+ * detection matches fs-fit.js's own scroller() so every caller asks the page the same way.
  * Runs INSIDE the page via page.evaluate/waitForFunction. */
 export const PAINTED = () => {
 	const mc = document.getElementById('maincontent');
@@ -52,7 +51,7 @@ export async function waitForPaint(page, timeout) {
 
 /* `stands()` and `pairStands()` both used to shell out to `owlab status -json` and `JSON.parse` its
  * answer themselves. One place now: an empty array on any failure (owlab absent, bad JSON) — the
- * caller decides whether that's a gate failure or a reason to skip. */
+ * caller decides whether that's a failure or a reason to skip. */
 function owlabRouters() {
 	let out;
 	try {
@@ -61,7 +60,7 @@ function owlabRouters() {
 	try { return JSON.parse(out).routers || []; } catch (e) { return []; }
 }
 
-/* The shape every gate reads a router through — `stands()`'s CORE/`--all` filtering and
+/* The shape every caller reads a router through — `stands()`'s CORE/`--all` filtering and
  * `pairStands()`'s twin lookup both produced this same object by hand. */
 const toStand = (r) => ({
 	id: r.id,
@@ -72,9 +71,9 @@ const toStand = (r) => ({
 });
 
 /* Every RUNNING owlab router, newest release first, or an empty array when owlab is absent — the
- * caller decides whether that is a failure (a gate) or a reason to skip (a local convenience).
+ * caller decides whether that is a failure or a reason to skip (a local convenience).
  * With no `only` and no `all`, the CORE set above; if none of it is running, everything that is,
- * with a line saying so — a gate that silently measured a different set than it claims is worse
+ * with a line saying so — a run that silently measured a different set than it claims is worse
  * than a slow one. */
 export function stands(only, { all = false } = {}) {
 	const routers = owlabRouters();
@@ -89,7 +88,7 @@ export function stands(only, { all = false } = {}) {
 		.filter((r) => r.state === 'running' && r.http_port && r.distro === 'openwrt')
 		.map(toStand);
 	if (wanted.length) {
-		/* --only names a stand that is not running: measuring the rest would pass a gate on fewer routers than asked */
+		/* --only names a stand that is not running: measuring the rest would pass a run on fewer routers than asked */
 		const missing = wanted.filter((id) => !running.some((r) => r.id === id));
 		if (missing.length) {
 			console.error(`${missing.join(', ')}: not running — --only asked for it, and a gate does not `
@@ -108,7 +107,7 @@ export function stands(only, { all = false } = {}) {
 }
 
 /* Cut the browser off from everything except the router under test: a fetch to the open internet
- * is somebody else's code and only adds noise (docs/development.md, "The live gates"). The app
+ * is somebody else's code and only adds noise. The app
  * stays on the stands (its Ace stylesheets can invert the cascade layer order, owlab.yaml); the
  * request never leaves. `abort`, not a fake 200, which the page would render. The router's origin
  * and data:/blob: pass. */
@@ -121,13 +120,13 @@ export async function sealToRouter(ctx, base) {
 		(route) => route.abort());
 }
 
-/* A stand that cannot serve LuCI at all, as opposed to a theme that misrenders it: the gate's
- * own verdict is "nothing was measured here", never a finding (docs/ci.md). */
+/* A stand that cannot serve LuCI at all, as opposed to a theme that misrenders it: the caller's
+ * own verdict is "nothing was measured here", never a finding. */
 export class StandDown extends Error {}
 
 /* Null when the answer is a LuCI page — the login form, or an authenticated page that loads luci.js —
  * else the sentence naming what the stand said instead. A snapshot stand whose ucode and
- * ucode-mod-html disagreed on libucode answered every request 502 "Bad Gateway", and every gate
+ * ucode-mod-html disagreed on libucode answered every request 502 "Bad Gateway", and every check
  * reported "L is not defined" as a defect of the theme. */
 export function loginFault(status, html) {
 	if (status < 500 && /luci_password|luci\.js|new LuCI\(/.test(html)) return null;
@@ -142,7 +141,7 @@ export function loginFault(status, html) {
 const NO_ANSWER = /net::ERR_(CONNECTION_|EMPTY_RESPONSE|SOCKET_NOT_CONNECTED)|NS_ERROR_(CONNECTION_REFUSED|NET_)|Could not connect|Connection (terminated|reset)/;
 
 /* The StandDown for such a navigation error, else the error itself: anything else is a bug in the
- * gate and keeps its stack. Use as `.catch((e) => { throw unreached(e, id, base); })`. The cause
+ * caller and keeps its stack. Use as `.catch((e) => { throw unreached(e, id, base); })`. The cause
  * rides in the sentence: a reset socket and a hung uhttpd are not a closed port, and the reader
  * would go looking for a free one. */
 const cause = (e) => String(e.message).split('\n')[0].replace(/^\w+\.\w+: | at https?:\/\/\S+$/g, '').trim();
@@ -154,14 +153,14 @@ export const unreached = (e, id, base) => (e && (e.name === 'TimeoutError' || NO
 const LANDED = () => (window.L && typeof window.L.require === 'function')
 	? window.L.require('ui').then(() => true) : false;
 
-/* LuCI answers an unauthenticated request with the login form, not a 403 page — so every live gate
+/* LuCI answers an unauthenticated request with the login form, not a 403 page — so every caller
  * has to log in before it can measure anything. owlab's routers are root with an empty password
- * (`owlab status` prints it); a hardware router is not what these gates run against. `id` names the
+ * (`owlab status` prints it); a hardware router is not what this runs against. `id` names the
  * router in the error; the host stands in for it when a caller has only a base URL.
  *
  * It returns once the landing has answered `L.require`, not at its domcontentloaded: the first goto
  * after a login from a landing still loading failed in WebKit 5 of 168 times (3.0%) against 0 of 840
- * later ones, while scroll-anchor, which awaited `L.require` there before its first goto, lost 7 of
+ * later ones, while a scroll-anchor sweep, which awaited `L.require` there before its first goto, lost 7 of
  * ~7400 (0.09%). A stand whose landing never answers is bounded at openPage's 20 s and is a StandDown. */
 export async function login(page, base, id = new URL(base).host) {
 	const res = await page.goto(base, { waitUntil: 'domcontentloaded' })
@@ -183,8 +182,8 @@ export async function login(page, base, id = new URL(base).host) {
  * the same commit died on webkit/owrt2410 with `page.goto: Timeout 20000ms exceeded` and
  * `page.goto: WebKit encountered an internal error` — two cells out of the sweep, every other cell
  * reporting `reader moved 0px`, and the same sweep green locally over 174 runs. So: three attempts
- * before a cell is written off. scroll-jank's gotos died the same way before any measurement (4
- * CI runs since 2026-10-20), so both gates open pages through this. Each failed attempt prints one
+ * before a cell is written off. A scroll-jank sweep's gotos died the same way before any
+ * measurement (4 CI runs from 2026-10-20). Each failed attempt prints one
  * stderr line, because a retry that worked left no trace and CI could not say what it had done. */
 export async function openPage(page, url) {
 	let last;
@@ -205,15 +204,16 @@ export async function openPage(page, url) {
 /* Share of attempted cells or pages under test that may go unopened before the sweep itself is the
  * problem: one flaky cell is the runner, a stand that stopped answering is not, and a run that
  * measured almost nothing must not say the reader stayed put. 2% alone rounds to zero on a small
- * sweep, so each gate names a floor, the count it tolerates whatever the share: scroll-anchor 3 of
- * ~170 cells (1.8%), scroll-jank 1 of 8 pages on a PR stand (12.5%; a floor of 3 would let both
- * processes@768 cells, the only ones holding the remedy contract, vanish unreported). */
+ * sweep, so each caller names a floor, the count it tolerates whatever the share: the scroll-anchor
+ * sweep used 3 of ~170 cells (1.8%), the scroll-jank one 1 of 8 pages on a PR stand (12.5%; a floor
+ * of 3 would let both processes@768 cells, the only ones holding the remedy contract, vanish
+ * unreported). */
 const UNOPENED_TOLERANCE = 0.02;
 export const tooManyUnopened = (unopened, attempted, floor) => unopened > Math.max(floor, attempted * UNOPENED_TOLERANCE);
 
 /* Every leaf of the router's own menu tree, as LuCI resolves it, not a list kept in the repo that
  * goes stale when an app is installed. `L.ui.menu.load()` returns the tree rooted at `admin`, so
- * the walk starts with an empty path (docs/development.md, "The live gates"). */
+ * the walk starts with an empty path. */
 export async function menuPaths(page, opts = {}) {
 	/* `L.ui` exists only once something required ui.js, which differs by release line (24.10
 	 * crashed with "Cannot read properties of undefined (reading 'menu')"): wait, then require it. */
@@ -273,13 +273,13 @@ export function pairStands(list, name) {
  * drifted" cells a lone run never shows. Use of a stand is therefore an flock on
  * ../tmp/stands-<id>.lock, one per stand in sorted order, held until this process dies (a child
  * `flock` kept alive by its stdin pipe, so SIGKILL frees it). `flock` is probed synchronously
- * first, and the wait is bounded, 30 min by default (`STANDS_LOCK_TIMEOUT_MS`).
- * tools/ci-local.sh hands its locks down through `STANDS_LOCK_HELD`/`STANDS_LOCK_PID`, checked by
- * `heldBy()`. docs/development.md, "The stand's own traps". */
+ * first, and the wait is bounded, 30 min by default (`STANDS_LOCK_TIMEOUT_MS`). A parent process
+ * that already holds the locks hands them down through `STANDS_LOCK_HELD`/`STANDS_LOCK_PID`,
+ * checked by `heldBy()`. docs/development.md, "The stand's own traps". */
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
-/* True only when `env` names a live ci-local that holds `file` for stand `id`. Exported for the
- * unit test; `flock -n` exits 1 only on contention, so any other failure reads as "not held". */
+/* True only when `env` names a live parent (its lock file reads `ci-local pid <pid>`) that holds
+ * `file` for stand `id`. `flock -n` exits 1 only on contention, so any other failure reads as "not held". */
 export function heldBy(id, file, env = process.env) {
 	const pid = Number(env.STANDS_LOCK_PID);
 	if (!Number.isInteger(pid) || pid < 1) return false;
@@ -346,7 +346,7 @@ function lockStands(ids, name) {
 	}
 }
 
-/* No stand, no verdict — and a gate that quietly reports success on zero routers is worse than one
+/* No stand, no verdict — and a run that quietly reports success on zero routers is worse than one
  * that fails, because it looks the same as a clean run in a log. */
 export function requireStands(list, name) {
 	if (!list.length) {
@@ -359,10 +359,10 @@ export function requireStands(list, name) {
 }
 
 /* Run `fn` on every stand at once and let each finish: one router answering 502 must not discard
- * what the others measured. `serial` runs them one after another for a gate whose subject is frame
- * pacing, where a second router rendering is noise (scroll-jank). Returns the routers that threw as
+ * what the others measured. `serial` runs them one after another for a caller whose subject is
+ * frame pacing, where a second router rendering is noise. Returns the routers that threw as
  * `<id>: <reason>` lines — a StandDown by its sentence, anything else with its stack, because that
- * one is a bug in the gate. */
+ * one is a bug in the caller. */
 export async function eachStand(list, fn, { serial = false } = {}) {
 	const run = async (stand) => {
 		try { await fn(stand); return []; }
@@ -378,7 +378,7 @@ export async function eachStand(list, fn, { serial = false } = {}) {
 }
 
 /* Say which routers measured nothing, and return how many: the caller exits non-zero after it has
- * printed the findings of the routers that did answer. A gate that runs once per engine passes the
+ * printed the findings of the routers that did answer. A caller that runs once per engine passes the
  * same line per engine; it is named once. */
 export function reportDown(name, down) {
 	const rows = [ ...new Set(down) ];
@@ -388,7 +388,8 @@ export function reportDown(name, down) {
 	return rows.length;
 }
 
-/* The ids in `wanted` that owlab does not report running. tools/ci-local.sh stops exactly these
- * after a leg: `owlab down` with no ids stops every stand of owlab.yaml (9 on the maintainer's box). */
+/* The ids in `wanted` that owlab does not report running: the ones a caller that booted them should
+ * stop after a leg, since `owlab down` with no ids stops every stand of owlab.yaml (9 on the
+ * maintainer's box). */
 export const notRunning = (wanted, routers) =>
 	wanted.filter((id) => !routers.some((r) => r.id === id && r.state === 'running'));

@@ -7,7 +7,7 @@
 # `gh api .../logs` keeps the colour codes, so this reads the job log itself.
 #
 #   tools/ci-log.sh <run-id> [job-regex] [--repo owner/name]
-#   tools/ci-log.sh --filter <N>      # stdin -> the last N decisive + context lines (the pure part, unit-tested)
+#   tools/ci-log.sh --filter <N>      # stdin -> the last N decisive + context lines (the pure part)
 set -eu
 
 # A TAP failure is `not ok N - name` + `location:` (indented one level per nesting); `error: |-` carries

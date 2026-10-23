@@ -1,4 +1,4 @@
-/* Small helpers several gates copied: a timestamped line logger and a mkdir-p file write. */
+/* Small helpers several tools copied: a timestamped line logger and a mkdir-p file write. */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -15,7 +15,7 @@ export function writeFile(path, body) {
 	writeFileSync(path, body);
 }
 
-/* Every gate parses its flags here so an unknown or malformed one is a usage error (exit 2, one
+/* A tool parses its flags here so an unknown or malformed one is a usage error (exit 2, one
  * line) and never a Node stack trace. */
 export function parseFlags(gate, options) {
 	try { return parseArgs({ options }).values; }

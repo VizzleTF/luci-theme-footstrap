@@ -1,15 +1,14 @@
 /* The --*-color-* export tier, parsed out of styles/02-tokens.css — the one place it is defined.
  *
- * A gate that hand-writes its own cross-product of families x levels checks the list, not the
- * contract: one such list knew --text-color-highest and the other did not, so that name was
- * defined, shipped, read by apps and inspected by nothing — setting --text-color-highest to #808080
- * (~3.95:1 on a light --fs-bg, a real AA failure) passed with "export tier: OK — 1820 checks".
- * Derived here and consumed by both, so a level added to the tokens is measured on the next run.
+ * A hand-written cross-product of families x levels describes the list, not the contract: two such
+ * lists once disagreed about --text-color-highest, so that name was defined, shipped and read by
+ * apps while one of the two never saw it. Derived here, so a level added to the tokens reaches the
+ * devkit on the next build.
  *
  * Names come back WITHOUT the leading `--`: that is the shape devkit.src.html renders
- * (`'var(--' + name + ')'`), and export-tier.mjs adds it back. */
+ * (`'var(--' + name + ')'`). */
 
-/* Families in the order the devkit renders them. The regex is the gate on what counts as the tier:
+/* Families in the order the devkit renders them. The regex decides what counts as the tier:
  * --fs-* is private and deliberately not surfaced — see the token file's own header. */
 const FAMILY_ORDER = ['background', 'border', 'text', 'primary', 'success', 'warn', 'error'];
 const LEVEL_RANK = { highest: 0, high: 1, medium: 2, low: 3 };

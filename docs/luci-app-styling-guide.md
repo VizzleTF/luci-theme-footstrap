@@ -139,8 +139,7 @@ warns you about from the other side. `:root` is a **shared global scope**, and a
 likelier name for an app to declare — used to repaint the theme itself: **312 of 336 elements
 changed colour** under a single hostile `:root` block. So footstrap now reads *only* its private
 `--fs-*` names internally and derives the export names *from* them. Same measurement after the split:
-**0 elements**. (`styles/02-tokens.css`; a CI gate fails the build if any theme rule reads an export
-name.)
+**0 elements**. (`styles/02-tokens.css`.)
 
 The practical consequence for you is the good half: **because the theme cannot be repainted by your
 `:root` any more, you can override anything the theme draws inside your own subtree — and you never
@@ -149,7 +148,7 @@ need `!important` to do it.** Unlayered beats every layer, unconditionally. If y
 
 ### 3.3. What the tier guarantees (and what to do with the guarantee)
 
-footstrap proves all of this in CI (`tools/export-tier.mjs`) across the full matrix of
+footstrap measured all of this across the full matrix of
 {light, dark} × {default, hicontrast, bootstrap, 2020, forum} × seven tint values — 70 combinations:
 
 - **Every level of `text` / `primary` / `success` / `warn` / `error` clears WCAG AA as TEXT** on all
@@ -168,7 +167,7 @@ footstrap proves all of this in CI (`tools/export-tier.mjs`) across the full mat
 
 footstrap is not just light/dark. `:root[data-palette="hicontrast"]` swaps the entire colour set, and
 a Tint slider re-hues every surface (`:root[data-tint]` with `--fs-tint-h` at any hue 1–360). Both
-axes move the export tier with them — which is why the CI matrix above sweeps exactly those axes.
+axes move the export tier with them — which is why the matrix above spans exactly those axes.
 
 An app on the tier follows all of it for free and stays legible. A hardcoded "close enough" colour
 does not move: a `#f7f7f7` card chosen to match the default panel is wrong the instant the user picks

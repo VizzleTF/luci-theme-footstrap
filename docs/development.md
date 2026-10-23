@@ -254,13 +254,15 @@ wrote them, and leaves `Signed-off-by` alone — openwrt/luci refuses a sign-off
 `tools/e2e.mjs` is the one check, and the local form of CI's `e2e` job (one per package manager). It
 lives the package's whole life on one running owlab router, the way an admin lives it:
 
-1. install the last published release — it must become the active theme;
-2. the admin switches to bootstrap and saves a footstrap uci setting;
-3. upgrade to this build — the theme choice and the setting must survive;
-4. the admin picks footstrap, and every menu page is opened by a full load at 1280 and 390 px and by
-   a click in the chrome, then the same pages under bootstrap;
+1. install the last published release — Footstrap is offered in Language and Style and the active
+   theme is left alone (the README has the admin pick it there);
+2. the admin picks footstrap and saves a footstrap uci setting;
+3. upgrade to this build — the theme choice and the setting must survive (an opkg upgrade once
+   flipped every 24.10 user back to bootstrap);
+4. every menu page is opened by a full load at 1280 and 390 px and by a click in the chrome, then
+   the same pages under bootstrap;
 5. remove the package — LuCI falls back to bootstrap and still serves the login;
-6. a fresh install of this build — it becomes the active theme.
+6. a fresh install of this build — offered, the active theme left alone.
 
 A page fails only for what footstrap adds — a JS error, a failed same-origin request, a view that
 never renders where bootstrap renders — or if footstrap's stylesheet or chrome is missing (LuCI falls

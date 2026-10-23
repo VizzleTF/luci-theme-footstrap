@@ -204,13 +204,13 @@ binary is checked against its build attestation). The job stages the build under
 managers' rules; its payload is the same tree `build` packs. The last release's package comes from
 `gh release download`. Then `tools/e2e.mjs` walks the life an admin gives the package:
 
-1. install the last published release — it must become the active theme;
-2. the admin switches to bootstrap and saves a footstrap uci setting;
+1. install the last published release — Footstrap is offered, the active theme is left alone;
+2. the admin picks footstrap and saves a footstrap uci setting;
 3. upgrade to this build — the theme choice and the setting must survive;
-4. the admin picks footstrap, and every page of the menu is opened by a full load at 1280 and
-   390 px and by a click in the chrome; then the same pages under bootstrap;
+4. every page of the menu is opened by a full load at 1280 and 390 px and by a click in the
+   chrome; then the same pages under bootstrap;
 5. remove the package — LuCI falls back to bootstrap and still serves the login;
-6. a fresh install of this build — it becomes the active theme.
+6. a fresh install of this build — offered, the active theme left alone.
 
 **Bootstrap on the same router is the reference, not a list of expected problems.** A page fails
 only for what footstrap adds — a JS error, a failed same-origin request, a view that never renders

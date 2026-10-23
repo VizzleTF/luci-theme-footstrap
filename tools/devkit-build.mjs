@@ -24,7 +24,7 @@ const TOKENS = join(ROOT, 'luci-theme-footstrap/styles/02-tokens.css');
 const OUT = join(ROOT, 'docs/devkit.html');
 
 /* The export tier is the whole contract an app is allowed to read. Its NAMES are parsed from the
- * token file (tools/lib/tokens.mjs — shared with export-tier.mjs, which MEASURES the same set);
+ * token file (tools/lib/tokens.mjs);
  * the values render live from the inlined stylesheet, so we never restate a colour. */
 
 /* Pull each <div class="g-sec"> out of the gallery. They are siblings (g-sec never nests), so a

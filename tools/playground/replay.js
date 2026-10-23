@@ -6,7 +6,7 @@
  *
  * `/luci-static/**` is never touched. `requestKey`/`ubusKey`/`stripBase`/`isSafeReturn` are
  * lib.mjs's own functions, written into pg-data.js by build.mjs (one global scope), not copies; a
- * drifted key answers nothing. A miss lands in `window.__pgMiss` (verify.mjs asserts it empty) and
+ * drifted key answers nothing. A miss lands in `window.__pgMiss` and
  * gets a JSON-RPC error, except `session.access`, which fs-router.js reads as "log in again", so
  * it answers `true`. The login gate imitates being logged out and does not enforce it: the site
  * is static, so the form on `window.__pgPage === 'login'` accepts any credentials, on purpose. */

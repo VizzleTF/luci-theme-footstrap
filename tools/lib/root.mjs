@@ -1,9 +1,8 @@
-/* The repo root, and the reads every gate does through it: `read`, `filesIn`, `readAll`. One copy.
+/* The repo root, and the reads the tools do through it: `read`, `filesIn`, `readAll`. One copy.
  *
  * A per-tool `join(dirname(fileURLToPath(import.meta.url)), '..')` drifts the moment a tool moves
  * between `tools/` and `tools/lib/` and every read fails with ENOENT on a path nobody wrote.
- * mirror.mjs (a MIXED list of files and directories) and minify-js.mjs (roots outside the repo)
- * keep their own walk on purpose. */
+ * minify-js.mjs (roots outside the repo) keeps its own walk on purpose. */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +23,7 @@ export const filesIn = (dir, ext) => readdirSync(join(ROOT, dir), { recursive: t
 	.filter((f) => f.endsWith(ext))
 	.map((f) => join(dir, f));
 
-/* Every such file's text, newline-joined — a whole tree as ONE string. That is what a gate wants
+/* Every such file's text, newline-joined — a whole tree as ONE string. That is what a tool wants
  * when the question is "does the theme, anywhere, do X": a named file goes stale the moment the
- * code moves to a sibling module, which is the failure chrome-fence.mjs's own header records. */
+ * code moves to a sibling module. */
 export const readAll = (dir, ext) => filesIn(dir, ext).map(read).join('\n');

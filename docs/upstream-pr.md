@@ -50,13 +50,13 @@ changelog and code comments, not in the upstream body.
 
 - The commit body carries no `#NNNN` and no link: a force-push re-sends every mention.
 - No compatibility with EOL releases (23.05 refused twice; 24.10 is next).
-- Gate-only code ships stripped: an export for a test is marked `/* fs:probe */` and the sync cuts it.
+- Probe-only code ships stripped: an export marked `/* fs:probe */` is cut by the sync.
 - The theme names no outside site and no repository of its own.
 - No migrations "just in case": OpenWrt assumes a full image upgrade.
 - `po/` stays out: Weblate owns it.
 - Release branches (`openwrt-25.12`, …) take bug and security fixes only.
 - `Makefile` is edited on the luci side by hand (`sync-luci-fork.sh` does not carry it), mirroring
-  our postinst/postrm/conffiles changes. `npm run fork-drift` is a report, not a gate to empty.
+  our postinst/postrm/conffiles changes.
 
 ### Already refused — do not offer again
 
@@ -90,7 +90,6 @@ the finished sheet: the branch is built by **replaying** states of our tree, nev
 | `../tmp/fs-hist` | worktree of ours, for the replay |
 | `../tmp/luci-pr` | THE clone of openwrt/luci: `origin` upstream, `fork` ours; all branch work here |
 | `../tmp/luci-ref` | worktree of that clone, the reference for Step 3 |
-| `../luci-fork` | drift report only (`npm run fork-drift`), synced from `main` |
 
 **The source is the latest release tag** (`git describe --tags --abbrev=0`). A review fix rides on
 top of the tag until the next release.
@@ -151,7 +150,7 @@ diff -r -x Makefile -x po ../tmp/luci-ref/themes/luci-theme-footstrap $LUCI/them
 
 `sync-luci-fork.sh` exits 1 when a file mode differs from our index, when probe stripping leaves a
 double blank line, or when a shipped file references something outside the tree (`../tmp/`,
-`tools/`, `tests/`, stands, `issue #N`, a commit hash); read its whole output.
+`tools/`, a test file, stands, `issue #N`, a commit hash); read its whole output.
 
 ### Step 4. Cut the PR commits
 
@@ -207,14 +206,14 @@ After the merge: `git worktree remove ../tmp/fs-hist`, `git -C $LUCI worktree re
 ## Preflight
 
 All of it runs before the **first** push: on #9111 the bot needed two rounds, and both times found
-what a local run catches. The PR carries the latest tag's tree, so sections 1, 4, 5 and 7 run in
+what a local run catches. The PR carries the latest tag's tree, so sections 4, 5 and 6 run in
 `../tmp/fs-hist` detached at the tag
 (`git -C ../tmp/fs-hist checkout --quiet --detach $(git describe --tags --abbrev=0)` from our root).
 
 0. **Review the branch diff** (`git -C ../tmp/luci-pr diff origin/master..`, plus
    `tools/upstream-review-facts.sh -C <luci worktree> origin/master HEAD` for the mechanical facts)
    for the classes the upstream bot flagged on #9111:
-   1. orphaned probe/gate comments whose code was stripped;
+   1. orphaned probe comments whose code was stripped;
    2. a removed or renamed API still referenced in the tree (grep the old name);
    3. a lost executable bit (`--summary`, `mode change 100755 => 100644`, a `cgi-bin` file above all);
    4. double blank lines, trailing whitespace, missing final newline (`git diff --check`);
@@ -224,7 +223,7 @@ what a local run catches. The PR carries the latest tag's tree, so sections 1, 4
    7. dead exports nothing imports;
    8. a visible behaviour change the commit body does not mention;
    9. formalities (subject, body lines, `Signed-off-by`, no link in a body).
-1. **Our gates**: `npm run check` exit 0; when touched also `npm run fork-drift`, `npm run upstream`.
+1. **Our check**: the tag's CI run has `e2e` green on both routers ([verifying.md](verifying.md)).
 2. **Their eslint on our files** — their config lists globals by hand and does not read the
    `'require X as Y'` pragma:
    ```sh
@@ -245,14 +244,10 @@ what a local run catches. The PR carries the latest tag's tree, so sections 1, 4
    docker exec <stand container> sh -c 'for f in $(find /usr/share/ucode/luci/template/themes/footstrap -name "*.ut"); do
      ucode -T -c -o /dev/null "$f" || echo "FAILS: $f"; done; echo done'
    ```
-5. **Live on both package managers**: `owlab sync owrt2512 owrt2410`; when `fs-fit` changed,
-   `tools/bg.sh node tools/scroll-anchor.mjs --engines chromium,firefox,webkit`. `npm run live`
-   takes no flags; call `node tools/<gate>.mjs --only owrt2512,owrt2410` directly.
-6. **Drift**: `./tools/sync-luci-fork.sh ../luci-fork && npm run fork-drift`. Only `Makefile`,
-   `po/` and `cascade.css` legitimately differ.
-7. **Size** (asked about twice): `node tools/size-budget.mjs --show`;
+5. **Live on both package managers**: `owlab sync owrt2512 owrt2410`.
+6. **Size** (asked about twice):
    `du -sb luci-theme-footstrap/ucode luci-theme-footstrap/htdocs/luci-static/resources`.
-8. **Security review** on the final branch: `/security-review` on a commit carrying the tag's tree
+7. **Security review** on the final branch: `/security-review` on a commit carrying the tag's tree
    over the previous synced tag — the recipe in [releasing.md](releasing.md) Step 2. First look: the
    signature chain in `install.sh`, new shell scripts, the login template (unauthenticated), sinks
    in the browser JS, build pipeline changes.

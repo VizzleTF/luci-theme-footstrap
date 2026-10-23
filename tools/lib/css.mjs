@@ -1,7 +1,7 @@
-/* Build the stylesheet for a gate to measure. One copy.
+/* Build the stylesheet for a tool to read. One copy.
  *
- * The stylesheet is GENERATED (build-css.sh concatenates styles/), so a gate must build it rather
- * than measure a stale copy. mkdtemp makes the output name a non-question: a fixed name under a
+ * The stylesheet is GENERATED (build-css.sh concatenates styles/), so a tool must build it rather
+ * than read a stale copy. mkdtemp makes the output name a non-question: a fixed name under a
  * shared /tmp made callers invent names to avoid colliding, so do not re-add a `name` knob. */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 
 import { ROOT } from './root.mjs';
 
-/* A fresh scratch dir, removed when the process exits (a gate run leaked one per build before). */
+/* A fresh scratch dir, removed when the process exits (a run leaked one per build before). */
 export function scratchDir(prefix) {
 	const dir = mkdtempSync(join(tmpdir(), prefix));
 	const clean = () => rmSync(dir, { recursive: true, force: true });
@@ -24,8 +24,8 @@ export function scratchDir(prefix) {
 
 /* The seam of every `shipped` sheet this process built, by sheet path: { names: Map(--fs-x -> --a),
  * gallery: docs/gallery.html with the same rename }. A page that reads a private name is the far side
- * of the seam (mangle-tokens.sh renames the JS and templates the same way), so a gate that stamps or
- * reads one asks `names`, and serveGallery serves `gallery`. */
+ * of the seam (mangle-tokens.sh renames the JS and templates the same way), so a caller that stamps or
+ * reads one asks `names`, and a gallery server serves `gallery`. */
 const SEAMS = new Map();
 export const seamOf = (cssPath) => SEAMS.get(cssPath);
 
@@ -46,10 +46,10 @@ function mangle(out, script, dir) {
 	});
 }
 
-/* -> absolute path of a freshly built cascade.css. `dev` keeps comments: css-dup matches @mirror
- * markers, which the squeeze strips. `shipped` runs mangle-tokens.sh after build-css.sh, the two
- * steps a router's sheet goes through (Makefile, tools/stage.sh), so a gate measures the bytes the
- * package ships; computed-diff does, the rest measure the readable sheet. `ref` builds a git ref
+/* -> absolute path of a freshly built cascade.css. `dev` keeps comments (the @mirror
+ * markers among them), which the squeeze strips. `shipped` runs mangle-tokens.sh after
+ * build-css.sh, the two steps a router's sheet goes through (Makefile, tools/stage.sh), so the
+ * caller reads the bytes the package ships. `ref` builds a git ref
  * instead of the worktree, scripts and all: `git archive` gives exactly build-css.sh, mangle-tokens.sh
  * and styles/ beside it, reads neither index nor worktree, and takes the ref as an argv entry, never
  * through a shell. stdio: 'inherit' keeps the scripts' "N bytes -> path" lines, which are worth having

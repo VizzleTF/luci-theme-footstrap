@@ -28,7 +28,7 @@ luci-theme-footstrap/
 │   │                     installs a page picks the largest icon and downscales, and iOS reads
 │   │                     the apple-touch-icon LINK, which points at the same file)
 │   │                     (the raster is COMMITTED and made by tools/build-icons.mjs — the
-│   │                      buildbot has no browser; `npm run icons` proves it matches logo.svg)
+│   │                      buildbot has no browser)
 │   │                     (bg and fonts/ are NOT here: they are symlinks uci-defaults
 │   │                      makes to /etc/footstrap/, which the admin uploads or installs;
 │   │                      the pattern is served by the cgi-bin script, not linked)
@@ -71,16 +71,15 @@ page colour, since the manifest is read once at install time and cannot follow a
 change (it paints the splash and the installed window's chrome, never the page). Chrome's install
 prompt needs a secure context, so over plain HTTP what this buys is iOS's Add to Home Screen — which
 reads the `apple-touch-icon` link rather than the manifest — plus the icon itself. Regenerate it with
-`node tools/build-icons.mjs` whenever `logo.svg` changes; `npm run icons` fails if you forget.
+`node tools/build-icons.mjs` whenever `logo.svg` changes.
 
 The committed file is **quantised to a 32-colour palette**: the picture is a flat background, one
 ink colour and the ramp between them, so a palette is the right encoding and the worst channel moves
 by 18 of 255 on 0.2% of the pixels. That step wants **ImageMagick**, and the repack after it wants
 **oxipng** (`-o 6`, zopfli 255, `--strip safe`: 1,613 B from ImageMagick's default zlib, 1,481 from
 its best, 1,341 from oxipng, identical IHDR, PLTE and inflated IDAT). Both are needed only when
-regenerating, and generating exits 1 without either: `npm run icons` compares PIXELS in the browser
-it already runs, so a machine without oxipng would commit the larger file and nothing would go red.
-A different ImageMagick version is not a failure and a redrawn logo still is. `logo_48.png` (320 B
+regenerating, and generating exits 1 without either, so a machine without oxipng cannot commit the
+larger file unnoticed. `logo_48.png` (320 B
 to 291 B) is not generated: it was repacked once with the same oxipng command. Nothing in luci-base
 could stand in for the icon, which is worth stating: it ships functional glyphs (interfaces, signal
 bars, ports) and no logo or raster of any kind, and every theme carries its own.
@@ -123,8 +122,7 @@ Two different tools; confusing them is expensive.
   default (`LUCI_MINIFY_JS?=1`) and jsmins the untouched source. Nothing sets `LUCI_MINIFY_JS` in
   the Makefile any more — until 0.14.x it did, gated on a `FOOTSTRAP_PREMIN` variable that only
   CI's SDK-build release leg set, and nothing set after that leg was retired in v0.11.7. Both
-  paths matter: comments are just under 40 % of the JS source (comment-share holds each file under
-  it), and uhttpd serves `/www` **uncompressed**, so those are bytes on the wire and in flash.
+  paths matter: comments are just under 40 % of the JS source, and uhttpd serves `/www` **uncompressed**, so those are bytes on the wire and in flash.
 
   The source therefore has to stay jsmin-safe — see the regex rule in
   [conventions.md](conventions.md).
@@ -135,9 +133,8 @@ The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sour
 `PKG_BUILD_DIR`, and edits the **copy**:
 
 1. **Copy `LICENSE`** into `PKG_BUILD_DIR` — `PKG_LICENSE_FILES` resolves against *that*, and
-   luci.mk does not copy the package root. The copy is metadata only, luci.mk never installs it;
-   `npm run makefile-contract` fails when a file named in `PKG_LICENSE_FILES` has no copy line,
-   which is how a drop as dead code went unseen once.
+   luci.mk does not copy the package root. The copy is metadata only, luci.mk never installs it,
+   so the line looks dead; it was once dropped as dead code and nothing noticed.
 2. **`build-css.sh`** → `cascade.css` in the build tree. `cat`/`awk` only, so it runs on the
    OpenWrt buildbot with no host toolchain.
 3. **`mangle-tokens.sh`** — shorten the private `--fs-*` names, 14% of the sheet.
@@ -166,7 +163,7 @@ The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sour
    spanning lines), a trailing backslash (a continued string), a quote left open at a line end
    inside a `{% %}` or `{{ }}` block (a multi-line string: `ucode -T -c` accepts one and its next
    line is data; 0 of the 5 templates have one), `<pre>` and `<textarea>`, the five places a
-   leading blank is data; `tests/strip-build.test.mjs` holds each refusal. The scan tells a regex
+   leading blank is data. The scan tells a regex
    literal from a division by the token before the `/`: an opening character, an operator or one of
    `return`, `case`, `in`, `delete`, `else` starts a regex (`ucode -T -c` reads those five that way
    and `typeof`, `void`, `throw`, `new`, `do` as names), so `return /"/` is not a string.
@@ -182,11 +179,11 @@ The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sour
    byte-identical to the ones the source templates serve, once the comments are removed from both
    (the only remaining difference is the session id).
 5. **`strip-build.sh probes`** — the `/* fs:probe */` export lines out of the resources JS: a few
-   module-private functions are exported only so a gate in this repository can call them. The
+   module-private functions are exported only for this repository's own tooling. The
    functions stay; the export line goes.
 6. **`strip-build.sh shell`** — whole-line `#` out of the shell under `root/`. A heredoc, and a
    `#` line inside a quoted string (`ssh "$R" "…"` is one: that line is data), refuse the build
-   naming `file:line`; `tests/strip-build.test.mjs` holds both.
+   naming `file:line`.
 7. **`strip-build.sh assets`** — the comment out of `logo.svg` and the indentation out of
    `manifest.json`, two files every browser fetches uncompressed.
 8. **Stamp `FS_VERSION`** into `fs-version.js` with `sed`. The path is part of the contract —
@@ -204,8 +201,8 @@ which `CONTRIBUTING.md` names as *the* way to translate LuCI. Nothing in this pa
 The release is built by owfeed, not luci.mk. From 0.14.4 the owfeed build emits the same set
 luci.mk would: **`luci-theme-footstrap`, plus one `luci-i18n-footstrap-<lang>` per language**, with
 the catalogue at `footstrap.<lang>.lmo` and a `uci-defaults` line registering the language in
-LuCI's own menu. `tools/stage.sh` builds the per-language staging trees, `owfeed.yml` declares one
-package each, and `tools/i18n-packages.mjs` fails the build when those three lists disagree.
+LuCI's own menu. `tools/stage.sh` builds the per-language staging trees and `owfeed.yml` declares
+one package each, so the languages in `po/`, the staging trees and `owfeed.yml` have to agree.
 
 **Measuring a size change.** Package figures are what the release ships, so they are taken the way
 CI builds: owfeed at the version `build.yml` pins (0.5.5) with `owfeed.yml`'s `compression:
@@ -272,8 +269,7 @@ request against it, so `luci-i18n-footstrap-ru` and `-es` were absent from the f
 that took while the signed assets sat in the release — the installer falls back to the release,
 through the same verified chain, and pins it to the tag the INSTALLED theme came from rather than to
 `latest`, because the feed trails the release by up to a day and a catalogue knows only the strings
-of its own version. `tools/check-packages.sh`
-asserts one theme package per format, one catalogue per language package, and none in the theme.
+of its own version.
 
 ## install.sh: fetch, verify, install
 
@@ -552,7 +548,8 @@ and reported as success. Measured on a live router: it held eight options, was p
 had no `.conffiles` entry beside base-files' and dnsmasq's.
 
 Nothing observable fails when this regresses — the wipe happens on somebody else's router, months
-later — so `npm run conffiles` gates it: every shipped `/etc/config/*` must be declared.
+later — so every shipped `/etc/config/*` must be declared. CI's `e2e` saves a footstrap setting
+before the upgrade and fails when it does not survive it ([verifying.md](verifying.md)).
 
 The uploaded background is the sibling case with the other answer. `/etc/footstrap/login-bg` is
 written at runtime too, but it lives outside `/etc/config`, so a package upgrade never touches it
@@ -592,10 +589,8 @@ There is no grant for an in-app update mechanism: the theme upgrades through the
 installer adds.
 
 rpcd **skips an unreadable file in `acl.d` and says nothing**, so a stray comma means the grant
-is issued to nobody and nothing else notices. `npm run acl` (`tools/check-acl.sh`, also a step in
-CI's `check` job) parses every shipped `acl.d/*.json` and additionally rejects a document that
-parses but grants nothing — a list instead of an object, or an entry with neither `read` nor
-`write`, both of which rpcd accepts just as quietly.
+is issued to nobody and nothing else notices. A document that parses but grants nothing — a list
+instead of an object, or an entry with neither `read` nor `write` — is accepted just as quietly.
 
 A related trap the page had to solve: `rpc.js` only raises on the ubus status code when the
 declaration asks it to (`reject: true`). Without it, a per-config ACL refusal — `uci` granted,
@@ -604,23 +599,20 @@ file had been written.
 
 ## `luci-upstream.pin`
 
-The single source for the pinned `openwrt/luci` commit and the sha256 of the two borrowed tools
-that CI **downloads and RUNS** as gates:
+The single source for the pinned `openwrt/luci` commit and the sha256 of the borrowed tools
+(`luci-base/src/jsmin.c`, `build/i18n-scan.pl`). `update-po.sh` **downloads and RUNS**
+`i18n-scan.pl` to regenerate the catalogue: it lexes `.ut` (rewriting the template into JS before
+xgettext) and picks up the title from the rpcd ACL; a `grep` for `_('…')` does neither.
 
-- `luci-base/src/jsmin.c` — decides whether the shipped JS is safe;
-- `build/i18n-scan.pl` — decides whether the catalogue is complete. It lexes `.ut` (rewriting the
-  template into JS before xgettext) and picks up the title from the rpcd ACL; a `grep` for
-  `_('…')` does neither.
-
-Taken from a moving `master`, these gates would be "whatever upstream pushed last"; the sha256
+Taken from a moving `master`, the tool would be "whatever upstream pushed last"; the sha256
 says so out loud. The same file pins `USIGN_PIN` (so the signer in CI and the verifier in the field
 are the same code) and `OPENWRT_KEYRING_PIN` — the commit of `openwrt/keyring` the release SDK's
 signing keys are read from, pinned from a *different* host than the tarball they verify.
 
-It deliberately pins **no ucode**. The template compile-check moved into the `verify` containers,
-where the router's own interpreter runs it against the installed templates on both release lines
-([ci.md](ci.md)) — so there is no interpreter to build and no commit to keep current, and the file
-says so in place to stop the pin coming back.
+It deliberately pins **no ucode**: the router's own interpreter runs the installed templates on
+both release lines in CI's `e2e`, where a template that fails shows as footstrap's chrome missing
+([verifying.md](verifying.md)) — so there is no interpreter to build and no commit to keep current,
+and the file says so in place to stop the pin coming back.
 
 ## The same package, twice: this tree and the luci tree
 
@@ -642,9 +634,7 @@ hand-maintained (`include ../../luci.mk`, `PKG_MAINTAINER`), so `postinst`, `pos
 `conffiles` have to be changed there as well — a postrm cleaned up here and not there is exactly
 the kind of divergence nothing else notices. And `po/` belongs to **Weblate** over there: upstream
 forbids editing catalogues by hand, so the sync no longer sends them, and a msgid change is its own
-deliberate PR against `po/templates/`. `npm run fork-drift` lists every shipped file the two trees
-disagree about and names those two separately; it is a report rather than a gate, because an
-unproposed change is a legitimate difference.
+deliberate PR against `po/templates/`.
 
 **That tree gets the built stylesheet; this one keeps the layers.** Here, `styles/` is thirty-eight
 files in four cascade layers whose *order* is the design, and `cascade.css` is a build artefact

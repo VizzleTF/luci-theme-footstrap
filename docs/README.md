@@ -10,9 +10,9 @@ Every page here stands on its own — start wherever your question is.
 | Page | Answers |
 |---|---|
 | [architecture.md](architecture.md) | What LuCI expects from a theme, and where footstrap plugs into it |
-| [conventions.md](conventions.md) | The rules a patch must follow, and which gate holds each one |
+| [conventions.md](conventions.md) | The rules a patch must follow, and why |
 | [development.md](development.md) | Bring up a dev router, push a change, prove it works |
-| [verifying.md](verifying.md) | What to run after an edit: tiers, per-area gates, the full cycle on the stands |
+| [verifying.md](verifying.md) | The one check (`tools/e2e.mjs`): what it proves, running it, reading its CI artifacts; the per-area invariants |
 
 ## How it is built
 
@@ -48,7 +48,7 @@ and a style checker: <https://vizzletf.github.io/luci-theme-footstrap/>.
 
 | File | What it is |
 |---|---|
-| `gallery.html` | every widget LuCI can emit, with the real class names — what the a11y gate runs against |
+| `gallery.html` | every widget LuCI can emit, with the real class names — part of the developer portal |
 | `devkit.src.html` | source of the developer portal |
 | `devkit.html` | built from `devkit.src.html`, `gallery.html` and `02-tokens.css` by the `pages` job. Generated, gitignored, never committed |
 | the playground | not a page here at all — recorded from a real router by `tools/playground/*` and CI's `playground` job, published as a release asset and fetched into Pages by `pages.yml`. [ci.md](ci.md) |
