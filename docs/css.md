@@ -93,9 +93,7 @@ flags of 43 and added one that was missing.
 
 The single exception is `theme/95-a11y-media.css`: `prefers-reduced-motion` has to kill animations
 declared in `base` as well as `theme`, and only an important declaration reaches back a layer. The
-inversion is what makes that file possible. `.stylelintrc.json` holds the allowlist and
-`declaration-no-important` fails on any flag outside it; `css-metrics` ratchets the total against
-`LIMITS.importants` in tools/css-metrics.mjs — the live count, not a number copied here.
+inversion is what makes that file possible.
 
 Flags beyond those that fight an inline `style=` (the PoE line and the traffic figures are those):
 the forced-colors focus outline in
@@ -107,12 +105,9 @@ line and a pair needs half).
 
 ## The browser floor
 
-The theme has never declared one, and the sheet quietly moved it twice. `npm run css-floor` now
-derives it from the built stylesheet and fails if this section disagrees.
+The theme has never declared one, and the sheet quietly moved it twice.
 
-<!-- css-floor -->
 **Chrome 108**, **Firefox 101**, **Safari 15.4** — below that the page is wrong, not plainer.
-<!-- /css-floor -->
 
 That floor is set by `@layer`, `:is()`/`:where()`, `:focus-visible`, `svh`/`dvh`, `accent-color`
 and the logical properties. Nothing on the list has a fallback worth writing: a theme whose layers
@@ -130,11 +125,11 @@ page is plainer:
 | `:has()` | 105 / 121 / 15.4 | 59 refinements: port tiles, password control-group, stacked-table footers |
 | `color-mix()` | 111 / 113 / 16.2 | the 26 mixed tokens fall back to `styles/04-nocolormix.css` |
 | `@container` | 105 / 110 / 16.0 | five width adaptations inside `fs-view` / `fs-content` |
-| relative `oklch(from …)` | 122 / 128 / 18 | the tint and the accent/status hue axes (the palette's own colours stay). The rules sit under an `@supports` probe of the exact syntax they use. The ink on a hex accent does not depend on it: `inkFor()` in `fs-axes.js` and the `head.ut` pre-paint compute it in JS (`npm run axes` holds the two copies equal), so #ffcc00 gets dark ink in every engine |
+| relative `oklch(from …)` | 122 / 128 / 18 | the tint and the accent/status hue axes (the palette's own colours stay). The rules sit under an `@supports` probe of the exact syntax they use. The ink on a hex accent does not depend on it: `inkFor()` in `fs-axes.js` and the `head.ut` pre-paint compute it in JS (two copies that must stay equal), so #ffcc00 gets dark ink in every engine |
 | `text-wrap: pretty`, `scrollbar-width` | — | typographic polish |
 | `overflow: clip` value | 90 / 94 / 16.0 | `.fs-main`'s `overflow-x: clip` and `.fs-staging`'s `overflow: clip` drop, and the browser's own cross-axis correction (CSS Overflow 3) takes over: a sideways scrollbar on the desktop sidebar's `.fs-main` (its sibling axis is already `overflow-y: auto`) or, in the top/narrow layouts and on `.fs-staging`, whole-page horizontal scroll — exactly how stock LuCI (no `clip` at all) already renders. `.fs-staging` also stays `visibility: hidden` regardless, since nothing inside a staged view sets `visibility: visible` on itself, so nothing is exposed. Measured with `overflow-x`/`overflow` forced to `initial` in a live Chromium |
 
-Two rules follow, and the gate holds both.
+Two rules follow.
 
 **A `:has()` part never shares a selector list with a part that has none.** A selector list is not
 forgiving: one unsupported compound invalidates the whole rule. `.table.fs-stacked .tr,
@@ -150,17 +145,16 @@ token, which is why the twins are a file and not a prelude. Tints degrade to `tr
 (an absent surface never lowers contrast), hairlines to the solid colour they are a fraction of,
 and the focus ring to `--fs-focus-ring-solo`, which was already mix-free.
 
-Adding any CSS feature the sheet has not used before fails `css-floor` until it is classified in
-`tools/css-floor.mjs` as hard or soft and the baseline is refreshed with
-`node tools/css-floor.mjs --update`. The JS floor is lower and is not the constraint: the SPA
-router uses nothing younger than `ResizeObserver`, and `requestIdleCallback` is the only
-feature-detected API (Safari has none); `CSS.supports` is only wrapped in a try/catch.
+Any CSS feature the sheet has not used before has to be placed on one side of this line: hard
+(it moves the floor above) or progressive (it joins the table). The JS floor is lower and is not
+the constraint: the SPA router uses nothing younger than `ResizeObserver`, and
+`requestIdleCallback` is the only feature-detected API (Safari has none); `CSS.supports` is only
+wrapped in a try/catch.
 
-Classification is by PROPERTY, which misses a value with its own support story: `overflow` is
-ancient, `overflow: clip` is Safari 16, and the gate said nothing while the value shipped a version
-past the floor above. `css-floor`'s `value:prop=val` entries in `FEATURES` check the exact property/value pairs worth
-tracking — most values share their property's support, so this stays a short, explicit list rather
-than a scan of every value in the sheet.
+Classifying by PROPERTY misses a value with its own support story: `overflow` is ancient,
+`overflow: clip` is Safari 16, and the value once shipped a version past the floor above with
+nobody noticing. Most values share their property's support, so the values worth tracking are
+a short, explicit list, not every value in the sheet.
 
 ### Vendor prefixes still in the sheet
 
@@ -191,7 +185,7 @@ A file's own `@layer` wrapper is stripped (first line to the `}` where brace dep
 the directory's wrapper emitted once. A rule written after that `}` stays unlayered in the source but
 would land inside the layer, so the build exits 1 naming `file:line`; blank lines and comments pass.
 The depth count skips multi-line comments and quoted strings, so a `{` in prose or in `content: "{"`
-does not move the close (`tests/build-css.test.mjs`).
+does not move the close.
 
 With `--dev` it is a plain `cat`: the output is byte-identical to the concatenated sources. A
 file to read on a router, not one to ship.
@@ -215,7 +209,7 @@ What the whitespace half never touches, each for its own reason:
 - **a newline inside a declaration** — also a space. When the scanner once joined lines
   needlessly, a wrapped `calc()` came out as `…))- .004 …`; a minus with no space *before* it is
   a parse error, the declaration fell away, `--fs-tint-c` became undefined, `--fs-bg` invalid at
-  computed-value time, and the canvas silently went white (caught by `export-tier` as 1.5:1);
+  computed-value time, and the canvas silently went white (1.5:1 contrast);
 - **anything inside a string** — every data URI here is quoted and full of `:`, `;` and spaces.
 
 Selectors and declarations are rewritten in five ways only, each the same selector or declaration
@@ -242,7 +236,7 @@ string or a comment:
   defaults, so the declaration computes the same. Left alone: a bare `0` (`flex: 0` is grow 0, not a
   basis), any `var()` or `calc()` basis, and a custom property named `--flex`. `!important` stays.
 
-`tests/build-css.test.mjs` holds the edge cases. Two caveats are latent, because nothing in the tree
+Two caveats are latent, because nothing in the tree
 has either shape: the first three rewrites cannot tell a selector from a declaration, so a
 custom-property **value** holding `[x="y"]` or ` !` would change its token stream (script reads it
 back with `getPropertyValue`), and the `conditionText` of an `@supports selector([x="y"])` keeps the
@@ -292,16 +286,12 @@ and parsed, serialising the requests.
 
 ## `@mirror`: duplication you cannot delete but can stop rotting
 
-`css-dup` finds two rules with identical declarations under mutually exclusive guards (a media
-query against an attribute selector, two `@container` thresholds). A cascade-aware reader needs
-both copies, so no linter will ever call it an error — and this is exactly the shape that drifts.
+Some rules carry identical declarations under mutually exclusive guards (a media query against an
+attribute selector, two `@container` thresholds). A cascade-aware reader needs both copies, so no
+linter will ever call it an error — and this is exactly the shape that drifts: the moment the
+copies diverge they stop looking like a duplicate at all.
 
-The trap it was built for: `css-dup` matches *identical* bodies, so the moment the copies diverge
-they stop being a duplicate and it goes quiet — **precisely when it should shout**.
-
-So every duplicated body must be a decision: merge it into one rule, or pin it. There is no
-numeric budget — a budget is a number nobody defends, and it waves through the next unexplained
-copy for free.
+So every duplicated body must be a decision: merge it into one rule, or pin it.
 
 The body is pinned, not the rule, so the wrapper goes **inside the braces** (the selectors are
 legitimately different; only the declarations must match):
@@ -314,29 +304,23 @@ legitimately different; only the declarations must match):
 }
 ```
 
-`css-dup` then accepts the duplicate and `tools/mirror.mjs` (`npm run mirror`) keeps the copies
-byte-identical: edit one and the build fails until you fix the other. **An unpinned duplicate is
-a hard failure. A `@mirror` group with one copy is also a failure** — a mirror of one holds
-nothing.
-
-`npm run mirror` prints the current groups; read them from there, not from a doc. Today it reports
-nine, plus one whole-file mirror:
+The copies of one group stay byte-identical: edit one, edit the other. A `@mirror` group with one
+copy holds nothing. `git grep -n '@mirror'` lists the current groups; today there are ten:
 
 | Group | Copies |
 |---|---|
-| `table-card/label`, `table-card/actions`, `table-card/actions-inner` | `theme/30-tables.css` (`.fs-stacked`) ↔ `theme/65-dropdown.css` (`@container`) |
+| `table-card/label`, `table-card/actions`, `table-card/actions-inner`, `table-card/actions-dropdown` | `theme/30-tables.css` (`.fs-stacked`) ↔ `theme/65-dropdown.css` (`@container`) |
 | `ind-badge/paint`, `poll-glyph/mask` | two places in `theme/20-shell.css` (the sidebar and the rail) |
 | `meter/beside`, `meter/beside-value` | two copies in `theme/25-progressbar.css` |
 | `selected-row/paint` | `theme/60-inputs.css` ↔ `theme/65-dropdown.css` |
 | `btn-wrap/anywhere` | `theme/70-modal.css` (`label.btn`) ↔ `theme/90-responsive.css` (`@container fs-view`) |
-| `@same-file LICENSE` | the whole file |
 
 ## `:where(#view)`, not bare `#view`
 
 A page-scoped selector in `styles/pages/` anchors on `:where(#view)[data-page="…"]` rather than a
 bare `#view[data-page="…"]`, because an id contributes `(1,0,0)` on top of whatever the rest of the
 selector already carries. `20-overview.css`'s deepest chain (the progressbar row's
-`.td:first-child` selector) already measured `[1,7,0]` on its own — stylelint's `selector-max-specificity` ceiling
+`.td:first-child` selector) already measured `[1,7,0]` on its own — the sheet's specificity ceiling
 — and a bare `#view` on top of it pushed that to `[1,9,0]`. `:where()` matches the exact same
 single element (an id is a valid `:where()` argument) but contributes zero specificity, so nothing
 about *which* element matches changes, and the chain measures `[1,7,0]` again — the ceiling then

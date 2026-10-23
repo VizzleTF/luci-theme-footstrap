@@ -1,24 +1,20 @@
 # Conventions
 
-The rules a change to this theme has to follow. Every one of them is a bug that was hit, and
-most are enforced by a gate — the gate is named next to the rule so you can check yourself
-before pushing.
+The rules a change to this theme has to follow. Every one of them is a bug that was hit.
 
 Read this before your first patch. For what the theme *is*, start at
 [architecture.md](architecture.md).
 
-## The two commands
+## The check
 
 ```sh
-npm run check        # every gate below, in one run; must exit 0 before you push
-owlab test --release 25.12.4 --install 'dist/noarch/luci-theme-footstrap-*.apk' \
-  --assert 'package luci-theme-footstrap' \
-  --assert 'http 200 /cgi-bin/luci/admin/status/overview'
+owlab up owrt2512
+node tools/e2e.mjs --router owrt2512 --old <release pkg> --new <built pkg>
 ```
 
-…and the same again with `--release 24.10.8 --install 'dist/all/*.ipk'`. One run per format:
-`--install` is a host-side glob evaluated per router, so a pattern matching both hands the apk box
-an ipk.
+…and the same again on `owrt2410` with the `.ipk` pair: 25.12/apk and 24.10/opkg. It is the one
+check, and CI's `e2e` job runs it on both routers; what it walks through is in
+[verifying.md](verifying.md).
 
 Nothing in `package.json` is shipped. `luci.mk` copies `htdocs/` and `ucode/` verbatim and
 never invokes node, and the OpenWrt buildbot has no node at all.
@@ -33,24 +29,25 @@ owlab doctor
 ```
 
 **A change that alters behaviour is not finished until it has run on a real OpenWrt userland**, on
-**both** package managers — 25.12/apk and 24.10/opkg. Not "it should work", not "the gates are
-green": run it. `owlab up` gives you the disposable routers `owlab.yaml` defines, and
-`owlab test` is the local form of the same assertions CI's `verify` job makes. How:
-[development.md](development.md).
+**both** package managers — 25.12/apk and 24.10/opkg. Not "it should work": run it. `owlab up`
+gives you the disposable routers `owlab.yaml` defines, and `tools/e2e.mjs` against them is the
+local form of CI's `e2e` job. How: [development.md](development.md).
 
-Why the rule is written down rather than assumed: **every gate in this repository is static.** They
-read files. Not one of them opens a page. The classes of bug they structurally cannot see:
+Why the rule is written down rather than assumed: a file cannot answer for a page. The classes of
+bug that reading the source structurally cannot see:
 
-- a preference that writes to the wrong place (the appearance axes were gated on their *contract*
-  while one of them silently rewrote a router-wide default);
+- a preference that writes to the wrong place (the appearance axes were checked on their
+  *contract* while one of them silently rewrote a router-wide default);
 - anything that only appears once a session, a poller or a second browser exists;
 - a template that compiles and renders the wrong thing;
 - an install path — `postinst`, `uci-defaults`, the marker file, a conffile surviving an upgrade;
 - any difference between apk and opkg.
 
-A stubbed harness in node is worth running for what it does prove — that a module initialises, that
-an axis stores where you think — but it proves nothing about the router. Say which of the two you
-did; do not let one stand in for the other.
+Every bug users have reported was about a page: #11 a column shredded to one character per line,
+#22 a clipped submenu title, #14 an indicator that did not fit, #10 phantom scroll from a hidden
+pane, #12 a doubled scrollbar in one engine, #8/#33/#36 a third-party app laid out wrong, and —
+reported on the upstream PR — two pages that came back empty after a client navigation. Say which
+router a run covered; do not let one stand in for the other.
 
 **If you genuinely cannot run it** (no Docker on the machine), say so plainly in the commit or the
 PR rather than reporting the change as verified. An untested change described as tested is worse
@@ -64,7 +61,7 @@ and are for third-party apps only.
 
 ```css
 color: var(--fs-dim);                                    /* yes */
-color: var(--text-color-medium);                         /* no — audit.py --strict fails */
+color: var(--text-color-medium);                         /* no */
 ```
 
 Why: `:root` is one shared scope, and every `luci-app-*` puts its CSS in the same document
@@ -91,16 +88,14 @@ cascade — `theme/90-responsive` outranks a `style=` written by `package-manage
 one written by `29_ports.js`, `theme/45-misc` widens the box the realtime graphs size inline and repaints its inline
 black border, `theme/65-dropdown` pins the open list's `inset-inline` over `ui.js`'s inline left/right and frees `.hide-close` from a RichListValue's inline `min-width:25vw`,
 and `styles/base` keeps the six
-`.left`/`.right`/… forcing utilities plus two inline-style fighters. `.stylelintrc.json` states the
-reason for each file and is the only copy of the list — `declaration-no-important` rejects a flag
-outside it — and `css-metrics` ratchets the total against `LIMITS.importants` in tools/css-metrics.mjs — the live count, not a number copied here.
+`.left`/`.right`/… forcing utilities plus two inline-style fighters. A flag outside these files
+is the wrong layer, not a new entry.
 
 **Win on specificity, never on source order.** Two rules with the same specificity where the
 later one is load-bearing is the same failure as 220 `!important`, only quieter. Cap:
-`[1,7,0]`, held by stylelint's `selector-max-specificity`.
+`[1,7,0]`.
 
-**Edit the rule that already styles the selector.** Do not append a second one. The shadowed-
-declaration counter in `audit.py` is at **0** and stays there.
+**Edit the rule that already styles the selector.** Do not append a second one.
 
 **No colour literals.** A `#hex` follows neither the palette nor dark mode. The single exception
 is `--fs-scrim` — black at .7 is the absence of light behind a dialog, not a shade of any token.
@@ -115,20 +110,20 @@ foreign CSS out of zone one is described in [third-party-apps.md](third-party-ap
 
 **Coverage is a contract.** A selector no stock LuCI page renders still gets styled: some
 third-party `luci-app-*` emits it. "Looks unused, delete it" un-styles somebody's app. PurgeCSS,
-uncss and any coverage-based trimming are forbidden here. The one safe dead-CSS search is
-`css-orphans`, and it is safe only because nothing outside the theme can emit an `fs-*` class.
+uncss and any coverage-based trimming are forbidden here. The one safe dead-CSS search is for
+`fs-*` selectors, and it is safe only because nothing outside the theme can emit an `fs-*` class.
 
-**Pin a duplicate you cannot merge.** `css-dup` finds identical declaration bodies under
-mutually exclusive guards — a shape no linter calls an error and the shape that drifts. Worse,
-`css-dup` matches *identical* bodies, so it goes quiet exactly when the copies diverge. Every
-duplicate body must be either merged or wrapped in `@mirror`, and `tools/mirror.mjs` then holds
-the copies byte-identical. A `@mirror` group with one copy is a hard failure.
+**Pin a duplicate you cannot merge.** Identical declaration bodies under mutually exclusive
+guards are a shape no linter calls an error and the shape that drifts: once the copies diverge
+they no longer look like duplicates at all. Every duplicate body is either merged or wrapped in
+`@mirror`/`@endmirror`, and the copies in one group stay byte-identical. A `@mirror` group with
+one copy is a mistake.
 
 **A `display` rule on `.table`/`.thead`/`.tbody`/`.tfoot`/`.tr`/`.th`/`.td` needs a role to match.**
 A `display` other than `table`/`table-row`/`table-cell`/… drops the implicit `table`/`row`/`cell`
 role HTML-AAM derives from it (WCAG 1.3.1), and `fs-select.js`'s role map is what puts it back.
-`tools/table-contract.mjs` holds both directions: it fails if the role map shrinks and it fails if a
-theme selector sets `display` on one of these classes with no entry in the map to pair with it.
+Both directions hold: the role map does not shrink, and a theme selector does not set `display` on
+one of these classes without an entry in the map to pair with it.
 
 **A flex item's automatic minimum size defaults to its CONTENT size, and `overflow` is what zeroes
 it.** Any flex item with no explicit `min-width` (row axis) or `min-height` (column axis) still has
@@ -151,10 +146,9 @@ Before adding a declaration to a flex item, name which of the two behaviours it 
 must actually shrink wants `overflow: hidden` (or an explicit `min-width: 0`) to reach zero; a label
 or a pill that must clip while holding its own width wants the overflow property paired with an
 explicit `min-width`/`max-width` that is not `auto`, so the automatic minimum never gets a vote.
-**No gate holds this rule in general.** `pseudo-loc` catches the first shape after the fact — a
-caption that grew and then overflowed its shrunk pill reads as a finding — but not the third: an
-inert `text-overflow: ellipsis` produces no overflow at all, because the box it sits on was never
-given the room to shrink in the first place, and nothing measures a clip rule that never fires.
+The third shape is invisible on a page: an inert `text-overflow: ellipsis` produces no overflow at
+all, because the box it sits on was never given the room to shrink in the first place, and nothing
+measures a clip rule that never fires.
 
 ## Writing JS
 
@@ -169,13 +163,11 @@ return (/^https?:\/\//i.test(a));    /* `(` is in the list — safe */
 ```
 
 Upstream bugs: openwrt/luci#8299, #8020, #8021, #8256. **A zero exit code proves nothing** —
-the corruption is silent. Two gates: eslint's `wrap-regex` forbids the shape, and
-`tools/jsmin-verify.mjs` builds the same jsmin and fails unless the token stream of the minified
-output matches the source. A backtick inside `${…}` in a template string is out too (jsmin loses
+the corruption is silent. A backtick inside `${…}` in a template string is out too (jsmin loses
 the string, but that one fails loudly).
 
-**Comments are free on the router.** They are just under 40 % of the JS source (`comment-share`
-holds each file under it) and none of them ship: release CI pre-minifies with uglify-js, and a
+**Comments are free on the router.** They are just under 40 % of the JS source and none of them
+ship: release CI pre-minifies with uglify-js, and a
 node-less build runs jsmin. What a comment says is governed by "Comments" below.
 
 **A required module is a singleton; there is no inheritance between modules.** `'require X'`
@@ -230,11 +222,11 @@ behind each line.
 | one pointer | `docs/anchoring.md`, "The corrections"; openwrt/luci#8981 | when the proof is longer than a line |
 
 One of each, in that order, in one sentence where it fits. **A file under
-`luci-theme-footstrap/htdocs`, `ucode` or `root` ships to openwrt/luci, where `tools/`, `tests/` and
-this repo's `issue #N` do not exist: it carries none of them as a pointer and the reason stays
+`luci-theme-footstrap/htdocs`, `ucode` or `root` ships to openwrt/luci, where `tools/` and this
+repo's `issue #N` do not exist: it carries none of them as a pointer and the reason stays
 inline** (`sync-luci-fork.sh` fails on them). A `docs/` pointer is allowed there, at most one per
 comment and never the only carrier of the reason: `sync-luci-fork.sh` counts them without failing,
-as upstream carries them. A pointer to `docs/` is also for `tools/`, `tests/`, `styles/` and the
+as upstream carries them. A pointer to `docs/` is also for `tools/`, `styles/` and the
 docs themselves. An upstream `openwrt/luci#N` is fine. A comment with no invariant is
 deleted, not reworded: restating the line it sits on is what it did.
 
@@ -246,7 +238,7 @@ deleted, not reworded: restating the line it sits on is what it did.
 | a task or session name (`task refill2`) | nothing — cite the docs heading instead | names nothing the reader can open |
 | a `../tmp/…` path | `docs/<area>.md` restates the finding | the file is not in the repository; the pointer is dead the next day |
 | a CI run id | the changelog entry, once | the run expires; the number it produced does not |
-| any of the three rows above, in a shipped file | `node tools/upstream-contract.mjs --static-only` fails on `../tmp/`, a task id and a run id under `luci-theme-footstrap/{htdocs,ucode,root,styles}`, with `file:line`; red on v0.14.13 (754e529) with 5 hits | the upstream bot caught the same litter three times by hand; `tools/upstream-review-facts.sh <base> <head>` prints the rest of its checklist in one read-only report |
+| any of the three rows above, in a shipped file | nothing — v0.14.13 (754e529) shipped 5 of them | the upstream bot caught the same litter three times by hand; `tools/sync-luci-fork.sh` fails on a `../tmp/` path in what it exports, and `tools/upstream-review-facts.sh <base> <head>` prints the rest of the bot's checklist in one read-only report |
 | the same fact the docs already hold | one line and the pointer | two copies drift |
 | CAPS for emphasis, a rhetorical question, a warning to a future maintainer | plain prose | an LLM weights capitals as shouting, not as priority |
 
@@ -257,7 +249,7 @@ deleted, not reworded: restating the line it sits on is what it did.
 | inline, on or above a statement | 1 line; 2 when the reason is a number |
 | above a function or a rule block | 8 lines |
 | module or file header | 15 lines: purpose, invariants, what the file does not own |
-| comment share of a shipped JS file | under 40 % of the bytes, held by `npm run comment-share`; `.ut` `{# #}` and shell `#` comments are cut by `strip-build.sh` before they ship (a source-only cost, 47 % in header.ut), so no gate counts them |
+| comment share of a shipped JS file | under 40 % of the bytes; `.ut` `{# #}` and shell `#` comments are cut by `strip-build.sh` before they ship (a source-only cost, 47 % in header.ut), so the limit does not apply to them |
 
 Over the limit means the text is an explanation, and an explanation is a `docs/` section pointed at
 from one line. `fs-fit.js` once stood at 85 % comment bytes; that was the measurement this table came from: the
@@ -272,14 +264,15 @@ rules it documents are sound, and no reader finds them.
   buys nothing: scrollHeight 1039 either way. Not how it was found, not which attempt it was.
 - **References survive every compression pass**: issue numbers, spec text quoted verbatim, upstream
   commits, file paths inside the repository.
-- **Some comments are code**: `@mirror name/tag` / `@endmirror` (`npm run mirror`), `/* fs:probe */`
-  (`strip-build.sh probes`), the eslint `'require …'` pragmas, the Makefile's buildroot signature line
-  (`npm run marker`), the literal `dataset.fsFit` write (`tools/table-contract.mjs`). Reword one
-  and a gate or the build breaks, silently in the Makefile's case.
+- **Some comments are code**: `@mirror name/tag` / `@endmirror` (they name the copies that change
+  together), `/* fs:probe */` (`strip-build.sh probes`), the eslint `'require …'` pragmas, the
+  Makefile's buildroot signature line (`include/scan.mk` greps for it). Reword one and the build
+  breaks, silently in the Makefile's case: the SDK no longer sees the package at all.
 - **A `{# … #}` comment in a template opens with `{#` alone on its line, the text one tab deeper,
   and closes with `#}` alone on its line.** A comment that fits one line stays `{# text #}`, and a
   closing tag may carry its own name (`</div>{# /.fs-shell #}`). One shape across all five
-  templates; `ucode -T -c` after the edit.
+  templates; `ucode -T -c` after the edit, on a running stand through `docker exec` (`owlab exec`
+  parses `-c` and `-o` after `--` as its own).
 - **Edit the comment that is there.** Never stack a second one on the first.
 - **Formal English.** No exclamation, no addressing the reader.
 - **A `#` line inside a quoted `ssh "$R" "…"` string is part of the string.** `sh -n` after the
@@ -300,9 +293,8 @@ citing it may not.
 
 Prove the code did not move: a token-stream compare against HEAD for every JS file, a
 comment-stripped and whitespace-normalised diff for CSS, `.ut`, shell and yaml. That is what caught
-a deleted Makefile marker and a lost shell escape. The full-tree compare is T2 (`tools/bg.sh`); the
-pass is finished when its output has been read.
-
+a deleted Makefile marker and a lost shell escape. The full-tree compare runs detached
+(`tools/bg.sh`); the pass is finished when its output has been read.
 
 ## Templates and translation
 
@@ -316,15 +308,13 @@ dialog, nonsense on a layout switch.
 - Chrome (Menu, Logout, Skip to content), login and warning strings: **deliberately no context**,
   so they inherit luci-base's translation in the ~40 languages the theme has no catalogue for.
 
-Nothing here fails loudly: `_()` without a catalogue is just English text. `npm run i18n` fails
-if the `.pot` is stale or any `msgstr` is empty.
+Nothing here fails loudly: `_()` without a catalogue is just English text.
 
 **Set the custom property BEFORE the attribute.** Every appearance axis is implemented twice —
 inline in `partials/head.ut` before first paint (no module loader exists yet) and live in
 `fs-axes.js` (`fs-prefs.js` for dark mode, layout, auto-collapse and rail) — and the order is
 load-bearing. Reversed, a reload paints exactly one frame in the previous hue: a symptom nobody
-reports and no other test catches. `tools/axes.mjs` derives the contract from the JS and checks the
-template against it.
+reports and no page-level check catches. The two copies change in the same edit.
 
 ## Package and registration
 
@@ -347,8 +337,7 @@ postinst).
 the installer takes the feed — but a reader that does gets one candidate, not a guess: GitHub
 returns assets **sorted by name**, and a `luci-i18n-…` package sorting ahead of `luci-theme-…` once
 picked the wrong asset silently (issue #6). Code already on somebody's router cannot be fixed
-remotely; only the release can. CI fails unless each package resolves to exactly one asset under its
-name-anchored regex.
+remotely; only the release can.
 
 **The translation catalogue lives in `po/`.** That is the directory `LUCI_LANGUAGES` globs, so
 luci.mk bakes a `luci-i18n-footstrap-<lang>` package per language exactly as it does for every
@@ -359,6 +348,17 @@ LuCI, can see.
 image ships `uclient-fetch`); fall back, do not depend. `jsonfilter`, `sha256sum` and `usign` are
 in the base image.
 
+**Every shipped `/etc/config/*` is a declared conffile.** `/etc/config/footstrap` is written at
+runtime by Save-as-default, and an undeclared one is replaced on upgrade. Every shipped
+`acl.d/*.json` parses and grants something: rpcd skips an unreadable file silently.
+
+**A language is listed in three places**: `po/<lang>/`, `tools/stage.sh` and `owfeed.yml`, with
+the names and labels luci.mk uses. A language missing from one stages into a directory nothing
+packages, with a green build.
+
+**The app-icon rasters are committed.** `tools/build-icons.mjs` generates them from `logo.svg`;
+the buildbot cannot rebuild them.
+
 ## The trust chain
 
 `install.sh` installs from the owfeed-packages feed, so **the package manager is what verifies the
@@ -366,7 +366,8 @@ bytes**: apk checks the index against `owfeed-packages.pem`, opkg against usign 
 `9040356b214084da`, and both keys are pinned in the script itself — it runs from `wget | sh` before
 any package of ours exists. The script's own fetch of those keys uses a verified TLS channel:
 never `-k` / `--no-check-certificate`, and never as a retry, because a failed verification *is* the
-MITM case.
+MITM case. It must also be safe to run over its own result: three field reports (#16, #28, #30)
+were this script alone, all on the second-run path.
 
 The installer no longer downloads release assets, so it carries no sha256, no `usign -V` and no
 `--allow-untrusted`. **The release still signs everything** — a `manifest.txt` plus a detached
@@ -382,78 +383,3 @@ Every commit writes into `## [Unreleased]` **in the same commit as the code**, i
 and `CHANGELOG_ru.md` (only `CLAUDE.md` and a fix to an entry already written skip it) — a
 changelog written afterwards is written from the diff, and the diff is exactly what does not know
 why. Format, categories and the release runbook: [releasing.md](releasing.md).
-
-## The gates, and what each one holds
-
-A gate's failure line names the item (cell, selector, file:line), the measured value, the threshold,
-and the write or input that caused it. A gate that only says "failed" makes the reader guess; a new
-gate is reviewed against this line.
-
-A gate reads what git tracks, what git ignores by rule, or what it builds itself, so a working tree
-and CI's clean checkout get the same verdict: a gate once checked `dist/` on disk, passed the
-pre-push here and turned main red on CI (6dc27c5). A gate that needs a file the checkout lacks
-builds it first or names the step that does.
-
-| Gate | Holds |
-|---|---|
-| `lint` | eslint over `htdocs/` and `ucode/`, stylelint over `styles/` — correctness only, not formatting; stylelint also holds the `!important` allowlist (`declaration-no-important` + the file override) and the data-title i18n check (`selector-disallowed-list`) |
-| `audit` | `audit.py --strict`: bracket balance (a truncated-file smoke test), undefined `var()`, shadowed declarations, export-tier reads, dead base declarations, colour literals. A stray `!important` used to be checked here too (`BANG_OK`) — folded into stylelint once measured redundant: `declaration-no-important` rejects the same flag on the same files. Bracket balance stays: a custom property's VALUE is opaque to postcss, so an extra `)` inside one never becomes a `CssSyntaxError` under `lint:css` |
-| `css-metrics` | ratchet: `!important` count (`LIMITS.importants` in tools/css-metrics.mjs), 0 empty rules on the built sheet (specificity `[1,7,0]` is stylelint's) |
-| `css-orphans` | dead `fs-*` selectors — it **gates** the forward direction (styled, emitted by nothing) and **reports** the reverse, where an unstyled class is often legitimate (a JS hook, an element riding on inherited styles). A new name in the reverse list wants a look or a line in `JUSTIFIED_UNSTYLED`; it does not fail the build |
-| `i18n-packages` | one package per language: `po/<lang>/`, `tools/stage.sh` and `owfeed.yml` list the same languages, and the names and labels match luci.mk's — a language missing from one stages into a directory nothing packages, with a green build |
-| `makefile-contract` | five Makefile invariants that fail silently on a router: `DEPENDS`, no hardcoded `PKG_VERSION`, no csstidy over `:has()`/`color-mix()`, no live `rpcd reload`/`restart` at install time, a `PKG_LICENSE_FILES` the SDK path still copies |
-| `acl` | every shipped `acl.d/*.json` parses **and** grants something — rpcd skips an unreadable file silently |
-| `css-floor` | the browser floor derived from the stylesheet: a selector list mixing a `:has()` part with one that has none, and any feature with no decision about what happens below its floor (`tools/baselines/css-features.json`); the claim in `css.md` is compared with the derived one |
-| `css-dup` | identical declaration bodies under different guards |
-| `tables` | the table contract: where a cell may break (one allowlist, no viewport queries), the floor holds when a data table is squeezed, a carded cell prints its caption, and no `.cbi-dropdown` sits inside a scroll container |
-| `mirror` | `@mirror`-pinned copies still byte-identical |
-| `axes` | the pre-paint in `head.ut` agrees with the live appearance appliers, and `header.ut` reads every saved option back |
-| `scroll-anchor` (live) | grows something above the reader and asserts the page does not move under them — twice, once with the engine's own scroll anchoring suppressed (the Safari path, forced on any engine with `localStorage.fsEngineAnchor='off'`) and once without, so a fallback that also runs where the engine already corrects is caught as well. Plus a scripted flick up and down: the theme may not correct WHILE the reader moves. Three page shapes (section bodies, a polled table's rows, a bare table under `#view`) across the two scrollers a layout and a width can produce; `--full` adds the axes measured not to change the answer, which is what CI crosses on a push |
-| `table-tick` (live) | performs a poll tick on purpose — rows out, rows back in, marks stripped, then a forced layout — and fails if the replaced table was laid out before anything answered for it. The intermediate lasts a microtask, so no sampler can see it: with the stylesheet's gate removed this reports 613px on Обзор@390 and 817px on Processes, and nothing with it in place |
-| `floor-contract` (live) | the poll floor, found by the inline `min-height` under `#view` whatever the `data-fs-floor` mark says. Accuracy: each floor is stripped and re-measured with `offsetHeight`, and the two must agree within 4px (ran after a fold closes and after a `depends()` row hides, which move no node). Shrink: a partial `childList` shrink must bring the floor down. Tab switch: no floor on the pane the reader left. Release: the tallest floor is emptied and must be given back, judged against what the EMPTY box stands at, since a box with no children still has its padding. Liveness: every page must still answer within a deadline (`--settle`), because a sweep that feeds itself never returns. None of this is visible in a file or on a page that is only loaded: 41px short on `.cbi-section-descr` (/admin/network/dhcp), 2432px left on `Initscripts` after a tab switch, 927px never taken off on Network → Interfaces. A box the poll refilled or replaced is not judged |
-| `fit-quiet` (live) | the reader's place may not move while the chrome measures itself. `fitChrome()` strips the layout classes to ask whether the menu fits a row, and the bar is above the reader on every page. The gate hooks `offsetTop` and `getClientRects()`, the two forced layouts of that pass, and bounds `#maincontent`'s document position both ways within 2px of where it started: 33px of dip at 767px, 8px at 480px without the pin, which an engine with no scroll anchoring lays the page out against. The symptom does not reproduce headless, so the cause is what is watched |
-| `gallery-coverage` | every (widget, container) pair `styles/` has a selector for is in `docs/gallery.html`: the pairs are READ from the CSS (a selector whose subject is a `ui.js` widget class, folded into families, with its ancestor chain), the gallery is parsed without a browser and each chain matched against a real widget's ancestry. The stacked state is part of the container: a `ui.ComboButton` in a `.fs-stacked` `td.cbi-section-actions` was absent, its rule shipped unmeasured, and the arrow wrapped under the label (61a3c24); with that row removed this names `cbi-dropdown in .table.fs-stacked .td.cbi-section-actions >`. `ALLOW` holds the pairs that cannot be shown (chrome the gallery lacks, classes ui.js no longer emits), each with a reason, and a stale entry fails too. 36 pairs today, 0.2 s |
-| `page-modules` | the `data-page` → module map in `menu-footstrap-common.js` names the same page each mapped module tests for itself, every mapped module exports the `wire()` the loader calls, and no `'require'` pragma is left for one anywhere — one pragma puts the file back on every page and takes the saving with it |
-| `comment-share` | every shipped JS file is under 40 % comment bytes (acorn's comment spans, delimiters included), and it fails when it found no file to measure |
-| `chrome-fence` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
-| `export-tier` | the `--*-color-*` contract: each level readable as text on three surfaces, each `--on-*` readable on its fill, and the ramp is not flat — measured with and without `prefers-contrast: more`, which re-states the inks |
-| `conffiles` | every shipped `/etc/config/*` is declared a conffile — `/etc/config/footstrap` is written at runtime by Save-as-default, and an undeclared one is replaced on upgrade |
-| `changelog` | section set, order, dates, compare links, RU mirror parity, bold leads |
-| `i18n` | `.pot` current, no empty `msgstr` |
-| `shell` | every shell script in the source tree parses (`sh -n`) — including `release-notes.sh`, which otherwise fails inside the release job |
-| `marker` | the `call BuildPackage` literal `include/scan.mk` greps for, without which the SDK does not see the package at all |
-| `a11y` | axe-core WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap,2020,forum} × {untinted,60°,260°}; then under emulated `forced-colors: active`: every selector in an `@media (forced-colors)` block must reach a gallery element (`CHROME_ONLY` lists the template-chrome-only ones: `header.ut`, and the rail guard `head.ut` stamps) and keyboard focus must draw a `Highlight` outline |
-| `placeholder-ink` (`npm run placeholder`) | a hint may not read as a value the reader typed: every `placeholder` attribute and every `li[placeholder]` row on `docs/gallery.html`, across all ten palette/mode combinations (5 palettes × 2 modes), must have travelled ≥40% of the way from the field's own ink to its fill in light and ≥30% in dark (oklab lightness), and still measure 3:1 on that fill — SC 1.4.11, not AA's 4.5, which is the decision the token records: a dark palette has 6.45:1 of ink to spend against light's 14.84:1, and a hint that clears AA has not moved far enough to stop reading as a value. Every combination runs again under `prefers-contrast: more`, where the query hands the AA ink back and the thresholds swap (≥15%, 4.5:1). `a11y` is excluded from `li[placeholder]` for the same decision — axe measures that row as text and skips the attribute carrying the same ink. axe-core skips `::placeholder` entirely and the old ink was legal by every threshold the theme had — 11.12:1 on footstrap light, against the value's 14.84:1. It also caught a colour rule that had never applied: `li[placeholder]` (0,2,2) lost to the menu row's own `color` (0,3,2) |
-| `test` | the unit suite (`node --test`, no browser): the shipped module is evaluated inside the same wrapper luci.js uses, and its pure logic is driven directly. For the cases a stand **cannot** produce — a luci-base with a surface missing, an alias loop in a foreign `menu.d`, a `firstchild` tie — not as a second opinion on what the stands already cover |
-| `gates-red` (inside `test`) | one planted defect per cheap file gate, run in a copy of the tree: `mirror`, `axes`, `css-dup`, `chrome-fence`, `css-floor`, `css-metrics`, `css-orphans`, `size`, `audit`, `makefile-contract`, `conffiles`, `acl`, `marker`, `page-modules`, `i18n-packages` must exit non-zero and name the planted item — a gate that goes quiet on its own defect is a pass everywhere. A new cheap file gate gets its case in `tests/gates-red.test.mjs` |
-| `pseudo-loc` | every visible string of `docs/gallery.html` grown +45 % per word at 320 and 390 CSS px across three densities and one `dir=rtl` point; a `self`, `parent` or `clip` overflow that GREW past `--eps` fails — a box sized for English ships broken in Russian |
-| `smoke` | the nine modules evaluate against a real DOM and the colour axes write `--fs-<x>-h` before `data-<x>`; `--staged` runs the minified, token-mangled tree `tools/stage.sh` makes. Not a page: the gallery has no luci-base |
-| `computed-diff` | worktree vs `HEAD` on the shipped sheet (`build-css.sh` then `mangle-tokens.sh`), 75 computed properties over every element and its `::before`/`::after`; `--control` must read 0. The gallery has no `header.ut` chrome, so `live-audit` and `spa-parity` read that |
-| `size` | ceiling on what the router SENDS, pinned at each release (`--pin`, measured + 2 %), raised between releases by the agent when a correct fix needs it (a measured minimum, the reason and the numbers in the commit's changelog entry, head-room, reported; the grant is in the header of `tools/size-budget.mjs`), and re-pinned DOWN when a refactor shrinks the build so the slack cannot hide growth: `cascade.css` after `build-css.sh` + the token mangle, and the shipped JS after the token mangle, the probe strip and uglify-js, in `stage.sh`'s order — the package build's own asset half, reproduced. uhttpd serves `/www` uncompressed, so these are wire bytes |
-| `icons` | the committed app-icon rasters still match `logo.svg` (per channel, with a tolerance) and still hold the maskable invariants — they are generated by `tools/build-icons.mjs` and cannot be rebuilt on the buildbot |
-
-## The live gates, and why a file cannot answer for a page
-
-`npm run live` (the gates listed in `package.json`'s `live` script) needs a **running owlab router**,
-which is why it is not in `npm run check`. Every gate above measures a file; every bug users have reported was about a page:
-#11 a column shredded to one character per line, #22 a clipped submenu title, #14 an indicator that
-did not fit, #10 phantom scroll from a hidden pane, #12 a doubled scrollbar in one engine, #8/#33/#36
-a third-party app laid out wrong, and — reported on the upstream PR — two pages that came back empty
-after a client navigation while every static gate stayed green.
-
-| Gate | Holds |
-|---|---|
-| `upstream` | the coupling registry: every assumption fs-*.js makes about luci-base (`L.Poll`'s alias and queue, `uci.state.values`/`loaded`, `uci.load()` answering "what did THIS call fetch", `network.js` loading its three packages exactly once, `require()` publishing onto `L`, the modal contract, where `addNotification` puts a banner, an open dropdown being `position: absolute`) checked against the luci-base the router runs. Each failure names the module here that was written against it |
-| `spa-parity` | one page per shape (every menu page with `--pages-all`), opened BOTH ways — by click and by full load — compared on content, on uci's cache, on `network.getWifiDevices()` and on console errors. No baseline: a difference is always a bug |
-| `install-check` | `install.sh` run twice on a stand — fresh, then over its own result — asserting the package is installed, `luci.main.mediaurlbase` points here and `cascade.css` is on disk. Three field reports (#16, #28, #30) were this script alone, all on the second-run path. It leaves the PUBLISHED release installed and re-syncs the working tree afterwards, so it runs last |
-| `scroll-jank` | scrolls with a real wheel, long enough that a poll tick lands inside it, in BOTH layouts (they scroll different elements) and on every engine asked for: a table may not re-decide its remedy while the page moves, an element's document position may not change under the reader, and Chromium's layout-shift score for the window must stay under 0.02. The pass the theme defers to the stop is reported in a phase of its own, never failed. Chromium by default; `--engines chromium,firefox,webkit` needs the other two installed |
-| `live-audit` | one page per shape (every menu page with `--pages-all`) at 320/390/568/768/1024/1440, each resized into AND one (768 by default) ENTERED with a load of its own — a fault that only exists on arrival is invisible to a resize, which is how a table 65px past its column reached a user; the arrival records only what the resize at that width did not, because a fault both passes see is one fault: sideways document scroll, an element past the content column with no scroller, a clipped non-scrolling box, a sub-24px hit target with a neighbour, an operable element with no name, two stacked scrollports, a JS error. Ratcheted against `tools/baselines/live-audit.json` — a NEW signature fails, and `--update` (read the diff first) rewrites it. That file is a **union across platforms**: a handful of findings sit within a pixel of their threshold and text metrics differ between a maintainer's containers and CI's runner, so six signatures first appeared in CI |
-
-`--engine firefox` and `--engine webkit` run the audit in the other two engines, keyed separately in
-the baseline: #12 was Firefox-only, and a chromium run must not bless a finding it never saw.
-
-`tools/jsmin-verify.mjs` runs in CI only: it needs a jsmin built from the commit in
-`luci-upstream.pin`. `ucode -T -c` over every template runs inside the `verify` containers on both
-releases, against the installed theme with the router's own interpreter, so nothing here has to
-build one. Locally it is a template's T0 on a running stand, through `docker exec`
-([verifying.md](verifying.md) "Chrome and templates"): `owlab exec` parses `-c` and `-o` after `--` as its own.
