@@ -16,8 +16,9 @@ node tools/e2e.mjs --router owrt2512 --old <release pkg> --new <built pkg>
 check, and CI's `e2e` job runs it on both routers; what it walks through is in
 [verifying.md](verifying.md).
 
-Nothing in `package.json` is shipped. `luci.mk` copies `htdocs/` and `ucode/` verbatim and
-never invokes node, and the OpenWrt buildbot has no node at all.
+No npm package is installed on a router. The release build (`tools/stage.sh`) runs uglify-js and
+acorn over the shipped JS and templates; `luci.mk` copies `htdocs/` and `ucode/` verbatim and never
+invokes node, and the OpenWrt buildbot has no node at all.
 
 ## Keep owlab installed, and run the change on a router
 
@@ -83,22 +84,27 @@ so a `theme` rule never needs a flag to beat `base`.
 
 The one flag sanctioned against *our own* rules is `theme/95-a11y-media.css`:
 `prefers-reduced-motion` has to kill animations declared in `base` too, and only an important
-declaration reaches back a layer. Everything else on the allowlist fights something outside the
-cascade — `theme/90-responsive` outranks a `style=` written by `package-manager.js`, `pages/20-overview`
+declaration reaches back a layer; the same file carries the forced-colors focus outline, for the
+same reason. Every other file with a flag fights something outside the cascade —
+`theme/90-responsive` outranks a `style=` written by `package-manager.js`, `pages/20-overview`
 one written by `29_ports.js`, `theme/45-misc` widens the box the realtime graphs size inline and repaints its inline
 black border, `theme/65-dropdown` pins the open list's `inset-inline` over `ui.js`'s inline left/right and frees `.hide-close` from a RichListValue's inline `min-width:25vw`,
-and `styles/base` keeps the six
-`.left`/`.right`/… forcing utilities plus two inline-style fighters. A flag outside these files
-is the wrong layer, not a new entry.
+`theme/30-tables` holds `word-break: normal` against `processes.js`'s inline `word-break: break-word`
+and luci-mod-dashboard's unlayered `word-break: break-all`, and two carded-cell `flex` widths against
+that same unlayered sheet's `flex: 2 2 10%`, and `styles/base` keeps the six `.left`/`.right`/…
+forcing utilities, `[hidden]` in `10-reset`, and two inline-style fighters in `95-luci`. A flag
+outside these files is the wrong layer, not a new entry. Nothing checks this list; review does.
 
 **Win on specificity, never on source order.** Two rules with the same specificity where the
 later one is load-bearing is the same failure as 220 `!important`, only quieter. Cap:
-`[1,7,0]`.
+`[1,7,0]` (a convention; nothing checks it).
 
 **Edit the rule that already styles the selector.** Do not append a second one.
 
-**No colour literals.** A `#hex` follows neither the palette nor dark mode. The single exception
-is `--fs-scrim` — black at .7 is the absence of light behind a dialog, not a shade of any token.
+**No colour literals outside the palettes.** A `#hex` follows neither the palette nor dark mode.
+The exceptions: `--fs-scrim` — black at .7 is the absence of light behind a dialog, not a shade of
+any token; the logo ring in `theme/10-chrome.css`, which flips with mode like the favicon SVG; and
+the paper palette in `theme/97-print.css`. Nothing checks this rule; review does.
 
 **Stay inside your zone.** There are three: the theme's own chrome (`fs-*` names, `data-fs-chrome`
 roots — ours alone, and fenced against foreign CSS); the shared LuCI widget surface (`cbi-*`,
@@ -216,7 +222,7 @@ gives nothing back. This is the full rule, with the example behind each line.
 |---|---|---|
 | the invariant | `min-height` AND `height` are pinned to the same value for the whole pass | always |
 | the reason, as a number | the bar walked 230 -> 123 px inside one pass, 107 px of growth | when one was measured |
-| one pointer | `docs/chrome.md`, "Keeping the reader's place when the engine will not"; openwrt/luci#8981 | when the proof is longer than a line |
+| one pointer | `docs/chrome.md`, "`data-narrow`"; openwrt/luci#8981 | when the proof is longer than a line |
 
 One of each, in that order, in one sentence where it fits. **A file under
 `luci-theme-footstrap/htdocs`, `ucode` or `root` ships to openwrt/luci, where `tools/` and this
@@ -267,8 +273,7 @@ rules it documents are sound, and no reader finds them.
 - **A `{# … #}` comment in a template opens with `{#` alone on its line, the text one tab deeper,
   and closes with `#}` alone on its line.** A comment that fits one line stays `{# text #}`, and a
   closing tag may carry its own name (`</div>{# /.fs-shell #}`). One shape across all five
-  templates; `ucode -T -c` after the edit, on a running stand through `docker exec` (`owlab exec`
-  parses `-c` and `-o` after `--` as its own).
+  templates; `ucode -T -c` after the edit, on a running stand (`owlab exec`).
 - **Edit the comment that is there.** Never stack a second one on the first.
 - **Formal English.** No exclamation, no addressing the reader.
 - **A `#` line inside a quoted `ssh "$R" "…"` string is part of the string.** `sh -n` after the
@@ -318,11 +323,11 @@ tint, accent and rounding are client axes (`localStorage` + attributes on `:root
 entries and not a server choice. Do not reintroduce `-dark`/`-light` symlink themes or
 layout-specific entries.
 
-**A fresh install may activate the theme; an upgrade must never change the active one.** What
-tells the two apart is whether the registration was already there: `uci-defaults` writes
-`mediaurlbase` only in the run that first added `luci.themes.Footstrap`, which is the idiom the
-other themes in the tree use. `$PKG_UPGRADE` is checked as well and carries nothing on its own —
-apk never exports it.
+**An install or an upgrade never changes the active theme.** `uci-defaults` registers
+`luci.themes.Footstrap`; its `mediaurlbase` line runs only in the run that first added the
+registration and never overwrites a value, and luci-base ships `main.mediaurlbase`, so on a stock
+router it sets nothing: the admin picks Footstrap in Language and Style. `$PKG_UPGRADE` is checked
+as well and carries nothing on its own — apk never exports it.
 
 **No `rpcd reload` and no `restart`.** restart logs out every session; reload is a SIGHUP re-exec
 that can drop a plugin; the package registers nothing for rpcd to re-read (Makefile, above the
@@ -364,10 +369,12 @@ never `-k` / `--no-check-certificate`, and never as a retry, because a failed ve
 MITM case. It must also be safe to run over its own result: three field reports (#16, #28, #30)
 were this script alone, all on the second-run path.
 
-The installer no longer downloads release assets, so it carries no sha256, no `usign -V` and no
-`--allow-untrusted`. **The release still signs everything** — a `manifest.txt` plus a detached
-`.sig` per asset, both verified in the `release` job — because that is what a by-hand install and
-a mirror have to be checked against.
+Only when the feed cannot be read at all does the installer fall back to the release
+(`install_from_release()`): `usign -V` over `manifest.txt` against the pinned release key, then the
+asset's sha256 from that manifest; apk's `--allow-untrusted` there waives only the package's own
+signature. **The release signs everything** — a `manifest.txt` plus a detached `.sig` per asset,
+both verified in the `release` job — because that fallback, a by-hand install and a mirror are
+checked against it.
 
 An ed25519 signature is the link that holds and a sha256 alone cannot: GitHub *computes* the asset
 digest from the uploaded bytes, so whoever can swap an asset gets the digest recomputed for them.

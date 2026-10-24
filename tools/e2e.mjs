@@ -5,29 +5,29 @@
  *   1. install the last published release        -> it is offered in Language and Style, and the
  *                                                     active theme is left alone (README: the admin
  *                                                     picks Footstrap there)
- *   2. the admin picks footstrap and saves a footstrap setting
- *   3. upgrade to this build                       -> the admin's theme and setting survive
- *   4. every page of the menu is opened: by a full load at
- *      desktop and phone width, and by a click in the chrome. The same pages are then opened
- *      under bootstrap, and a page fails only for what footstrap adds: a JS error, a failed
- *      request or a view that never renders where bootstrap had none, or the theme's own
- *      stylesheet and chrome missing (LuCI falls back to another theme silently on a broken
- *      template).
+ *   2. the admin picks footstrap, and a marker section is written to /etc/config/footstrap, the
+ *      conffile Appearance saves to
+ *   3. upgrade to this build                       -> the admin's theme and the marker survive
+ *   4. every page of the menu is opened under bootstrap, the reference, then under footstrap by a
+ *      full load at desktop and phone width, and every entry of footstrap's menu by a click on it
+ *      (crawl() below says what fails a page); then tools/anchor-check.mjs: a poll tick that grows
+ *      the page above a parked reader leaves them where they were, in Chromium, Firefox and WebKit
  *   5. remove the package                          -> LuCI falls back to bootstrap and still serves
- *   6. install this build on the clean router      -> offered, active theme left alone
+ *   6. install this build again                    -> offered, active theme left alone
  *
  * No list of expected problems: the stock theme on the same router is the reference.
  *
  *   node tools/e2e.mjs --router owrt2512 --old <last release pkg> --new <this build pkg> [--out dir]
  *
- * Exit 0 when every step passed, 1 otherwise; the report and one screenshot per page and width
- * land in --out (default ../tmp/e2e-<router>). */
+ * Exit 0 when every step passed, 1 otherwise; the report, anchor-check's log and one screenshot per
+ * page and width land in --out (default ../tmp/e2e-<router>). */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { ROOT } from './lib/root.mjs';
+import { login, menuPaths } from './lib/stands.mjs';
 
 const { values: opt } = parseArgs({ options: {
 	router: { type: 'string' },
@@ -47,6 +47,7 @@ const router = (status.routers || []).find((r) => r.id === opt.router && r.state
 if (!router) { console.error(`${opt.router}: not running (owlab up ${opt.router})`); process.exit(2); }
 const CONTAINER = `owlab-${status.project}-${router.id}`;
 const BASE = `http://localhost:${router.http_port}/cgi-bin/luci`;
+const SCRIPT = new URL(BASE).pathname;
 const APK = router.package_manager === 'apk';
 
 /* ---- the router side ---- */
@@ -86,6 +87,17 @@ function check(step, ok, detail = '') {
 
 /* ---- the browser side ---- */
 
+/* What the theme serves: a request to one of these that fails is footstrap's whatever bootstrap did. */
+const THEME_FILE = /^\/luci-static\/footstrap\/|^\/luci-static\/resources\/(fs-[\w-]+|menu-footstrap[\w-]*)\.js$|^\/luci-static\/resources\/view\/footstrap\/|^\/cgi-bin\/luci-theme-footstrap-pattern$/;
+
+/* How long a page is watched after its view rendered. The full load at desktop width is watched for
+ * one LuCI poll interval (5 s, header.ut's `pollinterval` default) plus 1 s for the tick's handlers:
+ * theme code that runs late runs on a poll tick or on a timer of its own, the longest of which is
+ * fs-router's 5 s warm wait. The phone and click passes look for what differs by width or by
+ * client navigation, which shows at render, and get 1 s, as does the reference before it waits
+ * for the network to go quiet (settle()). */
+const LONG = 6000, SHORT = 1000;
+
 /* The view has rendered: a client-side view has replaced its "Loading view…" spinner, a legacy CBI
  * or template page has put something into #maincontent. Runs inside the page. */
 const RENDERED = () => {
@@ -94,169 +106,285 @@ const RENDERED = () => {
 	const m = document.getElementById('maincontent');
 	return !!(m && m.textContent.trim());
 };
-/* footstrap is what painted the page: its stylesheet loaded and its chrome is in the document. */
-const FOOTSTRAP = () => {
-	const link = document.querySelector('link[data-fs-shell]');
-	return !!(link && link.sheet && document.querySelector('[data-fs-chrome]'));
+
+/* What the reader gets, measured inside the page under either theme:
+ * - text: characters of visible text in the view (#view, else #maincontent): every text node whose
+ *   element is rendered, outside a <select> (a native one under bootstrap lists every option in
+ *   innerText, footstrap's styled one shows the chosen one: 8289 against 494 characters on System
+ *   for the same 454 visible ones) and outside script and style;
+ * - rules: style rules in footstrap's stylesheet, nested ones included (the sheet is a handful of
+ *   @layer blocks at the top level);
+ * - token: an export-tier token footstrap's sheet defines on :root (the private --fs-* names are
+ *   mangled in a release build, so one of those cannot be named here);
+ * - nav: footstrap's menu column is rendered with a box of its own. */
+const MEASURE = () => {
+	const host = document.getElementById('view') || document.getElementById('maincontent');
+	let text = 0;
+	const walk = host && document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+	for (let t; walk && (t = walk.nextNode());) {
+		const el = t.parentElement;
+		if (!el.closest('select, datalist, script, style, template, noscript') &&
+		    el.checkVisibility({ opacityProperty: true, visibilityProperty: true }))
+			text += t.data.trim().length;
+	}
+	const count = (list) => { let n = 0; for (const r of list) n += 1 + (r.cssRules ? count(r.cssRules) : 0); return n; };
+	const sheet = document.querySelector('link[data-fs-shell]')?.sheet;
+	const nav = document.querySelector('nav[data-fs-chrome]');
+	const box = nav && nav.getBoundingClientRect();
+	return {
+		text,
+		rules: sheet ? count(sheet.cssRules) : 0,
+		token: getComputedStyle(document.documentElement).getPropertyValue('--primary-color-high').trim(),
+		nav: !!(nav && nav.checkVisibility() && box.width > 0 && box.height > 0),
+	};
 };
+/* The shipped sheet carries about 1000 rules. An empty, truncated or wrong file carries far fewer
+ * than half of that; a refactor does not move it by half. */
+const RULES_FLOOR = 500;
 
-/* Errors are compared as text with the volatile parts (numbers, query strings) removed, so the same
- * fault under both themes is one signature. */
-const signature = (s) => String(s).split('\n')[0].replace(/\?[^\s'")]*/g, '').replace(/\d+/g, 'N').slice(0, 300);
+/* Errors and requests are compared as text with the volatile parts (session ids, query strings,
+ * numbers) removed, so the same thing under both themes is one signature. */
+const signature = (s) => String(s).split('\n')[0].replace(/[0-9a-f]{32}/g, 'S').replace(/\?[^\s'")]*/g, '').replace(/\d+/g, 'N').slice(0, 300);
+const pathOf = (url) => { try { return new URL(url).pathname; } catch (e) { return String(url); } };
+/* the scripts on an error's stack, as paths; the first is where it was thrown */
+const scriptsOf = (stack) => (String(stack).match(/https?:\/\/[^\s)]+/g) || []).map((u) => pathOf(u.replace(/(:\d+)+$/, '')));
+const requestKey = (req) => signature(`${req.method()} ${pathOf(req.url())} ${req.postData() || ''}`);
 
-function watch(page, origin) {
-	const errors = new Set();
+/* Everything one page shows, each with the time it showed up: JS errors with the file they came
+ * from (`theme` when a theme file is on the stack, or logged the line), failed requests, and every
+ * request made (the reference's are what an app asks for on its own). Chromium's console line
+ * "Failed to load resource" is left out: it names no path, and the request itself is recorded
+ * below with its path. A request the page cancelled itself (a navigation away) is no failure. */
+function watch(page) {
+	const seen = { errors: new Map(), failed: new Map(), requested: new Set(), rendered: 0 };
 	const net = page.__net = { inflight: 0, last: Date.now() };
-	page.on('request', () => { net.inflight++; net.last = Date.now(); });
+	const error = (sig, scripts) => seen.errors.has(sig) ||
+		seen.errors.set(sig, { at: Date.now(), theme: scripts.some((p) => THEME_FILE.test(p)) });
+	const failed = (req, what) => seen.failed.has(requestKey(req)) ||
+		seen.failed.set(requestKey(req), { path: pathOf(req.url()), what, at: Date.now() });
+	page.on('request', (r) => { net.inflight++; net.last = Date.now(); seen.requested.add(requestKey(r)); });
 	const done = () => { net.inflight = Math.max(0, net.inflight - 1); net.last = Date.now(); };
 	page.on('requestfinished', done);
 	page.on('requestfailed', done);
-	page.on('pageerror', (e) => errors.add(`pageerror: ${signature(e.message)}`));
-	page.on('console', (m) => { if (m.type() === 'error') errors.add(`console: ${signature(m.text())}`); });
-	page.on('response', (r) => {
-		if (r.status() >= 400 && new URL(r.url()).origin === origin)
-			errors.add(`http ${r.status()}: ${signature(new URL(r.url()).pathname)}`);
+	page.on('pageerror', (e) => {
+		const scripts = scriptsOf(e.stack);
+		error(`pageerror: ${signature(e.message)} (${scripts[0] || ''})`, scripts);
 	});
+	page.on('console', (m) => {
+		if (m.type() !== 'error' || /^Failed to load resource/.test(m.text())) return;
+		const where = pathOf(m.location().url);
+		error(`console: ${signature(m.text())} (${where})`, [ where ]);
+	});
+	page.on('response', (r) => { if (r.status() >= 400) failed(r.request(), `http ${r.status()}`); });
 	page.on('requestfailed', (r) => {
-		if (new URL(r.url()).origin === origin) errors.add(`failed: ${signature(new URL(r.url()).pathname)}`);
+		const why = (r.failure() || {}).errorText || '';
+		if (!/ERR_ABORTED/.test(why)) failed(r, why);
 	});
-	return errors;
+	seen.clear = () => { seen.errors.clear(); seen.failed.clear(); seen.requested.clear(); seen.rendered = 0; };
+	return seen;
 }
 
-async function login(page) {
-	await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-	if (await page.$('input[name="luci_password"]')) {
-		await page.fill('input[name="luci_username"]', 'root');
-		await Promise.all([ page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-			page.press('input[name="luci_password"]', 'Enter') ]);
-	}
-	await page.waitForFunction(() => window.L && typeof window.L.require === 'function', null, { timeout: 30000 });
+/* Wait for the view, then watch the page `span` ms; the reference then also waits until nothing has
+ * been in flight for a second, 10 s in all at most: an app's own requests keep arriving after its
+ * view rendered (adblock and banip fetch their reports late) and must land in the reference. */
+async function settle(page, seen, span, reference) {
+	const rendered = await page.waitForFunction(RENDERED, null, { timeout: 20000 }).then(() => true, () => false);
+	seen.rendered = Date.now();
+	await page.waitForTimeout(span);
+	if (reference)
+		for (let waited = span; waited < 10000; waited += 250) {
+			if (page.__net.inflight === 0 && Date.now() - page.__net.last >= 1000) break;
+			await page.waitForTimeout(250);
+		}
+	return rendered;
 }
 
-/* Every page the menu offers that renders something: leaves whose action is a view, a template or
- * a CBI map, with a title. Logout is left out: it ends the session the walk runs in. */
-async function menuPaths(page) {
-	const paths = await page.evaluate(async () => {
-		const ui = await window.L.require('ui');
-		const tree = await ui.menu.load();
-		const out = [];
-		const walk = (node, path) => {
-			for (const [ name, child ] of Object.entries(node.children || {})) {
-				const p = path.concat(name);
-				if (child.children && Object.keys(child.children).length) { walk(child, p); continue; }
-				const type = (child.action && child.action.type) || '';
-				if ([ 'view', 'template', 'cbi' ].includes(type) && child.title) out.push('/' + p.join('/'));
-			}
-		};
-		walk(tree, []);
-		return out;
-	});
-	return paths.filter((p) => !/\/logout$/.test(p));
-}
+/* Footstrap's menu takes a click at this width: Playwright's actionability check (visible, stable,
+ * not covered) on its first entry, without clicking. Null when it does, else why not. */
+const unreachable = (page) => page.locator('#topmenu > li > a').first().click({ trial: true, timeout: 3000 })
+	.then(() => null, (e) => signature(e.message));
 
-/* An app's own requests keep arriving after its view has rendered (adblock and banip fetch their
- * reports late, and LuCI's poll never lets the network go quiet for long), so the two themes are
- * watched for different spans: footstrap for 1 s after its view rendered, the bootstrap reference
- * until nothing has been in flight for a second, at most 10 s. An app's late error then lands in
- * the reference, and footstrap is charged only for what it shows that the longer look did not. */
-async function settle(page, reference) {
-	if (!reference) return page.waitForTimeout(1000);
-	const net = page.__net;
-	for (let waited = 0; waited < 10000; waited += 250) {
-		if (net.inflight === 0 && Date.now() - net.last >= 1000) return;
-		await page.waitForTimeout(250);
-	}
+/* What a page showed, as `open` and `click` return it; `after` is ms after the view rendered. */
+async function reading(page, seen, rendered, extra = {}) {
+	const m = await page.evaluate(MEASURE).catch(() => ({ text: 0, rules: 0, token: '', nav: false }));
+	const t0 = seen.rendered || Date.now();
+	return {
+		errors: [ ...seen.errors ].map(([ sig, e ]) => ({ sig, theme: e.theme, after: e.at - t0 })),
+		failed: [ ...seen.failed ].map(([ key, f ]) => ({ key, path: f.path, what: f.what, after: f.at - t0 })),
+		watched: Date.now() - t0, rendered, ...m, ...extra,
+	};
 }
 
 const shotName = (path) => path.replace(/^\//, '').replace(/\//g, '_') || 'root';
 
-/* One full load of `path`: errors seen, whether the view rendered, whether footstrap painted it. */
-async function open(page, errors, path, shotDir, reference = false) {
-	errors.clear();
+/* One full load of `path`. */
+async function open(page, seen, path, { shotDir, span, reference = false, menu = false }) {
+	seen.clear();
 	let rendered = false;
 	try {
 		await page.goto(BASE + path, { waitUntil: 'load', timeout: 30000 });
-		rendered = await page.waitForFunction(RENDERED, null, { timeout: 20000 }).then(() => true, () => false);
-		await settle(page, reference);
-	} catch (e) { errors.add(`navigation: ${signature(e.message)}`); }
-	const painted = await page.evaluate(FOOTSTRAP).catch(() => false);
-	if (shotDir) await page.screenshot({ path: join(shotDir, `${shotName(path)}.jpg`), type: 'jpeg', quality: 60 }).catch(() => {});
-	return { errors: [ ...errors ], rendered, painted };
+		rendered = await settle(page, seen, span, reference);
+	} catch (e) { seen.errors.set(`navigation: ${signature(e.message)}`, { at: Date.now(), theme: false }); }
+	const r = await reading(page, seen, rendered, reference ? { requested: [ ...seen.requested ] }
+		: menu ? { unreachable: await unreachable(page) } : {});
+	await page.screenshot({ path: join(shotDir, `${shotName(path)}.jpg`), type: 'jpeg', quality: 60 }).catch(() => {});
+	return r;
 }
 
-/* The same page reached the way a user reaches it in footstrap: a click on its link in the chrome,
- * from wherever the previous click left the reader. Null when the chrome has no link to it (a page
- * reached through a tab strip). */
-async function click(page, errors, path) {
-	errors.clear();
-	const href = BASE + path;
-	const found = await page.evaluate((h) => {
-		const a = [ ...document.querySelectorAll('[data-fs-chrome] a[href], nav a[href]') ]
-			.find((el) => el.href === h || el.href === h + '/');
-		if (a) a.click();
-		return !!a;
-	}, href);
-	if (!found) return null;
+/* The entries footstrap's menu offers, from the router's own menu tree the way fs-chrome.js renders
+ * it: every top-level entry of the admin mode, and every entry under one. `leaf` is the page an
+ * entry lands on, which the reference was read on: an alias's target, else the first child, all
+ * the way down. */
+const menuEntries = (page) => page.evaluate(async () => {
+	const ui = await window.L.require('ui');
+	const tree = await ui.menu.load();
+	const admin = tree.children && tree.children.admin;
+	const at = (path) => path.split('/').filter(Boolean).reduce((n, k) => n && n.children && n.children[k], tree);
+	const leaf = (path) => {
+		for (let node = at(path), hops = 0; node && hops < 10; node = at(path), hops++) {
+			const a = node.action || {};
+			if ((a.type === 'alias' || a.type === 'rewrite') && a.path) { path = '/' + a.path; continue; }
+			const kids = ui.menu.getChildren(node);
+			if (!kids.length) break;
+			path += '/' + kids[0].name;
+		}
+		return path;
+	};
+	const out = [];
+	for (const top of admin ? ui.menu.getChildren(admin) : []) {
+		if (top.name === 'logout') continue;
+		const subs = ui.menu.getChildren(top);
+		if (!subs.length) out.push({ path: `/admin/${top.name}`, leaf: leaf(`/admin/${top.name}`) });
+		for (const sub of subs) {
+			const path = `/admin/${top.name}/${sub.name}`;
+			out.push({ path, top: top.name, leaf: leaf(path) });
+		}
+	}
+	return out;
+});
+
+/* An entry reached the way a reader reaches it: its section opened if its link is not showing, then
+ * a click on the link through Playwright's actionability path, so a link that is hidden, covered or
+ * zero-sized cannot be clicked. The view that was on screen must be replaced by a rendered one. */
+async function click(page, seen, entry) {
+	seen.clear();
+	const href = `[href$="${SCRIPT}${entry.path}"]`;
+	const link = page.locator(entry.top ? `#topmenu > li > ul a${href}` : `#topmenu > li > a${href}`).first();
+	/* fs-chrome.js builds the menu after the page loaded */
+	await page.locator('#topmenu > li > a').first().waitFor({ state: 'attached', timeout: 20000 }).catch(() => {});
+	if (!(await link.count())) return { missing: true };
+	try {
+		const header = page.locator(`#topmenu > li:has(> ul a${href}) > a`).first();
+		for (let i = 0; entry.top && i < 2 && !(await link.isVisible()); i++) await header.click({ timeout: 5000 });
+		await page.evaluate(() => { window.__e2eStale = (document.getElementById('view') || document.getElementById('maincontent'))?.firstElementChild; });
+		await link.click({ timeout: 5000 });
+	} catch (e) { return { unclickable: signature(e.message) }; }
 	let rendered = false;
 	try {
-		await page.waitForFunction((p) => location.pathname.replace(/\/$/, '').endsWith(p), path, { timeout: 20000 });
-		rendered = await page.waitForFunction(RENDERED, null, { timeout: 20000 }).then(() => true, () => false);
-		await settle(page);
-	} catch (e) { errors.add(`navigation: ${signature(e.message)}`); }
-	const painted = await page.evaluate(FOOTSTRAP).catch(() => false);
-	return { errors: [ ...errors ], rendered, painted };
+		await page.waitForFunction((p) => location.pathname.replace(/\/$/, '').endsWith(p) &&
+			(document.getElementById('view') || document.getElementById('maincontent'))?.firstElementChild !== window.__e2eStale,
+		entry.path, { timeout: 20000 });
+		rendered = await settle(page, seen, SHORT, false);
+	} catch (e) { seen.errors.set(`navigation: ${signature(e.message)}`, { at: Date.now(), theme: false }); }
+	return reading(page, seen, rendered);
+}
+
+/* What footstrap adds on a page over the bootstrap reference `ref` read on the same page:
+ * - a JS error with a theme file on its stack, or that footstrap's code logged: footstrap's,
+ *   always. Any other JS error that bootstrap did not show, while bootstrap was still watched; the
+ *   reference vouches for nothing past the span it was watched, so a later error counts only when
+ *   it is the theme's;
+ * - a failed request to a theme file: footstrap's, always. A failed request to anything else that
+ *   bootstrap never made, within the same span. An app's request that bootstrap also made is the
+ *   app's, whatever its answer: the answer depends on the router's state at that moment
+ *   (adblock's runtime file does not exist until its first run ends, and cgi-download answers 404
+ *   until then), and footstrap cannot change it — it never writes the session or its cookie, and a
+ *   lost session turns the next page into the login form, which the view, text and menu checks
+ *   fail. A request footstrap makes in an app's name (the router's view prefetch, a client
+ *   navigation) is one bootstrap never made, so it counts;
+ * - a view that never renders where bootstrap's did, or shows less than half of bootstrap's text
+ *   (hidden by CSS, or not drawn);
+ * - footstrap's stylesheet missing or near empty, its token unresolved, its menu not visible or not
+ *   clickable. LuCI falls back to another theme silently on a broken template, which shows here. */
+function judge(r, ref) {
+	const problems = new Set();
+	const errors = new Set(ref ? ref.errors.map((e) => e.sig) : []);
+	const asked = new Set(ref ? ref.requested : []);
+	const vouched = (x) => !!ref && x.after <= ref.watched;
+	for (const e of r.errors)
+		if (e.theme || (!errors.has(e.sig) && (vouched(e) || !ref))) problems.add(e.sig);
+	for (const f of r.failed)
+		if (THEME_FILE.test(f.path) || (!asked.has(f.key) && (vouched(f) || !ref))) problems.add(`${f.what}: ${f.path}`);
+	if (!r.rendered && (!ref || ref.rendered)) problems.add('the view never rendered');
+	if (ref && r.text < ref.text / 2) problems.add(`the view shows ${r.text} characters of text, bootstrap ${ref.text}`);
+	if (r.rules < RULES_FLOOR) problems.add(`footstrap's stylesheet holds ${r.rules} rules (floor ${RULES_FLOOR})`);
+	if (!r.token) problems.add('--primary-color-high does not resolve');
+	if (!r.nav) problems.add('the menu is not visible');
+	if (r.unreachable) problems.add(`the menu takes no click: ${r.unreachable}`);
+	return [ ...problems ];
 }
 
 async function session(browser, viewport) {
 	const ctx = await browser.newContext({ viewport, ignoreHTTPSErrors: true });
 	const page = await ctx.newPage();
-	const errors = watch(page, new URL(BASE).origin);
-	await login(page);
-	return { ctx, page, errors };
+	const seen = watch(page);
+	await login(page, BASE, opt.router);
+	return { ctx, page, seen };
 }
 
+/* Every pass is timed: the log says where a slow run spent it. */
+async function pass(name, items, fn) {
+	const t0 = Date.now(), out = {};
+	for (const x of items) out[x.path || x] = await fn(x);
+	console.log(`  ${name}: ${items.length} in ${Math.round((Date.now() - t0) / 1000)} s`);
+	return out;
+}
+
+/* The reference is read first, closest to the router's boot: a state an app is still settling into
+ * (a first run, a first download) then lands under bootstrap, where it costs nothing. */
 async function crawl(browser) {
-	const desk = await session(browser, { width: 1280, height: 800 });
-	const paths = await menuPaths(desk.page);
-	check('the menu lists pages', paths.length > 0, `${paths.length} pages`);
-	const shots = (w) => { const d = join(OUT, 'footstrap', w); mkdirSync(d, { recursive: true }); return d; };
-
-	const fs = { desktop: {}, phone: {}, click: {} };
-	for (const p of paths) fs.desktop[p] = await open(desk.page, desk.errors, p, shots('desktop'));
-	await desk.page.goto(BASE + paths[0], { waitUntil: 'load' });
-	for (const p of paths) fs.click[p] = await click(desk.page, desk.errors, p);
-	await desk.ctx.close();
-
-	const phone = await session(browser, { width: 390, height: 844 });
-	for (const p of paths) fs.phone[p] = await open(phone.page, phone.errors, p, shots('phone'));
-	await phone.ctx.close();
+	const dir = (...p) => { const d = join(OUT, ...p); mkdirSync(d, { recursive: true }); return d; };
+	const DESK = { width: 1280, height: 800 }, PHONE = { width: 390, height: 844 };
 
 	setTheme('/luci-static/bootstrap');
-	const ref = await session(browser, { width: 1280, height: 800 });
-	const bs = {};
-	const bsDir = join(OUT, 'bootstrap'); mkdirSync(bsDir, { recursive: true });
-	for (const p of paths) bs[p] = await open(ref.page, ref.errors, p, bsDir, true);
+	const ref = await session(browser, DESK);
+	const paths = (await menuPaths(ref.page)).filter((p) => !/\/logout$/.test(p));
+	check('the menu lists pages', paths.length > 0, `${paths.length} pages`);
+	const bs = await pass('bootstrap', paths, (p) => open(ref.page, ref.seen, p, { shotDir: dir('bootstrap'), span: LONG, reference: true }));
 	await ref.ctx.close();
 	setTheme('/luci-static/footstrap');
 
+	const desk = await session(browser, DESK);
+	const desktop = await pass('desktop', paths, (p) => open(desk.page, desk.seen, p, { shotDir: dir('footstrap', 'desktop'), span: LONG, menu: true }));
+	const entries = await menuEntries(desk.page);
+	await desk.page.goto(BASE + entries[entries.length - 1].path, { waitUntil: 'load' }).catch(() => {});
+	const clicks = await pass('click', entries, (e) => click(desk.page, desk.seen, e));
+	await desk.ctx.close();
+
+	const phoneS = await session(browser, PHONE);
+	const phone = await pass('phone', paths, (p) => open(phoneS.page, phoneS.seen, p, { shotDir: dir('footstrap', 'phone'), span: SHORT, menu: true }));
+	await phoneS.ctx.close();
+
 	const pages = [];
 	for (const p of paths) {
-		const base = new Set(bs[p].errors);
-		for (const [ how, r ] of [ [ 'desktop', fs.desktop[p] ], [ 'phone', fs.phone[p] ], [ 'click', fs.click[p] ] ]) {
-			if (!r) continue;
-			const added = r.errors.filter((e) => !base.has(e));
-			const problems = [ ...added ];
-			if (!r.rendered && bs[p].rendered) problems.push('the view never rendered (it does under bootstrap)');
-			if (!r.painted) problems.push('footstrap did not paint the page (stylesheet or chrome missing)');
-			pages.push({ path: p, how, problems });
-		}
+		pages.push({ path: p, how: 'desktop', problems: judge(desktop[p], bs[p]) });
+		pages.push({ path: p, how: 'phone', problems: judge(phone[p], bs[p]) });
+	}
+	for (const e of entries) {
+		const r = clicks[e.path];
+		const problems = r.missing ? [ 'the menu has no link to this entry' ]
+			: r.unclickable ? [ `its menu link takes no click: ${r.unclickable}` ]
+			: judge(r, bs[e.leaf]);
+		pages.push({ path: e.path, how: 'click', problems });
 	}
 	const bad = pages.filter((x) => x.problems.length);
 	for (const x of bad) for (const pr of x.problems) console.log(`  ${x.how.padEnd(7)} ${x.path}: ${pr}`);
-	const clicked = paths.filter((p) => fs.click[p]).length;
+	const clicked = entries.filter((e) => !clicks[e.path].missing && !clicks[e.path].unclickable).length;
+	check('every menu entry is reached by a click', entries.length > 0 && clicked === entries.length,
+		`${clicked} of ${entries.length} entries`);
 	check('every page renders under footstrap with nothing bootstrap does not also show', bad.length === 0,
-		`${paths.length} pages × desktop/phone, ${clicked} also by a click in the chrome; ${bad.length} failing`);
-	return { paths, pages, bootstrap: bs };
+		`${paths.length} pages × desktop/phone, ${entries.length} menu entries by a click; ${bad.length} failing`);
+	return { paths, entries, pages, bootstrap: bs, footstrap: { desktop, phone, click: clicks } };
 }
 
 /* A fresh install registers the theme for Language and Style and leaves the active one alone. */
@@ -267,7 +395,7 @@ function offered(what) {
 
 /* ---- the run ---- */
 
-let crawlReport = null;
+const report = { router: opt.router, results };
 try {
 	/* A clean router: no footstrap files, LuCI on its stock theme. owlab's own `theme:` setting may
 	 * have pointed LuCI at a theme that is not installed yet; that is undone, not judged. */
@@ -288,14 +416,23 @@ try {
 	check('the upgrade keeps the admin\'s footstrap settings', uci('footstrap.e2e') === 'marker');
 
 	const browser = await chromium.launch();
-	try { crawlReport = await crawl(browser); } finally { await browser.close(); }
+	try {
+		report.crawl = await crawl(browser);
+	} finally { await browser.close(); }
+
+	/* the installed build, still the active theme */
+	const anchor = spawnSync(process.execPath, [ join(ROOT, 'tools', 'anchor-check.mjs'), '--router', opt.router ], { encoding: 'utf8', timeout: 600000 });
+	const anchorLog = `${anchor.stdout || ''}${anchor.stderr || ''}`;
+	writeFileSync(join(OUT, 'anchor-check.txt'), anchorLog);
+	check('a poll tick that grows the page leaves the reader in place', anchor.status === 0,
+		anchorLog.split('\n').filter((l) => /^FAIL |^anchor-check /.test(l)).join(' | ') || `exit ${anchor.status}`);
 
 	const rmOut = remove();
 	check('the package removes', installedVersion() === '', rmOut.split('\n').slice(-1)[0]);
 	check('removal falls back to bootstrap', theme() === '/luci-static/bootstrap', theme());
-	/* 25.12 answers the login form with a 403, so the body is the evidence, not the status */
-	const login = await fetch(BASE + '/').then((r) => r.text(), (e) => String(e));
-	check('LuCI still serves its login form after removal', /luci_password/.test(login));
+	/* LuCI answers the login form with a 403, so the body is the evidence, not the status */
+	const form = await fetch(BASE + '/').then((r) => r.text(), (e) => String(e));
+	check('LuCI still serves its login form after removal', /luci_password/.test(form));
 
 	install(opt.new);
 	offered('this build');
@@ -303,7 +440,7 @@ try {
 	check('the run completes', false, String(e.stderr || e.message).split('\n').filter(Boolean).slice(-3).join(' | '));
 }
 
-writeFileSync(join(OUT, 'report.json'), JSON.stringify({ router: opt.router, results, crawl: crawlReport }, null, '\t'));
+writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, '\t'));
 const failed = results.filter((r) => !r.ok).length;
 console.log(`\n${opt.router}: ${results.length - failed}/${results.length} passed; report in ${OUT}`);
 process.exit(failed ? 1 : 0);

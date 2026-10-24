@@ -55,7 +55,8 @@ export function stands(only) {
 export async function sealToRouter(ctx, base) {
 	const host = new URL(base).host;
 	/* A predicate, never a catch-all glob: a glob sends every request, the router's own included,
-	 * through a JS callback (17 minutes past CI's 45-minute limit; docs/development.md). */
+	 * through a JS callback (a CI run went 17 minutes past its then 45-minute limit;
+	 * docs/development.md). */
 	await ctx.route(
 		(url) => url.host !== host && url.protocol !== 'data:' && url.protocol !== 'blob:',
 		(route) => route.abort());
@@ -66,15 +67,13 @@ export async function sealToRouter(ctx, base) {
 export class StandDown extends Error {}
 
 /* Null when the answer is a LuCI page — the login form, or an authenticated page that loads luci.js —
- * else the sentence naming what the stand said instead. A snapshot stand whose ucode and
- * ucode-mod-html disagreed on libucode answered every request 502 "Bad Gateway", and every check
- * reported "L is not defined" as a defect of the theme. */
-function loginFault(status, html) {
+ * else the sentence naming what the stand said instead, from the first line of text the browser
+ * rendered (`text`, the body's innerText: the browser parses the HTML, nothing here does). A
+ * snapshot stand whose ucode and ucode-mod-html disagreed on libucode answered every request 502
+ * "Bad Gateway", and every check reported "L is not defined" as a defect of the theme. */
+function loginFault(status, html, text) {
 	if (status < 500 && /luci_password|luci\.js|new LuCI\(/.test(html)) return null;
-	let line = html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '').replace(/<[^>]*>/g, '\n')
-		.split('\n').map((l) => l.trim()).find(Boolean) || 'empty body';
-	/* a console line, never HTML: whatever the tag strip above left, no angle bracket survives */
-	line = line.replace(/[<>]/g, '');
+	const line = text.split('\n').map((l) => l.trim()).find(Boolean) || 'empty body';
 	return `LuCI answered ${status} (${line.slice(0, 120)}) — the stand, not the theme`;
 }
 
@@ -96,7 +95,7 @@ export const unreached = (e, id, base) => (e && (e.name === 'TimeoutError' || NO
 const LANDED = () => (window.L && typeof window.L.require === 'function')
 	? window.L.require('ui').then(() => true) : false;
 
-/* LuCI answers an unauthenticated request with the login form, not a 403 page — so every caller
+/* LuCI answers an unauthenticated request with the login form (status 403) — so every caller
  * has to log in before it can measure anything. owlab's routers are root with an empty password
  * (`owlab status` prints it); a hardware router is not what this runs against. `id` names the
  * router in the error; the host stands in for it when a caller has only a base URL.
@@ -107,7 +106,8 @@ const LANDED = () => (window.L && typeof window.L.require === 'function')
 export async function login(page, base, id = new URL(base).host) {
 	const res = await page.goto(base, { waitUntil: 'domcontentloaded' })
 		.catch((e) => { throw unreached(e, id, base); });
-	const fault = loginFault(res ? res.status() : 0, await page.content());
+	const fault = loginFault(res ? res.status() : 0, await page.content(),
+		await page.evaluate(() => (document.body ? document.body.innerText : '')));
 	if (fault) throw new StandDown(`${id}: ${fault}`);
 	if (await page.$('input[name="luci_password"]')) {
 		await page.fill('input[name="luci_username"]', 'root');

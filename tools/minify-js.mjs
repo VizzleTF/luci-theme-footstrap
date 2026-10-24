@@ -165,8 +165,9 @@ for (const f of files) {
 		/* …and that the declaration is still REFERENCED. `compress.toplevel` is free to inline a
 		 * const that is only read: the declaration would survive for stage.sh's sed to stamp,
 		 * every reader would carry the pre-stamp literal, and every release would report
-		 * "Footstrap (dev)" with nothing saying otherwise. Three occurrences today — one
-		 * declaration, two reads in label(). */
+		 * "Footstrap (dev)" with nothing saying otherwise. Four occurrences today — one
+		 * declaration and three reads in label() once isReal() is inlined; the check needs one read
+		 * to survive. */
 		if (isVersion && (min.match(/FS_VERSION/g) || []).length < 2)
 			throw new Error('FS_VERSION was inlined — the declaration survives for the sed to stamp, '
 				+ 'but nothing reads it any more, so a stamped release would still say "(dev)"');

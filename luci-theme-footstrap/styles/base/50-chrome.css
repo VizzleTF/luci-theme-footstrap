@@ -36,8 +36,7 @@
 
 	/* the tab focus ring lives in theme/40-tabs.css: an accent outline is invisible on the ACTIVE
 	 * pill, whose fill is that same accent. The theme repaints the rule that stood here in full
-	 * (same selectors), so a copy left behind would be a dead declaration tools/audit.py --strict
-	 * reports. */
+	 * (same selectors), so a copy left behind would be a dead declaration. */
 
 	.cbi-tab-disabled[data-errors]::after {
 		content: attr(data-errors);

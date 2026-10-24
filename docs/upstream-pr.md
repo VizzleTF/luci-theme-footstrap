@@ -4,9 +4,6 @@ The theme lives upstream since 2026-08-20. Code is almost always accepted; PRs b
 how the commits are cut and how long the messages are. The median commit body in openwrt/luci is
 three lines and says WHAT changed.
 
-Every push to the fork, every `gh pr create|edit`, every comment or resolved thread upstream waits
-for the maintainer's word, each time. Drafts are shown in chat first.
-
 ## Order
 
 1. **Split plan** — one upstream commit per independent concern; name each commit's subject and the
@@ -15,7 +12,7 @@ for the maintainer's word, each time. Drafts are shown in chat first.
    Step 3 prints `tip == tag`.
 3. **Preflight, before the first push** — every section of [Preflight](#preflight) green.
 4. **Messages** — written last, once the commit set is final: one or two sentences each.
-5. **Publish** — on the maintainer's word. PR body: one line per commit; links and `Closes #NNNN`
+5. **Publish** — PR body: one line per commit; links and `Closes #NNNN`
    live only here.
 6. **Review** — [Answering review](#answering-review).
 
@@ -175,9 +172,9 @@ git diff --check origin/master..HEAD
 git log --format="%an <%ae>" origin/master..HEAD | sort -u
 ```
 
-### Step 6. Publish (the maintainer's word)
+### Step 6. Publish
 
-Run in the background (one push took over 120 s). New PR:
+One push took over 120 s. New PR:
 
 ```sh
 git -C $LUCI push --quiet fork <branch> \
@@ -240,9 +237,8 @@ what a local run catches. The PR carries the latest tag's tree, so sections 4, 5
 5. **Live on both package managers**: `owlab sync owrt2512 owrt2410`.
 6. **Size** (asked about twice):
    `du -sb luci-theme-footstrap/ucode luci-theme-footstrap/htdocs/luci-static/resources`.
-7. **Security review** on the final branch: `/security-review` on a commit carrying the tag's tree
-   over the previous synced tag — the recipe in [releasing.md](releasing.md) Step 2. First look: the
-   signature chain in `install.sh`, new shell scripts, the login template (unauthenticated), sinks
+7. **Security review** of the final branch against the previous synced tag, as in
+   [releasing.md](releasing.md) Step 2. First look: the signature chain in `install.sh`, new shell scripts, the login template (unauthenticated), sinks
    in the browser JS, build pipeline changes.
 
 ## Answering review
@@ -254,7 +250,7 @@ openwrt/luci --comments` for reviews, comments and state. Done = `MERGED` or `CL
 
 **Humans first.** Before any bot event, read every review:
 `gh api repos/openwrt/luci/pulls/<N>/reviews --jq '.[] | "=== \(.user.login) [\(.state)]\n\(.body)"'`.
-A review by anyone other than `openwrt-ai` leads the report.
+A review by anyone other than `openwrt-ai` comes first.
 
 ### The bot (`openwrt-ai`)
 
@@ -281,8 +277,8 @@ Resolve only threads fixed or measurably refuted, after the push lands.
 
 ### A person
 
-Report it at once, read it whole (never from the truncated notification), give a verdict per point
-(we do it / the reviewer is mistaken, here is why / needs the maintainer's decision). Obvious fixes
+Read it whole (never from the truncated notification) and give a verdict per point (we do it / the
+reviewer is mistaken, here is why / needs a decision). Obvious fixes
 go in at once; a disputed point waits.
 
 ### Commands

@@ -27,7 +27,7 @@ The script adds the theme's package feed, verifies the package's signature and c
 upgraded from a named version, or already current. Later versions arrive with the router's own
 `apk upgrade` or `opkg upgrade`.
 
-If `raw.githubusercontent.com` answers 429 (a shared exit or CGNAT), run the signed copy attached to
+If `raw.githubusercontent.com` answers 429 (a shared exit or CGNAT), run the copy attached to
 the latest release:
 
 ```sh

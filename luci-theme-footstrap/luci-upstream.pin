@@ -6,8 +6,8 @@
 LUCI_PIN=5cf20c5741dc34eea0faaf7324ef3751b05fa1f3
 I18N_SCAN_SHA256=a1823d1fdd942f31a105e1e53b401e146bc10527f231e016930b1a5123ef21d3
 
-# No ucode pin, deliberately: the `verify` job runs the router's own interpreter over the installed
-# templates on both release lines (docs/ci.md), so nothing is pinned, built or stubbed here.
+# No ucode pin, deliberately: the `e2e` job renders every installed template with the router's own
+# ucode on both release lines (tools/e2e.mjs), so nothing is pinned, built or stubbed here.
 
 # usign, OpenWrt's ed25519 signer: owfeed signs each release package with it, and build-apk.sh
 # builds this copy (via tools/build-usign.sh, not run in CI) to check the SDK it downloads. This is

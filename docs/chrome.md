@@ -129,6 +129,19 @@ The measurement, the observer and the coalescing live in `fs-fit.js`, the theme'
 still fit?" engine (also used by `fitTables` in `fs-select.js`). **A new fit decision registers with
 `fit.add()`; do not grow a second observer.**
 
+**The same observer keeps the reader in place when a poll tick grows the page above them.** While a
+tick refills a container, `holdFloor()` holds it at its last height, so a layout taken mid-refill
+cannot clamp the offset into a shorter document. Where the engine anchors itself
+(`CSS.supports('overflow-anchor', 'auto')`: Chrome 56+, Firefox 66+, Safari and iOS 27+), the
+engine moves the offset and the observer takes no reference. Elsewhere (Safari and iOS before 27) the
+observer takes a reference element at the top of the view before the mutation and writes its drift
+back on the next frame (`anchorFor()`, `scheduleAnchor()`, `applyAnchor()`). The `scroll` listener
+reads nothing inside the event, only on the next frame: a layout forced while WebKit dispatches
+`scroll` makes its anchoring controller skip that adjustment and anchor nothing for the rest of the
+document's life, and a sticky or fixed box (`.th`, `#modal_overlay`, the bar) leaves layout dirty at
+that moment. `tools/anchor-check.mjs`, which e2e runs, checks both paths in Chromium, Firefox and
+WebKit against bootstrap ([verifying.md](verifying.md)).
+
 The one literal is `@media (min-width: 521px)` around the vertical override in `20-shell.css`: the
 floor below which no slice leaves a readable 500 px, and simultaneously the safety net with JS
 disabled — no JS means no `data-narrow`, and a phone would otherwise draw the desktop sidebar.
@@ -142,9 +155,8 @@ but the bar is the one fitter whose element sits ABOVE the reader on every page:
 what gives the menu its own row, so for the widths where the menu does not need one the bar answers
 a row shorter than it stands — 98px against 65px at 767px, 123px against 115px at 480px, on
 owrt2512. That height is what the engine lays the rest of the page out against for the length of the
-pass. Chromium and Firefox put the reader back afterwards; Safari implements no scroll anchoring on
-any platform, and an iPhone reported the Overview creeping upward once per poll tick, bisected there
-to this pass. So `fitChrome()` writes `min-height` at the settled height before it strips the
+pass. An iPhone reported the Overview creeping upward once per poll tick, bisected there to this
+pass. So `fitChrome()` writes `min-height` at the settled height before it strips the
 classes and takes it off after — the measurement is unchanged, and the box the page is laid out
 against does not move. Hooking the two forced layouts of the pass (`offsetTop`, `getClientRects()`)
 and reading `#maincontent`'s document position there gave 0px of dip with the pin, 8px and 33px
@@ -406,197 +418,6 @@ wrong for indexing: Network → Firewall is an alias onto the `firewall/zones` v
 five tabs came back as an empty list and "port" found nothing on a router that plainly has a Port
 Forwards page. Measured on the dev router: 78 indexed nodes through `getChildren()`, with every tab
 of every aliased page missing.
-
-## Keeping the reader's place when the engine will not
-
-What follows here is the chrome's own half: which element a correction may take, and why.
-
-A poll tick changes the height of things above the reader — a station joins the associated list, a
-lease expires, an interface box grows a line — and everything below it moves. Chromium and Firefox
-hide that with **scroll anchoring**: they pick an element the reader can see and compensate the
-scroll offset so it stays put. **WebKit did not implement it until recently**, so on an older Safari
-and on every iPhone of that vintage the same tick moves the page under the reader's thumb. That is
-what "the Overview jitters" was, and it is why it was reported from Safari and an iPhone while the
-same router was still in Chrome. A current WebKit does anchor — and gets a DIFFERENT half of this
-wrong; see "What an engine that anchors still gets wrong" below.
-
-`fs-fit.js` therefore does the job **only where nobody else is doing it**: `ENGINE_ANCHORS` asks the
-platform (`CSS.supports('overflow-anchor', 'auto')` — an engine that does not know the property does
-not have the feature) rather than a browser name, because correcting an offset that the engine also
-corrects means two corrections and a page that jumps the other way.
-
-Three details carry it, and each one was a measured failure first:
-
-- **The reference is what sits at the top of the CONTENT, not the frame the fold cuts through.** A
-  tick that grows something inside that frame leaves the frame's own top exactly where it was —
-  drift 0, measured — while everything after it moves. One hit test below `[data-fs-chrome]` (the
-  bar is sticky and owns the first rows of the viewport; a test at y=1 returns the chrome and the
-  page gets no anchor at all) gives the same element the engine's own algorithm would pick.
-- **It is captured while the page is still, not in the mutation callback.** That callback runs after
-  the DOM changed, so a reference taken there has already moved with it: right for the fitters,
-  which have not run yet, and blind to the tick itself. The resting reference is refreshed after
-  every settled pass, after every correction, and when a scroll stops.
-- **It carries the offset it was taken at.** The reader scrolling and the page growing look the same
-  from the element alone; correcting against a reference from another offset would drag the page
-  back to where the reader had scrolled from.
-- **…and an offset that DROPPED with nobody scrolling, on the page it was taken on, is the engine.**
-  `dom.content()` — what every LuCI poll calls to refresh a section — empties the container before it
-  refills it, and for that moment the document is shorter than the offset the reader is at. The
-  engine clamps the offset into what is left, the section fills again and nothing puts it back. Three
-  conditions separate that from a reader who moved: a clamp only ever moves the offset **down**; a
-  reader who moved is one `scrolling()` still answers for (their scroll starts the sampler, while the
-  clamp's own scroll event arrives in the rendering step after the mutation callback); and the page
-  stamp has not changed, because the router resets both scrollers on a navigation and replays them on
-  a Back, and neither is a clamp to undo. The clamped amount is also what raises the one-viewport
-  ceiling on a correction — a drift that big normally means the view replaced its subtree, and a
-  clamp is the one that comes with a receipt.
-- **The correction does not need the reference to have survived.** `dom.content()` replaces a
-  section's children with new nodes, so the element that happened to sit at the top of the content
-  area usually does not survive the tick that moved the reader — measured on a 24.10 router, where it
-  was disconnected on exactly the tick that mattered and the fallback was left measuring a fresh
-  reference against nothing. With no element there is no drift, but there is still a number known
-  exactly: the offset dropped by this much and nothing else happened, so giving that back **is** the
-  correction. It cannot run away with the page either — if the document really did get shorter, the
-  browser clamps the write back and the reader keeps the offset they already had.
-
-**Two halves: the document does not shrink, and the reader is put back if it did.** Every container
-a poll empties carries a floor — `min-height` at the height it had at the last settled moment, held
-until the next one (`holdFloor()`, over `.cbi-section > div, .table > .tbody, .table`: what
-`dom.content()` is called on and nothing wider). A container emptying takes nothing off the document,
-so there is no shorter document for the engine to clamp into and the tick is invisible; the floors
-are re-measured after every settled batch, so a page that genuinely got shorter is shorter one frame
-later. Measured on a 25.12 stand with the correction switched off, a real poll tick clamped 1882px
-away without the floor and 0px with it; on 24.10, where the theme cannot reach the poll at all, the
-same park went from a 1206px clamp to no offset change at all.
-
-**The floor is on the containers because it may not be on the column.** `min-height` on an ancestor
-of the engine's own anchor is a scroll-anchoring suppression trigger — css-scroll-anchoring-1 §2.2.2
-lists it, and Blink's list (`css_properties.json5`, `invalidate: [..., "scroll-anchor"]`) is wider
-still — so a floor on `.fs-content`, where this used to live, turned the engine's anchoring off in
-exchange for holding the document up. Measured with it there: 120px grew above the reader and the
-page moved all 120px under them, on Chromium and Firefox alike; and the 15px this file used to quote
-for the same configuration was taken before `47e636d` gave anchoring engines a live reference, and
-was never re-taken. The suppression walks only the path from the anchor to the scroller, and a
-container that empties is never on it — either the anchor was inside it, in which case the engine has
-lost the anchor anyway, or the anchor is elsewhere and this container is its sibling. So the floor
-now runs on every engine, and the engine's own anchoring keeps working beside it.
-
-**A pin on the container itself does not work, and the shape that does was reported from the field.**
-`fs-overview.js` briefly pinned each container across `dom.content()` and released it in the same
-statement sequence — `dom.content()` performs no layout, so nothing ever observed the pin (measured:
-1882px still clamped away with it in place). The report that named it wraps `dom.content()` itself
-and releases two frames later, which does work — at the price of patching a luci-base API every app
-on the router shares, and up to seven read/write pairs per call. One element the theme owns, measured
-once per settled batch, is the same protection: on a live router with the correction off, the wrapper
-and the floor both held the reader at 0px against a 337px drift without either, at 16 measurements
-against 154 wrapped calls.
-
-**The router owns the offset when it navigates.** `fs-router` resets both scrollers for an incoming
-page and stamps `body[data-page]` a require later, so between the two there is a window in which a
-poll tick from the OUTGOING page still fires — an offset of 0, a remembered offset from where the
-reader was, nobody scrolling and the old stamp: every term of "the engine clamped this" is true. The
-router calls `fit.forgetRest()` at the reset rather than leaving the memo to be inferred from a stamp
-written afterwards.
-
-**What an engine that anchors still gets wrong.** `ENGINE_ANCHORS` asks whether the platform supports
-`overflow-anchor`, and every current engine answers yes, WebKit included — so the theme steps aside
-from the growth case. Anchoring is not the same promise as "a section can vanish and come back",
-which is what `dom.content()` does on every tick: the container empties, the offset is clamped into a
-document that is briefly shorter, and what the engine does on the way back is its own business.
-Chromium lands where it started. WebKit OVERSHOOTS — measured on both stands, both layouts and both
-widths, a swap that grew a section by 120px moved the offset by 180, leaving the reader 60px up the
-page **on every tick**.
-
-**The memo is a pair, and a clamped correction splits it.** `putBack()` is the one write either
-correction makes: it moves the offset by the drift it measured, and it used to update `_restAt`
-alone, on the reasoning that the element is now back at the top it was remembered at. It is not,
-whenever the write was clamped short — a page already at its end cannot scroll the last pixels — and
-then `_rest.top` names a position nothing can reach while `_restAt` has already moved on. The next
-tick corrects to that impossible top and takes the reader with it: measured on webkit/Overview at
-390 wide in the top layout, `_rest` claiming 93.02 for an element standing at 105, and the reader
-12px off after the tick (52px on the density beside it). Where the element actually landed is
-re-read after the write — for the reference and for the section it falls back to — which is two
-rects on a layout the write has already forced. `_rest.at` is left alone: it is read only by
-`anchorFor()`, on the path where the engine does no anchoring, and the sweep is green on all 18
-cells of the failing axis without touching it. **This only became visible when WebKit
-gained anchoring**: on the engine-anchoring path the theme corrects from a memo it keeps across
-ticks, where before it took a fresh reference on every mutation.
-
-**And the pages where nothing held the reader at all.** Two faults sat behind the same symptom, both
-of them in which ELEMENT the theme takes as its reference. `elementFromPoint` answers with `#view`
-itself wherever the hit lands in a gap between two sections — and the host's own top does not move
-when a poll changes something inside it, so the drift measured against it is zero on every tick, for
-ever. And a page that is ONE TABLE (Processes, Routes, the realtime lists) has that table as a direct
-child of `#view`: the climb out of the table — data tables are excluded as anchors, `30-tables.css`
-explains why — landed on the host and gave up, leaving no reference at all. Since the stylesheet also
-(correctly) tells the engine not to anchor inside those tables, nobody was holding the reader there on
-ANY engine: measured at 390px, 120px of growth above the fold moved the page 120px on chromium,
-firefox and webkit alike. The host is now refused as a reference and the hit is retried down the
-viewport; where the climb would reach the host, the TABLE ITSELF is the reference — its height is
-falsified by the fit pass, its top is not.
-
-`lateDrift()` closes the overshoot without asking who the engine is. Two frames after a mutation — long enough
-for the engine to have finished its own correction — the reference the theme was holding is asked
-where it is now. An engine that got it right reports zero and nothing happens; what is left over is
-what nobody put back, and that is what is given back. It answers GROWTH only: the collapse is the
-floor's, and the page it still matters on is the one that is a single data table, where the
-stylesheet has told the engine not to anchor and nobody else is holding the reader. Two things it is
-deliberately NOT: a browser test (`CSS.supports` can no longer separate the two behaviours), and a
-synthetic probe that performs the collapse itself (it calls Firefox broken, because a real page puts
-layout and a frame between the collapse and the refill; gating on it cost Chromium and Firefox 15px
-of drift they did not have).
-
-The price is a resting reference on every engine — a hit test and a rect per settled pass, measured
-on the stands at **0.2 ms typical and 6 ms worst** on a poll-dirtied WebKit layout, never during a
-flick, and skipped entirely while the page is at offset 0 (nothing to be put back to). It fires only
-where THE OFFSET HAS NOT MOVED since the reference was taken — `scrollTop() !== ref.at` and it sits
-the tick out — plus a user gesture keeping it out, so a correction can never land inside a scroll.
-Asking `scrolling()` instead does not work here and asking the sampler's step count is not enough:
-the engine's own compensation moves the offset and starts the sampler, and in WebKit a programmatic
-scroll's event arrives up to 1.2 s late, so the sampler is often not running at all while a flick is.
-Both of those let a correction through mid-flick — 161px on `@390 side`, 320px on `@1440 side`, both
-on webkit/Overview. `ref.at` and not `_restAt`, because `run()` re-remembers between the mutation and
-this frame, and where the sampler has not started that re-take records the offset the reader has
-already flicked to.
-
-**The theme's own put-off pass moves the page too, and nothing was looking.** A tick landing while
-the offset is in motion leaves its measurements to the pass that runs once the page holds still, and
-that pass re-lays the tables and rewrites every floor. `min-height` is itself a suppression trigger
-on the path to the anchor, so the engine's compensation can be off in exactly the frame that pass
-needs it: on ImmortalWrt 24.10/WebKit the pass's 88 `min-height` writes and a 58px jump of the offset
-land in the SAME frame, 429 ms after the mutation — `@390`, top layout, large density, Overview, one
-cell out of 48, and the offset moved with no write of the theme's own (every programmatic scroll
-write was intercepted and none came). `lateDrift()` is blind to it: scheduled from the mutation on
-the same `SCROLL_IDLE`, it read a drift of zero three milliseconds before the page moved.
-`settleDrift()` measures around that pass instead, and SYNCHRONOUSLY — the reader cannot scroll
-between two statements, so what it sees is the pass's own doing, and `getBoundingClientRect()` is the
-operation an engine must flush a pending adjustment before (css-scroll-anchoring-1 §2.2: the
-suppression window ends at the end of the event loop iteration, or before the next operation whose
-result would differ, whichever is sooner), so the read after the pass is a flush rather than a race.
-Measured two frames later instead, it closed that cell and corrected INSIDE A FLICK on three others,
-160px each.
-
-The measurement behind all of it grew 120px above the reader and required the page to stay within
-two pixels, once with the engine's anchoring suppressed and once without, on both scrollers; it
-refilled a section the way a poll does — emptied, then filled again, with the router's own poll held
-for the duration — and required the same; and it flicked the page up and down to prove the theme
-corrects nothing while the reader is moving. With the fallback removed the Safari case reports
-exactly the reported symptom — 120px of page moved under the reader, 255px on the swap measured in
-WebKit with the engine's own anchoring off, and 690px on a real Overview on the stands. It has to run
-on `chromium,firefox,webkit`, because the fault above lives on the path a stand-in engine does not
-take.
-
-The sweep crossed three page shapes and two scrollers, and both sets are what a measurement left
-standing rather than what looked thorough. The shapes: the Overview refills section BODIES, the
-realtime Connections table has its ROWS replaced under a poll, and Processes is one table that is a
-direct child of `#view` — the climb out of that one used to land on the host and give up. Processes
-proves the climb and never the swap: its single block is 6397px against 6108px of scroll on
-owrt2512, so it can never sit entirely above the reader, which is what a swap needs. Wireless was
-measured and dropped (812px of scroll at 390px wide, 0 at 1440). The scrollers: of `1440 side`,
-`1440 top`, `390 side` and `390 top`, only the first scrolls `#maincontent` and the other three
-scroll the window, so the first and the narrowest are the two that differ. Density is one value for
-the same reason — across 72 Overview cells, normal, compact and large reported the same two outcomes
-and nothing else.
 
 ## `fs-select.js`
 

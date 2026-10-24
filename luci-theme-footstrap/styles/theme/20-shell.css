@@ -527,7 +527,7 @@
 		.fs-main .alert-message button { white-space: normal; max-width: 100%; }
 	}
 	/* anywhere, not break-word: an inline-flex button keeps its min-content under break-word (a 496px word
-	 * overflowed a 320px button). Outside the @media: table-contract refuses overflow-wrap in a width query */
+	 * overflowed a 320px button). */
 	.fs-main .alert-message .btn,
 	.fs-main .alert-message button { overflow-wrap: anywhere; }
 

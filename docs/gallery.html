@@ -63,7 +63,7 @@
 <div class="g-sec">
 	<h2>Div table outside a section</h2>
 	<!-- luci-app-roamd (GitHub #67): a div .table.fs-dt with no [id] and no .cbi-section kept the generic
-	     .table overflow:hidden and became its own sticky scroll container. table-contract.mjs holds it. -->
+	     .table overflow:hidden and became its own sticky scroll container. -->
 	<div class="table fs-dt" data-fs-bare="1">
 		<div class="tr table-titles"><div class="th">Node</div><div class="th">Link</div></div>
 		<div class="tr"><div class="td" data-title="Node">mesh-1</div><div class="td" data-title="Link">-48 dBm</div></div>
@@ -76,7 +76,7 @@
 	<!-- luci-app-filemanager #file-table: `.table td:nth-child(1) { padding-left: 5px }` (0,2,1) is
 	     re-hosted into `@layer theme`, so it meets the fs-dt cell padding in the SAME layer and only
 	     specificity and order decide. The mock below is the same (0,2,1) and sits after the sheet;
-	     the theme's `.td` rule must not score above it. table-contract.mjs holds it. -->
+	     the theme's `.td` rule must not score above it. -->
 	<style>
 		@layer theme {
 			.g-app-pad td:nth-child(1) { padding-left: 5px; }
@@ -233,7 +233,7 @@ uci commit network</pre>
 				<label class="cbi-value-title" for="g-text">Text input</label>
 				<div class="cbi-value-field"><input id="g-text" type="text" class="cbi-input-text" value="OpenWrt"></div>
 			</div>
-			<!-- task 0147 (second RU sweep), finding 1: under 767px theme/90-responsive.css restates
+			<!-- under 767px theme/90-responsive.css restates
 			     `flex: 1 1 100%` on the label (stacked above the field), and a flex item's automatic
 			     minimum size is content-based once that basis is not smaller than the content — a
 			     label whose text has too few break points renders at its own min-content instead of
@@ -268,7 +268,7 @@ uci commit network</pre>
 					<select id="g-msel" multiple size="3"><option selected>one</option><option>two</option><option>three</option></select>
 				</div>
 			</div>
-			<!-- task 0145: a caption-less `div.cbi-checkbox` never gives the pill a sibling flex item
+			<!-- a caption-less `div.cbi-checkbox` never gives the pill a sibling flex item
 			     to shrink against, so this fixture stayed green through the whole life of the
 			     pill-shrink/knob-overhang bug — every check run against the gallery measured
 			     a switch that could never fail this way. `label.cbi-checkbox > input + label[for] +
@@ -300,7 +300,7 @@ uci commit network</pre>
 					<div class="cbi-checkbox"><input id="cb-tt-off" type="checkbox"><label for="cb-tt-off"></label><label class="cbi-tooltip-container">⚠️<div class="cbi-tooltip">Limited masquerading enabled</div></label></div>
 				</div>
 			</div>
-			<!-- task cbi-checkbox: forum.openwrt.org/t/251930 post #141 — luci-app-modemdata injects an
+			<!-- forum.openwrt.org/t/251930 post #141 — luci-app-modemdata injects an
 			     unlayered `label[for]{display:none!important}` scoped to its own markup, expecting the
 			     switch to live on the native input (as it does under bootstrap). Reproduced verbatim,
 			     scoped to this fixture only, to prove the switch stays visible from the INPUT alone. -->
@@ -474,7 +474,7 @@ option two</textarea></div>
 		     the spinner's !important used to exist for, and the one nothing rendered. -->
 		<div class="cbi-dropdown btn cbi-button cbi-button-apply spinning" tabindex="0"><ul><li>Applying…</li></ul><span class="open">▾</span></div>
 		<!-- Field dropdown (not .btn/.cbi-button) with a value longer than its 400px cap — the
-		     https-dns-proxy/nlbw-config/interface-edit shape task 0149 measured cutting mid-glyph at
+		     https-dns-proxy/nlbw-config/interface-edit shape measured cutting mid-glyph at
 		     320px (RU: 132/225/280px past the box at Compact/Normal/Large). No `title`/`aria-label`:
 		     the ellipsis is visual only, the full string stays in the DOM and the accessibility tree. -->
 		<div class="cbi-dropdown" tabindex="0"><ul><li class="focus" display="0">Автоматический выбор лучшего доступного вышестоящего DNS-сервера по задержке отклика</li></ul><span class="open">▾</span></div>
@@ -1257,7 +1257,7 @@ option two</textarea></div>
 </div>
 
 <div class="g-sec">
-	<h2>CBI section table — header reflow at the card boundary (RU, task 0163)</h2>
+	<h2>CBI section table — header reflow at the card boundary (RU)</h2>
 	<p class="g-note">`.cbi-map` pinned to 968px — firewall/zones' own measured content column at
 	   1024px, live, RU. The card fires on THIS element (theme/45-misc.css), one level above
 	   `.cbi-section`'s own `--fs-card-pad`, so 968px here only hands the table 936px. The six real
@@ -1361,7 +1361,7 @@ option two</textarea></div>
 	</div>
 </div>
 
-<!-- task 0147 (second RU sweep), finding 3: base/95-luci.css sizes each row-action button
+<!-- base/95-luci.css sizes each row-action button
      `flex: 1 1 4em` inside `.td.cbi-section-actions`, a plain <table>/.td markup (Startup, not
      form.js's .cbi-section-table above) with no per-row carding. A definite flex-basis caps the
      automatic minimum at 4em once the row runs out of room, so a caption longer than that shrinks

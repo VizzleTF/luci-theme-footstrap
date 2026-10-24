@@ -21,10 +21,10 @@ on:
       - 'luci-theme-footstrap/build-css.sh'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
-  # Called by build.yml's release job once the release is published, which is what refreshes the
-  # release-metadata mirror below. It cannot be `on: release`: an event raised by GITHUB_TOKEN does
-  # not trigger another workflow. Also called by build.yml's `pages-manual` job, a manual publish
-  # from a single run rather than a tag.
+  # Called by build.yml's `pages` job once a tag's release and its playground asset are published,
+  # which is what refreshes the release mirror below. It cannot be `on: release`: an event raised by
+  # GITHUB_TOKEN does not trigger another workflow. Also called by build.yml's `pages-manual` job, a
+  # manual publish from a single run rather than a tag.
   workflow_call:
     inputs:
       # 'release' (default): mirror releases/latest/download/playground.tar.gz, same as a direct
@@ -45,8 +45,11 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+# Every job carries a timeout, as in build.yml: the default is six hours. A run takes under a
+# minute.
 jobs:
   build:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -147,8 +150,8 @@ jobs:
       # A MANUAL PUBLISH (build.yml's `pages-manual`), and it FAILS CLOSED, unlike the fetch above:
       # that step exists to preview THIS run's own recording, so falling back to the release's (or
       # to none) on a miss would publish a preview that previewed nothing and say it succeeded.
-      # `download-artifact` reads the artifact `playground` uploaded earlier in this same run — see
-      # build.yml's `pages-manual` for why no `actions: read` is needed for that.
+      # `download-artifact` reads the artifact `playground` uploaded earlier in this same run, which
+      # takes the runner's own token and no `actions: read`.
       - name: Fetch this run's own playground
         if: inputs.playground-source == 'artifact'
         uses: actions/download-artifact@v8
@@ -171,6 +174,7 @@ jobs:
 
   deploy:
     needs: build
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       pages: write

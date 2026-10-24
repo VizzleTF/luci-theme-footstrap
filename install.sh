@@ -4,8 +4,8 @@
 #
 #   wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
 #
-# Rate-limited per source IP, shared behind one CGNAT (issue #17) — this signed copy instead,
-# verified before running as root:
+# Rate-limited per source IP, shared behind one CGNAT (issue #17) — the release's copy instead (a
+# detached install.sh.sig sits beside it; this pipe does not check it):
 #
 #   wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
 
@@ -222,8 +222,8 @@ finish() {	# <mode: feed | release>
 	# paragraph.
 	printf '\n'
 	info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
-	info "Layout, dark mode, palette, colours and the wallpaper live in the \"Footstrap\" tab"
-	info "of System -> System. Then hard-reload the page (Ctrl+F5)."
+	info "Layout, dark mode, palette, colours and the wallpaper live on the System -> Footstrap"
+	info "page. Then hard-reload the page (Ctrl+F5)."
 }
 
 # Reached only when the feed cannot be read at all. Picked from the SIGNED MANIFEST, never a bare

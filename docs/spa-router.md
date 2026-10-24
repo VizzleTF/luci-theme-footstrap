@@ -281,16 +281,14 @@ the same way, re-scoped to `#view[data-page="admin-system-package-manager"]`.
 **The scroll reset moved too, off the click and onto the same commit.** `window.scrollTo(0, 0)` used
 to run synchronously at the click, before the staged render — so the reader was thrown to the top of
 the OUTGOING page for the whole staging window, the other half of what a slow navigation reads as a
-jump. Measured with the incoming module's fetch held open 1.2 s
-(`../tmp/task-navflash/navflash-slow.mjs`): `y` used to reach 0 within 12 ms of the click and stay
+jump. Measured with the incoming module's fetch held open 1.2 s: `y` used to reach 0 within 12 ms of the click and stay
 there through the swap; moved into the same synchronous turn as `commitStage()`, it stays at the
 reader's own offset for the whole window and reaches 0 in the same frame the new page's content
 does. `fit.forgetRest()` stays at the click — it only invalidates a stale anchoring reference, which
 must happen as soon as the reader is committed to leaving, not at the swap.
 
 What showed it was sampling the outgoing page's document height and one of its page-scoped rules
-mid-flight, between the click and `commitStage()`, with the same held-open fetch
-`navflash-slow.mjs` uses — sampling only after arrival is exactly how this went unmeasured — and
+mid-flight, between the click and `commitStage()`, with the module fetch held open the same way — sampling only after arrival is exactly how this went unmeasured — and
 doing so at 767px, the width of `90-responsive.css`'s own `@media (max-width: …)` rule, as well as
 at 1440px. On `owrt2512`, before the re-scope: `#view
 .controls > div:not(.pager)` read `flex` mid-flight where the stacked layout wants `block`, document
@@ -766,13 +764,11 @@ carry could cancel the OTHER axis's restore.** `restoreScroll()`'s `onScroll` li
 scroller this call is actually restoring, wrong for the other one: `#maincontent` never scrolls in
 `top` and the document never scrolls in `sidebar`, so a write to the axis THIS `pos` leaves at 0 is
 never the reader outscrolling a restore that was never running there. Reproduced without a router
-(`../tmp/task-back/repro2.mjs`, real Chromium via Playwright, `fs-router.js` unmodified, `fs-fit.js`
-not even loaded): a bare `window.scrollTo(0, 111)` fired from an unrelated script while the sidebar
+(real Chromium via Playwright, `fs-router.js` unmodified, `fs-fit.js` not even loaded): a bare `window.scrollTo(0, 111)` fired from an unrelated script while the sidebar
 layout's `#maincontent` restore was still waiting for its content to grow tall enough left the reader
 at 0 for the rest of the 5 s window instead of the parked 3000px — the write never touched
 `#maincontent` at all, but the single shared cancellation flag stopped that restore anyway. Scoping
-the check to the axis `pos` actually carries fixes it: `../tmp/task-back/router-before.js` (today's
-code) samples `[0,0,0,0,0,…]`; fixed, `[0,0,3000,3000,3000,…]`, top layout unaffected either way.
+the check to the axis `pos` actually carries fixes it: the code before the fix samples `[0,0,0,0,0,…]`; fixed, `[0,0,3000,3000,3000,…]`, top layout unaffected either way.
 
 The listener is a capture listener on `window`, so it sees every element's `scroll`, and the element
 branch used to treat any of them as `#maincontent`. A script scrolling a `textarea` or an
@@ -810,39 +806,8 @@ not input — and every real gesture that could otherwise land there (a scrollba
 limit, in particular) already stops the restore through the direct `wheel`/`touchstart`/`keydown`
 listeners regardless of what `onScroll` decides. Verified live on all three `b` stands, both widths,
 after the fix: `owrt2512b` 1440px 2684 -> 2683, 767px 3500 -> 3500; `owrtsnap` (`owrtsnapb`) 1440px
-2473 -> 2473, 767px 3127 -> 3127 — and the `@390 top` shape from the original probe
-(`../tmp/task-noref/D-nav.txt`) reproduced and closed the same way in the synthetic harness this
-session added (`../tmp/task-back2/`). The cross-axis fix's own repro (`../tmp/task-back/repro2.mjs`)
-still samples `[0,0,3000,3000,…]` unchanged.
-
-**The restore can be correct and the reader still end up 431px short — that one is fs-fit's, not the
-router's, and it is open.** A Back-navigation scroll check reported `owrt2410`
-`/admin/status/overview` <- package-manager, Back: parked 2680, restored 2249 (CI run 34565660484);
-locally on `owrt2410b` it reproduces at roughly 1 run in 15 with the same 431px, and deterministically
-3 of 3 with the incoming view's own RPCs held open 700ms across the traversal — the staging window a
-loaded CI runner widens by itself (`../tmp/task-back431/slow.mjs`). Instrumented, the router's half is
-clean: `commitStage()` hands `restoreScroll()` `{win:2723,main:0}`, the first tick reads a ceiling of
-3152 and writes 2723, `pending=false`, done. **429 ms later — `SCROLL_IDLE` (400 ms) plus a tick —
-`fs-fit.js`'s `lateDrift()` writes `2292.21875` over it** (`writeOffset()` called from `lateDrift()`'s
-own `setTimeout`, named by stack in every run). The page is not moving under either of them: a census
-of the first 400 nodes in `#view` taken 60 ms after the commit and again 2.5 s later differs in 11
-entries, and all 11 are zero-height `IMG`/`BR` in fixed position whose document coordinate moved by
-exactly the scroll delta — every element that carries layout is where it was. Three independent
-measurements name the writer: with `localStorage.fsAnchor = 'off'` the same probe reads 2723, 3 of 3;
-with `fit.forgetRest()` added at the commit — the router's only lever into that file — it stays 431,
-2 of 2; and with the `fs-fit.js` of `50112c4^`, `71295ce^` and `28788d0^` served in its place it is
-still 431 (2293.8125 from 2725), so **it is not today's floor-measurement change**. The shape is
-`owrt2410`'s alone because the incoming page is already complete at the swap there — 400 of 400
-sampled nodes, the document at its final ceiling — while `owrt2512b`/`owrtsnapb` commit with 61-66
-nodes and grow afterwards (there the UA's traversal restore is clamped to 0 and `restoreScroll()`
-writes from 0, and no correction follows: 2683 -> 2683, 2473 -> 2473).
-
-A router-side hold was measured and is NOT shipped: keeping the rAF loop alive for the restore's own
-5 s window and no longer reading a `scroll` as the reader once the offset has been written reads
-2723, 2 of 2 — but it only undoes the correction one frame after it lands (the reader still sees the
-431px jump), and it spends the rest of that window overruling the `scroll`-based cancellation the
-three fixes above were built on. The fault is `lateDrift()` correcting across an SPA commit against a
-reference taken before it, and it belongs in `fs-fit.js`.
+2473 -> 2473, 767px 3127 -> 3127 — and the `@390 top` shape from the original probe reproduced and closed the same way in a synthetic
+harness. The cross-axis fix's own repro still samples `[0,0,3000,3000,…]` unchanged.
 
 ## A dead session ends the document
 

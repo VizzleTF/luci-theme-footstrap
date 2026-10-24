@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-/* The changelog contract (docs/releasing.md), held by a machine, because it drifts silently and the
- * release page is generated from it.
+/* The changelog contract (docs/releasing.md), checked by hand with `npm run changelog` before a tag
+ * (nothing runs it automatically), because it drifts silently and the release page is generated
+ * from it.
  *
  * `[Unreleased]` once accumulated a DUPLICATE `### Changed` (and `Fixed` before `Removed`) across
  * several commits, each fine on its own; `tools/release-notes.sh` prints a header at each `###`, so
@@ -78,8 +79,8 @@ export function insertBullet(text, canon, section, bullet) {
 /* THE REBASE SCAR: a released section must equal that section at its tag. `pull --rebase` once
  * landed an entry inside the tagged [0.14.14]; a cherry-pick put one under the wrong `###`.
  * Neither shows in the diff that did it. Only the NEWEST release is held: that is where an entry
- * strays (until the next tag), and 0.7-0.14 carry 24 legitimate post-tag edits a gate must not
- * rewrite. A tag absent locally, or from before the file, is skipped. */
+ * strays (until the next tag), and 0.7-0.14 carry 24 legitimate post-tag edits this check must not
+ * flag. A tag absent locally, or from before the file, is skipped. */
 export function sealedDrift(file, text, tagged) {
 	const newest = [...text.matchAll(/^## \[([^\]]+)\]/gm)].map(m => m[1]).find(id => id !== 'Unreleased');
 	if (!newest) return [];
@@ -208,7 +209,7 @@ function gate() {
 		 * in silence (release-notes.sh keeps only `**…**`). Checked on [Unreleased] and the newest
 		 * version ONLY — those are the two that can still be published. 106 bullets in older sections
 		 * predate the convention (it is unbroken from 0.8.4 up — 0.8.3 still has two); their notes are long since published,
-		 * so demanding a rewrite would be a gate policing the past instead of the next release. */
+		 * so demanding a rewrite would be this check policing the past instead of the next release. */
 		const publishable = versions.filter(v => v.id === 'Unreleased').concat(
 			versions.filter(v => v.id !== 'Unreleased').slice(0, 1));
 		for (const v of publishable)

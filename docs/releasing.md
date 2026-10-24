@@ -40,7 +40,8 @@ The code of the release is on `main` before the release commit is cut, and its p
 |---|---|
 | `build` | both formats, built by `owfeed build` |
 | `e2e` | `tools/e2e.mjs` on owrt2512 (25.12/apk) and owrt2410 (24.10/opkg): install the last release, upgrade to this build, open every menu page against bootstrap, remove, fresh install ([verifying.md](verifying.md)) |
-| `playground` | the playground site built from the package |
+
+`playground` does not run on a push to `main`; it runs first on the tag (or a `workflow_dispatch`).
 
 What stays local, beside reading CI:
 
@@ -53,24 +54,10 @@ npm run changelog
 25.12.5 -> 25.12.6`, when stale). A stale lock in owfeed-packages reds its `check / build` after
 the tag, which is where 0.14.15 found it.
 
-And `/security-review` on the diff this release carries, after the last code commit and before the
-tag. It is not a CI job and cannot be — it reads a diff rather than a tree — which is why it is named
-here: the pass is worth the minute on the five things a theme can actually get wrong (the
-installer's signature chain, new shell running over a build tree, the unauthenticated login
-template, sinks in the browser JS, the packaging pipeline), and a maintainer has asked outright
-whether one was done. The command reviews `git diff origin/HEAD...`, which is empty on `main` once
-the release commit is pushed (0.14.15 and 0.14.16 shipped seven commits nobody reviewed), so it
-runs in a worktree on a commit whose only parent is the previous tag:
-
-```sh
-c=$(git commit-tree 'HEAD^{tree}' -p '<prev>^{commit}' -m 'security review <v>') \
-  && git worktree add --detach ../tmp/sec-<v> "$c"
-# /security-review with ../tmp/sec-<v> as the working directory; verdict -> ../tmp/release-<v>/security.md
-git worktree remove ../tmp/sec-<v>
-```
-
-Its diff then equals `git diff <prev> HEAD`, deletions included (measured on v0.14.15..v0.14.16:
-28 files, +940/-188 both ways).
+And a security review of the diff this release carries, after the last code commit and before the
+tag: `git diff <prev> HEAD`, read by the maintainer. Nothing automates it. It is worth the time on the
+five things a theme can actually get wrong: the installer's signature chain, new shell running over a
+build tree, the unauthenticated login template, sinks in the browser JS, the packaging pipeline.
 
 ## Step 3 — asset selection (issue #6), separately and always
 
@@ -125,19 +112,19 @@ and the contract entry that guarded it are gone with the fallback they guarded.
 | #17 | the release assets, not a page | `manifest.txt` **and** `manifest.txt.sig` are present; `latest/download/manifest.txt` serves that file; `usign -V` passes with `release.pub`; `awk '$1=="pkg"'` yields one line per format; no install or update path touches `api.github.com`. **The manifest is now load-bearing for installs**, not only for readers: a router the feed cannot serve is installed from it (`install.sh` -> `install_from_release`), so a manifest that does not verify is an install that refuses |
 
 **Why #17 is here.** A manifest failure is **invisible on the page**: the theme looks fine while
-installation breaks for new users and the update badge breaks for existing ones — on someone
-else's router, weeks later. That is exactly the failure shape this file exists for.
+installation breaks for new users — on someone else's router, weeks later. That is exactly the failure shape this file exists for.
 
 ## The changelog contract
 
 The single source of truth for `CHANGELOG.md` and its Russian mirror `CHANGELOG_ru.md`.
 
-**`npm run changelog` holds the mechanical half**: the set, order and uniqueness of sections, empty
+**`npm run changelog` checks the mechanical half**: the set, order and uniqueness of sections, empty
 sections, dates, `compare` links, mirror parity (versions, dates, sections, bullet count) and the
 mandatory bold lead on `[Unreleased]` and a freshly cut version. It exists because `[Unreleased]`
 once accumulated a **duplicate `### Changed`** over several commits: each commit looked fine on its
 own, and `release-notes.sh` would have printed two "Changed" groups on the release page with nothing
-failing, because the notes are generated at tag time, when the tag is already pushed.
+failing, because the notes are generated at tag time, when the tag is already pushed. Run it
+yourself: CI does not.
 
 **Everything about the prose below, the script cannot check.** That part is on you.
 
@@ -169,7 +156,7 @@ Changelog on all three.** Do not "correct" entries toward the other standard.
 - Not all eight need to be present. A normal release is `Added`/`Changed`/`Fixed`, sometimes
   `Performance`.
 - **`Development` is for changes a theme user never sees:** CI, the e2e check, tooling
-  and agent docs. An entry is user-facing when it changes what a router running the package shows or
+  and docs. An entry is user-facing when it changes what a router running the package shows or
   does (`luci-theme-footstrap/**`, `install.sh`, the feed, the published package) and goes under
   `Added`/`Changed`/`Fixed`/…; everything else goes here. A fix to the trust chain a user installs
   through (`install.sh`, the signing keys, `tools/stage-release.sh`, the `release` job, the feed) is
@@ -227,28 +214,24 @@ from the diff after the fact; a self-reference to a commit hash.
 ## The runbook
 
 Only after everything above has passed, in this order: the tag points at a commit that already
-carries its own changelog section, and every CI job reads the sha the tag will name ("делай тег" means
-this procedure, not a bare `git tag`: 0.14.15 was tagged that way, with no security review and
-before CI on the release sha). A readiness question ("готов ли main") runs step 0 alone and reports
-each command with its verdict. `<v>` is the new version, `<prev>` the last tag; scratch output goes
-to `../tmp/release-<v>/`.
+carries its own changelog section, and every CI job reads the sha the tag will name (0.14.15 was
+tagged with a bare `git tag`, with no security review and before CI on the release sha). `<v>` is the
+new version, `<prev>` the last tag; scratch output goes to `../tmp/release-<v>/`.
 
 0. **Readiness** — any red stops here, with its owner named:
    - scope the diff (Step 1 above says which live checks it makes mandatory) and run those rows
      plus asset selection (Steps 3 and 4) on both stands ([verifying.md](verifying.md));
-   - Build's newest completed push run on `main` is `success` and is read job by job (`build`,
-     both `e2e` legs, `playground`);
+   - Build's newest completed push run on `main` is `success` and is read job by job (`build` and
+     both `e2e` legs);
    - `~/go/bin/owfeed lock` exits 0 at the repo root **and** in a fresh
      `gh repo clone owfeed/owfeed-packages ../tmp/release-<v>/feed -- --depth 1` (a stale lock
      there reds the feed's `check / build` after the tag);
-   - the security review of the whole release (Step 2's recipe), verdict saved to
-     `../tmp/release-<v>/security.md`; any finding goes to the maintainer before the tag.
+   - the security review of the whole release (Step 2), done before the tag.
 1. Rename `[Unreleased]` to `## [x.y.z] — YYYY-MM-DD` in both `CHANGELOG.md` and
    `CHANGELOG_ru.md`, and add the `compare/` link at the bottom of each. Sections in the canonical
    order, every bullet with a `bold lead`.
 2. `npm run changelog` — green.
-3. Commit that change as `release: x.y.z` and push it to `origin main`; this is part of a release
-   the maintainer asked for, so it needs no further word. Message in English, **no AI attribution**.
+3. Commit that change as `release: x.y.z` and push it to `origin main`.
 4. **Before the tag, read the release sha's run and the one before it on `main`**:
    `gh run list --branch main --workflow build.yml --event push -L2` (Build's push runs only: a
    CodeQL or pages run is not the pipeline the tag waits on; no `--status completed`, so the release
@@ -259,10 +242,8 @@ to `../tmp/release-<v>/`.
    has nothing to do with this release but will still hold it. `v0.14.12` was tagged onto exactly
    this: the previous commit on `main` had already failed the same way the day before, on the same
    upstream condition, and nobody looked before the tag went out.
-5. **The tag is the maintainer's word, each time**: either their message named it ("tag",
-   "делай тег", "release x.y.z") or the session asks, quoting both commands:
-   `git tag -a vx.y.z -m vx.y.z`, then `git push origin vx.y.z`, each in its own Bash call, the
-   push only after the create exited 0. The tag goes on the release commit, never first — it must
+5. **Tag the release commit**: `git tag -a vx.y.z -m vx.y.z`, then `git push origin vx.y.z` once the
+   create exited 0. The tag goes on the release commit, never first — it must
    point at a commit that already contains its own entry, or the release describes a version whose
    changelog does not yet exist.
 6. `origin` is the only remote (the `git.vaka.work` mirror was removed on 2026-07-25).

@@ -1,3 +1,5 @@
+> Archive. The numbers here come from synthetic gates that were removed in PR #76 and are not reproducible; do not act on them without measuring on a real router.
+
 # Keeping the reader's place: the log
 
 Every finding behind the mechanisms in [anchoring.md](anchoring.md), one heading per finding: what

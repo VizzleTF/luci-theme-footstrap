@@ -12,8 +12,7 @@ import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { minify } from 'uglify-js';
 
-/* not lib/root.mjs's filesIn(): that one resolves against the repo, and this runs over a build tree
- * whose path is given absolutely */
+/* walks the given build tree, not the repo */
 const templates = (dir) => readdirSync(dir, { recursive: true, encoding: 'utf8' })
 	.filter((f) => f.endsWith('.ut')).map((f) => join(dir, f));
 

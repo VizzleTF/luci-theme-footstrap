@@ -196,9 +196,16 @@ function noteUser() {
 	noteMotion();
 }
 
+/* Read on the next frame, never in the scroll event: a layout forced while WebKit dispatches one
+ * skips its anchoring adjustment and leaves the scroller marked as queued, so the engine anchors
+ * nothing for the rest of the document's life (ScrollAnchoringController::
+ * adjustScrollPositionForAnchoring returns before it clears the mark). Any sticky or fixed box —
+ * `.th`, `#modal_overlay`, the bar — leaves layout dirty there, so one `scrollY` read is enough. */
+const noteScroll = frame(noteMotion);
+
 (function watchMotion() {
 	const opts = { passive: true, capture: true };
-	window.addEventListener('scroll', noteMotion, opts);
+	window.addEventListener('scroll', noteScroll, opts);
 	for (const name of [ 'wheel', 'touchmove' ])
 		window.addEventListener(name, noteUser, opts);
 	for (const name of [ 'mousedown', 'keydown', 'touchstart' ])
@@ -237,33 +244,14 @@ function watch(el) {
 }
 
 /* ---- scroll anchoring, where the engine has none ----
- * An older WebKit absorbs none of a tick's growth and the page moved on every one, measured on the
- * reporter's own router: +133px, +134px, +123px, +108px. Computed from the reference, never the
- * offset: measuring the offset corrects an anchoring engine's own adjustment (16 movements, 1827px).
- * Whether there is one to leave anything behind is asked of the platform, never of a browser name —
- * with anchoring suppressed, a 120px growth moves the reader 120px. */
+ * Safari and iOS before 27 have no `overflow-anchor`, and a tick's growth above the reader moves
+ * them by all of it. Whether the engine anchors is asked of the platform, never of a browser name;
+ * where it does, the observer leaves the reader to it. Elsewhere the drift is computed from a
+ * reference element, never from the offset. */
 const ENGINE_ANCHORS = (() => {
-	/* dev switch */
-	try { if (localStorage.getItem('fsEngineAnchor') === 'off') return false; }
-	catch (e) { /* no storage, no switch */ }
 	try { return CSS.supports('overflow-anchor', 'auto'); }
 	catch (e) { return true; }
 })();
-
-/* A load-time check cannot see an engine that declines on a given refill: two residuals written
- * back 419-420ms late move the observer to the 7-36ms path until trust returns. Never a browser
- * name, only a count. */
-const LATE_MISS_LIMIT = 2;
-let _lateMisses = 0;
-let _engineTrusted = ENGINE_ANCHORS;
-/* The witness's own rounding on a 32-36 row lease table at 390 wide is 8-12.25px, none of them a
- * residual. */
-const LATE_ROUND_TOLERANCE = 16;
-
-/* Trust returns after this many refills where `_rest.el` itself held: the two cheaper witnesses
- * tried recovered on an engine still 48px wrong. */
-const TRUST_RECOVERY_LIMIT = 2;
-let _lateHits = 0;
 
 let _rest = null;
 let _restAt = null, _restPage = null;
@@ -348,61 +336,6 @@ function anchorEnabled() {
 	try { return localStorage.getItem('fsAnchor') !== 'off'; }
 	catch (e) { return true; }
 }
-/* ---- what the engine's own anchoring leaves behind ----
- * It keeps a reference still; it does not promise that a section can vanish and come back. An
- * older WebKit moved 180px for 120px of growth, so the element is asked where it is now. */
-let _lateFrame = 0;
-
-function lateDrift(ref, grow, floorShrink) {
-	if (_lateFrame) return;
-	if (!ref) return;
-	_lateFrame = requestAnimationFrame(() => {
-		const seen = scrollTop();
-		const settle = () => {
-			_lateFrame = 0;
-			if (!anchorEnabled()) return;
-			if (Date.now() < _userUntil) return;
-			if (_restPage !== pageStamp()) return;
-			/* The offset, not the event stream: the engine's own compensation starts the motion sampler, and
-			 * in WebKit the event arrives up to 1.2s late. `ref.at`, since run() has re-taken `_restAt` and the
-			 * comparison becomes a value against itself (320px through, @1440 side). */
-			if (scrollTop() !== seen) return;
-			let el = ref.el, was = ref.top;
-			if (!el || !el.isConnected) {
-				if (!ref.sec || !ref.sec.isConnected) return;
-				el = ref.sec; was = ref.secTop;
-			}
-			let drift = el.getBoundingClientRect().top - was;
-			/* The witness can be blind: the fold's element need not sit below the container this tick refilled,
-			 * 13 of 13 refills reading 0px with the reader 120px off, and a gap under the tolerance is `grow`'s
-			 * own rounding. */
-			if (Math.abs(drift) < 1 && grow > 1) {
-				const compensated = seen - ref.at;
-				if (Math.abs(compensated) < 1) drift = grow - compensated;
-				else if (Math.abs(grow - compensated) > LATE_ROUND_TOLERANCE) {
-					if (++_lateMisses >= LATE_MISS_LIMIT) { _engineTrusted = false; _lateHits = 0; }
-					rememberRest(true);
-					return;
-				}
-			}
-			if (Math.abs(drift) < 1) {
-				if (grow > 1 || floorShrink > 1) rememberRest(true);
-				return;	/* the engine put it back */
-			}
-			if (Math.abs(drift) > (window.innerHeight || 800)) return;
-			writeOffset(scrollTop() + drift);
-			rememberRest(true);
-			if (floorShrink > 1) return;
-			if (Math.abs(drift) <= LATE_ROUND_TOLERANCE) return;
-			if (++_lateMisses >= LATE_MISS_LIMIT) { _engineTrusted = false; _lateHits = 0; }
-		};
-		/* How long to wait is a question about the reader: where nothing is driving,
-		 * the engine is the only mover and its window is 7-36ms — 404-422ms became 8-61ms. */
-		if (!scrolling() && Date.now() >= _userUntil) settle();
-		else _lateFrame = window.setTimeout(settle, SCROLL_IDLE);
-	});
-}
-
 /* A floor `holdFloor()` could not clear at mutation time, cleared later with nobody watching: its
  * own frame slot, and the offset's own response to the write below as the check. Not gated on
  * `scrolling()` — the belated write is what the engine reacts to, and the reaction re-arms the
@@ -419,7 +352,8 @@ function settleDeferredFloor(offsetBefore, shrink) {
 			if (scrollTop() !== seen) return;		/* still settling, or the reader has moved */
 			const wanted = offsetBefore - shrink;
 			const gap = wanted - seen;
-			if (Math.abs(gap) <= LATE_ROUND_TOLERANCE) return;		/* the engine already gave it back */
+			/* 16: a 32-36 row lease table rounds by 8-12.25px at 390 wide */
+			if (Math.abs(gap) <= 16) return;		/* the engine already gave it back */
 			if (Math.abs(gap) > (window.innerHeight || 800)) return;
 			writeOffset(scrollTop() + gap);
 			if (_rest) { _rest.top -= gap; if (_rest.sec) _rest.secTop -= gap; _rest.at = scrollTop(); }
@@ -454,7 +388,6 @@ function applyAnchor(ref) {
 	if (!ref.el.isConnected) return;
 	const drift = ref.el.getBoundingClientRect().top - ref.top;
 	if (Math.abs(drift) < 1) return;			/* nothing needed correcting here */
-	_lateHits = 0;
 	if (Math.abs(drift) > (window.innerHeight || 0) + 200 + (ref.slack || 0)) return;
 	writeOffset(at + drift);
 	return true;
@@ -466,54 +399,30 @@ function observeContent() {
 		.filter(Boolean);
 	const viewHost = hosts[0];
 	_mo = new MutationObserver((records) => {
-		const settled = _rest;
-		const trustEngine = _engineTrusted;
-		const ref = trustEngine ? null : anchorFor();
-		/* The record's own target, read before run() rewrites its floor: the growth in pixels, rather than
-		 * whichever element the fold happened to hit, and read on every tick so recovery can tell a tick
-		 * that tested the engine from one that did not. The floored box the record sits in, since
-		 * `dom.content()` refills a node inside the pinned box on 1 of 12 nodes. */
+		const ref = ENGINE_ANCHORS ? null : anchorFor();
+		/* the floored box the record sits in, since `dom.content()` refills a node inside the pinned box
+		 * on 1 of 12 nodes */
 		let box = null;
 		for (const m of records) {
 			if (m.type !== 'childList') continue;
 			const b = m.target.closest(FLOORED);
 			if (b) { box = b; break; }
 		}
-		const before = box && (parseFloat(box.style.minHeight) || 0);
-		let grew = before ? box.offsetHeight - before : 0;
-		/* only growth above the reader's reference: counting a box below it wrote the whole growth back,
-		 * offset +120 and reader -120 */
-		if (grew > 1 && settled && settled.el.isConnected
-				&& box.getBoundingClientRect().top >= settled.el.getBoundingClientRect().top) grew = 0;
-		if (!trustEngine && grew > 1 && _rest && _rest.el.isConnected && Date.now() >= _userUntil
-				&& !scrolling() && _restPage === pageStamp()
-				&& Math.abs(_rest.el.getBoundingClientRect().top - _rest.top) < 1
-				&& ++_lateHits >= TRUST_RECOVERY_LIMIT) {
-			_engineTrusted = true;
-			_lateMisses = _lateHits = 0;
-		}
 		const wasScrolling = scrolling();
-		if (before && wasScrolling) _deferredFloor = box;
+		/* only a box already floored before run(): one run() floors now has nothing to settle later */
+		if (box && wasScrolling && (parseFloat(box.style.minHeight) || 0) > 0) _deferredFloor = box;
 		run(records);
 		if (!wasScrolling) _deferredFloor = null;
-		const floorShrink = before ? Math.max(0, before - (parseFloat(box.style.minHeight) || 0)) : 0;
 		/* `#view` itself emptied and refilled is a page swap: a reference measured mid-swap is read 431px
 		 * out and written over a correct restoreScroll(). */
-		let gone = 0, came = 0, took = 0, gave = 0;
-		for (const m of records) {
+		let gone = 0, came = 0;
+		for (const m of records)
 			if (m.target === viewHost) { gone += m.removedNodes.length; came += m.addedNodes.length; }
-			if (m.type === 'childList') { took += m.removedNodes.length; gave += m.addedNodes.length; }
-		}
 		if (gone && came) {
 			forgetRest();
 			return;
 		}
-		/* Not on a batch that only took nodes away: arming on the empty half wrote -834px, and superseding
-		 * with the later batch cost 12 findings. */
-		if (trustEngine) {
-			if (!(took && !gave && grew <= 0 && floorShrink <= 1)) lateDrift(settled, grew, floorShrink);
-		}
-		else scheduleAnchor(ref);
+		scheduleAnchor(ref);
 	});
 	for (const host of hosts) {
 		_mo.observe(host, { childList: true, subtree: true });

@@ -318,7 +318,7 @@ package list` line per dead feed — measured on 24.10.8, one dead feed of eight
 diagnostic lines and exit 1, four of eight gives eight lines and exit 4). Whatever the count, our
 own feed failing is never tolerated: `repo.owfeed.org` is a distinct host from the stock feeds, so
 an on-path/DNS attacker can blackhole it alone while the rest answer, and an earlier
-`bad < total` tolerance let that read as success on a stale index (security review, task 0176).
+`bad < total` tolerance let that read as success on a stale index (a security review).
 
 ### The feed-list rewrite: R1–R4
 
@@ -329,8 +329,8 @@ earned by a real report:
 | Rule | Invariant | What broke without it |
 |---|---|---|
 | R1 | The written line is matched **exactly**, never as a substring | `grep -q "$FEED_HOST"` matched a commented, tagged or other-branch/arch line while apk read none of them (forum.openwrt.org/t/251930#160) |
-| R2 | The correct line is placed **first**, and **moved** there even if already present elsewhere | An installer that only ever appended left the line stuck behind an admin's own unparsable line forever — apk's repository reader stops at the first line it cannot tokenise, so "is the line present" stayed true while apk never reached it (tester finding, `m6a-apk.sh` #6) |
-| R3 | Every **other** active line naming us is commented out (never deleted) and reported | One leftover or malformed line sitting above the correct one can shadow the whole feed with no error at all (security review, task 0176-e, `m5a-apk.sh`) |
+| R2 | The correct line is placed **first**, and **moved** there even if already present elsewhere | An installer that only ever appended left the line stuck behind an admin's own unparsable line forever — apk's repository reader stops at the first line it cannot tokenise, so "is the line present" stayed true while apk never reached it |
+| R3 | Every **other** active line naming us is commented out (never deleted) and reported | One leftover or malformed line sitting above the correct one can shadow the whole feed with no error at all |
 | R4 | "Nothing changed" is asked of the package manager (`feed_offer()`), never inferred from "the version did not move" | `apk add`/`opkg install` on an already-satisfied package exits 0 whether or not the feed carries something newer — issues #16, #28, #30, and a router whose feed line apk never read being told "already current" (forum.openwrt.org/t/251930#160) |
 
 The opkg leg matches on the host (`OPKG_HOST_RE`) **or** on the `src`/`src/gz` NAME field being
@@ -358,7 +358,7 @@ correct, and the reverse of HEAD, which wrote it unconditionally before the fetc
 `atomic_write()` resolves the real path, copies its mode/owner onto a temp file in the same
 directory, writes the new content into that copy, then `mv -f`s it over the original — one atomic
 rename, so a failure at any point before it leaves the file exactly as it was. Six shapes were
-found and fixed together in one security review (task 0176):
+found and fixed together in one security review:
 
 | Shape | Task | The fix |
 |---|---|---|
@@ -421,9 +421,10 @@ after measuring on owrt2512b (apk) and owrt2410b (opkg), fresh install and upgra
 `/etc/uci-defaults/30_luci-theme-footstrap` was already gone by the time our own content ran, and
 the theme was already registered. The re-run guard never fired.
 
-**Fresh install vs upgrade is decided by the registration itself.** `mediaurlbase` is written only
-in the run that first added `luci.themes.Footstrap`; on an upgrade the entry is already there, so
-nothing moves a router off the theme it is on. `[ "$PKG_UPGRADE" != 1 ]` is checked beside it, as
+**Neither an install nor an upgrade moves the active theme.** The `mediaurlbase` line runs only in
+the run that first added `luci.themes.Footstrap`, and `set_opt` never overwrites: luci-base ships
+`main.mediaurlbase`, so on a stock router it sets nothing, and the admin picks Footstrap in Language
+and Style. On an upgrade the entry is already there, so the line does not even run. `[ "$PKG_UPGRADE" != 1 ]` is checked beside it, as
 the other themes in the tree do, but carries nothing on a package install: apk never exports the
 variable and neither does our postinst. `dev-sync.sh` sets it by hand, so a dev router keeps its
 theme.
@@ -545,8 +546,8 @@ and reported as success. Measured on a live router: it held eight options, was p
 had no `.conffiles` entry beside base-files' and dnsmasq's.
 
 Nothing observable fails when this regresses — the wipe happens on somebody else's router, months
-later — so every shipped `/etc/config/*` must be declared. CI's `e2e` saves a footstrap setting
-before the upgrade and fails when it does not survive it ([verifying.md](verifying.md)).
+later — so every shipped `/etc/config/*` must be declared. CI's `e2e` writes a marker section
+into `/etc/config/footstrap` before the upgrade and fails when it does not survive it ([verifying.md](verifying.md)).
 
 The uploaded background is the sibling case with the other answer. `/etc/footstrap/login-bg` is
 written at runtime too, but it lives outside `/etc/config`, so a package upgrade never touches it
@@ -596,14 +597,15 @@ file had been written.
 
 ## `luci-upstream.pin`
 
-The single source for the pinned `openwrt/luci` commit and the sha256 of the borrowed tools
-(`luci-base/src/jsmin.c`, `build/i18n-scan.pl`). `update-po.sh` **downloads and RUNS**
+The single source for the pinned `openwrt/luci` commit and the sha256 of the borrowed
+`build/i18n-scan.pl`. `update-po.sh` **downloads and RUNS**
 `i18n-scan.pl` to regenerate the catalogue: it lexes `.ut` (rewriting the template into JS before
 xgettext) and picks up the title from the rpcd ACL; a `grep` for `_('…')` does neither.
 
 Taken from a moving `master`, the tool would be "whatever upstream pushed last"; the sha256
-says so out loud. The same file pins `USIGN_PIN` (so the signer in CI and the verifier in the field
-are the same code) and `OPENWRT_KEYRING_PIN` — the commit of `openwrt/keyring` the release SDK's
+says so out loud. The same file pins `USIGN_PIN` (the usign `build-apk.sh` builds, through
+`tools/build-usign.sh`, to check the SDK it downloads; CI signs through owfeed and does not use it)
+and `OPENWRT_KEYRING_PIN` — the commit of `openwrt/keyring` the release SDK's
 signing keys are read from, pinned from a *different* host than the tarball they verify.
 
 It deliberately pins **no ucode**: the router's own interpreter runs the installed templates on

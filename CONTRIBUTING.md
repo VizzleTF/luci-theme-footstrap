@@ -30,15 +30,16 @@ A change is not finished until it has run on a real OpenWrt userland — both pa
 cannot run it yourself, say so in the pull request rather than describing the change as verified; an
 untested change described as tested is worse than an untested one.
 
-Nothing in `package.json` ships. `luci.mk` copies `htdocs/` and `ucode/` verbatim, and the OpenWrt
-buildbot has no node — so the tooling may need node, and the package never may.
+No npm package is installed on a router. The release build (`tools/stage.sh`) runs uglify-js and
+acorn over the shipped JS and templates, but `luci.mk` copies `htdocs/` and `ucode/` verbatim and the
+OpenWrt buildbot has no node — so the tooling may need node, and the package source never may.
 
 ## What a pull request needs
 
 - **One concern per branch.** A layout fix and a packaging fix are two branches.
 - **Conventional Commits**, in English, present tense: `fix(chrome): …`, `feat(appearance): …`.
 - **A changelog entry in both files** — `CHANGELOG.md` and `CHANGELOG_ru.md`, same version, same
-  order. `npm run changelog` checks it.
+  order. Run `npm run changelog` to check it; CI does not run it.
 - **A green `e2e`** on both routers. A red run is fixed in the code under it, not in the check.
 - **A comment that says why.** The codebase's comments carry the constraint, the alternative that
   failed and the number that was measured — not a restatement of the line below them. A negative

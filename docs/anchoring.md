@@ -1,3 +1,5 @@
+> Archive. The numbers here come from synthetic gates that were removed in PR #76 and are not reproducible; do not act on them without measuring on a real router.
+
 # Keeping the reader's place
 
 A poll tick changes the height of something above the reader and the page under them moves. This

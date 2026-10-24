@@ -36,10 +36,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      # The rpcd ACL must grant exactly what SECURITY.md lists: any other grant (an `exec`, a new
-      # path, a new ubus method) or a malformed file fails here. rpcd skips a malformed ACL silently.
-      - name: The ACL grants only what SECURITY.md lists
+      # The source of truth for what the package may do over rpcd is the literal below; SECURITY.md
+      # lists the same grants by hand, so a change here is a change there. rpcd loads every file in
+      # acl.d and skips a malformed one silently: the directory must hold this one file, and jq must
+      # parse it and find exactly the literal (an `exec`, a new path or a new ubus method fails).
+      - name: The ACL grants exactly this step's literal, which SECURITY.md lists
         run: |
+          acl=luci-theme-footstrap/root/usr/share/rpcd/acl.d
+          held=$(find "$acl" -mindepth 1 -printf '%f ')
+          [ "$held" = 'luci-theme-footstrap.json ' ] || {
+            echo "::error::$acl must hold luci-theme-footstrap.json alone, holds: $held"
+            exit 1
+          }
           jq -e 'keys == ["luci-theme-footstrap"] and (."luci-theme-footstrap" | del(.description)) == {
             "read": {"uci": ["footstrap"]},
             "write": {
@@ -51,7 +59,7 @@ jobs:
                 "/etc/footstrap/pattern.svg": ["write", "remove"]
               }
             }
-          }' luci-theme-footstrap/root/usr/share/rpcd/acl.d/luci-theme-footstrap.json
+          }' "$acl/luci-theme-footstrap.json"
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -72,9 +80,9 @@ jobs:
             dist/all
           if-no-files-found: error
 
-  # The build under test is staged here again with a version above any release, so installing it
-  # over the last release is an upgrade by both package managers' rules; its payload is the same
-  # tree `build` packs.
+  # Does not wait for `build`: it stages and packs the same tree itself, stamped 9999.0.0 so that
+  # installing it over the last release is an upgrade by both package managers' rules. Its payload
+  # differs from `build`'s only in the version fs-version.js carries.
   e2e:
     name: The package's life on ${{ matrix.router }}
     timeout-minutes: 90
@@ -96,7 +104,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: sh tools/ci-playwright.sh
+      # tools/anchor-check.mjs, which e2e runs, drives all three engines
+      - run: sh tools/ci-playwright.sh chromium firefox webkit
       - uses: owfeed/owfeed/setup@v0.5.5
       - run: FOOTSTRAP_VERSION=9999.0.0 ./tools/stage.sh && owfeed build
       - name: Download the last release

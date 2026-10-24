@@ -7,12 +7,11 @@
 #
 # `owfeed build` packages a DIRECTORY; it does not build one, and it compiles the .po files itself
 # (byte-identical to po2lmo). Everything else the SDK did happens here, in the order below: 1 copy
-# (luci.mk's install mapping), 2 build-css, 3 mangle the private --fs-* names, 4 `strip-build.sh
-# probes` then uglify-js, 5 strip templates, minify the pre-paint scripts inside them, strip shell
-# and assets, 6 stamp FS_VERSION after the minify (minify-js.mjs keeps that declaration verbatim so
-# the sed still matches). Those are the Makefile's Build/Prepare steps plus two minifiers (uglify-js
-# over resources, minify-prepaint over head.ut); probes and templates touch disjoint trees, so
-# their order is free.
+# (luci.mk's install mapping), 2 build-css, 3 mangle the private --fs-* names, 4 uglify-js, 5 strip
+# templates, minify the pre-paint scripts inside them, strip shell and assets, 6 stamp FS_VERSION
+# after the minify (minify-js.mjs keeps that declaration verbatim so the sed still matches). Those
+# are the Makefile's Build/Prepare steps plus two minifiers (uglify-js over resources,
+# minify-prepaint over head.ut).
 # The lifecycle scripts are EXTRACTED from the Makefile, not kept as a second copy; `$$` is make's
 # escaping for a literal `$`, undone here.
 set -eu

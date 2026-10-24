@@ -29,7 +29,7 @@ Every page here stands on its own — start wherever your question is.
 | Page | Answers |
 |---|---|
 | [package.md](package.md) | Source tree, Makefile, uci-defaults, postinst/postrm |
-| [ci.md](ci.md) | The CI job graph, packaging, installation and the trust chain |
+| [ci.md](ci.md) | The CI job graph, the e2e job, packaging and releases |
 | [releasing.md](releasing.md) | The pre-release checklist, the changelog contract, the runbook |
 | [upstream-pr.md](upstream-pr.md) | The theme's pull request to openwrt/luci: building, preflight, review |
 | [benchmark.md](benchmark.md) | The navigation benchmark: method and results |
