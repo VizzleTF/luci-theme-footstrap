@@ -36,6 +36,22 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      # The rpcd ACL must grant exactly what SECURITY.md lists: any other grant (an `exec`, a new
+      # path, a new ubus method) or a malformed file fails here. rpcd skips a malformed ACL silently.
+      - name: The ACL grants only what SECURITY.md lists
+        run: |
+          jq -e 'keys == ["luci-theme-footstrap"] and (."luci-theme-footstrap" | del(.description)) == {
+            "read": {"uci": ["footstrap"]},
+            "write": {
+              "ubus": {"uci": ["set", "commit"], "file": ["remove"]},
+              "uci": ["footstrap"],
+              "cgi-io": ["upload"],
+              "file": {
+                "/etc/footstrap/login-bg": ["write", "remove"],
+                "/etc/footstrap/pattern.svg": ["write", "remove"]
+              }
+            }
+          }' luci-theme-footstrap/root/usr/share/rpcd/acl.d/luci-theme-footstrap.json
       - uses: actions/setup-node@v7
         with:
           node-version: '22'

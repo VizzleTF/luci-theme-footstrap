@@ -66,8 +66,6 @@ and the same on `owrt2410` with `luci-theme-footstrap_*_all.ipk` and
   point LuCI at a theme that is not installed; the run resets it to bootstrap rather than judging
   it. e2e installs, removes and switches themes on the router; `owlab sync` afterwards puts the
   working tree back.
-- A walk over every menu page outlasts a foreground call: start it with `tools/bg.sh <cmd>`
-  (detaches, logs into `../tmp/`) and wait with `tools/bg-wait.sh <run-id>`.
 - It exits 0 when every step passed, 1 otherwise, and 2 on bad arguments or a router that is not
   running. The output and screenshots land in `--out`, by default `../tmp/e2e-<router>`.
 - **Done means both**: 25.12/apk and 24.10/opkg. Say which one a run covered.
@@ -88,8 +86,8 @@ gh run download <run-id> -n e2e-owrt2410 -D ../tmp/e2e-ci-owrt2410
 
 The log prints `PASS`/`FAIL` per step and, under the crawl step, one line per failing page and way
 of opening it. A failure in an install, upgrade or removal step carries the package manager's last
-line of output in its detail. `tools/ci-log.sh <run-id>` prints a red job's failed step and its
-decisive lines; reproduce it with a local run on the same router before naming a cause (the diff,
+line of output in its detail. `gh run view <run-id> --log-failed` prints a red job's failed
+steps; reproduce it with a local run on the same router before naming a cause (the diff,
 infrastructure, the upstream feed).
 
 ## Rules for every change
@@ -103,9 +101,8 @@ infrastructure, the upstream feed).
   `> span.open`, a plain dropdown anywhere), and what it opens must be what a click at each target's
   centre reaches. `dispatchEvent` plus `getBoundingClientRect` cannot see a clip: 0.14.16 shipped a
   clipped ComboButton menu that such a check passed three times.
-- Some comments are code — `@mirror`/`@endmirror`, `/* fs:probe */`, eslint `'require …'`
-  pragmas, the Makefile's buildroot marker, the literal `dataset.fsFit` write. Keep them verbatim;
-  never reword comments with a mechanical `sed`.
+- Some comments are code — LuCI's `'require …'` directives, the Makefile's buildroot marker. Keep
+  them verbatim; never reword comments with a mechanical `sed`.
 - A `#` line inside a quoted `ssh "$R" "…"` string is part of the string: `sh -n` after editing.
 - Screenshots and scratch output go in `../tmp/`, never in the repository.
 
@@ -128,7 +125,8 @@ infrastructure, the upstream feed).
   with one that has none kills the whole rule below the floor — split it or wrap in `:is()`. A
   `color-mix()` token needs its static twin in `styles/04-nocolormix.css`.
 - No colour literals (`--fs-scrim` excepted); no `--*-rgb`/`--*-hsl` bridges.
-- A duplicate is merged or pinned in `@mirror`; a one-copy `@mirror` group is a mistake.
+- A duplicate is merged, or listed in [css.md](css.md) "Duplicates CSS cannot merge" and edited
+  in both copies.
 - `styles/base/` is editable, but prefer the matching `styles/theme/` file.
 - No bold mono: `<strong>` must be *assigned* the sans face.
 
@@ -189,7 +187,7 @@ hand on both routers.
 
 ## CI
 
-- After a push: `tools/bg.sh tools/ci-watch.sh --sha <sha>` plus its waiter → one verdict line.
+- After a push: `gh run list --commit <sha>`, then `gh run watch <run-id> --exit-status`.
 - Before pushing to `main`: Build's newest completed `push` run on `main` must be `success`
   (`gh run list --branch main --workflow build.yml --event push --status completed -L1`); a
   `cancelled`/`skipped` run says nothing — the one before it decides. CodeQL, pages and Dependabot

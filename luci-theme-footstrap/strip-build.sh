@@ -1,10 +1,9 @@
 #!/bin/sh
 # Strip build-time-only bytes from a BUILD TREE, one mode per kind of file:
-#   ./strip-build.sh templates|shell|probes|assets <dir>
+#   ./strip-build.sh templates|shell|assets <dir>
 #
 #   templates  `{# … #}`, whole-line `/* … */` and the indentation out of the .ut files
 #   shell      whole-line `#` out of the shell under root/ (uci-defaults, the CGI, keep.d)
-#   probes     the `/* fs:probe */` export lines out of the JS
 #   assets     the SVG favicon's comment and the whitespace in the manifest JSON
 #
 # Run from the Makefile over $(PKG_BUILD_DIR) and from tools/stage.sh over the staged payload, never
@@ -14,11 +13,11 @@
 # executes it. Reasons per mode sit above each branch below; docs/package.md has the rest.
 set -eu
 
-usage() { echo "usage: strip-build.sh templates|shell|probes|assets <dir>" >&2; exit 2; }
+usage() { echo "usage: strip-build.sh templates|shell|assets <dir>" >&2; exit 2; }
 
 MODE="${1:-}"
 DIR="${2:-}"
-case "$MODE" in templates|shell|probes|assets) ;; *) usage ;; esac
+case "$MODE" in templates|shell|assets) ;; *) usage ;; esac
 [ -n "$DIR" ] && [ -d "$DIR" ] || usage
 
 LIST=$(mktemp)
@@ -29,7 +28,6 @@ trap 'exit 130' INT TERM
 # The list goes through a file: `for f in $(find …)` splits on whitespace.
 case "$MODE" in
 	templates) find "$DIR" -type f -name '*.ut' ;;
-	probes)    find "$DIR" -type f -name '*.js' ;;
 	assets)    find "$DIR" -type f \( -name '*.svg' -o -name '*.json' \) ;;
 	shell)     find "$DIR" -type f ;;
 esac | sort > "$LIST"
@@ -50,11 +48,6 @@ want() {
 			echo "strip-build: $1:$(grep -n '<<' "$1" | head -1 | cut -d: -f1): a heredoc — refusing (a '#' line inside one is DATA, not a comment)" >&2
 			exit 1
 		fi ;;
-	# a few module-private functions are also exported for one reason: a gate here calls them.
-	# The function stays, the export line goes, with the comment block directly above it. Only a
-	# complete export entry may go; anything else fails the build, since a half-removed object
-	# literal is a module that does not parse.
-	probes) grep -q '/\* fs:probe \*/' "$1" ;;
 	# acl.d is excluded: rpcd skips a malformed ACL SILENTLY, so the grant would go to nobody, for ~200 B
 	assets) case "$1" in */rpcd/acl.d/*.json) return 1 ;; esac ;;
 	esac
@@ -222,36 +215,6 @@ strip() {
 			echo "strip-build: $1 lost its shebang — refusing" >&2
 			exit 1
 		fi ;;
-	probes)
-		pre=$(grep -c '/\* fs:probe \*/$' "$1" || true)
-		awk '
-			# a comment block directly above a probe entry describes that export, so it is held back
-			# and goes with it; above anything else it is released untouched
-			function flush() { if (nb) { printf "%s", buf; lastblank = 0 } buf = ""; nb = 0 }
-			incom { buf = buf $0 "\n"; nb++; if ($0 ~ /\*\//) { incom = 0 } ; next }
-			/^[ \t]*\/\*/ && !/\/\* fs:probe \*\/$/ {
-				flush()
-				buf = $0 "\n"; nb = 1
-				if ($0 !~ /\*\//) incom = 1
-				else if ($0 !~ /\*\/[ \t]*$/) flush()
-				next
-			}
-			/\/\* fs:probe \*\/$/ {
-				line = $0
-				sub(/[ \t]*\/\* fs:probe \*\/$/, "", line)
-				# a complete entry, in either form the modules use: `name,` or `name: expression,`
-				if (line ~ /^[ \t]*[A-Za-z_$][A-Za-z0-9_$]*[ \t]*,[ \t]*$/ ||
-				    line ~ /^[ \t]*[A-Za-z_$][A-Za-z0-9_$]*[ \t]*:.*,[ \t]*$/) { buf = ""; nb = 0; skipblank = lastblank; next }
-				print "strip-build: " FILENAME ":" NR ": not a whole export entry: " line > "/dev/stderr"
-				bad = 1
-			}
-			# a drop between two blank lines would leave a run the source did not have
-			skipblank && /^[ \t]*$/ { skipblank = 0; next }
-			{ flush(); skipblank = 0; lastblank = ($0 ~ /^[ \t]*$/); print }
-			END { flush(); exit bad }
-		' "$1" > "$CUR"
-		post=$(grep -c '/\* fs:probe \*/$' "$CUR" || true)
-		dropped=$((dropped + pre - post)) ;;
 	assets)
 		case "$1" in
 		*.svg)
@@ -315,7 +278,6 @@ strip() {
 before=0
 after=0
 found=0
-dropped=0
 while IFS= read -r f; do
 	want "$f" || continue
 	found=$((found + 1))
@@ -333,11 +295,9 @@ done < "$LIST"
 case "$MODE" in
 templates) [ "$found" -gt 0 ] || { echo "strip-build: no .ut under $DIR" >&2; exit 1; } ;;
 shell)     [ "$found" -gt 0 ] || { echo "strip-build: no shell file under $DIR" >&2; exit 1; } ;;
-probes)    [ "$found" -gt 0 ] || { echo "strip-build: no marked export in $DIR" >&2; exit 1; } ;;
 assets)    [ "$found" -gt 0 ] || { echo "strip-build: no .svg or .json in $DIR" >&2; exit 1; } ;;
 esac
 case "$MODE" in
-probes) echo "strip-build: probes: $dropped export(s) dropped from $found file(s)" ;;
 assets) echo "strip-build: assets: $found file(s)" ;;
 *)      echo "strip-build: $MODE: $found file(s), $before -> $after bytes (-$((before - after)))" ;;
 esac

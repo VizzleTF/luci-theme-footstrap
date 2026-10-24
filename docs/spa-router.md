@@ -286,8 +286,7 @@ jump. Measured with the incoming module's fetch held open 1.2 s
 there through the swap; moved into the same synchronous turn as `commitStage()`, it stays at the
 reader's own offset for the whole window and reaches 0 in the same frame the new page's content
 does. `fit.forgetRest()` stays at the click — it only invalidates a stale anchoring reference, which
-must happen as soon as the reader is committed to leaving, not at the swap. `docs/anchoring.md`,
-"The scroll reset", has the fuller reasoning and the numbers.
+must happen as soon as the reader is committed to leaving, not at the swap.
 
 What showed it was sampling the outgoing page's document height and one of its page-scoped rules
 mid-flight, between the click and `commitStage()`, with the same held-open fetch

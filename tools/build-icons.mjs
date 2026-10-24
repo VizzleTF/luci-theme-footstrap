@@ -84,7 +84,7 @@ function deriveIcons() {
 		return { name, size: Number(m[1]) };
 	});
 	if (!list.length) {
-		console.error('build-icons: manifest.json\'s icons[] is empty — nothing for this gate to check');
+		console.error('build-icons: manifest.json\'s icons[] is empty — nothing to check');
 		process.exit(1);
 	}
 
@@ -93,7 +93,7 @@ function deriveIcons() {
 	const tag = headUt.match(/<link\b[^>]*rel="apple-touch-icon"[^>]*>/);
 	const href = tag && tag[0].match(/href="\{\{ media \}\}\/([^"]+)"/);
 	if (!href) {
-		console.error(`build-icons: ${headUtPath} carries no apple-touch-icon link this gate can read`);
+		console.error(`build-icons: ${headUtPath} carries no apple-touch-icon link to read`);
 		process.exit(1);
 	}
 	if (!list.some((i) => i.name === href[1])) {

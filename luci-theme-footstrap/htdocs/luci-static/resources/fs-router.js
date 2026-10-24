@@ -110,7 +110,6 @@ function markAlive() {
 	_expired = false;
 	console.warn('footstrap: the LuCI session answers again — client navigation is back on.');
 }
-function sessionExpired() { return _expired; }
 function watchSession() {
 	const req = window.L.Request;
 	if (req && typeof req.addInterceptor === 'function')
@@ -809,22 +808,5 @@ return baseclass.extend({
 	seed,
 	wire: wireRouter,
 	onNavigate,
-	/* test-only, driven against a hand-broken `L`: the one way to see the off branch */
-	contractBreaks,	/* fs:probe */
-	/* test-only: the navigation sweep around a visibilitychange, and the session verdict the
-	 * interceptors reached */
-	clearViewIntervals,	/* fs:probe */
-	sessionExpired,	/* fs:probe */
-	/* test-only: the deferred `poll-stop` listener's own check, called directly so a test need not
-	 * fake a microtask tick */
-	hidePollIndicatorIfEmpty,	/* fs:probe */
-	/* test-only: the body-litter classifier and counter, and navigate() to prove the early return
-	 * reaches them */
-	strayBodyNode,	/* fs:probe */
-	bodyLittered,	/* fs:probe */
-	navigate,	/* fs:probe */
-	/* test-only: the progress bar's start/end pair, to drive the fade without a navigation */
-	progressStart,	/* fs:probe */
-	progressEnd,	/* fs:probe */
 	prefetchSegs
 });

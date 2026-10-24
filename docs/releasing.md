@@ -205,8 +205,8 @@ Changelog on all three.** Do not "correct" entries toward the other standard.
 
 **Every commit writes into `## [Unreleased]` in the same commit as the code**, in both files.
 A changelog written afterwards is written from the diff, and the diff is precisely what does not know
-why. Documentation, benchmarks, CI and packaging commits count too; only `CLAUDE.md` and a fix to an
-entry already written skip it. Write both with one call so neither half can be forgotten:
+why. Documentation, benchmarks, CI and packaging commits count too; only a fix to an entry already
+written skips it. Write both with one call so neither half can be forgotten:
 `node tools/changelog.mjs add <0-7> --en '- **…**' --ru '- **…**' && git commit …` (0 = Added …
 7 = Development; it writes the worktree and the index and recreates the heading when a release left
 none). List existing entries with `grep -n '^- \*\*' CHANGELOG.md` rather than reading the block.
@@ -272,8 +272,9 @@ to `../tmp/release-<v>/`.
    `v0.14.12`: any one red leg holds the whole release, including a leg red for a reason that has
    nothing to do with the diff — infrastructure or an upstream feed, not this release's code. **The
    release is not cut until the tag's own run is read, job by job, not merely waited on**:
-   `tools/ci-watch.sh --sha <sha>` (detached through `tools/bg.sh`) for the verdict, `gh run view
-   <id>` for the job list, `tools/ci-log.sh <id>` for a failing step's decisive lines; say plainly whether the cause is this diff, an infrastructure condition, or an upstream feed. Only then check
+   `gh run list --commit <sha>` for the tag's runs, `gh run watch <id> --exit-status` for the
+   verdict, `gh run view <id>` for the job list, `gh run view <id> --log-failed` for a failing
+   step's log; say plainly whether the cause is this diff, an infrastructure condition, or an upstream feed. Only then check
    the release carries the expected assets (plus a `.sig` for each): the theme resolving to exactly
    one asset per format, the manifest, the installer, the notes.
 8. **Publish the feed, and do not wait on the schedule.** The theme is installed from

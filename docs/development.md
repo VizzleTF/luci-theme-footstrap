@@ -186,7 +186,7 @@ rule in the code that would otherwise look arbitrary.
   the two writes is a visible fault.
 - **The source tree is not what a router runs.** A package carries the uglify-js-minified,
   token-mangled `fs-*.js` and `header.ut`, and the mangled sheet names the axis properties by the
-  map (`--fs-tint-h` is `--aJ` there); `fenceRules` is a `/* fs:probe */` export the stage strips.
+  map (`--fs-tint-h` is `--aJ` there).
   Router bytes are the mangled sheet, 115,927 B against the readable 134,210 B.
 - **A fault can need the phone width.** The switch-knob overhang (task 0145) measured nothing at
   1280 and a `width` of 26.80px against 40px declared at 390: the knob (`::after`,
@@ -237,18 +237,6 @@ rule in the code that would otherwise look arbitrary.
   landed 419 ms after the commit. Holding the incoming module fetch or ubus calls open (a Playwright
   route) is what makes such a race reproducible on a stand.
 
-### Git hooks
-
-The repository keeps its hooks in `.githooks/`, which is not active until you point git at it:
-
-```sh
-git config core.hooksPath .githooks
-```
-
-`commit-msg` strips Co-Authored-By, `Claude-Session:` and "Generated with" trailers from whatever
-wrote them, and leaves `Signed-off-by` alone — openwrt/luci refuses a sign-off with a
-`@users.noreply.github.com` address, so that line is load-bearing.
-
 ## Proving it on a router: `tools/e2e.mjs`
 
 `tools/e2e.mjs` is the one check, and the local form of CI's `e2e` job (one per package manager). It
@@ -284,8 +272,7 @@ when every step passed and 1 otherwise; `report.json` and one screenshot per pag
 
 The router it gets must carry LuCI and its apps but not this theme — `owlab up` alone, no `owlab
 sync` — and e2e installs, removes and switches themes on it; `owlab sync` afterwards puts the working
-tree back. A run over every menu page outlasts a foreground call: detach it with `tools/bg.sh` and
-pair it with `tools/bg-wait.sh`.
+tree back.
 
 **Pin exact point releases.** `owlab.yaml` pins `25.12.4` / `24.10.8`; `25.12` or a snapshot works
 today and fails within days.
@@ -317,8 +304,7 @@ If a change needs a real kernel — not this theme's usual case — a router can
 ### Proving it on hardware
 
 Nothing automated runs against hardware: e2e and the playground drive owlab routers only. A hardware
-run happens on the maintainer's explicit word for one change, never by reflex, and `dev-sync.sh` and
-`ssh` are `ask` in `.claude/settings.json` so that word is given at the prompt.
+run happens on the maintainer's explicit word for one change, never by reflex.
 
 1. Pre-check that the fallback exists, and record where the router is now:
    `ssh <host> 'ls -d /www/luci-static/bootstrap /usr/share/ucode/luci/template/themes/bootstrap/header.ut && uci get luci.main.mediaurlbase'`.
@@ -338,17 +324,12 @@ run happens on the maintainer's explicit word for one change, never by reflex, a
 
 `tools/playground/{capture,build}.mjs` turn an owlab stand into a static, offline site — CI's own
 `playground` job, [ci.md](ci.md). Each step needs the one before it (`capture` needs a booted,
-installed router; `build` needs `capture`'s output) and the chain is a router-driving Playwright
-run: detach it with `tools/bg.sh` and pair it with `tools/bg-wait.sh` in the same turn rather than
-waiting on it in the foreground.
+installed router; `build` needs `capture`'s output).
 
 ```sh
 owlab up owrt2512 && owlab install owrt2512 'dist/noarch/luci-theme-footstrap-*.apk'
-tools/bg.sh sh -c '
-  npm run playground:capture &&
+npm run playground:capture &&
   npm run playground:build -- --base /luci-theme-footstrap/playground
-'
-tools/bg-wait.sh <run-id>
 ```
 
 Each script also takes its own flags directly (`--recording DIR`, `--out DIR`, `--base /path`) —
@@ -514,7 +495,7 @@ Two harness facts hold behind `tools/lib/stands.mjs`, which `capture` reads the 
   `requireStands()` (`tools/lib/stands.mjs`, which `tools/playground/capture.mjs` uses) takes `flock`
   on `../tmp/stands-<id>.lock`, one per stand in sorted order, and holds it for the whole run; a
   second run on the same set waits, and says who holds it. `../tmp` there is the main checkout's from
-  every linked worktree too (`tools/lib/tmp-root.sh` and `.mjs`, the git common dir). The holder is a
+  every linked worktree too (`tools/lib/tmp-root.mjs`, the git common dir). The holder is a
   child `flock` kept alive by its stdin pipe, so the kernel frees the lock on any exit, SIGKILL
   included, and the wait is bounded (30 min, `STANDS_LOCK_TIMEOUT_MS`). The lock is advisory:
   `owlab sync`, `owlab up`, `owlab test` and `tools/e2e.mjs` do not take it, so no `owlab sync` while
@@ -528,7 +509,7 @@ Two harness facts hold behind `tools/lib/stands.mjs`, which `capture` reads the 
   half-built; a scrubbed environment (`env -i`, cron, a systemd unit) never had it. Tell the two
   apart with `docker ps --format '{{.Names}}\t{{.Ports}}'`: containers running means the ports are
   there and only the CLI is gone. Export the path into the command itself:
-  `tools/bg.sh sh -c 'export PATH=$HOME/go/bin:$PATH; node tools/e2e.mjs …'`.
+  `export PATH=$HOME/go/bin:$PATH; node tools/e2e.mjs …`.
 
 - **A page that pins the browser's main thread stops a Playwright run DEAD.** `page.evaluate()` is
   the one Playwright call with no timeout at all: it waits for the page's own thread, and a page
@@ -711,8 +692,8 @@ page and merge the byte maps yourself. The tell is a module count lower than the
 the page actually loads.
 
 **A layout fault can be invisible on one release line because that luci-base happens to mutate the
-page, not because the theme is right.** The poll floor left on an outgoing tab pane (issue #75,
-`docs/anchoring.md`) reproduces on 25.12 — 2432px of blank above System → Startup's textarea, for
+page, not because the theme is right.** The poll floor left on an outgoing tab pane (issue #75)
+reproduces on 25.12 — 2432px of blank above System → Startup's textarea, for
 the life of a page that never polls — and the same v0.14.6 build on the 24.10 stand cleared it
 within 200 ms of the switch, some other mutation there having woken the sweep. A stand that is green
 is evidence about that stand. What tells the two apart is measuring the mechanism rather than the
@@ -849,45 +830,8 @@ owlab test --release 25.12.4 --install '/path/to/dist/noarch/luci-theme-footstra
 **A run killed by a timeout reports a browser bug, not a finding.** `page.waitForTimeout: Target
 page, context or browser has been closed` with an empty `log: []` is the run being SIGTERMed
 mid-way — a sweep over every menu page does not fit in five minutes. The two apart: a real failure
-names the page and what failed; a killed run prints a Playwright stack. Never re-run it with a bigger
-foreground timeout: `tools/bg.sh`, report the run-id, and pair it with a waiter (below).
-
-**A detached run needs a waiter, or it is a run nobody reads.** `tools/bg.sh` calls `setsid`: the
-process outlives the shell that started it and nothing announces its end. The log and a `.status`
-file next to it are the whole interface, and `.status` appears only when the run is over — which
-makes "is it done?" a question you have to keep asking, and therefore one that gets forgotten. It
-was forgotten three times in a single session here, twice while somebody was waiting on the answer,
-each time for 15-30 minutes after the chain had already finished.
-
-Start the waiter in the same turn as the run: in the foreground as
-`tools/bg-wait.sh <run-id> 5 270` with `timeout: 300000` for a run under 4.5 min, otherwise as a
-background command, so finishing wakes you instead of you polling it:
-
-```sh
-tools/bg.sh sh -c '…'            # prints run-id and log path
-tools/bg-wait.sh <run-id>        # blocks until .status exists, prints `exit: N` and the `name:` lines
-```
-
-The waiter costs nothing while the run is going and turns the result into an event. A run whose log
-nobody opened is not a green run — that rule is older than this note; the waiter is what makes it
-practical to honour.
-
-It stops on three things rather than one: the `.status` file, the run's own pid disappearing
-(`<run-id>.pid`, written by the inner shell — a run killed by SIGKILL, by a reboot or by the
-machine sleeping never writes a status, and waiting for that file alone waits forever), and a cap,
-`tools/bg-wait.sh <run-id> [interval] [max]`, 7200 s by default. The last two print
-`exit: process-gone` and `exit: timeout` and exit 2: a waiter still alive when the session ends
-wakes it later with a verdict nobody asked for. A `timeout` there is the waiter's cap; read the
-`.status`.
-
-**`tools/bg.sh` refuses `ssh`, `scp`, `sftp`, `rsync`, `dev-sync.sh` and every git or gh
-subcommand off its read list.** An allow rule for the wrapper is the natural one to add, and
-the permission engine matches the first word of a command, so it cannot see an `ssh` inside
-`tools/bg.sh sh -c '…'` — the form every detached run uses — and the wrapper would carry that command
-straight past the `ask` rule guarding the hardware router, the one thing a wrong run breaks for a
-person. Those commands run in the foreground, where the prompt reaches the human.
-`tools/bg.sh --check <cmd>` prints `allowed` or `refused: <why>` and runs nothing; a probe of the
-fence uses it, never the command itself.
+names the page and what failed; a killed run prints a Playwright stack. Run it again without a
+timeout.
 
 **"It is the app's markup" is a claim, and switching the stand to bootstrap is how you check it.**
 A finding on a third-party page reads as the app's, and the reflex is to wave it through. Point the

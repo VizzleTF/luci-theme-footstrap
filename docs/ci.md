@@ -19,7 +19,7 @@ build ─┬─→ e2e (owrt2512, owrt2410) ─┬─→ release ─→ playgrou
 
 | Job | What it is |
 |---|---|
-| `build` | both package formats, via owfeed |
+| `build` | the ACL check, then both package formats, via owfeed |
 | `e2e` | `tools/e2e.mjs`, one leg per package manager: the package's whole life on a real router (below) |
 | `playground` | records a real router's pages into a static, replayable site (tags and dispatches) |
 | `release` | signs, generates the notes, attaches the assets |
@@ -36,8 +36,7 @@ dev dependency.
 `cooldown: default-days: 7` on both ecosystems (version updates only, never security updates), the
 repo's `.npmrc` sets `ignore-scripts=true` for every `npm ci` (CI and a developer's shell), and `pages.yml` gives `pages: write` and `id-token: write` to `deploy` alone, so the job
 that runs `npm ci` holds `contents: read` only. A new or replaced dependency needs the maintainer's word.
-No `min-release-age` in `.npmrc`: npm 11.20 never finishes installing a fresh version with a peer
-cycle (measured on eslint 10.13.0), and it might hold back a Dependabot security update; the
+No `min-release-age` in `.npmrc`: it might hold back a Dependabot security update; the
 cooldown and the maintainer's word on a new dependency carry the age.
 
 **Every job has a `timeout-minutes`, and every network install runs under `tools/ci-retry.sh`.**
@@ -56,25 +55,10 @@ and apt is the half that stalls.
 
 ## Reading a run
 
-Two scripts replace the hand-built `sleep` + `gh run list` + `gh run watch` loop. Both are read-only.
-
-- `tools/ci-watch.sh (--sha SHA | --run ID) [--repo R] [--workflow FILE|NAME] [--max S]` waits for a commit's
-  runs to appear (up to 10 min; `--commit` is matched, not `createdAt`, which is UTC and missed a
-  run), then for all of them to complete. On red it prints `ci-log.sh` for each failed run. The last
-  line is the verdict, `ci: green|red|timeout <sha7> runs <ids> [failed: <jobs>]`; exit 0 green, 1 red,
-  2 no run, 3 still running at `--max` (default 6000 s).
-  `--workflow` goes to `gh run list --workflow`, so `release.yml` and `release` both work (the run's
-  `workflowName` is the display name, and matching it here missed a file name after 608 s); `--run` ignores it.
-  Run it as `tools/bg.sh tools/ci-watch.sh --sha "$(git rev-parse HEAD)"` with `tools/bg-wait.sh` beside it.
-- `tools/ci-log.sh <run-id> [job-regex] [--repo R]` prints each failed job, its failed step and the
-  last decisive log lines (`##[error]`, `Error` and the other patterns in its header) plus the 8
-  non-empty lines before the step's first `##[error]`, where a step's own message sits; ANSI and timestamps stripped, 40 lines at most.
-  `gh run view --log-failed` prints nothing while a run is still marked in progress.
-
-`tools/bg.sh` lets reads through and refuses everything else: any `git` or `gh` subcommand off its read
-list (push, commit, tag, reset, rebase, update-ref, `gh pr|issue|release` writes, `gh run rerun|cancel|delete`,
-`gh api` with a non-GET method or `-f`/`-F`/`--field`/`--raw-field`/`--input`), plus `ssh`, `scp`, `sftp`,
-`rsync` and `dev-sync.sh`. `tools/bg.sh --check <cmd>` prints that verdict and runs nothing.
+- `gh run list --commit <sha>` lists a commit's runs; `gh run watch <run-id> --exit-status` waits
+  for one and exits non-zero on red.
+- `gh run view <run-id> --log-failed` prints the failed steps' logs. It prints nothing while a run
+  is still marked in progress.
 
 ## Rules the server holds
 
@@ -82,7 +66,7 @@ Three rulesets on the repository (Settings → Rules); `gh api repos/{owner}/{re
 
 | Ruleset | Target | Rules | Bypass |
 |---|---|---|---|
-| 24042288 "main: CI must pass" | `main` | required status checks (11) | admin, always: a direct push to `main` needs it, so each push prints "Bypassed rule violations … 11 of 11" and the checks are read after the push (`tools/ci-watch.sh`) |
+| 24042288 "main: CI must pass" | `main` | required status checks (11) | admin, always: a direct push to `main` needs it, so each push prints "Bypassed rule violations … 11 of 11" and the checks are read after the push (`gh run watch`) |
 | 25550110 "main: no force-push or deletion" | the default branch | `non_fast_forward`, `deletion` | none, admin included |
 | 25550119 "release tags: no move or deletion" | `refs/tags/v*` | `update`, `deletion` | none; creating a tag stays open for the release runbook |
 
@@ -150,14 +134,17 @@ why CI sets it from the commit.
 
 The steps:
 
+0. **The ACL grants only what SECURITY.md lists** — one `jq -e` that compares the rpcd ACL with the
+   grant list in `SECURITY.md`. Any other grant (an `exec`, a new path, a new ubus method) or a
+   malformed file fails the job; rpcd itself skips a malformed ACL silently.
 1. **Resolve the version** — from the tag (`v0.3.6` → `0.3.6`) or a fallback `0.<date>.<run>`. Plus
    `SOURCE_DATE_EPOCH` = the commit timestamp: both containers write mtimes, and a package's
    identity is a hash over its payload, so without a fixed epoch byte-identical content rebuilds
    into a package that *claims* to be new.
 2. **`./tools/stage.sh`** — the half owfeed deliberately does not do ("packages a directory; does
    not build one"). It is `Build/Prepare` from the Makefile in one script, with uglify-js where
-   luci.mk ran jsmin: build `cascade.css`, mangle the private `--fs-*` names, drop the
-   `/* fs:probe */` exports, minify the JS with uglify-js, strip the comments and indentation out of
+   luci.mk ran jsmin: build `cascade.css`, mangle the private `--fs-*` names, minify the JS with
+   uglify-js, strip the comments and indentation out of
    the templates and the comments out of the shell, strip `logo.svg` and `manifest.json`, stamp
    `FS_VERSION`. Three things on top of `Build/Prepare`, which the SDK path does not need or does
    itself: `minify-prepaint` over the inline pre-paint script in `head.ut`; the postinst/postrm
@@ -176,9 +163,7 @@ The steps:
    at uglify's defaults `FS_VERSION` is folded into its readers (229 B, no declaration left for
    the version sed) and `minify-js` refuses the file; set, it is 258 B with the declaration
    intact. `varify:false` beside it changed nothing (the same 258 B, byte for byte, with and
-   without), so it is not set. `fs-fit.js` reserves `makeTrail`, `_late` and `_anchor` from the mangle,
-   since uglify renames before it compresses and `pure_funcs` would otherwise match `a.record` and
-   drop nothing. `minify-prepaint`, run after `strip-build.sh templates` as in `stage.sh`, takes the
+   without), so it is not set. `minify-prepaint`, run after `strip-build.sh templates` as in `stage.sh`, takes the
    five inline blocks without ucode interpolation from 6424 to 4511 B (terser left 4632 B), 1913 B
    off every page load and off the login page, which fetches no module: 105 B less HTML per admin
    page and 119 B less on the login page than terser gave. Blocks with `{{`, `{%` or `{#`

@@ -284,30 +284,15 @@ page, so the files cannot be invalidated separately anyway. A runtime `@import` 
 approach) is worse than a second `<link>` — it is discovered only after the first file is fetched
 and parsed, serialising the requests.
 
-## `@mirror`: duplication you cannot delete but can stop rotting
+## Duplicates CSS cannot merge
 
 Some rules carry identical declarations under mutually exclusive guards (a media query against an
-attribute selector, two `@container` thresholds). A cascade-aware reader needs both copies, so no
-linter will ever call it an error — and this is exactly the shape that drifts: the moment the
-copies diverge they stop looking like a duplicate at all.
+attribute selector, two `@container` thresholds). A cascade-aware reader needs both copies, and
+this is exactly the shape that drifts: the moment the copies diverge they stop looking like a
+duplicate at all. So every duplicated body is a decision: merge it into one rule, or list it here
+and edit both copies together.
 
-So every duplicated body must be a decision: merge it into one rule, or pin it.
-
-The body is pinned, not the rule, so the wrapper goes **inside the braces** (the selectors are
-legitimately different; only the declarations must match):
-
-```css
-.table.fs-stacked .td[data-title]::before {
-	/* @mirror table-card/label */
-	content: attr(data-title); display: block; margin-bottom: 3px;
-	/* @endmirror */
-}
-```
-
-The copies of one group stay byte-identical: edit one, edit the other. A `@mirror` group with one
-copy holds nothing. `git grep -n '@mirror'` lists the current groups; today there are ten:
-
-| Group | Copies |
+| Declarations | Copies |
 |---|---|
 | `table-card/label`, `table-card/actions`, `table-card/actions-inner`, `table-card/actions-dropdown` | `theme/30-tables.css` (`.fs-stacked`) ↔ `theme/65-dropdown.css` (`@container`) |
 | `ind-badge/paint`, `poll-glyph/mask` | two places in `theme/20-shell.css` (the sidebar and the rail) |
@@ -850,10 +835,10 @@ The fix follows upstream `luci-theme-bootstrap`'s model: reserve one line in flo
 (`margin-block-start: calc(var(--fs-type-xs) * var(--fs-leading))`, the SAME expression
 `.fs-stacked` and the overview `<=560px` rule already used) as the bar's DEFAULT, so the floated
 label always has a band to sit inside regardless of what wraps it. Only the contexts that
-deliberately place the value BESIDE the bar (`.cbi-value-field`, a data table's meter column — both
-pinned in `@mirror meter/beside`) or on a neighbour's line (overview's meter rows at desktop, the
+deliberately place the value BESIDE the bar (`.cbi-value-field`, a data table's meter column — the
+two `meter/beside` copies) or on a neighbour's line (overview's meter rows at desktop, the
 package-manager disk bar at both desktop and phone) opt out with `margin-block-start: 0`. Where an
-existing rule already styled that bar it carries the declaration (`@mirror meter/beside`); overview
+existing rule already styled that bar it carries the declaration (`meter/beside`); overview
 and package-manager had none — no prior rule targeted the bar on either page — so each got a new
 page-layer rule for the same selector, opt-out only, no other declaration. Everything else — the
 gallery's bare meters, a third-party app's key/value table, the old dashboard's 30_wifi assoclist
@@ -1252,7 +1237,7 @@ needs **1190 px**, and overflowed its section by **557 px** — an overflow the 
 never had. **The act of measuring was the bug.** Do not "finish the job".
 
 The price is the last irreducible duplicate: the same declarations under a class and under an
-`@container`, which CSS cannot factor apart. It is pinned with `@mirror table-card/{label,actions}`.
+`@container`, which CSS cannot factor apart (`table-card/*` in "Duplicates CSS cannot merge").
 
 ### Which of the three a table gets, and what decides it
 

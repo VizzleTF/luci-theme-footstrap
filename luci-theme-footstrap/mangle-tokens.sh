@@ -6,8 +6,7 @@
 # 14% of the sheet: 18283 of 134210 bytes (measured 2026-10-14), wire bytes too: uhttpd serves /www
 # uncompressed.
 # The same map rewrites the .js and .ut under each <rewrite-dir> in place, BEFORE `strip-build.sh
-# templates` and the JS minifier. Verify with `npm run computed-diff` (tools/computed-diff.mjs),
-# mangled against plain.
+# templates` and the JS minifier.
 # Safe because (each checked):
 #   * `--fs-*` is the private tier; the export tier `--*-color-*` is untouched, and no installed
 #     luci-app reads a `--fs-` name.

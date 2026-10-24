@@ -127,7 +127,6 @@ for (const f of files) {
 	const name = basename(f);
 	const src = readFileSync(f, 'utf8');
 	const isVersion = (name === 'fs-version.js');
-	const trails = (name === 'fs-fit.js');
 	/* the two halves of "names this scope already has": what the file reads without binding, and
 	 * what the LuCI wrapper binds for it whether it reads them or not */
 	const free = new Set([ ...freeNames(src), ...wrapperParams(src) ]);
@@ -141,15 +140,9 @@ for (const f of files) {
 		 * (the guard below); the bytes it costs are in docs/ci.md, step 2. */
 		compress: {
 			directives: false, passes: 3, keep_fargs: true,
-			...(isVersion ? { evaluate: false } : {}),
-			/* fs-fit.js's two diagnostic trails are read only by `fs:probe` exports, stripped before this runs,
-			 * so their writes are dead in the package (docs/anchoring.md, "What the sweep itself cannot answer") */
-			pure_funcs: trails ? [ 'makeTrail', '_late.record', '_anchor.record', 'Math.round' ] : []
+			...(isVersion ? { evaluate: false } : {})
 		},
-		/* uglify renames every variable BEFORE it compresses, so pure_funcs would match `a.record` and
-		 * drop nothing: the three trail names are reserved, which costs 15 B less than `rename:false` */
-		mangle: { reserved: [ ...free, ...(isVersion ? [ 'FS_VERSION' ] : []),
-			...(trails ? [ 'makeTrail', '_late', '_anchor' ] : []) ] },
+		mangle: { reserved: [ ...free, ...(isVersion ? [ 'FS_VERSION' ] : []) ] },
 		/* quote_style 1 = single quotes, so the version sed's '[^']*' still matches */
 		output: isVersion ? { quote_style: 1 } : {}
 	});
@@ -177,10 +170,6 @@ for (const f of files) {
 		if (isVersion && (min.match(/FS_VERSION/g) || []).length < 2)
 			throw new Error('FS_VERSION was inlined — the declaration survives for the sed to stamp, '
 				+ 'but nothing reads it any more, so a stamped release would still say "(dev)"');
-		/* a rename of makeTrail/_late/_anchor would silently bring the trails back; their
-		 * reason strings are the tell, and nothing else in fs-fit.js carries them */
-		if (trails && /reader-intent|no-reference/.test(min))
-			throw new Error('the diagnostic trails survived — pure_funcs no longer matches makeTrail/_late/_anchor');
 		/* a floor, not a budget: an empty/truncated write must not ship (build-css.sh's rule) */
 		if (!min || min.length < 100 || min.length >= src.length)
 			throw new Error(`implausible output size ${min && min.length} (source ${src.length})`);

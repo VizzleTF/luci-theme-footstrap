@@ -271,9 +271,7 @@
 	/* after hover on purpose: hovering the selected row must still read as selected — docs/css.md
 	 * "Dropdown: the open list's rail and the selected-row's contrast". */
 	.cbi-dropdown[open] > ul.dropdown > li[selected] {
-		/* @mirror selected-row/paint */
 		background: var(--fs-panel2); color: var(--fs-accent); box-shadow: var(--fs-row-rail);
-		/* @endmirror */
 	}
 	/* theme's ring, not the UA's outline:auto; inset, since the menu clips overflow, rail rides
 	 * INSIDE it so a focused+selected row keeps both */
@@ -283,7 +281,7 @@
 	}
 
 	/* MULTI-select shows "chosen" via its CHECKBOX, drops the rail; pinned byte-identical to
-	 * `select option:checked` in theme/60-inputs.css (tools/mirror.mjs), which has no checkbox */
+	 * `select option:checked` in theme/60-inputs.css, which has no checkbox */
 	.cbi-dropdown[multiple][open] > ul.dropdown > li[selected]:not(:focus-visible) { box-shadow: none; }
 	.cbi-dropdown[multiple][open] > ul.dropdown > li[selected]:focus-visible {
 		box-shadow: inset 0 0 0 2px var(--fs-accent-soft);
@@ -352,36 +350,28 @@
 		.table.cbi-section-table .td[data-widget="dvalue"],
 		.table.cbi-section-table .td[data-widget="fvalue"],
 		.table.cbi-section-table .td[data-widget="button"] { flex-basis: 50%; }
-		/* PINNED to the data table's copy (theme/30-tables.css, tools/mirror.mjs): needed under a
+		/* PINNED to the data table's copy (theme/30-tables.css): needed under a
 		 * CLASS there and under this @container here, and CSS cannot OR the two guards. */
 		.table.cbi-section-table .td[data-title]::before {
-			/* @mirror table-card/label */
 			content: attr(data-title); display: block; margin-bottom: var(--fs-space-1);
 			font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking);
 			color: var(--fs-eyebrow-color);
-			/* @endmirror */
 		}
 		/* the row's buttons are not a label/value pair: full width, sharing the line. PINNED — see above. */
 		.table.cbi-section-table .td.cbi-section-actions {
-			/* @mirror table-card/actions */
 			display: flex; flex: 1 1 100%; justify-content: flex-start;
 			flex-wrap: wrap; gap: var(--fs-space-2); padding-top: var(--fs-space-2);
-			/* @endmirror */
 		}
 		.table.cbi-section-table .td.cbi-section-actions::before { content: none; }
 		/* LuCI groups the row's buttons in ONE inner div, so the td's own wrap never fires — the
 		 * div is a single flex item. PINNED to the data table's copy, same trap on Startup. */
 		.table.cbi-section-table .td.cbi-section-actions > :not(.cbi-dropdown) {
-			/* @mirror table-card/actions-inner */
 			flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: var(--fs-space-2);
-			/* @endmirror */
 		}
 		/* width: 0 — the label's nowrap min-content (288px for a Russian item at 360px) sizes the table-row-group
 		 * past the card (td right 442 vs 315); basis `content` still sizes the item to its label (it was 266px, a whole card, with `1 1 auto`). PINNED. */
 		.table.cbi-section-table .td.cbi-section-actions > .cbi-dropdown {
-			/* @mirror table-card/actions-dropdown */
 			flex: 0 1 content; width: 0; min-width: 0;
-			/* @endmirror */
 		}
 		.table.cbi-section-table .td .zone-forwards { width: 100%; }
 	}

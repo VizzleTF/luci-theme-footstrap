@@ -4,9 +4,9 @@
 #
 #   ./update-po.sh            rescan, merge, report what is still untranslated
 #   ./update-po.sh --check    change nothing; fail if the .pot is stale or a string is
-#                             untranslated. The CI gate.
+#                             untranslated.
 #
-# An untranslated _() falls through to its English msgid and nothing reports it, so --check is a gate.
+# An untranslated _() falls through to its English msgid and nothing else reports it.
 # `po/` is what LUCI_LANGUAGES globs and Weblate translates (docs/package.md): do not rename it.
 # Not run on the buildbot (luci.mk calls po2lmo); needs perl and gettext.
 # The scanner is LuCI's own build/i18n-scan.pl, not a grep: it lexes .ut into JS before xgettext and
@@ -16,7 +16,7 @@ set -eu
 cd "$(dirname "$0")"
 
 # Pinned by commit and sha256 in luci-upstream.pin: a fetched perl script is EXECUTED, and off a
-# moving branch the completeness gate would be whatever upstream pushed last.
+# moving branch the completeness check would be whatever upstream pushed last.
 . ./luci-upstream.pin
 SCANNER_URL="https://raw.githubusercontent.com/openwrt/luci/${LUCI_PIN}/build/i18n-scan.pl"
 SCANNER_SHA256="$I18N_SCAN_SHA256"

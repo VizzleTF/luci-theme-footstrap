@@ -113,11 +113,9 @@ third-party `luci-app-*` emits it. "Looks unused, delete it" un-styles somebody'
 uncss and any coverage-based trimming are forbidden here. The one safe dead-CSS search is for
 `fs-*` selectors, and it is safe only because nothing outside the theme can emit an `fs-*` class.
 
-**Pin a duplicate you cannot merge.** Identical declaration bodies under mutually exclusive
-guards are a shape no linter calls an error and the shape that drifts: once the copies diverge
-they no longer look like duplicates at all. Every duplicate body is either merged or wrapped in
-`@mirror`/`@endmirror`, and the copies in one group stay byte-identical. A `@mirror` group with
-one copy is a mistake.
+**Merge a duplicate where CSS allows.** Identical declaration bodies under mutually exclusive
+guards are the shape that drifts: once the copies diverge they no longer look like duplicates at
+all.
 
 **A `display` rule on `.table`/`.thead`/`.tbody`/`.tfoot`/`.tr`/`.th`/`.td` needs a role to match.**
 A `display` other than `table`/`table-row`/`table-cell`/… drops the implicit `table`/`row`/`cell`
@@ -210,8 +208,7 @@ pattern that reliably removes anonymous handlers.
 
 The reader is a model with this file open and no session history. It needs, per line it is about
 to change: what must stay true, why, and where the proof is. Everything else costs it context and
-gives nothing back. `CLAUDE.md` carries the short form; this is the full rule, with the example
-behind each line.
+gives nothing back. This is the full rule, with the example behind each line.
 
 ### What a comment carries
 
@@ -219,7 +216,7 @@ behind each line.
 |---|---|---|
 | the invariant | `min-height` AND `height` are pinned to the same value for the whole pass | always |
 | the reason, as a number | the bar walked 230 -> 123 px inside one pass, 107 px of growth | when one was measured |
-| one pointer | `docs/anchoring.md`, "The corrections"; openwrt/luci#8981 | when the proof is longer than a line |
+| one pointer | `docs/chrome.md`, "Keeping the reader's place when the engine will not"; openwrt/luci#8981 | when the proof is longer than a line |
 
 One of each, in that order, in one sentence where it fits. **A file under
 `luci-theme-footstrap/htdocs`, `ucode` or `root` ships to openwrt/luci, where `tools/` and this
@@ -238,7 +235,7 @@ deleted, not reworded: restating the line it sits on is what it did.
 | a task or session name (`task refill2`) | nothing — cite the docs heading instead | names nothing the reader can open |
 | a `../tmp/…` path | `docs/<area>.md` restates the finding | the file is not in the repository; the pointer is dead the next day |
 | a CI run id | the changelog entry, once | the run expires; the number it produced does not |
-| any of the three rows above, in a shipped file | nothing — v0.14.13 (754e529) shipped 5 of them | the upstream bot caught the same litter three times by hand; `tools/sync-luci-fork.sh` fails on a `../tmp/` path in what it exports, and `tools/upstream-review-facts.sh <base> <head>` prints the rest of the bot's checklist in one read-only report |
+| any of the three rows above, in a shipped file | nothing — v0.14.13 (754e529) shipped 5 of them | the upstream bot caught the same litter three times by hand; `tools/sync-luci-fork.sh` fails on a `../tmp/` path in what it exports |
 | the same fact the docs already hold | one line and the pointer | two copies drift |
 | CAPS for emphasis, a rhetorical question, a warning to a future maintainer | plain prose | an LLM weights capitals as shouting, not as priority |
 
@@ -264,8 +261,7 @@ rules it documents are sound, and no reader finds them.
   buys nothing: scrollHeight 1039 either way. Not how it was found, not which attempt it was.
 - **References survive every compression pass**: issue numbers, spec text quoted verbatim, upstream
   commits, file paths inside the repository.
-- **Some comments are code**: `@mirror name/tag` / `@endmirror` (they name the copies that change
-  together), `/* fs:probe */` (`strip-build.sh probes`), the eslint `'require …'` pragmas, the
+- **Some comments are code**: LuCI's `'require …'` directives, the
   Makefile's buildroot signature line (`include/scan.mk` greps for it). Reword one and the build
   breaks, silently in the Makefile's case: the SDK no longer sees the package at all.
 - **A `{# … #}` comment in a template opens with `{#` alone on its line, the text one tab deeper,
@@ -285,16 +281,15 @@ rules it documents are sound, and no reader finds them.
 ### Where the narrative goes
 
 The measurement that justifies a rule is written once, in `docs/<area>.md`, under a heading the
-code can cite: what was seen, what it was, the command that tells the two apart. `docs/anchoring.md`
-(the reference) and `docs/anchoring-log.md` (the findings) are those files for `fs-fit.js`. A docs section may be as long as the finding needs; the comment
-citing it may not.
+code can cite: what was seen, what it was, the command that tells the two apart. A docs section may
+be as long as the finding needs; the comment citing it may not.
 
 ### After a bulk comment pass
 
 Prove the code did not move: a token-stream compare against HEAD for every JS file, a
 comment-stripped and whitespace-normalised diff for CSS, `.ut`, shell and yaml. That is what caught
-a deleted Makefile marker and a lost shell escape. The full-tree compare runs detached
-(`tools/bg.sh`); the pass is finished when its output has been read.
+a deleted Makefile marker and a lost shell escape. The pass is finished when the compare's output
+has been read.
 
 ## Templates and translation
 
@@ -380,6 +375,6 @@ digest from the uploaded bytes, so whoever can swap an asset gets the digest rec
 ## Changelog and release
 
 Every commit writes into `## [Unreleased]` **in the same commit as the code**, in both `CHANGELOG.md`
-and `CHANGELOG_ru.md` (only `CLAUDE.md` and a fix to an entry already written skip it) — a
+and `CHANGELOG_ru.md` (only a fix to an entry already written skips it) — a
 changelog written afterwards is written from the diff, and the diff is exactly what does not know
 why. Format, categories and the release runbook: [releasing.md](releasing.md).

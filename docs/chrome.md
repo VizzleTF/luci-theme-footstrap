@@ -409,9 +409,7 @@ of every aliased page missing.
 
 ## Keeping the reader's place when the engine will not
 
-**Every mechanism, what each is for and what the sweep measures without it, is in
-[anchoring.md](anchoring.md).** What follows here is the chrome's own half: which element a
-correction may take, and why.
+What follows here is the chrome's own half: which element a correction may take, and why.
 
 A poll tick changes the height of things above the reader — a station joins the associated list, a
 lease expires, an interface box grows a line — and everything below it moves. Chromium and Firefox
@@ -586,9 +584,7 @@ corrects nothing while the reader is moving. With the fallback removed the Safar
 exactly the reported symptom — 120px of page moved under the reader, 255px on the swap measured in
 WebKit with the engine's own anchoring off, and 690px on a real Overview on the stands. It has to run
 on `chromium,firefox,webkit`, because the fault above lives on the path a stand-in engine does not
-take, and it has to wait on `fit.restAt()` rather than on a stopwatch: WebKit starts its motion
-sampler late enough that a flat wait measured the theme before it had a reference at all, which
-reported a jump on every WebKit run with the theme identical on all three engines.
+take.
 
 The sweep crossed three page shapes and two scrollers, and both sets are what a measurement left
 standing rather than what looked thorough. The shapes: the Overview refills section BODIES, the

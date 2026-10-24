@@ -50,7 +50,7 @@
 		padding-block: var(--fs-space-2); /* two --fs-space-2 = the row height above, one number */
 	}
 
-	/* Physical: border-block-start/-end need a css-floor.mjs support decision first. */
+	/* Physical: border-block-start/-end need a browser-floor support decision first. */
 	.tr.drag-over-above {
 		border-top: 2px solid var(--fs-accent);
 	}

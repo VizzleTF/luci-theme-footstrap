@@ -20,11 +20,9 @@
 
 	/* no HORIZONTAL scroll ever (measured 634px scroll vs 530px room) — docs/css.md "Modal: no horizontal scroll, ever" */
 	#modal_overlay .modal label.btn {
-		/* @mirror btn-wrap/anywhere */
 		white-space: normal;
 		min-width: 0;
 		overflow-wrap: anywhere;
-		/* @endmirror */
 	}
 	#modal_overlay .modal li { overflow-wrap: anywhere; }
 	/* tints come from base's ladder alone (base/95-luci.css); radii sit on the Rounding axis */

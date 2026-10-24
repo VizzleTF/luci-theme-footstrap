@@ -50,7 +50,6 @@ changelog and code comments, not in the upstream body.
 
 - The commit body carries no `#NNNN` and no link: a force-push re-sends every mention.
 - No compatibility with EOL releases (23.05 refused twice; 24.10 is next).
-- Probe-only code ships stripped: an export marked `/* fs:probe */` is cut by the sync.
 - The theme names no outside site and no repository of its own.
 - No migrations "just in case": OpenWrt assumes a full image upgrade.
 - `po/` stays out: Weblate owns it.
@@ -148,8 +147,7 @@ git -C ../tmp/fs-hist checkout --quiet upstream-N
 diff -r -x Makefile -x po ../tmp/luci-ref/themes/luci-theme-footstrap $LUCI/themes/luci-theme-footstrap && echo "tip == tag"
 ```
 
-`sync-luci-fork.sh` exits 1 when a file mode differs from our index, when probe stripping leaves a
-double blank line, or when a shipped file references something outside the tree (`../tmp/`,
+`sync-luci-fork.sh` exits 1 when a file mode differs from our index, or when a shipped file references something outside the tree (`../tmp/`,
 `tools/`, a test file, stands, `issue #N`, a commit hash); read its whole output.
 
 ### Step 4. Cut the PR commits
@@ -199,8 +197,6 @@ After the merge: `git worktree remove ../tmp/fs-hist`, `git -C $LUCI worktree re
 ### Traps
 
 - The author must be "First Last"; the clone inherits the global `VizzleTF` and bounces.
-- `sync-luci-fork.sh` strips `/* fs:probe */` exports only when the worktree it runs from holds
-  current `tools/sync-luci-fork.sh` and `luci-theme-footstrap/strip-build.sh`.
 - Upstream keeps `cascade.css` **unminified** and with **unmangled tokens** on purpose.
 
 ## Preflight
@@ -210,25 +206,22 @@ what a local run catches. The PR carries the latest tag's tree, so sections 4, 5
 `../tmp/fs-hist` detached at the tag
 (`git -C ../tmp/fs-hist checkout --quiet --detach $(git describe --tags --abbrev=0)` from our root).
 
-0. **Review the branch diff** (`git -C ../tmp/luci-pr diff origin/master..`, plus
-   `tools/upstream-review-facts.sh -C <luci worktree> origin/master HEAD` for the mechanical facts)
-   for the classes the upstream bot flagged on #9111:
-   1. orphaned probe comments whose code was stripped;
-   2. a removed or renamed API still referenced in the tree (grep the old name);
-   3. a lost executable bit (`--summary`, `mode change 100755 => 100644`, a `cgi-bin` file above all);
-   4. double blank lines, trailing whitespace, missing final newline (`git diff --check`);
-   5. references outside the tree in shipped files: `docs/`, `tools/`, `../tmp`, `#NNNN`, our repo
+0. **Review the branch diff** (`git -C ../tmp/luci-pr diff origin/master..`, with
+   `git diff --raw` and `git diff --check` over the same range for modes and whitespace) for the classes the upstream bot flagged on #9111:
+   1. a removed or renamed API still referenced in the tree (grep the old name);
+   2. a lost executable bit (`--summary`, `mode change 100755 => 100644`, a `cgi-bin` file above all);
+   3. double blank lines, trailing whitespace, missing final newline (`git diff --check`);
+   4. references outside the tree in shipped files: `docs/`, `tools/`, `../tmp`, `#NNNN`, our repo
       URL, `owlab`/`owfeed`;
-   6. a comment that stripping made false;
-   7. dead exports nothing imports;
-   8. a visible behaviour change the commit body does not mention;
-   9. formalities (subject, body lines, `Signed-off-by`, no link in a body).
+   5. dead exports nothing imports;
+   6. a visible behaviour change the commit body does not mention;
+   7. formalities (subject, body lines, `Signed-off-by`, no link in a body).
 1. **Our check**: the tag's CI run has `e2e` green on both routers ([verifying.md](verifying.md)).
-2. **Their eslint on our files** — their config lists globals by hand and does not read the
-   `'require X as Y'` pragma:
+2. **Their eslint on our files**, from their checkout's own `package.json` — their config lists
+   globals by hand and does not read the `'require X as Y'` pragma:
    ```sh
-   mkdir -p ../tmp/lintcheck && cp <changed .js> ../tmp/lintcheck/ && cp ../tmp/luci-pr/eslint.config.mjs ../tmp/lintcheck/
-   cd ../tmp/lintcheck && <repo>/node_modules/.bin/eslint --no-config-lookup -c ./eslint.config.mjs *.js | grep "is not defined"
+   cd ../tmp/luci-pr && npm install --ignore-scripts --no-save
+   node_modules/.bin/eslint themes/luci-theme-footstrap/htdocs | grep "is not defined"
    ```
    A warning on an alias is their config's defect (24 of the tree's 30 aliases, 59 files in 18
    packages); a warning on a real typo is a fix.
@@ -256,9 +249,8 @@ what a local run catches. The PR carries the latest tag's tree, so sections 4, 5
 
 A remark is closed by a change in the diff and by resolving its thread.
 
-**Watching**: `tools/pr-watch.sh <N> --seen ../tmp/pr-<N>.seen --max 1700` polls once a minute,
-dedupes events in the seen-file, keys CI by the head SHA, and exits on a review, a comment or a
-state change. Re-arm after each batch, also on exit 3 (nothing new). Done = `MERGED` or `CLOSED`.
+**Watching**: `gh pr checks <N> --repo openwrt/luci --watch` for CI, and `gh pr view <N> --repo
+openwrt/luci --comments` for reviews, comments and state. Done = `MERGED` or `CLOSED`.
 
 **Humans first.** Before any bot event, read every review:
 `gh api repos/openwrt/luci/pulls/<N>/reviews --jq '.[] | "=== \(.user.login) [\(.state)]\n\(.body)"'`.

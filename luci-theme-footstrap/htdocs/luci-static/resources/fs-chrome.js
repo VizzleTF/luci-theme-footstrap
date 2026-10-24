@@ -657,13 +657,4 @@ return baseclass.extend({
 			rail: prefs.currentRail()
 		});
 	},
-
-	/* test-only: the arithmetic driven directly covers every combination of layout, rail and width
-	 * without a browser */
-	columnWidth,	/* fs:probe */
-
-	/* test-only: the active-leaf rule and the key-repeat guard, and the indicator observer without the
-	 * rest of start() */
-	renderMainMenu,	/* fs:probe */
-	wireIndicatorCounts,	/* fs:probe */
 });

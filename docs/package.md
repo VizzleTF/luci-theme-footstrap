@@ -12,7 +12,7 @@ luci-theme-footstrap/
 ├── Makefile
 ├── build-css.sh          styles/ → cascade.css (cat + awk, no node)
 ├── mangle-tokens.sh      shorten the private --fs-* names in a BUILT sheet, then join it to one line
-├── strip-build.sh        build-tree-only bytes out, one mode each: templates, probes, shell, assets
+├── strip-build.sh        build-tree-only bytes out, one mode each: templates, shell, assets
 ├── build-apk.sh          SDK build, kept so the theme stays buildable without owfeed
 ├── dev-sync.sh           deploy to a HARDWARE router over ssh (containers use owlab)
 ├── update-po.sh          regenerate/verify the translation catalogue
@@ -127,7 +127,7 @@ Two different tools; confusing them is expensive.
   The source therefore has to stay jsmin-safe — see the regex rule in
   [conventions.md](conventions.md).
 
-### `Build/Prepare` — eight steps, in this order
+### `Build/Prepare` — seven steps, in this order
 
 The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sources into
 `PKG_BUILD_DIR`, and edits the **copy**:
@@ -178,15 +178,12 @@ The hook (its name keys on `LUCI_NAME`) runs right after luci.mk copies the sour
    Verified on a live router, not only by reading: the pages the stripped templates serve are
    byte-identical to the ones the source templates serve, once the comments are removed from both
    (the only remaining difference is the session id).
-5. **`strip-build.sh probes`** — the `/* fs:probe */` export lines out of the resources JS: a few
-   module-private functions are exported only for this repository's own tooling. The
-   functions stay; the export line goes.
-6. **`strip-build.sh shell`** — whole-line `#` out of the shell under `root/`. A heredoc, and a
+5. **`strip-build.sh shell`** — whole-line `#` out of the shell under `root/`. A heredoc, and a
    `#` line inside a quoted string (`ssh "$R" "…"` is one: that line is data), refuse the build
    naming `file:line`.
-7. **`strip-build.sh assets`** — the comment out of `logo.svg` and the indentation out of
+6. **`strip-build.sh assets`** — the comment out of `logo.svg` and the indentation out of
    `manifest.json`, two files every browser fetches uncompressed.
-8. **Stamp `FS_VERSION`** into `fs-version.js` with `sed`. The path is part of the contract —
+7. **Stamp `FS_VERSION`** into `fs-version.js` with `sed`. The path is part of the contract —
    `dev-sync.sh` and `tools/stage.sh` run the same substitution, so moving the constant means
    fixing three places. `tools/stage.sh` refuses a `FOOTSTRAP_VERSION` or tag outside
    `[0-9A-Za-z._-]` before it wipes `dist/`, the pattern `dev-sync.sh` holds the same stamp to.
