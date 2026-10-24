@@ -143,8 +143,9 @@ and the same on `owrt2410` with `luci-theme-footstrap_*_all.ipk` and
 - It exits 0 when every step passed, 1 otherwise, and 2 on bad arguments or a router that is not
   running. The output and screenshots land in `--out`, by default `../tmp/e2e-<router>`.
 - **Done means both**: 25.12/apk and 24.10/opkg. Say which one a run covered.
-- A full run took 29–30 minutes per router on a local stand, most of it the bootstrap reference and
-  the 6 s desktop pass (the log prints each pass's time); the anchoring check adds about 3.5 minutes.
+- A CI job takes about 20 minutes per router: the crawl about 8.5 (bootstrap 250 s, desktop 155 s,
+  click 58 s, phone 32 s; the log prints each pass's time), the anchoring check about 7, setup and
+  the package steps the rest.
 - The anchoring check runs on its own against any running router with footstrap active, an
   `owlab sync`ed one included: `node tools/anchor-check.mjs --router owrt2512 [--engines webkit]
   [--widths 390]`. It switches the theme to bootstrap for its reference cells and back to footstrap.
