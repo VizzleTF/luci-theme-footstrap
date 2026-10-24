@@ -52,7 +52,7 @@ npm run changelog
 `~/go/bin/owfeed lock` must exit 0 at the repo root and in a fresh clone of owfeed-packages. Without
 `--update` it only compares and writes nothing (exit 9 and the drift, e.g. `25.12 point release
 25.12.5 -> 25.12.6`, when stale). A stale lock in owfeed-packages reds its `check / build` after
-the tag, which is where 0.14.15 found it.
+the tag.
 
 And a security review of the diff this release carries, after the last code commit and before the
 tag: `git diff <prev> HEAD`, read by the maintainer. Nothing automates it. It is worth the time on the
@@ -90,15 +90,6 @@ What remains here is the human look at the issues below, on both releases (25.12
 24.10/opkg), for the areas the diff touched. Compare against stock bootstrap wherever you are
 unsure — it is the reference for LuCI behaviour.
 
-**23.05 used to have a line of its own here, and no longer does.** It was the oldest release the
-theme claimed and the only one whose `luci-base` was missing a widget the theme uses:
-`ui.RangeSlider` arrived in 24.10.3 (backport e4c67020de; 24.10.0-24.10.2 lack it, `install.sh` refuses them), and its absence took the ENTIRE System → Footstrap page down — the panel
-is built inside one try/catch, so the miss cost a console line and an empty tab, reported from the
-field by a user on 23.05.5 rather than by a gate. Support for that release ended at 0.14.2: it is
-EOL, and openwrt/luci declined to carry the compatibility code in the tree the theme now lives in
-(#8978). `install.sh` pins that version for a 23.05 router and says it is the last one; the stand
-and the contract entry that guarded it are gone with the fallback they guarded.
-
 | Issue | Page | What to look at |
 |---|---|---|
 | #1 | a third-party app with a wide table, firewall zones | the table stacks into cards, does not overflow its section; the content width does not tear |
@@ -120,11 +111,10 @@ The single source of truth for `CHANGELOG.md` and its Russian mirror `CHANGELOG_
 
 **`npm run changelog` checks the mechanical half**: the set, order and uniqueness of sections, empty
 sections, dates, `compare` links, mirror parity (versions, dates, sections, bullet count) and the
-mandatory bold lead on `[Unreleased]` and a freshly cut version. It exists because `[Unreleased]`
-once accumulated a **duplicate `### Changed`** over several commits: each commit looked fine on its
-own, and `release-notes.sh` would have printed two "Changed" groups on the release page with nothing
-failing, because the notes are generated at tag time, when the tag is already pushed. Run it
-yourself: CI does not.
+mandatory bold lead on `[Unreleased]` and a freshly cut version. A duplicate section built up over
+several commits looks fine in each of them, and `release-notes.sh` would print it twice on the
+release page with nothing failing, because the notes are generated at tag time, when the tag is
+already pushed. Run it yourself: CI does not.
 
 **Everything about the prose below, the script cannot check.** That part is on you.
 
@@ -214,8 +204,7 @@ from the diff after the fact; a self-reference to a commit hash.
 ## The runbook
 
 Only after everything above has passed, in this order: the tag points at a commit that already
-carries its own changelog section, and every CI job reads the sha the tag will name (0.14.15 was
-tagged with a bare `git tag`, with no security review and before CI on the release sha). `<v>` is the
+carries its own changelog section, and every CI job reads the sha the tag will name. `<v>` is the
 new version, `<prev>` the last tag; scratch output goes to `../tmp/release-<v>/`.
 
 0. **Readiness** — any red stops here, with its owner named:
@@ -236,22 +225,19 @@ new version, `<prev>` the last tag; scratch output goes to `../tmp/release-<v>/`
    `gh run list --branch main --workflow build.yml --event push -L2` (Build's push runs only: a
    CodeQL or pages run is not the pipeline the tag waits on; no `--status completed`, so the release
    sha's own run shows while it is still going). A run already red before your push
-   stays red after it, and `release` does not fire until whatever it currently gates on is green —
+   stays red after it, and `release` does not fire until `build`, `e2e` and `playground` are green —
    so a tag pushed onto a broken pipeline cannot publish. A pre-existing failure is not something to
    push past: it is either an infrastructure condition to be fixed first, or a real regression that
-   has nothing to do with this release but will still hold it. `v0.14.12` was tagged onto exactly
-   this: the previous commit on `main` had already failed the same way the day before, on the same
-   upstream condition, and nobody looked before the tag went out.
+   has nothing to do with this release but will still hold it.
 5. **Tag the release commit**: `git tag -a vx.y.z -m vx.y.z`, then `git push origin vx.y.z` once the
    create exited 0. The tag goes on the release commit, never first — it must
    point at a commit that already contains its own entry, or the release describes a version whose
    changelog does not yet exist.
-6. `origin` is the only remote (the `git.vaka.work` mirror was removed on 2026-07-25).
+6. `origin` is the only remote.
 7. CI on `v*` builds both formats, signs them, and builds the release body from the changelog, but
-   `release` does not run until whatever it gates on is green, by design — deliberately, so that a
-   tag cannot publish a package no router has installed. The consequence is exactly what bit
-   `v0.14.12`: any one red leg holds the whole release, including a leg red for a reason that has
-   nothing to do with the diff — infrastructure or an upstream feed, not this release's code. **The
+   `release` does not run until `build`, `e2e` and `playground` are green, by design, so that a
+   tag cannot publish a package no router has installed. The consequence: any one red leg holds the
+   whole release, including a leg red for a reason that has nothing to do with the diff — infrastructure or an upstream feed, not this release's code. **The
    release is not cut until the tag's own run is read, job by job, not merely waited on**:
    `gh run list --commit <sha>` for the tag's runs, `gh run watch <id> --exit-status` for the
    verdict, `gh run view <id>` for the job list, `gh run view <id> --log-failed` for a failing
@@ -263,9 +249,8 @@ new version, `<prev>` the last tag; scratch output goes to `../tmp/release-<v>/`
    runs `land` → `check` → `publish` on a cron GitHub thins to one run every 2-5 h. `check` pushes
    `update/luci-theme-footstrap-<VERSION>` and runs the checks on it; a *later* run's `land`
    fast-forwards `main` onto it once they are green, and the same run's `publish` dispatches
-   `publish.yml`. No pull request is opened, so nothing needs approving. On 0.14.14 the branch was
-   green 21 minutes after the release and no further scheduled run came for 5.5 h, the feed still
-   serving 0.14.13. So once `gh run list --repo owfeed/owfeed-packages --branch
+   `publish.yml`. No pull request is opened, so nothing needs approving. The next scheduled run can
+   be hours away, so once `gh run list --repo owfeed/owfeed-packages --branch
    update/luci-theme-footstrap-<VERSION>` shows the branch's `Check` green, dispatch it yourself:
    `gh workflow run update.yml --repo owfeed/owfeed-packages`, then `gh run watch <id> --repo
    owfeed/owfeed-packages` on that run and on the `publish.yml` run it starts (~1 min to land,

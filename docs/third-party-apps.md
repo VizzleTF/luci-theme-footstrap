@@ -10,10 +10,6 @@ outward-facing document the README links. Where the two disagree, that one is th
 > Playwright: 20 apps — 6 proxy stacks (OpenClash, passwall, passwall2, ssr-plus, mosdns, vssr),
 > 5 clash/mihomo wrappers (ssclash, podkop, justclash, homeproxy, nikki), 4 heavyweights
 > (dockerman, diskman, istore, AdGuardHome) — plus stock `openwrt/luci` apps as a baseline.
->
-> The prompt: `luci-app-ssclash`'s config editor drew as a black rectangle with no text and blew
-> the page up to 2 007 346 px. The cause was not the app but the theme, and it forced a rewrite of
-> the whole theme↔app contract.
 
 ## What a foreign app actually does
 
@@ -39,7 +35,7 @@ The distinction that matters is not `<style>` vs `<link>` — it is **who can pu
 - injected in render (filemanager, podkop): the app will repeat it on the next render;
 - injected **at module eval** (ACE, HexEditor, banip, adblock): it will never repeat, because
   the module is cached for the life of the document. Deleting such a sheet breaks the app until a
-  page reload. That is what happened to SSClash.
+  page reload.
 
 Separately: a `<style>`/`<link>` **inside the view's tree** (package-manager, nftables, aria2,
 v2raya, nlbwmon) is harmless — it dies with the contents of `#view`.
@@ -86,7 +82,7 @@ structureless black ACE and a 2-million-pixel page.
 
 A sheet is invasive if it could paint somebody else's page. Three tests, all on the facts rather
 than on a list of names — the set of theme names and custom properties is read out of `cascade.css`
-at runtime, 0.3 ms per transition:
+at runtime:
 
 1. **A bare selector** — no class, id or attribute (`pre`, `*`, `svg text`, `div > label + select`).
    It hits stock markup by construction.
@@ -135,13 +131,10 @@ A document can also be poisoned by a NODE instead of a sheet. A script that call
 `document.body.appendChild()` (or `insertBefore`/`replaceChild`/`append`/`prepend`/
 `insertAdjacentElement`/`insertAdjacentHTML`) parks an element where no page but the one that put it
 there can find it. `luci-app-bandix`'s `render()` does exactly this, unconditionally and on EVERY
-visit, for 7 tooltip/modal nodes (`#schedule-rules-tooltip`, `#lan-traffic-tooltip`, four
-`.bandix-modal-overlay`s, `#whitelist-modal`; `bandix-view/index.js:2371/2378`) — it never checks
-whether they already exist and never removes the previous copies (issue #56, reproduced on
-`owrt2512` and `owrt2410`): an SPA nav to another page used to leave every one of them sitting in
-`<body>` — unstyled once `scopeToCurrentPage()` darkens bandix's own `<style>` on the swap, painted
-under the footer — and a SPA return to bandix duplicated every id, a fresh `render()` appending a
-second copy over what was still there.
+visit, for its tooltip and modal nodes — it never checks whether they already exist and never
+removes the previous copies (issue #56). Under an SPA navigation those nodes would stay in `<body>`
+on the next page, unstyled once `scopeToCurrentPage()` switches off bandix's own `<style>`, and a
+return to bandix would duplicate every id.
 
 Nothing is deleted here either, for the reason Rule 1 already gives, whichever shape an app's append
 turns out to have: some apps really do append once, at module eval, the same way ACE and HexEditor
@@ -178,7 +171,7 @@ re-judging it on every navigation.
 `dedupeViewSheets()`. The rules do not disappear (the first copy stays), and a library's "have I
 imported this?" check still finds its sheet. Without it, podkop accumulates one `<style>` per visit.
 A copy is a duplicate only of one with the SAME owner (the page it arrived for): another app's copy
-is disabled on this page, so dropping this page's live copy for it left 0 of 2 copies painting.
+is disabled on this page, so dropping this page's live copy for it would leave no copy painting.
 Unowned copies still collapse.
 
 ### Rule 4. Dark mode is announced in three dialects
@@ -200,25 +193,23 @@ Apps read `--primary-color-*`, `--text-color-*`, `--background-color-*`, `--bord
 literal fallback. The export surface is exactly **26 names**, and the warning family is called
 **`warn`**: `--warn-color-high/-medium/-low` and `--on-warn-color`.
 
-Two findings that used to be filed as one:
+Two findings that look alike:
 
 - **podkop's `var(--warn-color-medium, orange)` (7 uses) WORKS.** The name is correct and resolves
   to the theme's ochre. There is no `--warning-color-*` anywhere in the tree, so "fixing" podkop to
-  use that would drop all seven declarations into the `orange` fallback. An earlier revision of this
-  document claimed the opposite; that was wrong.
+  use that would drop all seven declarations into the `orange` fallback.
 - **justclash's `var(--text-color, inherit)` (6 uses) is a real typo.** There is no level in the
   name and no such property; the correct one is `--text-color-high`. Do not invent `--text-color`
   on our side: that fixes somebody's typo at the price of a name we would then support forever.
 
-The private `--fs-*` tier (~125 properties) is not part of the contract and is not addressed to
+The private `--fs-*` tier (~130 properties) is not part of the contract and is not addressed to
 apps — which is exactly why it is separated. See [design-system.md](design-system.md).
 
 ### Rule 7. The chrome is fenced off, in three places that must agree
 
 An app's unlayered `!important` outranks every cascade layer, so the chrome cannot be defended by
-the cascade. It is defended by not matching, in three places, and the three must agree. Proven
-rather than assumed: breaking the fence constant to `.fs-sidebarTYPO` left the menu completely
-unprotected while every lint and build step **exited 0**.
+the cascade. It is defended by not matching, in three places, and the three must agree. Nothing in
+the build notices when they do not.
 
 1. **`header.ut` — the markup.** A chrome root marks itself with `data-fs-chrome`. The `<nav>`
    is one; so are the skip link, the two sr-only elements and the command palette, none of which sits
@@ -228,19 +219,16 @@ unprotected while every lint and build step **exited 0**.
    can no longer match a chrome element. That is what beats a third party's `!important`: there
    is nothing left to outrank.
 3. **`theme/10-chrome.css` — the pin.** It closes the one way in a fence cannot: inheritance
-   from `html`/`body`, where no match is needed at all. Measured against a hostile flagged rule
-   on `html`: font-style reached 166 of 169 menu elements, word-spacing/text-align 157,
-   letter-spacing/text-transform 156, cursor 46 — 0 with the pin, because it restates exactly the
-   inherited properties the chrome does not already declare itself.
+   from `html`/`body`, where no match is needed at all. It restates exactly the inherited
+   properties the chrome does not already declare itself.
 
 The mark lives in `header.ut`; rename it there and the two copies still saying the old name are
 wrong. That failure has no symptom — the fence silently stops fencing, nothing on screen changes,
 and the menu breaks on someone else's router months later.
 
-The fence and the pin are each **one canonical string**, to be read whole rather than for tokens.
-That is not pedantry: four independent `includes()` checks for the right tokens all passed on
-`:where(:not(.fs-sidebar), .fs-sidebar *)` — a plausible botched edit that is the exact **inverse**
-of a fence, targeting the chrome instead of sparing it.
+The fence and the pin are each **one canonical string**, to be read whole rather than for tokens:
+`:where(:not(.fs-sidebar), .fs-sidebar *)` has all the right tokens and is the exact **inverse** of
+a fence, targeting the chrome instead of sparing it.
 
 The shapes both strings encode, each a measured bug:
 
@@ -250,10 +238,9 @@ The shapes both strings encode, each a measured bug:
 - **The fence must cover the root AND its subtree** (`[m], [m] *`); the root alone leaves every menu
   element inside it exposed.
 - **The pin must cover the root ALONE**, and it says so itself (`:not([m] *)`) rather than trusting
-  that nobody ever nests a mark. Pinning descendants was measured and it broke the chrome's own
-  inheritance — a direct declaration beats an inherited one even when the inherited one is ours,
-  costing `.fs-label` its `nowrap` and forcing `text-align` from `start` to `left` on 302 elements,
-  which breaks every RTL language LuCI ships.
+  that nobody ever nests a mark. Pinning descendants breaks the chrome's own inheritance — a direct
+  declaration beats an inherited one even when the inherited one is ours, costing `.fs-label` its
+  `nowrap` and forcing `text-align` from `start` to `left`, which breaks every RTL language LuCI ships.
 - **The pin may carry only inherited properties.** A non-inherited one there is a style decision
   wearing a guard's coat, and at zero specificity it would lose to everything anyway.
 
@@ -267,32 +254,15 @@ two questions on it — where the top-level commas are, and where the `::` is. N
 recursion that reaches them (`r.cssRules`) is three lines and does not care which at-rule it just
 descended into.
 
-Measured rather than argued, on owrt2512 (25.12.4) against the live theme: **21 hostile sheets, one
-per syntax, each carrying `padding: 0 !important` on an unpinned selector, injected into `<head>`
-after the theme's own modules had loaded** — `*`; a selector list; nesting with `&`, without `&` and
-two levels deep; `:has()`; `:is()`/`:where()`; `:not(:has())`; bare `@scope` and `@scope … to …`;
-`@supports`; `@media`; the app's own `@layer`; an escaped leading digit and an escaped `@`; a comma
-and an IPv6 `::` inside an attribute value; a pseudo-element; and two sheets built entirely through
-`insertRule()` (empty text, so `textIsSheet()` refuses the `@layer` wrap and only the fence stands).
-**0 of 247 chrome elements moved in any of the 21, on both Blink and WebKit.** The negative control
-is the same payload marked `[data-fs-shell]` so the module skips it: **63 elements flattened** (59
-for the nested variant), which is what makes the twenty-one zeroes a working fence rather than a
-broken measurement. Gecko (Firefox 153) rewrites all of them identically on a synthetic page.
-
-Three things that fell out of it and are worth knowing:
-
 - **A nested rule under a pinned parent is fenced too, redundantly.** `#app-x .thing { &:hover { … } }`
   comes back as `&:hover:where(:not([data-fs-chrome], …))` — `&:hover` names nothing the theme does
   not know, so it reads as unpinned on its own. It costs nothing (the `&` still requires `#app-x`,
   which can never be chrome, and `:where()` adds no specificity) and the safe default is the right
   one: a nested rule whose parent is itself unpinned MUST be fenced, and from inside `fenceRules()`
   the two cases look the same. Every other shape round-trips byte-identical.
-- **The gap the fence does not cover is time, not syntax.** A first attempt at the measurement
-  injected on a fixed 2 s timer and reported 121 of 247 elements flattened on WebKit — the stand is
-  slow enough that the payload landed before `fs-sheets.js` had loaded and started watching `<head>`.
-  That is the flash the module's own comment already describes for server-rendered `<link>`s, it
-  affects only the page you are on, and it is not fixable from a module that has to be fetched. Any
-  future probe must wait for the theme's JS, or it measures the gap and calls it a fence failure.
+- **The gap the fence does not cover is time, not syntax.** A sheet that lands before `fs-sheets.js`
+  has loaded and started watching `<head>` paints unfenced until then. It affects only the page you
+  are on, and it is not fixable from a module that has to be fetched.
 - **`@import` is followed.** `fenceRules()` descends into `CSSImportRule.styleSheet`, so
   `* { padding: 0 !important }` imported by an app's `<style>` is fenced like its own rules. A
   re-hosted `<link>`'s import is fenced on the shim's `load` event (readable then in Chromium,
@@ -301,8 +271,7 @@ Three things that fell out of it and are worth knowing:
   shim appends the link's `media` after `layer(theme)`. A `rel=alternate` or `disabled` link is
   skipped but watched: its `rel`/`disabled` change re-runs the passes, because enabling adds no node
   (an attribute observer sees a child only if it is the target; `subtree` on `<body>` would fire on
-  every button LuCI's poll disables). Firefox keeps one shim per href on a re-added link, measured
-  1/1 against Chromium.
+  every button LuCI's poll disables). Firefox keeps one shim per href on a re-added link.
 
 The dark-mode guard must match `stampDark` the same way: that guard exists because third parties
 write the attributes this theme publishes (`luci-app-openclash` does it in seven templates). Add a
@@ -312,17 +281,17 @@ unguarded — silently.
 ### Rule 8. A foreign table is claimed by its HEADER ROW, not by its class
 
 `.table` is LuCI's class, and every table rule the theme has hangs off it — the frame, the cell
-padding, the measured card stack. An app that emits a bare `<table>` matched none of it, so nothing
-tagged it, nothing measured it and `.fs-main`'s `overflow-x: clip` silently CUT its right-hand
-columns; the only thing that ever reached it was a phone-tier scrollbar. `tagDataTables()` now takes
+padding, the measured card stack. An app that emits a bare `<table>` matches none of it, so untagged
+and unmeasured, `.fs-main`'s `overflow-x: clip` would silently cut its right-hand columns.
+`tagDataTables()` takes
 any table under a content root — `#view` or the `#modal_overlay` an app's dialog is built in — that
 has a header row in any of four markups, adds `.table.fs-dt`, and copies the
 column headings into `data-title` so the card has something to print. A table with **no** header row
 is left alone on purpose and scrolls: see [css.md](css.md#which-of-the-three-a-table-gets-and-what-decides-it).
 
 **The claim is re-made on every fit pass, not once per element.** These tables are polled: the app
-replaces the rows inside the element it already has, so a claim that ran once left every batch after
-it without `.tr`/`.td` and without a caption — on a table that may by then be carding, where the
+replaces the rows inside the element it already has, so a claim that ran once would leave every batch
+after it without `.tr`/`.td` and without a caption — on a table that may by then be carding, where the
 fresh rows fall out of the card layout uncaptioned. Both
 halves are additive, and the one JUDGEMENT — "does this table speak LuCI's row vocabulary, or is it
 ours to rewrite?" — is still taken once, at claim time, and remembered on the element, so LuCI's own
@@ -332,24 +301,17 @@ markup is never rewritten by a later pass.
 pass, not a once-a-second one. The adoption returns on its memo. The captioning skips **per row**:
 a row whose first cell already carries a caption has been walked, so on everything LuCI renders —
 where `ui.Table` writes `data-title` as it builds — the pass costs one attribute read per row and
-nothing else. Measured on Processes, 114 rows and 678 cells: 0.134 ms per pass for the full walk
-against **0.053 ms** with the per-row skip. Same tagged, carded and captioned counts as before the
-change, and no long task over eight poll ticks.
+nothing else.
 
 The question is asked of the ROW because no single row speaks for the table. A table-level probe has
 to pick one, and every choice is wrong for some shape: asking the last row stalls forever on a
 `<tfoot>` of per-column totals, which takes captions on the first pass and is never bare again while
-a poll keeps replacing the `<tbody>` above it — reproduced on a live table, where the fresh rows came
-back with no caption at all. Per row there is nothing to guess, and cells replaced inside a
+a poll keeps replacing the `<tbody>` above it, so the fresh rows come back with no caption. Per row there is nothing to guess, and cells replaced inside a
 surviving row arrive bare and are walked like any other.
 
-This is deliberately unmeasurable here. A census of `#view table:not(.table):not(.cbi-section-table)`
-over all **196** menu pages on the stand — openclash, justclash, ssclash, dashboard and statistics
-included — found **zero**: everything anyone here emits already carries the class. The rule exists for
-the shape a census cannot reach, which is what the coverage contract means
-([conventions.md](conventions.md)). The three synthetic shapes are checked instead, on Blink and
-WebKit at 1440 px and 390 px: `<thead><tr><th>` and `<tr><th>` both card with the right captions, a
-header-less matrix stays a scrolling matrix at both widths.
+No app surveyed here emits a bare table; the rule exists for the ones that do, which is what the
+coverage contract means ([conventions.md](conventions.md)). `<thead><tr><th>` and `<tr><th>` both
+card with the right captions; a header-less matrix stays a scrolling matrix.
 
 ### Rule 9. A table inside the app's OWN scroller is the app's business
 
@@ -358,11 +320,9 @@ app scrolls itself, that question has already been answered by somebody else, an
 ladder can give overrules it: within a 598px box a wide table overflows by definition, so the
 remedy ends in a card stack however much room the page has around it.
 
-Measured on `luci-app-filemanager`, which parks its listing in `#file-list-container.resizeable`
-(`resize: both; overflow: auto`, and no width of its own, so the browser's default box is what the
-reader gets): the listing came out as cards on a 1280px screen with 1224px of column beside it.
-Carded on the 0.14.3 package too, so this is not a regression of the fit rework — it is a case the
-rule never covered.
+`luci-app-filemanager` parks its listing in `#file-list-container.resizeable` (`resize: both;
+overflow: auto`, and no width of its own): without this rule the listing comes out as cards on a
+1280px screen with plenty of column beside it.
 
 `fit.inScroller()` walks from the table to the content root and answers whether any ancestor scrolls
 horizontally; `fs-select.js` asks BEFORE it applies the slot's remembered answer, so a table carded
@@ -371,8 +331,7 @@ by an older build is un-carded rather than carded again. The walk stops at `#vie
 scroll fallback the theme gives a foreign table is on the TABLE itself (`theme/30-tables.css`), not
 on an ancestor — neither may switch this rule on for everything.
 
-Swept over all 95 menu pages of a stand at 390px: **one** table matches, the file manager's. No
-stock page has a data table inside a scroller of its own, so nothing that cards today stops carding.
+No stock page has a data table inside a scroller of its own.
 
 ### What the theme cannot do, and should not try
 
@@ -383,7 +342,7 @@ stock page has a data table inside a scroller of its own, so nothing that cards 
 - An app's z-index on its own page is its own page.
 - An app's viewport media queries do not know about our sidebar.
 
-**And what the claim buys it, since 0.12.6.** A claimed table is measured like any other data table,
+**And what the claim buys it.** A claimed table is measured like any other data table,
 which means it gets the whole ladder: honest column floors while it is a table, the expendable
 columns (`hide-xs`/`hide-sm`) dropped by measurement rather than at 767px, one column allowed to
 shred before the table gives up on being a table, and the card as the last rung. A table that has
@@ -408,54 +367,3 @@ On a live router, the scenario that would catch everything above:
 3. visit podkop three times over SPA. The number of `<style>` elements in `<head>` must not grow
    (rule 3);
 4. justclash in dark mode: its `[data-theme="dark"]` rules must match (rule 4).
-
-## Appendix: the second ten by stars
-
-quickfile, tailscale-community, smartdns, internet-detector, 3ginfo-lite (client JS — brought up on
-the router and rendered) plus cloudflarespeedtest, aliddns, koolproxy, ech-workers, sms-tool
-(legacy Lua — read).
-
-**All ten preserve SPA navigation, and none injects anything that could paint someone else's page.**
-
-- `luci-app-internet-detector` is the only one of the ten that injects into `<head>` at all, at
-  module eval: `:root { --app-id-* }` (its own prefix, so inert by our rule) plus its own `.id-*`
-  classes. Its dark block hangs on `:root[data-darkmode="true"]` — our attribute — so dark mode
-  works for it out of the box. A fourth detection dialect, and we already stamp it.
-- `luci-app-smartdns` is the model: `E('style', [css])` returned inside `.cbi-map`, so it dies
-  with the view.
-- Legacy Lua apps put `<style>` in the page template, including bare `table { … }`. It cannot leak
-  (the page is server-rendered and SPA never enters), but light surfaces stay light on a dark
-  theme — unfixable from outside.
-
-The rules above cover the entire second ten with no theme change. Breakage is concentrated in the
-big old apps, not in the mass.
-
-## Appendix: `luci-app-podkop`, the app the fence was tested against
-
-Checked against `itdoginfo/podkop@main` sources, not from memory: the injected CSS was assembled
-from its template literals and **replayed on a live router** exactly the way the app does it.
-
-**What it does right:**
-
-- **One injection point**, one `<style>` in `<head>`. Not a `<link>` from the template, not
-  `insertRule()` in pieces.
-- **Names in its own space**: 30 of 40 selectors carry the BEM prefix `pdk_dashboard-page__…`, the
-  rest are pinned to its own ids. Our "pinned to the app" signal is a name the theme does not know,
-  and it is present in nearly every rule.
-- **It reads the export tier, not our private tokens**: `--background-color-low`,
-  `--success-color-medium`, `--warn-color-medium`, `--error-color-medium`, `--primary-color-high`,
-  `--primary-color-low`, `--text-color-high`. All seven are defined and follow the mode.
-
-**Our verdict on its real CSS:** `documentPoisoned()` is `false`, 0 chrome elements damaged, the
-sheet is not rewritten. So SPA is not disabled on podkop's pages and the theme leaves its styling
-alone. That is the "we are not over-clamping" check: the judge was tightened, and the model app
-still passes untouched.
-
-**What stayed generic, and why it is survivable:** `.centered`, `.rotate`, `.skeleton`, `.toast*`
-have no prefix. The theme does not style them, so by our test they count as pinned to the app and
-are left alone. That is luck, not protection — had the app called a class `.center` or `.table`, it
-would have landed in the shared vocabulary. Advice to authors: prefix every name, helpers
-included.
-
-**What we borrowed from it:** the loading placeholder. podkop draws a skeleton while its data
-arrives; our SPA had the same hole on a cold route. See [spa-router.md](spa-router.md).

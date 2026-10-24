@@ -1,7 +1,7 @@
 # Contributing
 
 Patches are welcome. This page is the short version; every rule below is written out, with the
-measurement behind it, in [`docs/`](docs/README.md).
+reason behind it, in [`docs/`](docs/README.md).
 
 ## Before you start
 

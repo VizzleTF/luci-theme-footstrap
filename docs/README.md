@@ -58,6 +58,5 @@ and a style checker: <https://vizzletf.github.io/luci-theme-footstrap/>.
 
 - One page, one job. If a page needs its own table of contents, it is probably two pages.
 - One fact lives in one place. Pages link to each other rather than repeating.
-- Every measurement carries the number it was made with, and every rule says what it protects
-  against — the alternative was usually tried and was worse.
+- Every rule says what it protects against. History lives in the changelog, not here.
 - Documentation that has stopped being true is deleted, not annotated.

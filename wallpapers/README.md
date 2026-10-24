@@ -10,18 +10,12 @@ this on the router, as root:
 wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/wallpapers/set-pattern.sh | sh -s cats
 ```
 
-`cats` or `dinos`, and the cats are back where they used to be. Details below.
+`cats` or `dinos`. Details below.
 
 | file | size | tile |
 |---|---|---|
 | `svg/cats.svg` | 77 kB | 870 units square, reads well around 440 px |
 | `svg/dinos.svg` | 128 kB | 2048 units square, reads well around 880 px |
-
-Earlier versions of the theme fetched these two from this repository on demand and checked them
-against a pinned sha256. That is gone: a theme in a package feed has no business calling a
-third-party host while a settings page is open, and *your* drawing is the interesting half of the
-feature anyway. They stay here because they are pleasant and because they are exactly the shape a
-pattern wants to be.
 
 ## Putting one back on a router without a browser
 
@@ -42,9 +36,11 @@ the *router's* default. **A browser that has already chosen a wallpaper keeps it
 every axis is per-browser first and the router default second, so on such a browser press *Reset to
 saved* on the Footstrap tab, or pick Pattern there by hand.
 
-The script raises the same objections the upload page does, by text matching rather than with a
-parser — a shell has no `DOMParser`. That is a cruder instrument in both directions, so a file it
-refuses can still be uploaded from the page, where a real parser decides.
+The script checks the file by text matching — a shell has no `DOMParser` — and refuses a file
+that trips a check rather than cleaning it: an executing or embedding element (`script`,
+`foreignObject`, `iframe`, `embed`, `object`, `audio`, `video`, `animate`, `set`), an event handler,
+a `javascript:` URL, or a reference off the router. That is a cruder instrument than the page's, so
+a file it refuses can still be uploaded from the page.
 
 ## What makes a good pattern
 
@@ -64,12 +60,13 @@ cannot be turned up.
 
 ## What the theme will refuse
 
-The upload is parsed with `DOMParser` — inertly, nothing runs — and rejected if the root is not
-`<svg>`, if any element executes or embeds (`script`, `foreignObject`, `iframe`, `embed`, `object`,
-`audio`, `video`, `animate`, `set`), if an attribute is a real event handler (`^on[a-z]+$`), if a
-value opens a `javascript:` URL, or if an `href` points off the router. `#fragment` and `data:`
-references are fine — that is how a tile refers to its own `<defs>` and embeds a bitmap. The cap is
-512 kB.
+The upload is parsed with `DOMParser` — inertly, nothing runs. It is rejected if it does not parse,
+if its root is not an `<svg>` in the SVG namespace, or if it is over 512 kB. Otherwise the unsafe
+parts are removed and the page says how many: elements outside the SVG namespace, `script`,
+`foreignObject`, a `<style>` that reaches off the document, an animation that targets a URL
+attribute, event handlers (`^on[a-z]+$`), `xml:base`, CSS references off the document, and any
+`href` that is not a `#fragment` or a raster `data:` image on an `<image>` — that is how a tile
+refers to its own `<defs>` and embeds a bitmap. A file with nothing left after cleaning is rejected.
 
 ## Licence
 

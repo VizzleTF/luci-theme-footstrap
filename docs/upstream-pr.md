@@ -59,8 +59,7 @@ changelog and code comments, not in the upstream body.
 1. 23.05 compatibility — "We are the upstream project. We don't need to keep adding compatibility
    code for old releases just because it happens to be possible".
 2. A footer link to an outside site — "None of the other themes do that".
-3. A long `uci-defaults` with old-version cleanup — cut from 162 lines to 36.
-4. Public exports for our gates.
+3. A long `uci-defaults` with old-version cleanup.
 
 ### Checklist before `gh pr create`
 
@@ -70,7 +69,7 @@ changelog and code comments, not in the upstream body.
 - [ ] `Signed-off-by` on every commit; author is the real full name, never a
       `@users.noreply.github.com` address
 - [ ] branch is not `master` and names the change
-- [ ] preflight green, `/security-review` read
+- [ ] preflight green, security review (Preflight 7) done
 - [ ] `diff -r` tip == tag (Step 3)
 - [ ] no `po/`, none of our build scripts; `Makefile` only as a mirror of ours
 
@@ -174,7 +173,7 @@ git log --format="%an <%ae>" origin/master..HEAD | sort -u
 
 ### Step 6. Publish
 
-One push took over 120 s. New PR:
+New PR:
 
 ```sh
 git -C $LUCI push --quiet fork <branch> \
@@ -198,8 +197,7 @@ After the merge: `git worktree remove ../tmp/fs-hist`, `git -C $LUCI worktree re
 
 ## Preflight
 
-All of it runs before the **first** push: on #9111 the bot needed two rounds, and both times found
-what a local run catches. The PR carries the latest tag's tree, so sections 4, 5 and 6 run in
+All of it runs before the **first** push: what the upstream bot flags, a local run catches. The PR carries the latest tag's tree, so sections 4, 5 and 6 run in
 `../tmp/fs-hist` detached at the tag
 (`git -C ../tmp/fs-hist checkout --quiet --detach $(git describe --tags --abbrev=0)` from our root).
 
@@ -220,8 +218,7 @@ what a local run catches. The PR carries the latest tag's tree, so sections 4, 5
    cd ../tmp/luci-pr && npm install --ignore-scripts --no-save
    node_modules/.bin/eslint themes/luci-theme-footstrap/htdocs | grep "is not defined"
    ```
-   A warning on an alias is their config's defect (24 of the tree's 30 aliases, 59 files in 18
-   packages); a warning on a real typo is a fix.
+   A warning on an alias is their config's defect; a warning on a real typo is a fix.
 3. **Their formalities** (`.github/formalities.json` in the clone): subject soft 60 / hard 80, body
    required and not a repeat of the subject, `Signed-off-by` matching the author, a real full name,
    branch not `master`/`main`, no merge commits, no CRLF.
@@ -235,7 +232,7 @@ what a local run catches. The PR carries the latest tag's tree, so sections 4, 5
      ucode -T -c -o /dev/null "$f" || echo "FAILS: $f"; done; echo done'
    ```
 5. **Live on both package managers**: `owlab sync owrt2512 owrt2410`.
-6. **Size** (asked about twice):
+6. **Size** (reviewers ask):
    `du -sb luci-theme-footstrap/ucode luci-theme-footstrap/htdocs/luci-static/resources`.
 7. **Security review** of the final branch against the previous synced tag, as in
    [releasing.md](releasing.md) Step 2. First look: the signature chain in `install.sh`, new shell scripts, the login template (unauthenticated), sinks
@@ -254,9 +251,8 @@ A review by anyone other than `openwrt-ai` comes first.
 
 ### The bot (`openwrt-ai`)
 
-1. **Measure whether it is right** — it is wrong noticeably more often than a person (it claimed
-   `text-overflow: ellipsis` did nothing although `white-space: nowrap` came from base; it also
-   found a real regression in the chart-label selector).
+1. **Measure whether it is right** — it is wrong noticeably more often than a person, and right
+   often enough that every remark is checked.
 2. A real defect: fix it on our `main` so the next tag carries it, and bring the same change into
    the commit it belongs to here (amend or fixup). Step 3 then runs against tag + fixes:
    ```sh

@@ -44,11 +44,7 @@ bug that reading the source structurally cannot see:
 - an install path — `postinst`, `uci-defaults`, the marker file, a conffile surviving an upgrade;
 - any difference between apk and opkg.
 
-Every bug users have reported was about a page: #11 a column shredded to one character per line,
-#22 a clipped submenu title, #14 an indicator that did not fit, #10 phantom scroll from a hidden
-pane, #12 a doubled scrollbar in one engine, #8/#33/#36 a third-party app laid out wrong, and —
-reported on the upstream PR — two pages that came back empty after a client navigation. Say which
-router a run covered; do not let one stand in for the other.
+Say which router a run covered; do not let one stand in for the other.
 
 **If you genuinely cannot run it** (no Docker on the machine), say so plainly in the commit or the
 PR rather than reporting the change as verified. An untested change described as tested is worse
@@ -66,9 +62,8 @@ color: var(--text-color-medium);                         /* no */
 ```
 
 Why: `:root` is one shared scope, and every `luci-app-*` puts its CSS in the same document
-**unlayered**, which outranks any `@layer`. A hostile `:root` recoloured **312 of 336** gallery
-elements before the tiers were split, and 0 after — the measurement and the two tiers are in
-[design-system.md](design-system.md).
+**unlayered**, which outranks any `@layer`, so an app's `:root` would recolour the theme. The two
+tiers are in [design-system.md](design-system.md).
 
 **Put the rule in the right layer instead of reaching for `!important`.** Layer order is
 `tokens, base, theme, page`, and a later layer beats an earlier one regardless of specificity —
@@ -109,9 +104,8 @@ the paper palette in `theme/97-print.css`. Nothing checks this rule; review does
 **Stay inside your zone.** There are three: the theme's own chrome (`fs-*` names, `data-fs-chrome`
 roots — ours alone, and fenced against foreign CSS); the shared LuCI widget surface (`cbi-*`,
 `.table`, `.alert-message` — ours to style, nobody's to own); and another package's namespace,
-which the theme never reaches into. `fs-overview.js` used to live in `luci-mod-status`'s global
-include directory, where LuCI evaluates every `*.js` — so it was downloaded and run on the
-overview of routers using a different theme. It is a chrome module now. The fence that keeps
+which the theme never reaches into: no theme file goes into another package's directory, such as
+`luci-mod-status`'s include directory, where LuCI evaluates every `*.js` under any theme. The fence that keeps
 foreign CSS out of zone one is described in [third-party-apps.md](third-party-apps.md).
 
 **Coverage is a contract.** A selector no stock LuCI page renders still gets styled: some
@@ -133,7 +127,7 @@ one of these classes without an entry in the map to pair with it.
 it.** Any flex item with no explicit `min-width` (row axis) or `min-height` (column axis) still has
 one: the *automatic minimum size*, which resolves to the item's min-content box unless the item's
 own `overflow` is something other than `visible`, in which case the automatic minimum drops to zero
-(CSS Flexbox §4.5). One cause, four symptoms in one session, in both directions:
+(CSS Flexbox §4.5). One cause, symptoms in both directions:
 
 - `.cbi-checkbox` is `inline-flex` and its pill had no `flex-shrink: 0` — the automatic minimum let
   the pill compress below its declared `--sw-w` while the knob kept its literal size and a travel
@@ -170,8 +164,7 @@ Upstream bugs: openwrt/luci#8299, #8020, #8021, #8256. **A zero exit code proves
 the corruption is silent. A backtick inside `${…}` in a template string is out too (jsmin loses
 the string, but that one fails loudly).
 
-**Comments are free on the router.** They are just under 40 % of the JS source and none of them
-ship: release CI pre-minifies with uglify-js, and a
+**Comments are free on the router.** None of them ship: release CI pre-minifies with uglify-js, and a
 node-less build runs jsmin. What a comment says is governed by "Comments" below.
 
 **A required module is a singleton; there is no inheritance between modules.** `'require X'`
@@ -212,9 +205,8 @@ pattern that reliably removes anonymous handlers.
 
 ## Comments
 
-The reader is a model with this file open and no session history. It needs, per line it is about
-to change: what must stay true, why, and where the proof is. Everything else costs it context and
-gives nothing back. This is the full rule, with the example behind each line.
+The reader has the file open and nothing else. They need, per line they are about to change: what
+must stay true, why, and where the proof is.
 
 ### What a comment carries
 
@@ -238,12 +230,11 @@ deleted, not reworded: restating the line it sits on is what it did.
 | cut | goes to | why |
 |---|---|---|
 | attempts and their order ("first shape … second shape …") | `docs/<area>.md`, one paragraph per attempt | the code is the survivor; the losers are history |
-| a task or session name (`task refill2`) | nothing — cite the docs heading instead | names nothing the reader can open |
 | a `../tmp/…` path | `docs/<area>.md` restates the finding | the file is not in the repository; the pointer is dead the next day |
 | a CI run id | the changelog entry, once | the run expires; the number it produced does not |
-| any of the three rows above, in a shipped file | nothing — v0.14.13 (754e529) shipped 5 of them | the upstream bot caught the same litter three times by hand; `tools/sync-luci-fork.sh` fails on a `../tmp/` path in what it exports |
+| a `../tmp/…` path or a CI run id, in a shipped file | nothing | `tools/sync-luci-fork.sh` fails on a `../tmp/` path in what it exports |
 | the same fact the docs already hold | one line and the pointer | two copies drift |
-| CAPS for emphasis, a rhetorical question, a warning to a future maintainer | plain prose | an LLM weights capitals as shouting, not as priority |
+| CAPS for emphasis, a rhetorical question, a warning to a future maintainer | plain prose | emphasis does not say what must stay true |
 
 ### Size
 
@@ -252,17 +243,15 @@ deleted, not reworded: restating the line it sits on is what it did.
 | inline, on or above a statement | 1 line; 2 when the reason is a number |
 | above a function or a rule block | 8 lines |
 | module or file header | 15 lines: purpose, invariants, what the file does not own |
-| comment share of a shipped JS file | under 40 % of the bytes; `.ut` `{# #}` and shell `#` comments are cut by `strip-build.sh` before they ship (a source-only cost, 47 % in header.ut), so the limit does not apply to them |
+| comment share of a shipped JS file | under 40 % of the bytes; `.ut` `{# #}` and shell `#` comments are cut by `strip-build.sh` before they ship, so the limit does not apply to them |
 
 Over the limit means the text is an explanation, and an explanation is a `docs/` section pointed at
-from one line. `fs-fit.js` once stood at 85 % comment bytes; that was the measurement this table came from: the
-rules it documents are sound, and no reader finds them.
+from one line.
 
 ### Rules that hold regardless of size
 
-- **A number or a name is part of the contract.** 15 comments once said the poll re-renders
-  "once a second" while `pollinterval` ships at 5 s. The comment changes in the edit that changes
-  the code, or git preserves the lie.
+- **A number or a name is part of the contract.** The comment changes in the edit that changes
+  the code.
 - **A negative result stays, in one line, present tense.** `display: none` on a zeroed tab pane
   buys nothing: scrollHeight 1039 either way. Not how it was found, not which attempt it was.
 - **References survive every compression pass**: issue numbers, spec text quoted verbatim, upstream
@@ -288,13 +277,6 @@ rules it documents are sound, and no reader finds them.
 The measurement that justifies a rule is written once, in `docs/<area>.md`, under a heading the
 code can cite: what was seen, what it was, the command that tells the two apart. A docs section may
 be as long as the finding needs; the comment citing it may not.
-
-### After a bulk comment pass
-
-Prove the code did not move: a token-stream compare against HEAD for every JS file, a
-comment-stripped and whitespace-normalised diff for CSS, `.ut`, shell and yaml. That is what caught
-a deleted Makefile marker and a lost shell escape. The pass is finished when the compare's output
-has been read.
 
 ## Templates and translation
 

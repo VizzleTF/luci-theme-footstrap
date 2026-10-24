@@ -202,15 +202,13 @@ themes, **wallpaper off** on all of them. Full data in `bench/results-25.12.json
 The router CPU columns answer the obvious suspicion: the speed is not bought with the router's
 processor. The same tour of 190 navigations costs it 18.4 s of web-stack CPU against 37.3 s.
 
-**Client CPU is missing from this run, and the reason is worth knowing.** A sample is dropped when
+**Client CPU is missing from this run.** A sample is dropped when
 the renderer process is replaced mid-navigation, and that does not fall evenly: footstrap kept 38
 pages of 38, bootstrap 18 and proton2025 16, because a full page load restarts the renderer far
 more often than an in-place swap does. What survives for a full-load theme is its *cheap*
 navigations, so the cross-theme ratio computed over the 14-page intersection reads as "the SPA
 theme burns more CPU" when it only means the other themes' expensive samples were thrown away. The
-script prints that coverage now and says outright that the ratio must not be quoted below 90%. The
-July run below had full coverage and measured **26.6 ms per navigation against bootstrap's
-45.8 ms**; that is the figure to use until a run with full coverage replaces it.
+script prints that coverage and says outright that the ratio must not be quoted below 90%.
 
 Per page, sorted by how much the client router buys:
 
@@ -257,108 +255,3 @@ Per page, sorted by how much the client router buys:
 | **TOTAL (sum of medians)** | **11306 ms** | **12142 ms** | **4933 ms** | **2.29×** | |
 | **median per-page speedup** | | | | **3.03×** | |
 | **pages navigated in place** | 0 | 0 | **38 / 38** | | |
-
-### The July 2026 run, and why the totals moved
-
-Same hardware, five runs, footstrap 0.11.3, measured 2026-07-26: **11 814 / 12 644 / 4545 ms**,
-2.60× total and 4.31× median page. So footstrap's total looks 388 ms worse now, while bootstrap's
-looks 508 ms better.
-
-**It is not the theme, and that was measured rather than argued.** Both versions were installed on
-this router in turn, against the same LuCI, the same 38 pages and five runs each:
-
-| | footstrap 0.11.7 | footstrap 0.12.0 |
-|---|--:|--:|
-| Time, sum of medians | 4932 ms | **4930 ms** |
-| Client CPU per navigation | 21.8 ms | **22.5 ms** |
-| Router CPU per navigation | 97.6 ms | **98.9 ms** |
-| median per-page difference | | **2.8 ms** |
-
-**What moved is the 40 ms uhttpd stall**, the one documented above. Turning it off on this router
-(`http_keepalive=0`, uhttpd restarted, everything else identical) and re-running the same 38 pages
-five times:
-
-| footstrap 0.12.0 | sum of medians | client CPU per navigation |
-|---|--:|--:|
-| `http_keepalive=20` (stock) | 4930 ms | 22.5 ms |
-| `http_keepalive=0` | **3886 ms** | **20.8 ms** |
-| | **1.27×** | |
-
-So a fifth of the theme's whole tour is a TCP stall that belongs to the web server. The growth since
-July tracks it, and tracks the number of requests a navigation makes:
-
-| requests during the navigation | pages | July | keep-alive 20 | keep-alive 0 |
-|---|--:|--:|--:|--:|
-| ≤ 1 | 16 | 1498 ms | 1680 ms | **1475 ms** |
-| all 38 | 38 | 4545 ms | 4930 ms | **3886 ms** |
-
-Read the first row: on the light pages the July run behaves like a router with no stall, and
-today's behaves like one with it. On the heavier pages July already paid it — Wireless was 127 ms
-then, 158 ms now and **58 ms** with the stall gone; Repository keys 132 / 156 / **58**. So July was
-a mixed state, not a clean baseline, which is the honest reading of it.
-
-`luci-base` was upgraded on this router on 2026-07-31 (26.134 → 26.209), which is the obvious
-suspect and is not the cause: the compare between those two commits touches 300 files and **none of
-them is `luci.js`, `form.js`, `uci.js`, `rpc.js` or `ui.js`**, so the set of calls a navigation makes
-did not change. Measured during the run with CDP initiator stacks: `file.read` 42.7 ms on Crontab,
-`uci.changes` 44.6 ms on Dropbear, `session.access` 44.2 ms on IP Sets — every one issued by
-`luci.js`, none by the theme, against a router that answers such a call in 1–4 ms.
-
-**What decides whether a given small call stalls is which socket it lands on**, and that is the
-browser's connection pool, not anything either side of this comparison controls. Why a single-call
-navigation landed on a fresh socket in July and on a reused one now is not established here; the
-candidates are the Chromium build the harness downloads and the state of the LAN. It is not the
-theme (4932 vs 4930 above) and not LuCI's JS (unchanged).
-
-The remedy remains `TCP_NODELAY` in uhttpd, which keeps keep-alive and helps every LuCI theme.
-`http_keepalive=0` buys the 1044 ms back today, and **must not be set on a router reachable over
-HTTPS** — this one listens on 443, where the same setting measured 3× worse.
-
-### Earlier baseline on the same hardware (footstrap 0.7.16)
-
-Three runs, 38 pages. Kept for comparison: the theme has gained modules and CSS since, and the
-ratio held. Full data was overwritten by the run above; this table is the record.
-
-| page | bootstrap | proton2025 | footstrap | ×bootstrap |
-|---|--:|--:|--:|--:|
-| `status/realtime/wireless` | 288 ms | 254 ms | 16 ms | **17.48×** |
-| `network/diagnostics` | 189 ms | 288 ms | 21 ms | **9.15×** |
-| `status/realtime/load` | 138 ms | 154 ms | 15 ms | **8.96×** |
-| `system/admin` | 136 ms | 153 ms | 16 ms | **8.82×** |
-| `system/admin/sshkeys` | 155 ms | 155 ms | 19 ms | **8.15×** |
-| `system/admin/password` | 108 ms | 155 ms | 14 ms | **7.74×** |
-| `status/realtime` | 106 ms | 156 ms | 15 ms | **7.04×** |
-| `status/realtime/cpu` | 190 ms | 168 ms | 28 ms | **6.69×** |
-| `system/admin/dropbear` | 223 ms | 303 ms | 37 ms | **6.09×** |
-| `network/network` | 367 ms | 370 ms | 63 ms | **5.81×** |
-| `system/crontab` | 182 ms | 199 ms | 39 ms | **4.61×** |
-| `network/firewall/zones` | 302 ms | 306 ms | 66 ms | **4.54×** |
-| `network/routes` | 350 ms | 308 ms | 78 ms | **4.47×** |
-| `system/admin/uhttpd` | 153 ms | 172 ms | 35 ms | **4.40×** |
-| `status/realtime/bandwidth` | 238 ms | 204 ms | 58 ms | **4.12×** |
-| `network/firewall/forwards` | 343 ms | 356 ms | 87 ms | **3.96×** |
-| `network/dns` | 328 ms | 398 ms | 84 ms | **3.92×** |
-| `status/logs/dmesg` | 101 ms | 156 ms | 26 ms | **3.82×** |
-| `network/firewall/rules` | 300 ms | 353 ms | 87 ms | **3.45×** |
-| `network/firewall` | 300 ms | 307 ms | 88 ms | **3.41×** |
-| `system/system` | 348 ms | 393 ms | 113 ms | **3.09×** |
-| `network/dhcp` | 279 ms | 363 ms | 91 ms | **3.07×** |
-| `status/logs/syslog` | 189 ms | 221 ms | 64 ms | **2.97×** |
-| `network/firewall/snats` | 225 ms | 222 ms | 80 ms | **2.81×** |
-| `status/logs` | 186 ms | 277 ms | 70 ms | **2.64×** |
-| `status/routesj` | 200 ms | 255 ms | 77 ms | **2.60×** |
-| `status/realtime/connections` | 139 ms | 154 ms | 56 ms | **2.47×** |
-| `network/firewall/ipsets` | 168 ms | 219 ms | 69 ms | **2.43×** |
-| `network/wireless` | 325 ms | 433 ms | 137 ms | **2.36×** |
-| `status/nftables` | 210 ms | 246 ms | 90 ms | **2.32×** |
-| `system/reboot` | 140 ms | 154 ms | 63 ms | **2.21×** |
-| `system/flash` | 244 ms | 221 ms | 113 ms | **2.15×** |
-| `system/leds` | 237 ms | 269 ms | 117 ms | **2.04×** |
-| `system/admin/repokeys` | 276 ms | 303 ms | 154 ms | **1.79×** |
-| `status/processes` | 290 ms | 308 ms | 170 ms | **1.70×** |
-| `status/overview` | 676 ms | 754 ms | 574 ms | **1.18×** |
-| `system/startup` | 1076 ms | 1091 ms | 941 ms | **1.14×** |
-| `system/package-manager` | 814 ms | 881 ms | 765 ms | **1.06×** |
-| **TOTAL (sum of medians)** | **10518 ms** | **11680 ms** | **4638 ms** | **2.27×** |
-| **median per-page speedup** | | | | **3.43×** |
-| **pages navigated in place** | 0 | 0 | **38 / 38** | |

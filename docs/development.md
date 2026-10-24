@@ -24,7 +24,7 @@ owlab doctor                  # what this machine can do (Docker, arch, emulatio
 Docker is the only other requirement. Everything else comes out of `owlab.yaml`.
 
 `owfeed` and `owlab` here follow the refs in `.github/workflows/build.yml`, which are the only pin
-(0.5.5 and 0.6.6 at the time of writing; `owfeed version`, `owlab version`). A release binary from
+(`owfeed version`, `owlab version` print what you have). A release binary from
 GitHub, checked with `gh attestation verify <file> -R owfeed/<tool>` and its `SHA256SUMS`, replaces
 the one in `~/go/bin`; `@latest` can run ahead of CI.
 
@@ -110,15 +110,14 @@ steps are spelled out in `owlab.yaml`:
   push. Without it everything is copied except the file LuCI actually requests, and the router
   404s on its own stylesheet;
 - `install:` maps the package directories onto router paths;
-- `post_sync:` registers the theme and removes legacy directories — here rather than through
-  `root/etc/uci-defaults/…`, because `sync` deliberately does not overwrite `/etc/config` or
+- `post_sync:` registers the theme and touches the package database so the asset cache key moves
+  (see Caches below) — here rather than through `root/etc/uci-defaults/…`, because `sync` deliberately does not overwrite `/etc/config` or
   `/etc/uci-defaults`: that is router state, not package content;
 - `theme: footstrap` — owlab sets `luci.main.mediaurlbase` after the push. Installing the package
   only registers the theme, which on a dev stand is the opposite of what you want.
 
-Resource JS is copied by glob (all of `htdocs/`), never by a list of names. The list was a bug: a
-new file made it into the package (luci.mk copies `htdocs/` wholesale) but silently never reached the
-dev router, so it was first exercised after the release.
+Resource JS is copied by glob (all of `htdocs/`), never by a list of names: luci.mk copies
+`htdocs/` wholesale, so a list would let a new file reach the package but never the dev router.
 
 What `sync` does not do: stamp `FS_VERSION` (System → Footstrap shows `dev`) and compile
 `po/*.po` into `.lmo` (strings stay English). Both belong to a real package build, which is where
@@ -142,8 +141,8 @@ they should be verified.
 - `.ut` templates are not cached between requests (ucode compiles on the fly) — an edit to
   `header.ut` is visible on F5.
 - CSS/JS are cached by the browser. `cascade.css` is served with `?v={{ pkgs_update_time }}`, so
-  touching the package database changes the key and an ordinary F5 picks the file up. **Which file
-  that is depends on the release**, so touch both:
+  touching the package database changes the key and an ordinary F5 picks the file up. `post_sync:`
+  does this on every sync; by hand, **which file that is depends on the release**, so touch both:
   ```sh
   owlab exec owrt2512 -- 'for db in /lib/apk/db/installed /usr/lib/opkg/status; do [ -f "$db" ] && touch "$db"; done'
   ```
@@ -159,9 +158,8 @@ owlab exec owrt2512 -- 'ucode -T -c -o /dev/null \
   /usr/share/ucode/luci/template/themes/footstrap/header.ut'
 ```
 
-**CSS** — not with screenshots. Live counters (uptime, DHCP leases, wifi signal) move 0.5–1.3% of
-pixels between two runs of the *same* stylesheet, while a real regression weighs 0.19%. Diff computed
-styles instead: load the page once, swap the `<link>` for the second sheet, snapshot
+**CSS** — not with screenshots. Live counters (uptime, DHCP leases, wifi signal) move more pixels
+between two runs of the *same* stylesheet than a real regression does. Diff computed styles instead: load the page once, swap the `<link>` for the second sheet, snapshot
 `getComputedStyle` over every element. Method and traps: [css.md](css.md).
 
 **Behaviour** — on a router: `tools/e2e.mjs` for the package's life and every menu page (next
@@ -172,69 +170,6 @@ section), and by hand on a synced stand for what it does not judge — a layout,
 No npm package is installed on a router, but the release build (`tools/stage.sh`) runs uglify-js and
 acorn from `package.json` over the shipped JS and templates. The OpenWrt buildbot has no node, so
 the Makefile path uses none of it.
-
-### What earlier measurements established
-
-These were found by measuring the gallery (`docs/gallery.html`) and live pages, and each explains a
-rule in the code that would otherwise look arbitrary.
-
-- **A module's exports are a contract between files.** `fs-appearance.js` once called
-  `axes.currentContentWidth()` while `fs-axes.js` exported no such name: `build()` threw inside the
-  one try/catch `mount()` wraps it in, and the "Footstrap" section vanished from System with no
-  other symptom. Each colour axis writes `--fs-<x>-h` before `data-<x>` (`fs-axes.js`); inverting
-  the two writes is a visible fault.
-- **The source tree is not what a router runs.** A package carries the uglify-js-minified,
-  token-mangled `fs-*.js` and `header.ut`, and the mangled sheet names the axis properties by the
-  map (`--fs-tint-h` is `--aJ` there).
-  Router bytes are the mangled sheet, 116,613 B against the readable 134,892 B (0.14.16).
-- **A fault can need the phone width.** The switch-knob overhang measured nothing at
-  1280 and a `width` of 26.80px against 40px declared at 390: the knob (`::after`,
-  `position: absolute`) stays anchored to the pill's declared width while the pill shrinks under a
-  longer caption. Held by `flex-shrink: 0` on `.cbi-checkbox > label[for]`
-  (`styles/theme/60-inputs.css`); Density=Large is the axis that exposed it on a 360px screen.
-- **Physical offsets break RTL.** `margin-inline-start`, not `margin-left`, in
-  `theme/65-dropdown.css`; the pre-8430a64 `.cbi-dropdown > ul > li[selected]` over-reached under
-  `forced-colors: active`. The `:focus-visible` repair needs its `!important` there: without it 4 of
-  186 focusables (`h3`, `button.fs-ap-fold`) showed no `Highlight` outline.
-- **Russian text runs 1.3-1.6x English**, and the faults it exposed were length faults. The
-  Port-status tile's stat line and the upload strip's Create/Cancel row were both `white-space:
-  nowrap` inherited from a text-only ellipsis rule (`styles/base/95-luci.css`) with no text to
-  ellipsis — a nested flex row, not a sentence; the checkbox caption's one unbreakable word needed
-  `overflow-wrap: anywhere`. A WireGuard public key inside an inline `<code>` had no `overflow-wrap`
-  and a firewall rule-jump tooltip's `white-space: pre` refused to wrap at all
-  (`base/20-typography.css`, `base/90-widgets.css`).
-- **Truncation that is on purpose:** the closed `.cbi-dropdown > ul > li` ellipsis
-  (`styles/theme/65-dropdown.css`; a flex item's automatic minimum stops `overflow: hidden` eliding a
-  value past the 400px cap). No `title`/`aria-label` is added: a `title` is not announced on touch
-  and a shortened `aria-label` breaks WCAG 2.5.3. The file browser's breadcrumb and filename column
-  (`styles/base/95-luci.css`) ellipsise instead of wrapping, and `.cbi-tabmenu > li { max-width:
-  100% }` shrinks a long tab label to an ellipsis. `.zonebadge .cbi-tooltip`'s
-  `margin: -1.6em 0 0 -5px` (`styles/base/90-widgets.css`) is an overlap trick, not reserved room.
-  The gallery's `#g-longlabel` is a deliberately unbreakable 38-character run built for
-  `styles/base/30-forms.css`'s `min-width: 0` floor; no CSS fits it in 320px.
-- **The section-table card asks at 992, not 960**. `.cbi-section-table` cards at
-  `@container fs-content (max-width: 960px)`, the same machinery a config table with inline widgets
-  uses, rather than a scroll fallback that would clip an open `.cbi-dropdown`/`.cbi-dynlist` list.
-  `fs-content` binds to `.cbi-map`, one level above the `.cbi-section` that spends `--fs-card-pad`
-  (16px a side) before the table sees the width: firewall zones' `.cbi-map` sat at 968px while the
-  section handed the table 936px for a 1017px Russian header. 992 (960 + 32) corrects that fixed
-  offset in the query's own frame, for any column count, language or viewport. A `.cbi-map`-pinned
-  specimen with those numbers is in `docs/gallery.html`.
-- **Limits that belong to the apps**, each checked against the markup: ssclash's "Additional
-  Settings" panel renders an inline `grid-template-columns: repeat(auto-fit, minmax(320px, 1fr))`,
-  a 320px floor that cannot fit a 320px column once the section's padding is subtracted, in any
-  language; filemanager sets an inline `width: 400px`; the dashboard widget's classes (`radio-info`,
-  `wifi-info`, …) appear nowhere in `styles/`; ACE renders its own virtualised layers; an RRD graph
-  on `/admin/statistics/graphs` is a bare `img` at its native width, which a phone cannot see whole
-  (usability debt, not a regression). `input.cbi-section-create-name` and LuCI's `form.TextValue`
-  textareas carry no accessible name because the `.cbi-value-title` label has no `for=` — markup in
-  luci-base or the app, outside this package's fence. `.cbi-dropdown[empty] > ul { max-width: 1px }`
-  (`theme/65-dropdown.css`) collapses an unselected multiselect's placeholder list on purpose.
-- **A client-navigation race needs time a stand does not give.** The router's own staging window is
-  ~210 ms on a stand against 1.2 s on real hardware, and a Back that commits while the incoming page
-  is still being built clamps the UA's restore to 0; the fs-fit.js correction that moved the reader
-  landed 419 ms after the commit. Holding the incoming module fetch or ubus calls open (a Playwright
-  route) is what makes such a race reproducible on a stand.
 
 ## Proving it on a router: `tools/e2e.mjs`
 
@@ -339,26 +274,18 @@ server rooted at `--base` to look at what was built.
 
 The site opens on a login page (`BASE/cgi-bin/luci/`, prefilled `root`/empty like a real router)
 that accepts any credentials — a static site has no server left to check them against — and
-`.fs-logout` returns to it; `build.mjs` refuses an old `--recording` made before `capture.mjs`
-saved the login form, naming the fix (re-capture) rather than shipping a playground with no login
-page.
-
-Capture timing, measured: the dashboard `login()` lands on lazy-loads `view/dashboard/include/10_router.js`
-(owlab.yaml) while the loop's first `goto` fires, so that response's body is already discarded; the
-`luci-mod-status` includes (10_system.js, 60_wifi.js) arrive ~0.5-0.6 s after `load` locally and
-later on a fresh CI container, and a fixed 300 ms settle dropped 8 of 9 overlay keys; one body read
-hung ~148 s on owrt2512b, past capture's 5-minute kill, hence the 15 s bound in `drainReads`.
+`.fs-logout` returns to it; `build.mjs` refuses a `--recording` that has no saved login form and
+asks for a re-capture.
 
 Two harness facts hold behind `tools/lib/stands.mjs`, which `capture` reads the stand through:
 
 - **`sealToRouter()` aborts every request that leaves the router's origin** (data:/blob: pass), so a
-  run stops depending on github.com and its rate limit: ssclash asks GitHub for a release on two
-  pages and a CI runner got 403. The route is a predicate and never a catch-all glob: a glob hands
-  every request, hundreds the router serves itself, to a JS callback, and pushed a CI job past its time
-  limit. It aborts rather than faking a 200, which the page would render.
+  run stops depending on github.com and its rate limit (ssclash asks GitHub for a release on two
+  pages). The route is a predicate and never a catch-all glob: a glob hands every request, hundreds
+  the router serves itself, to a JS callback, and slows a run past CI's time limit. It aborts rather than faking a 200, which the page would render.
 - **`menuPaths()` waits for `window.L.require` before asking for `ui`:** `L.ui` exists only once
-  something has required ui.js, and the 24.10 leg crashed with "Cannot read properties of undefined
-  (reading 'menu')" straight after the login redirect while 25.12 was fine. The tree arrives rooted
+  something has required ui.js, which on 24.10 is not yet the case straight after the login
+  redirect. The tree arrives rooted
   at `admin`, so the walk starts with an empty path (seeding `admin` yields `/admin/admin/...`, a
   sweep of 404s that reads as a clean run).
 
@@ -369,7 +296,7 @@ Each of these once read as a regression in the theme.
 - **A stand after `owlab up` carries no theme until `owlab sync`.** `up` starts the containers
   and leaves `luci.main.mediaurlbase` at `/luci-static/bootstrap`; `--rebuild` is a factory reset.
   Every page then logs `NetworkError: HTTP error 404 while loading class file
-  "/luci-static/resources/fs-prefs.js"`, or a probe silently measures stock bootstrap. Tell it
+  "/luci-static/resources/fs-prefs.js"`, or a measurement silently reads stock bootstrap. Tell it
   apart: `owlab exec <stand> -- uci get luci.main.mediaurlbase`. Run `owlab sync` before measuring
   the working tree — and not before `tools/e2e.mjs`, which wants the router without the theme.
 
@@ -493,9 +420,8 @@ Each of these once read as a regression in the theme.
   tell it apart.
 
 - **"It is the app's markup" is a claim; switching the stand to bootstrap checks it.** Re-measure
-  the same page at the same width under `/luci-static/bootstrap`. Three overflows on
-  `ssclash/config` at 320px looked like the app's split button; under bootstrap the page overflowed
-  by nothing, because this theme's buttons are wider. This is also why `tools/e2e.mjs` judges every
+  the same page at the same width under `/luci-static/bootstrap`: an overflow that looks like the
+  app's markup can come from this theme's own wider buttons. This is also why `tools/e2e.mjs` judges every
   page against bootstrap on the same router.
 
 - **When `tools/e2e.mjs` goes red, build the parent commit.** Package it, install it the same way,

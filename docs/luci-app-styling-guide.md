@@ -122,7 +122,7 @@ hardcoded colour with extra steps.
 - **`--warn-color-medium` is CORRECT.** podkop's `var(--warn-color-medium, orange)` (7 uses) resolves
   on footstrap and paints the themed amber. Do not "fix" it to `--warning-color-medium` — that
   name is defined by nothing, and the rename would silently drop every one of those 7 declarations
-  into the `orange` fallback. (An earlier version of this guide said the opposite. It was wrong.)
+  into the `orange` fallback.
 - **`--text-color` (justclash, 6 uses) really does not exist.** It is `--text-color-high`.
 
 ### 3.2. `--fs-*` is footstrap's PRIVATE tier — do not read it
@@ -132,14 +132,12 @@ export tier: `--fs-accent`, `--fs-panel2`, `--fs-radius`, `--fs-dim`, the whole 
 are not yours.** They are internal, they are renamed and re-derived whenever the theme wants to, and
 no other LuCI theme has them at all. Only the `--*-color-*` names above are a contract.
 
-The two-tier split is not tidiness — it is the fix for a measured bug, and it is the same bug §2
-warns you about from the other side. `:root` is a **shared global scope**, and an app's stylesheet is
-**unlayered**, so it outranks every cascade layer the theme has. One app writing
-`:root { --accent: … }` — or `--text-color-high`, which is a LuCI *convention* and therefore the
-likelier name for an app to declare — used to repaint the theme itself: **312 of 336 elements
-changed colour** under a single hostile `:root` block. So footstrap now reads *only* its private
-`--fs-*` names internally and derives the export names *from* them. Same measurement after the split:
-**0 elements**. (`styles/02-tokens.css`.)
+The two-tier split is the same bug §2 warns you about, seen from the other side. `:root` is a
+**shared global scope**, and an app's stylesheet is **unlayered**, so it outranks every cascade layer
+the theme has. One app writing `:root { --accent: … }` — or `--text-color-high`, which is a LuCI
+*convention* and therefore the likelier name for an app to declare — would repaint the theme itself.
+So footstrap reads *only* its private `--fs-*` names internally and derives the export names *from*
+them. (`styles/02-tokens.css`.)
 
 The practical consequence for you is the good half: **because the theme cannot be repainted by your
 `:root` any more, you can override anything the theme draws inside your own subtree — and you never
@@ -155,8 +153,7 @@ footstrap measured all of this across the full matrix of
   three `--background-color-*` surfaces. So you may paint any of them as a `color:` and not check.
 - **The matching `--on-*-color` clears AA *on top of* its colour used as a fill.** So: **to put text
   on a coloured fill, take the ink from `--on-*-color`. Do not invent one.** A hardcoded `#fff` on a
-  filled badge is the classic failure — it fell to **1.69:1** on seven of the eight dark-palette fills
-  before footstrap made the inks per-palette and per-mode.
+  filled badge is the classic failure: the inks differ per palette and per mode.
 - **`high` / `medium` / `low` are three genuinely different colours**, not three aliases. If you paint
   "no data" in `--primary-color-low`, it *will* read quieter than a live value. (Two caveats worth
   knowing: `--background-color-*` runs the other way, `high` = raised; and `-low` is genuinely the
