@@ -22,7 +22,7 @@
  *
  * Exit 0 when every step passed, 1 otherwise; the report and one screenshot per page and width
  * land in --out (default ../tmp/e2e-<router>). */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -56,12 +56,20 @@ const sh = (script) => execFileSync('docker', [ 'exec', CONTAINER, 'sh', '-c', s
 const uci = (key) => sh(`uci -q get ${key} || true`);
 const theme = () => uci('luci.main.mediaurlbase');
 
+/* The package manager runs from an argument vector, never a shell line: the package path comes from
+ * the command line. Output is stdout and stderr together, the way an admin reads it. */
+function pm(...args) {
+	const r = spawnSync('docker', [ 'exec', CONTAINER, ...args ], { encoding: 'utf8' });
+	const out = `${r.stdout || ''}${r.stderr || ''}`.trim();
+	if (r.status !== 0) throw Object.assign(new Error(`${args.join(' ')} exited ${r.status}`), { stderr: out });
+	return out;
+}
 function install(file) {
 	const dst = `/tmp/${basename(file)}`;
 	execFileSync('docker', [ 'cp', file, `${CONTAINER}:${dst}` ]);
-	return sh(APK ? `apk add --allow-untrusted ${dst} 2>&1` : `opkg install ${dst} 2>&1`);
+	return APK ? pm('apk', 'add', '--allow-untrusted', dst) : pm('opkg', 'install', dst);
 }
-const remove = () => sh(APK ? 'apk del luci-theme-footstrap 2>&1' : 'opkg remove luci-theme-footstrap 2>&1');
+const remove = () => APK ? pm('apk', 'del', 'luci-theme-footstrap') : pm('opkg', 'remove', 'luci-theme-footstrap');
 const installedVersion = () => sh(APK
 	? "apk list --installed luci-theme-footstrap 2>/dev/null | sed -n 's/^luci-theme-footstrap-\\([^ ]*\\) .*/\\1/p'"
 	: "opkg status luci-theme-footstrap | sed -n 's/^Version: //p'");
