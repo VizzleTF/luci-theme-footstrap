@@ -492,14 +492,8 @@ Two harness facts hold behind `tools/lib/stands.mjs`, which `capture` reads the 
   37 s after the first reported 12 findings — `the reader drifted 46/88/138px across real poll ticks`
   at every density and both layouts, on two stands — where either alone read none. A finding that
   appears on many cells at once, evenly across an axis, is this and not the theme.
-  `requireStands()` (`tools/lib/stands.mjs`, which `tools/playground/capture.mjs` uses) takes `flock`
-  on `../tmp/stands-<id>.lock`, one per stand in sorted order, and holds it for the whole run; a
-  second run on the same set waits, and says who holds it. `../tmp` there is the main checkout's from
-  every linked worktree too (`tools/lib/tmp-root.mjs`, the git common dir). The holder is a
-  child `flock` kept alive by its stdin pipe, so the kernel frees the lock on any exit, SIGKILL
-  included, and the wait is bounded (30 min, `STANDS_LOCK_TIMEOUT_MS`). The lock is advisory:
-  `owlab sync`, `owlab up`, `owlab test` and `tools/e2e.mjs` do not take it, so no `owlab sync` while
-  another run measures a stand.
+  Nothing locks a stand: run one `tools/e2e.mjs` or playground capture per router at a time, and no
+  `owlab sync` while a run is reading it.
 
 - **`owlab: command not found`, or `spawnSync owlab ENOENT` from `tools/e2e.mjs`, while every stand
   is up means the shell cannot find `owlab`, not that the stands are down.** `owlab` is a Go binary

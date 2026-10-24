@@ -3,9 +3,7 @@
  * The routers are owlab's — `owlab status -json` names each one and the port it answers on, so
  * nothing here hard-codes a port or a container name. Nothing here boots anything either: a tool
  * that starts and stops containers by itself is a tool nobody runs locally. */
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { closeSync, mkdirSync, openSync, readFileSync, unlinkSync } from 'node:fs';
-import { tmpRoot } from './tmp-root.mjs';
+import { execFileSync } from 'node:child_process';
 
 /* `owlab status -json`'s routers, or an empty array on any failure (owlab absent, bad JSON). */
 function owlabRouters() {
@@ -73,8 +71,10 @@ export class StandDown extends Error {}
  * reported "L is not defined" as a defect of the theme. */
 function loginFault(status, html) {
 	if (status < 500 && /luci_password|luci\.js|new LuCI\(/.test(html)) return null;
-	const line = html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '').replace(/<[^>]*>/g, '\n')
+	let line = html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '').replace(/<[^>]*>/g, '\n')
 		.split('\n').map((l) => l.trim()).find(Boolean) || 'empty body';
+	/* a console line, never HTML: whatever the tag strip above left, no angle bracket survives */
+	line = line.replace(/[<>]/g, '');
 	return `LuCI answered ${status} (${line.slice(0, 120)}) — the stand, not the theme`;
 }
 
@@ -148,69 +148,6 @@ export async function menuPaths(page) {
 	});
 }
 
-/* Two runs on one stand invent findings: a second sweep 37 s behind the first read 12 "the reader
- * drifted" cells a lone run never shows. Use of a stand is therefore an flock on
- * ../tmp/stands-<id>.lock, one per stand in sorted order, held until this process dies (a child
- * `flock` kept alive by its stdin pipe, so SIGKILL frees it). `flock` is probed synchronously
- * first, and the wait is bounded, 30 min by default (`STANDS_LOCK_TIMEOUT_MS`).
- * docs/development.md, "The stand's own traps". */
-const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-
-const lockDir = tmpRoot() + '/';
-
-/* Take one stand's lock and hold it until this process dies; the wait is bounded (see above). The
- * child writes `ok` once it holds the flock, or `busy` when `flock -w` gave up. */
-function take(id, name) {
-	const file = `${lockDir}stands-${id}.lock`;
-	const limit = Number(process.env.STANDS_LOCK_TIMEOUT_MS) || 30 * 60 * 1000;
-	const ack = `${file}.${process.pid}.ack`;
-	const fd = openSync(ack, 'w');
-	const child = spawn('sh', [ '-c', `flock -w ${Math.ceil(limit / 1000)} ` + '-x "$2" sh -c \'echo "$1" >"$2"; echo ok; cat >/dev/null\' sh "$1" "$2" || echo busy',
-		'sh', `${name} pid ${process.pid}`, file ], { stdio: [ 'pipe', fd, 'inherit' ] });
-	child.unref();
-	child.stdin.unref();
-	closeSync(fd);
-	const t0 = Date.now();
-	let said = false;
-	for (;;) {
-		const got = readFileSync(ack, 'utf8');
-		if (got.includes('ok') || got.includes('busy')) break;
-		let by = '';
-		if (Date.now() - t0 > 500) {
-			try { by = readFileSync(file, 'utf8').trim(); } catch { /* lock file not written yet */ }
-		}
-		if (!said && Date.now() - t0 > 500) {
-			console.error(`${name}: stand ${id} is in use (${by || 'holder unknown'}); waiting for ${file}`);
-			said = true;
-		}
-		sleep(100);
-	}
-	const held = readFileSync(ack, 'utf8').includes('ok');
-	unlinkSync(ack);
-	/* flock -w gives up by itself, so no waiting flock outlives this process to write a dead pid. */
-	if (!held && Date.now() - t0 >= limit - 1000) {
-		let by = '';
-		try { by = readFileSync(file, 'utf8').trim(); } catch { /* lock file not written yet */ }
-		console.error(`${name}: stand ${id} still held by ${by || 'an unknown holder'} after ${Math.round(limit / 1000)} s; gave up on ${file}`);
-		process.exit(2);
-	}
-	return held;
-}
-
-function lockStands(ids, name) {
-	mkdirSync(lockDir, { recursive: true });
-	if (spawnSync('flock', [ '--version' ], { stdio: 'ignore' }).error) {
-		console.error(`${name}: cannot run flock; util-linux is required`);
-		process.exit(2);
-	}
-	for (const id of [ ...ids ].sort()) {
-		/* `take` exits on a timeout, so a false here is flock itself failing. */
-		if (take(id, name)) continue;
-		console.error(`${name}: could not take the lock for stand ${id} (flock failed on ${lockDir}); not running unlocked`);
-		process.exit(2);
-	}
-}
-
 /* No stand, no verdict — and a run that quietly reports success on zero routers is worse than one
  * that fails, because it looks the same as a clean run in a log. */
 export function requireStands(list, name) {
@@ -219,6 +156,5 @@ export function requireStands(list, name) {
 		console.error('Start one with `owlab up` (see docs/development.md) and run this again.');
 		process.exit(2);
 	}
-	lockStands(list.map((s) => s.id), name);
 	return list;
 }
