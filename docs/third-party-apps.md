@@ -184,16 +184,15 @@ Unowned copies still collapse.
 ### Rule 4. Dark mode is announced in three dialects
 
 `data-darkmode` (read only by the theme itself) plus `data-theme` and `data-bs-theme` for outbound
-compatibility. `styles/` may never read the latter two — the same boundary as the export tier.
-`tools/axes.mjs` holds it: the pre-paint in `head.ut` and the live `stampDark()` must stamp the same
-set.
+compatibility. `styles/` may never read the latter two — the same boundary as the export tier. The
+pre-paint in `head.ut` and the live `stampDark()` must stamp the same set.
 
 ### Rule 5. `body` must have an OPAQUE background of the right brightness
 
 This is what every brightness sniffer reads. A transparent `body` (background moved to `:root` or a
 pseudo-element) makes OpenClash decide "light" — its `/rgb\(/` regex does not even match
-`rgba(0,0,0,0)` — and repaint our dark page in its light palette. `tools/export-tier.mjs` holds it
-across the whole palette × mode × tint matrix.
+`rgba(0,0,0,0)` — and repaint our dark page in its light palette. It has to hold across the whole
+palette × mode × tint matrix.
 
 ### Rule 6. The export tier is a contract, and it has to be a ramp
 
@@ -217,10 +216,9 @@ apps — which is exactly why it is separated. See [design-system.md](design-sys
 ### Rule 7. The chrome is fenced off, in three places that must agree
 
 An app's unlayered `!important` outranks every cascade layer, so the chrome cannot be defended by
-the cascade. It is defended by not matching, in three places — and `npm run chrome-fence` is
-what keeps them agreeing. Proven rather than assumed: breaking the fence constant to
-`.fs-sidebarTYPO` left the menu completely unprotected while `npm run check`, `jsmin-verify` and
-eslint **all exited 0**.
+the cascade. It is defended by not matching, in three places, and the three must agree. Proven
+rather than assumed: breaking the fence constant to `.fs-sidebarTYPO` left the menu completely
+unprotected while every lint and build step **exited 0**.
 
 1. **`header.ut` — the markup.** A chrome root marks itself with `data-fs-chrome`. The `<nav>`
    is one; so are the skip link, the two sr-only elements and the command palette, none of which sits
@@ -235,15 +233,14 @@ eslint **all exited 0**.
    letter-spacing/text-transform 156, cursor 46 — 0 with the pin, because it restates exactly the
    inherited properties the chrome does not already declare itself.
 
-The gate **derives the mark from the markup** and never restates it: rename it in `header.ut` and
-the gate re-derives it, then fails on the two copies still saying the old name. The failure it
-prevents has no symptom — the fence silently stops fencing, every test stays green, and the menu
-breaks on someone else's router months later.
+The mark lives in `header.ut`; rename it there and the two copies still saying the old name are
+wrong. That failure has no symptom — the fence silently stops fencing, nothing on screen changes,
+and the menu breaks on someone else's router months later.
 
-The fence and the pin are each **one canonical string** and are compared whole rather than tested
-for tokens. That is not pedantry: the token version's four independent `includes()` checks all
-passed on `:where(:not(.fs-sidebar), .fs-sidebar *)` — a plausible botched edit that is the exact
-**inverse** of a fence, targeting the chrome instead of sparing it.
+The fence and the pin are each **one canonical string**, to be read whole rather than for tokens.
+That is not pedantry: four independent `includes()` checks for the right tokens all passed on
+`:where(:not(.fs-sidebar), .fs-sidebar *)` — a plausible botched edit that is the exact **inverse**
+of a fence, targeting the chrome instead of sparing it.
 
 The shapes both strings encode, each a measured bug:
 
@@ -307,7 +304,7 @@ Three things that fell out of it and are worth knowing:
   every button LuCI's poll disables). Firefox keeps one shim per href on a re-added link, measured
   1/1 against Chromium.
 
-The same gate holds the dark-mode guard to `stampDark`: that guard exists because third parties
+The dark-mode guard must match `stampDark` the same way: that guard exists because third parties
 write the attributes this theme publishes (`luci-app-openclash` does it in seven templates). Add a
 fourth dialect to `stampDark` and forget the observer's `attributeFilter`, and that dialect is
 unguarded — silently.
@@ -402,10 +399,6 @@ open list against the nearest scroll parent — which would be the table. If you
 control.
 
 ## How to check
-
-```sh
-npm run check      # includes axes (rule 4) and export-tier (rules 5, 6)
-```
 
 On a live router, the scenario that would catch everything above:
 

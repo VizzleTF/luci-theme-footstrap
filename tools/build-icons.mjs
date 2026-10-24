@@ -11,8 +11,8 @@
  *
  *   node tools/build-icons.mjs [--check]
  *
- * `--check` is the GATE half (npm run icons): it re-renders and compares against the committed
- * PNGs, so a logo edit cannot ship with stale icons. It needs nothing but the browser — only
+ * `--check` re-renders and compares against the committed PNGs, which tells whether a logo edit
+ * left the icons stale. It needs nothing but the browser — only
  * regeneration needs ImageMagick and oxipng. */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -43,8 +43,8 @@ function quantiser() {
 	process.exit(1);
 }
 
-/* Mandatory, not "if present": the icons gate compares pixels, so a machine without oxipng would
- * commit ImageMagick's 1,613 B for the 1,341 B file and nothing would turn red. */
+/* Mandatory, not "if present": `--check` compares pixels, so a machine without oxipng would
+ * commit ImageMagick's 1,613 B for the 1,341 B file and `--check` would still pass. */
 function optimiser() {
 	try { execFileSync('oxipng', [ '--version' ], { stdio: 'ignore' }); return 'oxipng'; }
 	catch (e) { /* missing */ }
@@ -84,7 +84,7 @@ function deriveIcons() {
 		return { name, size: Number(m[1]) };
 	});
 	if (!list.length) {
-		console.error('build-icons: manifest.json\'s icons[] is empty — nothing for this gate to check');
+		console.error('build-icons: manifest.json\'s icons[] is empty — nothing to check');
 		process.exit(1);
 	}
 
@@ -93,7 +93,7 @@ function deriveIcons() {
 	const tag = headUt.match(/<link\b[^>]*rel="apple-touch-icon"[^>]*>/);
 	const href = tag && tag[0].match(/href="\{\{ media \}\}\/([^"]+)"/);
 	if (!href) {
-		console.error(`build-icons: ${headUtPath} carries no apple-touch-icon link this gate can read`);
+		console.error(`build-icons: ${headUtPath} carries no apple-touch-icon link to read`);
 		process.exit(1);
 	}
 	if (!list.some((i) => i.name === href[1])) {
@@ -117,7 +117,7 @@ const page = (size) => `<!doctype html><meta charset="utf-8"><style>
 
 /* `CHANNEL` is the per-channel drift on 0-255 (antialiasing moves an edge a shade or two);
  * `SHARE` is the canvas fraction allowed to drift that far. Not a byte compare: a Chromium bump
- * would turn the gate red on a commit that never touched logo.svg. */
+ * would fail `--check` on a commit that never touched logo.svg. */
 const CHANNEL = 12;
 const SHARE = 0.02;
 /* the safe zone `purpose: maskable` guarantees; outside it a platform may crop anything away */
@@ -216,7 +216,7 @@ for (const icon of ICONS) {
 	let r;
 	try { r = await inspect(tab, uri(readFileSync(target)), uri(png), BG); }
 	catch (e) {
-		/* an unreadable or undecodable committed file is a finding, not a stack trace: the gate has
+		/* an unreadable or undecodable committed file is a finding, not a stack trace: the run has
 		 * to say WHICH icon is broken, and keep judging the others */
 		say('could not be decoded — ' + (e && e.message ? e.message.split('\n')[0] : e));
 		continue;

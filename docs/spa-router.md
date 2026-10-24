@@ -271,7 +271,7 @@ and moving it would change when THEY react with no benefit to the CSS question t
 **A second file carried the identical bug, unnoticed longer because nothing sampled the width it
 lives at.** `styles/theme/90-responsive.css` scopes ~11 package-manager rules — the phone-width
 control stacking, inside `@media (max-width: 767px)` — through the same `body[data-page="admin-
-system-package-manager"]` selector `styles/pages/*.css` used before this fix. Every gate run against
+system-package-manager"]` selector `styles/pages/*.css` used before this fix. Every measurement of
 the fix above sampled at the 1440px desktop context, where that media query never matches, so the
 same mechanism survived the whole task unmeasured: leaving the page, mid-flight `body`'s value is
 already the incoming route's while the outgoing content is still on screen, so the rule stops
@@ -286,17 +286,13 @@ jump. Measured with the incoming module's fetch held open 1.2 s
 there through the swap; moved into the same synchronous turn as `commitStage()`, it stays at the
 reader's own offset for the whole window and reaches 0 in the same frame the new page's content
 does. `fit.forgetRest()` stays at the click — it only invalidates a stale anchoring reference, which
-must happen as soon as the reader is committed to leaving, not at the swap. `docs/anchoring.md`,
-"The scroll reset", has the fuller reasoning and the numbers.
+must happen as soon as the reader is committed to leaving, not at the swap.
 
-`tools/spa-parity.mjs`'s `stagingWindowCheck()` is what proves this holds: it samples the outgoing
-page's document height and one of its page-scoped rules mid-flight, between the click and
-`commitStage()`, with the same held-open fetch `navflash-slow.mjs` uses — sampling only after
-arrival, which is what every other check in that gate does, is exactly how this went unmeasured. It
-now runs twice: once in the 1440px context every other check in this gate uses, and once in its own
-context at the width read out of `90-responsive.css`'s own `@media (max-width: …)` rule (767px, not
-hard-coded, so an edit to the breakpoint cannot make the pass silently stop testing anything) — the
-pass that caught the narrow-viewport rules above. On `owrt2512`, before the re-scope: `#view
+What showed it was sampling the outgoing page's document height and one of its page-scoped rules
+mid-flight, between the click and `commitStage()`, with the same held-open fetch
+`navflash-slow.mjs` uses — sampling only after arrival is exactly how this went unmeasured — and
+doing so at 767px, the width of `90-responsive.css`'s own `@media (max-width: …)` rule, as well as
+at 1440px. On `owrt2512`, before the re-scope: `#view
 .controls > div:not(.pager)` read `flex` mid-flight where the stacked layout wants `block`, document
 height moving 22340 → 22172px; after, 0px movement and the rule holding `block`.
 
@@ -422,9 +418,7 @@ Before rendering the new view:
   page's own `require()`/render() is real async work, always later than a microtask queued during the
   synchronous `stop()` call that preceded it. It still declines on a non-empty queue, which is what a
   manual pause (the pill's own click handler) or a `Poll.remove()` down to one remaining poller both
-  leave behind. `tests/poll-status.test.mjs` drives both callers — a navigation's queue flush and a
-  bare `Poll.remove()` to empty — in both listener orders, plus a direct check that the hide does not
-  fire inside the synchronous dispatch at all.
+  leave behind.
 - **uci's config cache is dropped** (`flushUciCache()`). `uci.load()` does not answer "is this
   config present?" — it answers "which of these packages did THIS call fetch", skipping every
   package already in `state.values`. Four shipped views read the return value as an existence check
@@ -791,7 +785,7 @@ LEFT has no more business surviving a Back than it does a click: the reader is c
 that page exactly the same way in both cases, and fs-fit's own mutation observer runs on whatever
 commitStage() swaps in either way. Now called unconditionally.
 
-**Both fixes above were necessary and neither was sufficient: `spa-parity`'s live `back-scroll` case
+**Both fixes above were necessary and neither was sufficient: a live Back-navigation scroll check
 still dropped the reader to 0 on a real router** (`/admin/status/overview` <- package-manager, Back —
 owrt2512b, owrt2410b, owrtsnapb, both the 1440px and the narrow context) after they shipped, which is
 what this paragraph fixes. The mechanism is a THIRD, same-axis false alarm that a synthetic page never
@@ -822,7 +816,7 @@ session added (`../tmp/task-back2/`). The cross-axis fix's own repro (`../tmp/ta
 still samples `[0,0,3000,3000,…]` unchanged.
 
 **The restore can be correct and the reader still end up 431px short — that one is fs-fit's, not the
-router's, and it is open.** `spa-parity`'s `back-scroll` case reported `owrt2410`
+router's, and it is open.** A Back-navigation scroll check reported `owrt2410`
 `/admin/status/overview` <- package-manager, Back: parked 2680, restored 2249 (CI run 34565660484);
 locally on `owrt2410b` it reproduces at roughly 1 run in 15 with the same 431px, and deterministically
 3 of 3 with the incoming view's own RPCs held open 700ms across the traversal — the staging window a
@@ -896,9 +890,7 @@ distros): a live sid answers `[0, {access:true}]`, a DEAD one answers `[0, {acce
 200, no error frame — and the `-32002` that made luci-base fire the probe landed on the ordinary
 call before it. So "the reply parsed" is not "the session is there": reading it that way would clear
 the verdict with the very probe that confirms it. `access: false` therefore moves the verdict in
-neither direction, for the same reason it may not expire a session: an ACL denial looks identical. `tools/upstream-contract.mjs` carries the
-`expiry-signals` probe for the day upstream renames any of it; `tests/session-expiry.test.mjs` holds
-both directions.
+neither direction, for the same reason it may not expire a session: an ACL denial looks identical.
 
 ## Boundaries and degradation
 
@@ -911,13 +903,9 @@ both directions.
   logs *which* and returns. The page is then the server-dispatched MPA the theme was before the
   router existed: every link a full load, nothing else lost.
 
-  Not a duplicate of [`tools/upstream-contract.mjs`](../tools/upstream-contract.mjs), which asks
-  whether those surfaces still BEHAVE as assumed — the deeper question, and the one that caught the
-  `network.js` coupling. But that gate only ever runs here, against the two userlands this repo owns.
   A fork, a backport or a distribution that trims `luci.js` is a luci-base nobody in this repo can
   run, and there the first symptom used to be a click that opened nothing: the interception ran, the
-  swap threw halfway, and the reader was left on a page the theme had half torn down. Existence at
-  boot, semantics in the live gate.
+  swap threw halfway, and the reader was left on a page the theme had half torn down.
 
   The check is existence-only on purpose. A probe that called these to see what they answer would
   have to run them for effect — there is no dry `instantiateView` — and a boot check that navigates
@@ -925,10 +913,9 @@ both directions.
   are optional at their own call sites (a document that never loaded `network.js` has nothing to
   refill) and are guarded there.
 
-  The OFF branch cannot be seen on a stand, since both stands ship every name, so it is pinned by
-  [`tests/router-contract.test.mjs`](../tests/router-contract.test.mjs) instead: a hand-broken `L`
-  must name exactly the surface that is gone, a probe that throws counts as a break, and a broken
-  contract must leave the document with no click interception on it at all.
+  The OFF branch cannot be seen on a stand, since both stands ship every name. Its contract: a
+  hand-broken `L` must name exactly the surface that is gone, a lookup that throws counts as a break,
+  and a broken contract must leave the document with no click interception on it at all.
 - Layout is irrelevant to the router: there is one renderer, and sidebar/top is a client attribute
   the CSS morphs.
 - **A document the router could not have rendered is not one it navigates away from.** `wireRouter()`

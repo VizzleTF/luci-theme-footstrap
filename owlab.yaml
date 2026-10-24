@@ -94,7 +94,7 @@ defaults:
     - +openssh-sftp-server
 
     # The Russian catalogues, one per app above, pinned here after the first RU sweep found three
-    # overflow faults English never showed: RU strings run longer, and this theme's gates rendered
+    # overflow faults English never showed: RU strings run longer, and this theme was measured in
     # English only until 2026-09-06, so a caption that clips at a Cyrillic length went unmeasured.
     # The sweep installed these by hand; without a pin here the next `owlab up` would wipe them and
     # the next sweep would start over. One entry per luci-app-* above that ships a translation —
@@ -170,8 +170,8 @@ routers:
     ports: { http: 8024, ssh: 2224 }
     extra_packages: *third_party_apps
 
-  # ImmortalWrt (imm2512/imm2410) is not a default-boot stand: not a gate target
-  # (tools/lib/stands.mjs), and no behaviour claim needs it (see the "second instances" comment below).
+  # ImmortalWrt (imm2512/imm2410) is not a default-boot stand: tools/lib/stands.mjs ignores it,
+  # and no behaviour claim needs it (see the "second instances" comment below).
   # docs/development.md, "ImmortalWrt stands (on demand)" carries the two blocks verbatim and the
   # command to bring them up when a question is actually about the brand.
 
@@ -182,13 +182,13 @@ routers:
   #
   # No `extra_packages` here, on purpose: see the comment on owrt2512's `&third_party_apps` for the
   # kmod-tun / kmods-index mismatch that makes openclash and ssclash permanently unresolvable on
-  # this box. The theme still installs and every other gate this leg runs still runs.
+  # this box. The theme still installs.
   #
   # THE ORDINARY `packages:` LIST ABOVE CAN ALSO INSTALL SHORT HERE, and unlike the kmod-tun case
   # this is not permanent and carries no fix to pin against: `feeds/luci` and `feeds/packages` are
   # two git repos built into the snapshot index independently, and a `luci-app-*`/binary pair can
   # briefly disagree while one side has moved and the other has not yet mirrored. Task 0177 caught
-  # this from a scroll-anchor finding (owrtsnap @1440 side compact, Overview showing 12
+  # this from a layout finding (owrtsnap @1440 side compact, Overview showing 12
   # `.cbi-section` against owrt2512's 13) and named `luci-app-https-dns-proxy` as the absentee. By
   # task 0178 that package installed clean on every stand and the absentee was `luci-app-mwan3`
   # instead — no `90_mwan3.js`, and `/var/log/apk.log` on the same boot showed `ERROR: unable to
@@ -204,8 +204,8 @@ routers:
     release: "snapshot"
     # ssh 2228, NOT 2222: 2222 is the port a developer machine's own sshd usually listens on, and
     # docker refuses the bind with "address already in use" — which is why this stand had never come
-    # up, and why every gate that claimed the snapshot line was measuring two routers instead of
-    # three. docs/development.md, "The stand's own traps".
+    # up, and why every measurement that claimed the snapshot line was made on two routers instead
+    # of three. docs/development.md, "The stand's own traps".
     ports: { http: 8022, ssh: 2228 }
 
   # ---- second instances of the three OpenWrt lines, for parallel measurement ----
@@ -237,7 +237,7 @@ routers:
   # ---- fourth instance, one more set for a browser engine ----
   #
   # Added 2026-09-12. `-b` answered contention between two people; this answers contention inside
-  # ONE sweep. `tools/scroll-anchor.mjs --full` is 276 runs per engine, and running the three
+  # ONE sweep. The full scroll-anchor sweep of the time was 276 runs per engine, and running the three
   # engines in one process against one set of stands takes chromium's zygote down about two minutes
   # in (docs/development.md, "The stand's own traps") — so the sweep was being run one engine at a
   # time, ~25 min each, three quarters of a 20-core machine idle throughout. Three sets means three

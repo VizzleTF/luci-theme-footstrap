@@ -88,7 +88,7 @@ full sidebar.
 remainder with `--fs-content-min`; it **reads the widths from the CSS tokens** (`--fs-sidebar-w`,
 `--fs-rail-w`, `--fs-content-min`) through `getComputedStyle` rather than
 keeping copies — otherwise narrowing the rail in the styles would leave the measurement subtracting
-the old number, and no gate would notice. The result is `data-narrow` on `:root`, read by both the
+the old number, and nothing would notice. The result is `data-narrow` on `:root`, read by both the
 CSS and `flyoutMode()` in the JS.
 
 **The subtraction itself is `columnWidth()`, and there is exactly one of it.** Two callers need the
@@ -103,14 +103,12 @@ the `--fs-content-pad` token (no longer read at all): the same sheet re-paddings
 token stays 28, and a media query has no `data-*` to key on — nor may its breakpoint be copied into
 the JS. So the model asks the element what it actually got.
 
-The arithmetic is unit-tested per combination (`tests/chrome-geometry.test.mjs`); whether its inputs
-still describe the real page is checked on a stand, where `live-audit` compares `contentWidth()`
-against the live `.fs-content` box. That check is what caught the gutter, on every page at 320, 390
-and 568.
+What caught the gutter was comparing `contentWidth()` against the live `.fs-content` box on a stand,
+on every page at 320, 390 and 568.
 
 The model answers below the column's `max-width` and has no cap of its own: both callers ask a lower bound
 (500, 568), and the width slider's floor (1280) keeps a capped column at >= 1216px, above both, so a cap
-would change no decision. `live-audit` skips a column held at its `max-width` instead of comparing it exactly.
+would change no decision.
 
 **`contentWidth()`'s width is compared fresh on every call, not just cached from the last fitter.**
 `_shellOuter` (the window width `columnWidth()` subtracts from) is written only by `measureShell()`,
@@ -118,7 +116,7 @@ which only `fitShell()` calls, and `fitChrome()` steps aside for the whole `SCRO
 (400 ms, `fs-fit.js`) whenever `fit.scrolling()` answers yes — a resize starts that window the same
 way a flick does. A caller landing inside it — `fitTables()`'s, most of all, since it asks mid-scroll
 by design — got the PREVIOUS viewport's width: a resize from 568 to 390 still answered 568 for up to
-220 of the 400 ms, and the same shape held at every step of `live-audit`'s width list (−70 at
+220 of the 400 ms, and the same shape held at every width measured (−70 at
 320→390, −178 at 568→768 read backwards, −256 at 1024→1440 — always exactly the gap between the two
 adjacent widths). `contentWidth()` now compares `document.documentElement.clientWidth` against
 `_shellOuter` on every call and re-runs `measureShell()` when they differ, rather than only when
@@ -148,11 +146,11 @@ pass. Chromium and Firefox put the reader back afterwards; Safari implements no 
 any platform, and an iPhone reported the Overview creeping upward once per poll tick, bisected there
 to this pass. So `fitChrome()` writes `min-height` at the settled height before it strips the
 classes and takes it off after — the measurement is unchanged, and the box the page is laid out
-against does not move. `tools/fit-quiet.mjs` (`npm run quiet`, in `live`) hooks the two forced
-layouts of the pass (`offsetTop`, `getClientRects()`) and bounds `#maincontent`'s document position
-both ways within 2px of where it started: 0px of dip with the pin, 8px and 33px without it. The symptom itself does not reproduce headless — the pass is
-one synchronous task and both engines restore the offset once the bar is back, measured at half the
-page and at its bottom — which is why the gate watches the cause.
+against does not move. Hooking the two forced layouts of the pass (`offsetTop`, `getClientRects()`)
+and reading `#maincontent`'s document position there gave 0px of dip with the pin, 8px and 33px
+without it. The symptom itself does not reproduce headless — the pass is one synchronous task and
+both engines restore the offset once the bar is back, measured at half the page and at its bottom —
+so the cause, not the symptom, is what to measure.
 
 ## The bar: fit steps, scroll model, a rail that must match its guard
 
@@ -240,7 +238,7 @@ consecutive lines, and with the inherited leading that put 16px between their ce
 is. `line-height: max(26px, calc(var(--fs-type) * 2))` is a floor, not a fixed number, because a
 bare `26px` would be the one leading in the file that ignores the Density axis while a bare
 multiplier falls back under 24px at Compact (11.7px × 2 = 23.4) — exactly where the wrap is most
-likely. Found by `tools/live-audit.mjs` on CI's runner and not on the stands, because the wrap
+likely. Found on CI's runner and not on the stands, because the wrap
 width depends on text metrics the two environments render slightly differently.
 
 ## Tab strips
@@ -280,8 +278,7 @@ already equal the base), so for tabs `fs-dense2` changes nothing past `fs-dense1
   fill, stroke, 1.9 width and round caps are the one `.fs-ico, .fs-chevron` rule in
   `theme/20-shell.css`, not five attributes per element (100 B each, 300 B of every admin page).
   `header.ut` writes its three inline and `svgIcon()` (`fs-widgets.js`) emits the same markup for
-  the menu and the search palette; a class outside the rule draws a filled black glyph, which
-  `tests/icon-stroke.test.mjs` holds.
+  the menu and the search palette; a class outside the rule draws a filled black glyph.
 - `<body>` → a `.fs-shell` flex wrapper. Before it, the skip link `.fs-skip`
   ("Skip to content" → `#maincontent`), the first tab stop on the page.
 - **Sidebar** — `<nav class="fs-sidebar" aria-label="Menu">`, deliberately `<nav>`: `<aside>` gives
@@ -374,7 +371,7 @@ switches to it after load.
 **`set()` stamps THREE attributes:** `data-darkmode` (which this theme's CSS reads), plus
 `data-theme` and `data-bs-theme` as outbound compatibility for third-party apps that sniff
 them — `luci-app-justclash` hangs 21 rules on `data-theme`, `ssclash` checks `data-bs-theme`
-first. Nothing inside `styles/` may read the latter two. `tools/axes.mjs` holds the set.
+first. Nothing inside `styles/` may read the latter two.
 
 `<meta name="darkreader-lock">` stops the Dark Reader extension repainting the theme into mush.
 
@@ -412,9 +409,7 @@ of every aliased page missing.
 
 ## Keeping the reader's place when the engine will not
 
-**Every mechanism, what each is for and what the sweep measures without it, is in
-[anchoring.md](anchoring.md).** What follows here is the chrome's own half: which element a
-correction may take, and why.
+What follows here is the chrome's own half: which element a correction may take, and why.
 
 A poll tick changes the height of things above the reader — a station joins the associated list, a
 lease expires, an interface box grows a line — and everything below it moves. Chromium and Firefox
@@ -581,26 +576,17 @@ result would differ, whichever is sooner), so the read after the pass is a flush
 Measured two frames later instead, it closed that cell and corrected INSIDE A FLICK on three others,
 160px each.
 
-`tools/scroll-anchor.mjs` holds all of it: it grows 120px above the reader and requires the page to
-stay within two pixels, once with the engine's anchoring suppressed and once without, on both
-scrollers; it refills a section the way a poll does — emptied, then filled again, with the router's own
-poll held for the duration — and requires the same; and it flicks the page up and down to prove the
-theme corrects nothing while the reader is moving. With the fallback removed the Safari case reports
+The measurement behind all of it grew 120px above the reader and required the page to stay within
+two pixels, once with the engine's anchoring suppressed and once without, on both scrollers; it
+refilled a section the way a poll does — emptied, then filled again, with the router's own poll held
+for the duration — and required the same; and it flicked the page up and down to prove the theme
+corrects nothing while the reader is moving. With the fallback removed the Safari case reports
 exactly the reported symptom — 120px of page moved under the reader, 255px on the swap measured in
-WebKit with the engine's own anchoring off, and 690px on a real Overview on the stands. It runs on
-`chromium,firefox,webkit` in CI now, because the fault above lives on the path a stand-in engine does
-not take, and it waits on `fit.restAt()` rather than on a stopwatch: WebKit starts its motion sampler
-late enough that a flat wait measured the theme before it had a reference at all, which reported a
-jump on every WebKit run with the theme identical on all three engines.
+WebKit with the engine's own anchoring off, and 690px on a real Overview on the stands. It has to run
+on `chromium,firefox,webkit`, because the fault above lives on the path a stand-in engine does not
+take.
 
-**Findings print as they are found, and one cell can be run alone.** A `--full` sweep is 144 cells
-and tens of minutes, so a run that only speaks at the end costs a whole sweep per fix attempt — five
-attempts at the fault above were measured that way before the flags existed. Each finding is printed
-the moment it is made (`FINDING …`), `--bail` ends the run at the first one, and `--width 390
---layout top` narrows the sweep to the cell a finding names: the same measurement then takes a
-minute. CI passes none of them — how WIDE a fault is is half of what the sweep says.
-
-The sweep crosses three page shapes and two scrollers, and both sets are what a measurement left
+The sweep crossed three page shapes and two scrollers, and both sets are what a measurement left
 standing rather than what looked thorough. The shapes: the Overview refills section BODIES, the
 realtime Connections table has its ROWS replaced under a poll, and Processes is one table that is a
 direct child of `#view` — the climb out of that one used to land on the host and give up. Processes
@@ -608,9 +594,9 @@ proves the climb and never the swap: its single block is 6397px against 6108px o
 owrt2512, so it can never sit entirely above the reader, which is what a swap needs. Wireless was
 measured and dropped (812px of scroll at 390px wide, 0 at 1440). The scrollers: of `1440 side`,
 `1440 top`, `390 side` and `390 top`, only the first scrolls `#maincontent` and the other three
-scroll the window, so the sweep keeps the first and the narrowest. Density is one value for the same
-reason — across 72 Overview cells, normal, compact and large reported the same two outcomes and
-nothing else. `--full` crosses all of them anyway, and CI does that on a push and a tag.
+scroll the window, so the first and the narrowest are the two that differ. Density is one value for
+the same reason — across 72 Overview cells, normal, compact and large reported the same two outcomes
+and nothing else.
 
 ## `fs-select.js`
 

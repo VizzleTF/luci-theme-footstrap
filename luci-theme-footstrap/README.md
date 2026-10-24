@@ -62,6 +62,6 @@ ssh router 'uci set luci.main.mediaurlbase=/luci-static/footstrap; uci commit lu
 ssh router 'uci set luci.main.mediaurlbase=/luci-static/bootstrap; uci commit luci'   # roll back
 ```
 
-Before pushing, run `npm run check` from the repository root. The rules and the traps are in
+Before pushing, see [`../docs/verifying.md`](../docs/verifying.md). The rules and the traps are in
 [`../docs/conventions.md`](../docs/conventions.md); packaging is in
 [`../docs/package.md`](../docs/package.md).

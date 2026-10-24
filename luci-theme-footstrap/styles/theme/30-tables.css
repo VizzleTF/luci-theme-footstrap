@@ -114,7 +114,7 @@
 	}
 
 	/* fitTables() forces a layout with marks off, and anchoring can re-pick a node inside it
-	 * (18 jumps/1500 frames measured) — anchoring.md, "What the engine is told". */
+	 * (18 jumps/1500 frames measured). */
 	.table.fs-dt { overflow-anchor: none; }
 
 	.cbi-section .table:is([id], .fs-dt) .tr:not(.table-titles):not(.placeholder):hover .td { background: var(--fs-panel2); }
@@ -318,11 +318,9 @@
 	/* the column label, lifted above its value. PINNED: the config table needs this under its
 	 * own @container guard, which cannot share a block with a class. */
 	.table.fs-stacked .td[data-title]::before {
-		/* @mirror table-card/label */
 		content: attr(data-title); display: block; margin-bottom: var(--fs-space-1);
 		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking);
 		color: var(--fs-eyebrow-color);
-		/* @endmirror */
 	}
 	/* a footer cell needs [data-title] in its OWN selector to win the caption rule's (0,4,0) */
 	.table.fs-stacked .td.cbi-section-actions::before,
@@ -332,24 +330,18 @@
 	.table.fs-stacked .tfoot .td[data-title]::before { content: none; }
 	/* row buttons are not a label/value pair — full width below the pairs. PINNED, see above. */
 	.table.fs-stacked .td.cbi-section-actions {
-		/* @mirror table-card/actions */
 		display: flex; flex: 1 1 100%; justify-content: flex-start;
 		flex-wrap: wrap; gap: var(--fs-space-2); padding-top: var(--fs-space-2);
-		/* @endmirror */
 	}
 	/* LuCI groups buttons in ONE inner <div>, so this flex-wrap never fires and .fs-main clipped
 	 * the tail button. PINNED to the config table's copy. */
 	.table.fs-stacked .td.cbi-section-actions > :not(.cbi-dropdown) {
-		/* @mirror table-card/actions-inner */
 		flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: var(--fs-space-2);
-		/* @endmirror */
 	}
 	/* width: 0 — the label's nowrap min-content (288px for a Russian item at 360px) sizes the table-row-group
 	 * past the card (td right 442 vs 315); basis `content` still sizes the item to its label (it was 266px, a whole card, with `1 1 auto`). PINNED. */
 	.table.fs-stacked .td.cbi-section-actions > .cbi-dropdown {
-		/* @mirror table-card/actions-dropdown */
 		flex: 0 1 content; width: 0; min-width: 0;
-		/* @endmirror */
 	}
 	/* nothing in a half-width cell may force the row wider than the viewport — .fs-main clips,
 	 * it does not scroll to an over-wide child */

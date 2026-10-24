@@ -1,4 +1,0 @@
-schema_version: "1.1"
-name: readiness-question-is-read-only
-context:
-  scaffold_script: scaffold.sh

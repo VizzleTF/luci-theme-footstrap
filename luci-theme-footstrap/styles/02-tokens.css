@@ -8,8 +8,7 @@
 		--fs-focus-ring: 0 0 0 3px var(--fs-accent-soft);
 		--fs-focus-ring-solo: 0 0 0 2px var(--fs-panel), 0 0 0 5px var(--fs-accent);
 		--fs-focus-ring-invalid: 0 0 0 3px var(--fs-danger-fill);
-		/* opaque, not a tint (4.21:1 in dark); pinned by tools/mirror.mjs
-		 * (`selected-row/paint`), docs/css.md "@mirror" */
+		/* opaque, not a tint (4.21:1 in dark) */
 		--fs-row-rail: inset 2px 0 0 var(--fs-accent);
 
 		/* every separator is this one line, stated once rather than in 69 longhand declarations */
@@ -171,7 +170,6 @@
 		--border-color-medium: var(--fs-border);
 		--border-color-low: color-mix(in srgb, var(--fs-border) 55%, var(--fs-panel));
 
-		/* tools/export-tier.mjs proves the whole tier across palette x mode */
 		--primary-color-high: var(--fs-accent);
 		--primary-color-medium: color-mix(in oklch, var(--fs-accent) 78%, var(--fs-dim));
 		--primary-color-low: color-mix(in oklch, var(--fs-accent) 45%, var(--fs-dim));

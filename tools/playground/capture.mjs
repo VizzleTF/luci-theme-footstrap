@@ -8,7 +8,7 @@
  * and the stand's own version info (`meta.json`). Talks to ONE owlab stand (`tools/lib/stands.mjs`),
  * never touches the built site.
  *
- * Never run by a gate: needs a booted, installed owlab router (T2, docs/development.md).
+ * Needs a booted, installed owlab router (docs/development.md); CI's `playground` job runs it.
  *
  *   node tools/playground/capture.mjs [--recording DIR] [--pages FILE]
  */
@@ -43,7 +43,7 @@ if (FLAGS.help) {
 const STAND_ID = 'owrt2512';
 const OUT = FLAGS.recording;
 const PAGES_FILE = FLAGS.pages;
-/* A floor, not the wait: the load+settle window of spa-parity.mjs before `waitForQuiet` reads ubus
+/* A floor, not the wait: a load+settle window before `waitForQuiet` reads ubus
  * traffic, else a page whose lazy includes have not started reads as already quiet. */
 const SETTLE_MS = 1400;
 /* No same-origin request in flight for this long is "this page is done making the calls it's going
@@ -126,7 +126,7 @@ async function main() {
 	 * knows what a read WAS. An ubus POST's label always starts "POST " (`describePendingRequest`,
 	 * used at both call sites below — a GET, static or the document, never does), so a lost or a
 	 * failed ubus read is dropped rather than fatal: `missingOverlayKeys` at the end of the run is
-	 * the actual correctness gate for what the overlay needs. A document or static-asset read still
+	 * the actual correctness check for what the overlay needs. A document or static-asset read still
 	 * throws — nothing else re-fetches it if this read was the only place it gets recorded. */
 	const UBUS_LABEL_RE = /^POST /;
 	async function drain(phase) {

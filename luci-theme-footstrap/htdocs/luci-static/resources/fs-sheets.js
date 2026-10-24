@@ -449,10 +449,4 @@ return baseclass.extend({
 	documentPoisoned,
 	scopeToCurrentPage,
 	watchViewSheets,
-	/* test-only: the duplicate sweep, the fence rewrite, the owner stamp and the re-host, driven
-	 * directly instead of through a live document walk */
-	dedupeViewSheets,	/* fs:probe */
-	fenceRules,	/* fs:probe */
-	_owner,	/* fs:probe */
-	rehostIntoThemeLayer,	/* fs:probe */
 });

@@ -1,4 +1,0 @@
-schema_version: "1.1"
-name: stops-on-maintainer-hunks
-context:
-  scaffold_script: scaffold.sh

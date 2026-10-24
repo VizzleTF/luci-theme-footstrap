@@ -1,5 +1,5 @@
 #!/bin/sh
-# The browser the gates drive, without going through apt unless it is actually needed.
+# The browser tools/e2e.mjs drives, without going through apt unless it is actually needed.
 #
 #   sh tools/ci-playwright.sh
 #
@@ -8,7 +8,7 @@
 # stalls — three steps of one tag sat for 68, 68 and 17 minutes — while the CDN half has never been
 # the slow one, and the libraries are already present on GitHub's ubuntu image.
 #
-# So: fetch the browser, then PROVE it launches, which is the claim the gates need and a better one
+# So: fetch the browser, then PROVE it launches, which is the claim the e2e run needs and a better one
 # than "apt exited 0". Only if the launch fails do we go to apt, which is where a self-hosted or
 # trimmed image would land.
 #
@@ -19,8 +19,8 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
-# One engine by name: the gates that need firefox or webkit run in the `anchors` job, which
-# installs them itself. Installing them here would triple both halves of this.
+# One engine by name: nothing here drives firefox or webkit, and installing them would triple
+# both halves of this.
 sh tools/ci-retry.sh 300 npx playwright install chromium
 
 launches() {

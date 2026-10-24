@@ -93,9 +93,7 @@ flags of 43 and added one that was missing.
 
 The single exception is `theme/95-a11y-media.css`: `prefers-reduced-motion` has to kill animations
 declared in `base` as well as `theme`, and only an important declaration reaches back a layer. The
-inversion is what makes that file possible. `.stylelintrc.json` holds the allowlist and
-`declaration-no-important` fails on any flag outside it; `css-metrics` ratchets the total against
-`LIMITS.importants` in tools/css-metrics.mjs — the live count, not a number copied here.
+inversion is what makes that file possible.
 
 Flags beyond those that fight an inline `style=` (the PoE line and the traffic figures are those):
 the forced-colors focus outline in
@@ -107,12 +105,9 @@ line and a pair needs half).
 
 ## The browser floor
 
-The theme has never declared one, and the sheet quietly moved it twice. `npm run css-floor` now
-derives it from the built stylesheet and fails if this section disagrees.
+The theme has never declared one, and the sheet quietly moved it twice.
 
-<!-- css-floor -->
 **Chrome 108**, **Firefox 101**, **Safari 15.4** — below that the page is wrong, not plainer.
-<!-- /css-floor -->
 
 That floor is set by `@layer`, `:is()`/`:where()`, `:focus-visible`, `svh`/`dvh`, `accent-color`
 and the logical properties. Nothing on the list has a fallback worth writing: a theme whose layers
@@ -130,11 +125,11 @@ page is plainer:
 | `:has()` | 105 / 121 / 15.4 | 59 refinements: port tiles, password control-group, stacked-table footers |
 | `color-mix()` | 111 / 113 / 16.2 | the 26 mixed tokens fall back to `styles/04-nocolormix.css` |
 | `@container` | 105 / 110 / 16.0 | five width adaptations inside `fs-view` / `fs-content` |
-| relative `oklch(from …)` | 122 / 128 / 18 | the tint and the accent/status hue axes (the palette's own colours stay). The rules sit under an `@supports` probe of the exact syntax they use. The ink on a hex accent does not depend on it: `inkFor()` in `fs-axes.js` and the `head.ut` pre-paint compute it in JS (`npm run axes` holds the two copies equal), so #ffcc00 gets dark ink in every engine |
+| relative `oklch(from …)` | 122 / 128 / 18 | the tint and the accent/status hue axes (the palette's own colours stay). The rules sit under an `@supports` probe of the exact syntax they use. The ink on a hex accent does not depend on it: `inkFor()` in `fs-axes.js` and the `head.ut` pre-paint compute it in JS (two copies that must stay equal), so #ffcc00 gets dark ink in every engine |
 | `text-wrap: pretty`, `scrollbar-width` | — | typographic polish |
 | `overflow: clip` value | 90 / 94 / 16.0 | `.fs-main`'s `overflow-x: clip` and `.fs-staging`'s `overflow: clip` drop, and the browser's own cross-axis correction (CSS Overflow 3) takes over: a sideways scrollbar on the desktop sidebar's `.fs-main` (its sibling axis is already `overflow-y: auto`) or, in the top/narrow layouts and on `.fs-staging`, whole-page horizontal scroll — exactly how stock LuCI (no `clip` at all) already renders. `.fs-staging` also stays `visibility: hidden` regardless, since nothing inside a staged view sets `visibility: visible` on itself, so nothing is exposed. Measured with `overflow-x`/`overflow` forced to `initial` in a live Chromium |
 
-Two rules follow, and the gate holds both.
+Two rules follow.
 
 **A `:has()` part never shares a selector list with a part that has none.** A selector list is not
 forgiving: one unsupported compound invalidates the whole rule. `.table.fs-stacked .tr,
@@ -150,17 +145,16 @@ token, which is why the twins are a file and not a prelude. Tints degrade to `tr
 (an absent surface never lowers contrast), hairlines to the solid colour they are a fraction of,
 and the focus ring to `--fs-focus-ring-solo`, which was already mix-free.
 
-Adding any CSS feature the sheet has not used before fails `css-floor` until it is classified in
-`tools/css-floor.mjs` as hard or soft and the baseline is refreshed with
-`node tools/css-floor.mjs --update`. The JS floor is lower and is not the constraint: the SPA
-router uses nothing younger than `ResizeObserver`, and `requestIdleCallback` is the only
-feature-detected API (Safari has none); `CSS.supports` is only wrapped in a try/catch.
+Any CSS feature the sheet has not used before has to be placed on one side of this line: hard
+(it moves the floor above) or progressive (it joins the table). The JS floor is lower and is not
+the constraint: the SPA router uses nothing younger than `ResizeObserver`, and
+`requestIdleCallback` is the only feature-detected API (Safari has none); `CSS.supports` is only
+wrapped in a try/catch.
 
-Classification is by PROPERTY, which misses a value with its own support story: `overflow` is
-ancient, `overflow: clip` is Safari 16, and the gate said nothing while the value shipped a version
-past the floor above. `css-floor`'s `value:prop=val` entries in `FEATURES` check the exact property/value pairs worth
-tracking — most values share their property's support, so this stays a short, explicit list rather
-than a scan of every value in the sheet.
+Classifying by PROPERTY misses a value with its own support story: `overflow` is ancient,
+`overflow: clip` is Safari 16, and the value once shipped a version past the floor above with
+nobody noticing. Most values share their property's support, so the values worth tracking are
+a short, explicit list, not every value in the sheet.
 
 ### Vendor prefixes still in the sheet
 
@@ -191,7 +185,7 @@ A file's own `@layer` wrapper is stripped (first line to the `}` where brace dep
 the directory's wrapper emitted once. A rule written after that `}` stays unlayered in the source but
 would land inside the layer, so the build exits 1 naming `file:line`; blank lines and comments pass.
 The depth count skips multi-line comments and quoted strings, so a `{` in prose or in `content: "{"`
-does not move the close (`tests/build-css.test.mjs`).
+does not move the close.
 
 With `--dev` it is a plain `cat`: the output is byte-identical to the concatenated sources. A
 file to read on a router, not one to ship.
@@ -215,7 +209,7 @@ What the whitespace half never touches, each for its own reason:
 - **a newline inside a declaration** — also a space. When the scanner once joined lines
   needlessly, a wrapped `calc()` came out as `…))- .004 …`; a minus with no space *before* it is
   a parse error, the declaration fell away, `--fs-tint-c` became undefined, `--fs-bg` invalid at
-  computed-value time, and the canvas silently went white (caught by `export-tier` as 1.5:1);
+  computed-value time, and the canvas silently went white (1.5:1 contrast);
 - **anything inside a string** — every data URI here is quoted and full of `:`, `;` and spaces.
 
 Selectors and declarations are rewritten in five ways only, each the same selector or declaration
@@ -242,7 +236,7 @@ string or a comment:
   defaults, so the declaration computes the same. Left alone: a bare `0` (`flex: 0` is grow 0, not a
   basis), any `var()` or `calc()` basis, and a custom property named `--flex`. `!important` stays.
 
-`tests/build-css.test.mjs` holds the edge cases. Two caveats are latent, because nothing in the tree
+Two caveats are latent, because nothing in the tree
 has either shape: the first three rewrites cannot tell a selector from a declaration, so a
 custom-property **value** holding `[x="y"]` or ` !` would change its token stream (script reads it
 back with `getPropertyValue`), and the `conditionText` of an `@supports selector([x="y"])` keeps the
@@ -290,53 +284,28 @@ page, so the files cannot be invalidated separately anyway. A runtime `@import` 
 approach) is worse than a second `<link>` — it is discovered only after the first file is fetched
 and parsed, serialising the requests.
 
-## `@mirror`: duplication you cannot delete but can stop rotting
+## Duplicates CSS cannot merge
 
-`css-dup` finds two rules with identical declarations under mutually exclusive guards (a media
-query against an attribute selector, two `@container` thresholds). A cascade-aware reader needs
-both copies, so no linter will ever call it an error — and this is exactly the shape that drifts.
+Some rules carry identical declarations under mutually exclusive guards (a media query against an
+attribute selector, two `@container` thresholds). A cascade-aware reader needs both copies, and
+this is exactly the shape that drifts: the moment the copies diverge they stop looking like a
+duplicate at all. So every duplicated body is a decision: merge it into one rule, or list it here
+and edit both copies together.
 
-The trap it was built for: `css-dup` matches *identical* bodies, so the moment the copies diverge
-they stop being a duplicate and it goes quiet — **precisely when it should shout**.
-
-So every duplicated body must be a decision: merge it into one rule, or pin it. There is no
-numeric budget — a budget is a number nobody defends, and it waves through the next unexplained
-copy for free.
-
-The body is pinned, not the rule, so the wrapper goes **inside the braces** (the selectors are
-legitimately different; only the declarations must match):
-
-```css
-.table.fs-stacked .td[data-title]::before {
-	/* @mirror table-card/label */
-	content: attr(data-title); display: block; margin-bottom: 3px;
-	/* @endmirror */
-}
-```
-
-`css-dup` then accepts the duplicate and `tools/mirror.mjs` (`npm run mirror`) keeps the copies
-byte-identical: edit one and the build fails until you fix the other. **An unpinned duplicate is
-a hard failure. A `@mirror` group with one copy is also a failure** — a mirror of one holds
-nothing.
-
-`npm run mirror` prints the current groups; read them from there, not from a doc. Today it reports
-nine, plus one whole-file mirror:
-
-| Group | Copies |
+| Declarations | Copies |
 |---|---|
-| `table-card/label`, `table-card/actions`, `table-card/actions-inner` | `theme/30-tables.css` (`.fs-stacked`) ↔ `theme/65-dropdown.css` (`@container`) |
+| `table-card/label`, `table-card/actions`, `table-card/actions-inner`, `table-card/actions-dropdown` | `theme/30-tables.css` (`.fs-stacked`) ↔ `theme/65-dropdown.css` (`@container`) |
 | `ind-badge/paint`, `poll-glyph/mask` | two places in `theme/20-shell.css` (the sidebar and the rail) |
 | `meter/beside`, `meter/beside-value` | two copies in `theme/25-progressbar.css` |
 | `selected-row/paint` | `theme/60-inputs.css` ↔ `theme/65-dropdown.css` |
 | `btn-wrap/anywhere` | `theme/70-modal.css` (`label.btn`) ↔ `theme/90-responsive.css` (`@container fs-view`) |
-| `@same-file LICENSE` | the whole file |
 
 ## `:where(#view)`, not bare `#view`
 
 A page-scoped selector in `styles/pages/` anchors on `:where(#view)[data-page="…"]` rather than a
 bare `#view[data-page="…"]`, because an id contributes `(1,0,0)` on top of whatever the rest of the
 selector already carries. `20-overview.css`'s deepest chain (the progressbar row's
-`.td:first-child` selector) already measured `[1,7,0]` on its own — stylelint's `selector-max-specificity` ceiling
+`.td:first-child` selector) already measured `[1,7,0]` on its own — the sheet's specificity ceiling
 — and a bare `#view` on top of it pushed that to `[1,9,0]`. `:where()` matches the exact same
 single element (an id is a valid `:where()` argument) but contributes zero specificity, so nothing
 about *which* element matches changes, and the chain measures `[1,7,0]` again — the ceiling then
@@ -422,8 +391,6 @@ Never match a `data-title` *value* in a selector here: LuCI fills it from the co
 an English literal never matches on a localised router (issue #7 again), and for rows LuCI builds
 from the heading's `innerText`, any transform the theme puts on `.th` rewrites the string the
 theme's own CSS would try to match (`.th` carried `text-transform: uppercase` until issue #39).
-`.stylelintrc.json`'s `selector-disallowed-list` fails the build on any `[data-title="…"]` value
-match.
 
 ### Syslog filter bar: two disjoint container queries
 
@@ -470,7 +437,7 @@ Deleted controls, and why removing them is not an oversight:
 - **The hue slider in the colour control** — two controls for one value read as two settings, and
   the slider half could never reach a grey. The axis still stores a hue and `03-palettes.css`
   still rotates by it, so a saved value keeps painting; the slider CSS itself was dead in the
-  theme's own namespace, which `npm run css-orphans` exists to catch.
+  theme's own namespace and went with it.
 - **The `data-layout="top"` accordion toggle** hides `.fs-ap-submenus` because those sections are
   hover dropdowns in that layout, already exclusive — hidden in CSS, not by a JS branch, because
   the page is built once and a branch would freeze the control to whatever layout it loaded in.
@@ -607,8 +574,7 @@ moved nothing across 500 matching cells — `text-align: end` is this file's own
 rule's `start`.
 
 Column 4 (Description) is matched by index, `:nth-child(4)`, not `[data-title="Description"]`: a
-translated string `.stylelintrc.json`'s `selector-disallowed-list` fails the build on, and it used
-not to match even in English — LuCI builds `data-title` from the column heading's rendered
+translated string never matches on a localised router, and it used not to match even in English — LuCI builds `data-title` from the column heading's rendered
 `innerText`, and `.th` was uppercased then, so the attribute said "DESCRIPTION" and the literal
 matched zero elements on every router (fixed with the uppercase, `theme/30-tables.css`, issue #39).
 Columns: 1 Package name, 2 Version, 3 Size, 4 Description, 5 actions. `overflow-wrap`/`word-break`
@@ -623,8 +589,7 @@ immediately followed by a `.cbi-progressbar`, the same discriminator `theme/90-r
 already uses. The selector is `label:has(+ .cbi-progressbar)`, not
 `:has(:where(+ .cbi-progressbar))`: a leading combinator makes the argument a RELATIVE selector,
 which only `:has()` accepts — `:where()` takes a plain complex-selector list, so wrapping it there
-makes the whole rule invalid and the browser drops it silently, past both stylelint and
-`css-metrics`.
+makes the whole rule invalid and the browser drops it silently.
 
 ### SSH-keys: the card wrapper and the wide dynlist
 
@@ -641,7 +606,7 @@ layer beats specificity and `theme`'s plain `.cbi-dynlist` capped it anyway.
 `styles/base/` restyles class names LuCI itself emits with no theme-specific hook — the Meyer
 reset, CBI form/table markup, the modal `ui.js` builds, widgets with no generic equivalent. Prefer
 `styles/theme/` for anything that is paint; a base edit is for markup this theme cannot route
-around (`.claude/rules/css.md`).
+around.
 
 ### Reset: `[hidden]` must outrank every layer, not patch one mistake
 
@@ -696,16 +661,13 @@ below.
 
 ### Tables: roles survive a `display` override
 
-`tools/table-contract.mjs` check 1b. Rule A: a `display` change on a table part with nothing in its
-selector restricting it to one rung of the ladder (a state class, `:not()`/`:has()`, an attribute,
-an id) touches every such element at once; each shipped rule carries a ladder class (`.fs-stacked`,
-`.fs-dt`, `.cbi-section-table`, `.fs-rowstack`, `.fs-xscroll`, `hide-xs`/`hide-sm`) or the four-way
-`:not()` fence around the key/value tables in `theme/30-tables.css`. Rule B is scoped to a
-`.cbi-section` descendant named like a table part (`row`/`cell`/`col`/`head`/`body`/`foot`/`table`/
-`grid` as a whole hyphenated word: `.fs-kv-row` is caught, `.fs-ovl-empty` and `.ifacebox-head` are
-not). A false negative stays possible; a plain name-contains-"row" scan was rejected because it
-breaks `.fs-color-row`, `.fs-ap-actrow`, `.fs-ap-bgrow`, `.fs-ap-verrow` and `.fs-search-row`, none
-of them inside a `.cbi-section`.
+A `display` change on a table part with nothing in its selector restricting it to one rung of the
+ladder (a state class, `:not()`/`:has()`, an attribute, an id) touches every such element at once;
+each shipped rule carries a ladder class (`.fs-stacked`, `.fs-dt`, `.cbi-section-table`,
+`.fs-rowstack`, `.fs-xscroll`, `hide-xs`/`hide-sm`) or the four-way `:not()` fence around the
+key/value tables in `theme/30-tables.css`. The same holds for a `.cbi-section` descendant named like
+a table part (`row`/`cell`/`col`/`head`/`body`/`foot`/`table`/`grid` as a whole hyphenated word:
+`.fs-kv-row` is one, `.fs-ovl-empty` and `.ifacebox-head` are not).
 
 ### Tables: the key/value discriminator is the table's shape, not a class
 
@@ -828,8 +790,8 @@ the whole upload row standing 7px outside the card (same fix as the dynlist's fl
 Its child rule assumes every row is one line of text (`nowrap` + ellipsis); `.right` breaks that
 assumption — its content is the upload strip plus Create/Cancel, none of it text an ellipsis can
 stand in for. Inherited `nowrap` blocked the wrap the Browse button already had (`flex-wrap: wrap`),
-and `overflow: hidden` clipped Cancel's label 76px past the box with no "…" drawn — the gate's own
-"text the reader cannot reach" case, not the accepted dropdown/tab shape.
+and `overflow: hidden` clipped Cancel's label 76px past the box with no "…" drawn — text the reader
+cannot reach, not the accepted dropdown/tab shape.
 
 ### `base/95-luci.css`: Statistics graphs and Realtime SVGs are art drawn for a white ground
 
@@ -873,10 +835,10 @@ The fix follows upstream `luci-theme-bootstrap`'s model: reserve one line in flo
 (`margin-block-start: calc(var(--fs-type-xs) * var(--fs-leading))`, the SAME expression
 `.fs-stacked` and the overview `<=560px` rule already used) as the bar's DEFAULT, so the floated
 label always has a band to sit inside regardless of what wraps it. Only the contexts that
-deliberately place the value BESIDE the bar (`.cbi-value-field`, a data table's meter column — both
-pinned in `@mirror meter/beside`) or on a neighbour's line (overview's meter rows at desktop, the
+deliberately place the value BESIDE the bar (`.cbi-value-field`, a data table's meter column — the
+two `meter/beside` copies) or on a neighbour's line (overview's meter rows at desktop, the
 package-manager disk bar at both desktop and phone) opt out with `margin-block-start: 0`. Where an
-existing rule already styled that bar it carries the declaration (`@mirror meter/beside`); overview
+existing rule already styled that bar it carries the declaration (`meter/beside`); overview
 and package-manager had none — no prior rule targeted the bar on either page — so each got a new
 page-layer rule for the same selector, opt-out only, no other declaration. Everything else — the
 gallery's bare meters, a third-party app's key/value table, the old dashboard's 30_wifi assoclist
@@ -947,12 +909,9 @@ logical keyword — so under `[dir="rtl"]` (`theme/60-inputs.css`) the positions
 hand. The offsets must also swap between the two layers: mirrored as they were, the band that leans
 left would sit on the right and the chevron would draw as an inverted V. The padding that clears
 the chevron is `padding-inline-end`, so the text clearance follows the writing direction on its
-own. Measured with the `rtl` pass of `npm run computed-diff` (390px, `dir=rtl`) against the commit
-before the mirror: 7 selects change `padding-left` 12px → 32px and `padding-right` 32px → 12px,
-9 elements (the 7 selects and the 2 `.cbi-select` DIV shells) change `background-position`, and
-nothing else moves. `background-position` had to join the gate's property list for this: with the
-rule deleted the pass reports those 9 differences, and before the property was listed it reported
-0.
+own. Measured with a computed-style diff (390px, `dir=rtl`) against the commit before the mirror:
+7 selects change `padding-left` 12px → 32px and `padding-right` 32px → 12px, 9 elements (the 7
+selects and the 2 `.cbi-select` DIV shells) change `background-position`, and nothing else moves.
 
 ### Dropdown: the display state machine, unflagged
 
@@ -1150,7 +1109,7 @@ The frame, corner, placeholder and cell-padding rules in `theme/30-tables.css` s
 (luci-app-roamd, GitHub #67) matched none of them, kept the generic `.table { overflow: hidden }`,
 became the sticky header's scroll container, and its `.th` sat one bar-height (46px) over the first body
 row at scroll 0 in layout top (webkit, chromium); its cells kept 8px where a real table has 10px.
-`overflow: clip` on the generic rule is not the fix: it clips popups. `table-contract.mjs` check 2e holds it.
+`overflow: clip` on the generic rule is not the fix: it clips popups.
 
 The key is `:is(table, div).fs-dt` and not `.table.fs-dt` because of specificity: `:is()` scores its
 most specific argument, so `:is(table, div).fs-dt .td` is (0,2,1), exactly `table.fs-dt .td`, while
@@ -1159,10 +1118,8 @@ so it meets this rule in the same layer; luci-app-filemanager `#file-table`'s `.
 (0,2,1) used to win by source order and lost to (0,3,0) on owrt2512: Name and Permissions padding-left
 5 -> 12px, Type padding-right 5 -> 12px, Size header 15 -> 12px, Size cells 10 -> 12px, and the 70px
 Permissions column clipped more ("rwxr-..." -> "rwxr..."). Changing only that selector back restored
-the numbers. `table-contract.mjs` check 2f holds it: the cell padding with a real table and a mock app
-rule in the gallery, and each of the eight keys (padding `.td`/`.th`, the frame, four corners, the
-placeholder) by selector in the built sheet, so a `.table.fs-dt` revert of any one fails the gate. The
-rules that were `.table.fs-dt` in v0.14.14 keep it: the break floor, the `!important` word-break, the
+the numbers. Eight keys carry the `:is(table, div).fs-dt` form: padding `.td`/`.th`, the frame, four
+corners, the placeholder. The rules that were `.table.fs-dt` in v0.14.14 keep it: the break floor, the `!important` word-break, the
 sticky header, `overflow-anchor`, the fit gate (`:root[data-fs-fit] … .table.fs-dt:not(.fs-fitted)`)
 and the `.fs-stacked` card rules. `fs-select.js` tags `.table, table` with `fs-dt`; the form is
 `table` or `div` in practice, a `.table` on another tag would match neither. The frame group keeps `.cbi-section .table.fs-dt` and
@@ -1190,8 +1147,8 @@ reads them follows.
 - **secondary text**: `--fs-dim` toward `--fs-text`, and `--fs-faint` most of the way there too
   (10-11px eyebrow labels are where AA erodes first). Not all the way onto `--fs-dim`: the two are
   the export tier's `--text-color-medium` and `-low`, so collapsing them republishes one colour
-  twice to every app reading the gradation. 82% is a window `tools/export-tier.mjs` measures rather
-  than takes on trust: below 80 the fainter ink drops under AA on footstrap dark's `--fs-panel2`
+  twice to every app reading the gradation. 82% is a measured window, not one taken on trust:
+  below 80 the fainter ink drops under AA on footstrap dark's `--fs-panel2`
   (4.51:1 at 80), above 82 the high-to-low ramp falls under the 0.10 spread the tier promises (0.098
   at 84); 82 clears both, at 4.68:1 and 0.110.
 - **`--fs-placeholder`, in BOTH modes**: the one token the theme ships deliberately under AA
@@ -1199,8 +1156,7 @@ reads them follows.
   value, and a dark palette has only 6.45:1 of ink to spend. A reader who asked for more contrast has
   said which of the two they want, so the mixes go back to the AA-clearing 62% and 80% — 4.98:1 and
   4.61:1, at 37% and 20% of the ink-to-field range instead of 44% and 34%. Only
-  `--fs-placeholder-mix` moves: the mix itself is spelt once, in `03-palettes.css`. `placeholder-ink`
-  measures this pass as well.
+  `--fs-placeholder-mix` moves: the mix itself is spelt once, in `03-palettes.css`.
 - **the focus ring**: `--fs-focus-ring` is a tint of the accent (`--fs-accent-soft`, 10% light and
   15% dark), so at "more contrast" it carries the accent at 60% instead. Its sibling
   `--fs-focus-ring-solo` is already the solid accent and needs no restatement here.
@@ -1234,13 +1190,6 @@ grey carried), ButtonText for the check and the radio dot and for a button's spi
 the help icon and a bare spinner, which sit on the page like text. The wallpaper pattern
 (`15-wallpaper.css`) is the one masked fill left alone: decoration that is meant to drop out.
 
-`a11y` holds both halves: every selector in a `forced-colors` block must reach a gallery element
-(`CHROME_ONLY` in `tools/a11y-gallery.mjs` lists the five only `header.ut` and `head.ut` render — `#topmenu
-li.active > a`, `.fs-railtoggle`, `#tabmenu ul.tabs > li.active > a`, and the two collapsed-rail poll
-selectors, whose `:root[data-layout][data-rail]` guard a static gallery cannot carry), and keyboard focus
-must show a `Highlight` outline. `computed-diff`'s `1280/fc` pass reads the repairs' computed values;
-the compact poll pill has its own specimen in the gallery's chrome-bar section for that.
-
 ## The card contract: what is measured and what is not
 
 A table folds into cards by two different mechanisms, and that is not an unfinished job.
@@ -1273,7 +1222,7 @@ width, so the first pass over a table with no slot to inherit from read `scrollW
 0 overflows nothing, concluded "no remedy" — and CACHED that answer. The table then appeared at its
 natural width: on Status → Processes at 768px, 777px inside a 712px column, columns cut off by
 `.fs-main { overflow-x: clip }` with no scrollbar and nothing to say so. A second pass ~60 ms later
-usually corrected it, which is why it reached a user rather than a gate: that pass exists only if
+usually corrected it, which is why it reached a user: that pass exists only if
 something mutates `#view` again, and a page that renders once and stands still never does. So
 `fitTables()` treats a zero measurement as no answer at all — it lifts the gate, asks for one more
 frame, and writes nothing to the slot. Measured entering that page at 768: 2 of 8 arrivals on 0.13.1
@@ -1288,7 +1237,7 @@ needs **1190 px**, and overflowed its section by **557 px** — an overflow the 
 never had. **The act of measuring was the bug.** Do not "finish the job".
 
 The price is the last irreducible duplicate: the same declarations under a class and under an
-`@container`, which CSS cannot factor apart. It is pinned with `@mirror table-card/{label,actions}`.
+`@container`, which CSS cannot factor apart (`table-card/*` in "Duplicates CSS cannot merge").
 
 ### Which of the three a table gets, and what decides it
 
@@ -1354,8 +1303,7 @@ So the break value follows the tier, and the split is the design:
 | config table, key/value include, meter rows, realtime legend | `anywhere` (`base/40-tables.css`) | none of them is measured and none can card on demand — containment is the only outcome available |
 | header row, first column | `break-word` (`base/40-tables.css`) | the labels you read the table by (issues #32, #36) |
 
-`tools/table-contract.mjs` (`npm run tables`) holds that table to the sheet, selector by selector: a
-fifth place to decide how a cell may break is a hard failure, and so is any of them appearing under a
+These four are the only places that decide how a cell may break, and none of them sits under a
 viewport query.
 
 Two of the four per-page `nowrap` rules the general contract retired were `pages/60-assoclist.css`
@@ -1425,10 +1373,10 @@ The method that does work: load the gallery with each stylesheet, snapshot `getC
 Same DOM, same data — so any difference was caused by the CSS. The sheet is the one a router gets
 (`build-css.sh`, then `mangle-tokens.sh`), each side in its own document: swapping the `<link>` on
 one document only works while both sheets map the private tokens alike. The gallery has no
-`header.ut` chrome, so a change to the sidebar, bar, rail or menu reads 0 here and is measured by
-`live-audit` and `spa-parity` on a stand. `docs/development.md`, "The three cheap browser gates".
+`header.ut` chrome, so a change to the sidebar, bar, rail or menu reads 0 here and has to be
+measured on a router.
 
-> `cssdiff.py`, the script the changelog and `audit.py` refer to by name, is the maintainer's own
+> `cssdiff.py`, the script the changelog refers to by name, is the maintainer's own
 > tooling and is not in this repository. Without it, drive the steps above with Playwright
 > yourself — the result a review asks for is the property diff, not that particular script.
 
@@ -1452,8 +1400,7 @@ padding from another; and an actions column losing its right alignment.
 
 `docs/gallery.html` renders every widget `ui.js`/`cbi.js` can emit, with the real class names, so
 you do not have to hunt the router for a page that happens to contain the control you changed. It
-is not part of the package; it is published to GitHub Pages alongside the built stylesheet, and
-the a11y gate runs axe-core against it.
+is not part of the package; it is published to GitHub Pages alongside the built stylesheet.
 
 It immediately found two holes that existed on no router page but that any third-party
 `luci-app-*` can hit: native `input[type=button|submit|reset]` (which `styles/base` gave only

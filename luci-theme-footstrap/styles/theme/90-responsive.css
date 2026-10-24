@@ -4,11 +4,9 @@
 	@container fs-view (max-width: 360px) {
 		#view .cbi-button, #view .btn,
 		#view input[type="button"], #view input[type="submit"], #view input[type="reset"] {
-			/* @mirror btn-wrap/anywhere */
 			white-space: normal;
 			min-width: 0;
 			overflow-wrap: anywhere;
-			/* @endmirror */
 		}
 	}
 

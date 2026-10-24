@@ -30,13 +30,13 @@ dispatcher node and depends on `luci-base` alone. The parts worth your attention
   exists, so it is the one unauthenticated surface. The form is server-rendered on purpose.
 - **The rpcd ACL**, `root/usr/share/rpcd/acl.d/luci-theme-footstrap.json`. It grants uci
   read/write on the `footstrap` config, `cgi-io` upload, and `file` write/remove on two fixed
-  paths. No `exec` grant: `cgi-io` sets the uploaded file's mode itself (`filemode`) —
-  `npm run acl` fails the build if an interpreter grant appears.
+  paths. No `exec` grant: `cgi-io` sets the uploaded file's mode itself (`filemode`). CI's `build`
+  job fails if the ACL grants anything beyond this list (step "The ACL grants only what SECURITY.md
+  lists").
 - **The uploads.** Appearance accepts a login background and a pattern tile. Both are inspected in
   the browser (an SVG is parsed, a photo is redrawn on a canvas, which also drops EXIF) and land
   under `/etc/footstrap`, reached from `/www` through a symlink.
-- **The browser JS.** HTML is parsed from a string in four places, all literal; the
-  `fs/no-unsanitized-html` lint rule keeps it that way.
+- **The browser JS.** HTML is parsed from a string in four places, all literal.
 - **The installer**, `install.sh`, verifies a usign signature and a checksum before it installs
   anything, and pins 23.05 routers to 0.14.2.
 

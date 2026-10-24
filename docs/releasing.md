@@ -1,17 +1,17 @@
 # Releasing
 
 The mandatory pre-release checklist, the changelog contract, and the runbook. **No release goes out
-until the automatic gates are green and the live checks are done for every issue the release diff
-touches.**
+until CI's `e2e` is green on both routers and the live checks are done for every issue the release
+diff touches.**
 
 How CI builds and signs the packages: [ci.md](ci.md).
 
 ## Why there is a checklist at all
 
-Every closed bug left a guard behind — a gate or a live check that catches its return. This page
-is the register: one row per issue, the mechanism, the command, and whether it is automated.
+Every closed bug left a live check behind: what to look at, and where, to catch its return. This
+page is the register: one row per issue.
 
-A bug with no guard comes back silently. **If you fix something that has no row here, add a row.**
+A bug with no check comes back silently. **If you fix something that has no row here, add a row.**
 
 ## Step 1 — scope: what can regress in this release
 
@@ -24,43 +24,29 @@ git diff --name-only "$(git describe --tags --abbrev=0)" HEAD | grep -E 'styles/
 ```
 
 - The diff does not touch `styles/`, the renderer, the templates or the fence → the visual and
-  fence issues (#1–#5, #7–#11) cannot regress from it. Their gates being green is enough; a live run
-  is allowed but not required.
+  fence issues (#1–#5, #7–#11) cannot regress from it; a live look is allowed but not required.
 - The diff touches the matching area → the live check for those issues is mandatory.
 
-**Always mandatory regardless of the diff:** the whole automatic section, plus issue #6 (packaging
+**Always mandatory regardless of the diff:** CI's `e2e` on both routers, plus issue #6 (packaging
 and asset selection) — because #6 breaks at the release level rather than in the code, and
 nothing fails until a router in the field pulls the update.
 
-## Step 2 — the automatic gates: read CI on the release sha
+## Step 2 — read CI on the release sha
 
-The gates run in CI, not again on this machine. The code of the release is on `main` before the
-release commit is cut, and its push run is read **job by job** (`gh run view <id>`): a local re-run
-of the same gates on the same sha measured 67 min over nine stands and added no information —
-six of them are twins of the same three images, and every local live gate was a subset of CI's
-(`scroll-anchor` locally: one engine, no `--full`; CI: three engines, `--full`).
+The code of the release is on `main` before the release commit is cut, and its push run is read
+**job by job** (`gh run view <id>`):
 
 | CI job | What it holds |
 |---|---|
-| `check`, `lint` | every static gate below, `jsmin-verify`, `computed-diff` (a report on PRs, never a failure) |
-| `build` | both formats; `tools/check-packages.sh` — one theme package per format, catalogues outside it |
-| `verify` | `owlab test` on 25.12/apk and 24.10/opkg, the five assertions of [development.md](development.md#proving-it-on-a-router-owlab-test) |
-| `live` | `spa-parity`, `live-audit` (EN), `live-audit --lang ru` on 25.12 and 24.10 (`audit-ru`), `motion` (`upstream-contract`, `table-tick`, `floor-contract`, `fit-quiet`, `install-check`) |
-| `anchors` | `scroll-anchor --full` and `scroll-jank` on chromium, firefox and webkit |
-| `deep` (tag, `workflow_dispatch`) | `live-audit` and `spa-parity` with `--pages-all`, one shard per router |
-| `release-assets` (tag only) | the published release resolves to one asset per format per package name (step 3) |
+| `build` | both formats, built by `owfeed build` |
+| `e2e` | `tools/e2e.mjs` on owrt2512 (25.12/apk) and owrt2410 (24.10/opkg): install the last release, upgrade to this build, open every menu page against bootstrap, remove, fresh install ([verifying.md](verifying.md)) |
+| `playground` | the playground site built from the package |
 
 What stays local, beside reading CI:
 
 ```sh
 npm run changelog
-node tools/size-budget.mjs --pin
 ```
-
-`node tools/size-budget.mjs --pin` runs after the last code fix: a fix landed mid-release once left
-the pins stale. The ceilings may also rise between releases, each time with the reason and
-the numbers in the commit's changelog entry (the policy: the header of `tools/size-budget.mjs`); the pin here
-re-fits them to the build that ships.
 
 `~/go/bin/owfeed lock` must exit 0 at the repo root and in a fresh clone of owfeed-packages. Without
 `--update` it only compares and writes nothing (exit 9 and the drift, e.g. `25.12 point release
@@ -68,7 +54,7 @@ re-fits them to the build that ships.
 the tag, which is where 0.14.15 found it.
 
 And `/security-review` on the diff this release carries, after the last code commit and before the
-tag. It is not a gate and cannot be — it reads a diff rather than a tree — which is why it is named
+tag. It is not a CI job and cannot be — it reads a diff rather than a tree — which is why it is named
 here: the pass is worth the minute on the five things a theme can actually get wrong (the
 installer's signature chain, new shell running over a build tree, the unauthenticated login
 template, sinks in the browser JS, the packaging pipeline), and a maintainer has asked outright
@@ -86,41 +72,20 @@ git worktree remove ../tmp/sec-<v>
 Its diff then equals `git diff <prev> HEAD`, deletions included (measured on v0.14.15..v0.14.16:
 28 files, +940/-188 both ways).
 
-The guards inside `check`, by the issue that left them:
-
-| Issue | What went wrong | The guard inside `check` |
-|---|---|---|
-| #3, #8 | theme styles stopped applying on a foreign package's page (filemanager, OpenClash `*{padding:0!important}`) | `chrome-fence` — the fence/pin/dark-guard still match the chrome; `fs-sheets` re-hosts the foreign sheet |
-| #5 | the `low`/`medium`/`high` ramp was three aliases of one colour, so "no data" lit up like a live value | `export-tier` (three DIFFERENT colours), `audit --strict` |
-| forum 82-83 | the `placeholder` attribute and the unset dropdown row were drawn in the body inks, so an option's DEFAULT read as a value the reader had typed | `placeholder-ink` (a hint is ≥40% light / ≥30% dark of the ink-to-field range away from the value, and still 3:1, with every combination re-run under `prefers-contrast: more`) |
-| #6 | localisation ships as separate `luci-i18n-*` packages, and assets sorted by name can be picked instead of the theme | `i18n` (catalogue current and complete); `tools/check-packages.sh` in CI's `build` |
-| #9, #11 | config-table row labels and a data-table column vanished or were squeezed | `css-dup` + `mirror` (`@mirror table-card/*`) |
-| the ComboButton report | a split button wrapped its arrow under the label in a stacked action cell; the gallery had no such widget, so no gate saw it | `gallery-coverage` — every (widget, container) pair the styles distinguish has a fixture in `docs/gallery.html` |
-| 0.14.16 | a ComboButton's open menu was clipped by `overflow: hidden`; three testers "opened" it with `dispatchEvent` and a rect, which cannot see a clip | `table-contract` check 2d — a real click opens every visible `.cbi-dropdown` (a ComboButton on its `> span.open` arrow, which must be visible), `elementFromPoint` at each `li`'s centre returns that `li`, and no ancestor from the dropdown up clips or scrolls |
-| all | a rule lost its `!important` or started depending on source order | `css-metrics`, stylelint `selector-max-specificity`, `audit --strict`, `css-orphans` |
-| — | the template pre-paint drifted from the live appearance appliers | `axes` |
-| — | `[Unreleased]` without a bold lead, or the RU mirror out of sync → an empty release note | `changelog` |
-
-A push does not run `deep`, so before the tag dispatch the workflow on `main` (`gh workflow run
-build.yml --ref main`) and read that run too: it is the early stop for the wide gates and the
-evidence for the baseline prune below. **`release-assets` runs only on the tag**, so a red one there
-costs a fixed commit and a new patch tag.
-
 ## Step 3 — asset selection (issue #6), separately and always
 
 This is the most fragile part of every release and the only one that fails silently: the release
-notes and the asset choice are evaluated at tag time, in the field, months later.
+notes and the asset choice are evaluated at tag time, in the field, months later. Localisation
+ships as separate `luci-i18n-*` packages, and assets sorted by name can be picked instead of the
+theme.
 
-- **The CI gates**: `build` asserts exactly N assets per format, each package resolving through its
-  own **name-anchored** regex `^<name>[-_][^/]*\.EXT$` to exactly one (a `.sig` ends in `.EXT.sig`
-  and does not match `\.EXT$`); `release-assets` asks the same of the **published** release.
 - **The reader in the field** is `install.sh`, and it never guesses: on a router the feed cannot
   serve it reads the signed `manifest.txt` and matches `$2` against the package name exactly, which
   is what makes a release carrying `luci-theme-footstrap` and two `luci-i18n-footstrap-<lang>`
   packages safe where #6 was not.
-
-Until `release-assets` has been green on a real tag, the by-hand simulation below stays mandatory
-(a gate replaces a manual check only once it has run):
+- **Any other reader** resolves each package through its own **name-anchored** regex
+  `^<name>[-_][^/]*\.EXT$` to exactly one asset per format (a `.sig` ends in `.EXT.sig` and does not
+  match `\.EXT$`). Simulate it by hand on the release's shape:
 
 ```sh
 # on a dev router, RELJSON = the release JSON of the intended shape
@@ -133,14 +98,10 @@ done
 
 ## Step 4 — live checks for the areas the diff touched
 
-The wide live gates are CI's `deep` job (step 2). What remains here is the human look at the issues
-below, on both releases (25.12/apk and 24.10/opkg), for the areas the diff touched. Compare against
-stock bootstrap wherever you are unsure — it is the reference for LuCI behaviour.
-
-**`npm run live -- …` cannot carry flags**: `live` chains eight `npm run` calls with `&&`, and npm
-takes the forwarded flags as its own config, so no gate receives them. Call a gate by hand when one
-needs re-running locally, on the core stands only (`--only owrt2512,owrt2410,owrtsnap`): the twins
-are the same images, kept for parallel measurement (`owlab.yaml`).
+CI's `e2e` opens every menu page on both routers and fails only on what footstrap adds (step 2).
+What remains here is the human look at the issues below, on both releases (25.12/apk and
+24.10/opkg), for the areas the diff touched. Compare against stock bootstrap wherever you are
+unsure — it is the reference for LuCI behaviour.
 
 **23.05 used to have a line of its own here, and no longer does.** It was the oldest release the
 theme claimed and the only one whose `luci-base` was missing a widget the theme uses:
@@ -158,41 +119,14 @@ and the contract entry that guarded it are gone with the fallback they guarded.
 | #7 | `admin/system/package-manager` | the theme's favicon; buttons do not overlap the inputs; no stray unrounded table border |
 | #9 | `admin/network/firewall/forwards`, `/snats` (GridSection) | config-table row labels visible (`.fs-stacked` cards / `@container 960`) |
 | #10 | `admin/network/dhcp` (a page with hidden tabs) | no empty scroll below the content |
-| #41, #75 | `admin/network/network`, `admin/system/startup` (a page with a tab strip) | switch tabs: the pane the reader LEFT keeps no `min-height`, and the tab they opened starts where the page starts. `floor-contract` asks it automatically — it clicks the strip and reads the inactive panes — because the fault is invisible on a page that is only loaded and, on a page that does not poll, never goes away by itself |
-| the iPhone report | `admin/status/overview` on a narrow window, scrolled off the top | the page does not creep upward once per poll tick. `fit-quiet` asks the cause automatically — `#maincontent` may not move in either direction while the chrome measures itself — because the symptom needs an engine with no scroll anchoring and does not reproduce headless |
+| #41, #75 | `admin/network/network`, `admin/system/startup` (a page with a tab strip) | switch tabs: the pane the reader LEFT keeps no `min-height`, and the tab they opened starts where the page starts. The fault is invisible on a page that is only loaded and, on a page that does not poll, never goes away by itself |
+| the iPhone report | `admin/status/overview` on a narrow window, scrolled off the top | the page does not creep upward once per poll tick. The cause: `#maincontent` moved while the chrome measured itself; the symptom needs an engine with no scroll anchoring and does not reproduce headless |
 | #11 | `admin/status/overview` (client list) | the "Network" column is not crushed, rows are not over-wide |
 | #17 | the release assets, not a page | `manifest.txt` **and** `manifest.txt.sig` are present; `latest/download/manifest.txt` serves that file; `usign -V` passes with `release.pub`; `awk '$1=="pkg"'` yields one line per format; no install or update path touches `api.github.com`. **The manifest is now load-bearing for installs**, not only for readers: a router the feed cannot serve is installed from it (`install.sh` -> `install_from_release`), so a manifest that does not verify is an install that refuses |
 
-**Why #17 is here and not "CI will catch it".** CI does check it (the `release` job compares the
-served `latest/download/manifest.txt` against the built one), but a manifest failure is **invisible
-on the page**: the theme looks fine while installation breaks for new users and the update badge
-breaks for existing ones — on someone else's router, weeks later. That is exactly the failure shape
-this file exists for.
-
-### The stale `live-audit` baseline
-
-A baseline entry no run reproduces is a hole in the ratchet: a regression with that signature
-passes silently. Only a full sweep (`--pages-all`) can call an entry stale, so the evidence is
-CI's `deep` job, which a push does not run. Before the tag, dispatch the workflow on `main`
-(`gh workflow run build.yml --ref main`) and download every `live-audit-seen-deep-*` artifact of
-that run, all three routers: a shard that stopped on an unreached or frozen page writes none (one
-red only on NEW findings still writes it).
-
-`deep`'s own "N not reproduced on their own stand" is evidence, not the decision: a shard has one
-router, so its "M would be dropped" equals N (owrtsnap 48/48, owrt2512 8/8) and says nothing.
-Mostly it is an app that stand lacks. The decision is M from a dry run on the core stands with
-every deep file (nothing is written; it exits by findings as usual):
-
-```sh
-node tools/live-audit.mjs --only owrt2512,owrt2410,owrtsnap --pages-all \
-  --seen-in <every live-audit-seen-deep-*.json, comma-separated>
-```
-
-It prints "N baseline entr(ies) not reproduced on their own stand; M would be dropped by --update --prune". Prune only
-when M is above zero, never from one machine alone — the baseline is a union across platforms
-(measured 2026-10-18: N=55-56 across two runs, M=0 with the three deep files, so nothing to prune). Then the same command with
-`--update --prune` added; the dropped entries are printed, and the baseline goes into the release
-commit.
+**Why #17 is here.** A manifest failure is **invisible on the page**: the theme looks fine while
+installation breaks for new users and the update badge breaks for existing ones — on someone
+else's router, weeks later. That is exactly the failure shape this file exists for.
 
 ## The changelog contract
 
@@ -205,7 +139,7 @@ once accumulated a **duplicate `### Changed`** over several commits: each commit
 own, and `release-notes.sh` would have printed two "Changed" groups on the release page with nothing
 failing, because the notes are generated at tag time, when the tag is already pushed.
 
-**Everything about the prose below, the gate cannot check.** That part is on you.
+**Everything about the prose below, the script cannot check.** That part is on you.
 
 ### What we chose
 
@@ -234,7 +168,7 @@ Changelog on all three.** Do not "correct" entries toward the other standard.
 - **No empty sections.** No bullets, no heading.
 - Not all eight need to be present. A normal release is `Added`/`Changed`/`Fixed`, sometimes
   `Performance`.
-- **`Development` is for changes a theme user never sees:** the crew, hooks, gates, CI, tooling, tests
+- **`Development` is for changes a theme user never sees:** CI, the e2e check, tooling
   and agent docs. An entry is user-facing when it changes what a router running the package shows or
   does (`luci-theme-footstrap/**`, `install.sh`, the feed, the published package) and goes under
   `Added`/`Changed`/`Fixed`/…; everything else goes here. A fix to the trust chain a user installs
@@ -271,8 +205,11 @@ Changelog on all three.** Do not "correct" entries toward the other standard.
 
 **Every commit writes into `## [Unreleased]` in the same commit as the code**, in both files.
 A changelog written afterwards is written from the diff, and the diff is precisely what does not know
-why. Documentation, benchmarks, CI and packaging commits count too; only `CLAUDE.md` and a fix to an
-entry already written skip it (`.claude/rules/changelog.md`, enforced by `precommit-gate.sh`).
+why. Documentation, benchmarks, CI and packaging commits count too; only a fix to an entry already
+written skips it. Write both with one call so neither half can be forgotten:
+`node tools/changelog.mjs add <0-7> --en '- **…**' --ru '- **…**' && git commit …` (0 = Added …
+7 = Development; it writes the worktree and the index and recreates the heading when a release left
+none). List existing entries with `grep -n '^- \*\*' CHANGELOG.md` rather than reading the block.
 
 ### The bilingual mirror
 
@@ -289,11 +226,23 @@ from the diff after the fact; a self-reference to a commit hash.
 
 ## The runbook
 
-Only after everything above has passed. `/release` walks these steps in order. It is model-invoked
-on purpose, so "делай тег" lands in this procedure rather than in a bare `git tag` (0.14.15 was
-tagged that way, with no security review and before CI on the release sha); the tag itself stays
-gated by step 5 below, the `git-guard` hook and the `ask` rule.
+Only after everything above has passed, in this order: the tag points at a commit that already
+carries its own changelog section, and every CI job reads the sha the tag will name ("делай тег" means
+this procedure, not a bare `git tag`: 0.14.15 was tagged that way, with no security review and
+before CI on the release sha). A readiness question ("готов ли main") runs step 0 alone and reports
+each command with its verdict. `<v>` is the new version, `<prev>` the last tag; scratch output goes
+to `../tmp/release-<v>/`.
 
+0. **Readiness** — any red stops here, with its owner named:
+   - scope the diff (Step 1 above says which live checks it makes mandatory) and run those rows
+     plus asset selection (Steps 3 and 4) on both stands ([verifying.md](verifying.md));
+   - Build's newest completed push run on `main` is `success` and is read job by job (`build`,
+     both `e2e` legs, `playground`);
+   - `~/go/bin/owfeed lock` exits 0 at the repo root **and** in a fresh
+     `gh repo clone owfeed/owfeed-packages ../tmp/release-<v>/feed -- --depth 1` (a stale lock
+     there reds the feed's `check / build` after the tag);
+   - the security review of the whole release (Step 2's recipe), verdict saved to
+     `../tmp/release-<v>/security.md`; any finding goes to the maintainer before the tag.
 1. Rename `[Unreleased]` to `## [x.y.z] — YYYY-MM-DD` in both `CHANGELOG.md` and
    `CHANGELOG_ru.md`, and add the `compare/` link at the bottom of each. Sections in the canonical
    order, every bullet with a `bold lead`.
@@ -323,9 +272,9 @@ gated by step 5 below, the `git-guard` hook and the `ask` rule.
    `v0.14.12`: any one red leg holds the whole release, including a leg red for a reason that has
    nothing to do with the diff — infrastructure or an upstream feed, not this release's code. **The
    release is not cut until the tag's own run is read, job by job, not merely waited on**:
-   `tools/ci-watch.sh --sha <sha>` (detached through `tools/bg.sh`) for the verdict, `gh run view
-   <id>` for the job list, `tools/ci-log.sh <id>` for a failing step's decisive lines; say plainly whether the cause is this diff, an infrastructure condition, or an upstream feed. `deep`
-   and `release-assets` run here and nowhere before, so this is their first reading. Only then check
+   `gh run list --commit <sha>` for the tag's runs, `gh run watch <id> --exit-status` for the
+   verdict, `gh run view <id>` for the job list, `gh run view <id> --log-failed` for a failing
+   step's log; say plainly whether the cause is this diff, an infrastructure condition, or an upstream feed. Only then check
    the release carries the expected assets (plus a `.sig` for each): the theme resolving to exactly
    one asset per format, the manifest, the installer, the notes.
 8. **Publish the feed, and do not wait on the schedule.** The theme is installed from

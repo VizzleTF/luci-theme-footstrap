@@ -68,11 +68,7 @@ else
 	#    exists. The staged copies are rewritten, never $SRC.
 	"$SRC/mangle-tokens.sh" "$CSS" "$STAGE/www/luci-static/resources" "$STAGE/usr/share/ucode/luci"
 
-	# 4. The gate-only exports, BEFORE uglify-js — the marker is a comment, and uglify-js takes every
-	#    comment with it. See strip-build.sh for what a probe is and why a router does not need it.
-	"$SRC/strip-build.sh" probes "$STAGE/www/luci-static/resources"
-
-	#    …then uglify-js. On the SDK path this was optional (luci.mk's jsmin was the fallback for a
+	# 4. uglify-js. On the SDK path this was optional (luci.mk's jsmin was the fallback for a
 	#    buildbot with no node); there is no jsmin here, so it is the only minifier and a
 	#    missing node is a failed build rather than a bigger package.
 	node "$ROOT/tools/minify-js.mjs" "$STAGE/www/luci-static/resources"
@@ -144,8 +140,8 @@ chmod +x "$DIST/scripts/"*
 # language gets its own staging directory holding only its own .po. Package names and the
 # catalogue basename are luci.mk's (`luci-i18n-footstrap-<lang>`), and so is the uci-defaults line
 # that puts the language in LuCI's menu. The label is copied from luci.mk's LUCI_LANG.<code>
-# table; a language with no entry stops the build. tools/i18n-packages.mjs holds this table, po/
-# and owfeed.yml to each other.
+# table; a language with no entry stops the build. Adding a language means touching this table, po/
+# and owfeed.yml together.
 lang_name() {			# <code> -> the label LuCI shows
 	case "$1" in
 		es) echo 'Español (Spanish)' ;;
