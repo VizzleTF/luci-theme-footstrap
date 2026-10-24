@@ -332,10 +332,23 @@ async function session(browser, viewport) {
 	return { ctx, page, seen };
 }
 
-/* Every pass is timed: the log says where a slow run spent it. */
-async function pass(name, items, fn) {
+/* Pages read at once, each in a logged-in context of its own. Most of a page's time is the span it
+ * is watched, so four cut a pass about fourfold; the reference and footstrap run at the same count,
+ * so the router carries the same load under both. */
+const WORKERS = 4;
+const sessions = (browser, viewport) => Promise.all(Array.from({ length: WORKERS }, () => session(browser, viewport)));
+const closeAll = (list) => Promise.all(list.map((s) => s.ctx.close()));
+
+/* Every pass is timed: the log says where a slow run spent it. Each session takes the next item. */
+async function pass(name, items, list, fn) {
 	const t0 = Date.now(), out = {};
-	for (const x of items) out[x.path || x] = await fn(x);
+	let next = 0;
+	await Promise.all(list.map(async (s) => {
+		while (next < items.length) {
+			const x = items[next++];
+			out[x.path || x] = await fn(s, x);
+		}
+	}));
 	console.log(`  ${name}: ${items.length} in ${Math.round((Date.now() - t0) / 1000)} s`);
 	return out;
 }
@@ -347,23 +360,26 @@ async function crawl(browser) {
 	const DESK = { width: 1280, height: 800 }, PHONE = { width: 390, height: 844 };
 
 	setTheme('/luci-static/bootstrap');
-	const ref = await session(browser, DESK);
-	const paths = (await menuPaths(ref.page)).filter((p) => !/\/logout$/.test(p));
+	const refs = await sessions(browser, DESK);
+	const paths = (await menuPaths(refs[0].page)).filter((p) => !/\/logout$/.test(p));
 	check('the menu lists pages', paths.length > 0, `${paths.length} pages`);
-	const bs = await pass('bootstrap', paths, (p) => open(ref.page, ref.seen, p, { shotDir: dir('bootstrap'), span: LONG, reference: true }));
-	await ref.ctx.close();
+	const bs = await pass('bootstrap', paths, refs, (s, p) => open(s.page, s.seen, p, { shotDir: dir('bootstrap'), span: LONG, reference: true }));
+	await closeAll(refs);
 	setTheme('/luci-static/footstrap');
 
-	const desk = await session(browser, DESK);
-	const desktop = await pass('desktop', paths, (p) => open(desk.page, desk.seen, p, { shotDir: dir('footstrap', 'desktop'), span: LONG, menu: true }));
+	const desks = await sessions(browser, DESK);
+	const desktop = await pass('desktop', paths, desks, (s, p) => open(s.page, s.seen, p, { shotDir: dir('footstrap', 'desktop'), span: LONG, menu: true }));
+	await closeAll(desks.slice(1));
+	/* one page, entry after entry: each click leaves from the view the last one rendered */
+	const desk = desks[0];
 	const entries = await menuEntries(desk.page);
 	await desk.page.goto(BASE + entries[entries.length - 1].path, { waitUntil: 'load' }).catch(() => {});
-	const clicks = await pass('click', entries, (e) => click(desk.page, desk.seen, e));
+	const clicks = await pass('click', entries, [ desk ], (s, e) => click(s.page, s.seen, e));
 	await desk.ctx.close();
 
-	const phoneS = await session(browser, PHONE);
-	const phone = await pass('phone', paths, (p) => open(phoneS.page, phoneS.seen, p, { shotDir: dir('footstrap', 'phone'), span: SHORT, menu: true }));
-	await phoneS.ctx.close();
+	const phones = await sessions(browser, PHONE);
+	const phone = await pass('phone', paths, phones, (s, p) => open(s.page, s.seen, p, { shotDir: dir('footstrap', 'phone'), span: SHORT, menu: true }));
+	await closeAll(phones);
 
 	const pages = [];
 	for (const p of paths) {
@@ -421,10 +437,10 @@ try {
 	} finally { await browser.close(); }
 
 	/* the installed build, still the active theme */
-	const anchor = spawnSync(process.execPath, [ join(ROOT, 'tools', 'anchor-check.mjs'), '--router', opt.router ], { encoding: 'utf8', timeout: 600000 });
+	const anchor = spawnSync(process.execPath, [ join(ROOT, 'tools', 'anchor-check.mjs'), '--router', opt.router ], { encoding: 'utf8', timeout: 900000 });
 	const anchorLog = `${anchor.stdout || ''}${anchor.stderr || ''}`;
 	writeFileSync(join(OUT, 'anchor-check.txt'), anchorLog);
-	check('a poll tick that grows the page leaves the reader in place', anchor.status === 0,
+	check('a poll tick that changes the page above the reader leaves them in place', anchor.status === 0,
 		anchorLog.split('\n').filter((l) => /^FAIL |^anchor-check /.test(l)).join(' | ') || `exit ${anchor.status}`);
 
 	const rmOut = remove();

@@ -212,8 +212,8 @@ theme. Both legs run it because the templates are identical but the interpreters
 construct 25.12's ucode accepts is no proof that 24.10's does.
 
 After the crawl, with the build still installed and active, `tools/e2e.mjs` runs
-`tools/anchor-check.mjs`: a poll tick growing Status > Overview above a parked reader must leave
-them where bootstrap does in Chromium, Firefox and WebKit, and where nothing anchors the theme's own
+`tools/anchor-check.mjs`: a poll tick growing Status > Overview above a parked reader, and one
+shrinking it back, must leave them where bootstrap does in Chromium, Firefox and WebKit, and where nothing anchors the theme's own
 correction must hold them ([verifying.md](verifying.md) "What the check proves").
 
 Screenshots (one per page and width), `report.json` and `anchor-check.txt` are uploaded as artifact

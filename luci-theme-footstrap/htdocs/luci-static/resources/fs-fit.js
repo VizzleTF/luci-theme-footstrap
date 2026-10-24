@@ -163,15 +163,15 @@ function sampleMotion() {
 	_sampling = false;
 	/* The offset's own response to the write below, not a reference element's drift: one re-established
 	 * on wrong ground shows none. */
-	const target = _deferredFloor;
-	_deferredFloor = null;
-	const floorBefore = (target && target.isConnected) ? (parseFloat(target.style.minHeight) || 0) : 0;
+	/* Only a box wholly above the viewport moves the reader when it gives its floor up. */
+	const floorsAbove = [..._deferredFloors].filter((b) => b.isConnected && b.getBoundingClientRect().bottom <= 0)
+		.map((b) => [ b, parseFloat(b.style.minHeight) || 0 ]);
+	_deferredFloors.clear();
 	const offsetBefore = scrollTop();
 	holdFloor();
-	if (target && target.isConnected) {
-		const shrink = floorBefore - (parseFloat(target.style.minHeight) || 0);
-		if (shrink > 1) settleDeferredFloor(offsetBefore, shrink);
-	}
+	let shrink = 0;
+	for (const [ b, h ] of floorsAbove) shrink += h - (parseFloat(b.style.minHeight) || 0);
+	if (shrink > 1) settleDeferredFloor(offsetBefore, shrink);
 	rememberRest();
 	if (_deferred) {
 		_deferred = false;
@@ -255,7 +255,9 @@ const ENGINE_ANCHORS = (() => {
 
 let _rest = null;
 let _restAt = null, _restPage = null;
-let _deferredFloor = null;
+/* Every floored box a tick refilled while the reader scrolled: one tick refills several, and keeping
+ * one lost the lease table's 172px. */
+const _deferredFloors = new Set();
 function pageStamp() {
 	return (document.body && document.body.getAttribute('data-page')) || '';
 }
@@ -336,30 +338,19 @@ function anchorEnabled() {
 	try { return localStorage.getItem('fsAnchor') !== 'off'; }
 	catch (e) { return true; }
 }
-/* A floor `holdFloor()` could not clear at mutation time, cleared later with nobody watching: its
- * own frame slot, and the offset's own response to the write below as the check. Not gated on
- * `scrolling()` — the belated write is what the engine reacts to, and the reaction re-arms the
- * motion window, still reading true one rAF later on all three cells. */
-let _floorLateFrame = 0;
+/* Floors `holdFloor()` could not clear while the reader scrolled, cleared once they let go: written
+ * in the frame the floors came off, so no frame is painted with the reader moved. The offset as
+ * laid out after the clear tells whether the engine already gave it back. */
 function settleDeferredFloor(offsetBefore, shrink) {
-	if (_floorLateFrame) return;
-	_floorLateFrame = requestAnimationFrame(() => {
-		const seen = scrollTop();
-		_floorLateFrame = requestAnimationFrame(() => {
-			_floorLateFrame = 0;
-			if (!anchorEnabled() || Date.now() < _userUntil) return;
-			if (_restPage !== pageStamp()) return;
-			if (scrollTop() !== seen) return;		/* still settling, or the reader has moved */
-			const wanted = offsetBefore - shrink;
-			const gap = wanted - seen;
-			/* 16: a 32-36 row lease table rounds by 8-12.25px at 390 wide */
-			if (Math.abs(gap) <= 16) return;		/* the engine already gave it back */
-			if (Math.abs(gap) > (window.innerHeight || 800)) return;
-			writeOffset(scrollTop() + gap);
-			if (_rest) { _rest.top -= gap; if (_rest.sec) _rest.secTop -= gap; _rest.at = scrollTop(); }
-			_restAt = scrollTop();
-		});
-	});
+	if (!anchorEnabled() || Date.now() < _userUntil) return;
+	const seen = scrollTop();
+	const gap = offsetBefore - shrink - seen;
+	/* 16: a 32-36 row lease table rounds by 8-12.25px at 390 wide */
+	if (Math.abs(gap) <= 16) return;		/* the engine already gave it back */
+	/* no cap at the viewport: four leases stacked at 390px give up 1032px, all of it above */
+	writeOffset(seen + gap);
+	if (_rest) { _rest.top -= gap; if (_rest.sec) _rest.secTop -= gap; _rest.at = scrollTop(); }
+	_restAt = scrollTop();
 }
 
 function scheduleAnchor(ref) {
@@ -400,19 +391,17 @@ function observeContent() {
 	const viewHost = hosts[0];
 	_mo = new MutationObserver((records) => {
 		const ref = ENGINE_ANCHORS ? null : anchorFor();
-		/* the floored box the record sits in, since `dom.content()` refills a node inside the pinned box
-		 * on 1 of 12 nodes */
-		let box = null;
-		for (const m of records) {
-			if (m.type !== 'childList') continue;
-			const b = m.target.closest(FLOORED);
-			if (b) { box = b; break; }
-		}
 		const wasScrolling = scrolling();
-		/* only a box already floored before run(): one run() floors now has nothing to settle later */
-		if (box && wasScrolling && (parseFloat(box.style.minHeight) || 0) > 0) _deferredFloor = box;
+		/* every floored box a record sits in, since `dom.content()` refills a node inside the pinned box
+		 * on 1 of 12 nodes, and one batch refills several: only the first lost the lease table's.
+		 * Only a box already floored before run(): one run() floors now has nothing to settle later. */
+		if (wasScrolling)
+			for (const m of records) {
+				const b = m.type === 'childList' && m.target.closest(FLOORED);
+				if (b && (parseFloat(b.style.minHeight) || 0) > 0) _deferredFloors.add(b);
+			}
 		run(records);
-		if (!wasScrolling) _deferredFloor = null;
+		if (!wasScrolling) _deferredFloors.clear();
 		/* `#view` itself emptied and refilled is a page swap: a reference measured mid-swap is read 431px
 		 * out and written over a correct restoreScroll(). */
 		let gone = 0, came = 0;

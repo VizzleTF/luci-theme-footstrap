@@ -21,7 +21,9 @@ apps but not this theme, the way an admin lives it:
 4. **Every page of the menu is opened** — every leaf whose action is a view, a template or a CBI
    map, logout excepted. First under bootstrap, the reference, at 1280 px; then under footstrap by
    a full load at 1280 px and at 390 px, and every entry of footstrap's menu (each top-level entry
-   and each entry under one, from the router's own menu tree) by a click on its link. Then
+   and each entry under one, from the router's own menu tree) by a click on its link. The full-load
+   passes read four pages at a time, each in a logged-in context of its own, the same count under
+   both themes; the click pass is one page, entry after entry. Then
    `tools/anchor-check.mjs` (below) runs against the installed build.
 5. **Remove the package.** LuCI falls back to bootstrap and still serves its login form (LuCI
    answers the form with a 403, so the body is the evidence, not the status).
@@ -62,31 +64,38 @@ first, closest to the router's boot, so a state an app is still settling into la
 bootstrap. Errors and requests are compared as signatures with session ids, numbers and query
 strings removed; an error's signature carries the file it was thrown from.
 
-`tools/anchor-check.mjs` checks that a poll tick growing the page above a parked reader leaves
+`tools/anchor-check.mjs` checks that a poll tick changing the page above a parked reader leaves
 them in place, in Chromium, Firefox and WebKit at 1280 and 390 px. It appends 4 DHCP leases to the
-router's `/tmp/dhcp.leases` (restored afterwards), so LuCI's own poll grows the lease table on
-Status > Overview. The reader is parked by mouse wheel on the heading of the section below the
-leases, at the top of the viewport. Every frame for 15 s it records the median viewport shift of
-the elements that were in view and whose text is unique on the page. Per engine and width it runs
-four cells:
+router's `/tmp/dhcp.leases`, so LuCI's own poll grows the lease table on Status > Overview, then
+puts the file back, so the next poll takes the rows away. The reader is parked by mouse wheel on
+the heading of the section below the leases, at the top of the viewport, and holds still through
+each change. A third change does the shrink again while the reader keeps the wheel going, 20 px a
+step around their place, until the tick has landed, and is read from the moment they let go: the
+containers `fs-fit.js` floors keep their height while the reader scrolls and give it up after,
+above them. Bootstrap floors nothing, so it is no reference for that one. Each change is read from
+a fresh park and judged on its own. Every frame for 15 s (4 s after a let-go) it records the
+median viewport shift of the elements that were in view and whose text is unique on the page, and
+counts the frames painted with the reader off place (more than 2 px): a `ResizeObserver` on
+`#view` reads the shift after every animation frame callback of the frame, the theme's correction
+included, and before the paint. Per engine, width and change it runs four cells:
 
 | Cell | Passes when |
 |---|---|
 | bootstrap | it measured something; it is the reference |
-| footstrap | its end shift is at most 2 px larger than bootstrap's, and it shows the reader off place (more than 2 px) in no more frames than bootstrap |
-| footstrap without native anchoring: `CSS.supports()` answers no for `overflow-anchor`, `overflow-anchor: none` on every element | its end shift is at most 2 px, and it shows the reader off place in at most one frame, the one the correction is written in |
-| the same with `fsAnchor=off` in localStorage | it moves the reader by at least half the growth, else the cell above proves nothing |
+| footstrap | its end shift is at most 2 px larger than bootstrap's, and it shows the reader off place in no more frames, sampled or painted, than bootstrap |
+| footstrap without native anchoring: `CSS.supports()` answers no for `overflow-anchor`, `overflow-anchor: none` on every element | the change above the reader matches the footstrap cell's within 8 px (else the emulation changed the page), its end shift is at most 2 px, and no painted frame shows the reader off place |
+| the same with `fsAnchor=off` in localStorage | it moves the reader by at least half the change and at least one painted frame shows it off place, else the cell above proves nothing |
 
-A cell that measured nothing fails: the document grew by less than 50 px, offset plus shift do not
-add up to the growth (within 8 px, so the growth was not above the reader), fewer than 5 elements
-were tracked, or there was no section to park on. The step fails with every `FAIL` line in its
-detail. The router needs at least one lease in `/tmp/dhcp.leases` (owlab's fixtures seed them).
+A cell that measured nothing fails: less than 50 px changed above the reader (the move of their
+content in the document, the offset's share plus the viewport's, so what changes below them does
+not count), no tick landed while they scrolled, fewer than 5 elements were tracked, or there was no
+section to park on. The step fails with every `FAIL` line in its detail. The router needs at least one lease in `/tmp/dhcp.leases` (owlab's fixtures seed them).
 
 How long a page is watched after its view rendered:
 
 | Pass | Span |
 |---|---|
-| bootstrap, 1280 px | 1 s, then until nothing has been in flight for a second, 10 s at most |
+| bootstrap, 1280 px | 6 s, then until nothing has been in flight for a second, 10 s at most |
 | footstrap full load, 1280 px | 6 s: one LuCI poll interval (5 s, `pollinterval`'s default) and 1 s for the tick's handlers; theme code that runs late runs on a tick or on a timer of its own, the longest of which is `fs-router.js`'s 5 s warm wait |
 | footstrap full load, 390 px, and the click pass | 1 s |
 
@@ -106,8 +115,9 @@ What it does not judge, so a change there is looked at by hand on both routers (
   no real Safari runs;
 - the sidebar and rail layouts, the palettes, RU text and RTL: the run uses the defaults (the top
   bar, the default palette, English);
-- the reader's scroll position anywhere but the anchoring check's one page and growth, and Back
-  after a client navigation;
+- the reader's scroll position anywhere but the anchoring check's one page and its three changes
+  (a growth and a shrink under a reader holding still, a shrink under one scrolling), a change
+  below the reader, and Back after a client navigation;
 - a page reached only through a tab strip, by a click (it is still opened by a full load);
 - `install.sh`, the feed and the trust chain — e2e installs package files directly;
 - ImmortalWrt, 23.05 and hardware.
@@ -139,6 +149,13 @@ and the same on `owrt2410` with `luci-theme-footstrap_*_all.ipk` and
   `owlab sync`ed one included: `node tools/anchor-check.mjs --router owrt2512 [--engines webkit]
   [--widths 390]`. It switches the theme to bootstrap for its reference cells and back to footstrap.
   Exit 0 on a pass, 1 on a failure, 2 when the router is not running or has no lease.
+- Whether the anchoring check can fail at all: `node tools/anchor-mutants.mjs --router owrt2512`
+  puts known-bad dev builds of `fs-fit.js` on the router one at a time (the offset read inside the
+  scroll event, the correction a frame late, no correction, no floor, no deferred floor), runs the
+  check against each and reports which it killed, then puts the normal build back. Exit 1 when one
+  survived, 2 when a mutant's text is no longer in `fs-fit.js`. Run it after changing `fs-fit.js`
+  or the check; it takes about as long as the check per mutant, so pass `--widths 390` for a quick
+  pass. A surviving mutant is a hole in the check, or code the check never reaches.
 
 ## Reading a run
 
@@ -153,7 +170,7 @@ gh run download <run-id> -n e2e-owrt2410 -D ../tmp/e2e-ci-owrt2410
 | `report.json` | `results`: every step as `{ step, ok, detail }`; `crawl.pages`: one entry per path and way of opening it (`desktop`, `phone`, `click`) with its `problems`; `crawl.bootstrap` and `crawl.footstrap`: what each pass read on each path (errors and failed requests with the ms after render they showed up, the visible text, the stylesheet's rule count, the token, the menu) |
 | `footstrap/desktop/*.jpg`, `footstrap/phone/*.jpg` | one screenshot per page at 1280 and 390 px, named after the path (`admin_status_overview.jpg`) |
 | `bootstrap/*.jpg` | the same pages under bootstrap at 1280 px |
-| `anchor-check.txt` | `tools/anchor-check.mjs`'s log: per engine and width the growth and, per cell, the end shift, the largest shift and the frames off place, then the `FAIL` lines |
+| `anchor-check.txt` | `tools/anchor-check.mjs`'s log: per engine, width and change (grow, shrink), per cell the end shift, the largest shift, the frames off place sampled and painted, and the change in px, then the `FAIL` lines |
 
 The log prints `PASS`/`FAIL` per step and, under the crawl step, one line per failing page and way
 of opening it. A failure in an install, upgrade or removal step carries the package manager's last
