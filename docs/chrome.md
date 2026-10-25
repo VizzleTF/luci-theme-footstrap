@@ -57,9 +57,8 @@ There is no separate topbar inside `main`: the page title is a visually hidden `
 lives in the sidebar. The `◂` button (`#fs-rail-toggle`) collapses the sidebar to a 68 px icon rail
 with flyouts.
 
-**`.fs-sr` clips, it does not hide.** This was `hidden` once — that is `display:none`, which drops
-the element out of the accessibility tree: the `<h1>` effectively did not exist while the SPA
-router dutifully updated the title inside it. Clipping (as `.fs-skip` does) keeps it in the tree.
+**`.fs-sr` clips, it does not hide.** `hidden` is `display:none`, which drops the element out of
+the accessibility tree. Clipping (as `.fs-skip` does) keeps it in the tree.
 Beside it sits `#fs-nav-status` (`role="status"`, `aria-live="polite"`), where the router writes
 the page title after every SPA navigation — without it, a page change without a reload does not
 happen at all for a screen reader.
@@ -88,48 +87,50 @@ full sidebar.
 remainder with `--fs-content-min`; it **reads the widths from the CSS tokens** (`--fs-sidebar-w`,
 `--fs-rail-w`, `--fs-content-min`) through `getComputedStyle` rather than
 keeping copies — otherwise narrowing the rail in the styles would leave the measurement subtracting
-the old number, and no gate would notice. The result is `data-narrow` on `:root`, read by both the
+the old number, and nothing would notice. The result is `data-narrow` on `:root`, read by both the
 CSS and `flyoutMode()` in the JS.
 
 **The subtraction itself is `columnWidth()`, and there is exactly one of it.** Two callers need the
 width of the content column — `fitShell()`, deciding whether the sidebar still fits beside it, and
-`contentWidth()`, which answers `fitTables()` mid-scroll where reading layout per table is forbidden — and
-while the arithmetic was written twice it drifted twice: the gutter in `shellGeometry()` is already BOTH
-sides, so one copy subtracted it twice, and the top-BAR layout has no
-sidebar to subtract although it carries no `data-narrow` either (`fitShell()` removes it on the way
-out). Both errors are invisible in a screenshot and both are worth enough to push a table across
-`fitTables()`'s cramped threshold. The gutter it subtracts is MEASURED off `.fs-content` rather than read from
-the `--fs-content-pad` token (no longer read at all): the same sheet re-paddings that element to 16px a side below 767px while the
-token stays 28, and a media query has no `data-*` to key on — nor may its breakpoint be copied into
-the JS. So the model asks the element what it actually got.
-
-The arithmetic is unit-tested per combination (`tests/chrome-geometry.test.mjs`); whether its inputs
-still describe the real page is checked on a stand, where `live-audit` compares `contentWidth()`
-against the live `.fs-content` box. That check is what caught the gutter, on every page at 320, 390
-and 568.
+`contentWidth()`, which answers `fitTables()` mid-scroll where reading layout per table is forbidden. The
+gutter in `shellGeometry()` is already BOTH sides, and the top-BAR layout has no sidebar to subtract
+although it carries no `data-narrow` either (`fitShell()` removes it on the way out). The gutter it
+subtracts is MEASURED off `.fs-content` rather than read from the `--fs-content-pad` token: the same
+sheet re-paddings that element to 16px a side below 767px while the token stays 28, and a media
+query has no `data-*` to key on — nor may its breakpoint be copied into the JS.
 
 The model answers below the column's `max-width` and has no cap of its own: both callers ask a lower bound
 (500, 568), and the width slider's floor (1280) keeps a capped column at >= 1216px, above both, so a cap
-would change no decision. `live-audit` skips a column held at its `max-width` instead of comparing it exactly.
+would change no decision.
 
 **`contentWidth()`'s width is compared fresh on every call, not just cached from the last fitter.**
 `_shellOuter` (the window width `columnWidth()` subtracts from) is written only by `measureShell()`,
 which only `fitShell()` calls, and `fitChrome()` steps aside for the whole `SCROLL_IDLE` window
 (400 ms, `fs-fit.js`) whenever `fit.scrolling()` answers yes — a resize starts that window the same
 way a flick does. A caller landing inside it — `fitTables()`'s, most of all, since it asks mid-scroll
-by design — got the PREVIOUS viewport's width: a resize from 568 to 390 still answered 568 for up to
-220 of the 400 ms, and the same shape held at every step of `live-audit`'s width list (−70 at
-320→390, −178 at 568→768 read backwards, −256 at 1024→1440 — always exactly the gap between the two
-adjacent widths). `contentWidth()` now compares `document.documentElement.clientWidth` against
-`_shellOuter` on every call and re-runs `measureShell()` when they differ, rather than only when
-`_shellOuter` was still unset. That comparison is the one layout read the function's "no layout
-read" promise was already conditional on (the bootstrap branch made the same call). The read forces
+by design — would get the PREVIOUS viewport's width from a cache. So `contentWidth()` compares
+`document.documentElement.clientWidth` against `_shellOuter` on every call and re-runs
+`measureShell()` when they differ. That comparison is the one layout read the function's "no layout
+read" promise is conditional on. The read forces
 layout when it is dirty on classic-scrollbar engines (overlay-scrollbar phones skip the flush), so
 `fitTables()` takes it once per mid-scroll pass, lazily, not once per unanswered table.
 
 The measurement, the observer and the coalescing live in `fs-fit.js`, the theme's one "does it
 still fit?" engine (also used by `fitTables` in `fs-select.js`). **A new fit decision registers with
 `fit.add()`; do not grow a second observer.**
+
+**The same observer keeps the reader in place when a poll tick grows the page above them.** While a
+tick refills a container, `holdFloor()` holds it at its last height, so a layout taken mid-refill
+cannot clamp the offset into a shorter document. Where the engine anchors itself
+(`CSS.supports('overflow-anchor', 'auto')`: Chrome 56+, Firefox 66+, Safari and iOS 27+), the
+engine moves the offset and the observer takes no reference. Elsewhere (Safari and iOS before 27) the
+observer takes a reference element at the top of the view before the mutation and writes its drift
+back on the next frame (`anchorFor()`, `scheduleAnchor()`, `applyAnchor()`). The `scroll` listener
+reads nothing inside the event, only on the next frame: a layout forced while WebKit dispatches
+`scroll` makes its anchoring controller skip that adjustment and anchor nothing for the rest of the
+document's life, and a sticky or fixed box (`.th`, `#modal_overlay`, the bar) leaves layout dirty at
+that moment. `tools/anchor-check.mjs`, which e2e runs, checks both paths in Chromium, Firefox and
+WebKit against bootstrap ([verifying.md](verifying.md)).
 
 The one literal is `@media (min-width: 521px)` around the vertical override in `20-shell.css`: the
 floor below which no slice leaves a readable 500 px, and simultaneously the safety net with JS
@@ -142,17 +143,12 @@ depends on the number of sections on that particular router, not on the screen.
 **And it pins its own height while it measures.** Rule 1 says take the class off and ask the engine,
 but the bar is the one fitter whose element sits ABOVE the reader on every page: `fs-bar-stack` is
 what gives the menu its own row, so for the widths where the menu does not need one the bar answers
-a row shorter than it stands — 98px against 65px at 767px, 123px against 115px at 480px, on
-owrt2512. That height is what the engine lays the rest of the page out against for the length of the
-pass. Chromium and Firefox put the reader back afterwards; Safari implements no scroll anchoring on
-any platform, and an iPhone reported the Overview creeping upward once per poll tick, bisected there
-to this pass. So `fitChrome()` writes `min-height` at the settled height before it strips the
-classes and takes it off after — the measurement is unchanged, and the box the page is laid out
-against does not move. `tools/fit-quiet.mjs` (`npm run quiet`, in `live`) hooks the two forced
-layouts of the pass (`offsetTop`, `getClientRects()`) and bounds `#maincontent`'s document position
-both ways within 2px of where it started: 0px of dip with the pin, 8px and 33px without it. The symptom itself does not reproduce headless — the pass is
-one synchronous task and both engines restore the offset once the bar is back, measured at half the
-page and at its bottom — which is why the gate watches the cause.
+a row shorter than it stands. That height is what the engine lays the rest of the page out against
+for the length of the pass, and the page creeps upward once per poll tick (seen on iOS). So
+`fitChrome()` writes `min-height` at the settled height before it strips the classes and takes it
+off after — the measurement is unchanged, and the box the page is laid out against does not move.
+The symptom does not reproduce headless (the pass is one synchronous task), so measure
+`#maincontent`'s position at the pass's forced layouts, not the scroll offset afterwards.
 
 ## The bar: fit steps, scroll model, a rail that must match its guard
 
@@ -181,10 +177,10 @@ its own row when the pills alone are not enough.
 
 **Hostname handling is two rules for two different failures.** `overflow-wrap: anywhere` lets a
 long, dot-free hostname's flex min-content shrink so it cannot push the menu out of the bar
-(`nowrap` + ellipsis used to truncate the one string that identifies the router). `-webkit-line-clamp:
-3` bounds the other axis a width cap alone does not reach: at 1280px, 8 characters give the
-ordinary 46px bar, 63 (the kernel's nodename limit) give 73px, and an unbounded name gave a
-4273px-tall bar. Three lines outlasts every real hostname and still reads as a bar.
+(`nowrap` + ellipsis would truncate the one string that identifies the router). `-webkit-line-clamp:
+3` bounds the other axis a width cap alone does not reach: an unbounded name would make the bar
+thousands of pixels tall. Three lines outlasts every real hostname (the kernel's nodename limit is
+63) and still reads as a bar.
 
 **A static sidebar, never `position: sticky` (issue #7).** The desktop sidebar layout pins
 `.fs-shell` to the viewport and scrolls `.fs-main` inside itself, so the sidebar only needs to stay
@@ -198,40 +194,36 @@ leave stale.
 `height: 100svh; overflow: hidden` and `.fs-main` is its own `overflow: auto` scroller, so Chrome
 never grows the document past the viewport — but Firefox propagates an out-of-flow descendant's
 scrollable overflow past both overflow ancestors up to the initial containing block anyway,
-painting a second, whole-page scrollbar beside `.fs-main`'s own: measured on the Overview, where
-the `.fs-ovl` grid makes the column ~2800px tall, `html.scrollHeight` read 1058 against a 900px
-viewport (900 once contained), and the extra 158px dragged the fixed sidebar off-screen even
-though `overflow: hidden` hid the second scrollbar itself. Paint containment makes `.fs-main` the
+growing `html.scrollHeight` past the viewport and dragging the fixed sidebar off-screen (on the
+Overview, whose `.fs-ovl` grid is the tall descendant). Paint containment makes `.fs-main` the
 containing block for that descendant and clips it; LuCI's modals are `position: fixed` on
 `<body>`, not inside `.fs-main`, so the new containing block does not re-base them, and Chrome
 takes no path through this rule at all.
 
 **The rail's guard must be the vertical sidebar's, exactly** — same media floor, same
-`:not([data-narrow])`. It once read `min-width: 768px` against the vertical block's 521px, and
-between the two widths the vertical rules applied without the rail ones: the sidebar sprang back
-to its full 224px as the window shrank — it *expanded* — while the JS measurement was already
-subtracting the rail's 68px. The rail is a MODE of the vertical sidebar and can never be visible
+`:not([data-narrow])`. With a different floor, between the two widths the vertical rules apply
+without the rail ones: the sidebar springs back to its full 224px while the JS measurement is
+already subtracting the rail's 68px. The rail is a MODE of the vertical sidebar and can never be visible
 under conditions the vertical sidebar itself is not.
 
 **A flyout's heading reuses the bar's hover-bridge pseudo-element, and reset every geometry
 property doing it (issue #22).** `li.has-sub > ul::before` is the bar's invisible 10px hover
 bridge above the popup; in the rail the same selector carries the flyout's title instead, and
-leaving `position`, `inset` and `height` in force rendered the heading as a 10px-tall absolute box
-above the flyout, clipped in half by the panel's own overflow. The rail brings its own bridge as
+left in force, `position`, `inset` and `height` render the heading as a 10px-tall absolute box
+above the flyout, clipped by the panel's own overflow. The rail brings its own bridge as
 `li.has-sub::after` instead.
 
 **A collapsed-rail indicator badges its count instead of wrapping its prose (issue #14).** "Unsaved
-Changes: N" wants 86px in a 68px rail: unclamped, the pill wraps onto three lines and hangs 34px
-past the rail's edge over the content. `fs-chrome.js` lifts the count into `data-fs-badge` (a text
+Changes: N" does not fit a 68px rail: unclamped, the pill wraps onto three lines and hangs past
+the rail's edge over the content. `fs-chrome.js` lifts the count into `data-fs-badge` (a text
 node is unreachable by a selector) and the CSS paints a square showing the badge alone, `font-size:
 0` hiding the prose without removing it from the DOM (still read by a screen reader, still in
 `title` for the pointer).
 
-**A bar dropdown anchors to its own `<li>`, not to the bar (issue #19).** `position: static` plus a
-panel pinned at `left: 16px` anchored to the bar's edge instead of its trigger — measured at
-760px, the item at x=253 and the panel at x=32, nothing bridging the diagonal between them, so the
-CSS hover closed before a pointer reached the panel. `clampDropdown` (`fs-chrome.js`) now
-nudges an item near the edge back inside the viewport in every bar state.
+**A bar dropdown anchors to its own `<li>`, not to the bar (issue #19).** A panel anchored to the
+bar's edge leaves a diagonal gap to its trigger, and the CSS hover closes before a pointer reaches
+the panel. `clampDropdown` (`fs-chrome.js`) nudges an item near the edge back inside the viewport
+in every bar state.
 
 **A footer link pair needs 26px, not the type scale's own leading, between their centres (WCAG 2.2
 SC 2.5.8).** The footer is one sentence carrying two links; where it wraps, they land on
@@ -240,8 +232,7 @@ consecutive lines, and with the inherited leading that put 16px between their ce
 is. `line-height: max(26px, calc(var(--fs-type) * 2))` is a floor, not a fixed number, because a
 bare `26px` would be the one leading in the file that ignores the Density axis while a bare
 multiplier falls back under 24px at Compact (11.7px × 2 = 23.4) — exactly where the wrap is most
-likely. Found by `tools/live-audit.mjs` on CI's runner and not on the stands, because the wrap
-width depends on text metrics the two environments render slightly differently.
+likely. Where it wraps depends on text metrics, so it differs between machines.
 
 ## Tab strips
 
@@ -251,20 +242,17 @@ width depends on text metrics the two environments render slightly differently.
 `max-width: none`) except the active marker (`.active` vs `.cbi-tab`).
 
 **`.cbi-tabmenu > li` alone gets `max-width: 100%`, not `none`** (page tabs and the mode switcher
-keep `none`, since neither ever carries a sentence-length label). adblock's Overview page names one
-tab "Настройки межсетевого экрана" — measured 293px in a 264px column at 320px/Large, 28.6px past
-it, the section clipped by 30px; EN measured 0px overflow. The `a` already carries `white-space:
-nowrap; overflow: hidden; text-overflow: ellipsis` (`base/50-chrome.css`); it never engaged because
-the `li`'s `max-width: none` left its automatic minimum size at the label's full content width, so
-flexbox never shrank it. `100%` is smaller than that content width only once the column already is
+keep `none`, since neither ever carries a sentence-length label). A long translated CBI tab label
+(adblock's Overview in Russian) otherwise overflows a phone column. The `a` carries `white-space:
+nowrap; overflow: hidden; text-overflow: ellipsis` (`base/50-chrome.css`), which engages only
+because the `li`'s `max-width` stops its automatic minimum size sitting at the label's full content
+width. `100%` is smaller than that content width only once the column already is
 — a no-op everywhere the tab already fits.
 
 **Keyboard focus on a tab pill uses one ring for both states, `--fs-focus-ring-solo`.**
 `base/50-chrome.css`'s ordinary `outline: 2px solid var(--fs-accent)` is invisible on the active
-pill, whose background is the same accent (measured on the router: both `rgb(86,157,245)`). A tab
-flips nothing else on focus, so the ring alone is the indicator; the tinted `--fs-focus-ring`
-measured 1.15-1.29:1 against the strip in the version that tried it for the inactive pill only, below
-the ring's usual contrast floor. `box-shadow`, not `outline`, because the strip clips overflow and a
+pill, whose background is the same accent. A tab flips nothing else on focus, so the ring alone is
+the indicator; the tinted `--fs-focus-ring` is too low-contrast against the strip. `box-shadow`, not `outline`, because the strip clips overflow and a
 shadow is not clipped by the scroll container.
 
 **Density steps (`fs-dense1` → `fs-dense2`) come from `fitTabStrips()` (`fs-chrome.js`) measuring
@@ -280,8 +268,7 @@ already equal the base), so for tabs `fs-dense2` changes nothing past `fs-dense1
   fill, stroke, 1.9 width and round caps are the one `.fs-ico, .fs-chevron` rule in
   `theme/20-shell.css`, not five attributes per element (100 B each, 300 B of every admin page).
   `header.ut` writes its three inline and `svgIcon()` (`fs-widgets.js`) emits the same markup for
-  the menu and the search palette; a class outside the rule draws a filled black glyph, which
-  `tests/icon-stroke.test.mjs` holds.
+  the menu and the search palette; a class outside the rule draws a filled black glyph.
 - `<body>` → a `.fs-shell` flex wrapper. Before it, the skip link `.fs-skip`
   ("Skip to content" → `#maincontent`), the first tab stop on the page.
 - **Sidebar** — `<nav class="fs-sidebar" aria-label="Menu">`, deliberately `<nav>`: `<aside>` gives
@@ -291,10 +278,9 @@ already equal the base), so for tabs `fs-dense2` changes nothing past `fs-dense1
   - `<div id="indicators">`;
   - `.fs-navlabel` + `<ul class="nav" id="topmenu">` (filled by the menu JS) + `<ul id="modemenu">`;
   - `.fs-spacer` (`flex:1`);
-  - the search button (`#fs-search-btn`, the command palette below) and Log out. An Appearance
-    button used to sit between them; the axes are their own menu entry now
-    (`/admin/system/footstrap`, previously a tab stapled onto System → System), so the chrome
-    carries one control fewer — see [design-system.md](design-system.md).
+  - the search button (`#fs-search-btn`, the command palette below) and Log out. The appearance
+    axes are their own menu entry (`/admin/system/footstrap`) — see
+    [design-system.md](design-system.md).
 - **Main** — `<main class="fs-main" id="maincontent" tabindex="-1">`: the
   `.fs-title-main.fs-sr` `<h1>`, `#fs-nav-status`, and `.fs-content` (warnings, `#tabmenu`, `#view`, footer).
 - Must be preserved: `http.prepare_content`, `cbi.js`, the translations script, `node.css`, `css`,
@@ -303,16 +289,13 @@ already equal the base), so for tabs `fs-dense2` changes nothing past `fs-dense1
 `footer.ut` emits `<footer class="fs-footer" role="contentinfo">` — the role is explicit
 because `<footer>` only gets `contentinfo` implicitly when its nearest ancestor is `<body>`, and
 this one sits inside `<main>`. It hard-loads `L.require('menu-footstrap')` and then
-`L.require('fs-select')`; the `menu_module` parameter that used to pick a renderer went away with
-the second renderer.
+`L.require('fs-select')`.
 
 ## `fs-chrome.js` — the ONLY renderer
 
-There is no `menu-footstrap-top.js`. **A second layout was never a second design**: the sidebar
-renderer already produced markup its own CSS turns into a horizontal bar on a phone, and it already
-had a flyout mode where a section behaves exactly like a top-menu dropdown. The top layout is
-that mode at desktop width. The one piece of unique logic the deleted file carried, `clampDropdown`,
-moved to `fs-chrome.js`.
+**A second layout is not a second renderer**: the sidebar markup is what its CSS turns into a
+horizontal bar on a phone, and its flyout mode makes a section behave exactly like a top-menu
+dropdown. The top layout is that mode at desktop width.
 
 - `renderMainMenu` fills `#topmenu`: an item is
   `<li><a><icon><span class="fs-label">title</span><chevron></a></li>`, active by
@@ -338,9 +321,8 @@ moved to `fs-chrome.js`.
   once, the set remembered in `localStorage` `fs-menu-open`); in the rail, in the bar, or on a
   narrow screen it is an exclusive flyout. `flyoutMode()` decides, and it reads **exactly what the
   stylesheet reads**: `data-rail` / `data-layout=top` / `data-narrow`. Leaving flyout mode restores
-  the accordion (`restoreAccordion()`) — a plain `closeFlyouts()` was not enough, because it
-  stripped `.open` from everything while the markup is not rebuilt on a rail toggle, so "Keep open"
-  stopped meaning anything.
+  the accordion (`restoreAccordion()`), not a plain `closeFlyouts()`: the markup is not rebuilt on a
+  rail toggle, so stripping `.open` from everything would lose the remembered set.
 - `clampDropdown` pushes a dropdown back into the viewport at its inline-end edge (right in LTR, left in RTL, through `inset-inline-start`). Whenever the chrome is
   a BAR (`barDropdown()` — the top layout at any width, or a `data-narrow` sidebar), because that is
   when a panel hangs off its own `<li>`; the rail is excluded, where a flyout is anchored sideways
@@ -350,17 +332,10 @@ moved to `fs-chrome.js`.
 - Hover opening is pure CSS.
 
 - **The width probe's `!important` declarations.** An app carrying `div { min-width: 500px
-  !important }` won every read and folded the sidebar into a bar on a 1857px desktop: the cut became
-  500 + 500 + 1000 = 2000 CSS px, reported as a zoom bug (Chrome at 90 % gives 2063 CSS px and
-  passes, 100 % gives 1857 and fails). `box-sizing` is stated for the same reason, as
-  `getComputedStyle().width` is the content box.
-- **The indicator observer shares `stamp()`'s callback.** On WebKit at 390px a second indicator
-  pushed the page down 91px for 708 ms, until `fs-ind-compact` landed at 771 ms; sharing the
-  callback lands the decision in the microtask before paint.
-- **`contentWidth()` compares the window width fresh on every call.** A resize that moves the offset
-  opens the `SCROLL_IDLE` window (400 ms) itself, and a caller landing in it got the previous
-  viewport's width: 568px settling to 390px stayed 568 for up to 220 ms (-178px = 568 - 390, live
-  geometry audit on 24.10).
+  !important }` would otherwise win every read and fold the sidebar into a bar on a wide desktop.
+  `box-sizing` is stated for the same reason, as `getComputedStyle().width` is the content box.
+- **The indicator observer shares `stamp()`'s callback**, so `fs-ind-compact` lands in the
+  microtask before paint instead of a second indicator pushing the page down for a frame.
 
 ## Dark mode and outward compatibility
 
@@ -374,7 +349,7 @@ switches to it after load.
 **`set()` stamps THREE attributes:** `data-darkmode` (which this theme's CSS reads), plus
 `data-theme` and `data-bs-theme` as outbound compatibility for third-party apps that sniff
 them — `luci-app-justclash` hangs 21 rules on `data-theme`, `ssclash` checks `data-bs-theme`
-first. Nothing inside `styles/` may read the latter two. `tools/axes.mjs` holds the set.
+first. Nothing inside `styles/` may read the latter two.
 
 `<meta name="darkreader-lock">` stops the Dark Reader extension repainting the theme into mush.
 
@@ -407,210 +382,7 @@ at all until you are already there — "Port Forwards" is a tab of Network → F
 returns a copy whose `children` are the alias *target's*. That is right for drawing a menu and
 wrong for indexing: Network → Firewall is an alias onto the `firewall/zones` view, a leaf, so its
 five tabs came back as an empty list and "port" found nothing on a router that plainly has a Port
-Forwards page. Measured on the dev router: 78 indexed nodes through `getChildren()`, with every tab
-of every aliased page missing.
-
-## Keeping the reader's place when the engine will not
-
-**Every mechanism, what each is for and what the sweep measures without it, is in
-[anchoring.md](anchoring.md).** What follows here is the chrome's own half: which element a
-correction may take, and why.
-
-A poll tick changes the height of things above the reader — a station joins the associated list, a
-lease expires, an interface box grows a line — and everything below it moves. Chromium and Firefox
-hide that with **scroll anchoring**: they pick an element the reader can see and compensate the
-scroll offset so it stays put. **WebKit did not implement it until recently**, so on an older Safari
-and on every iPhone of that vintage the same tick moves the page under the reader's thumb. That is
-what "the Overview jitters" was, and it is why it was reported from Safari and an iPhone while the
-same router was still in Chrome. A current WebKit does anchor — and gets a DIFFERENT half of this
-wrong; see "What an engine that anchors still gets wrong" below.
-
-`fs-fit.js` therefore does the job **only where nobody else is doing it**: `ENGINE_ANCHORS` asks the
-platform (`CSS.supports('overflow-anchor', 'auto')` — an engine that does not know the property does
-not have the feature) rather than a browser name, because correcting an offset that the engine also
-corrects means two corrections and a page that jumps the other way.
-
-Three details carry it, and each one was a measured failure first:
-
-- **The reference is what sits at the top of the CONTENT, not the frame the fold cuts through.** A
-  tick that grows something inside that frame leaves the frame's own top exactly where it was —
-  drift 0, measured — while everything after it moves. One hit test below `[data-fs-chrome]` (the
-  bar is sticky and owns the first rows of the viewport; a test at y=1 returns the chrome and the
-  page gets no anchor at all) gives the same element the engine's own algorithm would pick.
-- **It is captured while the page is still, not in the mutation callback.** That callback runs after
-  the DOM changed, so a reference taken there has already moved with it: right for the fitters,
-  which have not run yet, and blind to the tick itself. The resting reference is refreshed after
-  every settled pass, after every correction, and when a scroll stops.
-- **It carries the offset it was taken at.** The reader scrolling and the page growing look the same
-  from the element alone; correcting against a reference from another offset would drag the page
-  back to where the reader had scrolled from.
-- **…and an offset that DROPPED with nobody scrolling, on the page it was taken on, is the engine.**
-  `dom.content()` — what every LuCI poll calls to refresh a section — empties the container before it
-  refills it, and for that moment the document is shorter than the offset the reader is at. The
-  engine clamps the offset into what is left, the section fills again and nothing puts it back. Three
-  conditions separate that from a reader who moved: a clamp only ever moves the offset **down**; a
-  reader who moved is one `scrolling()` still answers for (their scroll starts the sampler, while the
-  clamp's own scroll event arrives in the rendering step after the mutation callback); and the page
-  stamp has not changed, because the router resets both scrollers on a navigation and replays them on
-  a Back, and neither is a clamp to undo. The clamped amount is also what raises the one-viewport
-  ceiling on a correction — a drift that big normally means the view replaced its subtree, and a
-  clamp is the one that comes with a receipt.
-- **The correction does not need the reference to have survived.** `dom.content()` replaces a
-  section's children with new nodes, so the element that happened to sit at the top of the content
-  area usually does not survive the tick that moved the reader — measured on a 24.10 router, where it
-  was disconnected on exactly the tick that mattered and the fallback was left measuring a fresh
-  reference against nothing. With no element there is no drift, but there is still a number known
-  exactly: the offset dropped by this much and nothing else happened, so giving that back **is** the
-  correction. It cannot run away with the page either — if the document really did get shorter, the
-  browser clamps the write back and the reader keeps the offset they already had.
-
-**Two halves: the document does not shrink, and the reader is put back if it did.** Every container
-a poll empties carries a floor — `min-height` at the height it had at the last settled moment, held
-until the next one (`holdFloor()`, over `.cbi-section > div, .table > .tbody, .table`: what
-`dom.content()` is called on and nothing wider). A container emptying takes nothing off the document,
-so there is no shorter document for the engine to clamp into and the tick is invisible; the floors
-are re-measured after every settled batch, so a page that genuinely got shorter is shorter one frame
-later. Measured on a 25.12 stand with the correction switched off, a real poll tick clamped 1882px
-away without the floor and 0px with it; on 24.10, where the theme cannot reach the poll at all, the
-same park went from a 1206px clamp to no offset change at all.
-
-**The floor is on the containers because it may not be on the column.** `min-height` on an ancestor
-of the engine's own anchor is a scroll-anchoring suppression trigger — css-scroll-anchoring-1 §2.2.2
-lists it, and Blink's list (`css_properties.json5`, `invalidate: [..., "scroll-anchor"]`) is wider
-still — so a floor on `.fs-content`, where this used to live, turned the engine's anchoring off in
-exchange for holding the document up. Measured with it there: 120px grew above the reader and the
-page moved all 120px under them, on Chromium and Firefox alike; and the 15px this file used to quote
-for the same configuration was taken before `47e636d` gave anchoring engines a live reference, and
-was never re-taken. The suppression walks only the path from the anchor to the scroller, and a
-container that empties is never on it — either the anchor was inside it, in which case the engine has
-lost the anchor anyway, or the anchor is elsewhere and this container is its sibling. So the floor
-now runs on every engine, and the engine's own anchoring keeps working beside it.
-
-**A pin on the container itself does not work, and the shape that does was reported from the field.**
-`fs-overview.js` briefly pinned each container across `dom.content()` and released it in the same
-statement sequence — `dom.content()` performs no layout, so nothing ever observed the pin (measured:
-1882px still clamped away with it in place). The report that named it wraps `dom.content()` itself
-and releases two frames later, which does work — at the price of patching a luci-base API every app
-on the router shares, and up to seven read/write pairs per call. One element the theme owns, measured
-once per settled batch, is the same protection: on a live router with the correction off, the wrapper
-and the floor both held the reader at 0px against a 337px drift without either, at 16 measurements
-against 154 wrapped calls.
-
-**The router owns the offset when it navigates.** `fs-router` resets both scrollers for an incoming
-page and stamps `body[data-page]` a require later, so between the two there is a window in which a
-poll tick from the OUTGOING page still fires — an offset of 0, a remembered offset from where the
-reader was, nobody scrolling and the old stamp: every term of "the engine clamped this" is true. The
-router calls `fit.forgetRest()` at the reset rather than leaving the memo to be inferred from a stamp
-written afterwards.
-
-**What an engine that anchors still gets wrong.** `ENGINE_ANCHORS` asks whether the platform supports
-`overflow-anchor`, and every current engine answers yes, WebKit included — so the theme steps aside
-from the growth case. Anchoring is not the same promise as "a section can vanish and come back",
-which is what `dom.content()` does on every tick: the container empties, the offset is clamped into a
-document that is briefly shorter, and what the engine does on the way back is its own business.
-Chromium lands where it started. WebKit OVERSHOOTS — measured on both stands, both layouts and both
-widths, a swap that grew a section by 120px moved the offset by 180, leaving the reader 60px up the
-page **on every tick**.
-
-**The memo is a pair, and a clamped correction splits it.** `putBack()` is the one write either
-correction makes: it moves the offset by the drift it measured, and it used to update `_restAt`
-alone, on the reasoning that the element is now back at the top it was remembered at. It is not,
-whenever the write was clamped short — a page already at its end cannot scroll the last pixels — and
-then `_rest.top` names a position nothing can reach while `_restAt` has already moved on. The next
-tick corrects to that impossible top and takes the reader with it: measured on webkit/Overview at
-390 wide in the top layout, `_rest` claiming 93.02 for an element standing at 105, and the reader
-12px off after the tick (52px on the density beside it). Where the element actually landed is
-re-read after the write — for the reference and for the section it falls back to — which is two
-rects on a layout the write has already forced. `_rest.at` is left alone: it is read only by
-`anchorFor()`, on the path where the engine does no anchoring, and the sweep is green on all 18
-cells of the failing axis without touching it. **This only became visible when WebKit
-gained anchoring**: on the engine-anchoring path the theme corrects from a memo it keeps across
-ticks, where before it took a fresh reference on every mutation.
-
-**And the pages where nothing held the reader at all.** Two faults sat behind the same symptom, both
-of them in which ELEMENT the theme takes as its reference. `elementFromPoint` answers with `#view`
-itself wherever the hit lands in a gap between two sections — and the host's own top does not move
-when a poll changes something inside it, so the drift measured against it is zero on every tick, for
-ever. And a page that is ONE TABLE (Processes, Routes, the realtime lists) has that table as a direct
-child of `#view`: the climb out of the table — data tables are excluded as anchors, `30-tables.css`
-explains why — landed on the host and gave up, leaving no reference at all. Since the stylesheet also
-(correctly) tells the engine not to anchor inside those tables, nobody was holding the reader there on
-ANY engine: measured at 390px, 120px of growth above the fold moved the page 120px on chromium,
-firefox and webkit alike. The host is now refused as a reference and the hit is retried down the
-viewport; where the climb would reach the host, the TABLE ITSELF is the reference — its height is
-falsified by the fit pass, its top is not.
-
-`lateDrift()` closes the overshoot without asking who the engine is. Two frames after a mutation — long enough
-for the engine to have finished its own correction — the reference the theme was holding is asked
-where it is now. An engine that got it right reports zero and nothing happens; what is left over is
-what nobody put back, and that is what is given back. It answers GROWTH only: the collapse is the
-floor's, and the page it still matters on is the one that is a single data table, where the
-stylesheet has told the engine not to anchor and nobody else is holding the reader. Two things it is
-deliberately NOT: a browser test (`CSS.supports` can no longer separate the two behaviours), and a
-synthetic probe that performs the collapse itself (it calls Firefox broken, because a real page puts
-layout and a frame between the collapse and the refill; gating on it cost Chromium and Firefox 15px
-of drift they did not have).
-
-The price is a resting reference on every engine — a hit test and a rect per settled pass, measured
-on the stands at **0.2 ms typical and 6 ms worst** on a poll-dirtied WebKit layout, never during a
-flick, and skipped entirely while the page is at offset 0 (nothing to be put back to). It fires only
-where THE OFFSET HAS NOT MOVED since the reference was taken — `scrollTop() !== ref.at` and it sits
-the tick out — plus a user gesture keeping it out, so a correction can never land inside a scroll.
-Asking `scrolling()` instead does not work here and asking the sampler's step count is not enough:
-the engine's own compensation moves the offset and starts the sampler, and in WebKit a programmatic
-scroll's event arrives up to 1.2 s late, so the sampler is often not running at all while a flick is.
-Both of those let a correction through mid-flick — 161px on `@390 side`, 320px on `@1440 side`, both
-on webkit/Overview. `ref.at` and not `_restAt`, because `run()` re-remembers between the mutation and
-this frame, and where the sampler has not started that re-take records the offset the reader has
-already flicked to.
-
-**The theme's own put-off pass moves the page too, and nothing was looking.** A tick landing while
-the offset is in motion leaves its measurements to the pass that runs once the page holds still, and
-that pass re-lays the tables and rewrites every floor. `min-height` is itself a suppression trigger
-on the path to the anchor, so the engine's compensation can be off in exactly the frame that pass
-needs it: on ImmortalWrt 24.10/WebKit the pass's 88 `min-height` writes and a 58px jump of the offset
-land in the SAME frame, 429 ms after the mutation — `@390`, top layout, large density, Overview, one
-cell out of 48, and the offset moved with no write of the theme's own (every programmatic scroll
-write was intercepted and none came). `lateDrift()` is blind to it: scheduled from the mutation on
-the same `SCROLL_IDLE`, it read a drift of zero three milliseconds before the page moved.
-`settleDrift()` measures around that pass instead, and SYNCHRONOUSLY — the reader cannot scroll
-between two statements, so what it sees is the pass's own doing, and `getBoundingClientRect()` is the
-operation an engine must flush a pending adjustment before (css-scroll-anchoring-1 §2.2: the
-suppression window ends at the end of the event loop iteration, or before the next operation whose
-result would differ, whichever is sooner), so the read after the pass is a flush rather than a race.
-Measured two frames later instead, it closed that cell and corrected INSIDE A FLICK on three others,
-160px each.
-
-`tools/scroll-anchor.mjs` holds all of it: it grows 120px above the reader and requires the page to
-stay within two pixels, once with the engine's anchoring suppressed and once without, on both
-scrollers; it refills a section the way a poll does — emptied, then filled again, with the router's own
-poll held for the duration — and requires the same; and it flicks the page up and down to prove the
-theme corrects nothing while the reader is moving. With the fallback removed the Safari case reports
-exactly the reported symptom — 120px of page moved under the reader, 255px on the swap measured in
-WebKit with the engine's own anchoring off, and 690px on a real Overview on the stands. It runs on
-`chromium,firefox,webkit` in CI now, because the fault above lives on the path a stand-in engine does
-not take, and it waits on `fit.restAt()` rather than on a stopwatch: WebKit starts its motion sampler
-late enough that a flat wait measured the theme before it had a reference at all, which reported a
-jump on every WebKit run with the theme identical on all three engines.
-
-**Findings print as they are found, and one cell can be run alone.** A `--full` sweep is 144 cells
-and tens of minutes, so a run that only speaks at the end costs a whole sweep per fix attempt — five
-attempts at the fault above were measured that way before the flags existed. Each finding is printed
-the moment it is made (`FINDING …`), `--bail` ends the run at the first one, and `--width 390
---layout top` narrows the sweep to the cell a finding names: the same measurement then takes a
-minute. CI passes none of them — how WIDE a fault is is half of what the sweep says.
-
-The sweep crosses three page shapes and two scrollers, and both sets are what a measurement left
-standing rather than what looked thorough. The shapes: the Overview refills section BODIES, the
-realtime Connections table has its ROWS replaced under a poll, and Processes is one table that is a
-direct child of `#view` — the climb out of that one used to land on the host and give up. Processes
-proves the climb and never the swap: its single block is 6397px against 6108px of scroll on
-owrt2512, so it can never sit entirely above the reader, which is what a swap needs. Wireless was
-measured and dropped (812px of scroll at 390px wide, 0 at 1440). The scrollers: of `1440 side`,
-`1440 top`, `390 side` and `390 top`, only the first scrolls `#maincontent` and the other three
-scroll the window, so the sweep keeps the first and the narrowest. Density is one value for the same
-reason — across 72 Overview cells, normal, compact and large reported the same two outcomes and
-nothing else. `--full` crosses all of them anyway, and CI does that on a push and a tag.
+Forwards page.
 
 ## `fs-select.js`
 
@@ -621,34 +393,29 @@ be styled with CSS. The native `<select>` remains the form field and must stay
 It also owns `fitTables()`, which folds data tables into cards. Why config tables are handled
 differently, and why that difference is not an unfinished job: [css.md](css.md).
 
-### The measurements behind `fs-select.js`
+### Why `fs-select.js` does what it does
 
-The file keeps each rule and its reason; the numbers that set them live here.
-
-- **Roots.** `ui.showModal` parks its dialog on `#modal_overlay`, a sibling of `#view`; before the
-  overlay was a root, a table in the wireless-scan dialog stood 56px past the dialog's edge at 390px.
+- **Roots.** `ui.showModal` parks its dialog on `#modal_overlay`, a sibling of `#view`, so the
+  overlay is a root too; otherwise a dialog's table overflows the dialog.
 - **Bare tables.** A `<div class="table">` or a table with no LuCI class is tagged too, because a
-  third-party app may emit one. A census over all 196 menu pages of the dev stand found zero — the
-  rule exists for the apps that are not there.
+  third-party app may emit one. No stock page does.
 - **An honest floor.** `overflow-wrap: break-word` keeps a column's min-content real. Rebuilding the
-  floor in JS is UAX #14 by hand and wrong both ways: `WPA2-PSK/CCMP` measured 144px against a real
-  93px, so tables carded that had room.
+  floor in JS is UAX #14 by hand and wrong both ways, so tables would card that had room.
 - **`CRAMPED` is trusted, not measured.** Giving cells a min-width so "cramped" produces an
-  overflow was tried: it carded the firewall zone table at 1420px, and the card still overflowed by
-  39px.
+  overflow cards wide tables that fit, and the card still overflows.
 - **The answer lives on the slot.** The measurement strips a table's marks and lays out a full-width
-  table for the pass. The poll replaces the table every tick, so at iPhone width that threw the
-  reader 612px out and back, twice per tick; compensating afterwards was tried four ways and each was
-  wrong somewhere. Keying the answer on the section frame (table id, or position) removes the pass.
+  table for the pass. The poll replaces the table every tick, so measuring each new table would
+  throw the reader out and back twice per tick. Keying the answer on the section frame (table id, or
+  position) removes the pass.
 - **A zero measurement is not an answer.** The first pass reads `scrollWidth: 0` behind the
-  `.fs-fitted` gate; caching "fits" left a 777px table clipped inside a 712px column at 768px.
-- **Controls stack.** Network → Diagnostics is three controls in one header-less row needing 338px
-  in 320px; the Ping button was unreachable past `.fs-main`'s clip.
+  `.fs-fitted` gate; caching "fits" would leave a wide table clipped inside the column.
+- **Controls stack.** Network → Diagnostics is three controls in one header-less row; on a phone
+  the Ping button would sit past `.fs-main`'s clip.
 - **Dropping upstream's width pin.** A pin measured while the config table is carded is the card's
-  width: firewall/zones pinned 634px and scrolled sideways by 256px, against 192px on a fresh load.
+  width, and the table scrolls sideways once it unfolds.
 - **Claiming the resize hook.** `stabilizeActionColumnWidth` adds a `resize` listener per table
-  element and never removes it; under the SPA router that grew from 1 to 31 listeners over 120
-  navigations, ~11.8 KB per navigation with no plateau.
+  element and never removes it; under the SPA router the listeners would grow with every
+  navigation.
 
 ## Translation
 

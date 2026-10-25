@@ -1,3 +1,5 @@
+> Archive. The numbers here come from synthetic gates that were removed in PR #76 and are not reproducible; do not act on them without measuring on a real router.
+
 # Keeping the reader's place
 
 A poll tick changes the height of something above the reader and the page under them moves. This
@@ -8,9 +10,6 @@ one number that justifies it. `fs-fit.js` cites a heading here.
 disproven diagnosis and every attempt that was measured and rejected, one heading per finding. This
 page states the rule; that page says how it was learned. The chrome's half — which element a
 correction may take, why data tables are excluded — is in [chrome.md](chrome.md).
-
-The measurements are `tools/scroll-anchor.mjs` on the stands, `tools/floor-contract.mjs` for the
-floor and `tools/fit-quiet.mjs` for the chrome.
 
 ## Who is responsible: `ENGINE_ANCHORS`
 
@@ -104,8 +103,8 @@ zero. Nine things are load-bearing, and each was a measured failure first:
   `dom.content()` performs no layout, so no layout ever sees the pin: 1882px still clamped away.
 - **Cleared and re-measured, not read off the content.** The clear is what makes every other question
   answer itself: a collapsed tab pane measures 0 and keeps no floor, where a content reader pinned
-  the collapse open (893px, issue #41). `tools/floor-contract.mjs` holds it: 175 floors, worst 0px
-  against the box.
+  the collapse open (893px, issue #41). Measured across 175 floors, the worst was 0px against the
+  box.
 - **Written at the box's own rect height, not `offsetHeight`.** An integer floor stands up to half a
   pixel taller than its content; 22 such boxes made the document 2px taller with the floors than
   without, and the next clear handed that back as a clamp — 6 of 12 refills corrected against 12 of
@@ -267,14 +266,14 @@ own shape on the one node only `commitStage()` calls it on. On such a batch the 
 3 red before, 3 of 3 green after, no `writeOffset()` logged at all. Testing the target alone does
 not hold — `HOLD` grows the page by inserting a pad as `#view`'s own first child and matched too,
 leaving 120px uncorrected on all three twins (anchoring-log.md, "What the sweep itself could not
-see"; `spa-parity`'s `back-scroll` case is the gate).
+see").
 
 ## Is each one still needed
 
 One mechanism disabled at a time, on the agent's own stand so nothing else moves, over the axes that
-mechanism is supposed to hold. `tools/scroll-anchor.mjs`, `--width`/`--layout` to reach the cell and
-`--full` to cross the rest; every number below is what the sweep printed. A cell is only counted
-when it repeats — a lone finding on one pass is the parallel-stand noise `development.md` describes.
+mechanism is supposed to hold; every number below is what the scroll-anchoring sweep printed. A cell
+was only counted when it repeated — a lone finding on one pass is the parallel-stand noise
+[development.md](development.md) describes.
 
 **The poll belongs to one case of the sweep, and that is part of the measurement.** `Poll.start()`
 performs a tick synchronously (luci-base), so a case that restores the poll on its way out fires a
@@ -308,15 +307,14 @@ And four parts that carry the machinery rather than decide anything, so there is
 | part | why it is not in the table above |
 |---|---|
 | `rememberRest()` and `_rest` / `_restAt` / `_restPage` | the memo itself. Removing it removes every correction at once, which is what the rows above already measure one at a time |
-| `forgetRest()` | belongs to navigation, not to a tick: the router calls it when it resets both scrollers, and `spa-parity` is what covers that |
+| `forgetRest()` | belongs to navigation, not to a tick: the router calls it when it resets both scrollers |
 | `.table.fs-dt { overflow-anchor: none }` (`theme/30-tables.css`) | tells the ENGINE not to anchor inside a table whose layout the fit pass falsifies mid-pass. The sweep measures the theme's corrections, not the engine's choice of anchor |
 | `_scrollMem` / `saveScroll` / `restoreScroll` (`fs-router.js`) | per history entry, not per tick — see [spa-router.md](spa-router.md) |
 
-**Two of them the sweep cannot reach**, and that is a finding about the sweep. Both are held by the
-measurement in their own comment rather than by a gate, so a change there is not caught by CI:
-extend `tools/scroll-anchor.mjs` before touching one, or accept that the proof is historical.
+**Two of them the sweep could not reach**, and that is a finding about the sweep. Both are held only
+by the measurement in their own comment, so the proof is historical: re-measure before touching one.
 
-## What the gate itself cannot answer
+## What the sweep itself cannot answer
 
 `lateWhy()`, `lateTrail()`, `anchorWhy()` and `anchorTrail()` exist because a correction that did
 not write reads from outside as one symptom, `writes: []`, and `lateDrift()` has eight ways to reach
@@ -332,10 +330,10 @@ same tool fails the build if `reader-intent` or `no-reference` is still in the o
 
 Nothing else can answer "has a reference been taken yet": `scrolling()` says no both before the
 motion sampler starts and after it finishes, **1.5 s apart in WebKit**, and a flat wait instead made
-`tools/scroll-anchor.mjs` report a jump on every WebKit run and none on the other two engines with
+the sweep report a jump on every WebKit run and none on the other two engines with
 the theme identical on all three.
 
-`restAt()` and `engineTrusted()` carry no `/* fs:probe */` marker on purpose: they are read by a
+`restAt()` and `engineTrusted()` carry no `/* fs:probe */` marker on purpose: they were read by a
 browser sweep against the INSTALLED package, and a probe marker is what packaging strips. Marked,
 `restAt()` was stripped out and the sweep fell back to a flat wait — 14 findings on one router, every
 one of them WebKit, and not a word about the missing method.

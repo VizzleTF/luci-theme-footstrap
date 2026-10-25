@@ -3,7 +3,8 @@
 How footstrap is turned into packages and shipped. The theme is noarch
 (`LUCI_PKGARCH:=all`) and supports **OpenWrt 24.10** (`.ipk`/opkg) and **25.12+** (`.apk`/apk).
 
-What the Makefile and the install scripts do: [package.md](package.md). The release runbook:
+What the Makefile and the install scripts do, `install.sh`'s trust chain included:
+[package.md](package.md). The release runbook:
 [releasing.md](releasing.md).
 
 ## The job graph
@@ -12,145 +13,80 @@ What the Makefile and the install scripts do: [package.md](package.md). The rele
 dispatch.
 
 ```
-check ─┐          ┌─→ verify ─────┐
-       ├─→ build ─┼─→ live ───────┼─→ release ─→ playground-asset ─→ pages   (release and after: tags only)
-lint ──┘          └─→ playground ─┴─→ pages-manual                           (workflow_dispatch, publish-pages=true)
+build ───────────────────────────┐
+e2e (owrt2512, owrt2410) ────────┼─→ release ─→ playground-asset ─→ pages   (tags only)
+build ─→ playground ─────────────┘
+             └─→ pages-manual                                             (workflow_dispatch, publish-pages=true)
 ```
+
+`e2e` does not wait for `build`: it stages and packs the same tree itself (below), so the two run
+side by side and `release` waits for both.
 
 | Job | What it is |
 |---|---|
-| `check` | `npm run check:fast` — eslint, stylelint, the unit suite, shell/marker/acl, audit.py, and the rest of the fast tier |
-| `lint` | `npm run check:mid` + `check:slow` — the artefact ratchets, axe-core, and everything else that wants a browser; on a pull request also `computed-diff` against the merge-base, report only (artifact `computed-diff`) |
-| `build` | both package formats, via owfeed |
-| `verify` | installs this very build on real 25.12 and 24.10 userlands and renders its pages |
-| `live` | opens every page of the menu on those userlands and measures it — layout, navigation parity, and the assumptions this theme makes about luci-base |
-| `deep` | a tag's (and a dispatch's) job: every page of the menu, `spa-parity` and `live-audit` with `--pages-all`, one shard per router |
-| `playground` | records a real router's pages into a static, replayable site and proves it offline |
+| `build` | the ACL check, then both package formats, via owfeed |
+| `e2e` | `tools/e2e.mjs`, one leg per package manager: the package's whole life on a real router (below) |
+| `playground` | records a real router's pages into a static, replayable site (tags and dispatches) |
 | `release` | signs, generates the notes, attaches the assets |
-| `release-assets` | reads the published release back and asserts one asset per format per package name |
 | `playground-asset` | uploads `playground.tar.gz` to the tag's release, once one exists |
 | `pages` | refreshes the GitHub Pages portal and the release mirror, from the latest release |
 | `pages-manual` | same refresh, off a manual dispatch, from THIS run's own playground instead of a release — see `pages`, below |
 
 `permissions: contents: read` at workflow level; only `release` and `playground-asset` declare
 write, both gated to a `v*` tag. It used to be workflow-wide, which handed it to every
-`pull_request` run — including `npm ci` in lint, and therefore to the lifecycle scripts of every
+`pull_request` run — including every `npm ci`, and therefore to the lifecycle scripts of every
 dev dependency.
 
-**Every job has a `timeout-minutes`, and every network install runs under `tools/ci-retry.sh`.**
-The default job timeout is six hours, and the two things these jobs fetch from somebody else's
-server — apt and the Playwright CDN — stall rather than fail: on the 0.13.2 tag one apt step and two
+**Dependencies arrive a week late and run no install script.** `.github/dependabot.yml` sets
+`cooldown: default-days: 7` on both ecosystems (version updates only, never security updates), the
+repo's `.npmrc` sets `ignore-scripts=true` for every `npm ci` (CI and a developer's shell), and `pages.yml` gives `pages: write` and `id-token: write` to `deploy` alone, so the job
+that runs `npm ci` holds `contents: read` only. A new or replaced dependency needs the maintainer's word.
+No `min-release-age` in `.npmrc`: it might hold back a Dependabot security update; the
+cooldown and the maintainer's word on a new dependency carry the age.
+
+**Every job in `build.yml` and `pages.yml` has a `timeout-minutes`, and the two Playwright installs
+run under `tools/ci-retry.sh`.** The default job timeout is six hours, and the two things these
+jobs fetch from somebody else's server that have stalled — apt and the Playwright CDN — stall rather
+than fail: on the 0.13.2 tag one apt step and two
 playwright steps sat for 68, 68 and 17 minutes with GitHub reporting every system operational, and
-nothing retried them because nothing had failed. Each attempt now gets its own deadline (six minutes
-for apt, seven for playwright, three attempts), so a stall is a retry rather than a blocked release,
+nothing retried them because nothing had failed. Each attempt now gets its own deadline (300 s
+in `tools/ci-playwright.sh`, three attempts), so a stall is a retry rather than a blocked release,
 and the job timeout is the backstop behind that rather than the only clock in the job. Each attempt runs in a session of its own and is killed by process GROUP, because `timeout` signals only the child it started: the first version of the helper killed `playwright install --with-deps` and left the `apt-get` beneath it holding the lists lock, after which both retries died in seconds on that lock.
 
 And apt is asked for as little as possible, because retrying a stalled apt is still waiting for a
-stalled apt: a run spent its whole 20-minute budget doing exactly that. `gettext` is installed only
-when `msgfmt`/`msgmerge`/`xgettext` are missing from the image, and `tools/ci-playwright.sh` fetches
-Chromium from Playwright's CDN and then LAUNCHES it — the claim the gates actually need — going to
-apt for the system libraries only if that launch fails. `--with-deps` went through apt every time,
-and apt is the half that stalls.
+stalled apt: a run spent its whole 20-minute budget doing exactly that. `tools/ci-playwright.sh`
+fetches the engines it is given (Chromium by default) from Playwright's CDN and then LAUNCHES each
+— the claim `e2e` and `playground` actually need — going to apt for the system libraries only of
+the engines whose launch fails. `--with-deps` went through apt every time, and apt is the half that
+stalls. `playground` installs Chromium alone; `e2e` installs Chromium, Firefox and WebKit, for
+the anchoring check.
 
-## `check` and `lint` — one gate list, package.json's
+## Reading a run
 
-Both jobs run `npm run check:fast`/`check:mid`/`check:slow` (`package.json`) rather than one step
-per tool — that list used to be restated by hand in `build.yml`, and a tool added to a tier and
-forgotten here ran locally and never in CI: `makefile-contract`, `placeholder-ink`, `smoke` and
-`pseudo-loc` were exactly that, wired into `package.json`'s tiers and into no job. Locally it is the
-same command either way, `npm run check`; `tools/ci-local.sh check lint` runs the two jobs' own
-tiers, in their own order. The full table of what each gate holds is in
-[conventions.md](conventions.md).
+- `gh run list --commit <sha>` lists a commit's runs; `gh run watch <run-id> --exit-status` waits
+  for one and exits non-zero on red.
+- `gh run view <run-id> --log-failed` prints the failed steps' logs. It prints nothing while a run
+  is still marked in progress.
 
-`check` (job, `npm run check:fast`) needs `node_modules` now, for eslint and stylelint; the five
-gates that used to be node-free steps here are `check:fast` items too, unchanged in what they hold
-(`i18n` moved in from `check:mid` — below):
+## Rules the server holds
 
-1. **`shell`** (`sh -n` over `luci-theme-footstrap/*.sh`, `install.sh` and `tools/*.sh`) — the
-   scripts that never reach a router. `tools/` is in the glob because `release-notes.sh` runs only
-   in the `release` job, so a syntax error there used to surface at the most expensive possible
-   moment. The *payload* scripts are parsed elsewhere: `owfeed doctor` (OWF213) parses everything
-   under `files:` in the `build` job, which covers `/etc/uci-defaults/*` once `tools/stage.sh` has
-   staged it.
-2. **`marker`.** `include/scan.mk` finds packages by grepping for `call BuildPackage`, which this
-   Makefile only reaches through `luci.mk`'s include — so the literal in its trailing comment is
-   what makes the SDK see the package at all. It has been deleted as boilerplate once.
-3. **`acl`.** The ACL is valid JSON, and grants something: rpcd skips an unreadable file in `acl.d`
-   and says nothing, a stray comma means the grant is issued to nobody, and nothing else notices. A
-   document that parses but is a list, or an entry with neither `read` nor `write`, is the same
-   silent outcome by another route, so `tools/check-acl.sh` checks the shape too.
-4. **`audit`** (`audit.py --strict`) — bracket balance (a truncated-file smoke test; CSS only, and
-   the one check here stylelint cannot take over — a custom property's VALUE is opaque to postcss,
-   so an extra `)` inside one never becomes a `CssSyntaxError` there), undefined `var()`, shadowed
-   declarations, export-tier reads from `styles/`, dead base declarations, colour literals. A stray
-   `!important` used to be checked here too (`BANG_OK`); folded into stylelint once measured
-   redundant — see "The gates, and what each one holds" in conventions.md. `build-css.sh`'s own
-   correctness check (brace-balancing its output, refusing to write a suspiciously short file — a
-   broken-build floor of 80 KB, not a size budget) runs wherever a gate builds the sheet, which every
-   `check:mid` CSS gate (`css-metrics`, `css-floor`, `css-dup`) does in the `lint` job — a standalone
-   step here that built the sheet a second time and read nothing back was dropped once measured
-   redundant against that.
-5. **`i18n`**, last in `check:fast` so everything above still runs where gettext is missing —
-   `update-po.sh --check` fails if the `.pot` is stale or any `msgstr` is empty (a string in `_()`
-   with no translation renders in English silently, which is how the whole System → Footstrap page stayed
-   English on a Russian LuCI). It stayed in `check:fast` (not `check:mid`) on purpose: `build` needs
-   only the `check` job, and a broken `.pot` blocking packaging is the guarantee `i18n` exists for.
+Three rulesets on the repository (Settings → Rules); `gh api repos/{owner}/{repo}/rulesets` lists them.
 
-**Template compilation is not here** — it runs in `verify`, on the router, with the real `ucode`.
-It used to clone the interpreter at a pinned commit and build it with cmake, with the router runtime
-stubbed out through `-L`; the container has both for free and stubs nothing.
+| Ruleset | Target | Rules | Bypass |
+|---|---|---|---|
+| 24042288 "main: CI must pass" | `main` | required status checks (3): `Build the packages`, `The package's life on owrt2512`, `The package's life on owrt2410` | admin, always: a direct push to `main` needs it, so each push reports the bypassed rule and the checks are read after the push (`gh run watch`) |
+| 25550110 "main: no force-push or deletion" | the default branch | `non_fast_forward`, `deletion` | none, admin included |
+| 25550119 "release tags: no move or deletion" | `refs/tags/v*` | `update`, `deletion` | none; creating a tag stays open for the release runbook |
 
-The npm gates live in CI only: the buildbot has no node and does not need it, and nothing in
-`package.json` ships. The ones worth naming here:
+The last two were created on 2026-10-21 on the maintainer's word (audit P1-5). With no bypass, no
+token gets past them: a force-push or rewrite of `main`, or moving or deleting a released tag, starts
+with the maintainer disabling that ruleset in the UI, then their word as before.
 
-| Step | What it catches |
-|---|---|
-| `eslint` | including `wrap-regex`, which forbids `return /re/…`, the form jsmin breaks on |
-| `stylelint` | correctness and project invariants only — not a formatter; also holds the `!important` allowlist (`declaration-no-important` + the file override) and the data-title i18n check (`selector-disallowed-list`) |
-| `a11y-gallery.mjs` | axe-core, WCAG 2.2 AA over `docs/gallery.html`, {light,dark} × {footstrap,hicontrast,bootstrap,2020,forum} × {untinted,60°,260°} — **30 combinations** |
-| `export-tier.mjs` | the `--*-color-*` contract with foreign apps — axe cannot see it, their widgets are not in the gallery. 70 palette × mode × tint combinations, then the ten untinted ones again with `prefers-contrast: more` emulated, since that query re-states the ink tokens and so publishes a second tier |
-| `css-metrics.mjs` | ratchet: `!important` count (`LIMITS.importants`), empty rules (max specificity is stylelint's) |
-| `css-floor.mjs` | the browser floor derived from the built sheet against the one stated in `docs/css.md`, plus the two shapes that break below it: a `:has()` compound sharing a selector list with one that has none, and a CSS feature nobody has classified |
-| `fs-orphans.mjs` | dead `fs-*` selectors (safe only inside our namespace) |
-| `css-dup.mjs` | identical declaration bodies under different guards — no linter calls this an error |
-| `mirror.mjs` | `@mirror`-pinned copies still byte-identical (CSS) |
-| `axes.mjs` | the pre-paint in `head.ut` agrees with the live appearance appliers |
-| `page-modules.mjs` | the page → module map agrees with the modules, and neither is `require`d at eval |
-| `comment-share.mjs` | every shipped JS file is under 40 % comment bytes (`docs/conventions.md`, "Size") |
-| `table-contract.mjs` | the break points, and the rule that hides an unanswered data table still names every root `fs-select` scans, guarded on `:root[data-fs-fit]` — the selector half of what `table-tick.mjs` then proves on a page |
-| `chrome-fence.mjs` | the `[data-fs-chrome]` marker, fence and pin still match the chrome |
-| `gallery-coverage.mjs` | `docs/gallery.html` still renders every widget LuCI or an app can emit (a `check:fast` gate) |
-| `conffiles.mjs` | every shipped `/etc/config/*` is declared a conffile — else the manager replaces it on upgrade |
-| `changelog.mjs` | the changelog contract: sections, order, RU mirror, bold leads |
-| `jsmin-verify.mjs` | the **only** check that catches jsmin's silent corruption (exit 0) |
-| `npm test` | the unit suite — no browser, ~100 ms, and first in the job for that reason. It holds the branches a stand cannot enter: a luci-base missing a surface the router calls, an alias loop or a `firstchild` tie in a menu tree nobody ships |
-| `size-budget.mjs` | ratchet on the **artefact**: `build-css.sh` + the token mangle (over temp copies of `resources/` and `ucode/`, which it rewrites) for the sheet, uglify-js over a copy of `htdocs/luci-static/resources` for the JS. `--show` prints the per-module table into the log; `check:mid`'s `size` script runs it plain, so a jump wants a local `node tools/size-budget.mjs --show` to attribute it |
-| `build-icons.mjs --check` | the committed app-icon rasters still match `logo.svg` — per channel with a tolerance, plus the maskable invariants (declared size, no alpha, nothing outside the safe zone, a mark in the middle). Not byte equality: that tested the renderer, and a Chromium bump reddened it on a commit that never touched the logo |
-
-**About `jsmin-verify`:** jsmin corrupts a file silently and exits 0. The source shape it breaks on,
-and why eslint's `wrap-regex` stands beside this gate, are in [conventions.md](conventions.md); the
-two minification paths are in [package.md](package.md). What CI adds is the proof: it builds that
-same jsmin from `luci-base/src/jsmin.c` at the pinned commit and compares the token stream of the
-output against the source (acorn). The list of shipped JS is not written by hand — it is
-`find htdocs -name '*.js'`, because luci.mk copies `htdocs/` wholesale, so that *is* the shipped set.
-
-Both gates stay mandatory **for the source**, even though the release build minifies with uglify-js
-instead: a build without node still hands the untouched source to jsmin.
-
-**About `size-budget`:** the numeric budgets were dropped once, and the reason they are back is what
-they measure now. The old ones were counted on the SOURCE, which is not what anyone downloads — the
-sheet is concatenated and token-mangled and the JS goes through uglify-js, all of it inside the package
-build, so a developer's edit-and-check loop never sees the artefact at all. That is the shape a
-number drifts in: one feature at a time, each too small to argue with, none of them measured. This
-gate reproduces the package build's asset half and weighs the result. uhttpd serves `/www` with no
-compression, so identity bytes are wire bytes, read off flash by a core that is also routing packets.
-Raising a limit is a decision and wants a comment saying what it bought; lowering one after a cleanup
-is how the slack stops being spendable in silence.
-
-Most of what the other jobs run lives in `tools/*.sh` rather than inline in the YAML —
-`check-shell.sh`, `scan-marker.sh`, `check-acl.sh`, `build-jsmin.sh`,
-`check-packages.sh`, `feed-key.sh`, `stage-release.sh`. A step that is a script can be run by hand
-when it fails, and its reasoning lives beside the code instead of inside a workflow nobody reads.
+Most of what the jobs run lives in scripts rather than inline in the YAML — `tools/stage.sh`,
+`tools/ci-playwright.sh`, `tools/e2e.mjs`, `tools/playground/*.mjs`, `tools/stage-release.sh`. A
+step that is a script can be run by hand when it fails, and its reasoning lives beside the code
+instead of inside a workflow nobody reads. Nothing in `package.json` ships: the buildbot has no node
+and does not need it.
 
 ## `build` — owfeed, not the SDK
 
@@ -187,7 +123,7 @@ genuine → exit 0; one byte appended → exit 1; against a foreign repository �
 `package.yml`'s `owfeed-version`). Dependabot moves the `uses:` ref and never an input, so a
 `version: v0.5.1` beside `setup@v0.5.4` ran 0.5.1 under a ref that read 0.5.4; since owfeed 0.5.3 and
 owlab 0.6.4 an unset version installs the release the ref names. `~/go/bin/owfeed` and `owlab` follow
-the same refs (0.5.5, 0.6.5), taken from the GitHub release after `gh attestation verify -R
+the same refs (0.5.5, 0.6.6), taken from the GitHub release after `gh attestation verify -R
 owfeed/<tool>` and the release's `SHA256SUMS`, so `tools/stage.sh && owfeed build` writes CI's bytes.
 
 **Zopfli packages.** `owfeed.yml` sets `compression: zopfli` on all three packages (owfeed 0.5.5).
@@ -206,14 +142,22 @@ why CI sets it from the commit.
 
 The steps:
 
-1. **Resolve the version** — from the tag (`v0.3.6` → `0.3.6`) or a fallback `0.<date>.<run>`. Plus
-   `SOURCE_DATE_EPOCH` = the commit timestamp: both containers write mtimes, and a package's
+0. **The ACL grants exactly this step's literal, which SECURITY.md lists** — `acl.d` must hold
+   `luci-theme-footstrap.json` alone (rpcd loads every file there), and one `jq -e` compares that
+   file with the literal in the step. The literal is the source of truth; `SECURITY.md` lists the
+   same grants by hand, and nothing reads it. Any other grant (an `exec`, a new path, a new ubus
+   method), a second file or a malformed one fails the job; rpcd itself skips a malformed ACL
+   silently.
+1. **`SOURCE_DATE_EPOCH`** = the commit timestamp: both containers write mtimes, and a package's
    identity is a hash over its payload, so without a fixed epoch byte-identical content rebuilds
-   into a package that *claims* to be new.
+   into a package that *claims* to be new. No step sets a version: `stage.sh` takes
+   `FOOTSTRAP_VERSION`, else the newest tag (`git describe --tags --abbrev=0`, `v0.3.6` → `0.3.6`),
+   else refuses to build. `build` sets no `FOOTSTRAP_VERSION`, so on a tag its packages carry that
+   tag, and on a branch or a pull request the newest tag before it.
 2. **`./tools/stage.sh`** — the half owfeed deliberately does not do ("packages a directory; does
    not build one"). It is `Build/Prepare` from the Makefile in one script, with uglify-js where
-   luci.mk ran jsmin: build `cascade.css`, mangle the private `--fs-*` names, drop the
-   `/* fs:probe */` exports, minify the JS with uglify-js, strip the comments and indentation out of
+   luci.mk ran jsmin: build `cascade.css`, mangle the private `--fs-*` names, minify the JS with
+   uglify-js, strip the comments and indentation out of
    the templates and the comments out of the shell, strip `logo.svg` and `manifest.json`, stamp
    `FS_VERSION`. Three things on top of `Build/Prepare`, which the SDK path does not need or does
    itself: `minify-prepaint` over the inline pre-paint script in `head.ut`; the postinst/postrm
@@ -223,8 +167,7 @@ The steps:
    It ends with `chmod -R u=rwX,go=rX` over `dist/`: owfeed copies modes from disk, so the 5 files
    (0600) and 4 directories (0700) a local worktree can hold shipped as `-rw-------` and
    `drwx------ ./www/`, and uhttpd answers 403 on a file that is not world-readable. A CI
-   checkout has none of them, which is why only a local build showed it;
-   `tests/stage-modes.test.mjs` holds it.
+   checkout has none of them, which is why only a local build showed it.
    Measured on this tree: uglify-js 3.19.3 (pinned exact, the one minifier for the modules,
    `fs-version.js` and the pre-paint blocks) leaves the staged JS at 86,295 B where terser 5.51.2
    left 88,982 B: -2,687 B raw, -260 B gz9, 1,968 B of it on every cold admin page (identifiers are
@@ -233,190 +176,55 @@ The steps:
    at uglify's defaults `FS_VERSION` is folded into its readers (229 B, no declaration left for
    the version sed) and `minify-js` refuses the file; set, it is 258 B with the declaration
    intact. `varify:false` beside it changed nothing (the same 258 B, byte for byte, with and
-   without), so it is not set. `fs-fit.js` reserves `makeTrail`, `_late` and `_anchor` from the mangle,
-   since uglify renames before it compresses and `pure_funcs` would otherwise match `a.record` and
-   drop nothing. `minify-prepaint`, run after `strip-build.sh templates` as in `stage.sh`, takes the
+   without), so it is not set. `minify-prepaint`, run after `strip-build.sh templates` as in `stage.sh`, takes the
    five inline blocks without ucode interpolation from 6424 to 4511 B (terser left 4632 B), 1913 B
    off every page load and off the login page, which fetches no module: 105 B less HTML per admin
    page and 119 B less on the login page than terser gave. Blocks with `{{`, `{%` or `{#`
    (`head.ut`'s `window.__fsSD` data object, 23 substitutions) are left as they are, and it runs
-   over the build tree only: `axes.mjs` and `chrome-fence.mjs` read `head.ut` as text with regexes
-   pinned to its literal shape.
+   over the build tree only.
 3. **`owfeed build`** — deliberately without `--frozen-lock`. That flag re-derives `owfeed.lock`
    from `downloads.openwrt.org` and fails if it moved, which is right for a repository that
    **publishes a feed**, where the covered architecture set is part of the contract with
    subscribers. Here two noarch packages ride as release assets and expand into no architectures, so
    the flag buys nothing and costs a red release on every OpenWrt point release. The committed lock
    still pins which SDK the host `apk` comes from, so the toolchain does not float.
-4. **Assert the catalogues.** A `.lmo` is compiled in and absent from git, and a silently missing
-   one means every `_()` renders the English msgid with nobody reporting anything. Each language
-   ships as its own `luci-i18n-footstrap-<lang>`, so the assertion is one catalogue named
-   `footstrap.<lang>.lmo` per language package, a uci-defaults line registering that language, and
-   **none in the theme** — two packages owning one path is an install apk refuses. Counted against
-   the languages in `po/`, so adding one and forgetting to declare its package is a red build
-   rather than quiet English for some users.
-5. **Flatten the packages into `dist/`** (owfeed writes `dist/noarch` and `dist/all`; apk derives
-   the filename from name and version, so two architectures cannot share a directory). CI requires
-   that the theme resolve to exactly one asset per format under a name-anchored regex
-   (`luci-theme-footstrap[-_]…`). That is not hygiene, it is protection for old routers: see issue
-   #6 in [conventions.md](conventions.md).
 
-## `verify` — the package works on a real userland
+owfeed writes `dist/noarch` (apk) and `dist/all` (ipk): apk derives the filename from name and
+version, so two architectures cannot share a directory.
 
-Downloads the artifact and installs this build on real 25.12 and 24.10 containers through the
-owlab action, then renders its pages. On non-PR runs it additionally fetches the feed's public key
-and asserts the published feed serves a working theme.
+## `e2e` — the package's life on a real router
 
-That the build "produced an ipk" proves nothing about the ipk; this job is what does.
+That the build "produced an ipk" proves nothing about the ipk; this job is what does. One leg per
+package manager, `fail-fast` off: `owrt2512` (25.12/apk) and `owrt2410` (24.10/opkg), each an owlab
+router with LuCI and its apps but not this theme (`owfeed/owlab/setup` puts the CLI on PATH; the
+binary is checked against its build attestation). The job does not wait for `build`: it stages and
+packs the same tree itself with `FOOTSTRAP_VERSION=9999.0.0`, so installing it over the last release
+is an upgrade by both package managers' rules; its payload differs from `build`'s only in the
+version `fs-version.js` carries. The last release's package comes from `gh release download`. Then
+`tools/e2e.mjs` walks the life an admin gives the package; [verifying.md](verifying.md) "What the
+check proves" lists the steps and what fails a page.
 
-**When the feed does not answer, the assertion is skipped and says so.** `tools/feed-key.sh` still
-reports `reachable=false` rather than failing — the claim is about a channel this repository does not
-own — but the run now ends with "Report whether the published feed was measured", which writes
-*measured and passed*, *measured and failed* or *NOT MEASURED* into the run's annotations and job
-summary. A green `verify` no longer looks the same whether the feed was tested or never asked;
-`tools/ci-local.sh verify` prints the same sentence from the same script.
+**Bootstrap on the same router is the reference, not a list of expected problems.** A page fails
+only for what footstrap adds over bootstrap on the same page, or when footstrap's own stylesheet,
+token or menu is missing. The last one is what a broken template looks like from outside: luci.mk copies `ucode/` verbatim and nothing parses
+it on the way, so a stray brace in `header.ut` would silently move every user's LuCI to another
+theme. Both legs run it because the templates are identical but the interpreters are not, and a
+construct 25.12's ucode accepts is no proof that 24.10's does.
 
-**Five assertions per leg**, and the fifth is the template gate:
+After the crawl, with the build still installed and active, `tools/e2e.mjs` runs
+`tools/anchor-check.mjs`: a poll tick growing Status > Overview above a parked reader, and one
+shrinking it back, must leave them where bootstrap does in Chromium, Firefox and WebKit, and where nothing anchors the theme's own
+correction must hold them ([verifying.md](verifying.md) "What the check proves").
 
-```
-package luci-theme-footstrap
-file /www/luci-static/footstrap/cascade.css
-http 200 /cgi-bin/luci/admin/status/overview
-http 200 /cgi-bin/luci/admin/system/system
-exec for f in …/themes/footstrap/*.ut …/themes/footstrap/partials/*.ut; do ucode -T -c -o /dev/null "$f" || exit 1; done
-```
-
-`ucode -T -c` is LuCI's own trycompile, and it runs here against the installed templates with
-the router's real `luci.core` and `uci` — no interpreter of ours, no stubs. It runs on both
-legs: the templates are identical but the interpreters are not, and a construct 25.12's ucode
-accepts is no proof that 24.10's does. Without it a stray brace in `header.ut` ships green and
-silently moves every user's LuCI to another theme, because luci.mk copies `ucode/` verbatim and
-nothing parses it on the way.
-
-The same assertions are what `owlab test` runs locally — see [development.md](development.md), and
-keep the two in step.
-
-## `live` — the pages behave, not just the package
-
-`verify` proves the package installs and two pages answer 200. That is not the same claim as "the
-pages are right", and the difference is where every field report has lived: #11 a column shredded to
-one character per line, #22 a clipped submenu title, #12 a doubled scrollbar in one engine, #8/#33/#36
-a third-party app laid out wrong, and two pages that came back empty after a client navigation — all
-green under every static gate at the time.
-
-The job boots the same owlab containers a developer runs locally (`owfeed/owlab/setup` puts the CLI
-on PATH; the binary is checked against its build attestation), installs the artifact `build` just
-produced, and runs the live gates.
-
-**It is three jobs, not one.** Once `anchors` moved out, this was the release's critical path, so it
-became three slices (`parity`, `audit`, `motion`), each booting its own routers for 157s it does not
-share — the wall clock is the longest slice and not the sum. `fail-fast` is off: a parity failure
-says nothing about whether the reader stays put. `parity` and `audit` used to run in one job and
-share the page shapes they read through an `FS_SHAPES`-named cache — classifying is one load and a
-1200ms settle per page of the menu, and both gates did it back to back (measured: live-audit 421s
-alone, 303s after spa-parity had already read the same router). **Splitting them onto separate
-runners gave that saving back**: each is now its own matrix job, with no second gate in the same
-process to hand the answer to, so the cache was dropped (`tools/lib/page-shapes.mjs`) and `parity`
-and `audit` each walk the whole menu on their own — ~90s a router, the price of the split.
-
-Measured on the last run where every slice finished (`7ff9e56`, push, three routers): the gates are
-**485s** (spa-parity), **450s** (live-audit) and **754s** (`motion`'s six). `motion` carried a
-seventh until task liveslice — chromium's own scroll-anchor sweep, which grew from 145s to **1434s**
-when `--full` started crossing its density axis (`e48434c`) and put the slice at 39 of its 45
-minutes. That sweep is a shard of `anchors` now, beside firefox and webkit, where the cap is 75
-minutes and the one-job-per-engine rule already lives; the cells are the same cells.
-
-**A number here only holds while every page still answers.** `page.evaluate()` has no deadline in
-Playwright, so a page that pins the browser's main thread does not cost a page's worth of seconds —
-it costs the slice its whole budget. That is what happened for a day: `/admin/system/filemanager`
-under `13e9864` (`fs-fit.js`), `parity` and `audit` both cancelled at 45 minutes on every run, with
-nothing in either log. Both gates now print a line per page with the clock on it, so the next one
-names the page instead. **Read which page a slice last named; never raise the cap.**
-
-Printing a line is only half of it: a slice that names the page and is then killed at 45 minutes
-still measured nothing about the pages behind it. Each shape probe in `classify()`
-(`tools/lib/page-shapes.mjs`) is capped at `PROBE_DEADLINE_MS` (10s) — about 2000x the 4-5ms a live
-page answers in, and wide enough that even a menu where every path froze costs 16 minutes rather
-than the whole slice (96 paths, the widest measured, `owrt2512b` with the third-party fixtures). A
-page that loaded and then stopped answering is printed as a FINDING naming the router and the path,
-the walk continues on a fresh tab — a frozen page stays poisoned, every later `goto` on it burning
-its own 20s, while `close()` + `newPage()` costs 0.5s and the login lives on the context — and
-`parity` and `audit` exit non-zero. A page that never LOADED still says nothing, on purpose: that is
-the runner or the stand, not the theme, and the two must not read alike.
-
-**`audit-ru` is a fourth slice, one shard per router** (`owrt2512`, `owrt2410`): `live-audit --lang ru`
-on every push and pull request, because Russian strings run ~30% longer and break layouts English
-never reaches. The baseline carries `owrt2512@ru` and `owrt2410@ru` and no `owrtsnap@ru`, so there is
-no snapshot shard. It boots only its own router (`FS_ROUTERS`, `tools/ci-boot.sh`). Estimate 12
-minutes, from live-audit's 150s a router and a second pass over the language.
-
-**`deep` is the release's own pass, in CI.** Everything above measures one page per shape; a tag also
-takes every page of the menu (`--pages-all` on `spa-parity` and `live-audit`, `docs/releasing.md`
-step 4), which was a local pre-tag run and is a job now: one shard per router (`owrt2512`,
-`owrt2410`, `owrtsnap`), `release` waits on all three, a pull request skips them. Estimate 28 minutes
-a shard (spa-parity ~6, live-audit ~17 over the menu's 96 paths, 157s of boot) against the 45-minute
-cap, from the per-shape numbers above scaled by page count, not measured on a tag yet: the first tag's
-timings replace this line. **Stale baseline entries are decided from CI, not from one run:** only
-a full sweep decides them (`live-audit.mjs`), so `deep`'s live-audit alone writes the signatures it
-reproduced (`--seen-out`) and uploads artifact `live-audit-seen-deep-<router>`; `audit` and
-`audit-ru` write none, they could not use it. `deep` also runs on `workflow_dispatch`, so the prune
-reads these artifacts from a dispatch on `main` before the tag.
-
-Cheapest-first still holds inside `motion`, which opens with upstream-contract at 7s; it can no
-longer come before the other two slices, which are on runners of their own.
-
-1. `tools/upstream-contract.mjs` — the assumptions about luci-base. It runs first because if one of
-   them has moved, every finding below is downstream of it.
-2. `tools/spa-parity.mjs` — every page opened by a click and by a full load, compared.
-3. `tools/live-audit.mjs` — one page per shape at six widths (resized into) plus one ENTERED with a
-   load of its own — and the arrival records only what the resize at that width did not already
-   say, since a fault both passes see is one fault and a second copy of it is a baseline entry
-   that carries no information and only exists where that app is installed. Ratcheted against
-   `tools/baselines/live-audit.json`. `--update` UNIONS into that
-   file rather than replacing a router's set: the baseline is a union across platforms, and a
-   machine that does not install mwan3 must not delete mwan3's findings.
-4. `tools/scroll-jank.mjs` — a real wheel, long enough to meet a poll tick, in both layouts: nothing
-   may re-decide or jump while the page moves. A step of each `anchors` shard, `--engines <engine>`,
-   not of `motion`: that job installs chromium only, and the engine differences are now measured in
-   CI rather than locally before a release.
-5. `tools/table-tick.mjs` — the poll tick performed deliberately, with the layout forced inside the
-   window fs-select answers in: a replaced data table may not be laid out before it has an answer.
-6. `tools/scroll-anchor.mjs` — content grows above the reader and the page must not move under them,
-   with and without the engine's own scroll anchoring. It runs in its OWN job, **one shard per
-   engine — chromium, firefox and webkit** (`anchors`), not here: at 52 minutes against this job's 17
-   it was the whole release's critical path, and the three engines share nothing, so the shards run
-   at once. Chromium stayed in `motion` while it was the cheap engine at 145s and left when `--full`
-   took it to 1434s (task liveslice); it is now the shortest of the three shards and costs the
-   pipeline no wall clock at all. Its sweep is narrow on a pull request and `--full` on a push — the
-   axes it drops were measured not to change its answer, and a push is where being wrong about that
-   must still be caught.
-7. `tools/install-check.sh` — `install.sh` twice on each router, fresh and over its own result. It
-   goes last in its slice because it replaces the build under test with the published release; #16,
-   #28 and #30 were all this script, and all on the second run. That replacement is also why it may
-   not share a router with a gate still measuring the build — which a slice of its own guarantees.
-
-**Three routers on a push, one on a pull request.** The push set is the OpenWrt lines the theme
-supports — 25.12/apk, 24.10/opkg and the snapshot box, which tracks luci-base's master and so fails
-on an upstream change before a user reports it. ImmortalWrt is not in it: same luci-base, different
-brand and app set, never the leg that caught something first, and no gate measures it locally
-either (`tools/lib/stands.mjs`). What each gate holds, and how
-to run it by hand, is in [conventions.md](conventions.md) and [development.md](development.md).
-
-**The snapshot box carries no third-party extras (`owlab.yaml`, `owrtsnap`).** openclash and
-ssclash pull `kmod-tun`, which resolves through a kmods index keyed to the box's exact kernel git
-hash, and the box's baked kernel is never the one `downloads.openwrt.org/snapshots` is currently
-publishing kmods for — permanent drift, not a stale image. Measured 2026-09-07: `apk add` 404s the
-kmods `packages.adb` for the running `6.18.33` hash and both apps fail; justclash (no kernel module)
-installs cleanly on the same box, which is why it was never in the failure list. `owlab`'s own
-`extra_packages` merge is additive only (`defaults:` plus what a router adds, no subtraction), so
-the three apps are declared once, on `owrt2512`, and aliased onto the other release routers instead
-of living in `defaults:` — `owrtsnap` gets none. The snapshot leg still runs every other gate; only
-these three apps are untested there.
+Screenshots (one per page and width), `report.json` and `anchor-check.txt` are uploaded as artifact
+`e2e-<router>`, also on a red run. Locally: `owlab up <router>`, then
+`node tools/e2e.mjs --router <id> --old <release pkg> --new <built pkg>` (report under
+`../tmp/e2e-<router>` unless `--out` says otherwise); [verifying.md](verifying.md) has the rest.
 
 ## `playground` — a real router, recorded and replayed
 
 Turns `admin/status/overview` and seven other pages of an owlab stand into a static site any browser
-can open with no router behind it, and proves that site offline. Three scripts, `tools/playground/`:
+can open with no router behind it. Two scripts, `tools/playground/`:
 
 1. `capture.mjs` — boots nothing itself, talks to the `owrt2512` this job already installed the
    build on: logs in, fetches every page in `pages.json`, and records the server's own document, the
@@ -424,18 +232,13 @@ can open with no router behind it, and proves that site offline. Three scripts, 
 2. `build.mjs` — offline, deterministic: rewrites the recorded paths under `--base`, scrubs tokens
    and the stand's hostname, splices in `replay.js` (patches `XMLHttpRequest`/`fetch` to answer from
    the recording instead of a router), and tars the result.
-3. `verify.mjs` — opens the built site in a real Chromium and fails it on a page error, a replay
-   miss, a 404, or an empty `#view`; also proves the one client navigation this theme has and that an
-   Appearance change survives a reload.
 
-Runs on a tag, a pull request and `workflow_dispatch` — not only on release, because a regression in
-`fs-*.js` against a real ubus answer is a real fault and the cheapest place to catch it is before a
-tag exists to publish from. It replaces the 475 KB hand-written snapshot that used to live here,
-which imitated `fs-*.js` inline and had already gone 13 releases stale (`CHANGELOG.md`): this build
-runs the theme's own JS, so it cannot drift from it the same way.
+Runs on a tag and on `workflow_dispatch` (the source `pages-manual` publishes from). It replaces the
+475 KB hand-written snapshot that used to live here, which imitated `fs-*.js` inline and had already
+gone 13 releases stale (`CHANGELOG.md`): this build runs the theme's own JS, so it cannot drift from
+it the same way.
 
-Local run: `tools/ci-local.sh playground` (needs `--force`, same stand-safety rule as `live`); by
-hand, `docs/development.md`.
+By hand (`npm run playground:capture` / `playground:build`): `docs/development.md`.
 
 ## `release` — signing and publication
 
@@ -443,7 +246,7 @@ Tags only, and **it is a call into owfeed's own reusable workflow** rather than 
 
 ```yaml
 release:
-  needs: [build, verify, live, deep, anchors, lint, playground]
+  needs: [build, e2e, playground]
   if: startsWith(github.ref, 'refs/tags/v')
   uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.5
   secrets:    { sign-key: …OWFEED_AUTHOR_KEY, usign-key: …FOOTSTRAP_USIGN_KEY }
@@ -451,10 +254,10 @@ release:
                 sign-also: install.sh, notes-file: release-notes.md, verify-with: release.pub }
 ```
 
-**This is the only job that holds a key**, and this `needs` list is what stops a tag publishing a
-package no router has installed, no page has behaved on, or no recording has proven runs the real
-JS — `playground` is in it for the same reason as `live` and `anchors`: a fault it catches is the
-theme's, not a docs nit, and it does not ship with one unfound.
+**This is the only job that holds a key**, and `e2e` in this `needs` list is what stops a tag
+publishing a package that has not lived through install, upgrade, every page of the menu, removal
+and a fresh install on both package managers. `playground` is in it because `playground-asset`
+attaches its tarball to the release this job publishes.
 
 `tools/stage-release.sh` is our half — the `pre-release` hook. It writes the release notes where the
 workflow reads them and puts the one non-package asset into `dist/`, before the manifest is written,
@@ -485,14 +288,6 @@ and a copy already on somebody's router cannot be fixed remotely — a field ins
 would make it fetch a URL that 404s. The workflow checks that order on every release rather than
 relying on it.
 
-## `release-assets` — the published release, read back
-
-Tags only, `needs: release`. `docs/releasing.md` step 3 as a gate instead of a loop to remember: for
-the theme and each `luci-i18n-footstrap-<lang>` (one per `po/<lang>`), `gh release view --json assets`
-must show exactly one asset per format through the name-anchored regex `^<name>[-_][^/]*\.EXT$`.
-A `.sig` ends in `.EXT.sig` and does not match; a loose pattern once installed a language package
-AS the theme (issue #6).
-
 ## `playground-asset` — attaching the built playground to the release
 
 Tags only, `needs: [release, playground]`. `dist/*` rides the manifest `release` signs, and
@@ -509,7 +304,7 @@ Publishes the developer portal to GitHub Pages: `docs/devkit.html` (generated by
 `cascade.css` and `logo.svg` beside them. It also carries a **full mirror of the
 latest release** — the manifest, its signature, the installer **and the packages** — on a different
 host from github.com, so an outage or a block covering one need not cover the other. It is called by
-`release` (by way of `playground-asset`) rather than triggered by `on: release`, because an event
+`build.yml`'s `pages` job after `playground-asset` rather than triggered by `on: release`, because an event
 raised by `GITHUB_TOKEN` does not trigger another workflow.
 
 The devkit assembles itself from files that already exist — the real stylesheet, the export tier
@@ -548,154 +343,6 @@ rest of the portal. Two things to know before using it:
   run fires from `pages.yml`'s own push trigger, `playground-source` defaults back to `release`
   there, and Pages goes back to mirroring the latest tag.
 
-## Installation and the trust chain
-
-`install.sh` does one thing: it adds the owfeed-packages feed (key, repository entry, and a
-`keep.d` entry so a sysupgrade does not lose the key) and installs the theme from there.
-`apk upgrade` / `opkg upgrade` carries it forward afterwards, which is the whole reason to install
-from a feed rather than from a file.
-
-It then installs the catalogue for `luci.main.lang`, and **the feed not carrying that package is not
-a refusal**: a release reaches owfeed-packages through a pull request, so a NEW package — which
-`luci-i18n-footstrap-<lang>` was in 0.14.4 — is missing from the feed until that merges, while the
-signed asset for it is already in the release. The fallback takes it from the release through the
-chain below, pinned to the tag the installed theme came from, and `apk upgrade` picks the package up
-from the feed once it lands there.
-
-```sh
-wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
-```
-
-**The repository line goes into the manager's own customfeeds file**, `customfeeds.list` for apk and
-`customfeeds.conf` for opkg — not into a file of the theme's own. apk reads every `*.list` under
-`repositories.d/`, so a private file installs and upgrades just as well; what it cannot do is be
-seen. LuCI's package manager reads exactly three apk paths — `repositories`,
-`repositories.d/distfeeds.list`, `repositories.d/customfeeds.list` — in its rpcd ACL *and* hardcoded
-in `package-manager.js`, so a feed anywhere else is absent from "Configure APK" and cannot be edited
-or removed there. An installer from before this wrote `repositories.d/owfeed-packages.list`, which
-is why the apk branch deletes that file after writing its own line — the same repository configured
-twice, once where the admin can see it and once where they cannot, is worse than either. Neither
-customfeeds file needs a `keep.d` entry: both are conffiles of their manager (`apk-mbedtls`, `opkg`),
-sysupgrade backs up every conffile whose checksum has moved, and `build_list_of_backup_overlay_files`
-was already dropping the duplicate entry the script used to add.
-
-**The line is MOVED to be the first non-comment line, never merely appended or left wherever it
-already was** — measured on real apk: its customfeeds reader stops at the first line it cannot
-parse, so an admin's own unrelated line (or a stale one from an older run) sitting above where the
-correct line used to land could cut the feed off with no error at all, and a router this project's
-own OLDER installer had already configured has exactly that shape (the line appended, after
-whatever else was there) — so "is the line present" has to become "is it first", checked and
-repaired on every run, not only when the line is missing outright; the closing message distinguishes
-the three outcomes ("Adding"/"Feed added" when the line was missing, "Moving … to the top" when it
-only had to be repositioned, "already configured" when nothing changed). Every other ACTIVE line
-naming the feed's host (case-insensitive) or, on opkg, its src name, is commented out and reported
-rather than left to shadow the correct one; a line for any other host is untouched.
-
-Both this and the stale-line cleanup write the result atomically and never `mv` a fresh file over the
-customfeeds path directly: they resolve it with `readlink -f`, `cp -p` its mode and owner onto a temp
-file in the SAME directory (so the rename stays on one filesystem), write the new content into that
-copy, and only then `mv -f` it over the resolved target. A customfeeds file that is itself a symlink
-keeps being one — the rename replaces what it points at, never the link — and a write that fails
-partway (a full overlay, OOM, a `cp`/`cat`/`mv` a hostile PATH entry shadows) leaves the original
-byte-identical, because nothing is truncated until the copy is complete and the rename is what
-actually takes effect. **The failure itself is checked, not inferred**: `disable_other_lines`'s
-"disabled:" lines wait until the write actually lands before printing, and `ensure_first` reports
-its outcome through a real exit status the caller tests with `if`, never through `$(…)`, whose own
-exit code `set -e` cannot see — a failure to write the feeds file now exits 1 with one error naming
-the file, leaving it unchanged and no temporary files behind, instead of printing "Adding the
-feed…"/"disabled: …" over a write that silently never happened (measured on both package managers
-with `cp`, `mv`, and — on opkg — `cat` shimmed to fail; on apk a failing `cat` is intercepted
-earlier, at reading `/etc/apk/arch`, and reported there instead).
-
-**A snapshot router is served the newest release branch.** The feed publishes one branch per
-OpenWrt minor and has no snapshot channel — owfeed-packages lists exactly two release lines and they
-*are* the package-format split (apk from 25.12, ipk on 24.10), not a build of the theme per release.
-So `SNAPSHOT`, which parses to no branch, gets the newest branch its own package manager can read:
-`FALLBACK_BRANCHES_APK` / `_OPKG` in the script, probed newest-first against
-`releases/<branch>/<arch>/<index>` rather than assumed, so a branch listed before it is published —
-or one that does not carry this router's architecture — falls through instead of writing a
-repository entry that 404s on every update. What makes it sound here and not in general: the theme
-is noarch and `+luci-base` is its whole dependency list, so nothing in it was compiled against the
-branch it comes from. The probe's bytes are discarded; the index it found is still verified below.
-When no candidate answers, the script installs the signed release instead (below) rather than
-refusing — measured in an `openwrt/rootfs` snapshot container (`apk add` from the 25.12 branch, no
-`--allow-untrusted`, theme registered) and with the feed host pointed at a name that does not
-resolve.
-
-**Every downloader on the box is tried, not the first one that exists.** `uclient-fetch` needs
-libustream-mbedtls to speak https at all, and an image that ships wget-ssl or curl instead carries
-the binary without the library — so choosing by existence reported "the feed carries no branch for
-this router" when the truth was "this one tool cannot do TLS here". Reproduced with a
-`uclient-fetch` stub that always fails: the old script printed exactly the field report, the current
-one falls through to `wget` and installs from the feed. None of the three is ever asked to skip
-certificate verification; falling through to the next TOOL is not a downgrade.
-
-**What verifies the bytes on the feed path is the package manager**, against the feed key pinned in
-the script: apk checks the index against `owfeed-packages.pem`, opkg against usign key
-`9040356b214084da`.
-
-**The theme is now also carried by the official openwrt/luci feed, and a bare `apk add` picks that
-build instead of owfeed's.** apk resolves a name it is given with no version constraint to the
-HIGHEST version across every configured repository, not the one the repository line just added
-serves — and luci.mk stamps a LuCI-carried package from git's commit date rather than this
-project's own numbering. Measured on owrt2512 (OpenWrt 25.12.4, apk-tools 3.0.5):
-
-```
-# apk list luci-theme-footstrap
-luci-theme-footstrap-0.14.10-r1            noarch {luci-theme-footstrap}   ← owfeed
-luci-theme-footstrap-26.246.70755~4fd72fd  noarch {feeds/luci/…}           ← official feed
-```
-
-`install.sh`'s `apk add --upgrade "$PKG"` moved a router onto the second line — reported as
-"Upgraded luci-theme-footstrap 0.14.9-r1 -> 26.246.70755~4fd72fd", which is not an upgrade: that
-build predates this release (no rpcd-reload fix, no checkbox-tooltip fix) and comes from a
-different publisher. The fix is a version constraint the script now applies to both the theme and
-its `luci-i18n-footstrap-*` catalogues, `apk add --upgrade "$PKG<26"`, which both picks owfeed's
-build over the official one and REPAIRS a router that already has the official one (`--upgrade`
-still applies, so it downgrades, measured: "Downgrading luci-theme-footstrap
-(26.246.70755~4fd72fd -> 0.14.10-r1)"). `26` is a ceiling, not a version pin: `apk version -t`
-confirms `26.246.70755~4fd72fd` and `27.1.1~abc` both compare `>` against `26` — the LuCI stamp
-only grows with the calendar — while `0.14.10-r1`, `1.0.0-r1` and `25.99.99-r1` all compare `<`,
-so the constraint excludes every LuCI-stamped build for good and leaves this project's own
-numbering majors 1 through 25 to grow into. opkg has no `world` file and no version-constraint
-syntax on `install`/`upgrade`, so this has no opkg equivalent; left alone because the official
-24.10 feed does not carry the theme today (checked on owrt2410, `opkg info luci-theme-footstrap`
-names only this project's own `0.14.9-r1`) — if that changes, the fallback is the signed-release
-install path this script already has (`install_from_release`), which bypasses feed resolution
-entirely.
-
-**There is no pinned-tag install, and the release-asset fallback is automatic but never the first
-choice.** A router that cannot read the feed index at all — an architecture owfeed does not publish,
-a resolver that does not answer, a network that intercepts the host — is installed from the release
-instead of being sent away with a URL, and told plainly that `apk upgrade` will not carry the theme
-forward until the feed works.
-
-That path picks the artifact **from the signed manifest**, never by guessing an asset's name: GitHub
-sorts assets by name, and `luci-i18n-…` sorts ahead of `luci-theme-…`, so a release carrying
-per-language packages needs the manifest to say which asset is the theme, not a guessed name
-(issue #6). `manifest.txt` names exactly one file per
-format with its size and digest, and the chain fails closed in this order — verified TLS, then
-`usign -V` against the release key pinned in the script (the same key as `release.pub`), then the
-manifest's own sha256 over the downloaded artifact. A missing `usign`, a signature that does not
-verify, or a digest that does not match is a refusal, and the script then prints the by-hand URL as
-before. `apk`'s `--allow-untrusted` on this path says only that the `.apk` carries no APK signature
-of its own; what is trusted is the usign signature over the manifest, checked before the file is
-handed to the manager. Measured on 25.12/apk and 24.10/opkg containers, including the refusal: a
-one-character change to the pinned key leaves nothing installed.
-
-A router that wants an OLDER version still does it by hand — the feed carries one version per
-branch — with the **raw file from a release**, never the zip artifact from Actions:
-
-```sh
-apk add --allow-untrusted luci-theme-footstrap-*.apk   # 25.12+
-opkg install luci-theme-footstrap_*.ipk                # 24.10
-```
-
-`--allow-untrusted` means the package manager holds no key of ours. The release publishes a signed
-`manifest.txt` and a detached `.sig` per asset, so a by-hand install can be checked with
-`usign -V -m <pkg> -x <pkg>.sig -p release.pub` — which is what the installer's own fallback does
-for you.
-
 ## Package formats, and the usual mistake
 
 - **apk** (25.12+) — the Alpine apk-tools format, which OpenWrt adopted in 25.12.
@@ -705,13 +352,7 @@ for you.
 **"Malformed package file" from opkg** is almost always the wrong file: a GitHub artifact's zip
 wrapper, or an `.apk` where an `.ipk` belongs.
 
-An `.ipk` can be checked with a real opkg by hand — there is no such run in CI, and there was no
-real proof before either, since "an SDK 24.10 produced it" was the same non-proof:
-
-```sh
-docker run --rm -v /path/pkg.ipk:/tmp/p.ipk openwrt/rootfs:x86-64-24.10.4 \
-  sh -c 'mkdir -p /var/lock; opkg install --nodeps /tmp/p.ipk'
-```
+The `e2e` leg on `owrt2410` installs, upgrades and removes the `.ipk` with the router's own opkg.
 
 **All four lifecycle scripts are present in both containers.** The first version of owfeed emitted
 only `postinst` and `prerm` into the ipk — the pair `package-pack.mk` generates, and easy to mistake

@@ -122,7 +122,7 @@ hardcoded colour with extra steps.
 - **`--warn-color-medium` is CORRECT.** podkop's `var(--warn-color-medium, orange)` (7 uses) resolves
   on footstrap and paints the themed amber. Do not "fix" it to `--warning-color-medium` — that
   name is defined by nothing, and the rename would silently drop every one of those 7 declarations
-  into the `orange` fallback. (An earlier version of this guide said the opposite. It was wrong.)
+  into the `orange` fallback.
 - **`--text-color` (justclash, 6 uses) really does not exist.** It is `--text-color-high`.
 
 ### 3.2. `--fs-*` is footstrap's PRIVATE tier — do not read it
@@ -132,15 +132,12 @@ export tier: `--fs-accent`, `--fs-panel2`, `--fs-radius`, `--fs-dim`, the whole 
 are not yours.** They are internal, they are renamed and re-derived whenever the theme wants to, and
 no other LuCI theme has them at all. Only the `--*-color-*` names above are a contract.
 
-The two-tier split is not tidiness — it is the fix for a measured bug, and it is the same bug §2
-warns you about from the other side. `:root` is a **shared global scope**, and an app's stylesheet is
-**unlayered**, so it outranks every cascade layer the theme has. One app writing
-`:root { --accent: … }` — or `--text-color-high`, which is a LuCI *convention* and therefore the
-likelier name for an app to declare — used to repaint the theme itself: **312 of 336 elements
-changed colour** under a single hostile `:root` block. So footstrap now reads *only* its private
-`--fs-*` names internally and derives the export names *from* them. Same measurement after the split:
-**0 elements**. (`styles/02-tokens.css`; a CI gate fails the build if any theme rule reads an export
-name.)
+The two-tier split is the same bug §2 warns you about, seen from the other side. `:root` is a
+**shared global scope**, and an app's stylesheet is **unlayered**, so it outranks every cascade layer
+the theme has. One app writing `:root { --accent: … }` — or `--text-color-high`, which is a LuCI
+*convention* and therefore the likelier name for an app to declare — would repaint the theme itself.
+So footstrap reads *only* its private `--fs-*` names internally and derives the export names *from*
+them. (`styles/02-tokens.css`.)
 
 The practical consequence for you is the good half: **because the theme cannot be repainted by your
 `:root` any more, you can override anything the theme draws inside your own subtree — and you never
@@ -149,15 +146,14 @@ need `!important` to do it.** Unlayered beats every layer, unconditionally. If y
 
 ### 3.3. What the tier guarantees (and what to do with the guarantee)
 
-footstrap proves all of this in CI (`tools/export-tier.mjs`) across the full matrix of
+footstrap measured all of this across the full matrix of
 {light, dark} × {default, hicontrast, bootstrap, 2020, forum} × seven tint values — 70 combinations:
 
 - **Every level of `text` / `primary` / `success` / `warn` / `error` clears WCAG AA as TEXT** on all
   three `--background-color-*` surfaces. So you may paint any of them as a `color:` and not check.
 - **The matching `--on-*-color` clears AA *on top of* its colour used as a fill.** So: **to put text
   on a coloured fill, take the ink from `--on-*-color`. Do not invent one.** A hardcoded `#fff` on a
-  filled badge is the classic failure — it fell to **1.69:1** on seven of the eight dark-palette fills
-  before footstrap made the inks per-palette and per-mode.
+  filled badge is the classic failure: the inks differ per palette and per mode.
 - **`high` / `medium` / `low` are three genuinely different colours**, not three aliases. If you paint
   "no data" in `--primary-color-low`, it *will* read quieter than a live value. (Two caveats worth
   knowing: `--background-color-*` runs the other way, `high` = raised; and `-low` is genuinely the
@@ -168,7 +164,7 @@ footstrap proves all of this in CI (`tools/export-tier.mjs`) across the full mat
 
 footstrap is not just light/dark. `:root[data-palette="hicontrast"]` swaps the entire colour set, and
 a Tint slider re-hues every surface (`:root[data-tint]` with `--fs-tint-h` at any hue 1–360). Both
-axes move the export tier with them — which is why the CI matrix above sweeps exactly those axes.
+axes move the export tier with them — which is why the matrix above spans exactly those axes.
 
 An app on the tier follows all of it for free and stays legible. A hardcoded "close enough" colour
 does not move: a `#f7f7f7` card chosen to match the default panel is wrong the instant the user picks

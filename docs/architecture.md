@@ -63,8 +63,9 @@ Three things follow:
    `/usr/share/ucode/luci/template/themes/<name>/header.ut`.
 2. **A header that does not compile does not brick the UI.** LuCI falls back to the first working
    theme and shows a "Theme fallback" indicator carrying the error. Convenient while developing —
-   and the reason CI compiles every `.ut` with `ucode -T -c`: a stray brace would otherwise ship
-   green and quietly move every user to another theme.
+   and dangerous in a release: a stray brace quietly moves every user to another theme. The e2e
+   run on the routers fails a page whose footstrap stylesheet or chrome is missing, which is what
+   that fallback looks like.
 3. `resource` is always `/luci-static/resources`, shared with luci-base. Themes must not touch it.
 
 ## What the header must do
@@ -153,20 +154,13 @@ hard dependency — luci.js evaluates the module before the requirer's factory r
 page — so `menu-footstrap-common.js`
 carries a map from `data-page` to module name and requires the module when that page appears
 (server-stamped or router-stamped, the same attribute either way). The loader owns the observer on
-`body[data-page]` and calls the module's `onPage()` on every stamp; `wire()` re-checks the page
-synchronously, so one that arrives after the stamp is still picked up. The map repeats a page name
-the module also tests, and `npm run page-modules` derives both sides and fails if they drift.
+`body[data-page]` and calls the module's `wire()` on every stamp; `wire()` re-checks the page
+itself (`onPage()`). The map repeats a page name the module also tests, so the two must be edited
+together.
 
-`fs-appearance` (the Appearance controls) used to be the map's other entry, stapled onto System →
-System the same way. It now owns a route of its own, `/admin/system/footstrap`
-(`root/usr/share/luci/menu.d/luci-theme-footstrap.json`, dispatched to
-`view/footstrap/appearance.js`), which requires it by pragma like any ordinary view — an ordinary
-dependency, not a page-watching module, because a theme with a route no longer needs the
-`body[data-page]` workaround for the page it owns. What the route replaced: a MutationObserver on
-`#maincontent` watching for the stock form's tab strip, a 5 s deadline, a `body[data-page]` tracker,
-a stale-group WeakSet so the outgoing page's DOM could not false-match, and a sessionStorage flag so
-a reset's reload landed back on the tab — and a Save & Apply on a real router still lost the tab
-once, never reproduced on a stand.
+`fs-appearance` (the Appearance controls) is not a page module: it owns a route of its own,
+`/admin/system/footstrap` (`root/usr/share/luci/menu.d/luci-theme-footstrap.json`, dispatched to
+`view/footstrap/appearance.js`), which requires it by pragma like any ordinary view.
 
 **There is no update checker, and nothing that loads one.** The installer adds the owfeed-packages
 feed, so `apk upgrade` / `opkg upgrade` carries the theme forward, and a settings page has no
@@ -233,11 +227,9 @@ event handlers and off-document CSS are still matched by name:
   its `attributeName` is a URL-valued attribute (`href`, `ping`, any prefix): WebKit followed
   `<animateTransform attributeName="href">` to a same-origin `translate(…)` path on a click. Colour,
   rotation and motion animations stay; their `values`/`from`/`to`/`by` go through the CSS rule below.
-  The XHTML half was the hole: `<h:frame src="javascript:…">` ran with the router's session cookie on
-  a direct open without CSP in all three engines; `h:img src`/`srcset`, `h:picture`, `h:meta refresh`
-  fetched or navigated off the router in all three, `h:input type=image` in Chromium and Firefox,
-  `h:table background` in Chromium. A full Inkscape export (`sodipodi:namedview`, `rdf:RDF`) therefore reports itself
-  cleaned; nothing it draws is lost.
+  Foreign-namespace elements go because XHTML inside SVG can run script and fetch
+  (`<h:frame src="javascript:…">`, `h:img`, `h:meta refresh`) on a direct open. A full Inkscape
+  export (`sodipodi:namedview`, `rdf:RDF`) therefore reports itself cleaned; nothing it draws is lost.
 - **`href` / `xlink:href` / `ping`:** every URL-valued attribute is stripped the way the WHATWG URL parser strips (every TAB/LF/CR, then
   leading spaces — XML 1.0 admits no other C0 control; not JavaScript's `trim()`, which also eats NBSP and U+FEFF and let
   `&#160;data:…/../x` resolve as a same-origin path), then kept only as a same-document `#fragment`,
@@ -268,8 +260,5 @@ code comment limit (`docs/conventions.md`, "Comments") is 1-2 lines.
   without that header. Internal entities and `ATTLIST` defaults land in the DOM before the walk and
   are judged like any other node; `XMLSerializer` drops the internal subset.
 
-The 2026-10 review measured every case above with the file opened directly and no CSP — the worst
-sink — in Chromium, Firefox and WebKit: 0 outside requests and no script after the walk. The image
-sinks (`<img>`, `mask-image`, `background-image`) made 0 requests even with the raw file; the CGI's
-CSP is the second wall, and the CGI does not validate the bytes itself (an admin's direct
-`cgi-upload` POST skips the client walk).
+The CGI's CSP is the second wall. The CGI does not validate the bytes itself: an admin's direct
+`cgi-upload` POST skips the client walk.

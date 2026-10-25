@@ -27,7 +27,7 @@ wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/i
 Потом печатает, что сделал: поставил, обновил с такой-то версии или всё уже актуально. Новые версии дальше приходят вместе с `apk upgrade` или `opkg upgrade`
 роутера.
 
-Если `raw.githubusercontent.com` отвечает 429 (общий выход или CGNAT), запустите подписанную копию,
+Если `raw.githubusercontent.com` отвечает 429 (общий выход или CGNAT), запустите копию,
 приложенную к последнему релизу:
 
 ```sh
