@@ -216,12 +216,16 @@ async function park(page, width) {
 }
 
 /* The reader keeps the wheel going, 20px a step down and up around their place, until the tick that
- * takes the leases away has landed, then three steps more down and lets go. False when no tick
- * landed within 12 s. */
-async function scrollThrough(page) {
+ * takes the leases away has landed, then three steps more down and lets go. `rolling` resolves once
+ * the reader has been scrolling for a while: the leases may go only then, since a tick landing
+ * before the first step met a reader at rest and left nothing to measure. False when no tick
+ * landed within 12 s, or the leases went before the reader began. */
+async function scrollThrough(page, rolling) {
 	const gone = () => page.evaluate(() => !document.getElementById('view').textContent.includes('anchor-check-'));
 	for (let i = 0; i < 150; i++) {
+		if (i === 5) rolling();
 		if (await gone()) {
+			if (i <= 5) return false;
 			for (let j = 0; j < 3; j++) { await page.mouse.wheel(0, 20); await page.waitForTimeout(80); }
 			return true;
 		}
@@ -250,12 +254,15 @@ async function phase(name, browser, cells) {
 	grow();
 	await new Promise((r) => setTimeout(r, 7000));	/* a tick has rendered the rows and floored their box */
 	await repark();
-	shrink();
-	const out = await Promise.all(pages.map(async (p) => {
-		if (!p.parked) return null;
-		if (!(await scrollThrough(p.page))) return { missed: true };
+	const rolls = pages.map(() => { let ok; const p = new Promise((r) => { ok = r; }); return { p, ok }; });
+	const scrolled = Promise.all(pages.map(async (p, i) => {
+		if (!p.parked) { rolls[i].ok(); return null; }
+		if (!(await scrollThrough(p.page, rolls[i].ok))) { rolls[i].ok(); return { missed: true }; }
 		return p.page.evaluate(SAMPLE, [ 4, TOL, 200 ]);
 	}));
+	await Promise.all(rolls.map((r) => r.p));
+	shrink();
+	const out = await scrolled;
 	cells.forEach((c, i) => { c.res.scroll = out[i]; });
 	await Promise.all(pages.map((p) => p.ctx.close()));
 	console.log(`  ${name}: ${cells.length} pages`);
