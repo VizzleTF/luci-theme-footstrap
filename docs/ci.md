@@ -224,7 +224,7 @@ Screenshots (one per page and width), `report.json` and `anchor-check.txt` are u
 ## `playground` — a real router, recorded and replayed
 
 Turns `admin/status/overview` and seven other pages of an owlab stand into a static site any browser
-can open with no router behind it. Two scripts, `tools/playground/`:
+can open with no router behind it. Three scripts, `tools/playground/`:
 
 1. `capture.mjs` — boots nothing itself, talks to the `owrt2512` this job already installed the
    build on: logs in, fetches every page in `pages.json`, and records the server's own document, the
@@ -232,13 +232,17 @@ can open with no router behind it. Two scripts, `tools/playground/`:
 2. `build.mjs` — offline, deterministic: rewrites the recorded paths under `--base`, scrubs tokens
    and the stand's hostname, splices in `replay.js` (patches `XMLHttpRequest`/`fetch` to answer from
    the recording instead of a router), and tars the result.
+3. `verify.mjs` — serves the built site in Chromium and fails on a page error, an unanswered ubus
+   call, a 404 or an empty view, a client navigation that fell back to a full load, an Appearance
+   change that does not survive a reload, or a login gate that does not let the reader in and out.
+   The tarball reaches the release only if it passes.
 
 Runs on a tag and on `workflow_dispatch` (the source `pages-manual` publishes from). It replaces the
 475 KB hand-written snapshot that used to live here, which imitated `fs-*.js` inline and had already
 gone 13 releases stale (`CHANGELOG.md`): this build runs the theme's own JS, so it cannot drift from
 it the same way.
 
-By hand (`npm run playground:capture` / `playground:build`): `docs/development.md`.
+By hand (`npm run playground:capture` / `playground:build` / `playground:verify`): `docs/development.md`.
 
 ## `release` — signing and publication
 
