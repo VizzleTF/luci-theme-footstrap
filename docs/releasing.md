@@ -40,6 +40,7 @@ The code of the release is on `main` before the release commit is cut, and its p
 |---|---|
 | `build` | both formats, built by `owfeed build` |
 | `e2e` | `tools/e2e.mjs` on owrt2512 (25.12/apk) and owrt2410 (24.10/opkg): install the last release, upgrade to this build, open every menu page against bootstrap, remove, fresh install ([verifying.md](verifying.md)) |
+| `anchor` | `tools/anchor-check.mjs` on owrt2512 and owrt2410, beside `e2e`: a poll tick above a parked reader in Chromium, Firefox and WebKit ([verifying.md](verifying.md)) |
 
 `playground` does not run on a push to `main`; it runs first on the tag (or a `workflow_dispatch`).
 

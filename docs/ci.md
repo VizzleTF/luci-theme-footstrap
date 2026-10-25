@@ -25,7 +25,8 @@ side by side and `release` waits for both.
 | Job | What it is |
 |---|---|
 | `build` | the ACL check, then both package formats, via owfeed |
-| `e2e` | `tools/e2e.mjs`, one leg per package manager: the package's whole life on a real router (below) |
+| `e2e` | `tools/e2e.mjs --no-anchor`, one leg per package manager: the package's whole life on a real router (below) |
+| `anchor` | `tools/anchor-check.mjs`, one leg per package manager, beside `e2e` on a router of its own (below) |
 | `playground` | records a real router's pages into a static, replayable site (tags and dispatches) |
 | `release` | signs, generates the notes, attaches the assets |
 | `playground-asset` | uploads `playground.tar.gz` to the tag's release, once one exists |
@@ -211,13 +212,24 @@ it on the way, so a stray brace in `header.ut` would silently move every user's 
 theme. Both legs run it because the templates are identical but the interpreters are not, and a
 construct 25.12's ucode accepts is no proof that 24.10's does.
 
-After the crawl, with the build still installed and active, `tools/e2e.mjs` runs
-`tools/anchor-check.mjs`: a poll tick growing Status > Overview above a parked reader, and one
-shrinking it back, must leave them where bootstrap does in Chromium, Firefox and WebKit, and where nothing anchors the theme's own
-correction must hold them ([verifying.md](verifying.md) "What the check proves").
+`anchor` runs `tools/anchor-check.mjs` on a router of its own, beside the crawl rather than after it
+(they took 8.5 and 7 minutes one after the other): the same 9999.0.0 build is installed with
+`owlab install`, and a poll tick growing Status > Overview above a parked reader, and one shrinking it
+back, must leave them where bootstrap does in Chromium, Firefox and WebKit, and where nothing
+anchors the theme's own correction must hold them ([verifying.md](verifying.md) "What the check
+proves"). Its log is uploaded as artifact `anchor-<router>`.
 
-Screenshots (one per page and width), `report.json` and `anchor-check.txt` are uploaded as artifact
-`e2e-<router>`, also on a red run. Locally: `owlab up <router>`, then
+**Both jobs build their router in the background.** `owlab up` starts right after checkout and the
+`Wait for the router` step before the run prints its log and fails with its exit status; the
+browsers (`~/.cache/ms-playwright`, keyed by Playwright's version and the engines) and owfeed's SDK
+(`~/.cache/owfeed`, keyed by `owfeed.lock`) come from `actions/cache`, so the router is what the
+setup waits on. **A change that touches documentation alone skips both**: the first step runs
+`tools/ci-package-changed.sh` against the PR's base or the push's previous head and every later step
+is gated on its answer. The steps skip, not the job: a matrix job skipped at job level reports its
+name unexpanded, and the required check would wait forever.
+
+Screenshots (one per page and width) and `report.json` are uploaded as artifact `e2e-<router>`,
+also on a red run. Locally: `owlab up <router>`, then
 `node tools/e2e.mjs --router <id> --old <release pkg> --new <built pkg>` (report under
 `../tmp/e2e-<router>` unless `--out` says otherwise); [verifying.md](verifying.md) has the rest.
 

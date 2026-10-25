@@ -23,8 +23,9 @@ apps but not this theme, the way an admin lives it:
    a full load at 1280 px and at 390 px, and every entry of footstrap's menu (each top-level entry
    and each entry under one, from the router's own menu tree) by a click on its link. The full-load
    passes read four pages at a time, each in a logged-in context of its own, the same count under
-   both themes; the click pass is one page, entry after entry. Then
-   `tools/anchor-check.mjs` (below) runs against the installed build.
+   both themes; the click pass is two pages, each taking half the entries one after another. Then
+   `tools/anchor-check.mjs` (below) runs against the installed build; `--no-anchor` leaves it out,
+   which is what CI does, running it as a job of its own (`anchor`) on a router of its own.
 5. **Remove the package.** LuCI falls back to bootstrap and still serves its login form (LuCI
    answers the form with a 403, so the body is the evidence, not the status).
 6. **Install this build again.** Footstrap is offered, the active theme is left alone.
@@ -143,12 +144,17 @@ and the same on `owrt2410` with `luci-theme-footstrap_*_all.ipk` and
 - It exits 0 when every step passed, 1 otherwise, and 2 on bad arguments or a router that is not
   running. The output and screenshots land in `--out`, by default `../tmp/e2e-<router>`.
 - **Done means both**: 25.12/apk and 24.10/opkg. Say which one a run covered.
-- A CI job takes about 20 minutes per router: the crawl about 8.5 (bootstrap 250 s, desktop 155 s,
-  click 58 s, phone 32 s; the log prints each pass's time), the anchoring check about 7, setup and
-  the package steps the rest.
+- CI runs the crawl (`e2e`) and the anchoring check (`anchor`) as two jobs per router, side by side.
+  The crawl takes about 8 minutes (bootstrap 250 s, desktop 155 s, click about 30 s, phone 32 s; the
+  log prints each pass's time), the anchoring check about 5; a job's setup adds about 2, the router
+  building in the background while the browsers and the package are fetched and packed. A change
+  that touches documentation alone skips both (`tools/ci-package-changed.sh`).
 - The anchoring check runs on its own against any running router with footstrap active, an
   `owlab sync`ed one included: `node tools/anchor-check.mjs --router owrt2512 [--engines webkit]
   [--widths 390]`. It switches the theme to bootstrap for its reference cells and back to footstrap.
+  Footstrap's cells run one engine at a time; bootstrap's run as one phase across the engines, the
+  same six pages' load. When every failure is a cell that measured nothing, the whole check runs once
+  more (the log says `MEASURED NOTHING` first); a failure that measured something is never rerun.
   Exit 0 on a pass, 1 on a failure, 2 when the router is not running or has no lease.
 - Whether the anchoring check can fail at all: `node tools/anchor-mutants.mjs --router owrt2512`
   puts known-bad dev builds of `fs-fit.js` on the router one at a time (the offset read inside the
@@ -160,7 +166,8 @@ and the same on `owrt2410` with `luci-theme-footstrap_*_all.ipk` and
 
 ## Reading a run
 
-Each matrix leg uploads its `--out` directory as the artifact `e2e-<router>`, also when it failed:
+Each `e2e` leg uploads its `--out` directory as the artifact `e2e-<router>`, and each `anchor` leg
+its log as `anchor-<router>`, also when it failed:
 
 ```sh
 gh run download <run-id> -n e2e-owrt2410 -D ../tmp/e2e-ci-owrt2410
@@ -171,7 +178,7 @@ gh run download <run-id> -n e2e-owrt2410 -D ../tmp/e2e-ci-owrt2410
 | `report.json` | `results`: every step as `{ step, ok, detail }`; `crawl.pages`: one entry per path and way of opening it (`desktop`, `phone`, `click`) with its `problems`; `crawl.bootstrap` and `crawl.footstrap`: what each pass read on each path (errors and failed requests with the ms after render they showed up, the visible text, the stylesheet's rule count, the token, the menu) |
 | `footstrap/desktop/*.jpg`, `footstrap/phone/*.jpg` | one screenshot per page at 1280 and 390 px, named after the path (`admin_status_overview.jpg`) |
 | `bootstrap/*.jpg` | the same pages under bootstrap at 1280 px |
-| `anchor-check.txt` | `tools/anchor-check.mjs`'s log: per engine, width and change (grow, shrink), per cell the end shift, the largest shift, the frames off place sampled and painted, and the change in px, then the `FAIL` lines |
+| `anchor-check.txt` (in `anchor-<router>` from CI) | `tools/anchor-check.mjs`'s log: per engine, width and change (grow, shrink), per cell the end shift, the largest shift, the frames off place sampled and painted, and the change in px, then the `FAIL` lines |
 
 The log prints `PASS`/`FAIL` per step and, under the crawl step, one line per failing page and way
 of opening it. A failure in an install, upgrade or removal step carries the package manager's last

@@ -3,7 +3,8 @@
 #
 # One check: tools/e2e.mjs runs the package's whole life on a real OpenWrt of each package manager
 # (the last release, an upgrade to this build, every menu page against bootstrap, removal, a fresh
-# install). The release pipeline itself is owfeed's `package.yml`.
+# install), and tools/anchor-check.mjs runs beside it on a router of its own. The release pipeline
+# itself is owfeed's `package.yml`.
 
 name: Build LuCI theme packages
 
@@ -68,6 +69,12 @@ jobs:
       - run: npm ci
       # The `uses:` ref is the pin Dependabot moves; an unset version installs that ref.
       - uses: owfeed/owfeed/setup@v0.5.5
+      # The SDK owfeed fetches on its first build (~60 s on a bare runner, 2 s with it here); the lock
+      # names the release points, so a new point is a new key.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/owfeed
+          key: owfeed-${{ runner.os }}-${{ hashFiles('owfeed.lock') }}
       # The commit's timestamp: re-running a release over the same commit produces the same bytes.
       - run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
       - run: ./tools/stage.sh
@@ -83,9 +90,14 @@ jobs:
   # Does not wait for `build`: it stages and packs the same tree itself, stamped 9999.0.0 so that
   # installing it over the last release is an upgrade by both package managers' rules. Its payload
   # differs from `build`'s only in the version fs-version.js carries.
+  #
+  # The router is built in the background while the browsers and the package are fetched and packed,
+  # and waited for before the run. Every step after the first is gated on RUN: a change that touches
+  # documentation alone passes without a router (tools/ci-package-changed.sh says why the steps skip
+  # and not the job).
   e2e:
     name: The package's life on ${{ matrix.router }}
-    timeout-minutes: 90
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -99,30 +111,142 @@ jobs:
             new: dist/all/luci-theme-footstrap_[0-9]*_all.ipk
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - name: Does the change reach the package
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.before) || '' }}
+        run: echo "RUN=$(sh tools/ci-package-changed.sh "$BASE")" | tee -a "$GITHUB_ENV"
+      - if: env.RUN == 'true'
+        uses: owfeed/owlab/setup@v0.6.6
+      - if: env.RUN == 'true'
+        name: Start the router in the background
+        run: |
+          (owlab up ${{ matrix.router }}; echo $? > "$RUNNER_TEMP/owlab-up.tmp" && mv "$RUNNER_TEMP/owlab-up.tmp" "$RUNNER_TEMP/owlab-up.rc") \
+            > "$RUNNER_TEMP/owlab-up.log" 2>&1 < /dev/null &
+      - if: env.RUN == 'true'
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
-      # tools/anchor-check.mjs, which e2e runs, drives all three engines
-      - run: sh tools/ci-playwright.sh chromium firefox webkit
-      - uses: owfeed/owfeed/setup@v0.5.5
-      - run: FOOTSTRAP_VERSION=9999.0.0 ./tools/stage.sh && owfeed build
-      - name: Download the last release
+      - if: env.RUN == 'true'
+        run: npm ci
+      - if: env.RUN == 'true'
+        id: pw
+        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - if: env.RUN == 'true'
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium
+      - if: env.RUN == 'true'
+        run: sh tools/ci-playwright.sh chromium
+      - if: env.RUN == 'true'
+        uses: owfeed/owfeed/setup@v0.5.5
+      - if: env.RUN == 'true'
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/owfeed
+          key: owfeed-${{ runner.os }}-${{ hashFiles('owfeed.lock') }}
+      - if: env.RUN == 'true'
+        run: FOOTSTRAP_VERSION=9999.0.0 ./tools/stage.sh && owfeed build
+      - if: env.RUN == 'true'
+        name: Download the last release
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release download --repo "$GITHUB_REPOSITORY" --pattern '${{ matrix.old }}' --dir old
-      - uses: owfeed/owlab/setup@v0.6.6
-      - run: owlab up ${{ matrix.router }}
-      - run: node tools/e2e.mjs --router ${{ matrix.router }} --old old/${{ matrix.old }} --new ${{ matrix.new }} --out "$RUNNER_TEMP/e2e"
+      - if: env.RUN == 'true'
+        name: Wait for the router
+        timeout-minutes: 10
+        run: |
+          while [ ! -f "$RUNNER_TEMP/owlab-up.rc" ]; do sleep 2; done
+          cat "$RUNNER_TEMP/owlab-up.log"
+          exit "$(cat "$RUNNER_TEMP/owlab-up.rc")"
+      - if: env.RUN == 'true'
+        run: node tools/e2e.mjs --router ${{ matrix.router }} --old old/${{ matrix.old }} --new ${{ matrix.new }} --out "$RUNNER_TEMP/e2e" --no-anchor
         shell: bash -O nullglob -e {0}
-      - if: always()
+      - if: always() && env.RUN == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: e2e-${{ matrix.router }}
           path: ${{ runner.temp }}/e2e
           if-no-files-found: ignore
-      - if: always()
+      - if: always() && env.RUN == 'true'
+        run: owlab down || true
+
+  # tools/anchor-check.mjs on a router of its own, beside e2e rather than after its crawl: a poll tick
+  # growing and shrinking Status > Overview above a parked reader, in all three engines. The same
+  # 9999.0.0 build, installed fresh; the gate and the background router are e2e's.
+  anchor:
+    name: Scroll anchoring on ${{ matrix.router }}
+    timeout-minutes: 40
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - router: owrt2512
+            new: dist/noarch/luci-theme-footstrap-[0-9]*.apk
+          - router: owrt2410
+            new: dist/all/luci-theme-footstrap_[0-9]*_all.ipk
+    steps:
+      - uses: actions/checkout@v7
+      - name: Does the change reach the package
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.before) || '' }}
+        run: echo "RUN=$(sh tools/ci-package-changed.sh "$BASE")" | tee -a "$GITHUB_ENV"
+      - if: env.RUN == 'true'
+        uses: owfeed/owlab/setup@v0.6.6
+      - if: env.RUN == 'true'
+        name: Start the router in the background
+        run: |
+          (owlab up ${{ matrix.router }}; echo $? > "$RUNNER_TEMP/owlab-up.tmp" && mv "$RUNNER_TEMP/owlab-up.tmp" "$RUNNER_TEMP/owlab-up.rc") \
+            > "$RUNNER_TEMP/owlab-up.log" 2>&1 < /dev/null &
+      - if: env.RUN == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - if: env.RUN == 'true'
+        run: npm ci
+      - if: env.RUN == 'true'
+        id: pw
+        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - if: env.RUN == 'true'
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-firefox-webkit
+      - if: env.RUN == 'true'
+        run: sh tools/ci-playwright.sh chromium firefox webkit
+      - if: env.RUN == 'true'
+        uses: owfeed/owfeed/setup@v0.5.5
+      - if: env.RUN == 'true'
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/owfeed
+          key: owfeed-${{ runner.os }}-${{ hashFiles('owfeed.lock') }}
+      - if: env.RUN == 'true'
+        run: FOOTSTRAP_VERSION=9999.0.0 ./tools/stage.sh && owfeed build
+      - if: env.RUN == 'true'
+        name: Wait for the router
+        timeout-minutes: 10
+        run: |
+          while [ ! -f "$RUNNER_TEMP/owlab-up.rc" ]; do sleep 2; done
+          cat "$RUNNER_TEMP/owlab-up.log"
+          exit "$(cat "$RUNNER_TEMP/owlab-up.rc")"
+      - if: env.RUN == 'true'
+        run: owlab install ${{ matrix.router }} ${{ matrix.new }}
+      - if: env.RUN == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/anchor"
+          node tools/anchor-check.mjs --router ${{ matrix.router }} 2>&1 | tee "$RUNNER_TEMP/anchor/anchor-check.txt"
+        shell: bash
+      - if: always() && env.RUN == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: anchor-${{ matrix.router }}
+          path: ${{ runner.temp }}/anchor
+          if-no-files-found: ignore
+      - if: always() && env.RUN == 'true'
         run: owlab down || true
 
   # Builds a real router's `fs-*.js` and `luci.js` into a static site for Pages. `--base` matches the
@@ -169,7 +293,7 @@ jobs:
   # The only job that holds a key; `needs` keeps a tag from publishing a package that failed e2e.
   release:
     name: Sign and publish
-    needs: [build, e2e, playground]
+    needs: [build, e2e, anchor, playground]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
