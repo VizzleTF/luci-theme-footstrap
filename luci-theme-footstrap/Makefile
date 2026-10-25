@@ -30,8 +30,8 @@ LUCI_MINIFY_CSS:=0
 #
 # JS: the released package is built by owfeed (tools/stage.sh), not by this Makefile through the
 # SDK, so LUCI_MINIFY_JS keeps luci.mk's jsmin. jsmin's one-character lookback does not know `n` or
-# `>`, so `return /re/` makes it eat the rest of the file AND EXIT 0 (openwrt/luci#8299); eslint's
-# `wrap-regex` bans the shape and tools/jsmin-verify.mjs proves the output token-identical.
+# `>`, so `return /re/` makes it eat the rest of the file AND EXIT 0 (openwrt/luci#8299): wrap a
+# regex literal there in parentheses.
 
 # Apache-2.0, not a free choice: styles/base began as a fork of luci-theme-bootstrap's cascade.css,
 # the ucode templates derive from LuCI's and a few JS helpers are verbatim copies; the notices
@@ -119,16 +119,14 @@ define Build/Prepare/luci-theme-footstrap
 	# htdocs/ root/ ucode/; the copy is metadata only, luci.mk never installs it.
 	$(CP) $(CURDIR)/LICENSE $(PKG_BUILD_DIR)/
 	$(SHELL) $(CURDIR)/build-css.sh $(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css
-	# Private `--fs-*` names are 13% of the sheet; runs BEFORE the templates and probes strips, which
-	# take the comments it reads.
+	# Private `--fs-*` names are 13% of the sheet; runs BEFORE the templates strip, which takes the
+	# comments it reads.
 	$(SHELL) $(CURDIR)/mangle-tokens.sh \
 		$(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css \
 		$(PKG_BUILD_DIR)/htdocs/luci-static/resources $(PKG_BUILD_DIR)/ucode
 	# Strips `{# … #}`, whole-line `/* … */` and the indentation from the templates (-27.2 KB of 47.2).
 	# dev-sync.sh does not run this, so a router being debugged keeps its comments and indentation.
 	$(SHELL) $(CURDIR)/strip-build.sh templates $(PKG_BUILD_DIR)/ucode
-	# The gate-only `/* fs:probe */` exports: the functions stay, the export line goes.
-	$(SHELL) $(CURDIR)/strip-build.sh probes $(PKG_BUILD_DIR)/htdocs/luci-static/resources
 	# The same for the shell under root/ (about half of uci-defaults and the CGI are comments);
 	# whole-line `#` only.
 	$(SHELL) $(CURDIR)/strip-build.sh shell $(PKG_BUILD_DIR)/root
@@ -144,6 +142,5 @@ include $(TOPDIR)/feeds/luci/luci.mk
 # Load-bearing, not boilerplate: include/scan.mk finds packages by GREPPING Makefiles for
 # `call (Build/DefaultTargets|BuildPackage|KernelPackage)`. luci.mk calls BuildPackage, which the
 # grep cannot see, so without the literal line below the package gets no CONFIG_PACKAGE_* symbol and
-# `make package/<name>/compile` fails with "No rule to make target". tools/scan-marker.sh re-derives
-# the grep and fails the build if it goes missing.
+# `make package/<name>/compile` fails with "No rule to make target".
 # call BuildPackage - OpenWrt buildroot signature

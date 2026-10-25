@@ -203,7 +203,7 @@
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.th)):not(:has(.td:nth-child(3))) .th,
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.th)):not(:has(.td:nth-child(3))) .tr { border-bottom: 0; }
 	/* own rule, chosen instead of :is(): .cbi-value carries no :has(), and a selector list is not
-	 * forgiving below the browser floor (npm run css-floor) */
+	 * forgiving below the browser floor */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .cbi-value { border-bottom: 0; }
 
 	/* key/value name is the QUIET half: --fs-dim at normal weight, matching what the System table's

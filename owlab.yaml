@@ -94,7 +94,7 @@ defaults:
     - +openssh-sftp-server
 
     # The Russian catalogues, one per app above, pinned here after the first RU sweep found three
-    # overflow faults English never showed: RU strings run longer, and this theme's gates rendered
+    # overflow faults English never showed: RU strings run longer, and this theme was measured in
     # English only until 2026-09-06, so a caption that clips at a Cyrillic length went unmeasured.
     # The sweep installed these by hand; without a pin here the next `owlab up` would wipe them and
     # the next sweep would start over. One entry per luci-app-* above that ships a translation —
@@ -126,9 +126,9 @@ defaults:
 routers:
   - id: owrt2512
     # 25.12.4, NOT .5: the stand builds from openwrt/rootfs:x86_64-<release> and that tag has to
-    # EXIST in the registry — 25.12.5 publishes none, so `owlab up` cannot resolve it. CI's build.yml
-    # pins the same number for the same reason and the two must not drift. Check
-    # `docker manifest inspect openwrt/rootfs:x86_64-<release>` before bumping either.
+    # EXIST in the registry — 25.12.5 publishes none, so `owlab up` cannot resolve it. CI's e2e job
+    # boots its stands from this file. Check `docker manifest inspect openwrt/rootfs:x86_64-<release>`
+    # before bumping it.
     release: "25.12.4"
     ports: { http: 8025, ssh: 2225 }
     # Third-party apps whose stylesheets this theme has to share a document with. They are the
@@ -170,8 +170,8 @@ routers:
     ports: { http: 8024, ssh: 2224 }
     extra_packages: *third_party_apps
 
-  # ImmortalWrt (imm2512/imm2410) is not a default-boot stand: not a gate target
-  # (tools/lib/stands.mjs), and no behaviour claim needs it (see the "second instances" comment below).
+  # ImmortalWrt (imm2512/imm2410) is not a default-boot stand: tools/lib/stands.mjs ignores it,
+  # and no behaviour claim needs it.
   # docs/development.md, "ImmortalWrt stands (on demand)" carries the two blocks verbatim and the
   # command to bring them up when a question is actually about the brand.
 
@@ -182,79 +182,20 @@ routers:
   #
   # No `extra_packages` here, on purpose: see the comment on owrt2512's `&third_party_apps` for the
   # kmod-tun / kmods-index mismatch that makes openclash and ssclash permanently unresolvable on
-  # this box. The theme still installs and every other gate this leg runs still runs.
+  # this box. The theme still installs.
   #
   # THE ORDINARY `packages:` LIST ABOVE CAN ALSO INSTALL SHORT HERE, and unlike the kmod-tun case
   # this is not permanent and carries no fix to pin against: `feeds/luci` and `feeds/packages` are
   # two git repos built into the snapshot index independently, and a `luci-app-*`/binary pair can
-  # briefly disagree while one side has moved and the other has not yet mirrored. Task 0177 caught
-  # this from a scroll-anchor finding (owrtsnap @1440 side compact, Overview showing 12
-  # `.cbi-section` against owrt2512's 13) and named `luci-app-https-dns-proxy` as the absentee. By
-  # task 0178 that package installed clean on every stand and the absentee was `luci-app-mwan3`
-  # instead — no `90_mwan3.js`, and `/var/log/apk.log` on the same boot showed `ERROR: unable to
-  # select packages` for `mwan3`, `nlbwmon`, `openvpn` and `sqm` together. Two different names in
-  # two sessions is the finding: THE SET DRIFTS, so neither name belongs in this comment as if it
-  # were fixed. To check what is missing TODAY: `apk info -e <pkg>` for a `+luci-app-*` above
-  # against `owrtsnap`, or `grep 'unable to select' /var/log/apk.log` on that box, or just compare
-  # the Overview's `.cbi-section` count (or DOM count) against a release stand before treating a
-  # snapshot-only difference as a theme finding. Not pinned: `packages:` here has no version syntax,
-  # and a hard pin would go stale as the snapshot feed prunes old builds (unlike a release branch,
-  # which keeps them for the branch's life).
+  # briefly disagree while one side has moved and the other has not yet mirrored. THE SET DRIFTS.
+  # To check what is missing today: `grep 'unable to select' /var/log/apk.log` on this box, or
+  # `apk info -e <pkg>` for a `+luci-app-*` above, before treating a snapshot-only difference as a
+  # theme finding. Not pinned: `packages:` has no version syntax, and the snapshot feed prunes old
+  # builds.
   - id: owrtsnap
     release: "snapshot"
     # ssh 2228, NOT 2222: 2222 is the port a developer machine's own sshd usually listens on, and
     # docker refuses the bind with "address already in use" — which is why this stand had never come
-    # up, and why every gate that claimed the snapshot line was measuring two routers instead of
-    # three. docs/development.md, "The stand's own traps".
+    # up, and why every measurement that claimed the snapshot line was made on two routers instead
+    # of three. docs/development.md, "The stand's own traps".
     ports: { http: 8022, ssh: 2228 }
-
-  # ---- second instances of the three OpenWrt lines, for parallel measurement ----
-  #
-  # Not more coverage — the SAME three lines a second time. Added 2026-09-09, when a day of
-  # concurrent anchor work kept colliding on five stands: one agent held owrt2512/owrt2410/owrtsnap
-  # for a full three-engine sweep, a second was told to use the ImmortalWrt boxes because nothing
-  # else was free, and a measurement about the theme was very nearly made on the wrong distro. The
-  # maintainer's rule is that a behaviour claim needs 24.10, 25.12 and snapshot; imm* answers a
-  # question about the brand instead. So the answer to contention is more OpenWrt, never a
-  # substitute.
-  #
-  # Same releases and the same third-party fixtures as their originals, so a finding on `-b`
-  # carries exactly as much weight as one on the original. Ports: http 8045/8034/8032, ssh
-  # 2245/2234/2232 — each an original's port plus 20 (2512b) or 10 (2410b, snapb), clear of 2222 for
-  # the reason owrtsnap's comment gives.
-  - id: owrt2512b
-    release: "25.12.4"
-    ports: { http: 8045, ssh: 2245 }
-    extra_packages: *third_party_apps
-  - id: owrt2410b
-    release: "24.10.8"
-    ports: { http: 8034, ssh: 2234 }
-    extra_packages: *third_party_apps
-  - id: owrtsnapb
-    release: "snapshot"
-    ports: { http: 8032, ssh: 2232 }
-
-  # ---- fourth instance, one more set for a browser engine ----
-  #
-  # Added 2026-09-12. `-b` answered contention between two people; this answers contention inside
-  # ONE sweep. `tools/scroll-anchor.mjs --full` is 276 runs per engine, and running the three
-  # engines in one process against one set of stands takes chromium's zygote down about two minutes
-  # in (docs/development.md, "The stand's own traps") — so the sweep was being run one engine at a
-  # time, ~25 min each, three quarters of a 20-core machine idle throughout. Three sets means three
-  # separate node processes, each with its own engine AND its own routers: no shared browser server
-  # to lose, and no two contexts hitting one uhttpd.
-  #
-  # Same releases and the same third-party fixtures as their originals, so a finding on `-d` carries
-  # exactly as much weight as one on the original. Ports: `-d` is `-b` plus 20
-  # (8065/8054/8052, ssh 2265/2254/2252), clear of 2222.
-  - id: owrt2512d
-    release: "25.12.4"
-    ports: { http: 8065, ssh: 2265 }
-    extra_packages: *third_party_apps
-  - id: owrt2410d
-    release: "24.10.8"
-    ports: { http: 8054, ssh: 2254 }
-    extra_packages: *third_party_apps
-  - id: owrtsnapd
-    release: "snapshot"
-    ports: { http: 8052, ssh: 2252 }

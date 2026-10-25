@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-/* The changelog contract (docs/releasing.md), held by a machine, because it drifts silently and the
- * release page is generated from it.
+/* The changelog contract (docs/releasing.md), checked by hand with `npm run changelog` before a tag
+ * (nothing runs it automatically), because it drifts silently and the release page is generated
+ * from it.
  *
  * `[Unreleased]` once accumulated a DUPLICATE `### Changed` (and `Fixed` before `Removed`) across
  * several commits, each fine on its own; `tools/release-notes.sh` prints a header at each `###`, so
@@ -17,12 +18,13 @@ import { fileURLToPath } from 'node:url';
 
 import { ROOT, read } from './lib/root.mjs';
 
-/* Keep a Changelog's order, `Performance` appended (docs/releasing.md). The RU mirror's names are the same
- * list in the same order — that is what lets the two files be compared by INDEX rather than by
- * name, so only the prose language may differ. */
+/* Keep a Changelog's order, `Performance` and `Development` appended (docs/releasing.md). The RU mirror's
+ * names are the same list in the same order — that is what lets the two files be compared by INDEX rather
+ * than by name, so only the prose language may differ. `Development` (index 7) is for what a router never
+ * shows: release-notes.sh leaves it out of the release page. */
 const CANON = {
-	'CHANGELOG.md':    ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security', 'Performance'],
-	'CHANGELOG_ru.md': ['Добавлено', 'Изменено', 'Устарело', 'Удалено', 'Исправлено', 'Безопасность', 'Производительность'],
+	'CHANGELOG.md':    ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security', 'Performance', 'Development'],
+	'CHANGELOG_ru.md': ['Добавлено', 'Изменено', 'Устарело', 'Удалено', 'Исправлено', 'Безопасность', 'Производительность', 'Разработка'],
 };
 
 /* The line index where the section starting before `i` ends: the next heading or the link list. */
@@ -44,8 +46,13 @@ export function sectionText(text, id) {
 export function insertBullet(text, canon, section, bullet) {
 	if (!canon.includes(section)) throw new Error(`unknown section \`${section}\` — one of ${canon.join('/')}`);
 	const lines = text.split('\n');
-	const u = lines.findIndex(l => l.startsWith('## [Unreleased]'));
-	if (u < 0) throw new Error('no [Unreleased] heading');
+	let u = lines.findIndex(l => l.startsWith('## [Unreleased]'));
+	if (u < 0) {
+		/* A fresh release leaves none (docs/releasing.md): the next entry brings it back on top. */
+		u = lines.findIndex(l => l.startsWith('## ['));
+		if (u < 0) throw new Error('no `## [` heading to put [Unreleased] above');
+		lines.splice(u, 0, '## [Unreleased]', '');
+	}
 	const end = sectionEnd(lines, u + 1);
 	const heads = [];
 	for (let i = u + 1; i < end; i++) {
@@ -57,7 +64,8 @@ export function insertBullet(text, canon, section, bullet) {
 		const next = heads.find(x => x.at > h.at);
 		let at = next ? next.at : end;
 		while (lines[at - 1].trim() === '') at--;
-		lines.splice(at, 0, bullet);
+		/* an empty `### X` has no bullet to follow: keep one blank line under the heading */
+		lines.splice(at, 0, ...(at === h.at + 1 ? ['', bullet] : [bullet]));
 	} else {
 		const rank = canon.indexOf(section);
 		const next = heads.find(x => canon.indexOf(x.name) > rank);
@@ -71,8 +79,8 @@ export function insertBullet(text, canon, section, bullet) {
 /* THE REBASE SCAR: a released section must equal that section at its tag. `pull --rebase` once
  * landed an entry inside the tagged [0.14.14]; a cherry-pick put one under the wrong `###`.
  * Neither shows in the diff that did it. Only the NEWEST release is held: that is where an entry
- * strays (until the next tag), and 0.7-0.14 carry 24 legitimate post-tag edits a gate must not
- * rewrite. A tag absent locally, or from before the file, is skipped. */
+ * strays (until the next tag), and 0.7-0.14 carry 24 legitimate post-tag edits this check must not
+ * flag. A tag absent locally, or from before the file, is skipped. */
 export function sealedDrift(file, text, tagged) {
 	const newest = [...text.matchAll(/^## \[([^\]]+)\]/gm)].map(m => m[1]).find(id => id !== 'Unreleased');
 	if (!newest) return [];
@@ -86,13 +94,13 @@ const git = (...a) => execFileSync('git', ['-C', ROOT, ...a], { encoding: 'utf8'
 
 /* `changelog.mjs add <idx> --en "- **…**" --ru "- **…**"`: put one bullet pair into [Unreleased] of
  * both files, in the worktree AND in the index only (never other staged or unstaged edits), so a
- * commit can be split per entry. <idx> is the section's canonical index, 0 = Added … 6 = Performance. */
+ * commit can be split per entry. <idx> is the section's canonical index, 0 = Added … 7 = Development. */
 function addPair(argv) {
 	const idx = Number(argv[0]);
 	const flag = (n) => { const i = argv.indexOf(n); return i < 0 ? '' : argv[i + 1] ?? ''; };
 	const pair = { 'CHANGELOG.md': flag('--en'), 'CHANGELOG_ru.md': flag('--ru') };
-	if (!Number.isInteger(idx) || idx < 0 || idx > 6 || !Object.values(pair).every(b => b.startsWith('- **')))
-		throw new Error('usage: changelog.mjs add <0-6> --en "- **lead.** …" --ru "- **lead.** …"');
+	if (!Number.isInteger(idx) || idx < 0 || idx >= CANON['CHANGELOG.md'].length || !Object.values(pair).every(b => b.startsWith('- **')))
+		throw new Error('usage: changelog.mjs add <0-7> --en "- **lead.** …" --ru "- **lead.** …"');
 	/* All four texts first: a failure on the RU file must not leave EN written alone. */
 	const plan = Object.entries(pair).map(([file, bullet]) => {
 		const canon = CANON[file], sec = canon[idx];
@@ -201,7 +209,7 @@ function gate() {
 		 * in silence (release-notes.sh keeps only `**…**`). Checked on [Unreleased] and the newest
 		 * version ONLY — those are the two that can still be published. 106 bullets in older sections
 		 * predate the convention (it is unbroken from 0.8.4 up — 0.8.3 still has two); their notes are long since published,
-		 * so demanding a rewrite would be a gate policing the past instead of the next release. */
+		 * so demanding a rewrite would be this check policing the past instead of the next release. */
 		const publishable = versions.filter(v => v.id === 'Unreleased').concat(
 			versions.filter(v => v.id !== 'Unreleased').slice(0, 1));
 		for (const v of publishable)

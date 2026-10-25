@@ -14,8 +14,7 @@ Usage:
   LUCI_PW=<router-root-pw> docs/screenshots/capture.py [--form desktop|mobile|both]
                                                         [--ssh-host router] [--out DIR]
 
-Requires the project preview venv (Playwright + Chromium):
-  .claude/tooling/preview-venv/bin/python docs/screenshots/capture.py ...
+Requires a Python with Playwright + Chromium (pip install playwright; playwright install chromium).
 """
 import argparse, os, subprocess, sys, time, pathlib
 from playwright.sync_api import sync_playwright

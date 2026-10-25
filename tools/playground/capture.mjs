@@ -8,7 +8,7 @@
  * and the stand's own version info (`meta.json`). Talks to ONE owlab stand (`tools/lib/stands.mjs`),
  * never touches the built site.
  *
- * Never run by a gate: needs a booted, installed owlab router (T2, docs/development.md).
+ * Needs a booted, installed owlab router (docs/development.md); CI's `playground` job runs it.
  *
  *   node tools/playground/capture.mjs [--recording DIR] [--pages FILE]
  */
@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
-import { stands, login, menuPaths, sealToRouter, requireStands } from '../lib/stands.mjs';
+import { stands, login, menuPaths, sealToRouter, requireStands, StandDown, unreached } from '../lib/stands.mjs';
 import {
 	splitBatch, parseLsLines, waitForQuiet, drainReads, missingOverlayKeys,
 	createActivityTracker, createGenerationGate, describePendingRequest, describePendingRequests,
@@ -43,7 +43,7 @@ if (FLAGS.help) {
 const STAND_ID = 'owrt2512';
 const OUT = FLAGS.recording;
 const PAGES_FILE = FLAGS.pages;
-/* A floor, not the wait: the load+settle window of spa-parity.mjs before `waitForQuiet` reads ubus
+/* A floor, not the wait: a load+settle window before `waitForQuiet` reads ubus
  * traffic, else a page whose lazy includes have not started reads as already quiet. */
 const SETTLE_MS = 1400;
 /* No same-origin request in flight for this long is "this page is done making the calls it's going
@@ -126,7 +126,7 @@ async function main() {
 	 * knows what a read WAS. An ubus POST's label always starts "POST " (`describePendingRequest`,
 	 * used at both call sites below — a GET, static or the document, never does), so a lost or a
 	 * failed ubus read is dropped rather than fatal: `missingOverlayKeys` at the end of the run is
-	 * the actual correctness gate for what the overlay needs. A document or static-asset read still
+	 * the actual correctness check for what the overlay needs. A document or static-asset read still
 	 * throws — nothing else re-fetches it if this read was the only place it gets recorded. */
 	const UBUS_LABEL_RE = /^POST /;
 	async function drain(phase) {
@@ -174,7 +174,7 @@ async function main() {
 		track(`login ${describePendingRequest('GET', response.url(), null)}`, recordStatic(response)));
 	const [ loginResponse ] = await Promise.all([
 		loginPage.waitForResponse((r) => r.request().resourceType() === 'document', { timeout: 30000 }),
-		loginPage.goto(stand.base, { waitUntil: 'load' }),
+		loginPage.goto(stand.base, { waitUntil: 'load' }).catch((e) => { throw unreached(e, stand.id, stand.base); }),
 	]);
 	await loginPage.waitForTimeout(SETTLE_MS);
 	await drain('login page');
@@ -254,7 +254,7 @@ async function main() {
 		})());
 	});
 
-	await login(page, stand.base);
+	await login(page, stand.base, stand.id);
 
 	/* Every LEAF the router's own menu resolves to, not the list in pages.json: a page this build
 	 * asks for that the router does not offer is a stale pages.json entry, and failing loudly here
@@ -359,6 +359,7 @@ async function main() {
 }
 
 main().catch((e) => {
-	console.error(String(e && e.stack || e));
+	/* a stand that does not serve LuCI is named, not a stack: the capture is not at fault */
+	console.error(e instanceof StandDown ? e.message : String(e && e.stack || e));
 	process.exit(1);
 });

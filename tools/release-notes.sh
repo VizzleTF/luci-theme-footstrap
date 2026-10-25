@@ -5,7 +5,8 @@
 # Every bullet is `- **one-line effect.** then the rationale` (docs/releasing.md): the bold lead is
 # what a release reader wants, the rationale is for maintainers. So the notes are those leads,
 # grouped under their `###` headers — which means a bullet with NO bold lead is silently omitted,
-# and an empty section prints no header.
+# and an empty section prints no header. `### Development` / `### Разработка` (tooling a router never
+# shows) is left out whole, its header with it.
 #
 # CHANGELOG.md is primary; the CHANGELOG_ru.md mirror's summary is appended under a divider.
 #
@@ -21,21 +22,23 @@ changelog_ru="${changelog%.md}_ru.md"
 [ -f "$changelog" ] || { echo "no such changelog: $changelog" >&2; exit 1; }
 
 # extract(file): the bold lead of every bullet in the [ver] section, grouped under its `###`
-# headers (rationale and empty sections dropped). Same logic for either language. Prints
-# nothing if the section is absent.
+# headers (rationale, empty sections and Development dropped). Same logic for either language.
+# Exits 3 when the section is absent, or has no bullet at all: a version holding only Development
+# entries is not, and prints an empty body.
 extract() {
 	awk -v ver="$ver" '
 		# Print the finished bold title, emitting its section header first the one time a
 		# header is still pending — so an empty section never prints a lone header.
 		function flush(   t) {
 			if (!collecting) return
+			if (skip) { skipped = 1; collecting = 0; title = ""; return }
 			t = title
 			gsub(/[ \t]+/, " ", t); sub(/^ +/, "", t); sub(/ +$/, "", t)
 			if (pending_hdr != "") {
 				if (started) print ""        # blank line between sections
 				print pending_hdr; pending_hdr = ""; started = 1
 			}
-			print "- " t
+			print "- " t; printed = 1
 			collecting = 0; title = ""
 		}
 
@@ -52,7 +55,12 @@ extract() {
 			next
 		}
 
-		/^### / { flush(); pending_hdr = $0; next }   # header, held until a bullet prints
+		/^### / {                                     # header, held until a bullet prints
+			flush()
+			skip = ($0 == "### Development" || $0 == "### Разработка")
+			pending_hdr = skip ? "" : $0
+			next
+		}
 
 		/^- \*\*/ {                                   # bullet: keep only its **bold lead**
 			rest = substr($0, index($0, "**") + 2)
@@ -63,7 +71,7 @@ extract() {
 			next
 		}
 		# any other line (rationale continuation, blank) is dropped
-		END { flush() }
+		END { flush(); if (!printed && !skipped) exit 3 }
 	' "$1"
 }
 
@@ -71,8 +79,7 @@ extract() {
 # the only enforcement of docs/releasing.md's rule (rename [Unreleased], commit that, then tag THAT
 # commit): warning to stderr and exiting 0 published a release page reading "See the
 # CHANGELOG" for a version the changelog had never heard of.
-summary="$(extract "$changelog")"
-if [ -z "$summary" ]; then
+if ! summary="$(extract "$changelog")"; then
 	echo "error: no '## [$ver]' section in $changelog." >&2
 	echo "       Tag a commit that already carries its own changelog entry:" >&2
 	echo "       rename [Unreleased] -> [$ver], commit, then tag that commit." >&2
@@ -84,8 +91,7 @@ fi
 # edited in the same commit.
 summary_ru=""
 if [ -f "$changelog_ru" ]; then
-	summary_ru="$(extract "$changelog_ru")"
-	if [ -z "$summary_ru" ]; then
+	if ! summary_ru="$(extract "$changelog_ru")"; then
 		echo "error: no '## [$ver]' section in $changelog_ru (the EN file has one)." >&2
 		echo "       CHANGELOG.md and CHANGELOG_ru.md are kept in lockstep." >&2
 		exit 1

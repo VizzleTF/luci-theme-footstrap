@@ -164,7 +164,7 @@ msgctxt "footstrap"
 msgid "File"
 msgstr "Файл"
 
-# Product name, kept identical on purpose (task 0165): translating a brand name is a mistake,
+# Product name, kept identical on purpose: translating a brand name is a mistake,
 # not a missing string.
 #: root/usr/share/luci/menu.d/luci-theme-footstrap.json:3
 msgid "Footstrap"

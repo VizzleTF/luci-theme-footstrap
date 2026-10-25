@@ -1,15 +1,13 @@
-# Single source of the openwrt/luci commit whose two build tools we download and run as gates, and
-# of their checksums. Sourced as shell (`. luci-upstream.pin`) by update-po.sh and CI.
-#   - jsmin.c       compiled; its regex-vs-division lookback can silently eat a shipped JS file
-#   - i18n-scan.pl  run by perl; decides whether the translation catalogue is complete
-# Off a moving `master` the gate would be whatever upstream pushed last.
-# To bump: change LUCI_PIN, re-fetch both files at the new commit, update their sha256s.
+# Single source of the openwrt/luci commit whose i18n-scan.pl update-po.sh downloads and runs by
+# perl to decide whether the translation catalogue is complete, and of its checksum. Sourced as
+# shell (`. luci-upstream.pin`) by update-po.sh, build-apk.sh and tools/build-usign.sh.
+# Off a moving `master` the check would be whatever upstream pushed last.
+# To bump: change LUCI_PIN, re-fetch the file at the new commit, update its sha256.
 LUCI_PIN=5cf20c5741dc34eea0faaf7324ef3751b05fa1f3
-JSMIN_SHA256=0568b14873f27f339cf66a9c43603d0bc8ca501ff62522ea924c6e8daf1be215
 I18N_SCAN_SHA256=a1823d1fdd942f31a105e1e53b401e146bc10527f231e016930b1a5123ef21d3
 
-# No ucode pin, deliberately: the `verify` job runs the router's own interpreter over the installed
-# templates on both release lines (docs/ci.md), so nothing is pinned, built or stubbed here.
+# No ucode pin, deliberately: the `e2e` job renders every installed template with the router's own
+# ucode on both release lines (tools/e2e.mjs), so nothing is pinned, built or stubbed here.
 
 # usign, OpenWrt's ed25519 signer: owfeed signs each release package with it, and build-apk.sh
 # builds this copy (via tools/build-usign.sh, not run in CI) to check the SDK it downloads. This is

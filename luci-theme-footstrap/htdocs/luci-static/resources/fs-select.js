@@ -571,11 +571,6 @@ function wireTypeahead() {
 }
 
 return baseclass.extend({
-	/* test-only: the slot-cache key, driven directly */
-	shapeOf,	/* fs:probe */
-	/* test-only: the token-cell predicate */
-	markTokenCells,	/* fs:probe */
-
 	__init__() {
 		wireTypeahead();
 

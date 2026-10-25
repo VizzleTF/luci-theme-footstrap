@@ -20,7 +20,7 @@
 		--fs-good: var(--fs-good-base);
 		--fs-warn: var(--fs-warn-base);
 		--fs-danger: var(--fs-danger-base);
-		/* deliberately under AA — the "nothing here" ink, held by `npm run placeholder`.
+		/* deliberately under AA — the "nothing here" ink.
 		 * docs/design-system.md "The fourth ink is the one". */
 		--fs-placeholder-mix: 55%;
 		--fs-placeholder: color-mix(in oklch, var(--fs-text) var(--fs-placeholder-mix), var(--fs-panel2));

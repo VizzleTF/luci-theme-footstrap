@@ -165,10 +165,8 @@
 	.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]::before {
 		content: ""; width: var(--fs-icon-refresh-sz); height: var(--fs-icon-refresh-sz);
 		background: var(--fs-good);
-		/* @mirror poll-glyph/mask */
 		-webkit-mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
 		mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
-		/* @endmirror */
 	}
 	.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]:not([data-style="active"])::before {
 		background: var(--fs-dim);
@@ -180,10 +178,8 @@
 		min-width: var(--fs-btn-size); padding: 0 var(--fs-space-1); font-size: 0; justify-content: center;
 	}
 	.fs-sidebar.fs-ind-compact #indicators [data-indicator]:not([data-indicator="poll-status"])::after {
-		/* @mirror ind-badge/paint */
 		content: attr(data-fs-badge);
 		font-size: var(--fs-type-xs); font-weight: var(--fs-weight-bold); font-variant-numeric: tabular-nums;
-		/* @endmirror */
 	}
 
 	/* Exactly ONE member of the far-edge cluster may carry an auto inline-start margin, and it must be the
@@ -412,10 +408,8 @@
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"] {
 			font-size: 0; width: var(--fs-ctl-h-sm); height: var(--fs-ctl-h-sm); padding: 0;
 			border: 0; box-shadow: none; background: var(--fs-good);
-			/* @mirror poll-glyph/mask */
 			-webkit-mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
 			mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
-			/* @endmirror */
 			/* Static, deliberately: this is a poll running quietly forever, not something being
 			 * waited on, and a permanently spinning glyph also broke the click that pauses it. */
 		}
@@ -427,9 +421,8 @@
 		}
 
 		/* Badges its count instead of wrapping its prose (issue #14) — chrome.md, "A
-		 * collapsed-rail indicator badges its count". One rule per box: two would need an extra
-		 * attribute + :not() past stylelint's selector-max-specificity (1,7,0). `.fs-sidebar` is
-		 * deliberately absent: #indicators is an id. */
+		 * collapsed-rail indicator badges its count". `.fs-sidebar` is deliberately absent:
+		 * #indicators is an id. */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] #indicators [data-indicator]:not([data-indicator="poll-status"]) {
 			/* min-width, not width: the count is unbounded (a big config can queue three digits)
 			 * and a fixed box would clip it. */
@@ -437,13 +430,11 @@
 			padding: 0 var(--fs-space-1); overflow: hidden;
 			display: inline-flex; align-items: center; justify-content: center;
 		}
-		/* .fs-ind-compact above paints the same badge (mirror-pinned) but cannot SHARE this
+		/* .fs-ind-compact above paints the same badge but cannot SHARE this
 		 * rule: it applies at every width, this one must stay inside the 521px floor. */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] #indicators [data-indicator]:not([data-indicator="poll-status"])::after {
-			/* @mirror ind-badge/paint */
 			content: attr(data-fs-badge);
 			font-size: var(--fs-type-xs); font-weight: var(--fs-weight-bold); font-variant-numeric: tabular-nums;
-			/* @endmirror */
 		}
 	}
 
@@ -536,7 +527,7 @@
 		.fs-main .alert-message button { white-space: normal; max-width: 100%; }
 	}
 	/* anywhere, not break-word: an inline-flex button keeps its min-content under break-word (a 496px word
-	 * overflowed a 320px button). Outside the @media: table-contract refuses overflow-wrap in a width query */
+	 * overflowed a 320px button). */
 	.fs-main .alert-message .btn,
 	.fs-main .alert-message button { overflow-wrap: anywhere; }
 

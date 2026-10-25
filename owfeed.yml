@@ -14,9 +14,8 @@
 # and holds it to the same ed25519 signature over sha256sums, with the key pinned from another host.
 #
 # luci-theme-footstrap/Makefile stays, and is not a second source of truth: tools/stage.sh reads the
-# lifecycle scripts out of it, and CI keeps the gates that protect an SDK build (scan-marker, jsmin
-# equivalence). Anyone can still build this theme in an OpenWrt SDK; nothing we release comes from
-# one.
+# lifecycle scripts out of it. Anyone can still build this theme in an OpenWrt SDK; nothing we
+# release comes from one.
 
 version: 1
 
@@ -93,8 +92,7 @@ packages:
     # /etc/config/footstrap ships as a stub and is WRITTEN AT RUNTIME by Appearance -> "Save as
     # default". Undeclared, the package manager owns it as an ordinary file and replaces it on
     # upgrade, so the theme's own one-click Update wipes the admin's saved defaults and reports
-    # success. Any future root/etc/config/* goes here too (tools/conffiles.mjs holds this list to
-    # the tree).
+    # success. Any future root/etc/config/* goes here too.
     conffiles: ["/etc/config/footstrap"]
 
     # Extracted from the Makefile's own defines by tools/stage.sh, so the SDK path and this one
@@ -114,8 +112,7 @@ packages:
 # a Russian router installs luci-i18n-footstrap-ru and nobody else carries a byte.
 #
 # Splitting them means two packages can drift: an `_()` the older catalogue lacks renders in
-# English with nothing reporting it. That is the same trade every luci-app-* in the tree makes, and
-# `update-po.sh --check` already fails a build whose catalogues are behind the source.
+# English with nothing reporting it. That is the same trade every luci-app-* in the tree makes.
 #
 # NAMES AND PATHS ARE luci.mk's, not ours: `luci-i18n-$(LUCI_BASENAME)-<lang>` with LUCI_BASENAME
 # `footstrap`, and the catalogue basename `footstrap`, so `po2lmo` in an SDK build and owfeed here
@@ -124,8 +121,8 @@ packages:
 # fought over — bundling them was what forced the `footstrap-theme` basename in the first place.
 #
 # The per-language staging directories come from tools/stage.sh (it also writes the uci-defaults
-# line that puts the language in LuCI's menu); tools/i18n-packages.mjs holds po/, that script and
-# this list to each other, so adding a language cannot half-land.
+# line that puts the language in LuCI's menu); adding a language means touching po/, that script
+# and this list together.
 
   - name: luci-i18n-footstrap-ru
     build: mkpkg

@@ -63,7 +63,7 @@
 <div class="g-sec">
 	<h2>Div table outside a section</h2>
 	<!-- luci-app-roamd (GitHub #67): a div .table.fs-dt with no [id] and no .cbi-section kept the generic
-	     .table overflow:hidden and became its own sticky scroll container. table-contract.mjs holds it. -->
+	     .table overflow:hidden and became its own sticky scroll container. -->
 	<div class="table fs-dt" data-fs-bare="1">
 		<div class="tr table-titles"><div class="th">Node</div><div class="th">Link</div></div>
 		<div class="tr"><div class="td" data-title="Node">mesh-1</div><div class="td" data-title="Link">-48 dBm</div></div>
@@ -76,7 +76,7 @@
 	<!-- luci-app-filemanager #file-table: `.table td:nth-child(1) { padding-left: 5px }` (0,2,1) is
 	     re-hosted into `@layer theme`, so it meets the fs-dt cell padding in the SAME layer and only
 	     specificity and order decide. The mock below is the same (0,2,1) and sits after the sheet;
-	     the theme's `.td` rule must not score above it. table-contract.mjs holds it. -->
+	     the theme's `.td` rule must not score above it. -->
 	<style>
 		@layer theme {
 			.g-app-pad td:nth-child(1) { padding-left: 5px; }
@@ -233,7 +233,7 @@ uci commit network</pre>
 				<label class="cbi-value-title" for="g-text">Text input</label>
 				<div class="cbi-value-field"><input id="g-text" type="text" class="cbi-input-text" value="OpenWrt"></div>
 			</div>
-			<!-- task 0147 (second RU sweep), finding 1: under 767px theme/90-responsive.css restates
+			<!-- under 767px theme/90-responsive.css restates
 			     `flex: 1 1 100%` on the label (stacked above the field), and a flex item's automatic
 			     minimum size is content-based once that basis is not smaller than the content — a
 			     label whose text has too few break points renders at its own min-content instead of
@@ -268,9 +268,9 @@ uci commit network</pre>
 					<select id="g-msel" multiple size="3"><option selected>one</option><option>two</option><option>three</option></select>
 				</div>
 			</div>
-			<!-- task 0145: a caption-less `div.cbi-checkbox` never gives the pill a sibling flex item
+			<!-- a caption-less `div.cbi-checkbox` never gives the pill a sibling flex item
 			     to shrink against, so this fixture stayed green through the whole life of the
-			     pill-shrink/knob-overhang bug — every gallery gate, computed-diff included, measured
+			     pill-shrink/knob-overhang bug — every check run against the gallery measured
 			     a switch that could never fail this way. `label.cbi-checkbox > input + label[for] +
 			     TEXT` is package-manager.js's and banip's real markup (a raw checkbox with an inline
 			     caption, not the ui.Checkbox widget), and the caption is the RU string the bug was
@@ -300,7 +300,7 @@ uci commit network</pre>
 					<div class="cbi-checkbox"><input id="cb-tt-off" type="checkbox"><label for="cb-tt-off"></label><label class="cbi-tooltip-container">⚠️<div class="cbi-tooltip">Limited masquerading enabled</div></label></div>
 				</div>
 			</div>
-			<!-- task cbi-checkbox: forum.openwrt.org/t/251930 post #141 — luci-app-modemdata injects an
+			<!-- forum.openwrt.org/t/251930 post #141 — luci-app-modemdata injects an
 			     unlayered `label[for]{display:none!important}` scoped to its own markup, expecting the
 			     switch to live on the native input (as it does under bootstrap). Reproduced verbatim,
 			     scoped to this fixture only, to prove the switch stays visible from the INPUT alone. -->
@@ -474,7 +474,7 @@ option two</textarea></div>
 		     the spinner's !important used to exist for, and the one nothing rendered. -->
 		<div class="cbi-dropdown btn cbi-button cbi-button-apply spinning" tabindex="0"><ul><li>Applying…</li></ul><span class="open">▾</span></div>
 		<!-- Field dropdown (not .btn/.cbi-button) with a value longer than its 400px cap — the
-		     https-dns-proxy/nlbw-config/interface-edit shape task 0149 measured cutting mid-glyph at
+		     https-dns-proxy/nlbw-config/interface-edit shape measured cutting mid-glyph at
 		     320px (RU: 132/225/280px past the box at Compact/Normal/Large). No `title`/`aria-label`:
 		     the ellipsis is visual only, the full string stays in the DOM and the accessibility tree. -->
 		<div class="cbi-dropdown" tabindex="0"><ul><li class="focus" display="0">Автоматический выбор лучшего доступного вышестоящего DNS-сервера по задержке отклика</li></ul><span class="open">▾</span></div>
@@ -562,7 +562,7 @@ option two</textarea></div>
 		pill does not fight the field inside it.</p>
 	<p class="g-note">The theme also carries a rule for <code>li.create-item</code>, a class stock
 		LuCI does not emit anywhere (grepped: <code>ui.js</code> gives the li no class at all, only the
-		input gets <code>.create-item-input</code>). It is kept under the coverage contract — a
+		input gets <code>.create-item-input</code>). It is kept — a
 		third-party app may still emit it — but it is deliberately not rendered here, because this
 		gallery shows the markup LuCI really produces.</p>
 </div>
@@ -677,7 +677,7 @@ option two</textarea></div>
 		<div><button class="cbi-button cbi-button-action important">Revert changes</button> <button class="cbi-button cbi-button-negative important">Apply unchecked</button></div>
 	</div>
 	<!-- The rest of what base styles inside an alert: h5, a list, and a <pre>. Only h4 and <p> were
-	     here, so the audit's absorption backlog for `.alert-message li/ul/pre/h5` could not be
+	     here, so whether base's `.alert-message li/ul/pre/h5` rules were still alive could not be
 	     settled either way — an un-rendered widget shows no diff, which reads as "already dead". -->
 	<div class="alert-message danger">
 		<h5>Heading 5 inside an alert</h5>
@@ -757,8 +757,8 @@ option two</textarea></div>
 	<!-- The three below are what the Overview pass (annotateMeter, fs-overview.js) writes, not
 	     hand-authored markup like the three above: role, aria-value* and — the reason these exist at
 	     all — data-fs-level, which is the ONLY thing 25-progressbar.css's warn/danger rules match.
-	     Nothing above carried that attribute, so computed-diff, a11y and export-tier never rendered
-	     those two rules at all; a clean run proved nothing about them. None of the three carries
+	     Nothing above carried that attribute, so nothing on this page ever rendered those two rules;
+	     a clean look proved nothing about them. None of the three carries
 	     aria-label: none sits in a .cbi-value row or a table cell, so the pass finds no label and
 	     writes no attribute at all — the accessible name then falls back to `title`, the same reading
 	     the visible `::after` shows (fs-overview.js, findProgressbarLabel). -->
@@ -926,15 +926,15 @@ option two</textarea></div>
 		<!-- `.fs-dt` is written by fs-select.js on a live page (a table with a header row that is not
 		     a config table). The gallery has no LuCI JS, so the fixture carries the tag it would be
 		     given — without it, every rule the measured tier owns (the floor, the sticky header, the
-		     card) is unrepresented here and tools/table-contract.mjs has nothing to measure. -->
+		     card) is unrepresented here. -->
 		<table class="table fs-dt" id="status_leases">
 			<tr class="tr table-titles">
 				<th class="th">Hostname</th><th class="th">IPv4 address</th>
 				<th class="th">MAC</th><th class="th">Lease time</th><th class="th">&nbsp;</th>
 			</tr>
 			<!-- `data-title` on every cell, because `ui.Table` writes it on a live page and the card
-			     view prints it: a fixture without it renders a card of unlabelled values, which is
-			     the exact defect the contract gate exists to catch. -->
+			     view prints it: a fixture without it renders a card of unlabelled values, a defect
+			     the gallery would then show as if it were the theme's. -->
 			<tr class="tr cbi-rowstyle-1">
 				<td class="td" data-title="Hostname">Watch</td><td class="td" data-title="IPv4 address">10.11.12.131</td>
 				<td class="td" data-title="MAC">E6:EF:BA:54:DE:32</td><td class="td" data-title="Lease time">9h 10m 51s</td>
@@ -1030,8 +1030,8 @@ option two</textarea></div>
 	</div>
 
 	<h2>The shapes that broke it — one fixture per report</h2>
-	<!-- These are not decoration: each is the exact value that produced a bug, kept so the contract
-	     gate (tools/table-contract.mjs) has something to squeeze. A theme with no floor starves the
+	<!-- These are not decoration: each is the exact value that produced a bug, kept so a narrowed
+	     viewport has something to squeeze. A theme with no floor starves the
 	     column holding one of these, and the browser then reports, truthfully, that the table fits. -->
 	<div class="cbi-section g-overwide" tabindex="0" role="group" aria-label="Data table with the reported values (scrolls)">
 		<h3>Data table with the reported values</h3>
@@ -1114,7 +1114,7 @@ option two</textarea></div>
 	<h2>Key/value table, narrow container (System -&gt; System at 390px)</h2>
 	<p class="g-note">The @container fs-content query below only fires inside a container narrower than
 	   560px. `.g-wrap` (this page's only other fs-content container) never gets that narrow, so
-	   without a fixture of its own this rule is unrendered and computed-diff reads 0 for it. The
+	   without a fixture of its own this rule is unrendered here. The
 	   340px `.cbi-map` here stands in for the sidebar layout's cramped content column.</p>
 	<div class="cbi-map" style="max-width: 340px">
 		<div class="cbi-section">
@@ -1185,8 +1185,7 @@ option two</textarea></div>
 <div class="g-sec">
 	<h2>Widgets in the containers the layout rules tell apart</h2>
 	<p class="g-note">Each block is a widget in a container that styles/ has a selector for and the rest of
-	   this page never combined them in: tools/gallery-coverage.mjs derives the pairs from the CSS and fails
-	   on one that is not here. Markup is what LuCI emits (ui.js, form.js, tools/widgets.js, view/firewall).</p>
+	   this page never combined them in. Markup is what LuCI emits (ui.js, form.js, tools/widgets.js, view/firewall).</p>
 	<div class="cbi-section cbi-tblsection">
 		<h3>Section table: dropdown, input, tooltip and a ComboButton in the cells</h3>
 		<table class="table cbi-section-table">
@@ -1258,7 +1257,7 @@ option two</textarea></div>
 </div>
 
 <div class="g-sec">
-	<h2>CBI section table — header reflow at the card boundary (RU, task 0163)</h2>
+	<h2>CBI section table — header reflow at the card boundary (RU)</h2>
 	<p class="g-note">`.cbi-map` pinned to 968px — firewall/zones' own measured content column at
 	   1024px, live, RU. The card fires on THIS element (theme/45-misc.css), one level above
 	   `.cbi-section`'s own `--fs-card-pad`, so 968px here only hands the table 936px. The six real
@@ -1362,7 +1361,7 @@ option two</textarea></div>
 	</div>
 </div>
 
-<!-- task 0147 (second RU sweep), finding 3: base/95-luci.css sizes each row-action button
+<!-- base/95-luci.css sizes each row-action button
      `flex: 1 1 4em` inside `.td.cbi-section-actions`, a plain <table>/.td markup (Startup, not
      form.js's .cbi-section-table above) with no per-row carding. A definite flex-basis caps the
      automatic minimum at 4em once the row runs out of room, so a caption longer than that shrinks
@@ -1399,7 +1398,7 @@ option two</textarea></div>
 <div class="g-sec">
 	<h2>Dense fields — the table filter and the Appearance hex (--fs-type-field-xs)</h2>
 	<!-- Both sit at the xs size on desktop and take the 16px iOS floor under 767px; the hex is the only
-	     .fs-color-hex here, so without it computed-diff cannot see that reader of --fs-type-field-xs
+	     .fs-color-hex here, so without it nothing here renders that reader of --fs-type-field-xs
 	     (the table filter also appears in the tables above). -->
 	<table class="table cbi-section-table">
 		<tr class="tr cbi-section-table-titles cbi-section-table-filter">
@@ -1420,7 +1419,7 @@ option two</textarea></div>
 	     ucode/template/themes/footstrap/header.ut, and #indicators is the
 	     empty div header.ut leaves for LuCI (`<div id="indicators">`), which
 	     ui.js fills with a BARE `<span data-indicator=…>` — no class, which is exactly why a theme
-	     rule written against `.label` painted nothing and no gate noticed. Nothing here needs the
+	     rule written against `.label` painted nothing and nothing noticed. Nothing here needs the
 	     chrome JS: fs-chrome.js only adds .fs-ind-compact/.fs-bar-actrow by measurement, and their
 	     absence is the ordinary wide-bar case this fixture stands for. -->
 	<div class="fs-sidebar" style="position:static">
@@ -1455,7 +1454,7 @@ option two</textarea></div>
 	     focus ring from the theme (pages/20-overview.css). The wrapper differs by release
 	     (fs-overview.js headerEl()): 25.12 wraps the heading in `.cbi-title`, 24.10 leaves a bare
 	     `<h3>` as the section's own first child, and the theme rule has to reach both — this is
-	     the specimen that measures it, computed-diff otherwise reading 0 for this file. Appended
+	     the specimen that renders it, nothing else here rendering this file. Appended
 	     after Modal; nothing above is touched or reordered. -->
 	<div class="cbi-section">
 		<div class="cbi-title">
@@ -1519,7 +1518,7 @@ option two</textarea></div>
 	<h2>Modal</h2>
 	<!-- `opacity`/`visibility`, not just `position`/`display`: base/60-modal.css hides the overlay
 	     until <body> carries `modal-overlay-active`, so this whole section rendered NOTHING — and
-	     axe skips what is invisible, which meant the a11y gate had never once measured a dialog.
+	     axe skips what is invisible, which meant no accessibility audit had ever once measured a dialog.
 	     The body class is not usable here: it also sets `overflow: hidden; height: 100dvh`. -->
 	<div id="modal_overlay" style="position:static;display:block;background:transparent;padding:0;opacity:1;visibility:visible">
 		<div class="modal" style="margin:0">

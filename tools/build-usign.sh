@@ -14,8 +14,8 @@ here="$(cd "$(dirname "$0")/.." && pwd)"
 . "$here/luci-theme-footstrap/luci-upstream.pin"
 [ -n "${USIGN_PIN:-}" ] || { echo "USIGN_PIN missing from luci-upstream.pin" >&2; exit 1; }
 
-# Idempotent, because two STEPS of one job call this — the release job signs the installer and then
-# verifies every signature — and `git clone` into an existing directory fails. Reuse is only offered
+# Idempotent, because a caller may run it twice in one job and `git clone` into an existing
+# directory fails. Reuse is only offered
 # when the checkout is at the pinned commit: a tree left at some other revision is the drift this
 # script exists to prevent, so it is a loud error rather than a silent rebuild.
 if [ -e "$dest" ]; then

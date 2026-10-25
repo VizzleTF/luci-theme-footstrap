@@ -5,16 +5,14 @@
  *
  * ONLY blocks with no ucode interpolation are touched: a block containing `{{`, `{%` or `{#` (the
  * `window.__fsSD` data object in partials/head.ut) is not JavaScript and is left exactly as it is.
- * Over a BUILD TREE, never the checkout: tools/axes.mjs and tools/chrome-fence.mjs match head.ut as
- * TEXT with regexes pinned to its literal shape. CI-only, like the JS minifier.
+ * Over a BUILD TREE, never the checkout. CI-only, like the JS minifier.
  *
  * Usage: node tools/minify-prepaint.mjs <ucode-dir> */
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { minify } from 'uglify-js';
 
-/* not lib/root.mjs's filesIn(): that one resolves against the repo, and this runs over a build tree
- * whose path is given absolutely */
+/* walks the given build tree, not the repo */
 const templates = (dir) => readdirSync(dir, { recursive: true, encoding: 'utf8' })
 	.filter((f) => f.endsWith('.ut')).map((f) => join(dir, f));
 
@@ -46,7 +44,7 @@ for (const file of templates(dir)) {
 		if (!body.trim() || UCODE.test(body)) continue;
 		/* the pre-paint runs before anything else on the page and owns no module scope, so it
 		 * is a script, not a module; `toplevel` would rename the IIFEs' own bindings safely but
-		 * buys little here and is one more way to differ from what the gates read.
+		 * buys little here and is one more way to differ from the source.
 		 * passes 2, not minify-js.mjs's 3: the blocks are short and a third pass saves 2 B of 4767; webkit/v8
 		 * are the engine-bug workarounds explained there */
 		const min = minify(body, { module: false, webkit: true, v8: true, compress: { passes: 2 }, mangle: true });
@@ -65,8 +63,7 @@ for (const file of templates(dir)) {
 	files++;
 }
 
-/* A run that minified nothing is a run that measured nothing — the same failure mode
- * tools/scroll-anchor.mjs was taught to report rather than exit 0 on. */
+/* A run that minified nothing is a run that measured nothing, and it must not exit 0. */
 if (!blocks) {
 	console.error('minify-prepaint: no inline <script> block was minified — the templates changed shape '
 		+ 'or every block now carries ucode; refusing to report a saving of zero as success');

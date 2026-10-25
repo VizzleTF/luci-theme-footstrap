@@ -632,8 +632,4 @@ function build() {
 return baseclass.extend({
 	/* the dispatched page's whole render(), called by view/footstrap/appearance.js */
 	renderStandalone: () => Promise.resolve().then(build),
-
-	/* test-only: the observer's lifetime is a navigation, which a test can fire and cannot reach
-	 * through build() */
-	watchColours,	/* fs:probe */
 });

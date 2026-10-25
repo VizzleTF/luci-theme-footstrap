@@ -6,10 +6,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        Обязательных полей шесть, и почти все — в один клик. Остальное заполняйте, только если знаете:
+        Обязательных полей семь, и почти все — в один клик. Остальное заполняйте, только если знаете:
         короткий отчёт лучше ненаписанного.
 
-        Six required fields, most of them one click. Fill in the rest only if you know it — a short
+        Seven required fields, most of them one click. Fill in the rest only if you know it — a short
         report beats one you didn't send.
 
   - type: checkboxes

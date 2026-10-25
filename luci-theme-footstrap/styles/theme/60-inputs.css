@@ -273,9 +273,7 @@
 		.cbi-value-field select option:hover, .cbi-value-field select option:focus-visible { background: var(--fs-panel2); }
 		/* same shape as the open .cbi-dropdown's selected row (theme/65-dropdown.css): accent on --fs-accent-soft measures 4.21:1 in dark, under AA */
 		.cbi-value-field select option:checked {
-			/* @mirror selected-row/paint */
 			background: var(--fs-panel2); color: var(--fs-accent); box-shadow: var(--fs-row-rail);
-			/* @endmirror */
 		}
 	}
 

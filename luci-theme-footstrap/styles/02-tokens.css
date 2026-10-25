@@ -8,8 +8,7 @@
 		--fs-focus-ring: 0 0 0 3px var(--fs-accent-soft);
 		--fs-focus-ring-solo: 0 0 0 2px var(--fs-panel), 0 0 0 5px var(--fs-accent);
 		--fs-focus-ring-invalid: 0 0 0 3px var(--fs-danger-fill);
-		/* opaque, not a tint (4.21:1 in dark); pinned by tools/mirror.mjs
-		 * (`selected-row/paint`), docs/css.md "@mirror" */
+		/* opaque, not a tint (4.21:1 in dark) */
 		--fs-row-rail: inset 2px 0 0 var(--fs-accent);
 
 		/* every separator is this one line, stated once rather than in 69 longhand declarations */
@@ -41,7 +40,7 @@
 		/* ours, redrawn to stay so — not Lucide's. docs/design-system.md "Two glyphs drawn as
 		 * tokens, not fetched". */
 		--fs-icon-refresh: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'><path d='M4.4 9.6A8.5 8.5 0 0 1 18.6 7.6'/><path d='M19.6 14.4A8.5 8.5 0 0 1 5.4 16.4'/><path fill='%23000' stroke='none' d='M21.6 10.6 15.4 8.4 20.4 4.2Z'/><path fill='%23000' stroke='none' d='M2.4 13.4 8.6 15.6 3.6 19.8Z'/></svg>");
-		/* css-dup cannot police a glyph inlined once, sized at two call sites — keep in step by hand */
+		/* a glyph inlined once, sized at two call sites — keep them in step by hand */
 		--fs-icon-refresh-sz: calc(18px * var(--fs-density-type));
 
 		/* direction flips by mode: light darkens, dark brightens (`filter` recolours the ink too) */
@@ -154,7 +153,7 @@
 		--fs-z-tooltip: 1000;
 		--fs-z-dropdown: 1100;
 
-		/* outbound only (audit.py --strict fails a styles/ read of one). docs/design-system.md
+		/* outbound only: styles/ never reads one (nothing checks it). docs/design-system.md
 		 * "The export tier is a RAMP" */
 		--background-color-high: var(--fs-panel);
 		--background-color-medium: color-mix(in srgb, var(--fs-panel) 55%, var(--fs-panel2));
@@ -171,7 +170,6 @@
 		--border-color-medium: var(--fs-border);
 		--border-color-low: color-mix(in srgb, var(--fs-border) 55%, var(--fs-panel));
 
-		/* tools/export-tier.mjs proves the whole tier across palette x mode */
 		--primary-color-high: var(--fs-accent);
 		--primary-color-medium: color-mix(in oklch, var(--fs-accent) 78%, var(--fs-dim));
 		--primary-color-low: color-mix(in oklch, var(--fs-accent) 45%, var(--fs-dim));

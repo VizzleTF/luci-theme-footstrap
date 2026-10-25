@@ -1,7 +1,7 @@
 @layer theme {
 	/* honoured globally, every transition here is decoration. This file is the one place for flags against the theme's own rules,
 	 * and there are two: this block (a layer cannot reach base's own transitions) and the forced-colors focus outline below
-	 * (.stylelintrc.json holds the allowlist). .01ms not 0s: a zero duration never fires transitionend, LuCI's teardown waits for one. */
+	 * .01ms not 0s: a zero duration never fires transitionend, LuCI's teardown waits for one. */
 	@media (prefers-reduced-motion: reduce) {
 		*, *::before, *::after {
 			animation-duration: .01ms !important;
@@ -67,7 +67,7 @@
 		 * 103 ink pixels its box shows at rest, and a checked checkbox or radio is pixel-identical to an unchecked
 		 * one. A system colour with the fill un-forced brings it back; ButtonText polling and GrayText paused
 		 * keep the green/grey state — docs/css.md "A11y: forced-colors state repairs". Selectors repeat the
-		 * glyph rules' own (20-shell, 60-inputs, base/95-luci) with one class or attribute doubled, one step above the original; the two rail selectors already sit at the stylelint ceiling (1,7,0) and still win by file order. */
+		 * glyph rules' own (20-shell, 60-inputs, base/95-luci) with one class or attribute doubled, one step above the original; the two rail selectors already sit at (1,7,0) and still win by file order. */
 		.fs-sidebar.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]::before,
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"],
 		input[type="checkbox"][type="checkbox"]:not(:where(.cbi-checkbox > input)):checked::after,

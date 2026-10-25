@@ -288,7 +288,4 @@ return baseclass.extend({
 	removePattern: PATTERN.remove,
 	uploadLoginBg: LOGIN_BG.upload,
 	removeLoginBg: LOGIN_BG.remove,
-	/* test-only: the SVG cleaner and the CSS-escape decoder */
-	_sanitizeSvg,	/* fs:probe */
-	_cssUnescape,	/* fs:probe */
 });

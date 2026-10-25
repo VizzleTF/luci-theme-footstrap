@@ -40,33 +40,25 @@
 	/* Value moves BESIDE the bar where the row has no name above it: a CBI form row and a table
 	 * meter column, sharing one geometry via --fs-meter-value. One rule per shape, chosen instead
 	 * of :is() — the table half needs :has(), and in a plain list a non-parsing engine drops the
-	 * whole rule, form row included. @mirror pins the shared declarations. */
+	 * whole rule, form row included. */
 	.cbi-value-field > .cbi-progressbar {
-		/* @mirror meter/beside */
 		margin-inline-end: var(--fs-meter-value);
 		margin-block-start: 0;
-		/* @endmirror */
 		--fs-meter-value: calc(var(--fs-space-10) * 2);
 	}
 	.cbi-value-field > .cbi-progressbar::after {
-		/* @mirror meter/beside-value */
 		inset-inline: calc(100% + var(--fs-space-2)) auto; bottom: auto; top: 50%;
 		transform: translateY(-50%);
-		/* @endmirror */
 	}
 	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar {
-		/* @mirror meter/beside */
 		margin-inline-end: var(--fs-meter-value);
 		margin-block-start: 0;
-		/* @endmirror */
 		--fs-meter-value: var(--fs-space-10);
 		min-width: 60px; /* narrower and it stops reading as a meter; the column gives up the rest */
 	}
 	.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar::after {
-		/* @mirror meter/beside-value */
 		inset-inline: calc(100% + var(--fs-space-2)) auto; bottom: auto; top: 50%;
 		transform: translateY(-50%);
-		/* @endmirror */
 	}
 
 	/* Carded: "beside" ran the value over the neighbouring column's label (`.fs-stacked` halves

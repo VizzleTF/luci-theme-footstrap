@@ -1,15 +1,21 @@
-# SHA pins rot without this. A pinned action is only a decision anyone made if
+# Version-tag pins rot without this (actions/* on @vN, owfeed/* on @vX.Y.Z; no
+# SHA pin is left). A pinned action is only a decision anyone made if
 # something proposes the update as a diff; otherwise it is a version nobody chose
 # that stops receiving fixes -- the failure mode of pinning without automation.
 #
 # This repository sat two owfeed releases behind for exactly that reason: a pin
 # nobody was reminded about.
+#
+# cooldown 7: a release is proposed only a week after it is published, so a compromised one has
+# time to be yanked first (two bumps used to merge 18-28 h after release). Security updates ignore it.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]
@@ -18,6 +24,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       dev:
         patterns: ["*"]

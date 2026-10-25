@@ -1,16 +1,16 @@
 #!/bin/sh
-# The browser the gates drive, without going through apt unless it is actually needed.
+# The browsers a job drives, without going through apt unless it is actually needed.
 #
-#   sh tools/ci-playwright.sh
+#   sh tools/ci-playwright.sh [engine…]      (default: chromium)
 #
-# `npx playwright install --with-deps chromium` is two installs in one: the browser off Playwright's
+# `npx playwright install --with-deps <engine>` is two installs in one: the browser off Playwright's
 # CDN and a list of system libraries off apt. On this repository's runners the apt half is what
 # stalls — three steps of one tag sat for 68, 68 and 17 minutes — while the CDN half has never been
-# the slow one, and the libraries are already present on GitHub's ubuntu image.
+# the slow one, and Chromium's libraries are already present on GitHub's ubuntu image.
 #
-# So: fetch the browser, then PROVE it launches, which is the claim the gates need and a better one
-# than "apt exited 0". Only if the launch fails do we go to apt, which is where a self-hosted or
-# trimmed image would land.
+# So: fetch the browsers, then PROVE each launches, which is the claim the job needs and a better one
+# than "apt exited 0". Only the engines whose launch fails go to apt, which is where a self-hosted
+# or a trimmed image lands.
 #
 # Both installs run under tools/ci-retry.sh, which puts each attempt on a clock and kills its
 # process GROUP: a killed apt otherwise keeps /var/lib/apt/lists/lock and every retry dies on the
@@ -19,21 +19,27 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
-# One engine by name: the gates that need firefox or webkit run in the `anchors` job, which
-# installs them itself. Installing them here would triple both halves of this.
-sh tools/ci-retry.sh 300 npx playwright install chromium
+[ $# -gt 0 ] || set -- chromium
+
+sh tools/ci-retry.sh 300 npx playwright install "$@"
 
 launches() {
-	node -e "require('playwright').chromium.launch().then(b => b.close()).then(() => process.exit(0), e => { console.error(String(e).split('\n')[0]); process.exit(1); })"
+	node -e "require('playwright')['$1'].launch().then(b => b.close()).then(() => process.exit(0), e => { console.error(String(e).split('\n')[0]); process.exit(1); })"
 }
 
-if launches; then
-	echo "ci-playwright: chromium installed and launches; apt not needed."
-	exit 0
-fi
+missing=
+for engine in "$@"; do
+	if launches "$engine"; then echo "ci-playwright: $engine installed and launches."
+	else missing="$missing $engine"
+	fi
+done
+[ -n "$missing" ] || { echo "ci-playwright: apt not needed."; exit 0; }
 
-echo "ci-playwright: chromium will not launch on this image — installing its system libraries" >&2
-sh tools/ci-retry.sh 300 sudo -n npx playwright install-deps chromium
+echo "ci-playwright:$missing will not launch on this image — installing their system libraries" >&2
+# shellcheck disable=SC2086
+sh tools/ci-retry.sh 300 sudo -n npx playwright install-deps $missing
 
-launches || { echo "ci-playwright: chromium still will not launch after installing its libraries" >&2; exit 1; }
-echo "ci-playwright: chromium launches after the library install."
+for engine in $missing; do
+	launches "$engine" || { echo "ci-playwright: $engine still will not launch after installing its libraries" >&2; exit 1; }
+	echo "ci-playwright: $engine launches after the library install."
+done

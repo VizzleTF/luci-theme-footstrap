@@ -51,11 +51,6 @@ for stale in styles build-css.sh mangle-tokens.sh strip-build.sh \
 	rm -rf "$OUT/$stale"
 done
 
-# The gate-only exports do not travel either. They exist so a gate in THIS repository can call a
-# module-private function; upstream has no such gate, and a module surface nobody calls is dead
-# weight there. The functions stay — only the export line goes (strip-build.sh probes).
-sh "$SRC/strip-build.sh" probes "$OUT/htdocs/luci-static/resources"
-
 # Modes come from the theme repo's INDEX, never the worktree: core.fileMode=false here means a file
 # can lose +x on disk with git none the wiser, and rsync -a would carry that loss into the PR.
 find "$OUT" -type f -exec chmod 644 {} +
@@ -63,22 +58,13 @@ git -C "$ROOT" ls-files -s -- luci-theme-footstrap | while read -r mode _ _ path
 	if [ "$mode" = 100755 ] && [ -f "$DEST/themes/$path" ]; then chmod 755 "$DEST/themes/$path"; fi
 done
 
-# Verify, loudly: a mode that differs from the index, or a stripped JS with more double-blank runs
-# than its source (a removed probe block must not leave a run the source never had).
-bad=0
+# Verify, loudly: a mode that differs from the index.
 git -C "$ROOT" ls-files -s -- luci-theme-footstrap | while read -r mode _ _ path; do
 	f="$DEST/themes/$path"
 	[ -f "$f" ] || continue
 	want=644; [ "$mode" = 100755 ] && want=755
 	[ "$(stat -c %a "$f")" = "$want" ] || { echo "sync: mode $(stat -c %a "$f") != index $want: $path" >&2; exit 1; }
-done || bad=1
-dbl() { awk '/^[ \t]*$/ { if (++b == 2) n++; next } { b = 0 } END { print n + 0 }' "$1"; }
-for f in "$OUT"/htdocs/luci-static/resources/*.js; do
-	src="$SRC/${f#"$OUT"/}"
-	[ -f "$src" ] || continue
-	[ "$(dbl "$f")" -le "$(dbl "$src")" ] || { echo "sync: blank-line run not in source: ${f#"$OUT"/}" >&2; bad=1; }
-done
-[ "$bad" = 0 ] || exit 1
+done || exit 1
 
 # the artefact the far side commits, generated from the layers on this side
 sh "$SRC/build-css.sh" "$OUT/htdocs/luci-static/footstrap/cascade.css"
@@ -114,4 +100,3 @@ if [ -d "$OUT/po" ]; then
 fi
 doc_refs=$(grep -rEo --include='*.js' --include='*.ut' 'docs/[a-z-]+\.md' "$OUT/htdocs" "$OUT/ucode" | wc -l | tr -d ' ')
 echo "  docs/*.md:   $doc_refs pointer(s) in shipped JS/templates — accepted upstream, not checked"
-echo "  drift:       node tools/fork-drift.mjs $DEST"

@@ -317,9 +317,4 @@ function patchOverview() {
 return baseclass.extend({
 	/* called by menu-footstrap-common's loader on every data-page stamp that maps here */
 	wire,
-
-	/* test-only: the percent parse and the clamp/threshold split, driven directly rather than through
-	 * a live `.cbi-progressbar[title]` walk */
-	parseMeterPercent,	/* fs:probe */
-	annotateMeter,	/* fs:probe */
 });
