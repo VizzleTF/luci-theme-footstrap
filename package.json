@@ -7,7 +7,8 @@
     "devkit": "node tools/devkit-build.mjs",
     "changelog": "node tools/changelog.mjs",
     "playground:capture": "node tools/playground/capture.mjs",
-    "playground:build": "node tools/playground/build.mjs"
+    "playground:build": "node tools/playground/build.mjs",
+    "playground:verify": "node tools/playground/verify.mjs"
   },
   "devDependencies": {
     "acorn": "8.19.0",

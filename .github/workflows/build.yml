@@ -128,7 +128,7 @@ jobs:
   # Builds a real router's `fs-*.js` and `luci.js` into a static site for Pages. `--base` matches the
   # path `pages.yml` serves it under.
   playground:
-    name: Record the playground
+    name: Record and verify the playground
     timeout-minutes: 20
     needs: build
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
@@ -149,13 +149,14 @@ jobs:
       - run: owlab up owrt2512
       - run: owlab install owrt2512 dist/noarch/luci-theme-footstrap-*.apk
       # Under $RUNNER_TEMP: the recording cannot outlive the install it describes.
-      - name: Record and build
+      - name: Record, build and verify
         run: |
           set -eu
           PG="$RUNNER_TEMP/playground"
           node tools/playground/capture.mjs --recording "$PG/recording"
           node tools/playground/build.mjs --recording "$PG/recording" --out "$PG/out" \
             --base "/${GITHUB_REPOSITORY#*/}/playground"
+          node tools/playground/verify.mjs --out "$PG/out" --base "/${GITHUB_REPOSITORY#*/}/playground"
       - if: always()
         run: owlab down || true
       # Only the built tarball: the raw recording carries pre-scrub session tokens.

@@ -256,18 +256,19 @@ run happens on the maintainer's explicit word for one change, never by reflex.
 
 ### The playground: recording and replaying a real router
 
-`tools/playground/{capture,build}.mjs` turn an owlab stand into a static, offline site — CI's own
+`tools/playground/{capture,build,verify}.mjs` turn an owlab stand into a static, offline site — CI's own
 `playground` job, [ci.md](ci.md). Each step needs the one before it (`capture` needs a booted,
-installed router; `build` needs `capture`'s output).
+installed router; `build` needs `capture`'s output; `verify` needs `build`'s).
 
 ```sh
 owlab up owrt2512 && owlab install owrt2512 'dist/noarch/luci-theme-footstrap-*.apk'
 npm run playground:capture &&
-  npm run playground:build -- --base /luci-theme-footstrap/playground
+  npm run playground:build -- --base /luci-theme-footstrap/playground &&
+  npm run playground:verify -- --base /luci-theme-footstrap/playground
 ```
 
 Each script also takes its own flags directly (`--recording DIR`, `--out DIR`, `--base /path`) —
-`--help` on either prints the exact list. Output lands under `../tmp/playground/` by default
+`--help` on each prints the exact list. Output lands under `../tmp/playground/` by default
 (`recording/`, `out/`, `playground.tar.gz`), never inside the checkout. Open
 `../tmp/playground/out/cgi-bin/luci/admin/status/overview/index.html` in a browser under any static
 server rooted at `--base` to look at what was built.
