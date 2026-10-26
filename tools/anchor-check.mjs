@@ -22,18 +22,22 @@
  *              theme's own correction must hold the reader before any frame is painted
  *   no native, correction off  the same with fsAnchor=off: it must move the reader by at least half
  *              the change in a painted frame, or the cell above proves nothing. Both must see the
- *              change the footstrap cell saw above the reader, or the emulation changed the page
- * A cell that measured nothing fails: less than 50px changed above the reader (their content's move
- * in the document: the offset's share and the viewport's), no tick landed while they scrolled, or
- * fewer than MIN_TRACKED elements were seen.
+ *              change the footstrap cell saw above the reader, or they measured another page
+ * A cell that measured nothing fails, after the whole check ran once more: less than 50px changed
+ * above the reader (their content's move in the document: the offset's share and the viewport's),
+ * the lease rows never came or went in its view, no tick landed while they scrolled, they never held
+ * still after, fewer than MIN_TRACKED elements were seen, the no-native cells measured another
+ * page, or the stand stopped answering.
  *
  *   node tools/anchor-check.mjs --router owrt2512 [--engines chromium,firefox,webkit] [--widths 1280,390] [--rows 4]
  *
- * Exit 0 when every cell passed, 1 otherwise, 2 when the router is not there. */
+ * Exit 0 when every cell passed, 1 otherwise, 2 when the router is not there or has no lease, 3 when
+ * the stand stopped answering before the first measurement or in the rerun (nothing was judged). */
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import * as playwright from 'playwright';
-import { login, sealToRouter, stands } from './lib/stands.mjs';
+import { StandDown, login, sealToRouter, stands, stoodDown } from './lib/stands.mjs';
+import { ghData, ghProp } from './lib/util.mjs';
 
 const { values: opt } = parseArgs({ options: {
 	router: { type: 'string' },
@@ -46,7 +50,8 @@ if (!opt.router) {
 	process.exit(2);
 }
 const [ stand ] = stands(opt.router);
-const status = JSON.parse(execFileSync('owlab', [ 'status', '-json' ], { encoding: 'utf8' }));
+/* on a clock, SIGKILL: owlab catches TERM (signal.NotifyContext in its main) */
+const status = JSON.parse(execFileSync('owlab', [ 'status', '-json' ], { encoding: 'utf8', timeout: 60000, killSignal: 'SIGKILL' }));
 const CONTAINER = `owlab-${status.project}-${stand.id}`;
 const BASE = stand.base;
 const ROWS = +opt.rows;
@@ -56,23 +61,53 @@ const ABOVE_TOL = 8;		/* px: two cells of one page saw the same change above the
 const MIN_TRACKED = 5;
 const SECS = 15;		/* sampling window; the growth is written 1.5 s in, a poll is 5 s */
 
-const sh = (script, input) => execFileSync('docker', [ 'exec', '-i', CONTAINER, 'sh', '-c', script ],
-	{ encoding: 'utf8', input, stdio: [ input == null ? 'ignore' : 'pipe', 'pipe', 'pipe' ] });
+const sh = (script, input) => {
+	try {
+		/* SIGKILL: Node waits out a child that outlives its TERM, and the watchdog below waits with it */
+		return execFileSync('docker', [ 'exec', '-i', CONTAINER, 'sh', '-c', script ],
+			{ encoding: 'utf8', input, timeout: 60000, killSignal: 'SIGKILL', stdio: [ input == null ? 'ignore' : 'pipe', 'pipe', 'pipe' ] });
+	} catch (e) {
+		/* a docker exec that never returns, or one the daemon refuses (the container paused, stopped
+		 * or gone), is a stand that stopped answering, not a finding */
+		if (e.code === 'ETIMEDOUT') throw new StandDown(`${stand.id}: docker exec did not return in 60 s`);
+		if (/^Error response from daemon/m.test(e.stderr || '')) throw new StandDown(`${stand.id}: ${e.stderr.trim().split('\n')[0]}`);
+		throw e;
+	}
+};
 const setTheme = (name) => sh(`uci set luci.main.mediaurlbase=/luci-static/${name} && uci commit luci && rm -f /tmp/luci-indexcache* /tmp/luci-modulecache/*`);
 const LEASES = '/tmp/dhcp.leases';
-/* without the rows of a run that was killed before it put the file back */
-const saved = sh(`cat ${LEASES}`).split('\n').filter((l) => !/ anchor-check-\d+-\d+ /.test(l)).join('\n');
+const t0 = Date.now();
+let saved;
+try {
+	/* rc.local writes the fixtures at S95, after owlab already called the router up */
+	sh(`i=0; while [ $i -lt 30 ]; do grep -q . ${LEASES} 2>/dev/null && exit 0; i=$((i + 1)); sleep 1; done; exit 0`);
+	/* without the rows of a run that was killed before it put the file back */
+	saved = sh(`cat ${LEASES}`).split('\n').filter((l) => !/ anchor-check-\d+-\d+ /.test(l)).join('\n');
+} catch (e) {
+	/* a stand that stopped answering before the first measurement judged nothing either */
+	if (!(e instanceof StandDown)) throw e;
+	finish([ `${e.message} — measured nothing` ], true);
+}
 const firstMac = (saved.split('\n').find((l) => l.trim()) || '').split(/\s+/)[1];
-let batch = 0;
+/* written whole and renamed into place: a poll that read it mid-write would see it empty */
+const putLeases = (body) => sh(`cat > ${LEASES}.ac && mv -f ${LEASES}.ac ${LEASES}`, body);
+let batch = 0, added = '';
 function grow() {
 	batch++;
-	let lines = '';
 	for (let i = 0; i < ROWS; i++)
-		lines += `4102444800 02:00:00:00:${batch.toString(16).padStart(2, '0')}:${i.toString(16).padStart(2, '0')} 172.20.9.${batch * 10 + i} anchor-check-${batch}-${i} *\n`;
-	sh(`cat >> ${LEASES}`, lines);
+		added += `4102444800 02:00:00:00:${batch.toString(16).padStart(2, '0')}:${i.toString(16).padStart(2, '0')} 172.20.${batch}.${10 + i} anchor-check-${batch}-${i} *\n`;
+	putLeases(saved + added);
 }
 /* the leases the growth added go again: the poll takes the same rows away above the reader */
-const shrink = () => sh(`cat > ${LEASES}`, saved);
+const shrink = () => { added = ''; putLeases(saved); };
+/* A hung page or exec ends in a verdict, not in the job's timeout: no run, its re-measure included,
+ * takes 20 min */
+setTimeout(() => {
+	console.log(`FAIL anchor-check ${stand.id}: no verdict in 20 min, a page hung`);
+	console.log(`::error title=${ghProp(`Scroll anchoring ${stand.id}`)}::${ghData('no verdict in 20 min, a page hung')}`);
+	try { setTheme('footstrap'); shrink(); } catch { /* the stand is gone too */ }
+	process.exit(1);
+}, 20 * 60e3).unref();
 
 /* The reader's place: the heading of the section after the one that lists a lease, cut by the top
  * of the viewport, so nothing of the lease section is left in it. The engine anchors to the first
@@ -88,18 +123,31 @@ const PARK = (mac) => {
 };
 
 /* Runs in the page: every frame, the median shift of the elements the reader saw at the start. With
- * `still`, the start is when the offset has not moved for that many ms: a reader who just let go. */
-const SAMPLE = async ([ secs, tol, still ]) => {
+ * `still`, the start is when the offset has not moved for that many ms: a reader who just let go.
+ * `y0` is the offset before their last wheel step, and that clock starts only once the step has
+ * landed: WebKit scrolls asynchronously, and a clock started before it would read the step as the
+ * reader moving, or start late against fs-fit's release 400 ms after the last motion. */
+const SAMPLE = async ([ secs, tol, still, y0 ]) => {
 	const mc = document.getElementById('maincontent');
 	const sc = (mc && /(auto|scroll)/.test(getComputedStyle(mc).overflowY)) ? mc : document.scrollingElement;
-	if (still) await new Promise((ok) => {
+	/* a step that has not landed in 500 ms starts the clock after fs-fit's release: that cell can only
+	 * measure nothing */
+	if (still && y0 != null) {
+		const t1 = performance.now();
+		await new Promise((ok) => { const g = () => ((sc.scrollTop !== y0 || performance.now() - t1 > 500) ? ok() : requestAnimationFrame(g)); g(); });
+	}
+	/* a page that keeps moving the reader hangs no phase: 10 s without holding still measured nothing */
+	if (still && !(await new Promise((ok) => {
 		let y = sc.scrollTop, since = performance.now();
+		const start = since;
 		const f = () => {
 			if (sc.scrollTop !== y) { y = sc.scrollTop; since = performance.now(); }
-			if (performance.now() - since >= still) ok(); else requestAnimationFrame(f);
+			if (performance.now() - since >= still) ok(true);
+			else if (performance.now() - start > 10000) ok(false);
+			else requestAnimationFrame(f);
 		};
 		requestAnimationFrame(f);
-	});
+	}))) return { restless: true };
 	const view = document.getElementById('view');
 	const SEL = 'h1,h2,h3,h4,legend,label,.cbi-value-title,.th,.td,th,td,.ifacebox-head,.cbi-section-descr,button';
 	const key = (e) => e.tagName + '|' + e.textContent.trim().replace(/\s+/g, ' ').slice(0, 80);
@@ -154,7 +202,10 @@ const SAMPLE = async ([ secs, tol, still ]) => {
 	 * the viewport's. The document's own height also counts what changed below them. */
 	const scrolled = Math.round(sc.scrollTop - top0);
 	return { tracked: last ? last.n : 0, grew: Math.round(sc.scrollHeight - h0), scrolled,
-		above: last ? Math.round(scrolled + last.d) : 0, end: last ? r1(last.d) : null, max: r1(max), off, painted };
+		above: last ? Math.round(scrolled + last.d) : 0, end: last ? r1(last.d) : null, max: r1(max), off, painted,
+		rows: view.textContent.includes('anchor-check-'),
+		/* ms from the last wheel event the page saw to the start, for the log */
+		lag: Math.round(t0 - (window.__acWheelAt || t0)) };
 };
 
 /* An engine without scroll anchoring, as the theme sees one: the platform says so, and nothing anchors. */
@@ -177,17 +228,24 @@ const NO_NATIVE = () => {
 	else document.addEventListener('DOMContentLoaded', add);
 };
 
-async function open(browser, width, cell) {
-	const ctx = await browser.newContext({ viewport: { width, height: width > 500 ? 800 : 844 } });
+/* A page opens logged in: `cookies` is the session phase() logged into once for its engine */
+async function open(browser, width, cell, cookies) {
+	const ctx = await browser.newContext({ viewport: { width, height: width > 500 ? 800 : 844 },
+		storageState: { cookies, origins: cell === 'nnOff' ? [ { origin: new URL(BASE).origin, localStorage: [ { name: 'fsAnchor', value: 'off' } ] } ] : [] } });
 	await sealToRouter(ctx, BASE);
+	/* when the page last saw the wheel: SAMPLE's `lag`, never its clock */
+	await ctx.addInitScript(() => addEventListener('wheel', () => { window.__acWheelAt = performance.now(); }, { capture: true, passive: true }));
 	const page = await ctx.newPage();
-	await login(page, BASE, stand.id);
-	await page.evaluate((off) => { localStorage.removeItem('fsAnchor'); if (off) localStorage.setItem('fsAnchor', 'off'); },
-		cell === 'nnOff');
 	if (cell.startsWith('nn')) await page.addInitScript(NO_NATIVE);
-	await page.goto(`${BASE}/admin/status/overview`, { waitUntil: 'load' });
+	/* a load that timed out on a stand that answers measured nothing, and is measured again; WebKit and
+	 * Firefox run only here, so theme code that holds their load must not read as the stand */
+	await page.goto(`${BASE}/admin/status/overview`, { waitUntil: 'load' }).catch(async (e) => {
+		const r = await stoodDown(e, stand.id, BASE, `Status > Overview did not load in ${browser.browserType().name()}`);
+		throw r === e || r instanceof StandDown ? r : Object.assign(r, { unmeasured: true });
+	});
+	/* a view that never renders leaves nothing to park on: that cell measured nothing (valid()) */
 	await page.waitForFunction(() => { const v = document.getElementById('view');
-		return v && v.children.length && !v.querySelector(':scope > .spinning'); }, null, { timeout: 30000 });
+		return v && v.children.length && !v.querySelector(':scope > .spinning'); }, null, { timeout: 30000 }).catch(() => {});
 	await page.waitForFunction(`(${PARK})(${JSON.stringify(firstMac)}) != null`, null, { timeout: 30000 }).catch(() => {});
 	await page.waitForTimeout(6000);	/* the first tick has landed and the layout settled */
 	return { ctx, page, parked: await park(page, width) };
@@ -199,8 +257,8 @@ async function park(page, width) {
 	await page.mouse.move(Math.round(width / 2), Math.round(H / 2));
 	/* the wheel until the heading is in place and stays there: WebKit scrolls asynchronously, and a
 	 * park read as done moved 54px half a second later */
-	let at = null;
-	for (let i = 0; i < 200; i++) {
+	let at = null, i = 0;
+	for (; i < 200; i++) {
 		at = await page.evaluate(PARK, firstMac);
 		if (at == null) break;
 		if (Math.abs(at) < 12) {
@@ -212,6 +270,11 @@ async function park(page, width) {
 		await page.waitForTimeout(i % 10 === 9 ? 400 : 40);
 	}
 	await page.waitForTimeout(1500);	/* the reader holds still */
+	/* where the hold left them: a park that ran out of steps or drifted after, in the log */
+	if (at != null) {
+		const after = await page.evaluate(PARK, firstMac);
+		if (after == null || Math.abs(after) >= 12) console.log(`  park: ${after == null ? 'lost the section' : Math.round(after) + 'px off'} after the hold, ${i} steps`);
+	}
 	return at != null;
 }
 
@@ -219,15 +282,22 @@ async function park(page, width) {
  * takes the leases away has landed, then three steps more down and lets go. `rolling` resolves once
  * the reader has been scrolling for a while: the leases may go only then, since a tick landing
  * before the first step met a reader at rest and left nothing to measure. False when no tick
- * landed within 12 s, or the leases went before the reader began. */
+ * landed within 12 s, or the leases went before the reader began; else `{ y0 }`, the offset before
+ * the last step, for SAMPLE. */
 async function scrollThrough(page, rolling) {
 	const gone = () => page.evaluate(() => !document.getElementById('view').textContent.includes('anchor-check-'));
 	for (let i = 0; i < 150; i++) {
 		if (i === 5) rolling();
 		if (await gone()) {
 			if (i <= 5) return false;
-			for (let j = 0; j < 3; j++) { await page.mouse.wheel(0, 20); await page.waitForTimeout(80); }
-			return true;
+			/* the offset before the last step: SAMPLE starts the let-go clock once that step has landed */
+			let y0;
+			for (let j = 0; j < 3; j++) {
+				if (j === 2) y0 = await page.evaluate(() => { const mc = document.getElementById('maincontent'); return ((mc && /(auto|scroll)/.test(getComputedStyle(mc).overflowY)) ? mc : document.scrollingElement).scrollTop; });
+				await page.mouse.wheel(0, 20);
+				if (j < 2) await page.waitForTimeout(80);
+			}
+			return { y0 };
 		}
 		await page.mouse.wheel(0, i % 6 < 3 ? 20 : -20);
 		await page.waitForTimeout(80);
@@ -241,31 +311,69 @@ async function scrollThrough(page, rolling) {
  * one is read from the moment the reader let go: a container fs-fit.js floored keeps its height
  * while the reader scrolls, and gives it up once they stop, above them. */
 async function phase(name, browsers, cells) {
-	const pages = await Promise.all(cells.map((c) => open(browsers[c.engine], c.width, c.cell)));
+	/* how long each stage took, for the log: the next slow run names its stage */
+	const lap = ((t) => (what) => { const n = Date.now(); const s = `${what} ${((n - t) / 1000).toFixed(1)}s`; t = n; return s; })(Date.now());
+	const laps = [];
+	/* One login per engine, its session cookie on every page of that engine: rpcd sees one
+	 * session.login where it saw one per page. Per engine, not per phase: a cookie one engine
+	 * stored is not proven to be one another engine sends */
+	const cookies = {};
+	for (const e of new Set(cells.map((c) => c.engine))) {
+		const seed = await browsers[e].newContext();
+		await sealToRouter(seed, BASE);
+		await login(await seed.newPage(), BASE, stand.id);
+		cookies[e] = (await seed.storageState()).cookies;
+		await seed.close();
+	}
+	laps.push(lap('login'));
+	const pages = await Promise.all(cells.map((c) => open(browsers[c.engine], c.width, c.cell, cookies[c.engine])));
+	laps.push(lap('open'));
 	const repark = () => Promise.all(pages.map(async (p, i) => { p.parked = p.parked && await park(p.page, cells[i].width); }));
 	for (const [ kind, change ] of [ [ 'grow', grow ], [ 'shrink', shrink ] ]) {
-		if (kind !== 'grow') await repark();
-		const runs = pages.map((p) => (p.parked ? p.page.evaluate(SAMPLE, [ SECS, TOL, 0 ]) : Promise.resolve(null)));
+		if (kind !== 'grow') { await repark(); laps.push(lap('repark')); }
+		const runs = Promise.all(pages.map((p) => (p.parked ? p.page.evaluate(SAMPLE, [ SECS, TOL, 0 ]) : Promise.resolve(null))));
+		/* handled here, read below: a page that dies during the 1.5 s wait must not end Node */
+		runs.catch(() => {});
 		await new Promise((r) => setTimeout(r, 1500));
 		change();
-		const out = await Promise.all(runs);
+		const out = await runs;
 		cells.forEach((c, i) => { (c.res ||= {})[kind] = out[i]; });
+		laps.push(lap(kind));
+	}
+	/* bootstrap floors nothing: no scroll cell of its is judged (judgeAll), so its phase ends here */
+	if (cells.every((c) => c.cell === 'bs')) {
+		await Promise.all(pages.map((p) => p.ctx.close()));
+		console.log(`  ${name}: ${cells.length} pages (${laps.join(', ')})`);
+		return;
 	}
 	grow();
-	await new Promise((r) => setTimeout(r, 7000));	/* a tick has rendered the rows and floored their box */
+	/* the rows of this growth are in every view; fs-fit floors their box in the mutation's own callback.
+	 * A page they never reached has no tick to scroll through: measured nothing */
+	await Promise.all(pages.map((p) => p.parked && p.page.waitForFunction(
+		(b) => document.getElementById('view').textContent.includes(`anchor-check-${b}-`), batch, { timeout: 20000, polling: 100 })
+		.catch(() => { p.noRows = true; })));
+	await new Promise((r) => setTimeout(r, 500));	/* the layout after the refill */
+	laps.push(lap('rows'));
 	await repark();
+	laps.push(lap('repark'));
 	const rolls = pages.map(() => { let ok; const p = new Promise((r) => { ok = r; }); return { p, ok }; });
 	const scrolled = Promise.all(pages.map(async (p, i) => {
-		if (!p.parked) { rolls[i].ok(); return null; }
-		if (!(await scrollThrough(p.page, rolls[i].ok))) { rolls[i].ok(); return { missed: true }; }
-		return p.page.evaluate(SAMPLE, [ 4, TOL, 200 ]);
+		try {
+			if (!p.parked) return null;
+			if (p.noRows) return { missed: true };
+			const r = await scrollThrough(p.page, rolls[i].ok);
+			if (!r) return { missed: true };
+			return await p.page.evaluate(SAMPLE, [ 4, TOL, 200, r.y0 ]);
+		} finally { rolls[i].ok(); }
 	}));
+	scrolled.catch(() => {});
 	await Promise.all(rolls.map((r) => r.p));
 	shrink();
 	const out = await scrolled;
+	laps.push(lap('scroll'));
 	cells.forEach((c, i) => { c.res.scroll = out[i]; });
 	await Promise.all(pages.map((p) => p.ctx.close()));
-	console.log(`  ${name}: ${cells.length} pages`);
+	console.log(`  ${name}: ${cells.length} pages (${laps.join(', ')})`);
 }
 
 let fails = [];
@@ -275,6 +383,9 @@ const change = (x, kind) => (kind === 'grow' ? x.above : -x.above);
 const valid = (x, kind, where) => {
 	if (!x) fails.push(`${where}: no section below the leases to park on — measured nothing`);
 	else if (x.missed) fails.push(`${where}: no tick landed while the reader scrolled — measured nothing`);
+	else if (x.restless) fails.push(`${where}: the reader never held still for 200 ms in 10 s — measured nothing`);
+	/* the lease rows themselves came or went: live text above the reader moves by tens of px alone */
+	else if (x.rows !== (kind === 'grow')) fails.push(`${where}: the ${kind} never reached this page's view — measured nothing`);
 	else if (change(x, kind) < 50)
 		fails.push(`${where}: the ${kind} did not reach above the reader (${x.above}px there, ${x.grew}px in the document) — measured nothing`);
 	else if (x.tracked < MIN_TRACKED) fails.push(`${where}: ${x.tracked} elements seen — measured nothing`);
@@ -284,7 +395,6 @@ const valid = (x, kind, where) => {
 
 const engines = opt.engines.split(','), widths = opt.widths.split(',').map(Number);
 let cells;
-const t0 = Date.now();
 if (!firstMac) { console.error(`${stand.id}: ${LEASES} has no lease to find the section by`); process.exit(2); }
 
 /* One measurement of every cell. Footstrap runs one engine at a time, six pages; bootstrap's two
@@ -292,6 +402,10 @@ if (!firstMac) { console.error(`${stand.id}: ${LEASES} has no lease to find the 
 async function measure() {
 	cells = [];
 	for (const e of engines) for (const w of widths) for (const cell of [ 'fs', 'nn', 'nnOff', 'bs' ]) cells.push({ engine: e, width: w, cell });
+	/* from the leases the run found, whatever the last measurement left: a stand that stopped
+	 * answering mid-phase refused its cleanup below too, and a growth over the rows it left swaps
+	 * them for its own and measures nothing. The theme is set below before any page opens */
+	shrink();
 	try {
 		for (const theme of [ 'footstrap', 'bootstrap' ]) {
 			setTheme(theme);
@@ -301,7 +415,7 @@ async function measure() {
 					for (const e of group) browsers[e] = await playwright[e].launch();
 					await phase(`${theme} ${group.join('+')}`, browsers,
 						cells.filter((c) => group.includes(c.engine) && (c.cell === 'bs') === (theme === 'bootstrap')));
-				} finally { await Promise.all(Object.values(browsers).map((b) => b.close())); }
+				} finally { await Promise.all(Object.values(browsers).map((b) => b.close().catch(() => {}))); }
 			}
 		}
 	} finally {
@@ -315,15 +429,18 @@ function judgeAll() {
 	for (const e of engines) for (const w of widths) for (const kind of [ 'grow', 'shrink', 'scroll' ]) {
 		const k = `${e}@${w} ${kind}`;
 		const c = Object.fromEntries(cells.filter((x) => x.engine === e && x.width === w).map((x) => [ x.cell, x.res && x.res[kind] ]));
-		const show = (x) => (x ? `${x.end}/${x.max}/${x.off}f/${x.painted}p of ${x.above}px` : '-');
+		const show = (x) => (!x ? '-' : x.missed ? 'missed' : x.restless ? 'restless'
+			: `${x.end}/${x.max}/${x.off}f/${x.painted}p of ${x.above}px t${x.tracked} g${x.grew}${x.lag != null ? ` lag${x.lag}` : ''}`);
 		console.log(`${k}: reader moved (end/max/frames off/painted off of the change) footstrap ${show(c.fs)}, bootstrap ${show(c.bs)}; `
 			+ `no native: footstrap ${show(c.nn)}, correction off ${show(c.nnOff)}`);
 		/* bootstrap floors nothing, so nothing is left to change once its reader lets go: no reference there */
 		const ref = kind !== 'scroll';
 		if (![ 'fs', 'nn', 'nnOff', ...(ref ? [ 'bs' ] : []) ].map((n) => valid(c[n], kind, `${k} ${n}`)).every(Boolean)) continue;
-		/* the three footstrap cells read one page; a change that differs means the emulation changed it */
+		/* the three footstrap cells read one page; a change that differs means the emulation changed it
+		 * or the stimulus differed (live text above the reader), never the anchoring: an offset write
+		 * leaves the change above the reader as it is. Measured once more; the emulation fails again */
 		if ([ c.nn, c.nnOff ].some((x) => Math.abs(x.above - c.fs.above) > ABOVE_TOL)) {
-			fails.push(`${k}: the no-native cells changed by ${c.nn.above}/${c.nnOff.above}px above the reader where footstrap changed by ${c.fs.above}px — they measured another page`);
+			fails.push(`${k}: the no-native cells changed by ${c.nn.above}/${c.nnOff.above}px above the reader where footstrap changed by ${c.fs.above}px — they measured another page — measured nothing`);
 			continue;
 		}
 		const bs = ref ? c.bs : { end: 0, off: 0, painted: 0 };
@@ -345,16 +462,48 @@ function judgeAll() {
 	}
 }
 
+/* A stand that stopped answering mid-measure (StandDown) measured nothing too: lib/stands.mjs's
+ * contract, "the caller's own verdict is nothing was measured here, never a finding". */
+let standDown = false;
+async function attempt() {
+	standDown = false;
+	try {
+		await measure();
+		judgeAll();
+	} catch (e) {
+		if (e.unmeasured) { fails = [ `${e.message} — measured nothing` ]; return; }
+		if (!(e instanceof StandDown)) throw e;
+		standDown = true;
+		fails = [ `${e.message} — measured nothing` ];
+	}
+}
+
+/* The verdict, and the exit: 3 when the stand stopped answering (`down`), so nothing was judged */
+function finish(failures, down) {
+	for (const f of failures) console.log('FAIL ' + f);
+	console.log(`anchor-check ${stand.id}: ${failures.length ? `${failures.length} failure(s)` : 'PASS'} in ${Math.round((Date.now() - t0) / 1000)} s`);
+	const code = !failures.length ? 0 : down ? 3 : 1;
+	if (code === 1) console.log(`::error title=${ghProp(`Scroll anchoring ${stand.id}`)}::${ghData(`${failures.length} failure(s): ${failures[0]}`)}`);
+	/* nothing was judged, so the run may go once more: the title CI re-runs an infrastructure failure by */
+	if (code === 3) console.log(`::error title=${ghProp('Upstream outage (safe to rerun)')}::${ghData(`anchor-check ${stand.id}: the stand stopped answering`)}`);
+	process.exit(code);
+}
+
 /* A cell that measured nothing is a run that did not happen, not a finding: the whole check runs
  * once more then, and only then. A failure that measured something is never run again. */
-await measure();
-judgeAll();
+await attempt();
 if (fails.length && fails.every((f) => / — measured nothing$/.test(f))) {
-	for (const f of fails) console.log('MEASURED NOTHING ' + f);
+	/* a green run the re-measure rescued says so where it is read */
+	for (const f of fails) console.log(`::warning title=${ghProp(`anchor-check ${stand.id}`)}::${ghData(`MEASURED NOTHING ${f}`)}`);
 	console.log(`anchor-check ${stand.id}: measured nothing in ${fails.length} cell(s), measuring again`);
-	await measure();
-	judgeAll();
+	/* a stand that stopped answering gets a minute to come back first. LuCI's own page, not a static
+	 * file: uhttpd serves files itself and forks a process per LuCI request, so files still come
+	 * while LuCI hangs */
+	for (const end = Date.now() + 60e3; standDown && Date.now() < end;) {
+		if (await fetch(BASE, { signal: AbortSignal.timeout(5000) }).then((r) => r.status < 500, () => false)) break;
+		await new Promise((r) => setTimeout(r, 5000));
+	}
+	await attempt();
 }
-for (const f of fails) console.log('FAIL ' + f);
-console.log(`anchor-check ${stand.id}: ${fails.length ? `${fails.length} failure(s)` : 'PASS'} in ${Math.round((Date.now() - t0) / 1000)} s`);
-process.exit(fails.length ? 1 : 0);
+/* 3 here: the stand stopped answering in the rerun */
+finish(fails, standDown);

@@ -9,7 +9,8 @@ import { execFileSync } from 'node:child_process';
 function owlabRouters() {
 	let out;
 	try {
-		out = execFileSync('owlab', [ 'status', '-json' ], { encoding: 'utf8', stdio: [ 'ignore', 'pipe', 'ignore' ] });
+		/* SIGKILL: owlab catches TERM, and a hung one would hold the caller to its step's timeout */
+		out = execFileSync('owlab', [ 'status', '-json' ], { encoding: 'utf8', stdio: [ 'ignore', 'pipe', 'ignore' ], timeout: 60000, killSignal: 'SIGKILL' });
 	} catch (e) { return []; }
 	try { return JSON.parse(out).routers || []; } catch (e) { return []; }
 }
@@ -54,9 +55,9 @@ export function stands(only) {
  * and data:/blob: pass. */
 export async function sealToRouter(ctx, base) {
 	const host = new URL(base).host;
-	/* A predicate, never a catch-all glob: a glob sends every request, the router's own included,
-	 * through a JS callback (a CI run went 17 minutes past its then 45-minute limit;
-	 * docs/development.md). */
+	/* Playwright turns a predicate into a catch-all glob, so every request, the router's own included,
+	 * passes through this callback, and any route turns the browser's HTTP cache off. That costs little
+	 * at the few pages capture.mjs and anchor-check.mjs open; tools/e2e.mjs seals with a launch proxy. */
 	await ctx.route(
 		(url) => url.host !== host && url.protocol !== 'data:' && url.protocol !== 'blob:',
 		(route) => route.abort());
@@ -90,6 +91,27 @@ const cause = (e) => String(e.message).split('\n')[0].replace(/^\w+\.\w+: | at h
 export const unreached = (e, id, base) => (e && (e.name === 'TimeoutError' || NO_ANSWER.test(String(e.message))))
 	? new StandDown(`${id}: ${base} did not answer (${cause(e)}) — the stand, not the theme`) : e;
 
+/* Whether LuCI's root stays silent for a minute: no whole answer, any status, to a request every 5 s
+ * that gets 15 s. */
+export async function silent(base) {
+	for (const end = Date.now() + 60e3; Date.now() < end; await new Promise((r) => setTimeout(r, 5000)))
+		if (await fetch(`${base}/`, { signal: AbortSignal.timeout(15000) }).then((r) => r.arrayBuffer()).then(() => true, () => false))
+			return false;
+	return true;
+}
+
+/* A timeout, or a request the browser gave up on, is the stand's only when LuCI's root then stays
+ * silent too: theme code can hold a page, a login or a menu as surely as a dead stand can. So it is a
+ * StandDown when silent(), else an Error naming `what` on a stand that answered, for the caller to
+ * judge. Any other error comes back as it is. */
+export async function stoodDown(e, id, base, what) {
+	const down = unreached(e, id, base);
+	if (!(down instanceof StandDown) && !/XHR request aborted/.test(String(e && e.message))) return e;
+	if (await silent(base))
+		return down instanceof StandDown ? down : new StandDown(`${id}: ${base} did not answer (${cause(e)}) — the stand, not the theme`);
+	return new Error(`${id}: ${what} (${cause(e)}) while LuCI's root answered`);
+}
+
 /* Has the landing page's LuCI answered `L.require`? Runs INSIDE the page via waitForFunction, which
  * waits out the returned promise. */
 const LANDED = () => (window.L && typeof window.L.require === 'function')
@@ -102,34 +124,49 @@ const LANDED = () => (window.L && typeof window.L.require === 'function')
  *
  * It returns once the landing has answered `L.require`, not at its domcontentloaded: the first goto
  * after a login from a landing still loading failed in WebKit 5 of 168 times (3.0%) against 0 of 840
- * later ones. A stand whose landing never answers is bounded at 20 s and is a StandDown. */
-export async function login(page, base, id = new URL(base).host) {
+ * later ones. A landing that never answers is bounded at 20 s. A submit or a landing that timed out
+ * is a StandDown when LuCI's root then stays silent (stoodDown()); on a stand that answers, the login
+ * runs once more, so a blip costs one login, and a second timeout is the theme's form or landing. */
+export async function login(page, base, id = new URL(base).host, again = true) {
 	const res = await page.goto(base, { waitUntil: 'domcontentloaded' })
 		.catch((e) => { throw unreached(e, id, base); });
 	const fault = loginFault(res ? res.status() : 0, await page.content(),
 		await page.evaluate(() => (document.body ? document.body.innerText : '')));
 	if (fault) throw new StandDown(`${id}: ${fault}`);
-	if (await page.$('input[name="luci_password"]')) {
-		await page.fill('input[name="luci_username"]', 'root');
-		await Promise.all([
-			page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-			page.press('input[name="luci_password"]', 'Enter'),
-		]);
+	const form = !!(await page.$('input[name="luci_password"]'));
+	if (form) await page.fill('input[name="luci_username"]', 'root');
+	try {
+		if (form)
+			await Promise.all([
+				page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+				page.press('input[name="luci_password"]', 'Enter'),
+			]);
+		await page.waitForFunction(LANDED, null, { timeout: 20000 });
+	} catch (e) {
+		const r = await stoodDown(e, id, base, 'the login did not finish');
+		if (r === e || r instanceof StandDown || !again) throw r;
+		return login(page, base, id, false);
 	}
-	await page.waitForFunction(LANDED, null, { timeout: 20000 })
-		.catch((e) => { throw unreached(e, id, base); });
+	/* the login form loads luci.js too: landing proves nothing while the form is still on the page */
+	if (await page.$('input[name="luci_password"]'))
+		throw new Error(`${id}: LuCI answered its login form again after the login`);
 }
 
 /* Every leaf of the router's own menu tree, as LuCI resolves it, not a list kept in the repo that
  * goes stale when an app is installed. `L.ui.menu.load()` returns the tree rooted at `admin`, so
  * the walk starts with an empty path. */
-export async function menuPaths(page) {
+export async function menuPaths(page, id = new URL(page.url()).host) {
 	/* `L.ui` exists only once something required ui.js, which differs by release line (24.10
 	 * crashed with "Cannot read properties of undefined (reading 'menu')"): wait, then require it. */
 	await page.waitForFunction(() => window.L && typeof window.L.require === 'function', null, { timeout: 20000 });
 	/* Only leaves that render and are titled (`view`, `template`, `cbi`): 105 of 169 leaves with
 	 * openclash and justclash are `call` RPC endpoints, which paint nothing. */
-	return page.evaluate(async () => {
+	/* L.Request has no clock: a stand that stopped answering while the menu loaded held the caller
+	 * to its step's timeout. 30 s, the same as a page's load. */
+	let timer;
+	const late = new Promise((_, no) => { timer = setTimeout(() =>
+		no(Object.assign(new Error("LuCI's menu did not load in 30 s"), { name: 'TimeoutError' })), 30000); });
+	return Promise.race([ page.evaluate(async () => {
 		const ui = await L.require('ui');
 		const tree = await ui.menu.load();
 		const RENDERS = { view: 1, template: 1, cbi: 1 };
@@ -145,7 +182,8 @@ export async function menuPaths(page) {
 		};
 		walk(tree, []);
 		return out;
-	});
+	}), late ]).catch(async (e) => { throw await stoodDown(e, id, page.url(), "LuCI's menu did not load"); })
+		.finally(() => clearTimeout(timer));
 }
 
 /* No stand, no verdict — and a run that quietly reports success on zero routers is worse than one

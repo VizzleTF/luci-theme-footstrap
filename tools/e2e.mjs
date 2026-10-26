@@ -23,12 +23,13 @@
  * Exit 0 when every step passed, 1 otherwise; the report, anchor-check's log and one screenshot per
  * page and width land in --out (default ../tmp/e2e-<router>). */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { ROOT } from './lib/root.mjs';
-import { login, menuPaths } from './lib/stands.mjs';
+import { StandDown, login, menuPaths, stoodDown, unreached } from './lib/stands.mjs';
+import { ghData, ghProp } from './lib/util.mjs';
 
 const { values: opt } = parseArgs({ options: {
 	router: { type: 'string' },
@@ -44,7 +45,7 @@ if (!opt.router || !opt.old || !opt.new) {
 const OUT = opt.out || join(ROOT, '..', 'tmp', `e2e-${opt.router}`);
 mkdirSync(OUT, { recursive: true });
 
-const status = JSON.parse(execFileSync('owlab', [ 'status', '-json' ], { encoding: 'utf8' }));
+const status = JSON.parse(execFileSync('owlab', [ 'status', '-json' ], { encoding: 'utf8', timeout: 60000, killSignal: 'SIGKILL' }));
 const router = (status.routers || []).find((r) => r.id === opt.router && r.state === 'running');
 if (!router) { console.error(`${opt.router}: not running (owlab up ${opt.router})`); process.exit(2); }
 const CONTAINER = `owlab-${status.project}-${router.id}`;
@@ -54,23 +55,43 @@ const APK = router.package_manager === 'apk';
 
 /* ---- the router side ---- */
 
-const sh = (script) => execFileSync('docker', [ 'exec', CONTAINER, 'sh', '-c', script ],
-	{ encoding: 'utf8', stdio: [ 'ignore', 'pipe', 'pipe' ] }).trim();
+/* Every docker call is on a clock: a stand that stops answering ends the run red, not in the step's
+ * timeout. One that never returns, or that the daemon refuses (the container paused, stopped or
+ * gone), is the stand's, as in anchor-check.mjs: a StandDown. */
+const refused = (stderr) => (String(stderr || '').match(/^Error response from daemon.*$/m) || [ '' ])[0];
+function docker(...args) {
+	try {
+		return execFileSync('docker', args, { encoding: 'utf8', stdio: [ 'ignore', 'pipe', 'pipe' ], timeout: 60000 });
+	} catch (e) {
+		if (e.code === 'ETIMEDOUT') throw new StandDown(`${opt.router}: docker ${args[0]} did not return in 60 s`);
+		if (refused(e.stderr)) throw new StandDown(`${opt.router}: ${refused(e.stderr)}`);
+		throw e;
+	}
+}
+const sh = (script) => docker('exec', CONTAINER, 'sh', '-c', script).trim();
 const uci = (key) => sh(`uci -q get ${key} || true`);
 const theme = () => uci('luci.main.mediaurlbase');
 
 /* The package manager runs from an argument vector, never a shell line: the package path comes from
- * the command line. Output is stdout and stderr together, the way an admin reads it. */
+ * the command line. Output is stdout and stderr together, the way an admin reads it. Its clock is no
+ * StandDown: a package script of the theme's may be what hangs. */
 function pm(...args) {
-	const r = spawnSync('docker', [ 'exec', CONTAINER, ...args ], { encoding: 'utf8' });
+	const r = spawnSync('docker', [ 'exec', CONTAINER, ...args ], { encoding: 'utf8', timeout: 120000 });
 	const out = `${r.stdout || ''}${r.stderr || ''}`.trim();
+	if (r.error) {
+		const why = `${args.join(' ')} ${r.error.code === 'ETIMEDOUT' ? 'did not return in 120 s' : r.error.message}`;
+		/* last in the output, where the run's detail reads it */
+		throw Object.assign(new Error(why), { stderr: `${out}\n${why}` });
+	}
+	if (r.status !== 0 && refused(r.stderr)) throw new StandDown(`${opt.router}: ${refused(r.stderr)}`);
 	if (r.status !== 0) throw Object.assign(new Error(`${args.join(' ')} exited ${r.status}`), { stderr: out });
 	return out;
 }
+/* --no-network: the file and luci-base are all it needs; a stale index must not send apk to every feed */
 function install(file) {
 	const dst = `/tmp/${basename(file)}`;
-	execFileSync('docker', [ 'cp', file, `${CONTAINER}:${dst}` ]);
-	return APK ? pm('apk', 'add', '--allow-untrusted', dst) : pm('opkg', 'install', dst);
+	docker('cp', file, `${CONTAINER}:${dst}`);
+	return APK ? pm('apk', 'add', '--no-network', '--allow-untrusted', dst) : pm('opkg', 'install', dst);
 }
 const remove = () => APK ? pm('apk', 'del', 'luci-theme-footstrap') : pm('opkg', 'remove', 'luci-theme-footstrap');
 const installedVersion = () => sh(APK
@@ -80,10 +101,14 @@ const setTheme = (url) => sh(`uci set luci.main.mediaurlbase=${url} && uci commi
 
 /* ---- the report ---- */
 
+/* `standDown`: the step failed because the stand did not answer, so it judged nothing. */
 const results = [];
-function check(step, ok, detail = '') {
-	results.push({ step, ok, detail });
+function check(step, ok, detail = '', standDown = false) {
+	results.push(ok ? { step, ok, detail } : { step, ok, detail, standDown });
 	console.log(`${ok ? 'PASS' : 'FAIL'}  ${step}${detail ? ` — ${detail}` : ''}`);
+	/* a red step shows on the pull request, not only in the log; one the stand failed is annotated
+	 * at the run's end, once it is known whether anything else failed */
+	if (!ok && !standDown && process.env.GITHUB_ACTIONS) console.log(`::error title=${ghProp(step)}::${ghData(detail || step)}`);
 	return ok;
 }
 
@@ -96,8 +121,8 @@ const THEME_FILE = /^\/luci-static\/footstrap\/|^\/luci-static\/resources\/(fs-[
  * one LuCI poll interval (5 s, header.ut's `pollinterval` default) plus 1 s for the tick's handlers:
  * theme code that runs late runs on a poll tick or on a timer of its own, the longest of which is
  * fs-router's 5 s warm wait. The phone and click passes look for what differs by width or by
- * client navigation, which shows at render, and get 1 s, as does the reference before it waits
- * for the network to go quiet (settle()). */
+ * client navigation, which shows at render, and get 1 s. The reference gets LONG + 1 s, so it
+ * vouches for all of footstrap's desktop span, then waits for the network to go quiet (settle()). */
 const LONG = 6000, SHORT = 1000;
 
 /* The view has rendered: a client-side view has replaced its "Loading view…" spinner, a legacy CBI
@@ -144,9 +169,10 @@ const MEASURE = () => {
  * than half of that; a refactor does not move it by half. */
 const RULES_FLOOR = 500;
 
-/* Errors and requests are compared as text with the volatile parts (session ids, query strings,
- * numbers) removed, so the same thing under both themes is one signature. */
-const signature = (s) => String(s).split('\n')[0].replace(/[0-9a-f]{32}/g, 'S').replace(/\?[^\s'")]*/g, '').replace(/\d+/g, 'N').slice(0, 300);
+/* Errors and requests are compared as text with the volatile parts (session ids, UUIDs such as a
+ * blob: URL's, query strings, numbers) removed, so the same thing under both themes is one signature. */
+const signature = (s) => String(s).split('\n')[0]
+	.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, 'U').replace(/[0-9a-f]{32}/g, 'S').replace(/\?[^\s'")]*/g, '').replace(/\d+/g, 'N').slice(0, 300);
 const pathOf = (url) => { try { return new URL(url).pathname; } catch (e) { return String(url); } };
 /* the scripts on an error's stack, as paths; the first is where it was thrown */
 const scriptsOf = (stack) => (String(stack).match(/https?:\/\/[^\s)]+/g) || []).map((u) => pathOf(u.replace(/(:\d+)+$/, '')));
@@ -159,13 +185,13 @@ const requestKey = (req) => signature(`${req.method()} ${pathOf(req.url())} ${re
  * below with its path. A request the page cancelled itself (a navigation away) is no failure. */
 function watch(page) {
 	const seen = { errors: new Map(), failed: new Map(), requested: new Set(), rendered: 0 };
-	const net = page.__net = { inflight: 0, last: Date.now() };
+	const net = page.__net = { pending: new Set(), last: Date.now() };
 	const error = (sig, scripts) => seen.errors.has(sig) ||
 		seen.errors.set(sig, { at: Date.now(), theme: scripts.some((p) => THEME_FILE.test(p)) });
 	const failed = (req, what) => seen.failed.has(requestKey(req)) ||
 		seen.failed.set(requestKey(req), { path: pathOf(req.url()), what, at: Date.now() });
-	page.on('request', (r) => { net.inflight++; net.last = Date.now(); seen.requested.add(requestKey(r)); });
-	const done = () => { net.inflight = Math.max(0, net.inflight - 1); net.last = Date.now(); };
+	page.on('request', (r) => { net.pending.add(r); net.last = Date.now(); seen.requested.add(requestKey(r)); });
+	const done = (r) => { if (net.pending.delete(r)) net.last = Date.now(); };
 	page.on('requestfinished', done);
 	page.on('requestfailed', done);
 	page.on('pageerror', (e) => {
@@ -186,19 +212,41 @@ function watch(page) {
 	return seen;
 }
 
-/* Wait for the view, then watch the page `span` ms; the reference then also waits until nothing has
- * been in flight for a second, 10 s in all at most: an app's own requests keep arriving after its
- * view rendered (adblock and banip fetch their reports late) and must land in the reference. */
+/* Wait for the view, then watch the page `span` ms; the reference then also waits until nothing this
+ * page asked for has been in flight for a second, 10 s in all at most: an app's own requests keep
+ * arriving after its view rendered (adblock and banip fetch their reports late) and must land in
+ * the reference. */
 async function settle(page, seen, span, reference) {
 	const rendered = await page.waitForFunction(RENDERED, null, { timeout: 20000 }).then(() => true, () => false);
 	seen.rendered = Date.now();
 	await page.waitForTimeout(span);
 	if (reference)
 		for (let waited = span; waited < 10000; waited += 250) {
-			if (page.__net.inflight === 0 && Date.now() - page.__net.last >= 1000) break;
+			if (page.__net.pending.size === 0 && Date.now() - page.__net.last >= 1000) break;
 			await page.waitForTimeout(250);
 		}
 	return rendered;
+}
+
+/* What LuCI's root answers: `fault` is '' for its login form, else what came instead (the status
+ * and the start of the text, or the error), so a red step says whether the stand or the removal
+ * broke it; `down`: no whole answer came (refused, cut off, or none in 15 s). LuCI answers the form
+ * with a 403, so the body is the evidence, not the status. */
+const loginForm = () => fetch(BASE + '/', { signal: AbortSignal.timeout(15000) })
+	.then(async (r) => { const t = await r.text(); return { down: false, fault: /luci_password/.test(t) ? '' : `${r.status} ${t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)}` }; })
+	.catch((e) => ({ down: true, fault: `${e.name}: ${e.message}${e.cause ? ` (${e.cause.code || e.cause.message})` : ''}` }));
+
+/* A page that got no answer (none, or none in time), by a full load or a click, while LuCI's root
+ * gets none either for a minute: the stand stopped answering. The crawl ends there in a StandDown;
+ * reading every page left would run into the step's timeout and lose the report. A root that
+ * answers, at once or within the minute, leaves the failure the page's own, and a view a blip
+ * emptied is read once more after its pass. */
+async function standGone(e, path) {
+	const down = unreached(e, opt.router, BASE + path);
+	if (!(down instanceof StandDown)) return;
+	for (const end = Date.now() + 60e3; Date.now() < end; await new Promise((r) => setTimeout(r, 5000)))
+		if (!(await loginForm()).down) return;
+	throw down;
 }
 
 /* Footstrap's menu takes a click at this width: Playwright's actionability check (visible, stable,
@@ -206,9 +254,21 @@ async function settle(page, seen, span, reference) {
 const unreachable = (page) => page.locator('#topmenu > li > a').first().click({ trial: true, timeout: 3000 })
 	.then(() => null, (e) => signature(e.message));
 
+/* A load the router never answered stays pending, and page.evaluate and locator.count(), which have
+ * no clock, wait for it to commit: one such page held its pass until the step's timeout. A reading
+ * is bounded (a TimeoutError, so unreached() reads it as one); a page that goes on clicking is told
+ * to stop the load, and keeps the document it has. */
+const inTime = (p, ms) => Promise.race([ p, new Promise((_, no) => setTimeout(() =>
+	no(Object.assign(new Error(`the page did not answer in ${ms / 1000} s`), { name: 'TimeoutError' })), ms)) ]);
+async function stopLoading(page) {
+	const cdp = await page.context().newCDPSession(page);
+	await cdp.send('Page.stopLoading');
+	await cdp.detach();
+}
+
 /* What a page showed, as `open` and `click` return it; `after` is ms after the view rendered. */
 async function reading(page, seen, rendered, extra = {}) {
-	const m = await page.evaluate(MEASURE).catch(() => ({ text: 0, rules: 0, token: '', nav: false }));
+	const m = await inTime(page.evaluate(MEASURE), 10000).catch((e) => ({ text: 0, rules: 0, token: '', nav: false, unmeasured: signature(e.message) }));
 	const t0 = seen.rendered || Date.now();
 	return {
 		errors: [ ...seen.errors ].map(([ sig, e ]) => ({ sig, theme: e.theme, after: e.at - t0 })),
@@ -223,13 +283,17 @@ const shotName = (path) => path.replace(/^\//, '').replace(/\//g, '_') || 'root'
 async function open(page, seen, path, { shotDir, span, reference = false, menu = false }) {
 	seen.clear();
 	let rendered = false;
+	page.__net.pending.clear();	/* Playwright never finishes a request the last document left in flight */
 	try {
 		await page.goto(BASE + path, { waitUntil: 'load', timeout: 30000 });
 		rendered = await settle(page, seen, span, reference);
-	} catch (e) { seen.errors.set(`navigation: ${signature(e.message)}`, { at: Date.now(), theme: false }); }
+	} catch (e) {
+		seen.errors.set(`navigation: ${signature(e.message)}`, { at: Date.now(), theme: false });
+		await standGone(e, path);
+	}
 	const r = await reading(page, seen, rendered, reference ? { requested: [ ...seen.requested ] }
 		: menu ? { unreachable: await unreachable(page) } : {});
-	await page.screenshot({ path: join(shotDir, `${shotName(path)}.jpg`), type: 'jpeg', quality: 60 }).catch(() => {});
+	await page.screenshot({ path: join(shotDir, `${shotName(path)}.jpg`), type: 'jpeg', quality: 60, timeout: 10000 }).catch(() => {});
 	return r;
 }
 
@@ -278,16 +342,23 @@ async function click(page, seen, entry) {
 	try {
 		const header = page.locator(`#topmenu > li:has(> ul a${href}) > a`).first();
 		for (let i = 0; entry.top && i < 2 && !(await link.isVisible()); i++) await header.click({ timeout: 5000 });
-		await page.evaluate(() => { window.__e2eStale = (document.getElementById('view') || document.getElementById('maincontent'))?.firstElementChild; });
+		await inTime(page.evaluate(() => { window.__e2eStale = (document.getElementById('view') || document.getElementById('maincontent'))?.firstElementChild; }), 5000);
+		/* a click that starts a full load waits for it to commit */
 		await link.click({ timeout: 5000 });
-	} catch (e) { return { unclickable: signature(e.message) }; }
+	} catch (e) {
+		await standGone(e, entry.path);
+		return { unclickable: signature(e.message) };
+	}
 	let rendered = false;
 	try {
 		await page.waitForFunction((p) => location.pathname.replace(/\/$/, '').endsWith(p) &&
 			(document.getElementById('view') || document.getElementById('maincontent'))?.firstElementChild !== window.__e2eStale,
 		entry.path, { timeout: 20000 });
 		rendered = await settle(page, seen, SHORT, false);
-	} catch (e) { seen.errors.set(`navigation: ${signature(e.message)}`, { at: Date.now(), theme: false }); }
+	} catch (e) {
+		seen.errors.set(`navigation: ${signature(e.message)}`, { at: Date.now(), theme: false });
+		await standGone(e, entry.path);
+	}
 	return reading(page, seen, rendered);
 }
 
@@ -305,7 +376,7 @@ async function click(page, seen, entry) {
  *   fail. A request footstrap makes in an app's name (the router's view prefetch, a client
  *   navigation) is one bootstrap never made, so it counts;
  * - a view that never renders where bootstrap's did, or shows less than half of bootstrap's text
- *   (hidden by CSS, or not drawn);
+ *   (hidden by CSS, or not drawn), or that could not be read at all;
  * - footstrap's stylesheet missing or near empty, its token unresolved, its menu not visible or not
  *   clickable. LuCI falls back to another theme silently on a broken template, which shows here. */
 function judge(r, ref) {
@@ -318,10 +389,14 @@ function judge(r, ref) {
 	for (const f of r.failed)
 		if (THEME_FILE.test(f.path) || (!asked.has(f.key) && (vouched(f) || !ref))) problems.add(`${f.what}: ${f.path}`);
 	if (!r.rendered && (!ref || ref.rendered)) problems.add('the view never rendered');
-	if (ref && r.text < ref.text / 2) problems.add(`the view shows ${r.text} characters of text, bootstrap ${ref.text}`);
-	if (r.rules < RULES_FLOOR) problems.add(`footstrap's stylesheet holds ${r.rules} rules (floor ${RULES_FLOOR})`);
-	if (!r.token) problems.add('--primary-color-high does not resolve');
-	if (!r.nav) problems.add('the menu is not visible');
+	/* a page the evaluate could not read (its context gone) showed nothing, which is no broken shell */
+	if (r.unmeasured) problems.add(`could not measure the page: ${r.unmeasured}`);
+	else {
+		if (ref && r.text < ref.text / 2) problems.add(`the view shows ${r.text} characters of text, bootstrap ${ref.text}`);
+		if (r.rules < RULES_FLOOR) problems.add(`footstrap's stylesheet holds ${r.rules} rules (floor ${RULES_FLOOR})`);
+		if (!r.token) problems.add('--primary-color-high does not resolve');
+		if (!r.nav) problems.add('the menu is not visible');
+	}
 	if (r.unreachable) problems.add(`the menu takes no click: ${r.unreachable}`);
 	return [ ...problems ];
 }
@@ -356,57 +431,111 @@ async function pass(name, items, list, fn) {
 }
 
 /* The reference is read first, closest to the router's boot: a state an app is still settling into
- * (a first run, a first download) then lands under bootstrap, where it costs nothing. */
-async function crawl(browser) {
+ * (a first run, a first download) then lands under bootstrap, where it costs nothing. Each pass's
+ * reading lands in `into` as it ends, so a crawl that throws leaves what it finished. */
+async function crawl(browser, into) {
 	const dir = (...p) => { const d = join(OUT, ...p); mkdirSync(d, { recursive: true }); return d; };
 	const DESK = { width: 1280, height: 800 }, PHONE = { width: 390, height: 844 };
 
 	setTheme('/luci-static/bootstrap');
 	const refs = await sessions(browser, DESK);
-	const paths = (await menuPaths(refs[0].page)).filter((p) => !/\/logout$/.test(p));
+	/* menuPaths() leaves out a page whose node has children (Status > Firewall: an untitled
+	 * `iptables` child) or renders through a `call` (OpenVPN, OpenClash), yet the menu links it:
+	 * every page an entry lands on is read too, so its click has a reference. LuCI's menu tree is
+	 * the same under either theme. */
+	const entries = into.entries = await inTime(menuEntries(refs[0].page), 30000)
+		.catch(async (e) => { throw await stoodDown(e, opt.router, BASE, "LuCI's menu did not load"); });
+	const paths = into.paths = [ ...new Set([ ...await menuPaths(refs[0].page, opt.router), ...entries.map((e) => e.leaf) ]) ]
+		.filter((p) => !/\/logout$/.test(p));
 	check('the menu lists pages', paths.length > 0, `${paths.length} pages`);
-	const bs = await pass('bootstrap', paths, refs, (s, p) => open(s.page, s.seen, p, { shotDir: dir('bootstrap'), span: LONG, reference: true }));
-	await closeAll(refs);
+	const bs = into.bootstrap = await pass('bootstrap', paths, refs, (s, p) => open(s.page, s.seen, p, { shotDir: dir('bootstrap'), span: LONG + 1000, reference: true }));
+	await closeAll(refs.slice(1));
+	/* The process_list race (below) empties the reference too, and an empty reference vouches for an
+	 * empty footstrap view (3 runs in 5 on 24.10): a view that asked for the process list is read
+	 * once more alone, and the fuller reading kept. Its errors and requests join the first's, so the
+	 * second reading takes back nothing the first vouched for. */
+	for (const p of paths.filter((x) => bs[x].requested.some((k) => k.includes('"getProcessList"')))) {
+		const r = await open(refs[0].page, refs[0].seen, p, { shotDir: dir('bootstrap'), span: LONG + 1000, reference: true });
+		console.log(`  again, alone: bootstrap ${p}: ${bs[p].text} -> ${r.text} characters`);
+		if (r.text > bs[p].text) bs[p] = { ...r, watched: Math.max(bs[p].watched, r.watched), rendered: bs[p].rendered || r.rendered,
+			errors: [ ...bs[p].errors, ...r.errors ], requested: [ ...new Set([ ...bs[p].requested, ...r.requested ]) ] };
+	}
+	await closeAll(refs.slice(0, 1));
 	setTheme('/luci-static/footstrap');
 
 	const desks = await sessions(browser, DESK);
 	const desktop = await pass('desktop', paths, desks, (s, p) => open(s.page, s.seen, p, { shotDir: dir('footstrap', 'desktop'), span: LONG, menu: true }));
+	into.footstrap = { desktop };
 	await closeAll(desks.slice(2));
 	/* two pages, each taking half the entries one after another: each click leaves from the view the
-	 * last one rendered, and each page starts on the other half's last entry */
-	const entries = await menuEntries(desks[0].page);
+	 * last one rendered (after one that rendered nothing, from the document its stopped load left),
+	 * and each page starts on the other half's last entry */
 	const half = Math.ceil(entries.length / 2);
 	const chains = [ entries.slice(0, half), entries.slice(half) ];
-	const t0 = Date.now(), clicks = {};
+	const t0 = Date.now(), clicks = into.footstrap.click = {};
 	await Promise.all(chains.map(async (chain, i) => {
 		const s = desks[i], start = chains[1 - i].at(-1) || chain.at(-1);
-		await s.page.goto(BASE + start.path, { waitUntil: 'load' }).catch(() => {});
-		for (const e of chain) clicks[e.path] = await click(s.page, s.seen, e);
+		await s.page.goto(BASE + start.path, { waitUntil: 'load' })
+			.catch(async (e) => { await standGone(e, start.path); await stopLoading(s.page); });
+		for (const e of chain)
+			if (!(clicks[e.path] = await click(s.page, s.seen, e)).rendered) await stopLoading(s.page);
 	}));
 	console.log(`  click: ${entries.length} in ${Math.round((Date.now() - t0) / 1000)} s`);
 	await closeAll(desks.slice(0, 2));
 
 	const phones = await sessions(browser, PHONE);
-	const phone = await pass('phone', paths, phones, (s, p) => open(s.page, s.seen, p, { shotDir: dir('footstrap', 'phone'), span: SHORT, menu: true }));
+	const phone = into.footstrap.phone = await pass('phone', paths, phones, (s, p) => open(s.page, s.seen, p, { shotDir: dir('footstrap', 'phone'), span: SHORT, menu: true }));
 	await closeAll(phones);
 
 	/* LuCI's process_list (luci/sys.uc, 24.10 and 25.12) answers an empty list when another rpcd
 	 * child exits while it reads top's output, as a neighbour's file.exec does: a view short of
-	 * bootstrap's text is read once more on its own, with nothing else loading. A theme that hides
-	 * a view hides it again. */
+	 * bootstrap's text, or one the measurement could not read, is read once more on its own, with
+	 * nothing else loading. A theme that hides a view hides it again. `thin` also holds for a reading
+	 * without a text count (a second click that found no link). The race empties a view at a time,
+	 * one in each run it hit: more than 20 short in a pass is the theme, and reading every one again
+	 * would outlast the e2e step's 15 min and lose the report, so they stay as read. */
+	const thin = (r, ref) => !!r.unmeasured || !(r.text >= ref.text / 2);
+	const racy = (how, short) => {
+		if (short.length <= 20) return true;
+		console.log(`  again: ${short.length} ${how} readings short, more than the race leaves; none read again`);
+		return false;
+	};
+	const again = into.again = [];
 	for (const [ how, results, viewport, span ] of [ [ 'desktop', desktop, DESK, LONG ], [ 'phone', phone, PHONE, SHORT ] ]) {
-		const thin = paths.filter((p) => bs[p] && results[p].text < bs[p].text / 2);
-		if (!thin.length) continue;
+		const short = paths.filter((p) => bs[p] && thin(results[p], bs[p]));
+		if (!short.length || !racy(how, short)) continue;
 		const s = await session(browser, viewport);
-		for (const p of thin) {
+		for (const p of short) {
 			const before = results[p].text;
 			results[p] = await open(s.page, s.seen, p, { shotDir: dir('footstrap', how), span, menu: true });
 			console.log(`  again, alone: ${how} ${p}: ${before} -> ${results[p].text} characters (bootstrap ${bs[p].text})`);
+			again.push({ how, path: p, before, after: results[p].text, rescued: !thin(results[p], bs[p]) });
 		}
 		await s.ctx.close();
 	}
+	/* The same race on a click: an entry whose view shows less than half of bootstrap's text is
+	 * clicked once more on its own, from another entry's page. */
+	const thinClicks = entries.filter((e) => { const r = clicks[e.path];
+		return !r.missing && !r.unclickable && bs[e.leaf] && thin(r, bs[e.leaf]); });
+	if (thinClicks.length && racy('click', thinClicks)) {
+		const s = await session(browser, DESK);
+		for (const e of thinClicks) {
+			const before = clicks[e.path].text;
+			const from = (entries.find((x) => x.leaf !== e.leaf) || e).leaf;
+			await s.page.goto(BASE + from, { waitUntil: 'load' })
+				.catch(async (err) => { await standGone(err, from); await stopLoading(s.page); });
+			clicks[e.path] = await click(s.page, s.seen, e);
+			console.log(`  again, alone: click ${e.path}: ${before} -> ${clicks[e.path].text} characters (bootstrap ${bs[e.leaf].text})`);
+			again.push({ how: 'click', path: e.path, before, after: clicks[e.path].text, rescued: !thin(clicks[e.path], bs[e.leaf]) });
+		}
+		await s.ctx.close();
+	}
+	/* a view short only on its first reading says so where the run is read; one short on both is judged below */
+	if (process.env.GITHUB_ACTIONS)
+		for (const a of again.filter((x) => x.rescued))
+			console.log(`::warning title=${ghProp('Rescued by a second reading')}::${ghData(`${a.how} ${a.path}: ${a.before} -> ${a.after} characters`)}`);
 
-	const pages = [];
+	const pages = into.pages = [];
 	for (const p of paths) {
 		pages.push({ path: p, how: 'desktop', problems: judge(desktop[p], bs[p]) });
 		pages.push({ path: p, how: 'phone', problems: judge(phone[p], bs[p]) });
@@ -425,7 +554,6 @@ async function crawl(browser) {
 		`${clicked} of ${entries.length} entries`);
 	check('every page renders under footstrap with nothing bootstrap does not also show', bad.length === 0,
 		`${paths.length} pages × desktop/phone, ${entries.length} menu entries by a click; ${bad.length} failing`);
-	return { paths, entries, pages, bootstrap: bs, footstrap: { desktop, phone, click: clicks } };
 }
 
 /* A fresh install registers the theme for Language and Style and leaves the active one alone. */
@@ -456,34 +584,73 @@ try {
 	check('the upgrade keeps the admin\'s theme', theme() === '/luci-static/footstrap', theme());
 	check('the upgrade keeps the admin\'s footstrap settings', uci('footstrap.e2e') === 'marker');
 
-	const browser = await chromium.launch();
+	/* Every host but the router is refused at once and the same way under both themes: an app's call
+	 * to GitHub (ssclash, nlbw) no longer depends on the runner's network or GitHub's rate limit. A
+	 * proxy rather than sealToRouter(): any route turns the HTTP cache off. `bypass` must name
+	 * localhost, or Playwright sends loopback through the proxy too. */
+	const browser = await chromium.launch({ proxy: { server: 'http://127.0.0.1:9', bypass: 'localhost' } });
+	/* A crawl that throws (a login, or a page and LuCI's root, the stand did not answer) is a red step
+	 * of its own: the removal and the fresh install below still run, and the passes it finished stay
+	 * in the report. */
+	report.crawl = {};
 	try {
-		report.crawl = await crawl(browser);
-	} finally { await browser.close(); }
+		await crawl(browser, report.crawl);
+	} catch (e) {
+		check('the crawl completes', false, String(e.message).split('\n')[0], e instanceof StandDown);
+		/* the removal is judged from the admin's theme, whichever pass the crawl stopped in */
+		setTheme('/luci-static/footstrap');
+	} finally { await browser.close().catch(() => {}); }
 
 	/* the installed build, still the active theme */
 	if (!opt['no-anchor']) {
-		const anchor = spawnSync(process.execPath, [ join(ROOT, 'tools', 'anchor-check.mjs'), '--router', opt.router ], { encoding: 'utf8', timeout: 900000 });
+		/* past anchor-check's own 20 min verdict, which puts the theme and the leases back first */
+		const anchor = spawnSync(process.execPath, [ join(ROOT, 'tools', 'anchor-check.mjs'), '--router', opt.router ], { encoding: 'utf8', timeout: 25 * 60e3 });
 		const anchorLog = `${anchor.stdout || ''}${anchor.stderr || ''}`;
 		writeFileSync(join(OUT, 'anchor-check.txt'), anchorLog);
+		/* its exit 3: the stand stopped answering, so it judged nothing */
 		check('a poll tick that changes the page above the reader leaves them in place', anchor.status === 0,
-			anchorLog.split('\n').filter((l) => /^FAIL |^anchor-check /.test(l)).join(' | ') || `exit ${anchor.status}`);
+			anchorLog.split('\n').filter((l) => /^FAIL |^anchor-check /.test(l)).join(' | ') || `exit ${anchor.status}`, anchor.status === 3);
 	}
 
+	const control = await loginForm();
+	check('LuCI serves its login form before the removal', !control.fault, control.fault, control.down);
 	const rmOut = remove();
 	check('the package removes', installedVersion() === '', rmOut.split('\n').slice(-1)[0]);
 	check('removal falls back to bootstrap', theme() === '/luci-static/bootstrap', theme());
-	/* LuCI answers the login form with a 403, so the body is the evidence, not the status */
-	const form = await fetch(BASE + '/', { signal: AbortSignal.timeout(15000) }).then((r) => r.text(), (e) => String(e));
-	check('LuCI still serves its login form after removal', /luci_password/.test(form));
+	const form = await loginForm();
+	/* silence after the removal is the stand's only when it was silent before it too: a stand that
+	 * answered the control and then stopped may have been stopped by the removal */
+	check('LuCI still serves its login form after removal', !form.fault, form.fault, form.down && control.down);
 
 	install(opt.new);
 	offered('this build');
 } catch (e) {
-	check('the run completes', false, String(e.stderr || e.message).split('\n').filter(Boolean).slice(-3).join(' | '));
+	check('the run completes', false, String(e.stderr || e.message).split('\n').filter(Boolean).slice(-3).join(' | '), e instanceof StandDown);
 }
 
 writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, '\t'));
 const failed = results.filter((r) => !r.ok).length;
 console.log(`\n${opt.router}: ${results.length - failed}/${results.length} passed; report in ${OUT}`);
+/* A run whose every failure is the stand's judged nothing: on the first attempt it says so once, in
+ * the title CI re-runs such a run by. One other failure, or a second attempt, names each under its
+ * own step instead: a theme finding keeps the run red, and the same silence twice is no hiccup. */
+const down = results.filter((r) => !r.ok && r.standDown);
+if (down.length && process.env.GITHUB_ACTIONS) {
+	if (down.length === failed && process.env.GITHUB_RUN_ATTEMPT === '1')
+		console.log(`::error title=${ghProp('Upstream outage (safe to rerun)')}::${ghData(`e2e on ${opt.router}: ${down.map((r) => `${r.step}: ${r.detail}`).join(' | ')}`)}`);
+	else for (const r of down) console.log(`::error title=${ghProp(r.step)}::${ghData(r.detail || r.step)}`);
+}
+/* A red run's failing steps and pages on the run's page: GitHub shows at most 10 error annotations
+ * a step, and a broken theme fails hundreds of pages. Output only, so a summary that cannot be
+ * written changes no verdict; the rows stop at 300, far under the summary's 1 MiB. */
+if (failed && process.env.GITHUB_STEP_SUMMARY) {
+	const cell = (s) => String(s).replace(/\s+/g, ' ').replace(/\|/g, '\\|').replace(/</g, '&lt;');
+	const rows = (report.crawl?.pages || []).flatMap((x) => x.problems.map((pr) => `| ${x.how} | ${cell(x.path)} | ${cell(pr)} |`));
+	const md = [ `### e2e on ${opt.router}: ${results.length - failed}/${results.length} passed`, '',
+		...results.filter((r) => !r.ok).map((r) => `- ${cell(r.step)}${r.detail ? `: ${cell(r.detail)}` : ''}`), '',
+		...(rows.length ? [ '| how | path | problem |', '|---|---|---|', ...rows.slice(0, 300) ] : []),
+		...(rows.length > 300 ? [ '', `${rows.length - 300} more in report.json` ] : []), '' ];
+	try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, md.join('\n')); }
+	catch (e) { console.log(`the step summary was not written: ${e.message}`); }
+}
 process.exit(failed ? 1 : 0);
