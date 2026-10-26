@@ -374,12 +374,15 @@ async function click(page, seen, entry) {
  *   until then), and footstrap cannot change it — it never writes the session or its cookie, and a
  *   lost session turns the next page into the login form, which the view, text and menu checks
  *   fail. A request footstrap makes in an app's name (the router's view prefetch, a client
- *   navigation) is one bootstrap never made, so it counts;
+ *   navigation) is one bootstrap never made, so it counts. One that failed the same way under
+ *   bootstrap on any page (`known`) is the app's too: a page left by a load or a click finishes its
+ *   late requests into the next page's reading (banIP's runtime file, 404; OpenClash's GitHub
+ *   avatar, which the browser's seal refuses);
  * - a view that never renders where bootstrap's did, or shows less than half of bootstrap's text
  *   (hidden by CSS, or not drawn), or that could not be read at all;
  * - footstrap's stylesheet missing or near empty, its token unresolved, its menu not visible or not
  *   clickable. LuCI falls back to another theme silently on a broken template, which shows here. */
-function judge(r, ref) {
+function judge(r, ref, known) {
 	const problems = new Set();
 	const errors = new Set(ref ? ref.errors.map((e) => e.sig) : []);
 	const asked = new Set(ref ? ref.requested : []);
@@ -387,7 +390,8 @@ function judge(r, ref) {
 	for (const e of r.errors)
 		if (e.theme || (!errors.has(e.sig) && (vouched(e) || !ref))) problems.add(e.sig);
 	for (const f of r.failed)
-		if (THEME_FILE.test(f.path) || (!asked.has(f.key) && (vouched(f) || !ref))) problems.add(`${f.what}: ${f.path}`);
+		if (THEME_FILE.test(f.path) || (!asked.has(f.key) && !known.has(`${f.key} ${f.what}`) && (vouched(f) || !ref)))
+			problems.add(`${f.what}: ${f.path}`);
 	if (!r.rendered && (!ref || ref.rendered)) problems.add('the view never rendered');
 	/* a page the evaluate could not read (its context gone) showed nothing, which is no broken shell */
 	if (r.unmeasured) problems.add(`could not measure the page: ${r.unmeasured}`);
@@ -535,16 +539,17 @@ async function crawl(browser, into) {
 		for (const a of again.filter((x) => x.rescued))
 			console.log(`::warning title=${ghProp('Rescued by a second reading')}::${ghData(`${a.how} ${a.path}: ${a.before} -> ${a.after} characters`)}`);
 
+	const known = new Set(Object.values(bs).flatMap((b) => b.failed.map((f) => `${f.key} ${f.what}`)));
 	const pages = into.pages = [];
 	for (const p of paths) {
-		pages.push({ path: p, how: 'desktop', problems: judge(desktop[p], bs[p]) });
-		pages.push({ path: p, how: 'phone', problems: judge(phone[p], bs[p]) });
+		pages.push({ path: p, how: 'desktop', problems: judge(desktop[p], bs[p], known) });
+		pages.push({ path: p, how: 'phone', problems: judge(phone[p], bs[p], known) });
 	}
 	for (const e of entries) {
 		const r = clicks[e.path];
 		const problems = r.missing ? [ 'the menu has no link to this entry' ]
 			: r.unclickable ? [ `its menu link takes no click: ${r.unclickable}` ]
-			: judge(r, bs[e.leaf]);
+			: judge(r, bs[e.leaf], known);
 		pages.push({ path: e.path, how: 'click', problems });
 	}
 	const bad = pages.filter((x) => x.problems.length);

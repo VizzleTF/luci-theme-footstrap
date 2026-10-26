@@ -53,7 +53,10 @@ A page fails for what footstrap adds over bootstrap on the same page:
   boot and 200 later. Footstrap cannot change that answer: it never writes the session or
   its cookie, and a lost session turns the next page into the login form, which the checks below
   fail. A request footstrap makes in an app's name (its router's view prefetch, a client
-  navigation) is one bootstrap never made, so it counts;
+  navigation) is one bootstrap never made, so it counts. One that failed the same way under
+  bootstrap on any page is the app's too: a page left by a load or a click finishes its late
+  requests into the next page's reading (banIP's runtime file answers 404, OpenClash's GitHub
+  avatar meets the crawl's seal), and both turned a run red on a page that never asked for them;
 - a view that never renders (the `#view` spinner never replaced, `#maincontent` empty) where it
   renders under bootstrap, or whose visible text is less than half of bootstrap's. Visible text
   counts the characters of every text node in `#view` (else `#maincontent`) whose element is
