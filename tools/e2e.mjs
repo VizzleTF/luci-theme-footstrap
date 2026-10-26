@@ -335,9 +335,9 @@ async function session(browser, viewport) {
 }
 
 /* Pages read at once, each in a logged-in context of its own. Most of a page's time is the span it
- * is watched, so four cut a pass about fourfold; the reference and footstrap run at the same count,
+ * is watched, so more pages at once cut a pass; the reference and footstrap run at the same count,
  * so the router carries the same load under both. */
-const WORKERS = 4;
+const WORKERS = 8;
 const sessions = (browser, viewport) => Promise.all(Array.from({ length: WORKERS }, () => session(browser, viewport)));
 const closeAll = (list) => Promise.all(list.map((s) => s.ctx.close()));
 
@@ -389,6 +389,22 @@ async function crawl(browser) {
 	const phones = await sessions(browser, PHONE);
 	const phone = await pass('phone', paths, phones, (s, p) => open(s.page, s.seen, p, { shotDir: dir('footstrap', 'phone'), span: SHORT, menu: true }));
 	await closeAll(phones);
+
+	/* LuCI's process_list (luci/sys.uc, 24.10 and 25.12) answers an empty list when another rpcd
+	 * child exits while it reads top's output, as a neighbour's file.exec does: a view short of
+	 * bootstrap's text is read once more on its own, with nothing else loading. A theme that hides
+	 * a view hides it again. */
+	for (const [ how, results, viewport, span ] of [ [ 'desktop', desktop, DESK, LONG ], [ 'phone', phone, PHONE, SHORT ] ]) {
+		const thin = paths.filter((p) => bs[p] && results[p].text < bs[p].text / 2);
+		if (!thin.length) continue;
+		const s = await session(browser, viewport);
+		for (const p of thin) {
+			const before = results[p].text;
+			results[p] = await open(s.page, s.seen, p, { shotDir: dir('footstrap', how), span, menu: true });
+			console.log(`  again, alone: ${how} ${p}: ${before} -> ${results[p].text} characters (bootstrap ${bs[p].text})`);
+		}
+		await s.ctx.close();
+	}
 
 	const pages = [];
 	for (const p of paths) {

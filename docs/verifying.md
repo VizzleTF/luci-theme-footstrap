@@ -22,7 +22,7 @@ apps but not this theme, the way an admin lives it:
    map, logout excepted. First under bootstrap, the reference, at 1280 px; then under footstrap by
    a full load at 1280 px and at 390 px, and every entry of footstrap's menu (each top-level entry
    and each entry under one, from the router's own menu tree) by a click on its link. The full-load
-   passes read four pages at a time, each in a logged-in context of its own, the same count under
+   passes read eight pages at a time, each in a logged-in context of its own, the same count under
    both themes; the click pass is two pages, each taking half the entries one after another. Then
    `tools/anchor-check.mjs` (below) runs against the installed build; `--no-anchor` leaves it out,
    which is what CI does, running it as a job of its own (`anchor`) on a router of its own.
@@ -48,7 +48,11 @@ A page fails for what footstrap adds over bootstrap on the same page:
   renders under bootstrap, or whose visible text is less than half of bootstrap's: the characters
   of every text node in `#view` (else `#maincontent`) whose element is rendered, outside a
   `<select>`, whose options a native select under bootstrap lists and footstrap's styled one does
-  not. On a clean run footstrap's share is 0.62 at its lowest (390 px, `status/wireguard`);
+  not. On a clean run footstrap's share is 0.62 at its lowest (390 px, `status/wireguard`). A view
+  short of that is read once more on its own after the pass, with nothing else loading, and judged
+  on that reading: LuCI's `process_list` (Status → Processes) answers an empty list when another
+  rpcd child exits while it reads `top`'s output, as a neighbour page's `file.exec` does, on 24.10
+  and 25.12 alike (48–74 empty answers in ~190 beside a `file exec` loop, none alone);
 - footstrap's stylesheet (`link[data-fs-shell]`) holding fewer than 500 rules (the shipped sheet
   holds about 1000), `--primary-color-high` not resolving on `:root`, the menu column
   (`nav[data-fs-chrome]`) not visible with a box of its own, or the menu's first entry failing
@@ -145,8 +149,8 @@ and the same on `owrt2410` with `luci-theme-footstrap_*_all.ipk` and
   running. The output and screenshots land in `--out`, by default `../tmp/e2e-<router>`.
 - **Done means both**: 25.12/apk and 24.10/opkg. Say which one a run covered.
 - CI runs the crawl (`e2e`) and the anchoring check (`anchor`) as two jobs per router, side by side.
-  The crawl takes about 8 minutes (bootstrap 250 s, desktop 155 s, click about 30 s, phone 32 s; the
-  log prints each pass's time), the anchoring check about 5; a job's setup adds about 2, the router
+  The crawl takes about 4.5 minutes (bootstrap 130 s, desktop 80 s, click about 30 s, phone 18 s;
+  the log prints each pass's time), the anchoring check about 5, so the anchoring job ends the run; a job's setup adds about 2, the router
   building in the background while the browsers and the package are fetched and packed. A change
   that touches documentation alone skips both (`tools/ci-package-changed.sh`).
 - The anchoring check runs on its own against any running router with footstrap active, an
