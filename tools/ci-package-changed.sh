@@ -13,8 +13,9 @@ base="${1:-}"
 case "$base" in
 	'' | 0000000000000000000000000000000000000000) echo true; exit 0 ;;
 esac
-git cat-file -e "$base^{commit}" 2>/dev/null || git fetch -q --depth=1 origin "$base" 2>/dev/null || { echo true; exit 0; }
-files=$(git diff --name-only "$base" HEAD 2>/dev/null) || { echo true; exit 0; }
+git cat-file -e "$base^{commit}" 2>/dev/null || timeout 60 git fetch -q --depth=1 origin "$base" 2>/dev/null || { echo true; exit 0; }
+# --no-renames: a payload file moved into docs/ is a deletion from the payload, not a docs edit.
+files=$(git diff --no-renames --name-only "$base" HEAD 2>/dev/null) || { echo true; exit 0; }
 [ -n "$files" ] || { echo true; exit 0; }
 if printf '%s\n' "$files" | grep -E '^luci-theme-footstrap/(htdocs|ucode|root|po)/' | grep -q . \
 	|| printf '%s\n' "$files" | grep -Evq '^docs/|\.md$'; then echo true; else echo false; fi
